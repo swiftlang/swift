@@ -1086,7 +1086,7 @@ def clang_target : Separate<["-"], "clang-target">,
   Flags<[FrontendOption, SwiftAPIExtractOption, SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption]>,
   HelpText<"Separately set the target we should use for internal Clang instance">;
 
-def disable_clang_target : Separate<["-"], "disable-clang-target">,
+def disable_clang_target : Flag<["-"], "disable-clang-target">,
   Flags<[NewDriverOnlyOption]>,
   HelpText<"Disable a separately specified target triple for Clang instance to use">;
 
@@ -1361,6 +1361,10 @@ def migrator: Flag<["-", "--"], "migrator">,
 def abort_on_module_fail: Flag<["-", "--"], "abort-on-module-fail">,
   Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
   HelpText<"Abort if a module failed to load">;
+
+def disable_fail_on_error: Flag<["-", "--"], "disable-fail-on-error">,
+  Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
+  HelpText<"Don't exit with a nonzero status if errors are emitted">;
 
 def debug_mapping: Flag<["-", "--"], "debug-mapping">,
   Flags<[NoDriverOption, SwiftAPIDigesterOption]>,

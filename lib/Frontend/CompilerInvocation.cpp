@@ -18,6 +18,7 @@
 #include "swift/Option/Options.h"
 #include "swift/Option/SanitizerOptions.h"
 #include "swift/Strings.h"
+#include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Option/Arg.h"
@@ -27,6 +28,7 @@
 #include "llvm/Support/LineIterator.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Process.h"
+#include "llvm/Support/WithColor.h"
 
 using namespace swift;
 using namespace llvm::opt;
@@ -419,6 +421,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.EnableExperimentalConcurrency |=
     Args.hasArg(OPT_enable_experimental_concurrency);
+
+  Opts.EnableExperimentalOpaqueReturnTypes |=
+      Args.hasArg(OPT_enable_experimental_opaque_return_types);
 
   Opts.EnableExperimentalDistributed |=
     Args.hasArg(OPT_enable_experimental_distributed);
@@ -1016,6 +1021,28 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
   return false;
 }
 
+static void ParseSymbolGraphArgs(symbolgraphgen::SymbolGraphOptions &Opts,
+                                 ArgList &Args,
+                                 DiagnosticEngine &Diags,
+                                 LangOptions &LangOpts) {
+  using namespace options;
+
+  if (const Arg *A = Args.getLastArg(OPT_emit_symbol_graph_dir)) {
+    Opts.OutputDir = A->getValue();
+  }
+
+  Opts.Target = LangOpts.Target;
+
+  Opts.SkipInheritedDocs = Args.hasArg(OPT_skip_inherited_docs);
+  Opts.IncludeSPISymbols = Args.hasArg(OPT_include_spi_symbols);
+
+  // default values for generating symbol graphs during a build
+  Opts.MinimumAccessLevel = AccessLevel::Public;
+  Opts.PrettyPrint = false;
+  Opts.EmitSynthesizedMembers = true;
+  Opts.PrintMessages = false;
+}
+
 static bool ParseSearchPathArgs(SearchPathOptions &Opts,
                                 ArgList &Args,
                                 DiagnosticEngine &Diags,
@@ -1357,6 +1384,16 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   if (const Arg *A = Args.getLastArg(OPT_save_optimization_record_path))
     Opts.OptRecordFile = A->getValue();
 
+  // If any of the '-g<kind>', except '-gnone', is given,
+  // tell the SILPrinter to print debug info as well
+  if (const Arg *A = Args.getLastArg(OPT_g_Group)) {
+    if (!A->getOption().matches(options::OPT_gnone))
+      Opts.PrintDebugInfo = true;
+  }
+
+  if (Args.hasArg(OPT_legacy_gsil))
+    llvm::WithColor::warning() << "'-gsil' is deprecated, "
+                               << "use '-sil-based-debuginfo' instead\n";
   if (Args.hasArg(OPT_debug_on_sil)) {
     // Derive the name of the SIL file for debugging from
     // the regular outputfile.
@@ -1759,6 +1796,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   for (const auto &Lib : Args.getAllArgValues(options::OPT_autolink_library))
     Opts.LinkLibraries.push_back(LinkLibrary(Lib, LibraryKind::Library));
 
+  for (const auto &Lib : Args.getAllArgValues(options::OPT_public_autolink_library)) {
+    Opts.PublicLinkLibraries.push_back(Lib);
+  }
+
   if (const Arg *A = Args.getLastArg(OPT_type_info_dump_filter_EQ)) {
     StringRef mode(A->getValue());
     if (mode == "all")
@@ -1965,6 +2006,8 @@ bool CompilerInvocation::parseArgs(
                              workingDirectory)) {
     return true;
   }
+
+  ParseSymbolGraphArgs(SymbolGraphOpts, ParsedArgs, Diags, LangOpts);
 
   if (ParseSearchPathArgs(SearchPathOpts, ParsedArgs, Diags,
                           workingDirectory)) {

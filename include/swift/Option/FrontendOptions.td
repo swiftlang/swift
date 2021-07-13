@@ -160,6 +160,9 @@ def no_serialize_debugging_options :
 def autolink_library : Separate<["-"], "autolink-library">,
   HelpText<"Add dependent library">, Flags<[FrontendOption]>;
 
+def public_autolink_library : Separate<["-"], "public-autolink-library">,
+  HelpText<"Add public dependent library">, Flags<[FrontendOption]>;
+
 def disable_typo_correction : Flag<["-"], "disable-typo-correction">,
   HelpText<"Disable typo correction">;
 
@@ -434,6 +437,10 @@ def enable_experimental_static_assert :
   Flag<["-"], "enable-experimental-static-assert">,
   HelpText<"Enable experimental #assert">;
 
+def enable_experimental_opaque_return_types :
+  Flag<["-"], "enable-experimental-opaque-return-types">,
+  HelpText<"Enable experimental extensions to opaque return type support">;
+
 def enable_deserialization_recovery :
   Flag<["-"], "enable-deserialization-recovery">,
   HelpText<"Attempt to recover from missing xrefs (etc) in swiftmodules">;
@@ -638,9 +645,11 @@ def print_inst_counts : Flag<["-"], "print-inst-counts">,
   HelpText<"Before IRGen, count all the various SIL instructions. Must be used "
            "in conjunction with -print-stats.">;
 
-def debug_on_sil : Flag<["-"], "gsil">,
+def debug_on_sil : Flag<["-"], "sil-based-debuginfo">,
   HelpText<"Write the SIL into a file and generate debug-info to debug on SIL "
            " level.">;
+def legacy_gsil : Flag<["-"], "gsil">,
+  HelpText<"Deprecated, use '-sil-based-debuginfo' instead">;
 
 def print_llvm_inline_tree : Flag<["-"], "print-llvm-inline-tree">,
   HelpText<"Print the LLVM inline tree.">;

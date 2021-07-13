@@ -156,6 +156,14 @@ func testKeyPaths(dict: [NC: Int], nc: NC) {
   _ = \HasNC.dict[nc] // expected-warning{{cannot form key path that captures non-sendable type 'NC'}}
 }
 
+// ----------------------------------------------------------------------
+// Sendable restriction on nonisolated declarations.
+// ----------------------------------------------------------------------
+actor ANI {
+  // FIXME: improve diagnostics to talk about nonisolated
+  nonisolated let nc = NC() // expected-warning{{cannot use property 'nc' with a non-sendable type 'NC' across actors}}
+  nonisolated func f() -> NC? { nil } // expected-warning{{cannot call function returning non-sendable type 'NC?' across actors}}
+}
 
 // ----------------------------------------------------------------------
 // Sendable restriction on conformances.
@@ -245,11 +253,11 @@ final class C2: Sendable {
 
 class C3 { }
 
-class C4: C3, UnsafeSendable { // expected-warning{{'UnsafeSendable' is deprecated: Use @unchecked Sendable instead}}
+class C4: C3, @unchecked Sendable {
   var y: Int = 0 // okay
 }
 
-class C5: UnsafeSendable { // expected-warning{{'UnsafeSendable' is deprecated: Use @unchecked Sendable instead}}
+class C5: @unchecked Sendable {
   var x: Int = 0 // okay
 }
 
@@ -259,20 +267,39 @@ class C6: C5 {
 
 final class C7<T>: Sendable { }
 
-class C9: Sendable { } // expected-error{{non-final class 'C9' cannot conform to `Sendable`; use `UnsafeSendable`}}
+class C9: Sendable { } // expected-error{{non-final class 'C9' cannot conform to `Sendable`; use `@unchecked Sendable`}}
 
 // ----------------------------------------------------------------------
-// UnsafeSendable disabling checking
+// @unchecked Sendable disabling checking
 // ----------------------------------------------------------------------
-struct S11: UnsafeSendable { // expected-warning{{'UnsafeSendable' is deprecated: Use @unchecked Sendable instead}}
+struct S11: @unchecked Sendable {
   var nc: NotConcurrent // okay
 }
 
-struct S12<T>: UnsafeSendable { // expected-warning{{'UnsafeSendable' is deprecated: Use @unchecked Sendable instead}}
+struct S12<T>: @unchecked Sendable {
   var nc: T // okay
 }
 
-enum E11<T>: UnsafeSendable { // expected-warning{{'UnsafeSendable' is deprecated: Use @unchecked Sendable instead}}
+enum E11<T>: @unchecked Sendable {
+  case payload(NotConcurrent) // okay
+  case other(T) // okay
+}
+
+class C11 { }
+
+class C12: @unchecked C11 { } // expected-error{{'unchecked' attribute cannot apply to non-protocol type 'C11'}}
+
+protocol P { }
+
+protocol Q: @unchecked Sendable { } // expected-error{{'unchecked' attribute only applies in inheritance clauses}}
+
+typealias TypeAlias1 = @unchecked P // expected-error{{'unchecked' attribute only applies in inheritance clauses}}
+
+
+// ----------------------------------------------------------------------
+// UnsafeSendable historical name
+// ----------------------------------------------------------------------
+enum E12<T>: UnsafeSendable { // expected-warning{{'UnsafeSendable' is deprecated: Use @unchecked Sendable instead}}
   case payload(NotConcurrent) // okay
   case other(T) // okay
 }

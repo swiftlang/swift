@@ -238,6 +238,17 @@ PipeMemoryReader_receiveInstanceKind(const PipeMemoryReader *Reader) {
   return KindValue;
 }
 
+static uint8_t PipeMemoryReader_receiveShouldUnwrapExistential(
+    const PipeMemoryReader *Reader) {
+  int WriteFD = PipeMemoryReader_getParentWriteFD(Reader);
+  write(WriteFD, REQUEST_SHOULD_UNWRAP_CLASS_EXISTENTIAL, 2);
+  uint8_t ShouldUnwrap = 0;
+  PipeMemoryReader_collectBytesFromPipe(Reader, &ShouldUnwrap,
+                                        sizeof(ShouldUnwrap));
+  DEBUG_LOG("Requested if should unwrap class existential is", KindValue);
+  return ShouldUnwrap;
+}
+
 static uintptr_t
 PipeMemoryReader_receiveInstanceAddress(const PipeMemoryReader *Reader) {
   int WriteFD = PipeMemoryReader_getParentWriteFD(Reader);
@@ -445,24 +456,25 @@ int reflectHeapObject(SwiftReflectionContextRef RC,
   return 1;
 }
 
-int reflectExistential(SwiftReflectionContextRef RC,
-                       const PipeMemoryReader Pipe,
-                       swift_typeref_t MockExistentialTR) {
+int reflectExistentialImpl(
+    SwiftReflectionContextRef RC, const PipeMemoryReader Pipe,
+    swift_typeref_t MockExistentialTR,
+    int (*ProjectExistentialFn)(SwiftReflectionContextRef, swift_addr_t,
+                                swift_typeref_t, swift_typeref_t *,
+                                swift_addr_t *)) {
   uintptr_t instance = PipeMemoryReader_receiveInstanceAddress(&Pipe);
   if (instance == 0) {
     // Child has no more instances to examine
     PipeMemoryReader_sendDoneMessage(&Pipe);
     return 0;
   }
-  printf("Instance pointer in child address space: 0x%lx\n",
-         instance);
+  printf("Instance pointer in child address space: 0x%lx\n", instance);
 
   swift_typeref_t InstanceTypeRef;
   swift_addr_t StartOfInstanceData = 0;
 
-  if (!swift_reflection_projectExistential(RC, instance, MockExistentialTR,
-                                           &InstanceTypeRef,
-                                           &StartOfInstanceData)) {
+  if (!ProjectExistentialFn(RC, instance, MockExistentialTR, &InstanceTypeRef,
+                            &StartOfInstanceData)) {
     printf("swift_reflection_projectExistential failed.\n");
     PipeMemoryReader_sendDoneMessage(&Pipe);
     return 0;
@@ -476,8 +488,26 @@ int reflectExistential(SwiftReflectionContextRef RC,
   swift_reflection_dumpInfoForTypeRef(RC, InstanceTypeRef);
   printf("\n");
 
+  printf("Start of instance data: 0x%" PRIx64 "\n", StartOfInstanceData);
+  printf("\n");
+
   PipeMemoryReader_sendDoneMessage(&Pipe);
   return 1;
+}
+
+int reflectExistential(SwiftReflectionContextRef RC,
+                       const PipeMemoryReader Pipe,
+                       swift_typeref_t MockExistentialTR) {
+  return reflectExistentialImpl(RC, Pipe, MockExistentialTR,
+                                swift_reflection_projectExistential);
+}
+
+int reflectExistentialAndUnwrapClass(SwiftReflectionContextRef RC,
+                                     const PipeMemoryReader Pipe,
+                                     swift_typeref_t MockExistentialTR) {
+  return reflectExistentialImpl(
+      RC, Pipe, MockExistentialTR,
+      swift_reflection_projectExistentialAndUnwrapClass);
 }
 
 int reflectEnum(SwiftReflectionContextRef RC,
@@ -706,23 +736,38 @@ int doDumpHeapInstance(const char *BinaryFilename) {
           break;
         case Existential: {
           static const char Name[] = MANGLING_PREFIX_STR "ypD";
-          swift_typeref_t AnyTR
-            = swift_reflection_typeRefForMangledTypeName(RC,
-              Name, sizeof(Name)-1);
+          swift_typeref_t AnyTR = swift_reflection_typeRefForMangledTypeName(
+              RC, Name, sizeof(Name) - 1);
+          uint8_t ShouldUnwrap =
+              PipeMemoryReader_receiveShouldUnwrapExistential(&Pipe);
 
-          printf("Reflecting an existential.\n");
-          if (!reflectExistential(RC, Pipe, AnyTR))
-            return EXIT_SUCCESS;
+          if (ShouldUnwrap) {
+            printf("Reflecting an existential and unwrapping class.\n");
+            if (!reflectExistentialAndUnwrapClass(RC, Pipe, AnyTR))
+              return EXIT_SUCCESS;
+          } else {
+            printf("Reflecting an existential.\n");
+            if (!reflectExistential(RC, Pipe, AnyTR))
+              return EXIT_SUCCESS;
+          }
           break;
         }
         case ErrorExistential: {
           static const char ErrorName[] = MANGLING_PREFIX_STR "s5Error_pD";
-          swift_typeref_t ErrorTR
-            = swift_reflection_typeRefForMangledTypeName(RC,
-              ErrorName, sizeof(ErrorName)-1);
-          printf("Reflecting an error existential.\n");
-          if (!reflectExistential(RC, Pipe, ErrorTR))
-            return EXIT_SUCCESS;
+          swift_typeref_t ErrorTR = swift_reflection_typeRefForMangledTypeName(
+              RC, ErrorName, sizeof(ErrorName) - 1);
+          uint8_t ShouldUnwrap =
+              PipeMemoryReader_receiveShouldUnwrapExistential(&Pipe);
+
+          if (ShouldUnwrap) {
+            printf("Reflecting an error existential and unwrapping class.\n");
+            if (!reflectExistentialAndUnwrapClass(RC, Pipe, ErrorTR))
+              return EXIT_SUCCESS;
+          } else {
+            printf("Reflecting an error existential.\n");
+            if (!reflectExistential(RC, Pipe, ErrorTR))
+              return EXIT_SUCCESS;
+          }
           break;
         }
         case Closure:

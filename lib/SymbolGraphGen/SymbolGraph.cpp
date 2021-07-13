@@ -196,7 +196,6 @@ void SymbolGraph::recordNode(Symbol S) {
   // with this declaration.
   recordMemberRelationship(S);
   recordConformanceSynthesizedMemberRelationships(S);
-  recordSuperclassSynthesizedMemberRelationships(S);
   recordConformanceRelationships(S);
   recordInheritanceRelationships(S);
   recordDefaultImplementationRelationships(S);
@@ -256,45 +255,6 @@ void SymbolGraph::recordMemberRelationship(Symbol S) {
     case swift::DeclContextKind::Module:
     case swift::DeclContextKind::FileUnit:
       break;
-  }
-}
-
-void SymbolGraph::recordSuperclassSynthesizedMemberRelationships(Symbol S) {
-  if (!Walker.Options.EmitSynthesizedMembers) {
-    return;
-  }
-  // Via class inheritance...
-  if (const auto *C = dyn_cast<ClassDecl>(S.getSymbolDecl())) {
-    // Collect all superclass members up the inheritance chain.
-    SmallPtrSet<const ValueDecl *, 32> SuperClassMembers;
-    const auto *Super = C->getSuperclassDecl();
-    while (Super) {
-      for (const auto *SuperMember : Super->getMembers()) {
-        if (const auto *SuperMemberVD = dyn_cast<ValueDecl>(SuperMember)) {
-          SuperClassMembers.insert(SuperMemberVD);
-        }
-      }
-      Super = Super->getSuperclassDecl();
-    }
-    // Remove any that are overridden by this class.
-    for (const auto *DerivedMember : C->getMembers()) {
-      if (const auto *DerivedMemberVD = dyn_cast<ValueDecl>(DerivedMember)) {
-        if (const auto *Overridden = DerivedMemberVD->getOverriddenDecl()) {
-          SuperClassMembers.erase(Overridden);
-        }
-      }
-    }
-    // What remains in SuperClassMembers are inherited members that
-    // haven't been overridden by the class.
-    // Add a synthesized relationship.
-    for (const auto *InheritedMember : SuperClassMembers) {
-      if (canIncludeDeclAsNode(InheritedMember)) {
-        Symbol Source(this, InheritedMember, C);
-        Symbol Target(this, C, nullptr);
-        Nodes.insert(Source);
-        recordEdge(Source, Target, RelationshipKind::MemberOf());
-      }
-    }
   }
 }
 

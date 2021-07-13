@@ -153,6 +153,7 @@ enum class SourceLocInferenceBehavior : unsigned {
   BackwardsThenForwards = BackwardScan | ForwardScan2nd,
   ForwardScanAlwaysInfer = ForwardScan | AlwaysInfer,
   BackwardScanAlwaysInfer = BackwardScan | AlwaysInfer,
+  BackwardThenForwardAlwaysInfer = BackwardScan | ForwardScan2nd | AlwaysInfer,
 };
 
 inline SourceLocInferenceBehavior operator&(SourceLocInferenceBehavior lhs,

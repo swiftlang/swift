@@ -27,6 +27,7 @@
 
 namespace swift {
 class DefaultActor;
+class TaskOptionRecord;
 
 struct SwiftError;
 
@@ -35,53 +36,26 @@ struct AsyncTaskAndContext {
   AsyncContext *InitialContext;
 };
 
-/// Create a task object with no future which will run the given
-/// function.
+/// Create a task object.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-AsyncTaskAndContext swift_task_create_f(size_t flags,
-                             ThinNullaryAsyncSignature::FunctionType *function,
-                                        size_t initialContextSize);
+AsyncTaskAndContext swift_task_create(
+    size_t taskCreateFlags,
+    TaskOptionRecord *options,
+    const Metadata *futureResultType,
+    void *closureEntry, HeapObject *closureContext);
 
 /// Caution: not all future-initializing functions actually throw, so
 /// this signature may be incorrect.
 using FutureAsyncSignature =
   AsyncSignature<void(void*), /*throws*/ true>;
 
-/// Create a task object with a future which will run the given
-/// closure.
+/// Create a task object.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-AsyncTaskAndContext swift_task_create_future(
-    size_t flags,
+AsyncTaskAndContext swift_task_create_common(
+    size_t taskCreateFlags,
+    TaskOptionRecord *options,
     const Metadata *futureResultType,
-    void *closureEntryPoint,
-    HeapObject * /* +1 */ closureContext);
-
-/// Create a task object with a future which will run the given
-/// function.
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-AsyncTaskAndContext swift_task_create_future_f(
-    size_t flags,
-    const Metadata *futureResultType,
-    FutureAsyncSignature::FunctionType *function,
-    size_t initialContextSize);
-
-/// Create a task object with a future which will run the given
-/// closure, and offer its result to the task group
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-AsyncTaskAndContext swift_task_create_group_future(
-    size_t flags, TaskGroup *group,
-    const Metadata *futureResultType,
-    void *closureEntryPoint,
-    HeapObject * /* +1 */ closureContext);
-
-/// Create a task object with a future which will run the given
-/// function, and offer its result to the task group
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-AsyncTaskAndContext swift_task_create_group_future_f(
-    size_t flags,
-    TaskGroup *group,
-    const Metadata *futureResultType,
-    FutureAsyncSignature::FunctionType *function,
+    FutureAsyncSignature::FunctionType *function, void *closureContext,
     size_t initialContextSize);
 
 /// Allocate memory in a task.
@@ -125,12 +99,6 @@ swift_task_escalate(AsyncTask *task, JobPriority newPriority);
 // TODO: "async let wait" and "async let destroy" would be expressed
 //       similar to like TaskFutureWait;
 
-/// This matches the ABI of a closure `<T>(Builtin.NativeObject) async -> T`
-using TaskFutureWaitSignature =
-    SWIFT_CC(swiftasync)
-    void(OpaqueValue *,
-         SWIFT_ASYNC_CONTEXT AsyncContext *, AsyncTask *, Metadata *);
-
 /// Wait for a non-throwing future task to complete.
 ///
 /// This can be called from any thread. Its Swift signature is
@@ -141,12 +109,9 @@ using TaskFutureWaitSignature =
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
 void swift_task_future_wait(OpaqueValue *,
-         SWIFT_ASYNC_CONTEXT AsyncContext *, AsyncTask *, Metadata *);
-
-using TaskFutureWaitThrowingSignature =
-    SWIFT_CC(swiftasync)
-    void(OpaqueValue *,
-         SWIFT_ASYNC_CONTEXT AsyncContext *, AsyncTask *, Metadata *);
+         SWIFT_ASYNC_CONTEXT AsyncContext *, AsyncTask *,
+         TaskContinuationFunction *,
+         AsyncContext *);
 
 /// Wait for a potentially-throwing future task to complete.
 ///
@@ -157,15 +122,12 @@ using TaskFutureWaitThrowingSignature =
 ///    async throws -> Success
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
-void swift_task_future_wait_throwing(OpaqueValue *,
-                                     SWIFT_ASYNC_CONTEXT AsyncContext *,
-                                     AsyncTask *, Metadata *);
-
-using TaskGroupFutureWaitThrowingSignature =
-SWIFT_CC(swiftasync)
-  void(OpaqueValue *,
-       SWIFT_ASYNC_CONTEXT AsyncContext *, AsyncTask *, TaskGroup *,
-       const Metadata *successType);
+void swift_task_future_wait_throwing(
+  OpaqueValue *,
+  SWIFT_ASYNC_CONTEXT AsyncContext *,
+  AsyncTask *,
+  ThrowingTaskFutureWaitContinuationFunction *,
+  AsyncContext *);
 
 /// Wait for a readyQueue of a Channel to become non empty.
 ///
@@ -180,8 +142,9 @@ SWIFT_CC(swiftasync)
 SWIFT_EXPORT_FROM(swift_Concurrency)
 SWIFT_CC(swiftasync)
 void swift_taskGroup_wait_next_throwing(
-    OpaqueValue *resultPointer, SWIFT_ASYNC_CONTEXT AsyncContext *rawContext,
-    TaskGroup *group, const Metadata *successType);
+    OpaqueValue *resultPointer, SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
+    TaskGroup *group, ThrowingTaskFutureWaitContinuationFunction *resumeFn,
+    AsyncContext *callContext);
 
 /// Initialize a `TaskGroup` in the passed `group` memory location.
 /// The caller is responsible for retaining and managing the group's lifecycle.
@@ -192,7 +155,7 @@ void swift_taskGroup_wait_next_throwing(
 /// func swift_taskGroup_initialize(group: Builtin.RawPointer)
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_taskGroup_initialize(TaskGroup *group);
+void swift_taskGroup_initialize(TaskGroup *group, const Metadata *T);
 
 /// Attach a child task to the parent task's task group record.
 ///
@@ -281,16 +244,16 @@ bool swift_taskGroup_isEmpty(TaskGroup *group);
 ///
 /// \code
 /// func swift_asyncLet_start<T>(
-///     _ alet: Builtin.RawPointer,
+///     asyncLet: Builtin.RawPointer,
+///     options: Builtin.RawPointer?,
 ///     operation: __owned @Sendable () async throws -> T
 /// )
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_asyncLet_start(
-    AsyncLet *alet,
-    const Metadata *futureResultType,
-    void *closureEntryPoint,
-    void *closureContext);
+void swift_asyncLet_start(AsyncLet *alet,
+                          TaskOptionRecord *options,
+                          const Metadata *futureResultType,
+                          void *closureEntryPoint, HeapObject *closureContext);
 
 /// This matches the ABI of a closure `<T>(Builtin.RawPointer) async -> T`
 using AsyncLetWaitSignature =
@@ -310,7 +273,8 @@ using AsyncLetWaitSignature =
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
 void swift_asyncLet_wait(OpaqueValue *,
                          SWIFT_ASYNC_CONTEXT AsyncContext *,
-                         AsyncLet *, Metadata *);
+                         AsyncLet *, TaskContinuationFunction *,
+                         AsyncContext *);
 
 /// Wait for a potentially-throwing async-let to complete.
 ///
@@ -324,7 +288,9 @@ void swift_asyncLet_wait(OpaqueValue *,
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
 void swift_asyncLet_wait_throwing(OpaqueValue *,
                                   SWIFT_ASYNC_CONTEXT AsyncContext *,
-                                  AsyncLet *, Metadata *);
+                                  AsyncLet *,
+                                  ThrowingTaskFutureWaitContinuationFunction *,
+                                  AsyncContext *);
 
 /// Its Swift signature is
 ///
@@ -571,6 +537,10 @@ void swift_task_enqueueGlobalWithDelay(unsigned long long delay, Job *job);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_enqueueMainExecutor(Job *job);
 
+/// Enqueue the given job on the main executor.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_enqueueOnDispatchQueue(Job *job, HeapObject *queue);
+
 /// A hook to take over global enqueuing.
 typedef SWIFT_CC(swift) void (*swift_task_enqueueGlobal_original)(Job *job);
 SWIFT_EXPORT_FROM(swift_Concurrency)
@@ -688,6 +658,10 @@ AsyncTask *swift_task_getCurrent(void);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 ExecutorRef swift_task_getCurrentExecutor(void);
 
+/// Return the main-actor executor reference.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+ExecutorRef swift_task_getMainExecutor(void);
+
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 bool swift_task_isCurrentExecutor(ExecutorRef executor);
 
@@ -698,6 +672,18 @@ void swift_task_reportUnexpectedExecutor(
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 JobPriority swift_task_getCurrentThreadPriority(void);
+
+#ifdef __APPLE__
+/// A magic symbol whose address is the mask to apply to a frame pointer to
+/// signal that it is an async frame. Do not try to read the actual value of
+/// this global, it will crash.
+///
+/// On ARM64_32, the address is only 32 bits, and therefore this value covers
+/// the top 32 bits of the in-memory frame pointer. On other 32-bit platforms,
+/// the bit is not used and the address is always 0.
+SWIFT_EXPORT_FROM(swift_Concurrency)
+struct { char c; } swift_async_extendedFramePointerFlags;
+#endif
 
 }
 

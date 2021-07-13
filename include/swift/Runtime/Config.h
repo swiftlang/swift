@@ -20,6 +20,39 @@
 #include "swift/Basic/Compiler.h"
 #include "swift/Runtime/CMakeConfig.h"
 
+/// SWIFT_RUNTIME_WEAK_IMPORT - Marks a symbol for weak import.
+#if (__has_attribute(weak_import))
+#define SWIFT_RUNTIME_WEAK_IMPORT __attribute__((weak_import))
+#else
+#define SWIFT_RUNTIME_WEAK_IMPORT
+#endif
+
+/// SWIFT_RUNTIME_WEAK_CHECK - Tests if a potentially weakly linked function
+/// is linked into the runtime.  This is useful on Apple platforms where it is
+/// possible that system functions are only available on newer versions.
+#ifdef __clang__
+#define SWIFT_RUNTIME_WEAK_CHECK(x)                                     \
+  _Pragma("clang diagnostic push")                                      \
+  _Pragma("clang diagnostic ignored \"-Wunguarded-availability\"")      \
+  _Pragma("clang diagnostic ignored \"-Wunguarded-availability-new\"")  \
+  (&x)                                                                  \
+  _Pragma("clang diagnostic pop")
+#else
+#define SWIFT_RUNTIME_WEAK_CHECK(x) &x
+#endif
+
+/// SWIFT_RUNTIME_WEAK_USE - Use a potentially weakly imported symbol.
+#ifdef __clang__
+#define SWIFT_RUNTIME_WEAK_USE(x)                                       \
+  _Pragma("clang diagnostic push")                                      \
+  _Pragma("clang diagnostic ignored \"-Wunguarded-availability\"")      \
+  _Pragma("clang diagnostic ignored \"-Wunguarded-availability-new\"")  \
+  (x)                                                                   \
+  _Pragma("clang diagnostic pop")
+#else
+#define SWIFT_RUNTIME_WEAK_USE(x) x
+#endif
+
 /// SWIFT_RUNTIME_LIBRARY_VISIBILITY - If a class marked with this attribute is
 /// linked into a shared library, then the class should be private to the
 /// library and not accessible from outside it.  Can also be used to mark

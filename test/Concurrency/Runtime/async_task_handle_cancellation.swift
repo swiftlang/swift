@@ -7,13 +7,6 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
-// This test is flaky on VS2017 (unknown reasons)
-// UNSUPPORTED: MSVC_VER=15.0
-
-// This test is failing on windows. SR-14447.
-//
-// UNSUPPORTED: OS=windows-msvc
-
 @available(SwiftStdlib 5.5, *)
 @main struct Main {
   static func main() async {

@@ -223,10 +223,6 @@ createDistributedActor_init_local(ClassDecl *classDecl,
   initDecl->setSynthesized();
   initDecl->setBodySynthesizer(&createBody_DistributedActor_init_transport);
 
-  // This constructor is 'required', all distributed actors MUST invoke it.
-  auto *reqAttr = new (C) RequiredAttr(/*IsImplicit*/true);
-  initDecl->getAttrs().add(reqAttr);
-
   auto *nonIsoAttr = new (C) NonisolatedAttr(/*IsImplicit*/true);
   initDecl->getAttrs().add(nonIsoAttr);
 
@@ -255,7 +251,6 @@ createDistributedActor_init_local(ClassDecl *classDecl,
 /// \param initDecl The function decl whose body to synthesize.
 static std::pair<BraceStmt *, bool>
 createDistributedActor_init_resolve_body(AbstractFunctionDecl *initDecl, void *) {
-
   auto *funcDC = cast<DeclContext>(initDecl);
   auto &C = funcDC->getASTContext();
 
@@ -289,8 +284,8 @@ createDistributedActor_init_resolve_body(AbstractFunctionDecl *initDecl, void *)
   statements.push_back(assignAddressExpr);
   // end-of-FIXME: this must be checking with the transport instead
 
-  auto *body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc(),
-                                 /*implicit=*/true);
+  BraceStmt *body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc(),
+                                      /*implicit=*/true);
 
   return { body, /*isTypeChecked=*/false };
 }
@@ -306,7 +301,6 @@ static ConstructorDecl *
 createDistributedActor_init_resolve(ClassDecl *classDecl,
                                     ASTContext &ctx) {
   auto &C = ctx;
-
   auto conformanceDC = classDecl;
 
   // Expected type: (Self) -> (ActorAddress, ActorTransport) -> (Self)
@@ -349,9 +343,6 @@ createDistributedActor_init_resolve(ClassDecl *classDecl,
   initDecl->setImplicit();
   initDecl->setSynthesized();
   initDecl->setBodySynthesizer(&createDistributedActor_init_resolve_body);
-
-  // This constructor is 'required', all distributed actors MUST have it.
-  initDecl->getAttrs().add(new (C) RequiredAttr(/*IsImplicit*/true));
 
   auto *nonIsoAttr = new (C) NonisolatedAttr(/*IsImplicit*/true);
   initDecl->getAttrs().add(nonIsoAttr);
@@ -466,6 +457,80 @@ static void addImplicitDistributedActorConstructors(ClassDecl *decl) {
 }
 
 /******************************************************************************/
+/******************************** DEINIT **************************************/
+/******************************************************************************/
+
+/// A distributed actor's deinit MUST call `transport.resignAddress` before it
+/// is deallocated.
+static void addImplicitResignAddress(ClassDecl *decl) {
+  auto &C = decl->getASTContext();
+
+  DestructorDecl *existingDeinit = decl->getDestructor();
+  assert(existingDeinit);
+
+//  DestructorDecl *deinitDecl = existingDeinit != nullptr ? existingDeinit :
+//      new (C) DestructorDecl(SourceLoc(), decl);
+  DestructorDecl *deinitDecl = new (C) DestructorDecl(SourceLoc(), decl);
+
+  BraceStmt *body = deinitDecl->getBody();
+
+  // == Copy all existing statements to the new deinit
+  SmallVector<ASTNode, 2> statements; // TODO: how to init at body statements count size?
+  for (auto stmt : body->getElements())
+    statements.push_back(stmt); // TODO: copy?
+
+  // TODO: INJECT THIS AS FIRST THING IN A DEFER {}
+
+  // == Inject the lifecycle 'resignAddress' interaction
+  // ==== self
+  auto *selfRef = DerivedConformance::createSelfDeclRef(deinitDecl);
+
+  // ==== `self.actorTransport`
+  auto *varTransportExpr = UnresolvedDotExpr::createImplicit(C, selfRef,
+                                                           C.Id_actorTransport);
+
+  // ==== `self.actorAddress`
+  auto *varAddressExpr = UnresolvedDotExpr::createImplicit(C, selfRef,
+                                                           C.Id_actorAddress);
+//  auto addressRef = new (C) DeclRefExpr(varAddressExpr, DeclNameLoc(),
+//                                        /*implicit*/ true);
+//  auto addressRef = new (C) DeclRefExpr(ConcreteDeclRef(varAddressExpr), DeclNameLoc(),
+//                                        /*implicit=*/true);
+//  addressRef->setType(varAddressExpr->getType());
+
+  // ==== `self.transport.resignAddress(self.actorAddress)`
+  auto loc = deinitDecl->getLoc();
+//  auto resignAddressRef = new (C) DeclRefExpr(varTransportExpr, DeclNameLoc(),
+//                                              /*implicit=*/true);
+//  resignAddressRef->setThrows(false);
+  auto resignFuncDecls = C.getActorTransportDecl()->lookupDirect(C.Id_resignAddress);
+  assert(resignFuncDecls.size() == 1);
+  AbstractFunctionDecl *resignFuncDecl = dyn_cast<AbstractFunctionDecl>(resignFuncDecls.front());
+  auto resignFuncRef = new (C) DeclRefExpr(resignFuncDecl, DeclNameLoc(), /*implicit=*/true);
+
+  auto *addressParam = new (C) ParamDecl(
+      SourceLoc(), SourceLoc(), Identifier(),
+      SourceLoc(), C.Id_address, decl);
+  addressParam->setInterfaceType(C.getActorAddressDecl()->getInterfaceType());
+  addressParam->setSpecifier(ParamSpecifier::Default);
+  addressParam->setImplicit();
+  auto *paramList = ParameterList::createWithoutLoc(addressParam);
+
+  auto *resignFuncRefRef = UnresolvedDotExpr::createImplicit(
+      C, varTransportExpr, C.Id_resignAddress, paramList);
+
+  Expr *resignAddressCall = CallExpr::createImplicit(C, resignFuncRefRef,
+                                                     { varAddressExpr },
+                                                     { Identifier() });
+  statements.push_back(resignAddressCall);
+
+  BraceStmt *newBody = BraceStmt::create(C, SourceLoc(), statements, SourceLoc(),
+                                         /*implicit=*/true);
+
+  deinitDecl->setBody(newBody, AbstractFunctionDecl::BodyKind::TypeChecked); // FIXME: no idea if Parsed is right, we are NOT type checked I guess?
+}
+
+/******************************************************************************/
 /******************************** PROPERTIES **********************************/
 /******************************************************************************/
 
@@ -577,7 +642,7 @@ synthesizeRemoteFuncStubBody(AbstractFunctionDecl *func, void *context) {
   auto uintInit = ctx.getIntBuiltinInitDecl(uintDecl);
 
   auto missingTransportDecl = ctx.getMissingDistributedActorTransport();
-  assert(missingTransportDecl);
+  assert(missingTransportDecl && "Could not locate '_missingDistributedActorTransport' function");
 
   // Create a call to _Distributed._missingDistributedActorTransport
   auto loc = func->getLoc();
@@ -733,4 +798,5 @@ void swift::addImplicitDistributedActorMembersToClass(ClassDecl *decl) {
   addImplicitDistributedActorConstructors(decl);
   addImplicitDistributedActorStoredProperties(decl);
   addImplicitRemoteActorFunctions(decl);
+//  addImplicitResignAddress(decl);
 }

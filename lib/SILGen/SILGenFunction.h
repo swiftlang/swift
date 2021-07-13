@@ -614,9 +614,13 @@ public:
   /// Emits code for a ClosureExpr.
   void emitClosure(AbstractClosureExpr *ce);
   /// Generates code for a class destroying destructor. This
-  /// emits the body code from the DestructorDecl, calls the base class 
+  /// emits the body code from the DestructorDecl, calls the base class
   /// destructor, then implicitly releases the elements of the class.
   void emitDestroyingDestructor(DestructorDecl *dd);
+
+  /// Inject distributed actor and transport interaction code into the destructor.
+  void injectDistributedActorDestructorLifecycleCall(
+      DestructorDecl *dd, SILValue selfValue, SILBasicBlock *continueBB);
 
   /// Generates code for an artificial top-level function that starts an
   /// application based on a main type and optionally a main type.
@@ -1374,8 +1378,9 @@ public:
                        ArgumentSource &&value,
                        bool isOnSelfParameter);
 
-  ManagedValue emitAsyncLetStart(
-      SILLocation loc, Type functionType, ManagedValue taskFunction);
+  ManagedValue emitAsyncLetStart(SILLocation loc,
+                                 SILValue taskOptions,
+                                 Type functionType, ManagedValue taskFunction);
 
   ManagedValue emitAsyncLetGet(SILLocation loc, SILValue asyncLet);
 
@@ -2071,9 +2076,6 @@ public:
 
   /// Destroy and deallocate an initialized local variable.
   void destroyLocalVariable(SILLocation L, VarDecl *D);
-  
-  /// Deallocate an uninitialized local variable.
-  void deallocateUninitializedLocalVariable(SILLocation L, VarDecl *D);
 
   /// Enter a cleanup to deallocate a stack variable.
   CleanupHandle enterDeallocStackCleanup(SILValue address);

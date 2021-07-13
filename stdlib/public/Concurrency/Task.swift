@@ -36,9 +36,12 @@ import Swift
 /// individually schedulable as jobs.  Jobs are generally not interacted
 /// with by end-users directly, unless implementing a scheduler.
 @available(SwiftStdlib 5.5, *)
+@frozen
 public struct Task<Success, Failure: Error>: Sendable {
+  @usableFromInline
   internal let _task: Builtin.NativeObject
 
+  @_alwaysEmitIntoClient
   internal init(_ task: Builtin.NativeObject) {
     self._task = task
   }
@@ -98,7 +101,7 @@ extension Task {
   public var result: Result<Success, Failure> {
     get async {
       do {
-        return .success(try await get())
+        return .success(try await value)
       } catch {
         return .failure(error as! Failure) // as!-safe, guaranteed to be Failure
       }
@@ -199,11 +202,20 @@ public struct TaskPriority: RawRepresentable, Sendable {
   }
 
   public static let high: TaskPriority = .init(rawValue: 0x19)
-  public static let userInitiated: TaskPriority = high
-  public static let `default`: TaskPriority = .init(rawValue: 0x15)
+
+  @_alwaysEmitIntoClient
+  public static var medium: TaskPriority {
+    .init(rawValue: 0x15)
+  }
+
   public static let low: TaskPriority = .init(rawValue: 0x11)
+
+  public static let userInitiated: TaskPriority = high
   public static let utility: TaskPriority = low
   public static let background: TaskPriority = .init(rawValue: 0x09)
+
+  @available(*, deprecated, renamed: "medium")
+  public static let `default`: TaskPriority = .init(rawValue: 0x15)
 }
 
 @available(SwiftStdlib 5.5, *)
@@ -257,7 +269,7 @@ extension Task where Success == Never, Failure == Never {
       }
 
       // Otherwise, query the system.
-      return TaskPriority(rawValue: UInt8(_getCurrentThreadPriority()))
+      return TaskPriority(rawValue: UInt8(0))
     }
   }
 }
@@ -266,10 +278,6 @@ extension Task where Success == Never, Failure == Never {
 extension TaskPriority {
   /// Downgrade user-interactive to user-initiated.
   var _downgradeUserInteractive: TaskPriority {
-    if self == .userInteractive {
-      return .userInitiated
-    }
-
     return self
   }
 }
@@ -383,6 +391,36 @@ struct JobFlags {
   }
 }
 
+// ==== Task Creation Flags --------------------------------------------------
+
+/// Form task creation flags for use with the createAsyncTask builtins.
+@available(SwiftStdlib 5.5, *)
+@_alwaysEmitIntoClient
+func taskCreateFlags(
+  priority: TaskPriority?, isChildTask: Bool, copyTaskLocals: Bool,
+  inheritContext: Bool, enqueueJob: Bool,
+  addPendingGroupTaskUnconditionally: Bool
+) -> Int {
+  var bits = 0
+  bits |= (bits & ~0xFF) | Int(priority?.rawValue ?? 0)
+  if isChildTask {
+    bits |= 1 << 8
+  }
+  if copyTaskLocals {
+    bits |= 1 << 10
+  }
+  if inheritContext {
+    bits |= 1 << 11
+  }
+  if enqueueJob {
+    bits |= 1 << 12
+  }
+  if addPendingGroupTaskUnconditionally {
+    bits |= 1 << 13
+  }
+  return bits
+}
+
 // ==== Task Creation ----------------------------------------------------------
 @available(SwiftStdlib 5.5, *)
 extension Task where Failure == Never {
@@ -403,33 +441,25 @@ extension Task where Failure == Never {
   ///     Task.currentPriority.
   ///   - operation: the operation to execute
   @discardableResult
+  @_alwaysEmitIntoClient
   public init(
     priority: TaskPriority? = nil,
     @_inheritActorContext @_implicitSelfCapture operation: __owned @Sendable @escaping () async -> Success
   ) {
+#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     // Set up the job flags for a new task.
-    var flags = JobFlags()
-    flags.kind = .task
-    flags.priority = priority ?? Task<Never, Never>.currentPriority._downgradeUserInteractive
-    flags.isFuture = true
-    flags.isContinuingAsyncTask = true
+    let flags = taskCreateFlags(
+      priority: priority, isChildTask: false, copyTaskLocals: true,
+      inheritContext: true, enqueueJob: true,
+      addPendingGroupTaskUnconditionally: false)
 
-    // Create the asynchronous task future.
-    let (task, _) = Builtin.createAsyncTaskFuture(Int(flags.bits), operation)
-
-    // Copy all task locals to the newly created task.
-    // We must copy them rather than point to the current task since the new task
-    // is not structured and may out-live the current task.
-    //
-    // WARNING: This MUST be done BEFORE we enqueue the task,
-    // because it acts as-if it was running inside the task and thus does not
-    // take any extra steps to synchronize the task-local operations.
-    _taskLocalsCopy(to: task)
-
-    // Enqueue the resulting job.
-    _enqueueJobGlobal(Builtin.convertTaskToJob(task))
+    // Create the asynchronous task.
+    let (task, _) = Builtin.createAsyncTask(flags, operation)
 
     self._task = task
+#else
+    fatalError("Unsupported Swift compiler")
+#endif
   }
 }
 
@@ -448,33 +478,26 @@ extension Task where Failure == Error {
   ///     Task.currentPriority.
   ///   - operation: the operation to execute
   @discardableResult
+  @_alwaysEmitIntoClient
   public init(
     priority: TaskPriority? = nil,
     @_inheritActorContext @_implicitSelfCapture operation: __owned @Sendable @escaping () async throws -> Success
   ) {
-    // Set up the job flags for a new task.
-    var flags = JobFlags()
-    flags.kind = .task
-    flags.priority = priority ?? Task<Never, Never>.currentPriority._downgradeUserInteractive
-    flags.isFuture = true
-    flags.isContinuingAsyncTask = true
+#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
+    // Set up the task flags for a new task.
+    let flags = taskCreateFlags(
+      priority: priority, isChildTask: false, copyTaskLocals: true,
+      inheritContext: true, enqueueJob: true,
+      addPendingGroupTaskUnconditionally: false
+    )
 
     // Create the asynchronous task future.
-    let (task, _) = Builtin.createAsyncTaskFuture(Int(flags.bits), operation)
-
-    // Copy all task locals to the newly created task.
-    // We must copy them rather than point to the current task since the new task
-    // is not structured and may out-live the current task.
-    //
-    // WARNING: This MUST be done BEFORE we enqueue the task,
-    // because it acts as-if it was running inside the task and thus does not
-    // take any extra steps to synchronize the task-local operations.
-    _taskLocalsCopy(to: task)
-
-    // Enqueue the resulting job.
-    _enqueueJobGlobal(Builtin.convertTaskToJob(task))
+    let (task, _) = Builtin.createAsyncTask(flags, operation)
 
     self._task = task
+#else
+    fatalError("Unsupported Swift compiler")
+#endif
   }
 }
 
@@ -512,23 +535,25 @@ extension Task where Failure == Never {
   ///     tasks result or `cancel` it. If the operation fails the handle will
   ///     throw the error the operation has thrown when awaited on.
   @discardableResult
+  @_alwaysEmitIntoClient
   public static func detached(
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async -> Success
   ) -> Task<Success, Failure> {
+#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     // Set up the job flags for a new task.
-    var flags = JobFlags()
-    flags.kind = .task
-    flags.priority = priority ?? .default
-    flags.isFuture = true
+    let flags = taskCreateFlags(
+      priority: priority, isChildTask: false, copyTaskLocals: false,
+      inheritContext: false, enqueueJob: true,
+      addPendingGroupTaskUnconditionally: false)
 
     // Create the asynchronous task future.
-    let (task, _) = Builtin.createAsyncTaskFuture(Int(flags.bits), operation)
-
-    // Enqueue the resulting job.
-    _enqueueJobGlobal(Builtin.convertTaskToJob(task))
+    let (task, _) = Builtin.createAsyncTask(flags, operation)
 
     return Task(task)
+#else
+    fatalError("Unsupported Swift compiler")
+#endif
   }
 }
 
@@ -567,42 +592,26 @@ extension Task where Failure == Error {
   ///     tasks result or `cancel` it. If the operation fails the handle will
   ///     throw the error the operation has thrown when awaited on.
   @discardableResult
+  @_alwaysEmitIntoClient
   public static func detached(
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async throws -> Success
   ) -> Task<Success, Failure> {
+#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     // Set up the job flags for a new task.
-    var flags = JobFlags()
-    flags.kind = .task
-    flags.priority = priority ?? .default
-    flags.isFuture = true
+    let flags = taskCreateFlags(
+      priority: priority, isChildTask: false, copyTaskLocals: false,
+      inheritContext: false, enqueueJob: true,
+      addPendingGroupTaskUnconditionally: false
+    )
 
     // Create the asynchronous task future.
-    let (task, _) = Builtin.createAsyncTaskFuture(Int(flags.bits), operation)
-
-    // Enqueue the resulting job.
-    _enqueueJobGlobal(Builtin.convertTaskToJob(task))
+    let (task, _) = Builtin.createAsyncTask(flags, operation)
 
     return Task(task)
-  }
-}
-
-// ==== Async Sleep ------------------------------------------------------------
-
-@available(SwiftStdlib 5.5, *)
-extension Task where Success == Never, Failure == Never {
-  /// Suspends the current task for _at least_ the given duration
-  /// in nanoseconds.
-  ///
-  /// This function does _not_ block the underlying thread.
-  public static func sleep(_ duration: UInt64) async {
-    let currentTask = Builtin.getCurrentAsyncTask()
-    let priority = getJobFlags(currentTask).priority ?? Task.currentPriority._downgradeUserInteractive
-
-    return await Builtin.withUnsafeContinuation { (continuation: Builtin.RawUnsafeContinuation) -> Void in
-      let job = _taskCreateNullaryContinuationJob(priority: Int(priority.rawValue), continuation: continuation)
-      _enqueueJobGlobalWithDelay(duration, job)
-    }
+#else
+    fatalError("Unsupported Swift compiler")
+#endif
   }
 }
 
@@ -617,6 +626,8 @@ extension Task where Success == Never, Failure == Never {
   /// This is not a perfect cure for starvation;
   /// if the task is the highest-priority task in the system, it might go
   /// immediately back to executing.
+  ///
+  @available(*, deprecated, renamed: "suspend()")
   public static func yield() async {
     let currentTask = Builtin.getCurrentAsyncTask()
     let priority = getJobFlags(currentTask).priority ?? Task.currentPriority._downgradeUserInteractive
@@ -625,6 +636,11 @@ extension Task where Success == Never, Failure == Never {
       let job = _taskCreateNullaryContinuationJob(priority: Int(priority.rawValue), continuation: continuation)
       _enqueueJobGlobal(job)
     }
+  }
+
+  @_alwaysEmitIntoClient
+  public static func suspend() async {
+    await yield()
   }
 }
 
@@ -694,7 +710,12 @@ public struct UnsafeCurrentTask {
   /// - SeeAlso: `TaskPriority`
   /// - SeeAlso: `Task.currentPriority`
   public var priority: TaskPriority {
-    getJobFlags(_task).priority ?? .default
+    getJobFlags(_task).priority ?? .unspecified
+  }
+
+  /// Cancel the current task.
+  public func cancel() {
+    _taskCancel(_task)
   }
 }
 
@@ -714,7 +735,6 @@ extension UnsafeCurrentTask: Equatable {
 }
 
 // ==== Internal ---------------------------------------------------------------
-
 @available(SwiftStdlib 5.5, *)
 @_silgen_name("swift_task_getCurrent")
 func _getCurrentAsyncTask() -> Builtin.NativeObject?
@@ -801,12 +821,8 @@ func _getCurrentThreadPriority() -> Int
 @available(SwiftStdlib 5.5, *)
 @_alwaysEmitIntoClient
 @usableFromInline
-internal func _runTaskForBridgedAsyncMethod(_ body: @escaping () async -> Void) {
-#if compiler(>=5.5) && $Sendable && $InheritActorContext && $ImplicitSelfCapture
-  Task { await body() }
-#else
-  Task.runDetached { await body() }
-#endif
+internal func _runTaskForBridgedAsyncMethod(@_inheritActorContext _ body: __owned @Sendable @escaping () async -> Void) {
+  Task(operation: body)
 }
 
 #endif

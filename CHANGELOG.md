@@ -6,9 +6,120 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 Swift 5.5
 ---------
 
+* [SR-14731][]:
+
+  The compiler now correctly rejects the application of generic arguments to the
+  special `Self` type:
+
+  ```swift
+  struct Box<T> {
+    // previously interpreted as a return type of Box<T>, ignoring the <Int> part;
+    // now we diagnose an error with a fix-it suggesting replacing `Self` with `Box`
+    static func makeBox() -> Self<Int> {...}
+  }```
+
+* [SR-14878][]:
+
+  The compiler now correctly rejects `@available` annotations on enum cases with
+  associated values with an OS version newer than the current deployment target:
+
+  ```swift
+  @available(macOS 12, *)
+  public struct Crayon {}
+
+  public enum Pen {
+    case pencil
+
+    @available(macOS 12, *)
+    case crayon(Crayon)
+  }
+  ```
+
+  While this worked with some examples, there is no way for the Swift runtime to
+  perform the requisite dynamic layout needed to support this in general, which
+  could cause crashes at runtime.
+
+  Note that conditional availability on stored properties in structs and classes
+  is not supported for similar reasons; it was already correctly detected and
+  diagnosed.
+
+* [SE-0311][]:
+
+  Task local values can be defined using the new `@TaskLocal` property wrapper.
+  Such values are carried implicitly by the task in which the binding was made,
+  as well as any child-tasks, and unstructured task created from the tasks context.
+  
+  ```swift
+  struct TraceID { 
+    @TaskLocal
+    static var current: TraceID? 
+  }
+  
+  func printTraceID() {
+    if let traceID = TraceID.current {
+      print("\(traceID)")
+    } else {
+      print("nil")
+    }
+  }
+  
+  func run() async { 
+    printTraceID()    // prints: nil
+    TraceID.$current.withValue("1234-5678") { 
+      printTraceID()  // prints: 1234-5678
+      inner()         // prints: 1234-5678
+    }
+    printTraceID()    // prints: nil
+  }
+  
+  func inner() {
+    // if called from a context in which the task-local value
+    // was bound, it will print it (or 'nil' otherwise)
+    printTraceID()
+  }
+  ```
+
+* [SE-0316][]:
+
+	A type can be defined as a global actor. Global actors extend the notion
+	of actor isolation outside of a single actor type, so that global state
+	(and the functions that access it) can benefit from actor isolation,
+	even if the state and functions are scattered across many different
+	types, functions and modules. Global actors make it possible to safely
+	work with global variables in a concurrent program, as well as modeling
+	other global program constraints such as code that must only execute on
+  the "main thread" or "UI thread". A new global actor can be defined with
+  the `globalActor` attribute:
+
+  ```swift
+  @globalActor
+  struct DatabaseActor {
+    actor ActorType { }
+
+    static let shared: ActorType = ActorType()
+  }
+  ```
+
+  Global actor types can be used as custom attributes on various declarations,
+  which ensures that those declarations are only accessed on the actor described
+  by the global actor's `shared` instance. For example:
+
+  ```swift
+  @DatabaseActor func queryDB(query: Query) throws -> QueryResult
+
+  func runQuery(queryString: String) async throws -> QueryResult {
+    let query = try Query(parsing: queryString)
+    return try await queryDB(query: query) // 'await' because this implicitly hops to DatabaseActor.shared
+  }
+  ```
+
+  The concurrency library defines one global actor, `MainActor`, which
+  represents the main thread of execution. It should be used for any code that
+  must execute on the main thread, e.g., for updating UI.
+
 * [SE-0313][]:
 
-  Declarations inside an actor that would normally by actor-isolated can
+  Declarations inside an actor that would normally be actor-isolated can
   explicitly become non-isolated using the `nonisolated` keyword. Non-isolated
   declarations can be used to conform to synchronous protocol requirements:
 
@@ -8524,7 +8635,9 @@ Swift 1.0
 [SE-0300]: <https://github.com/apple/swift-evolution/blob/main/proposals/0300-continuation.md>
 [SE-0306]: <https://github.com/apple/swift-evolution/blob/main/proposals/0306-actors.md>
 [SE-0310]: <https://github.com/apple/swift-evolution/blob/main/proposals/0310-effectful-readonly-properties.md>
+[SE-0311]: <https://github.com/apple/swift-evolution/blob/main/proposals/0311-task-locals.md>
 [SE-0313]: <https://github.com/apple/swift-evolution/blob/main/proposals/0313-actor-isolation-control.md>
+[SE-0316]: <https://github.com/apple/swift-evolution/blob/main/proposals/0316-global-actors.md>
 
 [SR-75]: <https://bugs.swift.org/browse/SR-75>
 [SR-106]: <https://bugs.swift.org/browse/SR-106>
@@ -8563,3 +8676,5 @@ Swift 1.0
 [SR-11429]: <https://bugs.swift.org/browse/SR-11429>
 [SR-11700]: <https://bugs.swift.org/browse/SR-11700>
 [SR-11841]: <https://bugs.swift.org/browse/SR-11841>
+[SR-14731]: <https://bugs.swift.org/browse/SR-14731>
+[SR-14878]: <https://bugs.swift.org/browse/SR-14878>

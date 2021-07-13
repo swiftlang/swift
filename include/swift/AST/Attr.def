@@ -55,6 +55,7 @@ TYPE_ATTR(differentiable)
 TYPE_ATTR(noDerivative)
 TYPE_ATTR(async)
 TYPE_ATTR(Sendable)
+TYPE_ATTR(unchecked)
 
 // SIL-specific attributes
 TYPE_ATTR(block_storage)
@@ -581,7 +582,7 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(isolated, Isolated,
   103)
 
 SIMPLE_DECL_ATTR(globalActor, GlobalActor,
-  OnClass | OnStruct | OnEnum | ConcurrencyOnly |
+  OnClass | OnStruct | OnEnum |
   ABIStableToAdd | ABIBreakingToRemove |
   APIStableToAdd | APIBreakingToRemove,
   104)
@@ -673,7 +674,7 @@ SIMPLE_DECL_ATTR(_distributedActorIndependent, DistributedActorIndependent,
   119)
 
 SIMPLE_DECL_ATTR(_assemblyVision, EmitAssemblyVisionRemarks,
-  OnFunc | UserInaccessible | NotSerialized |
+  OnFunc | UserInaccessible | NotSerialized | OnNominalType |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   120)
 

@@ -1,4 +1,6 @@
 // RUN: %target-build-swift -g %s
+// This test occaisionally fails to link.
+// REQUIRES: SR14775
 
 // TF-1232: IRGenDebugInfo crash due to lack of proper mangling for
 // AutoDiff-generated declarations: linear map structs and branching trace

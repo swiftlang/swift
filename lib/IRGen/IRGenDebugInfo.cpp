@@ -192,7 +192,8 @@ public:
   void emitVariableDeclaration(IRBuilder &Builder,
                                ArrayRef<llvm::Value *> Storage,
                                DebugTypeInfo Ty, const SILDebugScope *DS,
-                               ValueDecl *VarDecl, SILDebugVariable VarInfo,
+                               Optional<SILLocation> VarLoc,
+                               SILDebugVariable VarInfo,
                                IndirectionKind = DirectValue,
                                ArtificialKind = RealValue);
   void emitDbgIntrinsic(IRBuilder &Builder, llvm::Value *Storage,
@@ -288,6 +289,8 @@ private:
   FilenameAndLocation getStartLocation(Optional<SILLocation> OptLoc) {
     if (!OptLoc)
       return {};
+    if (OptLoc->isFilenameAndLocation())
+      return sanitizeCodeViewFilenameAndLocation(*OptLoc->getFilenameAndLocation());
     return decodeSourceLoc(OptLoc->getStartSourceLoc());
   }
 
@@ -2329,7 +2332,7 @@ void IRGenDebugInfoImpl::emitArtificialFunction(IRBuilder &Builder,
 
 void IRGenDebugInfoImpl::emitVariableDeclaration(
     IRBuilder &Builder, ArrayRef<llvm::Value *> Storage, DebugTypeInfo DbgTy,
-    const SILDebugScope *DS, ValueDecl *VarDecl, SILDebugVariable VarInfo,
+    const SILDebugScope *DS, Optional<SILLocation> VarLoc, SILDebugVariable VarInfo,
     IndirectionKind Indirection, ArtificialKind Artificial) {
   assert(DS && "variable has no scope");
 
@@ -2345,7 +2348,7 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
 
   auto *Scope = dyn_cast_or_null<llvm::DILocalScope>(getOrCreateScope(DS));
   assert(Scope && "variable has no local scope");
-  auto Loc = getFilenameAndLocation(*this, VarDecl);
+  auto Loc = getStartLocation(VarLoc);
 
   // FIXME: this should be the scope of the type's declaration.
   // If this is an argument, attach it to the current function scope.
@@ -2539,7 +2542,7 @@ void IRGenDebugInfoImpl::emitTypeMetadata(IRGenFunction &IGF,
       Metadata->getType(), Size(CI.getTargetInfo().getPointerWidth(0)),
       Alignment(CI.getTargetInfo().getPointerAlign(0)));
   emitVariableDeclaration(IGF.Builder, Metadata, DbgTy, IGF.getDebugScope(),
-                          nullptr, {OS.str().str(), 0, false},
+                          {}, {OS.str().str(), 0, false},
                           // swift.type is already a pointer type,
                           // having a shadow copy doesn't add another
                           // layer of indirection.
@@ -2637,10 +2640,10 @@ void IRGenDebugInfo::emitArtificialFunction(IRBuilder &Builder,
 
 void IRGenDebugInfo::emitVariableDeclaration(
     IRBuilder &Builder, ArrayRef<llvm::Value *> Storage, DebugTypeInfo Ty,
-    const SILDebugScope *DS, ValueDecl *VarDecl, SILDebugVariable VarInfo,
+    const SILDebugScope *DS, Optional<SILLocation> VarLoc, SILDebugVariable VarInfo,
     IndirectionKind Indirection, ArtificialKind Artificial) {
   static_cast<IRGenDebugInfoImpl *>(this)->emitVariableDeclaration(
-      Builder, Storage, Ty, DS, VarDecl, VarInfo, Indirection, Artificial);
+      Builder, Storage, Ty, DS, VarLoc, VarInfo, Indirection, Artificial);
 }
 
 void IRGenDebugInfo::emitDbgIntrinsic(IRBuilder &Builder, llvm::Value *Storage,

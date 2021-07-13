@@ -385,10 +385,10 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
       tvDesiredProtos.insert(req.getProtocolDecl());
     }
   }
-  SmallVector<TypeLoc, 4> tvDesiredProtoTypeLocs;
+  SmallVector<InheritedEntry, 4> tvDesiredProtoInherited;
   for (auto *p : tvDesiredProtos)
-    tvDesiredProtoTypeLocs.push_back(
-      TypeLoc::withoutLoc(p->getDeclaredInterfaceType()));
+    tvDesiredProtoInherited.push_back(
+      InheritedEntry(TypeLoc::withoutLoc(p->getDeclaredInterfaceType())));
 
   // Cache original members and their associated types for later use.
   SmallVector<VarDecl *, 8> diffProperties;
@@ -397,7 +397,7 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
   auto synthesizedLoc = derived.ConformanceDecl->getEndLoc();
   auto *structDecl =
       new (C) StructDecl(synthesizedLoc, C.Id_TangentVector, synthesizedLoc,
-                         /*Inherited*/ C.AllocateCopy(tvDesiredProtoTypeLocs),
+                         /*Inherited*/ C.AllocateCopy(tvDesiredProtoInherited),
                          /*GenericParams*/ {}, parentDC);
   structDecl->setBraces({synthesizedLoc, synthesizedLoc});
   structDecl->setImplicit();

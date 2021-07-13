@@ -74,13 +74,11 @@ void _swift_task_dealloc_specific(AsyncTask *task, void *ptr);
 /// related to the active task.
 void runJobInEstablishedExecutorContext(Job *job);
 
+/// Initialize the async let storage for the given async-let child task.
+void asyncLet_addImpl(AsyncTask *task, AsyncLet *asyncLet);
+
 /// Clear the active task reference for the current thread.
 AsyncTask *_swift_task_clearCurrent();
-
-AsyncTaskAndContext swift_task_create_async_let_future(size_t flags,
-                     const Metadata *futureResultType,
-                     void *closureEntry,
-                     void *closureContext);
 
 #if defined(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
 #define SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR 1
@@ -104,15 +102,13 @@ void _swift_tsan_release(void *addr);
 /// Special values used with DispatchQueueIndex to indicate the global and main
 /// executors.
 #define DISPATCH_QUEUE_GLOBAL_EXECUTOR (void *)1
-#define DISPATCH_QUEUE_MAIN_EXECUTOR (void *)2
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wreturn-type-c-linkage"
-// FIXME: remove this and switch to a representation that uses
-// _dispatch_main_q somehow
-extern "C" SWIFT_CC(swift)
-ExecutorRef _swift_task_getMainExecutor();
-#pragma clang diagnostic pop
+inline SerialExecutorWitnessTable *
+_swift_task_getDispatchQueueSerialExecutorWitnessTable() {
+  extern SerialExecutorWitnessTable wtable
+    SWIFT_ASM_LABEL_WITH_PREFIX("$ss17DispatchQueueShimCScfsWP");
+  return &wtable;
+}
 
 // ==== ------------------------------------------------------------------------
 
@@ -132,14 +128,14 @@ namespace {
 ///   @_silgen_name("swift_asyncLet_waitThrowing")
 ///   func _asyncLetGetThrowing<T>(_ task: Builtin.RawPointer) async throws -> T
 ///
+///   @_silgen_name("swift_taskGroup_wait_next_throwing")
+///   func _taskGroupWaitNext<T>(group: Builtin.RawPointer) async throws -> T?
+///
 class TaskFutureWaitAsyncContext : public AsyncContext {
 public:
   SwiftError *errorResult;
 
   OpaqueValue *successResultPointer;
-
-  AsyncVoidClosureResumeEntryPoint *__ptrauth_swift_task_resume_function
-      asyncResumeEntryPoint;
 
   void fillWithSuccess(AsyncTask::FutureFragment *future) {
     fillWithSuccess(future->getStoragePtr(), future->getResultType(),
@@ -153,35 +149,6 @@ public:
   void fillWithError(AsyncTask::FutureFragment *future) {
     fillWithError(future->getError());
   }
-  void fillWithError(SwiftError *error) {
-    errorResult = error;
-    swift_errorRetain(error);
-  }
-};
-
-/// The layout of a frame to call the following function:
-///
-///   @_silgen_name("swift_taskGroup_wait_next_throwing")
-///   func _taskGroupWaitNext<T>(group: Builtin.RawPointer) async throws -> T?
-///
-class TaskGroupNextAsyncContext : public AsyncContext {
-public:
-  SwiftError *errorResult;
-
-  OpaqueValue *successResultPointer;
-
-  AsyncVoidClosureResumeEntryPoint *__ptrauth_swift_task_resume_function
-      asyncResumeEntryPoint;
-
-  // Arguments.
-  TaskGroup *group;
-
-  const Metadata *successType;
-
-  void fillWithSuccess(OpaqueValue *src, const Metadata *successType) {
-    successType->vw_initializeWithCopy(successResultPointer, src);
-  }
-
   void fillWithError(SwiftError *error) {
     errorResult = error;
     swift_errorRetain(error);

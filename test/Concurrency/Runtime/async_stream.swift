@@ -406,60 +406,6 @@ var tests = TestSuite("AsyncStream")
         expectTrue(expectation.fulfilled)
       }
 
-      tests.test("cancellation behavior of value emitted in handler") {
-        let ready = DispatchSemaphore(value: 0)
-        let done = DispatchSemaphore(value: 0)
-        let task = detach {
-          let series = AsyncStream(String.self) { continuation in
-            continuation.onTermination = { @Sendable _ in continuation.yield("Hit cancel") }
-          }
-          ready.signal()
-          var iterator = series.makeAsyncIterator()
-          let first = await iterator.next()
-          expectEqual(first, "Hit cancel")
-          let second = await iterator.next()
-          expectEqual(second, nil)
-          done.signal()
-        }
-        ready.wait()
-        task.cancel()
-        let result = done.wait(timeout: DispatchTime(uptimeNanoseconds: DispatchTime.now().uptimeNanoseconds + 1_000_000_000))
-        switch result {
-        case .timedOut:
-          expectFalse(true, "Timeout when awaiting finished state")
-        default: break
-        }
-      }
-
-      tests.test("cancellation behavior of value emitted in handler throwing") {
-        let ready = DispatchSemaphore(value: 0)
-        let done = DispatchSemaphore(value: 0)
-        let task = detach {
-          let series = AsyncThrowingStream(String.self) { continuation in
-            continuation.onTermination = { @Sendable _ in continuation.yield("Hit cancel") }
-          }
-          ready.signal()
-          var iterator = series.makeAsyncIterator()
-          do {
-            let first = try await iterator.next()
-            expectEqual(first, "Hit cancel")
-            let second = try await iterator.next()
-            expectEqual(second, nil)
-          } catch {
-            expectUnreachable("unexpected error thrown")
-          }
-          done.signal()
-        }
-        ready.wait()
-        task.cancel()
-        let result = done.wait(timeout: DispatchTime(uptimeNanoseconds: DispatchTime.now().uptimeNanoseconds + 1_000_000_000))
-        switch result {
-        case .timedOut:
-          expectFalse(true, "Timeout when awaiting finished state")
-        default: break
-        }
-      }
-
       await runAllTestsAsync()
     }
   }

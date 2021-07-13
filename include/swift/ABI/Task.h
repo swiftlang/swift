@@ -34,6 +34,7 @@ class Job;
 struct OpaqueValue;
 struct SwiftError;
 class TaskStatusRecord;
+class TaskOptionRecord;
 class TaskGroup;
 
 extern FullMetadata<DispatchClassMetadata> jobHeapMetadata;
@@ -70,6 +71,8 @@ public:
 
   // Derived classes can use this to store a Job Id.
   uint32_t Id = 0;
+
+  void *Reserved[2] = {};
 
   // We use this union to avoid having to do a second indirect branch
   // when resuming an asynchronous task, which we expect will be the
@@ -127,10 +130,10 @@ public:
 
 // The compiler will eventually assume these.
 #if SWIFT_POINTER_IS_8_BYTES
-static_assert(sizeof(Job) == 6 * sizeof(void*),
+static_assert(sizeof(Job) == 8 * sizeof(void*),
               "Job size is wrong");
 #else
-static_assert(sizeof(Job) == 8 * sizeof(void*),
+static_assert(sizeof(Job) == 10 * sizeof(void*),
               "Job size is wrong");
 #endif
 static_assert(alignof(Job) == 2 * alignof(void*),
@@ -200,7 +203,7 @@ public:
 
   /// Private storage for the use of the runtime.
   struct alignas(2 * alignof(void*)) OpaquePrivateStorage {
-    void *Storage[8];
+    void *Storage[6];
 
     /// Initialize this storage during the creation of a task.
     void initialize(AsyncTask *task);
@@ -481,7 +484,13 @@ public:
   /// \c Executing, then \c waitingTask has been added to the
   /// wait queue and will be scheduled when the future completes. Otherwise,
   /// the future has completed and can be queried.
-  FutureFragment::Status waitFuture(AsyncTask *waitingTask);
+  /// The waiting task's async context will be intialized with the parameters if
+  /// the current's task state is executing.
+  FutureFragment::Status waitFuture(AsyncTask *waitingTask,
+                                    AsyncContext *waitingTaskContext,
+                                    TaskContinuationFunction *resumeFn,
+                                    AsyncContext *callerContext,
+                                    OpaqueValue *result);
 
   /// Complete this future.
   ///
@@ -528,6 +537,8 @@ inline void Job::runInFullyEstablishedContext() {
   else
     return runSimpleInFullyEstablishedContext(); // 'return' forces tail call
 }
+
+// ==== ------------------------------------------------------------------------
 
 /// An asynchronous context within a task.  Generally contexts are
 /// allocated using the task-local stack alloc/dealloc operations, but

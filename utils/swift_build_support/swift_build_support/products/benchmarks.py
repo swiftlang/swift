@@ -51,19 +51,31 @@ class Benchmarks(product.Product):
     def should_test(self, host_target):
         return self.args.test_toolchainbenchmarks
 
+    def _get_test_environment(self, host_target):
+        if platform.system() == 'Darwin':
+            # the resulting binaries would search first in /usr/lib/swift,
+            # we need to prefer the libraries we just built
+            return {'DYLD_LIBRARY_PATH': os.path.join(
+                _get_toolchain_path(host_target, self, self.args),
+                'usr', 'lib', 'swift', 'macosx')}
+
+        return None
+
     def test(self, host_target):
         """Just run a single instance of the command for both .debug and
            .release.
         """
         cmdline = ['--num-iters=1', 'XorLoop']
+        test_environment = self._get_test_environment(host_target)
+
         bench_Onone = os.path.join(self.build_dir, 'bin', 'Benchmark_Onone')
-        shell.call([bench_Onone] + cmdline)
+        shell.call([bench_Onone] + cmdline, env=test_environment)
 
         bench_O = os.path.join(self.build_dir, 'bin', 'Benchmark_O')
-        shell.call([bench_O] + cmdline)
+        shell.call([bench_O] + cmdline, env=test_environment)
 
         bench_Osize = os.path.join(self.build_dir, 'bin', 'Benchmark_Osize')
-        shell.call([bench_Osize] + cmdline)
+        shell.call([bench_Osize] + cmdline, env=test_environment)
 
     def should_install(self, host_target):
         return False
@@ -85,7 +97,11 @@ class Benchmarks(product.Product):
                 swiftpm.SwiftPM]
 
 
-def run_build_script_helper(host_target, product, args):
+def _get_toolchain_path(host_target, product, args):
+    # TODO check if we should prefer using product.install_toolchain_path
+    # this logic initially was inside run_build_script_helper
+    # and was factored out so it can be used in testing as well
+
     toolchain_path = swiftpm.SwiftPM.get_install_destdir(args,
                                                          host_target,
                                                          product.build_dir)
@@ -93,6 +109,12 @@ def run_build_script_helper(host_target, product, args):
         # The prefix is an absolute path, so concatenate without os.path.
         toolchain_path += \
             targets.darwin_toolchain_prefix(args.install_prefix)
+
+    return toolchain_path
+
+
+def run_build_script_helper(host_target, product, args):
+    toolchain_path = _get_toolchain_path(host_target, product, args)
 
     # Our source_dir is expected to be './$SOURCE_ROOT/benchmarks'. That is due
     # the assumption that each product is in its own build directory. This

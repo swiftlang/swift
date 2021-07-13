@@ -53,6 +53,7 @@
 #include "swift/Basic/StringExtras.h"
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
+#include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "swift/Syntax/References.h"
 #include "swift/Syntax/SyntaxArena.h"
 #include "clang/AST/Type.h"
@@ -579,6 +580,7 @@ ASTContext *ASTContext::get(LangOptions &langOpts,
                             TypeCheckerOptions &typeckOpts,
                             SearchPathOptions &SearchPathOpts,
                             ClangImporterOptions &ClangImporterOpts,
+                            symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
                             SourceManager &SourceMgr,
                             DiagnosticEngine &Diags) {
   // If more than two data structures are concatentated, then the aggregate
@@ -593,17 +595,19 @@ ASTContext *ASTContext::get(LangOptions &langOpts,
   new (impl) Implementation();
   return new (mem)
       ASTContext(langOpts, typeckOpts, SearchPathOpts, ClangImporterOpts,
-                 SourceMgr, Diags);
+                 SymbolGraphOpts, SourceMgr, Diags);
 }
 
 ASTContext::ASTContext(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
                        SearchPathOptions &SearchPathOpts,
                        ClangImporterOptions &ClangImporterOpts,
+                       symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
                        SourceManager &SourceMgr, DiagnosticEngine &Diags)
   : LangOpts(langOpts),
     TypeCheckerOpts(typeckOpts),
     SearchPathOpts(SearchPathOpts),
     ClangImporterOpts(ClangImporterOpts),
+    SymbolGraphOpts(SymbolGraphOpts),
     SourceMgr(SourceMgr), Diags(Diags),
     evaluator(Diags, langOpts),
     TheBuiltinModule(createBuiltinModule(*this)),
@@ -1015,6 +1019,7 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
     M = getLoadedModule(Id_Differentiation);
     break;
   case KnownProtocolKind::Actor:
+  case KnownProtocolKind::GlobalActor:
   case KnownProtocolKind::AsyncSequence:
   case KnownProtocolKind::AsyncIteratorProtocol:
   case KnownProtocolKind::SerialExecutor:
@@ -2183,7 +2188,8 @@ ASTContext::getConformance(Type conformingType,
                            ProtocolDecl *protocol,
                            SourceLoc loc,
                            DeclContext *dc,
-                           ProtocolConformanceState state) {
+                           ProtocolConformanceState state,
+                           bool isUnchecked) {
   assert(dc->isTypeContext());
 
   llvm::FoldingSetNodeID id;
@@ -2199,7 +2205,8 @@ ASTContext::getConformance(Type conformingType,
   // Build a new normal protocol conformance.
   auto result
     = new (*this, AllocationArena::Permanent)
-      NormalProtocolConformance(conformingType, protocol, loc, dc, state);
+        NormalProtocolConformance(
+          conformingType, protocol, loc, dc, state,isUnchecked);
   normalConformances.InsertNode(result, insertPos);
 
   return result;
@@ -2827,7 +2834,7 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
     if (Ctx.isSwiftVersionAtLeast(5)) {
       if (wantDynamicSelf && CD->isConvenienceInit())
         if (auto *classDecl = selfTy->getClassOrBoundGenericClass())
-          if (!classDecl->isFinal())
+          if (!classDecl->isSemanticallyFinal())
             isDynamicSelf = true;
     }
   } else if (isa<DestructorDecl>(AFD)) {

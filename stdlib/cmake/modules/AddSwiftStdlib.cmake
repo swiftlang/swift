@@ -995,6 +995,10 @@ function(_add_swift_target_library_single target name)
         PROPERTIES
         INSTALL_RPATH "$ORIGIN")
     endif()
+  elseif("${SWIFTLIB_SINGLE_SDK}" STREQUAL "OPENBSD")
+    set_target_properties("${target}"
+      PROPERTIES
+      INSTALL_RPATH "$ORIGIN")
   endif()
 
   set_target_properties("${target}" PROPERTIES BUILD_WITH_INSTALL_RPATH YES)

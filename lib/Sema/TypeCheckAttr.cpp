@@ -799,7 +799,9 @@ void AttributeChecker::visitAccessControlAttr(AccessControlAttr *attr) {
   }
 
   if (attr->getAccess() == AccessLevel::Open) {
-    if (!isa<ClassDecl>(D) && !D->isPotentiallyOverridable() &&
+    auto classDecl = dyn_cast<ClassDecl>(D);
+    if (!(classDecl && !classDecl->isActor()) &&
+        !D->isPotentiallyOverridable() &&
         !attr->isInvalid()) {
       diagnose(attr->getLocation(), diag::access_control_open_bad_decl)
         .fixItReplace(attr->getRange(), "public");
@@ -2085,7 +2087,8 @@ void AttributeChecker::visitRequiredAttr(RequiredAttr *attr) {
     return;
   }
   // Only classes can have required constructors.
-  if (parentTy->getClassOrBoundGenericClass()) {
+  if (parentTy->getClassOrBoundGenericClass() &&
+      !parentTy->getClassOrBoundGenericClass()->isActor()) {
     // The constructor must be declared within the class itself.
     // FIXME: Allow an SDK overlay to add a required initializer to a class
     // defined in Objective-C
@@ -3351,10 +3354,9 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
   if (PDC && !PDC->isObjC()) {
     // Ownership does not make sense in protocols, except for "weak" on
     // properties of Objective-C protocols.
-    auto D = var->getASTContext().isSwiftVersionAtLeast(5)
-                 ? diag::ownership_invalid_in_protocols
-                 : diag::ownership_invalid_in_protocols_compat_warning;
+    auto D = diag::ownership_invalid_in_protocols;
     Diags.diagnose(attr->getLocation(), D, ownershipKind)
+        .warnUntilSwiftVersion(5)
         .fixItRemove(attr->getRange());
     attr->setInvalid();
   }
@@ -4489,7 +4491,7 @@ IndexSubset *DifferentiableAttributeTypeCheckRequest::evaluate(
     if (diagnoseDynamicSelfResult) {
       // Diagnose class initializers in non-final classes.
       if (isa<ConstructorDecl>(original)) {
-        if (!classDecl->isFinal()) {
+        if (!classDecl->isSemanticallyFinal()) {
           diags.diagnose(
               attr->getLocation(),
               diag::differentiable_attr_nonfinal_class_init_unsupported,
@@ -4790,7 +4792,7 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
     if (diagnoseDynamicSelfResult) {
       // Diagnose class initializers in non-final classes.
       if (isa<ConstructorDecl>(originalAFD)) {
-        if (!classDecl->isFinal()) {
+        if (!classDecl->isSemanticallyFinal()) {
           diags.diagnose(attr->getLocation(),
                          diag::derivative_attr_nonfinal_class_init_unsupported,
                          classDecl->getDeclaredInterfaceType());
@@ -5424,7 +5426,8 @@ void AttributeChecker::visitDistributedActorAttr(DistributedActorAttr *attr) {
       return;
     }
   } else if (dyn_cast<StructDecl>(D) || dyn_cast<EnumDecl>(D)) {
-    diagnoseAndRemoveAttr(attr, diag::distributed_actor_func_not_in_distributed_actor);
+    diagnoseAndRemoveAttr(
+        attr, diag::distributed_actor_func_not_in_distributed_actor);
     return;
   }
 
@@ -5435,19 +5438,31 @@ void AttributeChecker::visitDistributedActorAttr(DistributedActorAttr *attr) {
       return;
     }
 
+    // distributed func cannot be simultaneously nonisolated
+    if (auto nonisolated =
+            funcDecl->getAttrs().getAttribute<NonisolatedAttr>()) {
+      diagnoseAndRemoveAttr(nonisolated,
+                            diag::distributed_actor_func_nonisolated,
+                            funcDecl->getName());
+      return;
+    }
+
     // distributed func must be declared inside an distributed actor
     if (dc->getSelfClassDecl() &&
         !dc->getSelfClassDecl()->isDistributedActor()) {
-      diagnoseAndRemoveAttr(attr, diag::distributed_actor_func_not_in_distributed_actor);
+      diagnoseAndRemoveAttr(
+          attr, diag::distributed_actor_func_not_in_distributed_actor);
       return;
     } else if (auto protoDecl = dc->getSelfProtocolDecl()){
       if (!protoDecl->inheritsFromDistributedActor()) {
         // TODO: could suggest adding `: DistributedActor` to the protocol as well
-        diagnoseAndRemoveAttr(attr, diag::distributed_actor_func_not_in_distributed_actor);
+        diagnoseAndRemoveAttr(
+            attr, diag::distributed_actor_func_not_in_distributed_actor);
         return;
       }
     } else if (dc->getSelfStructDecl() || dc->getSelfEnumDecl()) {
-      diagnoseAndRemoveAttr(attr, diag::distributed_actor_func_not_in_distributed_actor);
+      diagnoseAndRemoveAttr(
+          attr, diag::distributed_actor_func_not_in_distributed_actor);
       return;
     }
   }
@@ -5457,11 +5472,27 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
   // 'nonisolated' can be applied to global and static/class variables
   // that do not have storage.
   auto dc = D->getDeclContext();
+
   if (auto var = dyn_cast<VarDecl>(D)) {
-    // 'nonisolated' can not be applied to mutable stored properties.
-    if (var->hasStorage() && var->supportsMutation()) {
-      diagnoseAndRemoveAttr(attr, diag::nonisolated_mutable_storage);
-      return;
+    // stored properties have limitations as to when they can be nonisolated.
+    if (var->hasStorage()) {
+      auto nominal = dyn_cast<NominalTypeDecl>(dc);
+
+      // 'nonisolated' can not be applied to stored properties inside
+      // distributed actors. Attempts of nonisolated access would be
+      // cross-actor, and that means they might be accessing on a remote actor,
+      // in which case the stored property storage does not exist.
+      if (nominal && nominal->isDistributedActor()) {
+        diagnoseAndRemoveAttr(attr,
+                              diag::nonisolated_distributed_actor_storage);
+        return;
+      }
+
+      // 'nonisolated' can not be applied to mutable stored properties.
+      if (var->supportsMutation()) {
+        diagnoseAndRemoveAttr(attr, diag::nonisolated_mutable_storage);
+        return;
+      }
     }
 
     // nonisolated can not be applied to local properties.

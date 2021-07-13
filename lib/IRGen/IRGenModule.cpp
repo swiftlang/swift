@@ -612,6 +612,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     Int8PtrTy, Int8PtrTy, // Job.SchedulerPrivate
     Int32Ty,              // Job.Flags
     Int32Ty,              // Job.ID
+    Int8PtrTy, Int8PtrTy, // Reserved
     FunctionPtrTy,        // Job.RunJob/Job.ResumeTask
     SwiftContextPtrTy,    // Task.ResumeContext
     IntPtrTy              // Task.Status
@@ -620,7 +621,17 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   AsyncFunctionPointerPtrTy = AsyncFunctionPointerTy->getPointerTo(DefaultAS);
   SwiftTaskPtrTy = SwiftTaskTy->getPointerTo(DefaultAS);
   SwiftAsyncLetPtrTy = Int8PtrTy; // we pass it opaquely (AsyncLet*)
+  SwiftTaskOptionRecordPtrTy = SizeTy; // Builtin.RawPointer? that we get as (TaskOptionRecord*)
   SwiftTaskGroupPtrTy = Int8PtrTy; // we pass it opaquely (TaskGroup*)
+  SwiftTaskOptionRecordTy = createStructType(*this, "swift.task_option", {
+    SizeTy,                     // Flags
+    SwiftTaskOptionRecordPtrTy, // Parent
+  });
+  SwiftTaskGroupTaskOptionRecordTy = createStructType(
+      *this, "swift.task_group_task_option", {
+    SwiftTaskOptionRecordTy,    // Base option record
+    SwiftTaskGroupPtrTy,        // Task group
+  });
   ExecutorFirstTy = SizeTy;
   ExecutorSecondTy = SizeTy;
   SwiftExecutorTy = createStructType(*this, "swift.executor", {
@@ -632,6 +643,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     Int8PtrTy, Int8PtrTy, // SchedulerPrivate
     Int32Ty,              // flags
     Int32Ty,              // ID
+    Int8PtrTy, Int8PtrTy, // Reserved
     FunctionPtrTy,        // RunJob/ResumeTask
   });
   SwiftJobPtrTy = SwiftJobTy->getPointerTo(DefaultAS);
@@ -776,6 +788,15 @@ namespace RuntimeConstants {
 
   RuntimeAvailability DifferentiationAvailability(ASTContext &context) {
     auto featureAvailability = context.getDifferentiationAvailability();
+    if (!isDeploymentAvailabilityContainedIn(context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
+  RuntimeAvailability
+  MultiPayloadEnumTagSinglePayloadAvailability(ASTContext &context) {
+    auto featureAvailability = context.getMultiPayloadEnumTagSinglePayload();
     if (!isDeploymentAvailabilityContainedIn(context, featureAvailability)) {
       return RuntimeAvailability::ConditionallyAvailable;
     }
@@ -1667,7 +1688,7 @@ bool IRGenModule::useDllStorage() { return ::useDllStorage(Triple); }
 
 bool IRGenModule::shouldPrespecializeGenericMetadata() {
   auto canPrespecializeTarget =
-      (Triple.isOSDarwin() || Triple.isTvOS() ||
+      (Triple.isOSDarwin() ||
        (Triple.isOSLinux() && !(Triple.isARM() && Triple.isArch32Bit())));
   if (canPrespecializeTarget && isStandardLibrary()) {
     return true;

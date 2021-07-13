@@ -127,7 +127,12 @@ const LoadableTypeInfo &TypeConverter::getExecutorTypeInfo() {
 
 void irgen::emitBuildMainActorExecutorRef(IRGenFunction &IGF,
                                           Explosion &out) {
-  // FIXME
+  auto call = IGF.Builder.CreateCall(IGF.IGM.getTaskGetMainExecutorFn(),
+                                     {});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
+
+  IGF.emitAllExtractValues(call, IGF.IGM.SwiftExecutorTy, out);
 }
 
 void irgen::emitBuildDefaultActorExecutorRef(IRGenFunction &IGF,
@@ -169,6 +174,7 @@ void irgen::emitGetCurrentExecutor(IRGenFunction &IGF, Explosion &out) {
 }
 
 llvm::Value *irgen::emitBuiltinStartAsyncLet(IRGenFunction &IGF,
+                                             llvm::Value *taskOptions,
                                              llvm::Value *taskFunction,
                                              llvm::Value *localContextInfo,
                                              SubstitutionMap subs) {
@@ -187,6 +193,7 @@ llvm::Value *irgen::emitBuiltinStartAsyncLet(IRGenFunction &IGF,
   // This is @_silgen_name("swift_asyncLet_start")
   auto *call = IGF.Builder.CreateCall(IGF.IGM.getAsyncLetStartFn(),
                                       {alet,
+                                       taskOptions,
                                        futureResultTypeMetadata,
                                        taskFunction,
                                        localContextInfo
@@ -206,15 +213,20 @@ void irgen::emitEndAsyncLet(IRGenFunction &IGF, llvm::Value *alet) {
   IGF.Builder.CreateLifetimeEnd(alet);
 }
 
-llvm::Value *irgen::emitCreateTaskGroup(IRGenFunction &IGF) {
+llvm::Value *irgen::emitCreateTaskGroup(IRGenFunction &IGF,
+                                        SubstitutionMap subs) {
   auto ty = llvm::ArrayType::get(IGF.IGM.Int8PtrTy, NumWords_TaskGroup);
   auto address = IGF.createAlloca(ty, Alignment(Alignment_TaskGroup));
   auto group = IGF.Builder.CreateBitCast(address.getAddress(),
                                          IGF.IGM.Int8PtrTy);
   IGF.Builder.CreateLifetimeStart(group);
+  assert(subs.getReplacementTypes().size() == 1 &&
+         "createTaskGroup should have a type substitution");
+  auto resultType = subs.getReplacementTypes()[0]->getCanonicalType();
+  auto resultTypeMetadata = IGF.emitAbstractTypeMetadataRef(resultType);
 
   auto *call = IGF.Builder.CreateCall(IGF.IGM.getTaskGroupInitializeFn(),
-                                      {group});
+                                      {group, resultTypeMetadata});
   call->setDoesNotThrow();
   call->setCallingConv(IGF.IGM.SwiftCC);
 

@@ -135,15 +135,28 @@ static bool hasForceEmitSemanticAttr(SILFunction &fn, StringRef passName) {
   });
 }
 
+static bool isMethodWithForceEmitSemanticAttrNominalType(SILFunction &fn) {
+  if (!fn.hasSelfParam())
+    return false;
+
+  auto selfType = fn.getSelfArgument()->getType();
+  auto *nomType = selfType.getNominalOrBoundGenericNominal();
+  if (!nomType)
+    return false;
+  return nomType->shouldEmitAssemblyVisionRemarksOnMethods();
+}
+
 Emitter::Emitter(StringRef passName, SILFunction &fn)
     : fn(fn), passName(passName),
       passedEnabled(
           hasForceEmitSemanticAttr(fn, passName) ||
+          isMethodWithForceEmitSemanticAttrNominalType(fn) ||
           (fn.getASTContext().LangOpts.OptimizationRemarkPassedPattern &&
            fn.getASTContext().LangOpts.OptimizationRemarkPassedPattern->match(
                passName))),
       missedEnabled(
           hasForceEmitSemanticAttr(fn, passName) ||
+          isMethodWithForceEmitSemanticAttrNominalType(fn) ||
           (fn.getASTContext().LangOpts.OptimizationRemarkMissedPattern &&
            fn.getASTContext().LangOpts.OptimizationRemarkMissedPattern->match(
                passName))) {}
@@ -161,6 +174,19 @@ static SourceLoc getLocForPresentation(SILLocation loc,
   llvm_unreachable("covered switch");
 }
 
+static bool instHasInferrableLoc(SILInstruction &inst) {
+  if (isa<DeallocStackInst>(inst) || isa<StrongRetainInst>(inst) ||
+      isa<StrongReleaseInst>(inst) || isa<RetainValueInst>(inst) ||
+      isa<ReleaseValueInst>(inst) || isa<EndAccessInst>(inst))
+    return false;
+
+  // Ignore empty tuples
+  if (auto *tup = dyn_cast<TupleInst>(&inst))
+    return tup->getNumOperands() != 0;
+
+  return true;
+}
+
 /// The user has passed us an instruction that for some reason has a source loc
 /// that can not be used. Search down the current block for an instruction with
 /// a valid source loc and use that instead.
@@ -169,11 +195,16 @@ inferOptRemarkSearchForwards(SILInstruction &i,
                              SourceLocPresentationKind presentationKind) {
   for (auto &inst :
        llvm::make_range(std::next(i.getIterator()), i.getParent()->end())) {
+    if (!instHasInferrableLoc(inst))
+      continue;
+    // Skip instructions without a loc we care about since we move it around.
     auto newLoc = getLocForPresentation(inst.getLoc(), presentationKind);
     if (auto inlinedLoc = inst.getDebugScope()->getOutermostInlineLocation())
       newLoc = getLocForPresentation(inlinedLoc, presentationKind);
-    if (newLoc.isValid())
+    if (newLoc.isValid()) {
+      LLVM_DEBUG(llvm::dbgs() << "Inferring loc from " << inst);
       return newLoc;
+    }
   }
 
   return SourceLoc();
@@ -188,11 +219,15 @@ inferOptRemarkSearchBackwards(SILInstruction &i,
                               SourceLocPresentationKind presentationKind) {
   for (auto &inst : llvm::make_range(std::next(i.getReverseIterator()),
                                      i.getParent()->rend())) {
+    if (!instHasInferrableLoc(inst))
+      continue;
     auto loc = inst.getLoc();
     if (auto inlinedLoc = inst.getDebugScope()->getOutermostInlineLocation())
       loc = inlinedLoc;
-    if (auto result = getLocForPresentation(loc, presentationKind))
+    if (auto result = getLocForPresentation(loc, presentationKind)) {
+      LLVM_DEBUG(llvm::dbgs() << "Inferring loc from " << inst);
       return result;
+    }
   }
 
   return SourceLoc();

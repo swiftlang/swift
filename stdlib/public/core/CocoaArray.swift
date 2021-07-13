@@ -146,5 +146,16 @@ internal struct _CocoaArrayWrapper: RandomAccessCollection {
     }
     return result
   }
+
+  @_alwaysEmitIntoClient
+  internal __consuming func _copyContents(
+    initializing buffer: UnsafeMutableBufferPointer<Element>
+  ) -> (Iterator, UnsafeMutableBufferPointer<Element>.Index) {
+    guard buffer.count > 0 else { return (makeIterator(), 0) }
+    let start = buffer.baseAddress!
+    let c = Swift.min(self.count, buffer.count)
+    let end = _copyContents(subRange: 0 ..< c, initializing: start)
+    return (IndexingIterator(_elements: self, _position: c), c)
+  }
 }
 #endif

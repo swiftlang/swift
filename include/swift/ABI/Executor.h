@@ -82,6 +82,15 @@ public:
     return ExecutorRef(actor, 0);
   }
 
+  /// Given a pointer to a serial executor and its SerialExecutor
+  /// conformance, return an executor reference for it.
+  static ExecutorRef forOrdinary(HeapObject *identity,
+                           const SerialExecutorWitnessTable *witnessTable) {
+    assert(identity);
+    assert(witnessTable);
+    return ExecutorRef(identity, reinterpret_cast<uintptr_t>(witnessTable));
+  }
+
   HeapObject *getIdentity() const {
     return Identity;
   }
@@ -112,6 +121,9 @@ public:
     return Identity != newExecutor.Identity;
   }
 
+  /// Is this executor the main executor?
+  bool isMainExecutor() const;
+
   bool operator==(ExecutorRef other) const {
     return Identity == other.Identity;
   }
@@ -127,6 +139,11 @@ using JobInvokeFunction =
 using TaskContinuationFunction =
   SWIFT_CC(swiftasync)
   void (SWIFT_ASYNC_CONTEXT AsyncContext *);
+
+using ThrowingTaskFutureWaitContinuationFunction =
+  SWIFT_CC(swiftasync)
+  void (SWIFT_ASYNC_CONTEXT AsyncContext *, SWIFT_CONTEXT void *);
+
 
 template <class AsyncSignature>
 class AsyncFunctionPointer;

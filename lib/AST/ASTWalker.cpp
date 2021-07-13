@@ -1126,6 +1126,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       case KeyPathExpr::Component::Kind::Identity:
       case KeyPathExpr::Component::Kind::TupleElement:
       case KeyPathExpr::Component::Kind::DictionaryKey:
+      case KeyPathExpr::Component::Kind::CodeCompletion:
         // No subexpr to visit.
         break;
       }
@@ -1856,6 +1857,10 @@ bool Traversal::visitIsolatedTypeRepr(IsolatedTypeRepr *T) {
 
 bool Traversal::visitOpaqueReturnTypeRepr(OpaqueReturnTypeRepr *T) {
   return doIt(T->getConstraint());
+}
+
+bool Traversal::visitNamedOpaqueReturnTypeRepr(NamedOpaqueReturnTypeRepr *T) {
+  return doIt(T->getBase());
 }
 
 bool Traversal::visitPlaceholderTypeRepr(PlaceholderTypeRepr *T) {

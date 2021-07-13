@@ -464,6 +464,17 @@ bb0(%0 : @owned $T):
   return %r : $()
 }
 
+sil [ossa] @test_store_enum_tuple : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %2 = enum $Optional<T>, #Optional.none!enumelt
+  %3 = tuple (%0 : $Int, %2 : $Optional<T>)
+  %8 = alloc_stack $(Int, Optional<T>)
+  store %3 to [trivial] %8 : $*(Int, Optional<T>)
+  dealloc_stack %8 : $*(Int, Optional<T>)
+  %13 = tuple ()
+  return %13 : $()
+}
+
 sil [ossa] @test_select_enum_addr : $@convention(thin) (@in_guaranteed Optional<T>) -> Builtin.Int1 {
 bb0(%0 : $*Optional<T>):
   %1 = integer_literal $Builtin.Int1, -1

@@ -23,6 +23,7 @@
 #include "llvm/BinaryFormat/ELF.h"
 #include "llvm/Object/COFF.h"
 #include "llvm/Support/Memory.h"
+#include "llvm/ADT/STLExtras.h"
 
 #include "swift/ABI/Enum.h"
 #include "swift/ABI/ObjectFile.h"
@@ -92,7 +93,7 @@ class ReflectionContext
   using super = remote::MetadataReader<Runtime, TypeRefBuilder>;
   using super::readMetadata;
   using super::readObjCClassName;
-
+  using super::readResolvedPointerValue;
   std::unordered_map<typename super::StoredPointer, const TypeInfo *> Cache;
 
   /// All buffers we need to keep around long term. This will automatically free them
@@ -644,6 +645,47 @@ public:
     return false;
   }
 
+  /// Adds an image using the FindSection closure to find the swift metadata
+  /// sections. \param FindSection
+  ///     Closure that finds sections by name. ReflectionContext is in charge
+  ///     of freeing the memory buffer in the RemoteRef return value.
+  ///     process.
+  /// \return
+  ///     \b True if any of the reflection sections were registered,
+  ///     \b false otherwise.
+  bool addImage(llvm::function_ref<
+                std::pair<RemoteRef<void>, uint64_t>(ReflectionSectionKind)>
+                    FindSection) {
+    auto Sections = {
+        ReflectionSectionKind::fieldmd, ReflectionSectionKind::assocty,
+        ReflectionSectionKind::builtin, ReflectionSectionKind::capture,
+        ReflectionSectionKind::typeref, ReflectionSectionKind::reflstr};
+
+    llvm::SmallVector<std::pair<RemoteRef<void>, uint64_t>, 6> Pairs;
+    for (auto Section : Sections) {
+      Pairs.push_back(FindSection(Section));
+      auto LatestRemoteRef = std::get<RemoteRef<void>>(Pairs.back());
+      if (LatestRemoteRef) {
+        MemoryReader::ReadBytesResult Buffer(
+            LatestRemoteRef.getLocalBuffer(),
+            [](const void *Ptr) { free(const_cast<void *>(Ptr)); });
+
+        savedBuffers.push_back(std::move(Buffer));
+      }
+    }
+
+    // If we didn't find any sections, return.
+    if (llvm::all_of(Pairs, [](const auto &Pair) { return !Pair.first; }))
+      return false;
+
+    ReflectionInfo Info = {
+        {Pairs[0].first, Pairs[0].second}, {Pairs[1].first, Pairs[1].second},
+        {Pairs[2].first, Pairs[2].second}, {Pairs[3].first, Pairs[3].second},
+        {Pairs[4].first, Pairs[4].second}, {Pairs[5].first, Pairs[5].second}};
+    this->addReflectionInfo(Info);
+    return true;
+  }
+
   void addReflectionInfo(ReflectionInfo I) {
     getBuilder().addReflectionInfo(I);
   }
@@ -687,7 +729,16 @@ public:
 
     return false;
   }
-  
+
+  /// Returns the address of the nominal type descriptor given a metadata
+  /// address.
+  StoredPointer nominalTypeDescriptorFromMetadata(StoredPointer MetadataAddress) {
+    auto Metadata = readMetadata(MetadataAddress);
+    if (!Metadata)
+      return 0;
+    return super::readAddressOfNominalTypeDescriptor(Metadata, true);
+  }
+
   /// Return a description of the layout of a class instance with the given
   /// metadata as its isa pointer.
   const TypeInfo *
@@ -789,6 +840,52 @@ public:
     }
   }
 
+  llvm::Optional<std::pair<const TypeRef *, RemoteAddress>>
+  getDynamicTypeAndAddressClassExistential(RemoteAddress ExistentialAddress) {
+    auto PointerValue =
+        readResolvedPointerValue(ExistentialAddress.getAddressData());
+    if (!PointerValue)
+      return {};
+    auto Result = readMetadataFromInstance(*PointerValue);
+    if (!Result)
+      return {};
+    auto TypeResult = readTypeFromMetadata(Result.getValue());
+    if (!TypeResult)
+      return {};
+    return {{std::move(TypeResult), RemoteAddress(*PointerValue)}};
+  }
+
+  llvm::Optional<std::pair<const TypeRef *, RemoteAddress>>
+  getDynamicTypeAndAddressErrorExistential(RemoteAddress ExistentialAddress,
+                                           bool *IsBridgedError = nullptr) {
+    auto Result = readMetadataAndValueErrorExistential(ExistentialAddress);
+    if (!Result)
+      return {};
+
+    auto TypeResult =
+        readTypeFromMetadata(Result->MetadataAddress.getAddressData());
+    if (!TypeResult)
+      return {};
+
+    if (IsBridgedError)
+      *IsBridgedError = Result->IsBridgedError;
+
+    return {{TypeResult, Result->PayloadAddress}};
+  }
+
+  llvm::Optional<std::pair<const TypeRef *, RemoteAddress>>
+  getDynamicTypeAndAddressOpaqueExistential(RemoteAddress ExistentialAddress) {
+    auto Result = readMetadataAndValueOpaqueExistential(ExistentialAddress);
+    if (!Result)
+      return {};
+
+    auto TypeResult =
+        readTypeFromMetadata(Result->MetadataAddress.getAddressData());
+    if (!TypeResult)
+      return {};
+    return {{std::move(TypeResult), Result->PayloadAddress}};
+  }
+
   bool projectExistential(RemoteAddress ExistentialAddress,
                           const TypeRef *ExistentialTR,
                           const TypeRef **OutInstanceTR,
@@ -850,6 +947,75 @@ public:
       return false;
     }
   }
+  /// A version of `projectExistential` tailored for LLDB.
+  /// This version dereferences the resulting TypeRef if it wraps
+  /// a class type, it also dereferences the input `ExistentialAddress` before
+  /// attempting to find its dynamic type and address when dealing with error
+  /// existentials.
+  llvm::Optional<std::pair<const TypeRef *, RemoteAddress>>
+  projectExistentialAndUnwrapClass(RemoteAddress ExistentialAddress,
+                                   const TypeRef &ExistentialTR) {
+    auto IsClass = [](const TypeRef *TypeResult) {
+      // When the existential wraps a class type, LLDB expects that the
+      // address returned is the class instance itself and not the address
+      // of the reference.
+      bool IsClass = TypeResult->getKind() == TypeRefKind::ForeignClass ||
+                     TypeResult->getKind() == TypeRefKind::ObjCClass;
+      if (auto *nominal = llvm::dyn_cast<NominalTypeRef>(TypeResult))
+        IsClass = nominal->isClass();
+      else if (auto *boundGeneric =
+                   llvm::dyn_cast<BoundGenericTypeRef>(TypeResult))
+        IsClass = boundGeneric->isClass();
+      return IsClass;
+    };
+
+    auto DereferenceAndSet = [&](RemoteAddress &Address) {
+      auto PointerValue = readResolvedPointerValue(Address.getAddressData());
+      if (!PointerValue)
+        return false;
+      Address = RemoteAddress(*PointerValue);
+      return true;
+    };
+
+    auto ExistentialRecordTI = getRecordTypeInfo(&ExistentialTR, nullptr);
+    if (!ExistentialRecordTI)
+      return {};
+
+    switch (ExistentialRecordTI->getRecordKind()) {
+    case RecordKind::ClassExistential:
+      return getDynamicTypeAndAddressClassExistential(ExistentialAddress);
+    case RecordKind::ErrorExistential: {
+      // LLDB stores the address of the error pointer.
+      if (!DereferenceAndSet(ExistentialAddress))
+        return {};
+
+      bool IsBridgedError = false;
+      auto Pair = getDynamicTypeAndAddressErrorExistential(ExistentialAddress,
+                                                           &IsBridgedError);
+      if (!Pair)
+        return {};
+
+      if (!IsBridgedError && IsClass(std::get<const TypeRef *>(*Pair)))
+        if (!DereferenceAndSet(std::get<RemoteAddress>(*Pair)))
+          return {};
+
+      return Pair;
+    }
+    case RecordKind::OpaqueExistential: {
+      auto Pair = getDynamicTypeAndAddressOpaqueExistential(ExistentialAddress);
+      if (!Pair)
+        return {};
+
+      if (IsClass(std::get<const TypeRef *>(*Pair)))
+        if (!DereferenceAndSet(std::get<RemoteAddress>(*Pair)))
+          return {};
+
+      return Pair;
+    }
+    default:
+      return {};
+    }
+  }
 
   /// Projects the value of an enum.
   ///
@@ -887,6 +1053,12 @@ public:
     } else {
       return getBuilder().getTypeConverter().getTypeInfo(TR, ExternalTypeInfo);
     }
+  }
+
+  const RecordTypeInfo *getRecordTypeInfo(const TypeRef *TR,
+                              remote::TypeInfoProvider *ExternalTypeInfo) {
+    auto *TypeInfo = getTypeInfo(TR, ExternalTypeInfo);
+    return dyn_cast_or_null<const RecordTypeInfo>(TypeInfo);
   }
 
   /// Iterate the protocol conformance cache tree rooted at NodePtr, calling
@@ -1189,9 +1361,7 @@ public:
     if (!AsyncTaskObj)
       return std::string("failure reading async task");
 
-    auto *Allocator = reinterpret_cast<const StackAllocator *>(
-        &AsyncTaskObj->AllocatorPrivate);
-    StoredPointer SlabPtr = Allocator->FirstSlab;
+    StoredPointer SlabPtr = AsyncTaskObj->PrivateStorage.Allocator.FirstSlab;
     while (SlabPtr) {
       auto SlabBytes = getReader().readBytes(
           RemoteAddress(SlabPtr), sizeof(typename StackAllocator::Slab));

@@ -156,7 +156,9 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
   serializationOpts.ModuleLinkName = opts.ModuleLinkName;
   serializationOpts.UserModuleVersion = opts.UserModuleVersion;
   serializationOpts.ExtraClangOptions = getClangImporterOptions().ExtraArgs;
-  
+  serializationOpts.PublicDependentLibraries =
+      getIRGenOptions().PublicLinkLibraries;
+
   if (opts.EmitSymbolGraph) {
     if (!opts.SymbolGraphOutputDir.empty()) {
       serializationOpts.SymbolGraphOutputDir = opts.SymbolGraphOutputDir;
@@ -221,6 +223,7 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
       Invocation.getLangOptions(), Invocation.getTypeCheckerOptions(),
       Invocation.getSearchPathOptions(),
       Invocation.getClangImporterOptions(),
+      Invocation.getSymbolGraphOptions(),
       SourceMgr, Diagnostics));
   registerParseRequestFunctions(Context->evaluator);
   registerTypeCheckerRequestFunctions(Context->evaluator);
@@ -449,6 +452,8 @@ void CompilerInstance::setUpDiagnosticOptions() {
   }
   Diagnostics.setDiagnosticDocumentationPath(
       Invocation.getDiagnosticOptions().DiagnosticDocumentationPath);
+  Diagnostics.setLanguageVersion(
+      Invocation.getLangOptions().EffectiveLanguageVersion);
   if (!Invocation.getDiagnosticOptions().LocalizationCode.empty()) {
     Diagnostics.setLocalization(
         Invocation.getDiagnosticOptions().LocalizationCode,

@@ -211,7 +211,7 @@ bool swift::isIntermediateRelease(SILInstruction *inst,
   return false;
 }
 
-static bool hasOnlyEndOfScopeOrDestroyUses(SILInstruction *inst) {
+bool swift::hasOnlyEndOfScopeOrDestroyUses(SILInstruction *inst) {
   for (SILValue result : inst->getResults()) {
     for (Operand *use : result->getUses()) {
       SILInstruction *user = use->getUser();

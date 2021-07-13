@@ -1547,6 +1547,9 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
       SmallVector<LocatorPathElt, 4> path;
       (void)locator.getLocatorParts(path);
 
+      while (!path.empty() && path.back().is<LocatorPathElt::TupleType>())
+        path.pop_back();
+
       if (!path.empty()) {
         // Direct pattern matching between tuple pattern and tuple type.
         if (path.back().is<LocatorPathElt::PatternMatch>()) {
@@ -4089,11 +4092,23 @@ bool ConstraintSystem::repairFailures(
     path.pop_back();
     // If this is a contextual mismatch between l-value types e.g.
     // `@lvalue String vs. @lvalue Int`, let's pretend that it's okay.
-    if (!path.empty() && path.back().is<LocatorPathElt::ContextualType>()) {
-      auto *locator = getConstraintLocator(anchor, path.back());
-      conversionsOrFixes.push_back(
-          IgnoreContextualType::create(*this, lhs, rhs, locator));
-      break;
+    if (!path.empty()) {
+      if (path.back().is<LocatorPathElt::ContextualType>()) {
+        auto *locator = getConstraintLocator(anchor, path.back());
+        conversionsOrFixes.push_back(
+            IgnoreContextualType::create(*this, lhs, rhs, locator));
+        break;
+      }
+
+      // If this is a function type param type mismatch in any position,
+      // the mismatch we want to report is for the whole structural type.
+      auto last = std::find_if(
+          path.rbegin(), path.rend(), [](LocatorPathElt &elt) -> bool {
+            return elt.is<LocatorPathElt::FunctionArgument>();
+          });
+
+      if (last != path.rend())
+        break;
     }
 
     LLVM_FALLTHROUGH;
@@ -4271,8 +4286,7 @@ bool ConstraintSystem::repairFailures(
     // it's going to be diagnosed by specialized fix which deals
     // with generic argument mismatches.
     if (matchKind == ConstraintKind::BindToPointerType) {
-      auto *member = rhs->getAs<DependentMemberType>();
-      if (!(member && member->getBase()->hasPlaceholder()))
+      if (!rhs->isPlaceholder())
         break;
     }
 
@@ -4619,6 +4633,12 @@ bool ConstraintSystem::repairFailures(
   }
 
   case ConstraintLocator::FunctionResult: {
+    if (lhs->isPlaceholder() || rhs->isPlaceholder()) {
+      recordAnyTypeVarAsPotentialHole(lhs);
+      recordAnyTypeVarAsPotentialHole(rhs);
+      return true;
+    }
+
     auto *loc = getConstraintLocator(anchor, {path.begin(), path.end() - 1});
     // If this is a mismatch between contextual type and (trailing)
     // closure with explicitly specified result type let's record it
@@ -4639,6 +4659,7 @@ bool ConstraintSystem::repairFailures(
         break;
       }
     }
+
     // Handle function result coerce expression wrong type conversion.
     if (isExpr<CoerceExpr>(anchor)) {
       auto *fix =
@@ -4723,6 +4744,15 @@ bool ConstraintSystem::repairFailures(
     // mismatches within the same tuple type can be coalesced later.
     auto index = elt.getAs<LocatorPathElt::TupleElement>()->getIndex();
     path.pop_back();
+
+    // Drop the tuple type path elements too, but extract each tuple type first.
+    if (path.back().is<LocatorPathElt::TupleType>()) {
+      rhs = path.back().getAs<LocatorPathElt::TupleType>()->getType();
+      path.pop_back();
+      lhs = path.back().getAs<LocatorPathElt::TupleType>()->getType();
+      path.pop_back();
+    }
+
     auto *tupleLocator = getConstraintLocator(locator.getAnchor(), path);
 
     // Let this fail if it's a contextual mismatch with sequence element types,
@@ -4875,14 +4905,24 @@ bool ConstraintSystem::repairFailures(
   }
 
   case ConstraintLocator::PatternMatch: {
+    auto *pattern = elt.castTo<LocatorPathElt::PatternMatch>().getPattern();
+    bool isMemberMatch =
+        lhs->is<FunctionType>() && isa<EnumElementPattern>(pattern);
+
+    // If member reference couldn't be resolved, let's allow pattern
+    // to have holes.
+    if (rhs->isPlaceholder() && isMemberMatch) {
+      recordAnyTypeVarAsPotentialHole(lhs);
+      return true;
+    }
+
     // If either type is a placeholder, consider this fixed.
     if (lhs->isPlaceholder() || rhs->isPlaceholder())
       return true;
 
-    // If the left-hand side is a function type and the pattern is an enum
-    // element pattern, call it a contextual mismatch.
-    auto pattern = elt.castTo<LocatorPathElt::PatternMatch>().getPattern();
-    if (lhs->is<FunctionType>() && isa<EnumElementPattern>(pattern)) {
+    // If member reference didn't match expected pattern,
+    // let's consider that a contextual mismatch.
+    if (isMemberMatch) {
       recordAnyTypeVarAsPotentialHole(lhs);
       recordAnyTypeVarAsPotentialHole(rhs);
 
@@ -5225,9 +5265,15 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     }
 
     case TypeKind::Tuple: {
+      // Add each tuple type to the locator before matching the element types.
+      // This is useful for diagnostics, because the error message can use the
+      // full tuple type for several element mismatches. Use the original types
+      // to preserve sugar such as typealiases.
+      auto tmpTupleLoc = locator.withPathElement(LocatorPathElt::TupleType(type1));
+      auto tupleLoc = tmpTupleLoc.withPathElement(LocatorPathElt::TupleType(type2));
       auto result = matchTupleTypes(cast<TupleType>(desugar1),
                                     cast<TupleType>(desugar2),
-                                    kind, subflags, locator);
+                                    kind, subflags, tupleLoc);
       if (result != SolutionKind::Error)
         return result;
 
@@ -6310,12 +6356,23 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
         auto requirement = signature->getRequirements()[req->getIndex()];
 
         auto *memberLoc = getConstraintLocator(anchor, path.front());
-        auto *memberRef = findResolvedMemberRef(memberLoc);
+        auto overload = findSelectedOverloadFor(memberLoc);
 
         // To figure out what is going on here we need to wait until
         // member overload is set in the constraint system.
-        if (!memberRef)
+        if (!overload) {
+          // If it's not allowed to generate new constraints
+          // there is no way to control re-activation, so this
+          // check has to fail.
+          if (!flags.contains(TMF_GenerateConstraints))
+            return SolutionKind::Error;
+
           return formUnsolved(/*activate=*/true);
+        }
+
+        auto *memberRef = overload->choice.getDeclOrNull();
+        if (!memberRef)
+          return SolutionKind::Error;
 
         // If this is a `Self` conformance requirement from a static member
         // reference on a protocol metatype, let's produce a tailored diagnostic.
@@ -6549,7 +6606,9 @@ static ConstraintFix *maybeWarnAboutExtraneousCast(
   if (!castExpr)
     return nullptr;
 
-  unsigned extraOptionals = fromOptionals.size() - toOptionals.size();
+  // "from" could be less optional than "to" e.g. `0 as Any?`, so
+  // we need to store the difference as a signed integer.
+  int extraOptionals = fromOptionals.size() - toOptionals.size();
   // Removing the optionality from to type when the force cast expr is an IUO.
   const auto *const TR = castExpr->getCastTypeRepr();
   if (isExpr<ForcedCheckedCastExpr>(anchor) && TR &&
@@ -7689,7 +7748,7 @@ static bool isNonFinalClass(Type type) {
     type = dynamicSelf->getSelfType();
 
   if (auto classDecl = type->getClassOrBoundGenericClass())
-    return !classDecl->isFinal();
+    return !classDecl->isSemanticallyFinal();
 
   if (auto archetype = type->getAs<ArchetypeType>())
     if (auto super = archetype->getSuperclass())
@@ -8176,6 +8235,13 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
           // `key path` constraint can't be retired until all components
           // are simplified.
           addTypeVariableConstraintsToWorkList(memberTypeVar);
+        } else if (locator->isLastElement<LocatorPathElt::PatternMatch>()) {
+          // Let's handle member patterns specifically because they use
+          // equality instead of argument application constraint, so allowing
+          // them to bind member could mean missing valid hole positions in
+          // the pattern.
+          assignFixedType(memberTypeVar,
+                          PlaceholderType::get(getASTContext(), memberTypeVar));
         } else {
           recordPotentialHole(memberTypeVar);
         }
@@ -8667,6 +8733,22 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
   auto *closureLocator = typeVar->getImpl().getLocator();
   auto *closure = castToExpr<ClosureExpr>(closureLocator->getAnchor());
   auto *inferredClosureType = getClosureType(closure);
+
+  // Let's look through all optionals associated with contextual
+  // type to make it possible to infer parameter/result type of
+  // the closure faster e.g.:
+  //
+  // func test(_: ((Int) -> Void)?) {
+  //   ...
+  // }
+  //
+  // test { $0 + ... }
+  //
+  // In this case dropping optionality from contextual type
+  // `((Int) -> Void)?` allows `resolveClosure` to infer type
+  // of `$0` directly (via `getContextualParamAt`) instead of
+  // having to use type variable inference mechanism.
+  contextualType = contextualType->lookThroughAllOptionalTypes();
 
   auto getContextualParamAt =
       [&contextualType, &inferredClosureType](
@@ -9468,7 +9550,12 @@ ConstraintSystem::simplifyKeyPathConstraint(
     case KeyPathExpr::Component::Kind::Invalid:
     case KeyPathExpr::Component::Kind::Identity:
       break;
-      
+
+    case KeyPathExpr::Component::Kind::CodeCompletion: {
+      anyComponentsUnresolved = true;
+      capability = ReadOnly;
+      break;
+    }
     case KeyPathExpr::Component::Kind::Property:
     case KeyPathExpr::Component::Kind::Subscript:
     case KeyPathExpr::Component::Kind::UnresolvedProperty:

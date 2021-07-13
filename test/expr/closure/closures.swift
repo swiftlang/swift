@@ -403,7 +403,7 @@ Void(0) // expected-error{{argument passed to call that takes no arguments}}
 _ = {0}
 
 // <rdar://problem/22086634> "multi-statement closures require an explicit return type" should be an error not a note
-let samples = {   // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{16-16= () -> <#Result#> in }}
+let samples = {   // expected-error {{cannot infer return type for closure with multiple statements; add explicit type to disambiguate}} {{16-16= () -> <#Result#> in }}
           if (i > 10) { return true }
           else { return false }
         }()
@@ -485,7 +485,7 @@ func lvalueCapture<T>(c: GenericClass<T>) {
 }
 
 // Don't expose @lvalue-ness in diagnostics.
-let closure = { // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{16-16= () -> <#Result#> in }}
+let closure = { // expected-error {{cannot infer return type for closure with multiple statements; add explicit type to disambiguate}} {{16-16= () -> <#Result#> in }}
   var helper = true
   return helper
 }
@@ -605,4 +605,92 @@ func testSR14678_Optional() -> (Int, Int)? {
   call(1) { // expected-error {{cannot convert return expression of type '((), Int)' to return type '(Int, Int)'}}
      (print("hello"), 0)
   }
+}
+
+// SR-13239
+func callit<T>(_ f: () -> T) -> T {
+  f()
+}
+
+func callitArgs<T>(_ : Int, _ f: () -> T) -> T {
+  f()
+}
+
+func callitArgsFn<T>(_ : Int, _ f: () -> () -> T) -> T {
+  f()()
+}
+
+func callitGenericArg<T>(_ a: T, _ f: () -> T) -> T { 
+  f()
+}
+
+func callitTuple<T>(_ : Int, _ f: () -> (T, Int)) -> T {
+  f().0
+}
+
+func callitVariadic<T>(_ fs: () -> T...) -> T {
+  fs.first!()
+}
+
+func testSR13239_Tuple() -> Int {
+  // expected-error@+2{{conflicting arguments to generic parameter 'T' ('()' vs. 'Int')}}
+  // expected-note@+1:3{{generic parameter 'T' inferred as 'Int' from context}}
+  callitTuple(1) { // expected-note@:18{{generic parameter 'T' inferred as '()' from closure return expression}}
+    (print("hello"), 0) 
+  }
+}
+
+func testSR13239() -> Int {
+  // expected-error@+2{{conflicting arguments to generic parameter 'T' ('()' vs. 'Int')}}
+  // expected-note@+1:3{{generic parameter 'T' inferred as 'Int' from context}}
+  callit { // expected-note@:10{{generic parameter 'T' inferred as '()' from closure return expression}}
+    print("hello")
+  }
+}
+
+func testSR13239_Args() -> Int {
+  // expected-error@+2{{conflicting arguments to generic parameter 'T' ('()' vs. 'Int')}}
+  // expected-note@+1:3{{generic parameter 'T' inferred as 'Int' from context}}
+  callitArgs(1) { // expected-note@:17{{generic parameter 'T' inferred as '()' from closure return expression}}
+    print("hello") 
+  }
+}
+
+func testSR13239_ArgsFn() -> Int {
+  // expected-error@+2{{conflicting arguments to generic parameter 'T' ('()' vs. 'Int')}}
+  // expected-note@+1:3{{generic parameter 'T' inferred as 'Int' from context}}
+  callitArgsFn(1) { // expected-note@:19{{generic parameter 'T' inferred as '()' from closure return expression}}
+    { print("hello") } 
+  }
+}
+
+func testSR13239MultiExpr() -> Int {
+  callit {
+    print("hello") 
+    return print("hello") // expected-error {{cannot convert return expression of type '()' to return type 'Int'}}
+  }
+}
+
+func testSR13239_GenericArg() -> Int {
+  // Generic argument is inferred as Int from first argument literal, so no conflict in this case.
+  callitGenericArg(1) {
+    print("hello") // expected-error {{cannot convert value of type '()' to closure result type 'Int'}}
+  }
+}
+
+func testSR13239_Variadic() -> Int {
+  // expected-error@+2{{conflicting arguments to generic parameter 'T' ('()' vs. 'Int')}}
+  // expected-note@+1:3{{generic parameter 'T' inferred as 'Int' from context}}
+  callitVariadic({ // expected-note@:18{{generic parameter 'T' inferred as '()' from closure return expression}}
+    print("hello")
+  })
+}
+
+func testSR13239_Variadic_Twos() -> Int {
+  // expected-error@+1{{cannot convert return expression of type '()' to return type 'Int'}}
+  callitVariadic({
+    print("hello")
+  }, {
+    print("hello")
+  })
 }

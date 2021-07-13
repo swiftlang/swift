@@ -964,7 +964,8 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
   }
 }
 
-bool swift::extractCompilerFlagsFromInterface(StringRef buffer,
+bool swift::extractCompilerFlagsFromInterface(StringRef interfacePath,
+                                              StringRef buffer,
                                               llvm::StringSaver &ArgSaver,
                                               SmallVectorImpl<const char *> &SubArgs) {
   SmallVector<StringRef, 1> FlagMatches;
@@ -973,6 +974,29 @@ bool swift::extractCompilerFlagsFromInterface(StringRef buffer,
     return true;
   assert(FlagMatches.size() == 2);
   llvm::cl::TokenizeGNUCommandLine(FlagMatches[1], ArgSaver, SubArgs);
+
+  auto intFileName = llvm::sys::path::filename(interfacePath);
+
+  // Sanitize arch if the file name and the encoded flags disagree.
+  // It's a known issue that we are using arm64e interfaces contents for the arm64 target,
+  // meaning the encoded module flags are using -target arm64e-x-x. Fortunately,
+  // we can tell the target arch from the interface file name, so we could sanitize
+  // the target to use by inferring target from the file name.
+  StringRef arm64 = "arm64";
+  StringRef arm64e = "arm64e";
+  if (intFileName.contains(arm64) && !intFileName.contains(arm64e)) {
+    for (unsigned I = 1; I < SubArgs.size(); ++I) {
+      if (strcmp(SubArgs[I - 1], "-target") != 0) {
+        continue;
+      }
+      StringRef triple(SubArgs[I]);
+      if (triple.startswith(arm64e)) {
+        SubArgs[I] = ArgSaver.save((llvm::Twine(arm64) +
+          triple.substr(arm64e.size())).str()).data();
+      }
+    }
+  }
+
   SmallVector<StringRef, 1> IgnFlagMatches;
   // Cherry-pick supported options from the ignorable list.
   auto IgnFlagRe = llvm::Regex("^// swift-module-flags-ignorable:(.*)$",
@@ -1011,7 +1035,8 @@ swift::extractUserModuleVersionFromInterface(StringRef moduleInterfacePath) {
     llvm::BumpPtrAllocator alloc;
     llvm::StringSaver argSaver(alloc);
     SmallVector<const char*, 8> args;
-    (void)extractCompilerFlagsFromInterface((*file)->getBuffer(), argSaver, args);
+    (void)extractCompilerFlagsFromInterface(moduleInterfacePath,
+                                            (*file)->getBuffer(), argSaver, args);
     for (unsigned I = 0, N = args.size(); I + 1 < N; I++) {
       // Check the version number specified via -user-module-version.
       StringRef current(args[I]), next(args[I + 1]);

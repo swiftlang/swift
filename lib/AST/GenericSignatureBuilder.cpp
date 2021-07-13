@@ -2413,7 +2413,7 @@ void DelayedRequirement::dump(llvm::raw_ostream &out) const {
   case Type:
   case Layout:
     out << ": ";
-      break;
+    break;
 
   case SameType:
     out << " == ";
@@ -4202,8 +4202,9 @@ static ConstraintResult visitInherited(
   ASTContext &ctx = typeDecl ? typeDecl->getASTContext()
                              : extDecl->getASTContext();
   auto &evaluator = ctx.evaluator;
-  ArrayRef<TypeLoc> inheritedTypes = typeDecl ? typeDecl->getInherited()
-                                              : extDecl->getInherited();
+  ArrayRef<InheritedEntry> inheritedTypes =
+      typeDecl ? typeDecl->getInherited()
+               : extDecl->getInherited();
   for (unsigned index : indices(inheritedTypes)) {
     Type inheritedType
       = evaluateOrDefault(evaluator,
@@ -5047,6 +5048,9 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenTypeParameters(
                                  equivClass->concreteTypeConstraints.end(),
                                  equivClass2->concreteTypeConstraints.begin(),
                                  equivClass2->concreteTypeConstraints.end());
+
+    for (const auto &conforms : equivClass->conformsTo)
+      (void)resolveConcreteConformance(T1, conforms.first);
   }
 
   // Make T1 the representative of T2, merging the equivalence classes.
@@ -5775,9 +5779,9 @@ void GenericSignatureBuilder::ExplicitRequirement::dump(
 
   out << getSubjectType();
   if (getKind() == RequirementKind::SameType)
-    out << " : ";
-  else
     out << " == ";
+  else
+    out << " : ";
 
   if (auto type = rhs.dyn_cast<Type>())
     out << type;
@@ -8142,6 +8146,8 @@ void GenericSignatureBuilder::enumerateRequirements(
                                RequirementRHS rhs) {
     if (auto req = createRequirement(kind, depTy, rhs, genericParams))
       requirements.push_back(*req);
+    else
+      Impl->HadAnyError = true;
   };
 
   // Collect all non-same type requirements.
@@ -8308,7 +8314,7 @@ static void checkGenericSignature(CanGenericSignature canSig,
         assert(compareDependentTypes(firstType, secondType) < 0 &&
                "Out-of-order type parameters in same-type constraint");
       } else {
-        assert(canSig->isCanonicalTypeInContext(secondType) &&
+        assert(canSig->isCanonicalTypeInContext(secondType, builder) &&
                "Concrete same-type isn't canonical in its own context");
       }
       break;
@@ -8485,6 +8491,8 @@ GenericSignature GenericSignatureBuilder::rebuildSignatureWithoutRedundantRequir
       auto newReq = stripBoundDependentMemberTypes(*optReq);
       newBuilder.addRequirement(newReq, getRebuiltSource(req.getSource()),
                                 nullptr);
+    } else {
+      Impl->HadAnyError = true;
     }
   }
 
@@ -8737,14 +8745,6 @@ void GenericSignatureBuilder::verifyGenericSignaturesInModule(
 
     verifyGenericSignature(context, canGenericSig);
   }
-}
-
-bool AbstractGenericSignatureRequest::isCached() const {
-  return true;
-}
-
-bool InferredGenericSignatureRequest::isCached() const {
-  return true;
 }
       
 /// Check whether the inputs to the \c AbstractGenericSignatureRequest are

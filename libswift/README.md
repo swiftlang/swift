@@ -38,7 +38,7 @@ The core SIL C++ classes have corresponding classes in _libswift_, for example `
 
 This makes _libswift_ easy to use and it allows to program in a "Swifty" style. For example one can write
 
-```
+```swift
   for inst in block.instructions {
     if let cfi = inst as? CondFailInst {
       // ...
@@ -70,7 +70,7 @@ No yet implemented instruction classes are mapped to a "placeholder" instruction
 
 ## The Optimizer
 
-Similar to SIL, the optimizer also uses a small bridging layer (`OptimizerBriding.h`).
+Similar to SIL, the optimizer also uses a small bridging layer (`OptimizerBridging.h`).
 Passes are registered in `registerSwiftPasses()`, called from `initializeLibSwift()`.
 The C++ PassManager can then call a _libwift_ pass like any other `SILFunctionTransform` pass.
 

@@ -26,6 +26,7 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/FileUnit.h"
+#include "swift/AST/GenericParamList.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
@@ -121,6 +122,8 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
   result.PrintIfConfig = false;
   result.CurrentModule = ModuleToPrint;
   result.FullyQualifiedTypes = true;
+  result.FullyQualifiedTypesIfAmbiguous = true;
+  result.FullyQualifiedExtendedTypesIfAmbiguous = true;
   result.UseExportedModuleNames = true;
   result.AllowNullTypes = false;
   result.SkipImports = true;
@@ -911,6 +914,7 @@ private:
   void printSynthesizedExtension(Type ExtendedType, ExtensionDecl *ExtDecl);
 
   void printExtension(ExtensionDecl* ExtDecl);
+  void printExtendedTypeName(TypeLoc ExtendedTypeLoc);
 
 public:
   PrintAST(ASTPrinter &Printer, const PrintOptions &Options)
@@ -995,18 +999,6 @@ public:
     ASTVisitor::visit(D);
 
     if (haveFeatureChecks) {
-      // If we guarded a marker protocol, print an alternative typealias
-      // for Any.
-      if (auto proto = dyn_cast<ProtocolDecl>(D)) {
-        if (proto->isMarkerProtocol()) {
-          Printer.printNewline();
-          Printer << "#else";
-          Printer.printNewline();
-          printAccess(proto);
-          Printer << "typealias " << proto->getName() << " = Any";
-        }
-      }
-
       printCompatibilityFeatureChecksPost(Printer);
     }
 
@@ -1815,7 +1807,7 @@ bool ShouldPrintChecker::shouldPrint(const Decl *D,
     auto Ext = cast<ExtensionDecl>(D);
     // If the extension doesn't add protocols or has no members that we should
     // print then skip printing it.
-    SmallVector<TypeLoc, 8> ProtocolsToPrint;
+    SmallVector<InheritedEntry, 8> ProtocolsToPrint;
     getInheritedForPrinting(Ext, Options, ProtocolsToPrint);
     if (ProtocolsToPrint.empty()) {
       bool HasMemberToPrint = false;
@@ -2233,15 +2225,18 @@ void PrintAST::printInherited(const Decl *decl) {
   if (!Options.PrintInherited) {
     return;
   }
-  SmallVector<TypeLoc, 6> TypesToPrint;
+  SmallVector<InheritedEntry, 6> TypesToPrint;
   getInheritedForPrinting(decl, Options, TypesToPrint);
   if (TypesToPrint.empty())
     return;
 
   Printer << " : ";
 
-  interleave(TypesToPrint, [&](TypeLoc TL) {
-    printTypeLoc(TL);
+  interleave(TypesToPrint, [&](InheritedEntry inherited) {
+    if (inherited.isUnchecked)
+      Printer << "@unchecked ";
+
+    printTypeLoc(inherited);
   }, [&]() {
     Printer << ", ";
   });
@@ -2329,15 +2324,18 @@ void PrintAST::visitImportDecl(ImportDecl *decl) {
                    [&] { Printer << "."; });
 }
 
-static void printExtendedTypeName(Type ExtendedType, ASTPrinter &Printer,
-                                  PrintOptions Options) {
-  Options.FullyQualifiedTypes = false;
-  Options.FullyQualifiedTypesIfAmbiguous = false;
+void PrintAST::printExtendedTypeName(TypeLoc ExtendedTypeLoc) {
+  bool OldFullyQualifiedTypesIfAmbiguous =
+    Options.FullyQualifiedTypesIfAmbiguous;
+  Options.FullyQualifiedTypesIfAmbiguous =
+    Options.FullyQualifiedExtendedTypesIfAmbiguous;
+  SWIFT_DEFER {
+    Options.FullyQualifiedTypesIfAmbiguous = OldFullyQualifiedTypesIfAmbiguous;
+  };
 
   // Strip off generic arguments, if any.
-  auto Ty = ExtendedType->getAnyNominal()->getDeclaredType();
-
-  Ty->print(Printer, Options);
+  auto Ty = ExtendedTypeLoc.getType()->getAnyNominal()->getDeclaredType();
+  printTypeLoc(TypeLoc(ExtendedTypeLoc.getTypeRepr(), Ty));
 }
 
 
@@ -2395,7 +2393,7 @@ void PrintAST::printSynthesizedExtension(Type ExtendedType,
     printAttributes(ExtDecl);
     Printer << tok::kw_extension << " ";
 
-    printExtendedTypeName(ExtendedType, Printer, Options);
+    printExtendedTypeName(TypeLoc::withoutLoc(ExtendedType));
     printInherited(ExtDecl);
 
     // We may need to combine requirements from ExtDecl (which has the members
@@ -2446,7 +2444,7 @@ void PrintAST::printExtension(ExtensionDecl *decl) {
         printTypeLoc(TypeLoc::withoutLoc(extendedType));
         return;
       }
-      printExtendedTypeName(extendedType, Printer, Options);
+      printExtendedTypeName(TypeLoc(decl->getExtendedTypeRepr(), extendedType));
     });
     printInherited(decl);
 
@@ -2508,60 +2506,6 @@ static bool usesFeatureAsyncAwait(Decl *decl) {
 }
 
 static bool usesFeatureMarkerProtocol(Decl *decl) {
-  // Check an inheritance clause for a marker protocol.
-  auto checkInherited = [&](ArrayRef<TypeLoc> inherited) -> bool {
-    for (const auto &inheritedEntry : inherited) {
-      if (auto inheritedType = inheritedEntry.getType()) {
-        if (inheritedType->isExistentialType()) {
-          auto layout = inheritedType->getExistentialLayout();
-          for (ProtocolType *protoTy : layout.getProtocols()) {
-            if (protoTy->getDecl()->isMarkerProtocol())
-              return true;
-          }
-        }
-      }
-    }
-
-    return false;
-  };
-
-  // Check generic requirements for a marker protocol.
-  auto checkRequirements = [&](ArrayRef<Requirement> requirements) -> bool {
-    for (const auto &req: requirements) {
-      if (req.getKind() == RequirementKind::Conformance &&
-          req.getSecondType()->castTo<ProtocolType>()->getDecl()
-              ->isMarkerProtocol())
-        return true;
-    }
-
-    return false;
-  };
-
-  if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
-    if (proto->isMarkerProtocol())
-      return true;
-
-    // Swift.Error and Swift.CodingKey "don't" use the marker protocol.
-    if (proto->isSpecificProtocol(KnownProtocolKind::Error) ||
-        proto->isSpecificProtocol(KnownProtocolKind::CodingKey)) {
-      return false;
-    }
-
-    if (checkInherited(proto->getInherited()))
-      return true;
-
-    if (checkRequirements(proto->getRequirementSignature()))
-      return true;
-  }
-
-  if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
-    if (checkRequirements(ext->getGenericRequirements()))
-      return true;
-
-    if (checkInherited(ext->getInherited()))
-      return true;
-  }
-
   return false;
 }
 
@@ -2638,7 +2582,7 @@ static bool usesFeatureRethrowsProtocol(
     return false;
 
   // Check an inheritance clause for a marker protocol.
-  auto checkInherited = [&](ArrayRef<TypeLoc> inherited) -> bool {
+  auto checkInherited = [&](ArrayRef<InheritedEntry> inherited) -> bool {
     for (const auto &inheritedEntry : inherited) {
       if (auto inheritedType = inheritedEntry.getType()) {
         if (inheritedType->isExistentialType()) {
@@ -2761,11 +2705,19 @@ static bool usesFeatureBuiltinBuildExecutor(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureBuiltinBuildMainExecutor(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureBuiltinContinuation(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureBuiltinTaskGroup(Decl *decl) {
+static bool usesFeatureBuiltinTaskGroupWithArgument(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureBuiltinCreateAsyncTaskInGroup(Decl *decl) {
   return false;
 }
 
@@ -5787,9 +5739,10 @@ void swift::printEnumElementsAsCases(
 }
 
 void
-swift::getInheritedForPrinting(const Decl *decl, const PrintOptions &options,
-                               llvm::SmallVectorImpl<TypeLoc> &Results) {
-  ArrayRef<TypeLoc> inherited;
+swift::getInheritedForPrinting(
+    const Decl *decl, const PrintOptions &options,
+    llvm::SmallVectorImpl<InheritedEntry> &Results) {
+  ArrayRef<InheritedEntry> inherited;
   if (auto td = dyn_cast<TypeDecl>(decl)) {
     inherited = td->getInherited();
   } else if (auto ed = dyn_cast<ExtensionDecl>(decl)) {
@@ -5797,29 +5750,22 @@ swift::getInheritedForPrinting(const Decl *decl, const PrintOptions &options,
   }
 
   // Collect explicit inherited types.
-  for (auto TL: inherited) {
-    if (auto ty = TL.getType()) {
+  for (auto entry: inherited) {
+    if (auto ty = entry.getType()) {
       bool foundUnprintable = ty.findIf([&](Type subTy) {
         if (auto aliasTy = dyn_cast<TypeAliasType>(subTy.getPointer()))
           return !options.shouldPrint(aliasTy->getDecl());
         if (auto NTD = subTy->getAnyNominal()) {
           if (!options.shouldPrint(NTD))
             return true;
-
-          if (auto PD = dyn_cast<ProtocolDecl>(NTD)) {
-            // Marker protocols are unprintable on concrete types, but they're
-            // okay on extension declarations and protocols.
-            if (PD->isMarkerProtocol() && !isa<ExtensionDecl>(decl) &&
-                !isa<ProtocolDecl>(decl))
-              return true;
-          }
         }
         return false;
       });
       if (foundUnprintable)
         continue;
     }
-    Results.push_back(TL);
+
+    Results.push_back(entry);
   }
 
   // Collect synthesized conformances.
@@ -5837,7 +5783,118 @@ swift::getInheritedForPrinting(const Decl *decl, const PrintOptions &options,
           isa<EnumDecl>(decl) &&
           cast<EnumDecl>(decl)->hasRawType())
         continue;
-      Results.push_back(TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()));
+      Results.push_back({TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()),
+                      /*isUnchecked=*/false});
     }
   }
+}
+
+//===----------------------------------------------------------------------===//
+//  Generic param list printing.
+//===----------------------------------------------------------------------===//
+
+void RequirementRepr::dump() const {
+  print(llvm::errs());
+  llvm::errs() << "\n";
+}
+
+void RequirementRepr::print(raw_ostream &out) const {
+  StreamPrinter printer(out);
+  print(printer);
+}
+
+void RequirementRepr::print(ASTPrinter &out) const {
+  auto printLayoutConstraint =
+      [&](const LayoutConstraintLoc &LayoutConstraintLoc) {
+        LayoutConstraintLoc.getLayoutConstraint()->print(out, PrintOptions());
+      };
+
+  switch (getKind()) {
+  case RequirementReprKind::LayoutConstraint:
+    if (auto *repr = getSubjectRepr()) {
+      repr->print(out, PrintOptions());
+    }
+    out << " : ";
+    printLayoutConstraint(getLayoutConstraintLoc());
+    break;
+
+  case RequirementReprKind::TypeConstraint:
+    if (auto *repr = getSubjectRepr()) {
+      repr->print(out, PrintOptions());
+    }
+    out << " : ";
+    if (auto *repr = getConstraintRepr()) {
+      repr->print(out, PrintOptions());
+    }
+    break;
+
+  case RequirementReprKind::SameType:
+    if (auto *repr = getFirstTypeRepr()) {
+      repr->print(out, PrintOptions());
+    }
+    out << " == ";
+    if (auto *repr = getSecondTypeRepr()) {
+      repr->print(out, PrintOptions());
+    }
+    break;
+  }
+}
+
+void GenericParamList::dump() const {
+  print(llvm::errs());
+  llvm::errs() << '\n';
+}
+
+void GenericParamList::print(raw_ostream &out, const PrintOptions &PO) const {
+  StreamPrinter printer(out);
+  print(printer, PO);
+}
+
+static void printTrailingRequirements(ASTPrinter &Printer,
+                                      ArrayRef<RequirementRepr> Reqs,
+                                      bool printWhereKeyword) {
+  if (Reqs.empty())
+    return;
+
+  if (printWhereKeyword)
+    Printer << " where ";
+  interleave(
+      Reqs,
+      [&](const RequirementRepr &req) {
+        Printer.callPrintStructurePre(PrintStructureKind::GenericRequirement);
+        req.print(Printer);
+        Printer.printStructurePost(PrintStructureKind::GenericRequirement);
+      },
+      [&] { Printer << ", "; });
+}
+
+void GenericParamList::print(ASTPrinter &Printer,
+                             const PrintOptions &PO) const {
+  Printer << '<';
+  interleave(
+      *this,
+      [&](const GenericTypeParamDecl *P) {
+        Printer << P->getName();
+        if (!P->getInherited().empty()) {
+          Printer << " : ";
+
+          auto loc = P->getInherited()[0];
+          if (willUseTypeReprPrinting(loc, nullptr, PO)) {
+            loc.getTypeRepr()->print(Printer, PO);
+          } else {
+            loc.getType()->print(Printer, PO);
+          }
+        }
+      },
+      [&] { Printer << ", "; });
+
+  printTrailingRequirements(Printer, getRequirements(),
+                            /*printWhereKeyword*/ true);
+  Printer << '>';
+}
+
+void TrailingWhereClause::print(llvm::raw_ostream &OS,
+                                bool printWhereKeyword) const {
+  StreamPrinter Printer(OS);
+  printTrailingRequirements(Printer, getRequirements(), printWhereKeyword);
 }

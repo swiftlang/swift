@@ -146,15 +146,15 @@ func takesNoEscapeFunction(fn: () -> ()) { // expected-note {{parameter 'fn' is 
 
 
 class FooClass {
-  var stored : Optional<(()->Int)->Void> = nil
+  var stored : Optional<(()->Int)->Void> = nil  // expected-note {{add explicit @escaping to function parameter #0}} {{26-26=@escaping }}
   var computed : (()->Int)->Void {
     get { return stored! }
     set(newValue) { stored = newValue } // ok
   }
   var computedEscaping : (@escaping ()->Int)->Void {
     get { return stored! }
-    set(newValue) { stored = newValue } // expected-error{{assigning non-escaping parameter 'newValue' to an @escaping closure}}
-    // expected-note@-1 {{parameter 'newValue' is implicitly non-escaping}}
+    set(newValue) { stored = newValue } // expected-error{{cannot assign value of type '(@escaping () -> Int) -> Void' to type '(() -> Int) -> Void'}}
+    // expected-note@-1{{parameter #0 expects escaping value of type '() -> Int'}}
   }
 }
 
@@ -230,3 +230,40 @@ extension SR_9760 {
 
 // SR-9178
 func foo<T>(_ x: @escaping T) {} // expected-error 1{{@escaping attribute only applies to function types}}
+
+// SR-14720
+var global: ((() -> Void) -> Void)? = nil // expected-note {{add explicit @escaping to function parameter #0}} {{15-15=@escaping }}
+
+class SR14720 {
+  let ok: (@escaping () -> Void) -> Void // OK
+  let callback: (() -> Void) -> Void // expected-note {{add explicit @escaping to function parameter #0}} {{18-18=@escaping }}
+  let callback1: (() -> Void, () -> Void) -> Void // expected-note {{add explicit @escaping to function parameter #1}} {{31-31=@escaping }} 
+  let callbackAuto: (@autoclosure () -> Void) -> Void // expected-note {{add explicit @escaping to function parameter #0}} {{34-34= @escaping}}
+  let callbackOpt: ((() -> Void) -> Void)? // expected-note{{add explicit @escaping to function parameter #0}} {{22-22=@escaping }}
+
+  init(f: @escaping (@escaping() -> Void) -> Void) {
+    self.callback = f // expected-error{{cannot assign value of type '(@escaping () -> Void) -> Void' to type '(() -> Void) -> Void'}}
+    // expected-note@-1{{parameter #0 expects escaping value of type '() -> Void'}}
+    self.ok = f // Ok
+  }
+
+  init(af: @escaping (@escaping() -> Void) -> Void) {
+    self.callbackOpt = af // expected-error{{cannot assign value of type '(@escaping () -> Void) -> Void' to type '(() -> Void) -> Void'}}
+    // expected-note@-1{{parameter #0 expects escaping value of type '() -> Void'}}  
+  }
+
+  init(ag: @escaping (@escaping() -> Void) -> Void) {
+    global = ag // expected-error{{cannot assign value of type '(@escaping () -> Void) -> Void' to type '(() -> Void) -> Void'}}
+    // expected-note@-1{{parameter #0 expects escaping value of type '() -> Void'}}
+  }
+
+  init(a: @escaping (@escaping () -> Void) -> Void) {
+    self.callbackAuto = a // expected-error{{cannot assign value of type '(@escaping () -> Void) -> Void' to type '(@autoclosure () -> Void) -> Void'}}
+    // expected-note@-1{{parameter #0 expects escaping value of type '() -> Void'}}
+  }
+
+  init(f: @escaping (() -> Void, @escaping() -> Void) -> Void) {
+    self.callback1 = f // expected-error{{cannot assign value of type '(() -> Void, @escaping () -> Void) -> Void' to type '(() -> Void, () -> Void) -> Void'}}
+    // expected-note@-1{{parameter #1 expects escaping value of type '() -> Void'}}
+  }
+}

@@ -432,6 +432,23 @@ bool DIMemoryObjectInfo::isElementLetProperty(unsigned Element) const {
   return false;
 }
 
+ConstructorDecl *DIMemoryObjectInfo::isActorInitSelf() const {
+  // is it 'self'?
+  if (!MemoryInst->isVar())
+    if (auto decl =
+        dyn_cast_or_null<ClassDecl>(getASTType()->getAnyNominal()))
+      // is it for an actor?
+      if (decl->isActor() && !decl->isDistributedActor()) // FIXME(78484431) skip distributed actors for now, until their initializers are fixed!
+        if (auto *silFn = MemoryInst->getFunction())
+          // is it a designated initializer?
+          if (auto *ctor = dyn_cast_or_null<ConstructorDecl>(
+                            silFn->getDeclContext()->getAsDecl()))
+            if (ctor->isDesignatedInit())
+              return ctor;
+
+  return nullptr;
+}
+
 //===----------------------------------------------------------------------===//
 //                        DIMemoryUse Implementation
 //===----------------------------------------------------------------------===//
@@ -1048,7 +1065,11 @@ void ElementUseCollector::collectClassSelfUses(SILValue ClassPointer) {
 
   // If we are looking at the init method for a root class, just walk the
   // MUI use-def chain directly to find our uses.
-  if (TheMemory.isRootSelf()) {
+  if (TheMemory.isRootSelf() ||
+  
+      // Also, just visit all users if ClassPointer is a closure argument,
+      // i.e. collectClassSelfUses is called from addClosureElementUses.
+      isa<SILFunctionArgument>(ClassPointer)) {
     collectClassSelfUses(ClassPointer, TheMemory.getType(), EltNumbering);
     return;
   }

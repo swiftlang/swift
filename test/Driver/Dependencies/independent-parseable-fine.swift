@@ -25,7 +25,8 @@
 // CHECK-SECOND-DAG: "{{(.\\/)?}}main.swift"
 // CHECK-SECOND: {{^}$}}
 
-// RUN: touch -t 201401240006 %t/*
+// Don't mess with the priors
+// RUN: touch -t 201401240006 %t/*.{swift,swiftdeps,json}
 // RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path "%{python.unquoted};%S/Inputs/update-dependencies.py;%swift-dependency-tool" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./main.swift -j1 -parseable-output 2>&1 | %FileCheck -check-prefix=CHECK-FIRST %s
 
 
@@ -73,6 +74,6 @@
 // CHECK-SECOND-MULTI-DAG: "{{(.\\/)?}}other.swift"
 // CHECK-SECOND-MULTI: {{^}$}}
 
-// RUN: touch -t 201401240006 %t/*
+// RUN: touch -t 201401240006 %t/*.{swift,swiftdeps,json}
 // RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path "%{python.unquoted};%S/Inputs/update-dependencies.py;%swift-dependency-tool" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./main.swift ./other.swift -module-name main -j1 -parseable-output 2>&1 | %FileCheck -check-prefix=CHECK-FIRST-MULTI %s
 

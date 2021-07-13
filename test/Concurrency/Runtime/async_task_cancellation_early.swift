@@ -13,7 +13,7 @@ import Dispatch
 @available(SwiftStdlib 5.5, *)
 func test_detach_cancel_child_early() async {
   print(#function) // CHECK: test_detach_cancel_child_early
-  let h: Task.Handle<Bool, Error> = detach {
+  let h: Task<Bool, Error> = Task.detached {
     async let childCancelled: Bool = { () -> Bool in
       await Task.sleep(2_000_000_000)
       return Task.isCancelled
@@ -31,7 +31,7 @@ func test_detach_cancel_child_early() async {
 
   h.cancel()
   print("handle cancel")
-  let got = try! await h.get()
+  let got = try! await h.value
   print("was cancelled: \(got)") // CHECK: was cancelled: true
 }
 

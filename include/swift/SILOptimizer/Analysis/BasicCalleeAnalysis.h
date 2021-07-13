@@ -37,22 +37,43 @@ class SILWitnessTable;
 /// allows a client to determine whether the list is incomplete in the
 /// sense that there may be unrepresented callees.
 class CalleeList {
-  llvm::TinyPtrVector<SILFunction *> CalleeFunctions;
-  bool IsIncomplete;
+  friend class CalleeCache;
+
+  using Callees = llvm::SmallVector<SILFunction *, 16>;
+
+  void *functionOrCallees;
+
+  enum class Kind : uint8_t {
+    empty,
+    singleFunction,
+    multipleCallees
+  } kind;
+
+  bool incomplete;
+
+  CalleeList(void *ptr, Kind kind, bool isIncomplete) :
+    functionOrCallees(ptr), kind(kind), incomplete(isIncomplete) {}
 
 public:
   /// Constructor for when we know nothing about the callees and must
   /// assume the worst.
-  CalleeList() : IsIncomplete(true) {}
+  CalleeList() : CalleeList(nullptr, Kind::empty, /*incomplete*/ true) {}
 
   /// Constructor for the case where we know an apply can target only
   /// a single function.
-  CalleeList(SILFunction *F) : CalleeFunctions(F), IsIncomplete(false) {}
+  CalleeList(SILFunction *F)
+    : CalleeList(F, Kind::singleFunction, /*incomplete*/ false) {}
 
   /// Constructor for arbitrary lists of callees.
-  CalleeList(llvm::SmallVectorImpl<SILFunction *> &List, bool IsIncomplete)
-      : CalleeFunctions(llvm::makeArrayRef(List.begin(), List.end())),
-        IsIncomplete(IsIncomplete) {}
+  CalleeList(Callees *callees, bool IsIncomplete)
+    : CalleeList(callees, Kind::multipleCallees, IsIncomplete) {}
+
+  static CalleeList fromOpaque(void *ptr, unsigned char kind, unsigned char isComplete) {
+    return CalleeList(ptr, (Kind)kind, (bool)isComplete);
+  }
+
+  void *getOpaquePtr() const { return functionOrCallees; }
+  unsigned char getOpaqueKind() const { return (unsigned char)kind; }
 
   SWIFT_DEBUG_DUMP;
 
@@ -60,15 +81,29 @@ public:
 
   /// Return an iterator for the beginning of the list.
   ArrayRef<SILFunction *>::iterator begin() const {
-    return CalleeFunctions.begin();
+    switch (kind) {
+      case Kind::empty:
+        return nullptr;
+      case Kind::singleFunction:
+        return (SILFunction * const *)&functionOrCallees;
+      case Kind::multipleCallees:
+        return ((Callees *)functionOrCallees)->begin();
+    }
   }
 
   /// Return an iterator for the end of the list.
   ArrayRef<SILFunction *>::iterator end() const {
-    return CalleeFunctions.end();
+    switch (kind) {
+      case Kind::empty:
+        return nullptr;
+      case Kind::singleFunction:
+        return (SILFunction * const *)&functionOrCallees + 1;
+      case Kind::multipleCallees:
+        return ((Callees *)functionOrCallees)->end();
+    }
   }
 
-  bool isIncomplete() const { return IsIncomplete; }
+  bool isIncomplete() const { return incomplete; }
 
   /// Returns true if all callees are known and not external.
   bool allCalleesVisible() const;
@@ -80,14 +115,13 @@ public:
 /// any function application site (including those that are simple
 /// function_ref, thin_to_thick, or partial_apply callees).
 class CalleeCache {
-  using Callees = llvm::SmallVector<SILFunction *, 16>;
-  using CalleesAndCanCallUnknown = llvm::PointerIntPair<Callees *, 1>;
+  using CalleesAndCanCallUnknown = llvm::PointerIntPair<CalleeList::Callees *, 1>;
   using CacheType = llvm::DenseMap<SILDeclRef, CalleesAndCanCallUnknown>;
 
   SILModule &M;
 
   // Allocator for the SmallVectors that we will be allocating.
-  llvm::SpecificBumpPtrAllocator<Callees> Allocator;
+  llvm::SpecificBumpPtrAllocator<CalleeList::Callees> Allocator;
 
   // The cache of precomputed callee lists for function decls appearing
   // in class virtual dispatch tables and witness tables.
@@ -106,6 +140,11 @@ public:
   /// Return the list of callees that can potentially be called at the
   /// given apply site.
   CalleeList getCalleeList(FullApplySite FAS) const;
+
+  CalleeList getCalleeListOfValue(SILValue callee) const {
+    return getCalleeListForCalleeKind(callee);
+  }
+
   /// Return the list of callees that can potentially be called at the
   /// given instruction. E.g. it could be destructors.
   CalleeList getCalleeList(SILInstruction *I) const;
@@ -178,6 +217,11 @@ public:
   CalleeList getCalleeList(FullApplySite FAS) {
     updateCache();
     return Cache->getCalleeList(FAS);
+  }
+
+  CalleeList getCalleeListOfValue(SILValue callee) {
+    updateCache();
+    return Cache->getCalleeListOfValue(callee);
   }
 
   CalleeList getCalleeList(SILInstruction *I) {

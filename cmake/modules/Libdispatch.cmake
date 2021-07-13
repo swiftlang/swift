@@ -110,6 +110,14 @@ foreach(sdk ${DISPATCH_SDKS})
                           ${CMAKE_COMMAND} -E copy
                           <INSTALL_DIR>/${LIBDISPATCH_RUNTIME_DIR}/${SWIFT_SDK_${sdk}_SHARED_LIBRARY_PREFIX}BlocksRuntime${SWIFT_SDK_${sdk}_SHARED_LIBRARY_SUFFIX}
                           ${SWIFTLIB_DIR}/${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}/${SWIFT_SDK_${sdk}_SHARED_LIBRARY_PREFIX}BlocksRuntime${SWIFT_SDK_${sdk}_SHARED_LIBRARY_SUFFIX}
+                        COMMAND
+                          ${CMAKE_COMMAND} -E copy
+                          <INSTALL_DIR>/${LIBDISPATCH_RUNTIME_DIR}/${SWIFT_SDK_${sdk}_SHARED_LIBRARY_PREFIX}dispatch${SWIFT_SDK_${sdk}_SHARED_LIBRARY_SUFFIX}
+                          ${SWIFTLIB_DIR}/${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${SWIFT_SDK_${sdk}_SHARED_LIBRARY_PREFIX}dispatch${SWIFT_SDK_${sdk}_SHARED_LIBRARY_SUFFIX}
+                        COMMAND
+			  ${CMAKE_COMMAND} -E copy
+                          <INSTALL_DIR>/${LIBDISPATCH_RUNTIME_DIR}/${SWIFT_SDK_${sdk}_SHARED_LIBRARY_PREFIX}BlocksRuntime${SWIFT_SDK_${sdk}_SHARED_LIBRARY_SUFFIX}
+                          ${SWIFTLIB_DIR}/${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${SWIFT_SDK_${sdk}_SHARED_LIBRARY_PREFIX}BlocksRuntime${SWIFT_SDK_${sdk}_SHARED_LIBRARY_SUFFIX}
                         STEP_TARGETS
                           install
                         BUILD_BYPRODUCTS

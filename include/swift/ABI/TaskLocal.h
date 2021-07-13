@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Swift ABI describing tasks.
+// Swift ABI describing task locals.
 //
 //===----------------------------------------------------------------------===//
 
@@ -68,6 +68,15 @@ public:
 
     // Trailing storage for the value itself. The storage will be
     // uninitialized or contain an instance of \c valueType.
+
+    /// Returns true if this item is a 'parent pointer'.
+    ///
+    /// A parent pointer is special kind of `Item` is created when pointing at
+    /// the parent storage, forming a chain of task local items spanning multiple
+    /// tasks.
+    bool isParentPointer() const {
+      return !valueType;
+    }
 
   protected:
     explicit Item()
@@ -174,7 +183,7 @@ public:
     /// returns, as such, any child tasks potentially accessing the value stack
     /// are guaranteed to be completed by the time we pop values off the stack
     /// (after the body has completed).
-    TaskLocal::Item *head;
+    TaskLocal::Item *head = nullptr;
 
   public:
 

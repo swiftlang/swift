@@ -207,9 +207,9 @@ public:
 /// The only operation on this component is `project`.
 class PhysicalPathComponent : public PathComponent {
   virtual void _anchor() override;
+  Optional<ActorIsolation> ActorIso;
 
 protected:
-  Optional<ActorIsolation> ActorIso;
   PhysicalPathComponent(LValueTypeData typeData, KindTy Kind,
                         Optional<ActorIsolation> actorIso = None)
     : PathComponent(typeData, Kind), ActorIso(actorIso) {
@@ -217,8 +217,16 @@ protected:
   }
 
 public:
-  // Obtains the actor-isolation required for any loads of this component.
-  Optional<ActorIsolation> getActorIsolation() const { return ActorIso; }
+  /// Obtains and consumes the actor-isolation required for any loads of
+  /// this component.
+  Optional<ActorIsolation> takeActorIsolation() {
+    Optional<ActorIsolation> current = ActorIso;
+    ActorIso = None;
+    return current;
+  }
+
+  /// Determines whether this component has any actor-isolation.
+  bool hasActorIsolation() const { return ActorIso.hasValue(); }
 };
 
 inline PhysicalPathComponent &PathComponent::asPhysical() {

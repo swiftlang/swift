@@ -29,5 +29,5 @@
 extension IOIPublicStruct {
   public func foo() {}
 }
-// CHECK-PUBLIC-NOT: IOIPublicStruct
-// CHECK-PRIVATE: @_spi{{.*}} extension IOIPublicStruct
+// CHECK-PUBLIC-NOT: ExperimentalImported.IOIPublicStruct
+// CHECK-PRIVATE: @_spi{{.*}} extension ExperimentalImported.IOIPublicStruct

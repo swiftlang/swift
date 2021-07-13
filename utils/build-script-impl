@@ -139,11 +139,10 @@ KNOWN_SETTINGS=(
     common-cmake-options                          ""                "CMake options used for all targets, including LLVM/Clang"
     extra-cmake-options                           ""                "Extra options to pass to CMake for all targets"
     ninja-cmake-options                           ""                "CMake options used for all ninja targets"
-    ninja-cmake-options                           ""                "CMake options used for all ninja targets"
 
     ## Build ...
     build-llvm                                    "1"               "set to 1 to build LLVM and Clang"
-    build-sil-debugging-stdlib                    "0"               "set to 1 to build the Swift standard library with -gsil to enable debugging and profiling on SIL level"
+    build-sil-debugging-stdlib                    "0"               "set to 1 to build the Swift standard library with -sil-based-debuginfo to enable debugging and profiling on SIL level"
     build-swift-dynamic-sdk-overlay               ""                "set to 1 to build dynamic variants of the Swift SDK overlay"
     build-swift-dynamic-stdlib                    ""                "set to 1 to build dynamic variants of the Swift standard library"
     build-swift-examples                          "1"               "set to 1 to build examples"
@@ -205,6 +204,7 @@ KNOWN_SETTINGS=(
     swift-stdlib-os-versioning                    "1"               "whether to build stdlib with availability based on OS versions (Darwin only)"
     swift-stdlib-stable-abi                       ""                "should stdlib be built with stable ABI, if not set defaults to true on Darwin, false otherwise"
     swift-disable-dead-stripping                  "0"               "turns off Darwin-specific dead stripping for Swift host tools"
+    common-swift-flags                            ""                "Flags used for Swift targets other than the stdlib, like the corelibs"
 
     ## FREESTANDING Stdlib Options
     swift-freestanding-sdk                      ""                "which SDK to use when building the FREESTANDING stdlib"
@@ -229,6 +229,7 @@ KNOWN_SETTINGS=(
     cross-compile-hosts                           ""                "space-separated list of targets to cross-compile host Swift tools for"
     cross-compile-with-host-tools                 ""                "set to use the clang we build for the host to then build the cross-compile hosts"
     cross-compile-install-prefixes                ""                "semicolon-separated list of install prefixes to use for the cross-compiled hosts. The list expands, so if there are more cross-compile hosts than prefixes, unmatched hosts use the last prefix in the list"
+    cross-compile-deps-path                       ""                "path for CMake to look for cross-compiled library dependencies, such as libXML2"
     skip-merge-lipo-cross-compile-tools           ""                "set to skip running merge-lipo after installing cross-compiled host Swift tools"
     coverage-db                                   ""                "If set, coverage database to use when prioritizing testing"
     skip-local-host-install                       ""                "If we are cross-compiling multiple targets, skip an install pass locally if the hosts match"
@@ -748,6 +749,7 @@ function set_build_options_for_host() {
             )
 
             lldb_cmake_options+=(
+                -DCMAKE_OSX_DEPLOYMENT_TARGET:STRING="${cmake_osx_deployment_target}"
                 -DCMAKE_OSX_SYSROOT:PATH="${cmake_os_sysroot}"
                 -DCMAKE_OSX_ARCHITECTURES="${architecture}"
             )
@@ -1249,6 +1251,8 @@ function calculate_targets_for_host() {
     SWIFT_BENCHMARK_TARGETS=($(get_host_specific_variable ${host} SWIFT_BENCHMARK_TARGETS))
     SWIFT_RUN_BENCHMARK_TARGETS=($(get_host_specific_variable ${host} SWIFT_RUN_BENCHMARK_TARGETS))
     SWIFT_TEST_TARGETS=($(get_host_specific_variable ${host} SWIFT_TEST_TARGETS))
+    SWIFT_FLAGS=($(get_host_specific_variable ${host} SWIFT_FLAGS))
+    SWIFT_TARGET_CMAKE_OPTIONS=($(get_host_specific_variable ${host} SWIFT_TARGET_CMAKE_OPTIONS))
 }
 
 
@@ -1390,6 +1394,14 @@ function swift_c_flags() {
     fi
 }
 
+function common_swift_flags() {
+    if [ "${module_cache}" == "" ] ; then
+        echo "error: a module cache path has not been set"
+        exit 1
+    fi
+    echo -n "${SWIFT_FLAGS[@]} ${COMMON_SWIFT_FLAGS} -module-cache-path \"${module_cache}\" "
+}
+
 function cmake_config_opt() {
     product=$1
     if [[ "${CMAKE_GENERATOR}" == "Xcode" ]] ; then
@@ -1433,6 +1445,25 @@ function cmake_config_opt() {
     fi
 }
 
+function copy_lib_stripping_architecture() {
+    local source="$1"
+    local dest="$2"
+    local arch="$3"
+
+    # An alternative approach would be to use || to first
+    # attempt the removal of the slice and fall back to the
+    # copy when failing.
+    # However, this would leave unneeded error messages in the logs
+    # that may hinder investigation; in addition, in this scenario
+    # the `call` function seems to not propagate correctly failure
+    # exit codes.
+    if lipo -archs "${source}" | grep -q "${arch}"; then
+        call lipo -remove "${arch}" "${source}" -output "${dest}"
+    else
+        call cp "${source}" "${dest}"
+    fi
+}
+
 function copy_embedded_compiler_rt_builtins_from_darwin_host_toolchain() {
     local clang_dest_dir="$1"
 
@@ -1458,7 +1489,8 @@ function copy_embedded_compiler_rt_builtins_from_darwin_host_toolchain() {
                 if [[ ! -f "${DEST_LIB_PATH}" ]]; then
                     if [[ -f "${HOST_LIB_PATH}" ]]; then
                         if [[ "$OS" == "tvos" ]]; then
-                            call lipo -remove i386 "${HOST_LIB_PATH}" -output "${DEST_LIB_PATH}" || call cp "${HOST_LIB_PATH}" "${DEST_LIB_PATH}"
+                            # This is to avoid strip failures when generating a toolchain
+                            copy_lib_stripping_architecture "${HOST_LIB_PATH}" "${DEST_LIB_PATH}" i386
                         else
                            call cp "${HOST_LIB_PATH}" "${DEST_LIB_PATH}"
                         fi
@@ -1474,7 +1506,8 @@ function copy_embedded_compiler_rt_builtins_from_darwin_host_toolchain() {
                 if [[ ! -f "${DEST_SIM_LIB_PATH}" ]]; then
                     if [[ -f "${HOST_SIM_LIB_PATH}" ]]; then
                         if [[ "$OS" == "tvos" ]]; then
-                            call lipo -remove i386 "${HOST_SIM_LIB_PATH}" -output "${DEST_SIM_LIB_PATH}" || call cp "${HOST_SIM_LIB_PATH}" "${DEST_SIM_LIB_PATH}"
+                            # This is to avoid strip failures when generating a toolchain
+                            copy_lib_stripping_architecture "${HOST_SIM_LIB_PATH}" "${DEST_SIM_LIB_PATH}" i386
                         else
                             call cp "${HOST_SIM_LIB_PATH}" "${DEST_SIM_LIB_PATH}"
                         fi
@@ -1674,6 +1707,9 @@ for host in "${ALL_HOSTS[@]}"; do
                   -DCMAKE_BUILD_TYPE:STRING="${CMARK_BUILD_TYPE}"
                   "${cmark_cmake_options[@]}"
                 )
+                if [[ $(is_cross_tools_host ${host}) ]] ; then
+                    cmake_options+=("${SWIFT_TARGET_CMAKE_OPTIONS[@]}")
+                fi
                 build_targets=(all)
                 ;;
 
@@ -1801,6 +1837,7 @@ for host in "${ALL_HOSTS[@]}"; do
                         -DCLANG_TABLEGEN=$(build_directory "${LOCAL_HOST}" llvm)/bin/clang-tblgen
                         -DLLVM_NATIVE_BUILD=$(build_directory "${LOCAL_HOST}" llvm)
                     )
+                    cmake_options+=("${SWIFT_TARGET_CMAKE_OPTIONS[@]}")
                 fi
 
                 ;;
@@ -2213,7 +2250,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DCMAKE_CXX_COMPILER:PATH="${CLANG_BIN}/clang++"
                     -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
                     -DCMAKE_Swift_COMPILER:PATH=${SWIFTC_BIN}
-                    -DCMAKE_Swift_FLAGS:STRING="-module-cache-path \"${module_cache}\""
+                    -DCMAKE_Swift_FLAGS:STRING="$(common_swift_flags)"
 
                     -DLLBUILD_ENABLE_ASSERTIONS:BOOL=$(true_false "${LLBUILD_ENABLE_ASSERTIONS}")
                     -DLLBUILD_SUPPORT_BINDINGS:=Swift
@@ -2228,6 +2265,22 @@ for host in "${ALL_HOSTS[@]}"; do
                     -Ddispatch_DIR:PATH=$(build_directory ${host} libdispatch)/cmake/modules
                     -DFoundation_DIR:PATH=$(build_directory ${host} foundation)/cmake/modules
                 )
+
+                if [[ $(is_cross_tools_host ${host}) ]] ; then
+                    cmake_options+=("${SWIFT_TARGET_CMAKE_OPTIONS[@]}")
+
+                    # llbuild looks for the SQlite3 library using find_package(),
+                    # so search for it in CROSS_COMPILE_DEPS_PATH using the CMake
+                    # process for doing so and don't use cross-compiled
+                    # executables, see the linked CMake docs for more info:
+                    #
+                    # https://cmake.org/cmake/help/latest/command/find_package.html
+                    # https://cmake.org/cmake/help/latest/command/find_program.html
+                    cmake_options+=(
+                        -DCMAKE_FIND_ROOT_PATH:PATH="${CROSS_COMPILE_DEPS_PATH}"
+                        -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER
+                    )
+                fi
 
                 # Ensure on Darwin platforms that we consider only the SQLite headers
                 # from the SDK instead of picking ones found elsewhere
@@ -2295,7 +2348,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DCMAKE_C_COMPILER:PATH="${CLANG_BIN}/clang"
                     -DCMAKE_CXX_COMPILER:PATH="${CLANG_BIN}/clang++"
                     -DCMAKE_Swift_COMPILER:PATH=${SWIFTC_BIN}
-                    -DCMAKE_Swift_FLAGS:STRING="-module-cache-path \"${module_cache}\""
+                    -DCMAKE_Swift_FLAGS:STRING="$(common_swift_flags)"
                     -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
                     -DCMAKE_INSTALL_LIBDIR:PATH="lib"
 
@@ -2311,6 +2364,9 @@ for host in "${ALL_HOSTS[@]}"; do
 
                     -DENABLE_TESTING=YES
                   )
+                  if [[ $(is_cross_tools_host ${host}) ]] ; then
+                      cmake_options+=("${SWIFT_TARGET_CMAKE_OPTIONS[@]}")
+                  fi
                 ;;
                 esac
 
@@ -2364,7 +2420,7 @@ for host in "${ALL_HOSTS[@]}"; do
                   -DCMAKE_CXX_COMPILER:PATH=${CLANG_BIN}/clang++
                   -DCMAKE_SWIFT_COMPILER:PATH=${SWIFTC_BIN}
                   -DCMAKE_Swift_COMPILER:PATH=${SWIFTC_BIN}
-                  -DCMAKE_Swift_FLAGS:STRING="-module-cache-path \"${module_cache}\""
+                  -DCMAKE_Swift_FLAGS:STRING="$(common_swift_flags)"
                   -DCMAKE_INSTALL_PREFIX:PATH=$(get_host_install_prefix ${host})
 
                   ${LIBICU_BUILD_ARGS[@]}
@@ -2380,6 +2436,24 @@ for host in "${ALL_HOSTS[@]}"; do
                   -DBUILD_SHARED_LIBS=$([[ ${product} == foundation_static ]] && echo "NO" || echo "YES")
                 )
 
+                if [[ $(is_cross_tools_host ${host}) ]] ; then
+                    cmake_options+=("${SWIFT_TARGET_CMAKE_OPTIONS[@]}")
+
+                    # Foundation looks for the ICU, libXML2 and libcurl libraries
+                    # using find_package(), so search for them in
+                    # CROSS_COMPILE_DEPS_PATH using the CMake process for doing
+                    # so, see the linked CMake docs for more info:
+                    #
+                    # https://cmake.org/cmake/help/latest/command/find_package.html
+                    cmake_options+=(
+                        -DCMAKE_FIND_ROOT_PATH:PATH="${CROSS_COMPILE_DEPS_PATH}"
+                    )
+                fi
+                if [[ "${host}" == "android-"* ]]; then
+                    cmake_options+=(
+                        -DCMAKE_HAVE_LIBC_PTHREAD=True
+                    )
+                fi
                 ;;
             libdispatch|libdispatch_static)
                 LIBDISPATCH_BUILD_DIR=$(build_directory ${host} ${product})
@@ -2406,7 +2480,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DCMAKE_CXX_COMPILER:PATH="${CLANG_BIN}/clang++"
                     -DCMAKE_SWIFT_COMPILER:PATH="${SWIFTC_BIN}"
                     -DCMAKE_Swift_COMPILER:PATH="${SWIFTC_BIN}"
-                    -DCMAKE_Swift_FLAGS:STRING="-module-cache-path \"${module_cache}\""
+                    -DCMAKE_Swift_FLAGS:STRING="$(common_swift_flags)"
                     -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
                     -DCMAKE_INSTALL_LIBDIR:PATH="lib"
 
@@ -2415,6 +2489,9 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DENABLE_TESTING=YES
                     -DBUILD_SHARED_LIBS=$([[ ${product} == libdispatch_static ]] && echo "NO" || echo "YES")
                   )
+                  if [[ $(is_cross_tools_host ${host}) ]] ; then
+                      cmake_options+=("${SWIFT_TARGET_CMAKE_OPTIONS[@]}")
+                  fi
                 ;;
                 esac
 

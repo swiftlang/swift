@@ -75,6 +75,36 @@ function(_set_target_prefix_and_suffix target kind sdk)
   endif()
 endfunction()
 
+function(_add_host_variant_swift_sanitizer_flags target)
+  if(LLVM_USE_SANITIZER)
+    if(LLVM_USE_SANITIZER STREQUAL "Address")
+      set(_Swift_SANITIZER_FLAGS "-sanitize=address")
+    elseif(LLVM_USE_SANITIZER STREQUAL "HWAddress")
+      # Not supported?
+    elseif(LLVM_USE_SANITIZER MATCHES "Memory(WithOrigins)?")
+      # Not supported
+      if(LLVM_USE_SANITIZER STREQUAL "MemoryWithOrigins")
+        # Not supported
+      endif()
+    elseif(LLVM_USE_SANITIZER STREQUAL "Undefined")
+      set(_Swift_SANITIZER_FLAGS "-sanitize=undefined")
+    elseif(LLVM_USE_SANITIZER STREQUAL "Thread")
+      set(_Swift_SANITIZER_FLAGS "-sanitize=thread")
+    elseif(LLVM_USE_SANITIZER STREQUAL "DataFlow")
+      # Not supported
+    elseif(LLVM_USE_SANITIZER STREQUAL "Address;Undefined" OR
+           LLVM_USE_SANITIZER STREQUAL "Undefined;Address")
+      set(_Swift_SANITIZER_FLAGS "-sanitize=address -sanitize=undefined")
+    elseif(LLVM_USE_SANITIZER STREQUAL "Leaks")
+      # Not supported
+    else()
+      message(SEND_ERROR "unsupported value for LLVM_USE_SANITIZER: ${LLVM_USE_SANITIZER}")
+    endif()
+
+    target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:Swift>:${_Swift_SANITIZER_FLAGS}>)
+  endif()
+endfunction()
+
 # Usage:
 # _add_host_variant_c_compile_link_flags(name)
 function(_add_host_variant_c_compile_link_flags name)
@@ -100,6 +130,8 @@ function(_add_host_variant_c_compile_link_flags name)
       MACCATALYST_BUILD_FLAVOR ""
       DEPLOYMENT_VERSION "${DEPLOYMENT_VERSION}")
     target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:Swift>:-target;${target}>)
+
+   _add_host_variant_swift_sanitizer_flags(${name})
   endif()
 
   set(_sysroot
@@ -568,13 +600,22 @@ function(add_swift_host_library name)
     # find all of the necessary swift libraries on Darwin.
     if (NOT ASHL_PURE_SWIFT)
       if (CMAKE_Swift_COMPILER)
-        # Add in the SDK directory for the host platform and add an rpath.
-        target_link_directories(${name} PRIVATE
-          ${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}/usr/lib/swift)
         # Add in the toolchain directory so we can grab compatibility libraries
         get_filename_component(TOOLCHAIN_BIN_DIR ${CMAKE_Swift_COMPILER} DIRECTORY)
         get_filename_component(TOOLCHAIN_LIB_DIR "${TOOLCHAIN_BIN_DIR}/../lib/swift/macosx" ABSOLUTE)
         target_link_directories(${name} PUBLIC ${TOOLCHAIN_LIB_DIR})
+
+        # Add in the SDK directory for the host platform.
+        #
+        # NOTE: We do this /after/ target_link_directorying TOOLCHAIN_LIB_DIR to
+        # ensure that we first find libraries from the toolchain, rather than
+        # from the SDK. The reason why this is important is that when we perform
+        # a stage2 build, this path is into the stage1 build. This is not a pure
+        # SDK and also contains compatibility libraries. We need to make sure
+        # that the compiler sees the actual toolchain's compatibility libraries
+        # first before the just built compability libraries or build errors occur.
+        target_link_directories(${name} PRIVATE
+          ${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}/usr/lib/swift)
       endif()
     endif()
 
@@ -776,13 +817,22 @@ function(add_swift_host_tool executable)
     # host side tools but link with clang, add the appropriate -L paths so we
     # find all of the necessary swift libraries on Darwin.
     if (CMAKE_Swift_COMPILER)
-      # Add in the SDK directory for the host platform and add an rpath.
-      target_link_directories(${executable} PRIVATE
-        ${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}/usr/lib/swift)
       # Add in the toolchain directory so we can grab compatibility libraries
       get_filename_component(TOOLCHAIN_BIN_DIR ${CMAKE_Swift_COMPILER} DIRECTORY)
       get_filename_component(TOOLCHAIN_LIB_DIR "${TOOLCHAIN_BIN_DIR}/../lib/swift/macosx" ABSOLUTE)
       target_link_directories(${executable} PUBLIC ${TOOLCHAIN_LIB_DIR})
+
+      # Add in the SDK directory for the host platform and add an rpath.
+      #
+      # NOTE: We do this /after/ target_link_directorying TOOLCHAIN_LIB_DIR to
+      # ensure that we first find libraries from the toolchain, rather than from
+      # the SDK. The reason why this is important is that when we perform a
+      # stage2 build, this path is into the stage1 build. This is not a pure SDK
+      # and also contains compatibility libraries. We need to make sure that the
+      # compiler sees the actual toolchain's compatibility libraries first
+      # before the just built compability libraries or build errors occur.
+      target_link_directories(${executable} PRIVATE
+        ${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}/usr/lib/swift)
 
       if (ASHT_HAS_LIBSWIFT AND SWIFT_TOOLS_ENABLE_LIBSWIFT)
         # Workaround to make lldb happy: we have to explicitly add all libswift modules
@@ -885,7 +935,9 @@ function(add_swift_fuzzer_host_tool executable)
 
   # Then make sure that we pass the -fsanitize=fuzzer flag both on the cflags
   # and cxx flags line.
-  target_compile_options(${executable} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:"-fsanitize=fuzzer">)
+  target_compile_options(${executable} PRIVATE
+    $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-fsanitize=fuzzer>
+    $<$<COMPILE_LANGUAGE:Swift>:-sanitize=fuzzer>)
   target_link_libraries(${executable} PRIVATE "-fsanitize=fuzzer")
 endfunction()
 

@@ -600,7 +600,7 @@ FUNCTION(GetFunctionMetadataDifferentiable,
 //                                          const Metadata *globalActor);
 FUNCTION(GetFunctionMetadataGlobalActor,
          swift_getFunctionTypeMetadataGlobalActor,
-         C_CC, AlwaysAvailable,
+         C_CC, ConcurrencyAvailability,
          RETURNS(TypeMetadataPtrTy),
          ARGS(SizeTy,
               SizeTy,
@@ -1547,71 +1547,20 @@ FUNCTION(TaskCancel,
          ARGS(SwiftTaskPtrTy),
          ATTRS(NoUnwind, ArgMemOnly))
 
-// AsyncTaskAndContext swift_task_create_f(
-//     size_t flags,
-//     TaskContinuationFunction* function,
-//     size_t contextSize);
-FUNCTION(TaskCreateFunc,
-         swift_task_create_f, SwiftCC,
-         ConcurrencyAvailability,
-         RETURNS(AsyncTaskAndContextTy),
-         ARGS(SizeTy, TaskContinuationFunctionPtrTy, SizeTy),
-         ATTRS(NoUnwind, ArgMemOnly))
-
-// AsyncTaskAndContext swift_task_create_future(
-//     size_t flags,
+// AsyncTaskAndContext swift_task_create(
+//     size_t taskCreateFlags,
+//     TaskOptionRecord *options,
 //     const Metadata *futureResultType,
-//     void *closureEntry,
-//     HeapObject *closureContext);
-FUNCTION(TaskCreateFuture,
-         swift_task_create_future, SwiftCC,
+//     void *closureEntry, HeapObject *closureContext);
+FUNCTION(TaskCreate,
+         swift_task_create, SwiftCC,
          ConcurrencyAvailability,
          RETURNS(AsyncTaskAndContextTy),
-         ARGS(SizeTy, TypeMetadataPtrTy,
-              Int8PtrTy, RefCountedPtrTy),
-         ATTRS(NoUnwind, ArgMemOnly))
-
-// AsyncTaskAndContext swift_task_create_future_f(
-//     size_t flags,
-//     const Metadata *futureResultType,
-//     TaskContinuationFunction *function,
-//     size_t contextSize);
-FUNCTION(TaskCreateFutureFunc,
-         swift_task_create_future_f, SwiftCC,
-         ConcurrencyAvailability,
-         RETURNS(AsyncTaskAndContextTy),
-         ARGS(SizeTy, TypeMetadataPtrTy,
-              TaskContinuationFunctionPtrTy, SizeTy),
-         ATTRS(NoUnwind, ArgMemOnly))
-
-// AsyncTaskAndContext swift_task_create_group_future(
-//     size_t flags,
-//     TaskGroup *group,
-//     const Metadata *futureResultType,
-//     void *closureEntry,
-//     HeapObject *closureContext);
-FUNCTION(TaskCreateGroupFuture,
-         swift_task_create_group_future, SwiftCC,
-         ConcurrencyAvailability,
-         RETURNS(AsyncTaskAndContextTy),
-         ARGS(SizeTy, SwiftTaskGroupPtrTy,
+         ARGS(SizeTy,
+              SwiftTaskOptionRecordPtrTy,
               TypeMetadataPtrTy,
-              Int8PtrTy, RefCountedPtrTy),
-         ATTRS(NoUnwind, ArgMemOnly))
-
-// AsyncTaskAndContext swift_task_create_group_future_f(
-//     size_t flags,
-//     TaskGroup *group,
-//     const Metadata *futureResultType,
-//     TaskContinuationFunction *function,
-//     size_t contextSize);
-FUNCTION(TaskCreateGroupFutureFunc,
-         swift_task_create_group_future_f, SwiftCC,
-         ConcurrencyAvailability,
-         RETURNS(AsyncTaskAndContextTy),
-         ARGS(SizeTy, SwiftTaskGroupPtrTy,
-              TypeMetadataPtrTy,
-              TaskContinuationFunctionPtrTy, SizeTy),
+              Int8PtrTy,
+              RefCountedPtrTy),
          ATTRS(NoUnwind, ArgMemOnly))
 
 // void swift_task_switch(AsyncContext *resumeContext,
@@ -1661,6 +1610,14 @@ FUNCTION(ContinuationThrowingResumeWithError,
 // ExecutorRef swift_task_getCurrentExecutor();
 FUNCTION(TaskGetCurrentExecutor,
          swift_task_getCurrentExecutor, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(SwiftExecutorTy),
+         ARGS(),
+         ATTRS(NoUnwind, ArgMemOnly))
+
+// ExecutorRef swift_task_getMainExecutor();
+FUNCTION(TaskGetMainExecutor,
+         swift_task_getMainExecutor, SwiftCC,
          ConcurrencyAvailability,
          RETURNS(SwiftExecutorTy),
          ARGS(),
@@ -1716,18 +1673,20 @@ FUNCTION(DistributedActorDestroy,
 
 /// void swift_asyncLet_start(
 ///     AsyncLet *alet,
+///     TaskOptionRecord *options,
 ///     const Metadata *futureResultType,
 ///     void *closureEntryPoint,
-///     OpaqueValue *closureContext
+///     HeapObject *closureContext
 /// );
 FUNCTION(AsyncLetStart,
          swift_asyncLet_start, SwiftCC,
          ConcurrencyAvailability,
          RETURNS(VoidTy),
-         ARGS(SwiftAsyncLetPtrTy, // AsyncLet*, alias for Int8PtrTy
-              TypeMetadataPtrTy,  // futureResultType
-              Int8PtrTy,          // closureEntry
-              OpaquePtrTy,        // closureContext
+         ARGS(SwiftAsyncLetPtrTy,         // AsyncLet*
+              SwiftTaskOptionRecordPtrTy, // options
+              TypeMetadataPtrTy,          // futureResultType
+              Int8PtrTy,                  // closureEntry
+              OpaquePtrTy,                // closureContext
          ),
          ATTRS(NoUnwind, ArgMemOnly))
 
@@ -1744,7 +1703,7 @@ FUNCTION(TaskGroupInitialize,
          swift_taskGroup_initialize, SwiftCC,
          ConcurrencyAvailability,
          RETURNS(VoidTy),
-         ARGS(Int8PtrTy),
+         ARGS(Int8PtrTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind))
 
 // void swift_taskGroup_destroy(TaskGroup *group);
@@ -1778,6 +1737,29 @@ FUNCTION(AutoDiffAllocateSubcontext,
          RETURNS(Int8PtrTy),
          ARGS(RefCountedPtrTy, SizeTy),
          ATTRS(NoUnwind, ArgMemOnly))
+
+// SWIFT_RUNTIME_EXPORT
+// unsigned swift_getMultiPayloadEnumTagSinglePayload(const OpaqueValue *value,
+//                                                    uint32_t numExtraCases,
+//                                                    const Metadata *enumType)
+FUNCTION(GetMultiPayloadEnumTagSinglePayload,
+         swift_getMultiPayloadEnumTagSinglePayload, C_CC,
+         MultiPayloadEnumTagSinglePayloadAvailability,
+         RETURNS(Int32Ty),
+         ARGS(OpaquePtrTy, Int32Ty, TypeMetadataPtrTy),
+         ATTRS(NoUnwind))
+
+// SWIFT_RUNTIME_EXPORT 
+// void swift_storeMultiPayloadEnumTagSinglePayload(OpaqueValue *value,
+//                                                   uint32_t index,
+//                                                   uint32_t numExtraCases,
+//                                                   const Metadata *enumType);
+FUNCTION(StoreMultiPayloadEnumTagSinglePayload,
+         swift_storeMultiPayloadEnumTagSinglePayload, C_CC,
+         MultiPayloadEnumTagSinglePayloadAvailability,
+         RETURNS(VoidTy),
+         ARGS(OpaquePtrTy, Int32Ty, Int32Ty, TypeMetadataPtrTy),
+         ATTRS(NoUnwind))
 
 #undef RETURNS
 #undef ARGS

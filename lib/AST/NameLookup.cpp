@@ -1414,6 +1414,7 @@ NominalTypeDecl::lookupDirectRemoteFunc(AbstractFunctionDecl *func) {
   auto remoteFuncId = C.getIdentifier("_remote_" + localFuncName);
 
   auto remoteFuncDecls = selfTyDecl->lookupDirect(DeclName(remoteFuncId));
+
   if (remoteFuncDecls.empty())
     return nullptr;
 
@@ -2261,8 +2262,9 @@ directReferencesForTypeRepr(Evaluator &evaluator,
   case TypeReprKind::SILBox:
   case TypeReprKind::Placeholder:
     return { };
-      
+
   case TypeReprKind::OpaqueReturn:
+  case TypeReprKind::NamedOpaqueReturn:
     return { };
 
   case TypeReprKind::Fixed:
@@ -2510,7 +2512,8 @@ GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) c
     // is implemented.
     if (auto *proto = ext->getExtendedProtocolDecl()) {
       auto protoType = proto->getDeclaredInterfaceType();
-      TypeLoc selfInherited[1] = { TypeLoc::withoutLoc(protoType) };
+      InheritedEntry selfInherited[1] = {
+        InheritedEntry(TypeLoc::withoutLoc(protoType)) };
       genericParams->getParams().front()->setInherited(
         ctx.AllocateCopy(selfInherited));
     }
@@ -2530,7 +2533,8 @@ GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) c
     auto selfDecl = new (ctx) GenericTypeParamDecl(
         proto, selfId, SourceLoc(), /*depth=*/0, /*index=*/0);
     auto protoType = proto->getDeclaredInterfaceType();
-    TypeLoc selfInherited[1] = { TypeLoc::withoutLoc(protoType) };
+    InheritedEntry selfInherited[1] = {
+      InheritedEntry(TypeLoc::withoutLoc(protoType)) };
     selfDecl->setInherited(ctx.AllocateCopy(selfInherited));
     selfDecl->setImplicit();
 
@@ -2660,7 +2664,7 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
 
 void swift::getDirectlyInheritedNominalTypeDecls(
     llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
-    unsigned i, llvm::SmallVectorImpl<Located<NominalTypeDecl *>> &result,
+    unsigned i, llvm::SmallVectorImpl<InheritedNominalEntry> &result,
     bool &anyObject) {
   auto typeDecl = decl.dyn_cast<const TypeDecl *>();
   auto extDecl = decl.dyn_cast<const ExtensionDecl *>();
@@ -2682,18 +2686,20 @@ void swift::getDirectlyInheritedNominalTypeDecls(
   // FIXME: This is a hack. We need cooperation from
   // InheritedDeclsReferencedRequest to make this work.
   SourceLoc loc;
+  SourceLoc uncheckedLoc;
   if (TypeRepr *typeRepr = typeDecl ? typeDecl->getInherited()[i].getTypeRepr()
                                     : extDecl->getInherited()[i].getTypeRepr()){
     loc = typeRepr->getLoc();
+    uncheckedLoc = typeRepr->findUncheckedAttrLoc();
   }
 
   // Form the result.
   for (auto nominal : nominalTypes) {
-    result.push_back({nominal, loc});
+    result.push_back({nominal, loc, uncheckedLoc});
   }
 }
 
-SmallVector<Located<NominalTypeDecl *>, 4>
+SmallVector<InheritedNominalEntry, 4>
 swift::getDirectlyInheritedNominalTypeDecls(
     llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
     bool &anyObject) {
@@ -2703,7 +2709,7 @@ swift::getDirectlyInheritedNominalTypeDecls(
   // Gather results from all of the inherited types.
   unsigned numInherited = typeDecl ? typeDecl->getInherited().size()
                                    : extDecl->getInherited().size();
-  SmallVector<Located<NominalTypeDecl *>, 4> result;
+  SmallVector<InheritedNominalEntry, 4> result;
   for (unsigned i : range(numInherited)) {
     getDirectlyInheritedNominalTypeDecls(decl, i, result, anyObject);
   }
@@ -2729,7 +2735,7 @@ swift::getDirectlyInheritedNominalTypeDecls(
       if (!req.getFirstType()->isEqual(protoSelfTy))
         continue;
 
-      result.emplace_back(req.getProtocolDecl(), loc);
+      result.emplace_back(req.getProtocolDecl(), loc, SourceLoc());
     }
     return result;
   }
@@ -2739,7 +2745,7 @@ swift::getDirectlyInheritedNominalTypeDecls(
   anyObject |= selfBounds.anyObject;
 
   for (auto inheritedNominal : selfBounds.decls)
-    result.emplace_back(inheritedNominal, loc);
+    result.emplace_back(inheritedNominal, loc, SourceLoc());
 
   return result;
 }

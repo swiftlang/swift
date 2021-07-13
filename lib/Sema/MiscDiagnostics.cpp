@@ -77,7 +77,9 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     SmallPtrSet<DeclRefExpr*, 4> AlreadyDiagnosedBitCasts;
 
     /// Keep track of the arguments to CallExprs.
-    SmallPtrSet<Expr *, 2> CallArgs;
+    ///  Key -> an argument expression,
+    ///  Value -> a call argument is associated with.
+    llvm::SmallDenseMap<Expr *, Expr *, 2> CallArgs;
 
     bool IsExprStmt;
 
@@ -141,14 +143,14 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         checkUseOfMetaTypeName(Base);
 
       if (auto *OLE = dyn_cast<ObjectLiteralExpr>(E)) {
-        CallArgs.insert(OLE->getArg());
+        CallArgs.insert({OLE->getArg(), E});
       }
 
       if (auto *SE = dyn_cast<SubscriptExpr>(E))
-        CallArgs.insert(SE->getIndex());
+        CallArgs.insert({SE->getIndex(), E});
 
       if (auto *DSE = dyn_cast<DynamicSubscriptExpr>(E))
-        CallArgs.insert(DSE->getIndex());
+        CallArgs.insert({DSE->getIndex(), E});
 
       if (auto *KPE = dyn_cast<KeyPathExpr>(E)) {
         // raise an error if this KeyPath contains an effectful member.
@@ -156,7 +158,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 
         for (auto Comp : KPE->getComponents()) {
           if (auto *Arg = Comp.getIndexExpr())
-            CallArgs.insert(Arg);
+            CallArgs.insert({Arg, E});
         }
       }
 
@@ -164,7 +166,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       // function and inspecting the arguments directly.
       if (auto *Call = dyn_cast<ApplyExpr>(E)) {
         // Record call arguments.
-        CallArgs.insert(Call->getArg());
+        CallArgs.insert({Call->getArg(), E});
 
         // Warn about surprising implicit optional promotions.
         checkOptionalPromotions(Call);
@@ -613,6 +615,11 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       if (!AlreadyDiagnosedMetatypes.insert(E).second)
         return;
 
+      // In Swift < 6 warn about plain type name passed as an
+      // argument to a subscript, dynamic subscript, or ObjC
+      // literal since it used to be accepted.
+      DiagnosticBehavior behavior = DiagnosticBehavior::Error;
+
       // Allow references to types as a part of:
       // - member references T.foo, T.Type, T.self, etc.
       // - constructor calls T()
@@ -632,11 +639,22 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
             isa<SubscriptExpr>(ParentExpr)) {
           return;
         }
+
+        if (!Ctx.LangOpts.isSwiftVersionAtLeast(6)) {
+          auto argument = CallArgs.find(ParentExpr);
+          if (argument != CallArgs.end()) {
+            auto *callExpr = argument->second;
+            if (isa<SubscriptExpr>(callExpr) ||
+                isa<DynamicSubscriptExpr>(callExpr) ||
+                isa<ObjectLiteralExpr>(callExpr))
+              behavior = DiagnosticBehavior::Warning;
+          }
+        }
       }
 
       // Is this a protocol metatype?
-
-      Ctx.Diags.diagnose(E->getStartLoc(), diag::value_of_metatype_type);
+      Ctx.Diags.diagnose(E->getStartLoc(), diag::value_of_metatype_type)
+          .limitBehavior(behavior);
 
       // Add fix-it to insert '()', only if this is a metatype of
       // non-existential type and has any initializers.
@@ -2878,12 +2896,31 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
                   
                   // If the subexpr is an "as?" cast, we can rewrite it to
                   // be an "is" test.
-                  bool isIsTest = false;
-                  if (isa<ConditionalCheckedCastExpr>(initExpr) &&
-                      !initExpr->isImplicit()) {
-                    noParens = isIsTest = true;
+                  ConditionalCheckedCastExpr *CCE = nullptr;
+
+                  // initExpr can be wrapped inside parens or try expressions.
+                  if (auto ccExpr = dyn_cast<ConditionalCheckedCastExpr>(
+                          initExpr->getValueProvidingExpr())) {
+                    if (!ccExpr->isImplicit()) {
+                      CCE = ccExpr;
+                      noParens = true;
+                    }
                   }
-                  
+
+                  // In cases where the value is optional, the cast expr is
+                  // wrapped inside OptionalEvaluationExpr. Unwrap it to get
+                  // ConditionalCheckedCastExpr.
+                  if (auto oeExpr = dyn_cast<OptionalEvaluationExpr>(
+                          initExpr->getValueProvidingExpr())) {
+                    if (auto ccExpr = dyn_cast<ConditionalCheckedCastExpr>(
+                            oeExpr->getSubExpr()->getValueProvidingExpr())) {
+                      if (!ccExpr->isImplicit()) {
+                        CCE = ccExpr;
+                        noParens = true;
+                      }
+                    }
+                  }
+
                   auto diagIF = Diags.diagnose(var->getLoc(),
                                                diag::pbd_never_used_stmtcond,
                                             var->getName());
@@ -2891,10 +2928,9 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
                   diagIF.fixItReplaceChars(introducerLoc,
                                            initExpr->getStartLoc(),
                                            &"("[noParens]);
-                  
-                  if (isIsTest) {
+
+                  if (CCE) {
                     // If this was an "x as? T" check, rewrite it to "x is T".
-                    auto CCE = cast<ConditionalCheckedCastExpr>(initExpr);
                     diagIF.fixItReplace(SourceRange(CCE->getLoc(),
                                                     CCE->getQuestionLoc()),
                                         "is");

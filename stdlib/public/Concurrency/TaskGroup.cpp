@@ -100,6 +100,8 @@ public:
     /// object itself.
     OpaqueValue *storage;
 
+    const Metadata *successType;
+
     /// The completed task, if necessary to keep alive until consumed by next().
     ///
     /// # Important: swift_release
@@ -124,6 +126,7 @@ public:
         /*storage*/ hadErrorResult ?
                     reinterpret_cast<OpaqueValue *>(fragment->getError()) :
                     fragment->getStoragePtr(),
+        /*successType*/fragment->getResultType(),
         /*task*/ asyncTask
       };
     }
@@ -292,15 +295,17 @@ private:
   /// or `nullptr` if no task is currently waiting.
   std::atomic<AsyncTask *> waitQueue;
 
+  const Metadata *successType;
+
   friend class ::swift::AsyncTask;
 
 public:
-  explicit TaskGroupImpl()
+  explicit TaskGroupImpl(const Metadata *T)
     : TaskGroupTaskStatusRecord(),
       status(GroupStatus::initial().status),
       readyQueue(),
 //          readyQueue(ReadyQueueItem::get(ReadyStatus::Empty, nullptr)),
-      waitQueue(nullptr) {}
+      waitQueue(nullptr), successType(T) {}
 
 
   TaskGroupTaskStatusRecord *getTaskRecord() {
@@ -451,8 +456,8 @@ static TaskGroup *asAbstract(TaskGroupImpl *group) {
 
 // Initializes into the preallocated _group an actual TaskGroupImpl.
 SWIFT_CC(swift)
-static void swift_taskGroup_initializeImpl(TaskGroup *group) {
-  TaskGroupImpl *impl = new (group) TaskGroupImpl();
+static void swift_taskGroup_initializeImpl(TaskGroup *group, const Metadata *T) {
+  TaskGroupImpl *impl = new (group) TaskGroupImpl(T);
   auto record = impl->getTaskRecord();
   assert(impl == record && "the group IS the task record");
 
@@ -503,7 +508,11 @@ void TaskGroup::offer(AsyncTask *completedTask, AsyncContext *context) {
   asImpl(this)->offer(completedTask, context);
 }
 
-static void fillGroupNextResult(TaskGroupNextAsyncContext *context,
+bool TaskGroup::isCancelled() {
+  return asImpl(this)->isCancelled();
+}
+
+static void fillGroupNextResult(TaskFutureWaitAsyncContext *context,
                                 PollResult result) {
   /// Fill in the result value
   switch (result.status) {
@@ -517,7 +526,7 @@ static void fillGroupNextResult(TaskGroupNextAsyncContext *context,
 
   case PollStatus::Success: {
     // Initialize the result as an Optional<Success>.
-    const Metadata *successType = context->successType;
+    const Metadata *successType = result.successType;
     OpaqueValue *destPtr = context->successResultPointer;
     // TODO: figure out a way to try to optimistically take the
     // value out of the finished task's future, if there are no
@@ -529,7 +538,7 @@ static void fillGroupNextResult(TaskGroupNextAsyncContext *context,
 
   case PollStatus::Empty: {
     // Initialize the result as a nil Optional<Success>.
-    const Metadata *successType = context->successType;
+    const Metadata *successType = result.successType;
     OpaqueValue *destPtr = context->successResultPointer;
     successType->vw_storeEnumTagSinglePayload(destPtr, 1, 1);
     return;
@@ -593,7 +602,7 @@ void TaskGroupImpl::offer(AsyncTask *completedTask, AsyncContext *context) {
         mutex.unlock(); // TODO: remove fragment lock, and use status for synchronization
 
         auto waitingContext =
-            static_cast<TaskGroupNextAsyncContext *>(
+            static_cast<TaskFutureWaitAsyncContext *>(
                 waitingTask->ResumeContext);
 
         fillGroupNextResult(waitingContext, result);
@@ -633,31 +642,49 @@ SWIFT_CC(swiftasync)
 static void
 task_group_wait_resume_adapter(SWIFT_ASYNC_CONTEXT AsyncContext *_context) {
 
-  auto context = static_cast<TaskGroupNextAsyncContext *>(_context);
-  return context->asyncResumeEntryPoint(_context, context->errorResult);
+  auto context = static_cast<TaskFutureWaitAsyncContext *>(_context);
+  auto resumeWithError =
+      reinterpret_cast<AsyncVoidClosureResumeEntryPoint *>(context->ResumeParent);
+  return resumeWithError(context->Parent, context->errorResult);
 }
+
+#ifdef __ARM_ARCH_7K__
+__attribute__((noinline))
+SWIFT_CC(swiftasync) static void workaround_function_swift_taskGroup_wait_next_throwingImpl(
+    OpaqueValue *result, SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
+    TaskGroup *_group,
+    ThrowingTaskFutureWaitContinuationFunction resumeFunction,
+    AsyncContext *callContext) {
+  // Make sure we don't eliminate calls to this function.
+  asm volatile("" // Do nothing.
+               :  // Output list, empty.
+               : "r"(result), "r"(callerContext), "r"(_group) // Input list.
+               : // Clobber list, empty.
+  );
+  return;
+}
+#endif
 
 // =============================================================================
 // ==== group.next() implementation (wait_next and groupPoll) ------------------
 SWIFT_CC(swiftasync)
 static void swift_taskGroup_wait_next_throwingImpl(
-    OpaqueValue *resultPointer, SWIFT_ASYNC_CONTEXT AsyncContext *rawContext,
-    TaskGroup *_group, const Metadata *successType) {
+    OpaqueValue *resultPointer, SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
+    TaskGroup *_group,
+    ThrowingTaskFutureWaitContinuationFunction *resumeFunction,
+    AsyncContext *rawContext) {
   auto waitingTask = swift_task_getCurrent();
-  auto originalResumeParent =
-      reinterpret_cast<AsyncVoidClosureResumeEntryPoint *>(
-          rawContext->ResumeParent);
   waitingTask->ResumeTask = task_group_wait_resume_adapter;
   waitingTask->ResumeContext = rawContext;
 
-  auto context = static_cast<TaskGroupNextAsyncContext *>(rawContext);
+  auto context = static_cast<TaskFutureWaitAsyncContext *>(rawContext);
+  context->ResumeParent =
+      reinterpret_cast<TaskContinuationFunction *>(resumeFunction);
+  context->Parent = callerContext;
   context->errorResult = nullptr;
-  context->asyncResumeEntryPoint = originalResumeParent;
   context->successResultPointer = resultPointer;
-  context->group = _group;
-  context->successType = successType;
 
-  auto group = asImpl(context->group);
+  auto group = asImpl(_group);
   assert(group && "swift_taskGroup_wait_next_throwing was passed context without group!");
 
   PollResult polled = group->poll(waitingTask);
@@ -665,7 +692,12 @@ static void swift_taskGroup_wait_next_throwingImpl(
   case PollStatus::MustWait:
     // The waiting task has been queued on the channel,
     // there were pending tasks so it will be woken up eventually.
+#ifdef __ARM_ARCH_7K__
+    return workaround_function_swift_taskGroup_wait_next_throwingImpl(
+        resultPointer, callerContext, _group, resumeFunction, rawContext);
+#else
     return;
+#endif
 
   case PollStatus::Empty:
   case PollStatus::Error:
@@ -681,6 +713,7 @@ PollResult TaskGroupImpl::poll(AsyncTask *waitingTask) {
 
   PollResult result;
   result.storage = nullptr;
+  result.successType = nullptr;
   result.retainedTask = nullptr;
 
   // ==== 1) bail out early if no tasks are pending ----------------------------
@@ -690,6 +723,7 @@ PollResult TaskGroupImpl::poll(AsyncTask *waitingTask) {
     // Bail out and return `nil` from `group.next()`.
     statusRemoveWaiting();
     result.status = PollStatus::Empty;
+    result.successType = this->successType;
     mutex.unlock(); // TODO: remove group lock, and use status for synchronization
     return result;
   }
@@ -711,6 +745,7 @@ PollResult TaskGroupImpl::poll(AsyncTask *waitingTask) {
       if (!taskDequeued) {
         result.status = PollStatus::MustWait;
         result.storage = nullptr;
+        result.successType = nullptr;
         result.retainedTask = nullptr;
         mutex.unlock(); // TODO: remove group lock, and use status for synchronization
         return result;
@@ -728,6 +763,7 @@ PollResult TaskGroupImpl::poll(AsyncTask *waitingTask) {
           // Immediately return the polled value
           result.status = PollStatus::Success;
           result.storage = futureFragment->getStoragePtr();
+          result.successType = futureFragment->getResultType();
           assert(result.retainedTask && "polled a task, it must be not null");
           _swift_tsan_acquire(static_cast<Job *>(result.retainedTask));
           mutex.unlock(); // TODO: remove fragment lock, and use status for synchronization
@@ -738,6 +774,7 @@ PollResult TaskGroupImpl::poll(AsyncTask *waitingTask) {
           result.status = PollStatus::Error;
           result.storage =
               reinterpret_cast<OpaqueValue *>(futureFragment->getError());
+          result.successType = nullptr;
           assert(result.retainedTask && "polled a task, it must be not null");
           _swift_tsan_acquire(static_cast<Job *>(result.retainedTask));
           mutex.unlock(); // TODO: remove fragment lock, and use status for synchronization
@@ -747,6 +784,7 @@ PollResult TaskGroupImpl::poll(AsyncTask *waitingTask) {
           result.status = PollStatus::Empty;
           result.storage = nullptr;
           result.retainedTask = nullptr;
+          result.successType = this->successType;
           mutex.unlock(); // TODO: remove fragment lock, and use status for synchronization
           return result;
       }

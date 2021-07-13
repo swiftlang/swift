@@ -61,20 +61,20 @@ if #available(macOS 11.3, iOS 14.5, tvOS 14.5, watchOS 7.4, *) {
   }
 }
 
-// FIXME(rdar://75916878): Investigate why reflecting differentiable function
-// types that contain generic parameters will lose '@differentiable' annotation.
-// FunctionTypeMetadataTests.test("Reflect generic differentiable function type") {
-//   func testGeneric<T: Differentiable>(_ type: T.Type) {
-//     expectEqual(
-//       """
-//       @differentiable(reverse) (\(String(reflecting: type))) -> \
-//       \(String(reflecting: type))
-//       """,
-//       String(reflecting: (@differentiable(reverse) (T) -> T).self))
-//   }
-//   testGeneric(Double.self)
-//   testGeneric([Float].self)
-//   testGeneric(Float?.self)
-// }
+if #available(macOS 12, iOS 15, tvOS 15, watchOS 8, *) {
+  FunctionTypeMetadataTests.test("Reflect generic differentiable function type") {
+    func testGeneric<T: Differentiable>(_ type: T.Type) {
+      expectEqual(
+        """
+        @differentiable(reverse) (\(String(reflecting: type))) -> \
+        \(String(reflecting: type))
+        """,
+        String(reflecting: (@differentiable(reverse) (T) -> T).self))
+    }
+    testGeneric(Double.self)
+    testGeneric([Float].self)
+    testGeneric(Float?.self)
+  }
+}
 
 runAllTests()

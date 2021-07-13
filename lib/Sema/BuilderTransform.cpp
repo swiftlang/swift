@@ -1869,12 +1869,8 @@ public:
           E, DC, /*replaceInvalidRefsWithErrors=*/true);
       HasError |= transaction.hasErrors();
 
-      if (!HasError) {
-        E->forEachChildExpr([&](Expr *expr) {
-          HasError |= isa<ErrorExpr>(expr);
-          return HasError ? nullptr : expr;
-        });
-      }
+      if (!HasError)
+        HasError |= containsErrorExpr(E);
 
       if (SuppressDiagnostics)
         transaction.abort();
@@ -1896,6 +1892,29 @@ public:
     return std::make_pair(true, S);
   }
 
+  /// Check whether given expression (including single-statement
+  /// closures) contains `ErrorExpr` as one of its sub-expressions.
+  bool containsErrorExpr(Expr *expr) {
+    bool hasError = false;
+
+    expr->forEachChildExpr([&](Expr *expr) -> Expr * {
+      hasError |= isa<ErrorExpr>(expr);
+      if (hasError)
+        return nullptr;
+
+      if (auto *closure = dyn_cast<ClosureExpr>(expr)) {
+        if (shouldTypeCheckInEnclosingExpression(closure)) {
+          hasError |= containsErrorExpr(closure->getSingleExpressionBody());
+          return hasError ? nullptr : expr;
+        }
+      }
+
+      return expr;
+    });
+
+    return hasError;
+  }
+
   /// Ignore patterns.
   std::pair<bool, Pattern*> walkToPatternPre(Pattern *pat) override {
     return { false, pat };
@@ -1906,13 +1925,6 @@ public:
 
 ResultBuilderBodyPreCheck PreCheckResultBuilderRequest::evaluate(
     Evaluator &evaluator, PreCheckResultBuilderDescriptor owner) const {
-  // We don't want to do the precheck if it will already have happened in
-  // the enclosing expression.
-  bool skipPrecheck = false;
-  if (auto closure = dyn_cast_or_null<ClosureExpr>(
-          owner.Fn.getAbstractClosureExpr()))
-    skipPrecheck = shouldTypeCheckInEnclosingExpression(closure);
-
   return PreCheckResultBuilderApplication(
              owner.Fn, /*skipPrecheck=*/false,
              /*suppressDiagnostics=*/owner.SuppressDiagnostics)

@@ -10,6 +10,9 @@ func simpleErr(arg: String, _ completion: (String?, Error?) -> Void) { }
 func simpleRes(arg: String, _ completion: (Result<String, Error>) -> Void) { }
 func run(block: () -> Bool) -> Bool { return false }
 
+func makeOptionalError() -> Error? { return nil }
+func makeOptionalString() -> String? { return nil }
+
 // RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=NESTED %s
 func nested() {
   simple {
@@ -129,8 +132,8 @@ func asyncResNewErr(arg: String, _ completion: (Result<String, Error>) -> Void) 
 // ASYNC-ERR-NEXT: }
 // ASYNC-ERR-NEXT: }
 
-// RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=ASYNC-UNHANDLED %s
-func asyncUnhandledCompletion(_ completion: (String) -> Void) {
+// RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=CALL-NON-ASYNC-IN-ASYNC %s
+func callNonAsyncInAsync(_ completion: (String) -> Void) {
   simple { str in
     let success = run {
       completion(str)
@@ -141,19 +144,21 @@ func asyncUnhandledCompletion(_ completion: (String) -> Void) {
     }
   }
 }
-// ASYNC-UNHANDLED: func asyncUnhandledCompletion() async -> String {
-// ASYNC-UNHANDLED-NEXT: let str = await simple()
-// ASYNC-UNHANDLED-NEXT: let success = run {
-// ASYNC-UNHANDLED-NEXT:   <#completion#>(str)
-// ASYNC-UNHANDLED-NEXT:   {{^}} return true{{$}}
-// ASYNC-UNHANDLED-NEXT: }
-// ASYNC-UNHANDLED-NEXT: if !success {
-// ASYNC-UNHANDLED-NEXT: {{^}} return "bad"{{$}}
-// ASYNC-UNHANDLED-NEXT: }
-// ASYNC-UNHANDLED-NEXT: }
+// CALL-NON-ASYNC-IN-ASYNC:      func callNonAsyncInAsync() async -> String {
+// CALL-NON-ASYNC-IN-ASYNC-NEXT:   let str = await simple()
+// CALL-NON-ASYNC-IN-ASYNC-NEXT:   return await withCheckedContinuation { continuation in
+// CALL-NON-ASYNC-IN-ASYNC-NEXT:     let success = run {
+// CALL-NON-ASYNC-IN-ASYNC-NEXT:       continuation.resume(returning: str)
+// CALL-NON-ASYNC-IN-ASYNC-NEXT:       {{^}} return true{{$}}
+// CALL-NON-ASYNC-IN-ASYNC-NEXT:     }
+// CALL-NON-ASYNC-IN-ASYNC-NEXT:     if !success {
+// CALL-NON-ASYNC-IN-ASYNC-NEXT:       continuation.resume(returning: "bad")
+// CALL-NON-ASYNC-IN-ASYNC-NEXT:     }
+// CALL-NON-ASYNC-IN-ASYNC-NEXT:   }
+// CALL-NON-ASYNC-IN-ASYNC-NEXT: }
 
-// RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=ASYNC-UNHANDLED-COMMENT %s
-func asyncUnhandledCommentedCompletion(_ completion: (String) -> Void) {
+// RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=CALL-NON-ASYNC-IN-ASYNC-COMMENT %s
+func callNonAsyncInAsyncComment(_ completion: (String) -> Void) {
   // a
   simple { str in // b
     // c
@@ -174,28 +179,30 @@ func asyncUnhandledCommentedCompletion(_ completion: (String) -> Void) {
   }
   // k
 }
-// ASYNC-UNHANDLED-COMMENT:      func asyncUnhandledCommentedCompletion() async -> String {
-// ASYNC-UNHANDLED-COMMENT-NEXT:   // a
-// ASYNC-UNHANDLED-COMMENT-NEXT:   let str = await simple()
-// ASYNC-UNHANDLED-COMMENT-NEXT:   // b
-// ASYNC-UNHANDLED-COMMENT-NEXT:   // c
-// ASYNC-UNHANDLED-COMMENT-NEXT:   let success = run {
-// ASYNC-UNHANDLED-COMMENT-NEXT:     // d
-// ASYNC-UNHANDLED-COMMENT-NEXT:     <#completion#>(str)
-// ASYNC-UNHANDLED-COMMENT-NEXT:     // e
-// ASYNC-UNHANDLED-COMMENT-NEXT:     {{^}} return true{{$}}
-// ASYNC-UNHANDLED-COMMENT-NEXT:     // f
-// ASYNC-UNHANDLED-COMMENT-NEXT:   }
-// ASYNC-UNHANDLED-COMMENT-NEXT:   // g
-// ASYNC-UNHANDLED-COMMENT-NEXT:   if !success {
-// ASYNC-UNHANDLED-COMMENT-NEXT:     // h
-// ASYNC-UNHANDLED-COMMENT-NEXT:     {{^}} return "bad"{{$}}
-// ASYNC-UNHANDLED-COMMENT-NEXT:     // i
-// ASYNC-UNHANDLED-COMMENT-NEXT:   }
-// ASYNC-UNHANDLED-COMMENT-NEXT:   // j
-// ASYNC-UNHANDLED-COMMENT-NEXT:   {{ }}
-// ASYNC-UNHANDLED-COMMENT-NEXT:   // k
-// ASYNC-UNHANDLED-COMMENT-NEXT: }
+// CALL-NON-ASYNC-IN-ASYNC-COMMENT:      func callNonAsyncInAsyncComment() async -> String {
+// CALL-NON-ASYNC-IN-ASYNC-COMMENT-NEXT:   // a
+// CALL-NON-ASYNC-IN-ASYNC-COMMENT-NEXT:   let str = await simple()
+// CALL-NON-ASYNC-IN-ASYNC-COMMENT-NEXT:   // b
+// CALL-NON-ASYNC-IN-ASYNC-COMMENT-NEXT:   // c
+// CALL-NON-ASYNC-IN-ASYNC-COMMENT-NEXT:   return await withCheckedContinuation { continuation in
+// CALL-NON-ASYNC-IN-ASYNC-COMMENT-NEXT:     let success = run {
+// CALL-NON-ASYNC-IN-ASYNC-COMMENT-NEXT:       // d
+// CALL-NON-ASYNC-IN-ASYNC-COMMENT-NEXT:       continuation.resume(returning: str)
+// CALL-NON-ASYNC-IN-ASYNC-COMMENT-NEXT:       // e
+// CALL-NON-ASYNC-IN-ASYNC-COMMENT-NEXT:       {{^}} return true{{$}}
+// CALL-NON-ASYNC-IN-ASYNC-COMMENT-NEXT:       // f
+// CALL-NON-ASYNC-IN-ASYNC-COMMENT-NEXT:     }
+// CALL-NON-ASYNC-IN-ASYNC-COMMENT-NEXT:     // g
+// CALL-NON-ASYNC-IN-ASYNC-COMMENT-NEXT:     if !success {
+// CALL-NON-ASYNC-IN-ASYNC-COMMENT-NEXT:       // h
+// CALL-NON-ASYNC-IN-ASYNC-COMMENT-NEXT:       continuation.resume(returning: "bad")
+// CALL-NON-ASYNC-IN-ASYNC-COMMENT-NEXT:       // i
+// CALL-NON-ASYNC-IN-ASYNC-COMMENT-NEXT:     }
+// CALL-NON-ASYNC-IN-ASYNC-COMMENT-NEXT:     // j
+// CALL-NON-ASYNC-IN-ASYNC-COMMENT-NEXT:     {{ }}
+// CALL-NON-ASYNC-IN-ASYNC-COMMENT-NEXT:     // k
+// CALL-NON-ASYNC-IN-ASYNC-COMMENT-NEXT:   }
+// CALL-NON-ASYNC-IN-ASYNC-COMMENT-NEXT: }
 
 // RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix VOID-AND-ERROR-HANDLER %s
 func voidAndErrorCompletion(completion: (Void?, Error?) -> Void) {
@@ -283,14 +290,34 @@ func testReturnHandling2(completion: @escaping (String) -> ()) {
 // RETURN-HANDLING2-NEXT:   }
 // RETURN-HANDLING2-NEXT: }
 
-// FIXME: We should arguably be able to handle transforming this completion handler call (rdar://78011350).
-// RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=RETURN-HANDLING3 %s
+// RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=RETURN-HANDLING3 %s
 func testReturnHandling3(_ completion: (String?, Error?) -> Void) {
   return (completion("", nil))
 }
 // RETURN-HANDLING3:      func testReturnHandling3() async throws -> String {
-// RETURN-HANDLING3-NEXT:   {{^}} return (<#completion#>("", nil)){{$}}
+// RETURN-HANDLING3-NEXT:   {{^}} return ""{{$}}
 // RETURN-HANDLING3-NEXT: }
+
+// RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=RETURN-HANDLING4 %s
+func testReturnHandling4(_ completion: (String?, Error?) -> Void) {
+  simpleErr(arg: "xxx") { str, err in
+    if str != nil {
+      completion(str, err)
+      return
+    }
+    print("some error stuff")
+    completion(str, err)
+  }
+}
+// RETURN-HANDLING4:      func testReturnHandling4() async throws -> String {
+// RETURN-HANDLING4-NEXT:   do {
+// RETURN-HANDLING4-NEXT:     let str = try await simpleErr(arg: "xxx")
+// RETURN-HANDLING4-NEXT:     return str
+// RETURN-HANDLING4-NEXT:   } catch let err {
+// RETURN-HANDLING4-NEXT:     print("some error stuff")
+// RETURN-HANDLING4-NEXT:     throw err
+// RETURN-HANDLING4-NEXT:   }
+// RETURN-HANDLING4-NEXT: }
 
 // RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=RDAR78693050 %s
 func rdar78693050(_ completion: () -> Void) {
@@ -329,3 +356,244 @@ func withDefaultArg(x: String = "") {
 // DEFAULT-ARG:      convert_function.swift [[# @LINE-3]]:1 -> [[# @LINE-2]]:2
 // DEFAULT-ARG-NOT:  @discardableResult
 // DEFAULT-ARG-NEXT: {{^}}func withDefaultArg(x: String = "") async
+
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=IMPLICIT-RETURN %s
+func withImplicitReturn(completionHandler: (String) -> Void) {
+  simple {
+    completionHandler($0)
+  }
+}
+// IMPLICIT-RETURN: func withImplicitReturn() async -> String {
+// IMPLICIT-RETURN-NEXT:   let val0 = await simple()
+// IMPLICIT-RETURN-NEXT:   return val0
+// IMPLICIT-RETURN-NEXT: }
+
+// This code doesn't compile after refactoring because we can't return `nil` from the async function. 
+// But there's not much else we can do here.
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=NIL-RESULT-AND-NIL-ERROR %s
+func nilResultAndNilError(completion: (String?, Error?) -> Void) {
+  completion(nil, nil)
+}
+// NIL-RESULT-AND-NIL-ERROR:      func nilResultAndNilError() async throws -> String {
+// NIL-RESULT-AND-NIL-ERROR-NEXT:   return nil
+// NIL-RESULT-AND-NIL-ERROR-NEXT: }
+
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=NIL-RESULT-AND-OPTIONAL-RELAYED-ERROR %s
+func nilResultAndOptionalRelayedError(completion: (String?, Error?) -> Void) {
+  simpleErr(arg: "test") { (res, err) in
+    completion(nil, err)
+  }
+}
+// NIL-RESULT-AND-OPTIONAL-RELAYED-ERROR:      func nilResultAndOptionalRelayedError() async throws -> String {
+// NIL-RESULT-AND-OPTIONAL-RELAYED-ERROR-NEXT:   let res = try await simpleErr(arg: "test")
+// NIL-RESULT-AND-OPTIONAL-RELAYED-ERROR-EMPTY:
+// NIL-RESULT-AND-OPTIONAL-RELAYED-ERROR-NEXT: }
+
+// This code doesn't compile after refactoring because we can't throw an optional error returned from makeOptionalError().
+// But it's not clear what the intended result should be either.
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=NIL-RESULT-AND-OPTIONAL-COMPLEX-ERROR %s
+func nilResultAndOptionalComplexError(completion: (String?, Error?) -> Void) {
+  completion(nil, makeOptionalError())
+}
+// NIL-RESULT-AND-OPTIONAL-COMPLEX-ERROR:      func nilResultAndOptionalComplexError() async throws -> String {
+// NIL-RESULT-AND-OPTIONAL-COMPLEX-ERROR-NEXT:   throw makeOptionalError()
+// NIL-RESULT-AND-OPTIONAL-COMPLEX-ERROR-NEXT: }
+
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=NIL-RESULT-AND-NON-OPTIONAL-ERROR %s
+func nilResultAndNonOptionalError(completion: (String?, Error?) -> Void) {
+  completion(nil, CustomError.Bad)
+}
+// NIL-RESULT-AND-NON-OPTIONAL-ERROR:      func nilResultAndNonOptionalError() async throws -> String {
+// NIL-RESULT-AND-NON-OPTIONAL-ERROR-NEXT:   throw CustomError.Bad
+// NIL-RESULT-AND-NON-OPTIONAL-ERROR-NEXT: }
+
+// In this case, we are previously ignoring the error returned from simpleErr but are rethrowing it in the refactored case. 
+// That's probably fine although it changes semantics.
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=OPTIONAL-RELAYED-RESULT-AND-NIL-ERROR %s
+func optionalRelayedResultAndNilError(completion: (String?, Error?) -> Void) {
+  simpleErr(arg: "test") { (res, err) in
+    completion(res, nil)
+  }
+}
+// OPTIONAL-RELAYED-RESULT-AND-NIL-ERROR:      func optionalRelayedResultAndNilError() async throws -> String {
+// OPTIONAL-RELAYED-RESULT-AND-NIL-ERROR-NEXT:   let res = try await simpleErr(arg: "test")
+// OPTIONAL-RELAYED-RESULT-AND-NIL-ERROR-NEXT:   return res
+// OPTIONAL-RELAYED-RESULT-AND-NIL-ERROR-NEXT: }
+
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=OPTIONAL-RELAYED-RESULT-AND-OPTIONAL-RELAYED-ERROR %s
+func optionalRelayedResultAndOptionalRelayedError(completion: (String?, Error?) -> Void) {
+  simpleErr(arg: "test") { (res, err) in
+    completion(res, err)
+  }
+}
+// OPTIONAL-RELAYED-RESULT-AND-OPTIONAL-RELAYED-ERROR:      func optionalRelayedResultAndOptionalRelayedError() async throws -> String {
+// OPTIONAL-RELAYED-RESULT-AND-OPTIONAL-RELAYED-ERROR-NEXT:   let res = try await simpleErr(arg: "test")
+// OPTIONAL-RELAYED-RESULT-AND-OPTIONAL-RELAYED-ERROR-NEXT:   return res
+// OPTIONAL-RELAYED-RESULT-AND-OPTIONAL-RELAYED-ERROR-NEXT: }
+
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=OPTIONAL-RELAYED-RESULT-AND-OPTIONAL-COMPLEX-ERROR %s
+func optionalRelayedResultAndOptionalComplexError(completion: (String?, Error?) -> Void) {
+  simpleErr(arg: "test") { (res, err) in
+    completion(res, makeOptionalError())
+  }
+}
+// OPTIONAL-RELAYED-RESULT-AND-OPTIONAL-COMPLEX-ERROR:      func optionalRelayedResultAndOptionalComplexError() async throws -> String {
+// OPTIONAL-RELAYED-RESULT-AND-OPTIONAL-COMPLEX-ERROR-NEXT:   let res = try await simpleErr(arg: "test")
+// OPTIONAL-RELAYED-RESULT-AND-OPTIONAL-COMPLEX-ERROR-NEXT:   if let error = makeOptionalError() {
+// OPTIONAL-RELAYED-RESULT-AND-OPTIONAL-COMPLEX-ERROR-NEXT:     throw error
+// OPTIONAL-RELAYED-RESULT-AND-OPTIONAL-COMPLEX-ERROR-NEXT:   } else {
+// OPTIONAL-RELAYED-RESULT-AND-OPTIONAL-COMPLEX-ERROR-NEXT:     return res
+// OPTIONAL-RELAYED-RESULT-AND-OPTIONAL-COMPLEX-ERROR-NEXT:   }
+// OPTIONAL-RELAYED-RESULT-AND-OPTIONAL-COMPLEX-ERROR-NEXT: }
+
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=OPTIONAL-RELAYED-RESULT-AND-NON-OPTIONAL-ERROR %s
+func optionalRelayedResultAndNonOptionalError(completion: (String?, Error?) -> Void) {
+  simpleErr(arg: "test") { (res, err) in
+    completion(res, CustomError.Bad)
+  }
+}
+// OPTIONAL-RELAYED-RESULT-AND-NON-OPTIONAL-ERROR:      func optionalRelayedResultAndNonOptionalError() async throws -> String {
+// OPTIONAL-RELAYED-RESULT-AND-NON-OPTIONAL-ERROR-NEXT:   let res = try await simpleErr(arg: "test")
+// OPTIONAL-RELAYED-RESULT-AND-NON-OPTIONAL-ERROR-NEXT:   throw CustomError.Bad
+// OPTIONAL-RELAYED-RESULT-AND-NON-OPTIONAL-ERROR-NEXT: }
+
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=NON-OPTIONAL-RELAYED-RESULT-AND-NIL-ERROR %s
+func nonOptionalRelayedResultAndNilError(completion: (String?, Error?) -> Void) {
+  simple { res in
+    completion(res, nil)
+  }
+}
+// NON-OPTIONAL-RELAYED-RESULT-AND-NIL-ERROR:      func nonOptionalRelayedResultAndNilError() async throws -> String {
+// NON-OPTIONAL-RELAYED-RESULT-AND-NIL-ERROR-NEXT:   let res = await simple()
+// NON-OPTIONAL-RELAYED-RESULT-AND-NIL-ERROR-NEXT:   return res
+// NON-OPTIONAL-RELAYED-RESULT-AND-NIL-ERROR-NEXT: }
+
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=NON-OPTIONAL-RELAYED-RESULT-AND-OPTIONAL-COMPLEX-ERROR %s
+func nonOptionalRelayedResultAndOptionalComplexError(completion: (String?, Error?) -> Void) {
+  simple { res in
+    completion(res, makeOptionalError())
+  }
+}
+// NON-OPTIONAL-RELAYED-RESULT-AND-OPTIONAL-COMPLEX-ERROR:      func nonOptionalRelayedResultAndOptionalComplexError() async throws -> String {
+// NON-OPTIONAL-RELAYED-RESULT-AND-OPTIONAL-COMPLEX-ERROR-NEXT:   let res = await simple()
+// NON-OPTIONAL-RELAYED-RESULT-AND-OPTIONAL-COMPLEX-ERROR-NEXT:   if let error = makeOptionalError() {
+// NON-OPTIONAL-RELAYED-RESULT-AND-OPTIONAL-COMPLEX-ERROR-NEXT:     throw error
+// NON-OPTIONAL-RELAYED-RESULT-AND-OPTIONAL-COMPLEX-ERROR-NEXT:   } else {
+// NON-OPTIONAL-RELAYED-RESULT-AND-OPTIONAL-COMPLEX-ERROR-NEXT:     return res
+// NON-OPTIONAL-RELAYED-RESULT-AND-OPTIONAL-COMPLEX-ERROR-NEXT:   }
+// NON-OPTIONAL-RELAYED-RESULT-AND-OPTIONAL-COMPLEX-ERROR-NEXT: }
+
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=NON-OPTIONAL-RELAYED-RESULT-AND-NON-OPTIONAL-ERROR %s
+func nonOptionalRelayedResultAndNonOptionalError(completion: (String?, Error?) -> Void) {
+  simple { res in
+    completion(res, CustomError.Bad)
+  }
+}
+// NON-OPTIONAL-RELAYED-RESULT-AND-NON-OPTIONAL-ERROR:      func nonOptionalRelayedResultAndNonOptionalError() async throws -> String {
+// NON-OPTIONAL-RELAYED-RESULT-AND-NON-OPTIONAL-ERROR-NEXT:   let res = await simple()
+// NON-OPTIONAL-RELAYED-RESULT-AND-NON-OPTIONAL-ERROR-NEXT:   throw CustomError.Bad
+// NON-OPTIONAL-RELAYED-RESULT-AND-NON-OPTIONAL-ERROR-NEXT: }
+
+// The refactored code doesn't compile because we can't return an optional String from the async function. 
+// But it's not clear what the intended result should be either, because `error` is always `nil`.
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=OPTIONAL-COMPLEX-RESULT-AND-NIL-ERROR %s
+func optionalComplexResultAndNilError(completion: (String?, Error?) -> Void) {
+  completion(makeOptionalString(), nil)
+}
+// OPTIONAL-COMPLEX-RESULT-AND-NIL-ERROR:      func optionalComplexResultAndNilError() async throws -> String {
+// OPTIONAL-COMPLEX-RESULT-AND-NIL-ERROR-NEXT:   return makeOptionalString()
+// OPTIONAL-COMPLEX-RESULT-AND-NIL-ERROR-NEXT: }
+
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=OPTIONAL-COMPLEX-RESULT-AND-OPTIONAL-RELAYED-ERROR %s
+func optionalComplexResultAndOptionalRelayedError(completion: (String?, Error?) -> Void) {
+  simpleErr(arg: "test") { (res, err) in
+    completion(makeOptionalString(), err)
+  }
+}
+// OPTIONAL-COMPLEX-RESULT-AND-OPTIONAL-RELAYED-ERROR:      func optionalComplexResultAndOptionalRelayedError() async throws -> String {
+// OPTIONAL-COMPLEX-RESULT-AND-OPTIONAL-RELAYED-ERROR-NEXT:   let res = try await simpleErr(arg: "test")
+// OPTIONAL-COMPLEX-RESULT-AND-OPTIONAL-RELAYED-ERROR-NEXT:   return makeOptionalString()
+// OPTIONAL-COMPLEX-RESULT-AND-OPTIONAL-RELAYED-ERROR-NEXT: }
+
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=OPTIONAL-COMPLEX-RESULT-AND-OPTIONAL-COMPLEX-ERROR %s
+func optionalComplexResultAndOptionalComplexError(completion: (String?, Error?) -> Void) {
+  completion(makeOptionalString(), makeOptionalError())
+}
+// OPTIONAL-COMPLEX-RESULT-AND-OPTIONAL-COMPLEX-ERROR:      func optionalComplexResultAndOptionalComplexError() async throws -> String {
+// OPTIONAL-COMPLEX-RESULT-AND-OPTIONAL-COMPLEX-ERROR-NEXT:   if let error = makeOptionalError() {
+// OPTIONAL-COMPLEX-RESULT-AND-OPTIONAL-COMPLEX-ERROR-NEXT:     throw error
+// OPTIONAL-COMPLEX-RESULT-AND-OPTIONAL-COMPLEX-ERROR-NEXT:   } else {
+// OPTIONAL-COMPLEX-RESULT-AND-OPTIONAL-COMPLEX-ERROR-NEXT:     return makeOptionalString()
+// OPTIONAL-COMPLEX-RESULT-AND-OPTIONAL-COMPLEX-ERROR-NEXT:   }
+// OPTIONAL-COMPLEX-RESULT-AND-OPTIONAL-COMPLEX-ERROR-NEXT: }
+
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=OPTIONAL-COMPLEX-RESULT-AND-NON-OPTIONAL-ERROR %s
+func optionalComplexResultAndNonOptionalError(completion: (String?, Error?) -> Void) {
+  completion(makeOptionalString(), CustomError.Bad)
+}
+// OPTIONAL-COMPLEX-RESULT-AND-NON-OPTIONAL-ERROR:      func optionalComplexResultAndNonOptionalError() async throws -> String {
+// OPTIONAL-COMPLEX-RESULT-AND-NON-OPTIONAL-ERROR-NEXT:   throw CustomError.Bad
+// OPTIONAL-COMPLEX-RESULT-AND-NON-OPTIONAL-ERROR-NEXT: }
+
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=NON-OPTIONAL-RESULT-AND-NIL-ERROR %s
+func nonOptionalResultAndNilError(completion: (String?, Error?) -> Void) {
+  completion("abc", nil)
+}
+// NON-OPTIONAL-RESULT-AND-NIL-ERROR:      func nonOptionalResultAndNilError() async throws -> String {
+// NON-OPTIONAL-RESULT-AND-NIL-ERROR-NEXT:   return "abc"
+// NON-OPTIONAL-RESULT-AND-NIL-ERROR-NEXT: }
+
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=NON-OPTIONAL-RESULT-AND-OPTIONAL-RELAYED-ERROR %s
+func nonOptionalResultAndOptionalRelayedError(completion: (String?, Error?) -> Void) {
+  simpleErr(arg: "test") { (res, err) in
+    completion("abc", err)
+  }
+}
+// NON-OPTIONAL-RESULT-AND-OPTIONAL-RELAYED-ERROR:      func nonOptionalResultAndOptionalRelayedError() async throws -> String {
+// NON-OPTIONAL-RESULT-AND-OPTIONAL-RELAYED-ERROR-NEXT:   let res = try await simpleErr(arg: "test")
+// NON-OPTIONAL-RESULT-AND-OPTIONAL-RELAYED-ERROR-NEXT:   return "abc"
+// NON-OPTIONAL-RESULT-AND-OPTIONAL-RELAYED-ERROR-NEXT: }
+
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=NON-OPTIONAL-RESULT-AND-OPTIONAL-COMPLEX-ERROR %s
+func nonOptionalResultAndOptionalComplexError(completion: (String?, Error?) -> Void) {
+  completion("abc", makeOptionalError())
+}
+// NON-OPTIONAL-RESULT-AND-OPTIONAL-COMPLEX-ERROR:      func nonOptionalResultAndOptionalComplexError() async throws -> String {
+// NON-OPTIONAL-RESULT-AND-OPTIONAL-COMPLEX-ERROR-NEXT:   if let error = makeOptionalError() {
+// NON-OPTIONAL-RESULT-AND-OPTIONAL-COMPLEX-ERROR-NEXT:     throw error
+// NON-OPTIONAL-RESULT-AND-OPTIONAL-COMPLEX-ERROR-NEXT:   } else {
+// NON-OPTIONAL-RESULT-AND-OPTIONAL-COMPLEX-ERROR-NEXT:     return "abc"
+// NON-OPTIONAL-RESULT-AND-OPTIONAL-COMPLEX-ERROR-NEXT:   }
+// NON-OPTIONAL-RESULT-AND-OPTIONAL-COMPLEX-ERROR-NEXT: }
+
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=NON-OPTIONAL-RESULT-AND-NON-OPTIONAL-ERROR %s
+func nonOptionalResultAndNonOptionalError(completion: (String?, Error?) -> Void) {
+  completion("abc", CustomError.Bad)
+}
+// NON-OPTIONAL-RESULT-AND-NON-OPTIONAL-ERROR:      func nonOptionalResultAndNonOptionalError() async throws -> String {
+// NON-OPTIONAL-RESULT-AND-NON-OPTIONAL-ERROR-NEXT:   throw CustomError.Bad
+// NON-OPTIONAL-RESULT-AND-NON-OPTIONAL-ERROR-NEXT: }
+
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=WRAP-COMPLETION-CALL-IN-PARENS %s
+func wrapCompletionCallInParenthesis(completion: (String?, Error?) -> Void) {
+  simpleErr(arg: "test") { (res, err) in
+    (completion(res, err))
+  }
+}
+// WRAP-COMPLETION-CALL-IN-PARENS:      func wrapCompletionCallInParenthesis() async throws -> String {
+// WRAP-COMPLETION-CALL-IN-PARENS-NEXT:   let res = try await simpleErr(arg: "test")
+// WRAP-COMPLETION-CALL-IN-PARENS-NEXT:   return res
+// WRAP-COMPLETION-CALL-IN-PARENS-NEXT: }
+
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=TWO-COMPLETION-HANDLER-CALLS %s
+func twoCompletionHandlerCalls(completion: (String?, Error?) -> Void) {
+  simpleErr(arg: "test") { (res, err) in
+    completion(res, err)
+    completion(res, err)
+  }
+}
+// TWO-COMPLETION-HANDLER-CALLS:      func twoCompletionHandlerCalls() async throws -> String {
+// TWO-COMPLETION-HANDLER-CALLS-NEXT:   let res = try await simpleErr(arg: "test")
+// TWO-COMPLETION-HANDLER-CALLS-NEXT:   return res
+// TWO-COMPLETION-HANDLER-CALLS-NEXT:   return res
+// TWO-COMPLETION-HANDLER-CALLS-NEXT: }

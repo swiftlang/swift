@@ -125,11 +125,15 @@ bool SemaAnnotator::walkToDeclPre(Decl *D) {
   bool IsExtension = false;
 
   if (auto *VD = dyn_cast<ValueDecl>(D)) {
-    if (VD->hasName() && !VD->isImplicit()) {
+    if (!VD->isImplicit()) {
       SourceManager &SM = VD->getASTContext().SourceMgr;
-      NameLen = VD->getBaseName().userFacingName().size();
-      if (Loc.isValid() && SM.extractText({Loc, 1}) == "`")
-        NameLen += 2;
+      if (VD->hasName()) {
+        NameLen = VD->getBaseName().userFacingName().size();
+        if (Loc.isValid() && SM.extractText({Loc, 1}) == "`")
+          NameLen += 2;
+      } else if (Loc.isValid() && SM.extractText({Loc, 1}) == "_") {
+        NameLen = 1;
+      }
     }
 
     auto ReportParamList = [&](ParameterList *PL) {
@@ -435,6 +439,7 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
       case KeyPathExpr::Component::Kind::OptionalForce:
       case KeyPathExpr::Component::Kind::Identity:
       case KeyPathExpr::Component::Kind::DictionaryKey:
+      case KeyPathExpr::Component::Kind::CodeCompletion:
         break;
       }
     }

@@ -288,6 +288,10 @@ std::string IRGenMangler::mangleSymbolNameForAssociatedConformanceWitness(
     Buffer << "default associated conformance";
   }
 
+  // appendProtocolConformance() sets CurGenericSignature; clear it out
+  // before calling appendAssociatedTypePath().
+  CurGenericSignature = nullptr;
+
   bool isFirstAssociatedTypeIdentifier = true;
   appendAssociatedTypePath(associatedType, isFirstAssociatedTypeIdentifier);
   appendProtocolName(proto);

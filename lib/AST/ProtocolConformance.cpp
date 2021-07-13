@@ -1250,10 +1250,15 @@ void NominalTypeDecl::prepareConformanceTable() const {
 
   // Actor classes conform to the actor protocol.
   if (auto classDecl = dyn_cast<ClassDecl>(mutableThis)) {
-    if (classDecl->isActor())
-      addSynthesized(KnownProtocolKind::Actor);
     if (classDecl->isDistributedActor())
       addSynthesized(KnownProtocolKind::DistributedActor);
+    else if (classDecl->isActor())
+      addSynthesized(KnownProtocolKind::Actor);
+  }
+
+  // Global actors conform to the GlobalActor protocol.
+  if (mutableThis->getAttrs().hasAttribute<GlobalActorAttr>()) {
+    addSynthesized(KnownProtocolKind::GlobalActor);
   }
 }
 
@@ -1345,6 +1350,9 @@ static ProtocolConformance *findSynthesizedSendableConformance(
 
   auto concrete = conformance.getConcrete();
   if (concrete->getDeclContext() != dc)
+    return nullptr;
+
+  if (isa<InheritedProtocolConformance>(concrete))
     return nullptr;
 
   auto normal = concrete->getRootNormalConformance();

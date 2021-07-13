@@ -209,24 +209,16 @@ namespace irgen {
       ///
       /// This is a micro-optimization we apply to certain special functions
       /// that we know don't need generics.
-      bool suppressGenerics() const {
+      bool useSpecialConvention() const {
         if (!isSpecial()) return false;
 
         switch (getSpecialKind()) {
-        case SpecialKind::TaskFutureWait:
-        case SpecialKind::TaskFutureWaitThrowing:
-        case SpecialKind::AsyncLetWait:
         case SpecialKind::AsyncLetWaitThrowing:
+        case SpecialKind::TaskFutureWaitThrowing:
+        case SpecialKind::TaskFutureWait:
+        case SpecialKind::AsyncLetWait:
         case SpecialKind::TaskGroupWaitNext:
-          // FIXME: I have disabled this optimization, if we bring it back we
-          // need to debug why it currently does not work (call emission
-          // computes an undef return pointer) and change the runtime entries to
-          // remove the extra type parameter.
-          //
-          // We suppress generics from these as a code-size optimization
-          // because the runtime can recover the success type from the
-          // future.
-          return false;
+          return true;
         }
         llvm_unreachable("covered switch");
       }
@@ -372,9 +364,7 @@ namespace irgen {
       return !kind.isAsyncFunctionPointer();
     }
 
-    bool suppressGenerics() const {
-      return kind.suppressGenerics();
-    }
+    bool useSpecialConvention() const { return kind.useSpecialConvention(); }
   };
 
   class Callee {
@@ -438,9 +428,7 @@ namespace irgen {
       return Fn.getSignature();
     }
 
-    bool suppressGenerics() const {
-      return Fn.suppressGenerics();
-    }
+    bool useSpecialConvention() const { return Fn.useSpecialConvention(); }
 
     /// If this callee has a value for the Swift context slot, return
     /// it; otherwise return non-null.
@@ -458,6 +446,7 @@ namespace irgen {
     llvm::Value *getObjCMethodSelector() const;
   };
 
+  FunctionPointer::Kind classifyFunctionPointerKind(SILFunction *fn);
 } // end namespace irgen
 } // end namespace swift
 

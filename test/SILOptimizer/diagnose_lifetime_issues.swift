@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil %s -o /dev/null -verify
+// RUN: %target-swift-frontend -emit-sil -enable-copy-propagation %s -o /dev/null -verify
 
 class Delegate {
   func foo() { }

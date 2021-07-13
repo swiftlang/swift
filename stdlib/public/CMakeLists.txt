@@ -4,6 +4,7 @@ set(SWIFT_RUNTIME_CXX_FLAGS)
 set(SWIFT_RUNTIME_LINK_FLAGS)
 set(SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS)
 set(SWIFT_RUNTIME_SWIFT_LINK_FLAGS)
+set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_LINK_FLAGS)
 
 if(SWIFT_RUNTIME_USE_SANITIZERS)
   # TODO: Refactor this
@@ -18,7 +19,7 @@ endif()
 list(APPEND  SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS "-Xfrontend" "-verify-syntax-tree")
 
 if(SWIFT_STDLIB_SIL_DEBUGGING)
-  list(APPEND SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS "-Xfrontend" "-gsil")
+  list(APPEND SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS "-Xfrontend" "-sil-based-debuginfo")
 endif()
 
 # Build the runtime with -Wall to catch, e.g., uninitialized variables
@@ -121,3 +122,9 @@ if(SWIFT_BUILD_SDK_OVERLAY)
   endif()
 endif()
 
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_LINK_FLAGS
+    "-Wl,-reexported_symbols_list,${CMAKE_CURRENT_SOURCE_DIR}/Concurrency/ReexportedSymbols")
+endif()
+
+list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}")

@@ -492,13 +492,7 @@ public:
   TypeBase *getWithoutSyntaxSugar();
 
   /// getASTContext - Return the ASTContext that this type belongs to.
-  ASTContext &getASTContext() {
-    // If this type is canonical, it has the ASTContext in it.
-    if (isCanonical())
-      return *const_cast<ASTContext*>(Context);
-    // If not, canonicalize it to get the Context.
-    return *const_cast<ASTContext*>(getCanonicalType()->Context);
-  }
+  ASTContext &getASTContext();
   
   /// isEqual - Return true if these two types are equal, ignoring sugar.
   ///
@@ -5993,6 +5987,22 @@ public:
   }
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(PlaceholderType, Type)
+
+/// getASTContext - Return the ASTContext that this type belongs to.
+inline ASTContext &TypeBase::getASTContext() {
+  // If this type is canonical, it has the ASTContext in it.
+  if (isCanonical())
+    return *const_cast<ASTContext*>(Context);
+
+  // getCanonicalType() on GenericFunctionType is very expensive;
+  // instead we can more easily fish the ASTContext out of any
+  // structural sub-component.
+  if (auto *genericFnType = dyn_cast<GenericFunctionType>(this))
+    return genericFnType->getGenericParams()[0]->getASTContext();
+
+  // If not, canonicalize it to get the Context.
+  return *const_cast<ASTContext*>(getCanonicalType()->Context);
+}
 
 inline bool TypeBase::isTypeVariableOrMember() {
   if (is<TypeVariableType>())

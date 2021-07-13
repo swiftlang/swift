@@ -5,12 +5,10 @@
 import Foundation
 
 // CHECK: %T16actor_class_objc7MyClassC = type <{ %swift.refcounted, %swift.defaultactor, %TSi }>
-// CHECK: %swift.defaultactor = type { [10 x i8*] }
+// CHECK: %swift.defaultactor = type { [12 x i8*] }
 
 // CHECK-LABEL: @"OBJC_METACLASS_$__TtC16actor_class_objc7MyClass" = global
 //   Metaclass is an instance of the root class.
-// CHECK-SAME: %objc_class* {{.*}}@"OBJC_METACLASS_$_NSObject{{(.ptrauth)?}}"
-//   Metaclass superclass is the metaclass of the superclass.
 // CHECK-SAME: %objc_class* {{.*}}@"OBJC_METACLASS_$_SwiftNativeNSObject{{(.ptrauth)?}}"
 
 // CHECK: @"$s16actor_class_objc7MyClassCMf" = internal global
@@ -20,18 +18,18 @@ import Foundation
 //   Flags: uses Swift refcounting
 // CHECK-SAME: i32 2,
 //   Instance size
-// CHECK-64-SAME: i32 104,
-// CHECK-32-SAME: i32 52,
+// CHECK-64-SAME: i32 120,
+// CHECK-32-SAME: i32 60,
 //   Alignment mask
 // CHECK-64-SAME: i16 15,
 // CHECK-32-SAME: i16 7,
 //   Field offset for 'x'
-// CHECK-64-SAME: i64 96,
-// CHECK-32-SAME: i32 48,
+// CHECK-64-SAME: i64 112,
+// CHECK-32-SAME: i32 56,
 
-public actor MyClass: NSObject {
+@objc public actor MyClass {
   public var x: Int
-  public override init() { self.x = 0 }
+  public init() { self.x = 0 }
 }
 
 // CHECK-LABEL: define {{.*}} @"$s16actor_class_objc7MyClassC1xSivg"

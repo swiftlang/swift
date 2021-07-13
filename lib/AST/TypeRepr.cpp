@@ -80,6 +80,19 @@ void *TypeRepr::operator new(size_t Bytes, const ASTContext &C,
   return C.Allocate(Bytes, Alignment);
 }
 
+SourceLoc TypeRepr::findUncheckedAttrLoc() const {
+  auto typeRepr = this;
+  while (auto attrTypeRepr = dyn_cast<AttributedTypeRepr>(typeRepr)) {
+    if (attrTypeRepr->getAttrs().has(TAK_unchecked)) {
+      return attrTypeRepr->getAttrs().getLoc(TAK_unchecked);
+    }
+
+    typeRepr = attrTypeRepr->getTypeRepr();
+  }
+
+  return SourceLoc();
+}
+
 DeclNameRef ComponentIdentTypeRepr::getNameRef() const {
   if (IdOrDecl.is<DeclNameRef>())
     return IdOrDecl.get<DeclNameRef>();
@@ -439,6 +452,25 @@ void OpaqueReturnTypeRepr::printImpl(ASTPrinter &Printer,
                                      const PrintOptions &Opts) const {
   Printer.printKeyword("some", Opts, /*Suffix=*/" ");
   printTypeRepr(Constraint, Printer, Opts);
+}
+
+SourceLoc NamedOpaqueReturnTypeRepr::getStartLocImpl() const {
+  return GenericParams->getLAngleLoc();
+}
+
+SourceLoc NamedOpaqueReturnTypeRepr::getEndLocImpl() const {
+  return Base->getEndLoc();
+}
+
+SourceLoc NamedOpaqueReturnTypeRepr::getLocImpl() const {
+  return Base->getLoc();
+}
+
+void NamedOpaqueReturnTypeRepr::printImpl(ASTPrinter &Printer,
+                                          const PrintOptions &Opts) const {
+  GenericParams->print(Printer, Opts);
+  Printer << ' ';
+  printTypeRepr(Base, Printer, Opts);
 }
 
 void SpecifierTypeRepr::printImpl(ASTPrinter &Printer,

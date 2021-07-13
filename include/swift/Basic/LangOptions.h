@@ -286,6 +286,11 @@ namespace swift {
     /// Enable experimental concurrency model.
     bool EnableExperimentalConcurrency = false;
 
+    /// Enable experimental support for additional opaque return type features,
+    /// i.e. named opaque return types (with 'where' clause support), and opaque
+    /// types in nested position within the function return type.
+    bool EnableExperimentalOpaqueReturnTypes = false;
+
     /// Enable experimental flow-sensitive concurrent captures.
     bool EnableExperimentalFlowSensitiveConcurrentCaptures = false;
 
@@ -448,7 +453,7 @@ namespace swift {
 
     /// Maximum iteration count for requirement machine confluent completion
     /// algorithm.
-    unsigned RequirementMachineStepLimit = 1000;
+    unsigned RequirementMachineStepLimit = 2000;
 
     /// Maximum term length for requirement machine confluent completion
     /// algorithm.

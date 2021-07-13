@@ -915,6 +915,10 @@ static bool isLazyPropertyGetter(ApplyInst *ai) {
       !callee->isLazyPropertyGetter())
     return false;
 
+  // We cannot inline a non-ossa function into an ossa function
+  if (ai->getFunction()->hasOwnership() && !callee->hasOwnership())
+    return false;
+
   // Only handle classes, but not structs.
   // Lazy property getters of structs have an indirect inout self parameter.
   // We don't know if the whole struct is overwritten between two getter calls.

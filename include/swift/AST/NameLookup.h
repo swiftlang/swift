@@ -17,8 +17,8 @@
 #ifndef SWIFT_AST_NAME_LOOKUP_H
 #define SWIFT_AST_NAME_LOOKUP_H
 
-#include "llvm/ADT/SmallVector.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Module.h"
 #include "swift/Basic/Compiler.h"
@@ -26,11 +26,11 @@
 #include "swift/Basic/NullablePtr.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/SourceManager.h"
+#include "llvm/ADT/SmallVector.h"
 
 namespace swift {
 class ASTContext;
 class DeclName;
-class GenericSignatureBuilder;
 class Type;
 class TypeDecl;
 class ValueDecl;
@@ -487,7 +487,7 @@ void lookupVisibleMemberDecls(VisibleDeclConsumer &Consumer,
                               bool includeInstanceMembers,
                               bool includeDerivedRequirements,
                               bool includeProtocolExtensionMembers,
-                              GenericSignatureBuilder *GSB = nullptr);
+                              GenericSignature genericSig = GenericSignature());
 
 namespace namelookup {
 
@@ -503,6 +503,19 @@ void filterForDiscriminator(SmallVectorImpl<Result> &results,
 
 } // end namespace namelookup
 
+/// Describes an inherited nominal entry.
+struct InheritedNominalEntry : Located<NominalTypeDecl *> {
+  /// The location of the "unchecked" attribute, if present.
+  SourceLoc uncheckedLoc;
+
+  InheritedNominalEntry() { }
+
+  InheritedNominalEntry(
+    NominalTypeDecl *item, SourceLoc loc,
+    SourceLoc uncheckedLoc
+  ) : Located(item, loc), uncheckedLoc(uncheckedLoc) { }
+};
+
 /// Retrieve the set of nominal type declarations that are directly
 /// "inherited" by the given declaration at a particular position in the
 /// list of "inherited" types.
@@ -511,7 +524,7 @@ void filterForDiscriminator(SmallVectorImpl<Result> &results,
 /// AnyObject type, set \c anyObject true.
 void getDirectlyInheritedNominalTypeDecls(
     llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
-    unsigned i, llvm::SmallVectorImpl<Located<NominalTypeDecl *>> &result,
+    unsigned i, llvm::SmallVectorImpl<InheritedNominalEntry> &result,
     bool &anyObject);
 
 /// Retrieve the set of nominal type declarations that are directly
@@ -519,7 +532,7 @@ void getDirectlyInheritedNominalTypeDecls(
 /// and splitting out the components of compositions.
 ///
 /// If we come across the AnyObject type, set \c anyObject true.
-SmallVector<Located<NominalTypeDecl *>, 4> getDirectlyInheritedNominalTypeDecls(
+SmallVector<InheritedNominalEntry, 4> getDirectlyInheritedNominalTypeDecls(
     llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
     bool &anyObject);
 

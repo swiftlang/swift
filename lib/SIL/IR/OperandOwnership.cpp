@@ -19,6 +19,16 @@
 
 using namespace swift;
 
+/// Return true if all OperandOwnership invariants hold.
+bool swift::checkOperandOwnershipInvariants(const Operand *operand) {
+  OperandOwnership opOwnership = operand->getOperandOwnership();
+  if (opOwnership == OperandOwnership::Borrow) {
+    // Must be a valid BorrowingOperand.
+    return bool(BorrowingOperand(const_cast<Operand *>(operand)));
+  }
+  return true;
+}
+
 //===----------------------------------------------------------------------===//
 //                         OperandOwnershipClassifier
 //===----------------------------------------------------------------------===//
@@ -755,11 +765,14 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, DestroyTaskGroup)
 BUILTIN_OPERAND_OWNERSHIP(ForwardingConsume, COWBufferForReading)
 BUILTIN_OPERAND_OWNERSHIP(ForwardingConsume, UnsafeGuaranteed)
 
+const int PARAMETER_INDEX_CREATE_ASYNC_TASK_FUTURE_FUNCTION = 2;
+const int PARAMETER_INDEX_CREATE_ASYNC_TASK_GROUP_FUTURE_FUNCTION = 3;
+
 OperandOwnership
-OperandOwnershipBuiltinClassifier::visitCreateAsyncTaskFuture(BuiltinInst *bi,
-                                                              StringRef attr) {
+OperandOwnershipBuiltinClassifier::visitCreateAsyncTask(BuiltinInst *bi,
+                                                        StringRef attr) {
   // The function operand is consumed by the new task.
-  if (&op == &bi->getOperandRef(2))
+  if (&op == &bi->getOperandRef(PARAMETER_INDEX_CREATE_ASYNC_TASK_FUTURE_FUNCTION))
     return OperandOwnership::DestroyingConsume;
   
   // FIXME: These are considered InteriorPointer because they may propagate a
@@ -770,10 +783,10 @@ OperandOwnershipBuiltinClassifier::visitCreateAsyncTaskFuture(BuiltinInst *bi,
 }
 
 OperandOwnership
-OperandOwnershipBuiltinClassifier::visitCreateAsyncTaskGroupFuture(BuiltinInst *bi,
-                                                                   StringRef attr) {
+OperandOwnershipBuiltinClassifier::visitCreateAsyncTaskInGroup(BuiltinInst *bi,
+                                                               StringRef attr) {
   // The function operand is consumed by the new task.
-  if (&op == &bi->getOperandRef(3))
+  if (&op == &bi->getOperandRef(PARAMETER_INDEX_CREATE_ASYNC_TASK_GROUP_FUTURE_FUNCTION))
     return OperandOwnership::DestroyingConsume;
   
   // FIXME: These are considered InteriorPointer because they may propagate a

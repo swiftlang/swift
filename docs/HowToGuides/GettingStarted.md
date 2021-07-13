@@ -151,35 +151,18 @@ Double-check that running `pwd` prints a path ending with `swift`.
 [Homebrew]: https://brew.sh/
 [Homebrew Bundle]: https://github.com/Homebrew/homebrew-bundle
 
-### Ubuntu Linux
+### Linux
 
-1. For Ubuntu 16.04 LTS and 18.04 LTS, run the following:
-
-   ```sh
-   sudo apt-get install    \
-     clang                 \
-     cmake                 \
-     git                   \
-     icu-devtools          \
-     libcurl4-openssl-dev  \
-     libedit-dev           \
-     libicu-dev            \
-     libncurses5-dev       \
-     libpython3-dev        \
-     libsqlite3-dev        \
-     libxml2-dev           \
-     ninja-build           \
-     pkg-config            \
-     python                \
-     python-six            \
-     rsync                 \
-     swig                  \
-     systemtap-sdt-dev     \
-     tzdata                \
-     uuid-dev
+1. The latest Linux dependencies are listed in the respective Dockerfiles:
+   * [Ubuntu 20.04](https://github.com/apple/swift-docker/blob/main/swift-ci/master/ubuntu/20.04/Dockerfile)
+   * [CentOS 7](https://github.com/apple/swift-docker/blob/main/swift-ci/master/centos/7/Dockerfile)
+   * [CentOS 8](https://github.com/apple/swift-docker/blob/main/swift-ci/master/centos/8/Dockerfile)
+   * [Amazon Linux 2](https://github.com/apple/swift-docker/blob/main/swift-ci/master/amazon-linux/2/Dockerfile)
+   
+2. To install sccache (optional):
+   ```
    sudo snap install sccache --candidate --classic
    ```
-
    **Note:** LLDB currently requires at least `swig-1.3.40` but will
    successfully build with version 2 shipped with Ubuntu.
 
@@ -246,6 +229,7 @@ Phew, that's a lot to digest! Now let's proceed to the actual build itself!
    [using both Ninja and Xcode](#using-both-ninja-and-xcode).
 3. Build the toolchain with optimizations, debuginfo, and assertions and run
    the tests.
+   macOS:
    - Via Ninja:
      ```sh
      utils/build-script --skip-build-benchmarks \
@@ -259,10 +243,14 @@ Phew, that's a lot to digest! Now let's proceed to the actual build itself!
        --sccache --release-debuginfo --swift-disable-dead-stripping --test \
        --xcode
      ```
+   Linux (uses Ninja):
+     ```sh
+     utils/build-script --release-debuginfo --test --skip-early-swift-driver
+     ```
    This will create a directory
    `swift-project/build/Ninja-RelWithDebInfoAssert`
    (with `Xcode` instead of `Ninja` if you used `--xcode`)
-   containing the build artifacts.
+   containing the Swift compiler and standard library and clang/LLVM build artifacts.
    - If the build succeeds: Once the build is complete, the tests will run.
      - If the tests are passing: Great! We can go to the next step.
      - If some tests are failing:
@@ -271,6 +259,10 @@ Phew, that's a lot to digest! Now let's proceed to the actual build itself!
          handy later when you run the tests after making a change.
    - If the build fails:
      See [Troubleshooting build issues](#troubleshooting-build-issues).
+
+   If you would like to additionally build the Swift corelibs,
+   ie swift-corelibs-libdispatch, swift-corelibs-foundation, and swift-corelibs-xctest,
+   on Linux, add the `--xctest` flag to `build-script`.
 
 In the following sections, for simplicity, we will assume that you are using a
 `Ninja-RelWithDebInfoAssert` build on macOS running on an Intel-based Mac,

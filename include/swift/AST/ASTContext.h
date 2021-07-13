@@ -28,6 +28,7 @@
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Located.h"
 #include "swift/Basic/Malloc.h"
+#include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "clang/AST/DeclTemplate.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
@@ -231,6 +232,7 @@ class ASTContext final {
   ASTContext(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
              SearchPathOptions &SearchPathOpts,
              ClangImporterOptions &ClangImporterOpts,
+             symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
              SourceManager &SourceMgr,
              DiagnosticEngine &Diags);
 
@@ -246,6 +248,7 @@ public:
   static ASTContext *get(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
                          SearchPathOptions &SearchPathOpts,
                          ClangImporterOptions &ClangImporterOpts,
+                         symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
                          SourceManager &SourceMgr, DiagnosticEngine &Diags);
   ~ASTContext();
 
@@ -266,6 +269,9 @@ public:
 
   /// The clang importer options used by this AST context.
   ClangImporterOptions &ClangImporterOpts;
+
+  /// The symbol graph generation options used by this AST context.
+  symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts;
 
   /// The source manager object.
   SourceManager &SourceMgr;
@@ -744,6 +750,10 @@ public:
   /// Get the runtime availability of support for differentiation.
   AvailabilityContext getDifferentiationAvailability();
 
+  /// Get the runtime availability of getters and setters of multi payload enum
+  /// tag single payloads.
+  AvailabilityContext getMultiPayloadEnumTagSinglePayload();
+
   /// Get the runtime availability of features introduced in the Swift 5.2
   /// compiler for the target platform.
   AvailabilityContext getSwift52Availability();
@@ -759,6 +769,10 @@ public:
   /// Get the runtime availability of features introduced in the Swift 5.5
   /// compiler for the target platform.
   AvailabilityContext getSwift55Availability();
+
+  /// Get the runtime availability of features introduced in the Swift 5.6
+  /// compiler for the target platform.
+  AvailabilityContext getSwift56Availability();
 
   /// Get the runtime availability of features that have been introduced in the
   /// Swift compiler for future versions of the target platform.
@@ -1005,7 +1019,8 @@ public:
                  ProtocolDecl *protocol,
                  SourceLoc loc,
                  DeclContext *dc,
-                 ProtocolConformanceState state);
+                 ProtocolConformanceState state,
+                 bool isUnchecked);
 
   /// Produce a self-conformance for the given protocol.
   SelfProtocolConformance *

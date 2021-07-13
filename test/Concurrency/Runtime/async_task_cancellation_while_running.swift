@@ -12,7 +12,7 @@ import Dispatch
 
 @available(SwiftStdlib 5.5, *)
 func test_detach_cancel_while_child_running() async {
-  let h: Task.Handle<Bool, Error> = detach {
+  let h: Task<Bool, Error> = detach {
     async let childCancelled: Bool = { () -> Bool in
       await Task.sleep(3_000_000_000)
       return Task.isCancelled

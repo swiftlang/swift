@@ -1399,6 +1399,9 @@ createValueConstructor(ClangImporter::Implementation &Impl,
   // Construct the set of parameters from the list of members.
   SmallVector<ParamDecl *, 8> valueParameters;
   for (auto var : members) {
+    if (var->isStatic())
+      continue;
+
     bool generateParamName = wantCtorParamNames;
 
     if (var->hasClangNode()) {
@@ -3114,8 +3117,9 @@ namespace {
                          Impl.importIdentifier(decl->getIdentifier()));
 
         // Add protocol declarations to the enum declaration.
-        SmallVector<TypeLoc, 2> inheritedTypes;
-        inheritedTypes.push_back(TypeLoc::withoutLoc(underlyingType));
+        SmallVector<InheritedEntry, 2> inheritedTypes;
+        inheritedTypes.push_back(
+            InheritedEntry(TypeLoc::withoutLoc(underlyingType)));
         enumDecl->setInherited(C.AllocateCopy(inheritedTypes));
 
         if (errorWrapper) {
@@ -5188,7 +5192,7 @@ namespace {
     // declaration.
     void importObjCProtocols(Decl *decl,
                              const clang::ObjCProtocolList &clangProtocols,
-                             SmallVectorImpl<TypeLoc> &inheritedTypes);
+                             SmallVectorImpl<InheritedEntry> &inheritedTypes);
 
     // Returns None on error. Returns nullptr if there is no type param list to
     // import or we suppress its import, as in the case of NSArray, NSSet, and
@@ -5258,7 +5262,7 @@ namespace {
       // Create the extension declaration and record it.
       objcClass->addExtension(result);
       Impl.ImportedDecls[{decl, getVersion()}] = result;
-      SmallVector<TypeLoc, 4> inheritedTypes;
+      SmallVector<InheritedEntry, 4> inheritedTypes;
       importObjCProtocols(result, decl->getReferencedProtocols(),
                           inheritedTypes);
       result->setInherited(Impl.SwiftContext.AllocateCopy(inheritedTypes));
@@ -5464,7 +5468,7 @@ namespace {
       Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
 
       // Import protocols this protocol conforms to.
-      SmallVector<TypeLoc, 4> inheritedTypes;
+      SmallVector<InheritedEntry, 4> inheritedTypes;
       importObjCProtocols(result, decl->getReferencedProtocols(),
                           inheritedTypes);
       result->setInherited(Impl.SwiftContext.AllocateCopy(inheritedTypes));
@@ -5614,7 +5618,7 @@ namespace {
       }
 
       // If this Objective-C class has a supertype, import it.
-      SmallVector<TypeLoc, 4> inheritedTypes;
+      SmallVector<InheritedEntry, 4> inheritedTypes;
       Type superclassType;
       if (decl->getSuperClass()) {
         clang::QualType clangSuperclassType =
@@ -6055,7 +6059,7 @@ SwiftDeclConverter::importCFClassType(const clang::TypedefNameDecl *decl,
   addObjCAttribute(theClass, None);
 
   if (superclass) {
-    SmallVector<TypeLoc, 4> inheritedTypes;
+    SmallVector<InheritedEntry, 4> inheritedTypes;
     inheritedTypes.push_back(TypeLoc::withoutLoc(superclass));
     theClass->setInherited(Impl.SwiftContext.AllocateCopy(inheritedTypes));
   }
@@ -7825,7 +7829,7 @@ void SwiftDeclConverter::addProtocols(
 
 void SwiftDeclConverter::importObjCProtocols(
     Decl *decl, const clang::ObjCProtocolList &clangProtocols,
-    SmallVectorImpl<TypeLoc> &inheritedTypes) {
+    SmallVectorImpl<InheritedEntry> &inheritedTypes) {
   SmallVector<ProtocolDecl *, 4> protocols;
   llvm::SmallPtrSet<ProtocolDecl *, 4> knownProtocols;
   if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
@@ -7839,7 +7843,9 @@ void SwiftDeclConverter::importObjCProtocols(
             Impl.importDecl(*cp, getActiveSwiftVersion()))) {
       addProtocols(proto, protocols, knownProtocols);
       inheritedTypes.push_back(
-        TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()));
+        InheritedEntry(
+          TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()),
+          /*isUnchecked=*/false));
     }
   }
 
@@ -7868,7 +7874,7 @@ Optional<GenericParamList *> SwiftDeclConverter::importObjCGenericParams(
     // nested.
 
     // Import parameter constraints.
-    SmallVector<TypeLoc, 1> inherited;
+    SmallVector<InheritedEntry, 1> inherited;
     if (objcGenericParam->hasExplicitBound()) {
       assert(!objcGenericParam->getUnderlyingType().isNull());
       auto clangBound = objcGenericParam->getUnderlyingType()
@@ -8728,19 +8734,28 @@ void ClangImporter::Implementation::importAttributes(
       // Prime the lexer.
       parser.consumeTokenWithoutFeedingReceiver();
 
+      bool hadError = false;
       SourceLoc atLoc;
       if (parser.consumeIf(tok::at_sign, atLoc)) {
-        (void)parser.parseDeclAttribute(
+        hadError = parser.parseDeclAttribute(
             MappedDecl->getAttrs(), atLoc, initContext,
-            /*isFromClangAttribute=*/true);
+            /*isFromClangAttribute=*/true).isError();
       } else {
-        // Complain about the missing '@'.
+        SourceLoc staticLoc;
+        StaticSpellingKind staticSpelling;
+        hadError = parser.parseDeclModifierList(
+            MappedDecl->getAttrs(), staticLoc, staticSpelling,
+            /*isFromClangAttribute=*/true);
+      }
+
+      if (hadError) {
+        // Complain about the unhandled attribute or modifier.
         auto &clangSrcMgr = getClangASTContext().getSourceManager();
         ClangSourceBufferImporter &bufferImporter =
           getBufferImporterForDiagnostics();
         SourceLoc attrLoc = bufferImporter.resolveSourceLocation(
           clangSrcMgr, swiftAttr->getLocation());
-        diagnose(attrLoc, diag::clang_swift_attr_without_at,
+        diagnose(attrLoc, diag::clang_swift_attr_unhandled,
                  swiftAttr->getAttribute());
       }
       continue;
@@ -9204,7 +9219,7 @@ ClangImporter::Implementation::importMirroredDecl(const clang::NamedDecl *decl,
 }
 
 DeclContext *ClangImporter::Implementation::importDeclContextImpl(
-    const clang::DeclContext *dc) {
+    const clang::Decl *ImportingDecl, const clang::DeclContext *dc) {
   // Every declaration should come from a module, so we should not see the
   // TranslationUnit DeclContext here.
   assert(!dc->isTranslationUnit());
@@ -9217,7 +9232,8 @@ DeclContext *ClangImporter::Implementation::importDeclContextImpl(
   // leads to the first category of the given name. We'd like to keep these
   // categories separated.
   auto useCanonical = !isa<clang::ObjCCategoryDecl>(decl);
-  auto swiftDecl = importDecl(decl, CurrentVersion, useCanonical);
+  auto swiftDecl = importDeclForDeclContext(ImportingDecl, decl->getName(),
+                                            decl, CurrentVersion, useCanonical);
   if (!swiftDecl)
     return nullptr;
 
@@ -9270,6 +9286,71 @@ GenericSignature ClangImporter::Implementation::buildGenericSignature(
       GenericSignature());
 }
 
+Decl *
+ClangImporter::Implementation::importDeclForDeclContext(
+    const clang::Decl *importingDecl,
+    StringRef writtenName,
+    const clang::NamedDecl *contextDecl,
+    Version version,
+    bool useCanonicalDecl)
+{
+  auto key = std::make_tuple(importingDecl, writtenName, contextDecl, version,
+                             useCanonicalDecl);
+  auto iter = find(llvm::reverse(contextDeclsBeingImported), key);
+
+  // No cycle? Remember that we're importing this, then import normally.
+  if (iter == contextDeclsBeingImported.rend()) {
+    contextDeclsBeingImported.push_back(key);
+    auto imported = importDecl(contextDecl, version, useCanonicalDecl);
+    contextDeclsBeingImported.pop_back();
+    return imported;
+  }
+
+  // There's a cycle. Is the declaration imported enough to break the cycle
+  // gracefully? If so, we'll have it in the decl cache.
+  if (auto cached = importDeclCached(contextDecl, version, useCanonicalDecl))
+    return cached;
+
+  // Can't break it? Warn and return nullptr, which is at least better than
+  // stack overflow by recursion.
+
+  // Avoid emitting warnings repeatedly.
+  if (!contextDeclsWarnedAbout.insert(contextDecl).second)
+    return nullptr;
+
+  auto convertLoc = [&](clang::SourceLocation clangLoc) {
+    return getBufferImporterForDiagnostics()
+      .resolveSourceLocation(getClangASTContext().getSourceManager(),
+                             clangLoc);
+  };
+
+  auto getDeclName = [](const clang::Decl *D) -> StringRef {
+    if (auto ND = dyn_cast<clang::NamedDecl>(D))
+      return ND->getName();
+    return "<anonymous>";
+  };
+
+  SourceLoc loc = convertLoc(importingDecl->getLocation());
+  diagnose(loc, diag::swift_name_circular_context_import,
+           writtenName, getDeclName(importingDecl));
+
+  // Diagnose other decls involved in the cycle.
+  for (auto entry : make_range(contextDeclsBeingImported.rbegin(), iter)) {
+    auto otherDecl = std::get<0>(entry);
+    auto otherWrittenName = std::get<1>(entry);
+    diagnose(convertLoc(otherDecl->getLocation()),
+             diag::swift_name_circular_context_import_other,
+             otherWrittenName, getDeclName(otherDecl));
+  }
+
+  if (auto *parentModule = contextDecl->getOwningModule()) {
+    diagnose(loc, diag::unresolvable_clang_decl_is_a_framework_bug,
+             parentModule->getFullModuleName());
+  }
+
+  return nullptr;
+}
+
 DeclContext *
 ClangImporter::Implementation::importDeclContextOf(
   const clang::Decl *decl,
@@ -9287,13 +9368,15 @@ ClangImporter::Implementation::importDeclContextOf(
     }
 
     // Import the DeclContext.
-    importedDC = importDeclContextImpl(dc);
+    importedDC = importDeclContextImpl(decl, dc);
     break;
   }
 
   case EffectiveClangContext::TypedefContext: {
     // Import the typedef-name as a declaration.
-    auto importedDecl = importDecl(context.getTypedefName(), CurrentVersion);
+    auto importedDecl = importDeclForDeclContext(
+        decl, context.getTypedefName()->getName(), context.getTypedefName(),
+        CurrentVersion);
     if (!importedDecl) return nullptr;
 
     // Dig out the imported DeclContext.
@@ -9311,17 +9394,19 @@ ClangImporter::Implementation::importDeclContextOf(
       if (auto clangDecl
             = lookupTable->resolveContext(context.getUnresolvedName())) {
         // Import the Clang declaration.
-        auto decl = importDecl(clangDecl, CurrentVersion);
-        if (!decl) return nullptr;
+        auto swiftDecl = importDeclForDeclContext(decl,
+                                                  context.getUnresolvedName(),
+                                                  clangDecl, CurrentVersion);
+        if (!swiftDecl) return nullptr;
 
         // Look through typealiases.
-        if (auto typealias = dyn_cast<TypeAliasDecl>(decl))
+        if (auto typealias = dyn_cast<TypeAliasDecl>(swiftDecl))
           importedDC = typealias->getDeclaredInterfaceType()->getAnyNominal();
         else // Map to a nominal type declaration.
-          importedDC = dyn_cast<NominalTypeDecl>(decl);
-        break;
+          importedDC = dyn_cast<NominalTypeDecl>(swiftDecl);
       }
     }
+    break;
   }
   }
 
@@ -9961,7 +10046,8 @@ void ClangImporter::Implementation::loadAllConformances(
     auto conformance = SwiftContext.getConformance(
         dc->getDeclaredInterfaceType(),
         protocol, SourceLoc(), dc,
-        ProtocolConformanceState::Incomplete);
+        ProtocolConformanceState::Incomplete,
+        protocol->isSpecificProtocol(KnownProtocolKind::Sendable));
     conformance->setLazyLoader(this, /*context*/0);
     conformance->setState(ProtocolConformanceState::Complete);
     Conformances.push_back(conformance);

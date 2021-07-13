@@ -1157,9 +1157,15 @@ NominalTypeDecl::takeConformanceLoaderSlow() {
   return { contextInfo->loader, contextInfo->allConformancesData };
 }
 
+InheritedEntry::InheritedEntry(const TypeLoc &typeLoc)
+    : TypeLoc(typeLoc), isUnchecked(false) {
+  if (auto typeRepr = typeLoc.getTypeRepr())
+    isUnchecked = typeRepr->findUncheckedAttrLoc().isValid();
+}
+
 ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
                              TypeRepr *extendedType,
-                             ArrayRef<TypeLoc> inherited,
+                             ArrayRef<InheritedEntry> inherited,
                              DeclContext *parent,
                              TrailingWhereClause *trailingWhereClause)
   : GenericContext(DeclContextKind::ExtensionDecl, parent, nullptr),
@@ -1176,7 +1182,7 @@ ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
 
 ExtensionDecl *ExtensionDecl::create(ASTContext &ctx, SourceLoc extensionLoc,
                                      TypeRepr *extendedType,
-                                     ArrayRef<TypeLoc> inherited,
+                                     ArrayRef<InheritedEntry> inherited,
                                      DeclContext *parent,
                                      TrailingWhereClause *trailingWhereClause,
                                      ClangNode clangNode) {
@@ -1595,10 +1601,12 @@ SourceRange PatternBindingDecl::getSourceRange() const {
 }
 
 static StaticSpellingKind getCorrectStaticSpellingForDecl(const Decl *D) {
-  if (!D->getDeclContext()->getSelfClassDecl())
-    return StaticSpellingKind::KeywordStatic;
+  if (auto classDecl = D->getDeclContext()->getSelfClassDecl()) {
+    if (!classDecl->isActor())
+      return StaticSpellingKind::KeywordClass;
+  }
 
-  return StaticSpellingKind::KeywordClass;
+  return StaticSpellingKind::KeywordStatic;
 }
 
 StaticSpellingKind PatternBindingDecl::getCorrectStaticSpelling() const {
@@ -2483,6 +2491,10 @@ bool swift::conflicting(const OverloadSignature& sig1,
   if (sig1.IsInstanceMember != sig2.IsInstanceMember)
     return false;
 
+  // If one is an async function and the other is not, they can't conflict.
+  if (sig1.IsAsyncFunction != sig2.IsAsyncFunction)
+    return false;
+
   // If one is a compound name and the other is not, they do not conflict
   // if one is a property and the other is a non-nullary function.
   if (sig1.Name.isCompoundName() != sig2.Name.isCompoundName()) {
@@ -2709,7 +2721,6 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
     = static_cast<bool>(getDeclContext()->getExtendedProtocolDecl());
   signature.IsInstanceMember = isInstanceMember();
   signature.IsVariable = isa<VarDecl>(this);
-  signature.IsFunction = isa<AbstractFunctionDecl>(this);
   signature.IsEnumElement = isa<EnumElementDecl>(this);
   signature.IsNominal = isa<NominalTypeDecl>(this);
   signature.IsTypeAlias = isa<TypeAliasDecl>(this);
@@ -2721,6 +2732,13 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
     if (func->isUnaryOperator()) {
       signature.UnaryOperator = func->getAttrs().getUnaryOperatorKind();
     }
+  }
+
+  // Functions include async/not-async.
+  if (auto func = dyn_cast<AbstractFunctionDecl>(this)) {
+    signature.IsFunction = true;
+    if (func->hasAsync())
+      signature.IsAsyncFunction = true;
   }
 
   if (auto *extension = dyn_cast<ExtensionDecl>(getDeclContext()))
@@ -2856,6 +2874,23 @@ void ValueDecl::setIsObjC(bool value) {
 
   LazySemanticInfo.isObjCComputed = true;
   LazySemanticInfo.isObjC = value;
+}
+
+bool ValueDecl::isSemanticallyFinal() const {
+  // Actor types are semantically final.
+  if (auto classDecl = dyn_cast<ClassDecl>(this)) {
+    if (classDecl->isActor())
+      return true;
+  }
+
+  // As are members of actor types.
+  if (auto classDecl = getDeclContext()->getSelfClassDecl()) {
+    if (classDecl->isActor())
+      return true;
+  }
+
+  // For everything else, the same as 'final'.
+  return isFinal();
 }
 
 bool ValueDecl::isFinal() const {
@@ -3202,13 +3237,13 @@ bool ValueDecl::shouldHideFromEditor() const {
 static AccessLevel getMaximallyOpenAccessFor(const ValueDecl *decl) {
   // Non-final classes are considered open to @testable importers.
   if (auto cls = dyn_cast<ClassDecl>(decl)) {
-    if (!cls->isFinal())
+    if (!cls->isSemanticallyFinal())
       return AccessLevel::Open;
 
   // Non-final overridable class members are considered open to
   // @testable importers.
   } else if (decl->isPotentiallyOverridable()) {
-    if (!cast<ValueDecl>(decl)->isFinal())
+    if (!cast<ValueDecl>(decl)->isSemanticallyFinal())
       return AccessLevel::Open;
   }
 
@@ -3322,9 +3357,6 @@ AccessLevel ValueDecl::getFormalAccess() const {
 }
 
 bool ValueDecl::hasOpenAccess(const DeclContext *useDC) const {
-  assert(isa<ClassDecl>(this) || isa<ConstructorDecl>(this) ||
-         isPotentiallyOverridable());
-
   AccessLevel access =
       getAdjustedFormalAccess(this, useDC,
                               /*treatUsableFromInlineAsPublic*/false);
@@ -3863,9 +3895,13 @@ bool NominalTypeDecl::isDistributedActor() const {
                            false);
 }
 
+bool NominalTypeDecl::isAnyActor() const {
+  return isActor() || isDistributedActor();
+}
+
 GenericTypeDecl::GenericTypeDecl(DeclKind K, DeclContext *DC,
                                  Identifier name, SourceLoc nameLoc,
-                                 ArrayRef<TypeLoc> inherited,
+                                 ArrayRef<InheritedEntry> inherited,
                                  GenericParamList *GenericParams) :
     GenericContext(DeclContextKind::GenericTypeDecl, DC, GenericParams),
     TypeDecl(K, DC, name, nameLoc, inherited) {}
@@ -4075,7 +4111,7 @@ AssociatedTypeDecl *AssociatedTypeDecl::getAssociatedTypeAnchor() const {
 
 EnumDecl::EnumDecl(SourceLoc EnumLoc,
                      Identifier Name, SourceLoc NameLoc,
-                     ArrayRef<TypeLoc> Inherited,
+                     ArrayRef<InheritedEntry> Inherited,
                      GenericParamList *GenericParams, DeclContext *Parent)
   : NominalTypeDecl(DeclKind::Enum, Parent, Name, NameLoc, Inherited,
                     GenericParams),
@@ -4099,7 +4135,7 @@ void EnumDecl::setRawType(Type rawType) {
 }
 
 StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
-                       ArrayRef<TypeLoc> Inherited,
+                       ArrayRef<InheritedEntry> Inherited,
                        GenericParamList *GenericParams, DeclContext *Parent)
   : NominalTypeDecl(DeclKind::Struct, Parent, Name, NameLoc, Inherited,
                     GenericParams),
@@ -4233,7 +4269,7 @@ VarDecl *NominalTypeDecl::getGlobalActorInstance() const {
 }
 
 ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
-                     ArrayRef<TypeLoc> Inherited,
+                     ArrayRef<InheritedEntry> Inherited,
                      GenericParamList *GenericParams, DeclContext *Parent,
                      bool isActor)
   : NominalTypeDecl(DeclKind::Class, Parent, Name, NameLoc, Inherited,
@@ -4738,7 +4774,7 @@ bool EnumDecl::hasCircularRawValue() const {
 
 ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
                            SourceLoc NameLoc, Identifier Name,
-                           ArrayRef<TypeLoc> Inherited,
+                           ArrayRef<InheritedEntry> Inherited,
                            TrailingWhereClause *TrailingWhere)
     : NominalTypeDecl(DeclKind::Protocol, DC, Name, NameLoc, Inherited,
                       nullptr),
@@ -5167,7 +5203,8 @@ void ProtocolDecl::computeKnownProtocolKind() const {
   if (module != module->getASTContext().getStdlibModule() &&
       !module->getName().is("Foundation") &&
       !module->getName().is("_Differentiation") &&
-      !module->getName().is("_Concurrency")) {
+      !module->getName().is("_Concurrency") &&
+      !module->getName().is("_Distributed")) {
     const_cast<ProtocolDecl *>(this)->Bits.ProtocolDecl.KnownProtocol = 1;
     return;
   }
@@ -5806,11 +5843,24 @@ void VarDecl::setNamingPattern(NamedPattern *Pat) {
 }
 
 TypeRepr *VarDecl::getTypeReprOrParentPatternTypeRepr() const {
-  if (auto *param = dyn_cast<ParamDecl>(this))
-    return param->getTypeRepr();
+  if (auto *Param = dyn_cast<ParamDecl>(this))
+    return Param->getTypeRepr();
 
-  if (auto *parentPattern = dyn_cast_or_null<TypedPattern>(getParentPattern()))
-    return parentPattern->getTypeRepr();
+  auto *ParentPattern = getParentPattern();
+
+  if (auto *TyPattern = dyn_cast_or_null<TypedPattern>(ParentPattern))
+    return TyPattern->getTypeRepr();
+
+  // Handle typed if/guard/while-let as a special case (e.g. `if let x: Int
+  // = Optional.some(4)`), since the `TypedPattern` is not the top-level
+  // pattern here - instead it is an implicit `OptionalSomePattern`
+  if (auto *SomePattern =
+          dyn_cast_or_null<OptionalSomePattern>(ParentPattern)) {
+    if (auto *TyPattern =
+            dyn_cast<TypedPattern>(SomePattern->getSubPattern())) {
+      return TyPattern->getTypeRepr();
+    }
+  }
 
   return nullptr;
 }
@@ -6545,9 +6595,12 @@ Expr *ParamDecl::getTypeCheckedDefaultExpr() const {
   }
 
   auto &ctx = getASTContext();
-  return evaluateOrDefault(
-      ctx.evaluator, DefaultArgumentExprRequest{const_cast<ParamDecl *>(this)},
-      new (ctx) ErrorExpr(getSourceRange(), ErrorType::get(ctx)));
+  if (Expr *E = evaluateOrDefault(
+          ctx.evaluator,
+          DefaultArgumentExprRequest{const_cast<ParamDecl *>(this)}, nullptr)) {
+    return E;
+  }
+  return new (ctx) ErrorExpr(getSourceRange(), ErrorType::get(ctx));
 }
 
 void ParamDecl::setDefaultExpr(Expr *E, bool isTypeChecked) {
@@ -8264,15 +8317,14 @@ bool ClassDecl::isRootDefaultActor(ModuleDecl *M,
 }
 
 bool ClassDecl::isNativeNSObjectSubclass() const {
-  // Only if we inherit from NSObject.
-  auto superclass = getSuperclassDecl();
-  if (!superclass || !superclass->isNSObject())
-    return false;
+  // @objc actors implicitly inherit from NSObject.
+  if (isActor() && getAttrs().hasAttribute<ObjCAttr>())
+    return true;
 
-  // For now, only actors (regardless of whether they're default actors).
-  // Eventually we should roll this out to more classes, but we have to
-  // do it with ABI compatibility.
-  return isActor();
+  // For now, non-actor classes cannot use the native NSObject subclass.
+  // Eventually we should roll this out to more classes that directly
+  // inherit NSObject, but we have to do it with ABI compatibility.
+  return false;
 }
 
 bool ClassDecl::isNSObject() const {

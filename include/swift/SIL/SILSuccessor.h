@@ -76,6 +76,8 @@ public:
   
   operator SILBasicBlock*() const { return SuccessorBlock; }
   SILBasicBlock *getBB() const { return SuccessorBlock; }
+  TermInst *getContainingInst() const { return ContainingInst; }
+  SILSuccessor *getNext() const { return Next; }
 
   ProfileCounter getCount() const { return Count; }
 

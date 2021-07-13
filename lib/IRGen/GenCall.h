@@ -120,7 +120,7 @@ namespace irgen {
                                            CanSILFunctionType originalType,
                                            CanSILFunctionType substitutedType,
                                            SubstitutionMap substitutionMap,
-                                           bool suppressGenerics,
+                                           bool useSpecialConvention,
                                            FunctionPointer::Kind kind);
 
   /// Given an async function, get the pointer to the function to be called and
@@ -224,21 +224,23 @@ namespace irgen {
 
   void emitTaskCancel(IRGenFunction &IGF, llvm::Value *task);
 
-  /// Emit a class to swift_task_create[_f] or swift_task_create_future[__f]
-  /// with the given flags, parent task, and task function.
-  ///
-  /// When \c futureResultType is non-null, calls the future variant to create
-  /// a future.
+  /// Emit a call to swift_task_create[_f] with the given flags, options, and
+  /// task function.
   llvm::Value *emitTaskCreate(
-    IRGenFunction &IGF, llvm::Value *flags,
+    IRGenFunction &IGF,
+    llvm::Value *flags,
     llvm::Value *taskGroup,
     llvm::Value *futureResultType,
-    llvm::Value *taskFunction, llvm::Value *localContextInfo,
+    llvm::Value *taskFunction,
+    llvm::Value *localContextInfo,
     SubstitutionMap subs);
 
   /// Allocate task local storage for the provided dynamic size.
   Address emitAllocAsyncContext(IRGenFunction &IGF, llvm::Value *sizeValue);
   void emitDeallocAsyncContext(IRGenFunction &IGF, Address context);
+  Address emitStaticAllocAsyncContext(IRGenFunction &IGF, Size size);
+  void emitStaticDeallocAsyncContext(IRGenFunction &IGF, Address context,
+                                     Size size);
 
   void emitAsyncFunctionEntry(IRGenFunction &IGF,
                               const AsyncContextLayout &layout,
