@@ -2215,6 +2215,8 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
         foreignError,
         foreignAsync,
         ImportAsMemberStatus());
+    calleeTypeInfo.origFormalType =
+        foreignCI.FormalPattern.getFunctionResultType();
 
     auto init = indirectResult
                 ? useBufferAsTemporary(indirectResult,
