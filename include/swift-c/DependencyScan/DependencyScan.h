@@ -359,6 +359,9 @@ swiftscan_scanner_cache_load(swiftscan_scanner_t scanner,
 SWIFTSCAN_PUBLIC void
 swiftscan_scanner_cache_reset(swiftscan_scanner_t scanner);
 
+/// An entry point to invoke the compiler via a library call.
+SWIFTSCAN_PUBLIC int invoke_swift_compiler(int argc, const char **argv);
+
 //===----------------------------------------------------------------------===//
 
 SWIFTSCAN_END_DECLS
