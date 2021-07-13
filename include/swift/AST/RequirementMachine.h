@@ -60,6 +60,7 @@ public:
   LayoutConstraint getLayoutConstraint(Type depType) const;
   bool requiresProtocol(Type depType, const ProtocolDecl *proto) const;
   GenericSignature::RequiredProtocols getRequiredProtocols(Type depType) const;
+  Type getSuperclassBound(Type depType) const;
   bool isConcreteType(Type depType) const;
   bool areSameTypeParameterInContext(Type depType1, Type depType2) const;
   Type getCanonicalTypeInContext(Type type,

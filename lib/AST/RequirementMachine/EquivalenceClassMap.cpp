@@ -129,6 +129,20 @@ static Type getTypeFromSubstitutionSchema(Type schema,
   });
 }
 
+/// Get the superclass bound of this equivalence class.
+///
+/// Asserts if this equivalence class does not have a superclass bound.
+Type EquivalenceClass::getSuperclassBound(
+    TypeArrayView<GenericTypeParamType> genericParams,
+    const ProtocolGraph &protos,
+    RewriteContext &ctx) const {
+  return getTypeFromSubstitutionSchema(Superclass->getSuperclass(),
+                                       Superclass->getSubstitutions(),
+                                       genericParams,
+                                       protos,
+                                       ctx);
+}
+
 /// Get the concrete type of this equivalence class.
 ///
 /// Asserts if this equivalence class is not concrete.

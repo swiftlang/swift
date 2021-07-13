@@ -332,19 +332,61 @@ Type GenericSignatureImpl::getSuperclassBound(Type type) const {
   assert(type->isTypeParameter() &&
          "Only type parameters can have superclass requirements");
 
-  auto &builder = *getGenericSignatureBuilder();
-  auto equivClass =
-  builder.resolveEquivalenceClass(
-                                type,
-                                ArchetypeResolutionKind::CompleteWellFormed);
-  if (!equivClass) return nullptr;
+  auto computeViaGSB = [&]() -> Type {
+    auto &builder = *getGenericSignatureBuilder();
+    auto equivClass =
+    builder.resolveEquivalenceClass(
+                                  type,
+                                  ArchetypeResolutionKind::CompleteWellFormed);
+    if (!equivClass) return nullptr;
 
-  // If this type was mapped to a concrete type, then there is no
-  // requirement.
-  if (equivClass->concreteType) return nullptr;
+    // If this type was mapped to a concrete type, then there is no
+    // requirement.
+    if (equivClass->concreteType) return nullptr;
 
-  // Retrieve the superclass bound.
-  return equivClass->superclass;
+    // Retrieve the superclass bound.
+    return equivClass->superclass;
+  };
+
+  auto computeViaRQM = [&]() {
+    auto *machine = getRequirementMachine();
+    return machine->getSuperclassBound(type);
+  };
+
+  auto &ctx = getASTContext();
+  if (ctx.LangOpts.EnableRequirementMachine) {
+    auto rqmResult = computeViaRQM();
+
+#ifndef NDEBUG
+    auto gsbResult = computeViaGSB();
+
+    auto check = [&]() {
+      if (!gsbResult || !rqmResult)
+        return !gsbResult == !rqmResult;
+      return gsbResult->isEqual(rqmResult);
+    };
+
+    if (!check()) {
+      llvm::errs() << "RequirementMachine::getSuperclassBound() is broken\n";
+      llvm::errs() << "Generic signature: " << GenericSignature(this) << "\n";
+      llvm::errs() << "Dependent type: "; type.dump(llvm::errs());
+      llvm::errs() << "GenericSignatureBuilder says: " << gsbResult << "\n";
+      if (gsbResult)
+        gsbResult.dump(llvm::errs());
+      llvm::errs() << "\n";
+      llvm::errs() << "RequirementMachine says: " << rqmResult << "\n";
+      if (rqmResult)
+        rqmResult.dump(llvm::errs());
+      llvm::errs() << "\n";
+      getRequirementMachine()->dump(llvm::errs());
+      abort();
+    }
+#endif
+
+    return rqmResult;
+  } else {
+    return computeViaGSB();
+  }
 }
 
 /// Determine the set of protocols to which the given type parameter is
