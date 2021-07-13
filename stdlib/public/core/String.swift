@@ -104,7 +104,7 @@ internal func unimplemented_utf8_32bit(
 ///
 /// A string is a collection of *extended grapheme clusters*, which approximate
 /// human-readable characters. Many individual characters, such as "é", "김",
-/// and "🇮🇳", can be made up of multiple Unicode scalar values. These scalar
+/// and "🇹🇷", can be made up of multiple Unicode scalar values. These scalar
 /// values are combined by Unicode's boundary algorithms into extended
 /// grapheme clusters, represented by the Swift `Character` type. Each element
 /// of a string is represented by a `Character` instance.
