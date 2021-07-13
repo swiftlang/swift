@@ -170,11 +170,11 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     bool Unmergable;
     unsigned InheritsCount;
     std::set<Requirement> Requirements;
-    void addRequirement(GenericSignature GenericSig, swift::Requirement Req) {
+    void addRequirement(swift::Requirement Req) {
       auto First = Req.getFirstType();
-      auto CanFirst = GenericSig->getCanonicalTypeInContext(First);
+      auto CanFirst = First->getCanonicalType();
       auto Second = Req.getSecondType();
-      auto CanSecond = GenericSig->getCanonicalTypeInContext(Second);
+      auto CanSecond = Second->getCanonicalType();
 
       Requirements.insert({First, Second, Req.getKind(), CanFirst, CanSecond});
     }
@@ -284,7 +284,6 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     }
 
     auto handleRequirements = [&](SubstitutionMap subMap,
-                                  GenericSignature GenericSig,
                                   ExtensionDecl *OwningExt,
                                   ArrayRef<Requirement> Reqs) {
       ProtocolDecl *BaseProto = OwningExt->getInnermostDeclContext()
@@ -336,7 +335,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
           if (!SubstReq->canBeSatisfied())
             return true;
 
-          MergeInfo.addRequirement(GenericSig, Req);
+          MergeInfo.addRequirement(Req);
         }
       }
       return false;
@@ -355,7 +354,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
 
       assert(Ext->getGenericSignature() && "No generic signature.");
       auto GenericSig = Ext->getGenericSignature();
-      if (handleRequirements(subMap, GenericSig, Ext, GenericSig->getRequirements()))
+      if (handleRequirements(subMap, Ext, GenericSig->getRequirements()))
         return {Result, MergeInfo};
     }
 
@@ -366,7 +365,6 @@ struct SynthesizedExtensionAnalyzer::Implementation {
           subMap = BaseType->getContextSubstitutionMap(M, NTD);
       }
       if (handleRequirements(subMap,
-                             Conf->getGenericSignature(),
                              EnablingExt,
                              Conf->getConditionalRequirements()))
         return {Result, MergeInfo};
