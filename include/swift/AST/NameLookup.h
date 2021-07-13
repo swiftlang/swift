@@ -17,8 +17,8 @@
 #ifndef SWIFT_AST_NAME_LOOKUP_H
 #define SWIFT_AST_NAME_LOOKUP_H
 
-#include "llvm/ADT/SmallVector.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Module.h"
 #include "swift/Basic/Compiler.h"
@@ -26,11 +26,11 @@
 #include "swift/Basic/NullablePtr.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/SourceManager.h"
+#include "llvm/ADT/SmallVector.h"
 
 namespace swift {
 class ASTContext;
 class DeclName;
-class GenericSignatureBuilder;
 class Type;
 class TypeDecl;
 class ValueDecl;
@@ -487,7 +487,7 @@ void lookupVisibleMemberDecls(VisibleDeclConsumer &Consumer,
                               bool includeInstanceMembers,
                               bool includeDerivedRequirements,
                               bool includeProtocolExtensionMembers,
-                              GenericSignatureBuilder *GSB = nullptr);
+                              GenericSignature genericSig = GenericSignature());
 
 namespace namelookup {
 
