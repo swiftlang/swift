@@ -767,6 +767,62 @@ private:
   }
 };
 
+class ConjunctionStep : public BindingStep<ConjunctionElementProducer> {
+  Constraint *Conjunction;
+
+  /// This is neccessary to restore original state of the constraint
+  /// system after cojunction step is done, because conjunction constraint
+  /// gets removed from the list early.
+  ConstraintList::iterator AfterConjunction;
+
+  /// Indicates that one of the elements failed inference.
+  bool HadFailure = false;
+
+public:
+  ConjunctionStep(ConstraintSystem &cs, Constraint *conjunction,
+                  SmallVectorImpl<Solution> &solutions)
+      : BindingStep(cs, {cs, conjunction}, solutions), Conjunction(conjunction),
+        AfterConjunction(erase(conjunction)) {
+    assert(conjunction->getKind() == ConstraintKind::Conjunction);
+  }
+
+  ~ConjunctionStep() override {
+    ActiveChoice.reset();
+    // Return conjunction constraint back to the system
+    restore(AfterConjunction, Conjunction);
+  }
+
+  StepResult resume(bool prevFailed) override;
+
+  void print(llvm::raw_ostream &Out) override {
+    Out << "ConjunctionStep for ";
+    Conjunction->print(Out, &CS.getASTContext().SourceMgr);
+    Out << '\n';
+  }
+
+protected:
+  bool attempt(const ConjunctionElement &element) override;
+
+  /// Conjunction can't skip elements.
+  bool shouldSkip(const ConjunctionElement &element) const override {
+    return false;
+  }
+
+  /// Conjunction can't reject attempting any of its elements.
+  bool shouldStopAt(const ConjunctionElement &element) const override {
+    return false;
+  }
+
+  /// Conjunctions only stop after first failure.
+  ///
+  /// TODO: In diagnostic mode conjunction evaluation should stop
+  ///       after first element failure and consider the rest to
+  ///       be solved, in order to produce good diagnostics.
+  bool shouldStopAfter(const ConjunctionElement &element) const override {
+    return HadFailure;
+  }
+};
+
 } // end namespace constraints
 } // end namespace swift
 

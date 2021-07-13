@@ -2195,6 +2195,15 @@ Constraint *ConstraintSystem::selectDisjunction() {
   return nullptr;
 }
 
+Constraint *ConstraintSystem::selectConjunction() {
+  for (auto &constraint : InactiveConstraints) {
+    if (constraint.getKind() == ConstraintKind::Conjunction)
+      return &constraint;
+  }
+
+  return nullptr;
+}
+
 bool DisjunctionChoice::attempt(ConstraintSystem &cs) const {
   cs.simplifyDisjunctionChoice(Choice);
 

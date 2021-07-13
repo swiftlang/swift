@@ -4994,6 +4994,11 @@ private:
   /// \returns The selected disjunction.
   Constraint *selectDisjunction();
 
+  /// Pick a conjunction from the InactiveConstraints list.
+  ///
+  /// \returns The selected conjunction.
+  Constraint *selectConjunction();
+
   /// Solve the system of constraints generated from provided expression.
   ///
   /// \param target The target to generate constraints from.

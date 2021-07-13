@@ -354,6 +354,9 @@ StepResult ComponentStep::take(bool prevFailed) {
     // Produce a disjunction step.
     return suspend(
         std::make_unique<DisjunctionStep>(CS, disjunction, Solutions));
+  } else if (auto *conjunction = CS.selectConjunction()) {
+    return suspend(
+        std::make_unique<ConjunctionStep>(CS, conjunction, Solutions));
   } else if (!CS.solverState->allowsFreeTypeVariables() &&
              CS.hasFreeTypeVariables()) {
     // If there are no disjunctions or type variables to bind
@@ -776,4 +779,35 @@ bool DisjunctionStep::attempt(const DisjunctionChoice &choice) {
   }
 
   return choice.attempt(CS);
+}
+
+bool ConjunctionStep::attempt(const ConjunctionElement &element) {
+  ++CS.solverState->NumConjunctionTerms;
+  return element.attempt(CS);
+}
+
+StepResult ConjunctionStep::resume(bool prevFailed) {
+  // If conjunction step is re-taken and there should be
+  // active choice, let's see if it has be solved or not.
+  assert(ActiveChoice);
+
+  // Rewind back the constraint system information.
+  ActiveChoice.reset();
+
+  if (CS.isDebugMode())
+    getDebugLogger() << ")\n";
+
+  if (prevFailed) {
+    HadFailure = true;
+    // During performance mode, failure to infer a type for one
+    // of the elements automatically fails whole conjunction.
+    //
+    // TODO: In diagnostic mode, let's consider this conjunction
+    // a success if at least one of its elements was solved
+    // successfully by use of fixes, and ignore the rest.
+    AnySolved = false;
+  }
+
+  // Attempt next conjunction choice (if any left).
+  return take(prevFailed);
 }
