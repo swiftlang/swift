@@ -322,8 +322,6 @@ bool AbstractionPattern::matchesTuple(CanTupleType substType) {
     auto type = getType();
     if (auto tuple = dyn_cast<TupleType>(type))
       return (tuple->getNumElements() == substType->getNumElements());
-    if (isa<OpaqueTypeArchetypeType>(type))
-      return true;
     return false;
   }
   }
@@ -873,9 +871,7 @@ AbstractionPattern AbstractionPattern::getOptionalObjectType() const {
     return *this;
 
   case Kind::Type:
-    if (isTypeParameter())
-      return AbstractionPattern::getOpaque();
-    if (isa<OpaqueTypeArchetypeType>(getType()))
+    if (isTypeParameterOrOpaqueArchetype())
       return AbstractionPattern::getOpaque();
     return AbstractionPattern(getGenericSignature(),
                               ::getOptionalObjectType(getType()));
