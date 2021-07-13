@@ -1,6 +1,8 @@
-func withError(_ completion: (String?, Error?) -> Void) { }
-func notOptional(_ completion: (String, Error?) -> Void) { }
-func errorOnly(_ completion: (Error?) -> Void) { }
+// REQUIRES: concurrency
+
+func withError(_ completion: @escaping (String?, Error?) -> Void) { }
+func notOptional(_ completion: @escaping (String, Error?) -> Void) { }
+func errorOnly(_ completion: @escaping (Error?) -> Void) { }
 func test(_ str: String) -> Bool { return false }
 
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=UNRELATED %s

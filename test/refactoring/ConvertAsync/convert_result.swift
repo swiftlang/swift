@@ -1,14 +1,16 @@
-func simple(_ completion: (Result<String, Error>) -> Void) { }
-func simpleWithArg(_ arg: Int, _ completion: (Result<String, Error>) -> Void) { }
-func noError(_ completion: (Result<String, Never>) -> Void) { }
+// REQUIRES: concurrency
+
+func simple(_ completion: @escaping (Result<String, Error>) -> Void) { }
+func simpleWithArg(_ arg: Int, _ completion: @escaping (Result<String, Error>) -> Void) { }
+func noError(_ completion: @escaping (Result<String, Never>) -> Void) { }
 func test(_ str: String) -> Bool { return false }
 
 // RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix VOID-RESULT %s
-func voidResult(completion: (Result<Void, Never>) -> Void) {}
+func voidResult(completion: @escaping (Result<Void, Never>) -> Void) {}
 // VOID-RESULT: func voidResult() async {}
 
 // RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix VOID-AND-ERROR-RESULT %s
-func voidAndErrorResult(completion: (Result<Void, Error>) -> Void) {}
+func voidAndErrorResult(completion: @escaping (Result<Void, Error>) -> Void) {}
 // VOID-AND-ERROR-RESULT: func voidAndErrorResult() async throws {}
 
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=SIMPLE %s

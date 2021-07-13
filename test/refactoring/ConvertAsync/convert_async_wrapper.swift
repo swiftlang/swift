@@ -1,3 +1,5 @@
+// REQUIRES: concurrency
+
 // RUN: %empty-directory(%t)
 
 enum CustomError : Error {

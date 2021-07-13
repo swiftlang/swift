@@ -116,7 +116,7 @@ HasInitWithDefaultArgs(y: 45, z: 89)
 func `hasBackticks`(`x`: Int) {}
 `hasBackticks`(`x`:2)
 
-func hasAsyncAlternative(completion: (String?, Error?) -> Void) { }
+func hasAsyncAlternative(completion: @escaping (String?, Error?) -> Void) { }
 func hasCallToAsyncAlternative() {
   hasAsyncAlternative { str, err in print(str!) }
 }
