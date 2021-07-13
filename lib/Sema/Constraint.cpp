@@ -937,13 +937,15 @@ Constraint *Constraint::createDisjunction(ConstraintSystem &cs,
   return disjunction;
 }
 
-Constraint *Constraint::createConjunction(ConstraintSystem &cs,
-                                          ArrayRef<Constraint *> constraints,
-                                          ConstraintLocator *locator) {
+Constraint *Constraint::createConjunction(
+    ConstraintSystem &cs, ArrayRef<Constraint *> constraints,
+    ConstraintLocator *locator, ArrayRef<TypeVariableType *> referencedVars) {
   SmallPtrSet<TypeVariableType *, 4> typeVars;
 
   for (auto *constraint : constraints)
     gatherReferencedTypeVars(constraint, typeVars);
+
+  typeVars.insert(referencedVars.begin(), referencedVars.end());
 
   assert(!constraints.empty() && "Empty conjunction constraint");
   unsigned size = totalSizeToAlloc<TypeVariableType*>(typeVars.size());

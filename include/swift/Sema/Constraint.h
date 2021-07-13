@@ -545,9 +545,10 @@ public:
                                          = ForgetChoice);
 
   /// Create a new conjunction constraint.
-  static Constraint *createConjunction(ConstraintSystem &cs,
-                                       ArrayRef<Constraint *> constraints,
-                                       ConstraintLocator *locator);
+  static Constraint *
+  createConjunction(ConstraintSystem &cs, ArrayRef<Constraint *> constraints,
+                    ConstraintLocator *locator,
+                    ArrayRef<TypeVariableType *> referencedVars = {});
 
   /// Create a new Applicable Function constraint.
   static Constraint *createApplicableFunction(
