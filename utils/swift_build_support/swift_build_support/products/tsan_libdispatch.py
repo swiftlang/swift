@@ -13,16 +13,11 @@
 import os
 
 from . import cmake_product
-from . import cmark
 from . import foundation
 from . import libcxx
 from . import libdispatch
 from . import libicu
-from . import llbuild
 from . import llvm
-from . import swift
-from . import swiftpm
-from . import xctest
 from .. import shell
 
 
@@ -85,13 +80,8 @@ class TSanLibDispatch(cmake_product.CMakeProduct):
 
     @classmethod
     def get_dependencies(cls):
-        return [cmark.CMark,
-                llvm.LLVM,
+        return [llvm.LLVM,
                 libcxx.LibCXX,
                 libicu.LibICU,
-                swift.Swift,
                 libdispatch.LibDispatch,
-                foundation.Foundation,
-                xctest.XCTest,
-                llbuild.LLBuild,
-                swiftpm.SwiftPM]
+                foundation.Foundation]
