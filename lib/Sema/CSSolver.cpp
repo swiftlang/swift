@@ -2299,3 +2299,7 @@ void DisjunctionChoice::propagateConversionInfo(ConstraintSystem &cs) const {
     cs.addConstraint(ConstraintKind::Bind, typeVar, conversionType,
                      Choice->getLocator());
 }
+
+bool ConjunctionElement::attempt(ConstraintSystem &cs) const {
+  return false;
+}

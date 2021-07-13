@@ -5580,6 +5580,20 @@ private:
   }
 };
 
+class ConjunctionElement {
+  Constraint *Element;
+
+public:
+  ConjunctionElement(Constraint *element) : Element(element) {}
+
+  bool attempt(ConstraintSystem &cs) const;
+
+  void print(llvm::raw_ostream &Out, SourceManager *SM) const {
+    Out << "conjunction element ";
+    Element->print(Out, SM);
+  }
+};
+
 class TypeVariableBinding {
   TypeVariableType *TypeVar;
   PotentialBinding Binding;
@@ -5821,6 +5835,28 @@ private:
   /// function type that the operator is applied to.
   void partitionGenericOperators(SmallVectorImpl<unsigned>::iterator first,
                                  SmallVectorImpl<unsigned>::iterator last);
+};
+
+class ConjunctionElementProducer : public BindingProducer<ConjunctionElement> {
+  ArrayRef<Constraint *> Elements;
+
+  unsigned Index = 0;
+
+public:
+  using Element = ConjunctionElement;
+
+  ConjunctionElementProducer(ConstraintSystem &cs, Constraint *conjunction)
+      : BindingProducer(cs, conjunction->getLocator()),
+        Elements(conjunction->getNestedConstraints()) {
+    assert(conjunction->getKind() == ConstraintKind::Conjunction);
+  }
+
+  Optional<Element> operator()() override {
+    if (Index >= Elements.size())
+      return None;
+
+    return ConjunctionElement(Elements[Index++]);
+  }
 };
 
 /// Determine whether given type is a known one
