@@ -2406,18 +2406,12 @@ public:
 
     if (auto superclass = CD->getSuperclassDecl()) {
       // Actors cannot have superclasses, nor can they be superclasses.
-      if (CD->isActor()) {
+      if (CD->isActor() && !superclass->isNSObject())
         CD->diagnose(diag::actor_inheritance,
                      /*distributed=*/CD->isDistributedActor());
-        if (superclass->isNSObject() && !CD->isDistributedActor()) {
-          CD->diagnose(diag::actor_inheritance_nsobject, CD->getName())
-            .fixItInsert(CD->getAttributeInsertionLoc(/*forModifier=*/false),
-                         "@objc ");
-        }
-      } else if (superclass->isActor()) {
+      else if (superclass->isActor())
         CD->diagnose(diag::actor_inheritance,
                      /*distributed=*/CD->isDistributedActor());
-      }
     }
 
     // Force lowering of stored properties.
