@@ -20,14 +20,14 @@ distributed actor DA {
     // nonisolated computed properties are outside of the actor and as such cannot access local
     _ = self.local // expected-error{{distributed actor-isolated property 'local' can only be referenced inside the distributed actor}}
 
-    _ = self.actorAddress // ok, special handled and always available
+    _ = self.id // ok, special handled and always available
     _ = self.actorTransport // ok, special handled and always available
   }
 
   distributed func dist() {}
 
   nonisolated func access() async throws {
-    _ = self.actorAddress // ok
+    _ = self.id // ok
     _ = self.actorTransport // ok
     
     // self is a distributed actor self is NOT isolated

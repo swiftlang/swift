@@ -904,6 +904,13 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   hashValueDecl->copyFormalAccessFrom(derived.Nominal,
                                       /*sourceIsParentContext*/ true);
 
+  if (derived.Nominal->isDistributedActor()) {
+    // While distributed actors implement hash(into:) explicitly, the hashValue
+    // is still synthesized as usual. We must make it nonisolated in order
+    // for the hashValue to be able to witness the protocol requirement.
+    hashValueDecl->getAttrs().add(new (C) NonisolatedAttr(/*IsImplicit*/true));
+  }
+
   Pattern *hashValuePat = NamedPattern::createImplicit(C, hashValueDecl);
   hashValuePat->setType(intType);
   hashValuePat = TypedPattern::createImplicit(C, hashValuePat, intType);

@@ -1763,7 +1763,7 @@ void swift::swift_distributedActor_remote_initialize(DefaultActor *_actor) { // 
 
 void swift::swift_distributedActor_destroy(DefaultActor *_actor) { // FIXME: !!!!! remove distributed C++ impl not needed?
   // TODO: need to resign the address before we destroy:
-  //       something like: actor.transport.resignAddress(actor.address)
+  //       something like: actor.transport.resignIdentity(actor.address)
 
   // FIXME: if this is a proxy, we would destroy a bit differently I guess? less memory was allocated etc.
   asImpl(_actor)->destroy(); // today we just replicate what defaultActor_destroy does
