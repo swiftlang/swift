@@ -3709,6 +3709,10 @@ WARNING(partial_application_of_function_invalid_swift4,none,
       "be an error in future Swift versions",
       (unsigned))
 
+// Cannot capture `async let`
+ERROR(capture_async_let_not_supported,none,
+      "capturing 'async let' variables is not supported", ())
+
 ERROR(self_assignment_var,none,
       "assigning a variable to itself", ())
 ERROR(self_assignment_prop,none,
