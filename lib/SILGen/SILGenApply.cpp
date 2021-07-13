@@ -3893,6 +3893,8 @@ RValue CallEmission::applyNormalCall(SGFContext C) {
   // Get the callee type information.
   auto calleeTypeInfo = callee.getTypeInfo(SGF);
 
+  calleeTypeInfo.origFormalType = origFormalType;
+
   // In C language modes, substitute the type of the AbstractionPattern
   // so that we won't see type parameters down when we try to form bridging
   // conversions.
@@ -3910,6 +3912,8 @@ RValue CallEmission::applyNormalCall(SGFContext C) {
   calleeTypeInfo.substResultType = formalType.getResult();
 
   if (selfArg.hasValue() && callSite.hasValue()) {
+    calleeTypeInfo.origFormalType =
+        calleeTypeInfo.origFormalType->getFunctionResultType();
     calleeTypeInfo.origResultType =
       calleeTypeInfo.origResultType->getFunctionResultType();
     calleeTypeInfo.substResultType =
@@ -4395,7 +4399,9 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
     // we left during the first pass.
     auto &completionArgSlot = const_cast<ManagedValue &>(args[completionIndex]);
 
-    completionArgSlot = resultPlan->emitForeignAsyncCompletionHandler(*this, loc);
+    auto origFormalType = *calleeTypeInfo.origFormalType;
+    completionArgSlot = resultPlan->emitForeignAsyncCompletionHandler(
+        *this, origFormalType, loc);
 
   } else if (auto foreignError = calleeTypeInfo.foreign.error) {
     unsigned errorParamIndex =
