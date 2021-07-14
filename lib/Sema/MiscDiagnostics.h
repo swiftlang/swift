@@ -111,8 +111,8 @@ void fixItEncloseTrailingClosure(ASTContext &ctx,
 /// Check that we use the async version of a function where available
 ///
 /// If a completion-handler function is called from an async context and it has
-/// a '@completionHandlerAsync' attribute, we emit a diagnostic suggesting the
-/// async call.
+/// a '@available' attribute with renamed field pointing to an async function,
+/// we emit a diagnostic suggesting the async call.
 void checkFunctionAsyncUsage(AbstractFunctionDecl *decl);
 void checkPatternBindingDeclAsyncUsage(PatternBindingDecl *decl);
 } // namespace swift

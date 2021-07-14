@@ -4458,8 +4458,7 @@ struct AsyncHandlerParamDesc : public AsyncHandlerDesc {
       return AsyncHandlerParamDesc();
 
     bool RequireName = RequireAttributeOrName;
-    if (RequireAttributeOrName &&
-        FD->getAttrs().hasAttribute<CompletionHandlerAsyncAttr>())
+    if (RequireAttributeOrName && FD->getAsyncAlternative())
       RequireName = false;
 
     // Require at least one parameter and void return type
@@ -7798,14 +7797,11 @@ void addCompletionHandlerAsyncAttrIfNeccessary(
     ASTContext &Ctx, const FuncDecl *FD,
     const AsyncHandlerParamDesc &HandlerDesc,
     SourceEditConsumer &EditConsumer) {
-  if (!Ctx.LangOpts.EnableExperimentalConcurrency)
-    return;
-
   llvm::SmallString<0> HandlerAttribute;
   llvm::raw_svector_ostream OS(HandlerAttribute);
-  OS << "@completionHandlerAsync(\"";
+  OS << "@available(*, renamed: \"";
   HandlerDesc.printAsyncFunctionName(OS);
-  OS << "\", completionHandlerIndex: " << HandlerDesc.Index << ")\n";
+  OS << "\")\n";
   EditConsumer.accept(Ctx.SourceMgr, FD->getAttributeInsertionLoc(false),
                       HandlerAttribute);
 }
@@ -7925,11 +7921,6 @@ bool RefactoringActionAddAsyncAlternative::performChange() {
   AsyncConverter Converter(TheFile, SM, DiagEngine, FD, HandlerDesc);
   if (!Converter.convert())
     return true;
-
-  // Deprecate the synchronous function
-  EditConsumer.accept(SM, FD->getAttributeInsertionLoc(false),
-                      "@available(*, deprecated, message: \"Prefer async "
-                      "alternative instead\")\n");
 
   addCompletionHandlerAsyncAttrIfNeccessary(Ctx, FD, HandlerDesc, EditConsumer);
 

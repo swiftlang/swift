@@ -2969,23 +2969,6 @@ public:
   bool isCached() const { return true; }
 };
 
-class AsyncAlternativeRequest
-    : public SimpleRequest<AsyncAlternativeRequest,
-                           AbstractFunctionDecl *(AbstractFunctionDecl *),
-                           RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  AbstractFunctionDecl *evaluate(
-      Evaluator &evaluator, AbstractFunctionDecl *attachedFunctionDecl) const;
-
-public:
-  bool isCached() const { return true; }
-};
-
 class RenamedDeclRequest
     : public SimpleRequest<RenamedDeclRequest,
                            ValueDecl *(const ValueDecl *, const AvailableAttr *),

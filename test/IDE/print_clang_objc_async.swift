@@ -9,61 +9,61 @@ import _Concurrency
 
 // CHECK-LABEL: class SlowServer : NSObject, ServiceProvider {
 
-// CHECK: @completionHandlerAsync("doSomethingSlow(_:)", completionHandlerIndex: 1)
+// CHECK: @available(*, renamed: "doSomethingSlow(_:)")
 // CHECK-NEXT: func doSomethingSlow(_ operation: String, completionHandler handler: @escaping (Int) -> Void)
 // CHECK-NEXT: @discardableResult
 // CHECK-NEXT: func doSomethingSlow(_ operation: String) async -> Int
 
-// CHECK: @completionHandlerAsync("doSomethingDangerous(_:)", completionHandlerIndex: 1)
+// CHECK: @available(*, renamed: "doSomethingDangerous(_:)")
 // CHECK-NEXT: func doSomethingDangerous(_ operation: String, completionHandler handler: ((String?, Error?) -> Void)? = nil)
 // CHECK-NEXT: @discardableResult
 // CHECK-NEXT: func doSomethingDangerous(_ operation: String) async throws -> String
 
-// CHECK: @completionHandlerAsync("checkAvailability()", completionHandlerIndex: 0)
+// CHECK: @available(*, renamed: "checkAvailability()")
 // CHECK-NEXT: func checkAvailability(completionHandler: @escaping (Bool) -> Void)
 // CHECK-NEXT: @discardableResult
 // CHECK-NEXT: func checkAvailability() async -> Bool
 
-// CHECK: @completionHandlerAsync("anotherExample()", completionHandlerIndex: 0)
+// CHECK: @available(*, renamed: "anotherExample()")
 // CHECK-NEXT: func anotherExample(completionBlock block: @escaping (String) -> Void)
 // CHECK-NEXT: @discardableResult
 // CHECK-NEXT: func anotherExample() async -> String
 
-// CHECK: @completionHandlerAsync("finalExample()", completionHandlerIndex: 0)
+// CHECK: @available(*, renamed: "finalExample()")
 // CHECK-NEXT: func finalExampleWithReply(to block: @escaping (String) -> Void)
 // CHECK-NEXT: @discardableResult
 // CHECK-NEXT: func finalExample() async -> String
 
-// CHECK: @completionHandlerAsync("replyingOperation(_:)", completionHandlerIndex: 1)
+// CHECK: @available(*, renamed: "replyingOperation(_:)")
 // CHECK-NEXT: func replyingOperation(_ operation: String, replyTo block: @escaping (String) -> Void)
 // CHECK-NEXT: @discardableResult
 // CHECK-NEXT: func replyingOperation(_ operation: String) async -> String
 
-// CHECK: @completionHandlerAsync("findAnswer()", completionHandlerIndex: 0)
+// CHECK: @available(*, renamed: "findAnswer()")
 // CHECK-NEXT: func findAnswer(completionHandler handler: @escaping (String?, Error?) -> Void)
 // CHECK-NEXT: @discardableResult
 // CHECK-NEXT: func findAnswer() async throws -> String
 
-// CHECK: @completionHandlerAsync("findAnswerFailingly()", completionHandlerIndex: 0)
+// CHECK: @available(*, renamed: "findAnswerFailingly()")
 // CHECK-NEXT: func findAnswerFailingly(completionHandler handler: @escaping (String?, Error?) -> Void) throws
 // CHECK-NEXT: @discardableResult
 // CHECK-NEXT: func findAnswerFailingly() async throws -> String
 
-// CHECK: @completionHandlerAsync("findQAndA()", completionHandlerIndex: 0)
+// CHECK: @available(*, renamed: "findQAndA()")
 // CHECK-NEXT: func findQAndA(completionHandler handler: @escaping (String?, String?, Error?) -> Void)
 // CHECK-NEXT: @discardableResult
 // CHECK-NEXT: func findQAndA() async throws -> (String?, String)
 
-// CHECK: @completionHandlerAsync("findQuestionableAnswers()", completionHandlerIndex: 0)
+// CHECK: @available(*, renamed: "findQuestionableAnswers()")
 // CHECK-NEXT: func findQuestionableAnswers(completionHandler handler: @escaping CompletionHandler)
 // CHECK-NEXT: @discardableResult
 // CHECK-NEXT: func findQuestionableAnswers() async throws -> (String, String?)
 
-// CHECK: @completionHandlerAsync("doSomethingFun(_:)", completionHandlerIndex: 1)
+// CHECK: @available(*, renamed: "doSomethingFun(_:)")
 // CHECK-NEXT: func doSomethingFun(_ operation: String, then completionHandler: @escaping () -> Void)
 // CHECK-NEXT: func doSomethingFun(_ operation: String) async
 
-// CHECK: @completionHandlerAsync("doSomethingConflicted(_:)", completionHandlerIndex: 1)
+// CHECK: @available(*, renamed: "doSomethingConflicted(_:)")
 // CHECK-NEXT: func doSomethingConflicted(_ operation: String, completionHandler handler: @escaping (Int) -> Void)
 // CHECK-NEXT: @discardableResult
 // CHECK-NEXT: func doSomethingConflicted(_ operation: String) async -> Int
@@ -73,12 +73,12 @@ import _Concurrency
 // CHECK: func dance(_ step: String) async -> String
 // CHECK: func __leap(_ height: Int) async -> String
 
-// CHECK: @completionHandlerAsync("runOnMainThread()", completionHandlerIndex: 0)
+// CHECK: @available(*, renamed: "runOnMainThread()")
 // CHECK-NEXT: func runOnMainThread(completionHandler completion: (@MainActor (String) -> Void)? = nil)
 // CHECK-NEXT: @discardableResult
 // CHECK-NEXT: func runOnMainThread() async -> String
 
-// CHECK: @completionHandlerAsync("asyncImportSame(_:)", completionHandlerIndex: 1)
+// CHECK: @available(*, renamed: "asyncImportSame(_:)")
 // CHECK-NEXT: func asyncImportSame(_ operation: String, completionHandler handler: @escaping (Int) -> Void)
 // CHECK-NEXT: @discardableResult
 // CHECK-NEXT: func asyncImportSame(_ operation: String) async -> Int
