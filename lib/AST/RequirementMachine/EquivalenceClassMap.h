@@ -27,6 +27,7 @@
 #include <vector>
 
 #include "ProtocolGraph.h"
+#include "RewriteContext.h"
 #include "RewriteSystem.h"
 
 namespace llvm {
@@ -36,6 +37,7 @@ namespace llvm {
 namespace swift {
 
 class ProtocolDecl;
+enum class RequirementKind : unsigned;
 
 namespace rewriting {
 
@@ -82,8 +84,25 @@ public:
   const MutableTerm &getKey() const { return Key; }
   void dump(llvm::raw_ostream &out) const;
 
+  bool hasSuperclassBound() const {
+    return Superclass.hasValue();
+  }
+
+  Type getSuperclassBound() const {
+    return Superclass->getSuperclass();
+  }
+
+  Type getSuperclassBound(
+      TypeArrayView<GenericTypeParamType> genericParams,
+      const ProtocolGraph &protos,
+      RewriteContext &ctx) const;
+
   bool isConcreteType() const {
     return ConcreteType.hasValue();
+  }
+
+  Type getConcreteType() const {
+    return ConcreteType->getConcreteType();
   }
 
   Type getConcreteType(
@@ -107,6 +126,10 @@ public:
 class EquivalenceClassMap {
   RewriteContext &Context;
   std::vector<std::unique_ptr<EquivalenceClass>> Map;
+
+  using ConcreteTypeInDomain = std::pair<CanType, ArrayRef<const ProtocolDecl *>>;
+  llvm::DenseMap<ConcreteTypeInDomain, MutableTerm> ConcreteTypeInDomainMap;
+
   const ProtocolGraph &Protos;
   unsigned DebugConcreteUnification : 1;
   unsigned DebugConcretizeNestedTypes : 1;
@@ -134,16 +157,21 @@ public:
   void clear();
   void addProperty(const MutableTerm &key, Atom property,
                    SmallVectorImpl<std::pair<MutableTerm, MutableTerm>> &inducedRules);
+
+  void computeConcreteTypeInDomainMap();
   void concretizeNestedTypesFromConcreteParents(
                    SmallVectorImpl<std::pair<MutableTerm, MutableTerm>> &inducedRules) const;
 
 private:
   void concretizeNestedTypesFromConcreteParent(
-                   const MutableTerm &key,
-                   CanType concreteType,
-                   ArrayRef<Term> substitutions,
+                   const MutableTerm &key, RequirementKind requirementKind,
+                   CanType concreteType, ArrayRef<Term> substitutions,
                    ArrayRef<const ProtocolDecl *> conformsTo,
                    SmallVectorImpl<std::pair<MutableTerm, MutableTerm>> &inducedRules) const;
+
+  MutableTerm computeConstraintTermForTypeWitness(
+      const MutableTerm &key, CanType concreteType, CanType typeWitness,
+      const MutableTerm &subjectType, ArrayRef<Term> substitutions) const;
 };
 
 } // end namespace rewriting
