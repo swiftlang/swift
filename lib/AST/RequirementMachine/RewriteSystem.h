@@ -22,7 +22,6 @@
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/Support/Allocator.h"
 #include "llvm/Support/TrailingObjects.h"
 #include <algorithm>
 
@@ -256,9 +255,11 @@ class Term final {
 public:
   size_t size() const;
 
-  ArrayRef<Atom>::const_iterator begin() const;
+  ArrayRef<Atom>::iterator begin() const;
+  ArrayRef<Atom>::iterator end() const;
 
-  ArrayRef<Atom>::const_iterator end() const;
+  ArrayRef<Atom>::reverse_iterator rbegin() const;
+  ArrayRef<Atom>::reverse_iterator rend() const;
 
   Atom back() const;
 
@@ -338,11 +339,19 @@ public:
 
   size_t size() const { return Atoms.size(); }
 
+  ArrayRef<const ProtocolDecl *> getRootProtocols() const;
+
   decltype(Atoms)::const_iterator begin() const { return Atoms.begin(); }
   decltype(Atoms)::const_iterator end() const { return Atoms.end(); }
 
   decltype(Atoms)::iterator begin() { return Atoms.begin(); }
   decltype(Atoms)::iterator end() { return Atoms.end(); }
+
+  decltype(Atoms)::const_reverse_iterator rbegin() const { return Atoms.rbegin(); }
+  decltype(Atoms)::const_reverse_iterator rend() const { return Atoms.rend(); }
+
+  decltype(Atoms)::reverse_iterator rbegin() { return Atoms.rbegin(); }
+  decltype(Atoms)::reverse_iterator rend() { return Atoms.rend(); }
 
   Atom back() const {
     return Atoms.back();
@@ -395,57 +404,6 @@ public:
     term.dump(out);
     return out;
   }
-};
-
-/// A global object that can be shared by multiple rewrite systems.
-///
-/// It stores uniqued atoms and terms.
-///
-/// Out-of-line methods are documented in RewriteSystem.cpp.
-class RewriteContext final {
-  friend class Atom;
-  friend class Term;
-
-  /// Allocator for uniquing atoms and terms.
-  llvm::BumpPtrAllocator Allocator;
-
-  /// Folding set for uniquing atoms.
-  llvm::FoldingSet<Atom::Storage> Atoms;
-
-  /// Folding set for uniquing terms.
-  llvm::FoldingSet<Term::Storage> Terms;
-
-  RewriteContext(const RewriteContext &) = delete;
-  RewriteContext(RewriteContext &&) = delete;
-  RewriteContext &operator=(const RewriteContext &) = delete;
-  RewriteContext &operator=(RewriteContext &&) = delete;
-
-  ASTContext &Context;
-
-public:
-  /// Statistical counters.
-  UnifiedStatsReporter *Stats;
-
-  RewriteContext(ASTContext &ctx) : Context(ctx), Stats(ctx.Stats) {}
-
-  Term getTermForType(CanType paramType, const ProtocolDecl *proto);
-
-  MutableTerm getMutableTermForType(CanType paramType,
-                                    const ProtocolDecl *proto);
-
-  ASTContext &getASTContext() { return Context; }
-
-  Type getTypeForTerm(Term term,
-                      TypeArrayView<GenericTypeParamType> genericParams,
-                      const ProtocolGraph &protos) const;
-
-  Type getTypeForTerm(const MutableTerm &term,
-                      TypeArrayView<GenericTypeParamType> genericParams,
-                      const ProtocolGraph &protos) const;
-
-  Type getRelativeTypeForTerm(
-                      const MutableTerm &term, const MutableTerm &prefix,
-                      const ProtocolGraph &protos) const;
 };
 
 /// A rewrite rule that replaces occurrences of LHS with RHS.
