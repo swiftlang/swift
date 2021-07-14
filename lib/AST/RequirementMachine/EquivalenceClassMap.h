@@ -27,6 +27,7 @@
 #include <vector>
 
 #include "ProtocolGraph.h"
+#include "RewriteContext.h"
 #include "RewriteSystem.h"
 
 namespace llvm {

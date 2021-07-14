@@ -1,4 +1,4 @@
-//===--- RequirementMachine.cpp - Generics with term rewriting --*- C++ -*-===//
+//===--- RequirementMachine.cpp - Generics with term rewriting ------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -23,6 +23,7 @@
 
 #include "EquivalenceClassMap.h"
 #include "ProtocolGraph.h"
+#include "RewriteContext.h"
 #include "RewriteSystem.h"
 
 using namespace swift;

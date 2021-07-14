@@ -22,7 +22,6 @@
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/Support/Allocator.h"
 #include "llvm/Support/TrailingObjects.h"
 #include <algorithm>
 
@@ -405,57 +404,6 @@ public:
     term.dump(out);
     return out;
   }
-};
-
-/// A global object that can be shared by multiple rewrite systems.
-///
-/// It stores uniqued atoms and terms.
-///
-/// Out-of-line methods are documented in RewriteSystem.cpp.
-class RewriteContext final {
-  friend class Atom;
-  friend class Term;
-
-  /// Allocator for uniquing atoms and terms.
-  llvm::BumpPtrAllocator Allocator;
-
-  /// Folding set for uniquing atoms.
-  llvm::FoldingSet<Atom::Storage> Atoms;
-
-  /// Folding set for uniquing terms.
-  llvm::FoldingSet<Term::Storage> Terms;
-
-  RewriteContext(const RewriteContext &) = delete;
-  RewriteContext(RewriteContext &&) = delete;
-  RewriteContext &operator=(const RewriteContext &) = delete;
-  RewriteContext &operator=(RewriteContext &&) = delete;
-
-  ASTContext &Context;
-
-public:
-  /// Statistical counters.
-  UnifiedStatsReporter *Stats;
-
-  RewriteContext(ASTContext &ctx) : Context(ctx), Stats(ctx.Stats) {}
-
-  Term getTermForType(CanType paramType, const ProtocolDecl *proto);
-
-  MutableTerm getMutableTermForType(CanType paramType,
-                                    const ProtocolDecl *proto);
-
-  ASTContext &getASTContext() { return Context; }
-
-  Type getTypeForTerm(Term term,
-                      TypeArrayView<GenericTypeParamType> genericParams,
-                      const ProtocolGraph &protos) const;
-
-  Type getTypeForTerm(const MutableTerm &term,
-                      TypeArrayView<GenericTypeParamType> genericParams,
-                      const ProtocolGraph &protos) const;
-
-  Type getRelativeTypeForTerm(
-                      const MutableTerm &term, const MutableTerm &prefix,
-                      const ProtocolGraph &protos) const;
 };
 
 /// A rewrite rule that replaces occurrences of LHS with RHS.

@@ -76,6 +76,7 @@ add_swift_host_library(swiftAST STATIC
   RequirementMachine/EquivalenceClassMap.cpp
   RequirementMachine/ProtocolGraph.cpp
   RequirementMachine/RequirementMachine.cpp
+  RequirementMachine/RewriteContext.cpp
   RequirementMachine/RewriteSystem.cpp
   RequirementMachine/RewriteSystemCompletion.cpp
   SILLayout.cpp
