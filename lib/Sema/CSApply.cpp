@@ -8900,8 +8900,9 @@ bool Solution::hasType(ASTNode node) const {
 }
 
 bool Solution::hasType(const KeyPathExpr *KP, unsigned ComponentIndex) const {
-  auto &cs = getConstraintSystem();
-  return cs.hasType(KP, ComponentIndex);
+  assert(KP && "Expected non-null key path parameter!");
+  return keyPathComponentTypes.find(std::make_pair(KP, ComponentIndex))
+            != keyPathComponentTypes.end();
 }
 
 Type Solution::getType(ASTNode node) const {
@@ -8911,6 +8912,11 @@ Type Solution::getType(ASTNode node) const {
 
   auto &cs = getConstraintSystem();
   return cs.getType(node);
+}
+
+Type Solution::getType(const KeyPathExpr *KP, unsigned I) const {
+  assert(hasType(KP, I) && "Expected type to have been set!");
+  return keyPathComponentTypes.find(std::make_pair(KP, I))->second;
 }
 
 Type Solution::getResolvedType(ASTNode node) const {
