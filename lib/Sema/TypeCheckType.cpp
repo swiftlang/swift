@@ -29,7 +29,6 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
-#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
@@ -75,8 +74,7 @@ TypeResolution::forInterface(DeclContext *dc, TypeResolutionOptions options,
                              HandlePlaceholderTypeReprFn placeholderHandler) {
   TypeResolution result(dc, TypeResolutionStage::Interface, options,
                         unboundTyOpener, placeholderHandler);
-  result.complete.genericSig = dc->getGenericSignatureOfContext();
-  result.complete.builder = nullptr;
+  result.genericSig = dc->getGenericSignatureOfContext();
   return result;
 }
 
@@ -102,22 +100,12 @@ TypeResolution::forContextual(DeclContext *dc, GenericEnvironment *genericEnv,
 TypeResolution TypeResolution::withOptions(TypeResolutionOptions opts) const {
   TypeResolution result(dc, stage, opts, unboundTyOpener, placeholderHandler);
   result.genericEnv = genericEnv;
-  result.complete = complete;
+  result.genericSig = genericSig;
   return result;
 }
 
 ASTContext &TypeResolution::getASTContext() const {
   return dc->getASTContext();
-}
-
-GenericSignatureBuilder *TypeResolution::getGenericSignatureBuilder() const {
-  assert(stage == TypeResolutionStage::Interface);
-  if (!complete.builder) {
-    auto genericSig = getGenericSignature();
-    complete.builder = genericSig->getGenericSignatureBuilder();
-  }
-
-  return complete.builder;
 }
 
 GenericSignature TypeResolution::getGenericSignature() const {
@@ -126,8 +114,8 @@ GenericSignature TypeResolution::getGenericSignature() const {
     return dc->getGenericSignatureOfContext();
 
   case TypeResolutionStage::Interface:
-    if (complete.genericSig)
-      return complete.genericSig;
+    if (genericSig)
+      return genericSig;
 
     return dc->getGenericSignatureOfContext();
 
@@ -197,22 +185,13 @@ Type TypeResolution::resolveDependentMemberType(
   if (!genericSig)
     return ErrorType::get(baseTy);
 
-  auto builder = getGenericSignatureBuilder();
-  auto baseEquivClass =
-    builder->resolveEquivalenceClass(
-                                baseTy,
-                                ArchetypeResolutionKind::CompleteWellFormed);
-  if (!baseEquivClass)
-    return ErrorType::get(baseTy);
-
-  ASTContext &ctx = baseTy->getASTContext();
-
   // Look for a nested type with the given name.
-  if (auto nestedType =
-          baseEquivClass->lookupNestedType(*builder, refIdentifier)) {
+  if (auto nestedType = genericSig->lookupNestedType(baseTy, refIdentifier)) {
     // Record the type we found.
     ref->setValue(nestedType, nullptr);
   } else {
+    ASTContext &ctx = DC->getASTContext();
+
     // Resolve the base to a potential archetype.
     // Perform typo correction.
     TypoCorrectionResults corrections(ref->getNameRef(), ref->getNameLoc());
@@ -258,13 +237,6 @@ Type TypeResolution::resolveDependentMemberType(
     return DependentMemberType::get(baseTy, assocType);
   }
 
-  // Otherwise, the nested type comes from a concrete type,
-  // or it's a typealias declared in protocol or protocol extension.
-  // Substitute the base type into it.
-
-  // Make sure that base type didn't get replaced along the way.
-  assert(baseTy->isTypeParameter());
-
   // There are two situations possible here:
   //
   // 1. Member comes from the protocol, which means that it has been
@@ -280,9 +252,12 @@ Type TypeResolution::resolveDependentMemberType(
   // end up using incorrect generic signature while attempting to form
   // a substituted type for the member we found.
   if (!concrete->getDeclContext()->getSelfProtocolDecl()) {
-    baseTy = baseEquivClass->concreteType ? baseEquivClass->concreteType
-                                          : baseEquivClass->superclass;
-    assert(baseTy);
+    if (auto concreteTy = genericSig->getConcreteType(baseTy))
+      baseTy = concreteTy;
+    else {
+      baseTy = genericSig->getSuperclassBound(baseTy);
+      assert(baseTy);
+    }
   }
 
   return TypeChecker::substMemberTypeWithBase(DC->getParentModule(), concrete,
@@ -305,16 +280,12 @@ Type TypeResolution::resolveSelfAssociatedType(Type baseTy,
   }
 
   assert(stage == TypeResolutionStage::Interface);
-  auto builder = getGenericSignatureBuilder();
-  auto baseEquivClass =
-    builder->resolveEquivalenceClass(
-                                baseTy,
-                                ArchetypeResolutionKind::CompleteWellFormed);
-  if (!baseEquivClass)
+  auto genericSig = getGenericSignature();
+  if (!genericSig)
     return ErrorType::get(baseTy);
 
   // Look for a nested type with the given name.
-  auto nestedType = baseEquivClass->lookupNestedType(*builder, name);
+  auto nestedType = genericSig->lookupNestedType(baseTy, name);
   assert(nestedType);
 
   // If the nested type has been resolved to an associated type, use it.
@@ -327,9 +298,12 @@ Type TypeResolution::resolveSelfAssociatedType(Type baseTy,
     // extension.
     //
     // Get the superclass of the 'Self' type parameter.
-    baseTy = (baseEquivClass->concreteType
-              ? baseEquivClass->concreteType
-              : baseEquivClass->superclass);
+    if (auto concreteTy = genericSig->getConcreteType(baseTy))
+      baseTy = concreteTy;
+    else {
+      baseTy = genericSig->getSuperclassBound(baseTy);
+      assert(baseTy);
+    }
     assert(baseTy);
   }
 
@@ -925,12 +899,13 @@ Type TypeResolution::applyUnboundGenericArguments(
     }
 
     skipRequirementsCheck |= parentTy->hasTypeVariable();
-  } else if (auto genericEnv =
-                 decl->getDeclContext()->getGenericEnvironmentOfContext()) {
-    auto genericSig = genericEnv->getGenericSignature();
+  } else if (auto genericSig =
+                 decl->getDeclContext()->getGenericSignatureOfContext()) {
     for (auto gp : genericSig->getGenericParams()) {
       subs[gp->getCanonicalType()->castTo<GenericTypeParamType>()] =
-          (usesArchetypes() ? genericEnv->mapTypeIntoContext(gp) : gp);
+          (usesArchetypes()
+           ? genericSig->getGenericEnvironment()->mapTypeIntoContext(gp)
+           : gp);
     }
   }
 
