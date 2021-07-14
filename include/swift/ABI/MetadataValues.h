@@ -2211,7 +2211,6 @@ public:
     Kind_width          = 8,
 
     CanThrow            = 8,
-    ShouldNotDeallocate = 9,
 
     // Kind-specific flags should grow down from 31.
 
@@ -2230,18 +2229,6 @@ public:
 
   /// Whether this context is permitted to throw.
   FLAGSET_DEFINE_FLAG_ACCESSORS(CanThrow, canThrow, setCanThrow)
-
-  /// Whether a function should avoid deallocating its context before
-  /// returning.  It should still pass its caller's context to its
-  /// return continuation.
-  ///
-  /// This flag can be set in the caller to optimize context allocation,
-  /// e.g. if the callee's context size is known statically and simply
-  /// allocated as part of the caller's context, or if the callee will
-  /// be called multiple times.
-  FLAGSET_DEFINE_FLAG_ACCESSORS(ShouldNotDeallocate,
-                                shouldNotDeallocateInCallee,
-                                setShouldNotDeallocateInCallee)
 
   /// See AsyncContinuationFlags::isExecutorSwitchForced.
   FLAGSET_DEFINE_FLAG_ACCESSORS(Continuation_IsExecutorSwitchForced,

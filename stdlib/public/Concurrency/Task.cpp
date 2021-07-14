@@ -635,7 +635,6 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   // be is the final hop.  Store a signed null instead.
   initialContext->Parent = nullptr;
   initialContext->Flags = AsyncContextKind::Ordinary;
-  initialContext->Flags.setShouldNotDeallocateInCallee(true);
 
   // Attach to the group, if needed.
   if (group) {
