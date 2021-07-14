@@ -880,7 +880,23 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     if (!Attr->Rename.empty()) {
       Printer << ", renamed: \"" << Attr->Rename << "\"";
     } else if (Attr->RenameDecl) {
-      Printer << ", renamed: \"" << Attr->RenameDecl->getName() << "\"";
+      Printer << ", renamed: \"";
+      if (auto *Accessor = dyn_cast<AccessorDecl>(Attr->RenameDecl)) {
+        switch (Accessor->getAccessorKind()) {
+        case AccessorKind::Get:
+          Printer << "getter:";
+          break;
+        case AccessorKind::Set:
+          Printer << "setter:";
+          break;
+        default:
+          break;
+        }
+        Printer << Accessor->getStorage()->getName() << "()";
+      } else {
+        Printer << Attr->RenameDecl->getName();
+      }
+      Printer << "\"";
     }
 
     // If there's no message, but this is specifically an imported
