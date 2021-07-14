@@ -12611,8 +12611,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
         /*flags=*/None, constraint.getLocator());
 
   case ConstraintKind::ClosureBodyElement:
-    return simplifyClosureBodyElementConstraint(constraint.getElementType(),
-                                                constraint.getClosureElement(),
+    return simplifyClosureBodyElementConstraint(constraint.getClosureElement(),
                                                 /*flags=*/None,
                                                 constraint.getLocator());
   }

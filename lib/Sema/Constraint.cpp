@@ -248,14 +248,13 @@ Constraint::Constraint(ConstraintKind kind, ConstraintFix *fix, Type first,
   std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
 }
 
-Constraint::Constraint(TypeVariableType *elementTy, ASTNode node,
-                       ConstraintLocator *locator,
+Constraint::Constraint(ASTNode node, ConstraintLocator *locator,
                        SmallPtrSetImpl<TypeVariableType *> &typeVars)
-  : Kind(ConstraintKind::ClosureBodyElement), TheFix(nullptr), HasRestriction(false),
-    IsActive(false), IsDisabled(false), IsDisabledForPerformance(false),
-    RememberChoice(false), IsFavored(false),
-    NumTypeVariables(typeVars.size()), ClosureElement{elementTy, node},
-    Locator(locator) {
+    : Kind(ConstraintKind::ClosureBodyElement), TheFix(nullptr),
+      HasRestriction(false), IsActive(false), IsDisabled(false),
+      IsDisabledForPerformance(false), RememberChoice(false), IsFavored(false),
+      NumTypeVariables(typeVars.size()), ClosureElement{node},
+      Locator(locator) {
   std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
 }
 
@@ -333,8 +332,7 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
                   getLocator());
 
   case ConstraintKind::ClosureBodyElement:
-    return createClosureBodyElement(cs, getElementType(), getClosureElement(),
-                                    getLocator());
+    return createClosureBodyElement(cs, getClosureElement(), getLocator());
   }
 
   llvm_unreachable("Unhandled ConstraintKind in switch.");
@@ -369,6 +367,12 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
                  constraint->print(Out, sm);
                },
                [&] { Out << "\n"; });
+    return;
+  }
+
+  if (Kind == ConstraintKind::ClosureBodyElement) {
+    Out << "closure body element ";
+    getClosureElement().dump(Out);
     return;
   }
 
@@ -491,17 +495,12 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
     Out << " can default to ";
     break;
 
-  case ConstraintKind::ClosureBodyElement: {
-    Out << " closure body element ";
-    getClosureElement().dump(Out);
-    skipSecond = true;
-    break;
-  }
-
   case ConstraintKind::Disjunction:
     llvm_unreachable("disjunction handled above");
   case ConstraintKind::Conjunction:
     llvm_unreachable("conjunction handled above");
+  case ConstraintKind::ClosureBodyElement:
+    llvm_unreachable("closure body element handled above");
   }
 
   if (!skipSecond)
@@ -669,7 +668,6 @@ gatherReferencedTypeVars(Constraint *constraint,
     break;
 
   case ConstraintKind::ClosureBodyElement:
-    constraint->getFirstType()->getTypeVariables(typeVars);
     break;
   }
 }
@@ -993,15 +991,12 @@ Constraint *Constraint::createApplicableFunction(
 }
 
 Constraint *Constraint::createClosureBodyElement(ConstraintSystem &cs,
-                                                 TypeVariableType *elementTy,
                                                  ASTNode node,
                                                  ConstraintLocator *locator) {
   SmallPtrSet<TypeVariableType *, 4> typeVars;
-  typeVars.insert(elementTy);
-
-  unsigned size = totalSizeToAlloc<TypeVariableType*>(typeVars.size());
+  unsigned size = totalSizeToAlloc<TypeVariableType *>(typeVars.size());
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
-  return new (mem) Constraint(elementTy, node, locator, typeVars);
+  return new (mem) Constraint(node, locator, typeVars);
 }
 
 Optional<TrailingClosureMatching>

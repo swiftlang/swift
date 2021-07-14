@@ -415,8 +415,6 @@ class Constraint final : public llvm::ilist_node<Constraint>,
     } Overload;
 
     struct {
-      /// The type of the node.
-      TypeVariableType *ElementTy;
       /// The node itself.
       ASTNode Element;
     } ClosureElement;
@@ -472,8 +470,7 @@ class Constraint final : public llvm::ilist_node<Constraint>,
              SmallPtrSetImpl<TypeVariableType *> &typeVars);
 
   /// Construct a closure body element constraint.
-  Constraint(TypeVariableType *elementTy, ASTNode node,
-             ConstraintLocator *locator,
+  Constraint(ASTNode node, ConstraintLocator *locator,
              SmallPtrSetImpl<TypeVariableType *> &typeVars);
 
   /// Retrieve the type variables buffer, for internal mutation.
@@ -557,7 +554,6 @@ public:
       ConstraintLocator *locator);
 
   static Constraint *createClosureBodyElement(ConstraintSystem &cs,
-                                              TypeVariableType *elementTy,
                                               ASTNode node,
                                               ConstraintLocator *locator);
 
@@ -695,7 +691,7 @@ public:
       return Member.First;
 
     case ConstraintKind::ClosureBodyElement:
-      return Type(ClosureElement.ElementTy);
+      llvm_unreachable("closure body element constraint has no type operands");
 
     default:
       return Types.First;
@@ -811,11 +807,6 @@ public:
            Kind == ConstraintKind::UnresolvedValueMember ||
            Kind == ConstraintKind::ValueWitness);
     return Member.UseDC;
-  }
-
-  TypeVariableType *getElementType() const {
-    assert(Kind == ConstraintKind::ClosureBodyElement);
-    return ClosureElement.ElementTy;
   }
 
   ASTNode getClosureElement() const {

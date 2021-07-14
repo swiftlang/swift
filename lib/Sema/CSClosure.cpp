@@ -132,8 +132,7 @@ bool ConstraintSystem::generateConstraints(ClosureExpr *closure) {
 
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyClosureBodyElementConstraint(
-    TypeVariableType *elementTy, ASTNode element, TypeMatchOptions flags,
-    ConstraintLocatorBuilder locator) {
+    ASTNode element, TypeMatchOptions flags, ConstraintLocatorBuilder locator) {
   return SolutionKind::Error;
 }
 
