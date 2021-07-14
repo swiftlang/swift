@@ -8161,11 +8161,18 @@ void addCompletionHandlerAttribute(Decl *asyncImport,
                                    ArrayRef<Decl *> members,
                                    ASTContext &SwiftContext) {
   auto *asyncFunc = dyn_cast_or_null<AbstractFunctionDecl>(asyncImport);
+  // Completion handler functions can be imported as getters, but the decl
+  // given back from the import is the property. Grab the underlying getter
+  if (auto *property = dyn_cast_or_null<AbstractStorageDecl>(asyncImport))
+    asyncFunc = property->getAccessor(AccessorKind::Get);
+
   if (!asyncFunc)
     return;
 
   for (auto *member : members) {
-    if (member != asyncImport) {
+    // Only add the attribute to functions that don't already have availability
+    if (member != asyncImport && isa<AbstractFunctionDecl>(member) &&
+        !member->getAttrs().hasAttribute<AvailableAttr>()) {
       member->getAttrs().add(
           AvailableAttr::createForAlternative(SwiftContext, asyncFunc));
     }
