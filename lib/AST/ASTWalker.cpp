@@ -1251,7 +1251,7 @@ public:
           D->getDeclContext()->getParentSourceFile())
         return true;
       if (Decl *ParentD = Walker.Parent.getAsDecl())
-        return (isa<NominalTypeDecl>(ParentD) || isa<ExtensionDecl>(ParentD));
+        return (!D->hasClangNode() && (isa<NominalTypeDecl>(ParentD) || isa<ExtensionDecl>(ParentD)));
       auto walkerParentAsStmt = Walker.Parent.getAsStmt();
       if (walkerParentAsStmt && isa<BraceStmt>(walkerParentAsStmt))
         return true;
