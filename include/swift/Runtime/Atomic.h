@@ -53,8 +53,13 @@ public:
   constexpr atomic_impl(Value value) : value(value) {}
 
   /// Force clients to always pass an order.
-  Value load(std::memory_order order) {
+  Value load(std::memory_order order) const {
     return value.load(order);
+  }
+
+  /// Force clients to always pass an order.
+  void store(Value newValue, std::memory_order order) {
+    return value.store(newValue, order);
   }
 
   /// Force clients to always pass an order.
@@ -75,14 +80,14 @@ public:
 /// AMD processors that lack cmpxchg16b, so we just use the intrinsic.
 template <class Value>
 class alignas(2 * sizeof(void*)) atomic_impl<Value, 2 * sizeof(void*)> {
-  volatile Value atomicValue;
+  mutable volatile Value atomicValue;
 public:
   constexpr atomic_impl(Value initialValue) : atomicValue(initialValue) {}
 
   atomic_impl(const atomic_impl &) = delete;
   atomic_impl &operator=(const atomic_impl &) = delete;
 
-  Value load(std::memory_order order) {
+  Value load(std::memory_order order) const {
     assert(order == std::memory_order_relaxed ||
            order == std::memory_order_acquire ||
            order == std::memory_order_consume);
@@ -105,6 +110,17 @@ public:
     }
 #endif
     return reinterpret_cast<Value &>(resultArray);
+  }
+
+  void store(Value newValue, std::memory_order order) {
+    assert(order == std::memory_order_relaxed ||
+           order == std::memory_order_release);
+    Value oldValue = load(std::memory_order_relaxed);
+    while (!compare_exchange_weak(oldValue, newValue,
+                                  /*success*/ order,
+                                  /*failure*/ std::memory_order_relaxed)) {
+      // try again
+    }
   }
 
   bool compare_exchange_weak(Value &oldValue, Value newValue,
