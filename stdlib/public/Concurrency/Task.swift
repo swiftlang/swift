@@ -762,7 +762,11 @@ public func _runAsyncMain(_ asyncFun: @escaping () async throws -> ()) {
   Task.detached {
     do {
 #if !os(Windows)
+#if compiler(>=5.5) && $BuiltinHopToActor
       Builtin.hopToActor(MainActor.shared)
+#else
+      fatalError("Swift compiler is incompatible with this SDK version")
+#endif
 #endif
       try await asyncFun()
       exit(0)

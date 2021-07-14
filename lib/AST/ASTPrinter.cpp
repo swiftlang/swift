@@ -2713,6 +2713,10 @@ static bool usesFeatureBuiltinContinuation(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureBuiltinHopToActor(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureBuiltinTaskGroupWithArgument(Decl *decl) {
   return false;
 }
