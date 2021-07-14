@@ -14,6 +14,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/Requirement.h"
 #include "llvm/ADT/DenseSet.h"
@@ -745,4 +746,120 @@ Type RequirementMachine::getCanonicalTypeInContext(
     // FIXME: Recursion guard is needed here
     return getCanonicalTypeInContext(substType, genericParams);
   });
+}
+
+/// Compare two associated types.
+static int compareAssociatedTypes(AssociatedTypeDecl *assocType1,
+                                  AssociatedTypeDecl *assocType2) {
+  // - by name.
+  if (int result = assocType1->getName().str().compare(
+                                              assocType2->getName().str()))
+    return result;
+
+  // Prefer an associated type with no overrides (i.e., an anchor) to one
+  // that has overrides.
+  bool hasOverridden1 = !assocType1->getOverriddenDecls().empty();
+  bool hasOverridden2 = !assocType2->getOverriddenDecls().empty();
+  if (hasOverridden1 != hasOverridden2)
+    return hasOverridden1 ? +1 : -1;
+
+  // - by protocol, so t_n_m.`P.T` < t_n_m.`Q.T` (given P < Q)
+  auto proto1 = assocType1->getProtocol();
+  auto proto2 = assocType2->getProtocol();
+  if (int compareProtocols = TypeDecl::compare(proto1, proto2))
+    return compareProtocols;
+
+  // Error case: if we have two associated types with the same name in the
+  // same protocol, just tie-break based on address.
+  if (assocType1 != assocType2)
+    return assocType1 < assocType2 ? -1 : +1;
+
+  return 0;
+}
+
+static void lookupConcreteNestedType(NominalTypeDecl *decl,
+                                     Identifier name,
+                                     SmallVectorImpl<TypeDecl *> &concreteDecls) {
+  SmallVector<ValueDecl *, 2> foundMembers;
+  decl->getParentModule()->lookupQualified(
+      decl, DeclNameRef(name),
+      NL_QualifiedDefault | NL_OnlyTypes | NL_ProtocolMembers,
+      foundMembers);
+  for (auto member : foundMembers)
+    concreteDecls.push_back(cast<TypeDecl>(member));
+}
+
+static TypeDecl *
+findBestConcreteNestedType(SmallVectorImpl<TypeDecl *> &concreteDecls) {
+  return *std::min_element(concreteDecls.begin(), concreteDecls.end(),
+                           [](TypeDecl *type1, TypeDecl *type2) {
+                             return TypeDecl::compare(type1, type2) < 0;
+                           });
+}
+
+TypeDecl *
+RequirementMachine::lookupNestedType(Type depType, Identifier name) const {
+  auto term = Impl->Context.getMutableTermForType(depType->getCanonicalType(),
+                                                  /*proto=*/nullptr);
+  Impl->System.simplify(term);
+  Impl->verify(term);
+
+  auto *equivClass = Impl->Map.lookUpEquivalenceClass(term);
+  if (!equivClass)
+    return nullptr;
+
+  // Look for types with the given name in protocols that we know about.
+  AssociatedTypeDecl *bestAssocType = nullptr;
+  SmallVector<TypeDecl *, 4> concreteDecls;
+
+  for (const auto *proto : equivClass->getConformsTo()) {
+    // Look for an associated type and/or concrete type with this name.
+    for (auto member : const_cast<ProtocolDecl *>(proto)->lookupDirect(name)) {
+      // If this is an associated type, record whether it is the best
+      // associated type we've seen thus far.
+      if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
+        // Retrieve the associated type anchor.
+        assocType = assocType->getAssociatedTypeAnchor();
+
+        if (!bestAssocType ||
+             compareAssociatedTypes(assocType, bestAssocType) < 0)
+          bestAssocType = assocType;
+
+        continue;
+      }
+
+      // If this is another type declaration, record it.
+      if (auto type = dyn_cast<TypeDecl>(member)) {
+        concreteDecls.push_back(type);
+        continue;
+      }
+    }
+  }
+
+  // If we haven't found anything yet but have a concrete type or a superclass,
+  // look for a type in that.
+  // FIXME: Shouldn't we always look here?
+  if (!bestAssocType && concreteDecls.empty()) {
+    Type typeToSearch;
+    if (equivClass->isConcreteType())
+      typeToSearch = equivClass->getConcreteType();
+    else if (equivClass->hasSuperclassBound())
+      typeToSearch = equivClass->getSuperclassBound();
+
+    if (typeToSearch)
+      if (auto *decl = typeToSearch->getAnyNominal())
+        lookupConcreteNestedType(decl, name, concreteDecls);
+  }
+
+  if (bestAssocType) {
+    assert(bestAssocType->getOverriddenDecls().empty() &&
+           "Lookup should never keep a non-anchor associated type");
+    return bestAssocType;
+
+  } else if (!concreteDecls.empty()) {
+    // Find the best concrete type.
+    return findBestConcreteNestedType(concreteDecls);
+  }
+
+  return nullptr;
 }

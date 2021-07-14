@@ -66,6 +66,7 @@ public:
   bool areSameTypeParameterInContext(Type depType1, Type depType2) const;
   Type getCanonicalTypeInContext(Type type,
                       TypeArrayView<GenericTypeParamType> genericParams) const;
+  TypeDecl *lookupNestedType(Type depType, Identifier name) const;
 
   void dump(llvm::raw_ostream &out) const;
 };

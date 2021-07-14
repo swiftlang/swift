@@ -87,6 +87,10 @@ public:
     return Superclass.hasValue();
   }
 
+  Type getSuperclassBound() const {
+    return Superclass->getSuperclass();
+  }
+
   Type getSuperclassBound(
       TypeArrayView<GenericTypeParamType> genericParams,
       const ProtocolGraph &protos,
@@ -94,6 +98,10 @@ public:
 
   bool isConcreteType() const {
     return ConcreteType.hasValue();
+  }
+
+  Type getConcreteType() const {
+    return ConcreteType->getConcreteType();
   }
 
   Type getConcreteType(

@@ -883,15 +883,49 @@ TypeDecl *
 GenericSignatureImpl::lookupNestedType(Type type, Identifier name) const {
   assert(type->isTypeParameter());
 
-  auto *builder = getGenericSignatureBuilder();
-  auto equivClass =
-    builder->resolveEquivalenceClass(
-                                type,
-                                ArchetypeResolutionKind::CompleteWellFormed);
-  if (!equivClass)
-    return nullptr;
+  auto computeViaGSB = [&]() -> TypeDecl * {
+    auto *builder = getGenericSignatureBuilder();
+    auto equivClass =
+      builder->resolveEquivalenceClass(
+                                  type,
+                                  ArchetypeResolutionKind::CompleteWellFormed);
+    if (!equivClass)
+      return nullptr;
 
-  return equivClass->lookupNestedType(*builder, name);
+    return equivClass->lookupNestedType(*builder, name);
+  };
+
+  auto computeViaRQM = [&]() {
+    auto *machine = getRequirementMachine();
+    return machine->lookupNestedType(type, name);
+  };
+
+  auto &ctx = getASTContext();
+  if (ctx.LangOpts.EnableRequirementMachine) {
+    auto rqmResult = computeViaRQM();
+
+#ifndef NDEBUG
+    auto gsbResult = computeViaGSB();
+
+    if (gsbResult != rqmResult) {
+      llvm::errs() << "RequirementMachine::lookupNestedType() is broken\n";
+      llvm::errs() << "Generic signature: " << GenericSignature(this) << "\n";
+      llvm::errs() << "Dependent type: "; type.dump(llvm::errs());
+      llvm::errs() << "GenericSignatureBuilder says: ";
+      gsbResult->dumpRef(llvm::errs());
+      llvm::errs() << "\n";
+      llvm::errs() << "RequirementMachine says: ";
+      rqmResult->dumpRef(llvm::errs());
+      llvm::errs() << "\n";
+      getRequirementMachine()->dump(llvm::errs());
+      abort();
+    }
+#endif
+
+    return rqmResult;
+  } else {
+    return computeViaGSB();
+  }
 }
 
 unsigned GenericParamKey::findIndexIn(
