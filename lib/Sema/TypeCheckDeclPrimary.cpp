@@ -1681,8 +1681,10 @@ public:
       (void) VD->isObjC();
       (void) VD->isDynamic();
 
-      // Check for actor isolation.
-      (void)getActorIsolation(VD);
+      if (isa<NominalTypeDecl>(VD)) {
+        // Check for actor isolation.
+        (void)getActorIsolation(VD);
+      }
 
       // If this is a member of a nominal type, don't allow it to have a name of
       // "Type" or "Protocol" since we reserve the X.Type and X.Protocol
