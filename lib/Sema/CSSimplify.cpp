@@ -8950,7 +8950,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
   // generate constraints for it now.
   auto &ctx = getASTContext();
   if (shouldTypeCheckInEnclosingExpression(closure)) {
-    if (generateConstraints(closure, closureType->getResult()))
+    if (generateConstraints(closure))
       return false;
   } else if (!hasExplicitResult(closure)) {
     // If this closure has an empty body and no explicit result type
