@@ -2211,7 +2211,11 @@ public:
     Kind_width          = 8,
 
     CanThrow            = 8,
-    ShouldNotDeallocate = 9
+    ShouldNotDeallocate = 9,
+
+    // Kind-specific flags should grow down from 31.
+
+    Continuation_IsExecutorSwitchForced = 31,
   };
 
   explicit AsyncContextFlags(uint32_t bits) : FlagSet(bits) {}
@@ -2238,6 +2242,11 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(ShouldNotDeallocate,
                                 shouldNotDeallocateInCallee,
                                 setShouldNotDeallocateInCallee)
+
+  /// See AsyncContinuationFlags::isExecutorSwitchForced.
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Continuation_IsExecutorSwitchForced,
+                                continuation_isExecutorSwitchForced,
+                                continuation_setIsExecutorSwitchForced)
 };
 
 /// Flags passed to swift_continuation_init.
@@ -2247,6 +2256,7 @@ public:
     CanThrow            = 0,
     HasExecutorOverride = 1,
     IsPreawaited        = 2,
+    IsExecutorSwitchForced = 3,
   };
 
   explicit AsyncContinuationFlags(size_t bits) : FlagSet(bits) {}
@@ -2262,10 +2272,27 @@ public:
                                 hasExecutorOverride,
                                 setHasExecutorOverride)
 
+  /// Whether the switch to the target executor should be forced
+  /// by swift_continuation_await.  If this is not set, and
+  /// swift_continuation_await finds that the continuation has
+  /// already been resumed, then execution will continue on the
+  /// current executor.  This has no effect in combination with
+  /// pre-awaiting.
+  ///
+  /// Setting this flag when you know statically that you're
+  /// already on the right executor is suboptimal.  In particular,
+  /// there's no good reason to set this if you're not also using
+  /// an executor override.
+  FLAGSET_DEFINE_FLAG_ACCESSORS(IsExecutorSwitchForced,
+                                isExecutorSwitchForced,
+                                setIsExecutorSwitchForced)
+
   /// Whether the continuation is "pre-awaited".  If so, it should
   /// be set up in the already-awaited state, and so resumptions
   /// will immediately schedule the continuation to begin
-  /// asynchronously.
+  /// asynchronously.  The continuation must not be subsequently
+  /// awaited if this is set.  The task is immediately treated as
+  /// suspended.
   FLAGSET_DEFINE_FLAG_ACCESSORS(IsPreawaited,
                                 isPreawaited,
                                 setIsPreawaited)

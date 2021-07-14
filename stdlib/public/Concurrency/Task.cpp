@@ -942,6 +942,8 @@ static AsyncTask *swift_continuation_initImpl(ContinuationAsyncContext *context,
                                               AsyncContinuationFlags flags) {
   context->Flags = AsyncContextKind::Continuation;
   if (flags.canThrow()) context->Flags.setCanThrow(true);
+  if (flags.isExecutorSwitchForced())
+    context->Flags.continuation_setIsExecutorSwitchForced(true);
   context->ErrorResult = nullptr;
 
   // Set the current executor as the target executor unless there's
@@ -987,9 +989,12 @@ static void swift_continuation_awaitImpl(ContinuationAsyncContext *context) {
 
   // If the status is already Resumed, we can resume immediately.
   // Comparing against Pending may be very slightly more compact.
-  if (oldStatus != ContinuationStatus::Pending)
-    // This is fine given how swift_continuation_init sets it up.
+  if (oldStatus != ContinuationStatus::Pending) {
+    if (context->isExecutorSwitchForced())
+      return swift_task_switch(context, context->ResumeParent,
+                               context->ResumeToExecutor);
     return context->ResumeParent(context);
+  }
 
   // Load the current task (we alreaady did this in assertions builds).
 #ifdef NDEBUG
@@ -1015,7 +1020,10 @@ static void swift_continuation_awaitImpl(ContinuationAsyncContext *context) {
 
   // Restore the running state of the task and resume it.
   task->flagAsRunning();
-  return task->runInFullyEstablishedContext();
+  if (context->isExecutorSwitchForced())
+    return swift_task_switch(context, context->ResumeParent,
+                             context->ResumeToExecutor);
+  return context->ResumeParent(context);
 }
 
 static void resumeTaskAfterContinuation(AsyncTask *task,

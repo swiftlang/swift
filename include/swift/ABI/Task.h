@@ -650,6 +650,10 @@ public:
     ErrorResult = error;
   }
 
+  bool isExecutorSwitchForced() const {
+    return Flags.continuation_isExecutorSwitchForced();
+  }
+
   static bool classof(const AsyncContext *context) {
     return context->Flags.getKind() == AsyncContextKind::Continuation;
   }
