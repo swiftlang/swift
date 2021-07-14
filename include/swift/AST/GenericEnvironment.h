@@ -21,7 +21,6 @@
 #include "swift/AST/GenericParamKey.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/GenericSignature.h"
-#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/Debug.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -86,8 +85,7 @@ class alignas(1 << DeclAlignInBits) GenericEnvironment final
 
   friend QueryInterfaceTypeSubstitutions;
 
-  Type getOrCreateArchetypeFromInterfaceType(
-      GenericSignatureBuilder::EquivalenceClass *equivClass);
+  Type getOrCreateArchetypeFromInterfaceType(Type depType);
 
   /// Retrieve the mapping for the given generic parameter, if present.
   ///
