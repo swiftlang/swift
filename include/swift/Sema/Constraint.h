@@ -553,9 +553,10 @@ public:
       Optional<TrailingClosureMatching> trailingClosureMatching,
       ConstraintLocator *locator);
 
-  static Constraint *createClosureBodyElement(ConstraintSystem &cs,
-                                              ASTNode node,
-                                              ConstraintLocator *locator);
+  static Constraint *
+  createClosureBodyElement(ConstraintSystem &cs, ASTNode node,
+                           ConstraintLocator *locator,
+                           ArrayRef<TypeVariableType *> referencedVars = {});
 
   /// Determine the kind of constraint.
   ConstraintKind getKind() const { return Kind; }

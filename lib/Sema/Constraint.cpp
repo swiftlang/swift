@@ -332,7 +332,8 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
                   getLocator());
 
   case ConstraintKind::ClosureBodyElement:
-    return createClosureBodyElement(cs, getClosureElement(), getLocator());
+    return createClosureBodyElement(cs, getClosureElement(), getLocator(),
+                                    getTypeVariables());
   }
 
   llvm_unreachable("Unhandled ConstraintKind in switch.");
@@ -990,10 +991,12 @@ Constraint *Constraint::createApplicableFunction(
   return constraint;
 }
 
-Constraint *Constraint::createClosureBodyElement(ConstraintSystem &cs,
-                                                 ASTNode node,
-                                                 ConstraintLocator *locator) {
+Constraint *Constraint::createClosureBodyElement(
+    ConstraintSystem &cs, ASTNode node, ConstraintLocator *locator,
+    ArrayRef<TypeVariableType *> referencedVars) {
   SmallPtrSet<TypeVariableType *, 4> typeVars;
+  typeVars.insert(referencedVars.begin(), referencedVars.end());
+
   unsigned size = totalSizeToAlloc<TypeVariableType *>(typeVars.size());
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
   return new (mem) Constraint(node, locator, typeVars);
