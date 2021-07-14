@@ -795,6 +795,21 @@ GenericSignatureImpl::getConformanceAccessPath(Type type,
       type, protocol, this);
 }
 
+TypeDecl *
+GenericSignatureImpl::lookupNestedType(Type type, Identifier name) const {
+  assert(type->isTypeParameter());
+
+  auto *builder = getGenericSignatureBuilder();
+  auto equivClass =
+    builder->resolveEquivalenceClass(
+                                type,
+                                ArchetypeResolutionKind::CompleteWellFormed);
+  if (!equivClass)
+    return nullptr;
+
+  return equivClass->lookupNestedType(*builder, name);
+}
+
 unsigned GenericParamKey::findIndexIn(
                       TypeArrayView<GenericTypeParamType> genericParams) const {
   // For depth 0, we have random access. We perform the extra checking so that
