@@ -2020,36 +2020,16 @@ static void lookupConcreteNestedType(NominalTypeDecl *decl,
     concreteDecls.push_back(cast<TypeDecl>(member));
 }
 
-static auto findBestConcreteNestedType(SmallVectorImpl<TypeDecl *> &concreteDecls) {
-  return std::min_element(concreteDecls.begin(), concreteDecls.end(),
-                          [](TypeDecl *type1, TypeDecl *type2) {
-                            return TypeDecl::compare(type1, type2) < 0;
-                          });
+static TypeDecl *findBestConcreteNestedType(SmallVectorImpl<TypeDecl *> &concreteDecls) {
+  return *std::min_element(concreteDecls.begin(), concreteDecls.end(),
+                           [](TypeDecl *type1, TypeDecl *type2) {
+                             return TypeDecl::compare(type1, type2) < 0;
+                           });
 }
 
 TypeDecl *EquivalenceClass::lookupNestedType(
                              GenericSignatureBuilder &builder,
-                             Identifier name,
-                             SmallVectorImpl<TypeDecl *> *otherConcreteTypes) {
-  // Populates the result structures from the given cache entry.
-  auto populateResult = [&](const CachedNestedType &cache) -> TypeDecl * {
-    if (otherConcreteTypes)
-      otherConcreteTypes->clear();
-
-    // If there aren't any types in the cache, we're done.
-    if (cache.types.empty()) return nullptr;
-
-    // The first type in the cache is always the final result.
-    // Collect the rest in the concrete-declarations list, if needed.
-    if (otherConcreteTypes) {
-      for (auto type : ArrayRef<TypeDecl *>(cache.types).slice(1)) {
-        otherConcreteTypes->push_back(type);
-      }
-    }
-
-    return cache.types.front();
-  };
-
+                             Identifier name) {
   // If we have a cached value that is up-to-date, use that.
   auto cached = nestedTypeNameCache.find(name);
   if (cached != nestedTypeNameCache.end() &&
@@ -2059,7 +2039,7 @@ TypeDecl *EquivalenceClass::lookupNestedType(
       (!concreteType ||
         cached->second.concreteTypePresent == concreteType->getCanonicalType())) {
     ++NumNestedTypeCacheHits;
-    return populateResult(cached->second);
+    return cached->second.type;
   }
 
   // Cache miss; go compute the result.
@@ -2112,24 +2092,16 @@ TypeDecl *EquivalenceClass::lookupNestedType(
   entry.concreteTypePresent =
     concreteType ? concreteType->getCanonicalType() : CanType();
   if (bestAssocType) {
-    entry.types.push_back(bestAssocType);
-    entry.types.insert(entry.types.end(),
-                       concreteDecls.begin(), concreteDecls.end());
+    entry.type = bestAssocType;
     assert(bestAssocType->getOverriddenDecls().empty() &&
            "Lookup should never keep a non-anchor associated type");
   } else if (!concreteDecls.empty()) {
     // Find the best concrete type.
-    auto bestConcreteTypeIter = findBestConcreteNestedType(concreteDecls);
-
-    // Put the best concrete type first; the rest will follow.
-    entry.types.push_back(*bestConcreteTypeIter);
-    entry.types.insert(entry.types.end(),
-                       concreteDecls.begin(), bestConcreteTypeIter);
-    entry.types.insert(entry.types.end(),
-                       bestConcreteTypeIter + 1, concreteDecls.end());
+    entry.type = findBestConcreteNestedType(concreteDecls);
   }
 
-  return populateResult((nestedTypeNameCache[name] = std::move(entry)));
+  nestedTypeNameCache[name] = entry;
+  return entry.type;
 }
 
 static Type getSugaredDependentType(Type type,
@@ -3829,8 +3801,7 @@ ResolvedType GenericSignatureBuilder::maybeResolveEquivalenceClass(
           if (concreteDecls.empty())
             return ResolvedType::forUnresolved(nullptr);
 
-          auto bestConcreteTypeIter = findBestConcreteNestedType(concreteDecls);
-          concreteDecl = *bestConcreteTypeIter;
+          concreteDecl = findBestConcreteNestedType(concreteDecls);
         }
       }
 
