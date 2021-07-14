@@ -4162,6 +4162,18 @@ void Pattern::print(llvm::raw_ostream &OS, const PrintOptions &Options) const {
 }
 
 //===----------------------------------------------------------------------===//
+//  Expr Printing
+//===----------------------------------------------------------------------===//
+
+void Expr::print(ASTPrinter &Printer, const PrintOptions &Opts) const {
+  // FIXME: Fully use the ASTPrinter.
+  llvm::SmallString<128> Str;
+  llvm::raw_svector_ostream OS(Str);
+  dump(OS);
+  Printer << OS.str();
+}
+
+//===----------------------------------------------------------------------===//
 //  Type Printing
 //===----------------------------------------------------------------------===//
 

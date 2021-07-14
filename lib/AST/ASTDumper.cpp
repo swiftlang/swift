@@ -195,6 +195,40 @@ private:
 
   template <typename T>
   StringRef getFlag(T &value, StringRef &label, SmallVectorImpl<char> &scratch);
+
+public:
+  void printRec(Decl *D, StringRef Label = "");
+  void printRec(Expr *E, StringRef Label = "");
+  void printRec(Stmt *S, StringRef Label = "");
+  void printRec(TypeRepr *T, StringRef Label = "");
+  void printRec(const Pattern *P, StringRef Label = "");
+  void printRec(Type Ty, StringRef Label = "");
+
+  void printRec(ParameterList *params, StringRef Label = "");
+  void printRec(StmtConditionElement C, StringRef Label = "");
+  void printRec(AvailabilitySpec *Query, StringRef Label = "");
+  void printRec(const Requirement &req, StringRef Label = "");
+  void printRec(SourceFile &SF, StringRef Label = "");
+
+  using VisitedConformances = llvm::SmallPtrSet<const ProtocolConformance *, 8>;
+
+  void printRecCycleBreaking(const ProtocolConformanceRef conf, StringRef Label,
+                             VisitedConformances &visited);
+  void printRecCycleBreaking(ProtocolConformance *conf, StringRef Label,
+                             VisitedConformances &visited);
+  void printRecCycleBreaking(SubstitutionMap map, StringRef label,
+                             VisitedConformances &visited,
+                             SubstitutionMap::DumpStyle style =
+                                SubstitutionMap::DumpStyle::Full);
+
+  void printRec(const ASTNode N, StringRef Label = "") {
+         if (auto n = N.dyn_cast<Expr *>()) printRec(n, Label);
+    else if (auto n = N.dyn_cast<Stmt *>()) printRec(n, Label);
+    else if (auto n = N.dyn_cast<Decl *>()) printRec(n, Label);
+    else if (auto n = N.dyn_cast<Pattern *>()) printRec(n, Label);
+    else if (auto n = N.dyn_cast<TypeRepr *>()) printRec(n, Label);
+    else llvm_unreachable("unknown ASTNode");
+  }
 };
 
 /// Helper class for dumping an AST node.
@@ -264,53 +298,36 @@ public:
     return ASTNodeDumper(dumper(), Name, Label, Color);
   }
 
-  void printRec(Decl *D, StringRef Label = "");
-  void printRec(Expr *E, StringRef Label = "");
-  void printRec(Stmt *S, StringRef Label = "");
-  void printRec(TypeRepr *T, StringRef Label = "");
-  void printRec(const Pattern *P, StringRef Label = "");
-  void printRec(Type Ty, StringRef Label = "");
+  template <typename T>
+  void printRec(T value, StringRef Label = "") {
+    dumper().newLine();
+    dumper().printRec(value, Label);
+  }
 
-  void printRec(ParameterList *params, StringRef Label = "");
-  void printRec(StmtConditionElement C, StringRef Label = "");
-  void printRec(AvailabilitySpec *Query, StringRef Label = "");
-  void printRec(const Requirement req, StringRef Label = "");
-
-  using VisitedConformances =
-      llvm::SmallPtrSetImpl<const ProtocolConformance *>;
-
-  void printRecCycleBreaking(const ProtocolConformanceRef conf, StringRef Label,
-                             VisitedConformances &visited);
-  void printRecCycleBreaking(SubstitutionMap map, StringRef label,
-                             VisitedConformances &visited);
-  void printRecCycleBreaking(const ProtocolConformance *conf, StringRef Label,
-                             VisitedConformances &visited);
+  template <typename T>
+  void printRecCycleBreaking(const T &value, StringRef Label,
+                             ASTDumper::VisitedConformances &visited) {
+    dumper().newLine();
+    dumper().printRecCycleBreaking(value, Label, visited);
+  }
 
   template <typename T>
   void printRecCycleBreaking(T value, StringRef label = "") {
-    llvm::SmallPtrSet<const ProtocolConformance *, 8> visited;
-    printRecCycleBreaking(value, label, visited);
+    ASTDumper::VisitedConformances visited;
+    dumper().newLine();
+    dumper().printRecCycleBreaking(value, label, visited);
   }
 
-  void printRec(const ASTNode N, StringRef Label = "") {
-         if (auto n = N.dyn_cast<Expr *>()) printRec(n, Label);
-    else if (auto n = N.dyn_cast<Stmt *>()) printRec(n, Label);
-    else if (auto n = N.dyn_cast<Decl *>()) printRec(n, Label);
-    else if (auto n = N.dyn_cast<Pattern *>()) printRec(n, Label);
-    else if (auto n = N.dyn_cast<TypeRepr *>()) printRec(n, Label);
-    else llvm_unreachable("unknown ASTNode");
-  }
-
-  template<typename T>
-  void printRec(ArrayRef<T> elems, StringRef Label) {
+  template<typename Container>
+  void printManyRec(const Container &elems, StringRef Label) {
     auto childDump = child("array", Label, ExprModifierColor);
     for (auto elt : elems) {
       childDump.printRec(elt, "");
     }
   }
 
-  template<typename T>
-  void printRecCycleBreaking(ArrayRef<T> elems, StringRef Label) {
+  template<typename Container>
+  void printManyRecCycleBreaking(const Container &elems, StringRef Label) {
     auto childDump = child("array", Label, ExprModifierColor);
     for (auto elt : elems) {
       childDump.printRecCycleBreaking(elt, "");
@@ -386,7 +403,10 @@ public:
   /// name that the node "is".
   void printNodeName(StringRef name) {
     // No guarantee the string won't need escaping, so we'll use QuotedString.
-    print(QuotedString(name), "", IdentifierColor);
+    printLabel("", IdentifierColor);
+    dumper().printPlain(IdentifierColor, [&](auto &os) {
+      os << QuotedString(name);
+    });
   }
 
   /// Print the name of the node we are currently dumping. Do not use
@@ -780,9 +800,18 @@ void printValue(const TrailingWhereClause *value, raw_ostream &os,
   else os << "<<null>>";
 }
 
-void printValue(const TypeAttributes &value, raw_ostream &os,
-                ASTContext *ctx) {
-  value.print(os);
+void printValue(const TypeAttributes &value, raw_ostream &os, ASTContext *ctx) {
+  llvm::SmallString<64> scratch;
+  llvm::raw_svector_ostream scratchOS(scratch);
+
+  value.print(scratchOS);
+
+  // TypeAttributes prints a trailing space.
+  if (!scratch.empty()) {
+    assert(scratch.back() == ' ');
+    scratch.pop_back();
+  }
+  os << scratch;
 }
 
 void printValue(const GenericSignature &value, raw_ostream &os,
@@ -892,11 +921,6 @@ static void printName(raw_ostream &os, DeclName name) {
   else
     os << name;
 }
-
-static void dumpSubstitutionMapRec(
-    ASTDumper &dumper, SubstitutionMap map, StringRef label,
-    SubstitutionMap::DumpStyle style,
-    llvm::SmallPtrSetImpl<const ProtocolConformance *> &visited);
 
 namespace {
   class PrintPattern : public PatternVisitor<PrintPattern, void, StringRef> {
@@ -1419,7 +1443,7 @@ namespace {
 
         if (Clause.Cond)
           childDump.printRec(Clause.Cond);
-        childDump.printRec(Clause.Elements, "elements");
+        childDump.printManyRec(Clause.Elements, "elements");
       }
     }
 
@@ -1492,8 +1516,7 @@ void ParameterList::dump() const {
 }
 
 void ParameterList::dump(raw_ostream &OS, unsigned Indent) const {
-  ASTDumper dumper(nullptr, OS, Indent);
-  PrintDecl(dumper).printParameterList(this, "");
+  ASTDumper(nullptr, OS, Indent).printRec(const_cast<ParameterList*>(this), "");
   llvm::errs() << '\n';
 }
 
@@ -1515,8 +1538,8 @@ void Decl::dump(const char *filename) const {
 }
 
 void Decl::dump(raw_ostream &OS, unsigned Indent) const {
-  ASTDumper dumper(&getASTContext(), OS, Indent);
-  PrintDecl(dumper).visit(const_cast<Decl *>(this), "");
+  ASTDumper(&getASTContext(), OS, Indent)
+    .printRec(const_cast<Decl *>(this), "");
   OS << '\n';
 }
 
@@ -1636,8 +1659,7 @@ void SourceFile::dump(llvm::raw_ostream &OS, bool parseIfNeeded) const {
   if (parseIfNeeded)
     (void)getTopLevelDecls();
 
-  ASTDumper dumper(&getASTContext(), OS);
-  PrintDecl(dumper).visitSourceFile(*this, "");
+  ASTDumper(&getASTContext(), OS).printRec(*const_cast<SourceFile *>(this), "");
   llvm::errs() << '\n';
 }
 
@@ -1652,8 +1674,8 @@ static ASTContext *getASTContextFromType(Type ty) {
 }
 
 void Pattern::dump(raw_ostream &OS, unsigned Indent) const {
-  ASTDumper dumper(getASTContextFromType(getType()), OS, Indent);
-  PrintPattern(dumper).visit(const_cast<Pattern*>(this), "");
+  ASTDumper(getASTContextFromType(getType()), OS, Indent)
+    .printRec(const_cast<Pattern*>(this), "");
   OS << '\n';
 }
 
@@ -1716,7 +1738,7 @@ public:
   void visitIfStmt(IfStmt *S, StringRef Label) {
     auto dump = printCommon(S, "if_stmt", Label);
 
-    dump.printRec(S->getCond(), "conditions");
+    dump.printManyRec(S->getCond(), "conditions");
     dump.printRec(S->getThenStmt(), "then_body");
     if (S->getElseStmt())
       dump.printRec(S->getElseStmt(), "else_body");
@@ -1724,7 +1746,7 @@ public:
 
   void visitGuardStmt(GuardStmt *S, StringRef Label) {
     auto dump = printCommon(S, "guard_stmt", Label);
-    dump.printRec(S->getCond(), "conditions");
+    dump.printManyRec(S->getCond(), "conditions");
     dump.printRec(S->getBody(), "else_body");
   }
 
@@ -1735,7 +1757,7 @@ public:
 
   void visitWhileStmt(WhileStmt *S, StringRef Label) {
     auto dump = printCommon(S, "while_stmt", Label);
-    dump.printRec(S->getCond(), "conditions");
+    dump.printManyRec(S->getCond(), "conditions");
     dump.printRec(S->getBody(), "body");
   }
 
@@ -1782,7 +1804,7 @@ public:
     auto dump = printCommon(S, "switch_stmt", Label);
 
     dump.printRec(S->getSubjectExpr(), "subject");
-    dump.printRec(S->getRawCases(), "cases");
+    dump.printManyRec(S->getRawCases(), "cases");
   }
 
   void visitCaseStmt(CaseStmt *S, StringRef Label) {
@@ -1791,7 +1813,7 @@ public:
     dump.printFlag(S->hasUnknownAttr(), "@unknown");
 
     if (S->hasCaseBodyVariables())
-      dump.printRec(S->getCaseBodyVariables(), "case_body_variables");
+      dump.printManyRec(S->getCaseBodyVariables(), "case_body_variables");
 
     for (const auto &LabelItem : S->getCaseLabelItems()) {
       auto childDump = dump.child("case_label_item", "", StmtColor);
@@ -1826,47 +1848,44 @@ public:
     auto dump = printCommon(S, "do_catch_stmt", Label);
 
     dump.printRec(S->getBody(), "do_body");
-    dump.printRec(S->getCatches(), "catch_clauses");
+    dump.printManyRec(S->getCatches(), "catch_clauses");
   }
 };
 
 } // end anonymous namespace
 
-void ASTNodeDumper::printRec(StmtConditionElement C, StringRef Label) {
+void ASTDumper::printRec(StmtConditionElement C, StringRef Label) {
   switch (C.getKind()) {
   case StmtConditionElement::CK_Boolean:
     return printRec(C.getBoolean(), Label);
 
   case StmtConditionElement::CK_PatternBinding: {
-    auto dump = child("pattern", Label, PatternColor);
+    ASTNodeDumper dump(*this, "pattern", Label, PatternColor);
     dump.printRec(C.getPattern());
     dump.printRec(C.getInitializer());
     break;
   }
 
   case StmtConditionElement::CK_Availability: {
-    auto dump = child("#available", Label, ASTNodeColor);
-    dump.printRec(C.getAvailability()->getQueries(), "queries");
+    ASTNodeDumper dump(*this, "#available", Label, ASTNodeColor);
+    dump.printManyRec(C.getAvailability()->getQueries(), "queries");
     break;
   }
   }
 }
 
-void ASTNodeDumper::printRec(AvailabilitySpec *Query, StringRef Label) {
-  dumper().newLine();
+void ASTDumper::printRec(AvailabilitySpec *Query, StringRef Label) {
   switch (Query->getKind()) {
   case AvailabilitySpecKind::PlatformVersionConstraint:
-    cast<PlatformVersionConstraintAvailabilitySpec>(Query)
-        ->print(dumper().OS, IndentChildren);
+    cast<PlatformVersionConstraintAvailabilitySpec>(Query)->print(OS, Indent);
     break;
   case AvailabilitySpecKind::LanguageVersionConstraint:
   case AvailabilitySpecKind::PackageDescriptionVersionConstraint:
-    cast<PlatformVersionConstraintAvailabilitySpec>(Query)
-        ->print(dumper().OS, IndentChildren);
+    cast<PlatformAgnosticVersionConstraintAvailabilitySpec>(Query)
+        ->print(OS, Indent);
     break;
   case AvailabilitySpecKind::OtherPlatform:
-    cast<OtherPlatformAvailabilitySpec>(Query)
-        ->print(dumper().OS, IndentChildren);
+    cast<OtherPlatformAvailabilitySpec>(Query)->print(OS, Indent);
     break;
   }
 
@@ -1878,8 +1897,8 @@ void Stmt::dump() const {
 }
 
 void Stmt::dump(raw_ostream &OS, const ASTContext *Ctx, unsigned Indent) const {
-  ASTDumper dumper(const_cast<ASTContext *>(Ctx), OS, Indent);
-  PrintStmt(dumper).visit(const_cast<Stmt*>(this), "");
+  ASTDumper(const_cast<ASTContext *>(Ctx), OS, Indent)
+    .printRec(const_cast<Stmt*>(this), "");
 }
 
 //===----------------------------------------------------------------------===//
@@ -2227,7 +2246,7 @@ public:
   void visitDestructureTupleExpr(DestructureTupleExpr *E, StringRef Label) {
     auto dump = printCommon(E, "destructure_tuple_expr", Label);
 
-    dump.printRec(E->getDestructuredElements(), "destructured");
+    dump.printManyRec(E->getDestructuredElements(), "destructured");
     dump.printRec(E->getSubExpr());
     dump.printRec(E->getResultExpr());
   }
@@ -2269,7 +2288,7 @@ public:
   void visitErasureExpr(ErasureExpr *E, StringRef Label) {
     auto dump = printCommon(E, "erasure_expr", Label);
 
-    dump.printRecCycleBreaking(E->getConformances(), "conformances");
+    dump.printManyRecCycleBreaking(E->getConformances(), "conformances");
     dump.printRec(E->getSubExpr());
   }
 
@@ -2840,23 +2859,15 @@ void Expr::dump(raw_ostream &OS, llvm::function_ref<Type(Expr *)> getTypeOfExpr,
                 llvm::function_ref<Type(KeyPathExpr *E, unsigned index)>
                     getTypeOfKeyPathComponent,
                 unsigned Indent) const {
-  ASTDumper dumper(
+  ASTDumper(
       getASTContextFromType(getTypeOfExpr(const_cast<Expr *>(this))), OS,
-      Indent, getTypeOfExpr, getTypeOfTypeRepr, getTypeOfKeyPathComponent);
-  PrintExpr(dumper).visit(const_cast<Expr *>(this), "");
+      Indent, getTypeOfExpr, getTypeOfTypeRepr, getTypeOfKeyPathComponent)
+    .printRec(const_cast<Expr *>(this), "");
 }
 
 void Expr::dump(raw_ostream &OS, unsigned Indent) const {
-  ASTDumper dumper(getASTContextFromType(getType()), OS, Indent);
-  PrintExpr(dumper).visit(const_cast<Expr *>(this), "");
-}
-
-void Expr::print(ASTPrinter &Printer, const PrintOptions &Opts) const {
-  // FIXME: Fully use the ASTPrinter.
-  llvm::SmallString<128> Str;
-  llvm::raw_svector_ostream OS(Str);
-  dump(OS);
-  Printer << OS.str();
+  ASTDumper(getASTContextFromType(getType()), OS, Indent)
+    .printRec(const_cast<Expr *>(this), "");
 }
 
 //===----------------------------------------------------------------------===//
@@ -3024,14 +3035,17 @@ public:
 } // end anonymous namespace
 
 void TypeRepr::dump() const {
-  ASTDumper dumper(nullptr, llvm::errs());
-  PrintTypeRepr(dumper).visit(const_cast<TypeRepr*>(this), "");
+  ASTDumper(nullptr, llvm::errs()).printRec(const_cast<TypeRepr*>(this), "");
   llvm::errs() << '\n';
 }
 
-void dumpRequirement(ASTDumper &dumper, const Requirement &req,
-                     StringRef label) {
-  ASTNodeDumper dump(dumper, "requirement", label, ASTNodeColor);
+//===----------------------------------------------------------------------===//
+// Printing for generic info. Some of these are mutually recursive; we pass
+// a list of visited conformances between them to break cycles.
+//===----------------------------------------------------------------------===//
+
+void ASTDumper::printRec(const Requirement &req, StringRef label) {
+  ASTNodeDumper dump(*this, "requirement", label, ASTNodeColor);
 
   dump.print(req.getFirstType(), "", TypeColor);
   dump.printFlag(req.getKind());
@@ -3041,29 +3055,22 @@ void dumpRequirement(ASTDumper &dumper, const Requirement &req,
     dump.print(req.getSecondType(), "", TypeColor);
 }
 
-// Recursive helpers to avoid infinite recursion for recursive protocol
-// conformances.
-static void dumpProtocolConformanceRec(
-    ASTDumper &dumper, const ProtocolConformance *conformance, StringRef Label,
-    ASTNodeDumper::VisitedConformances &visited);
-
-static void dumpProtocolConformanceRefRec(
-    ASTDumper &dumper, const ProtocolConformanceRef conformance,
-    StringRef label, ASTNodeDumper::VisitedConformances &visited) {
+void ASTDumper::printRecCycleBreaking(const ProtocolConformanceRef conformance,
+                                      StringRef label,
+                                      VisitedConformances &visited) {
   if (conformance.isInvalid()) {
-    (void)ASTNodeDumper(dumper, "invalid_conformance", label, ASTNodeColor);
+    (void)ASTNodeDumper(*this, "invalid_conformance", label, ASTNodeColor);
   } else if (conformance.isConcrete()) {
-    dumpProtocolConformanceRec(dumper, conformance.getConcrete(), label,
-                               visited);
+    printRecCycleBreaking(conformance.getConcrete(), label, visited);
   } else {
-    ASTNodeDumper dump(dumper, "abstract_conformance", label, ASTNodeColor);
+    ASTNodeDumper dump(*this, "abstract_conformance", label, ASTNodeColor);
     dump.printDeclRef(conformance.getAbstract(), "protocol");
   }
 }
 
-static void dumpProtocolConformanceRec(
-    ASTDumper &dumper, const ProtocolConformance *conformance, StringRef label,
-    ASTNodeDumper::VisitedConformances &visited) {
+void ASTDumper::printRecCycleBreaking(ProtocolConformance *conformance,
+                                      StringRef label,
+                                      VisitedConformances &visited) {
   // A recursive conformance shouldn't have its contents printed, or there's
   // infinite recursion. (This also avoids printing things that occur multiple
   // times in a conformance hierarchy.)
@@ -3071,7 +3078,7 @@ static void dumpProtocolConformanceRec(
 
   Optional<ASTNodeDumper> dump;
   auto printCommon = [&](const char *kind) {
-    dump.emplace(dumper, kind, label, ASTNodeColor);
+    dump.emplace(*this, kind, label, ASTNodeColor);
     dump->print(conformance->getType(), "type");
     dump->printDeclRef(conformance->getProtocol(), "protocol");
 
@@ -3080,12 +3087,13 @@ static void dumpProtocolConformanceRec(
   };
   auto printConditionalReqs = [&](Optional<ArrayRef<Requirement>> requirements) {
     if (!requirements) {
-      (void)dump->child("<<conditional requirements unable to be computed>>",
-                        "cond_reqs", ASTNodeColor);
+      (void)dump->child("<<requirements unable to be computed>>",
+                        "conditional", ASTNodeColor);
       return;
     }
 
-    dump->printRec(*requirements, "conditional_requirements");
+    for (auto req : *requirements)
+      dump->printRec(req, "conditional");
   };
 
   switch (conformance->getKind()) {
@@ -3110,15 +3118,16 @@ static void dumpProtocolConformanceRec(
         auto childDump = dump->child("value", "", ASTNodeColor);
         childDump.printNodeName(req);
 
-        childDump.printFlag(!witness, "no_witness");
-        childDump.printFlag(witness && witness.getDecl() == req,
-                            "dynamic_witness");
-        if (witness && witness.getDecl() != req)
+        if (!witness)
+          childDump.print("<<none>>", "witness");
+        else if (witness.getDecl() == req)
+          childDump.print("<<dynamic>>", "witness");
+        else
           childDump.print(witness.getDecl(), "witness");
       });
 
       for (auto sigConf : normal->getSignatureConformances())
-        dump->printRecCycleBreaking(sigConf, "", visited);
+        dump->printRecCycleBreaking(sigConf, "sig_conf", visited);
     }
 
     printConditionalReqs(normal->getConditionalRequirementsIfAvailable());
@@ -3155,13 +3164,12 @@ static void dumpProtocolConformanceRec(
   }
 }
 
-static void dumpSubstitutionMapRec(
-    ASTDumper &dumper, SubstitutionMap map, StringRef label,
-    SubstitutionMap::DumpStyle style,
-    llvm::SmallPtrSetImpl<const ProtocolConformance *> &visited) {
+void ASTDumper::printRecCycleBreaking(SubstitutionMap map, StringRef label,
+                                      VisitedConformances &visited,
+                                      SubstitutionMap::DumpStyle style) {
   auto genericSig = map.getGenericSignature();
 
-  ASTNodeDumper dump(dumper, "substitution_map", label, ASTNodeColor);
+  ASTNodeDumper dump(*this, "substitution_map", label, ASTNodeColor);
   if (genericSig.isNull()) {
     dump.print("<<null>>", "generic_signature");
     return;
@@ -3222,18 +3230,11 @@ void ProtocolConformanceRef::dump() const {
 
 void ProtocolConformanceRef::dump(llvm::raw_ostream &out, unsigned indent,
                                   bool details) const {
-  llvm::SmallPtrSet<const ProtocolConformance *, 8> visited;
+  ASTDumper::VisitedConformances visited;
   if (!details && isConcrete())
     visited.insert(getConcrete());
 
-  ASTDumper dumper(nullptr, out, indent);
-  dumpProtocolConformanceRefRec(dumper, *this, "", visited);
-}
-
-void ProtocolConformanceRef::print(llvm::raw_ostream &out) const {
-  llvm::SmallPtrSet<const ProtocolConformance *, 8> visited;
-  ASTDumper dumper(nullptr, out);
-  dumpProtocolConformanceRefRec(dumper, *this, "", visited);
+  ASTDumper(nullptr, out, indent).printRecCycleBreaking(*this, "", visited);
 }
 
 void ProtocolConformance::dump() const {
@@ -3243,16 +3244,17 @@ void ProtocolConformance::dump() const {
 }
 
 void ProtocolConformance::dump(llvm::raw_ostream &out, unsigned indent) const {
-  llvm::SmallPtrSet<const ProtocolConformance *, 8> visited;
-  ASTDumper dumper(nullptr, out, indent);
-  dumpProtocolConformanceRec(dumper, this, "", visited);
+  ASTDumper::VisitedConformances visited;
+  ASTDumper(nullptr, out, indent)
+      .printRecCycleBreaking(const_cast<ProtocolConformance*>(this), "",
+                             visited);
 }
 
 void SubstitutionMap::dump(llvm::raw_ostream &out, DumpStyle style,
                            unsigned indent) const {
-  llvm::SmallPtrSet<const ProtocolConformance *, 8> visited;
-  ASTDumper dumper(nullptr, out, indent);
-  dumpSubstitutionMapRec(dumper, *this, "", style, visited);
+  ASTDumper::VisitedConformances visited;
+  ASTDumper(nullptr, out, indent)
+      .printRecCycleBreaking(*this, "", visited, style);
 }
 
 void SubstitutionMap::dump() const {
@@ -3261,8 +3263,7 @@ void SubstitutionMap::dump() const {
 }
 
 void Requirement::dump(raw_ostream &out) const {
-  ASTDumper dumper(nullptr, out);
-  dumpRequirement(dumper, *this, "");
+  ASTDumper(nullptr, out).printRec(*this, "");
 }
 void Requirement::dump() const {
   dump(llvm::errs());
@@ -3376,7 +3377,7 @@ namespace {
       if (T->getParent())
         dump.printRec(T->getParent(), "parent");
 
-      dump.printRec(T->getDirectGenericArgs(), "generic_args");
+      dump.printManyRec(T->getDirectGenericArgs(), "generic_args");
     }
 
     void visitParenType(ParenType *T, StringRef label) {
@@ -3659,7 +3660,7 @@ namespace {
                                       StringRef label) {
       auto dump = printCommon("protocol_composition_type", label);
       dump.printFlag(T->hasExplicitAnyObject(), "any_object");
-      dump.printRec(T->getMembers(), "members");
+      dump.printManyRec(T->getMembers(), "members");
     }
 
     void visitLValueType(LValueType *T, StringRef label) {
@@ -3685,7 +3686,7 @@ namespace {
       dump.printDeclRef(T->getDecl(), "decl");
       if (T->getParent())
         dump.printRec(T->getParent(), "parent");
-      dump.printRec(T->getGenericArgs(), "generic_args");
+      dump.printManyRec(T->getGenericArgs(), "generic_args");
     }
 
     void visitBoundGenericClassType(BoundGenericClassType *T, StringRef label) {
@@ -3717,8 +3718,7 @@ void Type::dump(raw_ostream &os, unsigned indent) const {
     return; // not needed for the parser library.
   #endif
 
-  ASTDumper dumper(getASTContextFromType(*this), os, indent);
-  PrintType(dumper).visit(*this, "");
+  ASTDumper(getASTContextFromType(*this), os, indent).printRec(*this, "");
   os << "\n";
 }
 
@@ -3802,55 +3802,27 @@ void StableSerializationPath::dump(llvm::raw_ostream &os) const {
   }
 }
 
-void ASTNodeDumper::printRec(Decl *D, StringRef Label) {
-  dumper().newLine();
-  PrintDecl(*Dumper).visit(D, Label);
+void ASTDumper::printRec(Decl *D, StringRef Label) {
+  PrintDecl(*this).visit(D, Label);
 }
-void ASTNodeDumper::printRec(Expr *E, StringRef Label) {
-  dumper().newLine();
-  PrintExpr(*Dumper).visit(E, Label);
+void ASTDumper::printRec(Expr *E, StringRef Label) {
+  PrintExpr(*this).visit(E, Label);
 }
-void ASTNodeDumper::printRec(Stmt *S, StringRef Label) {
-  dumper().newLine();
-  PrintStmt(*Dumper).visit(S, Label);
+void ASTDumper::printRec(Stmt *S, StringRef Label) {
+  PrintStmt(*this).visit(S, Label);
 }
-void ASTNodeDumper::printRec(TypeRepr *T, StringRef Label) {
-  dumper().newLine();
-  PrintTypeRepr(*Dumper).visit(T, Label);
+void ASTDumper::printRec(TypeRepr *T, StringRef Label) {
+  PrintTypeRepr(*this).visit(T, Label);
 }
-void ASTNodeDumper::printRec(const Pattern *P, StringRef Label) {
-  dumper().newLine();
-  PrintPattern(*Dumper).visit(const_cast<Pattern *>(P), Label);
+void ASTDumper::printRec(const Pattern *P, StringRef Label) {
+  PrintPattern(*this).visit(const_cast<Pattern *>(P), Label);
 }
-void ASTNodeDumper::printRec(Type Ty, StringRef Label) {
-  dumper().newLine();
-  PrintType(*Dumper).visit(Ty, Label);
+void ASTDumper::printRec(Type Ty, StringRef Label) {
+  PrintType(*this).visit(Ty, Label);
 }
-void ASTNodeDumper::printRec(ParameterList *PL, StringRef Label) {
-  dumper().newLine();
-  PrintDecl(*Dumper).printParameterList(PL, Label);
+void ASTDumper::printRec(ParameterList *PL, StringRef Label) {
+  PrintDecl(*this).printParameterList(PL, Label);
 }
-void ASTNodeDumper::printRec(const Requirement req, StringRef Label) {
-  dumper().newLine();
-  dumpRequirement(*Dumper, req, Label);
-}
-
-void ASTNodeDumper::
-printRecCycleBreaking(const ProtocolConformanceRef conf, StringRef Label,
-                      VisitedConformances &visited) {
-  dumper().newLine();
-  dumpProtocolConformanceRefRec(*Dumper, conf, Label, visited);
-}
-void ASTNodeDumper::
-printRecCycleBreaking(const ProtocolConformance *conf, StringRef Label,
-                      VisitedConformances &visited) {
-  dumper().newLine();
-  dumpProtocolConformanceRec(*Dumper, conf, Label, visited);
-}
-void ASTNodeDumper::
-printRecCycleBreaking(SubstitutionMap map, StringRef label,
-                      VisitedConformances &visited) {
-  dumper().newLine();
-  dumpSubstitutionMapRec(*Dumper, map, label, SubstitutionMap::DumpStyle::Full,
-                         visited);
+void ASTDumper::printRec(SourceFile &SF, StringRef Label) {
+  PrintDecl(*this).visitSourceFile(SF, Label);
 }

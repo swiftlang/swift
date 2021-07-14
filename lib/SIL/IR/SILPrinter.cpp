@@ -397,7 +397,7 @@ static void printGenericSpecializationInfo(
     OS << '>';
     OS << " conformances <";
     interleave(Subs.getConformances(),
-               [&](ProtocolConformanceRef conf) { conf.print(OS); },
+               [&](ProtocolConformanceRef conf) { conf.dump(OS); },
                [&] { OS << ", ";});
     OS << '>';
   };

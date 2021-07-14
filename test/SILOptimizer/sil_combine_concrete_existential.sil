@@ -667,8 +667,8 @@ sil @callee2 : $@convention(thin) <τ_0_0 where τ_0_0 : SubscriptionViewControl
 // CHECK:   [[T5:%.*]] = function_ref @callee2 : $@convention(thin) <τ_0_0 where τ_0_0 : SubscriptionViewControllerDelegate> (@in τ_0_0, @thick SubscriptionViewControllerBuilder.Type) -> @owned SubscriptionViewControllerBuilder
 // CHECK:   [[T6:%.*]] = alloc_stack $@opened("E4D92D2A-8893-11EA-9C89-ACDE48001122") ResourceKitProtocol
 // CHECK:   copy_addr [[T4]] to [initialization] [[T6]] : $*@opened("E4D92D2A-8893-11EA-9C89-ACDE48001122") ResourceKitProtocol
-// CHECK: Generic specialization information for call-site callee2 <ResourceKitProtocol> conformances <(inherited_conformance type=ResourceKitProtocol protocol=SubscriptionViewControllerDelegate
-// CHECK:  (normal_conformance type=MyObject protocol=SubscriptionViewControllerDelegate))>:
+// CHECK: Generic specialization information for call-site callee2 <ResourceKitProtocol> conformances <(inherited_conformance type='@opened("{{[^"]+}}") ResourceKitProtocol' protocol='main.(file).SubscriptionViewControllerDelegate@
+// CHECK:  (normal_conformance type='MyObject' protocol='main.(file).SubscriptionViewControllerDelegate@{{[^']*}}'))>:
 // CHECK:   apply [[T5]]<@opened("E4D92D2A-8893-11EA-9C89-ACDE48001122") ResourceKitProtocol>([[T6]], [[T1]])
 
 sil @test_opend_archeype_concrete_conformance_substitution : $@convention(method) (@guaranteed ResourceKitProtocol, @guaranteed ViewController) -> () {

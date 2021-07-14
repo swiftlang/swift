@@ -6,7 +6,7 @@
 // has been assigned a type variable, but the calls inside the body have not.
 
 // CHECK: ---Initial constraints for the given expression---
-// CHECK: (interpolated_string_literal_expr type='$T
+// CHECK: (src=interpolated_string_literal_expr type='$T
 // CHECK-NOT: (call_expr implicit type='$T
 // CHECK: ---Solution---
 
