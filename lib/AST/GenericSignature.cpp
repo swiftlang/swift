@@ -875,8 +875,68 @@ CanGenericSignature::getGenericParams() const{
 ConformanceAccessPath
 GenericSignatureImpl::getConformanceAccessPath(Type type,
                                                ProtocolDecl *protocol) const {
-  return getGenericSignatureBuilder()->getConformanceAccessPath(
-      type, protocol, this);
+  auto computeViaGSB = [&]() {
+    return getGenericSignatureBuilder()->getConformanceAccessPath(
+        type, protocol, this);
+  };
+
+  auto computeViaRQM = [&]() {
+    auto *machine = getRequirementMachine();
+    return machine->getConformanceAccessPath(type, protocol);
+  };
+
+  auto &ctx = getASTContext();
+  if (ctx.LangOpts.EnableRequirementMachine) {
+    auto rqmResult = computeViaRQM();
+
+#ifndef NDEBUG
+    auto gsbResult = computeViaGSB();
+
+    auto compare = [&]() {
+      if (gsbResult.size() != rqmResult.size())
+        return false;
+
+      auto *begin1 = gsbResult.begin();
+      auto *end1 = gsbResult.end();
+      auto *begin2 = rqmResult.begin();
+      auto *end2 = rqmResult.end();
+
+      while (begin1 < end1) {
+        assert(begin2 < end2);
+
+        if (!begin1->first->isEqual(begin2->first))
+          return false;
+        if (begin1->second != begin2->second)
+          return false;
+
+        ++begin1;
+        ++begin2;
+      }
+
+      return true;
+    };
+
+    if (!compare()) {
+      llvm::errs() << "RequirementMachine::getConformanceAccessPath() is broken\n";
+      llvm::errs() << "Generic signature: " << GenericSignature(this) << "\n";
+      llvm::errs() << "Dependent type: "; type.dump(llvm::errs());
+      llvm::errs() << "Protocol: "; protocol->dumpRef(llvm::errs());
+      llvm::errs() << "\n";
+      llvm::errs() << "GenericSignatureBuilder says: ";
+      gsbResult.print(llvm::errs());
+      llvm::errs() << "\n";
+      llvm::errs() << "RequirementMachine says: ";
+      rqmResult.print(llvm::errs());
+      llvm::errs() << "\n\n";
+      getRequirementMachine()->dump(llvm::errs());
+      abort();
+    }
+#endif
+
+    return rqmResult;
+  } else {
+    return computeViaGSB();
+  }
 }
 
 TypeDecl *

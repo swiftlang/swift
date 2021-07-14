@@ -82,11 +82,13 @@ private:
 
   friend class GenericSignatureImpl;
   friend class GenericSignatureBuilder;
+  friend class RequirementMachine;
 
 public:
   typedef const Entry *const_iterator;
   typedef const_iterator iterator;
 
+  unsigned size() const { return path.size(); }
   const_iterator begin() const { return path.begin(); }
   const_iterator end() const { return path.end(); }
 

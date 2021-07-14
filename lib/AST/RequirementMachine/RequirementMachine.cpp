@@ -233,6 +233,17 @@ struct RequirementMachine::Implementation {
   CanGenericSignature Sig;
   bool Complete = false;
 
+  /// All conformance access paths computed so far.
+  llvm::DenseMap<std::pair<CanType, ProtocolDecl *>,
+                 ConformanceAccessPath> ConformanceAccessPaths;
+
+  /// Conformance access paths computed during the last round. All elements
+  /// have the same length. If a conformance access path of greater length
+  /// is requested, we refill CurrentConformanceAccessPaths with all paths of
+  /// length N+1, and add them to the ConformanceAccessPaths map.
+  std::vector<std::pair<CanType, ConformanceAccessPath>>
+      CurrentConformanceAccessPaths;
+
   explicit Implementation(ASTContext &ctx)
       : Context(ctx),
         System(Context),
@@ -746,6 +757,154 @@ Type RequirementMachine::getCanonicalTypeInContext(
     // FIXME: Recursion guard is needed here
     return getCanonicalTypeInContext(substType, genericParams);
   });
+}
+
+/// Replace 'Self' in the given dependent type (\c depTy) with the given
+/// dependent type, producing a type that refers to
+/// the nested type. This limited operation makes sure that it does not
+/// create any new potential archetypes along the way, so it should only be
+/// used in cases where we're reconstructing something that we know exists.
+static Type replaceSelfWithType(Type selfType, Type depTy) {
+  if (auto depMemTy = depTy->getAs<DependentMemberType>()) {
+    Type baseType = replaceSelfWithType(selfType, depMemTy->getBase());
+    assert(depMemTy->getAssocType() && "Missing associated type");
+    return DependentMemberType::get(baseType, depMemTy->getAssocType());
+  }
+
+  assert(depTy->is<GenericTypeParamType>() && "missing Self?");
+  return selfType;
+}
+
+/// Retrieve the conformance access path used to extract the conformance of
+/// interface \c type to the given \c protocol.
+///
+/// \param type The interface type whose conformance access path is to be
+/// queried.
+/// \param protocol A protocol to which \c type conforms.
+///
+/// \returns the conformance access path that starts at a requirement of
+/// this generic signature and ends at the conformance that makes \c type
+/// conform to \c protocol.
+///
+/// \seealso ConformanceAccessPath
+ConformanceAccessPath
+RequirementMachine::getConformanceAccessPath(Type type,
+                                             ProtocolDecl *protocol) {
+  auto canType = getCanonicalTypeInContext(type, { })->getCanonicalType();
+  assert(canType->isTypeParameter());
+
+  // Check if we've already cached the result before doing anything else.
+  auto found = Impl->ConformanceAccessPaths.find(
+      std::make_pair(canType, protocol));
+  if (found != Impl->ConformanceAccessPaths.end()) {
+    return found->second;
+  }
+
+  auto *Stats = Context.Stats;
+
+  FrontendStatsTracer tracer(Stats, "get-conformance-access-path");
+
+  auto recordPath = [&](CanType type, ProtocolDecl *proto,
+                        ConformanceAccessPath path) {
+    // Add the path to the buffer.
+    Impl->CurrentConformanceAccessPaths.emplace_back(type, path);
+
+    // Add the path to the map.
+    auto key = std::make_pair(type, proto);
+    auto inserted = Impl->ConformanceAccessPaths.insert(
+        std::make_pair(key, path));
+    assert(inserted.second);
+    (void) inserted;
+
+    if (Stats)
+      ++Stats->getFrontendCounters().NumConformanceAccessPathsRecorded;
+  };
+
+  // If this is the first time we're asked to look up a conformance access path,
+  // visit all of the root conformance requirements in our generic signature and
+  // add them to the buffer.
+  if (Impl->ConformanceAccessPaths.empty()) {
+    for (const auto &req : Impl->Sig->getRequirements()) {
+      // We only care about conformance requirements.
+      if (req.getKind() != RequirementKind::Conformance)
+        continue;
+
+      auto rootType = CanType(req.getFirstType());
+      auto *rootProto = req.getProtocolDecl();
+
+      ConformanceAccessPath::Entry root(rootType, rootProto);
+      ArrayRef<ConformanceAccessPath::Entry> path(root);
+      ConformanceAccessPath result(Context.AllocateCopy(path));
+
+      recordPath(rootType, rootProto, result);
+    }
+  }
+
+  // We enumerate conformance access paths in lexshort order until we find the
+  // path whose corresponding type canonicalizes to the one we are looking for.
+  while (true) {
+    auto found = Impl->ConformanceAccessPaths.find(
+        std::make_pair(canType, protocol));
+    if (found != Impl->ConformanceAccessPaths.end()) {
+      return found->second;
+    }
+
+    assert(Impl->CurrentConformanceAccessPaths.size() > 0);
+
+    // The buffer consists of all conformance access paths of length N.
+    // Swap it out with an empty buffer, and fill it with all paths of
+    // length N+1.
+    std::vector<std::pair<CanType, ConformanceAccessPath>> oldPaths;
+    std::swap(Impl->CurrentConformanceAccessPaths, oldPaths);
+
+    for (const auto &pair : oldPaths) {
+      const auto &lastElt = pair.second.back();
+      auto *lastProto = lastElt.second;
+
+      // A copy of the current path, populated as needed.
+      SmallVector<ConformanceAccessPath::Entry, 4> entries;
+
+      for (const auto &req : lastProto->getRequirementSignature()) {
+        // We only care about conformance requirements.
+        if (req.getKind() != RequirementKind::Conformance)
+          continue;
+
+        auto nextSubjectType = req.getFirstType()->getCanonicalType();
+        auto *nextProto = req.getProtocolDecl();
+
+        // Compute the canonical anchor for this conformance requirement.
+        auto nextType = replaceSelfWithType(pair.first, nextSubjectType);
+        auto nextCanType = getCanonicalTypeInContext(nextType, { })
+            ->getCanonicalType();
+
+        // Skip "derived via concrete" sources.
+        if (!nextCanType->isTypeParameter())
+          continue;
+
+        // If we've already seen a path for this conformance, skip it and
+        // don't add it to the buffer. Note that because we iterate over
+        // conformance access paths in lexshort order, the existing
+        // conformance access path is shorter than the one we found just now.
+        if (Impl->ConformanceAccessPaths.count(
+                std::make_pair(nextCanType, nextProto)))
+          continue;
+
+        if (entries.empty()) {
+          // Fill our temporary vector.
+          entries.insert(entries.begin(),
+                         pair.second.begin(),
+                         pair.second.end());
+        }
+
+        // Add the next entry.
+        entries.emplace_back(nextSubjectType, nextProto);
+        ConformanceAccessPath result = Context.AllocateCopy(entries);
+        entries.pop_back();
+
+        recordPath(nextCanType, nextProto, result);
+      }
+    }
+  }
 }
 
 /// Compare two associated types.
