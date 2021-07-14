@@ -588,6 +588,14 @@ void swift_defaultActor_enqueue(Job *job, DefaultActor *actor);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 AsyncTask *swift_task_suspend();
 
+/// Do a primitive suspension of the current task, as if part of
+/// a continuation, although this does not provide any of the
+/// higher-level continuation semantics.  The current task is returned;
+/// its ResumeFunction and ResumeContext will need to be initialized,
+/// and then it will need to be enqueued or run as a job later.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+AsyncTask *swift_task_suspend();
+
 /// Prepare a continuation in the current task.
 ///
 /// The caller should initialize the Parent, ResumeParent,
