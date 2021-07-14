@@ -119,27 +119,27 @@ Type TypeBase::mapTypeOutOfContext() {
 }
 
 Type
-GenericSignatureBuilder::EquivalenceClass::getTypeInContext(
-    GenericSignatureBuilder &builder, GenericEnvironment *genericEnv) {
-  auto genericParams = genericEnv->getGenericParams();
+GenericEnvironment::getOrCreateArchetypeFromInterfaceType(
+    GenericSignatureBuilder::EquivalenceClass *equivClass) {
+  auto genericParams = getGenericParams();
 
-  // The anchor descr
-  Type anchor = getAnchor(builder, genericParams);
+  auto &builder = *getGenericSignatureBuilder();
+  Type anchor = equivClass->getAnchor(builder, genericParams);
 
   // If this equivalence class is mapped to a concrete type, produce that
   // type.
-  if (concreteType) {
-    if (recursiveConcreteType)
+  if (equivClass->concreteType) {
+    if (equivClass->recursiveConcreteType)
       return ErrorType::get(anchor);
 
     // Prevent recursive substitution.
-    this->recursiveConcreteType = true;
+    equivClass->recursiveConcreteType = true;
     SWIFT_DEFER {
-      this->recursiveConcreteType = false;
+      equivClass->recursiveConcreteType = false;
     };
 
-    return genericEnv->mapTypeIntoContext(concreteType,
-                                          builder.getLookupConformanceFn());
+    return mapTypeIntoContext(equivClass->concreteType,
+                              builder.getLookupConformanceFn());
   }
 
   // Local function to check whether we have a generic parameter that has
@@ -148,7 +148,7 @@ GenericSignatureBuilder::EquivalenceClass::getTypeInContext(
     auto genericParam = anchor->getAs<GenericTypeParamType>();
     if (!genericParam) return Type();
 
-    auto type = genericEnv->getMappingIfPresent(genericParam);
+    auto type = getMappingIfPresent(genericParam);
     if (!type) return Type();
 
     // We already have a mapping for this generic parameter in the generic
@@ -169,8 +169,8 @@ GenericSignatureBuilder::EquivalenceClass::getTypeInContext(
 
     // Map the parent type into this context.
     parentArchetype =
-      parentEquivClass->getTypeInContext(builder, genericEnv)
-                      ->castTo<ArchetypeType>();
+      getOrCreateArchetypeFromInterfaceType(parentEquivClass)
+        ->castTo<ArchetypeType>();
 
     // If we already have a nested type with this name, return it.
     assocType = depMemTy->getAssocType();
@@ -186,17 +186,17 @@ GenericSignatureBuilder::EquivalenceClass::getTypeInContext(
   }
 
   // Substitute into the superclass.
-  Type superclass = this->recursiveSuperclassType ? Type() : this->superclass;
+  Type superclass = (equivClass->recursiveSuperclassType
+                     ? Type() : equivClass->superclass);
   if (superclass && superclass->hasTypeParameter()) {
     // Prevent recursive substitution.
-    this->recursiveSuperclassType = true;
+    equivClass->recursiveSuperclassType = true;
     SWIFT_DEFER {
-      this->recursiveSuperclassType = false;
+      equivClass->recursiveSuperclassType = false;
     };
 
-    superclass = genericEnv->mapTypeIntoContext(
-                                            superclass,
-                                            builder.getLookupConformanceFn());
+    superclass = mapTypeIntoContext(superclass,
+                                    builder.getLookupConformanceFn());
     if (superclass->is<ErrorType>())
       superclass = Type();
 
@@ -210,10 +210,10 @@ GenericSignatureBuilder::EquivalenceClass::getTypeInContext(
 
   // Collect the protocol conformances for the archetype.
   SmallVector<ProtocolDecl *, 4> protos;
-  for (const auto &conforms : conformsTo) {
+  for (const auto &conforms : equivClass->conformsTo) {
     auto proto = conforms.first;
 
-    if (!isConformanceSatisfiedBySuperclass(proto))
+    if (!equivClass->isConformanceSatisfiedBySuperclass(proto))
       protos.push_back(proto);
   }
 
@@ -223,18 +223,20 @@ GenericSignatureBuilder::EquivalenceClass::getTypeInContext(
     // Create a nested archetype.
     auto *depMemTy = anchor->castTo<DependentMemberType>();
     archetype = NestedArchetypeType::getNew(ctx, parentArchetype, depMemTy,
-                                            protos, superclass, layout);
+                                            protos, superclass,
+                                            equivClass->layout);
 
     // Register this archetype with its parent.
     parentArchetype->registerNestedType(assocType->getName(), archetype);
   } else {
     // Create a top-level archetype.
     auto genericParam = anchor->castTo<GenericTypeParamType>();
-    archetype = PrimaryArchetypeType::getNew(ctx, genericEnv, genericParam,
-                                             protos, superclass, layout);
+    archetype = PrimaryArchetypeType::getNew(ctx, this, genericParam,
+                                             protos, superclass,
+                                             equivClass->layout);
 
     // Register the archetype with the generic environment.
-    genericEnv->addMapping(genericParam, archetype);
+    addMapping(genericParam, archetype);
   }
 
   return archetype;
@@ -263,7 +265,7 @@ void ArchetypeType::resolveNestedType(
     result = concrete;
   } else {
     auto *equivClass = resolved.getEquivalenceClass(builder);
-    result = equivClass->getTypeInContext(builder, genericEnv);
+    result = genericEnv->getOrCreateArchetypeFromInterfaceType(equivClass);
   }
 
   assert(!nested.second ||
@@ -294,7 +296,7 @@ Type QueryInterfaceTypeSubstitutions::operator()(SubstitutableType *type) const{
                                   ArchetypeResolutionKind::CompleteWellFormed);
 
       auto mutableSelf = const_cast<GenericEnvironment *>(self);
-      contextType = equivClass->getTypeInContext(*builder, mutableSelf);
+      contextType = mutableSelf->getOrCreateArchetypeFromInterfaceType(equivClass);
 
       // FIXME: Redundant mapping from key -> index.
       if (self->getContextTypes()[index].isNull())
