@@ -93,9 +93,14 @@ func _checkExpectedExecutor(_filenameStart: Builtin.RawPointer,
     _filenameStart, _filenameLength, _filenameIsASCII, _line, _executor)
 }
 
+// This must take a DispatchQueueShim, not something like AnyObject,
+// or else SILGen will emit a retain/release in unoptimized builds,
+// which won't work because DispatchQueues aren't actually
+// Swift-retainable.
 @available(SwiftStdlib 5.5, *)
 @_silgen_name("swift_task_enqueueOnDispatchQueue")
-internal func _enqueueOnDispatchQueue(_ job: UnownedJob, queue: AnyObject)
+internal func _enqueueOnDispatchQueue(_ job: UnownedJob,
+                                      queue: DispatchQueueShim)
 
 /// Used by the runtime solely for the witness table it produces.
 /// FIXME: figure out some way to achieve that which doesn't generate
@@ -105,13 +110,11 @@ internal func _enqueueOnDispatchQueue(_ job: UnownedJob, queue: AnyObject)
 /// means a dispatch_queue_t, which is not the same as DispatchQueue
 /// on platforms where that is an instance of a wrapper class.
 @available(SwiftStdlib 5.5, *)
-internal class DispatchQueueShim: UnsafeSendable, SerialExecutor {
-  @inlinable
+internal final class DispatchQueueShim: UnsafeSendable, SerialExecutor {
   func enqueue(_ job: UnownedJob) {
     _enqueueOnDispatchQueue(job, queue: self)
   }
 
-  @inlinable
   func asUnownedSerialExecutor() -> UnownedSerialExecutor {
     return UnownedSerialExecutor(ordinary: self)
   }
