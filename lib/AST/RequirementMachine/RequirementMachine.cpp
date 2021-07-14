@@ -637,7 +637,40 @@ RequirementMachine::Implementation::getLongestValidPrefix(const MutableTerm &ter
   return prefix;
 }
 
-/// Unlike the other queries, the input type can be any type, not just a
+/// Unlike most other queries, the input type can be any type, not just a
+/// type parameter.
+///
+/// Returns true if all structural components that are type parameters are
+/// in their canonical form, and are not concrete (in which case they're
+/// not considered canonical, since they can be replaced with their
+/// concrete type).
+bool RequirementMachine::isCanonicalTypeInContext(Type type) const {
+  auto &protos = Impl->System.getProtocols();
+
+  // Look for non-canonical type parameters.
+  return !type.findIf([&](Type component) -> bool {
+    if (!component->isTypeParameter())
+      return false;
+
+    auto term = Impl->Context.getMutableTermForType(component->getCanonicalType(),
+                                                    /*proto=*/nullptr);
+
+    Impl->System.simplify(term);
+    Impl->verify(term);
+
+    auto *equivClass = Impl->Map.lookUpEquivalenceClass(term);
+    if (!equivClass)
+      return false;
+
+    if (equivClass->isConcreteType())
+      return true;
+
+    auto anchor = Impl->Context.getTypeForTerm(term, {}, protos);
+    return CanType(anchor) != CanType(component);
+  });
+}
+
+/// Unlike most other queries, the input type can be any type, not just a
 /// type parameter.
 ///
 /// Replaces all structural components that are type parameters with their

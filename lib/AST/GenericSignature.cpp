@@ -787,8 +787,39 @@ bool GenericSignatureImpl::isCanonicalTypeInContext(Type type) const {
   if (!type->hasTypeParameter())
     return true;
 
-  auto &builder = *getGenericSignatureBuilder();
-  return isCanonicalTypeInContext(type, builder);
+  auto computeViaGSB = [&]() {
+    auto &builder = *getGenericSignatureBuilder();
+    return isCanonicalTypeInContext(type, builder);
+  };
+
+  auto computeViaRQM = [&]() {
+    auto *machine = getRequirementMachine();
+    return machine->isCanonicalTypeInContext(type);
+  };
+
+  auto &ctx = getASTContext();
+  if (ctx.LangOpts.EnableRequirementMachine) {
+    auto rqmResult = computeViaRQM();
+
+#ifndef NDEBUG
+    auto gsbResult = computeViaGSB();
+
+    if (gsbResult != rqmResult) {
+      llvm::errs() << "RequirementMachine::isCanonicalTypeInContext() is broken\n";
+      llvm::errs() << "Generic signature: " << GenericSignature(this) << "\n";
+      llvm::errs() << "Dependent type: "; type.dump(llvm::errs());
+      llvm::errs() << "\n";
+      llvm::errs() << "GenericSignatureBuilder says: " << gsbResult << "\n";
+      llvm::errs() << "RequirementMachine says: " << rqmResult << "\n";
+      getRequirementMachine()->dump(llvm::errs());
+      abort();
+    }
+#endif
+
+    return rqmResult;
+  } else {
+    return computeViaGSB();
+  }
 }
 
 bool GenericSignatureImpl::isCanonicalTypeInContext(

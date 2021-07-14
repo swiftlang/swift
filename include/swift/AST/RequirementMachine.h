@@ -66,6 +66,7 @@ public:
   bool isConcreteType(Type depType) const;
   Type getConcreteType(Type depType) const;
   bool areSameTypeParameterInContext(Type depType1, Type depType2) const;
+  bool isCanonicalTypeInContext(Type type) const;
   Type getCanonicalTypeInContext(Type type,
                       TypeArrayView<GenericTypeParamType> genericParams) const;
   ConformanceAccessPath getConformanceAccessPath(Type type,
