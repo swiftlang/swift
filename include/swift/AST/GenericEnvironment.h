@@ -76,13 +76,12 @@ class alignas(1 << DeclAlignInBits) GenericEnvironment final
   /// generic signature.
   ArrayRef<Type> getContextTypes() const;
 
-  GenericEnvironment(GenericSignature signature,
-                     GenericSignatureBuilder *builder);
+  explicit GenericEnvironment(GenericSignature signature);
 
   friend ArchetypeType;
   friend GenericSignatureBuilder;
   
-  GenericSignatureBuilder *getGenericSignatureBuilder() const { return Builder; }
+  GenericSignatureBuilder *getGenericSignatureBuilder() const;
 
   friend QueryInterfaceTypeSubstitutions;
 
@@ -96,8 +95,7 @@ public:
   /// Create a new, "incomplete" generic environment that will be populated
   /// by calls to \c addMapping().
   static
-  GenericEnvironment *getIncomplete(GenericSignature signature,
-                                    GenericSignatureBuilder *builder);
+  GenericEnvironment *getIncomplete(GenericSignature signature);
 
   /// Add a mapping of a generic parameter to a specific type (which may be
   /// an archetype)

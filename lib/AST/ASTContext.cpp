@@ -4165,8 +4165,7 @@ OpaqueTypeArchetypeType::get(OpaqueTypeDecl *Decl,
   
   // Create a generic environment and bind the opaque archetype to the
   // opaque interface type from the decl's signature.
-  auto *builder = signature->getGenericSignatureBuilder();
-  auto *env = GenericEnvironment::getIncomplete(signature, builder);
+  auto *env = GenericEnvironment::getIncomplete(signature);
   env->addMapping(GenericParamKey(opaqueInterfaceTy), newOpaque);
   newOpaque->Environment = env;
   
@@ -4243,8 +4242,7 @@ GenericEnvironment *OpenedArchetypeType::getGenericEnvironment() const {
   auto &ctx = thisType->getASTContext();
   // Create a generic environment to represent the opened type.
   auto signature = ctx.getOpenedArchetypeSignature(Opened);
-  auto *builder = signature->getGenericSignatureBuilder();
-  auto *env = GenericEnvironment::getIncomplete(signature, builder);
+  auto *env = GenericEnvironment::getIncomplete(signature);
   env->addMapping(signature->getGenericParams()[0], thisType);
   Environment = env;
   
@@ -4399,15 +4397,14 @@ GenericSignature::get(TypeArrayView<GenericTypeParamType> params,
 }
 
 GenericEnvironment *GenericEnvironment::getIncomplete(
-                                             GenericSignature signature,
-                                             GenericSignatureBuilder *builder) {
+                                             GenericSignature signature) {
   auto &ctx = signature->getASTContext();
 
   // Allocate and construct the new environment.
   unsigned numGenericParams = signature->getGenericParams().size();
   size_t bytes = totalSizeToAlloc<Type>(numGenericParams);
   void *mem = ctx.Allocate(bytes, alignof(GenericEnvironment));
-  return new (mem) GenericEnvironment(signature, builder);
+  return new (mem) GenericEnvironment(signature);
 }
 
 void DeclName::CompoundDeclName::Profile(llvm::FoldingSetNodeID &id,

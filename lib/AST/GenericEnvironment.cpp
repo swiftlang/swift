@@ -46,13 +46,22 @@ GenericEnvironment::getGenericParams() const {
   return Signature->getGenericParams();
 }
 
-GenericEnvironment::GenericEnvironment(GenericSignature signature,
-                                       GenericSignatureBuilder *builder)
-  : Signature(signature), Builder(builder)
+GenericEnvironment::GenericEnvironment(GenericSignature signature)
+  : Signature(signature)
 {
   // Clear out the memory that holds the context types.
   std::uninitialized_fill(getContextTypes().begin(), getContextTypes().end(),
                           Type());
+}
+
+GenericSignatureBuilder *GenericEnvironment::getGenericSignatureBuilder() const {
+  if (Builder)
+    return Builder;
+
+  const_cast<GenericEnvironment *>(this)->Builder
+      = Signature->getGenericSignatureBuilder();
+
+  return Builder;
 }
 
 void GenericEnvironment::addMapping(GenericParamKey key,
@@ -122,15 +131,14 @@ Type QueryInterfaceTypeSubstitutions::operator()(SubstitutableType *type) const{
     // If the context type isn't already known, lazily create it.
     Type contextType = self->getContextTypes()[index];
     if (!contextType) {
-      assert(self->Builder &&"Missing generic signature builder for lazy query");
+      auto *builder = self->getGenericSignatureBuilder();
       auto equivClass =
-        self->Builder->resolveEquivalenceClass(
+        builder->resolveEquivalenceClass(
                                   type,
                                   ArchetypeResolutionKind::CompleteWellFormed);
 
       auto mutableSelf = const_cast<GenericEnvironment *>(self);
-      contextType = equivClass->getTypeInContext(*mutableSelf->Builder,
-                                                 mutableSelf);
+      contextType = equivClass->getTypeInContext(*builder, mutableSelf);
 
       // FIXME: Redundant mapping from key -> index.
       if (self->getContextTypes()[index].isNull())
