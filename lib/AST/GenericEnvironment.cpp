@@ -75,7 +75,9 @@ void GenericEnvironment::addMapping(GenericParamKey key,
   assert(genericParams[index] == key && "Bad generic parameter");
 
   // Add the mapping from the generic parameter to the context type.
-  assert(getContextTypes()[index].isNull() && "Already recoded this mapping");
+  assert(getContextTypes()[index].isNull() ||
+         getContextTypes()[index]->is<ErrorType>() &&
+         "Already recoded this mapping");
   getContextTypes()[index] = contextType;
 }
 
@@ -121,6 +123,8 @@ Type TypeBase::mapTypeOutOfContext() {
 Type
 GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
   auto &builder = *getGenericSignatureBuilder();
+  auto &ctx = builder.getASTContext();
+
   auto resolved =
     builder.maybeResolveEquivalenceClass(
                                   depType,
@@ -129,122 +133,86 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
   if (!resolved)
     return ErrorType::get(depType);
 
-  if (auto concrete = resolved.getAsConcreteType())
-    return concrete;
+  if (auto concrete = resolved.getAsConcreteType()) {
+    return mapTypeIntoContext(concrete,
+                              builder.getLookupConformanceFn());
+  }
 
   auto *equivClass = resolved.getEquivalenceClass(builder);
 
   auto genericParams = getGenericParams();
   Type anchor = equivClass->getAnchor(builder, genericParams);
 
-  // If this equivalence class is mapped to a concrete type, produce that
-  // type.
-  if (equivClass->concreteType) {
-    if (equivClass->recursiveConcreteType)
-      return ErrorType::get(anchor);
-
-    // Prevent recursive substitution.
-    equivClass->recursiveConcreteType = true;
-    SWIFT_DEFER {
-      equivClass->recursiveConcreteType = false;
-    };
-
-    return mapTypeIntoContext(equivClass->concreteType,
-                              builder.getLookupConformanceFn());
-  }
-
-  // Local function to check whether we have a generic parameter that has
-  // already been recorded
-  auto getAlreadyRecoveredGenericParam = [&]() -> Type {
-    auto genericParam = anchor->getAs<GenericTypeParamType>();
-    if (!genericParam) return Type();
-
-    auto type = getMappingIfPresent(genericParam);
-    if (!type) return Type();
-
-    // We already have a mapping for this generic parameter in the generic
-    // environment. Return it.
-    return *type;
-  };
-
-  AssociatedTypeDecl *assocType = nullptr;
+  // First, write an ErrorType to the location where this type is cached,
+  // to catch re-entrant lookups that might arise from an invalid generic
+  // signature (eg, <X where X == Array<X>>).
   ArchetypeType *parentArchetype = nullptr;
+  GenericTypeParamType *genericParam = nullptr;
   if (auto depMemTy = anchor->getAs<DependentMemberType>()) {
-    // Map the parent type into this context.
     parentArchetype =
       getOrCreateArchetypeFromInterfaceType(depMemTy->getBase())
         ->getAs<ArchetypeType>();
     if (!parentArchetype)
       return ErrorType::get(depMemTy);
 
-    // If we already have a nested type with this name, return it.
-    assocType = depMemTy->getAssocType();
-    if (auto nested =
-          parentArchetype->getNestedTypeIfKnown(assocType->getName())) {
-      return *nested;
+    auto name = depMemTy->getName();
+    if (auto type = parentArchetype->getNestedTypeIfKnown(name))
+      return *type;
+
+    parentArchetype->registerNestedType(name, ErrorType::get(ctx));
+  } else {
+    genericParam = anchor->castTo<GenericTypeParamType>();
+    if (auto type = getMappingIfPresent(genericParam))
+      return *type;
+    addMapping(genericParam, ErrorType::get(ctx));
+  }
+
+  Type result;
+
+  // If this equivalence class is mapped to a concrete type, produce that
+  // type.
+  if (equivClass->concreteType) {
+    result = mapTypeIntoContext(equivClass->concreteType,
+                                builder.getLookupConformanceFn());
+  } else {
+    // Substitute into the superclass.
+    Type superclass = equivClass->superclass;
+    if (superclass && superclass->hasTypeParameter()) {
+      superclass = mapTypeIntoContext(superclass,
+                                      builder.getLookupConformanceFn());
+      if (superclass->is<ErrorType>())
+        superclass = Type();
     }
 
-    // We will build the archetype below.
-  } else if (auto result = getAlreadyRecoveredGenericParam()) {
-    // Return already-contextualized generic type parameter.
-    return result;
-  }
+    // Collect the protocol conformances for the archetype.
+    SmallVector<ProtocolDecl *, 4> protos;
+    for (const auto &conforms : equivClass->conformsTo) {
+      auto proto = conforms.first;
 
-  // Substitute into the superclass.
-  Type superclass = (equivClass->recursiveSuperclassType
-                     ? Type() : equivClass->superclass);
-  if (superclass && superclass->hasTypeParameter()) {
-    // Prevent recursive substitution.
-    equivClass->recursiveSuperclassType = true;
-    SWIFT_DEFER {
-      equivClass->recursiveSuperclassType = false;
-    };
+      if (!equivClass->isConformanceSatisfiedBySuperclass(proto))
+        protos.push_back(proto);
+    }
 
-    superclass = mapTypeIntoContext(superclass,
-                                    builder.getLookupConformanceFn());
-    if (superclass->is<ErrorType>())
-      superclass = Type();
-
-    // We might have recursively recorded the archetype; if so, return early.
-    // FIXME: This should be detectable before we end up building archetypes.
-    if (auto result = getAlreadyRecoveredGenericParam())
-      return result;
-  }
-
-  // Build a new archetype.
-
-  // Collect the protocol conformances for the archetype.
-  SmallVector<ProtocolDecl *, 4> protos;
-  for (const auto &conforms : equivClass->conformsTo) {
-    auto proto = conforms.first;
-
-    if (!equivClass->isConformanceSatisfiedBySuperclass(proto))
-      protos.push_back(proto);
-  }
-
-  ArchetypeType *archetype;
-  ASTContext &ctx = builder.getASTContext();
-  if (parentArchetype) {
-    // Create a nested archetype.
-    auto *depMemTy = anchor->castTo<DependentMemberType>();
-    archetype = NestedArchetypeType::getNew(ctx, parentArchetype, depMemTy,
+    if (parentArchetype) {
+      auto *depMemTy = anchor->castTo<DependentMemberType>();
+      result = NestedArchetypeType::getNew(ctx, parentArchetype, depMemTy,
+                                           protos, superclass,
+                                           equivClass->layout);
+    } else {
+      result = PrimaryArchetypeType::getNew(ctx, this, genericParam,
                                             protos, superclass,
                                             equivClass->layout);
-
-    // Register this archetype with its parent.
-    parentArchetype->registerNestedType(assocType->getName(), archetype);
-  } else {
-    // Create a top-level archetype.
-    auto genericParam = anchor->castTo<GenericTypeParamType>();
-    archetype = PrimaryArchetypeType::getNew(ctx, this, genericParam,
-                                             protos, superclass,
-                                             equivClass->layout);
-
-    // Register the archetype with the generic environment.
-    addMapping(genericParam, archetype);
+    }
   }
 
-  return archetype;
+  // Cache the new archetype for future lookups.
+  if (auto depMemTy = anchor->getAs<DependentMemberType>()) {
+    parentArchetype->registerNestedType(depMemTy->getName(), result);
+  } else {
+    addMapping(genericParam, result);
+  }
+
+  return result;
 }
 
 void ArchetypeType::resolveNestedType(
@@ -258,7 +226,7 @@ void ArchetypeType::resolveNestedType(
 
   assert(!nested.second ||
          nested.second->isEqual(result) ||
-         (nested.second->hasError() && result->hasError()));
+         nested.second->is<ErrorType>());
   nested.second = result;
 }
 
@@ -275,17 +243,18 @@ Type QueryInterfaceTypeSubstitutions::operator()(SubstitutableType *type) const{
       return Type();
 
     // If the context type isn't already known, lazily create it.
-    Type contextType = self->getContextTypes()[index];
-    if (!contextType) {
-      auto mutableSelf = const_cast<GenericEnvironment *>(self);
-      contextType = mutableSelf->getOrCreateArchetypeFromInterfaceType(type);
+    auto mutableSelf = const_cast<GenericEnvironment *>(self);
+    Type &contextType = mutableSelf->getContextTypes()[index];
+    if (contextType)
+      return contextType;
 
-      // FIXME: Redundant mapping from key -> index.
-      if (self->getContextTypes()[index].isNull())
-        mutableSelf->addMapping(key, contextType);
-    }
+    auto result = mutableSelf->getOrCreateArchetypeFromInterfaceType(type);
 
-    return contextType;
+    assert (!contextType ||
+            contextType->isEqual(result) ||
+            contextType->is<ErrorType>());
+    contextType = result;
+    return result;
   }
 
   return Type();

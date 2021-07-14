@@ -151,6 +151,8 @@ public:
   mapConformanceRefIntoContext(Type conformingType,
                                ProtocolConformanceRef conformance) const;
 
+  /// Returns a substitution map that sends every generic parameter to its
+  /// corresponding archetype in this generic environment.
   SubstitutionMap getForwardingSubstitutionMap() const;
 
   void dump(raw_ostream &os) const;
