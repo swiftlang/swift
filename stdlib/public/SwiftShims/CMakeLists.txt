@@ -25,28 +25,7 @@ set(sources
   _SwiftDistributed.h
 
   DispatchOverlayShims.h
-  ObjectiveCOverlayShims.h
   XCTestOverlayShims.h
-
-  CoreFoundationOverlayShims.h
-  CFCharacterSetShims.h
-  CFHashingShims.h
-
-  FoundationOverlayShims.h
-  FoundationShimSupport.h
-  NSCalendarShims.h
-  NSCharacterSetShims.h
-  NSCoderShims.h
-  NSDataShims.h
-  NSDictionaryShims.h
-  NSErrorShims.h
-  NSFileManagerShims.h
-  NSIndexPathShims.h
-  NSIndexSetShims.h
-  NSKeyedArchiverShims.h
-  NSLocaleShims.h
-  NSTimeZoneShims.h
-  NSUndoManagerShims.h
 
   module.modulemap
   )

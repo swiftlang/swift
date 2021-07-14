@@ -57,3 +57,4 @@ swiftscan_compiler_supported_features_query
 swiftscan_scanner_cache_serialize
 swiftscan_scanner_cache_load
 swiftscan_scanner_cache_reset
+invoke_swift_compiler
