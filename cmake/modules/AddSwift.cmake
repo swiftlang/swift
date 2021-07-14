@@ -464,7 +464,8 @@ function(add_swift_host_library name)
         SHARED
         STATIC
         OBJECT
-        PURE_SWIFT)
+        PURE_SWIFT
+        HAS_LIBSWIFT)
   set(single_parameter_options)
   set(multiple_parameter_options
         LLVM_LINK_COMPONENTS)
@@ -509,6 +510,12 @@ function(add_swift_host_library name)
   endif()
 
   add_library(${name} ${libkind} ${ASHL_SOURCES})
+
+  if (ASHL_HAS_LIBSWIFT AND SWIFT_TOOLS_ENABLE_LIBSWIFT)
+    # Workaround for a linker crash related to autolinking: rdar://77839981
+    set_property(TARGET ${name} APPEND_STRING PROPERTY
+                 LINK_FLAGS " -lobjc ")
+  endif()
 
   # Respect LLVM_COMMON_DEPENDS if it is set.
   #
