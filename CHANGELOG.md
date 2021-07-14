@@ -3,6 +3,19 @@ CHANGELOG
 
 _**Note:** This is in reverse chronological order, so newer entries are added to the top._
 
+Swift Next
+----------
+* [SE-0290][]:
+
+  It is now possible to write inverted availability statements by using the new `#unavailable` keyword:
+
+  ```swift
+  if #unavailable(iOS 15.0) {
+      // Old functionality
+  } else {
+      // iOS 15 functionality 
+  }```
+
 Swift 5.5
 ---------
 
