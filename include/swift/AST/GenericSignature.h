@@ -389,6 +389,9 @@ public:
   ConformanceAccessPath getConformanceAccessPath(Type type,
                                                  ProtocolDecl *protocol) const;
 
+  /// Lookup a nested type with the given name within this type parameter.
+  TypeDecl *lookupNestedType(Type type, Identifier name) const;
+
   /// Get the ordinal of a generic parameter in this generic signature.
   ///
   /// For example, if you have a generic signature for a nested context like:
