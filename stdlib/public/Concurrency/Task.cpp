@@ -89,6 +89,7 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask,
               _swift_get_thread_id(), waitingTask, this);
 #endif
       _swift_tsan_acquire(static_cast<Job *>(this));
+      if (contextIntialized) waitingTask->flagAsRunning();
       // The task is done; we don't need to wait.
       return queueHead.getStatus();
 
@@ -98,7 +99,7 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask,
               _swift_get_thread_id(), waitingTask, this);
 #endif
       _swift_tsan_release(static_cast<Job *>(waitingTask));
-      // Task is now complete. We'll need to add ourselves to the queue.
+      // Task is not complete. We'll need to add ourselves to the queue.
       break;
     }
 
@@ -110,6 +111,7 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask,
       context->successResultPointer = result;
       context->ResumeParent = resumeFn;
       context->Parent = callerContext;
+      waitingTask->flagAsSuspended();
     }
 
     // Put the waiting task at the beginning of the wait queue.
@@ -934,8 +936,16 @@ size_t swift::swift_task_getJobFlags(AsyncTask *task) {
   return task->Flags.getOpaqueValue();
 }
 
-AsyncTask *swift::swift_continuation_init(ContinuationAsyncContext *context,
-                                          AsyncContinuationFlags flags) {
+SWIFT_CC(swift)
+static AsyncTask *swift_task_suspendImpl() {
+  auto task = swift_task_getCurrent();
+  task->flagAsSuspended();
+  return task;
+}
+
+SWIFT_CC(swift)
+static AsyncTask *swift_continuation_initImpl(ContinuationAsyncContext *context,
+                                              AsyncContinuationFlags flags) {
   context->Flags = AsyncContextKind::Continuation;
   if (flags.canThrow()) context->Flags.setCanThrow(true);
   context->ErrorResult = nullptr;
@@ -957,7 +967,61 @@ AsyncTask *swift::swift_continuation_init(ContinuationAsyncContext *context,
   task->ResumeContext = context;
   task->ResumeTask = context->ResumeParent;
 
+  // A preawait immediately suspends the task.
+  if (flags.isPreawaited()) {
+    task->flagAsSuspended();
+  }
+
   return task;
+}
+
+SWIFT_CC(swiftasync)
+static void swift_continuation_awaitImpl(ContinuationAsyncContext *context) {
+#ifndef NDEBUG
+  auto task = swift_task_getCurrent();
+  assert(task && "awaiting continuation without a task");
+  assert(task->ResumeContext == context);
+  assert(task->ResumeTask == context->ResumeParent);
+#endif
+
+  auto &sync = context->AwaitSynchronization;
+
+  auto oldStatus = sync.load(std::memory_order_acquire);
+  assert((oldStatus == ContinuationStatus::Pending ||
+          oldStatus == ContinuationStatus::Resumed) &&
+         "awaiting a corrupt or already-awaited continuation");
+
+  // If the status is already Resumed, we can resume immediately.
+  // Comparing against Pending may be very slightly more compact.
+  if (oldStatus != ContinuationStatus::Pending)
+    // This is fine given how swift_continuation_init sets it up.
+    return context->ResumeParent(context);
+
+  // Load the current task (we alreaady did this in assertions builds).
+#ifdef NDEBUG
+  auto task = swift_task_getCurrent();
+#endif
+
+  // Flag the task as suspended.
+  task->flagAsSuspended();
+
+  // Try to transition to Awaited.
+  bool success =
+    sync.compare_exchange_strong(oldStatus, ContinuationStatus::Awaited,
+                                 /*success*/ std::memory_order_release,
+                                 /*failure*/ std::memory_order_acquire);
+
+  // If that succeeded, we have nothing to do.
+  if (success) return;
+
+  // If it failed, it should be because someone concurrently resumed
+  // (note that the compare-exchange above is strong).
+  assert(oldStatus == ContinuationStatus::Resumed &&
+         "continuation was concurrently corrupted or awaited");
+
+  // Restore the running state of the task and resume it.
+  task->flagAsRunning();
+  return task->runInFullyEstablishedContext();
 }
 
 static void resumeTaskAfterContinuation(AsyncTask *task,

@@ -58,22 +58,7 @@ bb0:
 // CHECK: call swiftcc void @not_async_test()
 
 //   Arrive at the await_async_continuation point.
-// CHECK: [[synchronization_addr_before_await:%.*]] = getelementptr inbounds %swift.continuation_context, %swift.continuation_context* [[cont_context]], i32 0, i32 1
-// CHECK: [[first_at_sync_pt:%.*]] = cmpxchg [[INT]]* [[synchronization_addr_before_await]], {{(i64|i32)}} 0, {{(i64|i32)}} 1 release acquire
-// CHECK: [[first_at_sync_pt_bool:%.*]] = extractvalue { {{(i64|i32)}}, i1 } [[first_at_sync_pt]], 1
-// CHECK: br i1 [[first_at_sync_pt_bool]], label %await.async.abort, label %await.async.resume
-
-//  Abort if we are the first to arrive at the await/or continuation point --
-//  we must wait on the other to arrive.
-// CHECK: await.async.abort:
-// CHECK:  br label %coro.end
-
-// CHECK: coro.end:
-// CHECK:   call i1 (i8*, i1, ...) @llvm.coro.end.async(
-// CHECK:   unreachable
-
-// CHECK: await.async.resume:
-// CHECK:   call { i8* } (i32, i8*, i8*, ...) @llvm.coro.suspend.async{{.*}}({{.*}} @__swift_async_resume_project_context{{.*}}@__swift_suspend_dispatch_1
+// CHECK: [[suspend:%.*]] = call { i8* } (i32, i8*, i8*, ...) @llvm.coro.suspend.async.sl_p0i8s(i32 0, i8* [[resume_intrinsic]], i8* bitcast (i8* (i8*)* @__swift_async_resume_project_context to i8*), i8* bitcast (void (%swift.continuation_context*)* @__swift_continuation_await_point to i8*), %swift.continuation_context* [[cont_context]])
 // CHECK:   [[result_addr_addr:%.*]] = getelementptr inbounds %swift.continuation_context, %swift.continuation_context* [[cont_context]], i32 0, i32 3
 // CHECK:   [[result_addr:%.*]] = load %swift.opaque*, %swift.opaque** [[result_addr_addr]]
 // CHECK:   [[typed_result_addr:%.*]] = bitcast %swift.opaque* [[result_addr]] to i32*
@@ -81,12 +66,15 @@ bb0:
 // CHECK:   br label %[[result_bb:[0-9]+]]
 
 // CHECK: [[result_bb]]:
-// CHECK:   phi i32 [ [[result_value]], %await.async.resume ]
+// CHECK:   phi i32 [ [[result_value]], %entry ]
 
+// CHECK: define {{.*}} void @__swift_continuation_await_point(%swift.continuation_context* %0)
+// CHECK:      {{musttail call swifttailcc|tail call swiftcc}} void @swift_continuation_await(%swift.continuation_context* %0)
+// CHECK-NEXT: ret void
 
-// CHECK: define {{.*}} void @__swift_suspend_dispatch_1(i8* %0, i8* %1)
+// CHECK: define {{.*}} void @__swift_suspend_dispatch_1(i8* %0, %swift.context* %1)
 // CHECK-NOT: define
-// CHECK:  tail call swift{{(tail)?}}cc void %{{.*}}(i8* swiftasync %1)
+// CHECK:  tail call swift{{(tail)?}}cc void %{{.*}}(%swift.context* swiftasync %1)
 // CHECK-NEXT:  ret void
 
 sil @async_continuation : $@async () -> () {
