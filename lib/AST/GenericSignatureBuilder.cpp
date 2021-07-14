@@ -2826,38 +2826,6 @@ PotentialArchetype *PotentialArchetype::getOrCreateNestedType(
   return resultPA;
 }
 
-void ArchetypeType::resolveNestedType(
-                                    std::pair<Identifier, Type> &nested) const {
-  auto genericEnv = getGenericEnvironment();
-  auto &builder = *genericEnv->getGenericSignatureBuilder();
-
-  Type interfaceType = getInterfaceType();
-  Type memberInterfaceType =
-    DependentMemberType::get(interfaceType, nested.first);
-  auto resolved =
-    builder.maybeResolveEquivalenceClass(
-                                  memberInterfaceType,
-                                  ArchetypeResolutionKind::CompleteWellFormed,
-                                  /*wantExactPotentialArchetype=*/false);
-  if (!resolved) {
-    nested.second = ErrorType::get(interfaceType);
-    return;
-  }
-
-  Type result;
-  if (auto concrete = resolved.getAsConcreteType()) {
-    result = concrete;
-  } else {
-    auto *equivClass = resolved.getEquivalenceClass(builder);
-    result = equivClass->getTypeInContext(builder, genericEnv);
-  }
-
-  assert(!nested.second ||
-         nested.second->isEqual(result) ||
-         (nested.second->hasError() && result->hasError()));
-  nested.second = result;
-}
-
 Type GenericSignatureBuilder::PotentialArchetype::getDependentType(
                       TypeArrayView<GenericTypeParamType> genericParams) const {
   auto depType = getDependentType();
