@@ -9,7 +9,8 @@ set(LLVM_EXPORTED_SYMBOL_FILE
 
 add_swift_host_library(libSwiftScan SHARED
   libSwiftScan.cpp
-  c-include-check.c)
+  c-include-check.c
+  HAS_LIBSWIFT)
 
 add_dependencies(libSwiftScan
   clang
