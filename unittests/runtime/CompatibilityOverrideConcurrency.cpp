@@ -116,10 +116,6 @@ TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_job_run) {
   swift_job_run(nullptr, ExecutorRef::generic());
 }
 
-TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_getCurrent) {
-  swift_task_getCurrent();
-}
-
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_getCurrentExecutor) {
   swift_task_getCurrentExecutor();
 }

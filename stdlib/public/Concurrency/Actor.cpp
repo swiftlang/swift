@@ -245,7 +245,7 @@ void swift::runJobInEstablishedExecutorContext(Job *job) {
 }
 
 SWIFT_CC(swift)
-static AsyncTask *swift_task_getCurrentImpl() {
+AsyncTask *swift::swift_task_getCurrent() {
   return ActiveTask::get();
 }
 

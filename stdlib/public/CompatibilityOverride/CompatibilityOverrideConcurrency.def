@@ -78,10 +78,6 @@ OVERRIDE_ACTOR(job_run, void,
                swift::, (class Job *job, ExecutorRef executor),
                (job, executor))
 
-OVERRIDE_ACTOR(task_getCurrent, AsyncTask *,
-               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
-               swift::, ,)
-
 OVERRIDE_ACTOR(task_getCurrentExecutor, ExecutorRef,
                SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                swift::, ,)
