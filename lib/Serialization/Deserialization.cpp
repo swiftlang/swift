@@ -4315,7 +4315,9 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         DEF_VER_TUPLE_PIECES(Introduced);
         DEF_VER_TUPLE_PIECES(Deprecated);
         DEF_VER_TUPLE_PIECES(Obsoleted);
+        DeclID renameDeclID;
         unsigned platform, messageSize, renameSize;
+
         // Decode the record, pulling the version tuple information.
         serialization::decls_block::AvailableDeclAttrLayout::readRecord(
             scratch, isImplicit, isUnavailable, isDeprecated,
@@ -4323,7 +4325,12 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
             LIST_VER_TUPLE_PIECES(Introduced),
             LIST_VER_TUPLE_PIECES(Deprecated),
             LIST_VER_TUPLE_PIECES(Obsoleted),
-            platform, messageSize, renameSize);
+            platform, renameDeclID, messageSize, renameSize);
+
+        ValueDecl *renameDecl = nullptr;
+        if (renameDeclID) {
+          renameDecl = cast<ValueDecl>(MF.getDecl(renameDeclID));
+        }
 
         StringRef message = blobData.substr(0, messageSize);
         blobData = blobData.substr(messageSize);
@@ -4350,7 +4357,7 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
 
         Attr = new (ctx) AvailableAttr(
           SourceLoc(), SourceRange(),
-          (PlatformKind)platform, message, rename,
+          (PlatformKind)platform, message, rename, renameDecl,
           Introduced, SourceRange(),
           Deprecated, SourceRange(),
           Obsoleted, SourceRange(),
@@ -4615,21 +4622,6 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
 
         Attr = SPIAccessControlAttr::create(ctx, SourceLoc(),
                                             SourceRange(), spis);
-        break;
-      }
-
-      case decls_block::CompletionHandlerAsync_DECL_ATTR: {
-        bool isImplicit;
-        uint64_t handlerIndex;
-        uint64_t asyncFunctionDeclID;
-        serialization::decls_block::CompletionHandlerAsyncDeclAttrLayout::
-            readRecord(scratch, isImplicit, handlerIndex, asyncFunctionDeclID);
-
-        auto mappedFunctionDecl =
-            cast<AbstractFunctionDecl>(MF.getDecl(asyncFunctionDeclID));
-        Attr = new (ctx) CompletionHandlerAsyncAttr(
-            *mappedFunctionDecl, handlerIndex, /*handlerIndexLoc*/ SourceLoc(),
-            /*atLoc*/ SourceLoc(), /*range*/ SourceRange(), isImplicit);
         break;
       }
 

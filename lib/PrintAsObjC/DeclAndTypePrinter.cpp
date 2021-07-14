@@ -927,96 +927,11 @@ private:
     return hasPrintedAnything;
   }
 
-  const ValueDecl *getRenameDecl(const ValueDecl *D,
-                                 const ParsedDeclName renamedParsedDeclName) {
-    auto declContext = D->getDeclContext();
-    ASTContext &astContext = D->getASTContext();
-    auto renamedDeclName = renamedParsedDeclName.formDeclNameRef(astContext);
-
-    if (isa<ClassDecl>(D) || isa<ProtocolDecl>(D)) {
-      if (!renamedParsedDeclName.ContextName.empty()) {
-        return nullptr;
-      }
-      SmallVector<ValueDecl *, 1> decls;
-      declContext->lookupQualified(declContext->getParentModule(),
-                                   renamedDeclName.withoutArgumentLabels(),
-                                   NL_OnlyTypes,
-                                   decls);
-      if (decls.size() == 1)
-        return decls[0];
-      return nullptr;
-    }
-
-    TypeDecl *typeDecl = declContext->getSelfNominalTypeDecl();
-
-    const ValueDecl *renamedDecl = nullptr;
-    SmallVector<ValueDecl *, 4> lookupResults;
-    declContext->lookupQualified(typeDecl->getDeclaredInterfaceType(),
-                                 renamedDeclName, NL_QualifiedDefault,
-                                 lookupResults);
-
-    if (lookupResults.size() == 1) {
-      auto candidate = lookupResults[0];
-      if (!shouldInclude(candidate))
-        return nullptr;
-      if (candidate->getKind() != D->getKind() ||
-          (candidate->isInstanceMember() !=
-           cast<ValueDecl>(D)->isInstanceMember()))
-        return nullptr;
-
-      renamedDecl = candidate;
-    } else {
-      for (auto candidate : lookupResults) {
-        if (!shouldInclude(candidate))
-          continue;
-
-        if (candidate->getKind() != D->getKind() ||
-            (candidate->isInstanceMember() !=
-             cast<ValueDecl>(D)->isInstanceMember()))
-          continue;
-
-        if (isa<AbstractFunctionDecl>(candidate)) {
-          auto cParams = cast<AbstractFunctionDecl>(candidate)->getParameters();
-          auto dParams = cast<AbstractFunctionDecl>(D)->getParameters();
-
-          if (cParams->size() != dParams->size())
-            continue;
-
-          bool hasSameParameterTypes = true;
-          for (auto index : indices(*cParams)) {
-            auto cParamsType = cParams->get(index)->getType();
-            auto dParamsType = dParams->get(index)->getType();
-            if (!cParamsType->matchesParameter(dParamsType,
-                                               TypeMatchOptions())) {
-              hasSameParameterTypes = false;
-              break;
-            }
-          }
-
-          if (!hasSameParameterTypes) {
-            continue;
-          }
-        }
-
-        if (renamedDecl) {
-          // If we found a duplicated candidate then we would silently fail.
-          renamedDecl = nullptr;
-          break;
-        }
-        renamedDecl = candidate;
-      }
-    }
-    return renamedDecl;
-  }
-
   void printRenameForDecl(const AvailableAttr *AvAttr, const ValueDecl *D,
                           bool includeQuotes) {
     assert(!AvAttr->Rename.empty());
 
-    const ValueDecl *renamedDecl =
-        getRenameDecl(D, parseDeclName(AvAttr->Rename));
-
-    if (renamedDecl) {
+    if (const ValueDecl *renamedDecl = D->getRenamedDecl()) {
       SmallString<128> scratch;
       auto renamedObjCRuntimeName =
           renamedDecl->getObjCRuntimeName()->getString(scratch);

@@ -2910,6 +2910,11 @@ bool ValueDecl::isDistributedActorIndependent() const {
   return getAttrs().hasAttribute<DistributedActorIndependentAttr>();
 }
 
+ValueDecl *ValueDecl::getRenamedDecl() const {
+  return evaluateOrDefault(getASTContext().evaluator,
+                           RenamedDeclRequest{this}, nullptr);
+}
+
 bool ValueDecl::isObjCDynamicInGenericClass() const {
   if (!isObjCDynamic())
     return false;
@@ -7054,9 +7059,89 @@ bool AbstractFunctionDecl::hasDynamicSelfResult() const {
 }
 
 AbstractFunctionDecl *AbstractFunctionDecl::getAsyncAlternative() const {
-  auto mutableFunc = const_cast<AbstractFunctionDecl *>(this);
-  return evaluateOrDefault(getASTContext().evaluator,
-                           AsyncAlternativeRequest{mutableFunc}, nullptr);
+  // Async functions can't have async alternatives
+  if (hasAsync())
+    return nullptr;
+
+  auto *alternative = dyn_cast_or_null<AbstractFunctionDecl>(getRenamedDecl());
+  if (!alternative || !alternative->hasAsync())
+    return nullptr;
+  return alternative;
+}
+
+static bool isPotentialCompletionHandler(const ParamDecl *param) {
+  if (!param->getType())
+    return false;
+
+  const AnyFunctionType *paramType = param->getType()->getAs<AnyFunctionType>();
+  return paramType && paramType->getResult()->isVoid() &&
+      !paramType->isNoEscape() && !param->isAutoClosure();
+}
+
+Optional<unsigned>
+AbstractFunctionDecl::findPotentialCompletionHandlerParam(
+    AbstractFunctionDecl *asyncAlternative) const {
+  const ParameterList *params = getParameters();
+  if (params->size() == 0)
+    return None;
+
+  // If no async alternative given, just find the last parameter that matches
+  // a completion handler signature
+  if (!asyncAlternative) {
+    for (int i = params->size() - 1; i >= 0; --i) {
+      if (isPotentialCompletionHandler(params->get(i)))
+        return i;
+    }
+    return None;
+  }
+
+  // If this is an imported function with an async convention then we already
+  // have the index, grab it from there
+  auto asyncConvention = asyncAlternative->getForeignAsyncConvention();
+  if (asyncConvention) {
+    auto errorConvention = asyncAlternative->getForeignErrorConvention();
+    unsigned handlerIndex = asyncConvention->completionHandlerParamIndex();
+    if (errorConvention &&
+        !errorConvention->isErrorParameterReplacedWithVoid() &&
+        handlerIndex >= errorConvention->getErrorParameterIndex()) {
+      handlerIndex--;
+    }
+    return handlerIndex;
+  }
+
+  // Otherwise, match up the parameters of each function and return the single
+  // missing parameter that must also match a completion handler signature
+
+  const ParameterList *asyncParams = asyncAlternative->getParameters();
+  if (asyncParams && params->size() != asyncParams->size() + 1)
+    return None;
+
+  unsigned asyncParamIndex = 0;
+  Optional<unsigned> potentialParam;
+  for (const ParamDecl *param : *params) {
+    bool paramMatches = false;
+    if (asyncParamIndex < asyncParams->size()) {
+      const ParamDecl *asyncParam = asyncParams->get(asyncParamIndex);
+      // Don't have types for some reason, just return no match
+      if (!param->getType() || !asyncParam->getType())
+        return None;
+      paramMatches = param->getType()->matchesParameter(asyncParam->getType(),
+                                                        TypeMatchOptions());
+    }
+
+    if (paramMatches) {
+      asyncParamIndex++;
+      continue;
+    }
+
+    if (potentialParam || !isPotentialCompletionHandler(param))
+      return None;
+
+    // Make sure not to increment the param index, since the next sync param
+    // should match the current async
+    potentialParam = asyncParamIndex;
+  }
+  return potentialParam;
 }
 
 bool AbstractFunctionDecl::argumentNameIsAPIByDefault() const {

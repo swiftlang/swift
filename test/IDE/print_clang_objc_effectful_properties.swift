@@ -3,6 +3,7 @@
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -print-module -print-implicit-attrs -source-filename %s -module-to-print=EffectfulProperties -function-definitions=false > %t/EffectfulProperties.printed.txt
 // RUN: %FileCheck -input-file %t/EffectfulProperties.printed.txt %s
 
+// REQUIRES: concurrency
 // REQUIRES: objc_interop
 
 // CHECK-LABEL: class EffProps : NSObject {
@@ -28,7 +29,7 @@
 // CHECK:  func getMainDog(_ completion: @escaping (String) -> Void)
 // CHECK-NEXT:  var mainDogProp: String { get async }
 
-// CHECK:  @completionHandlerAsync("regularMainDog()", completionHandlerIndex: 0)
+// CHECK:       @available(*, renamed: "regularMainDog()")
 // CHECK-NEXT:  func regularMainDog(_ completion: @escaping (String) -> Void)
 // CHECK-NEXT:  @discardableResult
 // CHECK-NEXT:  func regularMainDog() async -> String

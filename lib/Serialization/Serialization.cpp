@@ -2449,6 +2449,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       ENCODE_VER_TUPLE(Deprecated, theAttr->Deprecated)
       ENCODE_VER_TUPLE(Obsoleted, theAttr->Obsoleted)
 
+      auto renameDeclID = S.addDeclRef(theAttr->RenameDecl);
       llvm::SmallString<32> blob;
       blob.append(theAttr->Message);
       blob.append(theAttr->Rename);
@@ -2463,6 +2464,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           LIST_VER_TUPLE_PIECES(Deprecated),
           LIST_VER_TUPLE_PIECES(Obsoleted),
           static_cast<unsigned>(theAttr->Platform),
+          renameDeclID,
           theAttr->Message.size(),
           theAttr->Rename.size(),
           blob);
@@ -2639,21 +2641,6 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       TransposeDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(), origNameId,
           origDeclID, paramIndicesVector);
-      return;
-    }
-
-    case DAK_CompletionHandlerAsync: {
-      auto *attr = cast<CompletionHandlerAsyncAttr>(DA);
-      auto abbrCode =
-          S.DeclTypeAbbrCodes[CompletionHandlerAsyncDeclAttrLayout::Code];
-
-      assert(attr->AsyncFunctionDecl &&
-             "Serializing unresolved completion handler async function decl");
-      auto asyncFuncDeclID = S.addDeclRef(attr->AsyncFunctionDecl);
-
-      CompletionHandlerAsyncDeclAttrLayout::emitRecord(
-          S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(),
-          attr->CompletionHandlerIndex, asyncFuncDeclID);
       return;
     }
     }

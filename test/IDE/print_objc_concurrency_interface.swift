@@ -8,7 +8,7 @@ import _Concurrency
 
 // CHECK-LABEL: class SlowServer : NSObject, ServiceProvider {
 
-// rdar://76685011: Make sure we don't print @completionHandlerAsync in generated interfaces.
-// CHECK-NOT: @completionHandlerAsync
+// rdar://76685011: Make sure we don't print implicit @available in generated interfaces.
+// CHECK-NOT: @available
 // CHECK: func doSomethingSlow(_ operation: String, completionHandler handler: @escaping (Int) -> Void)
 // CHECK: func doSomethingSlow(_ operation: String) async -> Int

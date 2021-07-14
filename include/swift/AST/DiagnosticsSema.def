@@ -3385,32 +3385,6 @@ ERROR(diff_params_clause_param_not_differentiable,none,
       "'Differentiable', but %0 does not conform to 'Differentiable'", (Type))
 
 // completionHanderAsync attribute
-ERROR(attr_completion_handler_async_handler_not_func,none,
-      "'%0' should be attached to a non-async completion-handler function",
-      (DeclAttribute))
-
-NOTE(note_attr_function_declared_async,none,
-     "function declared async", ())
-
-NOTE(note_attr_completion_function_must_return_void,none,
-     "completion handler must return 'Void'", ())
-
-NOTE(note_attr_completion_handler_async_type_is_not_function,none,
-     "%0 is not a function type", (Type))
-
-NOTE(note_attr_completion_handler_async_handler_attr_req,none,
-     "completion handler must%select{ not|}0 be '@%1'",
-     (bool, StringRef))
-
-ERROR(attr_completion_handler_async_handler_out_of_range,none,
-      "completion handler index out of range of the function parameters", ())
-
-ERROR(attr_completion_handler_async_ambiguous_function,none,
-      "ambiguous '%0' async function %1", (DeclAttribute, DeclNameRef))
-
-ERROR(attr_completion_handler_async_no_suitable_function,none,
-      "no corresponding async function named %0", (DeclNameRef))
-
 WARNING(warn_use_async_alternative,none,
         "consider using asynchronous alternative function",())
 

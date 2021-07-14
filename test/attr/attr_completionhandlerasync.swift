@@ -1,157 +1,73 @@
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
 
-// RUN: %target-typecheck-verify-swift -verify-ignore-unknown -enable-experimental-concurrency -I %S/Inputs/custom-modules
-// RUN: %target-typecheck-verify-swift -verify-ignore-unknown -enable-experimental-concurrency -parse-as-library -I %S/Inputs/custom-modules
+// RUN: %target-typecheck-verify-swift -verify-ignore-unknown -I %S/Inputs/custom-modules
+// RUN: %target-typecheck-verify-swift -verify-ignore-unknown -parse-as-library -I %S/Inputs/custom-modules
 
 import ObjcAsync
 
-// ===================
-// Parsing
-// ===================
+@available(*, renamed: "asyncFunc(_:)")
+func goodFunc1(value: String, completionHandler: @escaping (Int) -> Void) {}
+
+@available(*, renamed: "asyncFunc(_:)")
+func goodFunc2(value: String, completionHandler: @escaping (Int) -> Void) {}
+
+// Renamed decl doesn't match any function, so alternative shouldn't be found
+@available(*, renamed: "asyncFunc()")
+func badFunc(value: String, completionHandler: @escaping (Int) -> Void) {}
 
 // expected-note@+1 4 {{'asyncFunc' declared here}}
 func asyncFunc(_ text: String) async -> Int { }
 
-@completionHandlerAsync("asyncFunc(_:)", completionHandlerIndex: 1)
-func goodFunc1(value: String, completionHandler: @escaping (Int) -> Void) {}
-
-@completionHandlerAsync("asyncFunc(_:)")
-func goodFunc2(value: String, completionHandler: @escaping (Int) -> Void) {}
-
-// expected-error@+1{{no corresponding async function named 'asyncFunc()'}}
-@completionHandlerAsync("asyncFunc()")
-func badFunc(value: String, completionHandler: @escaping (Int) -> Void) {}
-
-// expected-error@+1:24{{expected '(' in 'completionHandlerAsync' attribute}}
-@completionHandlerAsync
-func func1() {}
-
-// expected-error@+1:25{{argument of 'completionHandlerAsync' attribute must be an identifier or full function name}}
-@completionHandlerAsync("not+identifier")
-func func2() {}
-
-// expected-error@+1:25{{argument of 'completionHandlerAsync' attribute must be an identifier or full function name}}
-@completionHandlerAsync("$dollarname")
-func func3() {}
-
-// expected-error@+1:25{{argument of 'completionHandlerAsync' attribute must be an identifier or full function name}}
-@completionHandlerAsync("TypePrefix.func")
-func func4() {}
-
-// expected-error@+1{{argument of 'completionHandlerAsync' cannot be an interpolated string literal}}
-@completionHandlerAsync("interpreted \()")
-func func5() {}
-
-@completionHandlerAsync("foo" // expected-error{{expected ')' in 'completionHandlerAsync' attribute}}
-func func6() {}
-
-@completionHandlerAsync("foo", completionHandlerIndex: 2 // expected-error@:57{{expected ')' in 'completionHandlerAsync'}}
-func func7() {}
-
-// expected-error@+1{{'@completionHandlerAsync' attribute cannot be applied to this declaration}}
-@completionHandlerAsync("foo", completionHandlerIndex: 0)
-protocol SomeProto {
-  // expected-error@+1:27{{no corresponding async function named 'protoFunc'}}
-  @completionHandlerAsync("protoFunc", completionHandlerIndex: 0)
-  func protoFunc(continuation: @escaping () -> Void)
-}
-
-// expected-error@+1{{'@completionHandlerAsync' attribute cannot be applied to this declaration}}
-@completionHandlerAsync("foo", completionHandlerIndex: 0)
-struct SomeStruct: SomeProto {
-  // expected-error@+1:27{{no corresponding async function named 'protoFunc'}}
-  @completionHandlerAsync("protoFunc", completionHandlerIndex: 0)
-  func protoFunc(continuation: @escaping () -> Void) {}
+struct SomeStruct {
+  @available(*, renamed: "structFunc")
+  func structFunc(continuation: @escaping () -> Void) { }
 
   // expected-note@+1{{'structFunc()' declared here}}
   func structFunc() async { }
 
-  @completionHandlerAsync("structFunc", completionHandlerIndex: 0)
-  func structFunc(continuation: @escaping () -> Void) { }
-
-  static func staticStructFunc() async { }
-
-  @completionHandlerAsync("staticStructFunc", completionHandlerIndex: 0)
+  @available(*, renamed: "staticStructFunc")
   static func staticStructFunc(completionHandler: @escaping () -> Void) { }
+
+  // expected-note@+1 2 {{'staticStructFunc()' declared here}}
+  static func staticStructFunc() async { }
 }
 
-// expected-error@+1 {{'@completionHandlerAsync' attribute cannot be applied to this declaration}}
-@completionHandlerAsync("foo", completionHandlerIndex: 0)
-class SomeClass: SomeProto {
-  // expected-error@+1:27{{no corresponding async function named 'protoFunc'}}
-  @completionHandlerAsync("protoFunc", completionHandlerIndex: 0)
-  func protoFunc(continuation: @escaping () -> Void) { }
+@available(*, renamed: "overloaded()")
+func asyncOnlyOverload(completionHandler: @escaping () -> Void) { }
+func overloaded() { }
+// expected-note@+1 {{'overloaded()' declared here}}
+func overloaded() async { }
 
-  func classFunc() async { }
+// Renamed decl is ambiguous but the params only match a single case, so we
+// should resolve the function
+@available(*, renamed: "overloadedAsyncFunc(value:)")
+func nonAmbiguousFunc(value: Int, handler: @escaping () -> Void) {}
+// expected-note@+1 {{'overloadedAsyncFunc(value:)' declared here}}
+func overloadedAsyncFunc(value: Int) async {}
+func overloadedAsyncFunc(value: String) async {}
 
-  @completionHandlerAsync("classFunc", completionHandlerIndex: 0)
-  func classFunc(completionHandler: @escaping () -> Void) { }
-}
+// Renamed decl is ambiguous and there's multiple matches, so can't resolve the
+// function
+@available(*, renamed: "asyncFuncDifferentParamNames")
+func ambiguousFunc(value: Int, handler: @escaping () -> Void) {}
+func asyncFuncDifferentParamNames(value: Int) async {}
+func asyncFuncDifferentParamNames(value2: Int) async {}
 
-// ===================
-// Typechecking
-// ===================
+// Renamed decl params don't match, so shouldn't resolved
+@available(*, renamed: "noMatchingParamsIntFunc(value:)")
+func noMatchingParamsFunc(value: Character, handler: @escaping () -> Void) {}
+func noMatchingParamsIntFunc(value: Int) async {}
 
-// expected-error@+1:2{{'@completionHandlerAsync' should be attached to a non-async completion-handler function}}
-@completionHandlerAsync("asyncFunc")
-func typecheckFunc1() async {} // expected-note@:23{{function declared async}}
-
-// expected-error@+1:2{{'@completionHandlerAsync' should be attached to a non-async completion-handler function}}
-@completionHandlerAsync("betterFunc")
-func typecheckFunc2() {}
-
-// expected-error@+2:2{{'@completionHandlerAsync' should be attached to a non-async completion-handler function}}
-// expected-note@+2:55{{'String' is not a function type}}
-@completionHandlerAsync("foo", completionHandlerIndex: 1)
-func typecheckFunc3(value: String, completionHandler: String) {}
-
-// expected-error@+2:2{{'@completionHandlerAsync' should be attached to a non-async completion-handler function}}
-// expected-note@+2:55{{'String' is not a function type}}
-@completionHandlerAsync("foo")
-func typecheckFunc4(value: String, completionHandler: String) {}
-
-// expected-error@+2:2{{'@completionHandlerAsync' should be attached to a non-async completion-handler function}}
-// expected-note@+2:33{{completion handler must return 'Void'}}
-@completionHandlerAsync("betterFunc(param:)")
-func typecheckFunc5(value: Int, completionHandler: @escaping (Int) -> Int) {}
-
-// expected-error@+1:56{{completion handler index out of range of the function parameters}}
-@completionHandlerAsync("foo", completionHandlerIndex: 2)
-func typecheckFunc6(value: Int) { }
-
-// expected-error@+3:2{{'@completionHandlerAsync' should be attached to a non-async completion-handler function}}
-// expected-note@+3:21{{completion handler must return 'Void'}}
-// expected-note@+2:21{{completion handler must be '@escaping'}}
-@completionHandlerAsync("foo", completionHandlerIndex: 0)
-func typecheckFunc7(handler: () -> Int) {}
-
-// expected-error@+3:2{{'@completionHandlerAsync' should be attached to a non-async completion-handler function}}
-// expected-note@+3:21{{completion handler must be '@escaping'}}
-// expected-note@+2:30{{completion handler must not be '@autoclosure'}}
-@completionHandlerAsync("foo")
-func typecheckFunc8(handler: @autoclosure () -> ()) {}
-
-// ===================
-// Decl assignment
-// ===================
-
-// expected-error@+1:25{{no corresponding async function named 'functionThatDoesntExist'}}
-@completionHandlerAsync("functionThatDoesntExist(_:)")
-func typecheckFunc8(handler: @escaping () -> Void) {}
-
-// These two have the same decl name, so they are ambiguous
-func matchingAsyncFunc(value: Int) async {} // expected-note{{'matchingAsyncFunc(value:)' declared here}}
-func matchingAsyncFunc(value: String) async {} // expected-note{{'matchingAsyncFunc(value:)' declared here}}
-
-// expected-error@+1:25{{ambiguous '@completionHandlerAsync' async function 'matchingAsyncFunc(value:)'}}
-@completionHandlerAsync("matchingAsyncFunc(value:)")
-func typecheckFunc9(handler: @escaping () -> Void) {}
+// Matching function isn't async, so shouldn't be resolved
+@available(*, renamed: "noMatchingSyncFunc(value:)")
+func noMatchingAsyncFunc(value: Int, handler: @escaping () -> Void) {}
+func noMatchingSyncFunc(value: Int) {}
 
 // Suggest using async alternative function in async context
 
 func asyncContext(t: HandlerTest) async {
-  // expected-warning@+1:3{{consider using asynchronous alternative function}}
+  // expected-warning@+1{{consider using asynchronous alternative function}}
   goodFunc1(value: "Hello") { _ in }
 
   let _ = {
@@ -167,9 +83,18 @@ func asyncContext(t: HandlerTest) async {
 
   let _ = await asyncFunc("World")
 
-  // This doesn't get the warning because the completionHandlerAsync failed to
-  // resolve the decl name
+  // expected-warning@+1{{consider using asynchronous alternative function}}
+  asyncOnlyOverload() { }
+
+  // expected-warning@+1{{consider using asynchronous alternative function}}
+  nonAmbiguousFunc(value: 1) { }
+
+  // These don't get the warning because we failed to resolve the name to a
+  // single async decl
   badFunc(value: "Hello") { _ in }
+  ambiguousFunc(value: 1) { }
+  noMatchingParamsFunc(value: "c") { }
+  noMatchingAsyncFunc(value: 1) { }
 
   // expected-warning@+1{{consider using asynchronous alternative function}}
   t.simple { _ in }
@@ -211,13 +136,13 @@ func syncContext(t: HandlerTest) {
 }
 
 let asyncGlobalClosure = { () async -> () in
-  // expected-warning@+1:3{{consider using asynchronous alternative function}}
+  // expected-warning@+1{{consider using asynchronous alternative function}}
   goodFunc1(value: "neat") { _ in }
 }
 
 class ClassCallingAsyncStuff {
   struct NestedStruct {
-    @completionHandlerAsync("structFunc()")
+    @available(*, renamed: "structFunc()")
     func structCompFunc(handler: @escaping () -> ()) { }
 
     // expected-note@+1{{'structFunc()' declared here}}
@@ -227,10 +152,10 @@ class ClassCallingAsyncStuff {
   // expected-note@+1 4 {{'asyncFunc()' declared here}}
   func asyncFunc() async {}
 
-  @completionHandlerAsync("asyncFunc()")
+  @available(*, renamed: "asyncFunc()")
   func compHandlerFunc(handler: @escaping () -> ()) {}
 
-  @completionHandlerAsync("asyncFunc()")
+  @available(*, renamed: "asyncFunc()")
   func compAsyncHandlerFunc(handler: @escaping () async -> ()) {}
 
   func async1() async {
@@ -263,6 +188,12 @@ class ClassCallingAsyncStuff {
   func structFunc(other: SomeStruct) async {
     // expected-warning@+1{{consider using asynchronous alternative function}}
     other.structFunc() { }
+
+    // expected-warning@+1{{consider using asynchronous alternative function}}
+    SomeStruct.staticStructFunc { }
+
+    // expected-warning@+1{{consider using asynchronous alternative function}}
+    type(of: other).staticStructFunc { }
   }
 
   // no warning
