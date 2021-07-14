@@ -119,11 +119,22 @@ Type TypeBase::mapTypeOutOfContext() {
 }
 
 Type
-GenericEnvironment::getOrCreateArchetypeFromInterfaceType(
-    GenericSignatureBuilder::EquivalenceClass *equivClass) {
-  auto genericParams = getGenericParams();
-
+GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
   auto &builder = *getGenericSignatureBuilder();
+  auto resolved =
+    builder.maybeResolveEquivalenceClass(
+                                  depType,
+                                  ArchetypeResolutionKind::CompleteWellFormed,
+                                  /*wantExactPotentialArchetype=*/false);
+  if (!resolved)
+    return ErrorType::get(depType);
+
+  if (auto concrete = resolved.getAsConcreteType())
+    return concrete;
+
+  auto *equivClass = resolved.getEquivalenceClass(builder);
+
+  auto genericParams = getGenericParams();
   Type anchor = equivClass->getAnchor(builder, genericParams);
 
   // If this equivalence class is mapped to a concrete type, produce that
@@ -159,18 +170,12 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(
   AssociatedTypeDecl *assocType = nullptr;
   ArchetypeType *parentArchetype = nullptr;
   if (auto depMemTy = anchor->getAs<DependentMemberType>()) {
-    // Resolve the equivalence class of the parent.
-    auto parentEquivClass =
-      builder.resolveEquivalenceClass(
-                          depMemTy->getBase(),
-                          ArchetypeResolutionKind::CompleteWellFormed);
-    if (!parentEquivClass)
-      return ErrorType::get(anchor);
-
     // Map the parent type into this context.
     parentArchetype =
-      getOrCreateArchetypeFromInterfaceType(parentEquivClass)
-        ->castTo<ArchetypeType>();
+      getOrCreateArchetypeFromInterfaceType(depMemTy->getBase())
+        ->getAs<ArchetypeType>();
+    if (!parentArchetype)
+      return ErrorType::get(depMemTy);
 
     // If we already have a nested type with this name, return it.
     assocType = depMemTy->getAssocType();
@@ -244,29 +249,12 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(
 
 void ArchetypeType::resolveNestedType(
                                     std::pair<Identifier, Type> &nested) const {
-  auto genericEnv = getGenericEnvironment();
-  auto &builder = *genericEnv->getGenericSignatureBuilder();
-
   Type interfaceType = getInterfaceType();
   Type memberInterfaceType =
-    DependentMemberType::get(interfaceType, nested.first);
-  auto resolved =
-    builder.maybeResolveEquivalenceClass(
-                                  memberInterfaceType,
-                                  ArchetypeResolutionKind::CompleteWellFormed,
-                                  /*wantExactPotentialArchetype=*/false);
-  if (!resolved) {
-    nested.second = ErrorType::get(interfaceType);
-    return;
-  }
+      DependentMemberType::get(interfaceType, nested.first);
 
-  Type result;
-  if (auto concrete = resolved.getAsConcreteType()) {
-    result = concrete;
-  } else {
-    auto *equivClass = resolved.getEquivalenceClass(builder);
-    result = genericEnv->getOrCreateArchetypeFromInterfaceType(equivClass);
-  }
+  Type result = getGenericEnvironment()->getOrCreateArchetypeFromInterfaceType(
+      memberInterfaceType);
 
   assert(!nested.second ||
          nested.second->isEqual(result) ||
@@ -289,14 +277,8 @@ Type QueryInterfaceTypeSubstitutions::operator()(SubstitutableType *type) const{
     // If the context type isn't already known, lazily create it.
     Type contextType = self->getContextTypes()[index];
     if (!contextType) {
-      auto *builder = self->getGenericSignatureBuilder();
-      auto equivClass =
-        builder->resolveEquivalenceClass(
-                                  type,
-                                  ArchetypeResolutionKind::CompleteWellFormed);
-
       auto mutableSelf = const_cast<GenericEnvironment *>(self);
-      contextType = mutableSelf->getOrCreateArchetypeFromInterfaceType(equivClass);
+      contextType = mutableSelf->getOrCreateArchetypeFromInterfaceType(type);
 
       // FIXME: Redundant mapping from key -> index.
       if (self->getContextTypes()[index].isNull())
