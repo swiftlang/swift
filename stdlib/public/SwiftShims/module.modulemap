@@ -22,38 +22,27 @@ module SwiftShims {
   export *
 }
 
+module _SwiftConcurrencyShims {
+  header "_SwiftConcurrency.h"
+}
+
 module SwiftOverlayShims {
   header "LibcOverlayShims.h"
   export *
 }
 
-// Various headers used to build overlays on Apple platforms.
+
+// Obsolete overlay shims on Apple platforms.
 // Note: These deliberately do not use "export *" to avoid circularity issues
 // (overlay -> shims -> framework -> overlay)
-// FIXME: These are only needed when building each overlay; they declare no
-// types and therefore would not strictly need to be present in an installed
-// Swift.
-// FIXME: These are not used at all on non-Apple platforms.
+
+// NOTE: These are obsolete and should never be imported into any project.
+// They are going to be removed in a future compiler release.
+
 module _SwiftDispatchOverlayShims {
   header "DispatchOverlayShims.h"
 }
 
-module _SwiftObjectiveCOverlayShims {
-  header "ObjectiveCOverlayShims.h"
-}
-
 module _SwiftXCTestOverlayShims {
   header "XCTestOverlayShims.h"
-}
-
-module _SwiftCoreFoundationOverlayShims {
-  header "CoreFoundationOverlayShims.h"
-}
-
-module _SwiftFoundationOverlayShims {
-  header "FoundationOverlayShims.h"
-}
-
-module _SwiftConcurrencyShims {
-  header "_SwiftConcurrency.h"
 }
