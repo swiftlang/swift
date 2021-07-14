@@ -237,11 +237,6 @@ public:
     Type getAnchor(GenericSignatureBuilder &builder,
                    TypeArrayView<GenericTypeParamType> genericParams);
 
-    /// Retrieve (or build) the contextual type corresponding to
-    /// this equivalence class within the given generic environment.
-    Type getTypeInContext(GenericSignatureBuilder &builder,
-                          GenericEnvironment *genericEnv);
-
     /// Dump a debugging representation of this equivalence class,
     void dump(llvm::raw_ostream &out,
               GenericSignatureBuilder *builder = nullptr) const;
