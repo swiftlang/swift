@@ -251,3 +251,37 @@ sil [ossa] @append_contentsOf_int : $@convention(thin) () -> () {
   return %19 : $()
 }
 
+// Ignore an invalid negative index without crashing.
+//
+// CHECK-LABEL: sil [ossa] @negative_index
+// CHECK: store %{{[0-9]+}} to [trivial]
+// CHECK: [[GETF:%.*]] = function_ref @getElement : $@convention(method) (MyInt, MyBool, _MyDependenceToken, @guaranteed MyArray<MyInt>) -> MyInt
+// CHECK: apply [[GETF]](%15, %17, %19, %7) : $@convention(method) (MyInt, MyBool, _MyDependenceToken, @guaranteed MyArray<MyInt>) -> MyInt
+// CHECK-LABEL: // end sil function 'negative_index'
+sil [ossa] @negative_index : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @swift_bufferAllocate : $@convention(thin) () -> @owned AnyObject // user: %3
+  %1 = integer_literal $Builtin.Int64, 1
+  %2 = struct $MyInt (%1 : $Builtin.Int64)
+  %3 = apply %0() : $@convention(thin) () -> @owned AnyObject
+  %4 = metatype $@thin MyArray<MyInt>.Type
+  %5 = function_ref @adoptStorage : $@convention(thin) (@owned AnyObject, MyInt, @thin MyArray<MyInt>.Type) -> @owned (MyArray<MyInt>, UnsafeMutablePointer<MyInt>)
+  %6 = apply %5(%3, %2, %4) : $@convention(thin) (@owned AnyObject, MyInt, @thin MyArray<MyInt>.Type) -> @owned (MyArray<MyInt>, UnsafeMutablePointer<MyInt>)
+  (%7, %8) = destructure_tuple %6 : $(MyArray<MyInt>, UnsafeMutablePointer<MyInt>)
+  %9 = struct_extract %8 : $UnsafeMutablePointer<MyInt>, #UnsafeMutablePointer._rawValue
+  %10 = pointer_to_address %9 : $Builtin.RawPointer to [strict] $*MyInt
+  %11 = integer_literal $Builtin.Int64, 0
+  %12 = struct $MyInt (%11 : $Builtin.Int64)
+  store %12 to [trivial] %10 : $*MyInt
+  %14 = integer_literal $Builtin.Int64, -1
+  %15 = struct $MyInt (%14 : $Builtin.Int64)
+  %16 = function_ref @hoistableIsNativeTypeChecked : $@convention(method) (@guaranteed MyArray<MyInt>) -> MyBool
+  %17 = apply %16(%7) : $@convention(method) (@guaranteed MyArray<MyInt>) -> MyBool
+  %18 = function_ref @checkSubscript : $@convention(method) (MyInt, MyBool, @guaranteed MyArray<MyInt>) -> _MyDependenceToken
+  %19 = apply %18(%12, %17, %7) : $@convention(method) (MyInt, MyBool, @guaranteed MyArray<MyInt>) -> _MyDependenceToken
+  %20 = function_ref @getElement : $@convention(method) (MyInt, MyBool, _MyDependenceToken, @guaranteed MyArray<MyInt>) -> MyInt
+  %21 = apply %20(%15, %17, %19, %7) : $@convention(method) (MyInt, MyBool, _MyDependenceToken, @guaranteed MyArray<MyInt>) -> MyInt
+  destroy_value %7 : $MyArray<MyInt>
+  %23 = tuple ()
+  return %23 : $()
+}
