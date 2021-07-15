@@ -823,7 +823,7 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
   // signature: when witness generic signature has same-type requirements
   // binding all generic parameters to concrete types, VJP function type uses
   // all the concrete types and VJP generic signature is null.
-  auto witnessCanGenSig = witness->getDerivativeGenericSignature()->getCanonicalSignature();
+  auto witnessCanGenSig = witness->getDerivativeGenericSignature().getCanonicalSignature();
   auto lookupConformance = LookUpConformanceInModule(module.getSwiftModule());
 
   // Given a type, returns its formal SIL parameter info.
@@ -983,8 +983,7 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
   // Do not use witness generic signature, which may have same-type requirements
   // binding all generic parameters to concrete types.
   auto pbGenericSig = vjp->getLoweredFunctionType()->getSubstGenericSignature();
-  auto *pbGenericEnv =
-      pbGenericSig ? pbGenericSig->getGenericEnvironment() : nullptr;
+  auto *pbGenericEnv = pbGenericSig.getGenericEnvironment();
   auto pbType = SILFunctionType::get(
       pbGenericSig, SILExtInfo::getThin(), origTy->getCoroutineKind(),
       origTy->getCalleeConvention(), pbParams, {}, adjResults, None,

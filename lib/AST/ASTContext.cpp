@@ -1894,7 +1894,7 @@ GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
 
 RequirementMachine *ASTContext::getOrCreateRequirementMachine(
     CanGenericSignature sig) {
-  assert(!sig->hasTypeVariable());
+  assert(!sig.hasTypeVariable());
 
   auto &rewriteCtx = getImpl().TheRewriteContext;
   if (!rewriteCtx)

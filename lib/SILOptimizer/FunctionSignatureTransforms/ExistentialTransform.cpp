@@ -628,7 +628,7 @@ void ExistentialTransform::createExistentialSpecializedFunction() {
     NewF = CachedFn;
   } else {
     auto NewFGenericSig = NewFTy->getInvocationGenericSignature();
-    auto NewFGenericEnv = NewFGenericSig->getGenericEnvironment();
+    auto NewFGenericEnv = NewFGenericSig.getGenericEnvironment();
     SILLinkage linkage = getSpecializedLinkage(F, F->getLinkage());
 
     NewF = FunctionBuilder.createFunction(

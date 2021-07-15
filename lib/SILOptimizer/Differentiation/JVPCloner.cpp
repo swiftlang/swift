@@ -1691,8 +1691,7 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
   // binding all generic parameters to concrete types.
   auto diffGenericSig =
       jvp->getLoweredFunctionType()->getSubstGenericSignature();
-  auto *diffGenericEnv =
-      diffGenericSig ? diffGenericSig->getGenericEnvironment() : nullptr;
+  auto *diffGenericEnv = diffGenericSig.getGenericEnvironment();
   auto diffType = SILFunctionType::get(
       diffGenericSig, SILExtInfo::getThin(), origTy->getCoroutineKind(),
       origTy->getCalleeConvention(), dfParams, {}, dfResults, None,

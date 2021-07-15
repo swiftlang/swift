@@ -246,8 +246,7 @@ SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
   
   if (F->empty()) {
     // Emit the implementation.
-    if (sig)
-      F->setGenericEnvironment(sig->getGenericEnvironment());
+    F->setGenericEnvironment(sig.getGenericEnvironment());
 
     SILGenFunction SGF(*this, *F, SwiftModule);
     {
@@ -508,8 +507,7 @@ SILFunction *SILGenModule::getOrCreateDerivativeVTableThunk(
   if (!thunk->empty())
     return thunk;
 
-  if (auto genSig = constantTy->getSubstGenericSignature())
-    thunk->setGenericEnvironment(genSig->getGenericEnvironment());
+  thunk->setGenericEnvironment(constantTy->getSubstGenericSignature().getGenericEnvironment());
   SILGenFunction SGF(*this, *thunk, SwiftModule);
   SmallVector<ManagedValue, 4> params;
   auto loc = derivativeFnDeclRef.getAsRegularLocation();

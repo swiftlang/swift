@@ -547,7 +547,7 @@ namespace {
       }
 
       auto sig = gft->getGenericSignature();
-      auto *env = sig->getGenericEnvironment();
+      auto *env = sig.getGenericEnvironment();
 
       witnessType = FunctionType::get(gft->getParams(),
                                       gft->getResult(),

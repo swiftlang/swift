@@ -915,7 +915,7 @@ getGenericEnvironmentAndSignatureWithRequirements(
         OrigGenSig.getPointer(), { }, std::move(RequirementsCopy)},
       GenericSignature());
 
-  auto NewGenEnv = NewGenSig->getGenericEnvironment();
+  auto NewGenEnv = NewGenSig.getGenericEnvironment();
   return { NewGenEnv, NewGenSig };
 }
 
@@ -1261,7 +1261,7 @@ public:
         M(M), SM(M.getSwiftModule()), Ctx(M.getASTContext()) {
 
     // Create the new generic signature using provided requirements.
-    SpecializedGenericEnv = SpecializedGenericSig->getGenericEnvironment();
+    SpecializedGenericEnv = SpecializedGenericSig.getGenericEnvironment();
 
     // Compute SubstitutionMaps required for re-mapping.
 
@@ -1585,7 +1585,7 @@ FunctionSignaturePartialSpecializer::
       Ctx.evaluator,
       AbstractGenericSignatureRequest{nullptr, AllGenericParams, AllRequirements},
       GenericSignature());
-  auto GenEnv = GenSig ? GenSig->getGenericEnvironment() : nullptr;
+  auto *GenEnv = GenSig.getGenericEnvironment();
   return { GenEnv, GenSig };
 }
 

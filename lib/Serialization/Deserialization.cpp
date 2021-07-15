@@ -5365,7 +5365,7 @@ public:
       MF.fatal();
 
     Type interfaceType = GenericTypeParamType::get(depth, index, ctx);
-    Type contextType = sig->getGenericEnvironment()
+    Type contextType = sig.getGenericEnvironment()
         ->mapTypeIntoContext(interfaceType);
 
     if (contextType->hasError())

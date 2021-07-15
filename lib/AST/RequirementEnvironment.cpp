@@ -138,12 +138,9 @@ RequirementEnvironment::RequirementEnvironment(
   if (!covariantSelf &&
       reqSig.getGenericParams().size() == 1 &&
       reqSig.getRequirements().size() == 1) {
-    syntheticSignature = conformanceDC->getGenericSignatureOfContext();
-    if (syntheticSignature) {
-      syntheticSignature = syntheticSignature.getCanonicalSignature();
-      syntheticEnvironment =
-        syntheticSignature->getGenericEnvironment();
-    }
+    syntheticSignature = conformanceDC->getGenericSignatureOfContext().getCanonicalSignature();
+    syntheticEnvironment =
+      syntheticSignature.getGenericEnvironment();
 
     return;
   }
@@ -217,5 +214,5 @@ RequirementEnvironment::RequirementEnvironment(
       AbstractGenericSignatureRequest{
         nullptr, std::move(genericParamTypes), std::move(requirements)},
       GenericSignature());
-  syntheticEnvironment = syntheticSignature->getGenericEnvironment();
+  syntheticEnvironment = syntheticSignature.getGenericEnvironment();
 }

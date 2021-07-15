@@ -236,7 +236,7 @@ PolymorphicConvention::PolymorphicConvention(IRGenModule &IGM,
 
 void PolymorphicConvention::addPseudogenericFulfillments() {
   enumerateRequirements([&](GenericRequirement reqt) {
-    auto archetype = Generics->getGenericEnvironment()
+    auto archetype = Generics.getGenericEnvironment()
                         ->mapTypeIntoContext(reqt.TypeParameter)
                         ->getAs<ArchetypeType>();
     assert(archetype && "did not get an archetype by mapping param?");

@@ -902,7 +902,7 @@ Type TypeResolution::applyUnboundGenericArguments(
     for (auto gp : genericSig.getGenericParams()) {
       subs[gp->getCanonicalType()->castTo<GenericTypeParamType>()] =
           (usesArchetypes()
-           ? genericSig->getGenericEnvironment()->mapTypeIntoContext(gp)
+           ? genericSig.getGenericEnvironment()->mapTypeIntoContext(gp)
            : gp);
     }
   }

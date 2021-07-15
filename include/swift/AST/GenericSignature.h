@@ -198,6 +198,11 @@ public:
 
   /// Whether this generic signature involves a type variable.
   bool hasTypeVariable() const;
+
+  /// Returns the generic environment that provides fresh contextual types
+  /// (archetypes) that correspond to the interface types in this generic
+  /// signature.
+  GenericEnvironment *getGenericEnvironment() const;
 };
 
 /// A reference to a canonical generic signature.
@@ -316,11 +321,6 @@ public:
 
   /// Retrieve the requirement machine for the given generic signature.
   RequirementMachine *getRequirementMachine() const;
-
-  /// Returns the generic environment that provides fresh contextual types
-  /// (archetypes) that correspond to the interface types in this generic
-  /// signature.
-  GenericEnvironment *getGenericEnvironment() const;
 
   /// Collects a set of requirements on a type parameter. Used by
   /// GenericEnvironment for building archetypes.
@@ -456,6 +456,11 @@ private:
 
   /// Returns the canonical generic signature. The result is cached.
   CanGenericSignature getCanonicalSignature() const;
+
+  /// Returns the generic environment that provides fresh contextual types
+  /// (archetypes) that correspond to the interface types in this generic
+  /// signature.
+  GenericEnvironment *getGenericEnvironment() const;
 };
 
 void simple_display(raw_ostream &out, GenericSignature sig);

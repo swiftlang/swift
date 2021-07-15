@@ -4517,9 +4517,7 @@ IndexSubset *DifferentiableAttributeTypeCheckRequest::evaluate(
   if (resolveDifferentiableAttrDerivativeGenericSignature(attr, original,
                                                           derivativeGenSig))
     return nullptr;
-  GenericEnvironment *derivativeGenEnv = nullptr;
-  if (derivativeGenSig)
-    derivativeGenEnv = derivativeGenSig->getGenericEnvironment();
+  auto *derivativeGenEnv = derivativeGenSig.getGenericEnvironment();
 
   // Compute the derivative function type.
   auto originalFnRemappedTy = originalFnTy;

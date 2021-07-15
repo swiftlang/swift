@@ -435,11 +435,10 @@ swift::handleSILGenericParams(GenericParamList *genericParams,
     genericParams->walk(walker);
   }
 
-  auto sig =
-      TypeChecker::checkGenericSignature(nestedList.back(), DC,
+  return TypeChecker::checkGenericSignature(nestedList.back(), DC,
                                          /*parentSig=*/nullptr,
-                                         /*allowConcreteGenericParams=*/true);
-  return (sig ? sig->getGenericEnvironment() : nullptr);
+                                         /*allowConcreteGenericParams=*/true)
+    .getGenericEnvironment();
 }
 
 void swift::typeCheckPatternBinding(PatternBindingDecl *PBD,

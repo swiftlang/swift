@@ -269,6 +269,12 @@ CanGenericSignature GenericSignatureImpl::getCanonicalSignature() const {
       CanonicalSignatureOrASTContext.get<const GenericSignatureImpl *>());
 }
 
+GenericEnvironment *GenericSignature::getGenericEnvironment() const {
+  if (isNull())
+    return nullptr;
+  return getPointer()->getGenericEnvironment();
+}
+
 GenericEnvironment *GenericSignatureImpl::getGenericEnvironment() const {
   if (GenericEnv == nullptr) {
     const auto impl = const_cast<GenericSignatureImpl *>(this);

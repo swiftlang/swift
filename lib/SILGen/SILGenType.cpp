@@ -184,9 +184,7 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
   if (auto existingThunk = M.lookUpFunction(name))
     return SILVTable::Entry(base, existingThunk, implKind, false);
 
-  GenericEnvironment *genericEnv = nullptr;
-  if (auto genericSig = overrideInfo.FormalType.getOptGenericSignature())
-    genericEnv = genericSig->getGenericEnvironment();
+  auto *genericEnv = overrideInfo.FormalType.getOptGenericSignature().getGenericEnvironment();
 
   // Emit the thunk.
   SILLocation loc(derivedDecl);

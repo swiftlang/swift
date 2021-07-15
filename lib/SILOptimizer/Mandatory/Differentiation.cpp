@@ -782,7 +782,7 @@ static SILFunction *createEmptyVJP(ADContext &context,
   auto vjpCanGenSig = witness->getDerivativeGenericSignature().getCanonicalSignature();
   GenericEnvironment *vjpGenericEnv = nullptr;
   if (vjpCanGenSig && !vjpCanGenSig->areAllParamsConcrete())
-    vjpGenericEnv = vjpCanGenSig->getGenericEnvironment();
+    vjpGenericEnv = vjpCanGenSig.getGenericEnvironment();
   auto vjpType = originalTy->getAutoDiffDerivativeFunctionType(
       config.parameterIndices, config.resultIndices,
       AutoDiffDerivativeFunctionKind::VJP,
@@ -823,7 +823,7 @@ static SILFunction *createEmptyJVP(ADContext &context,
   auto jvpCanGenSig = witness->getDerivativeGenericSignature().getCanonicalSignature();
   GenericEnvironment *jvpGenericEnv = nullptr;
   if (jvpCanGenSig && !jvpCanGenSig->areAllParamsConcrete())
-    jvpGenericEnv = jvpCanGenSig->getGenericEnvironment();
+    jvpGenericEnv = jvpCanGenSig.getGenericEnvironment();
   auto jvpType = originalTy->getAutoDiffDerivativeFunctionType(
       config.parameterIndices, config.resultIndices,
       AutoDiffDerivativeFunctionKind::JVP,
@@ -1034,8 +1034,7 @@ static SILValue promoteCurryThunkApplicationToDifferentiableFunction(
   // returned function value with an `differentiable_function`
   // instruction, and process the `differentiable_function` instruction.
   if (newThunk->empty()) {
-    if (auto newThunkGenSig = thunkType->getSubstGenericSignature())
-      newThunk->setGenericEnvironment(newThunkGenSig->getGenericEnvironment());
+    newThunk->setGenericEnvironment(thunkType->getSubstGenericSignature().getGenericEnvironment());
 
     BasicTypeSubstCloner cloner(thunk, newThunk);
     cloner.cloneFunction();

@@ -747,9 +747,7 @@ createDesignatedInitOverride(ClassDecl *classDecl,
                                              superclassCtor);
 
   if (auto superclassCtorSig = superclassCtor->getGenericSignature()) {
-    auto *genericEnv = (overrideInfo.GenericSig
-                        ? overrideInfo.GenericSig->getGenericEnvironment()
-                        : nullptr);
+    auto *genericEnv = overrideInfo.GenericSig.getGenericEnvironment();
 
     // If the base class initializer has a 'where' clause, it might impose
     // requirements on the base class's own generic parameters that are not

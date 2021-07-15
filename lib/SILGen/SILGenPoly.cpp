@@ -3059,7 +3059,7 @@ buildThunkSignature(SILGenFunction &SGF,
       AbstractGenericSignatureRequest{
         baseGenericSig.getPointer(), { newGenericParam }, { newRequirement }},
       GenericSignature());
-  genericEnv = genericSig->getGenericEnvironment();
+  genericEnv = genericSig.getGenericEnvironment();
 
   newArchetype = genericEnv->mapTypeIntoContext(newGenericParam)
     ->castTo<ArchetypeType>();
@@ -3938,10 +3938,7 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
     SILFunction *customDerivativeFn, const AutoDiffConfig &config,
     AutoDiffDerivativeFunctionKind kind) {
   auto customDerivativeFnTy = customDerivativeFn->getLoweredFunctionType();
-  auto *thunkGenericEnv = customDerivativeFnTy->getSubstGenericSignature()
-                              ? customDerivativeFnTy->getSubstGenericSignature()
-                                    ->getGenericEnvironment()
-                              : nullptr;
+  auto *thunkGenericEnv = customDerivativeFnTy->getSubstGenericSignature().getGenericEnvironment();
 
   auto origFnTy = originalFn->getLoweredFunctionType();
   auto derivativeCanGenSig = config.derivativeGenericSignature.getCanonicalSignature();
