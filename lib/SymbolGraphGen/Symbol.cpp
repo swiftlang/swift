@@ -318,7 +318,7 @@ void Symbol::serializeSwiftGenericMixin(llvm::json::OStream &OS) const {
 
       SmallVector<const GenericTypeParamType *, 4> FilteredParams;
       SmallVector<Requirement, 4> FilteredRequirements;
-      filterGenericParams(Generics->getGenericParams(), FilteredParams,
+      filterGenericParams(Generics.getGenericParams(), FilteredParams,
                           SubMap);
 
       const auto *Self = dyn_cast<NominalTypeDecl>(VD);
@@ -326,7 +326,7 @@ void Symbol::serializeSwiftGenericMixin(llvm::json::OStream &OS) const {
         Self = VD->getDeclContext()->getSelfNominalTypeDecl();
       }
 
-      filterGenericRequirements(Generics->getRequirements(), Self,
+      filterGenericRequirements(Generics.getRequirements(), Self,
                                 FilteredRequirements, SubMap, FilteredParams);
 
       if (FilteredParams.empty() && FilteredRequirements.empty()) {

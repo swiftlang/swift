@@ -135,7 +135,7 @@ static bool isExtensionAppliedInternal(const DeclContext *DC, Type BaseTy,
   SubstitutionMap substMap = BaseTy->getContextSubstitutionMap(
       module, ED->getExtendedNominal());
   return TypeChecker::checkGenericArguments(
-      module, genericSig->getRequirements(),
+      module, genericSig.getRequirements(),
       QuerySubstitutionMap{substMap}) == RequirementCheckResult::Success;
 }
 
@@ -171,7 +171,7 @@ static bool isMemberDeclAppliedInternal(const DeclContext *DC, Type BaseTy,
   // Note: we treat substitution failure as success, to avoid tripping
   // up over generic parameters introduced by the declaration itself.
   return TypeChecker::checkGenericArguments(
-      module, genericSig->getRequirements(),
+      module, genericSig.getRequirements(),
       QuerySubstitutionMap{substMap}) != RequirementCheckResult::Failure;
 }
 

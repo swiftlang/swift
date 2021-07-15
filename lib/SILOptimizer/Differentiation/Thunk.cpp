@@ -61,7 +61,7 @@ CanGenericSignature buildThunkSignature(SILFunction *fn, bool inheritGenericSig,
     if (auto genericSig =
             fn->getLoweredFunctionType()->getSubstGenericSignature()) {
       builder.addGenericSignature(genericSig);
-      depth = genericSig->getGenericParams().back()->getDepth() + 1;
+      depth = genericSig.getGenericParams().back()->getDepth() + 1;
     }
   }
 

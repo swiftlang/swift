@@ -182,6 +182,19 @@ private:
   // first, or use isEqual.
   void operator==(GenericSignature T) const = delete;
   void operator!=(GenericSignature T) const = delete;
+
+public:
+  /// Retrieve the generic parameters.
+  TypeArrayView<GenericTypeParamType> getGenericParams() const;
+
+  /// Retrieve the innermost generic parameters.
+  ///
+  /// Given a generic signature for a nested generic type, produce an
+  /// array of the generic parameters for the innermost generic type.
+  TypeArrayView<GenericTypeParamType> getInnermostGenericParams() const;
+
+  /// Retrieve the requirements.
+  ArrayRef<Requirement> getRequirements() const;
 };
 
 /// A reference to a canonical generic signature.
@@ -255,23 +268,6 @@ class alignas(1 << TypeAlignInBits) GenericSignatureImpl final
   friend class ArchetypeType;
 
 public:
-  /// Retrieve the generic parameters.
-  TypeArrayView<GenericTypeParamType> getGenericParams() const {
-    return TypeArrayView<GenericTypeParamType>(
-        {getTrailingObjects<Type>(), NumGenericParams});
-  }
-
-  /// Retrieve the innermost generic parameters.
-  ///
-  /// Given a generic signature for a nested generic type, produce an
-  /// array of the generic parameters for the innermost generic type.
-  TypeArrayView<GenericTypeParamType> getInnermostGenericParams() const;
-
-  /// Retrieve the requirements.
-  ArrayRef<Requirement> getRequirements() const {
-    return {getTrailingObjects<Requirement>(), NumRequirements};
-  }
-
   /// Only allow allocation by doing a placement new.
   void *operator new(size_t Bytes, void *Mem) {
     assert(Mem);
@@ -439,6 +435,27 @@ public:
   void print(ASTPrinter &Printer, PrintOptions Opts = PrintOptions()) const;
   SWIFT_DEBUG_DUMP;
   std::string getAsString() const;
+
+private:
+  friend GenericSignature;
+  friend CanGenericSignature;
+
+  /// Retrieve the generic parameters.
+  TypeArrayView<GenericTypeParamType> getGenericParams() const {
+    return TypeArrayView<GenericTypeParamType>(
+        {getTrailingObjects<Type>(), NumGenericParams});
+  }
+
+  /// Retrieve the innermost generic parameters.
+  ///
+  /// Given a generic signature for a nested generic type, produce an
+  /// array of the generic parameters for the innermost generic type.
+  TypeArrayView<GenericTypeParamType> getInnermostGenericParams() const;
+
+  /// Retrieve the requirements.
+  ArrayRef<Requirement> getRequirements() const {
+    return {getTrailingObjects<Requirement>(), NumRequirements};
+  }
 };
 
 void simple_display(raw_ostream &out, GenericSignature sig);

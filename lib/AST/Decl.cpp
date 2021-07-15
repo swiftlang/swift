@@ -965,18 +965,12 @@ GenericContext::GenericContext(DeclContextKind Kind, DeclContext *Parent,
 
 TypeArrayView<GenericTypeParamType>
 GenericContext::getInnermostGenericParamTypes() const {
-  if (auto sig = getGenericSignature())
-    return sig->getInnermostGenericParams();
-  else
-    return { };
+  return getGenericSignature().getInnermostGenericParams();
 }
 
 /// Retrieve the generic requirements.
 ArrayRef<Requirement> GenericContext::getGenericRequirements() const {
-  if (auto sig = getGenericSignature())
-    return sig->getRequirements();
-  else
-    return { };
+  return getGenericSignature().getRequirements();
 }
 
 GenericParamList *GenericContext::getGenericParams() const {

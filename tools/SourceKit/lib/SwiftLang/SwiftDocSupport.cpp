@@ -290,7 +290,7 @@ static void initDocGenericParams(const Decl *D, DocEntityInfo &Info,
 
   // FIXME: Not right for extensions of nested generic types
   if (GC->isGeneric()) {
-    for (auto *GP : GenericSig->getInnermostGenericParams()) {
+    for (auto *GP : GenericSig.getInnermostGenericParams()) {
       if (GP->getDecl()->isImplicit())
         continue;
       Type TypeToPrint = GP;
@@ -314,7 +314,7 @@ static void initDocGenericParams(const Decl *D, DocEntityInfo &Info,
   if (auto *typeDC = GC->getInnermostTypeContext())
     Proto = typeDC->getSelfProtocolDecl();
 
-  for (auto Req: GenericSig->getRequirements()) {
+  for (auto Req: GenericSig.getRequirements()) {
     if (Proto &&
         Req.getKind() == RequirementKind::Conformance &&
         Req.getFirstType()->isEqual(Proto->getSelfInterfaceType()) &&

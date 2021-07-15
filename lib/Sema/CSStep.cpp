@@ -583,7 +583,7 @@ bool IsDeclRefinementOfRequest::evaluate(Evaluator &evaluator,
 
   auto result = TypeChecker::checkGenericArguments(
       declA->getDeclContext()->getParentModule(),
-      genericSignatureB->getRequirements(),
+      genericSignatureB.getRequirements(),
       QueryTypeSubstitutionMap{ substMap });
 
   if (result != RequirementCheckResult::Success)

@@ -1870,8 +1870,8 @@ SubstitutionMap getApplySubstitutionsFromParsed(
 
   // Ensure that we have the right number of type arguments.
   auto genericSig = env->getGenericSignature();
-  if (parses.size() != genericSig->getGenericParams().size()) {
-    bool hasTooFew = parses.size() < genericSig->getGenericParams().size();
+  if (parses.size() != genericSig.getGenericParams().size()) {
+    bool hasTooFew = parses.size() < genericSig.getGenericParams().size();
     SP.P.diagnose(loc,
                   hasTooFew ? diag::sil_missing_substitutions
                             : diag::sil_too_many_substitutions);
@@ -1887,7 +1887,7 @@ SubstitutionMap getApplySubstitutionsFromParsed(
           return nullptr;
 
         auto index = genericSig->getGenericParamOrdinal(genericParam);
-        assert(index < genericSig->getGenericParams().size());
+        assert(index < genericSig.getGenericParams().size());
         assert(index < parses.size());
 
         // Provide the replacement type.
@@ -2200,9 +2200,9 @@ static bool parseSILDifferentiabilityWitnessConfigAndFunction(
     // generic have the same generic parameters.
     auto areGenericParametersConsistent = [&]() {
       llvm::SmallDenseSet<GenericParamKey, 4> genericParamKeys;
-      for (auto *origGP : origGenSig->getGenericParams())
-        genericParamKeys.insert(GenericParamKey(origGP));
-      for (auto *witnessGP : witnessGenSig->getGenericParams())
+      for (auto origGP : origGenSig.getGenericParams())
+        genericParamKeys.insert(GenericParamKey(origGP.getPointer()));
+      for (auto *witnessGP : witnessGenSig.getGenericParams())
         if (!genericParamKeys.erase(GenericParamKey(witnessGP)))
           return false;
       return genericParamKeys.empty();
@@ -2216,8 +2216,8 @@ static bool parseSILDifferentiabilityWitnessConfigAndFunction(
     // Combine parsed witness requirements with original function generic
     // signature requirements to form full witness generic signature.
     SmallVector<Requirement, 4> witnessRequirements(
-        witnessGenSig->getRequirements().begin(),
-        witnessGenSig->getRequirements().end());
+        witnessGenSig.getRequirements().begin(),
+        witnessGenSig.getRequirements().end());
     witnessGenSig = evaluateOrDefault(
         P.Context.evaluator,
         AbstractGenericSignatureRequest{origGenSig.getPointer(),

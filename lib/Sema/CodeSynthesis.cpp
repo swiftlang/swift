@@ -476,7 +476,7 @@ computeDesignatedInitOverrideSignature(ASTContext &ctx,
       // than the depth of the subclass.
       unsigned depth = 0;
       if (auto genericSig = classDecl->getGenericSignature())
-        depth = genericSig->getGenericParams().back()->getDepth() + 1;
+        depth = genericSig.getGenericParams().back()->getDepth() + 1;
 
       for (auto *param : genericParams->getParams()) {
         auto *newParam = new (ctx) GenericTypeParamDecl(classDecl,
@@ -506,7 +506,7 @@ computeDesignatedInitOverrideSignature(ASTContext &ctx,
     // The depth at which the initializer's own generic parameters start, if any.
     unsigned superclassDepth = 0;
     if (superclassSig)
-      superclassDepth = superclassSig->getGenericParams().back()->getDepth() + 1;
+      superclassDepth = superclassSig.getGenericParams().back()->getDepth() + 1;
 
     // We're going to be substituting the requirements of the base class
     // initializer to form the requirements of the derived class initializer.
@@ -537,7 +537,7 @@ computeDesignatedInitOverrideSignature(ASTContext &ctx,
       };
 
       SmallVector<Requirement, 2> requirements;
-      for (auto reqt : superclassCtorSig->getRequirements())
+      for (auto reqt : superclassCtorSig.getRequirements())
         if (auto substReqt = reqt.subst(substFn, lookupConformanceFn))
           requirements.push_back(*substReqt);
 
@@ -757,7 +757,7 @@ createDesignatedInitOverride(ClassDecl *classDecl,
     // this initializer; there's no way to call it on the derived class.
     auto checkResult = TypeChecker::checkGenericArguments(
         classDecl->getParentModule(),
-        superclassCtorSig->getRequirements(),
+        superclassCtorSig.getRequirements(),
         [&](Type type) -> Type {
           auto substType = type.subst(overrideInfo.OverrideSubMap);
           return GenericEnvironment::mapTypeIntoContext(

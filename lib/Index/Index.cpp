@@ -479,7 +479,7 @@ private:
 
     // The generic parameter in the extension has the same depths and index
     // as the one in the extended type.
-    for (auto ExtendedTypeGenParam : ExtendedTypeGenSig->getGenericParams()) {
+    for (auto ExtendedTypeGenParam : ExtendedTypeGenSig.getGenericParams()) {
       if (ExtendedTypeGenParam->getIndex() == GenParam->getIndex() &&
           ExtendedTypeGenParam->getDepth() == GenParam->getDepth()) {
         assert(ExtendedTypeGenParam->getDecl() &&

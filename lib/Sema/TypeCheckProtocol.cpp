@@ -357,7 +357,7 @@ matchWitnessDifferentiableAttr(DeclContext *dc, ValueDecl *req,
         auto reqDiffGenSig = reqDiffAttr->getDerivativeGenericSignature();
         auto conformanceGenSig = dc->getGenericSignatureOfContext();
         for (const auto &req :
-             witnessConfig.derivativeGenericSignature->getRequirements()) {
+             witnessConfig.derivativeGenericSignature.getRequirements()) {
           auto substReq = req.subst(result.WitnessSubstitutions);
           bool reqDiffGenSigSatisfies =
               reqDiffGenSig && substReq &&
@@ -2245,10 +2245,10 @@ static Type getRequirementTypeForDisplay(ModuleDecl *module,
 
     auto genericSig = fnTy->getOptGenericSignature();
     if (genericSig) {
-      if (genericSig->getGenericParams().size() > 1) {
+      if (genericSig.getGenericParams().size() > 1) {
         genericSig = GenericSignature::get(
-          genericSig->getGenericParams().slice(1),
-          genericSig->getRequirements());
+          genericSig.getGenericParams().slice(1),
+          genericSig.getRequirements());
       } else {
         genericSig = nullptr;
       }
@@ -3707,7 +3707,7 @@ static bool hasSelfSameTypeConstraint(const ValueDecl *req) {
     return false;
 
   const auto selfTy = proto->getSelfInterfaceType();
-  for (const auto &constr : genericSig->getRequirements()) {
+  for (const auto &constr : genericSig.getRequirements()) {
     if (constr.getKind() != RequirementKind::SameType)
       continue;
 
@@ -3731,7 +3731,7 @@ getAdopteeSelfSameTypeConstraint(ClassDecl *selfClass, ValueDecl *witness) {
   if (!genericSig) return None;
 
   // First, search for any bogus requirements.
-  auto it = llvm::find_if(genericSig->getRequirements(),
+  auto it = llvm::find_if(genericSig.getRequirements(),
                           [&selfClass](const auto &req) {
     if (req.getKind() != RequirementKind::SameType)
       return false;
@@ -3739,7 +3739,7 @@ getAdopteeSelfSameTypeConstraint(ClassDecl *selfClass, ValueDecl *witness) {
     return req.getFirstType()->getAnyNominal() == selfClass
         || req.getSecondType()->getAnyNominal() == selfClass;
   });
-  if (it == genericSig->getRequirements().end()) {
+  if (it == genericSig.getRequirements().end()) {
     return None;
   }
 

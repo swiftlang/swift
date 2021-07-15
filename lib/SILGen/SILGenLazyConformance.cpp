@@ -325,7 +325,7 @@ void SILGenModule::emitLazyConformancesForType(NominalTypeDecl *NTD) {
   auto genericSig = NTD->getGenericSignature();
 
   if (genericSig) {
-    for (auto reqt : genericSig->getRequirements()) {
+    for (auto reqt : genericSig.getRequirements()) {
       if (reqt.getKind() != RequirementKind::Layout)
         useConformancesFromType(reqt.getSecondType()->getCanonicalType());
     }

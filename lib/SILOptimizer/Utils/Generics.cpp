@@ -946,7 +946,7 @@ void ReabstractionInfo::performFullSpecializationPreparation(
 static bool hasNonSelfContainedRequirements(ArchetypeType *Archetype,
                                             GenericSignature Sig,
                                             GenericEnvironment *Env) {
-  auto Reqs = Sig->getRequirements();
+  auto Reqs = Sig.getRequirements();
   auto CurrentGP = Archetype->getInterfaceType()
                        ->getCanonicalType()
                        ->getRootGenericParam();
@@ -989,7 +989,7 @@ static bool hasNonSelfContainedRequirements(ArchetypeType *Archetype,
 static void collectRequirements(ArchetypeType *Archetype, GenericSignature Sig,
                                 GenericEnvironment *Env,
                                 SmallVectorImpl<Requirement> &CollectedReqs) {
-  auto Reqs = Sig->getRequirements();
+  auto Reqs = Sig.getRequirements();
   auto CurrentGP = Archetype->getInterfaceType()
                        ->getCanonicalType()
                        ->getRootGenericParam();
@@ -1268,7 +1268,7 @@ public:
     // Callee's generic signature and specialized generic signature
     // use the same set of generic parameters, i.e. each generic
     // parameter should be mapped to itself.
-    for (auto GP : CalleeGenericSig->getGenericParams()) {
+    for (auto GP : CalleeGenericSig.getGenericParams()) {
       CalleeInterfaceToSpecializedInterfaceMapping[GP] = Type(GP);
     }
     computeCalleeInterfaceToSpecializedInterfaceMap();
@@ -1437,7 +1437,7 @@ void FunctionSignaturePartialSpecializer::
 /// which requires a substitution.
 void FunctionSignaturePartialSpecializer::
     createGenericParamsForCalleeGenericParams() {
-  for (auto GP : CalleeGenericSig->getGenericParams()) {
+  for (auto GP : CalleeGenericSig.getGenericParams()) {
     auto CanTy = GP->getCanonicalType();
     auto CanTyInContext =
         CalleeGenericSig->getCanonicalTypeInContext(CanTy);
@@ -1571,7 +1571,7 @@ void FunctionSignaturePartialSpecializer::addCallerRequirements() {
 /// Add requirements from the callee's signature.
 void FunctionSignaturePartialSpecializer::addCalleeRequirements() {
   if (CalleeGenericSig)
-    addRequirements(CalleeGenericSig->getRequirements(),
+    addRequirements(CalleeGenericSig.getRequirements(),
                     CalleeInterfaceToSpecializedInterfaceMap);
 }
 
@@ -1657,7 +1657,7 @@ void FunctionSignaturePartialSpecializer::
     SpecializedGenericEnv = GenPair.first;
   }
 
-  for (auto GP : CalleeGenericSig->getGenericParams()) {
+  for (auto GP : CalleeGenericSig.getGenericParams()) {
     CalleeInterfaceToSpecializedInterfaceMapping[GP] = Type(GP);
   }
   computeCalleeInterfaceToSpecializedInterfaceMap();

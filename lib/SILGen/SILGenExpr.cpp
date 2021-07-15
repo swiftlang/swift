@@ -1363,7 +1363,7 @@ RValue SILGenFunction::emitCollectionConversion(SILLocation loc,
   // Form type parameter substitutions.
   auto genericSig = fn->getGenericSignature();
   unsigned fromParamCount = fromDecl->getGenericSignature()
-    ->getGenericParams().size();
+    .getGenericParams().size();
 
   auto subMap =
     SubstitutionMap::combineSubstitutionMaps(fromSubMap,

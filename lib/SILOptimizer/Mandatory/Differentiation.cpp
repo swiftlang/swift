@@ -205,7 +205,7 @@ static bool diagnoseUnsatisfiedRequirements(ADContext &context,
   // If there are no derivative requirements, return false.
   if (!derivativeGenSig)
     return false;
-  auto requirements = derivativeGenSig->getRequirements();
+  auto requirements = derivativeGenSig.getRequirements();
   if (requirements.empty())
     return false;
   // Iterate through all requirements and check whether they are satisfied.

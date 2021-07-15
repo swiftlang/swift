@@ -948,7 +948,7 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator,
   auto reqSignature = std::move(builder).computeGenericSignature(
                         /*allowConcreteGenericParams=*/false,
                         /*requirementSignatureSelfProto=*/proto);
-  return reqSignature->getRequirements();
+  return reqSignature.getRequirements();
 }
 
 Type
@@ -2766,8 +2766,8 @@ bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
   if (!nominalSig) return true;
 
   // Check that the type parameters are the same the whole way through.
-  auto nominalGenericParams = nominalSig->getGenericParams();
-  auto typealiasGenericParams = typealiasSig->getGenericParams();
+  auto nominalGenericParams = nominalSig.getGenericParams();
+  auto typealiasGenericParams = typealiasSig.getGenericParams();
   if (nominalGenericParams.size() != typealiasGenericParams.size())
     return false;
   if (!std::equal(nominalGenericParams.begin(), nominalGenericParams.end(),
@@ -2785,7 +2785,7 @@ bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
 
   // If our arguments line up with our innermost generic parameters, it's
   // a passthrough typealias.
-  auto innermostGenericParams = typealiasSig->getInnermostGenericParams();
+  auto innermostGenericParams = typealiasSig.getInnermostGenericParams();
   auto boundArgs = boundGenericType->getGenericArgs();
   if (boundArgs.size() != innermostGenericParams.size())
     return false;

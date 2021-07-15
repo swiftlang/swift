@@ -3866,7 +3866,7 @@ GenericSignatureBuilder::getConformanceAccessPath(Type type,
   // visit all of the root conformance requirements in our generic signature and
   // add them to the buffer.
   if (Impl->ConformanceAccessPaths.empty()) {
-    for (const auto &req : sig->getRequirements()) {
+    for (const auto &req : sig.getRequirements()) {
       // We only care about conformance requirements.
       if (req.getKind() != RequirementKind::Conformance)
         continue;
@@ -5303,7 +5303,7 @@ public:
         return Action::Continue;
 
       auto subMap = TypeAlias->getSubstitutionMap();
-      for (const auto &rawReq : genericSig->getRequirements()) {
+      for (const auto &rawReq : genericSig.getRequirements()) {
         if (auto req = rawReq.subst(subMap))
           Builder.addRequirement(*req, source, nullptr);
       }
@@ -5377,7 +5377,7 @@ public:
 
     // Handle the requirements.
     // FIXME: Inaccurate TypeReprs.
-    for (const auto &rawReq : genericSig->getRequirements()) {
+    for (const auto &rawReq : genericSig.getRequirements()) {
       if (auto req = rawReq.subst(subMap))
         Builder.addRequirement(*req, source, nullptr);
     }
@@ -8080,10 +8080,10 @@ void GenericSignatureBuilder::dump(llvm::raw_ostream &out) {
 void GenericSignatureBuilder::addGenericSignature(GenericSignature sig) {
   if (!sig) return;
 
-  for (auto param : sig->getGenericParams())
+  for (auto param : sig.getGenericParams())
     addGenericParameter(param);
 
-  for (auto &reqt : sig->getRequirements())
+  for (auto &reqt : sig.getRequirements())
     addRequirement(reqt, FloatingRequirementSource::forAbstract(), nullptr);
 }
 
@@ -8093,7 +8093,7 @@ static void checkGenericSignature(CanGenericSignature canSig,
                                   GenericSignatureBuilder &builder) {
   PrettyStackTraceGenericSignature debugStack("checking", canSig);
 
-  auto canonicalRequirements = canSig->getRequirements();
+  auto canonicalRequirements = canSig.getRequirements();
 
   // Check that the signature is canonical.
   for (unsigned idx : indices(canonicalRequirements)) {
@@ -8463,8 +8463,8 @@ void GenericSignatureBuilder::verifyGenericSignature(ASTContext &context,
   llvm::errs() << "\n";
 
   // Try building a new signature having the same requirements.
-  auto genericParams = sig->getGenericParams();
-  auto requirements = sig->getRequirements();
+  auto genericParams = sig.getGenericParams();
+  auto requirements = sig.getRequirements();
 
   {
     PrettyStackTraceGenericSignature debugStack("verifying", sig);
@@ -8589,9 +8589,10 @@ static bool isCanonicalRequest(GenericSignature baseSignature,
 GenericSignature
 AbstractGenericSignatureRequest::evaluate(
          Evaluator &evaluator,
-         const GenericSignatureImpl *baseSignature,
+         const GenericSignatureImpl *baseSignatureImpl,
          SmallVector<GenericTypeParamType *, 2> addedParameters,
          SmallVector<Requirement, 2> addedRequirements) const {
+  GenericSignature baseSignature = GenericSignature{baseSignatureImpl};
   // If nothing is added to the base signature, just return the base
   // signature.
   if (addedParameters.empty() && addedRequirements.empty())
@@ -8607,9 +8608,9 @@ AbstractGenericSignatureRequest::evaluate(
     ArrayRef<Requirement> requirements;
     if (baseSignature) {
       addedParameters.insert(addedParameters.begin(),
-                             baseSignature->getGenericParams().begin(),
-                             baseSignature->getGenericParams().end());
-      requirements = baseSignature->getRequirements();
+                             baseSignature.getGenericParams().begin(),
+                             baseSignature.getGenericParams().end());
+      requirements = baseSignature.getRequirements();
     }
 
     return GenericSignature::get(addedParameters, requirements);
@@ -8648,18 +8649,18 @@ AbstractGenericSignatureRequest::evaluate(
     // result the original request wanted.
     auto canSignature = *canSignatureResult;
     SmallVector<GenericTypeParamType *, 2> resugaredParameters;
-    resugaredParameters.reserve(canSignature->getGenericParams().size());
+    resugaredParameters.reserve(canSignature.getGenericParams().size());
     if (baseSignature) {
-      resugaredParameters.append(baseSignature->getGenericParams().begin(),
-                                 baseSignature->getGenericParams().end());
+      resugaredParameters.append(baseSignature.getGenericParams().begin(),
+                                 baseSignature.getGenericParams().end());
     }
     resugaredParameters.append(addedParameters.begin(), addedParameters.end());
     assert(resugaredParameters.size() ==
-               canSignature->getGenericParams().size());
+               canSignature.getGenericParams().size());
 
     SmallVector<Requirement, 2> resugaredRequirements;
-    resugaredRequirements.reserve(canSignature->getRequirements().size());
-    for (const auto &req : canSignature->getRequirements()) {
+    resugaredRequirements.reserve(canSignature.getRequirements().size());
+    for (const auto &req : canSignature.getRequirements()) {
       auto resugaredReq = req.subst(
           [&](SubstitutableType *type) {
             if (auto gp = dyn_cast<GenericTypeParamType>(type)) {

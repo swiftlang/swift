@@ -3169,12 +3169,12 @@ public:
 
     auto genericSig = methodType->getInvocationGenericSignature();
 
-    auto selfGenericParam = genericSig->getGenericParams()[0];
+    auto selfGenericParam = genericSig.getGenericParams()[0];
     require(selfGenericParam->getDepth() == 0
             && selfGenericParam->getIndex() == 0,
             "method should be polymorphic on Self parameter at depth 0 index 0");
     Optional<Requirement> selfRequirement;
-    for (auto req : genericSig->getRequirements()) {
+    for (auto req : genericSig.getRequirements()) {
       if (req.getKind() != RequirementKind::SameType) {
         selfRequirement = req;
         break;

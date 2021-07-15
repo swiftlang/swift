@@ -6353,7 +6353,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
         auto signature = path[path.size() - 2]
                              .castTo<LocatorPathElt::OpenedGeneric>()
                              .getSignature();
-        auto requirement = signature->getRequirements()[req->getIndex()];
+        auto requirement = signature.getRequirements()[req->getIndex()];
 
         auto *memberLoc = getConstraintLocator(anchor, path.front());
         auto overload = findSelectedOverloadFor(memberLoc);
@@ -9049,7 +9049,7 @@ ConstraintSystem::simplifyOpaqueUnderlyingTypeConstraint(Type type1, Type type2,
   assert(underlyingTyVar);
   
   if (auto dcSig = DC->getGenericSignatureOfContext()) {
-    for (auto param : dcSig->getGenericParams()) {
+    for (auto param : dcSig.getGenericParams()) {
       addConstraint(ConstraintKind::Bind,
                     openType(param, replacements),
                     DC->mapTypeIntoContext(param),

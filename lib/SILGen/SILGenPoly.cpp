@@ -3045,7 +3045,7 @@ buildThunkSignature(SILGenFunction &SGF,
     if (auto genericSig =
           SGF.F.getLoweredFunctionType()->getInvocationGenericSignature()) {
       baseGenericSig = genericSig;
-      depth = genericSig->getGenericParams().back()->getDepth() + 1;
+      depth = genericSig.getGenericParams().back()->getDepth() + 1;
     }
   }
 

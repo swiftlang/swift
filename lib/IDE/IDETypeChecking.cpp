@@ -354,7 +354,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
 
       assert(Ext->getGenericSignature() && "No generic signature.");
       auto GenericSig = Ext->getGenericSignature();
-      if (handleRequirements(subMap, Ext, GenericSig->getRequirements()))
+      if (handleRequirements(subMap, Ext, GenericSig.getRequirements()))
         return {Result, MergeInfo};
     }
 

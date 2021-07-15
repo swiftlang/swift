@@ -598,7 +598,7 @@ static void printDifferentiableAttrArguments(
   // generic signature. They should not be printed.
   ArrayRef<Requirement> derivativeRequirements;
   if (auto derivativeGenSig = attr->getDerivativeGenericSignature())
-    derivativeRequirements = derivativeGenSig->getRequirements();
+    derivativeRequirements = derivativeGenSig.getRequirements();
   auto requirementsToPrint =
     llvm::make_filter_range(derivativeRequirements, [&](Requirement req) {
         if (const auto &originalGenSig = original->getGenericSignature())
@@ -947,7 +947,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     SmallVector<Requirement, 4> requirementsScratch;
     ArrayRef<Requirement> requirements;
     if (auto sig = attr->getSpecializedSignature())
-      requirements = sig->getRequirements();
+      requirements = sig.getRequirements();
 
     auto *FnDecl = dyn_cast_or_null<AbstractFunctionDecl>(D);
     if (FnDecl && FnDecl->getGenericSignature()) {

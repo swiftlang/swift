@@ -113,7 +113,7 @@ PolymorphicEffectKindRequest::evaluate(Evaluator &evaluator,
   }
 
   if (auto genericSig = decl->getGenericSignature()) {
-    for (auto req : genericSig->getRequirements()) {
+    for (auto req : genericSig.getRequirements()) {
       if (req.getKind() == RequirementKind::Conformance) {
         if (req.getProtocolDecl()->hasPolymorphicEffect(kind)) {
           return PolymorphicEffectKind::ByConformance;

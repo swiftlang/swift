@@ -76,7 +76,7 @@ RequirementEnvironment::RequirementEnvironment(
     ++depth;
   }
   if (conformanceSig) {
-    depth += conformanceSig->getGenericParams().back()->getDepth() + 1;
+    depth += conformanceSig.getGenericParams().back()->getDepth() + 1;
   }
 
   // Build a substitution map to replace the protocol's \c Self and the type
@@ -136,8 +136,8 @@ RequirementEnvironment::RequirementEnvironment(
   // If the requirement itself is non-generic, the synthetic signature
   // is that of the conformance context.
   if (!covariantSelf &&
-      reqSig->getGenericParams().size() == 1 &&
-      reqSig->getRequirements().size() == 1) {
+      reqSig.getGenericParams().size() == 1 &&
+      reqSig.getRequirements().size() == 1) {
     syntheticSignature = conformanceDC->getGenericSignatureOfContext();
     if (syntheticSignature) {
       syntheticSignature = syntheticSignature.getCanonicalSignature();
@@ -162,7 +162,7 @@ RequirementEnvironment::RequirementEnvironment(
 
   // Now, add all generic parameters from the conforming type.
   if (conformanceSig) {
-    for (auto param : conformanceSig->getGenericParams()) {
+    for (auto param : conformanceSig.getGenericParams()) {
       auto substParam = Type(param).subst(conformanceToSyntheticTypeFn,
                                           conformanceToSyntheticConformanceFn);
       genericParamTypes.push_back(substParam->castTo<GenericTypeParamType>());
@@ -178,7 +178,7 @@ RequirementEnvironment::RequirementEnvironment(
   }
 
   if (conformanceSig) {
-    for (auto &rawReq : conformanceSig->getRequirements()) {
+    for (auto &rawReq : conformanceSig.getRequirements()) {
       if (auto req = rawReq.subst(conformanceToSyntheticTypeFn,
                                   conformanceToSyntheticConformanceFn))
         requirements.push_back(*req);
@@ -186,7 +186,7 @@ RequirementEnvironment::RequirementEnvironment(
   }
 
   // Finally, add the generic parameters from the requirement.
-  for (auto genericParam : reqSig->getGenericParams().slice(1)) {
+  for (auto genericParam : reqSig.getGenericParams().slice(1)) {
     // The only depth that makes sense is depth == 1, the generic parameters
     // of the requirement itself. Anything else is from invalid code.
     if (genericParam->getDepth() != 1) {
@@ -204,7 +204,7 @@ RequirementEnvironment::RequirementEnvironment(
 
   // Next, add each of the requirements (mapped from the requirement's
   // interface types into the abstract type parameters).
-  for (auto &rawReq : reqSig->getRequirements()) {
+  for (auto &rawReq : reqSig.getRequirements()) {
     if (auto req = rawReq.subst(reqToSyntheticEnvMap))
       requirements.push_back(*req);
   }

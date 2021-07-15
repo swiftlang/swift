@@ -1506,7 +1506,7 @@ static unsigned getDepthOfRequirement(const Requirement &req) {
 static void getRequirementsAtDepth(GenericSignature genericSig,
                                    unsigned depth,
                                    SmallVectorImpl<Requirement> &result) {
-  for (auto reqt : genericSig->getRequirements()) {
+  for (auto reqt : genericSig.getRequirements()) {
     unsigned currentDepth = getDepthOfRequirement(reqt);
     assert(currentDepth != ErrorDepth);
     if (currentDepth == depth)
@@ -1524,17 +1524,17 @@ void PrintAST::printGenericSignature(GenericSignature genericSig,
 void PrintAST::printGenericSignature(
     GenericSignature genericSig, unsigned flags,
     llvm::function_ref<bool(const Requirement &)> filter) {
-  auto requirements = genericSig->getRequirements();
+  auto requirements = genericSig.getRequirements();
 
   if (flags & InnermostOnly) {
-    auto genericParams = genericSig->getInnermostGenericParams();
+    auto genericParams = genericSig.getInnermostGenericParams();
 
     printSingleDepthOfGenericSignature(genericParams, requirements, flags,
                                        filter);
     return;
   }
 
-  auto genericParams = genericSig->getGenericParams();
+  auto genericParams = genericSig.getGenericParams();
 
   if (!Options.PrintInSILBody) {
     printSingleDepthOfGenericSignature(genericParams, requirements, flags,
@@ -2349,8 +2349,8 @@ void PrintAST::printSynthesizedExtension(Type ExtendedType,
 
   auto printRequirementsFrom = [&](ExtensionDecl *ED, bool &IsFirst) {
     auto Sig = ED->getGenericSignature();
-    printSingleDepthOfGenericSignature(Sig->getGenericParams(),
-                                       Sig->getRequirements(),
+    printSingleDepthOfGenericSignature(Sig.getGenericParams(),
+                                       Sig.getRequirements(),
                                        IsFirst, PrintRequirements,
                                        [](const Requirement &Req){
       return true;
@@ -2619,7 +2619,7 @@ static bool usesFeatureRethrowsProtocol(
 
   if (auto genericSig = decl->getInnermostDeclContext()
           ->getGenericSignatureOfContext()) {
-    for (const auto &req : genericSig->getRequirements()) {
+    for (const auto &req : genericSig.getRequirements()) {
       if (req.getKind() == RequirementKind::Conformance &&
           usesFeatureRethrowsProtocol(req.getProtocolDecl(), checked))
         return true;
