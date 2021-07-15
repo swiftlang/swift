@@ -254,6 +254,53 @@ GenericEnvironment *GenericSignatureImpl::getGenericEnvironment() const {
   return GenericEnv;
 }
 
+GenericSignature::LocalRequirements
+GenericSignatureImpl::getLocalRequirements(Type depType) const {
+  assert(depType->isTypeParameter() && "Expected a type parameter here");
+
+  GenericSignature::LocalRequirements result;
+
+  auto &builder = *getGenericSignatureBuilder();
+
+  auto resolved =
+    builder.maybeResolveEquivalenceClass(
+                                  depType,
+                                  ArchetypeResolutionKind::CompleteWellFormed,
+                                  /*wantExactPotentialArchetype=*/false);
+  if (!resolved) {
+    result.concreteType = ErrorType::get(depType);
+    return result;
+  }
+
+  if (auto concreteType = resolved.getAsConcreteType()) {
+    result.concreteType = concreteType;
+    return result;
+  }
+
+  auto *equivClass = resolved.getEquivalenceClass(builder);
+
+  auto genericParams = getGenericParams();
+  result.anchor = equivClass->getAnchor(builder, genericParams);
+
+  if (equivClass->concreteType) {
+    result.concreteType = equivClass->concreteType;
+    return result;
+  }
+
+  result.superclass = equivClass->superclass;
+
+  for (const auto &conforms : equivClass->conformsTo) {
+    auto proto = conforms.first;
+
+    if (!equivClass->isConformanceSatisfiedBySuperclass(proto))
+      result.protos.push_back(proto);
+  }
+
+  result.layout = equivClass->layout;
+
+  return result;
+}
+
 ASTContext &GenericSignatureImpl::getASTContext() const {
   // Canonical signatures store the ASTContext directly.
   if (auto ctx = CanonicalSignatureOrASTContext.dyn_cast<ASTContext *>())
