@@ -371,10 +371,7 @@ void LinearMapInfo::generateDifferentiationDataStructures(
     ADContext &context, SILFunction *derivativeFn) {
   auto &astCtx = original->getASTContext();
   // Get the derivative function generic signature.
-  CanGenericSignature derivativeFnGenSig = nullptr;
-  if (auto *derivativeFnGenEnv = derivativeFn->getGenericEnvironment())
-    derivativeFnGenSig =
-        derivativeFnGenEnv->getGenericSignature()->getCanonicalSignature();
+  auto derivativeFnGenSig = derivativeFnGenEnv->getGenericSignature().getCanonicalSignature();
 
   // Create linear map struct for each original block.
   for (auto &origBB : *original) {

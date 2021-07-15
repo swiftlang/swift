@@ -104,7 +104,7 @@ CanGenericSignature buildThunkSignature(SILFunction *fn, bool inheritGenericSig,
       },
       MakeAbstractConformanceForGenericType());
 
-  return genericSig->getCanonicalSignature();
+  return genericSig.getCanonicalSignature();
 }
 
 CanSILFunctionType buildThunkType(SILFunction *fn,

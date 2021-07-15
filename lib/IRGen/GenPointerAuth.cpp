@@ -523,7 +523,7 @@ static uint64_t getTypeHash(IRGenModule &IGM, CanSILFunctionType type) {
   auto genericSig = type->getInvocationGenericSignature();
   hashStringForFunctionType(
       IGM, type, Out,
-      genericSig ? genericSig->getCanonicalSignature()->getGenericEnvironment()
+      genericSig ? genericSig.getCanonicalSignature()->getGenericEnvironment()
                  : nullptr);
   return clang::CodeGen::computeStableStringHash(Out.str());
 }
@@ -533,7 +533,7 @@ static uint64_t getYieldTypesHash(IRGenModule &IGM, CanSILFunctionType type) {
   llvm::raw_svector_ostream out(buffer);
   auto genericSig = type->getInvocationGenericSignature();
   GenericEnvironment *genericEnv =
-      genericSig ? genericSig->getCanonicalSignature()->getGenericEnvironment()
+      genericSig ? genericSig.getCanonicalSignature()->getGenericEnvironment()
                  : nullptr;
 
   out << [&]() -> StringRef {

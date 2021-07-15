@@ -3944,9 +3944,7 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
                               : nullptr;
 
   auto origFnTy = originalFn->getLoweredFunctionType();
-  CanGenericSignature derivativeCanGenSig;
-  if (auto derivativeGenSig = config.derivativeGenericSignature)
-    derivativeCanGenSig = derivativeGenSig->getCanonicalSignature();
+  auto derivativeCanGenSig = config.derivativeGenericSignature.getCanonicalSignature();
   auto thunkFnTy = origFnTy->getAutoDiffDerivativeFunctionType(
       config.parameterIndices, config.resultIndices, kind, Types,
       LookUpConformanceInModule(M.getSwiftModule()), derivativeCanGenSig);

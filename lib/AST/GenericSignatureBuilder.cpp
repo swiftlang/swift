@@ -8611,9 +8611,7 @@ AbstractGenericSignatureRequest::evaluate(
   // generic signature builder.
   if (!isCanonicalRequest(baseSignature, addedParameters, addedRequirements)) {
     // Canonicalize the inputs so we can form the canonical request.
-    GenericSignature canBaseSignature;
-    if (baseSignature)
-      canBaseSignature = baseSignature->getCanonicalSignature();
+    auto canBaseSignature = baseSignature.getCanonicalSignature();
 
     SmallVector<GenericTypeParamType *, 2> canAddedParameters;
     canAddedParameters.reserve(addedParameters.size());

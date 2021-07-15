@@ -779,9 +779,7 @@ static SILFunction *createEmptyVJP(ADContext &context,
   Mangle::DifferentiationMangler mangler;
   auto vjpName = mangler.mangleDerivativeFunction(
       original->getName(), AutoDiffDerivativeFunctionKind::VJP, config);
-  CanGenericSignature vjpCanGenSig;
-  if (auto vjpGenSig = witness->getDerivativeGenericSignature())
-    vjpCanGenSig = vjpGenSig->getCanonicalSignature();
+  auto vjpCanGenSig = witness->getDerivativeGenericSignature().getCanonicalSignature();
   GenericEnvironment *vjpGenericEnv = nullptr;
   if (vjpCanGenSig && !vjpCanGenSig->areAllParamsConcrete())
     vjpGenericEnv = vjpCanGenSig->getGenericEnvironment();
@@ -822,9 +820,7 @@ static SILFunction *createEmptyJVP(ADContext &context,
   Mangle::DifferentiationMangler mangler;
   auto jvpName = mangler.mangleDerivativeFunction(
       original->getName(), AutoDiffDerivativeFunctionKind::JVP, config);
-  CanGenericSignature jvpCanGenSig;
-  if (auto jvpGenSig = witness->getDerivativeGenericSignature())
-    jvpCanGenSig = jvpGenSig->getCanonicalSignature();
+  auto jvpCanGenSig = witness->getDerivativeGenericSignature().getCanonicalSignature();
   GenericEnvironment *jvpGenericEnv = nullptr;
   if (jvpCanGenSig && !jvpCanGenSig->areAllParamsConcrete())
     jvpGenericEnv = jvpCanGenSig->getGenericEnvironment();
