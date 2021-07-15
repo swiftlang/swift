@@ -889,11 +889,9 @@ Type TypeResolution::applyUnboundGenericArguments(
         return resultType;
 
       auto parentSig = decl->getDeclContext()->getGenericSignatureOfContext();
-      if (parentSig) {
-        for (auto gp : parentSig.getGenericParams())
-          subs[gp->getCanonicalType()->castTo<GenericTypeParamType>()] =
-              genericSig->getConcreteType(gp);
-      }
+      for (auto gp : parentSig.getGenericParams())
+        subs[gp->getCanonicalType()->castTo<GenericTypeParamType>()] =
+            genericSig->getConcreteType(gp);
     } else {
       subs = parentTy->getContextSubstitutions(decl->getDeclContext());
     }

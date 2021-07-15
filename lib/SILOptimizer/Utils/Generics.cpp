@@ -1570,9 +1570,8 @@ void FunctionSignaturePartialSpecializer::addCallerRequirements() {
 
 /// Add requirements from the callee's signature.
 void FunctionSignaturePartialSpecializer::addCalleeRequirements() {
-  if (CalleeGenericSig)
-    addRequirements(CalleeGenericSig.getRequirements(),
-                    CalleeInterfaceToSpecializedInterfaceMap);
+  addRequirements(CalleeGenericSig.getRequirements(),
+                  CalleeInterfaceToSpecializedInterfaceMap);
 }
 
 std::pair<GenericEnvironment *, GenericSignature>

@@ -913,7 +913,6 @@ static VarDecl *getPointeeProperty(VarDecl *&cache,
   NominalTypeDecl *nominal = (ctx.*getNominal)();
   if (!nominal) return nullptr;
   auto sig = nominal->getGenericSignature();
-  if (!sig) return nullptr;
   if (sig.getGenericParams().size() != 1) return nullptr;
 
   // There must be a property named "pointee".

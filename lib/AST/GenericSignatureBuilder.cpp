@@ -5298,12 +5298,8 @@ public:
     // Infer from generic typealiases.
     if (auto TypeAlias = dyn_cast<TypeAliasType>(ty.getPointer())) {
       auto decl = TypeAlias->getDecl();
-      auto genericSig = decl->getGenericSignature();
-      if (!genericSig)
-        return Action::Continue;
-
       auto subMap = TypeAlias->getSubstitutionMap();
-      for (const auto &rawReq : genericSig.getRequirements()) {
+      for (const auto &rawReq : decl->getGenericSignature().getRequirements()) {
         if (auto req = rawReq.subst(subMap))
           Builder.addRequirement(*req, source, nullptr);
       }
@@ -8078,8 +8074,6 @@ void GenericSignatureBuilder::dump(llvm::raw_ostream &out) {
 }
 
 void GenericSignatureBuilder::addGenericSignature(GenericSignature sig) {
-  if (!sig) return;
-
   for (auto param : sig.getGenericParams())
     addGenericParameter(param);
 
@@ -8605,15 +8599,12 @@ AbstractGenericSignatureRequest::evaluate(
   // If there are no added requirements, we can form the signature directly
   // with the added parameters.
   if (addedRequirements.empty()) {
-    ArrayRef<Requirement> requirements;
-    if (baseSignature) {
-      addedParameters.insert(addedParameters.begin(),
-                             baseSignature.getGenericParams().begin(),
-                             baseSignature.getGenericParams().end());
-      requirements = baseSignature.getRequirements();
-    }
+    addedParameters.insert(addedParameters.begin(),
+                           baseSignature.getGenericParams().begin(),
+                           baseSignature.getGenericParams().end());
 
-    return GenericSignature::get(addedParameters, requirements);
+    return GenericSignature::get(addedParameters,
+                                 baseSignature.getRequirements());
   }
 
   // If the request is non-canonical, we won't need to build our own

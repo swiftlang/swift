@@ -1402,11 +1402,7 @@ static void bindArchetypesFromContext(
       continue;
     }
 
-    // If it's not generic, there's nothing to do.
     auto genericSig = parentDC->getGenericSignatureOfContext();
-    if (!genericSig)
-      break;
-
     for (auto *paramTy : genericSig.getGenericParams()) {
       Type contextTy = cs.DC->mapTypeIntoContext(paramTy);
       bindPrimaryArchetype(paramTy, contextTy);

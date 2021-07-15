@@ -3703,9 +3703,6 @@ static bool hasSelfSameTypeConstraint(const ValueDecl *req) {
     return false;
 
   const auto genericSig = genCtx->getGenericSignature();
-  if (!genericSig)
-    return false;
-
   const auto selfTy = proto->getSelfInterfaceType();
   for (const auto &constr : genericSig.getRequirements()) {
     if (constr.getKind() != RequirementKind::SameType)
@@ -3728,7 +3725,6 @@ static Optional<std::pair<RequirementRepr *, Requirement>>
 getAdopteeSelfSameTypeConstraint(ClassDecl *selfClass, ValueDecl *witness) {
   auto genericSig =
     witness->getInnermostDeclContext()->getGenericSignatureOfContext();
-  if (!genericSig) return None;
 
   // First, search for any bogus requirements.
   auto it = llvm::find_if(genericSig.getRequirements(),
