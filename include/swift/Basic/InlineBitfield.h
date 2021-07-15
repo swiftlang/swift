@@ -117,10 +117,4 @@ constexpr unsigned bitmax(unsigned a, unsigned b) {
 }
 
 constexpr unsigned countBitsUsed(uint64_t arg) {
-  // Is there a C++ "std::countLeadingZeros()"?
-  return 64 - __builtin_clz(arg);
-}
-
-} // end namespace swift
-
-#endif // SWIFT_INLINE_BITFIELD_H
+  return 64 - __builtin_clzll(arg); // assumes unsigned long long is 64 bits
