@@ -19,13 +19,21 @@ distributed actor LocalWorker {
 // ==== Fake Transport ---------------------------------------------------------
 
 @available(SwiftStdlib 5.5, *)
+struct ActorAddress: ActorIdentity {
+  let address: String
+  init(parse address : String) {
+    self.address = address
+  }
+}
+
+@available(SwiftStdlib 5.5, *)
 struct FakeTransport: ActorTransport {
   func resolve<Act>(address: ActorAddress, as actorType: Act.Type)
     throws -> ActorResolved<Act> where Act: DistributedActor {
     fatalError()
   }
 
-  func assignAddress<Act>(
+  func assignIdentity<Act>(
     _ actorType: Act.Type
   ) -> ActorAddress where Act : DistributedActor {
     let address = ActorAddress(parse: "xxx")
@@ -36,10 +44,10 @@ struct FakeTransport: ActorTransport {
   public func actorReady<Act>(
     _ actor: Act
   ) where Act: DistributedActor {
-    print("ready actor:\(actor), address:\(actor.actorAddress)")
+    print("ready actor:\(actor), address:\(actor.id)")
   }
 
-  public func resignAddress(
+  public func resignIdentity(
     _ address: ActorAddress
   ) {
     print("ready address:\(address)")

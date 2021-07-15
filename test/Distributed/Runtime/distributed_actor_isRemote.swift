@@ -27,11 +27,21 @@ extension SomeSpecificDistributedActor {
 
   @_dynamicReplacement(for: hello())
   nonisolated func _remote_hello() async throws -> String {
-    return "remote impl (address: \(actor.actorAddress))"
+    return "remote impl (address: \(actor.id))"
   }
 }
 
 // ==== Fake Transport ---------------------------------------------------------
+
+@available(SwiftStdlib 5.5, *)
+struct FakeActorID: ActorIdentity {
+  let id: UInt64
+}
+
+@available(SwiftStdlib 5.5, *)
+enum FakeTransportError: ActorTransportError {
+  case unsupportedActorIdentity(ActorIdentity)
+}
 
 @available(SwiftStdlib 5.5, *)
 struct FakeTransport: ActorTransport {
@@ -40,7 +50,7 @@ struct FakeTransport: ActorTransport {
     return .makeProxy
   }
 
-  func assignAddress<Act>(
+  func assignIdentity<Act>(
     _ actorType: Act.Type
   ) -> ActorAddress where Act : DistributedActor {
     ActorAddress(parse: "")
@@ -50,9 +60,10 @@ struct FakeTransport: ActorTransport {
     _ actor: Act
   ) where Act: DistributedActor {}
 
-  public func resignAddress(
-    _ address: ActorAddress
+  public func resignIdentity(
+    _ address: AnyActorIdentity
   ) {}
+
 }
 
 // ==== Execute ----------------------------------------------------------------
@@ -72,7 +83,7 @@ func test_remote() async {
   let transport = FakeTransport()
 
   let local = SomeSpecificDistributedActor(transport: transport)
-  _ = local.actorAddress
+  _ = local.id
   assert(__isLocalActor(local) == true, "should be local")
   assert(__isRemoteActor(local) == false, "should be local")
 

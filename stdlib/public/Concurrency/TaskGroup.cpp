@@ -754,7 +754,7 @@ PollResult TaskGroupImpl::poll(AsyncTask *waitingTask) {
       assert(item.getTask()->isFuture());
       auto futureFragment = item.getTask()->futureFragment();
 
-      // Store the task in the result, so after we're done processing it it may
+      // Store the task in the result, so after we're done processing it may
       // be swift_release'd; we kept it alive while it was in the readyQueue by
       // an additional retain issued as we enqueued it there.
       result.retainedTask = item.getTask();
