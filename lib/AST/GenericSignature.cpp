@@ -247,8 +247,9 @@ CanGenericSignature GenericSignatureImpl::getCanonicalSignature() const {
 
 GenericEnvironment *GenericSignatureImpl::getGenericEnvironment() const {
   if (GenericEnv == nullptr) {
+    auto *builder = getGenericSignatureBuilder();
     const auto impl = const_cast<GenericSignatureImpl *>(this);
-    impl->GenericEnv = GenericEnvironment::getIncomplete(this);
+    impl->GenericEnv = GenericEnvironment::getIncomplete(this, builder);
   }
 
   return GenericEnv;

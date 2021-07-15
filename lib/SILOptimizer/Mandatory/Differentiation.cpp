@@ -25,6 +25,7 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SourceFile.h"
