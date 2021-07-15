@@ -597,7 +597,7 @@ EXPR_NODES = [
     # postfix '#if' expession
     Node('PostfixIfConfigExpr', kind='Expr',
          children=[
-             Child('Base', kind='Expr'),
+             Child('Base', kind='Expr', is_optional=True),
              Child('Config', kind='IfConfigDecl'),
          ]),
 
