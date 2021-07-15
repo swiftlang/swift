@@ -34,12 +34,8 @@ public func withTaskCancellationHandler<T>(
 ) async rethrows -> T {
   let task = Builtin.getCurrentAsyncTask()
 
-  guard !_taskIsCancelled(task) else {
-    // If the current task is already cancelled, run the handler immediately.
-    handler()
-    return try await operation()
-  }
-
+  // unconditionally add the cancellation record to the task.
+  // if the task was already cancelled, it will be executed right away.
   let record = _taskAddCancellationHandler(handler: handler)
   defer { _taskRemoveCancellationHandler(record: record) }
 
