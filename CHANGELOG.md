@@ -7,7 +7,7 @@ Swift Next
 ----------
 * [SE-0290][]:
 
-  It is now possible to write inverted availability statements by using the new `#unavailable` keyword:
+  It is now possible to write inverted availability conditions by using the new `#unavailable` keyword:
 
   ```swift
   if #unavailable(iOS 15.0) {
