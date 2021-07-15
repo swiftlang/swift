@@ -1797,10 +1797,6 @@ void ASTContext::registerGenericSignatureBuilder(
 
 GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
                                                       CanGenericSignature sig) {
-  if (LangOpts.EnableRequirementMachine) {
-    (void) getOrCreateRequirementMachine(sig);
-  }
-
   // Check whether we already have a generic signature builder for this
   // signature and module.
   auto arena = getArena(sig);
