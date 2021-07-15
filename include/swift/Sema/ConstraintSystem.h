@@ -4096,10 +4096,9 @@ public:
   /// Generate constraints for the body of the given closure.
   ///
   /// \param closure the closure expression
-  /// \param resultType the closure's result type
   ///
   /// \returns \c true if constraint generation failed, \c false otherwise
-  bool generateConstraints(ClosureExpr *closure, Type resultType);
+  bool generateConstraints(ClosureExpr *closure);
 
   /// Generate constraints for the given (unchecked) expression.
   ///
