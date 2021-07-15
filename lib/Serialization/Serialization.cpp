@@ -1440,6 +1440,8 @@ void Serializer::writeASTBlockEntity(
     const NormalProtocolConformance *conformance) {
   using namespace decls_block;
 
+  PrettyStackTraceConformance trace("serializing", conformance);
+
   // The conformance must be complete, or we can't serialize it.
   assert(conformance->isComplete() || allowCompilerErrors());
   assert(NormalConformancesToSerialize.hasRef(conformance));
@@ -1460,6 +1462,9 @@ void Serializer::writeASTBlockEntity(
   });
 
   conformance->forEachValueWitness([&](ValueDecl *req, Witness witness) {
+      PrettyStackTraceDecl traceValueWitness(
+          "serializing value witness for requirement", req);
+
       ++numValueWitnesses;
       data.push_back(addDeclRef(req));
       data.push_back(addDeclRef(witness.getDecl()));
