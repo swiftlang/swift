@@ -1330,6 +1330,7 @@ public:
   llvm::Constant *getFixLifetimeFn();
   
   llvm::Constant *getFixedClassInitializationFn();
+  llvm::Function *getAwaitAsyncContinuationFn();
 
   /// The constructor used when generating code.
   ///

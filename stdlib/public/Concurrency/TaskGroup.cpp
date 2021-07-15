@@ -728,6 +728,9 @@ PollResult TaskGroupImpl::poll(AsyncTask *waitingTask) {
     return result;
   }
 
+  // Have we suspended the task?
+  bool hasSuspended = false;
+
   auto waitHead = waitQueue.load(std::memory_order_acquire);
 
   // ==== 2) Ready task was polled, return with it immediately -----------------
@@ -742,13 +745,12 @@ PollResult TaskGroupImpl::poll(AsyncTask *waitingTask) {
       // Success! We are allowed to poll.
       ReadyQueueItem item;
       bool taskDequeued = readyQueue.dequeue(item);
-      if (!taskDequeued) {
-        result.status = PollStatus::MustWait;
-        result.storage = nullptr;
-        result.successType = nullptr;
-        result.retainedTask = nullptr;
-        mutex.unlock(); // TODO: remove group lock, and use status for synchronization
-        return result;
+      assert(taskDequeued); (void) taskDequeued;
+
+      // We're going back to running the task, so if we suspended before,
+      // we need to flag it as running again.
+      if (hasSuspended) {
+        waitingTask->flagAsRunning();
       }
 
       assert(item.getTask()->isFuture());
@@ -796,6 +798,10 @@ PollResult TaskGroupImpl::poll(AsyncTask *waitingTask) {
   assert(assumed.readyTasks() == 0);
   _swift_tsan_release(static_cast<Job *>(waitingTask));
   while (true) {
+    if (!hasSuspended) {
+      hasSuspended = true;
+      waitingTask->flagAsSuspended();
+    }
     // Put the waiting task at the beginning of the wait queue.
     if (waitQueue.compare_exchange_weak(
         waitHead, waitingTask,
@@ -804,10 +810,10 @@ PollResult TaskGroupImpl::poll(AsyncTask *waitingTask) {
       mutex.unlock(); // TODO: remove fragment lock, and use status for synchronization
       // no ready tasks, so we must wait.
       result.status = PollStatus::MustWait;
+      _swift_task_clearCurrent();
       return result;
     } // else, try again
   }
-  assert(false && "must successfully compare exchange the waiting task.");
 }
 
 // =============================================================================

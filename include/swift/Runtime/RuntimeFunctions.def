@@ -1582,6 +1582,14 @@ FUNCTION(ContinuationInit,
          ARGS(ContinuationAsyncContextPtrTy, SizeTy),
          ATTRS(NoUnwind))
 
+// void swift_continuation_await(AsyncContext *continuationContext);
+FUNCTION(ContinuationAwait,
+         swift_continuation_await, SwiftAsyncCC,
+         ConcurrencyAvailability,
+         RETURNS(VoidTy),
+         ARGS(ContinuationAsyncContextPtrTy),
+         ATTRS(NoUnwind))
+
 // void swift_continuation_resume(AsyncTask *continuation);
 FUNCTION(ContinuationResume,
          swift_continuation_resume, SwiftCC,

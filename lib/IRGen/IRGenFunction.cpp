@@ -665,50 +665,8 @@ void IRGenFunction::emitAwaitAsyncContinuation(
   assert(AsyncCoroutineCurrentContinuationContext && "no active continuation");
   auto pointerAlignment = IGM.getPointerAlignment();
 
-  // Check whether the continuation has already been resumed.
-  // If so, we can just immediately continue with the control flow.
-  // Otherwise, we need to suspend, and resuming the continuation will
-  // trigger the function to resume.
-  //
-  // We do this by atomically trying to change the synchronization field
-  // in the continuation context from 0 (the state it was initialized
-  // with) to 1.  If this fails, the continuation must already have been
-  // resumed, so we can bypass the suspension point and immediately
-  // start interpreting the result stored in the continuation.
-  // Note that we use a strong compare-exchange (the default for the LLVM
-  // cmpxchg instruction), so spurious failures are disallowed; we can
-  // therefore trust that a failure means that the continuation has
-  // already been resumed.
-
-  auto contAwaitSyncAddr =
-      Builder.CreateStructGEP(AsyncCoroutineCurrentContinuationContext, 1);
-
-  auto pendingV = llvm::ConstantInt::get(
-      contAwaitSyncAddr->getType()->getPointerElementType(),
-      unsigned(ContinuationStatus::Pending));
-  auto awaitedV = llvm::ConstantInt::get(
-      contAwaitSyncAddr->getType()->getPointerElementType(),
-      unsigned(ContinuationStatus::Awaited));
-  auto results = Builder.CreateAtomicCmpXchg(
-      contAwaitSyncAddr, pendingV, awaitedV,
-      llvm::AtomicOrdering::Release /*success ordering*/,
-      llvm::AtomicOrdering::Acquire /* failure ordering */,
-      llvm::SyncScope::System);
-  auto firstAtAwait = Builder.CreateExtractValue(results, 1);
-  auto contBB = createBasicBlock("await.async.resume");
-  auto abortBB = createBasicBlock("await.async.abort");
-  Builder.CreateCondBr(firstAtAwait, abortBB, contBB);
-  Builder.emitBlock(abortBB);
-  {
-    // We were the first to the sync point. "Abort" (return from the
-    // coroutine partial function, without making a tail call to anything)
-    // because the continuation result is not available yet. When the
-    // continuation is later resumed, the task will get scheduled
-    // starting from the suspension point.
-    emitCoroutineOrAsyncExit();
-  }
-
-  Builder.emitBlock(contBB);
+  // Call swift_continuation_await to check whether the continuation
+  // has already been resumed.
   {
     // Set up the suspend point.
     SmallVector<llvm::Value *, 8> arguments;
@@ -718,15 +676,10 @@ void IRGenFunction::emitAwaitAsyncContinuation(
     auto resumeProjFn = getOrCreateResumePrjFn();
     arguments.push_back(
         Builder.CreateBitOrPointerCast(resumeProjFn, IGM.Int8PtrTy));
-    // The dispatch function just calls the resume point.
-    auto resumeFnPtr =
-        getFunctionPointerForResumeIntrinsic(AsyncCoroutineCurrentResume);
     arguments.push_back(Builder.CreateBitOrPointerCast(
-        createAsyncDispatchFn(resumeFnPtr, {IGM.Int8PtrTy}),
+        IGM.getAwaitAsyncContinuationFn(),
         IGM.Int8PtrTy));
-    arguments.push_back(AsyncCoroutineCurrentResume);
-    arguments.push_back(Builder.CreateBitOrPointerCast(
-        AsyncCoroutineCurrentContinuationContext, IGM.Int8PtrTy));
+    arguments.push_back(AsyncCoroutineCurrentContinuationContext);
     auto resultTy =
         llvm::StructType::get(IGM.getLLVMContext(), {IGM.Int8PtrTy}, false /*packed*/);
     emitSuspendAsyncCall(swiftAsyncContextIndex, resultTy, arguments);
