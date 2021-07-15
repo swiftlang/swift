@@ -465,8 +465,9 @@ public:
   {
     // Allocate space to receive the resume value when the continuation is
     // resumed.
-    opaqueResumeType = SGF.getLoweredType(AbstractionPattern::getOpaque(),
-                                          calleeTypeInfo.substResultType);
+    opaqueResumeType =
+        SGF.getLoweredType(AbstractionPattern(calleeTypeInfo.substResultType),
+                           calleeTypeInfo.substResultType);
     resumeBuf = SGF.emitTemporaryAllocation(loc, opaqueResumeType);
   }
   
