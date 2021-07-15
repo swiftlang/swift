@@ -89,7 +89,7 @@ func test_outside(distributed: D) async throws {
   try await distributed.distHelloAsyncThrows() // ok
 
   // special: the actorAddress may always be referred to
-  _ = distributed.actorAddress // ok
+  _ = distributed.id // ok
   _ = distributed.actorTransport // ok
 }
 

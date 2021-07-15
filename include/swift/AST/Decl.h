@@ -5262,12 +5262,6 @@ public:
     });
   }
 
-  /// Whether the given name is actorAddress, which is used for distributed actors.
-  static bool isDistributedActorAddressName(ASTContext &ctx, DeclName name);
-
-  /// Whether the given name is actorTransport, which is used for distributed actors.
-  static bool isDistributedActorTransportName(ASTContext &ctx, DeclName name);
-
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { 
     return D->getKind() == DeclKind::Var || D->getKind() == DeclKind::Param; 

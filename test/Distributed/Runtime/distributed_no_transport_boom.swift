@@ -23,13 +23,21 @@ distributed actor SomeSpecificDistributedActor {
 // ==== Fake Transport ---------------------------------------------------------
 
 @available(SwiftStdlib 5.5, *)
+struct ActorAddress: ActorIdentity {
+  let address: String
+  init(parse address : String) {
+    self.address = address
+  }
+}
+
+@available(SwiftStdlib 5.5, *)
 struct FakeTransport: ActorTransport {
   func resolve<Act>(address: ActorAddress, as actorType: Act.Type)
     throws -> ActorResolved<Act> where Act: DistributedActor {
     return .makeProxy
   }
 
-  func assignAddress<Act>(
+  func assignIdentity<Act>(
     _ actorType: Act.Type
   ) -> ActorAddress where Act : DistributedActor {
     ActorAddress(parse: "")
@@ -39,7 +47,7 @@ struct FakeTransport: ActorTransport {
     _ actor: Act
   ) where Act: DistributedActor {}
 
-  public func resignAddress(
+  public func resignIdentity(
     _ address: ActorAddress
   ) {}
 }

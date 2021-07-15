@@ -105,10 +105,10 @@ distributed actor BadMulti {
 // initializers to keep running while we actually created a proxy with no storage.
 @available(SwiftStdlib 5.5, *)
 distributed actor BadResolveInitCall {
-  convenience init(any: Any, address: ActorAddress, transport: ActorTransport) throws {
-    // expected-error@-1 {{'distributed actor' initializer 'init(any:address:transport:)' cannot delegate to resolve-initializer 'init(resolve:using:)', as it may result resolving a storageless proxy instance}}
-    // expected-error@-2 {{'distributed actor' initializer 'init(any:address:transport:)' must (directly or indirectly) delegate to 'init(transport:)'}}
-    try self.init(resolve: address, using: transport) // TODO: suggest removing this call, since it is illegal
+  convenience init(any: Any, id: AnyActorIdentity, transport: ActorTransport) throws {
+    // expected-error@-1 {{'distributed actor' initializer 'init(any:id:transport:)' cannot delegate to resolve-initializer 'init(resolve:using:)', as it may result resolving a storageless proxy instance}}
+    // expected-error@-2 {{'distributed actor' initializer 'init(any:id:transport:)' must (directly or indirectly) delegate to 'init(transport:)'}}
+    try self.init(resolve: id, using: transport) // TODO: suggest removing this call, since it is illegal
   }
 }
 
@@ -132,7 +132,7 @@ distributed actor BadRedeclare11 { // expected-error {{type 'BadRedeclare11' doe
 
 @available(SwiftStdlib 5.5, *)
 distributed actor BadRedeclare2 { // expected-error {{type 'BadRedeclare2' does not conform to protocol 'DistributedActor'}}
-  convenience init(resolve address: ActorAddress, using transport: ActorTransport) {}
+  convenience init(resolve id: AnyActorIdentity, using transport: ActorTransport) {}
   // expected-error@-1 {{'distributed actor' resolve-initializer 'init(resolve:using:)' cannot be implemented explicitly}}
   // expected-note@-2 {{candidate exactly matches}}
   // expected-error@-3 {{invalid redeclaration of synthesized 'init(resolve:using:)'}}
@@ -141,7 +141,7 @@ distributed actor BadRedeclare2 { // expected-error {{type 'BadRedeclare2' does 
 
 @available(SwiftStdlib 5.5, *)
 distributed actor BadRedeclare21 { //expected-error {{type 'BadRedeclare21' does not conform to protocol 'DistributedActor'}}
-  convenience init(resolve xxx: ActorAddress, using yyy: ActorTransport) {}
+  convenience init(resolve xxx: AnyActorIdentity, using yyy: ActorTransport) {}
   // expected-error@-1 {{'distributed actor' resolve-initializer 'init(resolve:using:)' cannot be implemented explicitly}}
   // expected-note@-2 {{candidate exactly matches}}
   // expected-error@-3 {{invalid redeclaration of synthesized 'init(resolve:using:)'}}
@@ -150,7 +150,7 @@ distributed actor BadRedeclare21 { //expected-error {{type 'BadRedeclare21' does
 
 @available(SwiftStdlib 5.5, *)
 distributed actor BadRedeclare22 { //expected-error {{type 'BadRedeclare22' does not conform to protocol 'DistributedActor'}}
-  convenience init(resolve: ActorAddress, using yyy: ActorTransport) throws {}
+  convenience init(resolve: AnyActorIdentity, using yyy: ActorTransport) throws {}
   // expected-error@-1 {{'distributed actor' resolve-initializer 'init(resolve:using:)' cannot be implemented explicitly}}
   // expected-note@-2 {{candidate exactly matches}}
   // expected-error@-3 {{invalid redeclaration of synthesized 'init(resolve:using:)'}}

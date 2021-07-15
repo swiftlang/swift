@@ -14,7 +14,7 @@ distributed actor D1 {
 @available(SwiftStdlib 5.5, *)
 distributed actor D2 {
   let actorTransport: String // expected-error{{invalid redeclaration of synthesized implementation for protocol requirement 'actorTransport'}}
-  let actorAddress: String // expected-error{{invalid redeclaration of synthesized implementation for protocol requirement 'actorAddress'}}
+  let id: String // expected-error{{invalid redeclaration of synthesized implementation for protocol requirement 'id'}}
 }
 
 // ==== Tests ------------------------------------------------------------------

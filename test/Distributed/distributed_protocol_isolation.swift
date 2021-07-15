@@ -77,7 +77,7 @@ func outside_good_generic<DP: DistProtocol>(dp: DP) async throws {
 }
 
 @available(SwiftStdlib 5.5, *)
-func outside_good_ext(dp: DistProtocol) async throws {
+func outside_good_ext<DP: DistProtocol>(dp: DP) async throws {
   _ = try await dp.dist() // implicit async throws
   _ = try await dp.dist(string: "") // implicit async throws
   _ = try await dp.distAsync() // implicit throws

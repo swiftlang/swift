@@ -42,7 +42,7 @@ distributed actor DA: DistributedActor {} // ok
 @available(SwiftStdlib 5.5, *)
 actor A2: DistributedActor {
   // expected-error@-1{{non-distributed actor type 'A2' cannot conform to the 'DistributedActor' protocol}} {{1-1=distributed }}
-  nonisolated var actorAddress: ActorAddress {
+  nonisolated var id: AnyActorIdentity {
     fatalError()
   }
   nonisolated var actorTransport: ActorTransport {
@@ -52,7 +52,7 @@ actor A2: DistributedActor {
   init(transport: ActorTransport) {
     fatalError()
   }
-  init(resolve address: ActorAddress, using transport: ActorTransport) throws {
+  init(resolve id: AnyActorIdentity, using transport: ActorTransport) throws {
     fatalError()
   }
 }
@@ -60,7 +60,7 @@ actor A2: DistributedActor {
 @available(SwiftStdlib 5.5, *)
 class C2: DistributedActor {
   // expected-error@-1{{non-actor type 'C2' cannot conform to the 'Actor' protocol}}
-  nonisolated var actorAddress: ActorAddress {
+  nonisolated var id: AnyActorIdentity {
     fatalError()
   }
   nonisolated var actorTransport: ActorTransport {
@@ -70,7 +70,7 @@ class C2: DistributedActor {
   required init(transport: ActorTransport) {
     fatalError()
   }
-  required init(resolve address: ActorAddress, using transport: ActorTransport) throws {
+  required init(resolve id: AnyActorIdentity, using transport: ActorTransport) throws {
     fatalError()
   }
 }
@@ -79,5 +79,6 @@ class C2: DistributedActor {
 struct S2: DistributedActor {
   // expected-error@-1{{non-class type 'S2' cannot conform to class protocol 'DistributedActor'}}
   // expected-error@-2{{non-class type 'S2' cannot conform to class protocol 'AnyActor'}}
+  // expected-error@-3{{type 'S2' does not conform to protocol 'Identifiable'}}
 }
 

@@ -35,11 +35,11 @@ public protocol AnyActor: AnyObject {}
 /// which involves enqueuing new partial tasks to be executed at some
 /// point.
 @available(SwiftStdlib 5.5, *)
-public protocol DistributedActor: AnyActor, Codable {
+public protocol DistributedActor: AnyActor, Identifiable, Hashable, Codable {
 
     /// Creates new (local) distributed actor instance, bound to the passed transport.
     ///
-    /// Upon initialization, the `actorAddress` field is populated by the transport,
+    /// Upon initialization, the `id` field is populated by the transport,
     /// with an address assigned to this actor.
     ///
     /// - Parameter transport: the transport this distributed actor instance will
@@ -57,7 +57,9 @@ public protocol DistributedActor: AnyActor, Codable {
     ///
     /// - Parameter address: the address to resolve, and produce an instance or proxy for.
     /// - Parameter transport: transport which should be used to resolve the `address`.
-    init(resolve address: ActorAddress, using transport: ActorTransport) throws
+    // FIXME: replace with static func resolve(_:using)
+    // TODO: make this <ID>(resolve id: ID, ...)
+    init(resolve id: AnyActorIdentity, using transport: ActorTransport) throws
 
     /// The `ActorTransport` associated with this actor.
     /// It is immutable and equal to the transport passed in the local/resolve
@@ -65,129 +67,104 @@ public protocol DistributedActor: AnyActor, Codable {
     ///
     /// Conformance to this requirement is synthesized automatically for any
     /// `distributed actor` declaration.
-    nonisolated var actorTransport: ActorTransport { get }
+    nonisolated var actorTransport: ActorTransport { get } // TODO: rename to `transport`?
 
-    /// Logical address which this distributed actor represents.
+    /// Logical identity of this distributed actor.
+    ///
+    /// Many distributed actor references may be pointing at, logically, the same actor.
+    /// For example, calling `resolve(address:using:)` multiple times, is not guaranteed
+    /// to return the same exact resolved actor instance, however all the references would
+    /// represent logically references to the same distributed actor, e.g. on a different node.
     ///
     /// An address is always uniquely pointing at a specific actor instance.
     ///
     /// Conformance to this requirement is synthesized automatically for any
     /// `distributed actor` declaration.
-    nonisolated var actorAddress: ActorAddress { get }
+    nonisolated var id: AnyActorIdentity { get }
+}
+
+// ==== Hashable conformance ---------------------------------------------------
+
+@available(SwiftStdlib 5.5, *)
+extension DistributedActor {
+  nonisolated public func hash(into hasher: inout Hasher) {
+    self.id.hash(into: &hasher)
+  }
+
+  nonisolated public static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.id == rhs.id
+  }
 }
 
 // ==== Codable conformance ----------------------------------------------------
 
 extension CodingUserInfoKey {
-@available(SwiftStdlib 5.5, *)
-    static let actorTransportKey = CodingUserInfoKey(rawValue: "$dist_act_trans")!
+    @available(SwiftStdlib 5.5, *)
+    static let actorTransportKey = CodingUserInfoKey(rawValue: "$dist_act_transport")!
 }
 
 @available(SwiftStdlib 5.5, *)
 extension DistributedActor {
-    nonisolated public init(from decoder: Decoder) throws {
-//        guard let transport = decoder.userInfo[.actorTransportKey] as? ActorTransport else {
-//            throw DistributedActorCodingError(message:
-//            "ActorTransport not available under the decoder.userInfo")
-//        }
-//
-//        var container = try decoder.singleValueContainer()
-//        let address = try container.decode(ActorAddress.self)
-//         self = try Self(resolve: address, using: transport) // FIXME: This is going to be solved by the init() work!!!!
-        fatalError("\(#function) is not implemented yet for distributed actors'")
-    }
+  nonisolated public init(from decoder: Decoder) throws {
+//    let id = try AnyActorIdentity(from: decoder)
+//    self = try Self.resolve(id, using: transport) // FIXME: This is going to be solved by the init() work!!!!
+    fatalError("\(#function) is not implemented yet for distributed actors'")
+  }
 
-    // FIXME: distributed(nonisolated)
-    nonisolated public func encode(to encoder: Encoder) throws {
-        var container = encoder.singleValueContainer()
-        try container.encode(self.actorAddress)
-    }
+  nonisolated public func encode(to encoder: Encoder) throws {
+    var container = encoder.singleValueContainer()
+    try container.encode(self.id)
+  }
 }
 
 /******************************************************************************/
-/***************************** Actor Address **********************************/
+/***************************** Actor Identity *********************************/
 /******************************************************************************/
 
-/// Uniquely identifies a distributed actor, and enables sending messages even to remote actors.
-///
-/// ## Identity
-/// The address is the source of truth with regards to referring to a _specific_ actor in the system.
-/// This is in contrast to an `ActorPath` which can be thought of as paths in a filesystem, however without any uniqueness
-/// or identity guarantees about the files those paths point to.
-///
-/// ## Lifecycle
-/// Note, that an ActorAddress is a pure value, and as such does not "participate" in an actors lifecycle;
-/// Thus, it may represent an address of an actor that has already terminated, so attempts to locate (resolve)
-/// an `ActorRef` for this address may result with a reference to dead letters (meaning, that the actor this address
-/// had pointed to does not exist, and most likely is dead / terminated).
-///
-/// ## Serialization
-///
-/// An address can be serialized using `Codable` or other serialization mechanisms.
-/// When shared over the network or with other processes it must include the origin's
-/// system address (e.g. the network address of the host, or process identifier).
-///
-/// When using `Codable` serialization this is done automatically, by looking up
-/// the address of the `ActorTransport` the actor is associated with if was a local
-/// instance, or simply carrying the full address if it already was a remote reference.
-///
-/// ## Format
-/// The address consists of the following parts:
-///
-/// ```
-/// |              node                  | path               | incarnation |
-///  (  protocol | name? | host | port  ) ( [segments] name )? (  uint32   )
-/// ```
-///
-/// For example: `sact://human-readable-name@127.0.0.1:7337/user/wallet/id-121242`.
-/// Note that the `ActorIncarnation` is not printed by default in the String representation of a path, yet may be inspected on demand.
+/// Uniquely identifies a distributed actor, and enables sending messages and identifying remote actors.
 @available(SwiftStdlib 5.5, *)
-public struct ActorAddress: Codable, Sendable, Equatable, Hashable {
-    /// Uniquely specifies the actor transport and the protocol used by it.
-    ///
-    /// E.g. "xpc", "specific-clustering-protocol" etc.
-    public var `protocol`: String
+public protocol ActorIdentity: Sendable, Hashable, Codable {}
 
-    public var host: String?
-    public var port: Int?
-    public var nodeID: UInt64?
-    public var path: String?
-
-    /// Unique Identifier of this actor.
-    public var uid: UInt64 // TODO: should we remove this
-
-    // FIXME: remove this or implement for real; this is just a hack implementation for now
-    public init(parse: String) {
-        self.protocol = "sact"
-        self.host = "xxx"
-        self.port = 7337
-        self.nodeID = 11
-        self.path = "example"
-        self.uid = 123123
-    }
-}
-
-// TODO: naive impl, bring in a real one
 @available(SwiftStdlib 5.5, *)
-extension ActorAddress: CustomStringConvertible {
-    public var description: String {
-        var result = `protocol`
-        result += "://"
-        if let host = host {
-            result += host
-        }
-        if let port = port {
-            result += ":\(port)"
-        }
-        // TODO: decide if we'd want to print the nodeID too here.
-        if let path = path {
-            result += "/\(path)"
-        }
-        if uid > 0 {
-            result += "#\(uid)"
-        }
-        return result
+public struct AnyActorIdentity: ActorIdentity, @unchecked Sendable {
+  @usableFromInline let _hashInto: (inout Hasher) -> ()
+  @usableFromInline let _equalTo: (Any) -> Bool
+  @usableFromInline let _encodeTo: (Encoder) throws -> ()
+
+  public init<ID>(_ identity: ID) where ID: ActorIdentity {
+    _hashInto = { hasher in identity.hash(into: &hasher) }
+    _equalTo = { other in
+      guard let rhs = other as? ID else {
+        return false
+      }
+      return identity == rhs
     }
+    _encodeTo = { encoder in
+      try identity.encode(to: encoder)
+    }
+  }
+
+  public init(from decoder: Decoder) throws {
+    let userInfoTransport = decoder.userInfo[.actorTransportKey]
+    guard let transport = userInfoTransport as? ActorTransport else {
+      throw DistributedActorCodingError(message:
+          "ActorTransport not available under the decoder.userInfo")
+    }
+
+    self = try transport.decodeIdentity(from: decoder)
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    try _encodeTo(encoder)
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    _hashInto(&hasher)
+  }
+
+  public static func == (lhs: AnyActorIdentity, rhs: AnyActorIdentity) -> Bool {
+    lhs._equalTo(rhs)
+  }
 }
 
 /******************************************************************************/
@@ -196,20 +173,21 @@ extension ActorAddress: CustomStringConvertible {
 
 /// Error protocol to which errors thrown by any `ActorTransport` should conform.
 @available(SwiftStdlib 5.5, *)
-public protocol ActorTransportError: Error {}
+public protocol ActorTransportError: Error {
+}
 
 @available(SwiftStdlib 5.5, *)
 public struct DistributedActorCodingError: ActorTransportError {
-    public let message: String
+  public let message: String
 
-    public init(message: String) {
-        self.message = message
-    }
+  public init(message: String) {
+    self.message = message
+  }
 
-    public static func missingTransportUserInfo<Act>(_ actorType: Act.Type) -> Self
-        where Act: DistributedActor {
-        .init(message: "Missing ActorTransport userInfo while decoding")
-    }
+  public static func missingTransportUserInfo<Act>(_ actorType: Act.Type) -> Self
+      where Act: DistributedActor {
+    .init(message: "Missing ActorTransport userInfo while decoding")
+  }
 }
 
 /******************************************************************************/
@@ -235,6 +213,6 @@ func _distributedActorRemoteInitialize(_ actor: AnyObject)
 /// Called to destroy the default actor instance in an actor.
 /// The implementation will call this within the actor's deinit.
 ///
-/// This will call `actorTransport.resignAddress(self.actorAddress)`.
+/// This will call `actorTransport.resignIdentity(self.id)`.
 @_silgen_name("swift_distributedActor_destroy")
 func _distributedActorDestroy(_ actor: AnyObject)
