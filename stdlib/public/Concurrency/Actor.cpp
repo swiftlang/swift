@@ -239,8 +239,8 @@ void swift::runJobInEstablishedExecutorContext(Job *job) {
 
     task->runInFullyEstablishedContext();
 
-    // Clear the active task.
-    ActiveTask::set(nullptr);
+    assert(ActiveTask::get() == nullptr &&
+           "active task wasn't cleared before susspending?");
   } else {
     // There's no extra bookkeeping to do for simple jobs.
     job->runSimpleInFullyEstablishedContext();
@@ -1937,6 +1937,7 @@ static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContex
           _swift_get_thread_id(), task, newExecutor.getIdentity());
 #endif
   task->flagAsSuspended();
+  _swift_task_clearCurrent();
   swift_task_enqueue(task, newExecutor);
 }
 

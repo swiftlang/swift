@@ -124,6 +124,7 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask,
       // Escalate the priority of this task based on the priority
       // of the waiting task.
       swift_task_escalate(this, waitingTask->Flags.getPriority());
+      _swift_task_clearCurrent();
       return FutureFragment::Status::Executing;
     }
   }
@@ -937,7 +938,7 @@ size_t swift::swift_task_getJobFlags(AsyncTask *task) {
 
 SWIFT_CC(swift)
 static AsyncTask *swift_task_suspendImpl() {
-  auto task = swift_task_getCurrent();
+  auto task = _swift_task_clearCurrent();
   task->flagAsSuspended();
   return task;
 }
@@ -963,15 +964,20 @@ static AsyncTask *swift_continuation_initImpl(ContinuationAsyncContext *context,
                                         : ContinuationStatus::Pending, 
                                       std::memory_order_relaxed);
 
-  auto task = swift_task_getCurrent();
-  assert(task && "initializing a continuation with no current task");
-  task->ResumeContext = context;
-  task->ResumeTask = context->ResumeParent;
+  AsyncTask *task;
 
   // A preawait immediately suspends the task.
   if (flags.isPreawaited()) {
+    task = _swift_task_clearCurrent();
+    assert(task && "initializing a continuation with no current task");
     task->flagAsSuspended();
+  } else {
+    task = swift_task_getCurrent();
+    assert(task && "initializing a continuation with no current task");
   }
+
+  task->ResumeContext = context;
+  task->ResumeTask = context->ResumeParent;
 
   return task;
 }
@@ -1016,7 +1022,10 @@ static void swift_continuation_awaitImpl(ContinuationAsyncContext *context) {
                                  /*failure*/ std::memory_order_acquire);
 
   // If that succeeded, we have nothing to do.
-  if (success) return;
+  if (success) {
+    _swift_task_clearCurrent();
+    return;
+  }
 
   // If it failed, it should be because someone concurrently resumed
   // (note that the compare-exchange above is strong).

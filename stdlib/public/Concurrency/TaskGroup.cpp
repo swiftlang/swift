@@ -810,10 +810,10 @@ PollResult TaskGroupImpl::poll(AsyncTask *waitingTask) {
       mutex.unlock(); // TODO: remove fragment lock, and use status for synchronization
       // no ready tasks, so we must wait.
       result.status = PollStatus::MustWait;
+      _swift_task_clearCurrent();
       return result;
     } // else, try again
   }
-  assert(false && "must successfully compare exchange the waiting task.");
 }
 
 // =============================================================================
