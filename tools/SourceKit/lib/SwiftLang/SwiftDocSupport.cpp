@@ -428,6 +428,9 @@ static bool initDocEntityInfo(const Decl *D,
   Info.IsOptional = D->getAttrs().hasAttribute<OptionalAttr>();
   if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
     Info.IsAsync = AFD->hasAsync();
+  } else if (auto *Storage = dyn_cast<AbstractStorageDecl>(D)) {
+    if (auto *Getter = Storage->getAccessor(AccessorKind::Get))
+      Info.IsAsync = Getter->hasAsync();
   }
 
   if (!IsRef) {
