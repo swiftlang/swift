@@ -3,6 +3,22 @@ CHANGELOG
 
 _**Note:** This is in reverse chronological order, so newer entries are added to the top._
 
+Swift Next
+----------
+* [SE-0290][]:
+
+  It is now possible to write inverted availability conditions by using the new `#unavailable` keyword:
+
+  ```swift
+  if #unavailable(iOS 15.0) {
+      // Old functionality
+  } else {
+      // iOS 15 functionality 
+  }
+  ```
+
+**Add new entries to the top of this section, not here!**
+
 Swift 5.5
 ---------
 
@@ -8627,6 +8643,7 @@ Swift 1.0
 [SE-0284]: <https://github.com/apple/swift-evolution/blob/main/proposals/0284-multiple-variadic-parameters.md>
 [SE-0286]: <https://github.com/apple/swift-evolution/blob/main/proposals/0286-forward-scan-trailing-closures.md>
 [SE-0287]: <https://github.com/apple/swift-evolution/blob/main/proposals/0287-implicit-member-chains.md>
+[SE-0290]: <https://github.com/apple/swift-evolution/blob/main/proposals/0290-negative-availability.md>
 [SE-0293]: <https://github.com/apple/swift-evolution/blob/main/proposals/0293-extend-property-wrappers-to-function-and-closure-parameters.md>
 [SE-0296]: <https://github.com/apple/swift-evolution/blob/main/proposals/0296-async-await.md>
 [SE-0297]: <https://github.com/apple/swift-evolution/blob/main/proposals/0297-concurrency-objc.md>
