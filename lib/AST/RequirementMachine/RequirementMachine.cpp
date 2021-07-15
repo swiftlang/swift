@@ -445,6 +445,45 @@ void RequirementMachine::dump(llvm::raw_ostream &out) const {
   Impl->dump(out);
 }
 
+/// Collects all requirements on a type parameter that are used to construct
+/// its ArchetypeType in a GenericEnvironment.
+GenericSignature::LocalRequirements
+RequirementMachine::getLocalRequirements(
+    Type depType,
+    TypeArrayView<GenericTypeParamType> genericParams) const {
+  auto term = Impl->Context.getMutableTermForType(depType->getCanonicalType(),
+                                                  /*proto=*/nullptr);
+  Impl->System.simplify(term);
+  Impl->verify(term);
+
+  auto &protos = Impl->System.getProtocols();
+
+  GenericSignature::LocalRequirements result;
+  result.anchor = Impl->Context.getTypeForTerm(term, genericParams, protos);
+
+  auto *equivClass = Impl->Map.lookUpEquivalenceClass(term);
+  if (!equivClass)
+    return result;
+
+  if (equivClass->isConcreteType()) {
+    result.concreteType = equivClass->getConcreteType({}, protos,
+                                                      Impl->Context);
+    return result;
+  }
+
+  if (equivClass->hasSuperclassBound()) {
+    result.superclass = equivClass->getSuperclassBound({}, protos,
+                                                       Impl->Context);
+  }
+
+  for (const auto *proto : equivClass->getConformsTo())
+    result.protos.push_back(const_cast<ProtocolDecl *>(proto));
+
+  result.layout = equivClass->getLayoutConstraint();
+
+  return result;
+}
+
 bool RequirementMachine::requiresClass(Type depType) const {
   auto term = Impl->Context.getMutableTermForType(depType->getCanonicalType(),
                                                   /*proto=*/nullptr);

@@ -58,6 +58,8 @@ public:
   // Generic signature queries. Generally you shouldn't have to construct a
   // RequirementMachine instance; instead, call the corresponding methods on
   // GenericSignature, which lazily create a RequirementMachine for you.
+  GenericSignature::LocalRequirements getLocalRequirements(Type depType,
+                      TypeArrayView<GenericTypeParamType> genericParams) const;
   bool requiresClass(Type depType) const;
   LayoutConstraint getLayoutConstraint(Type depType) const;
   bool requiresProtocol(Type depType, const ProtocolDecl *proto) const;

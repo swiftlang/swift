@@ -258,47 +258,134 @@ GenericSignature::LocalRequirements
 GenericSignatureImpl::getLocalRequirements(Type depType) const {
   assert(depType->isTypeParameter() && "Expected a type parameter here");
 
-  GenericSignature::LocalRequirements result;
+  auto computeViaGSB = [&]() {
+    GenericSignature::LocalRequirements result;
 
-  auto &builder = *getGenericSignatureBuilder();
+    auto &builder = *getGenericSignatureBuilder();
 
-  auto resolved =
-    builder.maybeResolveEquivalenceClass(
-                                  depType,
-                                  ArchetypeResolutionKind::CompleteWellFormed,
-                                  /*wantExactPotentialArchetype=*/false);
-  if (!resolved) {
-    result.concreteType = ErrorType::get(depType);
+    auto resolved =
+      builder.maybeResolveEquivalenceClass(
+                                    depType,
+                                    ArchetypeResolutionKind::CompleteWellFormed,
+                                    /*wantExactPotentialArchetype=*/false);
+    if (!resolved) {
+      result.concreteType = ErrorType::get(depType);
+      return result;
+    }
+
+    if (auto concreteType = resolved.getAsConcreteType()) {
+      result.concreteType = concreteType;
+      return result;
+    }
+
+    auto *equivClass = resolved.getEquivalenceClass(builder);
+
+    auto genericParams = getGenericParams();
+    result.anchor = equivClass->getAnchor(builder, genericParams);
+
+    if (equivClass->concreteType) {
+      result.concreteType = equivClass->concreteType;
+      return result;
+    }
+
+    result.superclass = equivClass->superclass;
+
+    for (const auto &conforms : equivClass->conformsTo) {
+      auto proto = conforms.first;
+
+      if (!equivClass->isConformanceSatisfiedBySuperclass(proto))
+        result.protos.push_back(proto);
+    }
+
+    result.layout = equivClass->layout;
+
     return result;
+  };
+
+  auto computeViaRQM = [&]() {
+    auto *machine = getRequirementMachine();
+    return machine->getLocalRequirements(depType, getGenericParams());
+  };
+
+  auto &ctx = getASTContext();
+  if (ctx.LangOpts.EnableRequirementMachine) {
+    auto rqmResult = computeViaRQM();
+
+#ifndef NDEBUG
+    auto gsbResult = computeViaGSB();
+
+    auto typesEqual = [&](Type lhs, Type rhs) {
+      if (!lhs || !rhs)
+        return !lhs == !rhs;
+      return lhs->isEqual(rhs);
+    };
+
+    auto compare = [&]() {
+      // If the types are concrete, we don't care about the rest.
+      if (gsbResult.concreteType || rqmResult.concreteType) {
+        if (!typesEqual(gsbResult.concreteType, rqmResult.concreteType))
+          return false;
+
+        return true;
+      }
+
+      if (!typesEqual(gsbResult.anchor, rqmResult.anchor))
+        return false;
+
+      if (gsbResult.layout != rqmResult.layout)
+        return false;
+
+      auto lhsProtos = gsbResult.protos;
+      ProtocolType::canonicalizeProtocols(lhsProtos);
+      auto rhsProtos = rqmResult.protos;
+      ProtocolType::canonicalizeProtocols(rhsProtos);
+
+      if (lhsProtos != rhsProtos)
+        return false;
+
+      return true;
+    };
+
+    auto dumpReqs = [&](const GenericSignature::LocalRequirements &reqs) {
+      if (reqs.anchor) {
+        llvm::errs() << "- Anchor: " << reqs.anchor << "\n";
+        reqs.anchor.dump(llvm::errs());
+      }
+      if (reqs.concreteType) {
+        llvm::errs() << "- Concrete type: " << reqs.concreteType << "\n";
+        reqs.concreteType.dump(llvm::errs());
+      }
+      if (reqs.superclass) {
+        llvm::errs() << "- Superclass: " << reqs.superclass << "\n";
+        reqs.superclass.dump(llvm::errs());
+      }
+      if (reqs.layout) {
+        llvm::errs() << "- Layout: " << reqs.layout << "\n";
+      }
+      for (const auto *proto : reqs.protos) {
+        llvm::errs() << "- Conforms to: " << proto->getName() << "\n";
+      }
+    };
+
+    if (!compare()) {
+      llvm::errs() << "RequirementMachine::getLocalRequirements() is broken\n";
+      llvm::errs() << "Generic signature: " << GenericSignature(this) << "\n";
+      llvm::errs() << "Dependent type: "; depType.dump(llvm::errs());
+      llvm::errs() << "GenericSignatureBuilder says:\n";
+      dumpReqs(gsbResult);
+      llvm::errs() << "\n";
+      llvm::errs() << "RequirementMachine says:\n";
+      dumpReqs(rqmResult);
+      llvm::errs() << "\n";
+      getRequirementMachine()->dump(llvm::errs());
+      abort();
+    }
+#endif
+
+    return rqmResult;
+  } else {
+    return computeViaGSB();
   }
-
-  if (auto concreteType = resolved.getAsConcreteType()) {
-    result.concreteType = concreteType;
-    return result;
-  }
-
-  auto *equivClass = resolved.getEquivalenceClass(builder);
-
-  auto genericParams = getGenericParams();
-  result.anchor = equivClass->getAnchor(builder, genericParams);
-
-  if (equivClass->concreteType) {
-    result.concreteType = equivClass->concreteType;
-    return result;
-  }
-
-  result.superclass = equivClass->superclass;
-
-  for (const auto &conforms : equivClass->conformsTo) {
-    auto proto = conforms.first;
-
-    if (!equivClass->isConformanceSatisfiedBySuperclass(proto))
-      result.protos.push_back(proto);
-  }
-
-  result.layout = equivClass->layout;
-
-  return result;
 }
 
 ASTContext &GenericSignatureImpl::getASTContext() const {
@@ -1049,10 +1136,16 @@ GenericSignatureImpl::lookupNestedType(Type type, Identifier name) const {
       llvm::errs() << "Generic signature: " << GenericSignature(this) << "\n";
       llvm::errs() << "Dependent type: "; type.dump(llvm::errs());
       llvm::errs() << "GenericSignatureBuilder says: ";
-      gsbResult->dumpRef(llvm::errs());
+      if (gsbResult)
+        gsbResult->dumpRef(llvm::errs());
+      else
+        llvm::errs() << "<nullptr>";
       llvm::errs() << "\n";
       llvm::errs() << "RequirementMachine says: ";
-      rqmResult->dumpRef(llvm::errs());
+      if (rqmResult)
+        rqmResult->dumpRef(llvm::errs());
+      else
+        llvm::errs() << "<nullptr>";
       llvm::errs() << "\n";
       getRequirementMachine()->dump(llvm::errs());
       abort();
