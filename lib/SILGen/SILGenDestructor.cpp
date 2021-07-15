@@ -125,14 +125,14 @@ void SILGenFunction::injectDistributedActorDestructorLifecycleCall(
   auto selfManagedValue = ManagedValue::forUnmanaged(selfValue);
   auto selfType = selfDecl->getType();
 
-  // ==== locate: self.actorAddress
-  auto addressVarDeclRefs = cd->lookupDirect(ctx.Id_actorAddress);
-  assert(addressVarDeclRefs.size() == 1);
-  auto *addressVarDeclRef = dyn_cast<VarDecl>(addressVarDeclRefs.front());
-  assert(addressVarDeclRef);
-  auto addressRef =
-      B.createRefElementAddr(Loc, selfValue, addressVarDeclRef,
-                             getLoweredType(addressVarDeclRef->getType()));
+  // ==== locate: self.id
+  auto idVarDeclRefs = cd->lookupDirect(ctx.Id_id);
+  assert(idVarDeclRefs.size() == 1);
+  auto *idVarDeclRef = dyn_cast<VarDecl>(idVarDeclRefs.front());
+  assert(idVarDeclRef);
+  auto idRef =
+      B.createRefElementAddr(Loc, selfValue, idVarDeclRef,
+                             getLoweredType(idVarDeclRef->getType()));
 
   // ==== locate: self.actorTransport
   auto transportVarDeclRefs = cd->lookupDirect(ctx.Id_actorTransport);
@@ -142,15 +142,15 @@ void SILGenFunction::injectDistributedActorDestructorLifecycleCall(
       B.createRefElementAddr(Loc, selfValue, transportVarDeclRef,
                              getLoweredType(transportVarDeclRef->getType()));
 
-  // locate: self.transport.resignAddress(...)
+  // locate: self.transport.resignIdentity(...)
   auto *transportDecl = ctx.getActorTransportDecl();
-  auto resignFnDecls = transportDecl->lookupDirect(ctx.Id_resignAddress);
+  auto resignFnDecls = transportDecl->lookupDirect(ctx.Id_resignIdentity);
   assert(resignFnDecls.size() == 1);
   auto *resignFnDecl = resignFnDecls.front();
   auto resignFnRef = SILDeclRef(resignFnDecl);
 
-  // we only transport.resignAddress if we are a local actor,
-  // and thus the address was created by transport.assignAddress.
+  // we only transport.resignIdentity if we are a local actor,
+  // and thus the address was created by transport.assignIdentity.
   auto isRemoteBB = createBasicBlock();
   auto isLocalBB = createBasicBlock();
 
@@ -187,7 +187,7 @@ void SILGenFunction::injectDistributedActorDestructorLifecycleCall(
   }
 
   // if local
-  // === self.transport.resignAddress(self.address)
+  // === self.transport.resignIdentity(self.address)
   {
     B.emitBlock(isLocalBB);
 
@@ -208,7 +208,7 @@ void SILGenFunction::injectDistributedActorDestructorLifecycleCall(
         transportDecl, openedTransport, ProtocolConformanceRef(transportDecl));
 
     SmallVector<SILValue, 2> params;
-    params.push_back(addressRef);
+    params.push_back(idRef);
     params.push_back(transportAddr); // self for the call, as last param
 
     B.createApply(Loc, witness, subs, params);

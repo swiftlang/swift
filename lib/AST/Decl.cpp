@@ -7816,17 +7816,6 @@ bool FuncDecl::isMainTypeMainMethod() const {
          getParameters()->size() == 0;
 }
 
-bool VarDecl::isDistributedActorAddressName(ASTContext &ctx, DeclName name) {
-  assert(name.getArgumentNames().size() == 0);
-  return name.getBaseName() == ctx.Id_actorAddress;
-}
-
-bool VarDecl::isDistributedActorTransportName(ASTContext &ctx, DeclName name) {
-  assert(name.getArgumentNames().size() == 0);
-  return name.getBaseName() == ctx.Id_transport ||
-    name.getBaseName() == ctx.Id_actorTransport;
-}
-
 ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
                                  bool Failable, SourceLoc FailabilityLoc,
                                  bool Async, SourceLoc AsyncLoc,
@@ -7899,6 +7888,7 @@ bool ConstructorDecl::isDistributedActorLocalInit() const {
   return params->get(0)->getInterfaceType()->isEqual(transportType);
 }
 
+// TODO: remove resolve init in favor of resolve function?
 bool ConstructorDecl::isDistributedActorResolveInit() const {
   auto name = getName();
   auto argumentNames = name.getArgumentNames();
@@ -7912,12 +7902,10 @@ bool ConstructorDecl::isDistributedActorResolveInit() const {
     return false;
 
   auto *params = getParameters();
-  assert(params->size() == 2);
-
-  auto addressType = C.getActorAddressDecl()->getDeclaredInterfaceType();
+  auto identityType = C.getAnyActorIdentityDecl()->getDeclaredInterfaceType();
   auto transportType = C.getActorTransportDecl()->getDeclaredInterfaceType();
 
-  return params->get(0)->getInterfaceType()->isEqual(addressType) &&
+  return params->get(0)->getInterfaceType()->isEqual(identityType) &&
          params->get(1)->getInterfaceType()->isEqual(transportType);
 }
 
