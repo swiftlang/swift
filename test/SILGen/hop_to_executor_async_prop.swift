@@ -604,3 +604,43 @@ struct Container {
         return await this!.isoRef
     }
 }
+
+
+@propertyWrapper
+struct StateObject<ObjectType> {
+    @MainActor(unsafe)
+    var wrappedValue: ObjectType {
+        fatalError()
+    }
+    init(wrappedValue: ObjectType) {}
+}
+
+final private actor Coordinactor {
+    var someValue: Int?
+}
+
+struct Blah {
+    @StateObject private var coordinator = Coordinactor()
+
+    // closure #1 in Blah.test()
+    // CHECK-LABEL: sil private [ossa] @$s4test4BlahVAAyyFyyYaYbcfU_ : $@convention(thin) @Sendable @async (Blah) -> () {
+    // CHECK:       hop_to_executor {{%[0-9]+}} : $MainActor
+    // CHECK:       [[ACTOR_OBJ_RAW:%[0-9]+]] = apply {{%[0-9]+}}({{%[0-9]+}}) : $@convention(method) (Blah) -> @owned Coordinactor
+    // CHECK:       hop_to_executor {{%[0-9]+}} : $Optional<Builtin.Executor>
+    // CHECK:       [[ACTOR_OBJ:%[0-9]+]] = begin_borrow [[ACTOR_OBJ_RAW]] : $Coordinactor
+    // CHECK:       [[VAL:%[0-9]+]] = ref_element_addr [[ACTOR_OBJ]] : $Coordinactor, #Coordinactor.someValue
+    // CHECK:       hop_to_executor [[ACTOR_OBJ]]
+    // CHECK:       [[VAL_ACCESS:%[0-9]+]] = begin_access [read] [dynamic] [[VAL]] : $*Optional<Int>
+    // CHECK:       {{%[0-9]+}} = load [trivial] %17 : $*Optional<Int>
+    // CHECK:       end_access %17 : $*Optional<Int>
+    // CHECK:       hop_to_executor {{%[0-9]+}} : $Optional<Builtin.Executor>
+    // CHECK: } // end sil function '$s4test4BlahVAAyyFyyYaYbcfU_'
+    @available(SwiftStdlib 5.5, *)
+    func test() {
+        Task.detached {
+            if await coordinator.someValue == nil {
+                fatalError()
+            }
+        }
+    }
+}
