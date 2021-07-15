@@ -311,9 +311,6 @@ public:
   
   ASTContext &getASTContext() const;
 
-  /// Returns the canonical generic signature. The result is cached.
-  CanGenericSignature getCanonicalSignature() const;
-
   /// Retrieve the generic signature builder for the given generic signature.
   GenericSignatureBuilder *getGenericSignatureBuilder() const;
 
@@ -456,6 +453,9 @@ private:
   ArrayRef<Requirement> getRequirements() const {
     return {getTrailingObjects<Requirement>(), NumRequirements};
   }
+
+  /// Returns the canonical generic signature. The result is cached.
+  CanGenericSignature getCanonicalSignature() const;
 };
 
 void simple_display(raw_ostream &out, GenericSignature sig);
