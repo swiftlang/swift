@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2020 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -48,7 +48,7 @@ public struct Task<Success, Failure: Error>: Sendable {
 }
 
 @available(SwiftStdlib 5.5, *)
-extension Task {
+extension Task where Failure == Error {
   /// Wait for the task to complete, returning (or throwing) its result.
   ///
   /// ### Priority
@@ -69,21 +69,6 @@ extension Task {
     }
   }
 
-  /// Wait for the task to complete, returning (or throwing) its result.
-  ///
-  /// ### Priority
-  /// If the task has not completed yet, its priority will be elevated to the
-  /// priority of the current task. Note that this may not be as effective as
-  /// creating the task with the "right" priority to in the first place.
-  ///
-  /// ### Cancellation
-  /// If the awaited on task gets cancelled externally the `get()` will throw
-  /// a cancellation error.
-  ///
-  /// If the task gets cancelled internally, e.g. by checking for cancellation
-  /// and throwing a specific error or using `checkCancellation` the error
-  /// thrown out of the task will be re-thrown here.
-
   /// Wait for the task to complete, returning its `Result`.
   ///
   /// ### Priority
@@ -103,11 +88,14 @@ extension Task {
       do {
         return .success(try await value)
       } catch {
-        return .failure(error as! Failure) // as!-safe, guaranteed to be Failure
+        return .failure(error)
       }
     }
   }
+}
 
+@available(SwiftStdlib 5.5, *)
+extension Task {
   /// Attempt to cancel the task.
   ///
   /// Whether this function has any effect is task-dependent.
@@ -139,6 +127,25 @@ extension Task where Failure == Never {
   public var value: Success {
     get async {
       return await _taskFutureGet(_task)
+    }
+  }
+
+  /// Wait for the task to complete, returning its `Result`.
+  ///
+  /// ### Priority
+  /// If the task has not completed yet, its priority will be elevated to the
+  /// priority of the current task. Note that this may not be as effective as
+  /// creating the task with the "right" priority to in the first place.
+  ///
+  /// ### Cancellation
+  /// The task this refers to may check for cancellation, however
+  /// since it is not-throwing it would have to handle it using some other
+  /// way than throwing a `CancellationError`, e.g. it could provide a neutral
+  /// value of the `Success` type, or encode that cancellation has occurred in
+  /// that type itself.
+  public var result: Result<Success, Failure> {
+    get async {
+      return .success(await value)
     }
   }
 }
