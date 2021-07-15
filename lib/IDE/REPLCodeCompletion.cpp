@@ -70,17 +70,28 @@ static std::string toInsertableString(CodeCompletionResult *Result) {
     case CodeCompletionString::Chunk::ChunkKind::CallArgumentName:
     case CodeCompletionString::Chunk::ChunkKind::CallArgumentInternalName:
     case CodeCompletionString::Chunk::ChunkKind::CallArgumentColon:
-    case CodeCompletionString::Chunk::ChunkKind::DeclAttrParamKeyword:
-    case CodeCompletionString::Chunk::ChunkKind::DeclAttrParamColon:
     case CodeCompletionString::Chunk::ChunkKind::CallArgumentType:
     case CodeCompletionString::Chunk::ChunkKind::CallArgumentClosureType:
-    case CodeCompletionString::Chunk::ChunkKind::OptionalBegin:
     case CodeCompletionString::Chunk::ChunkKind::CallArgumentBegin:
     case CodeCompletionString::Chunk::ChunkKind::CallArgumentTypeBegin:
+    case CodeCompletionString::Chunk::ChunkKind::ParameterDeclBegin:
+    case CodeCompletionString::Chunk::ChunkKind::ParameterDeclExternalName:
+    case CodeCompletionString::Chunk::ChunkKind::ParameterDeclLocalName:
+    case CodeCompletionString::Chunk::ChunkKind::ParameterDeclColon:
+    case CodeCompletionString::Chunk::ChunkKind::ParameterDeclTypeBegin:
+    case CodeCompletionString::Chunk::ChunkKind::DefaultArgumentClauseBegin:
+    case CodeCompletionString::Chunk::ChunkKind::GenericParameterClauseBegin:
+    case CodeCompletionString::Chunk::ChunkKind::GenericRequirementClauseBegin:
+    case CodeCompletionString::Chunk::ChunkKind::DeclAttrParamKeyword:
+    case CodeCompletionString::Chunk::ChunkKind::DeclAttrParamColon:
+    case CodeCompletionString::Chunk::ChunkKind::OptionalBegin:
     case CodeCompletionString::Chunk::ChunkKind::GenericParameterBegin:
     case CodeCompletionString::Chunk::ChunkKind::GenericParameterName:
+    case CodeCompletionString::Chunk::ChunkKind::EffectsSpecifierClauseBegin:
+    case CodeCompletionString::Chunk::ChunkKind::DeclResultTypeClauseBegin:
     case CodeCompletionString::Chunk::ChunkKind::TypeAnnotation:
     case CodeCompletionString::Chunk::ChunkKind::TypeAnnotationBegin:
+    case CodeCompletionString::Chunk::ChunkKind::AttributeAndModifierListBegin:
       return Str;
 
     case CodeCompletionString::Chunk::ChunkKind::CallArgumentClosureExpr:

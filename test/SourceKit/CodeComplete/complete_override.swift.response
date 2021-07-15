@@ -82,7 +82,7 @@
     },
     {
       key.kind: source.lang.swift.decl.function.method.instance,
-      key.name: "f(getMe a: Int, b: Double)",
+      key.name: "f(getMe:b:)",
       key.sourcetext: "override func f(getMe a: Int, b: Double) {\n<#code#>\n}",
       key.description: "f(getMe a: Int, b: Double)",
       key.typename: "",

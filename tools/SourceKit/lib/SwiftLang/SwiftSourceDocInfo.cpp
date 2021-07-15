@@ -107,8 +107,17 @@ static StringRef getTagForParameter(PrintStructureKind context) {
     return "syntaxtype.number";
   case PrintStructureKind::StringLiteral:
     return "syntaxtype.string";
+  case PrintStructureKind::DefaultArgumentClause:
+  case PrintStructureKind::DeclGenericParameterClause:
+  case PrintStructureKind::DeclGenericRequirementClause:
+  case PrintStructureKind::EffectsSpecifiers:
+  case PrintStructureKind::DeclResultTypeClause:
+  case PrintStructureKind::FunctionParameterList:
+  case PrintStructureKind::FunctionParameterType:
+    // These kinds are ignored by 'isIgnoredPrintStructureKind()'
+    llvm_unreachable("ignored structure kind");
   }
-  llvm_unreachable("unexpected parameter kind");
+  llvm_unreachable("unexpected structure kind");
 }
 
 static StringRef getDeclNameTagForDecl(const Decl *D) {
@@ -233,7 +242,24 @@ private:
       closeTag(tag);
   }
 
+  bool isIgnoredPrintStructureKind(PrintStructureKind kind) {
+    switch (kind) {
+    case PrintStructureKind::DefaultArgumentClause:
+    case PrintStructureKind::DeclGenericParameterClause:
+    case PrintStructureKind::DeclGenericRequirementClause:
+    case PrintStructureKind::EffectsSpecifiers:
+    case PrintStructureKind::DeclResultTypeClause:
+    case PrintStructureKind::FunctionParameterList:
+    case PrintStructureKind::FunctionParameterType:
+      return true;
+    default:
+      return false;
+    }
+  }
+
   void printStructurePre(PrintStructureKind kind, const Decl *D) override {
+    if (isIgnoredPrintStructureKind(kind))
+      return;
     if (kind == PrintStructureKind::TupleElement ||
         kind == PrintStructureKind::TupleType)
       fixupTuple(kind);
@@ -251,6 +277,8 @@ private:
     }
   }
   void printStructurePost(PrintStructureKind kind, const Decl *D) override {
+    if (isIgnoredPrintStructureKind(kind))
+      return;
     if (kind == PrintStructureKind::TupleElement ||
         kind == PrintStructureKind::TupleType) {
       auto prev = contextStack.pop_back_val();

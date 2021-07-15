@@ -8,6 +8,7 @@
 // RUN: %swift-ide-test -code-completion -code-completion-annotate-results -source-filename %s -code-completion-token=CALLARG | %FileCheck %s --check-prefix=CALLARG
 // RUN: %swift-ide-test -code-completion -code-completion-annotate-results -source-filename %s -code-completion-token=GENERIC | %FileCheck %s --check-prefix=GENERIC
 // RUN: %swift-ide-test -code-completion -code-completion-annotate-results -source-filename %s -code-completion-token=WHERE | %FileCheck %s --check-prefix=WHERE
+// RUN: %swift-ide-test -code-completion -code-completion-annotate-results -source-filename %s -code-completion-token=OVERRIDE -code-completion-sourcetext | %FileCheck %s --check-prefix=OVERRIDE
 
 struct MyStruct {
   init(x: Int) {}
@@ -138,3 +139,24 @@ struct TestGenericParamAnnotations<T> {
 // WHERE-DAG: Decl[Struct]/Local:                 <name>TestGenericParamAnnotations</name>;
 // WHERE-DAG: Keyword[Self]/CurrNominal:          <keyword>Self</keyword>;
 // WHERE: End completions
+
+protocol BaseP {
+  func protoMethod() -> @convention(c) (UInt8) -> Void
+  var value: MyStruct
+}
+class BaseC {
+  func baseMethodAsync(x: Int) async -> Int { }
+  func genericAsyncThrowsConstraint<T, U>(x: T) async throws -> U.Element where U: Collection, U.Element == Int {}
+  subscript(index: Int) -> (Int) -> Int { }
+}
+class DerivedC: BaseC, BaseP {
+  #^OVERRIDE^#
+// OVERRIDE-DAG: Keyword[func]/None:                 <keyword>func</keyword>; typename=; name=func; sourcetext=func
+// OVERRIDE-DAG: Decl[InstanceMethod]/Super:         <name>protoMethod</name>() -&gt; (<typeid.sys>UInt8</typeid.sys>) -&gt; <typeid.sys>Void</typeid.sys>; typename=; name=protoMethod(); sourcetext=func protoMethod() -> (UInt8) -> Void {\n<#code#>\n}
+// OVERRIDE-DAG: Decl[InstanceVar]/Super:            <name>value</name>: <typeid.user>MyStruct</typeid.user>; typename=; name=value; sourcetext=var value: MyStruct
+// OVERRIDE-DAG: Decl[InstanceMethod]/Super:         <name>baseMethodAsync</name>(<param><param.label>x</param.label>: <param.type><typeid.sys>Int</typeid.sys></param.type></param>) <keyword>async</keyword> -&gt; <typeid.sys>Int</typeid.sys>; typename=; name=baseMethodAsync(x:); sourcetext=override func baseMethodAsync(x: Int) async -> Int {\n<#code#>\n}
+// OVERRIDE-DAG: Decl[InstanceMethod]/Super:         <name>genericAsyncThrowsConstraint</name>&lt;T, U&gt;(<param><param.label>x</param.label>: <param.type><typeid.user>T</typeid.user></param.type></param>) <keyword>async</keyword> <keyword>throws</keyword> -&gt; <typeid.user>U</typeid.user>.<typeid.sys>Element</typeid.sys> <keyword>where</keyword> <typeid.user>U</typeid.user> : <typeid.sys>Collection</typeid.sys>, <typeid.user>U</typeid.user>.<typeid.sys>Element</typeid.sys> == <typeid.sys>Int</typeid.sys>; typename=; name=genericAsyncThrowsConstraint(x:); sourcetext=override func genericAsyncThrowsConstraint<T, U>(x: T) async throws -> U.Element where U : Collection, U.Element == Int {\n<#code#>\n}
+
+// OVERRIDE-DAG: Decl[Subscript]/Super:              <name>subscript</name>(<param><param.param>index</param.param>: <param.type><typeid.sys>Int</typeid.sys></param.type></param>) -&gt; (<typeid.sys>Int</typeid.sys>) -&gt; <typeid.sys>Int</typeid.sys>; typename=; name=subscript(:); sourcetext=override subscript(index: Int) -> (Int) -> Int {\n<#code#>\n}
+// OVERRIDE-DAG: Decl[Constructor]/Super:            <name>init</name>(); typename=; name=init(); sourcetext=override init() {\n<#code#>\n}
+}

@@ -26,7 +26,7 @@ class Module;
 }
 
 namespace {
-class AnnotatedTypePrinter;
+class CodeCompletionStringPrinter;
 }
 
 namespace swift {
@@ -71,7 +71,7 @@ struct ExpectedTypeContext {
 };
 
 class CodeCompletionResultBuilder {
-  friend AnnotatedTypePrinter;
+  friend CodeCompletionStringPrinter;
   
   CodeCompletionResultSink &Sink;
   CodeCompletionResult::ResultKind Kind;
@@ -193,6 +193,12 @@ public:
           "open ");
       break;
     }
+  }
+
+  void addRequiredKeyword() {
+    addChunkWithTextNoCopy(
+        CodeCompletionString::Chunk::ChunkKind::AccessControlKeyword,
+        "required ");
   }
 
   void addOverrideKeyword() {
