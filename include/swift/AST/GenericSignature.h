@@ -195,6 +195,9 @@ public:
 
   /// Retrieve the requirements.
   ArrayRef<Requirement> getRequirements() const;
+
+  /// Whether this generic signature involves a type variable.
+  bool hasTypeVariable() const;
 };
 
 /// A reference to a canonical generic signature.
@@ -423,9 +426,6 @@ public:
   /// Get the sugared form of a type by substituting any
   /// generic parameter types by their sugared form.
   Type getSugaredType(Type type) const;
-
-  /// Whether this generic signature involves a type variable.
-  bool hasTypeVariable() const;
 
   static void Profile(llvm::FoldingSetNodeID &ID,
                       TypeArrayView<GenericTypeParamType> genericParams,

@@ -1775,8 +1775,8 @@ static AllocationArena getArena(GenericSignature genericSig) {
   if (!genericSig)
     return AllocationArena::Permanent;
 
-  if (genericSig->hasTypeVariable()) {
-    assert(false && "What's going on");
+  if (genericSig.hasTypeVariable()) {
+    assert(false && "Unsubstituted type variable leaked into generic signature");
     return AllocationArena::ConstraintSolver;
   }
 

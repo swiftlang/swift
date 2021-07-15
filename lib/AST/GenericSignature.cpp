@@ -1272,7 +1272,7 @@ unsigned GenericSignatureImpl::getGenericParamOrdinal(
   return GenericParamKey(param).findIndexIn(getGenericParams());
 }
 
-bool GenericSignatureImpl::hasTypeVariable() const {
+bool GenericSignature::hasTypeVariable() const {
   return GenericSignature::hasTypeVariable(getRequirements());
 }
 
