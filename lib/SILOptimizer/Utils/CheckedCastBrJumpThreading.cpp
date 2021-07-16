@@ -42,6 +42,9 @@ class CheckedCastBrJumpThreading {
   // Dominator information to be used.
   DominanceInfo *DT;
 
+  // Enable non-trivial terminator rewriting in OSSA.
+  bool EnableOSSARewriteTerminator;
+
   // List of predecessors.
   typedef SmallVector<SILBasicBlock *, 8> PredList;
 
@@ -119,10 +122,14 @@ class CheckedCastBrJumpThreading {
   bool trySimplify(CheckedCastBranchInst *CCBI);
 
 public:
-  CheckedCastBrJumpThreading(SILFunction *Fn, DominanceInfo *DT,
-                             SmallVectorImpl<SILBasicBlock *> &BlocksForWorklist)
-      : Fn(Fn), DT(DT), BlocksForWorklist(BlocksForWorklist),
-        BlocksToEdit(Fn), BlocksToClone(Fn) { }
+  CheckedCastBrJumpThreading(
+      SILFunction *Fn, DominanceInfo *DT,
+      SmallVectorImpl<SILBasicBlock *> &BlocksForWorklist,
+      bool EnableOSSARewriteTerminator)
+      : Fn(Fn), DT(DT),
+        EnableOSSARewriteTerminator(EnableOSSARewriteTerminator),
+        BlocksForWorklist(BlocksForWorklist), BlocksToEdit(Fn),
+        BlocksToClone(Fn) {}
 
   void optimizeFunction();
 };
@@ -486,6 +493,11 @@ areEquivalentConditionsAlongPaths(CheckedCastBranchInst *DomCCBI) {
 /// Try performing a dominator-based jump-threading for
 /// checked_cast_br instructions.
 bool CheckedCastBrJumpThreading::trySimplify(CheckedCastBranchInst *CCBI) {
+  if (!EnableOSSARewriteTerminator && Fn->hasOwnership()
+      && !CCBI->getOperand()->getType().isTrivial(*Fn)) {
+    return false;
+  }
+
   // Init information about the checked_cast_br we try to
   // jump-thread.
   BB = CCBI->getParent();
@@ -685,9 +697,13 @@ void CheckedCastBrJumpThreading::optimizeFunction() {
 
 namespace swift {
 
-bool tryCheckedCastBrJumpThreading(SILFunction *Fn, DominanceInfo *DT,
-                        SmallVectorImpl<SILBasicBlock *> &BlocksForWorklist) {
-  CheckedCastBrJumpThreading CCBJumpThreading(Fn, DT, BlocksForWorklist);
+bool tryCheckedCastBrJumpThreading(
+    SILFunction *Fn, DominanceInfo *DT,
+    SmallVectorImpl<SILBasicBlock *> &BlocksForWorklist,
+    bool EnableOSSARewriteTerminator) {
+
+  CheckedCastBrJumpThreading CCBJumpThreading(Fn, DT, BlocksForWorklist,
+                                              EnableOSSARewriteTerminator);
   CCBJumpThreading.optimizeFunction();
   return !BlocksForWorklist.empty();
 }

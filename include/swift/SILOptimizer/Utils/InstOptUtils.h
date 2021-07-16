@@ -203,7 +203,8 @@ SILLinkage getSpecializedLinkage(SILFunction *f, SILLinkage linkage);
 /// function \p Fn.
 bool tryCheckedCastBrJumpThreading(
     SILFunction *fn, DominanceInfo *dt,
-    SmallVectorImpl<SILBasicBlock *> &blocksForWorklist);
+    SmallVectorImpl<SILBasicBlock *> &blocksForWorklist,
+    bool EnableOSSARewriteTerminator);
 
 /// A utility for deleting one or more instructions belonging to a function, and
 /// cleaning up any dead code resulting from deleting those instructions. Use
