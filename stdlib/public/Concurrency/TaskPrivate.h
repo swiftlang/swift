@@ -17,13 +17,14 @@
 #ifndef SWIFT_CONCURRENCY_TASKPRIVATE_H
 #define SWIFT_CONCURRENCY_TASKPRIVATE_H
 
-#include "swift/Runtime/Concurrency.h"
-#include "swift/ABI/Task.h"
-#include "swift/ABI/Metadata.h"
-#include "swift/Runtime/Atomic.h"
-#include "swift/Runtime/HeapObject.h"
-#include "swift/Runtime/Error.h"
 #include "Error.h"
+#include "swift/ABI/Metadata.h"
+#include "swift/ABI/Task.h"
+#include "swift/Runtime/Atomic.h"
+#include "swift/Runtime/Concurrency.h"
+#include "swift/Runtime/Error.h"
+#include "swift/Runtime/Exclusivity.h"
+#include "swift/Runtime/HeapObject.h"
 
 #define SWIFT_FATAL_ERROR swift_Concurrency_fatalError
 #include "../runtime/StackAllocator.h"
@@ -282,14 +283,19 @@ struct AsyncTask::PrivateStorage {
   /// Currently one word.
   TaskLocal::Storage Local;
 
+  /// State inside the AsyncTask whose state is only managed by the exclusivity
+  /// runtime in stdlibCore. We zero initialize to provide a safe initial value,
+  /// but actually initialize its bit state to a const global provided by
+  /// libswiftCore so that libswiftCore can control the layout of our initial
+  /// state.
+  uintptr_t ExclusivityAccessSet[2] = {0, 0};
+
   PrivateStorage(JobFlags flags)
-    : Status(ActiveTaskStatus(flags)),
-      Local(TaskLocal::Storage()) {}
+      : Status(ActiveTaskStatus(flags)), Local(TaskLocal::Storage()) {}
 
   PrivateStorage(JobFlags flags, void *slab, size_t slabCapacity)
-    : Status(ActiveTaskStatus(flags)),
-      Allocator(slab, slabCapacity),
-      Local(TaskLocal::Storage()) {}
+      : Status(ActiveTaskStatus(flags)), Allocator(slab, slabCapacity),
+        Local(TaskLocal::Storage()) {}
 
   void complete(AsyncTask *task) {
     // Destroy and deallocate any remaining task local items.
@@ -347,7 +353,10 @@ inline void AsyncTask::flagAsRunning() {
   while (true) {
     assert(!oldStatus.isRunning());
     if (oldStatus.isLocked()) {
-      return flagAsRunning_slow();
+      flagAsRunning_slow();
+      swift_task_enterThreadLocalContext(
+          (char *)&_private().ExclusivityAccessSet[0]);
+      return;
     }
 
     auto newStatus = oldStatus.withRunning(true);
@@ -358,8 +367,11 @@ inline void AsyncTask::flagAsRunning() {
 
     if (_private().Status.compare_exchange_weak(oldStatus, newStatus,
                                                 std::memory_order_relaxed,
-                                                std::memory_order_relaxed))
+                                                std::memory_order_relaxed)) {
+      swift_task_enterThreadLocalContext(
+          (char *)&_private().ExclusivityAccessSet[0]);
       return;
+    }
   }
 }
 
@@ -368,7 +380,10 @@ inline void AsyncTask::flagAsSuspended() {
   while (true) {
     assert(oldStatus.isRunning());
     if (oldStatus.isLocked()) {
-      return flagAsSuspended_slow();
+      flagAsSuspended_slow();
+      swift_task_exitThreadLocalContext(
+          (char *)&_private().ExclusivityAccessSet[0]);
+      return;
     }
 
     auto newStatus = oldStatus.withRunning(false);
@@ -379,8 +394,11 @@ inline void AsyncTask::flagAsSuspended() {
 
     if (_private().Status.compare_exchange_weak(oldStatus, newStatus,
                                                 std::memory_order_relaxed,
-                                                std::memory_order_relaxed))
+                                                std::memory_order_relaxed)) {
+      swift_task_exitThreadLocalContext(
+          (char *)&_private().ExclusivityAccessSet[0]);
       return;
+    }
   }
 }
 

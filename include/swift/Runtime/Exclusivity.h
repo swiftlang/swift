@@ -91,6 +91,30 @@ void swift_dumpTrackedAccesses();
 
 #endif
 
+/// Called when a task inits, resumes and returns control to caller synchronous
+/// code to update any exclusivity specific state associated with the task.
+///
+/// State is assumed to point to a buffer of memory with
+/// swift_task_threadLocalContextSize bytes that was initialized with
+/// swift_task_initThreadLocalContext.
+///
+/// We describe the algorithm in detail on SwiftTaskThreadLocalContext in
+/// Exclusivity.cpp.
+SWIFT_RUNTIME_EXPORT
+void swift_task_enterThreadLocalContext(char *state);
+
+/// Called when a task suspends and returns control to caller synchronous code
+/// to update any exclusivity specific state associated with the task.
+///
+/// State is assumed to point to a buffer of memory with
+/// swift_task_threadLocalContextSize bytes that was initialized with
+/// swift_task_initThreadLocalContext.
+///
+/// We describe the algorithm in detail on SwiftTaskThreadLocalContext in
+/// Exclusivity.cpp.
+SWIFT_RUNTIME_EXPORT
+void swift_task_exitThreadLocalContext(char *state);
+
 } // end namespace swift
 
 #endif
