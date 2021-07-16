@@ -20,6 +20,7 @@
 #include "swift/Runtime/Concurrency.h"
 #include "swift/ABI/Task.h"
 #include "swift/ABI/Metadata.h"
+#include "swift/Runtime/Atomic.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Error.h"
 #include "Error.h"
@@ -160,32 +161,95 @@ public:
 /// The current state of a task's status records.
 class ActiveTaskStatus {
   enum : uintptr_t {
-    IsCancelled = 0x1,
-    IsLocked = 0x2,
-    RecordMask = ~uintptr_t(IsCancelled | IsLocked)
+    /// The current running priority of the task.
+    PriorityMask = 0xFF,
+
+    /// Has the task been cancelled?
+    IsCancelled = 0x100,
+
+    /// Whether the task status is "locked", meaning that further
+    /// accesses need to wait on the task status record lock
+    IsLocked = 0x200,
+
+    /// Whether the running priority has been escalated above the
+    /// priority recorded in the Job header.
+    IsEscalated = 0x400,
+
+    /// Whether the task is actively running.
+    /// We don't really need to be tracking this in the runtime right
+    /// now, but we will need to eventually track enough information to
+    /// escalate the thread that's running a task, so doing the stores
+    /// necessary to maintain this gives us a more realistic baseline
+    /// for performance.
+    IsRunning = 0x800,
   };
 
-  uintptr_t Value;
+  TaskStatusRecord *Record;
+  uintptr_t Flags;
+
+  ActiveTaskStatus(TaskStatusRecord *record, uintptr_t flags)
+    : Record(record), Flags(flags) {}
 
 public:
-  constexpr ActiveTaskStatus() : Value(0) {}
-  ActiveTaskStatus(TaskStatusRecord *innermostRecord,
-                   bool cancelled, bool locked)
-    : Value(reinterpret_cast<uintptr_t>(innermostRecord)
-                + (locked ? IsLocked : 0)
-                + (cancelled ? IsCancelled : 0)) {}
+#ifdef __GLIBCXX__
+  /// We really don't want to provide this constructor, but in old
+  /// versions of libstdc++, std::atomic<T>::load incorrectly requires
+  /// the type to be default-constructible.
+  ActiveTaskStatus() = default;
+#endif
+
+  constexpr ActiveTaskStatus(JobFlags flags)
+    : Record(nullptr), Flags(uintptr_t(flags.getPriority())) {}
 
   /// Is the task currently cancelled?
-  bool isCancelled() const { return Value & IsCancelled; }
+  bool isCancelled() const { return Flags & IsCancelled; }
+  ActiveTaskStatus withCancelled() const {
+    return ActiveTaskStatus(Record, Flags | IsCancelled);
+  }
+
+  /// Is the task currently running?
+  /// Eventually we'll track this with more specificity, like whether
+  /// it's running on a specific thread, enqueued on a specific actor,
+  /// etc.
+  bool isRunning() const { return Flags & IsRunning; }
+  ActiveTaskStatus withRunning(bool isRunning) const {
+    return ActiveTaskStatus(Record, isRunning ? (Flags | IsRunning)
+                                              : (Flags & ~IsRunning));
+  }
 
   /// Is there an active lock on the cancellation information?
-  bool isLocked() const { return Value & IsLocked; }
+  bool isLocked() const { return Flags & IsLocked; }
+  ActiveTaskStatus withLockingRecord(TaskStatusRecord *lockRecord) const {
+    assert(!isLocked());
+    assert(lockRecord->Parent == Record);
+    return ActiveTaskStatus(lockRecord, Flags | IsLocked);
+  }
+
+  JobPriority getStoredPriority() const {
+    return JobPriority(Flags & PriorityMask);
+  }
+  bool isStoredPriorityEscalated() const {
+    return Flags & IsEscalated;
+  }
+  ActiveTaskStatus withEscalatedPriority(JobPriority priority) const {
+    assert(priority > getStoredPriority());
+    return ActiveTaskStatus(Record,
+                            (Flags & PriorityMask)
+                               | IsEscalated | uintptr_t(priority));
+  }
+  ActiveTaskStatus withoutStoredPriorityEscalation() const {
+    assert(isStoredPriorityEscalated());
+    return ActiveTaskStatus(Record, Flags & ~IsEscalated);
+  }
 
   /// Return the innermost cancellation record.  Code running
   /// asynchronously with this task should not access this record
   /// without having first locked it; see swift_taskCancel.
   TaskStatusRecord *getInnermostRecord() const {
-    return reinterpret_cast<TaskStatusRecord*>(Value & RecordMask);
+    return Record;
+  }
+  ActiveTaskStatus withInnermostRecord(TaskStatusRecord *newRecord) {
+    return ActiveTaskStatus(newRecord, Flags);
   }
 
   static TaskStatusRecord *getStatusRecordParent(TaskStatusRecord *ptr);
@@ -207,8 +271,8 @@ using TaskAllocator = StackAllocator<SlabCapacity>;
 /// Private storage in an AsyncTask object.
 struct AsyncTask::PrivateStorage {
   /// The currently-active information about cancellation.
-  /// Currently one word.
-  std::atomic<ActiveTaskStatus> Status;
+  /// Currently two words.
+  swift::atomic<ActiveTaskStatus> Status;
 
   /// The allocator for the task stack.
   /// Currently 2 words + 8 bytes.
@@ -218,12 +282,12 @@ struct AsyncTask::PrivateStorage {
   /// Currently one word.
   TaskLocal::Storage Local;
 
-  PrivateStorage()
-    : Status(ActiveTaskStatus()),
+  PrivateStorage(JobFlags flags)
+    : Status(ActiveTaskStatus(flags)),
       Local(TaskLocal::Storage()) {}
 
-  PrivateStorage(void *slab, size_t slabCapacity)
-    : Status(ActiveTaskStatus()),
+  PrivateStorage(JobFlags flags, void *slab, size_t slabCapacity)
+    : Status(ActiveTaskStatus(flags)),
       Allocator(slab, slabCapacity),
       Local(TaskLocal::Storage()) {}
 
@@ -251,13 +315,13 @@ AsyncTask::OpaquePrivateStorage::get() const {
   return reinterpret_cast<const PrivateStorage &>(*this);
 }
 inline void AsyncTask::OpaquePrivateStorage::initialize(AsyncTask *task) {
-  new (this) PrivateStorage();
+  new (this) PrivateStorage(task->Flags);
 }
 inline void
 AsyncTask::OpaquePrivateStorage::initializeWithSlab(AsyncTask *task,
                                                     void *slab,
                                                     size_t slabCapacity) {
-  new (this) PrivateStorage(slab, slabCapacity);
+  new (this) PrivateStorage(task->Flags, slab, slabCapacity);
 }
 inline void AsyncTask::OpaquePrivateStorage::complete(AsyncTask *task) {
   get().complete(task);
@@ -276,6 +340,48 @@ inline const AsyncTask::PrivateStorage &AsyncTask::_private() const {
 inline bool AsyncTask::isCancelled() const {
   return _private().Status.load(std::memory_order_relaxed)
                           .isCancelled();
+}
+
+inline void AsyncTask::flagAsRunning() {
+  auto oldStatus = _private().Status.load(std::memory_order_relaxed);
+  while (true) {
+    assert(!oldStatus.isRunning());
+    if (oldStatus.isLocked()) {
+      return flagAsRunning_slow();
+    }
+
+    auto newStatus = oldStatus.withRunning(true);
+    if (newStatus.isStoredPriorityEscalated()) {
+      newStatus = newStatus.withoutStoredPriorityEscalation();
+      Flags.setPriority(oldStatus.getStoredPriority());
+    }
+
+    if (_private().Status.compare_exchange_weak(oldStatus, newStatus,
+                                                std::memory_order_relaxed,
+                                                std::memory_order_relaxed))
+      return;
+  }
+}
+
+inline void AsyncTask::flagAsSuspended() {
+  auto oldStatus = _private().Status.load(std::memory_order_relaxed);
+  while (true) {
+    assert(oldStatus.isRunning());
+    if (oldStatus.isLocked()) {
+      return flagAsSuspended_slow();
+    }
+
+    auto newStatus = oldStatus.withRunning(false);
+    if (newStatus.isStoredPriorityEscalated()) {
+      newStatus = newStatus.withoutStoredPriorityEscalation();
+      Flags.setPriority(oldStatus.getStoredPriority());
+    }
+
+    if (_private().Status.compare_exchange_weak(oldStatus, newStatus,
+                                                std::memory_order_relaxed,
+                                                std::memory_order_relaxed))
+      return;
+  }
 }
 
 inline void AsyncTask::localValuePush(const HeapObject *key,

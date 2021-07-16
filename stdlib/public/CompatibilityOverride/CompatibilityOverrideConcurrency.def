@@ -78,10 +78,6 @@ OVERRIDE_ACTOR(job_run, void,
                swift::, (class Job *job, ExecutorRef executor),
                (job, executor))
 
-OVERRIDE_ACTOR(task_getCurrent, AsyncTask *,
-               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
-               swift::, ,)
-
 OVERRIDE_ACTOR(task_getCurrentExecutor, ExecutorRef,
                SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                swift::, ,)
@@ -158,6 +154,21 @@ OVERRIDE_TASK(task_createNullaryContinuationJob, NullaryContinuationJob *,
 OVERRIDE_TASK(task_asyncMainDrainQueue, void,
               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift), swift::,
               , )
+
+OVERRIDE_TASK(task_suspend, AsyncTask *,
+              SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+              swift::, ,)
+
+OVERRIDE_TASK(continuation_init, AsyncTask *,
+              SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+              swift::, (ContinuationAsyncContext *context,
+                        AsyncContinuationFlags flags),
+              (context, flags))
+
+OVERRIDE_TASK(continuation_await, void,
+              SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swiftasync),
+              swift::, (ContinuationAsyncContext *context),
+              (context))
 
 OVERRIDE_ASYNC_LET(asyncLet_wait, void, SWIFT_EXPORT_FROM(swift_Concurrency),
                    SWIFT_CC(swiftasync), swift::,

@@ -3432,7 +3432,9 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
   printAttributes(decl);
   // Explicitly print 'mutating' and 'nonmutating' if needed.
   printMutabilityModifiersIfNeeded(decl);
-
+  if (decl->isConsuming()) {
+    Printer.printKeyword("__consuming", Options, " ");
+  }
   switch (auto kind = decl->getAccessorKind()) {
   case AccessorKind::Get:
   case AccessorKind::Address:
