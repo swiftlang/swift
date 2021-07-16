@@ -27,11 +27,11 @@ class ModuleDecl;
 
 using ImportModuleTy = PointerUnion<ModuleDecl*, const clang::Module*>;
 
-/// Prints the declarations of \p M to \p os, filtering by \p minRequiredAccess
-/// and collecting imports in \p imports along the way.
+/// Prints the declarations of \p M to \p os and collecting imports in
+/// \p imports along the way.
 void printModuleContentsAsObjC(raw_ostream &os,
                                llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
-                               ModuleDecl &M, AccessLevel minRequiredAccess);
+                               ModuleDecl &M);
 
 } // end namespace swift
 
