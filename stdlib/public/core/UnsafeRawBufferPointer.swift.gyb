@@ -271,7 +271,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// - Parameters:
   ///   - byteCount: The number of bytes to allocate.
   ///   - alignment: The alignment of the new region of allocated memory, in
-  ///     bytes.
+  ///     bytes. `alignment` must be a whole power of 2.
   /// - Returns: A buffer pointer to a newly allocated region of memory aligned 
   ///     to `alignment`.
   @inlinable
