@@ -1067,11 +1067,10 @@ def target_variant : Separate<["-"], "target-variant">,
            " variant target triple in addition to the main -target triple">;
 
 def clang_target : Separate<["-"], "clang-target">,
-  Flags<[FrontendOption, SwiftAPIExtractOption, SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption]>,
+  Flags<[FrontendOption, SwiftAPIExtractOption, SwiftSymbolGraphExtractOption]>,
   HelpText<"Separately set the target we should use for internal Clang instance">;
 
 def disable_clang_target : Flag<["-"], "disable-clang-target">,
-  Flags<[NewDriverOnlyOption]>,
   HelpText<"Disable a separately specified target triple for Clang instance to use">;
 
 def profile_generate : Flag<["-"], "profile-generate">,
