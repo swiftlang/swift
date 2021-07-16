@@ -25,8 +25,8 @@ def main():
         sys.exit(1)
 
     with io.open(sys.argv[1], mode='r', encoding='utf8') as input_file, \
-         io.open(sys.argv[2], mode='w', encoding='utf8') as output_file, \
-         io.open(sys.argv[3], mode='w', encoding='utf8') as access_notes_file:
+            io.open(sys.argv[2], mode='w', encoding='utf8') as output_file, \
+            io.open(sys.argv[3], mode='w', encoding='utf8') as access_notes_file:
 
         # Add header to access notes file
         access_notes_file.write(u"""\
