@@ -5433,7 +5433,7 @@ public:
   /// This is useful to be able to exhaustively attempt bindings
   /// for type variables found at one level, before proceeding to
   /// supertypes or literal defaults etc.
-  virtual bool needsToComputeNext() const { return false; }
+  virtual bool needsToComputeNext() const = 0;
 };
 
 class TypeVarBindingProducer : public BindingProducer<TypeVariableBinding> {
@@ -5591,6 +5591,8 @@ public:
     return DisjunctionChoice(CS, currIndex, Choices[Ordering[currIndex]],
                              IsExplicitConversion, isBeginningOfPartition);
   }
+
+  bool needsToComputeNext() const override { return false; }
 
 private:
   // Partition the choices in the disjunction into groups that we will
