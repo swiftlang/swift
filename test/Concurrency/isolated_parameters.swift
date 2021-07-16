@@ -54,3 +54,39 @@ func testIsolatedParamCallsAsync(a: isolated A, b: A) async {
   // expected-note@-1{{calls to global function 'globalFuncIsolated' from outside of its actor context are implicitly asynchronous}}
   await globalFuncIsolated(b)
 }
+
+actor MyActor {
+  func hello() {}
+}
+
+typealias MyFn = (isolated: Int) -> Void // expected-error {{function types cannot have argument labels; use '_' before 'isolated'}}
+typealias MyFnFixed = (_: isolated MyActor) -> Void
+
+func standalone(_: isolated MyActor) {}
+func check() {
+  let _: MyFnFixed = standalone
+  let _: MyFnFixed = { (_: isolated MyActor) in () }
+}
+
+
+@available(SwiftStdlib 5.5, *)
+protocol P {
+  func f(isolated: MyActor) async
+  func g(isolated x: MyActor) async
+  func h(isolated MyActor: isolated MyActor)
+  func i(isolated: isolated MyActor)
+  func j(isolated: Int) -> Int
+  func k(isolated y: Int) -> Int
+  func l(isolated _: Int) -> Int
+}
+
+@available(SwiftStdlib 5.5, *)
+struct S: P {
+  func f(isolated: MyActor) async { await isolated.hello() }
+  func g(isolated x: MyActor) async { await x.hello() }
+  func h(isolated MyActor: isolated MyActor) { i(isolated: MyActor) }
+  func i(isolated: isolated MyActor) { isolated.hello() }
+  func j(isolated: Int) -> Int { return isolated }
+  func k(isolated y: Int) -> Int { return j(isolated: y) }
+  func l(isolated _: Int) -> Int { return k(isolated: 0) }
+}
