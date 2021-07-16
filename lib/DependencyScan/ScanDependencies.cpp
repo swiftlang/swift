@@ -1049,16 +1049,11 @@ identifyMainModuleDependencies(CompilerInstance &instance) {
        instance.getASTContext()
            .LangOpts.EffectiveLanguageVersion.asAPINotesVersionString())
           .str();
-
   // Compute the dependencies of the main module.
-  std::vector<StringRef> ExtraPCMArgs = {
-    "-Xcc", apinotesVer
-  };
-  if (!instance.getASTContext().LangOpts.ClangTarget.hasValue())
-    ExtraPCMArgs.insert(ExtraPCMArgs.begin(),
-                        {"-Xcc", "-target", "-Xcc",
-                         instance.getASTContext().LangOpts.Target.str()});
-  auto mainDependencies = ModuleDependencies::forMainSwiftModule(ExtraPCMArgs);
+  auto mainDependencies = ModuleDependencies::forMainSwiftModule(
+      {// ExtraPCMArgs
+       "-Xcc", "-target", "-Xcc",
+       instance.getASTContext().LangOpts.Target.str(), "-Xcc", apinotesVer});
 
   // Compute Implicit dependencies of the main module
   {
