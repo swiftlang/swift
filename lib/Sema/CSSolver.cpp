@@ -2310,5 +2310,6 @@ void DisjunctionChoice::propagateConversionInfo(ConstraintSystem &cs) const {
 }
 
 bool ConjunctionElement::attempt(ConstraintSystem &cs) const {
-  return false;
+  auto result = cs.simplifyConstraint(*Element);
+  return result != ConstraintSystem::SolutionKind::Error;
 }
