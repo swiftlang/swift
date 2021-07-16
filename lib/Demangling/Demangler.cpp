@@ -2639,7 +2639,8 @@ NodePointer Demangler::demangleAutoDiffSelfReorderingReabstractionThunk() {
   addChild(result, popNode(Node::Kind::DependentGenericSignature));
   result = addChild(result, popNode(Node::Kind::Type));
   result = addChild(result, popNode(Node::Kind::Type));
-  result->reverseChildren();
+  if (result)
+    result->reverseChildren();
   result = addChild(result, demangleAutoDiffFunctionKind());
   return result;
 }
