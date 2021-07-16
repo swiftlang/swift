@@ -117,11 +117,11 @@ constexpr unsigned bitmax(unsigned a, unsigned b) {
 }
 
 constexpr unsigned countBitsUsed(uint64_t arg) {
-// Assumes unsigned long long is 64 bit
+// Assumes uint64_t is the same as unsigned long long
 #if defined(_MSC_VER)
-  return 64u - __lzcnt64(arg);
+  return 64u - __lzcnt64(static_cast<unsigned long long>(arg));
 #else
-  return 64u - __builtin_clzll(arg);
+  return 64u - __builtin_clzll(static_cast<unsigned long long>(arg));
 #endif
 }
 
