@@ -476,7 +476,7 @@ RequirementMachine::getLocalRequirements(
                                                        Impl->Context);
   }
 
-  for (const auto *proto : equivClass->getConformsTo())
+  for (const auto *proto : equivClass->getConformsToExcludingSuperclassConformances())
     result.protos.push_back(const_cast<ProtocolDecl *>(proto));
 
   result.layout = equivClass->getLayoutConstraint();

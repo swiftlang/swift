@@ -173,7 +173,7 @@ public:
     Type concreteType;
     Type superclass;
 
-    SmallVector<ProtocolDecl *, 2> protos;
+    RequiredProtocols protos;
     LayoutConstraint layout;
   };
 

@@ -63,6 +63,41 @@
 using namespace swift;
 using namespace rewriting;
 
+/// This papers over a behavioral difference between
+/// GenericSignature::getRequiredProtocols() and ArchetypeType::getConformsTo();
+/// the latter drops any protocols to which the superclass requirement
+/// conforms to concretely.
+llvm::TinyPtrVector<const ProtocolDecl *>
+EquivalenceClass::getConformsToExcludingSuperclassConformances() const {
+  llvm::TinyPtrVector<const ProtocolDecl *> result;
+
+  if (SuperclassConformances.empty()) {
+    result = ConformsTo;
+    return result;
+  }
+
+  // The conformances in SuperclassConformances should appear in the same order
+  // as the protocols in ConformsTo.
+  auto conformanceIter = SuperclassConformances.begin();
+
+  for (const auto *proto : ConformsTo) {
+    if (conformanceIter == SuperclassConformances.end()) {
+      result.push_back(proto);
+      continue;
+    }
+
+    if (proto == (*conformanceIter)->getProtocol()) {
+      ++conformanceIter;
+      continue;
+    }
+
+    result.push_back(proto);
+  }
+
+  assert(conformanceIter == SuperclassConformances.end());
+  return result;
+}
+
 void EquivalenceClass::dump(llvm::raw_ostream &out) const {
   out << Key << " => {";
 
@@ -650,6 +685,7 @@ void EquivalenceClassMap::concretizeNestedTypesFromConcreteParents(
           equivClass->ConcreteType->getConcreteType(),
           equivClass->ConcreteType->getSubstitutions(),
           equivClass->getConformsTo(),
+          equivClass->ConcreteConformances,
           inducedRules);
     }
 
@@ -664,6 +700,7 @@ void EquivalenceClassMap::concretizeNestedTypesFromConcreteParents(
           equivClass->Superclass->getSuperclass(),
           equivClass->Superclass->getSubstitutions(),
           equivClass->getConformsTo(),
+          equivClass->SuperclassConformances,
           inducedRules);
     }
   }
@@ -705,6 +742,7 @@ void EquivalenceClassMap::concretizeNestedTypesFromConcreteParent(
     const MutableTerm &key, RequirementKind requirementKind,
     CanType concreteType, ArrayRef<Term> substitutions,
     ArrayRef<const ProtocolDecl *> conformsTo,
+    llvm::TinyPtrVector<ProtocolConformance *> &conformances,
     SmallVectorImpl<std::pair<MutableTerm, MutableTerm>> &inducedRules) const {
   assert(requirementKind == RequirementKind::SameType ||
          requirementKind == RequirementKind::Superclass);
@@ -730,11 +768,15 @@ void EquivalenceClassMap::concretizeNestedTypesFromConcreteParent(
     // opaque result type?
     assert(!conformance.isAbstract());
 
+    auto *concrete = conformance.getConcrete();
+
+    // Record the conformance for use by
+    // EquivalenceClass::getConformsToExcludingSuperclassConformances().
+    conformances.push_back(concrete);
+
     auto assocTypes = Protos.getProtocolInfo(proto).AssociatedTypes;
     if (assocTypes.empty())
       continue;
-
-    auto *concrete = conformance.getConcrete();
 
     for (auto *assocType : assocTypes) {
       if (DebugConcretizeNestedTypes) {
