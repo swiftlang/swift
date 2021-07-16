@@ -118,7 +118,7 @@ constexpr unsigned bitmax(unsigned a, unsigned b) {
 }
 
 constexpr unsigned countBitsUsed(uint64_t arg) {
-  return 64u - countLeadingZeros(arg);
+  return 64u - llvm::countLeadingZeros(arg);
 }
 
 } // end namespace swift
