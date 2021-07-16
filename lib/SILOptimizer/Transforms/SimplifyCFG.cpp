@@ -829,7 +829,7 @@ getEnumCaseRecursive(SILValue Val, SILBasicBlock *UsedInBB, int RecursionDepth,
     Pred = UsedInBB->getSinglePredecessorBlock();
   }
 
-  // In case of a block argument, recursively check the enum cases of all
+  // In case of a phi, recursively check the enum cases of all
   // incoming predecessors.
   if (auto *Arg = dyn_cast<SILArgument>(Val)) {
     HandledArgs.insert(Arg);
@@ -2697,8 +2697,6 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
 bool SimplifyCFG::simplifyTermWithIdenticalDestBlocks(SILBasicBlock *BB) {
   TrampolineDest commonDest;
   for (auto *SuccBlock : BB->getSuccessorBlocks()) {
-    if (SuccBlock->getNumArguments() != 0)
-      return false;
     auto trampolineDest = TrampolineDest(BB, SuccBlock);
     if (!trampolineDest) {
       return false;
@@ -2911,11 +2909,7 @@ bool SimplifyCFG::simplifyBlocks() {
 /// Canonicalize all switch_enum and switch_enum_addr instructions.
 /// If possible, replace the default with the corresponding unique case.
 bool SimplifyCFG::canonicalizeSwitchEnums() {
-  if (!EnableOSSARewriteTerminator && Fn.hasOwnership()) {
-    // TODO: OSSA. In OSSA, the default switch_enum case passes the
-    // original enum as a block argument. This needs to check that the block
-    // argument is dead, then replace it with the a new argument for the default
-    // payload.
+  if (!EnableOSSASimplifyCFG && Fn.hasOwnership()) {
     return false;
   }
   bool Changed = false;
@@ -2933,6 +2927,15 @@ bool SimplifyCFG::canonicalizeSwitchEnums() {
     if (!elementDecl)
       continue;
     
+    if (!EnableOSSARewriteTerminator && Fn.hasOwnership()) {
+      if (!SWI.getOperand()->getType().isTrivial(Fn)) {
+        // TODO: OSSA. In OSSA, the default switch_enum case passes the original
+        // enum as a block argument. This needs to check that the block argument
+        // is dead, then replace it with the a new argument for the default
+        // payload.
+        continue;
+      }
+    }
     LLVM_DEBUG(llvm::dbgs() << "simplify canonical switch_enum\n");
 
     // Construct a new instruction by copying all the case entries.
@@ -2941,9 +2944,25 @@ bool SimplifyCFG::canonicalizeSwitchEnums() {
       CaseBBs.push_back(SWI.getCase(idx));
     }
     // Add the default-entry of the original instruction as case-entry.
-    CaseBBs.push_back(std::make_pair(elementDecl.get(), SWI.getDefaultBB()));
+    auto *defaultBB = SWI.getDefaultBB();
+    CaseBBs.push_back(std::make_pair(elementDecl.get(), defaultBB));
 
     if (isa<SwitchEnumInst>(*SWI)) {
+      if (Fn.hasOwnership()) {
+        assert(defaultBB->getNumArguments() == 1);
+        defaultBB->getArgument(0)->replaceAllUsesWith(SWI.getOperand());
+        defaultBB->eraseArgument(0);
+        // TODO: handle non-trivial payloads. The new block argument must be
+        // destroyed. The old default argument may need to be copied. But it may
+        // also be possible to optimize the common case on-the-fly without the
+        // extra copy/destroy.
+        if (elementDecl.get()->hasAssociatedValues()) {
+          // Note: this is not really a phi.
+          auto elementTy = SWI.getOperand()->getType().getEnumElementType(
+              elementDecl.get(), Fn.getModule(), Fn.getTypeExpansionContext());
+          defaultBB->createPhiArgument(elementTy, OwnershipKind::None);
+        }
+      }
       SILBuilderWithScope(SWI).createSwitchEnum(SWI->getLoc(), SWI.getOperand(),
                                                 nullptr, CaseBBs);
     } else {
