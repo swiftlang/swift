@@ -231,15 +231,16 @@ void swift::runJobInEstablishedExecutorContext(Job *job) {
     // Update the active task in the current thread.
     ActiveTask::set(task);
 
-    // FIXME: update the task status to say that it's running
-    // on the current thread.  If the task suspends itself to run
-    // on an actor, it should update the task status appropriately;
-    // we don't need to update it afterwards.
+    // Update the task status to say that it's running on the
+    // current thread.  If the task suspends somewhere, it should
+    // update the task status appropriately; we don't need to update
+    // it afterwards.
+    task->flagAsRunning();
 
     task->runInFullyEstablishedContext();
 
-    // Clear the active task.
-    ActiveTask::set(nullptr);
+    assert(ActiveTask::get() == nullptr &&
+           "active task wasn't cleared before susspending?");
   } else {
     // There's no extra bookkeeping to do for simple jobs.
     job->runSimpleInFullyEstablishedContext();
@@ -253,7 +254,7 @@ void swift::runJobInEstablishedExecutorContext(Job *job) {
 }
 
 SWIFT_CC(swift)
-static AsyncTask *swift_task_getCurrentImpl() {
+AsyncTask *swift::swift_task_getCurrent() {
   return ActiveTask::get();
 }
 
@@ -1845,6 +1846,9 @@ SWIFT_CC(swiftasync)
 static void runOnAssumedThread(AsyncTask *task, ExecutorRef executor,
                                ExecutorTrackingInfo *oldTracking,
                                RunningJobInfo runner) {
+  // Note that this doesn't change the active task and so doesn't
+  // need to either update ActiveTask or flagAsRunning/flagAsSuspended.
+
   // If there's alreaady tracking info set up, just change the executor
   // there and tail-call the task.  We don't want these frames to
   // potentially accumulate linearly.
@@ -1932,6 +1936,8 @@ static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContex
   fprintf(stderr, "[%lu] switch failed, task %p enqueued on executor %p\n",
           _swift_get_thread_id(), task, newExecutor.getIdentity());
 #endif
+  task->flagAsSuspended();
+  _swift_task_clearCurrent();
   swift_task_enqueue(task, newExecutor);
 }
 

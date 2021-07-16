@@ -605,19 +605,27 @@ void swift_defaultActor_enqueue(Job *job, DefaultActor *actor);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 bool swift_distributed_actor_is_remote(DefaultActor *actor);
 
+/// Do a primitive suspension of the current task, as if part of
+/// a continuation, although this does not provide any of the
+/// higher-level continuation semantics.  The current task is returned;
+/// its ResumeFunction and ResumeContext will need to be initialized,
+/// and then it will need to be enqueued or run as a job later.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+AsyncTask *swift_task_suspend();
+
 /// Prepare a continuation in the current task.
 ///
 /// The caller should initialize the Parent, ResumeParent,
 /// and NormalResult fields.  This function will initialize the other
-/// fields with appropriate defaaults; the caller may then overwrite
+/// fields with appropriate defaults; the caller may then overwrite
 /// them if desired.
-///
-/// This function is provided as a code-size and runtime-usage
-/// optimization; calling it is not required if code is willing to
-/// do all its work inline.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 AsyncTask *swift_continuation_init(ContinuationAsyncContext *context,
                                    AsyncContinuationFlags flags);
+
+/// Await an initialized continuation.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
+void swift_continuation_await(ContinuationAsyncContext *continuationContext);
 
 /// Resume a task from a non-throwing continuation, given a normal
 /// result which has already been stored into the continuation.
