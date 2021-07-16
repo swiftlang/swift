@@ -287,32 +287,32 @@ func testMissingArgs() {
 
   // MISSINGARG_INLINE: Begin completions, 14 items
   // MISSINGARG_INLINE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: foo[#Foo#]; name=foo
-  // MISSINGARG_INLINE-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#(self): Foo#})[#(into: inout Hasher) -> Void#]; name=hash(self: Foo)
+  // MISSINGARG_INLINE-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#(self): Foo#})[#(into: inout Hasher) -> Void#]; name=hash(:)
   // MISSINGARG_INLINE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: bar[#Bar#]; name=bar
-  // MISSINGARG_INLINE-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#(self): Bar#})[#(into: inout Hasher) -> Void#]; name=hash(self: Bar)
+  // MISSINGARG_INLINE-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#(self): Bar#})[#(into: inout Hasher) -> Void#]; name=hash(:)
   // MISSINGARG_INLINE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: bop[#Bop#]; name=bop
-  // MISSINGARG_INLINE-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#(self): Bop#})[#(into: inout Hasher) -> Void#]; name=hash(self: Bop)
+  // MISSINGARG_INLINE-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#(self): Bop#})[#(into: inout Hasher) -> Void#]; name=hash(:)
   // MISSINGARG_INLINE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: bix[#Bix#]; name=bix
-  // MISSINGARG_INLINE-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#(self): Bix#})[#(into: inout Hasher) -> Void#]; name=hash(self: Bix)
+  // MISSINGARG_INLINE-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#(self): Bix#})[#(into: inout Hasher) -> Void#]; name=hash(:)
   // MISSINGARG_INLINE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: boy[#Boy#]; name=boy
-  // MISSINGARG_INLINE-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#(self): Boy#})[#(into: inout Hasher) -> Void#]; name=hash(self: Boy)
+  // MISSINGARG_INLINE-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#(self): Boy#})[#(into: inout Hasher) -> Void#]; name=hash(:)
   // MISSINGARG_INLINE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: blu[#Blu#]; name=blu
-  // MISSINGARG_INLINE-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#(self): Blu#})[#(into: inout Hasher) -> Void#]; name=hash(self: Blu)
+  // MISSINGARG_INLINE-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#(self): Blu#})[#(into: inout Hasher) -> Void#]; name=hash(:)
   // MISSINGARG_INLINE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: baz[#Baz#]; name=baz
-  // MISSINGARG_INLINE-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#(self): Baz#})[#(into: inout Hasher) -> Void#]; name=hash(self: Baz)
+  // MISSINGARG_INLINE-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#(self): Baz#})[#(into: inout Hasher) -> Void#]; name=hash(:)
   // MISSINGARG_INLINE: End completions
 
   // MISSINGARG_TRAILING: Begin completions, 10 items
   // MISSINGARG_TRAILING-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: foo[#Foo#]; name=foo
-  // MISSINGARG_TRAILING-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#(self): Foo#})[#(into: inout Hasher) -> Void#]; name=hash(self: Foo)
+  // MISSINGARG_TRAILING-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#(self): Foo#})[#(into: inout Hasher) -> Void#]; name=hash(:)
   // MISSINGARG_TRAILING-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: bar[#Bar#]; name=bar
-  // MISSINGARG_TRAILING-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#(self): Bar#})[#(into: inout Hasher) -> Void#]; name=hash(self: Bar)
+  // MISSINGARG_TRAILING-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#(self): Bar#})[#(into: inout Hasher) -> Void#]; name=hash(:)
   // MISSINGARG_TRAILING-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: bop[#Bop#]; name=bop
-  // MISSINGARG_TRAILING-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#(self): Bop#})[#(into: inout Hasher) -> Void#]; name=hash(self: Bop)
+  // MISSINGARG_TRAILING-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#(self): Bop#})[#(into: inout Hasher) -> Void#]; name=hash(:)
   // MISSINGARG_TRAILING-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: bix[#Bix#]; name=bix
-  // MISSINGARG_TRAILING-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#(self): Bix#})[#(into: inout Hasher) -> Void#]; name=hash(self: Bix)
+  // MISSINGARG_TRAILING-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#(self): Bix#})[#(into: inout Hasher) -> Void#]; name=hash(:)
   // MISSINGARG_TRAILING-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: boy[#Boy#]; name=boy
-  // MISSINGARG_TRAILING-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#(self): Boy#})[#(into: inout Hasher) -> Void#]; name=hash(self: Boy)
+  // MISSINGARG_TRAILING-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#(self): Boy#})[#(into: inout Hasher) -> Void#]; name=hash(:)
   // MISSINGARG_TRAILING: End completions
 }
 

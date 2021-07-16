@@ -130,7 +130,7 @@ func f2() {
 // ASSIGN_5: Begin completions, 3 items
 // ASSIGN_5-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]:     case2[#D1#]; name=case2
 // ASSIGN_5-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]:     case1[#D1#]; name=case1
-// ASSIGN_5-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]:     hash({#(self): D1#})[#(into: inout Hasher) -> Void#]; name=hash(self: D1)
+// ASSIGN_5-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]:     hash({#(self): D1#})[#(into: inout Hasher) -> Void#]; name=hash(:)
 
 	func f6() {
 	  var d : D2
@@ -139,7 +139,7 @@ func f2() {
 // ASSIGN_6: Begin completions, 3 items
 // ASSIGN_6-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]:     case3[#D2#]; name=case3
 // ASSIGN_6-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]:     case4[#D2#]; name=case4
-// ASSIGN_6-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]:     hash({#(self): D2#})[#(into: inout Hasher) -> Void#]; name=hash(self: D2)
+// ASSIGN_6-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]:     hash({#(self): D2#})[#(into: inout Hasher) -> Void#]; name=hash(:)
 
   func f7 (C : C2) {
     var i : Int

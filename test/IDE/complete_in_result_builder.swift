@@ -126,14 +126,14 @@ func testPatternMatching() {
     // OPTIONAL_FOOSTRUCT: Begin completions, 9 items
     // OPTIONAL_FOOSTRUCT-DAG: Keyword[nil]/None/Erase[1]/TypeRelation[Identical]:         nil[#FooStruct?#]; name=nil
     // OPTIONAL_FOOSTRUCT-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Identical]: none[#Optional<FooStruct>#]; name=none
-    // OPTIONAL_FOOSTRUCT-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Identical]: some({#FooStruct#})[#Optional<FooStruct>#]; name=some(FooStruct)
+    // OPTIONAL_FOOSTRUCT-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Identical]: some({#FooStruct#})[#Optional<FooStruct>#]; name=some()
     // FIXME: 'FooStruct' members should not be shown.
     // OPTIONAL_FOOSTRUCT-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: init()[#FooStruct#]; name=init()
-    // OPTIONAL_FOOSTRUCT-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: init({#Int#})[#FooStruct#]; name=init(Int)
-    // OPTIONAL_FOOSTRUCT-DAG: Decl[InstanceMethod]/CurrNominal:   boolGen({#(self): FooStruct#})[#() -> Bool#]; name=boolGen(self: FooStruct)
-    // OPTIONAL_FOOSTRUCT-DAG: Decl[InstanceMethod]/CurrNominal:   intGen({#(self): FooStruct#})[#() -> Int#]; name=intGen(self: FooStruct)
-    // OPTIONAL_FOOSTRUCT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: map({#(self): Optional<FooStruct>#})[#((FooStruct) throws -> U) -> U?#]; name=map(self: Optional<FooStruct>)
-    // OPTIONAL_FOOSTRUCT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: flatMap({#(self): Optional<FooStruct>#})[#((FooStruct) throws -> U?) -> U?#]; name=flatMap(self: Optional<FooStruct>)
+    // OPTIONAL_FOOSTRUCT-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: init({#Int#})[#FooStruct#]; name=init()
+    // OPTIONAL_FOOSTRUCT-DAG: Decl[InstanceMethod]/CurrNominal:   boolGen({#(self): FooStruct#})[#() -> Bool#]; name=boolGen(:)
+    // OPTIONAL_FOOSTRUCT-DAG: Decl[InstanceMethod]/CurrNominal:   intGen({#(self): FooStruct#})[#() -> Int#]; name=intGen(:)
+    // OPTIONAL_FOOSTRUCT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: map({#(self): Optional<FooStruct>#})[#((FooStruct) throws -> U) -> U?#]; name=map(:)
+    // OPTIONAL_FOOSTRUCT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: flatMap({#(self): Optional<FooStruct>#})[#((FooStruct) throws -> U?) -> U?#]; name=flatMap(:)
     // OPTIONAL_FOOSTRUCT-NOT: init({#(some):
     // OPTIONAL_FOOSTRUCT-NOT: init({#nilLiteral:
     // OPTIONAL_FOOSTRUCT: End completions

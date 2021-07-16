@@ -2,18 +2,6 @@
   key.results: [
     {
       key.kind: source.lang.swift.decl.function.subscript,
-      key.name: "[label:]",
-      key.sourcetext: "[label: <#T##Int#>]",
-      key.description: "[<callarg><callarg.label>label</callarg.label> <callarg.param>param</callarg.param>: <callarg.type><typeid.sys>Int</typeid.sys></callarg.type></callarg>]",
-      key.typename: "<typeid.sys>Int</typeid.sys>",
-      key.context: source.codecompletion.context.thisclass,
-      key.typerelation: source.codecompletion.typerelation.unknown,
-      key.num_bytes_to_erase: 0,
-      key.associated_usrs: "s:29complete_annotateddescription8MyStructV5labelS2i_tcip",
-      key.modulename: "complete_annotateddescription"
-    },
-    {
-      key.kind: source.lang.swift.decl.function.subscript,
       key.name: "[:]",
       key.sourcetext: "[<#T##param: Int##Int#>]",
       key.description: "[<callarg><callarg.label>_</callarg.label> <callarg.param>param</callarg.param>: <callarg.type><typeid.sys>Int</typeid.sys></callarg.type></callarg>]",
@@ -22,6 +10,18 @@
       key.typerelation: source.codecompletion.typerelation.unknown,
       key.num_bytes_to_erase: 0,
       key.associated_usrs: "s:29complete_annotateddescription8MyStructVyS2icip",
+      key.modulename: "complete_annotateddescription"
+    },
+    {
+      key.kind: source.lang.swift.decl.function.subscript,
+      key.name: "[label:]",
+      key.sourcetext: "[label: <#T##Int#>]",
+      key.description: "[<callarg><callarg.label>label</callarg.label> <callarg.param>param</callarg.param>: <callarg.type><typeid.sys>Int</typeid.sys></callarg.type></callarg>]",
+      key.typename: "<typeid.sys>Int</typeid.sys>",
+      key.context: source.codecompletion.context.thisclass,
+      key.typerelation: source.codecompletion.typerelation.unknown,
+      key.num_bytes_to_erase: 0,
+      key.associated_usrs: "s:29complete_annotateddescription8MyStructV5labelS2i_tcip",
       key.modulename: "complete_annotateddescription"
     },
     {

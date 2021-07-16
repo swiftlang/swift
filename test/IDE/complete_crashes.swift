@@ -224,8 +224,8 @@ func foo_38149042(bar: Bar_38149042) {
 // RDAR_38149042: Begin completions
 // RDAR_38149042-DAG: Decl[InstanceVar]/CurrNominal:                  .x[#Int#]; name=x
 // RDAR_38149042-DAG: Keyword[self]/CurrNominal: .self[#Baz_38149042#]; name=self
-// RDAR_38149042-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: [' ']=== {#AnyObject?#}[#Bool#]; name==== AnyObject?
-// RDAR_38149042-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: [' ']!== {#AnyObject?#}[#Bool#]; name=!== AnyObject?
+// RDAR_38149042-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: [' ']=== {#AnyObject?#}[#Bool#]; name====
+// RDAR_38149042-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: [' ']!== {#AnyObject?#}[#Bool#]; name=!==
 // RDAR_38149042: End completions
 
 // rdar://problem/38272904
@@ -291,7 +291,7 @@ public final class IntStore {
   }
 }
 // RDAR_41232519: Begin completions
-// RDAR_41232519: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: [' ']+ {#Int#}[#Int#]; name=+ Int
+// RDAR_41232519: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: [' ']+ {#Int#}[#Int#]; name=+
 // RDAR_41232519: End completions
 
 // rdar://problem/28188259
@@ -300,7 +300,7 @@ func test_28188259(x: ((Int) -> Void) -> Void) {
   x({_ in }#^RDAR_28188259^#)
 }
 // RDAR_28188259: Begin completions
-// RDAR_28188259-DAG: Pattern/CurrModule/Flair[ArgLabels]: ({#Int#})[#Void#]; name=(Int)
+// RDAR_28188259-DAG: Pattern/CurrModule/Flair[ArgLabels]: ({#Int#})[#Void#]; name=()
 // RDAR_28188259-DAG: Keyword[self]/CurrNominal:          .self[#(Int) -> ()#]; name=self
 // RDAR_28188259: End completions
 
