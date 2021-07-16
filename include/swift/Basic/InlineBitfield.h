@@ -124,3 +124,7 @@ constexpr unsigned countBitsUsed(uint64_t arg) {
   return 64u - __builtin_clzll(arg);
 #endif
 }
+
+} // end namespace swift
+
+#endif // SWIFT_INLINE_BITFIELD_H
