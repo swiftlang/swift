@@ -2055,6 +2055,15 @@ function(add_swift_target_library name)
           list(APPEND THIN_INPUT_TARGETS ${VARIANT_NAME})
         endif()
       endif()
+
+      if(sdk IN_LIST SWIFT_APPLE_PLATFORMS)
+        # In the past, we relied on unsetting globally
+        # CMAKE_OSX_ARCHITECTURES to ensure that CMake would
+        # not add the -arch flag
+        # This is no longer the case when running on Apple Silicon,
+        # when CMake will enforce a default (see https://gitlab.kitware.com/cmake/cmake/-/merge_requests/5291)
+        set_property(TARGET ${VARIANT_NAME} PROPERTY OSX_ARCHITECTURES "${arch}")
+      endif()
     endforeach()
 
     # Configure module-only targets
@@ -2493,6 +2502,13 @@ function(add_swift_target_executable name)
       endif()
 
       if(${sdk} IN_LIST SWIFT_APPLE_PLATFORMS)
+        # In the past, we relied on unsetting globally
+        # CMAKE_OSX_ARCHITECTURES to ensure that CMake would
+        # not add the -arch flag
+        # This is no longer the case when running on Apple Silicon,
+        # when CMake will enforce a default (see https://gitlab.kitware.com/cmake/cmake/-/merge_requests/5291)
+        set_property(TARGET ${VARIANT_NAME} PROPERTY OSX_ARCHITECTURES "${arch}")
+
         add_custom_command_target(unused_var2
          COMMAND "codesign" "-f" "-s" "-" "${SWIFT_RUNTIME_OUTPUT_INTDIR}/${VARIANT_NAME}"
          CUSTOM_TARGET_NAME "${VARIANT_NAME}_signed"
