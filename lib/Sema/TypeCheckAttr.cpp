@@ -1876,17 +1876,26 @@ synthesizeMainBody(AbstractFunctionDecl *fn, void *arg) {
     // Pass main into _runAsyncMain(_ asyncFunc: () async throws -> ())
     // Resulting $main looks like:
     // $main() { _runAsyncMain(main) }
+    auto makeErrorExpr = [&context, mainFunction]() {
+      auto result = new (context) ErrorExpr(mainFunction->getSourceRange());
+      SmallVector<ASTNode, 1> stmts;
+      stmts.push_back(result);
+      auto body = BraceStmt::create(context, SourceLoc(), stmts, SourceLoc(),
+                                    /*Implicit*/ true);
+      return std::make_pair(body, /*typechecked*/ true);
+    };
     auto *concurrencyModule = context.getLoadedModule(context.Id_Concurrency);
     if (!concurrencyModule) {
       context.Diags.diagnose(mainFunction->getAsyncLoc(),
                              diag::async_main_no_concurrency);
-      auto result = new (context) ErrorExpr(mainFunction->getSourceRange());
-      SmallVector<ASTNode, 1> stmts;
-      stmts.push_back(result);
-      auto body = BraceStmt::create(context, SourceLoc(), stmts,
-                                    SourceLoc(), /*Implicit*/true);
+      return makeErrorExpr();
+    }
 
-      return std::make_pair(body, /*typechecked*/true);
+    if (!context.LangOpts.EnableExperimentalAsyncMain) {
+      context.Diags.diagnose(
+          mainFunction->getAsyncLoc(), diag::pound_error,
+          "pass '-enable-experimental-async-main' to use async-main");
+      return makeErrorExpr();
     }
 
     SmallVector<ValueDecl *, 1> decls;

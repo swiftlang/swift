@@ -286,6 +286,9 @@ namespace swift {
     /// Enable experimental concurrency model.
     bool EnableExperimentalConcurrency = false;
 
+    /// Enable experimental async main.
+    bool EnableExperimentalAsyncMain = false;
+
     /// Enable experimental support for additional opaque return type features,
     /// i.e. named opaque return types (with 'where' clause support), and opaque
     /// types in nested position within the function return type.

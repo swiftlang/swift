@@ -441,6 +441,10 @@ def enable_experimental_opaque_return_types :
   Flag<["-"], "enable-experimental-opaque-return-types">,
   HelpText<"Enable experimental extensions to opaque return type support">;
 
+def enable_experimental_async_main :
+  Flag<["-"], "enable-experimental-async-main">,
+  HelpText<"Enable experimental extension for asynchronous main function">;
+
 def enable_deserialization_recovery :
   Flag<["-"], "enable-deserialization-recovery">,
   HelpText<"Attempt to recover from missing xrefs (etc) in swiftmodules">;
