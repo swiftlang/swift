@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift-dylib(%t/%target-library-name(PrintShims)) %S/../../Inputs/print-shims.swift -module-name PrintShims -emit-module -emit-module-path %t/PrintShims.swiftmodule
+// RUN: %target-build-swift-dylib(%t/%target-library-name(PrintShims)) %S/../../Inputs/print-shims.swift -Xfrontend -enable-experimental-async-main -module-name PrintShims -emit-module -emit-module-path %t/PrintShims.swiftmodule
 // RUN: %target-codesign %t/%target-library-name(PrintShims)
 // RUN: %target-build-swift-dylib(%t/%target-library-name(ResilientProtocol)) %S/Inputs/protocol-1instance-void_to_void.swift -Xfrontend -enable-experimental-concurrency -g -module-name ResilientProtocol -emit-module -emit-module-path %t/ResilientProtocol.swiftmodule
 // RUN: %target-codesign %t/%target-library-name(ResilientProtocol)
