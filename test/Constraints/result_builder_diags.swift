@@ -652,7 +652,7 @@ struct MyView {
 
   @TupleBuilder var invalidSwitchMultiple: some P {
     switch Optional.some(1) {
-    case .none: // expected-error {{'case' label in a 'switch' should have at least one executable statement}}
+    case .none: // expected-error {{'case' label in a 'switch' must have at least one executable statement}}
     case . // expected-error {{expected ':' after 'case'}}
     } // expected-error {{expected identifier after '.' expression}}
   }
