@@ -117,4 +117,10 @@ constexpr unsigned bitmax(unsigned a, unsigned b) {
 }
 
 constexpr unsigned countBitsUsed(uint64_t arg) {
-  return 64u - countTrailingZeros(arg);
+// Assumes unsigned long long is 64 bit
+#if defined(_MSC_VER)
+  return 64u - __lzcnt64(arg);
+#else
+  return 64u - __builtin_clzll(arg);
+#endif
+}
