@@ -384,6 +384,16 @@ inline void AsyncTask::flagAsSuspended() {
   }
 }
 
+// READ ME: This is not a dead function! Do not remove it! This is a function
+// that can be used when debugging locally to instrument when a task actually is
+// dealloced.
+inline void AsyncTask::flagAsCompleted() {
+#if SWIFT_TASK_PRINTF_DEBUG
+  fprintf(stderr, "[%lu] task completed %p\n",
+          _swift_get_thread_id(), this);
+#endif
+}
+
 inline void AsyncTask::localValuePush(const HeapObject *key,
                                       /* +1 */ OpaqueValue *value,
                                       const Metadata *valueType) {
