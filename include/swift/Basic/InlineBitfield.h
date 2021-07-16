@@ -19,7 +19,6 @@
 
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/MathExtras.h"
-
 #include <cstdint>
 
 // Boilerplate namespace in case we add non-macros.
