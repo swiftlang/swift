@@ -1110,7 +1110,12 @@ swift_task_addCancellationHandlerImpl(
   auto *record = new (allocation)
       CancellationNotificationStatusRecord(unsigned_handler, context);
 
-  swift_task_addStatusRecord(record);
+  if (swift_task_addStatusRecord(record))
+    return record;
+
+  // else, the task was already cancelled, so while the record was added,
+  // we must run it immediately here since no other task will trigger it.
+  record->run();
   return record;
 }
 
