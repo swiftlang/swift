@@ -162,6 +162,8 @@ template <class Context, class Fn>
 static void parkTask(AsyncTask *task, Context *context, Fn &&fn) {
   auto invoke =
     TaskContinuationFromLambda<Fn, Context>::get(std::move(fn));
+  auto currentTask = swift_task_suspend();
+  EXPECT_EQ(task, currentTask);
   task->ResumeTask = invoke;
   task->ResumeContext = context;
 }

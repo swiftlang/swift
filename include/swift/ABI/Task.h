@@ -203,7 +203,7 @@ public:
 
   /// Private storage for the use of the runtime.
   struct alignas(2 * alignof(void*)) OpaquePrivateStorage {
-    void *Storage[6];
+    void *Storage[14];
 
     /// Initialize this storage during the creation of a task.
     void initialize(AsyncTask *task);
@@ -260,7 +260,25 @@ public:
   void runInFullyEstablishedContext() {
     return ResumeTask(ResumeContext); // 'return' forces tail call
   }
-  
+
+  /// Flag that this task is now running.  This can update
+  /// the priority stored in the job flags if the priority has been
+  /// escalated.
+  ///
+  /// Generally this should be done immediately after updating
+  /// ActiveTask.
+  void flagAsRunning();
+  void flagAsRunning_slow();
+
+  /// Flag that this task is now suspended.  This can update the
+  /// priority stored in the job flags if the priority hsa been
+  /// escalated.  Generally this should be done immediately after
+  /// clearing ActiveTask and immediately before enqueuing the task
+  /// somewhere.  TODO: record where the task is enqueued if
+  /// possible.
+  void flagAsSuspended();
+  void flagAsSuspended_slow();
+
   /// Check whether this task has been cancelled.
   /// Checking this is, of course, inherently race-prone on its own.
   bool isCancelled() const;
@@ -630,6 +648,10 @@ public:
 
   void setErrorResult(SwiftError *error) {
     ErrorResult = error;
+  }
+
+  bool isExecutorSwitchForced() const {
+    return Flags.continuation_isExecutorSwitchForced();
   }
 
   static bool classof(const AsyncContext *context) {
