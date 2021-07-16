@@ -18,11 +18,9 @@
 #define SWIFT_INLINE_BITFIELD_H
 
 #include "llvm/Support/Compiler.h"
-#include <cstdint>
+#include "llvm/Support/MathExtras.h"
 
-#if defined(_MSC_VER)
-#include <intrin.h>
-#endif
+#include <cstdint>
 
 // Boilerplate namespace in case we add non-macros.
 namespace swift {
@@ -121,12 +119,7 @@ constexpr unsigned bitmax(unsigned a, unsigned b) {
 }
 
 constexpr unsigned countBitsUsed(uint64_t arg) {
-// Assumes uint64_t is the same as unsigned long long
-#if defined(_MSC_VER)
-  return 64u - static_cast<unsigned>(__lzcnt64(arg));
-#else
-  return 64u - __builtin_clzll(static_cast<unsigned long long>(arg));
-#endif
+  return 64u - countLeadingZeros(arg);
 }
 
 } // end namespace swift
