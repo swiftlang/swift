@@ -225,6 +225,8 @@ static void destroyJob(SWIFT_CONTEXT HeapObject *obj) {
 }
 
 AsyncTask::~AsyncTask() {
+  flagAsCompleted();
+
   // For a future, destroy the result.
   if (isFuture()) {
     futureFragment()->destroy();

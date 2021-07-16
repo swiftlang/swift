@@ -384,6 +384,9 @@ inline void AsyncTask::flagAsSuspended() {
   }
 }
 
+inline void AsyncTask::flagAsCompleted() {
+}
+
 inline void AsyncTask::localValuePush(const HeapObject *key,
                                       /* +1 */ OpaqueValue *value,
                                       const Metadata *valueType) {
