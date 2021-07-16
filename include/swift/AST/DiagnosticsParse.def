@@ -1139,7 +1139,7 @@ ERROR(default_with_where,none,
       "'default' cannot be used with a 'where' guard expression",
       ())
 ERROR(case_stmt_without_body,none,
-      "%select{'case'|'default'}0 label in a 'switch' should have at least one "
+      "%select{'case'|'default'}0 label in a 'switch' must have at least one "
       "executable statement", (bool))
 
 // 'try' on statements
