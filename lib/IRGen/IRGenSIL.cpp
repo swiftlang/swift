@@ -5160,7 +5160,12 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
     }
   }
 
-  SILType SILTy = i->getType();
+  SILType SILTy;
+  if (auto MaybeSILTy = VarInfo->Type)
+    // If there is auxiliary type info, use it
+    SILTy = *MaybeSILTy;
+  else
+    SILTy = i->getType();
   auto RealType = SILTy.getASTType();
   DebugTypeInfo DbgTy;
   if (Decl) {

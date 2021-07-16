@@ -10,6 +10,7 @@ struct MyStruct {
 
 sil_scope 1 { loc "file.swift":7:6 parent @test_fragment : $@convention(thin) () -> () }
 
+// Testing op_fragment w/ debug_value_addr
 sil hidden @test_fragment : $@convention(thin) () -> () {
 bb0:
   %2 = alloc_stack $MyStruct, var, name "my_struct", loc "file.swift":8:9, scope 1
@@ -25,6 +26,27 @@ bb0:
   // CHECK-SAME:           !DIExpression(DW_OP_deref, DW_OP_LLVM_fragment, 0, 64)
   // CHECK-NOT:           ), !dbg ![[VAR_DECL_MD]]
   dealloc_stack %2 : $*MyStruct
+  %r = tuple()
+  return %r : $()
+}
+
+sil_scope 2 { loc "file.swift":14:6 parent @test_alloc_stack : $@convention(thin) () -> () }
+
+// Testing di-expression w/ alloc_stack
+sil hidden @test_alloc_stack : $@convention(thin) () -> () {
+bb0:
+  %my_struct = alloc_stack $MyStruct, var, name "my_struct", loc "file.swift":15:9, scope 2
+  // CHECK: %[[MY_STRUCT:.+]] = alloca %{{.*}}MyStruct
+  // CHECK: llvm.dbg.declare(metadata {{.*}}* %[[MY_STRUCT]], metadata ![[VAR_DECL_MD:[0-9]+]]
+  // CHECK-SIL: alloc_stack $Int, var
+  // CHECK-SIL-SAME:        (name "my_struct", loc "file.swift":15:9, scope {{[0-9]+}})
+  // CHECK-SIL-SAME:        type $MyStruct, expr op_fragment:#MyStruct.x
+  %field_x = alloc_stack $Int, var, (name "my_struct", loc "file.swift":15:9, scope 2), type $MyStruct, expr op_fragment:#MyStruct.x, loc "file.swift":16:17, scope 2
+  // CHECK: %[[FIELD_X:.+]] = alloca %TSi
+  // CHECK: llvm.dbg.declare(metadata %TSi* %[[FIELD_X]], metadata ![[VAR_DECL_MD]]
+  // CHECK-SAME:             !DIExpression(DW_OP_LLVM_fragment, 0, 64)
+  dealloc_stack %field_x : $*Int
+  dealloc_stack %my_struct: $*MyStruct
   %r = tuple()
   return %r : $()
 }

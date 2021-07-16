@@ -1210,7 +1210,8 @@ public:
     if (AVI->hasDynamicLifetime())
       *this << "[dynamic_lifetime] ";
     *this << AVI->getElementType();
-    printDebugVar(AVI->getVarInfo());
+    printDebugVar(AVI->getVarInfo(),
+                  &AVI->getModule().getASTContext().SourceMgr);
   }
 
   void printAllocRefInstBase(AllocRefInstBase *ARI) {
@@ -1245,7 +1246,8 @@ public:
     if (ABI->hasDynamicLifetime())
       *this << "[dynamic_lifetime] ";
     *this << ABI->getType();
-    printDebugVar(ABI->getVarInfo());
+    printDebugVar(ABI->getVarInfo(),
+                  &ABI->getModule().getASTContext().SourceMgr);
   }
 
   void printSubstitutions(SubstitutionMap Subs,

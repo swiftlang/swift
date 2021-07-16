@@ -2493,13 +2493,13 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
       Operands.push_back(SizeInBits);
     }
     llvm::DIExpression *DIExpr = DBuilder.createExpression(Operands);
-    emitDbgIntrinsic(
-        Builder, Piece, Var,
-        // DW_OP_LLVM_fragment must be the last part of an DIExpr
-        // so we can't append more if IsPiece is true.
-        Operands.empty() || IsPiece ? DIExpr : appendDIExpression(DIExpr),
-        DInstLine, DInstLoc.column, Scope, DS,
-        Indirection == CoroDirectValue || Indirection == CoroIndirectValue);
+    emitDbgIntrinsic(Builder, Piece, Var,
+                     // DW_OP_LLVM_fragment must be the last part of an DIExpr
+                     // so we can't append more if IsPiece is true.
+                     IsPiece ? DIExpr : appendDIExpression(DIExpr), DInstLine,
+                     DInstLoc.column, Scope, DS,
+                     Indirection == CoroDirectValue ||
+                         Indirection == CoroIndirectValue);
   }
 
   // Emit locationless intrinsic for variables that were optimized away.

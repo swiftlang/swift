@@ -1806,6 +1806,50 @@ public:
 static_assert(sizeof(TailAllocatedDebugVariable) == 4,
               "SILNode inline bitfield needs updating");
 
+/// Used for keeping track of advanced / supplement debug variable info
+/// stored in trailing objects space inside debug instructions (e.g.
+/// debug_value)
+class SILDebugVariableSupplement {
+protected:
+  enum SourceLocKind : unsigned { SLK_Loc = 0b01, SLK_Scope = 0b10 };
+
+  unsigned NumDIExprOperands : 8;
+
+  unsigned HasAuxDebugVariableType : 1;
+
+  unsigned AuxVariableSourceLoc : 2;
+
+  SILDebugVariableSupplement(unsigned NumDIExprOps, bool AuxType, bool AuxLoc,
+                             bool AuxScope)
+      : NumDIExprOperands(NumDIExprOps), HasAuxDebugVariableType(AuxType),
+        AuxVariableSourceLoc((AuxLoc ? SLK_Loc : 0) |
+                             (AuxScope ? SLK_Scope : 0)) {}
+};
+
+#define SIL_DEBUG_VAR_SUPPLEMENT_TRAILING_OBJS_IMPL()                          \
+  inline bool hasAuxDebugLocation() const {                                    \
+    return AuxVariableSourceLoc & SLK_Loc;                                     \
+  }                                                                            \
+  inline bool hasAuxDebugScope() const {                                       \
+    return AuxVariableSourceLoc & SLK_Scope;                                   \
+  }                                                                            \
+                                                                               \
+  size_t numTrailingObjects(OverloadToken<SILType>) const {                    \
+    return HasAuxDebugVariableType ? 1 : 0;                                    \
+  }                                                                            \
+                                                                               \
+  size_t numTrailingObjects(OverloadToken<SILLocation>) const {                \
+    return hasAuxDebugLocation() ? 1 : 0;                                      \
+  }                                                                            \
+                                                                               \
+  size_t numTrailingObjects(OverloadToken<const SILDebugScope *>) const {      \
+    return hasAuxDebugScope() ? 1 : 0;                                         \
+  }                                                                            \
+                                                                               \
+  size_t numTrailingObjects(OverloadToken<SILDIExprElement>) const {           \
+    return NumDIExprOperands;                                                  \
+  }
+
 //===----------------------------------------------------------------------===//
 // Allocation Instructions
 //===----------------------------------------------------------------------===//
@@ -1833,7 +1877,10 @@ class DeallocStackInst;
 class AllocStackInst final
     : public InstructionBase<SILInstructionKind::AllocStackInst,
                              AllocationInst>,
-      private llvm::TrailingObjects<AllocStackInst, Operand, char> {
+      private SILDebugVariableSupplement,
+      private llvm::TrailingObjects<AllocStackInst, SILType, SILLocation,
+                                    const SILDebugScope *, SILDIExprElement,
+                                    Operand, char> {
   friend TrailingObjects;
   friend SILBuilder;
 
@@ -1848,6 +1895,8 @@ class AllocStackInst final
                                 SILFunction &F,
                                 Optional<SILDebugVariable> Var,
                                 bool hasDynamicLifetime);
+
+  SIL_DEBUG_VAR_SUPPLEMENT_TRAILING_OBJS_IMPL()
 
   size_t numTrailingObjects(OverloadToken<Operand>) const {
     return SILNode::Bits.AllocStackInst.NumOperands;
@@ -1878,9 +1927,24 @@ public:
 
   /// Return the debug variable information attached to this instruction.
   Optional<SILDebugVariable> getVarInfo() const {
+    Optional<SILType> AuxVarType;
+    Optional<SILLocation> VarDeclLoc;
+    const SILDebugScope *VarDeclScope = nullptr;
+    if (HasAuxDebugVariableType)
+      AuxVarType = *getTrailingObjects<SILType>();
+
+    if (hasAuxDebugLocation())
+      VarDeclLoc = *getTrailingObjects<SILLocation>();
+    if (hasAuxDebugScope())
+      VarDeclScope = *getTrailingObjects<const SILDebugScope *>();
+
+    llvm::ArrayRef<SILDIExprElement> DIExprElements(
+        getTrailingObjects<SILDIExprElement>(), NumDIExprOperands);
+
     auto RawValue = SILNode::Bits.AllocStackInst.VarInfo;
     auto VI = TailAllocatedDebugVariable(RawValue);
-    return VI.get(getDecl(), getTrailingObjects<char>());
+    return VI.get(getDecl(), getTrailingObjects<char>(), AuxVarType, VarDeclLoc,
+                  VarDeclScope, DIExprElements);
   };
   void setArgNo(unsigned N) {
     auto RawValue = SILNode::Bits.AllocStackInst.VarInfo;
@@ -4560,28 +4624,17 @@ public:
   }
 };
 
-/// Simple bitmasks that represent whether a SIL instruction
-/// or debug variable has SILLocation, DebugScope, or both of them
-/// attached.
-struct SILSourceLocKind {
-  static constexpr unsigned Loc = 0b01;
-  static constexpr unsigned Scope = 0b10;
-};
-
 /// Define the start or update to a symbolic variable value (for loadable
 /// types).
 class DebugValueInst final
     : public UnaryInstructionBase<SILInstructionKind::DebugValueInst,
                                   NonValueInstruction>,
+      private SILDebugVariableSupplement,
       private llvm::TrailingObjects<DebugValueInst, SILType, SILLocation,
                                     const SILDebugScope *, SILDIExprElement,
                                     char> {
   friend TrailingObjects;
   friend SILBuilder;
-
-  unsigned NumDIExprOperands;
-  bool HasAuxDebugVariableType;
-  unsigned AuxVariableSourceLoc : 2;
 
   TailAllocatedDebugVariable VarInfo;
 
@@ -4591,28 +4644,7 @@ class DebugValueInst final
                                 SILModule &M, SILDebugVariable Var,
                                 bool poisonRefs);
 
-  inline bool hasAuxDebugLocation() const {
-    return AuxVariableSourceLoc & SILSourceLocKind::Loc;
-  }
-  inline bool hasAuxDebugScope() const {
-    return AuxVariableSourceLoc & SILSourceLocKind::Scope;
-  }
-
-  size_t numTrailingObjects(OverloadToken<SILType>) const {
-    return HasAuxDebugVariableType ? 1 : 0;
-  }
-
-  size_t numTrailingObjects(OverloadToken<SILLocation>) const {
-    return hasAuxDebugLocation() ? 1 : 0;
-  }
-
-  size_t numTrailingObjects(OverloadToken<const SILDebugScope *>) const {
-    return hasAuxDebugScope() ? 1 : 0;
-  }
-
-  size_t numTrailingObjects(OverloadToken<SILDIExprElement>) const {
-    return NumDIExprOperands;
-  }
+  SIL_DEBUG_VAR_SUPPLEMENT_TRAILING_OBJS_IMPL()
 
   size_t numTrailingObjects(OverloadToken<char>) const { return 1; }
 
@@ -4622,7 +4654,6 @@ public:
   VarDecl *getDecl() const;
   /// Return the debug variable information attached to this instruction.
   Optional<SILDebugVariable> getVarInfo() const {
-    ;
     Optional<SILType> AuxVarType;
     Optional<SILLocation> VarDeclLoc;
     const SILDebugScope *VarDeclScope = nullptr;
@@ -4662,15 +4693,12 @@ public:
 class DebugValueAddrInst final
     : public UnaryInstructionBase<SILInstructionKind::DebugValueAddrInst,
                                   NonValueInstruction>,
+      private SILDebugVariableSupplement,
       private llvm::TrailingObjects<DebugValueAddrInst, SILType, SILLocation,
                                     const SILDebugScope *, SILDIExprElement,
                                     char> {
   friend TrailingObjects;
   friend SILBuilder;
-
-  unsigned NumDIExprOperands;
-  bool HasAuxDebugVariableType;
-  unsigned AuxVariableSourceLoc : 2;
 
   TailAllocatedDebugVariable VarInfo;
 
@@ -4680,28 +4708,7 @@ class DebugValueAddrInst final
                                     SILValue Operand, SILModule &M,
                                     SILDebugVariable Var);
 
-  inline bool hasAuxDebugLocation() const {
-    return AuxVariableSourceLoc & SILSourceLocKind::Loc;
-  }
-  inline bool hasAuxDebugScope() const {
-    return AuxVariableSourceLoc & SILSourceLocKind::Scope;
-  }
-
-  size_t numTrailingObjects(OverloadToken<SILType>) const {
-    return HasAuxDebugVariableType ? 1 : 0;
-  }
-
-  size_t numTrailingObjects(OverloadToken<SILLocation>) const {
-    return hasAuxDebugLocation() ? 1 : 0;
-  }
-
-  size_t numTrailingObjects(OverloadToken<const SILDebugScope *>) const {
-    return hasAuxDebugScope() ? 1 : 0;
-  }
-
-  size_t numTrailingObjects(OverloadToken<SILDIExprElement>) const {
-    return NumDIExprOperands;
-  }
+  SIL_DEBUG_VAR_SUPPLEMENT_TRAILING_OBJS_IMPL()
 
 public:
   /// Return the underlying variable declaration that this denotes,
