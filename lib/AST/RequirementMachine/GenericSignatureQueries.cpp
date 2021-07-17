@@ -419,10 +419,7 @@ Type RequirementMachine::getCanonicalTypeInContext(
 }
 
 /// Replace 'Self' in the given dependent type (\c depTy) with the given
-/// dependent type, producing a type that refers to
-/// the nested type. This limited operation makes sure that it does not
-/// create any new potential archetypes along the way, so it should only be
-/// used in cases where we're reconstructing something that we know exists.
+/// dependent type, producing a type that refers to the nested type.
 static Type replaceSelfWithType(Type selfType, Type depTy) {
   if (auto depMemTy = depTy->getAs<DependentMemberType>()) {
     Type baseType = replaceSelfWithType(selfType, depMemTy->getBase());
