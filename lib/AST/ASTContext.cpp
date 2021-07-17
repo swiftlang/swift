@@ -1797,6 +1797,12 @@ void ASTContext::registerGenericSignatureBuilder(
 
 GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
                                                       CanGenericSignature sig) {
+  // We should only create GenericSignatureBuilders if the requirement machine
+  // mode is ::Disabled or ::Verify.
+  assert(LangOpts.EnableRequirementMachine != RequirementMachineMode::Enabled &&
+         "Shouldn't create GenericSignatureBuilder when RequirementMachine "
+         "is enabled");
+
   // Check whether we already have a generic signature builder for this
   // signature and module.
   auto arena = getArena(sig);
