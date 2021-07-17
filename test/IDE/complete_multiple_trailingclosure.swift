@@ -230,14 +230,14 @@ struct TestNominalMember: P {
   #^MEMBERDECL_NEWLINE^#
 
 // MEMBERDECL_SAMELINE: Begin completions, 4 items
-// MEMBERDECL_SAMELINE-DAG: Pattern/Local/Flair[ArgLabels]:     {#fn2: (() -> String)? {|}#}[#(() -> String)?#]; name=fn2: (() -> String)?
+// MEMBERDECL_SAMELINE-DAG: Pattern/Local/Flair[ArgLabels]:     {#fn2: (() -> String)? {|}#}[#(() -> String)?#]; name=fn2:
 // MEMBERDECL_SAMELINE-DAG: Decl[InstanceMethod]/CurrNominal:   .enumFunc()[#Void#]; name=enumFunc()
-// MEMBERDECL_SAMELINE-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: [' ']+ {#SimpleEnum#}[#SimpleEnum#]; name=+ SimpleEnum
+// MEMBERDECL_SAMELINE-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: [' ']+ {#SimpleEnum#}[#SimpleEnum#]; name=+ 
 // MEMBERDECL_SAMELINE-DAG: Keyword[self]/CurrNominal:          .self[#SimpleEnum#]; name=self
 // MEMBERDECL_SAMELINE: End completions
 
 // MEMBERDECL_NEWLINE: Begin completions
-// FIXME-MEMBERDECL_NEWLINE-DAG: Pattern/Local/Flair[ArgLabels]: {#fn2: (() -> String)? {|}#}[#(() -> String)?#]; name=fn2: (() -> String)?
+// FIXME-MEMBERDECL_NEWLINE-DAG: Pattern/Local/Flair[ArgLabels]: {#fn2: (() -> String)? {|}#}[#(() -> String)?#]; name=fn2:
 // MEMBERDECL_NEWLINE-DAG: Keyword[enum]/None:                 enum; name=enum
 // MEMBERDECL_NEWLINE-DAG: Keyword[func]/None:                 func; name=func
 // MEMBERDECL_NEWLINE-DAG: Keyword[private]/None:              private; name=private

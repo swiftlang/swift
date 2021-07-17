@@ -1443,44 +1443,6 @@ CodeCompletionString::getFirstTextChunk(bool includeLeadingPunctuation) const {
   return StringRef();
 }
 
-void CodeCompletionString::getName(raw_ostream &OS) const {
-  auto FirstTextChunk = getFirstTextChunkIndex();
-  int TextSize = 0;
-  if (FirstTextChunk.hasValue()) {
-    auto chunks = getChunks().slice(*FirstTextChunk);
-
-    for (auto i = chunks.begin(), e = chunks.end(); i != e; ++i) {
-      using ChunkKind = Chunk::ChunkKind;
-
-      bool shouldPrint = !i->isAnnotation();
-      switch (i->getKind()) {
-      case ChunkKind::TypeAnnotation:
-      case ChunkKind::CallParameterClosureType:
-      case ChunkKind::CallParameterClosureExpr:
-      case ChunkKind::DeclAttrParamColon:
-      case ChunkKind::OptionalMethodCallTail:
-        continue;
-      case ChunkKind::TypeAnnotationBegin: {
-        auto level = i->getNestingLevel();
-        do { ++i; } while (i != e && !i->endsPreviousNestedGroup(level));
-        --i;
-        continue;
-      }
-      case ChunkKind::EffectsSpecifierKeyword:
-        shouldPrint = true; // Even when they're annotations.
-        break;
-      default:
-        break;
-      }
-
-      if (i->hasText() && shouldPrint) {
-        TextSize += i->getText().size();
-        OS << i->getText();
-      }
-    }
-  }
-}
-
 void CodeCompletionContext::sortCompletionResults(
     MutableArrayRef<CodeCompletionResult *> Results) {
   struct ResultAndName {
@@ -1495,7 +1457,7 @@ void CodeCompletionContext::sortCompletionResults(
     auto *result = Results[i];
     nameCache[i].result = result;
     llvm::raw_string_ostream OS(nameCache[i].name);
-    result->getCompletionString()->getName(OS);
+    printCodeCompletionResultFilterName(*result, OS);
     OS.flush();
   }
 
@@ -7428,10 +7390,8 @@ void PrintingCodeCompletionConsumer::handleResults(
       Result->getCompletionString()->print(OS);
     }
 
-    llvm::SmallString<64> Name;
-    llvm::raw_svector_ostream NameOs(Name);
-    Result->getCompletionString()->getName(NameOs);
-    OS << "; name=" << Name;
+    OS << "; name=";
+    printCodeCompletionResultFilterName(*Result, OS);
 
     StringRef comment = Result->getBriefDocComment();
     if (IncludeComments && !comment.empty()) {

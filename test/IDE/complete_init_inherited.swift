@@ -72,13 +72,13 @@ class D : C {
 // TEST_D-NEXT: Keyword/CurrNominal:                .Type[#D.Type#]; name=Type
 // TEST_D-NEXT: End completions
 
-// TEST_D_DOT: Decl[Constructor]/CurrNominal:       init({#d: D#})[#D#]; name=init(d: D)
-// TEST_D_DOT-NEXT: Decl[Constructor]/CurrNominal:  init({#int: Int#})[#D#]; name=init(int: Int)
-// TEST_D_DOT-NEXT: Decl[Constructor]/Super:        init({#c: C#})[#C#]; name=init(c: C)
+// TEST_D_DOT: Decl[Constructor]/CurrNominal:       init({#d: D#})[#D#]; name=init(d:)
+// TEST_D_DOT-NEXT: Decl[Constructor]/CurrNominal:  init({#int: Int#})[#D#]; name=init(int:)
+// TEST_D_DOT-NEXT: Decl[Constructor]/Super:        init({#c: C#})[#C#]; name=init(c:)
 
-// TEST_D_PAREN: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:       ['(']{#d: D#}[')'][#D#]; name=d: D
-// TEST_D_PAREN-NEXT: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:  ['(']{#int: Int#}[')'][#D#]; name=int: Int
-// TEST_D_PAREN-NEXT: Decl[Constructor]/Super/Flair[ArgLabels]:  ['(']{#c: C#}[')'][#C#]; name=c: C
+// TEST_D_PAREN: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:       ['(']{#d: D#}[')'][#D#]; name=d:
+// TEST_D_PAREN-NEXT: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:  ['(']{#int: Int#}[')'][#D#]; name=int:
+// TEST_D_PAREN-NEXT: Decl[Constructor]/Super/Flair[ArgLabels]:  ['(']{#c: C#}[')'][#C#]; name=c:
 
 func testA() {
   A#^TEST_A^#
