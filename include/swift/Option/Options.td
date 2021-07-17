@@ -1066,6 +1066,13 @@ def target_variant : Separate<["-"], "target-variant">,
   HelpText<"Generate 'zippered' code for macCatalyst that can run on the specified"
            " variant target triple in addition to the main -target triple">;
 
+def clang_target : Separate<["-"], "clang-target">,
+  Flags<[FrontendOption, SwiftAPIExtractOption, SwiftSymbolGraphExtractOption]>,
+  HelpText<"Separately set the target we should use for internal Clang instance">;
+
+def disable_clang_target : Flag<["-"], "disable-clang-target">,
+  HelpText<"Disable a separately specified target triple for Clang instance to use">;
+
 def profile_generate : Flag<["-"], "profile-generate">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Generate instrumented code to collect execution counts">;
