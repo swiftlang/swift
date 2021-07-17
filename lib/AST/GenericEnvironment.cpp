@@ -15,11 +15,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Defer.h"
-#include "GenericSignatureBuilderImpl.h"
 
 using namespace swift;
 
@@ -54,16 +53,6 @@ GenericEnvironment::GenericEnvironment(GenericSignature signature)
   // Clear out the memory that holds the context types.
   std::uninitialized_fill(getContextTypes().begin(), getContextTypes().end(),
                           Type());
-}
-
-GenericSignatureBuilder *GenericEnvironment::getGenericSignatureBuilder() const {
-  if (Builder)
-    return Builder;
-
-  const_cast<GenericEnvironment *>(this)->Builder
-      = Signature->getGenericSignatureBuilder();
-
-  return Builder;
 }
 
 void GenericEnvironment::addMapping(GenericParamKey key,
@@ -122,33 +111,30 @@ Type TypeBase::mapTypeOutOfContext() {
 
 Type
 GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
-  auto &builder = *getGenericSignatureBuilder();
-  auto &ctx = builder.getASTContext();
+  auto genericSig = getGenericSignature();
+  LookUpConformanceInSignature conformanceLookupFn(genericSig.getPointer());
 
-  auto resolved =
-    builder.maybeResolveEquivalenceClass(
-                                  depType,
-                                  ArchetypeResolutionKind::CompleteWellFormed,
-                                  /*wantExactPotentialArchetype=*/false);
-  if (!resolved)
-    return ErrorType::get(depType);
+  auto requirements = genericSig->getLocalRequirements(depType);
 
-  if (auto concrete = resolved.getAsConcreteType()) {
-    return mapTypeIntoContext(concrete,
-                              builder.getLookupConformanceFn());
+  // FIXME: With the RequirementMachine, we will always have an anchor.
+  if (requirements.concreteType && !requirements.anchor) {
+    if (requirements.concreteType->is<ErrorType>())
+      return requirements.concreteType;
+
+    return mapTypeIntoContext(requirements.concreteType,
+                              conformanceLookupFn);
   }
 
-  auto *equivClass = resolved.getEquivalenceClass(builder);
+  assert(requirements.anchor && "No anchor or concrete type?");
 
-  auto genericParams = getGenericParams();
-  Type anchor = equivClass->getAnchor(builder, genericParams);
+  auto &ctx = genericSig->getASTContext();
 
   // First, write an ErrorType to the location where this type is cached,
   // to catch re-entrant lookups that might arise from an invalid generic
   // signature (eg, <X where X == Array<X>>).
   ArchetypeType *parentArchetype = nullptr;
   GenericTypeParamType *genericParam = nullptr;
-  if (auto depMemTy = anchor->getAs<DependentMemberType>()) {
+  if (auto depMemTy = requirements.anchor->getAs<DependentMemberType>()) {
     parentArchetype =
       getOrCreateArchetypeFromInterfaceType(depMemTy->getBase())
         ->getAs<ArchetypeType>();
@@ -161,7 +147,7 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
 
     parentArchetype->registerNestedType(name, ErrorType::get(ctx));
   } else {
-    genericParam = anchor->castTo<GenericTypeParamType>();
+    genericParam = requirements.anchor->castTo<GenericTypeParamType>();
     if (auto type = getMappingIfPresent(genericParam))
       return *type;
     addMapping(genericParam, ErrorType::get(ctx));
@@ -171,42 +157,33 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
 
   // If this equivalence class is mapped to a concrete type, produce that
   // type.
-  if (equivClass->concreteType) {
-    result = mapTypeIntoContext(equivClass->concreteType,
-                                builder.getLookupConformanceFn());
+  if (requirements.concreteType) {
+    result = mapTypeIntoContext(requirements.concreteType,
+                                conformanceLookupFn);
   } else {
     // Substitute into the superclass.
-    Type superclass = equivClass->superclass;
+    Type superclass = requirements.superclass;
     if (superclass && superclass->hasTypeParameter()) {
       superclass = mapTypeIntoContext(superclass,
-                                      builder.getLookupConformanceFn());
+                                      conformanceLookupFn);
       if (superclass->is<ErrorType>())
         superclass = Type();
     }
 
-    // Collect the protocol conformances for the archetype.
-    SmallVector<ProtocolDecl *, 4> protos;
-    for (const auto &conforms : equivClass->conformsTo) {
-      auto proto = conforms.first;
-
-      if (!equivClass->isConformanceSatisfiedBySuperclass(proto))
-        protos.push_back(proto);
-    }
-
     if (parentArchetype) {
-      auto *depMemTy = anchor->castTo<DependentMemberType>();
+      auto *depMemTy = requirements.anchor->castTo<DependentMemberType>();
       result = NestedArchetypeType::getNew(ctx, parentArchetype, depMemTy,
-                                           protos, superclass,
-                                           equivClass->layout);
+                                           requirements.protos, superclass,
+                                           requirements.layout);
     } else {
       result = PrimaryArchetypeType::getNew(ctx, this, genericParam,
-                                            protos, superclass,
-                                            equivClass->layout);
+                                            requirements.protos, superclass,
+                                            requirements.layout);
     }
   }
 
   // Cache the new archetype for future lookups.
-  if (auto depMemTy = anchor->getAs<DependentMemberType>()) {
+  if (auto depMemTy = requirements.anchor->getAs<DependentMemberType>()) {
     parentArchetype->registerNestedType(depMemTy->getName(), result);
   } else {
     addMapping(genericParam, result);

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-requirement-machine
+// RUN: %target-typecheck-verify-swift -requirement-machine=verify
 
 // Make sure the requirement machine can compute a confluent
 // completion in examples where we merge two associated types
