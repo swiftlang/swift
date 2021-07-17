@@ -28,7 +28,7 @@ namespace swift {
 
 /// We use the PIMPL pattern to avoid creeping header dependencies.
 struct RequirementMachine::Implementation {
-  rewriting::RewriteContext Context;
+  rewriting::RewriteContext &Context;
   rewriting::RewriteSystem System;
   rewriting::EquivalenceClassMap Map;
   CanGenericSignature Sig;
@@ -45,7 +45,7 @@ struct RequirementMachine::Implementation {
   std::vector<std::pair<CanType, ConformanceAccessPath>>
       CurrentConformanceAccessPaths;
 
-  explicit Implementation(ASTContext &ctx)
+  explicit Implementation(rewriting::RewriteContext &ctx)
       : Context(ctx),
         System(Context),
         Map(Context, System.getProtocols()) {}

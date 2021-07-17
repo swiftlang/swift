@@ -67,6 +67,8 @@
 #include <algorithm>
 #include <memory>
 
+#include "RequirementMachine/RewriteContext.h"
+
 using namespace swift;
 
 #define DEBUG_TYPE "ASTContext"
@@ -531,6 +533,9 @@ struct ASTContext::Implementation {
   /// The scratch context used to allocate intrinsic data on behalf of \c swift::IntrinsicInfo
   std::unique_ptr<llvm::LLVMContext> IntrinsicScratchContext;
 #endif
+
+  /// Memory allocation arena for the term rewriting system.
+  std::unique_ptr<rewriting::RewriteContext> TheRewriteContext;
 };
 
 ASTContext::Implementation::Implementation()
@@ -1771,8 +1776,10 @@ static AllocationArena getArena(GenericSignature genericSig) {
   if (!genericSig)
     return AllocationArena::Permanent;
 
-  if (genericSig->hasTypeVariable())
+  if (genericSig->hasTypeVariable()) {
+    assert(false && "What's going on");
     return AllocationArena::ConstraintSolver;
+  }
 
   return AllocationArena::Permanent;
 }
@@ -1780,6 +1787,9 @@ static AllocationArena getArena(GenericSignature genericSig) {
 void ASTContext::registerGenericSignatureBuilder(
                                        GenericSignature sig,
                                        GenericSignatureBuilder &&builder) {
+  if (LangOpts.EnableRequirementMachine == RequirementMachineMode::Enabled)
+    return;
+
   auto canSig = sig.getCanonicalSignature();
   auto arena = getArena(sig);
   auto &genericSignatureBuilders =
@@ -1885,6 +1895,12 @@ GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
 
 RequirementMachine *ASTContext::getOrCreateRequirementMachine(
     CanGenericSignature sig) {
+  assert(!sig->hasTypeVariable());
+
+  auto &rewriteCtx = getImpl().TheRewriteContext;
+  if (!rewriteCtx)
+    rewriteCtx.reset(new rewriting::RewriteContext(*this));
+
   // Check whether we already have a requirement machine for this
   // signature.
   auto arena = getArena(sig);
@@ -1902,12 +1918,12 @@ RequirementMachine *ASTContext::getOrCreateRequirementMachine(
     return machine;
   }
 
-  auto *machine = new RequirementMachine(*this);
+  auto *machine = new RequirementMachine(*rewriteCtx);
 
   // Store this requirement machine before adding the signature,
   // to catch re-entrant construction via addGenericSignature()
   // below.
-  machinePtr = std::unique_ptr<RequirementMachine>(machine);
+  machinePtr.reset(machine);
 
   machine->addGenericSignature(sig);
 

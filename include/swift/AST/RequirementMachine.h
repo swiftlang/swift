@@ -21,6 +21,10 @@ class raw_ostream;
 
 namespace swift {
 
+namespace rewriting {
+class RewriteContext;
+}
+
 class ASTContext;
 class AssociatedTypeDecl;
 class CanType;
@@ -40,7 +44,7 @@ class RequirementMachine final {
   ASTContext &Context;
   Implementation *Impl;
 
-  explicit RequirementMachine(ASTContext &ctx);
+  explicit RequirementMachine(rewriting::RewriteContext &rewriteCtx);
 
   RequirementMachine(const RequirementMachine &) = delete;
   RequirementMachine(RequirementMachine &&) = delete;

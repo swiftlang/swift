@@ -295,7 +295,8 @@ void RequirementMachine::Implementation::dump(llvm::raw_ostream &out) {
   Map.dump(out);
 }
 
-RequirementMachine::RequirementMachine(ASTContext &ctx) : Context(ctx) {
+RequirementMachine::RequirementMachine(RewriteContext &ctx)
+    : Context(ctx.getASTContext()) {
   Impl = new Implementation(ctx);
 }
 
