@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s -module-name initializers -swift-version 5 -enable-experimental-concurrency | %FileCheck --enable-var-scope %s
+// RUN: %target-swift-frontend -emit-silgen %s -module-name initializers -swift-version 5 -enable-experimental-concurrency | %FileCheck %s --enable-var-scope --implicit-check-not=hop_to_executor
 // REQUIRES: concurrency
 
 // CHECK:       protocol Person {
@@ -57,8 +57,6 @@ enum MyEnum {
 
 actor MyActor {
   // CHECK-DAG:   sil hidden [ossa] @$s12initializers7MyActorCACyYacfc : $@convention(method) @async (@owned MyActor) -> @owned MyActor
-  // CHECK-NOT:     hop_to_executor
-  // CHECK-DAG:   } // end sil function '$s12initializers7MyActorCACyYacfc'
   init() async {}
 }
 
@@ -153,4 +151,48 @@ func makeDog() async {
 // CHECK:        } // end sil function '$s12initializers8makeBirbyyYaF'
 func makeBirb() async {
   _ = await Birb(name: "Chirpy")
+}
+
+actor SomeActor {
+  var x: Int = 0
+
+  // NOTE: during SILGen, we don't expect any hop_to_executors in here.
+  // The implicit check-not covers that for us. The hops are inserted later.
+  init() async {}
+
+  // CHECK-LABEL: sil hidden [ossa] @$s12initializers9SomeActorC10someMethodyyYaF : $@convention(method) @async (@guaranteed SomeActor) -> () {
+  // CHECK:           hop_to_executor {{%[0-9]+}} : $SomeActor
+  // CHECK: } // end sil function '$s12initializers9SomeActorC10someMethodyyYaF'
+  func someMethod() async {}
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s12initializers9makeActorAA04SomeC0CyYaF : $@convention(thin) @async () -> @owned SomeActor {
+// CHECK:         hop_to_executor {{%[0-9]+}} : $MainActor
+// CHECK:         [[INIT:%[0-9]+]] = function_ref @$s12initializers9SomeActorCACyYacfC : $@convention(method) @async (@thick SomeActor.Type) -> @owned SomeActor
+// CHECK:         {{%[0-9]+}} = apply [[INIT]]({{%[0-9]+}}) : $@convention(method) @async (@thick SomeActor.Type) -> @owned SomeActor
+// CHECK:         hop_to_executor {{%[0-9]+}} : $MainActor
+// CHECK: } // end sil function '$s12initializers9makeActorAA04SomeC0CyYaF'
+@MainActor
+func makeActor() async -> SomeActor {
+  return await SomeActor()
+}
+
+// None of the below calls are expected to have a hop before or after the call.
+
+func makeActorFromGeneric() async -> SomeActor {
+  return await SomeActor()
+}
+
+func callActorMethodFromGeneric(a: SomeActor) async {
+  await a.someMethod()
+}
+
+@available(SwiftStdlib 5.5, *)
+func makeActorInTask() async {
+  Task.detached { await SomeActor() }
+}
+
+@available(SwiftStdlib 5.5, *)
+func callActorMethodInTask(a: SomeActor) async {
+  Task.detached { await a.someMethod() }
 }
