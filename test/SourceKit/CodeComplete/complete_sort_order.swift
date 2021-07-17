@@ -1,3 +1,5 @@
+// REQUIRES: rdar80729544
+
 func foo(a a: String) {}
 func foo(a a: Int) {}
 func foo(b b: Int) {}
