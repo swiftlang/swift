@@ -224,6 +224,10 @@ foreach(sdk ${SWIFT_SDKS})
           set(libicu_data_a ${ICU_UC_LIBDIR}/libicudata.a)
         endif()
       endif()
+      set(libdl -ldl)
+      if(sdk STREQUAL OPENBSD)
+        set(libdl)
+      endif()
       set(libpthread -lpthread)
       set(android_libraries)
       if(sdk STREQUAL ANDROID)
@@ -233,7 +237,7 @@ foreach(sdk ${SWIFT_SDKS})
 
       set(linkfile ${lowercase_sdk}/static-stdlib-args.lnk)
       file(WRITE "${SWIFTSTATICLIB_DIR}/${linkfile}" "
--ldl
+${libdl}
 ${libpthread}
 ${android_libraries}
 -lswiftCore
