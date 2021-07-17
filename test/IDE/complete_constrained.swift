@@ -64,11 +64,11 @@ func foo(s: MyStruct<Int>) {
   let _ = s.#^MYSTRUCT_INT_DOT^#
 // MYSTRUCT_INT_DOT: Begin completions, 7 items
 // MYSTRUCT_INT_DOT-DAG: Keyword[self]/CurrNominal:          self[#MyStruct<Int>#]; name=self
-// MYSTRUCT_INT_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   methodWithConstrainedGenericParam({#x: SomeProto#})[#Int#]; name=methodWithConstrainedGenericParam(x: SomeProto)
+// MYSTRUCT_INT_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   methodWithConstrainedGenericParam({#x: SomeProto#})[#Int#]; name=methodWithConstrainedGenericParam(x:)
 // MYSTRUCT_INT_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   concreteExt_TEqInt_None()[#Int#]; name=concreteExt_TEqInt_None()
-// MYSTRUCT_INT_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   concreteExt_None_TEqInt({#(x): U#})[#Int#]; name=concreteExt_None_TEqInt(x: U)
+// MYSTRUCT_INT_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   concreteExt_None_TEqInt({#(x): U#})[#Int#]; name=concreteExt_None_TEqInt(:)
 // MYSTRUCT_INT_DOT-DAG: Decl[InstanceMethod]/Super:         protoExt_AssocEqInt_None()[#Int#]; name=protoExt_AssocEqInt_None()
-// MYSTRUCT_INT_DOT-DAG: Decl[InstanceMethod]/Super:         protoExt_None_AssocEqInt({#(x): U#})[#Int#]; name=protoExt_None_AssocEqInt(x: U)
+// MYSTRUCT_INT_DOT-DAG: Decl[InstanceMethod]/Super:         protoExt_None_AssocEqInt({#(x): U#})[#Int#]; name=protoExt_None_AssocEqInt(:)
 // MYSTRUCT_INT_DOT-DAG: Decl[InstanceMethod]/Super:         conditional_Int()[#Int#]; name=conditional_Int()
 // MYSTRUCT_INT_DOT: End completions
 
@@ -77,14 +77,14 @@ func foo(s: MyStruct<Int>) {
 // META_MYSTRUCT_INT_DOT-DAG: Keyword[self]/CurrNominal:          self[#MyStruct<Int>.Type#]; name=self
 // META_MYSTRUCT_INT_DOT-DAG: Keyword/CurrNominal:                Type[#MyStruct<Int>.Type#]; name=Type
 // META_MYSTRUCT_INT_DOT-DAG: Decl[TypeAlias]/CurrNominal:        Assoc[#T#]; name=Assoc
-// META_MYSTRUCT_INT_DOT-DAG: Decl[Constructor]/CurrNominal:      init({#int: U#})[#MyStruct<Int>#]; name=init(int: U)
-// META_MYSTRUCT_INT_DOT-DAG: Decl[Constructor]/CurrNominal:      init({#withConstrainedGenericParam: SomeProto#})[#MyStruct<Int>#]; name=init(withConstrainedGenericParam: SomeProto)
-// META_MYSTRUCT_INT_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   methodWithConstrainedGenericParam({#(self): MyStruct<Int>#})[#(x: SomeProto) -> Int#]; name=methodWithConstrainedGenericParam(self: MyStruct<Int>)
-// META_MYSTRUCT_INT_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   concreteExt_TEqInt_None({#(self): MyStruct<Int>#})[#() -> Int#]; name=concreteExt_TEqInt_None(self: MyStruct<Int>)
-// META_MYSTRUCT_INT_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   concreteExt_None_TEqInt({#(self): MyStruct<Int>#})[#(U) -> Int#]; name=concreteExt_None_TEqInt(self: MyStruct<Int>)
-// META_MYSTRUCT_INT_DOT-DAG: Decl[InstanceMethod]/Super:         protoExt_AssocEqInt_None({#(self): MyStruct<Int>#})[#() -> Int#]; name=protoExt_AssocEqInt_None(self: MyStruct<Int>)
-// META_MYSTRUCT_INT_DOT-DAG: Decl[InstanceMethod]/Super:         protoExt_None_AssocEqInt({#(self): MyStruct<Int>#})[#(U) -> Int#]; name=protoExt_None_AssocEqInt(self: MyStruct<Int>)
-// META_MYSTRUCT_INT_DOT-DAG: Decl[InstanceMethod]/Super:         conditional_Int({#(self): MyStruct<Int>#})[#() -> Int#]; name=conditional_Int(self: MyStruct<Int>)
+// META_MYSTRUCT_INT_DOT-DAG: Decl[Constructor]/CurrNominal:      init({#int: U#})[#MyStruct<Int>#]; name=init(int:)
+// META_MYSTRUCT_INT_DOT-DAG: Decl[Constructor]/CurrNominal:      init({#withConstrainedGenericParam: SomeProto#})[#MyStruct<Int>#]; name=init(withConstrainedGenericParam:)
+// META_MYSTRUCT_INT_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   methodWithConstrainedGenericParam({#(self): MyStruct<Int>#})[#(x: SomeProto) -> Int#]; name=methodWithConstrainedGenericParam(:)
+// META_MYSTRUCT_INT_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   concreteExt_TEqInt_None({#(self): MyStruct<Int>#})[#() -> Int#]; name=concreteExt_TEqInt_None(:)
+// META_MYSTRUCT_INT_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   concreteExt_None_TEqInt({#(self): MyStruct<Int>#})[#(U) -> Int#]; name=concreteExt_None_TEqInt(:)
+// META_MYSTRUCT_INT_DOT-DAG: Decl[InstanceMethod]/Super:         protoExt_AssocEqInt_None({#(self): MyStruct<Int>#})[#() -> Int#]; name=protoExt_AssocEqInt_None(:)
+// META_MYSTRUCT_INT_DOT-DAG: Decl[InstanceMethod]/Super:         protoExt_None_AssocEqInt({#(self): MyStruct<Int>#})[#(U) -> Int#]; name=protoExt_None_AssocEqInt(:)
+// META_MYSTRUCT_INT_DOT-DAG: Decl[InstanceMethod]/Super:         conditional_Int({#(self): MyStruct<Int>#})[#() -> Int#]; name=conditional_Int(:)
 // META_MYSTRUCT_INT_DOT: End completions
 }
 
@@ -119,9 +119,9 @@ func testVegetarian(chef: Chef<Vegetarian>) {
   chef.cook(.#^CONDITIONAL_OVERLOAD_ARG^#)
 // CONDITIONAL_OVERLOAD_ARG: Begin completions, 4 items
 // CONDITIONAL_OVERLOAD_ARG-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]:    apple[#Fruit#]; name=apple
-// CONDITIONAL_OVERLOAD_ARG-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]:    hash({#(self): Fruit#})[#(into: inout Hasher) -> Void#]; name=hash(self: Fruit)
+// CONDITIONAL_OVERLOAD_ARG-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]:    hash({#(self): Fruit#})[#(into: inout Hasher) -> Void#]; name=hash(:)
 // CONDITIONAL_OVERLOAD_ARG-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]:    broccoli[#Vegetable#]; name=broccoli
-// CONDITIONAL_OVERLOAD_ARG-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]:    hash({#(self): Vegetable#})[#(into: inout Hasher) -> Void#]; name=hash(self: Vegetable)
+// CONDITIONAL_OVERLOAD_ARG-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]:    hash({#(self): Vegetable#})[#(into: inout Hasher) -> Void#]; name=hash(:)
 // CONDITIONAL_OVERLOAD_ARG: End completions
 
   var chefMeta: Chef<Vegetarian>.Type = Chef<Vegetarian>.self
@@ -132,7 +132,7 @@ func testVegetarian(chef: Chef<Vegetarian>) {
 //       (e.g. by adding the missing 'Meat' conformance to 'Vegetarian' - clearly not the intention here - but replace 'Meat' with 'Equatable').
 // CONDITIONAL_INAPPLICABLE_ARG: Begin completions, 2 items
 // CONDITIONAL_INAPPLICABLE_ARG-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: chicken[#Meat#]; name=chicken
-// CONDITIONAL_INAPPLICABLE_ARG-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): Meat#})[#(into: inout Hasher) -> Void#]; name=hash(self: Meat)
+// CONDITIONAL_INAPPLICABLE_ARG-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): Meat#})[#(into: inout Hasher) -> Void#]; name=hash(:)
 // CONDITIONAL_INAPPLICABLE_ARG: End completions
 }
 

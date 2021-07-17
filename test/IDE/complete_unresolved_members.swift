@@ -147,7 +147,7 @@ class C4 {
 // UNRESOLVED_3: Begin completions, 3 items
 // UNRESOLVED_3-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: North[#SomeEnum1#]; name=North
 // UNRESOLVED_3-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: South[#SomeEnum1#]; name=South
-// UNRESOLVED_3-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): SomeEnum1#})[#(into: inout Hasher) -> Void#]; name=hash(self: SomeEnum1)
+// UNRESOLVED_3-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): SomeEnum1#})[#(into: inout Hasher) -> Void#]; name=hash(:)
 // UNRESOLVED_3: End completions
 
 // Exhaustive to make sure we don't include `init({#(some):` or `init({#nilLiteral:` entries
@@ -192,7 +192,7 @@ func testOptionalWithCustomExtension() {
 // UNRESOLVED_OPT_4-DAG: Keyword[nil]/None/Erase[1]/TypeRelation[Identical]: nil[#Somewhere?#]; name=nil
 // UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Identical]: none[#Optional<Somewhere>#]; name=none
 // UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Identical]: some({#Somewhere#})[#Optional<Somewhere>#];
-// UNRESOLVED_OPT_4-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]: init({#str: String#})[#Optional<Somewhere>#]; name=init(str: String)
+// UNRESOLVED_OPT_4-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]: init({#str: String#})[#Optional<Somewhere>#]; name=init(str:)
 // UNRESOLVED_OPT_4-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: nowhere[#Optional<Somewhere>#]; name=nowhere
 // UNRESOLVED_OPT_4-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: map({#(self): Optional<Somewhere>#})[#((Somewhere) throws -> U) -> U?#];
 // UNRESOLVED_OPT_4-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: flatMap({#(self): Optional<Somewhere>#})[#((Somewhere) throws -> U?) -> U?#];

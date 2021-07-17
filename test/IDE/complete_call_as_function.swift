@@ -67,7 +67,7 @@ func testCallAsFunction(add: Adder, addTy: Adder.Type) {
   let _ = Adder#^TYPEEXPR_NO_DOT^#;
 // TYPEEXPR_NO_DOT: Begin completions, 4 items
 // TYPEEXPR_NO_DOT-NOT: {#x: Int#}, {#y: Int#}
-// TYPEEXPR_NO_DOT-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ({#base: Int#})[#Adder#]; name=(base: Int)
+// TYPEEXPR_NO_DOT-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ({#base: Int#})[#Adder#];
 // TYPEEXPR_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   .callAsFunction({#(self): Adder#})[#(x: Int, y: Int) -> Int#];
 // TYPEEXPR_NO_DOT-DAG: Keyword[self]/CurrNominal:          .self[#Adder.Type#];
 // TYPEEXPR_NO_DOT-DAG: Keyword/CurrNominal:                .Type[#Adder.Type#];

@@ -64,7 +64,7 @@ struct MyStruct : P {
 
   typealias #^TYPEALIASNAME_CONFORMANCE^#
 // TYPEALIASNAME_CONFORMANCE: Begin completions, 1 items
-// TYPEALIASNAME_CONFORMANCE-NEXT: Decl[AssociatedType]/Super: Assoc = {#(Type)#}; name=Assoc = Type
+// TYPEALIASNAME_CONFORMANCE-NEXT: Decl[AssociatedType]/Super: Assoc = {#(Type)#}; name=Assoc = 
 // TYPEALIASNAME_CONFORMANCE-NEXT: End completions
 }
 struct MyStruct2: P {

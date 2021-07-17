@@ -235,15 +235,15 @@ class C3 {
 // NEGATIVE_OVERLOAD4-NOT: Decl[Class]{{.*}} C2
 
 // OVERLOAD5: Begin completions
-// OVERLOAD5-DAG: Decl[FreeFunction]/CurrModule/Flair[ArgLabels]:      ['(']{#(a): C1#}, {#b1: C2#}[')'][#Void#]; name=a: C1, b1: C2
-// OVERLOAD5-DAG: Decl[FreeFunction]/CurrModule/Flair[ArgLabels]:      ['(']{#(a): C2#}, {#b2: C1#}[')'][#Void#]; name=a: C2, b2: C1
+// OVERLOAD5-DAG: Decl[FreeFunction]/CurrModule/Flair[ArgLabels]:      ['(']{#(a): C1#}, {#b1: C2#}[')'][#Void#]; name=:b1:
+// OVERLOAD5-DAG: Decl[FreeFunction]/CurrModule/Flair[ArgLabels]:      ['(']{#(a): C2#}, {#b2: C1#}[')'][#Void#]; name=:b2:
 // OVERLOAD5-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Identical]: C1I[#C1#]; name=C1I
 // OVERLOAD5-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Identical]: C2I[#C2#]; name=C2I
 // OVERLOAD5: End completions
 
 // OVERLOAD6: Begin completions
-// OVERLOAD6-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]:   ['(']{#(a1): C1#}, {#b1: C2#}[')'][#Void#]; name=a1: C1, b1: C2
-// OVERLOAD6-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]:   ['(']{#a2: C2#}, {#b2: C1#}[')'][#Void#]; name=a2: C2, b2: C1
+// OVERLOAD6-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]:   ['(']{#(a1): C1#}, {#b1: C2#}[')'][#Void#]; name=:b1:
+// OVERLOAD6-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]:   ['(']{#a2: C2#}, {#b2: C1#}[')'][#Void#]; name=a2:b2:
 // OVERLOAD6-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Identical]: C1I[#C1#]; name=C1I
 // OVERLOAD6-DAG: Decl[InstanceVar]/CurrNominal:      C2I[#C2#]; name=C2I
 // OVERLOAD6: End completions
@@ -336,8 +336,8 @@ class C4 {
 // MEMBER1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: IntOpGen()[#Int?#]; name=IntOpGen()
 // MEMBER1-DAG: Decl[InstanceMethod]/CurrNominal:   StringGen()[#String#]; name=StringGen()
 // MEMBER1-DAG: Decl[InstanceMethod]/CurrNominal:   StringOpGen()[#String?#]; name=StringOpGen()
-// MEMBER1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: IntTaker({#(i1): Int#}, {#i2: Int#})[#Void#]; name=IntTaker(i1: Int, i2: Int)
-// MEMBER1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: StringTaker({#(s1): String#}, {#s2: String#})[#Void#]; name=StringTaker(s1: String, s2: String)
+// MEMBER1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: IntTaker({#(i1): Int#}, {#i2: Int#})[#Void#]; name=IntTaker(:i2:)
+// MEMBER1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: StringTaker({#(s1): String#}, {#s2: String#})[#Void#]; name=StringTaker(:s2:)
 // MEMBER1-NOT: Keyword[try]/None: try; name=try
 // MEMBER1-NOT: Keyword[try]/None: try!; name=try!
 // MEMBER1-NOT: Keyword[try]/None: try?; name=try?
@@ -349,28 +349,28 @@ class C4 {
 // MEMBER2-DAG: Decl[InstanceMethod]/CurrNominal:   IntOpGen()[#Int?#]; name=IntOpGen()
 // MEMBER2-DAG: Decl[InstanceMethod]/CurrNominal:   StringGen()[#String#]; name=StringGen()
 // MEMBER2-DAG: Decl[InstanceMethod]/CurrNominal:   StringOpGen()[#String?#]; name=StringOpGen()
-// MEMBER2-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: IntTaker({#(i1): Int#}, {#i2: Int#})[#Void#]; name=IntTaker(i1: Int, i2: Int)
-// MEMBER2-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: StringTaker({#(s1): String#}, {#s2: String#})[#Void#]; name=StringTaker(s1: String, s2: String)
+// MEMBER2-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: IntTaker({#(i1): Int#}, {#i2: Int#})[#Void#]; name=IntTaker(:i2:)
+// MEMBER2-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: StringTaker({#(s1): String#}, {#s2: String#})[#Void#]; name=StringTaker(:s2:)
 
 // MEMBER3: Begin completions
 // MEMBER3-DAG: Decl[InstanceMethod]/CurrNominal:   IntGen()[#Int#]; name=IntGen()
 // MEMBER3-DAG: Decl[InstanceMethod]/CurrNominal:   IntOpGen()[#Int?#]; name=IntOpGen()
 // MEMBER3-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: StringGen()[#String#]; name=StringGen()
 // MEMBER3-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: StringOpGen()[#String?#]; name=StringOpGen()
-// MEMBER3-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: IntTaker({#(i1): Int#}, {#i2: Int#})[#Void#]; name=IntTaker(i1: Int, i2: Int)
-// MEMBER3-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: StringTaker({#(s1): String#}, {#s2: String#})[#Void#]; name=StringTaker(s1: String, s2: String)
+// MEMBER3-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: IntTaker({#(i1): Int#}, {#i2: Int#})[#Void#]; name=IntTaker(:i2:)
+// MEMBER3-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: StringTaker({#(s1): String#}, {#s2: String#})[#Void#]; name=StringTaker(:s2:)
 
 // MEMBER4: Begin completions
 // MEMBER4-DAG: Decl[InstanceMethod]/CurrNominal:   IntGen()[#Int#]; name=IntGen()
 // MEMBER4-DAG: Decl[InstanceMethod]/CurrNominal:   IntOpGen()[#Int?#]; name=IntOpGen()
 // MEMBER4-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: StringGen()[#String#]; name=StringGen()
 // MEMBER4-DAG: Decl[InstanceMethod]/CurrNominal:   StringOpGen()[#String?#]; name=StringOpGen()
-// MEMBER4-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: IntTaker({#(i1): Int#}, {#i2: Int#})[#Void#]; name=IntTaker(i1: Int, i2: Int)
-// MEMBER4-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: StringTaker({#(s1): String#}, {#s2: String#})[#Void#]; name=StringTaker(s1: String, s2: String)
+// MEMBER4-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: IntTaker({#(i1): Int#}, {#i2: Int#})[#Void#]; name=IntTaker(:i2:)
+// MEMBER4-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: StringTaker({#(s1): String#}, {#s2: String#})[#Void#]; name=StringTaker(:s2:)
 
 // MEMBER7: Begin completions
 // MEMBER7-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem/TypeRelation[Invalid]: removeAll()[#Void#]; name=removeAll()
-// MEMBER7-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem/TypeRelation[Invalid]: removeAll({#keepingCapacity: Bool#})[#Void#]; name=removeAll(keepingCapacity: Bool)
+// MEMBER7-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem/TypeRelation[Invalid]: removeAll({#keepingCapacity: Bool#})[#Void#]; name=removeAll(keepingCapacity:)
 // MEMBER7-DAG: Decl[InstanceVar]/CurrNominal/IsSystem/TypeRelation[Convertible]: count[#Int#]; name=count
 // MEMBER7-DAG: Decl[InstanceVar]/CurrNominal/IsSystem/TypeRelation[Convertible]: capacity[#Int#]; name=capacity
 
@@ -379,8 +379,8 @@ class C4 {
 // MEMBER8-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: InternalIntOpGen()[#Int?#]; name=InternalIntOpGen()
 // MEMBER8-DAG: Decl[InstanceMethod]/CurrNominal:   InternalStringGen()[#String#]; name=InternalStringGen()
 // MEMBER8-DAG: Decl[InstanceMethod]/CurrNominal:   InternalStringOpGen()[#String?#]; name=InternalStringOpGen()
-// MEMBER8-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: InternalIntTaker({#(i1): Int#}, {#i2: Int#})[#Void#]; name=InternalIntTaker(i1: Int, i2: Int)
-// MEMBER8-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: InternalStringTaker({#(s1): String#}, {#s2: String#})[#Void#]; name=InternalStringTaker(s1: String, s2: String)
+// MEMBER8-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: InternalIntTaker({#(i1): Int#}, {#i2: Int#})[#Void#]; name=InternalIntTaker(:i2:)
+// MEMBER8-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: InternalStringTaker({#(s1): String#}, {#s2: String#})[#Void#]; name=InternalStringTaker(:s2:)
 
 // FARG6: Begin completions
 // FARG6-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: InternalIntGen()[#Int#]
@@ -506,7 +506,7 @@ func testTupleShuffle() {
 // SHUFFLE_3-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]:     foo[#SimpleEnum#]; name=foo
 // SHUFFLE_3-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]:     bar[#SimpleEnum#]; name=bar
 // SHUFFLE_3-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]:     baz[#SimpleEnum#]; name=baz
-// SHUFFLE_3-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]:     hash({#(self): SimpleEnum#})[#(into: inout Hasher) -> Void#]; name=hash(self: SimpleEnum)
+// SHUFFLE_3-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]:     hash({#(self): SimpleEnum#})[#(into: inout Hasher) -> Void#]; name=hash(:)
 
 
 class HasSubscript {
@@ -541,7 +541,7 @@ func testSubscript(obj: HasSubscript, intValue: Int, strValue: String) {
 // Note: we still provide completions despite the missing label - there's a fixit to add it in later.
 // SUBSCRIPT_2_DOT: Begin completions
 // SUBSCRIPT_2_DOT: Decl[Constructor]/CurrNominal/IsSystem/TypeRelation[Identical]: init()[#String#]; name=init()
-// SUBSCRIPT_2_DOT: Decl[Constructor]/CurrNominal/IsSystem/TypeRelation[Identical]: init({#(c): Character#})[#String#]; name=init(c: Character)
+// SUBSCRIPT_2_DOT: Decl[Constructor]/CurrNominal/IsSystem/TypeRelation[Identical]: init({#(c): Character#})[#String#]; name=init(:)
 
   let _ = obj[42, default: #^SUBSCRIPT_3^#
 // SUBSCRIPT_3: Begin completions
@@ -560,7 +560,7 @@ func testSubscript(obj: HasSubscript, intValue: Int, strValue: String) {
 // SUBSCRIPT_3_DOT-NOT: i1
 // SUBSCRIPT_3_DOT-NOT: s1
 // SUBSCRIPT_3_DOT-DAG: Decl[Constructor]/CurrNominal/IsSystem/TypeRelation[Identical]: init()[#String#]; name=init()
-// SUBSCRIPT_3_DOT-DAG: Decl[Constructor]/CurrNominal/IsSystem/TypeRelation[Identical]: init({#(c): Character#})[#String#]; name=init(c: Character)
+// SUBSCRIPT_3_DOT-DAG: Decl[Constructor]/CurrNominal/IsSystem/TypeRelation[Identical]: init({#(c): Character#})[#String#]; name=init(:)
 
 }
 
@@ -609,7 +609,7 @@ class TestStaticMemberCall {
 func testStaticMemberCall() {
   let _ = TestStaticMemberCall.create1(#^STATIC_METHOD_AFTERPAREN_1^#)
 // STATIC_METHOD_AFTERPAREN_1: Begin completions, 1 items
-// STATIC_METHOD_AFTERPAREN_1: Decl[StaticMethod]/CurrNominal/Flair[ArgLabels]:     ['(']{#arg1: Int#}[')'][#TestStaticMemberCall#]; name=arg1: Int
+// STATIC_METHOD_AFTERPAREN_1: Decl[StaticMethod]/CurrNominal/Flair[ArgLabels]:     ['(']{#arg1: Int#}[')'][#TestStaticMemberCall#]; name=arg1:
 // STATIC_METHOD_AFTERPAREN_1: End completions
 
   let _ = TestStaticMemberCall.create2(#^STATIC_METHOD_AFTERPAREN_2^#)
@@ -634,14 +634,14 @@ func testStaticMemberCall() {
 
   let _ = TestStaticMemberCall.createOverloaded(#^STATIC_METHOD_OVERLOADED^#)
 // STATIC_METHOD_OVERLOADED: Begin completions, 2 items
-// STATIC_METHOD_OVERLOADED-DAG: Decl[StaticMethod]/CurrNominal/Flair[ArgLabels]:     ['(']{#arg1: Int#}[')'][#TestStaticMemberCall#]; name=arg1: Int
-// STATIC_METHOD_OVERLOADED-DAG: Decl[StaticMethod]/CurrNominal/Flair[ArgLabels]:     ['(']{#arg1: String#}[')'][#String#]; name=arg1: String
+// STATIC_METHOD_OVERLOADED-DAG: Decl[StaticMethod]/CurrNominal/Flair[ArgLabels]:     ['(']{#arg1: Int#}[')'][#TestStaticMemberCall#]; name=arg1:
+// STATIC_METHOD_OVERLOADED-DAG: Decl[StaticMethod]/CurrNominal/Flair[ArgLabels]:     ['(']{#arg1: String#}[')'][#String#]; name=arg1:
 // STATIC_METHOD_OVERLOADED: End completions
 }
 func testImplicitMember() {
   let _: TestStaticMemberCall = .create1(#^IMPLICIT_MEMBER_AFTERPAREN_1^#)
 // IMPLICIT_MEMBER_AFTERPAREN_1: Begin completions, 1 items
-// IMPLICIT_MEMBER_AFTERPAREN_1: Decl[StaticMethod]/CurrNominal/Flair[ArgLabels]/TypeRelation[Identical]: ['(']{#arg1: Int#}[')'][#TestStaticMemberCall#]; name=arg1: Int
+// IMPLICIT_MEMBER_AFTERPAREN_1: Decl[StaticMethod]/CurrNominal/Flair[ArgLabels]/TypeRelation[Identical]: ['(']{#arg1: Int#}[')'][#TestStaticMemberCall#]; name=arg1:
 // IMPLICIT_MEMBER_AFTERPAREN_1: End completions
 
   let _: TestStaticMemberCall = .create2(#^IMPLICIT_MEMBER_AFTERPAREN_2^#)
@@ -654,7 +654,7 @@ func testImplicitMember() {
 
   let _: TestStaticMemberCall? = .create1(#^IMPLICIT_MEMBER_AFTERPAREN_3^#)
 // IMPLICIT_MEMBER_AFTERPAREN_3: Begin completions, 1 items
-// IMPLICIT_MEMBER_AFTERPAREN_3: Decl[StaticMethod]/CurrNominal/Flair[ArgLabels]/TypeRelation[Convertible]: ['(']{#arg1: Int#}[')'][#TestStaticMemberCall#]; name=arg1: Int
+// IMPLICIT_MEMBER_AFTERPAREN_3: Decl[StaticMethod]/CurrNominal/Flair[ArgLabels]/TypeRelation[Convertible]: ['(']{#arg1: Int#}[')'][#TestStaticMemberCall#]; name=arg1:
 // IMPLICIT_MEMBER_AFTERPAREN_3: End completions
 
   let _: TestStaticMemberCall = .create2(1, #^IMPLICIT_MEMBER_SECOND^#)
@@ -671,8 +671,8 @@ func testImplicitMember() {
 
   let _: TestStaticMemberCall = .createOverloaded(#^IMPLICIT_MEMBER_OVERLOADED^#)
 // IMPLICIT_MEMBER_OVERLOADED: Begin completions, 2 items
-// IMPLICIT_MEMBER_OVERLOADED: Decl[StaticMethod]/CurrNominal/Flair[ArgLabels]/TypeRelation[Identical]: ['(']{#arg1: Int#}[')'][#TestStaticMemberCall#]; name=arg1: Int
-// IMPLICIT_MEMBER_OVERLOADED: Decl[StaticMethod]/CurrNominal/Flair[ArgLabels]:     ['(']{#arg1: String#}[')'][#String#]; name=arg1: String
+// IMPLICIT_MEMBER_OVERLOADED: Decl[StaticMethod]/CurrNominal/Flair[ArgLabels]/TypeRelation[Identical]: ['(']{#arg1: Int#}[')'][#TestStaticMemberCall#]; name=arg1:
+// IMPLICIT_MEMBER_OVERLOADED: Decl[StaticMethod]/CurrNominal/Flair[ArgLabels]:     ['(']{#arg1: String#}[')'][#String#]; name=arg1:
 // IMPLICIT_MEMBER_OVERLOADED: End completions
 }
 func testImplicitMemberInArrayLiteral() {
@@ -763,8 +763,8 @@ func testTypecheckedTypeExpr() {
   MyType(#^TYPECHECKED_TYPEEXPR^#
 }
 // TYPECHECKED_TYPEEXPR: Begin completions
-// TYPECHECKED_TYPEEXPR: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#arg1: String#}, {#arg2: _#}[')'][#MyType<_>#]; name=arg1: String, arg2: _
-// TYPECHECKED_TYPEEXPR: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#(intVal): Int#}[')'][#MyType<Int>#]; name=intVal: Int
+// TYPECHECKED_TYPEEXPR: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#arg1: String#}, {#arg2: _#}[')'][#MyType<_>#]; name=arg1:arg2:
+// TYPECHECKED_TYPEEXPR: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#(intVal): Int#}[')'][#MyType<Int>#]; name=:
 // TYPECHECKED_TYPEEXPR: End completions
 
 func testPamrameterFlags(_: Int, inoutArg: inout Int, autoclosureArg: @autoclosure () -> Int, iuoArg: Int!, variadicArg: Int...) {
@@ -796,7 +796,7 @@ func testTupleElement(arg: (SimpleEnum, SimpleEnum)) {
 // TUPLEELEM_1-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]:     foo[#SimpleEnum#]; name=foo
 // TUPLEELEM_1-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]:     bar[#SimpleEnum#]; name=bar
 // TUPLEELEM_1-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]:     baz[#SimpleEnum#]; name=baz
-// TUPLEELEM_1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]:     hash({#(self): SimpleEnum#})[#(into: inout Hasher) -> Void#]; name=hash(self: SimpleEnum)
+// TUPLEELEM_1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]:     hash({#(self): SimpleEnum#})[#(into: inout Hasher) -> Void#]; name=hash(:)
 // TUPLEELEM_1: End completions
   testTupleElement(arg: (.foo, .bar, .#^TUPLEELEM_2^#))
 // TUPLEELEM_2-NOT: Begin completions
@@ -816,7 +816,7 @@ func testKeyPathThunkInBase() {
 // KEYPATH_THUNK_BASE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]:     foo[#SimpleEnum#]; name=foo
 // KEYPATH_THUNK_BASE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]:     bar[#SimpleEnum#]; name=bar
 // KEYPATH_THUNK_BASE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]:     baz[#SimpleEnum#]; name=baz
-// KEYPATH_THUNK_BASE-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]:     hash({#(self): SimpleEnum#})[#(into: inout Hasher) -> Void#]; name=hash(self: SimpleEnum)
+// KEYPATH_THUNK_BASE-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]:     hash({#(self): SimpleEnum#})[#(into: inout Hasher) -> Void#]; name=hash(:)
 // KEYPATH_THUNK_BASE: End completions
 }
 

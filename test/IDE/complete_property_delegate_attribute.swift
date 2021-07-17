@@ -21,8 +21,8 @@ struct TestStruct {
   @MyStruct(#^AFTER_PAREN^#
   var test1
 // AFTER_PAREN: Begin completions, 2 items
-// AFTER_PAREN-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#wrappedValue: MyEnum#}[')'][#MyStruct#]; name=wrappedValue: MyEnum
-// AFTER_PAREN-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#arg1: MyEnum#}, {#arg2: Int#}[')'][#MyStruct#]; name=arg1: MyEnum, arg2: Int
+// AFTER_PAREN-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#wrappedValue: MyEnum#}[')'][#MyStruct#]; name=wrappedValue:
+// AFTER_PAREN-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#arg1: MyEnum#}, {#arg2: Int#}[')'][#MyStruct#]; name=arg1:arg2:
 // AFTER_PAREN: End completions
 
   @MyStruct(arg1: #^ARG_MyEnum_NODOT^#

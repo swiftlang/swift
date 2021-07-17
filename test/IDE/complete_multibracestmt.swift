@@ -35,5 +35,5 @@ func test(pred: Bool) {
 // CHECK: Begin completions, 3 items
 // CHECK-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: bar[#E#]; name=bar
 // CHECK-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: foo[#E#]; name=foo
-// CHECK-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): E#})[#(into: inout Hasher) -> Void#]; name=hash(self: E)
+// CHECK-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): E#})[#(into: inout Hasher) -> Void#]; name=hash(:)
 // CHECK: End completions
