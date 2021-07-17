@@ -228,23 +228,14 @@ public:
 
     /// Lookup a nested type with the given name within this equivalence
     /// class.
-    ///
-    /// \param otherConcreteTypes If non-null, will be filled in the all of the
-    /// concrete types we found (other than the result) with the same name.
     TypeDecl *lookupNestedType(
                    GenericSignatureBuilder &builder,
-                   Identifier name,
-                   SmallVectorImpl<TypeDecl *> *otherConcreteTypes = nullptr);
+                   Identifier name);
 
     /// Retrieve the "anchor" type that canonically describes this equivalence
     /// class, for use in the canonical type.
     Type getAnchor(GenericSignatureBuilder &builder,
                    TypeArrayView<GenericTypeParamType> genericParams);
-
-    /// Retrieve (or build) the contextual type corresponding to
-    /// this equivalence class within the given generic environment.
-    Type getTypeInContext(GenericSignatureBuilder &builder,
-                          GenericEnvironment *genericEnv);
 
     /// Dump a debugging representation of this equivalence class,
     void dump(llvm::raw_ostream &out,
@@ -268,7 +259,7 @@ public:
       unsigned numConformancesPresent;
       CanType superclassPresent;
       CanType concreteTypePresent;
-      llvm::TinyPtrVector<TypeDecl *> types;
+      TypeDecl *type = nullptr;
     };
 
     /// Cached nested-type information, which contains the best declaration

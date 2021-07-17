@@ -3472,7 +3472,7 @@ void ArchetypeType::registerNestedType(Identifier name, Type nested) {
          "Unable to find nested type?");
   assert(!found->second ||
          found->second->isEqual(nested) ||
-         (found->second->hasError() && nested->hasError()));
+         found->second->is<ErrorType>());
   found->second = nested;
 }
 
