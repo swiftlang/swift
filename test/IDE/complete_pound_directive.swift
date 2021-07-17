@@ -15,11 +15,11 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONDITION_GLOBAL_2 -D FOO -D BAR | %FileCheck %s -check-prefix=CONDITION -check-prefix=WITHFLAG
 
 // POUND_DIRECTIVE: Begin completions, 7 items
-// POUND_DIRECTIVE-DAG: Keyword[#sourceLocation]/None:      sourceLocation(file: {#String#}, line: {#Int#}); name=sourceLocation(file: String, line: Int)
-// POUND_DIRECTIVE-DAG: Keyword[#warning]/None:             warning("{#(message)#}"); name=warning("message")
-// POUND_DIRECTIVE-DAG: Keyword[#error]/None:               error("{#(message)#}"); name=error("message")
-// POUND_DIRECTIVE-DAG: Keyword[#if]/None:                  if {#(condition)#}; name=if condition
-// POUND_DIRECTIVE-DAG: Keyword[#elseif]/None:              elseif {#(condition)#}; name=elseif condition
+// POUND_DIRECTIVE-DAG: Keyword[#sourceLocation]/None:      sourceLocation(file: {#String#}, line: {#Int#}); name=sourceLocation(file:line:)
+// POUND_DIRECTIVE-DAG: Keyword[#warning]/None:             warning("{#(message)#}"); name=warning("")
+// POUND_DIRECTIVE-DAG: Keyword[#error]/None:               error("{#(message)#}"); name=error("")
+// POUND_DIRECTIVE-DAG: Keyword[#if]/None:                  if {#(condition)#}; name=if 
+// POUND_DIRECTIVE-DAG: Keyword[#elseif]/None:              elseif {#(condition)#}; name=elseif 
 // POUND_DIRECTIVE-DAG: Keyword[#else]/None:                else; name=else
 // POUND_DIRECTIVE-DAG: Keyword[#endif]/None:               endif; name=endif
 
@@ -47,14 +47,14 @@ class C {
 
 // CONDITION: Begin completions
 // CONDITION-NOT: globalVar
-// CONDITION-DAG: Pattern/CurrModule/Flair[ExprSpecific]:               os({#(name)#}); name=os(name)
-// CONDITION-DAG: Pattern/CurrModule/Flair[ExprSpecific]:               arch({#(name)#}); name=arch(name)
-// CONDITION-DAG: Pattern/CurrModule/Flair[ExprSpecific]:               canImport({#(module)#}); name=canImport(module)
+// CONDITION-DAG: Pattern/CurrModule/Flair[ExprSpecific]:               os({#(name)#}); name=os()
+// CONDITION-DAG: Pattern/CurrModule/Flair[ExprSpecific]:               arch({#(name)#}); name=arch()
+// CONDITION-DAG: Pattern/CurrModule/Flair[ExprSpecific]:               canImport({#(module)#}); name=canImport()
 // CONDITION-DAG: Pattern/CurrModule/Flair[ExprSpecific]:               targetEnvironment(simulator); name=targetEnvironment(simulator)
-// CONDITION-DAG: Pattern/CurrModule/Flair[ExprSpecific]:               swift(>={#(version)#}); name=swift(>=version)
-// CONDITION-DAG: Pattern/CurrModule/Flair[ExprSpecific]:               swift(<{#(version)#}); name=swift(<version)
-// CONDITION-DAG: Pattern/CurrModule/Flair[ExprSpecific]:               compiler(>={#(version)#}); name=compiler(>=version)
-// CONDITION-DAG: Pattern/CurrModule/Flair[ExprSpecific]:               compiler(<{#(version)#}); name=compiler(<version)
+// CONDITION-DAG: Pattern/CurrModule/Flair[ExprSpecific]:               swift(>={#(version)#}); name=swift(>=)
+// CONDITION-DAG: Pattern/CurrModule/Flair[ExprSpecific]:               swift(<{#(version)#}); name=swift(<)
+// CONDITION-DAG: Pattern/CurrModule/Flair[ExprSpecific]:               compiler(>={#(version)#}); name=compiler(>=)
+// CONDITION-DAG: Pattern/CurrModule/Flair[ExprSpecific]:               compiler(<{#(version)#}); name=compiler(<)
 // CONDITION-DAG: Keyword[true]/None:                 true[#Bool#]; name=true
 // CONDITION-DAG: Keyword[false]/None:                false[#Bool#]; name=false
 // CONDITION-NOT: globalVar

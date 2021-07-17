@@ -125,8 +125,8 @@ func testArchetypeAnnotations<T>(arg: TestArchetypeAnnotations<T>) {
 }
 // GENERIC: Begin completions, 3 items
 // GENERIC-DAG: Keyword[self]/CurrNominal:          <keyword>self</keyword>; typename=<typeid.user>TestArchetypeAnnotations</typeid.user>&lt;<typeid.user>T</typeid.user>&gt;; name=self
-// GENERIC-DAG: Decl[InstanceMethod]/CurrNominal:   <name>foo1</name>(<callarg><callarg.label>u</callarg.label>: <callarg.type><typeid.user>U</typeid.user></callarg.type></callarg>, <callarg><callarg.label>t</callarg.label>: <callarg.type><typeid.user>T</typeid.user></callarg.type></callarg>); typename=<typeid.sys>Void</typeid.sys>; name=foo1(u: U, t: T)
-// GENERIC-DAG: Decl[InstanceMethod]/CurrNominal:   <name>foo2</name>(<callarg><callarg.label>s</callarg.label>: <callarg.type><typeid.sys>Sequence</typeid.sys></callarg.type></callarg>, <callarg><callarg.label>elt</callarg.label>: <callarg.type><typeid.sys>Sequence</typeid.sys>.<typeid.sys>Element</typeid.sys></callarg.type></callarg>); typename=<typeid.sys>Void</typeid.sys>; name=foo2(s: Sequence, elt: Sequence.Element)
+// GENERIC-DAG: Decl[InstanceMethod]/CurrNominal:   <name>foo1</name>(<callarg><callarg.label>u</callarg.label>: <callarg.type><typeid.user>U</typeid.user></callarg.type></callarg>, <callarg><callarg.label>t</callarg.label>: <callarg.type><typeid.user>T</typeid.user></callarg.type></callarg>); typename=<typeid.sys>Void</typeid.sys>; name=foo1(u:t:)
+// GENERIC-DAG: Decl[InstanceMethod]/CurrNominal:   <name>foo2</name>(<callarg><callarg.label>s</callarg.label>: <callarg.type><typeid.sys>Sequence</typeid.sys></callarg.type></callarg>, <callarg><callarg.label>elt</callarg.label>: <callarg.type><typeid.sys>Sequence</typeid.sys>.<typeid.sys>Element</typeid.sys></callarg.type></callarg>); typename=<typeid.sys>Void</typeid.sys>; name=foo2(s:elt:)
 // GENERIC: End completions
 
 struct TestGenericParamAnnotations<T> {

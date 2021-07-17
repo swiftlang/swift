@@ -72,12 +72,12 @@ class Subclass : NSObject {
 
 
 // CHECK-AFTER_POUND-NOT: selector
-// CHECK-AFTER_POUND: Keyword/Local/Flair[ExprSpecific]:               available({#Platform...#}, *); name=available(Platform..., *)
+// CHECK-AFTER_POUND: Keyword/Local/Flair[ExprSpecific]:               available({#Platform...#}, *); name=available(*)
 
-// CHECK-CONTEXT_SELECTOR: Keyword/None/TypeRelation[Identical]: #selector({#@objc method#})[#Selector#]; name=#selector(@objc method)
+// CHECK-CONTEXT_SELECTOR: Keyword/None/TypeRelation[Identical]: #selector({#@objc method#})[#Selector#]; name=#selector()
 
-// CHECK-SELECTOR_BASIC: Keyword/None:                       getter: {#@objc property#}; name=getter: @objc property
-// CHECK-SELECTOR_BASIC: Keyword/None:                       setter: {#@objc property#}; name=setter: @objc property
+// CHECK-SELECTOR_BASIC: Keyword/None:                       getter: {#@objc property#}; name=getter: 
+// CHECK-SELECTOR_BASIC: Keyword/None:                       setter: {#@objc property#}; name=setter: 
 
 // CHECK-IN_SELECTOR-NOT: getter:
 // CHECK-IN_SELECTOR: Decl[Constructor]/CurrNominal/IsSystem:    {{.?}}init[#(NSObject.Type) -> () -> NSObject#]; name=init

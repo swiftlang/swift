@@ -218,7 +218,7 @@ func testGetInitFromMetatype4() {
   type(of: a).#^INIT_FROM_METATYPE4^#
 }
 
-// INIT_FROM_METATYPE4: Decl[Constructor]/CurrNominal: init({#a: Int#})[#ExplicitConstructorsDerived2#]; name=init(a: Int)
+// INIT_FROM_METATYPE4: Decl[Constructor]/CurrNominal: init({#a: Int#})[#ExplicitConstructorsDerived2#]{{; name=.+$}}
 // INIT_FROM_METATYPE4-NOT: Decl[Constructor]/CurrNominal:      init()[#ExplicitConstructorsDerived2#]{{; name=.+$}}
 
 struct ExplicitConstructorsDerived3 {
@@ -312,9 +312,9 @@ public class AvailableTest {
 func testAvailable() {
   let _ = AvailableTest(#^AVAILABLE_1^#
 // AVAILABLE_1: Begin completions, 3 items
-// AVAILABLE_1-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#opt: Int#}[')'][#AvailableTest?#]; name=opt: Int
-// AVAILABLE_1-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#normal1: Int#}[')'][#AvailableTest#]; name=normal1: Int
-// AVAILABLE_1-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#normal2: Int#}[')'][#AvailableTest#]; name=normal2: Int
+// AVAILABLE_1-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#opt: Int#}[')'][#AvailableTest?#]; name=opt:
+// AVAILABLE_1-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#normal1: Int#}[')'][#AvailableTest#]; name=normal1:
+// AVAILABLE_1-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#normal2: Int#}[')'][#AvailableTest#]; name=normal2:
 // AVAILABLE_1: End completions
 
   let _ = AvailableTest.init(#^AVAILABLE_2?check=AVAILABLE_1^#
@@ -344,8 +344,8 @@ func testDependentTypeInClosure() {
 // DEPENDENT_IN_CLOSURE_2: Begin completions, 4 items
 // DEPENDENT_IN_CLOSURE_2-DAG: Keyword[self]/CurrNominal:          self[#DependentTypeInClosure<_>.Type#]; name=self
 // DEPENDENT_IN_CLOSURE_2-DAG: Keyword/CurrNominal:                Type[#DependentTypeInClosure<_>.Type#]; name=Type
-// DEPENDENT_IN_CLOSURE_2-DAG: Decl[Constructor]/CurrNominal:      init({#(arg): _#}, {#fn: (_.Content) -> Void##(_.Content) -> Void#})[#DependentTypeInClosure<_>#]; name=init(arg: _, fn: (_.Content) -> Void)
-// DEPENDENT_IN_CLOSURE_2-DAG: Decl[Constructor]/CurrNominal:      init({#arg: _#}, {#fn: () -> _.Content##() -> _.Content#})[#DependentTypeInClosure<_>#]; name=init(arg: _, fn: () -> _.Content)
+// DEPENDENT_IN_CLOSURE_2-DAG: Decl[Constructor]/CurrNominal:      init({#(arg): _#}, {#fn: (_.Content) -> Void##(_.Content) -> Void#})[#DependentTypeInClosure<_>#]; name=init(:fn:)
+// DEPENDENT_IN_CLOSURE_2-DAG: Decl[Constructor]/CurrNominal:      init({#arg: _#}, {#fn: () -> _.Content##() -> _.Content#})[#DependentTypeInClosure<_>#]; name=init(arg:fn:)
 // DEPENDENT_IN_CLOSURE_2: End completions
 }
 struct InitWithUnresolved<Data: DataType> where Data.Content: Comparable {
