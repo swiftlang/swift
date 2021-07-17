@@ -600,7 +600,7 @@ public struct UnsafeMutableRawPointer: _Pointer, Sendable {
   /// - Parameters:
   ///   - byteCount: The number of bytes to allocate. `byteCount` must not be negative.
   ///   - alignment: The alignment of the new region of allocated memory, in
-  ///     bytes.
+  ///     bytes. `alignment` must be a whole power of 2.
   /// - Returns: A pointer to a newly allocated region of memory. The memory is
   ///   allocated, but not initialized.
   @inlinable
