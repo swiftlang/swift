@@ -2020,36 +2020,16 @@ static void lookupConcreteNestedType(NominalTypeDecl *decl,
     concreteDecls.push_back(cast<TypeDecl>(member));
 }
 
-static auto findBestConcreteNestedType(SmallVectorImpl<TypeDecl *> &concreteDecls) {
-  return std::min_element(concreteDecls.begin(), concreteDecls.end(),
-                          [](TypeDecl *type1, TypeDecl *type2) {
-                            return TypeDecl::compare(type1, type2) < 0;
-                          });
+static TypeDecl *findBestConcreteNestedType(SmallVectorImpl<TypeDecl *> &concreteDecls) {
+  return *std::min_element(concreteDecls.begin(), concreteDecls.end(),
+                           [](TypeDecl *type1, TypeDecl *type2) {
+                             return TypeDecl::compare(type1, type2) < 0;
+                           });
 }
 
 TypeDecl *EquivalenceClass::lookupNestedType(
                              GenericSignatureBuilder &builder,
-                             Identifier name,
-                             SmallVectorImpl<TypeDecl *> *otherConcreteTypes) {
-  // Populates the result structures from the given cache entry.
-  auto populateResult = [&](const CachedNestedType &cache) -> TypeDecl * {
-    if (otherConcreteTypes)
-      otherConcreteTypes->clear();
-
-    // If there aren't any types in the cache, we're done.
-    if (cache.types.empty()) return nullptr;
-
-    // The first type in the cache is always the final result.
-    // Collect the rest in the concrete-declarations list, if needed.
-    if (otherConcreteTypes) {
-      for (auto type : ArrayRef<TypeDecl *>(cache.types).slice(1)) {
-        otherConcreteTypes->push_back(type);
-      }
-    }
-
-    return cache.types.front();
-  };
-
+                             Identifier name) {
   // If we have a cached value that is up-to-date, use that.
   auto cached = nestedTypeNameCache.find(name);
   if (cached != nestedTypeNameCache.end() &&
@@ -2059,7 +2039,7 @@ TypeDecl *EquivalenceClass::lookupNestedType(
       (!concreteType ||
         cached->second.concreteTypePresent == concreteType->getCanonicalType())) {
     ++NumNestedTypeCacheHits;
-    return populateResult(cached->second);
+    return cached->second.type;
   }
 
   // Cache miss; go compute the result.
@@ -2112,24 +2092,16 @@ TypeDecl *EquivalenceClass::lookupNestedType(
   entry.concreteTypePresent =
     concreteType ? concreteType->getCanonicalType() : CanType();
   if (bestAssocType) {
-    entry.types.push_back(bestAssocType);
-    entry.types.insert(entry.types.end(),
-                       concreteDecls.begin(), concreteDecls.end());
+    entry.type = bestAssocType;
     assert(bestAssocType->getOverriddenDecls().empty() &&
            "Lookup should never keep a non-anchor associated type");
   } else if (!concreteDecls.empty()) {
     // Find the best concrete type.
-    auto bestConcreteTypeIter = findBestConcreteNestedType(concreteDecls);
-
-    // Put the best concrete type first; the rest will follow.
-    entry.types.push_back(*bestConcreteTypeIter);
-    entry.types.insert(entry.types.end(),
-                       concreteDecls.begin(), bestConcreteTypeIter);
-    entry.types.insert(entry.types.end(),
-                       bestConcreteTypeIter + 1, concreteDecls.end());
+    entry.type = findBestConcreteNestedType(concreteDecls);
   }
 
-  return populateResult((nestedTypeNameCache[name] = std::move(entry)));
+  nestedTypeNameCache[name] = entry;
+  return entry.type;
 }
 
 static Type getSugaredDependentType(Type type,
@@ -2195,127 +2167,6 @@ Type EquivalenceClass::getAnchor(
 #endif
 
   return substAnchor();
-}
-
-Type EquivalenceClass::getTypeInContext(GenericSignatureBuilder &builder,
-                                        GenericEnvironment *genericEnv) {
-  auto genericParams = genericEnv->getGenericParams();
-
-  // The anchor descr
-  Type anchor = getAnchor(builder, genericParams);
-
-  // If this equivalence class is mapped to a concrete type, produce that
-  // type.
-  if (concreteType) {
-    if (recursiveConcreteType)
-      return ErrorType::get(anchor);
-
-    // Prevent recursive substitution.
-    this->recursiveConcreteType = true;
-    SWIFT_DEFER {
-      this->recursiveConcreteType = false;
-    };
-
-    return genericEnv->mapTypeIntoContext(concreteType,
-                                          builder.getLookupConformanceFn());
-  }
-
-  // Local function to check whether we have a generic parameter that has
-  // already been recorded
-  auto getAlreadyRecoveredGenericParam = [&]() -> Type {
-    auto genericParam = anchor->getAs<GenericTypeParamType>();
-    if (!genericParam) return Type();
-
-    auto type = genericEnv->getMappingIfPresent(genericParam);
-    if (!type) return Type();
-
-    // We already have a mapping for this generic parameter in the generic
-    // environment. Return it.
-    return *type;
-  };
-
-  AssociatedTypeDecl *assocType = nullptr;
-  ArchetypeType *parentArchetype = nullptr;
-  if (auto depMemTy = anchor->getAs<DependentMemberType>()) {
-    // Resolve the equivalence class of the parent.
-    auto parentEquivClass =
-      builder.resolveEquivalenceClass(
-                          depMemTy->getBase(),
-                          ArchetypeResolutionKind::CompleteWellFormed);
-    if (!parentEquivClass)
-      return ErrorType::get(anchor);
-
-    // Map the parent type into this context.
-    parentArchetype =
-      parentEquivClass->getTypeInContext(builder, genericEnv)
-                      ->castTo<ArchetypeType>();
-
-    // If we already have a nested type with this name, return it.
-    assocType = depMemTy->getAssocType();
-    if (auto nested =
-          parentArchetype->getNestedTypeIfKnown(assocType->getName())) {
-      return *nested;
-    }
-
-    // We will build the archetype below.
-  } else if (auto result = getAlreadyRecoveredGenericParam()) {
-    // Return already-contextualized generic type parameter.
-    return result;
-  }
-
-  // Substitute into the superclass.
-  Type superclass = this->recursiveSuperclassType ? Type() : this->superclass;
-  if (superclass && superclass->hasTypeParameter()) {
-    // Prevent recursive substitution.
-    this->recursiveSuperclassType = true;
-    SWIFT_DEFER {
-      this->recursiveSuperclassType = false;
-    };
-
-    superclass = genericEnv->mapTypeIntoContext(
-                                            superclass,
-                                            builder.getLookupConformanceFn());
-    if (superclass->is<ErrorType>())
-      superclass = Type();
-
-    // We might have recursively recorded the archetype; if so, return early.
-    // FIXME: This should be detectable before we end up building archetypes.
-    if (auto result = getAlreadyRecoveredGenericParam())
-      return result;
-  }
-
-  // Build a new archetype.
-
-  // Collect the protocol conformances for the archetype.
-  SmallVector<ProtocolDecl *, 4> protos;
-  for (const auto &conforms : conformsTo) {
-    auto proto = conforms.first;
-
-    if (!isConformanceSatisfiedBySuperclass(proto))
-      protos.push_back(proto);
-  }
-
-  ArchetypeType *archetype;
-  ASTContext &ctx = builder.getASTContext();
-  if (parentArchetype) {
-    // Create a nested archetype.
-    auto *depMemTy = anchor->castTo<DependentMemberType>();
-    archetype = NestedArchetypeType::getNew(ctx, parentArchetype, depMemTy,
-                                            protos, superclass, layout);
-
-    // Register this archetype with its parent.
-    parentArchetype->registerNestedType(assocType->getName(), archetype);
-  } else {
-    // Create a top-level archetype.
-    auto genericParam = anchor->castTo<GenericTypeParamType>();
-    archetype = PrimaryArchetypeType::getNew(ctx, genericEnv, genericParam,
-                                             protos, superclass, layout);
-
-    // Register the archetype with the generic environment.
-    genericEnv->addMapping(genericParam, archetype);
-  }
-
-  return archetype;
 }
 
 void EquivalenceClass::dump(llvm::raw_ostream &out,
@@ -2852,38 +2703,6 @@ PotentialArchetype *PotentialArchetype::getOrCreateNestedType(
   }
 
   return resultPA;
-}
-
-void ArchetypeType::resolveNestedType(
-                                    std::pair<Identifier, Type> &nested) const {
-  auto genericEnv = getGenericEnvironment();
-  auto &builder = *genericEnv->getGenericSignatureBuilder();
-
-  Type interfaceType = getInterfaceType();
-  Type memberInterfaceType =
-    DependentMemberType::get(interfaceType, nested.first);
-  auto resolved =
-    builder.maybeResolveEquivalenceClass(
-                                  memberInterfaceType,
-                                  ArchetypeResolutionKind::CompleteWellFormed,
-                                  /*wantExactPotentialArchetype=*/false);
-  if (!resolved) {
-    nested.second = ErrorType::get(interfaceType);
-    return;
-  }
-
-  Type result;
-  if (auto concrete = resolved.getAsConcreteType()) {
-    result = concrete;
-  } else {
-    auto *equivClass = resolved.getEquivalenceClass(builder);
-    result = equivClass->getTypeInContext(builder, genericEnv);
-  }
-
-  assert(!nested.second ||
-         nested.second->isEqual(result) ||
-         (nested.second->hasError() && result->hasError()));
-  nested.second = result;
 }
 
 Type GenericSignatureBuilder::PotentialArchetype::getDependentType(
@@ -3829,8 +3648,7 @@ ResolvedType GenericSignatureBuilder::maybeResolveEquivalenceClass(
           if (concreteDecls.empty())
             return ResolvedType::forUnresolved(nullptr);
 
-          auto bestConcreteTypeIter = findBestConcreteNestedType(concreteDecls);
-          concreteDecl = *bestConcreteTypeIter;
+          concreteDecl = findBestConcreteNestedType(concreteDecls);
         }
       }
 
