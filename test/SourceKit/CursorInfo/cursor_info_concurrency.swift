@@ -20,7 +20,7 @@ func test(act: MyActor) async throws {
 // RUN: %{python} %utils/split_file.py -o %t %s
 
 // RUN: %empty-directory(%t/Modules)
-// RUN: %target-swift-frontend -emit-module -o %t/Modules/MyModule.swiftmodule -module-name MyModule %t/MyModule.swift -enable-experimental-concurrency 
+// RUN: %target-swift-frontend -emit-module -o %t/Modules/MyModule.swiftmodule -module-name MyModule %t/MyModule.swift -enable-experimental-concurrency -disable-availability-checking
 
 // RUN: %sourcekitd-test -req=cursor -pos=1:15 %t/MyModule.swift -- %t/MyModule.swift -target %target-triple -Xfrontend -enable-experimental-concurrency | %FileCheck -check-prefix=ACTOR %s
 // RUN: %sourcekitd-test -req=cursor -pos=2:15 %t/MyModule.swift -- %t/MyModule.swift -target %target-triple -Xfrontend -enable-experimental-concurrency | %FileCheck -check-prefix=FUNC %s

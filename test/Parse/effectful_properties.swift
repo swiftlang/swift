@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -disable-availability-checking
 
 struct MyProps {
   var prop1 : Int {

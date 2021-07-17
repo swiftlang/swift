@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module-path %t/a.swiftmodule -module-name a %s
+// RUN: %target-swift-frontend -emit-module-path %t/a.swiftmodule -module-name a %s -disable-availability-checking
 // RUN: %target-swift-ide-test -print-module -module-to-print a -source-filename x -I %t | %FileCheck -check-prefix MODULE-CHECK %s
-// RUN: %target-swift-frontend -emit-module-path %t/b.swiftmodule -module-name a  %t/a.swiftmodule
+// RUN: %target-swift-frontend -emit-module-path %t/b.swiftmodule -module-name a  %t/a.swiftmodule -disable-availability-checking
 // RUN: cmp -s %t/a.swiftmodule %t/b.swiftmodule
 
 ///////////
