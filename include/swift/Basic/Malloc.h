@@ -34,11 +34,11 @@ inline void *AlignedAlloc(size_t size, size_t align) {
   if (align < sizeof(void*))
     align = sizeof(void*);
   
-  void *r;
 #if defined(_WIN32)
-  r = _aligned_malloc(size, align);
+  void *r = _aligned_malloc(size, align);
   assert(r && "_aligned_malloc failed");
 #else
+  void *r = nullptr;
   int res = posix_memalign(&r, align, size);
   assert(res == 0 && "posix_memalign failed");
   (void)res; // Silence the unused variable warning.
