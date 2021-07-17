@@ -27,10 +27,11 @@
 #include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Debug.h"
+#include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/ThreadLocalStorage.h"
-#include <memory>
 #include <inttypes.h>
+#include <memory>
 #include <stdio.h>
 
 // Pick a return-address strategy
@@ -55,6 +56,16 @@ static const char *getAccessName(ExclusivityFlags flags) {
   default: return "unknown";
   }
 }
+
+// In asserts builds if the environment variable
+// SWIFT_DEBUG_RUNTIME_EXCLUSIVITY_LOGGING is set, emit logging information.
+#ifndef NDEBUG
+
+static inline bool isExclusivityLoggingEnabled() {
+  return runtime::environment::SWIFT_DEBUG_RUNTIME_EXCLUSIVITY_LOGGING();
+}
+
+#endif
 
 SWIFT_ALWAYS_INLINE
 static void reportExclusivityConflict(ExclusivityFlags oldAction, void *oldPC,
@@ -179,6 +190,10 @@ public:
   constexpr bool isHead(Access *access) const { return Head == access; }
 
   bool insert(Access *access, void *pc, void *pointer, ExclusivityFlags flags) {
+#ifndef NDEBUG
+    if (isExclusivityLoggingEnabled())
+      printf("Inserting new access: %p\n", access);
+#endif
     auto action = getAccessAction(flags);
 
     for (Access *cur = Head; cur != nullptr; cur = cur->getNext()) {
@@ -198,16 +213,32 @@ public:
       // 0 means no backtrace will be printed.
       fatalError(0, "Fatal access conflict detected.\n");
     }
-    if (!isTracking(flags))
+    if (!isTracking(flags)) {
+#ifndef NDEBUG
+      if (isExclusivityLoggingEnabled()) {
+        printf("  Not tracking!\n");
+      }
+#endif
       return false;
+    }
 
     // Insert to the front of the array so that remove tends to find it faster.
     access->initialize(pc, pointer, Head, action);
     Head = access;
+#ifndef NDEBUG
+    if (isExclusivityLoggingEnabled()) {
+      printf("  Tracking!\n");
+      swift_dumpTrackedAccesses();
+    }
+#endif
     return true;
   }
 
   void remove(Access *access) {
+#ifndef NDEBUG
+    if (isExclusivityLoggingEnabled())
+      printf("Removing access: %p\n", access);
+#endif
     assert(Head != nullptr && "Can not remove access from empty access list");
     auto cur = Head;
     // Fast path: stack discipline.
@@ -419,9 +450,14 @@ char *swift::swift_getOrigOfReplaceable(char **OrigFnPtr) {
 //
 // This is only intended to be used in the debugger.
 void swift::swift_dumpTrackedAccesses() {
-  getTLSContext().accessSet.forEach([](Access *a) {
-      fprintf(stderr, "Access. Pointer: %p. PC: %p. AccessAction: %s\n",
-              a->Pointer, a->PC, getAccessName(a->getAccessAction()));
+  auto &accessSet = getTLSContext().accessSet;
+  if (!accessSet) {
+    printf("        No Accesses.\n");
+    return;
+  }
+  accessSet.forEach([](Access *a) {
+    printf("        Access. Pointer: %p. PC: %p. AccessAction: %s\n",
+           a->Pointer, a->PC, getAccessName(a->getAccessAction()));
   });
 }
 
@@ -616,6 +652,14 @@ namespace {
 struct SwiftTaskThreadLocalContext {
   uintptr_t state[2];
 
+#ifndef NDEBUG
+  void dump() {
+    printf("        SwiftTaskThreadLocalContext: (FirstAccess,LastAccess): "
+           "(%p, %p)\n",
+           (void *)state[0], (void *)state[1]);
+  }
+#endif
+
   bool hasInitialAccessSet() const {
     // If state[0] is nullptr, we have an initial access set.
     return bool(state[0]);
@@ -641,6 +685,27 @@ void swift::swift_task_enterThreadLocalContext(char *state) {
   auto &taskCtx = *reinterpret_cast<SwiftTaskThreadLocalContext *>(state);
   auto &tlsCtxAccessSet = getTLSContext().accessSet;
 
+#ifndef NDEBUG
+  if (isExclusivityLoggingEnabled()) {
+    printf("Entering Thread Local Context. Before Swizzle. Storage: %p\n",
+           state);
+    taskCtx.dump();
+    swift_dumpTrackedAccesses();
+  }
+
+  auto logEndState = [&] {
+    if (isExclusivityLoggingEnabled()) {
+      printf("Entering Thread Local Context. After Swizzle. Storage: %p\n",
+             state);
+      taskCtx.dump();
+      swift_dumpTrackedAccesses();
+    }
+  };
+#else
+  // Just a no-op that should inline away.
+  auto logEndState = [] {};
+#endif
+
   // First handle all of the cases where our task does not start without an
   // initial access set.
   //
@@ -652,6 +717,7 @@ void swift::swift_task_enterThreadLocalContext(char *state) {
     //
     // Handles push cases 1-2.
     if (!tlsCtxAccessSet) {
+      logEndState();
       return;
     }
 
@@ -662,6 +728,7 @@ void swift::swift_task_enterThreadLocalContext(char *state) {
     //
     // Handles push cases 3-4.
     taskCtx.setTaskAccessSetHead(tlsCtxAccessSet.getHead());
+    logEndState();
     return;
   }
 
@@ -678,6 +745,7 @@ void swift::swift_task_enterThreadLocalContext(char *state) {
     tlsCtxAccessSet = taskCtx.getTaskAccessSetHead();
     taskCtx.setTaskAccessSetHead(nullptr);
     taskCtx.setTaskAccessSetTail(nullptr);
+    logEndState();
     return;
   }
 
@@ -692,12 +760,37 @@ void swift::swift_task_enterThreadLocalContext(char *state) {
   tail->setNext(oldHead);
   taskCtx.setTaskAccessSetHead(oldHead);
   taskCtx.setTaskAccessSetTail(nullptr);
+  logEndState();
 }
 
 // See algorithm description on SwiftTaskThreadLocalContext.
 void swift::swift_task_exitThreadLocalContext(char *state) {
   auto &taskCtx = *reinterpret_cast<SwiftTaskThreadLocalContext *>(state);
   auto &tlsCtxAccessSet = getTLSContext().accessSet;
+
+#ifndef NDEBUG
+  if (isExclusivityLoggingEnabled()) {
+    printf("Exiting Thread Local Context. Before Swizzle. Storage: %p\n",
+           state);
+    taskCtx.dump();
+    swift_dumpTrackedAccesses();
+  }
+
+  auto logEndState = [&] {
+    if (isExclusivityLoggingEnabled()) {
+      printf("Exiting Thread Local Context. After Swizzle. Storage: %p\n",
+             state);
+      taskCtx.dump();
+      swift_dumpTrackedAccesses();
+    }
+  };
+#else
+  // If we are not compiling with asserts, just use a simple identity function
+  // that should be inlined away.
+  //
+  // TODO: Can we use defer in the runtime?
+  auto logEndState = [] {};
+#endif
 
   // First check our ctx to see if we were tracking a previous synchronous
   // head. If we don't then we know that our synchronous thread was not
@@ -717,6 +810,7 @@ void swift::swift_task_exitThreadLocalContext(char *state) {
     if (!tlsCtxAccessSet) {
       assert(taskCtx.getTaskAccessSetTail() == nullptr &&
              "Make sure we set this to nullptr when we pushed");
+      logEndState();
       return;
     }
 
@@ -733,6 +827,7 @@ void swift::swift_task_exitThreadLocalContext(char *state) {
     tlsCtxAccessSet = nullptr;
     taskCtx.setTaskAccessSetHead(newHead);
     taskCtx.setTaskAccessSetTail(newTail);
+    logEndState();
     return;
   }
 
@@ -749,6 +844,7 @@ void swift::swift_task_exitThreadLocalContext(char *state) {
   // Handles pop cases 3.
   if (tlsCtxAccessSet.getHead() == oldHead) {
     taskCtx.setTaskAccessSetHead(nullptr);
+    logEndState();
     return;
   }
 
@@ -766,4 +862,5 @@ void swift::swift_task_exitThreadLocalContext(char *state) {
   tlsCtxAccessSet.setHead(oldHead);
   taskCtx.setTaskAccessSetHead(newHead);
   taskCtx.setTaskAccessSetTail(newEnd);
+  logEndState();
 }
