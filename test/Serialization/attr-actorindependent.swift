@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -enable-experimental-concurrency -emit-module-path %t/a.swiftmodule -module-name a %s
+// RUN: %target-swift-frontend -enable-experimental-concurrency -disable-availability-checking -emit-module-path %t/a.swiftmodule -module-name a %s
 // RUN: llvm-bcanalyzer -dump %t/a.swiftmodule | %FileCheck -check-prefix BC-CHECK %s
 // RUN: %target-swift-ide-test -print-module -module-to-print a -source-filename x -I %t | %FileCheck -check-prefix MODULE-CHECK %s
-// RUN: %target-swift-frontend -enable-experimental-concurrency -emit-module-path %t/b.swiftmodule -module-name a  %t/a.swiftmodule
+// RUN: %target-swift-frontend -enable-experimental-concurrency -disable-availability-checking -emit-module-path %t/b.swiftmodule -module-name a  %t/a.swiftmodule
 // RUN: cmp -s %t/a.swiftmodule %t/b.swiftmodule
 
 // REQUIRES: concurrency

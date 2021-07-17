@@ -1,4 +1,5 @@
-// RUN: %target-typecheck-verify-swift -enable-library-evolution
+// RUN: %target-typecheck-verify-swift -enable-library-evolution -disable-availability-checking
+// REQUIRES: concurrency
 
 class C1 { }
 final class C2: Sendable { }

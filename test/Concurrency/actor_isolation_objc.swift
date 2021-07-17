@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency -enable-experimental-async-handler
+// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency -enable-experimental-async-handler -disable-availability-checking
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
 

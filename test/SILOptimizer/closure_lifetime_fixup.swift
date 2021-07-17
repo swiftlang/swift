@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %S/../Inputs/resilient_struct.swift -enable-library-evolution -emit-module -emit-module-path %t/resilient_struct.swiftmodule
-// RUN: %target-swift-frontend %S/../Inputs/resilient_enum.swift -I %t -enable-library-evolution -emit-module -emit-module-path %t/resilient_enum.swiftmodule
-// RUN: %target-swift-frontend %s -sil-verify-all -enable-experimental-concurrency -emit-sil -disable-copy-propagation -I %t -o - | %FileCheck %s
+// RUN: %target-swift-frontend %S/../Inputs/resilient_struct.swift -enable-library-evolution -disable-availability-checking -emit-module -emit-module-path %t/resilient_struct.swiftmodule
+// RUN: %target-swift-frontend %S/../Inputs/resilient_enum.swift -I %t -enable-library-evolution  -disable-availability-checking -emit-module -emit-module-path %t/resilient_enum.swiftmodule
+// RUN: %target-swift-frontend %s -sil-verify-all -enable-experimental-concurrency -disable-availability-checking -emit-sil -disable-copy-propagation -I %t -o - | %FileCheck %s
 
 // Using -disable-copy-propagation to pattern match against older SIL
 // output. At least until -enable-copy-propagation has been around

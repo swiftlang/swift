@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify %s -enable-experimental-concurrency -verify-ignore-unknown
+// RUN: %target-swift-frontend -typecheck -verify %s -enable-experimental-concurrency -verify-ignore-unknown -disable-availability-checking
 // REQUIRES: concurrency
 
 actor SomeActor { }
