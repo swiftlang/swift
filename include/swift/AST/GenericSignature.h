@@ -165,6 +165,18 @@ public:
 public:
   using RequiredProtocols = SmallVector<ProtocolDecl *, 2>;
 
+  /// Stores a set of requirements on a type parameter. Used by
+  /// GenericEnvironment for building archetypes.
+  struct LocalRequirements {
+    Type anchor;
+
+    Type concreteType;
+    Type superclass;
+
+    RequiredProtocols protos;
+    LayoutConstraint layout;
+  };
+
 private:
   // Direct comparison is disabled for generic signatures.  Canonicalize them
   // first, or use isEqual.
@@ -313,6 +325,10 @@ public:
   /// (archetypes) that correspond to the interface types in this generic
   /// signature.
   GenericEnvironment *getGenericEnvironment() const;
+
+  /// Collects a set of requirements on a type parameter. Used by
+  /// GenericEnvironment for building archetypes.
+  GenericSignature::LocalRequirements getLocalRequirements(Type depType) const;
 
   /// Uniquing for the ASTContext.
   void Profile(llvm::FoldingSetNodeID &ID) const {

@@ -78,6 +78,18 @@ namespace swift {
     ErrorOnFailureRemarkOnSuccess
   };
 
+  /// Value for LangOptions::EnableRequirementMachine.
+  enum class RequirementMachineMode {
+    /// Use the GenericSignatureBuilder for all queries.
+    Disabled = 0,
+
+    /// Use the RequirementMachine for all queries.
+    Enabled = 1,
+
+    /// Use both and assert if the results do not match.
+    Verify = 2
+  };
+
   /// A collection of options that affect the language dialect and
   /// provide compiler debugging facilities.
   class LangOptions final {
@@ -446,7 +458,8 @@ namespace swift {
         ASTVerifierOverrideKind::NoOverride;
 
     /// Whether the new experimental generics implementation is enabled.
-    bool EnableRequirementMachine = false;
+    RequirementMachineMode EnableRequirementMachine =
+        RequirementMachineMode::Disabled;
 
     /// Enables debugging output from the requirement machine.
     bool DebugRequirementMachine = false;

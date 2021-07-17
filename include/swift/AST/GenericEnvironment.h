@@ -31,7 +31,6 @@
 namespace swift {
 
 class ArchetypeType;
-class GenericSignatureBuilder;
 class ASTContext;
 class GenericTypeParamType;
 class SILModule;
@@ -60,7 +59,6 @@ public:
 class alignas(1 << DeclAlignInBits) GenericEnvironment final
         : private llvm::TrailingObjects<GenericEnvironment, Type> {
   GenericSignature Signature = GenericSignature();
-  GenericSignatureBuilder *Builder = nullptr;
 
   friend TrailingObjects;
 
@@ -79,10 +77,6 @@ class alignas(1 << DeclAlignInBits) GenericEnvironment final
   explicit GenericEnvironment(GenericSignature signature);
 
   friend ArchetypeType;
-  friend GenericSignatureBuilder;
-  
-  GenericSignatureBuilder *getGenericSignatureBuilder() const;
-
   friend QueryInterfaceTypeSubstitutions;
 
   Type getOrCreateArchetypeFromInterfaceType(Type depType);

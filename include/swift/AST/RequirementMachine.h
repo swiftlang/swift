@@ -21,6 +21,10 @@ class raw_ostream;
 
 namespace swift {
 
+namespace rewriting {
+class RewriteContext;
+}
+
 class ASTContext;
 class AssociatedTypeDecl;
 class CanType;
@@ -40,7 +44,7 @@ class RequirementMachine final {
   ASTContext &Context;
   Implementation *Impl;
 
-  explicit RequirementMachine(ASTContext &ctx);
+  explicit RequirementMachine(rewriting::RewriteContext &rewriteCtx);
 
   RequirementMachine(const RequirementMachine &) = delete;
   RequirementMachine(RequirementMachine &&) = delete;
@@ -58,6 +62,8 @@ public:
   // Generic signature queries. Generally you shouldn't have to construct a
   // RequirementMachine instance; instead, call the corresponding methods on
   // GenericSignature, which lazily create a RequirementMachine for you.
+  GenericSignature::LocalRequirements getLocalRequirements(Type depType,
+                      TypeArrayView<GenericTypeParamType> genericParams) const;
   bool requiresClass(Type depType) const;
   LayoutConstraint getLayoutConstraint(Type depType) const;
   bool requiresProtocol(Type depType, const ProtocolDecl *proto) const;
