@@ -1,0 +1,123 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -simplify-cfg | %FileCheck %s
+
+// Tests tryJumpThreading with OSSA. This does not require
+// -jumpthread-simplify-cfg, which is only for dominator-based
+// jump-threading.
+
+// Includes the OSSA form of tests from simplify_cfg_simple.sil,
+// simplify_cfg_opaque.sil, and simplify_cfg_address_phi.sil.
+// ...and new OSSA test cases.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+class C {
+  @_hasStorage @_hasInitialValue var field: Int { get set }
+  init()
+}
+
+sil @getC : $@convention(thin) () -> C
+
+protocol P {}
+
+// Test that debug_value_addr is not unnecessarilly lost during address projection sinking.
+public class CC<R> {
+  let r : R
+  init(_ _r: R) { r = _r }
+}
+
+sil @useAny : $@convention(thin) <V> (@in_guaranteed V) -> ()
+
+// Test that jump threading sinks a ref_element_addr, generating a
+// non-address phi for its operand.
+//
+// The retain on separate paths followed by a merged release, and
+// target block with a conditional branch are necessary just to get
+// jump threading to kick in.
+//
+// CHECK-LABEL: sil @testJumpThreadRefEltLoop : $@convention(thin) () -> () {
+// CHECK: bb0
+// CHECK:   function_ref @getC : $@convention(thin) () -> C
+// CHECK:   cond_br undef, bb1, bb2
+// CHECK: bb1:
+// CHECK:   [[C1:%.*]] = apply %0() : $@convention(thin) () -> C
+// CHECK:   strong_retain [[C1]] : $C
+// CHECK:   strong_release [[C1]] : $C
+// CHECK:   br bb3([[C1]] : $C)
+// CHECK: bb2:
+// CHECK:   [[C2:%.*]] = apply %0() : $@convention(thin) () -> C
+// CHECK:   strong_retain [[C2]] : $C
+// CHECK:   strong_release [[C2]] : $C
+// CHECK:   br bb3([[C2]] : $C)
+// CHECK: bb3([[PHI:%.*]] : $C):
+// CHECK:   [[ADR:%.*]] = ref_element_addr [[PHI]] : $C, #C.field
+// CHECK:   begin_access [read] [dynamic] [[ADR]] : $*Int
+// CHECK:   load
+// CHECK:   end_access
+// CHECK-LABEL: } // end sil function 'testJumpThreadRefEltLoop'
+sil @testJumpThreadRefEltLoop : $@convention(thin) () -> () {
+bb0:
+  %f = function_ref @getC : $@convention(thin) () -> C
+  cond_br undef, bb1, bb2
+
+bb1:
+  %c1 = apply %f() : $@convention(thin) ()->C
+  strong_retain %c1 : $C
+  br bb3(%c1 : $C)
+
+bb2:
+  %c2 = apply %f() : $@convention(thin) ()->C
+  strong_retain %c2 : $C
+  br bb3(%c2 : $C)
+
+bb3(%arg : $C):
+  strong_release %arg : $C
+  %18 = ref_element_addr %arg : $C, #C.field
+  br bb4
+
+bb4:
+  %19 = begin_access [read] [dynamic] %18 : $*Int
+  %20 = load %19 : $*Int
+  end_access %19 : $*Int
+  cond_br undef, bb4, bb5
+
+bb5:
+  %z = tuple ()
+  return %z : $()
+}
+
+// CHECK-LABEL: sil @testDebugValue : $@convention(method) <R><S> (@in_guaranteed S, @guaranteed CC<R>, Bool) -> () {
+// CHECK: debug_value_addr %0 : $*S, let, name "u"
+// CHECK: apply %{{.*}}<S>(%0) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+// CHECK: [[FIELD:%.*]] = ref_element_addr %1 : $CC<R>, #CC.r
+// CHECK: debug_value_addr [[FIELD]] : $*R, let, name "u"
+// CHECK: apply %{{.*}}<R>([[FIELD]]) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+// CHECK-LABEL: } // end sil function 'testDebugValue'
+sil @testDebugValue : $@convention(method) <R><S> (@in_guaranteed S, @guaranteed CC<R>, Bool) -> () {
+bb0(%0 : $*S, %1 : $CC<R>, %2 : $Bool):
+  %bool = struct_extract %2 : $Bool, #Bool._value
+  cond_br %bool, bb1, bb2
+
+bb1:
+  debug_value_addr %0 : $*S, let, name "u"
+  %f1 = function_ref @useAny : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %call1 = apply %f1<S>(%0) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  br bb2
+
+bb2:
+  %field = ref_element_addr %1 : $CC<R>, #CC.r
+  debug_value_addr %field : $*R, let, name "t"
+  cond_br %bool, bb3, bb4
+
+bb3:
+  debug_value_addr %field : $*R, let, name "u"
+  %f2 = function_ref @useAny : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %call2 = apply %f2<R>(%field) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  br bb4
+
+bb4:
+  %z = tuple ()
+  return %z : $()
+}

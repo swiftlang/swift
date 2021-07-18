@@ -170,6 +170,9 @@ protected:
   /// state is reset each time analyzeAddressProjections is called.
   SinkAddressProjections sinkProj;
 
+  // If available, the current DeadEndBlocks for incremental update.
+  DeadEndBlocks *deBlocks;
+
 public:
   /// An ordered list of old to new available value pairs.
   ///
@@ -178,8 +181,8 @@ public:
   SmallVector<std::pair<SILValue, SILValue>, 16> availVals;
 
   // Clone blocks starting at `origBB`, within the same function.
-  BasicBlockCloner(SILBasicBlock *origBB)
-      : SILCloner(*origBB->getParent()), origBB(origBB) {}
+  BasicBlockCloner(SILBasicBlock *origBB, DeadEndBlocks *deBlocks = nullptr)
+      : SILCloner(*origBB->getParent()), origBB(origBB), deBlocks(deBlocks) {}
 
   bool canCloneBlock() {
     for (auto &inst : *origBB) {
@@ -218,6 +221,12 @@ public:
     successorBBs.reserve(origBB->getSuccessors().size());
     llvm::copy(origBB->getSuccessors(), std::back_inserter(successorBBs));
     cloneReachableBlocks(origBB, successorBBs, insertAfterBB);
+
+    if (deBlocks) {
+      for (auto *succBB : successorBBs) {
+        deBlocks->updateForReachableBlock(succBB);
+      }
+    }
   }
 
   /// Clone the given branch instruction's destination block, splitting

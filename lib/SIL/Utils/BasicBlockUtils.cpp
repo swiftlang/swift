@@ -174,7 +174,8 @@ void swift::getEdgeArgs(TermInst *T, unsigned edgeIdx, SILBasicBlock *newEdgeBB,
     if (!succBB->getNumArguments())
       return;
     args.push_back(newEdgeBB->createPhiArgument(
-        succBB->getArgument(0)->getType(), OwnershipKind::Owned));
+        succBB->getArgument(0)->getType(),
+        succBB->getArgument(0)->getOwnershipKind()));
     return;
   }
 
@@ -186,7 +187,8 @@ void swift::getEdgeArgs(TermInst *T, unsigned edgeIdx, SILBasicBlock *newEdgeBB,
     if (!succBB->getNumArguments())
       return;
     args.push_back(newEdgeBB->createPhiArgument(
-        succBB->getArgument(0)->getType(), OwnershipKind::Owned));
+        succBB->getArgument(0)->getType(),
+        succBB->getArgument(0)->getOwnershipKind()));
     return;
   }
 
@@ -366,6 +368,15 @@ void swift::mergeBasicBlockWithSingleSuccessor(SILBasicBlock *BB,
 //                              DeadEndBlocks
 //===----------------------------------------------------------------------===//
 
+// Propagate the reachability up the control flow graph.
+void DeadEndBlocks::propagateNewlyReachableBlocks(unsigned startIdx) {
+  for (unsigned idx = startIdx; idx < reachableBlocks.size(); ++idx) {
+    const SILBasicBlock *bb = reachableBlocks[idx];
+    for (SILBasicBlock *predBB : bb->getPredecessorBlocks())
+      reachableBlocks.insert(predBB);
+  }
+}
+
 void DeadEndBlocks::compute() {
   assert(reachableBlocks.empty() && "Computed twice");
 
@@ -377,13 +388,19 @@ void DeadEndBlocks::compute() {
     if (TI->isFunctionExiting())
       reachableBlocks.insert(&BB);
   }
-  // Propagate the reachability up the control flow graph.
-  unsigned Idx = 0;
-  while (Idx < reachableBlocks.size()) {
-    const SILBasicBlock *BB = reachableBlocks[Idx++];
-    for (SILBasicBlock *Pred : BB->getPredecessorBlocks())
-      reachableBlocks.insert(Pred);
+  propagateNewlyReachableBlocks(0);
+}
+
+void DeadEndBlocks::updateForReachableBlock(SILBasicBlock *reachableBB) {
+  if (!didComputeValue)
+    return;
+
+  assert(reachableBlocks.count(reachableBB));
+  unsigned numReachable = reachableBlocks.size();
+  for (SILBasicBlock *predBB : reachableBB->getPredecessorBlocks()) {
+    reachableBlocks.insert(predBB);
   }
+  propagateNewlyReachableBlocks(numReachable);
 }
 
 bool DeadEndBlocks::triviallyEndsInUnreachable(SILBasicBlock *block) {

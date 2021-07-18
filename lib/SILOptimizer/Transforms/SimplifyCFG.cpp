@@ -22,6 +22,7 @@
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TerminatorUtils.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
+#include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ProgramTerminationAnalysis.h"
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
@@ -42,6 +43,25 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 using namespace swift;
+
+// This is temporarily used for testing until Swift 5.5 branches to reduce risk.
+llvm::cl::opt<bool> EnableOSSASimplifyCFG(
+    "enable-ossa-simplify-cfg",
+    llvm::cl::desc(
+        "Enable non-trivial OSSA simplify-cfg and simple jump threading "
+        "(staging)."));
+
+// This requires new OwnershipOptUtilities which aren't well tested yet.
+llvm::cl::opt<bool> EnableOSSARewriteTerminator(
+    "enable-ossa-rewriteterminator",
+    llvm::cl::desc(
+        "Enable OSSA simplify-cfg with non-trivial terminator rewriting "
+        "(staging)."));
+
+llvm::cl::opt<bool> IsInfiniteJumpThreadingBudget(
+    "sil-infinite-jump-threading-budget",
+    llvm::cl::desc(
+        "Use infinite budget for jump threading. Useful for testing purposes"));
 
 STATISTIC(NumBlocksDeleted, "Number of unreachable blocks removed");
 STATISTIC(NumBlocksMerged, "Number of blocks merged together");
@@ -71,6 +91,12 @@ class SimplifyCFG {
   SILOptFunctionBuilder FuncBuilder;
   SILFunction &Fn;
   SILPassManager *PM;
+
+  // DeadEndBlocks remains conservatively valid across updates that rewrite
+  // branches and remove edges. Any transformation that adds a block must call
+  // updateForReachableBlock(). Removing a block causes a dangling pointer
+  // within DeadEndBlocks, but this pointer can't be accessed by queries.
+  DeadEndBlocks *deBlocks = nullptr;
 
   // WorklistList is the actual list that we iterate over (for determinism).
   // Slots may be null, which should be ignored.
@@ -571,6 +597,8 @@ static bool tryDominatorBasedSimplifications(
         if (stripExpectIntrinsic(Op.get()) == DominatingCondition) {
           if (!EdgeValue)
             EdgeValue = createValueForEdge(UserInst, DominatingTerminator, Idx);
+          LLVM_DEBUG(llvm::dbgs() << "replace dominated operand\n  in "
+                     << *UserInst << "  with " << EdgeValue);
           Op.set(EdgeValue);
           Changed = true;
         }
@@ -661,6 +689,9 @@ bool SimplifyCFG::dominatorBasedSimplify(DominanceAnalysis *DA) {
   // Get the dominator tree.
   DT = DA->get(&Fn);
 
+  if (!EnableOSSASimplifyCFG && Fn.hasOwnership())
+    return false;
+
   // Split all critical edges such that we can move code onto edges. This is
   // also required for SSA construction in dominatorBasedSimplifications' jump
   // threading. It only splits new critical edges it creates by jump threading.
@@ -668,16 +699,6 @@ bool SimplifyCFG::dominatorBasedSimplify(DominanceAnalysis *DA) {
   if (!Fn.hasOwnership() && EnableJumpThread) {
     Changed = splitAllCriticalEdges(Fn, DT, nullptr);
   }
-
-  // TODO: OSSA phi support. Even if all block arguments are trivial,
-  // jump-threading may require creation of guaranteed phis, which may require
-  // creation of nested borrow scopes.
-  if (Fn.hasOwnership()) {
-    for (auto &BB : Fn)
-      Changed |= simplifyArgs(&BB);
-    return Changed;
-  }
-
   unsigned MaxIter = MaxIterationsOfDominatorBasedSimplify;
   SmallVector<SILBasicBlock *, 16> BlocksForWorklist;
 
@@ -688,7 +709,8 @@ bool SimplifyCFG::dominatorBasedSimplify(DominanceAnalysis *DA) {
     // Do dominator based simplification of terminator condition. This does not
     // and MUST NOT change the CFG without updating the dominator tree to
     // reflect such change.
-    if (tryCheckedCastBrJumpThreading(&Fn, DT, BlocksForWorklist)) {
+    if (tryCheckedCastBrJumpThreading(&Fn, DT, deBlocks, BlocksForWorklist,
+                                      EnableOSSARewriteTerminator)) {
       for (auto BB: BlocksForWorklist)
         addToWorklist(BB);
 
@@ -816,7 +838,7 @@ getEnumCaseRecursive(SILValue Val, SILBasicBlock *UsedInBB, int RecursionDepth,
     Pred = UsedInBB->getSinglePredecessorBlock();
   }
 
-  // In case of a block argument, recursively check the enum cases of all
+  // In case of a phi, recursively check the enum cases of all
   // incoming predecessors.
   if (auto *Arg = dyn_cast<SILArgument>(Val)) {
     HandledArgs.insert(Arg);
@@ -1029,15 +1051,19 @@ static bool hasInjectedEnumAtEndOfBlock(SILBasicBlock *block, SILValue enumAddr)
 /// tryJumpThreading - Check to see if it looks profitable to duplicate the
 /// destination of an unconditional jump into the bottom of this block.
 bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
-  // TODO: OSSA phi support. Even if all block arguments are trivial,
-  // jump-threading may require creation of guaranteed phis, which may require
-  // creation of nested borrow scopes.
-  if (Fn.hasOwnership())
+  if (!EnableOSSASimplifyCFG && Fn.hasOwnership())
     return false;
 
   auto *DestBB = BI->getDestBB();
   auto *SrcBB = BI->getParent();
   TermInst *destTerminator = DestBB->getTerminator();
+  if (!EnableOSSARewriteTerminator && Fn.hasOwnership()) {
+    if (llvm::any_of(DestBB->getArguments(), [this](SILValue op) {
+          return !op->getType().isTrivial(Fn);
+        })) {
+      return false;
+   }
+  }
   // If the destination block ends with a return, we don't want to duplicate it.
   // We want to maintain the canonical form of a single return where possible.
   if (destTerminator->isFunctionExiting())
@@ -1056,7 +1082,7 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
   // major second order simplifications.  Here we only do it if there are
   // "constant" arguments to the branch or if we know how to fold something
   // given the duplication.
-  int ThreadingBudget = 0;
+  int ThreadingBudget = IsInfiniteJumpThreadingBudget ? INT_MAX : 0;
 
   for (unsigned i : indices(BI->getArgs())) {
     SILValue Arg = BI->getArg(i);
@@ -1183,11 +1209,19 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
 /// result in exposing opportunities for CFG simplification.
 bool SimplifyCFG::simplifyBranchOperands(OperandValueArrayRef Operands) {
   InstModCallbacks callbacks;
+#ifndef NDEBUG
+  callbacks = callbacks.onDelete(
+    [](SILInstruction *instToKill) {
+      LLVM_DEBUG(llvm::dbgs() << "simplify and erase " << *instToKill);
+      instToKill->eraseFromParent();
+    });
+#endif
+
   for (auto O = Operands.begin(), E = Operands.end(); O != E; ++O) {
     // All of our interesting simplifications are on single-value instructions
     // for now.
     if (auto *I = dyn_cast<SingleValueInstruction>(*O)) {
-      simplifyAndReplaceAllSimplifiedUsesAndErase(I, callbacks);
+      simplifyAndReplaceAllSimplifiedUsesAndErase(I, callbacks, deBlocks);
     }
   }
   return callbacks.hadCallbackInvocation();
@@ -1820,8 +1854,7 @@ static bool isOnlyUnreachable(SILBasicBlock *BB) {
 /// switch_enum where all but one block consists of just an
 /// "unreachable" with an unchecked_enum_data and branch.
 bool SimplifyCFG::simplifySwitchEnumUnreachableBlocks(SwitchEnumInst *SEI) {
-  if (Fn.hasOwnership()) {
-    // TODO: OSSA; cleanup terminator results.
+  if (!EnableOSSARewriteTerminator && Fn.hasOwnership()) {
     if (!SEI->getOperand()->getType().isTrivial(Fn))
       return false;
   }
@@ -2118,7 +2151,7 @@ static bool hasSameUltimateSuccessor(SILBasicBlock *noneBB, SILBasicBlock *someB
 bool SimplifyCFG::simplifySwitchEnumOnObjcClassOptional(SwitchEnumInst *SEI) {
   // TODO: OSSA; handle non-trivial enum case cleanup
   // (simplify_switch_enum_objc.sil).
-  if (Fn.hasOwnership()) {
+  if (!EnableOSSARewriteTerminator && Fn.hasOwnership()) {
     return false;
   }
 
@@ -2182,7 +2215,7 @@ bool SimplifyCFG::simplifySwitchEnumBlock(SwitchEnumInst *SEI) {
   auto *LiveBlock = SEI->getCaseDestination(EnumCase.get());
   auto *ThisBB = SEI->getParent();
 
-  if (Fn.hasOwnership()) {
+  if (!EnableOSSARewriteTerminator && Fn.hasOwnership()) {
     // TODO: OSSA; cleanup terminator results.
     if (!SEI->getOperand()->getType().isTrivial(Fn))
       return false;
@@ -2422,7 +2455,7 @@ bool SimplifyCFG::simplifyCheckedCastBranchBlock(CheckedCastBranchInst *CCBI) {
 bool SimplifyCFG::simplifyCheckedCastValueBranchBlock(
     CheckedCastValueBranchInst *CCBI) {
   // TODO: OSSA; handle cleanups for opaque cases (simplify_cfg_opaque.sil).
-  if (Fn.hasOwnership()) {
+  if (!EnableOSSARewriteTerminator && Fn.hasOwnership()) {
     return false;
   }
 
@@ -2681,8 +2714,6 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
 bool SimplifyCFG::simplifyTermWithIdenticalDestBlocks(SILBasicBlock *BB) {
   TrampolineDest commonDest;
   for (auto *SuccBlock : BB->getSuccessorBlocks()) {
-    if (SuccBlock->getNumArguments() != 0)
-      return false;
     auto trampolineDest = TrampolineDest(BB, SuccBlock);
     if (!trampolineDest) {
       return false;
@@ -2700,7 +2731,7 @@ bool SimplifyCFG::simplifyTermWithIdenticalDestBlocks(SILBasicBlock *BB) {
   TermInst *Term = BB->getTerminator();
   // TODO: OSSA; cleanup nontrivial terminator operands (if this ever actually
   // happens)
-  if (Fn.hasOwnership()) {
+  if (!EnableOSSARewriteTerminator && Fn.hasOwnership()) {
     if (llvm::any_of(Term->getOperandValues(), [this](SILValue op) {
           return !op->getType().isTrivial(Fn);
         })) {
@@ -2895,11 +2926,7 @@ bool SimplifyCFG::simplifyBlocks() {
 /// Canonicalize all switch_enum and switch_enum_addr instructions.
 /// If possible, replace the default with the corresponding unique case.
 bool SimplifyCFG::canonicalizeSwitchEnums() {
-  if (Fn.hasOwnership()) {
-    // TODO: OSSA. In OSSA, the default switch_enum case passes the
-    // original enum as a block argument. This needs to check that the block
-    // argument is dead, then replace it with the a new argument for the default
-    // payload.
+  if (!EnableOSSASimplifyCFG && Fn.hasOwnership()) {
     return false;
   }
   bool Changed = false;
@@ -2917,6 +2944,15 @@ bool SimplifyCFG::canonicalizeSwitchEnums() {
     if (!elementDecl)
       continue;
     
+    if (!EnableOSSARewriteTerminator && Fn.hasOwnership()) {
+      if (!SWI.getOperand()->getType().isTrivial(Fn)) {
+        // TODO: OSSA. In OSSA, the default switch_enum case passes the original
+        // enum as a block argument. This needs to check that the block argument
+        // is dead, then replace it with the a new argument for the default
+        // payload.
+        continue;
+      }
+    }
     LLVM_DEBUG(llvm::dbgs() << "simplify canonical switch_enum\n");
 
     // Construct a new instruction by copying all the case entries.
@@ -2925,9 +2961,25 @@ bool SimplifyCFG::canonicalizeSwitchEnums() {
       CaseBBs.push_back(SWI.getCase(idx));
     }
     // Add the default-entry of the original instruction as case-entry.
-    CaseBBs.push_back(std::make_pair(elementDecl.get(), SWI.getDefaultBB()));
+    auto *defaultBB = SWI.getDefaultBB();
+    CaseBBs.push_back(std::make_pair(elementDecl.get(), defaultBB));
 
     if (isa<SwitchEnumInst>(*SWI)) {
+      if (Fn.hasOwnership()) {
+        assert(defaultBB->getNumArguments() == 1);
+        defaultBB->getArgument(0)->replaceAllUsesWith(SWI.getOperand());
+        defaultBB->eraseArgument(0);
+        // TODO: handle non-trivial payloads. The new block argument must be
+        // destroyed. The old default argument may need to be copied. But it may
+        // also be possible to optimize the common case on-the-fly without the
+        // extra copy/destroy.
+        if (elementDecl.get()->hasAssociatedValues()) {
+          // Note: this is not really a phi.
+          auto elementTy = SWI.getOperand()->getType().getEnumElementType(
+              elementDecl.get(), Fn.getModule(), Fn.getTypeExpansionContext());
+          defaultBB->createPhiArgument(elementTy, OwnershipKind::None);
+        }
+      }
       SILBuilderWithScope(SWI).createSwitchEnum(SWI->getLoc(), SWI.getOperand(),
                                                 nullptr, CaseBBs);
     } else {
@@ -3003,7 +3055,7 @@ bool SimplifyCFG::tailDuplicateObjCMethodCallSuccessorBlocks() {
   // TODO: OSSA phi support. Even if all block arguments are trivial,
   // jump-threading may require creation of guaranteed phis, which may require
   // creation of nested borrow scopes.
-  if (Fn.hasOwnership()) {
+  if (!EnableOSSARewriteTerminator && Fn.hasOwnership()) {
     return false;
   }
   // Collect blocks to tail duplicate.
@@ -3212,7 +3264,7 @@ RemoveDeadArgsWhenSplitting("sroa-args-remove-dead-args-after",
                             llvm::cl::init(true));
 
 bool ArgumentSplitter::split() {
-  if (Arg->getFunction()->hasOwnership()) {
+  if (!EnableOSSARewriteTerminator && Arg->getFunction()->hasOwnership()) {
     // TODO: OSSA phi support
     if (!Arg->getType().isTrivial(*Arg->getFunction()))
       return false;
@@ -3338,6 +3390,16 @@ bool SimplifyCFG::run() {
   // First remove any block not reachable from the entry.
   bool Changed = removeUnreachableBlocks(Fn);
 
+  DeadEndBlocksAnalysis *deBlocksAnalysis =
+    PM->getAnalysis<DeadEndBlocksAnalysis>();
+  if (Changed) {
+    // Eliminate unreachable blocks from deBlocks. This isn't strictly necessary
+    // but avoids excess dangling pointers in deBlocks.
+    deBlocksAnalysis->invalidate(&Fn,
+                                 SILAnalysis::InvalidationKind::Everything);
+  }
+  deBlocks = deBlocksAnalysis->get(&Fn);
+
   // Find the set of loop headers. We don't want to jump-thread through headers.
   findLoopHeaders();
 
@@ -3356,11 +3418,15 @@ bool SimplifyCFG::run() {
 
   // Do simplifications that require the dominator tree to be accurate.
   DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
-
   if (Changed) {
     // Force dominator recomputation since we modified the cfg.
     DA->invalidate(&Fn, SILAnalysis::InvalidationKind::Everything);
+    // Eliminate unreachable blocks from deBlocks. This isn't strictly necessary
+    // but avoids excess dangling pointers in deBlocks.
+    deBlocksAnalysis->invalidate(&Fn,
+                                 SILAnalysis::InvalidationKind::Everything);
   }
+  deBlocks = deBlocksAnalysis->get(&Fn);
 
   Changed |= dominatorBasedSimplify(DA);
 
@@ -4004,7 +4070,7 @@ bool SimplifyCFG::simplifyArgs(SILBasicBlock *BB) {
   if (BB->pred_empty())
     return false;
 
-  if (Fn.hasOwnership()) {
+  if (!EnableOSSARewriteTerminator && Fn.hasOwnership()) {
     // TODO: OSSA phi support
     if (llvm::any_of(BB->getArguments(), [this](SILArgument *arg) {
           return !arg->getType().isTrivial(Fn);
