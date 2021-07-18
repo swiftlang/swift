@@ -1319,6 +1319,10 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
   // If we are supposed to use RequireOSSAModules, do so.
   genericSubInvocation.getSILOptions().EnableOSSAModules =
       bool(RequireOSSAModules);
+  if (LangOpts.DisableAvailabilityChecking) {
+    genericSubInvocation.getLangOptions().DisableAvailabilityChecking = true;
+    GenericArgs.push_back("-disable-availability-checking");
+  }
 }
 
 bool InterfaceSubContextDelegateImpl::extractSwiftInterfaceVersionAndArgs(
