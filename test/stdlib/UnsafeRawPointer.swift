@@ -238,7 +238,7 @@ UnsafeMutableRawPointerExtraTestSuite.test("absurd.allocation.misaligned") {
 
 UnsafeMutableRawPointerExtraTestSuite.test("absurd.allocation.gargantuan") {
   expectCrashLater()
-  let mustFail = UnsafeMutableRawPointer.allocate(byteCount: 400000000000000000,
+  let mustFail = UnsafeMutableRawPointer.allocate(byteCount: Int.max,
                                                   alignment: 0)
   expectUnreachable()
 }
