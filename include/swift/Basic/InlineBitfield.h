@@ -127,6 +127,8 @@ constexpr unsigned countBitsUsed(uint64_t arg) {
   return 64u - static_cast<unsigned>(__lzcnt64(arg));
 #elseif  defined(_M_ARM) || defined(_M_ARM64)
   return 64u - static_cast<unsigned>(_CountLeadingZeros64(arg));
+#elseif __has_builtin(__builtin_ctzll) || defined(__GNUC__)
+  return 64u - __builtin_clzll(static_cast<unsigned long long>(arg));
 #else
 # error unsupported architecture
 #endif
