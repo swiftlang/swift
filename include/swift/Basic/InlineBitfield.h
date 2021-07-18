@@ -123,7 +123,13 @@ constexpr unsigned bitmax(unsigned a, unsigned b) {
 constexpr unsigned countBitsUsed(uint64_t arg) {
 // Assumes uint64_t is the same as unsigned long long
 #if defined(_MSC_VER)
+#if defined(_M_AMD64)
   return 64u - static_cast<unsigned>(__lzcnt64(arg));
+#elseif  defined(_M_ARM) || defined(_M_ARM64)
+  return 64u - static_cast<unsigned>(_CountLeadingZeros64(arg));
+#else
+# error unsupported architecture
+#endif
 #else
   return 64u - __builtin_clzll(static_cast<unsigned long long>(arg));
 #endif
