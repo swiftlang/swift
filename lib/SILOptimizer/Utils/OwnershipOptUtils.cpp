@@ -101,6 +101,102 @@ insertOwnedBaseValueAlongBranchEdge(BranchInst *bi, SILValue innerCopy,
 }
 
 //===----------------------------------------------------------------------===//
+//                      Ownership RAUW Helper Functions
+//===----------------------------------------------------------------------===//
+
+// Determine whether it is valid to replace \p oldValue with \p newValue by
+// directly checking ownership requirements. This does not determine whether the
+// scope of the newValue can be fully extended.
+bool OwnershipRAUWHelper::hasValidRAUWOwnership(SILValue oldValue,
+                                                SILValue newValue) {
+  auto newOwnershipKind = newValue.getOwnershipKind();
+
+  // If our new kind is ValueOwnershipKind::None, then we are fine. We
+  // trivially support that. This check also ensures that we can always
+  // replace any value with a ValueOwnershipKind::None value.
+  if (newOwnershipKind == OwnershipKind::None)
+    return true;
+
+  // If our old ownership kind is ValueOwnershipKind::None and our new kind is
+  // not, we may need to do more work that has not been implemented yet. So
+  // bail.
+  //
+  // Due to our requirement that types line up, this can only occur given a
+  // non-trivial typed value with None ownership. This can only happen when
+  // oldValue is a trivial payloaded or no-payload non-trivially typed
+  // enum. That doesn't occur that often so we just bail on it today until we
+  // implement this functionality.
+  if (oldValue.getOwnershipKind() == OwnershipKind::None)
+    return false;
+
+  // First check if oldValue is SILUndef. If it is, then we know that:
+  //
+  // 1. SILUndef (and thus oldValue) must have OwnershipKind::None.
+  // 2. newValue is not OwnershipKind::None due to our check above.
+  //
+  // Thus we know that we would be replacing a value with OwnershipKind::None
+  // with a value with non-None ownership. This is a case we don't support, so
+  // we can bail now.
+  if (isa<SILUndef>(oldValue))
+    return false;
+
+  // Ok, we now know that we do not have SILUndef implying that we must be able
+  // to get a module from our value since we must have an argument or an
+  // instruction.
+  auto *m = oldValue->getModule();
+  assert(m);
+
+  // If we are in Raw SIL, just bail at this point. We do not support
+  // ownership fixups.
+  if (m->getStage() == SILStage::Raw)
+    return false;
+
+  return true;
+}
+
+// Determine whether it is valid to replace \p oldValue with \p newValue and
+// extend the lifetime of \p oldValue to cover the new uses.
+//
+// This updates the OwnershipFixupContext, populating transitiveBorrowedUses and
+// recursiveReborrows.
+static bool canFixUpOwnershipForRAUW(SILValue oldValue, SILValue newValue,
+                                     OwnershipFixupContext &context) {
+  if (!OwnershipRAUWHelper::hasValidRAUWOwnership(oldValue, newValue))
+    return false;
+
+  if (oldValue.getOwnershipKind() != OwnershipKind::Guaranteed)
+    return true;
+
+  // Check that the old lifetime can be extended and record the necessary
+  // book-keeping in the OwnershipFixupContext.
+  context.clear();
+
+  if (auto borrowedValue = BorrowedValue(oldValue)) {
+    // FIXME!!!: remove this logic and use BorrowedLifetimeExtender.
+    SmallPtrSet<SILValue, 4> reborrows;
+    auto visitReborrow = [&](Operand *endScope) {
+      auto borrowingOper = BorrowingOperand(endScope);
+      assert(borrowingOper.isReborrow());
+      if (reborrows.insert(
+              borrowingOper.getBorrowIntroducingUserResult().value).second) {
+        context.recursiveReborrows.push_back(endScope);
+      }
+    };
+    findTransitiveGuaranteedUses(oldValue, context.transitiveBorrowedUses,
+                                 visitReborrow);
+    for (unsigned idx = 0; idx < context.recursiveReborrows.size(); ++idx) {
+      findTransitiveGuaranteedUses(context.recursiveReborrows[idx].getValue(),
+                                   context.transitiveBorrowedUses,
+                                   visitReborrow);
+    }
+    return true;
+  }
+  // Check that an inner guaranteed value is not used by a PointerEscape.
+  SmallVector<Operand *, 16> usePoints;
+  return findInnerTransitiveGuaranteedUses(oldValue, usePoints);
+}
+
+//===----------------------------------------------------------------------===//
 //                          BorrowedLifetimeExtender
 //===----------------------------------------------------------------------===//
 
@@ -330,106 +426,6 @@ extendOverBorrowScopeAndConsume(SILValue ownedValue) {
     PhiValue ownedPhi = reborrowedToOwnedPhis[reborrowedPhi];
     destroyAtScopeEnd(ownedPhi, BorrowedValue(reborrowedPhi));
   }
-}
-
-//===----------------------------------------------------------------------===//
-//                      Ownership RAUW Helper Functions
-//===----------------------------------------------------------------------===//
-
-// Determine whether it is valid to replace \p oldValue with \p newValue by
-// directly checking ownership requirements. This does not determine whether the
-// scope of the newValue can be fully extended.
-bool OwnershipRAUWHelper::hasValidRAUWOwnership(SILValue oldValue,
-                                                SILValue newValue) {
-  auto newOwnershipKind = newValue.getOwnershipKind();
-
-  // If our new kind is ValueOwnershipKind::None, then we are fine. We
-  // trivially support that. This check also ensures that we can always
-  // replace any value with a ValueOwnershipKind::None value.
-  if (newOwnershipKind == OwnershipKind::None)
-    return true;
-
-  // If our old ownership kind is ValueOwnershipKind::None and our new kind is
-  // not, we may need to do more work that has not been implemented yet. So
-  // bail.
-  //
-  // Due to our requirement that types line up, this can only occur given a
-  // non-trivial typed value with None ownership. This can only happen when
-  // oldValue is a trivial payloaded or no-payload non-trivially typed
-  // enum. That doesn't occur that often so we just bail on it today until we
-  // implement this functionality.
-  if (oldValue.getOwnershipKind() == OwnershipKind::None)
-    return false;
-
-  // First check if oldValue is SILUndef. If it is, then we know that:
-  //
-  // 1. SILUndef (and thus oldValue) must have OwnershipKind::None.
-  // 2. newValue is not OwnershipKind::None due to our check above.
-  //
-  // Thus we know that we would be replacing a value with OwnershipKind::None
-  // with a value with non-None ownership. This is a case we don't support, so
-  // we can bail now.
-  if (isa<SILUndef>(oldValue))
-    return false;
-
-  // Ok, we now know that we do not have SILUndef implying that we must be able
-  // to get a module from our value since we must have an argument or an
-  // instruction.
-  auto *m = oldValue->getModule();
-  assert(m);
-
-  // If we are in Raw SIL, just bail at this point. We do not support
-  // ownership fixups.
-  if (m->getStage() == SILStage::Raw)
-    return false;
-
-  return true;
-}
-
-// Determine whether it is valid to replace \p oldValue with \p newValue and
-// extend the lifetime of \p oldValue to cover the new uses.
-//
-// This updates the OwnershipFixupContext, populating transitiveBorrowedUses and
-// recursiveReborrows.
-static bool canFixUpOwnershipForRAUW(SILValue oldValue, SILValue newValue,
-                                     OwnershipFixupContext &context) {
-  if (!OwnershipRAUWHelper::hasValidRAUWOwnership(oldValue, newValue))
-    return false;
-
-  if (oldValue.getOwnershipKind() != OwnershipKind::Guaranteed)
-    return true;
-
-  // Check that the old lifetime can be extended and record the necessary
-  // book-keeping in the OwnershipFixupContext.
-  context.clear();
-
-  // Note: The following code is the same logic as
-  // findExtendedTransitiveGuaranteedUses(), but it handles the reborrows
-  // itself to maintain book-keeping. This is intended to be moved into a
-  // different utility in a follow-up commit.
-  SmallSetVector<SILValue, 4> reborrows;
-  auto visitReborrow = [&](Operand *endScope) {
-    auto borrowingOper = BorrowingOperand(endScope);
-    assert(borrowingOper.isReborrow());
-    // TODO: if non-phi reborrows ever exist, handle them using a separate
-    // SILValue list since we don't want to refer directly to phi SILValues.
-    reborrows.insert(borrowingOper.getBorrowIntroducingUserResult().value);
-    context.recursiveReborrows.push_back(endScope);
-  };
-  if (!findTransitiveGuaranteedUses(oldValue, context.transitiveBorrowedUses,
-                                    visitReborrow))
-    return false;
-
-  for (unsigned idx = 0; idx < reborrows.size(); ++idx) {
-    bool result =
-      findTransitiveGuaranteedUses(reborrows[idx],
-                                   context.transitiveBorrowedUses,
-                                   visitReborrow);
-    // It is impossible to find a Pointer escape while traversing reborrows.
-    assert(result && "visiting reborrows always succeeds");
-    (void)result;
-  }
-  return true;
 }
 
 //===----------------------------------------------------------------------===//
