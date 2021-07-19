@@ -148,6 +148,10 @@ struct OwnershipFixupContext {
   InstModCallbacks &callbacks;
   DeadEndBlocks &deBlocks;
 
+  // Cache the use-points for the lifetime of an inner guaranteed value (which
+  // does not introduce a borrow scope) after checking validity. These will be
+  // used again to extend the lifetime of the replacement value.
+  SmallVector<Operand *, 8> guaranteedUsePoints;
 
   // FIXME: remove these two vectors once BorrowedLifetimeExtender is used
   // everywhere.
@@ -162,6 +166,8 @@ struct OwnershipFixupContext {
     /// compute all transitive address uses of oldValue. If we find that we do
     /// need this fixed up, then we will copy our interior pointer base value
     /// and use this to seed that new lifetime.
+    ///
+    /// FIXME: shouldn't these already be covered by guaranteedUsePoints?
     SmallVector<Operand *, 8> allAddressUsesFromOldValue;
 
     /// This is the interior pointer (e.g. ref_element_addr)
@@ -184,6 +190,7 @@ struct OwnershipFixupContext {
       : callbacks(callbacks), deBlocks(deBlocks) {}
 
   void clear() {
+    guaranteedUsePoints.clear();
     transitiveBorrowedUses.clear();
     recursiveReborrows.clear();
     extraAddressFixupInfo.allAddressUsesFromOldValue.clear();
