@@ -5859,6 +5859,10 @@ public:
 
     return ConjunctionElement(Elements[Index++]);
   }
+
+  bool needsToComputeNext() const override { return false; }
+
+  bool isExhausted() const override { return Index >= Elements.size(); }
 };
 
 /// Determine whether given type is a known one
