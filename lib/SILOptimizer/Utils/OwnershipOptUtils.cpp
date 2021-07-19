@@ -448,13 +448,6 @@ struct OwnershipLifetimeExtender {
   CopyValueInst *createPlusOneCopy(SILValue value,
                                    SILInstruction *consumingPoint);
 
-  /// Create a new borrow scope for \p newValue that is cleaned up along all
-  /// paths that do not go through consuming point. The caller is expected to
-  /// consumg \p newValue at \p consumingPoint since we insert a destroy_value
-  /// right after wards.
-  BeginBorrowInst *createPlusOneBorrow(SILValue newValue,
-                                       SILInstruction *consumingPoint);
-
   /// Create a copy of \p value that covers all of \p range and insert all
   /// needed destroy_values. We assume that no uses in \p range consume \p
   /// value.
@@ -484,6 +477,14 @@ struct OwnershipLifetimeExtender {
                                         ArrayRef<Operand *> range) {
     return createPlusZeroBorrow<ArrayRef<Operand *>>(value, range);
   }
+  // --- FIXME!!! remove the following (replaced by BorrowedLifetimeExtender)
+
+  /// Create a new borrow scope for \p newValue that is cleaned up along all
+  /// paths that do not go through consuming point. The caller is expected to
+  /// consumg \p newValue at \p consumingPoint since we insert a destroy_value
+  /// right after wards.
+  BeginBorrowInst *originalCreatePlusOneBorrow(SILValue newValue,
+                                               SILInstruction *consumingPoint);
 };
 
 } // end anonymous namespace
@@ -528,57 +529,6 @@ OwnershipLifetimeExtender::createPlusOneCopy(SILValue value,
       [&](SILBasicBlock *postDomBlock) {
         auto front = postDomBlock->begin();
         SILBuilderWithScope newBuilder(front);
-        auto *dvi = newBuilder.createDestroyValue(front->getLoc(), copy);
-        callbacks.createdNewInst(dvi);
-      });
-  return result;
-}
-
-BeginBorrowInst *
-OwnershipLifetimeExtender::createPlusOneBorrow(SILValue value,
-                                               SILInstruction *consumingPoint) {
-  auto *newValInsertPt = value->getDefiningInsertionPoint();
-  assert(newValInsertPt);
-  CopyValueInst *copy;
-  BeginBorrowInst *borrow;
-  if (!isa<SILArgument>(value)) {
-    SILBuilderWithScope::insertAfter(newValInsertPt, [&](SILBuilder &builder) {
-      copy = builder.createCopyValue(builder.getInsertionPointLoc(), value);
-      borrow = builder.createBeginBorrow(builder.getInsertionPointLoc(), copy);
-    });
-  } else {
-    SILBuilderWithScope builder(newValInsertPt);
-    copy = builder.createCopyValue(newValInsertPt->getLoc(), value);
-    borrow = builder.createBeginBorrow(newValInsertPt->getLoc(), copy);
-  }
-
-  auto &callbacks = ctx.callbacks;
-  callbacks.createdNewInst(copy);
-  callbacks.createdNewInst(borrow);
-
-  auto *result = borrow;
-  findJointPostDominatingSet(
-      newValInsertPt->getParent(), consumingPoint->getParent(),
-      // inputBlocksFoundDuringWalk.
-      [&](SILBasicBlock *loopBlock) {
-        // This must be consumingPoint->getParent() since we only have one
-        // consuming use. In this case, we know that this is the consuming
-        // point where we will need a control equivalent copy_value (and that
-        // destroy_value will be put for the out of loop value as appropriate.
-        assert(loopBlock == consumingPoint->getParent());
-        auto front = loopBlock->begin();
-        SILBuilderWithScope newBuilder(front);
-        result = newBuilder.createBeginBorrow(front->getLoc(), borrow);
-        callbacks.createdNewInst(result);
-
-        llvm_unreachable("Should never visit this!");
-      },
-      // Input blocks in joint post dom set. We don't care about thse.
-      [&](SILBasicBlock *postDomBlock) {
-        auto front = postDomBlock->begin();
-        SILBuilderWithScope newBuilder(front);
-        auto *ebi = newBuilder.createEndBorrow(front->getLoc(), borrow);
-        callbacks.createdNewInst(ebi);
         auto *dvi = newBuilder.createDestroyValue(front->getLoc(), copy);
         callbacks.createdNewInst(dvi);
       });
@@ -672,6 +622,58 @@ OwnershipLifetimeExtender::createPlusZeroBorrow(SILValue newValue,
   }
 
   return borrow;
+}
+
+
+// TODO: replace with borrowOverValue/borrowOverSingleUse
+BeginBorrowInst *OwnershipLifetimeExtender::originalCreatePlusOneBorrow(
+    SILValue value, SILInstruction *consumingPoint) {
+  auto *newValInsertPt = value->getDefiningInsertionPoint();
+  assert(newValInsertPt);
+  CopyValueInst *copy;
+  BeginBorrowInst *borrow;
+  if (!isa<SILArgument>(value)) {
+    SILBuilderWithScope::insertAfter(newValInsertPt, [&](SILBuilder &builder) {
+      copy = builder.createCopyValue(builder.getInsertionPointLoc(), value);
+      borrow = builder.createBeginBorrow(builder.getInsertionPointLoc(), copy);
+    });
+  } else {
+    SILBuilderWithScope builder(newValInsertPt);
+    copy = builder.createCopyValue(newValInsertPt->getLoc(), value);
+    borrow = builder.createBeginBorrow(newValInsertPt->getLoc(), copy);
+  }
+
+  auto &callbacks = ctx.callbacks;
+  callbacks.createdNewInst(copy);
+  callbacks.createdNewInst(borrow);
+
+  auto *result = borrow;
+  findJointPostDominatingSet(
+      newValInsertPt->getParent(), consumingPoint->getParent(),
+      // inputBlocksFoundDuringWalk.
+      [&](SILBasicBlock *loopBlock) {
+        // This must be consumingPoint->getParent() since we only have one
+        // consuming use. In this case, we know that this is the consuming
+        // point where we will need a control equivalent copy_value (and that
+        // destroy_value will be put for the out of loop value as appropriate.
+        assert(loopBlock == consumingPoint->getParent());
+        auto front = loopBlock->begin();
+        SILBuilderWithScope newBuilder(front);
+        result = newBuilder.createBeginBorrow(front->getLoc(), borrow);
+        callbacks.createdNewInst(result);
+
+        llvm_unreachable("Should never visit this!");
+      },
+      // Input blocks in joint post dom set. We don't care about thse.
+      [&](SILBasicBlock *postDomBlock) {
+        auto front = postDomBlock->begin();
+        SILBuilderWithScope newBuilder(front);
+        auto *ebi = newBuilder.createEndBorrow(front->getLoc(), borrow);
+        callbacks.createdNewInst(ebi);
+        auto *dvi = newBuilder.createDestroyValue(front->getLoc(), copy);
+        callbacks.createdNewInst(dvi);
+      });
+  return result;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1238,7 +1240,8 @@ SILBasicBlock::iterator SingleUseReplacementUtility::handleGuaranteed() {
     } else {
       // If we didn't have a reborrow and still had a lifetime ending use,
       // handle it.
-      SILValue borrow = extender.createPlusOneBorrow(newValue, use->getUser());
+      SILValue borrow =
+          extender.originalCreatePlusOneBorrow(newValue, use->getUser());
       // Then replace use->get() with this copy. We will insert compensating end
       // scope instructions on use->get() if we need to.
       return replaceSingleUse(use, borrow, ctx.callbacks);
