@@ -2197,6 +2197,9 @@ Constraint *ConstraintSystem::selectDisjunction() {
 
 Constraint *ConstraintSystem::selectConjunction() {
   for (auto &constraint : InactiveConstraints) {
+    if (constraint.isDisabled())
+      continue;
+
     if (constraint.getKind() == ConstraintKind::Conjunction)
       return &constraint;
   }
