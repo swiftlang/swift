@@ -1,5 +1,11 @@
 // RUN: %target-sil-opt -enable-sil-verify-all %s -simplify-cfg | %FileCheck %s
 
+// Tests dominator-based simplification with OSSA. This does not
+// require -jumpthread-simplify-cfg, which enabled jump-threading
+// within dominator-based simplification.
+
+// Includes the OSSA form of tests from simplify_cfg_unique_values.sil.
+
 sil_stage canonical
 
 import Builtin

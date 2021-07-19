@@ -183,7 +183,7 @@ public:
 
   /// Return the terminator instruction for which this argument is a result,
   /// otherwise return nullptr.
-  TermInst *getTerminatorForResultArg() const;
+  TermInst *getTerminatorForResult() const;
 
   /// Return the SILArgumentKind of this argument.
   SILArgumentKind getKind() const {
@@ -299,7 +299,7 @@ public:
 
   /// Return the terminator instruction for which this argument is a result,
   /// otherwise return nullptr.
-  TermInst *getTerminatorForResultArg() const;
+  TermInst *getTerminatorForResult() const;
 
   static bool classof(const SILInstruction *) = delete;
   static bool classof(const SILUndef *) = delete;
@@ -445,10 +445,10 @@ inline TermInst *SILArgument::getSingleTerminator() const {
   llvm_unreachable("Covered switch is not covered?!");
 }
 
-inline TermInst *SILArgument::getTerminatorForResultArg() const {
+inline TermInst *SILArgument::getTerminatorForResult() const {
   switch (getKind()) {
   case SILArgumentKind::SILPhiArgument:
-    return cast<SILPhiArgument>(this)->getTerminatorForResultArg();
+    return cast<SILPhiArgument>(this)->getTerminatorForResult();
   case SILArgumentKind::SILFunctionArgument:
     return nullptr;
   }

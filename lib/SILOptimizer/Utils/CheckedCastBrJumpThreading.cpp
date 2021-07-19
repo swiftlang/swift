@@ -42,6 +42,16 @@ class CheckedCastBrJumpThreading {
   // Dominator information to be used.
   DominanceInfo *DT;
 
+  // DeadEndBlocks is used by OwnershipRAUW and incrementally updated within
+  // CheckedCastBrJumpThreading.
+  //
+  // TODO: incrementally update dead-end blocks during SimplifyCFG so it doesn't
+  // need to be recomputed each time tryCheckedCastBrJumpThreading is called.
+  DeadEndBlocks *deBlocks;
+
+  // Enable non-trivial terminator rewriting in OSSA.
+  bool EnableOSSARewriteTerminator;
+
   // List of predecessors.
   typedef SmallVector<SILBasicBlock *, 8> PredList;
 
@@ -119,10 +129,14 @@ class CheckedCastBrJumpThreading {
   bool trySimplify(CheckedCastBranchInst *CCBI);
 
 public:
-  CheckedCastBrJumpThreading(SILFunction *Fn, DominanceInfo *DT,
-                             SmallVectorImpl<SILBasicBlock *> &BlocksForWorklist)
-      : Fn(Fn), DT(DT), BlocksForWorklist(BlocksForWorklist),
-        BlocksToEdit(Fn), BlocksToClone(Fn) { }
+  CheckedCastBrJumpThreading(
+      SILFunction *Fn, DominanceInfo *DT, DeadEndBlocks *deBlocks,
+      SmallVectorImpl<SILBasicBlock *> &BlocksForWorklist,
+      bool EnableOSSARewriteTerminator)
+      : Fn(Fn), DT(DT), deBlocks(deBlocks),
+        EnableOSSARewriteTerminator(EnableOSSARewriteTerminator),
+        BlocksForWorklist(BlocksForWorklist), BlocksToEdit(Fn),
+        BlocksToClone(Fn) {}
 
   void optimizeFunction();
 };
@@ -486,6 +500,11 @@ areEquivalentConditionsAlongPaths(CheckedCastBranchInst *DomCCBI) {
 /// Try performing a dominator-based jump-threading for
 /// checked_cast_br instructions.
 bool CheckedCastBrJumpThreading::trySimplify(CheckedCastBranchInst *CCBI) {
+  if (!EnableOSSARewriteTerminator && Fn->hasOwnership()
+      && !CCBI->getOperand()->getType().isTrivial(*Fn)) {
+    return false;
+  }
+
   // Init information about the checked_cast_br we try to
   // jump-thread.
   BB = CCBI->getParent();
@@ -661,7 +680,7 @@ void CheckedCastBrJumpThreading::optimizeFunction() {
     Fn->verifyCriticalEdges();
 
   for (Edit *edit : Edits) {
-    BasicBlockCloner Cloner(edit->CCBBlock);
+    BasicBlockCloner Cloner(edit->CCBBlock, deBlocks);
     if (!Cloner.canCloneBlock())
       continue;
 
@@ -685,9 +704,14 @@ void CheckedCastBrJumpThreading::optimizeFunction() {
 
 namespace swift {
 
-bool tryCheckedCastBrJumpThreading(SILFunction *Fn, DominanceInfo *DT,
-                        SmallVectorImpl<SILBasicBlock *> &BlocksForWorklist) {
-  CheckedCastBrJumpThreading CCBJumpThreading(Fn, DT, BlocksForWorklist);
+bool tryCheckedCastBrJumpThreading(
+    SILFunction *Fn, DominanceInfo *DT, DeadEndBlocks *deBlocks,
+    SmallVectorImpl<SILBasicBlock *> &BlocksForWorklist,
+    bool EnableOSSARewriteTerminator) {
+
+  CheckedCastBrJumpThreading CCBJumpThreading(Fn, DT, deBlocks,
+                                              BlocksForWorklist,
+                                              EnableOSSARewriteTerminator);
   CCBJumpThreading.optimizeFunction();
   return !BlocksForWorklist.empty();
 }

@@ -12,12 +12,12 @@ sil @sink : $@convention(thin) (Int64, Int64, Int64, Int64) -> ()
 
 // Check if SimplifyCFG can optimize this function in reasonable time.
 
-// CHECK-LABEL: sil @testit
+// CHECK-LABEL: sil [ossa] @testit
 
 // Check if there are not too many basic blocks generated.
 // CHECK-NOT: bb1000:
 
-sil @testit : $@convention(thin) (Int64, Int64, Int64, Int64, Int64, Int64) -> () {
+sil [ossa] @testit : $@convention(thin) (Int64, Int64, Int64, Int64, Int64, Int64) -> () {
 bb0(%0 : $Int64, %1 : $Int64, %2 : $Int64, %3 : $Int64, %4 : $Int64, %5 : $Int64):
   %12 = integer_literal $Builtin.Int64, 2
   %13 = struct_extract %0 : $Int64, #Int64._value

@@ -63,8 +63,16 @@ class EquivalenceClass {
   /// The most specific superclass constraint this type satisfies.
   Optional<Atom> Superclass;
 
+  /// All concrete conformances of Superclass to the protocols in the
+  /// ConformsTo list.
+  llvm::TinyPtrVector<ProtocolConformance *> SuperclassConformances;
+
   /// The most specific concrete type constraint this type satisfies.
   Optional<Atom> ConcreteType;
+
+  /// All concrete conformances of ConcreteType to the protocols in the
+  /// ConformsTo list.
+  llvm::TinyPtrVector<ProtocolConformance *> ConcreteConformances;
 
   explicit EquivalenceClass(const MutableTerm &key) : Key(key) {}
 
@@ -117,6 +125,9 @@ public:
   ArrayRef<const ProtocolDecl *> getConformsTo() const {
     return ConformsTo;
   }
+
+  llvm::TinyPtrVector<const ProtocolDecl *>
+  getConformsToExcludingSuperclassConformances() const;
 };
 
 /// Stores all rewrite rules of the form T.[p] => T, where [p] is a property
@@ -167,6 +178,7 @@ private:
                    const MutableTerm &key, RequirementKind requirementKind,
                    CanType concreteType, ArrayRef<Term> substitutions,
                    ArrayRef<const ProtocolDecl *> conformsTo,
+                   llvm::TinyPtrVector<ProtocolConformance *> &conformances,
                    SmallVectorImpl<std::pair<MutableTerm, MutableTerm>> &inducedRules) const;
 
   MutableTerm computeConstraintTermForTypeWitness(
