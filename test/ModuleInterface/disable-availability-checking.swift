@@ -1,4 +1,4 @@
-// REQUIRES: OS=macosx
+// REQUIRES: OS=macosx && CPU=x86_64
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/inputs)
 // RUN: %empty-directory(%t/modulecache)
