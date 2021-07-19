@@ -3636,9 +3636,10 @@ bool SILFunctionType::hasSameExtInfoAs(const SILFunctionType *otherFn) {
 }
 
 FunctionType *
-GenericFunctionType::substGenericArgs(SubstitutionMap subs) {
+GenericFunctionType::substGenericArgs(SubstitutionMap subs,
+                                      SubstOptions options) {
   return substGenericArgs(
-    [=](Type t) { return t.subst(subs); });
+    [=](Type t) { return t.subst(subs, options); });
 }
 
 FunctionType *GenericFunctionType::substGenericArgs(
