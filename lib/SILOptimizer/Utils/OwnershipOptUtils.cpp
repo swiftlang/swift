@@ -489,9 +489,14 @@ struct OwnershipLifetimeExtender {
 
 } // end anonymous namespace
 
-// Lifetime extend newValue over owned oldValue assuming that our copy will have
-// its lifetime ended by oldValue's lifetime ending uses after RAUWing by our
-// caller.
+/// Lifetime extend \p value over \p consumingPoint, assuming that \p
+/// consumingPoint will consume \p value after the client performs replacement
+/// (this implicit destruction on the caller-side makes it a "plus-one"
+/// copy). Destroy \p copy on all paths that don't reach \p consumingPoint.
+///
+/// Precondition: \p value is owned
+///
+/// Precondition: \p consumingPoint is dominated by \p value
 CopyValueInst *
 OwnershipLifetimeExtender::createPlusOneCopy(SILValue value,
                                              SILInstruction *consumingPoint) {
@@ -504,28 +509,23 @@ OwnershipLifetimeExtender::createPlusOneCopy(SILValue value,
 
   auto *result = copy;
   findJointPostDominatingSet(
-      copyPoint->getParent(), consumingPoint->getParent(),
+      copy->getParent(), consumingPoint->getParent(),
       // inputBlocksFoundDuringWalk.
       [&](SILBasicBlock *loopBlock) {
-        // This must be consumingPoint->getParent() since we only have one
-        // consuming use. In this case, we know that this is the consuming
-        // point where we will need a control equivalent copy_value (and that
-        // destroy_value will be put for the out of loop value as appropriate.
-        assert(loopBlock == consumingPoint->getParent());
-        auto front = loopBlock->begin();
-        SILBuilderWithScope newBuilder(front);
-
         // Create an extra copy when the consuming point is inside a
         // loop and both copyPoint and the destroy points are outside the
         // loop. This copy will be consumed in the same block. The original
         // value will be destroyed on all paths exiting the loop.
         //
         // Since copyPoint dominates consumingPoint, it must be outside the
-        // loop. Otherwise backward traversal would have stopped at copyPoint.
+        // loop. Otherwise backward traversal would have stopped at copyPoint
+        assert(loopBlock == consumingPoint->getParent());
+        auto front = loopBlock->begin();
+        SILBuilderWithScope newBuilder(front);
         result = newBuilder.createCopyValue(front->getLoc(), copy);
         callbacks.createdNewInst(result);
       },
-      // Input blocks in joint post dom set. We don't care about thse.
+      // Leaky blocks that never reach consumingPoint.
       [&](SILBasicBlock *postDomBlock) {
         auto front = postDomBlock->begin();
         SILBuilderWithScope newBuilder(front);
