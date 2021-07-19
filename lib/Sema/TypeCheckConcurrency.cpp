@@ -3225,6 +3225,26 @@ ActorIsolation ActorIsolationRequest::evaluate(
     return inferred;
   };
 
+  // If this is a "defer" function body, inherit the global actor isolation
+  // from its context.
+  if (auto func = dyn_cast<FuncDecl>(value)) {
+    if (func->isDeferBody()) {
+      switch (auto enclosingIsolation =
+                  getActorIsolationOfContext(func->getDeclContext())) {
+      case ActorIsolation::ActorInstance:
+      case ActorIsolation::DistributedActorInstance:
+      case ActorIsolation::Independent:
+      case ActorIsolation::Unspecified:
+        // Do nothing.
+        break;
+
+      case ActorIsolation::GlobalActor:
+      case ActorIsolation::GlobalActorUnsafe:
+        return inferredIsolation(enclosingIsolation);
+      }
+    }
+  }
+
   // If the declaration overrides another declaration, it must have the same
   // actor isolation.
   if (auto overriddenValue = value->getOverriddenDecl()) {
