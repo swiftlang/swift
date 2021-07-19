@@ -105,9 +105,10 @@ insertOwnedBaseValueAlongBranchEdge(BranchInst *bi, SILValue innerCopy,
 //===----------------------------------------------------------------------===//
 
 // Determine whether it is valid to replace \p oldValue with \p newValue by
-// directly checking ownership requirements. This does not determine whether
-// the scope of the newValue can be fully extended.
-static bool hasValidRAUWOwnership(SILValue oldValue, SILValue newValue) {
+// directly checking ownership requirements. This does not determine whether the
+// scope of the newValue can be fully extended.
+bool OwnershipRAUWHelper::hasValidRAUWOwnership(SILValue oldValue,
+                                                SILValue newValue) {
   auto newOwnershipKind = newValue.getOwnershipKind();
 
   // If our new kind is ValueOwnershipKind::None, then we are fine. We
@@ -160,7 +161,7 @@ static bool hasValidRAUWOwnership(SILValue oldValue, SILValue newValue) {
 // recursiveReborrows.
 static bool canFixUpOwnershipForRAUW(SILValue oldValue, SILValue newValue,
                                      OwnershipFixupContext &context) {
-  if (!hasValidRAUWOwnership(oldValue, newValue))
+  if (!OwnershipRAUWHelper::hasValidRAUWOwnership(oldValue, newValue))
     return false;
 
   if (oldValue.getOwnershipKind() != OwnershipKind::Guaranteed)
@@ -178,7 +179,7 @@ static bool canFixUpOwnershipForRAUW(SILValue oldValue, SILValue newValue,
   auto visitReborrow = [&](Operand *endScope) {
     auto borrowingOper = BorrowingOperand(endScope);
     assert(borrowingOper.isReborrow());
-    // TODO: if non-phi reborrows even exist, handle them using a separate
+    // TODO: if non-phi reborrows ever exist, handle them using a separate
     // SILValue list since we don't want to refer directly to phi SILValues.
     reborrows.insert(borrowingOper.getBorrowIntroducingUserResult().value);
     context.recursiveReborrows.push_back(endScope);
@@ -419,6 +420,9 @@ OwnershipLifetimeExtender::createPlusZeroBorrow(SILValue newValue,
   }
   assert(copy && borrow);
 
+  // We don't expect an empty useRange. If it happens, then the newly created
+  // copy will never be destroyed.
+  assert(!useRange.empty());
   auto opRange = makeUserRange(useRange);
   ValueLifetimeAnalysis lifetimeAnalysis(copy, opRange);
   ValueLifetimeAnalysis::Frontier frontier;
@@ -593,9 +597,19 @@ rewriteReborrows(SILValue newBorrowedValue,
 namespace {
 
 struct OwnershipRAUWUtility {
-  SingleValueInstruction *oldValue;
+  SILValue oldValue;
   SILValue newValue;
   OwnershipFixupContext &ctx;
+
+  // For terminator results, the consuming point is the predecessor's
+  // terminator. This avoids destroys on unused paths. It is also the
+  // instruction which will be deleted, thus needs operand cleanup.
+  SILInstruction *getConsumingPoint() const {
+    if (auto *blockArg = dyn_cast<SILPhiArgument>(oldValue))
+      return blockArg->getTerminatorForResult();
+
+    return cast<SingleValueInstruction>(oldValue);
+  }
 
   SILBasicBlock::iterator handleUnowned();
 
@@ -654,7 +668,6 @@ SILBasicBlock::iterator OwnershipRAUWUtility::handleUnowned() {
     auto extender = getLifetimeExtender();
     SILValue borrow =
         extender.createPlusZeroBorrow(newValue, oldValue->getUses());
-    SILBuilderWithScope builder(oldValue);
     return replaceAllUsesAndErase(oldValue, borrow, callbacks);
   }
   case OwnershipKind::Owned: {
@@ -684,7 +697,6 @@ SILBasicBlock::iterator OwnershipRAUWUtility::handleUnowned() {
     }
     auto extender = getLifetimeExtender();
     SILValue copy = extender.createPlusZeroCopy(newValue, oldValue->getUses());
-    SILBuilderWithScope builder(oldValue);
     auto result = replaceAllUsesAndErase(oldValue, copy, callbacks);
     return result;
   }
@@ -746,7 +758,7 @@ SILBasicBlock::iterator OwnershipRAUWUtility::handleGuaranteed() {
 
 SILBasicBlock::iterator OwnershipRAUWUtility::perform() {
   assert(oldValue->getFunction()->hasOwnership());
-  assert(hasValidRAUWOwnership(oldValue, newValue) &&
+  assert(OwnershipRAUWHelper::hasValidRAUWOwnership(oldValue, newValue) &&
       "Should have checked if can perform this operation before calling it?!");
   // If our new value is just none, we can pass anything to do it so just RAUW
   // and return.
@@ -754,9 +766,9 @@ SILBasicBlock::iterator OwnershipRAUWUtility::perform() {
   // NOTE: This handles RAUWing with undef.
   if (newValue.getOwnershipKind() == OwnershipKind::None)
     return replaceAllUsesAndErase(oldValue, newValue, ctx.callbacks);
-  assert(SILValue(oldValue).getOwnershipKind() != OwnershipKind::None);
+  assert(oldValue.getOwnershipKind() != OwnershipKind::None);
 
-  switch (SILValue(oldValue).getOwnershipKind()) {
+  switch (oldValue.getOwnershipKind()) {
   case OwnershipKind::None:
     // If our old value was none and our new value is not, we need to do
     // something more complex that we do not support yet, so bail. We should
@@ -770,11 +782,12 @@ SILBasicBlock::iterator OwnershipRAUWUtility::perform() {
   case OwnershipKind::Owned: {
     // If we have an owned value that we want to replace with a value with any
     // other non-None ownership, we need to copy the other value for a
-    // lifetimeEnding RAUW, then RAUW the value, and insert a destroy_value on
+    // lifetimeEnding RAUW, RAUW the value, and insert a destroy_value of
     // the original value.
     auto extender = getLifetimeExtender();
-    SILValue copy = extender.createPlusOneCopy(newValue, oldValue);
-    cleanupOperandsBeforeDeletion(oldValue, ctx.callbacks);
+    auto *consumingPoint = getConsumingPoint();
+    SILValue copy = extender.createPlusOneCopy(newValue, consumingPoint);
+    cleanupOperandsBeforeDeletion(consumingPoint, ctx.callbacks);
     auto result = replaceAllUsesAndErase(oldValue, copy, ctx.callbacks);
     return result;
   }
@@ -844,7 +857,7 @@ OwnershipRAUWHelper::replaceAddressUses(SingleValueInstruction *oldValue,
 //===----------------------------------------------------------------------===//
 
 OwnershipRAUWHelper::OwnershipRAUWHelper(OwnershipFixupContext &inputCtx,
-                                         SingleValueInstruction *inputOldValue,
+                                         SILValue inputOldValue,
                                          SILValue inputNewValue)
     : ctx(&inputCtx), oldValue(inputOldValue), newValue(inputNewValue) {
   // If we are already not valid, just bail.
@@ -855,6 +868,14 @@ OwnershipRAUWHelper::OwnershipRAUWHelper(OwnershipFixupContext &inputCtx,
   // and leave the object valid.
   if (!oldValue->getFunction()->hasOwnership())
     return;
+
+  // This utility currently only handles erasing SingleValueInstructions and
+  // terminator results.
+  assert(isa<SingleValueInstruction>(inputOldValue)
+         || cast<SILPhiArgument>(inputOldValue)->isTerminatorResult());
+
+  // Clear the context before populating it anew.
+  ctx->clear();
 
   // Otherwise, lets check if we can perform this RAUW operation. If we can't,
   // set ctx to nullptr to invalidate the helper and return.
@@ -978,9 +999,11 @@ OwnershipRAUWHelper::perform(SingleValueInstruction *maybeTransformedNewValue) {
   // Make sure to always clear our context after we transform.
   SWIFT_DEFER { ctx->clear(); };
 
-  if (oldValue->getType().isAddress())
-    return replaceAddressUses(oldValue, actualNewValue);
-
+  if (oldValue->getType().isAddress()) {
+    assert(isa<SingleValueInstruction>(oldValue)
+           && "block argument cannot be an address");
+    return replaceAddressUses(cast<SingleValueInstruction>(oldValue), newValue);
+  }
   OwnershipRAUWUtility utility{oldValue, actualNewValue, *ctx};
   return utility.perform();
 }
@@ -1199,10 +1222,14 @@ OwnershipReplaceSingleUseHelper::OwnershipReplaceSingleUseHelper(
 
   // Otherwise, lets check if we can perform this RAUW operation. If we can't,
   // set ctx to nullptr to invalidate the helper and return.
-  if (!hasValidRAUWOwnership(use->get(), newValue)) {
+  if (!OwnershipRAUWHelper::hasValidRAUWOwnership(use->get(), newValue)) {
     ctx = nullptr;
     return;
   }
+
+  // FIXME:!!! If this does not use canFixUpOwnershipForRAUW, then it needs to
+  // do the equivalent safety checks. At least ensure that the use is not a
+  // PointerEscape. But we should put that check behind a standard utility.
 
   // Then see if our use is a lifetime ending use of a guaranteed value that is
   // a reborrow.
