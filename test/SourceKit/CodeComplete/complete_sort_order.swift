@@ -1,5 +1,3 @@
-// REQUIRES: rdar80729544
-
 func foo(a a: String) {}
 func foo(a a: Int) {}
 func foo(b b: Int) {}
@@ -15,15 +13,14 @@ func test() {
 // RUN: %FileCheck -check-prefix=NAME_UNSORTED %s < %t.orig.off
 // RUN: not %diff -u %t.orig %t.orig.off
 
-// Make sure the order is as below, foo(Int) should come before foo(String).
-// NAME_SORTED: key.description: "#column"
-// NAME_SORTED: key.description: "foo(a: Int)"
-// NAME_SORTED-NOT: key.description
-// NAME_SORTED: key.description: "foo(a: String)"
-// NAME_SORTED-NOT: key.description
-// NAME_SORTED: key.description: "foo(b: Int)"
-// NAME_SORTED: key.description: "test()"
-// NAME_SORTED: key.description: "x"
+// NAME_SORTED: key.name: "#column"
+// NAME_SORTED: key.name: "foo(a:)"
+// NAME_SORTED-NOT: key.name:
+// NAME_SORTED: key.name: "foo(a:)"
+// NAME_SORTED-NOT: key.name:
+// NAME_SORTED: key.name: "foo(b:)"
+// NAME_SORTED: key.name: "test()"
+// NAME_SORTED: key.name: "x"
 
 // NAME_UNSORTED-DAG: key.description: "x"
 // NAME_UNSORTED-DAG: key.description: "foo(a: String)"
