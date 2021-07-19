@@ -556,6 +556,29 @@ public:
   /// Return the next token that will be installed by \c consumeToken.
   const Token &peekToken();
 
+  /// Consumes K tokens within a backtracking scope before calling \c f and
+  /// providing it with the backtracking scope. Unless if the backtracking is
+  /// explicitly cancelled, the parser's token state is restored after \c f
+  /// returns.
+  ///
+  /// \param K The number of tokens ahead to skip. Zero is the current token.
+  /// \param f The function to apply after skipping K tokens ahead.
+  ///          The value returned by \c f will be returned by \c peekToken
+  ///           after the parser is rolled back.
+  /// \returns the value returned by \c f
+  /// \note When calling, you may need to specify the \c Val type
+  ///       explicitly as a type parameter.
+  template <typename Val>
+  Val lookahead(unsigned char K,
+                llvm::function_ref<Val(CancellableBacktrackingScope &)> f) {
+    CancellableBacktrackingScope backtrackScope(*this);
+
+    for (unsigned char i = 0; i < K; ++i)
+      consumeToken();
+
+    return f(backtrackScope);
+  }
+
   /// Consume a token that we created on the fly to correct the original token
   /// stream from lexer.
   void consumeExtraToken(Token K);
