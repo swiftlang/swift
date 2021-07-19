@@ -1,4 +1,3 @@
-
 // RUN: %empty-directory(%t)
 
 // RUN: %empty-directory(%t/Sources)
@@ -54,7 +53,7 @@ func test(val: MyStruct) {
 // MEMBER-LABEL: Begin completions, 5 items
 // MEMBER-DAG: Keyword[self]/CurrNominal:          self[#MyStruct#]; name=self{{$}}
 // MEMBER-DAG: Decl[InstanceVar]/CurrNominal:      propertyInType[#Int#]; name=propertyInType; source={{.*}}/Sources/MyModule1.swift
-// MEMBER-DAG: Decl[InstanceMethod]/CurrNominal:   funcInType({#x: Int#})[#Void#]; name=funcInType(x: Int); source={{.*}}/Sources/MyModule1.swift
+// MEMBER-DAG: Decl[InstanceMethod]/CurrNominal:   funcInType({#x: Int#})[#Void#]; name=funcInType(x:); source={{.*}}/Sources/MyModule1.swift
 // MEMBER-DAG: Decl[InstanceVar]/CurrNominal:      propertyInExtension[#String#]; name=propertyInExtension; source={{.*}}/Sources/MyModule2.swift
 // MEMBER-DAG: Decl[InstanceMethod]/CurrNominal:   funcInExtension()[#String#]; name=funcInExtension(); source={{.*}}/Sources/MyModule2.swift
 // MEMBER: End completions
@@ -66,7 +65,7 @@ func test(val: MyStruct) {
 // MEMBER_MOD-LABEL: Begin completions, 5 items
 // MEMBER_MOD-DAG: Keyword[self]/CurrNominal:          self[#MyStruct#]; name=self{{$}}
 // MEMBER_MOD-DAG: Decl[InstanceVar]/CurrNominal:      propertyInType[#Int#]; name=propertyInType; source={{.*}}/Sources/MyModule1.swift
-// MEMBER_MOD-DAG: Decl[InstanceMethod]/CurrNominal:   funcInType({#x: Int#})[#Void#]; name=funcInType(x: Int); source={{.*}}/Sources/MyModule1.swift
+// MEMBER_MOD-DAG: Decl[InstanceMethod]/CurrNominal:   funcInType({#x: Int#})[#Void#]; name=funcInType(x:); source={{.*}}/Sources/MyModule1.swift
 // MEMBER_MOD-DAG: Decl[InstanceVar]/CurrNominal:      propertyInExtension[#String#]; name=propertyInExtension; source={{.*}}/Sources/MyModule2.swift
 // MEMBER_MOD-DAG: Decl[InstanceMethod]/CurrNominal:   funcInExtension()[#String#]; name=funcInExtension(); source={{.*}}/Sources/MyModule2.swift
 // MEMBER_MOD: End completions

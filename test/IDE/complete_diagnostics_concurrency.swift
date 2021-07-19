@@ -18,7 +18,7 @@ actor MyActor {
 func testAsyncContext() {
     #^SYNC_CONTEXT^#
 // SYNC_CONTEXT: Begin completions
-// SYNC_CONTEXT-DAG: Decl[FreeFunction]/CurrModule/NotRecommended: asyncFunc()[' async'][#Void#]; name=asyncFunc() async; diagnostics=error:async 'asyncFunc()' used in a context that does not support concurrency{{$}}
+// SYNC_CONTEXT-DAG: Decl[FreeFunction]/CurrModule/NotRecommended: asyncFunc()[' async'][#Void#]; name=asyncFunc(); diagnostics=error:async 'asyncFunc()' used in a context that does not support concurrency{{$}}
 // SYNC_CONTEXT-DAG: Decl[FreeFunction]/CurrModule:      syncFunc()[#Void#]; name=syncFunc(){{$}}
 // SYNC_CONTEXT: End completions
 }
@@ -26,7 +26,7 @@ func testAsyncContext() {
 func testActor(obj: MyActor) async {
     obj.#^ACTOR^#
 // ACTOR: Begin completions
-// ACTOR-DAG: Decl[InstanceMethod]/CurrNominal:   receiveSendable({#arg: MySendable#})[' async'][#Void#]; name=receiveSendable(arg: MySendable) async{{$}}
-// ACTOR-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended: receiveNonSendable({#arg: MyNonSendable#})[' async'][#Void#]; name=receiveNonSendable(arg: MyNonSendable) async; diagnostics=warning:actor-isolated 'receiveNonSendable(arg:)' should only be referenced from inside the actor{{$}}
+// ACTOR-DAG: Decl[InstanceMethod]/CurrNominal:   receiveSendable({#arg: MySendable#})[' async'][#Void#]; name=receiveSendable(arg:){{$}}
+// ACTOR-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended: receiveNonSendable({#arg: MyNonSendable#})[' async'][#Void#]; name=receiveNonSendable(arg:); diagnostics=warning:actor-isolated 'receiveNonSendable(arg:)' should only be referenced from inside the actor{{$}}
 // ACTOR: End completions
 }
