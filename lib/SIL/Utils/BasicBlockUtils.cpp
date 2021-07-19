@@ -521,3 +521,36 @@ void swift::findJointPostDominatingSet(
     }
   }
 }
+
+//===----------------------------------------------------------------------===//
+//                          checkReachingBlockDominance
+//===----------------------------------------------------------------------===//
+
+#ifndef NDEBUG
+/// Verify that \p sourceBlock dominates \p destBlock given that some path from
+/// \p sourceBlock to \p destBlock exists.
+///
+/// Useful for assertions without computing Dominance.
+bool swift::checkReachingBlockDominates(SILBasicBlock *sourceBlock,
+                                        SILBasicBlock *destBlock) {
+  SILBasicBlock *entryBlock = sourceBlock->getParent()->getEntryBlock();
+  BasicBlockSet visitedBlocks(sourceBlock->getParent());
+  SmallVector<SILBasicBlock *, 32> workList = {destBlock};
+  bool reaches = false;
+  while (!workList.empty()) {
+    SILBasicBlock *block = workList.pop_back_val();
+    if (block == sourceBlock) {
+      reaches = true;
+      continue;
+    }
+    if (block == entryBlock) {
+      return false; // does not dominate
+    }
+    for (auto *predBlock : block->getPredecessorBlocks()) {
+      if (!visitedBlocks.contains(predBlock))
+        workList.push_back(predBlock);
+    }
+  }
+  return reaches;
+}
+#endif
