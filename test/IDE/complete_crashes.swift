@@ -389,3 +389,23 @@ struct StructWithCallAsFunction: HasCallAsFunctionRequirement {
 }
 // CRASH_CALL_AS_FUNCTION: Begin completion
 // CRASH_CALL_AS_FUNCTION: End completions
+
+// rdar://80635105
+protocol P_80635105 {
+  associatedtype T
+}
+struct S_80635105<T> {}
+extension S_80635105 : P_80635105 {}
+extension P_80635105 {
+  func foo<U : P_80635105>(_ x: U.T) where U == Self.T {}
+}
+
+// RUN: %target-swift-ide-test -code-completion -code-completion-token=RDAR_80635105 -source-filename=%s | %FileCheck %s -check-prefix=RDAR_80635105
+func test_80635105() {
+  let fn = { x in
+    S_80635105.#^RDAR_80635105^#
+    // RDAR_80635105: Begin completions
+    // RDAR_80635105: Decl[InstanceMethod]/Super: foo({#(self): S_80635105<_>#})[#(P_80635105.T) -> Void#]; name=foo
+    // RDAR_80635105: End completions
+  }
+}
