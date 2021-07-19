@@ -1303,7 +1303,7 @@ template <class Iterator, class RNG>
 void shuffle(Iterator first, Iterator last, RNG &&g) {
   // It would be better to use a std::uniform_int_distribution,
   // but that would be stdlib dependent.
-  for (auto size = last - first; size > 1; ++first, (void)--size)
+  for (auto size = last - first; size > 1; ++first, --size)
     std::iter_swap(first, first + g() % size);
 }
 
