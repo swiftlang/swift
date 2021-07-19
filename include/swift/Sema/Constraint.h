@@ -352,6 +352,10 @@ class Constraint final : public llvm::ilist_node<Constraint>,
   /// in its disjunction.
   unsigned IsFavored : 1;
 
+  /// Whether or not this constraint should be solved in isolation from
+  /// the rest of the constraint system. Currently only applies to conjunctions.
+  unsigned IsIsolated : 1;
+
   /// The number of type variables referenced by this constraint.
   ///
   /// The type variables themselves are tail-allocated.
@@ -429,7 +433,7 @@ class Constraint final : public llvm::ilist_node<Constraint>,
   void *operator new(size_t) = delete;
 
   Constraint(ConstraintKind kind, ArrayRef<Constraint *> constraints,
-             ConstraintLocator *locator,
+             bool isIsolated, ConstraintLocator *locator,
              SmallPtrSetImpl<TypeVariableType *> &typeVars);
 
   /// Construct a new constraint.
@@ -542,9 +546,13 @@ public:
                                          = ForgetChoice);
 
   /// Create a new conjunction constraint.
+  ///
+  /// \param isIsolated - Indicates whether given constraint should be
+  /// solved in isolation from the rest of the constraint system i.e.
+  /// by removing all of the unrelated type variables and constraints.
   static Constraint *
   createConjunction(ConstraintSystem &cs, ArrayRef<Constraint *> constraints,
-                    ConstraintLocator *locator,
+                    bool isIsolated, ConstraintLocator *locator,
                     ArrayRef<TypeVariableType *> referencedVars = {});
 
   /// Create a new Applicable Function constraint.
@@ -783,6 +791,10 @@ public:
   /// Determine if this constraint represents explicit conversion,
   /// e.g. coercion constraint "as X" which forms a disjunction.
   bool isExplicitConversion() const;
+
+  /// Determine whether this constraint should be solved in isolation
+  /// from the rest of the constraint system.
+  bool isIsolated() const { return IsIsolated; }
 
   /// Whether this is a one-way constraint.
   bool isOneWayConstraint() const {
