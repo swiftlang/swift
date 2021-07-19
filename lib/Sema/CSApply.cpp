@@ -1067,7 +1067,7 @@ namespace {
         outerParamTypes.push_back(AnyFunctionType::Param(outerParamType,
                                                          Identifier(),
                                                          paramInfo[i].getParameterFlags()));
-        outerParam->setInterfaceType(outerParamType);
+        outerParam->setInterfaceType(outerParamType->mapTypeOutOfContext());
 
         if (fnDecl.getAbstractFunctionDecl())
           argLabels.push_back(innerParam->getArgumentName());
@@ -8151,11 +8151,12 @@ namespace {
 
         if (auto *projectionVar = param->getPropertyWrapperProjectionVar()) {
           projectionVar->setInterfaceType(
-              solution.simplifyType(solution.getType(projectionVar)));
+              solution.simplifyType(solution.getType(projectionVar))->mapTypeOutOfContext());
         }
 
         auto *wrappedValueVar = param->getPropertyWrapperWrappedValueVar();
-        auto wrappedValueType = solution.simplifyType(solution.getType(wrappedValueVar));
+        auto wrappedValueType =
+            solution.simplifyType(solution.getType(wrappedValueVar))->mapTypeOutOfContext();
         wrappedValueVar->setInterfaceType(wrappedValueType->getWithoutSpecifierType());
 
         if (param->hasImplicitPropertyWrapper()) {
