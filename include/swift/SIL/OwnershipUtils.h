@@ -444,21 +444,22 @@ public:
   operator Kind() const { return value; }
 
   /// Is this a borrow scope that begins and ends within the same function and
-  /// thus is guaranteed to have an "end_scope" instruction.
+  /// thus is guaranteed to have an "end_scope" instruction?
   ///
   /// In contrast, borrow scopes that are non-local (e.x. from
   /// SILFunctionArguments) rely a construct like a SILFunction as the begin/end
   /// of the scope.
+  ///
+  /// Returns false for an invalid BorrowedValue.
   bool isLocalScope() const {
     switch (value) {
     case BorrowedValueKind::Invalid:
-      llvm_unreachable("Using invalid case?!");
+    case BorrowedValueKind::SILFunctionArgument:
+      return false;
     case BorrowedValueKind::BeginBorrow:
     case BorrowedValueKind::LoadBorrow:
     case BorrowedValueKind::Phi:
       return true;
-    case BorrowedValueKind::SILFunctionArgument:
-      return false;
     }
     llvm_unreachable("Covered switch isnt covered?!");
   }
