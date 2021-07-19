@@ -2061,7 +2061,8 @@ function(add_swift_target_library name)
         # CMAKE_OSX_ARCHITECTURES to ensure that CMake would
         # not add the -arch flag
         # This is no longer the case when running on Apple Silicon,
-        # when CMake will enforce a default (see https://gitlab.kitware.com/cmake/cmake/-/merge_requests/5291)
+        # when CMake will enforce a default (see
+        # https://gitlab.kitware.com/cmake/cmake/-/merge_requests/5291)
         set_property(TARGET ${VARIANT_NAME} PROPERTY OSX_ARCHITECTURES "${arch}")
       endif()
     endforeach()
@@ -2506,7 +2507,8 @@ function(add_swift_target_executable name)
         # CMAKE_OSX_ARCHITECTURES to ensure that CMake would
         # not add the -arch flag
         # This is no longer the case when running on Apple Silicon,
-        # when CMake will enforce a default (see https://gitlab.kitware.com/cmake/cmake/-/merge_requests/5291)
+        # when CMake will enforce a default (see
+        # https://gitlab.kitware.com/cmake/cmake/-/merge_requests/5291)
         set_property(TARGET ${VARIANT_NAME} PROPERTY OSX_ARCHITECTURES "${arch}")
 
         add_custom_command_target(unused_var2
