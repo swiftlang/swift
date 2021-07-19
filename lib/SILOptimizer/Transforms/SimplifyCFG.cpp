@@ -4036,6 +4036,8 @@ bool SimplifyCFG::simplifyArgument(SILBasicBlock *BB, unsigned i) {
   return true;
 }
 
+// OWNERSHIP NOTE: This is always safe for guaranteed and owned arguments since
+// in both cases the phi will consume its input.
 static void tryToReplaceArgWithIncomingValue(SILBasicBlock *BB, unsigned i,
                                              DominanceInfo *DT) {
   auto *A = BB->getArgument(i);
