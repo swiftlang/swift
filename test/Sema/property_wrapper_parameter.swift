@@ -125,3 +125,9 @@ func testResultBuilderWithImplicitWrapper(@ProjectionWrapper value: String) {
     $value
   }
 }
+
+func takesWrapperClosure<T>(_: ProjectionWrapper<[S<T>]>, closure: (ProjectionWrapper<S<T>>) -> Void) {}
+
+func testGenericPropertyWrapper<U>(@ProjectionWrapper wrappers: [S<U>]) {
+  takesWrapperClosure($wrappers) { $wrapper in }
+}
