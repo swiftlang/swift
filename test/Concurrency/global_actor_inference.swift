@@ -538,3 +538,17 @@ func acceptAsyncSendableClosureInheriting<T>(@_inheritActorContext _: @Sendable 
     await onlyOnMainActor() // expected-warning{{no 'async' operations occur within 'await' expression}}
   }
 }
+
+
+// defer bodies inherit global actor-ness
+@MainActor
+var statefulThingy: Bool = false
+
+@MainActor
+func useFooInADefer() -> String {
+  defer {
+    statefulThingy = true
+  }
+
+  return "hello"
+}
