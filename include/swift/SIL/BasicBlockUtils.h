@@ -148,6 +148,10 @@ void findJointPostDominatingSet(
     function_ref<void(SILBasicBlock *)> foundJointPostDomSetCompletionBlocks,
     function_ref<void(SILBasicBlock *)> inputBlocksInJointPostDomSet = {});
 
+#ifndef NDEBUG
+bool checkDominates(SILBasicBlock *sourceBlock, SILBasicBlock *destBlock);
+#endif
+
 } // namespace swift
 
 #endif
