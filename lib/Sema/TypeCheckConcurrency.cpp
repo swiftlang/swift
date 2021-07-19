@@ -3133,7 +3133,6 @@ ActorIsolation ActorIsolationRequest::evaluate(
       switch (auto enclosingIsolation =
                   getActorIsolationOfContext(func->getDeclContext())) {
       case ActorIsolation::ActorInstance:
-      case ActorIsolation::DistributedActorInstance:
       case ActorIsolation::Independent:
       case ActorIsolation::Unspecified:
         // Do nothing.
