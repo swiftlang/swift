@@ -4,21 +4,24 @@
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 
-// Temporarily disabled to unblock PR testing:
-// REQUIRES: rdar80745964
-
 // rdar://76038845
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
 import Dispatch
 
+let seconds: UInt64 = 1_000_000_000
+
 @available(SwiftStdlib 5.5, *)
 func test_detach_cancel_child_early() async {
   print(#function) // CHECK: test_detach_cancel_child_early
   let h: Task<Bool, Error> = Task.detached {
     async let childCancelled: Bool = { () -> Bool in
-      await Task.sleep(2_000_000_000)
+      do {
+        try await Task.sleep(nanoseconds: 10 * seconds)
+      } catch {
+        print("sleep interrupted") // CHECK: sleep interrupted
+      }
       return Task.isCancelled
     }()
 
