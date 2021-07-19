@@ -20,6 +20,10 @@
 #include "llvm/Support/Compiler.h"
 #include <cstdint>
 
+#if defined(_MSC_VER)
+#include <intrin.h>
+#endif
+
 // Boilerplate namespace in case we add non-macros.
 namespace swift {
 
@@ -117,71 +121,20 @@ constexpr unsigned bitmax(unsigned a, unsigned b) {
 }
 
 constexpr unsigned countBitsUsed(uint64_t arg) {
-  // Is there a C++ "std::countLeadingZeros()"?
-  return (arg & 1ull << 63 ? 63 :
-          arg & 1ull << 62 ? 62 :
-          arg & 1ull << 61 ? 61 :
-          arg & 1ull << 60 ? 60 :
-          arg & 1ull << 59 ? 59 :
-          arg & 1ull << 58 ? 58 :
-          arg & 1ull << 57 ? 57 :
-          arg & 1ull << 56 ? 56 :
-          arg & 1ull << 55 ? 55 :
-          arg & 1ull << 54 ? 54 :
-          arg & 1ull << 53 ? 53 :
-          arg & 1ull << 52 ? 52 :
-          arg & 1ull << 51 ? 51 :
-          arg & 1ull << 50 ? 50 :
-          arg & 1ull << 49 ? 49 :
-          arg & 1ull << 48 ? 48 :
-          arg & 1ull << 47 ? 47 :
-          arg & 1ull << 46 ? 46 :
-          arg & 1ull << 45 ? 45 :
-          arg & 1ull << 44 ? 44 :
-          arg & 1ull << 43 ? 43 :
-          arg & 1ull << 42 ? 42 :
-          arg & 1ull << 41 ? 41 :
-          arg & 1ull << 40 ? 40 :
-          arg & 1ull << 39 ? 39 :
-          arg & 1ull << 38 ? 38 :
-          arg & 1ull << 37 ? 37 :
-          arg & 1ull << 36 ? 36 :
-          arg & 1ull << 35 ? 35 :
-          arg & 1ull << 34 ? 34 :
-          arg & 1ull << 33 ? 33 :
-          arg & 1ull << 32 ? 32 :
-          arg & 1ull << 31 ? 31 :
-          arg & 1ull << 30 ? 30 :
-          arg & 1ull << 29 ? 29 :
-          arg & 1ull << 28 ? 28 :
-          arg & 1ull << 27 ? 27 :
-          arg & 1ull << 26 ? 26 :
-          arg & 1ull << 25 ? 25 :
-          arg & 1ull << 24 ? 24 :
-          arg & 1ull << 23 ? 23 :
-          arg & 1ull << 22 ? 22 :
-          arg & 1ull << 21 ? 21 :
-          arg & 1ull << 20 ? 20 :
-          arg & 1ull << 19 ? 19 :
-          arg & 1ull << 18 ? 18 :
-          arg & 1ull << 17 ? 17 :
-          arg & 1ull << 16 ? 16 :
-          arg & 1ull << 15 ? 15 :
-          arg & 1ull << 14 ? 14 :
-          arg & 1ull << 13 ? 13 :
-          arg & 1ull << 12 ? 12 :
-          arg & 1ull << 11 ? 11 :
-          arg & 1ull << 10 ? 10 :
-          arg & 1ull << 9 ? 9 :
-          arg & 1ull << 8 ? 8 :
-          arg & 1ull << 7 ? 7 :
-          arg & 1ull << 6 ? 6 :
-          arg & 1ull << 5 ? 5 :
-          arg & 1ull << 4 ? 4 :
-          arg & 1ull << 3 ? 3 :
-          arg & 1ull << 2 ? 2 :
-          arg & 1ull << 1 ? 1 : 0
-      ) + 1;
+// Assumes uint64_t is the same as unsigned long long
+#if defined(_MSC_VER)
+#if defined(_M_AMD64)
+  return 64u - static_cast<unsigned>(__lzcnt64(arg));
+#elseif  defined(_M_ARM) || defined(_M_ARM64)
+  return 64u - static_cast<unsigned>(_CountLeadingZeros64(arg));
+#elseif __has_builtin(__builtin_ctzll) || defined(__GNUC__)
+  return 64u - __builtin_clzll(static_cast<unsigned long long>(arg));
+#else
+# error unsupported architecture
+#endif
+#else
+  return 64u - __builtin_clzll(static_cast<unsigned long long>(arg));
+#endif
 }
 
 } // end namespace swift
