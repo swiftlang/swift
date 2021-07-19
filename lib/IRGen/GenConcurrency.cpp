@@ -21,6 +21,7 @@
 #include "ExtraInhabitants.h"
 #include "GenProto.h"
 #include "GenType.h"
+#include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "LoadableTypeInfo.h"
@@ -240,4 +241,35 @@ void irgen::emitDestroyTaskGroup(IRGenFunction &IGF, llvm::Value *group) {
   call->setCallingConv(IGF.IGM.SwiftCC);
 
   IGF.Builder.CreateLifetimeEnd(group);
+}
+
+llvm::Function *IRGenModule::getAwaitAsyncContinuationFn() {
+  StringRef name = "__swift_continuation_await_point";
+  if (llvm::GlobalValue *F = Module.getNamedValue(name))
+    return cast<llvm::Function>(F);
+
+  // The parameters here match the extra arguments passed to
+  // @llvm.coro.suspend.async by emitAwaitAsyncContinuation.
+  llvm::Type *argTys[] = { ContinuationAsyncContextPtrTy };
+  auto *suspendFnTy =
+    llvm::FunctionType::get(VoidTy, argTys, false /*vaargs*/);
+
+  llvm::Function *suspendFn =
+      llvm::Function::Create(suspendFnTy, llvm::Function::InternalLinkage,
+                             name, &Module);
+  suspendFn->setCallingConv(SwiftAsyncCC);
+  suspendFn->setDoesNotThrow();
+  IRGenFunction suspendIGF(*this, suspendFn);
+  if (DebugInfo)
+    DebugInfo->emitArtificialFunction(suspendIGF, suspendFn);
+  auto &Builder = suspendIGF.Builder;
+
+  llvm::Value *context = suspendFn->getArg(0);
+  auto *call = Builder.CreateCall(getContinuationAwaitFn(), { context });
+  call->setDoesNotThrow();
+  call->setCallingConv(SwiftAsyncCC);
+  call->setTailCallKind(AsyncTailCallKind);
+
+  Builder.CreateRetVoid();
+  return suspendFn;
 }

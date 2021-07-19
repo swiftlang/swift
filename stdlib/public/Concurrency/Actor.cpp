@@ -222,10 +222,11 @@ void swift::runJobInEstablishedExecutorContext(Job *job) {
     // Update the active task in the current thread.
     ActiveTask::set(task);
 
-    // FIXME: update the task status to say that it's running
-    // on the current thread.  If the task suspends itself to run
-    // on an actor, it should update the task status appropriately;
-    // we don't need to update it afterwards.
+    // Update the task status to say that it's running on the
+    // current thread.  If the task suspends somewhere, it should
+    // update the task status appropriately; we don't need to update
+    // it afterwards.
+    task->flagAsRunning();
 
     task->runInFullyEstablishedContext();
 
@@ -244,7 +245,7 @@ void swift::runJobInEstablishedExecutorContext(Job *job) {
 }
 
 SWIFT_CC(swift)
-static AsyncTask *swift_task_getCurrentImpl() {
+AsyncTask *swift::swift_task_getCurrent() {
   return ActiveTask::get();
 }
 
@@ -1790,6 +1791,9 @@ SWIFT_CC(swiftasync)
 static void runOnAssumedThread(AsyncTask *task, ExecutorRef executor,
                                ExecutorTrackingInfo *oldTracking,
                                RunningJobInfo runner) {
+  // Note that this doesn't change the active task and so doesn't
+  // need to either update ActiveTask or flagAsRunning/flagAsSuspended.
+
   // If there's alreaady tracking info set up, just change the executor
   // there and tail-call the task.  We don't want these frames to
   // potentially accumulate linearly.
@@ -1872,6 +1876,7 @@ static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContex
 #if SWIFT_TASK_PRINTF_DEBUG
   fprintf(stderr, "[%p] switch failed, task %p enqueued on executor %p\n", pthread_self(), task, newExecutor.getIdentity());
 #endif
+  task->flagAsSuspended();
   swift_task_enqueue(task, newExecutor);
 }
 
