@@ -1241,7 +1241,7 @@ public:
   }
   
   bool shouldSkip(Decl *D) {
-    if (isa<VarDecl>(D)) {
+    if (auto *VD = dyn_cast<VarDecl>(D)) {
       // VarDecls are walked via their NamedPattern, ignore them if we encounter
       // then in the few cases where they are also pushed outside as members.
       // In all those cases we can walk them via the pattern binding decl.
@@ -1250,8 +1250,8 @@ public:
       if (Walker.Parent.getAsModule() &&
           D->getDeclContext()->getParentSourceFile())
         return true;
-      if (Decl *ParentD = Walker.Parent.getAsDecl())
-        return (isa<NominalTypeDecl>(ParentD) || isa<ExtensionDecl>(ParentD));
+      if (Walker.Parent.getAsDecl() && VD->getParentPatternBinding())
+        return true;
       auto walkerParentAsStmt = Walker.Parent.getAsStmt();
       if (walkerParentAsStmt && isa<BraceStmt>(walkerParentAsStmt))
         return true;
