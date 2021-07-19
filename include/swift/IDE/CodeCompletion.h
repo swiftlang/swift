@@ -138,29 +138,32 @@ public:
     /// Generic type parameter name.
     GenericParameterName,
 
-    /// The first chunk of a substring that describes the parameter for a
+    /// The first chunk of a substring that describes the argument for a
     /// function call.
-    CallParameterBegin,
-    /// Function call parameter name.
-    CallParameterName,
-    /// Function call parameter internal / local name.  If the parameter has no
-    /// formal API name, it can still have a local name which can be useful
-    /// for display purposes.
+    CallArgumentBegin,
+
+    /// Function call argument label.
+    CallArgumentName,
+
+    /// Function parameter internal / local name for an call argument. If the
+    /// parameter has no formal API name, it can still have a local name which
+    /// can be useful for display purposes.
     ///
     /// This chunk should not be inserted into the editor buffer.
-    CallParameterInternalName,
-    /// A colon between parameter name and value.  Should be inserted in the
-    /// editor buffer if the preceding CallParameterName was inserted.
-    CallParameterColon,
+    CallArgumentInternalName,
+
+    /// A colon between argument name and value.  Should be inserted in the
+    /// editor buffer if the preceding CallArgumentName was inserted.
+    CallArgumentColon,
 
     /// A colon between parameter name and value. Used in decl attribute.
     DeclAttrParamColon,
 
-    /// Required parameter type.
-    CallParameterType,
+    /// Required argument type.
+    CallArgumentType,
 
-    /// Parameter type tag for annotated results.
-    CallParameterTypeBegin,
+    /// Argument type tag for annotated results.
+    CallArgumentTypeBegin,
 
     /// System type name.
     TypeIdSystem,
@@ -168,15 +171,15 @@ public:
     /// Non-system type name.
     TypeIdUser,
 
-    /// Desugared closure parameter type. This can be used to get the
-    /// closure type if CallParameterType is a TypeAliasType.
-    CallParameterClosureType,
+    /// Desugared closure argument type. This can be used to get the
+    /// closure type if CallArgumentType is a TypeAliasType.
+    CallArgumentClosureType,
 
-    /// An expanded closure expression for the value of a parameter, including
+    /// An expanded closure expression for the value of an argument, including
     /// the left and right braces and possible signature. The preferred
     /// position to put the cursor after the completion result is inserted
     /// into the editor buffer is between the braces.
-    CallParameterClosureExpr,
+    CallArgumentClosureExpr,
 
     /// A placeholder for \c ! or \c ? in a call to a method found by dynamic
     /// lookup.
@@ -212,10 +215,10 @@ public:
   };
 
   static bool chunkStartsNestedGroup(ChunkKind Kind) {
-    return Kind == ChunkKind::CallParameterBegin ||
+    return Kind == ChunkKind::CallArgumentBegin ||
            Kind == ChunkKind::GenericParameterBegin ||
            Kind == ChunkKind::OptionalBegin ||
-           Kind == ChunkKind::CallParameterTypeBegin ||
+           Kind == ChunkKind::CallArgumentTypeBegin ||
            Kind == ChunkKind::TypeAnnotationBegin;
   }
 
@@ -243,14 +246,14 @@ public:
            Kind == ChunkKind::Ampersand ||
            Kind == ChunkKind::Equal ||
            Kind == ChunkKind::Whitespace ||
-           Kind == ChunkKind::CallParameterName ||
-           Kind == ChunkKind::CallParameterInternalName ||
-           Kind == ChunkKind::CallParameterColon ||
+           Kind == ChunkKind::CallArgumentName ||
+           Kind == ChunkKind::CallArgumentInternalName ||
+           Kind == ChunkKind::CallArgumentColon ||
            Kind == ChunkKind::DeclAttrParamColon ||
            Kind == ChunkKind::DeclAttrParamKeyword ||
-           Kind == ChunkKind::CallParameterType ||
-           Kind == ChunkKind::CallParameterClosureType ||
-           Kind == ChunkKind::CallParameterClosureExpr ||
+           Kind == ChunkKind::CallArgumentType ||
+           Kind == ChunkKind::CallArgumentClosureType ||
+           Kind == ChunkKind::CallArgumentClosureExpr ||
            Kind == ChunkKind::GenericParameterName ||
            Kind == ChunkKind::DynamicLookupMethodCallTail ||
            Kind == ChunkKind::OptionalMethodCallTail ||
