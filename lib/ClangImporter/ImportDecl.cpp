@@ -3502,6 +3502,10 @@ namespace {
       SmallVector<ConstructorDecl *, 4> ctors;
       SmallVector<TypeDecl *, 4> nestedTypes;
 
+      // Store the already imported members in a set to avoid importing the same
+      // decls multiple times.
+      SmallPtrSet<clang::Decl *, 16> importedMembers;
+
       // FIXME: Import anonymous union fields and support field access when
       // it is nested in a struct.
 
@@ -3518,6 +3522,12 @@ namespace {
           if (recordDecl->isInjectedClassName()) {
             continue;
           }
+        }
+
+        // If we've already imported this decl & added it to the resulting
+        // struct, skip it so we don't add the same member twice.
+        if (!importedMembers.insert(m->getCanonicalDecl()).second) {
+          continue;
         }
 
         auto nd = dyn_cast<clang::NamedDecl>(m);
@@ -3547,12 +3557,6 @@ namespace {
             continue;
           }
         }
-
-        // If we've already imported this decl, skip it so we don't add the same
-        // member twice.
-        if (Impl.ImportedDecls.find({nd->getCanonicalDecl(), getVersion()}) !=
-            Impl.ImportedDecls.end())
-          continue;
 
         // If we encounter an IndirectFieldDecl, ensure that its parent is
         // importable before attempting to import it because they are dependent

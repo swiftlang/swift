@@ -32,3 +32,8 @@ module TemplatesSecondHeader {
   header "templates-second-header.h"
   requires cplusplus
 }
+
+module TemplatesWithForwardDecl {
+  header "templates-with-forward-decl.h"
+  requires cplusplus
+}
