@@ -55,6 +55,10 @@ struct OwnershipFixupContext {
   InstModCallbacks &callbacks;
   DeadEndBlocks &deBlocks;
 
+  // Cache the use-points for the lifetime of an inner guaranteed value (which
+  // does not introduce a borrow scope) after checking validity. These will be
+  // used again to extend the lifetime of the replacement value.
+  SmallVector<Operand *, 8> guaranteedUsePoints;
 
   // FIXME: remove these two vectors once BorrowedLifetimeExtender is used
   // everywhere.
@@ -87,6 +91,7 @@ struct OwnershipFixupContext {
       : callbacks(callbacks), deBlocks(deBlocks) {}
 
   void clear() {
+    guaranteedUsePoints.clear();
     transitiveBorrowedUses.clear();
     recursiveReborrows.clear();
     extraAddressFixupInfo.allAddressUsesFromOldValue.clear();

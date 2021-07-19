@@ -192,8 +192,8 @@ static bool canFixUpOwnershipForRAUW(SILValue oldValue, SILValue newValue,
     return true;
   }
   // Check that an inner guaranteed value is not used by a PointerEscape.
-  SmallVector<Operand *, 16> usePoints;
-  return findInnerTransitiveGuaranteedUses(oldValue, usePoints);
+  return findInnerTransitiveGuaranteedUses(oldValue,
+                                           context.guaranteedUsePoints);
 }
 
 //===----------------------------------------------------------------------===//
@@ -695,7 +695,7 @@ OwnershipLifetimeExtender::borrowOverValue(SILValue newValue,
   }
   auto borrowPt = getBorrowPoint(newValue, guaranteedValue);
   return borrowCopyOverGuaranteedUses(newValue, borrowPt,
-                                      guaranteedValue->getUses());
+                                      ArrayRef<Operand *>(ctx.guaranteedUsePoints));
 }
 
 // Borrow \p newValue over \p singleGuaranteedUse. Return the new guaranteed
