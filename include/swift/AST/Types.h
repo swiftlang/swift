@@ -3503,7 +3503,8 @@ public:
                               
   /// Substitute the given generic arguments into this generic
   /// function type and return the resulting non-generic type.
-  FunctionType *substGenericArgs(SubstitutionMap subs);
+  FunctionType *substGenericArgs(SubstitutionMap subs,
+                                 SubstOptions options = None);
   FunctionType *substGenericArgs(llvm::function_ref<Type(Type)> substFn) const;
 
   void Profile(llvm::FoldingSetNodeID &ID) {

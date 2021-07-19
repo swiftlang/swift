@@ -2563,9 +2563,16 @@ public:
         // For everything else, substitute in the base type.
         auto Subs = MaybeNominalType->getMemberSubstitutionMap(CurrModule, VD);
 
-        // Pass in DesugarMemberTypes so that we see the actual
-        // concrete type witnesses instead of type alias types.
-        T = T.subst(Subs, SubstFlags::DesugarMemberTypes);
+        // For a GenericFunctionType, we only want to substitute the
+        // param/result types, as otherwise we might end up with a bad generic
+        // signature if there are UnresolvedTypes present in the base type. Note
+        // we pass in DesugarMemberTypes so that we see the actual concrete type
+        // witnesses instead of type alias types.
+        if (auto *GFT = T->getAs<GenericFunctionType>()) {
+          T = GFT->substGenericArgs(Subs, SubstFlags::DesugarMemberTypes);
+        } else {
+          T = T.subst(Subs, SubstFlags::DesugarMemberTypes);
+        }
       }
     }
 
