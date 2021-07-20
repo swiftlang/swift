@@ -4030,7 +4030,7 @@ public:
       require(instClass,
               "upcast must convert a class metatype to a class metatype");
       
-      if (instClass->usesObjCGenericsModel()) {
+      if (instClass->isTypeErasedGenericClass()) {
         require(instClass->getDeclaredTypeInContext()
                   ->isBindableToSuperclassOf(opInstTy),
                 "upcast must cast to a superclass or an existential metatype");
@@ -4063,7 +4063,7 @@ public:
     auto ToClass = ToTy.getClassOrBoundGenericClass();
     require(ToClass,
             "upcast must convert a class instance to a class type");
-      if (ToClass->usesObjCGenericsModel()) {
+      if (ToClass->isTypeErasedGenericClass()) {
         require(ToClass->getDeclaredTypeInContext()
                   ->isBindableToSuperclassOf(FromTy.getASTType()),
                 "upcast must cast to a superclass or an existential metatype");

@@ -418,7 +418,7 @@ void PolymorphicConvention::considerParameter(SILParameterInfo param,
         // sources of metadata.
         CanType objTy = metatypeTy.getInstanceType();
         if (auto classDecl = objTy->getClassOrBoundGenericClass())
-          if (classDecl->usesObjCGenericsModel())
+          if (classDecl->isTypeErasedGenericClass())
             return;
 
         considerNewTypeSource(MetadataSource::Kind::Metadata,

@@ -2919,7 +2919,8 @@ bool ValueDecl::isObjCDynamicInGenericClass() const {
   if (!classDecl)
     return false;
 
-  return classDecl->isGenericContext() && !classDecl->usesObjCGenericsModel();
+  return classDecl->isGenericContext()
+             && !classDecl->isTypeErasedGenericClass();
 }
 
 bool ValueDecl::shouldUseObjCMethodReplacement() const {
@@ -4190,7 +4191,7 @@ bool NominalTypeDecl::isTypeErasedGenericClass() const {
   // ObjC classes are type erased.
   // TODO: Unless they have magic methods...
   if (auto clas = dyn_cast<ClassDecl>(this))
-    return clas->hasClangNode() && clas->isGenericContext();
+    return clas->isTypeErasedGenericClass();
   return false;
 }
 

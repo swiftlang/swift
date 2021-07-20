@@ -3979,7 +3979,7 @@ public:
   /// Returns true if the decl uses the Objective-C generics model.
   ///
   /// This is true of imported Objective-C classes.
-  bool usesObjCGenericsModel() const {
+  bool isTypeErasedGenericClass() const {
     return hasClangNode() && isGenericContext() && isObjC();
   }
   
