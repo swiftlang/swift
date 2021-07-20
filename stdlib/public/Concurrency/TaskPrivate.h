@@ -42,6 +42,9 @@ namespace swift {
 
 // Uncomment to enable helpful debug spew to stderr
 //#define SWIFT_TASK_PRINTF_DEBUG 1
+// Tip: The output generally contains a bunch of pointer values which may
+// be tedious to compare across different log lines. Try piping the runtime's
+// output to utils/name-pointers to get human-readable names.
 
 #if defined(_WIN32)
 using ThreadID = decltype(GetCurrentThreadId());
