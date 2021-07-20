@@ -39,8 +39,8 @@ void swift::ide::printCodeCompletionResultDescription(
       using ChunkKind = CodeCompletionString::Chunk::ChunkKind;
 
       if (C.is(ChunkKind::TypeAnnotation) ||
-          C.is(ChunkKind::CallParameterClosureType) ||
-          C.is(ChunkKind::CallParameterClosureExpr) ||
+          C.is(ChunkKind::CallArgumentClosureType) ||
+          C.is(ChunkKind::CallArgumentClosureExpr) ||
           C.is(ChunkKind::Whitespace))
         continue;
 
@@ -52,9 +52,9 @@ void swift::ide::printCodeCompletionResultDescription(
         continue;
       }
 
-      if (isOperator && C.is(ChunkKind::CallParameterType))
+      if (isOperator && C.is(ChunkKind::CallArgumentType))
         continue;
-      if (isOperator && C.is(ChunkKind::CallParameterTypeBegin)) {
+      if (isOperator && C.is(ChunkKind::CallArgumentTypeBegin)) {
         auto level = I->getNestingLevel();
         do { ++I; } while (I != E && !I->endsPreviousNestedGroup(level));
         --I;
@@ -117,15 +117,15 @@ class AnnotatingResultPrinter {
     case ChunkKind::TypeIdUser:
       printWithTag("typeid.user", C.getText());
       break;
-    case ChunkKind::CallParameterName:
+    case ChunkKind::CallArgumentName:
       printWithTag("callarg.label", C.getText());
       break;
-    case ChunkKind::CallParameterInternalName:
+    case ChunkKind::CallArgumentInternalName:
       printWithTag("callarg.param", C.getText());
       break;
     case ChunkKind::TypeAnnotation:
-    case ChunkKind::CallParameterClosureType:
-    case ChunkKind::CallParameterClosureExpr:
+    case ChunkKind::CallArgumentClosureType:
+    case ChunkKind::CallArgumentClosureExpr:
     case ChunkKind::Whitespace:
       // ignore;
       break;
@@ -140,7 +140,7 @@ class AnnotatingResultPrinter {
     for (auto i = chunks.begin(), e = chunks.end(); i != e; ++i) {
       using ChunkKind = CodeCompletionString::Chunk::ChunkKind;
 
-      if (i->is(ChunkKind::CallParameterTypeBegin)) {
+      if (i->is(ChunkKind::CallArgumentTypeBegin)) {
         OS << "<callarg.type>";
         auto nestingLevel = i->getNestingLevel();
         ++i;
@@ -182,7 +182,7 @@ public:
         }
 
         // Print call argument group.
-        if (i->is(ChunkKind::CallParameterBegin)) {
+        if (i->is(ChunkKind::CallArgumentBegin)) {
           auto start = i;
           auto level = i->getNestingLevel();
           do { ++i; } while (i != e && !i->endsPreviousNestedGroup(level));
@@ -192,7 +192,7 @@ public:
           continue;
         }
 
-        if (isOperator && i->is(ChunkKind::CallParameterType))
+        if (isOperator && i->is(ChunkKind::CallArgumentType))
           continue;
         printTextChunk(*i);
       }
@@ -261,16 +261,16 @@ void swift::ide::printCodeCompletionResultTypeNameAnnotated(const CodeCompletion
 static void
 constructTextForCallParam(ArrayRef<CodeCompletionString::Chunk> ParamGroup,
                           raw_ostream &OS) {
-  assert(ParamGroup.front().is(ChunkKind::CallParameterBegin));
+  assert(ParamGroup.front().is(ChunkKind::CallArgumentBegin));
 
   for (; !ParamGroup.empty(); ParamGroup = ParamGroup.slice(1)) {
     auto &C = ParamGroup.front();
     if (C.isAnnotation())
       continue;
-    if (C.is(ChunkKind::CallParameterInternalName) ||
-        C.is(ChunkKind::CallParameterType) ||
-        C.is(ChunkKind::CallParameterTypeBegin) ||
-        C.is(ChunkKind::CallParameterClosureExpr)) {
+    if (C.is(ChunkKind::CallArgumentInternalName) ||
+        C.is(ChunkKind::CallArgumentType) ||
+        C.is(ChunkKind::CallArgumentTypeBegin) ||
+        C.is(ChunkKind::CallArgumentClosureExpr)) {
       break;
     }
     if (!C.hasText())
@@ -284,7 +284,7 @@ constructTextForCallParam(ArrayRef<CodeCompletionString::Chunk> ParamGroup,
 
   for (auto i = ParamGroup.begin(), e = ParamGroup.end(); i != e; ++i) {
     auto &C = *i;
-    if (C.is(ChunkKind::CallParameterTypeBegin)) {
+    if (C.is(ChunkKind::CallArgumentTypeBegin)) {
       assert(TypeString.empty());
       auto nestingLevel = C.getNestingLevel();
       ++i;
@@ -299,16 +299,16 @@ constructTextForCallParam(ArrayRef<CodeCompletionString::Chunk> ParamGroup,
       --i;
       continue;
     }
-    if (C.is(ChunkKind::CallParameterClosureType)) {
+    if (C.is(ChunkKind::CallArgumentClosureType)) {
       assert(ExpansionTypeString.empty());
       ExpansionTypeString = C.getText();
       continue;
     }
-    if (C.is(ChunkKind::CallParameterType)) {
+    if (C.is(ChunkKind::CallArgumentType)) {
       assert(TypeString.empty());
       TypeString = C.getText();
     }
-    if (C.is(ChunkKind::CallParameterClosureExpr)) {
+    if (C.is(ChunkKind::CallArgumentClosureExpr)) {
       // We have a closure expression, so provide it directly instead of in
       // a placeholder.
       OS << "{";
@@ -348,7 +348,7 @@ void swift::ide::printCodeCompletionResultSourceText(
       OS << " {\n" << getCodePlaceholder() << "\n}";
       continue;
     }
-    if (C.is(ChunkKind::CallParameterBegin)) {
+    if (C.is(ChunkKind::CallArgumentBegin)) {
       size_t Start = i++;
       for (; i < Chunks.size(); ++i) {
         if (Chunks[i].endsPreviousNestedGroup(C.getNestingLevel()))
@@ -403,10 +403,10 @@ void swift::ide::printCodeCompletionResultFilterName(
       bool shouldPrint = !C.isAnnotation();
       switch (C.getKind()) {
       case ChunkKind::TypeAnnotation:
-      case ChunkKind::CallParameterInternalName:
-      case ChunkKind::CallParameterClosureType:
-      case ChunkKind::CallParameterClosureExpr:
-      case ChunkKind::CallParameterType:
+      case ChunkKind::CallArgumentInternalName:
+      case ChunkKind::CallArgumentClosureType:
+      case ChunkKind::CallArgumentClosureExpr:
+      case ChunkKind::CallArgumentType:
       case ChunkKind::DeclAttrParamColon:
       case ChunkKind::Comma:
       case ChunkKind::Whitespace:
@@ -414,7 +414,7 @@ void swift::ide::printCodeCompletionResultFilterName(
       case ChunkKind::Ampersand:
       case ChunkKind::OptionalMethodCallTail:
         continue;
-      case ChunkKind::CallParameterTypeBegin:
+      case ChunkKind::CallArgumentTypeBegin:
       case ChunkKind::TypeAnnotationBegin: {
         // Skip call parameter type or type annotation structure.
         auto nestingLevel = C.getNestingLevel();
@@ -424,7 +424,7 @@ void swift::ide::printCodeCompletionResultFilterName(
         --i;
         continue;
       }
-      case ChunkKind::CallParameterColon:
+      case ChunkKind::CallArgumentColon:
         // Since we don't add the type, also don't add the space after ':'.
         if (shouldPrint)
           OS << ":";
