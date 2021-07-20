@@ -1135,13 +1135,12 @@ AbstractionPattern
 AbstractionPattern::unsafeGetSubstFieldType(ValueDecl *member,
                                             CanType origMemberInterfaceType)
 const {
+  assert(origMemberInterfaceType);
   if (isTypeParameterOrOpaqueArchetype()) {
     // Fall back to the generic abstraction pattern for the member.
     auto sig = member->getDeclContext()->getGenericSignatureOfContext();
-    CanType memberTy = origMemberInterfaceType
-      ? origMemberInterfaceType
-      : member->getInterfaceType()->getCanonicalType(sig);
-    return AbstractionPattern(sig.getCanonicalSignature(), memberTy);
+    return AbstractionPattern(sig.getCanonicalSignature(),
+                              origMemberInterfaceType);
   }
 
   switch (getKind()) {
