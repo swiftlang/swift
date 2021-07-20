@@ -341,7 +341,7 @@ extension AsyncStream: AsyncSequence {
     ///
     /// If you cancel the task this iterator is running in while `next()` is
     /// awaiting a value, the `AsyncStream` terminates. In this case, `next()`
-    /// may return `nil` immediately, or else return `nil` on subseuqent calls.
+    /// may return `nil` immediately, or else return `nil` on subsequent calls.
     public mutating func next() async -> Element? {
       await produce()
     }

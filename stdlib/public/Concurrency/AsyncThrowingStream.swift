@@ -63,9 +63,9 @@ import Swift
 ///     }
 ///
 /// To adapt this to use `async`-`await`, extend the `QuakeMonitor` to add a
-/// `quakes` property, of type `AsyncStream<Quake>`. In the getter for this
-/// property, return an `AsyncStream`, whose `build` closure -- called at
-/// runtime to create the stream -- does the following:
+/// `quakes` property, of type `AsyncThrowingStream<Quake>`. In the getter for
+/// this property, return an `AsyncThrowingStream`, whose `build` closure --
+/// called at runtime to create the stream -- does the following:
 ///
 /// 1. Creates a `QuakeMonitor` instance.
 /// 2. Sets the monitor's `quakeHandler` property to a closure that receives
@@ -246,16 +246,16 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
   /// Constructs an asynchronous stream for an element type, using the
   /// specified buffering policy and element-producing closure.
   ///
-  /// - Parameter elementType: The type of element the `AsyncStream`
+  /// - Parameter elementType: The type of element the `AsyncThrowingStream`
   ///   produces
   /// - Parameter maxBufferedElements: The maximum number of elements to
   ///   hold in the buffer. By default, this value is unlimited. Use a
   ///   `Continuation.BufferingPolicy` to buffer a specified number of oldest
   ///   or newest elements.
   /// - Parameter build: A custom closure that yields values to the
-  ///   `AsyncStream`. This closure receives a `AsyncThrowingStream.Continuation`
-  ///   instance that it uses to provide elements to the stream and terminate the
-  ///   stream when finished.
+  ///   `AsyncThrowingStream`. This closure receives an
+  ///   `AsyncThrowingStream.Continuation` instance that it uses to provide
+  ///   elements to the stream and terminate the stream when finished.
   ///
   /// The `AsyncThrowingStream.Contuation` received by the `build` closure is
   /// appopriate for use in concurrent contexts. It is thread safe to send and
@@ -363,15 +363,16 @@ extension AsyncThrowingStream: AsyncSequence {
     /// The next value from the asynchronous stream.
     ///
     /// When `next()` returns `nil`, this signifies the end of the
-    /// `AsyncStream`.
+    /// `AsyncThrowingStream`.
     ///
-    /// It is a programmer error to invoke `next()` from a
-    /// concurrent context that contends with another such call, and this will
-    /// result in a call to `fatalError()`.
+    /// It is a programmer error to invoke `next()` from a concurrent context
+    /// that contends with another such call, and this will result in a call to
+    ///  `fatalError()`.
     ///
     /// If you cancel the task this iterator is running in while `next()` is
-    /// awaiting a value, the `AsyncStream` terminates. In this case, `next()`
-    /// may return `nil` immediately, or else return `nil` on subseuqent calls.
+    /// awaiting a value, the `AsyncThrowingStream` terminates. In this case,
+    /// `next()` may return `nil` immediately, or else return `nil` on
+    /// subsequent calls.
     public mutating func next() async throws -> Element? {
       return try await produce()
     }
@@ -416,18 +417,18 @@ extension AsyncThrowingStream.Continuation {
     }
   }
 
-    /// Resume the task awaiting the next iteration point by having it return
-    /// nomally from its suspension point.
-    ///
-    /// - Returns: A `YieldResult` indicating the success or failure of the
-    ///   yield operation.
-    ///
-    /// Use this method with `AsyncStream` instances whose `Element` type is
-    /// `Void`. In this case, the `yield()` call simply unblocks the awaiting
-    /// iteration; there is no value to return.
-    ///
-    /// If you call this method repeatedly, each call returns immediately, without
-    /// blocking for any awaiting consumption from the iteration.
+  /// Resume the task awaiting the next iteration point by having it return
+  /// nomally from its suspension point.
+  ///
+  /// - Returns: A `YieldResult` indicating the success or failure of the
+  ///   yield operation.
+  ///
+  /// Use this method with `AsyncThrowingStream` instances whose `Element`
+  /// type is `Void`. In this case, the `yield()` call simply unblocks the
+  /// awaiting iteration; there is no value to return.
+  ///
+  /// If you call this method repeatedly, each call returns immediately,
+  /// without blocking for any awaiting consumption from the iteration.
   @discardableResult
   public func yield() -> YieldResult where Element == Void {
     storage.yield(())
