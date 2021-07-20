@@ -5936,6 +5936,13 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
   // Check all conformances.
   groupChecker.checkAllConformances();
 
+  // Check actor isolation.
+  for (auto *member : idc->getMembers()) {
+    if (auto *valueDecl = dyn_cast<ValueDecl>(member)) {
+      (void)getActorIsolation(valueDecl);
+    }
+  }
+
   if (Context.TypeCheckerOpts.DebugGenericSignatures &&
       !conformances.empty()) {
     // Now that they're filled out, print out information about the conformances
