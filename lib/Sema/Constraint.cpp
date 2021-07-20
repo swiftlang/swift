@@ -686,6 +686,8 @@ gatherReferencedTypeVars(Constraint *constraint,
     break;
 
   case ConstraintKind::ClosureBodyElement:
+    typeVars.insert(constraint->getTypeVariables().begin(),
+                    constraint->getTypeVariables().end());
     break;
   }
 }
