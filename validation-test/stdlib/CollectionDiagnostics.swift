@@ -154,6 +154,8 @@ struct CollectionWithNonDefaultSubSequence: Collection {
   public subscript(position: Int) -> Int { position }
 }
 
+// expected-error@+2 {{type 'MutableCollectionWithNonDefaultSubSequence' does not conform to protocol 'MutableCollection'}}
+// expected-error@+1 {{unavailable subscript 'subscript(_:)' was used to satisfy a requirement of protocol 'MutableCollection'}}
 struct MutableCollectionWithNonDefaultSubSequence: MutableCollection {
   public var startIndex: Int
   public var endIndex: Int
