@@ -149,6 +149,7 @@ public struct AsyncStream<Element> {
     
     /// A strategy that handles exhaustion of a buffer’s capacity.
     public enum BufferingPolicy {
+      /// Continue to add to the buffer, treating its capacity as infinite.
       case unbounded
       
       /// When the buffer is full, discard the newly received element.
@@ -191,14 +192,15 @@ public struct AsyncStream<Element> {
       storage.finish()
     }
 
-    /// A callback to invoke when canceling iteration of a AsyncStream.
+    /// A callback to invoke when canceling iteration of an asynchronous
+    /// stream.
     ///
-    /// If an `onTermination` callback is set, using task cancelation to
-    /// terminate iteration of a AsyncStream results in a call to this
+    /// If an `onTermination` callback is set, using task cancellation to
+    /// terminate iteration of a `AsyncStream` results in a call to this
     /// callback.
     ///
     /// Cancelling an active iteration invokes the `onTermination` callback
-    /// first, then resumes by yeilding `nil`. This means that you can perform
+    /// first, then resumes by yielding `nil`. This means that you can perform
     /// needed cleanup in the cancellation handler. After reaching a terminal
     /// state, the `AsyncStream` disposes of the callback.
     public var onTermination: (@Sendable (Termination) -> Void)? {
@@ -223,9 +225,9 @@ public struct AsyncStream<Element> {
   ///   `Continuation.BufferingPolicy` to buffer a specified number of oldest
   ///   or newest elements.
   /// - Parameter build: A custom closure that yields values to the
-  ///  `AsyncStream`. This closure receives a `AsyncStream.Continuation` object
-  ///  that it uses to provide elements to the stream and terminate the stream
-  ///  when finished.
+  ///   `AsyncStream`. This closure receives a `AsyncStream.Continuation`
+  ///   instance that it uses to provide elements to the stream and terminate the
+  ///   stream when finished.
   ///
   /// The `AsyncStream.Contuation` received by the `build` closure is appopriate
   /// for use in concurrent contexts. It is thread safe to send and finish; all
@@ -235,7 +237,7 @@ public struct AsyncStream<Element> {
   /// The following example shows an `AsyncStream` created with this
   /// initializer that produces random numbers on a one-second interval. When
   /// a private `keepRunning` variable becomes `false`, the inner `while` loop
-  /// 
+  /// exits and the stream finishes.
   ///
   ///     let stream = AsyncStream<Int>(
   ///         Int.self, bufferingPolicy: .bufferingNewest(5)) { continuation in
@@ -345,7 +347,8 @@ extension AsyncStream: AsyncSequence {
     }
   }
 
-  /// Constructs an iterator.
+  /// Creates the asynchronous iterator that produces elements of this
+  /// asynchronous sequence.
   public func makeAsyncIterator() -> Iterator {
     return Iterator(produce: produce)
   }
@@ -381,7 +384,7 @@ extension AsyncStream.Continuation {
   /// - Returns: A `YieldResult` indicating the success or failure of the
   ///   yield operation.
   ///
-  /// Use this method with `AsyncStream` instances whose element type is
+  /// Use this method with `AsyncStream` instances whose `Element` type is
   /// `Void`. In this case, the `yield()` call simply unblocks the awaiting
   /// iteration; there is no value to return.
   ///
