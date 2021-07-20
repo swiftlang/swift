@@ -238,6 +238,7 @@ extension MutableCollection {
   ///   the range must be valid indices of the collection.
   ///
   /// - Complexity: O(1)
+  @available(*, unavailable)
   @inlinable
   public subscript(bounds: Range<Index>) -> Slice<Self> {
     get {
@@ -282,7 +283,7 @@ extension MutableCollection {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 9999, *)
 extension MutableCollection where SubSequence == Slice<Self> {
 
   /// Accesses a contiguous subrange of the collection's elements.
@@ -310,6 +311,7 @@ extension MutableCollection where SubSequence == Slice<Self> {
   ///
   /// - Complexity: O(1)
   @inlinable
+  @_alwaysEmitIntoClient
   public subscript(bounds: Range<Index>) -> Slice<Self> {
     get {
       _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
