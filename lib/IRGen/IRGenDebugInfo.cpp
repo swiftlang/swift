@@ -918,8 +918,7 @@ private:
     SmallVector<llvm::Metadata *, 16> Elements;
     unsigned OffsetInBits = 0;
     for (VarDecl *VD : Decl->getStoredProperties()) {
-      auto memberTy =
-          BaseTy->getTypeOfMember(IGM.getSwiftModule(), VD, nullptr);
+      auto memberTy = BaseTy->getTypeOfMember(IGM.getSwiftModule(), VD);
 
       if (auto DbgTy = CompletedDebugTypeInfo::getFromTypeInfo(
               VD->getInterfaceType(),
