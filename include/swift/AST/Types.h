@@ -1116,10 +1116,22 @@ public:
   TypeSubstitutionMap getMemberSubstitutions(const ValueDecl *member,
                                              GenericEnvironment *genericEnv=nullptr);
 
+  /// Retrieve the type of the given property as seen through the given base
+  /// type, substituting generic arguments where necessary. This is the same as
+  /// the more general overload of \c TypeBase::getTypeOfMember, but defaults to
+  /// the property's interface type for the \c memberType.
+  ///
+  /// \param module The module in which the substitution occurs.
+  ///
+  /// \param member The property whose type we are substituting.
+  ///
+  /// \returns The resulting property type.
+  Type getTypeOfMember(ModuleDecl *module, const VarDecl *member);
+
   /// Retrieve the type of the given member as seen through the given base
   /// type, substituting generic arguments where necessary.
   ///
-  /// This routine allows one to take a concrete type (the "this" type) and
+  /// This routine allows one to take a concrete type (the "self" type) and
   /// and a member of that type (or one of its superclasses), then determine
   /// what type an access to that member through the base type will have.
   /// For example, given:
@@ -1130,20 +1142,23 @@ public:
   /// }
   /// \endcode
   ///
-  /// Given the type \c Vector<Int> and the member \c add, the resulting type
-  /// of the member will be \c (self : Vector<Int>) -> (value : Int) -> ().
+  /// Given the type \c Vector<Int>, the member \c add, and its method interface
+  /// type (value: T) -> Void the resulting type will be (value: Int) -> Void.
   ///
   /// \param module The module in which the substitution occurs.
   ///
   /// \param member The member whose type we are substituting.
   ///
-  /// \param memberType The type of the member, in which archetypes will be
-  /// replaced by the generic arguments provided by the base type. If null,
-  /// the member's type will be used.
+  /// \param memberType The type of the member in which generic parameters will
+  /// be replaced by the generic arguments provided by the base type. Note this
+  /// must not be a GenericFunctionType. For a method, either strip the self
+  /// parameter and generic signature using e.g \c getMethodInterfaceType, or
+  /// use \c substGenericArgs if you want to substitute types for any of the
+  /// method's generic parameters.
   ///
-  /// \returns the resulting member type.
+  /// \returns The resulting member type.
   Type getTypeOfMember(ModuleDecl *module, const ValueDecl *member,
-                       Type memberType = Type());
+                       Type memberType);
 
   /// Get the type of a superclass member as seen from the subclass,
   /// substituting generic parameters, dynamic Self return, and the
