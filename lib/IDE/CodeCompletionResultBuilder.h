@@ -390,39 +390,39 @@ public:
 
   void addCallParameterColon() {
     addChunkWithText(CodeCompletionString::Chunk::ChunkKind::
-                     CallParameterColon, ": ");
+                     CallArgumentColon, ": ");
   }
 
   void addSimpleNamedParameter(StringRef name) {
-    withNestedGroup(CodeCompletionString::Chunk::ChunkKind::CallParameterBegin, [&] {
+    withNestedGroup(CodeCompletionString::Chunk::ChunkKind::CallArgumentBegin, [&] {
       // Use internal, since we don't want the name to be outside the
       // placeholder.
       addChunkWithText(
-          CodeCompletionString::Chunk::ChunkKind::CallParameterInternalName,
+          CodeCompletionString::Chunk::ChunkKind::CallArgumentInternalName,
           name);
     });
   }
 
   void addSimpleTypedParameter(StringRef Annotation, bool IsVarArg = false) {
-    withNestedGroup(CodeCompletionString::Chunk::ChunkKind::CallParameterBegin, [&] {
+    withNestedGroup(CodeCompletionString::Chunk::ChunkKind::CallArgumentBegin, [&] {
       addChunkWithText(
-          CodeCompletionString::Chunk::ChunkKind::CallParameterType,
+          CodeCompletionString::Chunk::ChunkKind::CallArgumentType,
           Annotation);
       if (IsVarArg)
         addEllipsis();
     });
   }
 
-  void addCallParameter(Identifier Name, Identifier LocalName, Type Ty,
-                        Type ContextTy, bool IsVarArg, bool IsInOut, bool IsIUO,
-                        bool isAutoClosure, bool useUnderscoreLabel,
-                        bool isLabeledTrailingClosure);
+  void addCallArgument(Identifier Name, Identifier LocalName, Type Ty,
+                       Type ContextTy, bool IsVarArg, bool IsInOut, bool IsIUO,
+                       bool isAutoClosure, bool useUnderscoreLabel,
+                       bool isLabeledTrailingClosure);
 
-  void addCallParameter(Identifier Name, Type Ty, Type ContextTy = Type()) {
-    addCallParameter(Name, Identifier(), Ty, ContextTy,
-                     /*IsVarArg=*/false, /*IsInOut=*/false, /*isIUO=*/false,
-                     /*isAutoClosure=*/false, /*useUnderscoreLabel=*/false,
-                     /*isLabeledTrailingClosure=*/false);
+  void addCallArgument(Identifier Name, Type Ty, Type ContextTy = Type()) {
+    addCallArgument(Name, Identifier(), Ty, ContextTy,
+                    /*IsVarArg=*/false, /*IsInOut=*/false, /*isIUO=*/false,
+                    /*isAutoClosure=*/false, /*useUnderscoreLabel=*/false,
+                    /*isLabeledTrailingClosure=*/false);
   }
 
   void addGenericParameter(StringRef Name) {
