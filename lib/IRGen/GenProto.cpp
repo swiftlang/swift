@@ -236,12 +236,17 @@ PolymorphicConvention::PolymorphicConvention(IRGenModule &IGM,
 
 void PolymorphicConvention::addPseudogenericFulfillments() {
   enumerateRequirements([&](GenericRequirement reqt) {
-    MetadataPath path;
-    path.addImpossibleComponent();
+    auto archetype = Generics->getGenericEnvironment()
+                        ->mapTypeIntoContext(reqt.TypeParameter)
+                        ->getAs<ArchetypeType>();
+    assert(archetype && "did not get an archetype by mapping param?");
+    auto erasedTypeParam = archetype->getExistentialType()->getCanonicalType();
+    Sources.emplace_back(MetadataSource::Kind::ErasedTypeMetadata,
+                         reqt.TypeParameter, erasedTypeParam);
 
-    unsigned sourceIndex = 0; // unimportant, since impossible
+    MetadataPath path;
     Fulfillments.addFulfillment({reqt.TypeParameter, reqt.Protocol},
-                                sourceIndex, std::move(path),
+                                Sources.size() - 1, std::move(path),
                                 MetadataState::Complete);
   });
 }
@@ -597,6 +602,17 @@ void EmitPolymorphicParameters::bindExtraSource(
                                             return getTypeInContext(type);
                                           });
       }
+      return;
+    }
+
+    case MetadataSource::Kind::ErasedTypeMetadata: {
+      ArtificialLocation Loc(IGF.getDebugScope(), IGF.IGM.DebugInfo.get(),
+                             IGF.Builder);
+      CanType argTy = getTypeInContext(source.Type);
+      llvm::Value *metadata = IGF.emitTypeMetadataRef(source.getFixedType());
+      setTypeMetadataName(IGF.IGM, metadata, argTy);
+      IGF.bindLocalTypeDataFromTypeMetadata(argTy, IsExact, metadata,
+                                            MetadataState::Complete);
       return;
     }
   }
@@ -2986,6 +3002,10 @@ namespace {
         case MetadataSource::Kind::SelfMetadata:
         case MetadataSource::Kind::SelfWitnessTable:
           continue;
+
+        // No influence on the arguments.
+        case MetadataSource::Kind::ErasedTypeMetadata:
+          continue;
         }
         llvm_unreachable("bad source kind!");
       }
@@ -3040,6 +3060,10 @@ void EmitPolymorphicArguments::emit(SubstitutionMap subs,
       // Added later.
       continue;
     }
+
+    case MetadataSource::Kind::ErasedTypeMetadata:
+      // No influence on the arguments.
+      continue;
     }
     llvm_unreachable("bad source kind");
   }
@@ -3097,6 +3121,10 @@ NecessaryBindings NecessaryBindings::computeBindings(
 
     case MetadataSource::Kind::SelfWitnessTable:
       // We'll just pass undef in cases like this.
+      continue;
+
+    case MetadataSource::Kind::ErasedTypeMetadata:
+      // Fixed in the body.
       continue;
     }
     llvm_unreachable("bad source kind");
@@ -3320,6 +3348,8 @@ namespace {
       case MetadataSource::Kind::SelfMetadata:
       case MetadataSource::Kind::SelfWitnessTable:
         return; // handled as a special case in expand()
+      case MetadataSource::Kind::ErasedTypeMetadata:
+        return; // fixed in the body
       }
       llvm_unreachable("bad source kind");
     }

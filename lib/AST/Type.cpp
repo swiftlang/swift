@@ -3003,7 +3003,8 @@ Type ArchetypeType::getExistentialType() const {
     constraintTypes.push_back(proto->getDeclaredInterfaceType());
   }
   return ProtocolCompositionType::get(
-     const_cast<ArchetypeType*>(this)->getASTContext(), constraintTypes, false);
+     const_cast<ArchetypeType*>(this)->getASTContext(), constraintTypes,
+                                      requiresClass());
 }
 
 PrimaryArchetypeType::PrimaryArchetypeType(const ASTContext &Ctx,
