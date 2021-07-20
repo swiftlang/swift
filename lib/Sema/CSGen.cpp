@@ -2217,6 +2217,8 @@ namespace {
         // If we have a type to ascribe to the variable, do so now.
         if (oneWayVarType)
           CS.setType(var, oneWayVarType);
+        else
+          CS.setType(var, varType);
 
         return setType(varType);
       }
