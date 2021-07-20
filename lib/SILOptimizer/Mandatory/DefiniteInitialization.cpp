@@ -2027,12 +2027,14 @@ void LifetimeChecker::reportIllegalUseForActorInit(
 
   case ActorInitKind::Plain:
     diagnose(Module, Use.Inst->getLoc(), diag::self_disallowed_actor_init,
-             false, ProblemDesc);
+             false, ProblemDesc)
+      .warnUntilSwiftVersion(6);
     break;
 
   case ActorInitKind::GlobalActorIsolated:
     diagnose(Module, Use.Inst->getLoc(), diag::self_disallowed_actor_init,
-             true, ProblemDesc);
+             true, ProblemDesc)
+      .warnUntilSwiftVersion(6);
     break;
   }
 
@@ -2070,11 +2072,13 @@ void LifetimeChecker::handleLoadUseFailureForActorInit(
     llvm::report_fatal_error("this actor init is never problematic!");
 
   case ActorInitKind::Plain:
-    diagnose(Module, Use.Inst->getLoc(), diag::self_use_actor_init, false);
+    diagnose(Module, Use.Inst->getLoc(), diag::self_use_actor_init, false)
+      .warnUntilSwiftVersion(6);
     break;
 
   case ActorInitKind::GlobalActorIsolated:
-    diagnose(Module, Use.Inst->getLoc(), diag::self_use_actor_init, true);
+    diagnose(Module, Use.Inst->getLoc(), diag::self_use_actor_init, true)
+      .warnUntilSwiftVersion(6);
     break;
   }
 
