@@ -889,6 +889,9 @@ AvailabilityContext Decl::getAvailabilityForLinkage() const {
   if (auto *accessor = dyn_cast<AccessorDecl>(this))
     return accessor->getStorage()->getAvailabilityForLinkage();
 
+  if (auto *opaqueTypeDecl = dyn_cast<OpaqueTypeDecl>(this))
+    return opaqueTypeDecl->getNamingDecl()->getAvailabilityForLinkage();
+
   if (auto *ext = dyn_cast<ExtensionDecl>(this))
     if (auto *nominal = ext->getExtendedNominal())
       return nominal->getAvailabilityForLinkage();
@@ -913,6 +916,9 @@ bool Decl::isAlwaysWeakImported() const {
 
   if (auto *accessor = dyn_cast<AccessorDecl>(this))
     return accessor->getStorage()->isAlwaysWeakImported();
+
+  if (auto *opaqueTypeDecl = dyn_cast<OpaqueTypeDecl>(this))
+    return opaqueTypeDecl->getNamingDecl()->isAlwaysWeakImported();
 
   if (auto *ext = dyn_cast<ExtensionDecl>(this))
     if (auto *nominal = ext->getExtendedNominal())
