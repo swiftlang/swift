@@ -217,12 +217,21 @@ namespace irgen {
   public:
     CanType Type;
 
-    MetadataSource(Kind kind, unsigned index, CanType type)
+    MetadataSource(Kind kind, CanType type)
+      : TheKind(kind), Index(InvalidSourceIndex), Type(type)
+    {
+      assert(!requiresSourceIndex(kind));
+    }
+
+
+    MetadataSource(Kind kind, CanType type, unsigned index)
       : TheKind(kind), Index(index), Type(type) {
-      assert(index != InvalidSourceIndex || !requiresSourceIndex(kind));
+      assert(requiresSourceIndex(kind));
+      assert(index != InvalidSourceIndex);
     }
 
     Kind getKind() const { return TheKind; }
+
     unsigned getParamIndex() const {
       assert(requiresSourceIndex(getKind()));
       return Index;

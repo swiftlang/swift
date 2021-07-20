@@ -134,8 +134,10 @@ public:
 
 private:
   void initGenerics();
-  void considerNewTypeSource(MetadataSource::Kind kind, unsigned paramIndex,
-                             CanType type, IsExact_t isExact);
+
+  template <typename ...Args>
+  void considerNewTypeSource(IsExact_t isExact, MetadataSource::Kind kind,
+                             CanType type, Args... args);
   bool considerType(CanType type, IsExact_t isExact,
                     unsigned sourceIndex, MetadataPath &&path);
 
@@ -302,14 +304,15 @@ void PolymorphicConvention::initGenerics() {
   Generics = FnType->getInvocationGenericSignature();
 }
 
-void PolymorphicConvention::considerNewTypeSource(MetadataSource::Kind kind,
-                                                  unsigned paramIndex,
+template <typename ...Args>
+void PolymorphicConvention::considerNewTypeSource(IsExact_t isExact,
+                                                  MetadataSource::Kind kind,
                                                   CanType type,
-                                                  IsExact_t isExact) {
+                                                  Args... args) {
   if (!Fulfillments.isInterestingTypeForFulfillments(type)) return;
 
   // Prospectively add a source.
-  Sources.emplace_back(kind, paramIndex, type);
+  Sources.emplace_back(kind, type, std::forward<Args>(args)...);
 
   // Consider the source.
   if (!considerType(type, isExact, Sources.size() - 1, MetadataPath())) {
@@ -333,9 +336,7 @@ void PolymorphicConvention::considerWitnessSelf(CanSILFunctionType fnType) {
   auto conformance = fnType->getWitnessMethodConformanceOrInvalid();
 
   // First, bind type metadata for Self.
-  Sources.emplace_back(MetadataSource::Kind::SelfMetadata,
-                       MetadataSource::InvalidSourceIndex,
-                       selfTy);
+  Sources.emplace_back(MetadataSource::Kind::SelfMetadata, selfTy);
 
   if (selfTy->is<GenericTypeParamType>()) {
     // The Self type is abstract, so we can fulfill its metadata from
@@ -347,8 +348,7 @@ void PolymorphicConvention::considerWitnessSelf(CanSILFunctionType fnType) {
 
   // The witness table for the Self : P conformance can be
   // fulfilled from the Self witness table parameter.
-  Sources.emplace_back(MetadataSource::Kind::SelfWitnessTable,
-                       MetadataSource::InvalidSourceIndex, selfTy);
+  Sources.emplace_back(MetadataSource::Kind::SelfWitnessTable, selfTy);
   addSelfWitnessTableFulfillment(selfTy, conformance);
 }
 
@@ -359,8 +359,7 @@ void PolymorphicConvention::considerObjCGenericSelf(CanSILFunctionType fnType) {
   unsigned paramIndex = fnType->getParameters().size() - 1;
 
   // Bind type metadata for Self.
-  Sources.emplace_back(MetadataSource::Kind::ClassPointer, paramIndex,
-                       selfTy);
+  Sources.emplace_back(MetadataSource::Kind::ClassPointer, selfTy, paramIndex);
 
   if (isa<GenericTypeParamType>(selfTy))
     addSelfMetadataFulfillment(selfTy);
@@ -385,8 +384,9 @@ void PolymorphicConvention::considerParameter(SILParameterInfo param,
     case ParameterConvention::Indirect_InoutAliasable:
       if (!isSelfParameter) return;
       if (type->getNominalOrBoundGenericNominal()) {
-        considerNewTypeSource(MetadataSource::Kind::GenericLValueMetadata,
-                              paramIndex, type, IsExact);
+        considerNewTypeSource(IsExact,
+                              MetadataSource::Kind::GenericLValueMetadata,
+                              type, paramIndex);
       }
       return;
 
@@ -395,15 +395,15 @@ void PolymorphicConvention::considerParameter(SILParameterInfo param,
     case ParameterConvention::Direct_Guaranteed:
       // Classes are sources of metadata.
       if (type->getClassOrBoundGenericClass()) {
-        considerNewTypeSource(MetadataSource::Kind::ClassPointer,
-                              paramIndex, type, IsInexact);
+        considerNewTypeSource(IsInexact, MetadataSource::Kind::ClassPointer,
+                              type, paramIndex);
         return;
       }
 
       if (isa<GenericTypeParamType>(type)) {
         if (auto superclassTy = getSuperclassBound(type)) {
-          considerNewTypeSource(MetadataSource::Kind::ClassPointer,
-                                paramIndex, superclassTy, IsInexact);
+          considerNewTypeSource(IsInexact, MetadataSource::Kind::ClassPointer,
+                                superclassTy, paramIndex);
           return;
 
         }
@@ -421,8 +421,8 @@ void PolymorphicConvention::considerParameter(SILParameterInfo param,
           if (classDecl->isTypeErasedGenericClass())
             return;
 
-        considerNewTypeSource(MetadataSource::Kind::Metadata,
-                              paramIndex, objTy, IsInexact);
+        considerNewTypeSource(IsInexact, MetadataSource::Kind::Metadata, objTy,
+                              paramIndex);
         return;
       }
 
