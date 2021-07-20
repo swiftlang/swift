@@ -998,8 +998,11 @@ ConstraintSystem::getPropertyWrapperInformation(
         if (!decl->hasAttachedPropertyWrapper())
           return None;
 
-        return std::make_pair(decl,
-                              decl->getPropertyWrapperBackingPropertyType());
+        auto backingTy = decl->getPropertyWrapperBackingPropertyType();
+        if (!backingTy)
+          return None;
+
+        return std::make_pair(decl, backingTy);
       });
 }
 

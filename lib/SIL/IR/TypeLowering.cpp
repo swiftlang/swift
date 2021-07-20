@@ -1768,7 +1768,10 @@ namespace {
         // field type against the declaration's interface type as we normally
         // would, we use the substituted field type in order to accurately
         // preserve the properties of the aggregate.
-        auto origFieldType = origType.unsafeGetSubstFieldType(field);
+        auto sig = field->getDeclContext()->getGenericSignatureOfContext();
+        auto interfaceTy = field->getInterfaceType()->getCanonicalType(sig);
+        auto origFieldType = origType.unsafeGetSubstFieldType(field,
+                                                              interfaceTy);
         
         properties.addSubobject(classifyType(origFieldType, substFieldType,
                                              TC, Expansion));

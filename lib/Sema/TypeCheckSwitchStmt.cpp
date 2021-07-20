@@ -844,11 +844,10 @@ namespace {
 
                 // .e(a: X, b: X)   -> (a: X, b: X)
                 // .f((a: X, b: X)) -> ((a: X, b: X)
-                auto eedTy = tp->getCanonicalType()->getTypeOfMember(
-                    E->getModuleContext(), eed,
-                    eed->getArgumentInterfaceType());
                 SmallVector<Space, 4> constElemSpaces;
-                if (eedTy) {
+                if (auto payloadTy = eed->getArgumentInterfaceType()) {
+                  auto eedTy = tp->getCanonicalType()->getTypeOfMember(
+                      E->getModuleContext(), eed, payloadTy);
                   if (auto *TTy = eedTy->getAs<TupleType>()) {
                     Space::getTupleTypeSpaces(eedTy, TTy, constElemSpaces);
                   } else if (auto *TTy =
