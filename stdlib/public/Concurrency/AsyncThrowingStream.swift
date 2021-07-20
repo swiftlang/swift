@@ -138,7 +138,7 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
   
   public init(
     unfolding produce: @escaping () async throws -> Element?
-  ) {
+  ) where Failure == Error {
     self.produce = produce
   }
 }
