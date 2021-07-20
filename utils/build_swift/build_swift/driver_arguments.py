@@ -515,6 +515,9 @@ def create_argument_parser():
     option('--clang-profile-instr-use', store_path,
            help='profile file to use for clang PGO')
 
+    option('--swift-profile-instr-use', store_path,
+           help='profile file to use for clang PGO while building swift')
+
     option('--llvm-max-parallel-lto-link-jobs', store_int,
            default=defaults.LLVM_MAX_PARALLEL_LTO_LINK_JOBS,
            metavar='COUNT',
@@ -646,6 +649,9 @@ def create_argument_parser():
     option(['--back-deploy-concurrency'], toggle_true('build_backdeployconcurrency'),
            help='build back-deployment support for concurrency')
 
+    option('--install-llvm', toggle_true,
+           help='install llvm')
+
     option(['--install-back-deploy-concurrency'],
            toggle_true('install_backdeployconcurrency'),
            help='install back-deployment support libraries for concurrency')
@@ -760,6 +766,11 @@ def create_argument_parser():
            toggle_false('build_clang_tools_extra'),
            default=True,
            help='skip building clang-tools-extra as part of llvm')
+
+    option('--skip-build-compiler-rt',
+           toggle_false('build_compiler_rt'),
+           default=True,
+           help='skip building compiler-rt as part of llvm')
 
     # -------------------------------------------------------------------------
     in_group('Extra actions to perform before or in addition to building')
@@ -1110,6 +1121,9 @@ def create_argument_parser():
                 'This can be useful to reduce build times when e.g. '
                 'tests do not need to run')
 
+    option('--build-toolchain-only', toggle_true,
+           help='only build the necessary tools to build an external toolchain')
+
     # -------------------------------------------------------------------------
     in_group('Skip testing specified targets')
 
@@ -1210,6 +1224,9 @@ def create_argument_parser():
     # -------------------------------------------------------------------------
     in_group('Build settings specific for LLVM')
 
+    option('--llvm-enable-modules', toggle_true('llvm_enable_modules'),
+           help='enable building llvm using modules')
+
     option('--llvm-targets-to-build', store,
            default='X86;ARM;AArch64;PowerPC;SystemZ;Mips',
            help='LLVM target generators to build')
@@ -1228,6 +1245,9 @@ def create_argument_parser():
                 'llvm-ninja-targets (or the default ones). '
                 'Can be called multiple times '
                 'to add multiple such options.')
+
+    option('--no-llvm-include-tests', toggle_false('llvm_include_tests'),
+           help='do not generate testing targets for LLVM')
 
     # -------------------------------------------------------------------------
     in_group('Build settings for Android')
@@ -1293,6 +1313,9 @@ def create_argument_parser():
            help='skip building cmark')
     option('--skip-build-llvm', toggle_false('build_llvm'),
            help='skip building llvm')
+    option('--build-llvm', toggle_true('_build_llvm'),
+           default=True,
+           help='build llvm and clang')
     option('--skip-build-swift', toggle_false('build_swift'),
            help='skip building swift')
     option('--skip-build-libxml2', toggle_false('build_libxml2'),
