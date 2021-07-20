@@ -1,6 +1,7 @@
 // This is an overlay Swift module.
 @_exported import ObjectiveC
 
+@frozen
 public struct ObjCBool : CustomStringConvertible {
 #if (os(macOS) && arch(x86_64)) || (os(iOS) && (arch(i386) || arch(arm) || targetEnvironment(macCatalyst)))
 
@@ -34,6 +35,7 @@ public struct ObjCBool : CustomStringConvertible {
   }
 }
 
+@frozen
 public struct Selector {
   private var ptr : OpaquePointer
 }

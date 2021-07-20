@@ -8523,7 +8523,7 @@ void swift::simple_display(llvm::raw_ostream &out, AccessorKind kind) {
 }
 
 SourceLoc swift::extractNearestSourceLoc(const Decl *decl) {
-  auto loc = decl->getLoc();
+  auto loc = decl->getLoc(/*SerializedOK=*/false);
   if (loc.isValid())
     return loc;
 
