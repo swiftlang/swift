@@ -7,7 +7,7 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
-// REQUIRES: radar78290608
+// REQUIRES: rdar78290608
 
 import _Distributed
 
@@ -39,6 +39,7 @@ extension LocalWorker {
 
 // ==== Fake Transport ---------------------------------------------------------
 
+
 @available(SwiftStdlib 5.5, *)
 struct ActorAddress: ActorIdentity {
   let address: String
@@ -49,29 +50,29 @@ struct ActorAddress: ActorIdentity {
 
 @available(SwiftStdlib 5.5, *)
 struct FakeTransport: ActorTransport {
-  func resolve<Act>(address: ActorAddress, as actorType: Act.Type)
-  throws -> ActorResolved<Act> where Act: DistributedActor {
-    fatalError()
+  func decodeIdentity(from decoder: Decoder) throws -> AnyActorIdentity {
+    fatalError("not implemented:\(#function)")
   }
 
-  func assignIdentity<Act>(
-    _ actorType: Act.Type
-  ) -> ActorAddress where Act : DistributedActor {
-    let address = ActorAddress(parse: "xxx")
-    print("assign type:\(actorType), address:\(address)")
-    return address
+  func resolve<Act>(_ identity: Act.ID, as actorType: Act.Type)
+  throws -> ActorResolved<Act>
+      where Act: DistributedActor {
+    .makeProxy
   }
 
-  public func actorReady<Act>(
-    _ actor: Act
-  ) where Act: DistributedActor {
-    print("ready actor:\(actor), address:\(actor.id)")
+  func assignIdentity<Act>(_ actorType: Act.Type) -> AnyActorIdentity
+      where Act: DistributedActor {
+    let id = ActorAddress(parse: "xxx")
+    print("assign type:\(actorType), id:\(id)")
+    return .init(id)
   }
 
-  public func resignIdentity(
-    _ address: ActorAddress
-  ) {
-    print("ready address:\(address)")
+  func actorReady<Act>(_ actor: Act) where Act: DistributedActor {
+    print("ready actor:\(actor), id:\(actor.id)")
+  }
+
+  func resignIdentity(_ id: AnyActorIdentity) {
+    print("ready id:\(id)")
   }
 }
 
@@ -84,8 +85,8 @@ func test_local() async throws {
   let worker = LocalWorker(transport: transport)
   let x = try await worker.function()
   print("call: \(x)")
-  // CHECK: assign type:LocalWorker, address:[[ADDRESS:.*]]
-  // CHECK: ready actor:main.LocalWorker, address:[[ADDRESS]]
+  // CHECK: assign type:LocalWorker, id:[[ADDRESS:.*]]
+  // CHECK: ready actor:main.LocalWorker, id:AnyActorIdentity([[ADDRESS]])
   // CHECK: call: local:
 }
 
@@ -94,7 +95,7 @@ func test_remote() async throws {
   let address = ActorAddress(parse: "")
   let transport = FakeTransport()
 
-  let worker = try LocalWorker(resolve: address, using: transport)
+  let worker = try LocalWorker(resolve: .init(address), using: transport)
   let x = try await worker.function()
   print("call: \(x)")
   // CHECK: call: _cluster_remote_function():
