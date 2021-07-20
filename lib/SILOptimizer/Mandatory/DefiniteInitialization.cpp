@@ -818,7 +818,7 @@ static void injectHopToExecutorAfter(SILLocation loc,
       if (needsBorrow)
         actor = b.createBeginBorrow(loc, actor);
 
-      b.createHopToExecutor(loc, actor, /*mandatory=*/false);
+      b.createHopToExecutor(loc, actor);
 
       if (needsBorrow)
         b.createEndBorrow(loc, actor);
@@ -967,7 +967,7 @@ void LifetimeChecker::injectActorHops() {
 
     AvailabilitySet inSet(outSet.size());
     auto const &predecessors = block.getPredecessorBlocks();
-    for (const auto &pred : predecessors)
+    for (auto *pred : predecessors)
       inSet.mergeIn(getBlockInfo(pred).OutAvailability);
 
     if (inSet.isAllYes()) {
