@@ -399,12 +399,12 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
   auto effectiveAccess = d->getEffectiveAccess();
   
   // Private setter implementations for an internal storage declaration should
-  // be internal as well, so that a dynamically-writable
-  // keypath can be formed from other files.
+  // be at least internal as well, so that a dynamically-writable
+  // keypath can be formed from other files in the same module.
   if (auto accessor = dyn_cast<AccessorDecl>(d)) {
     if (accessor->isSetter()
-       && accessor->getStorage()->getEffectiveAccess() == AccessLevel::Internal)
-      effectiveAccess = AccessLevel::Internal;
+       && accessor->getStorage()->getEffectiveAccess() >= AccessLevel::Internal)
+      effectiveAccess = std::max(effectiveAccess, AccessLevel::Internal);
   }
 
   switch (effectiveAccess) {
