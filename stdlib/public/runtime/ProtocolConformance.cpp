@@ -157,14 +157,20 @@ tryGetCompleteMetadataNonblocking(const Metadata *metadata) {
 
 /// Get the superclass of metadata, which may be incomplete. When the metadata
 /// is not sufficiently complete, then we fall back to demangling the superclass
-/// in the nominal type descriptor, which is slow but works. Return NULL if the
-/// metadata is not a class.
+/// in the nominal type descriptor, which is slow but works. Return {NULL,
+/// MetadataState::Complete} if the metadata is not a class, or has no
+/// superclass.
 ///
 /// If the metadata's current state is known, it may be passed in as
 /// knownMetadataState. This saves the cost of retrieving that info separately.
+///
+/// When instantiateSuperclassMetadata is true, this function will instantiate
+/// superclass metadata when necessary. When false, this will return {NULL,
+/// MetadataState::Abstract} to indicate that there's an uninstantiated
+/// superclass that was not returned.
 static MetadataResponse getSuperclassForMaybeIncompleteMetadata(
-    const Metadata *metadata,
-    llvm::Optional<MetadataState> knownMetadataState) {
+    const Metadata *metadata, llvm::Optional<MetadataState> knownMetadataState,
+    bool instantiateSuperclassMetadata) {
   const ClassMetadata *classMetadata = dyn_cast<ClassMetadata>(metadata);
   if (!classMetadata)
     return {_swift_class_getSuperclass(metadata), MetadataState::Complete};
@@ -192,36 +198,43 @@ static MetadataResponse getSuperclassForMaybeIncompleteMetadata(
     // The subclass metadata is complete. Fetch and return the superclass.
     auto *superMetadata = getMetadataForClass(classMetadata->Superclass);
     return {superMetadata, MetadataState::Complete};
-  }
-  if (metadataState == MetadataState::NonTransitiveComplete) {
+  } else if (metadataState == MetadataState::NonTransitiveComplete) {
     // The subclass metadata is complete, but, unlike above, not transitively.
     // Its Superclass field is valid, so just read that field to get to the
     // superclass to proceed to the next step.
     auto *superMetadata = getMetadataForClass(classMetadata->Superclass);
     auto superState = tryGetCompleteMetadataNonblocking(superMetadata);
     return {superMetadata, superState};
-  } else {
+  } else if (instantiateSuperclassMetadata) {
     // The subclass metadata is either LayoutComplete or Abstract, so the
     // Superclass field is not valid.  To get to the superclass, make the
     // expensive call to getSuperclassMetadata which demangles the superclass
     // name from the nominal type descriptor to get the metadata for the
     // superclass.
-    MetadataRequest request(MetadataState::Complete,
+    MetadataRequest request(MetadataState::Abstract,
                             /*non-blocking*/ true);
     return getSuperclassMetadata(request, classMetadata);
+  } else {
+    // The Superclass field is not valid and the caller did not request
+    // instantiation. Return a NULL superclass and Abstract to indicate that a
+    // superclass exists but is not yet instantiated.
+    return {nullptr, MetadataState::Abstract};
   }
 }
 
-class MaybeIncompleteSuperclassIterator {
+struct MaybeIncompleteSuperclassIterator {
   const Metadata *metadata;
   llvm::Optional<MetadataState> state;
+  bool instantiateSuperclassMetadata;
 
-public:
-  MaybeIncompleteSuperclassIterator(const Metadata *metadata)
-      : metadata(metadata), state(llvm::None) {}
+  MaybeIncompleteSuperclassIterator(const Metadata *metadata,
+                                    bool instantiateSuperclassMetadata)
+      : metadata(metadata), state(llvm::None),
+        instantiateSuperclassMetadata(instantiateSuperclassMetadata) {}
 
   MaybeIncompleteSuperclassIterator &operator++() {
-    auto response = getSuperclassForMaybeIncompleteMetadata(metadata, state);
+    auto response = getSuperclassForMaybeIncompleteMetadata(
+        metadata, state, instantiateSuperclassMetadata);
     metadata = response.Value;
     state = response.State;
     return *this;
@@ -238,10 +251,12 @@ public:
 /// superclasses in order. If the metadata is not a class, iteration will
 /// provide that metadata and then stop.
 iterator_range<MaybeIncompleteSuperclassIterator>
-iterateMaybeIncompleteSuperclasses(const Metadata *metadata) {
+iterateMaybeIncompleteSuperclasses(const Metadata *metadata,
+                                   bool instantiateSuperclassMetadata) {
   return iterator_range<MaybeIncompleteSuperclassIterator>(
-      MaybeIncompleteSuperclassIterator(metadata),
-      MaybeIncompleteSuperclassIterator(nullptr));
+      MaybeIncompleteSuperclassIterator(metadata,
+                                        instantiateSuperclassMetadata),
+      MaybeIncompleteSuperclassIterator(nullptr, false));
 }
 
 /// Take the type reference inside a protocol conformance record and fetch the
@@ -562,12 +577,14 @@ swift::swift_registerProtocolConformances(const ProtocolConformanceRecord *begin
 /// A return value of `{ false, nullptr }` indicates nothing was cached.
 static std::pair<bool, const WitnessTable *>
 searchInConformanceCache(const Metadata *type,
-                         const ProtocolDescriptor *protocol) {
+                         const ProtocolDescriptor *protocol,
+                         bool instantiateSuperclassMetadata) {
   auto &C = Conformances.get();
   auto origType = type;
   auto snapshot = C.Cache.snapshot();
 
-  for (auto type : iterateMaybeIncompleteSuperclasses(type)) {
+  for (auto type : iterateMaybeIncompleteSuperclasses(
+           type, instantiateSuperclassMetadata)) {
     if (auto *Value = snapshot.find(ConformanceCacheKey(type, protocol))) {
       return {type == origType, Value->getWitnessTable()};
     }
@@ -655,9 +672,10 @@ namespace {
     /// Retrieve the type that matches the conformance candidate, which may
     /// be a superclass of the given type. Returns null if this type does not
     /// match this conformance.
-    const Metadata *getMatchingType(const Metadata *conformingType) const {
-      for (auto conformingType :
-           iterateMaybeIncompleteSuperclasses(conformingType)) {
+    const Metadata *getMatchingType(const Metadata *conformingType,
+                                    bool instantiateSuperclassMetadata) const {
+      for (auto conformingType : iterateMaybeIncompleteSuperclasses(
+               conformingType, instantiateSuperclassMetadata)) {
         if (matches(conformingType))
           return conformingType;
       }
@@ -671,7 +689,8 @@ static void validateSharedCacheResults(
     ConformanceState &C, const Metadata *type,
     const ProtocolDescriptor *protocol,
     const WitnessTable *dyldCachedWitnessTable,
-    const ProtocolConformanceDescriptor *dyldCachedConformanceDescriptor) {
+    const ProtocolConformanceDescriptor *dyldCachedConformanceDescriptor,
+    bool instantiateSuperclassMetadata) {
 #if USE_DYLD_SHARED_CACHE_CONFORMANCE_TABLES
   if (!C.sharedCacheOptimizationsActive() || !C.validateSharedCacheResults)
     return;
@@ -684,7 +703,7 @@ static void validateSharedCacheResults(
         continue;
 
       ConformanceCandidate candidate(descriptor);
-      if (candidate.getMatchingType(type))
+      if (candidate.getMatchingType(type, instantiateSuperclassMetadata))
         conformances.push_back(&descriptor);
     }
   }
@@ -733,7 +752,8 @@ static void validateSharedCacheResults(
 static std::tuple<const WitnessTable *, const ProtocolConformanceDescriptor *,
                   bool>
 findSharedCacheConformance(ConformanceState &C, const Metadata *type,
-                           const ProtocolDescriptor *protocol) {
+                           const ProtocolDescriptor *protocol,
+                           bool instantiateSuperclassMetadata) {
 #if USE_DYLD_SHARED_CACHE_CONFORMANCE_TABLES
   const ContextDescriptor *description;
   llvm::StringRef foreignTypeIdentity;
@@ -767,7 +787,8 @@ findSharedCacheConformance(ConformanceState &C, const Metadata *type,
             dyldResult.value);
 
     assert(conformanceDescriptor->getProtocol() == protocol);
-    assert(ConformanceCandidate{*conformanceDescriptor}.getMatchingType(type));
+    assert(ConformanceCandidate{*conformanceDescriptor}.getMatchingType(
+        type, instantiateSuperclassMetadata));
 
     if (conformanceDescriptor->getGenericWitnessTable()) {
       SHARED_CACHE_LOG(
@@ -818,9 +839,15 @@ findSharedCacheConformance(ConformanceState &C, const Metadata *type,
 #endif
 }
 
-static const WitnessTable *
-swift_conformsToProtocolImpl(const Metadata *const type,
-                             const ProtocolDescriptor *protocol) {
+/// Check if a type conforms to a protocol, possibly instantiating superclasses
+/// that have not yet been instantiated. The return value is a pair consisting
+/// of the witness table for the conformance (or NULL if no conformance was
+/// found), and a boolean indicating whether there are uninstantiated
+/// superclasses that were not searched.
+static std::pair<const WitnessTable *, bool>
+swift_conformsToProtocolMaybeInstantiateSuperclasses(
+    const Metadata *const type, const ProtocolDescriptor *protocol,
+    bool instantiateSuperclassMetadata) {
   auto &C = Conformances.get();
 
   const WitnessTable *dyldCachedWitnessTable = nullptr;
@@ -830,51 +857,56 @@ swift_conformsToProtocolImpl(const Metadata *const type,
   // Search the shared cache tables for a conformance for this type, and for
   // superclasses (if it's a class).
   if (C.sharedCacheOptimizationsActive()) {
-    for (auto dyldSearchType : iterateMaybeIncompleteSuperclasses(type)) {
+    for (auto dyldSearchType : iterateMaybeIncompleteSuperclasses(
+             type, instantiateSuperclassMetadata)) {
       bool definitiveFailure;
       std::tie(dyldCachedWitnessTable, dyldCachedConformanceDescriptor,
                definitiveFailure) =
-          findSharedCacheConformance(C, dyldSearchType, protocol);
+          findSharedCacheConformance(C, dyldSearchType, protocol,
+                                     instantiateSuperclassMetadata);
 
       if (definitiveFailure)
-        return nullptr;
+        return {nullptr, false};
 
       if (dyldCachedWitnessTable || dyldCachedConformanceDescriptor)
         break;
     }
 
     validateSharedCacheResults(C, type, protocol, dyldCachedWitnessTable,
-                               dyldCachedConformanceDescriptor);
+                               dyldCachedConformanceDescriptor,
+                               instantiateSuperclassMetadata);
     // Return a cached result if we got a witness table. We can't do this if
     // scanSectionsBackwards is set, since a scanned conformance can override a
     // cached result in that case.
     if (!C.scanSectionsBackwards)
       if (dyldCachedWitnessTable)
-        return dyldCachedWitnessTable;
+        return {dyldCachedWitnessTable, false};
   }
 
   // See if we have an authoritative cached conformance. The
   // ConcurrentReadableHashMap data structure allows us to search the map
   // concurrently without locking.
-  auto found = searchInConformanceCache(type, protocol);
+  auto found =
+      searchInConformanceCache(type, protocol, instantiateSuperclassMetadata);
   if (found.first) {
     // An authoritative negative result can be overridden by a result from dyld.
     if (!found.second) {
       if (dyldCachedWitnessTable)
-        return dyldCachedWitnessTable;
+        return {dyldCachedWitnessTable, false};
     }
-    return found.second;
+    return {found.second, false};
   }
 
   if (dyldCachedConformanceDescriptor) {
     ConformanceCandidate candidate(*dyldCachedConformanceDescriptor);
-    auto *matchingType = candidate.getMatchingType(type);
+    auto *matchingType =
+        candidate.getMatchingType(type, instantiateSuperclassMetadata);
     assert(matchingType);
     auto witness = dyldCachedConformanceDescriptor->getWitnessTable(matchingType);
     C.cacheResult(type, protocol, witness, /*always cache*/ 0);
     SHARED_CACHE_LOG("Caching generic conformance to %s found in shared cache",
                      protocol->Name.get());
-    return witness;
+    return {witness, false};
   }
 
   // Scan conformance records.
@@ -890,7 +922,8 @@ swift_conformsToProtocolImpl(const Metadata *const type,
       // The matching type is exact, so they can't go stale, and we should
       // always cache them.
       ConformanceCandidate candidate(descriptor);
-      if (auto *matchingType = candidate.getMatchingType(type)) {
+      if (auto *matchingType =
+              candidate.getMatchingType(type, instantiateSuperclassMetadata)) {
         auto witness = descriptor.getWitnessTable(matchingType);
         C.cacheResult(matchingType, protocol, witness, /*always cache*/ 0);
         foundWitnesses.insert({matchingType, witness});
@@ -918,7 +951,13 @@ swift_conformsToProtocolImpl(const Metadata *const type,
   // Find the most specific conformance that was scanned.
   const WitnessTable *foundWitness = nullptr;
   const Metadata *foundType = nullptr;
-  for (auto searchType : iterateMaybeIncompleteSuperclasses(type)) {
+
+  // Use MaybeIncompleteSuperclassIterator directly so we can examine its final
+  // state. Complete indicates that we finished normally, Abstract indicates
+  // that there's an uninstantiated superclass we didn't iterate over.
+  MaybeIncompleteSuperclassIterator superclassIterator{
+      type, instantiateSuperclassMetadata};
+  for (; auto searchType = superclassIterator.metadata; ++superclassIterator) {
     const WitnessTable *witness = foundWitnesses.lookup(searchType);
     if (witness) {
       if (!foundType) {
@@ -936,17 +975,49 @@ swift_conformsToProtocolImpl(const Metadata *const type,
     }
   }
 
+  // Do not cache negative results if there were uninstantiated superclasses we
+  // didn't search. They might have a conformance that will be found later.
+  bool hasUninstantiatedSuperclass =
+      superclassIterator.state == MetadataState::Abstract;
+
   // If it's for a superclass or if we didn't find anything, then add an
   // authoritative entry for this type.
   if (foundType != type)
-    C.cacheResult(type, protocol, foundWitness, snapshot.count());
+    if (foundWitness || !hasUninstantiatedSuperclass)
+      C.cacheResult(type, protocol, foundWitness, snapshot.count());
 
   // A negative result can be overridden by a result from dyld.
-  if (foundWitness) {
+  if (!foundWitness) {
     if (dyldCachedWitnessTable)
-      return dyldCachedWitnessTable;
+      return {dyldCachedWitnessTable, false};
   }
-  return foundWitness;
+  return {foundWitness, hasUninstantiatedSuperclass};
+}
+
+static const WitnessTable *
+swift_conformsToProtocolImpl(const Metadata *const type,
+                             const ProtocolDescriptor *protocol) {
+  const WitnessTable *table;
+  bool hasUninstantiatedSuperclass;
+
+  // First, try without instantiating any new superclasses. This avoids
+  // an infinite loop for cases like `class Sub: Super<Sub>`. In cases like
+  // that, the conformance must exist on the subclass (or at least somewhere
+  // in the chain before we get to an uninstantiated superclass) so this search
+  // will succeed without trying to instantiate Super while it's already being
+  // instantiated.=
+  std::tie(table, hasUninstantiatedSuperclass) =
+      swift_conformsToProtocolMaybeInstantiateSuperclasses(
+          type, protocol, false /*instantiateSuperclassMetadata*/);
+
+  // If no conformance was found, and there is an uninstantiated superclass that
+  // was not searched, then try the search again and instantiate all
+  // superclasses.
+  if (!table && hasUninstantiatedSuperclass)
+    std::tie(table, hasUninstantiatedSuperclass) =
+        swift_conformsToProtocolMaybeInstantiateSuperclasses(
+            type, protocol, true /*instantiateSuperclassMetadata*/);
+  return table;
 }
 
 const ContextDescriptor *
@@ -973,8 +1044,8 @@ bool isSwiftClassMetadataSubclass(const ClassMetadata *subclass,
 
   llvm::Optional<MetadataState> subclassState = llvm::None;
   while (true) {
-    auto response =
-        getSuperclassForMaybeIncompleteMetadata(subclass, subclassState);
+    auto response = getSuperclassForMaybeIncompleteMetadata(
+        subclass, subclassState, true /*instantiateSuperclassMetadata*/);
     if (response.Value == superclass)
       return true;
     if (!response.Value)
@@ -1177,7 +1248,8 @@ const Metadata *swift::findConformingSuperclass(
   // Figure out which type we're looking for.
   ConformanceCandidate candidate(*conformance);
 
-  const Metadata *conformingType = candidate.getMatchingType(type);
+  const Metadata *conformingType =
+      candidate.getMatchingType(type, true /*instantiateSuperclassMetadata*/);
   assert(conformingType);
   return conformingType;
 }
