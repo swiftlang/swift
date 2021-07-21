@@ -381,3 +381,11 @@ func testImplicitAsyncIsolatedParam(
   // CHECK-NEXT: hop_to_executor [[CURRENT]] : $Optional<Builtin.Executor>
   await otherActor.otherIsolated(i, actor, d)
 }
+
+// CHECK-LABEL: sil hidden [ossa] @$s4test22asyncWithIsolatedParam1i5actor1dySi_AA7MyActorCYiSdtYaF : $@convention(thin) @async (Int, @guaranteed MyActor, Double) -> ()
+func asyncWithIsolatedParam(i: Int, actor: isolated MyActor, d: Double) async {
+  // CHECK: [[ACTOR:%.*]] = copy_value %1 : $MyActor
+  // CHECK-NEXT: [[BORROWED:%.*]] = begin_borrow [[ACTOR]] : $MyActor
+  // CHECK-NEXT: hop_to_executor [[BORROWED]] : $MyActor
+  // CHECK-NEXT: end_borrow [[BORROWED]] : $MyActor
+}
