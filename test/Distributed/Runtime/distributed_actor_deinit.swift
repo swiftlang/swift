@@ -7,7 +7,7 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
-// REQUIRES: radar78290608
+// REQUIRES: rdar78290608
 
 import _Distributed
 
@@ -97,27 +97,27 @@ func test() {
 
   _ = DA(transport: transport)
   // CHECK: assign type:DA, address:[[ADDRESS:.*]]
-  // CHECK: ready actor:main.DA, address:[[ADDRESS]]
-  // CHECK: resign address:[[ADDRESS]]
+  // CHECK: ready actor:main.DA, address:AnyActorIdentity(ActorAddress(address: "xxx"))
+  // CHECK: resign address:AnyActorIdentity(ActorAddress(address: "xxx"))
 
   _ = DA_userDefined(transport: transport)
   // CHECK: assign type:DA_userDefined, address:[[ADDRESS:.*]]
-  // CHECK: ready actor:main.DA_userDefined, address:[[ADDRESS]]
-  // CHECK: resign address:[[ADDRESS]]
+  // CHECK: ready actor:main.DA_userDefined, address:AnyActorIdentity(ActorAddress(address: "xxx"))
+  // CHECK: resign address:AnyActorIdentity(ActorAddress(address: "xxx"))
 
   // resign must happen as the _last thing_ after user-deinit completed
   _ = DA_userDefined2(transport: transport)
   // CHECK: assign type:DA_userDefined2, address:[[ADDRESS:.*]]
-  // CHECK: ready actor:main.DA_userDefined2, address:[[ADDRESS]]
-  // CHECK: Deinitializing [[ADDRESS]]
-  // CHECK-NEXT: resign address:[[ADDRESS]]
+  // CHECK: ready actor:main.DA_userDefined2, address:AnyActorIdentity(ActorAddress(address: "xxx"))
+  // CHECK: Deinitializing AnyActorIdentity(ActorAddress(address: "xxx"))
+  // CHECK-NEXT: resign address:AnyActorIdentity(ActorAddress(address: "xxx"))
 
   // resign must happen as the _last thing_ after user-deinit completed
   _ = DA_state(transport: transport)
   // CHECK: assign type:DA_state, address:[[ADDRESS:.*]]
-  // CHECK: ready actor:main.DA_state, address:[[ADDRESS]]
-  // CHECK: Deinitializing [[ADDRESS]]
-  // CHECK-NEXT: resign address:[[ADDRESS]]
+  // CHECK: ready actor:main.DA_state, address:AnyActorIdentity(ActorAddress(address: "xxx"))
+  // CHECK: Deinitializing AnyActorIdentity(ActorAddress(address: "xxx"))
+  // CHECK-NEXT: resign address:AnyActorIdentity(ActorAddress(address: "xxx"))
 
   // a remote actor should not resign it's address, it was never "assigned" it
   print("before")
