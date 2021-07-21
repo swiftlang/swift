@@ -854,6 +854,29 @@ actor MyActorP: P {
 }
 
 @available(SwiftStdlib 5.5, *)
+protocol SP {
+  static func s()
+}
+
+@available(SwiftStdlib 5.5, *)
+actor ASP: SP {
+  static func s() { }
+}
+
+@available(SwiftStdlib 5.5, *)
+protocol SPD {
+  static func sd()
+}
+@available(SwiftStdlib 5.5, *)
+extension SPD {
+  static func sd() { }
+}
+
+@available(SwiftStdlib 5.5, *)
+actor ASPD: SPD {
+}
+
+@available(SwiftStdlib 5.5, *)
 func testCrossActorProtocol<T: P>(t: T) async {
   await t.f()
   await t.g()
@@ -863,6 +886,8 @@ func testCrossActorProtocol<T: P>(t: T) async {
   t.g()
   // expected-error@-1{{expression is 'async' but is not marked with 'await'}}{{3-3=await }}
   // expected-note@-2{{calls to instance method 'g()' from outside of its actor context are implicitly asynchronous}}
+  ASP.s()
+  ASPD.sd()
 }
 
 // ----------------------------------------------------------------------
