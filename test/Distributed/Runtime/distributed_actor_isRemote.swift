@@ -11,7 +11,7 @@
 // rdar://77798215
 // UNSUPPORTED: OS=windows-msvc
 
-// REQUIRES: radar78290608
+// REQUIRES: rdar78290608
 
 import _Distributed
 
@@ -25,9 +25,9 @@ distributed actor SomeSpecificDistributedActor {
 @available(SwiftStdlib 5.5, *)
 extension SomeSpecificDistributedActor {
 
-  @_dynamicReplacement(for: hello())
-  nonisolated func _remote_hello() async throws -> String {
-    return "remote impl (address: \(actor.id))"
+  @_dynamicReplacement(for: _remote_hello())
+  nonisolated func _remote_impl_hello() async throws -> String {
+    return "remote impl (address: \(self.id))"
   }
 }
 
@@ -40,30 +40,43 @@ struct FakeActorID: ActorIdentity {
 
 @available(SwiftStdlib 5.5, *)
 enum FakeTransportError: ActorTransportError {
-  case unsupportedActorIdentity(ActorIdentity)
+  case unsupportedActorIdentity(AnyActorIdentity)
+}
+
+@available(SwiftStdlib 5.5, *)
+struct ActorAddress: ActorIdentity {
+  let address: String
+  init(parse address : String) {
+    self.address = address
+  }
 }
 
 @available(SwiftStdlib 5.5, *)
 struct FakeTransport: ActorTransport {
-  func resolve<Act>(address: ActorAddress, as actorType: Act.Type)
-    throws -> ActorResolved<Act> where Act: DistributedActor {
-    return .makeProxy
+  func decodeIdentity(from decoder: Decoder) throws -> AnyActorIdentity {
+    fatalError("not implemented:\(#function)")
   }
 
-  func assignIdentity<Act>(
-    _ actorType: Act.Type
-  ) -> ActorAddress where Act : DistributedActor {
-    ActorAddress(parse: "")
+  func resolve<Act>(_ identity: Act.ID, as actorType: Act.Type)
+  throws -> ActorResolved<Act>
+      where Act: DistributedActor {
+    .makeProxy
   }
 
-  public func actorReady<Act>(
-    _ actor: Act
-  ) where Act: DistributedActor {}
+  func assignIdentity<Act>(_ actorType: Act.Type) -> AnyActorIdentity
+      where Act: DistributedActor {
+    let id = ActorAddress(parse: "xxx")
+    print("assign type:\(actorType), id:\(id)")
+    return .init(id)
+  }
 
-  public func resignIdentity(
-    _ address: AnyActorIdentity
-  ) {}
+  func actorReady<Act>(_ actor: Act) where Act: DistributedActor {
+    print("ready actor:\(actor), id:\(actor.id)")
+  }
 
+  func resignIdentity(_ id: AnyActorIdentity) {
+    print("ready id:\(id)")
+  }
 }
 
 // ==== Execute ----------------------------------------------------------------
@@ -88,7 +101,7 @@ func test_remote() async {
   assert(__isRemoteActor(local) == false, "should be local")
 
   // assume it always makes a remote one
-  let remote = try! SomeSpecificDistributedActor(resolve: address, using: transport)
+  let remote = try! SomeSpecificDistributedActor(resolve: .init(address), using: transport)
   assert(__isLocalActor(remote) == false, "should be remote")
   assert(__isRemoteActor(remote) == true, "should be remote")
 

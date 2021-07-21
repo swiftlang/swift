@@ -126,13 +126,16 @@ extension DistributedActor {
 public protocol ActorIdentity: Sendable, Hashable, Codable {}
 
 @available(SwiftStdlib 5.5, *)
-public struct AnyActorIdentity: ActorIdentity, @unchecked Sendable {
+public struct AnyActorIdentity: ActorIdentity, @unchecked Sendable, CustomStringConvertible {
   @usableFromInline let _hashInto: (inout Hasher) -> ()
   @usableFromInline let _equalTo: (Any) -> Bool
   @usableFromInline let _encodeTo: (Encoder) throws -> ()
+  @usableFromInline let _description: () -> String
 
   public init<ID>(_ identity: ID) where ID: ActorIdentity {
-    _hashInto = { hasher in identity.hash(into: &hasher) }
+    _hashInto = { hasher in identity
+        .hash(into: &hasher)
+    }
     _equalTo = { other in
       guard let rhs = other as? ID else {
         return false
@@ -141,6 +144,9 @@ public struct AnyActorIdentity: ActorIdentity, @unchecked Sendable {
     }
     _encodeTo = { encoder in
       try identity.encode(to: encoder)
+    }
+    _description = { () in
+      "\(identity)"
     }
   }
 
@@ -156,6 +162,10 @@ public struct AnyActorIdentity: ActorIdentity, @unchecked Sendable {
 
   public func encode(to encoder: Encoder) throws {
     try _encodeTo(encoder)
+  }
+
+  public var description: String {
+    "\(Self.self)(\(self._description()))"
   }
 
   public func hash(into hasher: inout Hasher) {

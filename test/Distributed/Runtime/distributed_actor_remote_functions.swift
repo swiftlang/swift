@@ -11,12 +11,17 @@
 // rdar://77798215
 // UNSUPPORTED: OS=windows-msvc
 
-// REQUIRES: radar78290608
+// REQUIRES: rdar78290608
 
 import _Distributed
 import _Concurrency
 
-struct Boom: Error {}
+struct Boom: Error {
+  let whoFailed: String
+  init(_ whoFailed: String) {
+    self.whoFailed = whoFailed
+  }
+}
 
 @available(SwiftStdlib 5.5, *)
 distributed actor SomeSpecificDistributedActor {
@@ -38,16 +43,50 @@ distributed actor SomeSpecificDistributedActor {
    "local(\(#function))"
   }
 
- // === errors
+  // === errors
 
- distributed func helloThrowsImplBoom() throws -> String {
-   throw Boom()
- }
+  distributed func helloThrowsImplBoom() throws -> String {
+    throw Boom("impl")
+  }
 
- distributed func helloThrowsTransportBoom() throws -> String {
-   "local(\(#function))"
- }
+  distributed func helloThrowsTransportBoom() throws -> String {
+    "local(\(#function))"
+  }
+}
 
+@available(SwiftStdlib 5.5, *)
+extension SomeSpecificDistributedActor {
+  @_dynamicReplacement(for:_remote_helloAsyncThrows())
+  nonisolated func _remote_impl_helloAsyncThrows() async throws -> String {
+    "remote(\(#function))"
+  }
+
+  @_dynamicReplacement(for:_remote_helloAsync())
+  nonisolated func _remote_impl_helloAsync() async throws -> String {
+    "remote(\(#function))"
+  }
+
+  @_dynamicReplacement(for:_remote_helloThrows())
+  nonisolated func _remote_impl_helloThrows() async throws -> String {
+    "remote(\(#function))"
+  }
+
+  @_dynamicReplacement(for:_remote_hello())
+  nonisolated func _remote_impl_hello() async throws -> String {
+    "remote(\(#function))"
+  }
+
+  // === errors
+
+  @_dynamicReplacement(for:_remote_helloThrowsImplBoom())
+  nonisolated func _remote_impl_helloThrowsImplBoom() async throws -> String {
+    "remote(\(#function))"
+  }
+
+  @_dynamicReplacement(for:_remote_helloThrowsTransportBoom())
+  nonisolated func _remote_impl_helloThrowsTransportBoom() async throws -> String {
+    throw Boom("transport")
+  }
 }
 
 // ==== Execute ----------------------------------------------------------------
@@ -71,24 +110,26 @@ struct ActorAddress: ActorIdentity {
 
 @available(SwiftStdlib 5.5, *)
 struct FakeTransport: ActorTransport {
-  func resolve<Act>(address: ActorAddress, as actorType: Act.Type)
-    throws -> ActorResolved<Act> where Act: DistributedActor {
-    return .makeProxy
+  func decodeIdentity(from decoder: Decoder) throws -> AnyActorIdentity {
+    fatalError("not implemented:\(#function)")
   }
 
-  func assignIdentity<Act>(
-    _ actorType: Act.Type
-  ) -> ActorAddress where Act : DistributedActor {
-    ActorAddress(parse: "")
+  func resolve<Act>(_ identity: Act.ID, as actorType: Act.Type)
+  throws -> ActorResolved<Act>
+      where Act: DistributedActor {
+    .makeProxy
   }
 
-  public func actorReady<Act>(
-    _ actor: Act
-  ) where Act: DistributedActor {}
+  func assignIdentity<Act>(_ actorType: Act.Type) -> AnyActorIdentity
+      where Act: DistributedActor {
+    .init(ActorAddress(parse: ""))
+  }
 
-  public func resignIdentity(
-    _ address: ActorAddress
-  ) {}
+  func actorReady<Act>(_ actor: Act) where Act: DistributedActor {
+  }
+
+  func resignIdentity(_ id: AnyActorIdentity) {
+  }
 }
 
 // ==== Execute ----------------------------------------------------------------
@@ -114,21 +155,21 @@ func test_remote_invoke(address: ActorAddress, transport: ActorTransport) async 
     if __isRemoteActor(actor) {
       do {
         _ = try await actor.helloThrowsTransportBoom()
-        preconditionFailure("Should have thrown")
+        preconditionFailure("helloThrowsTransportBoom: should have thrown")
       } catch {
         print("\(personality) - helloThrowsTransportBoom: \(error)")
       }
-
+    } else {
       do {
         _ = try await actor.helloThrowsImplBoom()
-        preconditionFailure("Should have thrown")
+        preconditionFailure("helloThrowsImplBoom: Should have thrown")
       } catch {
         print("\(personality) - helloThrowsImplBoom: \(error)")
       }
     }
   }
 
-  let remote = try! SomeSpecificDistributedActor(resolve: address, using: transport)
+  let remote = try! SomeSpecificDistributedActor(resolve: .init(address), using: transport)
   assert(__isRemoteActor(remote) == true, "should be remote")
 
   let local = SomeSpecificDistributedActor(transport: transport)
@@ -141,17 +182,16 @@ func test_remote_invoke(address: ActorAddress, transport: ActorTransport) async 
   // CHECK: local - helloAsync: local(helloAsync())
   // CHECK: local - helloThrows: local(helloThrows())
   // CHECK: local - hello: local(hello())
-
+  // CHECK: local - helloThrowsImplBoom: Boom(whoFailed: "impl")
 
   print("remote isRemote: \(__isRemoteActor(remote))")
   // CHECK: remote isRemote: true
   await check(actor: remote)
-  // CHECK: remote - helloAsyncThrows: remote(_remote_helloAsyncThrows(actor:))
-  // CHECK: remote - helloAsync: remote(_remote_helloAsync(actor:))
-  // CHECK: remote - helloThrows: remote(_remote_helloThrows(actor:))
-  // CHECK: remote - hello: remote(_remote_hello(actor:))
-  // CHECK: remote - helloThrowsTransportBoom: Boom()
-  // CHECK: remote - helloThrowsImplBoom: Boom()
+  // CHECK: remote - helloAsyncThrows: remote(_remote_impl_helloAsyncThrows())
+  // CHECK: remote - helloAsync: remote(_remote_impl_helloAsync())
+  // CHECK: remote - helloThrows: remote(_remote_impl_helloThrows())
+  // CHECK: remote - hello: remote(_remote_impl_hello())
+  // CHECK: remote - helloThrowsTransportBoom: Boom(whoFailed: "transport")
 
   print(local)
   print(remote)
