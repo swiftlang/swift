@@ -1938,8 +1938,8 @@ OverlayFileContents::load(std::unique_ptr<llvm::MemoryBuffer> input,
     return error;
 
   if (contents.version > 1) {
-    auto message = Twine("key 'version' has invalid value: ") + Twine(contents.version);
-    errorMessages.push_back(message.str());
+    std::string message = (Twine("key 'version' has invalid value: ") + Twine(contents.version)).str();
+    errorMessages.emplace_back(std::move(message));
     return make_error_code(std::errc::result_out_of_range);
   }
 
