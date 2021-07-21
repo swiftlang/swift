@@ -13,7 +13,7 @@ distributed actor OK1 {
   // ok, since all fields are initialized, the constructors can be synthesized
 }
 
-// TODO: test all the FIXITs in this file (!!!)
+// TODO: test all the FIXITs in this file
 
 @available(SwiftStdlib 5.5, *)
 distributed actor Bad1 {

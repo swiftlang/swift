@@ -89,6 +89,17 @@ distributed actor DistributedActor_1 {
     fatalError()
   }
 
+  static func staticFunc() -> String { "" } // ok
+
+// TODO: should be able to handle a static, global actor isolated function as well
+//  @MainActor
+//  static func staticMainActorFunc() -> String { "" } // ok
+
+  static distributed func staticDistributedFunc() -> String {
+    // expected-error@-1{{'distributed' functions cannot be 'static'}}{10-21=}
+    fatalError()
+  }
+
   func test_inside() async throws {
     _ = self.name
     _ = self.computedMutable
@@ -126,10 +137,29 @@ func test_outside(
   _ = distributed.id
   _ = distributed.actorTransport
 
+  // ==== static functions
+  _ = distributed.staticFunc() // expected-error{{static member 'staticFunc' cannot be used on instance of type 'DistributedActor_1'}}
+  _ = DistributedActor_1.staticFunc()
+
   // ==== non-distributed functions
   _ = await distributed.hello() // expected-error{{only 'distributed' functions can be called from outside the distributed actor}}
   _ = await distributed.helloAsync() // expected-error{{only 'distributed' functions can be called from outside the distributed actor}}
   _ = try await distributed.helloAsyncThrows() // expected-error{{only 'distributed' functions can be called from outside the distributed actor}}
+}
+
+// ==== Protocols and static (non isolated functions)
+
+@available(SwiftStdlib 5.5, *)
+protocol P {
+  static func hello() -> String
+}
+@available(SwiftStdlib 5.5, *)
+extension P {
+  static func hello() -> String { "" }
+}
+
+@available(SwiftStdlib 5.5, *)
+distributed actor ALL: P {
 }
 
 // ==== Codable parameters and return types ------------------------------------
