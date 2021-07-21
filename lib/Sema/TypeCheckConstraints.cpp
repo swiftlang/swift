@@ -2026,7 +2026,12 @@ HasDynamicCallableAttributeRequest::evaluate(Evaluator &evaluator,
 }
 
 bool swift::shouldTypeCheckInEnclosingExpression(ClosureExpr *expr) {
-  return expr->hasSingleExpressionBody();
+  if (expr->hasSingleExpressionBody())
+    return true;
+
+  auto &ctx = expr->getASTContext();
+  return !expr->hasEmptyBody() &&
+         ctx.TypeCheckerOpts.EnableMultiStatementClosureInference;
 }
 
 void swift::forEachExprInConstraintSystem(
