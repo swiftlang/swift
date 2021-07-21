@@ -181,6 +181,7 @@ cmake -B S:\b\3 ^
   -D ICU_I18N_LIBRARY_RELEASE=S:\library\icu-67\usr\lib\icuin67.lib ^
   -D ICU_ROOT=S:\Library\icu-67\usr ^
   -D ICU_UC_LIBRARY_RELEASE=S:\Library\icu-67\usr\lib\icuuc67.lib ^
+  -D LIBXML2_DEFINITIONS="/DLIBXML_STATIC" ^
   -D LIBXML2_LIBRARY=S:\Library\libxml2-development\usr\lib\libxml2s.lib ^
   -D LIBXML2_INCLUDE_DIR=S:\Library\libxml2-development\usr\include\libxml2 ^
   -D ENABLE_TESTING=NO ^
