@@ -4288,6 +4288,29 @@ bool SILGenModule::isNonMutatingSelfIndirect(SILDeclRef methodRef) {
   return self.isFormalIndirect();
 }
 
+namespace {
+/// Cleanup to insert fix_lifetime and destroy
+class FixLifetimeDestroyCleanup : public Cleanup {
+  SILValue val;
+
+public:
+  FixLifetimeDestroyCleanup(SILValue val) : val(val) {}
+
+  void emit(SILGenFunction &SGF, CleanupLocation l,
+            ForUnwind_t forUnwind) override {
+    SGF.B.emitFixLifetime(l, val);
+    SGF.B.emitDestroyOperation(l, val);
+  }
+
+  void dump(SILGenFunction &SGF) const override {
+#ifndef NDEBUG
+    llvm::errs() << "FixLifetimeDestroyCleanup "
+                 << "State:" << getState() << " "
+                 << "Value: " << val << "\n";
+#endif
+  }
+};
+} // end anonymous namespace
 
 //===----------------------------------------------------------------------===//
 //                           Top Level Entrypoints
@@ -4437,6 +4460,19 @@ RValue SILGenFunction::emitApply(
   // hop back to the current executor
   breadcrumb.emit(*this, loc);
 
+  // For objc async calls, lifetime extend the args until the result plan which
+  // generates `await_async_continuation`.
+  // Lifetime is extended by creating unmanaged copies here and by pushing the
+  // cleanups required just before the result plan is generated.
+  SmallVector<ManagedValue, 8> unmanagedCopies;
+  if (calleeTypeInfo.foreign.async) {
+    for (auto arg : args) {
+      if (arg.hasCleanup()) {
+        unmanagedCopies.push_back(arg.unmanagedCopy(*this, loc));
+      }
+    }
+  }
+
   // Pop the argument scope.
   argScope.pop();
 
@@ -4512,11 +4548,29 @@ RValue SILGenFunction::emitApply(
     emitForeignErrorCheck(loc, directResults, errorTemp, doesNotThrow,
                           *foreignError);
   }
-  
+
+  // For objc async calls, push cleanup to be used on throw paths in the result
+  // planner.
+  for (unsigned i : indices(unmanagedCopies)) {
+    SILValue value = unmanagedCopies[i].getValue();
+    Cleanups.pushCleanup<FixLifetimeDestroyCleanup>(value);
+    unmanagedCopies[i] = ManagedValue(value, Cleanups.getTopCleanup());
+  }
+
   auto directResultsArray = makeArrayRef(directResults);
   RValue result =
     resultPlan->finish(*this, loc, substResultType, directResultsArray);
   assert(directResultsArray.empty() && "didn't claim all direct results");
+
+  // For objc async calls, generate cleanup on the resume path here and forward
+  // the previously pushed cleanups.
+  if (calleeTypeInfo.foreign.async) {
+    for (auto unmanagedCopy : unmanagedCopies) {
+      auto value = unmanagedCopy.forward(*this);
+      B.emitFixLifetime(loc, value);
+      B.emitDestroyOperation(loc, value);
+    }
+  }
 
   return result;
 }
