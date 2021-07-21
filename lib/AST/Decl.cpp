@@ -6782,7 +6782,7 @@ ParamDecl::getDefaultValueStringRepresentation(
           if (auto *placeholder = findWrappedValuePlaceholder(parentInit))
             wrappedValue = placeholder->getOriginalWrappedValue();
 
-        if (!wrappedValue || !wrappedValue->getSourceRange().isValid()) {
+        if (!wrappedValue) {
           if (auto type = original->getPropertyWrapperBackingPropertyType()) {
             if (auto nominal = type->getAnyNominal()) {
               scratch.clear();
@@ -6796,6 +6796,9 @@ ParamDecl::getDefaultValueStringRepresentation(
 
           return ".init()";
         }
+
+        if (!wrappedValue->getSourceRange().isValid())
+          return StringRef();
 
         auto &sourceMgr = getASTContext().SourceMgr;
         return extractInlinableText(sourceMgr, wrappedValue, scratch);
