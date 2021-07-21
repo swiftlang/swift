@@ -214,11 +214,11 @@
         },
         "next" : {
             "aliases": ["next", "master-next",
-                        "next",
+                        "swift/next",
                         "stable-next", "upstream",
                         "next-upstream", "upstream-with-swift"],
             "repos": {
-                "llvm-project": "next",
+                "llvm-project": "swift/next",
                 "swift": "next",
                 "cmark": "main",
                 "llbuild": "main",
