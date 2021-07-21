@@ -8,7 +8,7 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
-// REQUIRES: radar78290608
+// REQUIRES: rdar78290608
 
 import _Distributed
 
@@ -17,6 +17,10 @@ distributed actor SomeSpecificDistributedActor {
 
   distributed func hello() async throws {
      print("hello from \(self.id)")
+  }
+
+  distributed func echo(int: Int) async throws -> Int {
+    int
   }
 }
 
@@ -41,25 +45,23 @@ struct ActorAddress: ActorIdentity {
 
 @available(SwiftStdlib 5.5, *)
 struct FakeTransport: ActorTransport {
-
   func decodeIdentity(from decoder: Decoder) throws -> AnyActorIdentity {
-    fatalError()
+    fatalError("not implemented \(#function)")
   }
 
-  func resolve<Act>(identity: Act.ID, as actorType: Act.Type)
-    throws -> ActorResolved<Act>
+  func resolve<Act>(_ identity: Act.ID, as actorType: Act.Type) throws -> ActorResolved<Act>
       where Act: DistributedActor {
-    fatalError()
+    return .makeProxy
   }
 
   func assignIdentity<Act>(_ actorType: Act.Type) -> AnyActorIdentity
       where Act: DistributedActor {
-    ActorAddress(parse: "")
+    .init(ActorAddress(parse: ""))
   }
 
   public func actorReady<Act>(_ actor: Act)
       where Act: DistributedActor {
-    fatalError()
+    print("\(#function):\(actor)")
   }
 
   func resignIdentity(_ id: AnyActorIdentity) {}
@@ -73,7 +75,7 @@ func test_initializers() {
   let transport = FakeTransport()
 
   _ = SomeSpecificDistributedActor(transport: transport)
-  _ = try! SomeSpecificDistributedActor.resolve(address, using: transport)
+  _ = try! SomeSpecificDistributedActor(resolve: .init(address), using: transport)
 }
 
 @available(SwiftStdlib 5.5, *)
