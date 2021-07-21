@@ -249,7 +249,7 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
   ///
   /// - Parameter elementType: The type of element the `AsyncThrowingStream`
   ///   produces
-  /// - Parameter maxBufferedElements: The maximum number of elements to
+  /// - Parameter limit: The maximum number of elements to
   ///   hold in the buffer. By default, this value is unlimited. Use a
   ///   `Continuation.BufferingPolicy` to buffer a specified number of oldest
   ///   or newest elements.

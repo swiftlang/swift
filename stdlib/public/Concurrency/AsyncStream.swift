@@ -220,8 +220,8 @@ public struct AsyncStream<Element> {
   ///
   /// - Parameter elementType: The type of element the `AsyncStream`
   ///   produces
-  /// - Parameter maxBufferedElements: The maximum number of elements to
-  ///   hold in the buffer. By default, this value is unlimited. Use a
+  /// - Parameter limit: The maximum number of elements to hold in the buffer.
+  ///   By default, this value is unlimited. Use a
   ///   `Continuation.BufferingPolicy` to buffer a specified number of oldest
   ///   or newest elements.
   /// - Parameter build: A custom closure that yields values to the
