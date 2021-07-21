@@ -217,3 +217,10 @@ public func withUnsafeThrowingContinuation<T>(
     fn(UnsafeContinuation<T, Error>($0))
   }
 }
+
+/// A hack to mark an SDK that supports swift_continuation_await.
+@available(SwiftStdlib 5.5, *)
+@_alwaysEmitIntoClient
+public func _abiEnableAwaitContinuation() {
+  fatalError("never use this function")
+}
