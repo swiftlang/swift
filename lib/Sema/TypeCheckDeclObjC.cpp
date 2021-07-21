@@ -553,7 +553,7 @@ static bool checkObjCInExtensionContext(const ValueDecl *value,
                 ->getModuleContext()
                 ->isImplicitDynamicEnabled())
           return false;
-        if (!classDecl->usesObjCGenericsModel()) {
+        if (!classDecl->isTypeErasedGenericClass()) {
           softenIfAccessNote(value, reason.getAttr(),
             value->diagnose(diag::objc_in_generic_extension,
                             classDecl->isGeneric())
