@@ -658,6 +658,17 @@ void IRGenFunction::emitGetAsyncContinuation(SILType resumeTy,
   out.add(unsafeContinuation);
 }
 
+static bool shouldUseContinuationAwait(IRGenModule &IGM) {
+  auto &ctx = IGM.Context;
+  auto module = ctx.getLoadedModule(ctx.Id_Concurrency);
+  assert(module && "building async code without concurrency library");
+  SmallVector<ValueDecl *, 1> results;
+  module->lookupValue(ctx.getIdentifier("_abiEnableAwaitContinuation"),
+                      NLKind::UnqualifiedLookup, results);
+  assert(results.size() <= 1);
+  return !results.empty();
+}
+
 void IRGenFunction::emitAwaitAsyncContinuation(
     SILType resumeTy, bool isIndirectResult,
     Explosion &outDirectResult, llvm::BasicBlock *&normalBB,
@@ -667,6 +678,43 @@ void IRGenFunction::emitAwaitAsyncContinuation(
 
   // Call swift_continuation_await to check whether the continuation
   // has already been resumed.
+  bool useContinuationAwait = shouldUseContinuationAwait(IGM);
+
+  // As a temporary hack for compatibility with SDKs that don't provide
+  // swift_continuation_await, emit the old inline sequence.  This can
+  // be removed as soon as we're sure that such SDKs don't exist.
+  if (!useContinuationAwait) {
+    auto contAwaitSyncAddr =
+        Builder.CreateStructGEP(AsyncCoroutineCurrentContinuationContext, 1);
+
+    auto pendingV = llvm::ConstantInt::get(
+        contAwaitSyncAddr->getType()->getPointerElementType(),
+        unsigned(ContinuationStatus::Pending));
+    auto awaitedV = llvm::ConstantInt::get(
+        contAwaitSyncAddr->getType()->getPointerElementType(),
+        unsigned(ContinuationStatus::Awaited));
+    auto results = Builder.CreateAtomicCmpXchg(
+        contAwaitSyncAddr, pendingV, awaitedV,
+        llvm::AtomicOrdering::Release /*success ordering*/,
+        llvm::AtomicOrdering::Acquire /* failure ordering */,
+        llvm::SyncScope::System);
+    auto firstAtAwait = Builder.CreateExtractValue(results, 1);
+    auto contBB = createBasicBlock("await.async.resume");
+    auto abortBB = createBasicBlock("await.async.abort");
+    Builder.CreateCondBr(firstAtAwait, abortBB, contBB);
+    Builder.emitBlock(abortBB);
+    {
+      // We were the first to the sync point. "Abort" (return from the
+      // coroutine partial function, without making a tail call to anything)
+      // because the continuation result is not available yet. When the
+      // continuation is later resumed, the task will get scheduled
+      // starting from the suspension point.
+      emitCoroutineOrAsyncExit();
+    }
+
+    Builder.emitBlock(contBB);
+  }
+
   {
     // Set up the suspend point.
     SmallVector<llvm::Value *, 8> arguments;
@@ -676,10 +724,26 @@ void IRGenFunction::emitAwaitAsyncContinuation(
     auto resumeProjFn = getOrCreateResumePrjFn();
     arguments.push_back(
         Builder.CreateBitOrPointerCast(resumeProjFn, IGM.Int8PtrTy));
-    arguments.push_back(Builder.CreateBitOrPointerCast(
-        IGM.getAwaitAsyncContinuationFn(),
-        IGM.Int8PtrTy));
-    arguments.push_back(AsyncCoroutineCurrentContinuationContext);
+
+    llvm::Constant *awaitFnPtr;
+    if (useContinuationAwait) {
+      awaitFnPtr = IGM.getAwaitAsyncContinuationFn();
+    } else {
+      auto resumeFnPtr =
+        getFunctionPointerForResumeIntrinsic(AsyncCoroutineCurrentResume);
+      awaitFnPtr = createAsyncDispatchFn(resumeFnPtr, {IGM.Int8PtrTy});
+    }
+    arguments.push_back(
+        Builder.CreateBitOrPointerCast(awaitFnPtr, IGM.Int8PtrTy));
+
+    if (useContinuationAwait) {
+      arguments.push_back(AsyncCoroutineCurrentContinuationContext);
+    } else {
+      arguments.push_back(AsyncCoroutineCurrentResume);
+      arguments.push_back(Builder.CreateBitOrPointerCast(
+        AsyncCoroutineCurrentContinuationContext, IGM.Int8PtrTy));
+    }
+
     auto resultTy =
         llvm::StructType::get(IGM.getLLVMContext(), {IGM.Int8PtrTy}, false /*packed*/);
     emitSuspendAsyncCall(swiftAsyncContextIndex, resultTy, arguments);
