@@ -3662,7 +3662,7 @@ class CallEmission {
 
   Callee callee;
   FormalEvaluationScope initialWritebackScope;
-  Optional<ActorIsolation> implicitAsyncIsolation;
+  Optional<ImplicitActorHopTarget> implicitActorHopTarget;
   bool implicitlyThrows;
 
 public:
@@ -3671,7 +3671,7 @@ public:
                FormalEvaluationScope &&writebackScope)
       : SGF(SGF), callee(std::move(callee)),
         initialWritebackScope(std::move(writebackScope)),
-        implicitAsyncIsolation(None),
+        implicitActorHopTarget(None),
         implicitlyThrows(false) {}
 
   /// A factory method for decomposing the apply expr \p e into a call
@@ -3712,8 +3712,9 @@ public:
   /// Sets a flag that indicates whether this call be treated as being 
   /// implicitly async, i.e., it requires a hop_to_executor prior to 
   /// invoking the sync callee, etc.
-  void setImplicitlyAsync(Optional<ActorIsolation> implicitAsyncIsolation) {
-    this->implicitAsyncIsolation = implicitAsyncIsolation;
+  void setImplicitlyAsync(
+      Optional<ImplicitActorHopTarget> implicitActorHopTarget) {
+    this->implicitActorHopTarget = implicitActorHopTarget;
   }
 
   /// Sets a flag that indicates whether this call be treated as being
@@ -3945,7 +3946,7 @@ RValue CallEmission::applyNormalCall(SGFContext C) {
   return SGF.emitApply(
       std::move(resultPlan), std::move(argScope), uncurriedLoc.getValue(), mv,
       callee.getSubstitutions(), uncurriedArgs, calleeTypeInfo, options,
-      uncurriedContext, implicitAsyncIsolation);
+      uncurriedContext, implicitActorHopTarget);
 }
 
 static void emitPseudoFunctionArguments(SILGenFunction &SGF,
@@ -4260,28 +4261,9 @@ CallEmission CallEmission::forApplyExpr(SILGenFunction &SGF, ApplyExpr *e) {
                          apply.callSite->isNoThrows(),
                          apply.callSite->isNoAsync());
 
-    // For an implicitly-async call, determine the actor isolation.
-    if (apply.callSite->implicitlyAsync()) {
-      Optional<ActorIsolation> isolation;
-
-      // Check for global-actor isolation on the function type.
-      if (auto fnType = apply.callSite->getFn()->getType()
-              ->castTo<FunctionType>()) {
-        if (Type globalActor = fnType->getGlobalActor()) {
-          isolation = ActorIsolation::forGlobalActor(globalActor, false);
-        }
-      }
-
-      // If there was no global-actor isolation on the function type, find
-      // the callee declaration and retrieve the isolation from it.
-      if (!isolation) {
-        if (auto decl = emission.callee.getDecl())
-          isolation = getActorIsolation(decl);
-      }
-
-      assert(isolation && "Implicitly asynchronous call without isolation");
-      emission.setImplicitlyAsync(isolation);
-    }
+    // For an implicitly-async call, record the target of the actor hop.
+    if (auto target = apply.callSite->isImplicitlyAsync())
+      emission.setImplicitlyAsync(target);
   }
 
   return emission;
@@ -4334,13 +4316,14 @@ bool SILGenModule::isNonMutatingSelfIndirect(SILDeclRef methodRef) {
 /// lowered appropriately for the abstraction level but that the
 /// result does need to be turned back into something matching a
 /// formal type.
-RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
-                                 ArgumentScope &&argScope, SILLocation loc,
-                                 ManagedValue fn, SubstitutionMap subs,
-                                 ArrayRef<ManagedValue> args,
-                                 const CalleeTypeInfo &calleeTypeInfo,
-                                 ApplyOptions options, SGFContext evalContext,
-                                 Optional<ActorIsolation> implicitAsyncIsolation) {
+RValue SILGenFunction::emitApply(
+    ResultPlanPtr &&resultPlan,
+    ArgumentScope &&argScope, SILLocation loc,
+    ManagedValue fn, SubstitutionMap subs,
+    ArrayRef<ManagedValue> args,
+    const CalleeTypeInfo &calleeTypeInfo,
+    ApplyOptions options, SGFContext evalContext,
+    Optional<ImplicitActorHopTarget> implicitActorHopTarget) {
   auto substFnType = calleeTypeInfo.substFnType;
   auto substResultType = calleeTypeInfo.substResultType;
 
@@ -4428,32 +4411,31 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
 
   ExecutorBreadcrumb breadcrumb;
   
-  // The presence of `implicitAsyncIsolation` indicates that the callee is a
+  // The presence of `implicitActorHopTarget` indicates that the callee is a
   // synchronous function isolated to an actor other than our own.
   // Such functions require the caller to hop to the callee's executor
   // prior to invoking the callee.
-  if (implicitAsyncIsolation) {
+  if (implicitActorHopTarget) {
     assert(F.isAsync() && "cannot hop_to_executor in a non-async func!");
 
-    switch (*implicitAsyncIsolation) {
-    case ActorIsolation::DistributedActorInstance: {
-      // TODO: if the actor is remote there is no need to hop
-      LLVM_FALLTHROUGH;
-    }
-    case ActorIsolation::ActorInstance:
-      breadcrumb = emitHopToTargetActor(loc, *implicitAsyncIsolation,
-                                        args.back());
+    SILValue executor;
+    switch (*implicitActorHopTarget) {
+    case ImplicitActorHopTarget::InstanceSelf:
+      executor = emitLoadActorExecutor(loc, args.back());
       break;
 
-    case ActorIsolation::GlobalActor:
-    case ActorIsolation::GlobalActorUnsafe:
-      breadcrumb = emitHopToTargetActor(loc, *implicitAsyncIsolation, None);
+    case ImplicitActorHopTarget::GlobalActor:
+      executor = emitLoadGlobalActorExecutor(
+          implicitActorHopTarget->getGlobalActor());
       break;
 
-    case ActorIsolation::Independent:
-    case ActorIsolation::Unspecified:
-      llvm_unreachable("Not actor-isolated");
+    case ImplicitActorHopTarget::IsolatedParameter:
+      executor = emitLoadActorExecutor(
+          loc, args[implicitActorHopTarget->getIsolatedParameterIndex()]);
+      break;
     }
+
+    breadcrumb = emitHopToTargetExecutor(loc, executor);
   } else if (ExpectedExecutor && substFnType->isAsync()) {
     // Otherwise, if we're in an actor method ourselves, and we're calling into
     // any sort of async function, we'll want to make sure to hop back to our
