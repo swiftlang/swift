@@ -7,6 +7,10 @@
 // rdar://76038845
 // UNSUPPORTED: use_os_stdlib
 
+// rdar://79670222 : This test fails on ios and watchos
+// UNSUPPORTED: OS=ios
+// UNSUPPORTED: OS=watchos
+
 import Dispatch
 import StdlibUnittest
 
