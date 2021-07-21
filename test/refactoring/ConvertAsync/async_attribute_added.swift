@@ -10,7 +10,7 @@ func simple(completion: @escaping (String) -> Void) { }
 // SIMPLE-EMPTY:
 // SIMPLE-NEXT: async_attribute_added.swift [[# @LINE-7]]:53 -> [[# @LINE-7]]:56
 // SIMPLE-NEXT: {
-// SIMPLE-NEXT: async {
+// SIMPLE-NEXT: Task {
 // SIMPLE-NEXT: let result = await simple()
 // SIMPLE-NEXT: completion(result)
 // SIMPLE-NEXT: }

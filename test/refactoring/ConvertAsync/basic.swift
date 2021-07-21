@@ -21,7 +21,7 @@ func simple(completion: (String) -> Void) { }
 // ASYNC-SIMPLE-EMPTY:
 // ASYNC-SIMPLE-NEXT: basic.swift [[# @LINE-4]]:43 -> [[# @LINE-4]]:46
 // ASYNC-SIMPLE-NEXT: {
-// ASYNC-SIMPLE-NEXT: async {
+// ASYNC-SIMPLE-NEXT: Task {
 // ASYNC-SIMPLE-NEXT: let result = await simple()
 // ASYNC-SIMPLE-NEXT: completion(result)
 // ASYNC-SIMPLE-NEXT: }
@@ -37,7 +37,7 @@ func simple(completion: (String) -> Void) { }
 // RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=ASYNC-SIMPLENOLABEL %s
 func simpleWithoutLabel(_ completion: (String) -> Void) { }
 // ASYNC-SIMPLENOLABEL: {
-// ASYNC-SIMPLENOLABEL-NEXT: async {
+// ASYNC-SIMPLENOLABEL-NEXT: Task {
 // ASYNC-SIMPLENOLABEL-NEXT: let result = await simpleWithoutLabel()
 // ASYNC-SIMPLENOLABEL-NEXT: completion(result)
 // ASYNC-SIMPLENOLABEL-NEXT: }
@@ -47,7 +47,7 @@ func simpleWithoutLabel(_ completion: (String) -> Void) { }
 // RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=ASYNC-SIMPLEWITHARG %s
 func simpleWithArg(a: Int, completion: (String) -> Void) { }
 // ASYNC-SIMPLEWITHARG: {
-// ASYNC-SIMPLEWITHARG-NEXT: async {
+// ASYNC-SIMPLEWITHARG-NEXT: Task {
 // ASYNC-SIMPLEWITHARG-NEXT: let result = await simpleWithArg(a: a)
 // ASYNC-SIMPLEWITHARG-NEXT: completion(result)
 // ASYNC-SIMPLEWITHARG-NEXT: }
@@ -57,7 +57,7 @@ func simpleWithArg(a: Int, completion: (String) -> Void) { }
 // RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=ASYNC-MULTIPLERESULTS %s
 func multipleResults(completion: (String, Int) -> Void) { }
 // ASYNC-MULTIPLERESULTS: {
-// ASYNC-MULTIPLERESULTS-NEXT: async {
+// ASYNC-MULTIPLERESULTS-NEXT: Task {
 // ASYNC-MULTIPLERESULTS-NEXT: let result = await multipleResults()
 // ASYNC-MULTIPLERESULTS-NEXT: completion(result.0, result.1)
 // ASYNC-MULTIPLERESULTS-NEXT: }
@@ -67,7 +67,7 @@ func multipleResults(completion: (String, Int) -> Void) { }
 // RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=ASYNC-NONOPTIONALERROR %s
 func nonOptionalError(completion: (String, Error) -> Void) { }
 // ASYNC-NONOPTIONALERROR: {
-// ASYNC-NONOPTIONALERROR-NEXT: async {
+// ASYNC-NONOPTIONALERROR-NEXT: Task {
 // ASYNC-NONOPTIONALERROR-NEXT: let result = await nonOptionalError()
 // ASYNC-NONOPTIONALERROR-NEXT: completion(result.0, result.1)
 // ASYNC-NONOPTIONALERROR-NEXT: }
@@ -77,7 +77,7 @@ func nonOptionalError(completion: (String, Error) -> Void) { }
 // RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=ASYNC-NOPARAMS %s
 func noParams(completion: () -> Void) { }
 // ASYNC-NOPARAMS: {
-// ASYNC-NOPARAMS-NEXT: async {
+// ASYNC-NOPARAMS-NEXT: Task {
 // ASYNC-NOPARAMS-NEXT: await noParams()
 // ASYNC-NOPARAMS-NEXT: completion()
 // ASYNC-NOPARAMS-NEXT: }
@@ -87,7 +87,7 @@ func noParams(completion: () -> Void) { }
 // RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=ASYNC-ERROR %s
 func error(completion: (String?, Error?) -> Void) { }
 // ASYNC-ERROR: {
-// ASYNC-ERROR-NEXT: async {
+// ASYNC-ERROR-NEXT: Task {
 // ASYNC-ERROR-NEXT: do {
 // ASYNC-ERROR-NEXT: let result = try await error()
 // ASYNC-ERROR-NEXT: completion(result, nil)
@@ -100,7 +100,7 @@ func error(completion: (String?, Error?) -> Void) { }
 // RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=ASYNC-ERRORONLY %s
 func errorOnly(completion: (Error?) -> Void) { }
 // ASYNC-ERRORONLY: {
-// ASYNC-ERRORONLY-NEXT: async {
+// ASYNC-ERRORONLY-NEXT: Task {
 // ASYNC-ERRORONLY-NEXT: do {
 // ASYNC-ERRORONLY-NEXT: try await errorOnly()
 // ASYNC-ERRORONLY-NEXT: completion(nil)
@@ -114,7 +114,7 @@ func errorOnly(completion: (Error?) -> Void) { }
 // RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=ASYNC-ERRORNONOPTIONALRESULT %s
 func errorNonOptionalResult(completion: (String, Error?) -> Void) { }
 // ASYNC-ERRORNONOPTIONALRESULT: {
-// ASYNC-ERRORNONOPTIONALRESULT-NEXT: async {
+// ASYNC-ERRORNONOPTIONALRESULT-NEXT: Task {
 // ASYNC-ERRORNONOPTIONALRESULT-NEXT: do {
 // ASYNC-ERRORNONOPTIONALRESULT-NEXT: let result = try await errorNonOptionalResult()
 // ASYNC-ERRORNONOPTIONALRESULT-NEXT: completion(result, nil)
@@ -128,7 +128,7 @@ func errorNonOptionalResult(completion: (String, Error?) -> Void) { }
 // RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=ASYNC-CUSTOMERROR %s
 func customError(completion: (String?, CustomError?) -> Void) { }
 // ASYNC-CUSTOMERROR: {
-// ASYNC-CUSTOMERROR-NEXT: async {
+// ASYNC-CUSTOMERROR-NEXT: Task {
 // ASYNC-CUSTOMERROR-NEXT: do {
 // ASYNC-CUSTOMERROR-NEXT: let result = try await customError()
 // ASYNC-CUSTOMERROR-NEXT: completion(result, nil)
@@ -142,7 +142,7 @@ func customError(completion: (String?, CustomError?) -> Void) { }
 // RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=ASYNC-ALIAS %s
 func alias(completion: SomeCallback) { }
 // ASYNC-ALIAS: {
-// ASYNC-ALIAS-NEXT: async {
+// ASYNC-ALIAS-NEXT: Task {
 // ASYNC-ALIAS-NEXT: let result = await alias()
 // ASYNC-ALIAS-NEXT: completion(result)
 // ASYNC-ALIAS-NEXT: }
@@ -152,7 +152,7 @@ func alias(completion: SomeCallback) { }
 // RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=ASYNC-NESTEDALIAS %s
 func nestedAlias(completion: NestedAliasCallback) { }
 // ASYNC-NESTEDALIAS: {
-// ASYNC-NESTEDALIAS-NEXT: async {
+// ASYNC-NESTEDALIAS-NEXT: Task {
 // ASYNC-NESTEDALIAS-NEXT: let result = await nestedAlias()
 // ASYNC-NESTEDALIAS-NEXT: completion(result)
 // ASYNC-NESTEDALIAS-NEXT: }
@@ -162,7 +162,7 @@ func nestedAlias(completion: NestedAliasCallback) { }
 // RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=ASYNC-SIMPLERESULT %s
 func simpleResult(completion: (Result<String, Never>) -> Void) { }
 // ASYNC-SIMPLERESULT: {
-// ASYNC-SIMPLERESULT-NEXT: async {
+// ASYNC-SIMPLERESULT-NEXT: Task {
 // ASYNC-SIMPLERESULT-NEXT: let result = await simpleResult()
 // ASYNC-SIMPLERESULT-NEXT: completion(.success(result))
 // ASYNC-SIMPLERESULT-NEXT: }
@@ -172,7 +172,7 @@ func simpleResult(completion: (Result<String, Never>) -> Void) { }
 // RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=ASYNC-ERRORRESULT %s
 func errorResult(completion: (Result<String, Error>) -> Void) { }
 // ASYNC-ERRORRESULT: {
-// ASYNC-ERRORRESULT-NEXT: async {
+// ASYNC-ERRORRESULT-NEXT: Task {
 // ASYNC-ERRORRESULT-NEXT: do {
 // ASYNC-ERRORRESULT-NEXT: let result = try await errorResult()
 // ASYNC-ERRORRESULT-NEXT: completion(.success(result))
@@ -186,7 +186,7 @@ func errorResult(completion: (Result<String, Error>) -> Void) { }
 // RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=ASYNC-CUSTOMERRORRESULT %s
 func customErrorResult(completion: (Result<String, CustomError>) -> Void) { }
 // ASYNC-CUSTOMERRORRESULT: {
-// ASYNC-CUSTOMERRORRESULT-NEXT: async {
+// ASYNC-CUSTOMERRORRESULT-NEXT: Task {
 // ASYNC-CUSTOMERRORRESULT-NEXT: do {
 // ASYNC-CUSTOMERRORRESULT-NEXT: let result = try await customErrorResult()
 // ASYNC-CUSTOMERRORRESULT-NEXT: completion(.success(result))
@@ -200,7 +200,7 @@ func customErrorResult(completion: (Result<String, CustomError>) -> Void) { }
 // RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=ASYNC-ALIASRESULT %s
 func aliasedResult(completion: SomeResultCallback) { }
 // ASYNC-ALIASRESULT: {
-// ASYNC-ALIASRESULT-NEXT: async {
+// ASYNC-ALIASRESULT-NEXT: Task {
 // ASYNC-ALIASRESULT-NEXT: do {
 // ASYNC-ALIASRESULT-NEXT: let result = try await aliasedResult()
 // ASYNC-ALIASRESULT-NEXT: completion(.success(result))
@@ -214,7 +214,7 @@ func aliasedResult(completion: SomeResultCallback) { }
 // RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=MANY %s
 func many(_ completion: (String, Int) -> Void) { }
 // MANY: {
-// MANY-NEXT: async {
+// MANY-NEXT: Task {
 // MANY-NEXT: let result = await many()
 // MANY-NEXT: completion(result.0, result.1)
 // MANY-NEXT: }
@@ -224,7 +224,7 @@ func many(_ completion: (String, Int) -> Void) { }
 // RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=OPTIONAL-SINGLE %s
 func optionalSingle(completion: (String?) -> Void) { }
 // OPTIONAL-SINGLE: {
-// OPTIONAL-SINGLE-NEXT: async {
+// OPTIONAL-SINGLE-NEXT: Task {
 // OPTIONAL-SINGLE-NEXT: let result = await optionalSingle()
 // OPTIONAL-SINGLE-NEXT: completion(result)
 // OPTIONAL-SINGLE-NEXT: }
@@ -234,7 +234,7 @@ func optionalSingle(completion: (String?) -> Void) { }
 // RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=MANY-OPTIONAL %s
 func manyOptional(_ completion: (String?, Int?) -> Void) { }
 // MANY-OPTIONAL: {
-// MANY-OPTIONAL-NEXT: async {
+// MANY-OPTIONAL-NEXT: Task {
 // MANY-OPTIONAL-NEXT: let result = await manyOptional()
 // MANY-OPTIONAL-NEXT: completion(result.0, result.1)
 // MANY-OPTIONAL-NEXT: }
@@ -244,7 +244,7 @@ func manyOptional(_ completion: (String?, Int?) -> Void) { }
 // RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=MIXED %s
 func mixed(_ completion: (String?, Int) -> Void) { }
 // MIXED: {
-// MIXED-NEXT: async {
+// MIXED-NEXT: Task {
 // MIXED-NEXT: let result = await mixed()
 // MIXED-NEXT: completion(result.0, result.1)
 // MIXED-NEXT: }
@@ -254,7 +254,7 @@ func mixed(_ completion: (String?, Int) -> Void) { }
 // RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1
 func mixedOptionalError(_ completion: (String?, Int, Error?) -> Void) { }
 // MIXED-OPTIONAL-ERROR: {
-// MIXED-OPTIONAL-ERROR-NEXT: async {
+// MIXED-OPTIONAL-ERROR-NEXT: Task {
 // MIXED-OPTIONAL-ERROR-NEXT: do {
 // MIXED-OPTIONAL-ERROR-NEXT: let result = try await mixedOptionalError()
 // MIXED-OPTIONAL-ERROR-NEXT: completion(result.0, result.1, nil)
@@ -268,7 +268,7 @@ func mixedOptionalError(_ completion: (String?, Int, Error?) -> Void) { }
 // RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=MIXED-ERROR %s
 func mixedError(_ completion: (String?, Int, Error) -> Void) { }
 // MIXED-ERROR: {
-// MIXED-ERROR-NEXT: async {
+// MIXED-ERROR-NEXT: Task {
 // MIXED-ERROR-NEXT: let result = await mixedError()
 // MIXED-ERROR-NEXT: completion(result.0, result.1, result.2)
 // MIXED-ERROR-NEXT: }
@@ -278,7 +278,7 @@ func mixedError(_ completion: (String?, Int, Error) -> Void) { }
 // RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=GENERIC %s
 func generic<T, R>(completion: (T, R) -> Void) { }
 // GENERIC: {
-// GENERIC-NEXT: async {
+// GENERIC-NEXT: Task {
 // GENERIC-NEXT: let result: (T, R) = await generic()
 // GENERIC-NEXT: completion(result.0, result.1)
 // GENERIC-NEXT: }
@@ -288,7 +288,7 @@ func generic<T, R>(completion: (T, R) -> Void) { }
 // RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=GENERIC-RESULT %s
 func genericResult<T>(completion: (T?, Error?) -> Void) where T: Numeric { }
 // GENERIC-RESULT: {
-// GENERIC-RESULT-NEXT: async {
+// GENERIC-RESULT-NEXT: Task {
 // GENERIC-RESULT-NEXT: do {
 // GENERIC-RESULT-NEXT: let result: T = try await genericResult()
 // GENERIC-RESULT-NEXT: completion(result, nil)
@@ -303,7 +303,7 @@ func genericResult<T>(completion: (T?, Error?) -> Void) where T: Numeric { }
 // RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=GENERIC-ERROR %s
 func genericError<E>(completion: (String?, E?) -> Void) where E: Error { }
 // GENERIC-ERROR: {
-// GENERIC-ERROR-NEXT: async {
+// GENERIC-ERROR-NEXT: Task {
 // GENERIC-ERROR-NEXT: do {
 // GENERIC-ERROR-NEXT: let result: String = try await genericError()
 // GENERIC-ERROR-NEXT: completion(result, nil)
@@ -317,7 +317,7 @@ func genericError<E>(completion: (String?, E?) -> Void) where E: Error { }
 // RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=OTHER-NAME %s
 func otherName(execute: (String) -> Void) { }
 // OTHER-NAME: {
-// OTHER-NAME-NEXT: async {
+// OTHER-NAME-NEXT: Task {
 // OTHER-NAME-NEXT: let result = await otherName()
 // OTHER-NAME-NEXT: execute(result)
 // OTHER-NAME-NEXT: }
@@ -327,7 +327,7 @@ func otherName(execute: (String) -> Void) { }
 // RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=DEFAULT_ARGS %s
 func defaultArgs(a: Int, b: Int = 10, completion: (String) -> Void) { }
 // DEFAULT_ARGS: {
-// DEFAULT_ARGS-NEXT: async {
+// DEFAULT_ARGS-NEXT: Task {
 // DEFAULT_ARGS-NEXT: let result = await defaultArgs(a: a, b: b)
 // DEFAULT_ARGS-NEXT: completion(result)
 // DEFAULT_ARGS-NEXT: }
@@ -419,7 +419,7 @@ func cConvention(completion: @convention(c) () -> Void) { }
 // RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix VOID-HANDLER %s
 func voidCompletion(completion: (Void) -> Void) {}
 // VOID-HANDLER: {
-// VOID-HANDLER-NEXT: async {
+// VOID-HANDLER-NEXT: Task {
 // VOID-HANDLER-NEXT: await voidCompletion()
 // VOID-HANDLER-NEXT: completion(())
 // VOID-HANDLER-NEXT: }
@@ -429,7 +429,7 @@ func voidCompletion(completion: (Void) -> Void) {}
 // RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix OPT-VOID-AND-ERROR-HANDLER %s
 func optVoidAndErrorCompletion(completion: (Void?, Error?) -> Void) {}
 // OPT-VOID-AND-ERROR-HANDLER: {
-// OPT-VOID-AND-ERROR-HANDLER-NEXT: async {
+// OPT-VOID-AND-ERROR-HANDLER-NEXT: Task {
 // OPT-VOID-AND-ERROR-HANDLER-NEXT: do {
 // OPT-VOID-AND-ERROR-HANDLER-NEXT: try await optVoidAndErrorCompletion()
 // OPT-VOID-AND-ERROR-HANDLER-NEXT: completion((), nil)
@@ -443,7 +443,7 @@ func optVoidAndErrorCompletion(completion: (Void?, Error?) -> Void) {}
 // RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix TOO-MUCH-VOID-AND-ERROR-HANDLER %s
 func tooMuchVoidAndErrorCompletion(completion: (Void?, Void?, Error?) -> Void) {}
 // TOO-MUCH-VOID-AND-ERROR-HANDLER: {
-// TOO-MUCH-VOID-AND-ERROR-HANDLER-NEXT: async {
+// TOO-MUCH-VOID-AND-ERROR-HANDLER-NEXT: Task {
 // TOO-MUCH-VOID-AND-ERROR-HANDLER-NEXT: do {
 // TOO-MUCH-VOID-AND-ERROR-HANDLER-NEXT: try await tooMuchVoidAndErrorCompletion()
 // TOO-MUCH-VOID-AND-ERROR-HANDLER-NEXT: completion((), (), nil)
@@ -457,7 +457,7 @@ func tooMuchVoidAndErrorCompletion(completion: (Void?, Void?, Error?) -> Void) {
 // RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix VOID-PROPER-AND-ERROR-HANDLER %s
 func tooVoidProperAndErrorCompletion(completion: (Void?, String?, Error?) -> Void) {}
 // VOID-PROPER-AND-ERROR-HANDLER: {
-// VOID-PROPER-AND-ERROR-HANDLER-NEXT: async {
+// VOID-PROPER-AND-ERROR-HANDLER-NEXT: Task {
 // VOID-PROPER-AND-ERROR-HANDLER-NEXT: do {
 // VOID-PROPER-AND-ERROR-HANDLER-NEXT: let result = try await tooVoidProperAndErrorCompletion()
 // VOID-PROPER-AND-ERROR-HANDLER-NEXT: completion((), result.1, nil)
@@ -471,7 +471,7 @@ func tooVoidProperAndErrorCompletion(completion: (Void?, String?, Error?) -> Voi
 // RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1
 func voidAndErrorCompletion(completion: (Void, Error?) -> Void) {}
 // VOID-AND-ERROR-HANDLER: {
-// VOID-AND-ERROR-HANDLER-NEXT: async {
+// VOID-AND-ERROR-HANDLER-NEXT: Task {
 // VOID-AND-ERROR-HANDLER-NEXT: do {
 // VOID-AND-ERROR-HANDLER-NEXT: try await voidAndErrorCompletion()
 // VOID-AND-ERROR-HANDLER-NEXT: completion((), nil)

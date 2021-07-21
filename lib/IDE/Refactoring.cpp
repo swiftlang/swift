@@ -5943,7 +5943,7 @@ public:
     FuncDecl *FD = cast<FuncDecl>(StartNode.get<Decl *>());
 
     OS << tok::l_brace << "\n"; // start function body
-    OS << "async " << tok::l_brace << "\n";
+    OS << "Task " << tok::l_brace << "\n";
     addHoistedNamedCallback(FD, TopHandler, TopHandler.getNameStr(), [&]() {
       if (TopHandler.HasError) {
         OS << tok::kw_try << " ";
@@ -5952,7 +5952,7 @@ public:
       addCallToAsyncMethod(FD, TopHandler);
     });
     OS << "\n";
-    OS << tok::r_brace << "\n"; // end 'async'
+    OS << tok::r_brace << "\n"; // end 'Task'
     OS << tok::r_brace << "\n"; // end function body
     return true;
   }
@@ -7661,7 +7661,7 @@ private:
         // causes the following legacy body to be created:
         //
         // func foo(completion: (String, Int) -> Void) {
-        //   async {
+        //   Task {
         //     let result = await foo()
         //     completion(result.0, result.1)
         //   }
@@ -7745,7 +7745,7 @@ private:
   /// we generate
   /// \code
   /// func foo<GenericParam>(completion: (GenericParam) -> Void) {
-  ///   async {
+  ///   Task {
   ///     let result: GenericParam = await foo()
   ///               <------------>
   ///     completion(result)
