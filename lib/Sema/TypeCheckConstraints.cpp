@@ -1857,7 +1857,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   // classes. This may be necessary to force-fit ObjC APIs that depend on
   // covariance, or for APIs where the generic parameter annotations in the
   // ObjC headers are inaccurate.
-  if (clas && clas->usesObjCGenericsModel()) {
+  if (clas && clas->isTypeErasedGenericClass()) {
     if (fromType->getClassOrBoundGenericClass() == clas)
       return CheckedCastKind::ValueCast;
   }

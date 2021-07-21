@@ -1993,7 +1993,7 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
     if (auto ext = dyn_cast<ExtensionDecl>(DC)) {
       if (auto classDecl = ext->getSelfClassDecl()) {
         if (classDecl->isGenericContext()) {
-          if (!classDecl->usesObjCGenericsModel()) {
+          if (!classDecl->isTypeErasedGenericClass()) {
             C.Diags.diagnose(ComplainLoc,
                              diag::objc_protocol_in_generic_extension,
                              classDecl->isGeneric(), T, ProtoType);
@@ -2014,7 +2014,7 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
     // types for any obj-c ones.
     while (nestedType) {
       if (auto clas = nestedType->getClassOrBoundGenericClass()) {
-        if (clas->usesObjCGenericsModel()) {
+        if (clas->isTypeErasedGenericClass()) {
           C.Diags.diagnose(ComplainLoc,
                            diag::objc_generics_cannot_conditionally_conform, T,
                            ProtoType);
@@ -3014,7 +3014,7 @@ bool ConformanceChecker::checkObjCTypeErasedGenerics(
   auto classDecl = Adoptee->getClassOrBoundGenericClass();
   if (!classDecl) return false;
 
-  if (!classDecl->usesObjCGenericsModel()) return false;
+  if (!classDecl->isTypeErasedGenericClass()) return false;
 
   // Concrete types are okay.
   if (!type->getCanonicalType()->hasTypeParameter()) return false;
