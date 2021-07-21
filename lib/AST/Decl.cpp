@@ -6782,7 +6782,7 @@ ParamDecl::getDefaultValueStringRepresentation(
           if (auto *placeholder = findWrappedValuePlaceholder(parentInit))
             wrappedValue = placeholder->getOriginalWrappedValue();
 
-        if (!wrappedValue) {
+        if (!wrappedValue || !wrappedValue->getSourceRange().isValid()) {
           if (auto type = original->getPropertyWrapperBackingPropertyType()) {
             if (auto nominal = type->getAnyNominal()) {
               scratch.clear();
