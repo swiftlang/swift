@@ -2,6 +2,7 @@
 // REQUIRES: static_stdlib
 // REQUIRES: concurrency
 // REQUIRES: libdispatch_static
+// REQUIRES: rdar80900643
 
 // RUN: %empty-directory(%t)
 // RUN: echo 'public func asyncFunc() async { print("Hello") }' > %t/asyncModule.swift
@@ -18,8 +19,8 @@
 // RUN:   ldd %t/main | %FileCheck %s --check-prefix=LDD; \
 // RUN: fi
 
-// LDD-NOT: libswiftCore.so 
-// LDD-NOT: libswift_Concurrency.so 
+// LDD-NOT: libswiftCore.so
+// LDD-NOT: libswift_Concurrency.so
 
 import asyncModule
 
