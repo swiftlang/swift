@@ -214,7 +214,6 @@
         },
         "next" : {
             "aliases": ["next", "master-next",
-                        "next",
                         "stable-next", "upstream",
                         "next-upstream", "upstream-with-swift"],
             "repos": {
