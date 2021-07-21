@@ -321,7 +321,7 @@ llvm::Value *irgen::emitInvariantLoadOfOpaqueWitness(IRGenFunction &IGF,
   llvm::Value *slot = table;
   if (index.getValue() != 0)
     slot = IGF.Builder.CreateConstInBoundsGEP1_32(
-        /*Ty=*/nullptr, table, index.getValue());
+       table->getType()->getPointerElementType(), table, index.getValue());
 
   if (slotPtr) *slotPtr = slot;
 
