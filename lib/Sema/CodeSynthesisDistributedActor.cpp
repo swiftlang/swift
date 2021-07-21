@@ -231,6 +231,7 @@ createDistributedActor_init_local(ClassDecl *classDecl,
 }
 
 // ==== Distributed Actor: Resolve Initializer ---------------------------------
+// TODO: remove resolve initializer in favor of resolve static function
 
 /// Synthesizes the body for
 ///
