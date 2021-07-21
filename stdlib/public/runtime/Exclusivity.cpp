@@ -16,6 +16,7 @@
 
 // NOTE: This should really be applied in the CMakeLists.txt.  However, we do
 // not have a way to currently specify that at the target specific level yet.
+
 #if defined(_WIN32)
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
@@ -63,6 +64,39 @@ static const char *getAccessName(ExclusivityFlags flags) {
 
 static inline bool isExclusivityLoggingEnabled() {
   return runtime::environment::SWIFT_DEBUG_RUNTIME_EXCLUSIVITY_LOGGING();
+}
+
+static inline void _flockfile_stderr() {
+#if defined(_WIN32)
+  _lock_file(stderr);
+#elif defined(__wasi__)
+  // WebAssembly/WASI doesn't support file locking yet
+  // https://bugs.swift.org/browse/SR-12097
+#else
+  flockfile(stderr);
+#endif
+}
+
+static inline void _funlockfile_stderr() {
+#if defined(_WIN32)
+  _unlock_file(stderr);
+#elif defined(__wasi__)
+  // WebAssembly/WASI doesn't support file locking yet
+  // https://bugs.swift.org/browse/SR-12097
+#else
+  funlockfile(stderr);
+#endif
+}
+
+/// Used to ensure that logging printfs are deterministic.
+static inline void withLoggingLock(std::function<void()> func) {
+  assert(isExclusivityLoggingEnabled() &&
+         "Should only be called if exclusivity logging is enabled!");
+
+  _flockfile_stderr();
+  func();
+  fflush(stderr);
+  _funlockfile_stderr();
 }
 
 #endif
@@ -191,8 +225,10 @@ public:
 
   bool insert(Access *access, void *pc, void *pointer, ExclusivityFlags flags) {
 #ifndef NDEBUG
-    if (isExclusivityLoggingEnabled())
-      fprintf(stderr, "Inserting new access: %p\n", access);
+    if (isExclusivityLoggingEnabled()) {
+      withLoggingLock(
+          [&]() { fprintf(stderr, "Inserting new access: %p\n", access); });
+    }
 #endif
     auto action = getAccessAction(flags);
 
@@ -216,7 +252,7 @@ public:
     if (!isTracking(flags)) {
 #ifndef NDEBUG
       if (isExclusivityLoggingEnabled()) {
-        fprintf(stderr, "  Not tracking!\n");
+        withLoggingLock([&]() { fprintf(stderr, "  Not tracking!\n"); });
       }
 #endif
       return false;
@@ -227,8 +263,10 @@ public:
     Head = access;
 #ifndef NDEBUG
     if (isExclusivityLoggingEnabled()) {
-      fprintf(stderr, "  Tracking!\n");
-      swift_dumpTrackedAccesses();
+      withLoggingLock([&]() {
+        fprintf(stderr, "  Tracking!\n");
+        swift_dumpTrackedAccesses();
+      });
     }
 #endif
     return true;
@@ -237,8 +275,10 @@ public:
   void remove(Access *access) {
     assert(Head && "removal from empty AccessSet");
 #ifndef NDEBUG
-    if (isExclusivityLoggingEnabled())
-      fprintf(stderr, "Removing access: %p\n", access);
+    if (isExclusivityLoggingEnabled()) {
+      withLoggingLock(
+          [&]() { fprintf(stderr, "Removing access: %p\n", access); });
+    }
 #endif
     auto cur = Head;
     // Fast path: stack discipline.
@@ -708,20 +748,24 @@ void swift::swift_task_enterThreadLocalContext(char *state) {
 
 #ifndef NDEBUG
   if (isExclusivityLoggingEnabled()) {
-    fprintf(stderr,
-            "Entering Thread Local Context. Before Swizzle. Task: %p\n",
-            taskCtx.getTaskAddress());
-    taskCtx.dump();
-    swift_dumpTrackedAccesses();
+    withLoggingLock([&]() {
+      fprintf(stderr,
+              "Entering Thread Local Context. Before Swizzle. Task: %p\n",
+              taskCtx.getTaskAddress());
+      taskCtx.dump();
+      swift_dumpTrackedAccesses();
+    });
   }
 
   auto logEndState = [&] {
     if (isExclusivityLoggingEnabled()) {
-      fprintf(stderr,
-              "Entering Thread Local Context. After Swizzle. Task: %p\n",
-              taskCtx.getTaskAddress());
-      taskCtx.dump();
-      swift_dumpTrackedAccesses();
+      withLoggingLock([&]() {
+        fprintf(stderr,
+                "Entering Thread Local Context. After Swizzle. Task: %p\n",
+                taskCtx.getTaskAddress());
+        taskCtx.dump();
+        swift_dumpTrackedAccesses();
+      });
     }
   };
 #else
@@ -794,20 +838,24 @@ void swift::swift_task_exitThreadLocalContext(char *state) {
 
 #ifndef NDEBUG
   if (isExclusivityLoggingEnabled()) {
-    fprintf(stderr,
-            "Exiting Thread Local Context. Before Swizzle. Task: %p\n",
-            taskCtx.getTaskAddress());
-    taskCtx.dump();
-    swift_dumpTrackedAccesses();
+    withLoggingLock([&]() {
+      fprintf(stderr,
+              "Exiting Thread Local Context. Before Swizzle. Task: %p\n",
+              taskCtx.getTaskAddress());
+      taskCtx.dump();
+      swift_dumpTrackedAccesses();
+    });
   }
 
   auto logEndState = [&] {
     if (isExclusivityLoggingEnabled()) {
-      fprintf(stderr,
-              "Exiting Thread Local Context. After Swizzle. Task: %p\n",
-              taskCtx.getTaskAddress());
-      taskCtx.dump();
-      swift_dumpTrackedAccesses();
+      withLoggingLock([&]() {
+        fprintf(stderr,
+                "Exiting Thread Local Context. After Swizzle. Task: %p\n",
+                taskCtx.getTaskAddress());
+        taskCtx.dump();
+        swift_dumpTrackedAccesses();
+      });
     }
   };
 #else
