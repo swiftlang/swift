@@ -17,6 +17,7 @@
 #ifndef SWIFT_AST_AST_NODE_H
 #define SWIFT_AST_AST_NODE_H
 
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "swift/Basic/Debug.h"
 #include "swift/AST/TypeAlignments.h"
@@ -35,13 +36,16 @@ namespace swift {
   class SourceLoc;
   class SourceRange;
   class ASTWalker;
+  class StmtConditionElement;
   enum class ExprKind : uint8_t;
   enum class DeclKind : uint8_t;
   enum class PatternKind : uint8_t;
   enum class StmtKind;
 
+  using StmtCondition = llvm::MutableArrayRef<StmtConditionElement>;
+
   struct ASTNode : public llvm::PointerUnion<Expr *, Stmt *, Decl *, Pattern *,
-                                             TypeRepr *> {
+                                             TypeRepr *, StmtCondition *> {
     // Inherit the constructors from PointerUnion.
     using PointerUnion::PointerUnion;
 
