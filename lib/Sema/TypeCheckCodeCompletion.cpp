@@ -1347,7 +1347,7 @@ void KeyPathTypeCheckCompletionCallback::sawSolution(
   } else {
     // We are completing after a component. Get the previous component's result
     // type.
-    BaseType = S.simplifyType(CS.getType(KeyPath, ComponentIndex - 1));
+    BaseType = S.simplifyType(S.getType(KeyPath, ComponentIndex - 1));
   }
 
   // If ExpectedTy is a duplicate of any other result, ignore this solution.
