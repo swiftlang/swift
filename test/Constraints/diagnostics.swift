@@ -1219,12 +1219,14 @@ func voidFuncWithEffects1() throws {
   // expected-note@-2 {{did you mean to add a return type?}}{{35-35= -> <#Return Type#>}}
 }
 
+@available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
 func voidFuncWithEffects2() async throws {
   return 1
   // expected-error@-1 {{unexpected non-void return value in void function}}
   // expected-note@-2 {{did you mean to add a return type?}}{{41-41= -> <#Return Type#>}}
 }
 
+@available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
 // expected-error@+1 {{'async' must precede 'throws'}}
 func voidFuncWithEffects3() throws async {
   return 1
@@ -1232,6 +1234,7 @@ func voidFuncWithEffects3() throws async {
   // expected-note@-2 {{did you mean to add a return type?}}{{41-41= -> <#Return Type#>}}
 }
 
+@available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
 func voidFuncWithEffects4() async {
   return 1
   // expected-error@-1 {{unexpected non-void return value in void function}}
@@ -1244,6 +1247,7 @@ func voidFuncWithEffects5(_ closure: () throws -> Void) rethrows {
   // expected-note@-2 {{did you mean to add a return type?}}{{65-65= -> <#Return Type#>}}
 }
 
+@available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
 func voidGenericFuncWithEffects<T>(arg: T) async where T: CustomStringConvertible {
   return 1
   // expected-error@-1 {{unexpected non-void return value in void function}}
