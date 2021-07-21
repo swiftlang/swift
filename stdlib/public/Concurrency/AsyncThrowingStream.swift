@@ -115,29 +115,29 @@ import Swift
 @available(SwiftStdlib 5.5, *)
 public struct AsyncThrowingStream<Element, Failure: Error> {
 
-    /// A mechanism to interface between synchronous code and an asynchronous
-    /// stream.
-    ///
-    /// The closure you provide to the `AsyncThrowingStream` in
-    /// `init(_:bufferingPolicy:_:)` receives an instance of this type when
-    /// invoked. Use this continuation to provide elements to the stream by
-    /// calling one of the `yield` methods, then terminate the stream normally by
-    /// calling the `finish()` method. You can also use the continuation's
-    /// `finish(throwing:)` method to terminate the stream by throwing an error.
-    public struct Continuation: Sendable {
+  /// A mechanism to interface between synchronous code and an asynchronous
+  /// stream.
+  ///
+  /// The closure you provide to the `AsyncThrowingStream` in
+  /// `init(_:bufferingPolicy:_:)` receives an instance of this type when
+  /// invoked. Use this continuation to provide elements to the stream by
+  /// calling one of the `yield` methods, then terminate the stream normally by
+  /// calling the `finish()` method. You can also use the continuation's
+  /// `finish(throwing:)` method to terminate the stream by throwing an error.
+  public struct Continuation: Sendable {
     /// A type that indicates how the stream terminated.
     ///
     /// The `onTermination` closure receives an instance of this type.
     public enum Termination {
       
-     /// The stream finished as a result of calling the continuation's
-     ///  `finish` method.
-     ///
-     ///  The associated `Failure` value provides the error that terminated
-     ///  the stream. If no error occurred, this value is `nil`.
+      /// The stream finished as a result of calling the continuation's
+      ///  `finish` method.
+      ///
+      ///  The associated `Failure` value provides the error that terminated
+      ///  the stream. If no error occurred, this value is `nil`.
       case finished(Failure?)
       
-     /// The stream finished as a result of cancellation.
+      /// The stream finished as a result of cancellation.
       case cancelled
     }
     
@@ -157,17 +157,18 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
       /// yield are mutually exclusive.
       case enqueued(remaining: Int)
       
-      /// The stream did not enqueue the element due to a full buffer.
+      /// The stream didn't enqueue the element due to a full buffer.
       ///
       /// The associated element for this case is the element that the stream
       /// dropped.
       case dropped(Element)
       
-     /// The stream did not enqueue the element because the stream was in a
-     /// terminal state.
-     ///
-     /// This indicates the stream terminated prior to calling `yield`, either
-     /// because the stream finished normally or through cancellation.
+      /// The stream didn't enqueue the element because the stream was in a
+      /// terminal state.
+      ///
+      /// This indicates the stream terminated prior to calling `yield`, either
+      /// because the stream finished normally or through cancellation, or
+      /// threw an error
       case terminated
     }
     

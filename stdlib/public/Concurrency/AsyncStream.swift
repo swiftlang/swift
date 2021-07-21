@@ -104,10 +104,10 @@ public struct AsyncStream<Element> {
   /// calling one of the `yield` methods, then terminate the stream normally by
   /// calling the `finish()` method.
   public struct Continuation: Sendable {
-      /// A type that indicates how the stream terminated.
-      ///
-      /// The `onTermination` closure receives an instance of this type.
-      public enum Termination {
+    /// A type that indicates how the stream terminated.
+    ///
+    /// The `onTermination` closure receives an instance of this type.
+    public enum Termination {
       
       /// The stream finished as a result of calling the continuation's
       ///  `finish` method.
@@ -133,13 +133,13 @@ public struct AsyncStream<Element> {
       /// yield are mutually exclusive.
       case enqueued(remaining: Int)
       
-      /// The stream did not enqueue the element due to a full buffer.
+      /// The stream didn't enqueue the element due to a full buffer.
       ///
       /// The associated element for this case is the element that the stream
       /// dropped.
       case dropped(Element)
       
-      /// The stream did not enqueue the element because the stream was in a
+      /// The stream didn't enqueue the element because the stream was in a
       /// terminal state.
       ///
       /// This indicates the stream terminated prior to calling `yield`, either
