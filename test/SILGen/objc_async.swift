@@ -8,6 +8,8 @@ import ObjCConcurrency
 // CHECK-LABEL: sil {{.*}}@${{.*}}14testSlowServer
 func testSlowServer(slowServer: SlowServer) async throws {
   // CHECK: [[RESUME_BUF:%.*]] = alloc_stack $Int
+  // CHECK: [[STRINGINIT:%.*]] = function_ref @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF :
+  // CHECK: [[ARG:%.*]] = apply [[STRINGINIT]]
   // CHECK: [[METHOD:%.*]] = objc_method {{.*}} $@convention(objc_method) (NSString, @convention(block) (Int) -> (), SlowServer) -> ()
   // CHECK: [[CONT:%.*]] = get_async_continuation_addr Int, [[RESUME_BUF]]
   // CHECK: [[WRAPPED:%.*]] = struct $UnsafeContinuation<Int, Never> ([[CONT]] : $Builtin.RawUnsafeContinuation)
@@ -16,10 +18,14 @@ func testSlowServer(slowServer: SlowServer) async throws {
   // CHECK: store [[WRAPPED]] to [trivial] [[CONT_SLOT]]
   // CHECK: [[BLOCK_IMPL:%.*]] = function_ref @[[INT_COMPLETION_BLOCK:.*]] : $@convention(c) (@inout_aliasable @block_storage UnsafeContinuation<Int, Never>, Int) -> ()
   // CHECK: [[BLOCK:%.*]] = init_block_storage_header [[BLOCK_STORAGE]] {{.*}}, invoke [[BLOCK_IMPL]]
-  // CHECK: apply [[METHOD]]({{.*}}, [[BLOCK]], %0)
+  // CHECK: apply [[METHOD]]([[ARG]], [[BLOCK]], %0)
+  // CHECK: [[COPY:%.*]] = copy_value [[ARG]]
+  // CHECK: destroy_value [[ARG]]
   // CHECK: await_async_continuation [[CONT]] {{.*}}, resume [[RESUME:bb[0-9]+]]
   // CHECK: [[RESUME]]:
   // CHECK: [[RESULT:%.*]] = load [trivial] [[RESUME_BUF]]
+  // CHECK: fix_lifetime [[COPY]]
+  // CHECK: destroy_value [[COPY]]
   // CHECK: dealloc_stack [[RESUME_BUF]]
   let _: Int = await slowServer.doSomethingSlow("mail")
 
