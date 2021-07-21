@@ -355,7 +355,12 @@ static Expr *makeBinOp(ASTContext &Ctx, Expr *Op, Expr *LHS, Expr *RHS,
 
   if (auto *ifExpr = dyn_cast<IfExpr>(Op)) {
     // Resolve the ternary expression.
-    assert(!ifExpr->isFolded() && "already folded if expr in sequence?!");
+    if (!Ctx.CompletionCallback) {
+      // In code completion we might call preCheckExpression twice - once for
+      // the first pass and once for the second pass. This is fine since
+      // preCheckExpression idempotent.
+      assert(!ifExpr->isFolded() && "already folded if expr in sequence?!");
+    }
     ifExpr->setCondExpr(LHS);
     ifExpr->setElseExpr(RHS);
     return ifExpr;
@@ -363,7 +368,12 @@ static Expr *makeBinOp(ASTContext &Ctx, Expr *Op, Expr *LHS, Expr *RHS,
 
   if (auto *assign = dyn_cast<AssignExpr>(Op)) {
     // Resolve the assignment expression.
-    assert(!assign->isFolded() && "already folded assign expr in sequence?!");
+    if (!Ctx.CompletionCallback) {
+      // In code completion we might call preCheckExpression twice - once for
+      // the first pass and once for the second pass. This is fine since
+      // preCheckExpression idempotent.
+      assert(!assign->isFolded() && "already folded assign expr in sequence?!");
+    }
     assign->setDest(LHS);
     assign->setSrc(RHS);
     return assign;
@@ -371,7 +381,12 @@ static Expr *makeBinOp(ASTContext &Ctx, Expr *Op, Expr *LHS, Expr *RHS,
   
   if (auto *as = dyn_cast<ExplicitCastExpr>(Op)) {
     // Resolve the 'as' or 'is' expression.
-    assert(!as->isFolded() && "already folded 'as' expr in sequence?!");
+    if (!Ctx.CompletionCallback) {
+      // In code completion we might call preCheckExpression twice - once for
+      // the first pass and once for the second pass. This is fine since
+      // preCheckExpression idempotent.
+      assert(!as->isFolded() && "already folded 'as' expr in sequence?!");
+    }
     assert(RHS == as && "'as' with non-type RHS?!");
     as->setSubExpr(LHS);    
     return as;
@@ -379,7 +394,12 @@ static Expr *makeBinOp(ASTContext &Ctx, Expr *Op, Expr *LHS, Expr *RHS,
 
   if (auto *arrow = dyn_cast<ArrowExpr>(Op)) {
     // Resolve the '->' expression.
-    assert(!arrow->isFolded() && "already folded '->' expr in sequence?!");
+    if (!Ctx.CompletionCallback) {
+      // In code completion we might call preCheckExpression twice - once for
+      // the first pass and once for the second pass. This is fine since
+      // preCheckExpression idempotent.
+      assert(!arrow->isFolded() && "already folded '->' expr in sequence?!");
+    }
     arrow->setArgsExpr(LHS);
     arrow->setResultExpr(RHS);
     return arrow;
