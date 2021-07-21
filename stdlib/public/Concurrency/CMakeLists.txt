@@ -29,6 +29,15 @@ if(SWIFT_CONCURRENCY_USES_DISPATCH)
   endif()
 endif()
 
+# Linux requires us to link an atomic library to use atomics.
+# Frustratingly, in many cases this isn't necessary because the
+# sequence is inlined, but we have some code that's just subtle
+# enough to turn into runtime calls.
+if(SWIFT_HOST_VARIANT STREQUAL "linux" OR
+   SWIFT_HOST_VARIANT STREQUAL "android")
+  list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_LINK_FLAGS
+    -latomic)
+endif()
 
 add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   ../CompatibilityOverride/CompatibilityOverride.cpp
