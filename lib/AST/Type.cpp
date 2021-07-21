@@ -1163,38 +1163,6 @@ static void addProtocols(Type T,
   Superclass = T;
 }
 
-/// Add the protocol (or protocols) in the type T to the stack of
-/// protocols, checking whether any of the protocols had already been seen and
-/// zapping those in the original list that we find again.
-static void
-addMinimumProtocols(Type T, SmallVectorImpl<ProtocolDecl *> &Protocols,
-                    llvm::SmallDenseMap<ProtocolDecl *, unsigned> &Known,
-                    llvm::SmallPtrSetImpl<ProtocolDecl *> &Visited,
-                    SmallVector<ProtocolDecl *, 16> &Stack, bool &ZappedAny) {
-  if (auto Proto = T->getAs<ProtocolType>()) {
-    auto KnownPos = Known.find(Proto->getDecl());
-    if (KnownPos != Known.end()) {
-      // We've come across a protocol that is in our original list. Zap it.
-      Protocols[KnownPos->second] = nullptr;
-      ZappedAny = true;
-    }
-
-    if (Visited.insert(Proto->getDecl()).second) {
-      Stack.push_back(Proto->getDecl());
-      for (auto Inherited : Proto->getDecl()->getInheritedProtocols())
-        addMinimumProtocols(Inherited->getDeclaredInterfaceType(),
-                            Protocols, Known, Visited, Stack, ZappedAny);
-    }
-    return;
-  }
-  
-  if (auto PC = T->getAs<ProtocolCompositionType>()) {
-    for (auto C : PC->getMembers()) {
-      addMinimumProtocols(C, Protocols, Known, Visited, Stack, ZappedAny);
-    }
-  }
-}
-
 bool ProtocolType::visitAllProtocols(
                                  ArrayRef<ProtocolDecl *> protocols,
                                  llvm::function_ref<bool(ProtocolDecl *)> fn) {
@@ -1229,44 +1197,48 @@ bool ProtocolType::visitAllProtocols(
 void ProtocolType::canonicalizeProtocols(
        SmallVectorImpl<ProtocolDecl *> &protocols) {
   llvm::SmallDenseMap<ProtocolDecl *, unsigned> known;
-  llvm::SmallPtrSet<ProtocolDecl *, 16> visited;
-  SmallVector<ProtocolDecl *, 16> stack;
   bool zappedAny = false;
 
   // Seed the stack with the protocol declarations in the original list.
   // Zap any obvious duplicates along the way.
-  for (unsigned I = 0, N = protocols.size(); I != N; ++I) {
-    // Check whether we've seen this protocol before.
-    auto knownPos = known.find(protocols[I]);
-    
+  for (unsigned i : indices(protocols)) {
     // If we have not seen this protocol before, record its index.
-    if (knownPos == known.end()) {
-      known[protocols[I]] = I;
-      stack.push_back(protocols[I]);
+    if (known.count(protocols[i]) == 0) {
+      known[protocols[i]] = i;
       continue;
     }
-    
+
     // We have seen this protocol before; zap this occurrence.
-    protocols[I] = nullptr;
+    protocols[i] = nullptr;
     zappedAny = true;
   }
   
   // Walk the inheritance hierarchies of all of the protocols. If we run into
   // one of the known protocols, zap it from the original list.
-  while (!stack.empty()) {
-    ProtocolDecl *Current = stack.back();
-    stack.pop_back();
-    
+  for (unsigned i : indices(protocols)) {
+    auto *proto = protocols[i];
+    if (proto == nullptr)
+      continue;
+
     // Add the protocols we inherited.
-    for (auto Inherited : Current->getInheritedProtocols()) {
-      addMinimumProtocols(Inherited->getDeclaredInterfaceType(),
-                          protocols, known, visited, stack, zappedAny);
-    }
+    proto->walkInheritedProtocols([&](ProtocolDecl *inherited) {
+      if (inherited == proto)
+        return TypeWalker::Action::Continue;
+
+      auto found = known.find(inherited);
+      if (found != known.end()) {
+        protocols[found->second] = nullptr;
+        zappedAny = true;
+      }
+
+      return TypeWalker::Action::Continue;
+    });
   }
   
-  if (zappedAny)
+  if (zappedAny) {
     protocols.erase(std::remove(protocols.begin(), protocols.end(), nullptr),
                     protocols.end());
+  }
 
   // Sort the set of protocols by module + name, to give a stable
   // ordering.
