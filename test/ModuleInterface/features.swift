@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -typecheck -swift-version 5 -module-name FeatureTest -emit-module-interface-path - -enable-library-evolution -enable-experimental-concurrency %s | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck -swift-version 5 -module-name FeatureTest -emit-module-interface-path - -enable-library-evolution -enable-experimental-concurrency -disable-availability-checking %s | %FileCheck %s
 // REQUIRES: concurrency
 
 // REQUIRES: concurrency

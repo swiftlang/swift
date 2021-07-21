@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-experimental-concurrency %s -parse-as-library -parse-stdlib -emit-sil -o - | %FileCheck %s
+// RUN: %target-swift-frontend -enable-experimental-concurrency -disable-availability-checking %s -parse-as-library -parse-stdlib -emit-sil -o - | %FileCheck %s
 
 // REQUIRES: concurrency
 

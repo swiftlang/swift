@@ -1658,6 +1658,48 @@ void TypeChecker::diagnosePotentialOpaqueTypeUnavailability(
   fixAvailability(ReferenceRange, ReferenceDC, RequiredRange, Context);
 }
 
+static void diagnosePotentialConcurrencyUnavailability(
+    SourceRange ReferenceRange, const DeclContext *ReferenceDC,
+    const UnavailabilityReason &Reason) {
+  ASTContext &Context = ReferenceDC->getASTContext();
+
+  auto RequiredRange = Reason.getRequiredOSVersionRange();
+  {
+    auto Err =
+      Context.Diags.diagnose(
+          ReferenceRange.Start,
+          diag::availability_concurrency_only_version_newer,
+          prettyPlatformString(targetPlatform(Context.LangOpts)),
+          Reason.getRequiredOSVersionRange().getLowerEndpoint());
+
+    // Direct a fixit to the error if an existing guard is nearly-correct
+    if (fixAvailabilityByNarrowingNearbyVersionCheck(ReferenceRange,
+                                                     ReferenceDC,
+                                                     RequiredRange, Context, Err))
+      return;
+  }
+  fixAvailability(ReferenceRange, ReferenceDC, RequiredRange, Context);
+}
+
+
+void TypeChecker::checkConcurrencyAvailability(SourceRange ReferenceRange,
+                                               const DeclContext *ReferenceDC) {
+  // Check the availability of concurrency runtime support.
+  ASTContext &ctx = ReferenceDC->getASTContext();
+  if (ctx.LangOpts.DisableAvailabilityChecking)
+    return;
+  
+  auto runningOS =
+    TypeChecker::overApproximateAvailabilityAtLocation(
+      ReferenceRange.Start, ReferenceDC);
+  auto availability = ctx.getConcurrencyAvailability();
+  if (!runningOS.isContainedIn(availability)) {
+    diagnosePotentialConcurrencyUnavailability(
+      ReferenceRange, ReferenceDC,
+      UnavailabilityReason::requiresVersionRange(availability.getOSVersion()));
+  }
+}
+
 void TypeChecker::diagnosePotentialUnavailability(
     const ValueDecl *D, SourceRange ReferenceRange,
     const DeclContext *ReferenceDC,

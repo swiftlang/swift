@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s -module-name initializers -swift-version 5 -enable-experimental-concurrency | %FileCheck %s --enable-var-scope --implicit-check-not=hop_to_executor
+// RUN: %target-swift-frontend -emit-silgen %s -module-name initializers -swift-version 5 -enable-experimental-concurrency -disable-availability-checking | %FileCheck %s --enable-var-scope --implicit-check-not=hop_to_executor
 // REQUIRES: concurrency
 
 // CHECK:       protocol Person {
