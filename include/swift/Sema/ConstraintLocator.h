@@ -953,6 +953,44 @@ public:
   }
 };
 
+class LocatorPathElt::ClosureBodyElement final
+    : public StoredPointerElement<void> {
+public:
+  ClosureBodyElement(ASTNode element)
+      : StoredPointerElement(PathElementKind::ClosureBodyElement,
+                             element.getOpaqueValue()) {
+    assert(element);
+  }
+
+  ASTNode getElement() const {
+    // Unfortunately \c getFromOpaqueValue doesn't produce an ASTNode.
+    auto node = ASTNode::getFromOpaqueValue(getStoredPointer());
+    if (auto *expr = node.dyn_cast<Expr *>())
+      return expr;
+
+    if (auto *stmt = node.dyn_cast<Stmt *>())
+      return stmt;
+
+    if (auto *decl = node.dyn_cast<Decl *>())
+      return decl;
+
+    if (auto *pattern = node.dyn_cast<Pattern *>())
+      return pattern;
+
+    if (auto *repr = node.dyn_cast<TypeRepr *>())
+      return repr;
+
+    if (auto *cond = node.dyn_cast<StmtCondition *>())
+      return cond;
+
+    llvm_unreachable("unhandled ASTNode element kind");
+  }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == PathElementKind::ClosureBodyElement;
+  }
+};
+
 namespace details {
   template <typename CustomPathElement>
   class PathElement {
