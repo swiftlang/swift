@@ -175,6 +175,9 @@ Solution ConstraintSystem::finalize() {
   for (auto &nodeType : NodeTypes) {
     solution.nodeTypes.insert(nodeType);
   }
+  for (auto &keyPathComponentType : KeyPathComponentTypes) {
+    solution.keyPathComponentTypes.insert(keyPathComponentType);
+  }
 
   // Remember contextual types.
   solution.contextualTypes.assign(
