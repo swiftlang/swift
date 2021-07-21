@@ -5701,6 +5701,11 @@ GenericSignatureBuilder::isValidRequirementDerivationPath(
 
     auto otherSubjectType = otherReq.getSubjectType();
 
+    auto *equivClass = resolveEquivalenceClass(otherSubjectType,
+                                         ArchetypeResolutionKind::AlreadyKnown);
+    assert(equivClass &&
+           "Explicit requirement names an unknown equivalence class?");
+
     // If our requirement is based on a path involving some other
     // redundant requirement, see if we can derive the redundant
     // requirement using requirements we haven't visited yet.
@@ -5719,11 +5724,6 @@ GenericSignatureBuilder::isValidRequirementDerivationPath(
       // redundant; there's no other derivation that would not be redundant.
       if (!otherSource->isDerivedNonRootRequirement())
         return None;
-
-      auto *equivClass = resolveEquivalenceClass(otherSubjectType,
-                                           ArchetypeResolutionKind::AlreadyKnown);
-      assert(equivClass &&
-             "Explicit requirement names an unknown equivalence class?");
 
       switch (otherReq.getKind()) {
       case RequirementKind::Conformance: {
@@ -5804,20 +5804,22 @@ GenericSignatureBuilder::isValidRequirementDerivationPath(
       }
     }
 
-    if (auto *depMemType = otherSubjectType->getAs<DependentMemberType>()) {
+    auto anchor = equivClass->getAnchor(*this, { });
+
+    if (auto *depMemType = anchor->getAs<DependentMemberType>()) {
       // If 'req' is based on some other conformance requirement
       // `T.[P.]A : Q', we want to make sure that we have a
       // non-redundant derivation for 'T : P'.
       auto baseType = depMemType->getBase();
       auto *proto = depMemType->getAssocType()->getProtocol();
 
-      auto *equivClass = resolveEquivalenceClass(baseType,
+      auto *baseEquivClass = resolveEquivalenceClass(baseType,
                                            ArchetypeResolutionKind::AlreadyKnown);
-      assert(equivClass &&
+      assert(baseEquivClass &&
              "Explicit requirement names an unknown equivalence class?");
 
-      auto found = equivClass->conformsTo.find(proto);
-      assert(found != equivClass->conformsTo.end());
+      auto found = baseEquivClass->conformsTo.find(proto);
+      assert(found != baseEquivClass->conformsTo.end());
 
       bool foundValidDerivation = false;
       for (const auto &constraint : found->second) {
