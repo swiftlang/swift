@@ -278,7 +278,7 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
   ///                     let random = Int.random(in: 1...10)
   ///                     if (random % 5 == 0) {
   ///                         continuation.finish(throwing: MyRandomNumberError())
-  ///                         break
+  ///                         return
   ///                     } else {
   ///                         continuation.yield(random)
   ///                     }
