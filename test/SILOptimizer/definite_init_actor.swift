@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -module-name test -swift-version 5 -sil-verify-all -emit-sil %s | %FileCheck --enable-var-scope --implicit-check-not='hop_to_executor' %s
+// RUN: %target-swift-frontend -module-name test -disable-availability-checking -swift-version 5 -sil-verify-all -emit-sil %s | %FileCheck --enable-var-scope --implicit-check-not='hop_to_executor' %s
 
 // REQUIRES: concurrency
 

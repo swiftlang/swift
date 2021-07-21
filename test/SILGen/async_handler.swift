@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s -module-name test -swift-version 5 -enable-experimental-concurrency -enable-experimental-async-handler | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s -module-name test -swift-version 5 -enable-experimental-concurrency -enable-experimental-async-handler -disable-availability-checking | %FileCheck %s
 // REQUIRES: concurrency
 
 func take<T>(_ t: T) async {

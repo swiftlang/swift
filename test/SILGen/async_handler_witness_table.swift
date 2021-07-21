@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -enable-experimental-concurrency -enable-experimental-async-handler> %t.out
+// RUN: %target-swift-emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -enable-experimental-concurrency -enable-experimental-async-handler -disable-availability-checking > %t.out
 // RUN: %FileCheck %s < %t.out
 
 // REQUIRES: objc_interop

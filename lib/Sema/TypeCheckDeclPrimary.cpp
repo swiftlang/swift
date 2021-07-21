@@ -2315,6 +2315,9 @@ public:
 
     TypeChecker::checkDeclAttributes(CD);
 
+    if (CD->isActor())
+      TypeChecker::checkConcurrencyAvailability(CD->getLoc(), CD);
+
     for (Decl *Member : CD->getABIMembers())
       visit(Member);
 
@@ -2609,6 +2612,9 @@ public:
 
     checkImplementationOnlyOverride(FD);
 
+    if (FD->getAsyncLoc().isValid())
+      TypeChecker::checkConcurrencyAvailability(FD->getAsyncLoc(), FD);
+    
     if (requiresDefinition(FD) && !FD->hasBody()) {
       // Complain if we should have a body.
       FD->diagnose(diag::func_decl_without_brace);
@@ -2858,6 +2864,9 @@ public:
 
     TypeChecker::checkDeclAttributes(CD);
     TypeChecker::checkParameterList(CD->getParameters(), CD);
+
+    if (CD->getAsyncLoc().isValid())
+      TypeChecker::checkConcurrencyAvailability(CD->getAsyncLoc(), CD);
 
     // Check whether this initializer overrides an initializer in its
     // superclass.

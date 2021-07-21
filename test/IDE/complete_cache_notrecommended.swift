@@ -62,7 +62,7 @@ func testSyncMember(obj: MyActor) async -> Int {
 // RUN: %{python} %utils/split_file.py -o %t %s
 
 // RUN: %empty-directory(%t/Modules)
-// RUN: %target-swift-frontend -emit-module -module-name MyModule -o %t/Modules %t/MyModule.swift
+// RUN: %target-swift-frontend -emit-module -module-name MyModule -o %t/Modules %t/MyModule.swift -disable-availability-checking
 
 // RUN: %empty-directory(%t/output)
 // RUN: %empty-directory(%t/ccp)
