@@ -626,18 +626,22 @@ ExecutorBreadcrumb SILGenFunction::emitHopToTargetActor(SILLocation loc,
     return ExecutorBreadcrumb();
 
   if (auto executor = emitExecutor(loc, *maybeIso, maybeSelf)) {
-    // Record the previous executor to hop back to when we no longer need to
-    // be isolated to the target actor.
-    //
-    // If we're calling from an actor method ourselves, then we'll want to hop
-    // back to our own actor.
-    auto breadcrumb = ExecutorBreadcrumb(emitGetCurrentExecutor(loc));
-    B.createHopToExecutor(loc, executor.getValue());
-    
-    return breadcrumb;
+    return emitHopToTargetExecutor(loc, *executor);
   } else {
     return ExecutorBreadcrumb();
   }
+}
+
+ExecutorBreadcrumb SILGenFunction::emitHopToTargetExecutor(
+    SILLocation loc, SILValue executor) {
+  // Record the previous executor to hop back to when we no longer need to
+  // be isolated to the target actor.
+  //
+  // If we're calling from an actor method ourselves, then we'll want to hop
+  // back to our own actor.
+  auto breadcrumb = ExecutorBreadcrumb(emitGetCurrentExecutor(loc));
+  B.createHopToExecutor(loc, executor);
+  return breadcrumb;
 }
 
 Optional<SILValue> SILGenFunction::emitExecutor(
