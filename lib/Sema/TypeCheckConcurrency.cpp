@@ -385,6 +385,7 @@ ActorIsolationRestriction ActorIsolationRestriction::forDeclaration(
       if (func->isAsyncContext())
         isAccessibleAcrossActors = true;
 
+      // FIXME: move diagnosis out of this function entirely (!)
       if (func->isDistributed()) {
         if (auto classDecl = dyn_cast<ClassDecl>(decl->getDeclContext())) {
           if (!classDecl->isDistributedActor()) {
@@ -2273,9 +2274,11 @@ namespace {
         if (dyn_cast<ConstructorDecl>(member))
           return false;
 
-        // While the member may be unrestricted, perhaps
+        // While the member may be unrestricted, perhaps it is in a
+        // distributed actor, in which case we need to diagnose it.
         if (auto classDecl = dyn_cast<ClassDecl>(member->getDeclContext())) {
           if (classDecl->isDistributedActor()) {
+            fprintf(stderr, "[%s:%d] (%s) HERE\n", __FILE__, __LINE__, __FUNCTION__);
             ctx.Diags.diagnose(memberLoc, diag::distributed_actor_isolated_method);
             noteIsolatedActorMember(member, context);
             return true;
@@ -2312,29 +2315,40 @@ namespace {
             !(isolatedActor.isActorSelf() &&
               member->isInstanceMember() &&
               isActorInitOrDeInitContext(getDeclContext()))) {
-          // invocation on not-'self', is only okey if this is a distributed func
+          // cross actor invocation is only ok for a distributed or static func
           if (auto func = dyn_cast<FuncDecl>(member)) {
-            if (!func->isDistributed()) {
+            if (func->isStatic()) {
+              // FIXME: rather, never end up as distributed actor self isolated
+              //        at all for static funcs
+              continueToCheckingLocalIsolation = true;
+            } else if (func->isDistributed()) {
+              tryMarkImplicitlyAsync(memberLoc, memberRef, context);
+              tryMarkImplicitlyThrows(memberLoc, memberRef, context);
+
+              // distributed func reference, that passes all checks, great!
+              continueToCheckingLocalIsolation = true;
+            } else {
+              // the func is neither static or distributed
               ctx.Diags.diagnose(memberLoc, diag::distributed_actor_isolated_method);
               // TODO: offer a fixit to add 'distributed' on the member; how to test fixits? See also https://github.com/apple/swift/pull/35930/files
               noteIsolatedActorMember(member, context);
               return true;
             }
 
-            assert(func->isDistributed());
-            tryMarkImplicitlyAsync(memberLoc, memberRef, context);
-            tryMarkImplicitlyThrows(memberLoc, memberRef, context);
-
-            // distributed func reference, that passes all checks, great!
-            continueToCheckingLocalIsolation = true;
           } // end FuncDecl
 
           if (!continueToCheckingLocalIsolation) {
             // it wasn't a function (including a distributed function),
             // so we need to perform some more checks
             if (auto var = dyn_cast<VarDecl>(member)) {
+              // TODO: we want to remove _distributedActorIndependent in favor of nonisolated
+              //
               // @_distributedActorIndependent decls are accessible always,
               // regardless of distributed actor-isolation; e.g. actorAddress
+              if (member->getAttrs().hasAttribute<DistributedActorIndependentAttr>())
+                return false;
+
+              // nonisolated decls are accessible always
               if (member->getAttrs().hasAttribute<DistributedActorIndependentAttr>())
                 return false;
 
@@ -2347,13 +2361,16 @@ namespace {
                 noteIsolatedActorMember(member, context);
                 return true;
               }
-            }
+            } // end VarDecl
 
             // TODO: would have to also consider subscripts and other things
           }
         } // end !isolatedActor
 
-        return false;
+        if (!continueToCheckingLocalIsolation)
+          return false;
+
+        LLVM_FALLTHROUGH;
       }
 
       case ActorIsolationRestriction::ActorSelf: {
@@ -2428,9 +2445,10 @@ namespace {
       case ActorIsolationRestriction::Unsafe:
         // This case is hit when passing actor state inout to functions in some
         // cases. The error is emitted by diagnoseInOutArg.
-
-        if (auto classDecl = dyn_cast<ClassDecl>(member->getDeclContext())) {
-          if (classDecl->isDistributedActor()) {
+        auto classDecl = dyn_cast<ClassDecl>(member->getDeclContext());
+        if (classDecl && classDecl->isDistributedActor()) {
+          auto funcDecl = dyn_cast<AbstractFunctionDecl>(member);
+          if (funcDecl && !funcDecl->isStatic()) {
             member->diagnose(diag::distributed_actor_isolated_method);
             return true;
           }
@@ -3164,7 +3182,8 @@ ActorIsolation ActorIsolationRequest::evaluate(
     }
 
     if (auto nominal = value->getDeclContext()->getSelfNominalTypeDecl()) {
-      if (nominal->isDistributedActor()) {
+      /// Unless the function is static, it is isolated to the dist actor
+      if (nominal->isDistributedActor() && !func->isStatic()) {
         defaultIsolation = ActorIsolation::forDistributedActorInstance(nominal);
       }
     }

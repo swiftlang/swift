@@ -46,20 +46,23 @@ public protocol DistributedActor: AnyActor, Identifiable, Hashable, Codable {
     ///   associated with.
     init(transport: ActorTransport)
 
-    /// Resolves the passed in `address` against the `transport`,
-    /// returning either a local or remote actor reference.
+    @available(*, deprecated, renamed: "SomeDistributedActor.resolve(_:using:)")
+    init(resolve id: AnyActorIdentity, using transport: ActorTransport) throws
+
+    /// Resolves the passed in `identity` against the `transport`, returning
+    /// either a local or remote actor reference.
     ///
-    /// The transport will be asked to `resolve` the address and return either
-    /// a local instance or determine that a proxy instance should be created
-    /// for this address. A proxy actor will forward all invocations through
+    /// The transport will be asked to `resolve` the identity and return either
+    /// a local instance or request a proxy to be created for this identity.
+    ///
+    /// A remote distributed actor reference will forward all invocations through
     /// the transport, allowing it to take over the remote messaging with the
     /// remote actor instance.
     ///
-    /// - Parameter address: the address to resolve, and produce an instance or proxy for.
-    /// - Parameter transport: transport which should be used to resolve the `address`.
-    // FIXME: replace with static func resolve(_:using)
-    // TODO: make this <ID>(resolve id: ID, ...)
-    init(resolve id: AnyActorIdentity, using transport: ActorTransport) throws
+    /// - Parameter identity: identity uniquely identifying a, potentially remote, actor in the system
+    /// - Parameter transport: `transport` which should be used to resolve the `identity`, and be associated with the returned actor
+    static func resolve<Identity>(_ identity: Identity, using transport: ActorTransport)
+      throws -> Self where Identity: ActorIdentity
 
     /// The `ActorTransport` associated with this actor.
     /// It is immutable and equal to the transport passed in the local/resolve
@@ -81,6 +84,23 @@ public protocol DistributedActor: AnyActor, Identifiable, Hashable, Codable {
     /// Conformance to this requirement is synthesized automatically for any
     /// `distributed actor` declaration.
     nonisolated var id: AnyActorIdentity { get }
+}
+
+@available(SwiftStdlib 5.5, *)
+extension DistributedActor {
+
+  public static func resolve<Identity>(_ identity: Identity, using transport: ActorTransport)
+      throws -> Self where Identity: ActorIdentity {
+    switch try transport.resolve(AnyActorIdentity(identity), as: Self.self) {
+    case .resolved(let instance):
+      return instance
+
+    case .makeProxy:
+      // FIXME: this needs actual implementation of distributedActorRemoteCreate
+      let remote: Any = distributedActorRemoteCreate(identity: identity, transport: transport)
+      return remote as! Self
+    }
+  }
 }
 
 // ==== Hashable conformance ---------------------------------------------------
@@ -219,6 +239,9 @@ func __isLocalActor(_ actor: AnyObject) -> Bool {
 /// The implementation will call this within the actor's initializer.
 @_silgen_name("swift_distributedActor_remote_initialize")
 func _distributedActorRemoteInitialize(_ actor: AnyObject)
+
+@_silgen_name("swift_distributedActor_remote_create")
+func distributedActorRemoteCreate(identity: Any, transport: Any) -> Any // TODO: make it typed
 
 /// Called to destroy the default actor instance in an actor.
 /// The implementation will call this within the actor's deinit.
