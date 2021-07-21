@@ -1021,6 +1021,9 @@ diagnosePotentialOpaqueTypeUnavailability(SourceRange ReferenceRange,
                                           const DeclContext *ReferenceDC,
                                           const UnavailabilityReason &Reason);
 
+void checkConcurrencyAvailability(SourceRange ReferenceRange,
+                                  const DeclContext *ReferenceDC);
+
 /// Emits a diagnostic for a reference to a storage accessor that is
 /// potentially unavailable.
 void diagnosePotentialAccessorUnavailability(

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify %s -enable-experimental-concurrency -verify-syntax-tree
+// RUN: %target-swift-frontend -typecheck -verify %s -enable-experimental-concurrency -verify-syntax-tree -disable-availability-checking
 
 // REQUIRES: concurrency
 

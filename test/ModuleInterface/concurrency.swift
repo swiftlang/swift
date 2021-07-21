@@ -4,10 +4,12 @@
 // REQUIRES: concurrency
 
 #if LIBRARY
+@available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
 public func fn() async {
   fatalError()
 }
 
+@available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
 public func reasyncFn(_: () async -> ()) reasync {
   fatalError()
 }
@@ -17,6 +19,7 @@ public func reasyncFn(_: () async -> ()) reasync {
 #else
 import Library
 
+@available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
 func callFn() async {
   await fn()
 }
