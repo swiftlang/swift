@@ -3411,7 +3411,7 @@ llvm::Value *irgen::emitClassHeapMetadataRef(IRGenFunction &IGF, CanType type,
                                              bool allowUninitialized) {
   assert(request.canResponseStatusBeIgnored() &&
          "emitClassHeapMetadataRef only supports satisfied requests");
-  assert(type->mayHaveSuperclass());
+  assert(type->mayHaveSuperclass() || type->isTypeErasedGenericClassType());
 
   // Archetypes may or may not be ObjC classes and need unwrapping to get at
   // the class object.
@@ -3426,7 +3426,7 @@ llvm::Value *irgen::emitClassHeapMetadataRef(IRGenFunction &IGF, CanType type,
     return classPtr;
   }
   
-  if (ClassDecl *theClass = type->getClassOrBoundGenericClass()) {
+  if (ClassDecl *theClass = dyn_cast_or_null<ClassDecl>(type->getAnyNominal())) {
     if (!hasKnownSwiftMetadata(IGF.IGM, theClass)) {
       llvm::Value *result =
         emitObjCHeapMetadataRef(IGF, theClass, allowUninitialized);

@@ -1118,6 +1118,10 @@ public:
       case irgen::MetadataSource::Kind::Metadata:
         Root = SourceBuilder.createMetadataCapture(Source.getParamIndex());
         break;
+
+      case irgen::MetadataSource::Kind::ErasedTypeMetadata:
+        // Fixed in the function body
+        break;
       }
 
       // The metadata might be reached via a non-trivial path (eg,
