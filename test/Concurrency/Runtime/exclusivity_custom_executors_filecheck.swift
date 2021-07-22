@@ -7,6 +7,9 @@
 // UNSUPPORTED: back_deployment_runtime
 // UNSUPPORTED: use_os_stdlib
 
+// Disabled until test hang can be looked at.
+// UNSUPPORTED: OS=windows-msvc
+
 // Only enabled if our stdlib has asserts enabled since the exclusivity runtime
 // will only emit logging when the stdlib is compiled with asserts. This is done
 // on purpose since we do not want to ship the runtime with this logging even
