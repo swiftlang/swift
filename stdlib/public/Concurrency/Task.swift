@@ -658,7 +658,6 @@ extension Task where Success == Never, Failure == Never {
   /// the executor immediately resumes execution of the same task.
   /// As such,
   /// this method isn't necessarily a way to avoid resource starvation.
-  @available(*, deprecated, renamed: "suspend()")
   public static func yield() async {
     return await Builtin.withUnsafeContinuation { (continuation: Builtin.RawUnsafeContinuation) -> Void in
       let job = _taskCreateNullaryContinuationJob(
@@ -666,11 +665,6 @@ extension Task where Success == Never, Failure == Never {
           continuation: continuation)
       _enqueueJobGlobal(job)
     }
-  }
-
-  @_alwaysEmitIntoClient
-  public static func suspend() async {
-    await yield()
   }
 }
 
