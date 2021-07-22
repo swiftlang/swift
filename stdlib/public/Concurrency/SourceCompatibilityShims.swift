@@ -29,6 +29,12 @@ extension Task where Success == Never, Failure == Never {
   public static func CancellationError() -> _Concurrency.CancellationError {
     return _Concurrency.CancellationError()
   }
+
+  @available(*, deprecated, renamed: "yield()")
+  @_alwaysEmitIntoClient
+  public static func suspend() async {
+    await yield()
+  }
 }
 
 @available(SwiftStdlib 5.5, *)
