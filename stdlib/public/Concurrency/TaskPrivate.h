@@ -159,7 +159,7 @@ public:
 } // end anonymous namespace
 
 /// The current state of a task's status records.
-class ActiveTaskStatus {
+class alignas(sizeof(void*) * 2) ActiveTaskStatus {
   enum : uintptr_t {
     /// The current running priority of the task.
     PriorityMask = 0xFF,
