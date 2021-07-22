@@ -747,6 +747,10 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     // implication. Thus we can skip them.
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
       if (auto *BD = VD->getOverriddenDecl()) {
+        // If the overriden decl won't be printed, printing override will fail
+        // the build of the interface file.
+        if (!Options.shouldPrint(BD))
+          return false;
         if (!BD->hasClangNode() &&
             !BD->getFormalAccessScope(VD->getDeclContext(),
                                       /*treatUsableFromInlineAsPublic*/ true)
