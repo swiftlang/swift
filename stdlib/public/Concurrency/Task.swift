@@ -627,7 +627,6 @@ extension Task where Success == Never, Failure == Never {
   /// if the task is the highest-priority task in the system, it might go
   /// immediately back to executing.
   ///
-  @available(*, deprecated, renamed: "suspend()")
   public static func yield() async {
     return await Builtin.withUnsafeContinuation { (continuation: Builtin.RawUnsafeContinuation) -> Void in
       let job = _taskCreateNullaryContinuationJob(
@@ -635,11 +634,6 @@ extension Task where Success == Never, Failure == Never {
           continuation: continuation)
       _enqueueJobGlobal(job)
     }
-  }
-
-  @_alwaysEmitIntoClient
-  public static func suspend() async {
-    await yield()
   }
 }
 
