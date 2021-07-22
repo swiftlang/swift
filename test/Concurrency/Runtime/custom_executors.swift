@@ -6,6 +6,9 @@
 // UNSUPPORTED: back_deployment_runtime
 // UNSUPPORTED: use_os_stdlib
 
+// Disabled until test hang can be looked at.
+// UNSUPPORTED: OS=windows-msvc
+
 actor Simple {
   var count = 0
   func report() {
