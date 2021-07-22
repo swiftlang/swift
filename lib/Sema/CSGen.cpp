@@ -2519,10 +2519,8 @@ namespace {
         std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
           // If there are any error expressions in this closure
           // it wouldn't be possible to infer its type.
-          if (isa<ErrorExpr>(expr)) {
+          if (isa<ErrorExpr>(expr))
             hasErrorExprs = true;
-            return {false, nullptr};
-          }
 
           // Retrieve type variables from references to var decls.
           if (auto *declRef = dyn_cast<DeclRefExpr>(expr)) {
