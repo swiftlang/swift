@@ -24,7 +24,94 @@ using namespace swift::constraints;
 
 namespace {
 
+/// Find any type variable references inside of an AST node.
+class TypeVariableRefFinder : public ASTWalker {
+  ConstraintSystem &CS;
+  ASTNode Parent;
+
+  llvm::SmallSetVector<TypeVariableType *, 2> referencedVars;
+
+public:
+  TypeVariableRefFinder(ConstraintSystem &cs, ASTNode parent)
+      : CS(cs), Parent(parent) {}
+
+  std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+    if (auto *DRE = dyn_cast<DeclRefExpr>(expr)) {
+      if (auto type = CS.getTypeIfAvailable(DRE->getDecl())) {
+        if (auto *typeVar = type->getAs<TypeVariableType>())
+          referencedVars.insert(typeVar);
+      }
+    }
+
+    return {true, expr};
+  }
+
+  std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
+    // Return statements have to reference outside result type
+    // since all of them are joined by it if it's not specified
+    // explicitly.
+    if (isa<ReturnStmt>(stmt)) {
+      if (auto *closure = getAsExpr<ClosureExpr>(Parent)) {
+        auto resultTy = CS.getClosureType(closure)->getResult();
+        if (auto *typeVar = resultTy->getAs<TypeVariableType>())
+          referencedVars.insert(typeVar);
+      }
+    }
+
+    return {true, stmt};
+  }
+
+  ArrayRef<TypeVariableType *> getReferencedVars() const {
+    return referencedVars.getArrayRef();
+  }
+};
+
 // MARK: Constraint generation
+
+static void createConjunctionForBody(ConstraintSystem &cs, BraceStmt *body,
+                                     ASTNode parent,
+                                     ConstraintLocator *locator) {
+  bool isIsolated = false;
+  SmallVector<TypeVariableType *, 2> referencedVars;
+
+  // If this is a top level closure, it has to be isolated.
+  if (auto *closure = getAsExpr<ClosureExpr>(parent)) {
+    isIsolated = !isa<AbstractClosureExpr>(closure->getParent());
+    referencedVars.push_back(cs.getType(closure)->castTo<TypeVariableType>());
+  }
+
+  SmallVector<Constraint *, 4> elements;
+
+  for (auto element : body->getElements()) {
+    if (auto *decl = element.dyn_cast<Decl *>()) {
+      // - Ignore variable declarations, they are handled by pattern bindings;
+      // - Ignore #if, the chosen children should appear in the
+      // surrounding context;
+      // - Skip #warning and #error, they are handled during solution
+      //   application.
+      if (isa<VarDecl>(decl) || isa<IfConfigDecl>(decl) ||
+          isa<PoundDiagnosticDecl>(decl))
+        continue;
+    }
+
+    TypeVariableRefFinder refFinder(cs, parent);
+
+    // If conjunction would require isolation, each element
+    // has to bring any of the referenced outer context
+    // type variables into scope.
+    if (isIsolated)
+      element.walk(refFinder);
+
+    auto *elementLoc = cs.getConstraintLocator(
+        locator, LocatorPathElt::ClosureBodyElement(element));
+
+    elements.push_back(Constraint::createClosureBodyElement(
+        cs, element, elementLoc, refFinder.getReferencedVars()));
+  }
+
+  cs.addUnsolvedConstraint(Constraint::createConjunction(
+      cs, elements, isIsolated, locator, referencedVars));
+}
 
 /// Statement visitor that generates constraints for a given closure body.
 class ClosureConstraintGenerator
@@ -33,16 +120,27 @@ class ClosureConstraintGenerator
 
   ConstraintSystem &cs;
   ClosureExpr *closure;
+  ConstraintLocator *locator;
 
 public:
   /// Whether an error was encountered while generating constraints.
   bool hadError = false;
 
-  ClosureConstraintGenerator(ConstraintSystem &cs, ClosureExpr *closure)
-      : cs(cs), closure(closure) {}
+  ClosureConstraintGenerator(ConstraintSystem &cs, ClosureExpr *closure,
+                             ConstraintLocator *locator)
+      : cs(cs), closure(closure), locator(locator) {}
 
 private:
   void visitDecl(Decl *decl) {
+    if (isSupportedMultiStatementClosure()) {
+      if (auto patternBinding = dyn_cast<PatternBindingDecl>(decl)) {
+        SolutionApplicationTarget target(patternBinding);
+        if (cs.generateConstraints(target, FreeTypeVariableBinding::Disallow))
+          hadError = true;
+        return;
+      }
+    }
+
     // Just ignore #if; the chosen children should appear in the
     // surrounding context.  This isn't good for source tools but it
     // at least works.
@@ -62,6 +160,20 @@ private:
   }
 
   void visitBraceStmt(BraceStmt *braceStmt) {
+    if (isSupportedMultiStatementClosure()) {
+      ASTNode parent;
+      if (locator->getPath().empty()) {
+        parent = locator->getAnchor();
+      } else {
+        auto parentElt =
+            locator->findLast<LocatorPathElt::ClosureBodyElement>();
+        assert(parentElt && "body has to have an anchor statement");
+        parent = parentElt->getElement();
+      }
+      createConjunctionForBody(cs, braceStmt, parent, locator);
+      return;
+    }
+
     for (auto node : braceStmt->getElements()) {
       if (auto expr = node.dyn_cast<Expr *>()) {
         auto generatedExpr = cs.generateConstraints(
@@ -99,6 +211,11 @@ private:
                          closure, LocatorPathElt::ClosureBody(hasReturn)));
   }
 
+  bool isSupportedMultiStatementClosure() const {
+    return !closure->hasSingleExpressionBody() &&
+           shouldTypeCheckInEnclosingExpression(closure);
+  }
+
 #define UNSUPPORTED_STMT(STMT) void visit##STMT##Stmt(STMT##Stmt *) { \
       llvm_unreachable("Unsupported statement kind " #STMT);          \
   }
@@ -121,13 +238,37 @@ private:
   UNSUPPORTED_STMT(PoundAssert)
 #undef UNSUPPORTED_STMT
 };
-
 }
 
 bool ConstraintSystem::generateConstraints(ClosureExpr *closure) {
-  ClosureConstraintGenerator generator(*this, closure);
-  generator.visit(closure->getBody());
-  return generator.hadError;
+  auto &ctx = closure->getASTContext();
+
+  if (shouldTypeCheckInEnclosingExpression(closure)) {
+    ClosureConstraintGenerator generator(*this, closure,
+                                         getConstraintLocator(closure));
+    generator.visit(closure->getBody());
+
+    if (closure->hasSingleExpressionBody())
+      return generator.hadError;
+  }
+
+  // If this closure has an empty body and no explicit result type
+  // let's bind result type to `Void` since that's the only type empty body
+  // can produce. Otherwise, if (multi-statement) closure doesn't have
+  // an explicit result (no `return` statements) let's default it to `Void`.
+  if (!hasExplicitResult(closure)) {
+    auto constraintKind =
+        (closure->hasEmptyBody() && !closure->hasExplicitResultType())
+            ? ConstraintKind::Bind
+            : ConstraintKind::Defaultable;
+
+    addConstraint(
+        constraintKind, getClosureType(closure)->getResult(),
+        ctx.TheEmptyTupleType,
+        getConstraintLocator(closure, ConstraintLocator::ClosureResult));
+  }
+
+  return false;
 }
 
 ConstraintSystem::SolutionKind
@@ -175,11 +316,23 @@ private:
   }
 
   void visitDecl(Decl *decl) {
-    
     if (isa<IfConfigDecl>(decl))
       return;
-    
-    llvm_unreachable("Unimplemented case for closure body");
+
+    // Variable declaration would be handled by a pattern binding.
+    if (isa<VarDecl>(decl))
+      return;
+
+    // Generate constraints for pattern binding declarations.
+    if (auto patternBinding = dyn_cast<PatternBindingDecl>(decl)) {
+      SolutionApplicationTarget target(patternBinding);
+      if (!rewriteTarget(target))
+        hadError = true;
+
+      return;
+    }
+
+    TypeChecker::typeCheckDecl(decl);
   }
 
   ASTNode visitBraceStmt(BraceStmt *braceStmt) {

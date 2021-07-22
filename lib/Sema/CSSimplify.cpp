@@ -9132,26 +9132,8 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
     }
   }
 
-  // If this closure should be type-checked as part of this expression,
-  // generate constraints for it now.
-  auto &ctx = getASTContext();
-  if (shouldTypeCheckInEnclosingExpression(closure)) {
-    if (generateConstraints(closure))
-      return false;
-  } else if (!hasExplicitResult(closure)) {
-    // If this closure has an empty body and no explicit result type
-    // let's bind result type to `Void` since that's the only type empty body
-    // can produce. Otherwise, if (multi-statement) closure doesn't have
-    // an explicit result (no `return` statements) let's default it to `Void`.
-    auto constraintKind = (closure->hasEmptyBody() && !closure->hasExplicitResultType())
-                              ? ConstraintKind::Bind
-                              : ConstraintKind::Defaultable;
-    addConstraint(
-        constraintKind, inferredClosureType->getResult(), ctx.TheEmptyTupleType,
-        getConstraintLocator(closure, ConstraintLocator::ClosureResult));
-  }
-
-  return true;
+  // Generate constraints from the body of this closure.
+  return !generateConstraints(closure);
 }
 
 ConstraintSystem::SolutionKind
