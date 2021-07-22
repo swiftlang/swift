@@ -90,3 +90,15 @@ struct S: P {
   func k(isolated y: Int) -> Int { return j(isolated: y) }
   func l(isolated _: Int) -> Int { return k(isolated: 0) }
 }
+
+
+// Redeclaration checking
+actor TestActor {
+  func test() { // expected-note{{'test()' previously declared here}}
+  }
+  nonisolated func test() { // expected-error{{invalid redeclaration of 'test()'}}
+  }
+}
+
+func redecl(_: TestActor) { } // expected-note{{'redecl' previously declared here}}
+func redecl(_: isolated TestActor) { } // expected-error{{invalid redeclaration of 'redecl'}}
