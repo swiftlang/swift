@@ -44,7 +44,7 @@ public func withTaskCancellationHandler<T>(
 
 @available(SwiftStdlib 5.5, *)
 extension Task {
-  /// Returns `true` if the task is cancelled, and should stop executing.
+  /// Returns `true` if the task is canceled, and should stop executing.
   ///
   /// - SeeAlso: `checkCancellation()`
   public var isCancelled: Bool {
@@ -60,7 +60,7 @@ extension Task {
 
 @available(SwiftStdlib 5.5, *)
 extension Task where Success == Never, Failure == Never {
-  /// Returns `true` if the task is cancelled, and should stop executing.
+  /// Returns `true` if the task is canceled, and should stop executing.
   ///
   /// If no current `Task` is available, returns `false`, as outside of a task
   /// context no task cancellation may be observed.
@@ -75,7 +75,7 @@ extension Task where Success == Never, Failure == Never {
 
 @available(SwiftStdlib 5.5, *)
 extension Task where Success == Never, Failure == Never {
-  /// Check if the task is cancelled and throw an `CancellationError` if it was.
+  /// Check if the task is canceled and throw an `CancellationError` if it was.
   ///
   /// The error is always an instance of `Task.CancellationError`.
   ///
@@ -87,10 +87,10 @@ extension Task where Success == Never, Failure == Never {
   }
 }
 
-/// The default cancellation thrown when a task is cancelled.
+/// The default cancellation thrown when a task is canceled.
 ///
 /// This error is also thrown automatically by `Task.checkCancellation()`,
-/// if the current task has been cancelled.
+/// if the current task has been canceled.
 @available(SwiftStdlib 5.5, *)
 public struct CancellationError: Error {
   // no extra information, cancellation is intended to be light-weight
