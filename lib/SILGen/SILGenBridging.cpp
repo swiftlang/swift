@@ -1569,8 +1569,10 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
     if (thunk.hasDecl()) {
       isolation = getActorIsolation(thunk.getDecl());
     }
-    
-    if (isolation) {
+
+    // A hop is only needed in the thunk if it is global-actor isolated.
+    // Native, instance-isolated async methods will hop in the prologue.
+    if (isolation && isolation->isGlobalActor()) {
       emitHopToTargetActor(loc, *isolation, None);
     }
   }

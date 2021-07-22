@@ -42,3 +42,16 @@ actor A {
   func g() { } // expected-note{{add '@objc' to expose this instance method to Objective-C}}
   @objc func h() async { }
 }
+
+actor Dril: NSObject {
+  // expected-note@+2 {{add 'async' to function 'postSynchronouslyTo(twitter:)' to make it asynchronous}}
+  // expected-error@+1 {{actor-isolated instance method 'postSynchronouslyTo(twitter:)' cannot be @objc}}
+  @objc func postSynchronouslyTo(twitter msg: String) -> Bool {
+    return true
+  }
+
+  @MainActor
+  @objc func postFromMainActorTo(twitter msg: String) -> Bool {
+    return true
+  }
+}
