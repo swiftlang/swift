@@ -5590,6 +5590,10 @@ public:
 
   bool attempt(ConstraintSystem &cs) const;
 
+  ArrayRef<TypeVariableType *> getReferencedVars() const {
+    return Element->getTypeVariables();
+  }
+
   void print(llvm::raw_ostream &Out, SourceManager *SM) const {
     Out << "conjunction element ";
     Element->print(Out, SM);
