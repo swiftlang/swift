@@ -298,7 +298,13 @@ public:
   /// Add the default-actor header to the layout.  This must be the second
   /// thing added to the layout, following the Swift heap header.
   void addDefaultActorHeader(ElementLayout &elt);
-  
+  /// Add the distributed-actor header to the layout.  This must be added
+  /// either after the default-actor header (for local actors) or after the
+  /// Swift heap header for remote actors (because they do not need any of the
+  /// "real actor" capabilities, we can skip their header keeping remote
+  /// references as small as possible).
+  void addDistributedActorHeader(ElementLayout &elt);
+
   /// Add a number of fields to the layout.  The field layouts need
   /// only have the TypeInfo set; the rest will be filled out.
   ///
@@ -459,6 +465,7 @@ public:
 };
 
 Size getDefaultActorStorageFieldOffset(IRGenModule &IGM);
+Size getDistributedActorStorageFieldOffset(IRGenModule &IGM);
 
 } // end namespace irgen
 } // end namespace swift

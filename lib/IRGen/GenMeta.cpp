@@ -2794,6 +2794,10 @@ static void emitFieldOffsetGlobals(IRGenModule &IGM,
     // storage, which is never accessed directly.
     case Field::DefaultActorStorage:
       return;
+    // Similarly to default actor storage, distributed actor storage is never
+    // accessed directly so no need to add an offset global.
+    case Field::DistributedActorStorage:
+      return;
     }
 
     auto prop = field.getVarDecl();
@@ -3171,6 +3175,11 @@ namespace {
 
     void addDefaultActorStorageFieldOffset() {
       B.addInt(IGM.SizeTy, getDefaultActorStorageFieldOffset(IGM).getValue());
+    }
+
+    // TODO(distributed): would this perhaps depend on if it is remote or not...?
+    void addDistributedActorStorageFieldOffset() {
+      B.addInt(IGM.SizeTy, getDistributedActorStorageFieldOffset(IGM).getValue());
     }
 
     void addReifiedVTableEntry(SILDeclRef fn) {

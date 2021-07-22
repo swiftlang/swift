@@ -1111,6 +1111,8 @@ namespace {
 
       if (getClass()->isRootDefaultActor())
         Ivars.push_back(Field::DefaultActorStorage);
+      if (getClass()->isDistributedActor())
+        Ivars.push_back(Field::DistributedActorStorage);
       visitMembers(getClass());
 
       if (Lowering::usesObjCAllocator(getClass())) {
@@ -1871,8 +1873,9 @@ namespace {
       switch (pair.first) {
       case FieldAccess::ConstantDirect:
       case FieldAccess::NonConstantDirect: {
-        // Default actor storage doesn't get an ivar access variable.
-        if (field.getKind() == Field::DefaultActorStorage) {
+        // Default (or distributed) actor storage doesn't get an ivar access variable.
+        if (field.getKind() == Field::DefaultActorStorage ||
+            field.getKind() == Field::DistributedActorStorage) {
           offsetPtr = nullptr;
           break;
         }

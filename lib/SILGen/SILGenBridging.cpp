@@ -1977,7 +1977,7 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
   // Check if actor is local or remote and call respective function
   //
   // func X_distributedThunk(...) async throws -> T {
-  //   if __isRemoteActor(self) {
+  //   if _isDistributedRemoteActor(self) {
   //     return try await self._remote_X(...)
   //   } else {
   //     return try await self.X(...)
@@ -2023,7 +2023,7 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
   auto selfValue = ManagedValue::forUnmanaged(params[params.size() - 1]);
   auto selfType = selfDecl->getType();
 
-  // if __isRemoteActor(self) {
+  // if _isDistributedRemoteActor(self) {
   //   ...
   // } else {
   //   ...
@@ -2045,7 +2045,7 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
     B.createCondBranch(loc, isRemoteResultUnwrapped, isRemoteBB, isLocalBB);
   }
 
-  // // if __isRemoteActor(self)
+  // // if _isDistributedRemoteActor(self)
   // {
   //   return try await self._remote_X(...)
   // }

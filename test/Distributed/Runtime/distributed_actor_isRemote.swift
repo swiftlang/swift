@@ -82,10 +82,10 @@ struct FakeTransport: ActorTransport {
 // ==== Execute ----------------------------------------------------------------
 
 @_silgen_name("swift_distributed_actor_is_remote")
-func __isRemoteActor(_ actor: AnyObject) -> Bool
+func _isDistributedRemoteActor(_ actor: AnyObject) -> Bool
 
 func __isLocalActor(_ actor: AnyObject) -> Bool {
-  return !__isRemoteActor(actor)
+  return !_isDistributedRemoteActor(actor)
 }
 
 // ==== Execute ----------------------------------------------------------------
@@ -98,12 +98,12 @@ func test_remote() async {
   let local = SomeSpecificDistributedActor(transport: transport)
   _ = local.id
   assert(__isLocalActor(local) == true, "should be local")
-  assert(__isRemoteActor(local) == false, "should be local")
+  assert(_isDistributedRemoteActor(local) == false, "should be local")
 
   // assume it always makes a remote one
   let remote = try! SomeSpecificDistributedActor(resolve: .init(address), using: transport)
   assert(__isLocalActor(remote) == false, "should be remote")
-  assert(__isRemoteActor(remote) == true, "should be remote")
+  assert(_isDistributedRemoteActor(remote) == true, "should be remote")
 
   print("done") // CHECK: done
 }

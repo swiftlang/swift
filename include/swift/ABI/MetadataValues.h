@@ -47,6 +47,10 @@ enum {
   /// in a default actor.
   NumWords_DefaultActor = 12,
 
+  /// The number of words (in addition to heap-object, and if local also
+  /// actor header) in a distributed actor.
+  NumWords_DistributedActor = 4, // TODO: no idea how many we need?
+
   /// The number of words in a task.
   NumWords_AsyncTask = 24,
 
@@ -129,6 +133,9 @@ const size_t MaximumAlignment = 16;
 
 /// The alignment of a DefaultActor.
 const size_t Alignment_DefaultActor = MaximumAlignment;
+
+/// The alignment of a DistributedActor.
+const size_t Alignment_DistributedActor = MaximumAlignment;
 
 /// The alignment of a TaskGroup.
 const size_t Alignment_TaskGroup = MaximumAlignment;

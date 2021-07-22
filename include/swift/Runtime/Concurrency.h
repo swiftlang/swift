@@ -587,9 +587,9 @@ void swift_distributedActor_remote_initialize(DefaultActor *actor);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 OpaqueValue* swift_distributedActor_remote_create(
   /* +1 */OpaqueValue *identity,
-  /* +1 */OpaqueValue *transport
-  // metadata for identity
-  // metadata for transport
+  /* +1 */OpaqueValue *transport,
+  const Metadata *identityType,
+  const Metadata *transportType
 );
 
 /// Destroy the runtime storage for a default actor.

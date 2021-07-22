@@ -1474,6 +1474,21 @@ public:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinDefaultActorStorageType, BuiltinType);
 
+/// BuiltinDistributedActorStorageType - The type of the stored property
+/// that's added implicitly to distributed actors.  It is used to store their
+/// identity and transport.  It follows the same pattern as
+/// BuiltinDefaultActorStorageType does for default actors.
+class BuiltinDistributedActorStorageType : public BuiltinType {
+  friend class ASTContext;
+  BuiltinDistributedActorStorageType(const ASTContext &C)
+    : BuiltinType(TypeKind::BuiltinDistributedActorStorage, C) {}
+public:
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::BuiltinDistributedActorStorage;
+  }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinDistributedActorStorageType, BuiltinType);
+
 /// BuiltinNativeObjectType - The builtin opaque object-pointer type.
 /// Useful for keeping an object alive when it is otherwise being
 /// manipulated via an unsafe pointer type.

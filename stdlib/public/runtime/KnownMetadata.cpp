@@ -93,6 +93,11 @@ namespace ctypes {
       void *storage[NumWords_DefaultActor];
     };
 
+    // Distributed actor storage type.
+    struct alignas(2 * alignof(void*)) Bd {
+      void *storage[NumWords_DistributedActor];
+    };
+
     // ExecutorRef type.
     struct Be {
       HeapObject *Identity;

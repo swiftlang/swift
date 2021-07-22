@@ -411,6 +411,8 @@ namespace {
 
 class DefaultActorImpl;
 
+class DistributedActorFragment;
+
 /// A job to process a default actor.  Allocated inline in the actor.
 class ProcessInlineJob : public Job {
 public:
@@ -618,7 +620,7 @@ class DefaultActorImpl : public HeapObject {
       Status_width = 3,
 
       HasActiveInlineJob = 3,
-      IsDistributedRemote = 4,
+      IsDistributedActor = 4,
 
       MaxPriority = 8,
       MaxPriority_width = JobFlags::Priority_width,
@@ -649,9 +651,8 @@ class DefaultActorImpl : public HeapObject {
     FLAGSET_DEFINE_FLAG_ACCESSORS(HasActiveInlineJob,
                                   hasActiveInlineJob, setHasActiveInlineJob)
 
-    /// Is the actor a distributed 'remote' actor?
-    /// I.e. it does not have storage for user-defined properties and all
-    /// function call must be transformed into $distributed_ function calls.
+    /// Is the actor a '(local) distributed actor'?
+    /// If so, it has the 'DistributedActorFragment' available.
     FLAGSET_DEFINE_FLAG_ACCESSORS(IsDistributedRemote,
                                   isDistributedRemote, setIsDistributedRemote)
 
@@ -683,11 +684,11 @@ class DefaultActorImpl : public HeapObject {
 
 public:
   /// Properly construct an actor, except for the heap header.
-  /// \param isDistributedRemote When true sets the IsDistributedRemote flag
-  void initialize(bool isDistributedRemote = false) {
-    // TODO: this is just a simple implementation, rather we would want to allocate a proxy
+  /// \param isDistributed When true sets the IsDistributedActor flag
+  void initialize(bool isDistributed = false) {
+    // TODO(distributed): this is just a simple implementation, rather we would want to allocate a proxy
     auto flags = Flags();
-    flags.setIsDistributedRemote(isDistributedRemote);
+    flags.setIsDistributedActor(true);
     new (&CurrentState) std::atomic<State>(State{JobRef(), flags});
   }
 
@@ -716,6 +717,8 @@ public:
   /// Note that a distributed *local* actor instance is the same as any other
   /// ordinary default (local) actor, and no special handling is needed for them.
   bool isDistributedRemote();
+
+  Dist
   
 private:
   void deallocateUnconditional();
@@ -1759,7 +1762,10 @@ void swift::swift_defaultActor_deallocateResilient(HeapObject *actor) {
 // TODO: most likely where we'd need to create the "proxy instance" instead? (most likely remove this and use swift_distributedActor_remote_create instead)
 void swift::swift_distributedActor_remote_initialize(DefaultActor *_actor) { // FIXME: remove distributed C++ impl not needed?
   auto actor = asImpl(_actor);
-  actor->initialize(/*remote=*/true);
+  actor->initialize(/*distributed=*/true);
+  if (auto distributed = actor->distributedActorFragment()) {
+    distributed->setRemote(true);
+  }
 }
 
 // TODO: missing implementation of creating a proxy for the remote actor
@@ -1992,4 +1998,36 @@ static void swift_task_enqueueImpl(Job *job, ExecutorRef executor) {
 bool DefaultActorImpl::isDistributedRemote() {
   auto state = CurrentState.load(std::memory_order_relaxed);
   return state.Flags.isDistributedRemote() == 1;
+}
+
+SWIFT_CC(swift)
+static void swift_task_enqueueImpl(Actor *actor) {
+
+}
+
+/*****************************************************************************/
+/******************* DISTRIBUTED ACTOR IMPLEMENTATION ************************/
+/*****************************************************************************/
+
+/// Storage common for *any* distributed actor, regardless if local or remote.
+///
+/// Local distributed actors store this fragment right after the actor header,
+/// while remote distributed actors completely skip the actor header and are
+/// represented in memory by *just* the \c DistributedActorFragment.
+// TODO: the remote actor does not need to BE an actor at all
+class DistributedActorFragment {
+private:
+  /// Pointer at existential `ActorIdentity` stored by any `distributed actor`.
+  OpaqueValue *identity;
+  /// Pointer at existential `ActorTransport` stored by any `distributed actor`.
+  OpaqueValue *transport;
+
+public:
+  OpaqueValue *getActorIdentity() const {
+    return identity;
+  }
+
+  OpaqueValue *getActorTransport() const {
+    return transport;
+  }
 }

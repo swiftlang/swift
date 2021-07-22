@@ -154,7 +154,7 @@ void SILGenFunction::injectDistributedActorDestructorLifecycleCall(
   auto isRemoteBB = createBasicBlock();
   auto isLocalBB = createBasicBlock();
 
-  // if __isRemoteActor(self) {
+  // if _isDistributedRemoteActor(self) {
   //   ...
   // } else {
   //   ...

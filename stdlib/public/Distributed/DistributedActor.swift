@@ -227,10 +227,10 @@ public struct DistributedActorCodingError: ActorTransportError {
 // ==== isRemote / isLocal -----------------------------------------------------
 
 @_silgen_name("swift_distributed_actor_is_remote")
-func __isRemoteActor(_ actor: AnyObject) -> Bool
+func _isDistributedRemoteActor(_ actor: AnyObject) -> Bool
 
 func __isLocalActor(_ actor: AnyObject) -> Bool {
-    return !__isRemoteActor(actor)
+    return !_isDistributedRemoteActor(actor)
 }
 
 // ==== Proxy Actor lifecycle --------------------------------------------------
@@ -241,7 +241,10 @@ func __isLocalActor(_ actor: AnyObject) -> Bool {
 func _distributedActorRemoteInitialize(_ actor: AnyObject)
 
 @_silgen_name("swift_distributedActor_remote_create")
-func distributedActorRemoteCreate(identity: Any, transport: Any) -> Any // TODO: make it typed
+func distributedActorRemoteCreate<Identity, Transport>(
+  identity: ActorIdentity,
+  transport: ActorTransport
+) -> Any
 
 /// Called to destroy the default actor instance in an actor.
 /// The implementation will call this within the actor's deinit.

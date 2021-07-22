@@ -2101,6 +2101,20 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
     auto spareBits = SpareBitVector::getConstant(size.getValueInBits(), false);
     return new PrimitiveTypeInfo(ty, size, std::move(spareBits), align);
   }
+  case TypeKind::BuiltinDistributedActorStorage: {
+    // Builtin.DistributedActorStorage represents the extra storage
+    // (beyond the heap (or heap+actor) header) of a distributed actor.  It is
+    // fixed-size and totally opaque.
+    auto numWords = NumWords_DistributedActor;
+
+    auto ty = llvm::StructType::create(IGM.getLLVMContext(),
+                                 llvm::ArrayType::get(IGM.Int8PtrTy, numWords),
+                                       "swift.distributedactor");
+    auto size = IGM.getPointerSize() * numWords;
+    auto align = Alignment(2 * IGM.getPointerAlignment().getValue());
+    auto spareBits = SpareBitVector::getConstant(size.getValueInBits(), false);
+    return new PrimitiveTypeInfo(ty, size, std::move(spareBits), align);
+  }
 
   case TypeKind::PrimaryArchetype:
   case TypeKind::OpenedArchetype:

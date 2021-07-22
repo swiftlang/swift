@@ -214,6 +214,7 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
   case TypeKind::BuiltinJob:
   case TypeKind::BuiltinExecutor:
   case TypeKind::BuiltinDefaultActorStorage:
+  case TypeKind::BuiltinDistributedActorStorage:
   case TypeKind::BuiltinUnsafeValueBuffer:
   case TypeKind::BuiltinVector:
   case TypeKind::Tuple:
@@ -5216,6 +5217,7 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   case TypeKind::BuiltinJob:
   case TypeKind::BuiltinExecutor:
   case TypeKind::BuiltinDefaultActorStorage:
+  case TypeKind::BuiltinDistributedActorStorage:
   case TypeKind::BuiltinUnsafeValueBuffer:
   case TypeKind::BuiltinVector:
   case TypeKind::Tuple:

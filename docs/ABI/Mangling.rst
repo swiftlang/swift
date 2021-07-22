@@ -539,6 +539,7 @@ Types
   #if SWIFT_RUNTIME_VERSION >= 5.5
     type ::= 'Bc'                              // Builtin.RawUnsafeContinuation
     type ::= 'BD'                              // Builtin.DefaultActorStorage
+    type ::= 'Bb'                              // Builtin.DistributedActorStorage
     type ::= 'Be'                              // Builtin.Executor
   #endif
   type ::= 'Bf' NATURAL '_'                  // Builtin.Float<n>

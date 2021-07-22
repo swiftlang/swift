@@ -92,10 +92,10 @@ extension SomeSpecificDistributedActor {
 // ==== Execute ----------------------------------------------------------------
 
 @_silgen_name("swift_distributed_actor_is_remote")
-func __isRemoteActor(_ actor: AnyObject) -> Bool
+func _isDistributedRemoteActor(_ actor: AnyObject) -> Bool
 
 func __isLocalActor(_ actor: AnyObject) -> Bool {
-  return !__isRemoteActor(actor)
+  return !_isDistributedRemoteActor(actor)
 }
 
 // ==== Fake Transport ---------------------------------------------------------
@@ -137,7 +137,7 @@ struct FakeTransport: ActorTransport {
 @available(SwiftStdlib 5.5, *)
 func test_remote_invoke(address: ActorAddress, transport: ActorTransport) async {
   func check(actor: SomeSpecificDistributedActor) async {
-    let personality = __isRemoteActor(actor) ? "remote" : "local"
+    let personality = _isDistributedRemoteActor(actor) ? "remote" : "local"
 
     let h1 = try! await actor.helloAsyncThrows()
     print("\(personality) - helloAsyncThrows: \(h1)")
@@ -152,7 +152,7 @@ func test_remote_invoke(address: ActorAddress, transport: ActorTransport) async 
     print("\(personality) - hello: \(h4)")
 
     // error throws
-    if __isRemoteActor(actor) {
+    if _isDistributedRemoteActor(actor) {
       do {
         _ = try await actor.helloThrowsTransportBoom()
         preconditionFailure("helloThrowsTransportBoom: should have thrown")
@@ -170,12 +170,12 @@ func test_remote_invoke(address: ActorAddress, transport: ActorTransport) async 
   }
 
   let remote = try! SomeSpecificDistributedActor(resolve: .init(address), using: transport)
-  assert(__isRemoteActor(remote) == true, "should be remote")
+  assert(_isDistributedRemoteActor(remote) == true, "should be remote")
 
   let local = SomeSpecificDistributedActor(transport: transport)
-  assert(__isRemoteActor(local) == false, "should be local")
+  assert(_isDistributedRemoteActor(local) == false, "should be local")
 
-  print("local isRemote: \(__isRemoteActor(local))")
+  print("local isRemote: \(_isDistributedRemoteActor(local))")
   // CHECK: local isRemote: false
   await check(actor: local)
   // CHECK: local - helloAsyncThrows: local(helloAsyncThrows())
@@ -184,7 +184,7 @@ func test_remote_invoke(address: ActorAddress, transport: ActorTransport) async 
   // CHECK: local - hello: local(hello())
   // CHECK: local - helloThrowsImplBoom: Boom(whoFailed: "impl")
 
-  print("remote isRemote: \(__isRemoteActor(remote))")
+  print("remote isRemote: \(_isDistributedRemoteActor(remote))")
   // CHECK: remote isRemote: true
   await check(actor: remote)
   // CHECK: remote - helloAsyncThrows: remote(_remote_impl_helloAsyncThrows())

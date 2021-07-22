@@ -228,6 +228,35 @@ Size irgen::getDefaultActorStorageFieldOffset(IRGenModule &IGM) {
   return IGM.RefCountedStructSize;
 }
 
+void StructLayoutBuilder::addDistributedActorHeader(ElementLayout &elt) {
+  // TODO: is this right? we want to store two things there... the identity and transport.
+  assert(StructFields.size() == 2 &&
+         StructFields[0] == IGM.RefCountedStructTy &&
+         StructFields[1] == IGM.RefCountedStructTy &&
+         "adding distributed actor header at wrong offset");
+
+  // These must match the DistributedActor class in Actor.h. // FIXME: we don't declare it there, should we?
+  auto size = NumWords_DistributedActor * IGM.getPointerSize();
+  auto align = Alignment(Alignment_DistributedActor);
+  auto ty = llvm::ArrayType::get(IGM.Int8PtrTy, NumWords_DistributedActor);
+
+  // Note that we align the *entire structure* to the new alignment,
+  // not the storage we're adding.  Otherwise we would potentially
+  // get internal padding.
+  assert(CurSize.isMultipleOf(IGM.getPointerSize()));
+  assert(align >= CurAlignment);
+  assert(CurSize == getDistributedActorStorageFieldOffset(IGM));
+  elt.completeFixed(IsNotPOD, CurSize, /*struct index*/ 1); // FIXME: anything else to do here since we have 2 fields?
+  CurSize += size;
+  CurAlignment = align;
+  StructFields.push_back(ty);
+  headerSize = CurSize;
+}
+
+Size irgen::getDistributedActorStorageFieldOffset(IRGenModule &IGM) {
+  return IGM.RefCountedStructSize;
+}
+
 bool StructLayoutBuilder::addFields(llvm::MutableArrayRef<ElementLayout> elts,
                                     LayoutStrategy strategy) {
   // Track whether we've added any storage to our layout.
@@ -422,6 +451,9 @@ void irgen::forEachField(IRGenModule &IGM, const NominalTypeDecl *typeDecl,
   if (classDecl && classDecl->isRootDefaultActor()) {
     fn(Field::DefaultActorStorage);
   }
+  if (classDecl && classDecl->isDistributedActor()) {
+    fn(Field::DistributedActorStorage);
+  }
 
   for (auto decl :
          typeDecl->getStoredPropertiesAndMissingMemberPlaceholders()) {
@@ -443,6 +475,9 @@ SILType Field::getType(IRGenModule &IGM, SILType baseType) const {
   case Field::DefaultActorStorage:
     return SILType::getPrimitiveObjectType(
                              IGM.Context.TheDefaultActorStorageType);
+  case Field::DistributedActorStorage:
+    return SILType::getPrimitiveObjectType(
+                             IGM.Context.TheDistributedActorStorageType);
   }
   llvm_unreachable("bad field kind");
 }
@@ -455,6 +490,8 @@ Type Field::getInterfaceType(IRGenModule &IGM) const {
     llvm_unreachable("cannot ask for type of missing member");
   case Field::DefaultActorStorage:
     return IGM.Context.TheDefaultActorStorageType;
+  case Field::DistributedActorStorage:
+    return IGM.Context.TheDistributedActorStorageType;
   }
   llvm_unreachable("bad field kind");
 }
@@ -467,6 +504,8 @@ StringRef Field::getName() const {
     llvm_unreachable("cannot ask for type of missing member");
   case Field::DefaultActorStorage:
     return DEFAULT_ACTOR_STORAGE_FIELD_NAME;
+  case Field::DistributedActorStorage:
+    return DISTRIBUTED_ACTOR_STORAGE_FIELD_NAME;
   }
   llvm_unreachable("bad field kind");
 }

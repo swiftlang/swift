@@ -27,10 +27,10 @@ distributed actor SomeSpecificDistributedActor {
 // ==== Execute ----------------------------------------------------------------
 
 @_silgen_name("swift_distributed_actor_is_remote")
-func __isRemoteActor(_ actor: AnyObject) -> Bool
+func _isDistributedRemoteActor(_ actor: AnyObject) -> Bool
 
 func __isLocalActor(_ actor: AnyObject) -> Bool {
-  return !__isRemoteActor(actor)
+  return !_isDistributedRemoteActor(actor)
 }
 
 // ==== Fake Transport ---------------------------------------------------------
