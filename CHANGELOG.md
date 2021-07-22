@@ -3,8 +3,8 @@ CHANGELOG
 
 _**Note:** This is in reverse chronological order, so newer entries are added to the top._
 
-Swift Next
-----------
+Swift 5.6
+---------
 * [SE-0290][]:
 
   It is now possible to write inverted availability conditions by using the new `#unavailable` keyword:
