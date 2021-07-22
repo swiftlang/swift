@@ -26,3 +26,12 @@ extension P where T : C {
     missing()
   }
 }
+
+struct S : P {}
+
+extension P where T == S {
+  // CHECK-LABEL: Generic signature: <Self where Self == S>
+  func test() {
+    missing()
+  }
+}

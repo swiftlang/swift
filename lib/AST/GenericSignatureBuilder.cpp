@@ -8355,6 +8355,40 @@ GenericSignature GenericSignatureBuilder::rebuildSignatureWithoutRedundantRequir
       }
     };
 
+    // If we have a same-type requirement where the right hand side is concrete,
+    // canonicalize the left hand side, in case dropping some redundant
+    // conformance requirement turns the original left hand side into an
+    // unresolvable type.
+    if (!req.getRHS().get<Type>()->isTypeParameter()) {
+      auto resolvedSubject =
+          maybeResolveEquivalenceClass(req.getSubjectType(),
+                                       ArchetypeResolutionKind::WellFormed,
+                                       /*wantExactPotentialArchetype=*/false);
+
+      auto *resolvedEquivClass = resolvedSubject.getEquivalenceClass(*this);
+      auto resolvedSubjectType = resolvedEquivClass->getAnchor(*this, { });
+
+      auto constraintType = resolveType(req.getRHS().get<Type>());
+
+      auto newReq = stripBoundDependentMemberTypes(
+          Requirement(RequirementKind::SameType,
+                      resolvedSubjectType, constraintType));
+
+      if (Impl->DebugRedundantRequirements) {
+        llvm::dbgs() << "=> ";
+        newReq.dump(llvm::dbgs());
+        llvm::dbgs() << "\n";
+      }
+      newBuilder.addRequirement(newReq, getRebuiltSource(req.getSource()),
+                                nullptr);
+
+      continue;
+    }
+
+    // Otherwise, we can't canonicalize the two sides of the requirement, since
+    // doing so will produce a trivial same-type requirement T == T. Instead,
+    // apply some ad-hoc rules to improve the odds that the requirement will
+    // resolve in the rebuilt GSB.
     auto subjectType = resolveType(req.getSubjectType());
     auto constraintType = resolveType(req.getRHS().get<Type>());
 
