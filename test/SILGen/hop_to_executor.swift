@@ -356,3 +356,36 @@ func testGenericGlobalActorClosure<T>(_: T) {
     = { @GenericGlobalActorWithGetter<T> x in x }
   acceptAsyncClosure2(ggat)
 }
+
+func acceptIsolatedParam(_: Int, _: isolated MyActor, _: Double) { }
+
+extension MyActor {
+  nonisolated func otherIsolated(_: Int, _: isolated MyActor, _: Double) { }
+}
+
+// CHECK: sil hidden [ossa] @$s4test0A26ImplicitAsyncIsolatedParam1i1d5actor10otherActorySi_SdAA02MyH0CAHtYaF
+func testImplicitAsyncIsolatedParam(
+  i: Int, d: Double, actor: MyActor, otherActor: MyActor
+) async {
+  // CHECK: [[FN1:%.*]] = function_ref @$s4test19acceptIsolatedParamyySi_AA7MyActorCYiSdtF
+  // CHECK-NEXT: [[CURRENT:%.*]] = builtin "getCurrentExecutor"() : $Optional<Builtin.Executor>
+  // CHECK-NEXT: hop_to_executor %2 : $MyActor
+  // CHECK-NEXT: apply [[FN1]](%0, %2, %1) : $@convention(thin) (Int, @guaranteed MyActor, Double) -> ()
+  // CHECK-NEXT: hop_to_executor [[CURRENT]] : $Optional<Builtin.Executor>
+  await acceptIsolatedParam(i, actor, d)
+
+  // CHECK: [[FN2:%.*]] = function_ref @$s4test7MyActorC13otherIsolatedyySi_ACYiSdtF : $@convention(method) (Int, @guaranteed MyActor, Double, @guaranteed MyActor) -> ()
+  // CHECK-NEXT: [[CURRENT:%.*]] = builtin "getCurrentExecutor"() : $Optional<Builtin.Executor>
+  // CHECK-NEXT: hop_to_executor %2 : $MyActor
+  // CHECK-NEXT: apply [[FN2]](%0, %2, %1, %3) : $@convention(method) (Int, @guaranteed MyActor, Double, @guaranteed MyActor) -> ()
+  // CHECK-NEXT: hop_to_executor [[CURRENT]] : $Optional<Builtin.Executor>
+  await otherActor.otherIsolated(i, actor, d)
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s4test22asyncWithIsolatedParam1i5actor1dySi_AA7MyActorCYiSdtYaF : $@convention(thin) @async (Int, @guaranteed MyActor, Double) -> ()
+func asyncWithIsolatedParam(i: Int, actor: isolated MyActor, d: Double) async {
+  // CHECK: [[ACTOR:%.*]] = copy_value %1 : $MyActor
+  // CHECK-NEXT: [[BORROWED:%.*]] = begin_borrow [[ACTOR]] : $MyActor
+  // CHECK-NEXT: hop_to_executor [[BORROWED]] : $MyActor
+  // CHECK-NEXT: end_borrow [[BORROWED]] : $MyActor
+}

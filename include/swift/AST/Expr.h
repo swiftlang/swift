@@ -1189,11 +1189,74 @@ public:
   }
 };
 
+/// Describes the actor to which an implicit-async expression will hop.
+struct ImplicitActorHopTarget {
+  enum Kind {
+    /// The "self" instance.
+    InstanceSelf,
+    /// A global actor with the given type.
+    GlobalActor,
+    /// An isolated parameter in a call.
+    IsolatedParameter,
+  };
+
+private:
+  /// The lower two bits are the Kind, and the remaining bits are used for
+  /// the payload, which might by a TypeBase * (for a global actor) or a
+  /// integer value (for an isolated parameter).
+  uintptr_t bits;
+
+  constexpr ImplicitActorHopTarget(uintptr_t bits) : bits(bits) { }
+
+public:
+  /// Default-initialized to instance "self".
+  constexpr ImplicitActorHopTarget() : bits(0) { }
+
+  static ImplicitActorHopTarget forInstanceSelf() {
+    return ImplicitActorHopTarget(InstanceSelf);
+  }
+
+  static ImplicitActorHopTarget forGlobalActor(Type globalActor) {
+    uintptr_t bits =
+      reinterpret_cast<uintptr_t>(globalActor.getPointer()) | GlobalActor;
+    return ImplicitActorHopTarget(bits);
+  }
+
+  static ImplicitActorHopTarget forIsolatedParameter(unsigned index) {
+    uintptr_t bits = static_cast<uintptr_t>(index) << 2 | IsolatedParameter;
+    return ImplicitActorHopTarget(bits);
+  }
+
+  /// Determine the kind of implicit actor hop being performed.
+  Kind getKind() const {
+    return static_cast<Kind>(bits & 0x03);
+  }
+
+  operator Kind() const {
+    return getKind();
+  }
+
+  /// Retrieve the global actor type for an implicit hop to a global actor.
+  Type getGlobalActor() const {
+    assert(getKind() == GlobalActor);
+    return Type(reinterpret_cast<TypeBase *>(bits & ~0x03));
+  }
+
+  /// Retrieve the (zero-based) parameter index for the isolated parameter
+  /// in a call.
+  unsigned getIsolatedParameterIndex() const {
+    assert(getKind() == IsolatedParameter);
+    return bits >> 2;
+  }
+};
+
+
 /// DeclRefExpr - A reference to a value, "x".
 class DeclRefExpr : public Expr {
   /// The declaration pointer.
   ConcreteDeclRef D;
   DeclNameLoc Loc;
+  ImplicitActorHopTarget implicitActorHopTarget;
 
 public:
   DeclRefExpr(ConcreteDeclRef D, DeclNameLoc Loc, bool Implicit,
@@ -1220,13 +1283,18 @@ public:
   }
 
   /// Determine whether this reference needs to happen asynchronously, i.e.,
-  /// guarded by hop_to_executor
-  bool isImplicitlyAsync() const { return Bits.DeclRefExpr.IsImplicitlyAsync; }
+  /// guarded by hop_to_executor, and if so describe the target.
+  Optional<ImplicitActorHopTarget> isImplicitlyAsync() const {
+    if (!Bits.DeclRefExpr.IsImplicitlyAsync)
+      return None;
 
-  /// Set whether this reference needs to happen asynchronously, i.e.,
-  /// guarded by hop_to_executor
-  void setImplicitlyAsync(bool isImplicitlyAsync) {
-    Bits.DeclRefExpr.IsImplicitlyAsync = isImplicitlyAsync;
+    return implicitActorHopTarget;
+  }
+
+  /// Note that this reference is implicitly async and set the target.
+  void setImplicitlyAsync(ImplicitActorHopTarget target) {
+    Bits.DeclRefExpr.IsImplicitlyAsync = true;
+    implicitActorHopTarget = target;
   }
 
   /// Determine whether this reference needs may implicitly throw.
@@ -1554,6 +1622,7 @@ public:
 class LookupExpr : public Expr {
   Expr *Base;
   ConcreteDeclRef Member;
+  ImplicitActorHopTarget implicitActorHopTarget;
 
 protected:
   explicit LookupExpr(ExprKind Kind, Expr *base, ConcreteDeclRef member,
@@ -1577,7 +1646,7 @@ public:
 
   /// Determine whether the operation has a known underlying declaration or not.
   bool hasDecl() const { return static_cast<bool>(Member); }
-  
+
   /// Retrieve the declaration that this /// operation refers to.
   /// Only valid when \c hasDecl() is true.
   ConcreteDeclRef getDecl() const {
@@ -1592,13 +1661,18 @@ public:
   void setIsSuper(bool isSuper) { Bits.LookupExpr.IsSuper = isSuper; }
 
   /// Determine whether this reference needs to happen asynchronously, i.e.,
-  /// guarded by hop_to_executor
-  bool isImplicitlyAsync() const { return Bits.LookupExpr.IsImplicitlyAsync; }
+  /// guarded by hop_to_executor, and if so describe the target.
+  Optional<ImplicitActorHopTarget> isImplicitlyAsync() const {
+    if (!Bits.LookupExpr.IsImplicitlyAsync)
+      return None;
 
-  /// Set whether this reference needs to happen asynchronously, i.e.,
-  /// guarded by hop_to_executor
-  void setImplicitlyAsync(bool isImplicitlyAsync) {
-    Bits.LookupExpr.IsImplicitlyAsync = isImplicitlyAsync;
+    return implicitActorHopTarget;
+  }
+
+  /// Note that this reference is implicitly async and set the target.
+  void setImplicitlyAsync(ImplicitActorHopTarget target) {
+    Bits.LookupExpr.IsImplicitlyAsync = true;
+    implicitActorHopTarget = target;
   }
 
   /// Determine whether this reference needs may implicitly throw.
@@ -4481,7 +4555,9 @@ class ApplyExpr : public Expr {
 
   /// The argument being passed to it.
   Expr *Arg;
-  
+
+  ImplicitActorHopTarget implicitActorHopTarget;
+
   /// Returns true if \c e could be used as the call's argument. For most \c ApplyExpr
   /// subclasses, this means it is a \c ParenExpr or \c TupleExpr.
   bool validateArg(Expr *e) const;
@@ -4554,11 +4630,19 @@ public:
   ///
   /// where the new closure is declared to be async.
   ///
-  bool implicitlyAsync() const {
-    return Bits.ApplyExpr.ImplicitlyAsync;
+  /// When the application is implciitly async, the result describes
+  /// the actor to which we need to need to hop.
+  Optional<ImplicitActorHopTarget> isImplicitlyAsync() const {
+    if (!Bits.ApplyExpr.ImplicitlyAsync)
+      return None;
+
+    return implicitActorHopTarget;
   }
-  void setImplicitlyAsync(bool flag) {
-    Bits.ApplyExpr.ImplicitlyAsync = flag;
+
+  /// Note that this application is implicitly async and set the target.
+  void setImplicitlyAsync(ImplicitActorHopTarget target) {
+    Bits.ApplyExpr.ImplicitlyAsync = true;
+    implicitActorHopTarget = target;
   }
 
   /// Is this application _implicitly_ required to be a throwing call?
