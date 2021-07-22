@@ -42,6 +42,7 @@ public func withExclusiveAccess<T, U>(to x: inout T, f: (inout T) -> U) -> U {
     return f(&x)
 }
 
+@available(SwiftStdlib 5.5, *)
 @MainActor @inline(never)
 func withExclusiveAccessAsync<T, U>(to x: inout T, f: (inout T) async -> U) async -> U {
     debugLog("==> Enter 'withExclusiveAccessAsync'")
