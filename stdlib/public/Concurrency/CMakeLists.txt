@@ -33,8 +33,7 @@ endif()
 # Frustratingly, in many cases this isn't necessary because the
 # sequence is inlined, but we have some code that's just subtle
 # enough to turn into runtime calls.
-if(SWIFT_HOST_VARIANT STREQUAL "linux" OR
-   SWIFT_HOST_VARIANT STREQUAL "android")
+if(SWIFT_HOST_VARIANT STREQUAL "android")
   list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_LINK_FLAGS
     -latomic)
 endif()
