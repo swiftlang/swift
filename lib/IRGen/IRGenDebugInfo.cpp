@@ -17,6 +17,7 @@
 #define DEBUG_TYPE "debug-info"
 #include "IRGenDebugInfo.h"
 #include "GenOpaque.h"
+#include "GenStruct.h"
 #include "GenType.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Expr.h"
@@ -189,6 +190,12 @@ public:
   llvm::DISubprogram *emitFunction(SILFunction &SILFn, llvm::Function *Fn);
   void emitArtificialFunction(IRBuilder &Builder, llvm::Function *Fn,
                               SILType SILTy);
+
+  void handleFragmentDIExpr(const SILDIExprOperand &CurDIExprOp,
+                            SmallVectorImpl<uint64_t> &Operands);
+  void buildDebugInfoExpression(const SILDebugVariable &VarInfo,
+                                SmallVectorImpl<uint64_t> &Operands);
+
   void emitVariableDeclaration(IRBuilder &Builder,
                                ArrayRef<llvm::Value *> Storage,
                                DebugTypeInfo Ty, const SILDebugScope *DS,
@@ -2329,10 +2336,59 @@ void IRGenDebugInfoImpl::emitArtificialFunction(IRBuilder &Builder,
   setCurrentLoc(Builder, Scope, ALoc);
 }
 
+void IRGenDebugInfoImpl::handleFragmentDIExpr(
+    const SILDIExprOperand &CurDIExprOp,
+    SmallVectorImpl<uint64_t> &Operands) {
+  assert(CurDIExprOp.getOperator() == SILDIExprOperator::Fragment);
+  // Expecting a VarDecl that points to a field in an struct
+  auto DIExprArgs = CurDIExprOp.args();
+  auto *VD = dyn_cast_or_null<VarDecl>(DIExprArgs.size()?
+                                       DIExprArgs[0].getAsDecl() : nullptr);
+  assert(VD && "Expecting a VarDecl as the operand for "
+               "DIExprOperator::Fragment");
+  // Translate the based type
+  DeclContext *ParentDecl = VD->getDeclContext();
+  SILType ParentSILType =
+      IGM.getLoweredType(ParentDecl->getDeclaredTypeInContext());
+  // Retrieve the offset & size of the field
+  llvm::Constant *Offset =
+      emitPhysicalStructMemberFixedOffset(IGM, ParentSILType, VD);
+  llvm::Type *FieldTy =
+      getPhysicalStructFieldTypeInfo(IGM, ParentSILType, VD)->getStorageType();
+  assert(Offset && FieldTy && "Non-fixed type?");
+
+  uint64_t SizeOfByte = CI.getTargetInfo().getCharWidth();
+  uint64_t SizeInBits = IGM.DataLayout.getTypeSizeInBits(FieldTy);
+  uint64_t OffsetInBits =
+      Offset->getUniqueInteger().getLimitedValue() * SizeOfByte;
+
+  // Translate to LLVM dbg intrinsic operands
+  Operands.push_back(llvm::dwarf::DW_OP_LLVM_fragment);
+  Operands.push_back(OffsetInBits);
+  Operands.push_back(SizeInBits);
+}
+
+void IRGenDebugInfoImpl::buildDebugInfoExpression(
+    const SILDebugVariable &VarInfo, SmallVectorImpl<uint64_t> &Operands) {
+  assert(VarInfo.DIExpr && "SIL debug info expression not found");
+
+  const auto &DIExpr = VarInfo.DIExpr;
+  for (const SILDIExprOperand &ExprOperand : DIExpr.operands()) {
+    switch (ExprOperand.getOperator()) {
+    case SILDIExprOperator::Fragment:
+      handleFragmentDIExpr(ExprOperand, Operands);
+      break;
+    default:
+      llvm_unreachable("Unrecoginized operator");
+    }
+  }
+}
+
 void IRGenDebugInfoImpl::emitVariableDeclaration(
     IRBuilder &Builder, ArrayRef<llvm::Value *> Storage, DebugTypeInfo DbgTy,
-    const SILDebugScope *DS, Optional<SILLocation> VarLoc, SILDebugVariable VarInfo,
-    IndirectionKind Indirection, ArtificialKind Artificial) {
+    const SILDebugScope *DS, Optional<SILLocation> DbgInstLoc,
+    SILDebugVariable VarInfo, IndirectionKind Indirection,
+    ArtificialKind Artificial) {
   assert(DS && "variable has no scope");
 
   if (Opts.DebugInfoLevel <= IRGenDebugInfoLevel::LineTables)
@@ -2347,7 +2403,7 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
 
   auto *Scope = dyn_cast_or_null<llvm::DILocalScope>(getOrCreateScope(DS));
   assert(Scope && "variable has no local scope");
-  auto Loc = getStartLocation(VarLoc);
+  auto DInstLoc = getStartLocation(DbgInstLoc);
 
   // FIXME: this should be the scope of the type's declaration.
   // If this is an argument, attach it to the current function scope.
@@ -2362,10 +2418,11 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
   if (VarInfo.Constant)
     DITy = DBuilder.createQualifiedType(llvm::dwarf::DW_TAG_const_type, DITy);
 
-  unsigned Line = Loc.line;
+  unsigned DInstLine = DInstLoc.line;
 
   // Self is always an artificial argument, so are variables without location.
-  if (!Line || (VarInfo.ArgNo > 0 && VarInfo.Name == IGM.Context.Id_self.str()))
+  if (!DInstLine ||
+      (VarInfo.ArgNo > 0 && VarInfo.Name == IGM.Context.Id_self.str()))
     Artificial = ArtificialValue;
 
   llvm::DINode::DIFlags Flags = llvm::DINode::FlagZero;
@@ -2375,12 +2432,35 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
   // This could be Opts.Optimize if we would also unique DIVariables here.
   bool Optimized = false;
   // Create the descriptor for the variable.
+  unsigned DVarLine = DInstLine;
+  if (VarInfo.Loc) {
+    auto DVarLoc = getStartLocation(VarInfo.Loc);
+    DVarLine = DVarLoc.line;
+  }
+  llvm::DIScope *VarScope = Scope;
+  if (VarInfo.Scope) {
+    if (auto *VS = dyn_cast_or_null<llvm::DILocalScope>(
+            getOrCreateScope(VarInfo.Scope)))
+      VarScope = VS;
+  }
   llvm::DILocalVariable *Var =
       (VarInfo.ArgNo > 0)
-          ? DBuilder.createParameterVariable(Scope, VarInfo.Name, VarInfo.ArgNo,
-                                             Unit, Line, DITy, Optimized, Flags)
-          : DBuilder.createAutoVariable(Scope, VarInfo.Name, Unit, Line, DITy,
-                                        Optimized, Flags);
+          ? DBuilder.createParameterVariable(VarScope, VarInfo.Name,
+                                             VarInfo.ArgNo, Unit, DVarLine,
+                                             DITy, Optimized, Flags)
+          : DBuilder.createAutoVariable(VarScope, VarInfo.Name, Unit, DVarLine,
+                                        DITy, Optimized, Flags);
+
+  auto appendDIExpression =
+      [&VarInfo, this](llvm::DIExpression *DIExpr) -> llvm::DIExpression * {
+    if (VarInfo.DIExpr) {
+      llvm::SmallVector<uint64_t, 2> Operands;
+      buildDebugInfoExpression(VarInfo, Operands);
+      if (Operands.size())
+        return llvm::DIExpression::append(DIExpr, Operands);
+    }
+    return DIExpr;
+  };
 
   // Running variables for the current/previous piece.
   bool IsPiece = Storage.size() > 1;
@@ -2412,16 +2492,21 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
       Operands.push_back(OffsetInBits);
       Operands.push_back(SizeInBits);
     }
-    emitDbgIntrinsic(Builder, Piece, Var, DBuilder.createExpression(Operands),
-                     Line, Loc.column, Scope, DS,
-                     Indirection == CoroDirectValue ||
-                         Indirection == CoroIndirectValue);
+    llvm::DIExpression *DIExpr = DBuilder.createExpression(Operands);
+    emitDbgIntrinsic(
+        Builder, Piece, Var,
+        // DW_OP_LLVM_fragment must be the last part of an DIExpr
+        // so we can't append more if IsPiece is true.
+        Operands.empty() || IsPiece ? DIExpr : appendDIExpression(DIExpr),
+        DInstLine, DInstLoc.column, Scope, DS,
+        Indirection == CoroDirectValue || Indirection == CoroIndirectValue);
   }
 
   // Emit locationless intrinsic for variables that were optimized away.
   if (Storage.empty())
     emitDbgIntrinsic(Builder, llvm::ConstantInt::get(IGM.Int64Ty, 0), Var,
-                     DBuilder.createExpression(), Line, Loc.column, Scope, DS,
+                     appendDIExpression(DBuilder.createExpression()), DInstLine,
+                     DInstLoc.column, Scope, DS,
                      Indirection == CoroDirectValue ||
                          Indirection == CoroIndirectValue);
 }
@@ -2437,7 +2522,8 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
   auto *BB = Builder.GetInsertBlock();
 
   // An alloca may only be described by exactly one dbg.declare.
-  if (isa<llvm::AllocaInst>(Storage) && !llvm::FindDbgAddrUses(Storage).empty())
+  if (isa<llvm::AllocaInst>(Storage) &&
+      !llvm::FindDbgDeclareUses(Storage).empty())
     return;
 
   // A dbg.declare is only meaningful if there is a single alloca for
