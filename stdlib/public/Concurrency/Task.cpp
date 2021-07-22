@@ -479,7 +479,12 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
     if (currentTask)
       jobFlags.setPriority(currentTask->getPriority());
     else
-      jobFlags.setPriority(swift_task_getCurrentThreadPriority());
+      // FIXME: Ideally, this should be setting priority based on
+      // swift_task_getCurrentThreadPriority(). However, that creates
+      // priority differences which lead to different kinds of hangs
+      // Temporarily use Unspecified to work around that.
+      // See also: PR #37939.
+      jobFlags.setPriority(JobPriority::Unspecified);
   }
 
   // Figure out the size of the header.
