@@ -844,6 +844,11 @@ public:
                             Optional<ActorIsolation> actorIso,
                             Optional<ManagedValue> actorSelf);
 
+  /// Emit a hop to the target executor, returning a breadcrumb with enough
+  /// enough information to hop back.
+  ExecutorBreadcrumb emitHopToTargetExecutor(SILLocation loc,
+                                             SILValue executor);
+
   /// Generate a hop directly to a dynamic actor instance. This can only be done
   /// inside an async actor-independent function. No hop-back is expected.
   void emitHopToActorValue(SILLocation loc, ManagedValue actor);
@@ -1598,7 +1603,7 @@ public:
                    ArrayRef<ManagedValue> args,
                    const CalleeTypeInfo &calleeTypeInfo, ApplyOptions options,
                    SGFContext evalContext, 
-                   Optional<ActorIsolation> implicitAsyncIsolation);
+                   Optional<ImplicitActorHopTarget> implicitActorHopTarget);
 
   RValue emitApplyOfDefaultArgGenerator(SILLocation loc,
                                         ConcreteDeclRef defaultArgsOwner,
