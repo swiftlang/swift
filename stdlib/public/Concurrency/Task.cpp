@@ -484,6 +484,13 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   if (jobFlags.getPriority() == JobPriority::Unspecified)
     jobFlags.setPriority(JobPriority::Default);
 
+  // FIXME HACK HACK
+  // Work around a bug in the actor runtime where it may drop tasks
+  // (== deadlock) when dealing with different priority levels. To do so,
+  // we normalize all priority levels to "unspecified".
+  jobFlags.setPriority(JobPriority::Unspecified);
+  // FIXME HACK HACK
+
   // Figure out the size of the header.
   size_t headerSize = sizeof(AsyncTask);
   if (parent) {
@@ -1124,11 +1131,15 @@ static NullaryContinuationJob*
 swift_task_createNullaryContinuationJobImpl(
     size_t priority,
     AsyncTask *continuation) {
+  // FIXME HACK HACK
+  // Work around a bug in the actor runtime where it may drop tasks
+  // (== deadlock) when dealing with different priority levels. To do so,
+  // we normalize all priority levels to "unspecified".
   void *allocation =
       swift_task_alloc(sizeof(NullaryContinuationJob));
   auto *job =
       new (allocation) NullaryContinuationJob(
-        swift_task_getCurrent(), static_cast<JobPriority>(priority),
+        swift_task_getCurrent(), JobPriority::Unspecified,
         continuation);
 
   return job;

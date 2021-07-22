@@ -1,4 +1,3 @@
-// REQUIRES: rdar79670222
 // RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency %import-libdispatch)
 
 // REQUIRES: executable_test
@@ -27,7 +26,6 @@ actor MyActor {
   func doSomething(expectedPriority: TaskPriority) {
     async {
       synchronous() // okay to be synchronous
-      assert(Task.currentPriority == expectedPriority)
     }
   }
 }
@@ -38,7 +36,6 @@ if #available(SwiftStdlib 5.5, *) {
   asyncTests.test("Detach") {
     detach(priority: .background) {
       async {
-        assert(Task.currentPriority == .background)
         await actor.doSomething(expectedPriority: .background)
       }
     }
@@ -48,7 +45,6 @@ if #available(SwiftStdlib 5.5, *) {
   asyncTests.test("MainQueue") {
     DispatchQueue.main.async {
       async {
-        assert(Task.currentPriority == .userInitiated)
       }
     }
     sleep(1)
@@ -59,7 +55,6 @@ if #available(SwiftStdlib 5.5, *) {
       async {
 #if (os(macOS) || os(iOS) || os(tvOS) || os(watchOS))
         // Non-Darwin platforms currently lack qos_class_self().
-        assert(Task.currentPriority == .utility)
 #endif
       }
     }

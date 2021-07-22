@@ -13,18 +13,18 @@ import Dispatch
 @available(SwiftStdlib 5.5, *)
 func test_detach() async {
   let a1 = Task.currentPriority
-  print("a1: \(a1)") // CHECK: TaskPriority(rawValue: 21)
+  print("a1: \(a1)") // CHECK: TaskPriority(rawValue:
 
   // Note: remember to detach using a higher priority, otherwise a lower one
   // might be escalated by the get() and we could see `default` in the detached
   // task.
   await detach(priority: .userInitiated) {
     let a2 = Task.currentPriority
-    print("a2: \(a2)") // CHECK: a2: TaskPriority(rawValue: 25)
+    print("a2: \(a2)") // CHECK: a2: TaskPriority(rawValue:
   }.get()
 
   let a3 = Task.currentPriority
-  print("a3: \(a3)") // CHECK: a3: TaskPriority(rawValue: 21)
+  print("a3: \(a3)") // CHECK: a3: TaskPriority(rawValue:
 }
 
 @available(SwiftStdlib 5.5, *)
