@@ -783,10 +783,46 @@ bool DisjunctionStep::attempt(const DisjunctionChoice &choice) {
 
 bool ConjunctionStep::attempt(const ConjunctionElement &element) {
   ++CS.solverState->NumConjunctionTerms;
+
+  // Outside or previous element score doesn't affect
+  // subsequent elements.
+  CS.solverState->BestScore.reset();
+
+  // Apply solution inferred for all the previous elements
+  // because this element could reference declarations
+  // established in previous element(s).
+  if (!Solutions.empty()) {
+    assert(Solutions.size() == 1);
+    // Note that solution is removed here. This is done
+    // because we want build a single complete solution
+    // incrementally.
+    CS.applySolution(Solutions.pop_back_val());
+  }
+
+  // Bring all of the referenced variables into scope.
+  for (auto *typeVar : element.getReferencedVars())
+    CS.addTypeVariable(typeVar);
+
+  // Make sure that element is solved in isolation
+  // by dropping all scoring information.
+  CS.CurrentScore = Score();
+
   return element.attempt(CS);
 }
 
 StepResult ConjunctionStep::resume(bool prevFailed) {
+  // Return from the follow-up splitter step that
+  // attempted to apply information gained from the
+  // isolated constraint to the outer context.
+  if (bool(IsolationScope)) {
+    IsolationScope.reset();
+
+    if (CS.isDebugMode())
+      getDebugLogger() << ")\n";
+
+    return done(/*isSuccess=*/!prevFailed);
+  }
+
   // If conjunction step is re-taken and there should be
   // active choice, let's see if it has be solved or not.
   assert(ActiveChoice);
@@ -797,7 +833,11 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
   if (CS.isDebugMode())
     getDebugLogger() << ")\n";
 
-  if (prevFailed) {
+  // Check whether it makes sense to continue solving
+  // this conjunction. Note that for conjunction constraint
+  // to be considered a success all of its elements have
+  // to produce a single solution.
+  if (prevFailed || Solutions.size() != 1) {
     HadFailure = true;
     // During performance mode, failure to infer a type for one
     // of the elements automatically fails whole conjunction.
@@ -806,8 +846,78 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
     // a success if at least one of its elements was solved
     // successfully by use of fixes, and ignore the rest.
     AnySolved = false;
+  } else {
+    AnySolved = true;
   }
 
-  // Attempt next conjunction choice (if any left).
+  // After all of the elements have been checked, let's
+  // see if conjunction was successful and if so, continue
+  // solving along the current path until complete
+  // solution is reached.
+  if (Producer.isExhausted()) {
+    // Restore constraint system state before conjunction.
+    //
+    // Note that this doesn't include conjunction constraint
+    // itself because we don't want to re-solve it at this
+    // point.
+    if (Conjunction->isIsolated()) {
+      assert(
+          Snapshot &&
+          "Isolated conjunction requires a snapshot of the constraint system");
+      Snapshot->restore();
+    }
+
+    // If one of the elements failed, that means while
+    // conjunction failed with it.
+    if (HadFailure)
+      return done(/*isSuccess=*/false);
+
+    // If this was an isolated conjunction solver needs to do
+    // the following:
+    //
+    // a. Return all of the previously out-of-scope constraints;
+    // b. Apply solution reached for the conjunction;
+    // c. Continue solving along this path to reach a
+    //    complete solution using type information
+    //    inferred from this step.
+    if (Conjunction->isIsolated()) {
+      if (CS.isDebugMode()) {
+        auto &log = getDebugLogger();
+        log << "(applying conjunction result to outer context\n";
+      }
+
+      // Establish isolation scope so that conjunction solution
+      // and follow-up steps could be rolled back.
+      IsolationScope = std::make_unique<Scope>(CS);
+
+      // Apply solution inferred for the conjunction.
+      CS.applySolution(Solutions.pop_back_val());
+
+      // Restore best score, since upcoming step is going to
+      // work with outer scope in relation to the conjunction.
+      CS.solverState->BestScore = BestScore;
+
+      // Active all of the previously out-of-scope constraints
+      // because conjunction can propagate type information up
+      // by allowing its elements to reference type variables
+      // from outer scope (e.g. variable declarations and or captures).
+      {
+        CS.ActiveConstraints.splice(CS.ActiveConstraints.end(),
+                                    CS.InactiveConstraints);
+        for (auto &constraint : CS.ActiveConstraints)
+          constraint.setActive(true);
+      }
+
+      // Restore score to the one before conjunction. This has
+      // be done after solution, reached for the body, is applied.
+      CS.CurrentScore = CurrentScore;
+
+      // Now that all of the information from the conjunction has
+      // been applied, let's attempt to solve the outer scope.
+      return suspend(std::make_unique<SplitterStep>(CS, Solutions));
+    }
+  }
+
+  // Attempt next conjunction choice.
   return take(prevFailed);
 }

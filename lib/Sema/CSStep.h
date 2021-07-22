@@ -482,9 +482,9 @@ private:
 };
 
 template <typename P> class BindingStep : public SolverStep {
+protected:
   using Scope = ConstraintSystem::SolverScope;
 
-protected:
   P Producer;
 
   /// Indicates whether any of the attempted bindings
@@ -768,28 +768,84 @@ private:
 };
 
 class ConjunctionStep : public BindingStep<ConjunctionElementProducer> {
-  Constraint *Conjunction;
+  /// Snapshot of the constraint system before conjunction.
+  class SolverSnapshot {
+    ConstraintSystem &CS;
 
-  /// This is neccessary to restore original state of the constraint
-  /// system after cojunction step is done, because conjunction constraint
-  /// gets removed from the list early.
+    llvm::SetVector<TypeVariableType *> TypeVars;
+    ConstraintList Constraints;
+
+  public:
+    SolverSnapshot(ConstraintSystem &cs)
+        : CS(cs), TypeVars(std::move(cs.TypeVariables)) {
+      auto &CG = CS.getConstraintGraph();
+      // Remove all of the current inactive constraints.
+      Constraints.splice(Constraints.end(), CS.InactiveConstraints);
+      // Clear constraint graph.
+      for (auto &constraint : Constraints)
+        CG.removeConstraint(&constraint);
+    }
+
+    void restore() {
+      auto &CG = CS.getConstraintGraph();
+
+      CS.TypeVariables = std::move(TypeVars);
+      CS.InactiveConstraints.splice(CS.InactiveConstraints.end(), Constraints);
+
+      for (auto &constraint : CS.InactiveConstraints)
+        CG.addConstraint(&constraint);
+    }
+  };
+
+  /// Best solution solver reached so far.
+  Optional<Score> BestScore;
+  /// The score established before conjunction is attempted.
+  Score CurrentScore;
+
+  /// Conjunction constraint associated with this step.
+  Constraint *Conjunction;
+  /// Position of the conjunction in the inactive constraints
+  /// list which is required to re-instate it to the system
+  /// after this step is done.
   ConstraintList::iterator AfterConjunction;
 
   /// Indicates that one of the elements failed inference.
   bool HadFailure = false;
 
+  /// If this conjunction has to be solved in isolation,
+  /// this scope would be initialized once all of the
+  /// elements are successfully solved to continue solving
+  /// along the current path as-if there was no conjunction.
+  std::unique_ptr<Scope> IsolationScope = nullptr;
+
+  /// If conjunction has to be solved in isolation, this
+  /// variable would capture the snapshot of the constraint
+  /// system step before conjunction step.
+  Optional<SolverSnapshot> Snapshot;
+
 public:
   ConjunctionStep(ConstraintSystem &cs, Constraint *conjunction,
                   SmallVectorImpl<Solution> &solutions)
-      : BindingStep(cs, {cs, conjunction}, solutions), Conjunction(conjunction),
-        AfterConjunction(erase(conjunction)) {
+      : BindingStep(cs, {cs, conjunction}, solutions),
+        BestScore(getBestScore()), CurrentScore(getCurrentScore()),
+        Conjunction(conjunction), AfterConjunction(erase(conjunction)) {
     assert(conjunction->getKind() == ConstraintKind::Conjunction);
+
+    // Make a snapshot of the constraint system state before conjunction.
+    if (conjunction->isIsolated())
+      Snapshot.emplace(cs);
   }
 
   ~ConjunctionStep() override {
-    ActiveChoice.reset();
-    // Return conjunction constraint back to the system
+    assert(!bool(ActiveChoice));
+    assert(!bool(IsolationScope));
+
+    // Restore conjunction constraint.
     restore(AfterConjunction, Conjunction);
+
+    // Restore best score.
+    CS.solverState->BestScore = BestScore;
+    CS.CurrentScore = CurrentScore;
   }
 
   StepResult resume(bool prevFailed) override;

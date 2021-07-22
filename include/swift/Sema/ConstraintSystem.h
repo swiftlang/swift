@@ -2224,6 +2224,7 @@ public:
   friend class SplitterStep;
   friend class ComponentStep;
   friend class TypeVariableStep;
+  friend class ConjunctionStep;
   friend class RequirementFailure;
   friend class MissingMemberFailure;
 
