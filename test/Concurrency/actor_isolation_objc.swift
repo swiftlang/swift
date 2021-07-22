@@ -53,5 +53,15 @@ func outside(a : A) async {
   await a.i() // expected-warning {{no 'async' operations occur within 'await' expression}}
 }
 
+actor Dril: NSObject {
+  // expected-note@+2 {{add 'async' to function 'postSynchronouslyTo(twitter:)' to make it asynchronous}}
+  // expected-error@+1 {{actor-isolated instance method 'postSynchronouslyTo(twitter:)' cannot be @objc}}
+  @objc func postSynchronouslyTo(twitter msg: String) -> Bool {
+    return true
+  }
 
-
+  @MainActor
+  @objc func postFromMainActorTo(twitter msg: String) -> Bool {
+    return true
+  }
+}
