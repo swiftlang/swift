@@ -653,7 +653,7 @@ findMemberReference(Expr *expr) {
 /// Note that this must be called after the implicitlyAsync flag has been set,
 /// or implicitly async calls will not return the correct value.
 static bool isAsyncCall(const ApplyExpr *call) {
-  if (call->implicitlyAsync())
+  if (call->isImplicitlyAsync())
     return true;
 
   // Effectively the same as doing a
@@ -1196,13 +1196,13 @@ namespace {
     ///      ...))
     ///
     /// and we reach up to mark the CallExpr.
-    void markNearestCallAsImplicitlyAsync() {
+    void markNearestCallAsImplicitlyAsync(ImplicitActorHopTarget target) {
       assert(applyStack.size() > 0 && "not contained within an Apply?");
 
       const auto End = applyStack.rend();
       for (auto I = applyStack.rbegin(); I != End; ++I)
         if (auto call = dyn_cast<CallExpr>(*I)) {
-          call->setImplicitlyAsync(true);
+          call->setImplicitlyAsync(target);
           return;
         }
       llvm_unreachable("expected a CallExpr in applyStack!");
@@ -1654,7 +1654,7 @@ namespace {
         case ActorIsolationRestriction::GlobalActor: {
           ctx.Diags.diagnose(argLoc, diag::actor_isolated_inout_state,
                              decl->getDescriptiveKind(), decl->getName(),
-                             call->implicitlyAsync());
+                             call->isImplicitlyAsync().hasValue());
           decl->diagnose(diag::kind_declared_here, decl->getDescriptiveKind());
           result = true;
           break;
@@ -1677,7 +1677,7 @@ namespace {
           } else {
             ctx.Diags.diagnose(argLoc, diag::actor_isolated_inout_state,
                                decl->getDescriptiveKind(), decl->getName(),
-                               call->implicitlyAsync());
+                               call->isImplicitlyAsync().hasValue());
             result = true;
           }
           break;
@@ -1747,7 +1747,8 @@ namespace {
     /// actor-isolated member (e.g., sync function application, property access)
     AsyncMarkingResult tryMarkImplicitlyAsync(SourceLoc declLoc,
                                               ConcreteDeclRef concDeclRef,
-                                              Expr* context) {
+                                              Expr* context,
+                                              ImplicitActorHopTarget target) {
       ValueDecl *decl = concDeclRef.getDecl();
       AsyncMarkingResult result = AsyncMarkingResult::NotFound;
 
@@ -1759,7 +1760,7 @@ namespace {
             if (!isInAsynchronousContext())
               return AsyncMarkingResult::SyncContext;
 
-            declRef->setImplicitlyAsync(true);
+            declRef->setImplicitlyAsync(target);
             result = AsyncMarkingResult::FoundAsync;
           }
         } else if (auto lookupExpr = dyn_cast_or_null<LookupExpr>(context)) {
@@ -1768,7 +1769,7 @@ namespace {
             if (!isInAsynchronousContext())
               return AsyncMarkingResult::SyncContext;
 
-            lookupExpr->setImplicitlyAsync(true);
+            lookupExpr->setImplicitlyAsync(target);
             result = AsyncMarkingResult::FoundAsync;
           }
         }
@@ -1781,7 +1782,7 @@ namespace {
         if (!isInAsynchronousContext())
           return AsyncMarkingResult::SyncContext;
 
-        markNearestCallAsImplicitlyAsync();
+        markNearestCallAsImplicitlyAsync(target);
         result = AsyncMarkingResult::FoundAsync;
 
       } else if (!applyStack.empty()) {
@@ -1794,13 +1795,13 @@ namespace {
         Expr *fn = apply->getFn()->getValueProvidingExpr();
         if (auto memberRef = findMemberReference(fn)) {
           auto concDecl = memberRef->first;
-          if (decl == concDecl.getDecl() && !apply->implicitlyAsync()) {
+          if (decl == concDecl.getDecl() && !apply->isImplicitlyAsync()) {
 
             if (!isInAsynchronousContext())
               return AsyncMarkingResult::SyncContext;
 
             // then this ValueDecl appears as the called value of the ApplyExpr.
-            markNearestCallAsImplicitlyAsync();
+            markNearestCallAsImplicitlyAsync(target);
             result = AsyncMarkingResult::FoundAsync;
           }
         }
@@ -1876,6 +1877,7 @@ namespace {
         return false;
 
       // Check for isolated parameters.
+      Optional<unsigned> isolatedParamIdx;
       for (unsigned paramIdx : range(fnType->getNumParams())) {
         // We only care about isolated parameters.
         if (!fnType->getParams()[paramIdx].isIsolated())
@@ -1899,6 +1901,7 @@ namespace {
         }
 
         unsatisfiedIsolation = ActorIsolation::forActorInstance(nominal);
+        isolatedParamIdx = paramIdx;
         break;
       }
 
@@ -1933,10 +1936,25 @@ namespace {
       }
 
       // Mark as implicitly async.
-      // FIXME: Record how it is implicitly async, e.g., by stashing a
-      // ClosureActorIsolation in ApplyExpr?
-      if (!fnType->getExtInfo().isAsync())
-        apply->setImplicitlyAsync(true);
+      if (!fnType->getExtInfo().isAsync()) {
+        switch (*unsatisfiedIsolation) {
+        case ActorIsolation::GlobalActor:
+        case ActorIsolation::GlobalActorUnsafe:
+          apply->setImplicitlyAsync(
+              ImplicitActorHopTarget::forGlobalActor(
+                unsatisfiedIsolation->getGlobalActor()));
+          break;
+
+        case ActorIsolation::ActorInstance:
+          apply->setImplicitlyAsync(
+            ImplicitActorHopTarget::forIsolatedParameter(*isolatedParamIdx));
+          break;
+
+        case ActorIsolation::Unspecified:
+        case ActorIsolation::Independent:
+          llvm_unreachable("Not actor-isolated");
+        }
+      }
 
       // If we don't need to check for sendability, we're done.
       if (!shouldDiagnoseNonSendableViolations(ctx.LangOpts))
@@ -1989,7 +2007,9 @@ namespace {
 
       switch (contextIsolation) {
       case ActorIsolation::ActorInstance: {
-        auto result = tryMarkImplicitlyAsync(loc, valueRef, context);
+        auto result = tryMarkImplicitlyAsync(
+          loc, valueRef, context,
+          ImplicitActorHopTarget::forGlobalActor(globalActor));
         if (result == AsyncMarkingResult::FoundAsync)
           return false;
 
@@ -2008,7 +2028,9 @@ namespace {
       case ActorIsolation::GlobalActorUnsafe: {
         // Check if this decl reference is the callee of the enclosing Apply,
         // making it OK as an implicitly async call.
-        auto result = tryMarkImplicitlyAsync(loc, valueRef, context);
+        auto result = tryMarkImplicitlyAsync(
+            loc, valueRef, context,
+            ImplicitActorHopTarget::forGlobalActor(globalActor));
         if (result == AsyncMarkingResult::FoundAsync)
           return false;
 
@@ -2026,7 +2048,9 @@ namespace {
       }
 
       case ActorIsolation::Independent: {
-        auto result = tryMarkImplicitlyAsync(loc, valueRef, context);
+        auto result = tryMarkImplicitlyAsync(
+            loc, valueRef, context,
+            ImplicitActorHopTarget::forGlobalActor(globalActor));
         if (result == AsyncMarkingResult::FoundAsync)
           return false;
 
@@ -2043,7 +2067,9 @@ namespace {
       }
 
       case ActorIsolation::Unspecified: {
-        auto result = tryMarkImplicitlyAsync(loc, valueRef, context);
+        auto result = tryMarkImplicitlyAsync(
+            loc, valueRef, context,
+            ImplicitActorHopTarget::forGlobalActor(globalActor));
         if (result == AsyncMarkingResult::FoundAsync)
           return false;
 
@@ -2374,7 +2400,8 @@ namespace {
 
         // Try implicit asynchronous access.
         auto implicitAsyncResult = tryMarkImplicitlyAsync(
-            memberLoc, memberRef, context);
+            memberLoc, memberRef, context,
+            ImplicitActorHopTarget::forInstanceSelf());
         if (implicitAsyncResult == AsyncMarkingResult::FoundAsync)
           return false; // no problems
         else if (implicitAsyncResult == AsyncMarkingResult::NotSendable)

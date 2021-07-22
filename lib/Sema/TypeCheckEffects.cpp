@@ -758,7 +758,7 @@ public:
   /// Check to see if the given function application throws or is async.
   Classification classifyApply(ApplyExpr *E) {
     if (isa<SelfApplyExpr>(E)) {
-      assert(!E->implicitlyAsync());
+      assert(!E->isImplicitlyAsync());
       return Classification();
     }
 
@@ -775,7 +775,7 @@ public:
     // If the function doesn't have any effects, we're done here.
     if (!fnType->isThrowing() &&
         !fnType->isAsync() &&
-        !E->implicitlyAsync()) {
+        !E->isImplicitlyAsync()) {
       return Classification();
     }
 
@@ -794,7 +794,7 @@ public:
     auto classifyApplyEffect = [&](EffectKind kind) {
       if (!fnType->hasEffect(kind) &&
           !(kind == EffectKind::Async &&
-            E->implicitlyAsync())) {
+            E->isImplicitlyAsync())) {
         return;
       }
 
@@ -2874,7 +2874,7 @@ private:
          }
 
          auto *call = dyn_cast<ApplyExpr>(&diag.expr);
-         if (call && call->implicitlyAsync()) {
+         if (call && call->isImplicitlyAsync()) {
            // Emit a tailored note if the call is implicitly async, meaning the
            // callee is isolated to an actor.
            auto callee = call->getCalledValue();
