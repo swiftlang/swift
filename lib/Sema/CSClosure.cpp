@@ -274,7 +274,24 @@ bool ConstraintSystem::generateConstraints(ClosureExpr *closure) {
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyClosureBodyElementConstraint(
     ASTNode element, TypeMatchOptions flags, ConstraintLocatorBuilder locator) {
-  return SolutionKind::Error;
+  auto *closure = castToExpr<ClosureExpr>(locator.getAnchor());
+
+  ClosureConstraintGenerator generator(*this, closure,
+                                       getConstraintLocator(locator));
+
+  if (auto *expr = element.dyn_cast<Expr *>()) {
+    if (!generateConstraints(expr, closure, /*isInputExpression=*/false))
+      return SolutionKind::Error;
+  } else if (auto *stmt = element.dyn_cast<Stmt *>()) {
+    generator.visit(stmt);
+  } else if (auto *cond = element.dyn_cast<StmtCondition *>()) {
+    if (generateConstraints(*cond, closure))
+      return SolutionKind::Error;
+  } else {
+    generator.visit(element.get<Decl *>());
+  }
+
+  return generator.hadError ? SolutionKind::Error : SolutionKind::Solved;
 }
 
 // MARK: Solution application
