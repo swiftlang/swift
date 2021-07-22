@@ -7596,17 +7596,32 @@ private:
     OS << tok::r_paren;
   }
 
-  /// If the error type of \p HandlerDesc is more specialized than \c Error,
-  /// adds an 'as! CustomError' cast to the more specialized error type to the
-  /// output stream.
-  void
-  addCastToCustomErrorTypeIfNecessary(const AsyncHandlerDesc &HandlerDesc) {
-    const ASTContext &Ctx = HandlerDesc.getHandler()->getASTContext();
+  /// Adds a forwarded error argument to a completion handler call. If the error
+  /// type of \p HandlerDesc is more specialized than \c Error, an
+  /// 'as! CustomError' cast to the more specialized error type will be added to
+  /// the output stream.
+  void addForwardedErrorArgument(StringRef ErrorName,
+                                 const AsyncHandlerDesc &HandlerDesc) {
+    // If the error type is already Error, we can pass it as-is.
     auto ErrorType = *HandlerDesc.getErrorType();
-    if (ErrorType->getCanonicalType() != Ctx.getExceptionType()) {
-      OS << " " << tok::kw_as << tok::exclaim_postfix << " ";
-      ErrorType->lookThroughSingleOptionalType()->print(OS);
+    if (ErrorType->getCanonicalType() == getASTContext().getExceptionType()) {
+      OS << ErrorName;
+      return;
     }
+
+    // Otherwise we need to add a force cast to the destination custom error
+    // type. If this is for an Error? parameter, we'll need to add parens around
+    // the cast to silence a compiler warning about force casting never
+    // producing nil.
+    auto RequiresParens = HandlerDesc.getErrorParam().hasValue();
+    if (RequiresParens)
+      OS << tok::l_paren;
+
+    OS << ErrorName << " " << tok::kw_as << tok::exclaim_postfix << " ";
+    ErrorType->lookThroughSingleOptionalType()->print(OS);
+
+    if (RequiresParens)
+      OS << tok::r_paren;
   }
 
   /// If \p T has a natural default value like \c nil for \c Optional or \c ()
@@ -7637,8 +7652,7 @@ private:
     if (HandlerDesc.HasError && Index == HandlerDesc.params().size() - 1) {
       // The error parameter is the last argument of the completion handler.
       if (ResultName.empty()) {
-        OS << "error";
-        addCastToCustomErrorTypeIfNecessary(HandlerDesc);
+        addForwardedErrorArgument("error", HandlerDesc);
       } else {
         addDefaultValueOrPlaceholder(HandlerDesc.params()[Index].getPlainType());
       }
@@ -7707,8 +7721,8 @@ private:
         OS << tok::period_prefix << "success" << tok::l_paren << ResultName
            << tok::r_paren;
       } else {
-        OS << tok::period_prefix << "failure" << tok::l_paren << "error";
-        addCastToCustomErrorTypeIfNecessary(HandlerDesc);
+        OS << tok::period_prefix << "failure" << tok::l_paren;
+        addForwardedErrorArgument("error", HandlerDesc);
         OS << tok::r_paren;
       }
       break;
