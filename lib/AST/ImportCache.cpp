@@ -63,6 +63,24 @@ void ImportSet::Profile(
   }
 }
 
+void ImportSet::dump() const {
+  llvm::errs() << "HasHeaderImportModule: " << HasHeaderImportModule << "\n";
+
+  llvm::errs() << "TopLevelImports:";
+  for (auto import : getTopLevelImports()) {
+    llvm::errs() << "\n- ";
+    simple_display(llvm::errs(), import);
+  }
+  llvm::errs() << "\n";
+
+  llvm::errs() << "TransitiveImports:";
+  for (auto import : getTransitiveImports()) {
+    llvm::errs() << "\n- ";
+    simple_display(llvm::errs(), import);
+  }
+  llvm::errs() << "\n";
+}
+
 static void collectExports(ImportedModule next,
                            SmallVectorImpl<ImportedModule> &stack) {
   SmallVector<ImportedModule, 4> exports;

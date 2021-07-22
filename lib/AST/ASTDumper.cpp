@@ -1320,9 +1320,11 @@ std::string ValueDecl::printRef() const {
 }
 
 void ValueDecl::dumpRef(raw_ostream &os) const {
-  // Print the context.
-  printContext(os, getDeclContext());
-  os << ".";
+  if (!isa<ModuleDecl>(this)) {
+    // Print the context.
+    printContext(os, getDeclContext());
+    os << ".";
+  }
 
   // Print name.
   getName().printPretty(os);
