@@ -395,9 +395,6 @@ void DerivativeFunctionTypeError::log(raw_ostream &OS) const {
   case Kind::NoSemanticResults:
     OS << "has no semantic results ('Void' result)";
     break;
-  case Kind::MultipleSemanticResults:
-    OS << "has multiple semantic results";
-    break;
   case Kind::NoDifferentiabilityParameters:
     OS << "has no differentiability parameters";
     break;

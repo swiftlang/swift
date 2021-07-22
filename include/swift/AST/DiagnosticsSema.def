@@ -3496,9 +3496,6 @@ NOTE(autodiff_attr_original_decl_not_same_type_context,none,
      (DescriptiveDeclKind))
 ERROR(autodiff_attr_original_void_result,none,
       "cannot differentiate void function %0", (DeclName))
-ERROR(autodiff_attr_original_multiple_semantic_results,none,
-      "cannot differentiate functions with both an 'inout' parameter and a "
-      "result", ())
 ERROR(autodiff_attr_result_not_differentiable,none,
       "can only differentiate functions with results that conform to "
       "'Differentiable', but %0 does not conform to 'Differentiable'", (Type))

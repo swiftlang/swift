@@ -4909,12 +4909,6 @@ bool resolveDifferentiableAttrDifferentiabilityParameters(
                     original->getName())
           .highlight(original->getSourceRange());
       return;
-    case DerivativeFunctionTypeError::Kind::MultipleSemanticResults:
-      diags
-          .diagnose(attr->getLocation(),
-                    diag::autodiff_attr_original_multiple_semantic_results)
-          .highlight(original->getSourceRange());
-      return;
     case DerivativeFunctionTypeError::Kind::NoDifferentiabilityParameters:
       diags.diagnose(attr->getLocation(),
                      diag::diff_params_clause_no_inferred_parameters);
@@ -5425,12 +5419,6 @@ static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
           .diagnose(attr->getLocation(),
                     diag::autodiff_attr_original_void_result,
                     originalAFD->getName())
-          .highlight(attr->getOriginalFunctionName().Loc.getSourceRange());
-      return;
-    case DerivativeFunctionTypeError::Kind::MultipleSemanticResults:
-      diags
-          .diagnose(attr->getLocation(),
-                    diag::autodiff_attr_original_multiple_semantic_results)
           .highlight(attr->getOriginalFunctionName().Loc.getSourceRange());
       return;
     case DerivativeFunctionTypeError::Kind::NoDifferentiabilityParameters:

@@ -6439,11 +6439,6 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
   if (originalResults.empty())
     return llvm::make_error<DerivativeFunctionTypeError>(
         this, DerivativeFunctionTypeError::Kind::NoSemanticResults);
-  // Error if multiple original semantic results.
-  // TODO(TF-1250): Support functions with multiple semantic results.
-  if (originalResults.size() > 1)
-    return llvm::make_error<DerivativeFunctionTypeError>(
-        this, DerivativeFunctionTypeError::Kind::MultipleSemanticResults);
   auto originalResult = originalResults.front();
   auto originalResultType = originalResult.type;
 
