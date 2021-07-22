@@ -17,3 +17,12 @@ extension P where T : Q {
     missing()
   }
 }
+
+class C : P {}
+
+extension P where T : C {
+  // CHECK-LABEL: Generic signature: <Self where Self == C>
+  func test() {
+    missing()
+  }
+}

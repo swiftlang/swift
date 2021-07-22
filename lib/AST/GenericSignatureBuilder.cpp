@@ -8281,24 +8281,42 @@ GenericSignature GenericSignatureBuilder::rebuildSignatureWithoutRedundantRequir
     }
 
     auto subjectType = req.getSubjectType();
-    subjectType = stripBoundDependentMemberTypes(subjectType);
-    auto resolvedSubjectType =
-        resolveDependentMemberTypes(*this, subjectType,
-                                    ArchetypeResolutionKind::WellFormed);
+    auto resolvedSubject =
+        maybeResolveEquivalenceClass(subjectType,
+                                     ArchetypeResolutionKind::WellFormed,
+                                     /*wantExactPotentialArchetype=*/false);
+
+    auto *resolvedEquivClass = resolvedSubject.getEquivalenceClass(*this);
+    Type resolvedSubjectType;
+    if (resolvedEquivClass != nullptr)
+      resolvedSubjectType = resolvedEquivClass->getAnchor(*this, { });
 
     // This can occur if the combination of a superclass requirement and
     // protocol conformance requirement force a type to become concrete.
     //
     // FIXME: Is there a more principled formulation of this?
-    if (req.getKind() == RequirementKind::Superclass &&
-        !resolvedSubjectType->isTypeParameter()) {
-      newBuilder.addRequirement(Requirement(RequirementKind::SameType,
-                                            subjectType, resolvedSubjectType),
-                                getRebuiltSource(req.getSource()), nullptr);
-      continue;
+    if (req.getKind() == RequirementKind::Superclass) {
+      if (resolvedSubject.getAsConcreteType()) {
+        auto unresolvedSubjectType = stripBoundDependentMemberTypes(subjectType);
+        newBuilder.addRequirement(Requirement(RequirementKind::SameType,
+                                              unresolvedSubjectType,
+                                              resolvedSubject.getAsConcreteType()),
+                                  getRebuiltSource(req.getSource()), nullptr);
+        continue;
+      }
+
+      if (resolvedEquivClass->concreteType) {
+        auto unresolvedSubjectType = stripBoundDependentMemberTypes(
+            resolvedSubjectType);
+        newBuilder.addRequirement(Requirement(RequirementKind::SameType,
+                                              unresolvedSubjectType,
+                                              resolvedEquivClass->concreteType),
+                                  getRebuiltSource(req.getSource()), nullptr);
+        continue;
+      }
     }
 
-    assert(resolvedSubjectType->isTypeParameter());
+    assert(resolvedSubjectType && resolvedSubjectType->isTypeParameter());
 
     if (auto optReq = createRequirement(req.getKind(), resolvedSubjectType,
                                         req.getRHS(), getGenericParams())) {
