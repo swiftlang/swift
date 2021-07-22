@@ -2676,6 +2676,13 @@ public:
     return AFD->getResilienceExpansion() != ResilienceExpansion::Minimal;
   }
 
+  /// FIXME: This is an egregious hack to turn off availability checking
+  /// for specific functions that were missing availability in older versions
+  /// of existing libraries that we must nonethess still support.
+  static bool hasHistoricallyWrongAvailability(FuncDecl *func) {
+    return func->getName().isCompoundName("swift_deletedAsyncMethodError", { });
+  }
+
   void visitFuncDecl(FuncDecl *FD) {
     // Force these requests in case they emit diagnostics.
     (void) FD->getInterfaceType();
@@ -2721,7 +2728,8 @@ public:
 
     checkImplementationOnlyOverride(FD);
 
-    if (FD->getAsyncLoc().isValid())
+    if (FD->getAsyncLoc().isValid() &&
+        !hasHistoricallyWrongAvailability(FD))
       TypeChecker::checkConcurrencyAvailability(FD->getAsyncLoc(), FD);
     
     if (requiresDefinition(FD) && !FD->hasBody()) {
