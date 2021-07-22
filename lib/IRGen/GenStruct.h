@@ -34,7 +34,8 @@ namespace irgen {
   class IRGenFunction;
   class IRGenModule;
   class MemberAccessStrategy;
-  
+  class TypeInfo;
+
   Address projectPhysicalStructMemberAddress(IRGenFunction &IGF,
                                              Address base,
                                              SILType baseType,
@@ -58,6 +59,10 @@ namespace irgen {
   getPhysicalStructMemberAccessStrategy(IRGenModule &IGM,
                                         SILType baseType, VarDecl *field);
 
+  const TypeInfo *getPhysicalStructFieldTypeInfo(IRGenModule &IGM,
+                                                 SILType baseType,
+                                                 VarDecl *field);
+
   /// Returns the index of the element in the llvm struct type which represents
   /// \p field in \p baseType.
   ///
@@ -66,7 +71,6 @@ namespace irgen {
   llvm::Optional<unsigned> getPhysicalStructFieldIndex(IRGenModule &IGM,
                                                        SILType baseType,
                                                        VarDecl *field);
-
 } // end namespace irgen
 } // end namespace swift
 

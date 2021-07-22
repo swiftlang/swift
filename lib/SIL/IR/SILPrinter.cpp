@@ -1143,16 +1143,67 @@ public:
     }
   }
 
-  void printDebugVar(Optional<SILDebugVariable> Var) {
+  void printDebugInfoExpression(const SILDebugInfoExpression &DIExpr) {
+    assert(DIExpr && "DIExpression empty?");
+    *this << ", expr ";
+    bool IsFirst = true;
+    for (const auto &E : DIExpr.elements()) {
+      if (IsFirst)
+        IsFirst = false;
+      else
+        *this << ":";
+
+      switch (E.getKind()) {
+      case SILDIExprElement::OperatorKind: {
+        SILDIExprOperator Op = E.getAsOperator();
+        assert(Op != SILDIExprOperator::INVALID &&
+               "Invalid SILDIExprOperator kind");
+        *this << SILDIExprInfo::get(Op)->OpText;
+        break;
+      }
+      case SILDIExprElement::DeclKind: {
+        const Decl *D = E.getAsDecl();
+        // FIXME: Can we generalize this special handling for VarDecl
+        // to other kinds of Decl?
+        if (const auto *VD = dyn_cast<VarDecl>(D)) {
+          *this << "#";
+          printFullContext(VD->getDeclContext(), PrintState.OS);
+          *this << VD->getName().get();
+        } else
+          D->print(PrintState.OS, PrintState.ASTOptions);
+        break;
+      }
+      }
+    }
+  }
+
+  void printDebugVar(Optional<SILDebugVariable> Var,
+                     const SourceManager *SM = nullptr) {
     if (!Var || Var->Name.empty())
       return;
     if (Var->Constant)
       *this << ", let";
     else
       *this << ", var";
-    *this << ", name \"" << Var->Name << '"';
+
+    if ((Var->Loc || Var->Scope) && SM) {
+      *this << ", (name \"" << Var->Name << '"';
+      if (Var->Loc)
+        printDebugLocRef(*Var->Loc, *SM);
+      if (Var->Scope)
+        printDebugScopeRef(Var->Scope, *SM);
+      *this << ")";
+    } else
+      *this << ", name \"" << Var->Name << '"';
+
     if (Var->ArgNo)
       *this << ", argno " << Var->ArgNo;
+    if (Var->Type) {
+      *this << ", type ";
+      Var->Type->print(PrintState.OS, PrintState.ASTOptions);
+    }
+    if (Var->DIExpr)
+      printDebugInfoExpression(Var->DIExpr);
   }
 
   void visitAllocStackInst(AllocStackInst *AVI) {
@@ -1518,12 +1569,14 @@ public:
     if (DVI->poisonRefs())
       *this << "[poison] ";
     *this << getIDAndType(DVI->getOperand());
-    printDebugVar(DVI->getVarInfo());
+    printDebugVar(DVI->getVarInfo(),
+                  &DVI->getModule().getASTContext().SourceMgr);
   }
 
   void visitDebugValueAddrInst(DebugValueAddrInst *DVAI) {
     *this << getIDAndType(DVAI->getOperand());
-    printDebugVar(DVAI->getVarInfo());
+    printDebugVar(DVAI->getVarInfo(),
+                  &DVAI->getModule().getASTContext().SourceMgr);
   }
 
 #define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \

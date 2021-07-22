@@ -1039,8 +1039,9 @@ public:
     CurInstruction = I;
     checkSILInstruction(I);
 
-    // Check the SILLLocation attached to the instruction.
-    checkInstructionsSILLocation(I);
+    // Check the SILLLocation attached to the instruction,
+    // as well as debug-variable-carrying instructions.
+    checkInstructionsDebugInfo(I);
 
     // Check ownership and types.
     SILFunction *F = I->getFunction();
@@ -1204,27 +1205,7 @@ public:
     }
   }
 
-  void checkInstructionsSILLocation(SILInstruction *inst) {
-    // First verify structural debug info information.
-    inst->verifyDebugInfo();
-
-    // Check the debug scope.
-    auto *debugScope = inst->getDebugScope();
-    if (debugScope && !maybeScopeless(*inst))
-      require(debugScope, "instruction has a location, but no scope");
-    require(!debugScope ||
-                debugScope->getParentFunction() == inst->getFunction(),
-            "debug scope of instruction belongs to a different function");
-
-    // Check that there is at most one debug variable defined for each argument
-    // slot if our debug scope is not an inlined call site.
-    //
-    // This catches SIL transformations that accidentally remove inline
-    // information (stored in the SILDebugScope) from debug-variable-carrying
-    // instructions.
-    if (debugScope->InlinedCallSite)
-      return;
-
+  void checkDebugVariable(SILInstruction *inst) {
     Optional<SILDebugVariable> varInfo;
     if (auto *di = dyn_cast<AllocStackInst>(inst))
       varInfo = di->getVarInfo();
@@ -1238,21 +1219,66 @@ public:
     if (!varInfo)
       return;
 
-    if (unsigned argNum = varInfo->ArgNo) {
-      // It is a function argument.
-      if (argNum < DebugVars.size() && !DebugVars[argNum].empty() &&
-          !varInfo->Name.empty()) {
-        require(DebugVars[argNum] == varInfo->Name,
-                "Scope contains conflicting debug variables for one function "
-                "argument");
-      } else {
-        // Reserve enough space.
-        while (DebugVars.size() <= argNum) {
-          DebugVars.push_back(StringRef());
+    auto *debugScope = inst->getDebugScope();
+
+    // Check that there is at most one debug variable defined for each argument
+    // slot if our debug scope is not an inlined call site.
+    //
+    // This catches SIL transformations that accidentally remove inline
+    // information (stored in the SILDebugScope) from debug-variable-carrying
+    // instructions.
+    if (debugScope && !debugScope->InlinedCallSite)
+      if (unsigned argNum = varInfo->ArgNo) {
+        // It is a function argument.
+        if (argNum < DebugVars.size() && !DebugVars[argNum].empty() &&
+            !varInfo->Name.empty()) {
+          require(DebugVars[argNum] == varInfo->Name,
+                  "Scope contains conflicting debug variables for one function "
+                  "argument");
+        } else {
+          // Reserve enough space.
+          while (DebugVars.size() <= argNum) {
+            DebugVars.push_back(StringRef());
+          }
         }
+        DebugVars[argNum] = varInfo->Name;
       }
-      DebugVars[argNum] = varInfo->Name;
+
+    // Check debug info expression
+    if (const auto &DIExpr = varInfo->DIExpr) {
+      for (auto It = DIExpr.element_begin(), ItEnd = DIExpr.element_end();
+           It != ItEnd;) {
+        require(It->getKind() == SILDIExprElement::OperatorKind,
+                "dangling di-expression operand");
+        auto Op = It->getAsOperator();
+        const auto *DIExprInfo = SILDIExprInfo::get(Op);
+        require(DIExprInfo, "unrecognized di-expression operator");
+        ++It;
+        // Check operand kinds
+        for (auto OpK : DIExprInfo->OperandKinds)
+          require(It != ItEnd && (It++)->getKind() == OpK,
+                  "di-expression operand kind mismatch");
+
+        if (Op == SILDIExprOperator::Fragment)
+          require(It == ItEnd, "op_fragment directive needs to be at the end "
+                               "of a di-expression");
+      }
     }
+  }
+
+  void checkInstructionsDebugInfo(SILInstruction *inst) {
+    // First verify structural debug info information.
+    inst->verifyDebugInfo();
+
+    // Check the debug scope.
+    auto *debugScope = inst->getDebugScope();
+    if (debugScope && !maybeScopeless(*inst))
+      require(debugScope, "instruction has a location, but no scope");
+    require(!debugScope ||
+                debugScope->getParentFunction() == inst->getFunction(),
+            "debug scope of instruction belongs to a different function");
+
+    checkDebugVariable(inst);
   }
 
   /// Check that the types of this value producer are all legal in the function
