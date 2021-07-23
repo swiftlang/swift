@@ -3196,12 +3196,6 @@ public:
     /// Whether to include @_implements members.
     /// Used by conformance-checking to find special @_implements members.
     IncludeAttrImplements = 1 << 0,
-    /// Whether to avoid loading lazy members from any new extensions that would otherwise be found
-    /// by deserialization.
-    ///
-    /// Used by the module loader to break recursion and as an optimization e.g. when it is known that a
-    /// particular member declaration will never appear in an extension.
-    IgnoreNewExtensions = 1 << 1,
   };
 
   /// Find all of the declarations with the given name within this nominal type
