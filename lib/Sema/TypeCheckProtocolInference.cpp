@@ -215,13 +215,10 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
     if (!proto) {
       // Retrieve the generic signature of the extension.
       const auto extensionSig = extension->getGenericSignature();
-
-      // Extensions of non-generic nominals are always viable for inference.
-      if (!extensionSig)
-        return true;
-
-      return extensionSig->requirementsNotSatisfiedBy(
-          conformanceCtx->getGenericSignatureOfContext()).empty();
+      return extensionSig
+          .requirementsNotSatisfiedBy(
+              conformanceCtx->getGenericSignatureOfContext())
+          .empty();
     }
 
     // The condition here is a bit more fickle than

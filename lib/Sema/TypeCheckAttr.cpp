@@ -2148,7 +2148,7 @@ static void checkSpecializeAttrRequirements(SpecializeAttr *attr,
                                             ASTContext &ctx) {
   bool hadError = false;
 
-  auto specializedReqs = specializedSig->requirementsNotSatisfiedBy(originalSig);
+  auto specializedReqs = specializedSig.requirementsNotSatisfiedBy(originalSig);
   for (auto specializedReq : specializedReqs) {
     if (!specializedReq.getFirstType()->is<GenericTypeParamType>()) {
       ctx.Diags.diagnose(attr->getLocation(),
@@ -4687,18 +4687,10 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
   // Returns true if the generic parameters in `source` satisfy the generic
   // requirements in `target`.
   std::function<bool(GenericSignature, GenericSignature)>
-      checkGenericSignatureSatisfied = [&](GenericSignature source,
-                                           GenericSignature target) {
-        // If target is null, then its requirements are satisfied.
-        if (!target)
-          return true;
-        // If source is null but target is not null, then target's
-        // requirements are not satisfied.
-        if (!source)
-          return false;
-
-        return target->requirementsNotSatisfiedBy(source).empty();
-      };
+      checkGenericSignatureSatisfied =
+          [&](GenericSignature source, GenericSignature target) {
+            return target.requirementsNotSatisfiedBy(source).empty();
+          };
 
   // Returns true if the derivative function and original function candidate are
   // defined in compatible type contexts. If the derivative function and the
@@ -5326,18 +5318,10 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
   // Returns true if the generic parameters in `source` satisfy the generic
   // requirements in `target`.
   std::function<bool(GenericSignature, GenericSignature)>
-      checkGenericSignatureSatisfied = [&](GenericSignature source,
-                                           GenericSignature target) {
-        // If target is null, then its requirements are satisfied.
-        if (!target)
-          return true;
-        // If source is null but target is not null, then target's
-        // requirements are not satisfied.
-        if (!source)
-          return false;
-
-        return target->requirementsNotSatisfiedBy(source).empty();
-      };
+      checkGenericSignatureSatisfied =
+          [&](GenericSignature source, GenericSignature target) {
+            return target.requirementsNotSatisfiedBy(source).empty();
+          };
 
   auto isValidOriginalCandidate = [&](AbstractFunctionDecl *originalCandidate)
       -> Optional<AbstractFunctionDeclLookupErrorKind> {

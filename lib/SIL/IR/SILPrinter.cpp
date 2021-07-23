@@ -3706,17 +3706,8 @@ void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
   if (genericEnv)
     genericSig = genericEnv->getGenericSignature();
 
-  ArrayRef<Requirement> requirements;
-  SmallVector<Requirement, 4> requirementsScratch;
-  if (auto specializedSig = getSpecializedSignature()) {
-    if (genericSig) {
-      requirementsScratch = specializedSig->requirementsNotSatisfiedBy(
-          genericSig);
-      requirements = requirementsScratch;
-    } else {
-      requirements = specializedSig.getRequirements();
-    }
-  }
+  auto requirements =
+      getSpecializedSignature().requirementsNotSatisfiedBy(genericSig);
   if (targetFunction) {
     OS << "target: \"" << targetFunction->getName() << "\", ";
   }

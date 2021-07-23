@@ -967,6 +967,16 @@ bool GenericSignatureImpl::isRequirementSatisfied(
   return requirement.isSatisfied(conditionalRequirements, allowMissing);
 }
 
+SmallVector<Requirement, 4>
+GenericSignature::requirementsNotSatisfiedBy(GenericSignature otherSig) const {
+  // The null generic signature has no requirements, therefore all requirements
+  // are satisfied by any signature.
+  if (isNull()) {
+    return {};
+  }
+  return getPointer()->requirementsNotSatisfiedBy(otherSig);
+}
+
 SmallVector<Requirement, 4> GenericSignatureImpl::requirementsNotSatisfiedBy(
                                             GenericSignature otherSig) const {
   SmallVector<Requirement, 4> result;
