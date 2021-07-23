@@ -481,6 +481,55 @@ See [Generics.rst](/docs/Generics.rst) for more details.
 
 ## `@_specializeExtension`
 
+Allows extending `@usableFromInline` internal types from foreign modules.
+Consider the following example involving two modules:
+
+```swift
+// Module A
+@usableFromInline
+internal struct S<T> { /* ... */ }
+
+// Module B
+import A
+
+@_specializeExtension
+extension S { // OK
+  // add methods here
+}
+
+extension S /* or A.S */ { // error: cannot find 'S' in scope
+}
+```
+
+This ability can be used to add specializations of existing methods
+in downstream libraries when used in conjunction with `@_specialize`.
+
+```swift
+// Module A
+@usableFromInline
+internal struct S<T> {
+  @inlinable
+  internal func doIt() { /* body */ }
+}
+
+// Module B
+import A
+
+@_specializeExtension
+extension S { // ok
+  @_specialize(exported: true, target: doIt(), where T == Int)
+  public func specializedDoIt() {}
+}
+
+// Module C
+import A
+import B
+
+func f(_ s: S<Int>) {
+  s.doIt() // will call specialized version of doIt() where T == Int from B
+}
+```
+
 ## `@_spi(spiName)`
 
 Marks a declaration as SPI (System Programming Interface), instead of API.
