@@ -1,4 +1,5 @@
 // RUN: %target-typecheck-verify-swift
+// REQUIRES: concurrency
 
 public protocol P {
   associatedtype T
