@@ -1463,7 +1463,7 @@ CanGenericSignature IRGenModule::getCurGenericContext() {
 }
 
 GenericEnvironment *TypeConverter::getGenericEnvironment() {
-  return CurGenericSignature->getGenericEnvironment();
+  return CurGenericSignature.getGenericEnvironment();
 }
 
 GenericEnvironment *IRGenModule::getGenericEnvironment() {
@@ -1816,7 +1816,7 @@ ArchetypeType *TypeConverter::getExemplarArchetype(ArchetypeType *t) {
   // Dig out the canonical generic environment.
   auto genericSig = genericEnv->getGenericSignature();
   auto canGenericSig = genericSig.getCanonicalSignature();
-  auto canGenericEnv = canGenericSig->getGenericEnvironment();
+  auto canGenericEnv = canGenericSig.getGenericEnvironment();
   if (canGenericEnv == genericEnv) return t;
 
   // Map the archetype out of its own generic environment and into the
@@ -2567,7 +2567,7 @@ bool TypeConverter::isExemplarArchetype(ArchetypeType *arch) const {
   // Dig out the canonical generic environment.
   auto genericSig = genericEnv->getGenericSignature();
   auto canGenericSig = genericSig.getCanonicalSignature();
-  auto canGenericEnv = canGenericSig->getGenericEnvironment();
+  auto canGenericEnv = canGenericSig.getGenericEnvironment();
 
   // If this archetype is in the canonical generic environment, it's an
   // exemplar archetype.

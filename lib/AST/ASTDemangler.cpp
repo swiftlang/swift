@@ -205,7 +205,7 @@ createSubstitutionMapFromGenericArgs(GenericSignature genericSig,
   if (!genericSig)
     return SubstitutionMap();
   
-  if (genericSig->getGenericParams().size() != args.size())
+  if (genericSig.getGenericParams().size() != args.size())
     return SubstitutionMap();
 
   return SubstitutionMap::get(
@@ -306,7 +306,7 @@ Type ASTBuilder::createBoundGenericType(GenericTypeDecl *decl,
 
   auto genericSig = aliasDecl->getGenericSignature();
   for (unsigned i = 0, e = args.size(); i < e; ++i) {
-    auto origTy = genericSig->getInnermostGenericParams()[i];
+    auto origTy = genericSig.getInnermostGenericParams()[i];
     auto substTy = args[i];
 
     subs[origTy->getCanonicalType()->castTo<GenericTypeParamType>()] =

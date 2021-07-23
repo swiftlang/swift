@@ -708,11 +708,11 @@ namespace {
         // suppressed. Treat it as a typedef.
         return None;
       }
-      if (index > genericSig->getGenericParams().size()) {
+      if (index > genericSig.getGenericParams().size()) {
         return ImportResult();
       }
 
-      return ImportResult(genericSig->getGenericParams()[index],
+      return ImportResult(genericSig.getGenericParams()[index],
                           ImportHint::ObjCPointer);
     }
 
@@ -1110,7 +1110,7 @@ namespace {
             auto unboundDecl = unboundType->getDecl();
             auto bridgedSig = unboundDecl->getGenericSignature();
             assert(bridgedSig && "Bridged signature");
-            unsigned numExpectedTypeArgs = bridgedSig->getGenericParams().size();
+            unsigned numExpectedTypeArgs = bridgedSig.getGenericParams().size();
             if (importedTypeArgs.size() != numExpectedTypeArgs)
               return Type();
 

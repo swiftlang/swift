@@ -2171,7 +2171,7 @@ static void checkSpecializeAttrRequirements(SpecializeAttr *attr,
 
   SmallVector<GenericTypeParamType *, 2> unspecializedParams;
 
-  for (auto *paramTy : specializedSig->getGenericParams()) {
+  for (auto *paramTy : specializedSig.getGenericParams()) {
     auto canTy = paramTy->getCanonicalType();
     if (specializedSig->isCanonicalTypeInContext(canTy) &&
         (!specializedSig->getLayoutConstraint(canTy) ||
@@ -2180,7 +2180,7 @@ static void checkSpecializeAttrRequirements(SpecializeAttr *attr,
     }
   }
 
-  unsigned expectedCount = specializedSig->getGenericParams().size();
+  unsigned expectedCount = specializedSig.getGenericParams().size();
   unsigned gotCount = expectedCount - unspecializedParams.size();
 
   if (expectedCount == gotCount)
@@ -2778,7 +2778,7 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
       return false;
 
     auto genericSignature = init->getGenericSignature();
-    auto genericParamType = genericSignature->getInnermostGenericParams().front();
+    auto genericParamType = genericSignature.getInnermostGenericParams().front();
 
     // Fow now, only allow one parameter.
     auto params = init->getParameters();
@@ -2804,7 +2804,7 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
 
     // Use invalid 'SourceLoc's to suppress diagnostics.
     auto result = TypeChecker::checkGenericArguments(
-          module, genericSignature->getRequirements(),
+          module, genericSignature.getRequirements(),
           [&](SubstitutableType *type) -> Type {
             if (type->isEqual(genericParamType))
               return protocol->getSelfTypeInContext();
@@ -4517,9 +4517,7 @@ IndexSubset *DifferentiableAttributeTypeCheckRequest::evaluate(
   if (resolveDifferentiableAttrDerivativeGenericSignature(attr, original,
                                                           derivativeGenSig))
     return nullptr;
-  GenericEnvironment *derivativeGenEnv = nullptr;
-  if (derivativeGenSig)
-    derivativeGenEnv = derivativeGenSig->getGenericEnvironment();
+  auto *derivativeGenEnv = derivativeGenSig.getGenericEnvironment();
 
   // Compute the derivative function type.
   auto originalFnRemappedTy = originalFnTy;

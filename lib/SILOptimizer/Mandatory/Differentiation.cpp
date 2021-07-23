@@ -203,9 +203,7 @@ static bool diagnoseUnsatisfiedRequirements(ADContext &context,
     return false;
 
   // If there are no derivative requirements, return false.
-  if (!derivativeGenSig)
-    return false;
-  auto requirements = derivativeGenSig->getRequirements();
+  auto requirements = derivativeGenSig.getRequirements();
   if (requirements.empty())
     return false;
   // Iterate through all requirements and check whether they are satisfied.
@@ -781,12 +779,10 @@ static SILFunction *createEmptyVJP(ADContext &context,
   Mangle::DifferentiationMangler mangler;
   auto vjpName = mangler.mangleDerivativeFunction(
       original->getName(), AutoDiffDerivativeFunctionKind::VJP, config);
-  CanGenericSignature vjpCanGenSig;
-  if (auto vjpGenSig = witness->getDerivativeGenericSignature())
-    vjpCanGenSig = vjpGenSig->getCanonicalSignature();
+  auto vjpCanGenSig = witness->getDerivativeGenericSignature().getCanonicalSignature();
   GenericEnvironment *vjpGenericEnv = nullptr;
   if (vjpCanGenSig && !vjpCanGenSig->areAllParamsConcrete())
-    vjpGenericEnv = vjpCanGenSig->getGenericEnvironment();
+    vjpGenericEnv = vjpCanGenSig.getGenericEnvironment();
   auto vjpType = originalTy->getAutoDiffDerivativeFunctionType(
       config.parameterIndices, config.resultIndices,
       AutoDiffDerivativeFunctionKind::VJP,
@@ -824,12 +820,10 @@ static SILFunction *createEmptyJVP(ADContext &context,
   Mangle::DifferentiationMangler mangler;
   auto jvpName = mangler.mangleDerivativeFunction(
       original->getName(), AutoDiffDerivativeFunctionKind::JVP, config);
-  CanGenericSignature jvpCanGenSig;
-  if (auto jvpGenSig = witness->getDerivativeGenericSignature())
-    jvpCanGenSig = jvpGenSig->getCanonicalSignature();
+  auto jvpCanGenSig = witness->getDerivativeGenericSignature().getCanonicalSignature();
   GenericEnvironment *jvpGenericEnv = nullptr;
   if (jvpCanGenSig && !jvpCanGenSig->areAllParamsConcrete())
-    jvpGenericEnv = jvpCanGenSig->getGenericEnvironment();
+    jvpGenericEnv = jvpCanGenSig.getGenericEnvironment();
   auto jvpType = originalTy->getAutoDiffDerivativeFunctionType(
       config.parameterIndices, config.resultIndices,
       AutoDiffDerivativeFunctionKind::JVP,
@@ -1040,8 +1034,7 @@ static SILValue promoteCurryThunkApplicationToDifferentiableFunction(
   // returned function value with an `differentiable_function`
   // instruction, and process the `differentiable_function` instruction.
   if (newThunk->empty()) {
-    if (auto newThunkGenSig = thunkType->getSubstGenericSignature())
-      newThunk->setGenericEnvironment(newThunkGenSig->getGenericEnvironment());
+    newThunk->setGenericEnvironment(thunkType->getSubstGenericSignature().getGenericEnvironment());
 
     BasicTypeSubstCloner cloner(thunk, newThunk);
     cloner.cloneFunction();

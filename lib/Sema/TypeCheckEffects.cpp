@@ -112,12 +112,10 @@ PolymorphicEffectKindRequest::evaluate(Evaluator &evaluator,
     return PolymorphicEffectKind::Always;
   }
 
-  if (auto genericSig = decl->getGenericSignature()) {
-    for (auto req : genericSig->getRequirements()) {
-      if (req.getKind() == RequirementKind::Conformance) {
-        if (req.getProtocolDecl()->hasPolymorphicEffect(kind)) {
-          return PolymorphicEffectKind::ByConformance;
-        }
+  for (auto req : decl->getGenericSignature().getRequirements()) {
+    if (req.getKind() == RequirementKind::Conformance) {
+      if (req.getProtocolDecl()->hasPolymorphicEffect(kind)) {
+        return PolymorphicEffectKind::ByConformance;
       }
     }
   }

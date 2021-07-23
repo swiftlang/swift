@@ -1299,7 +1299,7 @@ public:
     
     // Extract structural substitutions.
     if (origContextType->hasTypeParameter()) {
-      origContextType = origSig->getGenericEnvironment()
+      origContextType = origSig.getGenericEnvironment()
         ->mapTypeIntoContext(origContextType)
         ->getCanonicalType();
     }

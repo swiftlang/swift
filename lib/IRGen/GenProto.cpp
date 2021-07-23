@@ -236,7 +236,7 @@ PolymorphicConvention::PolymorphicConvention(IRGenModule &IGM,
 
 void PolymorphicConvention::addPseudogenericFulfillments() {
   enumerateRequirements([&](GenericRequirement reqt) {
-    auto archetype = Generics->getGenericEnvironment()
+    auto archetype = Generics.getGenericEnvironment()
                         ->mapTypeIntoContext(reqt.TypeParameter)
                         ->getAs<ArchetypeType>();
     assert(archetype && "did not get an archetype by mapping param?");
@@ -263,7 +263,7 @@ irgen::enumerateGenericSignatureRequirements(CanGenericSignature signature,
   });
 
   // Get the protocol conformances.
-  for (auto &reqt : signature->getRequirements()) {
+  for (auto &reqt : signature.getRequirements()) {
     switch (reqt.getKind()) {
       // Ignore these; they don't introduce extra requirements.
       case RequirementKind::Superclass:
@@ -470,7 +470,7 @@ void irgen::enumerateGenericParamFulfillments(IRGenModule &IGM,
   // captured value.
   auto generics = fnType->getInvocationGenericSignature();
 
-  for (auto genericParam : generics->getGenericParams()) {
+  for (auto genericParam : generics.getGenericParams()) {
     auto genericParamType = genericParam->getCanonicalType();
 
     auto fulfillment
@@ -3538,7 +3538,7 @@ llvm::Constant *IRGenModule::getAddrOfGenericEnvironment(
         llvm::SmallVector<uint16_t, 4> genericParamCounts;
         unsigned curDepth = 0;
         unsigned genericParamCount = 0;
-        for (const auto gp : signature->getGenericParams()) {
+        for (const auto gp : signature.getGenericParams()) {
           if (curDepth != gp->getDepth()) {
             genericParamCounts.push_back(genericParamCount);
             curDepth = gp->getDepth();
@@ -3550,7 +3550,7 @@ llvm::Constant *IRGenModule::getAddrOfGenericEnvironment(
 
         auto flags = GenericEnvironmentFlags()
           .withNumGenericParameterLevels(genericParamCounts.size())
-          .withNumGenericRequirements(signature->getRequirements().size());
+          .withNumGenericRequirements(signature.getRequirements().size());
 
         ConstantStructBuilder fields = builder.beginStruct();
         fields.setPacked(true);
@@ -3575,7 +3575,7 @@ llvm::Constant *IRGenModule::getAddrOfGenericEnvironment(
 
         // Generic requirements
         irgen::addGenericRequirements(*this, fields, signature,
-                                      signature->getRequirements());
+                                      signature.getRequirements());
         return fields.finishAndCreateFuture();
       });
 }

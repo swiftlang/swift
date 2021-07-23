@@ -326,7 +326,7 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
             auto selfAssocTy = DependentMemberType::get(selfTy,
                                                         dmt->getAssocType());
             for (auto &reqt : witnessContext->getGenericSignatureOfContext()
-                                            ->getRequirements()) {
+                                            .getRequirements()) {
               switch (reqt.getKind()) {
               case RequirementKind::Conformance:
               case RequirementKind::Superclass:
@@ -907,7 +907,7 @@ AssociatedTypeInference::computeAbstractTypeWitness(
 
   // If there is a generic parameter of the named type, use that.
   if (auto genericSig = dc->getGenericSignatureOfContext()) {
-    for (auto gp : genericSig->getInnermostGenericParams()) {
+    for (auto gp : genericSig.getInnermostGenericParams()) {
       if (gp->getName() == assocType->getName())
         return AbstractTypeWitness::forGenericParam(assocType, gp);
     }
@@ -1129,8 +1129,8 @@ bool AssociatedTypeInference::checkConstrainedExtension(ExtensionDecl *ext) {
   SubstOptions options = getSubstOptionsWithCurrentTypeWitnesses();
   switch (TypeChecker::checkGenericArguments(
                        dc, SourceLoc(), SourceLoc(), adoptee,
-                       ext->getGenericSignature()->getGenericParams(),
-                       ext->getGenericSignature()->getRequirements(),
+                       ext->getGenericSignature().getGenericParams(),
+                       ext->getGenericSignature().getRequirements(),
                        QueryTypeSubstitutionMap{subs},
                        options)) {
   case RequirementCheckResult::Success:
@@ -1504,7 +1504,7 @@ static Comparison compareDeclsForInference(DeclContext *DC, ValueDecl *decl1,
       insertProtocol(parent);
   };
 
-  for (auto &reqt : sig1->getRequirements()) {
+  for (auto &reqt : sig1.getRequirements()) {
     if (!reqt.getFirstType()->isEqual(selfParam))
       continue;
     switch (reqt.getKind()) {
@@ -1536,7 +1536,7 @@ static Comparison compareDeclsForInference(DeclContext *DC, ValueDecl *decl1,
       removeProtocol(parent);
   };
 
-  for (auto &reqt : sig2->getRequirements()) {
+  for (auto &reqt : sig2.getRequirements()) {
     if (!reqt.getFirstType()->isEqual(selfParam))
       continue;
     switch (reqt.getKind()) {

@@ -366,7 +366,7 @@ static bool doesTypeAliasFullyConstrainAllOuterGenericParams(
   if (!parentSig || !genericSig)
     return false;
 
-  for (auto *paramType : parentSig->getGenericParams()) {
+  for (auto *paramType : parentSig.getGenericParams()) {
     if (!genericSig->isConcreteType(paramType))
       return false;
   }
