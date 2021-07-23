@@ -68,6 +68,22 @@ public:
 
 // MARK: Constraint generation
 
+/// Check whether it makes sense to convert this element into a constrant.
+static bool isViableElement(ASTNode element) {
+  if (auto *decl = element.dyn_cast<Decl *>()) {
+    // - Ignore variable declarations, they are handled by pattern bindings;
+    // - Ignore #if, the chosen children should appear in the
+    // surrounding context;
+    // - Skip #warning and #error, they are handled during solution
+    //   application.
+    if (isa<VarDecl>(decl) || isa<IfConfigDecl>(decl) ||
+        isa<PoundDiagnosticDecl>(decl))
+      return false;
+  }
+
+  return true;
+}
+
 static void createConjunctionForBody(ConstraintSystem &cs, BraceStmt *body,
                                      ASTNode parent,
                                      ConstraintLocator *locator) {
@@ -83,16 +99,8 @@ static void createConjunctionForBody(ConstraintSystem &cs, BraceStmt *body,
   SmallVector<Constraint *, 4> elements;
 
   for (auto element : body->getElements()) {
-    if (auto *decl = element.dyn_cast<Decl *>()) {
-      // - Ignore variable declarations, they are handled by pattern bindings;
-      // - Ignore #if, the chosen children should appear in the
-      // surrounding context;
-      // - Skip #warning and #error, they are handled during solution
-      //   application.
-      if (isa<VarDecl>(decl) || isa<IfConfigDecl>(decl) ||
-          isa<PoundDiagnosticDecl>(decl))
-        continue;
-    }
+    if (!isViableElement(element))
+      continue;
 
     TypeVariableRefFinder refFinder(cs, parent);
 
@@ -111,6 +119,27 @@ static void createConjunctionForBody(ConstraintSystem &cs, BraceStmt *body,
 
   cs.addUnsolvedConstraint(Constraint::createConjunction(
       cs, elements, isIsolated, locator, referencedVars));
+}
+
+static void createNonIsolatedConjunction(
+    ConstraintSystem &cs,
+    ArrayRef<std::pair<ASTNode, ConstraintLocator *>> elements,
+    ConstraintLocator *locator) {
+  SmallVector<Constraint *, 4> constraints;
+
+  for (const auto &entry : elements) {
+    ASTNode element = entry.first;
+    ConstraintLocator *elementLoc = entry.second;
+
+    if (!isViableElement(element))
+      continue;
+
+    constraints.push_back(Constraint::createClosureBodyElement(
+        cs, element, elementLoc));
+  }
+
+  cs.addUnsolvedConstraint(Constraint::createConjunction(
+      cs, constraints, /*isIsolated=*/false, locator));
 }
 
 /// Statement visitor that generates constraints for a given closure body.
@@ -163,31 +192,30 @@ private:
     if (!isSupportedMultiStatementClosure())
       llvm_unreachable("Unsupported statement: If");
 
-    SmallVector<Constraint *, 4> elements;
+    SmallVector<std::pair<ASTNode, ConstraintLocator *>> elements;
 
     // Condition
     {
       auto *condLoc =
-          cs.getConstraintLocator(locator, ConstraintLocator::Condition);
-      elements.push_back(Constraint::createClosureBodyElement(
-          cs, ifStmt->getCondPointer(), condLoc));
+        cs.getConstraintLocator(locator, ConstraintLocator::Condition);
+      elements.push_back({ifStmt->getCondPointer(), condLoc});
     }
 
     // Then Branch
-    auto *thenLoc = cs.getConstraintLocator(
+    {
+      auto *thenLoc = cs.getConstraintLocator(
         locator, LocatorPathElt::TernaryBranch(/*then=*/true));
-    elements.push_back(Constraint::createClosureBodyElement(
-        cs, ifStmt->getThenStmt(), thenLoc));
+      elements.push_back({ifStmt->getThenStmt(), thenLoc});
+    }
 
+    // Else Branch (if any).
     if (auto *elseStmt = ifStmt->getElseStmt()) {
       auto *elseLoc = cs.getConstraintLocator(
           locator, LocatorPathElt::TernaryBranch(/*then=*/false));
-      elements.push_back(
-          Constraint::createClosureBodyElement(cs, elseStmt, elseLoc));
+      elements.push_back({ifStmt->getElseStmt(), elseLoc});
     }
 
-    cs.addUnsolvedConstraint(Constraint::createConjunction(
-        cs, elements, /*isIsolated=*/false, locator));
+    createNonIsolatedConjunction(cs, elements, locator);
   }
 
   void visitBraceStmt(BraceStmt *braceStmt) {
