@@ -333,9 +333,10 @@ For more details, see the educational note on
 
 ## `@_nonoverride`
 
-Warns when a protocol restates a requirement from another protocol that
-it refines, without annotated the declaration with either `override` or
-`@_nonoverride`, when the `-warn-implicit-overrides` flag is passed.
+Marks a declaration that is not an override of another.
+When the `-warn-implicit-overrides` flag is used, a warning is issued when a
+protocol restates a requirement from another protocol it refines without
+annotating the declaration with either `override` or `@_nonoverride`.
 
 An `override` annotation causes the overriding declaration to be treated
 identically to the overridden declaration; a conforming type can only
