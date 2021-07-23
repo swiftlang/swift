@@ -89,7 +89,7 @@ ArrayRef<Type> SubstitutionMap::getReplacementTypes() const {
 
   // Make sure we've filled in all of the replacement types.
   if (!storage->populatedAllReplacements) {
-    for (auto gp : getGenericSignature()->getGenericParams()) {
+    for (auto gp : getGenericSignature().getGenericParams()) {
       (void)lookupSubstitution(cast<SubstitutableType>(gp->getCanonicalType()));
     }
 
@@ -103,7 +103,7 @@ ArrayRef<Type> SubstitutionMap::getInnermostReplacementTypes() const {
   if (empty()) return { };
 
   return getReplacementTypes().take_back(
-      getGenericSignature()->getInnermostGenericParams().size());
+      getGenericSignature().getInnermostGenericParams().size());
 }
 
 GenericSignature SubstitutionMap::getGenericSignature() const {
@@ -213,7 +213,7 @@ SubstitutionMap SubstitutionMap::get(GenericSignature genericSig,
 
   // Form the replacement types.
   SmallVector<Type, 4> replacementTypes;
-  replacementTypes.reserve(genericSig->getGenericParams().size());
+  replacementTypes.reserve(genericSig.getGenericParams().size());
 
   genericSig->forEachParam([&](GenericTypeParamType *gp, bool canonical) {
     // Don't eagerly form replacements for non-canonical generic parameters.
@@ -229,7 +229,7 @@ SubstitutionMap SubstitutionMap::get(GenericSignature genericSig,
 
   // Form the stored conformances.
   SmallVector<ProtocolConformanceRef, 4> conformances;
-  for (const auto &req : genericSig->getRequirements()) {
+  for (const auto &req : genericSig.getRequirements()) {
     if (req.getKind() != RequirementKind::Conformance) continue;
 
     CanType depTy = req.getFirstType()->getCanonicalType();
@@ -263,7 +263,7 @@ Type SubstitutionMap::lookupSubstitution(CanSubstitutableType type) const {
   auto replacementTypes = mutableThis->getReplacementTypesBuffer();
   auto genericSig = getGenericSignature();
   assert(genericSig);
-  auto genericParams = genericSig->getGenericParams();
+  auto genericParams = genericSig.getGenericParams();
   auto replacementIndex =
     GenericParamKey(genericParam).findIndexIn(genericParams);
 
@@ -336,7 +336,7 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
   auto getSignatureConformance =
       [&](Type type, ProtocolDecl *proto) -> Optional<ProtocolConformanceRef> {
     unsigned index = 0;
-    for (auto reqt : genericSig->getRequirements()) {
+    for (auto reqt : genericSig.getRequirements()) {
       if (reqt.getKind() == RequirementKind::Conformance) {
         if (reqt.getFirstType()->isEqual(type) &&
             reqt.getProtocolDecl() == proto)
@@ -461,7 +461,7 @@ SubstitutionMap SubstitutionMap::subst(TypeSubstitutionFn subs,
   auto oldConformances = getConformances();
 
   auto genericSig = getGenericSignature();
-  for (const auto &req : genericSig->getRequirements()) {
+  for (const auto &req : genericSig.getRequirements()) {
     if (req.getKind() != RequirementKind::Conformance) continue;
 
     auto conformance = oldConformances[0];
@@ -542,7 +542,7 @@ SubstitutionMap::getOverrideSubstitutions(const ClassDecl *baseClass,
   unsigned baseDepth = 0;
   SubstitutionMap baseSubMap;
   if (auto baseClassSig = baseClass->getGenericSignature()) {
-    baseDepth = baseClassSig->getGenericParams().back()->getDepth() + 1;
+    baseDepth = baseClassSig.getGenericParams().back()->getDepth() + 1;
 
     auto derivedClassTy = derivedClass->getDeclaredInterfaceType();
     if (derivedSubs)
@@ -556,7 +556,7 @@ SubstitutionMap::getOverrideSubstitutions(const ClassDecl *baseClass,
 
   unsigned origDepth = 0;
   if (auto derivedClassSig = derivedClass->getGenericSignature())
-    origDepth = derivedClassSig->getGenericParams().back()->getDepth() + 1;
+    origDepth = derivedClassSig.getGenericParams().back()->getDepth() + 1;
 
   SubstitutionMap origSubMap;
   if (derivedSubs)
@@ -659,7 +659,7 @@ void SubstitutionMap::verify() const {
 
   unsigned conformanceIndex = 0;
 
-  for (const auto &req : getGenericSignature()->getRequirements()) {
+  for (const auto &req : getGenericSignature().getRequirements()) {
     if (req.getKind() != RequirementKind::Conformance)
       continue;
 

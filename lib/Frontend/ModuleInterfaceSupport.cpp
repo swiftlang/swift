@@ -646,7 +646,7 @@ public:
         },
         [&out] { out << ", "; });
     out << " where "
-        << nominal->getGenericSignature()->getGenericParams().front()->getName()
+        << nominal->getGenericSignature().getGenericParams().front()->getName()
         << " : " << DummyProtocolName << " {}\n";
     return true;
   }

@@ -86,7 +86,7 @@ class ReferencedTypeFinder : public TypeDeclFinder {
     auto sig = decl->getGenericSignature();
 
     for_each(boundGeneric->getGenericArgs(),
-             sig->getInnermostGenericParams(),
+             sig.getInnermostGenericParams(),
              [&](Type argTy, GenericTypeParamType *paramTy) {
       // FIXME: I think there's a bug here with recursive generic types.
       if (isObjCGeneric && isConstrained(sig, paramTy))

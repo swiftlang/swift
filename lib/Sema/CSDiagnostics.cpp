@@ -200,7 +200,7 @@ const Requirement &RequirementFailure::getRequirement() const {
   // type requirement this conditional conformance belongs to.
   auto requirements = isConditional()
                           ? Conformance->getConditionalRequirements()
-                          : Signature->getRequirements();
+                          : Signature.getRequirements();
   return requirements[getRequirementIndex()];
 }
 

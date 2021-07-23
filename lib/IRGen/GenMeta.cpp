@@ -415,15 +415,15 @@ namespace {
       });
 
       // Pad the structure up to four bytes for the following requirements.
-      unsigned padding = (unsigned) -canSig->getGenericParams().size() & 3;
+      unsigned padding = (unsigned) -canSig.getGenericParams().size() & 3;
       for (unsigned i = 0; i < padding; ++i)
         B.addInt(IGM.Int8Ty, 0);
       
       // Fill in the parameter count.
-      assert(canSig->getGenericParams().size() <= UINT16_MAX
+      assert(canSig.getGenericParams().size() <= UINT16_MAX
              && "way too generic");
       B.fillPlaceholderWithInt(*GenericParamCount, IGM.Int16Ty,
-                               canSig->getGenericParams().size());
+                               canSig.getGenericParams().size());
     }
     
     void addGenericParameter(GenericParamKind kind,
@@ -442,7 +442,7 @@ namespace {
       auto metadata =
         irgen::addGenericRequirements(IGM, B,
                             asImpl().getGenericSignature(),
-                            asImpl().getGenericSignature()->getRequirements());
+                            asImpl().getGenericSignature().getRequirements());
 
       // Fill in the final requirement count.
       assert(metadata.NumRequirements <= UINT16_MAX

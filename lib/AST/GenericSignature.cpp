@@ -156,6 +156,30 @@ ASTContext &GenericSignature::getASTContext(
     return requirements.front().getFirstType()->getASTContext();
 }
 
+/// Retrieve the generic parameters.
+TypeArrayView<GenericTypeParamType> GenericSignature::getGenericParams() const {
+  return isNull()
+      ? TypeArrayView<GenericTypeParamType>{}
+      : getPointer()->getGenericParams();
+}
+
+/// Retrieve the innermost generic parameters.
+///
+/// Given a generic signature for a nested generic type, produce an
+/// array of the generic parameters for the innermost generic type.
+TypeArrayView<GenericTypeParamType> GenericSignature::getInnermostGenericParams() const {
+  return isNull()
+      ? TypeArrayView<GenericTypeParamType>{}
+      : getPointer()->getInnermostGenericParams();
+}
+
+/// Retrieve the requirements.
+ArrayRef<Requirement> GenericSignature::getRequirements() const {
+  return isNull()
+      ? ArrayRef<Requirement>{}
+      : getPointer()->getRequirements();
+}
+
 GenericSignatureBuilder *
 GenericSignatureImpl::getGenericSignatureBuilder() const {
   // The generic signature builder is associated with the canonical signature.
@@ -243,6 +267,12 @@ CanGenericSignature GenericSignatureImpl::getCanonicalSignature() const {
   // Otherwise, return the stored canonical signature.
   return CanGenericSignature(
       CanonicalSignatureOrASTContext.get<const GenericSignatureImpl *>());
+}
+
+GenericEnvironment *GenericSignature::getGenericEnvironment() const {
+  if (isNull())
+    return nullptr;
+  return getPointer()->getGenericEnvironment();
 }
 
 GenericEnvironment *GenericSignatureImpl::getGenericEnvironment() const {
@@ -1062,7 +1092,7 @@ CanType GenericSignatureImpl::getCanonicalTypeInContext(Type type) const {
 }
 
 ArrayRef<CanTypeWrapper<GenericTypeParamType>>
-CanGenericSignature::getGenericParams() const{
+CanGenericSignature::getGenericParams() const {
   auto params = getPointer()->getGenericParams().getOriginalArray();
   auto base = static_cast<const CanTypeWrapper<GenericTypeParamType>*>(
                                                               params.data());
@@ -1248,7 +1278,7 @@ unsigned GenericSignatureImpl::getGenericParamOrdinal(
   return GenericParamKey(param).findIndexIn(getGenericParams());
 }
 
-bool GenericSignatureImpl::hasTypeVariable() const {
+bool GenericSignature::hasTypeVariable() const {
   return GenericSignature::hasTypeVariable(getRequirements());
 }
 
@@ -1275,7 +1305,7 @@ bool GenericSignature::hasTypeVariable(ArrayRef<Requirement> requirements) {
 
 void GenericSignature::Profile(llvm::FoldingSetNodeID &id) const {
   return GenericSignature::Profile(id, getPointer()->getGenericParams(),
-                                   getPointer()->getRequirements());
+                                     getPointer()->getRequirements());
 }
 
 void GenericSignature::Profile(llvm::FoldingSetNodeID &ID,

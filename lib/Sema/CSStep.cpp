@@ -555,9 +555,9 @@ bool IsDeclRefinementOfRequest::evaluate(Evaluator &evaluator,
 
   // Substitute generic parameters with their archetypes in each generic function.
   Type substTypeA = typeA->substGenericArgs(
-      genericSignatureA->getGenericEnvironment()->getForwardingSubstitutionMap());
+      genericSignatureA.getGenericEnvironment()->getForwardingSubstitutionMap());
   Type substTypeB = typeB->substGenericArgs(
-      genericSignatureB->getGenericEnvironment()->getForwardingSubstitutionMap());
+      genericSignatureB.getGenericEnvironment()->getForwardingSubstitutionMap());
 
   // Attempt to substitute archetypes from the second type with archetypes in the
   // same structural position in the first type.
@@ -583,7 +583,7 @@ bool IsDeclRefinementOfRequest::evaluate(Evaluator &evaluator,
 
   auto result = TypeChecker::checkGenericArguments(
       declA->getDeclContext()->getParentModule(),
-      genericSignatureB->getRequirements(),
+      genericSignatureB.getRequirements(),
       QueryTypeSubstitutionMap{ substMap });
 
   if (result != RequirementCheckResult::Success)

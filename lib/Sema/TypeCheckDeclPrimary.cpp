@@ -2588,8 +2588,8 @@ public:
 
       llvm::errs() << "Canonical requirement signature: ";
       auto canRequirementSig =
-        CanGenericSignature::getCanonical(requirementsSig->getGenericParams(),
-                                          requirementsSig->getRequirements());
+        CanGenericSignature::getCanonical(requirementsSig.getGenericParams(),
+                                          requirementsSig.getRequirements());
       canRequirementSig->print(llvm::errs());
       llvm::errs() << "\n";
     }

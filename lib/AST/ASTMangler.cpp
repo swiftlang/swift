@@ -1498,7 +1498,7 @@ unsigned ASTMangler::appendBoundGenericArgs(DeclContext *dc,
     // If we are generic at this level, emit all of the replacements at
     // this level.
     if (genericContext->isGeneric()) {
-      auto genericParams = subs.getGenericSignature()->getGenericParams();
+      auto genericParams = subs.getGenericSignature().getGenericParams();
       unsigned depth = genericParams[currentGenericParamIdx]->getDepth();
       auto replacements = subs.getReplacementTypes();
       for (unsigned lastGenericParamIdx = genericParams.size();
@@ -2586,7 +2586,7 @@ bool ASTMangler::appendGenericSignature(GenericSignature sig,
   CurGenericSignature = canSig;
 
   unsigned initialParamDepth;
-  TypeArrayView<GenericTypeParamType> genericParams;
+  ArrayRef<CanTypeWrapper<GenericTypeParamType>> genericParams;
   ArrayRef<Requirement> requirements;
   SmallVector<Requirement, 4> requirementsBuffer;
   if (contextSig) {
@@ -2597,12 +2597,12 @@ bool ASTMangler::appendGenericSignature(GenericSignature sig,
     }
 
     // The signature depth starts above the depth of the context signature.
-    if (!contextSig->getGenericParams().empty()) {
-      initialParamDepth = contextSig->getGenericParams().back()->getDepth() + 1;
+    if (!contextSig.getGenericParams().empty()) {
+      initialParamDepth = contextSig.getGenericParams().back()->getDepth() + 1;
     }
 
     // Find the parameters at this depth (or greater).
-    genericParams = canSig->getGenericParams();
+    genericParams = canSig.getGenericParams();
     unsigned firstParam = genericParams.size();
     while (firstParam > 1 &&
            genericParams[firstParam-1]->getDepth() >= initialParamDepth)
@@ -2614,11 +2614,11 @@ bool ASTMangler::appendGenericSignature(GenericSignature sig,
     // it's better to mangle the complete canonical signature because we
     // have a special-case mangling for that.
     if (genericParams.empty() &&
-        contextSig->getGenericParams().size() == 1 &&
-        contextSig->getRequirements().empty()) {
+        contextSig.getGenericParams().size() == 1 &&
+        contextSig.getRequirements().empty()) {
       initialParamDepth = 0;
-      genericParams = canSig->getGenericParams();
-      requirements = canSig->getRequirements();
+      genericParams = canSig.getGenericParams();
+      requirements = canSig.getRequirements();
     } else {
       requirementsBuffer = canSig->requirementsNotSatisfiedBy(contextSig);
       requirements = requirementsBuffer;
@@ -2626,8 +2626,8 @@ bool ASTMangler::appendGenericSignature(GenericSignature sig,
   } else {
     // Use the complete canonical signature.
     initialParamDepth = 0;
-    genericParams = canSig->getGenericParams();
-    requirements = canSig->getRequirements();
+    genericParams = canSig.getGenericParams();
+    requirements = canSig.getRequirements();
   }
 
   if (genericParams.empty() && requirements.empty())
@@ -2708,7 +2708,7 @@ void ASTMangler::appendRequirement(const Requirement &reqt) {
 }
 
 void ASTMangler::appendGenericSignatureParts(
-                                     TypeArrayView<GenericTypeParamType> params,
+                                     ArrayRef<CanTypeWrapper<GenericTypeParamType>> params,
                                      unsigned initialParamDepth,
                                      ArrayRef<Requirement> requirements) {
   // Mangle the requirements.
@@ -3127,7 +3127,7 @@ void ASTMangler::appendDependentProtocolConformance(
       appendProtocolName(entry.second);
       auto index =
         conformanceRequirementIndex(entry,
-                                    CurGenericSignature->getRequirements());
+                                    CurGenericSignature.getRequirements());
       // This is never an unknown index and so must be adjusted by 2 per ABI.
       appendOperator("HD", Index(index + 2));
       continue;
@@ -3173,7 +3173,7 @@ void ASTMangler::appendAnyProtocolConformance(
     appendDependentProtocolConformance(path);
   } else if (auto opaqueType = conformingType->getAs<OpaqueTypeArchetypeType>()) {
     GenericSignature opaqueSignature = opaqueType->getBoundSignature();
-    GenericTypeParamType *opaqueTypeParam = opaqueSignature->getGenericParams().back();
+    GenericTypeParamType *opaqueTypeParam = opaqueSignature.getGenericParams().back();
     ConformanceAccessPath conformanceAccessPath =
         opaqueSignature->getConformanceAccessPath(opaqueTypeParam,
                                                   conformance.getAbstract());

@@ -1358,7 +1358,7 @@ void Serializer::writeASTBlockEntity(GenericSignature sig) {
   // have to encode them manually because one of them has a declaration with
   // module context (which can happen in SIL).
   bool mustEncodeParamsManually =
-      llvm::any_of(sig->getGenericParams(),
+      llvm::any_of(sig.getGenericParams(),
                    [](const GenericTypeParamType *paramTy) {
     auto *decl = paramTy->getDecl();
     return decl && decl->getDeclContext()->isModuleScopeContext();
@@ -1367,7 +1367,7 @@ void Serializer::writeASTBlockEntity(GenericSignature sig) {
   if (!mustEncodeParamsManually) {
     // Record the generic parameters.
     SmallVector<uint64_t, 4> rawParamIDs;
-    for (auto *paramTy : sig->getGenericParams()) {
+    for (auto *paramTy : sig.getGenericParams()) {
       rawParamIDs.push_back(addTypeRef(paramTy));
     }
 
@@ -1377,7 +1377,7 @@ void Serializer::writeASTBlockEntity(GenericSignature sig) {
   } else {
     // Record the generic parameters.
     SmallVector<uint64_t, 4> rawParamIDs;
-    for (auto *paramTy : sig->getGenericParams()) {
+    for (auto *paramTy : sig.getGenericParams()) {
       auto *decl = paramTy->getDecl();
 
       // For a full environment, add the name and canonicalize the param type.
@@ -1393,7 +1393,7 @@ void Serializer::writeASTBlockEntity(GenericSignature sig) {
                                           rawParamIDs);
   }
 
-  writeGenericRequirements(sig->getRequirements(), DeclTypeAbbrCodes);
+  writeGenericRequirements(sig.getRequirements(), DeclTypeAbbrCodes);
 }
 
 void Serializer::writeASTBlockEntity(const SubstitutionMap substitutions) {

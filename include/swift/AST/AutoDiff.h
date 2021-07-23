@@ -727,10 +727,7 @@ template <> struct DenseMapInfo<AutoDiffConfig> {
   }
 
   static unsigned getHashValue(const AutoDiffConfig &Val) {
-    auto canGenSig =
-        Val.derivativeGenericSignature
-            ? Val.derivativeGenericSignature->getCanonicalSignature()
-            : nullptr;
+    auto canGenSig = Val.derivativeGenericSignature.getCanonicalSignature();
     unsigned combinedHash = hash_combine(
         ~1U, DenseMapInfo<void *>::getHashValue(Val.parameterIndices),
         DenseMapInfo<void *>::getHashValue(Val.resultIndices),
@@ -739,14 +736,8 @@ template <> struct DenseMapInfo<AutoDiffConfig> {
   }
 
   static bool isEqual(const AutoDiffConfig &LHS, const AutoDiffConfig &RHS) {
-    auto lhsCanGenSig =
-        LHS.derivativeGenericSignature
-            ? LHS.derivativeGenericSignature->getCanonicalSignature()
-            : nullptr;
-    auto rhsCanGenSig =
-        RHS.derivativeGenericSignature
-            ? RHS.derivativeGenericSignature->getCanonicalSignature()
-            : nullptr;
+    auto lhsCanGenSig = LHS.derivativeGenericSignature.getCanonicalSignature();
+    auto rhsCanGenSig = RHS.derivativeGenericSignature.getCanonicalSignature();
     return LHS.parameterIndices == RHS.parameterIndices &&
            LHS.resultIndices == RHS.resultIndices &&
            DenseMapInfo<GenericSignature>::isEqual(lhsCanGenSig, rhsCanGenSig);
