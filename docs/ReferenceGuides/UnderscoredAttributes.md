@@ -437,8 +437,9 @@ about the semantics results in undefined behavior.
 
 Shows underscored protocols from the standard library in the generated interface.
 
-By default, SourceKit hides underscored protocols from the generated swiftinterface,
-but this attribute can be used to override that behavior.
+By default, SourceKit hides underscored protocols from the generated
+swiftinterface (for all modules, not just the standard library), but this
+attribute can be used to override that behavior for the standard library.
 
 ## `@_silgen_name("cName")`
 
