@@ -159,6 +159,37 @@ private:
     llvm_unreachable("Unimplemented case for closure body");
   }
 
+  void visitIfStmt(IfStmt *ifStmt) {
+    if (!isSupportedMultiStatementClosure())
+      llvm_unreachable("Unsupported statement: If");
+
+    SmallVector<Constraint *, 4> elements;
+
+    // Condition
+    {
+      auto *condLoc =
+          cs.getConstraintLocator(locator, ConstraintLocator::Condition);
+      elements.push_back(Constraint::createClosureBodyElement(
+          cs, ifStmt->getCondPointer(), condLoc));
+    }
+
+    // Then Branch
+    auto *thenLoc = cs.getConstraintLocator(
+        locator, LocatorPathElt::TernaryBranch(/*then=*/true));
+    elements.push_back(Constraint::createClosureBodyElement(
+        cs, ifStmt->getThenStmt(), thenLoc));
+
+    if (auto *elseStmt = ifStmt->getElseStmt()) {
+      auto *elseLoc = cs.getConstraintLocator(
+          locator, LocatorPathElt::TernaryBranch(/*then=*/false));
+      elements.push_back(
+          Constraint::createClosureBodyElement(cs, elseStmt, elseLoc));
+    }
+
+    cs.addUnsolvedConstraint(Constraint::createConjunction(
+        cs, elements, /*isIsolated=*/false, locator));
+  }
+
   void visitBraceStmt(BraceStmt *braceStmt) {
     if (isSupportedMultiStatementClosure()) {
       ASTNode parent;
@@ -221,7 +252,6 @@ private:
   }
   UNSUPPORTED_STMT(Yield)
   UNSUPPORTED_STMT(Defer)
-  UNSUPPORTED_STMT(If)
   UNSUPPORTED_STMT(Guard)
   UNSUPPORTED_STMT(While)
   UNSUPPORTED_STMT(Do)
@@ -352,6 +382,23 @@ private:
     TypeChecker::typeCheckDecl(decl);
   }
 
+  ASTNode visitIfStmt(IfStmt *ifStmt) {
+    // Rewrite the condition.
+    if (auto condition = rewriteTarget(
+            SolutionApplicationTarget(ifStmt->getCond(), closure)))
+      ifStmt->setCond(*condition->getAsStmtCondition());
+    else
+      hadError = true;
+
+    ifStmt->setThenStmt(visit(ifStmt->getThenStmt()).get<Stmt *>());
+
+    if (auto elseStmt = ifStmt->getElseStmt()) {
+      ifStmt->setElseStmt(visit(elseStmt).get<Stmt *>());
+    }
+
+    return ifStmt;
+  }
+
   ASTNode visitBraceStmt(BraceStmt *braceStmt) {
     for (auto &node : braceStmt->getElements()) {
       if (auto expr = node.dyn_cast<Expr *>()) {
@@ -441,7 +488,6 @@ private:
   }
   UNSUPPORTED_STMT(Yield)
   UNSUPPORTED_STMT(Defer)
-  UNSUPPORTED_STMT(If)
   UNSUPPORTED_STMT(Guard)
   UNSUPPORTED_STMT(While)
   UNSUPPORTED_STMT(Do)
