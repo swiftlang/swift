@@ -177,6 +177,14 @@ public:
   /// if invalid.
   void addCapture(CapturedValue capture) {
     auto VD = capture.getDecl();
+    
+    if (auto var = dyn_cast<VarDecl>(VD)) {
+      // `async let` variables cannot currently be captured.
+      if (var->isAsyncLet()) {
+        Context.Diags.diagnose(capture.getLoc(), diag::capture_async_let_not_supported);
+        return;
+      }
+    }
 
     // Check to see if we already have an entry for this decl.
     unsigned &entryNumber = captureEntryNumber[VD];
