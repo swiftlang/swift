@@ -942,7 +942,7 @@ AsyncTask *swift::swift_continuation_init(ContinuationAsyncContext *context,
   // Set the current executor as the target executor unless there's
   // an executor override.
   if (!flags.hasExecutorOverride())
-    context->ResumeToExecutor = swift_task_getCurrentExecutor();
+    context->ResumeToExecutor = ExecutorRef::generic();
 
   // We can initialize this with a relaxed store because resumption
   // must happen-after this call.
