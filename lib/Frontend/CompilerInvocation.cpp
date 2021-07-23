@@ -1836,6 +1836,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
         runtimeCompatibilityVersion = llvm::VersionTuple(5, 0);
       } else if (version.equals("5.1")) {
         runtimeCompatibilityVersion = llvm::VersionTuple(5, 1);
+      } else if (version.equals("5.5")) {
+        runtimeCompatibilityVersion = llvm::VersionTuple(5, 5);
       } else {
         Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                        versionArg->getAsString(Args), version);
@@ -1855,6 +1857,12 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   if (!Args.hasArg(options::
           OPT_disable_autolinking_runtime_compatibility_dynamic_replacements)) {
     Opts.AutolinkRuntimeCompatibilityDynamicReplacementLibraryVersion =
+        getRuntimeCompatVersion();
+  }
+
+  if (!Args.hasArg(
+          options::OPT_disable_autolinking_runtime_compatibility_concurrency)) {
+    Opts.AutolinkRuntimeCompatibilityConcurrencyLibraryVersion =
         getRuntimeCompatVersion();
   }
 
