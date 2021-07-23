@@ -1,4 +1,5 @@
 // RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t -enable-experimental-concurrency
+// REQUIRES: concurrency
 
 // SAFE_NOTREC: Begin completions, 2 items
 // SAFE_NOTREC-DAG: Keyword[self]/CurrNominal:          self[#SafelyIsolatedCls#];
