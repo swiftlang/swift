@@ -13,6 +13,12 @@
 import Swift
 @_implementationOnly import _SwiftConcurrencyShims
 
+@available(SwiftStdlib 5.5, *)
+@_silgen_name("swift_job_run")
+@usableFromInline
+internal func _swiftJobRun(_ job: UnownedJob,
+                           _ executor: UnownedSerialExecutor) -> ()
+
 /// A unit of scheduleable work.
 ///
 /// Unless you're implementing a scheduler,
@@ -21,6 +27,12 @@ import Swift
 @frozen
 public struct UnownedJob {
   private var context: Builtin.Job
+
+  @_alwaysEmitIntoClient
+  @inlinable
+  public func _runSynchronously(on executor: UnownedSerialExecutor) {
+      _swiftJobRun(self, executor)
+  }
 }
 
 /// A mechanism to interface
