@@ -50,6 +50,18 @@ public func debugLog(_ s: String) {
 @available(SwiftStdlib 5.5, *)
 @main
 struct Runner {
+    @MainActor
+    @inline(never)
+    static func withExclusiveAccessAsync<T, U>(to x: inout T, f: (inout T) async -> U) async -> U {
+        await f(&x)
+    }
+
+    @MainActor
+    @inline(never)
+    static func withExclusiveAccess<T, U>(to x: inout T, f: (inout T) -> U) -> U {
+        f(&x)
+    }
+
     @inline(never)
     @MainActor
     static func doSomething() async { }
@@ -295,8 +307,8 @@ struct Runner {
             // First access begins here.
             await callCallee1()
             useGlobal(&global1) // We should not crash here since we cleaned up
-                                // the access in callCallee1 after we returned
-                                // from the await there.
+            // the access in callCallee1 after we returned
+            // from the await there.
             debugLog("==> Exit Main")
         }
 
@@ -338,9 +350,292 @@ struct Runner {
             // First access begins here.
             await callCallee1()
             useGlobal(&global1) // We should not crash here since we cleaned up
-                                // the access in callCallee1 after we returned
-                                // from the await there.
+            // the access in callCallee1 after we returned
+            // from the await there.
             debugLog("==> Exit Main")
+        }
+
+        // These are additional tests that used to be FileChecked but FileCheck
+        // was too hard to use in a concurrent context.
+        exclusivityTests.test("case1") { @MainActor in
+            @inline(never)
+            @Sendable func callee2(_ x: inout Int, _ y: inout Int, _ z: inout Int) -> Void {
+                debugLog("==> Enter callee2")
+                debugLog("==> Exit callee2")
+            }
+            
+            // We add an inline never here to make sure that we do not eliminate
+            // the dynamic access after inlining.
+            @MainActor
+            @inline(never)
+            func callee1() async -> () {
+                debugLog("==> Enter callee1")
+                let handle = Task { @MainActor in
+                    debugLog("==> Enter callee1 Closure")
+                    
+                    // These accesses end before we await in the task.
+                    do {
+                        callee2(&global1, &global2, &global3)
+                    }
+                    let handle2 = Task { @MainActor in
+                        debugLog("==> Enter handle2!")
+                        debugLog("==> Exit handle2!")
+                    }
+                    await handle2.value
+                    debugLog("==> Exit callee1 Closure")
+                }
+                await handle.value
+                debugLog("==> Exit callee1")
+            }
+            
+            debugLog("==> Enter 'testCase1'")
+            await callee1()
+            debugLog("==> Exit 'testCase1'")
+        }
+
+        // Case 2: (F, F, T). In case 2, our task does not start with a live access
+        // and nothing from the outside synchronous context, but does pop with a new
+        // access.
+        //
+        // We use a suspend point and a withExclusiveAccessAsync(to:) to test this.
+        exclusivityTests.test("case2.filecheck.nocrash") { @MainActor in
+            debugLog("==> Enter 'testCase2'")
+
+            let handle = Task { @MainActor in
+                debugLog("==> Inner Handle")
+                await withExclusiveAccessAsync(to: &global1) { @MainActor (x: inout Int) async -> Void in
+                    let innerTaskHandle = Task { @MainActor in
+                        // Different task, shouldn't crash.
+                        withExclusiveAccess(to: &global1) { _ in
+                            debugLog("==> No crash!")
+                        }
+                        debugLog("==> End Inner Task Handle")
+                    }
+                    // This will cause us to serialize the access to global1. If
+                    // we had an access here, we would crash.
+                    await innerTaskHandle.value
+                    debugLog("==> After")
+                }
+                // Accessis over. We shouldn't crash here.
+                withExclusiveAccess(to: &global1) { _ in
+                    debugLog("==> No crash!")
+                }
+                debugLog("==> Inner Handle: After exclusive access")
+            }
+
+            await handle.value
+            debugLog("==> After exclusive access")
+            let handle2 = Task { @MainActor in
+                debugLog("==> Enter handle2!")
+                debugLog("==> Exit handle2!")
+            }
+            await handle2.value
+            debugLog("==> Exit 'testCase2'")
+        }
+
+        exclusivityTests.test("case2.filecheck.crash") { @MainActor in
+            expectCrashLater(withMessage: "Fatal access conflict detected")
+            debugLog("==> Enter 'testCase2'")
+
+            let handle = Task { @MainActor in
+                debugLog("==> Inner Handle")
+                await withExclusiveAccessAsync(to: &global1) { @MainActor (x: inout Int) async -> Void in
+                    let innerTaskHandle = Task { @MainActor in
+                        debugLog("==> End Inner Task Handle")
+                    }
+                    await innerTaskHandle.value
+                    // We will crash here if we properly brought back in the
+                    // access to global1 despite running code on a different
+                    // task.
+                    withExclusiveAccess(to: &global1) { _ in
+                        debugLog("==> Got a crash!")
+                    }
+                    debugLog("==> After")
+                }
+                debugLog("==> Inner Handle: After exclusive access")
+            }
+
+            await handle.value
+            debugLog("==> After exclusive access")
+            let handle2 = Task { @MainActor in
+                debugLog("==> Enter handle2!")
+                debugLog("==> Exit handle2!")
+            }
+            await handle2.value
+            debugLog("==> Exit 'testCase2'")
+        }
+
+        // Case 5: (T,F,F). To test case 5, we use with exclusive access to to
+        // create an exclusivity scope that goes over a suspension point. We are
+        // interesting in the case where we return after the suspension point. That
+        // push/pop is going to have our outer task bring in state and end it.
+        //
+        // CHECK-LABEL: ==> Enter 'testCase5'
+        // CHECK: ==> Task: [[TASK:0x[0-9a-f]+]]
+        // CHECK: Inserting new access: [[LLNODE:0x[a-z0-9]+]]
+        // CHECK-NEXT: Tracking!
+        // CHECK-NEXT: Access. Pointer: [[ACCESS:0x[a-z0-9]+]]
+        // CHECK: Exiting Thread Local Context. Before Swizzle. Task: [[TASK]]
+        // CHECK-NEXT: SwiftTaskThreadLocalContext: (FirstAccess,LastAccess): (0x0, 0x0)
+        // CHECK-NEXT: Access. Pointer: [[ACCESS]]. PC:
+        // CHECK: Exiting Thread Local Context. After Swizzle. Task: [[TASK]]
+        // CHECK_NEXT: SwiftTaskThreadLocalContext: (FirstAccess,LastAccess): ([[LLNODE]], [[LLNODE]])
+        // CHECK_NEXT: No Accesses.
+        //
+        // CHECK-NOT: Removing access:
+        // CHECK: ==> End Inner Task Handle
+        // CHECK: ==> After
+        // CHECK: Removing access: [[LLNODE]]
+        // CHECK: ==> After exclusive access
+        // CHECK: Exiting Thread Local Context. Before Swizzle. Task: [[TASK]]
+        // CHECK-NEXT:         SwiftTaskThreadLocalContext: (FirstAccess,LastAccess): (0x0, 0x0)
+        // CHECK-NEXT:         No Accesses.
+        // CHECK: Exiting Thread Local Context. After Swizzle. Task: [[TASK]]
+        // CHECK-NEXT:         SwiftTaskThreadLocalContext: (FirstAccess,LastAccess): (0x0, 0x0)
+        // CHECK-NEXT:         No Accesses.
+        //
+        // CHECK: ==> Exit 'testCase5'
+        exclusivityTests.test("case5.filecheck") { @MainActor in
+            debugLog("==> Enter 'testCase5'")
+
+            let outerHandle = Task { @MainActor in
+                await withExclusiveAccessAsync(to: &global1) { @MainActor (x: inout Int) async -> Void in
+                    let innerTaskHandle = Task { @MainActor in
+                        debugLog("==> End Inner Task Handle")
+                    }
+                    await innerTaskHandle.value
+                    debugLog("==> After")
+                }
+                debugLog("==> After exclusive access")
+                let handle2 = Task { @MainActor in
+                    debugLog("==> Enter handle2!")
+                    debugLog("==> Exit handle2!")
+                }
+                await handle2.value
+            }
+            await outerHandle.value
+            debugLog("==> Exit 'testCase5'")
+        }
+
+        exclusivityTests.test("case5.filecheck.crash") { @MainActor in
+            expectCrashLater(withMessage: "Fatal access conflict detected")
+            debugLog("==> Enter 'testCase5'")
+
+            let outerHandle = Task { @MainActor in
+                await withExclusiveAccessAsync(to: &global1) { @MainActor (x: inout Int) async -> Void in
+                    let innerTaskHandle = Task { @MainActor in
+                        debugLog("==> End Inner Task Handle")
+                    }
+                    await innerTaskHandle.value
+                    debugLog("==> After")
+                    withExclusiveAccess(to: &global1) { _ in
+                        debugLog("==> Crash here")
+                    }
+                }
+                debugLog("==> After exclusive access")
+                let handle2 = Task { @MainActor in
+                    debugLog("==> Enter handle2!")
+                    debugLog("==> Exit handle2!")
+                }
+                await handle2.value
+            }
+            await outerHandle.value
+            debugLog("==> Exit 'testCase5'")
+        }
+
+        // Case 6: (T, F, T). In case 6, our task starts with live accesses and is
+        // popped with live accesses. There are no sync accesses.
+        //
+        // We test this by looking at the behavior of the runtime after we
+        // finish executing handle2. In this case, we first check that things
+        // just work normally and as a 2nd case perform a conflicting access to
+        // make sure we crash.
+        exclusivityTests.test("case6.filecheck") { @MainActor in
+            let outerHandle = Task { @MainActor in
+                let callee2 = { @MainActor (_ x: inout Int) -> Void in
+                    debugLog("==> Enter callee2")
+                    debugLog("==> Exit callee2")
+                }
+
+                // We add an inline never here to make sure that we do not eliminate
+                // the dynamic access after inlining.
+                @MainActor
+                @inline(never)
+                func callee1(_ x: inout Int) async -> () {
+                    debugLog("==> Enter callee1")
+                    // This task is what prevents this example from crashing.
+                    let handle = Task { @MainActor in
+                        debugLog("==> Enter callee1 Closure")
+                        // Second access. Different Task so it is ok.
+                        await withExclusiveAccessAsync(to: &global1) {
+                            await callee2(&$0)
+                        }
+                        debugLog("==> Exit callee1 Closure")
+                    }
+                    await handle.value
+                    debugLog("==> callee1 after first await")
+                    // Force an await here so we can see that we properly swizzle.
+                    let handle2 = Task { @MainActor in
+                        debugLog("==> Enter handle2!")
+                        debugLog("==> Exit handle2!")
+                    }
+                    await handle2.value
+                    debugLog("==> Exit callee1")
+                }
+
+                // First access begins here.
+                await callee1(&global1)
+            }
+            debugLog("==> Enter 'testCase6'")
+            await outerHandle.value
+            debugLog("==> Exit 'testCase6'")
+        }
+
+        exclusivityTests.test("case6.filecheck.crash") { @MainActor in
+            expectCrashLater(withMessage: "Fatal access conflict detected")
+            let outerHandle = Task { @MainActor in
+                let callee2 = { @MainActor (_ x: inout Int) -> Void in
+                    debugLog("==> Enter callee2")
+                    debugLog("==> Exit callee2")
+                }
+
+                // We add an inline never here to make sure that we do not eliminate
+                // the dynamic access after inlining.
+                @MainActor
+                @inline(never)
+                func callee1(_ x: inout Int) async -> () {
+                    debugLog("==> Enter callee1")
+                    // This task is what prevents this example from crashing.
+                    let handle = Task { @MainActor in
+                        debugLog("==> Enter callee1 Closure")
+                        // Second access. Different Task so it is ok.
+                        await withExclusiveAccessAsync(to: &global1) {
+                            await callee2(&$0)
+                        }
+                        debugLog("==> Exit callee1 Closure")
+                    }
+                    await handle.value
+                    debugLog("==> callee1 after first await")
+                    // Force an await here so we can see that we properly swizzle.
+                    let handle2 = Task { @MainActor in
+                        debugLog("==> Enter handle2!")
+                        debugLog("==> Exit handle2!")
+                    }
+                    await handle2.value
+                    // Make sure we brought back in the access to x so we crash
+                    // here.
+                    withExclusiveAccess(to: &global1) { _ in
+                        debugLog("==> Will crash here!")
+                    }
+                    debugLog("==> Exit callee1")
+                }
+
+                // First access begins here.
+                await callee1(&global1)
+            }
+            debugLog("==> Enter 'testCase6'")
+            await outerHandle.value
+            debugLog("==> Exit 'testCase6'")
         }
 
         await runAllTestsAsync()
