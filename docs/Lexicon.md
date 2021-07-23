@@ -67,6 +67,17 @@ and the combination of module path + access path is an "import path".)
 
 See `ImportPath` and the types nested inside it for more on this.
 
+## access pattern
+
+Defines how some particular storage (a property or a subscript) is accessed.
+For example, when accessing a property `let y = a.x`, the compiler could potentially
+use `get` accessor or the `_read` accessor. Similarly, for a modification like
+`a.x += 1`, the compiler could use `get` + `set` or it could use `_modify`.
+
+The access pattern can differ for call-sites which can/cannot see the underlying
+implementation. Clients which cannot see the underlying implementation are said
+to use the conservative access pattern.
+
 ## archetype
 
 A placeholder for a generic parameter or an associated type within a

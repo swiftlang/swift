@@ -41,6 +41,13 @@ function which did not have one previously does not break ABI.
 
 ## `@_borrowed`
 
+Indicates that the [conservative access pattern](/docs/Lexicon.md#access-pattern)
+for some storage (a subscript or a property) should use the `_read` accessor
+instead of `get`.
+
+For more details, see the forum post on
+[Value ownership when reading from a storage declaration](https://forums.swift.org/t/value-ownership-when-reading-from-a-storage-declaration/15076).
+
 ## `@_cdecl("cName")`
 
 Similar to `@_silgen_name` but uses the C calling convention.
