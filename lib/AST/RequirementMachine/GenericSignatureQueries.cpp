@@ -489,7 +489,7 @@ RequirementMachine::getConformanceAccessPath(Type type,
     }
   }
 
-  // We enumerate conformance access paths in lexshort order until we find the
+  // We enumerate conformance access paths in shortlex order until we find the
   // path whose corresponding type canonicalizes to the one we are looking for.
   while (true) {
     auto found = ConformanceAccessPaths.find(
@@ -532,7 +532,7 @@ RequirementMachine::getConformanceAccessPath(Type type,
 
         // If we've already seen a path for this conformance, skip it and
         // don't add it to the buffer. Note that because we iterate over
-        // conformance access paths in lexshort order, the existing
+        // conformance access paths in shortlex order, the existing
         // conformance access path is shorter than the one we found just now.
         if (ConformanceAccessPaths.count(
                 std::make_pair(nextCanType, nextProto)))

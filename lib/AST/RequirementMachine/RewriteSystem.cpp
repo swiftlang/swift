@@ -784,7 +784,7 @@ ArrayRef<const ProtocolDecl *> MutableTerm::getRootProtocols() const {
   llvm_unreachable("Bad root symbol");
 }
 
-/// Linear order on terms.
+/// Shortlex order on terms.
 ///
 /// First we compare length, then perform a lexicographic comparison
 /// on symbols if the two terms have the same length.
