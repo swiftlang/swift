@@ -495,6 +495,13 @@ doing a textual search.
 
 ## `@_staticInitializeObjCMetadata`
 
+Indicates that a static initializer should be emitted to register the
+Objective-C metadata when the image is loaded, rather than on first use of the
+Objective-C metadata.
+
+This attribute is inferred for `NSCoding` classes that won't
+have static Objective-C metadata or have an `@NSKeyedArchiveLegacy` attribute.
+
 ## `@_transparent`
 
 Marks a function to be "macro-like", i.e., it is guaranteed to be inlined
