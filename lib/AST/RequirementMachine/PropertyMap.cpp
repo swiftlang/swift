@@ -1,4 +1,4 @@
-//===--- EquivalenceClassMap.cpp - Facts about generic parameters ---------===//
+//===--- PropertyMap.cpp - Collects properties of type parameters ---------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -41,8 +41,8 @@
 // T, then we look for rules of the form V.[p] => V' where V is fully reduced,
 // and a suffix of T.
 //
-// This is the idea behind the equivalence class map. We collect all rules of the
-// form V.[p] => V' into a multi-map keyed by V. Then given an arbitrary type T,
+// This is the idea behind the property map. We collect all rules of the form
+// V.[p] => V into a multi-map keyed by V. Then given an arbitrary type T,
 // we can reduce it and look up successive suffixes to find all properties [p]
 // satisfied by T.
 //
@@ -58,7 +58,7 @@
 #include <algorithm>
 #include <vector>
 
-#include "EquivalenceClassMap.h"
+#include "PropertyMap.h"
 
 using namespace swift;
 using namespace rewriting;
@@ -68,7 +68,7 @@ using namespace rewriting;
 /// the latter drops any protocols to which the superclass requirement
 /// conforms to concretely.
 llvm::TinyPtrVector<const ProtocolDecl *>
-EquivalenceClass::getConformsToExcludingSuperclassConformances() const {
+PropertyBag::getConformsToExcludingSuperclassConformances() const {
   llvm::TinyPtrVector<const ProtocolDecl *> result;
 
   if (SuperclassConformances.empty()) {
@@ -98,7 +98,7 @@ EquivalenceClass::getConformsToExcludingSuperclassConformances() const {
   return result;
 }
 
-void EquivalenceClass::dump(llvm::raw_ostream &out) const {
+void PropertyBag::dump(llvm::raw_ostream &out) const {
   out << Key << " => {";
 
   if (!ConformsTo.empty()) {
@@ -164,10 +164,10 @@ static Type getTypeFromSubstitutionSchema(Type schema,
   });
 }
 
-/// Get the superclass bound of this equivalence class.
+/// Get the superclass bound for the term represented by this property bag.
 ///
-/// Asserts if this equivalence class does not have a superclass bound.
-Type EquivalenceClass::getSuperclassBound(
+/// Asserts if this property bag does not have a superclass bound.
+Type PropertyBag::getSuperclassBound(
     TypeArrayView<GenericTypeParamType> genericParams,
     const ProtocolGraph &protos,
     RewriteContext &ctx) const {
@@ -178,10 +178,10 @@ Type EquivalenceClass::getSuperclassBound(
                                        ctx);
 }
 
-/// Get the concrete type of this equivalence class.
+/// Get the concrete type of the term represented by this property bag.
 ///
-/// Asserts if this equivalence class is not concrete.
-Type EquivalenceClass::getConcreteType(
+/// Asserts if this property bag is not concrete.
+Type PropertyBag::getConcreteType(
     TypeArrayView<GenericTypeParamType> genericParams,
     const ProtocolGraph &protos,
     RewriteContext &ctx) const {
@@ -311,7 +311,7 @@ remapConcreteSubstitutionSchema(CanType concreteType,
 ///   T.[concrete: Foo<τ_0_0, τ_0_1, String> with {X.Y, Z}]
 ///   T.[concrete: Foo<Int, τ_0_0, τ_0_1> with {A.B, W}]
 ///
-/// The two concrete type symbols will be added to the equivalence class of 'T',
+/// The two concrete type symbols will be added to the property bag of 'T',
 /// and we will eventually end up in this method, where we will generate three
 /// induced rules:
 ///
@@ -438,7 +438,7 @@ static bool unifyConcreteTypes(
   return false;
 }
 
-void EquivalenceClass::addProperty(
+void PropertyBag::addProperty(
     Symbol property, RewriteContext &ctx,
     SmallVectorImpl<std::pair<MutableTerm, MutableTerm>> &inducedRules,
     bool debug) {
@@ -494,10 +494,10 @@ void EquivalenceClass::addProperty(
   llvm_unreachable("Bad symbol kind");
 }
 
-void EquivalenceClass::copyPropertiesFrom(const EquivalenceClass *next,
-                                          RewriteContext &ctx) {
-  // If this is the equivalence class of T and 'next' is the
-  // equivalence class of V, then T := UV for some non-empty U.
+void PropertyBag::copyPropertiesFrom(const PropertyBag *next,
+                                     RewriteContext &ctx) {
+  // If this is the property bag of T and 'next' is the
+  // property bag of V, then T := UV for some non-empty U.
   int prefixLength = Key.size() - next->Key.size();
   assert(prefixLength > 0);
   assert(std::equal(Key.begin() + prefixLength, Key.end(),
@@ -508,8 +508,8 @@ void EquivalenceClass::copyPropertiesFrom(const EquivalenceClass *next,
   ConformsTo = next->ConformsTo;
   Layout = next->Layout;
 
-  // If the equivalence class of V has superclass or concrete type
-  // substitutions {X1, ..., Xn}, then the equivalence class of
+  // If the property bag of V has superclass or concrete type
+  // substitutions {X1, ..., Xn}, then the property bag of
   // T := UV should have substitutions {UX1, ..., UXn}.
   MutableTerm prefix(Key.begin(), Key.begin() + prefixLength);
 
@@ -524,16 +524,16 @@ void EquivalenceClass::copyPropertiesFrom(const EquivalenceClass *next,
   }
 }
 
-/// Look for an equivalence class corresponding to the given key, returning nullptr
+/// Look for an property bag corresponding to the given key, returning nullptr
 /// if one has not been recorded.
-EquivalenceClass *
-EquivalenceClassMap::getEquivalenceClassIfPresent(const MutableTerm &key) const {
+PropertyBag *
+PropertyMap::getPropertiesIfPresent(const MutableTerm &key) const {
   assert(!key.empty());
  
-  for (const auto &equivClass : Map) {
-    int compare = equivClass->getKey().compare(key, Protos);
+  for (const auto &props : Map) {
+    int compare = props->getKey().compare(key, Protos);
     if (compare == 0)
-      return equivClass.get();
+      return props.get();
     if (compare > 0)
       return nullptr;
   }
@@ -541,13 +541,13 @@ EquivalenceClassMap::getEquivalenceClassIfPresent(const MutableTerm &key) const 
   return nullptr;
 }
 
-/// Look for an equivalence class corresponding to a suffix of the given key.
+/// Look for an property bag corresponding to a suffix of the given key.
 ///
 /// Returns nullptr if no information is known about this key.
-EquivalenceClass *
-EquivalenceClassMap::lookUpEquivalenceClass(const MutableTerm &key) const {
-  if (auto *equivClass = getEquivalenceClassIfPresent(key))
-    return equivClass;
+PropertyBag *
+PropertyMap::lookUpProperties(const MutableTerm &key) const {
+  if (auto *props = getPropertiesIfPresent(key))
+    return props;
 
   auto begin = key.begin() + 1;
   auto end = key.end();
@@ -555,7 +555,7 @@ EquivalenceClassMap::lookUpEquivalenceClass(const MutableTerm &key) const {
   while (begin != end) {
     MutableTerm suffix(begin, end);
 
-    if (auto *suffixClass = getEquivalenceClassIfPresent(suffix))
+    if (auto *suffixClass = getPropertiesIfPresent(suffix))
       return suffixClass;
 
     ++begin;
@@ -564,12 +564,12 @@ EquivalenceClassMap::lookUpEquivalenceClass(const MutableTerm &key) const {
   return nullptr;
 }
 
-/// Look for an equivalence class corresponding to the given key, creating a new
-/// equivalence class if necessary.
+/// Look for an property bag corresponding to the given key, creating a new
+/// property bag if necessary.
 ///
 /// This must be called in monotonically non-decreasing key order.
-EquivalenceClass *
-EquivalenceClassMap::getOrCreateEquivalenceClass(const MutableTerm &key) {
+PropertyBag *
+PropertyMap::getOrCreateProperties(const MutableTerm &key) {
   assert(!key.empty());
 
   if (!Map.empty()) {
@@ -578,13 +578,13 @@ EquivalenceClassMap::getOrCreateEquivalenceClass(const MutableTerm &key) {
     if (compare == 0)
       return lastEquivClass.get();
 
-    assert(compare < 0 && "Must record equivalence classes in sorted order");
+    assert(compare < 0 && "Must record property bags in sorted order");
   }
 
-  auto *equivClass = new EquivalenceClass(key);
+  auto *props = new PropertyBag(key);
 
-  // Look for the longest suffix of the key that has an equivalence class,
-  // recording it as the next equivalence class if we find one.
+  // Look for the longest suffix of the key that has an property bag,
+  // recording it as the next property bag if we find one.
   //
   // For example, if our rewrite system contains the following three rules:
   //
@@ -592,121 +592,121 @@ EquivalenceClassMap::getOrCreateEquivalenceClass(const MutableTerm &key) {
   //   B.A.[Q] => B.A
   //   C.A.[R] => C.A
   //
-  // Then we have three equivalence classes:
+  // Then we have three property bags:
   //
   //   A => { [P] }
   //   B.A => { [Q] }
   //   C.A => { [R] }
   //
-  // The next equivalence class of both 'B.A' and 'C.A' is 'A'; conceptually,
+  // The next property bag of both 'B.A' and 'C.A' is 'A'; conceptually,
   // the set of properties satisfied by 'B.A' is a superset of the properties
   // satisfied by 'A'; analogously for 'C.A'.
   //
   // Since 'A' has no proper suffix with additional properties, the next
-  // equivalence class of 'A' is nullptr.
-  if (auto *next = lookUpEquivalenceClass(key))
-    equivClass->copyPropertiesFrom(next, Context);
+  // property bag of 'A' is nullptr.
+  if (auto *next = lookUpProperties(key))
+    props->copyPropertiesFrom(next, Context);
 
-  Map.emplace_back(equivClass);
+  Map.emplace_back(props);
 
-  return equivClass;
+  return props;
 }
 
-void EquivalenceClassMap::clear() {
+void PropertyMap::clear() {
   Map.clear();
   ConcreteTypeInDomainMap.clear();
 }
 
 /// Record a protocol conformance, layout or superclass constraint on the given
 /// key. Must be called in monotonically non-decreasing key order.
-void EquivalenceClassMap::addProperty(
+void PropertyMap::addProperty(
     const MutableTerm &key, Symbol property,
     SmallVectorImpl<std::pair<MutableTerm, MutableTerm>> &inducedRules) {
   assert(property.isProperty());
-  auto *equivClass = getOrCreateEquivalenceClass(key);
-  equivClass->addProperty(property, Context,
-                          inducedRules, DebugConcreteUnification);
+  auto *props = getOrCreateProperties(key);
+  props->addProperty(property, Context,
+                     inducedRules, DebugConcreteUnification);
 }
 
 /// For each fully-concrete type, find the shortest term having that concrete type.
 /// This is later used by computeConstraintTermForTypeWitness().
-void EquivalenceClassMap::computeConcreteTypeInDomainMap() {
-  for (const auto &equivClass : Map) {
-    if (!equivClass->isConcreteType())
+void PropertyMap::computeConcreteTypeInDomainMap() {
+  for (const auto &props : Map) {
+    if (!props->isConcreteType())
       continue;
 
-    auto concreteType = equivClass->ConcreteType->getConcreteType();
+    auto concreteType = props->ConcreteType->getConcreteType();
     if (concreteType->hasTypeParameter())
       continue;
 
-    assert(equivClass->ConcreteType->getSubstitutions().empty());
+    assert(props->ConcreteType->getSubstitutions().empty());
 
-    auto domain = equivClass->Key.getRootProtocols();
+    auto domain = props->Key.getRootProtocols();
     auto concreteTypeKey = std::make_pair(concreteType, domain);
 
     auto found = ConcreteTypeInDomainMap.find(concreteTypeKey);
     if (found != ConcreteTypeInDomainMap.end()) {
       const auto &otherTerm = found->second;
-      assert(equivClass->Key.compare(otherTerm, Protos) > 0 &&
+      assert(props->Key.compare(otherTerm, Protos) > 0 &&
              "Out-of-order keys?");
       continue;
     }
 
     auto inserted = ConcreteTypeInDomainMap.insert(
-        std::make_pair(concreteTypeKey, equivClass->Key));
+        std::make_pair(concreteTypeKey, props->Key));
     assert(inserted.second);
     (void) inserted;
   }
 }
 
-void EquivalenceClassMap::concretizeNestedTypesFromConcreteParents(
+void PropertyMap::concretizeNestedTypesFromConcreteParents(
     SmallVectorImpl<std::pair<MutableTerm, MutableTerm>> &inducedRules) const {
-  for (const auto &equivClass : Map) {
-    if (equivClass->getConformsTo().empty())
+  for (const auto &props : Map) {
+    if (props->getConformsTo().empty())
       continue;
 
     if (DebugConcretizeNestedTypes) {
-      if (equivClass->isConcreteType() ||
-          equivClass->hasSuperclassBound()) {
+      if (props->isConcreteType() ||
+          props->hasSuperclassBound()) {
         llvm::dbgs() << "^ Concretizing nested types of ";
-        equivClass->dump(llvm::dbgs());
+        props->dump(llvm::dbgs());
         llvm::dbgs() << "\n";
       }
     }
 
-    if (equivClass->isConcreteType()) {
+    if (props->isConcreteType()) {
       if (DebugConcretizeNestedTypes) {
         llvm::dbgs() << "- via concrete type requirement\n";
       }
 
       concretizeNestedTypesFromConcreteParent(
-          equivClass->getKey(),
+          props->getKey(),
           RequirementKind::SameType,
-          equivClass->ConcreteType->getConcreteType(),
-          equivClass->ConcreteType->getSubstitutions(),
-          equivClass->getConformsTo(),
-          equivClass->ConcreteConformances,
+          props->ConcreteType->getConcreteType(),
+          props->ConcreteType->getSubstitutions(),
+          props->getConformsTo(),
+          props->ConcreteConformances,
           inducedRules);
     }
 
-    if (equivClass->hasSuperclassBound()) {
+    if (props->hasSuperclassBound()) {
       if (DebugConcretizeNestedTypes) {
         llvm::dbgs() << "- via superclass requirement\n";
       }
 
       concretizeNestedTypesFromConcreteParent(
-          equivClass->getKey(),
+          props->getKey(),
           RequirementKind::Superclass,
-          equivClass->Superclass->getSuperclass(),
-          equivClass->Superclass->getSubstitutions(),
-          equivClass->getConformsTo(),
-          equivClass->SuperclassConformances,
+          props->Superclass->getSuperclass(),
+          props->Superclass->getSubstitutions(),
+          props->getConformsTo(),
+          props->SuperclassConformances,
           inducedRules);
     }
   }
 }
 
-/// Suppose a same-type requirement merges two equivalence classes,
+/// Suppose a same-type requirement merges two property bags,
 /// one of which has a conformance requirement to P and the other
 /// one has a concrete type or superclass requirement.
 ///
@@ -723,7 +723,7 @@ void EquivalenceClassMap::concretizeNestedTypesFromConcreteParents(
 ///      typealias C = B.V
 ///    }
 ///
-/// together with the following equivalence class:
+/// together with the following property bag:
 ///
 ///    T => { conforms_to: [ P ], concrete: Foo<Int, τ_0_0> with <U> }
 ///
@@ -738,7 +738,7 @@ void EquivalenceClassMap::concretizeNestedTypesFromConcreteParents(
 ///
 ///    T.[P:B] => U.V
 ///
-void EquivalenceClassMap::concretizeNestedTypesFromConcreteParent(
+void PropertyMap::concretizeNestedTypesFromConcreteParent(
     const MutableTerm &key, RequirementKind requirementKind,
     CanType concreteType, ArrayRef<Term> substitutions,
     ArrayRef<const ProtocolDecl *> conformsTo,
@@ -771,7 +771,7 @@ void EquivalenceClassMap::concretizeNestedTypesFromConcreteParent(
     auto *concrete = conformance.getConcrete();
 
     // Record the conformance for use by
-    // EquivalenceClass::getConformsToExcludingSuperclassConformances().
+    // PropertyBag::getConformsToExcludingSuperclassConformances().
     conformances.push_back(concrete);
 
     auto assocTypes = Protos.getProtocolInfo(proto).AssociatedTypes;
@@ -834,7 +834,7 @@ void EquivalenceClassMap::concretizeNestedTypesFromConcreteParent(
   }
 }
 
-/// Given the key of an equivalence class known to have \p concreteType,
+/// Given the key of an property bag known to have \p concreteType,
 /// together with a \p typeWitness from a conformance on that concrete
 /// type, return the right hand side of a rewrite rule to relate
 /// \p subjectType with a term representing the type witness.
@@ -858,7 +858,7 @@ void EquivalenceClassMap::concretizeNestedTypesFromConcreteParent(
 /// rewrite rule:
 ///
 ///        T.[P:A] => V
-MutableTerm EquivalenceClassMap::computeConstraintTermForTypeWitness(
+MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
     const MutableTerm &key, CanType concreteType, CanType typeWitness,
     const MutableTerm &subjectType, ArrayRef<Term> substitutions) const {
   if (!typeWitness->hasTypeParameter()) {
@@ -870,7 +870,7 @@ MutableTerm EquivalenceClassMap::computeConstraintTermForTypeWitness(
     if (found != ConcreteTypeInDomainMap.end()) {
       if (found->second != subjectType) {
         if (DebugConcretizeNestedTypes) {
-          llvm::dbgs() << "^^ Type witness can re-use equivalence class of "
+          llvm::dbgs() << "^^ Type witness can re-use property bag of "
                        << found->second << "\n";
         }
         return found->second;
@@ -902,17 +902,17 @@ MutableTerm EquivalenceClassMap::computeConstraintTermForTypeWitness(
   return constraintType;
 }
 
-void EquivalenceClassMap::dump(llvm::raw_ostream &out) const {
-  out << "Equivalence class map: {\n";
-  for (const auto &equivClass : Map) {
+void PropertyMap::dump(llvm::raw_ostream &out) const {
+  out << "Property map: {\n";
+  for (const auto &props : Map) {
     out << "  ";
-    equivClass->dump(out);
+    props->dump(out);
     out << "\n";
   }
   out << "}\n";
 }
 
-/// Build the equivalence class map from all rules of the form T.[p] => T, where
+/// Build the property map from all rules of the form T.[p] => T, where
 /// [p] is a property symbol.
 ///
 /// Returns a pair consisting of a status and number of iterations executed.
@@ -925,9 +925,9 @@ void EquivalenceClassMap::dump(llvm::raw_ostream &out) const {
 ///
 /// Otherwise, the status is CompletionResult::Success.
 std::pair<RewriteSystem::CompletionResult, unsigned>
-RewriteSystem::buildEquivalenceClassMap(EquivalenceClassMap &map,
-                                        unsigned maxIterations,
-                                        unsigned maxDepth) {
+RewriteSystem::buildPropertyMap(PropertyMap &map,
+                                unsigned maxIterations,
+                                unsigned maxDepth) {
   map.clear();
 
   std::vector<std::pair<MutableTerm, Symbol>> properties;
@@ -955,9 +955,9 @@ RewriteSystem::buildEquivalenceClassMap(EquivalenceClassMap &map,
     properties.emplace_back(key, property);
   }
 
-  // EquivalenceClassMap::addRule() requires that shorter rules are added
+  // PropertyMap::addRule() requires that shorter rules are added
   // before longer rules, so that it can perform lookups on suffixes and call
-  // EquivalenceClass::copyPropertiesFrom().
+  // PropertyBag::copyPropertiesFrom().
   std::sort(properties.begin(), properties.end(),
             [&](const std::pair<MutableTerm, Symbol> &lhs,
                 const std::pair<MutableTerm, Symbol> &rhs) -> bool {
@@ -972,8 +972,8 @@ RewriteSystem::buildEquivalenceClassMap(EquivalenceClassMap &map,
     map.addProperty(pair.first, pair.second, inducedRules);
   }
 
-  // We collect equivalence classes with fully concrete types so that we can
-  // re-use them to tie off recursion in the next step.
+  // We collect terms with fully concrete types so that we can re-use them
+  // to tie off recursion in the next step.
   map.computeConcreteTypeInDomainMap();
 
   // Now, we merge concrete type rules with conformance rules, by adding

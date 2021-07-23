@@ -19,7 +19,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include <vector>
 
-#include "EquivalenceClassMap.h"
+#include "PropertyMap.h"
 #include "ProtocolGraph.h"
 #include "RewriteContext.h"
 #include "RewriteSystem.h"
@@ -30,7 +30,7 @@ namespace swift {
 struct RequirementMachine::Implementation {
   rewriting::RewriteContext &Context;
   rewriting::RewriteSystem System;
-  rewriting::EquivalenceClassMap Map;
+  rewriting::PropertyMap Map;
   CanGenericSignature Sig;
   bool Complete = false;
 

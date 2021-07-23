@@ -23,7 +23,7 @@
 #include <vector>
 
 #include "RequirementMachineImpl.h"
-#include "EquivalenceClassMap.h"
+#include "PropertyMap.h"
 #include "ProtocolGraph.h"
 #include "RewriteContext.h"
 #include "RewriteSystem.h"
@@ -47,25 +47,25 @@ RequirementMachine::getLocalRequirements(
   GenericSignature::LocalRequirements result;
   result.anchor = Impl->Context.getTypeForTerm(term, genericParams, protos);
 
-  auto *equivClass = Impl->Map.lookUpEquivalenceClass(term);
-  if (!equivClass)
+  auto *props = Impl->Map.lookUpProperties(term);
+  if (!props)
     return result;
 
-  if (equivClass->isConcreteType()) {
-    result.concreteType = equivClass->getConcreteType({}, protos,
-                                                      Impl->Context);
+  if (props->isConcreteType()) {
+    result.concreteType = props->getConcreteType({}, protos,
+                                                 Impl->Context);
     return result;
   }
 
-  if (equivClass->hasSuperclassBound()) {
-    result.superclass = equivClass->getSuperclassBound({}, protos,
-                                                       Impl->Context);
+  if (props->hasSuperclassBound()) {
+    result.superclass = props->getSuperclassBound({}, protos,
+                                                  Impl->Context);
   }
 
-  for (const auto *proto : equivClass->getConformsToExcludingSuperclassConformances())
+  for (const auto *proto : props->getConformsToExcludingSuperclassConformances())
     result.protos.push_back(const_cast<ProtocolDecl *>(proto));
 
-  result.layout = equivClass->getLayoutConstraint();
+  result.layout = props->getLayoutConstraint();
 
   return result;
 }
@@ -76,14 +76,14 @@ bool RequirementMachine::requiresClass(Type depType) const {
   Impl->System.simplify(term);
   Impl->verify(term);
 
-  auto *equivClass = Impl->Map.lookUpEquivalenceClass(term);
-  if (!equivClass)
+  auto *props = Impl->Map.lookUpProperties(term);
+  if (!props)
     return false;
 
-  if (equivClass->isConcreteType())
+  if (props->isConcreteType())
     return false;
 
-  auto layout = equivClass->getLayoutConstraint();
+  auto layout = props->getLayoutConstraint();
   return (layout && layout->isClass());
 }
 
@@ -93,11 +93,11 @@ LayoutConstraint RequirementMachine::getLayoutConstraint(Type depType) const {
   Impl->System.simplify(term);
   Impl->verify(term);
 
-  auto *equivClass = Impl->Map.lookUpEquivalenceClass(term);
-  if (!equivClass)
+  auto *props = Impl->Map.lookUpProperties(term);
+  if (!props)
     return LayoutConstraint();
 
-  return equivClass->getLayoutConstraint();
+  return props->getLayoutConstraint();
 }
 
 bool RequirementMachine::requiresProtocol(Type depType,
@@ -107,14 +107,14 @@ bool RequirementMachine::requiresProtocol(Type depType,
   Impl->System.simplify(term);
   Impl->verify(term);
 
-  auto *equivClass = Impl->Map.lookUpEquivalenceClass(term);
-  if (!equivClass)
+  auto *props = Impl->Map.lookUpProperties(term);
+  if (!props)
     return false;
 
-  if (equivClass->isConcreteType())
+  if (props->isConcreteType())
     return false;
 
-  for (auto *otherProto : equivClass->getConformsTo()) {
+  for (auto *otherProto : props->getConformsTo()) {
     if (otherProto == proto)
       return true;
   }
@@ -129,15 +129,15 @@ RequirementMachine::getRequiredProtocols(Type depType) const {
   Impl->System.simplify(term);
   Impl->verify(term);
 
-  auto *equivClass = Impl->Map.lookUpEquivalenceClass(term);
-  if (!equivClass)
+  auto *props = Impl->Map.lookUpProperties(term);
+  if (!props)
     return { };
 
-  if (equivClass->isConcreteType())
+  if (props->isConcreteType())
     return { };
 
   GenericSignature::RequiredProtocols result;
-  for (auto *otherProto : equivClass->getConformsTo()) {
+  for (auto *otherProto : props->getConformsTo()) {
     result.push_back(const_cast<ProtocolDecl *>(otherProto));
   }
 
@@ -152,15 +152,15 @@ Type RequirementMachine::getSuperclassBound(Type depType) const {
   Impl->System.simplify(term);
   Impl->verify(term);
 
-  auto *equivClass = Impl->Map.lookUpEquivalenceClass(term);
-  if (!equivClass)
+  auto *props = Impl->Map.lookUpProperties(term);
+  if (!props)
     return Type();
 
-  if (!equivClass->hasSuperclassBound())
+  if (!props->hasSuperclassBound())
     return Type();
 
   auto &protos = Impl->System.getProtocols();
-  return equivClass->getSuperclassBound({ }, protos, Impl->Context);
+  return props->getSuperclassBound({ }, protos, Impl->Context);
 }
 
 bool RequirementMachine::isConcreteType(Type depType) const {
@@ -169,11 +169,11 @@ bool RequirementMachine::isConcreteType(Type depType) const {
   Impl->System.simplify(term);
   Impl->verify(term);
 
-  auto *equivClass = Impl->Map.lookUpEquivalenceClass(term);
-  if (!equivClass)
+  auto *props = Impl->Map.lookUpProperties(term);
+  if (!props)
     return false;
 
-  return equivClass->isConcreteType();
+  return props->isConcreteType();
 }
 
 Type RequirementMachine::getConcreteType(Type depType) const {
@@ -182,15 +182,15 @@ Type RequirementMachine::getConcreteType(Type depType) const {
   Impl->System.simplify(term);
   Impl->verify(term);
 
-  auto *equivClass = Impl->Map.lookUpEquivalenceClass(term);
-  if (!equivClass)
+  auto *props = Impl->Map.lookUpProperties(term);
+  if (!props)
     return Type();
 
-  if (!equivClass->isConcreteType())
+  if (!props->isConcreteType())
     return Type();
 
   auto &protos = Impl->System.getProtocols();
-  return equivClass->getConcreteType({ }, protos, Impl->Context);
+  return props->getConcreteType({ }, protos, Impl->Context);
 }
 
 bool RequirementMachine::areSameTypeParameterInContext(Type depType1,
@@ -231,11 +231,11 @@ RequirementMachine::Implementation::getLongestValidPrefix(const MutableTerm &ter
       break;
 
     case Symbol::Kind::AssociatedType: {
-      const auto *equivClass = Map.lookUpEquivalenceClass(prefix);
-      if (!equivClass)
+      const auto *props = Map.lookUpProperties(prefix);
+      if (!props)
         return prefix;
 
-      auto conformsTo = equivClass->getConformsTo();
+      auto conformsTo = props->getConformsTo();
 
       for (const auto *proto : symbol.getProtocols()) {
         if (!System.getProtocols().isKnownProtocol(proto))
@@ -284,11 +284,11 @@ bool RequirementMachine::isCanonicalTypeInContext(Type type) const {
     Impl->System.simplify(term);
     Impl->verify(term);
 
-    auto *equivClass = Impl->Map.lookUpEquivalenceClass(term);
-    if (!equivClass)
+    auto *props = Impl->Map.lookUpProperties(term);
+    if (!props)
       return false;
 
-    if (equivClass->isConcreteType())
+    if (props->isConcreteType())
       return true;
 
     auto anchor = Impl->Context.getTypeForTerm(term, {}, protos);
@@ -352,10 +352,10 @@ Type RequirementMachine::getCanonicalTypeInContext(
     auto prefixType = [&]() -> Type {
       Impl->verify(prefix);
 
-      auto *equivClass = Impl->Map.lookUpEquivalenceClass(prefix);
-      if (equivClass && equivClass->isConcreteType()) {
-        auto concreteType = equivClass->getConcreteType(genericParams,
-                                                        protos, Impl->Context);
+      auto *props = Impl->Map.lookUpProperties(prefix);
+      if (props && props->isConcreteType()) {
+        auto concreteType = props->getConcreteType(genericParams,
+                                                   protos, Impl->Context);
         if (!concreteType->hasTypeParameter())
           return concreteType;
 
@@ -619,15 +619,15 @@ RequirementMachine::lookupNestedType(Type depType, Identifier name) const {
   Impl->System.simplify(term);
   Impl->verify(term);
 
-  auto *equivClass = Impl->Map.lookUpEquivalenceClass(term);
-  if (!equivClass)
+  auto *props = Impl->Map.lookUpProperties(term);
+  if (!props)
     return nullptr;
 
   // Look for types with the given name in protocols that we know about.
   AssociatedTypeDecl *bestAssocType = nullptr;
   SmallVector<TypeDecl *, 4> concreteDecls;
 
-  for (const auto *proto : equivClass->getConformsTo()) {
+  for (const auto *proto : props->getConformsTo()) {
     // Look for an associated type and/or concrete type with this name.
     for (auto member : const_cast<ProtocolDecl *>(proto)->lookupDirect(name)) {
       // If this is an associated type, record whether it is the best
@@ -656,10 +656,10 @@ RequirementMachine::lookupNestedType(Type depType, Identifier name) const {
   // FIXME: Shouldn't we always look here?
   if (!bestAssocType && concreteDecls.empty()) {
     Type typeToSearch;
-    if (equivClass->isConcreteType())
-      typeToSearch = equivClass->getConcreteType();
-    else if (equivClass->hasSuperclassBound())
-      typeToSearch = equivClass->getSuperclassBound();
+    if (props->isConcreteType())
+      typeToSearch = props->getConcreteType();
+    else if (props->hasSuperclassBound())
+      typeToSearch = props->getSuperclassBound();
 
     if (typeToSearch)
       if (auto *decl = typeToSearch->getAnyNominal())

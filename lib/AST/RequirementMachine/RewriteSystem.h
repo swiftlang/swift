@@ -35,7 +35,7 @@ namespace swift {
 
 namespace rewriting {
 
-class EquivalenceClassMap;
+class PropertyMap;
 class MutableTerm;
 class RewriteContext;
 class Term;
@@ -556,9 +556,9 @@ public:
   void simplifyRightHandSides();
 
   std::pair<CompletionResult, unsigned>
-  buildEquivalenceClassMap(EquivalenceClassMap &map,
-                           unsigned maxIterations,
-                           unsigned maxDepth);
+  buildPropertyMap(PropertyMap &map,
+                   unsigned maxIterations,
+                   unsigned maxDepth);
 
   void dump(llvm::raw_ostream &out) const;
 

@@ -19,7 +19,7 @@
 #include "swift/AST/Requirement.h"
 #include <vector>
 
-#include "EquivalenceClassMap.h"
+#include "PropertyMap.h"
 #include "ProtocolGraph.h"
 #include "RewriteContext.h"
 #include "RewriteSystem.h"
@@ -375,13 +375,13 @@ void RequirementMachine::computeCompletion() {
     checkCompletionResult();
 
     // Simplify right hand sides in preparation for building the
-    // equivalence class map.
+    // property map.
     Impl->System.simplifyRightHandSides();
 
-    // Build the equivalence class map, which performs concrete term
+    // Build the property map, which also performs concrete term
     // unification; if this added any new rules, run the completion
     // procedure again.
-    result = Impl->System.buildEquivalenceClassMap(
+    result = Impl->System.buildPropertyMap(
         Impl->Map,
         Context.LangOpts.RequirementMachineStepLimit,
         Context.LangOpts.RequirementMachineDepthLimit);
@@ -393,8 +393,8 @@ void RequirementMachine::computeCompletion() {
 
     checkCompletionResult();
 
-    // If buildEquivalenceClassMap() added new rules, we run another
-    // round of Knuth-Bendix, and build the equivalence class map again.
+    // If buildPropertyMap() added new rules, we run another round of
+    // Knuth-Bendix, and build the property map again.
     if (result.second == 0)
       break;
   }
