@@ -212,32 +212,32 @@ MutableTerm
 RequirementMachine::Implementation::getLongestValidPrefix(const MutableTerm &term) {
   MutableTerm prefix;
 
-  for (auto atom : term) {
-    switch (atom.getKind()) {
-    case Atom::Kind::Name:
+  for (auto symbol : term) {
+    switch (symbol.getKind()) {
+    case Symbol::Kind::Name:
       return prefix;
 
-    case Atom::Kind::Protocol:
+    case Symbol::Kind::Protocol:
       assert(prefix.empty() &&
-             "Protocol atom can only appear at the start of a type term");
-      if (!System.getProtocols().isKnownProtocol(atom.getProtocol()))
+             "Protocol symbol can only appear at the start of a type term");
+      if (!System.getProtocols().isKnownProtocol(symbol.getProtocol()))
         return prefix;
 
       break;
 
-    case Atom::Kind::GenericParam:
+    case Symbol::Kind::GenericParam:
       assert(prefix.empty() &&
-             "Generic parameter atom can only appear at the start of a type term");
+             "Generic parameter symbol can only appear at the start of a type term");
       break;
 
-    case Atom::Kind::AssociatedType: {
+    case Symbol::Kind::AssociatedType: {
       const auto *equivClass = Map.lookUpEquivalenceClass(prefix);
       if (!equivClass)
         return prefix;
 
       auto conformsTo = equivClass->getConformsTo();
 
-      for (const auto *proto : atom.getProtocols()) {
+      for (const auto *proto : symbol.getProtocols()) {
         if (!System.getProtocols().isKnownProtocol(proto))
           return prefix;
 
@@ -250,14 +250,14 @@ RequirementMachine::Implementation::getLongestValidPrefix(const MutableTerm &ter
       break;
     }
 
-    case Atom::Kind::Layout:
-    case Atom::Kind::Superclass:
-    case Atom::Kind::ConcreteType:
-      llvm_unreachable("Property atom cannot appear in a type term");
+    case Symbol::Kind::Layout:
+    case Symbol::Kind::Superclass:
+    case Symbol::Kind::ConcreteType:
+      llvm_unreachable("Property symbol cannot appear in a type term");
     }
 
-    // This atom is valid, add it to the longest prefix.
-    prefix.add(atom);
+    // This symbol is valid, add it to the longest prefix.
+    prefix.add(symbol);
   }
 
   return prefix;

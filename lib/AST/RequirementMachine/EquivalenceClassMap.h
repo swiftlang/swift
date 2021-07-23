@@ -45,7 +45,7 @@ class MutableTerm;
 class RewriteContext;
 class Term;
 
-/// Stores all rewrite rules of the form T.[p] => T, where [p] is a property atom,
+/// Stores all rewrite rules of the form T.[p] => T, where [p] is a property symbol,
 /// for a single term 'T'.
 class EquivalenceClass {
   friend class EquivalenceClassMap;
@@ -61,14 +61,14 @@ class EquivalenceClass {
   LayoutConstraint Layout;
 
   /// The most specific superclass constraint this type satisfies.
-  Optional<Atom> Superclass;
+  Optional<Symbol> Superclass;
 
   /// All concrete conformances of Superclass to the protocols in the
   /// ConformsTo list.
   llvm::TinyPtrVector<ProtocolConformance *> SuperclassConformances;
 
   /// The most specific concrete type constraint this type satisfies.
-  Optional<Atom> ConcreteType;
+  Optional<Symbol> ConcreteType;
 
   /// All concrete conformances of ConcreteType to the protocols in the
   /// ConformsTo list.
@@ -76,7 +76,7 @@ class EquivalenceClass {
 
   explicit EquivalenceClass(const MutableTerm &key) : Key(key) {}
 
-  void addProperty(Atom property,
+  void addProperty(Symbol property,
                    RewriteContext &ctx,
                    SmallVectorImpl<std::pair<MutableTerm, MutableTerm>> &inducedRules,
                    bool debug);
@@ -131,7 +131,7 @@ public:
 };
 
 /// Stores all rewrite rules of the form T.[p] => T, where [p] is a property
-/// atom, for all terms 'T'.
+/// symbol, for all terms 'T'.
 ///
 /// Out-of-line methods are documented in EquivalenceClassMap.cpp.
 class EquivalenceClassMap {
@@ -166,7 +166,7 @@ public:
   void dump(llvm::raw_ostream &out) const;
 
   void clear();
-  void addProperty(const MutableTerm &key, Atom property,
+  void addProperty(const MutableTerm &key, Symbol property,
                    SmallVectorImpl<std::pair<MutableTerm, MutableTerm>> &inducedRules);
 
   void computeConcreteTypeInDomainMap();

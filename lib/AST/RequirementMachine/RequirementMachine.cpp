@@ -125,11 +125,11 @@ void RewriteSystemBuilder::addGenericSignature(CanGenericSignature sig) {
 void RewriteSystemBuilder::addAssociatedType(const AssociatedTypeDecl *type,
                                              const ProtocolDecl *proto) {
   MutableTerm lhs;
-  lhs.add(Atom::forProtocol(proto, Context));
-  lhs.add(Atom::forName(type->getName(), Context));
+  lhs.add(Symbol::forProtocol(proto, Context));
+  lhs.add(Symbol::forName(type->getName(), Context));
 
   MutableTerm rhs;
-  rhs.add(Atom::forAssociatedType(proto, type->getName(), Context));
+  rhs.add(Symbol::forAssociatedType(proto, type->getName(), Context));
 
   Rules.emplace_back(lhs, rhs);
 }
@@ -138,11 +138,11 @@ void RewriteSystemBuilder::addAssociatedType(const AssociatedTypeDecl *type,
 ///
 /// If \p proto is null, this is a generic requirement from the top-level
 /// generic signature. The added rewrite rule will be rooted in a generic
-/// parameter atom.
+/// parameter symbol.
 ///
 /// If \p proto is non-null, this is a generic requirement in the protocol's
 /// requirement signature. The added rewrite rule will be rooted in a
-/// protocol atom.
+/// protocol symbol.
 void RewriteSystemBuilder::addRequirement(const Requirement &req,
                                           const ProtocolDecl *proto) {
   if (Debug) {
@@ -168,7 +168,7 @@ void RewriteSystemBuilder::addRequirement(const Requirement &req,
     auto *proto = req.getProtocolDecl();
 
     constraintTerm = subjectTerm;
-    constraintTerm.add(Atom::forProtocol(proto, Context));
+    constraintTerm.add(Symbol::forProtocol(proto, Context));
     break;
   }
 
@@ -183,8 +183,8 @@ void RewriteSystemBuilder::addRequirement(const Requirement &req,
                                               substitutions);
 
     constraintTerm = subjectTerm;
-    constraintTerm.add(Atom::forSuperclass(otherType, substitutions,
-                                           Context));
+    constraintTerm.add(Symbol::forSuperclass(otherType, substitutions,
+                                             Context));
     break;
   }
 
@@ -193,8 +193,8 @@ void RewriteSystemBuilder::addRequirement(const Requirement &req,
     //
     //   T.[layout: L] == T
     constraintTerm = subjectTerm;
-    constraintTerm.add(Atom::forLayout(req.getLayoutConstraint(),
-                                       Context));
+    constraintTerm.add(Symbol::forLayout(req.getLayoutConstraint(),
+                                         Context));
     break;
   }
 
@@ -211,8 +211,8 @@ void RewriteSystemBuilder::addRequirement(const Requirement &req,
                                                 substitutions);
 
       constraintTerm = subjectTerm;
-      constraintTerm.add(Atom::forConcreteType(otherType, substitutions,
-                                               Context));
+      constraintTerm.add(Symbol::forConcreteType(otherType, substitutions,
+                                                 Context));
       break;
     }
 
@@ -230,44 +230,44 @@ void RequirementMachine::Implementation::verify(const MutableTerm &term) {
 
   // First, "erase" resolved associated types from the term, and try
   // to simplify it again.
-  for (auto atom : term) {
+  for (auto symbol : term) {
     if (erased.empty()) {
-      switch (atom.getKind()) {
-      case Atom::Kind::Protocol:
-      case Atom::Kind::GenericParam:
-        erased.add(atom);
+      switch (symbol.getKind()) {
+      case Symbol::Kind::Protocol:
+      case Symbol::Kind::GenericParam:
+        erased.add(symbol);
         continue;
 
-      case Atom::Kind::AssociatedType:
-        erased.add(Atom::forProtocol(atom.getProtocols()[0], Context));
+      case Symbol::Kind::AssociatedType:
+        erased.add(Symbol::forProtocol(symbol.getProtocols()[0], Context));
         break;
 
-      case Atom::Kind::Name:
-      case Atom::Kind::Layout:
-      case Atom::Kind::Superclass:
-      case Atom::Kind::ConcreteType:
-        llvm::errs() << "Bad initial atom in " << term << "\n";
+      case Symbol::Kind::Name:
+      case Symbol::Kind::Layout:
+      case Symbol::Kind::Superclass:
+      case Symbol::Kind::ConcreteType:
+        llvm::errs() << "Bad initial symbol in " << term << "\n";
         abort();
         break;
       }
     }
 
-    switch (atom.getKind()) {
-    case Atom::Kind::Name:
+    switch (symbol.getKind()) {
+    case Symbol::Kind::Name:
       assert(!erased.empty());
-      erased.add(atom);
+      erased.add(symbol);
       break;
 
-    case Atom::Kind::AssociatedType:
-      erased.add(Atom::forName(atom.getName(), Context));
+    case Symbol::Kind::AssociatedType:
+      erased.add(Symbol::forName(symbol.getName(), Context));
       break;
 
-    case Atom::Kind::Protocol:
-    case Atom::Kind::GenericParam:
-    case Atom::Kind::Layout:
-    case Atom::Kind::Superclass:
-    case Atom::Kind::ConcreteType:
-      llvm::errs() << "Bad interior atom " << atom << " in " << term << "\n";
+    case Symbol::Kind::Protocol:
+    case Symbol::Kind::GenericParam:
+    case Symbol::Kind::Layout:
+    case Symbol::Kind::Superclass:
+    case Symbol::Kind::ConcreteType:
+      llvm::errs() << "Bad interior symbol " << symbol << " in " << term << "\n";
       abort();
       break;
     }

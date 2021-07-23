@@ -20,7 +20,7 @@
 //
 //    T.[p] => T
 //
-// Where [p] is a "property atom": [layout: L], [superclass: Foo],
+// Where [p] is a "property symbol": [layout: L], [superclass: Foo],
 // [concrete: Bar].
 //
 // Given an arbitrary type T and a property [p], we can check if T satisfies the
@@ -200,7 +200,7 @@ Type EquivalenceClass::getConcreteType(
 /// If the nth entry in the array is S, this will produce S.X.Y.Z.
 ///
 /// There is a special behavior if the substitution is a term consisting of a
-/// single protocol atom [P]. If the innermost associated type in
+/// single protocol symbol [P]. If the innermost associated type in
 /// \p typeWitness is [Q:Foo], the result will be [P:Foo], not [P].[Q:Foo] or
 /// [Q:Foo].
 static MutableTerm getRelativeTermForType(CanType typeWitness,
@@ -212,16 +212,16 @@ static MutableTerm getRelativeTermForType(CanType typeWitness,
   unsigned index = getGenericParamIndex(typeWitness->getRootGenericParam());
   result = MutableTerm(substitutions[index]);
 
-  // If the substitution is a term consisting of a single protocol atom
+  // If the substitution is a term consisting of a single protocol symbol
   // [P], save P for later.
   const ProtocolDecl *proto = nullptr;
   if (result.size() == 1 &&
-      result[0].getKind() == Atom::Kind::Protocol) {
+      result[0].getKind() == Symbol::Kind::Protocol) {
     proto = result[0].getProtocol();
   }
 
   // Collect zero or more member type names in reverse order.
-  SmallVector<Atom, 3> atoms;
+  SmallVector<Symbol, 3> symbols;
   while (auto memberType = dyn_cast<DependentMemberType>(typeWitness)) {
     typeWitness = memberType.getBase();
 
@@ -229,26 +229,26 @@ static MutableTerm getRelativeTermForType(CanType typeWitness,
     assert(assocType != nullptr &&
            "Conformance checking should not produce unresolved member types");
 
-    // If the substitution is a term consisting of a single protocol atom [P],
+    // If the substitution is a term consisting of a single protocol symbol [P],
     // produce [P:Foo] instead of [P].[Q:Foo] or [Q:Foo].
     const auto *thisProto = assocType->getProtocol();
     if (proto && isa<GenericTypeParamType>(typeWitness)) {
       thisProto = proto;
 
       assert(result.size() == 1);
-      assert(result[0].getKind() == Atom::Kind::Protocol);
+      assert(result[0].getKind() == Symbol::Kind::Protocol);
       assert(result[0].getProtocol() == proto);
       result = MutableTerm();
     }
 
-    atoms.push_back(Atom::forAssociatedType(thisProto,
-                                            assocType->getName(), ctx));
+    symbols.push_back(Symbol::forAssociatedType(thisProto,
+                                                assocType->getName(), ctx));
   }
 
   // Add the member type names.
-  std::reverse(atoms.begin(), atoms.end());
-  for (auto atom : atoms)
-    result.add(atom);
+  std::reverse(symbols.begin(), symbols.end());
+  for (auto symbol : symbols)
+    result.add(symbol);
 
   return result;
 }
@@ -311,7 +311,7 @@ remapConcreteSubstitutionSchema(CanType concreteType,
 ///   T.[concrete: Foo<τ_0_0, τ_0_1, String> with {X.Y, Z}]
 ///   T.[concrete: Foo<Int, τ_0_0, τ_0_1> with {A.B, W}]
 ///
-/// The two concrete type atoms will be added to the equivalence class of 'T',
+/// The two concrete type symbols will be added to the equivalence class of 'T',
 /// and we will eventually end up in this method, where we will generate three
 /// induced rules:
 ///
@@ -324,7 +324,7 @@ remapConcreteSubstitutionSchema(CanType concreteType,
 ///
 /// Returns true if a conflict was detected.
 static bool unifyConcreteTypes(
-    Atom lhs, Atom rhs, RewriteContext &ctx,
+    Symbol lhs, Symbol rhs, RewriteContext &ctx,
     SmallVectorImpl<std::pair<MutableTerm, MutableTerm>> &inducedRules,
     bool debug) {
   auto lhsType = lhs.getConcreteType();
@@ -385,7 +385,7 @@ static bool unifyConcreteTypes(
                                                             ctx, result);
 
         MutableTerm constraintTerm(subjectTerm);
-        constraintTerm.add(Atom::forConcreteType(concreteType, result, ctx));
+        constraintTerm.add(Symbol::forConcreteType(concreteType, result, ctx));
 
         if (debug) {
           llvm::dbgs() << "%% Induced rule " << subjectTerm
@@ -408,7 +408,7 @@ static bool unifyConcreteTypes(
                                                             ctx, result);
 
         MutableTerm constraintTerm(subjectTerm);
-        constraintTerm.add(Atom::forConcreteType(concreteType, result, ctx));
+        constraintTerm.add(Symbol::forConcreteType(concreteType, result, ctx));
 
         if (debug) {
           llvm::dbgs() << "%% Induced rule " << subjectTerm
@@ -439,16 +439,16 @@ static bool unifyConcreteTypes(
 }
 
 void EquivalenceClass::addProperty(
-    Atom property, RewriteContext &ctx,
+    Symbol property, RewriteContext &ctx,
     SmallVectorImpl<std::pair<MutableTerm, MutableTerm>> &inducedRules,
     bool debug) {
 
   switch (property.getKind()) {
-  case Atom::Kind::Protocol:
+  case Symbol::Kind::Protocol:
     ConformsTo.push_back(property.getProtocol());
     return;
 
-  case Atom::Kind::Layout:
+  case Symbol::Kind::Layout:
     if (!Layout)
       Layout = property.getLayoutConstraint();
     else
@@ -456,7 +456,7 @@ void EquivalenceClass::addProperty(
 
     return;
 
-  case Atom::Kind::Superclass: {
+  case Symbol::Kind::Superclass: {
     auto superclass = property.getSuperclass();
 
     // A superclass requirement implies a layout requirement.
@@ -466,7 +466,7 @@ void EquivalenceClass::addProperty(
           ? LayoutConstraintKind::Class
           : LayoutConstraintKind::NativeClass,
         ctx.getASTContext());
-    addProperty(Atom::forLayout(layout, ctx), ctx, inducedRules, debug);
+    addProperty(Symbol::forLayout(layout, ctx), ctx, inducedRules, debug);
 
     // FIXME: This needs to find the most derived subclass and also call
     // unifyConcreteTypes()
@@ -474,7 +474,7 @@ void EquivalenceClass::addProperty(
     return;
   }
 
-  case Atom::Kind::ConcreteType: {
+  case Symbol::Kind::ConcreteType: {
     if (ConcreteType) {
       (void) unifyConcreteTypes(*ConcreteType, property,
                                 ctx, inducedRules, debug);
@@ -485,13 +485,13 @@ void EquivalenceClass::addProperty(
     return;
   }
 
-  case Atom::Kind::Name:
-  case Atom::Kind::GenericParam:
-  case Atom::Kind::AssociatedType:
+  case Symbol::Kind::Name:
+  case Symbol::Kind::GenericParam:
+  case Symbol::Kind::AssociatedType:
     break;
   }
 
-  llvm_unreachable("Bad atom kind");
+  llvm_unreachable("Bad symbol kind");
 }
 
 void EquivalenceClass::copyPropertiesFrom(const EquivalenceClass *next,
@@ -620,7 +620,7 @@ void EquivalenceClassMap::clear() {
 /// Record a protocol conformance, layout or superclass constraint on the given
 /// key. Must be called in monotonically non-decreasing key order.
 void EquivalenceClassMap::addProperty(
-    const MutableTerm &key, Atom property,
+    const MutableTerm &key, Symbol property,
     SmallVectorImpl<std::pair<MutableTerm, MutableTerm>> &inducedRules) {
   assert(property.isProperty());
   auto *equivClass = getOrCreateEquivalenceClass(key);
@@ -803,8 +803,8 @@ void EquivalenceClassMap::concretizeNestedTypesFromConcreteParent(
       }
 
       MutableTerm subjectType = key;
-      subjectType.add(Atom::forAssociatedType(proto, assocType->getName(),
-                                              Context));
+      subjectType.add(Symbol::forAssociatedType(proto, assocType->getName(),
+                                                Context));
 
       MutableTerm constraintType;
 
@@ -896,7 +896,7 @@ MutableTerm EquivalenceClassMap::computeConstraintTermForTypeWitness(
 
   // Add a rule T.[P:A].[concrete: Foo.A] => T.[P:A].
   constraintType.add(
-      Atom::forConcreteType(
+      Symbol::forConcreteType(
           typeWitnessSchema, result, Context));
 
   return constraintType;
@@ -913,7 +913,7 @@ void EquivalenceClassMap::dump(llvm::raw_ostream &out) const {
 }
 
 /// Build the equivalence class map from all rules of the form T.[p] => T, where
-/// [p] is a property atom.
+/// [p] is a property symbol.
 ///
 /// Returns a pair consisting of a status and number of iterations executed.
 ///
@@ -930,7 +930,7 @@ RewriteSystem::buildEquivalenceClassMap(EquivalenceClassMap &map,
                                         unsigned maxDepth) {
   map.clear();
 
-  std::vector<std::pair<MutableTerm, Atom>> properties;
+  std::vector<std::pair<MutableTerm, Symbol>> properties;
 
   for (const auto &rule : Rules) {
     if (rule.isDeleted())
@@ -959,8 +959,8 @@ RewriteSystem::buildEquivalenceClassMap(EquivalenceClassMap &map,
   // before longer rules, so that it can perform lookups on suffixes and call
   // EquivalenceClass::copyPropertiesFrom().
   std::sort(properties.begin(), properties.end(),
-            [&](const std::pair<MutableTerm, Atom> &lhs,
-                const std::pair<MutableTerm, Atom> &rhs) -> bool {
+            [&](const std::pair<MutableTerm, Symbol> &lhs,
+                const std::pair<MutableTerm, Symbol> &rhs) -> bool {
               return lhs.first.compare(rhs.first, Protos) < 0;
             });
 
