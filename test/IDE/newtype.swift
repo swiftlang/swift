@@ -92,7 +92,7 @@
 // PRINT-NEXT:  extension CFNewType {
 // PRINT-NEXT:    static let MyCFNewTypeValue: CFNewType
 // PRINT-NEXT:    static let MyCFNewTypeValueUnauditedButConst: CFNewType
-// PRINT-NEXT:    static var MyCFNewTypeValueUnaudited: Unmanaged<CFString>
+// PRINT-NEXT:    static var MyCFNewTypeValueUnaudited: Unmanaged<CFNewType>
 // PRINT-NEXT:  }
 // PRINT-NEXT:  func FooAudited() -> CFNewType
 // PRINT-NEXT:  func FooUnaudited() -> Unmanaged<CFString>
