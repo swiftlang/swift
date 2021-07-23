@@ -283,7 +283,6 @@ extension MutableCollection {
   }
 }
 
-@available(SwiftStdlib 9999, *)
 extension MutableCollection where SubSequence == Slice<Self> {
 
   /// Accesses a contiguous subrange of the collection's elements.
