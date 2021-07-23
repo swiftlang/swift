@@ -1498,10 +1498,6 @@ DeclNameRef swift::formDeclNameRef(ASTContext &ctx,
   return DeclNameRef({ ctx, baseNameId, argumentLabelIds });
 }
 
-DeclName swift::parseDeclName(ASTContext &ctx, StringRef name) {
-  return parseDeclName(name).formDeclName(ctx);
-}
-
 void PrettyStackTraceParser::print(llvm::raw_ostream &out) const {
   out << "With parser at source location: ";
   P.Tok.getLoc().print(out, P.Context.SourceMgr);

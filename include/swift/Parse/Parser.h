@@ -1934,9 +1934,6 @@ DeclNameRef formDeclNameRef(ASTContext &ctx,
                             bool isInitializer,
                             bool isSubscript = false);
 
-/// Parse a stringified Swift declaration name, e.g. "init(frame:)".
-DeclName parseDeclName(ASTContext &ctx, StringRef name);
-
 /// Whether a given token can be the start of a decl.
 bool isKeywordPossibleDeclStart(const Token &Tok);
 

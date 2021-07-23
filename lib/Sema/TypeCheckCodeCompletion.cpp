@@ -1323,7 +1323,6 @@ void KeyPathTypeCheckCompletionCallback::sawSolution(
   assert(ComponentIndex < KeyPath->getComponents().size() &&
          "Didn't find a code compleiton component?");
 
-  auto &CS = S.getConstraintSystem();
   Type BaseType;
   if (ComponentIndex == 0) {
     // We are completing on the root and need to extract the key path's root
