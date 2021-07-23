@@ -26,11 +26,13 @@
 
 namespace swift {
 
+namespace rewriting {
+
 /// We use the PIMPL pattern to avoid creeping header dependencies.
 struct RequirementMachine::Implementation {
-  rewriting::RewriteContext &Context;
-  rewriting::RewriteSystem System;
-  rewriting::PropertyMap Map;
+  RewriteContext &Context;
+  RewriteSystem System;
+  PropertyMap Map;
   CanGenericSignature Sig;
   bool Complete = false;
 
@@ -45,16 +47,17 @@ struct RequirementMachine::Implementation {
   std::vector<std::pair<CanType, ConformanceAccessPath>>
       CurrentConformanceAccessPaths;
 
-  explicit Implementation(rewriting::RewriteContext &ctx)
+  explicit Implementation(RewriteContext &ctx)
       : Context(ctx),
         System(Context),
         Map(Context, System.getProtocols()) {}
-  void verify(const rewriting::MutableTerm &term);
+  void verify(const MutableTerm &term);
   void dump(llvm::raw_ostream &out);
 
-  rewriting::MutableTerm getLongestValidPrefix(
-      const rewriting::MutableTerm &term);
+  MutableTerm getLongestValidPrefix(const MutableTerm &term);
 };
+
+}
 
 }
 

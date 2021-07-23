@@ -191,7 +191,7 @@ GenericSignatureImpl::getGenericSignatureBuilder() const {
                                              CanGenericSignature(this));
 }
 
-RequirementMachine *
+rewriting::RequirementMachine *
 GenericSignatureImpl::getRequirementMachine() const {
   // The requirement machine is associated with the canonical signature.
   if (!isCanonical())

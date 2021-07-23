@@ -21,10 +21,6 @@ class raw_ostream;
 
 namespace swift {
 
-namespace rewriting {
-class RewriteContext;
-}
-
 class ASTContext;
 class AssociatedTypeDecl;
 class CanType;
@@ -34,17 +30,20 @@ class ProtocolDecl;
 class Requirement;
 class Type;
 
+namespace rewriting {
+class RewriteContext;
+
 /// Wraps a rewrite system with higher-level operations in terms of
 /// generic signatures and interface types.
 class RequirementMachine final {
-  friend class ASTContext;
+  friend class swift::ASTContext;
 
   struct Implementation;
 
   ASTContext &Context;
   Implementation *Impl;
 
-  explicit RequirementMachine(rewriting::RewriteContext &rewriteCtx);
+  explicit RequirementMachine(RewriteContext &rewriteCtx);
 
   RequirementMachine(const RequirementMachine &) = delete;
   RequirementMachine(RequirementMachine &&) = delete;
@@ -81,6 +80,8 @@ public:
 
   void dump(llvm::raw_ostream &out) const;
 };
+
+} // end namespace rewriting
 
 } // end namespace swift
 

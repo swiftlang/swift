@@ -33,9 +33,12 @@ namespace swift {
 class GenericSignatureBuilder;
 class ProtocolConformanceRef;
 class ProtocolType;
-class RequirementMachine;
 class SubstitutionMap;
 class GenericEnvironment;
+
+namespace rewriting {
+  class RequirementMachine;
+}
 
 /// An access path used to find a particular protocol conformance within
 /// a generic signature.
@@ -82,7 +85,7 @@ private:
 
   friend class GenericSignatureImpl;
   friend class GenericSignatureBuilder;
-  friend class RequirementMachine;
+  friend class rewriting::RequirementMachine;
 
 public:
   typedef const Entry *const_iterator;
@@ -320,7 +323,7 @@ public:
   GenericSignatureBuilder *getGenericSignatureBuilder() const;
 
   /// Retrieve the requirement machine for the given generic signature.
-  RequirementMachine *getRequirementMachine() const;
+  rewriting::RequirementMachine *getRequirementMachine() const;
 
   /// Collects a set of requirements on a type parameter. Used by
   /// GenericEnvironment for building archetypes.
