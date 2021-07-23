@@ -140,7 +140,21 @@ func g() {
 
 ## `@_fixed_layout`
 
+Same as `@frozen` but also works for classes.
+
+With `@_fixed_layout` classes, vtable layout still happens dynamically, so
+non-public virtual methods can be removed, new virtual methods can be added,
+and existing virtual methods can be reordered.
+
 ## `@_hasInitialValue`
+
+Marks that a property has an initializing expression.
+
+This information is lost in the swiftinterface,
+but it is required as it results in a symbol for the initializer
+(if a class/struct `init` is inlined, it will call initializers
+for properties that it doesn't initialize itself).
+This information is necessary for correct TBD file generation.
 
 ## `@_hasMissingDesignatedInitializers`
 
@@ -181,6 +195,18 @@ there is no way to close this safety hole because the user cannot override
 the invisible designated initializer because they lack sufficient visibility.
 
 ## `@_hasStorage`
+
+Marks a property as being a stored property in a swiftinterface.
+
+For `@frozen` types, the compiler needs to be able to tell whether a particular
+property is stored or computed to correctly perform type layout.
+
+```
+@frozen struct S {
+  @_hasStorage var x: Int { get set } // stored
+  var y: Int { get set } // computed
+}
+```
 
 ## `@_implementationOnly`
 
