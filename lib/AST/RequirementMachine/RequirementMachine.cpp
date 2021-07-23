@@ -219,7 +219,7 @@ void RewriteSystemBuilder::addRequirement(const Requirement &req,
   Rules.emplace_back(subjectTerm, constraintTerm);
 }
 
-void RequirementMachine::Implementation::verify(const MutableTerm &term) {
+void RequirementMachine::verify(const MutableTerm &term) const {
 #ifndef NDEBUG
   MutableTerm erased;
 
@@ -284,51 +284,54 @@ void RequirementMachine::Implementation::verify(const MutableTerm &term) {
 #endif
 }
 
-void RequirementMachine::Implementation::dump(llvm::raw_ostream &out) {
+void RequirementMachine::dump(llvm::raw_ostream &out) const {
   out << "Requirement machine for " << Sig << "\n";
   System.dump(out);
   Map.dump(out);
 }
 
 RequirementMachine::RequirementMachine(RewriteContext &ctx)
-    : Context(ctx.getASTContext()) {
-  Impl = new Implementation(ctx);
+    : Context(ctx), System(ctx), Map(ctx, System.getProtocols()) {
+  auto &langOpts = ctx.getASTContext().LangOpts;
+  Debug = langOpts.DebugRequirementMachine;
+  RequirementMachineStepLimit = langOpts.RequirementMachineStepLimit;
+  RequirementMachineDepthLimit = langOpts.RequirementMachineDepthLimit;
+  Stats = ctx.getASTContext().Stats;
 }
 
-RequirementMachine::~RequirementMachine() {
-  delete Impl;
-}
+RequirementMachine::~RequirementMachine() {}
 
 void RequirementMachine::addGenericSignature(CanGenericSignature sig) {
-  Impl->Sig = sig;
+  Sig = sig;
 
   PrettyStackTraceGenericSignature debugStack("building rewrite system for", sig);
 
-  auto *Stats = Context.Stats;
+  auto &ctx = Context.getASTContext();
+  auto *Stats = ctx.Stats;
 
   if (Stats)
     ++Stats->getFrontendCounters().NumRequirementMachines;
 
   FrontendStatsTracer tracer(Stats, "build-rewrite-system");
 
-  if (Context.LangOpts.DebugRequirementMachine) {
+  if (Debug) {
     llvm::dbgs() << "Adding generic signature " << sig << " {\n";
   }
 
+
   // Collect the top-level requirements, and all transtively-referenced
   // protocol requirement signatures.
-  RewriteSystemBuilder builder(Impl->Context,
-                               Context.LangOpts.DebugRequirementMachine);
+  RewriteSystemBuilder builder(Context, Debug);
   builder.addGenericSignature(sig);
 
   // Add the initial set of rewrite rules to the rewrite system, also
   // providing the protocol graph to use for the linear order on terms.
-  Impl->System.initialize(std::move(builder.Rules),
-                          std::move(builder.Protocols));
+  System.initialize(std::move(builder.Rules),
+                    std::move(builder.Protocols));
 
   computeCompletion();
 
-  if (Context.LangOpts.DebugRequirementMachine) {
+  if (Debug) {
     llvm::dbgs() << "}\n";
   }
 }
@@ -338,12 +341,12 @@ void RequirementMachine::addGenericSignature(CanGenericSignature sig) {
 void RequirementMachine::computeCompletion() {
   while (true) {
     // First, run the Knuth-Bendix algorithm to resolve overlapping rules.
-    auto result = Impl->System.computeConfluentCompletion(
-        Context.LangOpts.RequirementMachineStepLimit,
-        Context.LangOpts.RequirementMachineDepthLimit);
+    auto result = System.computeConfluentCompletion(
+        RequirementMachineStepLimit,
+        RequirementMachineDepthLimit);
 
-    if (Context.Stats) {
-      Context.Stats->getFrontendCounters()
+    if (Stats) {
+      Stats->getFrontendCounters()
           .NumRequirementMachineCompletionSteps += result.second;
     }
 
@@ -354,15 +357,15 @@ void RequirementMachine::computeCompletion() {
         break;
 
       case RewriteSystem::CompletionResult::MaxIterations:
-        llvm::errs() << "Generic signature " << Impl->Sig
+        llvm::errs() << "Generic signature " << Sig
                      << " exceeds maximum completion step count\n";
-        Impl->System.dump(llvm::errs());
+        System.dump(llvm::errs());
         abort();
 
       case RewriteSystem::CompletionResult::MaxDepth:
-        llvm::errs() << "Generic signature " << Impl->Sig
+        llvm::errs() << "Generic signature " << Sig
                      << " exceeds maximum completion depth\n";
-        Impl->System.dump(llvm::errs());
+        System.dump(llvm::errs());
         abort();
       }
     };
@@ -371,18 +374,18 @@ void RequirementMachine::computeCompletion() {
 
     // Simplify right hand sides in preparation for building the
     // property map.
-    Impl->System.simplifyRightHandSides();
+    System.simplifyRightHandSides();
 
     // Build the property map, which also performs concrete term
     // unification; if this added any new rules, run the completion
     // procedure again.
-    result = Impl->System.buildPropertyMap(
-        Impl->Map,
-        Context.LangOpts.RequirementMachineStepLimit,
-        Context.LangOpts.RequirementMachineDepthLimit);
+    result = System.buildPropertyMap(
+        Map,
+        RequirementMachineStepLimit,
+        RequirementMachineDepthLimit);
 
-    if (Context.Stats) {
-      Context.Stats->getFrontendCounters()
+    if (Stats) {
+      Stats->getFrontendCounters()
         .NumRequirementMachineUnifiedConcreteTerms += result.second;
     }
 
@@ -394,18 +397,14 @@ void RequirementMachine::computeCompletion() {
       break;
   }
 
-  if (Context.LangOpts.DebugRequirementMachine) {
+  if (Debug) {
     dump(llvm::dbgs());
   }
 
-  assert(!Impl->Complete);
-  Impl->Complete = true;
+  assert(!Complete);
+  Complete = true;
 }
 
 bool RequirementMachine::isComplete() const {
-  return Impl->Complete;
-}
-
-void RequirementMachine::dump(llvm::raw_ostream &out) const {
-  Impl->dump(out);
+  return Complete;
 }

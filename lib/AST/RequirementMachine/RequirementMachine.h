@@ -36,6 +36,7 @@ class LayoutConstraint;
 class ProtocolDecl;
 class Requirement;
 class Type;
+class UnifiedStatsReporter;
 
 namespace rewriting {
 class RewriteContext;
@@ -45,10 +46,29 @@ class RewriteContext;
 class RequirementMachine final {
   friend class swift::ASTContext;
 
-  struct Implementation;
+  CanGenericSignature Sig;
 
-  ASTContext &Context;
-  Implementation *Impl;
+  RewriteContext &Context;
+  RewriteSystem System;
+  PropertyMap Map;
+
+  bool Debug = false;
+  bool Complete = false;
+  unsigned RequirementMachineStepLimit;
+  unsigned RequirementMachineDepthLimit;
+
+  UnifiedStatsReporter *Stats;
+
+  /// All conformance access paths computed so far.
+  llvm::DenseMap<std::pair<CanType, ProtocolDecl *>,
+                 ConformanceAccessPath> ConformanceAccessPaths;
+
+  /// Conformance access paths computed during the last round. All elements
+  /// have the same length. If a conformance access path of greater length
+  /// is requested, we refill CurrentConformanceAccessPaths with all paths of
+  /// length N+1, and add them to the ConformanceAccessPaths map.
+  std::vector<std::pair<CanType, ConformanceAccessPath>>
+      CurrentConformanceAccessPaths;
 
   explicit RequirementMachine(RewriteContext &rewriteCtx);
 
@@ -61,6 +81,8 @@ class RequirementMachine final {
 
   bool isComplete() const;
   void computeCompletion();
+
+  MutableTerm getLongestValidPrefix(const MutableTerm &term) const;
 
 public:
   ~RequirementMachine();
@@ -85,36 +107,8 @@ public:
                                                  ProtocolDecl *protocol);
   TypeDecl *lookupNestedType(Type depType, Identifier name) const;
 
+  void verify(const MutableTerm &term) const;
   void dump(llvm::raw_ostream &out) const;
-};
-
-/// We use the PIMPL pattern to avoid creeping header dependencies.
-struct RequirementMachine::Implementation {
-  RewriteContext &Context;
-  RewriteSystem System;
-  PropertyMap Map;
-  CanGenericSignature Sig;
-  bool Complete = false;
-
-  /// All conformance access paths computed so far.
-  llvm::DenseMap<std::pair<CanType, ProtocolDecl *>,
-                 ConformanceAccessPath> ConformanceAccessPaths;
-
-  /// Conformance access paths computed during the last round. All elements
-  /// have the same length. If a conformance access path of greater length
-  /// is requested, we refill CurrentConformanceAccessPaths with all paths of
-  /// length N+1, and add them to the ConformanceAccessPaths map.
-  std::vector<std::pair<CanType, ConformanceAccessPath>>
-      CurrentConformanceAccessPaths;
-
-  explicit Implementation(RewriteContext &ctx)
-      : Context(ctx),
-        System(Context),
-        Map(Context, System.getProtocols()) {}
-  void verify(const MutableTerm &term);
-  void dump(llvm::raw_ostream &out);
-
-  MutableTerm getLongestValidPrefix(const MutableTerm &term);
 };
 
 } // end namespace rewriting
