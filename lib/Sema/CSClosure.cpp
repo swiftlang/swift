@@ -81,6 +81,14 @@ static bool isViableElement(ASTNode element) {
       return false;
   }
 
+  if (auto *stmt = element.dyn_cast<Stmt *>()) {
+    // Empty brace statements are now viable because they do not require
+    // inference.
+    if (auto *braceStmt = dyn_cast<BraceStmt>(stmt)) {
+      return braceStmt->getNumElements() > 0;
+    }
+  }
+
   return true;
 }
 
