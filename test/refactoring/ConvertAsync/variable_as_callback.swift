@@ -317,7 +317,7 @@ func testGenericErrorVariableCompletionHandler<MyGenericError>(completionHandler
 // GENERIC-ERROR-NEXT:   let result: String = try await genericError()
 // GENERIC-ERROR-NEXT:   completionHandler(result, nil)
 // GENERIC-ERROR-NEXT: } catch {
-// GENERIC-ERROR-NEXT:   completionHandler(nil, error as! MyGenericError)
+// GENERIC-ERROR-NEXT:   completionHandler(nil, (error as! MyGenericError))
 // GENERIC-ERROR-NEXT: }
 
 // RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=DEFAULT-ARGS-FUNC %s
