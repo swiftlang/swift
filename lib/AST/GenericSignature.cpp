@@ -22,9 +22,9 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/PrettyStackTrace.h"
-#include "swift/AST/RequirementMachine.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/STLExtras.h"
+#include "RequirementMachine/RequirementMachine.h"
 #include <functional>
 
 using namespace swift;

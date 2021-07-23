@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/RequirementMachine.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericSignature.h"
@@ -21,9 +20,10 @@
 
 #include "PropertyMap.h"
 #include "ProtocolGraph.h"
+#include "RequirementMachine.h"
+#include "RequirementMachineImpl.h"
 #include "RewriteContext.h"
 #include "RewriteSystem.h"
-#include "RequirementMachineImpl.h"
 
 using namespace swift;
 using namespace rewriting;

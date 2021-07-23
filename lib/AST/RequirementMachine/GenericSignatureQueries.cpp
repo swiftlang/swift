@@ -14,7 +14,6 @@
 // Use those methods instead of calling into the RequirementMachine directly.
 //
 //===----------------------------------------------------------------------===//
-#include "swift/AST/RequirementMachine.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericSignature.h"
@@ -22,6 +21,7 @@
 #include "llvm/ADT/TinyPtrVector.h"
 #include <vector>
 
+#include "RequirementMachine.h"
 #include "RequirementMachineImpl.h"
 #include "PropertyMap.h"
 #include "ProtocolGraph.h"

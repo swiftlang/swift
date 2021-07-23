@@ -13,12 +13,12 @@
 #ifndef SWIFT_REQUIREMENTMACHINEIMPL_H
 #define SWIFT_REQUIREMENTMACHINEIMPL_H
 
-#include "swift/AST/RequirementMachine.h"
 #include "swift/AST/GenericSignature.h"
 
 #include "llvm/ADT/DenseMap.h"
 #include <vector>
 
+#include "RequirementMachine.h"
 #include "PropertyMap.h"
 #include "ProtocolGraph.h"
 #include "RewriteContext.h"

@@ -41,7 +41,6 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/RawComment.h"
-#include "swift/AST/RequirementMachine.h"
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SourceFile.h"
@@ -67,6 +66,7 @@
 #include <algorithm>
 #include <memory>
 
+#include "RequirementMachine/RequirementMachine.h"
 #include "RequirementMachine/RewriteContext.h"
 
 using namespace swift;
