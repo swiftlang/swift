@@ -142,11 +142,11 @@ Indicates that there may be designated initializers that are
 not printed in the swiftinterface file for a particular class.
 
 This attribute is needed for the initializer model to maintain correctness when
-library evolution is enabled. This is because a class may have non-public
-designated initializers, and Swift allows the inheritance of convenience
-initializers if and only if the subclass overrides (or has synthesized
-overrides) of every designated initializer in its superclass. Consider the
-following code:
+[library evolution](/docs/LibraryEvolution.rst) is enabled. This is because a
+class may have non-public designated initializers, and Swift allows the
+inheritance of convenience initializers if and only if the subclass overrides
+(or has synthesized overrides) of every designated initializer in its
+superclass. Consider the following code:
 
 ```swift
 // Lib.swift
