@@ -2642,6 +2642,7 @@ public:
   void analyzeActorIsolation(const ValueDecl *VD, Type T, bool &implicitlyAsync,
                              Optional<NotRecommendedReason> &NotRecommended) {
     auto isolation = getActorIsolation(const_cast<ValueDecl *>(VD));
+    auto &ctx = VD->getASTContext();
 
     switch (isolation.getKind()) {
     case ActorIsolation::ActorInstance: {
@@ -2651,8 +2652,16 @@ public:
       }
       break;
     }
-    case ActorIsolation::GlobalActor:
-    case ActorIsolation::GlobalActorUnsafe: {
+    case ActorIsolation::GlobalActorUnsafe:
+      // For "unsafe" global actor isolation, automatic 'async' only happens
+      // if the context has adopted concurrency.
+      if (!CanCurrDeclContextHandleAsync &&
+          !completionContextUsesConcurrencyFeatures(CurrDeclContext) &&
+          !ctx.LangOpts.WarnConcurrency) {
+        return;
+      }
+      LLVM_FALLTHROUGH;
+    case ActorIsolation::GlobalActor: {
       auto contextIsolation = getActorIsolationOfContext(
           const_cast<DeclContext *>(CurrDeclContext));
       if (contextIsolation != isolation) {
