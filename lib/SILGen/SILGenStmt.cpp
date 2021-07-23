@@ -330,9 +330,10 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
           continue;
         }
       } else if (auto D = ESD.dyn_cast<Decl*>()) {
-        // Local type declarations are not unreachable because they can appear
-        // after the declared type has already been used.
-        if (isa<TypeDecl>(D))
+        // Local declarations aren't unreachable - only their usages can be. To
+        // that end, we only care about pattern bindings since their
+        // initializer expressions can be unreachable.
+        if (!isa<PatternBindingDecl>(D))
           continue;
       }
       
