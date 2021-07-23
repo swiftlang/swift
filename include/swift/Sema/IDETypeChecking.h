@@ -305,6 +305,9 @@ namespace swift {
   /// for a Fix-It that adds a new build* function to a result builder.
   std::tuple<SourceLoc, std::string, Type>
   determineResultBuilderBuildFixItInfo(NominalTypeDecl *builder);
+
+  /// Just a proxy to swift::contextUsesConcurrencyFeatures() from lib/IDE code.
+  bool completionContextUsesConcurrencyFeatures(const DeclContext *dc);
 }
 
 #endif
