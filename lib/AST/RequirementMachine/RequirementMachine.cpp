@@ -18,12 +18,7 @@
 #include "swift/AST/Requirement.h"
 #include <vector>
 
-#include "PropertyMap.h"
-#include "ProtocolGraph.h"
 #include "RequirementMachine.h"
-#include "RequirementMachineImpl.h"
-#include "RewriteContext.h"
-#include "RewriteSystem.h"
 
 using namespace swift;
 using namespace rewriting;

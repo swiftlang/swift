@@ -22,11 +22,6 @@
 #include <vector>
 
 #include "RequirementMachine.h"
-#include "RequirementMachineImpl.h"
-#include "PropertyMap.h"
-#include "ProtocolGraph.h"
-#include "RewriteContext.h"
-#include "RewriteSystem.h"
 
 using namespace swift;
 using namespace rewriting;
