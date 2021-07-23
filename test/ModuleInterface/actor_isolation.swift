@@ -68,6 +68,18 @@ public class C7 { }
 @available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
 extension C7: UnsafeSendable { }
 
+@available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
+public protocol P2 {
+  @SomeGlobalActor func method()
+}
+
+@available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
+// CHECK: class {{(Test.)?}}C8 : {{(Test.)?}}P2 {
+public class C8 : P2 {
+  // CHECK: @{{(Test.)?}}SomeGlobalActor public func method()
+  public func method() {}
+}
+
 // FIXME: Work around a bug where module printing depends on the "synthesized"
 // bit in conformances which is not serialized and not present in the textual
 // form.
