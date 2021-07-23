@@ -598,6 +598,10 @@ def experimental_cxx_stdlib :
   Separate<["-"], "experimental-cxx-stdlib">,
   HelpText<"C++ standard library to use; forwarded to Clang's -stdlib flag">;
 
+def experimental_emit_module_separately:
+  Flag<["-"], "experimental-emit-module-separately">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
+  HelpText<"Schedule a swift module emission job instead of a merge-modules job (new Driver only)">;
 
 // Diagnostic control options
 def suppress_warnings : Flag<["-"], "suppress-warnings">,
