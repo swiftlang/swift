@@ -594,7 +594,7 @@ private:
       if (asyncConvention &&
           i == asyncConvention->completionHandlerParamIndex()) {
         os << piece << ":(";
-        print(asyncConvention->completionHandlerType(), None);
+        print(asyncConvention->completionHandlerType(), OTK_None);
         os << ")completionHandler";
         continue;
       }
