@@ -133,7 +133,7 @@ func customError(completion: (String?, CustomError?) -> Void) { }
 // ASYNC-CUSTOMERROR-NEXT: let result = try await customError()
 // ASYNC-CUSTOMERROR-NEXT: completion(result, nil)
 // ASYNC-CUSTOMERROR-NEXT: } catch {
-// ASYNC-CUSTOMERROR-NEXT: completion(nil, error as! CustomError)
+// ASYNC-CUSTOMERROR-NEXT: completion(nil, (error as! CustomError))
 // ASYNC-CUSTOMERROR-NEXT: }
 // ASYNC-CUSTOMERROR-NEXT: }
 // ASYNC-CUSTOMERROR-NEXT: }
@@ -308,7 +308,7 @@ func genericError<E>(completion: (String?, E?) -> Void) where E: Error { }
 // GENERIC-ERROR-NEXT: let result: String = try await genericError()
 // GENERIC-ERROR-NEXT: completion(result, nil)
 // GENERIC-ERROR-NEXT: } catch {
-// GENERIC-ERROR-NEXT: completion(nil, error as! E)
+// GENERIC-ERROR-NEXT: completion(nil, (error as! E))
 // GENERIC-ERROR-NEXT: }
 // GENERIC-ERROR-NEXT: }
 // GENERIC-ERROR-NEXT: }
