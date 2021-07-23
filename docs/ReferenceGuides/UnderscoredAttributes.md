@@ -105,6 +105,12 @@ For more details, see the forum post on
 
 ## `@_distributedActorIndependent`
 
+Marks a specific property of a distributed actor to be available even if the
+actor is remote.
+
+This only applies to two distributed actor properties `address` and `transport`.
+It cannot be safely declared on any properties defined by ordinary Swift code.
+
 ## `@_effects(effectname)`
 
 Tells the compiler that the implementation of the defined function is limited
@@ -255,6 +261,17 @@ class C {
 ## `@_inheritActorContext`
 
 (Note that it is "inherit", not "inherits", unlike below.)
+
+Marks that a `@Sendable async` closure argument should inherited the actor
+context (i.e. what actor it should be run on) based on the declaration site
+of the closure. This is different from the typical behavior, where the closure
+may be runnable anywhere unless its type specifically declares that it will
+run on a specific actor.
+
+This new attribute can be used on parameters of `@Sendable async` type
+to indicate that the closures arguments passed to such parameters
+should inherit the actor context where they are formed, which is not
+the normal behavior for `@Sendable` closures.
 
 ## `@_inheritsConvenienceInitializers`
 
