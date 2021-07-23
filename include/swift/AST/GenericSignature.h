@@ -209,6 +209,10 @@ public:
   SmallVector<Requirement, 4>
   requirementsNotSatisfiedBy(GenericSignature otherSig) const;
 
+  /// Return the canonical version of the given type under this generic
+  /// signature.
+  CanType getCanonicalTypeInContext(Type type) const;
+
   /// Check invariants.
   void verify() const;
 };
@@ -381,10 +385,6 @@ public:
   bool isRequirementSatisfied(
       Requirement requirement, bool allowMissing = false) const;
 
-  /// Return the canonical version of the given type under this generic
-  /// signature.
-  CanType getCanonicalTypeInContext(Type type) const;
-
   bool isCanonicalTypeInContext(Type type) const;
   bool isCanonicalTypeInContext(Type type,
                                 GenericSignatureBuilder &builder) const;
@@ -470,6 +470,10 @@ private:
   /// equivalent to or a subset of the generic parameters in this signature.
   SmallVector<Requirement, 4>
   requirementsNotSatisfiedBy(GenericSignature otherSig) const;
+
+  /// Return the canonical version of the given type under this generic
+  /// signature.
+  CanType getCanonicalTypeInContext(Type type) const;
 };
 
 void simple_display(raw_ostream &out, GenericSignature sig);

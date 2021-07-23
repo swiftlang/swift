@@ -4024,15 +4024,6 @@ static bool checkFunctionSignature(
     return false;
   }
 
-  // Map type into the required function type's generic signature, if it exists.
-  // This is significant when the required generic signature has same-type
-  // requirements while the candidate generic signature does not.
-  auto mapType = [&](Type type) {
-    if (!requiredGenSig)
-      return type->getCanonicalType();
-    return requiredGenSig->getCanonicalTypeInContext(type);
-  };
-
   // Check that parameter types match, disregarding labels.
   if (required->getNumParams() != candidateFnTy->getNumParams())
     return false;
@@ -4041,14 +4032,16 @@ static bool checkFunctionSignature(
                   [&](AnyFunctionType::Param x, AnyFunctionType::Param y) {
                     auto xInstanceTy = x.getOldType()->getMetatypeInstanceType();
                     auto yInstanceTy = y.getOldType()->getMetatypeInstanceType();
-                    return xInstanceTy->isEqual(mapType(yInstanceTy));
+                    return xInstanceTy->isEqual(
+                        requiredGenSig.getCanonicalTypeInContext(yInstanceTy));
                   }))
     return false;
 
   // If required result type is not a function type, check that result types
   // match exactly.
   auto requiredResultFnTy = dyn_cast<AnyFunctionType>(required.getResult());
-  auto candidateResultTy = mapType(candidateFnTy.getResult());
+  auto candidateResultTy =
+      requiredGenSig.getCanonicalTypeInContext(candidateFnTy.getResult());
   if (!requiredResultFnTy) {
     auto requiredResultTupleTy = dyn_cast<TupleType>(required.getResult());
     auto candidateResultTupleTy = dyn_cast<TupleType>(candidateResultTy);

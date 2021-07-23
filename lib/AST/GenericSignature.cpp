@@ -1081,6 +1081,15 @@ bool GenericSignatureImpl::isCanonicalTypeInContext(
   });
 }
 
+CanType GenericSignature::getCanonicalTypeInContext(Type type) const {
+  // The null generic signature has no requirements so cannot influence the
+  // structure of the can type computed here.
+  if (isNull()) {
+    return type->getCanonicalType();
+  }
+  return getPointer()->getCanonicalTypeInContext(type);
+}
+
 CanType GenericSignatureImpl::getCanonicalTypeInContext(Type type) const {
   type = type->getCanonicalType();
 

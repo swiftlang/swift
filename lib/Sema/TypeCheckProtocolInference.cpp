@@ -827,7 +827,7 @@ Type AssociatedTypeInference::computeFixedTypeWitness(
       continue;
 
     auto structuralTy = DependentMemberType::get(selfTy, assocType->getName());
-    const auto ty = sig->getCanonicalTypeInContext(structuralTy);
+    const auto ty = sig.getCanonicalTypeInContext(structuralTy);
 
     // A dependent member type with an identical base and name indicates that
     // the protocol does not same-type constrain it in any way; move on to
