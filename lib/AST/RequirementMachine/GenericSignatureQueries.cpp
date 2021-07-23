@@ -483,7 +483,7 @@ RequirementMachine::getConformanceAccessPath(Type type,
   // visit all of the root conformance requirements in our generic signature and
   // add them to the buffer.
   if (Impl->ConformanceAccessPaths.empty()) {
-    for (const auto &req : Impl->Sig->getRequirements()) {
+    for (const auto &req : Impl->Sig.getRequirements()) {
       // We only care about conformance requirements.
       if (req.getKind() != RequirementKind::Conformance)
         continue;

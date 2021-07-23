@@ -525,7 +525,7 @@ public:
       impFnTy = cast<SILFunctionType>(impTy.getASTType());
     }
     auto env = SGF.F.getGenericEnvironment();
-    auto sig = env ? env->getGenericSignature()->getCanonicalSignature()
+    auto sig = env ? env->getGenericSignature().getCanonicalSignature()
                    : CanGenericSignature();
     SILFunction *impl = SGF.SGM
       .getOrCreateForeignAsyncCompletionHandlerImplFunction(

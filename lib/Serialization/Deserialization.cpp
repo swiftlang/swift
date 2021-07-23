@@ -1816,7 +1816,7 @@ giveUpFastPath:
       }
 
       bool found = false;
-      for (auto paramTy : currentSig->getGenericParams()) {
+      for (auto paramTy : currentSig.getGenericParams()) {
         if (paramTy->getIndex() == paramIndex &&
             paramTy->getDepth() == depth) {
           values.clear();
@@ -4110,7 +4110,7 @@ public:
         paramCount += paramList->size();
       }
       assert(paramCount ==
-             extension->getGenericSignature()->getGenericParams().size());
+             extension->getGenericSignature().getGenericParams().size());
     }
 #endif
 
@@ -5365,7 +5365,7 @@ public:
       MF.fatal();
 
     Type interfaceType = GenericTypeParamType::get(depth, index, ctx);
-    Type contextType = sig->getGenericEnvironment()
+    Type contextType = sig.getGenericEnvironment()
         ->mapTypeIntoContext(interfaceType);
 
     if (contextType->hasError())

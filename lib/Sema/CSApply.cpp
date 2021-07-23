@@ -547,7 +547,7 @@ namespace {
       }
 
       auto sig = gft->getGenericSignature();
-      auto *env = sig->getGenericEnvironment();
+      auto *env = sig.getGenericEnvironment();
 
       witnessType = FunctionType::get(gft->getParams(),
                                       gft->getResult(),
@@ -2450,7 +2450,7 @@ namespace {
       auto subMap = SubstitutionMap::get(
           genericSig,
           [&](SubstitutableType *type) -> Type {
-            assert(type->isEqual(genericSig->getGenericParams()[0]));
+            assert(type->isEqual(genericSig.getGenericParams()[0]));
             return valueType;
           },
           [&](CanType origType, Type replacementType,

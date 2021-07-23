@@ -2238,10 +2238,10 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
 
     ArrayRef<Requirement> reqts;
     if (auto sig = pattern->getGenericSignature()) {
-      ListOfValues.push_back(sig->getGenericParams().size());
-      for (auto param : sig->getGenericParams())
+      ListOfValues.push_back(sig.getGenericParams().size());
+      for (auto param : sig.getGenericParams())
         ListOfValues.push_back(S.addTypeRef(param));
-      reqts = sig->getRequirements();
+      reqts = sig.getRequirements();
     } else {
       ListOfValues.push_back(0);
     }

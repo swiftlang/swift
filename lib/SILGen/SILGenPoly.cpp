@@ -3045,7 +3045,7 @@ buildThunkSignature(SILGenFunction &SGF,
     if (auto genericSig =
           SGF.F.getLoweredFunctionType()->getInvocationGenericSignature()) {
       baseGenericSig = genericSig;
-      depth = genericSig->getGenericParams().back()->getDepth() + 1;
+      depth = genericSig.getGenericParams().back()->getDepth() + 1;
     }
   }
 
@@ -3059,7 +3059,7 @@ buildThunkSignature(SILGenFunction &SGF,
       AbstractGenericSignatureRequest{
         baseGenericSig.getPointer(), { newGenericParam }, { newRequirement }},
       GenericSignature());
-  genericEnv = genericSig->getGenericEnvironment();
+  genericEnv = genericSig.getGenericEnvironment();
 
   newArchetype = genericEnv->mapTypeIntoContext(newGenericParam)
     ->castTo<ArchetypeType>();
@@ -3938,15 +3938,10 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
     SILFunction *customDerivativeFn, const AutoDiffConfig &config,
     AutoDiffDerivativeFunctionKind kind) {
   auto customDerivativeFnTy = customDerivativeFn->getLoweredFunctionType();
-  auto *thunkGenericEnv = customDerivativeFnTy->getSubstGenericSignature()
-                              ? customDerivativeFnTy->getSubstGenericSignature()
-                                    ->getGenericEnvironment()
-                              : nullptr;
+  auto *thunkGenericEnv = customDerivativeFnTy->getSubstGenericSignature().getGenericEnvironment();
 
   auto origFnTy = originalFn->getLoweredFunctionType();
-  CanGenericSignature derivativeCanGenSig;
-  if (auto derivativeGenSig = config.derivativeGenericSignature)
-    derivativeCanGenSig = derivativeGenSig->getCanonicalSignature();
+  auto derivativeCanGenSig = config.derivativeGenericSignature.getCanonicalSignature();
   auto thunkFnTy = origFnTy->getAutoDiffDerivativeFunctionType(
       config.parameterIndices, config.resultIndices, kind, Types,
       LookUpConformanceInModule(M.getSwiftModule()), derivativeCanGenSig);

@@ -534,7 +534,7 @@ SILGenModule::getKeyPathProjectionCoroutine(bool isReadAccess,
                                          SubstitutionMap(),
                                          getASTContext());
 
-  auto env = sig->getGenericEnvironment();
+  auto env = sig.getGenericEnvironment();
 
   SILGenFunctionBuilder builder(*this);
   fn = builder.createFunction(SILLinkage::PublicExternal,

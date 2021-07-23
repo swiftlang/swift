@@ -472,17 +472,17 @@ static void printSILFunctionNameAndType(
   function->printName(OS);
   OS << " : $";
   auto *genEnv = function->getGenericEnvironment();
-  const GenericSignatureImpl *genSig = nullptr;
+  GenericSignature genSig;
 
   // If `genEnv` is defined, get sugared names of generic
   // parameter types for printing.
   if (genEnv) {
-    genSig = genEnv->getGenericSignature().getPointer();
+    genSig = genEnv->getGenericSignature();
 
     llvm::DenseSet<Identifier> usedNames;
     llvm::SmallString<16> disambiguatedNameBuf;
     unsigned disambiguatedNameCounter = 1;
-    for (auto *paramTy : genSig->getGenericParams()) {
+    for (auto *paramTy : genSig.getGenericParams()) {
       // Get a uniqued sugared name for the generic parameter type.
       auto sugaredTy = genEnv->getGenericSignature()->getSugaredType(paramTy);
       Identifier name = sugaredTy->getName();
@@ -506,7 +506,7 @@ static void printSILFunctionNameAndType(
     }
   }
   auto printOptions = PrintOptions::printSIL(silPrintContext);
-  printOptions.GenericSig = genSig;
+  printOptions.GenericSig = genSig.getPointer();
   printOptions.AlternativeTypeNames =
       sugaredTypeNames.empty() ? nullptr : &sugaredTypeNames;
   function->getLoweredFunctionType()->print(OS, printOptions);
@@ -1258,7 +1258,7 @@ public:
 
     *this << '<';
     bool first = true;
-    for (auto gp : genericSig->getGenericParams()) {
+    for (auto gp : genericSig.getGenericParams()) {
       if (first) first = false;
       else *this << ", ";
 
@@ -3648,7 +3648,7 @@ void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
           genericSig);
       requirements = requirementsScratch;
     } else {
-      requirements = specializedSig->getRequirements();
+      requirements = specializedSig.getRequirements();
     }
   }
   if (targetFunction) {

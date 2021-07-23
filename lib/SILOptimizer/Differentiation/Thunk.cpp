@@ -61,7 +61,7 @@ CanGenericSignature buildThunkSignature(SILFunction *fn, bool inheritGenericSig,
     if (auto genericSig =
             fn->getLoweredFunctionType()->getSubstGenericSignature()) {
       builder.addGenericSignature(genericSig);
-      depth = genericSig->getGenericParams().back()->getDepth() + 1;
+      depth = genericSig.getGenericParams().back()->getDepth() + 1;
     }
   }
 
@@ -77,7 +77,7 @@ CanGenericSignature buildThunkSignature(SILFunction *fn, bool inheritGenericSig,
 
   auto genericSig = std::move(builder).computeGenericSignature(
       /*allowConcreteGenericParams=*/true);
-  genericEnv = genericSig->getGenericEnvironment();
+  genericEnv = genericSig.getGenericEnvironment();
 
   newArchetype =
       genericEnv->mapTypeIntoContext(newGenericParam)->castTo<ArchetypeType>();
@@ -104,7 +104,7 @@ CanGenericSignature buildThunkSignature(SILFunction *fn, bool inheritGenericSig,
       },
       MakeAbstractConformanceForGenericType());
 
-  return genericSig->getCanonicalSignature();
+  return genericSig.getCanonicalSignature();
 }
 
 CanSILFunctionType buildThunkType(SILFunction *fn,

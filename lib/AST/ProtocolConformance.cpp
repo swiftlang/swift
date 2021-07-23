@@ -532,8 +532,8 @@ ConditionalRequirementsRequest::evaluate(Evaluator &evaluator,
   // something else. The most important bit is having the same type
   // parameters. (NB. if/when Swift gets parameterized extensions, this needs to
   // change.)
-  assert(typeSig->getCanonicalSignature().getGenericParams() ==
-         extensionSig->getCanonicalSignature().getGenericParams());
+  assert(typeSig.getCanonicalSignature().getGenericParams() ==
+         extensionSig.getCanonicalSignature().getGenericParams());
 
   // Find the requirements in the extension that aren't proved by the original
   // type, these are the ones that make the conformance conditional.

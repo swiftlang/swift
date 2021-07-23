@@ -407,7 +407,7 @@ getSubstitutionsForCallee(SILModule &module, CanSILFunctionType baseCalleeType,
   unsigned baseDepth = 0;
   SubstitutionMap baseSubMap;
   if (auto baseClassSig = baseClassDecl->getGenericSignatureOfContext()) {
-    baseDepth = baseClassSig->getGenericParams().back()->getDepth() + 1;
+    baseDepth = baseClassSig.getGenericParams().back()->getDepth() + 1;
 
     // Compute the type of the base class, starting from the
     // derived class type and the type of the method's self
@@ -434,7 +434,7 @@ getSubstitutionsForCallee(SILModule &module, CanSILFunctionType baseCalleeType,
   // parameters from the derived class.
   unsigned origDepth = 0;
   if (auto calleeClassSig = calleeClassDecl->getGenericSignatureOfContext())
-    origDepth = calleeClassSig->getGenericParams().back()->getDepth() + 1;
+    origDepth = calleeClassSig.getGenericParams().back()->getDepth() + 1;
 
   auto baseCalleeSig = baseCalleeType->getInvocationGenericSignature();
 
@@ -916,7 +916,7 @@ getWitnessMethodSubstitutions(
   unsigned baseDepth = 0;
   auto *rootConformance = conformance->getRootConformance();
   if (auto witnessSig = rootConformance->getGenericSignature())
-    baseDepth = witnessSig->getGenericParams().back()->getDepth() + 1;
+    baseDepth = witnessSig.getGenericParams().back()->getDepth() + 1;
 
   // If the witness has a class-constrained 'Self' generic parameter,
   // we have to build a new substitution map that shifts all generic

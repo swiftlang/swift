@@ -750,8 +750,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
 
   GenericEnvironment *genericEnv = nullptr;
   if (!declarationOnly)
-    if (auto genericSig = MF->getGenericSignature(genericSigID))
-      genericEnv = genericSig->getGenericEnvironment();
+    genericEnv = MF->getGenericSignature(genericSigID).getGenericEnvironment();
 
   // If the next entry is the end of the block, then this function has
   // no contents.

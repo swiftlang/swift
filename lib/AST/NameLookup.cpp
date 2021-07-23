@@ -702,13 +702,9 @@ static void recordShadowedDecls(ArrayRef<ValueDecl *> decls,
     if (decl->isRecursiveValidation())
       continue;
 
-    CanGenericSignature signature;
-
-    auto *dc = decl->getInnermostDeclContext();
-    if (auto genericSig = dc->getGenericSignatureOfContext())
-      signature = genericSig->getCanonicalSignature();
-
     // Record this declaration based on its signature.
+    auto *dc = decl->getInnermostDeclContext();
+    auto signature = dc->getGenericSignatureOfContext().getCanonicalSignature();
     auto &known = collisions[signature.getPointer()];
     if (known.size() == 1) {
       collisionSignatures.push_back(signature.getPointer());

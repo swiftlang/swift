@@ -633,8 +633,8 @@ bool TypeChecker::checkContextualRequirements(GenericTypeDecl *decl,
     TypeChecker::checkGenericArguments(
         dc, loc, noteLoc,
         decl->getDeclaredInterfaceType(),
-        genericSig->getGenericParams(),
-        genericSig->getRequirements(),
+        genericSig.getGenericParams(),
+        genericSig.getRequirements(),
         QueryTypeSubstitutionMap{subMap});
 
   switch (result) {
@@ -889,11 +889,9 @@ Type TypeResolution::applyUnboundGenericArguments(
         return resultType;
 
       auto parentSig = decl->getDeclContext()->getGenericSignatureOfContext();
-      if (parentSig) {
-        for (auto gp : parentSig->getGenericParams())
-          subs[gp->getCanonicalType()->castTo<GenericTypeParamType>()] =
-              genericSig->getConcreteType(gp);
-      }
+      for (auto gp : parentSig.getGenericParams())
+        subs[gp->getCanonicalType()->castTo<GenericTypeParamType>()] =
+            genericSig->getConcreteType(gp);
     } else {
       subs = parentTy->getContextSubstitutions(decl->getDeclContext());
     }
@@ -901,10 +899,10 @@ Type TypeResolution::applyUnboundGenericArguments(
     skipRequirementsCheck |= parentTy->hasTypeVariable();
   } else if (auto genericSig =
                  decl->getDeclContext()->getGenericSignatureOfContext()) {
-    for (auto gp : genericSig->getGenericParams()) {
+    for (auto gp : genericSig.getGenericParams()) {
       subs[gp->getCanonicalType()->castTo<GenericTypeParamType>()] =
           (usesArchetypes()
-           ? genericSig->getGenericEnvironment()->mapTypeIntoContext(gp)
+           ? genericSig.getGenericEnvironment()->mapTypeIntoContext(gp)
            : gp);
     }
   }
@@ -916,7 +914,7 @@ Type TypeResolution::applyUnboundGenericArguments(
   // Realize the types of the generic arguments and add them to the
   // substitution map.
   for (unsigned i = 0, e = genericArgs.size(); i < e; ++i) {
-    auto origTy = genericSig->getInnermostGenericParams()[i];
+    auto origTy = genericSig.getInnermostGenericParams()[i];
     auto substTy = genericArgs[i];
 
     // Enter a substitution.
@@ -935,7 +933,7 @@ Type TypeResolution::applyUnboundGenericArguments(
     auto result = TypeChecker::checkGenericArguments(
         getDeclContext(), loc, noteLoc,
         UnboundGenericType::get(decl, parentTy, getASTContext()),
-        genericSig->getGenericParams(), genericSig->getRequirements(),
+        genericSig.getGenericParams(), genericSig.getRequirements(),
         QueryTypeSubstitutionMap{subs});
 
     switch (result) {
@@ -3038,9 +3036,9 @@ NeverNullType TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
   if (genericSig) {
     TypeSubstitutionMap genericArgMap;
 
-    auto params = genericSig->getGenericParams();
+    auto params = genericSig.getGenericParams();
     if (repr->getGenericArguments().size()
-          != genericSig->getGenericParams().size()) {
+          != genericSig.getGenericParams().size()) {
       diagnose(repr->getLoc(), diag::sil_box_arg_mismatch);
       return ErrorType::get(getASTContext());
     }
@@ -3142,7 +3140,7 @@ NeverNullType TypeResolver::resolveSILFunctionType(
                                   TypeResolver &&parameterResolver) {
     auto sig = env->getGenericSignature().getCanonicalSignature();
     TypeSubstitutionMap subsMap;
-    auto params = sig->getGenericParams();
+    auto params = sig.getGenericParams();
     for (unsigned i : indices(args)) {
       auto resolved = parameterResolver.resolveType(args[i], options);
       subsMap.insert({params[i], resolved->getCanonicalType()});

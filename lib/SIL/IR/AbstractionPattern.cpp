@@ -630,7 +630,7 @@ AbstractionPattern::getObjCMethodAsyncCompletionHandlerType(
     if (auto origSig = getGenericSignature()) {
       patternSig = origSig;
     } else if (auto genFnTy = dyn_cast<GenericFunctionType>(getType())) {
-      patternSig = genFnTy->getGenericSignature()->getCanonicalSignature();
+      patternSig = genFnTy->getGenericSignature().getCanonicalSignature();
     }
     
     return AbstractionPattern(patternSig,
