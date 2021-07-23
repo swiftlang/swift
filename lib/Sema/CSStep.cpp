@@ -807,7 +807,14 @@ bool ConjunctionStep::attempt(const ConjunctionElement &element) {
   // by dropping all scoring information.
   CS.CurrentScore = Score();
 
-  return element.attempt(CS);
+  auto success = element.attempt(CS);
+
+  // If element attempt has failed, mark whole conjunction
+  // as a failure.
+  if (!success)
+    markAsFailed();
+
+  return success;
 }
 
 StepResult ConjunctionStep::resume(bool prevFailed) {
@@ -838,14 +845,7 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
   // to be considered a success all of its elements have
   // to produce a single solution.
   if (prevFailed || Solutions.size() != 1) {
-    HadFailure = true;
-    // During performance mode, failure to infer a type for one
-    // of the elements automatically fails whole conjunction.
-    //
-    // TODO: In diagnostic mode, let's consider this conjunction
-    // a success if at least one of its elements was solved
-    // successfully by use of fixes, and ignore the rest.
-    AnySolved = false;
+    markAsFailed();
   } else {
     AnySolved = true;
   }

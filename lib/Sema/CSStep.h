@@ -877,6 +877,17 @@ protected:
   bool shouldStopAfter(const ConjunctionElement &element) const override {
     return HadFailure;
   }
+
+  void markAsFailed() {
+    HadFailure = true;
+    // During performance mode, failure to infer a type for one
+    // of the elements automatically fails whole conjunction.
+    //
+    // TODO: In diagnostic mode, let's consider this conjunction
+    // a success if at least one of its elements was solved
+    // successfully by use of fixes, and ignore the rest.
+    AnySolved = false;
+  }
 };
 
 } // end namespace constraints
