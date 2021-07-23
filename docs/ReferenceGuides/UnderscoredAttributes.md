@@ -33,8 +33,7 @@ module which uses the code.
 
 This means that `@_alwaysEmitIntoClient` definitions are _not_ part of the
 defining module's ABI, so changing the implementation at a later stage
-does not break ABI. (TODO: Does it matter if the `@_alwaysEmitIntoClient`
-definition is used in the defining module, say in an `@inlinable` function?)
+does not break ABI.
 
 Most notably, default argument expressions are implicitly
 `@_alwaysEmitIntoClient`, which means that adding a default argument to a
