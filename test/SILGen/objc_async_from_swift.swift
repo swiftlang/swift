@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-silgen -I %S/Inputs/custom-modules -enable-experimental-concurrency -disable-availability-checking %s -verify | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-cpu %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-silgen -I %S/Inputs/custom-modules -enable-experimental-concurrency -disable-availability-checking %s -verify | %FileCheck --implicit-check-not=hop_to_executor --check-prefix=CHECK --check-prefix=CHECK-%target-cpu %s
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
 
@@ -114,9 +114,44 @@ class SlowServerlet: SlowServer {
 
 @FooActor
 class ActorConstrained: NSObject {
-    // CHECK-LABEL: sil shared [thunk] [ossa] @$s{{.*}}16ActorConstrainedC3foo{{.*}}U_To
+    // ActorConstrained.foo()
+    // CHECK-LABEL: sil hidden [ossa] @$s{{.*}}16ActorConstrainedC3foo{{.*}} : $@convention(method) @async (@guaranteed ActorConstrained) -> Bool {
     // CHECK:         hop_to_executor {{%.*}} : $FooActor
+
+    // @objc ActorConstrained.foo()
+    // CHECK-LABEL: sil hidden [thunk] [ossa] @$s{{.*}}16ActorConstrainedC3foo{{.*}}To : $@convention(objc_method) (@convention(block) (Bool) -> (), ActorConstrained) -> () {
+    // CHECK:         [[ASYNC_CLOS:%[0-9]+]] = function_ref @$s{{.*}}16ActorConstrainedC3foo{{.*}}U_To : $@convention(thin) @Sendable @async (@convention(block) (Bool) -> (), ActorConstrained) -> ()
+    // CHECK:         [[PRIMED_CLOS:%[0-9]+]] = partial_apply [callee_guaranteed] [[ASYNC_CLOS]](
+    // CHECK:         [[TASK_RUNNER:%[0-9]+]] = function_ref @$ss29_runTaskForBridgedAsyncMethodyyyyYaYbcnF
+    // CHECK:         apply [[TASK_RUNNER]]([[PRIMED_CLOS]])
+
+    // @objc closure #1 in ActorConstrained.foo()
+    // CHECK-LABEL: sil shared [thunk] [ossa] @$s{{.*}}16ActorConstrainedC3foo{{.*}}U_To : $@convention(thin) @Sendable @async (@convention(block) (Bool) -> (), ActorConstrained) -> () {
+    // CHECK:           hop_to_executor {{%.*}} : $FooActor
     @objc func foo() async -> Bool {
+        return true
+    }
+}
+
+
+actor Dril: NSObject {
+    // Dril.postTo(twitter:)
+    // CHECK-LABEL: sil hidden [ossa] @$s{{.*}}4DrilC6postTo7twitter{{.*}} : $@convention(method) @async (@guaranteed String, @guaranteed Dril) -> Bool {
+    // CHECK:           hop_to_executor {{%.*}} : $Dril
+
+    // @objc Dril.postTo(twitter:)
+    // CHECK-LABEL: sil hidden [thunk] [ossa] @$s{{.*}}4DrilC6postTo7twitter{{.*}}To : $@convention(objc_method) (NSString, @convention(block) (Bool) -> (), Dril) -> () {
+    // CHECK:         [[ASYNC_CLOS:%[0-9]+]] = function_ref @$s{{.*}}4DrilC6postTo7twitter{{.*}}U_To : $@convention(thin) @Sendable @async (NSString, @convention(block) (Bool) -> (), Dril) -> ()
+    // CHECK:         [[PRIMED_CLOS:%[0-9]+]] = partial_apply [callee_guaranteed] [[ASYNC_CLOS]](
+    // CHECK:         [[TASK_RUNNER:%[0-9]+]] = function_ref @$ss29_runTaskForBridgedAsyncMethodyyyyYaYbcnF
+    // CHECK:         apply [[TASK_RUNNER]]([[PRIMED_CLOS]])
+    @objc func postTo(twitter msg: String) async -> Bool {
+        return true
+    }
+
+    // this is known to not emit a hop in the objc thunk (rdar://80972126)
+    @MainActor
+    @objc func postFromMainActorTo(twitter msg: String) -> Bool {
         return true
     }
 }
