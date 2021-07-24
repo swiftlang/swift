@@ -1,4 +1,6 @@
-func simple(completion: (String?, Error?) -> Void) { }
+// REQUIRES: concurrency
+
+func simple(completion: @escaping (String?, Error?) -> Void) { }
 
 func mismatches() {
   // RUN: not %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3
@@ -16,4 +18,4 @@ func mismatches() {
 }
 
 // RUN: not %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1
-func missingBody(complete: (Int?, Error?) -> Void)
+func missingBody(complete: @escaping (Int?, Error?) -> Void)

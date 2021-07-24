@@ -1,6 +1,8 @@
+// REQUIRES: concurrency
+
 // RUN: %empty-directory(%t)
 
-func simpleWithError(completion: (String?, Error?) -> Void) {}
+func simpleWithError(completion: @escaping (String?, Error?) -> Void) {}
 func simpleWithError() async throws -> String {}
 
 func testPathClassification() async throws {
