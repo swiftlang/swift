@@ -56,7 +56,7 @@ OperatorsTestSuite.test("ReadWriteIntArray.subscript (inline)") {
 }
 
 OperatorsTestSuite.test("ReadOnlyIntArray.subscript (inline)") {
-  var arr = ReadOnlyIntArray(1)
+  let arr = ReadOnlyIntArray(1)
 
   let result0 = arr[0]
   let result2 = arr[2]
@@ -80,7 +80,7 @@ OperatorsTestSuite.test("WriteOnlyIntArray.subscript (inline)") {
 }
 
 OperatorsTestSuite.test("DifferentTypesArray.subscript (inline)") {
-  var arr = DifferentTypesArray()
+  let arr = DifferentTypesArray()
 
   let resultInt: Int32 = arr[2]
   let resultDouble: Double = arr[0.1]
