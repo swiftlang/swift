@@ -879,7 +879,7 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
       assert(
           Snapshot &&
           "Isolated conjunction requires a snapshot of the constraint system");
-      Snapshot->restore();
+      Snapshot.reset();
     }
 
     // If one of the elements failed, that means while

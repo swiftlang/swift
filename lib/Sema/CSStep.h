@@ -786,7 +786,7 @@ class ConjunctionStep : public BindingStep<ConjunctionElementProducer> {
         CG.removeConstraint(&constraint);
     }
 
-    void restore() {
+    ~SolverSnapshot() {
       auto &CG = CS.getConstraintGraph();
 
       CS.TypeVariables = std::move(TypeVars);
@@ -839,6 +839,9 @@ public:
   ~ConjunctionStep() override {
     assert(!bool(ActiveChoice));
     assert(!bool(IsolationScope));
+
+    // Return all of the type variables and constraints back.
+    Snapshot.reset();
 
     // Restore conjunction constraint.
     restore(AfterConjunction, Conjunction);
