@@ -8010,28 +8010,6 @@ bool ConstructorDecl::isDistributedActorLocalInit() const {
   return params->get(0)->getInterfaceType()->isEqual(transportType);
 }
 
-// TODO: remove resolve init in favor of resolve function?
-bool ConstructorDecl::isDistributedActorResolveInit() const {
-  auto name = getName();
-  auto argumentNames = name.getArgumentNames();
-
-  if (argumentNames.size() != 2)
-    return false;
-
-  auto &C = getASTContext();
-  if (argumentNames[0] != C.Id_resolve ||
-      argumentNames[1] != C.Id_using)
-    return false;
-
-  auto *params = getParameters();
-  auto identityType = C.getAnyActorIdentityDecl()->getDeclaredInterfaceType();
-  auto transportType = C.getActorTransportDecl()->getDeclaredInterfaceType();
-
-  return params->get(0)->getInterfaceType()->isEqual(identityType) &&
-         params->get(1)->getInterfaceType()->isEqual(transportType);
-}
-
-
 DestructorDecl::DestructorDecl(SourceLoc DestructorLoc, DeclContext *Parent)
   : AbstractFunctionDecl(DeclKind::Destructor, Parent,
                          DeclBaseName::createDestructor(), DestructorLoc,

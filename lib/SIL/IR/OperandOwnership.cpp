@@ -829,7 +829,6 @@ BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, CancelAsyncTask)
 BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, InitializeDefaultActor)
 BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, DestroyDefaultActor)
 
-BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, InitializeDistributedRemoteActor)
 BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, DestroyDistributedActor)
 
 // FIXME: Why do these reqiuire a borrowed value at all?

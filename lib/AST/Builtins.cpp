@@ -2807,7 +2807,6 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::DestroyDefaultActor:
     return getDefaultActorInitDestroy(Context, Id);
 
-  case BuiltinValueKind::InitializeDistributedRemoteActor:
   case BuiltinValueKind::DestroyDistributedActor:
     return getDistributedActorInitDestroy(Context, Id);
 

@@ -6981,12 +6981,6 @@ public:
   /// ```
   bool isDistributedActorLocalInit() const;
 
-  /// Checks if the initializer is a distributed actor's 'resolve' initializer:
-  /// ```
-  /// init(resolve address: ActorAddress, using transport: ActorTransport)
-  /// ```
-  bool isDistributedActorResolveInit() const;
-
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Constructor;
   }

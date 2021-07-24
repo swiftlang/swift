@@ -46,9 +46,6 @@ public protocol DistributedActor: AnyActor, Identifiable, Hashable, Codable {
     ///   associated with.
     init(transport: ActorTransport)
 
-    @available(*, deprecated, renamed: "SomeDistributedActor.resolve(_:using:)")
-    init(resolve id: AnyActorIdentity, using transport: ActorTransport) throws
-
     /// Resolves the passed in `identity` against the `transport`, returning
     /// either a local or remote actor reference.
     ///
@@ -61,8 +58,9 @@ public protocol DistributedActor: AnyActor, Identifiable, Hashable, Codable {
     ///
     /// - Parameter identity: identity uniquely identifying a, potentially remote, actor in the system
     /// - Parameter transport: `transport` which should be used to resolve the `identity`, and be associated with the returned actor
-    static func resolve<Identity>(_ identity: Identity, using transport: ActorTransport)
-      throws -> Self where Identity: ActorIdentity
+    ///
+    static func resolve<Identity>(_ identity: Identity, using transport: ActorTransport) throws -> Self
+            where Identity: ActorIdentity
 
     /// The `ActorTransport` associated with this actor.
     /// It is immutable and equal to the transport passed in the local/resolve
@@ -96,7 +94,6 @@ extension DistributedActor {
       return instance
 
     case .makeProxy:
-      // FIXME: this needs actual implementation of distributedActorRemoteCreate
       let remote: Any = distributedActorRemoteCreate(identity: identity, transport: transport)
       return remote as! Self
     }
@@ -234,11 +231,6 @@ func __isLocalActor(_ actor: AnyObject) -> Bool {
 }
 
 // ==== Proxy Actor lifecycle --------------------------------------------------
-
-/// Called to initialize the distributed-remote actor 'proxy' instance in an actor.
-/// The implementation will call this within the actor's initializer.
-@_silgen_name("swift_distributedActor_remote_initialize")
-func _distributedActorRemoteInitialize(_ actor: AnyObject)
 
 @_silgen_name("swift_distributedActor_remote_create")
 func distributedActorRemoteCreate(identity: Any, transport: Any) -> Any // TODO: make it typed

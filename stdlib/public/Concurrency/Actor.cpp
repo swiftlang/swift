@@ -1756,12 +1756,6 @@ void swift::swift_defaultActor_deallocateResilient(HeapObject *actor) {
                       metadata->getInstanceAlignMask());
 }
 
-// TODO: most likely where we'd need to create the "proxy instance" instead? (most likely remove this and use swift_distributedActor_remote_create instead)
-void swift::swift_distributedActor_remote_initialize(DefaultActor *_actor) { // FIXME: remove distributed C++ impl not needed?
-  auto actor = asImpl(_actor);
-  actor->initialize(/*remote=*/true);
-}
-
 // TODO: missing implementation of creating a proxy for the remote actor
 OpaqueValue* swift::swift_distributedActor_remote_create(OpaqueValue *identity,
                                                          OpaqueValue *transport) {

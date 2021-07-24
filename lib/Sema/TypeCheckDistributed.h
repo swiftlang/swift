@@ -47,7 +47,8 @@ class ValueDecl;
 
 /// Check distributed actor isolation rules.
 
-/// The local and resolve distributed actor constructors have special rules to check.
+/// Perform semantic checking on a distributed actor's constructor, if this
+/// is a distributed actor constructor.
 void checkDistributedActorConstructor(ClassDecl *decl, ConstructorDecl *ctor);
 
 bool checkDistributedFunction(FuncDecl *decl, bool diagnose);

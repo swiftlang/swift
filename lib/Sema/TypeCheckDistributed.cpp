@@ -127,44 +127,52 @@ bool swift::checkDistributedFunction(FuncDecl *func, bool diagnose) {
   return false;
 }
 
-void swift::checkDistributedActorConstructor(ClassDecl *decl, ConstructorDecl *ctor) {
-  // bail out unless distributed actor, only those have special rules to check here
+/// Ensures that the given constructor will eventually delegate to
+/// self.init(transport:).
+void swift::checkDistributedActorConstructor(ClassDecl *decl,
+                                             ConstructorDecl *originalCtor) {
+  // bail out unless distributed actor, only those have special rules to check
   if (!decl->isDistributedActor())
     return;
 
-  // bail out for synthesized constructors
-  if (ctor->isSynthesized())
+  // our synthesized constructors don't need any checks
+  // (i.e. the resolve/local constructor would not delegate anywhere etc)
+  if (originalCtor->isSynthesized())
     return;
 
-  if (ctor->isDistributedActorLocalInit()) {
-    // it is not legal to manually define init(transport:)
-    // TODO: we want to lift this restriction but it is tricky
-    ctor->diagnose(diag::distributed_actor_local_init_explicitly_defined)
-        .fixItRemove(SourceRange(ctor->getStartLoc(), decl->getStartLoc()));
-    // TODO: we should be able to allow this, but then we need to inject
-    //       code or force users to "do the right thing"
+  // If this non-synthesized init meets the specifications of the local actor
+  // init, then raise an error. It is not legal to manually define it.
+  if (originalCtor->isDistributedActorLocalInit()) {
+    originalCtor->diagnose(diag::distributed_actor_local_init_explicitly_defined);
     return;
   }
 
-  if (ctor->isDistributedActorResolveInit()) {
-    // It is illegal for users to attempt defining a resolve initializer;
-    // Suggest removing it entirely, there is no way users can implement this init.
-    ctor->diagnose(diag::distributed_actor_init_resolve_must_not_be_user_defined)
-        .fixItRemove(SourceRange(ctor->getStartLoc(), decl->getStartLoc()));
-    return;
-  }
+  // Determine whether the distributed actor's local init is eventually
+  // delegated to from the current constructor.
+  ConstructorDecl *ctor = originalCtor;
+  do {
+    // Check what this ctor delegates to.
+    // If the current constructor doesn't delegate at all, then diagnostic.
+    auto initInfo = ctor->getDelegatingOrChainedInitKind();
+    if (initInfo.initKind == BodyInitKind::Delegating) {
+      if (ApplyExpr *apply = initInfo.initExpr) {
+        if (Expr *callee = apply->getFn()) {
+          if (auto ctorRef = dyn_cast<OtherConstructorDeclRefExpr>(callee)) {
+            ctor = ctorRef->getDecl(); // move to that ctor
 
-  // All user defined initializers on distributed actors must be 'convenience'.
-  //
-  // The only initializer that is allowed to be designated is init(transport:)
-  // which we synthesize on behalf of a distributed actor.
-  //
-  // When checking ctor bodies we'll check
-  if (!ctor->isConvenienceInit()) {
-    ctor->diagnose(diag::distributed_actor_init_user_defined_must_be_convenience,
-                   ctor->getName())
-        .fixItInsert(ctor->getConstructorLoc(), "convenience ");
-    return;
-  }
+            if (ctor->isDistributedActorLocalInit()) // success
+              return;
+
+            continue; // keep looking
+          }
+        }
+      }
+    }
+
+    break;
+  } while (true);
+
+  // Otherwise, it's an error to not delegate, eventually, to the local init.
+  originalCtor->diagnose(diag::distributed_actor_init_must_delegate_to_local_init,
+                         originalCtor->getName());
 }
-
