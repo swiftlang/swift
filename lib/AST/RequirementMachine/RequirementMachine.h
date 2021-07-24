@@ -14,16 +14,19 @@
 #define SWIFT_REQUIREMENTMACHINE_H
 
 #include "swift/AST/GenericSignature.h"
+#include "llvm/ADT/DenseMap.h"
+#include <vector>
+
+#include "PropertyMap.h"
+#include "ProtocolGraph.h"
+#include "RewriteContext.h"
+#include "RewriteSystem.h"
 
 namespace llvm {
 class raw_ostream;
 }
 
 namespace swift {
-
-namespace rewriting {
-class RewriteContext;
-}
 
 class ASTContext;
 class AssociatedTypeDecl;
@@ -33,18 +36,41 @@ class LayoutConstraint;
 class ProtocolDecl;
 class Requirement;
 class Type;
+class UnifiedStatsReporter;
+
+namespace rewriting {
+class RewriteContext;
 
 /// Wraps a rewrite system with higher-level operations in terms of
 /// generic signatures and interface types.
 class RequirementMachine final {
-  friend class ASTContext;
+  friend class swift::ASTContext;
 
-  struct Implementation;
+  CanGenericSignature Sig;
 
-  ASTContext &Context;
-  Implementation *Impl;
+  RewriteContext &Context;
+  RewriteSystem System;
+  PropertyMap Map;
 
-  explicit RequirementMachine(rewriting::RewriteContext &rewriteCtx);
+  bool Debug = false;
+  bool Complete = false;
+  unsigned RequirementMachineStepLimit;
+  unsigned RequirementMachineDepthLimit;
+
+  UnifiedStatsReporter *Stats;
+
+  /// All conformance access paths computed so far.
+  llvm::DenseMap<std::pair<CanType, ProtocolDecl *>,
+                 ConformanceAccessPath> ConformanceAccessPaths;
+
+  /// Conformance access paths computed during the last round. All elements
+  /// have the same length. If a conformance access path of greater length
+  /// is requested, we refill CurrentConformanceAccessPaths with all paths of
+  /// length N+1, and add them to the ConformanceAccessPaths map.
+  std::vector<std::pair<CanType, ConformanceAccessPath>>
+      CurrentConformanceAccessPaths;
+
+  explicit RequirementMachine(RewriteContext &rewriteCtx);
 
   RequirementMachine(const RequirementMachine &) = delete;
   RequirementMachine(RequirementMachine &&) = delete;
@@ -55,6 +81,8 @@ class RequirementMachine final {
 
   bool isComplete() const;
   void computeCompletion();
+
+  MutableTerm getLongestValidPrefix(const MutableTerm &term) const;
 
 public:
   ~RequirementMachine();
@@ -79,8 +107,11 @@ public:
                                                  ProtocolDecl *protocol);
   TypeDecl *lookupNestedType(Type depType, Identifier name) const;
 
+  void verify(const MutableTerm &term) const;
   void dump(llvm::raw_ostream &out) const;
 };
+
+} // end namespace rewriting
 
 } // end namespace swift
 

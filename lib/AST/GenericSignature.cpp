@@ -22,9 +22,9 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/PrettyStackTrace.h"
-#include "swift/AST/RequirementMachine.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/STLExtras.h"
+#include "RequirementMachine/RequirementMachine.h"
 #include <functional>
 
 using namespace swift;
@@ -191,7 +191,7 @@ GenericSignatureImpl::getGenericSignatureBuilder() const {
                                              CanGenericSignature(this));
 }
 
-RequirementMachine *
+rewriting::RequirementMachine *
 GenericSignatureImpl::getRequirementMachine() const {
   // The requirement machine is associated with the canonical signature.
   if (!isCanonical())

@@ -31,7 +31,7 @@ struct G<T : P2a & P3a> {}
 // CHECK: - τ_0_0.[P2a&P3a:T].[concrete: X<τ_0_0> with <τ_0_0.[P3a:U]>] => τ_0_0.[P2a&P3a:T]
 // CHECK: - τ_0_0.[P2a&P3a:T].[P2:T].[concrete: X<τ_0_0> with <τ_0_0.[P3a:U].[P1:T]>] => τ_0_0.[P2a&P3a:T].[P2:T]
 // CHECK: }
-// CHECK-LABEL: Equivalence class map: {
+// CHECK-LABEL: Property map: {
 // CHECK: τ_0_0.[P2a&P3a:T] => { conforms_to: [P2] concrete_type: [concrete: X<τ_0_0> with <τ_0_0.[P3a:U]>] }
 // CHECK: τ_0_0.[P2a&P3a:T].[P2:T] => { concrete_type: [concrete: X<τ_0_0> with <τ_0_0.[P3a:U].[P1:T]>] }
 // CHECK: }
