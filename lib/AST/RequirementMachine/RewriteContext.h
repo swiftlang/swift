@@ -26,18 +26,18 @@ namespace rewriting {
 
 /// A global object that can be shared by multiple rewrite systems.
 ///
-/// It stores uniqued atoms and terms.
+/// It stores uniqued symbols and terms.
 ///
 /// Out-of-line methods are documented in RewriteContext.cpp.
 class RewriteContext final {
-  friend class Atom;
+  friend class Symbol;
   friend class Term;
 
-  /// Allocator for uniquing atoms and terms.
+  /// Allocator for uniquing symbols and terms.
   llvm::BumpPtrAllocator Allocator;
 
-  /// Folding set for uniquing atoms.
-  llvm::FoldingSet<Atom::Storage> Atoms;
+  /// Folding set for uniquing symbols.
+  llvm::FoldingSet<Symbol::Storage> Symbols;
 
   /// Folding set for uniquing terms.
   llvm::FoldingSet<Term::Storage> Terms;

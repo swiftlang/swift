@@ -49,7 +49,7 @@ struct G<T : P1 & P2> {}
 // CHECK: - τ_0_0.[P1&P2:B].[P1:A] => τ_0_0.[P1&P2:B]
 // CHECK: - τ_0_0.[P1&P2:B].[P1:B] => τ_0_0.[P1&P2:A]
 // CHECK: }
-// CHECK-LABEL: Equivalence class map: {
+// CHECK-LABEL: Property map: {
 // CHECK: τ_0_0.[P1&P2:A] => { conforms_to: [P1] concrete_type: [concrete: S1] }
 // CHECK: τ_0_0.[P1&P2:B] => { conforms_to: [P1] concrete_type: [concrete: S2] }
 // CHECK: }

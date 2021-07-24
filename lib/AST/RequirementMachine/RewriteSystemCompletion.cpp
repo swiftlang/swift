@@ -37,19 +37,19 @@
 using namespace swift;
 using namespace rewriting;
 
-/// For a superclass or concrete type atom
+/// For a superclass or concrete type symbol
 ///
 ///   [concrete: Foo<X1, ..., Xn>]
 ///   [superclass: Foo<X1, ..., Xn>]
 ///
-/// Return a new atom where the prefix T is prepended to each of the
+/// Return a new symbol where the prefix T is prepended to each of the
 /// substitutions:
 ///
 ///   [concrete: Foo<T.X1, ..., T.Xn>]
 ///   [superclass: Foo<T.X1, ..., T.Xn>]
 ///
-/// Asserts if this is not a superclass or concrete type atom.
-Atom Atom::prependPrefixToConcreteSubstitutions(
+/// Asserts if this is not a superclass or concrete type symbol.
+Symbol Symbol::prependPrefixToConcreteSubstitutions(
     const MutableTerm &prefix,
     RewriteContext &ctx) const {
   if (prefix.empty())
@@ -157,15 +157,15 @@ MutableTerm::checkForOverlap(const MutableTerm &other,
   return OverlapKind::None;
 }
 
-/// If we have two atoms [P:T] and [Q:T], produce a merged atom:
+/// If we have two symbols [P:T] and [Q:T], produce a merged symbol:
 ///
 /// - If P inherits from Q, this is just [P:T].
 /// - If Q inherits from P, this is just [Q:T].
 /// - If P and Q are unrelated, this is [P&Q:T].
-Atom RewriteSystem::mergeAssociatedTypes(Atom lhs, Atom rhs) const {
+Symbol RewriteSystem::mergeAssociatedTypes(Symbol lhs, Symbol rhs) const {
   // Check preconditions that were established by RewriteSystem::addRule().
-  assert(lhs.getKind() == Atom::Kind::AssociatedType);
-  assert(rhs.getKind() == Atom::Kind::AssociatedType);
+  assert(lhs.getKind() == Symbol::Kind::AssociatedType);
+  assert(rhs.getKind() == Symbol::Kind::AssociatedType);
   assert(lhs.getName() == rhs.getName());
   assert(lhs.compare(rhs, Protos) > 0);
 
@@ -210,7 +210,7 @@ Atom RewriteSystem::mergeAssociatedTypes(Atom lhs, Atom rhs) const {
   // of the two sets.
   assert(minimalProtos.size() <= protos.size() + otherProtos.size());
 
-  return Atom::forAssociatedType(minimalProtos, lhs.getName(), Context);
+  return Symbol::forAssociatedType(minimalProtos, lhs.getName(), Context);
 }
 
 /// Consider the following example:
@@ -253,7 +253,7 @@ Atom RewriteSystem::mergeAssociatedTypes(Atom lhs, Atom rhs) const {
 ///
 ///   <T>.[P2:T] => <T>.[P1:T]
 ///
-/// When we add this rule, we introduce a new merged atom [P1&P2:T] in
+/// When we add this rule, we introduce a new merged symbol [P1&P2:T] in
 /// a pair of new rules:
 ///
 ///   <T>.[P1:T] => <T>.[P1&P2:T]
@@ -297,14 +297,14 @@ void RewriteSystem::processMergedAssociatedTypes() {
       llvm::dbgs() << lhs << " => " << rhs << "\n";
     }
 
-    auto mergedAtom = mergeAssociatedTypes(lhs.back(), rhs.back());
+    auto mergedSymbol = mergeAssociatedTypes(lhs.back(), rhs.back());
     if (DebugMerge) {
-      llvm::dbgs() << "### Merged atom " << mergedAtom << "\n";
+      llvm::dbgs() << "### Merged symbol " << mergedSymbol << "\n";
     }
 
     // Build the term X.[P1&P2:T].
     MutableTerm mergedTerm = lhs;
-    mergedTerm.back() = mergedAtom;
+    mergedTerm.back() = mergedSymbol;
 
     // Add the rule X.[P1:T] => X.[P1&P2:T].
     addRule(lhs, mergedTerm);
@@ -320,7 +320,7 @@ void RewriteSystem::processMergedAssociatedTypes() {
     for (const auto &otherRule : Rules) {
       const auto &otherLHS = otherRule.getLHS();
       if (otherLHS.size() == 2 &&
-          otherLHS[1].getKind() == Atom::Kind::Protocol) {
+          otherLHS[1].getKind() == Symbol::Kind::Protocol) {
         if (otherLHS[0] == lhs.back() ||
             otherLHS[0] == rhs.back()) {
           // We have a rule of the form
@@ -341,11 +341,11 @@ void RewriteSystem::processMergedAssociatedTypes() {
           //   [P1&P2:T].[Q] => [P1&P2:T]
           //
           MutableTerm newLHS;
-          newLHS.add(mergedAtom);
+          newLHS.add(mergedSymbol);
           newLHS.add(otherLHS[1]);
 
           MutableTerm newRHS;
-          newRHS.add(mergedAtom);
+          newRHS.add(mergedSymbol);
 
           inducedRules.emplace_back(newLHS, newRHS);
         }
@@ -376,7 +376,7 @@ void RewriteSystem::processMergedAssociatedTypes() {
 /// apply, but we arbitrarily pick case 1.
 ///
 /// There is also an additional wrinkle. If we're in case 2, and the
-/// last atom of V is a superclass or concrete type atom A, we prepend
+/// last symbol of V is a superclass or concrete type symbol A, we prepend
 /// T to each substitution of A.
 ///
 /// For example, suppose we have the following two rules:
