@@ -33,7 +33,7 @@ public func test<T : P>(_ t: T) where T == T.A {
 // CHECK-NEXT: - τ_0_1.A => τ_0_0
 // CHECK-NEXT: - τ_0_0.A => τ_0_0
 // CHECK-NEXT: }
-// CHECK-NEXT: Equivalence class map: {
+// CHECK-NEXT: Property map: {
 // CHECK-NEXT:   [P:A] => { conforms_to: [P] }
 // CHECK-NEXT:   τ_0_0 => { conforms_to: [P] }
 // CHECK-NEXT:   τ_0_1 => { conforms_to: [P] }

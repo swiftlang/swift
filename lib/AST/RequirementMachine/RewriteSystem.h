@@ -35,14 +35,14 @@ namespace swift {
 
 namespace rewriting {
 
-class EquivalenceClassMap;
+class PropertyMap;
 class MutableTerm;
 class RewriteContext;
 class Term;
 
 /// The smallest element in the rewrite system.
 ///
-/// enum Atom {
+/// enum Symbol {
 ///   case name(Identifier)
 ///   case protocol(Protocol)
 ///   case type([Protocol], Identifier)
@@ -52,14 +52,14 @@ class Term;
 ///   case concrete(CanType, substitutions: [Term])
 /// }
 ///
-/// For the concrete type atoms (`superclass` and `concrete`),
+/// For the concrete type symbols (`superclass` and `concrete`),
 /// the type's structural components must either be concrete, or
 /// generic parameters. All generic parameters must have a depth
 /// of 0; the generic parameter index corresponds to an index in
 /// the `substitutions` array.
 ///
 /// For example, the superclass requirement
-/// "T : MyClass<U.X, (Int) -> V.A.B>" is denoted with an atom
+/// "T : MyClass<U.X, (Int) -> V.A.B>" is denoted with a symbol
 /// structured as follows:
 ///
 /// - type: MyClass<τ_0_0, (Int) -> τ_0_1>
@@ -68,11 +68,11 @@ class Term;
 ///   - V.A.B
 ///
 /// Out-of-line methods are documented in RewriteSystem.cpp.
-class Atom final {
+class Symbol final {
 public:
   enum class Kind : uint8_t {
     //////
-    ////// Special atom kind that is both type-like and property-like:
+    ////// Special symbol kind that is both type-like and property-like:
     //////
 
     /// When appearing at the start of a term, denotes a nested
@@ -83,7 +83,7 @@ public:
     Protocol,
 
     //////
-    ////// "Type-like" atom kinds:
+    ////// "Type-like" symbol kinds:
     //////
 
     /// An associated type [P:T] or [P&Q&...:T]. The parent term
@@ -100,7 +100,7 @@ public:
     Name,
 
     //////
-    ////// "Property-like" atom kinds:
+    ////// "Property-like" symbol kinds:
     //////
 
     /// When appearing at the end of a term, denotes that the
@@ -124,7 +124,7 @@ private:
 private:
   const Storage *Ptr;
 
-  Atom(const Storage *ptr) : Ptr(ptr) {}
+  Symbol(const Storage *ptr) : Ptr(ptr) {}
 
 public:
   Kind getKind() const;
@@ -134,10 +134,10 @@ public:
   /// constraint.
   bool isProperty() const {
     auto kind = getKind();
-    return (kind == Atom::Kind::Protocol ||
-            kind == Atom::Kind::Layout ||
-            kind == Atom::Kind::Superclass ||
-            kind == Atom::Kind::ConcreteType);
+    return (kind == Symbol::Kind::Protocol ||
+            kind == Symbol::Kind::Layout ||
+            kind == Symbol::Kind::Superclass ||
+            kind == Symbol::Kind::ConcreteType);
   }
 
   bool isSuperclassOrConcreteType() const {
@@ -161,61 +161,61 @@ public:
 
   ArrayRef<Term> getSubstitutions() const;
 
-  /// Returns an opaque pointer that uniquely identifies this atom.
+  /// Returns an opaque pointer that uniquely identifies this symbol.
   const void *getOpaquePointer() const {
     return Ptr;
   }
 
-  static Atom forName(Identifier name,
-                      RewriteContext &ctx);
-
-  static Atom forProtocol(const ProtocolDecl *proto,
-                          RewriteContext &ctx);
-
-  static Atom forAssociatedType(const ProtocolDecl *proto,
-                                Identifier name,
-                                RewriteContext &ctx);
-
-  static Atom forAssociatedType(ArrayRef<const ProtocolDecl *> protos,
-                                Identifier name,
-                                RewriteContext &ctx);
-
-  static Atom forGenericParam(GenericTypeParamType *param,
-                              RewriteContext &ctx);
-
-  static Atom forLayout(LayoutConstraint layout,
+  static Symbol forName(Identifier name,
                         RewriteContext &ctx);
 
-  static Atom forSuperclass(CanType type,
-                            ArrayRef<Term> substitutions,
+  static Symbol forProtocol(const ProtocolDecl *proto,
                             RewriteContext &ctx);
 
-  static Atom forConcreteType(CanType type,
+  static Symbol forAssociatedType(const ProtocolDecl *proto,
+                                  Identifier name,
+                                  RewriteContext &ctx);
+
+  static Symbol forAssociatedType(ArrayRef<const ProtocolDecl *> protos,
+                                  Identifier name,
+                                  RewriteContext &ctx);
+
+  static Symbol forGenericParam(GenericTypeParamType *param,
+                                RewriteContext &ctx);
+
+  static Symbol forLayout(LayoutConstraint layout,
+                          RewriteContext &ctx);
+
+  static Symbol forSuperclass(CanType type,
                               ArrayRef<Term> substitutions,
                               RewriteContext &ctx);
 
-  int compare(Atom other, const ProtocolGraph &protos) const;
+  static Symbol forConcreteType(CanType type,
+                                ArrayRef<Term> substitutions,
+                                RewriteContext &ctx);
 
-  Atom transformConcreteSubstitutions(
+  int compare(Symbol other, const ProtocolGraph &protos) const;
+
+  Symbol transformConcreteSubstitutions(
       llvm::function_ref<Term(Term)> fn,
       RewriteContext &ctx) const;
 
-  Atom prependPrefixToConcreteSubstitutions(
+  Symbol prependPrefixToConcreteSubstitutions(
       const MutableTerm &prefix,
       RewriteContext &ctx) const;
 
   void dump(llvm::raw_ostream &out) const;
 
-  friend bool operator==(Atom lhs, Atom rhs) {
+  friend bool operator==(Symbol lhs, Symbol rhs) {
     return lhs.Ptr == rhs.Ptr;
   }
 
-  friend bool operator!=(Atom lhs, Atom rhs) {
+  friend bool operator!=(Symbol lhs, Symbol rhs) {
     return !(lhs == rhs);
   }
 
-  friend llvm::raw_ostream &operator<<(llvm::raw_ostream &out, Atom atom) {
-    atom.dump(out);
+  friend llvm::raw_ostream &operator<<(llvm::raw_ostream &out, Symbol symbol) {
+    symbol.dump(out);
     return out;
   }
 };
@@ -230,16 +230,16 @@ enum class OverlapKind {
   Second
 };
 
-/// A term is a sequence of one or more atoms.
+/// A term is a sequence of one or more symbols.
 ///
 /// The Term type is a uniqued, permanently-allocated representation,
 /// used to represent terms in the rewrite rules themselves. See also
 /// MutableTerm for the other representation.
 ///
-/// The first atom in the term must be a protocol, generic parameter, or
-/// associated type atom.
+/// The first symbol in the term must be a protocol, generic parameter, or
+/// associated type symbol.
 ///
-/// A layout, superclass or concrete type atom must only appear at the
+/// A layout, superclass or concrete type symbol must only appear at the
 /// end of a term.
 ///
 /// Out-of-line methods are documented in RewriteSystem.cpp.
@@ -255,15 +255,15 @@ class Term final {
 public:
   size_t size() const;
 
-  ArrayRef<Atom>::iterator begin() const;
-  ArrayRef<Atom>::iterator end() const;
+  ArrayRef<Symbol>::iterator begin() const;
+  ArrayRef<Symbol>::iterator end() const;
 
-  ArrayRef<Atom>::reverse_iterator rbegin() const;
-  ArrayRef<Atom>::reverse_iterator rend() const;
+  ArrayRef<Symbol>::reverse_iterator rbegin() const;
+  ArrayRef<Symbol>::reverse_iterator rend() const;
 
-  Atom back() const;
+  Symbol back() const;
 
-  Atom operator[](size_t index) const;
+  Symbol operator[](size_t index) const;
 
   /// Returns an opaque pointer that uniquely identifies this term.
   const void *getOpaquePointer() const {
@@ -288,91 +288,91 @@ public:
   }
 };
 
-/// A term is a sequence of one or more atoms.
+/// A term is a sequence of one or more symbols.
 ///
 /// The MutableTerm type is a dynamically-allocated representation,
 /// used to represent temporary values in simplification and completion.
 /// See also Term for the other representation.
 ///
-/// The first atom in the term must be a protocol, generic parameter, or
-/// associated type atom.
+/// The first symbol in the term must be a protocol, generic parameter, or
+/// associated type symbol.
 ///
-/// A layout constraint atom must only appear at the end of a term.
+/// A layout constraint symbol must only appear at the end of a term.
 ///
 /// Out-of-line methods are documented in RewriteSystem.cpp.
 class MutableTerm final {
-  llvm::SmallVector<Atom, 3> Atoms;
+  llvm::SmallVector<Symbol, 3> Symbols;
 
 public:
-  /// Creates an empty term. At least one atom must be added for the term
+  /// Creates an empty term. At least one symbol must be added for the term
   /// to become valid.
   MutableTerm() {}
 
-  explicit MutableTerm(decltype(Atoms)::const_iterator begin,
-                       decltype(Atoms)::const_iterator end)
-    : Atoms(begin, end) {}
+  explicit MutableTerm(decltype(Symbols)::const_iterator begin,
+                       decltype(Symbols)::const_iterator end)
+    : Symbols(begin, end) {}
 
-  explicit MutableTerm(llvm::SmallVector<Atom, 3> &&atoms)
-    : Atoms(std::move(atoms)) {}
+  explicit MutableTerm(llvm::SmallVector<Symbol, 3> &&symbols)
+    : Symbols(std::move(symbols)) {}
 
-  explicit MutableTerm(ArrayRef<Atom> atoms)
-    : Atoms(atoms.begin(), atoms.end()) {}
+  explicit MutableTerm(ArrayRef<Symbol> symbols)
+    : Symbols(symbols.begin(), symbols.end()) {}
 
   explicit MutableTerm(Term term)
-    : Atoms(term.begin(), term.end()) {}
+    : Symbols(term.begin(), term.end()) {}
 
-  void add(Atom atom) {
-    Atoms.push_back(atom);
+  void add(Symbol symbol) {
+    Symbols.push_back(symbol);
   }
 
   void append(Term other) {
-    Atoms.append(other.begin(), other.end());
+    Symbols.append(other.begin(), other.end());
   }
 
   void append(const MutableTerm &other) {
-    Atoms.append(other.begin(), other.end());
+    Symbols.append(other.begin(), other.end());
   }
 
   int compare(const MutableTerm &other, const ProtocolGraph &protos) const;
 
-  bool empty() const { return Atoms.empty(); }
+  bool empty() const { return Symbols.empty(); }
 
-  size_t size() const { return Atoms.size(); }
+  size_t size() const { return Symbols.size(); }
 
   ArrayRef<const ProtocolDecl *> getRootProtocols() const;
 
-  decltype(Atoms)::const_iterator begin() const { return Atoms.begin(); }
-  decltype(Atoms)::const_iterator end() const { return Atoms.end(); }
+  decltype(Symbols)::const_iterator begin() const { return Symbols.begin(); }
+  decltype(Symbols)::const_iterator end() const { return Symbols.end(); }
 
-  decltype(Atoms)::iterator begin() { return Atoms.begin(); }
-  decltype(Atoms)::iterator end() { return Atoms.end(); }
+  decltype(Symbols)::iterator begin() { return Symbols.begin(); }
+  decltype(Symbols)::iterator end() { return Symbols.end(); }
 
-  decltype(Atoms)::const_reverse_iterator rbegin() const { return Atoms.rbegin(); }
-  decltype(Atoms)::const_reverse_iterator rend() const { return Atoms.rend(); }
+  decltype(Symbols)::const_reverse_iterator rbegin() const { return Symbols.rbegin(); }
+  decltype(Symbols)::const_reverse_iterator rend() const { return Symbols.rend(); }
 
-  decltype(Atoms)::reverse_iterator rbegin() { return Atoms.rbegin(); }
-  decltype(Atoms)::reverse_iterator rend() { return Atoms.rend(); }
+  decltype(Symbols)::reverse_iterator rbegin() { return Symbols.rbegin(); }
+  decltype(Symbols)::reverse_iterator rend() { return Symbols.rend(); }
 
-  Atom back() const {
-    return Atoms.back();
+  Symbol back() const {
+    return Symbols.back();
   }
 
-  Atom &back() {
-    return Atoms.back();
+  Symbol &back() {
+    return Symbols.back();
   }
 
-  Atom operator[](size_t index) const {
-    return Atoms[index];
+  Symbol operator[](size_t index) const {
+    return Symbols[index];
   }
 
-  Atom &operator[](size_t index) {
-    return Atoms[index];
+  Symbol &operator[](size_t index) {
+    return Symbols[index];
   }
 
-  decltype(Atoms)::const_iterator findSubTerm(
+  decltype(Symbols)::const_iterator findSubTerm(
       const MutableTerm &other) const;
 
-  decltype(Atoms)::iterator findSubTerm(
+  decltype(Symbols)::iterator findSubTerm(
       const MutableTerm &other);
 
   /// Returns true if this term contains, or is equal to, \p other.
@@ -484,7 +484,7 @@ class RewriteSystem final {
   std::vector<Rule> Rules;
 
   /// The graph of all protocols transitively referenced via our set of
-  /// rewrite rules, used for the linear order on atoms.
+  /// rewrite rules, used for the linear order on symbols.
   ProtocolGraph Protos;
 
   /// A list of pending terms for the associated type merging completion
@@ -492,9 +492,9 @@ class RewriteSystem final {
   ///
   /// The pair (lhs, rhs) satisfies the following conditions:
   /// - lhs > rhs
-  /// - all atoms but the last are pair-wise equal in lhs and rhs
-  /// - the last atom in both lhs and rhs is an associated type atom
-  /// - the last atom in both lhs and rhs has the same name
+  /// - all symbols but the last are pair-wise equal in lhs and rhs
+  /// - the last symbol in both lhs and rhs is an associated type symbol
+  /// - the last symbol in both lhs and rhs has the same name
   ///
   /// See RewriteSystem::processMergedAssociatedTypes() for details.
   std::vector<std::pair<MutableTerm, MutableTerm>> MergedAssociatedTypes;
@@ -531,7 +531,7 @@ public:
   void initialize(std::vector<std::pair<MutableTerm, MutableTerm>> &&rules,
                   ProtocolGraph &&protos);
 
-  Atom simplifySubstitutionsInSuperclassOrConcreteAtom(Atom atom) const;
+  Symbol simplifySubstitutionsInSuperclassOrConcreteSymbol(Symbol symbol) const;
 
   bool addRule(MutableTerm lhs, MutableTerm rhs);
 
@@ -556,9 +556,9 @@ public:
   void simplifyRightHandSides();
 
   std::pair<CompletionResult, unsigned>
-  buildEquivalenceClassMap(EquivalenceClassMap &map,
-                           unsigned maxIterations,
-                           unsigned maxDepth);
+  buildPropertyMap(PropertyMap &map,
+                   unsigned maxIterations,
+                   unsigned maxDepth);
 
   void dump(llvm::raw_ostream &out) const;
 
@@ -566,7 +566,7 @@ private:
   Optional<std::pair<MutableTerm, MutableTerm>>
   computeCriticalPair(const Rule &lhs, const Rule &rhs) const;
 
-  Atom mergeAssociatedTypes(Atom lhs, Atom rhs) const;
+  Symbol mergeAssociatedTypes(Symbol lhs, Symbol rhs) const;
   void processMergedAssociatedTypes();
 };
 

@@ -1,4 +1,4 @@
-//===--- EquivalenceClassMap.h - Facts about generic parameters -*- C++ -*-===//
+//===--- PropertyMap.h - Properties of type parameter terms 0000-*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -11,12 +11,12 @@
 //===----------------------------------------------------------------------===//
 //
 // A description of this data structure and its purpose can be found in
-// EquivalenceClassMap.cpp.
+// PropertyMap.cpp.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_EQUIVALENCECLASSMAP_H
-#define SWIFT_EQUIVALENCECLASSMAP_H
+#ifndef SWIFT_PROPERTYMAP_H
+#define SWIFT_PROPERTYMAP_H
 
 #include "swift/AST/LayoutConstraint.h"
 #include "llvm/ADT/DenseMap.h"
@@ -45,13 +45,12 @@ class MutableTerm;
 class RewriteContext;
 class Term;
 
-/// Stores all rewrite rules of the form T.[p] => T, where [p] is a property atom,
-/// for a single term 'T'.
-class EquivalenceClass {
-  friend class EquivalenceClassMap;
+/// Stores a convenient representation of all "property-like" rewrite rules of
+/// the form T.[p] => T, where [p] is a property symbol, for some term 'T'.
+class PropertyBag {
+  friend class PropertyMap;
 
-  /// The fully reduced term whose properties are recorded in this equivalence
-  /// class.
+  /// The fully reduced term whose properties are recorded in this property bag.
   MutableTerm Key;
 
   /// All protocols this type conforms to.
@@ -61,32 +60,32 @@ class EquivalenceClass {
   LayoutConstraint Layout;
 
   /// The most specific superclass constraint this type satisfies.
-  Optional<Atom> Superclass;
+  Optional<Symbol> Superclass;
 
   /// All concrete conformances of Superclass to the protocols in the
   /// ConformsTo list.
   llvm::TinyPtrVector<ProtocolConformance *> SuperclassConformances;
 
   /// The most specific concrete type constraint this type satisfies.
-  Optional<Atom> ConcreteType;
+  Optional<Symbol> ConcreteType;
 
   /// All concrete conformances of ConcreteType to the protocols in the
   /// ConformsTo list.
   llvm::TinyPtrVector<ProtocolConformance *> ConcreteConformances;
 
-  explicit EquivalenceClass(const MutableTerm &key) : Key(key) {}
+  explicit PropertyBag(const MutableTerm &key) : Key(key) {}
 
-  void addProperty(Atom property,
+  void addProperty(Symbol property,
                    RewriteContext &ctx,
                    SmallVectorImpl<std::pair<MutableTerm, MutableTerm>> &inducedRules,
                    bool debug);
-  void copyPropertiesFrom(const EquivalenceClass *next,
+  void copyPropertiesFrom(const PropertyBag *next,
                           RewriteContext &ctx);
 
-  EquivalenceClass(const EquivalenceClass &) = delete;
-  EquivalenceClass(EquivalenceClass &&) = delete;
-  EquivalenceClass &operator=(const EquivalenceClass &) = delete;
-  EquivalenceClass &operator=(EquivalenceClass &&) = delete;
+  PropertyBag(const PropertyBag &) = delete;
+  PropertyBag(PropertyBag &&) = delete;
+  PropertyBag &operator=(const PropertyBag &) = delete;
+  PropertyBag &operator=(PropertyBag &&) = delete;
 
 public:
   const MutableTerm &getKey() const { return Key; }
@@ -131,12 +130,12 @@ public:
 };
 
 /// Stores all rewrite rules of the form T.[p] => T, where [p] is a property
-/// atom, for all terms 'T'.
+/// symbol, for all terms 'T'.
 ///
-/// Out-of-line methods are documented in EquivalenceClassMap.cpp.
-class EquivalenceClassMap {
+/// Out-of-line methods are documented in PropertyMap.cpp.
+class PropertyMap {
   RewriteContext &Context;
-  std::vector<std::unique_ptr<EquivalenceClass>> Map;
+  std::vector<std::unique_ptr<PropertyBag>> Map;
 
   using ConcreteTypeInDomain = std::pair<CanType, ArrayRef<const ProtocolDecl *>>;
   llvm::DenseMap<ConcreteTypeInDomain, MutableTerm> ConcreteTypeInDomainMap;
@@ -145,28 +144,28 @@ class EquivalenceClassMap {
   unsigned DebugConcreteUnification : 1;
   unsigned DebugConcretizeNestedTypes : 1;
 
-  EquivalenceClass *getEquivalenceClassIfPresent(const MutableTerm &key) const;
-  EquivalenceClass *getOrCreateEquivalenceClass(const MutableTerm &key);
+  PropertyBag *getPropertiesIfPresent(const MutableTerm &key) const;
+  PropertyBag *getOrCreateProperties(const MutableTerm &key);
 
-  EquivalenceClassMap(const EquivalenceClassMap &) = delete;
-  EquivalenceClassMap(EquivalenceClassMap &&) = delete;
-  EquivalenceClassMap &operator=(const EquivalenceClassMap &) = delete;
-  EquivalenceClassMap &operator=(EquivalenceClassMap &&) = delete;
+  PropertyMap(const PropertyMap &) = delete;
+  PropertyMap(PropertyMap &&) = delete;
+  PropertyMap &operator=(const PropertyMap &) = delete;
+  PropertyMap &operator=(PropertyMap &&) = delete;
 
 public:
-  explicit EquivalenceClassMap(RewriteContext &ctx,
-                               const ProtocolGraph &protos)
+  explicit PropertyMap(RewriteContext &ctx,
+                       const ProtocolGraph &protos)
       : Context(ctx), Protos(protos) {
     DebugConcreteUnification = false;
     DebugConcretizeNestedTypes = false;
   }
 
-  EquivalenceClass *lookUpEquivalenceClass(const MutableTerm &key) const;
+  PropertyBag *lookUpProperties(const MutableTerm &key) const;
 
   void dump(llvm::raw_ostream &out) const;
 
   void clear();
-  void addProperty(const MutableTerm &key, Atom property,
+  void addProperty(const MutableTerm &key, Symbol property,
                    SmallVectorImpl<std::pair<MutableTerm, MutableTerm>> &inducedRules);
 
   void computeConcreteTypeInDomainMap();

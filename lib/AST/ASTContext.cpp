@@ -41,7 +41,6 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/RawComment.h"
-#include "swift/AST/RequirementMachine.h"
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SourceFile.h"
@@ -67,6 +66,7 @@
 #include <algorithm>
 #include <memory>
 
+#include "RequirementMachine/RequirementMachine.h"
 #include "RequirementMachine/RewriteContext.h"
 
 using namespace swift;
@@ -420,7 +420,8 @@ struct ASTContext::Implementation {
       GenericSignatureBuilders;
 
     /// Stored requirement machines for canonical generic signatures.
-    llvm::DenseMap<GenericSignature, std::unique_ptr<RequirementMachine>>
+    llvm::DenseMap<GenericSignature,
+                   std::unique_ptr<rewriting::RequirementMachine>>
       RequirementMachines;
 
     /// The set of function types.
@@ -1892,8 +1893,8 @@ GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
   return builder;
 }
 
-RequirementMachine *ASTContext::getOrCreateRequirementMachine(
-    CanGenericSignature sig) {
+rewriting::RequirementMachine *
+ASTContext::getOrCreateRequirementMachine(CanGenericSignature sig) {
   assert(!sig.hasTypeVariable());
 
   auto &rewriteCtx = getImpl().TheRewriteContext;
@@ -1917,7 +1918,7 @@ RequirementMachine *ASTContext::getOrCreateRequirementMachine(
     return machine;
   }
 
-  auto *machine = new RequirementMachine(*rewriteCtx);
+  auto *machine = new rewriting::RequirementMachine(*rewriteCtx);
 
   // Store this requirement machine before adding the signature,
   // to catch re-entrant construction via addGenericSignature()
