@@ -222,6 +222,7 @@ public:
   virtual NullablePtr<DeclAttribute> getDeclAttributeIfAny() const {
     return nullptr;
   }
+  virtual NullablePtr<Stmt> getParentStmtIfAny() const;
 
 #pragma mark - debugging and printing
 

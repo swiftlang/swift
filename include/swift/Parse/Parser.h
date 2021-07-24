@@ -1669,9 +1669,12 @@ public:
           SourceLoc &throwsLoc,
           SourceLoc &arrowLoc,
           TypeExpr *&explicitResultType,
-          SourceLoc &inLoc);
+          SourceLoc &inLocm,
+          SmallVectorImpl<Identifier> &varsForSynthesizedGuard);
 
   Expr *parseExprAnonClosureArg();
+  GuardStmt *synthesizedGuardStmt(SmallVectorImpl<Identifier> &varsForSynthesizedGuard,
+                                  SourceLoc guardLoc);
   ParserResult<Expr> parseExprList(tok LeftTok, tok RightTok,
                                    syntax::SyntaxKind Kind);
 

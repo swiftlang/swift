@@ -164,6 +164,7 @@ class ExplicitSelfRequiredTest {
     doVoidStuff({ [unowned self] in x += 1 })
     doVoidStuff({ [unowned(unsafe) self] in x += 1 })
     doVoidStuff({ [unowned self = self] in x += 1 })
+    doVoidStuff({ [guard self] in x += 1 })
 
     doStuff({ [self] in x+1 })
     doStuff({ [self = self] in x+1 })
@@ -199,6 +200,7 @@ class ExplicitSelfRequiredTest {
     doVoidStuff({ [unowned self] in _ = method() })
     doVoidStuff({ [unowned(unsafe) self] in _ = method() })
     doVoidStuff({ [unowned self = self] in _ = method() })
+    doVoidStuff({ [guard self] in _ = method() })
 
     doStuff { self.method() }
     doStuff { [self] in method() }
@@ -322,6 +324,7 @@ func testCaptureBehavior(_ ptr : SomeClass) {
   let v2 : SomeClass = ptr
 
   doStuff { [weak v1] in v1!.foo() }
+  // doStuff { [guard v1] in v1.foo() } // This should fail, todo: write expected error
   // expected-warning @+2 {{variable 'v1' was written to, but never read}}
   doStuff { [weak v1,                 // expected-note {{previous}}
              weak v1] in v1!.foo() }  // expected-error {{invalid redeclaration of 'v1'}}

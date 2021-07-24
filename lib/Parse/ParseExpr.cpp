@@ -2458,7 +2458,8 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
     ParameterList *&params,
     SourceLoc &asyncLoc, SourceLoc &throwsLoc,
     SourceLoc &arrowLoc,
-    TypeExpr *&explicitResultType, SourceLoc &inLoc) {
+    TypeExpr *&explicitResultType, SourceLoc &inLoc,
+    SmallVectorImpl<Identifier> &varsForSynthesizedGuard) {
   // Clear out result parameters.
   bracketRange = SourceRange();
   attributes = DeclAttributes();
@@ -2574,10 +2575,18 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
       // Check for the strength specifier: "weak", "unowned", or
       // "unowned(safe/unsafe)".
       SourceLoc ownershipLocStart, ownershipLocEnd;
+      bool capturedVarNeedsSynthesizedGuard = false;
       auto ownershipKind = ReferenceOwnership::Strong;
       if (Tok.isContextualKeyword("weak")){
         ownershipLocStart = ownershipLocEnd = consumeToken(tok::identifier);
         ownershipKind = ReferenceOwnership::Weak;
+      } else if (Tok.is(tok::kw_guard)) {
+        // [guard x] has the same runtime semantics as [weak x],
+        // but [guard x] will synthesize the `guard let x = x else { return }`
+        // TODO: What actual syntax do we want for this?
+        ownershipLocStart = ownershipLocEnd = consumeToken(tok::kw_guard);
+        ownershipKind = ReferenceOwnership::Weak;
+        capturedVarNeedsSynthesizedGuard = true;
       } else if (Tok.isContextualKeyword("unowned")) {
         ownershipLocStart = ownershipLocEnd = consumeToken(tok::identifier);
         ownershipKind = ReferenceOwnership::Unowned;
@@ -2679,6 +2688,11 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
       if (ownershipKind != ReferenceOwnership::Strong)
         VD->getAttrs().add(new (Context) ReferenceOwnershipAttr(
           SourceRange(ownershipLocStart, ownershipLocEnd), ownershipKind));
+      
+      // If this capture used `[guard x]`, it needs a corresponding
+      // synthesized guard statement in the closure body
+      if (capturedVarNeedsSynthesizedGuard)
+        varsForSynthesizedGuard.push_back(name);
 
       auto pattern = NamedPattern::createImplicit(Context, VD);
 
@@ -2880,9 +2894,10 @@ ParserResult<Expr> Parser::parseExprClosure() {
   SourceLoc arrowLoc;
   TypeExpr *explicitResultType;
   SourceLoc inLoc;
+  SmallVector<Identifier, 4> varsForSynthesizedGuard;
   Status |= parseClosureSignatureIfPresent(
       attributes, bracketRange, captureList, capturedSelfDecl, params, asyncLoc,
-      throwsLoc, arrowLoc, explicitResultType, inLoc);
+      throwsLoc, arrowLoc, explicitResultType, inLoc, varsForSynthesizedGuard);
 
   // If the closure was created in the context of an array type signature's
   // size expression, there will not be a local context. A parse error will
@@ -2915,6 +2930,14 @@ ParserResult<Expr> Parser::parseExprClosure() {
 
   // Parse the body.
   SmallVector<ASTNode, 4> bodyElements;
+    
+  // If any of the capture list entires use `[guard x]`,
+  // we need to synthesize a guard and use it as the first body element.
+  auto guardStmt = synthesizedGuardStmt(varsForSynthesizedGuard, inLoc);
+  if (guardStmt) {
+    bodyElements.push_back(guardStmt);
+  }
+  
   Status |= parseBraceItems(bodyElements, BraceItemListKind::Brace);
 
   if (SourceMgr.rangeContainsCodeCompletionLoc({leftBrace, PreviousLoc})) {
@@ -3060,6 +3083,52 @@ Expr *Parser::parseExprAnonClosureArg() {
 
   return new (Context) DeclRefExpr(decls[ArgNo], DeclNameLoc(Loc),
                                    /*Implicit=*/false);
+}
+
+/// Creates a synthesized GuardStmt for any variables in the capture list using [guard x]
+GuardStmt *Parser::synthesizedGuardStmt(SmallVectorImpl<Identifier> &varsForSynthesizedGuard,
+                                        SourceLoc guardLoc) {
+  if (varsForSynthesizedGuard.empty())
+    return nullptr;
+      
+  SmallVector<StmtConditionElement, 4> conditions;
+  for (Identifier identifier : varsForSynthesizedGuard) {
+    // synthesize `let identifier = identifier` pattern
+    auto lhsSelfVarDecl = new (Context) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Let,
+                                                guardLoc, identifier,
+                                                CurDeclContext);
+    
+    auto lhsSelfNamedPattern = new (Context) NamedPattern(lhsSelfVarDecl);
+    auto lhsSelfBinding = new (Context) BindingPattern(guardLoc, true, lhsSelfNamedPattern);
+
+    auto selfDeclNameRef = new DeclNameRef(identifier);
+    auto rhsSelfDecl = new (Context) UnresolvedDeclRefExpr(*selfDeclNameRef,
+                                                           DeclRefKind::Ordinary,
+                                                           DeclNameLoc(guardLoc));
+    
+    lhsSelfVarDecl->setImplicit();
+    lhsSelfNamedPattern->setImplicit();
+    lhsSelfBinding->setImplicit();
+    rhsSelfDecl->setImplicit();
+    
+    conditions.push_back({guardLoc, lhsSelfBinding, rhsSelfDecl});
+  }
+
+  // synthesize `{ return }`
+  auto returnStmt = new (Context) ReturnStmt(guardLoc, nullptr, /* IsImplicit */true);
+
+  SmallVector<ASTNode, 4> braceStmtElements;
+  braceStmtElements.push_back(returnStmt);
+  
+  auto braceStmt = BraceStmt::create(Context, guardLoc,
+                                     Context.AllocateCopy(braceStmtElements), guardLoc,
+                                     /* IsImplicit */true);
+  
+  // synthesize `guard let identifier = identifier else { return }`
+  auto guardStmt = new (Context) GuardStmt(guardLoc, Context.AllocateCopy(conditions),
+                                           braceStmt, /* IsImplicit */true);
+  
+  return guardStmt;
 }
 
 

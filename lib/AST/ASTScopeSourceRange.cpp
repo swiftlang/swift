@@ -47,6 +47,11 @@ void ASTScopeImpl::checkSourceRangeBeforeAddingChild(ASTScopeImpl *child,
       if (PBD->isDebuggerBinding())
         return;
   
+  // Also ignore implicit statements, since they don't have valid source ranges.
+  if (auto stmt = getParentStmtIfAny().getPtrOrNull())
+    if (stmt->isImplicit())
+      return;
+  
   auto &sourceMgr = ctx.SourceMgr;
 
   auto range = getCharSourceRangeOfScope(sourceMgr);
@@ -94,6 +99,18 @@ void ASTScopeImpl::checkSourceRangeBeforeAddingChild(ASTScopeImpl *child,
       abort();
     }
   }
+}
+
+// Recursively finds the nearest parent Stmt, if one is present
+NullablePtr<Stmt> ASTScopeImpl::getParentStmtIfAny() const {
+  if (auto parent = getParent().getPtrOrNull()) {
+    if (auto parentStmt = parent->getStmtIfAny().getPtrOrNull())
+      return parentStmt;
+    else
+      return parent->getParentStmtIfAny();
+  }
+  
+  return nullptr;
 }
 
 #pragma mark getSourceRangeOfThisASTNode
