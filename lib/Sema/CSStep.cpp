@@ -844,9 +844,24 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
   // this conjunction. Note that for conjunction constraint
   // to be considered a success all of its elements have
   // to produce a single solution.
-  if (prevFailed || Solutions.size() != 1) {
-    markAsFailed();
-  } else {
+  {
+    auto failConjunction = [&]() {
+      markAsFailed();
+      return done(/*isSuccess=*/false);
+    };
+
+    if (prevFailed)
+      return failConjunction();
+
+    if (Solutions.size() > 1) {
+      filterSolutions(Solutions, /*minimize=*/true);
+
+      if (Solutions.size() != 1)
+        return failConjunction();
+    }
+
+    // Since there is only one solution, let's
+    // consider this element as solved.
     AnySolved = true;
   }
 
