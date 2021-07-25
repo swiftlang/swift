@@ -40,9 +40,12 @@ struct ExpectedFixIt;
 struct LineColumnRange {
   static constexpr unsigned NoValue = ~0u;
 
-  unsigned StartCol, EndCol;
+  unsigned StartLine, StartCol;
+  unsigned EndLine, EndCol;
 
-  LineColumnRange() : StartCol(NoValue), EndCol(NoValue) {}
+  LineColumnRange()
+      : StartLine(NoValue), StartCol(NoValue), EndLine(NoValue),
+        EndCol(NoValue) {}
 };
 
 class CapturedFixItInfo final {
@@ -60,7 +63,9 @@ public:
   /// Obtain the line-column range corresponding to the fix-it's
   /// replacement range.
   const LineColumnRange &getLineColumnRange(const SourceManager &SM,
-                                            unsigned BufferID) const;
+                                            unsigned BufferID,
+                                            bool ComputeStartLocLine,
+                                            bool ComputeEndLocLine) const;
 };
 
 struct CapturedDiagnosticInfo {
@@ -132,7 +137,7 @@ private:
 
   // Render the verifier syntax for a given set of fix-its.
   std::string renderFixits(ArrayRef<CapturedFixItInfo> ActualFixIts,
-                           unsigned BufferID) const;
+                           unsigned BufferID, unsigned DiagnosticLineNo) const;
 
   void printRemainingDiagnostics() const;
 };
