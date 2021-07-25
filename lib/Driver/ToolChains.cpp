@@ -560,7 +560,7 @@ ToolChain::constructInvocation(const CompileJobAction &job,
                       options::OPT_disable_autolinking_runtime_compatibility)) {
     Arguments.push_back("-disable-autolinking-runtime-compatibility");
   }
-                                 
+
   if (auto arg = context.Args.getLastArg(
                                   options::OPT_runtime_compatibility_version)) {
     Arguments.push_back("-runtime-compatibility-version");
@@ -581,6 +581,9 @@ ToolChain::constructInvocation(const CompileJobAction &job,
       Arguments,
       options::
           OPT_disable_autolinking_runtime_compatibility_dynamic_replacements);
+  context.Args.AddLastArg(
+      Arguments,
+      options::OPT_disable_autolinking_runtime_compatibility_concurrency);
 
   if (context.OI.CompilerMode == OutputInfo::Mode::SingleCompile) {
     context.Args.AddLastArg(Arguments, options::OPT_emit_symbol_graph);
