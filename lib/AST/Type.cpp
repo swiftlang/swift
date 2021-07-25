@@ -6432,26 +6432,38 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
   getSubsetParameters(parameterIndices, diffParams,
                       /*reverseCurryLevels*/ !makeSelfParamFirst);
 
-  // Get the original semantic result type.
+  // Get the original non-inout semantic result types.
   SmallVector<AutoDiffSemanticFunctionResultType, 1> originalResults;
   autodiff::getFunctionSemanticResultTypes(this, originalResults);
   // Error if no original semantic results.
   if (originalResults.empty())
     return llvm::make_error<DerivativeFunctionTypeError>(
         this, DerivativeFunctionTypeError::Kind::NoSemanticResults);
-  auto originalResult = originalResults.front();
-  auto originalResultType = originalResult.type;
+  // Accumulate non-inout result tangent spaces.
+  SmallVector<Type, 1> resultTanTypes;
+  bool hasInoutResult = false;
+  for (auto i : range(originalResults.size())) {
+    auto originalResult = originalResults[i];
+    if (originalResult.isInout) {
+      hasInoutResult = true;
+      continue;
+    }
+    auto originalResultType = originalResult.type;
+    // Get the original semantic result type's `TangentVector` associated type.
+    auto resultTan =
+        originalResultType->getAutoDiffTangentSpace(lookupConformance);
+    if (!resultTan)
+      continue;
+    auto resultTanType = resultTan->getType();
+    resultTanTypes.push_back(resultTanType);
+  }
 
-  // Get the original semantic result type's `TangentVector` associated type.
-  auto resultTan =
-      originalResultType->getAutoDiffTangentSpace(lookupConformance);
-  // Error if original semantic result has no tangent space.
-  if (!resultTan) {
+  // Error if no semantic result has a tangent space.
+  if (resultTanTypes.empty() && !hasInoutResult) {
     return llvm::make_error<DerivativeFunctionTypeError>(
         this, DerivativeFunctionTypeError::Kind::NonDifferentiableResult,
-        std::make_pair(originalResultType, /*index*/ 0));
+        std::make_pair(originalResults.front().type, /*index*/ 0));
   }
-  auto resultTanType = resultTan->getType();
 
   // Compute the result linear map function type.
   FunctionType *linearMapType;
@@ -6467,11 +6479,10 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
     // - Original:      `(T0, inout T1, ...) -> Void`
     // - Differential: `(T0.Tan, ...) -> T1.Tan`
     //
-    // Case 3: original function has a wrt `inout` parameter.
-    // - Original:     `(T0, inout T1, ...) -> Void`
-    // - Differential: `(T0.Tan, inout T1.Tan, ...) -> Void`
+    // Case 3: original function has wrt `inout` parameters.
+    // - Original:     `(T0, inout T1, ...) -> R`
+    // - Differential: `(T0.Tan, inout T1.Tan, ...) -> R.Tan`
     SmallVector<AnyFunctionType::Param, 4> differentialParams;
-    bool hasInoutDiffParameter = false;
     for (auto i : range(diffParams.size())) {
       auto diffParam = diffParams[i];
       auto paramType = diffParam.getPlainType();
@@ -6486,11 +6497,23 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
       }
       differentialParams.push_back(AnyFunctionType::Param(
           paramTan->getType(), Identifier(), diffParam.getParameterFlags()));
-      if (diffParam.isInOut())
-        hasInoutDiffParameter = true;
     }
-    auto differentialResult =
-        hasInoutDiffParameter ? Type(ctx.TheEmptyTupleType) : resultTanType;
+    Type differentialResult;
+    if (resultTanTypes.empty()) {
+      differentialResult = ctx.TheEmptyTupleType;
+    } else if (resultTanTypes.size() == 1) {
+      differentialResult = resultTanTypes.front();
+    } else {
+      SmallVector<TupleTypeElt, 2> differentialResults;
+      for (auto i : range(resultTanTypes.size())) {
+        auto resultTanType = resultTanTypes[i];
+        auto flags = ParameterTypeFlags().withInOut(false);
+        differentialResults.push_back(
+            TupleTypeElt(resultTanType, Identifier(), flags));
+      }
+      differentialResult = TupleType::get(differentialResults, ctx);
+    }
+
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     FunctionType::ExtInfo info;
     linearMapType =
@@ -6508,11 +6531,11 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
     // - Original: `(T0, inout T1, ...) -> Void`
     // - Pullback: `(T1.Tan) -> (T0.Tan, ...)`
     //
-    // Case 3: original function has a wrt `inout` parameter.
-    // - Original: `(T0, inout T1, ...) -> Void`
-    // - Pullback: `(inout T1.Tan) -> (T0.Tan, ...)`
+    // Case 3: original function has wrt `inout` parameters.
+    // - Original: `(T0, inout T1, ...) -> R`
+    // - Pullback: `(R.Tan, inout T1.Tan) -> (T0.Tan, ...)`
     SmallVector<TupleTypeElt, 4> pullbackResults;
-    bool hasInoutDiffParameter = false;
+    SmallVector<AnyFunctionType::Param, 2> inoutParams;
     for (auto i : range(diffParams.size())) {
       auto diffParam = diffParams[i];
       auto paramType = diffParam.getPlainType();
@@ -6526,7 +6549,7 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
             std::make_pair(paramType, i));
       }
       if (diffParam.isInOut()) {
-        hasInoutDiffParameter = true;
+        inoutParams.push_back(diffParam);
         continue;
       }
       pullbackResults.emplace_back(paramTan->getType());
@@ -6539,12 +6562,27 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
     } else {
       pullbackResult = TupleType::get(pullbackResults, ctx);
     }
-    auto flags = ParameterTypeFlags().withInOut(hasInoutDiffParameter);
-    auto pullbackParam =
-        AnyFunctionType::Param(resultTanType, Identifier(), flags);
+    // First accumulate non-inout results as pullback parameters.
+    SmallVector<FunctionType::Param, 2> pullbackParams;
+    for (auto i : range(resultTanTypes.size())) {
+      auto resultTanType = resultTanTypes[i];
+      auto flags = ParameterTypeFlags().withInOut(false);
+      pullbackParams.push_back(AnyFunctionType::Param(
+          resultTanType, Identifier(), flags));
+    }
+    // Then append inout parameters.
+    for (auto i : range(inoutParams.size())) {
+      auto inoutParam = inoutParams[i];
+      auto inoutParamType = inoutParam.getPlainType();
+      auto inoutParamTan =
+          inoutParamType->getAutoDiffTangentSpace(lookupConformance);
+      auto flags = ParameterTypeFlags().withInOut(true);
+      pullbackParams.push_back(AnyFunctionType::Param(
+          inoutParamTan->getType(), Identifier(), flags));
+    }
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     FunctionType::ExtInfo info;
-    linearMapType = FunctionType::get({pullbackParam}, pullbackResult, info);
+    linearMapType = FunctionType::get(pullbackParams, pullbackResult, info);
     break;
   }
   }

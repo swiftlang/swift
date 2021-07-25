@@ -121,6 +121,32 @@ SimpleMathTests.test("MultipleResults") {
   expectEqual((4, 3), gradient(at: 3, 4, of: multiply_swapAndReturnProduct))
 }
 
+// Test function with multiple `inout` parameters and a custom pullback.
+@differentiable(reverse)
+func swapCustom(_ x: inout Float, _ y: inout Float) {
+  let tmp = x; x = y; y = tmp
+}
+@derivative(of: swapCustom)
+func vjpSwapCustom(_ x: inout Float, _ y: inout Float) -> (
+  value: Void, pullback: (inout Float, inout Float) -> Void
+) {
+  swapCustom(&x, &y)
+  return ((), {v1, v2 in
+    let tmp = v1; v1 = v2; v2 = v1
+  })
+}
+
+SimpleMathTests.test("MultipleResultsWithCustomPullback") {
+  func multiply_swapCustom(_ x: Float, _ y: Float) -> Float {
+    var tuple = (x, y)
+    swapCustom(&tuple.0, &tuple.1)
+    return tuple.0 * tuple.1
+  }
+
+  expectEqual((4, 3), gradient(at: 3, 4, of: multiply_swapCustom))
+  expectEqual((10, 5), gradient(at: 5, 10, of: multiply_swapCustom))
+}
+
 SimpleMathTests.test("CaptureLocal") {
   let z: Float = 10
   func foo(_ x: Float) -> Float {

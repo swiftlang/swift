@@ -748,7 +748,15 @@ func multipleSemanticResults(_ x: inout Float) -> Float {
 }
 @derivative(of: multipleSemanticResults)
 func vjpMultipleSemanticResults(x: inout Float) -> (
-  value: Float, pullback: (inout Float) -> Void
+  value: Float, pullback: (Float, inout Float) -> Void
+) { fatalError() }
+
+func inoutNonDifferentiableResult(_ x: inout Float) -> Int {
+  return 5
+}
+@derivative(of: inoutNonDifferentiableResult)
+func vjpInoutNonDifferentiableResult(x: inout Float) -> (
+  value: Int, pullback: (inout Float) -> Void
 ) { fatalError() }
 
 struct InoutParameters: Differentiable {
@@ -884,13 +892,13 @@ extension InoutParameters {
   func multipleSemanticResults(_ x: inout Float) -> Float { x }
   @derivative(of: multipleSemanticResults)
   func vjpMultipleSemanticResults(_ x: inout Float) -> (
-    value: Float, pullback: (inout Float) -> Void
+    value: Float, pullback: (Float, inout Float) -> Void
   ) { fatalError() }
 
   func inoutVoid(_ x: Float, _ void: inout Void) -> Float {}
   @derivative(of: inoutVoid)
   func vjpInoutVoidParameter(_ x: Float, _ void: inout Void) -> (
-    value: Float, pullback: (inout Float) -> Void
+    value: Float, pullback: (Float) -> Float
   ) { fatalError() }
 }
 
