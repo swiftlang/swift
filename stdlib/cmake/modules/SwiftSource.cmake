@@ -459,6 +459,7 @@ function(_compile_swift_files
   if (SWIFTFILE_IS_STDLIB OR SWIFTFILE_IS_SDK_OVERLAY)
     list(APPEND swift_flags "-runtime-compatibility-version" "none")
     list(APPEND swift_flags "-disable-autolinking-runtime-compatibility-dynamic-replacements")
+    list(APPEND swift_flags "-Xfrontend" "-disable-autolinking-runtime-compatibility-concurrency")
   endif()
 
   if (SWIFTFILE_IS_STDLIB_CORE OR SWIFTFILE_IS_SDK_OVERLAY)
