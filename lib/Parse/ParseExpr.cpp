@@ -2936,6 +2936,20 @@ ParserResult<Expr> Parser::parseExprClosure() {
   auto guardStmt = synthesizedGuardStmt(varsForSynthesizedGuard, inLoc);
   if (guardStmt) {
     bodyElements.push_back(guardStmt);
+    
+    // If the capture list has `[guard self]` then we can
+    // allow implicit self in the closure body.
+    bool guardsSelf = false;
+    
+    for (auto identifier : varsForSynthesizedGuard) {
+      if (identifier.str() == "self") {
+        guardsSelf = true;
+        break;
+      }
+    }
+    
+    if (guardsSelf)
+      closure->setAllowsImplicitSelfCapture();
   }
   
   Status |= parseBraceItems(bodyElements, BraceItemListKind::Brace);

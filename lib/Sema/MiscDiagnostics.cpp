@@ -1711,6 +1711,11 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       if (auto *VD = closureExpr->getCapturedSelfDecl()) {
         // Either this is a weak capture of self...
         if (VD->getType()->is<WeakStorageType>()) {
+          // `[guard self]` captures have runtime semantics of `[weak self]`
+          // but allows implicit `self.` references.
+          if (closureExpr->allowsImplicitSelfCapture())
+            return false;
+          
           Diags.diagnose(VD->getLoc(), diag::note_self_captured_weakly);
         // ...or something completely different.
         } else {
