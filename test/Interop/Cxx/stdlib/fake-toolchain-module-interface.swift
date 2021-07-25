@@ -6,6 +6,6 @@
 // XFAIL: OS=linux-androideabi
 // XFAIL: OS=linux-android
 
-// CHECK: extension FakeNamespace {
+// CHECK: enum FakeNamespace {
 // CHECK:   static func foo(_ x: Int32)
 // CHECK: }

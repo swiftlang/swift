@@ -68,8 +68,8 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Memory.h"
 #include "llvm/Support/Path.h"
-#include "llvm/Support/YAMLTraits.h"
 #include "llvm/Support/YAMLParser.h"
+#include "llvm/Support/YAMLTraits.h"
 #include <algorithm>
 #include <memory>
 
@@ -3863,11 +3863,6 @@ void ClangImporter::Implementation::lookupValue(
           importDeclReal(clangDecl->getMostRecentDecl(), CurrentVersion,
                          /*useCanonicalDecl*/ !isNamespace);
 
-      if (isNamespace) {
-        if (auto extension = cast_or_null<ExtensionDecl>(realDecl))
-          realDecl = extension->getExtendedNominal();
-      }
-
       if (!realDecl)
         continue;
       decl = cast<ValueDecl>(realDecl);
@@ -4049,7 +4044,7 @@ SmallVector<SwiftLookupTable::SingleEntry, 4>
 ClangDirectLookupRequest::evaluate(Evaluator &evaluator,
                                    ClangDirectLookupDescriptor desc) const {
   auto &ctx = desc.decl->getASTContext();
-  auto *clangDecl = desc.decl->getClangDecl();
+  auto *clangDecl = desc.clangDecl;
   // Class templates aren't in the lookup table.
   if (auto spec = dyn_cast<clang::ClassTemplateSpecializationDecl>(clangDecl))
     return lookupInClassTemplateSpecialization(ctx, spec, desc.name);
@@ -4065,49 +4060,20 @@ ClangDirectLookupRequest::evaluate(Evaluator &evaluator,
 
   auto foundDecls = lookupTable->lookup(
       SerializedSwiftName(desc.name.getBaseName()), effectiveClangContext);
-  // TODO: in `SwiftLookupTable::lookup` the `searchContext` is only a string.
-  // This is problematic because we might have two nested search contexts with
-  // the same name. The search context needs to be updated to be a decl (or
-  // decl context), but that will be a larger, seperate refactor. When that
-  // happens we can remove the below logic.
-  //
-  // We filter here by ensuring that each decl and all of its parents have the
-  // same name as `clangDecl` and its parents. This is prefered to checking the
-  // decl context pointer is equal to `clangDecl` because we may have a forward
-  // declared struct, multiple redecls of a namespace, or transparent contexts.
-  auto deepCompareDeclContexts = [](auto first, auto second) {
-    while (first->getParent() && second->getParent()) {
-      first = first->getParent();
-      second = second->getParent();
-
-      // Look through transparent contexts. If we have one (or more) extern C++
-      // contexts, that is the same as none.
-      while (first->isTransparentContext())
-        first = first->getParent();
-      while (second->isTransparentContext())
-        second = second->getParent();
-
-      auto firstName = dyn_cast<clang::NamedDecl>(first);
-      auto secondName = dyn_cast<clang::NamedDecl>(second);
-
-      if (!firstName || !secondName) {
-        if (firstName != secondName)
-          return false;
-        continue;
-      }
-
-      if (firstName->getName() != secondName->getName())
-        return false;
-    }
-    return !first->getParent() && !second->getParent();
-  };
+  // Make sure that `clangDecl` is the parent of all the members we found.
   SmallVector<SwiftLookupTable::SingleEntry, 4> filteredDecls;
   llvm::copy_if(
       foundDecls, std::back_inserter(filteredDecls),
-      [&deepCompareDeclContexts, dc = cast<clang::DeclContext>(clangDecl)](
-          SwiftLookupTable::SingleEntry decl) {
-        return deepCompareDeclContexts(
-            decl.get<clang::NamedDecl *>()->getDeclContext(), dc);
+      [clangDecl](SwiftLookupTable::SingleEntry decl) {
+            auto first = decl.get<clang::NamedDecl *>()->getDeclContext();
+            auto second = cast<clang::DeclContext>(clangDecl);
+            if (auto firstDecl = dyn_cast<clang::Decl>(first)) {
+              if (auto secondDecl = dyn_cast<clang::Decl>(second))
+                return firstDecl->getCanonicalDecl() == secondDecl->getCanonicalDecl();
+              else
+                return false;
+            }
+            return first == second;
       });
   return filteredDecls;
 }
@@ -4116,17 +4082,22 @@ TinyPtrVector<ValueDecl *> CXXNamespaceMemberLookup::evaluate(
     Evaluator &evaluator, CXXNamespaceMemberLookupDescriptor desc) const {
   EnumDecl *namespaceDecl = desc.namespaceDecl;
   DeclName name = desc.name;
-
+  auto *clangNamespaceDecl =
+      cast<clang::NamespaceDecl>(namespaceDecl->getClangDecl());
   auto &ctx = namespaceDecl->getASTContext();
-  auto allResults = evaluateOrDefault(
-      ctx.evaluator, ClangDirectLookupRequest({namespaceDecl, name}), {});
 
   TinyPtrVector<ValueDecl *> result;
-  for (auto found : allResults) {
-    auto clangMember = found.get<clang::NamedDecl *>();
-    if (auto import =
-            ctx.getClangModuleLoader()->importDeclDirectly(clangMember))
-      result.push_back(cast<ValueDecl>(import));
+  for (auto redecl : clangNamespaceDecl->redecls()) {
+    auto allResults = evaluateOrDefault(
+        ctx.evaluator, ClangDirectLookupRequest({namespaceDecl, redecl, name}),
+        {});
+
+    for (auto found : allResults) {
+      auto clangMember = found.get<clang::NamedDecl *>();
+      if (auto import =
+              ctx.getClangModuleLoader()->importDeclDirectly(clangMember))
+        result.push_back(cast<ValueDecl>(import));
+    }
   }
 
   return result;
@@ -4139,7 +4110,9 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
 
   auto &ctx = recordDecl->getASTContext();
   auto allResults = evaluateOrDefault(
-      ctx.evaluator, ClangDirectLookupRequest({recordDecl, name}), {});
+      ctx.evaluator,
+      ClangDirectLookupRequest({recordDecl, recordDecl->getClangDecl(), name}),
+      {});
 
   // Find the results that are actually a member of "recordDecl".
   TinyPtrVector<ValueDecl *> result;
@@ -4188,8 +4161,9 @@ ClangImporter::Implementation::loadNamedMembers(
   auto table = findLookupTable(*CMO);
   assert(table && "clang module without lookup table");
 
-  assert(isa<clang::ObjCContainerDecl>(CD) || isa<clang::NamespaceDecl>(CD) ||
-         isa<clang::RecordDecl>(CD));
+  assert(!isa<clang::NamespaceDecl>(CD) && "Namespace members should be loaded"
+                                           "via a request.");
+  assert(isa<clang::ObjCContainerDecl>(CD));
 
   // Force the members of the entire inheritance hierarchy to be loaded and
   // deserialized before loading the named member of a class. This warms up
@@ -4202,6 +4176,7 @@ ClangImporter::Implementation::loadNamedMembers(
     if (auto *superclassDecl = classDecl->getSuperclassDecl())
       (void) const_cast<ClassDecl *>(superclassDecl)->lookupDirect(N);
 
+  // TODO: update this to use the requestified lookup.
   TinyPtrVector<ValueDecl *> Members;
   for (auto entry : table->lookup(SerializedSwiftName(N),
                                   effectiveClangContext)) {

@@ -34,18 +34,21 @@ class EnumDecl;
 /// The input type for a clang direct lookup request.
 struct ClangDirectLookupDescriptor final {
   Decl *decl;
+  const clang::Decl *clangDecl;
   DeclName name;
 
-  ClangDirectLookupDescriptor(Decl *decl, DeclName name)
-      : decl(decl), name(name) {}
+  ClangDirectLookupDescriptor(Decl *decl, const clang::Decl *clangDecl,
+                              DeclName name)
+      : decl(decl), clangDecl(clangDecl), name(name) {}
 
   friend llvm::hash_code hash_value(const ClangDirectLookupDescriptor &desc) {
-    return llvm::hash_combine(desc.name, desc.decl);
+    return llvm::hash_combine(desc.name, desc.decl, desc.clangDecl);
   }
 
   friend bool operator==(const ClangDirectLookupDescriptor &lhs,
                          const ClangDirectLookupDescriptor &rhs) {
-    return lhs.name == rhs.name && lhs.decl == rhs.decl;
+    return lhs.name == rhs.name && lhs.decl == rhs.decl &&
+           lhs.clangDecl == rhs.clangDecl;
   }
 
   friend bool operator!=(const ClangDirectLookupDescriptor &lhs,
