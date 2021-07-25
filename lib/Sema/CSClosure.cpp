@@ -92,48 +92,22 @@ static bool isViableElement(ASTNode element) {
   return true;
 }
 
-static void createConjunctionForBody(ConstraintSystem &cs, BraceStmt *body,
-                                     ASTNode parent,
-                                     ConstraintLocator *locator) {
+static void
+createConjunction(ConstraintSystem &cs,
+                  ArrayRef<std::pair<ASTNode, ConstraintLocator *>> elements,
+                  ConstraintLocator *locator) {
   bool isIsolated = false;
+
+  SmallVector<Constraint *, 4> constraints;
   SmallVector<TypeVariableType *, 2> referencedVars;
 
-  // If this is a top level closure, it has to be isolated.
-  if (auto *closure = getAsExpr<ClosureExpr>(parent)) {
+  if (locator->directlyAt<ClosureExpr>()) {
+    auto *closure = castToExpr<ClosureExpr>(locator->getAnchor());
+
+    // If this is a top level closure, it has to be isolated.
     isIsolated = !isa<AbstractClosureExpr>(closure->getParent());
     referencedVars.push_back(cs.getType(closure)->castTo<TypeVariableType>());
   }
-
-  SmallVector<Constraint *, 4> elements;
-
-  for (auto element : body->getElements()) {
-    if (!isViableElement(element))
-      continue;
-
-    TypeVariableRefFinder refFinder(cs, parent);
-
-    // If conjunction would require isolation, each element
-    // has to bring any of the referenced outer context
-    // type variables into scope.
-    if (isIsolated)
-      element.walk(refFinder);
-
-    auto *elementLoc = cs.getConstraintLocator(
-        locator, LocatorPathElt::ClosureBodyElement(element));
-
-    elements.push_back(Constraint::createClosureBodyElement(
-        cs, element, elementLoc, refFinder.getReferencedVars()));
-  }
-
-  cs.addUnsolvedConstraint(Constraint::createConjunction(
-      cs, elements, isIsolated, locator, referencedVars));
-}
-
-static void createNonIsolatedConjunction(
-    ConstraintSystem &cs,
-    ArrayRef<std::pair<ASTNode, ConstraintLocator *>> elements,
-    ConstraintLocator *locator) {
-  SmallVector<Constraint *, 4> constraints;
 
   for (const auto &entry : elements) {
     ASTNode element = entry.first;
@@ -142,12 +116,20 @@ static void createNonIsolatedConjunction(
     if (!isViableElement(element))
       continue;
 
+    TypeVariableRefFinder refFinder(cs, locator->getAnchor());
+
+    // Solvable elements have to bring any of the referenced
+    // outer context type variables into scope.
+    if (element.is<Decl *>() || element.is<StmtCondition *>() ||
+        element.is<Expr *>() || element.isStmt(StmtKind::Return))
+      element.walk(refFinder);
+
     constraints.push_back(Constraint::createClosureBodyElement(
-        cs, element, elementLoc));
+        cs, element, elementLoc, refFinder.getReferencedVars()));
   }
 
   cs.addUnsolvedConstraint(Constraint::createConjunction(
-      cs, constraints, /*isIsolated=*/false, locator));
+      cs, constraints, isIsolated, locator, referencedVars));
 }
 
 /// Statement visitor that generates constraints for a given closure body.
@@ -223,21 +205,20 @@ private:
       elements.push_back({ifStmt->getElseStmt(), elseLoc});
     }
 
-    createNonIsolatedConjunction(cs, elements, locator);
+    createConjunction(cs, elements, locator);
   }
 
   void visitBraceStmt(BraceStmt *braceStmt) {
     if (isSupportedMultiStatementClosure()) {
-      ASTNode parent;
-      if (locator->getPath().empty()) {
-        parent = locator->getAnchor();
-      } else {
-        auto parentElt =
-            locator->findLast<LocatorPathElt::ClosureBodyElement>();
-        assert(parentElt && "body has to have an anchor statement");
-        parent = parentElt->getElement();
+      SmallVector<std::pair<ASTNode, ConstraintLocator *>, 4> elements;
+      for (auto element : braceStmt->getElements()) {
+        elements.push_back(std::make_pair(
+            element,
+            cs.getConstraintLocator(
+                locator, LocatorPathElt::ClosureBodyElement(element))));
       }
-      createConjunctionForBody(cs, braceStmt, parent, locator);
+
+      createConjunction(cs, elements, locator);
       return;
     }
 
