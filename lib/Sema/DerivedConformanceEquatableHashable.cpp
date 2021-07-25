@@ -550,6 +550,12 @@ deriveHashable_hashInto(
   hashDecl->copyFormalAccessFrom(derived.Nominal,
                                  /*sourceIsParentContext=*/true);
 
+  // The derived hash(into:) for an actor must be non-isolated.
+  if (derived.Nominal->isActor() ||
+      getActorIsolation(derived.Nominal) == ActorIsolation::GlobalActor) {
+    hashDecl->getAttrs().add(new (C) NonisolatedAttr(/*IsImplicit*/true));
+  }
+
   derived.addMembersToConformanceContext({hashDecl});
 
   return hashDecl;
@@ -904,10 +910,9 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   hashValueDecl->copyFormalAccessFrom(derived.Nominal,
                                       /*sourceIsParentContext*/ true);
 
-  if (derived.Nominal->isDistributedActor()) {
-    // While distributed actors implement hash(into:) explicitly, the hashValue
-    // is still synthesized as usual. We must make it nonisolated in order
-    // for the hashValue to be able to witness the protocol requirement.
+  // The derived hashValue of an actor must be nonisolated.
+  if (derived.Nominal->isActor() ||
+      getActorIsolation(derived.Nominal) == ActorIsolation::GlobalActor) {
     hashValueDecl->getAttrs().add(new (C) NonisolatedAttr(/*IsImplicit*/true));
   }
 
