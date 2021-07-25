@@ -630,9 +630,13 @@ gatherReferencedTypeVars(Constraint *constraint,
                          SmallPtrSetImpl<TypeVariableType *> &typeVars) {
   switch (constraint->getKind()) {
   case ConstraintKind::Disjunction:
-  case ConstraintKind::Conjunction:
     for (auto nested : constraint->getNestedConstraints())
       gatherReferencedTypeVars(nested, typeVars);
+    return;
+
+  case ConstraintKind::Conjunction:
+    typeVars.insert(constraint->getTypeVariables().begin(),
+                    constraint->getTypeVariables().end());
     return;
 
   case ConstraintKind::KeyPath:
@@ -960,11 +964,10 @@ Constraint *Constraint::createConjunction(
     ConstraintSystem &cs, ArrayRef<Constraint *> constraints, bool isIsolated,
     ConstraintLocator *locator, ArrayRef<TypeVariableType *> referencedVars) {
   SmallPtrSet<TypeVariableType *, 4> typeVars;
-
-  for (auto *constraint : constraints)
-    gatherReferencedTypeVars(constraint, typeVars);
-
   typeVars.insert(referencedVars.begin(), referencedVars.end());
+
+  // Conjunctions don't gather constraints from either elements
+  // because each have to be solved in isolation.
 
   assert(!constraints.empty() && "Empty conjunction constraint");
   unsigned size = totalSizeToAlloc<TypeVariableType*>(typeVars.size());
