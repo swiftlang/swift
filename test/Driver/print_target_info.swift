@@ -25,6 +25,8 @@
 // CHECK-IOS:       "libraryName": "swiftCompatibility51",
 // CHECK-IOS:       "libraryName": "swiftCompatibilityDynamicReplacements"
 // CHECK-IOS:       "filter": "executable"
+// CHECK-IOS:       "libraryName": "swiftCompatibilityConcurrency"
+// CHECK-IOS:       "filter": "all"
 // CHECK-IOS:     ],
 // CHECK-IOS:     "librariesRequireRPath": true
 // CHECK-IOS:   }
