@@ -721,7 +721,7 @@ static EnumElementDecl *getOppositeBinaryDecl(const SILGenFunction &SGF,
     return nullptr;
   }
 
-  EnumDecl::ElementRange range = enumDecl->getAllElements();
+  auto range = enumDecl->getAllElements();
   auto iter = range.begin();
   if (iter == range.end())
     return nullptr;
