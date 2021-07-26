@@ -593,7 +593,7 @@ SIMPLE_DECL_ATTR(_specializeExtension, SpecializeExtension,
   105)
 
 CONTEXTUAL_SIMPLE_DECL_ATTR(async, Async,
-  DeclModifier | OnVar | OnFunc | ConcurrencyOnly |
+  DeclModifier | OnVar | OnFunc |
   ABIBreakingToAdd | ABIBreakingToRemove |
   APIBreakingToAdd | APIBreakingToRemove,
   106)
