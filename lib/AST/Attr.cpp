@@ -957,6 +957,10 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+  case DAK_GenerateLayoutBytecode:
+    Printer << "@_GenerateLayoutBytecode";
+    break;
+
   case DAK_CDecl:
     Printer << "@_cdecl(\"" << cast<CDeclAttr>(this)->Name << "\")";
     break;
@@ -1221,6 +1225,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "_alignment";
   case DAK_CDecl:
     return "_cdecl";
+  case DAK_GenerateLayoutBytecode:
+    return "_generateLayoutBytecode";
   case DAK_SwiftNativeObjCRuntimeBase:
     return "_swift_native_objc_runtime_base";
   case DAK_Semantics:

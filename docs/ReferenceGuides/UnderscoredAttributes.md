@@ -634,3 +634,9 @@ calls a runtime function which allocates memory or locks, respectively.
 The `@_noLocks` attribute implies `@_noAllocation` because a memory allocation
 also locks.
 
+## @_GenerateLayoutBytecode
+
+Rather than lowering value witness functions to copy and destroy a type to
+code, create a smaller bytecode layout representing the type and interpret that
+at runtime to destroy the type.
+

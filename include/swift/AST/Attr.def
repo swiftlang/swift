@@ -699,6 +699,12 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(_const, CompileTimeConst,
   ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
   126)
 
+DECL_ATTR(_GenerateLayoutBytecode, GenerateLayoutBytecode,
+  OnClass | OnStruct | OnEnum |
+  LongAttribute | UserInaccessible |
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  127)
+
 // If you're adding a new underscored attribute here, please document it in
 // docs/ReferenceGuides/UnderscoredAttributes.md.
 
