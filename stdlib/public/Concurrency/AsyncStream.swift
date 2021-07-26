@@ -243,8 +243,8 @@ public struct AsyncStream<Element> {
   /// a private `keepRunning` variable becomes `false`, the inner `while` loop
   /// exits and the stream finishes.
   ///
-  ///     let stream = AsyncStream<Int>(
-  ///         Int.self, bufferingPolicy: .bufferingNewest(5)) { continuation in
+  ///     let stream = AsyncStream<Int>(Int.self,
+  ///                                   bufferingPolicy: .bufferingNewest(5)) { continuation in
   ///             Task.detached {
   ///                 while keepRunning {
   ///                     await Task.sleep(1 * 1_000_000_000)

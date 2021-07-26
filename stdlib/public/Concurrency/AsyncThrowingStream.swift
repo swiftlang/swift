@@ -274,8 +274,8 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
   /// exits and the stream finishes. If the random number is divisble by 5 with
   /// no remainder, the stream throws a `MyRandomNumberError`.
   ///
-  ///     let stream = AsyncThrowingStream<Int, Error>(
-  ///         Int.self, bufferingPolicy: .bufferingNewest(5)) { continuation in
+  ///     let stream = AsyncThrowingStream<Int, Error>(Int.self,
+  ///                                                  bufferingPolicy: .bufferingNewest(5)) { continuation in
   ///             Task.detached {
   ///                 while (keepRunning) {
   ///                     await Task.sleep(1 * 1_000_000_000)
