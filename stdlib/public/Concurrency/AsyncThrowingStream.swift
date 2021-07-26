@@ -327,7 +327,7 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
   /// The following example shows an `AsyncThrowingStream` created with this
   /// initializer that produces random numbers on a one-second interval. If the
   /// random number is divisble by 5 with no remainder, the stream throws a
-  ///  `MyRandomNumberError`.
+  /// `MyRandomNumberError`.
   ///
   ///     let stream = AsyncThrowingStream<Int, Error> {
   ///             await Task.sleep(1 * 1_000_000_000)

@@ -286,13 +286,14 @@ public struct AsyncStream<Element> {
   /// iteration).
   ///
   /// The following example shows an `AsyncStream` created with this
-  /// initializer that produces random numbers on a one-second interval.
+  /// initializer that produces random numbers on a one-second interval. This
+  /// example uses Swift's multiple trailing closure syntax, which omits
+  /// the `unfolding` parameter label.
   ///
-  ///     let stream = AsyncStream<Int>(
-  ///         unfolding: {
+  ///     let stream = AsyncStream<Int> {
   ///             await Task.sleep(1 * 1_000_000_000)
   ///             return Int.random(in: 1...10)
-  ///         },
+  ///         }
   ///         onCancel: { @Sendable () in print ("Canceled.") }
   ///     )
   ///
