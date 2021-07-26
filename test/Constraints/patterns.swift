@@ -514,3 +514,9 @@ func rdar64157451() {
     if case .foo(let v as DoeNotExist) = e {} // expected-error {{cannot find type 'DoeNotExist' in scope}}
   }
 }
+
+// rdar://80797176 - circular reference incorrectly diagnosed while reaching for a type of a pattern.
+func rdar80797176 () {
+  for x: Int in [1, 2] where x.bitWidth == 32 { // Ok
+  }
+}
