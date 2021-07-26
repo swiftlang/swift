@@ -26,7 +26,7 @@ import Swift
 /// them to the stream by calling the continuation's `yield(_:)` method. When
 /// there are no further elements to produce, call the continuation's
 /// `finish()` method. This causes the sequence iterator to produce a `nil`,
-/// which terminates the sequence. The continuation is `Sendable`, which permits
+/// which terminates the sequence. The continuation conforms to `Sendable`, which permits
 /// calling it from concurrent contexts external to the iteration of the
 /// `AsyncStream`.
 ///
@@ -83,7 +83,7 @@ import Swift
 ///         }
 ///     }
 ///
-/// Since the stream is an `AsyncSequence`, the call point can use the
+/// Because the stream is an `AsyncSequence`, the call point can use the
 /// `for`-`await`-`in` syntax to process each `Quake` instance as the stream
 /// produces it:
 ///
@@ -154,12 +154,12 @@ public struct AsyncStream<Element> {
       
       /// When the buffer is full, discard the newly received element.
       ///
-      /// This strategy enforces keeping the specified amount of oldest values.
+      /// This strategy enforces keeping the specified number of oldest values.
       case bufferingOldest(Int)
       
       /// When the buffer is full, discard the oldest element in the buffer.
       ///
-      /// This strategy enforces keeping the specified amount of newest values.
+      /// This strategy enforces keeping the specified number of newest values.
       case bufferingNewest(Int)
     }
 
@@ -199,7 +199,7 @@ public struct AsyncStream<Element> {
     /// terminate iteration of a `AsyncStream` results in a call to this
     /// callback.
     ///
-    /// Cancelling an active iteration invokes the `onTermination` callback
+    /// Canceling an active iteration invokes the `onTermination` callback
     /// first, then resumes by yielding `nil`. This means that you can perform
     /// needed cleanup in the cancellation handler. After reaching a terminal
     /// state, the `AsyncStream` disposes of the callback.
@@ -219,7 +219,7 @@ public struct AsyncStream<Element> {
   /// specified buffering policy and element-producing closure.
   ///
   /// - Parameter elementType: The type of element the `AsyncStream`
-  ///   produces
+  ///   produces.
   /// - Parameter limit: The maximum number of elements to hold in the buffer.
   ///   By default, this value is unlimited. Use a
   ///   `Continuation.BufferingPolicy` to buffer a specified number of oldest
@@ -232,7 +232,7 @@ public struct AsyncStream<Element> {
   /// The `AsyncStream.Contuation` received by the `build` closure is appopriate
   /// for use in concurrent contexts. It is thread safe to send and finish; all
   /// calls are to the continuation are serialized, however calling this from
-  /// multiple concurrent contexts could result in out of order delivery.
+  /// multiple concurrent contexts could result in out-of-order delivery.
   ///
   /// The following example shows an `AsyncStream` created with this
   /// initializer that produces random numbers on a one-second interval. When
@@ -242,7 +242,7 @@ public struct AsyncStream<Element> {
   ///     let stream = AsyncStream<Int>(
   ///         Int.self, bufferingPolicy: .bufferingNewest(5)) { continuation in
   ///             Task.detached {
-  ///                 while (keepRunning) {
+  ///                 while keepRunning {
   ///                     await Task.sleep(1 * 1_000_000_000)
   ///                     continuation.yield(Int.random(in: 1...10))
   ///                 }
@@ -270,7 +270,7 @@ public struct AsyncStream<Element> {
   ///
   /// - Parameters:
   ///   - produce: A closure that asynchronously produces elements for the
-  ///    stream.
+  ///     stream.
   ///   - onCancel: A closure to execute when cancelling the stream's task.
   ///
   /// Use this convenience initializer when you have an asychronous function
@@ -323,7 +323,7 @@ public struct AsyncStream<Element> {
 extension AsyncStream: AsyncSequence {
   /// The asynchronous iterator for iterating an asynchronous stream.
   ///
-  /// This type is specificially not `Sendable`. Do not use it from multiple
+  /// This type specifically doesn't conform to `Sendable`. Do not use it from multiple
   /// concurrent contexts. It is a programmer error to invoke `next()` from a
   /// concurrent context that contends with another such call, and this will
   /// result in a call to `fatalError()`.
@@ -341,7 +341,7 @@ extension AsyncStream: AsyncSequence {
     ///
     /// If you cancel the task this iterator is running in while `next()` is
     /// awaiting a value, the `AsyncStream` terminates. In this case, `next()`
-    /// may return `nil` immediately, or else return `nil` on subsequent calls.
+    /// might return `nil` immediately, or might return `nil` on subsequent calls.
     public mutating func next() async -> Element? {
       await produce()
     }
