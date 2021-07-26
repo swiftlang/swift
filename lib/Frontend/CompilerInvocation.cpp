@@ -2126,30 +2126,3 @@ CompilerInvocation::setUpInputForSILTool(
   }
   return fileBufOrErr;
 }
-
-bool CompilerInvocation::isModuleExternallyConsumed(
-    const ModuleDecl *mod) const {
-  // Modules for executables aren't expected to be consumed by other modules.
-  // This picks up all kinds of entrypoints, including script mode,
-  // @UIApplicationMain and @NSApplicationMain.
-  if (mod->hasEntryPoint()) {
-    return false;
-  }
-
-  // If an implicit Objective-C header was needed to construct this module, it
-  // must be the product of a library target.
-  if (!getFrontendOptions().ImplicitObjCHeaderPath.empty()) {
-    return false;
-  }
-
-  // App extensions are special beasts because they build without entrypoints
-  // like library targets, but they behave like executable targets because
-  // their associated modules are not suitable for distribution.
-  if (mod->getASTContext().LangOpts.EnableAppExtensionRestrictions) {
-    return false;
-  }
-
-  // FIXME: This is still a lousy approximation of whether the module file will
-  // be externally consumed.
-  return true;
-}
