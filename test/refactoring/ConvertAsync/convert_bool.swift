@@ -1,3 +1,4 @@
+// REQUIRES: rdar81128571
 // REQUIRES: objc_interop
 // REQUIRES: concurrency
 
