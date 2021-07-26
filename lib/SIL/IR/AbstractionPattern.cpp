@@ -662,6 +662,30 @@ AbstractionPattern::getObjCMethodAsyncCompletionHandlerType(
   llvm_unreachable("covered switch");
 }
 
+
+CanType AbstractionPattern::getObjCMethodAsyncCompletionHandlerForeignType(
+    ForeignAsyncConvention convention,
+    Lowering::TypeConverter &TC
+) const {
+  auto nativeCHTy = convention.completionHandlerType();
+
+  // Use the abstraction pattern we're lowering against in order to lower
+  // the completion handler type, so we can preserve C/ObjC distinctions that
+  // normally get abstracted away by the importer.
+  auto completionHandlerNativeOrigTy = getObjCMethodAsyncCompletionHandlerType(nativeCHTy);
+  
+  // Bridge the Swift completion handler type back to its
+  // foreign representation.
+  auto foreignCHTy = TC.getLoweredBridgedType(completionHandlerNativeOrigTy,
+                                    nativeCHTy,
+                                    Bridgeability::Full,
+                                    SILFunctionTypeRepresentation::ObjCMethod,
+                                    TypeConverter::ForArgument)
+    ->getCanonicalType();
+
+  return foreignCHTy;
+}
+
 AbstractionPattern
 AbstractionPattern::getFunctionParamType(unsigned index) const {
   switch (getKind()) {
