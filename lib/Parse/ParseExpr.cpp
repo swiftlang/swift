@@ -1211,13 +1211,17 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
         SmallVector<TypeRepr *, 8> args;
         SourceLoc LAngleLoc, RAngleLoc;
         auto argStat = parseGenericArguments(args, LAngleLoc, RAngleLoc);
+        Result = makeParserResult(Result | argStat, Result.getPtrOrNull());
         if (argStat.isErrorOrHasCompletion())
           diagnose(LAngleLoc, diag::while_parsing_as_left_angle_bracket);
 
         SyntaxContext->createNodeInPlace(SyntaxKind::SpecializeExpr);
-        Result = makeParserResult(
-            Result, UnresolvedSpecializeExpr::create(
-                        Context, Result.get(), LAngleLoc, args, RAngleLoc));
+        // The result can be empty in error cases.
+        if (!args.empty()) {
+          Result = makeParserResult(
+              Result, UnresolvedSpecializeExpr::create(
+                          Context, Result.get(), LAngleLoc, args, RAngleLoc));
+        }
       }
 
       continue;
