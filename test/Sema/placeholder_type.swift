@@ -202,3 +202,17 @@ let _: SetFailureType<Int, String> = Just<Int>().setFailureType(to: _.self).setF
 
 let _: (_) = 0 as Int // expected-error {{placeholders are not allowed as top-level types}}
 let _: Int = 0 as (_) // expected-error {{placeholders are not allowed as top-level types}}
+
+_ = (1...10)
+    .map {
+        (
+            $0,
+            (
+                "\($0)",
+                $0 > 5
+            )
+        )
+    }
+    .map { (intValue, x: (_, boolValue: _)) in
+        x.boolValue ? intValue : 0
+    }
