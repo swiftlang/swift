@@ -49,7 +49,7 @@ import Swift
 ///
 /// Consider a hypothetical `QuakeMonitor` type that provides callers with
 /// `Quake` instances every time it detects an earthquake. To receive callbacks,
-/// callers set a custom closure a closure as the value of the monitor's
+/// callers set a custom closure as the value of the monitor's
 /// `quakeHandler` property, which the monitor calls back as necessary. Callers
 /// can also set an `errorHandler` to receive asychronous error notifications,
 /// such as the monitor service suddenly becoming unavailable.
