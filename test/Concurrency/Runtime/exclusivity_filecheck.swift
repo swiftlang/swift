@@ -1,3 +1,4 @@
+// REQUIRES: rdar81024581
 // RUN: export env %env-SWIFT_DEBUG_RUNTIME_EXCLUSIVITY_LOGGING=1 && \
 // RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -parse-as-library -Xfrontend -disable-access-control -parse-stdlib) 2>&1 | %FileCheck %s
 
