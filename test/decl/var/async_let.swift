@@ -40,9 +40,6 @@ func cook() async throws {
 }
 
 func testInterpolation() async {
-  spawn let x = "\(12345)"
-  _ = await x
-
   async let y = "\(12345)"
   _ = await y
 }
