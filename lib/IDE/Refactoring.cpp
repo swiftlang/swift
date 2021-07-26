@@ -3709,7 +3709,7 @@ static CallExpr *findTrailingClosureTarget(
     return nullptr;
   CallExpr *CE = cast<CallExpr>(contexts.back().get<Expr*>());
 
-  if (CE->hasTrailingClosure())
+  if (CE->getUnlabeledTrailingClosureIndex().hasValue())
     // Call expression already has a trailing closure.
     return nullptr;
 
