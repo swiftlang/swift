@@ -35,7 +35,7 @@ import Swift
 /// permits calling it from concurrent contexts external to
 /// the iteration of the `AsyncThrowingStream`.
 ///
-/// An arbitrary source of elements may produce elements faster than they are
+/// An arbitrary source of elements can produce elements faster than they are
 /// consumed by a caller iterating over them. Because of this, `AsyncThrowingStream`
 /// defines a buffering behavior, allowing the stream to buffer a specific
 /// number of oldest or newest elements. By default, the buffer limit is
@@ -143,6 +143,10 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
     
     /// A type that indicates the result of yielding a value to a client, by
     /// way of the continuation.
+    ///
+    /// The various `yield` methods of `AsyncThrowingStream.Continuation` return
+    /// this type to indicate the success or failure of yielding an element to
+    /// the continuation.
     public enum YieldResult {
       
       /// The stream successfully enqueued the element.
@@ -198,7 +202,7 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
     /// - Returns: A `YieldResult` indicating the success or failure of the
     ///   yield operation.
     ///
-    /// If nothing is awaiting the next value, this call attempts to buffer the
+    /// If nothing is awaiting the next value, the method attempts to buffer the
     /// result's element.
     ///
     /// This can be called more than once and returns to the caller immediately
