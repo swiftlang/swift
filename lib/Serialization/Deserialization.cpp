@@ -4644,6 +4644,14 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         break;
       }
 
+      case decls_block::GenerateLayoutBytecode_DECL_ATTR: {
+        bool isImplicit;
+        serialization::decls_block::GenerateLayoutBytecodeDeclAttrLayout::
+            readRecord(scratch, isImplicit);
+        Attr = new (ctx) GenerateLayoutBytecodeAttr(isImplicit);
+        break;
+      }
+
       case decls_block::Alignment_DECL_ATTR: {
         bool isImplicit;
         unsigned alignment;

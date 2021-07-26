@@ -2530,6 +2530,15 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
+    case DAK_GenerateLayoutBytecode: {
+      auto *theAttr = cast<GenerateLayoutBytecodeAttr>(DA);
+      auto abbrCode =
+          S.DeclTypeAbbrCodes[GenerateLayoutBytecodeDeclAttrLayout::Code];
+      GenerateLayoutBytecodeDeclAttrLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode, theAttr->isImplicit());
+      return;
+    }
+
     case DAK_CDecl: {
       auto *theAttr = cast<CDeclAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[CDeclDeclAttrLayout::Code];
