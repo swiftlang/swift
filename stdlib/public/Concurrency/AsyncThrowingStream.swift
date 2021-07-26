@@ -258,7 +258,7 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
   ///   `AsyncThrowingStream.Continuation` instance that it uses to provide
   ///   elements to the stream and terminate the stream when finished.
   ///
-  /// The `AsyncThrowingStream.Contuation` received by the `build` closure is
+  /// The `AsyncThrowingStream.Continuation` received by the `build` closure is
   /// appopriate for use in concurrent contexts. It is thread safe to send and
   /// finish; all calls are to the continuation are serialized, however calling
   /// this from multiple concurrent contexts could result in out of order
