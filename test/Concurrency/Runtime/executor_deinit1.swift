@@ -6,10 +6,8 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
-// https://bugs.swift.org/browse/SR-14461
-// UNSUPPORTED: linux
-
-// REQUIRES: rdar78325660
+// rdar78325660
+// UNSUPPORTED: CPU=arm64 && OS=macosx
 
 // doesn't matter that it's bool identity function or not
 func boolIdentityFn(_ x : Bool) -> Bool { return x }
