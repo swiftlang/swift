@@ -257,8 +257,6 @@ public:
   void visitDistributedActorIndependentAttr(DistributedActorIndependentAttr *attr);
   void visitGlobalActorAttr(GlobalActorAttr *attr);
   void visitAsyncAttr(AsyncAttr *attr);
-  void visitSpawnAttr(SpawnAttr *attr);
-  void visitAsyncOrSpawnAttr(DeclAttribute *attr);
   void visitMarkerAttr(MarkerAttr *attr);
 
   void visitReasyncAttr(ReasyncAttr *attr);
@@ -5530,16 +5528,6 @@ void AttributeChecker::visitGlobalActorAttr(GlobalActorAttr *attr) {
 }
 
 void AttributeChecker::visitAsyncAttr(AsyncAttr *attr) {
-  if (isa<VarDecl>(D)) {
-    visitAsyncOrSpawnAttr(attr);
-  }
-}
-
-void AttributeChecker::visitSpawnAttr(SpawnAttr *attr) {
-  visitAsyncOrSpawnAttr(attr);
-}
-
-void AttributeChecker::visitAsyncOrSpawnAttr(DeclAttribute *attr) {
   auto var = dyn_cast<VarDecl>(D);
   if (!var)
     return;
