@@ -97,11 +97,6 @@ extension Bar {
     }
 }
 
-protocol P {}
-struct ConformsToP: P{}
-
-func somePlaceholder() -> some _ { ConformsToP() } // expected-error {{placeholder type not allowed here}}
-
 // FIXME: We should probably have better diagnostics for these situations--the user probably meant to use implicit member syntax
 let _: Int = _() // expected-error {{type of expression is ambiguous without more context}}
 let _: () -> Int = { _() } // expected-error {{unable to infer closure type in the current context}}
