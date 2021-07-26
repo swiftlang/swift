@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -print-module -print-interface -source-filename %s -module-to-print=ObjCConcurrency -function-definitions=false -enable-experimental-concurrency | %FileCheck %s
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -print-module -print-interface -source-filename %s -module-to-print=ObjCConcurrency -function-definitions=false  | %FileCheck %s
 
 // REQUIRES: objc_interop
 // REQUIRES: concurrency
