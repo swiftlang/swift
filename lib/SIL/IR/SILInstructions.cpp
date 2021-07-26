@@ -2822,7 +2822,7 @@ SILType GetAsyncContinuationInstBase::getLoweredResumeType() const {
   auto formalType = getFormalResumeType();
   auto &M = getFunction()->getModule();
   auto c = getFunction()->getTypeExpansionContext();
-  return M.Types.getLoweredType(AbstractionPattern::getOpaque(), formalType, c);
+  return M.Types.getLoweredType(AbstractionPattern(formalType), formalType, c);
 }
 
 ReturnInst::ReturnInst(SILFunction &func, SILDebugLocation debugLoc,

@@ -1378,6 +1378,13 @@ public:
   /// Swift type.
   AbstractionPattern getObjCMethodAsyncCompletionHandlerType(
                                      CanType swiftCompletionHandlerType) const;
+
+  /// If this pattern refers to a foreign ObjC method that was imported as 
+  /// async, return the bridged-back-to-ObjC completion handler type.
+  CanType getObjCMethodAsyncCompletionHandlerForeignType(
+      ForeignAsyncConvention convention,
+      Lowering::TypeConverter &TC
+  ) const;
   
   void dump() const LLVM_ATTRIBUTE_USED;
   void print(raw_ostream &OS) const;
