@@ -1415,3 +1415,31 @@ func rdar74696023() {
     // expected-note@-2 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
   }
 }
+
+func testUnwrapFixIts(x: Int?) {
+  let _ = x + 2 // expected-error {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
+  // expected-note@-1 {{coalesce using '??' to provide a default when the optional value contains 'nil'}} {{11-11=(}} {{12-12= ?? <#default value#>)}}
+  // expected-note@-2 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{12-12=!}}
+  let _ = (x ?? 0) + 2
+
+  let _ = 2 + x // expected-error {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
+  // expected-note@-1 {{coalesce using '??' to provide a default when the optional value contains 'nil'}} {{15-15=(}} {{16-16= ?? <#default value#>)}}
+  // expected-note@-2 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{16-16=!}}
+  let _ = 2 + (x ?? 0)
+
+  func foo(y: Int) {}
+  foo(y: x) // expected-error {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
+  // expected-note@-1 {{coalesce using '??' to provide a default when the optional value contains 'nil'}} {{11-11= ?? <#default value#>}}
+  // expected-note@-2 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{11-11=!}}
+  foo(y: x ?? 0) 
+
+  let _ = x < 2 // expected-error {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
+  // expected-note@-1 {{coalesce using '??' to provide a default when the optional value contains 'nil'}} {{12-12= ?? <#default value#>}}
+  // expected-note@-2 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{12-12=!}}
+  let _ = x ?? 0 < 2
+
+  let _ = 2 < x // expected-error {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
+  // expected-note@-1 {{coalesce using '??' to provide a default when the optional value contains 'nil'}} {{16-16= ?? <#default value#>}}
+  // expected-note@-2 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{16-16=!}}
+  let _ = 2 < x ?? 0
+}

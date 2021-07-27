@@ -5994,7 +5994,7 @@ bool VarDecl::isMemberwiseInitialized(bool preferDeclaredProperties) const {
 }
 
 bool VarDecl::isAsyncLet() const {
-  return getAttrs().hasAttribute<AsyncAttr>() || getAttrs().hasAttribute<SpawnAttr>();
+  return getAttrs().hasAttribute<AsyncAttr>();
 }
 
 void ParamDecl::setSpecifier(Specifier specifier) {

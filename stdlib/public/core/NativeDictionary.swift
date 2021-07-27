@@ -354,6 +354,10 @@ extension _NativeDictionary: _DictionaryBuffer {
   @inlinable
   @inline(__always)
   func contains(_ key: Key) -> Bool {
+    if count == 0 {
+      // Fast path that avoids computing the hash of the key.
+      return false
+    }
     return find(key).found
   }
 

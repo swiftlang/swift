@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency -disable-availability-checking -warn-concurrency
+// RUN: %target-typecheck-verify-swift  -disable-availability-checking -warn-concurrency
 // REQUIRES: concurrency
 
 @available(SwiftStdlib 5.5, *)

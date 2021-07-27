@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency -disable-availability-checking
+// RUN: %target-typecheck-verify-swift  -disable-availability-checking
 
 // REQUIRES: concurrency
 
@@ -40,9 +40,6 @@ func cook() async throws {
 }
 
 func testInterpolation() async {
-  spawn let x = "\(12345)"
-  _ = await x
-
   async let y = "\(12345)"
   _ = await y
 }

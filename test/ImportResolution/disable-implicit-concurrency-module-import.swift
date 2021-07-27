@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency -disable-implicit-concurrency-module-import
+// RUN: %target-typecheck-verify-swift  -disable-implicit-concurrency-module-import
 // REQUIRES: concurrency
 
 

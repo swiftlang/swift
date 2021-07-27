@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s -module-name test -swift-version 5 -enable-experimental-concurrency -disable-availability-checking -parse-stdlib -sil-verify-all | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s -module-name test -swift-version 5  -disable-availability-checking -parse-stdlib -sil-verify-all | %FileCheck %s
 // REQUIRES: concurrency
 
 import Swift

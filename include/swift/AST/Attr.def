@@ -593,7 +593,7 @@ SIMPLE_DECL_ATTR(_specializeExtension, SpecializeExtension,
   105)
 
 CONTEXTUAL_SIMPLE_DECL_ATTR(async, Async,
-  DeclModifier | OnVar | OnFunc | ConcurrencyOnly |
+  DeclModifier | OnVar | OnFunc |
   ABIBreakingToAdd | ABIBreakingToRemove |
   APIBreakingToAdd | APIBreakingToRemove,
   106)
@@ -653,11 +653,7 @@ SIMPLE_DECL_ATTR(_inheritActorContext, InheritActorContext,
   ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIBreakingToRemove,
   116)
 
-CONTEXTUAL_SIMPLE_DECL_ATTR(spawn, Spawn,
-  DeclModifier | OnVar | ConcurrencyOnly |
-  ABIBreakingToAdd | ABIBreakingToRemove |
-  APIBreakingToAdd | APIBreakingToRemove,
-  117)
+// 117 was 'spawn' and is now unused
 
 CONTEXTUAL_SIMPLE_DECL_ATTR(distributed, DistributedActor,
   DeclModifier | OnClass | OnFunc |

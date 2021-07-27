@@ -484,8 +484,12 @@ CharSourceRange innerCharSourceRangeFromSourceRange(const SourceManager &SM,
   return CharSourceRange(SM, SRS, (SR.End != SR.Start) ? SR.End : SRS);
 }
 
-CharSourceRange parameterNameRangeOfCallArg(const TupleExpr *TE,
+CharSourceRange parameterNameRangeOfCallArg(const Expr *ArgListExpr,
                                             const Expr *Arg) {
+  if (isa<ParenExpr>(ArgListExpr))
+    return CharSourceRange();
+
+  auto *TE = cast<TupleExpr>(ArgListExpr);
   if (!TE->hasElementNameLocs() || !TE->hasElementNames())
     return CharSourceRange();
 
@@ -547,12 +551,11 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
   if (isVisitedBefore(E))
     return {false, E};
 
-  auto addCallArgExpr = [&](Expr *Elem, TupleExpr *ParentTupleExpr) {
-    if (isa<DefaultArgumentExpr>(Elem) ||
-        !isCurrentCallArgExpr(ParentTupleExpr))
+  auto addCallArgExpr = [&](Expr *Elem, Expr *ArgListExpr) {
+    if (isa<DefaultArgumentExpr>(Elem) || !isCurrentCallArgExpr(ArgListExpr))
       return;
 
-    CharSourceRange NR = parameterNameRangeOfCallArg(ParentTupleExpr, Elem);
+    CharSourceRange NR = parameterNameRangeOfCallArg(ArgListExpr, Elem);
     SyntaxStructureNode SN;
     SN.Kind = SyntaxStructureKind::Argument;
     SN.NameRange = NR;
@@ -568,15 +571,9 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
     pushStructureNode(SN, Elem);
   };
 
-  if (auto *ParentTupleExpr = dyn_cast_or_null<TupleExpr>(Parent.getAsExpr())) {
-    // the argument value is a tuple expression already, we can just extract it
-    addCallArgExpr(E, ParentTupleExpr);
-  } else if (auto *ParentOptionalExpr = dyn_cast_or_null<OptionalEvaluationExpr>(Parent.getAsExpr())) {
-    // if an argument value is an optional expression, we should extract the
-    // argument from the subexpression
-    if (auto *ParentTupleExpr = dyn_cast_or_null<TupleExpr>(ParentOptionalExpr->getSubExpr())) {
-      addCallArgExpr(E, ParentTupleExpr);
-    }
+  if (auto *ParentExpr = Parent.getAsExpr()) {
+    if (isa<TupleExpr>(ParentExpr) || isa<ParenExpr>(ParentExpr))
+      addCallArgExpr(E, ParentExpr);
   }
 
   if (E->isImplicit())

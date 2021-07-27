@@ -174,14 +174,12 @@ static bool writeSIL(SILModule &SM, const PrimarySpecificPaths &PSPs,
 ///
 /// \see swift::printAsObjC
 static bool printAsObjCIfNeeded(StringRef outputPath, ModuleDecl *M,
-                                StringRef bridgingHeader, bool moduleIsPublic) {
+                                StringRef bridgingHeader) {
   if (outputPath.empty())
     return false;
   return withOutputFile(M->getDiags(), outputPath,
                         [&](raw_ostream &out) -> bool {
-    auto requiredAccess = moduleIsPublic ? AccessLevel::Public
-                                         : AccessLevel::Internal;
-    return printAsObjC(out, M, bridgingHeader, requiredAccess);
+    return printAsObjC(out, M, bridgingHeader);
   });
 }
 
@@ -853,8 +851,7 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
     }
     hadAnyError |= printAsObjCIfNeeded(
         Invocation.getObjCHeaderOutputPathForAtMostOnePrimary(),
-        Instance.getMainModule(), BridgingHeaderPathForPrint,
-        Invocation.isModuleExternallyConsumed(Instance.getMainModule()));
+        Instance.getMainModule(), BridgingHeaderPathForPrint);
   }
 
   // Only want the header if there's been any errors, ie. there's not much

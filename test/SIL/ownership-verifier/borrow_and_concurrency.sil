@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-experimental-concurrency -o /dev/null %s 
+// RUN: %target-sil-opt  -o /dev/null %s 
 
 // REQUIRES: concurrency
 

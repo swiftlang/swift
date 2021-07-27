@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - \
-// RUN:    -module-name a -enable-experimental-concurrency -disable-availability-checking \
+// RUN:    -module-name a  -disable-availability-checking \
 // RUN:    | %FileCheck %s --check-prefix=CHECK
 // REQUIRES: concurrency
 

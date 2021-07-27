@@ -34,9 +34,11 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/StorageImpl.h"
+#include "swift/AST/SwiftNameTranslation.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Parse/Parser.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "clang/Basic/CharInfo.h"
 #include "llvm/ADT/STLExtras.h"
@@ -257,8 +259,6 @@ public:
   void visitDistributedActorIndependentAttr(DistributedActorIndependentAttr *attr);
   void visitGlobalActorAttr(GlobalActorAttr *attr);
   void visitAsyncAttr(AsyncAttr *attr);
-  void visitSpawnAttr(SpawnAttr *attr);
-  void visitAsyncOrSpawnAttr(DeclAttribute *attr);
   void visitMarkerAttr(MarkerAttr *attr);
 
   void visitReasyncAttr(ReasyncAttr *attr);
@@ -5530,16 +5530,6 @@ void AttributeChecker::visitGlobalActorAttr(GlobalActorAttr *attr) {
 }
 
 void AttributeChecker::visitAsyncAttr(AsyncAttr *attr) {
-  if (isa<VarDecl>(D)) {
-    visitAsyncOrSpawnAttr(attr);
-  }
-}
-
-void AttributeChecker::visitSpawnAttr(SpawnAttr *attr) {
-  visitAsyncOrSpawnAttr(attr);
-}
-
-void AttributeChecker::visitAsyncOrSpawnAttr(DeclAttribute *attr) {
   auto var = dyn_cast<VarDecl>(D);
   if (!var)
     return;
@@ -5867,4 +5857,113 @@ AbstractFunctionDecl *AsyncAlternativeRequest::evaluate(
 
     return candidates.front();
   }
+}
+
+static bool renameCouldMatch(const ValueDecl *original,
+                             const ValueDecl *candidate,
+                             bool originalIsObjCVisible,
+                             AccessLevel minAccess) {
+  // Kinds have to match
+  if (candidate->getKind() != original->getKind())
+    return false;
+
+  // Instance can't match static/class function
+  if (candidate->isInstanceMember() != original->isInstanceMember())
+    return false;
+
+  // If the original is ObjC visible then the rename must be as well
+  if (originalIsObjCVisible &&
+      !objc_translation::isVisibleToObjC(candidate, minAccess))
+    return false;
+
+  // @available is intended for public interfaces, so an implementation-only
+  // decl shouldn't match
+  if (candidate->getAttrs().hasAttribute<ImplementationOnlyAttr>())
+    return false;
+
+  return true;
+}
+
+static bool parametersMatch(const AbstractFunctionDecl *a,
+                            const AbstractFunctionDecl *b) {
+  auto aParams = a->getParameters();
+  auto bParams = b->getParameters();
+
+  if (aParams->size() != bParams->size())
+    return false;
+
+  for (auto index : indices(*aParams)) {
+    auto aParamType = aParams->get(index)->getType();
+    auto bParamType = bParams->get(index)->getType();
+    if (!aParamType->matchesParameter(bParamType, TypeMatchOptions()))
+      return false;
+  }
+  return true;
+}
+
+ValueDecl *RenamedDeclRequest::evaluate(Evaluator &evaluator,
+                                        const ValueDecl *attached,
+                                        const AvailableAttr *attr) const {
+  if (attr->Rename.empty())
+    return nullptr;
+
+  auto declContext = attached->getDeclContext();
+  ASTContext &astContext = attached->getASTContext();
+  auto renamedParsedDeclName = parseDeclName(attr->Rename);
+  auto renamedDeclName = renamedParsedDeclName.formDeclNameRef(astContext);
+
+  if (isa<ClassDecl>(attached) || isa<ProtocolDecl>(attached)) {
+    if (!renamedParsedDeclName.ContextName.empty()) {
+      return nullptr;
+    }
+    SmallVector<ValueDecl *, 1> decls;
+    declContext->lookupQualified(declContext->getParentModule(),
+                                 renamedDeclName.withoutArgumentLabels(),
+                                 NL_OnlyTypes,
+                                 decls);
+    if (decls.size() == 1)
+      return decls[0];
+    return nullptr;
+  }
+
+  TypeDecl *typeDecl = declContext->getSelfNominalTypeDecl();
+
+  SmallVector<ValueDecl *, 4> lookupResults;
+  declContext->lookupQualified(typeDecl->getDeclaredInterfaceType(),
+                               renamedDeclName, NL_QualifiedDefault,
+                               lookupResults);
+
+  auto minAccess = AccessLevel::Private;
+  if (attached->getModuleContext()->isExternallyConsumed())
+    minAccess = AccessLevel::Public;
+  bool attachedIsObjcVisible =
+      objc_translation::isVisibleToObjC(attached, minAccess);
+
+  if (lookupResults.size() == 1) {
+    auto candidate = lookupResults[0];
+    if (!renameCouldMatch(attached, candidate, attachedIsObjcVisible,
+                          minAccess))
+      return nullptr;
+    return candidate;
+  }
+
+  ValueDecl *renamedDecl = nullptr;
+  for (auto candidate : lookupResults) {
+    if (!renameCouldMatch(attached, candidate, attachedIsObjcVisible,
+                          minAccess))
+      continue;
+
+    if (isa<AbstractFunctionDecl>(candidate) &&
+        !parametersMatch(cast<AbstractFunctionDecl>(attached),
+                         cast<AbstractFunctionDecl>(candidate)))
+        continue;
+
+    if (renamedDecl) {
+      // Don't allow ambiguous matches
+      renamedDecl = nullptr;
+      break;
+    }
+    renamedDecl = candidate;
+  }
+  return renamedDecl;
 }

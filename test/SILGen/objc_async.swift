@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-silgen -I %S/Inputs/custom-modules -enable-experimental-concurrency -disable-availability-checking %s -verify | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-cpu %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-silgen -I %S/Inputs/custom-modules  -disable-availability-checking %s -verify | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-cpu %s
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
 
@@ -76,6 +76,13 @@ func testSlowServer(slowServer: SlowServer) async throws {
   let _: NSObject? = try await slowServer.stopRecording()
   let _: NSObject = try await slowServer.someObject()
 
+  let _: () -> Void = await slowServer.performVoid2Void()
+  let _: (Any) -> Void = await slowServer.performId2Void()
+  let _: (Any) -> Any = await slowServer.performId2Id()
+  let _: (String) -> String = await slowServer.performNSString2NSString()
+
+  let _: ((String) -> String, String) = await slowServer.performNSString2NSStringNSString()
+  let _: ((Any) -> Void, (Any) -> Void) = await slowServer.performId2VoidId2Void()
 }
 
 func testGeneric<T: AnyObject>(x: GenericObject<T>) async throws {
