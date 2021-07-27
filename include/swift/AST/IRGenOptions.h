@@ -448,6 +448,7 @@ public:
   Optional<llvm::VersionTuple> AutolinkRuntimeCompatibilityDynamicReplacementLibraryVersion;
   Optional<llvm::VersionTuple>
       AutolinkRuntimeCompatibilityConcurrencyLibraryVersion;
+  bool AutolinkRuntimeCompatibilityBytecodeLayoutsLibrary;
 
   JITDebugArtifact DumpJIT = JITDebugArtifact::None;
 

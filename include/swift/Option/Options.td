@@ -1369,6 +1369,12 @@ def disable_autolinking_runtime_compatibility_concurrency
       HelpText<"Do not use autolinking for the concurrency runtime "
                "compatibility library">;
 
+def enable_autolinking_runtime_compatibility_bytecode_layouts
+    : Flag<[ "-" ], "enable-autolinking-runtime-compatibility-bytecode-layouts">,
+      Flags<[ FrontendOption ]>,
+      HelpText<"Enable autolinking for the bytecode layouts runtime "
+               "compatibility library">;
+
 def emit_symbol_graph: Flag<["-"], "emit-symbol-graph">,
   Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
   HelpText<"Emit a symbol graph">;
