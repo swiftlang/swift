@@ -1,4 +1,4 @@
-// RUN: not --crash %target-sil-opt -enable-experimental-concurrency %s
+// RUN: not --crash %target-sil-opt  %s
 
 // REQUIRES: concurrency
 

@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -Xfrontend -disable-availability-checking -parse-stdlib -parse-as-library -lswiftSwiftReflectionTest %s -o %t/reflect_task
+// RUN: %target-build-swift  -Xfrontend -disable-availability-checking -parse-stdlib -parse-as-library -lswiftSwiftReflectionTest %s -o %t/reflect_task
 // RUN: %target-codesign %t/reflect_task
 
 // RUN: %target-run %target-swift-reflection-test %t/reflect_task | %FileCheck %s --dump-input=fail

@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend -emit-silgen %s -module-name test -swift-version 5 -enable-experimental-concurrency -disable-availability-checking -enable-actor-data-race-checks | %FileCheck --enable-var-scope %s --check-prefix=CHECK-RAW
-// RUN: %target-swift-frontend -emit-silgen %s -module-name test -swift-version 5 -enable-experimental-concurrency -disable-availability-checking -enable-actor-data-race-checks > %t.sil
-// RUN: %target-sil-opt -enable-sil-verify-all %t.sil -lower-hop-to-actor -enable-experimental-concurrency | %FileCheck --enable-var-scope %s --check-prefix=CHECK-CANONICAL
+// RUN: %target-swift-frontend -emit-silgen %s -module-name test -swift-version 5  -disable-availability-checking -enable-actor-data-race-checks | %FileCheck --enable-var-scope %s --check-prefix=CHECK-RAW
+// RUN: %target-swift-frontend -emit-silgen %s -module-name test -swift-version 5  -disable-availability-checking -enable-actor-data-race-checks > %t.sil
+// RUN: %target-sil-opt -enable-sil-verify-all %t.sil -lower-hop-to-actor  | %FileCheck --enable-var-scope %s --check-prefix=CHECK-CANONICAL
 // REQUIRES: concurrency
 
 import Swift

@@ -15,11 +15,11 @@
 // -----------------------------------------------------------------------------
 // RUN: %empty-directory(%t)
 //
-// RUN: %target-build-swift -swift-version 5 -g -Onone -Xfrontend -enable-experimental-concurrency -module-name a %s -o %t/a.swift5.Onone.out
+// RUN: %target-build-swift -swift-version 5 -g -Onone  -module-name a %s -o %t/a.swift5.Onone.out
 // RUN: %target-codesign %t/a.swift5.Onone.out
 // RUN: %target-run %t/a.swift5.Onone.out
 //
-// RUN: %target-build-swift -swift-version 5 -g -O -Xfrontend -enable-experimental-concurrency -module-name a %s -o %t/a.swift5.O.out
+// RUN: %target-build-swift -swift-version 5 -g -O  -module-name a %s -o %t/a.swift5.O.out
 // RUN: %target-codesign %t/a.swift5.O.out
 // RUN: %target-run %t/a.swift5.O.out
 //
