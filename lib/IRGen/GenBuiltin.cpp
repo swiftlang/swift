@@ -29,6 +29,7 @@
 #include "GenCall.h"
 #include "GenCast.h"
 #include "GenConcurrency.h"
+#include "GenDistributed.h"
 #include "GenPointerAuth.h"
 #include "GenIntegerLiteral.h"
 #include "IRGenFunction.h"
@@ -356,6 +357,18 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     auto type = substitutions.getReplacementTypes()[0]->getCanonicalType();
     auto conf = substitutions.getConformances()[0];
     emitBuildOrdinarySerialExecutorRef(IGF, actor, type, conf, out);
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::BuildDistributedActorIdentity) {
+    auto actor = args.claimNext();
+    emitBuildDistributedActorIdentity(IGF, actor, out);
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::BuildDistributedActorTransport) {
+    auto actor = args.claimNext();
+    emitBuildDistributedActorTransport(IGF, actor, out);
     return;
   }
 

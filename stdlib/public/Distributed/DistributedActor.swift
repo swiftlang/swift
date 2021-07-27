@@ -61,8 +61,8 @@ public protocol DistributedActor: AnyActor, Identifiable, Hashable, Codable {
     ///
     /// - Parameter identity: identity uniquely identifying a, potentially remote, actor in the system
     /// - Parameter transport: `transport` which should be used to resolve the `identity`, and be associated with the returned actor
-    static func resolve<Identity>(_ identity: Identity, using transport: ActorTransport)
-      throws -> Self where Identity: ActorIdentity
+    static func resolve<Identity, Transport>(_ identity: Identity, using transport: Transport)
+      throws -> Self where Identity: ActorIdentity, Transport: ActorTransport
 
     /// The `ActorTransport` associated with this actor.
     /// It is immutable and equal to the transport passed in the local/resolve
@@ -70,7 +70,7 @@ public protocol DistributedActor: AnyActor, Identifiable, Hashable, Codable {
     ///
     /// Conformance to this requirement is synthesized automatically for any
     /// `distributed actor` declaration.
-    nonisolated var actorTransport: ActorTransport { get } // TODO: rename to `transport`?
+    nonisolated var actorTransport: ActorTransport { get } // TODO(distributed): rename to `transport`?
 
     /// Logical identity of this distributed actor.
     ///
@@ -89,8 +89,10 @@ public protocol DistributedActor: AnyActor, Identifiable, Hashable, Codable {
 @available(SwiftStdlib 5.5, *)
 extension DistributedActor {
 
-  public static func resolve<Identity>(_ identity: Identity, using transport: ActorTransport)
-      throws -> Self where Identity: ActorIdentity {
+  public static func resolve<Identity, Transport>(
+      _ identity: Identity,
+      using transport: Transport
+  ) throws -> Self where Identity: ActorIdentity, Transport: ActorTransport {
     switch try transport.resolve(AnyActorIdentity(identity), as: Self.self) {
     case .resolved(let instance):
       return instance
@@ -241,10 +243,11 @@ func __isLocalActor(_ actor: AnyObject) -> Bool {
 func _distributedActorRemoteInitialize(_ actor: AnyObject)
 
 @_silgen_name("swift_distributedActor_remote_create")
+@available(SwiftStdlib 5.5, *)
 func distributedActorRemoteCreate<Identity, Transport>(
-  identity: ActorIdentity,
-  transport: ActorTransport
-) -> Any
+  identity: Identity,
+  transport: Transport
+) -> AnyObject where Identity: ActorIdentity, Transport: ActorTransport
 
 /// Called to destroy the default actor instance in an actor.
 /// The implementation will call this within the actor's deinit.

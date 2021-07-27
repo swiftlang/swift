@@ -653,8 +653,8 @@ class DefaultActorImpl : public HeapObject {
 
     /// Is the actor a '(local) distributed actor'?
     /// If so, it has the 'DistributedActorFragment' available.
-    FLAGSET_DEFINE_FLAG_ACCESSORS(IsDistributedRemote,
-                                  isDistributedRemote, setIsDistributedRemote)
+    FLAGSET_DEFINE_FLAG_ACCESSORS(IsDistributedActor,
+                                  isDistributedActor, setIsDistributedActor)
 
     /// What is the maximum priority of jobs that are currently running
     /// or enqueued on this actor?
@@ -686,7 +686,6 @@ public:
   /// Properly construct an actor, except for the heap header.
   /// \param isDistributed When true sets the IsDistributedActor flag
   void initialize(bool isDistributed = false) {
-    // TODO(distributed): this is just a simple implementation, rather we would want to allocate a proxy
     auto flags = Flags();
     flags.setIsDistributedActor(true);
     new (&CurrentState) std::atomic<State>(State{JobRef(), flags});
@@ -716,9 +715,10 @@ public:
   ///
   /// Note that a distributed *local* actor instance is the same as any other
   /// ordinary default (local) actor, and no special handling is needed for them.
-  bool isDistributedRemote();
+  bool isDistributedActor();
 
-  Dist
+  /// If the actor is a distributed actor, return its fragment.
+  DistributedActorFragment* distributedActorFragment();
   
 private:
   void deallocateUnconditional();
@@ -1759,32 +1759,6 @@ void swift::swift_defaultActor_deallocateResilient(HeapObject *actor) {
                       metadata->getInstanceAlignMask());
 }
 
-// TODO: most likely where we'd need to create the "proxy instance" instead? (most likely remove this and use swift_distributedActor_remote_create instead)
-void swift::swift_distributedActor_remote_initialize(DefaultActor *_actor) { // FIXME: remove distributed C++ impl not needed?
-  auto actor = asImpl(_actor);
-  actor->initialize(/*distributed=*/true);
-  if (auto distributed = actor->distributedActorFragment()) {
-    distributed->setRemote(true);
-  }
-}
-
-// TODO: missing implementation of creating a proxy for the remote actor
-OpaqueValue* swift::swift_distributedActor_remote_create(OpaqueValue *identity,
-                                                         OpaqueValue *transport) {
-  assert(false && "swift_distributedActor_remote_create is not implemented yet!");
-}
-
-void swift::swift_distributedActor_destroy(DefaultActor *_actor) { // FIXME: remove distributed C++ impl not needed?
-  // TODO: need to resign the address before we destroy:
-  //       something like: actor.transport.resignIdentity(actor.address)
-
-  // FIXME: if this is a proxy, we would destroy a bit differently I guess? less memory was allocated etc.
-  asImpl(_actor)->destroy(); // today we just replicate what defaultActor_destroy does
-}
-
-bool swift::swift_distributed_actor_is_remote(DefaultActor *_actor) {
-  return asImpl(_actor)->isDistributedRemote();
-}
 
 /// FIXME: only exists for the quick-and-dirty MainActor implementation.
 namespace swift {
@@ -1995,39 +1969,87 @@ static void swift_task_enqueueImpl(Job *job, ExecutorRef executor) {
 /***************************** DISTRIBUTED ACTOR *****************************/
 /*****************************************************************************/
 
-bool DefaultActorImpl::isDistributedRemote() {
+bool DefaultActorImpl::isDistributedActor() {
   auto state = CurrentState.load(std::memory_order_relaxed);
-  return state.Flags.isDistributedRemote() == 1;
+  return state.Flags.isDistributedActor() == 1;
 }
 
-SWIFT_CC(swift)
-static void swift_task_enqueueImpl(Actor *actor) {
+DistributedActorFragment* DefaultActorImpl::distributedActorFragment() { 
+  if (!isDistributedActor())
+    return nullptr; // only a 'local distributed actor' has such fragment
 
+  auto offset = this + 0; // FIXME(distributed) find out where the fragment is?
+  assert(false && "finding the distributed actor fragment of local dist actor is not implemented");
+  return nullptr;
 }
 
 /*****************************************************************************/
 /******************* DISTRIBUTED ACTOR IMPLEMENTATION ************************/
 /*****************************************************************************/
 
+namespace {
 /// Storage common for *any* distributed actor, regardless if local or remote.
 ///
 /// Local distributed actors store this fragment right after the actor header,
 /// while remote distributed actors completely skip the actor header and are
 /// represented in memory by *just* the \c DistributedActorFragment.
+///
+/// Local distributed actor:
+///     [ heap header | actor header | distributed fragment | <actor state> ]
+///
+/// Remote distributed actor (fixed size):
+///     [ heap header | distributed fragment ]
 // TODO: the remote actor does not need to BE an actor at all
 class DistributedActorFragment {
 private:
-  /// Pointer at existential `ActorIdentity` stored by any `distributed actor`.
+  enum class Status : __swift_uintptr_t {
+    IsRemote = 1,
+  };
+
+  uintptr_t status;
+
+  /// `ActorIdentity` stored by any `distributed actor`.
   OpaqueValue *identity;
-  /// Pointer at existential `ActorTransport` stored by any `distributed actor`.
+  /// `ActorTransport` stored by any `distributed actor`.
   OpaqueValue *transport;
 
 public:
-  OpaqueValue *getActorIdentity() const {
-    return identity;
-  }
+  explicit DistributedActorFragment(OpaqueValue *identity,
+                                    OpaqueValue *transport, bool isRemote)
+      : status(isRemote ? 1 : 0), identity(identity), transport(transport) {}
 
-  OpaqueValue *getActorTransport() const {
-    return transport;
-  }
+  OpaqueValue *getActorIdentity() const { return identity; }
+
+  OpaqueValue *getActorTransport() const { return transport; }
+
+  void setRemote(bool isRemote = true) { status = isRemote ? 1 : 0; }
+
+  bool isRemote() const { assert(false); }
+};
+
+} // end anonymous namespace
+
+// TODO: most likely where we'd need to create the "proxy instance" instead? (most likely remove this and use swift_distributedActor_remote_create instead)
+void swift::swift_distributedActor_remote_initialize(DefaultActor *_actor) { // FIXME: remove distributed C++ impl not needed?
+  auto actor = asImpl(_actor);
+  actor->initialize(/*distributed=*/true);
+  auto distributed = actor->distributedActorFragment();
+  assert(distributed && "initializing a remote actor, yet no distributed fragment available!");
+  distributed->setRemote(true);
+}
+
+// TODO: missing implementation of creating a proxy for the remote actor
+OpaqueValue* swift::swift_distributedActor_remote_create(
+    OpaqueValue *identity, OpaqueValue *transport,
+    const Metadata *identityType, const Metadata *transportType) {
+  assert(false && "swift_distributedActor_remote_create is not implemented yet!");
+}
+
+void swift::swift_distributedActor_destroy(DefaultActor *_actor) { // FIXME: remove distributed C++ impl not needed?
+  // FIXME: if this is a proxy, we would destroy a bit differently I guess? less memory was allocated etc.
+  asImpl(_actor)->destroy(); // today we just replicate what defaultActor_destroy does
+}
+
+bool swift::swift_distributed_actor_is_remote(DefaultActor *_actor) {
+  return asImpl(_actor)->isDistributedActor();
 }

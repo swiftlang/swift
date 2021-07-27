@@ -709,6 +709,7 @@ private:
       flags.setIsArtificial();
       break;
     case Field::DistributedActorStorage:
+      fprintf(stderr, "[%s:%d] (%s) ADD FIELD: Field::DistributedActorStorage\n", __FILE__, __LINE__, __FUNCTION__);
       flags.setIsArtificial();
       break;
     }

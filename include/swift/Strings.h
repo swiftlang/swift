@@ -49,6 +49,8 @@ constexpr static const StringLiteral SEMANTICS_PROGRAMTERMINATION_POINT =
 
 constexpr static const StringLiteral SEMANTICS_DEFAULT_ACTOR =
     "defaultActor";
+constexpr static const StringLiteral SEMANTICS_DISTRIBUTED_ACTOR =
+    "distributedActor";
 
 constexpr static const StringLiteral DEFAULT_ACTOR_STORAGE_FIELD_NAME =
     "$defaultActor";

@@ -1674,11 +1674,17 @@ FUNCTION(DistributedActorInitializeRemote,
 // OpaqueValue* swift_distributedActor_remote_create(
 //     OpaqueValue *identity,
 //     OpaqueValue *transport);
+//     Metadata *identityMetadata,
+//     Metadata *transportMetadata);
 FUNCTION(DistributedActorRemoteCreate,
          swift_distributedActor_remote_create, SwiftCC,
          ConcurrencyAvailability,
          RETURNS(OpaquePtrTy), // TODO: is this the right type here?
-         ARGS(OpaquePtrTy, OpaquePtrTy),
+         ARGS(OpaquePtrTy,
+              OpaquePtrTy,
+              TypeMetadataPtrTy,
+              TypeMetadataPtrTy
+         ),
          ATTRS(NoUnwind))
 
 // void swift_distributedActor_destroy(DefaultActor *actor); // TODO: ProxyActor *proxy?

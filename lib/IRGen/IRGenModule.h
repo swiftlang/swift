@@ -747,6 +747,10 @@ public:
   llvm::PointerType *ContinuationAsyncContextPtrTy;
   llvm::StructType *DifferentiabilityWitnessTy; // { i8*, i8* }
 
+  // Distributed Actors
+  llvm::PointerType *DistributedActorIdentityFirstTy; // TODO(distributed): do we need First/Second info here?
+  llvm::PointerType *DistributedActorTransportSecondTy;
+
   llvm::GlobalVariable *TheTrivialPropertyDescriptor = nullptr;
 
   /// Used to create unique names for class layout types with tail allocated

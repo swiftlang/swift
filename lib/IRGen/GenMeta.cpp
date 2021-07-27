@@ -2232,16 +2232,23 @@ static void emitInitializeFieldOffsetVector(IRGenFunction &IGF,
   fields = IGF.Builder.CreateStructGEP(fields, 0, Size(0));
 
   unsigned index = 0;
+  fprintf(stderr, "[%s:%d] (%s) TRYING TO ADD FIELDS, FOR:\n", __FILE__, __LINE__, __FUNCTION__);
+  metadata->getType()->dump();
   forEachField(IGM, target, [&](Field field) {
     assert(field.isConcrete() &&
            "initializing offset vector for type with missing member?");
     SILType propTy = field.getType(IGM, T);
+    fprintf(stderr, "[%s:%d] (%s) CREATE STORE FOR: \n", __FILE__, __LINE__, __FUNCTION__);
+    propTy.dump();
     llvm::Value *fieldLayout = emitTypeLayoutRef(IGF, propTy, collector);
     Address fieldLayoutAddr =
       IGF.Builder.CreateConstArrayGEP(fields, index, IGM.getPointerSize());
     IGF.Builder.CreateStore(fieldLayout, fieldLayoutAddr);
     ++index;
+    fprintf(stderr, "[%s:%d] (%s) OK; index = %d\n", __FILE__, __LINE__, __FUNCTION__, index);
   });
+  fprintf(stderr, "[%s:%d] (%s) INDEX = %d\n", __FILE__, __LINE__, __FUNCTION__, index);
+  fprintf(stderr, "[%s:%d] (%s) NUMFIELDS = %d\n", __FILE__, __LINE__, __FUNCTION__, numFields);
   assert(index == numFields);
 
   // Ask the runtime to lay out the struct or class.

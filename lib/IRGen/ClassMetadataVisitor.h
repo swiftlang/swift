@@ -195,7 +195,8 @@ private:
       asImpl().addDefaultActorStorageFieldOffset();
       return;
     case Field::DistributedActorStorage:
-      asImpl().addDistributedActorStorageFieldOffset(); // TODO; seems enough?
+      fprintf(stderr, "[%s:%d] (%s) add field entry: Field::DistributedActorStorage\n", __FILE__, __LINE__, __FUNCTION__);
+      asImpl().addDistributedActorStorageFieldOffset();
       return;
     }
   }

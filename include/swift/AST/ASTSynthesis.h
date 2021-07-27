@@ -50,6 +50,8 @@ enum SingletonTypeSynthesizer {
   _void,
   _word,
   _serialExecutor,
+  _anyActorIdentity, // _Distributed.AnyActorIdentity
+  _actorTransport, // _Distributed.ActorTransport
 };
 inline Type synthesizeType(SynthesisContext &SC,
                            SingletonTypeSynthesizer kind) {
@@ -69,6 +71,11 @@ inline Type synthesizeType(SynthesisContext &SC,
   case _serialExecutor:
     return SC.Context.getProtocol(KnownProtocolKind::SerialExecutor)
       ->getDeclaredInterfaceType();
+  case _anyActorIdentity: // FIXME(distributed): this is a struct
+    assert(false && "not implemented");
+  case _actorTransport:
+    return SC.Context.getProtocol(KnownProtocolKind::ActorTransport)
+        ->getDeclaredInterfaceType();
   }
 }
 

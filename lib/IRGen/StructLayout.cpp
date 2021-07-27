@@ -441,6 +441,8 @@ unsigned irgen::getNumFields(const NominalTypeDecl *target) {
   if (auto cls = dyn_cast<ClassDecl>(target)) {
     if (cls->isRootDefaultActor())
       numFields++;
+    if (cls->isDistributedActor())
+      numFields++;
   }
   return numFields;
 }
@@ -449,9 +451,13 @@ void irgen::forEachField(IRGenModule &IGM, const NominalTypeDecl *typeDecl,
                          llvm::function_ref<void(Field field)> fn) {
   auto classDecl = dyn_cast<ClassDecl>(typeDecl);
   if (classDecl && classDecl->isRootDefaultActor()) {
+//    classDecl->dump();
+    fprintf(stderr, "[%s:%d] (%s) IS isRootDefaultActor\n", __FILE__, __LINE__, __FUNCTION__);
     fn(Field::DefaultActorStorage);
   }
   if (classDecl && classDecl->isDistributedActor()) {
+//    classDecl->dump();
+    fprintf(stderr, "[%s:%d] (%s) IS isDistributedActor\n", __FILE__, __LINE__, __FUNCTION__);
     fn(Field::DistributedActorStorage);
   }
 
