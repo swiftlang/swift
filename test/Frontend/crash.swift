@@ -16,6 +16,10 @@
 // CHECK-ALLOW: Program arguments: {{.*}} -experimental-allow-module-with-compiler-errors
 // CHECK-ALLOW: Compiling with effective version
 
+// RUN: not --crash %target-swift-frontend -typecheck -debug-crash-after-parse -experimental-allow-module-with-compiler-errors -swift-version 5 %s 2>&1 | %FileCheck -check-prefix CHECK-CURRENT %s
+// CHECK-CURRENT: Program arguments: {{.*}} -experimental-allow-module-with-compiler-errors
+// CHECK-CURRENT: Compiling with the current language version
+
 func anchor() {}
 anchor()
 
