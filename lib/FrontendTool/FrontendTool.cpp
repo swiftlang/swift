@@ -1969,6 +1969,8 @@ public:
     auto effective = LangOpts.EffectiveLanguageVersion;
     if (effective != version::Version::getCurrentLanguageVersion()) {
       os << "Compiling with effective version " << effective;
+    } else {
+      os << "Compiling with the current language version";
     }
     os << "\n";
   };
