@@ -1,5 +1,5 @@
 // swift-interface-format-version: 1.0
-// swift-module-flags: -enable-library-evolution -module-name OldActor -enable-experimental-concurrency
+// swift-module-flags: -enable-library-evolution -module-name OldActor 
 import Swift
 import _Concurrency
 

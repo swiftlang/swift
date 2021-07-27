@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -parse-as-library)
+// RUN: %target-run-simple-swift( -parse-as-library)
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
