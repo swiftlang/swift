@@ -571,12 +571,6 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
   if (auto *ParentTupleExpr = dyn_cast_or_null<TupleExpr>(Parent.getAsExpr())) {
     // the argument value is a tuple expression already, we can just extract it
     addCallArgExpr(E, ParentTupleExpr);
-  } else if (auto *ParentOptionalExpr = dyn_cast_or_null<OptionalEvaluationExpr>(Parent.getAsExpr())) {
-    // if an argument value is an optional expression, we should extract the
-    // argument from the subexpression
-    if (auto *ParentTupleExpr = dyn_cast_or_null<TupleExpr>(ParentOptionalExpr->getSubExpr())) {
-      addCallArgExpr(E, ParentTupleExpr);
-    }
   }
 
   if (E->isImplicit())
