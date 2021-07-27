@@ -66,13 +66,21 @@ Marks an overload that the type checker should try to avoid using. When the
 expression type checker is considering overloads, it will prefer a solution
 with fewer `@_disfavoredOverload` declarations over one with more of them.
 
-Historically, it was designed to help with `ExpressibleByXYZLiteral` types.
-The type checker strongly prefers to give literals their default type
-(e.g. `Int` for `ExpressibleByIntegerLiteral`,
-`String` for `ExpressibleByStringLiteral`, etc.).
-If an API should prefer some other type, but accept the default too,
-marking the declaration taking the default type with `@_disfavoredOverload`
-gives the desired behavior:
+Use `@_disfavoredOverload` to work around known bugs in the overload
+resolution rules that cannot be immediately fixed without a source break.
+Don't use it to adjust overload resolution rules that are otherwise sensible
+but happen to produce undesirable results for your particular API; it will
+likely be removed or made into a no-op eventually, and then you will be
+stuck with an overload set that cannot be made to function in the way
+you intend.
+
+`@_disfavoredOverload` was first introduced to work around a bug in overload
+resolution with `ExpressibleByXYZLiteral` types. The type checker strongly
+prefers to give literals their default type (e.g. `Int` for
+`ExpressibleByIntegerLiteral`, `String` for `ExpressibleByStringLiteral`,
+etc.). If an API should prefer some other type, but accept the default too,
+ marking the declaration taking the default type with `@_disfavoredOverload`
+ gives the desired behavior:
 
 ```swift
 extension LocalizedStringKey: ExpressibleByStringLiteral { ... }
@@ -86,12 +94,6 @@ extension Text {
   @_disfavoredOverload init<S: StringProtocol>(_ str: S) { ... }
 }
 ```
-
-`@_disfavoredOverload` is a stop-gap design; eventually the type-checker
-behavior should be fixed and the attribute should be removed/made into a no-op.
-
-Its main use case is to work around clearly undesirable overload resolution,
-not to arbitrarily manipulate overload priority.
 
 ## `@_dynamicReplacement(for:)`
 
