@@ -6457,6 +6457,22 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
     auto resultTanType = resultTan->getType();
     resultTanTypes.push_back(resultTanType);
   }
+  // Append non-wrt inout result tangent spaces.
+  auto *resultFunctionType = this->getResult()->getAs<AnyFunctionType>();
+  auto sourceFunction = resultFunctionType ? resultFunctionType : this;
+  for (unsigned i : range(sourceFunction->getNumParams())) {
+    auto param = sourceFunction->getParams()[i];
+    if (parameterIndices->contains(i))
+      continue;
+    if (param.isInOut()) {
+      auto resultType = param.getPlainType();
+      auto resultTan = resultType->getAutoDiffTangentSpace(lookupConformance);
+      if (!resultTan)
+        continue;
+      auto resultTanType = resultTan->getType();
+      resultTanTypes.push_back(resultTanType);
+    }
+  }
 
   // Error if no semantic result has a tangent space.
   if (resultTanTypes.empty() && !hasInoutResult) {
