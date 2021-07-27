@@ -821,9 +821,7 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
   // Return from the follow-up splitter step that
   // attempted to apply information gained from the
   // isolated constraint to the outer context.
-  if (bool(IsolationScope)) {
-    IsolationScope.reset();
-
+  if (Snapshot && Snapshot->isScoped()) {
     if (CS.isDebugMode())
       getDebugLogger() << ")\n";
 
@@ -870,18 +868,6 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
   // solving along the current path until complete
   // solution is reached.
   if (Producer.isExhausted()) {
-    // Restore constraint system state before conjunction.
-    //
-    // Note that this doesn't include conjunction constraint
-    // itself because we don't want to re-solve it at this
-    // point.
-    if (Conjunction->isIsolated()) {
-      assert(
-          Snapshot &&
-          "Isolated conjunction requires a snapshot of the constraint system");
-      Snapshot.reset();
-    }
-
     // If one of the elements failed, that means while
     // conjunction failed with it.
     if (HadFailure)
@@ -901,12 +887,15 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
         log << "(applying conjunction result to outer context\n";
       }
 
-      // Establish isolation scope so that conjunction solution
-      // and follow-up steps could be rolled back.
-      IsolationScope = std::make_unique<Scope>(CS);
-
-      // Apply solution inferred for the conjunction.
-      CS.applySolution(Solutions.pop_back_val());
+      // Restore constraint system state before conjunction.
+      //
+      // Note that this doesn't include conjunction constraint
+      // itself because we don't want to re-solve it at this
+      // point.
+      assert(
+          Snapshot &&
+          "Isolated conjunction requires a snapshot of the constraint system");
+      Snapshot->setupOuterContext(Solutions.pop_back_val());
 
       // Restore best score, since upcoming step is going to
       // work with outer scope in relation to the conjunction.

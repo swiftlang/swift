@@ -775,6 +775,12 @@ class ConjunctionStep : public BindingStep<ConjunctionElementProducer> {
     llvm::SetVector<TypeVariableType *> TypeVars;
     ConstraintList Constraints;
 
+    /// If this conjunction has to be solved in isolation,
+    /// this scope would be initialized once all of the
+    /// elements are successfully solved to continue solving
+    /// along the current path as-if there was no conjunction.
+    std::unique_ptr<Scope> IsolationScope = nullptr;
+
   public:
     SolverSnapshot(ConstraintSystem &cs)
         : CS(cs), TypeVars(std::move(cs.TypeVariables)) {
@@ -786,12 +792,47 @@ class ConjunctionStep : public BindingStep<ConjunctionElementProducer> {
         CG.removeConstraint(&constraint);
     }
 
-    ~SolverSnapshot() {
-      auto &CG = CS.getConstraintGraph();
+    void setupOuterContext(Solution solution) {
+      // Re-add type variables and constraints back
+      // to the constraint system.
+      restore();
 
+      // Establish isolation scope so that conjunction solution
+      // and follow-up steps could be rolled back.
+      IsolationScope = std::make_unique<Scope>(CS);
+
+      // Apply solution inferred for the conjunction.
+      CS.applySolution(solution);
+
+      // Add constraints to the graph after solution
+      // has been applied to make sure that all type
+      // information is available to incremental inference.
+      for (auto &constraint : CS.InactiveConstraints)
+        CS.CG.addConstraint(&constraint);
+    }
+
+    bool isScoped() const { return bool(IsolationScope); }
+
+    ~SolverSnapshot() {
+      if (!IsolationScope)
+        restore();
+
+      IsolationScope.reset();
+      // Re-add all of the constraint to the constraint
+      // graph after scope has been rolled back, to make
+      // make sure the original (before conjunction)
+      // state is completely restored.
+      updateConstraintGraph();
+    }
+
+  private:
+    void restore() {
       CS.TypeVariables = std::move(TypeVars);
       CS.InactiveConstraints.splice(CS.InactiveConstraints.end(), Constraints);
+    }
 
+    void updateConstraintGraph() {
+      auto &CG = CS.getConstraintGraph();
       for (auto &constraint : CS.InactiveConstraints)
         CG.addConstraint(&constraint);
     }
@@ -811,12 +852,6 @@ class ConjunctionStep : public BindingStep<ConjunctionElementProducer> {
 
   /// Indicates that one of the elements failed inference.
   bool HadFailure = false;
-
-  /// If this conjunction has to be solved in isolation,
-  /// this scope would be initialized once all of the
-  /// elements are successfully solved to continue solving
-  /// along the current path as-if there was no conjunction.
-  std::unique_ptr<Scope> IsolationScope = nullptr;
 
   /// If conjunction has to be solved in isolation, this
   /// variable would capture the snapshot of the constraint
@@ -838,7 +873,6 @@ public:
 
   ~ConjunctionStep() override {
     assert(!bool(ActiveChoice));
-    assert(!bool(IsolationScope));
 
     // Return all of the type variables and constraints back.
     Snapshot.reset();
