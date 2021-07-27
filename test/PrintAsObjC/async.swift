@@ -19,13 +19,13 @@ import Foundation
 
 // CHECK-LABEL: @interface BarClass : NSObject
 @objc @objcMembers class BarClass: NSObject {
-  // CHECK: (void)doSomethingBigWithCompletionHandler:(void (^)(NSInteger))completionHandler;
+  // CHECK: (void)doSomethingBigWithCompletionHandler:(void (^ _Nonnull)(NSInteger))completionHandler;
   func doSomethingBig() async -> Int { 0 }
 
-  // CHECK: - (void)longRunningWithString:(NSString * _Nonnull)string completionHandler:(void (^)(BarClass * _Nullable, NSError * _Nullable))completionHandler;
+  // CHECK: - (void)longRunningWithString:(NSString * _Nonnull)string completionHandler:(void (^ _Nonnull)(BarClass * _Nullable, NSError * _Nullable))completionHandler;
   func longRunning(string: String) async throws -> BarClass { return self }
 
-  // CHECK: - (void)magicTupleReturnWithCompletionHandler:(void (^)(BarClass * _Nonnull, NSInteger))completionHandler;
+  // CHECK: - (void)magicTupleReturnWithCompletionHandler:(void (^ _Nonnull)(BarClass * _Nonnull, NSInteger))completionHandler;
   func magicTupleReturn() async -> (BarClass, Int) { return (self, 0) }
 }
 // CHECK: @end
