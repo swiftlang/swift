@@ -227,8 +227,65 @@ struct Runner {
                 // need to await here.
                 let handle2 = await Task { @CustomActor in
                     debugLog("==> In inner handle")
+                    // Different task without sync so no access issue.
+                    withExclusiveAccess(to: &global) { _ in
+                        debugLog("==> Making sure can push/pop access")
+                    }
+                    withExclusiveAccess(to: &global2) { _ in
+                        debugLog("==> Making sure can push/pop access")
+                    }
                 }
                 await handle2.value
+            }
+            withExclusiveAccess(to: &global2) { _ in
+                // Sync accesses should have not been injected yet.
+                debugLog("==> No crash.")
+            }
+            withExclusiveAccess(to: &global) { _ in
+                // Make sure that global is cleaned up appropriately.
+                debugLog("==> No crash.")
+            }
+            await handle.value
+            withExclusiveAccess(to: &global2) { _ in
+                // Sync accesses should have been cleaned up by now. So no
+                // crash.
+                debugLog("==> No crash.")
+            }
+            withExclusiveAccess(to: &global) { _ in
+                // Make sure that global is cleaned up appropriately.
+                debugLog("==> No crash.")
+            }
+        }
+
+        // Make sure that we crash when accessing &global.
+        exclusivityTests.test("case3.crash") { @MainActor in
+            expectCrashLater(withMessage: "Fatal access conflict detected")
+            debugLog("==> Before handle")
+            let handle = Task { @MyMainActor in
+                debugLog("==> Main: In handle!")
+                debugLog("==> No Crash!")
+                debugLog("==> Main: All done!")
+
+                withExclusiveAccess(to: &global) { _ in
+                    debugLog("==> Making sure can push/pop access")
+                }
+                // In order to test that we properly hand off the access, we
+                // need to await here.
+                let handle2 = await Task { @CustomActor in
+                    debugLog("==> In inner handle")
+                    // No crash here.
+                    withExclusiveAccess(to: &global) { _ in
+                        debugLog("==> Making sure can push/pop access")
+                    }
+                    withExclusiveAccess(to: &global2) { _ in
+                        debugLog("==> Making sure can push/pop access")
+                    }
+                }
+                await handle2.value
+                // But we should crash here if we restore appropriately.
+                withExclusiveAccess(to: &global2) { _ in
+                    debugLog("Crash!")
+                }
             }
             await handle.value
         }
@@ -318,6 +375,70 @@ struct Runner {
 
                 await withExclusiveAccessAsync(to: &global) {
                     @MyMainActorWithAccessInUnownedExecAccessor (x: inout Int) async -> Void in
+                    debugLog("==> Making sure can push/pop access")
+                }
+                // In order to test that we properly hand off the access, we
+                // need to await here.
+                let handle2 = await Task { @CustomActor in
+                    debugLog("==> In inner handle")
+                }
+                await handle2.value
+            }
+            await handle.value
+        }
+
+        // CHECK-LABEL: ==> Enter 'testCase4'
+        // CHECK: ==> MySerialExecutor: Got an enqueue!
+        // CHECK-NEXT: Inserting new access: [[SYNC_NODE_1:0x[0-9a-f]+]]
+        // CHECK-NEXT:   Tracking!
+        // CHECK-NEXT:         Access. Pointer: [[SYNC_ACCESS_1:0x[0-9a-f]+]]. PC:
+        // CHECK: ==> Enter 'withExclusiveAccess'
+        // CHECK-NEXT: Inserting new access: [[SYNC_NODE_2:0x[0-9a-f]+]]
+        // CHECK-NEXT:   Tracking!
+        // CHECK-NEXT:         Access. Pointer: [[SYNC_ACCESS_2]]. PC:
+        // CHECK-NEXT:         Access. Pointer: [[SYNC_ACCESS_1]]. PC:
+        // CHECK: ==> Enter 'withExclusiveAccess'
+        // CHECK: ==> MySerialExecutor: Inside access!
+        // CHECK: ==> MySerialExecutor: Getting Unowned Executor!
+        // CHECK-NEXT: Entering Thread Local Context. Before Swizzle. Task: [[TASK:0x[0-9a-f]+]]
+        // CHECK-NEXT:         SwiftTaskThreadLocalContext: (FirstAccess,LastAccess): (0x0, 0x0)
+        // CHECK-NEXT:         Access. Pointer: [[SYNC_ACCESS_2]]. PC:
+        // CHECK-NEXT:         Access. Pointer: [[SYNC_ACCESS_1]]. PC:
+        // CHECK-NEXT: Entering Thread Local Context. After Swizzle. Task: [[TASK]]
+        // CHECK-NEXT:         SwiftTaskThreadLocalContext: (FirstAccess,LastAccess): ([[SYNC_NODE_2]], 0x0)
+        // CHECK-NEXT:         Access. Pointer: [[SYNC_ACCESS_2]]. PC:
+        // CHECK-NEXT:         Access. Pointer: [[SYNC_ACCESS_1]]. PC:
+        // CHECK: ==> Main: In handle!
+        // CHECK: ==> No Crash!
+        // CHECK: ==> Main: All done!
+        // CHECK: Inserting new access: [[TASK_NODE:0x[0-9a-f]+]]
+        // CHECK-NEXT:   Tracking!
+        // CHECK-NEXT:         Access. Pointer: [[TASK_ACCESS:0x[0-9a-f]+]].
+        // CHECK-NEXT:         Access. Pointer: [[SYNC_ACCESS_2]]. PC:
+        // CHECK-NEXT:         Access. Pointer: [[SYNC_ACCESS_1]]. PC:
+        // CHECK-NEXT: Exiting Thread Local Context. Before Swizzle. Task: [[TASK]]
+        // CHECK-NEXT:         SwiftTaskThreadLocalContext: (FirstAccess,LastAccess): ([[SYNC_NODE_2]], 0x0)
+        // CHECK-NEXT:         Access. Pointer: [[TASK_ACCESS]]. PC:
+        // CHECK-NEXT:         Access. Pointer: [[SYNC_ACCESS_2]]. PC:
+        // CHECK-NEXT:         Access. Pointer: [[SYNC_ACCESS_1]]. PC:
+        // CHECK-NEXT: Exiting Thread Local Context. After Swizzle. Task: [[TASK]]
+        // CHECK-NEXT:         SwiftTaskThreadLocalContext: (FirstAccess,LastAccess): ([[TASK_NODE]], [[TASK_NODE]])
+        // CHECK-NEXT:         Access. Pointer: [[SYNC_ACCESS_2]]. PC:
+        // CHECK-NEXT:         Access. Pointer: [[SYNC_ACCESS_1]]. PC:
+        // CHECK: ==> MySerialExecutor: Inside access after run synchronously!
+        // CHECK: ==> Exit 'testCase4'
+        exclusivityTests.test("case4.filecheck") { @MainActor in
+            debugLog("==> Enter 'testCase4'")
+            defer { debugLog("==> Exit 'testCase4'") }
+
+            debugLog("==> Before handle")
+            let handle = Task { @MyMainActor in
+                debugLog("==> Main: In handle!")
+                debugLog("==> No Crash!")
+                debugLog("==> Main: All done!")
+
+                await withExclusiveAccessAsync(to: &global) {
+                    @MyMainActor (x: inout Int) async -> Void in
                     debugLog("==> Making sure can push/pop access")
                 }
                 // In order to test that we properly hand off the access, we
