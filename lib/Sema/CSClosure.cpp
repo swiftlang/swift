@@ -208,6 +208,19 @@ private:
     createConjunction(cs, elements, locator);
   }
 
+  void visitGuardStmt(GuardStmt *guardStmt) {
+    if (!isSupportedMultiStatementClosure())
+      llvm_unreachable("Unsupported statement: Guard");
+
+    createConjunction(
+        cs,
+        {std::make_pair(
+             guardStmt->getCondPointer(),
+             cs.getConstraintLocator(locator, ConstraintLocator::Condition)),
+         std::make_pair(guardStmt->getBody(), locator)},
+        locator);
+  }
+
   void visitBraceStmt(BraceStmt *braceStmt) {
     if (isSupportedMultiStatementClosure()) {
       SmallVector<std::pair<ASTNode, ConstraintLocator *>, 4> elements;
@@ -269,7 +282,6 @@ private:
   }
   UNSUPPORTED_STMT(Yield)
   UNSUPPORTED_STMT(Defer)
-  UNSUPPORTED_STMT(Guard)
   UNSUPPORTED_STMT(While)
   UNSUPPORTED_STMT(Do)
   UNSUPPORTED_STMT(DoCatch)
@@ -416,6 +428,18 @@ private:
     return ifStmt;
   }
 
+  ASTNode visitGuardStmt(GuardStmt *guardStmt) {
+    if (auto condition = rewriteTarget(
+            SolutionApplicationTarget(guardStmt->getCond(), closure)))
+      guardStmt->setCond(*condition->getAsStmtCondition());
+    else
+      hadError = true;
+
+    auto *body = visit(guardStmt->getBody()).get<Stmt *>();
+    guardStmt->setBody(cast<BraceStmt>(body));
+    return guardStmt;
+  }
+
   ASTNode visitBraceStmt(BraceStmt *braceStmt) {
     for (auto &node : braceStmt->getElements()) {
       if (auto expr = node.dyn_cast<Expr *>()) {
@@ -505,7 +529,6 @@ private:
   }
   UNSUPPORTED_STMT(Yield)
   UNSUPPORTED_STMT(Defer)
-  UNSUPPORTED_STMT(Guard)
   UNSUPPORTED_STMT(While)
   UNSUPPORTED_STMT(Do)
   UNSUPPORTED_STMT(DoCatch)
