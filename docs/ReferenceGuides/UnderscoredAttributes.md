@@ -382,6 +382,14 @@ used when compiling the standard library and overlays.
 
 ## `@_objc_non_lazy_realization`
 
+Marks a class as being non-lazily (i.e. eagerly) [realized](/docs/Lexicon.md#realization).
+
+This is used for declarations which may be statically referenced and wouldn't
+go through the normal lazy realization paths. For example, the empty array
+class must be non-lazily realized, because empty arrays are statically
+allocated. Otherwise, passing the empty array object to other code without
+triggering realization would load to a read from uninitialized memory.
+
 ## `@_optimize([none|size|speed])`
 
 Controls the compiler's optimization mode. This attribute is analogous to the
