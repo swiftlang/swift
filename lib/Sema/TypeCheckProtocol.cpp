@@ -6005,10 +6005,8 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
           continue;
 
         bool valueIsType = isa<TypeDecl>(value);
-        const auto flags =
-            NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
         for (auto requirement
-                : diag.Protocol->lookupDirect(value->getName(), flags)) {
+                : diag.Protocol->lookupDirect(value->getName())) {
           if (requirement->getDeclContext() != diag.Protocol)
             continue;
 
@@ -6210,8 +6208,7 @@ swift::findWitnessedObjCRequirements(const ValueDecl *witness,
     if (!proto->isObjC()) continue;
 
     Optional<ProtocolConformance *> conformance;
-    const auto flags = NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
-    for (auto req : proto->lookupDirect(name, flags)) {
+    for (auto req : proto->lookupDirect(name)) {
       // Skip anything in a protocol extension.
       if (req->getDeclContext() != proto) continue;
 
