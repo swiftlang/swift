@@ -11,7 +11,7 @@
 
 // REQUIRES: concurrency
 
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -parse-as-library %s -typecheck -I %S/Inputs/custom-modules -emit-objc-header-path %t/async.h -import-objc-header %S/../Inputs/empty.h  -enable-experimental-concurrency -typecheck -disable-availability-checking
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -parse-as-library %s -typecheck -I %S/Inputs/custom-modules -emit-objc-header-path %t/async.h -import-objc-header %S/../Inputs/empty.h   -typecheck -disable-availability-checking
 // RUN: %FileCheck %s < %t/async.h
 // RUN: %check-in-clang -I %S/Inputs/custom-modules/ %t/async.h
 

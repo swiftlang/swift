@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -lower-hop-to-actor -enable-experimental-concurrency | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -lower-hop-to-actor  | %FileCheck %s
 
 // REQUIRES: concurrency
 

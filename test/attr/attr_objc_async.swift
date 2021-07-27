@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend -disable-objc-attr-requires-foundation-module -typecheck -verify -verify-ignore-unknown %s -swift-version 5 -enable-source-import -I %S/Inputs -enable-experimental-concurrency -disable-availability-checking -warn-concurrency
-// RUN: %target-swift-ide-test -skip-deinit=false -print-ast-typechecked -source-filename %s -function-definitions=true -prefer-type-repr=false -print-implicit-attrs=true -explode-pattern-binding-decls=true -disable-objc-attr-requires-foundation-module -swift-version 5 -enable-source-import -I %S/Inputs -enable-experimental-concurrency | %FileCheck %s
-// RUN: not %target-swift-frontend -typecheck -dump-ast -disable-objc-attr-requires-foundation-module %s -swift-version 5 -enable-source-import -I %S/Inputs -enable-experimental-concurrency -disable-availability-checking -warn-concurrency > %t.ast
+// RUN: %target-swift-frontend -disable-objc-attr-requires-foundation-module -typecheck -verify -verify-ignore-unknown %s -swift-version 5 -enable-source-import -I %S/Inputs  -disable-availability-checking -warn-concurrency
+// RUN: %target-swift-ide-test -skip-deinit=false -print-ast-typechecked -source-filename %s -function-definitions=true -prefer-type-repr=false -print-implicit-attrs=true -explode-pattern-binding-decls=true -disable-objc-attr-requires-foundation-module -swift-version 5 -enable-source-import -I %S/Inputs  | %FileCheck %s
+// RUN: not %target-swift-frontend -typecheck -dump-ast -disable-objc-attr-requires-foundation-module %s -swift-version 5 -enable-source-import -I %S/Inputs  -disable-availability-checking -warn-concurrency > %t.ast
 // RUN: %FileCheck -check-prefix CHECK-DUMP %s < %t.ast
 // REQUIRES: objc_interop
 // REQUIRES: concurrency
