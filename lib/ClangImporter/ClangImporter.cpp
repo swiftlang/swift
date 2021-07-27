@@ -2870,11 +2870,6 @@ void ClangImporter::lookupTypeDecl(
           continue;
         }
         auto *imported = Impl.importDecl(clangDecl, Impl.CurrentVersion);
-
-        // Namespaces are imported as extensions for enums.
-        if (auto ext = dyn_cast_or_null<ExtensionDecl>(imported)) {
-          imported = ext->getExtendedNominal();
-        }
         if (auto *importedType = dyn_cast_or_null<TypeDecl>(imported)) {
           foundViaClang = true;
           receiver(importedType);
@@ -3841,22 +3836,11 @@ void ClangImporter::Implementation::lookupValue(
     // If the entry is not visible, skip it.
     if (!isVisibleClangEntry(entry)) continue;
 
-    ValueDecl *decl = nullptr;
+    ValueDecl *decl;
     // If it's a Clang declaration, try to import it.
     if (auto clangDecl = entry.dyn_cast<clang::NamedDecl *>()) {
-      bool isNamespace = isa<clang::NamespaceDecl>(clangDecl);
-      Decl *realDecl =
-          importDeclReal(clangDecl->getMostRecentDecl(), CurrentVersion,
-                         /*useCanonicalDecl*/ !isNamespace);
-
-      if (isNamespace) {
-        if (auto extension = cast_or_null<ExtensionDecl>(realDecl))
-          realDecl = extension->getExtendedNominal();
-      }
-
-      if (!realDecl)
-        continue;
-      decl = cast<ValueDecl>(realDecl);
+      decl = cast_or_null<ValueDecl>(
+          importDeclReal(clangDecl->getMostRecentDecl(), CurrentVersion));
       if (!decl) continue;
     } else if (!name.isSpecial()) {
       // Try to import a macro.
