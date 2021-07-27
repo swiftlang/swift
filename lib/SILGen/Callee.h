@@ -23,7 +23,6 @@ namespace Lowering {
 
 class CalleeTypeInfo {
 public:
-  Optional<AbstractionPattern> origFormalType;
   CanSILFunctionType substFnType;
   Optional<AbstractionPattern> origResultType;
   CanType substResultType;
@@ -46,18 +45,17 @@ public:
                  const Optional<ForeignAsyncConvention> &foreignAsync,
                  ImportAsMemberStatus foreignSelf,
                  Optional<SILFunctionTypeRepresentation> overrideRep = None)
-      : origFormalType(llvm::None), substFnType(substFnType),
-        origResultType(origResultType),
-        substResultType(substResultType), foreign{foreignError, foreignAsync,
-                                                  foreignSelf},
+      : substFnType(substFnType), origResultType(origResultType),
+        substResultType(substResultType),
+        foreign{foreignError, foreignAsync, foreignSelf},
         overrideRep(overrideRep) {}
 
   CalleeTypeInfo(CanSILFunctionType substFnType,
                  AbstractionPattern origResultType, CanType substResultType,
                  Optional<SILFunctionTypeRepresentation> overrideRep = None)
-      : origFormalType(llvm::None), substFnType(substFnType),
-        origResultType(origResultType), substResultType(substResultType),
-        foreign(), overrideRep(overrideRep) {}
+      : substFnType(substFnType), origResultType(origResultType),
+        substResultType(substResultType), foreign(),
+        overrideRep(overrideRep) {}
 
   SILFunctionTypeRepresentation getOverrideRep() const {
     return overrideRep.getValueOr(substFnType->getRepresentation());

@@ -182,9 +182,10 @@ public:
   /// implementation function for an ObjC API that was imported
   /// as `async` in Swift.
   SILFunction *getOrCreateForeignAsyncCompletionHandlerImplFunction(
-      CanSILFunctionType blockType, CanType continuationTy,
-      AbstractionPattern origFormalType, CanGenericSignature sig,
-      ForeignAsyncConvention convention);
+                                           CanSILFunctionType blockType,
+                                           CanType continuationTy,
+                                           CanGenericSignature sig,
+                                           ForeignAsyncConvention convention);
 
   /// Determine whether the given class has any instance variables that
   /// need to be destroyed.
