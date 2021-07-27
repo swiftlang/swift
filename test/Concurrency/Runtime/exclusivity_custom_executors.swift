@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift( %import-libdispatch -parse-as-library)
+// RUN: %target-run-simple-swift(-parse-as-library)
 
 // REQUIRES: concurrency
 // REQUIRES: executable_test
