@@ -493,8 +493,8 @@ The process of initializing an ObjC class for use by the ObjC runtime.
 This consists of allocating runtime tracking data, fixing up method lists
 and attaching categories.
 
-This is distinct from the initialization performed by `+initialize`,
-which happens only when the first message is sent to the class.
+This is distinct from the initialization performed by `+initialize`, which
+happens only when the first message (other than `+load`) is sent to the class.
 
 The order of operations is: realization, followed by `+load` (if present),
 followed by `+initialize`. There are few cases where these can happen
@@ -508,8 +508,7 @@ at different times.
   such a class, realization eagerly happens at load time before `+load` runs.
   (Fun aside: C++ static initializers run after `+load`.) `+initialize` still
   runs lazily on the first message.
-- If the class has a special attribute such as
-  [`@_objc_non_lazy_realization`](/docs/ReferenceGuides/UnderscoredAttributes.md#_objc_non_lazy_realization):
+- If the class is marked [`@_objc_non_lazy_realization`](/docs/ReferenceGuides/UnderscoredAttributes.md#_objc_non_lazy_realization):
   Realization happens at load time. `+initialize` still runs lazily on the first
   message.
 

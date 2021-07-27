@@ -388,7 +388,9 @@ This is used for declarations which may be statically referenced and wouldn't
 go through the normal lazy realization paths. For example, the empty array
 class must be non-lazily realized, because empty arrays are statically
 allocated. Otherwise, passing the empty array object to other code without
-triggering realization would load to a read from uninitialized memory.
+triggering realization could allow for the unrealized empty array class to be
+passed to ObjC runtime APIs which only operate on realized classes, resulting
+in a crash.
 
 ## `@_optimize([none|size|speed])`
 
