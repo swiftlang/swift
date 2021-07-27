@@ -7891,6 +7891,15 @@ static std::pair<Expr *, unsigned> getPrecedenceParentAndIndex(Expr *expr,
   }
   Expr *parent = it->second;
 
+  // Look through an unresolved chain wrapper expr, as it has no effect on
+  // precedence.
+  if (isa<UnresolvedMemberChainResultExpr>(parent)) {
+    it = parentMap.find(parent);
+    if (it == parentMap.end())
+      return {nullptr, 0};
+    parent = it->second;
+  }
+
   // Handle all cases where the answer isn't just going to be { parent, 0 }.
   if (auto tuple = dyn_cast<TupleExpr>(parent)) {
     // Get index of expression in tuple.
@@ -7970,13 +7979,13 @@ bool swift::exprNeedsParensOutsideFollowingOperator(
   Expr *parent;
   unsigned index;
   std::tie(parent, index) = getPrecedenceParentAndIndex(expr, rootExpr);
-  if (!parent || isa<TupleExpr>(parent)) {
+  if (!parent)
     return false;
-  }
 
-  if (auto parenExp = dyn_cast<ParenExpr>(parent))
-    if (!parenExp->isImplicit())
+  if (isa<ParenExpr>(parent) || isa<TupleExpr>(parent)) {
+    if (!parent->isImplicit())
       return false;
+  }
 
   if (parent->isInfixOperator()) {
     auto parentPG = TypeChecker::lookupPrecedenceGroupForInfixOperator(DC,
