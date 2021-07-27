@@ -548,10 +548,10 @@ public:
       return result;
 
     auto func = cast<AbstractFunctionDecl>(constant->getDecl());
-    result.foreign = CalleeTypeInfo::ForeignInfo{
-      func->getForeignErrorConvention(),
-      func->getForeignAsyncConvention(),
-      func->getImportAsMemberStatus(),
+    result.foreign = ForeignInfo{
+        func->getImportAsMemberStatus(),
+        func->getForeignErrorConvention(),
+        func->getForeignAsyncConvention(),
     };
 
     // Remove the metatype "self" parameter by making this a static member.
@@ -2764,7 +2764,7 @@ class ArgEmitter {
   SILFunctionTypeRepresentation Rep;
   bool IsYield;
   bool IsForCoroutine;
-  CalleeTypeInfo::ForeignInfo Foreign;
+  ForeignInfo Foreign;
   ClaimedParamsRef ParamInfos;
   SmallVectorImpl<ManagedValue> &Args;
 
@@ -2777,10 +2777,10 @@ public:
              bool isYield, bool isForCoroutine, ClaimedParamsRef paramInfos,
              SmallVectorImpl<ManagedValue> &args,
              SmallVectorImpl<DelayedArgument> &delayedArgs,
-             const CalleeTypeInfo::ForeignInfo &foreign)
+             const ForeignInfo &foreign)
       : SGF(SGF), Rep(Rep), IsYield(isYield), IsForCoroutine(isForCoroutine),
-        Foreign(foreign),
-        ParamInfos(paramInfos), Args(args), DelayedArguments(delayedArgs) {}
+        Foreign(foreign), ParamInfos(paramInfos), Args(args),
+        DelayedArguments(delayedArgs) {}
 
   // origParamType is a parameter type.
   void emitSingleArg(ArgumentSource &&arg, AbstractionPattern origParamType) {
@@ -3362,11 +3362,9 @@ void DelayedArgument::emitDefaultArgument(SILGenFunction &SGF,
 
   SmallVector<ManagedValue, 4> loweredArgs;
   SmallVector<DelayedArgument, 4> delayedArgs;
-  auto emitter =
-      ArgEmitter(SGF, info.functionRepresentation, /*yield*/ false,
-                 /*coroutine*/ false, info.paramsToEmit, loweredArgs,
-                 delayedArgs,
-                 CalleeTypeInfo::ForeignInfo{});
+  auto emitter = ArgEmitter(SGF, info.functionRepresentation, /*yield*/ false,
+                            /*coroutine*/ false, info.paramsToEmit, loweredArgs,
+                            delayedArgs, ForeignInfo{});
 
   emitter.emitSingleArg(ArgumentSource(info.loc, std::move(value)),
                         info.origResultType);
@@ -3528,10 +3526,9 @@ struct ParamLowering {
         Rep(fnType->getRepresentation()), fnConv(fnType, SGF.SGM.M),
         typeExpansionContext(SGF.getTypeExpansionContext()) {}
 
-  ClaimedParamsRef
-  claimParams(AbstractionPattern origFormalType,
-              ArrayRef<AnyFunctionType::Param> substParams,
-              const CalleeTypeInfo::ForeignInfo &foreign) {
+  ClaimedParamsRef claimParams(AbstractionPattern origFormalType,
+                               ArrayRef<AnyFunctionType::Param> substParams,
+                               const ForeignInfo &foreign) {
     unsigned count = 0;
     if (!foreign.self.isStatic()) {
       for (auto i : indices(substParams)) {
@@ -3640,7 +3637,7 @@ public:
             CanSILFunctionType substFnType, ParamLowering &lowering,
             SmallVectorImpl<ManagedValue> &args,
             SmallVectorImpl<DelayedArgument> &delayedArgs,
-            const CalleeTypeInfo::ForeignInfo &foreign) && {
+            const ForeignInfo &foreign) && {
     auto params = lowering.claimParams(origFormalType, getParams(), foreign);
 
     ArgEmitter emitter(SGF, lowering.Rep, /*yield*/ false,
@@ -3781,8 +3778,7 @@ private:
   /// ApplyOptions.
   ApplyOptions emitArgumentsForNormalApply(
       AbstractionPattern origFormalType, CanSILFunctionType substFnType,
-      const CalleeTypeInfo::ForeignInfo &foreign,
-      SmallVectorImpl<ManagedValue> &uncurriedArgs,
+      const ForeignInfo &foreign, SmallVectorImpl<ManagedValue> &uncurriedArgs,
       Optional<SILLocation> &uncurriedLoc);
 
   RValue
@@ -4101,8 +4097,7 @@ CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
   SmallVector<ManagedValue, 4> uncurriedArgs;
   Optional<SILLocation> uncurriedLoc;
   CanFunctionType formalApplyType;
-  emitArgumentsForNormalApply(origFormalType, substFnType,
-                              CalleeTypeInfo::ForeignInfo{},
+  emitArgumentsForNormalApply(origFormalType, substFnType, ForeignInfo{},
                               uncurriedArgs, uncurriedLoc);
 
   // If we have a late emitter, now that we have emitted our arguments, call the
@@ -4166,8 +4161,7 @@ CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
 
 ApplyOptions CallEmission::emitArgumentsForNormalApply(
     AbstractionPattern origFormalType, CanSILFunctionType substFnType,
-    const CalleeTypeInfo::ForeignInfo &foreign,
-    SmallVectorImpl<ManagedValue> &uncurriedArgs,
+    const ForeignInfo &foreign, SmallVectorImpl<ManagedValue> &uncurriedArgs,
     Optional<SILLocation> &uncurriedLoc) {
   ApplyOptions options;
 
@@ -4202,7 +4196,7 @@ ApplyOptions CallEmission::emitArgumentsForNormalApply(
       args.push_back({});
       
       // Claim the foreign "self" with the self param.
-      auto siteForeign = CalleeTypeInfo::ForeignInfo{{}, {}, foreign.self};
+      auto siteForeign = ForeignInfo{foreign.self, {}, {}};
       std::move(*selfArg).emit(SGF, origFormalType, substFnType, paramLowering,
                                args.back(), delayedArgs,
                                siteForeign);
@@ -4214,8 +4208,7 @@ ApplyOptions CallEmission::emitArgumentsForNormalApply(
 
     // Claim the foreign error and/or async argument(s) with the method
     // formal params.
-    auto siteForeign =
-        CalleeTypeInfo::ForeignInfo{foreign.error, foreign.async, {}};
+    auto siteForeign = ForeignInfo{{}, foreign.error, foreign.async};
     std::move(*callSite).emit(SGF, origFormalType, substFnType, paramLowering,
                               args.back(), delayedArgs,
                               siteForeign);
@@ -4629,10 +4622,8 @@ RValue SILGenFunction::emitMonomorphicApply(
     SGFContext evalContext) {
   auto fnType = fn.getType().castTo<SILFunctionType>();
   assert(!fnType->isPolymorphic());
-  CalleeTypeInfo::ForeignInfo foreign{
-    foreignError,
-    {}, // TODO: take a foreign async convention?
-    {},
+  ForeignInfo foreign{
+      {}, foreignError, {}, // TODO: take a foreign async convention?
   };
   CalleeTypeInfo calleeTypeInfo(fnType, AbstractionPattern(foreignResultType),
                                 nativeResultType,
@@ -4733,10 +4724,8 @@ void SILGenFunction::emitYield(SILLocation loc,
   }
 
   ArgEmitter emitter(*this, fnType->getRepresentation(), /*yield*/ true,
-                     /*isForCoroutine*/ false,
-                     ClaimedParamsRef(substYieldTys),
-                     yieldArgs, delayedArgs,
-                     CalleeTypeInfo::ForeignInfo{});
+                     /*isForCoroutine*/ false, ClaimedParamsRef(substYieldTys),
+                     yieldArgs, delayedArgs, ForeignInfo{});
 
   for (auto i : indices(valueSources)) {
     emitter.emitSingleArg(std::move(valueSources[i]), origTypes[i]);
@@ -5609,11 +5598,9 @@ static void emitPseudoFunctionArguments(SILGenFunction &SGF,
   SmallVector<DelayedArgument, 2> delayedArgs;
 
   ArgEmitter emitter(SGF, SILFunctionTypeRepresentation::Thin,
-     /*yield*/ false,
-     /*isForCoroutine*/ false,
-     ClaimedParamsRef(substParamTys),
-     argValues, delayedArgs,
-     CalleeTypeInfo::ForeignInfo{});
+                     /*yield*/ false,
+                     /*isForCoroutine*/ false, ClaimedParamsRef(substParamTys),
+                     argValues, delayedArgs, ForeignInfo{});
 
   emitter.emitPreparedArgs(std::move(args), origFnType);
 
@@ -6284,9 +6271,8 @@ SmallVector<ManagedValue, 4> SILGenFunction::emitKeyPathSubscriptOperands(
   ArgEmitter emitter(*this, fnType->getRepresentation(),
                      /*yield*/ false,
                      /*isForCoroutine*/ false,
-                     ClaimedParamsRef(fnType->getParameters()),
-                     argValues, delayedArgs,
-                     CalleeTypeInfo::ForeignInfo{});
+                     ClaimedParamsRef(fnType->getParameters()), argValues,
+                     delayedArgs, ForeignInfo{});
 
   auto prepared =
       prepareSubscriptIndices(subscript, subs,
