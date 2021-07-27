@@ -1257,16 +1257,6 @@ static void diagnoseIgnoredLiteral(ASTContext &Ctx, LiteralExpr *LE) {
 }
 
 void TypeChecker::checkIgnoredExpr(Expr *E) {
-  // For parity with C, several places in the grammar accept multiple
-  // comma-separated expressions and then bind them together as an implicit
-  // tuple.  Break these apart and check them separately.
-  if (E->isImplicit() && isa<TupleExpr>(E)) {
-    for (auto Elt : cast<TupleExpr>(E)->getElements()) {
-      checkIgnoredExpr(Elt);
-    }
-    return;
-  }
-
   // Skip checking if there is no type, which presumably means there was a
   // type error.
   if (!E->getType()) {

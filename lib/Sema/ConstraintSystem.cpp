@@ -3778,16 +3778,7 @@ static bool diagnoseContextualFunctionCallGenericAmbiguity(
                                             TypeVariableType *typeVar) {
     auto argParamMatch = argMatching->second.parameterBindings[argIdx];
     auto param = applyFnType->getParams()[argParamMatch.front()];
-    if (param.isVariadic()) {
-      auto paramType = param.getParameterType();
-      // Variadic parameter is constructed as an ArraySliceType(which is
-      // just sugared type for a bound generic) with the closure type as
-      // element.
-      auto baseType = paramType->getDesugaredType()->castTo<BoundGenericType>();
-      auto paramFnType = baseType->getGenericArgs()[0]->castTo<FunctionType>();
-      return cs.typeVarOccursInType(typeVar, paramFnType->getResult());
-    }
-    auto paramFnType = param.getParameterType()->castTo<FunctionType>();
+    auto paramFnType = param.getPlainType()->castTo<FunctionType>();
     return cs.typeVarOccursInType(typeVar, paramFnType->getResult());
   };
 
