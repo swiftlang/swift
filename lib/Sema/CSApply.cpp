@@ -655,8 +655,8 @@ namespace {
                                                    ctx);
                     cs.setType(base, MetatypeType::get(baseTy));
 
-                    refExpr = new (ctx) DotSyntaxCallExpr(declRefExpr,
-                                                          SourceLoc(), base);
+                    refExpr = DotSyntaxCallExpr::create(ctx, declRefExpr,
+                                                        SourceLoc(), base);
                     auto refType = fullType->castTo<FunctionType>()->getResult();
                     cs.setType(refExpr, refType);
                   } else {
@@ -1175,8 +1175,8 @@ namespace {
       }
 
       // (Self) -> ...
-      ApplyExpr *selfCall = new (context) DotSyntaxCallExpr(
-          ref, SourceLoc(), selfOpenedRef);
+      ApplyExpr *selfCall =
+          DotSyntaxCallExpr::create(context, ref, SourceLoc(), selfOpenedRef);
       selfCall->setType(refTy->getResult());
       cs.cacheType(selfCall);
 
@@ -1743,7 +1743,7 @@ namespace {
       if (isa<ConstructorDecl>(member)) {
         // FIXME: Provide type annotation.
         ref = forceUnwrapIfExpected(ref, choice, memberLocator);
-        apply = new (context) ConstructorRefCallExpr(ref, base);
+        apply = ConstructorRefCallExpr::create(context, ref, base);
       } else if (isUnboundInstanceMember) {
         auto refType = cs.simplifyType(openedType);
         if (!cs.getType(ref)->isEqual(refType)) {
@@ -1762,7 +1762,7 @@ namespace {
         assert((!baseIsInstance || member->isInstanceMember()) &&
                "can't call a static method on an instance");
         ref = forceUnwrapIfExpected(ref, choice, memberLocator);
-        apply = new (context) DotSyntaxCallExpr(ref, dotLoc, base);
+        apply = DotSyntaxCallExpr::create(context, ref, dotLoc, base);
         if (Implicit) {
           apply->setImplicit();
         }
@@ -3152,8 +3152,8 @@ namespace {
       Expr *ctorRef = buildOtherConstructorRef(overload.openedFullType, callee,
                                                base, nameLoc, ctorLocator,
                                                implicit);
-      auto *call = new (cs.getASTContext()) DotSyntaxCallExpr(ctorRef, dotLoc,
-                                                              base);
+      auto *call =
+          DotSyntaxCallExpr::create(cs.getASTContext(), ctorRef, dotLoc, base);
 
       return finishApply(call, cs.getType(expr), locator, ctorLocator);
     }

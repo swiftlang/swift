@@ -1779,12 +1779,28 @@ Expr *CallExpr::getDirectCallee() const {
   }
 }
 
+PrefixUnaryExpr *PrefixUnaryExpr::create(ASTContext &ctx, Expr *fn,
+                                         Expr *operand, Type ty) {
+  return new (ctx) PrefixUnaryExpr(fn, operand, ty);
+}
+
+PostfixUnaryExpr *PostfixUnaryExpr::create(ASTContext &ctx, Expr *fn,
+                                           Expr *operand, Type ty) {
+  return new (ctx) PostfixUnaryExpr(fn, operand, ty);
+}
+
 BinaryExpr *BinaryExpr::create(ASTContext &ctx, Expr *lhs, Expr *fn, Expr *rhs,
                                bool implicit, Type ty) {
   auto *packedArg = TupleExpr::createImplicit(ctx, {lhs, rhs}, /*labels*/ {});
   computeSingleArgumentType(ctx, packedArg, /*implicit*/ true,
                             [](Expr *E) { return E->getType(); });
   return new (ctx) BinaryExpr(fn, packedArg, implicit, ty);
+}
+
+DotSyntaxCallExpr *DotSyntaxCallExpr::create(ASTContext &ctx, Expr *fnExpr,
+                                             SourceLoc dotLoc, Expr *baseExpr,
+                                             Type ty) {
+  return new (ctx) DotSyntaxCallExpr(fnExpr, dotLoc, baseExpr, ty);
 }
 
 SourceLoc DotSyntaxCallExpr::getLoc() const {
@@ -1812,6 +1828,13 @@ SourceLoc DotSyntaxCallExpr::getEndLoc() const {
   }
 
   return getFn()->getEndLoc();
+}
+
+ConstructorRefCallExpr *ConstructorRefCallExpr::create(ASTContext &ctx,
+                                                       Expr *fnExpr,
+                                                       Expr *baseExpr,
+                                                       Type ty) {
+  return new (ctx) ConstructorRefCallExpr(fnExpr, baseExpr, ty);
 }
 
 void ExplicitCastExpr::setCastType(Type type) {

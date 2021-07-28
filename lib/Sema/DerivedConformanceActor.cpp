@@ -70,8 +70,8 @@ static Expr *constructUnownedSerialExecutor(ASTContext &ctx,
     //   (Builtin.Executor) -> UnownedSerialExecutor
     auto metatypeRef = TypeExpr::createImplicit(executorType, ctx);
     Type ctorAppliedType = ctorType->getAs<FunctionType>()->getResult();
-    auto selfApply = new (ctx) ConstructorRefCallExpr(initRef, metatypeRef,
-                                                      ctorAppliedType);
+    auto selfApply = ConstructorRefCallExpr::create(ctx, initRef, metatypeRef,
+                                                    ctorAppliedType);
     selfApply->setImplicit(true);
     selfApply->setThrows(false);
 

@@ -4787,9 +4787,12 @@ public:
   
 /// PrefixUnaryExpr - Prefix unary expressions like '!y'.
 class PrefixUnaryExpr : public ApplyExpr {
+  PrefixUnaryExpr(Expr *fn, Expr *operand, Type ty = Type())
+      : ApplyExpr(ExprKind::PrefixUnary, fn, operand, /*implicit*/ false, ty) {}
+
 public:
-  PrefixUnaryExpr(Expr *Fn, Expr *Arg, Type Ty = Type())
-    : ApplyExpr(ExprKind::PrefixUnary, Fn, Arg, /*Implicit=*/false, Ty) {}
+  static PrefixUnaryExpr *create(ASTContext &ctx, Expr *fn, Expr *operand,
+                                 Type ty = Type());
 
   SourceLoc getLoc() const { return getFn()->getStartLoc(); }
 
@@ -4807,9 +4810,13 @@ public:
 
 /// PostfixUnaryExpr - Postfix unary expressions like 'y!'.
 class PostfixUnaryExpr : public ApplyExpr {
+  PostfixUnaryExpr(Expr *fn, Expr *operand, Type ty = Type())
+      : ApplyExpr(ExprKind::PostfixUnary, fn, operand, /*implicit*/ false, ty) {
+  }
+
 public:
-  PostfixUnaryExpr(Expr *Fn, Expr *Arg, Type Ty = Type())
-    : ApplyExpr(ExprKind::PostfixUnary, Fn, Arg, /*Implicit=*/false, Ty) {}
+  static PostfixUnaryExpr *create(ASTContext &ctx, Expr *fn, Expr *operand,
+                                  Type ty = Type());
 
   SourceLoc getLoc() const { return getFn()->getStartLoc(); }
   
@@ -4877,14 +4884,18 @@ public:
 /// is modeled as a DeclRefExpr or OverloadSetRefExpr on the method.
 class DotSyntaxCallExpr : public SelfApplyExpr {
   SourceLoc DotLoc;
-  
-public:
-  DotSyntaxCallExpr(Expr *FnExpr, SourceLoc DotLoc, Expr *BaseExpr,
-                    Type Ty = Type())
-    : SelfApplyExpr(ExprKind::DotSyntaxCall, FnExpr, BaseExpr, Ty),
-      DotLoc(DotLoc) {
+
+  DotSyntaxCallExpr(Expr *fnExpr, SourceLoc dotLoc, Expr *baseExpr,
+                    Type ty = Type())
+      : SelfApplyExpr(ExprKind::DotSyntaxCall, fnExpr, baseExpr, ty),
+        DotLoc(dotLoc) {
     setImplicit(DotLoc.isInvalid());
   }
+
+public:
+  static DotSyntaxCallExpr *create(ASTContext &ctx, Expr *fnExpr,
+                                   SourceLoc dotLoc, Expr *baseExpr,
+                                   Type ty = Type());
 
   SourceLoc getDotLoc() const { return DotLoc; }
 
@@ -4901,9 +4912,12 @@ public:
 /// actual reference to function which returns the constructor is modeled
 /// as a DeclRefExpr.
 class ConstructorRefCallExpr : public SelfApplyExpr {
+  ConstructorRefCallExpr(Expr *fnExpr, Expr *baseExpr, Type ty = Type())
+      : SelfApplyExpr(ExprKind::ConstructorRefCall, fnExpr, baseExpr, ty) {}
+
 public:
-  ConstructorRefCallExpr(Expr *FnExpr, Expr *BaseExpr, Type Ty = Type())
-    : SelfApplyExpr(ExprKind::ConstructorRefCall, FnExpr, BaseExpr, Ty) {}
+  static ConstructorRefCallExpr *create(ASTContext &ctx, Expr *fnExpr,
+                                        Expr *baseExpr, Type ty = Type());
 
   SourceLoc getLoc() const { return getFn()->getLoc(); }
   SourceLoc getStartLoc() const { return getBase()->getStartLoc(); }

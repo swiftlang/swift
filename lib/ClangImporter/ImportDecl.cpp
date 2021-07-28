@@ -6490,8 +6490,8 @@ Decl *SwiftDeclConverter::importEnumCaseAlias(
                                             /*implicit*/ true);
     constantRef->setType(enumElt->getInterfaceType());
 
-    auto instantiate = new (Impl.SwiftContext)
-        DotSyntaxCallExpr(constantRef, SourceLoc(), typeRef);
+    auto instantiate = DotSyntaxCallExpr::create(Impl.SwiftContext, constantRef,
+                                                 SourceLoc(), typeRef);
     instantiate->setType(importedEnumTy);
     instantiate->setThrows(false);
 
@@ -7634,7 +7634,7 @@ createAccessorImplCallExpr(FuncDecl *accessorImpl,
   accessorImplExpr->setType(accessorImpl->getInterfaceType());
 
   auto accessorImplDotCallExpr =
-      new (ctx) DotSyntaxCallExpr(accessorImplExpr, SourceLoc(), selfExpr);
+      DotSyntaxCallExpr::create(ctx, accessorImplExpr, SourceLoc(), selfExpr);
   accessorImplDotCallExpr->setType(accessorImpl->getMethodInterfaceType());
   accessorImplDotCallExpr->setThrows(false);
 
@@ -9662,8 +9662,8 @@ synthesizeConstantGetterBody(AbstractFunctionDecl *afd, void *voidContext) {
 
     // (Self) -> ...
     initTy = initTy->castTo<FunctionType>()->getResult();
-    auto initRef = new (ctx) DotSyntaxCallExpr(declRef, SourceLoc(),
-                                               typeRef, initTy);
+    auto initRef =
+        DotSyntaxCallExpr::create(ctx, declRef, SourceLoc(), typeRef, initTy);
     initRef->setThrows(false);
 
     // (rawValue: T) -> ...
