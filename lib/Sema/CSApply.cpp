@@ -1254,7 +1254,7 @@ namespace {
                                        /*implicit=*/true);
       }
 
-      auto argTy = AnyFunctionType::composeInput(context, calleeParams,
+      auto argTy = AnyFunctionType::composeTuple(context, calleeParams,
                                                  /*canonical*/false);
       closureArg->setType(argTy);
       cs.cacheType(closureArg);
@@ -5808,7 +5808,7 @@ Expr *ExprRewriter::coerceCallArguments(
   ParameterListInfo paramInfo(params, callee.getDecl(), skipCurriedSelf);
 
   SmallVector<AnyFunctionType::Param, 8> args;
-  AnyFunctionType::decomposeInput(cs.getType(arg), args);
+  AnyFunctionType::decomposeTuple(cs.getType(arg), args);
 
   // If this application is an init(wrappedValue:) call that needs an injected
   // wrapped value placeholder, the first non-defaulted argument must be
@@ -6101,7 +6101,7 @@ Expr *ExprRewriter::coerceCallArguments(
   }
 
   // Rebuild the argument list, sharing as much structure as possible.
-  auto paramType = AnyFunctionType::composeInput(ctx, newParams,
+  auto paramType = AnyFunctionType::composeTuple(ctx, newParams,
                                                  /*canonicalVararg=*/false);
   if (isa<ParenType>(paramType.getPointer())) {
     if (argParen) {
@@ -7639,7 +7639,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
                                                     {escapable}, {}, getType);
         cs.cacheSubExprTypes(callSubExpr);
         cs.setType(callSubExpr->getArg(),
-                   AnyFunctionType::composeInput(ctx,
+                   AnyFunctionType::composeTuple(ctx,
                                                  escapableParams, false));
         cs.setType(callSubExpr, resultType);
         

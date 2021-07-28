@@ -136,7 +136,7 @@ Expr *swift::buildArgumentForwardingExpr(ArrayRef<ParamDecl*> params,
                                 SourceLoc(), false, IsImplicit);
   }
 
-  auto argTy = AnyFunctionType::composeInput(ctx, elts, /*canonical*/false);
+  auto argTy = AnyFunctionType::composeTuple(ctx, elts, /*canonical*/false);
   argExpr->setType(argTy);
 
   return argExpr;

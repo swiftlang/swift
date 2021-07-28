@@ -4022,7 +4022,7 @@ RValue CallEmission::applyEnumElementConstructor(SGFContext C) {
                                 resultFnType, argVals,
                                 std::move(*callSite).forward());
 
-    auto payloadTy = AnyFunctionType::composeInput(SGF.getASTContext(),
+    auto payloadTy = AnyFunctionType::composeTuple(SGF.getASTContext(),
                                                   resultFnType.getParams(),
                                                   /*canonicalVararg*/ true);
     auto arg = RValue(SGF, argVals, payloadTy->getCanonicalType());
@@ -4278,7 +4278,7 @@ CallEmission CallEmission::forApplyExpr(SILGenFunction &SGF, ApplyExpr *e) {
     Expr *arg = apply.callSite->getArg();
 
     SmallVector<AnyFunctionType::Param, 8> params;
-    AnyFunctionType::decomposeInput(arg->getType(), params);
+    AnyFunctionType::decomposeTuple(arg->getType(), params);
 
     PreparedArguments preparedArgs(params, arg);
 
