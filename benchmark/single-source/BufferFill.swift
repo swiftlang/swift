@@ -107,6 +107,7 @@ public func rawBufferInitializeMemoryTeardown() {
 public func rawBufferInitializeMemoryExecute(n: Int) {
   // Measure performance when initializing an UnsafeRawBuffer
   // from a Collection that supports `withContiguousStorageIfAvailable`
+  // See: https://bugs.swift.org/browse/SR-14982
 
   for _ in 0..<n {
     var (iterator, initialized) = rb.initializeMemory(as: Int.self, from: a)
