@@ -2648,37 +2648,6 @@ static ArrayRef<Decl *> evaluateMembersRequest(
     TypeChecker::addImplicitConstructors(nominal);
   }
 
-  // Force any conformances that may introduce more members.
-  for (auto conformance : idc->getLocalConformances()) {
-    auto proto = conformance->getProtocol();
-    bool isDerivable =
-      conformance->getState() == ProtocolConformanceState::Incomplete &&
-      proto->getKnownDerivableProtocolKind();
-
-    switch (kind) {
-    case MembersRequestKind::ABI:
-      // Force any derivable conformances in this context.
-      if (isDerivable)
-        break;
-
-      continue;
-
-    case MembersRequestKind::All:
-      // Force any derivable conformances.
-      if (isDerivable)
-        break;
-
-      // If there are any associated types in the protocol, they might add
-      // type aliases here.
-      if (!proto->getAssociatedTypeMembers().empty())
-        break;
-
-      continue;
-    }
-
-    TypeChecker::checkConformance(conformance->getRootNormalConformance());
-  }
-
   // If the type conforms to Encodable or Decodable, even via an extension,
   // the CodingKeys enum is synthesized as a member of the type itself.
   // Force it into existence.
