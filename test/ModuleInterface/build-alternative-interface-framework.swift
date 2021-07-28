@@ -1,7 +1,6 @@
 // REQUIRES: VENDOR=apple
 
-// Required DummyFramework imported is only built for those two CPU architectures.
-// REQUIRES: CPU=arm64 || CPU=x86_64
+// Required DummyFramework imported is only built for macOS supported archs (x86_64, arm64, arm64e)
 // REQUIRES: OS=macosx
 
 // RUN: %empty-directory(%t/module-cache)
