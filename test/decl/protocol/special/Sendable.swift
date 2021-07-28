@@ -22,11 +22,12 @@ func testSendableBuiltinConformances(
   // Errors
   acceptSendable((i, ns)) // expected-error{{global function 'acceptSendable' requires that 'NotSendable' conform to 'Sendable'}}
   acceptSendable(nsf) // expected-error{{type '() -> Void' cannot conform to 'Sendable'}}
-  // FIXME: expected-note@-1{{only concrete types such as structs, enums and classes can conform to protocols}}
+  // expected-note@-1{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
   acceptSendable((nsf, i)) // expected-error{{type '() -> Void' cannot conform to 'Sendable'}}
-  // FIXME: expected-note@-1{{only concrete types such as structs, enums and classes can conform to protocols}}
+  // expected-note@-1{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
   // expected-note@-2{{requirement from conditional conformance of '(() -> Void, Int)' to 'Sendable'}}
   acceptSendable(funNotSendable) // expected-error{{type '() -> Void' cannot conform to 'Sendable'}}
-  // FIXME: expected-note@-1{{only concrete types such as structs, enums and classes can conform to protocols}}
+  // expected-note@-1{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
   // expected-note@-2{{requirement from conditional conformance of '(Int, () -> Void, NotSendable.Type)' to 'Sendable'}}
+  acceptSendable((i, ns)) // expected-error{{global function 'acceptSendable' requires that 'NotSendable' conform to 'Sendable'}}
 }

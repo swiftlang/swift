@@ -1923,6 +1923,12 @@ ERROR(type_cannot_conform, none,
 NOTE(only_concrete_types_conform_to_protocols,none,
      "only concrete types such as structs, enums and classes can conform to protocols",
      ())
+NOTE(nonsendable_function_type,none,
+     "a function type must be marked '@Sendable' to conform to 'Sendable'", ())
+NOTE(nonsendable_tuple_type,none,
+     "a tuple type must be composed of 'Sendable' elements to conform to "
+     "'Sendable'", ())
+
 NOTE(required_by_opaque_return,none,
     "required by opaque return type of %0 %1", (DescriptiveDeclKind, DeclName))
 NOTE(required_by_decl,none,
