@@ -5830,11 +5830,13 @@ diagnoseMissingAppendInterpolationMethod(NominalTypeDecl *typeDecl) {
 
 void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
   auto *const dc = idc->getAsGenericContext();
+  auto *sf = dc->getParentSourceFile();
 
-  // For anything imported from Clang, lazily check conformances.
-  if (isa<ClangModuleUnit>(dc->getModuleScopeContext()))
-    return;
+  assert(sf != nullptr &&
+         "checkConformancesInContext() should not be called on imported "
+         "or deserialized DeclContexts");
 
+  // Catch invalid extensions.
   const auto *const nominal = dc->getSelfNominalTypeDecl();
   if (!nominal)
     return;
@@ -6055,8 +6057,7 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
   // If there were any unsatisfied requirements, check whether there
   // are any near-matches we should diagnose.
   if (!unsatisfiedReqs.empty() && !anyInvalid) {
-    SourceFile *SF = dc->getParentSourceFile();
-    if (SF && SF->Kind != SourceFileKind::Interface) {
+    if (sf->Kind != SourceFileKind::Interface) {
       // Find all of the members that aren't used to satisfy
       // requirements, and check whether they are close to an
       // unsatisfied or defaulted requirement.
@@ -6140,27 +6141,25 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
       }
     }
 
-    if (auto *sf = dc->getParentSourceFile()) {
-      // For any unsatisfied optional @objc requirements that remain
-      // unsatisfied, note them in the AST for @objc selector collision
-      // checking.
-      for (auto req : unsatisfiedReqs) {
-        // Skip non-@objc requirements.
-        if (!req->isObjC()) continue;
+    // For any unsatisfied optional @objc requirements that remain
+    // unsatisfied, note them in the AST for @objc selector collision
+    // checking.
+    for (auto req : unsatisfiedReqs) {
+      // Skip non-@objc requirements.
+      if (!req->isObjC()) continue;
 
-        // Skip unavailable requirements.
-        if (req->getAttrs().isUnavailable(Context)) continue;
+      // Skip unavailable requirements.
+      if (req->getAttrs().isUnavailable(Context)) continue;
 
-        // Record this requirement.
-        if (auto funcReq = dyn_cast<AbstractFunctionDecl>(req)) {
-          sf->ObjCUnsatisfiedOptReqs.emplace_back(dc, funcReq);
-        } else {
-          auto storageReq = cast<AbstractStorageDecl>(req);
-          if (auto getter = storageReq->getParsedAccessor(AccessorKind::Get))
-            sf->ObjCUnsatisfiedOptReqs.emplace_back(dc, getter);
-          if (auto setter = storageReq->getParsedAccessor(AccessorKind::Set))
-            sf->ObjCUnsatisfiedOptReqs.emplace_back(dc, setter);
-        }
+      // Record this requirement.
+      if (auto funcReq = dyn_cast<AbstractFunctionDecl>(req)) {
+        sf->ObjCUnsatisfiedOptReqs.emplace_back(dc, funcReq);
+      } else {
+        auto storageReq = cast<AbstractStorageDecl>(req);
+        if (auto getter = storageReq->getParsedAccessor(AccessorKind::Get))
+          sf->ObjCUnsatisfiedOptReqs.emplace_back(dc, getter);
+        if (auto setter = storageReq->getParsedAccessor(AccessorKind::Set))
+          sf->ObjCUnsatisfiedOptReqs.emplace_back(dc, setter);
       }
     }
   }
