@@ -6802,7 +6802,8 @@ private:
         // Synthesize the force unwrap so that we get the expected results.
         if (TopHandler.getHandlerType() == HandlerType::PARAMS &&
             TopHandler.HasError) {
-          if (auto DRE = dyn_cast<DeclRefExpr>(Elt)) {
+          if (auto DRE =
+                  dyn_cast<DeclRefExpr>(Elt->getSemanticsProvidingExpr())) {
             auto D = DRE->getDecl();
             if (Unwraps.count(D)) {
               Elt = new (getASTContext()) ForceValueExpr(Elt, SourceLoc());
