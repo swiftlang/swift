@@ -963,9 +963,15 @@ void SpecializedProtocolConformance::computeConditionalRequirements() const {
     // Substitute the conditional requirements so that they're phrased in
     // terms of the specialized types, not the conformance-declaring decl's
     // types.
-    auto nominal = GenericConformance->getType()->getAnyNominal();
-    auto module = nominal->getModuleContext();
-    auto subMap = getType()->getContextSubstitutionMap(module, nominal);
+    ModuleDecl *module;
+    SubstitutionMap subMap;
+    if (auto nominal = GenericConformance->getType()->getAnyNominal()) {
+      module = nominal->getModuleContext();
+      subMap = getType()->getContextSubstitutionMap(module, nominal);
+    } else {
+      module = getProtocol()->getModuleContext();
+      subMap = getSubstitutionMap();
+    }
 
     SmallVector<Requirement, 4> newReqs;
     for (auto oldReq : *parentCondReqs) {
