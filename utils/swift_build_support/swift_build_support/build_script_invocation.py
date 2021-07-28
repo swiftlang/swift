@@ -424,6 +424,21 @@ class BuildScriptInvocation(object):
                 "--llvm-install-components=%s" % args.llvm_install_components
             ]
 
+        if not args.clean_libdispatch:
+            impl_args += [
+                "--skip-clean-libdispatch"
+            ]
+
+        if not args.clean_foundation:
+            impl_args += [
+                "--skip-clean-foundation"
+            ]
+
+        if not args.clean_xctest:
+            impl_args += [
+                "--skip-clean-xctest"
+            ]
+
         if not args.clean_llbuild:
             impl_args += [
                 "--skip-clean-llbuild"
