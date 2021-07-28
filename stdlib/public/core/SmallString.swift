@@ -201,6 +201,7 @@ extension _SmallString: RandomAccessCollection, MutableCollection {
     // This setter is required for _SmallString to be a valid MutableCollection.
     // Since _SmallString is internal and this setter unused, we cheat.
     @_alwaysEmitIntoClient set { fatalError() }
+    @_alwaysEmitIntoClient _modify { fatalError() }
   }
 }
 
