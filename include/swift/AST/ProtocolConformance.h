@@ -996,22 +996,21 @@ public:
 /// A builtin conformance appears when a non-nominal type has a
 /// conformance that is synthesized by the implementation.
 class BuiltinProtocolConformance final : public RootProtocolConformance,
-      private llvm::TrailingObjects<BuiltinProtocolConformance,
-                                    ProtocolConformanceRef> {
+      private llvm::TrailingObjects<BuiltinProtocolConformance, Requirement> {
   friend ASTContext;
   friend TrailingObjects;
 
-  ProtocolDecl *protocol = nullptr;
-  size_t numConformances;
+  ProtocolDecl *protocol;
+  GenericSignature genericSig;
+  size_t numConditionalRequirements;
 
-  mutable Optional<ArrayRef<Requirement>> conditionalConformances = None;
+  size_t numTrailingObjects(OverloadToken<Requirement>) const {
+    return numConditionalRequirements;
+  }
 
   BuiltinProtocolConformance(Type conformingType, ProtocolDecl *protocol,
-                             ArrayRef<ProtocolConformanceRef> conformances);
-
-  size_t numTrailingObjects(OverloadToken<ProtocolConformanceRef>) const {
-    return numConformances;
-  }
+                             GenericSignature genericSig,
+                             ArrayRef<Requirement> conditionalRequirements);
 
 public:
   /// Get the protocol being conformed to.
@@ -1019,24 +1018,22 @@ public:
     return protocol;
   }
 
-  /// Get the trailing conformances that this builtin conformance needs.
-  MutableArrayRef<ProtocolConformanceRef> getConformances() {
-    return {getTrailingObjects<ProtocolConformanceRef>(), numConformances};
-  }
-
-  /// Get the trailing conformances that this builtin conformance needs.
-  ArrayRef<ProtocolConformanceRef> getConformances() const {
-    return {getTrailingObjects<ProtocolConformanceRef>(), numConformances};
+  /// Retrieve the generic signature that describes the type parameters used
+  /// within the conforming type.
+  GenericSignature getGenericSignature() const {
+    return genericSig;
   }
 
   /// Get any requirements that must be satisfied for this conformance to apply.
   Optional<ArrayRef<Requirement>>
   getConditionalRequirementsIfAvailable() const {
-    return ArrayRef<Requirement>();
+    return getConditionalRequirements();
   }
 
   /// Get any requirements that must be satisfied for this conformance to apply.
-  ArrayRef<Requirement> getConditionalRequirements() const;
+  ArrayRef<Requirement> getConditionalRequirements() const {
+    return {getTrailingObjects<Requirement>(), numConditionalRequirements};
+  }
 
   /// Get the declaration context that contains the nominal type declaration.
   DeclContext *getDeclContext() const {

@@ -6160,8 +6160,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
 
     // This conformance may be conditional, in which case we need to consider
     // those requirements as constraints too.
-    if (conformance.isConcrete() &&
-        !isa<BuiltinProtocolConformance>(conformance.getConcrete())) {
+    if (conformance.isConcrete()) {
       unsigned index = 0;
       auto *conformanceLoc = getConstraintLocator(
           loc,

@@ -1014,7 +1014,8 @@ public:
   /// Produce the builtin conformance for some structural type to some protocol.
   BuiltinProtocolConformance *
   getBuiltinConformance(Type type, ProtocolDecl *protocol,
-                        ArrayRef<ProtocolConformanceRef> conformances);
+                        GenericSignature genericSig,
+                        ArrayRef<Requirement> conditionalRequirements);
 
   /// A callback used to produce a diagnostic for an ill-formed protocol
   /// conformance that was type-checked before we're actually walking the

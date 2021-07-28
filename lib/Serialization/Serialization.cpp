@@ -1579,11 +1579,10 @@ Serializer::writeConformance(ProtocolConformanceRef conformanceRef,
     unsigned abbrCode = abbrCodes[BuiltinProtocolConformanceLayout::Code];
     auto typeID = addTypeRef(builtin->getType());
     auto protocolID = addDeclRef(builtin->getProtocol());
-    BuiltinProtocolConformanceLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                                 typeID, protocolID,
-                                             builtin->getConformances().size());
-
-    writeConformances(builtin->getConformances(), abbrCodes);
+    auto genericSigID = addGenericSignatureRef(builtin->getGenericSignature());
+    BuiltinProtocolConformanceLayout::emitRecord(
+        Out, ScratchRecord, abbrCode, typeID, protocolID, genericSigID);
+    writeGenericRequirements(builtin->getConditionalRequirements(), abbrCodes);
     break;
   }
 }

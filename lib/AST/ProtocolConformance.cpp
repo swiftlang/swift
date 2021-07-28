@@ -326,8 +326,10 @@ GenericSignature ProtocolConformance::getGenericSignature() const {
     // generic signature.
     return getDeclContext()->getGenericSignatureOfContext();
 
-  case ProtocolConformanceKind::Specialized:
   case ProtocolConformanceKind::Builtin:
+    return cast<BuiltinProtocolConformance>(this)->getGenericSignature();
+
+  case ProtocolConformanceKind::Specialized:
     // If we have a specialized protocol conformance, since we do not support
     // currently partial specialization, we know that it cannot have any open
     // type variables.
@@ -1580,33 +1582,14 @@ ProtocolConformanceRef::getCanonicalConformanceRef() const {
 
 BuiltinProtocolConformance::BuiltinProtocolConformance(
     Type conformingType, ProtocolDecl *protocol,
-    ArrayRef<ProtocolConformanceRef> conformances) : 
-      RootProtocolConformance(ProtocolConformanceKind::Builtin, conformingType),
-      protocol(protocol), numConformances(conformances.size()) {
-  std::uninitialized_copy(conformances.begin(), conformances.end(),
-                          getTrailingObjects<ProtocolConformanceRef>());
-}
-
-ArrayRef<Requirement>
-BuiltinProtocolConformance::getConditionalRequirements() const {
-  if (conditionalConformances == None) {
-    // Right now only tuples are builtin and have conditional conformances.
-    if (auto tuple = getType()->getAs<TupleType>()) {
-      SmallVector<Requirement, 4> requirements;
-
-      for (size_t i = 0; i != getConformances().size(); i += 1) {
-        auto req = Requirement(RequirementKind::Conformance,
-                               tuple->getElement(i).getType(),
-                               getProtocol()->getDeclaredType());
-        requirements.push_back(req);
-      }
-
-      conditionalConformances = getProtocol()->getASTContext()
-                                             .AllocateCopy(requirements);
-    }
-  }
-
-  return *conditionalConformances;
+    GenericSignature genericSig,
+    ArrayRef<Requirement> conditionalRequirements
+) : RootProtocolConformance(ProtocolConformanceKind::Builtin, conformingType),
+    protocol(protocol), genericSig(genericSig),
+    numConditionalRequirements(conditionalRequirements.size()) {
+  std::uninitialized_copy(conditionalRequirements.begin(),
+                          conditionalRequirements.end(),
+                          getTrailingObjects<Requirement>());
 }
 
 // See swift/Basic/Statistic.h for declaration: this enables tracing
