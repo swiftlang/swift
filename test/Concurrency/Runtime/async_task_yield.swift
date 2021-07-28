@@ -1,8 +1,7 @@
-// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -parse-as-library) | %FileCheck %s
+// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -parse-as-library)
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
-// REQUIRES: rdar78638858
 
 // https://bugs.swift.org/browse/SR-14333
 // UNSUPPORTED: OS=windows-msvc
@@ -35,10 +34,10 @@ func yielding() async {
   let one = One()
   let two = Two()
   await withTaskGroup(of: Int.self) { group in
-    await group.spawn {
+    group.addTask {
       await one.go(times: 100)
     }
-    await group.spawn {
+    group.addTask {
       await two.go(times: 100)
     }
   }
@@ -48,7 +47,5 @@ func yielding() async {
 @main struct Main {
   static func main() async {
     await yielding()
-    // TODO: No idea for a good test for this... Open to ideas?
-    // CHECK: Two @ 100
   }
 }
