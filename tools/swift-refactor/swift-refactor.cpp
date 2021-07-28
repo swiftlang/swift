@@ -294,6 +294,7 @@ int main(int argc, char *argv[]) {
   Invocation.getLangOptions().AttachCommentsToDecls = true;
   Invocation.getLangOptions().CollectParsedToken = true;
   Invocation.getLangOptions().BuildSyntaxTree = true;
+  Invocation.getLangOptions().DisableAvailabilityChecking = true;
 
   if (options::EnableExperimentalConcurrency)
     Invocation.getLangOptions().EnableExperimentalConcurrency = true;
