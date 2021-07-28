@@ -547,8 +547,10 @@ ModuleFile::readConformanceChecked(llvm::BitstreamCursor &Cursor,
     TypeID conformingTypeID;
     DeclID protoID;
     GenericSignatureID genericSigID;
+    unsigned builtinConformanceKind;
     BuiltinProtocolConformanceLayout::readRecord(scratch, conformingTypeID,
-                                                 protoID, genericSigID);
+                                                 protoID, genericSigID,
+                                                 builtinConformanceKind);
 
     Type conformingType = getType(conformingTypeID);
 
@@ -569,7 +571,8 @@ ModuleFile::readConformanceChecked(llvm::BitstreamCursor &Cursor,
       return std::move(error);
 
     auto conformance = getContext().getBuiltinConformance(
-        conformingType, proto, *genericSig, conditionalRequirements);
+        conformingType, proto, *genericSig, conditionalRequirements,
+        static_cast<BuiltinConformanceKind>(builtinConformanceKind));
     return ProtocolConformanceRef(conformance);
   }
 

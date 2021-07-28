@@ -1591,10 +1591,13 @@ ProtocolConformanceRef::getCanonicalConformanceRef() const {
 BuiltinProtocolConformance::BuiltinProtocolConformance(
     Type conformingType, ProtocolDecl *protocol,
     GenericSignature genericSig,
-    ArrayRef<Requirement> conditionalRequirements
+    ArrayRef<Requirement> conditionalRequirements,
+    BuiltinConformanceKind kind
 ) : RootProtocolConformance(ProtocolConformanceKind::Builtin, conformingType),
     protocol(protocol), genericSig(genericSig),
-    numConditionalRequirements(conditionalRequirements.size()) {
+    numConditionalRequirements(conditionalRequirements.size()),
+    builtinConformanceKind(static_cast<unsigned>(kind))
+{
   std::uninitialized_copy(conditionalRequirements.begin(),
                           conditionalRequirements.end(),
                           getTrailingObjects<Requirement>());

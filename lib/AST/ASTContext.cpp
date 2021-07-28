@@ -2331,7 +2331,8 @@ BuiltinProtocolConformance *
 ASTContext::getBuiltinConformance(
     Type type, ProtocolDecl *protocol,
     GenericSignature genericSig,
-    ArrayRef<Requirement> conditionalRequirements
+    ArrayRef<Requirement> conditionalRequirements,
+    BuiltinConformanceKind kind
 ) {
   auto key = std::make_pair(type, protocol);
   AllocationArena arena = getArena(type->getRecursiveProperties());
@@ -2343,7 +2344,7 @@ ASTContext::getBuiltinConformance(
         totalSizeToAlloc<Requirement>(conditionalRequirements.size());
     auto mem = this->Allocate(size, alignof(BuiltinProtocolConformance), arena);
     entry = new (mem) BuiltinProtocolConformance(
-        type, protocol, genericSig, conditionalRequirements);
+        type, protocol, genericSig, conditionalRequirements, kind);
   }
   return entry;
 }

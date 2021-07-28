@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeCheckAvailability.h"
+#include "TypeCheckConcurrency.h"
 #include "TypeChecker.h"
 #include "TypeCheckObjC.h"
 #include "MiscDiagnostics.h"
@@ -3478,6 +3479,12 @@ void swift::diagnoseTypeAvailability(const TypeRepr *TR, Type T, SourceLoc loc,
   diagnoseTypeAvailability(T, loc, where, flags);
 }
 
+static void diagnoseMissingConformance(
+    SourceLoc loc, Type type, ProtocolDecl *proto) {
+  assert(proto->isSpecificProtocol(KnownProtocolKind::Sendable));
+  diagnoseMissingSendableConformance(loc, type);
+}
+
 bool
 swift::diagnoseConformanceAvailability(SourceLoc loc,
                                        ProtocolConformanceRef conformance,
@@ -3490,6 +3497,15 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
 
   const ProtocolConformance *concreteConf = conformance.getConcrete();
   const RootProtocolConformance *rootConf = concreteConf->getRootConformance();
+
+  // Diagnose "missing" conformances where we needed a conformance but
+  // didn't have one.
+  if (auto builtinConformance = dyn_cast<BuiltinProtocolConformance>(rootConf)){
+    if (builtinConformance->isMissing()) {
+      diagnoseMissingConformance(loc, builtinConformance->getType(),
+                                 builtinConformance->getProtocol());
+    }
+  }
 
   auto *DC = where.getDeclContext();
 

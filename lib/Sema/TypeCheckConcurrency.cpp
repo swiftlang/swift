@@ -546,13 +546,44 @@ static bool isSendableClosure(
   return false;
 }
 
+/// Look for missing Sendable conformances
+static bool hasMissingSendableConformance(
+    ModuleDecl *module, ProtocolConformanceRef conformance) {
+  if (!conformance.isConcrete())
+    return false;
+
+  // Is this a missing Sendable conformance?
+  const ProtocolConformance *concreteConf = conformance.getConcrete();
+  const RootProtocolConformance *rootConf = concreteConf->getRootConformance();
+  if (auto builtinConformance = dyn_cast<BuiltinProtocolConformance>(rootConf)){
+    if (builtinConformance->isMissing() && builtinConformance->getProtocol()->isSpecificProtocol(
+            KnownProtocolKind::Sendable)) {
+      return true;
+    }
+  }
+
+  // Check conformances that are part of this conformance.
+  auto subMap = concreteConf->getSubstitutions(module);
+  for (auto conformance : subMap.getConformances()) {
+    if (hasMissingSendableConformance(module, conformance))
+      return true;
+  }
+
+  return false;
+}
+
 /// Determine whether the given type is suitable as a concurrent value type.
 bool swift::isSendableType(ModuleDecl *module, Type type) {
   auto proto = module->getASTContext().getProtocol(KnownProtocolKind::Sendable);
   if (!proto)
     return true;
 
-  return !TypeChecker::conformsToProtocol(type, proto, module).isInvalid();
+  auto conformance = TypeChecker::conformsToProtocol(type, proto, module);
+  if (conformance.isInvalid())
+    return false;
+
+  // Look for missing Sendable conformances.
+  return !hasMissingSendableConformance(module, conformance);
 }
 
 static bool diagnoseNonConcurrentParameter(
@@ -651,6 +682,17 @@ bool swift::diagnoseNonConcurrentTypesInReference(
   }
 
   return false;
+}
+
+void swift::diagnoseMissingSendableConformance(SourceLoc loc, Type type) {
+  ASTContext &ctx = type->getASTContext();
+  if (type->is<FunctionType>()) {
+    ctx.Diags.diagnose(loc, diag::non_sendable_function_type, type)
+      .warnUntilSwiftVersion(6);
+  } else {
+    ctx.Diags.diagnose(loc, diag::non_sendable_type, type)
+      .warnUntilSwiftVersion(6);
+  }
 }
 
 /// Determine whether this is the main actor type.
