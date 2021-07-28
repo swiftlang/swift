@@ -243,6 +243,13 @@ static void writePrologue(raw_ostream &out, ASTContext &ctx,
          "#if !defined(IBSegueAction)\n"
          "# define IBSegueAction\n"
          "#endif\n"
+         "#if !defined(SWIFT_EXTERN)\n"
+         "# if defined(__cplusplus)\n"
+         "#  define SWIFT_EXTERN extern \"C\"\n"
+         "# else\n"
+         "#  define SWIFT_EXTERN extern\n"
+         "# endif\n"
+         "#endif\n"
          ;
   static_assert(SWIFT_MAX_IMPORTED_SIMD_ELEMENTS == 4,
               "need to add SIMD typedefs here if max elements is increased");
