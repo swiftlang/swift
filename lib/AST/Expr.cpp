@@ -2402,7 +2402,7 @@ KeyPathExpr::Component::Component(ASTContext *ctxForCopyingLabels,
     : Decl(decl), SubscriptIndexExpr(indexExpr), KindValue(kind),
       ComponentType(type), Loc(loc)
 {
-  assert(kind != Kind::TupleElement || subscriptLabels.empty());
+  assert(kind == Kind::Subscript || kind == Kind::UnresolvedSubscript);
   assert(subscriptLabels.size() == indexHashables.size()
          || indexHashables.empty());
   SubscriptLabelsData = subscriptLabels.data();

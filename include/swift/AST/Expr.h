@@ -5609,7 +5609,8 @@ public:
     Kind KindValue;
     Type ComponentType;
     SourceLoc Loc;
-    
+
+    // Private constructor for subscript component.
     explicit Component(ASTContext *ctxForCopyingLabels,
                        DeclNameOrRef decl,
                        Expr *indexExpr,
@@ -5619,27 +5620,31 @@ public:
                        Type type,
                        SourceLoc loc);
 
-    // Private constructor for tuple element kind
-    Component(unsigned tupleIndex, Type elementType, SourceLoc loc)
-      : Component(nullptr, {}, nullptr, {}, {}, Kind::TupleElement,
-        elementType, loc) {
+    // Private constructor for property or #keyPath dictionary key.
+    explicit Component(DeclNameOrRef decl, Kind kind, Type type, SourceLoc loc)
+        : Component(kind, type, loc) {
+      assert(kind == Kind::Property || kind == Kind::UnresolvedProperty ||
+             kind == Kind::DictionaryKey);
+      Decl = decl;
+    }
+
+    // Private constructor for tuple element kind.
+    explicit Component(unsigned tupleIndex, Type elementType, SourceLoc loc)
+        : Component(Kind::TupleElement, elementType, loc) {
       TupleIndex = tupleIndex;
     }
-    
+
+    // Private constructor for basic components with no additional information.
+    explicit Component(Kind kind, Type type, SourceLoc loc)
+        : Decl(), KindValue(kind), ComponentType(type), Loc(loc) {}
+
   public:
-    Component()
-      : Component(nullptr, {}, nullptr, {}, {}, Kind::Invalid,
-                  Type(), SourceLoc())
-    {}
-    
+    Component() : Component(Kind::Invalid, Type(), SourceLoc()) {}
+
     /// Create an unresolved component for a property.
     static Component forUnresolvedProperty(DeclNameRef UnresolvedName,
                                            SourceLoc Loc) {
-      return Component(nullptr,
-                       UnresolvedName, nullptr, {}, {},
-                       Kind::UnresolvedProperty,
-                       Type(),
-                       Loc);
+      return Component(UnresolvedName, Kind::UnresolvedProperty, Type(), Loc);
     }
     
     /// Create an unresolved component for a subscript.
@@ -5669,38 +5674,26 @@ public:
     
     /// Create an unresolved optional force `!` component.
     static Component forUnresolvedOptionalForce(SourceLoc BangLoc) {
-      return Component(nullptr, {}, nullptr, {}, {},
-                       Kind::OptionalForce,
-                       Type(),
-                       BangLoc);
+      return Component(Kind::OptionalForce, Type(), BangLoc);
     }
     
     /// Create an unresolved optional chain `?` component.
     static Component forUnresolvedOptionalChain(SourceLoc QuestionLoc) {
-      return Component(nullptr, {}, nullptr, {}, {},
-                       Kind::OptionalChain,
-                       Type(),
-                       QuestionLoc);
+      return Component(Kind::OptionalChain, Type(), QuestionLoc);
     }
     
     /// Create a component for a property.
     static Component forProperty(ConcreteDeclRef property,
                                  Type propertyType,
                                  SourceLoc loc) {
-      return Component(nullptr, property, nullptr, {}, {},
-                       Kind::Property,
-                       propertyType,
-                       loc);
+      return Component(property, Kind::Property, propertyType, loc);
     }
 
     /// Create a component for a dictionary key (#keyPath only).
     static Component forDictionaryKey(DeclNameRef UnresolvedName,
                                       Type valueType,
                                       SourceLoc loc) {
-      return Component(nullptr, UnresolvedName, nullptr, {}, {},
-                       Kind::DictionaryKey,
-                       valueType,
-                       loc);
+      return Component(UnresolvedName, Kind::DictionaryKey, valueType, loc);
     }
     
     /// Create a component for a subscript.
@@ -5726,32 +5719,24 @@ public:
     
     /// Create an optional-forcing `!` component.
     static Component forOptionalForce(Type forcedType, SourceLoc bangLoc) {
-      return Component(nullptr, {}, nullptr, {}, {},
-                       Kind::OptionalForce, forcedType,
-                       bangLoc);
+      return Component(Kind::OptionalForce, forcedType, bangLoc);
     }
     
     /// Create an optional-chaining `?` component.
     static Component forOptionalChain(Type unwrappedType,
                                       SourceLoc questionLoc) {
-      return Component(nullptr, {}, nullptr, {}, {},
-                       Kind::OptionalChain, unwrappedType,
-                       questionLoc);
+      return Component(Kind::OptionalChain, unwrappedType, questionLoc);
     }
     
     /// Create an optional-wrapping component. This doesn't have a surface
     /// syntax but may appear when the non-optional result of an optional chain
     /// is implicitly wrapped.
     static Component forOptionalWrap(Type wrappedType) {
-      return Component(nullptr, {}, nullptr, {}, {},
-                       Kind::OptionalWrap, wrappedType,
-                       SourceLoc());
+      return Component(Kind::OptionalWrap, wrappedType, SourceLoc());
     }
     
     static Component forIdentity(SourceLoc selfLoc) {
-      return Component(nullptr, {}, nullptr, {}, {},
-                       Kind::Identity, Type(),
-                       selfLoc);
+      return Component(Kind::Identity, Type(), selfLoc);
     }
     
     static Component forTupleElement(unsigned fieldNumber,
@@ -5761,8 +5746,7 @@ public:
     }
 
     static Component forCodeCompletion(SourceLoc Loc) {
-      return Component(nullptr, {}, nullptr, {}, {}, Kind::CodeCompletion,
-                       Type(), Loc);
+      return Component(Kind::CodeCompletion, Type(), Loc);
     }
 
     SourceLoc getLoc() const {
