@@ -757,3 +757,13 @@ class SynthesizedConformance5: SynthesizedConformance2 {
 // OVERRIDE_SYNTHESIZED_5-DAG: Decl[Constructor]/Super:                required init(from decoder: Decoder) throws {|};
 // FIXME: 'required init(from decoder: Decoder)' is suggested twice
 }
+
+protocol ProtocolSr14687 {
+  var value: Int { get }
+}
+struct StructSr14687: ProtocolSr14687 {
+  let foo = val, #^MULTI_VAR_DECL_OVERRIDE^#
+// MULTI_VAR_DECL_OVERRIDE:     Begin completions, 1 items
+// MULTI_VAR_DECL_OVERRIDE-DAG: Decl[InstanceVar]/Super:            value: Int;
+// MULTI_VAR_DECL_OVERRIDE:     End completions
+}
