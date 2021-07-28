@@ -989,6 +989,115 @@ ProtocolConformanceRef ModuleDecl::lookupConformance(Type type,
       getASTContext().evaluator, request, ProtocolConformanceRef::forInvalid());
 }
 
+/// Synthesize a builtin tuple type conformance to the given protocol, if
+/// appropriate.
+static ProtocolConformanceRef getBuiltinTupleTypeConformance(
+    Type type, const TupleType *tupleType, ProtocolDecl *protocol) {
+  // Tuple type are Sendable when all of their element types are Sendable.
+  if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+    ASTContext &ctx = protocol->getASTContext();
+
+    // Create the pieces for a generic tuple type (T1, T2, ... TN) and a
+    // generic signature <T1, T2, ..., TN>.
+    SmallVector<GenericTypeParamType *, 4> genericParams;
+    SmallVector<Type, 4> typeSubstitutions;
+    SmallVector<TupleTypeElt, 4> genericElements;
+    SmallVector<Requirement, 4> conditionalRequirements;
+    for (const auto &elt : tupleType->getElements()) {
+      auto genericParam = GenericTypeParamType::get(0, genericParams.size(), ctx);
+      genericParams.push_back(genericParam);
+      typeSubstitutions.push_back(elt.getRawType());
+      genericElements.push_back(elt.getWithType(genericParam));
+      conditionalRequirements.push_back(
+          Requirement(RequirementKind::Conformance, genericParam,
+                      protocol->getDeclaredType()));
+    }
+
+    // If there were no generic parameters, just form the builtin conformance.
+    if (genericParams.empty()) {
+      return ProtocolConformanceRef(
+          ctx.getBuiltinConformance(type, protocol, GenericSignature(), { }));
+    }
+
+    // Form a generic conformance of (T1, T2, ..., TN): Sendable with signature
+    // <T1, T2, ..., TN> and conditional requirements T1: Sendable,
+    // T2: Sendable, ..., TN: Sendable.
+    auto genericTupleType = TupleType::get(genericElements, ctx);
+    auto genericSig = GenericSignature::get(genericParams, { });
+    auto genericConformance = ctx.getBuiltinConformance(
+        genericTupleType, protocol, genericSig, conditionalRequirements);
+
+    // Compute the substitution map from the generic parameters of the
+    // generic conformance to actual types that were in the tuple type.
+    // Form a specialized conformance from that.
+    auto subMap = SubstitutionMap::get(genericSig, typeSubstitutions, { });
+    return ProtocolConformanceRef(
+        ctx.getSpecializedConformance(type, genericConformance, subMap));
+  }
+
+  return ProtocolConformanceRef::forInvalid();
+}
+
+/// Whether the given function type conforms to Sendable.
+static bool isSendableFunctionType(const FunctionType *functionType) {
+  if (functionType->isSendable())
+    return true;
+
+  // C and thin function types have no captures, so they are Sendable.
+  switch (functionType->getExtInfo().getRepresentation()) {
+  case FunctionTypeRepresentation::Block:
+  case FunctionTypeRepresentation::Swift:
+    return false;
+
+  case FunctionTypeRepresentation::CFunctionPointer:
+  case FunctionTypeRepresentation::Thin:
+    return true;
+  }
+}
+
+/// Synthesize a builtin function type conformance to the given protocol, if
+/// appropriate.
+static ProtocolConformanceRef getBuiltinFunctionTypeConformance(
+    Type type, const FunctionType *functionType, ProtocolDecl *protocol) {
+  // @Sendable function types are Sendable.
+  if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable) &&
+      isSendableFunctionType(functionType)) {
+    ASTContext &ctx = protocol->getASTContext();
+    return ProtocolConformanceRef(
+        ctx.getBuiltinConformance(type, protocol, GenericSignature(), { }));
+  }
+
+  return ProtocolConformanceRef::forInvalid();
+}
+
+/// Synthesize a builtin metatype type conformance to the given protocol, if
+/// appropriate.
+static ProtocolConformanceRef getBuiltinMetaTypeTypeConformance(
+    Type type, const AnyMetatypeType *metatypeType, ProtocolDecl *protocol) {
+  // All metatypes are Sendable.
+  if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+    ASTContext &ctx = protocol->getASTContext();
+    return ProtocolConformanceRef(
+        ctx.getBuiltinConformance(type, protocol, GenericSignature(), { }));
+  }
+
+  return ProtocolConformanceRef::forInvalid();
+}
+
+/// Synthesize a builtin type conformance to the given protocol, if
+/// appropriate.
+static ProtocolConformanceRef getBuiltinBuiltinTypeConformance(
+    Type type, const BuiltinType *builtinType, ProtocolDecl *protocol) {
+  // All builtin are Sendable.
+  if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+    ASTContext &ctx = protocol->getASTContext();
+    return ProtocolConformanceRef(
+        ctx.getBuiltinConformance(type, protocol, GenericSignature(), { }));
+  }
+
+  return ProtocolConformanceRef::forInvalid();
+}
+
 ProtocolConformanceRef
 LookupConformanceInModuleRequest::evaluate(
     Evaluator &evaluator, LookupConformanceDescriptor desc) const {
@@ -1042,6 +1151,26 @@ LookupConformanceInModuleRequest::evaluate(
   // intended type might have. Same goes for PlaceholderType.
   if (type->is<UnresolvedType>() || type->is<PlaceholderType>())
     return ProtocolConformanceRef(protocol);
+
+  // Tuple types can conform to protocols.
+  if (auto tupleType = type->getAs<TupleType>()) {
+    return getBuiltinTupleTypeConformance(type, tupleType, protocol);
+  }
+
+  // Function types can conform to protocols.
+  if (auto functionType = type->getAs<FunctionType>()) {
+    return getBuiltinFunctionTypeConformance(type, functionType, protocol);
+  }
+
+  // Metatypes can conform to protocols.
+  if (auto metatypeType = type->getAs<AnyMetatypeType>()) {
+    return getBuiltinMetaTypeTypeConformance(type, metatypeType, protocol);
+  }
+
+  // Builtin types can conform to protocols.
+  if (auto builtinType = type->getAs<BuiltinType>()) {
+    return getBuiltinBuiltinTypeConformance(type, builtinType, protocol);
+  }
 
   auto nominal = type->getAnyNominal();
 

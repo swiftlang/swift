@@ -544,7 +544,21 @@ bool MissingConformanceFailure::diagnoseTypeCannotConform(
                  nonConformingType->isEqual(protocolType),
                  protocolType);
 
-  emitDiagnostic(diag::only_concrete_types_conform_to_protocols);
+  bool emittedSpecializedNote = false;
+  if (auto protoType = protocolType->getAs<ProtocolType>()) {
+    if (protoType->getDecl()->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+      if (nonConformingType->is<FunctionType>()) {
+        emitDiagnostic(diag::nonsendable_function_type);
+        emittedSpecializedNote = true;
+      } else if (nonConformingType->is<TupleType>()) {
+        emitDiagnostic(diag::nonsendable_tuple_type);
+        emittedSpecializedNote = true;
+      }
+    }
+  }
+
+  if (!emittedSpecializedNote)
+    emitDiagnostic(diag::only_concrete_types_conform_to_protocols);
 
   if (auto *OTD = dyn_cast<OpaqueTypeDecl>(AffectedDecl)) {
     auto *namingDecl = OTD->getNamingDecl();
