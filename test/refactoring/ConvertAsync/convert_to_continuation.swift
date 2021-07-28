@@ -173,7 +173,7 @@ func testThrowingContinuationRelayingErrorAndTwoComplexResults(completionHandler
 // THROWING-CONTINUATION-RELAYING-ERROR-AND-TWO-COMPLEX-RESULTS-NEXT:   }
 // THROWING-CONTINUATION-RELAYING-ERROR-AND-TWO-COMPLEX-RESULTS-NEXT: }
 
-// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=THROWING-CONTINUATION-RELAYING-ERROR-AND-COMPLEX-RESULT-WITH-TRAILING-CLOSURE %s
+// RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=THROWING-CONTINUATION-RELAYING-ERROR-AND-COMPLEX-RESULT-WITH-TRAILING-CLOSURE %s
 func testThrowingContinuationRelayingErrorAndComplexResultWithTrailingClosure(completionHandler: @escaping (Int?, Error?) -> Void) {
   withoutAsyncAlternativeThrowing { (theValue, theError) in
     completionHandler(theValue.map { $0 + 1 }, theError)
