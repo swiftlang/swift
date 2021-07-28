@@ -448,8 +448,8 @@ struct Struct123: Equatable {
 }
 func testBestSolutionFilter() {
   let a = Struct123();
-  let b = [Struct123]().first(where: { $0 == a && 1 + 90 * 5 / 8 == 45 * -10 })?.structMem != .#^BEST_SOLUTION_FILTER?xfail=rdar73282163^#
-  let c = min(10.3, 10 / 10.4) < 6 / 7 ? true : Optional(a)?.structMem != .#^BEST_SOLUTION_FILTER2?check=BEST_SOLUTION_FILTER;xfail=rdar73282163^#
+  let b = [Struct123]().first(where: { $0 == a && 1 + 90 * 5 / 8 == 45 * -10 })?.structMem != .#^BEST_SOLUTION_FILTER^#
+  let c = min(10.3, 10 / 10.4) < 6 / 7 ? true : Optional(a)?.structMem != .#^BEST_SOLUTION_FILTER2?check=BEST_SOLUTION_FILTER^#
 }
 
 // BEST_SOLUTION_FILTER: Begin completions
@@ -465,7 +465,7 @@ func testBestSolutionGeneric() {
   func genAndInt(_ x: Int) -> Int { return 1 }
   func genAndInt<T>(_ x: T) -> Test1 { return Test1() }
 
-  genAndInt(2).#^BEST_SOLUTION_FILTER_GEN?xfail=rdar73282163^#
+  genAndInt(2).#^BEST_SOLUTION_FILTER_GEN^#
 }
 
 // BEST_SOLUTION_FILTER_GEN: Begin completions
@@ -473,3 +473,42 @@ func testBestSolutionGeneric() {
 // BEST_SOLUTION_FILTER_GEN-DAG: Keyword[self]/CurrNominal:     self[#Test1#]; name=self
 // BEST_SOLUTION_FILTER_GEN: End completions
 
+struct S1 {
+  func s1() {}
+}
+struct S2 {
+  func s2() {}
+}
+
+protocol Foo {
+  func bar() -> S1
+}
+extension Foo {
+  func bar() -> S1 { return S1() }
+}
+
+struct S3: Foo {
+  func bar() -> S2 {
+    return S2()
+  }
+}
+
+func testOverridenProtocolMethod(x: S3) {
+  x.bar().#^COMPLETE_OVERRIDDEN_PROTOCOL_METHOD^#
+}
+// COMPLETE_OVERRIDDEN_PROTOCOL_METHOD: Begin completions, 4 items
+// COMPLETE_OVERRIDDEN_PROTOCOL_METHOD: Keyword[self]/CurrNominal:          self[#S2#];
+// COMPLETE_OVERRIDDEN_PROTOCOL_METHOD: Decl[InstanceMethod]/CurrNominal:   s2()[#Void#];
+// COMPLETE_OVERRIDDEN_PROTOCOL_METHOD: Keyword[self]/CurrNominal:          self[#S1#];
+// COMPLETE_OVERRIDDEN_PROTOCOL_METHOD: Decl[InstanceMethod]/CurrNominal:   s1()[#Void#];
+// COMPLETE_OVERRIDDEN_PROTOCOL_METHOD: End completions
+
+class C1 {
+  func bar() -> S1 { return S1() }
+}
+class C2: C1 {
+  func bar() -> S2 { return S2() }
+}
+func testOverridenClassMethod(x: C2) {
+  x.bar().#^COMPLETE_OVERRIDDEN_CLASS_METHOD?check=COMPLETE_OVERRIDDEN_PROTOCOL_METHOD^#
+}

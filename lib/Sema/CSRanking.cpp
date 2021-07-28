@@ -944,15 +944,20 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     // Determine whether one declaration is more specialized than the other.
     bool firstAsSpecializedAs = false;
     bool secondAsSpecializedAs = false;
-    if (isDeclAsSpecializedAs(cs.DC, decl1, decl2,
-                              isDynamicOverloadComparison)) {
-      score1 += weight;
+    if (cs.isForCodeCompletion()) {
       firstAsSpecializedAs = true;
-    }
-    if (isDeclAsSpecializedAs(cs.DC, decl2, decl1,
-                              isDynamicOverloadComparison)) {
-      score2 += weight;
       secondAsSpecializedAs = true;
+    } else {
+      if (isDeclAsSpecializedAs(cs.DC, decl1, decl2,
+                                isDynamicOverloadComparison)) {
+        score1 += weight;
+        firstAsSpecializedAs = true;
+      }
+      if (isDeclAsSpecializedAs(cs.DC, decl2, decl1,
+                                isDynamicOverloadComparison)) {
+        score2 += weight;
+        secondAsSpecializedAs = true;
+      }
     }
 
     // If each is as specialized as the other, and both are constructors,
