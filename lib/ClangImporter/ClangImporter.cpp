@@ -4322,3 +4322,8 @@ ClangImporter::instantiateCXXClassTemplate(
   return dyn_cast_or_null<StructDecl>(
       Impl.importDecl(ctsd, Impl.CurrentVersion));
 }
+
+bool ClangImporter::isCXXMethodMutating(const clang::CXXMethodDecl *method) {
+  return isa<clang::CXXConstructorDecl>(method) || !method->isConst() ||
+         method->getParent()->hasMutableFields();
+}

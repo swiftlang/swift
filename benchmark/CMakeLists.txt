@@ -44,6 +44,7 @@ set(SWIFT_BENCH_MODULES
     single-source/BitCount
     single-source/Breadcrumbs
     single-source/BucketSort
+    single-source/BufferFill
     single-source/ByteSwap
     single-source/COWTree
     single-source/COWArrayGuaranteedParameterOverhead

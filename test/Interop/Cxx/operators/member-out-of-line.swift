@@ -15,7 +15,7 @@ import StdlibUnittest
 var OperatorsTestSuite = TestSuite("Operators")
 
 OperatorsTestSuite.test("LoadableIntWrapper.plus (out-of-line)") {
-  var lhs = LoadableIntWrapper(value: 42)
+  let lhs = LoadableIntWrapper(value: 42)
   let rhs = LoadableIntWrapper(value: 23)
 
   let result = lhs + rhs
@@ -24,7 +24,7 @@ OperatorsTestSuite.test("LoadableIntWrapper.plus (out-of-line)") {
 }
 
 OperatorsTestSuite.test("LoadableIntWrapper.call (out-of-line)") {
-  var wrapper = LoadableIntWrapper(value: 42)
+  let wrapper = LoadableIntWrapper(value: 42)
 
   let resultNoArgs = wrapper()
   let resultOneArg = wrapper(23)
@@ -36,7 +36,7 @@ OperatorsTestSuite.test("LoadableIntWrapper.call (out-of-line)") {
 }
 
 OperatorsTestSuite.test("AddressOnlyIntWrapper.call (out-of-line)") {
-  var wrapper = AddressOnlyIntWrapper(42)
+  let wrapper = AddressOnlyIntWrapper(42)
 
   let resultNoArgs = wrapper()
   let resultOneArg = wrapper(23)

@@ -2830,18 +2830,31 @@ public:
 class CXXMethodConventions : public CFunctionTypeConventions {
   using super = CFunctionTypeConventions;
   const clang::CXXMethodDecl *TheDecl;
+  bool isMutating;
 
 public:
-  CXXMethodConventions(const clang::CXXMethodDecl *decl)
+  CXXMethodConventions(const clang::CXXMethodDecl *decl, bool isMutating)
       : CFunctionTypeConventions(
             ConventionsKind::CXXMethod,
             decl->getType()->castAs<clang::FunctionType>()),
-        TheDecl(decl) {}
+        TheDecl(decl), isMutating(isMutating) {}
   ParameterConvention
   getIndirectSelfParameter(const AbstractionPattern &type) const override {
-    if (TheDecl->isConst())
+    llvm_unreachable(
+        "cxx functions do not have a Swift self parameter; "
+        "foreign self parameter is handled in getIndirectParameter");
+  }
+
+  ParameterConvention
+  getIndirectParameter(unsigned int index, const AbstractionPattern &type,
+                       const TypeLowering &substTL) const override {
+    // `self` is the last parameter.
+    if (index == TheDecl->getNumParams()) {
+      if (isMutating)
+        return ParameterConvention::Indirect_Inout;
       return ParameterConvention::Indirect_In_Guaranteed;
-    return ParameterConvention::Indirect_Inout;
+    }
+    return super::getIndirectParameter(index, type, substTL);
   }
   ResultConvention getResult(const TypeLowering &resultTL) const override {
     if (isa<clang::CXXConstructorDecl>(TheDecl)) {
@@ -2893,7 +2906,9 @@ static CanSILFunctionType getSILFunctionTypeForClangDecl(
     AbstractionPattern origPattern = method->isOverloadedOperator() ?
         AbstractionPattern::getCXXOperatorMethod(origType, method, foreignInfo.Self):
         AbstractionPattern::getCXXMethod(origType, method, foreignInfo.Self);
-    auto conventions = CXXMethodConventions(method);
+    bool isMutating =
+        TC.Context.getClangModuleLoader()->isCXXMethodMutating(method);
+    auto conventions = CXXMethodConventions(method, isMutating);
     return getSILFunctionType(TC, TypeExpansionContext::minimal(), origPattern,
                               substInterfaceType, extInfoBuilder, conventions,
                               foreignInfo, constant, constant, None,

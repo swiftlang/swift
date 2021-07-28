@@ -4176,10 +4176,10 @@ namespace {
             selfIdx = None;
           } else {
             selfIdx = 0;
-            // Workaround until proper const support is handled: Force
-            // everything to be mutating. This implicitly makes the parameter
-            // indirect.
-            selfIsInOut = true;
+            // If the method is imported as mutating, this implicitly makes the
+            // parameter indirect.
+            selfIsInOut = Impl.SwiftContext.getClangModuleLoader()
+                              ->isCXXMethodMutating(mdecl);
           }
         }
       }
@@ -7588,23 +7588,24 @@ SwiftDeclConverter::importAccessor(const clang::ObjCMethodDecl *clangAccessor,
   return accessor;
 }
 
-static InOutExpr *
-createInOutSelfExpr(AccessorDecl *accessorDecl) {
+static Expr *createSelfExpr(AccessorDecl *accessorDecl) {
   ASTContext &ctx = accessorDecl->getASTContext();
 
-  auto inoutSelfDecl = accessorDecl->getImplicitSelfDecl();
-  auto inoutSelfRefExpr =
-      new (ctx) DeclRefExpr(inoutSelfDecl, DeclNameLoc(),
-                            /*implicit=*/ true);
-  inoutSelfRefExpr->setType(LValueType::get(inoutSelfDecl->getInterfaceType()));
+  auto selfDecl = accessorDecl->getImplicitSelfDecl();
+  auto selfRefExpr = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(),
+                                           /*implicit*/ true);
 
-  auto inoutSelfExpr =
-      new (ctx) InOutExpr(SourceLoc(),
-                          inoutSelfRefExpr,
-                          accessorDecl->mapTypeIntoContext(
-                              inoutSelfDecl->getValueInterfaceType()),
-                          /*isImplicit=*/ true);
-  inoutSelfExpr->setType(InOutType::get(inoutSelfDecl->getInterfaceType()));
+  if (!accessorDecl->isMutating()) {
+    selfRefExpr->setType(selfDecl->getInterfaceType());
+    return selfRefExpr;
+  }
+  selfRefExpr->setType(LValueType::get(selfDecl->getInterfaceType()));
+
+  auto inoutSelfExpr = new (ctx) InOutExpr(
+      SourceLoc(), selfRefExpr,
+      accessorDecl->mapTypeIntoContext(selfDecl->getValueInterfaceType()),
+      /*isImplicit*/ true);
+  inoutSelfExpr->setType(InOutType::get(selfDecl->getInterfaceType()));
   return inoutSelfExpr;
 }
 
@@ -7622,7 +7623,7 @@ createParamRefExpr(AccessorDecl *accessorDecl, unsigned index) {
 
 static CallExpr *
 createAccessorImplCallExpr(FuncDecl *accessorImpl,
-                           InOutExpr *inoutSelfExpr,
+                           Expr *selfExpr,
                            DeclRefExpr *keyRefExpr) {
   ASTContext &ctx = accessorImpl->getASTContext();
 
@@ -7633,9 +7634,7 @@ createAccessorImplCallExpr(FuncDecl *accessorImpl,
   accessorImplExpr->setType(accessorImpl->getInterfaceType());
 
   auto accessorImplDotCallExpr =
-      new (ctx) DotSyntaxCallExpr(accessorImplExpr,
-                                  SourceLoc(),
-                                  inoutSelfExpr);
+      new (ctx) DotSyntaxCallExpr(accessorImplExpr, SourceLoc(), selfExpr);
   accessorImplDotCallExpr->setType(accessorImpl->getMethodInterfaceType());
   accessorImplDotCallExpr->setThrows(false);
 
@@ -7655,14 +7654,13 @@ synthesizeSubscriptGetterBody(AbstractFunctionDecl *afd, void *context) {
 
   ASTContext &ctx = getterDecl->getASTContext();
 
-  InOutExpr *inoutSelfExpr = createInOutSelfExpr(getterDecl);
+  Expr *selfExpr = createSelfExpr(getterDecl);
   DeclRefExpr *keyRefExpr = createParamRefExpr(getterDecl, 0);
 
   Type elementTy = getterDecl->getResultInterfaceType();
 
-  auto *getterImplCallExpr = createAccessorImplCallExpr(getterImpl,
-                                                        inoutSelfExpr,
-                                                        keyRefExpr);
+  auto *getterImplCallExpr =
+      createAccessorImplCallExpr(getterImpl, selfExpr, keyRefExpr);
 
   // This default handles C++'s operator[] that returns a value type.
   Expr *propertyExpr = getterImplCallExpr;
@@ -7708,14 +7706,13 @@ synthesizeSubscriptSetterBody(AbstractFunctionDecl *afd, void *context) {
 
   ASTContext &ctx = setterDecl->getASTContext();
 
-  InOutExpr *inoutSelfExpr = createInOutSelfExpr(setterDecl);
+  Expr *selfExpr = createSelfExpr(setterDecl);
   DeclRefExpr *valueParamRefExpr = createParamRefExpr(setterDecl, 0);
   DeclRefExpr *keyParamRefExpr = createParamRefExpr(setterDecl, 1);
 
   Type elementTy = valueParamRefExpr->getDecl()->getInterfaceType();
 
-  auto *setterImplCallExpr = createAccessorImplCallExpr(setterImpl,
-                                                        inoutSelfExpr,
+  auto *setterImplCallExpr = createAccessorImplCallExpr(setterImpl, selfExpr,
                                                         keyParamRefExpr);
 
   VarDecl *pointeePropertyDecl = ctx.getPointerPointeePropertyDecl(PTK_UnsafeMutablePointer);
