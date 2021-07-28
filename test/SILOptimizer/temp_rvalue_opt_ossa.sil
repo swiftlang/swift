@@ -14,7 +14,9 @@ struct GS<Base> {
   var _value: Builtin.Int64
 }
 
-class Klass {}
+class Klass {
+  var id: Int 
+}
 
 struct Two {
   var a: Klass
@@ -22,7 +24,7 @@ struct Two {
 }
 
 struct NonTrivialStruct {
-  var val:Klass
+  var val: Klass
 }
 
 public enum FakeOptional<T> {
@@ -48,6 +50,8 @@ bb0(%0 : $*Klass, %1 : $*Klass):
   return %9999 : $()
 }
 
+sil @opaque_indirect_user : $@convention(thin) (@in Klass) -> ()
+sil @opaque_direct_user : $@convention(thin) (@owned Klass) -> ()
 sil @throwing_function : $@convention(thin) (@in_guaranteed Klass) -> ((), @error Error)
 sil @use_gsbase_builtinnativeobject : $@convention(thin) (@guaranteed GS<Builtin.NativeObject>) -> ()
 
@@ -1463,3 +1467,100 @@ bb1(%6 : @guaranteed $Klass):
   return %res : $()
 }
 
+// CHECK-LABEL: sil [ossa] @test_temprvoborrowboundary3a :
+// CHECK:   copy_addr
+// CHECK-NOT:   copy_addr
+// CHECK: } // end sil function 'test_temprvoborrowboundary3a'
+sil [ossa] @test_temprvoborrowboundary3a : $@convention(thin) (@in NonTrivialStruct) -> () {
+bb0(%0 : $*NonTrivialStruct):
+  %local = alloc_stack $Optional<Int>
+  %tmpobj = alloc_stack $Int
+  %st_ele = struct_element_addr %0 : $*NonTrivialStruct, #NonTrivialStruct.val
+  %ld = load_borrow %st_ele : $*Klass
+  %id = ref_element_addr %ld : $Klass, #Klass.id
+  copy_addr %id to [initialization] %tmpobj : $*Int
+  end_borrow %ld : $Klass
+  %enum = init_enum_data_addr %local : $*Optional<Int>, #Optional.some!enumelt
+  copy_addr [take] %tmpobj to [initialization] %enum : $*Int
+  destroy_addr %0 : $*NonTrivialStruct
+  destroy_addr %local : $*Optional<Int>
+  dealloc_stack %tmpobj : $*Int
+  dealloc_stack %local : $*Optional<Int>
+  %139 = tuple ()
+  return %139 : $()
+}
+
+// This does not get optimized because the apply can modify copySrc
+// CHECK-LABEL: sil [ossa] @test_temprvoborrowboundary3b :
+// CHECK:   copy_addr
+// CHECK:   copy_addr
+// CHECK: } // end sil function 'test_temprvoborrowboundary3b'
+sil [ossa] @test_temprvoborrowboundary3b : $@convention(thin) (@in NonTrivialStruct) -> () {
+bb0(%0 : $*NonTrivialStruct):
+  %local = alloc_stack $Optional<Int>
+  %tmpobj = alloc_stack $Int
+  %st_ele = struct_element_addr %0 : $*NonTrivialStruct, #NonTrivialStruct.val
+  %ld = load_borrow %st_ele : $*Klass
+  %id = ref_element_addr %ld : $Klass, #Klass.id
+  copy_addr %id to [initialization] %tmpobj : $*Int
+  end_borrow %ld : $Klass
+  %f = function_ref @opaque_indirect_user : $@convention(thin) (@in Klass) -> ()
+  %a = apply %f(%st_ele) : $@convention(thin) (@in Klass) -> ()
+  %enum = init_enum_data_addr %local : $*Optional<Int>, #Optional.some!enumelt
+  copy_addr [take] %tmpobj to [initialization] %enum : $*Int
+  destroy_addr %local : $*Optional<Int>
+  dealloc_stack %tmpobj : $*Int
+  dealloc_stack %local : $*Optional<Int>
+  %139 = tuple ()
+  return %139 : $()
+}
+
+// This does not get optimized because we cannot extend the borrow scope over an aliasing load [take]
+// CHECK-LABEL: sil [ossa] @test_temprvoborrowboundary3c :
+// CHECK:   copy_addr
+// CHECK:   copy_addr
+// CHECK: } // end sil function 'test_temprvoborrowboundary3c'
+sil [ossa] @test_temprvoborrowboundary3c : $@convention(thin) (@in NonTrivialStruct) -> () {
+bb0(%0 : $*NonTrivialStruct):
+  %local = alloc_stack $Optional<Int>
+  %tmpobj = alloc_stack $Int
+  %st_ele = struct_element_addr %0 : $*NonTrivialStruct, #NonTrivialStruct.val
+  %ld = load_borrow %st_ele : $*Klass
+  %id = ref_element_addr %ld : $Klass, #Klass.id
+  copy_addr %id to [initialization] %tmpobj : $*Int
+  end_borrow %ld : $Klass
+  %klass_ele = load [take] %st_ele : $*Klass
+  %enum = init_enum_data_addr %local : $*Optional<Int>, #Optional.some!enumelt
+  copy_addr [take] %tmpobj to [initialization] %enum : $*Int
+  destroy_addr %enum : $*Int
+  destroy_value %klass_ele : $Klass
+  dealloc_stack %tmpobj : $*Int
+  dealloc_stack %local : $*Optional<Int>
+  %139 = tuple ()
+  return %139 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_extendborrowaccessscope :
+// CHECK:   copy_addr
+// CHECK-NOT:   copy_addr
+// CHECK: } // end sil function 'test_extendborrowaccessscope'
+sil [ossa] @test_extendborrowaccessscope : $@convention(thin) (@in NonTrivialStruct) -> () {
+bb0(%0 : $*NonTrivialStruct):
+  %local = alloc_stack $Optional<Int>
+  %tmpobj = alloc_stack $Int
+  %st_ele = struct_element_addr %0 : $*NonTrivialStruct, #NonTrivialStruct.val
+  %ld = load_borrow %st_ele : $*Klass
+  %id = ref_element_addr %ld : $Klass, #Klass.id
+  %ba = begin_access [read] [dynamic] %id : $*Int
+  copy_addr %id to [initialization] %tmpobj : $*Int
+  end_access %ba : $*Int
+  end_borrow %ld : $Klass
+  %enum = init_enum_data_addr %local : $*Optional<Int>, #Optional.some!enumelt
+  copy_addr [take] %tmpobj to [initialization] %enum : $*Int
+  destroy_addr %0 : $*NonTrivialStruct
+  destroy_addr %local : $*Optional<Int>
+  dealloc_stack %tmpobj : $*Int
+  dealloc_stack %local : $*Optional<Int>
+  %139 = tuple ()
+  return %139 : $()
+}
