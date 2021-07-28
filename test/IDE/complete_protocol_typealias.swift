@@ -56,3 +56,10 @@ func testGenericUnresolvedMember() {
 // GENERIC_UNRESOLVED_MEMBER-DAG: Decl[TypeAlias]/CurrNominal:   Storage[#Array<T>#];
 // GENERIC_UNRESOLVED_MEMBER: End completions
 }
+
+struct ConformingType: MyProto {
+	func foo(content: #^GLOBAL_COMPLETE_IN_CONFORMING_TYPE^#) {}
+// GLOBAL_COMPLETE_IN_CONFORMING_TYPE: Begin completions
+// GLOBAL_COMPLETE_IN_CONFORMING_TYPE: Decl[TypeAlias]/Super:              Content[#Int#];
+// GLOBAL_COMPLETE_IN_CONFORMING_TYPE: End completions
+}
