@@ -387,12 +387,11 @@ public protocol Collection: Sequence {
   /// Returns an iterator over the elements of the collection.
   override __consuming func makeIterator() -> Iterator
 
-  /// A sequence that represents a contiguous subrange of the collection's
-  /// elements.
+  /// A collection representing a contiguous subrange of this collection's
+  /// elements. The subsequence shares indices with the original collection.
   ///
-  /// This associated type appears as a requirement in the `Sequence`
-  /// protocol, but it is restated here with stricter constraints. In a
-  /// collection, the subsequence should also conform to `Collection`.
+  /// The default subsequence type for collections that don't define their own
+  /// is `Slice`.
   associatedtype SubSequence: Collection = Slice<Self>
   where SubSequence.Index == Index,
         Element == SubSequence.Element,
