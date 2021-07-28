@@ -4721,6 +4721,14 @@ public:
                   /*trailingClosures=*/{}, /*implicit=*/true, getType);
   }
 
+  /// Create a new implicit call expression with no arguments and no
+  /// source-location information.
+  ///
+  /// \param fn The nullary function being called.
+  static CallExpr *createImplicitEmpty(ASTContext &ctx, Expr *fn) {
+    return createImplicit(ctx, fn, {}, {});
+  }
+
   /// Create a new call expression.
   ///
   /// \param fn The function being called

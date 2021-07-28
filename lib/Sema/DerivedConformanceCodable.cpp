@@ -1431,8 +1431,7 @@ deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
 
         // container.superDecoder()
         auto *superDecoderCall =
-          CallExpr::createImplicit(C, superDecoderRef, ArrayRef<Expr *>(),
-                                   ArrayRef<Identifier>());
+            CallExpr::createImplicitEmpty(C, superDecoderRef);
 
         // super
         auto *superRef = new (C) SuperRefExpr(initDecl->getImplicitSelfDecl(),
@@ -1477,9 +1476,7 @@ deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
         auto *superInitRef = UnresolvedDotExpr::createImplicit(C, superRef,
                                                                initName);
         // super.init() call
-        Expr *callExpr = CallExpr::createImplicit(C, superInitRef,
-                                                  ArrayRef<Expr *>(),
-                                                  ArrayRef<Identifier>());
+        Expr *callExpr = CallExpr::createImplicitEmpty(C, superInitRef);
 
         // If super.init throws, try super.init()
         if (superInitDecl->hasThrows())

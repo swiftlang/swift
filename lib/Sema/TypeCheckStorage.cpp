@@ -1574,7 +1574,7 @@ synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
     if (arg) {
       Call = CallExpr::createImplicit(Ctx, Callee, {ValueDRE}, {Identifier()});
     } else {
-      Call = CallExpr::createImplicit(Ctx, Callee, {}, {});
+      Call = CallExpr::createImplicitEmpty(Ctx, Callee);
     }
 
     if (auto funcType = type->getAs<FunctionType>())
@@ -1751,7 +1751,7 @@ synthesizeModifyCoroutineBodyWithSimpleDidSet(AccessorDecl *accessor,
       Callee = DSCE;
     }
 
-    auto *Call = CallExpr::createImplicit(ctx, Callee, {}, {});
+    auto *Call = CallExpr::createImplicitEmpty(ctx, Callee);
     if (auto funcType = type->getAs<FunctionType>())
       type = funcType->getResult();
     Call->setType(type);

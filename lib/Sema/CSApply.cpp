@@ -6057,7 +6057,7 @@ Expr *ExprRewriter::coerceCallArguments(
             cs.buildAutoClosureExpr(arg, closureType, dc,
                                     isDefaultWrappedValue),
             /*isAutoClosure=*/true);
-        arg = CallExpr::createImplicit(ctx, placeholder, {}, {});
+        arg = CallExpr::createImplicitEmpty(ctx, placeholder);
         arg->setType(closureType->getResult());
         cs.cacheType(arg);
       }
@@ -8338,8 +8338,7 @@ static Expr *wrapAsyncLetInitializer(
 
   // Call the autoclosure so that the AST types line up. SILGen will ignore the
   // actual calls and translate them into a different mechanism.
-  auto autoclosureCall = CallExpr::createImplicit(
-      ctx, autoclosureExpr, { }, { });
+  auto autoclosureCall = CallExpr::createImplicitEmpty(ctx, autoclosureExpr);
   autoclosureCall->setType(initializerType);
   autoclosureCall->setThrows(throws);
 

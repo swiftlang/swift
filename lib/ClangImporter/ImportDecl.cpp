@@ -1278,7 +1278,7 @@ synthesizeStructDefaultConstructorBody(AbstractFunctionDecl *afd,
   FunctionType::ExtInfo info;
   zeroInitializerRef->setType(FunctionType::get({}, selfType, info));
 
-  auto call = CallExpr::createImplicit(ctx, zeroInitializerRef, {}, {});
+  auto call = CallExpr::createImplicitEmpty(ctx, zeroInitializerRef);
   call->setType(selfType);
   call->setThrows(false);
 
