@@ -12,7 +12,8 @@ struct S1 {}
 struct S2 {}
 
 // CHECK-LABEL: sil hidden [ossa] @$s21same_type_abstraction28callClosureWithConcreteTypes{{[_0-9a-zA-Z]*}}F
-// CHECK:         function_ref @$s{{.*}}TR :
+// CHECK-NOT:         function_ref @$s{{.*}}TR :
+// CHECK:             apply {{.*}} : ${{.*}}(@in_guaranteed
 func callClosureWithConcreteTypes<T: Associated, U: Associated>(x: Abstracted<T, U>, arg: S1) -> S2 where T.Assoc == S1, U.Assoc == S2 {
   return x.closure(arg)
 }
