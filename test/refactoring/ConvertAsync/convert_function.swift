@@ -587,6 +587,17 @@ func wrapCompletionCallInParenthesis(completion: @escaping (String?, Error?) -> 
 // WRAP-COMPLETION-CALL-IN-PARENS-NEXT:   return res
 // WRAP-COMPLETION-CALL-IN-PARENS-NEXT: }
 
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=WRAP-RESULT-IN-PARENS %s
+func wrapResultInParenthesis(completion: @escaping (String?, Error?) -> Void) {
+  simpleErr(arg: "test") { (res, err) in
+    completion((res).self, err)
+  }
+}
+// WRAP-RESULT-IN-PARENS:      func wrapResultInParenthesis() async throws -> String {
+// WRAP-RESULT-IN-PARENS-NEXT:   let res = try await simpleErr(arg: "test")
+// WRAP-RESULT-IN-PARENS-NEXT:   return res
+// WRAP-RESULT-IN-PARENS-NEXT: }
+
 // RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=TWO-COMPLETION-HANDLER-CALLS %s
 func twoCompletionHandlerCalls(completion: @escaping (String?, Error?) -> Void) {
   simpleErr(arg: "test") { (res, err) in
