@@ -4198,11 +4198,12 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
                                     NormalProtocolConformance *conformance) {
           auto &diags = witness->getASTContext().Diags;
           SourceLoc diagLoc = getLocForDiagnosingWitness(conformance, witness);
-          diags.diagnose(diagLoc,
-                         diag::witness_unavailable,
-                         witness->getDescriptiveKind(),
-                         witness->getName(),
-                         conformance->getProtocol()->getName());
+          auto *attr = AvailableAttr::isUnavailable(witness);
+          EncodedDiagnosticMessage EncodedMessage(attr->Message);
+          diags.diagnose(diagLoc, diag::witness_unavailable,
+                         witness->getDescriptiveKind(), witness->getName(),
+                         conformance->getProtocol()->getName(),
+                         EncodedMessage.Message);
           emitDeclaredHereIfNeeded(diags, diagLoc, witness);
           diags.diagnose(requirement, diag::kind_declname_declared_here,
                          DescriptiveDeclKind::Requirement,
