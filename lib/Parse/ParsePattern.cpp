@@ -1138,7 +1138,7 @@ ParserResult<Pattern> Parser::parsePattern() {
       // code complete anything here -- we expect an identifier.
       consumeToken(tok::code_complete);
     }
-    return nullptr;
+    return makeParserCodeCompletionStatus();
     
   case tok::kw_var:
   case tok::kw_let: {
