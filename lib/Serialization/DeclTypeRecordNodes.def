@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -168,7 +168,7 @@ OTHER(GENERIC_PARAM_LIST, 230)
 OTHER(GENERIC_SIGNATURE, 231)
 TRAILING_INFO(GENERIC_REQUIREMENT)
 TRAILING_INFO(LAYOUT_REQUIREMENT)
-// 234 is unused
+OTHER(BUILTIN_PROTOCOL_CONFORMANCE, 234)
 OTHER(SIL_GENERIC_SIGNATURE, 235)
 OTHER(SUBSTITUTION_MAP, 236)
 

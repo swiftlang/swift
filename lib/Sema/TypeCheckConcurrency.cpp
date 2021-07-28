@@ -25,7 +25,6 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/TypeCheckRequests.h"
-#include "swift/AST/TypeVisitor.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/Sema/IDETypeChecking.h"
 
@@ -549,137 +548,11 @@ static bool isSendableClosure(
 
 /// Determine whether the given type is suitable as a concurrent value type.
 bool swift::isSendableType(ModuleDecl *module, Type type) {
-  class IsSendable : public TypeVisitor<IsSendable, bool> {
-    ModuleDecl *module;
-    ProtocolDecl *SendableProto;
+  auto proto = module->getASTContext().getProtocol(KnownProtocolKind::Sendable);
+  if (!proto)
+    return true;
 
-  public:
-    IsSendable(ModuleDecl *module) : module(module) {
-      SendableProto = module->getASTContext().getProtocol(
-          KnownProtocolKind::Sendable);
-    }
-
-#define ALWAYS_CONCURRENT_VALUE(Id) \
-    bool visit##Id##Type(Id##Type *) { return true; }
-
-#define UNEXPECTED_TYPE(Id) ALWAYS_CONCURRENT_VALUE(Id)
-
-    ALWAYS_CONCURRENT_VALUE(Error)
-    ALWAYS_CONCURRENT_VALUE(Builtin)
-    ALWAYS_CONCURRENT_VALUE(AnyMetatype)
-    ALWAYS_CONCURRENT_VALUE(Module)
-
-    UNEXPECTED_TYPE(GenericTypeParam)
-    UNEXPECTED_TYPE(DependentMember)
-    UNEXPECTED_TYPE(GenericFunction)
-
-#define TYPE(Id, Parent)
-
- // Look through type sugar.
-#define SUGARED_TYPE(Id, Parent)                    \
-    bool visit##Id##Type(Id##Type *type) {          \
-      return visit(type->getSinglyDesugaredType()); \
-    }
-
-// Unchecked and artificial types won't show up in well-formed code,
-// but don't trip over them.
-#define UNCHECKED_TYPE(Id, Parent) UNEXPECTED_TYPE(Id)
-#define ARTIFICIAL_TYPE(Id, Parent) UNEXPECTED_TYPE(Id)
-
-#include "swift/AST/TypeNodes.def"
-
-#undef UNEXPECTED_TYPE
-#undef ALWAYS_CONCURRENT_VALUE
-
-    bool visitForConformanceCheck(TypeBase *type) {
-      if (!SendableProto)
-        return true;
-
-      return !TypeChecker::conformsToProtocol(
-          Type(type), SendableProto, module).isInvalid();
-    }
-
-    bool visitTupleType(TupleType *type) {
-      for (Type elementType : type->getElementTypes()) {
-        if (!visit(elementType))
-          return false;
-      }
-
-      return true;
-    }
-
-    bool visitReferenceStorageType(ReferenceStorageType *type) {
-      return visit(type->getReferentType());
-    }
-
-    bool visitEnumType(EnumType *type) {
-      return visitForConformanceCheck(type);
-    }
-
-    bool visitStructType(StructType *type) {
-      return visitForConformanceCheck(type);
-    }
-
-    bool visitClassType(ClassType *type) {
-      return visitForConformanceCheck(type);
-    }
-
-    bool visitProtocolType(ProtocolType *type) {
-      if (!SendableProto)
-        return true;
-
-      return !TypeChecker::containsProtocol(
-        Type(type), SendableProto, module).isInvalid();
-    }
-
-    bool visitBoundGenericType(BoundGenericType *type) {
-      return visitForConformanceCheck(type);
-    }
-
-    bool visitDynamicSelfType(DynamicSelfType *type) {
-      return visit(type->getSelfType());
-    }
-
-    bool visitArchetypeType(ArchetypeType *type) {
-      return visitForConformanceCheck(type);
-    }
-
-    bool visitFunctionType(FunctionType *type) {
-      // Concurrent function types meet the requirements.
-      if (type->isSendable())
-        return true;
-
-      // C and thin function types meeting the requirements because they
-      // cannot have captures.
-      switch (type->getExtInfo().getRepresentation()) {
-      case FunctionTypeRepresentation::Block:
-      case FunctionTypeRepresentation::Swift:
-        return false;
-
-      case FunctionTypeRepresentation::CFunctionPointer:
-      case FunctionTypeRepresentation::Thin:
-        return true;
-      }
-    }
-
-    bool visitProtocolCompositionType(ProtocolCompositionType *type) {
-      if (!SendableProto)
-        return true;
-
-      return !TypeChecker::containsProtocol(type, SendableProto, module)
-        .isInvalid();
-    }
-
-    bool visitLValueType(LValueType *type) {
-      return visit(type->getObjectType());
-    }
-
-    bool visitInOutType(InOutType *type) {
-      return visit(type->getObjectType());
-    }
-  } checker(module);
-
-  return checker.visit(type);
+  return !TypeChecker::conformsToProtocol(type, proto, module).isInvalid();
 }
 
 static bool diagnoseNonConcurrentParameter(
@@ -3654,7 +3527,8 @@ static bool checkSendableInstanceStorage(
         continue;
       }
 
-      auto propertyType = dc->mapTypeIntoContext(property->getInterfaceType());
+      auto propertyType = dc->mapTypeIntoContext(property->getInterfaceType())
+          ->getRValueType()->getReferenceStorageReferent();
       if (!isSendableType(dc->getParentModule(), propertyType)) {
         if (behavior == DiagnosticBehavior::Ignore)
           return true;
