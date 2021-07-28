@@ -439,12 +439,13 @@ struct AnotherTy: MyProtocol {}
 func testSubType() {
   var _: BaseClass = .#^SUBTYPE_1^#
 }
-// SUBTYPE_1: Begin completions, 4 items
-// SUBTYPE_1-NOT: Concrete1(
+// SUBTYPE_1: Begin completions, 6 items
 // SUBTYPE_1-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]: init()[#BaseClass#];
 // SUBTYPE_1-DAG: Decl[Class]/CurrNominal/TypeRelation[Convertible]: SubClass[#BaseClass.SubClass#];
 // SUBTYPE_1-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Convertible]: subInstance[#BaseClass.SubClass#];
 // SUBTYPE_1-DAG: Decl[Constructor]/CurrNominal:      init({#failable: Void#})[#BaseClass?#];
+// SUBTYPE_1-DAG: Decl[TypeAlias]/Super/TypeRelation[Identical]: Concrete1[#BaseClass#];
+// SUBTYPE_1-DAG: Decl[TypeAlias]/Super:              Concrete2[#AnotherTy#];
 // SUBTYPE_1: End completions
 
 func testMemberTypealias() {

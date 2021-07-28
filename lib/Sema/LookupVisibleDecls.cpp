@@ -477,6 +477,12 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
           if (!isDeclVisibleInLookupMode(VD, LS, FromContext))
             continue;
 
+          if (isa<TypeAliasDecl>(VD)) {
+            // Typealias declarations of the protocol are always visible in
+            // types that inherits from it.
+            Consumer.foundDecl(VD, ReasonForThisProtocol);
+            continue;
+          }
           if (!VD->isProtocolRequirement())
             continue;
 
