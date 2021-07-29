@@ -19,7 +19,7 @@ typealias NestedAliasCallback = SomeCallback
 // RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):13 | %FileCheck -check-prefix=ASYNC-SIMPLE %s
 func simple(completion: (String) -> Void) { }
 // ASYNC-SIMPLE: basic.swift [[# @LINE-1]]:1 -> [[# @LINE-1]]:1
-// ASYNC-SIMPLE-NEXT: @available(*, deprecated, message: "Prefer async alternative instead")
+// ASYNC-SIMPLE-NEXT: @available(*, renamed: "simple()")
 // ASYNC-SIMPLE-EMPTY:
 // ASYNC-SIMPLE-NEXT: basic.swift [[# @LINE-4]]:43 -> [[# @LINE-4]]:46
 // ASYNC-SIMPLE-NEXT: {

@@ -629,7 +629,7 @@ public:
 
   AvailableAttr(SourceLoc AtLoc, SourceRange Range,
                    PlatformKind Platform,
-                   StringRef Message, StringRef Rename,
+                   StringRef Message, StringRef Rename, ValueDecl *RenameDecl,
                    const llvm::VersionTuple &Introduced,
                    SourceRange IntroducedRange,
                    const llvm::VersionTuple &Deprecated,
@@ -639,7 +639,7 @@ public:
                    PlatformAgnosticAvailabilityKind PlatformAgnostic,
                    bool Implicit)
     : DeclAttribute(DAK_Available, AtLoc, Range, Implicit),
-      Message(Message), Rename(Rename),
+      Message(Message), Rename(Rename), RenameDecl(RenameDecl),
       INIT_VER_TUPLE(Introduced), IntroducedRange(IntroducedRange),
       INIT_VER_TUPLE(Deprecated), DeprecatedRange(DeprecatedRange),
       INIT_VER_TUPLE(Obsoleted), ObsoletedRange(ObsoletedRange),
@@ -659,6 +659,12 @@ public:
   /// name, optionally with a prefixed type, similar to the syntax used for
   /// the `NS_SWIFT_NAME` annotation in Objective-C.
   const StringRef Rename;
+
+  /// The declaration referred to by \c Rename. Note that this is only set for
+  /// deserialized attributes or inferred attributes from ObjectiveC code.
+  /// \c ValueDecl::getRenamedDecl should be used to find the declaration
+  /// corresponding to \c Rename.
+  ValueDecl *RenameDecl;
 
   /// Indicates when the symbol was introduced.
   const Optional<llvm::VersionTuple> Introduced;
@@ -745,6 +751,11 @@ public:
                          = PlatformAgnosticAvailabilityKind::Unavailable,
                          llvm::VersionTuple Obsoleted
                          = llvm::VersionTuple());
+
+  /// Create an AvailableAttr that indicates the given \p AsyncFunc should be
+  /// preferentially used in async contexts
+  static AvailableAttr *createForAlternative(ASTContext &C,
+                                             AbstractFunctionDecl *AsyncFunc);
 
   AvailableAttr *clone(ASTContext &C, bool implicit) const;
 
@@ -2018,57 +2029,6 @@ public:
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Transpose;
-  }
-};
-
-/// The `@completionHandlerAsync` attribute marks a function as having an async
-/// alternative, optionally providing a name (for cases when the alternative
-/// has a different name).
-class CompletionHandlerAsyncAttr final : public DeclAttribute {
-public:
-  /// Reference to the async alternative function. Only set for deserialized
-  /// attributes or inferred attributes from ObjectiveC code.
-  AbstractFunctionDecl *AsyncFunctionDecl;
-
-  /// DeclName of the async function in the attribute. Only set from actual
-  /// Swift code, deserialization/ObjectiveC imports will set the decl instead.
-  const DeclNameRef AsyncFunctionName;
-
-  /// Source location of the async function name in the attribute
-  const SourceLoc AsyncFunctionNameLoc;
-
-  /// The index of the completion handler
-  const size_t CompletionHandlerIndex;
-
-  /// Source location of the completion handler index passed to the index
-  const SourceLoc CompletionHandlerIndexLoc;
-
-  CompletionHandlerAsyncAttr(DeclNameRef asyncFunctionName,
-                             SourceLoc asyncFunctionNameLoc,
-                             size_t completionHandlerIndex,
-                             SourceLoc completionHandlerIndexLoc,
-                             SourceLoc atLoc, SourceRange range)
-      : DeclAttribute(DAK_CompletionHandlerAsync, atLoc, range,
-                      /*implicit*/ false),
-        AsyncFunctionDecl(nullptr),
-        AsyncFunctionName(asyncFunctionName),
-        AsyncFunctionNameLoc(asyncFunctionNameLoc),
-        CompletionHandlerIndex(completionHandlerIndex),
-        CompletionHandlerIndexLoc(completionHandlerIndexLoc) {}
-
-  CompletionHandlerAsyncAttr(AbstractFunctionDecl &asyncFunctionDecl,
-                             size_t completionHandlerIndex,
-                             SourceLoc completionHandlerIndexLoc,
-                             SourceLoc atLoc, SourceRange range,
-                             bool implicit)
-      : DeclAttribute(DAK_CompletionHandlerAsync, atLoc, range,
-                      implicit),
-        AsyncFunctionDecl(&asyncFunctionDecl) ,
-        CompletionHandlerIndex(completionHandlerIndex),
-        CompletionHandlerIndexLoc(completionHandlerIndexLoc) {}
-
-  static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_CompletionHandlerAsync;
   }
 };
 
