@@ -1232,12 +1232,6 @@ def disable_autolinking_runtime_compatibility_dynamic_replacements
       HelpText<"Do not use autolinking for the dynamic replacement runtime "
                "compatibility library">;
 
-def disable_autolinking_runtime_compatibility_concurrency
-    : Flag<[ "-" ], "disable-autolinking-runtime-compatibility-concurrency">,
-      Flags<[ FrontendOption ]>,
-      HelpText<"Do not use autolinking for the concurrency runtime "
-               "compatibility library">;
-
 def emit_symbol_graph: Flag<["-"], "emit-symbol-graph">,
   Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
   HelpText<"Emit a symbol graph">;
