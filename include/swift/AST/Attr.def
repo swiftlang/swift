@@ -621,11 +621,7 @@ SIMPLE_DECL_ATTR(reasync, AtReasync,
   ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
   110)
 
-DECL_ATTR(completionHandlerAsync, CompletionHandlerAsync,
-  OnAbstractFunction | ConcurrencyOnly | LongAttribute |
-  ABIStableToAdd | ABIStableToRemove |
-  APIStableToAdd | APIStableToRemove,
-  111)
+// 111 was an experimental @completionHandlerAsync and is now unused
 
 CONTEXTUAL_SIMPLE_DECL_ATTR(nonisolated, Nonisolated,
   DeclModifier | OnFunc | OnConstructor | OnVar | OnSubscript |
