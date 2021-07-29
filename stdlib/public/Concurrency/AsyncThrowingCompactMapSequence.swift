@@ -68,6 +68,7 @@ extension AsyncSequence {
 /// An asynchronous sequence that maps an error-throwing closure over the base
 /// sequence’s elements, omitting results that don't return a value.
 @available(SwiftStdlib 5.5, *)
+@frozen
 public struct AsyncThrowingCompactMapSequence<Base: AsyncSequence, ElementOfResult> {
   @usableFromInline
   let base: Base
@@ -75,7 +76,7 @@ public struct AsyncThrowingCompactMapSequence<Base: AsyncSequence, ElementOfResu
   @usableFromInline
   let transform: (Base.Element) async throws -> ElementOfResult?
 
-  @usableFromInline
+  @inlinable
   init(
     _ base: Base, 
     transform: @escaping (Base.Element) async throws -> ElementOfResult?
@@ -96,6 +97,7 @@ extension AsyncThrowingCompactMapSequence: AsyncSequence {
   public typealias AsyncIterator = Iterator
 
   /// The iterator that produces elements of the compact map sequence.
+  @frozen
   public struct Iterator: AsyncIteratorProtocol {
     public typealias Element = ElementOfResult
 
@@ -108,7 +110,7 @@ extension AsyncThrowingCompactMapSequence: AsyncSequence {
     @usableFromInline
     var finished = false
 
-    @usableFromInline
+    @inlinable
     init(
       _ baseIterator: Base.AsyncIterator, 
       transform: @escaping (Base.Element) async throws -> ElementOfResult?

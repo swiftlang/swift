@@ -471,11 +471,60 @@ void StringOptimization::invalidateModifiedObjects(SILInstruction *inst,
   }
 }
 
+/// If \p value is a struct_extract, return its operand and field.
+static std::pair<SILValue, VarDecl *> skipStructExtract(SILValue value) {
+  if (auto *sei = dyn_cast<StructExtractInst>(value))
+    return {sei->getOperand(), sei->getField()};
+
+  // Look through function calls, which do the struct_extract in the callee.
+  // This specifically targets
+  //    String(stringInterpolation: DefaultStringInterpolation)
+  // which is not inlined in the high level pipeline (due to the specified
+  // effects).
+  auto *apply = dyn_cast<ApplyInst>(value);
+  if (!apply)
+    return {value, nullptr};
+  
+  SILFunction *callee = apply->getReferencedFunctionOrNull();
+  if (!callee || !callee->isDefinition())
+    return {value, nullptr};
+
+  // `String(stringInterpolation: DefaultStringInterpolation)` has only a single
+  // basic block. Avoid the effort of searching all blocks for a `return`.
+  auto *ret = dyn_cast<ReturnInst>(callee->getEntryBlock()->getTerminator());
+  if (!ret)
+    return {value, nullptr};
+
+  auto *sei = dyn_cast<StructExtractInst>(ret->getOperand());
+  if (!sei)
+    return {value, nullptr};
+  
+  auto *arg = dyn_cast<SILFunctionArgument>(sei->getOperand());
+  if (!arg)
+    return {value, nullptr};
+
+  value = apply->getArgument(arg->getIndex());
+  return {value, sei->getField()};
+}
+
 /// Returns information about value if it's a constant string.
 StringOptimization::StringInfo StringOptimization::getStringInfo(SILValue value) {
   if (!value)
     return StringInfo::unknown();
   
+  // Look through struct_extract(struct(value)).
+  // This specifically targets calls to
+  //    String(stringInterpolation: DefaultStringInterpolation)
+  // which are not inlined in the high level pipeline.
+  VarDecl *field = nullptr;
+  std::tie(value, field) = skipStructExtract(value);
+  if (field) {
+    auto *si = dyn_cast<StructInst>(value);
+    if (!si)
+      return StringInfo::unknown();
+    value = si->getFieldValue(field);
+  }
+
   auto *apply = dyn_cast<ApplyInst>(value);
   if (!apply) {
     return getStringFromStaticLet(value);

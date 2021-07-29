@@ -9,8 +9,6 @@ else()
   )
 endif()
 
-set_swift_llvm_is_available()
-
 add_swift_host_library(swiftAST STATIC
   AbstractSourceFileDepGraphFactory.cpp
   AccessNotes.cpp
@@ -75,6 +73,13 @@ add_swift_host_library(swiftAST STATIC
   ProtocolConformance.cpp
   RawComment.cpp
   RequirementEnvironment.cpp
+  RequirementMachine/GenericSignatureQueries.cpp
+  RequirementMachine/PropertyMap.cpp
+  RequirementMachine/ProtocolGraph.cpp
+  RequirementMachine/RequirementMachine.cpp
+  RequirementMachine/RewriteContext.cpp
+  RequirementMachine/RewriteSystem.cpp
+  RequirementMachine/RewriteSystemCompletion.cpp
   SILLayout.cpp
   Stmt.cpp
   SubstitutionMap.cpp
@@ -146,3 +151,5 @@ endif()
 # headers.
 # For more information see the comment at the top of lib/CMakeLists.txt.
 add_dependencies(swiftAST intrinsics_gen clang-tablegen-targets)
+
+set_swift_llvm_is_available(swiftAST)

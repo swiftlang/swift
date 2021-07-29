@@ -99,7 +99,7 @@ private:
 
   /// Either the class marked \@NS/UIApplicationMain or the synthesized FuncDecl
   /// that calls main on the type marked @main.
-  Decl *MainDecl = nullptr;
+  ValueDecl *MainDecl = nullptr;
 
   /// The source location of the main type.
   SourceLoc MainDeclDiagLoc;
@@ -241,10 +241,17 @@ public:
   /// unsatisfied, which might conflict with other Objective-C methods.
   std::vector<ObjCUnsatisfiedOptReq> ObjCUnsatisfiedOptReqs;
 
+  /// A selector that is used by two different declarations in the same class.
+  /// Fields: classDecl, selector, isInstanceMethod.
   using ObjCMethodConflict = std::tuple<ClassDecl *, ObjCSelector, bool>;
 
   /// List of Objective-C member conflicts we have found during type checking.
   std::vector<ObjCMethodConflict> ObjCMethodConflicts;
+
+  /// List of attributes added by access notes, used to emit remarks for valid
+  /// ones.
+  llvm::DenseMap<ValueDecl *, std::vector<DeclAttribute *>>
+      AttrsAddedByAccessNotes;
 
   /// Describes what kind of file this is, which can affect some type checking
   /// and other behavior.
@@ -480,7 +487,7 @@ public:
     llvm_unreachable("bad SourceFileKind");
   }
 
-  Decl *getMainDecl() const override { return MainDecl; }
+  ValueDecl *getMainDecl() const override { return MainDecl; }
   SourceLoc getMainDeclDiagLoc() const {
     assert(hasMainDecl());
     return MainDeclDiagLoc;
@@ -494,7 +501,7 @@ public:
   /// one.
   ///
   /// Should only be called during type-checking.
-  bool registerMainDecl(Decl *mainDecl, SourceLoc diagLoc);
+  bool registerMainDecl(ValueDecl *mainDecl, SourceLoc diagLoc);
 
   /// True if this source file has an application entry point.
   ///

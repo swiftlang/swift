@@ -124,7 +124,7 @@ ErrorOr<ModuleDependencies> ModuleDependencyScanner::scanInterfaceFile(
     std::string InPath = moduleInterfacePath.str();
     auto compiledCandidates = getCompiledCandidates(Ctx, moduleName.str(),
                                                     InPath);
-    Result = ModuleDependencies::forSwiftInterface(InPath,
+    Result = ModuleDependencies::forSwiftTextualModule(InPath,
                                                    compiledCandidates,
                                                    Args,
                                                    PCMArgs,

@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency %import-libdispatch -parse-as-library) | %FileCheck %s
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -22,7 +22,7 @@ func test_taskGroup_isEmpty() async {
     // CHECK: before add: isEmpty=true
     print("before add: isEmpty=\(group.isEmpty)")
 
-    group.spawn {
+    group.async {
       await Task.sleep(2_000_000_000)
       return await asyncEcho(1)
     }

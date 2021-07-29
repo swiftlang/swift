@@ -468,47 +468,6 @@ void DefaultTypeRequest::cacheResult(Type value) const {
   cacheEntry = value;
 }
 
-bool PropertyWrapperTypeInfoRequest::isCached() const {
-  auto nominal = std::get<0>(getStorage());
-  return nominal->getAttrs().hasAttribute<PropertyWrapperAttr>();;
-}
-
-bool AttachedPropertyWrappersRequest::isCached() const {
-  auto var = std::get<0>(getStorage());
-  return !var->getAttrs().isEmpty();
-}
-
-bool AttachedPropertyWrapperTypeRequest::isCached() const {
-  auto var = std::get<0>(getStorage());
-  return !var->getAttrs().isEmpty();
-}
-
-bool PropertyWrapperBackingPropertyTypeRequest::isCached() const {
-  auto var = std::get<0>(getStorage());
-  return !var->getAttrs().isEmpty() &&
-         !(isa<ParamDecl>(var) && isa<ClosureExpr>(var->getDeclContext()));
-}
-
-bool PropertyWrapperAuxiliaryVariablesRequest::isCached() const {
-  auto var = std::get<0>(getStorage());
-  return !var->getAttrs().isEmpty() || var->hasImplicitPropertyWrapper();
-}
-
-bool PropertyWrapperInitializerInfoRequest::isCached() const {
-  auto var = std::get<0>(getStorage());
-  return !var->getAttrs().isEmpty() || var->hasImplicitPropertyWrapper();
-}
-
-bool PropertyWrapperMutabilityRequest::isCached() const {
-  auto var = std::get<0>(getStorage());
-  return !var->getAttrs().isEmpty() || var->hasImplicitPropertyWrapper();
-}
-
-bool PropertyWrapperLValuenessRequest::isCached() const {
-  auto var = std::get<0>(getStorage());
-  return !var->getAttrs().isEmpty() || var->hasImplicitPropertyWrapper();
-}
-
 void swift::simple_display(
     llvm::raw_ostream &out, const PropertyWrapperTypeInfo &propertyWrapper) {
   out << "{ ";
@@ -607,16 +566,6 @@ void swift::simple_display(llvm::raw_ostream &out,
 
   out << ", allowUsableFromInline: "
       << (value.allowUsableFromInline ? "true" : "false");
-}
-
-//----------------------------------------------------------------------------//
-// ResultBuilder-related requests.
-//----------------------------------------------------------------------------//
-
-bool AttachedResultBuilderRequest::isCached() const {
-  // Only needs to be cached if there are any custom attributes.
-  auto var = std::get<0>(getStorage());
-  return var->getAttrs().hasAttribute<CustomAttr>();
 }
 
 //----------------------------------------------------------------------------//
@@ -1084,6 +1033,12 @@ void swift::simple_display(llvm::raw_ostream &out,
   case ImplicitMemberAction::ResolveDecodable:
     out << "resolve Decodable.init(from:)";
     break;
+  case ImplicitMemberAction::ResolveDistributedActor:
+    out << "resolve DistributedActor[init(transport:), init(resolve:using:)]";
+    break;
+  case ImplicitMemberAction::ResolveDistributedActorIdentity:
+    out << "resolve DistributedActor.id";
+    break;
   }
 }
 
@@ -1511,6 +1466,7 @@ void CustomAttrTypeRequest::cacheResult(Type value) const {
 bool ActorIsolation::requiresSubstitution() const {
   switch (kind) {
   case ActorInstance:
+  case DistributedActorInstance:
   case Independent:
   case Unspecified:
     return false;
@@ -1525,6 +1481,7 @@ bool ActorIsolation::requiresSubstitution() const {
 ActorIsolation ActorIsolation::subst(SubstitutionMap subs) const {
   switch (kind) {
   case ActorInstance:
+  case DistributedActorInstance:
   case Independent:
   case Unspecified:
     return *this;
@@ -1542,6 +1499,10 @@ void swift::simple_display(
   switch (state) {
     case ActorIsolation::ActorInstance:
       out << "actor-isolated to instance of " << state.getActor()->getName();
+      break;
+
+    case ActorIsolation::DistributedActorInstance:
+      out << "distributed-actor-isolated to instance of " << state.getActor()->getName();
       break;
 
     case ActorIsolation::Independent:

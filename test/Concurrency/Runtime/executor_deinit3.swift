@@ -1,8 +1,9 @@
-// RUN: %target-run-simple-swift(-parse-as-library -Xfrontend -enable-experimental-concurrency %import-libdispatch) | %FileCheck %s
+// RUN: %target-run-simple-swift(-parse-as-library -Xfrontend -enable-experimental-concurrency -Xfrontend -disable-availability-checking %import-libdispatch) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
+// REQUIRES: rdar78576626
 
 // rdar://76038845
 // UNSUPPORTED: use_os_stdlib
@@ -27,7 +28,7 @@ class Runner {
 @available(SwiftStdlib 5.5, *)
 actor Container {
     var generation = 0
-    var runners = [Int : Task.Handle<Void, Never>]()
+    var runners = [Int : Task<Void, Never>]()
 
     func build(_ n: Int) {
         for _ in 0..<n {

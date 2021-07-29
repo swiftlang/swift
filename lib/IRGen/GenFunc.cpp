@@ -593,12 +593,11 @@ getFuncSignatureInfoForLowered(IRGenModule &IGM, CanSILFunctionType type) {
   llvm_unreachable("bad function type representation");
 }
 
-Signature
-IRGenModule::getSignature(CanSILFunctionType type,
-                          bool suppressGenerics) {
+Signature IRGenModule::getSignature(CanSILFunctionType type,
+                                    bool useSpecialConvention) {
   // Don't bother caching if we've been asked to suppress generics.
-  if (suppressGenerics)
-    return Signature::getUncached(*this, type, suppressGenerics);
+  if (useSpecialConvention)
+    return Signature::getUncached(*this, type, useSpecialConvention);
 
   auto &sigInfo = getFuncSignatureInfoForLowered(*this, type);
   return sigInfo.getSignature(*this);
@@ -1071,7 +1070,7 @@ public:
             substType, outType, subs, layout, conventions),
         layout(getAsyncContextLayout(
             subIGF.IGM, origType, substType, subs,
-            staticFnPtr ? staticFnPtr->suppressGenerics() : false,
+            staticFnPtr ? staticFnPtr->useSpecialConvention() : false,
             FunctionPointer::Kind(
                 FunctionPointer::BasicKind::AsyncFunctionPointer))),
         currentArgumentIndex(outType->getNumParameters()) {}
@@ -1160,7 +1159,8 @@ public:
         fnPtr.getAuthInfo().getCorrespondingCodeAuthInfo();
     auto newFnPtr = FunctionPointer(
         FunctionPointer::Kind::Function, fnPtr.getPointer(subIGF), newAuthInfo,
-        Signature::forAsyncAwait(subIGF.IGM, origType));
+        Signature::forAsyncAwait(subIGF.IGM, origType,
+                                 /*useSpecialConvention*/ false));
     auto &Builder = subIGF.Builder;
 
     auto argValues = args.claimAll();
@@ -1268,7 +1268,8 @@ static llvm::Value *emitPartialApplicationForwarder(IRGenModule &IGM,
   IRGenFunction subIGF(IGM, fwd);
   if (origType->isAsync()) {
     auto asyncContextIdx =
-        Signature::forAsyncEntry(IGM, outType).getAsyncContextIndex();
+        Signature::forAsyncEntry(IGM, outType, /*useSpecialConvention*/ false)
+            .getAsyncContextIndex();
     asyncLayout.emplace(irgen::getAsyncContextLayout(
         IGM, origType, substType, subs, /*suppress generics*/ false,
         FunctionPointer::Kind(
@@ -1372,8 +1373,9 @@ static llvm::Value *emitPartialApplicationForwarder(IRGenModule &IGM,
   // captured arguments which we will do later. Otherwise, we have to
   // potentially bind polymorphic arguments from the context if it was a
   // partially applied argument.
-  bool hasPolymorphicParams = hasPolymorphicParameters(origType) &&
-    (!staticFnPtr || !staticFnPtr->suppressGenerics());
+  bool hasPolymorphicParams =
+      hasPolymorphicParameters(origType) &&
+      (!staticFnPtr || !staticFnPtr->useSpecialConvention());
   if (!layout && hasPolymorphicParams) {
     assert(conventions.size() == 1);
     // We could have either partially applied an argument from the function

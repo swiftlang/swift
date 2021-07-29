@@ -636,9 +636,18 @@ const ExternalSourceLocs *Decl::getSerializedLocs() const {
     return &NullLocs;
   }
 
+  CharSourceRange BufferRange = SM.getRangeForBuffer(BufferID);
   auto ResolveLoc = [&](const ExternalSourceLocs::RawLoc &Raw) -> SourceLoc {
+    // If the underlying source has been updated and the swiftsourceinfo hasn't,
+    // make sure we don't produce invalid source locations. Ideally would check
+    // the file hasn't been modified.
+    if (Raw.Offset > BufferRange.getByteLength())
+      return SourceLoc();
+
     // If the decl had a presumed loc, create its virtual file so that
-    // getPresumedLineAndColForLoc works from serialized locations as well.
+    // getPresumedLineAndColForLoc works from serialized locations as well. No
+    // need to check the buffer range, the directive must be before the location
+    // itself.
     if (Raw.Directive.isValid()) {
       auto &LD = Raw.Directive;
       SourceLoc Loc = SM.getLocForOffset(BufferID, LD.Offset);
@@ -880,6 +889,9 @@ AvailabilityContext Decl::getAvailabilityForLinkage() const {
   if (auto *accessor = dyn_cast<AccessorDecl>(this))
     return accessor->getStorage()->getAvailabilityForLinkage();
 
+  if (auto *opaqueTypeDecl = dyn_cast<OpaqueTypeDecl>(this))
+    return opaqueTypeDecl->getNamingDecl()->getAvailabilityForLinkage();
+
   if (auto *ext = dyn_cast<ExtensionDecl>(this))
     if (auto *nominal = ext->getExtendedNominal())
       return nominal->getAvailabilityForLinkage();
@@ -904,6 +916,9 @@ bool Decl::isAlwaysWeakImported() const {
 
   if (auto *accessor = dyn_cast<AccessorDecl>(this))
     return accessor->getStorage()->isAlwaysWeakImported();
+
+  if (auto *opaqueTypeDecl = dyn_cast<OpaqueTypeDecl>(this))
+    return opaqueTypeDecl->getNamingDecl()->isAlwaysWeakImported();
 
   if (auto *ext = dyn_cast<ExtensionDecl>(this))
     if (auto *nominal = ext->getExtendedNominal())
@@ -950,18 +965,12 @@ GenericContext::GenericContext(DeclContextKind Kind, DeclContext *Parent,
 
 TypeArrayView<GenericTypeParamType>
 GenericContext::getInnermostGenericParamTypes() const {
-  if (auto sig = getGenericSignature())
-    return sig->getInnermostGenericParams();
-  else
-    return { };
+  return getGenericSignature().getInnermostGenericParams();
 }
 
 /// Retrieve the generic requirements.
 ArrayRef<Requirement> GenericContext::getGenericRequirements() const {
-  if (auto sig = getGenericSignature())
-    return sig->getRequirements();
-  else
-    return { };
+  return getGenericSignature().getRequirements();
 }
 
 GenericParamList *GenericContext::getGenericParams() const {
@@ -992,10 +1001,7 @@ GenericSignature GenericContext::getGenericSignature() const {
 }
 
 GenericEnvironment *GenericContext::getGenericEnvironment() const {
-  if (auto genericSig = getGenericSignature())
-    return genericSig->getGenericEnvironment();
-
-  return nullptr;
+  return getGenericSignature().getGenericEnvironment();
 }
 
 void GenericContext::setGenericSignature(GenericSignature genericSig) {
@@ -1148,9 +1154,15 @@ NominalTypeDecl::takeConformanceLoaderSlow() {
   return { contextInfo->loader, contextInfo->allConformancesData };
 }
 
+InheritedEntry::InheritedEntry(const TypeLoc &typeLoc)
+    : TypeLoc(typeLoc), isUnchecked(false) {
+  if (auto typeRepr = typeLoc.getTypeRepr())
+    isUnchecked = typeRepr->findUncheckedAttrLoc().isValid();
+}
+
 ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
                              TypeRepr *extendedType,
-                             ArrayRef<TypeLoc> inherited,
+                             ArrayRef<InheritedEntry> inherited,
                              DeclContext *parent,
                              TrailingWhereClause *trailingWhereClause)
   : GenericContext(DeclContextKind::ExtensionDecl, parent, nullptr),
@@ -1167,7 +1179,7 @@ ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
 
 ExtensionDecl *ExtensionDecl::create(ASTContext &ctx, SourceLoc extensionLoc,
                                      TypeRepr *extendedType,
-                                     ArrayRef<TypeLoc> inherited,
+                                     ArrayRef<InheritedEntry> inherited,
                                      DeclContext *parent,
                                      TrailingWhereClause *trailingWhereClause,
                                      ClangNode clangNode) {
@@ -1341,6 +1353,17 @@ PatternBindingDecl *PatternBindingDecl::createImplicit(
   return Result;
 }
 
+PatternBindingDecl *PatternBindingDecl::createForDebugger(
+    ASTContext &Ctx, StaticSpellingKind StaticSpelling, Pattern *Pat, Expr *E,
+    DeclContext *Parent) {
+  auto *Result = createImplicit(Ctx, StaticSpelling, Pat, E, Parent);
+  Result->Bits.PatternBindingDecl.IsDebugger = true;
+  for (auto &entry : Result->getMutablePatternList()) {
+    entry.setFromDebugger();
+  }
+  return Result;
+}
+
 PatternBindingDecl *
 PatternBindingDecl::create(ASTContext &Ctx, SourceLoc StaticLoc,
                            StaticSpellingKind StaticSpelling,
@@ -1409,6 +1432,15 @@ ParamDecl *PatternBindingInitializer::getImplicitSelfDecl() const {
       LazySelfParam->setImplicit();
       LazySelfParam->setSpecifier(specifier);
       LazySelfParam->setInterfaceType(DC->getSelfInterfaceType());
+
+      // Lazy members of actors have an isolated 'self', assuming there is
+      // no "nonisolated" attribute.
+      if (auto nominal = DC->getSelfNominalTypeDecl()) {
+        if (nominal->isActor() &&
+            !singleVar->getAttrs().hasAttribute<NonisolatedAttr>())
+          LazySelfParam->setIsolated();
+      }
+
       mutableThis->SelfParam = LazySelfParam;
     }
   }
@@ -1541,7 +1573,7 @@ SourceRange PatternBindingEntry::getSourceRange(bool omitAccessors) const {
 bool PatternBindingEntry::hasInitStringRepresentation() const {
   if (InitContextAndFlags.getInt().contains(PatternFlags::IsText))
     return !InitStringRepresentation.empty();
-  return getInit() && getInit()->getSourceRange().isValid();
+  return getOriginalInit() && getOriginalInit()->getSourceRange().isValid();
 }
 
 StringRef PatternBindingEntry::getInitStringRepresentation(
@@ -1566,10 +1598,12 @@ SourceRange PatternBindingDecl::getSourceRange() const {
 }
 
 static StaticSpellingKind getCorrectStaticSpellingForDecl(const Decl *D) {
-  if (!D->getDeclContext()->getSelfClassDecl())
-    return StaticSpellingKind::KeywordStatic;
+  if (auto classDecl = D->getDeclContext()->getSelfClassDecl()) {
+    if (!classDecl->isActor())
+      return StaticSpellingKind::KeywordClass;
+  }
 
-  return StaticSpellingKind::KeywordClass;
+  return StaticSpellingKind::KeywordStatic;
 }
 
 StaticSpellingKind PatternBindingDecl::getCorrectStaticSpelling() const {
@@ -2454,6 +2488,10 @@ bool swift::conflicting(const OverloadSignature& sig1,
   if (sig1.IsInstanceMember != sig2.IsInstanceMember)
     return false;
 
+  // If one is an async function and the other is not, they can't conflict.
+  if (sig1.IsAsyncFunction != sig2.IsAsyncFunction)
+    return false;
+
   // If one is a compound name and the other is not, they do not conflict
   // if one is a property and the other is a non-nullary function.
   if (sig1.Name.isCompoundName() != sig2.Name.isCompoundName()) {
@@ -2641,8 +2679,10 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
   for (const auto &param : funcTy->getParams()) {
     auto newParamType = mapSignatureParamType(ctx, param.getPlainType());
 
-    // Don't allow overloading by @_nonEphemeral.
-    auto newFlags = param.getParameterFlags().withNonEphemeral(false);
+    // Don't allow overloading by @_nonEphemeral or isolated.
+    auto newFlags = param.getParameterFlags()
+        .withNonEphemeral(false)
+        .withIsolated(false);
 
     // For the 'self' of a method, strip off 'inout'.
     if (isMethod) {
@@ -2680,7 +2720,6 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
     = static_cast<bool>(getDeclContext()->getExtendedProtocolDecl());
   signature.IsInstanceMember = isInstanceMember();
   signature.IsVariable = isa<VarDecl>(this);
-  signature.IsFunction = isa<AbstractFunctionDecl>(this);
   signature.IsEnumElement = isa<EnumElementDecl>(this);
   signature.IsNominal = isa<NominalTypeDecl>(this);
   signature.IsTypeAlias = isa<TypeAliasDecl>(this);
@@ -2692,6 +2731,13 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
     if (func->isUnaryOperator()) {
       signature.UnaryOperator = func->getAttrs().getUnaryOperatorKind();
     }
+  }
+
+  // Functions include async/not-async.
+  if (auto func = dyn_cast<AbstractFunctionDecl>(this)) {
+    signature.IsFunction = true;
+    if (func->hasAsync())
+      signature.IsAsyncFunction = true;
   }
 
   if (auto *extension = dyn_cast<ExtensionDecl>(getDeclContext()))
@@ -2829,6 +2875,23 @@ void ValueDecl::setIsObjC(bool value) {
   LazySemanticInfo.isObjC = value;
 }
 
+bool ValueDecl::isSemanticallyFinal() const {
+  // Actor types are semantically final.
+  if (auto classDecl = dyn_cast<ClassDecl>(this)) {
+    if (classDecl->isActor())
+      return true;
+  }
+
+  // As are members of actor types.
+  if (auto classDecl = getDeclContext()->getSelfClassDecl()) {
+    if (classDecl->isActor())
+      return true;
+  }
+
+  // For everything else, the same as 'final'.
+  return isFinal();
+}
+
 bool ValueDecl::isFinal() const {
   return evaluateOrDefault(getASTContext().evaluator,
                            IsFinalRequest { const_cast<ValueDecl *>(this) },
@@ -2842,6 +2905,10 @@ bool ValueDecl::isDynamic() const {
     getAttrs().hasAttribute<DynamicAttr>());
 }
 
+bool ValueDecl::isDistributedActorIndependent() const {
+  return getAttrs().hasAttribute<DistributedActorIndependentAttr>();
+}
+
 bool ValueDecl::isObjCDynamicInGenericClass() const {
   if (!isObjCDynamic())
     return false;
@@ -2851,7 +2918,8 @@ bool ValueDecl::isObjCDynamicInGenericClass() const {
   if (!classDecl)
     return false;
 
-  return classDecl->isGenericContext() && !classDecl->usesObjCGenericsModel();
+  return classDecl->isGenericContext()
+             && !classDecl->isTypeErasedGenericClass();
 }
 
 bool ValueDecl::shouldUseObjCMethodReplacement() const {
@@ -3169,13 +3237,13 @@ bool ValueDecl::shouldHideFromEditor() const {
 static AccessLevel getMaximallyOpenAccessFor(const ValueDecl *decl) {
   // Non-final classes are considered open to @testable importers.
   if (auto cls = dyn_cast<ClassDecl>(decl)) {
-    if (!cls->isFinal())
+    if (!cls->isSemanticallyFinal())
       return AccessLevel::Open;
 
   // Non-final overridable class members are considered open to
   // @testable importers.
   } else if (decl->isPotentiallyOverridable()) {
-    if (!cast<ValueDecl>(decl)->isFinal())
+    if (!cast<ValueDecl>(decl)->isSemanticallyFinal())
       return AccessLevel::Open;
   }
 
@@ -3289,9 +3357,6 @@ AccessLevel ValueDecl::getFormalAccess() const {
 }
 
 bool ValueDecl::hasOpenAccess(const DeclContext *useDC) const {
-  assert(isa<ClassDecl>(this) || isa<ConstructorDecl>(this) ||
-         isPotentiallyOverridable());
-
   AccessLevel access =
       getAdjustedFormalAccess(this, useDC,
                               /*treatUsableFromInlineAsPublic*/false);
@@ -3823,10 +3888,20 @@ bool NominalTypeDecl::isActor() const {
                            false);
 }
 
+bool NominalTypeDecl::isDistributedActor() const {
+  auto mutableThis = const_cast<NominalTypeDecl *>(this);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           IsDistributedActorRequest{mutableThis},
+                           false);
+}
+
+bool NominalTypeDecl::isAnyActor() const {
+  return isActor() || isDistributedActor();
+}
 
 GenericTypeDecl::GenericTypeDecl(DeclKind K, DeclContext *DC,
                                  Identifier name, SourceLoc nameLoc,
-                                 ArrayRef<TypeLoc> inherited,
+                                 ArrayRef<InheritedEntry> inherited,
                                  GenericParamList *GenericParams) :
     GenericContext(DeclContextKind::GenericTypeDecl, DC, GenericParams),
     TypeDecl(K, DC, name, nameLoc, inherited) {}
@@ -4036,7 +4111,7 @@ AssociatedTypeDecl *AssociatedTypeDecl::getAssociatedTypeAnchor() const {
 
 EnumDecl::EnumDecl(SourceLoc EnumLoc,
                      Identifier Name, SourceLoc NameLoc,
-                     ArrayRef<TypeLoc> Inherited,
+                     ArrayRef<InheritedEntry> Inherited,
                      GenericParamList *GenericParams, DeclContext *Parent)
   : NominalTypeDecl(DeclKind::Enum, Parent, Name, NameLoc, Inherited,
                     GenericParams),
@@ -4060,7 +4135,7 @@ void EnumDecl::setRawType(Type rawType) {
 }
 
 StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
-                       ArrayRef<TypeLoc> Inherited,
+                       ArrayRef<InheritedEntry> Inherited,
                        GenericParamList *GenericParams, DeclContext *Parent)
   : NominalTypeDecl(DeclKind::Struct, Parent, Name, NameLoc, Inherited,
                     GenericParams),
@@ -4115,7 +4190,7 @@ bool NominalTypeDecl::isTypeErasedGenericClass() const {
   // ObjC classes are type erased.
   // TODO: Unless they have magic methods...
   if (auto clas = dyn_cast<ClassDecl>(this))
-    return clas->hasClangNode() && clas->isGenericContext();
+    return clas->isTypeErasedGenericClass();
   return false;
 }
 
@@ -4127,6 +4202,13 @@ ConstructorDecl *NominalTypeDecl::getDefaultInitializer() const {
   auto *mutableThis = const_cast<NominalTypeDecl *>(this);
   return evaluateOrDefault(ctx.evaluator,
                            SynthesizeDefaultInitRequest{mutableThis}, nullptr);
+}
+
+bool NominalTypeDecl::hasDistributedActorLocalInitializer() const {
+  auto &ctx = getASTContext();
+  auto *mutableThis = const_cast<NominalTypeDecl *>(this);
+  return evaluateOrDefault(ctx.evaluator, HasDistributedActorLocalInitRequest{mutableThis},
+                           false);
 }
 
 void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
@@ -4151,15 +4233,24 @@ void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
     }
   } else {
     auto argumentNames = member.getArgumentNames();
-    if (!member.isCompoundName() || argumentNames.size() == 1) {
-      if (baseName == DeclBaseName::createConstructor() &&
-          (member.isSimpleName() || argumentNames.front() == Context.Id_from)) {
-        action.emplace(ImplicitMemberAction::ResolveDecodable);
+    if (member.isSimpleName() || argumentNames.size() == 1) {
+      if (baseName == DeclBaseName::createConstructor()) {
+        if ((member.isSimpleName() || argumentNames.front() == Context.Id_from)) {
+          action.emplace(ImplicitMemberAction::ResolveDecodable);
+        } else if (argumentNames.front() == Context.Id_transport) {
+          action.emplace(ImplicitMemberAction::ResolveDistributedActor);
+        }
       } else if (!baseName.isSpecial() &&
-                 baseName.getIdentifier() == Context.Id_encode &&
-                 (member.isSimpleName() ||
-                  argumentNames.front() == Context.Id_to)) {
+           baseName.getIdentifier() == Context.Id_encode &&
+           (member.isSimpleName() || argumentNames.front() == Context.Id_to)) {
         action.emplace(ImplicitMemberAction::ResolveEncodable);
+      }
+    } else if (member.isSimpleName() || argumentNames.size() == 2) {
+      if (baseName == DeclBaseName::createConstructor()) {
+        if (argumentNames[0] == Context.Id_resolve &&
+            argumentNames[1] == Context.Id_using) {
+          action.emplace(ImplicitMemberAction::ResolveDistributedActor);
+        }
       }
     }
   }
@@ -4178,7 +4269,7 @@ VarDecl *NominalTypeDecl::getGlobalActorInstance() const {
 }
 
 ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
-                     ArrayRef<TypeLoc> Inherited,
+                     ArrayRef<InheritedEntry> Inherited,
                      GenericParamList *GenericParams, DeclContext *Parent,
                      bool isActor)
   : NominalTypeDecl(DeclKind::Class, Parent, Name, NameLoc, Inherited,
@@ -4683,7 +4774,7 @@ bool EnumDecl::hasCircularRawValue() const {
 
 ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
                            SourceLoc NameLoc, Identifier Name,
-                           ArrayRef<TypeLoc> Inherited,
+                           ArrayRef<InheritedEntry> Inherited,
                            TrailingWhereClause *TrailingWhere)
     : NominalTypeDecl(DeclKind::Protocol, DC, Name, NameLoc, Inherited,
                       nullptr),
@@ -4701,6 +4792,11 @@ ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
 
 bool ProtocolDecl::isMarkerProtocol() const {
   return getAttrs().hasAttribute<MarkerAttr>();
+}
+
+bool ProtocolDecl::inheritsFromDistributedActor() const {
+  auto &C = getASTContext();
+  return inheritsFrom(C.getDistributedActorDecl());
 }
 
 ArrayRef<ProtocolDecl *> ProtocolDecl::getInheritedProtocols() const {
@@ -5107,7 +5203,8 @@ void ProtocolDecl::computeKnownProtocolKind() const {
   if (module != module->getASTContext().getStdlibModule() &&
       !module->getName().is("Foundation") &&
       !module->getName().is("_Differentiation") &&
-      !module->getName().is("_Concurrency")) {
+      !module->getName().is("_Concurrency") &&
+      !module->getName().is("_Distributed")) {
     const_cast<ProtocolDecl *>(this)->Bits.ProtocolDecl.KnownProtocol = 1;
     return;
   }
@@ -5155,6 +5252,8 @@ Optional<KnownDerivableProtocolKind>
     return KnownDerivableProtocolKind::Differentiable;
   case KnownProtocolKind::Actor:
     return KnownDerivableProtocolKind::Actor;
+  case KnownProtocolKind::DistributedActor:
+    return KnownDerivableProtocolKind::DistributedActor;
   default: return None;
   }
 }
@@ -5195,6 +5294,10 @@ bool AbstractStorageDecl::hasAnyNativeDynamicAccessors() const {
       return true;
   }
   return false;
+}
+
+bool AbstractStorageDecl::isDistributedActorIndependent() const {
+  return getAttrs().hasAttribute<DistributedActorIndependentAttr>();
 }
 
 void AbstractStorageDecl::setAccessors(SourceLoc lbraceLoc,
@@ -5740,11 +5843,24 @@ void VarDecl::setNamingPattern(NamedPattern *Pat) {
 }
 
 TypeRepr *VarDecl::getTypeReprOrParentPatternTypeRepr() const {
-  if (auto *param = dyn_cast<ParamDecl>(this))
-    return param->getTypeRepr();
+  if (auto *Param = dyn_cast<ParamDecl>(this))
+    return Param->getTypeRepr();
 
-  if (auto *parentPattern = dyn_cast_or_null<TypedPattern>(getParentPattern()))
-    return parentPattern->getTypeRepr();
+  auto *ParentPattern = getParentPattern();
+
+  if (auto *TyPattern = dyn_cast_or_null<TypedPattern>(ParentPattern))
+    return TyPattern->getTypeRepr();
+
+  // Handle typed if/guard/while-let as a special case (e.g. `if let x: Int
+  // = Optional.some(4)`), since the `TypedPattern` is not the top-level
+  // pattern here - instead it is an implicit `OptionalSomePattern`
+  if (auto *SomePattern =
+          dyn_cast_or_null<OptionalSomePattern>(ParentPattern)) {
+    if (auto *TyPattern =
+            dyn_cast<TypedPattern>(SomePattern->getSubPattern())) {
+      return TyPattern->getTypeRepr();
+    }
+  }
 
   return nullptr;
 }
@@ -6276,6 +6392,12 @@ ParamDecl *ParamDecl::cloneWithoutType(const ASTContext &Ctx, ParamDecl *PD) {
   return Clone;
 }
 
+ParamDecl *ParamDecl::clone(const ASTContext &Ctx, ParamDecl *PD) {
+  auto *Clone = ParamDecl::cloneWithoutType(Ctx, PD);
+  Clone->setInterfaceType(PD->getInterfaceType());
+  return Clone;
+}
+
 /// Retrieve the type of 'self' for the given context.
 Type DeclContext::getSelfTypeInContext() const {
   assert(isTypeContext());
@@ -6402,8 +6524,7 @@ AnyFunctionType::Param ParamDecl::toFunctionParam(Type type) const {
   auto internalLabel = getParameterName();
   auto flags = ParameterTypeFlags::fromParameterType(
       type, isVariadic(), isAutoClosure(), isNonEphemeral(),
-      getValueOwnership(),
-      /*isNoDerivative*/ false);
+      getValueOwnership(), isIsolated(), /*isNoDerivative*/ false);
   return AnyFunctionType::Param(type, label, flags, internalLabel);
 }
 
@@ -6474,9 +6595,12 @@ Expr *ParamDecl::getTypeCheckedDefaultExpr() const {
   }
 
   auto &ctx = getASTContext();
-  return evaluateOrDefault(
-      ctx.evaluator, DefaultArgumentExprRequest{const_cast<ParamDecl *>(this)},
-      new (ctx) ErrorExpr(getSourceRange(), ErrorType::get(ctx)));
+  if (Expr *E = evaluateOrDefault(
+          ctx.evaluator,
+          DefaultArgumentExprRequest{const_cast<ParamDecl *>(this)}, nullptr)) {
+    return E;
+  }
+  return new (ctx) ErrorExpr(getSourceRange(), ErrorType::get(ctx));
 }
 
 void ParamDecl::setDefaultExpr(Expr *E, bool isTypeChecked) {
@@ -6955,6 +7079,17 @@ bool AbstractFunctionDecl::argumentNameIsAPIByDefault() const {
 
 bool AbstractFunctionDecl::isSendable() const {
   return getAttrs().hasAttribute<SendableAttr>();
+}
+
+bool AbstractFunctionDecl::isDistributed() const {
+  auto func = dyn_cast<FuncDecl>(this);
+  if (!func)
+    return false;
+
+  auto mutableFunc = const_cast<FuncDecl *>(func);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           IsDistributedFuncRequest{mutableFunc},
+                           false);
 }
 
 BraceStmt *AbstractFunctionDecl::getBody(bool canSynthesize) const {
@@ -7735,6 +7870,46 @@ bool ConstructorDecl::isObjCZeroParameterWithLongSelector() const {
   return params->get(0)->getInterfaceType()->isVoid();
 }
 
+bool ConstructorDecl::isDistributedActorLocalInit() const {
+  auto name = getName();
+  auto argumentNames = name.getArgumentNames();
+
+  if (argumentNames.size() != 1)
+    return false;
+
+  auto &C = getASTContext();
+  if (argumentNames[0] != C.Id_transport)
+    return false;
+
+  auto *params = getParameters();
+  assert(params->size() == 1);
+
+  auto transportType = C.getActorTransportDecl()->getDeclaredInterfaceType();
+  return params->get(0)->getInterfaceType()->isEqual(transportType);
+}
+
+// TODO: remove resolve init in favor of resolve function?
+bool ConstructorDecl::isDistributedActorResolveInit() const {
+  auto name = getName();
+  auto argumentNames = name.getArgumentNames();
+
+  if (argumentNames.size() != 2)
+    return false;
+
+  auto &C = getASTContext();
+  if (argumentNames[0] != C.Id_resolve ||
+      argumentNames[1] != C.Id_using)
+    return false;
+
+  auto *params = getParameters();
+  auto identityType = C.getAnyActorIdentityDecl()->getDeclaredInterfaceType();
+  auto transportType = C.getActorTransportDecl()->getDeclaredInterfaceType();
+
+  return params->get(0)->getInterfaceType()->isEqual(identityType) &&
+         params->get(1)->getInterfaceType()->isEqual(transportType);
+}
+
+
 DestructorDecl::DestructorDecl(SourceLoc DestructorLoc, DeclContext *Parent)
   : AbstractFunctionDecl(DeclKind::Destructor, Parent,
                          DeclBaseName::createDestructor(), DestructorLoc,
@@ -8130,15 +8305,14 @@ bool ClassDecl::isRootDefaultActor(ModuleDecl *M,
 }
 
 bool ClassDecl::isNativeNSObjectSubclass() const {
-  // Only if we inherit from NSObject.
-  auto superclass = getSuperclassDecl();
-  if (!superclass || !superclass->isNSObject())
-    return false;
+  // @objc actors implicitly inherit from NSObject.
+  if (isActor() && getAttrs().hasAttribute<ObjCAttr>())
+    return true;
 
-  // For now, only actors (regardless of whether they're default actors).
-  // Eventually we should roll this out to more classes, but we have to
-  // do it with ABI compatibility.
-  return isActor();
+  // For now, non-actor classes cannot use the native NSObject subclass.
+  // Eventually we should roll this out to more classes that directly
+  // inherit NSObject, but we have to do it with ABI compatibility.
+  return false;
 }
 
 bool ClassDecl::isNSObject() const {
@@ -8202,6 +8376,7 @@ ActorIsolation swift::getActorIsolationOfContext(DeclContext *dc) {
       auto selfDecl = isolation.getActorInstance();
       auto actorClass = selfDecl->getType()->getRValueType()
           ->getClassOrBoundGenericClass();
+      // FIXME: Doesn't work properly with generics
       assert(actorClass && "Bad closure actor isolation?");
       return ActorIsolation::forActorInstance(actorClass);
     }
@@ -8342,7 +8517,7 @@ void swift::simple_display(llvm::raw_ostream &out, AccessorKind kind) {
 }
 
 SourceLoc swift::extractNearestSourceLoc(const Decl *decl) {
-  auto loc = decl->getLoc();
+  auto loc = decl->getLoc(/*SerializedOK=*/false);
   if (loc.isValid())
     return loc;
 

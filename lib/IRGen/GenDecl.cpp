@@ -85,7 +85,7 @@ llvm::cl::opt<bool> UseBasicDynamicReplacement(
     llvm::cl::desc("Basic implementation of dynamic replacement"));
 
 namespace {
-  
+
 /// Add methods, properties, and protocol conformances from a JITed extension
 /// to an ObjC class using the ObjC runtime.
 ///
@@ -119,8 +119,8 @@ public:
                                              /*allow uninitialized*/ false);
     classMetadata = Builder.CreateBitCast(classMetadata, IGM.ObjCClassPtrTy);
     metaclassMetadata = IGM.getAddrOfMetaclassObject(
-                                       origTy.getClassOrBoundGenericClass(),
-                                                         NotForDefinition);
+                          dyn_cast_or_null<ClassDecl>(origTy->getAnyNominal()),
+                          NotForDefinition);
     metaclassMetadata = llvm::ConstantExpr::getBitCast(metaclassMetadata,
                                                    IGM.ObjCClassPtrTy);
 
@@ -485,6 +485,9 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
       if (libraryName == "swiftCompatibilityDynamicReplacements") {
         compatibilityVersion = IRGen.Opts.
             AutolinkRuntimeCompatibilityDynamicReplacementLibraryVersion;
+      } else if (libraryName == "swiftCompatibilityConcurrency") {
+        compatibilityVersion =
+            IRGen.Opts.AutolinkRuntimeCompatibilityConcurrencyLibraryVersion;
       } else {
         compatibilityVersion = IRGen.Opts.
             AutolinkRuntimeCompatibilityLibraryVersion;
@@ -585,8 +588,7 @@ void IRGenModule::emitRuntimeRegistration() {
   if (SwiftProtocols.empty() && ProtocolConformances.empty() &&
       RuntimeResolvableTypes.empty() &&
       (!ObjCInterop || (ObjCProtocols.empty() && ObjCClasses.empty() &&
-                        ObjCCategoryDecls.empty())) &&
-      FieldDescriptors.empty())
+                        ObjCCategoryDecls.empty())))
     return;
   
   // Find the entry point.
@@ -746,10 +748,6 @@ void IRGenModule::emitRuntimeRegistration() {
     for (ExtensionDecl *ext : ObjCCategoryDecls) {
       CategoryInitializerVisitor(RegIGF, ext).visitMembers(ext);
     }
-  }
-
-  if (!FieldDescriptors.empty()) {
-    emitFieldDescriptors();
   }
 
   RegIGF.Builder.CreateRetVoid();
@@ -2055,13 +2053,20 @@ LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo,
                        const LinkEntity &entity,
                        ForDefinition_t isDefinition) {
   LinkInfo result;
+  entity.mangle(result.Name);
 
   bool isKnownLocal = entity.isAlwaysSharedLinkage();
-  if (const auto *DC = entity.getDeclContextForEmission())
+  if (const auto *DC = entity.getDeclContextForEmission()) {
     if (const auto *MD = DC->getParentModule())
       isKnownLocal = MD == swiftModule || MD->isStaticLibrary();
+  } else if (entity.hasSILFunction()) {
+    // SIL serialized entitites (functions, witness tables, vtables) do not have
+    // an associated DeclContext and are serialized into the current module.  As
+    // a result, we explicitly handle SIL Functions here. We do not expect other
+    // types to be referenced directly.
+    isKnownLocal = entity.getSILFunction()->isStaticallyLinked();
+  }
 
-  entity.mangle(result.Name);
   bool weakImported = entity.isWeakImported(swiftModule);
   result.IRL = getIRLinkage(linkInfo, entity.getLinkage(isDefinition),
                             isDefinition, weakImported, isKnownLocal);
@@ -2648,7 +2653,9 @@ void IRGenModule::createReplaceableProlog(IRGenFunction &IGF, SILFunction *f) {
         asyncFnPtr.getAuthInfo().getCorrespondingCodeAuthInfo();
     auto newFnPtr = FunctionPointer(
         FunctionPointer::Kind::Function, asyncFnPtr.getPointer(IGF),
-        codeAuthInfo, Signature::forAsyncAwait(IGM, silFunctionType));
+        codeAuthInfo,
+        Signature::forAsyncAwait(IGM, silFunctionType,
+                                 /*useSpecialConvention*/ false));
     SmallVector<llvm::Value *, 16> forwardedArgs;
     for (auto &arg : IGF.CurFn->args())
       forwardedArgs.push_back(&arg);
@@ -2955,6 +2962,10 @@ void IRGenModule::emitDynamicReplacementOriginalFunctionThunk(SILFunction *f) {
       FunctionPointer(fnType, typeFnPtr, authInfo, signature)
           .getAsFunction(IGF),
       forwardedArgs);
+  Res->setTailCall();
+  if (f->isAsync()) {
+    Res->setTailCallKind(IGF.IGM.AsyncTailCallKind);
+  }
 
   if (implFn->getReturnType()->isVoidTy())
     IGF.Builder.CreateRetVoid();
@@ -3103,8 +3114,9 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
              isLazilyEmittedFunction(*f, getSILModule())) {
     IRGen.addLazyFunction(f);
   }
-
-  Signature signature = getSignature(f->getLoweredFunctionType());
+  auto fpKind = irgen::classifyFunctionPointerKind(f);
+  Signature signature =
+      getSignature(f->getLoweredFunctionType(), fpKind.useSpecialConvention());
   addLLVMFunctionAttributes(f, signature);
 
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
@@ -3808,58 +3820,6 @@ llvm::Constant *IRGenModule::emitTypeMetadataRecords() {
   auto initializer = llvm::ConstantArray::get(arrayTy, elts);
 
   var->setInitializer(initializer);
-  var->setSection(sectionName);
-  var->setAlignment(llvm::MaybeAlign(4));
-
-  disableAddressSanitizer(*this, var);
-  
-  addUsedGlobal(var);
-  return var;
-}
-
-llvm::Constant *IRGenModule::emitFieldDescriptors() {
-  std::string sectionName;
-  switch (TargetInfo.OutputObjectFormat) {
-  case llvm::Triple::MachO:
-    sectionName = "__TEXT, __swift5_fieldmd, regular, no_dead_strip";
-    break;
-  case llvm::Triple::ELF:
-  case llvm::Triple::Wasm:
-    sectionName = "swift5_fieldmd";
-    break;
-  case llvm::Triple::XCOFF:
-  case llvm::Triple::COFF:
-    sectionName = ".sw5flmd$B";
-    break;
-  case llvm::Triple::GOFF:
-  case llvm::Triple::UnknownObjectFormat:
-    llvm_unreachable("Don't know how to emit field records table for "
-                     "the selected object format.");
-  }
-
-  // Do nothing if the list is empty.
-  if (FieldDescriptors.empty())
-    return nullptr;
-
-  // Define the global variable for the field record list.
-  // We have to do this before defining the initializer since the entries will
-  // contain offsets relative to themselves.
-  auto arrayTy =
-      llvm::ArrayType::get(FieldDescriptorPtrTy, FieldDescriptors.size());
-
-  // FIXME: This needs to be a linker-local symbol in order for Darwin ld to
-  // resolve relocations relative to it.
-  auto var = new llvm::GlobalVariable(
-      Module, arrayTy,
-      /*isConstant*/ true, llvm::GlobalValue::PrivateLinkage,
-      /*initializer*/ nullptr, "\x01l_type_metadata_table");
-
-  SmallVector<llvm::Constant *, 8> elts;
-  for (auto *descriptor : FieldDescriptors)
-    elts.push_back(
-        llvm::ConstantExpr::getBitCast(descriptor, FieldDescriptorPtrTy));
-
-  var->setInitializer(llvm::ConstantArray::get(arrayTy, elts));
   var->setSection(sectionName);
   var->setAlignment(llvm::MaybeAlign(4));
 

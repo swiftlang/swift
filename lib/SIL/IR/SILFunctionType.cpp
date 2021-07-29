@@ -23,7 +23,6 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/ForeignInfo.h"
 #include "swift/AST/GenericEnvironment.h"
-#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -1300,7 +1299,7 @@ public:
     
     // Extract structural substitutions.
     if (origContextType->hasTypeParameter()) {
-      origContextType = origSig->getGenericEnvironment()
+      origContextType = origSig.getGenericEnvironment()
         ->mapTypeIntoContext(origContextType)
         ->getCanonicalType();
     }
@@ -1675,25 +1674,9 @@ private:
         || NextOrigParamIndex != Foreign.Async->completionHandlerParamIndex())
       return false;
     
-    auto nativeCHTy = Foreign.Async->completionHandlerType();
-
-    // Use the abstraction pattern we're lowering against in order to lower
-    // the completion handler type, so we can preserve C/ObjC distinctions that
-    // normally get abstracted away by the importer.
-    auto completionHandlerNativeOrigTy = TopLevelOrigType
-      .getObjCMethodAsyncCompletionHandlerType(nativeCHTy);
-    
-    // Bridge the Swift completion handler type back to its
-    // foreign representation.
-    auto foreignCHTy = TC.getLoweredBridgedType(completionHandlerNativeOrigTy,
-                                      nativeCHTy,
-                                      Bridgeability::Full,
-                                      SILFunctionTypeRepresentation::ObjCMethod,
-                                      TypeConverter::ForArgument)
-      ->getCanonicalType();
-    
-    auto completionHandlerOrigTy = TopLevelOrigType
-      .getObjCMethodAsyncCompletionHandlerType(foreignCHTy);
+    CanType foreignCHTy = TopLevelOrigType
+      .getObjCMethodAsyncCompletionHandlerForeignType(Foreign.Async.getValue(), TC);
+    auto completionHandlerOrigTy = TopLevelOrigType.getObjCMethodAsyncCompletionHandlerType(foreignCHTy);
     auto completionHandlerTy = TC.getLoweredType(completionHandlerOrigTy,
                                                  foreignCHTy, expansion)
       .getASTType();
@@ -1767,7 +1750,7 @@ static bool isPseudogeneric(SILDeclRef c) {
   if (!dc) return false;
 
   auto classDecl = dc->getSelfClassDecl();
-  return (classDecl && classDecl->usesObjCGenericsModel());
+  return (classDecl && classDecl->isTypeErasedGenericClass());
 }
 
 /// Update the result type given the foreign error convention that we will be
@@ -1988,6 +1971,7 @@ static void destructureYieldsForCoroutine(TypeConverter &TC,
                                           Optional<SILDeclRef> origConstant,
                                           Optional<SILDeclRef> constant,
                                           Optional<SubstitutionMap> reqtSubs,
+                                          Optional<GenericSignature> genericSig,
                                           SmallVectorImpl<SILYieldInfo> &yields,
                                           SILCoroutineKind &coroutineKind,
                                           SubstFunctionTypeCollector &subst) {
@@ -2012,12 +1996,14 @@ static void destructureYieldsForCoroutine(TypeConverter &TC,
 
   auto storage = accessor->getStorage();
   auto valueType = storage->getValueInterfaceType();
+
   if (reqtSubs) {
     valueType = valueType.subst(*reqtSubs);
   }
 
-  auto canValueType = valueType->getCanonicalType(
-    accessor->getGenericSignature());
+  auto canValueType = (genericSig
+                       ? valueType->getCanonicalType(*genericSig)
+                       : valueType->getCanonicalType());
 
   // 'modify' yields an inout of the target type.
   if (accessor->getAccessorKind() == AccessorKind::Modify) {
@@ -2178,7 +2164,8 @@ static CanSILFunctionType getSILFunctionType(
   SILCoroutineKind coroutineKind = SILCoroutineKind::None;
   SmallVector<SILYieldInfo, 8> yields;
   destructureYieldsForCoroutine(TC, expansionContext, origConstant, constant,
-                                reqtSubs, yields, coroutineKind, subst);
+                                reqtSubs, genericSig, yields, coroutineKind,
+                                subst);
   
   // Destructure the result tuple type.
   SmallVector<SILResultInfo, 8> results;
@@ -2512,6 +2499,9 @@ static CanSILFunctionType getNativeSILFunctionType(
           DefaultConventions(NormalParameterConvention::Guaranteed));
     case SILDeclRef::Kind::Deallocator:
       return getSILFunctionTypeForConventions(DeallocatorConventions());
+
+    case SILDeclRef::Kind::EntryPoint:
+      llvm_unreachable("Handled by getSILFunctionTypeForAbstractCFunction");
     }
   }
   }
@@ -3038,6 +3028,7 @@ static ObjCSelectorFamily getObjCSelectorFamily(SILDeclRef c) {
   case SILDeclRef::Kind::StoredPropertyInitializer:
   case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
   case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
+  case SILDeclRef::Kind::EntryPoint:
     llvm_unreachable("Unexpected Kind of foreign SILDeclRef");
   }
 
@@ -3262,19 +3253,21 @@ TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
   }
 
   // Anonymous functions currently always have Freestanding CC.
-  if (!c.hasDecl())
+  if (c.getAbstractClosureExpr())
     return SILFunctionTypeRepresentation::Thin;
 
   // FIXME: Assert that there is a native entry point
   // available. There's no great way to do this.
 
   // Protocol witnesses are called using the witness calling convention.
-  if (auto proto = dyn_cast<ProtocolDecl>(c.getDecl()->getDeclContext())) {
-    // Use the regular method convention for foreign-to-native thunks.
-    if (c.isForeignToNativeThunk())
-      return SILFunctionTypeRepresentation::Method;
-    assert(!c.isNativeToForeignThunk() && "shouldn't be possible");
-    return getProtocolWitnessRepresentation(proto);
+  if (c.hasDecl()) {
+    if (auto proto = dyn_cast<ProtocolDecl>(c.getDecl()->getDeclContext())) {
+      // Use the regular method convention for foreign-to-native thunks.
+      if (c.isForeignToNativeThunk())
+        return SILFunctionTypeRepresentation::Method;
+      assert(!c.isNativeToForeignThunk() && "shouldn't be possible");
+      return getProtocolWitnessRepresentation(proto);
+    }
   }
 
   switch (c.kind) {
@@ -3298,6 +3291,9 @@ TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
     case SILDeclRef::Kind::IVarInitializer:
     case SILDeclRef::Kind::IVarDestroyer:
       return SILFunctionTypeRepresentation::Method;
+
+    case SILDeclRef::Kind::EntryPoint:
+      return SILFunctionTypeRepresentation::CFunctionPointer;
   }
 
   llvm_unreachable("Unhandled SILDeclRefKind in switch.");
@@ -4125,6 +4121,7 @@ static AbstractFunctionDecl *getBridgedFunction(SILDeclRef declRef) {
   case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
   case SILDeclRef::Kind::IVarInitializer:
   case SILDeclRef::Kind::IVarDestroyer:
+  case SILDeclRef::Kind::EntryPoint:
     return nullptr;
   }
   llvm_unreachable("bad SILDeclRef kind");
@@ -4294,6 +4291,11 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
     extInfo = extInfo.withThrows(true);
   if (innerExtInfo.isAsync())
     extInfo = extInfo.withAsync(true);
+
+  // Distributed thunks are always `async throws`
+  if (constant.isDistributedThunk()) {
+    extInfo = extInfo.withAsync(true).withThrows(true);
+  }
 
   // If this is a C++ constructor, don't add the metatype "self" parameter
   // because we'll never use it and it will cause problems in IRGen.

@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-parse-as-library -Xfrontend -enable-copy-propagation -Xfrontend -enable-experimental-concurrency %import-libdispatch) | %FileCheck %s
+// RUN: %target-run-simple-swift(-parse-as-library -Xfrontend -enable-copy-propagation -Xfrontend -enable-experimental-concurrency -Xfrontend -disable-availability-checking %import-libdispatch) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -7,6 +7,21 @@
 // rdar://76038845
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
+
+struct Container {
+    @MainActor static var counter: Int = 10
+    @MainActor static var this: Container?
+
+    var noniso: Int = 20
+
+    static func getCount() async -> Int {
+        return await counter
+    }
+
+    static func getValue() async -> Int? {
+        return await this?.noniso
+    }
+}
 
 @propertyWrapper
 struct SuccessTracker {
@@ -142,6 +157,13 @@ actor Tester {
         print("done property wrapper test")
         return true
     }
+
+    func doContainerTest() async -> Bool {
+        var total: Int = 0
+        total += await Container.getCount()
+        total += await Container.getValue() ?? 0
+        return total == 10
+    }
 }
 
 @globalActor
@@ -169,6 +191,10 @@ var expectedResult : Bool {
 
         guard await test.doPropertyWrapperTest() == success else {
             fatalError("fail property wrapper test")
+        }
+
+        guard await test.doContainerTest() == success else {
+            fatalError("fail container test")
         }
 
         // CHECK: done all testing

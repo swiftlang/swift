@@ -78,7 +78,8 @@ insertOwnedBaseValueAlongBranchEdge(BranchInst *bi, SILValue innerCopy,
   // argument.
   auto *phiArg =
       destBB->createPhiArgument(innerCopy->getType(), OwnershipKind::Owned);
-  addNewEdgeValueToBranch(bi, destBB, innerCopy, callbacks);
+  InstructionDeleter deleter(callbacks);
+  addNewEdgeValueToBranch(bi, destBB, innerCopy, deleter);
 
   // Grab our predecessor blocks, ignoring us, add to the branch edge an
   // undef corresponding to our value.
@@ -93,7 +94,7 @@ insertOwnedBaseValueAlongBranchEdge(BranchInst *bi, SILValue innerCopy,
       continue;
     addNewEdgeValueToBranch(
         predBlock->getTerminator(), destBB,
-        SILUndef::get(innerCopy->getType(), *destBB->getParent()), callbacks);
+        SILUndef::get(innerCopy->getType(), *destBB->getParent()), deleter);
   }
 
   return phiArg;
@@ -508,7 +509,7 @@ static void eliminateReborrowsOfRecursiveBorrows(
       // Otherwise, we have a reborrow. For now our reborrows must be
       // phis. Add our owned value as a new argument of that phi along our
       // edge and undef along all other edges.
-      auto borrowingOp = BorrowingOperand::get(use);
+      auto borrowingOp = BorrowingOperand(use);
       auto *brInst = cast<BranchInst>(borrowingOp.op->getUser());
       auto *newBorrowedPhi = brInst->getArgForOperand(*borrowingOp);
       auto *newBasePhi =
@@ -572,7 +573,7 @@ rewriteReborrows(SILValue newBorrowedValue,
       // Otherwise, we have a reborrow. For now our reborrows must be
       // phis. Add our owned value as a new argument of that phi along our
       // edge and undef along all other edges.
-      auto borrowingOp = BorrowingOperand::get(use);
+      auto borrowingOp = BorrowingOperand(use);
       auto *brInst = cast<BranchInst>(borrowingOp.op->getUser());
       auto *newBorrowedPhi = brInst->getArgForOperand(*borrowingOp);
       auto *newBasePhi =

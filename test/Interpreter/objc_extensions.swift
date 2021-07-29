@@ -62,3 +62,27 @@ let z: AnyObject = NSObject()
 
 // CHECK: 123
 print(z.sillyMethod())
+
+// Category on an ObjC generic class using a type-pinning parameter, including
+// a cast to an existential metatype
+@objc protocol CacheNameDefaulting {
+  static var defaultCacheName: String { get }
+}
+extension OuterClass.InnerClass: CacheNameDefaulting {
+  static var defaultCacheName: String { "InnerClasses" }
+}
+
+extension NSCache {
+  @objc convenience init(ofObjects objectTy: ObjectType.Type, forKeys keyTy: KeyType.Type) {
+    self.init()
+
+    if let defaultNameTy = objectTy as? CacheNameDefaulting.Type {
+      self.name = defaultNameTy.defaultCacheName
+    }
+  }
+}
+
+let cache = NSCache(ofObjects: OuterClass.InnerClass.self, forKeys: NSString.self)
+
+// CHECK: InnerClasses
+print(cache.name)

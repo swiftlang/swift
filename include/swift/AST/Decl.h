@@ -228,6 +228,9 @@ struct OverloadSignature {
   /// Whether this is a function.
   unsigned IsFunction : 1;
 
+  /// Whether this is an async function.
+  unsigned IsAsyncFunction : 1;
+
   /// Whether this is a enum element.
   unsigned IsEnumElement : 1;
 
@@ -249,8 +252,9 @@ struct OverloadSignature {
 
   OverloadSignature()
       : UnaryOperator(UnaryOperatorKind::None), IsInstanceMember(false),
-        IsVariable(false), IsFunction(false), InProtocolExtension(false),
-        InExtensionOfGenericType(false), HasOpaqueReturnType(false) { }
+        IsVariable(false), IsFunction(false), IsAsyncFunction(false),
+        InProtocolExtension(false), InExtensionOfGenericType(false),
+        HasOpaqueReturnType(false) { }
 };
 
 /// Determine whether two overload signatures conflict.
@@ -318,9 +322,12 @@ protected:
     Hoisted : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(PatternBindingDecl, Decl, 1+2+16,
+  SWIFT_INLINE_BITFIELD_FULL(PatternBindingDecl, Decl, 1+1+2+16,
     /// Whether this pattern binding declares static variables.
     IsStatic : 1,
+
+    /// Whether this pattern binding is synthesized by the debugger.
+    IsDebugger : 1,
 
     /// Whether 'static' or 'class' was used.
     StaticSpelling : 2,
@@ -1202,6 +1209,17 @@ public:
   }
 };
 
+/// An entry in the "inherited" list of a type or extension.
+struct InheritedEntry : public TypeLoc {
+  /// Whether there was an @unchecked attribute.
+  bool isUnchecked = false;
+
+  InheritedEntry(const TypeLoc &typeLoc);
+
+  InheritedEntry(const TypeLoc &typeLoc, bool isUnchecked)
+    : TypeLoc(typeLoc), isUnchecked(isUnchecked) { }
+};
+
 /// ExtensionDecl - This represents a type extension containing methods
 /// associated with the type.  This is not a ValueDecl and has no Type because
 /// there are no runtime values of the Extension's type.  
@@ -1220,7 +1238,7 @@ class ExtensionDecl final : public GenericContext, public Decl,
   /// extended nominal.
   llvm::PointerIntPair<NominalTypeDecl *, 1, bool> ExtendedNominal;
 
-  ArrayRef<TypeLoc> Inherited;
+  ArrayRef<InheritedEntry> Inherited;
 
   /// The next extension in the linked list of extensions.
   ///
@@ -1239,7 +1257,7 @@ class ExtensionDecl final : public GenericContext, public Decl,
   friend class IterableDeclContext;
 
   ExtensionDecl(SourceLoc extensionLoc, TypeRepr *extendedType,
-                ArrayRef<TypeLoc> inherited,
+                ArrayRef<InheritedEntry> inherited,
                 DeclContext *parent,
                 TrailingWhereClause *trailingWhereClause);
 
@@ -1264,7 +1282,7 @@ public:
   /// Create a new extension declaration.
   static ExtensionDecl *create(ASTContext &ctx, SourceLoc extensionLoc,
                                TypeRepr *extendedType,
-                               ArrayRef<TypeLoc> inherited,
+                               ArrayRef<InheritedEntry> inherited,
                                DeclContext *parent,
                                TrailingWhereClause *trailingWhereClause,
                                ClangNode clangNode = ClangNode());
@@ -1312,13 +1330,16 @@ public:
   bool alreadyBoundToNominal() const { return NextExtension.getInt(); }
 
   /// Retrieve the extended type definition as written in the source, if it exists.
+  ///
+  /// Repr would not be available if the extension was been loaded
+  /// from a serialized module.
   TypeRepr *getExtendedTypeRepr() const { return ExtendedTypeRepr; }
                               
   /// Retrieve the set of protocols that this type inherits (i.e,
   /// explicitly conforms to).
-  ArrayRef<TypeLoc> getInherited() const { return Inherited; }
+  ArrayRef<InheritedEntry> getInherited() const { return Inherited; }
 
-  void setInherited(ArrayRef<TypeLoc> i) { Inherited = i; }
+  void setInherited(ArrayRef<InheritedEntry> i) { Inherited = i; }
 
   bool hasDefaultAccessLevel() const {
     return Bits.ExtensionDecl.DefaultAndMaxAccessLevel != 0;
@@ -1471,9 +1492,10 @@ class PatternBindingEntry {
   enum class PatternFlags {
     IsText = 1 << 0,
     IsFullyValidated = 1 << 1,
+    IsFromDebugger = 1 << 2,
   };
   /// The initializer context used for this pattern binding entry.
-  llvm::PointerIntPair<DeclContext *, 2, OptionSet<PatternFlags>>
+  llvm::PointerIntPair<DeclContext *, 3, OptionSet<PatternFlags>>
       InitContextAndFlags;
 
   /// Values captured by this initializer.
@@ -1499,6 +1521,14 @@ private:
   void setFullyValidated() {
     InitContextAndFlags.setInt(InitContextAndFlags.getInt() |
                                PatternFlags::IsFullyValidated);
+  }
+
+  /// Set if this pattern binding came from the debugger.
+  ///
+  /// Stay away unless you are \c PatternBindingDecl::createForDebugger
+  void setFromDebugger() {
+    InitContextAndFlags.setInt(InitContextAndFlags.getInt() |
+                               PatternFlags::IsFromDebugger);
   }
 
 public:
@@ -1581,6 +1611,11 @@ private:
   }
   void setInitializerSubsumed() {
     PatternAndFlags.setInt(PatternAndFlags.getInt() | Flags::Subsumed);
+  }
+
+  /// Returns \c true if the debugger created this pattern binding entry.
+  bool isFromDebugger() const {
+    return InitContextAndFlags.getInt().contains(PatternFlags::IsFromDebugger);
   }
 
   // Return the first variable initialized by this pattern.
@@ -1667,6 +1702,13 @@ public:
                                SourceLoc VarLoc,
                                unsigned NumPatternEntries,
                                DeclContext *Parent);
+
+  // A dedicated entrypoint that allows LLDB to create pattern bindings
+  // that look implicit to the compiler but contain user code.
+  static PatternBindingDecl *createForDebugger(ASTContext &Ctx,
+                                               StaticSpellingKind Spelling,
+                                               Pattern *Pat, Expr *E,
+                                               DeclContext *Parent);
 
   SourceLoc getStartLoc() const {
     return StaticLoc.isValid() ? StaticLoc : VarLoc;
@@ -1868,6 +1910,9 @@ public:
                                         SmallVectorImpl<char> &scratch) const {
     return getPatternList()[i].getInitStringRepresentation(scratch);
   }
+
+  /// Returns \c true if this pattern binding was created by the debugger.
+  bool isDebuggerBinding() const { return Bits.PatternBindingDecl.IsDebugger; }
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::PatternBinding;
@@ -2340,11 +2385,17 @@ public:
   /// Note whether this declaration is known to be exposed to Objective-C.
   void setIsObjC(bool Value);
 
+  /// Is this declaration semantically 'final', meaning that the type checker
+  /// should treat it as final even if the ABI does not?
+  bool isSemanticallyFinal() const;
+
   /// Is this declaration 'final'?
   bool isFinal() const;
 
   /// Is this declaration marked with 'dynamic'?
   bool isDynamic() const;
+
+  bool isDistributedActorIndependent() const;
 
 private:
   bool isObjCDynamic() const {
@@ -2498,12 +2549,12 @@ public:
 
 /// This is a common base class for declarations which declare a type.
 class TypeDecl : public ValueDecl {
-  ArrayRef<TypeLoc> Inherited;
+  ArrayRef<InheritedEntry> Inherited;
 
 protected:
   TypeDecl(DeclKind K, llvm::PointerUnion<DeclContext *, ASTContext *> context,
            Identifier name, SourceLoc NameLoc,
-           ArrayRef<TypeLoc> inherited) :
+           ArrayRef<InheritedEntry> inherited) :
     ValueDecl(K, context, name, NameLoc), Inherited(inherited) {}
 
 public:
@@ -2521,9 +2572,9 @@ public:
 
   /// Retrieve the set of protocols that this type inherits (i.e,
   /// explicitly conforms to).
-  ArrayRef<TypeLoc> getInherited() const { return Inherited; }
+  ArrayRef<InheritedEntry> getInherited() const { return Inherited; }
 
-  void setInherited(ArrayRef<TypeLoc> i) { Inherited = i; }
+  void setInherited(ArrayRef<InheritedEntry> i) { Inherited = i; }
 
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_TypeDecl &&
@@ -2548,7 +2599,7 @@ class GenericTypeDecl : public GenericContext, public TypeDecl {
 public:
   GenericTypeDecl(DeclKind K, DeclContext *DC,
                   Identifier name, SourceLoc nameLoc,
-                  ArrayRef<TypeLoc> inherited,
+                  ArrayRef<InheritedEntry> inherited,
                   GenericParamList *GenericParams);
 
   // Resolve ambiguity due to multiple base classes.
@@ -3075,7 +3126,7 @@ protected:
 
   NominalTypeDecl(DeclKind K, DeclContext *DC, Identifier name,
                   SourceLoc NameLoc,
-                  ArrayRef<TypeLoc> inherited,
+                  ArrayRef<InheritedEntry> inherited,
                   GenericParamList *GenericParams) :
     GenericTypeDecl(K, DC, name, NameLoc, inherited, GenericParams),
     IterableDeclContext(IterableDeclContextKind::NominalTypeDecl)
@@ -3164,6 +3215,11 @@ public:
                                           OptionSet<LookupDirectFlags> flags =
                                           OptionSet<LookupDirectFlags>());
 
+  /// Find the '_remote_<...>' counterpart function to a 'distributed func'.
+  ///
+  /// If the passed in function is not distributed this function returns null.
+  AbstractFunctionDecl* lookupDirectRemoteFunc(AbstractFunctionDecl *func);
+
   /// Collect the set of protocols to which this type should implicitly
   /// conform, such as AnyObject (for classes).
   void getImplicitProtocols(SmallVectorImpl<ProtocolDecl *> &protocols);
@@ -3220,6 +3276,13 @@ public:
   /// `Actor` protocol.
   bool isActor() const;
 
+  /// Whether this nominal type qualifies as a distributed actor, meaning that
+  /// it is either a distributed actor.
+  bool isDistributedActor() const;
+
+  /// Whether this nominal type qualifies as any actor (plain or distributed).
+  bool isAnyActor() const;
+
   /// Return the range of semantics attributes attached to this NominalTypeDecl.
   auto getSemanticsAttrs() const
       -> decltype(getAttrs().getSemanticsAttrs()) {
@@ -3228,6 +3291,12 @@ public:
 
   bool hasSemanticsAttr(StringRef attrValue) const {
     return getAttrs().hasSemanticsAttr(attrValue);
+  }
+
+  /// Returns true if we should emit assembly vision remarks on all methods of
+  /// this nominal type.
+  bool shouldEmitAssemblyVisionRemarksOnMethods() const {
+    return getAttrs().hasAttribute<EmitAssemblyVisionRemarksAttr>();
   }
 
   /// Whether this declaration has a synthesized memberwise initializer.
@@ -3287,6 +3356,8 @@ public:
   /// \returns the static 'shared' property for a global actor, or \c nullptr
   /// for types that are not global actors.
   VarDecl *getGlobalActorInstance() const;
+
+  bool hasDistributedActorLocalInitializer() const;
 
   /// Whether this type is a global actor, which can be used as an
   /// attribute to decorate declarations for inclusion in the actor-isolated
@@ -3354,7 +3425,7 @@ class EnumDecl final : public NominalTypeDecl {
 
 public:
   EnumDecl(SourceLoc EnumLoc, Identifier Name, SourceLoc NameLoc,
-            ArrayRef<TypeLoc> Inherited,
+            ArrayRef<InheritedEntry> Inherited,
             GenericParamList *GenericParams, DeclContext *DC);
 
   SourceLoc getStartLoc() const { return EnumLoc; }
@@ -3522,7 +3593,7 @@ class StructDecl final : public NominalTypeDecl {
 
 public:
   StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
-             ArrayRef<TypeLoc> Inherited,
+             ArrayRef<InheritedEntry> Inherited,
              GenericParamList *GenericParams, DeclContext *DC);
 
   SourceLoc getStartLoc() const { return StructLoc; }
@@ -3668,7 +3739,7 @@ class ClassDecl final : public NominalTypeDecl {
 
 public:
   ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
-            ArrayRef<TypeLoc> Inherited,
+            ArrayRef<InheritedEntry> Inherited,
             GenericParamList *GenericParams, DeclContext *DC,
             bool isActor);
 
@@ -3771,6 +3842,12 @@ public:
 
   /// Whether the class was explicitly declared with the `actor` keyword.
   bool isExplicitActor() const { return Bits.ClassDecl.IsActor; }
+
+  /// Whether the class was explicitly declared with the `distributed actor` keywords.
+  bool isExplicitDistributedActor() const {
+    return isExplicitActor() &&
+           getAttrs().hasAttribute<DistributedActorAttr>();
+  }
 
   /// Get the closest-to-root superclass that's an actor class.
   const ClassDecl *getRootActorClass() const;
@@ -3902,7 +3979,7 @@ public:
   /// Returns true if the decl uses the Objective-C generics model.
   ///
   /// This is true of imported Objective-C classes.
-  bool usesObjCGenericsModel() const {
+  bool isTypeErasedGenericClass() const {
     return hasClangNode() && isGenericContext() && isObjC();
   }
   
@@ -4003,6 +4080,7 @@ enum class KnownDerivableProtocolKind : uint8_t {
   AdditiveArithmetic,
   Differentiable,
   Actor,
+  DistributedActor,
 };
 
 /// ProtocolDecl - A declaration of a protocol, for example:
@@ -4096,7 +4174,7 @@ class ProtocolDecl final : public NominalTypeDecl {
   
 public:
   ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc, SourceLoc NameLoc,
-               Identifier Name, ArrayRef<TypeLoc> Inherited,
+               Identifier Name, ArrayRef<InheritedEntry> Inherited,
                TrailingWhereClause *TrailingWhere);
 
   using Decl::getASTContext;
@@ -4195,6 +4273,10 @@ public:
   /// Determine whether this is a "marker" protocol, meaning that is indicates
   /// semantics but has no corresponding witness table.
   bool isMarkerProtocol() const;
+
+  /// Is a protocol that can only be conformed by distributed actors.
+  /// Such protocols are allowed to contain distributed functions.
+  bool inheritsFromDistributedActor() const;
 
 private:
   void computeKnownProtocolKind() const;
@@ -4714,6 +4796,8 @@ public:
 
   bool hasAnyNativeDynamicAccessors() const;
 
+  bool isDistributedActorIndependent() const;
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_AbstractStorageDecl &&
@@ -5170,7 +5254,7 @@ public:
     return getAttrs().getAttributes<SemanticsAttr>();
   }
 
-  /// Returns true if this VarDelc has the string \p attrValue as a semantics
+  /// Returns true if this VarDecl has the string \p attrValue as a semantics
   /// attribute.
   bool hasSemanticsAttr(StringRef attrValue) const {
     return llvm::any_of(getSemanticsAttrs(), [&](const SemanticsAttr *attr) {
@@ -5203,7 +5287,7 @@ class ParamDecl : public VarDecl {
 
   TypeRepr *TyRepr = nullptr;
 
-  struct StoredDefaultArgument {
+  struct alignas(1 << DeclAlignInBits) StoredDefaultArgument {
     PointerUnion<Expr *, VarDecl *> DefaultArg;
 
     /// Stores the context for the default argument as well as a bit to
@@ -5224,10 +5308,13 @@ class ParamDecl : public VarDecl {
 
     /// Whether or not this parameter is `@autoclosure`.
     IsAutoClosure = 1 << 1,
+
+    /// Whether or not this parameter is 'isolated'.
+    IsIsolated = 1 << 2,
   };
 
   /// The default value, if any, along with flags.
-  llvm::PointerIntPair<StoredDefaultArgument *, 2, OptionSet<Flags>>
+  llvm::PointerIntPair<StoredDefaultArgument *, 3, OptionSet<Flags>>
       DefaultValueAndFlags;
 
   friend class ParamSpecifierRequest;
@@ -5239,7 +5326,10 @@ public:
 
   /// Create a new ParamDecl identical to the first except without the interface type.
   static ParamDecl *cloneWithoutType(const ASTContext &Ctx, ParamDecl *PD);
-  
+
+  /// Create a an identical copy of this ParamDecl.
+  static ParamDecl *clone(const ASTContext &Ctx, ParamDecl *PD);
+
   /// Retrieve the argument (API) name for this function parameter.
   Identifier getArgumentName() const {
     return ArgumentNameAndDestructured.getPointer();
@@ -5376,6 +5466,17 @@ public:
     auto flags = DefaultValueAndFlags.getInt();
     DefaultValueAndFlags.setInt(value ? flags | Flags::IsAutoClosure
                                       : flags - Flags::IsAutoClosure);
+  }
+
+  /// Whether or not this parameter is marked with 'isolated'.
+  bool isIsolated() const {
+    return DefaultValueAndFlags.getInt().contains(Flags::IsIsolated);
+  }
+
+  void setIsolated(bool value = true) {
+    auto flags = DefaultValueAndFlags.getInt();
+    DefaultValueAndFlags.setInt(value ? flags | Flags::IsIsolated
+                                      : flags - Flags::IsIsolated);
   }
 
   /// Does this parameter reject temporary pointer conversions?
@@ -5854,6 +5955,9 @@ public:
 
   /// Returns if the function is 'rethrows' or 'reasync'.
   bool hasPolymorphicEffect(EffectKind kind) const;
+
+  /// Returns 'true' if the function is distributed.
+  bool isDistributed() const;
 
   PolymorphicEffectKind getPolymorphicEffectKind(EffectKind kind) const;
 
@@ -6864,6 +6968,18 @@ public:
   /// \endcode
   bool isObjCZeroParameterWithLongSelector() const;
 
+  /// Checks if the initializer is a distributed actor's 'local' initializer:
+  /// ```
+  /// init(transport: ActorTransport)
+  /// ```
+  bool isDistributedActorLocalInit() const;
+
+  /// Checks if the initializer is a distributed actor's 'resolve' initializer:
+  /// ```
+  /// init(resolve address: ActorAddress, using transport: ActorTransport)
+  /// ```
+  bool isDistributedActorResolveInit() const;
+
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Constructor;
   }
@@ -7458,7 +7574,8 @@ inline bool Decl::isPotentiallyOverridable() const {
       isa<SubscriptDecl>(this) ||
       isa<FuncDecl>(this) ||
       isa<DestructorDecl>(this)) {
-    return getDeclContext()->getSelfClassDecl();
+    auto classDecl = getDeclContext()->getSelfClassDecl();
+    return classDecl && !classDecl->isActor();
   } else {
     return false;
   }

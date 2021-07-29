@@ -16,7 +16,7 @@ import Swift
 /// elements.
 ///
 /// An `AsyncSequence` resembles the `Sequence` type --- offering a list of
-/// values you can step through one at a time --- and adds asynchroncity. An
+/// values you can step through one at a time --- and adds asynchronicity. An
 /// `AsyncSequence` may have all, some, or none of its values available when
 /// you first use it. Instead, you use `await` to receive values as they become
 /// available.
@@ -74,14 +74,16 @@ import Swift
 @available(SwiftStdlib 5.5, *)
 @rethrows
 public protocol AsyncSequence {
-  /// The type of element produced by this asynchronous sequence.
+  /// The type of asynchronous iterator that produces elements of this
+  /// asynchronous sequence.
   associatedtype AsyncIterator: AsyncIteratorProtocol where AsyncIterator.Element == Element
+  /// The type of element produced by this asynchronous sequence.
+  associatedtype Element
   /// Creates the asynchronous iterator that produces elements of this
   /// asynchronous sequence.
   ///
   /// - Returns: An instance of the `AsyncIterator` type used to produce
   /// elements of the asynchronous sequence.
-  associatedtype Element
   __consuming func makeAsyncIterator() -> AsyncIterator
 }
 

@@ -34,7 +34,6 @@ add_swift_unittest(SwiftBasicTests
   TransformRangeTest.cpp
   TypeLookupError.cpp
   UnicodeTest.cpp
-  ValueEnumeratorTest.cpp
   ${generated_tests}
   )
 

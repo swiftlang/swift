@@ -57,6 +57,13 @@ typedef void (^CompletionHandler)(NSString * _Nullable, NSString * _Nullable_res
 // rdar://73798726
 - (void)getSomeObjectWithCompletionHandler:(nullable void (^)(NSObject *_Nullable x, NSError *_Nullable error))handler;
 
+- (void)performVoid2VoidWithCompletion:(void (^ _Nonnull)(void (^ _Nonnull)(void)))completion;
+- (void)performId2VoidWithCompletion:(void (^ _Nonnull)(void (^ _Nonnull)(id _Nonnull)))completion;
+- (void)performId2IdWithCompletion:(void (^ _Nonnull)(id _Nonnull (^ _Nonnull)(id _Nonnull)))completion;
+- (void)performNSString2NSStringWithCompletion:(void (^ _Nonnull)(NSString * _Nonnull (^ _Nonnull)(NSString * _Nonnull)))completion;
+- (void)performNSString2NSStringNSStringWithCompletion:(void (^ _Nonnull)(NSString * _Nonnull (^ _Nonnull)(NSString * _Nonnull), NSString * _Nonnull))completion;
+- (void)performId2VoidId2VoidWithCompletion:(void (^ _Nonnull)(void (^ _Nonnull)(id _Nonnull), void (^ _Nonnull)(id _Nonnull)))completion;
+
 -(void)oldAPIWithCompletionHandler:(void (^ _Nonnull)(NSString *_Nullable, NSError *_Nullable))handler __attribute__((availability(macosx, deprecated=10.14)));
 
 -(void)someAsyncMethodWithBlock:(void (^ _Nonnull)(NSString *_Nullable, NSError *_Nullable))completionHandler;
@@ -96,6 +103,7 @@ typedef void (^CompletionHandler)(NSString * _Nullable, NSString * _Nullable_res
 
 @protocol ProtocolWithSwiftAttributes
 -(void)independentMethod __attribute__((__swift_attr__("@actorIndependent")));
+-(void)nonisolatedMethod __attribute__((__swift_attr__("nonisolated")));
 -(void)mainActorMethod __attribute__((__swift_attr__("@MainActor")));
 -(void)uiActorMethod __attribute__((__swift_attr__("@UIActor")));
 

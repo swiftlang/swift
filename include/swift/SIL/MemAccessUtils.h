@@ -464,6 +464,7 @@ public:
     case AccessedStorage::Tail:
       return getObject();
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Visit all access roots. If any roots are visited then the original memory

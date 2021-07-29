@@ -288,12 +288,6 @@ ERROR(batch_scan_input_file_corrupted,none,
       "batch dependencies scan input file from %0 is malformed",
       (StringRef))
 
-REMARK(default_previous_install_name, none,
-      "default previous install name for %0 is %1", (StringRef, StringRef))
-
-REMARK(platform_previous_install_name, none,
-       "previous install name for %0 in %1 is %2", (StringRef, StringRef, StringRef))
-
 ERROR(unknown_platform_name, none,
       "unkown platform name %0", (StringRef))
 
@@ -371,6 +365,11 @@ WARNING(warning_module_shadowing_may_break_module_interface,none,
         /*shadowedModule=*/ModuleDecl *, /*interfaceModule*/ModuleDecl *))
 REMARK(rebuilding_module_from_interface,none,
        "rebuilding module '%0' from interface '%1'", (StringRef, StringRef))
+REMARK(rebuilding_stdlib_from_interface,none,
+       "did not find a prebuilt standard library for target '%0' compatible "
+       "with this Swift compiler; building it may take a few minutes, but it "
+       "should only happen once for this combination of compiler and target",
+       (StringRef))
 NOTE(sdk_version_pbm_version,none,
      "SDK build version is '%0'; prebuilt modules were "
      "built using SDK build version: '%1'", (StringRef, StringRef))

@@ -82,6 +82,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "ExecutorBreadcrumb.h"
 #include "Initialization.h"
 #include "LValue.h"
 #include "RValue.h"
@@ -2941,6 +2942,16 @@ static void buildThunkBody(SILGenFunction &SGF, SILLocation loc,
   assert(!fnType->isPolymorphic());
   auto argTypes = fnType->getParameters();
 
+  // If the input is synchronous and global-actor-qualified, and the
+  // output is asynchronous, hop to the executor expected by the input.
+  ExecutorBreadcrumb prevExecutor;
+  if (outputSubstType->isAsync() && !inputSubstType->isAsync()) {
+    if (Type globalActor = inputSubstType->getGlobalActor()) {
+      prevExecutor = SGF.emitHopToTargetActor(
+          loc, ActorIsolation::forGlobalActor(globalActor, false), None);
+    }
+  }
+
   // Translate the argument values.  Function parameters are
   // contravariant: we want to switch the direction of transformation
   // on them by flipping inputOrigType and outputOrigType.
@@ -2983,6 +2994,9 @@ static void buildThunkBody(SILGenFunction &SGF, SILLocation loc,
 
   // Reabstract the result.
   SILValue outerResult = resultPlanner.execute(innerResult);
+
+  // If we hopped to the target's executor, then we need to hop back.
+  prevExecutor.emit(SGF, loc);
 
   scope.pop();
   SGF.B.createReturn(loc, outerResult);
@@ -3031,7 +3045,7 @@ buildThunkSignature(SILGenFunction &SGF,
     if (auto genericSig =
           SGF.F.getLoweredFunctionType()->getInvocationGenericSignature()) {
       baseGenericSig = genericSig;
-      depth = genericSig->getGenericParams().back()->getDepth() + 1;
+      depth = genericSig.getGenericParams().back()->getDepth() + 1;
     }
   }
 
@@ -3045,7 +3059,7 @@ buildThunkSignature(SILGenFunction &SGF,
       AbstractGenericSignatureRequest{
         baseGenericSig.getPointer(), { newGenericParam }, { newRequirement }},
       GenericSignature());
-  genericEnv = genericSig->getGenericEnvironment();
+  genericEnv = genericSig.getGenericEnvironment();
 
   newArchetype = genericEnv->mapTypeIntoContext(newGenericParam)
     ->castTo<ArchetypeType>();
@@ -3329,11 +3343,20 @@ static ManagedValue createThunk(SILGenFunction &SGF,
                                       genericEnv,
                                       interfaceSubs,
                                       dynamicSelfType);
+  // An actor-isolated non-async function can be converted to an async function
+  // by inserting a hop to the global actor.
+  CanType globalActorForThunk;
+  if (outputSubstType->isAsync()
+      && !inputSubstType->isAsync()) {
+    globalActorForThunk = CanType(inputSubstType->getGlobalActor());
+  }
+  
   auto thunk = SGF.SGM.getOrCreateReabstractionThunk(
                                        thunkType,
                                        sourceType,
                                        toType,
-                                       dynamicSelfType);
+                                       dynamicSelfType,
+                                       globalActorForThunk);
 
   // Build it if necessary.
   if (thunk->empty()) {
@@ -3557,7 +3580,7 @@ SILGenFunction::createWithoutActuallyEscapingClosure(
       dynamicSelfType);
 
   auto *thunk = SGM.getOrCreateReabstractionThunk(
-      thunkType, noEscapingFnTy, escapingFnTy, dynamicSelfType);
+      thunkType, noEscapingFnTy, escapingFnTy, dynamicSelfType, CanType());
 
   if (thunk->empty()) {
     thunk->setWithoutActuallyEscapingThunk();
@@ -3661,7 +3684,7 @@ ManagedValue SILGenFunction::getThunkedAutoDiffLinearMap(
   // Otherwise, it is just a normal reabstraction thunk.
   else {
     name = mangler.mangleReabstractionThunkHelper(
-        thunkType, fromInterfaceType, toInterfaceType, Type(),
+        thunkType, fromInterfaceType, toInterfaceType, Type(), Type(),
         getModule().getSwiftModule());
   }
 
@@ -3915,15 +3938,10 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
     SILFunction *customDerivativeFn, const AutoDiffConfig &config,
     AutoDiffDerivativeFunctionKind kind) {
   auto customDerivativeFnTy = customDerivativeFn->getLoweredFunctionType();
-  auto *thunkGenericEnv = customDerivativeFnTy->getSubstGenericSignature()
-                              ? customDerivativeFnTy->getSubstGenericSignature()
-                                    ->getGenericEnvironment()
-                              : nullptr;
+  auto *thunkGenericEnv = customDerivativeFnTy->getSubstGenericSignature().getGenericEnvironment();
 
   auto origFnTy = originalFn->getLoweredFunctionType();
-  CanGenericSignature derivativeCanGenSig;
-  if (auto derivativeGenSig = config.derivativeGenericSignature)
-    derivativeCanGenSig = derivativeGenSig->getCanonicalSignature();
+  auto derivativeCanGenSig = config.derivativeGenericSignature.getCanonicalSignature();
   auto thunkFnTy = origFnTy->getAutoDiffDerivativeFunctionType(
       config.parameterIndices, config.resultIndices, kind, Types,
       LookUpConformanceInModule(M.getSwiftModule()), derivativeCanGenSig);

@@ -694,24 +694,22 @@ void swift::swift_rootObjCDealloc(HeapObject *self) {
 }
 #endif
 
-#if SWIFT_OBJC_INTEROP
-static bool _check_fast_dealloc() {
-  return dlsym(RTLD_NEXT, "_objc_has_weak_formation_callout") != nullptr;
-}
-#endif
-
 void swift::swift_deallocClassInstance(HeapObject *object,
                                        size_t allocatedSize,
                                        size_t allocatedAlignMask) {
-  
 #if SWIFT_OBJC_INTEROP
   // We need to let the ObjC runtime clean up any associated objects or weak
   // references associated with this object.
-  const bool fastDeallocSupported = SWIFT_LAZY_CONSTANT(_check_fast_dealloc());
+#if TARGET_OS_SIMULATOR && (__x86_64__ || __i386__)
+  const bool fastDeallocSupported = false;
+#else
+  const bool fastDeallocSupported = true;
+#endif
   if (!fastDeallocSupported || !object->refCounts.getPureSwiftDeallocation()) {
     objc_destructInstance((id)object);
   }
 #endif
+
   swift_deallocObject(object, allocatedSize, allocatedAlignMask);
 }
 

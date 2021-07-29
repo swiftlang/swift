@@ -101,8 +101,8 @@ namespace {
       if (auto CapE = dyn_cast<CaptureListExpr>(E)) {
         if (isa<AutoClosureExpr>(ParentDC)) {
           for (auto &Cap : CapE->getCaptureList()) {
-            Cap.Init->setDeclContext(ParentDC);
-            Cap.Var->setDeclContext(ParentDC);
+            Cap.PBD->setDeclContext(ParentDC);
+            Cap.getVar()->setDeclContext(ParentDC);
           }
         }
       }
@@ -1455,8 +1455,8 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
     
     SourceRange SR1 = call->getArg()->getSourceRange(), SR2;
     if (auto *BO = dyn_cast<BinaryExpr>(call)) {
-      SR1 = BO->getArg()->getElement(0)->getSourceRange();
-      SR2 = BO->getArg()->getElement(1)->getSourceRange();
+      SR1 = BO->getLHS()->getSourceRange();
+      SR2 = BO->getRHS()->getSourceRange();
     }
     
     // Otherwise, produce a generic diagnostic.
@@ -1753,6 +1753,9 @@ static void checkClassConstructorBody(ClassDecl *classDecl,
     ctx.Diags.diagnose(initKindAndExpr.initExpr->getLoc(), diag::delegation_here);
   }
 
+  if (classDecl->isActor())
+    checkActorConstructorBody(classDecl, ctor, body);
+
   // An inlinable constructor in a class must always be delegating,
   // unless the class is '@_fixed_layout'.
   // Note: This is specifically not using isFormallyResilient. We relax this
@@ -1919,11 +1922,18 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(Evaluator &evaluator,
     if (Type builderType = getResultBuilderType(func)) {
       auto optBody =
           TypeChecker::applyResultBuilderBodyTransform(func, builderType);
-      if (!optBody || !*optBody)
-        return true;
-      // Wire up the function body now.
-      func->setBody(*optBody, AbstractFunctionDecl::BodyKind::TypeChecked);
-      return false;
+      if (optBody && *optBody) {
+        // Wire up the function body now.
+        func->setBody(*optBody, AbstractFunctionDecl::BodyKind::TypeChecked);
+        return false;
+      }
+      // FIXME: We failed to apply the result builder transform. Fall back to
+      // just type checking the node that contains the code completion token.
+      // This may be missing some context from the result builder but in
+      // practice it often contains sufficient information to provide a decent
+      // level of code completion that's better than providing nothing at all.
+      // The proper solution would be to only partially type check the result
+      // builder so that this fall back would not be necessary.
     } else if (func->hasSingleExpressionBody() &&
                 func->getResultInterfaceType()->isVoid()) {
        // The function returns void.  We don't need an explicit return, no matter
@@ -1939,6 +1949,19 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(Evaluator &evaluator,
   if (auto CE = dyn_cast<ClosureExpr>(DC)) {
     if (CE->getBodyState() == ClosureExpr::BodyState::Parsed) {
       swift::typeCheckASTNodeAtLoc(CE->getParent(), CE->getLoc());
+      // We need the actor isolation of the closure to be set so that we can
+      // annotate results that are on the same global actor.
+      // Since we are evaluating TypeCheckASTNodeAtLocRequest for every closure
+      // from outermost to innermost, we don't want to call checkActorIsolation,
+      // because that would cause actor isolation to be checked multiple times
+      // for nested closures. Instead, call determineClosureActorIsolation
+      // directly and set the closure's actor isolation manually. We can
+      // guarantee of that the actor isolation of enclosing closures have their
+      // isolation checked before nested ones are being checked by the way
+      // TypeCheckASTNodeAtLocRequest is called multiple times, as described
+      // above.
+      auto ActorIsolation = determineClosureActorIsolation(CE);
+      CE->setActorIsolation(ActorIsolation);
       if (CE->getBodyState() != ClosureExpr::BodyState::ReadyForTypeChecking)
         return false;
     }
@@ -1962,7 +1985,7 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
   BraceStmt *body = AFD->getBody();
   assert(body && "Expected body to type-check");
 
-  // It's possible we sythesized an already type-checked body, in which case
+  // It's possible we synthesized an already type-checked body, in which case
   // we're done.
   if (AFD->isBodyTypeChecked())
     return body;
@@ -2043,6 +2066,7 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
   // Class constructor checking.
   if (auto *ctor = dyn_cast<ConstructorDecl>(AFD)) {
     if (auto classDecl = ctor->getDeclContext()->getSelfClassDecl()) {
+      checkActorConstructor(classDecl, ctor);
       checkClassConstructorBody(classDecl, ctor, body);
     }
   }

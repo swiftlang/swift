@@ -36,6 +36,10 @@ class ProtocolType;
 class SubstitutionMap;
 class GenericEnvironment;
 
+namespace rewriting {
+  class RequirementMachine;
+}
+
 /// An access path used to find a particular protocol conformance within
 /// a generic signature.
 ///
@@ -81,11 +85,13 @@ private:
 
   friend class GenericSignatureImpl;
   friend class GenericSignatureBuilder;
+  friend class rewriting::RequirementMachine;
 
 public:
   typedef const Entry *const_iterator;
   typedef const_iterator iterator;
 
+  unsigned size() const { return path.size(); }
   const_iterator begin() const { return path.begin(); }
   const_iterator end() const { return path.end(); }
 
@@ -162,11 +168,44 @@ public:
 public:
   using RequiredProtocols = SmallVector<ProtocolDecl *, 2>;
 
+  /// Stores a set of requirements on a type parameter. Used by
+  /// GenericEnvironment for building archetypes.
+  struct LocalRequirements {
+    Type anchor;
+
+    Type concreteType;
+    Type superclass;
+
+    RequiredProtocols protos;
+    LayoutConstraint layout;
+  };
+
 private:
   // Direct comparison is disabled for generic signatures.  Canonicalize them
   // first, or use isEqual.
   void operator==(GenericSignature T) const = delete;
   void operator!=(GenericSignature T) const = delete;
+
+public:
+  /// Retrieve the generic parameters.
+  TypeArrayView<GenericTypeParamType> getGenericParams() const;
+
+  /// Retrieve the innermost generic parameters.
+  ///
+  /// Given a generic signature for a nested generic type, produce an
+  /// array of the generic parameters for the innermost generic type.
+  TypeArrayView<GenericTypeParamType> getInnermostGenericParams() const;
+
+  /// Retrieve the requirements.
+  ArrayRef<Requirement> getRequirements() const;
+
+  /// Whether this generic signature involves a type variable.
+  bool hasTypeVariable() const;
+
+  /// Returns the generic environment that provides fresh contextual types
+  /// (archetypes) that correspond to the interface types in this generic
+  /// signature.
+  GenericEnvironment *getGenericEnvironment() const;
 };
 
 /// A reference to a canonical generic signature.
@@ -240,23 +279,6 @@ class alignas(1 << TypeAlignInBits) GenericSignatureImpl final
   friend class ArchetypeType;
 
 public:
-  /// Retrieve the generic parameters.
-  TypeArrayView<GenericTypeParamType> getGenericParams() const {
-    return TypeArrayView<GenericTypeParamType>(
-        {getTrailingObjects<Type>(), NumGenericParams});
-  }
-
-  /// Retrieve the innermost generic parameters.
-  ///
-  /// Given a generic signature for a nested generic type, produce an
-  /// array of the generic parameters for the innermost generic type.
-  TypeArrayView<GenericTypeParamType> getInnermostGenericParams() const;
-
-  /// Retrieve the requirements.
-  ArrayRef<Requirement> getRequirements() const {
-    return {getTrailingObjects<Requirement>(), NumRequirements};
-  }
-
   /// Only allow allocation by doing a placement new.
   void *operator new(size_t Bytes, void *Mem) {
     assert(Mem);
@@ -297,16 +319,15 @@ public:
   
   ASTContext &getASTContext() const;
 
-  /// Returns the canonical generic signature. The result is cached.
-  CanGenericSignature getCanonicalSignature() const;
-
   /// Retrieve the generic signature builder for the given generic signature.
   GenericSignatureBuilder *getGenericSignatureBuilder() const;
 
-  /// Returns the generic environment that provides fresh contextual types
-  /// (archetypes) that correspond to the interface types in this generic
-  /// signature.
-  GenericEnvironment *getGenericEnvironment() const;
+  /// Retrieve the requirement machine for the given generic signature.
+  rewriting::RequirementMachine *getRequirementMachine() const;
+
+  /// Collects a set of requirements on a type parameter. Used by
+  /// GenericEnvironment for building archetypes.
+  GenericSignature::LocalRequirements getLocalRequirements(Type depType) const;
 
   /// Uniquing for the ASTContext.
   void Profile(llvm::FoldingSetNodeID &ID) const {
@@ -385,6 +406,9 @@ public:
   ConformanceAccessPath getConformanceAccessPath(Type type,
                                                  ProtocolDecl *protocol) const;
 
+  /// Lookup a nested type with the given name within this type parameter.
+  TypeDecl *lookupNestedType(Type type, Identifier name) const;
+
   /// Get the ordinal of a generic parameter in this generic signature.
   ///
   /// For example, if you have a generic signature for a nested context like:
@@ -403,9 +427,6 @@ public:
   /// generic parameter types by their sugared form.
   Type getSugaredType(Type type) const;
 
-  /// Whether this generic signature involves a type variable.
-  bool hasTypeVariable() const;
-
   static void Profile(llvm::FoldingSetNodeID &ID,
                       TypeArrayView<GenericTypeParamType> genericParams,
                       ArrayRef<Requirement> requirements);
@@ -414,6 +435,35 @@ public:
   void print(ASTPrinter &Printer, PrintOptions Opts = PrintOptions()) const;
   SWIFT_DEBUG_DUMP;
   std::string getAsString() const;
+
+private:
+  friend GenericSignature;
+  friend CanGenericSignature;
+
+  /// Retrieve the generic parameters.
+  TypeArrayView<GenericTypeParamType> getGenericParams() const {
+    return TypeArrayView<GenericTypeParamType>(
+        {getTrailingObjects<Type>(), NumGenericParams});
+  }
+
+  /// Retrieve the innermost generic parameters.
+  ///
+  /// Given a generic signature for a nested generic type, produce an
+  /// array of the generic parameters for the innermost generic type.
+  TypeArrayView<GenericTypeParamType> getInnermostGenericParams() const;
+
+  /// Retrieve the requirements.
+  ArrayRef<Requirement> getRequirements() const {
+    return {getTrailingObjects<Requirement>(), NumRequirements};
+  }
+
+  /// Returns the canonical generic signature. The result is cached.
+  CanGenericSignature getCanonicalSignature() const;
+
+  /// Returns the generic environment that provides fresh contextual types
+  /// (archetypes) that correspond to the interface types in this generic
+  /// signature.
+  GenericEnvironment *getGenericEnvironment() const;
 };
 
 void simple_display(raw_ostream &out, GenericSignature sig);

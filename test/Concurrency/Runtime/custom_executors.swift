@@ -1,11 +1,13 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency %import-libdispatch -parse-as-library) | %FileCheck %s
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library) | %FileCheck %s
 
 // REQUIRES: concurrency
 // REQUIRES: executable_test
 
-// UNSUPPORTED: OS=windows-msvc
 // UNSUPPORTED: back_deployment_runtime
 // UNSUPPORTED: use_os_stdlib
+
+// Disabled until test hang can be looked at.
+// UNSUPPORTED: OS=windows-msvc
 
 actor Simple {
   var count = 0

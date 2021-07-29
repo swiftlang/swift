@@ -125,16 +125,6 @@ StringRef InstallNameStore::getInstallName(LinkerPlatformId Id) const {
     return It->second;
 }
 
-void InstallNameStore::remark(ASTContext &Ctx, StringRef ModuleName) const {
-  Ctx.Diags.diagnose(SourceLoc(), diag::default_previous_install_name,
-                     ModuleName, InstallName);
-  for (auto Pair: PlatformInstallName) {
-    Ctx.Diags.diagnose(SourceLoc(), diag::platform_previous_install_name,
-                       ModuleName, getLinkerPlatformName(Pair.first),
-                       Pair.second);
-  }
-}
-
 static std::string getScalaNodeText(Node *N) {
   SmallString<32> Buffer;
   return cast<ScalarNode>(N)->getValue(Buffer).str();
@@ -214,11 +204,6 @@ TBDGenVisitor::parsePreviousModuleInstallNameMap() {
   std::unique_ptr<std::map<std::string, InstallNameStore>> pResult(
     new std::map<std::string, InstallNameStore>());
   auto &AllInstallNames = *pResult;
-  SWIFT_DEFER {
-    for (auto Pair: AllInstallNames) {
-      Pair.second.remark(Ctx, Pair.first);
-    }
-  };
 
   // Load the input file.
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
@@ -732,6 +717,10 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
     addSymbol(SILDeclRef(AFD).asForeign());
   }
 
+  if (AFD->isDistributed()) {
+    addSymbol(SILDeclRef(AFD).asDistributed());
+  }
+
   // Add derivative function symbols.
   for (const auto *differentiableAttr :
        AFD->getAttrs().getAttributes<DifferentiableAttr>())
@@ -1152,6 +1141,29 @@ void TBDGenVisitor::addFirstFileSymbols() {
   }
 }
 
+void TBDGenVisitor::addMainIfNecessary(FileUnit *file) {
+  // HACK: 'main' is a special symbol that's always emitted in SILGen if
+  //       the file has an entry point. Since it doesn't show up in the
+  //       module until SILGen, we need to explicitly add it here.
+  //
+  // Make sure to only add the main symbol for the module that we're emitting
+  // TBD for, and not for any statically linked libraries.
+  if (!file->hasEntryPoint() || file->getParentModule() != SwiftModule)
+    return;
+
+  auto entryPointSymbol =
+      SwiftModule->getASTContext().getEntryPointFunctionName();
+
+  if (auto *decl = file->getMainDecl()) {
+    auto ref = SILDeclRef::getMainDeclEntryPoint(decl);
+    addSymbol(entryPointSymbol, SymbolSource::forSILDeclRef(ref));
+    return;
+  }
+
+  auto ref = SILDeclRef::getMainFileEntryPoint(file);
+  addSymbol(entryPointSymbol, SymbolSource::forSILDeclRef(ref));
+}
+
 void TBDGenVisitor::visit(Decl *D) {
   DeclStack.push_back(D);
   SWIFT_DEFER { DeclStack.pop_back(); };
@@ -1163,9 +1175,6 @@ static bool hasLinkerDirective(Decl *D) {
 }
 
 void TBDGenVisitor::visitFile(FileUnit *file) {
-  if (file == SwiftModule->getFiles()[0])
-    addFirstFileSymbols();
-
   SmallVector<Decl *, 16> decls;
   file->getTopLevelDecls(decls);
 
@@ -1179,6 +1188,9 @@ void TBDGenVisitor::visitFile(FileUnit *file) {
 }
 
 void TBDGenVisitor::visit(const TBDGenDescriptor &desc) {
+  // Add any autolinking force_load symbols.
+  addFirstFileSymbols();
+  
   if (auto *singleFile = desc.getSingleFile()) {
     assert(SwiftModule == singleFile->getParentModule() &&
            "mismatched file and module");
@@ -1207,6 +1219,7 @@ void TBDGenVisitor::visit(const TBDGenDescriptor &desc) {
     // Diagnose module name that cannot be found
     ctx.Diags.diagnose(SourceLoc(), diag::unknown_swift_module_name, Name);
   }
+
   // Collect symbols in each module.
   llvm::for_each(Modules, [&](ModuleDecl *M) {
     for (auto *file : M->getFiles()) {
@@ -1348,8 +1361,8 @@ public:
     apigen::APIAvailability availability;
     if (source.kind == SymbolSource::Kind::SIL) {
       auto ref = source.getSILDeclRef();
-      if (auto *decl = ref.getDecl())
-        availability = getAvailability(decl);
+      if (ref.hasDecl())
+        availability = getAvailability(ref.getDecl());
     }
 
     api.addSymbol(symbol, moduleLoc, apigen::APILinkage::Exported,

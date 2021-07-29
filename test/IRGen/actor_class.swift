@@ -1,9 +1,9 @@
-// RUN: %target-swift-frontend -emit-ir %s -swift-version 5 -enable-experimental-concurrency | %IRGenFileCheck %s
+// RUN: %target-swift-frontend -emit-ir %s -swift-version 5 -enable-experimental-concurrency -disable-availability-checking | %IRGenFileCheck %s
 // REQUIRES: concurrency
 
 
 // CHECK: %T11actor_class7MyClassC = type <{ %swift.refcounted, %swift.defaultactor, %TSi }>
-// CHECK: %swift.defaultactor = type { [10 x i8*] }
+// CHECK: %swift.defaultactor = type { [12 x i8*] }
 
 // CHECK-objc-LABEL: @"$s11actor_class7MyClassCMm" = global
 // CHECK-objc-SAME: @"OBJC_METACLASS_$__TtCs12_SwiftObject{{(.ptrauth)?}}"
@@ -15,13 +15,13 @@
 //   Flags: uses Swift refcounting
 // CHECK-SAME: i32 2,
 //   Instance size
-// CHECK-64-SAME: i32 104,
-// CHECK-32-SAME: i32 52,
+ // CHECK-64-SAME: i32 120,
+// CHECK-32-SAME: i32 60,
 //   Alignment mask
 // CHECK-64-SAME: i16 15,
 // CHECK-32-SAME: i16 7,
 //   Field offset for 'x'
-// CHECK-objc-SAME: [[INT]] {{48|96}},
+// CHECK-objc-SAME: [[INT]] {{56|112}},
 
 // Type descriptor.
 // CHECK-LABEL: @"$s11actor_class9ExchangerCMn" = {{.*}}constant

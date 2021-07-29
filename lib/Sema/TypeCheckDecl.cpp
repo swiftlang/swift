@@ -445,6 +445,14 @@ InitKindRequest::evaluate(Evaluator &evaluator, ConstructorDecl *decl) const {
       }
     }
 
+    // the init(transport:) initializer of a distributed actor is special, as
+    // it ties the actors lifecycle with the transport. As such, it must always
+    // be invoked by any other initializer, just like a designated initializer.
+    if (auto clazz = dyn_cast<ClassDecl>(decl->getDeclContext())) {
+      if (clazz->isDistributedActor() && decl->isDistributedActorLocalInit())
+        return CtorInitializerKind::Designated;
+    }
+
     if (decl->getDeclContext()->getExtendedProtocolDecl()) {
       return CtorInitializerKind::Convenience;
     }
@@ -863,7 +871,7 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     return true;
 
   // The presence of 'final' blocks the inference of 'dynamic'.
-  if (decl->isFinal())
+  if (decl->isSemanticallyFinal())
     return false;
 
   // Types are never 'dynamic'.
@@ -940,7 +948,7 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator,
   auto reqSignature = std::move(builder).computeGenericSignature(
                         /*allowConcreteGenericParams=*/false,
                         /*requirementSignatureSelfProto=*/proto);
-  return reqSignature->getRequirements();
+  return reqSignature.getRequirements();
 }
 
 Type
@@ -1860,7 +1868,7 @@ FunctionOperatorRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
   if (dc->isTypeContext()) {
     if (auto classDecl = dc->getSelfClassDecl()) {
       // For a class, we also need the function or class to be 'final'.
-      if (!classDecl->isFinal() && !FD->isFinal() &&
+      if (!classDecl->isSemanticallyFinal() && !FD->isFinal() &&
           FD->getStaticLoc().isValid() &&
           FD->getStaticSpelling() != StaticSpellingKind::KeywordStatic) {
         FD->diagnose(diag::nonfinal_operator_in_class,
@@ -2149,6 +2157,9 @@ ParamSpecifierRequest::evaluate(Evaluator &evaluator,
     nestedRepr = tupleRepr->getElementType(0);
   }
 
+  if (auto isolated = dyn_cast<IsolatedTypeRepr>(nestedRepr))
+    nestedRepr = isolated->getBase();
+  
   if (isa<InOutTypeRepr>(nestedRepr) &&
       param->isDefaultArgument()) {
     auto &ctx = param->getASTContext();
@@ -2299,6 +2310,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       auto selfParam = computeSelfParam(AFD,
                                         /*isInitializingCtor*/true,
                                         /*wantDynamicSelf*/true);
+      PD->setIsolated(selfParam.isIsolated());
       return selfParam.getPlainType();
     }
 
@@ -2754,8 +2766,8 @@ bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
   if (!nominalSig) return true;
 
   // Check that the type parameters are the same the whole way through.
-  auto nominalGenericParams = nominalSig->getGenericParams();
-  auto typealiasGenericParams = typealiasSig->getGenericParams();
+  auto nominalGenericParams = nominalSig.getGenericParams();
+  auto typealiasGenericParams = typealiasSig.getGenericParams();
   if (nominalGenericParams.size() != typealiasGenericParams.size())
     return false;
   if (!std::equal(nominalGenericParams.begin(), nominalGenericParams.end(),
@@ -2773,7 +2785,7 @@ bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
 
   // If our arguments line up with our innermost generic parameters, it's
   // a passthrough typealias.
-  auto innermostGenericParams = typealiasSig->getInnermostGenericParams();
+  auto innermostGenericParams = typealiasSig.getInnermostGenericParams();
   auto boundArgs = boundGenericType->getGenericArgs();
   if (boundArgs.size() != innermostGenericParams.size())
     return false;

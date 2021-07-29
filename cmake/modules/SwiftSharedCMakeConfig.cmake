@@ -98,7 +98,49 @@ macro(swift_common_standalone_build_config_llvm product)
   endif()
 
   if(LLVM_ENABLE_ZLIB)
-   find_package(ZLIB REQUIRED)
+    find_package(ZLIB REQUIRED)
+  endif()
+
+  # Work around a bug in the swift-driver that causes the swift-driver to not be
+  # able to accept .tbd files when linking without passing in the .tbd file with
+  # a -Xlinker flag.
+  #
+  # Both clang and swiftc can accept an -Xlinker flag so we use that to pass the
+  # value.
+  if (APPLE)
+    get_target_property(LLVMSUPPORT_INTERFACE_LINK_LIBRARIES LLVMSupport INTERFACE_LINK_LIBRARIES)
+    get_target_property(LLVMSUPPORT_INTERFACE_LINK_OPTIONS LLVMSupport INTERFACE_LINK_OPTIONS)
+    set(new_libraries)
+    set(new_options)
+    if (LLVMSUPPORT_INTERFACE_LINK_OPTIONS)
+      set(new_options ${LLVMSUPPORT_INTERFACE_LINK_OPTIONS})
+    endif()
+    foreach(lib ${LLVMSUPPORT_INTERFACE_LINK_LIBRARIES})
+      # The reason why we also fix link libraries that are specified as a full
+      # target is since those targets can still be a tbd file.
+      #
+      # Example: ZLIB::ZLIB's library path is defined by
+      # ZLIB_LIBRARY_{DEBUG,RELEASE} which can on Darwin have a tbd file as a
+      # value. So we need to work around this until we get a newer swiftc that
+      # can accept a .tbd file.
+      if (TARGET ${lib})
+        list(APPEND new_options "LINKER:$<TARGET_FILE:${lib}>")
+        continue()
+      endif()
+
+      # If we have an interface library dependency that is just a path to a tbd
+      # file, pass the tbd file via -Xlinker so it gets straight to the linker.
+      get_filename_component(LIB_FILENAME_COMPONENT ${lib} LAST_EXT)
+      if ("${LIB_FILENAME_COMPONENT}" STREQUAL ".tbd")
+        list(APPEND new_options "LINKER:${lib}")
+        continue()
+      endif()
+
+      list(APPEND new_libraries "${lib}")
+    endforeach()
+
+    set_target_properties(LLVMSupport PROPERTIES INTERFACE_LINK_LIBRARIES "${new_libraries}")
+    set_target_properties(LLVMSupport PROPERTIES INTERFACE_LINK_OPTIONS "${new_options}")
   endif()
 
   include(AddLLVM)

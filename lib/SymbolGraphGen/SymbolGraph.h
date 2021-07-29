@@ -146,15 +146,6 @@ struct SymbolGraph {
   void recordConformanceSynthesizedMemberRelationships(Symbol S);
 
   /**
-   If a declaration has members by subclassing, record a symbol with a
-   "synthesized" USR to disambiguate from the superclass's real implementation.
-
-   This makes it more convenient
-   to curate symbols on a subclass's documentation.
-   */
-  void recordSuperclassSynthesizedMemberRelationships(Symbol S);
-
-  /**
    Record InheritsFrom relationships for every class from which the
    declaration inherits.
    */

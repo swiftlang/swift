@@ -54,17 +54,17 @@ func testFreeFunc() {
   freeFunc2(#^FREE_FUNC_2^#
 }
 // FREE_FUNC_1: Begin completions, 1 items
-// FREE_FUNC_1: Decl[FreeFunction]/CurrModule: ['(']{#x: Int...#}[')'][#Void#]{{; name=.+$}}
+// FREE_FUNC_1: Decl[FreeFunction]/CurrModule/Flair[ArgLabels]: ['(']{#x: Int...#}[')'][#Void#]{{; name=.+$}}
 // FREE_FUNC_1: End completions
 // FREE_FUNC_2: Begin completions, 1 items
-// FREE_FUNC_2: Decl[FreeFunction]/CurrModule: ['(']{#x: Int#}, {#y: Int...#}[')'][#Void#]{{; name=.+$}}
+// FREE_FUNC_2: Decl[FreeFunction]/CurrModule/Flair[ArgLabels]: ['(']{#x: Int#}, {#y: Int...#}[')'][#Void#]{{; name=.+$}}
 // FREE_FUNC_2: End completions
 
 func testInit() {
   let c =C(#^INIT_1^#
 }
 // INIT_1: Begin completions, 1 items
-// INIT_1: Decl[Constructor]/CurrNominal:      ['(']{#x: Int...#}[')'][#C#]{{; name=.+$}}
+// INIT_1: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#x: Int...#}[')'][#C#]{{; name=.+$}}
 // INIT_1: End completions
 
 func testMethod() {
@@ -72,10 +72,10 @@ func testMethod() {
   obj.method2(#^METHOD_2^#
 }
 // METHOD_1: Begin completions, 1 items
-// METHOD_1: Decl[InstanceMethod]/CurrNominal: ['(']{#x: Int...#}[')'][#Void#]{{; name=.+$}}
+// METHOD_1: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]: ['(']{#x: Int...#}[')'][#Void#]{{; name=.+$}}
 // METHOD_1: End completions
 // METHOD_2: Begin completions, 1 items
-// METHOD_2: Decl[InstanceMethod]/CurrNominal: ['(']{#x: Int#}, {#y: Int...#}[')'][#Void#]{{; name=.+$}}
+// METHOD_2: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]: ['(']{#x: Int#}, {#y: Int...#}[')'][#Void#]{{; name=.+$}}
 // METHOD_2: End completions
 
 func testSubscript() {
@@ -89,7 +89,7 @@ func testGenericFreeFunc() {
   genericFreeFunc1(#^GENERIC_FREE_FUNC_1^#
 }
 // GENERIC_FREE_FUNC_1: Begin completions, 1 items
-// GENERIC_FREE_FUNC_1: Decl[FreeFunction]/CurrModule: ['(']{#t: T...#}[')'][#Void#]{{; name=.+$}}
+// GENERIC_FREE_FUNC_1: Decl[FreeFunction]/CurrModule/Flair[ArgLabels]: ['(']{#t: T...#}[')'][#Void#]{{; name=.+$}}
 // GENERIC_FREE_FUNC_1: End completions
 
 
@@ -97,5 +97,5 @@ func testInterestingType() {
   interestingType1(#^INTERESTING_TYPE_1^#
 }
 // INTERESTING_TYPE_1: Begin completions, 1 items
-// INTERESTING_TYPE_1: Decl[FreeFunction]/CurrModule: ['(']{#x: (Int, (Int, String))...#}[')'][#Void#]{{; name=.+$}}
+// INTERESTING_TYPE_1: Decl[FreeFunction]/CurrModule/Flair[ArgLabels]: ['(']{#x: (Int, (Int, String))...#}[')'][#Void#]{{; name=.+$}}
 // INTERESTING_TYPE_1: End completions

@@ -172,10 +172,13 @@ the same bug ("I have a dup of this"); as a verb, the act of marking a bug
 written "dupe". Pronounced the same way as the first syllable of
 "duplicate", which for most American English speakers is "doop".
 
-## existential
+## existential type
 
-A value whose type is a protocol composition (including a single protocol
-and *zero* protocols; the latter is the `Any` type).
+A type that is a protocol composition (including a single protocol and *zero* protocols; the latter is the `Any` type).
+
+## existential value
+
+A value of [existential type](#existential-type), commonly referred to simply as an "existential".
 
 ## explicit module build
 

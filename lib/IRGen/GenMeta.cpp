@@ -415,15 +415,15 @@ namespace {
       });
 
       // Pad the structure up to four bytes for the following requirements.
-      unsigned padding = (unsigned) -canSig->getGenericParams().size() & 3;
+      unsigned padding = (unsigned) -canSig.getGenericParams().size() & 3;
       for (unsigned i = 0; i < padding; ++i)
         B.addInt(IGM.Int8Ty, 0);
       
       // Fill in the parameter count.
-      assert(canSig->getGenericParams().size() <= UINT16_MAX
+      assert(canSig.getGenericParams().size() <= UINT16_MAX
              && "way too generic");
       B.fillPlaceholderWithInt(*GenericParamCount, IGM.Int16Ty,
-                               canSig->getGenericParams().size());
+                               canSig.getGenericParams().size());
     }
     
     void addGenericParameter(GenericParamKind kind,
@@ -442,7 +442,7 @@ namespace {
       auto metadata =
         irgen::addGenericRequirements(IGM, B,
                             asImpl().getGenericSignature(),
-                            asImpl().getGenericSignature()->getRequirements());
+                            asImpl().getGenericSignature().getRequirements());
 
       // Fill in the final requirement count.
       assert(metadata.NumRequirements <= UINT16_MAX
@@ -916,6 +916,10 @@ namespace {
         if (!entry.isValid() || entry.getKind() != SILWitnessTable::Method ||
             entry.getMethodWitness().Requirement != func)
           continue;
+        auto silFunc = entry.getMethodWitness().Witness;
+        if (silFunc->isAsync()) {
+          return IGM.getAddrOfAsyncFunctionPointer(silFunc);
+        }
         return IGM.getAddrOfSILFunction(entry.getMethodWitness().Witness,
                                         NotForDefinition);
       }
@@ -2946,6 +2950,7 @@ namespace {
                                  swift::irgen::ConstantReference::Direct);
       }
       }
+      llvm_unreachable("covered switch");
     }
 
     void addValueWitnessTable() {
@@ -3004,6 +3009,7 @@ namespace {
       case ClassMetadataStrategy::Fixed:
         return false;
       }
+      llvm_unreachable("covered switch");
     }
 
     void addSuperclass() {
@@ -5159,10 +5165,13 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::Differentiable:
   case KnownProtocolKind::FloatingPoint:
   case KnownProtocolKind::Actor:
+  case KnownProtocolKind::ActorTransport:
+  case KnownProtocolKind::DistributedActor:
   case KnownProtocolKind::SerialExecutor:
   case KnownProtocolKind::Sendable:
   case KnownProtocolKind::UnsafeSendable:
   case KnownProtocolKind::RangeReplaceableCollection:
+  case KnownProtocolKind::GlobalActor:
     return SpecialProtocol::None;
   }
 

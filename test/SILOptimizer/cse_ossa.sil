@@ -1223,3 +1223,78 @@ bb0(%0 : $*Builtin.Int64, %1 : @guaranteed $Builtin.NativeObject):
   destroy_value %copy : $Builtin.NativeObject
   return %6 : $(Builtin.Int64, Builtin.Int64)
 }
+
+final class LazyKlass {
+  final var lazyProperty: Int64 { get set }
+  @_hasStorage @_hasInitialValue final var lazyPropertyStorage : Int64? { get set }
+  init()
+}
+
+sil private [lazy_getter] [noinline] @lazy_class_getter_nonossa : $@convention(method) (@guaranteed LazyKlass) -> Int64 {
+bb0(%0 : $LazyKlass):
+  %2 = ref_element_addr %0 : $LazyKlass, #LazyKlass.lazyPropertyStorage 
+  %3 = load %2 : $*Optional<Int64>
+  switch_enum %3 : $Optional<Int64>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%5 : $Int64):
+  br bb3(%5 : $Int64)
+
+bb2:
+  %9 = integer_literal $Builtin.Int64, 27
+  %10 = struct $Int64 (%9 : $Builtin.Int64)
+  %12 = enum $Optional<Int64>, #Optional.some!enumelt, %10 : $Int64
+  store %12 to %2 : $*Optional<Int64>
+  br bb3(%10 : $Int64)
+
+bb3(%15 : $Int64):
+  return %15 : $Int64
+}
+
+sil private [lazy_getter] [noinline] [ossa] @lazy_class_getter_ossa : $@convention(method) (@guaranteed LazyKlass) -> Int64 {
+bb0(%0 : @guaranteed $LazyKlass):
+  %2 = ref_element_addr %0 : $LazyKlass, #LazyKlass.lazyPropertyStorage 
+  %3 = load [trivial] %2 : $*Optional<Int64>
+  switch_enum %3 : $Optional<Int64>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%5 : $Int64):
+  br bb3(%5 : $Int64)
+
+bb2:
+  %9 = integer_literal $Builtin.Int64, 27
+  %10 = struct $Int64 (%9 : $Builtin.Int64)
+  %12 = enum $Optional<Int64>, #Optional.some!enumelt, %10 : $Int64
+  store %12 to [trivial] %2 : $*Optional<Int64>
+  br bb3(%10 : $Int64)
+
+bb3(%15 : $Int64):
+  return %15 : $Int64
+}
+
+// CHECK-LABEL: sil [ossa] @dont_cse_nonossa_getter :
+// CHECK:   [[GETTER:%[0-9]+]] = function_ref @lazy_class_getter_nonossa
+// CHECK:   apply [[GETTER]]
+// CHECK:   apply [[GETTER]]
+// CHECK: } // end sil function 'dont_cse_nonossa_getter'
+sil [ossa] @dont_cse_nonossa_getter : $@convention(thin) (@guaranteed LazyKlass) -> (Int64, Int64) {
+bb0(%0 : @guaranteed $LazyKlass):
+  %getter = function_ref @lazy_class_getter_nonossa : $@convention(method) (@guaranteed LazyKlass) -> Int64
+  %call1 = apply %getter(%0) : $@convention(method) (@guaranteed LazyKlass) -> Int64
+  %call2 = apply %getter(%0) : $@convention(method) (@guaranteed LazyKlass) -> Int64
+  %res = tuple (%call1 : $Int64, %call2 : $Int64)
+  return %res : $(Int64, Int64)
+}
+
+// CHECK-LABEL: sil @cse_ossa_getter :
+// CHECK:   [[GETTER:%[0-9]+]] = function_ref @lazy_class_getter_ossa
+// CHECK:   apply [[GETTER]]
+// CHECK-NOT:   apply [[GETTER]]
+// CHECK: } // end sil function 'cse_ossa_getter'
+sil @cse_ossa_getter : $@convention(thin) (@guaranteed LazyKlass) -> (Int64, Int64) {
+bb0(%0 : $LazyKlass):
+  %1 = function_ref @lazy_class_getter_ossa : $@convention(method) (@guaranteed LazyKlass) -> Int64
+  %2 = apply %1(%0) : $@convention(method) (@guaranteed LazyKlass) -> Int64
+  %3 = apply %1(%0) : $@convention(method) (@guaranteed LazyKlass) -> Int64
+  %4 = tuple (%2 : $Int64, %3 : $Int64)
+  return %4 : $(Int64, Int64)
+}
+

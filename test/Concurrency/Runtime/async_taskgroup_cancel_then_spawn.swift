@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency %import-libdispatch -parse-as-library) | %FileCheck %s --dump-input always
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library) | %FileCheck %s --dump-input always
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -37,12 +37,15 @@ func test_taskGroup_cancel_then_add() async {
     let none = await group.next()
     print("next second: \(none)") // CHECK: next second: nil
 
-    group.spawn { 3 }
-    print("added third, unconditionally") // CHECK: added third, unconditionally
-    print("group isCancelled: \(group.isCancelled)") // CHECK: group isCancelled: true
-
+    group.spawn {
+      print("child task isCancelled: \(Task.isCancelled)") // CHECK: child task isCancelled: true
+      return 3
+    }
     let three = await group.next()!
     print("next third: \(three)") // CHECK: next third: 3
+
+    print("added third, unconditionally") // CHECK: added third, unconditionally
+    print("group isCancelled: \(group.isCancelled)") // CHECK: group isCancelled: true
 
     return one + (none ?? 0)
   }

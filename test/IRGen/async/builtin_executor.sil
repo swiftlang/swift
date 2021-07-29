@@ -54,7 +54,7 @@ bb0(%0 : $MyDefaultActor):
 sil @test_build_custom_actor : $(@guaranteed MyCustomActor) -> Builtin.Executor {
 bb0(%0 : $MyCustomActor):
   // CHECK:      [[T0:%.*]] = ptrtoint %T4test13MyCustomActorC* %0 to [[INT]]
-  // CHECK-NEXT: [[T1:%.*]] = call i8** @"$s4test13MyCustomActorCACs14SerialExecutorAAWl"()
+  // CHECK-NEXT: [[T1:%.*]] = call i8** @"$s4test13MyCustomActorCACScfAAWl"()
   // CHECK-NEXT: [[T2:%.*]] = ptrtoint i8** [[T1]] to [[INT]]
   // CHECK:      [[ONE:%.*]] = insertvalue { [[INT]], [[INT]] } undef, [[INT]] [[T0]], 0
   // CHECK-NEXT: [[TWO:%.*]] = insertvalue { [[INT]], [[INT]] } [[ONE]], [[INT]] [[T2]], 1

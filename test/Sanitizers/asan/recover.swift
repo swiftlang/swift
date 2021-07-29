@@ -2,7 +2,7 @@
 // REQUIRES: asan_runtime
 // UNSUPPORTED: windows
 
-// Check with recovery instrumentation and runtime option to continue execution.
+// Check with recovery instrumentation and the runtime option to continue execution.
 // RUN: %target-swiftc_driver %s -target %sanitizers-target-triple -g -sanitize=address -sanitize-recover=address -import-objc-header %S/asan_interface.h -emit-ir -o %t.asan_recover.ll
 // RUN: %FileCheck -check-prefix=CHECK-IR -input-file=%t.asan_recover.ll %s
 // RUN: %target-swiftc_driver %s -target %sanitizers-target-triple -g -sanitize=address -sanitize-recover=address -import-objc-header %S/asan_interface.h -o %t_asan_recover
@@ -29,7 +29,7 @@
 // CHECK-IR-NOT: call {{.+}} @memcpy
 
 // FIXME: We need this so we can flush stdout but this won't
-// work on other Platforms (e.g. Windows).
+// work on other Platforms (e.g. Microsoft Windows).
 #if canImport(Glibc)
     import Glibc
 #else
@@ -66,7 +66,7 @@ __asan_poison_memory_region(UnsafeMutableRawPointer(x), size)
 // print(x)
 // ```
 //
-// However, this generated code that called into memcpy rather than performing
+// However, this generated code that's called into memcpy rather than performing
 // a direct read which meant that ASan caught an issue via its interceptors
 // rather than from instrumentation, which does not test the right thing here.
 //
@@ -88,7 +88,7 @@ fflush(stdout)
 // CHECK-RECOVER-STDOUT: Read first element:0
 
 // Second error
-// NOTE: Very loose regex is to accomodate if name demangling
+// NOTE: Very loose regex is to accommodate if name demangling
 // fails. rdar://problem/57235673
 // CHECK-RECOVER-STDERR: AddressSanitizer: use-after-poison
 // CHECK-RECOVER-STDERR: #0 0x{{.+}} in {{.*}}foo{{.*}}

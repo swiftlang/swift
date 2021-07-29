@@ -41,6 +41,7 @@ namespace options {
     SwiftSymbolGraphExtractOption = (1 << 16),
     SwiftAPIDigesterOption = (1 << 17),
     NewDriverOnlyOption = (1 << 18),
+    ModuleInterfaceOptionIgnorable = (1 << 19),
   };
 
   enum ID {

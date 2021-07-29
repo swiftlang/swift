@@ -64,8 +64,8 @@ import Swift
 /// are created within that scope.
 ///
 /// Detached tasks do not inherit task-local values, however tasks created using
-/// the `async {}` operation do inherit task-locals by copying them to the new
-/// asynchronous task, even though it is an un-structured task.
+/// the `Task { ... }` initializer do inherit task-locals by copying them to the
+/// new asynchronous task, even though it is an un-structured task.
 ///
 /// ### Examples
 ///
@@ -78,12 +78,12 @@ import Swift
 ///       print("traceID: \(traceID)") // traceID: 1234
 ///       call() // traceID: 1234
 ///
-///       asyncDetached { // detached tasks do not inherit task-local values
-///         call() // traceID: nil
+///       Task { // unstructured tasks do inherit task locals by copying
+///         call() // traceID: 1234
 ///       }
 ///
-///       async { // async tasks do inherit task locals by copying
-///         call() // traceID: 1234
+///       Task.detached { // detached tasks do not inherit task-local values
+///         call() // traceID: nil
 ///       }
 ///     }
 ///
@@ -147,15 +147,16 @@ public final class TaskLocal<Value>: UnsafeSendable, CustomStringConvertible {
     return try await operation()
   }
 
-  /// Binds the task-local to the specific value for the duration of the synchronous operation.
+  /// Binds the task-local to the specific value for the duration of the
+  /// synchronous operation.
   ///
   /// The value is available throughout the execution of the operation closure,
   /// including any `get` operations performed by child-tasks created during the
   /// execution of the operation closure.
   ///
   /// If the same task-local is bound multiple times, be it in the same task, or
-  /// in specific child tasks, the more specific (i.e. "deeper") binding is
-  /// returned when the value is read.
+  /// in specific child tasks, the "more specific" binding is returned when the
+  /// value is read.
   ///
   /// If the value is a reference type, it will be retained for the duration of
   /// the operation closure.
@@ -194,7 +195,7 @@ public final class TaskLocal<Value>: UnsafeSendable, CustomStringConvertible {
     storage storageKeyPath: ReferenceWritableKeyPath<Never, TaskLocal<Value>>
   ) -> Value {
     get {
-      fatalError()
+      fatalError("Will never be executed, since enclosing instance is Never")
     }
   }
 

@@ -3009,7 +3009,8 @@ void SILCloner<ImplClass>
   recordClonedInstruction(Inst,
                           getBuilder().createHopToExecutor(
                             getOpLocation(Inst->getLoc()),
-                            getOpValue(Inst->getTargetExecutor())));
+                            getOpValue(Inst->getTargetExecutor()),
+                            Inst->isMandatory()));
 }
 
 template <typename ImplClass>

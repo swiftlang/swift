@@ -25,7 +25,7 @@ benefit of all Swift developers.
         - [Getting CommandLine for swift stdlib from Ninja to enable dumping stdlib SIL](#getting-commandline-for-swift-stdlib-from-ninja-to-enable-dumping-stdlib-sil)
         - [Dumping the SIL and other Data in LLDB](#dumping-the-sil-and-other-data-in-lldb)
     - [Debugging and Profiling on SIL level](#debugging-and-profiling-on-sil-level)
-        - [SIL source level profiling using -gsil](#sil-source-level-profiling-using--gsil)
+        - [SIL source level profiling using -sil-based-debuginfo](#sil-source-level-profiling)
         - [ViewCFG: Regex based CFG Printer for SIL/LLVM-IR](#viewcfg-regex-based-cfg-printer-for-silllvm-ir)
         - [Debugging the Compiler using advanced LLDB Breakpoints](#debugging-the-compiler-using-advanced-lldb-breakpoints)
         - [Debugging the Compiler using LLDB Scripts](#debugging-the-compiler-using-lldb-scripts)
@@ -99,6 +99,12 @@ swiftc -emit-sil -Onone file.swift
 
 ```sh
 swiftc -emit-sil -O file.swift
+```
+
+* **Debug info in SIL** To print debug info from `file.swift` in SIL:
+
+```sh
+swiftc -g -emit-sil -O file.swift
 ```
 
 * **IRGen** To print the LLVM IR after IR generation:
@@ -299,12 +305,13 @@ has a `dump()` method you can call.
 
 ## Debugging and Profiling on SIL level
 
-### SIL source level profiling using -gsil
+### SIL source level profiling
 
 The compiler provides a way to debug and profile on SIL level. To enable SIL
-debugging add the front-end option -gsil together with -g. Example:
+debugging add the front-end option -sil-based-debuginfo together with -g.
+Example:
 
-    swiftc -g -Xfrontend -gsil -O test.swift -o a.out
+    swiftc -g -Xfrontend -sil-based-debuginfo -O test.swift -o a.out
 
 This writes the SIL after optimizations into a file and generates debug info
 for it. In the debugger and profiler you can then see the SIL code instead of
@@ -915,7 +922,7 @@ One of the first steps is an invocation of the driver's
 In order to create a Swift compiler installation (`--install-swift`), the
 standalone driver must be built as a separate build product using the
 *just-built* Swift compiler and toolchain (the ones built in the same
-`build-script` invocation, preceeding the SwiftDriver build product). The
+`build-script` invocation, preceding the SwiftDriver build product). The
 additional build product is added to the build by specifying the
 `--swift-driver` option of the `build-script`. The driver product is istalled
 into the resulting toolchain installation by specifying the

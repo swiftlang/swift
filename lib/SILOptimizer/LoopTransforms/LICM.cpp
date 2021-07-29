@@ -1467,7 +1467,7 @@ public:
 
     DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
     PostDominanceAnalysis *PDA = PM->getAnalysis<PostDominanceAnalysis>();
-    AliasAnalysis *AA = PM->getAnalysis<AliasAnalysis>();
+    AliasAnalysis *AA = PM->getAnalysis<AliasAnalysis>(F);
     SideEffectAnalysis *SEA = PM->getAnalysis<SideEffectAnalysis>();
     AccessedStorageAnalysis *ASA = getAnalysis<AccessedStorageAnalysis>();
     DominanceInfo *DomTree = nullptr;

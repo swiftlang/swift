@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -parse-as-library %import-libdispatch) | %FileCheck %s
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -Xfrontend -disable-availability-checking -parse-as-library %import-libdispatch) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -79,8 +79,38 @@ func groups() async {
 }
 
 @available(SwiftStdlib 5.5, *)
+func taskInsideGroup() async {
+  Task {
+    print("outside") // CHECK: outside
+    _ = await withTaskGroup(of: Int.self) { group -> Int in
+      print("in group") // CHECK: in group
+      printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(defaultValue: 0) (0)
+
+      for _ in 0..<5 {
+        Task {
+          printTaskLocal(TL.$number)
+          print("some task")
+        }
+      }
+
+      return 0
+    }
+  }
+
+  // CHECK: some task
+  // CHECK: some task
+  // CHECK: some task
+  // CHECK: some task
+
+  await Task.sleep(5 * 1_000_000_000)
+
+//  await t.value
+}
+
+@available(SwiftStdlib 5.5, *)
 @main struct Main {
   static func main() async {
     await groups()
+    await taskInsideGroup()
   }
 }

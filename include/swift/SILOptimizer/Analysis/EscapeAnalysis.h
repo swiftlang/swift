@@ -832,11 +832,6 @@ public:
     /// Propagates the escape states through the graph.
     void propagateEscapeStates();
 
-    /// Remove a value from the graph. Do not delete the mapped node, but reset
-    /// mappedValue if it is set to this value, and make sure that the node
-    /// cannot be looked up with getNode().
-    void removeFromGraph(ValueBase *V);
-
     enum class Traversal { Follow, Backtrack, Halt };
 
     /// Traverse backward from startNode, following predecessor edges.
@@ -1236,10 +1231,6 @@ public:
 
   /// Notify the analysis about changed witness or vtables.
   virtual void invalidateFunctionTables() override { }
-
-  virtual void handleDeleteNotification(SILNode *N) override;
-
-  virtual bool needsNotifications() override { return true; }
 
   virtual void verify() const override;
 

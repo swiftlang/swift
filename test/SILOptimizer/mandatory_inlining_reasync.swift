@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -enable-experimental-concurrency %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -enable-experimental-concurrency -disable-availability-checking %s | %FileCheck %s
 // REQUIRES: concurrency
 
 @_transparent

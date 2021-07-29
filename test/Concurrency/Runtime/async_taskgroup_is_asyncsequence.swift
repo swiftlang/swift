@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -parse-as-library) | %FileCheck %s --dump-input=always
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -Xfrontend -disable-availability-checking -parse-as-library) | %FileCheck %s --dump-input=always
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -8,7 +8,6 @@
 // UNSUPPORTED: back_deployment_runtime
 
 // UNSUPPORTED: linux
-// XFAIL: windows
 
 @available(SwiftStdlib 5.5, *)
 func test_taskGroup_is_asyncSequence() async {

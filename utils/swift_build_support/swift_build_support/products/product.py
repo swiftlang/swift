@@ -13,7 +13,10 @@
 import abc
 import os
 
+from build_swift.build_swift.wrappers import xcrun
+
 from .. import cmake
+from .. import shell
 from .. import targets
 
 
@@ -68,6 +71,18 @@ class Product(object):
         built using the host toolchain.
         """
         raise NotImplementedError
+
+    @classmethod
+    def is_ignore_install_all_product(cls):
+        """is_ignore_install_all_product -> bool
+
+        Whether this product is to ignore the install-all directive
+        and insted always respect its own should_install.
+        This is useful when we run -install-all but have products
+        which should never be installed into the toolchain
+        (e.g. earlyswiftdriver)
+        """
+        return False
 
     @classmethod
     def is_swiftpm_unified_build_product(cls):
@@ -166,6 +181,8 @@ class Product(object):
         self.source_dir = source_dir
         self.build_dir = build_dir
         self.cmake_options = cmake.CMakeOptions()
+        self.common_c_flags = ['-Wno-unknown-warning-option',
+                               '-Werror=unguarded-availability-new']
 
     def is_release(self):
         """is_release() -> Bool
@@ -189,6 +206,98 @@ class Product(object):
             install_destdir = '%s/intermediate-install/%s' % (build_root, host_target)
         return targets.toolchain_path(install_destdir,
                                       self.args.install_prefix)
+
+    def is_darwin_host(self, host_target):
+        return host_target.startswith("macosx") or \
+            host_target.startswith("iphone") or \
+            host_target.startswith("appletv") or \
+            host_target.startswith("watch")
+
+    def should_include_host_in_lipo(self, host_target):
+        return self.args.cross_compile_hosts and \
+            self.is_darwin_host(host_target)
+
+    def host_install_destdir(self, host_target):
+        if self.args.cross_compile_hosts:
+            # If cross compiling tools, install into a host-specific subdirectory.
+            if self.should_include_host_in_lipo(host_target):
+                # If this is one of the hosts we should lipo,
+                # install in to a temporary subdirectory.
+                return '%s/intermediate-install/%s' % \
+                    (self.args.install_destdir, host_target)
+            elif host_target == "merged-hosts":
+                # This assumes that all hosts are merged to the lipo.
+                return self.args.install_destdir
+            else:
+                return '%s/%s' % (self.args.install_destdir, host_target)
+        else:
+            return self.args.install_destdir
+
+    def is_cross_compile_target(self, host_target):
+        return self.args.cross_compile_hosts and \
+            host_target in self.args.cross_compile_hosts
+
+    def generate_darwin_toolchain_file(self, platform, arch):
+        shell.makedirs(self.build_dir)
+        toolchain_file = os.path.join(self.build_dir, 'BuildScriptToolchain.cmake')
+
+        cmake_osx_sysroot = xcrun.sdk_path(platform)
+
+        target = None
+        if platform == 'macosx':
+            target = '{}-apple-macosx{}'.format(
+                arch, self.args.darwin_deployment_version_osx)
+        elif platform == 'iphonesimulator':
+            target = '{}-apple-ios{}'.format(
+                arch, self.args.darwin_deployment_version_ios)
+        elif platform == 'iphoneos':
+            target = '{}-apple-ios{}'.format(
+                arch, self.args.darwin_deployment_version_ios)
+        elif platform == 'appletvsimulator':
+            target = '{}-apple-tvos{}'.format(
+                arch, self.args.darwin_deployment_version_tvos)
+        elif platform == 'appletvos':
+            target = '{}-apple-tvos{}'.format(
+                arch, self.args.darwin_deployment_version_tvos)
+        elif platform == 'watchsimulator':
+            target = '{}-apple-watchos{}'.format(
+                arch, self.args.darwin_deployment_version_watchos)
+        elif platform == 'watchos':
+            target = '{}-apple-watchos{}'.format(
+                arch, self.args.darwin_deployment_version_watchos)
+        else:
+            raise RuntimeError("Unhandled platform?!")
+
+        toolchain_args = {}
+
+        toolchain_args['CMAKE_SYSTEM_NAME'] = 'Darwin'
+        toolchain_args['CMAKE_OSX_SYSROOT'] = cmake_osx_sysroot
+        toolchain_args['CMAKE_OSX_ARCHITECTURES'] = arch
+
+        if self.toolchain.cc.endswith('clang'):
+            toolchain_args['CMAKE_C_COMPILER_TARGET'] = target
+        if self.toolchain.cxx.endswith('clang++'):
+            toolchain_args['CMAKE_CXX_COMPILER_TARGET'] = target
+        # Swift always supports cross compiling.
+        toolchain_args['CMAKE_Swift_COMPILER_TARGET'] = target
+
+        # Sort by the key so that we always produce the same toolchain file
+        data = sorted(toolchain_args.items(), key=lambda x: x[0])
+        if not self.args.dry_run:
+            with open(toolchain_file, 'w') as f:
+                f.writelines("set({} {})\n".format(k, v) for k, v in data)
+        else:
+            print("DRY_RUN! Writing Toolchain file to path: {}".format(toolchain_file))
+
+        return toolchain_file
+
+    def common_cross_c_flags(self, platform, arch):
+        cross_flags = []
+
+        if self.is_release():
+            cross_flags.append('-fno-stack-protector')
+
+        return self.common_c_flags + cross_flags
 
 
 class ProductBuilder(object):

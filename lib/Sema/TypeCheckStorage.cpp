@@ -121,14 +121,28 @@ static void computeLoweredStoredProperties(NominalTypeDecl *decl) {
   // If this is an actor, check conformance to the Actor protocol to
   // ensure that the actor storage will get created (if needed).
   if (auto classDecl = dyn_cast<ClassDecl>(decl)) {
+    // If this is an actor class, check conformance to the Actor protocol to
+    // ensure that the actor storage will get created (if needed).
     if (classDecl->isActor()) {
       ASTContext &ctx = decl->getASTContext();
+
       if (auto actorProto = ctx.getProtocol(KnownProtocolKind::Actor)) {
         SmallVector<ProtocolConformance *, 1> conformances;
         classDecl->lookupConformance(
             decl->getModuleContext(), actorProto, conformances);
         for (auto conformance : conformances)
           TypeChecker::checkConformance(conformance->getRootNormalConformance());
+      }
+
+      // If this is a distributed actor, synthesize its special stored properties.
+      if (classDecl->isDistributedActor()) {
+        if (auto actorProto = ctx.getProtocol(KnownProtocolKind::DistributedActor)) {
+          SmallVector<ProtocolConformance *, 1> conformances;
+          classDecl->lookupConformance(
+              decl->getModuleContext(), actorProto, conformances);
+          for (auto conformance : conformances)
+            TypeChecker::checkConformance(conformance->getRootNormalConformance());
+        }
       }
     }
   }
@@ -217,6 +231,14 @@ PatternBindingEntryRequest::evaluate(Evaluator &eval,
         }
       }
     }
+  }
+
+  // Reject "class" methods on actors.
+  if (StaticSpelling == StaticSpellingKind::KeywordClass &&
+      binding->getDeclContext()->getSelfClassDecl() &&
+      binding->getDeclContext()->getSelfClassDecl()->isActor()) {
+    binding->diagnose(diag::class_var_not_in_class, false)
+        .fixItReplace(binding->getStaticLoc(), "static");
   }
 
   // Check the pattern.
@@ -1229,8 +1251,8 @@ namespace {
       if (auto CLE = dyn_cast<CaptureListExpr>(E)) {
         // Make sure to recontextualize any decls in the capture list as well.
         for (auto &CLE : CLE->getCaptureList()) {
-          CLE.Var->setDeclContext(NewDC);
-          CLE.Init->setDeclContext(NewDC);
+          CLE.getVar()->setDeclContext(NewDC);
+          CLE.PBD->setDeclContext(NewDC);
         }
       }
       
@@ -2584,6 +2606,11 @@ static void typeCheckSynthesizedWrapperInitializer(VarDecl *wrappedVar,
           dyn_cast_or_null<Initializer>(parentPBD->getInitContext(i))) {
     TypeChecker::contextualizeInitializer(initializerContext, initializer);
   }
+
+  auto *backingVar = wrappedVar->getPropertyWrapperBackingProperty();
+  auto *backingPBD = backingVar->getParentPatternBinding();
+  checkPropertyWrapperActorIsolation(backingPBD, initializer);
+  TypeChecker::checkPropertyWrapperEffects(backingPBD, initializer);
 }
 
 static PropertyWrapperMutability::Value
@@ -2871,10 +2898,16 @@ PropertyWrapperInitializerInfoRequest::evaluate(Evaluator &evaluator,
       if (!parentPBD->isInitialized(patternNumber) && wrapperInfo.defaultInit) {
         // FIXME: Record this expression somewhere so that DI can perform the
         // initialization itself.
-        Expr *initializer = nullptr;
-        typeCheckSynthesizedWrapperInitializer(var, initializer);
-        pbd->setInit(0, initializer);
+        Expr *defaultInit = nullptr;
+        typeCheckSynthesizedWrapperInitializer(var, defaultInit);
+        pbd->setInit(0, defaultInit);
         pbd->setInitializerChecked(0);
+
+        // If a static, global, or local wrapped property has a default
+        // initializer, this is the only initializer that will be used.
+        if (var->isStatic() || !dc->isTypeContext()) {
+          initializer = defaultInit;
+        }
       } else if (var->hasObservers() && !dc->isTypeContext()) {
         var->diagnose(diag::observingprop_requires_initializer);
       }
@@ -2992,15 +3025,6 @@ static void finishProtocolStorageImplInfo(AbstractStorageDecl *storage,
   }
 }
 
-/// This emits a diagnostic with a fixit to remove the attribute.
-template<typename ...ArgTypes>
-void diagnoseAndRemoveAttr(Decl *D, DeclAttribute *attr,
-                           ArgTypes &&...Args) {
-  auto &ctx = D->getASTContext();
-  ctx.Diags.diagnose(attr->getLocation(), std::forward<ArgTypes>(Args)...)
-    .fixItRemove(attr->getRangeWithAt());
-}
-
 static void finishLazyVariableImplInfo(VarDecl *var,
                                        StorageImplInfo &info) {
   auto *attr = var->getAttrs().getAttribute<LazyAttr>();
@@ -3008,16 +3032,16 @@ static void finishLazyVariableImplInfo(VarDecl *var,
   // It cannot currently be used on let's since we don't have a mutability model
   // that supports it.
   if (var->isLet())
-    diagnoseAndRemoveAttr(var, attr, diag::lazy_not_on_let);
+    diagnoseAttrWithRemovalFixIt(var, attr, diag::lazy_not_on_let);
 
   // lazy must have an initializer.
   if (!var->getParentInitializer())
-    diagnoseAndRemoveAttr(var, attr, diag::lazy_requires_initializer);
+    diagnoseAttrWithRemovalFixIt(var, attr, diag::lazy_requires_initializer);
 
   bool invalid = false;
 
   if (isa<ProtocolDecl>(var->getDeclContext())) {
-    diagnoseAndRemoveAttr(var, attr, diag::lazy_not_in_protocol);
+    diagnoseAttrWithRemovalFixIt(var, attr, diag::lazy_not_in_protocol);
     invalid = true;
   }
 
@@ -3025,13 +3049,13 @@ static void finishLazyVariableImplInfo(VarDecl *var,
   if (info.getReadImpl() != ReadImplKind::Stored &&
       (info.getWriteImpl() != WriteImplKind::Stored &&
        info.getWriteImpl() != WriteImplKind::StoredWithObservers)) {
-    diagnoseAndRemoveAttr(var, attr, diag::lazy_not_on_computed);
+    diagnoseAttrWithRemovalFixIt(var, attr, diag::lazy_not_on_computed);
     invalid = true;
   }
 
   // The pattern binding must only bind a single variable.
   if (!var->getParentPatternBinding()->getSingleVar())
-    diagnoseAndRemoveAttr(var, attr, diag::lazy_requires_single_var);
+    diagnoseAttrWithRemovalFixIt(var, attr, diag::lazy_requires_single_var);
 
   if (!invalid)
     info = StorageImplInfo::getMutableComputed();
@@ -3083,7 +3107,7 @@ static void finishNSManagedImplInfo(VarDecl *var,
   auto *attr = var->getAttrs().getAttribute<NSManagedAttr>();
 
   if (var->isLet())
-    diagnoseAndRemoveAttr(var, attr, diag::attr_NSManaged_let_property);
+    diagnoseAttrWithRemovalFixIt(var, attr, diag::attr_NSManaged_let_property);
 
   SourceFile *parentFile = var->getDeclContext()->getParentSourceFile();
 
@@ -3095,7 +3119,7 @@ static void finishNSManagedImplInfo(VarDecl *var,
     if (parentFile && parentFile->Kind == SourceFileKind::Interface)
       return;
 
-    diagnoseAndRemoveAttr(var, attr, diag::attr_NSManaged_not_stored, kind);
+    diagnoseAttrWithRemovalFixIt(var, attr, diag::attr_NSManaged_not_stored, kind);
   };
 
   // @NSManaged properties must be written as stored.

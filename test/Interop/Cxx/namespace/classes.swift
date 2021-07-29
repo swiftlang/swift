@@ -20,6 +20,10 @@ NamespacesTestSuite.test("Basic classes") {
   var siblingBasicStruct = ClassesNS3.BasicStruct()
   let siblingMemberCString = siblingBasicStruct.basicMember()
   expectEqual(String(cString: siblingMemberCString!), "ClassesNS3::BasicStruct::basicMember")
+
+  var basicStructViaAlias = ClassesNS4.AliasToGlobalNS1.BasicStruct()
+  let basicMemberViaAliasCString = basicStructViaAlias.basicMember()
+  expectEqual(String(cString: basicMemberViaAliasCString!), "ClassesNS1::BasicStruct::basicMember")
 }
 
 NamespacesTestSuite.test("Forward declared classes") {

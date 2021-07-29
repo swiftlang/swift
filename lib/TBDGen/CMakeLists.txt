@@ -1,4 +1,4 @@
-set_swift_llvm_is_available()
+
 add_swift_host_library(swiftTBDGen STATIC
   APIGen.cpp
   TBDGen.cpp
@@ -11,3 +11,5 @@ target_link_libraries(swiftTBDGen PRIVATE
   swiftAST
   swiftIRGen
   swiftSIL)
+
+set_swift_llvm_is_available(swiftTBDGen)

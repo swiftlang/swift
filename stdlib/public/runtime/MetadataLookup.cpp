@@ -673,6 +673,10 @@ _searchTypeMetadataRecords(TypeMetadataPrivateState &T,
 #define STANDARD_TYPE(KIND, MANGLING, TYPENAME) \
   extern "C" const ContextDescriptor DESCRIPTOR_MANGLING(MANGLING, DESCRIPTOR_MANGLING_SUFFIX(KIND));
 
+// FIXME: When the _Concurrency library gets merged into the Standard Library,
+// we will be able to reference those symbols directly as well.
+#define STANDARD_TYPE_2(KIND, MANGLING, TYPENAME)
+
 #if !SWIFT_OBJC_INTEROP
 # define OBJC_INTEROP_STANDARD_TYPE(KIND, MANGLING, TYPENAME)
 #endif
@@ -703,6 +707,9 @@ _findContextDescriptor(Demangle::NodePointer node,
     if (name.equals(#TYPENAME)) { \
       return &DESCRIPTOR_MANGLING(MANGLING, DESCRIPTOR_MANGLING_SUFFIX(KIND)); \
     }
+  // FIXME: When the _Concurrency library gets merged into the Standard Library,
+  // we will be able to reference those symbols directly as well.
+#define STANDARD_TYPE_2(KIND, MANGLING, TYPENAME)
 #if !SWIFT_OBJC_INTEROP
 # define OBJC_INTEROP_STANDARD_TYPE(KIND, MANGLING, TYPENAME)
 #endif
@@ -1480,7 +1487,8 @@ public:
   createFunctionType(
       llvm::ArrayRef<Demangle::FunctionParam<BuiltType>> params,
       BuiltType result, FunctionTypeFlags flags,
-      FunctionMetadataDifferentiabilityKind diffKind) const {
+      FunctionMetadataDifferentiabilityKind diffKind,
+      BuiltType globalActorType) const {
     assert(
         (flags.isDifferentiable() && diffKind.isDifferentiable()) ||
         (!flags.isDifferentiable() && !diffKind.isDifferentiable()));
@@ -1497,15 +1505,22 @@ public:
         paramFlags.push_back(param.getFlags().getIntValue());
     }
 
-    return flags.isDifferentiable()
-        ? swift_getFunctionTypeMetadataDifferentiable(
-              flags, diffKind, paramTypes.data(),
-              flags.hasParameterFlags() ? paramFlags.data() : nullptr,
-              result)
-        : swift_getFunctionTypeMetadata(
-              flags, paramTypes.data(),
-              flags.hasParameterFlags() ? paramFlags.data() : nullptr,
-              result);
+    if (globalActorType)
+      flags = flags.withGlobalActor(true);
+
+    return flags.hasGlobalActor()
+        ? swift_getFunctionTypeMetadataGlobalActor(flags, diffKind, paramTypes.data(),
+            flags.hasParameterFlags() ? paramFlags.data() : nullptr, result,
+            globalActorType)
+        : flags.isDifferentiable()
+          ? swift_getFunctionTypeMetadataDifferentiable(
+                flags, diffKind, paramTypes.data(),
+                flags.hasParameterFlags() ? paramFlags.data() : nullptr,
+                result)
+          : swift_getFunctionTypeMetadata(
+                flags, paramTypes.data(),
+                flags.hasParameterFlags() ? paramFlags.data() : nullptr,
+                result);
   }
 
   TypeLookupErrorOr<BuiltType> createImplFunctionType(
@@ -1944,23 +1959,9 @@ getObjCClassByMangledName(const char * _Nonnull typeName,
 
 __attribute__((constructor))
 static void installGetClassHook() {
-  // FIXME: delete this #if and dlsym once we don't
-  // need to build with older libobjc headers
-#if !OBJC_GETCLASSHOOK_DEFINED
-  using objc_hook_getClass =  BOOL(*)(const char * _Nonnull name,
-                                      Class _Nullable * _Nonnull outClass);
-  auto objc_setHook_getClass =
-    (void(*)(objc_hook_getClass _Nonnull,
-             objc_hook_getClass _Nullable * _Nonnull))
-    dlsym(RTLD_DEFAULT, "objc_setHook_getClass");
-#endif
-
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunguarded-availability"
-  if (&objc_setHook_getClass) {
-    objc_setHook_getClass(getObjCClassByMangledName, &OldGetClassHook);
+  if (SWIFT_RUNTIME_WEAK_CHECK(objc_setHook_getClass)) {
+    SWIFT_RUNTIME_WEAK_USE(objc_setHook_getClass(getObjCClassByMangledName, &OldGetClassHook));
   }
-#pragma clang diagnostic pop
 }
 
 #endif

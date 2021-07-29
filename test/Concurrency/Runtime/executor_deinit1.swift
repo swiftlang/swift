@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-parse-as-library -Xfrontend -enable-experimental-concurrency %import-libdispatch) | %FileCheck %s
+// RUN: %target-run-simple-swift(-parse-as-library -Xfrontend -enable-experimental-concurrency -Xfrontend -disable-availability-checking %import-libdispatch) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -9,10 +9,7 @@
 // https://bugs.swift.org/browse/SR-14461
 // UNSUPPORTED: linux
 
-// rdar://77658743
-// UNSUPPORTED: swift_test_mode_optimize
-// UNSUPPORTED: swift_test_mode_optimize_size
-
+// REQUIRES: rdar78325660
 
 // doesn't matter that it's bool identity function or not
 func boolIdentityFn(_ x : Bool) -> Bool { return x }

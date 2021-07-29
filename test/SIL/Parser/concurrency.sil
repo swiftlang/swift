@@ -13,6 +13,8 @@ sil @test_hop_to_executor : $@convention(thin) (@guaranteed Actor) -> () {
 bb0(%0 : $Actor):
   // CHECK: hop_to_executor %0 : $Actor
   hop_to_executor %0 : $Actor
+  // CHECK: hop_to_executor [mandatory] %0 : $Actor
+  hop_to_executor [mandatory] %0 : $Actor
   %2 = tuple ()
   return %2 : $()
 }

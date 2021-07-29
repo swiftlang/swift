@@ -16,6 +16,7 @@
 #include "sourcekitd/DocSupportAnnotationArray.h"
 #include "sourcekitd/TokenAnnotationsArray.h"
 #include "sourcekitd/ExpressionTypeArray.h"
+#include "sourcekitd/VariableTypeArray.h"
 
 #include "SourceKit/Core/Context.h"
 #include "SourceKit/Core/LangSupport.h"
@@ -29,6 +30,7 @@
 
 #include "swift/Basic/ExponentialGrowthAppendingBinaryByteStream.h"
 #include "swift/Basic/Mangler.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Basic/Version.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/ManglingMacros.h"
@@ -192,6 +194,10 @@ static void reportCursorInfo(const RequestResult<CursorInfoData> &Result, Respon
 
 static void reportExpressionTypeInfo(const RequestResult<ExpressionTypesInFile> &Result,
                                      ResponseReceiver Rec);
+
+static void
+reportVariableTypeInfo(const RequestResult<VariableTypesInFile> &Result,
+                       ResponseReceiver Rec);
 
 static void reportRangeInfo(const RequestResult<RangeInfo> &Result, ResponseReceiver Rec);
 
@@ -918,6 +924,11 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
         dict.set(KeyValue, stat->value);
       };
 
+      Statistic instructionCount(
+          UIdentFromSKDUID(KindStatInstructionCount),
+          "# of instructions executed since the SourceKit process was started");
+      instructionCount.value.store(swift::getInstructionsExecuted());
+      addStat(&instructionCount);
       addStat(&numRequests);
       addStat(&numSemaRequests);
       std::for_each(stats.begin(), stats.end(), addStat);
@@ -1146,6 +1157,19 @@ static void handleSemanticRequest(
       [Rec](const RequestResult<ExpressionTypesInFile> &Result) {
         reportExpressionTypeInfo(Result, Rec);
       });
+  }
+
+  if (ReqUID == RequestCollectVariableType) {
+    LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
+    Optional<unsigned> Offset = Req.getOptionalInt64(KeyOffset).map(
+        [](int64_t v) -> unsigned { return v; });
+    Optional<unsigned> Length = Req.getOptionalInt64(KeyLength).map(
+        [](int64_t v) -> unsigned { return v; });
+    return Lang.collectVariableTypes(
+        *SourceFile, Args, Offset, Length,
+        [Rec](const RequestResult<VariableTypesInFile> &Result) {
+          reportVariableTypeInfo(Result, Rec);
+        });
   }
 
   if (ReqUID == RequestFindLocalRenameRanges) {
@@ -1972,6 +1996,30 @@ static void reportExpressionTypeInfo(const RequestResult<ExpressionTypesInFile> 
     ArrBuilder.add(R);
   }
   Dict.setCustomBuffer(KeyExpressionTypeList, ArrBuilder.createBuffer());
+  Rec(Builder.createResponse());
+}
+
+//===----------------------------------------------------------------------===//
+// ReportVariableTypeInfo
+//===----------------------------------------------------------------------===//
+
+static void
+reportVariableTypeInfo(const RequestResult<VariableTypesInFile> &Result,
+                       ResponseReceiver Rec) {
+  if (Result.isCancelled())
+    return Rec(createErrorRequestCancelled());
+  if (Result.isError())
+    return Rec(createErrorRequestFailed(Result.getError()));
+
+  const VariableTypesInFile &Info = Result.value();
+
+  ResponseBuilder Builder;
+  auto Dict = Builder.getDictionary();
+  VariableTypeArrayBuilder ArrBuilder(Info.TypeBuffer);
+  for (auto &R : Info.Results) {
+    ArrBuilder.add(R);
+  }
+  Dict.setCustomBuffer(KeyVariableTypeList, ArrBuilder.createBuffer());
   Rec(Builder.createResponse());
 }
 

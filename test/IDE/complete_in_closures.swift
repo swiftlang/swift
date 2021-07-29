@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t
 
-// ERROR_COMMON: found code completion token
-// ERROR_COMMON-NOT: Begin completions
+// EMTPY: Token
+// EMPTY-NOT: Begin completions
 
 //===--- Helper types that are used in this test
 
@@ -194,7 +194,7 @@ acceptsListAndTrailingClosureTVoid(
 
 func getInt() -> Int? { return 0 }
 func testAcceptsTrailingClosureInt1() {
-  acceptsTrailingClosureFooVoid { #^IN_TRAILING_CLOSURE_16?check=WITH_GLOBAL_DECLS^# in
+  acceptsTrailingClosureFooVoid { #^IN_TRAILING_CLOSURE_16?check=EMPTY^# in
     if let myvar = getInt() {
     }
   }
@@ -312,8 +312,8 @@ func testIIFE() {
   }()
 }
 // IN_IIFE_1: Begin completions
-// IN_IIFE_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: north[#SomeEnum#]
-// IN_IIFE_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: south[#SomeEnum#]
+// IN_IIFE_1-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: north[#SomeEnum#]
+// IN_IIFE_1-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: south[#SomeEnum#]
 
 extension Error {
   var myErrorNumber: Int { return 0 }
@@ -339,7 +339,7 @@ var foo = {
   // DECL_IN_CLOSURE_IN_TOPLEVEL_INIT-DAG: Keyword[self]/CurrNominal:          self[#String#]; name=self
   // DECL_IN_CLOSURE_IN_TOPLEVEL_INIT-DAG: Decl[InstanceVar]/CurrNominal/IsSystem: count[#Int#]; name=count
   // DECL_IN_CLOSURE_IN_TOPLEVEL_INIT-DAG: Decl[InstanceVar]/CurrNominal/IsSystem: unicodeScalars[#String.UnicodeScalarView#]; name=unicodeScalars
-  // DECL_IN_CLOSURE_IN_TOPLEVEL_INIT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: hasPrefix({#(prefix): String#})[#Bool#]; name=hasPrefix(prefix: String)
+  // DECL_IN_CLOSURE_IN_TOPLEVEL_INIT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: hasPrefix({#(prefix): String#})[#Bool#]; name=hasPrefix(:)
   // DECL_IN_CLOSURE_IN_TOPLEVEL_INIT-DAG: Decl[InstanceVar]/CurrNominal/IsSystem: utf16[#String.UTF16View#]; name=utf16
   // DECL_IN_CLOSURE_IN_TOPLEVEL_INIT-DAG: Decl[InstanceMethod]/Super/IsSystem: dropFirst()[#Substring#]; name=dropFirst()
   // DECL_IN_CLOSURE_IN_TOPLEVEL_INIT: End completions
@@ -363,11 +363,36 @@ func testInsideTernaryClosureReturn(test: Bool) -> [String] {
         // SINGLE_TERNARY_EXPR_CLOSURE_CONTEXT-DAG: Decl[InstanceVar]/CurrNominal/IsSystem: .description[#String#]; name=description
         // SINGLE_TERNARY_EXPR_CLOSURE_CONTEXT-DAG: Decl[InstanceVar]/CurrNominal/IsSystem: .isWhitespace[#Bool#]; name=isWhitespace
         // SINGLE_TERNARY_EXPR_CLOSURE_CONTEXT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: .uppercased()[#String#]; name=uppercased()
-        // SINGLE_TERNARY_EXPR_CLOSURE_CONTEXT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: [' ']... {#String.Element#}[#ClosedRange<String.Element>#]; name=... String.Element
-        // SINGLE_TERNARY_EXPR_CLOSURE_CONTEXT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: [' ']< {#Character#}[#Bool#]; name=< Character
-        // SINGLE_TERNARY_EXPR_CLOSURE_CONTEXT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: [' ']>= {#String.Element#}[#Bool#]; name=>= String.Element
-        // SINGLE_TERNARY_EXPR_CLOSURE_CONTEXT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: [' ']== {#Character#}[#Bool#]; name=== Character
+        // SINGLE_TERNARY_EXPR_CLOSURE_CONTEXT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: [' ']... {#String.Element#}[#ClosedRange<String.Element>#]; name=...
+        // SINGLE_TERNARY_EXPR_CLOSURE_CONTEXT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: [' ']< {#Character#}[#Bool#]; name=<
+        // SINGLE_TERNARY_EXPR_CLOSURE_CONTEXT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: [' ']>= {#String.Element#}[#Bool#]; name=>=
+        // SINGLE_TERNARY_EXPR_CLOSURE_CONTEXT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: [' ']== {#Character#}[#Bool#]; name===
         // SINGLE_TERNARY_EXPR_CLOSURE_CONTEXT-DAG: Keyword[self]/CurrNominal:          .self[#String.Element#]; name=self
         // SINGLE_TERNARY_EXPR_CLOSURE_CONTEXT: End completions
     }
+}
+
+func testSignature() {
+    func accept<T>(_: () -> T) {}
+
+    accept { #^PARAM_BARE_1?check=EMPTY^# in }
+    accept { #^PARAM_BARE_2?check=EMPTY^#, arg2 in }
+    accept { arg1, #^PARAM_BARE_3?check=EMPTY^# in }
+
+    accept { (#^PARAM_PAREN_1?check=EMPTY^#) in }
+    accept { (#^PARAM_PAREN_2?check=EMPTY^#, arg2) in }
+    accept { (arg1, #^PARAM_PAREN_3?check=EMPTY^#) in }
+
+    accept { (arg1: #^PARAMTYPE_1?check=WITH_GLOBAL_DECLS^#) in }
+    accept { (arg1: Int, arg2: #^PARAMTYPE_2?check=WITH_GLOBAL_DECLS^#) in }
+
+    accept { [#^CAPTURE_1?check=WITH_GLOBAL_DECLS^#] in }
+    accept { [weak #^CAPTURE_2?check=WITH_GLOBAL_DECLS^#] in }
+    accept { [#^CAPTURE_3?check=EMPTY^# = capture] in }
+    accept { [weak #^CAPTURE_4?check=EMPTY^# = capture] in }
+
+    accept { () -> #^RESULTTYPE_1?check=WITH_GLOBAL_DECLS^# in }
+    accept { arg1, arg2 -> #^RESULTTYPE_2?check=WITH_GLOBAL_DECLS^# in }
+
+    // NOTE: For effects specifiers completion (e.g. '() <HERE> -> Void') see test/IDE/complete_concurrency_specifier.swift
 }

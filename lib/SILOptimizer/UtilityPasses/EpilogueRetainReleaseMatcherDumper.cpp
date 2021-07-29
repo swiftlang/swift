@@ -39,12 +39,13 @@ namespace {
 class SILEpilogueRetainReleaseMatcherDumper : public SILModuleTransform {
 
   void run() override {
-    auto *AA = PM->getAnalysis<AliasAnalysis>();
     auto *RCIA = getAnalysis<RCIdentityAnalysis>();
     for (auto &Fn: *getModule()) {
       // Function is not definition.
       if (!Fn.isDefinition())
         continue;
+
+      auto *AA = PM->getAnalysis<AliasAnalysis>(&Fn);
 
       llvm::outs() << "START: sil @" << Fn.getName() << "\n";
 

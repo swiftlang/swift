@@ -294,30 +294,38 @@ bool ide::initCompilerInvocation(
   StreamDiagConsumer DiagConsumer(ErrOS);
   Diags.addConsumer(DiagConsumer);
 
-  bool HadError = driver::getSingleFrontendInvocationFromDriverArguments(
-      Args, Diags, [&](ArrayRef<const char *> FrontendArgs) {
-    return Invocation.parseArgs(FrontendArgs, Diags);
-  }, /*ForceNoOutputs=*/true);
+  bool InvocationCreationFailed =
+      driver::getSingleFrontendInvocationFromDriverArguments(
+          Args, Diags,
+          [&](ArrayRef<const char *> FrontendArgs) {
+            return Invocation.parseArgs(FrontendArgs, Diags);
+          },
+          /*ForceNoOutputs=*/true);
 
   // Remove the StreamDiagConsumer as it's no longer needed.
   Diags.removeConsumer(DiagConsumer);
 
-  if (HadError) {
-    Error = std::string(ErrOS.str());
+  Error = std::string(ErrOS.str());
+  if (InvocationCreationFailed) {
     return true;
   }
 
+  std::string SymlinkResolveError;
   Invocation.getFrontendOptions().InputsAndOutputs =
       resolveSymbolicLinksInInputs(
           Invocation.getFrontendOptions().InputsAndOutputs,
-          UnresolvedPrimaryFile, FileSystem, Error);
+          UnresolvedPrimaryFile, FileSystem, SymlinkResolveError);
 
   // SourceKit functionalities want to proceed even if there are missing inputs.
   Invocation.getFrontendOptions().InputsAndOutputs
       .setShouldRecoverMissingInputs();
 
-  if (!Error.empty())
+  if (!SymlinkResolveError.empty()) {
+    // resolveSymbolicLinksInInputs fails if the unresolved primary file is not
+    // in the input files. We can't recover from that.
+    Error += SymlinkResolveError;
     return true;
+  }
 
   ClangImporterOptions &ImporterOpts = Invocation.getClangImporterOptions();
   ImporterOpts.DetailedPreprocessingRecord = true;
@@ -1009,9 +1017,6 @@ accept(SourceManager &SM, RegionType Type, ArrayRef<Replacement> Replacements) {
   }
 }
 
-swift::ide::SourceEditTextConsumer::
-SourceEditTextConsumer(llvm::raw_ostream &OS) : OS(OS) { }
-
 void swift::ide::SourceEditTextConsumer::
 accept(SourceManager &SM, RegionType Type, ArrayRef<Replacement> Replacements) {
   for (const auto &Replacement: Replacements) {
@@ -1105,6 +1110,14 @@ accept(SourceManager &SM, RegionType RegionType,
 
   for (const auto &Replacement : Replacements) {
     Impl.accept(SM, Replacement.Range, Replacement.Text);
+  }
+}
+
+void swift::ide::BroadcastingSourceEditConsumer::accept(
+    SourceManager &SM, RegionType RegionType,
+    ArrayRef<Replacement> Replacements) {
+  for (auto &Consumer : Consumers) {
+    Consumer->accept(SM, RegionType, Replacements);
   }
 }
 

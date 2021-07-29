@@ -303,7 +303,9 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
         getMemberUseDC(), getFunctionRefKind(), getLocator());
 
   case ConstraintKind::Disjunction:
-    return createDisjunction(cs, getNestedConstraints(), getLocator());
+    return createDisjunction(
+        cs, getNestedConstraints(), getLocator(),
+        static_cast<RememberChoice_t>(shouldRememberChoice()));
 
   case ConstraintKind::KeyPath:
   case ConstraintKind::KeyPathApplication:

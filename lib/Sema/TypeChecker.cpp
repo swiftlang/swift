@@ -17,6 +17,7 @@
 
 #include "swift/Subsystems.h"
 #include "TypeChecker.h"
+#include "TypeCheckDecl.h"
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
 #include "CodeSynthesis.h"
@@ -335,6 +336,7 @@ void swift::performWholeModuleTypeChecking(SourceFile &SF) {
     diagnoseObjCMethodConflicts(SF);
     diagnoseObjCUnsatisfiedOptReqConflicts(SF);
     diagnoseUnintendedObjCMethodOverrides(SF);
+    diagnoseAttrsAddedByAccessNote(SF);
     return;
   case SourceFileKind::SIL:
   case SourceFileKind::Interface:
@@ -433,11 +435,10 @@ swift::handleSILGenericParams(GenericParamList *genericParams,
     genericParams->walk(walker);
   }
 
-  auto sig =
-      TypeChecker::checkGenericSignature(nestedList.back(), DC,
+  return TypeChecker::checkGenericSignature(nestedList.back(), DC,
                                          /*parentSig=*/nullptr,
-                                         /*allowConcreteGenericParams=*/true);
-  return (sig ? sig->getGenericEnvironment() : nullptr);
+                                         /*allowConcreteGenericParams=*/true)
+    .getGenericEnvironment();
 }
 
 void swift::typeCheckPatternBinding(PatternBindingDecl *PBD,

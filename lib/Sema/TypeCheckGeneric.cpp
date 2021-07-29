@@ -19,7 +19,6 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
-#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -105,11 +104,20 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
       fixitLoc = originatingDecl->getStartLoc();
     }
 
-    ctx.Diags.diagnose(repr->getLoc(),
-                       diag::opaque_type_in_protocol_requirement)
-      .fixItInsert(fixitLoc, "associatedtype <#AssocType#>\n")
-      .fixItReplace(repr->getSourceRange(), "<#AssocType#>");
-    
+    std::string result;
+    const char *const placeholder = "<#AssocType#>";
+    {
+      llvm::raw_string_ostream out(result);
+      out << "associatedtype " << placeholder << ": ";
+      repr->getConstraint()->print(out);
+      out << "\n";
+    }
+
+    ctx.Diags
+        .diagnose(repr->getLoc(), diag::opaque_type_in_protocol_requirement)
+        .fixItInsert(fixitLoc, result)
+        .fixItReplace(repr->getSourceRange(), placeholder);
+
     return nullptr;
   }
   
@@ -161,7 +169,7 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
   
   if (outerGenericSignature) {
     returnTypeDepth =
-               outerGenericSignature->getGenericParams().back()->getDepth() + 1;
+               outerGenericSignature.getGenericParams().back()->getDepth() + 1;
   }
   
   auto returnTypeParam = GenericTypeParamType::get(returnTypeDepth, 0, ctx);
@@ -250,7 +258,7 @@ void TypeChecker::checkProtocolSelfRequirements(ValueDecl *decl) {
     auto &ctx = proto->getASTContext();
     auto protoSelf = proto->getSelfInterfaceType();
     auto sig = decl->getInnermostDeclContext()->getGenericSignatureOfContext();
-    for (auto req : sig->getRequirements()) {
+    for (auto req : sig.getRequirements()) {
       // If one of the types in the requirement is dependent on a non-Self
       // type parameter, this requirement is okay.
       if (!isSelfDerivedOrConcrete(protoSelf, req.getFirstType()) ||
@@ -395,7 +403,7 @@ void TypeChecker::checkReferencedGenericParams(GenericContext *dc) {
 
   auto FindReferencedGenericParamsInRequirements =
     [&requirements, genericSig, &reqTypesVisitor] {
-    requirements = genericSig->getRequirements();
+    requirements = genericSig.getRequirements();
     // Try to find new referenced generic parameter types in requirements until
     // we reach a fix point. We need to iterate until a fix point, because we
     // may have e.g. chains of same-type requirements like:
@@ -422,7 +430,7 @@ void TypeChecker::checkReferencedGenericParams(GenericContext *dc) {
 
   // Check that every generic parameter type from the signature is
   // among referencedGenericParams.
-  for (auto *genParam : genericSig->getGenericParams()) {
+  for (auto *genParam : genericSig.getGenericParams()) {
     auto *paramDecl = genParam->getDecl();
     if (paramDecl->getDepth() != fnGenericParamsDepth)
       continue;
@@ -576,7 +584,7 @@ static unsigned getExtendedTypeGenericDepth(ExtensionDecl *ext) {
   auto sig = nominal->getGenericSignatureOfContext();
   if (!sig) return static_cast<unsigned>(-1);
 
-  return sig->getGenericParams().back()->getDepth();
+  return sig.getGenericParams().back()->getDepth();
 }
 
 GenericSignature

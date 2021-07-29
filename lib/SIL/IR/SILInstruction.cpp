@@ -68,7 +68,6 @@ void llvm::ilist_traits<SILInstruction>::addNodeToList(SILInstruction *I) {
 
 void llvm::ilist_traits<SILInstruction>::removeNodeFromList(SILInstruction *I) {
   // When an instruction is removed from a BB, clear the parent pointer.
-  assert(I->ParentBB && "Not in a list!");
   I->ParentBB = nullptr;
 }
 
@@ -102,6 +101,16 @@ SILFunction *SILInstruction::getFunction() const {
 
 SILModule &SILInstruction::getModule() const {
   return getFunction()->getModule();
+}
+
+void SILInstruction::removeFromParent() {
+#ifndef NDEBUG
+  for (auto result : getResults()) {
+    assert(result->use_empty() && "Uses of SILInstruction remain at deletion.");
+  }
+#endif
+  getParent()->remove(this);
+  ParentBB = nullptr;
 }
 
 /// eraseFromParent - This method unlinks 'self' from the containing basic
@@ -145,6 +154,15 @@ void SILInstruction::dropAllReferences() {
   for (auto OpI = PossiblyDeadOps.begin(),
             OpE = PossiblyDeadOps.end(); OpI != OpE; ++OpI) {
     OpI->drop();
+  }
+  dropNonOperandReferences();
+}
+
+void SILInstruction::dropNonOperandReferences() {
+  if (auto *termInst = dyn_cast<TermInst>(this)) {
+    for (SILSuccessor &succ : termInst->getSuccessors()) {
+      succ = nullptr;
+    }
   }
 
   // If we have a function ref inst, we need to especially drop its function

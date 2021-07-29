@@ -145,7 +145,11 @@ public:
   /// Don't generate code using partial_apply in SIL generation.
   bool DisableSILPartialApply = false;
 
-  /// The name of the SIL outputfile if compiled with SIL debugging (-gsil).
+  /// Print debug information into the SIL file
+  bool PrintDebugInfo = false;
+
+  /// The name of the SIL outputfile if compiled with SIL debugging
+  /// (-sil-based-debuginfo).
   std::string SILOutputFileNameForDebugging;
 
   /// If set to true, compile with the SIL Ownership Model enabled.

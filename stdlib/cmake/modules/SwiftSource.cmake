@@ -264,6 +264,10 @@ function(_add_target_variant_swift_compile_flags
     list(APPEND result "-D" "SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY")
   endif()
 
+  if(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED)
+    list(APPEND result "-D" "SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED")
+  endif()
+
   if(SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS)
     list(APPEND result "-D" "SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS")
   endif()
@@ -455,6 +459,7 @@ function(_compile_swift_files
   if (SWIFTFILE_IS_STDLIB OR SWIFTFILE_IS_SDK_OVERLAY)
     list(APPEND swift_flags "-runtime-compatibility-version" "none")
     list(APPEND swift_flags "-disable-autolinking-runtime-compatibility-dynamic-replacements")
+    list(APPEND swift_flags "-Xfrontend" "-disable-autolinking-runtime-compatibility-concurrency")
   endif()
 
   if (SWIFTFILE_IS_STDLIB_CORE OR SWIFTFILE_IS_SDK_OVERLAY)
@@ -626,7 +631,17 @@ function(_compile_swift_files
   if(CMAKE_HOST_SYSTEM_NAME STREQUAL Windows)
     set(HOST_EXECUTABLE_SUFFIX .exe)
   endif()
-  set(swift_compiler_tool "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swiftc${HOST_EXECUTABLE_SUFFIX}")
+  if(SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER)
+    if(SWIFT_PREBUILT_SWIFT)
+      set(swift_compiler_tool "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swiftc${HOST_EXECUTABLE_SUFFIX}")
+    elseif(CMAKE_Swift_COMPILER)
+      set(swift_compiler_tool "${CMAKE_Swift_COMPILER}")
+    else()
+      message(ERROR "Must pass in prebuilt tools using SWIFT_NATIVE_SWIFT_TOOLS_PATH or set CMAKE_Swift_COMPILER")
+    endif()
+  else()
+    set(swift_compiler_tool "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swiftc${HOST_EXECUTABLE_SUFFIX}")
+  endif()
 
   set(swift_compiler_tool_dep)
   if(SWIFT_INCLUDE_TOOLS)

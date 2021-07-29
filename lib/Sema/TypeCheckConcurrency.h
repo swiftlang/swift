@@ -25,10 +25,12 @@
 namespace swift {
 
 class AbstractFunctionDecl;
+class ConstructorDecl;
 class ActorIsolation;
 class AnyFunctionType;
 class ASTContext;
 class ClassDecl;
+class ClosureActorIsolation;
 class ClosureExpr;
 class ConcreteDeclRef;
 class CustomAttr;
@@ -51,10 +53,22 @@ void addAsyncNotes(AbstractFunctionDecl const* func);
 /// Check actor isolation rules.
 void checkTopLevelActorIsolation(TopLevelCodeDecl *decl);
 void checkFunctionActorIsolation(AbstractFunctionDecl *decl);
+void checkActorConstructor(ClassDecl *decl, ConstructorDecl *ctor);
+void checkActorConstructorBody(ClassDecl *decl, ConstructorDecl *ctor, BraceStmt *body);
 void checkInitializerActorIsolation(Initializer *init, Expr *expr);
 void checkEnumElementActorIsolation(EnumElementDecl *element, Expr *expr);
 void checkPropertyWrapperActorIsolation(
     PatternBindingDecl *binding, Expr *expr);
+
+/// Determine the isolation of a particular closure.
+///
+/// This forwards to \c ActorIsolationChecker::determineClosureActorIsolation
+/// and thus assumes that enclosing closures have already had their isolation
+/// checked.
+///
+/// This does not set the closure's actor isolation
+ClosureActorIsolation
+determineClosureActorIsolation(AbstractClosureExpr *closure);
 
 /// Describes the kind of operation that introduced the concurrent refernece.
 enum class ConcurrentReferenceKind {
@@ -67,6 +81,8 @@ enum class ConcurrentReferenceKind {
   LocalCapture,
   /// Concurrent function
   ConcurrentFunction,
+  /// Nonisolated declaration.
+  Nonisolated,
 };
 
 /// The isolation restriction in effect for a given declaration that is
@@ -99,6 +115,10 @@ public:
     /// are permitted from elsewhere as a cross-actor reference, but
     /// contexts with unspecified isolation won't diagnose anything.
     GlobalActorUnsafe,
+
+    /// References to declarations that are part of a distributed actor are
+    /// only permitted if they are async.
+    DistributedActorSelf,
   };
 
 private:
@@ -128,7 +148,9 @@ public:
 
   /// Retrieve the actor type that the declaration is within.
   NominalTypeDecl *getActorType() const {
-    assert(kind == ActorSelf || kind == CrossActorSelf);
+    assert(kind == ActorSelf || 
+           kind == CrossActorSelf || 
+           kind == DistributedActorSelf);
     return data.actorType;
   }
 
@@ -158,6 +180,15 @@ public:
     return result;
   }
 
+  /// Accesses to the given declaration can only be made via the 'self' of
+  /// the current actor.
+  static ActorIsolationRestriction forDistributedActorSelf(
+      NominalTypeDecl *actor, bool isCrossActor) {
+    ActorIsolationRestriction result(DistributedActorSelf, isCrossActor);
+    result.data.actorType = actor;
+    return result;
+  }
+
   /// Accesses to the given declaration can only be made via this particular
   /// global actor or is a cross-actor access.
   static ActorIsolationRestriction forGlobalActor(
@@ -173,7 +204,8 @@ public:
   /// \param fromExpression Indicates that the reference is coming from an
   /// expression.
   static ActorIsolationRestriction forDeclaration(
-      ConcreteDeclRef declRef, bool fromExpression = true);
+      ConcreteDeclRef declRef, const DeclContext *fromDC,
+      bool fromExpression = true);
 
   operator Kind() const { return kind; };
 };
@@ -223,7 +255,7 @@ enum class SendableCheck {
   /// protocols that added Sendable after-the-fact.
   ImpliedByStandardProtocol,
 
-  /// Implicit conformance to Sendable for structs and enums.
+  /// Implicit conformance to Sendable.
   Implicit,
 };
 
@@ -233,8 +265,8 @@ enum class SendableCheck {
 Optional<std::pair<CustomAttr *, NominalTypeDecl *>>
 checkGlobalActorAttributes(
     SourceLoc loc, DeclContext *dc, ArrayRef<CustomAttr *> attrs);
-
 /// Get the explicit global actor specified for a closure.
+
 Type getExplicitGlobalActor(ClosureExpr *closure);
 
 /// Check the correctness of the given Sendable conformance.

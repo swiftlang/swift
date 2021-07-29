@@ -98,6 +98,7 @@ import _Concurrency
 
 // CHECK-LABEL: protocol ProtocolWithSwiftAttributes {
 // CHECK-NEXT: nonisolated func independentMethod()
+// CHECK-NEXT: nonisolated func nonisolatedMethod()
 // CHECK-NEXT: {{^}} @objc @MainActor func mainActorMethod()
 // CHECK-NEXT: {{^}} @objc @MainActor func uiActorMethod()
 // CHECK-NEXT: {{^}} @objc optional func missingAtAttributeMethod()

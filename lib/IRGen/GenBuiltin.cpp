@@ -230,13 +230,35 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   }
 
   if (Builtin.ID == BuiltinValueKind::StartAsyncLet) {
+    auto taskOptions = args.claimNext();
     auto taskFunction = args.claimNext();
     auto taskContext = args.claimNext();
 
     auto asyncLet = emitBuiltinStartAsyncLet(
         IGF,
+        taskOptions,
         taskFunction,
         taskContext,
+        nullptr,
+        substitutions
+        );
+
+    out.add(asyncLet);
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::StartAsyncLetWithLocalBuffer) {
+    auto taskOptions = args.claimNext();
+    auto taskFunction = args.claimNext();
+    auto taskContext = args.claimNext();
+    auto localBuffer = args.claimNext();
+
+    auto asyncLet = emitBuiltinStartAsyncLet(
+        IGF,
+        taskOptions,
+        taskFunction,
+        taskContext,
+        localBuffer,
         substitutions
         );
 
@@ -252,8 +274,18 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
+  if (Builtin.ID == BuiltinValueKind::EndAsyncLetLifetime) {
+    IGF.Builder.CreateLifetimeEnd(args.claimNext());
+    // Ignore a second operand which is inserted by ClosureLifetimeFixup and
+    // only used for dependency tracking.
+    (void)args.claimAll();
+    return;
+  }
+
   if (Builtin.ID == BuiltinValueKind::CreateTaskGroup) {
-    out.add(emitCreateTaskGroup(IGF));
+    // Claim metadata pointer.
+    (void)args.claimAll();
+    out.add(emitCreateTaskGroup(IGF, substitutions));
     return;
   }
 
@@ -269,24 +301,24 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
-  if (Builtin.ID == BuiltinValueKind::CreateAsyncTaskFuture ||
-      Builtin.ID == BuiltinValueKind::CreateAsyncTaskGroupFuture) {
+  if (Builtin.ID == BuiltinValueKind::CreateAsyncTask ||
+      Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroup) {
 
     auto flags = args.claimNext();
     auto taskGroup =
-        (Builtin.ID == BuiltinValueKind::CreateAsyncTaskGroupFuture)
+        (Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroup)
         ? args.claimNext()
         : nullptr;
-    auto futureResultType =
-        ((Builtin.ID == BuiltinValueKind::CreateAsyncTaskFuture) ||
-         (Builtin.ID == BuiltinValueKind::CreateAsyncTaskGroupFuture))
-          ? args.claimNext()
-          : nullptr;
+    auto futureResultType = args.claimNext();
     auto taskFunction = args.claimNext();
     auto taskContext = args.claimNext();
 
     auto newTaskAndContext = emitTaskCreate(
-        IGF, flags, taskGroup, futureResultType, taskFunction, taskContext,
+        IGF,
+        flags,
+        taskGroup,
+        futureResultType,
+        taskFunction, taskContext,
         substitutions);
 
     // Cast back to NativeObject/RawPointer.
@@ -355,6 +387,29 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     auto type = substitutions.getReplacementTypes()[0]->getCanonicalType();
     auto conf = substitutions.getConformances()[0];
     emitBuildOrdinarySerialExecutorRef(IGF, actor, type, conf, out);
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::InitializeDistributedRemoteActor) {
+    auto fn = IGF.IGM.getDistributedActorInitializeRemoteFn();
+    auto actor = args.claimNext();
+    actor = IGF.Builder.CreateBitCast(actor, IGF.IGM.RefCountedPtrTy);
+    // init(resolve address, using transport)
+    auto call = IGF.Builder.CreateCall(fn, {
+      actor
+      // TODO: might have to carry `address, transport` depending on how we implement the resolve initializers
+    });
+    call->setCallingConv(IGF.IGM.SwiftCC);
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::DestroyDistributedActor) {
+    auto fn = IGF.IGM.getDistributedActorDestroyFn();
+    auto actor = args.claimNext();
+    actor = IGF.Builder.CreateBitCast(actor, IGF.IGM.RefCountedPtrTy);
+    auto call = IGF.Builder.CreateCall(fn, {actor});
+    call->setCallingConv(IGF.IGM.SwiftCC);
+    call->setDoesNotThrow();
     return;
   }
 

@@ -287,44 +287,45 @@ struct ModuleRebuildInfo {
 
   /// Emits a diagnostic for all out-of-date compiled or forwarding modules
   /// encountered while trying to load a module.
-  void diagnose(ASTContext &ctx, SourceLoc loc, StringRef moduleName,
-                 StringRef interfacePath, StringRef prebuiltCacheDir) {
-    ctx.Diags.diagnose(loc, diag::rebuilding_module_from_interface,
-                       moduleName, interfacePath);
+  template<typename... DiagArgs>
+  void diagnose(ASTContext &ctx, DiagnosticEngine &diags,
+                StringRef prebuiltCacheDir, SourceLoc loc,
+                DiagArgs &&...diagArgs) {
+    diags.diagnose(loc, std::forward<DiagArgs>(diagArgs)...);
     auto SDKVer = getSDKBuildVersion(ctx.SearchPathOpts.SDKPath);
     llvm::SmallString<64> buffer = prebuiltCacheDir;
     llvm::sys::path::append(buffer, "SystemVersion.plist");
     auto PBMVer = getSDKBuildVersionFromPlist(buffer.str());
     if (!SDKVer.empty() && !PBMVer.empty()) {
       // Remark the potential version difference.
-      ctx.Diags.diagnose(loc, diag::sdk_version_pbm_version, SDKVer,
+      diags.diagnose(loc, diag::sdk_version_pbm_version, SDKVer,
                          PBMVer);
     }
     // We may have found multiple failing modules, that failed for different
     // reasons. Emit a note for each of them.
     for (auto &mod : outOfDateModules) {
-      ctx.Diags.diagnose(loc, diag::out_of_date_module_here,
+      diags.diagnose(loc, diag::out_of_date_module_here,
                          (unsigned)mod.kind, mod.path);
 
       // Diagnose any out-of-date dependencies in this module.
       for (auto &dep : mod.outOfDateDependencies) {
-        ctx.Diags.diagnose(loc, diag::module_interface_dependency_out_of_date,
+        diags.diagnose(loc, diag::module_interface_dependency_out_of_date,
                            dep);
       }
 
       // Diagnose any missing dependencies in this module.
       for (auto &dep : mod.missingDependencies) {
-        ctx.Diags.diagnose(loc, diag::module_interface_dependency_missing, dep);
+        diags.diagnose(loc, diag::module_interface_dependency_missing, dep);
       }
 
       // If there was a compiled module that wasn't able to be read, diagnose
       // the reason we couldn't read it.
       if (auto status = mod.serializationStatus) {
         if (auto reason = invalidModuleReason(*status)) {
-          ctx.Diags.diagnose(loc, diag::compiled_module_invalid_reason,
+          diags.diagnose(loc, diag::compiled_module_invalid_reason,
               mod.path, reason);
         } else {
-          ctx.Diags.diagnose(loc, diag::compiled_module_invalid, mod.path);
+          diags.diagnose(loc, diag::compiled_module_invalid, mod.path);
         }
       }
     }
@@ -425,9 +426,17 @@ class ModuleInterfaceLoaderImpl {
   }
 
   std::string getBackupPublicModuleInterfacePath() {
+    return getBackupPublicModuleInterfacePath(ctx.SourceMgr, backupInterfaceDir,
+                                              moduleName, interfacePath);
+  }
+
+  static std::string getBackupPublicModuleInterfacePath(SourceManager &SM,
+                                                        StringRef backupInterfaceDir,
+                                                        StringRef moduleName,
+                                                        StringRef interfacePath) {
     if (backupInterfaceDir.empty())
       return std::string();
-    auto &fs = *ctx.SourceMgr.getFileSystem();
+    auto &fs = *SM.getFileSystem();
     auto fileName = llvm::sys::path::filename(interfacePath);
     {
       llvm::SmallString<256> path(backupInterfaceDir);
@@ -949,12 +958,33 @@ class ModuleInterfaceLoaderImpl {
     }
 
     std::unique_ptr<llvm::MemoryBuffer> moduleBuffer;
+
     // We didn't discover a module corresponding to this interface.
     // Diagnose that we didn't find a loadable module, if we were asked to.
-    auto remarkRebuild = [&]() {
-      rebuildInfo.diagnose(ctx, diagnosticLoc, moduleName,
-                           interfacePath, prebuiltCacheDir);
+    //
+    // Note that we use `diags` so that we emit this remark even when we're
+    // emitting other messages to `emptyDiags` (see below); these act as status
+    // messages to explain what's taking so long.
+    auto remarkRebuildAll = [&]() {
+      rebuildInfo.diagnose(ctx, diags, prebuiltCacheDir, diagnosticLoc,
+                           diag::rebuilding_module_from_interface, moduleName,
+                           interfacePath);
     };
+    // Diagnose only for the standard library; it should be prebuilt in typical
+    // workflows, but if it isn't, building it may take several minutes and a
+    // lot of memory, so users may think the compiler is busy-hung.
+    auto remarkRebuildStdlib = [&]() {
+      if (moduleName != "Swift")
+        return;
+      
+      auto moduleTriple = getTargetSpecificModuleTriple(ctx.LangOpts.Target);
+      rebuildInfo.diagnose(ctx, diags, prebuiltCacheDir, SourceLoc(),
+                           diag::rebuilding_stdlib_from_interface,
+                           moduleTriple.str());
+    };
+    auto remarkRebuild = Opts.remarkOnRebuildFromInterface
+                       ? llvm::function_ref<void()>(remarkRebuildAll)
+                       : remarkRebuildStdlib;
 
     bool failed = false;
     std::string backupPath = getBackupPublicModuleInterfacePath();
@@ -988,11 +1018,8 @@ class ModuleInterfaceLoaderImpl {
       if (rebuildInfo.sawOutOfDateModule(modulePath))
         builder.addExtraDependency(modulePath);
       failed = builder.buildSwiftModule(cachedOutputPath,
-                                             /*shouldSerializeDeps*/true,
-                                             &moduleBuffer,
-                                             Opts.remarkOnRebuildFromInterface ?
-                                               remarkRebuild:
-                                             llvm::function_ref<void()>());
+                                        /*shouldSerializeDeps*/true,
+                                        &moduleBuffer, remarkRebuild);
     }
     if (!failed) {
       // If succeeded, we are done.
@@ -1025,9 +1052,7 @@ class ModuleInterfaceLoaderImpl {
       // calcualted using the canonical interface file path to make sure we
       // can find it from the canonical interface file.
       auto failedAgain = fallbackBuilder.buildSwiftModule(cachedOutputPath,
-        /*shouldSerializeDeps*/true, &moduleBuffer,
-        Opts.remarkOnRebuildFromInterface ? remarkRebuild:
-                                            llvm::function_ref<void()>());
+          /*shouldSerializeDeps*/true, &moduleBuffer, remarkRebuild);
       if (failedAgain)
         return std::make_error_code(std::errc::invalid_argument);
       assert(moduleBuffer);
@@ -1145,21 +1170,6 @@ ModuleInterfaceCheckerImpl::getCompiledModuleCandidatesForInterface(
   return results;
 }
 
-std::string
-ModuleInterfaceCheckerImpl::getBackupPublicModuleInterfacePath(StringRef moduleName,
-                                                               StringRef interfacePath) {
-  // Derive .swiftmodule path from the .swiftinterface path.
-  auto newExt = file_types::getExtension(file_types::TY_SwiftModuleFile);
-  llvm::SmallString<32> modulePath = interfacePath;
-  llvm::sys::path::replace_extension(modulePath, newExt);
-  ModuleInterfaceLoaderImpl Impl(Ctx, modulePath, interfacePath, moduleName,
-                                 CacheDir, PrebuiltCacheDir, BackupInterfaceDir,
-                                 SourceLoc(), Opts,
-                                 RequiresOSSAModules, nullptr,
-                                 ModuleLoadingMode::PreferSerialized);
-  return Impl.getBackupPublicModuleInterfacePath();
-}
-
 bool ModuleInterfaceCheckerImpl::tryEmitForwardingModule(
     StringRef moduleName, StringRef interfacePath,
     ArrayRef<std::string> candidates, StringRef outputPath) {
@@ -1212,9 +1222,29 @@ bool ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
                                  LoaderOpts.disableInterfaceLock);
   // FIXME: We really only want to serialize 'important' dependencies here, if
   //        we want to ship the built swiftmodules to another machine.
-  return builder.buildSwiftModule(OutPath, /*shouldSerializeDeps*/true,
-                                  /*ModuleBuffer*/nullptr, nullptr,
-                                  SearchPathOpts.CandidateCompiledModules);
+  auto failed = builder.buildSwiftModule(OutPath, /*shouldSerializeDeps*/true,
+                                         /*ModuleBuffer*/nullptr, nullptr,
+                                         SearchPathOpts.CandidateCompiledModules);
+  if (!failed)
+    return false;
+  auto backInPath =
+    ModuleInterfaceLoaderImpl::getBackupPublicModuleInterfacePath(SourceMgr,
+      BackupInterfaceDir, ModuleName, InPath);
+  if (backInPath.empty())
+    return true;
+  assert(failed);
+  assert(!backInPath.empty());
+  ModuleInterfaceBuilder backupBuilder(SourceMgr, &Diags, astDelegate, backInPath,
+                                       ModuleName, CacheDir, PrebuiltCacheDir,
+                                       BackupInterfaceDir,
+                                       LoaderOpts.disableInterfaceLock);
+  // Ensure we can rebuild module after user changed the original interface file.
+  backupBuilder.addExtraDependency(InPath);
+  // FIXME: We really only want to serialize 'important' dependencies here, if
+  //        we want to ship the built swiftmodules to another machine.
+  return backupBuilder.buildSwiftModule(OutPath, /*shouldSerializeDeps*/true,
+                                        /*ModuleBuffer*/nullptr, nullptr,
+                                        SearchPathOpts.CandidateCompiledModules);
 }
 
 void ModuleInterfaceLoader::collectVisibleTopLevelModuleNames(
@@ -1236,6 +1266,17 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
   auto triple = ArgSaver.save(genericSubInvocation.getTargetTriple());
   if (!triple.empty()) {
     GenericArgs.push_back("-target");
+    GenericArgs.push_back(triple);
+  }
+
+  if (LangOpts.ClangTarget.hasValue()) {
+    genericSubInvocation.getLangOptions().ClangTarget = LangOpts.ClangTarget;
+    auto triple = ArgSaver.save(genericSubInvocation.getLangOptions()
+      .ClangTarget->getTriple());
+    assert(!triple.empty());
+    // In explicit module build, all PCMs will be built using the given clang target.
+    // So the Swift interface should know that as well to load these PCMs properly.
+    GenericArgs.push_back("-clang-target");
     GenericArgs.push_back(triple);
   }
 
@@ -1278,6 +1319,10 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
   // If we are supposed to use RequireOSSAModules, do so.
   genericSubInvocation.getSILOptions().EnableOSSAModules =
       bool(RequireOSSAModules);
+  if (LangOpts.DisableAvailabilityChecking) {
+    genericSubInvocation.getLangOptions().DisableAvailabilityChecking = true;
+    GenericArgs.push_back("-disable-availability-checking");
+  }
 }
 
 bool InterfaceSubContextDelegateImpl::extractSwiftInterfaceVersionAndArgs(
@@ -1305,7 +1350,7 @@ bool InterfaceSubContextDelegateImpl::extractSwiftInterfaceVersionAndArgs(
              diag::error_extracting_version_from_module_interface);
     return true;
   }
-  if (extractCompilerFlagsFromInterface(SB, ArgSaver, SubArgs)) {
+  if (extractCompilerFlagsFromInterface(interfacePath, SB, ArgSaver, SubArgs)) {
     diagnose(interfacePath, diagnosticLoc,
              diag::error_extracting_version_from_module_interface);
     return true;
@@ -1606,15 +1651,20 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
   }
   info.BuildArguments = BuildArgs;
   info.Hash = CacheHash;
-  auto target =  *(std::find(BuildArgs.rbegin(), BuildArgs.rend(), "-target") - 1);
+  auto target = *(std::find(BuildArgs.rbegin(), BuildArgs.rend(), "-target") - 1);
   auto langVersion = *(std::find(BuildArgs.rbegin(), BuildArgs.rend(),
                                  "-swift-version") - 1);
-  std::array<StringRef, 6> ExtraPCMArgs = {
-    // PCMs should use the target triple the interface will be using to build
-    "-Xcc", "-target", "-Xcc", target,
+
+  std::vector<StringRef> ExtraPCMArgs = {
     // PCMs should use the effective Swift language version for apinotes.
-    "-Xcc", ArgSaver.save((llvm::Twine("-fapinotes-swift-version=") + langVersion).str())
+    "-Xcc",
+    ArgSaver.save((llvm::Twine("-fapinotes-swift-version=") + langVersion).str())
   };
+  if (!subInvocation.getLangOptions().ClangTarget.hasValue()) {
+    ExtraPCMArgs.insert(ExtraPCMArgs.begin(), {"-Xcc", "-target",
+                                               "-Xcc", target});
+  }
+
   info.ExtraPCMArgs = ExtraPCMArgs;
   // Run the action under the sub compiler instance.
   return action(info);

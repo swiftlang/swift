@@ -177,9 +177,15 @@ documentation, please create a thread on the Swift forums under the
   <!-- NOTE: Outdated -->
 - [Lexicon.md](/docs/Lexicon.md):
   Canonical reference for terminology used throughout the project.
-  
+
 ### ABI
 
+- [CallConvSummary.rst](/docs/ABI/CallConvSummary.rst):
+	A concise summary of the calling conventions used for C/C++, Objective-C
+	and Swift on Apple platforms.  Contains references to source documents,
+	where further detail is required.
+- [CallingConvention.rst](/docs/ABI/CallingConvention.rst):
+  Describes in detail the Swift calling convention.
 - [GenericSignature.md](/docs/ABI/GenericSignature.md):
   Describes what generic signatures are and how they are used in the ABI,
   including the algorithms for minimization and canonicalization.
@@ -191,9 +197,6 @@ documentation, please create a thread on the Swift forums under the
 - [Mangling.rst](/docs/ABI/Mangling.rst):
   Describes the stable mangling scheme, which produces unique symbols for
   ABI-public declarations.
-- [RegisterUsage.md](/docs/ABI/RegisterUsage.md):
-  Summarizes the register allocation for ARM64 and x86_64 calling conventions,
-  including the context register (self) and error return register.
 - [TypeLayout.rst](/docs/ABI/TypeLayout.rst):
   Describes the algorithms/strategies for fragile struct and tuple layout;
   class layout; fragile enum layout; and existential container layout.

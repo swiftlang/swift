@@ -83,7 +83,7 @@ class MemBehaviorDumper : public SILModuleTransform {
       if (!gatherValues(Fn, Values))
         continue;
 
-      AliasAnalysis *AA = PM->getAnalysis<AliasAnalysis>();
+      AliasAnalysis *AA = PM->getAnalysis<AliasAnalysis>(&Fn);
 
       unsigned PairCount = 0;
       for (auto &BB : Fn) {

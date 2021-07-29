@@ -105,7 +105,6 @@ public:
   void removeCachedAST();
 
   ImmutableTextSnapshotRef getLatestSnapshot() const;
-  std::pair<unsigned, unsigned> getLineAndColumnInBuffer(unsigned Offset);
 
   void resetSyntaxInfo(ImmutableTextSnapshotRef Snapshot,
                        SwiftLangSupport &Lang, bool BuildSyntaxTree,
@@ -603,6 +602,12 @@ public:
                               ArrayRef<const char *> ExpectedProtocols,
                               bool CanonicalType,
                               std::function<void(const RequestResult<ExpressionTypesInFile> &)> Receiver) override;
+
+  void collectVariableTypes(
+      StringRef FileName, ArrayRef<const char *> Args,
+      Optional<unsigned> Offset, Optional<unsigned> Length,
+      std::function<void(const RequestResult<VariableTypesInFile> &)> Receiver)
+      override;
 
   void semanticRefactoring(StringRef Filename, SemanticRefactoringInfo Info,
                            ArrayRef<const char*> Args,

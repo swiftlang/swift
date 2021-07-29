@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s -enable-experimental-concurrency | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s -enable-experimental-concurrency -disable-availability-checking | %FileCheck %s
 // REQUIRES: concurrency
 
 // CHECK-LABEL: sil hidden [ossa] @$s7reasync0A8FunctionyyyyYaXEYaF : $@convention(thin) @async (@noescape @async @callee_guaranteed () -> ()) -> () {

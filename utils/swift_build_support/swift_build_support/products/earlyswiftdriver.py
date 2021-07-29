@@ -41,10 +41,13 @@ class EarlySwiftDriver(product.Product):
         return True
 
     def should_build(self, host_target):
+        if self.is_cross_compile_target(host_target):
+            return False
+
         if self.args.build_early_swift_driver:
             if toolchain.host_toolchain().find_tool("swift") is None:
                 warn_msg = 'Host toolchain could not locate a '\
-                           'compiler to build swift-drver. '\
+                           'compiler to build swift-driver. '\
                            '(Try `--skip-early-swift-driver`)'
                 print('-- Warning: {}', warn_msg)
                 return False
@@ -79,6 +82,16 @@ class EarlySwiftDriver(product.Product):
         # If a toolchain install is required, please use the SwiftDriver (no 'Early')
         # product with `--swift-driver --install-swift-driver`.
         return False
+
+    @classmethod
+    def is_ignore_install_all_product(cls):
+        # Ensures that `install_all` setting triggered by `--infer` does not
+        # affect products which specify `is_ignore_install_all_product` as
+        # True. This is useful for products which should not be installed into the
+        # toolchain (corresponding build products that use the just-built
+        # toolchain are the products that get installed, e.g. `swiftdriver` to
+        # `earlyswiftdriver`).
+        return True
 
     def install(self, host_target):
         run_build_script_helper('install', host_target, self, self.args)

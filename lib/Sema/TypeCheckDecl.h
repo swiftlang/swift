@@ -59,6 +59,8 @@ void validatePrecedenceGroup(PrecedenceGroupDecl *PGD);
 bool checkDesignatedTypes(OperatorDecl *OD,
                           ArrayRef<Located<Identifier>> identifiers);
 
+void diagnoseAttrsAddedByAccessNote(SourceFile &SF);
+
 }
 
 #endif

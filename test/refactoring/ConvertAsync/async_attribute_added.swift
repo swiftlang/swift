@@ -1,3 +1,5 @@
+// REQUIRES: concurrency
+
 // RUN: %empty-directory(%t)
 
 // RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 -enable-experimental-concurrency | %FileCheck -check-prefix=SIMPLE %s
@@ -10,7 +12,7 @@ func simple(completion: @escaping (String) -> Void) { }
 // SIMPLE-EMPTY:
 // SIMPLE-NEXT: async_attribute_added.swift [[# @LINE-7]]:53 -> [[# @LINE-7]]:56
 // SIMPLE-NEXT: {
-// SIMPLE-NEXT: async {
+// SIMPLE-NEXT: Task {
 // SIMPLE-NEXT: let result = await simple()
 // SIMPLE-NEXT: completion(result)
 // SIMPLE-NEXT: }

@@ -235,12 +235,6 @@ class EpilogueARCFunctionInfo {
   llvm::DenseMap<SILValue, ARCInstructions> EpilogueReleaseInstCache;
 
 public:
-  void handleDeleteNotification(SILNode *node) {
-    // Being conservative and clear everything for now.
-    EpilogueRetainInstCache.clear();
-    EpilogueReleaseInstCache.clear();
-  }
-
   /// Constructor.
   EpilogueARCFunctionInfo(SILFunction *F, PostOrderAnalysis *PO,
                           AliasAnalysis *AA, RCIdentityAnalysis *RC)
@@ -273,37 +267,20 @@ public:
 };
 
 class EpilogueARCAnalysis : public FunctionAnalysisBase<EpilogueARCFunctionInfo> {
+  /// Backlink to the pass manager.
+  SILPassManager *passManager = nullptr;
   /// Current post order analysis we are using.
-  PostOrderAnalysis *PO;
-  /// Current alias analysis we are using.
-  AliasAnalysis *AA;
+  PostOrderAnalysis *PO = nullptr;
   /// Current RC Identity analysis we are using.
-  RCIdentityAnalysis *RC;
-
+  RCIdentityAnalysis *RC = nullptr;
+  
 public:
   EpilogueARCAnalysis(SILModule *)
       : FunctionAnalysisBase<EpilogueARCFunctionInfo>(
-            SILAnalysisKind::EpilogueARC),
-        PO(nullptr), AA(nullptr), RC(nullptr) {}
+            SILAnalysisKind::EpilogueARC) {}
 
   EpilogueARCAnalysis(const EpilogueARCAnalysis &) = delete;
   EpilogueARCAnalysis &operator=(const EpilogueARCAnalysis &) = delete;
-
-  virtual void handleDeleteNotification(SILNode *node) override {
-    // If the parent function of this instruction was just turned into an
-    // external declaration, bail. This happens during SILFunction destruction.
-    SILFunction *F = node->getFunction();
-    if (F->isExternalDeclaration()) {
-      return;
-    }
-
-    // If we do have an analysis, tell it to handle its delete notifications.
-    if (auto A = maybeGet(F)) {
-      A.get()->handleDeleteNotification(node);
-    }
-  }
-
-  virtual bool needsNotifications() override { return true; }
 
   static bool classof(const SILAnalysis *S) {
     return S->getKind() == SILAnalysisKind::EpilogueARC;
@@ -312,9 +289,7 @@ public:
   virtual void initialize(SILPassManager *PM) override;
   
   virtual std::unique_ptr<EpilogueARCFunctionInfo>
-  newFunctionAnalysis(SILFunction *F) override {
-    return std::make_unique<EpilogueARCFunctionInfo>(F, PO, AA, RC);
-  }
+  newFunctionAnalysis(SILFunction *F) override;
 
   virtual bool shouldInvalidate(SILAnalysis::InvalidationKind K) override {
     return true;

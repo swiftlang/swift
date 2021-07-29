@@ -35,7 +35,6 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
-#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
@@ -73,7 +72,7 @@ using namespace swift;
 static void checkInheritanceClause(
     llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> declUnion) {
   const DeclContext *DC;
-  ArrayRef<TypeLoc> inheritedClause;
+  ArrayRef<InheritedEntry> inheritedClause;
   const ExtensionDecl *ext = nullptr;
   const TypeDecl *typeDecl = nullptr;
   const Decl *decl;
@@ -354,6 +353,13 @@ static void installCodingKeysIfNecessary(NominalTypeDecl *NTD) {
   (void)evaluateOrDefault(NTD->getASTContext().evaluator, req, {});
 }
 
+// TODO: same ugly hack as Codable does...
+static void installDistributedActorIfNecessary(NominalTypeDecl *NTD) {
+  auto req =
+    ResolveImplicitMemberRequest{NTD, ImplicitMemberAction::ResolveDistributedActor};
+  (void)evaluateOrDefault(NTD->getASTContext().evaluator, req, {});
+}
+
 // Check for static properties that produce empty option sets
 // using a rawValue initializer with a value of '0'
 static void checkForEmptyOptionSet(const VarDecl *VD) {
@@ -620,7 +626,9 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
     // Thwart attempts to override the same declaration more than once.
     const auto *currentOverride = current->getOverriddenDecl();
     const auto *otherOverride = other->getOverriddenDecl();
-    if (currentOverride && currentOverride == otherOverride) {
+    const auto *otherInit = dyn_cast<ConstructorDecl>(other);
+    if (currentOverride && currentOverride == otherOverride &&
+        !(otherInit && otherInit->isImplicit())) {
       current->diagnose(diag::multiple_override, current->getName());
       other->diagnose(diag::multiple_override_prev, other->getName());
       current->setInvalid();
@@ -1218,6 +1226,7 @@ static std::string getFixItStringForDecodable(ClassDecl *CD,
 static void diagnoseClassWithoutInitializers(ClassDecl *classDecl) {
   ASTContext &C = classDecl->getASTContext();
   C.Diags.diagnose(classDecl, diag::class_without_init,
+                   classDecl->isExplicitActor(),
                    classDecl->getDeclaredType());
 
   // HACK: We've got a special case to look out for and diagnose specifically to
@@ -1401,6 +1410,28 @@ static void maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl) {
   diagnoseClassWithoutInitializers(classDecl);
 }
 
+void TypeChecker::checkResultType(Type resultType,
+                                  DeclContext *owner) {
+//  // Only distributed functions have special requirements on return types.
+//  if (!owner->isDistributed())
+//    return;
+//
+//  auto conformanceDC = owner->getConformanceContext();
+//
+//  // Result type of distributed functions must be Codable.
+//  auto target =
+//      conformanceDC->mapTypeIntoContext(it->second->getValueInterfaceType());
+//  if (TypeChecker::conformsToProtocol(target, derived.Protocol, conformanceDC)
+//      .isInvalid()) {
+//    TypeLoc typeLoc = {
+//        it->second->getTypeReprOrParentPatternTypeRepr(),
+//        it->second->getType(),
+//    };
+//    it->second->diagnose(diag::codable_non_conforming_property_here,
+//                         derived.getProtocolType(), typeLoc);
+//    propertiesAreValid = false;
+}
+
 void TypeChecker::diagnoseDuplicateBoundVars(Pattern *pattern) {
   SmallVector<VarDecl *, 2> boundVars;
   pattern->collectVariables(boundVars);
@@ -1411,71 +1442,119 @@ void TypeChecker::diagnoseDuplicateBoundVars(Pattern *pattern) {
 void TypeChecker::diagnoseDuplicateCaptureVars(CaptureListExpr *expr) {
   SmallVector<VarDecl *, 2> captureListVars;
   for (auto &capture : expr->getCaptureList())
-    captureListVars.push_back(capture.Var);
+    captureListVars.push_back(capture.getVar());
 
   diagnoseDuplicateDecls(captureListVars);
 }
 
-template<typename ...DiagIDAndArgs> InFlightDiagnostic
-diagnoseAtAttrOrDecl(DeclAttribute *attr, ValueDecl *VD,
-                     DiagIDAndArgs... idAndArgs) {
-  ASTContext &ctx = VD->getASTContext();
-  if (attr->getLocation().isValid())
-    return ctx.Diags.diagnose(attr->getLocation(), idAndArgs...);
-  else
-    return ctx.Diags.diagnose(VD, idAndArgs...);
+static StringRef prettyPrintAttrs(const ValueDecl *VD,
+                                  ArrayRef<const DeclAttribute *> attrs,
+                                  SmallVectorImpl<char> &out) {
+  llvm::raw_svector_ostream os(out);
+  StreamPrinter printer(os);
+
+  PrintOptions opts = PrintOptions::printEverything();
+  VD->getAttrs().print(printer, opts, attrs, VD);
+  return StringRef(out.begin(), out.size()).drop_back();
+}
+
+static void diagnoseChangesByAccessNote(
+    ValueDecl *VD,
+    ArrayRef<const DeclAttribute *> attrs,
+    Diag<StringRef, StringRef, DescriptiveDeclKind> diagID,
+    Diag<StringRef> fixItID,
+    llvm::function_ref<void(InFlightDiagnostic, StringRef)> addFixIts) {
+  if (!VD->getASTContext().LangOpts.shouldRemarkOnAccessNoteSuccess() ||
+      attrs.empty())
+    return;
+
+  // Generate string containing all attributes.
+  SmallString<64> attrString;
+  auto attrText = prettyPrintAttrs(VD, attrs, attrString);
+
+  SourceLoc fixItLoc;
+
+  auto reason = VD->getModuleContext()->getAccessNotes().Reason;
+  auto diag = VD->diagnose(diagID, reason, attrText, VD->getDescriptiveKind());
+  for (auto attr : attrs) {
+    diag.highlight(attr->getRangeWithAt());
+    if (fixItLoc.isInvalid())
+      fixItLoc = attr->getRangeWithAt().Start;
+  }
+  diag.flush();
+
+  if (!fixItLoc)
+    fixItLoc = VD->getAttributeInsertionLoc(true);
+
+  addFixIts(VD->getASTContext().Diags.diagnose(fixItLoc, fixItID, attrText),
+            attrString);
 }
 
 template <typename Attr>
 static void addOrRemoveAttr(ValueDecl *VD, const AccessNotesFile &notes,
                             Optional<bool> expected,
+                            SmallVectorImpl<DeclAttribute *> &removedAttrs,
                             llvm::function_ref<Attr*()> willCreate) {
   if (!expected) return;
 
   auto attr = VD->getAttrs().getAttribute<Attr>();
   if (*expected == (attr != nullptr)) return;
 
-  auto diagnoseChangeByAccessNote =
-      [&](Diag<StringRef, bool, StringRef, DescriptiveDeclKind> diagID,
-          Diag<bool> fixitID) -> InFlightDiagnostic {
-    bool isModifier = attr->isDeclModifier();
-
-    diagnoseAtAttrOrDecl(attr, VD, diagID, notes.Reason, isModifier,
-                          attr->getAttrName(), VD->getDescriptiveKind());
-    return diagnoseAtAttrOrDecl(attr, VD, fixitID, isModifier);
-  };
-
   if (*expected) {
     attr = willCreate();
     attr->setAddedByAccessNote();
     VD->getAttrs().add(attr);
 
-    SmallString<64> attrString;
-    llvm::raw_svector_ostream os(attrString);
-    attr->print(os, VD);
-
-    diagnoseChangeByAccessNote(diag::attr_added_by_access_note,
-                               diag::fixit_attr_added_by_access_note)
-      .fixItInsert(VD->getAttributeInsertionLoc(attr->isDeclModifier()),
-                   attrString);
+    // Arrange for us to emit a remark about this attribute after type checking
+    // has ensured it's valid.
+    if (auto SF = VD->getDeclContext()->getParentSourceFile())
+      SF->AttrsAddedByAccessNotes[VD].push_back(attr);
   } else {
+    removedAttrs.push_back(attr);
     VD->getAttrs().removeAttribute(attr);
-    diagnoseChangeByAccessNote(diag::attr_removed_by_access_note,
-                               diag::fixit_attr_removed_by_access_note)
-      .fixItRemove(attr->getRangeWithAt());
   }
+}
+
+InFlightDiagnostic
+swift::softenIfAccessNote(const Decl *D, const DeclAttribute *attr,
+                          InFlightDiagnostic &diag) {
+  const ValueDecl *VD = dyn_cast<ValueDecl>(D);
+  if (!VD || !attr || !attr->getAddedByAccessNote())
+    return std::move(diag);
+
+  SmallString<32> attrString;
+  auto attrText = prettyPrintAttrs(VD, makeArrayRef(attr), attrString);
+
+  ASTContext &ctx = D->getASTContext();
+  auto behavior = ctx.LangOpts.getAccessNoteFailureLimit();
+  return std::move(diag.wrapIn(diag::wrap_invalid_attr_added_by_access_note,
+                               D->getModuleContext()->getAccessNotes().Reason,
+                               ctx.AllocateCopy(attrText), D->getDescriptiveKind())
+                        .limitBehavior(behavior));
 }
 
 static void applyAccessNote(ValueDecl *VD, const AccessNote &note,
                             const AccessNotesFile &notes) {
   ASTContext &ctx = VD->getASTContext();
+  SmallVector<DeclAttribute *, 2> removedAttrs;
 
-  addOrRemoveAttr<ObjCAttr>(VD, notes, note.ObjC, [&]{
+  addOrRemoveAttr<ObjCAttr>(VD, notes, note.ObjC, removedAttrs, [&]{
     return ObjCAttr::create(ctx, note.ObjCName, false);
   });
 
-  addOrRemoveAttr<DynamicAttr>(VD, notes, note.Dynamic, [&]{
+  addOrRemoveAttr<DynamicAttr>(VD, notes, note.Dynamic, removedAttrs, [&]{
     return new (ctx) DynamicAttr(true);
+  });
+
+  // FIXME: If we ever have more attributes, we'll need to sort removedAttrs by
+  // SourceLoc. As it is, attrs are always before modifiers, so we're okay now.
+
+  diagnoseChangesByAccessNote(VD, removedAttrs,
+                              diag::attr_removed_by_access_note,
+                              diag::fixit_attr_removed_by_access_note,
+                              [&](InFlightDiagnostic diag, StringRef code) {
+    for (auto attr : llvm::reverse(removedAttrs))
+      diag.fixItRemove(attr->getRangeWithAt());
   });
 
   if (note.ObjCName) {
@@ -1483,32 +1562,27 @@ static void applyAccessNote(ValueDecl *VD, const AccessNote &note,
     assert(attr && "ObjCName set, but ObjCAttr not true or did not apply???");
 
     if (!attr->hasName()) {
+      auto oldName = attr->getName();
       attr->setName(*note.ObjCName, true);
-      diagnoseAtAttrOrDecl(attr, VD,
-                           diag::attr_objc_name_changed_by_access_note,
-                           notes.Reason, VD->getDescriptiveKind(),
-                           *note.ObjCName);
 
-      SmallString<64> newNameString;
-      llvm::raw_svector_ostream os(newNameString);
-      os << "(";
-      os << *note.ObjCName;
-      os << ")";
+      if (!ctx.LangOpts.shouldRemarkOnAccessNoteSuccess())
+        return;
 
-      auto note = diagnoseAtAttrOrDecl(attr, VD,
-                            diag::fixit_attr_objc_name_changed_by_access_note);
+      VD->diagnose(diag::attr_objc_name_changed_by_access_note,
+                   notes.Reason, VD->getDescriptiveKind(), *note.ObjCName);
 
-      if (attr->getLParenLoc().isValid())
-        note.fixItReplace({ attr->getLParenLoc(), attr->getRParenLoc() },
-                          newNameString);
-      else
-        note.fixItInsertAfter(attr->getLocation(), newNameString);
+      auto fixIt =
+          VD->diagnose(diag::fixit_attr_objc_name_changed_by_access_note);
+      fixDeclarationObjCName(fixIt, VD, oldName, *note.ObjCName);
     }
     else if (attr->getName() != *note.ObjCName) {
-      diagnoseAtAttrOrDecl(attr, VD,
-                           diag::attr_objc_name_conflicts_with_access_note,
-                           notes.Reason, VD->getDescriptiveKind(),
-                           *note.ObjCName, *attr->getName());
+      auto behavior = ctx.LangOpts.getAccessNoteFailureLimit();
+
+      VD->diagnose(diag::attr_objc_name_conflicts_with_access_note,
+                   notes.Reason, VD->getDescriptiveKind(), *attr->getName(),
+                   *note.ObjCName)
+          .highlight(attr->getRangeWithAt())
+          .limitBehavior(behavior);
     }
   }
 }
@@ -1516,6 +1590,38 @@ static void applyAccessNote(ValueDecl *VD, const AccessNote &note,
 void TypeChecker::applyAccessNote(ValueDecl *VD) {
   (void)evaluateOrDefault(VD->getASTContext().evaluator,
                           ApplyAccessNoteRequest{VD}, {});
+}
+
+void swift::diagnoseAttrsAddedByAccessNote(SourceFile &SF) {
+  if (!SF.getASTContext().LangOpts.shouldRemarkOnAccessNoteSuccess())
+    return;
+
+  for (auto declAndAttrs : SF.AttrsAddedByAccessNotes) {
+    auto D = declAndAttrs.getFirst();
+    SmallVector<DeclAttribute *, 4> sortedAttrs;
+    llvm::append_range(sortedAttrs, declAndAttrs.getSecond());
+
+    // Filter out invalid attributes.
+    sortedAttrs.erase(
+      llvm::remove_if(sortedAttrs, [](DeclAttribute *attr) {
+        assert(attr->getAddedByAccessNote());
+        return attr->isInvalid();
+      }), sortedAttrs.end());
+    if (sortedAttrs.empty()) continue;
+
+    // Sort attributes by name.
+    llvm::sort(sortedAttrs, [](DeclAttribute * first, DeclAttribute * second) {
+      return first->getAttrName() < second->getAttrName();
+    });
+    sortedAttrs.erase(std::unique(sortedAttrs.begin(), sortedAttrs.end()),
+                      sortedAttrs.end());
+
+    diagnoseChangesByAccessNote(D, sortedAttrs, diag::attr_added_by_access_note,
+                                diag::fixit_attr_added_by_access_note,
+                                [=](InFlightDiagnostic diag, StringRef code) {
+      diag.fixItInsert(D->getAttributeInsertionLoc(/*isModifier=*/true), code);
+    });
+  }
 }
 
 evaluator::SideEffect
@@ -1562,7 +1668,7 @@ public:
       // Force some requests, which can produce diagnostics.
 
       // Check redeclaration.
-      (void) evaluateOrDefault(decl->getASTContext().evaluator,
+      (void) evaluateOrDefault(Context.evaluator,
                                CheckRedeclarationRequest{VD}, {});
 
       // Compute access level.
@@ -1576,6 +1682,12 @@ public:
       (void) VD->isObjC();
       (void) VD->isDynamic();
 
+      // Check for actor isolation of top-level and local declarations.
+      // Declarations inside types are handled in checkConformancesInContext()
+      // to avoid cycles involving associated type inference.
+      if (!VD->getDeclContext()->isTypeContext())
+        (void) getActorIsolation(VD);
+
       // If this is a member of a nominal type, don't allow it to have a name of
       // "Type" or "Protocol" since we reserve the X.Type and X.Protocol
       // expressions to mean something builtin to the language.  We *do* allow
@@ -1585,7 +1697,7 @@ public:
            VD->getName().isSimpleName(Context.Id_Protocol)) &&
           VD->getNameLoc().isValid() &&
           Context.SourceMgr.extractText({VD->getNameLoc(), 1}) != "`") {
-        auto &DE = getASTContext().Diags;
+        auto &DE = Context.Diags;
         DE.diagnose(VD->getNameLoc(), diag::reserved_member_name,
                     VD->getName(), VD->getBaseIdentifier().str());
         DE.diagnose(VD->getNameLoc(), diag::backticks_to_escape)
@@ -1792,31 +1904,6 @@ public:
     });
   }
 
-  /// If the given pattern binding has a property wrapper, check the
-  /// isolation and effects of the backing storage initializer.
-  void checkPropertyWrapperBackingInitializer(PatternBindingDecl *PBD) {
-    auto singleVar = PBD->getSingleVar();
-    if (!singleVar)
-      return;
-
-    if (!singleVar->hasAttachedPropertyWrapper())
-      return;
-
-    auto *backingVar = singleVar->getPropertyWrapperBackingProperty();
-    if (!backingVar)
-      return;
-
-    auto backingPBD = backingVar->getParentPatternBinding();
-    if (!backingPBD)
-      return;
-
-    auto initInfo = singleVar->getPropertyWrapperInitializerInfo();
-    if (auto initializer = initInfo.getInitFromWrappedValue()) {
-      checkPropertyWrapperActorIsolation(backingPBD, initializer);
-      TypeChecker::checkPropertyWrapperEffects(backingPBD, initializer);
-    }
-  }
-
   void visitPatternBindingDecl(PatternBindingDecl *PBD) {
     DeclContext *DC = PBD->getDeclContext();
 
@@ -1963,8 +2050,6 @@ public:
         }
       }
     }
-
-    checkPropertyWrapperBackingInitializer(PBD);
   }
 
   void visitSubscriptDecl(SubscriptDecl *SD) {
@@ -2024,6 +2109,14 @@ public:
           SD->supportsMutation()) {
         SD->diagnose(diag::dynamic_self_in_mutable_subscript);
       }
+    }
+
+    // Reject "class" methods on actors.
+    if (SD->getStaticSpelling() == StaticSpellingKind::KeywordClass &&
+        SD->getDeclContext()->getSelfClassDecl() &&
+        SD->getDeclContext()->getSelfClassDecl()->isActor()) {
+      SD->diagnose(diag::class_subscript_not_in_class, false)
+          .fixItReplace(SD->getStaticLoc(), "static");
     }
 
     // Now check all the accessors.
@@ -2190,6 +2283,7 @@ public:
     TypeChecker::addImplicitConstructors(SD);
 
     installCodingKeysIfNecessary(SD);
+    installDistributedActorIfNecessary(SD);
 
     TypeChecker::checkDeclAttributes(SD);
 
@@ -2317,9 +2411,11 @@ public:
     if (auto superclass = CD->getSuperclassDecl()) {
       // Actors cannot have superclasses, nor can they be superclasses.
       if (CD->isActor() && !superclass->isNSObject())
-        CD->diagnose(diag::actor_inheritance);
+        CD->diagnose(diag::actor_inheritance,
+                     /*distributed=*/CD->isDistributedActor());
       else if (superclass->isActor())
-        CD->diagnose(diag::actor_inheritance);
+        CD->diagnose(diag::actor_inheritance,
+                     /*distributed=*/CD->isDistributedActor());
     }
 
     // Force lowering of stored properties.
@@ -2329,6 +2425,9 @@ public:
     (void) CD->getDestructor();
 
     TypeChecker::checkDeclAttributes(CD);
+
+    if (CD->isActor())
+      TypeChecker::checkConcurrencyAvailability(CD->getLoc(), CD);
 
     for (Decl *Member : CD->getABIMembers())
       visit(Member);
@@ -2489,8 +2588,8 @@ public:
 
       llvm::errs() << "Canonical requirement signature: ";
       auto canRequirementSig =
-        CanGenericSignature::getCanonical(requirementsSig->getGenericParams(),
-                                          requirementsSig->getRequirements());
+        CanGenericSignature::getCanonical(requirementsSig.getGenericParams(),
+                                          requirementsSig.getRequirements());
       canRequirementSig->print(llvm::errs());
       llvm::errs() << "\n";
     }
@@ -2580,6 +2679,13 @@ public:
     return AFD->getResilienceExpansion() != ResilienceExpansion::Minimal;
   }
 
+  /// FIXME: This is an egregious hack to turn off availability checking
+  /// for specific functions that were missing availability in older versions
+  /// of existing libraries that we must nonethess still support.
+  static bool hasHistoricallyWrongAvailability(FuncDecl *func) {
+    return func->getName().isCompoundName("swift_deletedAsyncMethodError", { });
+  }
+
   void visitFuncDecl(FuncDecl *FD) {
     // Force these requests in case they emit diagnostics.
     (void) FD->getInterfaceType();
@@ -2596,6 +2702,7 @@ public:
       checkAccessControl(FD);
 
       TypeChecker::checkParameterList(FD->getParameters(), FD);
+      TypeChecker::checkResultType(FD->getResultInterfaceType(), FD);
     }
 
     TypeChecker::checkDeclAttributes(FD);
@@ -2624,6 +2731,10 @@ public:
 
     checkImplementationOnlyOverride(FD);
 
+    if (FD->getAsyncLoc().isValid() &&
+        !hasHistoricallyWrongAvailability(FD))
+      TypeChecker::checkConcurrencyAvailability(FD->getAsyncLoc(), FD);
+    
     if (requiresDefinition(FD) && !FD->hasBody()) {
       // Complain if we should have a body.
       FD->diagnose(diag::func_decl_without_brace);
@@ -2662,6 +2773,14 @@ public:
       }
     }
 
+    // Reject "class" methods on actors.
+    if (StaticSpelling == StaticSpellingKind::KeywordClass &&
+        FD->getDeclContext()->getSelfClassDecl() &&
+        FD->getDeclContext()->getSelfClassDecl()->isActor()) {
+      FD->diagnose(diag::class_func_not_in_class, false)
+          .fixItReplace(FD->getStaticLoc(), "static");
+    }
+
     // Member functions need some special validation logic.
     if (FD->getDeclContext()->isTypeContext()) {
       if (FD->isOperator() && !isMemberOperator(FD, nullptr)) {
@@ -2680,8 +2799,8 @@ public:
     if (auto CDeclAttr = FD->getAttrs().getAttribute<swift::CDeclAttr>()) {
       Optional<ForeignAsyncConvention> asyncConvention;
       Optional<ForeignErrorConvention> errorConvention;
-      if (isRepresentableInObjC(FD, ObjCReason::ExplicitlyCDecl,
-                                asyncConvention, errorConvention)) {
+      ObjCReason reason(ObjCReason::ExplicitlyCDecl, CDeclAttr);
+      if (isRepresentableInObjC(FD, reason, asyncConvention, errorConvention)) {
         if (FD->hasAsync()) {
           FD->setForeignAsyncConvention(*asyncConvention);
           getASTContext().Diags.diagnose(CDeclAttr->getLocation(),
@@ -2691,6 +2810,8 @@ public:
           getASTContext().Diags.diagnose(CDeclAttr->getLocation(),
                                          diag::cdecl_throws);
         }
+      } else {
+        reason.setAttrInvalid();
       }
     }
   }
@@ -2865,6 +2986,9 @@ public:
 
     TypeChecker::checkDeclAttributes(CD);
     TypeChecker::checkParameterList(CD->getParameters(), CD);
+
+    if (CD->getAsyncLoc().isValid())
+      TypeChecker::checkConcurrencyAvailability(CD->getAsyncLoc(), CD);
 
     // Check whether this initializer overrides an initializer in its
     // superclass.

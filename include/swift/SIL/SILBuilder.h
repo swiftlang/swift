@@ -123,6 +123,13 @@ public:
     setInsertionPoint(I);
   }
 
+  // Used by libswift bridging.
+  explicit SILBuilder(SILInstruction *I, const SILDebugScope *debugScope)
+      : TempContext(I->getFunction()->getModule()),
+        C(TempContext), F(I->getFunction()), CurDebugScope(debugScope) {
+    setInsertionPoint(I);
+  }
+
   explicit SILBuilder(SILBasicBlock::iterator I,
                       SmallVectorImpl<SILInstruction *> *InsertedInstrs = 0)
       : SILBuilder(&*I, InsertedInstrs) {}
@@ -2117,9 +2124,11 @@ public:
                                                                  Throws));
   }
 
-  HopToExecutorInst *createHopToExecutor(SILLocation Loc, SILValue Actor) {
+  HopToExecutorInst *createHopToExecutor(SILLocation Loc, SILValue Actor,
+                                         bool mandatory) {
     return insert(new (getModule()) HopToExecutorInst(getSILDebugLocation(Loc),
-                                                      Actor, hasOwnership()));
+                                                      Actor, hasOwnership(),
+                                                      mandatory));
   }
 
   ExtractExecutorInst *createExtractExecutor(SILLocation Loc, SILValue Actor) {
@@ -2639,6 +2648,11 @@ private:
     C.notifyInserted(TheInst);
 
 #ifndef NDEBUG
+    // If we are inserting into a specific function (rather than a block for a
+    // global_addr), verify that our instruction/the associated location are in
+    // sync. We don't care if an instruction is used in global_addr.
+    if (F)
+      TheInst->verifyDebugInfo();
     TheInst->verifyOperandOwnership();
 #endif
   }

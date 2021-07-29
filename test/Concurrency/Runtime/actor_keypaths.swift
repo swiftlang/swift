@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency %import-libdispatch)
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -Xfrontend -disable-availability-checking %import-libdispatch)
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -17,10 +17,14 @@ actor Page {
       set { numWordsMem.pointee = newValue }
     }
 
-    init(_ words : Int) {
+    private init(withWords words : Int) {
         initialNumWords = words
         numWordsMem = .allocate(capacity: 1)
         numWordsMem.initialize(to: words)
+    }
+
+    convenience init(_ words: Int) {
+        self.init(withWords: words)
         numWords = words
     }
 

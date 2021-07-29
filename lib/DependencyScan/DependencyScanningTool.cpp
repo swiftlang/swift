@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/DependencyScan/DependencyScanningTool.h"
+#include "swift/DependencyScan/SerializedModuleDependencyCacheFormat.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/LLVMInitialize.h"
@@ -77,11 +78,37 @@ DependencyScanningTool::getDependencies(
         BatchInput.size(), std::make_error_code(std::errc::invalid_argument));
   auto Instance = std::move(*InstanceOrErr);
 
-  auto batchScanResults = performBatchModuleScan(
+  auto BatchScanResults = performBatchModuleScan(
       *Instance.get(), *SharedCache, VersionedPCMInstanceCacheCache.get(),
       Saver, BatchInput);
 
-  return batchScanResults;
+  return BatchScanResults;
+}
+
+void DependencyScanningTool::serializeCache(llvm::StringRef path) {
+  SourceManager SM;
+  DiagnosticEngine Diags(SM);
+  Diags.addConsumer(PDC);
+  module_dependency_cache_serialization::writeInterModuleDependenciesCache(
+      Diags, path, *SharedCache);
+}
+
+bool DependencyScanningTool::loadCache(llvm::StringRef path) {
+  SourceManager SM;
+  DiagnosticEngine Diags(SM);
+  Diags.addConsumer(PDC);
+  SharedCache = std::make_unique<ModuleDependenciesCache>();
+  bool readFailed =
+      module_dependency_cache_serialization::readInterModuleDependenciesCache(
+          path, *SharedCache);
+  if (readFailed) {
+    Diags.diagnose(SourceLoc(), diag::warn_scaner_deserialize_failed, path);
+  }
+  return readFailed;
+}
+
+void DependencyScanningTool::resetCache() {
+  SharedCache.reset(new ModuleDependenciesCache());
 }
 
 llvm::ErrorOr<std::unique_ptr<CompilerInstance>>

@@ -334,6 +334,10 @@ AvailabilityContext ASTContext::getDifferentiationAvailability() {
   return getSwiftFutureAvailability();
 }
 
+AvailabilityContext ASTContext::getMultiPayloadEnumTagSinglePayload() {
+  return getSwift56Availability();
+}
+
 AvailabilityContext ASTContext::getSwift52Availability() {
   auto target = LangOpts.Target;
 
@@ -413,9 +417,25 @@ AvailabilityContext ASTContext::getSwift54Availability() {
 }
 
 AvailabilityContext ASTContext::getSwift55Availability() {
-  return getSwiftFutureAvailability();
+  auto target = LangOpts.Target;
+
+  if (target.isMacOSX() ) {
+    return AvailabilityContext(
+        VersionRange::allGTE(llvm::VersionTuple(12, 0, 0)));
+  } else if (target.isiOS()) {
+    return AvailabilityContext(
+        VersionRange::allGTE(llvm::VersionTuple(15, 0, 0)));
+  } else if (target.isWatchOS()) {
+    return AvailabilityContext(
+        VersionRange::allGTE(llvm::VersionTuple(8, 0, 0)));
+  } else {
+    return AvailabilityContext::alwaysAvailable();
+  }
 }
 
+AvailabilityContext ASTContext::getSwift56Availability() {
+  return getSwiftFutureAvailability();
+}
 
 AvailabilityContext ASTContext::getSwiftFutureAvailability() {
   auto target = LangOpts.Target;

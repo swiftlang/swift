@@ -95,7 +95,8 @@ function(get_test_dependencies SDK result_var_name)
       llvm-readelf
       llvm-readobj
       llvm-strings
-      not)
+      not
+      split-file)
   endif()
 
   if(("${SDK}" STREQUAL "IOS") OR
@@ -153,6 +154,10 @@ if(NOT CMAKE_CFG_INTDIR STREQUAL ".")
        "--param" "build_mode=${CMAKE_CFG_INTDIR}")
 endif()
 
+if(SWIFT_TOOLS_ENABLE_LIBSWIFT)
+  list(APPEND SWIFT_LIT_ARGS "--param" "libswift")
+endif()
+
 if (LLVM_USE_SANITIZER STREQUAL "Address")
   set(SWIFT_ASAN_BUILD TRUE)
 endif()
@@ -166,6 +171,7 @@ normalize_boolean_spelling(SWIFT_BUILD_SYNTAXPARSERLIB)
 normalize_boolean_spelling(SWIFT_ENABLE_SOURCEKIT_TESTS)
 normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
 normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
+normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED)
 is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" SWIFT_OPTIMIZED)
 
 set(profdata_merge_worker
@@ -340,6 +346,10 @@ foreach(SDK ${SWIFT_SDKS})
 
         if(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
           list(APPEND LIT_ARGS "--param" "concurrency")
+        endif()
+
+        if(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED)
+          list(APPEND LIT_ARGS "--param" "distributed")
         endif()
 
         foreach(test_subset ${TEST_SUBSETS})

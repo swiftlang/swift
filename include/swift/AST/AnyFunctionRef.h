@@ -210,9 +210,9 @@ public:
     llvm_unreachable("unexpected AnyFunctionRef representation");
   }
   
-  SourceLoc getLoc() const {
+  SourceLoc getLoc(bool SerializedOK = true) const {
     if (auto afd = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
-      return afd->getLoc();
+      return afd->getLoc(SerializedOK);
     }
     if (auto ce = TheFunction.dyn_cast<AbstractClosureExpr *>()) {
       return ce->getLoc();
@@ -269,7 +269,7 @@ public:
   }
 
   friend SourceLoc extractNearestSourceLoc(AnyFunctionRef fn) {
-    return fn.getLoc();
+    return fn.getLoc(/*SerializedOK=*/false);
   }
 
 private:

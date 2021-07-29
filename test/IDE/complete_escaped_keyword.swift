@@ -26,33 +26,33 @@ enum MyEnum {
     let _ = #^STATIC_PRIMARY^#
 // STATIC_PRIMARY: Begin completion
 // STATIC_PRIMARY-DAG: Decl[LocalVar]/Local:               self[#MyEnum.Type#]; name=self
-// STATIC_PRIMARY-DAG: Decl[EnumElement]/CurrNominal:      `class`({#struct: String#})[#MyEnum#]; name=`class`(struct: String)
-// STATIC_PRIMARY-DAG: Decl[EnumElement]/CurrNominal:      `let`({#var: String#})[#MyEnum#]; name=`let`(var: String)
-// STATIC_PRIMARY-DAG: Decl[StaticMethod]/CurrNominal:     `public`({#private: String#})[#Int#]; name=`public`(private: String)
-// STATIC_PRIMARY-DAG: Decl[InstanceMethod]/CurrNominal:   `init`({#(self): MyEnum#})[#(deinit: String) -> Int#]; name=`init`(self: MyEnum)
-// STATIC_PRIMARY-DAG: Decl[InstanceMethod]/CurrNominal:   `if`({#(self): MyEnum#})[#(else: String) -> Int#]; name=`if`(self: MyEnum)
+// STATIC_PRIMARY-DAG: Decl[EnumElement]/CurrNominal:      `class`({#struct: String#})[#MyEnum#]; name=`class`(struct:)
+// STATIC_PRIMARY-DAG: Decl[EnumElement]/CurrNominal:      `let`({#var: String#})[#MyEnum#]; name=`let`(var:)
+// STATIC_PRIMARY-DAG: Decl[StaticMethod]/CurrNominal:     `public`({#private: String#})[#Int#]; name=`public`(private:)
+// STATIC_PRIMARY-DAG: Decl[InstanceMethod]/CurrNominal:   `init`({#(self): MyEnum#})[#(deinit: String) -> Int#]; name=`init`(:)
+// STATIC_PRIMARY-DAG: Decl[InstanceMethod]/CurrNominal:   `if`({#(self): MyEnum#})[#(else: String) -> Int#]; name=`if`(:)
 // STATIC_PRIMARY: End completion
 
     let _ = self#^STATIC_SELF_NODOT^#
 // STATIC_SELF_NODOT: Begin completions
 // STATIC_SELF_NODOT-DAG: Keyword[self]/CurrNominal:          .self[#MyEnum.Type#]; name=self
-// STATIC_SELF_NODOT-DAG: Decl[EnumElement]/CurrNominal:      .class({#struct: String#})[#MyEnum#]; name=class(struct: String)
-// STATIC_SELF_NODOT-DAG: Decl[EnumElement]/CurrNominal:      .let({#var: String#})[#MyEnum#]; name=let(var: String)
-// STATIC_SELF_NODOT-DAG: Decl[Constructor]/CurrNominal:      .init({#init: String#})[#MyEnum#]; name=init(init: String)
-// STATIC_SELF_NODOT-DAG: Decl[StaticMethod]/CurrNominal:     .public({#private: String#})[#Int#]; name=public(private: String)
-// STATIC_SELF_NODOT-DAG: Decl[InstanceMethod]/CurrNominal:   .`init`({#(self): MyEnum#})[#(deinit: String) -> Int#]; name=`init`(self: MyEnum)
-// STATIC_SELF_NODOT-DAG: Decl[InstanceMethod]/CurrNominal:   .if({#(self): MyEnum#})[#(else: String) -> Int#]; name=if(self: MyEnum)
+// STATIC_SELF_NODOT-DAG: Decl[EnumElement]/CurrNominal:      .class({#struct: String#})[#MyEnum#]; name=class(struct:)
+// STATIC_SELF_NODOT-DAG: Decl[EnumElement]/CurrNominal:      .let({#var: String#})[#MyEnum#]; name=let(var:)
+// STATIC_SELF_NODOT-DAG: Decl[Constructor]/CurrNominal:      .init({#init: String#})[#MyEnum#]; name=init(init:)
+// STATIC_SELF_NODOT-DAG: Decl[StaticMethod]/CurrNominal:     .public({#private: String#})[#Int#]; name=public(private:)
+// STATIC_SELF_NODOT-DAG: Decl[InstanceMethod]/CurrNominal:   .`init`({#(self): MyEnum#})[#(deinit: String) -> Int#]; name=`init`(:)
+// STATIC_SELF_NODOT-DAG: Decl[InstanceMethod]/CurrNominal:   .if({#(self): MyEnum#})[#(else: String) -> Int#]; name=if(:)
 // STATIC_SELF_NODOT: End completion
 
     let _ = self.#^STATIC_SELF_DOT^#
 // STATIC_SELF_DOT: Begin completions
 // STATIC_SELF_DOT-DAG: Keyword[self]/CurrNominal:          self[#MyEnum.Type#]; name=self
-// STATIC_SELF_DOT-DAG: Decl[EnumElement]/CurrNominal:      class({#struct: String#})[#MyEnum#]; name=class(struct: String)
-// STATIC_SELF_DOT-DAG: Decl[EnumElement]/CurrNominal:      let({#var: String#})[#MyEnum#]; name=let(var: String)
-// STATIC_SELF_DOT-DAG: Decl[Constructor]/CurrNominal:      init({#init: String#})[#MyEnum#]; name=init(init: String)
-// STATIC_SELF_DOT-DAG: Decl[StaticMethod]/CurrNominal:     public({#private: String#})[#Int#]; name=public(private: String)
-// STATIC_SELF_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   `init`({#(self): MyEnum#})[#(deinit: String) -> Int#]; name=`init`(self: MyEnum)
-// STATIC_SELF_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   if({#(self): MyEnum#})[#(else: String) -> Int#]; name=if(self: MyEnum)
+// STATIC_SELF_DOT-DAG: Decl[EnumElement]/CurrNominal:      class({#struct: String#})[#MyEnum#]; name=class(struct:)
+// STATIC_SELF_DOT-DAG: Decl[EnumElement]/CurrNominal:      let({#var: String#})[#MyEnum#]; name=let(var:)
+// STATIC_SELF_DOT-DAG: Decl[Constructor]/CurrNominal:      init({#init: String#})[#MyEnum#]; name=init(init:)
+// STATIC_SELF_DOT-DAG: Decl[StaticMethod]/CurrNominal:     public({#private: String#})[#Int#]; name=public(private:)
+// STATIC_SELF_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   `init`({#(self): MyEnum#})[#(deinit: String) -> Int#]; name=`init`(:)
+// STATIC_SELF_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   if({#(self): MyEnum#})[#(else: String) -> Int#]; name=if(:)
 // STATIC_SELF_DOT: End completion
 
     let _ = meta#^META_NODOT^#
@@ -68,14 +68,14 @@ enum MyEnum {
 // INSTANCE_PRIMARY-DAG: Decl[LocalVar]/Local:               self[#MyEnum#]; name=self
 // INSTANCE_PRIMARY-DAG: Decl[InstanceVar]/CurrNominal:      self[#Int#]; name=self
 // FIXME: ^ This is shadowed. We should hide this.
-// INSTANCE_PRIMARY-DAG: Decl[InstanceMethod]/CurrNominal:   `init`({#deinit: String#})[#Int#]; name=`init`(deinit: String)
-// INSTANCE_PRIMARY-DAG: Decl[InstanceMethod]/CurrNominal:   `if`({#else: String#})[#Int#]; name=`if`(else: String)
+// INSTANCE_PRIMARY-DAG: Decl[InstanceMethod]/CurrNominal:   `init`({#deinit: String#})[#Int#]; name=`init`(deinit:)
+// INSTANCE_PRIMARY-DAG: Decl[InstanceMethod]/CurrNominal:   `if`({#else: String#})[#Int#]; name=`if`(else:)
 // INSTANCE_PRIMARY: End completion
 
     let _ = self#^INSTANCE_SELF_NODOT^#
 // INSTANCE_SELF_NODOT: Begin completions
-// INSTANCE_SELF_NODOT-DAG: Decl[InstanceMethod]/CurrNominal:   .`init`({#deinit: String#})[#Int#]; name=`init`(deinit: String)
-// INSTANCE_SELF_NODOT-DAG: Decl[InstanceMethod]/CurrNominal:   .if({#else: String#})[#Int#]; name=if(else: String)
+// INSTANCE_SELF_NODOT-DAG: Decl[InstanceMethod]/CurrNominal:   .`init`({#deinit: String#})[#Int#]; name=`init`(deinit:)
+// INSTANCE_SELF_NODOT-DAG: Decl[InstanceMethod]/CurrNominal:   .if({#else: String#})[#Int#]; name=if(else:)
 // INSTANCE_SELF_NODOT-DAG: Decl[InstanceVar]/CurrNominal:      .`self`[#Int#]; name=`self`
 // INSTANCE_SELF_NODOT-DAG: Keyword[self]/CurrNominal:          .self[#MyEnum#]; name=self
 
@@ -83,8 +83,8 @@ enum MyEnum {
 
     let _ = self.#^INSTANCE_SELF_DOT^#
 // INSTANCE_SELF_DOT: Begin completions
-// INSTANCE_SELF_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   `init`({#deinit: String#})[#Int#]; name=`init`(deinit: String)
-// INSTANCE_SELF_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   if({#else: String#})[#Int#]; name=if(else: String)
+// INSTANCE_SELF_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   `init`({#deinit: String#})[#Int#]; name=`init`(deinit:)
+// INSTANCE_SELF_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   if({#else: String#})[#Int#]; name=if(else:)
 // INSTANCE_SELF_DOT-DAG: Decl[InstanceVar]/CurrNominal:      `self`[#Int#]; name=`self`
 // INSTANCE_SELF_DOT-DAG: Keyword[self]/CurrNominal:          self[#MyEnum#]; name=self
 // INSTANCE_SELF_DOT: End completions

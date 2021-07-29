@@ -21,7 +21,6 @@
 #include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
-#include "swift/AST/GenericParamList.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -113,107 +112,6 @@ namespace {
 
   };
 } // end anonymous namespace
-
-//===----------------------------------------------------------------------===//
-//  Generic param list printing.
-//===----------------------------------------------------------------------===//
-
-void RequirementRepr::dump() const {
-  print(llvm::errs());
-  llvm::errs() << "\n";
-}
-
-void RequirementRepr::printImpl(ASTPrinter &out) const {
-  auto printLayoutConstraint =
-      [&](const LayoutConstraintLoc &LayoutConstraintLoc) {
-        LayoutConstraintLoc.getLayoutConstraint()->print(out, PrintOptions());
-      };
-
-  switch (getKind()) {
-  case RequirementReprKind::LayoutConstraint:
-    if (auto *repr = getSubjectRepr()) {
-      repr->print(out, PrintOptions());
-    }
-    out << " : ";
-    printLayoutConstraint(getLayoutConstraintLoc());
-    break;
-
-  case RequirementReprKind::TypeConstraint:
-    if (auto *repr = getSubjectRepr()) {
-      repr->print(out, PrintOptions());
-    }
-    out << " : ";
-    if (auto *repr = getConstraintRepr()) {
-      repr->print(out, PrintOptions());
-    }
-    break;
-
-  case RequirementReprKind::SameType:
-    if (auto *repr = getFirstTypeRepr()) {
-      repr->print(out, PrintOptions());
-    }
-    out << " == ";
-    if (auto *repr = getSecondTypeRepr()) {
-      repr->print(out, PrintOptions());
-    }
-    break;
-  }
-}
-
-void RequirementRepr::print(raw_ostream &out) const {
-  StreamPrinter printer(out);
-  printImpl(printer);
-}
-void RequirementRepr::print(ASTPrinter &out) const {
-  printImpl(out);
-}
-
-static void printTrailingRequirements(ASTPrinter &Printer,
-                                      ArrayRef<RequirementRepr> Reqs,
-                                      bool printWhereKeyword) {
-  if (Reqs.empty()) return;
-
-  if (printWhereKeyword)
-    Printer << " where ";
-  interleave(
-      Reqs,
-      [&](const RequirementRepr &req) {
-        Printer.callPrintStructurePre(PrintStructureKind::GenericRequirement);
-        req.print(Printer);
-        Printer.printStructurePost(PrintStructureKind::GenericRequirement);
-      },
-      [&] { Printer << ", "; });
-}
-
-void GenericParamList::print(llvm::raw_ostream &OS) const {
-  OS << '<';
-  interleave(*this,
-             [&](const GenericTypeParamDecl *P) {
-               OS << P->getName();
-               if (!P->getInherited().empty()) {
-                 OS << " : ";
-                 P->getInherited()[0].getType().print(OS);
-               }
-             },
-             [&] { OS << ", "; });
-
-  StreamPrinter Printer(OS);
-  printTrailingRequirements(Printer, getRequirements(),
-                            /*printWhereKeyword*/true);
-  OS << '>';
-}
-
-void GenericParamList::dump() const {
-  print(llvm::errs());
-  llvm::errs() << '\n';
-}
-
-void TrailingWhereClause::print(llvm::raw_ostream &OS,
-                                bool printWhereKeyword) const {
-  StreamPrinter Printer(OS);
-  printTrailingRequirements(Printer, getRequirements(),
-                            printWhereKeyword);
-}
 
 static void printGenericParameters(raw_ostream &OS, GenericParamList *Params) {
   if (!Params)
@@ -601,11 +499,12 @@ namespace {
         PrintWithColorRAII(OS, DeclModifierColor) << " trailing_semi";
     }
 
-    void printInherited(ArrayRef<TypeLoc> Inherited) {
+    void printInherited(ArrayRef<InheritedEntry> Inherited) {
       if (Inherited.empty())
         return;
       OS << " inherits: ";
-      interleave(Inherited, [&](TypeLoc Super) { Super.getType().print(OS); },
+      interleave(Inherited,
+                 [&](InheritedEntry Super) { Super.getType().print(OS); },
                  [&] { OS << ", "; });
     }
 
@@ -954,6 +853,10 @@ namespace {
       if (!D->getCaptureInfo().isTrivial()) {
         OS << " ";
         D->getCaptureInfo().print(OS);
+      }
+
+      if (D->isDistributed()) {
+        OS << " distributed";
       }
 
       if (auto fac = D->getForeignAsyncConvention()) {
@@ -1417,9 +1320,11 @@ std::string ValueDecl::printRef() const {
 }
 
 void ValueDecl::dumpRef(raw_ostream &os) const {
-  // Print the context.
-  printContext(os, getDeclContext());
-  os << ".";
+  if (!isa<ModuleDecl>(this)) {
+    // Print the context.
+    printContext(os, getDeclContext());
+    os << ".";
+  }
 
   // Print name.
   getName().printPretty(os);
@@ -2496,8 +2401,7 @@ public:
     for (auto capture : E->getCaptureList()) {
       OS << '\n';
       Indent += 2;
-      printRec(capture.Var);
-      printRec(capture.Init);
+      printRec(capture.PBD);
       Indent -= 2;
     }
     printRec(E->getClosureBody());
@@ -2878,6 +2782,9 @@ public:
         PrintWithColorRAII(OS, IdentifierColor)
           << "  key='" << component.getUnresolvedDeclName() << "'";
         break;
+      case KeyPathExpr::Component::Kind::CodeCompletion:
+        PrintWithColorRAII(OS, ASTNodeColor) << "completion";
+        break;
       }
       PrintWithColorRAII(OS, TypeColor)
         << " type='" << GetTypeOfKeyPathComponent(E, i) << "'";
@@ -3115,6 +3022,12 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
+  void visitIsolatedTypeRepr(IsolatedTypeRepr *T) {
+    printCommon("isolated") << '\n';
+    printRec(T->getBase());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
   void visitOptionalTypeRepr(OptionalTypeRepr *T) {
     printCommon("type_optional") << '\n';
     printRec(T->getBase());
@@ -3131,6 +3044,12 @@ public:
   void visitOpaqueReturnTypeRepr(OpaqueReturnTypeRepr *T) {
     printCommon("type_opaque_return");
     printRec(T->getConstraint());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
+  void visitNamedOpaqueReturnTypeRepr(NamedOpaqueReturnTypeRepr *T) {
+    printCommon("type_named_opaque_return") << '\n';
+    printRec(T->getBase());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
@@ -3367,7 +3286,7 @@ static void dumpSubstitutionMapRec(
   }
 
   genericSig->print(out);
-  auto genericParams = genericSig->getGenericParams();
+  auto genericParams = genericSig.getGenericParams();
   auto replacementTypes =
       static_cast<const SubstitutionMap &>(map).getReplacementTypesBuffer();
   for (unsigned i : indices(genericParams)) {
@@ -3396,7 +3315,7 @@ static void dumpSubstitutionMapRec(
     return;
 
   auto conformances = map.getConformances();
-  for (const auto &req : genericSig->getRequirements()) {
+  for (const auto &req : genericSig.getRequirements()) {
     if (req.getKind() != RequirementKind::Conformance)
       continue;
 

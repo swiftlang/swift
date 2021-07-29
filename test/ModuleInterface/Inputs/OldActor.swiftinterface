@@ -1,0 +1,15 @@
+// swift-interface-format-version: 1.0
+// swift-module-flags: -enable-library-evolution -module-name OldActor -enable-experimental-concurrency
+import Swift
+import _Concurrency
+
+#if compiler(>=5.3) && $Actors
+@available(SwiftStdlib 5.5, *)
+public actor Monk {
+  public init()
+  deinit
+  public func method()
+  // Lacks an unownedExecutor property
+}
+#endif
+

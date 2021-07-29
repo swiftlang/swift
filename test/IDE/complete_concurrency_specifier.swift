@@ -43,3 +43,12 @@ _ = { () #^CLOSURE_WITHARROW?check=SPECIFIER^# -> Void in }
 _ = { () async #^CLOSURE_WITHASYNCARROW?check=SPECIFIER_WITHASYNC^# -> Void in }
 _ = { () throws #^CLOSURE_WITHTHROWSARROW?check=SPECIFIER_WITHTHROWS^# -> Void in }
 _ = { () async throws #^CLOSURE_WITHASYNCTHROWSARROW?check=SPECIFIER_WITHASYNCTHROWS^# -> Void in }
+
+_ = { arg #^CLOSURE2?check=SPECIFIER^# in }
+_ = { arg async #^CLOSURE2_WITHASYNC?check=SPECIFIER_WITHASYNC^# in }
+_ = { arg throws #^CLOSURE2_WITHTHROWS?check=SPECIFIER_WITHTHROWS^# in }
+_ = { arg async throws #^CLOSURE2_WITHAASYNCTHROWS?check=SPECIFIER_WITHASYNCTHROWS^# in }
+_ = { arg #^CLOSURE2_WITHARROW?check=SPECIFIER^# -> Void in }
+_ = { arg async #^CLOSURE2_WITHASYNCARROW?check=SPECIFIER_WITHASYNC^# -> Void in }
+_ = { arg throws #^CLOSURE2_WITHTHROWSARROW?check=SPECIFIER_WITHTHROWS^# -> Void in }
+_ = { arg async throws #^CLOSURE2_WITHASYNCTHROWSARROW?check=SPECIFIER_WITHASYNCTHROWS^# -> Void in }

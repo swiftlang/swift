@@ -318,7 +318,7 @@ void Symbol::serializeSwiftGenericMixin(llvm::json::OStream &OS) const {
 
       SmallVector<const GenericTypeParamType *, 4> FilteredParams;
       SmallVector<Requirement, 4> FilteredRequirements;
-      filterGenericParams(Generics->getGenericParams(), FilteredParams,
+      filterGenericParams(Generics.getGenericParams(), FilteredParams,
                           SubMap);
 
       const auto *Self = dyn_cast<NominalTypeDecl>(VD);
@@ -326,7 +326,7 @@ void Symbol::serializeSwiftGenericMixin(llvm::json::OStream &OS) const {
         Self = VD->getDeclContext()->getSelfNominalTypeDecl();
       }
 
-      filterGenericRequirements(Generics->getRequirements(), Self,
+      filterGenericRequirements(Generics.getRequirements(), Self,
                                 FilteredRequirements, SubMap, FilteredParams);
 
       if (FilteredParams.empty() && FilteredRequirements.empty()) {
@@ -471,6 +471,11 @@ void Symbol::serializeAvailabilityMixin(llvm::json::OStream &OS) const {
   });
 }
 
+void Symbol::serializeSPIMixin(llvm::json::OStream &OS) const {
+  if (VD->isSPI())
+    OS.attribute("spi", true);
+}
+
 void Symbol::serialize(llvm::json::OStream &OS) const {
   OS.object([&](){
     serializeKind(OS);
@@ -487,6 +492,7 @@ void Symbol::serialize(llvm::json::OStream &OS) const {
     serializeAccessLevelMixin(OS);
     serializeAvailabilityMixin(OS);
     serializeLocationMixin(OS);
+    serializeSPIMixin(OS);
   });
 }
 

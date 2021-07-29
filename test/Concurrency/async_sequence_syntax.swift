@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
+// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency -disable-availability-checking
 // REQUIRES: concurrency
 
 // expected-note@+2{{add 'async' to function 'missingAsync' to make it asynchronous}}

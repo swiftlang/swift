@@ -15,7 +15,7 @@ import Swift
 
 /// Common protocol to which all actors conform.
 ///
-/// The \c Actor protocol generalizes over all actor types. Actor types
+/// The `Actor` protocol generalizes over all actor types. Actor types
 /// implicitly conform to this protocol.
 @available(SwiftStdlib 5.5, *)
 public protocol Actor: AnyObject, Sendable {
@@ -51,49 +51,3 @@ public func _defaultActorDestroy(_ actor: AnyObject)
 @_silgen_name("swift_task_enqueueMainExecutor")
 @usableFromInline
 internal func _enqueueOnMain(_ job: UnownedJob)
-
-/// A singleton actor whose executor is equivalent to 
-/// \c DispatchQueue.main, which is the main dispatch queue.
-@available(SwiftStdlib 5.5, *)
-@globalActor public final actor MainActor: SerialExecutor {
-  public static let shared = MainActor()
-
-  @inlinable
-  public nonisolated var unownedExecutor: UnownedSerialExecutor {
-    return asUnownedSerialExecutor()
-  }
-
-  @inlinable
-  public nonisolated func asUnownedSerialExecutor() -> UnownedSerialExecutor {
-    return UnownedSerialExecutor(ordinary: self)
-  }
-
-  @inlinable
-  public nonisolated func enqueue(_ job: UnownedJob) {
-    _enqueueOnMain(job)
-  }
-}
-
-// Used by the concurrency runtime
-@available(SwiftStdlib 5.5, *)
-extension SerialExecutor {
-  @_silgen_name("_swift_task_getMainExecutor")
-  internal func _getMainExecutor() -> UnownedSerialExecutor {
-    return MainActor.shared.unownedExecutor
-  }
-}
-
-@available(SwiftStdlib 5.5, *)
-extension MainActor {
-  /// Execute the given body closure on the main actor.
-  public static func run<T>(
-    resultType: T.Type = T.self,
-    body: @MainActor @Sendable () throws -> T
-  ) async rethrows -> T {
-    @MainActor func runOnMain(body: @MainActor @Sendable () throws -> T) async rethrows -> T {
-      return try body()
-    }
-
-    return try await runOnMain(body: body)
-  }
-}

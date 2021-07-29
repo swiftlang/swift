@@ -114,7 +114,7 @@ CUSTOM_LOCATOR_PATH_ELT(KeyPathDynamicMember)
 SIMPLE_LOCATOR_PATH_ELT(KeyPathRoot)
 
 /// The type of the key path expression.
-SIMPLE_LOCATOR_PATH_ELT(KeyPathType)
+CUSTOM_LOCATOR_PATH_ELT(KeyPathType)
 
 /// The value of a key path.
 SIMPLE_LOCATOR_PATH_ELT(KeyPathValue)
@@ -163,6 +163,10 @@ SIMPLE_LOCATOR_PATH_ELT(SubscriptMember)
 
 /// The missing argument synthesized by the solver.
 CUSTOM_LOCATOR_PATH_ELT(SynthesizedArgument)
+
+/// A tuple type, which provides context for subsequent tuple element
+/// path components.
+CUSTOM_LOCATOR_PATH_ELT(TupleType)
 
 /// Tuple elements.
 ABSTRACT_LOCATOR_PATH_ELT(AnyTupleElement)

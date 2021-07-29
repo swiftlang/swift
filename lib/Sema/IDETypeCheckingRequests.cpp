@@ -135,7 +135,7 @@ static bool isExtensionAppliedInternal(const DeclContext *DC, Type BaseTy,
   SubstitutionMap substMap = BaseTy->getContextSubstitutionMap(
       module, ED->getExtendedNominal());
   return TypeChecker::checkGenericArguments(
-      module, genericSig->getRequirements(),
+      module, genericSig.getRequirements(),
       QuerySubstitutionMap{substMap}) == RequirementCheckResult::Success;
 }
 
@@ -149,6 +149,13 @@ static bool isMemberDeclAppliedInternal(const DeclContext *DC, Type BaseTy,
   if (BaseTy->hasTypeVariable() || BaseTy->hasUnboundGenericType()||
       BaseTy->hasUnresolvedType() || BaseTy->hasError())
     return true;
+
+  if (isa<TypeAliasDecl>(VD) && BaseTy->is<ProtocolType>()) {
+    // The protocol doesn't satisfy its own generic signature (static members
+    // of the protocol are not visible on the protocol itself) but we can still
+    // access typealias declarations on it.
+    return true;
+  }
 
   const GenericContext *genericDecl = VD->getAsGenericContext();
   if (!genericDecl)
@@ -164,7 +171,7 @@ static bool isMemberDeclAppliedInternal(const DeclContext *DC, Type BaseTy,
   // Note: we treat substitution failure as success, to avoid tripping
   // up over generic parameters introduced by the declaration itself.
   return TypeChecker::checkGenericArguments(
-      module, genericSig->getRequirements(),
+      module, genericSig.getRequirements(),
       QuerySubstitutionMap{substMap}) != RequirementCheckResult::Failure;
 }
 

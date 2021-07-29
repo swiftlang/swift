@@ -53,13 +53,10 @@ from swift_build_support.swift_build_support.toolchain import host_toolchain
 # These versions are community sourced. At any given time only the Xcode
 # version used by Swift CI is officially supported. See ci.swift.org
 _SUPPORTED_XCODE_BUILDS = [
-    ("12.2 beta 3", "12B5035g"),
-    ("12.2 Release Candidate", "12B5044c"),
-    ("12.2", "12B45b"),
     ("12.3", "12C33"),
     ("12.4", "12D4e"),
-    ("12.5 beta 3", "12E5244e"),
-    ("12.5", "12E262")
+    ("12.5", "12E262"),
+    ("13.0 beta", "13A5154h")
 ]
 
 # -----------------------------------------------------------------------------
@@ -778,6 +775,9 @@ class BuildScriptInvocation(object):
         if args.dry_run:
             impl_args += ["--dry-run"]
 
+        if args.reconfigure:
+            impl_args += ["--reconfigure"]
+
         if args.clang_profile_instr_use:
             impl_args += [
                 "--clang-profile-instr-use=%s" %
@@ -841,6 +841,7 @@ class BuildScriptInvocation(object):
         """
 
         args = self.args
+        args.build_root = self.workspace.build_root
 
         options = {}
         for host_target in [args.host_target] + args.cross_compile_hosts:
@@ -862,6 +863,8 @@ class BuildScriptInvocation(object):
                     config.swift_benchmark_run_targets),
                 "SWIFT_TEST_TARGETS": " ".join(
                     config.swift_test_run_targets),
+                "SWIFT_FLAGS": config.swift_flags,
+                "SWIFT_TARGET_CMAKE_OPTIONS": config.cmake_options,
             }
 
         return options
@@ -886,11 +889,12 @@ class BuildScriptInvocation(object):
         if self.args.build_early_swift_driver:
             before_impl_product_classes.append(products.EarlySwiftDriver)
 
+        if self.args.build_cmark:
+            before_impl_product_classes.append(products.CMark)
+
         # FIXME: This is a weird division (returning a list of class objects),
         # but it matches the existing structure of the `build-script-impl`.
         impl_product_classes = []
-        if self.args.build_cmark:
-            impl_product_classes.append(products.CMark)
 
         # If --skip-build-llvm is passed in, LLVM cannot be completely disabled, as
         # Swift still needs a few LLVM targets like tblgen to be built for it to be
@@ -956,11 +960,13 @@ class BuildScriptInvocation(object):
         # infer dependencies, infer the dependencies now and then re-split the
         # list.
         if self.args.infer_dependencies:
-            combined = impl_product_classes + product_classes
+            combined_classes = before_impl_product_classes +\
+                impl_product_classes +\
+                product_classes
             if self.args.verbose_build:
                 print("-- Build Graph Inference --")
                 print("Initial Product List:")
-                for p in combined:
+                for p in combined_classes:
                     print("    {}".format(p.product_name()))
 
             # Now that we have produced the schedule, resplit. We require our
@@ -973,17 +979,18 @@ class BuildScriptInvocation(object):
             impl_product_classes = []
             product_classes = []
             is_darwin = platform.system() == 'Darwin'
-            final_schedule = build_graph.produce_scheduled_build(combined)[0]
+            final_schedule =\
+                build_graph.produce_scheduled_build(combined_classes)[0]
             for p in final_schedule:
                 if is_darwin and p.is_nondarwin_only_build_product():
                     continue
-
                 if p.is_build_script_impl_product():
                     impl_product_classes.append(p)
                 elif p.is_before_build_script_impl_product():
                     before_impl_product_classes.append(p)
                 else:
                     product_classes.append(p)
+
             if self.args.verbose_build:
                 print("Final Build Order:")
                 for p in before_impl_product_classes:
@@ -1026,7 +1033,7 @@ class BuildScriptInvocation(object):
 
         # Pre-build-script-impl products...
         # Note: currently only supports building for the host.
-        for host_target in [self.args.host_target]:
+        for host_target in all_host_names:
             for product_class in before_impl_product_classes:
                 if product_class.is_build_script_impl_product():
                     continue
@@ -1147,8 +1154,14 @@ class BuildScriptInvocation(object):
             print("--- Running tests for %s ---" % product_name)
             product.test(host_target)
             print("--- Finished tests for %s ---" % product_name)
+        # Install the product if it should be installed specifically, or
+        # if it should be built and `install_all` is set to True.
+        # The exception is select before_build_script_impl products
+        # which set `is_ignore_install_all_product` to True, ensuring
+        # they are never installed. (e.g. earlySwiftDriver).
         if product.should_install(host_target) or \
-           (self.install_all and product.should_build(host_target)):
+           (self.install_all and product.should_build(host_target) and
+           not product.is_ignore_install_all_product()):
             print("--- Installing %s ---" % product_name)
             product.install(host_target)
 

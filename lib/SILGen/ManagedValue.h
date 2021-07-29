@@ -270,6 +270,10 @@ public:
   /// Emit a copy of this value with independent ownership.
   ManagedValue copy(SILGenFunction &SGF, SILLocation loc) const;
 
+  /// Returns an unmanaged copy of this value.
+  /// WARNING: Callers of this API should manage the cleanup of this value!
+  ManagedValue unmanagedCopy(SILGenFunction &SGF, SILLocation loc) const;
+
   /// Emit a copy of this value with independent ownership into the current
   /// formal evaluation scope.
   ManagedValue formalAccessCopy(SILGenFunction &SGF, SILLocation loc);

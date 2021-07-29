@@ -88,6 +88,7 @@ public:
     DynamicThunk,
     SwiftAsObjCThunk,
     ObjCAsSwiftThunk,
+    DistributedThunk,
   };
 
   ASTMangler(bool DWARFMangling = false)
@@ -163,6 +164,7 @@ public:
   std::string mangleReabstractionThunkHelper(CanSILFunctionType ThunkType,
                                              Type FromType, Type ToType,
                                              Type SelfType,
+                                             Type GlobalActorBound,
                                              ModuleDecl *Module);
 
   /// Mangle a completion handler block implementation function, used for importing ObjC
@@ -385,7 +387,7 @@ protected:
 
   void appendRequirement(const Requirement &reqt);
 
-  void appendGenericSignatureParts(TypeArrayView<GenericTypeParamType> params,
+  void appendGenericSignatureParts(ArrayRef<CanTypeWrapper<GenericTypeParamType>> params,
                                    unsigned initialParamDepth,
                                    ArrayRef<Requirement> requirements);
 

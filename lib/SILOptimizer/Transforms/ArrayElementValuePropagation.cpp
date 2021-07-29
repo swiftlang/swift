@@ -214,7 +214,10 @@ bool ArrayAllocation::replaceGetElements() {
     if (ConstantIndex == None)
       continue;
 
-    assert(*ConstantIndex >= 0 && "Must have a positive index");
+    // ElementValueMap keys are unsigned. Avoid implicit signed-unsigned
+    // conversion from an invalid index to a valid index.
+    if (*ConstantIndex < 0)
+      continue;
 
     auto EltValueIt = ElementValueMap.find(*ConstantIndex);
     if (EltValueIt == ElementValueMap.end())

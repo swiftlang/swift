@@ -10,9 +10,6 @@
 #
 #===----------------------------------------------------------------------===#
 
-set(swift_concurrency_objc_sources
-  SwiftNativeNSObject.mm)
-
 set(LLVM_OPTIONAL_SOURCES
   ${swift_concurrency_objc_sources})
 
@@ -31,7 +28,6 @@ if(SWIFT_CONCURRENCY_USES_DISPATCH)
       dispatch)
   endif()
 endif()
-
 
 add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   ../CompatibilityOverride/CompatibilityOverride.cpp
@@ -60,7 +56,10 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   AsyncThrowingFlatMapSequence.swift
   AsyncThrowingMapSequence.swift
   AsyncThrowingPrefixWhileSequence.swift
+  GlobalActor.swift
+  MainActor.swift
   PartialAsyncTask.swift
+  SourceCompatibilityShims.swift
   Task.cpp
   Task.swift
   TaskCancellation.swift
@@ -70,6 +69,7 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   TaskGroup.swift
   TaskLocal.cpp
   TaskLocal.swift
+  TaskSleep.swift
   ThreadSanitizer.cpp
   Mutex.cpp
   AsyncStreamBuffer.swift
@@ -95,7 +95,7 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
     -parse-stdlib
     -Xfrontend -enable-experimental-concurrency
     -Xfrontend -define-availability
-    -Xfrontend \"SwiftStdlib 5.5:macOS 9999, iOS 9999, watchOS 9999, tvOS 9999\"
-  LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
+    -Xfrontend \"SwiftStdlib 5.5:macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0\"
+  LINK_FLAGS "${SWIFT_RUNTIME_CONCURRENCY_SWIFT_LINK_FLAGS}"
   INSTALL_IN_COMPONENT stdlib
 )

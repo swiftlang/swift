@@ -245,12 +245,45 @@ bb0:
   %6 = metatype $@thin String.Type
   %7 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
   %8 = apply %7(%3, %4, %5, %6) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %d = struct $DefaultStringInterpolation (%8 : $String)
+  %e = struct_extract %d : $DefaultStringInterpolation, #DefaultStringInterpolation._storage
   %9 = function_ref @string_getUTF8CString : $@convention(method) (@guaranteed String) -> @owned ContiguousArray<Int8>
-  %10 = apply %9(%8) : $@convention(method) (@guaranteed String) -> @owned ContiguousArray<Int8>
+  %10 = apply %9(%e) : $@convention(method) (@guaranteed String) -> @owned ContiguousArray<Int8>
   %11 = struct_extract %10 : $ContiguousArray<Int8>, #ContiguousArray._buffer
   %12 = struct_extract %11 : $_ContiguousArrayBuffer<Int8>, #_ContiguousArrayBuffer._storage
   %13 = ref_tail_addr %12 : $__ContiguousArrayStorageBase, $Int8
   %14 = address_to_pointer %13 : $*Int8 to $Builtin.RawPointer
   return %14 : $Builtin.RawPointer
+}
+
+// CHECK-LABEL: sil @test_interpolated_cstring
+// CHECK:       apply
+// CHECK:       [[S:%[0-9]+]] = string_literal utf8 "a"
+// CHECK:       return [[S]]
+// CHECK:     } // end sil function 'test_interpolated_cstring'
+sil @test_interpolated_cstring : $@convention(thin) () -> Builtin.RawPointer {
+bb0:
+  %3 = string_literal utf8 "a"
+  %4 = integer_literal $Builtin.Word, 1
+  %5 = integer_literal $Builtin.Int1, -1
+  %6 = metatype $@thin String.Type
+  %7 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %8 = apply %7(%3, %4, %5, %6) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %d = struct $DefaultStringInterpolation (%8 : $String)
+  %f = function_ref @$sSS19stringInterpolationSSs013DefaultStringB0V_tcfC : $@convention(method) (@owned DefaultStringInterpolation, @thin String.Type) -> @owned String
+  %a = apply %f(%d, %6) : $@convention(method) (@owned DefaultStringInterpolation, @thin String.Type) -> @owned String
+  %9 = function_ref @string_getUTF8CString : $@convention(method) (@guaranteed String) -> @owned ContiguousArray<Int8>
+  %10 = apply %9(%a) : $@convention(method) (@guaranteed String) -> @owned ContiguousArray<Int8>
+  %11 = struct_extract %10 : $ContiguousArray<Int8>, #ContiguousArray._buffer
+  %12 = struct_extract %11 : $_ContiguousArrayBuffer<Int8>, #_ContiguousArrayBuffer._storage
+  %13 = ref_tail_addr %12 : $__ContiguousArrayStorageBase, $Int8
+  %14 = address_to_pointer %13 : $*Int8 to $Builtin.RawPointer
+  return %14 : $Builtin.RawPointer
+}
+
+sil public_external [readonly] @$sSS19stringInterpolationSSs013DefaultStringB0V_tcfC : $@convention(method) (@owned DefaultStringInterpolation, @thin String.Type) -> @owned String {
+bb0(%0 : $DefaultStringInterpolation, %1 : $@thin String.Type):
+  %2 = struct_extract %0 : $DefaultStringInterpolation, #DefaultStringInterpolation._storage
+  return %2 : $String
 }
 

@@ -136,7 +136,7 @@ public func testOutlining() {
 // CHECK:   %15 = function_ref @$sSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ : $@convention(method) (@guaranteed Optional<NSString>, @thin String.Type) -> @owned String
 // CHECK:   %16 = metatype $@thin String.Type
 // CHECK:   %17 = apply %15(%9, %16) : $@convention(method) (@guaranteed Optional<NSString>, @thin String.Type) -> @owned String
-// CHECK:   release_value %9 : $Optional<NSString>          // id: %18
+// CHECK:   release_value %9 : $Optional<NSString>
 // CHECK:   %19 = enum $Optional<String>, #Optional.some!enumelt, %17 : $String
 // CHECK:   br bb3(%19 : $Optional<String>)
 //

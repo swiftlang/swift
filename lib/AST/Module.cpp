@@ -1066,7 +1066,27 @@ LookupConformanceInModuleRequest::evaluate(
     }
   }
 
-  // FIXME: Ambiguity resolution.
+  assert(!conformances.empty());
+
+  // If we have multiple conformances, first try to filter out any that are
+  // unavailable on the current deployment target.
+  //
+  // FIXME: Conformance lookup should really depend on source location for
+  // this to be 100% correct.
+  if (conformances.size() > 1) {
+    SmallVector<ProtocolConformance *, 2> availableConformances;
+
+    for (auto *conformance : conformances) {
+      if (conformance->getDeclContext()->isAlwaysAvailableConformanceContext())
+        availableConformances.push_back(conformance);
+    }
+
+    // Don't filter anything out if all conformances are unavailable.
+    if (!availableConformances.empty())
+      std::swap(availableConformances, conformances);
+  }
+
+  // If we still have multiple conformances, just pick the first one.
   auto conformance = conformances.front();
 
   // Rebuild inherited conformances based on the root normal conformance.
@@ -1407,6 +1427,12 @@ bool ModuleDecl::isStdlibModule() const {
   return !getParent() && getName() == getASTContext().StdlibModuleName;
 }
 
+bool ModuleDecl::hasStandardSubstitutions() const {
+  return !getParent() &&
+      (getName() == getASTContext().StdlibModuleName ||
+       getName() == getASTContext().Id_Concurrency);
+}
+
 bool ModuleDecl::isSwiftShimsModule() const {
   return !getParent() && getName() == getASTContext().SwiftShimsModuleName;
 }
@@ -1423,7 +1449,7 @@ bool ModuleDecl::isBuiltinModule() const {
   return this == getASTContext().TheBuiltinModule;
 }
 
-bool SourceFile::registerMainDecl(Decl *mainDecl, SourceLoc diagLoc) {
+bool SourceFile::registerMainDecl(ValueDecl *mainDecl, SourceLoc diagLoc) {
   assert(mainDecl);
   if (mainDecl == MainDecl)
     return false;
@@ -1912,8 +1938,8 @@ OverlayFileContents::load(std::unique_ptr<llvm::MemoryBuffer> input,
     return error;
 
   if (contents.version > 1) {
-    auto message = Twine("key 'version' has invalid value: ") + Twine(contents.version);
-    errorMessages.push_back(message.str());
+    std::string message = (Twine("key 'version' has invalid value: ") + Twine(contents.version)).str();
+    errorMessages.emplace_back(std::move(message));
     return make_error_code(std::errc::result_out_of_range);
   }
 

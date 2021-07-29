@@ -1,10 +1,18 @@
 // RUN: %target-sil-opt -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -jumpthread-simplify-cfg | %FileCheck %s
 //
 // These tests case are converted to OSSA form, but aren't yet
-// optimized in OSSA mode. Move them to simplify_cfg_ossa.sil when
-// they are enabled.
+// optimized in OSSA mode. Move them to one of these files when
+// they are enabled:
+// - simplify_cfg_ossa.sil
+// - simplify_cfg_simplejumpthread.sil
+// - simplify_cfg_checkcast.sil
+// - simplify_cfg_domjumpthread.sil
 //
-// REQUIRES: disabled
+// REQUIRES: EnableOSSASimplifyCFG
+
+sil_stage canonical
+
+import Builtin
 
 class C {}
 
@@ -47,60 +55,6 @@ bb5:
 
 bb6(%14 : $FakeBool):
   return %14 : $FakeBool
-}
-
-// func testThread2(a : Int32) -> Int32 {
-//   enum b = (a ? _true : _false)
-//   if b == _true { return 42 } else { return 17 }
-//
-
-/// CHECK-LABEL: sil [ossa] @testThread2
-/// CHECK: bb0([[COND:%.*]] : {{.*}}):
-/// CHECK: cond_br [[COND]], bb1, bb2
-/// CHECK: bb1:
-/// CHECK:  integer_literal $Builtin.Int64, 42
-/// CHeCK:  br bb3
-/// CHECK: bb2:
-/// CHECK:  integer_literal $Builtin.Int64, 17
-/// CHECK:  br bb3
-/// CHECK: bb3
-/// CHECK:  return
-
-sil [ossa] @testThread2 : $@convention(thin) (Builtin.Int1) -> Int64 {
-bb0(%0 : $Builtin.Int1):
-  %t = integer_literal $Builtin.Int1, 1
-  %f = integer_literal $Builtin.Int1, 0
-  cond_br %0, bb1, bb2
-
-bb1:                                              // Preds: bb0
-  %4 = enum $BoolLike, #BoolLike.true_!enumelt    // user: %5
-  br bb3(%4 : $BoolLike)                          // id: %5
-
-bb2:                                              // Preds: bb0
-  %8 = enum $BoolLike, #BoolLike.false_!enumelt   // user: %9
-  br bb3(%8 : $BoolLike)                          // id: %9
-
-bb3(%6 : $BoolLike):                              // Preds: bb3 bb1
-  %100 = select_enum %6 : $BoolLike, case #BoolLike.true_!enumelt: %t, case #BoolLike.false_!enumelt: %f : $Builtin.Int1
-  br bb4                                          // id: %7
-
-bb4:                                              // Preds: bb2
-  cond_br %100, bb5, bb6                          // id: %10
-
-bb5:                                              // Preds: bb4
-  %11 = metatype $@thin Int64.Type
-  %12 = integer_literal $Builtin.Int64, 42        // user: %13
-  %13 = struct $Int64 (%12 : $Builtin.Int64)      // user: %14
-  br bb7(%13 : $Int64)                            // id: %14
-
-bb6:                                              // Preds: bb4
-  %15 = metatype $@thin Int64.Type
-  %16 = integer_literal $Builtin.Int64, 17        // user: %17
-  %17 = struct $Int64 (%16 : $Builtin.Int64)      // user: %18
-  br bb7(%17 : $Int64)                            // id: %18
-
-bb7(%19 : $Int64):                                // Preds: bb6 bb5
-  return %19 : $Int64                             // id: %21
 }
 
 // func testThread3(a : Int32) -> Int32 {

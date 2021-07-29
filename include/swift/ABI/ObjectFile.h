@@ -31,7 +31,7 @@ public:
 };
 
 /// Responsible for providing the Mach-O reflection section identifiers.
-class SwiftObjectFileFormatMachO : SwiftObjectFileFormat {
+class SwiftObjectFileFormatMachO : public SwiftObjectFileFormat {
 public:
   llvm::StringRef getSectionName(ReflectionSectionKind section) override {
     switch (section) {
@@ -53,7 +53,7 @@ public:
 };
 
 /// Responsible for providing the ELF reflection section identifiers.
-class SwiftObjectFileFormatELF : SwiftObjectFileFormat {
+class SwiftObjectFileFormatELF : public SwiftObjectFileFormat {
 public:
   llvm::StringRef getSectionName(ReflectionSectionKind section) override {
     switch (section) {
@@ -75,7 +75,7 @@ public:
 };
 
 /// Responsible for providing the COFF reflection section identifiers
-class SwiftObjectFileFormatCOFF : SwiftObjectFileFormat {
+class SwiftObjectFileFormatCOFF : public SwiftObjectFileFormat {
 public:
   llvm::StringRef getSectionName(ReflectionSectionKind section) override {
     switch (section) {

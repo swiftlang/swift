@@ -141,6 +141,31 @@ bool SILModule::isTypeMetadataAccessible(CanType type) {
   });
 }
 
+/// Return the minimum linkage structurally required to reference the given formal type.
+FormalLinkage swift::getTypeLinkage(CanType t) {
+  assert(t->isLegalFormalType());
+  
+  class Walker : public TypeWalker {
+  public:
+    FormalLinkage Linkage;
+    Walker() : Linkage(FormalLinkage::PublicUnique) {}
+
+    Action walkToTypePre(Type ty) override {
+      // Non-nominal types are always available.
+      auto decl = ty->getNominalOrBoundGenericNominal();
+      if (!decl)
+        return Action::Continue;
+      
+      Linkage = std::min(Linkage, getDeclLinkage(decl));
+      return Action::Continue;
+    }
+  };
+
+  Walker w;
+  t.walk(w);
+  return w.Linkage;
+}
+
 /// Answer whether IRGen's emitTypeMetadataForLayout can fetch metadata for
 /// a type, which is the necessary condition for being able to do value
 /// operations on the type using dynamic metadata.

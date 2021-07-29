@@ -657,12 +657,26 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   B.createReturn(ImplicitReturnLocation(Loc), initedSelfValue);
 }
 
-static void emitDefaultActorInitialization(SILGenFunction &SGF,
-                                           SILLocation loc,
-                                           ManagedValue self) {
+static void emitDefaultActorInitialization(
+    SILGenFunction &SGF, SILLocation loc, ManagedValue self) {
   auto &ctx = SGF.getASTContext();
   auto builtinName = ctx.getIdentifier(
     getBuiltinName(BuiltinValueKind::InitializeDefaultActor));
+  auto resultTy = SGF.SGM.Types.getEmptyTupleType();
+
+  FullExpr scope(SGF.Cleanups, CleanupLocation(loc));
+  SGF.B.createBuiltin(loc, builtinName, resultTy, /*subs*/{},
+                      { self.borrow(SGF, loc).getValue() });
+}
+
+static void emitDistributedRemoteActorInitialization(
+    SILGenFunction &SGF, SILLocation loc,
+    ManagedValue self,
+    bool addressArg, bool transportArg // FIXME: make those real arguments
+    ) {
+  auto &ctx = SGF.getASTContext();
+  auto builtinName = ctx.getIdentifier(
+    getBuiltinName(BuiltinValueKind::InitializeDistributedRemoteActor));
   auto resultTy = SGF.SGM.Types.getEmptyTupleType();
 
   FullExpr scope(SGF.Cleanups, CleanupLocation(loc));
@@ -678,7 +692,7 @@ void SILGenFunction::emitConstructorPrologActorHop(
 
   if (auto executor = emitExecutor(loc, *maybeIso, None)) {
     ExpectedExecutor = *executor;
-    B.createHopToExecutor(loc, *executor);
+    B.createHopToExecutor(loc, *executor, /*mandatory*/ false);
   }
 }
 
@@ -762,7 +776,17 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   if (selfClassDecl->isRootDefaultActor() && !isDelegating) {
     SILLocation PrologueLoc(selfDecl);
     PrologueLoc.markAsPrologue();
-    emitDefaultActorInitialization(*this, PrologueLoc, selfArg);
+
+    if (selfClassDecl->isDistributedActor() &&
+        ctor->isDistributedActorResolveInit()) {
+      auto addressArg  = false; // TODO: get the address argument
+      auto transportArg  = false; // TODO: get the transport argument
+      emitDistributedRemoteActorInitialization(*this, PrologueLoc,
+          selfArg, addressArg, transportArg);
+    } else {
+      // is normal (default) actor
+      emitDefaultActorInitialization(*this, PrologueLoc, selfArg);
+    }
   }
 
   if (!ctor->hasStubImplementation()) {
@@ -1012,6 +1036,7 @@ emitMemberInit(SILGenFunction &SGF, VarDecl *selfDecl, Pattern *pattern) {
 #include "swift/AST/PatternNodes.def"
     llvm_unreachable("Refutable pattern in stored property pattern binding");
   }
+  llvm_unreachable("covered switch");
 }
 
 static std::pair<AbstractionPattern, CanType>
@@ -1117,10 +1142,22 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
         // abstraction level. To undo this, we use a converting
         // initialization and rely on the peephole that optimizes
         // out the redundant conversion.
-        auto loweredResultTy = getLoweredType(origType, substType);
-        auto loweredSubstTy = getLoweredType(substType);
+        SILType loweredResultTy;
+        SILType loweredSubstTy;
 
-        if (loweredResultTy != loweredSubstTy) {
+        // A converting initialization isn't necessary if the member is
+        // a property wrapper. Though the initial value can have a
+        // reabstractable type, the result of the initialization is
+        // always the property wrapper type, which is never reabstractable.
+        bool needsConvertingInit = false;
+        auto *singleVar = varPattern->getSingleVar();
+        if (!(singleVar && singleVar->getOriginalWrappedProperty())) {
+          loweredResultTy = getLoweredType(origType, substType);
+          loweredSubstTy = getLoweredType(substType);
+          needsConvertingInit = loweredResultTy != loweredSubstTy;
+        }
+
+        if (needsConvertingInit) {
           Conversion conversion = Conversion::getSubstToOrig(
               origType, substType,
               loweredResultTy);

@@ -967,3 +967,18 @@ struct TestAutoclosureComposition {
 
 // CHECK-LABEL: sil_vtable [serialized] TestMyWrapper
 // CHECK: #TestMyWrapper.$useMyWrapper!getter
+
+@propertyWrapper
+struct AutoclosureWrapper<T> {
+  init(wrappedValue: @autoclosure () -> T) {
+    self.wrappedValue = wrappedValue()
+  }
+  var wrappedValue: T
+}
+
+struct TestReabstractableWrappedValue<T1> {
+  struct S<T2> { }
+
+  @AutoclosureWrapper var v: S<T1> = S()
+  init() where T1 == Int { }
+}

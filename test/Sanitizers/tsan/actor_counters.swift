@@ -8,12 +8,6 @@
 // UNSUPPORTED: linux
 // UNSUPPORTED: windows
 
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#endif
-
 @available(SwiftStdlib 5.5, *)
 actor Counter {
   private var value = 0
@@ -66,7 +60,7 @@ func runTest(numCounters: Int, numWorkers: Int, numIterations: Int) async {
   for i in 0..<numWorkers {
     workers.append(
       detach { [counters] in
-        usleep(UInt32.random(in: 0..<100) * 1000)
+        await Task.sleep(UInt64.random(in: 0..<100) * 1_000_000)
         await worker(identity: i, counters: counters, numIterations: numIterations)
       }
     )

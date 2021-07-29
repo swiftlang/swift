@@ -447,6 +447,7 @@ BorrowedValue BorrowingOperand::getBorrowIntroducingUserResult() {
     return BorrowedValue(bi->getDestBB()->getArgument(op->getOperandNumber()));
   }
   }
+  llvm_unreachable("covered switch");
 }
 
 void BorrowingOperand::getImplicitUses(
@@ -1327,10 +1328,10 @@ void swift::findTransitiveReborrowBaseValuePairs(
 }
 
 void swift::visitTransitiveEndBorrows(
-    BeginBorrowInst *borrowInst,
+    BorrowedValue beginBorrow,
     function_ref<void(EndBorrowInst *)> visitEndBorrow) {
   SmallSetVector<SILValue, 4> worklist;
-  worklist.insert(borrowInst);
+  worklist.insert(beginBorrow.value);
 
   while (!worklist.empty()) {
     auto val = worklist.pop_back_val();

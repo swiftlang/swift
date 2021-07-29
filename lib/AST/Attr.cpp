@@ -598,7 +598,7 @@ static void printDifferentiableAttrArguments(
   // generic signature. They should not be printed.
   ArrayRef<Requirement> derivativeRequirements;
   if (auto derivativeGenSig = attr->getDerivativeGenericSignature())
-    derivativeRequirements = derivativeGenSig->getRequirements();
+    derivativeRequirements = derivativeGenSig.getRequirements();
   auto requirementsToPrint =
     llvm::make_filter_range(derivativeRequirements, [&](Requirement req) {
         if (const auto &originalGenSig = original->getGenericSignature())
@@ -747,6 +747,10 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     // implication. Thus we can skip them.
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
       if (auto *BD = VD->getOverriddenDecl()) {
+        // If the overriden decl won't be printed, printing override will fail
+        // the build of the interface file.
+        if (!Options.shouldPrint(BD))
+          return false;
         if (!BD->hasClangNode() &&
             !BD->getFormalAccessScope(VD->getDeclContext(),
                                       /*treatUsableFromInlineAsPublic*/ true)
@@ -941,10 +945,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     if (target)
       Printer << "target: " << target << ", ";
     SmallVector<Requirement, 4> requirementsScratch;
-    ArrayRef<Requirement> requirements;
-    if (auto sig = attr->getSpecializedSignature())
-      requirements = sig->getRequirements();
-
+    auto requirements = attr->getSpecializedSignature().getRequirements();
     auto *FnDecl = dyn_cast_or_null<AbstractFunctionDecl>(D);
     if (FnDecl && FnDecl->getGenericSignature()) {
       auto genericSig = FnDecl->getGenericSignature();
@@ -1799,7 +1800,7 @@ void DifferentiableAttr::setParameterIndices(IndexSubset *paramIndices) {
 GenericEnvironment *DifferentiableAttr::getDerivativeGenericEnvironment(
     AbstractFunctionDecl *original) const {
   if (auto derivativeGenSig = getDerivativeGenericSignature())
-    return derivativeGenSig->getGenericEnvironment();
+    return derivativeGenSig.getGenericEnvironment();
   return original->getGenericEnvironment();
 }
 

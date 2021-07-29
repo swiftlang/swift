@@ -28,13 +28,17 @@
 #include "swift/SIL/SILInstructionWorklist.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILVisitor.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SILOptimizer/Analysis/ClassHierarchyAnalysis.h"
 #include "swift/SILOptimizer/Analysis/NonLocalAccessBlockAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ProtocolConformanceAnalysis.h"
+#include "swift/SILOptimizer/OptimizerBridging.h"
 #include "swift/SILOptimizer/Utils/CastOptimizer.h"
 #include "swift/SILOptimizer/Utils/Existential.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
+#include "swift/SILOptimizer/PassManager/PassManager.h"
+
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 
@@ -68,6 +72,9 @@ class SILCombiner :
   /// Worklist containing all of the instructions primed for simplification.
   SmallSILInstructionWorklist<256> Worklist;
 
+  /// Utility for dead code removal.
+  InstructionDeleter deleter;
+
   /// A cache of "dead end blocks" through which all paths it is known that the
   /// program will terminate. This means that we are allowed to leak
   /// objects.
@@ -78,6 +85,9 @@ class SILCombiner :
 
   /// If set to true then the optimizer is free to erase cond_fail instructions.
   bool RemoveCondFails;
+
+  /// If set to true then copies are canonicalized in OSSA mode.
+  bool enableCopyPropagation;
 
   /// Set to true if some alloc/dealloc_stack instruction are inserted and at
   /// the end of the run stack nesting needs to be corrected.
@@ -92,59 +102,63 @@ class SILCombiner :
   /// Cast optimizer
   CastOptimizer CastOpt;
 
-  /// Centralized InstModCallback that we use for certain utility methods.
-  InstModCallbacks instModCallbacks;
-
   /// Dead end blocks cache. SILCombine is already not allowed to mess with CFG
   /// edges so it is safe to use this here.
   DeadEndBlocks deBlocks;
 
   /// External context struct used by \see ownershipRAUWHelper.
   OwnershipFixupContext ownershipFixupContext;
+  
+  /// For invoking Swift instruction passes in libswift.
+  LibswiftPassInvocation libswiftPassInvocation;
 
 public:
   SILCombiner(SILFunctionTransform *parentTransform,
               SILOptFunctionBuilder &FuncBuilder, SILBuilder &B,
               AliasAnalysis *AA, DominanceAnalysis *DA,
               ProtocolConformanceAnalysis *PCA, ClassHierarchyAnalysis *CHA,
-              NonLocalAccessBlockAnalysis *NLABA, bool removeCondFails)
+              NonLocalAccessBlockAnalysis *NLABA, bool removeCondFails,
+              bool enableCopyPropagation)
       : parentTransform(parentTransform), AA(AA), DA(DA), PCA(PCA), CHA(CHA),
-        NLABA(NLABA), Worklist("SC"), deadEndBlocks(&B.getFunction()),
-        MadeChange(false), RemoveCondFails(removeCondFails), Iteration(0),
-        Builder(B), CastOpt(
-                        FuncBuilder, nullptr /*SILBuilderContext*/,
-                        /* ReplaceValueUsesAction */
-                        [&](SILValue Original, SILValue Replacement) {
-                          replaceValueUsesWith(Original, Replacement);
-                        },
-                        /* ReplaceInstUsesAction */
-                        [&](SingleValueInstruction *I, ValueBase *V) {
-                          replaceInstUsesWith(*I, V);
-                        },
-                        /* EraseAction */
-                        [&](SILInstruction *I) { eraseInstFromFunction(*I); }),
-        instModCallbacks(), deBlocks(&B.getFunction()),
-        ownershipFixupContext(instModCallbacks, deBlocks) {
-    instModCallbacks =
-        InstModCallbacks()
-            .onDelete([&](SILInstruction *instToDelete) {
-              // We allow for users in SILCombine to perform 2 stage deletion,
-              // so we need to split the erasing of instructions from adding
-              // operands to the worklist.
-              eraseInstFromFunction(
-                  *instToDelete, false /*do not add operands to the worklist*/);
-            })
-            .onNotifyWillBeDeleted([&](SILInstruction *instThatWillBeDeleted) {
-              Worklist.addOperandsToWorklist(*instThatWillBeDeleted);
-            })
-            .onCreateNewInst([&](SILInstruction *newlyCreatedInst) {
-              Worklist.add(newlyCreatedInst);
-            })
-            .onSetUseValue([&](Operand *use, SILValue newValue) {
-              use->set(newValue);
-              Worklist.add(use->getUser());
-            });
-  }
+        NLABA(NLABA), Worklist("SC"),
+        deleter(InstModCallbacks()
+                    .onDelete([&](SILInstruction *instToDelete) {
+                      // We allow for users in SILCombine to perform 2 stage
+                      // deletion, so we need to split the erasing of
+                      // instructions from adding operands to the worklist.
+                      eraseInstFromFunction(*instToDelete,
+                                            false /* don't add operands */);
+                    })
+                    .onNotifyWillBeDeleted(
+                        [&](SILInstruction *instThatWillBeDeleted) {
+                          Worklist.addOperandsToWorklist(
+                            *instThatWillBeDeleted);
+                        })
+                    .onCreateNewInst([&](SILInstruction *newlyCreatedInst) {
+                      Worklist.add(newlyCreatedInst);
+                    })
+                    .onSetUseValue([&](Operand *use, SILValue newValue) {
+                      use->set(newValue);
+                      Worklist.add(use->getUser());
+                    })),
+        deadEndBlocks(&B.getFunction()), MadeChange(false),
+        RemoveCondFails(removeCondFails),
+        enableCopyPropagation(enableCopyPropagation), Iteration(0), Builder(B),
+        CastOpt(
+            FuncBuilder, nullptr /*SILBuilderContext*/,
+            /* ReplaceValueUsesAction */
+            [&](SILValue Original, SILValue Replacement) {
+              replaceValueUsesWith(Original, Replacement);
+            },
+            /* ReplaceInstUsesAction */
+            [&](SingleValueInstruction *I, ValueBase *V) {
+              replaceInstUsesWith(*I, V);
+            },
+            /* EraseAction */
+            [&](SILInstruction *I) { eraseInstFromFunction(*I); }),
+        deBlocks(&B.getFunction()),
+        ownershipFixupContext(getInstModCallbacks(), deBlocks),
+        libswiftPassInvocation(parentTransform->getPassManager(), this) {}
 
   bool runOnFunction(SILFunction &F);
 
@@ -317,10 +331,17 @@ public:
       
   SILInstruction *visitMarkDependenceInst(MarkDependenceInst *MDI);
   SILInstruction *visitClassifyBridgeObjectInst(ClassifyBridgeObjectInst *CBOI);
-  SILInstruction *visitGlobalValueInst(GlobalValueInst *globalValue);
   SILInstruction *visitConvertFunctionInst(ConvertFunctionInst *CFI);
   SILInstruction *
   visitConvertEscapeToNoEscapeInst(ConvertEscapeToNoEscapeInst *Cvt);
+
+  SILInstruction *legacyVisitGlobalValueInst(GlobalValueInst *globalValue);
+
+#define PASS(ID, TAG, DESCRIPTION)
+#define SWIFT_FUNCTION_PASS(ID, TAG, DESCRIPTION)
+#define SWIFT_INSTRUCTION_PASS(INST, TAG) \
+  SILInstruction *visit##INST(INST *);
+#include "swift/SILOptimizer/PassManager/Passes.def"
 
   /// Instruction visitor helpers.
   SILInstruction *optimizeBuiltinCanBeObjCClass(BuiltinInst *AI);
@@ -360,6 +381,10 @@ public:
   /// try to visit it.
   bool trySinkOwnedForwardingInst(SingleValueInstruction *svi);
 
+  /// Apply CanonicalizeOSSALifetime to the extended lifetime of any copy
+  /// introduced during SILCombine for an owned value.
+  void canonicalizeOSSALifetimes();
+
   // Optimize concatenation of string literals.
   // Constant-fold concatenation of string literals known at compile-time.
   SILInstruction *optimizeConcatenationOfStringLiterals(ApplyInst *AI);
@@ -381,7 +406,7 @@ public:
       SingleValueInstruction *user, SingleValueInstruction *value,
       function_ref<SILValue()> newValueGenerator);
 
-  InstModCallbacks &getInstModCallbacks() { return instModCallbacks; }
+  InstModCallbacks &getInstModCallbacks() { return deleter.getCallbacks(); }
 
 private:
   // Build concrete existential information using findInitExistential.
@@ -452,6 +477,10 @@ private:
   bool hasOwnership() const {
     return Builder.hasOwnership();
   }
+  
+  void runSwiftInstructionPass(SILInstruction *inst,
+                               void (*runFunction)(BridgedInstructionPassCtxt));
+
 };
 
 } // end namespace swift

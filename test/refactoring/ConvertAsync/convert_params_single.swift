@@ -1,6 +1,8 @@
-func withError(_ completion: (String?, Error?) -> Void) { }
-func notOptional(_ completion: (String, Error?) -> Void) { }
-func errorOnly(_ completion: (Error?) -> Void) { }
+// REQUIRES: concurrency
+
+func withError(_ completion: @escaping (String?, Error?) -> Void) { }
+func notOptional(_ completion: @escaping (String, Error?) -> Void) { }
+func errorOnly(_ completion: @escaping (Error?) -> Void) { }
 func test(_ str: String) -> Bool { return false }
 
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=UNRELATED %s
@@ -313,7 +315,7 @@ withError { res, err in
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=UNBOUND %s
 withError { res, err in
   print("before")
-  if res != nil && err == nil {
+  if ((res != (nil)) && err == nil) {
     print("got result \(res!)")
   } else {
     print("got error \(err!)")
@@ -372,10 +374,14 @@ withError { res, err in
   if let str2 = res {
     print("got result \(str2)")
   }
+  if case (let str3?) = (res) {
+    print("got result \(str3)")
+  }
   print("after")
 }
 // MULTIBIND: let str = try await withError()
 // MULTIBIND-NEXT: print("before")
+// MULTIBIND-NEXT: print("got result \(str)")
 // MULTIBIND-NEXT: print("got result \(str)")
 // MULTIBIND-NEXT: print("got result \(str)")
 // MULTIBIND-NEXT: print("after")

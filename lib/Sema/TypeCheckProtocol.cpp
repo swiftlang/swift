@@ -357,7 +357,7 @@ matchWitnessDifferentiableAttr(DeclContext *dc, ValueDecl *req,
         auto reqDiffGenSig = reqDiffAttr->getDerivativeGenericSignature();
         auto conformanceGenSig = dc->getGenericSignatureOfContext();
         for (const auto &req :
-             witnessConfig.derivativeGenericSignature->getRequirements()) {
+             witnessConfig.derivativeGenericSignature.getRequirements()) {
           auto substReq = req.subst(result.WitnessSubstitutions);
           bool reqDiffGenSigSatisfies =
               reqDiffGenSig && substReq &&
@@ -874,11 +874,16 @@ static Optional<RequirementMatch> findMissingGenericRequirementForSolutionFix(
   type = solution.simplifyType(type);
   missingType = solution.simplifyType(missingType);
 
-  missingType = missingType->mapTypeOutOfContext();
-  if (missingType->hasTypeParameter())
-    if (auto env = conformance->getGenericEnvironment())
-      if (auto assocType = env->mapTypeIntoContext(missingType))
-        missingType = assocType;
+  if (auto *env = conformance->getGenericEnvironment()) {
+    // We use subst() with LookUpConformanceInModule here, because
+    // associated type inference failures mean that we can end up
+    // here with a DependentMemberType with an ArchetypeType base.
+    missingType = missingType.subst(
+      [&](SubstitutableType *type) -> Type {
+        return env->mapTypeIntoContext(type->mapTypeOutOfContext());
+      },
+      LookUpConformanceInModule(conformance->getDeclContext()->getParentModule()));
+  }
 
   auto missingRequirementMatch = [&](Type type) -> RequirementMatch {
     Requirement requirement(requirementKind, type, missingType);
@@ -942,7 +947,7 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
   ClassDecl *covariantSelf = nullptr;
   if (witness->getDeclContext()->getExtendedProtocolDecl()) {
     if (auto *classDecl = dc->getSelfClassDecl()) {
-      if (!classDecl->isFinal()) {
+      if (!classDecl->isSemanticallyFinal()) {
         // If the requirement's type does not involve any associated types,
         // we use a class-constrained generic parameter as the 'Self' type
         // in the witness thunk.
@@ -1349,6 +1354,27 @@ bool WitnessChecker::findBestWitness(
 
       matches.push_back(std::move(match));
     }
+  }
+
+  // If there are multiple viable matches, drop any that are less available than the
+  // requirement.
+  if (numViable > 1) {
+    SmallVector<RequirementMatch, 2> checkedMatches;
+    bool foundCheckedMatch = false;
+
+    for (auto match : matches) {
+      if (!match.isViable()) {
+        checkedMatches.push_back(match);
+      } else if (checkWitness(requirement, match).Kind != CheckKind::Availability) {
+        foundCheckedMatch = true;
+        checkedMatches.push_back(match);
+      }
+    }
+
+    // If none of the matches were at least as available as the requirement, don't
+    // drop any of them; this will produce better diagnostics.
+    if (foundCheckedMatch)
+      std::swap(checkedMatches, matches);
   }
 
   if (numViable == 0) {
@@ -1832,6 +1858,13 @@ static void diagnoseConformanceImpliedByConditionalConformance(
       .fixItInsert(loc, differentFixit);
 }
 
+/// Determine whether there are additional semantic checks for conformance
+/// to the given protocol. This should return true when @unchecked can be
+/// used to disable those semantic checks.
+static bool hasAdditionalSemanticChecks(ProtocolDecl *proto) {
+  return proto->isSpecificProtocol(KnownProtocolKind::Sendable);
+}
+
 /// Determine whether the type \c T conforms to the protocol \c Proto,
 /// recording the complete witness table if it does.
 ProtocolConformance *MultiConformanceChecker::
@@ -1960,7 +1993,7 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
     if (auto ext = dyn_cast<ExtensionDecl>(DC)) {
       if (auto classDecl = ext->getSelfClassDecl()) {
         if (classDecl->isGenericContext()) {
-          if (!classDecl->usesObjCGenericsModel()) {
+          if (!classDecl->isTypeErasedGenericClass()) {
             C.Diags.diagnose(ComplainLoc,
                              diag::objc_protocol_in_generic_extension,
                              classDecl->isGeneric(), T, ProtoType);
@@ -1981,7 +2014,7 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
     // types for any obj-c ones.
     while (nestedType) {
       if (auto clas = nestedType->getClassOrBoundGenericClass()) {
-        if (clas->usesObjCGenericsModel()) {
+        if (clas->isTypeErasedGenericClass()) {
           C.Diags.diagnose(ComplainLoc,
                            diag::objc_generics_cannot_conditionally_conform, T,
                            ProtoType);
@@ -2032,6 +2065,13 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
     }
     conformance->setInvalid();
     return conformance;
+  }
+
+  // Complain about the use of @unchecked for protocols that don't have
+  // additional semantic checks.
+  if (conformance->isUnchecked() && !hasAdditionalSemanticChecks(Proto)) {
+    C.Diags.diagnose(
+      ComplainLoc, diag::unchecked_conformance_not_special, ProtoType);
   }
 
   bool impliedDisablesMissingWitnessFixits = false;
@@ -2205,10 +2245,10 @@ static Type getRequirementTypeForDisplay(ModuleDecl *module,
 
     auto genericSig = fnTy->getOptGenericSignature();
     if (genericSig) {
-      if (genericSig->getGenericParams().size() > 1) {
+      if (genericSig.getGenericParams().size() > 1) {
         genericSig = GenericSignature::get(
-          genericSig->getGenericParams().slice(1),
-          genericSig->getRequirements());
+          genericSig.getGenericParams().slice(1),
+          genericSig.getRequirements());
       } else {
         genericSig = nullptr;
       }
@@ -2684,7 +2724,18 @@ ConformanceChecker::getReferencedAssociatedTypes(ValueDecl *req) {
   };
 
   Walker walker(Proto, assocTypes);
-  req->getInterfaceType()->getCanonicalType().walk(walker);
+
+  // This dance below is to avoid calling getCanonicalType() on a
+  // GenericFunctionType, which creates a GenericSignatureBuilder, which
+  // can in turn trigger associated type inference and cause a cycle.
+  auto reqTy = req->getInterfaceType();
+  if (auto *funcTy = reqTy->getAs<GenericFunctionType>()) {
+    for (auto param : funcTy->getParams())
+      param.getPlainType()->getCanonicalType().walk(walker);
+    funcTy->getResult()->getCanonicalType().walk(walker);
+  } else {
+    reqTy->getCanonicalType().walk(walker);
+  }
 
   return assocTypes;
 }
@@ -2772,11 +2823,32 @@ bool ConformanceChecker::checkActorIsolation(
   Type witnessGlobalActor;
   switch (auto witnessRestriction =
               ActorIsolationRestriction::forDeclaration(
-                  witness, /*fromExpression=*/false)) {
+                  witness, witness->getDeclContext(),
+                  /*fromExpression=*/false)) {
+  case ActorIsolationRestriction::DistributedActorSelf: {
+    if (witness->isSynthesized()) {
+      // we only have two 'distributed-actor-nonisolated' properties,
+      // the address and transport; if we see any such marked property,
+      // we're free to automatically assume those are fine and accessible always.
+      if (witness->isDistributedActorIndependent())
+        return false;
+    }
+
+    if (auto funcDecl = dyn_cast<AbstractFunctionDecl>(witness)) {
+      // A 'distributed func' may witness a distributed isolated function requirement.
+      if (funcDecl->isDistributed())
+        return false;
+    }
+
+    // continue checking ActorSelf rules
+    LLVM_FALLTHROUGH;
+  }
   case ActorIsolationRestriction::ActorSelf: {
+    auto requirementIsolation = getActorIsolation(requirement);
+
     // An actor-isolated witness can only conform to an actor-isolated
     // requirement.
-    if (getActorIsolation(requirement) == ActorIsolation::ActorInstance)
+    if (requirementIsolation == ActorIsolation::ActorInstance)
       return false;
 
     witness->diagnose(diag::actor_isolated_witness,
@@ -2829,6 +2901,11 @@ bool ConformanceChecker::checkActorIsolation(
   switch (auto requirementIsolation = getActorIsolation(requirement)) {
   case ActorIsolation::ActorInstance:
     llvm_unreachable("There are not actor protocols");
+  case ActorIsolation::DistributedActorInstance:
+    // A requirement inside a distributed actor, where it has a protocol that was
+    // bound requiring a `DistributedActor` conformance (`protocol D: DistributedActor`),
+    // results in the requirement being isolated to given distributed actor.
+    break;
 
   case ActorIsolation::GlobalActorUnsafe:
     requirementIsUnsafe = true;
@@ -2937,7 +3014,7 @@ bool ConformanceChecker::checkObjCTypeErasedGenerics(
   auto classDecl = Adoptee->getClassOrBoundGenericClass();
   if (!classDecl) return false;
 
-  if (!classDecl->usesObjCGenericsModel()) return false;
+  if (!classDecl->isTypeErasedGenericClass()) return false;
 
   // Concrete types are okay.
   if (!type->getCanonicalType()->hasTypeParameter()) return false;
@@ -3197,7 +3274,7 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
                      Type AdopterTy, SourceLoc TypeLoc, raw_ostream &OS) {
   if (isa<ConstructorDecl>(Requirement)) {
     if (auto CD = Adopter->getSelfClassDecl()) {
-      if (!CD->isFinal() && isa<ExtensionDecl>(Adopter)) {
+      if (!CD->isSemanticallyFinal() && isa<ExtensionDecl>(Adopter)) {
         // In this case, user should mark class as 'final' or define
         // 'required' initializer directly in the class definition.
         return false;
@@ -3626,11 +3703,8 @@ static bool hasSelfSameTypeConstraint(const ValueDecl *req) {
     return false;
 
   const auto genericSig = genCtx->getGenericSignature();
-  if (!genericSig)
-    return false;
-
   const auto selfTy = proto->getSelfInterfaceType();
-  for (const auto &constr : genericSig->getRequirements()) {
+  for (const auto &constr : genericSig.getRequirements()) {
     if (constr.getKind() != RequirementKind::SameType)
       continue;
 
@@ -3651,10 +3725,9 @@ static Optional<std::pair<RequirementRepr *, Requirement>>
 getAdopteeSelfSameTypeConstraint(ClassDecl *selfClass, ValueDecl *witness) {
   auto genericSig =
     witness->getInnermostDeclContext()->getGenericSignatureOfContext();
-  if (!genericSig) return None;
 
   // First, search for any bogus requirements.
-  auto it = llvm::find_if(genericSig->getRequirements(),
+  auto it = llvm::find_if(genericSig.getRequirements(),
                           [&selfClass](const auto &req) {
     if (req.getKind() != RequirementKind::SameType)
       return false;
@@ -3662,7 +3735,7 @@ getAdopteeSelfSameTypeConstraint(ClassDecl *selfClass, ValueDecl *witness) {
     return req.getFirstType()->getAnyNominal() == selfClass
         || req.getSecondType()->getAnyNominal() == selfClass;
   });
-  if (it == genericSig->getRequirements().end()) {
+  if (it == genericSig.getRequirements().end()) {
     return None;
   }
 
@@ -4139,7 +4212,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
     }
 
     if (auto *classDecl = Adoptee->getClassOrBoundGenericClass()) {
-      if (!classDecl->isFinal()) {
+      if (!classDecl->isSemanticallyFinal()) {
         checkNonFinalClassWitness(requirement, witness);
       }
     }
@@ -4607,10 +4680,12 @@ void ConformanceChecker::resolveValueWitnesses() {
         return;
 
       // Ensure that Actor.unownedExecutor is implemented within the
-      // actor class itself.
+      // actor class itself.  But if this somehow resolves to the
+      // requirement, ignore it.
       if (requirement->getName().isSimpleName(C.Id_unownedExecutor) &&
           Proto->isSpecificProtocol(KnownProtocolKind::Actor) &&
           DC != witness->getDeclContext() &&
+          !isa<ProtocolDecl>(witness->getDeclContext()) &&
           Adoptee->getClassOrBoundGenericClass() &&
           Adoptee->getClassOrBoundGenericClass()->isActor()) {
         witness->diagnose(diag::unowned_executor_outside_actor);
@@ -5155,7 +5230,7 @@ TypeChecker::couldDynamicallyConformToProtocol(Type type, ProtocolDecl *Proto,
   
   // A non-final class might have a subclass that conforms to the protocol.
   if (auto *classDecl = type->getClassOrBoundGenericClass()) {
-    if (!classDecl->isFinal())
+    if (!classDecl->isSemanticallyFinal())
       return true;
   }
 
@@ -5775,7 +5850,7 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
   MultiConformanceChecker groupChecker(Context);
 
   ProtocolConformance *SendableConformance = nullptr;
-  ProtocolConformance *unsafeSendableConformance = nullptr;
+  bool sendableConformanceIsUnchecked = false;
   ProtocolConformance *errorConformance = nullptr;
   ProtocolConformance *codingKeyConformance = nullptr;
   bool anyInvalid = false;
@@ -5806,9 +5881,39 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
       }
     } else if (proto->isSpecificProtocol(KnownProtocolKind::Sendable)) {
       SendableConformance = conformance;
+
+      if (auto normal = conformance->getRootNormalConformance()) {
+        if (normal->isUnchecked())
+          sendableConformanceIsUnchecked = true;
+      }
+    } else if (proto->isSpecificProtocol(KnownProtocolKind::DistributedActor)) {
+      if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
+        if (!classDecl->isDistributedActor()) {
+          if (classDecl->isActor()) {
+            dc->getSelfNominalTypeDecl()
+            ->diagnose(diag::distributed_actor_protocol_illegal_inheritance,
+                       dc->getSelfNominalTypeDecl()->getName())
+                       .fixItInsert(classDecl->getStartLoc(), "distributed ");
+          } else {
+            dc->getSelfNominalTypeDecl()
+            ->diagnose(diag::actor_protocol_illegal_inheritance,
+                       dc->getSelfNominalTypeDecl()->getName())
+                       .fixItReplace(nominal->getStartLoc(), "distributed actor");
+          }
+        }
+      }
+    } else if (proto->isSpecificProtocol(KnownProtocolKind::Actor)) {
+      if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
+        if (!classDecl->isExplicitActor()) {
+          dc->getSelfNominalTypeDecl()
+              ->diagnose(diag::actor_protocol_illegal_inheritance,
+                         dc->getSelfNominalTypeDecl()->getName())
+              .fixItReplace(nominal->getStartLoc(), "actor");
+        }
+      }
     } else if (proto->isSpecificProtocol(
                    KnownProtocolKind::UnsafeSendable)) {
-      unsafeSendableConformance = conformance;
+      sendableConformanceIsUnchecked = true;
     } else if (proto->isSpecificProtocol(KnownProtocolKind::Error)) {
       errorConformance = conformance;
     } else if (proto->isSpecificProtocol(KnownProtocolKind::CodingKey)) {
@@ -5817,7 +5922,7 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
   }
 
   // Check constraints of Sendable.
-  if (SendableConformance && !unsafeSendableConformance) {
+  if (SendableConformance && !sendableConformanceIsUnchecked) {
     SendableCheck check = SendableCheck::Explicit;
     if (errorConformance || codingKeyConformance)
       check = SendableCheck::ImpliedByStandardProtocol;
@@ -5826,6 +5931,13 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
 
   // Check all conformances.
   groupChecker.checkAllConformances();
+
+  // Check actor isolation.
+  for (auto *member : idc->getMembers()) {
+    if (auto *valueDecl = dyn_cast<ValueDecl>(member)) {
+      (void)getActorIsolation(valueDecl);
+    }
+  }
 
   if (Context.TypeCheckerOpts.DebugGenericSignatures &&
       !conformances.empty()) {
@@ -6294,6 +6406,9 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
 
   case KnownDerivableProtocolKind::Differentiable:
     return derived.deriveDifferentiable(Requirement);
+
+  case KnownDerivableProtocolKind::DistributedActor:
+    return derived.deriveDistributedActor(Requirement);
 
   case KnownDerivableProtocolKind::OptionSet:
       llvm_unreachable(

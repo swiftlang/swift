@@ -1,4 +1,5 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency %import-libdispatch)
+// REQUIRES: rdar79670222
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -Xfrontend -disable-availability-checking %import-libdispatch)
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -23,7 +24,7 @@ var asyncTests = TestSuite("Async")
 actor MyActor {
   func synchronous() { }
 
-  func doSomething(expectedPriority: Task.Priority) {
+  func doSomething(expectedPriority: TaskPriority) {
     async {
       synchronous() // okay to be synchronous
       assert(Task.currentPriority == expectedPriority)
@@ -67,4 +68,3 @@ if #available(SwiftStdlib 5.5, *) {
 }
 
 runAllTests()
-

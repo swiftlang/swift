@@ -105,7 +105,7 @@ bool LowerHopToActor::processHop(HopToExecutorInst *hop) {
   // or else emit code to derive it.
   SILValue executor = emitGetExecutor(hop->getLoc(), actor, /*optional*/true);
 
-  B.createHopToExecutor(hop->getLoc(), executor);
+  B.createHopToExecutor(hop->getLoc(), executor, /*mandatory*/ false);
 
   hop->eraseFromParent();
 

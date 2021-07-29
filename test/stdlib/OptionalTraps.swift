@@ -25,7 +25,7 @@ func shouldCheckErrorLocation() -> Bool {
   guard _isDebugAssertConfiguration() else { return false }
   // The runtime error location format changed after the 5.3 release.
   // (https://github.com/apple/swift/pull/34665)
-  if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+  if #available(macOS 11.3, iOS 14.5, tvOS 14.5, watchOS 7.4, *) {
     return true
   } else {
     return false

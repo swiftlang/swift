@@ -379,6 +379,7 @@ std::string ASTMangler::mangleReabstractionThunkHelper(
                                             Type FromType,
                                             Type ToType,
                                             Type SelfType,
+                                            Type GlobalActorBound,
                                             ModuleDecl *Module) {
   Mod = Module;
   assert(ThunkType->getPatternSubstitutions().empty() && "not implemented");
@@ -399,6 +400,11 @@ std::string ASTMangler::mangleReabstractionThunkHelper(
     appendOperator("Ty");
   else
     appendOperator("TR");
+  
+  if (GlobalActorBound) {
+    appendType(GlobalActorBound);
+    appendOperator("TU");
+  }
 
   return finalize();
 }
@@ -821,6 +827,7 @@ void ASTMangler::appendSymbolKind(SymbolKind SKind) {
     case SymbolKind::DynamicThunk: return appendOperator("TD");
     case SymbolKind::SwiftAsObjCThunk: return appendOperator("To");
     case SymbolKind::ObjCAsSwiftThunk: return appendOperator("TO");
+    case SymbolKind::DistributedThunk: return appendOperator("Td");
   }
 }
 
@@ -1491,7 +1498,7 @@ unsigned ASTMangler::appendBoundGenericArgs(DeclContext *dc,
     // If we are generic at this level, emit all of the replacements at
     // this level.
     if (genericContext->isGeneric()) {
-      auto genericParams = subs.getGenericSignature()->getGenericParams();
+      auto genericParams = subs.getGenericSignature().getGenericParams();
       unsigned depth = genericParams[currentGenericParamIdx]->getDepth();
       auto replacements = subs.getReplacementTypes();
       for (unsigned lastGenericParamIdx = genericParams.size();
@@ -2470,6 +2477,11 @@ void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
     appendOperator("Yjl");
     break;
   }
+
+  if (Type globalActor = fn->getGlobalActor()) {
+    appendType(globalActor);
+    appendOperator("Yc");
+  }
 }
 
 void ASTMangler::appendFunctionInputType(
@@ -2559,6 +2571,9 @@ void ASTMangler::appendTypeListElement(Identifier name, Type elementType,
     appendOperator("n");
     break;
   }
+  if (flags.isIsolated())
+    appendOperator("Yi");
+
   if (!name.empty())
     appendIdentifier(name.str());
   if (flags.isVariadic())
@@ -2571,7 +2586,7 @@ bool ASTMangler::appendGenericSignature(GenericSignature sig,
   CurGenericSignature = canSig;
 
   unsigned initialParamDepth;
-  TypeArrayView<GenericTypeParamType> genericParams;
+  ArrayRef<CanTypeWrapper<GenericTypeParamType>> genericParams;
   ArrayRef<Requirement> requirements;
   SmallVector<Requirement, 4> requirementsBuffer;
   if (contextSig) {
@@ -2582,12 +2597,12 @@ bool ASTMangler::appendGenericSignature(GenericSignature sig,
     }
 
     // The signature depth starts above the depth of the context signature.
-    if (!contextSig->getGenericParams().empty()) {
-      initialParamDepth = contextSig->getGenericParams().back()->getDepth() + 1;
+    if (!contextSig.getGenericParams().empty()) {
+      initialParamDepth = contextSig.getGenericParams().back()->getDepth() + 1;
     }
 
     // Find the parameters at this depth (or greater).
-    genericParams = canSig->getGenericParams();
+    genericParams = canSig.getGenericParams();
     unsigned firstParam = genericParams.size();
     while (firstParam > 1 &&
            genericParams[firstParam-1]->getDepth() >= initialParamDepth)
@@ -2599,11 +2614,11 @@ bool ASTMangler::appendGenericSignature(GenericSignature sig,
     // it's better to mangle the complete canonical signature because we
     // have a special-case mangling for that.
     if (genericParams.empty() &&
-        contextSig->getGenericParams().size() == 1 &&
-        contextSig->getRequirements().empty()) {
+        contextSig.getGenericParams().size() == 1 &&
+        contextSig.getRequirements().empty()) {
       initialParamDepth = 0;
-      genericParams = canSig->getGenericParams();
-      requirements = canSig->getRequirements();
+      genericParams = canSig.getGenericParams();
+      requirements = canSig.getRequirements();
     } else {
       requirementsBuffer = canSig->requirementsNotSatisfiedBy(contextSig);
       requirements = requirementsBuffer;
@@ -2611,8 +2626,8 @@ bool ASTMangler::appendGenericSignature(GenericSignature sig,
   } else {
     // Use the complete canonical signature.
     initialParamDepth = 0;
-    genericParams = canSig->getGenericParams();
-    requirements = canSig->getRequirements();
+    genericParams = canSig.getGenericParams();
+    requirements = canSig.getRequirements();
   }
 
   if (genericParams.empty() && requirements.empty())
@@ -2693,7 +2708,7 @@ void ASTMangler::appendRequirement(const Requirement &reqt) {
 }
 
 void ASTMangler::appendGenericSignatureParts(
-                                     TypeArrayView<GenericTypeParamType> params,
+                                     ArrayRef<CanTypeWrapper<GenericTypeParamType>> params,
                                      unsigned initialParamDepth,
                                      ArrayRef<Requirement> requirements) {
   // Mangle the requirements.
@@ -2869,18 +2884,6 @@ CanType ASTMangler::getDeclTypeForMangling(
 
   Type ty = decl->getInterfaceType()->getReferenceStorageReferent();
 
-  // Strip the global actor out of the mangling.
-  ty = ty.transform([](Type type) {
-    if (auto fnType = type->getAs<AnyFunctionType>()) {
-      if (fnType->getGlobalActor()) {
-        return Type(fnType->withExtInfo(
-            fnType->getExtInfo().withGlobalActor(Type())));
-      }
-    }
-
-    return type;
-  });
-
   auto canTy = ty->getCanonicalType();
 
   if (auto gft = dyn_cast<GenericFunctionType>(canTy)) {
@@ -2928,13 +2931,15 @@ void ASTMangler::appendDeclType(const ValueDecl *decl,
 
 bool ASTMangler::tryAppendStandardSubstitution(const GenericTypeDecl *decl) {
   // Bail out if our parent isn't the swift standard library.
-  if (!decl->isStdlibDecl())
+  auto dc = decl->getDeclContext();
+  if (!dc->isModuleScopeContext() ||
+      !dc->getParentModule()->hasStandardSubstitutions())
     return false;
 
   if (isa<NominalTypeDecl>(decl)) {
-    if (char Subst = getStandardTypeSubst(decl->getName().str())) {
-      if (!SubstMerging.tryMergeSubst(*this, Subst, /*isStandardSubst*/ true)) {
-        appendOperator("S", StringRef(&Subst, 1));
+    if (auto Subst = getStandardTypeSubst(decl->getName().str())) {
+      if (!SubstMerging.tryMergeSubst(*this, *Subst, /*isStandardSubst*/ true)){
+        appendOperator("S", *Subst);
       }
       return true;
     }
@@ -3122,7 +3127,7 @@ void ASTMangler::appendDependentProtocolConformance(
       appendProtocolName(entry.second);
       auto index =
         conformanceRequirementIndex(entry,
-                                    CurGenericSignature->getRequirements());
+                                    CurGenericSignature.getRequirements());
       // This is never an unknown index and so must be adjusted by 2 per ABI.
       appendOperator("HD", Index(index + 2));
       continue;
@@ -3168,7 +3173,7 @@ void ASTMangler::appendAnyProtocolConformance(
     appendDependentProtocolConformance(path);
   } else if (auto opaqueType = conformingType->getAs<OpaqueTypeArchetypeType>()) {
     GenericSignature opaqueSignature = opaqueType->getBoundSignature();
-    GenericTypeParamType *opaqueTypeParam = opaqueSignature->getGenericParams().back();
+    GenericTypeParamType *opaqueTypeParam = opaqueSignature.getGenericParams().back();
     ConformanceAccessPath conformanceAccessPath =
         opaqueSignature->getConformanceAccessPath(opaqueTypeParam,
                                                   conformance.getAbstract());

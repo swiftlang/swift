@@ -166,9 +166,10 @@ protected:
 
   SWIFT_INLINE_BITFIELD_EMPTY(LiteralExpr, Expr);
   SWIFT_INLINE_BITFIELD_EMPTY(IdentityExpr, Expr);
-  SWIFT_INLINE_BITFIELD(LookupExpr, Expr, 1+1,
+  SWIFT_INLINE_BITFIELD(LookupExpr, Expr, 1+1+1,
     IsSuper : 1,
-    IsImplicitlyAsync : 1
+    IsImplicitlyAsync : 1,
+    IsImplicitlyThrows : 1
   );
   SWIFT_INLINE_BITFIELD_EMPTY(DynamicLookupExpr, LookupExpr);
 
@@ -194,10 +195,11 @@ protected:
     LiteralCapacity : 32
   );
 
-  SWIFT_INLINE_BITFIELD(DeclRefExpr, Expr, 2+2+1,
+  SWIFT_INLINE_BITFIELD(DeclRefExpr, Expr, 2+2+1+1,
     Semantics : 2, // an AccessSemantics
     FunctionRefKind : 2,
-    IsImplicitlyAsync : 1
+    IsImplicitlyAsync : 1,
+    IsImplicitlyThrows : 1
   );
 
   SWIFT_INLINE_BITFIELD(UnresolvedDeclRefExpr, Expr, 2+2,
@@ -345,10 +347,11 @@ protected:
     NumCaptures : 32
   );
 
-  SWIFT_INLINE_BITFIELD(ApplyExpr, Expr, 1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ApplyExpr, Expr, 1+1+1+1+1,
     ThrowsIsSet : 1,
     Throws : 1,
     ImplicitlyAsync : 1,
+    ImplicitlyThrows : 1,
     NoAsync : 1
   );
 
@@ -1186,11 +1189,74 @@ public:
   }
 };
 
+/// Describes the actor to which an implicit-async expression will hop.
+struct ImplicitActorHopTarget {
+  enum Kind {
+    /// The "self" instance.
+    InstanceSelf,
+    /// A global actor with the given type.
+    GlobalActor,
+    /// An isolated parameter in a call.
+    IsolatedParameter,
+  };
+
+private:
+  /// The lower two bits are the Kind, and the remaining bits are used for
+  /// the payload, which might by a TypeBase * (for a global actor) or a
+  /// integer value (for an isolated parameter).
+  uintptr_t bits;
+
+  constexpr ImplicitActorHopTarget(uintptr_t bits) : bits(bits) { }
+
+public:
+  /// Default-initialized to instance "self".
+  constexpr ImplicitActorHopTarget() : bits(0) { }
+
+  static ImplicitActorHopTarget forInstanceSelf() {
+    return ImplicitActorHopTarget(InstanceSelf);
+  }
+
+  static ImplicitActorHopTarget forGlobalActor(Type globalActor) {
+    uintptr_t bits =
+      reinterpret_cast<uintptr_t>(globalActor.getPointer()) | GlobalActor;
+    return ImplicitActorHopTarget(bits);
+  }
+
+  static ImplicitActorHopTarget forIsolatedParameter(unsigned index) {
+    uintptr_t bits = static_cast<uintptr_t>(index) << 2 | IsolatedParameter;
+    return ImplicitActorHopTarget(bits);
+  }
+
+  /// Determine the kind of implicit actor hop being performed.
+  Kind getKind() const {
+    return static_cast<Kind>(bits & 0x03);
+  }
+
+  operator Kind() const {
+    return getKind();
+  }
+
+  /// Retrieve the global actor type for an implicit hop to a global actor.
+  Type getGlobalActor() const {
+    assert(getKind() == GlobalActor);
+    return Type(reinterpret_cast<TypeBase *>(bits & ~0x03));
+  }
+
+  /// Retrieve the (zero-based) parameter index for the isolated parameter
+  /// in a call.
+  unsigned getIsolatedParameterIndex() const {
+    assert(getKind() == IsolatedParameter);
+    return bits >> 2;
+  }
+};
+
+
 /// DeclRefExpr - A reference to a value, "x".
 class DeclRefExpr : public Expr {
   /// The declaration pointer.
   ConcreteDeclRef D;
   DeclNameLoc Loc;
+  ImplicitActorHopTarget implicitActorHopTarget;
 
 public:
   DeclRefExpr(ConcreteDeclRef D, DeclNameLoc Loc, bool Implicit,
@@ -1202,6 +1268,7 @@ public:
       static_cast<unsigned>(Loc.isCompound() ? FunctionRefKind::Compound
                                              : FunctionRefKind::Unapplied);
     Bits.DeclRefExpr.IsImplicitlyAsync = false;
+    Bits.DeclRefExpr.IsImplicitlyThrows = false;
   }
 
   /// Retrieve the declaration to which this expression refers.
@@ -1216,13 +1283,34 @@ public:
   }
 
   /// Determine whether this reference needs to happen asynchronously, i.e.,
-  /// guarded by hop_to_executor
-  bool isImplicitlyAsync() const { return Bits.DeclRefExpr.IsImplicitlyAsync; }
+  /// guarded by hop_to_executor, and if so describe the target.
+  Optional<ImplicitActorHopTarget> isImplicitlyAsync() const {
+    if (!Bits.DeclRefExpr.IsImplicitlyAsync)
+      return None;
 
-  /// Set whether this reference needs to happen asynchronously, i.e.,
-  /// guarded by hop_to_executor
-  void setImplicitlyAsync(bool isImplicitlyAsync) {
-    Bits.DeclRefExpr.IsImplicitlyAsync = isImplicitlyAsync;
+    return implicitActorHopTarget;
+  }
+
+  /// Note that this reference is implicitly async and set the target.
+  void setImplicitlyAsync(ImplicitActorHopTarget target) {
+    Bits.DeclRefExpr.IsImplicitlyAsync = true;
+    implicitActorHopTarget = target;
+  }
+
+  /// Determine whether this reference needs may implicitly throw.
+  ///
+  /// This is the case for non-throwing `distributed func` declarations,
+  /// which are cross-actor invoked, because such calls actually go over the
+  /// transport/network, and may throw from this, rather than the function
+  /// implementation itself..
+  bool isImplicitlyThrows() const { return Bits.DeclRefExpr.IsImplicitlyThrows; }
+
+  /// Set whether this reference must account for a `throw` occurring for reasons
+  /// other than the function implementation itself throwing, e.g. an
+  /// `ActorTransport` implementing a `distributed func` call throwing a
+  /// networking error.
+  void setImplicitlyThrows(bool isImplicitlyThrows) {
+    Bits.DeclRefExpr.IsImplicitlyThrows = isImplicitlyThrows;
   }
 
   /// Retrieve the concrete declaration reference.
@@ -1534,6 +1622,7 @@ public:
 class LookupExpr : public Expr {
   Expr *Base;
   ConcreteDeclRef Member;
+  ImplicitActorHopTarget implicitActorHopTarget;
 
 protected:
   explicit LookupExpr(ExprKind Kind, Expr *base, ConcreteDeclRef member,
@@ -1541,6 +1630,7 @@ protected:
       : Expr(Kind, Implicit), Base(base), Member(member) {
     Bits.LookupExpr.IsSuper = false;
     Bits.LookupExpr.IsImplicitlyAsync = false;
+    Bits.LookupExpr.IsImplicitlyThrows = false;
     assert(Base);
   }
 
@@ -1556,7 +1646,7 @@ public:
 
   /// Determine whether the operation has a known underlying declaration or not.
   bool hasDecl() const { return static_cast<bool>(Member); }
-  
+
   /// Retrieve the declaration that this /// operation refers to.
   /// Only valid when \c hasDecl() is true.
   ConcreteDeclRef getDecl() const {
@@ -1571,13 +1661,34 @@ public:
   void setIsSuper(bool isSuper) { Bits.LookupExpr.IsSuper = isSuper; }
 
   /// Determine whether this reference needs to happen asynchronously, i.e.,
-  /// guarded by hop_to_executor
-  bool isImplicitlyAsync() const { return Bits.LookupExpr.IsImplicitlyAsync; }
+  /// guarded by hop_to_executor, and if so describe the target.
+  Optional<ImplicitActorHopTarget> isImplicitlyAsync() const {
+    if (!Bits.LookupExpr.IsImplicitlyAsync)
+      return None;
 
-  /// Set whether this reference needs to happen asynchronously, i.e.,
-  /// guarded by hop_to_executor
-  void setImplicitlyAsync(bool isImplicitlyAsync) {
-    Bits.LookupExpr.IsImplicitlyAsync = isImplicitlyAsync;
+    return implicitActorHopTarget;
+  }
+
+  /// Note that this reference is implicitly async and set the target.
+  void setImplicitlyAsync(ImplicitActorHopTarget target) {
+    Bits.LookupExpr.IsImplicitlyAsync = true;
+    implicitActorHopTarget = target;
+  }
+
+  /// Determine whether this reference needs may implicitly throw.
+  ///
+  /// This is the case for non-throwing `distributed func` declarations,
+  /// which are cross-actor invoked, because such calls actually go over the
+  /// transport/network, and may throw from this, rather than the function
+  /// implementation itself..
+  bool isImplicitlyThrows() const { return Bits.LookupExpr.IsImplicitlyThrows; }
+
+  /// Set whether this reference must account for a `throw` occurring for reasons
+  /// other than the function implementation itself throwing, e.g. an
+  /// `ActorTransport` implementing a `distributed func` call throwing a
+  /// networking error.
+  void setImplicitlyThrows(bool isImplicitlyThrows) {
+    Bits.LookupExpr.IsImplicitlyThrows = isImplicitlyThrows;
   }
 
   static bool classof(const Expr *E) {
@@ -4143,13 +4254,11 @@ public:
 /// Instances of this structure represent elements of the capture list that can
 /// optionally occur in a capture expression.
 struct CaptureListEntry {
-  VarDecl *Var;
-  PatternBindingDecl *Init;
+  PatternBindingDecl *PBD;
 
-  CaptureListEntry(VarDecl *Var, PatternBindingDecl *Init)
-  : Var(Var), Init(Init) {
-  }
+  explicit CaptureListEntry(PatternBindingDecl *PBD);
 
+  VarDecl *getVar() const;
   bool isSimpleSelfCapture() const;
 };
 
@@ -4446,7 +4555,9 @@ class ApplyExpr : public Expr {
 
   /// The argument being passed to it.
   Expr *Arg;
-  
+
+  ImplicitActorHopTarget implicitActorHopTarget;
+
   /// Returns true if \c e could be used as the call's argument. For most \c ApplyExpr
   /// subclasses, this means it is a \c ParenExpr or \c TupleExpr.
   bool validateArg(Expr *e) const;
@@ -4458,6 +4569,7 @@ protected:
     assert(validateArg(Arg) && "Arg is not a permitted expr kind");
     Bits.ApplyExpr.ThrowsIsSet = false;
     Bits.ApplyExpr.ImplicitlyAsync = false;
+    Bits.ApplyExpr.ImplicitlyThrows = false;
     Bits.ApplyExpr.NoAsync = false;
   }
 
@@ -4518,11 +4630,32 @@ public:
   ///
   /// where the new closure is declared to be async.
   ///
-  bool implicitlyAsync() const {
-    return Bits.ApplyExpr.ImplicitlyAsync;
+  /// When the application is implciitly async, the result describes
+  /// the actor to which we need to need to hop.
+  Optional<ImplicitActorHopTarget> isImplicitlyAsync() const {
+    if (!Bits.ApplyExpr.ImplicitlyAsync)
+      return None;
+
+    return implicitActorHopTarget;
   }
-  void setImplicitlyAsync(bool flag) {
-    Bits.ApplyExpr.ImplicitlyAsync = flag;
+
+  /// Note that this application is implicitly async and set the target.
+  void setImplicitlyAsync(ImplicitActorHopTarget target) {
+    Bits.ApplyExpr.ImplicitlyAsync = true;
+    implicitActorHopTarget = target;
+  }
+
+  /// Is this application _implicitly_ required to be a throwing call?
+  /// This can happen if the function is actually a proxy function invocation,
+  /// which may throw, regardless of the target function throwing, e.g.
+  /// a distributed function call on a 'remote' actor, may throw due to network
+  /// issues reported by the transport, regardless if the actual target function
+  /// can throw.
+  bool implicitlyThrows() const {
+    return Bits.ApplyExpr.ImplicitlyThrows;
+  }
+  void setImplicitlyThrows(bool flag) {
+    Bits.ApplyExpr.ImplicitlyThrows = flag;
   }
 
   ValueDecl *getCalledValue() const;
@@ -4687,17 +4820,26 @@ public:
 /// BinaryExpr - Infix binary expressions like 'x+y'.  The argument is always
 /// an implicit tuple expression of the type expected by the function.
 class BinaryExpr : public ApplyExpr {
+  BinaryExpr(Expr *fn, TupleExpr *arg, bool implicit, Type ty = Type())
+      : ApplyExpr(ExprKind::Binary, fn, arg, implicit, ty) {
+    assert(arg->getNumElements() == 2);
+  }
+
 public:
-  BinaryExpr(Expr *Fn, TupleExpr *Arg, bool Implicit, Type Ty = Type())
-    : ApplyExpr(ExprKind::Binary, Fn, Arg, Implicit, Ty) {}
+  static BinaryExpr *create(ASTContext &ctx, Expr *lhs, Expr *fn, Expr *rhs,
+                            bool implicit, Type ty = Type());
+
+  /// The left-hand argument of the binary operation.
+  Expr *getLHS() const { return cast<TupleExpr>(getArg())->getElement(0); }
+
+  /// The right-hand argument of the binary operation.
+  Expr *getRHS() const { return cast<TupleExpr>(getArg())->getElement(1); }
 
   SourceLoc getLoc() const { return getFn()->getLoc(); }
 
   SourceRange getSourceRange() const { return getArg()->getSourceRange(); }
   SourceLoc getStartLoc() const { return getArg()->getStartLoc(); }
   SourceLoc getEndLoc() const { return getArg()->getEndLoc(); }
-
-  TupleExpr *getArg() const { return cast<TupleExpr>(ApplyExpr::getArg()); }
 
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Binary;}
 };
@@ -5404,6 +5546,7 @@ public:
   /// - a resolved ValueDecl, referring to
   /// - a subscript index expression, which may or may not be resolved
   /// - an optional chaining, forcing, or wrapping component
+  /// - a code completion token
   class Component {
   public:
     enum class Kind: unsigned {
@@ -5418,6 +5561,7 @@ public:
       Identity,
       TupleElement,
       DictionaryKey,
+      CodeCompletion,
     };
   
   private:
@@ -5593,8 +5737,12 @@ public:
                                      SourceLoc loc) {
       return Component(fieldNumber, elementType, loc);
     }
-      
-      
+
+    static Component forCodeCompletion(SourceLoc Loc) {
+      return Component(nullptr, {}, nullptr, {}, {}, Kind::CodeCompletion,
+                       Type(), Loc);
+    }
+
     SourceLoc getLoc() const {
       return Loc;
     }
@@ -5632,6 +5780,7 @@ public:
       case Kind::UnresolvedSubscript:
       case Kind::UnresolvedProperty:
       case Kind::Invalid:
+      case Kind::CodeCompletion:
         return false;
       }
       llvm_unreachable("unhandled kind");
@@ -5652,6 +5801,7 @@ public:
       case Kind::Identity:
       case Kind::TupleElement:
       case Kind::DictionaryKey:
+      case Kind::CodeCompletion:
         return nullptr;
       }
       llvm_unreachable("unhandled kind");
@@ -5672,6 +5822,7 @@ public:
       case Kind::Identity:
       case Kind::TupleElement:
       case Kind::DictionaryKey:
+      case Kind::CodeCompletion:
         llvm_unreachable("no subscript labels for this kind");
       }
       llvm_unreachable("unhandled kind");
@@ -5695,6 +5846,7 @@ public:
       case Kind::Identity:
       case Kind::TupleElement:
       case Kind::DictionaryKey:
+      case Kind::CodeCompletion:
         return {};
       }
       llvm_unreachable("unhandled kind");
@@ -5718,6 +5870,7 @@ public:
       case Kind::Property:
       case Kind::Identity:
       case Kind::TupleElement:
+      case Kind::CodeCompletion:
         llvm_unreachable("no unresolved name for this kind");
       }
       llvm_unreachable("unhandled kind");
@@ -5738,6 +5891,7 @@ public:
       case Kind::Identity:
       case Kind::TupleElement:
       case Kind::DictionaryKey:
+      case Kind::CodeCompletion:
         return false;
       }
       llvm_unreachable("unhandled kind");
@@ -5758,6 +5912,7 @@ public:
       case Kind::Identity:
       case Kind::TupleElement:
       case Kind::DictionaryKey:
+      case Kind::CodeCompletion:
         llvm_unreachable("no decl ref for this kind");
       }
       llvm_unreachable("unhandled kind");
@@ -5778,6 +5933,7 @@ public:
         case Kind::Property:
         case Kind::Subscript:
         case Kind::DictionaryKey:
+        case Kind::CodeCompletion:
           llvm_unreachable("no field number for this kind");
       }
       llvm_unreachable("unhandled kind");
@@ -5833,7 +5989,10 @@ public:
   /// Indicates if the key path expression is composed by a single invalid
   /// component. e.g. missing component `\Root`
   bool hasSingleInvalidComponent() const {
-    return Components.size() == 1 && !Components.front().isValid();
+    if (ParsedRoot && ParsedRoot->getKind() == ExprKind::Type) {
+      return Components.size() == 1 && !Components.front().isValid();
+    }
+    return false;
   }
 
   /// Retrieve the string literal expression, which will be \c NULL prior to

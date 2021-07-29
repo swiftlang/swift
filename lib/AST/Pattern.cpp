@@ -291,6 +291,15 @@ bool Pattern::hasStorage() const {
   return HasStorage;
 }
 
+bool Pattern::hasAnyMutableBindings() const {
+  auto HasMutable = false;
+  forEachVariable([&](VarDecl *VD) {
+    if (!VD->isLet())
+      HasMutable = true;
+  });
+  return HasMutable;
+}
+
 /// Return true if this is a non-resolved ExprPattern which is syntactically
 /// irrefutable.
 static bool isIrrefutableExprPattern(const ExprPattern *EP) {

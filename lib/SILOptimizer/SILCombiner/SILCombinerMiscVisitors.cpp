@@ -1599,9 +1599,11 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
     Builder.createStore(DataAddrInst->getLoc(), E, DataAddrInst->getOperand(),
                         StoreOwnershipQualifier::Unqualified);
     // Cleanup.
-    eraseUsesOfInstruction(DataAddrInst);
-    recursivelyDeleteTriviallyDeadInstructions(DataAddrInst, true);
-    return eraseInstFromFunction(*IEAI);
+    getInstModCallbacks().notifyWillBeDeleted(DataAddrInst);
+    deleter.forceDeleteWithUsers(DataAddrInst);
+    deleter.forceDelete(IEAI);
+    deleter.cleanupDeadInstructions();
+    return nullptr;
   }
 
   // Check whether we have an apply initializing the enum.
@@ -2208,7 +2210,8 @@ SILInstruction *SILCombiner::visitMarkDependenceInst(MarkDependenceInst *mdi) {
                                              use, eiBase->getOperand());
       if (helper) {
         helper.perform();
-        tryEliminateOnlyOwnershipUsedForwardingInst(eiBase, instModCallbacks);
+        tryEliminateOnlyOwnershipUsedForwardingInst(eiBase,
+                                                    getInstModCallbacks());
         return mdi;
       }
     }
@@ -2222,7 +2225,7 @@ SILInstruction *SILCombiner::visitMarkDependenceInst(MarkDependenceInst *mdi) {
                                            use, ier->getOperand());
     if (helper) {
       helper.perform();
-      tryEliminateOnlyOwnershipUsedForwardingInst(ier, instModCallbacks);
+      tryEliminateOnlyOwnershipUsedForwardingInst(ier, getInstModCallbacks());
       return mdi;
     }
   }
@@ -2235,7 +2238,7 @@ SILInstruction *SILCombiner::visitMarkDependenceInst(MarkDependenceInst *mdi) {
                                            use, oeri->getOperand());
     if (helper) {
       helper.perform();
-      tryEliminateOnlyOwnershipUsedForwardingInst(oeri, instModCallbacks);
+      tryEliminateOnlyOwnershipUsedForwardingInst(oeri, getInstModCallbacks());
       return mdi;
     }
   }
@@ -2309,7 +2312,7 @@ static bool checkGlobalValueUsers(SILValue val,
 }
 
 SILInstruction *
-SILCombiner::visitGlobalValueInst(GlobalValueInst *globalValue) {
+SILCombiner::legacyVisitGlobalValueInst(GlobalValueInst *globalValue) {
   // Delete all reference count instructions on a global_value if the only other
   // users are projections (ref_element_addr and ref_tail_addr).
   SmallVector<SILInstruction *, 8> toDelete;

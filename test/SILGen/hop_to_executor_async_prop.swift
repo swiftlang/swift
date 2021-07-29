@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s -module-name test -swift-version 5 -enable-experimental-concurrency | %FileCheck --enable-var-scope %s
+// RUN: %target-swift-frontend -emit-silgen %s -module-name test -swift-version 5 -enable-experimental-concurrency -disable-availability-checking | %FileCheck --enable-var-scope %s --implicit-check-not 'hop_to_executor {{%[0-9]+}}'
 // REQUIRES: concurrency
 
 @propertyWrapper
@@ -83,7 +83,7 @@ struct GlobalCat {
 // CHECK:  bb0([[CAT:%[0-9]+]] : @guaranteed $Cat):
 // CHECK:    [[PREV_EXEC:%.*]] = builtin "getCurrentExecutor"
 // CHECK:    hop_to_executor [[CAT]] : $Cat
-// CHECK:    [[CAT_GETTER:%[0-9]+]] = class_method [[CAT]] : $Cat, #Cat.computedSweater!getter : (Cat) -> () -> Sweater, $@convention(method) (@guaranteed Cat) -> @owned Sweater
+// CHECK:    [[CAT_GETTER:%[0-9]+]] = class_method [[CAT]] : $Cat, #Cat.computedSweater!getter : (isolated Cat) -> () -> Sweater, $@convention(method) (@guaranteed Cat) -> @owned Sweater
 // CHECK:    [[SWEATER1_REF:%[0-9]+]] = apply [[CAT_GETTER]]([[CAT]]) : $@convention(method) (@guaranteed Cat) -> @owned Sweater
 // CHECK:    hop_to_executor [[PREV_EXEC]]
 // CHECK:    [[SWEATER1:%[0-9]+]] = begin_borrow [[SWEATER1_REF]] : $Sweater
@@ -96,7 +96,7 @@ struct GlobalCat {
 // CHECK:    [[PREV_EXEC:%.*]] = builtin "getCurrentExecutor"
 // CHECK:    hop_to_executor [[CAT2]] : $Cat
 // CHECK:    [[CAT2_FOR_LOAD:%[0-9]+]] = begin_borrow [[CAT2_REF]] : $Cat
-// CHECK:    [[CAT2_GETTER:%[0-9]+]] = class_method [[CAT2_FOR_LOAD]] : $Cat, #Cat.computedSweater!getter : (Cat) -> () -> Sweater, $@convention(method) (@guaranteed Cat) -> @owned Sweater
+// CHECK:    [[CAT2_GETTER:%[0-9]+]] = class_method [[CAT2_FOR_LOAD]] : $Cat, #Cat.computedSweater!getter : (isolated Cat) -> () -> Sweater, $@convention(method) (@guaranteed Cat) -> @owned Sweater
 // CHECK:    [[SWEATER2_OWNER:%[0-9]+]] = apply [[CAT2_GETTER]]([[CAT2_FOR_LOAD]]) : $@convention(method) (@guaranteed Cat) -> @owned Sweater
 // CHECK:    end_borrow [[CAT2_FOR_LOAD]] : $Cat
 // CHECK:    end_borrow [[CAT2]] : $Cat
@@ -147,9 +147,9 @@ actor Dog {
     // CHECK:   [[GLOBAL_BOOL_ACCESS:%[0-9]+]] = begin_access [read] [dynamic] [[GLOBAL_BOOL_ADDR]] : $*Bool
     // CHECK:   [[THE_BOOL:%[0-9]+]] = load [trivial] [[GLOBAL_BOOL_ACCESS]] : $*Bool
     // CHECK:   end_access [[GLOBAL_BOOL_ACCESS]] : $*Bool
-    // CHECK:   end_borrow [[BORROWED_CAT]] : $Cat
 
     // CHECK:   hop_to_executor [[SELF]] : $Dog
+    // CHECK:   end_borrow [[BORROWED_CAT]] : $Cat
     // CHECK:   destroy_value [[CAT]] : $Cat
     // CHECK:   return [[THE_BOOL]] : $Bool
     // CHECK: } // end sil function '$s4test3DogC15accessGlobalVarSbyYaF'
@@ -176,7 +176,7 @@ actor Dog {
     // CHECK:    [[BORROWED_BIRB:%[0-9]+]] = begin_borrow [[BIRB]] : $Birb
     // CHECK:    hop_to_executor [[BORROWED_BIRB]] : $Birb
     // CHECK:    [[BORROWED_BIRB_FOR_LOAD:%[0-9]+]] = begin_borrow [[BIRB]] : $Birb
-    // CHECK:    [[FEATHER_GETTER:%[0-9]+]] = class_method [[BORROWED_BIRB_FOR_LOAD]] : $Birb, #Birb.feathers!getter : (Birb) -> () -> Int, $@convention(method) (@guaranteed Birb) -> Int
+    // CHECK:    [[FEATHER_GETTER:%[0-9]+]] = class_method [[BORROWED_BIRB_FOR_LOAD]] : $Birb, #Birb.feathers!getter : (isolated Birb) -> () -> Int, $@convention(method) (@guaranteed Birb) -> Int
     // CHECK:    [[THE_INT:%[0-9]+]] = apply [[FEATHER_GETTER]]([[BORROWED_BIRB_FOR_LOAD]]) : $@convention(method) (@guaranteed Birb) -> Int
     // CHECK:    end_borrow [[BORROWED_BIRB_FOR_LOAD]] : $Birb
     // CHECK:    end_borrow [[BORROWED_BIRB]] : $Birb
@@ -195,13 +195,13 @@ actor Dog {
     // CHECK:  bb0([[CAT:%[0-9]+]] : @guaranteed $Cat, [[SELF:%[0-9]+]] : @guaranteed $Dog):
     // CHECK:    hop_to_executor [[SELF]] : $Dog
     // CHECK:    hop_to_executor [[CAT]] : $Cat
-    // CHECK:    [[CAT_GETTER:%[0-9]+]] = class_method [[CAT]] : $Cat, #Cat.bestFriend!getter : (Cat) -> () -> Birb, $@convention(method) (@guaranteed Cat) -> @owned Birb
+    // CHECK:    [[CAT_GETTER:%[0-9]+]] = class_method [[CAT]] : $Cat, #Cat.bestFriend!getter : (isolated Cat) -> () -> Birb, $@convention(method) (@guaranteed Cat) -> @owned Birb
     // CHECK:    [[BIRB_REF:%[0-9]+]] = apply [[CAT_GETTER]]([[CAT]]) : $@convention(method) (@guaranteed Cat) -> @owned Birb
     // CHECK:    hop_to_executor [[SELF]] : $Dog
     // CHECK:    [[BIRB:%[0-9]+]] = begin_borrow [[BIRB_REF]] : $Birb
     // CHECK:    hop_to_executor [[BIRB]] : $Birb
     // CHECK:    [[BIRB_FOR_LOAD:%[0-9]+]] = begin_borrow [[BIRB_REF]] : $Birb
-    // CHECK:    [[BIRB_GETTER:%[0-9]+]] = class_method [[BIRB_FOR_LOAD]] : $Birb, #Birb.feathers!getter : (Birb) -> () -> Int, $@convention(method) (@guaranteed Birb) -> Int
+    // CHECK:    [[BIRB_GETTER:%[0-9]+]] = class_method [[BIRB_FOR_LOAD]] : $Birb, #Birb.feathers!getter : (isolated Birb) -> () -> Int, $@convention(method) (@guaranteed Birb) -> Int
     // CHECK:    [[THE_INT:%[0-9]+]] = apply [[BIRB_GETTER]]([[BIRB_FOR_LOAD]]) : $@convention(method) (@guaranteed Birb) -> Int
     // CHECK:    end_borrow [[BIRB_FOR_LOAD]] : $Birb
     // CHECK:    end_borrow [[BIRB]] : $Birb
@@ -222,7 +222,7 @@ actor Dog {
 
     // CHECK:   hop_to_executor [[CAT_BORROW_FOR_HOP]] : $Cat
     // CHECK:   [[CAT_BORROW_FOR_LOAD:%[0-9]+]] = begin_borrow [[CAT_REF]] : $Cat
-    // CHECK:   [[GETTER:%[0-9]+]] = class_method [[CAT_BORROW_FOR_LOAD]] : $Cat, #Cat.storedBool!getter : (Cat) -> () -> Bool, $@convention(method) (@guaranteed Cat) -> Bool
+    // CHECK:   [[GETTER:%[0-9]+]] = class_method [[CAT_BORROW_FOR_LOAD]] : $Cat, #Cat.storedBool!getter : (isolated Cat) -> () -> Bool, $@convention(method) (@guaranteed Cat) -> Bool
     // CHECK:   [[THE_BOOL:%[0-9]+]] = apply [[GETTER]]([[CAT_BORROW_FOR_LOAD]]) : $@convention(method) (@guaranteed Cat) -> Bool
     // CHECK:   end_borrow [[CAT_BORROW_FOR_LOAD]] : $Cat
     // CHECK:   end_borrow [[CAT_BORROW_FOR_HOP]] : $Cat
@@ -244,7 +244,7 @@ actor Dog {
 
     // CHECK:   hop_to_executor [[CAT_BORROW_FOR_HOP]] : $Cat
     // CHECK:   [[CAT_BORROW_FOR_LOAD:%[0-9]+]] = begin_borrow [[CAT_REF]] : $Cat
-    // CHECK:   [[FRIEND_GETTER:%[0-9]+]] = class_method [[CAT_BORROW_FOR_LOAD]] : $Cat, #Cat.friend!getter : (Cat) -> () -> Cat, $@convention(method) (@guaranteed Cat) -> @owned Cat
+    // CHECK:   [[FRIEND_GETTER:%[0-9]+]] = class_method [[CAT_BORROW_FOR_LOAD]] : $Cat, #Cat.friend!getter : (isolated Cat) -> () -> Cat, $@convention(method) (@guaranteed Cat) -> @owned Cat
     // CHECK:   [[FRIEND_REF:%[0-9]+]] = apply [[FRIEND_GETTER]]([[CAT_BORROW_FOR_LOAD]]) : $@convention(method) (@guaranteed Cat) -> @owned Cat
     // CHECK:   end_borrow [[CAT_BORROW_FOR_LOAD]] : $Cat
     // CHECK:   end_borrow [[CAT_BORROW_FOR_HOP]] : $Cat
@@ -255,7 +255,7 @@ actor Dog {
 
     // CHECK:   hop_to_executor [[FRIEND_BORROW_FOR_HOP]] : $Cat
     // CHECK:   [[FRIEND_BORROW_FOR_LOAD:%[0-9]+]] = begin_borrow [[FRIEND_REF]] : $Cat
-    // CHECK:   [[BOOL_GETTER:%[0-9]+]] = class_method [[FRIEND_BORROW_FOR_LOAD]] : $Cat, #Cat.storedBool!getter : (Cat) -> () -> Bool, $@convention(method) (@guaranteed Cat) -> Bool
+    // CHECK:   [[BOOL_GETTER:%[0-9]+]] = class_method [[FRIEND_BORROW_FOR_LOAD]] : $Cat, #Cat.storedBool!getter : (isolated Cat) -> () -> Bool, $@convention(method) (@guaranteed Cat) -> Bool
     // CHECK:   [[THE_BOOL:%[0-9]+]] = apply [[BOOL_GETTER]]([[FRIEND_BORROW_FOR_LOAD]]) : $@convention(method) (@guaranteed Cat) -> Bool
     // CHECK:   end_borrow [[FRIEND_BORROW_FOR_LOAD]] : $Cat
     // CHECK:   end_borrow [[FRIEND_BORROW_FOR_HOP]] : $Cat
@@ -275,7 +275,7 @@ actor Dog {
     // CHECK:   [[INTEGER1:%[0-9]+]] = apply {{%[0-9]+}}({{%[0-9]+}}, {{%[0-9]+}}) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
 
     // CHECK:   hop_to_executor [[CAT]] : $Cat
-    // CHECK:   [[SUBSCRIPT_FN:%[0-9]+]] = class_method [[CAT]] : $Cat, #Cat.subscript!getter : (Cat) -> (Int) -> Cat, $@convention(method) (Int, @guaranteed Cat) -> @owned Cat
+    // CHECK:   [[SUBSCRIPT_FN:%[0-9]+]] = class_method [[CAT]] : $Cat, #Cat.subscript!getter : (isolated Cat) -> (Int) -> Cat, $@convention(method) (Int, @guaranteed Cat) -> @owned Cat
     // CHECK:   [[OTHER_CAT:%[0-9]+]] = apply [[SUBSCRIPT_FN]]([[INTEGER1]], [[CAT]]) : $@convention(method) (Int, @guaranteed Cat) -> @owned Cat
 
     // CHECK:   hop_to_executor [[DOG]] : $Dog
@@ -294,7 +294,7 @@ actor Dog {
 
     // CHECK:   hop_to_executor [[RVALUE_CAT]] : $Cat
     // CHECK:   [[RVALUE_CAT_FOR_LOAD:%[0-9]+]] = begin_borrow [[RVALUE_CAT_REF]] : $Cat
-    // CHECK:   [[RVALUE_CAT_SUBSCRIPT:%[0-9]+]] = class_method [[RVALUE_CAT_FOR_LOAD]] : $Cat, #Cat.subscript!getter : (Cat) -> (Int) -> Cat, $@convention(method) (Int, @guaranteed Cat) -> @owned Cat
+    // CHECK:   [[RVALUE_CAT_SUBSCRIPT:%[0-9]+]] = class_method [[RVALUE_CAT_FOR_LOAD]] : $Cat, #Cat.subscript!getter : (isolated Cat) -> (Int) -> Cat, $@convention(method) (Int, @guaranteed Cat) -> @owned Cat
     // CHECK:   [[FIRST_CAT_REF:%[0-9]+]] = apply [[RVALUE_CAT_SUBSCRIPT]]([[INT_ONE]], [[RVALUE_CAT_FOR_LOAD]]) : $@convention(method) (Int, @guaranteed Cat) -> @owned Cat
     // CHECK:   end_borrow [[RVALUE_CAT_FOR_LOAD]] : $Cat
     // CHECK:   end_borrow [[RVALUE_CAT]] : $Cat
@@ -307,7 +307,7 @@ actor Dog {
 
     // CHECK:   hop_to_executor [[FIRST_CAT]] : $Cat
     // CHECK:   [[FIRST_CAT_FOR_LOAD:%[0-9]+]] = begin_borrow [[FIRST_CAT_REF]] : $Cat
-    // CHECK:   [[FIRST_CAT_SUBSCRIPT:%[0-9]+]] = class_method [[FIRST_CAT_FOR_LOAD]] : $Cat, #Cat.subscript!getter : (Cat) -> (Int) -> Cat, $@convention(method) (Int, @guaranteed Cat) -> @owned Cat
+    // CHECK:   [[FIRST_CAT_SUBSCRIPT:%[0-9]+]] = class_method [[FIRST_CAT_FOR_LOAD]] : $Cat, #Cat.subscript!getter : (isolated Cat) -> (Int) -> Cat, $@convention(method) (Int, @guaranteed Cat) -> @owned Cat
     // CHECK:   [[SECOND_CAT_REF:%[0-9]+]] = apply [[FIRST_CAT_SUBSCRIPT]]([[INT_TWO]], [[FIRST_CAT_FOR_LOAD]]) : $@convention(method) (Int, @guaranteed Cat) -> @owned Cat
     // CHECK:   end_borrow [[FIRST_CAT_FOR_LOAD]] : $Cat
     // CHECK:   end_borrow [[FIRST_CAT]] : $Cat
@@ -330,7 +330,7 @@ actor Dog {
 
     // CHECK:     hop_to_executor [[CAT]] : $Cat
     // CHECK:     [[CAT_FOR_LOAD:%[0-9]+]] = begin_borrow [[CAT_REF:%[0-9]+]] : $Cat
-    // CHECK:     [[GETTER:%[0-9]+]] = class_method [[CAT_FOR_LOAD]] : $Cat, #Cat.storedBool!getter : (Cat) -> () -> Bool, $@convention(method) (@guaranteed Cat) -> Bool
+    // CHECK:     [[GETTER:%[0-9]+]] = class_method [[CAT_FOR_LOAD]] : $Cat, #Cat.storedBool!getter : (isolated Cat) -> () -> Bool, $@convention(method) (@guaranteed Cat) -> Bool
     // CHECK:     [[THE_BOOL:%[0-9]+]] = apply [[GETTER]]([[CAT_FOR_LOAD]]) : $@convention(method) (@guaranteed Cat) -> Bool
     // CHECK:     end_borrow [[CAT_FOR_LOAD]] : $Cat
     // CHECK:     end_borrow [[CAT]] : $Cat
@@ -348,7 +348,7 @@ actor Dog {
     // CHECK:    hop_to_executor [[SELF]] : $Dog
 
     // CHECK:    hop_to_executor [[CAT]] : $Cat
-    // CHECK:    [[CAT_GETTER:%[0-9]+]] = class_method [[CAT]] : $Cat, #Cat.computedSweater!getter : (Cat) -> () -> Sweater, $@convention(method) (@guaranteed Cat) -> @owned Sweater
+    // CHECK:    [[CAT_GETTER:%[0-9]+]] = class_method [[CAT]] : $Cat, #Cat.computedSweater!getter : (isolated Cat) -> () -> Sweater, $@convention(method) (@guaranteed Cat) -> @owned Sweater
     // CHECK:    [[SWEATER1_REF:%[0-9]+]] = apply [[CAT_GETTER]]([[CAT]]) : $@convention(method) (@guaranteed Cat) -> @owned Sweater
 
     // CHECK:    hop_to_executor [[SELF]] : $Dog
@@ -361,7 +361,7 @@ actor Dog {
 
     // CHECK:    hop_to_executor [[CAT2]] : $Cat
     // CHECK:    [[CAT2_FOR_LOAD:%[0-9]+]] = begin_borrow [[CAT2_REF]] : $Cat
-    // CHECK:    [[CAT2_GETTER:%[0-9]+]] = class_method [[CAT2_FOR_LOAD]] : $Cat, #Cat.computedSweater!getter : (Cat) -> () -> Sweater, $@convention(method) (@guaranteed Cat) -> @owned Sweater
+    // CHECK:    [[CAT2_GETTER:%[0-9]+]] = class_method [[CAT2_FOR_LOAD]] : $Cat, #Cat.computedSweater!getter : (isolated Cat) -> () -> Sweater, $@convention(method) (@guaranteed Cat) -> @owned Sweater
     // CHECK:    [[SWEATER2_OWNER:%[0-9]+]] = apply [[CAT2_GETTER]]([[CAT2_FOR_LOAD]]) : $@convention(method) (@guaranteed Cat) -> @owned Sweater
     // CHECK:    end_borrow [[CAT2_FOR_LOAD]] : $Cat
     // CHECK:    end_borrow [[CAT2]] : $Cat
@@ -380,13 +380,13 @@ actor Dog {
     // CHECK:  bb0([[CAT:%[0-9]+]] : @guaranteed $Cat, [[SELF:%[0-9]+]] : @guaranteed $Dog):
     // CHECK:    hop_to_executor [[SELF]] : $Dog
     // CHECK:    hop_to_executor [[CAT]] : $Cat
-    // CHECK:    [[CAT_GETTER:%[0-9]+]] = class_method [[CAT]] : $Cat, #Cat.friend!getter : (Cat) -> () -> Cat, $@convention(method) (@guaranteed Cat) -> @owned Cat
+    // CHECK:    [[CAT_GETTER:%[0-9]+]] = class_method [[CAT]] : $Cat, #Cat.friend!getter : (isolated Cat) -> () -> Cat, $@convention(method) (@guaranteed Cat) -> @owned Cat
     // CHECK:    [[FRIEND1_REF:%[0-9]+]] = apply [[CAT_GETTER]]([[CAT]]) : $@convention(method) (@guaranteed Cat) -> @owned Cat
     // CHECK:    hop_to_executor [[SELF]] : $Dog
     // CHECK:    [[FRIEND1:%[0-9]+]] = begin_borrow [[FRIEND1_REF]] : $Cat
     // CHECK:    hop_to_executor [[FRIEND1]] : $Cat
     // CHECK:    [[FRIEND1_FOR_LOAD:%[0-9]+]] = begin_borrow [[FRIEND1_REF]] : $Cat
-    // CHECK:    [[FRIEND1_GETTER:%[0-9]+]] = class_method [[FRIEND1_FOR_LOAD]] : $Cat, #Cat.friend!getter : (Cat) -> () -> Cat, $@convention(method) (@guaranteed Cat) -> @owned Cat
+    // CHECK:    [[FRIEND1_GETTER:%[0-9]+]] = class_method [[FRIEND1_FOR_LOAD]] : $Cat, #Cat.friend!getter : (isolated Cat) -> () -> Cat, $@convention(method) (@guaranteed Cat) -> @owned Cat
     // CHECK:    [[FRIEND2_REF:%[0-9]+]] = apply [[FRIEND1_GETTER]]([[FRIEND1_FOR_LOAD]]) : $@convention(method) (@guaranteed Cat) -> @owned Cat
     // CHECK:    end_borrow [[FRIEND1_FOR_LOAD]] : $Cat
     // CHECK:    end_borrow [[FRIEND1]] : $Cat
@@ -405,7 +405,7 @@ actor Dog {
     // CHECK:    [[FRIEND1_STACK:%[0-9]+]] = alloc_stack $Optional<Cat>
 
     // CHECK:    hop_to_executor [[CAT]] : $Cat
-    // CHECK:    [[MAYBE_GETTER:%[0-9]+]] = class_method [[CAT]] : $Cat, #Cat.maybeFriend!getter : (Cat) -> () -> Cat?, $@convention(method) (@guaranteed Cat) -> @owned Optional<Cat>
+    // CHECK:    [[MAYBE_GETTER:%[0-9]+]] = class_method [[CAT]] : $Cat, #Cat.maybeFriend!getter : (isolated Cat) -> () -> Cat?, $@convention(method) (@guaranteed Cat) -> @owned Optional<Cat>
     // CHECK:    [[MAYBE_FRIEND:%[0-9]+]] = apply [[MAYBE_GETTER]]([[CAT]]) : $@convention(method) (@guaranteed Cat) -> @owned Optional<Cat>
     // CHECK:    store [[MAYBE_FRIEND]] to [init] [[FRIEND1_STACK]] : $*Optional<Cat>
 
@@ -420,7 +420,7 @@ actor Dog {
     // CHECK:    [[FRIEND1:%[0-9]+]] = begin_borrow [[FRIEND1_REF]] : $Cat
     // CHECK:    hop_to_executor [[FRIEND1]] : $Cat
     // CHECK:    [[FRIEND1_FOR_LOAD:%[0-9]+]] = begin_borrow [[FRIEND1_REF]] : $Cat
-    // CHECK:    [[FRIEND1_GETTER:%[0-9]+]] = class_method [[FRIEND1_FOR_LOAD]] : $Cat, #Cat.friend!getter : (Cat) -> () -> Cat, $@convention(method) (@guaranteed Cat) -> @owned Cat
+    // CHECK:    [[FRIEND1_GETTER:%[0-9]+]] = class_method [[FRIEND1_FOR_LOAD]] : $Cat, #Cat.friend!getter : (isolated Cat) -> () -> Cat, $@convention(method) (@guaranteed Cat) -> @owned Cat
     // CHECK:    [[FRIEND2_REF:%[0-9]+]] = apply [[FRIEND1_GETTER]]([[FRIEND1_FOR_LOAD]]) : $@convention(method) (@guaranteed Cat) -> @owned Cat
     // CHECK:    end_borrow [[FRIEND1_FOR_LOAD]] : $Cat
     // CHECK:    end_borrow [[FRIEND1]] : $Cat
@@ -437,3 +437,210 @@ actor Dog {
     }
 } // END OF DOG ACTOR
 
+class Point {
+    var pt: (Int, Int) = (0, 0)
+}
+
+@MainActor
+var globalCircle: ((Int, Int)?, Float) = (nil, 1.1)
+
+struct Container {
+    @MainActor static var counter: Int = 10
+    @MainActor static var this: Container?
+    @MainActor static var staticCircle: ((Int, Int)?, Float) = (nil, 2.1)
+
+    var noniso: Int = 20
+
+    @GlobalCat var iso: Float = 1.0
+    @GlobalCat var isoRef: CatBox = CatBox()
+
+    // CHECK-LABEL: sil hidden [ossa] @$s4test9ContainerV12accessTuple1SfyYaF : $@convention(method) @async (@guaranteed Container) -> Float {
+    // CHECK:     hop_to_executor {{%[0-9]+}} : $MainActor
+    // CHECK:     [[ACCESS:%[0-9]+]] = begin_access [read] [dynamic] {{%[0-9]+}} : $*(Optional<(Int, Int)>, Float)
+    // CHECK:     [[ADDR:%[0-9]+]] = tuple_element_addr [[ACCESS]] : $*(Optional<(Int, Int)>, Float), 1
+    // CHECK:     {{%[0-9]+}} = load [trivial] [[ADDR]] : $*Float
+    // CHECK:     end_access [[ACCESS]] : $*(Optional<(Int, Int)>, Float)
+    // CHECK:     hop_to_executor {{%[0-9]+}} : $Optional<Builtin.Executor>
+    // CHECK: } // end sil function '$s4test9ContainerV12accessTuple1SfyYaF'
+    func accessTuple1() async -> Float {
+        return await globalCircle.1
+    }
+
+    // CHECK-LABEL: sil hidden [ossa] @$s4test9ContainerV12accessTuple2SiSgyYaFZ : $@convention(method) @async (@thin Container.Type) -> Optional<Int> {
+    // CHECK:     hop_to_executor {{%[0-9]+}} : $MainActor
+    // CHECK:     [[ACCESS:%[0-9]+]] = begin_access [read] [dynamic] {{%[0-9]+}} : $*(Optional<(Int, Int)>, Float)
+    // CHECK:     [[ADDR:%[0-9]+]] = tuple_element_addr [[ACCESS]] : $*(Optional<(Int, Int)>, Float), 0
+    // CHECK:     switch_enum_addr [[SCRUTINEE:%[0-9]+]] : $*Optional<(Int, Int)>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[CRASH_BB:bb[0-9]+]]
+
+    // CHECK: [[CRASH_BB]]:
+    // CHECK-NOT:   hop_to_executor {{%[0-9]+}}
+    // CHECK:       unreachable
+
+    // CHECK: [[SOME_BB]]:
+    // CHECK:     [[TUPLE_ADDR:%[0-9]+]] = unchecked_take_enum_data_addr [[SCRUTINEE]] : $*Optional<(Int, Int)>, #Optional.some!enumelt
+    // CHECK:     [[ELM_ADDR:%[0-9]+]] = tuple_element_addr [[TUPLE_ADDR]] : $*(Int, Int), 0
+    // CHECK:     {{%[0-9]+}} = load [trivial] [[ELM_ADDR]] : $*Int
+    // CHECK:     end_access [[ACCESS]] : $*(Optional<(Int, Int)>, Float)
+    // CHECK:     hop_to_executor {{%[0-9]+}} : $Optional<Builtin.Executor>
+    // CHECK: } // end sil function '$s4test9ContainerV12accessTuple2SiSgyYaFZ'
+    static func accessTuple2() async -> Int? {
+        return await globalCircle.0!.0
+    }
+
+    // CHECK-LABEL: sil hidden [ossa] @$s4test9ContainerV12accessTuple3SfyYaF : $@convention(method) @async (@guaranteed Container) -> Float {
+    // CHECK:     hop_to_executor {{%[0-9]+}} : $MainActor
+    // CHECK:     [[ACCESS:%[0-9]+]] = begin_access [read] [dynamic] {{%[0-9]+}} : $*(Optional<(Int, Int)>, Float)
+    // CHECK:     [[ADDR:%[0-9]+]] = tuple_element_addr [[ACCESS]] : $*(Optional<(Int, Int)>, Float), 1
+    // CHECK:     {{%[0-9]+}} = load [trivial] [[ADDR]] : $*Float
+    // CHECK:     end_access [[ACCESS]] : $*(Optional<(Int, Int)>, Float)
+    // CHECK:     hop_to_executor {{%[0-9]+}} : $Optional<Builtin.Executor>
+    // CHECK: } // end sil function '$s4test9ContainerV12accessTuple3SfyYaF'
+    func accessTuple3() async -> Float {
+        return await Container.staticCircle.1
+    }
+
+    // CHECK-LABEL: sil hidden [ossa] @$s4test9ContainerV12accessTuple4SiSgyYaFZ : $@convention(method) @async (@thin Container.Type) -> Optional<Int> {
+    // CHECK:     hop_to_executor {{%[0-9]+}} : $MainActor
+    // CHECK:     [[ACCESS:%[0-9]+]] = begin_access [read] [dynamic] {{%[0-9]+}} : $*(Optional<(Int, Int)>, Float)
+    // CHECK:     [[ADDR:%[0-9]+]] = tuple_element_addr [[ACCESS]] : $*(Optional<(Int, Int)>, Float), 0
+    // CHECK:     switch_enum_addr [[SCRUTINEE:%[0-9]+]] : $*Optional<(Int, Int)>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[CRASH_BB:bb[0-9]+]]
+
+    // CHECK: [[CRASH_BB]]:
+    // CHECK-NOT:   hop_to_executor {{%[0-9]+}}
+    // CHECK:       unreachable
+
+    // CHECK: [[SOME_BB]]:
+    // CHECK:     [[TUPLE_ADDR:%[0-9]+]] = unchecked_take_enum_data_addr [[SCRUTINEE]] : $*Optional<(Int, Int)>, #Optional.some!enumelt
+    // CHECK:     [[ELM_ADDR:%[0-9]+]] = tuple_element_addr [[TUPLE_ADDR]] : $*(Int, Int), 0
+    // CHECK:     {{%[0-9]+}} = load [trivial] [[ELM_ADDR]] : $*Int
+    // CHECK:     end_access [[ACCESS]] : $*(Optional<(Int, Int)>, Float)
+    // CHECK:     hop_to_executor {{%[0-9]+}} : $Optional<Builtin.Executor>
+    // CHECK: } // end sil function '$s4test9ContainerV12accessTuple4SiSgyYaFZ'
+    static func accessTuple4() async -> Int? {
+        return await Container.staticCircle.0!.0
+    }
+
+
+    // CHECK-LABEL: sil hidden [ossa] @$s4test9ContainerV8getCountSiyYaFZ : $@convention(method) @async (@thin Container.Type) -> Int {
+    // CHECK:   hop_to_executor {{%[0-9]+}} : $MainActor
+    // CHECK:   {{%[0-9]+}} = begin_access [read] [dynamic] {{%[0-9]+}} : $*Int
+    // CHECK:   {{%[0-9]+}} = load [trivial] {{%[0-9]+}} : $*Int
+    // CHECK:   hop_to_executor {{%[0-9]+}} : $Optional<Builtin.Executor>
+    // CHECK: } // end sil function '$s4test9ContainerV8getCountSiyYaFZ'
+    static func getCount() async -> Int {
+        return await counter
+    }
+
+
+    // CHECK-LABEL: sil hidden [ossa] @$s4test9ContainerV8getValueSiSgyYaFZ : $@convention(method) @async (@thin Container.Type) -> Optional<Int> {
+    // CHECK: bb0(%0 : $@thin Container.Type):
+    // CHECK:    [[MAIN:%[0-9]+]] = begin_borrow {{%[0-9]+}} : $MainActor
+    // CHECK:    [[PREV:%[0-9]+]] = builtin "getCurrentExecutor"() : $Optional<Builtin.Executor>
+    // CHECK:    hop_to_executor [[MAIN]] : $MainActor
+    // CHECK:    [[ACCESS:%[0-9]+]] = begin_access [read] [dynamic] {{%[0-9]+}} : $*Optional<Container>
+    // CHECK:    cond_br {{%[0-9]+}}, [[TRUE_BB:bb[0-9]+]], [[FALSE_BB:bb[0-9]+]]
+    //
+    // CHECK: [[TRUE_BB]]:
+    // CHECK:    {{%[0-9]+}} = load [trivial] {{%[0-9]+}} : $*Int
+    // CHECK:    end_access [[ACCESS]] : $*Optional<Container>
+    // CHECK:    hop_to_executor [[PREV]] : $Optional<Builtin.Executor>
+    //
+    // CHECK: [[FALSE_BB]]:
+    // CHECK:    end_access [[ACCESS]] : $*Optional<Container>
+    // CHECK:    hop_to_executor [[PREV]] : $Optional<Builtin.Executor>
+    //
+    // CHECK: } // end sil function '$s4test9ContainerV8getValueSiSgyYaFZ'
+    static func getValue() async -> Int? {
+        return await this?.noniso
+    }
+
+    // CHECK-LABEL: sil hidden [ossa] @$s4test9ContainerV10getOrCrashSfyYaFZ : $@convention(method) @async (@thin Container.Type) -> Float {
+    // CHECK: bb0({{%[0-9]+}} : $@thin Container.Type):
+    // CHECK:    [[MAIN:%[0-9]+]] = begin_borrow {{%[0-9]+}} : $MainActor
+    // CHECK:    [[PREV:%[0-9]+]] = builtin "getCurrentExecutor"() : $Optional<Builtin.Executor>
+    // CHECK:    hop_to_executor [[MAIN]] : $MainActor
+    // CHECK:    [[ACCESS:%[0-9]+]] = begin_access [read] [dynamic] {{%[0-9]+}} : $*Optional<Container>
+    // CHECK:    switch_enum_addr %11 : $*Optional<Container>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[CRASH_BB:bb[0-9]+]]
+    //
+    // CHECK: [[CRASH_BB]]:
+    // CHECK-NOT:   hop_to_executor {{%[0-9]+}}
+    // CHECK:       unreachable
+    //
+    // CHECK: [[SOME_BB]]:
+    // CHECK:       [[DATA_ADDR:%[0-9]+]] = unchecked_take_enum_data_addr %11 : $*Optional<Container>, #Optional.some!enumelt
+    // CHECK:       [[ELEM_ADDR:%[0-9]+]] = struct_element_addr %22 : $*Container, #Container.iso
+    // CHECK:       [[PREV_AGAIN:%[0-9]+]] = builtin "getCurrentExecutor"() : $Optional<Builtin.Executor>
+    // CHECK:       hop_to_executor {{%[0-9]+}} : $Cat
+    // CHECK:       {{%[0-9]+}} = load [trivial] [[ELEM_ADDR]] : $*Float
+    // CHECK:       hop_to_executor [[PREV]] : $Optional<Builtin.Executor>
+    // CHECK:       hop_to_executor [[PREV_AGAIN]] : $Optional<Builtin.Executor>
+    // CHECK: } // end sil function '$s4test9ContainerV10getOrCrashSfyYaFZ'
+    static func getOrCrash() async -> Float {
+        return await this!.iso
+    }
+
+    // CHECK-LABEL: sil hidden [ossa] @$s4test9ContainerV13getRefOrCrashAA6CatBoxCyYaFZ : $@convention(method) @async (@thin Container.Type) -> @owned CatBox {
+    // CHECK: bb0({{%[0-9]+}} : $@thin Container.Type):
+    // CHECK:    [[MAIN:%[0-9]+]] = begin_borrow {{%[0-9]+}} : $MainActor
+    // CHECK:    [[PREV:%[0-9]+]] = builtin "getCurrentExecutor"() : $Optional<Builtin.Executor>
+    // CHECK:    hop_to_executor [[MAIN]] : $MainActor
+    // CHECK:    [[ACCESS:%[0-9]+]] = begin_access [read] [dynamic] {{%[0-9]+}} : $*Optional<Container>
+    // CHECK:    switch_enum_addr %11 : $*Optional<Container>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[CRASH_BB:bb[0-9]+]]
+    //
+    // CHECK: [[CRASH_BB]]:
+    // CHECK-NOT:   hop_to_executor {{%[0-9]+}}
+    // CHECK:       unreachable
+    //
+    // CHECK: [[SOME_BB]]:
+    // CHECK:       [[DATA_ADDR:%[0-9]+]] = unchecked_take_enum_data_addr %11 : $*Optional<Container>, #Optional.some!enumelt
+    // CHECK:       [[ELEM_ADDR:%[0-9]+]] = struct_element_addr %22 : $*Container, #Container.iso
+    // CHECK:       [[PREV_AGAIN:%[0-9]+]] = builtin "getCurrentExecutor"() : $Optional<Builtin.Executor>
+    // CHECK:       hop_to_executor {{%[0-9]+}} : $Cat
+    // CHECK:       {{%[0-9]+}} = load [copy] [[ELEM_ADDR]] : $*CatBox
+    // CHECK:       hop_to_executor [[PREV]] : $Optional<Builtin.Executor>
+    // CHECK:       hop_to_executor [[PREV_AGAIN]] : $Optional<Builtin.Executor>
+    // CHECK: } // end sil function '$s4test9ContainerV13getRefOrCrashAA6CatBoxCyYaFZ'
+    static func getRefOrCrash() async -> CatBox {
+        return await this!.isoRef
+    }
+}
+
+
+@propertyWrapper
+struct StateObject<ObjectType> {
+    @MainActor(unsafe)
+    var wrappedValue: ObjectType {
+        fatalError()
+    }
+    init(wrappedValue: ObjectType) {}
+}
+
+final private actor Coordinactor {
+    var someValue: Int?
+}
+
+struct Blah {
+    @StateObject private var coordinator = Coordinactor()
+
+    // closure #1 in Blah.test()
+    // CHECK-LABEL: sil private [ossa] @$s4test4BlahVAAyyFyyYaYbcfU_ : $@convention(thin) @Sendable @async (Blah) -> () {
+    // CHECK:       hop_to_executor {{%[0-9]+}} : $MainActor
+    // CHECK:       [[ACTOR_OBJ_RAW:%[0-9]+]] = apply {{%[0-9]+}}({{%[0-9]+}}) : $@convention(method) (Blah) -> @owned Coordinactor
+    // CHECK:       hop_to_executor {{%[0-9]+}} : $Optional<Builtin.Executor>
+    // CHECK:       [[ACTOR_OBJ:%[0-9]+]] = begin_borrow [[ACTOR_OBJ_RAW]] : $Coordinactor
+    // CHECK:       [[VAL:%[0-9]+]] = ref_element_addr [[ACTOR_OBJ]] : $Coordinactor, #Coordinactor.someValue
+    // CHECK:       hop_to_executor [[ACTOR_OBJ]]
+    // CHECK:       [[VAL_ACCESS:%[0-9]+]] = begin_access [read] [dynamic] [[VAL]] : $*Optional<Int>
+    // CHECK:       {{%[0-9]+}} = load [trivial] %17 : $*Optional<Int>
+    // CHECK:       end_access %17 : $*Optional<Int>
+    // CHECK:       hop_to_executor {{%[0-9]+}} : $Optional<Builtin.Executor>
+    // CHECK: } // end sil function '$s4test4BlahVAAyyFyyYaYbcfU_'
+    @available(SwiftStdlib 5.5, *)
+    func test() {
+        Task.detached {
+            if await coordinator.someValue == nil {
+                fatalError()
+            }
+        }
+    }
+}

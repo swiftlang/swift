@@ -356,6 +356,10 @@ public:
   /// Determine whether this type variable represents a closure result type.
   bool isClosureResultType() const;
 
+  /// Determine whether this type variable represents
+  /// a type of a key path expression.
+  bool isKeyPathType() const;
+
   /// Retrieve the representative of the equivalence class to which this
   /// type variable belongs.
   ///
@@ -1181,6 +1185,10 @@ public:
   /// The node -> type mappings introduced by this solution.
   llvm::DenseMap<ASTNode, Type> nodeTypes;
 
+  /// The key path component types introduced by this solution.
+  llvm::DenseMap<std::pair<const KeyPathExpr *, unsigned>, TypeBase *>
+      keyPathComponentTypes;
+
   /// Contextual types introduced by this solution.
   std::vector<std::pair<ASTNode, ContextualTypeInfo>> contextualTypes;
 
@@ -1289,8 +1297,15 @@ public:
 
   bool hasType(ASTNode node) const;
 
+  /// Returns \c true if the \p ComponentIndex-th component in \p KP has a type
+  /// associated with it.
+  bool hasType(const KeyPathExpr *KP, unsigned ComponentIndex) const;
+
   /// Retrieve the type of the given node, as recorded in this solution.
   Type getType(ASTNode node) const;
+
+  /// Retrieve the type of the \p ComponentIndex-th component in \p KP.
+  Type getType(const KeyPathExpr *KP, unsigned ComponentIndex) const;
 
   /// Retrieve the type of the given node as recorded in this solution
   /// and resolve all of the type variables in contains to form a fully
@@ -1379,11 +1394,11 @@ enum class ConstraintSystemFlags {
 
   /// If set, verbose output is enabled for this constraint system.
   ///
-  /// Note that this flag is automatically applied to all constraint systems
+  /// Note that this flag is automatically applied to all constraint systems,
   /// when \c DebugConstraintSolver is set in \c TypeCheckerOptions. It can be
   /// automatically enabled for select constraint solving attempts by setting
-  /// \c DebugConstraintSolverAttempt. Finally, it be automatically enabled
-  /// for a pre-configured set of expressions on line numbers by setting
+  /// \c DebugConstraintSolverAttempt. Finally, it can also be automatically 
+  /// enabled for a pre-configured set of expressions on line numbers by setting
   /// \c DebugConstraintSolverOnLines.
   DebugConstraints = 0x10,
 
@@ -2370,7 +2385,7 @@ private:
      /// The best solution computed so far.
     Optional<Score> BestScore;
 
-    /// The number of the solution attempt we're looking at.
+    /// The number of the solution attempts we're looking at.
     unsigned SolutionAttempt;
 
     /// Refers to the innermost partial solution scope.
@@ -2517,8 +2532,8 @@ private:
 
   private:
     /// The list of constraints that have been retired along the
-    /// current path, this list is used in LIFO fashion when constraints
-    /// are added back to the circulation.
+    /// current path, this list is used in LIFO fashion when
+    /// constraints are added back to the circulation.
     ConstraintList retiredConstraints;
 
     /// The set of constraints which were active at the time of this state
@@ -2817,8 +2832,8 @@ private:
   /// able to emit an error message, or false if none of the fixits worked out.
   bool applySolutionFixes(const Solution &solution);
 
-  /// If there is more than one viable solution,
-  /// attempt to pick the best solution and remove all of the rest.
+  /// If there is more than one viable solution, attempt 
+  /// to pick the best solution and remove all of the rest.
   ///
   /// \param solutions The set of solutions to filter.
   ///
@@ -2861,7 +2876,7 @@ private:
   void addKeyPathApplicationRootConstraint(Type root, ConstraintLocatorBuilder locator);
 
 public:
-  /// Lookup for a member with the given name in the given base type.
+  /// Lookup for a member with the given name which is in the given base type.
   ///
   /// This routine caches the results of member lookups in the top constraint
   /// system, to avoid.
@@ -3951,7 +3966,7 @@ public:
   }
 
 private:
-  /// Adjust the constraint system to accomodate the given selected overload, and
+  /// Adjust the constraint system to accommodate the given selected overload, and
   /// recompute the type of the referenced declaration.
   ///
   /// \returns a pair containing the adjusted opened type of a reference to
@@ -4088,10 +4103,9 @@ public:
   /// Generate constraints for the body of the given closure.
   ///
   /// \param closure the closure expression
-  /// \param resultType the closure's result type
   ///
   /// \returns \c true if constraint generation failed, \c false otherwise
-  bool generateConstraints(ClosureExpr *closure, Type resultType);
+  bool generateConstraints(ClosureExpr *closure);
 
   /// Generate constraints for the given (unchecked) expression.
   ///
@@ -4429,7 +4443,23 @@ public:
 
   /// Build implicit autoclosure expression wrapping a given expression.
   /// Given expression represents computed result of the closure.
+  ///
+  /// The \p ClosureDC must be the deepest possible context that
+  /// contains this autoclosure expression. For example,
+  ///
+  /// func foo() {
+  ///   _ = { $0 || $1 || $2 }
+  /// }
+  ///
+  /// Even though the decl context of $1 (after solution application) is
+  /// `||`'s autoclosure parameter, we cannot know this until solution
+  /// application has finished because autoclosure expressions are expanded in
+  /// depth-first order then \c ContextualizeClosures comes around to clean up.
+  /// All that is required is that the explicit closure be the context since it
+  /// is the innermost context that can introduce potential new capturable
+  /// declarations.
   Expr *buildAutoClosureExpr(Expr *expr, FunctionType *closureType,
+                             DeclContext *ClosureDC,
                              bool isDefaultWrappedValue = false,
                              bool isAsyncLetWrapper = false);
 
@@ -5365,6 +5395,9 @@ public:
   TypeVariableBinding(TypeVariableType *typeVar, PotentialBinding &binding)
       : TypeVar(typeVar), Binding(binding) {}
 
+  TypeVariableType *getTypeVariable() const { return TypeVar; }
+  Type getType() const { return Binding.BindingType; }
+
   bool isDefaultable() const { return Binding.isDefaultableBinding(); }
 
   bool hasDefaultedProtocol() const {
@@ -5407,7 +5440,9 @@ public:
   /// This is useful to be able to exhaustively attempt bindings
   /// for type variables found at one level, before proceeding to
   /// supertypes or literal defaults etc.
-  virtual bool needsToComputeNext() const { return false; }
+  virtual bool needsToComputeNext() const = 0;
+
+  virtual bool isExhausted() const = 0;
 };
 
 class TypeVarBindingProducer : public BindingProducer<TypeVariableBinding> {
@@ -5434,6 +5469,8 @@ class TypeVarBindingProducer : public BindingProducer<TypeVariableBinding> {
   /// to that protocol or be wrapped in an optional.
   bool CanBeNil;
 
+  bool IsExhausted = false;
+
 public:
   using Element = TypeVariableBinding;
 
@@ -5443,16 +5480,39 @@ public:
   ArrayRef<Binding> getCurrentBindings() const { return Bindings; }
 
   Optional<Element> operator()() override {
+    if (isExhausted())
+      return None;
+
     // Once we reach the end of the current bindings
     // let's try to compute new ones, e.g. supertypes,
     // literal defaults, if that fails, we are done.
-    if (needsToComputeNext() && !computeNext())
+    if (needsToComputeNext() && !computeNext()) {
+      IsExhausted = true;
       return None;
+    }
 
-    return TypeVariableBinding(TypeVar, Bindings[Index++]);
+    auto &binding = Bindings[Index++];
+
+    // Record produced type as bound/explored early, otherwise
+    // it could be possible to re-discover it during `computeNext()`,
+    // which leads to duplicate bindings e.g. inferring fallback
+    // `Void` for a closure result type when `Void` was already
+    // inferred as a direct/transitive binding.
+    {
+      auto type = binding.BindingType;
+
+      BoundTypes.insert(type.getPointer());
+      ExploredTypes.insert(type->getCanonicalType());
+    }
+
+    return TypeVariableBinding(TypeVar, binding);
   }
 
-  bool needsToComputeNext() const override { return Index >= Bindings.size(); }
+  bool needsToComputeNext() const override {
+    return isExhausted() ? false : Index >= Bindings.size();
+  }
+
+  bool isExhausted() const override { return IsExhausted; }
 
 private:
   /// Compute next batch of bindings if possible, this could
@@ -5525,10 +5585,10 @@ public:
   }
 
   Optional<Element> operator()() override {
-    unsigned currIndex = Index;
-    if (currIndex >= Choices.size())
+    if (isExhausted())
       return None;
 
+    unsigned currIndex = Index;
     bool isBeginningOfPartition = PartitionIndex < PartitionBeginning.size() &&
                                   PartitionBeginning[PartitionIndex] == Index;
     if (isBeginningOfPartition)
@@ -5551,6 +5611,10 @@ public:
     return DisjunctionChoice(CS, currIndex, Choices[Ordering[currIndex]],
                              IsExplicitConversion, isBeginningOfPartition);
   }
+
+  bool needsToComputeNext() const override { return false; }
+
+  bool isExhausted() const override { return Index >= Choices.size(); }
 
 private:
   // Partition the choices in the disjunction into groups that we will

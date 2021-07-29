@@ -21,6 +21,7 @@
 #include "clang/Basic/SourceManager.h"
 #include "clang/Edit/EditedSource.h"
 #include "clang/Rewrite/Core/RewriteBuffer.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
 
 using namespace swift;
@@ -148,6 +149,9 @@ Migrator::performAFixItMigration(version::Version SwiftLanguageVersion) {
   }
 
   auto Instance = std::make_unique<swift::CompilerInstance>();
+  // rdar://78576743 - Reset LLVM global state for command-line arguments set
+  // by prior calls to setup.
+  llvm::cl::ResetAllOptionOccurrences();
   if (Instance->setup(Invocation)) {
     return nullptr;
   }

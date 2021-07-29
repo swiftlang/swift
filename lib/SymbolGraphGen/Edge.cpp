@@ -36,6 +36,15 @@ const ValueDecl *getForeignProtocolRequirement(const ValueDecl *VD, const Module
     requirements.pop();
   }
 }
+
+const ValueDecl *getProtocolRequirement(const ValueDecl *VD) {
+  auto reqs = VD->getSatisfiedProtocolRequirements();
+
+  if (!reqs.empty())
+    return reqs.front();
+  else
+    return nullptr;
+}
 } // end anonymous namespace
 
 void Edge::serialize(llvm::json::OStream &OS) const {
@@ -79,10 +88,8 @@ void Edge::serialize(llvm::json::OStream &OS) const {
     }
     
     const ValueDecl *InheritingDecl = nullptr;
-    if (const auto *ID = Source.getDeclInheritingDocs()) {
-      if (Target.getSymbolDecl() == ID || Source.getSynthesizedBaseTypeDecl())
-        InheritingDecl = ID;
-    }
+    if (const auto *ID = Source.getDeclInheritingDocs())
+      InheritingDecl = ID;
 
     if (!InheritingDecl && Source.getSynthesizedBaseTypeDecl())
       InheritingDecl = Source.getSymbolDecl();
@@ -91,7 +98,12 @@ void Edge::serialize(llvm::json::OStream &OS) const {
       if (const auto *ID = getForeignProtocolRequirement(Source.getSymbolDecl(), &Graph->M))
         InheritingDecl = ID;
     }
-    
+
+    if (!InheritingDecl) {
+      if (const auto *ID = getProtocolRequirement(Source.getSymbolDecl()))
+        InheritingDecl = ID;
+    }
+
     // If our source symbol is a inheriting decl, write in information about
     // where it's inheriting docs from.
     if (InheritingDecl) {

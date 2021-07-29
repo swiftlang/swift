@@ -360,3 +360,20 @@ do {
     }
   }
 }
+
+// https://bugs.swift.org/browse/SR-14731
+struct Generic<T> {
+  func foo() -> Self<Int> {}
+  // expected-error@-1 {{cannot specialize 'Self'}}
+  // expected-note@-2 {{did you mean to explicitly reference 'Generic' instead?}}{{17-21=Generic}}
+}
+
+struct NonGeneric {
+  func foo() -> Self<Int> {}
+  // expected-error@-1 {{cannot specialize 'Self'}}
+}
+
+protocol P {
+  func foo() -> Self<Int>
+  // expected-error@-1 {{cannot specialize non-generic type 'Self'}}
+}

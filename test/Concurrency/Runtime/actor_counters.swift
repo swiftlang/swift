@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency %import-libdispatch -parse-as-library)
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library)
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -27,6 +27,12 @@ actor Counter {
 
     value = value + 1
     return current
+  }
+
+  deinit {
+      for i in 0..<value {
+          assert(scratchBuffer[i] == 1)
+      }
   }
 }
 

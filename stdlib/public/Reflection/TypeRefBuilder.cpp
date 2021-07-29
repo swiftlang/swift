@@ -84,13 +84,22 @@ valid_type_ref:
 }
 
 /// Load and normalize a mangled name so it can be matched with string equality.
-std::string
+llvm::Optional<std::string>
 TypeRefBuilder::normalizeReflectionName(RemoteRef<char> reflectionName) {
   // Remangle the reflection name to resolve symbolic references.
-  if (auto node = demangleTypeRef(reflectionName)) {
-    auto result = mangleNode(node);
-    clearNodeFactory();
-    return result;
+  if (auto node = demangleTypeRef(reflectionName,
+                                  /*useOpaqueTypeSymbolicReferences*/ false)) {
+    switch (node->getKind()) {
+    case Node::Kind::TypeSymbolicReference:
+    case Node::Kind::ProtocolSymbolicReference:
+    case Node::Kind::OpaqueTypeDescriptorSymbolicReference:
+      // Symbolic references cannot be mangled, return a failure.
+      return {};
+    default:
+      auto result = mangleNode(node);
+      clearNodeFactory();
+      return result;
+    }
   }
 
   // Fall back to the raw string.
@@ -102,7 +111,9 @@ bool
 TypeRefBuilder::reflectionNameMatches(RemoteRef<char> reflectionName,
                                       StringRef searchName) {
   auto normalized = normalizeReflectionName(reflectionName);
-  return searchName.equals(normalized);
+  if (!normalized)
+    return false;
+  return searchName.equals(*normalized);
 }
 
 const TypeRef * TypeRefBuilder::
@@ -194,8 +205,8 @@ TypeRefBuilder::getFieldTypeInfo(const TypeRef *TR) {
       if (!FD->hasMangledTypeName())
         continue;
       auto CandidateMangledName = readTypeRef(FD, FD->MangledTypeName);
-      auto NormalizedName = normalizeReflectionName(CandidateMangledName);
-      FieldTypeInfoCache[NormalizedName] = FD;
+      if (auto NormalizedName = normalizeReflectionName(CandidateMangledName))
+        FieldTypeInfoCache[*NormalizedName] = FD;
     }
   }
 

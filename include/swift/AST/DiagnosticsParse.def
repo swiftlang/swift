@@ -589,14 +589,19 @@ ERROR(sil_missing_substitutions,none,
       "missing substitutions", ())
 ERROR(sil_too_many_substitutions,none,
       "too many substitutions", ())
-ERROR(sil_dbg_unknown_key,none,
-      "unknown key '%0' in debug variable declaration", (StringRef))
 ERROR(sil_objc_with_tail_elements,none,
       "alloc_ref [objc] cannot have tail allocated elements", ())
 ERROR(sil_expected_access_kind,none,
       "%0 instruction must have explicit access kind", (StringRef))
 ERROR(sil_expected_access_enforcement,none,
       "%0 instruction must have explicit access enforcement", (StringRef))
+
+ERROR(sil_dbg_unknown_key,none,
+      "unknown key '%0' in debug variable declaration", (StringRef))
+ERROR(sil_dbg_unknown_expr_part,none,
+      "unrecognized debug info expression %0", (StringRef))
+ERROR(sil_dbg_expr_expect_operand_kind,none,
+      "operator %0 expects a %1 kind operand here", (StringRef, StringRef))
 
 ERROR(sil_keypath_expected_component_kind,none,
       "expected keypath component kind", ())
@@ -931,6 +936,12 @@ WARNING(parameter_unnamed_warn,none,
 ERROR(parameter_curry_syntax_removed,none,
       "cannot have more than one parameter list", ())
 
+ERROR(availability_cannot_be_mixed,none,
+      "#available and #unavailable cannot be in the same statement", ())
+
+ERROR(false_available_is_called_unavailable,none,
+      "#available cannot be used as an expression, did you mean to use '#unavailable'?", ())
+
 ERROR(initializer_as_typed_pattern,none,
       "unexpected initializer in pattern; did you mean to use '='?", ())
 
@@ -1133,7 +1144,7 @@ ERROR(default_with_where,none,
       "'default' cannot be used with a 'where' guard expression",
       ())
 ERROR(case_stmt_without_body,none,
-      "%select{'case'|'default'}0 label in a 'switch' should have at least one "
+      "%select{'case'|'default'}0 label in a 'switch' must have at least one "
       "executable statement", (bool))
 
 // 'try' on statements
@@ -1223,8 +1234,8 @@ ERROR(invalid_float_literal_missing_leading_zero,none,
       "'.%0' is not a valid floating point literal; it must be written '0.%0'",
       (StringRef))
 ERROR(availability_query_outside_if_stmt_guard, none,
-      "#available may only be used as condition of an 'if', 'guard'"
-      " or 'while' statement", ())
+      "%0 may only be used as condition of an 'if', 'guard'"
+      " or 'while' statement", (StringRef))
 
 ERROR(empty_arg_label_underscore, none,
       "an empty argument label is spelled with '_'", ())
@@ -1428,6 +1439,8 @@ ERROR(attr_renamed, none,
       "'@%0' has been renamed to '@%1'", (StringRef, StringRef))
 WARNING(attr_renamed_warning, none,
         "'@%0' has been renamed to '@%1'", (StringRef, StringRef))
+WARNING(attr_renamed_to_modifier_warning, none,
+        "'@%0' has been renamed to '%1'", (StringRef, StringRef))
 ERROR(attr_name_close_match, none,
       "no attribute named '@%0'; did you mean '@%1'?", (StringRef, StringRef))
 ERROR(attr_unsupported_on_target, none,
@@ -1810,19 +1823,22 @@ ERROR(avail_query_version_comparison_not_needed,
 ERROR(availability_query_wildcard_required, none,
       "must handle potential future platforms with '*'", ())
 
+ERROR(unavailability_query_wildcard_not_required, none,
+      "platform wildcard '*' is always implicit in #unavailable", ())
+
 ERROR(availability_must_occur_alone, none,
       "'%0' version-availability must be specified alone", (StringRef))
 
 ERROR(pound_available_swift_not_allowed, none,
-      "Swift language version checks not allowed in #available(...)", ())
+      "Swift language version checks not allowed in %0(...)", (StringRef))
 
 ERROR(pound_available_package_description_not_allowed, none,
-      "PackageDescription version checks not allowed in #available(...)", ())
+      "PackageDescription version checks not allowed in %0(...)", (StringRef))
 
 ERROR(availability_query_repeated_platform, none,
       "version for '%0' already specified", (StringRef))
 
-ERROR(attr_requires_concurrency,none,
+ERROR(attr_requires_concurrency, none,
       "'%0' %select{attribute|modifier}1 is only valid when experimental "
       "concurrency is enabled",
       (StringRef, bool))

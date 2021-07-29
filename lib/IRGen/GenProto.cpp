@@ -134,8 +134,10 @@ public:
 
 private:
   void initGenerics();
-  void considerNewTypeSource(MetadataSource::Kind kind, unsigned paramIndex,
-                             CanType type, IsExact_t isExact);
+
+  template <typename ...Args>
+  void considerNewTypeSource(IsExact_t isExact, MetadataSource::Kind kind,
+                             CanType type, Args... args);
   bool considerType(CanType type, IsExact_t isExact,
                     unsigned sourceIndex, MetadataPath &&path);
 
@@ -234,12 +236,17 @@ PolymorphicConvention::PolymorphicConvention(IRGenModule &IGM,
 
 void PolymorphicConvention::addPseudogenericFulfillments() {
   enumerateRequirements([&](GenericRequirement reqt) {
-    MetadataPath path;
-    path.addImpossibleComponent();
+    auto archetype = Generics.getGenericEnvironment()
+                        ->mapTypeIntoContext(reqt.TypeParameter)
+                        ->getAs<ArchetypeType>();
+    assert(archetype && "did not get an archetype by mapping param?");
+    auto erasedTypeParam = archetype->getExistentialType()->getCanonicalType();
+    Sources.emplace_back(MetadataSource::Kind::ErasedTypeMetadata,
+                         reqt.TypeParameter, erasedTypeParam);
 
-    unsigned sourceIndex = 0; // unimportant, since impossible
+    MetadataPath path;
     Fulfillments.addFulfillment({reqt.TypeParameter, reqt.Protocol},
-                                sourceIndex, std::move(path),
+                                Sources.size() - 1, std::move(path),
                                 MetadataState::Complete);
   });
 }
@@ -256,7 +263,7 @@ irgen::enumerateGenericSignatureRequirements(CanGenericSignature signature,
   });
 
   // Get the protocol conformances.
-  for (auto &reqt : signature->getRequirements()) {
+  for (auto &reqt : signature.getRequirements()) {
     switch (reqt.getKind()) {
       // Ignore these; they don't introduce extra requirements.
       case RequirementKind::Superclass:
@@ -302,14 +309,15 @@ void PolymorphicConvention::initGenerics() {
   Generics = FnType->getInvocationGenericSignature();
 }
 
-void PolymorphicConvention::considerNewTypeSource(MetadataSource::Kind kind,
-                                                  unsigned paramIndex,
+template <typename ...Args>
+void PolymorphicConvention::considerNewTypeSource(IsExact_t isExact,
+                                                  MetadataSource::Kind kind,
                                                   CanType type,
-                                                  IsExact_t isExact) {
+                                                  Args... args) {
   if (!Fulfillments.isInterestingTypeForFulfillments(type)) return;
 
   // Prospectively add a source.
-  Sources.emplace_back(kind, paramIndex, type);
+  Sources.emplace_back(kind, type, std::forward<Args>(args)...);
 
   // Consider the source.
   if (!considerType(type, isExact, Sources.size() - 1, MetadataPath())) {
@@ -333,9 +341,7 @@ void PolymorphicConvention::considerWitnessSelf(CanSILFunctionType fnType) {
   auto conformance = fnType->getWitnessMethodConformanceOrInvalid();
 
   // First, bind type metadata for Self.
-  Sources.emplace_back(MetadataSource::Kind::SelfMetadata,
-                       MetadataSource::InvalidSourceIndex,
-                       selfTy);
+  Sources.emplace_back(MetadataSource::Kind::SelfMetadata, selfTy);
 
   if (selfTy->is<GenericTypeParamType>()) {
     // The Self type is abstract, so we can fulfill its metadata from
@@ -347,8 +353,7 @@ void PolymorphicConvention::considerWitnessSelf(CanSILFunctionType fnType) {
 
   // The witness table for the Self : P conformance can be
   // fulfilled from the Self witness table parameter.
-  Sources.emplace_back(MetadataSource::Kind::SelfWitnessTable,
-                       MetadataSource::InvalidSourceIndex, selfTy);
+  Sources.emplace_back(MetadataSource::Kind::SelfWitnessTable, selfTy);
   addSelfWitnessTableFulfillment(selfTy, conformance);
 }
 
@@ -359,8 +364,7 @@ void PolymorphicConvention::considerObjCGenericSelf(CanSILFunctionType fnType) {
   unsigned paramIndex = fnType->getParameters().size() - 1;
 
   // Bind type metadata for Self.
-  Sources.emplace_back(MetadataSource::Kind::ClassPointer, paramIndex,
-                       selfTy);
+  Sources.emplace_back(MetadataSource::Kind::ClassPointer, selfTy, paramIndex);
 
   if (isa<GenericTypeParamType>(selfTy))
     addSelfMetadataFulfillment(selfTy);
@@ -385,8 +389,9 @@ void PolymorphicConvention::considerParameter(SILParameterInfo param,
     case ParameterConvention::Indirect_InoutAliasable:
       if (!isSelfParameter) return;
       if (type->getNominalOrBoundGenericNominal()) {
-        considerNewTypeSource(MetadataSource::Kind::GenericLValueMetadata,
-                              paramIndex, type, IsExact);
+        considerNewTypeSource(IsExact,
+                              MetadataSource::Kind::GenericLValueMetadata,
+                              type, paramIndex);
       }
       return;
 
@@ -395,15 +400,15 @@ void PolymorphicConvention::considerParameter(SILParameterInfo param,
     case ParameterConvention::Direct_Guaranteed:
       // Classes are sources of metadata.
       if (type->getClassOrBoundGenericClass()) {
-        considerNewTypeSource(MetadataSource::Kind::ClassPointer,
-                              paramIndex, type, IsInexact);
+        considerNewTypeSource(IsInexact, MetadataSource::Kind::ClassPointer,
+                              type, paramIndex);
         return;
       }
 
       if (isa<GenericTypeParamType>(type)) {
         if (auto superclassTy = getSuperclassBound(type)) {
-          considerNewTypeSource(MetadataSource::Kind::ClassPointer,
-                                paramIndex, superclassTy, IsInexact);
+          considerNewTypeSource(IsInexact, MetadataSource::Kind::ClassPointer,
+                                superclassTy, paramIndex);
           return;
 
         }
@@ -418,11 +423,11 @@ void PolymorphicConvention::considerParameter(SILParameterInfo param,
         // sources of metadata.
         CanType objTy = metatypeTy.getInstanceType();
         if (auto classDecl = objTy->getClassOrBoundGenericClass())
-          if (classDecl->usesObjCGenericsModel())
+          if (classDecl->isTypeErasedGenericClass())
             return;
 
-        considerNewTypeSource(MetadataSource::Kind::Metadata,
-                              paramIndex, objTy, IsInexact);
+        considerNewTypeSource(IsInexact, MetadataSource::Kind::Metadata, objTy,
+                              paramIndex);
         return;
       }
 
@@ -465,7 +470,7 @@ void irgen::enumerateGenericParamFulfillments(IRGenModule &IGM,
   // captured value.
   auto generics = fnType->getInvocationGenericSignature();
 
-  for (auto genericParam : generics->getGenericParams()) {
+  for (auto genericParam : generics.getGenericParams()) {
     auto genericParamType = genericParam->getCanonicalType();
 
     auto fulfillment
@@ -597,6 +602,17 @@ void EmitPolymorphicParameters::bindExtraSource(
                                             return getTypeInContext(type);
                                           });
       }
+      return;
+    }
+
+    case MetadataSource::Kind::ErasedTypeMetadata: {
+      ArtificialLocation Loc(IGF.getDebugScope(), IGF.IGM.DebugInfo.get(),
+                             IGF.Builder);
+      CanType argTy = getTypeInContext(source.Type);
+      llvm::Value *metadata = IGF.emitTypeMetadataRef(source.getFixedType());
+      setTypeMetadataName(IGF.IGM, metadata, argTy);
+      IGF.bindLocalTypeDataFromTypeMetadata(argTy, IsExact, metadata,
+                                            MetadataState::Complete);
       return;
     }
   }
@@ -2986,6 +3002,10 @@ namespace {
         case MetadataSource::Kind::SelfMetadata:
         case MetadataSource::Kind::SelfWitnessTable:
           continue;
+
+        // No influence on the arguments.
+        case MetadataSource::Kind::ErasedTypeMetadata:
+          continue;
         }
         llvm_unreachable("bad source kind!");
       }
@@ -3040,6 +3060,10 @@ void EmitPolymorphicArguments::emit(SubstitutionMap subs,
       // Added later.
       continue;
     }
+
+    case MetadataSource::Kind::ErasedTypeMetadata:
+      // No influence on the arguments.
+      continue;
     }
     llvm_unreachable("bad source kind");
   }
@@ -3097,6 +3121,10 @@ NecessaryBindings NecessaryBindings::computeBindings(
 
     case MetadataSource::Kind::SelfWitnessTable:
       // We'll just pass undef in cases like this.
+      continue;
+
+    case MetadataSource::Kind::ErasedTypeMetadata:
+      // Fixed in the body.
       continue;
     }
     llvm_unreachable("bad source kind");
@@ -3320,6 +3348,8 @@ namespace {
       case MetadataSource::Kind::SelfMetadata:
       case MetadataSource::Kind::SelfWitnessTable:
         return; // handled as a special case in expand()
+      case MetadataSource::Kind::ErasedTypeMetadata:
+        return; // fixed in the body
       }
       llvm_unreachable("bad source kind");
     }
@@ -3508,7 +3538,7 @@ llvm::Constant *IRGenModule::getAddrOfGenericEnvironment(
         llvm::SmallVector<uint16_t, 4> genericParamCounts;
         unsigned curDepth = 0;
         unsigned genericParamCount = 0;
-        for (const auto gp : signature->getGenericParams()) {
+        for (const auto gp : signature.getGenericParams()) {
           if (curDepth != gp->getDepth()) {
             genericParamCounts.push_back(genericParamCount);
             curDepth = gp->getDepth();
@@ -3520,7 +3550,7 @@ llvm::Constant *IRGenModule::getAddrOfGenericEnvironment(
 
         auto flags = GenericEnvironmentFlags()
           .withNumGenericParameterLevels(genericParamCounts.size())
-          .withNumGenericRequirements(signature->getRequirements().size());
+          .withNumGenericRequirements(signature.getRequirements().size());
 
         ConstantStructBuilder fields = builder.beginStruct();
         fields.setPacked(true);
@@ -3545,7 +3575,7 @@ llvm::Constant *IRGenModule::getAddrOfGenericEnvironment(
 
         // Generic requirements
         irgen::addGenericRequirements(*this, fields, signature,
-                                      signature->getRequirements());
+                                      signature.getRequirements());
         return fields.finishAndCreateFuture();
       });
 }

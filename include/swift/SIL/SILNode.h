@@ -21,6 +21,7 @@
 #include "llvm/Support/PointerLikeTypeTraits.h"
 #include "swift/Basic/InlineBitfield.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/SIL/SwiftObjectHeader.h"
 #include <type_traits>
 
 namespace swift {
@@ -114,7 +115,10 @@ public:
 ///   subobject.  If the SILNode is actually the base subobject of a
 ///   ValueBase subobject, the cast will yield a corrupted value.
 ///   Always use the LLVM casts (cast<>, dyn_cast<>, etc.) instead.
-class alignas(8) SILNode {
+class alignas(8) SILNode :
+  // SILNode contains a swift object header for bridging with libswift.
+  // For details see libswift/README.md.
+  public SwiftObjectHeader {
 public:
   enum { NumVOKindBits = 3 };
   enum { NumStoreOwnershipQualifierBits = 2 };
@@ -338,6 +342,10 @@ protected:
     Immutable : 1
   );
 
+  SWIFT_INLINE_BITFIELD(HopToExecutorInst, NonValueInstruction, 1,
+    mandatory : 1
+  );
+
   SWIFT_INLINE_BITFIELD(DestroyValueInst, NonValueInstruction, 1,
                         PoisonRefs : 1);
 
@@ -422,8 +430,11 @@ protected:
 
   } Bits;
 
+private:
+  SwiftMetatype getSILNodeMetatype(SILNodeKind kind);
+
 protected:
-  SILNode(SILNodeKind kind) {
+  SILNode(SILNodeKind kind) : SwiftObjectHeader(getSILNodeMetatype(kind)) {
     Bits.OpaqueBits = 0;
     Bits.SILNode.Kind = unsigned(kind);
   }

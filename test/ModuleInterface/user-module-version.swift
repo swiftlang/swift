@@ -3,7 +3,7 @@
 // RUN: %empty-directory(%t/binary)
 // RUN: %empty-directory(%t/module-cache)
 
-// RUN: %target-swift-frontend -emit-module %s -module-name Foo -swift-version 5 -disable-implicit-concurrency-module-import -user-module-version 113.33.44.55 -emit-module-interface-path %t/textual/Foo.swiftinterface -enable-library-evolution -emit-module-path %t/binary/Foo.swiftmodule
+// RUN: %target-swift-frontend -emit-module %s -module-name Foo -swift-version 5 -disable-implicit-concurrency-module-import -user-module-version 113.33.44.55.66.77 -emit-module-interface-path %t/textual/Foo.swiftinterface -enable-library-evolution -emit-module-path %t/binary/Foo.swiftmodule
 
 // RUN: %FileCheck %s --check-prefix=INTERFACE-FLAG < %t/textual/Foo.swiftinterface
 

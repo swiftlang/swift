@@ -205,7 +205,7 @@ createSubstitutionMapFromGenericArgs(GenericSignature genericSig,
   if (!genericSig)
     return SubstitutionMap();
   
-  if (genericSig->getGenericParams().size() != args.size())
+  if (genericSig.getGenericParams().size() != args.size())
     return SubstitutionMap();
 
   return SubstitutionMap::get(
@@ -306,7 +306,7 @@ Type ASTBuilder::createBoundGenericType(GenericTypeDecl *decl,
 
   auto genericSig = aliasDecl->getGenericSignature();
   for (unsigned i = 0, e = args.size(); i < e; ++i) {
-    auto origTy = genericSig->getInnermostGenericParams()[i];
+    auto origTy = genericSig.getInnermostGenericParams()[i];
     auto substTy = args[i];
 
     subs[origTy->getCanonicalType()->castTo<GenericTypeParamType>()] =
@@ -344,7 +344,7 @@ Type ASTBuilder::createTupleType(ArrayRef<Type> eltTypes, StringRef labels) {
 Type ASTBuilder::createFunctionType(
     ArrayRef<Demangle::FunctionParam<Type>> params,
     Type output, FunctionTypeFlags flags,
-    FunctionMetadataDifferentiabilityKind diffKind) {
+    FunctionMetadataDifferentiabilityKind diffKind, Type globalActor) {
   // The result type must be materializable.
   if (!output->isMaterializable()) return Type();
 
@@ -407,14 +407,12 @@ Type ASTBuilder::createFunctionType(
     clangFunctionType = Ctx.getClangFunctionType(funcParams, output,
                                                  representation);
 
-  Type globalActor;
-  // FIXME: Demangle global actors.
-
   auto einfo =
       FunctionType::ExtInfoBuilder(representation, noescape, flags.isThrowing(),
                                    resultDiffKind, clangFunctionType,
                                    globalActor)
           .withAsync(flags.isAsync())
+          .withConcurrent(flags.isSendable())
           .build();
 
   return FunctionType::get(funcParams, output, einfo);
@@ -1058,6 +1056,15 @@ ASTBuilder::findTypeDecl(DeclContext *dc,
     // If we already have a viable result, it's ambiguous, so give up.
     if (result) return nullptr;
     result = candidate;
+  }
+
+  // If we looked into the standard library module, but didn't find anything,
+  // try the _Concurrency module, which is also mangled into the Swift module.
+  if (!result && !dc->getParent() && module->isStdlibModule()) {
+    ASTContext &ctx = module->getASTContext();
+    if (auto concurrencyModule = ctx.getLoadedModule(ctx.Id_Concurrency)) {
+      return findTypeDecl(concurrencyModule, name, privateDiscriminator, kind);
+    }
   }
 
   return result;

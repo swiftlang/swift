@@ -510,13 +510,11 @@ bb0(%0 : @owned $@callee_owned (@owned Builtin.NativeObject) -> @owned Builtin.N
 // CHECK:   [[ARG_COPY_2:%.*]] = copy_value [[ARG_COPY]]
 // CHECK:   [[PAI:%.*]] = partial_apply [[FN]]([[ARG_COPY]])
 // CHECK:   [[ARG_COPY_3:%.*]] = copy_value [[ARG]]
-// CHECK:   [[PAI_COPY:%.*]] = copy_value [[PAI]]
 // CHECK:   [[FN2:%.*]] = function_ref @nativeobject_plus :
 // CHECK:   [[RESULT:%.*]] = apply [[FN2]]([[ARG_COPY_3]], [[ARG_COPY_2]])
-// CHECK:   destroy_value [[PAI_COPY]]
-// CHECK:   [[PAI_COPY_2:%.*]] = copy_value [[PAI]]
+// CHECK:   [[PAI_COPY:%.*]] = copy_value [[PAI]]
 // CHECK:   [[OPAQUE_FN:%.*]] = function_ref @partial_apply_user
-// CHECK:   apply [[OPAQUE_FN]]([[PAI_COPY_2]])
+// CHECK:   apply [[OPAQUE_FN]]([[PAI_COPY]])
 // CHECK:   destroy_value [[PAI]]
 // CHECK:   destroy_value [[ARG]]
 // CHECK:   return [[RESULT]]

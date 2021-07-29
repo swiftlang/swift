@@ -76,6 +76,7 @@ class CodeCompletionResultBuilder {
   CodeCompletionResultSink &Sink;
   CodeCompletionResult::ResultKind Kind;
   SemanticContextKind SemanticContext;
+  CodeCompletionFlair Flair;
   unsigned NumBytesToErase = 0;
   const Decl *AssociatedDecl = nullptr;
   Optional<CodeCompletionLiteralKind> LiteralKind;
@@ -87,7 +88,6 @@ class CodeCompletionResultBuilder {
   ExpectedTypeContext declTypeContext;
   CodeCompletionResult::ExpectedTypeRelation ExpectedTypeRelation =
       CodeCompletionResult::Unknown;
-  bool IsArgumentLabels = false;
   bool Cancelled = false;
   ArrayRef<std::pair<StringRef, StringRef>> CommentWords;
   CodeCompletionResult::NotRecommendedReason NotRecReason =
@@ -155,8 +155,8 @@ public:
     SemanticContext = Kind;
   }
 
-  void setIsArgumentLabels(bool Flag = true) {
-    IsArgumentLabels = Flag;
+  void addFlair(CodeCompletionFlair Options) {
+    Flair |= Options;
   }
 
   void
@@ -360,6 +360,12 @@ public:
       addTypeAnnotation(Annotation);
   }
 
+  void addAttributeKeyword(StringRef Name, StringRef Annotation) {
+    addChunkWithText(CodeCompletionString::Chunk::ChunkKind::Attribute, Name);
+    if (!Annotation.empty())
+      addTypeAnnotation(Annotation);
+  }
+
   StringRef escapeKeyword(StringRef Word, bool escapeAllKeywords,
                           llvm::SmallString<16> &EscapedKeyword) {
     EscapedKeyword.clear();
@@ -384,39 +390,39 @@ public:
 
   void addCallParameterColon() {
     addChunkWithText(CodeCompletionString::Chunk::ChunkKind::
-                     CallParameterColon, ": ");
+                     CallArgumentColon, ": ");
   }
 
   void addSimpleNamedParameter(StringRef name) {
-    withNestedGroup(CodeCompletionString::Chunk::ChunkKind::CallParameterBegin, [&] {
+    withNestedGroup(CodeCompletionString::Chunk::ChunkKind::CallArgumentBegin, [&] {
       // Use internal, since we don't want the name to be outside the
       // placeholder.
       addChunkWithText(
-          CodeCompletionString::Chunk::ChunkKind::CallParameterInternalName,
+          CodeCompletionString::Chunk::ChunkKind::CallArgumentInternalName,
           name);
     });
   }
 
   void addSimpleTypedParameter(StringRef Annotation, bool IsVarArg = false) {
-    withNestedGroup(CodeCompletionString::Chunk::ChunkKind::CallParameterBegin, [&] {
+    withNestedGroup(CodeCompletionString::Chunk::ChunkKind::CallArgumentBegin, [&] {
       addChunkWithText(
-          CodeCompletionString::Chunk::ChunkKind::CallParameterType,
+          CodeCompletionString::Chunk::ChunkKind::CallArgumentType,
           Annotation);
       if (IsVarArg)
         addEllipsis();
     });
   }
 
-  void addCallParameter(Identifier Name, Identifier LocalName, Type Ty,
-                        Type ContextTy, bool IsVarArg, bool IsInOut, bool IsIUO,
-                        bool isAutoClosure, bool useUnderscoreLabel,
-                        bool isLabeledTrailingClosure);
+  void addCallArgument(Identifier Name, Identifier LocalName, Type Ty,
+                       Type ContextTy, bool IsVarArg, bool IsInOut, bool IsIUO,
+                       bool isAutoClosure, bool useUnderscoreLabel,
+                       bool isLabeledTrailingClosure);
 
-  void addCallParameter(Identifier Name, Type Ty, Type ContextTy = Type()) {
-    addCallParameter(Name, Identifier(), Ty, ContextTy,
-                     /*IsVarArg=*/false, /*IsInOut=*/false, /*isIUO=*/false,
-                     /*isAutoClosure=*/false, /*useUnderscoreLabel=*/false,
-                     /*isLabeledTrailingClosure=*/false);
+  void addCallArgument(Identifier Name, Type Ty, Type ContextTy = Type()) {
+    addCallArgument(Name, Identifier(), Ty, ContextTy,
+                    /*IsVarArg=*/false, /*IsInOut=*/false, /*isIUO=*/false,
+                    /*isAutoClosure=*/false, /*useUnderscoreLabel=*/false,
+                    /*isLabeledTrailingClosure=*/false);
   }
 
   void addGenericParameter(StringRef Name) {

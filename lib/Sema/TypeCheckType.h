@@ -28,7 +28,6 @@ class TypeRepr;
 class ComponentIdentTypeRepr;
 class GenericEnvironment;
 class GenericSignature;
-class GenericSignatureBuilder;
 
 /// Flags that describe the context of type checking a pattern or
 /// type.
@@ -131,6 +130,9 @@ enum class TypeResolverContext : uint8_t {
 
   /// Whether this is the type of an editor placeholder.
   EditorPlaceholderExpr,
+
+  /// Whether this is an "inherited" type.
+  Inherited,
 };
 
 /// Options that determine how type resolution should work.
@@ -212,6 +214,7 @@ public:
     case Context::GenericRequirement:
     case Context::ImmediateOptionalTypeArgument:
     case Context::AbstractFunctionDecl:
+    case Context::Inherited:
       return false;
     }
     llvm_unreachable("unhandled kind");
@@ -293,20 +296,11 @@ class TypeResolution {
   HandlePlaceholderTypeReprFn placeholderHandler;
 
 private:
-  union {
-    /// The generic environment used to map to archetypes.
-    GenericEnvironment *genericEnv;
+  /// The generic environment used to map to archetypes.
+  GenericEnvironment *genericEnv;
 
-    /// The generic signature
-    struct {
-      /// The generic signature to use for type resolution.
-      GenericSignature genericSig;
-
-      /// The generic signature builder that will answer queries about
-      /// generic types.
-      mutable GenericSignatureBuilder *builder;
-    } complete;
-  };
+  /// The generic signature to use for type resolution.
+  GenericSignature genericSig;
 
   TypeResolution(DeclContext *dc, TypeResolutionStage stage,
                  TypeResolutionOptions options,
@@ -314,9 +308,8 @@ private:
                  HandlePlaceholderTypeReprFn placeholderHandler)
       : dc(dc), stage(stage), options(options),
         unboundTyOpener(unboundTyOpener),
-        placeholderHandler(placeholderHandler) {}
-
-  GenericSignatureBuilder *getGenericSignatureBuilder() const;
+        placeholderHandler(placeholderHandler),
+        genericEnv(nullptr) {}
 
   /// Retrieves the generic signature for the context, or NULL if there is
   /// no generic signature to resolve types.

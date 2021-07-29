@@ -120,7 +120,7 @@ git -C "%source_root%\swift" checkout-index --force --all
 @set "skip_repositories_arg=%skip_repositories_arg% --skip-repository tensorflow-swift-apis"
 @set "skip_repositories_arg=%skip_repositories_arg% --skip-repository yams"
 
-call "%source_root%\swift\utils\update-checkout.cmd" %scheme_arg% %skip_repositories_arg% --clone --skip-history --github-comment "%ghprbCommentBody%" >NUL 2>NUL
+call "%source_root%\swift\utils\update-checkout.cmd" %scheme_arg% %skip_repositories_arg% --clone --skip-history --skip-tags --github-comment "%ghprbCommentBody%" >NUL 2>NUL
 
 goto :eof
 endlocal
@@ -180,6 +180,7 @@ cmake^
     -DCMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE%^
     -DCMAKE_C_COMPILER=cl^
     -DCMAKE_CXX_COMPILER=cl^
+    -DCMAKE_MT=mt^
     -DCMAKE_INSTALL_PREFIX:PATH=%install_directory%^
     -DLLVM_DEFAULT_TARGET_TRIPLE=x86_64-unknown-windows-msvc^
     -DLLVM_ENABLE_PDB:BOOL=YES^
@@ -222,6 +223,7 @@ cmake^
     -DCMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE%^
     -DCMAKE_C_COMPILER=cl^
     -DCMAKE_CXX_COMPILER=cl^
+    -DCMAKE_MT=mt^
     -DCMAKE_CXX_FLAGS:STRING="/GS- /Oy"^
     -DCMAKE_EXE_LINKER_FLAGS:STRING=/INCREMENTAL:NO^
     -DCMAKE_SHARED_LINKER_FLAGS:STRING=/INCREMENTAL:NO^
@@ -245,6 +247,7 @@ cmake^
     -DCMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE%^
     -DCMAKE_C_COMPILER=cl^
     -DCMAKE_CXX_COMPILER=cl^
+    -DCMAKE_MT=mt^
     -DCMAKE_INSTALL_PREFIX:PATH=%install_directory%^
     -DClang_DIR:PATH=%build_root%\llvm\lib\cmake\clang^
     -DSWIFT_PATH_TO_CMARK_BUILD:PATH=%build_root%\cmark^
@@ -265,6 +268,7 @@ cmake^
     -DSWIFT_BUILD_SOURCEKIT:BOOL=YES^
     -DSWIFT_ENABLE_SOURCEKIT_TESTS:BOOL=YES^
     -DSWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY=YES^
+    -DSWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED=YES^
     -DSWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING=YES^
     -DSWIFT_INSTALL_COMPONENTS="autolink-driver;compiler;clang-resource-dir-symlink;stdlib;sdk-overlay;editor-integration;tools;sourcekit-inproc;swift-remote-mirror;swift-remote-mirror-headers"^
     -DSWIFT_PARALLEL_LINK_JOBS=8^
@@ -302,6 +306,7 @@ cmake^
     -DCMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE%^
     -DCMAKE_C_COMPILER=cl^
     -DCMAKE_CXX_COMPILER=cl^
+    -DCMAKE_MT=mt^
     -DCMAKE_INSTALL_PREFIX:PATH=%install_directory%^
     -DLLVM_DIR:PATH=%build_root%\llvm\lib\cmake\llvm^
     -DClang_DIR:PATH=%build_root%\llvm\lib\cmake\clang^
@@ -334,6 +339,7 @@ cmake^
     -DCMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE%^
     -DCMAKE_C_COMPILER=clang-cl^
     -DCMAKE_CXX_COMPILER=clang-cl^
+    -DCMAKE_MT=mt^
     -DCMAKE_Swift_COMPILER=swiftc^
     -DSwift_DIR:PATH=%build_root%\swift\lib\cmake\swift^
     -DCMAKE_INSTALL_PREFIX:PATH=%install_directory%^

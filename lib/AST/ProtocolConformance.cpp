@@ -532,8 +532,8 @@ ConditionalRequirementsRequest::evaluate(Evaluator &evaluator,
   // something else. The most important bit is having the same type
   // parameters. (NB. if/when Swift gets parameterized extensions, this needs to
   // change.)
-  assert(typeSig->getCanonicalSignature().getGenericParams() ==
-         extensionSig->getCanonicalSignature().getGenericParams());
+  assert(typeSig.getCanonicalSignature().getGenericParams() ==
+         extensionSig.getCanonicalSignature().getGenericParams());
 
   // Find the requirements in the extension that aren't proved by the original
   // type, these are the ones that make the conformance conditional.
@@ -1250,8 +1250,15 @@ void NominalTypeDecl::prepareConformanceTable() const {
 
   // Actor classes conform to the actor protocol.
   if (auto classDecl = dyn_cast<ClassDecl>(mutableThis)) {
-    if (classDecl->isActor())
+    if (classDecl->isDistributedActor())
+      addSynthesized(KnownProtocolKind::DistributedActor);
+    else if (classDecl->isActor())
       addSynthesized(KnownProtocolKind::Actor);
+  }
+
+  // Global actors conform to the GlobalActor protocol.
+  if (mutableThis->getAttrs().hasAttribute<GlobalActorAttr>()) {
+    addSynthesized(KnownProtocolKind::GlobalActor);
   }
 }
 
@@ -1343,6 +1350,9 @@ static ProtocolConformance *findSynthesizedSendableConformance(
 
   auto concrete = conformance.getConcrete();
   if (concrete->getDeclContext() != dc)
+    return nullptr;
+
+  if (isa<InheritedProtocolConformance>(concrete))
     return nullptr;
 
   auto normal = concrete->getRootNormalConformance();

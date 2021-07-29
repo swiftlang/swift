@@ -1039,8 +1039,9 @@ public:
     CurInstruction = I;
     checkSILInstruction(I);
 
-    // Check the SILLLocation attached to the instruction.
-    checkInstructionsSILLocation(I);
+    // Check the SILLLocation attached to the instruction,
+    // as well as debug-variable-carrying instructions.
+    checkInstructionsDebugInfo(I);
 
     // Check ownership and types.
     SILFunction *F = I->getFunction();
@@ -1204,67 +1205,80 @@ public:
     }
   }
 
-  void checkInstructionsSILLocation(SILInstruction *I) {
-    // Check the debug scope.
-    auto *DS = I->getDebugScope();
-    if (DS && !maybeScopeless(*I))
-      require(DS, "instruction has a location, but no scope");
+  void checkDebugVariable(SILInstruction *inst) {
+    Optional<SILDebugVariable> varInfo;
+    if (auto *di = dyn_cast<AllocStackInst>(inst))
+      varInfo = di->getVarInfo();
+    else if (auto *di = dyn_cast<AllocBoxInst>(inst))
+      varInfo = di->getVarInfo();
+    else if (auto *di = dyn_cast<DebugValueInst>(inst))
+      varInfo = di->getVarInfo();
+    else if (auto *di = dyn_cast<DebugValueAddrInst>(inst))
+      varInfo = di->getVarInfo();
 
-    require(!DS || DS->getParentFunction() == I->getFunction(),
-            "debug scope of instruction belongs to a different function");
-
-    // Check the location kind.
-    SILLocation L = I->getLoc();
-    SILLocation::LocationKind LocKind = L.getKind();
-    SILInstructionKind InstKind = I->getKind();
-
-    // Check that there is at most one debug variable defined
-    // for each argument slot. This catches SIL transformations
-    // that accidentally remove inline information (stored in the SILDebugScope)
-    // from debug-variable-carrying instructions.
-    if (!DS->InlinedCallSite) {
-      Optional<SILDebugVariable> VarInfo;
-      if (auto *DI = dyn_cast<AllocStackInst>(I))
-        VarInfo = DI->getVarInfo();
-      else if (auto *DI = dyn_cast<AllocBoxInst>(I))
-        VarInfo = DI->getVarInfo();
-      else if (auto *DI = dyn_cast<DebugValueInst>(I))
-        VarInfo = DI->getVarInfo();
-      else if (auto *DI = dyn_cast<DebugValueAddrInst>(I))
-        VarInfo = DI->getVarInfo();
-
-      if (VarInfo)
-        if (unsigned ArgNo = VarInfo->ArgNo) {
-          // It is a function argument.
-          if (ArgNo < DebugVars.size() && !DebugVars[ArgNo].empty() && !VarInfo->Name.empty()) {
-            require(
-                DebugVars[ArgNo] == VarInfo->Name,
-                "Scope contains conflicting debug variables for one function "
-                "argument");
-          } else {
-            // Reserve enough space.
-            while (DebugVars.size() <= ArgNo) {
-              DebugVars.push_back(StringRef());
-            }
-          }
-          DebugVars[ArgNo] = VarInfo->Name;
-      }
-    }
-
-    // Regular locations are allowed on all instructions.
-    if (LocKind == SILLocation::RegularKind)
+    if (!varInfo)
       return;
 
-    if (LocKind == SILLocation::ReturnKind ||
-        LocKind == SILLocation::ImplicitReturnKind)
-      require(InstKind == SILInstructionKind::BranchInst ||
-              InstKind == SILInstructionKind::ReturnInst ||
-              InstKind == SILInstructionKind::UnreachableInst,
-        "return locations are only allowed on branch and return instructions");
+    auto *debugScope = inst->getDebugScope();
 
-    if (LocKind == SILLocation::ArtificialUnreachableKind)
-      require(InstKind == SILInstructionKind::UnreachableInst,
-        "artificial locations are only allowed on Unreachable instructions");
+    // Check that there is at most one debug variable defined for each argument
+    // slot if our debug scope is not an inlined call site.
+    //
+    // This catches SIL transformations that accidentally remove inline
+    // information (stored in the SILDebugScope) from debug-variable-carrying
+    // instructions.
+    if (debugScope && !debugScope->InlinedCallSite)
+      if (unsigned argNum = varInfo->ArgNo) {
+        // It is a function argument.
+        if (argNum < DebugVars.size() && !DebugVars[argNum].empty() &&
+            !varInfo->Name.empty()) {
+          require(DebugVars[argNum] == varInfo->Name,
+                  "Scope contains conflicting debug variables for one function "
+                  "argument");
+        } else {
+          // Reserve enough space.
+          while (DebugVars.size() <= argNum) {
+            DebugVars.push_back(StringRef());
+          }
+        }
+        DebugVars[argNum] = varInfo->Name;
+      }
+
+    // Check debug info expression
+    if (const auto &DIExpr = varInfo->DIExpr) {
+      for (auto It = DIExpr.element_begin(), ItEnd = DIExpr.element_end();
+           It != ItEnd;) {
+        require(It->getKind() == SILDIExprElement::OperatorKind,
+                "dangling di-expression operand");
+        auto Op = It->getAsOperator();
+        const auto *DIExprInfo = SILDIExprInfo::get(Op);
+        require(DIExprInfo, "unrecognized di-expression operator");
+        ++It;
+        // Check operand kinds
+        for (auto OpK : DIExprInfo->OperandKinds)
+          require(It != ItEnd && (It++)->getKind() == OpK,
+                  "di-expression operand kind mismatch");
+
+        if (Op == SILDIExprOperator::Fragment)
+          require(It == ItEnd, "op_fragment directive needs to be at the end "
+                               "of a di-expression");
+      }
+    }
+  }
+
+  void checkInstructionsDebugInfo(SILInstruction *inst) {
+    // First verify structural debug info information.
+    inst->verifyDebugInfo();
+
+    // Check the debug scope.
+    auto *debugScope = inst->getDebugScope();
+    if (debugScope && !maybeScopeless(*inst))
+      require(debugScope, "instruction has a location, but no scope");
+    require(!debugScope ||
+                debugScope->getParentFunction() == inst->getFunction(),
+            "debug scope of instruction belongs to a different function");
+
+    checkDebugVariable(inst);
   }
 
   /// Check that the types of this value producer are all legal in the function
@@ -1431,8 +1445,8 @@ public:
       });
     }
 
-    if (subs.getGenericSignature()->getCanonicalSignature() !=
-          fnTy->getInvocationGenericSignature()->getCanonicalSignature()) {
+    if (subs.getGenericSignature().getCanonicalSignature() !=
+          fnTy->getInvocationGenericSignature().getCanonicalSignature()) {
       llvm::dbgs() << "substitution map's generic signature: ";
       subs.getGenericSignature()->print(llvm::dbgs());
       llvm::dbgs() << "\n";
@@ -3155,12 +3169,12 @@ public:
 
     auto genericSig = methodType->getInvocationGenericSignature();
 
-    auto selfGenericParam = genericSig->getGenericParams()[0];
+    auto selfGenericParam = genericSig.getGenericParams()[0];
     require(selfGenericParam->getDepth() == 0
             && selfGenericParam->getIndex() == 0,
             "method should be polymorphic on Self parameter at depth 0 index 0");
     Optional<Requirement> selfRequirement;
-    for (auto req : genericSig->getRequirements()) {
+    for (auto req : genericSig.getRequirements()) {
       if (req.getKind() != RequirementKind::SameType) {
         selfRequirement = req;
         break;
@@ -3175,7 +3189,7 @@ public:
             "requirement Self parameter must conform to called protocol");
 
     auto lookupType = AMI->getLookupType();
-    if (getOpenedArchetypeOf(lookupType) || isa<DynamicSelfType>(lookupType)) {
+    if (getOpenedArchetypeOf(lookupType) || lookupType->hasDynamicSelfType()) {
       require(AMI->getTypeDependentOperands().size() == 1,
               "Must have a type dependent operand for the opened archetype");
       verifyOpenedArchetype(AMI, lookupType);
@@ -4042,7 +4056,7 @@ public:
       require(instClass,
               "upcast must convert a class metatype to a class metatype");
       
-      if (instClass->usesObjCGenericsModel()) {
+      if (instClass->isTypeErasedGenericClass()) {
         require(instClass->getDeclaredTypeInContext()
                   ->isBindableToSuperclassOf(opInstTy),
                 "upcast must cast to a superclass or an existential metatype");
@@ -4075,7 +4089,7 @@ public:
     auto ToClass = ToTy.getClassOrBoundGenericClass();
     require(ToClass,
             "upcast must convert a class instance to a class type");
-      if (ToClass->usesObjCGenericsModel()) {
+      if (ToClass->isTypeErasedGenericClass()) {
         require(ToClass->getDeclaredTypeInContext()
                   ->isBindableToSuperclassOf(FromTy.getASTType()),
                 "upcast must cast to a superclass or an existential metatype");

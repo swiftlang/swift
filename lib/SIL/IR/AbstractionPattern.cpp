@@ -322,8 +322,6 @@ bool AbstractionPattern::matchesTuple(CanTupleType substType) {
     auto type = getType();
     if (auto tuple = dyn_cast<TupleType>(type))
       return (tuple->getNumElements() == substType->getNumElements());
-    if (isa<OpaqueTypeArchetypeType>(type))
-      return true;
     return false;
   }
   }
@@ -632,7 +630,7 @@ AbstractionPattern::getObjCMethodAsyncCompletionHandlerType(
     if (auto origSig = getGenericSignature()) {
       patternSig = origSig;
     } else if (auto genFnTy = dyn_cast<GenericFunctionType>(getType())) {
-      patternSig = genFnTy->getGenericSignature()->getCanonicalSignature();
+      patternSig = genFnTy->getGenericSignature().getCanonicalSignature();
     }
     
     return AbstractionPattern(patternSig,
@@ -661,6 +659,31 @@ AbstractionPattern::getObjCMethodAsyncCompletionHandlerType(
   case Kind::ObjCCompletionHandlerArgumentsType:
     swift_unreachable("not appropriate for this kind");
   }
+  llvm_unreachable("covered switch");
+}
+
+
+CanType AbstractionPattern::getObjCMethodAsyncCompletionHandlerForeignType(
+    ForeignAsyncConvention convention,
+    Lowering::TypeConverter &TC
+) const {
+  auto nativeCHTy = convention.completionHandlerType();
+
+  // Use the abstraction pattern we're lowering against in order to lower
+  // the completion handler type, so we can preserve C/ObjC distinctions that
+  // normally get abstracted away by the importer.
+  auto completionHandlerNativeOrigTy = getObjCMethodAsyncCompletionHandlerType(nativeCHTy);
+  
+  // Bridge the Swift completion handler type back to its
+  // foreign representation.
+  auto foreignCHTy = TC.getLoweredBridgedType(completionHandlerNativeOrigTy,
+                                    nativeCHTy,
+                                    Bridgeability::Full,
+                                    SILFunctionTypeRepresentation::ObjCMethod,
+                                    TypeConverter::ForArgument)
+    ->getCanonicalType();
+
+  return foreignCHTy;
 }
 
 AbstractionPattern
@@ -872,9 +895,7 @@ AbstractionPattern AbstractionPattern::getOptionalObjectType() const {
     return *this;
 
   case Kind::Type:
-    if (isTypeParameter())
-      return AbstractionPattern::getOpaque();
-    if (isa<OpaqueTypeArchetypeType>(getType()))
+    if (isTypeParameterOrOpaqueArchetype())
       return AbstractionPattern::getOpaque();
     return AbstractionPattern(getGenericSignature(),
                               ::getOptionalObjectType(getType()));
@@ -1138,13 +1159,12 @@ AbstractionPattern
 AbstractionPattern::unsafeGetSubstFieldType(ValueDecl *member,
                                             CanType origMemberInterfaceType)
 const {
+  assert(origMemberInterfaceType);
   if (isTypeParameterOrOpaqueArchetype()) {
     // Fall back to the generic abstraction pattern for the member.
     auto sig = member->getDeclContext()->getGenericSignatureOfContext();
-    CanType memberTy = origMemberInterfaceType
-      ? origMemberInterfaceType
-      : member->getInterfaceType()->getCanonicalType(sig);
-    return AbstractionPattern(sig.getCanonicalSignature(), memberTy);
+    return AbstractionPattern(sig.getCanonicalSignature(),
+                              origMemberInterfaceType);
   }
 
   switch (getKind()) {

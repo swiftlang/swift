@@ -41,6 +41,7 @@
 #include "swift/Serialization/Validation.h"
 #include "swift/Subsystems.h"
 #include "swift/TBDGen/TBDGen.h"
+#include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Option/ArgList.h"
@@ -86,6 +87,7 @@ class CompilerInvocation {
   TypeCheckerOptions TypeCheckerOpts;
   FrontendOptions FrontendOpts;
   ClangImporterOptions ClangImporterOpts;
+  symbolgraphgen::SymbolGraphOptions SymbolGraphOpts;
   SearchPathOptions SearchPathOpts;
   DiagnosticOptions DiagnosticOpts;
   MigratorOptions MigratorOpts;
@@ -257,6 +259,11 @@ public:
     return ClangImporterOpts;
   }
 
+  symbolgraphgen::SymbolGraphOptions &getSymbolGraphOptions() { return SymbolGraphOpts; }
+  const symbolgraphgen::SymbolGraphOptions &getSymbolGraphOptions() const {
+    return SymbolGraphOpts;
+  }
+
   SearchPathOptions &getSearchPathOptions() { return SearchPathOpts; }
   const SearchPathOptions &getSearchPathOptions() const {
     return SearchPathOpts;
@@ -346,6 +353,9 @@ public:
   /// Whether the Swift Concurrency support library should be implicitly
   /// imported.
   bool shouldImportSwiftConcurrency() const;
+
+  /// Whether the Distributed support library should be implicitly imported.
+  bool shouldImportSwiftDistributed() const;
 
   /// Performs input setup common to these tools:
   /// sil-opt, sil-func-extractor, sil-llvm-gen, and sil-nm.

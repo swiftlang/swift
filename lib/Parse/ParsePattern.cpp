@@ -17,6 +17,7 @@
 #include "swift/Parse/Parser.h"
 
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/GenericParamList.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/SourceFile.h"
@@ -150,22 +151,40 @@ static ParserStatus parseDefaultArgument(
 
 /// Determine whether we are at the start of a parameter name when
 /// parsing a parameter.
-static bool startsParameterName(Parser &parser, bool isClosure) {
+bool Parser::startsParameterName(bool isClosure) {
   // '_' cannot be a type, so it must be a parameter name.
-  if (parser.Tok.is(tok::kw__))
+  if (Tok.is(tok::kw__))
     return true;
 
   // To have a parameter name here, we need a name.
-  if (!parser.Tok.canBeArgumentLabel())
+  if (!Tok.canBeArgumentLabel())
     return false;
 
-  // If the next token can be an argument label or is ':', this is a name.
-  const auto &nextTok = parser.peekToken();
-  if (nextTok.is(tok::colon) || nextTok.canBeArgumentLabel())
+  // If the next token is ':', this is a name.
+  const auto &nextTok = peekToken();
+  if (nextTok.is(tok::colon))
     return true;
 
-  if (parser.isOptionalToken(nextTok)
-      || parser.isImplicitlyUnwrappedOptionalToken(nextTok))
+  // If the next token can be an argument label, we might have a name.
+  if (nextTok.canBeArgumentLabel()) {
+    // If the first name wasn't "isolated", we're done.
+    if (!Tok.isContextualKeyword("isolated"))
+      return true;
+
+    // "isolated" can be an argument label, but it's also a contextual keyword,
+    // so look ahead one more token (two total) see if we have a ':' that would
+    // indicate that this is an argument label.
+    return lookahead<bool>(2, [&](CancellableBacktrackingScope &) {
+      if (Tok.is(tok::colon))
+        return true; // isolated :
+
+      // isolated x :
+      return Tok.canBeArgumentLabel() && nextTok.is(tok::colon);
+    });
+  }
+
+  if (isOptionalToken(nextTok)
+      || isImplicitlyUnwrappedOptionalToken(nextTok))
     return false;
 
   // The identifier could be a name or it could be a type. In a closure, we
@@ -238,26 +257,51 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       }
     }
     
-    // ('inout' | '__shared' | '__owned')?
+    // ('inout' | '__shared' | '__owned' | isolated)?
     bool hasSpecifier = false;
     while (Tok.is(tok::kw_inout) ||
-           (Tok.is(tok::identifier) &&
-            (Tok.getRawText().equals("__shared") ||
-             Tok.getRawText().equals("__owned")))) {
+           Tok.isContextualKeyword("__shared") ||
+           Tok.isContextualKeyword("__owned") ||
+           Tok.isContextualKeyword("isolated")) {
+
+      if (Tok.isContextualKeyword("isolated")) {
+        // did we already find an 'isolated' type modifier?
+        if (param.IsolatedLoc.isValid()) {
+          diagnose(Tok, diag::parameter_specifier_repeated)
+              .fixItRemove(Tok.getLoc());
+          consumeToken();
+          continue;
+        }
+
+        // is this 'isolated' token the identifier of an argument label?
+        bool partOfArgumentLabel = lookahead<bool>(1, [&](CancellableBacktrackingScope &) {
+          if (Tok.is(tok::colon))
+            return true;  // isolated :
+
+          // isolated x :
+          return Tok.canBeArgumentLabel() && peekToken().is(tok::colon);
+        });
+
+        if (partOfArgumentLabel)
+          break;
+
+        // consume 'isolated' as type modifier
+        param.IsolatedLoc = consumeToken();
+        continue;
+      }
+
       if (!hasSpecifier) {
         if (Tok.is(tok::kw_inout)) {
           // This case is handled later when mapping to ParamDecls for
           // better fixits.
           param.SpecifierKind = ParamDecl::Specifier::InOut;
           param.SpecifierLoc = consumeToken();
-        } else if (Tok.is(tok::identifier) &&
-                   Tok.getRawText().equals("__shared")) {
+        } else if (Tok.isContextualKeyword("__shared")) {
           // This case is handled later when mapping to ParamDecls for
           // better fixits.
           param.SpecifierKind = ParamDecl::Specifier::Shared;
           param.SpecifierLoc = consumeToken();
-        } else if (Tok.is(tok::identifier) &&
-                   Tok.getRawText().equals("__owned")) {
+        } else if (Tok.isContextualKeyword("__owned")) {
           // This case is handled later when mapping to ParamDecls for
           // better fixits.
           param.SpecifierKind = ParamDecl::Specifier::Owned;
@@ -279,8 +323,8 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       diagnose(Tok, diag::parameter_let_var_as_attr, Tok.getText())
         .fixItReplace(Tok.getLoc(), "`" + Tok.getText().str() + "`");
     }
-    
-    if (startsParameterName(*this, isClosure)) {
+
+    if (startsParameterName(isClosure)) {
       // identifier-or-none for the first name
       param.FirstNameLoc = consumeArgumentLabel(param.FirstName,
                                                 /*diagnoseDollarPrefix=*/!isClosure);
@@ -350,7 +394,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       }
 
       if (isBareType && paramContext == ParameterContextKind::EnumElement) {
-        auto type = parseType(diag::expected_parameter_type, false);
+        auto type = parseType(diag::expected_parameter_type);
         status |= type;
         param.Type = type.getPtrOrNull();
         param.FirstName = Identifier();
@@ -365,7 +409,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         // the user is about to type the parameter label and we shouldn't
         // suggest types.
         SourceLoc typeStartLoc = Tok.getLoc();
-        auto type = parseType(diag::expected_parameter_type, false);
+        auto type = parseType(diag::expected_parameter_type);
         status |= type;
         param.Type = type.getPtrOrNull();
 
@@ -408,7 +452,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         status.setIsParseError();
       }
     }
-                        
+
     // '...'?
     if (Tok.isEllipsis()) {
       Tok.setKind(tok::ellipsis);
@@ -541,18 +585,42 @@ mapParsedParameters(Parser &parser,
                                                              "__owned",
                                                              parsingEnumElt);
       }
+
+      if (paramInfo.IsolatedLoc.isValid()) {
+        type = new (parser.Context) IsolatedTypeRepr(
+            type, paramInfo.IsolatedLoc);
+        param->setIsolated();
+      }
+
       param->setTypeRepr(type);
 
-      // If there is `@autoclosure` attribute associated with the type
-      // let's mark that in the declaration as well, because it
-      // belongs to both type flags and declaration.
-      if (auto *ATR = dyn_cast<AttributedTypeRepr>(type)) {
-        auto &attrs = ATR->getAttrs();
-        // At this point we actually don't know if that's valid to mark
-        // this parameter declaration as `autoclosure` because type has
-        // not been resolved yet - it should either be a function type
-        // or typealias with underlying function type.
-        param->setAutoClosure(attrs.has(TypeAttrKind::TAK_autoclosure));
+      // Dig through the type to find any attributes or modifiers that are
+      // associated with the type but should also be reflected on the
+      // declaration.
+      {
+        auto unwrappedType = type;
+        while (true) {
+          if (auto *ATR = dyn_cast<AttributedTypeRepr>(unwrappedType)) {
+            auto &attrs = ATR->getAttrs();
+            // At this point we actually don't know if that's valid to mark
+            // this parameter declaration as `autoclosure` because type has
+            // not been resolved yet - it should either be a function type
+            // or typealias with underlying function type.
+            param->setAutoClosure(attrs.has(TypeAttrKind::TAK_autoclosure));
+
+            unwrappedType = ATR->getTypeRepr();
+            continue;
+          }
+
+          if (auto *STR = dyn_cast<SpecifierTypeRepr>(unwrappedType)) {
+            if (isa<IsolatedTypeRepr>(STR))
+              param->setIsolated(true);
+            unwrappedType = STR->getBase();
+            continue;;
+          }
+
+          break;
+        }
       }
     } else if (paramInfo.SpecifierLoc.isValid()) {
       StringRef specifier;
@@ -816,8 +884,8 @@ Parser::parseFunctionSignature(Identifier SimpleName,
       arrowLoc = consumeToken(tok::colon);
     }
 
-    // Check for effect specifiers after the arrow, but before the type, and
-    // correct it.
+    // Check for effect specifiers after the arrow, but before the return type,
+    // and correct it.
     parseEffectsSpecifiers(arrowLoc, asyncLoc, &reasync, throwsLoc, &rethrows);
 
     ParserResult<TypeRepr> ResultType =

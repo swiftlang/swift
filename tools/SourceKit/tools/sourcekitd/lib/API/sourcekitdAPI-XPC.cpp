@@ -16,6 +16,7 @@
 #include "sourcekitd/DocSupportAnnotationArray.h"
 #include "sourcekitd/TokenAnnotationsArray.h"
 #include "sourcekitd/ExpressionTypeArray.h"
+#include "sourcekitd/VariableTypeArray.h"
 #include "sourcekitd/RawData.h"
 #include "sourcekitd/RequestResponsePrinterBase.h"
 #include "SourceKit/Support/UIdent.h"
@@ -624,6 +625,7 @@ static sourcekitd_variant_type_t XPCVar_get_type(sourcekitd_variant_t var) {
     case CustomBufferKind::DocStructureElementArray:
     case CustomBufferKind::AttributesArray:
     case CustomBufferKind::ExpressionTypeArray:
+    case CustomBufferKind::VariableTypeArray:
       return SOURCEKITD_VARIANT_TYPE_ARRAY;
     case CustomBufferKind::RawData:
       return SOURCEKITD_VARIANT_TYPE_DATA;
@@ -786,6 +788,9 @@ static sourcekitd_variant_t variantFromXPCObject(xpc_object_t obj) {
                 (uintptr_t)CUSTOM_BUF_START(obj), 0 }};
     case CustomBufferKind::ExpressionTypeArray:
       return {{ (uintptr_t)getVariantFunctionsForExpressionTypeArray(),
+                (uintptr_t)CUSTOM_BUF_START(obj), 0 }};
+    case CustomBufferKind::VariableTypeArray:
+      return {{ (uintptr_t)getVariantFunctionsForVariableTypeArray(),
                 (uintptr_t)CUSTOM_BUF_START(obj), 0 }};
     case sourcekitd::CustomBufferKind::RawData:
       return {{ (uintptr_t)getVariantFunctionsForRawData(),

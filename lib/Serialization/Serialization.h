@@ -72,7 +72,7 @@ protected:
 public:
   SerializerBase(ArrayRef<unsigned char> signature, ModuleOrSourceFile DC);
 
-  ASTContext &getASTContext();
+  ASTContext &getASTContext() const;
 };
 
 class Serializer : public SerializerBase {
@@ -538,6 +538,8 @@ public:
   /// Writes a set of generic requirements.
   void writeGenericRequirements(ArrayRef<Requirement> requirements,
                                 const std::array<unsigned, 256> &abbrCodes);
+
+  bool allowCompilerErrors() const;
 };
 
 /// Serialize module documentation to the given stream.

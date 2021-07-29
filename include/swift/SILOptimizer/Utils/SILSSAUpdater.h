@@ -14,6 +14,7 @@
 #define SWIFT_SIL_SILSSAUPDATER_H
 
 #include "llvm/Support/Allocator.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
 
@@ -58,6 +59,10 @@ class SILSSAUpdater {
   // If not null updated with inserted 'phi' nodes (SILArgument).
   SmallVectorImpl<SILPhiArgument *> *insertedPhis;
 
+  // Used to delete branch instructions when they are replaced for adding
+  // phi arguments.
+  InstructionDeleter deleter;
+
   // Not copyable.
   void operator=(const SILSSAUpdater &) = delete;
   SILSSAUpdater(const SILSSAUpdater &) = delete;
@@ -66,6 +71,8 @@ public:
   explicit SILSSAUpdater(
       SmallVectorImpl<SILPhiArgument *> *insertedPhis = nullptr);
   ~SILSSAUpdater();
+
+  InstructionDeleter &getDeleter() { return deleter; }
 
   void setInsertedPhis(SmallVectorImpl<SILPhiArgument *> *inputInsertedPhis) {
     insertedPhis = inputInsertedPhis;

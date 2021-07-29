@@ -263,15 +263,21 @@ extension Unsafe${Mutable}RawBufferPointer: RandomAccessCollection { }
 
 extension Unsafe${Mutable}RawBufferPointer {
 %  if mutable:
-  /// Returns a newly allocated buffer with the given size, in bytes.
+  /// Allocates uninitialized memory with the specified size and alignment.
   ///
-  /// The memory referenced by the new buffer is allocated, but not
-  /// initialized.
+  /// You are in charge of managing the allocated memory. Be sure to deallocate
+  /// any memory that you manually allocate.
+  ///
+  /// The allocated memory is not bound to any specific type and must be bound
+  /// before performing any typed operations. If you are using the memory for
+  /// a specific type, allocate memory using the
+  /// `UnsafeMutablePointerBuffer.allocate(capacity:)` static method instead.
   ///
   /// - Parameters:
-  ///   - byteCount: The number of bytes to allocate.
+  ///   - byteCount: The number of bytes to allocate. `byteCount` must not be
+  ///     negative.
   ///   - alignment: The alignment of the new region of allocated memory, in
-  ///     bytes.
+  ///     bytes. `alignment` must be a whole power of 2.
   /// - Returns: A buffer pointer to a newly allocated region of memory aligned 
   ///     to `alignment`.
   @inlinable

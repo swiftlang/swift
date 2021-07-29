@@ -376,11 +376,18 @@ public:
   /// a local variable.
   llvm::DenseMap<ValueDecl*, VarLoc> VarLocs;
 
+  // Context information for tracking an `async let` child task.
+  struct AsyncLetChildTask {
+    SILValue asyncLet; // RawPointer to the async let state
+    SILValue resultBuf; // RawPointer to the result buffer
+    bool isThrowing; // true if task can throw
+  };
+  
   /// Mapping from each async let clause to the AsyncLet repr that contains the
   /// AsyncTask that will produce the initializer value for that clause and a
   /// Boolean value indicating whether the task can throw.
   llvm::SmallDenseMap<std::pair<PatternBindingDecl *, unsigned>,
-                      std::pair<SILValue, bool /*isThrowing*/> >
+                      AsyncLetChildTask>
       AsyncLetChildTasks;
 
   /// When rebinding 'self' during an initializer delegation, we have to be
@@ -614,9 +621,13 @@ public:
   /// Emits code for a ClosureExpr.
   void emitClosure(AbstractClosureExpr *ce);
   /// Generates code for a class destroying destructor. This
-  /// emits the body code from the DestructorDecl, calls the base class 
+  /// emits the body code from the DestructorDecl, calls the base class
   /// destructor, then implicitly releases the elements of the class.
   void emitDestroyingDestructor(DestructorDecl *dd);
+
+  /// Inject distributed actor and transport interaction code into the destructor.
+  void injectDistributedActorDestructorLifecycleCall(
+      DestructorDecl *dd, SILValue selfValue, SILBasicBlock *continueBB);
 
   /// Generates code for an artificial top-level function that starts an
   /// application based on a main type and optionally a main type.
@@ -674,6 +685,9 @@ public:
   /// Returns the SILFunction created for the closure implementation function that is enqueued on the
   /// new task.
   SILFunction *emitNativeAsyncToForeignThunk(SILDeclRef thunk);
+
+  /// Generates a thunk from an actor function
+  void emitDistributedThunk(SILDeclRef thunk);
 
   /// Generate a nullary function that returns the given value.
   /// If \p emitProfilerIncrement is set, emit a profiler increment for
@@ -836,6 +850,15 @@ public:
   ExecutorBreadcrumb emitHopToTargetActor(SILLocation loc,
                             Optional<ActorIsolation> actorIso,
                             Optional<ManagedValue> actorSelf);
+
+  /// Emit a hop to the target executor, returning a breadcrumb with enough
+  /// enough information to hop back.
+  ExecutorBreadcrumb emitHopToTargetExecutor(SILLocation loc,
+                                             SILValue executor);
+
+  /// Generate a hop directly to a dynamic actor instance. This can only be done
+  /// inside an async actor-independent function. No hop-back is expected.
+  void emitHopToActorValue(SILLocation loc, ManagedValue actor);
 
   /// A version of `emitHopToTargetActor` that is specialized to the needs
   /// of various types of ConstructorDecls, like class or value initializers,
@@ -1367,17 +1390,16 @@ public:
                        ArgumentSource &&value,
                        bool isOnSelfParameter);
 
-  ManagedValue emitAsyncLetStart(
-      SILLocation loc, Type functionType, ManagedValue taskFunction);
+  ManagedValue emitAsyncLetStart(SILLocation loc,
+                                 SILValue taskOptions,
+                                 Type functionType, ManagedValue taskFunction,
+                                 SILValue resultBuf);
 
-  ManagedValue emitAsyncLetGet(SILLocation loc, SILValue asyncLet);
+  void emitFinishAsyncLet(SILLocation loc, SILValue asyncLet, SILValue resultBuf);
 
-  ManagedValue emitEndAsyncLet(SILLocation loc, SILValue asyncLet);
-
+  ManagedValue emitReadAsyncLetBinding(SILLocation loc, VarDecl *var);
+  
   ManagedValue emitCancelAsyncTask(SILLocation loc, SILValue task);
-
-  void completeAsyncLetChildTask(
-      PatternBindingDecl *patternBinding, unsigned index);
 
   bool maybeEmitMaterializeForSetThunk(ProtocolConformanceRef conformance,
                                        SILLinkage linkage,
@@ -1586,7 +1608,7 @@ public:
                    ArrayRef<ManagedValue> args,
                    const CalleeTypeInfo &calleeTypeInfo, ApplyOptions options,
                    SGFContext evalContext, 
-                   Optional<ActorIsolation> implicitAsyncIsolation);
+                   Optional<ImplicitActorHopTarget> implicitActorHopTarget);
 
   RValue emitApplyOfDefaultArgGenerator(SILLocation loc,
                                         ConcreteDeclRef defaultArgsOwner,
@@ -2064,9 +2086,6 @@ public:
 
   /// Destroy and deallocate an initialized local variable.
   void destroyLocalVariable(SILLocation L, VarDecl *D);
-  
-  /// Deallocate an uninitialized local variable.
-  void deallocateUninitializedLocalVariable(SILLocation L, VarDecl *D);
 
   /// Enter a cleanup to deallocate a stack variable.
   CleanupHandle enterDeallocStackCleanup(SILValue address);
@@ -2099,7 +2118,7 @@ public:
   CleanupHandle enterCancelAsyncTaskCleanup(SILValue task);
 
   // Enter a cleanup to cancel and destroy an AsyncLet as it leaves the scope.
-  CleanupHandle enterAsyncLetCleanup(SILValue alet);
+  CleanupHandle enterAsyncLetCleanup(SILValue alet, SILValue resultBuf);
 
   /// Evaluate an Expr as an lvalue.
   LValue emitLValue(Expr *E, SGFAccessKind accessKind,

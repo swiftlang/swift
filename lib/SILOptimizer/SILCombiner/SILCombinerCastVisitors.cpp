@@ -1024,7 +1024,7 @@ SILCombiner::visitConvertFunctionInst(ConvertFunctionInst *cfi) {
         SILValue newValue = cfi->getConverted();
         if (newValue.getOwnershipKind() != OwnershipKind::Owned &&
             newValue.getOwnershipKind() != OwnershipKind::Guaranteed) {
-          instModCallbacks.setUseValue(use, newValue);
+          getInstModCallbacks().setUseValue(use, newValue);
           fas.setSubstCalleeType(newValue->getType().castTo<SILFunctionType>());
           continue;
         }
@@ -1112,6 +1112,6 @@ SILCombiner::visitConvertFunctionInst(ConvertFunctionInst *cfi) {
 
   // Replace a convert_function that only has refcounting uses with its
   // operand.
-  tryEliminateOnlyOwnershipUsedForwardingInst(cfi, instModCallbacks);
+  tryEliminateOnlyOwnershipUsedForwardingInst(cfi, getInstModCallbacks());
   return nullptr;
 }

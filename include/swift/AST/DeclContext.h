@@ -618,6 +618,10 @@ public:
   /// is also included.
   unsigned getSemanticDepth() const;
 
+  /// Returns if this extension is always available on the current deployment
+  /// target. Used for conformance lookup disambiguation.
+  bool isAlwaysAvailableConformanceContext() const;
+
   /// \returns true if traversal was aborted, false otherwise.
   bool walkContext(ASTWalker &Walker);
 

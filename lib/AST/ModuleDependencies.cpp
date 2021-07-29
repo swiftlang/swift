@@ -118,6 +118,11 @@ void ModuleDependencies::addBridgingSourceFile(StringRef bridgingSourceFile) {
   swiftStorage->bridgingSourceFiles.push_back(bridgingSourceFile.str());
 }
 
+void ModuleDependencies::addSourceFile(StringRef sourceFile) {
+  auto swiftStorage = cast<SwiftTextualModuleDependenciesStorage>(storage.get());
+  swiftStorage->sourceFiles.push_back(sourceFile.str());
+}
+
 /// Add (Clang) module on which the bridging header depends.
 void ModuleDependencies::addBridgingModuleDependency(
     StringRef module, llvm::StringSet<> &alreadyAddedModules) {

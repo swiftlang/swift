@@ -66,6 +66,7 @@ PrunedLiveBlocks::IsLive PrunedLiveBlocks::updateForUse(SILInstruction *user) {
     return getBlockLiveness(bb);
   }
   }
+  llvm_unreachable("covered switch");
 }
 
 //===----------------------------------------------------------------------===//

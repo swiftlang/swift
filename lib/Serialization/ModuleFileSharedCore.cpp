@@ -14,18 +14,16 @@
 #include "ModuleFileCoreTableInfo.h"
 #include "BCReadingExtras.h"
 #include "DeserializationErrors.h"
+#include "swift/Basic/LangOptions.h"
 #include "swift/Strings.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/OnDiskHashTable.h"
+#include "llvm/Support/PrettyStackTrace.h"
 
 using namespace swift;
 using namespace swift::serialization;
 using namespace llvm::support;
 using llvm::Expected;
-
-StringRef swift::getNameOfModule(const ModuleFileSharedCore *MF) {
-  return MF->getName();
-}
 
 static bool checkModuleSignature(llvm::BitstreamCursor &cursor,
                                  ArrayRef<unsigned char> signature) {
@@ -472,11 +470,29 @@ std::string ModuleFileSharedCore::Dependency::getPrettyPrintedPath() const {
   return output;
 }
 
-void ModuleFileSharedCore::fatal(llvm::Error error) {
-  logAllUnhandledErrors(std::move(error), llvm::errs(),
-                        "\n*** DESERIALIZATION FAILURE (please include this "
-                        "section in any bug report) ***\n");
+void ModuleFileSharedCore::fatal(llvm::Error error) const {
+  llvm::SmallString<0> errorStr;
+  llvm::raw_svector_ostream out(errorStr);
+
+  out << "*** DESERIALIZATION FAILURE ***\n";
+  outputDiagnosticInfo(out);
+  out << "\n";
+  if (error) {
+    handleAllErrors(std::move(error), [&](const llvm::ErrorInfoBase &ei) {
+      ei.log(out);
+      out << "\n";
+    });
+  }
+
+  llvm::PrettyStackTraceString trace(errorStr.c_str());
   abort();
+}
+
+void ModuleFileSharedCore::outputDiagnosticInfo(llvm::raw_ostream &os) const {
+  os << "module '" << Name << "' with full misc version '" << MiscVersion
+      << "'";
+  if (Bits.IsAllowModuleWithCompilerErrorsEnabled)
+    os << " (built with -experimental-allow-module-with-compiler-errors)";
 }
 
 ModuleFileSharedCore::~ModuleFileSharedCore() { }

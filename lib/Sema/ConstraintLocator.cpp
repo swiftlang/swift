@@ -63,6 +63,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::WrappedValue:
   case ConstraintLocator::GenericParameter:
   case ConstraintLocator::GenericArgument:
+  case ConstraintLocator::TupleType:
   case ConstraintLocator::NamedTupleElement:
   case ConstraintLocator::TupleElement:
   case ConstraintLocator::ProtocolRequirement:
@@ -122,7 +123,7 @@ bool ConstraintLocator::isKeyPathType() const {
   // The format of locator should be `<keypath expr> -> key path type`
   if (!anchor || !isExpr<KeyPathExpr>(anchor) || path.size() != 1)
     return false;
-  return path.back().getKind() == ConstraintLocator::KeyPathType;
+  return path.back().is<LocatorPathElt::KeyPathType>();
 }
 
 bool ConstraintLocator::isKeyPathRoot() const {
@@ -355,6 +356,12 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
     case MemberRefBase:
       out << "member reference base";
       break;
+
+    case TupleType: {
+      auto tupleElt = elt.castTo<LocatorPathElt::TupleType>();
+      out << "tuple type '" << tupleElt.getType()->getString(PO) << "'";
+      break;
+    }
 
     case NamedTupleElement: {
       auto tupleElt = elt.castTo<LocatorPathElt::NamedTupleElement>();

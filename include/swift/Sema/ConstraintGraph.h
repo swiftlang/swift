@@ -125,16 +125,16 @@ private:
   /// Infer bindings from the given constraint and notify referenced variables
   /// about its arrival (if requested). This happens every time a new constraint
   /// gets added to a constraint graph node.
-  void introduceToInference(Constraint *constraint, bool notifyReferencedVars);
+  void introduceToInference(Constraint *constraint);
 
   /// Forget about the given constraint. This happens every time a constraint
   /// gets removed for a constraint graph.
-  void retractFromInference(Constraint *constraint, bool notifyReferencedVars);
+  void retractFromInference(Constraint *constraint);
 
   /// Re-evaluate the given constraint. This happens when there are changes
   /// in associated type variables e.g. bound/unbound to/from a fixed type,
   /// equivalence class changes.
-  void reintroduceToInference(Constraint *constraint, bool notifyReferencedVars);
+  void reintroduceToInference(Constraint *constraint);
 
   /// Similar to \c introduceToInference(Constraint *, ...) this method is going
   /// to notify inference that this type variable has been bound to a concrete
@@ -165,6 +165,10 @@ private:
   /// This is useful in situations when type variable gets bound and unbound,
   /// or equivalence class changes.
   void notifyReferencingVars() const;
+
+  /// Notify all of the type variables referenced by this one about a change.
+  void notifyReferencedVars(
+      llvm::function_ref<void(ConstraintGraphNode &)> notification);
 
   /// }
 

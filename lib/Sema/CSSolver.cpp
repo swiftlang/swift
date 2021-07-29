@@ -175,6 +175,9 @@ Solution ConstraintSystem::finalize() {
   for (auto &nodeType : NodeTypes) {
     solution.nodeTypes.insert(nodeType);
   }
+  for (auto &keyPathComponentType : KeyPathComponentTypes) {
+    solution.keyPathComponentTypes.insert(keyPathComponentType);
+  }
 
   // Remember contextual types.
   solution.contextualTypes.assign(
@@ -884,8 +887,8 @@ void ConstraintSystem::shrink(Expr *expr) {
         return isArithmeticExprOfLiterals(postfix->getArg());
 
       if (auto binary = dyn_cast<BinaryExpr>(expr))
-        return isArithmeticExprOfLiterals(binary->getArg()->getElement(0)) &&
-               isArithmeticExprOfLiterals(binary->getArg()->getElement(1));
+        return isArithmeticExprOfLiterals(binary->getLHS()) &&
+               isArithmeticExprOfLiterals(binary->getRHS());
 
       return isa<IntegerLiteralExpr>(expr) || isa<FloatLiteralExpr>(expr);
     }

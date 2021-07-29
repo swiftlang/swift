@@ -794,8 +794,7 @@ public:
   /// Note that, for most purposes, you should lower a field's type against its
   /// *unsubstituted* interface type.
   AbstractionPattern
-  unsafeGetSubstFieldType(ValueDecl *member,
-                          CanType origMemberType = CanType()) const;
+  unsafeGetSubstFieldType(ValueDecl *member, CanType origMemberType) const;
   
 private:
   /// Return an abstraction pattern for the curried type of an
@@ -1379,6 +1378,13 @@ public:
   /// Swift type.
   AbstractionPattern getObjCMethodAsyncCompletionHandlerType(
                                      CanType swiftCompletionHandlerType) const;
+
+  /// If this pattern refers to a foreign ObjC method that was imported as 
+  /// async, return the bridged-back-to-ObjC completion handler type.
+  CanType getObjCMethodAsyncCompletionHandlerForeignType(
+      ForeignAsyncConvention convention,
+      Lowering::TypeConverter &TC
+  ) const;
   
   void dump() const LLVM_ATTRIBUTE_USED;
   void print(raw_ostream &OS) const;

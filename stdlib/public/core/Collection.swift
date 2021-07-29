@@ -1044,6 +1044,18 @@ extension Collection where SubSequence == Slice<Self> {
   }
 }
 
+extension Collection {
+  // This unavailable default implementation of `subscript(bounds: Range<_>)`
+  // prevents incomplete Collection implementations from satisfying the
+  // protocol through the use of the generic convenience implementation
+  // `subscript<R: RangeExpression>(r: R)`. If that were the case, at
+  // runtime the generic implementation would call itself
+  // in an infinite recursion because of the absence of a better option.
+  @available(*, unavailable)
+  @_alwaysEmitIntoClient
+  public subscript(bounds: Range<Index>) -> SubSequence { fatalError() }
+}
+
 extension Collection where SubSequence == Self {
   /// Removes and returns the first element of the collection.
   ///

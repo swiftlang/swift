@@ -394,7 +394,7 @@ bb0(%arg : @owned $T):
 // CHECK-TRACE-LABEL: *** CopyPropagation: testBorrowCopy
 // CHECK-TRACE:  Outer copy          [[OUTERCOPY:%.*]] = copy_value %0 : $T
 // CHECK-TRACE:  Use of outer copy   destroy_value
-// CHECK-TRACE:  Removing   %{{.*}} = copy_value
+// CHECK-TRACE:  Deleting   %{{.*}} = copy_value
 // CHECK-TRACE:  Removing   destroy_value [[OUTERCOPY]] : $T
 // CHECK-TRACE:  Removing   [[OUTERCOPY]] = copy_value %0 : $T
 //

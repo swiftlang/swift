@@ -367,8 +367,6 @@ public:
                                ArrayRef<std::string> candidates,
                                StringRef outPath) override;
   bool isCached(StringRef DepPath);
-  std::string getBackupPublicModuleInterfacePath(StringRef moduleName,
-                                                 StringRef interfacePath) override;
 };
 
 /// A ModuleLoader that runs a subordinate \c CompilerInvocation and

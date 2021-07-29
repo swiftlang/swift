@@ -957,7 +957,9 @@ class PatternEntryInitializerScope final : public AbstractPatternEntryScope {
 public:
   PatternEntryInitializerScope(PatternBindingDecl *pbDecl, unsigned entryIndex)
       : AbstractPatternEntryScope(pbDecl, entryIndex),
-        initAsWrittenWhenCreated(pbDecl->getOriginalInit(entryIndex)) {}
+        initAsWrittenWhenCreated(pbDecl->isDebuggerBinding() ?
+                                 pbDecl->getInit(entryIndex) :
+                                 pbDecl->getOriginalInit(entryIndex)) {}
   virtual ~PatternEntryInitializerScope() {}
 
 protected:

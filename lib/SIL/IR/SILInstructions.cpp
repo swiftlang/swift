@@ -116,13 +116,20 @@ template <typename INST>
 static void *allocateDebugVarCarryingInst(SILModule &M,
                                           Optional<SILDebugVariable> Var,
                                           ArrayRef<SILValue> Operands = {}) {
-  return M.allocateInst(sizeof(INST) + (Var ? Var->Name.size() : 0) +
-                            sizeof(Operand) * Operands.size(),
-                        alignof(INST));
+  return M.allocateInst(
+      sizeof(INST) + (Var ? Var->Name.size() : 0) +
+          (Var && Var->Type ? sizeof(SILType) : 0) +
+          (Var && Var->Loc ? sizeof(SILLocation) : 0) +
+          (Var && Var->Scope ? sizeof(const SILDebugScope *) : 0) +
+          sizeof(SILDIExprElement) * (Var ? Var->DIExpr.getNumElements() : 0) +
+          sizeof(Operand) * Operands.size(),
+      alignof(INST));
 }
 
 TailAllocatedDebugVariable::TailAllocatedDebugVariable(
-    Optional<SILDebugVariable> Var, char *buf) {
+    Optional<SILDebugVariable> Var, char *buf, SILType *AuxVarType,
+    SILLocation *DeclLoc, const SILDebugScope **DeclScope,
+    SILDIExprElement *DIExprOps) {
   if (!Var) {
     Bits.RawValue = 0;
     return;
@@ -135,6 +142,16 @@ TailAllocatedDebugVariable::TailAllocatedDebugVariable(
   assert(Bits.Data.ArgNo == Var->ArgNo && "Truncation");
   assert(Bits.Data.NameLength == Var->Name.size() && "Truncation");
   memcpy(buf, Var->Name.data(), Bits.Data.NameLength);
+  if (AuxVarType && Var->Type)
+    *AuxVarType = *Var->Type;
+  if (DeclLoc && Var->Loc)
+    *DeclLoc = *Var->Loc;
+  if (DeclScope && Var->Scope)
+    *DeclScope = Var->Scope;
+  if (DIExprOps) {
+    llvm::ArrayRef<SILDIExprElement> Ops(Var->DIExpr.Elements);
+    memcpy(DIExprOps, Ops.data(), sizeof(SILDIExprElement) * Ops.size());
+  }
 }
 
 StringRef TailAllocatedDebugVariable::getName(const char *buf) const {
@@ -280,9 +297,16 @@ SILType AllocBoxInst::getAddressType() const {
 DebugValueInst::DebugValueInst(SILDebugLocation DebugLoc, SILValue Operand,
                                SILDebugVariable Var, bool poisonRefs)
     : UnaryInstructionBase(DebugLoc, Operand),
-      VarInfo(Var, getTrailingObjects<char>()) {
-    setPoisonRefs(poisonRefs);
-  }
+      NumDIExprOperands(Var.DIExpr.getNumElements()),
+      HasAuxDebugVariableType(Var.Type.hasValue()),
+      AuxVariableSourceLoc((Var.Loc.hasValue() ? SILSourceLocKind::Loc : 0) |
+                           (Var.Scope ? SILSourceLocKind::Scope : 0)),
+      VarInfo(Var, getTrailingObjects<char>(), getTrailingObjects<SILType>(),
+              getTrailingObjects<SILLocation>(),
+              getTrailingObjects<const SILDebugScope *>(),
+              getTrailingObjects<SILDIExprElement>()) {
+  setPoisonRefs(poisonRefs);
+}
 
 DebugValueInst *DebugValueInst::create(SILDebugLocation DebugLoc,
                                        SILValue Operand, SILModule &M,
@@ -292,10 +316,16 @@ DebugValueInst *DebugValueInst::create(SILDebugLocation DebugLoc,
 }
 
 DebugValueAddrInst::DebugValueAddrInst(SILDebugLocation DebugLoc,
-                                       SILValue Operand,
-                                       SILDebugVariable Var)
+                                       SILValue Operand, SILDebugVariable Var)
     : UnaryInstructionBase(DebugLoc, Operand),
-      VarInfo(Var, getTrailingObjects<char>()) {}
+      NumDIExprOperands(Var.DIExpr.getNumElements()),
+      HasAuxDebugVariableType(Var.Type.hasValue()),
+      AuxVariableSourceLoc((Var.Loc.hasValue() ? SILSourceLocKind::Loc : 0) |
+                           (Var.Scope ? SILSourceLocKind::Scope : 0)),
+      VarInfo(Var, getTrailingObjects<char>(), getTrailingObjects<SILType>(),
+              getTrailingObjects<SILLocation>(),
+              getTrailingObjects<const SILDebugScope *>(),
+              getTrailingObjects<SILDIExprElement>()) {}
 
 DebugValueAddrInst *DebugValueAddrInst::create(SILDebugLocation DebugLoc,
                                                SILValue Operand, SILModule &M,
@@ -751,9 +781,7 @@ SILType DifferentiabilityWitnessFunctionInst::getDifferentiabilityWitnessType(
     SILModule &module, DifferentiabilityWitnessFunctionKind witnessKind,
     SILDifferentiabilityWitness *witness) {
   auto fnTy = witness->getOriginalFunction()->getLoweredFunctionType();
-  CanGenericSignature witnessCanGenSig;
-  if (auto witnessGenSig = witness->getDerivativeGenericSignature())
-    witnessCanGenSig = witnessGenSig->getCanonicalSignature();
+  auto witnessCanGenSig = witness->getDerivativeGenericSignature().getCanonicalSignature();
   auto *parameterIndices = witness->getParameterIndices();
   auto *resultIndices = witness->getResultIndices();
   if (auto derivativeKind = witnessKind.getAsDerivativeFunctionKind()) {
@@ -1309,6 +1337,16 @@ unsigned swift::getFieldIndex(NominalTypeDecl *decl, VarDecl *field) {
   llvm_unreachable("The field decl for a struct_extract, struct_element_addr, "
                    "or ref_element_addr must be an accessible stored "
                    "property of the operand type");
+}
+
+unsigned swift::getCaseIndex(EnumElementDecl *enumElement) {
+  unsigned idx = 0;
+  for (EnumElementDecl *e : enumElement->getParentEnum()->getAllElements()) {
+    if (e == enumElement)
+      return idx;
+    ++idx;
+  }
+  llvm_unreachable("enum element not found in enum decl");
 }
 
 /// Get the property for a struct or class by its unique index.
@@ -2784,7 +2822,7 @@ SILType GetAsyncContinuationInstBase::getLoweredResumeType() const {
   auto formalType = getFormalResumeType();
   auto &M = getFunction()->getModule();
   auto c = getFunction()->getTypeExpansionContext();
-  return M.Types.getLoweredType(AbstractionPattern::getOpaque(), formalType, c);
+  return M.Types.getLoweredType(AbstractionPattern(formalType), formalType, c);
 }
 
 ReturnInst::ReturnInst(SILFunction &func, SILDebugLocation debugLoc,

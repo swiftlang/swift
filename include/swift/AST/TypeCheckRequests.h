@@ -606,7 +606,7 @@ private:
 
 public:
   // Caching
-  bool isCached() const;
+  bool isCached() const { return true; }
 };
 
 /// Request the nominal type declaration to which the given custom attribute
@@ -627,7 +627,7 @@ private:
 
 public:
   // Caching
-  bool isCached() const;
+  bool isCached() const { return true; }
 };
 
 /// Request the raw (possibly unbound generic) type of the property wrapper
@@ -648,7 +648,7 @@ private:
 
 public:
   // Caching
-  bool isCached() const;
+  bool isCached() const { return true; }
 };
 
 /// Request the nominal type declaration to which the given custom attribute
@@ -669,7 +669,7 @@ private:
 
 public:
   // Caching
-  bool isCached() const;
+  bool isCached() const { return true; }
 };
 
 /// Request information about the mutability of composed property wrappers.
@@ -689,7 +689,7 @@ private:
 
 public:
   // Caching
-  bool isCached() const;
+  bool isCached() const { return true; }
 };
 
 /// Request information about the l-valueness of composed property wrappers.
@@ -709,7 +709,7 @@ private:
 
 public:
   // Caching
-  bool isCached() const;
+  bool isCached() const { return true; }
 };
 
 /// Request the synthesized auxiliary declarations for a wrapped property.
@@ -729,7 +729,7 @@ private:
 
 public:
   // Caching
-  bool isCached() const;
+  bool isCached() const { return true; }
 };
 
 /// Request information about initialization of the backing property
@@ -750,7 +750,7 @@ private:
 
 public:
   // Caching
-  bool isCached() const;
+  bool isCached() const { return true; }
 };
 
 /// Retrieve the structural type of an alias type.
@@ -833,7 +833,7 @@ private:
 
 public:
   // Caching
-  bool isCached() const;
+  bool isCached() const { return true; }
 };
 
 /// Request the result builder type attached to the given declaration,
@@ -915,6 +915,42 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Determine whether the given class is a distributed actor.
+class IsDistributedActorRequest :
+    public SimpleRequest<IsDistributedActorRequest,
+        bool(NominalTypeDecl *),
+        RequestFlags::Cached> {
+public:
+    using SimpleRequest::SimpleRequest;
+
+private:
+    friend SimpleRequest;
+
+    bool evaluate(Evaluator &evaluator, NominalTypeDecl *nominal) const;
+
+public:
+    // Caching
+    bool isCached() const { return true; }
+};
+
+/// Determine whether the given func is distributed.
+class IsDistributedFuncRequest :
+    public SimpleRequest<IsDistributedFuncRequest,
+        bool(FuncDecl *),
+        RequestFlags::Cached> {
+public:
+    using SimpleRequest::SimpleRequest;
+
+private:
+    friend SimpleRequest;
+
+    bool evaluate(Evaluator &evaluator, FuncDecl *func) const;
+
+public:
+    // Caching
+    bool isCached() const { return true; }
+};
+
 /// Retrieve the static "shared" property within a global actor that provides
 /// the actor instance representing the global actor.
 ///
@@ -982,6 +1018,20 @@ private:
 public:
   // Caching
   bool isCached() const { return true; }
+};
+
+/// Determine whether the given function should have an isolated 'self'.
+class HasIsolatedSelfRequest :
+    public SimpleRequest<HasIsolatedSelfRequest,
+                         bool(ValueDecl *),
+                         RequestFlags::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  bool evaluate(Evaluator &evaluator, ValueDecl *func) const;
 };
 
 /// Request whether the storage has a mutating getter.
@@ -1364,7 +1414,7 @@ private:
 
 public:
   // Separate caching.
-  bool isCached() const;
+  bool isCached() const { return true; }
 
   /// Abstract generic signature requests never have source-location info.
   SourceLoc getNearestLoc() const {
@@ -1399,7 +1449,7 @@ private:
 
 public:
   // Separate caching.
-  bool isCached() const;
+  bool isCached() const { return true; }
 
   /// Inferred generic signature requests don't have source-location info.
   SourceLoc getNearestLoc() const {
@@ -1905,6 +1955,24 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Checks whether this type has a distributed actor "local" initializer.
+class HasDistributedActorLocalInitRequest
+    : public SimpleRequest<HasDistributedActorLocalInitRequest, bool(NominalTypeDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  bool evaluate(Evaluator &evaluator, NominalTypeDecl *decl) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
 /// Synthesizes a default initializer for a given type.
 class SynthesizeDefaultInitRequest
     : public SimpleRequest<SynthesizeDefaultInitRequest,
@@ -1995,6 +2063,8 @@ enum class ImplicitMemberAction : uint8_t {
   ResolveCodingKeys,
   ResolveEncodable,
   ResolveDecodable,
+  ResolveDistributedActor,
+  ResolveDistributedActorIdentity,
 };
 
 class ResolveImplicitMemberRequest

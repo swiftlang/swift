@@ -31,7 +31,6 @@
 namespace swift {
 
 class ArchetypeType;
-class GenericSignatureBuilder;
 class ASTContext;
 class GenericTypeParamType;
 class SILModule;
@@ -60,7 +59,6 @@ public:
 class alignas(1 << DeclAlignInBits) GenericEnvironment final
         : private llvm::TrailingObjects<GenericEnvironment, Type> {
   GenericSignature Signature = GenericSignature();
-  GenericSignatureBuilder *Builder = nullptr;
 
   friend TrailingObjects;
 
@@ -76,15 +74,17 @@ class alignas(1 << DeclAlignInBits) GenericEnvironment final
   /// generic signature.
   ArrayRef<Type> getContextTypes() const;
 
-  GenericEnvironment(GenericSignature signature,
-                     GenericSignatureBuilder *builder);
+  explicit GenericEnvironment(GenericSignature signature);
 
   friend ArchetypeType;
-  friend GenericSignatureBuilder;
-  
-  GenericSignatureBuilder *getGenericSignatureBuilder() const { return Builder; }
-
   friend QueryInterfaceTypeSubstitutions;
+
+  Type getOrCreateArchetypeFromInterfaceType(Type depType);
+
+  /// Retrieve the mapping for the given generic parameter, if present.
+  ///
+  /// This is only useful when lazily populating a generic environment.
+  Optional<Type> getMappingIfPresent(GenericParamKey key) const;
 
 public:
   GenericSignature getGenericSignature() const {
@@ -96,17 +96,11 @@ public:
   /// Create a new, "incomplete" generic environment that will be populated
   /// by calls to \c addMapping().
   static
-  GenericEnvironment *getIncomplete(GenericSignature signature,
-                                    GenericSignatureBuilder *builder);
+  GenericEnvironment *getIncomplete(GenericSignature signature);
 
   /// Add a mapping of a generic parameter to a specific type (which may be
   /// an archetype)
   void addMapping(GenericParamKey key, Type contextType);
-
-  /// Retrieve the mapping for the given generic parameter, if present.
-  ///
-  /// This is only useful when lazily populating a generic environment.
-  Optional<Type> getMappingIfPresent(GenericParamKey key) const;
 
   /// Make vanilla new/delete illegal.
   void *operator new(size_t Bytes) = delete;
@@ -151,6 +145,8 @@ public:
   mapConformanceRefIntoContext(Type conformingType,
                                ProtocolConformanceRef conformance) const;
 
+  /// Returns a substitution map that sends every generic parameter to its
+  /// corresponding archetype in this generic environment.
   SubstitutionMap getForwardingSubstitutionMap() const;
 
   void dump(raw_ostream &os) const;

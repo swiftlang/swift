@@ -1429,27 +1429,27 @@ Type swift::getAsyncTaskAndContextType(ASTContext &ctx) {
   return TupleType::get(resultTupleElements, ctx);
 }
 
-static ValueDecl *getCreateAsyncTaskFuture(ASTContext &ctx, Identifier id) {
+static ValueDecl *getCreateAsyncTask(ASTContext &ctx, Identifier id) {
   BuiltinFunctionBuilder builder(ctx);
   auto genericParam = makeGenericParam().build(builder);
-  builder.addParameter(makeConcrete(ctx.getIntType()));
+  builder.addParameter(makeConcrete(ctx.getIntType())); // 0 flags
   auto extInfo = ASTExtInfoBuilder().withAsync().withThrows().build();
   builder.addParameter(
-     makeConcrete(FunctionType::get({ }, genericParam, extInfo)));
+      makeConcrete(FunctionType::get({ }, genericParam, extInfo))); // 1 operation
   builder.setResult(makeConcrete(getAsyncTaskAndContextType(ctx)));
   return builder.build(id);
 }
 
-static ValueDecl *getCreateAsyncTaskGroupFuture(ASTContext &ctx, Identifier id) {
+static ValueDecl *getCreateAsyncTaskInGroup(ASTContext &ctx, Identifier id) {
   BuiltinFunctionBuilder builder(ctx);
-  auto genericParam = makeGenericParam().build(builder);
-  builder.addParameter(makeConcrete(ctx.getIntType())); // flags
-  builder.addParameter(
-      makeConcrete(OptionalType::get(ctx.TheRawPointerType))); // group
+  auto genericParam = makeGenericParam().build(builder); // <T>
+  builder.addParameter(makeConcrete(ctx.getIntType())); // 0 flags
+  builder.addParameter(makeConcrete(ctx.TheRawPointerType)); // 1 group
   auto extInfo = ASTExtInfoBuilder().withAsync().withThrows().build();
   builder.addParameter(
-     makeConcrete(FunctionType::get({ }, genericParam, extInfo)));
+      makeConcrete(FunctionType::get({ }, genericParam, extInfo))); // 2 operation
   builder.setResult(makeConcrete(getAsyncTaskAndContextType(ctx)));
+
   return builder.build(id);
 }
 
@@ -1464,6 +1464,13 @@ static ValueDecl *getDefaultActorInitDestroy(ASTContext &ctx,
                                              Identifier id) {
   return getBuiltinFunction(ctx, id, _thin,
                             _parameters(_nativeObject),
+                            _void);
+}
+
+static ValueDecl *getDistributedActorInitDestroy(ASTContext &ctx,
+                                                 Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _parameters(_nativeObject), // TODO: no idea if to pass more here?
                             _void);
 }
 
@@ -1485,11 +1492,6 @@ static ValueDecl *getResumeContinuationThrowing(ASTContext &ctx,
 }
 
 static ValueDecl *getStartAsyncLet(ASTContext &ctx, Identifier id) {
-//  return getBuiltinFunction(ctx, id, _thin,
-//                            _generics(_unrestricted),
-//                            _parameters(_rawPointer, <function>), TODO: seems we can't express function here?
-//                            _rawPointer)
-
   ModuleDecl *M = ctx.TheBuiltinModule;
   DeclContext *DC = &M->getMainFile(FileUnitKind::Builtin);
   SynthesisContext SC(ctx, DC);
@@ -1498,6 +1500,9 @@ static ValueDecl *getStartAsyncLet(ASTContext &ctx, Identifier id) {
   auto genericParam = makeGenericParam().build(builder); // <T>
 
   // AsyncLet*
+  builder.addParameter(makeConcrete(OptionalType::get(ctx.TheRawPointerType)));
+
+  // TaskOptionRecord*
   builder.addParameter(makeConcrete(OptionalType::get(ctx.TheRawPointerType)));
 
   // operation async function pointer: () async throws -> T
@@ -1518,7 +1523,8 @@ static ValueDecl *getEndAsyncLet(ASTContext &ctx, Identifier id) {
 
 static ValueDecl *getCreateTaskGroup(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin,
-                            _parameters(),
+                            _generics(_unrestricted),
+                            _parameters(_metatype(_typeparam(0))),
                             _rawPointer);
 }
 
@@ -1840,6 +1846,17 @@ static ValueDecl *getWithUnsafeContinuation(ASTContext &ctx,
   if (throws)
     builder.setThrows();
 
+  return builder.build(id);
+}
+
+static ValueDecl *getHopToActor(ASTContext &ctx, Identifier id) {
+  BuiltinFunctionBuilder builder(ctx);
+  auto *actorProto = ctx.getProtocol(KnownProtocolKind::Actor);
+  // Create type parameters and add conformance constraints.
+  auto actorParam = makeGenericParam();
+  builder.addParameter(actorParam);
+  builder.addConformanceRequirement(actorParam, actorProto);
+  builder.setResult(makeConcrete(TupleType::getEmpty(ctx)));
   return builder.build(id);
 }
 
@@ -2749,11 +2766,11 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::CancelAsyncTask:
     return getCancelAsyncTask(Context, Id);
 
-  case BuiltinValueKind::CreateAsyncTaskFuture:
-    return getCreateAsyncTaskFuture(Context, Id);
+  case BuiltinValueKind::CreateAsyncTask:
+    return getCreateAsyncTask(Context, Id);
 
-  case BuiltinValueKind::CreateAsyncTaskGroupFuture:
-    return getCreateAsyncTaskGroupFuture(Context, Id);
+  case BuiltinValueKind::CreateAsyncTaskInGroup:
+    return getCreateAsyncTaskInGroup(Context, Id);
 
   case BuiltinValueKind::ConvertTaskToJob:
     return getConvertTaskToJob(Context, Id);
@@ -2800,10 +2817,16 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::DestroyDefaultActor:
     return getDefaultActorInitDestroy(Context, Id);
 
+  case BuiltinValueKind::InitializeDistributedRemoteActor:
+  case BuiltinValueKind::DestroyDistributedActor:
+    return getDistributedActorInitDestroy(Context, Id);
+
   case BuiltinValueKind::StartAsyncLet:
+  case BuiltinValueKind::StartAsyncLetWithLocalBuffer:
     return getStartAsyncLet(Context, Id);
 
   case BuiltinValueKind::EndAsyncLet:
+  case BuiltinValueKind::EndAsyncLetLifetime:
     return getEndAsyncLet(Context, Id);
 
   case BuiltinValueKind::CreateTaskGroup:
@@ -2824,6 +2847,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::WithUnsafeThrowingContinuation:
     return getWithUnsafeContinuation(Context, Id, /*throws=*/true);
+
+  case BuiltinValueKind::HopToActor:
+    return getHopToActor(Context, Id);
 
   case BuiltinValueKind::AutoDiffCreateLinearMapContext:
     return getAutoDiffCreateLinearMapContext(Context, Id);

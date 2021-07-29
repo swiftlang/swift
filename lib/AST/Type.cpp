@@ -2121,11 +2121,11 @@ public:
     bool didChange = newParent != substBGT.getParent();
     
     auto depthStart =
-      genericSig->getGenericParams().size() - bgt->getGenericArgs().size();
+      genericSig.getGenericParams().size() - bgt->getGenericArgs().size();
     for (auto i : indices(bgt->getGenericArgs())) {
       auto orig = bgt->getGenericArgs()[i]->getCanonicalType();
       auto subst = substBGT.getGenericArgs()[i];
-      auto gp = genericSig->getGenericParams()[depthStart + i];
+      auto gp = genericSig.getGenericParams()[depthStart + i];
       
       // The new type is upper-bounded by the constraints the nominal type
       // requires. The substitution operation may be interested in transforming
@@ -2152,7 +2152,7 @@ public:
       didChange |= (newParam != subst);
     }
 
-    for (const auto &req : genericSig->getRequirements()) {
+    for (const auto &req : genericSig.getRequirements()) {
       if (req.getKind() != RequirementKind::Conformance) continue;
 
       auto canTy = req.getFirstType()->getCanonicalType();
@@ -3003,7 +3003,8 @@ Type ArchetypeType::getExistentialType() const {
     constraintTypes.push_back(proto->getDeclaredInterfaceType());
   }
   return ProtocolCompositionType::get(
-     const_cast<ArchetypeType*>(this)->getASTContext(), constraintTypes, false);
+     const_cast<ArchetypeType*>(this)->getASTContext(), constraintTypes,
+                                      requiresClass());
 }
 
 PrimaryArchetypeType::PrimaryArchetypeType(const ASTContext &Ctx,
@@ -3472,7 +3473,7 @@ void ArchetypeType::registerNestedType(Identifier name, Type nested) {
          "Unable to find nested type?");
   assert(!found->second ||
          found->second->isEqual(nested) ||
-         (found->second->hasError() && nested->hasError()));
+         found->second->is<ErrorType>());
   found->second = nested;
 }
 
@@ -3636,9 +3637,10 @@ bool SILFunctionType::hasSameExtInfoAs(const SILFunctionType *otherFn) {
 }
 
 FunctionType *
-GenericFunctionType::substGenericArgs(SubstitutionMap subs) {
+GenericFunctionType::substGenericArgs(SubstitutionMap subs,
+                                      SubstOptions options) {
   return substGenericArgs(
-    [=](Type t) { return t.subst(subs); });
+    [=](Type t) { return t.subst(subs, options); });
 }
 
 FunctionType *GenericFunctionType::substGenericArgs(
@@ -4188,7 +4190,7 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
     baseTy = baseTy->getSuperclassForDecl(ownerClass);
 
   // Gather all of the substitutions for all levels of generic arguments.
-  auto params = genericSig->getGenericParams();
+  auto params = genericSig.getGenericParams();
   unsigned n = params.size();
 
   while (baseTy && n > 0) {
@@ -4282,7 +4284,7 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(
     auto *innerDC = member->getInnermostDeclContext();
     if (innerDC->isInnermostContextGeneric()) {
       if (auto sig = innerDC->getGenericSignatureOfContext()) {
-        for (auto param : sig->getInnermostGenericParams()) {
+        for (auto param : sig.getInnermostGenericParams()) {
           auto *genericParam = param->getCanonicalType()
               ->castTo<GenericTypeParamType>();
           substitutions[genericParam] =
@@ -4311,8 +4313,16 @@ SubstitutionMap TypeBase::getMemberSubstitutionMap(
       LookUpConformanceInModule(module));
 }
 
+Type TypeBase::getTypeOfMember(ModuleDecl *module, const VarDecl *member) {
+  return getTypeOfMember(module, member, member->getInterfaceType());
+}
+
 Type TypeBase::getTypeOfMember(ModuleDecl *module, const ValueDecl *member,
                                Type memberType) {
+  assert(memberType);
+  assert(!memberType->is<GenericFunctionType>() &&
+         "Generic function types are not supported");
+
   if (is<ErrorType>())
     return ErrorType::get(getASTContext());
 
@@ -4320,12 +4330,6 @@ Type TypeBase::getTypeOfMember(ModuleDecl *module, const ValueDecl *member,
     auto objectTy = lvalue->getObjectType();
     return objectTy->getTypeOfMember(module, member, memberType);
   }
-
-  // If no member type was provided, use the member's type.
-  if (!memberType)
-    memberType = member->getInterfaceType();
-
-  assert(memberType);
 
   // Perform the substitution.
   auto substitutions = getMemberSubstitutionMap(module, member);

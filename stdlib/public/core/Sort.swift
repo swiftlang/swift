@@ -400,13 +400,13 @@ internal func _merge<Element>(
     // After moving elements, the storage and buffer look like this, where
     // `x` is uninitialized memory:
     //
-    // Storage: [4, 4, 7, 8, 9, 6, x, x,  x,  x,  x]
-    //                          ^  ^                 ^
-    //                    srcHigh  destLow        destHigh (past the end)
+    // Storage: [4, 4, 7, 8, 9, 16, x, x,  x,  x,  x]
+    //                              ^                 ^
+    //                       srcHigh/destLow       destHigh (past the end)
     //
-    // Buffer:                    [8, 8, 10, 12, 15, x, ...]
-    //                             ^                 ^
-    //                          bufferLow        bufferHigh
+    // Buffer:                     [8, 8, 10, 12, 15, x, ...]
+    //                              ^                 ^
+    //                          bufferLow         bufferHigh
     buffer.moveInitialize(from: mid, count: highCount)
     bufferHigh = bufferLow + highCount
     
@@ -555,7 +555,7 @@ extension UnsafeMutableBufferPointer {
     // (a) - for all i in 2..<runs.count:
     //         - runs[i - 2].count > runs[i - 1].count + runs[i].count
     // (b) - for c = runs.count - 1:
-    //         - runs[i - 1].count > runs[i].count
+    //         - runs[c - 1].count > runs[c].count
     //
     // Loop until the invariant is satisified for the top four elements of
     // `runs`. Because this method is called for every added run, and only

@@ -613,6 +613,10 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     if (getFile()->getParentModule() == SILMod.getSwiftModule())
       fn->setLinkage(linkage);
 
+    if (getFile()->getParentModule()->isStaticLibrary() ||
+        getFile()->getParentModule() == SILMod.getSwiftModule())
+      fn->setIsStaticallyLinked(true);
+
     // Don't override the transparency or linkage of a function with
     // an existing declaration, except if we deserialized a
     // PublicNonABI function, which has HiddenExternal when
@@ -746,8 +750,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
 
   GenericEnvironment *genericEnv = nullptr;
   if (!declarationOnly)
-    if (auto genericSig = MF->getGenericSignature(genericSigID))
-      genericEnv = genericSig->getGenericEnvironment();
+    genericEnv = MF->getGenericSignature(genericSigID).getGenericEnvironment();
 
   // If the next entry is the end of the block, then this function has
   // no contents.
@@ -1848,7 +1851,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   UNARY_INSTRUCTION(IsUnique)
   UNARY_INSTRUCTION(AbortApply)
   UNARY_INSTRUCTION(EndApply)
-  UNARY_INSTRUCTION(HopToExecutor)
   UNARY_INSTRUCTION(ExtractExecutor)
 #undef UNARY_INSTRUCTION
 #undef REFCOUNTING_INSTRUCTION
@@ -1864,6 +1866,16 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     break;
   }
 
+  case SILInstructionKind::HopToExecutorInst: {
+    assert(RecordKind == SIL_ONE_OPERAND && "Layout should be OneOperand.");
+    unsigned mandatory = Attr;
+    ResultInst = Builder.createHopToExecutor(
+        Loc,
+        getLocalValue(ValID, getSILType(MF->getType(TyID),
+                                        (SILValueCategory)TyCategory, Fn)),
+        mandatory != 0);
+    break;
+  }
   case SILInstructionKind::DestroyValueInst: {
     assert(RecordKind == SIL_ONE_OPERAND && "Layout should be OneOperand.");
     unsigned poisonRefs = Attr;

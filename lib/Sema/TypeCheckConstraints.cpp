@@ -111,6 +111,10 @@ bool TypeVariableType::Implementation::isClosureResultType() const {
          locator->isLastElement<LocatorPathElt::ClosureResult>();
 }
 
+bool TypeVariableType::Implementation::isKeyPathType() const {
+  return locator && locator->isKeyPathType();
+}
+
 void *operator new(size_t bytes, ConstraintSystem& cs,
                    size_t alignment) {
   return cs.getAllocator().Allocate(bytes, alignment);
@@ -663,20 +667,14 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
   auto *matchOp =
       TypeChecker::buildRefExpr(choices, DC, DeclNameLoc(EP->getLoc()),
                                 /*Implicit=*/true, FunctionRefKind::Compound);
-  auto *matchVarRef = new (Context) DeclRefExpr(matchVar,
-                                                DeclNameLoc(EP->getLoc()),
-                                                /*Implicit=*/true);
-  
-  Expr *matchArgElts[] = {EP->getSubExpr(), matchVarRef};
-  auto *matchArgs
-    = TupleExpr::create(Context, EP->getSubExpr()->getSourceRange().Start,
-                        matchArgElts, { }, { },
-                        EP->getSubExpr()->getSourceRange().End,
-                        /*HasTrailingClosure=*/false, /*Implicit=*/true);
-  
-  Expr *matchCall = new (Context) BinaryExpr(matchOp, matchArgs,
-                                             /*Implicit=*/true);
 
+  // Note we use getEndLoc here to have the BinaryExpr source range be the same
+  // as the expr pattern source range.
+  auto *matchVarRef = new (Context) DeclRefExpr(matchVar,
+                                                DeclNameLoc(EP->getEndLoc()),
+                                                /*Implicit=*/true);
+  Expr *matchCall = BinaryExpr::create(Context, EP->getSubExpr(), matchOp,
+                                       matchVarRef, /*implicit*/ true);
   // Check the expression as a condition.
   bool hadError = typeCheckCondition(matchCall, DC);
   // Save the type-checked expression in the pattern.
@@ -1859,7 +1857,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   // classes. This may be necessary to force-fit ObjC APIs that depend on
   // covariance, or for APIs where the generic parameter annotations in the
   // ObjC headers are inaccurate.
-  if (clas && clas->usesObjCGenericsModel()) {
+  if (clas && clas->isTypeErasedGenericClass()) {
     if (fromType->getClassOrBoundGenericClass() == clas)
       return CheckedCastKind::ValueCast;
   }

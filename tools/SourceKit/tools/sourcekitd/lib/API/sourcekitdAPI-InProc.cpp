@@ -18,6 +18,7 @@
 #include "sourcekitd/RawData.h"
 #include "sourcekitd/TokenAnnotationsArray.h"
 #include "sourcekitd/ExpressionTypeArray.h"
+#include "sourcekitd/VariableTypeArray.h"
 #include "sourcekitd/Logging.h"
 #include "SourceKit/Core/LLVM.h"
 #include "SourceKit/Support/UIdent.h"
@@ -254,6 +255,7 @@ public:
       case CustomBufferKind::DocStructureElementArray:
       case CustomBufferKind::AttributesArray:
       case CustomBufferKind::ExpressionTypeArray:
+      case CustomBufferKind::VariableTypeArray:
         return SOURCEKITD_VARIANT_TYPE_ARRAY;
       case CustomBufferKind::RawData:
         return SOURCEKITD_VARIANT_TYPE_DATA;
@@ -992,6 +994,9 @@ static sourcekitd_variant_t variantFromSKDObject(SKDObjectRef Object) {
       case CustomBufferKind::ExpressionTypeArray:
         return {{ (uintptr_t)getVariantFunctionsForExpressionTypeArray(),
           (uintptr_t)DataObject->getDataPtr(), 0 }};
+      case CustomBufferKind::VariableTypeArray:
+        return {{ (uintptr_t)getVariantFunctionsForVariableTypeArray(),
+                  (uintptr_t)DataObject->getDataPtr(), 0 }};
       case CustomBufferKind::RawData:
         return {{ (uintptr_t)getVariantFunctionsForRawData(),
                   (uintptr_t)DataObject->getDataPtr(),

@@ -204,6 +204,9 @@ public:
   /// The libraries and frameworks specified on the command line.
   SmallVector<LinkLibrary, 4> LinkLibraries;
 
+  /// The public dependent libraries specified on the command line.
+  std::vector<std::string> PublicLinkLibraries;
+
   /// If non-empty, the (unmangled) name of a dummy symbol to emit that can be
   /// used to force-load this module.
   std::string ForceLoadSymbolName;
@@ -249,9 +252,6 @@ public:
 
   /// Whether we should run swift specific LLVM optimizations after IRGen.
   unsigned DisableSwiftSpecificLLVMOptzns : 1;
-
-  /// Whether we should run LLVM SLP vectorizer.
-  unsigned DisableLLVMSLPVectorizer : 1;
 
   /// Special codegen for playgrounds.
   unsigned Playground : 1;
@@ -370,6 +370,8 @@ public:
   /// Pull in runtime compatibility shim libraries by autolinking.
   Optional<llvm::VersionTuple> AutolinkRuntimeCompatibilityLibraryVersion;
   Optional<llvm::VersionTuple> AutolinkRuntimeCompatibilityDynamicReplacementLibraryVersion;
+  Optional<llvm::VersionTuple>
+      AutolinkRuntimeCompatibilityConcurrencyLibraryVersion;
 
   JITDebugArtifact DumpJIT = JITDebugArtifact::None;
 
@@ -384,7 +386,7 @@ public:
         DebugInfoFormat(IRGenDebugInfoFormat::None),
         DisableClangModuleSkeletonCUs(false), UseJIT(false),
         DisableLLVMOptzns(false), DisableSwiftSpecificLLVMOptzns(false),
-        DisableLLVMSLPVectorizer(false), Playground(false),
+        Playground(false),
         EmitStackPromotionChecks(false), FunctionSections(false),
         PrintInlineTree(false), EmbedMode(IRGenEmbedMode::None),
         LLVMLTOKind(IRGenLLVMLTOKind::None), HasValueNamesSetting(false),

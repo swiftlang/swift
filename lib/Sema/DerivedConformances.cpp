@@ -77,6 +77,8 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
 
   if (*derivableKind == KnownDerivableProtocolKind::Actor)
     return canDeriveActor(DC, Nominal);
+  if (*derivableKind == KnownDerivableProtocolKind::DistributedActor)
+    return canDeriveDistributedActor(Nominal, DC);
 
   if (*derivableKind == KnownDerivableProtocolKind::AdditiveArithmetic)
     return canDeriveAdditiveArithmetic(Nominal, DC);
@@ -543,7 +545,7 @@ bool DerivedConformance::checkAndDiagnoseDisallowedContext(
   // A non-final class can't have an protocol-witnesss initializer in an
   // extension.
   if (auto CD = dyn_cast<ClassDecl>(Nominal)) {
-    if (!CD->isFinal() && isa<ConstructorDecl>(synthesizing) &&
+    if (!CD->isSemanticallyFinal() && isa<ConstructorDecl>(synthesizing) &&
         isa<ExtensionDecl>(ConformanceDecl)) {
       ConformanceDecl->diagnose(
           diag::cannot_synthesize_init_in_extension_of_nonfinal,
@@ -577,13 +579,8 @@ GuardStmt *DerivedConformance::returnIfNotEqualGuard(ASTContext &C,
   auto cmpFuncExpr = new (C) UnresolvedDeclRefExpr(
     DeclNameRef(C.Id_EqualsOperator), DeclRefKind::BinaryOperator,
     DeclNameLoc());
-  auto cmpArgsTuple = TupleExpr::create(C, SourceLoc(),
-                                        { lhsExpr, rhsExpr },
-                                        { }, { }, SourceLoc(),
-                                        /*HasTrailingClosure*/false,
-                                        /*Implicit*/true);
-  auto cmpExpr = new (C) BinaryExpr(cmpFuncExpr, cmpArgsTuple,
-                                    /*Implicit*/true);
+  auto *cmpExpr = BinaryExpr::create(C, lhsExpr, cmpFuncExpr, rhsExpr,
+                                     /*implicit*/ true);
   conditions.emplace_back(cmpExpr);
 
   // Build and return the complete guard statement.
@@ -617,12 +614,8 @@ GuardStmt *DerivedConformance::returnComparisonIfNotEqualGuard(ASTContext &C,
   auto ltFuncExpr = new (C) UnresolvedDeclRefExpr(
     DeclNameRef(C.Id_LessThanOperator), DeclRefKind::BinaryOperator,
     DeclNameLoc());
-  auto ltArgsTuple = TupleExpr::create(C, SourceLoc(),
-                                        { lhsExpr, rhsExpr },
-                                        { }, { }, SourceLoc(),
-                                        /*HasTrailingClosure*/false,
-                                        /*Implicit*/true);
-  auto ltExpr = new (C) BinaryExpr(ltFuncExpr, ltArgsTuple, /*Implicit*/true);
+  auto *ltExpr = BinaryExpr::create(C, lhsExpr, ltFuncExpr, rhsExpr,
+                                    /*implicit*/ true);
   return returnIfNotEqualGuard(C, lhsExpr, rhsExpr, ltExpr);
 }
 

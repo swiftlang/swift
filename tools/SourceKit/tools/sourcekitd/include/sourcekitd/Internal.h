@@ -60,6 +60,7 @@ enum class CustomBufferKind {
   DocStructureElementArray,
   AttributesArray,
   ExpressionTypeArray,
+  VariableTypeArray,
   RawData
 };
 

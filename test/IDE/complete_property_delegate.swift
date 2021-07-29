@@ -72,7 +72,7 @@ func paramTest(@Lazzzy arg: MyMember) {
 // PARAM-DAG: Decl[LocalVar]/Local:               arg[#MyMember#]; name=arg
 // PARAM-DAG: Decl[LocalVar]/Local:               $arg[#String#]; name=$arg
 // PARAM-DAG: Decl[LocalVar]/Local:               _arg[#Lazzzy<MyMember>#]; name=_arg
-// PARAM-DAG: Decl[FreeFunction]/CurrModule:      paramTest({#arg: MyMember#})[#Void#]; name=paramTest(arg: MyMember)
+// PARAM-DAG: Decl[FreeFunction]/CurrModule:      paramTest({#arg: MyMember#})[#Void#]; name=paramTest(arg:)
 // PARAM: End completions
 }
 func closureTest() {
@@ -92,7 +92,7 @@ func localTest() {
 // LOCAL-DAG: Decl[LocalVar]/Local:               local[#MyMember#]; name=local
 // LOCAL-DAG: Decl[LocalVar]/Local:               $local[#String#]; name=$local
 // LOCAL-DAG: Decl[LocalVar]/Local:               _local[#Lazzzy<MyMember>#]; name=_local
-// LOCAL-DAG: Decl[FreeFunction]/CurrModule:      paramTest({#arg: MyMember#})[#Void#]; name=paramTest(arg: MyMember)
+// LOCAL-DAG: Decl[FreeFunction]/CurrModule:      paramTest({#arg: MyMember#})[#Void#]; name=paramTest(arg:)
 // LOCAL: End completions
 }
 

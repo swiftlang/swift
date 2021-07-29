@@ -1,28 +1,50 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
+// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency -disable-availability-checking
 
 // REQUIRES: concurrency
 
 actor MyActor { }
 
-class MyActorSubclass1: MyActor { } // expected-error{{actor types do not support inheritance}}
-// expected-error@-1{{non-final class 'MyActorSubclass1' cannot conform to `Sendable`; use `UnsafeSendable`}}
+class MyActorSubclass1: MyActor { }
+// expected-error@-1{{actor types do not support inheritance}}
+// expected-error@-2{{type 'MyActorSubclass1' cannot conform to the 'Actor' protocol}}
+// expected-error@-3{{non-final class 'MyActorSubclass1' cannot conform to `Sendable`; use `@unchecked Sendable`}}
 
 actor MyActorSubclass2: MyActor { } // expected-error{{actor types do not support inheritance}}
 
-// expected-warning@+1{{'actor class' has been renamed to 'actor'}}{{7-13=}}
+// expected-error@+1{{keyword 'class' cannot be used as an identifier here}}
 actor class MyActorClass { }
 
-class NonActor { }
+class NonActor { } // expected-note{{overridden declaration is here}}
 
 actor NonActorSubclass : NonActor { } // expected-error{{actor types do not support inheritance}}
+// expected-error@-1{{actor-isolated initializer 'init()' has different actor isolation from nonisolated overridden declaration}}
 
-// expected-warning@+1{{'actor class' has been renamed to 'actor'}}{{14-20=}}
+// expected-error@+1{{keyword 'class' cannot be used as an identifier here}}
 public actor class BobHope {}
-// expected-warning@+1{{'actor class' has been renamed to 'actor'}}{{14-19=actor}}{{1-7=}}
+// expected-error@+1{{keyword 'public' cannot be used as an identifier here}}
 actor public class BarbraStreisand {}
-// expected-warning@+2{{'actor class' has been renamed to 'actor'}}{{14-21=}}
-// expected-error@+1{{'actor' may only be used on 'class' declarations}}
+// expected-error@+1{{keyword 'struct' cannot be used as an identifier here}}
 public actor struct JulieAndrews {}
-// expected-warning@+2{{'actor class' has been renamed to 'actor'}}{{14-18=actor}}{{1-7=}}
-// expected-error@+1{{'actor' may only be used on 'class' declarations}}
+// expected-error@+1{{keyword 'public' cannot be used as an identifier here}}
 actor public enum TomHanks {}
+
+open actor A1 { } // expected-error{{only classes and overridable class members can be declared 'open'; use 'public'}}
+
+actor A2 {
+  required init() { } // expected-error{{'required' initializer in non-class type 'A2'}}
+  open func f() { } // expected-error{{only classes and overridable class members can be declared 'open'; use 'public'}}
+
+  final func g() { } // okay for now
+  class func h() { } // expected-error{{class methods are only allowed within classes; use 'static' to declare a static method}}
+  static func i() { } // okay
+
+  class var someProp: Int { 0 } // expected-error{{class properties are only allowed within classes; use 'static' to declare a static property}}
+}
+
+extension A2 {
+  class func h2() { } // expected-error{{class methods are only allowed within classes; use 'static' to declare a static method}}
+  static func i2() { } // okay
+
+  class subscript(i: Int) -> Int { i } // expected-error{{class subscripts are only allowed within classes; use 'static' to declare a static subscript}}
+  static subscript(s: String) -> String { s }
+}

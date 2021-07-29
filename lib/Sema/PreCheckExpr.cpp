@@ -1799,7 +1799,7 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
       // The protocols we are composing
       SmallVector<TypeRepr *, 4> Types;
 
-      auto lhsExpr = binaryExpr->getArg()->getElement(0);
+      auto *lhsExpr = binaryExpr->getLHS();
       if (auto *lhs = dyn_cast<TypeExpr>(lhsExpr)) {
         Types.push_back(lhs->getTypeRepr());
       } else if (isa<BinaryExpr>(lhsExpr)) {
@@ -1819,7 +1819,7 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
         return nullptr;
 
       // Add the rhs which is just a TypeExpr
-      auto *rhs = dyn_cast<TypeExpr>(binaryExpr->getArg()->getElement(1));
+      auto *rhs = dyn_cast<TypeExpr>(binaryExpr->getRHS());
       if (!rhs) return nullptr;
       Types.push_back(rhs->getTypeRepr());
 
@@ -1888,6 +1888,15 @@ void PreCheckExpression::resolveKeyPathExpr(KeyPathExpr *KPE) {
             UDE->getName(), UDE->getLoc()));
 
         expr = UDE->getBase();
+      } else if (auto CCE = dyn_cast<CodeCompletionExpr>(expr)) {
+        components.push_back(
+            KeyPathExpr::Component::forCodeCompletion(CCE->getLoc()));
+
+        expr = CCE->getBase();
+        if (!expr) {
+          // We are completing on the key path's base. Stop iterating.
+          return;
+        }
       } else if (auto SE = dyn_cast<SubscriptExpr>(expr)) {
         // .[0] or just plain [0]
         components.push_back(

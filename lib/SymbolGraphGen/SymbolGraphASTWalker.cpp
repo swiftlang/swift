@@ -45,6 +45,11 @@ SymbolGraph *SymbolGraphASTWalker::getModuleSymbolGraph(const Decl *D) {
 
   if (this->M.getNameStr().equals(M->getNameStr())) {
     return &MainGraph;
+  } else if (MainGraph.DeclaringModule.hasValue() &&
+      MainGraph.DeclaringModule.getValue()->getNameStr().equals(M->getNameStr())) {
+    // Cross-import overlay modules already appear as "extensions" of their declaring module; we
+    // should put actual extensions of that module into the main graph
+    return &MainGraph;
   }
   auto Found = ExtendedModuleGraphs.find(M->getNameStr());
   if (Found != ExtendedModuleGraphs.end()) {

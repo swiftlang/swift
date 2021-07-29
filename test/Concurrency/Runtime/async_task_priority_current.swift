@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency %import-libdispatch -parse-as-library) | %FileCheck --dump-input=always %s
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library) | %FileCheck --dump-input=always %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -13,24 +13,24 @@ import Dispatch
 @available(SwiftStdlib 5.5, *)
 func test_detach() async {
   let a1 = Task.currentPriority
-  print("a1: \(a1)") // CHECK: a1: unspecified
+  print("a1: \(a1)") // CHECK: TaskPriority(rawValue: 0)
 
   // Note: remember to detach using a higher priority, otherwise a lower one
   // might be escalated by the get() and we could see `default` in the detached
   // task.
   await detach(priority: .userInitiated) {
     let a2 = Task.currentPriority
-    print("a2: \(a2)") // CHECK: a2: userInitiated
+    print("a2: \(a2)") // CHECK: a2: TaskPriority(rawValue: 25)
   }.get()
 
   let a3 = Task.currentPriority
-  print("a3: \(a3)") // CHECK: a3: unspecified
+  print("a3: \(a3)") // CHECK: a3: TaskPriority(rawValue: 0)
 }
 
 @available(SwiftStdlib 5.5, *)
 func test_multiple_lo_indirectly_escalated() async {
   @Sendable
-  func loopUntil(priority: Task.Priority) async {
+  func loopUntil(priority: TaskPriority) async {
     while (Task.currentPriority != priority) {
       await Task.sleep(1_000_000_000)
     }

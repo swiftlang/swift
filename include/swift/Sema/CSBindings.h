@@ -391,6 +391,13 @@ public:
     if (Bindings.empty())
       return false;
 
+    // Literal requirements always result in a subtype/supertype
+    // relationship to a concrete type.
+    if (llvm::any_of(Literals, [](const auto &literal) {
+          return literal.second.viableAsBinding();
+        }))
+      return false;
+
     return llvm::all_of(Bindings, [](const PotentialBinding &binding) {
       return binding.BindingType->isExistentialType() &&
              binding.Kind == AllowedBindingKind::Subtypes;

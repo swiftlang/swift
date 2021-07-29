@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -typecheck -enable-library-evolution -enable-experimental-concurrency -emit-module-interface-path %t/Library.swiftinterface -module-name Library %s
+// RUN: %target-swift-frontend -typecheck -enable-library-evolution -enable-experimental-concurrency -disable-availability-checking -emit-module-interface-path %t/Library.swiftinterface -module-name Library %s
 // RUN: %FileCheck --check-prefix CHECK-EXTENSION %s <%t/Library.swiftinterface
 // RUN: %FileCheck --check-prefix CHECK %s <%t/Library.swiftinterface
 // REQUIRES: concurrency

@@ -32,6 +32,7 @@ sil [ossa] @getOwnedC : $@convention(thin) () -> (@owned C)
 sil [ossa] @takeOwnedC : $@convention(thin) (@owned C) -> ()
 sil [ossa] @takeOwnedCTwice : $@convention(thin) (@owned C, @owned C) -> ()
 sil [ossa] @takeGuaranteedC : $@convention(thin) (@guaranteed C) -> ()
+sil [ossa] @takeGuaranteedAnyObject : $@convention(thin) (@guaranteed AnyObject) -> ()
 
 // -O ignores this because there's no copy_value
 // -Onone hoists the destroy and adds a poison flag.
@@ -342,6 +343,8 @@ bb0:
   br bb1
 
 bb1:
+  %f2 = function_ref @takeGuaranteedAnyObject : $@convention(thin) (@guaranteed AnyObject) -> ()
+  %call = apply %f2(%obj) : $@convention(thin) (@guaranteed AnyObject) -> ()
   destroy_value %copy : $AnyObject
   destroy_value %obj : $AnyObject
   destroy_value %box : ${ var AnyObject }
@@ -392,6 +395,8 @@ bb1:
   br bb2
 
 bb2:
+  %f2 = function_ref @takeGuaranteedAnyObject : $@convention(thin) (@guaranteed AnyObject) -> ()
+  %call = apply %f2(%obj) : $@convention(thin) (@guaranteed AnyObject) -> ()
   destroy_value %copy : $AnyObject
   destroy_value %obj : $AnyObject
   destroy_value %box : ${ var AnyObject }
@@ -435,6 +440,8 @@ bb0:
   br bb1
 
 bb1:
+  %f2 = function_ref @takeGuaranteedAnyObject : $@convention(thin) (@guaranteed AnyObject) -> ()
+  %call = apply %f2(%obj) : $@convention(thin) (@guaranteed AnyObject) -> ()
   destroy_value %copy : $AnyObject
   destroy_value %obj : $AnyObject
   destroy_value %box : ${ var AnyObject }
@@ -484,6 +491,8 @@ bb1:
   br bb2
 
 bb2:
+  %f2 = function_ref @takeGuaranteedAnyObject : $@convention(thin) (@guaranteed AnyObject) -> ()
+  %call = apply %f2(%obj) : $@convention(thin) (@guaranteed AnyObject) -> ()
   destroy_value %copy : $AnyObject
   destroy_value %obj : $AnyObject
   destroy_value %box : ${ var AnyObject }
@@ -527,6 +536,8 @@ bb0:
   br bb1
 
 bb1:
+  %f2 = function_ref @takeGuaranteedAnyObject : $@convention(thin) (@guaranteed AnyObject) -> ()
+  %call = apply %f2(%obj) : $@convention(thin) (@guaranteed AnyObject) -> ()
   destroy_value %copy : $AnyObject
   destroy_value %obj : $AnyObject
   destroy_value %box : ${ var AnyObject }
@@ -577,6 +588,8 @@ bb1:
   br bb2
 
 bb2:
+  %f2 = function_ref @takeGuaranteedAnyObject : $@convention(thin) (@guaranteed AnyObject) -> ()
+  %call = apply %f2(%obj) : $@convention(thin) (@guaranteed AnyObject) -> ()
   destroy_value %copy : $AnyObject
   destroy_value %obj : $AnyObject
   destroy_value %box : ${ var AnyObject }
@@ -622,6 +635,8 @@ bb0:
   br bb1
 
 bb1:
+  %f2 = function_ref @takeGuaranteedAnyObject : $@convention(thin) (@guaranteed AnyObject) -> ()
+  %call = apply %f2(%obj) : $@convention(thin) (@guaranteed AnyObject) -> ()
   destroy_value %obj : $AnyObject
   destroy_value %box : ${ var AnyObject }
   %v = tuple ()

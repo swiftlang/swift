@@ -1520,3 +1520,19 @@ extension ArraySlice {
 
 extension ArraySlice: Sendable, UnsafeSendable
   where Element: Sendable { }
+
+#if INTERNAL_CHECKS_ENABLED
+extension ArraySlice {
+  // This allows us to test the `_copyContents` implementation in
+  // `_SliceBuffer`. (It's like `_copyToContiguousArray` but it always makes a
+  // copy.)
+  @_alwaysEmitIntoClient
+  public func _copyToNewArray() -> [Element] {
+    Array(unsafeUninitializedCapacity: self.count) { buffer, count in
+      var (it, c) = self._buffer._copyContents(initializing: buffer)
+      _precondition(it.next() == nil)
+      count = c
+    }
+  }
+}
+#endif

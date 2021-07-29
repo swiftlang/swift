@@ -465,8 +465,9 @@ public:
   {
     // Allocate space to receive the resume value when the continuation is
     // resumed.
-    opaqueResumeType = SGF.getLoweredType(AbstractionPattern::getOpaque(),
-                                          calleeTypeInfo.substResultType);
+    opaqueResumeType =
+        SGF.getLoweredType(AbstractionPattern(calleeTypeInfo.substResultType),
+                           calleeTypeInfo.substResultType);
     resumeBuf = SGF.emitTemporaryAllocation(loc, opaqueResumeType);
   }
   
@@ -475,10 +476,11 @@ public:
                             SmallVectorImpl<SILValue> &outList) const override {
     // A foreign async function shouldn't have any indirect results.
   }
-  
+
   ManagedValue
-  emitForeignAsyncCompletionHandler(SILGenFunction &SGF, SILLocation loc)
-  override {
+  emitForeignAsyncCompletionHandler(SILGenFunction &SGF,
+                                    AbstractionPattern origFormalType,
+                                    SILLocation loc) override {
     // Get the current continuation for the task.
     bool throws = calleeTypeInfo.foreign.async
         ->completionHandlerErrorParamIndex().hasValue();
@@ -525,15 +527,14 @@ public:
       impFnTy = cast<SILFunctionType>(impTy.getASTType());
     }
     auto env = SGF.F.getGenericEnvironment();
-    auto sig = env ? env->getGenericSignature()->getCanonicalSignature()
+    auto sig = env ? env->getGenericSignature().getCanonicalSignature()
                    : CanGenericSignature();
-    SILFunction *impl = SGF.SGM
-      .getOrCreateForeignAsyncCompletionHandlerImplFunction(
-                  cast<SILFunctionType>(impFnTy->mapTypeOutOfContext()
-                                               ->getCanonicalType(sig)),
-                  continuationTy->mapTypeOutOfContext()->getCanonicalType(sig),
-                  sig,
-                  *calleeTypeInfo.foreign.async);
+    SILFunction *impl =
+        SGF.SGM.getOrCreateForeignAsyncCompletionHandlerImplFunction(
+            cast<SILFunctionType>(
+                impFnTy->mapTypeOutOfContext()->getCanonicalType(sig)),
+            continuationTy->mapTypeOutOfContext()->getCanonicalType(sig),
+            origFormalType, sig, *calleeTypeInfo.foreign.async);
     auto impRef = SGF.B.createFunctionRef(loc, impl);
     
     // Initialize the block object for the completion handler.
@@ -551,7 +552,7 @@ public:
     // _Block_copy-ing it.
     return ManagedValue::forUnmanaged(block);
   }
-  
+
   RValue finish(SILGenFunction &SGF, SILLocation loc, CanType substType,
                 ArrayRef<ManagedValue> &directResults) override {
     // There should be no direct results from the call.

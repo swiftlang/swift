@@ -1,0 +1,11 @@
+# REQUIRES: standalone_build,OS=macosx
+
+# Test that makes sure when we link in a pure swift shared lib into a cxx tool
+# that we set rpaths right and thus can run the test.
+
+# RUN: %swift_obj_root/bin/TestCPPToolLinkSwiftSharedLib | %FileCheck %s
+# RUN: %swift_obj_root/bin/TestCPPToolLinkSwiftStaticLib | %FileCheck %s
+
+# CHECK: I am in cpplib log!
+# CHECK: Swift is going to return 34
+# CHECK: doSomething: 34

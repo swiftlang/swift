@@ -266,6 +266,12 @@ static llvm::cl::list<std::string>
 BuildConfigs("D", llvm::cl::desc("Conditional compilation flags"),
              llvm::cl::cat(Category));
 
+static llvm::cl::opt<bool>
+ParseAsLibrary("parse-as-library",
+               llvm::cl::desc("Parse '-source-filename' as a library source file"),
+               llvm::cl::cat(Category),
+               llvm::cl::init(false));
+
 static llvm::cl::opt<std::string>
 SDK("sdk", llvm::cl::desc("path to the SDK to build against"),
     llvm::cl::cat(Category));
@@ -751,15 +757,35 @@ static llvm::cl::opt<bool>
 EnableExperimentalConcurrency("enable-experimental-concurrency",
                               llvm::cl::desc("Enable experimental concurrency model"),
                               llvm::cl::init(false));
+static llvm::cl::opt<bool>
+WarnConcurrency("warn-concurrency",
+                llvm::cl::desc("Additional concurrency warnings"),
+                llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
 DisableImplicitConcurrencyImport("disable-implicit-concurrency-module-import",
                                  llvm::cl::desc("Disable implicit import of _Concurrency module"),
                                  llvm::cl::init(false));
 
+static llvm::cl::opt<bool> EnableExperimentalOpaqueReturnTypes(
+    "enable-experimental-opaque-return-types",
+    llvm::cl::desc(
+        "Enable experimental extensions to opaque return type support"),
+    llvm::cl::Hidden, llvm::cl::cat(Category), llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
+EnableExperimentalDistributed("enable-experimental-distributed",
+                              llvm::cl::desc("Enable experimental distributed actors and functions"),
+                              llvm::cl::init(false));
+
 static llvm::cl::list<std::string>
 AccessNotesPath("access-notes-path", llvm::cl::desc("Path to access notes file"),
                 llvm::cl::cat(Category));
+
+static llvm::cl::opt<bool>
+AllowCompilerErrors("allow-compiler-errors",
+                    llvm::cl::desc("Whether to attempt to continue despite compiler errors"),
+                    llvm::cl::init(false));
 
 } // namespace options
 
@@ -3843,8 +3869,21 @@ int main(int argc, char *argv[]) {
   if (options::EnableExperimentalConcurrency) {
     InitInvok.getLangOptions().EnableExperimentalConcurrency = true;
   }
+  if (options::WarnConcurrency) {
+    InitInvok.getLangOptions().WarnConcurrency = true;
+  }
   if (options::DisableImplicitConcurrencyImport) {
     InitInvok.getLangOptions().DisableImplicitConcurrencyModuleImport = true;
+  }
+  if (options::EnableExperimentalOpaqueReturnTypes) {
+    InitInvok.getLangOptions().EnableExperimentalOpaqueReturnTypes = true;
+  }
+
+  if (options::EnableExperimentalDistributed) {
+    // distributed implies concurrency features:
+    InitInvok.getLangOptions().EnableExperimentalConcurrency = true;
+    // enable 'distributed' parsing and features
+    InitInvok.getLangOptions().EnableExperimentalDistributed = true;
   }
 
   if (!options::Triple.empty())
@@ -3868,6 +3907,10 @@ int main(int argc, char *argv[]) {
   if (!options::AccessNotesPath.empty()) {
     InitInvok.getFrontendOptions().AccessNotesPath =
         options::AccessNotesPath[options::AccessNotesPath.size()-1];
+  }
+  if (options::ParseAsLibrary) {
+    InitInvok.getFrontendOptions().InputMode =
+        swift::FrontendOptions::ParseInputMode::SwiftLibrary;
   }
   InitInvok.getClangImporterOptions().PrecompiledHeaderOutputDir =
     options::PCHOutputDir;
@@ -3917,6 +3960,12 @@ int main(int argc, char *argv[]) {
       options::ExplicitSwiftModuleMap;
     InitInvok.getFrontendOptions().DisableImplicitModules = true;
   }
+
+  if (options::AllowCompilerErrors) {
+    InitInvok.getFrontendOptions().AllowModuleWithCompilerErrors = true;
+    InitInvok.getLangOptions().AllowModuleWithCompilerErrors = true;
+  }
+
   // Process the clang arguments last and allow them to override previously
   // set options.
   if (!CCArgs.empty()) {

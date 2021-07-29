@@ -1183,7 +1183,7 @@ private:
             copyTy->isDictionary() ||
             copyTy->isSet() ||
             copyTy->isString() ||
-            (!getKnownTypeInfo(nominal) && getObjCBridgedClass(nominal))) {
+            getObjCBridgedClass(nominal)) {
           // We fast-path the most common cases in the condition above.
           os << ", copy";
         } else if (copyTy->isUnmanaged()) {
@@ -1371,10 +1371,15 @@ private:
 
 public:
   /// If \p nominal is bridged to an Objective-C class (via a conformance to
-  /// _ObjectiveCBridgeable), return that class.
+  /// _ObjectiveCBridgeable) and is not an imported Clang type or a known type,
+  /// return that class.
   ///
   /// Otherwise returns null.
   const ClassDecl *getObjCBridgedClass(const NominalTypeDecl *nominal) {
+    // Print known types as their unbridged type.
+    if (getKnownTypeInfo(nominal))
+      return nullptr;
+
     // Print imported bridgeable decls as their unbridged type.
     if (nominal->hasClangNode())
       return nullptr;

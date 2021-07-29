@@ -51,6 +51,11 @@ def ArgumentIsPath : OptionFlag;
 // and read/parsed from there when reconstituting a .swiftmodule from it.
 def ModuleInterfaceOption : OptionFlag;
 
+// The option should be written into a .swiftinterface module interface file,
+// and read/parsed from there when reconstituting a .swiftmodule from it.
+// The option can be safely ignored by the older compiler.
+def ModuleInterfaceOptionIgnorable : OptionFlag;
+
 // The option causes the output of a supplementary output, or is the path option
 // for a supplementary output. E.g., `-emit-module` and `-emit-module-path`.
 def SupplementaryOutput : OptionFlag;
@@ -544,6 +549,10 @@ def disable_bridging_pch : Flag<["-"], "disable-bridging-pch">,
 def lto : Joined<["-"], "lto=">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Specify the LTO type to either 'llvm-thin' or 'llvm-full'">;
+  
+def lto_library : Separate<["-"], "lto-library">,
+  Flags<[FrontendOption, ArgumentIsPath, NoInteractiveOption]>,
+  HelpText<"Perform LTO with <lto-library>">, MetaVarName<"<lto-library>">;
 
 def access_notes_path : Separate<["-"], "access-notes-path">,
   Flags<[FrontendOption, ArgumentIsPath]>,
@@ -589,6 +598,10 @@ def experimental_cxx_stdlib :
   Separate<["-"], "experimental-cxx-stdlib">,
   HelpText<"C++ standard library to use; forwarded to Clang's -stdlib flag">;
 
+def experimental_emit_module_separately:
+  Flag<["-"], "experimental-emit-module-separately">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
+  HelpText<"Schedule a swift module emission job instead of a merge-modules job (new Driver only)">;
 
 // Diagnostic control options
 def suppress_warnings : Flag<["-"], "suppress-warnings">,
@@ -1077,6 +1090,14 @@ def target_variant : Separate<["-"], "target-variant">,
   HelpText<"Generate 'zippered' code for macCatalyst that can run on the specified"
            " variant target triple in addition to the main -target triple">;
 
+def clang_target : Separate<["-"], "clang-target">,
+  Flags<[FrontendOption, SwiftAPIExtractOption, SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption]>,
+  HelpText<"Separately set the target we should use for internal Clang instance">;
+
+def disable_clang_target : Flag<["-"], "disable-clang-target">,
+  Flags<[NewDriverOnlyOption]>,
+  HelpText<"Disable a separately specified target triple for Clang instance to use">;
+
 def profile_generate : Flag<["-"], "profile-generate">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Generate instrumented code to collect execution counts">;
@@ -1184,7 +1205,7 @@ def working_directory_EQ : Joined<["-"], "working-directory=">,
   Alias<working_directory>;
 
 def user_module_version : Separate<["-"], "user-module-version">,
-  Flags<[FrontendOption, ModuleInterfaceOption, NewDriverOnlyOption]>,
+  Flags<[FrontendOption, ModuleInterfaceOptionIgnorable, NewDriverOnlyOption]>,
   HelpText<"Module version specified from Swift module authors">,
   MetaVarName<"<vers>">;
 
@@ -1209,6 +1230,12 @@ def disable_autolinking_runtime_compatibility_dynamic_replacements
     : Flag<[ "-" ], "disable-autolinking-runtime-compatibility-dynamic-replacements">,
       Flags<[ FrontendOption ]>,
       HelpText<"Do not use autolinking for the dynamic replacement runtime "
+               "compatibility library">;
+
+def disable_autolinking_runtime_compatibility_concurrency
+    : Flag<[ "-" ], "disable-autolinking-runtime-compatibility-concurrency">,
+      Flags<[ FrontendOption ]>,
+      HelpText<"Do not use autolinking for the concurrency runtime "
                "compatibility library">;
 
 def emit_symbol_graph: Flag<["-"], "emit-symbol-graph">,
@@ -1246,6 +1273,11 @@ def skip_inherited_docs : Flag<["-"], "skip-inherited-docs">,
          NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
   HelpText<"Skip emitting doc comments for members inherited through classes or "
            "default implementations">;
+
+def include_spi_symbols : Flag<["-"], "include-spi-symbols">,
+  Flags<[SwiftSymbolGraphExtractOption, FrontendOption,
+         NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
+  HelpText<"Add symbols with SPI information to the symbol graph">;
 
 // swift-api-digester-only options
 def dump_sdk: Flag<["-", "--"], "dump-sdk">,
@@ -1343,6 +1375,10 @@ def migrator: Flag<["-", "--"], "migrator">,
 def abort_on_module_fail: Flag<["-", "--"], "abort-on-module-fail">,
   Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
   HelpText<"Abort if a module failed to load">;
+
+def disable_fail_on_error: Flag<["-", "--"], "disable-fail-on-error">,
+  Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
+  HelpText<"Don't exit with a nonzero status if errors are emitted">;
 
 def debug_mapping: Flag<["-", "--"], "debug-mapping">,
   Flags<[NoDriverOption, SwiftAPIDigesterOption]>,

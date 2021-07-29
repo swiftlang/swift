@@ -99,28 +99,6 @@ use_metadata(NSRuncingOptions.mince)
   case Foo = -1, Bar, Bas
 }
 
-// CHECK-LABEL: define hidden swiftcc i64 @"$s12objc_ns_enum0a1_C7_injectAA14ExportedToObjCOyF"()
-// CHECK:         ret i64 -1
-func objc_enum_inject() -> ExportedToObjC {
-  return .Foo
-}
-
-// CHECK-LABEL: define hidden swiftcc i64 @"$s12objc_ns_enum0a1_C7_switchySiAA14ExportedToObjCOF"(i64 %0)
-// CHECK:         switch i64 %0, label {{%.*}} [
-// CHECK:           i64 -1, label {{%.*}}
-// CHECK:           i64  0, label {{%.*}}
-// CHECK:           i64  1, label {{%.*}}
-func objc_enum_switch(_ x: ExportedToObjC) -> Int {
-  switch x {
-  case .Foo:
-    return 0
-  case .Bar:
-    return 1
-  case .Bas:
-    return 2
-  }
-}
-
 @objc class ObjCEnumMethods : NSObject {
   // CHECK: define internal void @"$s12objc_ns_enum15ObjCEnumMethodsC0C2InyyAA010ExportedToD1COFTo"([[OBJC_ENUM_METHODS:.*]]* %0, i8* %1, i64 %2)
   @objc dynamic func enumIn(_ x: ExportedToObjC) {}

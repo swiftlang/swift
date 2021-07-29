@@ -175,6 +175,10 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
     arguments.push_back("-aarch64-use-tbi");
   }
 
+  if (output.getPrimaryOutputType() == file_types::TY_SwiftModuleFile) {
+    arguments.push_back("-warn-on-potentially-unavailable-enum-case");
+  }
+
   // Enable or disable ObjC interop appropriately for the platform
   if (Triple.isOSDarwin()) {
     arguments.push_back("-enable-objc-interop");
@@ -556,7 +560,7 @@ ToolChain::constructInvocation(const CompileJobAction &job,
                       options::OPT_disable_autolinking_runtime_compatibility)) {
     Arguments.push_back("-disable-autolinking-runtime-compatibility");
   }
-                                 
+
   if (auto arg = context.Args.getLastArg(
                                   options::OPT_runtime_compatibility_version)) {
     Arguments.push_back("-runtime-compatibility-version");
@@ -577,11 +581,15 @@ ToolChain::constructInvocation(const CompileJobAction &job,
       Arguments,
       options::
           OPT_disable_autolinking_runtime_compatibility_dynamic_replacements);
+  context.Args.AddLastArg(
+      Arguments,
+      options::OPT_disable_autolinking_runtime_compatibility_concurrency);
 
   if (context.OI.CompilerMode == OutputInfo::Mode::SingleCompile) {
     context.Args.AddLastArg(Arguments, options::OPT_emit_symbol_graph);
     context.Args.AddLastArg(Arguments, options::OPT_emit_symbol_graph_dir);
   }
+  context.Args.AddLastArg(Arguments, options::OPT_include_spi_symbols);
 
   return II;
 }
@@ -1071,6 +1079,7 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
 
   context.Args.AddLastArg(Arguments, options::OPT_emit_symbol_graph);
   context.Args.AddLastArg(Arguments, options::OPT_emit_symbol_graph_dir);
+  context.Args.AddLastArg(Arguments, options::OPT_include_spi_symbols);
 
   context.Args.AddLastArg(Arguments, options::OPT_import_objc_header);
 

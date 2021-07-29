@@ -1051,7 +1051,12 @@ public:
       return;
     }
 
-    auto constant = SILDeclRef(afd).asForeign(requiresForeignEntryPoint(afd));
+    SILDeclRef constant = SILDeclRef(afd);
+    if (afd->isDistributed()) {
+      constant = constant.asDistributed(true);
+    } else {
+      constant = constant.asForeign(requiresForeignEntryPoint(afd));
+    }
 
     auto subs = e->getDeclRef().getSubstitutions();
 
@@ -1108,9 +1113,14 @@ public:
     }
 
     // Otherwise, we have a statically-dispatched call.
-    auto constant = SILDeclRef(e->getDecl())
-      .asForeign(!isConstructorWithGeneratedAllocatorThunk(e->getDecl())
-                 && requiresForeignEntryPoint(e->getDecl()));
+    auto constant = SILDeclRef(e->getDecl());
+    if (e->getDecl()->getAttrs().hasAttribute<DistributedActorAttr>()) {
+      constant = constant.asDistributed(true);
+    } else {
+      constant = constant.asForeign(
+                   !isConstructorWithGeneratedAllocatorThunk(e->getDecl())
+                   && requiresForeignEntryPoint(e->getDecl()));
+    }
 
     auto captureInfo = SGF.SGM.Types.getLoweredLocalCaptures(constant);
     if (afd->getDeclContext()->isLocalContext() &&
@@ -1917,6 +1927,7 @@ buildBuiltinLiteralArgs(SILGenFunction &SGF, SGFContext C,
   case MagicIdentifierLiteralExpr::DSOHandle:
     llvm_unreachable("handled elsewhere");
   }
+  llvm_unreachable("covered switch");
 }
 
 static inline PreparedArguments buildBuiltinLiteralArgs(SILGenFunction &SGF,
@@ -3651,7 +3662,8 @@ class CallEmission {
 
   Callee callee;
   FormalEvaluationScope initialWritebackScope;
-  Optional<ActorIsolation> implicitAsyncIsolation;
+  Optional<ImplicitActorHopTarget> implicitActorHopTarget;
+  bool implicitlyThrows;
 
 public:
   /// Create an emission for a call of the given callee.
@@ -3659,7 +3671,8 @@ public:
                FormalEvaluationScope &&writebackScope)
       : SGF(SGF), callee(std::move(callee)),
         initialWritebackScope(std::move(writebackScope)),
-        implicitAsyncIsolation(None) {}
+        implicitActorHopTarget(None),
+        implicitlyThrows(false) {}
 
   /// A factory method for decomposing the apply expr \p e into a call
   /// emission.
@@ -3699,9 +3712,16 @@ public:
   /// Sets a flag that indicates whether this call be treated as being 
   /// implicitly async, i.e., it requires a hop_to_executor prior to 
   /// invoking the sync callee, etc.
-  void setImplicitlyAsync(Optional<ActorIsolation> implicitAsyncIsolation) {
-    this->implicitAsyncIsolation = implicitAsyncIsolation;
+  void setImplicitlyAsync(
+      Optional<ImplicitActorHopTarget> implicitActorHopTarget) {
+    this->implicitActorHopTarget = implicitActorHopTarget;
   }
+
+  /// Sets a flag that indicates whether this call be treated as being
+  /// implicitly throws, i.e., the call may be delegating to a proxy function
+  /// which actually is throwing, regardless whether or not the actual target
+  /// function can throw or not.
+  void setImplicitlyThrows(bool flag) { implicitlyThrows = flag; }
 
   CleanupHandle applyCoroutine(SmallVectorImpl<ManagedValue> &yields);
 
@@ -3874,6 +3894,8 @@ RValue CallEmission::applyNormalCall(SGFContext C) {
   // Get the callee type information.
   auto calleeTypeInfo = callee.getTypeInfo(SGF);
 
+  calleeTypeInfo.origFormalType = origFormalType;
+
   // In C language modes, substitute the type of the AbstractionPattern
   // so that we won't see type parameters down when we try to form bridging
   // conversions.
@@ -3891,6 +3913,8 @@ RValue CallEmission::applyNormalCall(SGFContext C) {
   calleeTypeInfo.substResultType = formalType.getResult();
 
   if (selfArg.hasValue() && callSite.hasValue()) {
+    calleeTypeInfo.origFormalType =
+        calleeTypeInfo.origFormalType->getFunctionResultType();
     calleeTypeInfo.origResultType =
       calleeTypeInfo.origResultType->getFunctionResultType();
     calleeTypeInfo.substResultType =
@@ -3926,7 +3950,7 @@ RValue CallEmission::applyNormalCall(SGFContext C) {
   return SGF.emitApply(
       std::move(resultPlan), std::move(argScope), uncurriedLoc.getValue(), mv,
       callee.getSubstitutions(), uncurriedArgs, calleeTypeInfo, options,
-      uncurriedContext, implicitAsyncIsolation);
+      uncurriedContext, implicitActorHopTarget);
 }
 
 static void emitPseudoFunctionArguments(SILGenFunction &SGF,
@@ -4241,28 +4265,9 @@ CallEmission CallEmission::forApplyExpr(SILGenFunction &SGF, ApplyExpr *e) {
                          apply.callSite->isNoThrows(),
                          apply.callSite->isNoAsync());
 
-    // For an implicitly-async call, determine the actor isolation.
-    if (apply.callSite->implicitlyAsync()) {
-      Optional<ActorIsolation> isolation;
-
-      // Check for global-actor isolation on the function type.
-      if (auto fnType = apply.callSite->getFn()->getType()
-              ->castTo<FunctionType>()) {
-        if (Type globalActor = fnType->getGlobalActor()) {
-          isolation = ActorIsolation::forGlobalActor(globalActor, false);
-        }
-      }
-
-      // If there was no global-actor isolation on the function type, find
-      // the callee declaration and retrieve the isolation from it.
-      if (!isolation) {
-        if (auto decl = emission.callee.getDecl())
-          isolation = getActorIsolation(decl);
-      }
-
-      assert(isolation && "Implicitly asynchronous call without isolation");
-      emission.setImplicitlyAsync(isolation);
-    }
+    // For an implicitly-async call, record the target of the actor hop.
+    if (auto target = apply.callSite->isImplicitlyAsync())
+      emission.setImplicitlyAsync(target);
   }
 
   return emission;
@@ -4306,6 +4311,29 @@ bool SILGenModule::isNonMutatingSelfIndirect(SILDeclRef methodRef) {
   return self.isFormalIndirect();
 }
 
+namespace {
+/// Cleanup to insert fix_lifetime and destroy
+class FixLifetimeDestroyCleanup : public Cleanup {
+  SILValue val;
+
+public:
+  FixLifetimeDestroyCleanup(SILValue val) : val(val) {}
+
+  void emit(SILGenFunction &SGF, CleanupLocation l,
+            ForUnwind_t forUnwind) override {
+    SGF.B.emitFixLifetime(l, val);
+    SGF.B.emitDestroyOperation(l, val);
+  }
+
+  void dump(SILGenFunction &SGF) const override {
+#ifndef NDEBUG
+    llvm::errs() << "FixLifetimeDestroyCleanup "
+                 << "State:" << getState() << " "
+                 << "Value: " << val << "\n";
+#endif
+  }
+};
+} // end anonymous namespace
 
 //===----------------------------------------------------------------------===//
 //                           Top Level Entrypoints
@@ -4315,13 +4343,14 @@ bool SILGenModule::isNonMutatingSelfIndirect(SILDeclRef methodRef) {
 /// lowered appropriately for the abstraction level but that the
 /// result does need to be turned back into something matching a
 /// formal type.
-RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
-                                 ArgumentScope &&argScope, SILLocation loc,
-                                 ManagedValue fn, SubstitutionMap subs,
-                                 ArrayRef<ManagedValue> args,
-                                 const CalleeTypeInfo &calleeTypeInfo,
-                                 ApplyOptions options, SGFContext evalContext,
-                                 Optional<ActorIsolation> implicitAsyncIsolation) {
+RValue SILGenFunction::emitApply(
+    ResultPlanPtr &&resultPlan,
+    ArgumentScope &&argScope, SILLocation loc,
+    ManagedValue fn, SubstitutionMap subs,
+    ArrayRef<ManagedValue> args,
+    const CalleeTypeInfo &calleeTypeInfo,
+    ApplyOptions options, SGFContext evalContext,
+    Optional<ImplicitActorHopTarget> implicitActorHopTarget) {
   auto substFnType = calleeTypeInfo.substFnType;
   auto substResultType = calleeTypeInfo.substResultType;
 
@@ -4376,7 +4405,9 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
     // we left during the first pass.
     auto &completionArgSlot = const_cast<ManagedValue &>(args[completionIndex]);
 
-    completionArgSlot = resultPlan->emitForeignAsyncCompletionHandler(*this, loc);
+    auto origFormalType = *calleeTypeInfo.origFormalType;
+    completionArgSlot = resultPlan->emitForeignAsyncCompletionHandler(
+        *this, origFormalType, loc);
 
   } else if (auto foreignError = calleeTypeInfo.foreign.error) {
     unsigned errorParamIndex =
@@ -4409,28 +4440,31 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
 
   ExecutorBreadcrumb breadcrumb;
   
-  // The presence of `implicitAsyncIsolation` indicates that the callee is a
+  // The presence of `implicitActorHopTarget` indicates that the callee is a
   // synchronous function isolated to an actor other than our own.
   // Such functions require the caller to hop to the callee's executor
   // prior to invoking the callee.
-  if (implicitAsyncIsolation) {
+  if (implicitActorHopTarget) {
     assert(F.isAsync() && "cannot hop_to_executor in a non-async func!");
 
-    switch (*implicitAsyncIsolation) {
-    case ActorIsolation::ActorInstance:
-      breadcrumb = emitHopToTargetActor(loc, *implicitAsyncIsolation,
-                                        args.back());
+    SILValue executor;
+    switch (*implicitActorHopTarget) {
+    case ImplicitActorHopTarget::InstanceSelf:
+      executor = emitLoadActorExecutor(loc, args.back());
       break;
 
-    case ActorIsolation::GlobalActor:
-    case ActorIsolation::GlobalActorUnsafe:
-      breadcrumb = emitHopToTargetActor(loc, *implicitAsyncIsolation, None);
+    case ImplicitActorHopTarget::GlobalActor:
+      executor = emitLoadGlobalActorExecutor(
+          implicitActorHopTarget->getGlobalActor());
       break;
 
-    case ActorIsolation::Independent:
-    case ActorIsolation::Unspecified:
-      llvm_unreachable("Not actor-isolated");
+    case ImplicitActorHopTarget::IsolatedParameter:
+      executor = emitLoadActorExecutor(
+          loc, args[implicitActorHopTarget->getIsolatedParameterIndex()]);
+      break;
     }
+
+    breadcrumb = emitHopToTargetExecutor(loc, executor);
   } else if (ExpectedExecutor && substFnType->isAsync()) {
     // Otherwise, if we're in an actor method ourselves, and we're calling into
     // any sort of async function, we'll want to make sure to hop back to our
@@ -4450,6 +4484,19 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
 
   // hop back to the current executor
   breadcrumb.emit(*this, loc);
+
+  // For objc async calls, lifetime extend the args until the result plan which
+  // generates `await_async_continuation`.
+  // Lifetime is extended by creating unmanaged copies here and by pushing the
+  // cleanups required just before the result plan is generated.
+  SmallVector<ManagedValue, 8> unmanagedCopies;
+  if (calleeTypeInfo.foreign.async) {
+    for (auto arg : args) {
+      if (arg.hasCleanup()) {
+        unmanagedCopies.push_back(arg.unmanagedCopy(*this, loc));
+      }
+    }
+  }
 
   // Pop the argument scope.
   argScope.pop();
@@ -4526,11 +4573,29 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
     emitForeignErrorCheck(loc, directResults, errorTemp, doesNotThrow,
                           *foreignError);
   }
-  
+
+  // For objc async calls, push cleanup to be used on throw paths in the result
+  // planner.
+  for (unsigned i : indices(unmanagedCopies)) {
+    SILValue value = unmanagedCopies[i].getValue();
+    Cleanups.pushCleanup<FixLifetimeDestroyCleanup>(value);
+    unmanagedCopies[i] = ManagedValue(value, Cleanups.getTopCleanup());
+  }
+
   auto directResultsArray = makeArrayRef(directResults);
   RValue result =
     resultPlan->finish(*this, loc, substResultType, directResultsArray);
   assert(directResultsArray.empty() && "didn't claim all direct results");
+
+  // For objc async calls, generate cleanup on the resume path here and forward
+  // the previously pushed cleanups.
+  if (calleeTypeInfo.foreign.async) {
+    for (auto unmanagedCopy : unmanagedCopies) {
+      auto value = unmanagedCopy.forward(*this);
+      B.emitFixLifetime(loc, value);
+      B.emitDestroyOperation(loc, value);
+    }
+  }
 
   return result;
 }
@@ -4983,6 +5048,11 @@ RValue SILGenFunction::emitApplyMethod(SILLocation loc, ConcreteDeclRef declRef,
   // Form the reference to the method.
   auto callRef = SILDeclRef(call, SILDeclRef::Kind::Func)
                      .asForeign(requiresForeignEntryPoint(declRef.getDecl()));
+
+  if (call->isDistributed()) {
+    callRef = callRef.asDistributed(true);
+  }
+
   auto declRefConstant = getConstantInfo(getTypeExpansionContext(), callRef);
   auto subs = declRef.getSubstitutions();
   bool throws = false;
@@ -5763,7 +5833,10 @@ SILGenFunction::emitCoroutineAccessor(SILLocation loc, SILDeclRef accessor,
 }
 
 ManagedValue SILGenFunction::emitAsyncLetStart(
-    SILLocation loc, Type functionType, ManagedValue taskFunction) {
+    SILLocation loc,
+    SILValue taskOptions,
+    Type functionType, ManagedValue taskFunction,
+    SILValue resultBuf) {
   ASTContext &ctx = getASTContext();
   Type resultType = functionType->castTo<FunctionType>()->getResult();
   Type replacementTypes[] = {resultType};
@@ -5772,8 +5845,7 @@ ManagedValue SILGenFunction::emitAsyncLetStart(
   auto subs = SubstitutionMap::get(startBuiltin->getGenericSignature(),
                                    replacementTypes,
                                    ArrayRef<ProtocolConformanceRef>{});
-
-  CanType origParamType = startBuiltin->getParameters()->get(1)
+  CanType origParamType = startBuiltin->getParameters()->get(2)
       ->getInterfaceType()->getCanonicalType();
   CanType substParamType = origParamType.subst(subs)->getCanonicalType();
 
@@ -5786,9 +5858,9 @@ ManagedValue SILGenFunction::emitAsyncLetStart(
 
   auto apply = B.createBuiltin(
       loc,
-      ctx.getIdentifier(getBuiltinName(BuiltinValueKind::StartAsyncLet)),
+      ctx.getIdentifier(getBuiltinName(BuiltinValueKind::StartAsyncLetWithLocalBuffer)),
       getLoweredType(ctx.TheRawPointerType), subs,
-      { taskFunction.forward(*this) });
+      {taskOptions, taskFunction.forward(*this), resultBuf});
 
   return ManagedValue::forUnmanaged(apply);
 }
@@ -5804,43 +5876,121 @@ ManagedValue SILGenFunction::emitCancelAsyncTask(
   return ManagedValue::forUnmanaged(apply);
 }
 
-void SILGenFunction::completeAsyncLetChildTask(
-    PatternBindingDecl *patternBinding, unsigned index) {
-  SILValue asyncLet;
-  bool isThrowing;
-  std::tie(asyncLet, isThrowing)= AsyncLetChildTasks[{patternBinding, index}];
+ManagedValue SILGenFunction::emitReadAsyncLetBinding(SILLocation loc,
+                                                     VarDecl *var) {
+  auto patternBinding = var->getParentPatternBinding();
+  auto index = patternBinding->getPatternEntryIndexForVarDecl(var);
+  auto childTask = AsyncLetChildTasks[{patternBinding, index}];
 
-  Type childResultType = patternBinding->getPattern(index)->getType();
+  auto pattern = patternBinding->getPattern(index);
+  Type formalPatternType = pattern->getType();
+  // async let context stores the maximally-abstracted representation.
+  SILType loweredOpaquePatternType = getLoweredType(AbstractionPattern::getOpaque(),
+                                                    formalPatternType);
 
-  auto asyncLetGet = isThrowing
+  auto asyncLetGet = childTask.isThrowing
       ? SGM.getAsyncLetGetThrowing()
       : SGM.getAsyncLetGet();
 
-  // Get the result from the async-let future.
-  Type replacementTypes[] = {childResultType};
-  auto subs = SubstitutionMap::get(asyncLetGet->getGenericSignature(),
-                                   replacementTypes,
-                                   ArrayRef<ProtocolConformanceRef>{});
-  RValue childResult = emitApplyOfLibraryIntrinsic(
-      SILLocation(patternBinding), asyncLetGet, subs,
-      { ManagedValue::forTrivialObjectRValue(asyncLet) },
-      SGFContext());
+  // The intrinsic returns a pointer to the address of the result value inside
+  // the async let task context.
+  emitApplyOfLibraryIntrinsic(loc, asyncLetGet, {},
+                   {ManagedValue::forTrivialObjectRValue(childTask.asyncLet),
+                    ManagedValue::forTrivialObjectRValue(childTask.resultBuf)},
+                   SGFContext());
+  
+  auto resultAddr = B.createPointerToAddress(loc, childTask.resultBuf,
+                loweredOpaquePatternType.getAddressType(),
+                /*strict*/ true,
+                /*invariant*/ true);
+  
+  // Project the address of the variable within the pattern binding result.
+  struct ProjectResultVisitor: public PatternVisitor<ProjectResultVisitor>
+  {
+    SILGenFunction &SGF;
+    SILLocation loc;
+    VarDecl *var;
+    SILValue resultAddr, varAddr;
+    SmallVector<unsigned, 4> path;
+    
+    ProjectResultVisitor(SILGenFunction &SGF,
+                         SILLocation loc,
+                         VarDecl *var,
+                         SILValue resultAddr)
+      : SGF(SGF), loc(loc), var(var), resultAddr(resultAddr), varAddr() {}
 
-  // Write the child result into the pattern variables.
-  emitAssignToPatternVars(
-      SILLocation(patternBinding), patternBinding->getPattern(index),
-      std::move(childResult));
+    // Walk through non-binding patterns.
+    void visitParenPattern(ParenPattern *P) {
+      return visit(P->getSubPattern());
+    }
+    void visitTypedPattern(TypedPattern *P) {
+      return visit(P->getSubPattern());
+    }
+    void visitBindingPattern(BindingPattern *P) {
+      return visit(P->getSubPattern());
+    }
+    void visitTuplePattern(TuplePattern *P) {
+      path.push_back(0);
+      for (unsigned i : indices(P->getElements())) {
+        path.back() = i;
+        visit(P->getElement(i).getPattern());
+        // If we found the variable of interest, we're done.
+        if (varAddr)
+          return;
+      }
+      path.pop_back();
+    }
+    void visitAnyPattern(AnyPattern *P) {}
+
+    // When we see the variable binding, project it out of the aggregate.
+    void visitNamedPattern(NamedPattern *P) {
+      if (P->getDecl() != var)
+        return;
+      
+      assert(!varAddr && "var appears in pattern more than once?");
+      varAddr = resultAddr;
+      for (unsigned component : path) {
+        varAddr = SGF.B.createTupleElementAddr(loc, varAddr, component);
+      }
+    }
+
+  #define INVALID_PATTERN(Id, Parent) \
+    void visit##Id##Pattern(Id##Pattern *) { \
+      llvm_unreachable("pattern not valid in var binding"); \
+    }
+  #define PATTERN(Id, Parent)
+  #define REFUTABLE_PATTERN(Id, Parent) INVALID_PATTERN(Id, Parent)
+  #include "swift/AST/PatternNodes.def"
+  #undef INVALID_PATTERN
+  };
+
+  ProjectResultVisitor visitor(*this, loc, var, resultAddr);
+  visitor.visit(pattern);
+  assert(visitor.varAddr && "didn't find var in pattern?");
+  
+  // Load and reabstract the value if needed.
+  auto genericSig = F.getLoweredFunctionType()->getInvocationGenericSignature();
+  auto substVarTy = var->getType()->getCanonicalType(genericSig);
+  auto substAbstraction = AbstractionPattern(genericSig, substVarTy);
+  return emitLoad(loc, visitor.varAddr, substAbstraction, substVarTy,
+                  getTypeLowering(substAbstraction, substVarTy),
+                  SGFContext(), IsNotTake);
 }
 
-ManagedValue SILGenFunction::emitEndAsyncLet(
-    SILLocation loc, SILValue asyncLet) {
-  ASTContext &ctx = getASTContext();
-  auto apply = B.createBuiltin(
-      loc,
-      ctx.getIdentifier(getBuiltinName(BuiltinValueKind::EndAsyncLet)),
-      getLoweredType(ctx.TheEmptyTupleType), SubstitutionMap(),
-      { asyncLet });
-  return ManagedValue::forUnmanaged(apply);
+void SILGenFunction::emitFinishAsyncLet(
+    SILLocation loc, SILValue asyncLet, SILValue resultPtr) {
+  // This runtime function cancels the task, awaits its completion, and
+  // destroys the value in the result buffer if necessary.
+  emitApplyOfLibraryIntrinsic(loc, SGM.getFinishAsyncLet(), {},
+                             {ManagedValue::forTrivialObjectRValue(asyncLet),
+                              ManagedValue::forTrivialObjectRValue(resultPtr)},
+                             SGFContext());
+  // This builtin ends the lifetime of the allocation for the async let.
+  auto &ctx = getASTContext();
+  B.createBuiltin(loc,
+    ctx.getIdentifier(getBuiltinName(BuiltinValueKind::EndAsyncLetLifetime)),
+    getLoweredType(ctx.TheEmptyTupleType), {},
+    {asyncLet});
 }
 
 // Create a partial application of a dynamic method, applying bridging thunks

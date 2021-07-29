@@ -235,7 +235,7 @@ protected:
   using PathEltKind = ConstraintLocator::PathElementKind;
   using DiagOnDecl = Diag<DescriptiveDeclKind, DeclName, Type, Type>;
   using DiagInReference = Diag<DescriptiveDeclKind, DeclName, Type, Type, Type>;
-  using DiagAsNote = Diag<Type, Type, Type, Type, StringRef>;
+  using DiagAsNote = Diag<Type, Type, Type, Type>;
 
   /// If this failure associated with one of the conditional requirements,
   /// this field would represent conformance where requirement comes from.
@@ -608,7 +608,10 @@ public:
   ContextualFailure(const Solution &solution, ContextualTypePurpose purpose,
                     Type lhs, Type rhs, ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator), CTP(purpose), RawFromType(lhs),
-        RawToType(rhs) {}
+        RawToType(rhs) {
+    assert(lhs && "Expected a valid 'from' type");
+    assert(rhs && "Expected a valid 'to' type");
+  }
 
   SourceLoc getLoc() const override;
 
@@ -737,6 +740,11 @@ private:
   /// argument, or trying to assign it to a variable which expects @escaping
   /// or @Sendable function.
   bool diagnoseParameterUse() const;
+
+  /// Emit a tailored diagnostic for a no-escape/espace mismatch for function
+  /// arguments where the mismatch has to take into account that a
+  /// function type subtype relation in the parameter position is contravariant.
+  bool diagnoseFunctionParameterEscapenessMismatch(AssignExpr *) const;
 };
 
 /// Diagnose failure where a global actor attribute is dropped when
@@ -2493,7 +2501,7 @@ public:
   bool diagnoseAsError() override;
 
 private:
-  std::tuple<Type, Type, unsigned> unwrapedTypes() const;
+  std::tuple<Type, Type, int> unwrappedTypes() const;
 
   bool diagnoseIfExpr() const;
 

@@ -2023,7 +2023,7 @@ ConstantFolder::processWorkList() {
 
     // Eagerly DCE. We do this after visiting all users to ensure we don't
     // invalidate the uses iterator.
-    deleter.cleanUpDeadInstructions();
+    deleter.cleanupDeadInstructions();
   }
 
   // TODO: refactor this code outside of the method. Passes should not merge

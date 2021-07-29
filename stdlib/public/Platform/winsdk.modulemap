@@ -485,6 +485,13 @@ module WinSDK [system] {
 
     link "AdvAPI32.Lib"
   }
+  
+  module WinUSB {
+    header "winusb.h"
+    export *
+    
+    link "winusb.lib"
+  }
 
   // TODO(compnerd) does it make sense to implicitly export this API surface?
   // It seems to be meant for device drivers.

@@ -509,6 +509,7 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
     case ComponentKind::OptionalWrap:
     case ComponentKind::Identity:
     case ComponentKind::DictionaryKey:
+    case ComponentKind::CodeCompletion:
       // These components don't have any callee associated, so just continue.
       break;
     }
@@ -997,8 +998,11 @@ ConstraintSystem::getPropertyWrapperInformation(
         if (!decl->hasAttachedPropertyWrapper())
           return None;
 
-        return std::make_pair(decl,
-                              decl->getPropertyWrapperBackingPropertyType());
+        auto backingTy = decl->getPropertyWrapperBackingPropertyType();
+        if (!backingTy)
+          return None;
+
+        return std::make_pair(decl, backingTy);
       });
 }
 
@@ -1398,12 +1402,8 @@ static void bindArchetypesFromContext(
       continue;
     }
 
-    // If it's not generic, there's nothing to do.
     auto genericSig = parentDC->getGenericSignatureOfContext();
-    if (!genericSig)
-      break;
-
-    for (auto *paramTy : genericSig->getGenericParams()) {
+    for (auto *paramTy : genericSig.getGenericParams()) {
       Type contextTy = cs.DC->mapTypeIntoContext(paramTy);
       bindPrimaryArchetype(paramTy, contextTy);
     }
@@ -1435,7 +1435,7 @@ void ConstraintSystem::openGenericParameters(DeclContext *outerDC,
   assert(sig);
 
   // Create the type variables for the generic parameters.
-  for (auto gp : sig->getGenericParams()) {
+  for (auto gp : sig.getGenericParams()) {
     auto *paramLocator = getConstraintLocator(
         locator.withPathElement(LocatorPathElt::GenericParameter(gp)));
 
@@ -1458,7 +1458,7 @@ void ConstraintSystem::openGenericRequirements(
     DeclContext *outerDC, GenericSignature signature,
     bool skipProtocolSelfConstraint, ConstraintLocatorBuilder locator,
     llvm::function_ref<Type(Type)> substFn) {
-  auto requirements = signature->getRequirements();
+  auto requirements = signature.getRequirements();
   for (unsigned pos = 0, n = requirements.size(); pos != n; ++pos) {
     const auto &req = requirements[pos];
 
@@ -2957,6 +2957,10 @@ Type ConstraintSystem::simplifyTypeImpl(Type type,
       // Simplify the base.
       Type newBase = simplifyTypeImpl(depMemTy->getBase(), getFixedTypeFn);
 
+      if (newBase->isPlaceholder()) {
+        return PlaceholderType::get(getASTContext(), depMemTy);
+      }
+
       // If nothing changed, we're done.
       if (newBase.getPointer() == depMemTy->getBase().getPointer())
         return type;
@@ -3200,8 +3204,8 @@ static void diagnoseOperatorAmbiguity(ConstraintSystem &cs,
 
   const auto &solution = solutions.front();
   if (auto *binaryOp = dyn_cast<BinaryExpr>(applyExpr)) {
-    auto *lhs = binaryOp->getArg()->getElement(0);
-    auto *rhs = binaryOp->getArg()->getElement(1);
+    auto *lhs = binaryOp->getLHS();
+    auto *rhs = binaryOp->getRHS();
 
     auto lhsType =
         solution.simplifyType(solution.getType(lhs))->getRValueType();
@@ -3676,10 +3680,16 @@ static bool diagnoseAmbiguity(
         assert(fn);
 
         if (fn->getNumParams() == 1) {
+          auto argExpr =
+              simplifyLocatorToAnchor(solution.Fixes.front()->getLocator());
+          assert(argExpr);
+
           const auto &param = fn->getParams()[0];
+          auto argType = solution.simplifyType(cs.getType(argExpr));
+
           DE.diagnose(noteLoc, diag::candidate_has_invalid_argument_at_position,
                       solution.simplifyType(param.getPlainType()),
-                      /*position=*/1, param.isInOut());
+                      /*position=*/1, param.isInOut(), argType);
         } else {
           DE.diagnose(noteLoc, diag::candidate_partial_match,
                       fn->getParamListAsString(fn->getParams()));
@@ -3701,6 +3711,160 @@ static bool diagnoseAmbiguity(
   }
 
   return diagnosed;
+}
+
+using FixInContext = std::pair<const Solution *, const ConstraintFix *>;
+
+// Attempts to diagnose function call ambiguities of types inferred for a result
+// generic parameter from contextual type and a closure argument that
+// conflicting infer a different type for the same argument. Example:
+//   func callit<T>(_ f: () -> T) -> T {
+//     f()
+//   }
+//
+//   func context() -> Int {
+//     callit {
+//       print("hello")
+//     }
+//   }
+// Where generic argument `T` can be inferred both as `Int` from contextual
+// result and `Void` from the closure argument result.
+static bool diagnoseContextualFunctionCallGenericAmbiguity(
+    ConstraintSystem &cs, ArrayRef<FixInContext> contextualFixes,
+    ArrayRef<FixInContext> allFixes) {
+
+  if (contextualFixes.empty())
+    return false;
+
+  auto contextualFix = contextualFixes.front();
+  if (!std::all_of(contextualFixes.begin() + 1, contextualFixes.end(),
+                   [&contextualFix](FixInContext fix) {
+                     return fix.second->getLocator() ==
+                            contextualFix.second->getLocator();
+                   }))
+    return false;
+
+  auto fixLocator = contextualFix.second->getLocator();
+  auto contextualAnchor = fixLocator->getAnchor();
+  auto *AE = getAsExpr<ApplyExpr>(contextualAnchor);
+  // All contextual failures anchored on the same function call.
+  if (!AE)
+    return false;
+
+  auto fnLocator = cs.getConstraintLocator(AE->getSemanticFn());
+  auto overload = contextualFix.first->getOverloadChoiceIfAvailable(fnLocator);
+  if (!overload)
+    return false;
+
+  auto applyFnType = overload->openedType->castTo<FunctionType>();
+  auto resultTypeVar = applyFnType->getResult()->getAs<TypeVariableType>();
+  if (!resultTypeVar)
+    return false;
+
+  auto *GP = resultTypeVar->getImpl().getGenericParameter();
+  if (!GP)
+    return false;
+
+  auto applyLoc =
+      cs.getConstraintLocator(AE, {LocatorPathElt::ApplyArgument()});
+  auto argMatching =
+      contextualFix.first->argumentMatchingChoices.find(applyLoc);
+  if (argMatching == contextualFix.first->argumentMatchingChoices.end()) {
+    return false;
+  }
+
+  auto typeParamResultInvolvesTypeVar = [&cs, &applyFnType, &argMatching](
+                                            unsigned argIdx,
+                                            TypeVariableType *typeVar) {
+    auto argParamMatch = argMatching->second.parameterBindings[argIdx];
+    auto param = applyFnType->getParams()[argParamMatch.front()];
+    if (param.isVariadic()) {
+      auto paramType = param.getParameterType();
+      // Variadic parameter is constructed as an ArraySliceType(which is
+      // just sugared type for a bound generic) with the closure type as
+      // element.
+      auto baseType = paramType->getDesugaredType()->castTo<BoundGenericType>();
+      auto paramFnType = baseType->getGenericArgs()[0]->castTo<FunctionType>();
+      return cs.typeVarOccursInType(typeVar, paramFnType->getResult());
+    }
+    auto paramFnType = param.getParameterType()->castTo<FunctionType>();
+    return cs.typeVarOccursInType(typeVar, paramFnType->getResult());
+  };
+
+  llvm::SmallVector<ClosureExpr *, 2> closureArguments;
+  // A single closure argument.
+  if (auto *closure =
+          getAsExpr<ClosureExpr>(AE->getArg()->getSemanticsProvidingExpr())) {
+    if (typeParamResultInvolvesTypeVar(/*paramIdx=*/0, resultTypeVar))
+      closureArguments.push_back(closure);
+  } else if (auto *argTuple = getAsExpr<TupleExpr>(AE->getArg())) {
+    for (auto i : indices(argTuple->getElements())) {
+      auto arg = argTuple->getElements()[i];
+      auto *closure = getAsExpr<ClosureExpr>(arg);
+      if (closure &&
+          typeParamResultInvolvesTypeVar(/*paramIdx=*/i, resultTypeVar)) {
+        closureArguments.push_back(closure);
+      }
+    }
+  }
+
+  // If no closure result's involves the generic parameter, just bail because we
+  // won't find a conflict.
+  if (closureArguments.empty())
+    return false;
+
+  // At least one closure where result type involves the generic parameter.
+  // So let's try to collect the set of fixed types for the generic parameter
+  // from all the closure contextual fix/solutions and if there are more than
+  // one fixed type diagnose it.
+  llvm::SmallSetVector<Type, 4> genericParamInferredTypes;
+  for (auto &fix : contextualFixes)
+    genericParamInferredTypes.insert(fix.first->getFixedType(resultTypeVar));
+
+  if (llvm::all_of(allFixes, [&](FixInContext fix) {
+        auto fixLocator = fix.second->getLocator();
+        if (fixLocator->isForContextualType())
+          return true;
+
+        if (!(fix.second->getKind() == FixKind::ContextualMismatch ||
+              fix.second->getKind() == FixKind::AllowTupleTypeMismatch))
+          return false;
+
+        auto anchor = fixLocator->getAnchor();
+        if (!(anchor == contextualAnchor ||
+              fixLocator->isLastElement<LocatorPathElt::ClosureResult>() ||
+              fixLocator->isLastElement<LocatorPathElt::ClosureBody>()))
+          return false;
+
+        genericParamInferredTypes.insert(
+            fix.first->getFixedType(resultTypeVar));
+        return true;
+      })) {
+
+    if (genericParamInferredTypes.size() != 2)
+      return false;
+
+    auto &DE = cs.getASTContext().Diags;
+    llvm::SmallString<64> arguments;
+    llvm::raw_svector_ostream OS(arguments);
+    interleave(
+        genericParamInferredTypes,
+        [&](Type argType) { OS << "'" << argType << "'"; },
+        [&OS] { OS << " vs. "; });
+
+    DE.diagnose(AE->getLoc(), diag::conflicting_arguments_for_generic_parameter,
+                GP, OS.str());
+
+    DE.diagnose(AE->getLoc(),
+                diag::generic_parameter_inferred_from_result_context, GP,
+                genericParamInferredTypes.back());
+    DE.diagnose(closureArguments.front()->getStartLoc(),
+                diag::generic_parameter_inferred_from_closure, GP,
+                genericParamInferredTypes.front());
+
+    return true;
+  }
+  return false;
 }
 
 bool ConstraintSystem::diagnoseAmbiguityWithFixes(
@@ -3746,6 +3910,16 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
     }
   }
 
+  // If there either no fixes at all or all of the are warnings,
+  // let's diagnose this as regular ambiguity.
+  if (llvm::all_of(solutions, [](const Solution &solution) {
+        return llvm::all_of(solution.Fixes, [](const ConstraintFix *fix) {
+          return fix->isWarning();
+        });
+      })) {
+    return diagnoseAmbiguity(solutions);
+  }
+
   // Algorithm is as follows:
   //
   // a. Aggregate all of the available fixes based on callee locator;
@@ -3755,16 +3929,15 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
   // d. Diagnose remaining (uniqued based on kind + locator) fixes
   //    iff they appear in all of the solutions.
 
-  using Fix = std::pair<const Solution *, const ConstraintFix *>;
-
-  llvm::SmallSetVector<Fix, 4> fixes;
+  llvm::SmallSetVector<FixInContext, 4> fixes;
   for (auto &solution : solutions) {
     for (auto *fix : solution.Fixes)
       fixes.insert({&solution, fix});
   }
 
-  llvm::MapVector<ConstraintLocator *, SmallVector<Fix, 4>> fixesByCallee;
-  llvm::SmallVector<Fix, 4> contextualFixes;
+  llvm::MapVector<ConstraintLocator *, SmallVector<FixInContext, 4>>
+      fixesByCallee;
+  llvm::SmallVector<FixInContext, 4> contextualFixes;
 
   for (const auto &entry : fixes) {
     const auto &solution = *entry.first;
@@ -3784,7 +3957,7 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
   bool diagnosed = false;
 
   // All of the fixes which have been considered already.
-  llvm::SmallSetVector<Fix, 4> consideredFixes;
+  llvm::SmallSetVector<FixInContext, 4> consideredFixes;
 
   for (const auto &ambiguity : solutionDiff.overloads) {
     auto fixes = fixesByCallee.find(ambiguity.locator);
@@ -3807,7 +3980,8 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
   // overload choices.
   fixes.set_subtract(consideredFixes);
 
-  llvm::MapVector<std::pair<FixKind, ConstraintLocator *>, SmallVector<Fix, 4>>
+  llvm::MapVector<std::pair<FixKind, ConstraintLocator *>,
+                  SmallVector<FixInContext, 4>>
       fixesByKind;
 
   for (const auto &entry : fixes) {
@@ -3830,6 +4004,10 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
       diagnosed |= aggregate.front().second->diagnoseForAmbiguity(aggregate);
     }
   }
+
+  if (!diagnosed && diagnoseContextualFunctionCallGenericAmbiguity(
+                        *this, contextualFixes, fixes.getArrayRef()))
+    return true;
 
   return diagnosed;
 }
@@ -4106,6 +4284,10 @@ void constraints::simplifyLocator(ASTNode &anchor,
       // Arguments in autoclosure positions, lvalue and rvalue adjustments,
       // unresolved members, and implicit callAsFunction references are
       // implicit.
+      path = path.slice(1);
+      continue;
+
+   case ConstraintLocator::TupleType:
       path = path.slice(1);
       continue;
 
@@ -4929,6 +5111,7 @@ ConstraintSystem::isConversionEphemeral(ConversionRestrictionKind conversion,
 
 Expr *ConstraintSystem::buildAutoClosureExpr(Expr *expr,
                                              FunctionType *closureType,
+                                             DeclContext *ClosureContext,
                                              bool isDefaultWrappedValue,
                                              bool isAsyncLetWrapper) {
   auto &Context = DC->getASTContext();
@@ -4947,8 +5130,9 @@ Expr *ConstraintSystem::buildAutoClosureExpr(Expr *expr,
     newClosureType = closureType->withExtInfo(info.withNoEscape(false))
                          ->castTo<FunctionType>();
 
-  auto *closure = new (Context) AutoClosureExpr(
-      expr, newClosureType, AutoClosureExpr::InvalidDiscriminator, DC);
+  auto *closure = new (Context)
+      AutoClosureExpr(expr, newClosureType,
+                      AutoClosureExpr::InvalidDiscriminator, ClosureContext);
 
   closure->setParameterList(ParameterList::createEmpty(Context));
 
@@ -5400,7 +5584,7 @@ static Optional<Requirement> getRequirement(ConstraintSystem &cs,
   if (auto openedGeneric =
           reqLocator->findLast<LocatorPathElt::OpenedGeneric>()) {
     auto signature = openedGeneric->getSignature();
-    return signature->getRequirements()[reqLoc->getIndex()];
+    return signature.getRequirements()[reqLoc->getIndex()];
   }
 
   return None;

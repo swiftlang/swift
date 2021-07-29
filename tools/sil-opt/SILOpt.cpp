@@ -20,6 +20,7 @@
 #include "swift/AST/SILOptions.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/LLVMInitialize.h"
+#include "swift/Basic/InitializeLibSwift.h"
 #include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
@@ -104,6 +105,10 @@ EnableExperimentalConcurrency("enable-experimental-concurrency",
                    llvm::cl::desc("Enable experimental concurrency model."));
 
 static llvm::cl::opt<bool>
+EnableExperimentalDistributed("enable-experimental-distributed",
+                   llvm::cl::desc("Enable experimental distributed actors."));
+
+static llvm::cl::opt<bool>
 VerifyExclusivity("enable-verify-exclusivity",
                   llvm::cl::desc("Verify the access markers used to enforce exclusivity."));
 
@@ -116,6 +121,14 @@ static llvm::cl::opt<bool> EnableOSSAModules(
     llvm::cl::desc("Do we always serialize SIL in OSSA form? If "
                    "this is disabled we do not serialize in OSSA "
                    "form when optimizing."));
+
+static llvm::cl::opt<bool> EnableCopyPropagation(
+    "enable-copy-propagation",
+    llvm::cl::desc("Enable the copy propagation pass."));
+
+static llvm::cl::opt<bool> DisableCopyPropagation(
+    "disable-copy-propagation",
+    llvm::cl::desc("Disable the copy propagation pass."));
 
 namespace {
 enum class EnforceExclusivityMode {
@@ -353,6 +366,8 @@ int main(int argc, char **argv) {
 
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift SIL optimizer\n");
 
+  initializeLibSwift();
+
   if (PrintStats)
     llvm::EnableStatistics();
 
@@ -463,6 +478,8 @@ int main(int argc, char **argv) {
   SILOpts.EnableSpeculativeDevirtualization = EnableSpeculativeDevirtualization;
   SILOpts.IgnoreAlwaysInline = IgnoreAlwaysInline;
   SILOpts.EnableOSSAModules = EnableOSSAModules;
+  SILOpts.EnableCopyPropagation = EnableCopyPropagation;
+  SILOpts.DisableCopyPropagation = DisableCopyPropagation;
 
   serialization::ExtendedValidationInfo extendedInfo;
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =

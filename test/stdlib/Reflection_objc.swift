@@ -9,9 +9,6 @@
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
-// rdar://problem/75006694
-// XFAIL: OS=macosx && CPU=arm64
-
 //
 // DO NOT add more tests to this file.  Add them to test/1_stdlib/Runtime.swift.
 //
@@ -69,8 +66,8 @@ print("ObjC quick look objects:")
 // CHECK-LABEL: ObjC enums:
 print("ObjC enums:")
 
-// CHECK-NEXT: We cannot reflect NSComparisonResult yet
-print("We cannot reflect \(ComparisonResult.orderedAscending) yet")
+// CHECK-NEXT: We cannot properly reflect NSComparisonResult(rawValue: -1) yet
+print("We cannot properly reflect \(ComparisonResult.orderedAscending) yet")
 
 // Don't crash when introspecting framework types such as NSURL.
 // <rdar://problem/16592777>

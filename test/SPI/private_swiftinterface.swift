@@ -73,8 +73,8 @@ public func foo() {}
 }
 
 @_spi(MySPI) public extension SPIClassLocal {
-// CHECK-PRIVATE: @_spi(MySPI) extension SPIClassLocal
-// CHECK-PUBLIC-NOT: extension SPIClassLocal
+// CHECK-PRIVATE: @_spi(MySPI) extension {{.+}}.SPIClassLocal
+// CHECK-PUBLIC-NOT: extension {{.+}}.SPIClassLocal
 
   @_spi(MySPI) func extensionMethod() {}
   // CHECK-PRIVATE: @_spi(MySPI) public func extensionMethod
@@ -110,8 +110,8 @@ private class PrivateClassLocal {}
 // CHECK-PUBLIC-NOT: useOfSPITypeOk
 
 @_spi(LocalSPI) extension SPIClass {
-  // CHECK-PRIVATE: @_spi(LocalSPI) extension SPIClass
-  // CHECK-PUBLIC-NOT: SPIClass
+  // CHECK-PRIVATE: @_spi(LocalSPI) extension SPIHelper.SPIClass
+  // CHECK-PUBLIC-NOT: SPIHelper.SPIClass
 
   @_spi(LocalSPI) public func extensionSPIMethod() {}
   // CHECK-PRIVATE: @_spi(LocalSPI) public func extensionSPIMethod()
@@ -182,7 +182,7 @@ private protocol PrivateConstraint {}
 
 @_spi(LocalSPI)
 extension PublicType: SPIProto2 where T: SPIProto2 {}
-// CHECK-PRIVATE: extension PublicType : {{.*}}.SPIProto2 where T : {{.*}}.SPIProto2
+// CHECK-PRIVATE: extension {{.*}}.PublicType : {{.*}}.SPIProto2 where T : {{.*}}.SPIProto2
 // CHECK-PUBLIC-NOT: _ConstraintThatIsNotPartOfTheAPIOfThisLibrary
 
 public protocol LocalPublicProto {}

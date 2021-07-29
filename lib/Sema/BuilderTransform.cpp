@@ -502,15 +502,19 @@ protected:
     if (!cs || !thenVar || (elseChainVar && !*elseChainVar))
       return nullptr;
 
-    // If there is a #available in the condition, the 'then' will need to
-    // be wrapped in a call to buildLimitedAvailability(_:), if available.
     Expr *thenVarRefExpr = buildVarRef(
         thenVar, ifStmt->getThenStmt()->getEndLoc());
-    if (findAvailabilityCondition(ifStmt->getCond()) &&
-        builderSupports(ctx.Id_buildLimitedAvailability)) {
-      thenVarRefExpr = buildCallIfWanted(
-          ifStmt->getThenStmt()->getEndLoc(), ctx.Id_buildLimitedAvailability,
-          { thenVarRefExpr }, { Identifier() });
+
+    // If there is a #available in the condition, wrap the 'then' in a call to
+    // buildLimitedAvailability(_:).
+    auto availabilityCond = findAvailabilityCondition(ifStmt->getCond());
+    bool supportsAvailability =
+        availabilityCond && builderSupports(ctx.Id_buildLimitedAvailability);
+    if (supportsAvailability &&
+        !availabilityCond->getAvailability()->isUnavailability()) {
+      thenVarRefExpr = buildCallIfWanted(ifStmt->getThenStmt()->getEndLoc(),
+                                         ctx.Id_buildLimitedAvailability,
+                                         {thenVarRefExpr}, {Identifier()});
     }
 
     // Prepare the `then` operand by wrapping it to produce a chain result.
@@ -533,12 +537,22 @@ protected:
       elseExpr = buildVarRef(*elseChainVar, ifStmt->getEndLoc());
       elseLoc = ifStmt->getElseLoc();
 
-    // - Otherwise, wrap it to produce a chain result.
+      // - Otherwise, wrap it to produce a chain result.
     } else {
+      Expr *elseVarRefExpr = buildVarRef(*elseChainVar, ifStmt->getEndLoc());
+
+      // If there is a #unavailable in the condition, wrap the 'else' in a call
+      // to buildLimitedAvailability(_:).
+      if (supportsAvailability &&
+          availabilityCond->getAvailability()->isUnavailability()) {
+        elseVarRefExpr = buildCallIfWanted(ifStmt->getEndLoc(),
+                                           ctx.Id_buildLimitedAvailability,
+                                           {elseVarRefExpr}, {Identifier()});
+      }
+
+      elseExpr = buildWrappedChainPayload(elseVarRefExpr, payloadIndex + 1,
+                                          numPayloads, isOptional);
       elseLoc = ifStmt->getElseLoc();
-      elseExpr = buildWrappedChainPayload(
-          buildVarRef(*elseChainVar, ifStmt->getEndLoc()),
-          payloadIndex + 1, numPayloads, isOptional);
     }
 
     // The operand should have optional type if we had optional results,
@@ -1265,9 +1279,18 @@ public:
     // this warning to an error.
     if (auto availabilityCond = findAvailabilityCondition(ifStmt->getCond())) {
       SourceLoc loc = availabilityCond->getStartLoc();
-      Type thenBodyType = solution.simplifyType(
+      Type bodyType;
+      if (availabilityCond->getAvailability()->isUnavailability()) {
+        // For #unavailable, we need to check the "else".
+        Type elseBodyType = solution.simplifyType(
+          solution.getType(target.captured.second[1]));
+        bodyType = elseBodyType;
+      } else {
+        Type thenBodyType = solution.simplifyType(
           solution.getType(target.captured.second[0]));
-      thenBodyType.findIf([&](Type type) {
+        bodyType = thenBodyType;
+      }
+      bodyType.findIf([&](Type type) {
         auto nominal = type->getAnyNominal();
         if (!nominal)
           return false;
@@ -1587,10 +1610,7 @@ Optional<BraceStmt *> TypeChecker::applyResultBuilderBodyTransform(
     }
 
     if (attr) {
-      ctx.Diags.diagnose(
-          attr->getLocation(), diag::result_builder_remove_attr)
-        .fixItRemove(attr->getRangeWithAt());
-      attr->setInvalid();
+      diagnoseAndRemoveAttr(func, attr, diag::result_builder_remove_attr);
     }
 
     // Note that one can remove all of the return statements.
@@ -1872,12 +1892,8 @@ public:
           E, DC, /*replaceInvalidRefsWithErrors=*/true);
       HasError |= transaction.hasErrors();
 
-      if (!HasError) {
-        E->forEachChildExpr([&](Expr *expr) {
-          HasError |= isa<ErrorExpr>(expr);
-          return HasError ? nullptr : expr;
-        });
-      }
+      if (!HasError)
+        HasError |= containsErrorExpr(E);
 
       if (SuppressDiagnostics)
         transaction.abort();
@@ -1899,6 +1915,29 @@ public:
     return std::make_pair(true, S);
   }
 
+  /// Check whether given expression (including single-statement
+  /// closures) contains `ErrorExpr` as one of its sub-expressions.
+  bool containsErrorExpr(Expr *expr) {
+    bool hasError = false;
+
+    expr->forEachChildExpr([&](Expr *expr) -> Expr * {
+      hasError |= isa<ErrorExpr>(expr);
+      if (hasError)
+        return nullptr;
+
+      if (auto *closure = dyn_cast<ClosureExpr>(expr)) {
+        if (shouldTypeCheckInEnclosingExpression(closure)) {
+          hasError |= containsErrorExpr(closure->getSingleExpressionBody());
+          return hasError ? nullptr : expr;
+        }
+      }
+
+      return expr;
+    });
+
+    return hasError;
+  }
+
   /// Ignore patterns.
   std::pair<bool, Pattern*> walkToPatternPre(Pattern *pat) override {
     return { false, pat };
@@ -1909,13 +1948,6 @@ public:
 
 ResultBuilderBodyPreCheck PreCheckResultBuilderRequest::evaluate(
     Evaluator &evaluator, PreCheckResultBuilderDescriptor owner) const {
-  // We don't want to do the precheck if it will already have happened in
-  // the enclosing expression.
-  bool skipPrecheck = false;
-  if (auto closure = dyn_cast_or_null<ClosureExpr>(
-          owner.Fn.getAbstractClosureExpr()))
-    skipPrecheck = shouldTypeCheckInEnclosingExpression(closure);
-
   return PreCheckResultBuilderApplication(
              owner.Fn, /*skipPrecheck=*/false,
              /*suppressDiagnostics=*/owner.SuppressDiagnostics)

@@ -67,6 +67,9 @@ static void printNameTranslationInfo(sourcekitd_variant_t Info, llvm::raw_ostrea
 static void printRangeInfo(sourcekitd_variant_t Info, StringRef Filename,
                            llvm::raw_ostream &OS);
 static void printExpressionType(sourcekitd_variant_t Info, llvm::raw_ostream &OS);
+static void printVariableType(sourcekitd_variant_t Info,
+                              llvm::MemoryBuffer *SourceBuf,
+                              llvm::raw_ostream &OS);
 static void printDocInfo(sourcekitd_variant_t Info, StringRef Filename);
 static void printInterfaceGen(sourcekitd_variant_t Info, bool CheckASCII);
 static void printSemanticInfo();
@@ -489,6 +492,23 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
   return 0;
 }
 
+static void setRefactoringFields(sourcekitd_object_t &Req, TestOptions Opts,
+                                 sourcekitd_uid_t RefactoringKind,
+                                 llvm::MemoryBuffer *SourceBuf) {
+  if (Opts.Offset && !Opts.Line && !Opts.Col) {
+    auto LineCol = resolveToLineCol(Opts.Offset, SourceBuf);
+    Opts.Line = LineCol.first;
+    Opts.Col = LineCol.second;
+  }
+  sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
+                                        RequestSemanticRefactoring);
+  sourcekitd_request_dictionary_set_uid(Req, KeyActionUID, RefactoringKind);
+  sourcekitd_request_dictionary_set_string(Req, KeyName, Opts.Name.c_str());
+  sourcekitd_request_dictionary_set_int64(Req, KeyLine, Opts.Line);
+  sourcekitd_request_dictionary_set_int64(Req, KeyColumn, Opts.Col);
+  sourcekitd_request_dictionary_set_int64(Req, KeyLength, Opts.Length);
+}
+
 static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
   if (!Opts.JsonRequestPath.empty())
     return handleJsonRequestPath(Opts.JsonRequestPath, Opts);
@@ -721,16 +741,21 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     break;
   }
 
-#define SEMANTIC_REFACTORING(KIND, NAME, ID) case SourceKitRequest::KIND:                 \
-    {                                                                                     \
-      sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestSemanticRefactoring); \
-      sourcekitd_request_dictionary_set_uid(Req, KeyActionUID, KindRefactoring##KIND);    \
-      sourcekitd_request_dictionary_set_string(Req, KeyName, Opts.Name.c_str());          \
-      sourcekitd_request_dictionary_set_int64(Req, KeyLine, Opts.Line);                   \
-      sourcekitd_request_dictionary_set_int64(Req, KeyColumn, Opts.Col);                  \
-      sourcekitd_request_dictionary_set_int64(Req, KeyLength, Opts.Length);               \
-      break;                                                                              \
+  case SourceKitRequest::CollectVariableType: {
+    sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
+                                          RequestCollectVariableType);
+    if (Opts.Length) {
+      sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
+      sourcekitd_request_dictionary_set_int64(Req, KeyLength, Opts.Length);
     }
+    addRequestOptionsDirect(Req, Opts);
+    break;
+  }
+
+#define SEMANTIC_REFACTORING(KIND, NAME, ID)                                   \
+  case SourceKitRequest::KIND:                                                 \
+    setRefactoringFields(Req, Opts, KindRefactoring##KIND, SourceBuf.get());   \
+    break;
 #include "swift/IDE/RefactoringKinds.def"
 
   case SourceKitRequest::MarkupToXML: {
@@ -1241,6 +1266,10 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
 
     case SourceKitRequest::CollectExpresstionType:
       printExpressionType(Info, llvm::outs());
+      break;
+
+    case SourceKitRequest::CollectVariableType:
+      printVariableType(Info, SourceBuf.get(), llvm::outs());
       break;
 
     case SourceKitRequest::DocInfo:
@@ -1932,6 +1961,36 @@ static void printExpressionType(sourcekitd_variant_t Info, llvm::raw_ostream &OS
     }
   }
   OS << "</ExpressionTypes>\n";
+}
+
+static void printVariableType(sourcekitd_variant_t Info,
+                              llvm::MemoryBuffer *SourceBuf,
+                              llvm::raw_ostream &OS) {
+  auto TypeBuffer =
+      sourcekitd_variant_dictionary_get_value(Info, KeyVariableTypeList);
+  unsigned Count = sourcekitd_variant_array_get_count(TypeBuffer);
+  if (!Count) {
+    OS << "cannot find variable types in the file\n";
+    return;
+  }
+  OS << "<VariableTypes>\n";
+  for (unsigned i = 0; i != Count; ++i) {
+    sourcekitd_variant_t Item = sourcekitd_variant_array_get_value(TypeBuffer, i);
+    unsigned Offset = sourcekitd_variant_dictionary_get_int64(Item, KeyVariableOffset);
+    unsigned Length = sourcekitd_variant_dictionary_get_int64(Item, KeyVariableLength);
+    auto Start = resolveToLineCol(Offset, SourceBuf);
+    auto End = resolveToLineCol(Offset + Length, SourceBuf);
+    bool HasExplicitType = sourcekitd_variant_dictionary_get_bool(Item, KeyVariableTypeExplicit);
+    auto PrintedType = sourcekitd_variant_dictionary_get_string(Item, KeyVariableType);
+    OS << "("
+       << Start.first << ":" << Start.second
+       << ", "
+       << End.first << ":" << End.second
+       << "): "
+       << PrintedType
+       << " (explicit type: " << HasExplicitType << ")\n";
+  }
+  OS << "</VariableTypes>\n";
 }
 
 static void printFoundInterface(sourcekitd_variant_t Info,

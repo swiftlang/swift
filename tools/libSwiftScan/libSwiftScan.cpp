@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/LLVMInitialize.h"
+#include "swift/DriverTool/DriverTool.h"
 #include "swift/DependencyScan/DependencyScanImpl.h"
 #include "swift/DependencyScan/DependencyScanningTool.h"
 #include "swift/DependencyScan/StringUtils.h"
@@ -93,6 +94,25 @@ void swiftscan_dependency_set_dispose(swiftscan_dependency_set_t *set) {
   }
   delete[] set->modules;
   delete set;
+}
+
+//=== Scanner Cache Operations --------------------------------------------===//
+
+void swiftscan_scanner_cache_serialize(swiftscan_scanner_t scanner,
+                                       const char * path) {
+  DependencyScanningTool *ScanningTool = unwrap(scanner);
+  ScanningTool->serializeCache(path);
+}
+
+bool swiftscan_scanner_cache_load(swiftscan_scanner_t scanner,
+                                  const char * path) {
+  DependencyScanningTool *ScanningTool = unwrap(scanner);
+  return ScanningTool->loadCache(path);
+}
+
+void swiftscan_scanner_cache_reset(swiftscan_scanner_t scanner) {
+  DependencyScanningTool *ScanningTool = unwrap(scanner);
+  ScanningTool->resetCache();
 }
 
 //=== Scanner Functions ---------------------------------------------------===//
@@ -490,4 +510,8 @@ swiftscan_string_set_t *
 swiftscan_compiler_supported_features_query() {
   // TODO: We are yet to figure out how "Features" will be organized.
   return nullptr;
+}
+
+int invoke_swift_compiler(int argc, const char **argv) {
+  return swift::mainEntry(argc, argv);
 }

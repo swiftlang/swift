@@ -556,6 +556,29 @@ public:
   /// Return the next token that will be installed by \c consumeToken.
   const Token &peekToken();
 
+  /// Consumes K tokens within a backtracking scope before calling \c f and
+  /// providing it with the backtracking scope. Unless if the backtracking is
+  /// explicitly cancelled, the parser's token state is restored after \c f
+  /// returns.
+  ///
+  /// \param K The number of tokens ahead to skip. Zero is the current token.
+  /// \param f The function to apply after skipping K tokens ahead.
+  ///          The value returned by \c f will be returned by \c peekToken
+  ///           after the parser is rolled back.
+  /// \returns the value returned by \c f
+  /// \note When calling, you may need to specify the \c Val type
+  ///       explicitly as a type parameter.
+  template <typename Val>
+  Val lookahead(unsigned char K,
+                llvm::function_ref<Val(CancellableBacktrackingScope &)> f) {
+    CancellableBacktrackingScope backtrackScope(*this);
+
+    for (unsigned char i = 0; i < K; ++i)
+      consumeToken();
+
+    return f(backtrackScope);
+  }
+
   /// Consume a token that we created on the fly to correct the original token
   /// stream from lexer.
   void consumeExtraToken(Token K);
@@ -742,6 +765,14 @@ public:
   /// passed the `-enable-experimental-concurrency` flag to the frontend.
   bool shouldParseExperimentalConcurrency() const {
     return Context.LangOpts.EnableExperimentalConcurrency ||
+      Context.LangOpts.ParseForSyntaxTreeOnly;
+  }
+
+  /// Returns true to indicate that experimental 'distributed actor' syntax
+  /// should be parsed if the parser is only a syntax tree or if the user has
+  /// passed the `-enable-experimental-distributed' flag to the frontend.
+  bool shouldParseExperimentalDistributed() const {
+    return Context.LangOpts.EnableExperimentalDistributed ||
       Context.LangOpts.ParseForSyntaxTreeOnly;
   }
 
@@ -996,7 +1027,8 @@ public:
 
   /// Parse the optional modifiers before a declaration.
   bool parseDeclModifierList(DeclAttributes &Attributes, SourceLoc &StaticLoc,
-                             StaticSpellingKind &StaticSpelling);
+                             StaticSpellingKind &StaticSpelling,
+                             bool isFromClangAttribute = false);
 
   /// Parse an availability attribute of the form
   /// @available(*, introduced: 1.0, deprecated: 3.1).
@@ -1090,31 +1122,35 @@ public:
   bool parseVersionTuple(llvm::VersionTuple &Version, SourceRange &Range,
                          const Diagnostic &D);
 
-  bool parseTypeAttributeList(ParamDecl::Specifier &Specifier,
-                              SourceLoc &SpecifierLoc,
-                              TypeAttributes &Attributes) {
+  ParserStatus parseTypeAttributeList(ParamDecl::Specifier &Specifier,
+                                      SourceLoc &SpecifierLoc,
+                                      SourceLoc &IsolatedLoc,
+                                      TypeAttributes &Attributes) {
     if (Tok.isAny(tok::at_sign, tok::kw_inout) ||
         (Tok.is(tok::identifier) &&
          (Tok.getRawText().equals("__shared") ||
-          Tok.getRawText().equals("__owned"))))
-      return parseTypeAttributeListPresent(Specifier, SpecifierLoc, Attributes);
-    return false;
+          Tok.getRawText().equals("__owned") ||
+          Tok.isContextualKeyword("isolated"))))
+      return parseTypeAttributeListPresent(
+          Specifier, SpecifierLoc, IsolatedLoc, Attributes);
+    return makeParserSuccess();
   }
-  bool parseTypeAttributeListPresent(ParamDecl::Specifier &Specifier,
-                                     SourceLoc &SpecifierLoc,
-                                     TypeAttributes &Attributes);
+
+  ParserStatus parseTypeAttributeListPresent(ParamDecl::Specifier &Specifier,
+                                             SourceLoc &SpecifierLoc,
+                                             SourceLoc &IsolatedLoc,
+                                             TypeAttributes &Attributes);
 
   bool parseConventionAttributeInternal(bool justChecking,
                                         TypeAttributes::Convention &convention);
 
-  bool parseTypeAttribute(TypeAttributes &Attributes, SourceLoc AtLoc,
-                          PatternBindingInitializer *&initContext,
-                          bool justChecking = false);
-  
-  
+  ParserStatus parseTypeAttribute(TypeAttributes &Attributes, SourceLoc AtLoc,
+                                  PatternBindingInitializer *&initContext,
+                                  bool justChecking = false);
+
   ParserResult<ImportDecl> parseDeclImport(ParseDeclOptions Flags,
                                            DeclAttributes &Attributes);
-  ParserStatus parseInheritance(SmallVectorImpl<TypeLoc> &Inherited,
+  ParserStatus parseInheritance(SmallVectorImpl<InheritedEntry> &Inherited,
                                 bool allowClassRequirement,
                                 bool allowAnyObject);
   ParserStatus parseDeclItem(bool &PreviousHadSemi,
@@ -1205,15 +1241,32 @@ public:
 
   //===--------------------------------------------------------------------===//
   // Type Parsing
-  
+
+  enum class ParseTypeReason {
+    /// Any type parsing context.
+    Unspecified,
+
+    /// Whether the type is for a closure attribute.
+    CustomAttribute,
+  };
+
   ParserResult<TypeRepr> parseType();
-  ParserResult<TypeRepr> parseType(Diag<> MessageID,
-                                   bool IsSILFuncDecl = false);
+  ParserResult<TypeRepr> parseType(
+      Diag<> MessageID,
+      ParseTypeReason reason = ParseTypeReason::Unspecified);
+
+  /// Parse a type optionally prefixed by a list of named opaque parameters. If
+  /// no params present, return 'type'. Otherwise, return 'type-named-opaque'.
+  ///
+  ///   type-named-opaque:
+  ///     generic-params type
+  ParserResult<TypeRepr> parseTypeWithOpaqueParams(Diag<> MessageID);
 
   ParserResult<TypeRepr>
-    parseTypeSimpleOrComposition(Diag<> MessageID);
+    parseTypeSimpleOrComposition(Diag<> MessageID, ParseTypeReason reason);
 
-  ParserResult<TypeRepr> parseTypeSimple(Diag<> MessageID);
+  ParserResult<TypeRepr> parseTypeSimple(
+      Diag<> MessageID, ParseTypeReason reason);
 
   /// Parse layout constraint.
   LayoutConstraint parseLayoutConstraint(Identifier LayoutConstraintID);
@@ -1241,7 +1294,7 @@ public:
                                          const TypeAttributes &attrs);
   
   ParserResult<TypeRepr> parseTypeTupleBody();
-  ParserResult<TypeRepr> parseTypeArray(TypeRepr *Base);
+  ParserResult<TypeRepr> parseTypeArray(ParserResult<TypeRepr> Base);
 
   /// Parse a collection type.
   ///   type-simple:
@@ -1249,9 +1302,10 @@ public:
   ///     '[' type ':' type ']'
   ParserResult<TypeRepr> parseTypeCollection();
 
-  ParserResult<TypeRepr> parseTypeOptional(TypeRepr *Base);
+  ParserResult<TypeRepr> parseTypeOptional(ParserResult<TypeRepr> Base);
 
-  ParserResult<TypeRepr> parseTypeImplicitlyUnwrappedOptional(TypeRepr *Base);
+  ParserResult<TypeRepr>
+  parseTypeImplicitlyUnwrappedOptional(ParserResult<TypeRepr> Base);
 
   bool isOptionalToken(const Token &T) const;
   SourceLoc consumeOptionalToken();
@@ -1261,7 +1315,8 @@ public:
 
   TypeRepr *applyAttributeToType(TypeRepr *Ty, const TypeAttributes &Attr,
                                  ParamDecl::Specifier Specifier,
-                                 SourceLoc SpecifierLoc);
+                                 SourceLoc SpecifierLoc,
+                                 SourceLoc IsolatedLoc);
 
   //===--------------------------------------------------------------------===//
   // Pattern Parsing
@@ -1320,6 +1375,9 @@ public:
     /// The second name, the presence of which is indicated by \c SecondNameLoc.
     Identifier SecondName;
 
+    /// The location of the 'isolated' keyword, if present.
+    SourceLoc IsolatedLoc;
+
     /// The type following the ':'.
     TypeRepr *Type = nullptr;
 
@@ -1353,6 +1411,9 @@ public:
     /// An enum element.
     EnumElement,
   };
+
+  /// Whether we are at the start of a parameter name when parsing a parameter.
+  bool startsParameterName(bool isClosure);
 
   /// Parse a parameter-clause.
   ///
@@ -1731,11 +1792,21 @@ public:
   //===--------------------------------------------------------------------===//
   // Availability Specification Parsing
 
+  /// The source of an availability spec list.
+  enum class AvailabilitySpecSource: uint8_t {
+    /// A spec from '@available(<spec>, ...)' or '#available(<spec>, ...)'.
+    Available,
+    /// A spec from '#unavailable(<spec>, ...)'.
+    Unavailable,
+    /// A spec from a '-define-availability "Name:<spec>, ..."' frontend arg.
+    Macro,
+  };
+
   /// Parse a comma-separated list of availability specifications. Try to
-  /// expand availability macros when /p ParsingMacroDefinition is false.
+  /// expand availability macros when /p Source is not a command line macro.
   ParserStatus
   parseAvailabilitySpecList(SmallVectorImpl<AvailabilitySpec *> &Specs,
-                            bool ParsingMacroDefinition = false);
+                            AvailabilitySpecSource Source);
 
   /// Does the current matches an argument macro name? Parsing compiler
   /// arguments as required without consuming tokens from the source file
@@ -1862,9 +1933,6 @@ DeclNameRef formDeclNameRef(ASTContext &ctx,
                             bool isFunctionName,
                             bool isInitializer,
                             bool isSubscript = false);
-
-/// Parse a stringified Swift declaration name, e.g. "init(frame:)".
-DeclName parseDeclName(ASTContext &ctx, StringRef name);
 
 /// Whether a given token can be the start of a decl.
 bool isKeywordPossibleDeclStart(const Token &Tok);
