@@ -24,6 +24,11 @@ subst T: /d
 subst T: %BuildRoot% || (exit /b)
 set BuildRoot=T:
 
+:: Identify the PackageRoot
+set PackageRoot=%BuildRoot%\package
+
+md %PackageRoot%
+
 :: Identify the InstallRoot
 set InstallRoot=%BuildRoot%\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr
 set PlatformRoot=%BuildRoot%\Library\Developer\Platforms\Windows.platform
@@ -38,10 +43,15 @@ set TMPDIR=%BuildRoot%\tmp
 call :CloneDependencies || (exit /b)
 call :CloneRepositories || (exit /b)
 
+md "%BuildRoot%\Library"
+
 :: TODO(compnerd) build ICU from source
 curl.exe -sOL "https://github.com/unicode-org/icu/releases/download/release-67-1/icu4c-67_1-Win64-MSVC2017.zip" || (exit /b)
-md "%BuildRoot%\Library"
 "%SystemDrive%\Program Files\Git\usr\bin\unzip.exe" -o icu4c-67_1-Win64-MSVC2017.zip -d %BuildRoot%\Library\icu-67.1
+md %BuildRoot%\Library\icu-67.1\usr\bin
+copy %BuildRoot%\Library\icu-67.1\bin64\icudt67.dll %BuildRoot%\Library\icu-67.1\usr\bin || (exit /b)
+copy %BuildRoot%\Library\icu-67.1\bin64\icuin67.dll %BuildRoot%\Library\icu-67.1\usr\bin || (exit /b)
+copy %BuildRoot%\Library\icu-67.1\bin64\icuuc67.dll %BuildRoot%\Library\icu-67.1\usr\bin || (exit /b)
 
 :: FIXME(compnerd) is there a way to build the sources without downloading the amalgamation?
 curl.exe -sOL "https://sqlite.org/2021/sqlite-amalgamation-3360000.zip" || (exit /b)
@@ -584,6 +594,73 @@ cmake --build %BuildRoot%\15 --target install || (exit /b)
 python -c "import plistlib; print(str(plistlib.dumps({ 'DefaultProperties': { 'DEFAULT_USE_RUNTIME': 'MD' } }), encoding='utf-8'))" > %SDKInstallRoot%\SDKSettings.plist
 :: TODO(compnerd) match the XCTest installation name
 python -c "import plistlib; print(str(plistlib.dumps({ 'DefaultProperties': { 'XCTEST_VERSION': 'development' } }), encoding='utf-8'))" > %PlatformRoot%\Info.plist
+
+:: Package toolchain.msi
+msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\toolchain.wixproj ^
+  -p:RunWixToolsOutOfProc=true ^
+  -p:OutputPath=%PackageRoot%\toolchain\ ^
+  -p:IntermediateOutputPath=%PackageRoot%\toolchain\ ^
+  -p:TOOLCHAIN_ROOT=%BuildRoot%\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain
+:: TODO(compnerd) actually perform the code-signing
+:: signtool sign /f Apple_CodeSign.pfx /p Apple_CodeSign_Password /tr http://timestamp.digicert.com /fd sha256 %PackageRoot%\toolchain\toolchain.msi
+
+:: Package sdk.msi
+msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\CustomActions\SwiftInstaller\SwiftInstaller.vcxproj -t:restore
+msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\sdk.wixproj ^
+  -p:RunWixToolsOutOfProc=true ^
+  -p:OutputPath=%PackageRoot%\sdk\ ^
+  -p:IntermediateOutputPath=%PackageRoot%\sdk\ ^
+  -p:PLATFORM_ROOT=%PlatformRoot%\ ^
+  -p:SDK_ROOT=%SDKInstallRoot%\ ^
+  -p:SWIFT_SOURCE_DIR=%SourceRoot%\swift\ ^
+  -p:PlatformToolset=v142
+:: TODO(compnerd) actually perform the code-signing
+:: signtool sign /f Apple_CodeSign.pfx /p Apple_CodeSign_Password /tr http://timestamp.digicert.com /fd sha256 %PackageRoot%\sdk\sdk.msi
+
+:: Package runtime.msi
+msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\runtime.wixproj ^
+  -p:RunWixToolsOutOfProc=true ^
+  -p:OutputPath=%PackageRoot%\runtime\ ^
+  -p:IntermediateOutputPath=%PackageRoot%\runtime\ ^
+  -p:SDK_ROOT=%SDKInstallRoot%\
+:: TODO(compnerd) actually perform the code-signing
+:: signtool sign /f Apple_CodeSign.pfx /p Apple_CodeSign_Password /tr http://timestamp.digicert.com /fd sha256 %PackageRoot%\runtime\runtime.msi
+
+:: Package icu.msi
+msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\icu.wixproj ^
+  -p:RunWixToolsOutOfProc=true ^
+  -p:OutputPath=%PackageRoot%\icu\ ^
+  -p:IntermediateOutputPath=%PackageRoot%\icu\ ^
+  -p:ProductVersion=67.1 ^
+  -p:ProductVersionMajor=67 ^
+  -p:ICU_ROOT=%BuildRoot%
+:: TODO(compnerd) actually perform the code-signing
+:: signtool sign /f Apple_CodeSign.pfx /p Apple_CodeSign_Password /tr http://timestamp.digicert.com /fd sha256 %PackageRoot%\icu\icu.msi
+
+:: Package devtools.msi
+msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\devtools.wixproj ^
+  -p:RunWixToolsOutOfProc=true ^
+  -p:OutputPath=%PackageRoot%\devtools\ ^
+  -p:IntermediateOutputPath=%PackageRoot%\devtools\ ^
+  -p:DEVTOOLS_ROOT=%BuildRoot%\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain
+:: TODO(compnerd) actually perform the code-signing
+:: signtool sign /f Apple_CodeSign.pfx /p Apple_CodeSign_Password /tr http://timestamp.digicert.com /fd sha256 %PackageRoot%\devtools\devtools.msi
+
+:: Collate MSIs
+move %PackageRoot%\toolchain\toolchain.msi %PackageRoot% || (exit /b)
+move %PackageRoot%\sdk\sdk.msi %PackageRoot% || (exit /b)
+move %PackageRoot%\runtime\runtime.msi %PackageRoot% || (exit /b)
+move %PackageRoot%\icu\icu.msi %PackageRoot% || (exit /b)
+move %PackageRoot%\devtools\devtools.msi %PackageRoot% || (exit /b)
+
+:: Build Installer
+msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\installer.wixproj ^
+  -p:RunWixToolsOutOfProc=true ^
+  -p:OutputPath=%PackageRoot%\installer\ ^
+  -p:IntermediateOutputPath=%PackageRoot%\installer\ ^
+  -p:MSI_LOCATION=%PackageRoot%\
+:: TODO(compnerd) actually perform the code-signing
+:: signtool sign /f Apple_CodeSign.pfx /p Apple_CodeSign_Password /tr http://timestamp.digicert.com /fd sha256 %PackageRoot%\installer\installer.exe
 
 :: Clean up the module cache
 rd /s /q %LocalAppData%\clang\ModuleCache
