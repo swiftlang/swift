@@ -559,7 +559,7 @@ namespace {
       if (!fnTy)
         return false;
       
-      Type paramTy = FunctionType::composeInput(CS.getASTContext(),
+      Type paramTy = FunctionType::composeTuple(CS.getASTContext(),
                                                 fnTy->getParams(), false);
 
       auto argTy = CS.getType(expr->getArg())
@@ -637,7 +637,7 @@ namespace {
           return false;
 
         auto paramTy =
-            AnyFunctionType::composeInput(CS.getASTContext(), fnTy->getParams(),
+            AnyFunctionType::composeTuple(CS.getASTContext(), fnTy->getParams(),
                                           /*canonicalVararg*/ false);
         return favoredTy->isEqual(paramTy);
       };
@@ -990,7 +990,7 @@ namespace {
       // arguments together with their inout-ness, instead of a single
       // ParenExpr or TupleExpr.
       SmallVector<AnyFunctionType::Param, 8> params;
-      AnyFunctionType::decomposeInput(CS.getType(index), params);
+      AnyFunctionType::decomposeTuple(CS.getType(index), params);
 
       // Add the constraint that the index expression's type be convertible
       // to the input type of the subscript operator.
@@ -1211,7 +1211,7 @@ namespace {
                                   FunctionRefKind::DoubleApply, {}, memberLoc);
 
       SmallVector<AnyFunctionType::Param, 8> args;
-      AnyFunctionType::decomposeInput(CS.getType(expr->getArg()), args);
+      AnyFunctionType::decomposeTuple(CS.getType(expr->getArg()), args);
 
       auto resultType = CS.createTypeVariable(
           CS.getConstraintLocator(expr, ConstraintLocator::FunctionResult),
@@ -2264,7 +2264,7 @@ namespace {
         // types so long as we have the right number of such types.
         SmallVector<AnyFunctionType::Param, 4> externalEltTypes;
         if (externalPatternType) {
-          AnyFunctionType::decomposeInput(externalPatternType,
+          AnyFunctionType::decomposeTuple(externalPatternType,
                                           externalEltTypes);
 
           // If we have the wrong number of elements, we may not be able to
@@ -2449,7 +2449,7 @@ namespace {
             return Type();
 
           SmallVector<AnyFunctionType::Param, 4> params;
-          AnyFunctionType::decomposeInput(subPatternType, params);
+          AnyFunctionType::decomposeTuple(subPatternType, params);
 
           // Remove parameter labels; they aren't used when matching cases,
           // but outright conflicts will be checked during coercion.
@@ -2681,7 +2681,7 @@ namespace {
       // arguments together with their inout-ness, instead of a single
       // ParenExpr or TupleExpr.
       SmallVector<AnyFunctionType::Param, 8> params;
-      AnyFunctionType::decomposeInput(CS.getType(expr->getArg()), params);
+      AnyFunctionType::decomposeTuple(CS.getType(expr->getArg()), params);
 
       CS.addConstraint(ConstraintKind::ApplicableFunction,
                        FunctionType::get(params, resultType, extInfo),

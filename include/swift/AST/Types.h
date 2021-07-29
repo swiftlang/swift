@@ -3018,19 +3018,16 @@ protected:
   }
 
 public:
-  /// Break an input type into an array of \c AnyFunctionType::Params.
-  static void decomposeInput(Type type,
+  /// Break a tuple or paren type into an array of \c AnyFunctionType::Params.
+  static void decomposeTuple(Type type,
                              SmallVectorImpl<Param> &result);
 
-  /// Take an array of parameters and turn it into an input type.
-  ///
-  /// The result type is only there as a way to extract the ASTContext when
-  /// needed.
-  static Type composeInput(ASTContext &ctx, ArrayRef<Param> params,
+  /// Take an array of parameters and turn it into a tuple or paren type.
+  static Type composeTuple(ASTContext &ctx, ArrayRef<Param> params,
                            bool canonicalVararg);
-  static Type composeInput(ASTContext &ctx, CanParamArrayRef params,
+  static Type composeTuple(ASTContext &ctx, CanParamArrayRef params,
                            bool canonicalVararg) {
-    return composeInput(ctx, params.getOriginalArray(), canonicalVararg);
+    return composeTuple(ctx, params.getOriginalArray(), canonicalVararg);
   }
 
   /// Given two arrays of parameters determine if they are equal in their
