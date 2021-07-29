@@ -4,6 +4,9 @@
 // REQUIRES: concurrency
 // REQUIRES: foundation
 
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
+
 import Foundation
 
 @available(SwiftStdlib 5.5, *)
