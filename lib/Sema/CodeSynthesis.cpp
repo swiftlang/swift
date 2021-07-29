@@ -136,7 +136,7 @@ Expr *swift::buildArgumentForwardingExpr(ArrayRef<ParamDecl*> params,
                                 SourceLoc(), false, IsImplicit);
   }
 
-  auto argTy = AnyFunctionType::composeInput(ctx, elts, /*canonical*/false);
+  auto argTy = AnyFunctionType::composeTuple(ctx, elts, /*canonical*/false);
   argExpr->setType(argTy);
 
   return argExpr;
@@ -663,7 +663,7 @@ synthesizeDesignatedInitOverride(AbstractFunctionDecl *fn, void *context) {
   if (auto *funcTy = type->getAs<FunctionType>())
     type = funcTy->getResult();
   auto *superclassCtorRefExpr =
-      new (ctx) DotSyntaxCallExpr(ctorRefExpr, SourceLoc(), superRef, type);
+      DotSyntaxCallExpr::create(ctx, ctorRefExpr, SourceLoc(), superRef, type);
   superclassCtorRefExpr->setThrows(false);
 
   auto *bodyParams = ctor->getParameters();

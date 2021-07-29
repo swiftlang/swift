@@ -566,6 +566,7 @@ TypeChecker::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
   auto *opExpr = TypeChecker::resolveDeclRefExpr(
       &UDRE, DC, /*replaceInvalidRefsWithErrors=*/true);
 
+  auto &ctx = DC->getASTContext();
   switch (refKind) {
   case DeclRefKind::PostfixOperator: {
     // (postfix_unary_expr
@@ -574,9 +575,8 @@ TypeChecker::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
     //     (<LHS>)))
     ParenExpr Args(SourceLoc(), LHS, SourceLoc(),
                    /*hasTrailingClosure=*/false);
-    PostfixUnaryExpr postfixExpr(opExpr, &Args);
-    return getTypeOfCompletionOperatorImpl(DC, &postfixExpr,
-                                           referencedDecl);
+    auto *postfixExpr = PostfixUnaryExpr::create(ctx, opExpr, &Args);
+    return getTypeOfCompletionOperatorImpl(DC, postfixExpr, referencedDecl);
   }
 
   case DeclRefKind::BinaryOperator: {
@@ -586,8 +586,8 @@ TypeChecker::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
     //     (<LHS>)
     //     (code_completion_expr)))
     CodeCompletionExpr dummyRHS(Loc);
-    auto *binaryExpr = BinaryExpr::create(DC->getASTContext(), LHS, opExpr,
-                                          &dummyRHS, /*implicit*/ true);
+    auto *binaryExpr = BinaryExpr::create(ctx, LHS, opExpr, &dummyRHS,
+                                          /*implicit*/ true);
     return getTypeOfCompletionOperatorImpl(DC, binaryExpr, referencedDecl);
   }
 

@@ -1076,7 +1076,7 @@ static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
   // Drop the self type
   copyMethodType = copyMethodType->getResult()->castTo<FunctionType>();
 
-  auto DSCE = new (Ctx) DotSyntaxCallExpr(DRE, SourceLoc(), Val);
+  auto DSCE = DotSyntaxCallExpr::create(Ctx, DRE, SourceLoc(), Val);
   DSCE->setImplicit();
   DSCE->setType(copyMethodType);
   DSCE->setThrows(false);
@@ -1561,7 +1561,7 @@ synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
       auto *SelfDRE =
           buildSelfReference(SelfDecl, SelfAccessorKind::Peer, IsSelfLValue);
       SelfDRE = maybeWrapInOutExpr(SelfDRE, Ctx);
-      auto *DSCE = new (Ctx) DotSyntaxCallExpr(Callee, SourceLoc(), SelfDRE);
+      auto *DSCE = DotSyntaxCallExpr::create(Ctx, Callee, SourceLoc(), SelfDRE);
 
       if (auto funcType = type->getAs<FunctionType>())
         type = funcType->getResult();
@@ -1574,7 +1574,7 @@ synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
     if (arg) {
       Call = CallExpr::createImplicit(Ctx, Callee, {ValueDRE}, {Identifier()});
     } else {
-      Call = CallExpr::createImplicit(Ctx, Callee, {}, {});
+      Call = CallExpr::createImplicitEmpty(Ctx, Callee);
     }
 
     if (auto funcType = type->getAs<FunctionType>())
@@ -1742,7 +1742,7 @@ synthesizeModifyCoroutineBodyWithSimpleDidSet(AccessorDecl *accessor,
       auto *SelfDRE = buildSelfReference(SelfDecl, SelfAccessorKind::Peer,
                                          storage->isSetterMutating());
       SelfDRE = maybeWrapInOutExpr(SelfDRE, ctx);
-      auto *DSCE = new (ctx) DotSyntaxCallExpr(Callee, SourceLoc(), SelfDRE);
+      auto *DSCE = DotSyntaxCallExpr::create(ctx, Callee, SourceLoc(), SelfDRE);
 
       if (auto funcType = type->getAs<FunctionType>())
         type = funcType->getResult();
@@ -1751,7 +1751,7 @@ synthesizeModifyCoroutineBodyWithSimpleDidSet(AccessorDecl *accessor,
       Callee = DSCE;
     }
 
-    auto *Call = CallExpr::createImplicit(ctx, Callee, {}, {});
+    auto *Call = CallExpr::createImplicitEmpty(ctx, Callee);
     if (auto funcType = type->getAs<FunctionType>())
       type = funcType->getResult();
     Call->setType(type);
