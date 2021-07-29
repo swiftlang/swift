@@ -1595,7 +1595,7 @@ static Expr* constructCallToSuperInit(ConstructorDecl *ctor,
                                               SourceLoc(), /*Implicit=*/true);
   Expr *r = UnresolvedDotExpr::createImplicit(
       Context, superRef, DeclBaseName::createConstructor());
-  r = CallExpr::createImplicit(Context, r, { }, { });
+  r = CallExpr::createImplicitEmpty(Context, r);
 
   if (ctor->hasThrows())
     r = new (Context) TryExpr(SourceLoc(), r, Type(), /*implicit=*/true);

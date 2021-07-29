@@ -239,7 +239,7 @@ private:
     Closure->setBody(ClosureBody, /*isSingleExpression=*/false);
 
     // Call the closure.
-    auto *ClosureCall = CallExpr::createImplicit(Ctx, Closure, {}, {});
+    auto *ClosureCall = CallExpr::createImplicitEmpty(Ctx, Closure);
     ClosureCall->setThrows(false);
 
     // TODO: typeCheckExpression() seems to assign types to everything here,
