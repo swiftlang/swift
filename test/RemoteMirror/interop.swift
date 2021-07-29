@@ -2,7 +2,7 @@
 
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %S/Inputs/interop.swift -emit-library -module-name InteropTest -o %t/%target-library-name(InteropTest)
-// RUN: %target-clang %S/Inputs/interop.m -framework Foundation -I %S/../../include/swift/SwiftRemoteMirror -I %S/../../include/ -o %t/InteropTest
+// RUN: %target-clang %target-sanitizer-opt %S/Inputs/interop.m -framework Foundation -I %S/../../include/swift/SwiftRemoteMirror -I %S/../../include/ -o %t/InteropTest
 // RUN: %target-codesign %t/%target-library-name(InteropTest)
 // RUN: %target-codesign %t/InteropTest
 // RUN: %target-run %t/InteropTest %t/%target-library-name(InteropTest) %platform-module-dir/%target-library-name(swiftRemoteMirror) | %FileCheck %s
