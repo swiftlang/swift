@@ -485,9 +485,6 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
       if (libraryName == "swiftCompatibilityDynamicReplacements") {
         compatibilityVersion = IRGen.Opts.
             AutolinkRuntimeCompatibilityDynamicReplacementLibraryVersion;
-      } else if (libraryName == "swiftCompatibilityConcurrency") {
-        compatibilityVersion =
-            IRGen.Opts.AutolinkRuntimeCompatibilityConcurrencyLibraryVersion;
       } else {
         compatibilityVersion = IRGen.Opts.
             AutolinkRuntimeCompatibilityLibraryVersion;

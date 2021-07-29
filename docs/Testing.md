@@ -350,6 +350,9 @@ code for the target that is not the build machine:
 * ``%target-cc-options``: the clang flags to setup the target with the right
   architecture and platform version.
 
+* ``%target-sanitizer-opt``: if sanitizers are enabled for the build, the
+  corresponding ``-fsanitize=`` option.
+
 * ``%target-triple``: a triple composed of the ``%target-cpu``, the vendor,
   the ``%target-os``, and the operating system version number. Possible values
   include ``i386-apple-ios7.0`` or ``armv7k-apple-watchos2.0``.
