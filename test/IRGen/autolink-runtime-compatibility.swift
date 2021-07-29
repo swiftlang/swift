@@ -10,7 +10,7 @@
 // Doesn't autolink compatibility library because target OS doesn't need it
 // RUN: %target-swift-frontend -target %target-cpu-apple-macosx10.24 -emit-ir -parse-stdlib %s | %FileCheck -check-prefix=NO-FORCE-LOAD %s
 
-// Only autolinks 5.1 compatibility library because target OS has 5.1
+// Only autolinks 5.1 and concurrency compatibility library because target OS has 5.1 and 5.5.
 // RUN: %target-swift-frontend -target %target-cpu-apple-macosx10.15 -emit-ir -parse-stdlib %s | %FileCheck -check-prefix=FORCE-LOAD-51 %s
 
 // Autolinks because compatibility library was explicitly asked for
