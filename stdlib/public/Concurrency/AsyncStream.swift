@@ -129,12 +129,14 @@ public struct AsyncStream<Element> {
       ///
       /// This value reprsents the successful enqueueing of an element, whether
       /// the stream buffers the element or delivers it immediately to a pending
-      /// call to `next()`. The associated value `remaining` indicates the
-      /// number of remaining slots in the buffer at the point in time of
-      /// yielding.
+      /// call to `next()`. The associated value `remaining` is a hint that
+      /// indicates the number of remaining slots in the buffer at the time of
+      /// the `yield` call.
       ///
-      /// > Note: Acting on the remaining count is valid only when calls to
-      /// yield are mutually exclusive.
+      /// > Note: From a thread safety viewpoint, `remaining` is a lower bound
+      /// on the number of remaining slots. This is because a subsequent call
+      /// that uses the `remaining` value could race on the consumption of
+      /// values from the stream.
       case enqueued(remaining: Int)
       
       /// The stream didn't enqueue the element due to a full buffer.
@@ -153,17 +155,20 @@ public struct AsyncStream<Element> {
     
     /// A strategy that handles exhaustion of a buffer’s capacity.
     public enum BufferingPolicy {
-      /// Continue to add to the buffer, treating its capacity as infinite.
+      /// Continue to add to the buffer, without imposing a limit on the number
+      /// of buffered elements.
       case unbounded
       
       /// When the buffer is full, discard the newly received element.
       ///
-      /// This strategy enforces keeping the specified number of oldest values.
+      /// This strategy enforces keeping at most the specified number of oldest
+      /// values.
       case bufferingOldest(Int)
       
       /// When the buffer is full, discard the oldest element in the buffer.
       ///
-      /// This strategy enforces keeping the specified number of newest values.
+      /// This strategy enforces keeping at most the specified number of newest
+      /// values.
       case bufferingNewest(Int)
     }
 
@@ -180,7 +185,7 @@ public struct AsyncStream<Element> {
     /// result's element.
     ///
     /// This can be called more than once and returns to the caller immediately
-    /// without blocking for any awaiting consuption from the iteration.
+    /// without blocking for any awaiting consumption from the iteration.
     @discardableResult
     public func yield(_ value: __owned Element) -> YieldResult {
       storage.yield(value)
@@ -206,7 +211,8 @@ public struct AsyncStream<Element> {
     /// Canceling an active iteration invokes the `onTermination` callback
     /// first, then resumes by yielding `nil`. This means that you can perform
     /// needed cleanup in the cancellation handler. After reaching a terminal
-    /// state, the `AsyncStream` disposes of the callback.
+    /// state as a result of cancellation, the `AsyncStream` sets the callback
+    /// to `nil`.
     public var onTermination: (@Sendable (Termination) -> Void)? {
       get {
         return storage.getOnTermination()
@@ -224,10 +230,10 @@ public struct AsyncStream<Element> {
   ///
   /// - Parameter elementType: The type of element the `AsyncStream`
   ///   produces.
-  /// - Parameter limit: The maximum number of elements to hold in the buffer.
-  ///   By default, this value is unlimited. Use a
-  ///   `Continuation.BufferingPolicy` to buffer a specified number of oldest
-  ///   or newest elements.
+  /// - Parameter bufferingPolicy: A `Continuation.BufferingPolicy` value to
+  ///   set the stream's buffering behavior. By default, the stream buffers an
+  ///   unlimited number of elements. You can also set the policy to buffer a
+  ///   specified number of oldest or newest elements.
   /// - Parameter build: A custom closure that yields values to the
   ///   `AsyncStream`. This closure receives a `AsyncStream.Continuation`
   ///   instance that it uses to provide elements to the stream and terminate the
@@ -280,9 +286,9 @@ public struct AsyncStream<Element> {
   /// Use this convenience initializer when you have an asychronous function
   /// that can produce elements for the stream, and don't want to invoke
   /// a continuation manually. This initializer "unfolds" your closure into
-  /// a full-blown asynchronous stream. The created stream handles adherence to
-  /// the `AsyncSequence` protocol automatically, including termination (whether
-  /// by cancellation or by returning `nil` from the closure to finish
+  /// a full-blown asynchronous stream. The created stream handles conformance
+  /// to the `AsyncSequence` protocol automatically, including termination
+  /// (whether by cancellation or by returning `nil` from the closure to finish
   /// iteration).
   ///
   /// The following example shows an `AsyncStream` created with this

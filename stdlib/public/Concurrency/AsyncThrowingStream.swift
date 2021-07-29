@@ -206,7 +206,7 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
     /// result's element.
     ///
     /// This can be called more than once and returns to the caller immediately
-    /// without blocking for any awaiting consuption from the iteration.
+    /// without blocking for any awaiting consumption from the iteration.
     @discardableResult
     public func yield(_ value: __owned Element) -> YieldResult {
       storage.yield(value)
