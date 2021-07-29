@@ -133,7 +133,7 @@ public struct AsyncStream<Element> {
       /// indicates the number of remaining slots in the buffer at the time of
       /// the `yield` call.
       ///
-      /// > Note: From a thread safety viewpoint, `remaining` is a lower bound
+      /// - Note: From a thread safety viewpoint, `remaining` is a lower bound
       /// on the number of remaining slots. This is because a subsequent call
       /// that uses the `remaining` value could race on the consumption of
       /// values from the stream.
