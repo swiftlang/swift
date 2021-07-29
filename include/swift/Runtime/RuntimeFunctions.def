@@ -1663,22 +1663,37 @@ FUNCTION(DefaultActorDeallocateResilient,
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind))
 
+// void swift_distributedActor_local_initialize(
+//     DefaultActor *actor, // FIXME: this may not necessarily be Default actor... just some actor, pass as HeapObject?
+//     OpaqueValue *id,
+//     OpaqueValue *transport
+// );
+FUNCTION(DistributedActorInitializeLocal,
+         swift_distributedActor_local_initialize, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy, // actor
+              OpaquePtrTy, // id
+              OpaquePtrTy, // transport
+         ),
+         ATTRS(NoUnwind))
+
 // void swift_distributedActor_remote_initialize(DefaultActor *actor);
 FUNCTION(DistributedActorInitializeRemote,
          swift_distributedActor_remote_initialize, SwiftCC,
-         ConcurrencyAvailability,
+         ConcurrencyAvailability, // FIXME(distributed): DistributedAvailability
          RETURNS(VoidTy),
          ARGS(RefCountedPtrTy), // TODO also address and transport?
          ATTRS(NoUnwind))
 
 // OpaqueValue* swift_distributedActor_remote_create(
 //     OpaqueValue *identity,
-//     OpaqueValue *transport);
+//     OpaqueValue *transport,
 //     Metadata *identityMetadata,
 //     Metadata *transportMetadata);
 FUNCTION(DistributedActorRemoteCreate,
          swift_distributedActor_remote_create, SwiftCC,
-         ConcurrencyAvailability,
+         ConcurrencyAvailability, // FIXME(distributed): DistributedAvailability
          RETURNS(OpaquePtrTy), // TODO: is this the right type here?
          ARGS(OpaquePtrTy,
               OpaquePtrTy,
@@ -1690,10 +1705,30 @@ FUNCTION(DistributedActorRemoteCreate,
 // void swift_distributedActor_destroy(DefaultActor *actor); // TODO: ProxyActor *proxy?
 FUNCTION(DistributedActorDestroy,
          swift_distributedActor_destroy, SwiftCC,
-         ConcurrencyAvailability,
+         ConcurrencyAvailability, // FIXME(distributed): DistributedAvailability
          RETURNS(VoidTy),
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind))
+
+// OpaqueValue* swift_distributedActor_getIdentity(
+//     DefaultActor *actor // TODO: not always DefaultActor?
+// );
+FUNCTION(DistributedActorGetIdentity,
+        swift_distributedActor_getIdentity, SwiftCC,
+        ConcurrencyAvailability, // FIXME(distributed): DistributedAvailability
+        RETURNS(VoidTy),
+        ARGS(OpaquePtrTy), // TODO: is this the right type or executor or default actor?
+        ATTRS(NoUnwind))
+
+// OpaqueValue* swift_distributedActor_getTransport(
+//     DefaultActor *actor // TODO: not always DefaultActor?
+// );
+FUNCTION(DistributedActorGetTransport,
+        swift_distributedActor_getTransport, SwiftCC,
+        ConcurrencyAvailability, // FIXME(distributed): DistributedAvailability
+        RETURNS(VoidTy),
+        ARGS(OpaquePtrTy), // TODO: is this the right type or executor or default actor?
+        ATTRS(NoUnwind))
 
 /// void swift_asyncLet_start(
 ///     AsyncLet *alet,

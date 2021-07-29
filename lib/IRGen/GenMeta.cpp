@@ -5181,8 +5181,9 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::Differentiable:
   case KnownProtocolKind::FloatingPoint:
   case KnownProtocolKind::Actor:
-  case KnownProtocolKind::ActorTransport:
   case KnownProtocolKind::DistributedActor:
+  case KnownProtocolKind::ActorIdentity:
+  case KnownProtocolKind::ActorTransport:
   case KnownProtocolKind::SerialExecutor:
   case KnownProtocolKind::Sendable:
   case KnownProtocolKind::UnsafeSendable:

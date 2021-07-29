@@ -372,15 +372,25 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
+  if (Builtin.ID == BuiltinValueKind::InitializeDistributedLocalActor) {
+    auto fn = IGF.IGM.getDistributedActorInitializeLocalFn();
+    auto actor = args.claimNext();
+    auto identity = args.claimNext();
+    auto transport = args.claimNext();
+    actor = IGF.Builder.CreateBitCast(actor, IGF.IGM.RefCountedPtrTy);
+    identity = IGF.Builder.CreateBitCast(identity, IGF.IGM.RefCountedPtrTy);
+    transport = IGF.Builder.CreateBitCast(transport, IGF.IGM.RefCountedPtrTy);
+    auto call = IGF.Builder.CreateCall(fn, {actor, identity, transport});
+    call->setCallingConv(IGF.IGM.SwiftCC);
+    return;
+  }
+
   if (Builtin.ID == BuiltinValueKind::InitializeDistributedRemoteActor) {
     auto fn = IGF.IGM.getDistributedActorInitializeRemoteFn();
     auto actor = args.claimNext();
     actor = IGF.Builder.CreateBitCast(actor, IGF.IGM.RefCountedPtrTy);
-    // init(resolve address, using transport)
-    auto call = IGF.Builder.CreateCall(fn, {
-      actor
-      // TODO: might have to carry `address, transport` depending on how we implement the resolve initializers
-    });
+    // TODO: might have to carry `address, transport` depending on how we implement the resolve initializers
+    auto call = IGF.Builder.CreateCall(fn, {actor});
     call->setCallingConv(IGF.IGM.SwiftCC);
     return;
   }

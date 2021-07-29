@@ -1031,6 +1031,8 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
     M = getLoadedModule(Id_Concurrency);
     break;
   case KnownProtocolKind::DistributedActor:
+  case KnownProtocolKind::ActorIdentity:
+  case KnownProtocolKind::ActorTransport:
     M = getLoadedModule(Id_Distributed);
     break;
   default:

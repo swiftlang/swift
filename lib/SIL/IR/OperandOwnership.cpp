@@ -828,6 +828,7 @@ BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, InitializeDefaultActor)
 BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, DestroyDefaultActor)
 
 BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, InitializeDistributedRemoteActor)
+BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, InitializeDistributedLocalActor)
 BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, DestroyDistributedActor)
 
 // FIXME: Why do these reqiuire a borrowed value at all?
@@ -843,6 +844,9 @@ BUILTIN_OPERAND_OWNERSHIP(BitwiseEscape, BuildDefaultActorExecutorRef)
 BUILTIN_OPERAND_OWNERSHIP(BitwiseEscape, BuildMainActorExecutorRef)
 
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, AutoDiffCreateLinearMapContext)
+
+BUILTIN_OPERAND_OWNERSHIP(BitwiseEscape, BuildDistributedActorIdentity)
+BUILTIN_OPERAND_OWNERSHIP(BitwiseEscape, BuildDistributedActorTransport)
 
 #undef BUILTIN_OPERAND_OWNERSHIP
 

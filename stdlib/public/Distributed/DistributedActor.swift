@@ -35,7 +35,10 @@ public protocol AnyActor: AnyObject {}
 /// which involves enqueuing new partial tasks to be executed at some
 /// point.
 @available(SwiftStdlib 5.5, *)
-public protocol DistributedActor: AnyActor, Identifiable, Hashable, Codable {
+public protocol DistributedActor: AnyActor,
+    // Identifiable, // FIXME(distributed): once we figure out how to store ID in the Fragment,
+    //                                      without having to store the entire type eraser :-(
+    Hashable, Codable {
 
     /// Creates new (local) distributed actor instance, bound to the passed transport.
     ///
@@ -45,9 +48,6 @@ public protocol DistributedActor: AnyActor, Identifiable, Hashable, Codable {
     /// - Parameter transport: the transport this distributed actor instance will
     ///   associated with.
     init(transport: ActorTransport)
-
-    @available(*, deprecated, renamed: "SomeDistributedActor.resolve(_:using:)")
-    init(resolve id: AnyActorIdentity, using transport: ActorTransport) throws
 
     /// Resolves the passed in `identity` against the `transport`, returning
     /// either a local or remote actor reference.
@@ -83,7 +83,12 @@ public protocol DistributedActor: AnyActor, Identifiable, Hashable, Codable {
     ///
     /// Conformance to this requirement is synthesized automatically for any
     /// `distributed actor` declaration.
-    nonisolated var id: AnyActorIdentity { get }
+  // FIXME(distributed): once we figure out how to store ID in the Fragment,
+  //   without having to store the entire type eraser :-(
+   nonisolated var id: AnyActorIdentity { magic(self) }
+
+   @_distributedActorAlwaysThere // not user accesible
+   var _id: AnyActorIdentity
 }
 
 @available(SwiftStdlib 5.5, *)
@@ -110,11 +115,13 @@ extension DistributedActor {
 @available(SwiftStdlib 5.5, *)
 extension DistributedActor {
   nonisolated public func hash(into hasher: inout Hasher) {
-    self.id.hash(into: &hasher)
+    // FIXME(distributed): self.id.hash(into: &hasher) // uncomment when we figure out storing the identity...
+    fatalError("Storing identity is not implemented")
   }
 
   nonisolated public static func == (lhs: Self, rhs: Self) -> Bool {
-    lhs.id == rhs.id
+    // FIXME(distributed): lhs.id == rhs.id  // uncomment when we figure out storing the identity...
+    fatalError("Storing identity is not implemented")
   }
 }
 
@@ -134,8 +141,9 @@ extension DistributedActor {
   }
 
   nonisolated public func encode(to encoder: Encoder) throws {
-    var container = encoder.singleValueContainer()
-    try container.encode(self.id)
+    // var container = encoder.singleValueContainer()
+    // FIXME(distributed): try container.encode(self.id) // storing identity is not implemented in the new scheme yet...
+    fatalError("Storing identity is not implemented")
   }
 }
 
@@ -184,7 +192,7 @@ public struct AnyActorIdentity: ActorIdentity, @unchecked Sendable, CustomString
 
   public func encode(to encoder: Encoder) throws {
     try _encodeTo(encoder)
-  }
+  }/**/
 
   public var description: String {
     "\(Self.self)(\(self._description()))"

@@ -578,24 +578,6 @@ void swift_defaultActor_deallocate(DefaultActor *actor);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_defaultActor_deallocateResilient(HeapObject *actor);
 
-/// Initialize the runtime storage for a distributed remote actor.
-// TODO: this may end up being removed as we move to the "proxy creation" below
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_distributedActor_remote_initialize(DefaultActor *actor);
-
-/// Create a proxy object that will serve as remote distributed actor instance.
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-OpaqueValue* swift_distributedActor_remote_create(
-  /* +1 */OpaqueValue *identity,
-  /* +1 */OpaqueValue *transport,
-  const Metadata *identityType,
-  const Metadata *transportType
-);
-
-/// Destroy the runtime storage for a default actor.
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_distributedActor_destroy(DefaultActor *actor);
-
 /// Enqueue a job on the default actor implementation.
 ///
 /// The job must be ready to run.  Notably, if it's a task, that
@@ -610,10 +592,6 @@ void swift_distributedActor_destroy(DefaultActor *actor);
 /// execution.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_defaultActor_enqueue(Job *job, DefaultActor *actor);
-
-/// Check if the actor is a distributed 'remote' actor instance.
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-bool swift_distributed_actor_is_remote(DefaultActor *actor);
 
 /// Do a primitive suspension of the current task, as if part of
 /// a continuation, although this does not provide any of the

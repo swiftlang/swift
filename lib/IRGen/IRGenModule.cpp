@@ -678,15 +678,20 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
       *this, "swift.differentiability_witness", {Int8PtrTy, Int8PtrTy});
 
   // FIXME(distributed): decide how to store the identity... the struct wrapper is very painful:
-//  DistributedActorIdentityFirstTy = createStructType(
+//  DistributedActorIdentityTy = createStructType(
 //      *this, "swift.distributed_actor_any_identity",
 //      {Int8PtrTy, // _hashInto
 //      {Int8PtrTy, // _equalTo
 //      {Int8PtrTy, // _encodeTo
 //      {Int8PtrTy, // _description
 //      });
-  DistributedActorIdentityFirstTy = Int8PtrTy; // FIXME(distributed): this forces AnyActorIdentity to be a class, easier to implement, but painful to pass around...
-  DistributedActorTransportSecondTy = Int8PtrTy;
+  DistributedActorIdentityTy = Int8PtrTy; // FIXME(distributed): this forces AnyActorIdentity to be a class, easier to implement, but painful to pass around...
+  // TODO(distributed): do we need to do the same dance as Executor where it is two fields? I don't think so right?
+//  SwiftExecutorTy = createStructType(*this, "swift.executor", {
+//    ExecutorFirstTy,      // identity
+//    ExecutorSecondTy,     // implementation
+//  });
+  DistributedActorTransportTy = Int8PtrTy;
 }
 
 IRGenModule::~IRGenModule() {

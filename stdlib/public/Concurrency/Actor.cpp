@@ -16,6 +16,7 @@
 ///===----------------------------------------------------------------------===///
 
 #include "swift/Runtime/Concurrency.h"
+#include "swift/Runtime/Distributed.h"
 
 #ifdef _WIN32
 // On Windows, an include below triggers an indirect include of minwindef.h
@@ -406,6 +407,7 @@ void swift::swift_task_reportUnexpectedExecutor(
 /*****************************************************************************/
 /*********************** DEFAULT ACTOR IMPLEMENTATION ************************/
 /*****************************************************************************/
+
 
 namespace {
 
@@ -1978,9 +1980,17 @@ DistributedActorFragment* DefaultActorImpl::distributedActorFragment() {
   if (!isDistributedActor())
     return nullptr; // only a 'local distributed actor' has such fragment
 
-  auto offset = this + 0; // FIXME(distributed) find out where the fragment is?
+  // this + 1 // roundToAlignment
+
+  // NOTES:
+  // local: either DefaultActor or not
+  // l default actor     [   | default actor | dist actor | ...]
+  // l non default actor [   | dist actor | ...]
+  // remote            [ x | dist actor | ...]
+
+
+  // auto offset = this + 0; // FIXME(distributed) find out where the fragment is?
   assert(false && "finding the distributed actor fragment of local dist actor is not implemented");
-  return nullptr;
 }
 
 /*****************************************************************************/
@@ -2002,11 +2012,11 @@ namespace {
 // TODO: the remote actor does not need to BE an actor at all
 class DistributedActorFragment {
 private:
-  enum class Status : __swift_uintptr_t {
-    IsRemote = 1,
-  };
-
-  uintptr_t status;
+//  enum class Status : __swift_uintptr_t {
+//    IsRemote = 1,
+//  };
+//
+//  uintptr_t status;
 
   /// `ActorIdentity` stored by any `distributed actor`.
   OpaqueValue *identity;
@@ -2029,6 +2039,16 @@ public:
 
 } // end anonymous namespace
 
+void swift::swift_distributedActor_local_initialize(DefaultActor *_actor,
+                                                    OpaqueValue *identity,
+                                                    OpaqueValue *transport) {
+  auto actor = asImpl(_actor);
+  actor->initialize(/*distributed=*/true);
+  auto distributed = actor->distributedActorFragment();
+  assert(distributed && "initializing a remote actor, yet no distributed fragment available!");
+  distributed->setRemote(false);
+}
+
 // TODO: most likely where we'd need to create the "proxy instance" instead? (most likely remove this and use swift_distributedActor_remote_create instead)
 void swift::swift_distributedActor_remote_initialize(DefaultActor *_actor) { // FIXME: remove distributed C++ impl not needed?
   auto actor = asImpl(_actor);
@@ -2049,6 +2069,31 @@ void swift::swift_distributedActor_destroy(DefaultActor *_actor) { // FIXME: rem
   // FIXME: if this is a proxy, we would destroy a bit differently I guess? less memory was allocated etc.
   asImpl(_actor)->destroy(); // today we just replicate what defaultActor_destroy does
 }
+
+OpaqueValue* swift::swift_distributedActor_getIdentity(DefaultActor *_actor) {
+  auto actor = asImpl(_actor);
+
+  assert(actor->isDistributedActor() &&
+      "Attempted to get DistributedActor.identity, or non-distributed actor.");
+  auto distributed = actor->distributedActorFragment();
+  assert(distributed &&
+         "Distributed actor with missing distributed-actor storage fragment!");
+
+  return distributed->getActorIdentity();
+}
+
+OpaqueValue* swift::swift_distributedActor_getTransport(DefaultActor *_actor) {
+  auto actor = asImpl(_actor);
+
+  assert(actor->isDistributedActor() &&
+      "Attempted to get DistributedActor.transport, or non-distributed actor.");
+  auto distributed = actor->distributedActorFragment();
+  assert(distributed &&
+         "Distributed actor with missing distributed-actor storage fragment!");
+
+  return distributed->getActorTransport();
+}
+
 
 bool swift::swift_distributed_actor_is_remote(DefaultActor *_actor) {
   return asImpl(_actor)->isDistributedActor();

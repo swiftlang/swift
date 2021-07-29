@@ -1657,6 +1657,48 @@ static ManagedValue emitBuiltinBuildMainActorExecutorRef(
                               BuiltinValueKind::BuildMainActorExecutorRef);
 }
 
+static ManagedValue emitBuiltinBuildDistributedActorIdentity(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    ArrayRef<ManagedValue> args, SGFContext C) {
+  ASTContext &ctx = SGF.getASTContext();
+
+  assert(false && "how do I get AnyActorIdentity here?"); // FIXME(distributed): how to get the right type here
+//  auto builtinApply = SGF.B.createBuiltin(
+//      loc,
+//      BuiltinValueKind::BuildDistributedActorIdentity,
+//      SILType::getPrimitiveObjectType(ctx.TheExecutorType), // FIXME: the AnyActorIdentity?
+//      subs,
+//      /*args*/argValues);
+//  return ManagedValue::forUnmanaged(builtinApply);
+}
+
+static ManagedValue emitBuiltinBuildDistributedActorTransport(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    ArrayRef<ManagedValue> args, SGFContext C) {
+  ASTContext &ctx = SGF.getASTContext();
+
+  auto transportType =
+      ctx.getProtocol(KnownProtocolKind::ActorTransport)
+          ->getDeclaredInterfaceType()
+      ->getCanonicalType();
+  auto builtinApply = SGF.B.createBuiltin(
+      loc,
+      ctx.getIdentifier(getBuiltinName(BuiltinValueKind::BuildDistributedActorTransport)),
+      //      SILType::getPrimitiveObjectType(ctx.TheExecutorType),
+      //      TODO(distributed): this was this for the executor, how do we
+      //                         return existential ActorTransport?
+      SILType::getPrimitiveObjectType(transportType),
+//    error: no viable conversion from 'swift::Type' to 'swift::CanType'
+//      SILType::getPrimitiveObjectType(transportType),
+//      ^~~~~~~~~~~~~
+      subs,
+      {
+        args[0].borrow(SGF, loc).getValue() // actor
+      });
+  return ManagedValue::forUnmanaged(builtinApply);
+}
+
+
 Optional<SpecializedEmitter>
 SpecializedEmitter::forDecl(SILGenModule &SGM, SILDeclRef function) {
   // Only consider standalone declarations in the Builtin module.

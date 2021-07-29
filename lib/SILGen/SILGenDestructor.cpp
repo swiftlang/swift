@@ -127,6 +127,12 @@ void SILGenFunction::injectDistributedActorDestructorLifecycleCall(
 
   // ==== locate: self.id
   auto idVarDeclRefs = cd->lookupDirect(ctx.Id_id);
+
+  // FIXME(distributed): bring back the id storage and remove this hack...!
+  if (idVarDeclRefs.size() == 0)
+    return;
+  // end of FIXME(distributed): bring back the id storage and remove this hack...!
+
   assert(idVarDeclRefs.size() == 1);
   auto *idVarDeclRef = dyn_cast<VarDecl>(idVarDeclRefs.front());
   assert(idVarDeclRef);

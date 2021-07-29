@@ -64,7 +64,7 @@ public protocol ActorTransport: Sendable {
   /// E.g. if an actor is created under address `addr1` then immediately invoking
   /// `transport.resolve(address: addr1, as: Greeter.self)` MUST return a reference
   /// to the same actor.
-  // FIXME: make it Act.ID needs changes in AST gen
+  // FIXME: return ActorIdentity; needs changes in AST gen
   func assignIdentity<Act>(_ actorType: Act.Type) -> AnyActorIdentity
       where Act: DistributedActor
 //  func assignIdentity<Act>(_ actorType: Act.Type) -> Act.ID

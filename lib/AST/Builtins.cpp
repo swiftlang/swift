@@ -1471,6 +1471,16 @@ static ValueDecl *getDistributedActorInitDestroy(ASTContext &ctx,
                             _void);
 }
 
+static ValueDecl *getDistributedActorInitializeLocal(ASTContext &ctx,
+                                                     Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _parameters(_nativeObject, // actor
+                                        _nativeObject, // identity, existential // FIXME: what type to use here?
+                                        _nativeObject  // transport, existential // FIXME: what type to use here?
+                            ), // TODO: no idea what type to pass here?
+                            _void);
+}
+
 static ValueDecl *getResumeContinuationReturning(ASTContext &ctx,
                                                  Identifier id) {
   return getBuiltinFunction(ctx, id, _thin,
@@ -1552,6 +1562,25 @@ static ValueDecl *getBuildOrdinarySerialExecutorRef(ASTContext &ctx,
                               _conformsTo(_typeparam(0), _serialExecutor)),
                             _parameters(_typeparam(0)),
                             _executor);
+}
+
+static ValueDecl *getBuildDistributedActorIdentity(ASTContext &ctx,
+                                                   Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _generics(_unrestricted,
+                                      _layout(_typeparam(0), _classLayout())),
+                                      _parameters(_typeparam(0)),
+//                                       _anyActorIdentity); // FIXME(distributed): should this be the anyActorIdentity?
+                                      _actorIdentity); // FIXME(distributed): we must return the wrapped one since it has self type requirements...
+}
+
+static ValueDecl *getBuildDistributedActorTransport(ASTContext &ctx,
+                                                    Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _generics(_unrestricted,
+                                      _layout(_typeparam(0), _classLayout())),
+                                      _parameters(_typeparam(0)),
+                                      _actorTransport);
 }
 
 static ValueDecl *getAutoDiffCreateLinearMapContext(ASTContext &ctx,
@@ -2776,6 +2805,12 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::BuildOrdinarySerialExecutorRef:
     return getBuildOrdinarySerialExecutorRef(Context, Id);
 
+  case BuiltinValueKind::BuildDistributedActorIdentity:
+    return getBuildDistributedActorIdentity(Context, Id);
+
+  case BuiltinValueKind::BuildDistributedActorTransport:
+    return getBuildDistributedActorTransport(Context, Id);
+
   case BuiltinValueKind::PoundAssert:
     return getPoundAssert(Context, Id);
 
@@ -2809,7 +2844,11 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::DestroyDefaultActor:
     return getDefaultActorInitDestroy(Context, Id);
 
+  case BuiltinValueKind::InitializeDistributedLocalActor:
+    return getDistributedActorInitializeLocal(Context, Id);
   case BuiltinValueKind::InitializeDistributedRemoteActor:
+    return getDistributedActorInitDestroy(Context, Id); // FIXME: make it's own def or reuse the local init one if they match
+
   case BuiltinValueKind::DestroyDistributedActor:
     return getDistributedActorInitDestroy(Context, Id);
 

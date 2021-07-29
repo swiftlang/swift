@@ -49,11 +49,11 @@ constexpr static const StringLiteral SEMANTICS_PROGRAMTERMINATION_POINT =
 
 constexpr static const StringLiteral SEMANTICS_DEFAULT_ACTOR =
     "defaultActor";
-constexpr static const StringLiteral SEMANTICS_DISTRIBUTED_ACTOR =
-    "distributedActor";
-
 constexpr static const StringLiteral DEFAULT_ACTOR_STORAGE_FIELD_NAME =
     "$defaultActor";
+
+constexpr static const StringLiteral SEMANTICS_DISTRIBUTED_ACTOR = // TODO: check for it in TypeCheck...
+    "distributedActor";
 constexpr static const StringLiteral DISTRIBUTED_ACTOR_STORAGE_FIELD_NAME =
     "$distributedActor";
 

@@ -538,6 +538,7 @@ CONSTANT_OWNERSHIP_BUILTIN(None, ConvertTaskToJob)
 CONSTANT_OWNERSHIP_BUILTIN(None, InitializeDefaultActor)
 CONSTANT_OWNERSHIP_BUILTIN(None, DestroyDefaultActor)
 CONSTANT_OWNERSHIP_BUILTIN(None, InitializeDistributedRemoteActor)
+CONSTANT_OWNERSHIP_BUILTIN(None, InitializeDistributedLocalActor)
 CONSTANT_OWNERSHIP_BUILTIN(None, DestroyDistributedActor)
 CONSTANT_OWNERSHIP_BUILTIN(Owned, AutoDiffCreateLinearMapContext)
 CONSTANT_OWNERSHIP_BUILTIN(None, AutoDiffProjectTopLevelSubcontext)
@@ -553,6 +554,9 @@ CONSTANT_OWNERSHIP_BUILTIN(None, StartAsyncLet)
 CONSTANT_OWNERSHIP_BUILTIN(None, EndAsyncLet)
 CONSTANT_OWNERSHIP_BUILTIN(None, CreateTaskGroup)
 CONSTANT_OWNERSHIP_BUILTIN(None, DestroyTaskGroup)
+
+CONSTANT_OWNERSHIP_BUILTIN(None, BuildDistributedActorIdentity)
+CONSTANT_OWNERSHIP_BUILTIN(None, BuildDistributedActorTransport)
 
 #undef CONSTANT_OWNERSHIP_BUILTIN
 

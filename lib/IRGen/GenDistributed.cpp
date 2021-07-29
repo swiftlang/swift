@@ -38,17 +38,23 @@ namespace {
 void irgen::emitBuildDistributedActorIdentity(IRGenFunction &IGF,
                                               llvm::Value *actor,
                                               Explosion &out) {
-  // The implementation word of a default actor is just a null pointer.
-  llvm::Value *identity =
-    IGF.Builder.CreatePtrToInt(actor, IGF.IGM.ExecutorFirstTy);
-  llvm::Value *impl = llvm::ConstantInt::get(IGF.IGM.ExecutorSecondTy, 0);
+  auto call = IGF.Builder.CreateCall(IGF.IGM.getDistributedActorGetIdentityFn(), // similar to getTaskGetMainExecutorFn
+                                     {actor});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
 
-  out.add(identity);
-  out.add(impl);
+  // IGF.emitAllExtractValues(call, IGF.IGM.DistributedActorIdentityTy, out); // if it was a struct
+  out.add(call);
 }
 
 void irgen::emitBuildDistributedActorTransport(IRGenFunction &IGF,
                                                llvm::Value *actor,
                                                Explosion &out) {
+  auto call = IGF.Builder.CreateCall(IGF.IGM.getDistributedActorGetTransportFn(), // similar to getTaskGetMainExecutorFn
+                                     {actor});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
 
+  // IGF.emitAllExtractValues(call, IGF.IGM.DistributedActorIdentityTy, out); // if it was a struct
+  out.add(call);
 }

@@ -727,6 +727,10 @@ BUILTIN_MISC_OPERATION(InitializeDefaultActor, "initializeDefaultActor", "", Spe
 /// Destroy the default-actor instance in a default actor object.
 BUILTIN_MISC_OPERATION(DestroyDefaultActor, "destroyDefaultActor", "", Special)
 
+/// Initialize the implicit state of a distributed local actor.
+BUILTIN_MISC_OPERATION(InitializeDistributedLocalActor,
+                       "initializeDistributedLocalActor", "", Special)
+
 /// Initialize a "proxy" for a distributed remote actor.
 BUILTIN_MISC_OPERATION(InitializeDistributedRemoteActor,
                        "initializeDistributedRemoteActor", "", Special)
@@ -850,6 +854,14 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(BuildOrdinarySerialExecutorRef,
 /// Build a Builtin.Executor value from a default actor reference.
 BUILTIN_MISC_OPERATION_WITH_SILGEN(BuildDefaultActorExecutorRef,
                                    "buildDefaultActorExecutorRef", "n", Special)
+
+/// Build an AnyActorTransport from a distributed actor reference.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(BuildDistributedActorIdentity,
+                                   "buildDistributedActorIdentity", "n", Special)
+
+/// Build a ActorTransport value from a distributed actor reference.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(BuildDistributedActorTransport,
+                                   "buildDistributedActorTransport", "n", Special)
 
 /// Build a Builtin.Executor value for the main actor.
 BUILTIN_MISC_OPERATION_WITH_SILGEN(BuildMainActorExecutorRef,

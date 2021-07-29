@@ -1868,6 +1868,18 @@ public:
                         "result of build*ExecutorRef");
       return;
     }
+
+    if (builtinKind == BuiltinValueKind::BuildDistributedActorIdentity ||
+        builtinKind == BuiltinValueKind::BuildDistributedActorTransport) {
+      require(arguments.size() == 1,
+              "builtin expects one argument");
+      require(arguments[0]->getType().isObject(),
+              "operand of builtin should have object type");
+//      requireObjectType(BuiltinExecutorType, BI, // FIXME(distributed); what here?
+//                        "result of build*ExecutorRef");
+      return;
+    }
+
   }
   
   void checkFunctionRefBaseInst(FunctionRefBaseInst *FRI) {

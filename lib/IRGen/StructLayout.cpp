@@ -451,8 +451,6 @@ void irgen::forEachField(IRGenModule &IGM, const NominalTypeDecl *typeDecl,
                          llvm::function_ref<void(Field field)> fn) {
   auto classDecl = dyn_cast<ClassDecl>(typeDecl);
   if (classDecl && classDecl->isRootDefaultActor()) {
-//    classDecl->dump();
-    fprintf(stderr, "[%s:%d] (%s) IS isRootDefaultActor\n", __FILE__, __LINE__, __FUNCTION__);
     fn(Field::DefaultActorStorage);
   }
   if (classDecl && classDecl->isDistributedActor()) {

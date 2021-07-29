@@ -18,6 +18,7 @@
 #include "TypeCheckDecl.h"
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
+#include "swift/Strings.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Availability.h"
 #include "swift/AST/Expr.h"
@@ -136,34 +137,67 @@ createBody_DistributedActor_init_transport(AbstractFunctionDecl *initDecl, void 
 
   auto *selfRef = DerivedConformance::createSelfDeclRef(initDecl);
 
-  // ==== `self.actorTransport = transport`
-  {
-    // self.actorTransport
-    auto *varTransportExpr = UnresolvedDotExpr::createImplicit(C, selfRef,
-                                                               C.Id_actorTransport);
-    auto *assignTransportExpr = new (C) AssignExpr(
-        varTransportExpr, SourceLoc(), transportExpr, /*Implicit=*/true);
-    statements.push_back(assignTransportExpr);
-  }
+//  // ==== `self.actorTransport = transport`
+//  {
+//    // self.actorTransport
+//    auto *varTransportExpr = UnresolvedDotExpr::createImplicit(C, selfRef,
+//                                                               C.Id_actorTransport);
+//    auto *assignTransportExpr = new (C) AssignExpr(
+//        varTransportExpr, SourceLoc(), transportExpr, /*Implicit=*/true);
+//    statements.push_back(assignTransportExpr);
+//  }
+//
+//  auto selfType = funcDC->getInnermostTypeContext()->getSelfTypeInContext();
+//
+//  // ==== `self.id = transport.assignIdentity<Self>(Self.self)`
+//  {
+//    // self.id
+//    auto *varIdExpr = UnresolvedDotExpr::createImplicit(C, selfRef, C.Id_id);
+//    // Bound transport.assignIdentity(Self.self) call
+//    auto anyIdentityType = C.getAnyActorIdentityDecl()->getDeclaredInterfaceType();
+//    auto *callExpr = createCall_DistributedActor_transport_assignIdentity(
+//        C, funcDC,
+//        /*base=*/transportExpr,
+//        /*returnType=*/anyIdentityType, // TODO(distributed): move the function to return just ActorIdentity
+//        /*param=*/selfType);
+//    auto *assignIdExpr = new (C) AssignExpr(
+//        varIdExpr, SourceLoc(), callExpr, /*Implicit=*/true);
+//    statements.push_back(assignIdExpr);
+//  }
 
-  auto selfType = funcDC->getInnermostTypeContext()->getSelfTypeInContext();
-
-  // ==== `self.id = transport.assignIdentity<Self>(Self.self)`
+  // Initialize the identity and transport stored in the implicitly created storage
   {
-    // self.id
-    auto *varIdExpr = UnresolvedDotExpr::createImplicit(C, selfRef, C.Id_id);
-    // Bound transport.assignIdentity(Self.self) call
-    auto anyAddressType = C.getAnyActorIdentityDecl()->getDeclaredInterfaceType();
-    auto *callExpr = createCall_DistributedActor_transport_assignIdentity(
+    // 1. Obtain the identity assigned by the transport.
+    auto selfType = funcDC->getInnermostTypeContext()->getSelfTypeInContext();
+    auto anyIdentityType = C.getAnyActorIdentityDecl()->getDeclaredInterfaceType(); // TODO: use the esistential here
+    auto identityType = C.getProtocol(KnownProtocolKind::ActorIdentity)->getDeclaredInterfaceType();
+    auto *assignIdentityCallExpr = createCall_DistributedActor_transport_assignIdentity(
         C, funcDC,
         /*base=*/transportExpr,
-        /*returnType=*/anyAddressType, // TODO: move the function to return just ActorIdentity
+        /*returnType=*/anyIdentityType, // TODO(distributed): move the function to return just ActorIdentity
         /*param=*/selfType);
-    auto *assignIdExpr = new (C) AssignExpr(
-        varIdExpr, SourceLoc(), callExpr, /*Implicit=*/true);
-    statements.push_back(assignIdExpr);
+
+    auto *typeInfo = DerivedConformance::createSelfDeclRef(initDecl);
+
+    // 2. Obtain built-in function reference.
+    auto builtinID = C.getIdentifier("initializeDistributedLocalActor");
+    auto *builtinDecl = getBuiltinValueDecl(C, builtinID);
+    auto *builtinExpr = new (C) DeclRefExpr(ConcreteDeclRef(builtinDecl),
+                                            DeclNameLoc(), /*implicit=*/true);
+
+    statements.push_back(assignIdentityCallExpr);
+
+    // 3. Create the call
+////    SmallVector<Expr*, 3> args = {assignIdentityCallExpr, transportExpr, typeInfo};
+//    SmallVector<Expr*, 3> args = {selfRef, assignIdentityCallExpr, transportExpr};
+//    SmallVector<Identifier, 3> argLabels =
+//        {Identifier(), Identifier(), Identifier()};
+//
+//    auto *call = CallExpr::createImplicit(C, builtinExpr, args, argLabels);
+//    statements.push_back(call);
   }
 
+  // FIXME: this must be called once we're done initializing... at end of user inits
   // ---=== Done initializing ===---
   // === `transport.actorReady(self)`
   {
@@ -231,19 +265,19 @@ createDistributedActor_init_local(ClassDecl *classDecl,
 }
 
 // ==== Distributed Actor: Resolve Initializer ---------------------------------
-// TODO: remove resolve initializer in favor of resolve static function
+// TODO(distributed): remove resolve initializer in favor of resolve static function
 
 /// Synthesizes the body for
 ///
 /// ```
 /// init(resolve address: ActorAddress, using transport: ActorTransport) throws {
-///   // TODO: implement calling the transport
+///   // TODO(distributed): implement calling the transport
 ///   switch try transport.resolve(address: address, as: Self.self) {
 ///   case .instance(let instance):
 ///     self = instance
 ///   case .makeProxy:
-///   // TODO: use RebindSelfInConstructorExpr here?
-///     self = <<MAGIC MAKE PROXY>>(address, transport) // TODO: implement this
+///   // TODO(distributed): use RebindSelfInConstructorExpr here?
+///     self = <<MAGIC MAKE PROXY>>(address, transport) // TODO(distributed): implement this
 ///   }
 /// }
 /// ```
@@ -267,20 +301,20 @@ createDistributedActor_init_resolve_body(AbstractFunctionDecl *initDecl, void *)
   auto *selfRef = DerivedConformance::createSelfDeclRef(initDecl);
 
   // ==== `self.actorTransport = transport`
-  auto *varTransportExpr = UnresolvedDotExpr::createImplicit(
-      C, selfRef, C.Id_actorTransport);
-  auto *assignTransportExpr = new (C) AssignExpr(
-      varTransportExpr, SourceLoc(), transportExpr, /*Implicit=*/true);
-  statements.push_back(assignTransportExpr);
+//  auto *varTransportExpr = UnresolvedDotExpr::createImplicit(
+//      C, selfRef, C.Id_actorTransport);
+//  auto *assignTransportExpr = new (C) AssignExpr(
+//      varTransportExpr, SourceLoc(), transportExpr, /*Implicit=*/true);
+//  statements.push_back(assignTransportExpr);
 
   // ==== `self.id = transport.assignIdentity<Self>(Self.self)`
   // self.id
-  auto *varIdExpr = UnresolvedDotExpr::createImplicit(C, selfRef, C.Id_id);
-  // TODO implement calling the transport with the address and Self.self
-  // FIXME: this must be checking with the transport instead
-  auto *assignIdExpr = new (C) AssignExpr(
-      varIdExpr, SourceLoc(), idExpr, /*Implicit=*/true);
-  statements.push_back(assignIdExpr);
+//  auto *varIdExpr = UnresolvedDotExpr::createImplicit(C, selfRef, C.Id_id);
+//  // TODO(distributed): implement calling the transport with the address and Self.self
+//  // FIXME(distributed): this must be checking with the transport instead
+//  auto *assignIdExpr = new (C) AssignExpr(
+//      varIdExpr, SourceLoc(), idExpr, /*Implicit=*/true);
+//  statements.push_back(assignIdExpr);
   // end-of-FIXME: this must be checking with the transport instead
 
   BraceStmt *body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc(),
@@ -296,7 +330,7 @@ createDistributedActor_init_resolve_body(AbstractFunctionDecl *initDecl, void *)
 /// ```
 ///
 /// resolve initializer.
-// TODO: will be replaced with resolve function.
+// TODO(distributed): will be replaced with resolve function.
 static ConstructorDecl *
 createDistributedActor_init_resolve(ClassDecl *classDecl,
                                     ASTContext &ctx) {
@@ -370,13 +404,13 @@ createDistributedActorInit(ClassDecl *classDecl,
 
     break;
   }
-  case 2: {
-    if (requirement->isDistributedActorResolveInit()) {
-      return createDistributedActor_init_resolve(classDecl, ctx);
-    }
-
-    break;
-  }
+//  case 2: {
+//    if (requirement->isDistributedActorResolveInit()) {
+//      return createDistributedActor_init_resolve(classDecl, ctx);
+//    }
+//
+//    break;
+//  }
   }
 
   return nullptr;
@@ -410,7 +444,7 @@ static void collectNonOveriddenDistributedActorInits(
     // Distributed Actor Constructor
     auto daCtor = cast<ConstructorDecl>(decl);
 
-    // TODO: Don't require it if overriden
+    // TODO(distributed): Don't require it if overriden
     //    if (!overriddenInits.count(daCtor))
     results.push_back(daCtor);
   }
@@ -436,14 +470,6 @@ static void addImplicitDistributedActorConstructors(ClassDecl *decl) {
   // Check whether the user has defined a designated initializer for this class,
   // and whether all of its stored properties have initial values.
   auto &ctx = decl->getASTContext();
-  //  bool foundDesignatedInit = hasUserDefinedDesignatedInit(ctx.evaluator, decl);
-  //  bool defaultInitable =
-  //      areAllStoredPropertiesDefaultInitializable(ctx.evaluator, decl);
-  //
-  //  // We can't define these overrides if we have any uninitialized
-  //  // stored properties.
-  //  if (!defaultInitable && !foundDesignatedInit)
-  //    return;
 
   SmallVector<ConstructorDecl *, 4> nonOverridenCtors;
   collectNonOveriddenDistributedActorInits(
@@ -475,11 +501,11 @@ static void addImplicitResignIdentity(ClassDecl *decl) {
   BraceStmt *body = deinitDecl->getBody();
 
   // == Copy all existing statements to the new deinit
-  SmallVector<ASTNode, 2> statements; // TODO: how to init at body statements count size?
+  SmallVector<ASTNode, 2> statements; // TODO(distributed): how to init at body statements count size?
   for (auto stmt : body->getElements())
-    statements.push_back(stmt); // TODO: copy?
+    statements.push_back(stmt); // TODO(distributed): copy?
 
-  // TODO: INJECT THIS AS FIRST THING IN A DEFER {}
+  // TODO(distributed): INJECT THIS AS FIRST THING IN A DEFER {}
 
   // == Inject the lifecycle 'resignIdentity' interaction
   // ==== self
@@ -523,14 +549,15 @@ static void addImplicitResignIdentity(ClassDecl *decl) {
   BraceStmt *newBody = BraceStmt::create(C, SourceLoc(), statements, SourceLoc(),
                                          /*implicit=*/true);
 
-  deinitDecl->setBody(newBody, AbstractFunctionDecl::BodyKind::TypeChecked); // FIXME: no idea if Parsed is right, we are NOT type checked I guess?
+  deinitDecl->setBody(newBody, AbstractFunctionDecl::BodyKind::TypeChecked); // FIXME(distributed): no idea if Parsed is right, we are NOT type checked I guess?
 }
 
 /******************************************************************************/
 /******************************** PROPERTIES **********************************/
 /******************************************************************************/
 
-// TODO: deduplicate with 'declareDerivedProperty' from DerivedConformance...
+// TODO(distributed): deduplicate with 'declareDerivedProperty' from DerivedConformance...
+// TODO(distributed): those are actually computed, see addGetterToReadOnlyDerivedProperty
 std::pair<VarDecl *, PatternBindingDecl *>
 createStoredProperty(ClassDecl *classDecl, ASTContext &ctx,
                      VarDecl::Introducer introducer, Identifier name,
@@ -558,56 +585,145 @@ createStoredProperty(ClassDecl *classDecl, ASTContext &ctx,
   return {propDecl, pbDecl};
 }
 
+static std::pair<BraceStmt *, bool>
+deriveBodyDistributedActor_id(AbstractFunctionDecl *getter, void *) {
+  // var id: AnyActorIdentity {
+  //   get {
+  //     return Builtin.buildDistributedActorIdentity(self)
+  //   }
+  // }
+  ASTContext &ctx = getter->getASTContext();
+
+  // Build a reference to self.
+  Type selfType = getter->getImplicitSelfDecl()->getType();
+  Expr *selfArg = DerivedConformance::createSelfDeclRef(getter);
+  selfArg->setType(selfType);
+
+  // The builtin call gives us a Builtin.Executor.
+  auto builtinCall =
+      DerivedConformance::createBuiltinCall(ctx,
+                          BuiltinValueKind::BuildDistributedActorIdentity,
+                                            {selfType}, {}, {selfArg});
+
+//  // Turn that into an UnownedSerialExecutor.
+//  auto initCall = constructUnownedSerialExecutor(ctx, builtinCall);
+//  if (!initCall) return failure();
+//
+//  auto ret = new (ctx) ReturnStmt(SourceLoc(), initCall, /*implicit*/ true);
+  auto ret = new (ctx) ReturnStmt(SourceLoc(), builtinCall, /*implicit*/ true);
+
+  auto body = BraceStmt::create(
+      ctx, SourceLoc(), { ret }, SourceLoc(), /*implicit=*/true);
+  return { body, /*isTypeChecked=*/true };
+}
+
+static std::pair<BraceStmt *, bool>
+deriveBodyDistributedActor_actorTransport(AbstractFunctionDecl *getter, void *) {
+  // var actorTransport: ActorTransport {
+  //   get {
+  //     return Builtin.buildDistributedActorTransport(self)
+  //   }
+  // }
+  ASTContext &ctx = getter->getASTContext();
+
+//  // Produce an empty brace statement on failure.
+//  auto failure = [&]() -> std::pair<BraceStmt *, bool> {
+//    auto body = BraceStmt::create(
+//        ctx, SourceLoc(), { }, SourceLoc(), /*implicit=*/true);
+//    return { body, /*isTypeChecked=*/true };
+//  };
+
+  // Build a reference to self.
+  Type selfType = getter->getImplicitSelfDecl()->getType();
+  Expr *selfArg = DerivedConformance::createSelfDeclRef(getter);
+  selfArg->setType(selfType);
+
+  // The builtin call gives us a Builtin.Executor.
+  auto builtinCall =
+      DerivedConformance::createBuiltinCall(ctx,
+                          BuiltinValueKind::BuildDistributedActorTransport,
+                                            {selfType}, {}, {selfArg});
+
+  auto ret = new (ctx) ReturnStmt(SourceLoc(), builtinCall, /*implicit*/ true);
+
+  auto body = BraceStmt::create(
+      ctx, SourceLoc(), { ret }, SourceLoc(), /*implicit=*/true);
+  return { body, /*isTypeChecked=*/true };
+}
+
 /// Adds the following, fairly special, properties to each distributed actor:
 /// - actorTransport
 /// - id
-static void addImplicitDistributedActorStoredProperties(ClassDecl *decl) {
+// TODO(distributed): move to DerivedConformanceDistributedActor style, since those are indeed protocol witnesses
+static void addImplicitDistributedActorProperties(ClassDecl *decl) {
   assert(decl->isDistributedActor());
 
   auto &C = decl->getASTContext();
 
-  // ```
-  // @_distributedActorIndependent
-  // let id: AnyActorIdentity // TODO: move to `nonisolated var id {}` once we have the new allocation scheme
-  // ```
-  {
-    auto propertyType = C.getAnyActorIdentityDecl()->getDeclaredInterfaceType();
+  // FIXME(distributed, doug help?): enable synthesis of id, but it's hard because we can't store ActorIdentity because Hashable...
+  //        - we also do not want to store AnyActorIdentity because that's a ton of pointers...
+  //        - so we might have to return a "RawActorIndentity" or "Builtin.ActorIdentity" and implement the "Any"
+  //          using delegation to runtime, in C++ to call the hash etc? This sounds terrible...
+//  // ```
+//  // nonisolated var id: AnyActorIdentity { <builtin> }
+//  // ```
+//  {
+//    auto propertyType = C.getAnyActorIdentityDecl()->getDeclaredInterfaceType();
+//    // TODO(distributed): diagnose if this type is missing, see: diag::concurrency_lib_missing
+//
+//    VarDecl *propDecl;
+//    PatternBindingDecl *pbDecl;
+//    std::tie(propDecl, pbDecl) = createStoredProperty(
+//        decl, C,
+//        VarDecl::Introducer::Var, C.Id_id,
+//        propertyType, propertyType,
+//        /*isStatic=*/false, /*isFinal=*/true);
+//
+//    propDecl->getAttrs().add(
+//        new (C) SemanticsAttr(SEMANTICS_DISTRIBUTED_ACTOR,
+//                              SourceLoc(), SourceRange(), /*implicit*/ true));
+//    propDecl->getAttrs().add(
+//        new (C) NonisolatedAttr(/*IsImplicit=*/true));
+//
+//    // Define the getter.
+//    auto getterDecl = DerivedConformance::addGetterToReadOnlyDerivedProperty(
+//        propDecl, propertyType);
+//    getterDecl->setBodySynthesizer(&deriveBodyDistributedActor_id);
+//
+////    // Make the property implicitly final.
+////    property->getAttrs().add(new (ctx) FinalAttr(/*IsImplicit=*/true));
+////    if (property->getFormalAccess() == AccessLevel::Open)
+////      property->overwriteAccess(AccessLevel::Public);
+//
+//    decl->addMember(propDecl);
+//    decl->addMember(pbDecl);
+//  }
 
-    VarDecl *propDecl;
-    PatternBindingDecl *pbDecl;
-    std::tie(propDecl, pbDecl) = createStoredProperty(
-        decl, C,
-        VarDecl::Introducer::Let, C.Id_id,
-        propertyType, propertyType,
-        /*isStatic=*/false, /*isFinal=*/true);
-
-    // mark as @_distributedActorIndependent, allowing access to it from everywhere
-    propDecl->getAttrs().add(
-        new (C) DistributedActorIndependentAttr(/*IsImplicit=*/true)); // TODO: remove and move to nonisolated once new constructors land
-
-    decl->addMember(propDecl);
-    decl->addMember(pbDecl);
-  }
-
   // ```
-  // @_distributedActorIndependent
-  // let actorTransport: ActorTransport
+  // nonisolated var actorTransport: ActorTransport { <builtin> }
   // ```
-  // (no need for @actorIndependent because it is an immutable let)
   {
     auto propertyType = C.getActorTransportDecl()->getDeclaredInterfaceType();
+    // TODO(distributed): diagnose if this type is missing, see: diag::concurrency_lib_missing
 
     VarDecl *propDecl;
     PatternBindingDecl *pbDecl;
     std::tie(propDecl, pbDecl) = createStoredProperty(
         decl, C,
-        VarDecl::Introducer::Let, C.Id_actorTransport,
+        VarDecl::Introducer::Var, C.Id_actorTransport,
         propertyType, propertyType,
         /*isStatic=*/false, /*isFinal=*/true);
 
-    // mark as @_distributedActorIndependent, allowing access to it from everywhere
     propDecl->getAttrs().add(
-        new (C) DistributedActorIndependentAttr(/*IsImplicit=*/true)); // TODO: remove and move to nonisolated once new constructors land
+        new (C) SemanticsAttr(SEMANTICS_DISTRIBUTED_ACTOR,
+                              SourceLoc(), SourceRange(), /*implicit*/ true));
+    propDecl->getAttrs().add(
+        new (C) NonisolatedAttr(/*IsImplicit=*/true));
+
+    // Define the getter.
+    auto getterDecl = DerivedConformance::addGetterToReadOnlyDerivedProperty(
+        propDecl, propertyType);
+    getterDecl->setBodySynthesizer(&deriveBodyDistributedActor_actorTransport);
 
     decl->addMember(propDecl);
     decl->addMember(pbDecl);
@@ -696,7 +812,7 @@ synthesizeRemoteFuncStubBody(AbstractFunctionDecl *func, void *context) {
 
   SmallVector<ASTNode, 2> stmts;
   stmts.push_back(call); // something() -> Never
-  // stmts.push_back(new (ctx) ReturnStmt(SourceLoc(), /*Result=*/nullptr)); // FIXME: this causes 'different types for return type: String vs. ()'
+  // stmts.push_back(new (ctx) ReturnStmt(SourceLoc(), /*Result=*/nullptr)); // FIXME(distributed): this causes 'different types for return type: String vs. ()'
   auto body = BraceStmt::create(ctx, SourceLoc(), stmts, SourceLoc(),
                                 /*implicit=*/true);
   return { body, /*isTypeChecked=*/true };
@@ -729,7 +845,7 @@ static void addImplicitRemoteActorFunction(ClassDecl *decl, FuncDecl *func) {
   auto remoteFuncIdent = makeRemoteFuncIdentifier(func);
 
   auto params = ParameterList::clone(C, func->getParameters());
-  auto genericParams = func->getGenericParams(); // TODO: also clone those
+  auto genericParams = func->getGenericParams(); // TODO(distributed): also clone those
   Type resultTy = func->getResultInterfaceType();
 
   DeclName name(C, remoteFuncIdent, params);
@@ -791,7 +907,7 @@ void swift::addImplicitDistributedActorMembersToClass(ClassDecl *decl) {
   }
 
   addImplicitDistributedActorConstructors(decl);
-  addImplicitDistributedActorStoredProperties(decl);
+  addImplicitDistributedActorProperties(decl);
   addImplicitRemoteActorFunctions(decl);
 //  addImplicitResignIdentity(decl);
 }
