@@ -6,6 +6,10 @@
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
+// REQUIRES: concurrency
+
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 func run(_ s: Clazz) async throws {
     let res: (String, String) = try await s.doSomethingMultiResultFlaggy()
