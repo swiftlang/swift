@@ -1756,10 +1756,34 @@ void swift::swift_defaultActor_deallocateResilient(HeapObject *actor) {
                       metadata->getInstanceAlignMask());
 }
 
-// TODO: missing implementation of creating a proxy for the remote actor
 OpaqueValue* swift::swift_distributedActor_remote_create(OpaqueValue *identity,
-                                                         OpaqueValue *transport) {
-  assert(false && "swift_distributedActor_remote_create is not implemented yet!");
+                                                         OpaqueValue *transport,
+                                                         HeapMetadata *type) {
+  assert(false && "not implemented yet");
+  return nullptr;
+
+  /* Uncomment the code below once DistributedActorFragment exists.
+  auto *wtable = type->getValueWitnesses();
+  auto stride = wtable->getStride();
+  auto alignMask = wtable->getAlignmentMask();
+
+  /// FIXME(distributed): right now, the type layout is not accounting for the
+  /// DistributedActorFragment being in the allocation, because I haven't
+  /// rebased on top of Konrad's in-flight PR. So, for now I'm just rounding
+  /// up to make sure there is enough space, and hoping the alignment is OK.
+  stride = std::max(stride, sizeof(DistributedActorFragment));
+
+  HeapObject* obj = swift_allocObject(type, stride, alignMask);
+
+  // find and initialize the DistributedActorFragment
+  void *daStore = reinterpret_cast<void*>(obj + 1);
+
+  // TODO(distributed): what about ref counts for identity and transport?
+  new (daStore) DistributedActorFragment(identity, transport);
+
+  // TODO(distributed): what about ref count of this obj?
+  return reinterpret_cast<OpaqueValue*>(obj);
+  */
 }
 
 void swift::swift_distributedActor_destroy(DefaultActor *_actor) { // FIXME: remove distributed C++ impl not needed?

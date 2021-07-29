@@ -719,9 +719,8 @@ void swift_defaultActor_deallocateResilient(HeapObject *actor);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 OpaqueValue* swift_distributedActor_remote_create(
   /* +1 */OpaqueValue *identity,
-  /* +1 */OpaqueValue *transport
-  // metadata for identity
-  // metadata for transport
+  /* +1 */OpaqueValue *transport,
+          HeapMetadata *type
 );
 
 /// Destroy the runtime storage for a default actor.

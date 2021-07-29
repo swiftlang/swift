@@ -1665,7 +1665,8 @@ FUNCTION(DefaultActorDeallocateResilient,
 
 // OpaqueValue* swift_distributedActor_remote_create(
 //     OpaqueValue *identity,
-//     OpaqueValue *transport);
+//     OpaqueValue *transport,
+//     HeapMetadata *type;
 FUNCTION(DistributedActorRemoteCreate,
          swift_distributedActor_remote_create, SwiftCC,
          ConcurrencyAvailability,

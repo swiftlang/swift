@@ -94,7 +94,7 @@ extension DistributedActor {
       return instance
 
     case .makeProxy:
-      let remote: Any = distributedActorRemoteCreate(identity: identity, transport: transport)
+      let remote: Any = distributedActorRemoteCreate(identity: identity, transport: transport, type: Self.self)
       return remote as! Self
     }
   }
@@ -233,7 +233,7 @@ func __isLocalActor(_ actor: AnyObject) -> Bool {
 // ==== Proxy Actor lifecycle --------------------------------------------------
 
 @_silgen_name("swift_distributedActor_remote_create")
-func distributedActorRemoteCreate(identity: Any, transport: Any) -> Any // TODO: make it typed
+func distributedActorRemoteCreate(identity: Any, transport: Any, type: Any) -> Any // TODO: make it typed
 
 /// Called to destroy the default actor instance in an actor.
 /// The implementation will call this within the actor's deinit.
