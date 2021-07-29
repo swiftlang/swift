@@ -3741,6 +3741,7 @@ NormalProtocolConformance *GetImplicitSendableRequest::evaluate(
     conformance->setSourceKindAndImplyingConformance(
         ConformanceEntryKind::Synthesized, nullptr);
 
+    nominal->registerProtocolConformance(conformance, /*synthesized=*/true);
     return conformance;
   };
 

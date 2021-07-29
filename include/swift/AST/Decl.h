@@ -3251,7 +3251,8 @@ public:
   ///
   /// This is used by deserialization of module files to report
   /// conformances.
-  void registerProtocolConformance(ProtocolConformance *conformance);
+  void registerProtocolConformance(ProtocolConformance *conformance,
+                                   bool synthesized = false);
 
   void setConformanceLoader(LazyMemberLoader *resolver, uint64_t contextData);
 

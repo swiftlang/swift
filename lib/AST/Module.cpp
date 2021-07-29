@@ -996,8 +996,7 @@ static ProtocolConformanceRef getInvalidOrMissingConformance(
   // Introduce "missing" conformances to Sendable, so that type checking
   // (and even code generation) can continue.
   ASTContext &ctx = proto->getASTContext();
-  if (proto->isSpecificProtocol(KnownProtocolKind::Sendable) &&
-      ctx.LangOpts.WarnConcurrency) {
+  if (proto->isSpecificProtocol(KnownProtocolKind::Sendable)) {
     return ProtocolConformanceRef(
         ctx.getBuiltinConformance(
           type, proto, GenericSignature(), { },

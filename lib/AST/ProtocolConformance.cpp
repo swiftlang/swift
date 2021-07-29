@@ -1320,9 +1320,9 @@ void NominalTypeDecl::getImplicitProtocols(
 }
 
 void NominalTypeDecl::registerProtocolConformance(
-       ProtocolConformance *conformance) {
+       ProtocolConformance *conformance, bool synthesized) {
   prepareConformanceTable();
-  ConformanceTable->registerProtocolConformance(conformance);
+  ConformanceTable->registerProtocolConformance(conformance, synthesized);
 }
 
 ArrayRef<ValueDecl *>
