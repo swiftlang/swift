@@ -241,6 +241,19 @@ private:
     visitBraceStmt(doStmt->getBody());
   }
 
+  void visitRepeatWhileStmt(RepeatWhileStmt *repeatWhileStmt) {
+    if (!isSupportedMultiStatementClosure())
+      llvm_unreachable("Unsupported statement: Do");
+
+    createConjunction(
+        cs,
+        {std::make_pair(
+             repeatWhileStmt->getCond(),
+             cs.getConstraintLocator(locator, ConstraintLocator::Condition)),
+         std::make_pair(repeatWhileStmt->getBody(), locator)},
+        locator);
+  }
+
   void visitBraceStmt(BraceStmt *braceStmt) {
     if (isSupportedMultiStatementClosure()) {
       SmallVector<std::pair<ASTNode, ConstraintLocator *>, 4> elements;
@@ -303,7 +316,6 @@ private:
   UNSUPPORTED_STMT(Yield)
   UNSUPPORTED_STMT(Defer)
   UNSUPPORTED_STMT(DoCatch)
-  UNSUPPORTED_STMT(RepeatWhile)
   UNSUPPORTED_STMT(ForEach)
   UNSUPPORTED_STMT(Switch)
   UNSUPPORTED_STMT(Case)
@@ -348,6 +360,25 @@ bool ConstraintSystem::generateConstraints(ClosureExpr *closure) {
   return false;
 }
 
+bool isConditionOfStmt(ConstraintLocatorBuilder locator) {
+  auto last = locator.last();
+  if (!(last && last->is<LocatorPathElt::Condition>()))
+    return false;
+
+  SmallVector<LocatorPathElt, 4> path;
+  (void)locator.getLocatorParts(path);
+
+  path.pop_back();
+
+  if (path.empty())
+    return false;
+
+  if (auto closureElt = path.back().getAs<LocatorPathElt::ClosureBodyElement>())
+    return closureElt->getElement().dyn_cast<Stmt *>();
+
+  return false;
+}
+
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyClosureBodyElementConstraint(
     ASTNode element, TypeMatchOptions flags, ConstraintLocatorBuilder locator) {
@@ -357,6 +388,23 @@ ConstraintSystem::simplifyClosureBodyElementConstraint(
                                        getConstraintLocator(locator));
 
   if (auto *expr = element.dyn_cast<Expr *>()) {
+    // If this expression represents a condition of some labeled statement
+    // it has to be convertible to `Bool`.
+    if (isConditionOfStmt(locator)) {
+      auto boolDecl = getASTContext().getBoolDecl();
+      assert(boolDecl && "Bool is missing");
+
+      SolutionApplicationTarget target(expr, closure, CTP_Condition,
+                                       boolDecl->getDeclaredType(),
+                                       /*isDiscarded=*/false);
+
+      if (generateConstraints(target, FreeTypeVariableBinding::Disallow))
+        return SolutionKind::Error;
+
+      setSolutionApplicationTarget(expr, target);
+      return SolutionKind::Solved;
+    }
+
     if (!generateConstraints(expr, closure, /*isInputExpression=*/false))
       return SolutionKind::Error;
   } else if (auto *stmt = element.dyn_cast<Stmt *>()) {
@@ -476,6 +524,21 @@ private:
     return doStmt;
   }
 
+  ASTNode visitRepeatWhileStmt(RepeatWhileStmt *repeatWhileStmt) {
+    auto body = visit(repeatWhileStmt->getBody()).get<Stmt *>();
+    repeatWhileStmt->setBody(cast<BraceStmt>(body));
+
+    // Rewrite the condition.
+    auto &cs = solution.getConstraintSystem();
+    auto target = *cs.getSolutionApplicationTarget(repeatWhileStmt->getCond());
+    if (auto condition = rewriteTarget(target))
+      repeatWhileStmt->setCond(condition->getAsExpr());
+    else
+      hadError = true;
+
+    return repeatWhileStmt;
+  }
+
   ASTNode visitBraceStmt(BraceStmt *braceStmt) {
     for (auto &node : braceStmt->getElements()) {
       if (auto expr = node.dyn_cast<Expr *>()) {
@@ -566,7 +629,6 @@ private:
   UNSUPPORTED_STMT(Yield)
   UNSUPPORTED_STMT(Defer)
   UNSUPPORTED_STMT(DoCatch)
-  UNSUPPORTED_STMT(RepeatWhile)
   UNSUPPORTED_STMT(ForEach)
   UNSUPPORTED_STMT(Switch)
   UNSUPPORTED_STMT(Case)
