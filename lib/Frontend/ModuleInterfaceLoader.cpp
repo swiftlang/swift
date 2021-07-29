@@ -1153,6 +1153,13 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
   genericSubInvocation.setImportSearchPaths(SearchPathOpts.ImportSearchPaths);
   genericSubInvocation.setFrameworkSearchPaths(SearchPathOpts.FrameworkSearchPaths);
   if (!SearchPathOpts.SDKPath.empty()) {
+    // Add -sdk arguments to the module building commands.
+    // Module building commands need this because dependencies sometimes use
+    // sdk-relative paths (prebuilt modules for example). Without -sdk, the command
+    // will not be able to local these dependencies, leading to unnecessary
+    // building from textual interfaces.
+    GenericArgs.push_back("-sdk");
+    GenericArgs.push_back(ArgSaver.save(SearchPathOpts.SDKPath));
     genericSubInvocation.setSDKPath(SearchPathOpts.SDKPath);
   }
 
