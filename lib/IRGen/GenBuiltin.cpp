@@ -375,12 +375,13 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   if (Builtin.ID == BuiltinValueKind::InitializeDistributedLocalActor) {
     auto fn = IGF.IGM.getDistributedActorInitializeLocalFn();
     auto actor = args.claimNext();
-    auto identity = args.claimNext();
+//    auto identity = args.claimNext(); // FIXME(distributed): pass the identity to init
     auto transport = args.claimNext();
-    actor = IGF.Builder.CreateBitCast(actor, IGF.IGM.RefCountedPtrTy);
-    identity = IGF.Builder.CreateBitCast(identity, IGF.IGM.RefCountedPtrTy);
-    transport = IGF.Builder.CreateBitCast(transport, IGF.IGM.RefCountedPtrTy);
-    auto call = IGF.Builder.CreateCall(fn, {actor, identity, transport});
+    actor = IGF.Builder.CreateBitCast(actor, IGF.IGM.OpaquePtrTy); // TODO(distributed): actor pointer?
+    // identity = IGF.Builder.CreateBitCast(identity, IGF.IGM.OpaquePtrTy); // FIXME(distributed): pass the identity to init
+    transport = IGF.Builder.CreateBitCast(transport, IGF.IGM.OpaquePtrTy);
+    // auto call = IGF.Builder.CreateCall(fn, {actor, identity, transport}); // FIXME(distributed): pass the identity to init
+    auto call = IGF.Builder.CreateCall(fn, {actor, transport});
     call->setCallingConv(IGF.IGM.SwiftCC);
     return;
   }

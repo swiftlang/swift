@@ -2088,7 +2088,7 @@ public:
 } // end anonymous namespace
 
 void swift::swift_distributedActor_local_initialize(DefaultActor *_actor,
-                                                    OpaqueValue *identity,
+                                                    // OpaqueValue *identity, // FIXME(distributed): pass the identity to init
                                                     OpaqueValue *transport) {
   auto actor = asImpl(_actor);
   actor->initialize(/*distributed=*/true);

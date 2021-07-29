@@ -2245,7 +2245,6 @@ static void emitInitializeFieldOffsetVector(IRGenFunction &IGF,
       IGF.Builder.CreateConstArrayGEP(fields, index, IGM.getPointerSize());
     IGF.Builder.CreateStore(fieldLayout, fieldLayoutAddr);
     ++index;
-    fprintf(stderr, "[%s:%d] (%s) OK; index = %d\n", __FILE__, __LINE__, __FUNCTION__, index);
   });
   fprintf(stderr, "[%s:%d] (%s) INDEX = %d\n", __FILE__, __LINE__, __FUNCTION__, index);
   fprintf(stderr, "[%s:%d] (%s) NUMFIELDS = %d\n", __FILE__, __LINE__, __FUNCTION__, numFields);

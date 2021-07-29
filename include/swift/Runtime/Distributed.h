@@ -30,7 +30,7 @@ class DefaultActor;
 /// Initialize the runtime storage for a distributed local actor.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_distributedActor_local_initialize(DefaultActor *actor,
-                                             OpaqueValue *identity,
+                                             // OpaqueValue *identity,  // FIXME(distributed): pass the identity to init
                                              OpaqueValue *transport);
 
 /// Initialize the runtime storage for a distributed remote actor.

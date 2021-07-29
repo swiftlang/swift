@@ -142,7 +142,7 @@ SILBasicBlock::createFunctionArgument(SILType Ty, const ValueDecl *D,
   const SILFunction *Parent = getParent();
   auto OwnershipKind = ValueOwnershipKind(
       *Parent, Ty,
-      Parent->getConventions().getSILArgumentConvention(getNumArguments()));
+      Parent->getConventions().getSILArgumentConvention(getNumArguments())); /// XXX
   return new (getModule()) SILFunctionArgument(this, Ty, OwnershipKind, D);
 }
 

@@ -1665,7 +1665,7 @@ FUNCTION(DefaultActorDeallocateResilient,
 
 // void swift_distributedActor_local_initialize(
 //     DefaultActor *actor, // FIXME: this may not necessarily be Default actor... just some actor, pass as HeapObject?
-//     OpaqueValue *id,
+//     OpaqueValue *id, // FIXME(distributed): pass the identity to init
 //     OpaqueValue *transport
 // );
 FUNCTION(DistributedActorInitializeLocal,
@@ -1673,7 +1673,7 @@ FUNCTION(DistributedActorInitializeLocal,
          ConcurrencyAvailability,
          RETURNS(VoidTy),
          ARGS(RefCountedPtrTy, // actor
-              OpaquePtrTy, // id
+//              OpaquePtrTy, // id // FIXME(distributed): pass the identity to init
               OpaquePtrTy, // transport
          ),
          ATTRS(NoUnwind))

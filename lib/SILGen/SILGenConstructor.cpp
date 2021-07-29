@@ -671,15 +671,18 @@ static void emitDefaultActorInitialization(
 
 static void emitDistributedLocalActorInitialization(
     SILGenFunction &SGF, SILLocation loc,
-    ManagedValue self, SILFunctionArgument *transportArg) {
+    ManagedValue self, ManagedValue transportArg) {
   auto &ctx = SGF.getASTContext();
   auto builtinName = ctx.getIdentifier(
       getBuiltinName(BuiltinValueKind::InitializeDistributedLocalActor));
   auto resultTy = SGF.SGM.Types.getEmptyTupleType();
 
   FullExpr scope(SGF.Cleanups, CleanupLocation(loc));
-  SGF.B.createBuiltin(loc, builtinName, resultTy, /*subs*/ {},
-                      {self.borrow(SGF, loc).getValue()});
+  SGF.B.createBuiltin(loc, builtinName, resultTy,
+                      /*subs*/ {},
+                      {self.borrow(SGF, loc).getValue(),
+                       transportArg.borrow(SGF, loc).getValue(),
+                      });
 }
 
 static void emitDistributedRemoteActorInitialization(
@@ -815,8 +818,16 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
       auto params = ctor->getParameters();
       assert(params->size() == 1);
       auto transportParam = params->get(0);
+
+      // FIXME: can't figure out how to get right type and pass to the thing?
       auto transportTy = getLoweredTypeForFunctionArgument(transportParam->getType());
-      auto transportArg = F.begin()->createFunctionArgument(transportTy, transportParam);
+//      SILType transportTy = getLoweredLoadableType(transportParam->getType());
+//      SILType transportTy = SILType::getPrimitiveAddressType(transportParam->getType()->getCanonicalType());
+//      SILType transportTy = getTypeLowering(transportParam->getType())
+//          .getLoweredType();
+
+//      auto transportArg = F.begin()->createFunctionArgument(transportTy, transportParam); // XXXX
+      ManagedValue transportArg = B.createInputFunctionArgument(transportTy, transportParam);
 
       emitDistributedLocalActorInitialization(*this, PrologueLoc,
                                               selfArg, transportArg);
