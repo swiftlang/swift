@@ -454,8 +454,6 @@ void irgen::forEachField(IRGenModule &IGM, const NominalTypeDecl *typeDecl,
     fn(Field::DefaultActorStorage);
   }
   if (classDecl && classDecl->isDistributedActor()) {
-//    classDecl->dump();
-    fprintf(stderr, "[%s:%d] (%s) IS isDistributedActor\n", __FILE__, __LINE__, __FUNCTION__);
     fn(Field::DistributedActorStorage);
   }
 

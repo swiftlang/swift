@@ -907,7 +907,7 @@ void swift::addImplicitDistributedActorMembersToClass(ClassDecl *decl) {
   }
 
   addImplicitDistributedActorConstructors(decl);
-  addImplicitDistributedActorProperties(decl);
+//  addImplicitDistributedActorProperties(decl);
   addImplicitRemoteActorFunctions(decl);
 //  addImplicitResignIdentity(decl);
 }

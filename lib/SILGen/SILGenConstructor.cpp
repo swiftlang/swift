@@ -671,7 +671,7 @@ static void emitDefaultActorInitialization(
 
 static void emitDistributedLocalActorInitialization(
     SILGenFunction &SGF, SILLocation loc,
-    ManagedValue self, ManagedValue transportArg) {
+    ManagedValue self, SILFunctionArgument *transportArg) {
   auto &ctx = SGF.getASTContext();
   auto builtinName = ctx.getIdentifier(
       getBuiltinName(BuiltinValueKind::InitializeDistributedLocalActor));
@@ -797,10 +797,29 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
       SILLocation PrologueLoc(selfDecl);
       PrologueLoc.markAsPrologue();
 
+      // TODO(distributed): actually this has to be emitted into every designated distributed
+      //       actor init, not just the "local init one"; it becomes just a
+      //       special case that replaces the no arg initializer for distributed actors
+//      ParamDecl *transportParam;
+//      auto transportProtocol = dc->getProtocol(KnownProtocolKind::ActorTransport);
+//      for(auto param : ctor->getParameters()) {
+//        if (param->getType()->inheritsFrom(transportProtocol)) {
+//          transportParam = param;
+//          break;
+//        }
+//      }
+//      assert(transportParam &&
+//             "Missing ActorTransport parameter "
+//             "in distributed actor designated initializer!")
+
       auto params = ctor->getParameters();
-      auto transportArg = params->get(0);
-      emitDistributedLocalActorInitialization(*this, PrologueLoc, selfArg,
-                                              transportArg->forward(*this));
+      assert(params->size() == 1);
+      auto transportParam = params->get(0);
+      auto transportTy = getLoweredTypeForFunctionArgument(transportParam->getType());
+      auto transportArg = F.begin()->createFunctionArgument(transportTy, transportParam);
+
+      emitDistributedLocalActorInitialization(*this, PrologueLoc,
+                                              selfArg, transportArg);
     } // else, it's a user defined constructor
   }
 

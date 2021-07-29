@@ -70,7 +70,7 @@ public protocol DistributedActor: AnyActor,
     ///
     /// Conformance to this requirement is synthesized automatically for any
     /// `distributed actor` declaration.
-    nonisolated var actorTransport: ActorTransport { get } // TODO(distributed): rename to `transport`?
+//    nonisolated var actorTransport: ActorTransport { get } // TODO(distributed): rename to `transport`?
 
     /// Logical identity of this distributed actor.
     ///
@@ -85,10 +85,14 @@ public protocol DistributedActor: AnyActor,
     /// `distributed actor` declaration.
   // FIXME(distributed): once we figure out how to store ID in the Fragment,
   //   without having to store the entire type eraser :-(
-   nonisolated var id: AnyActorIdentity { magic(self) }
+  // nonisolated var id: AnyActorIdentity { get }
+}
 
-   @_distributedActorAlwaysThere // not user accesible
-   var _id: AnyActorIdentity
+@available(SwiftStdlib 5.5, *)
+extension DistributedActor {
+  nonisolated var actorTransport: ActorTransport {
+    _distributedGetActorTransport(self)
+  }
 }
 
 @available(SwiftStdlib 5.5, *)
@@ -263,3 +267,7 @@ func distributedActorRemoteCreate<Identity, Transport>(
 /// This will call `actorTransport.resignIdentity(self.id)`.
 @_silgen_name("swift_distributedActor_destroy")
 func _distributedActorDestroy(_ actor: AnyObject)
+
+@_silgen_name("swift_distributedActor_getTransport")
+@available(SwiftStdlib 5.5, *)
+public func _distributedGetActorTransport(_ actor: AnyObject) -> ActorTransport

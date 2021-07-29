@@ -623,6 +623,7 @@ class DefaultActorImpl : public HeapObject {
 
       HasActiveInlineJob = 3,
       IsDistributedActor = 4,
+      IsDistributedRemoteActor = 5,
 
       MaxPriority = 8,
       MaxPriority_width = JobFlags::Priority_width,
@@ -653,10 +654,23 @@ class DefaultActorImpl : public HeapObject {
     FLAGSET_DEFINE_FLAG_ACCESSORS(HasActiveInlineJob,
                                   hasActiveInlineJob, setHasActiveInlineJob)
 
-    /// Is the actor a '(local) distributed actor'?
-    /// If so, it has the 'DistributedActorFragment' available.
+    /// Is the actor a 'distributed actor'?
+    ///
+    /// If so, it has the 'DistributedActorFragment' available, but you must
+    /// inquire if the actor is remote or not, to determine the offset at which
+    /// the fragment is located.
     FLAGSET_DEFINE_FLAG_ACCESSORS(IsDistributedActor,
                                   isDistributedActor, setIsDistributedActor)
+
+    /// Is the actor a 'remote (!) distributed actor'?
+    ///
+    /// If true, it has the 'DistributedActorFragment' available immediately
+    /// after the heap header, as no DefaultActor data is present (!).
+    ///
+    /// iIf false, it has the `DistributedActorFragment' available
+    FLAGSET_DEFINE_FLAG_ACCESSORS(IsDistributedRemoteActor,
+                                  isDistributedRemoteActor,
+                                  setIsDistributedRemoteActor)
 
     /// What is the maximum priority of jobs that are currently running
     /// or enqueued on this actor?
@@ -689,7 +703,8 @@ public:
   /// \param isDistributed When true sets the IsDistributedActor flag
   void initialize(bool isDistributed = false) {
     auto flags = Flags();
-    flags.setIsDistributedActor(true);
+    flags.setIsDistributedActor(isDistributed);
+    flags.setIsDistributedRemoteActor(false);
     new (&CurrentState) std::atomic<State>(State{JobRef(), flags});
   }
 
@@ -713,11 +728,16 @@ public:
   /// Claim the next job off the actor or give it up.
   Job *claimNextJobOrGiveUp(bool actorIsOwned, RunningJobInfo runner);
 
+  // ==== Distributed Actor ----------------------------------------------------
+
   /// Check if the actor is actually a distributed *remote* actor.
   ///
   /// Note that a distributed *local* actor instance is the same as any other
   /// ordinary default (local) actor, and no special handling is needed for them.
   bool isDistributedActor();
+
+  bool isDistributedRemoteActor();
+  bool isDistributedLocalActor();
 
   /// If the actor is a distributed actor, return its fragment.
   DistributedActorFragment* distributedActorFragment();
@@ -1976,21 +1996,57 @@ bool DefaultActorImpl::isDistributedActor() {
   return state.Flags.isDistributedActor() == 1;
 }
 
-DistributedActorFragment* DefaultActorImpl::distributedActorFragment() { 
-  if (!isDistributedActor())
-    return nullptr; // only a 'local distributed actor' has such fragment
+bool DefaultActorImpl::isDistributedRemoteActor() {
+  auto state = CurrentState.load(std::memory_order_relaxed);
+  return state.Flags.isDistributedActor() &&
+         state.Flags.isDistributedRemoteActor();
+}
 
-  // this + 1 // roundToAlignment
+bool DefaultActorImpl::isDistributedLocalActor() {
+  auto state = CurrentState.load(std::memory_order_relaxed);
+  return state.Flags.isDistributedActor() &&
+         !state.Flags.isDistributedRemoteActor();
+}
 
-  // NOTES:
-  // local: either DefaultActor or not
-  // l default actor     [   | default actor | dist actor | ...]
-  // l non default actor [   | dist actor | ...]
-  // remote            [ x | dist actor | ...]
+static DistributedActorFragment* distributedActorFragment(void *base,
+                                                          bool isDistributed,
+                                                          bool isRemote) {
+  if (!isDistributed)
+    return nullptr; // only distributed actors have such fragment
 
+  bool isDefaultLocal = !isRemote; // FIXME(distributed): how do we know if it is NOT a DefaultActor?
 
-  // auto offset = this + 0; // FIXME(distributed) find out where the fragment is?
-  assert(false && "finding the distributed actor fragment of local dist actor is not implemented");
+  // The offset at which the distributed actor fragment is located is different
+  // depending on if we are a remote actor or not:
+  //
+  // - local:
+  //   - default actor     [ heap header | default actor | dist actor | ...]
+  //   x non default actor [ heap header | dist actor | ... ]
+  // - remote              [ heap header | dist actor | ... ]
+
+  auto offset = reinterpret_cast<char *>(base);
+  offset += sizeof(HeapObject);
+  fprintf(stderr, "[%s:%d] (%s) THIS(%p) ++ HEAP -> %p\n", __FILE__, __LINE__, __FUNCTION__, base, offset);
+
+  // Since we are in DefaultActorImpl, we definitely are a local actor, however
+  // let's double-check that; It means we need to skip the default actor's storage.
+  if (isDefaultLocal) {
+    offset += sizeof(DefaultActor);
+    fprintf(stderr, "[%s:%d] (%s) THIS(%p) ++ DefaultActor -> %p\n", __FILE__, __LINE__, __FUNCTION__, base, offset);
+  }
+
+  fprintf(stderr, "[%s:%d] (%s) DistributedActorFragment(%p)\n", __FILE__, __LINE__, __FUNCTION__, offset);
+  auto fragment = reinterpret_cast<DistributedActorFragment*>(offset);
+  // TODO(distributed): assert on the fragment that it actually looks valid
+  return fragment;
+}
+
+DistributedActorFragment* DefaultActorImpl::distributedActorFragment() {
+  auto state = CurrentState.load(std::memory_order_relaxed);
+  bool isDistributed = state.Flags.isDistributedActor();
+  bool isRemote = state.Flags.isDistributedRemoteActor();
+
+  return ::distributedActorFragment(this, isDistributed, isRemote);
 }
 
 /*****************************************************************************/
@@ -2012,11 +2068,6 @@ namespace {
 // TODO: the remote actor does not need to BE an actor at all
 class DistributedActorFragment {
 private:
-//  enum class Status : __swift_uintptr_t {
-//    IsRemote = 1,
-//  };
-//
-//  uintptr_t status;
 
   /// `ActorIdentity` stored by any `distributed actor`.
   OpaqueValue *identity;
@@ -2025,16 +2076,13 @@ private:
 
 public:
   explicit DistributedActorFragment(OpaqueValue *identity,
-                                    OpaqueValue *transport, bool isRemote)
-      : status(isRemote ? 1 : 0), identity(identity), transport(transport) {}
+                                    OpaqueValue *transport)
+      : identity(identity),
+        transport(transport) {}
 
   OpaqueValue *getActorIdentity() const { return identity; }
 
   OpaqueValue *getActorTransport() const { return transport; }
-
-  void setRemote(bool isRemote = true) { status = isRemote ? 1 : 0; }
-
-  bool isRemote() const { assert(false); }
 };
 
 } // end anonymous namespace
@@ -2046,16 +2094,11 @@ void swift::swift_distributedActor_local_initialize(DefaultActor *_actor,
   actor->initialize(/*distributed=*/true);
   auto distributed = actor->distributedActorFragment();
   assert(distributed && "initializing a remote actor, yet no distributed fragment available!");
-  distributed->setRemote(false);
 }
 
 // TODO: most likely where we'd need to create the "proxy instance" instead? (most likely remove this and use swift_distributedActor_remote_create instead)
 void swift::swift_distributedActor_remote_initialize(DefaultActor *_actor) { // FIXME: remove distributed C++ impl not needed?
-  auto actor = asImpl(_actor);
-  actor->initialize(/*distributed=*/true);
-  auto distributed = actor->distributedActorFragment();
-  assert(distributed && "initializing a remote actor, yet no distributed fragment available!");
-  distributed->setRemote(true);
+  assert(false); // TODO: remove this
 }
 
 // TODO: missing implementation of creating a proxy for the remote actor
