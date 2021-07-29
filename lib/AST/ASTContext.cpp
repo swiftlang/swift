@@ -41,6 +41,7 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/RawComment.h"
+#include "swift/AST/SearchPathOptions.h"
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SourceFile.h"
@@ -1573,20 +1574,23 @@ Optional<ModuleDependencies> ASTContext::getModuleDependencies(
     bool cacheOnly) {
   // Retrieve the dependencies for this module.
   if (cacheOnly) {
+    auto searchPathSet = getAllModuleSearchPathsSet();
     // Check whether we've cached this result.
     if (!isUnderlyingClangModule) {
-      if (auto found = cache.findDependencies(moduleName,
-                                              ModuleDependenciesKind::SwiftTextual))
+      if (auto found = cache.findDependencies(
+              moduleName,
+              {ModuleDependenciesKind::SwiftTextual, searchPathSet}))
         return found;
-      if (auto found = cache.findDependencies(moduleName,
-                                              ModuleDependenciesKind::SwiftTextual))
+      if (auto found = cache.findDependencies(
+              moduleName, {ModuleDependenciesKind::SwiftBinary, searchPathSet}))
         return found;
-      if (auto found = cache.findDependencies(moduleName,
-                                              ModuleDependenciesKind::SwiftPlaceholder))
+      if (auto found = cache.findDependencies(
+              moduleName,
+              {ModuleDependenciesKind::SwiftPlaceholder, searchPathSet}))
         return found;
     }
-    if (auto found = cache.findDependencies(moduleName,
-                                            ModuleDependenciesKind::Clang))
+    if (auto found = cache.findDependencies(
+            moduleName, {ModuleDependenciesKind::Clang, searchPathSet}))
       return found;
   } else {
     for (auto &loader : getImpl().ModuleLoaders) {
@@ -1594,8 +1598,8 @@ Optional<ModuleDependencies> ASTContext::getModuleDependencies(
           loader.get() != getImpl().TheClangModuleLoader)
         continue;
 
-      if (auto dependencies = loader->getModuleDependencies(moduleName, cache,
-                                                            delegate))
+      if (auto dependencies =
+              loader->getModuleDependencies(moduleName, cache, delegate))
         return dependencies;
     }
   }
@@ -1616,6 +1620,65 @@ ASTContext::getSwiftModuleDependencies(StringRef moduleName,
       return dependencies;
   }
   return None;
+}
+
+namespace {
+  static StringRef
+  pathStringFromFrameworkSearchPath(const SearchPathOptions::FrameworkSearchPath &next) {
+    return next.Path;
+  };
+}
+
+std::vector<std::string> ASTContext::getDarwinImplicitFrameworkSearchPaths()
+const {
+  assert(LangOpts.Target.isOSDarwin());
+  SmallString<128> systemFrameworksScratch;
+  systemFrameworksScratch = SearchPathOpts.SDKPath;
+  llvm::sys::path::append(systemFrameworksScratch, "System", "Library", "Frameworks");
+
+  SmallString<128> frameworksScratch;
+  frameworksScratch = SearchPathOpts.SDKPath;
+  llvm::sys::path::append(frameworksScratch, "Library", "Frameworks");
+  return {systemFrameworksScratch.str().str(), frameworksScratch.str().str()};
+}
+
+llvm::StringSet<> ASTContext::getAllModuleSearchPathsSet()
+const {
+  llvm::StringSet<> result;
+  result.insert(SearchPathOpts.ImportSearchPaths.begin(),
+                SearchPathOpts.ImportSearchPaths.end());
+
+  // Framework paths are "special", they contain more than path strings,
+  // but path strings are all we care about here.
+  using FrameworkPathView = ArrayRefView<SearchPathOptions::FrameworkSearchPath,
+                                         StringRef,
+                                         pathStringFromFrameworkSearchPath>;
+  FrameworkPathView frameworkPathsOnly{SearchPathOpts.FrameworkSearchPaths};
+  result.insert(frameworkPathsOnly.begin(), frameworkPathsOnly.end());
+
+  if (LangOpts.Target.isOSDarwin()) {
+    auto implicitFrameworkSearchPaths = getDarwinImplicitFrameworkSearchPaths();
+    result.insert(implicitFrameworkSearchPaths.begin(),
+                  implicitFrameworkSearchPaths.end());
+  }
+  result.insert(SearchPathOpts.RuntimeLibraryImportPaths.begin(),
+                SearchPathOpts.RuntimeLibraryImportPaths.end());
+
+  // ClangImporter special-cases the path for SwiftShims, so do the same here
+  // If there are no shims in the resource dir, add a search path in the SDK.
+  SmallString<128> shimsPath(SearchPathOpts.RuntimeResourcePath);
+  llvm::sys::path::append(shimsPath, "shims");
+  if (!llvm::sys::fs::exists(shimsPath)) {
+    shimsPath = SearchPathOpts.SDKPath;
+    llvm::sys::path::append(shimsPath, "usr", "lib", "swift", "shims");
+  }
+  result.insert(shimsPath.str());
+
+  // Clang system modules are found in the SDK root
+  SmallString<128> clangSysRootPath(SearchPathOpts.SDKPath);
+  llvm::sys::path::append(clangSysRootPath, "usr", "include");
+  result.insert(clangSysRootPath.str());
+  return result;
 }
 
 void ASTContext::loadExtensions(NominalTypeDecl *nominal,
