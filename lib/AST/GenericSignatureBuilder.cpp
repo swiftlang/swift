@@ -5701,6 +5701,11 @@ GenericSignatureBuilder::isValidRequirementDerivationPath(
 
     auto otherSubjectType = otherReq.getSubjectType();
 
+    auto *equivClass = resolveEquivalenceClass(otherSubjectType,
+                                         ArchetypeResolutionKind::AlreadyKnown);
+    assert(equivClass &&
+           "Explicit requirement names an unknown equivalence class?");
+
     // If our requirement is based on a path involving some other
     // redundant requirement, see if we can derive the redundant
     // requirement using requirements we haven't visited yet.
@@ -5719,11 +5724,6 @@ GenericSignatureBuilder::isValidRequirementDerivationPath(
       // redundant; there's no other derivation that would not be redundant.
       if (!otherSource->isDerivedNonRootRequirement())
         return None;
-
-      auto *equivClass = resolveEquivalenceClass(otherSubjectType,
-                                           ArchetypeResolutionKind::AlreadyKnown);
-      assert(equivClass &&
-             "Explicit requirement names an unknown equivalence class?");
 
       switch (otherReq.getKind()) {
       case RequirementKind::Conformance: {
@@ -5804,20 +5804,22 @@ GenericSignatureBuilder::isValidRequirementDerivationPath(
       }
     }
 
-    if (auto *depMemType = otherSubjectType->getAs<DependentMemberType>()) {
+    auto anchor = equivClass->getAnchor(*this, { });
+
+    if (auto *depMemType = anchor->getAs<DependentMemberType>()) {
       // If 'req' is based on some other conformance requirement
       // `T.[P.]A : Q', we want to make sure that we have a
       // non-redundant derivation for 'T : P'.
       auto baseType = depMemType->getBase();
       auto *proto = depMemType->getAssocType()->getProtocol();
 
-      auto *equivClass = resolveEquivalenceClass(baseType,
+      auto *baseEquivClass = resolveEquivalenceClass(baseType,
                                            ArchetypeResolutionKind::AlreadyKnown);
-      assert(equivClass &&
+      assert(baseEquivClass &&
              "Explicit requirement names an unknown equivalence class?");
 
-      auto found = equivClass->conformsTo.find(proto);
-      assert(found != equivClass->conformsTo.end());
+      auto found = baseEquivClass->conformsTo.find(proto);
+      assert(found != baseEquivClass->conformsTo.end());
 
       bool foundValidDerivation = false;
       for (const auto &constraint : found->second) {
@@ -8279,24 +8281,42 @@ GenericSignature GenericSignatureBuilder::rebuildSignatureWithoutRedundantRequir
     }
 
     auto subjectType = req.getSubjectType();
-    subjectType = stripBoundDependentMemberTypes(subjectType);
-    auto resolvedSubjectType =
-        resolveDependentMemberTypes(*this, subjectType,
-                                    ArchetypeResolutionKind::WellFormed);
+    auto resolvedSubject =
+        maybeResolveEquivalenceClass(subjectType,
+                                     ArchetypeResolutionKind::WellFormed,
+                                     /*wantExactPotentialArchetype=*/false);
+
+    auto *resolvedEquivClass = resolvedSubject.getEquivalenceClass(*this);
+    Type resolvedSubjectType;
+    if (resolvedEquivClass != nullptr)
+      resolvedSubjectType = resolvedEquivClass->getAnchor(*this, { });
 
     // This can occur if the combination of a superclass requirement and
     // protocol conformance requirement force a type to become concrete.
     //
     // FIXME: Is there a more principled formulation of this?
-    if (req.getKind() == RequirementKind::Superclass &&
-        !resolvedSubjectType->isTypeParameter()) {
-      newBuilder.addRequirement(Requirement(RequirementKind::SameType,
-                                            subjectType, resolvedSubjectType),
-                                getRebuiltSource(req.getSource()), nullptr);
-      continue;
+    if (req.getKind() == RequirementKind::Superclass) {
+      if (resolvedSubject.getAsConcreteType()) {
+        auto unresolvedSubjectType = stripBoundDependentMemberTypes(subjectType);
+        newBuilder.addRequirement(Requirement(RequirementKind::SameType,
+                                              unresolvedSubjectType,
+                                              resolvedSubject.getAsConcreteType()),
+                                  getRebuiltSource(req.getSource()), nullptr);
+        continue;
+      }
+
+      if (resolvedEquivClass->concreteType) {
+        auto unresolvedSubjectType = stripBoundDependentMemberTypes(
+            resolvedSubjectType);
+        newBuilder.addRequirement(Requirement(RequirementKind::SameType,
+                                              unresolvedSubjectType,
+                                              resolvedEquivClass->concreteType),
+                                  getRebuiltSource(req.getSource()), nullptr);
+        continue;
+      }
     }
 
-    assert(resolvedSubjectType->isTypeParameter());
+    assert(resolvedSubjectType && resolvedSubjectType->isTypeParameter());
 
     if (auto optReq = createRequirement(req.getKind(), resolvedSubjectType,
                                         req.getRHS(), getGenericParams())) {
@@ -8335,6 +8355,40 @@ GenericSignature GenericSignatureBuilder::rebuildSignatureWithoutRedundantRequir
       }
     };
 
+    // If we have a same-type requirement where the right hand side is concrete,
+    // canonicalize the left hand side, in case dropping some redundant
+    // conformance requirement turns the original left hand side into an
+    // unresolvable type.
+    if (!req.getRHS().get<Type>()->isTypeParameter()) {
+      auto resolvedSubject =
+          maybeResolveEquivalenceClass(req.getSubjectType(),
+                                       ArchetypeResolutionKind::WellFormed,
+                                       /*wantExactPotentialArchetype=*/false);
+
+      auto *resolvedEquivClass = resolvedSubject.getEquivalenceClass(*this);
+      auto resolvedSubjectType = resolvedEquivClass->getAnchor(*this, { });
+
+      auto constraintType = resolveType(req.getRHS().get<Type>());
+
+      auto newReq = stripBoundDependentMemberTypes(
+          Requirement(RequirementKind::SameType,
+                      resolvedSubjectType, constraintType));
+
+      if (Impl->DebugRedundantRequirements) {
+        llvm::dbgs() << "=> ";
+        newReq.dump(llvm::dbgs());
+        llvm::dbgs() << "\n";
+      }
+      newBuilder.addRequirement(newReq, getRebuiltSource(req.getSource()),
+                                nullptr);
+
+      continue;
+    }
+
+    // Otherwise, we can't canonicalize the two sides of the requirement, since
+    // doing so will produce a trivial same-type requirement T == T. Instead,
+    // apply some ad-hoc rules to improve the odds that the requirement will
+    // resolve in the rebuilt GSB.
     auto subjectType = resolveType(req.getSubjectType());
     auto constraintType = resolveType(req.getRHS().get<Type>());
 

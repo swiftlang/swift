@@ -48,8 +48,8 @@ struct OriginalExampleWithWarning<A, B> where A : P2, B : P2, A.T == B.T {
   init<C, D, E>(_: C)
     where C : P1,
           D : P1, // expected-warning {{redundant conformance constraint 'D' : 'P1'}}
-          // expected-note@-1 {{conformance constraint 'C.T' : 'P1' implied here}}
-          C.T : P1, // expected-warning {{redundant conformance constraint 'C.T' : 'P1'}}
+          C.T : P1, // expected-warning {{redundant conformance constraint 'D' : 'P1'}}
+          // expected-note@-1 {{conformance constraint 'D' : 'P1' implied here}}
           A == S1<C, C.T.T, S2<C.T>>,
           C.T == D,
           E == D.T { }
