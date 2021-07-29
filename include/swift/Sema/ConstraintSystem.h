@@ -124,6 +124,9 @@ class SavedTypeVariableBinding {
   /// The parent or fixed type.
   llvm::PointerUnion<TypeVariableType *, TypeBase *> ParentOrFixed;
 
+  /// The locator associated with bound type
+  ConstraintLocator *BoundLocator;
+
 public:
   explicit SavedTypeVariableBinding(TypeVariableType *typeVar);
 
@@ -239,6 +242,8 @@ class TypeVariableType::Implementation {
   /// type is bound.
   llvm::PointerUnion<TypeVariableType *, TypeBase *> ParentOrFixed;
 
+  constraints::ConstraintLocator *BoundLocator = nullptr;
+
   /// The corresponding node in the constraint graph.
   constraints::ConstraintGraphNode *GraphNode = nullptr;
 
@@ -336,6 +341,12 @@ public:
   /// created.
   constraints::ConstraintLocator *getLocator() const {
     return locator;
+  }
+
+  /// Retrieve the locator describing where the type bound to this type variable
+  /// originated.
+  constraints::ConstraintLocator *getBoundLocator() const {
+    return BoundLocator;
   }
 
   /// Retrieve the generic parameter opened by this type variable.
@@ -465,6 +476,7 @@ public:
 
   /// Assign a fixed type to this equivalence class.
   void assignFixedType(Type type,
+                       constraints::ConstraintLocator *loc,
                        constraints::SavedTypeVariableBindings *record) {
     assert((!getFixedType(0) || getFixedType(0)->isEqual(type)) &&
            "Already has a fixed type!");
@@ -472,6 +484,7 @@ public:
     if (record)
       rep->getImpl().recordBinding(*record);
     rep->getImpl().ParentOrFixed = type.getPointer();
+    rep->getImpl().BoundLocator = loc;
   }
 
   void setCanBindToLValue(constraints::SavedTypeVariableBindings *record,
@@ -3908,6 +3921,7 @@ public:
   /// \param notifyBindingInference Whether to notify binding inference about
   /// the change to this type variable.
   void assignFixedType(TypeVariableType *typeVar, Type type,
+                       ConstraintLocator *loc,
                        bool updateState = true,
                        bool notifyBindingInference = true);
 
@@ -5341,7 +5355,7 @@ struct CompletionArgInfo {
   Optional<unsigned> firstTrailingIdx;
   unsigned argCount;
 
-  /// \returns true  if the given argument index is possibly about to be written
+  /// \returns true if the given argument index is possibly about to be written
   /// by the user (given the completion index) so shouldn't be penalised as
   /// missing when ranking solutions.
   bool allowsMissingArgAt(unsigned argInsertIdx, AnyFunctionType::Param param);

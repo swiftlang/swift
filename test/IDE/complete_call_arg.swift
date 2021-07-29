@@ -1035,6 +1035,15 @@ func testArgsAfterCompletion() {
   // VALID_UNRESOLVED-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): A#})[#(into: inout Hasher) -> Void#]; name=hash(:)
   // VALID_UNRESOLVED: End completions
 
+  overloaded(x: 1, .#^VALID_UNRESOLVED_NOCOMMA^# localB)
+
+  // VALID_UNRESOLVED_NOCOMMA: Begin completions, 4 items
+  // VALID_UNRESOLVED_NOCOMMA-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: a[#A#]; name=a
+  // VALID_UNRESOLVED_NOCOMMA-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: b[#B#]; name=b
+  // VALID_UNRESOLVED_NOCOMMA-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): A#})[#(into: inout Hasher) -> Void#]; name=hash(:)
+  // VALID_UNRESOLVED_NOCOMMA-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): B#})[#(into: inout Hasher) -> Void#]; name=hash(:)
+  // VALID_UNRESOLVED_NOCOMMA: End completions
+
   overloaded(x: 1, #^VALID_GLOBAL^#, localB)
   // VALID_GLOBAL: Begin completions
   // VALID_GLOBAL-DAG: Decl[LocalVar]/Local/TypeRelation[Identical]: localA[#A#]; name=localA
@@ -1049,12 +1058,19 @@ func testArgsAfterCompletion() {
   // VALID_LABEL: Pattern/Local/Flair[ArgLabels]: {#firstA: A#}[#A#]; name=firstA:
   // VALID_LABEL: End completions
 
+  overloadedLabel(x: 1, #^VALID_LABEL_NOCOMMA^# second: localB)
+  // VALID_LABEL_NOCOMMA: Begin completions, 2 items
+  // VALID_LABEL_NOCOMMA-DAG: Pattern/Local/Flair[ArgLabels]: {#firstA: A#}[#A#]; name=firstA:
+  // VALID_LABEL_NOCOMMA-DAG: Pattern/Local/Flair[ArgLabels]: {#firstB: B#}[#B#]; name=firstB:
+  // VALID_LABEL_NOCOMMA: End completions
+
   overloadedLabel(x: 1, #^INVALID_LABEL^#, wrongLabelRightType: localB)
   // INVALID_LABEL: Begin completions, 2 items
   // INVALID_LABEL-DAG: Pattern/Local/Flair[ArgLabels]: {#firstA: A#}[#A#]; name=firstA:
   // INVALID_LABEL-DAG: Pattern/Local/Flair[ArgLabels]: {#firstB: B#}[#B#]; name=firstB:
   // INVALID_LABEL: End completions
 
+  overloadedLabel(x: 1, #^INVALID_TYPE?check=INVALID_LABEL^#, second: 34)
   overloadedLabel(x: 1, #^INVALID_LABEL_TYPE?check=INVALID_LABEL^#, wrongLabelWrongType: 2) // invalid
 
   func overloadedArity(x: Int, firstA: A, second: B, third: Double) {}
@@ -1064,6 +1080,8 @@ func testArgsAfterCompletion() {
   // VALID_ARITY: Begin completions, 1 items
   // VALID_ARITY: Pattern/Local/Flair[ArgLabels]: {#firstA: A#}[#A#]; name=firstA:
   // VALID_ARITY: End completions
+
+  overloadedArity(x: 1, #^VALID_ARITY_NOCOMMA?check=VALID_ARITY^# second: localB, third: 4.5)
 
   overloadedArity(x: 1, #^INVALID_ARITY^#, wrong: localB)
   // INVALID_ARITY: Begin completions, 2 items
@@ -1090,6 +1108,7 @@ func testArgsAfterCompletion() {
   // VALID_DEFAULTED_AFTER-DAG: Pattern/Local/Flair[ArgLabels]: {#y: A#}[#A#]; name=y:
   // VALID_DEFAULTED_AFTER: End completions
 
+  overloadedDefaulted(x: 1, #^VALID_DEFAULTED_AFTER_NOCOMMA?check=VALID_DEFAULTED^# z: localA)
   overloadedDefaulted(x: 1, #^INVALID_DEFAULTED?check=VALID_DEFAULTED^#, w: "hello")
   overloadedDefaulted(x: 1, #^INVALID_DEFAULTED_TYPO?check=VALID_DEFAULTED^#, zz: localA)
   overloadedDefaulted(x: 1, #^INVALID_DEFAULTED_TYPO_TYPE?check=VALID_DEFAULTED^#, zz: "hello")
@@ -1104,8 +1123,10 @@ func testArgsAfterCompletion() {
   func overloadedGeneric(x: Int, p: String, q: Int) {}
   struct MissingConformance {}
   overloadedGeneric(x: 1, #^INVALID_MISSINGCONFORMANCE^#, z: MissingConformance(), y: MissingConformance())
-  // FIXME: This should also suggest y.
-  // INVALID_MISSINGCONFORMANCE: Begin completions, 1 item
-  // INVALID_MISSINGCONFORMANCE: Pattern/Local/Flair[ArgLabels]: {#p: String#}[#String#]; name=p:
+  // INVALID_MISSINGCONFORMANCE: Begin completions, 2 items
+  // INVALID_MISSINGCONFORMANCE-DAG: Pattern/Local/Flair[ArgLabels]: {#p: String#}[#String#]; name=p:
+  // INVALID_MISSINGCONFORMANCE-DAG: Pattern/Local/Flair[ArgLabels]: {#y: String#}[#String#]; name=y:
   // INVALID_MISSINGCONFORMANCE: End completions
+
+  overloadedGeneric(x: 1, #^INVALID_MISSINGCONFORMANCE_NOCOMMA?check=INVALID_MISSINGCONFORMANCE^# z: MisingConformance(), y: MissingConformance())
 }

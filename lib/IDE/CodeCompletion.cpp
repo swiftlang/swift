@@ -6753,6 +6753,15 @@ static void deliverCompletionResults(CodeCompletionContext &CompletionContext,
 static bool addPossibleParams(
     const ArgumentTypeCheckCompletionCallback::Result &Ret,
     SmallVectorImpl<PossibleParamInfo> &Params, SmallVectorImpl<Type> &Types) {
+
+  if (!Ret.ParamIdx)
+    return true;
+
+  if (Ret.HasLabel) {
+    Types.push_back(Ret.ExpectedType);
+    return true;
+  }
+
   ArrayRef<AnyFunctionType::Param> ParamsToPass =
       Ret.FuncTy->getAs<AnyFunctionType>()->getParams();
   ParameterList *PL = nullptr;
@@ -6767,15 +6776,7 @@ static bool addPossibleParams(
   }
   assert(PL->size() == ParamsToPass.size());
 
-  if (!Ret.ParamIdx)
-    return true;
-
-  if (Ret.HasLabel) {
-    Types.push_back(Ret.ExpectedType);
-    return true;
-  }
-
-  bool showGlobalCompletions = false;
+  bool ShowGlobalCompletions = false;
   for (auto Idx: range(*Ret.ParamIdx, PL->size())) {
     bool IsCompletion = Idx == Ret.ParamIdx;
 
@@ -6791,13 +6792,13 @@ static bool addPossibleParams(
       if (!llvm::any_of(Params, [&](PossibleParamInfo &Existing){ return PP == Existing; }))
         Params.push_back(std::move(PP));
     } else {
-      showGlobalCompletions = true;
+      ShowGlobalCompletions = true;
       Types.push_back(P->getPlainType());
     }
     if (Required)
       break;
   }
-  return showGlobalCompletions;
+  return ShowGlobalCompletions;
 }
 
 static void deliverArgumentResults(
@@ -6829,7 +6830,7 @@ static void deliverArgumentResults(
           SemanticContext = SemanticContextKind::CurrentNominal;
         }
       }
-      if (Result.isSubscript()) {
+      if (Result.IsSubscript) {
         assert(SemanticContext != SemanticContextKind::None && BaseTy);
         auto *SD = dyn_cast_or_null<SubscriptDecl>(Result.FuncD);
         Lookup.addSubscriptCallPattern(Result.FuncTy->getAs<AnyFunctionType>(),
@@ -6982,8 +6983,7 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
     assert(CodeCompleteTokenExpr);
     assert(CurDeclContext);
 
-    DotExprTypeCheckCompletionCallback Lookup(CurDeclContext,
-                                              CodeCompleteTokenExpr);
+    DotExprTypeCheckCompletionCallback Lookup(CodeCompleteTokenExpr);
     llvm::SaveAndRestore<TypeCheckCompletionCallback*>
       CompletionCollector(Context.CompletionCallback, &Lookup);
     typeCheckContextAt(CurDeclContext, CompletionLoc);
@@ -6994,7 +6994,7 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
     // typechecking still resolve even these cases would be beneficial for
     // tooling in general though.
     if (!Lookup.gotCallback())
-      Lookup.fallbackTypeCheck();
+      Lookup.fallbackTypeCheck(CurDeclContext);
 
     addKeywords(CompletionContext.getResultSink(), MaybeFuncBody);
 

@@ -1182,6 +1182,12 @@ bool SkipUnhandledConstructInResultBuilder::diagnose(const Solution &solution,
   return failure.diagnose(asNote);
 }
 
+IgnoreArgumentsAfterCompletion *
+IgnoreArgumentsAfterCompletion:: create(ConstraintSystem &cs,
+                                        ConstraintLocator *locator) {
+  return new (cs.getAllocator()) IgnoreArgumentsAfterCompletion(cs, locator);
+}
+
 bool AllowMutatingMemberOnRValueBase::diagnose(const Solution &solution,
                                                bool asNote) const {
   MutatingMemberRefOnImmutableBase failure(solution, getMember(), getLocator());

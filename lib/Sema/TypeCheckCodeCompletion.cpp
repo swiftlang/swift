@@ -1120,7 +1120,27 @@ swift::lookupSemanticMember(DeclContext *DC, Type ty, DeclName name) {
   return TypeChecker::lookupMember(DC, ty, DeclNameRef(name), None);
 }
 
-void DotExprTypeCheckCompletionCallback::fallbackTypeCheck() {
+void TypeCheckCompletionCallback::
+fallbackTypeCheck(DeclContext *DC) {
+  assert(!GotCallback);
+
+  CompletionContextFinder finder(DC);
+  if (!finder.hasCompletionExpr())
+    return;
+
+  auto fallback = finder.getFallbackCompletionExpr();
+  if (!fallback)
+    return;
+
+  SolutionApplicationTarget completionTarget(fallback->E, fallback->DC,
+                                             CTP_Unused, Type(),
+                                             /*isDiscared=*/true);
+  TypeChecker::typeCheckForCodeCompletion(
+      completionTarget, /*needsPrecheck*/true,
+      [&](const Solution &S) { sawSolution(S); });
+}
+
+void DotExprTypeCheckCompletionCallback::fallbackTypeCheck(DeclContext *DC) {
   assert(!gotCallback());
 
   // Default to checking the completion expression in isolation.
@@ -1139,47 +1159,6 @@ void DotExprTypeCheckCompletionCallback::fallbackTypeCheck() {
                                              CTP_Unused, Type(),
                                              /*isDiscared=*/true);
 
-  TypeChecker::typeCheckForCodeCompletion(
-      completionTarget, /*needsPrecheck*/true,
-      [&](const Solution &S) { sawSolution(S); });
-}
-
-void UnresolvedMemberTypeCheckCompletionCallback::
-fallbackTypeCheck(DeclContext *DC) {
-  assert(!gotCallback());
-
-  CompletionContextFinder finder(DC);
-  if (!finder.hasCompletionExpr())
-    return;
-
-  auto fallback = finder.getFallbackCompletionExpr();
-  if (!fallback)
-    return;
-
-
-  SolutionApplicationTarget completionTarget(fallback->E, fallback->DC,
-                                             CTP_Unused, Type(),
-                                             /*isDiscared=*/true);
-  TypeChecker::typeCheckForCodeCompletion(
-      completionTarget, /*needsPrecheck*/true,
-      [&](const Solution &S) { sawSolution(S); });
-}
-
-void ArgumentTypeCheckCompletionCallback::
-fallbackTypeCheck(DeclContext *DC) {
-  assert(!gotCallback());
-
-  CompletionContextFinder finder(DC);
-  if (!finder.hasCompletionExpr())
-    return;
-
-  auto fallback = finder.getFallbackCompletionExpr();
-  if (!fallback)
-    return;
-
-  SolutionApplicationTarget completionTarget(fallback->E, fallback->DC,
-                                             CTP_Unused, Type(),
-                                             /*isDiscarded=*/true);
   TypeChecker::typeCheckForCodeCompletion(
       completionTarget, /*needsPrecheck*/true,
       [&](const Solution &S) { sawSolution(S); });
@@ -1261,7 +1240,7 @@ static bool isImplicitSingleExpressionReturn(ConstraintSystem &CS,
 
 void DotExprTypeCheckCompletionCallback::
 sawSolution(const constraints::Solution &S) {
-  GotCallback = true;
+  TypeCheckCompletionCallback::sawSolution(S);
   auto &CS = S.getConstraintSystem();
   auto *ParsedExpr = CompletionExpr->getBase();
   auto *SemanticExpr = ParsedExpr->getSemanticsProvidingExpr();
@@ -1308,7 +1287,7 @@ sawSolution(const constraints::Solution &S) {
 
 void UnresolvedMemberTypeCheckCompletionCallback::
 sawSolution(const constraints::Solution &S) {
-  GotCallback = true;
+  TypeCheckCompletionCallback::sawSolution(S);
 
   auto &CS = S.getConstraintSystem();
   Type ExpectedTy = getTypeForCompletion(S, CompletionExpr);
@@ -1331,6 +1310,8 @@ sawSolution(const constraints::Solution &S) {
 
 void KeyPathTypeCheckCompletionCallback::sawSolution(
     const constraints::Solution &S) {
+  TypeCheckCompletionCallback::sawSolution(S);
+
   // Determine the code completion.
   size_t ComponentIndex = 0;
   for (auto &Component : KeyPath->getComponents()) {
@@ -1380,13 +1361,9 @@ void KeyPathTypeCheckCompletionCallback::sawSolution(
   }
 }
 
-bool ArgumentTypeCheckCompletionCallback::Result::isSubscript() const {
-  return CallE && isa<SubscriptExpr>(CallE);
-}
-
 void ArgumentTypeCheckCompletionCallback::
 sawSolution(const constraints::Solution &S) {
-  GotCallback = true;
+  TypeCheckCompletionCallback::sawSolution(S);
 
   Type ExpectedTy = getTypeForCompletion(S, CompletionExpr);
   if (!ExpectedTy)
@@ -1417,10 +1394,11 @@ sawSolution(const constraints::Solution &S) {
   ValueDecl *FuncD = SelectedOverload->choice.getDeclOrNull();
   Type FuncTy = S.simplifyType(SelectedOverload->openedType);
 
-  // For completion as the arg in a call to the implicit (keypath: _) method the
-  // solver can't know what kind of keypath is expected (e.g. KeyPath vs
-  // WritableKeyPath) so it ends up as a hole. Just assume KeyPath so we show
-  // the root type to users.
+  // For completion as the arg in a call to the implicit [keypath: _] subscript
+  // the solver can't know what kind of keypath is expected without an actual
+  // argument (e.g. a KeyPath vs WritableKeyPath) so it ends up as a hole.
+  // Just assume KeyPath so we show the expected keypath's root type to users
+  // rather than '_'.
   if (SelectedOverload->choice.getKind() == OverloadChoiceKind::KeyPathApplication) {
     auto Params = FuncTy->getAs<AnyFunctionType>()->getParams();
     if (Params.size() == 1 && Params[0].getPlainType()->is<UnresolvedType>()) {
@@ -1462,19 +1440,6 @@ sawSolution(const constraints::Solution &S) {
       ClaimedParams.push_back(i);
   }
 
-  if (!ParamIdx && Bindings.size()) {
-    if (ClaimedParams.empty()) {
-      // If no parameters were claimed, assume the completion arg corresponds to
-      // the first paramter.
-      assert(!ParamIdx);
-      ParamIdx = 0;
-    } else if (ClaimedParams.back() < Bindings.size() - 1) {
-      // Otherwise assume it's the param after the last claimed parameter.
-      ParamIdx = ClaimedParams.back() + 1;
-      IsNoninitialVariadic = Bindings[*ParamIdx].size() > 1;
-    }
-  }
-
   bool HasLabel = false;
   Expr *Arg = CS.getParentExpr(CompletionExpr);
   if (TupleExpr *TE = dyn_cast<TupleExpr>(Arg))
@@ -1498,6 +1463,6 @@ sawSolution(const constraints::Solution &S) {
     return;
   }
 
-  Results.push_back({ExpectedTy, ParentCall, FuncD, FuncTy, ArgIdx, ParamIdx,
+  Results.push_back({ExpectedTy, isa<SubscriptExpr>(ParentCall), FuncD, FuncTy, ArgIdx, ParamIdx,
       std::move(ClaimedParams), IsNoninitialVariadic, BaseTy, HasLabel});
 }

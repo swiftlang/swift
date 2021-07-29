@@ -352,20 +352,12 @@ static bool matchCallArgumentsImpl(
     if (numClaimedArgs == numArgs)
       return None;
 
-    // If the next arg is a code completion token with no label, and we're using
-    // the new solver-based code completion (to avoid affecting the AST used by
-    // unmigrated completion kinds) claim it without complaining about the
-    // missing label. Completion will suggest the label in such cases.
-    if (completionInfo && nextArgIdx < numArgs &&
-        args[nextArgIdx].getLabel().empty()) {
-      if (isCodeCompletionTypeVar(args[nextArgIdx].getPlainType()))
-        return claim(paramLabel, nextArgIdx, /*ignoreNameMismatch*/true);
-    }
-
     // Go hunting for an unclaimed argument whose name does match.
     Optional<unsigned> claimedWithSameName;
+    unsigned firstArgIdx = nextArgIdx;
     for (unsigned i = nextArgIdx; i != numArgs; ++i) {
       auto argLabel = args[i].getLabel();
+      bool claimIgnoringNameMismatch = false;
 
       if (argLabel != paramLabel &&
           !(argLabel.str().startswith("$") &&
@@ -375,9 +367,22 @@ static bool matchCallArgumentsImpl(
         if (forVariadic)
           return None;
 
-        // Otherwise we can continue trying to find argument which
-        // matches parameter with or without label.
-        continue;
+        // If the arg is a code completion token with no label, and we're using
+        // the new solver-based code completion (to avoid affecting the AST used
+        // by unmigrated completion kinds) pretend the labels matched if it's a
+        // positional match (i.e. the first attempted arg match) or we're
+        // ignoring name mismatches. Completion will suggest the label in such
+        // cases.
+        if (completionInfo && argLabel.empty() &&
+            isCodeCompletionTypeVar(args[i].getPlainType()) &&
+            (i == firstArgIdx || ignoreNameMismatch)) {
+          // Avoid triggering relabelling fixes about the completion arg.
+          claimIgnoringNameMismatch = true;
+        } else {
+          // Otherwise we can continue trying to find argument which
+          // matches parameter with or without label.
+          continue;
+        }
       }
 
       // Skip claimed arguments.
@@ -401,7 +406,7 @@ static bool matchCallArgumentsImpl(
         // func foo(_ a: Int, _ b: Int = 0, c: Int = 0, _ d: Int) {}
         // foo(1, c: 2, 3) // -> `3` will be claimed as '_ b:'.
         // ```
-        if (argLabel.empty())
+        if (argLabel.empty() && !claimIgnoringNameMismatch)
           continue;
 
         // We don't allow out-of-order matching beyond the completion location.
@@ -410,13 +415,13 @@ static bool matchCallArgumentsImpl(
         // the completion was the last argument, as the user may be re-writing
         // the callsite rather than updating an argument in an existing one.
         if (completionInfo && completionInfo->isBefore(i))
-          continue;
+          break;
 
         potentiallyOutOfOrder = true;
       }
 
       // Claim it.
-      return claim(paramLabel, i);
+      return claim(paramLabel, i, claimIgnoringNameMismatch);
     }
 
     // If we're not supposed to attempt any fixes, we're done.
@@ -750,69 +755,23 @@ static bool matchCallArgumentsImpl(
     // If we still haven't claimed all of the arguments,
     // fail if there is no recovery.
     if (numClaimedArgs != numArgs) {
-      bool unclaimedArgAfterCompletion = false;
       for (auto index : indices(claimedArgs)) {
         if (claimedArgs[index])
           continue;
 
-        // Avoid reporting individual extra arguments after the completion
-        // position. They are reported via a single callback below.
+        // Avoid reporting extra arguments after the completion position as
+        // individual failures. Instead give a single report that arguments
+        // after the completion were invalid. This allows us to rank overloads
+        // that didn't have invalid args after the completion higher, while
+        // still treating all overloads that did equally (regardless of the
+        // exact number of extraneous args).
         if (completionInfo && completionInfo->isBefore(index)) {
-          unclaimedArgAfterCompletion = true;
-          continue;
+          if (listener.invalidArgumentsAfterCompletion())
+            return true;
+          break;
         }
 
         if (listener.extraArgument(index))
-          return true;
-      }
-
-      if (unclaimedArgAfterCompletion) {
-        // There were invalid arguments after the completion position. The
-        // user may be intending to rewrite the callsite (rather than update an
-        // argument) so proceed as if all arguments after the completion
-        // position (even those already bound) weren't present. This prevents
-        // this solution being penalized based on the exact number and kind
-        // of issues those arguments contain.
-        unsigned afterIdx = completionInfo->completionIdx + 1;
-
-        auto argsBegin = args.begin() + afterIdx;
-        if (argsBegin != args.end())
-          args.erase(argsBegin, args.end());
-        numArgs = args.size();
-
-        if (!actualArgNames.empty()) {
-          auto actualNamesBegin = actualArgNames.begin() + afterIdx;
-          if (actualNamesBegin != actualArgNames.end())
-            actualArgNames.erase(actualNamesBegin, actualArgNames.end());
-        }
-
-        auto claimedBegin = claimedArgs.begin() + afterIdx;
-        if (claimedBegin != claimedArgs.end())
-          claimedArgs.erase(claimedBegin, claimedArgs.end());
-        numClaimedArgs = llvm::count_if(claimedArgs, [](bool claimed){
-          return claimed;
-        });
-
-        for (auto &params: llvm::reverse(parameterBindings)) {
-          if (params.empty())
-            continue;
-          if (!completionInfo->isBefore(params.back()))
-            break;
-          if (completionInfo->isBefore(params.front())) {
-            params.clear();
-            haveUnfulfilledParams = true;
-          } else {
-            llvm::erase_if(params, [&](unsigned argIdx) {
-              return completionInfo->isBefore(argIdx);
-            });
-          }
-        }
-
-        // Report that post-completion args where ignored. This allows us to
-        // rank overloads that didn't require dropping the args higher, while
-        // still treating all overloads that did equally, regardless of how
-        // many args were dropped or what issues they would otherwise trigger.
-        if (listener.invalidArgumentsAfterCompletion())
           return true;
       }
     }
@@ -901,8 +860,8 @@ static bool matchCallArgumentsImpl(
       for (const auto &binding : parameterBindings) {
         paramToArgMap.push_back(argIdx);
         // Ignore argument bindings that were synthesized due to missing args.
-         argIdx += llvm::count_if(
-             binding, [numArgs](unsigned argIdx) { return argIdx < numArgs; });
+        argIdx += llvm::count_if(
+            binding, [numArgs](unsigned argIdx) { return argIdx < numArgs; });
       }
     }
 
@@ -1250,8 +1209,9 @@ public:
     // This is only triggered when solving for code completion (which doesn't
     // produce diagnostics) so no need to record a fix for this. Still increase
     // the score to penalize this solution though.
-    CS.increaseScore(SK_Fix);
-    return false;
+    auto *locator = CS.getConstraintLocator(Locator);
+    auto *fix = IgnoreArgumentsAfterCompletion::create(CS, locator);
+    return CS.recordFix(fix, /*impact=*/1);
   }
 
   bool missingLabel(unsigned paramIndex) override {
@@ -2375,7 +2335,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     auto *typeVar = createTypeVariable(getConstraintLocator(argLoc),
                                        TVO_CanBindToNoEscape);
     params.emplace_back(typeVar);
-    assignFixedType(typeVar, input);
+    assignFixedType(typeVar, input, loc);
   };
 
   {
@@ -3297,7 +3257,9 @@ ConstraintSystem::matchTypesBindTypeVar(
                : getTypeMatchFailure(locator);
   }
 
-  assignFixedType(typeVar, type, /*updateState=*/true,
+
+  auto loc = getConstraintLocator(locator);
+  assignFixedType(typeVar, type, loc, /*updateState=*/true,
                   /*notifyInference=*/!flags.contains(TMF_BindingTypeVariable));
 
   return getTypeMatchSuccess();
@@ -5222,9 +5184,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         if (auto *iot = type1->getAs<InOutType>()) {
           if (!rep2->getImpl().canBindToLValue())
             return getTypeMatchFailure(locator);
-          assignFixedType(rep2, LValueType::get(iot->getObjectType()));
+          assignFixedType(rep2, LValueType::get(iot->getObjectType()),
+                          getConstraintLocator(locator));
         } else {
-          assignFixedType(rep2, type1);
+          assignFixedType(rep2, type1, getConstraintLocator(locator));
         }
         return getTypeMatchSuccess();
       } else if (typeVar1 && !typeVar2) {
@@ -5237,9 +5200,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         if (auto *lvt = type2->getAs<LValueType>()) {
           if (!rep1->getImpl().canBindToInOut())
             return getTypeMatchFailure(locator);
-          assignFixedType(rep1, InOutType::get(lvt->getObjectType()));
+          assignFixedType(rep1, InOutType::get(lvt->getObjectType()),
+                          getConstraintLocator(locator));
         } else {
-          assignFixedType(rep1, type2);
+          assignFixedType(rep1, type2, getConstraintLocator(locator));
         }
         return getTypeMatchSuccess();
       } if (typeVar1 && typeVar2) {
@@ -6375,6 +6339,27 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   if (!shouldAttemptFixes())
     return SolutionKind::Error;
 
+  // when the conformance check fails and is for code completion
+  // get the current saved binding and check the source locator
+  // if from argument conversion do check for which args it relates to here.
+  if (isForCodeCompletion() && typeVar) {
+    auto getArgIdx = [&](ConstraintLocator *loc) -> Optional<unsigned> {
+      SmallVector<LocatorPathElt, 8> path;
+      if (auto applyArg = loc->findLast<LocatorPathElt::ApplyArgToParam>())
+        return applyArg->getArgIdx();
+      return None;
+    };
+
+    if (auto loc = typeVar->getImpl().getBoundLocator()) {
+      auto completionInfo = getCompletionArgInfo(loc->getAnchor(), *this);
+      auto argIdx = getArgIdx(loc);
+      if (completionInfo && argIdx && completionInfo->isBefore(*argIdx)) {
+        auto *fix = IgnoreArgumentsAfterCompletion::create(*this, loc);
+        return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+      }
+    }
+  }
+
   auto protocolTy = protocol->getDeclaredInterfaceType();
 
   // If this conformance has been fixed already, let's just consider this done.
@@ -7147,8 +7132,8 @@ static bool isForKeyPathSubscript(ConstraintSystem &cs,
   return false;
 }
 
-static bool isForKeyPathSubscriptWithoutLabel(ConstraintSystem &cs,
-                                              ConstraintLocator *locator) {
+static bool mayBeForKeyPathSubscriptWithoutLabel(ConstraintSystem &cs,
+                                                 ConstraintLocator *locator) {
   if (!locator || !locator->getAnchor())
     return false;
 
@@ -7292,7 +7277,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   // subscript without a `keyPath:` label. Add it to the result so that it
   // can be caught by the missing argument label checking later.
   if (isForKeyPathSubscript(*this, memberLocator) ||
-      (isForKeyPathSubscriptWithoutLabel(*this, memberLocator)
+      (mayBeForKeyPathSubscriptWithoutLabel(*this, memberLocator)
        && includeInaccessibleMembers)) {
     if (baseTy->isAnyObject()) {
       result.addUnviable(
@@ -8403,7 +8388,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
           // them to bind member could mean missing valid hole positions in
           // the pattern.
           assignFixedType(memberTypeVar,
-                          PlaceholderType::get(getASTContext(), memberTypeVar));
+                          PlaceholderType::get(getASTContext(), memberTypeVar),
+                          getConstraintLocator(locator));
         } else {
           recordPotentialHole(memberTypeVar);
         }
@@ -9102,7 +9088,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
   auto closureType =
       FunctionType::get(parameters, inferredClosureType->getResult(),
                         closureExtInfo);
-  assignFixedType(typeVar, closureType, closureLocator);
+  assignFixedType(typeVar, closureType, closureLocator, closureLocator);
 
   // If there is a result builder to apply, do so now.
   if (resultBuilderType) {
@@ -11408,38 +11394,37 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
     log << ")\n";
   }
 
-  // If this fix is in a call argument after the argument containing the code
-  // completion location, give a fixed penalty with the same impact as that for
-  // the fix to ignore all arguments after the completion position when matching
-  // arguments based on labels.
+  // All fixes within call arguments after the argument containing the code
+  // completion location are coalesced into a single fix with a fixed impact.
+  // This is so that the exact number and kind of such fixes won't impact the
+  // ranking of different overload choices. Fixes being required in arguments
+  // after the completion point are taken as an indication that the user is
+  // re-writing the call and intends to remove those arguments afterwards.
   if (isForCodeCompletion()) {
-
-    auto getArgAndAnchor = [&](ConstraintLocator *loc) -> Optional<std::pair<unsigned, ASTNode>> {
-      SmallVector<LocatorPathElt, 8> path;
-      auto anchor = loc->getAnchor();
+    auto loc = fix->getLocator();
+    auto isIgnoreArgsFix = [&](ConstraintFix *otherFix) {
+      return otherFix->getKind() == FixKind::IgnoreArgumentsAfterCompletion &&
+        otherFix->getLocator()->getAnchor() == loc->getAnchor();
+    };
+    auto getArgIdx = [&](ConstraintLocator *loc) -> Optional<unsigned> {
       if (auto applyArg = loc->findLast<LocatorPathElt::ApplyArgToParam>())
-        return std::make_pair(applyArg->getArgIdx(), anchor);
+        return applyArg->getArgIdx();
       return None;
     };
-    auto *loc = fix->getLocator();
-    loc->dump(this);
-    auto completionInfo = getCompletionArgInfo(loc->getAnchor(), *this);
-    auto argAndAnchor = getArgAndAnchor(loc);
-    if (completionInfo && argAndAnchor &&
-        completionInfo->isBefore(argAndAnchor->first)) {
-      // Make sure we only penalize issues in arguments after the argument
-      // containing the completion position once.
-      bool isFirst = llvm::all_of(getFixes(), [&](const ConstraintFix *fix) {
-        if (auto fixArgAndAnchor = getArgAndAnchor(fix->getLocator()))
-          return !completionInfo->isBefore(fixArgAndAnchor->first) ||
-              fixArgAndAnchor->second != argAndAnchor->second ||
-              fixArgAndAnchor->first > argAndAnchor->first;
-        return true;
-      });
 
-      if (!isFirst)
-        return false;
-      impact = 1;
+
+    if (fix->getKind() != FixKind::IgnoreArgumentsAfterCompletion) {
+      // If this fix is within a call arg after the arg containing the code
+      // completion point, remap it to an IgnoreArgumentsAfterCompletion fix.
+      auto *loc = fix->getLocator();
+      auto completionInfo = getCompletionArgInfo(loc->getAnchor(), *this);
+      auto argIdx = getArgIdx(loc);
+      if (completionInfo && argIdx && completionInfo->isBefore(*argIdx))
+        return recordFix(IgnoreArgumentsAfterCompletion::create(*this, loc));
+    } else if (llvm::any_of(getFixes(), isIgnoreArgsFix)) {
+      // If we've already recorded an IgnoreArgumentsAfterCompletion fix for
+      // this anchor, ignore this fix.
+      return false;
     }
   }
 
@@ -11783,7 +11768,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
                                       TVO_CanBindToLValue |
                                         TVO_CanBindToNoEscape |
                                         TVO_CanBindToHole);
-    assignFixedType(valueBaseTy, dictTy);
+    assignFixedType(valueBaseTy, dictTy, fix->getLocator());
     auto dictionaryKeyTy = DependentMemberType::get(valueBaseTy, keyAssocTy);
 
     // Extract the array element type.
@@ -11865,6 +11850,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::SpecifyClosureParameterType:
   case FixKind::SpecifyClosureReturnType:
   case FixKind::AddQualifierToAccessTopLevelName:
+  case FixKind::IgnoreArgumentsAfterCompletion:
     llvm_unreachable("handled elsewhere");
   }
 

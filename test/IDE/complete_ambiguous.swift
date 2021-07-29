@@ -492,9 +492,9 @@ func testAmbiguousArgs() {
   overloaded().someFunc(a: 2, #^ARG_NO_LABEL^#)
 
   // ARG_NO_LABEL: Begin completions, 3 items
-  // ARG_NO_LABEL-DAG: Pattern/Local/Flair[ArgLabels]:     {#b: Int#}[#Int#]; name=b: Int
-  // ARG_NO_LABEL-DAG: Pattern/Local/Flair[ArgLabels]:     {#c: String#}[#String#]; name=c: String
-  // ARG_NO_LABEL-DAG: Pattern/Local/Flair[ArgLabels]:     {#d: String#}[#String#]; name=d: String
+  // ARG_NO_LABEL-DAG: Pattern/Local/Flair[ArgLabels]:     {#b: Int#}[#Int#]; name=b:
+  // ARG_NO_LABEL-DAG: Pattern/Local/Flair[ArgLabels]:     {#c: String#}[#String#]; name=c:
+  // ARG_NO_LABEL-DAG: Pattern/Local/Flair[ArgLabels]:     {#d: String#}[#String#]; name=d:
   // ARG_NO_LABEL: End completions
 
   overloaded().someFunc(a: 2, b: #^ARG_LABEL^#)
@@ -507,20 +507,21 @@ func testAmbiguousArgs() {
   overloaded().someFunc(a: 2, c: "Foo", #^ARG_NO_LABEL2^#)
 
   // ARG_NO_LABEL2: Begin completions, 1 item
-  // ARG_NO_LABEL2: Pattern/Local/Flair[ArgLabels]:     {#d: String#}[#String#]; name=d: String
+  // ARG_NO_LABEL2: Pattern/Local/Flair[ArgLabels]:     {#d: String#}[#String#]; name=d:
   // ARG_NO_LABEL2: End completions
 
   overloaded().someFunc(a: 2, wrongLabel: "Foo", #^ARG_NO_LABEL_PREV_WRONG^#)
 
-  // ARG_NO_LABEL_PREV_WRONG: Begin completions, 2 items
-  // ARG_NO_LABEL_PREV_WRONG-DAG: Pattern/Local/Flair[ArgLabels]:     {#c: String#}[#String#]; name=c: String
-  // ARG_NO_LABEL_PREV_WRONG-DAG: Pattern/Local/Flair[ArgLabels]:     {#d: String#}[#String#]; name=d: String
+  // ARG_NO_LABEL_PREV_WRONG: Begin completions, 3 items
+  // ARG_NO_LABEL_PREV_WRONG-DAG: Pattern/Local/Flair[ArgLabels]:     {#b: Int#}[#Int#]; name=b:
+  // ARG_NO_LABEL_PREV_WRONG-DAG: Pattern/Local/Flair[ArgLabels]:     {#c: String#}[#String#]; name=c:
+  // ARG_NO_LABEL_PREV_WRONG-DAG: Pattern/Local/Flair[ArgLabels]:     {#d: String#}[#String#]; name=d:
   // ARG_NO_LABEL_PREV_WRONG: End completions
 
   overloaded().someFunc(a: 2, d: "Foo", #^ARG_NO_LABEL_OUT_OF_ORDER^#)
   // ARG_NO_LABEL_OUT_OF_ORDER: Begin completions
   // ARG_NO_LABEL_OUT_OF_ORDER-NOT: name=d: String
-  // ARG_NO_LABEL_OUT_OF_ORDER: Pattern/Local/Flair[ArgLabels]:     {#c: String#}[#String#]; name=c: String
+  // ARG_NO_LABEL_OUT_OF_ORDER: Pattern/Local/Flair[ArgLabels]:     {#c: String#}[#String#]; name=c:
   // ARG_NO_LABEL_OUT_OF_ORDER-NOT: name=d: String
   // ARG_NO_LABEL_OUT_OF_ORDER: End completions
 
@@ -533,20 +534,20 @@ func testAmbiguousArgs() {
 
   overloaded().someFunc(a: 2, #^LATER_ARGS^#, d: "foo")
   // LATER_ARGS: Begin completions, 1 item
-  // LATER_ARGS: Pattern/Local/Flair[ArgLabels]:     {#c: String#}[#String#]; name=c: String
+  // LATER_ARGS: Pattern/Local/Flair[ArgLabels]:     {#c: String#}[#String#]; name=c:
   // LATER_ARGS: End completions
 
   overloaded().someFunc(a: 2, #^LATER_ARGS_WRONG^#, k: 4.5)
   // LATER_ARGS_WRONG: Begin completions, 3 items
-  // LATER_ARGS_WRONG-DAG: Pattern/Local/Flair[ArgLabels]: {#b: Int#}[#Int#]; name=b: Int
-  // LATER_ARGS_WRONG-DAG: Pattern/Local/Flair[ArgLabels]: {#c: String#}[#String#]; name=c: String
-  // LATER_ARGS_WRONG-DAG: Pattern/Local/Flair[ArgLabels]: {#d: String#}[#String#]; name=d: String
+  // LATER_ARGS_WRONG-DAG: Pattern/Local/Flair[ArgLabels]: {#b: Int#}[#Int#]; name=b:
+  // LATER_ARGS_WRONG-DAG: Pattern/Local/Flair[ArgLabels]: {#c: String#}[#String#]; name=c:
+  // LATER_ARGS_WRONG-DAG: Pattern/Local/Flair[ArgLabels]: {#d: String#}[#String#]; name=d:
   // LATER_ARGS_WRONG-DAG: End completions
 
 
   overloaded().variadic(y: 2, #^INITIAL_VARARG^#, 4)
   // INITIAL_VARARG: Begin completions, 1 item
-  // INITIAL_VARARG: Pattern/Local/Flair[ArgLabels]: {#x: Int...#}[#Int#]; name=x: Int...
+  // INITIAL_VARARG: Pattern/Local/Flair[ArgLabels]: {#x: Int...#}[#Int#]; name=x:
   // INITIAL VARARG: End completions
 
   overloaded().variadic(y: 2, x: 2, #^NONINITIAL_VARARG^#)
