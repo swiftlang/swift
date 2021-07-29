@@ -234,6 +234,13 @@ private:
         locator);
   }
 
+  void visitDoStmt(DoStmt *doStmt) {
+    if (!isSupportedMultiStatementClosure())
+      llvm_unreachable("Unsupported statement: Do");
+
+    visitBraceStmt(doStmt->getBody());
+  }
+
   void visitBraceStmt(BraceStmt *braceStmt) {
     if (isSupportedMultiStatementClosure()) {
       SmallVector<std::pair<ASTNode, ConstraintLocator *>, 4> elements;
@@ -295,7 +302,6 @@ private:
   }
   UNSUPPORTED_STMT(Yield)
   UNSUPPORTED_STMT(Defer)
-  UNSUPPORTED_STMT(Do)
   UNSUPPORTED_STMT(DoCatch)
   UNSUPPORTED_STMT(RepeatWhile)
   UNSUPPORTED_STMT(ForEach)
@@ -464,6 +470,12 @@ private:
     return whileStmt;
   }
 
+  ASTNode visitDoStmt(DoStmt *doStmt) {
+    auto body = visit(doStmt->getBody()).get<Stmt *>();
+    doStmt->setBody(cast<BraceStmt>(body));
+    return doStmt;
+  }
+
   ASTNode visitBraceStmt(BraceStmt *braceStmt) {
     for (auto &node : braceStmt->getElements()) {
       if (auto expr = node.dyn_cast<Expr *>()) {
@@ -553,7 +565,6 @@ private:
   }
   UNSUPPORTED_STMT(Yield)
   UNSUPPORTED_STMT(Defer)
-  UNSUPPORTED_STMT(Do)
   UNSUPPORTED_STMT(DoCatch)
   UNSUPPORTED_STMT(RepeatWhile)
   UNSUPPORTED_STMT(ForEach)
