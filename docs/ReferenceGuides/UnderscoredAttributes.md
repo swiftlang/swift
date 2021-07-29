@@ -590,6 +590,18 @@ dynamic replacement of functions with an opaque return type.
 
 ## `@_weakLinked`
 
+Allows a declaration to be weakly-referenced, i.e., any references emitted by
+client modules to the declaration's symbol will have weak linkage. This means
+that client code will compile without the guarantee that the symbol will be
+available at runtime. This requires a dynamic safety check (such as using
+`dlsym (3)`); otherwise, accessing the symbol when it is unavailable leads
+to a runtime crash.
+
+This is an unsafe alternative to using `@available`, which is statically checked.
+If the availability of a library symbol is newer than the deployment target of
+the client, the symbol will be weakly linked, but checking for `@available` and
+`#(un)available` ensures that a symbol is not accessed when it is unavailable.
+
 ## `@_unsafeMainActor`, `@_unsafeSendable`
 
 Marks a parameter's (function) type as `@MainActor` (`@Sendable`) in Swift 6 and
