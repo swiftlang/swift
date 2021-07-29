@@ -1703,11 +1703,6 @@ ERROR(sil_inst_autodiff_invalid_witness_generic_signature,PointsToFirstBadToken,
       "parameters as original function generic signature '%1'",
       (StringRef, StringRef))
 
-// completionHandlerAsync
-ERROR(attr_completion_handler_async_invalid_name, none,
-      "argument of '%0' attribute must be an identifier or full function name",
-      (StringRef))
-
 //------------------------------------------------------------------------------
 // MARK: Generics parsing diagnostics
 //------------------------------------------------------------------------------

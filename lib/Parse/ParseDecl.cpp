@@ -568,7 +568,7 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
   auto Attr = new (Context)
   AvailableAttr(AtLoc, SourceRange(AttrLoc, Tok.getLoc()),
                 PlatformKind.getValue(),
-                Message, Renamed,
+                Message, Renamed, /*RenameDecl=*/nullptr,
                 Introduced.Version, Introduced.Range,
                 Deprecated.Version, Deprecated.Range,
                 Obsoleted.Version, Obsoleted.Range,
@@ -1575,70 +1575,6 @@ void Parser::parseAllAvailabilityMacroArguments() {
   AvailabilityMacrosComputed = true;
 }
 
-static CompletionHandlerAsyncAttr *
-parseCompletionHandlerAsyncAttribute(Parser &P, StringRef AttrName,
-                                     SourceLoc AtLoc, DeclAttrKind DK) {
-  SourceLoc Loc = P.PreviousLoc;
-
-  if (!P.consumeIf(tok::l_paren)) {
-    P.diagnose(P.getEndOfPreviousLoc(), diag::attr_expected_lparen, AttrName,
-               DeclAttribute::isDeclModifier(DK));
-    return nullptr;
-  }
-
-  if (!P.Tok.is(tok::string_literal)) {
-    P.diagnose(Loc, diag::attr_expected_string_literal, AttrName);
-    return nullptr;
-  }
-
-  SourceLoc nameLoc = P.Tok.getLoc();
-  Optional<StringRef> asyncFunctionName = P.getStringLiteralIfNotInterpolated(
-      nameLoc, ("argument of '" + AttrName + "'").str());
-  P.consumeToken(tok::string_literal);
-
-  if (!asyncFunctionName)
-    return nullptr;
-
-  ParsedDeclName parsedAsyncName = parseDeclName(*asyncFunctionName);
-  if (!parsedAsyncName || !parsedAsyncName.ContextName.empty()) {
-    P.diagnose(nameLoc, diag::attr_completion_handler_async_invalid_name,
-               AttrName);
-    return nullptr;
-  }
-
-  size_t handlerIndex = 0;
-  SourceLoc handlerIndexLoc = SourceLoc();
-  if (P.consumeIf(tok::comma)) {
-    // The completion handler is explicitly specified, parse it
-    if (P.parseSpecificIdentifier("completionHandlerIndex",
-                                  diag::attr_missing_label,
-                                  "completionHandlerIndex", AttrName) ||
-        P.parseToken(tok::colon, diag::expected_colon_after_label,
-                     "completionHandlerIndex")) {
-      return nullptr;
-    }
-
-    if (P.Tok.getText().getAsInteger(0, handlerIndex)) {
-      P.diagnose(P.Tok.getLoc(), diag::attr_expected_integer_literal, AttrName);
-      return nullptr;
-    }
-
-    handlerIndexLoc = P.consumeToken(tok::integer_literal);
-  }
-
-  SourceRange AttrRange = SourceRange(Loc, P.Tok.getRange().getStart());
-  if (!P.consumeIf(tok::r_paren)) {
-    P.diagnose(P.getEndOfPreviousLoc(), diag::attr_expected_rparen, AttrName,
-               DeclAttribute::isDeclModifier(DK));
-    return nullptr;
-  }
-
-  return new (P.Context) CompletionHandlerAsyncAttr(
-      parsedAsyncName.formDeclNameRef(P.Context), nameLoc,
-      handlerIndex, handlerIndexLoc, AtLoc,
-      AttrRange);
-}
-
 bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                                    DeclAttrKind DK, bool isFromClangAttribute) {
   // Ok, it is a valid attribute, eat it, and then process it.
@@ -2360,6 +2296,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                                      Platform,
                                      /*Message=*/StringRef(),
                                      /*Rename=*/StringRef(),
+                                     /*RenameDecl=*/nullptr,
                                      /*Introduced=*/Version,
                                      /*IntroducedRange=*/VersionRange,
                                      /*Deprecated=*/llvm::VersionTuple(),
@@ -2681,19 +2618,6 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 
     Attributes.add(new (Context) ProjectedValuePropertyAttr(
         name, AtLoc, range, /*implicit*/ false));
-    break;
-  }
-  case DAK_CompletionHandlerAsync: {
-    auto *attr =
-        parseCompletionHandlerAsyncAttribute(*this, AttrName, AtLoc, DK);
-    if (!attr) {
-      skipUntilDeclStmtRBrace(tok::r_paren);
-      consumeIf(tok::r_paren);
-      return false;
-    }
-
-    if (!DiscardAttribute)
-      Attributes.add(attr);
     break;
   }
   }

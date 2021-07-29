@@ -1845,6 +1845,7 @@ static void applyAvailableAttribute(Decl *decl, AvailabilityContext &info,
                                       targetPlatform(C.LangOpts),
                                       /*Message=*/StringRef(),
                                       /*Rename=*/StringRef(),
+                                      /*RenameDecl=*/nullptr,
                                       info.getOSVersion().getLowerEndpoint(),
                                       /*IntroducedRange*/SourceRange(),
                                       /*Deprecated=*/noVersion,
@@ -2730,6 +2731,7 @@ namespace {
           attr = new (ctx) AvailableAttr(
               SourceLoc(), SourceRange(), PlatformKind::none,
               /*Message*/StringRef(), ctx.AllocateCopy(renamed.str()),
+              /*RenameDecl=*/nullptr,
               /*Introduced*/introducedVersion, SourceRange(),
               /*Deprecated*/llvm::VersionTuple(), SourceRange(),
               /*Obsoleted*/llvm::VersionTuple(), SourceRange(),
@@ -8158,27 +8160,14 @@ static bool suppressOverriddenMethods(ClangImporter::Implementation &importer,
 void addCompletionHandlerAttribute(Decl *asyncImport,
                                    ArrayRef<Decl *> members,
                                    ASTContext &SwiftContext) {
-  auto *ayncFunc = dyn_cast_or_null<AbstractFunctionDecl>(asyncImport);
-  if (!ayncFunc)
+  auto *asyncFunc = dyn_cast_or_null<AbstractFunctionDecl>(asyncImport);
+  if (!asyncFunc)
     return;
-
-  auto errorConvention = ayncFunc->getForeignErrorConvention();
-  auto asyncConvention = ayncFunc->getForeignAsyncConvention();
-  if (!asyncConvention)
-    return;
-
-  unsigned completionIndex = asyncConvention->completionHandlerParamIndex();
-  if (errorConvention &&
-      completionIndex >= errorConvention->getErrorParameterIndex()) {
-    completionIndex--;
-  }
 
   for (auto *member : members) {
     if (member != asyncImport) {
       member->getAttrs().add(
-          new (SwiftContext) CompletionHandlerAsyncAttr(
-              cast<AbstractFunctionDecl>(*asyncImport), completionIndex,
-              SourceLoc(), SourceLoc(), SourceRange(), /*implicit*/ true));
+          AvailableAttr::createForAlternative(SwiftContext, asyncFunc));
     }
   }
 }
@@ -8690,6 +8679,7 @@ void ClangImporter::Implementation::importAttributes(
       auto AvAttr = new (C) AvailableAttr(SourceLoc(), SourceRange(),
                                           platformK.getValue(),
                                           message, swiftReplacement,
+                                          /*RenameDecl=*/nullptr,
                                           introduced,
                                           /*IntroducedRange=*/SourceRange(),
                                           deprecated,
