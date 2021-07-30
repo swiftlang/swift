@@ -3001,14 +3001,7 @@ static bool checkClassGlobalActorIsolation(
   switch (superIsolation) {
   case ActorIsolation::Unspecified:
   case ActorIsolation::Independent:
-    // Allow ObjC superclasses with unspecified global actors, because we do
-    // not expect for Objective-C classes to have been universally annotated.
-    // FIXME: We might choose to tighten this up in Swift 6.
-    if (superclassDecl->getClangNode())
-      return false;
-
-    // Break out to diagnose the error below.
-    break;
+    return false;
 
   case ActorIsolation::ActorInstance:
   case ActorIsolation::DistributedActorInstance:
