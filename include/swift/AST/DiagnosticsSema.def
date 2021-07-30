@@ -2317,8 +2317,8 @@ NOTE(declared_protocol_conformance_here,none,
      (Type, unsigned, Identifier, Identifier))
 
 ERROR(witness_unavailable,none,
-        "unavailable %0 %1 was used to satisfy a requirement of protocol %2",
-        (DescriptiveDeclKind, DeclName, Identifier))
+        "unavailable %0 %1 was used to satisfy a requirement of protocol %2%select{|: %3}3",
+        (DescriptiveDeclKind, DeclName, Identifier, StringRef))
 
 ERROR(redundant_conformance,none,
       "redundant conformance of %0 to protocol %1", (Type, Identifier))
