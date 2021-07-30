@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -module-name=sildeclref_parse | %target-sil-opt -module-name=sildeclref_parse | %FileCheck %s
+// RUN: %target-sil-opt %s -module-name=sildeclref_parse -requirement-machine off | %target-sil-opt -module-name=sildeclref_parse -requirement-machine off | %FileCheck %s
 // Parse AutoDiff derivative SILDeclRefs via `witness_method` and `class_method` instructions.
 
 import Swift

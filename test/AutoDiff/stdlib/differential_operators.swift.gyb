@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %gyb %s -o %t/differential_operators.swift
-// RUN: %target-build-swift %t/differential_operators.swift -o %t/differential_operators
+// RUN: %target-build-swift %t/differential_operators.swift -o %t/differential_operators -Xfrontend -requirement-machine=off
 // RUN: %target-codesign %t/differential_operators
 // RUN: %target-run %t/differential_operators
 // REQUIRES: executable_test

@@ -1,10 +1,10 @@
-// RUN: %target-run-simple-swift
+// RUN: %target-run-simple-swift(-Xfrontend -requirement-machine=off)
 
 // NOTE(TF-813): verify that enabling forward-mode does not affect reverse-mode.
 // Temporarily disabled because forward-mode is not at feature parity with reverse-mode.
-// UN: %target-run-simple-swift(-Xfrontend -enable-experimental-forward-mode-differentiation)
+// UN: %target-run-simple-swift(-Xfrontend -enable-experimental-forward-mode-differentiation -Xfrontend -requirement-machine=off)
 
-// RUN: %target-swift-frontend -Xllvm -sil-print-after=differentiation %s -emit-sil -o /dev/null -module-name null 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-print-after=differentiation %s -emit-sil -o /dev/null -module-name null -requirement-machine=off 2>&1 | %FileCheck %s
 
 // REQUIRES: executable_test
 
