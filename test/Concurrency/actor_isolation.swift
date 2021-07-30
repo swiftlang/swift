@@ -970,7 +970,7 @@ actor Counter {
 class C2 { }
 
 @SomeGlobalActor
-class C3: C2 { } // expected-error{{global actor 'SomeGlobalActor'-isolated class 'C3' has different actor isolation from nonisolated superclass 'C2'}}
+class C3: C2 { } // it's okay to add a global actor to a nonisolated class.
 
 @GenericGlobalActor<U>
 class GenericSuper<U> { }
