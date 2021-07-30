@@ -546,7 +546,6 @@ bool CompilerInstance::setUpModuleLoaders() {
     auto ESML = ExplicitSwiftModuleLoader::create(
         *Context,
         getDependencyTracker(), MLM,
-        Invocation.getSearchPathOptions().ExplicitSwiftModules,
         Invocation.getSearchPathOptions().ExplicitSwiftModuleMap,
         IgnoreSourceInfoFile);
     this->DefaultSerializedLoader = ESML.get();
