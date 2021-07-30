@@ -36,6 +36,23 @@
 #if __has_include(<mach-o/dyld_priv.h>)
 #include <mach-o/dyld_priv.h>
 #define DYLD_EXPECTED_SWIFT_OPTIMIZATIONS_VERSION 1u
+
+// Redeclare these functions as weak so we can build against a macOS 12 SDK and
+// still test on macOS 11.
+LLVM_ATTRIBUTE_WEAK
+struct _dyld_protocol_conformance_result
+_dyld_find_protocol_conformance(const void *protocolDescriptor,
+                                const void *metadataType,
+                                const void *typeDescriptor);
+
+LLVM_ATTRIBUTE_WEAK
+struct _dyld_protocol_conformance_result
+_dyld_find_foreign_type_protocol_conformance(const void *protocol,
+                                             const char *foreignTypeIdentityStart,
+                                             size_t foreignTypeIdentityLength);
+
+LLVM_ATTRIBUTE_WEAK
+uint32_t _dyld_swift_optimizations_version(void);
 #endif
 
 // Set this to 1 to enable logging of calls to the dyld shared cache conformance
