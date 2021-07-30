@@ -682,7 +682,10 @@ void Serializer::writeModuleInfo(ModuleDependencyID moduleID,
       getIdentifier(moduleID.first),
       getArray(moduleID, ModuleIdentifierArrayKind::DirectDependencies));
 
-  if (auto swiftTextDeps = dependencyInfo.getAsSwiftTextualModule()) {
+  switch (dependencyInfo.getKind()) {
+  case swift::ModuleDependenciesKind::SwiftTextual: {
+    auto swiftTextDeps = dependencyInfo.getAsSwiftTextualModule();
+    assert(swiftTextDeps);
     unsigned swiftInterfaceFileId =
         swiftTextDeps->swiftInterfaceFile
             ? getIdentifier(swiftTextDeps->swiftInterfaceFile.getValue())
@@ -703,24 +706,33 @@ void Serializer::writeModuleInfo(ModuleDependencyID moduleID,
         getArray(moduleID, ModuleIdentifierArrayKind::BridgingSourceFiles),
         getArray(moduleID,
                  ModuleIdentifierArrayKind::BridgingModuleDependencies));
-
-  } else if (auto swiftBinDeps = dependencyInfo.getAsSwiftBinaryModule()) {
+    break;
+  }
+  case swift::ModuleDependenciesKind::SwiftBinary: {
+    auto swiftBinDeps = dependencyInfo.getAsSwiftBinaryModule();
+    assert(swiftBinDeps);
     SwiftBinaryModuleDetailsLayout::emitRecord(
         Out, ScratchRecord, AbbrCodes[SwiftBinaryModuleDetailsLayout::Code],
         getIdentifier(swiftBinDeps->compiledModulePath),
         getIdentifier(swiftBinDeps->moduleDocPath),
         getIdentifier(swiftBinDeps->sourceInfoPath), swiftBinDeps->isFramework);
 
-  } else if (auto swiftPHDeps =
-                 dependencyInfo.getAsPlaceholderDependencyModule()) {
+    break;
+  }
+  case swift::ModuleDependenciesKind::SwiftPlaceholder: {
+    auto swiftPHDeps = dependencyInfo.getAsPlaceholderDependencyModule();
+    assert(swiftPHDeps);
     SwiftPlaceholderModuleDetailsLayout::emitRecord(
         Out, ScratchRecord,
         AbbrCodes[SwiftPlaceholderModuleDetailsLayout::Code],
         getIdentifier(swiftPHDeps->compiledModulePath),
         getIdentifier(swiftPHDeps->moduleDocPath),
         getIdentifier(swiftPHDeps->sourceInfoPath));
-
-  } else if (auto clangDeps = dependencyInfo.getAsClangModule()) {
+    break;
+  }
+  case swift::ModuleDependenciesKind::Clang: {
+    auto clangDeps = dependencyInfo.getAsClangModule();
+    assert(clangDeps);
     ClangModuleDetailsLayout::emitRecord(
         Out, ScratchRecord, AbbrCodes[ClangModuleDetailsLayout::Code],
         getIdentifier(clangDeps->moduleMapFile),
@@ -728,8 +740,8 @@ void Serializer::writeModuleInfo(ModuleDependencyID moduleID,
         getArray(moduleID, ModuleIdentifierArrayKind::NonPathCommandLine),
         getArray(moduleID, ModuleIdentifierArrayKind::FileDependencies));
 
-  } else {
-    llvm_unreachable("Unexpected module dependency kind.");
+    break;
+  }
   }
 }
 
@@ -802,52 +814,69 @@ unsigned Serializer::getArray(ModuleDependencyID moduleID,
 
 void Serializer::collectStringsAndArrays(const ModuleDependenciesCache &cache) {
   for (auto &moduleID : cache.getAllModules()) {
-    auto dependencyInfo =
-        cache.findDependencies(moduleID.first, moduleID.second);
-    assert(dependencyInfo.hasValue() && "Expected dependency info.");
-    // Add the module's name
-    addIdentifier(moduleID.first);
-    // Add the module's dependencies
-    addArray(moduleID, ModuleIdentifierArrayKind::DirectDependencies,
-             dependencyInfo->getModuleDependencies());
+    auto dependencyInfos = cache.findAllDependenciesIrrespectiveOfSearchPaths(
+        moduleID.first, moduleID.second);
+    assert(dependencyInfos.hasValue() && "Expected dependency info.");
+    for (auto &dependencyInfo : *dependencyInfos) {
+      // Add the module's name
+      addIdentifier(moduleID.first);
+      // Add the module's dependencies
+      addArray(moduleID, ModuleIdentifierArrayKind::DirectDependencies,
+               dependencyInfo.getModuleDependencies());
 
-    // Add the dependency-kind-specific data
-    if (auto swiftTextDeps = dependencyInfo->getAsSwiftTextualModule()) {
-      if (swiftTextDeps->swiftInterfaceFile)
-        addIdentifier(swiftTextDeps->swiftInterfaceFile.getValue());
-      addArray(moduleID, ModuleIdentifierArrayKind::CompiledModuleCandidates,
-               swiftTextDeps->compiledModuleCandidates);
-      addArray(moduleID, ModuleIdentifierArrayKind::BuildCommandLine,
-               swiftTextDeps->buildCommandLine);
-      addArray(moduleID, ModuleIdentifierArrayKind::ExtraPCMArgs,
-               swiftTextDeps->extraPCMArgs);
-      addIdentifier(swiftTextDeps->contextHash);
-      if (swiftTextDeps->bridgingHeaderFile)
-        addIdentifier(swiftTextDeps->bridgingHeaderFile.getValue());
-      addArray(moduleID, ModuleIdentifierArrayKind::SourceFiles,
-               swiftTextDeps->sourceFiles);
-      addArray(moduleID, ModuleIdentifierArrayKind::BridgingSourceFiles,
-               swiftTextDeps->bridgingSourceFiles);
-      addArray(moduleID, ModuleIdentifierArrayKind::BridgingModuleDependencies,
-               swiftTextDeps->bridgingModuleDependencies);
-    } else if (auto swiftBinDeps = dependencyInfo->getAsSwiftBinaryModule()) {
-      addIdentifier(swiftBinDeps->compiledModulePath);
-      addIdentifier(swiftBinDeps->moduleDocPath);
-      addIdentifier(swiftBinDeps->sourceInfoPath);
-    } else if (auto swiftPHDeps =
-                   dependencyInfo->getAsPlaceholderDependencyModule()) {
-      addIdentifier(swiftPHDeps->compiledModulePath);
-      addIdentifier(swiftPHDeps->moduleDocPath);
-      addIdentifier(swiftPHDeps->sourceInfoPath);
-    } else if (auto clangDeps = dependencyInfo->getAsClangModule()) {
-      addIdentifier(clangDeps->moduleMapFile);
-      addIdentifier(clangDeps->contextHash);
-      addArray(moduleID, ModuleIdentifierArrayKind::NonPathCommandLine,
-               clangDeps->nonPathCommandLine);
-      addArray(moduleID, ModuleIdentifierArrayKind::FileDependencies,
-               clangDeps->fileDependencies);
-    } else {
-      llvm_unreachable("Unexpected module dependency kind.");
+      // Add the dependency-kind-specific data
+      switch (dependencyInfo.getKind()) {
+      case swift::ModuleDependenciesKind::SwiftTextual: {
+        auto swiftTextDeps = dependencyInfo.getAsSwiftTextualModule();
+        assert(swiftTextDeps);
+        if (swiftTextDeps->swiftInterfaceFile)
+          addIdentifier(swiftTextDeps->swiftInterfaceFile.getValue());
+        addArray(moduleID, ModuleIdentifierArrayKind::CompiledModuleCandidates,
+                 swiftTextDeps->compiledModuleCandidates);
+        addArray(moduleID, ModuleIdentifierArrayKind::BuildCommandLine,
+                 swiftTextDeps->buildCommandLine);
+        addArray(moduleID, ModuleIdentifierArrayKind::ExtraPCMArgs,
+                 swiftTextDeps->extraPCMArgs);
+        addIdentifier(swiftTextDeps->contextHash);
+        if (swiftTextDeps->bridgingHeaderFile)
+          addIdentifier(swiftTextDeps->bridgingHeaderFile.getValue());
+        addArray(moduleID, ModuleIdentifierArrayKind::SourceFiles,
+                 swiftTextDeps->sourceFiles);
+        addArray(moduleID, ModuleIdentifierArrayKind::BridgingSourceFiles,
+                 swiftTextDeps->bridgingSourceFiles);
+        addArray(moduleID,
+                 ModuleIdentifierArrayKind::BridgingModuleDependencies,
+                 swiftTextDeps->bridgingModuleDependencies);
+        break;
+      }
+      case swift::ModuleDependenciesKind::SwiftBinary: {
+        auto swiftBinDeps = dependencyInfo.getAsSwiftBinaryModule();
+        assert(swiftBinDeps);
+        addIdentifier(swiftBinDeps->compiledModulePath);
+        addIdentifier(swiftBinDeps->moduleDocPath);
+        addIdentifier(swiftBinDeps->sourceInfoPath);
+        break;
+      }
+      case swift::ModuleDependenciesKind::SwiftPlaceholder: {
+        auto swiftPHDeps = dependencyInfo.getAsPlaceholderDependencyModule();
+        assert(swiftPHDeps);
+        addIdentifier(swiftPHDeps->compiledModulePath);
+        addIdentifier(swiftPHDeps->moduleDocPath);
+        addIdentifier(swiftPHDeps->sourceInfoPath);
+        break;
+      }
+      case swift::ModuleDependenciesKind::Clang: {
+        auto clangDeps = dependencyInfo.getAsClangModule();
+        assert(clangDeps);
+        addIdentifier(clangDeps->moduleMapFile);
+        addIdentifier(clangDeps->contextHash);
+        addArray(moduleID, ModuleIdentifierArrayKind::NonPathCommandLine,
+                 clangDeps->nonPathCommandLine);
+        addArray(moduleID, ModuleIdentifierArrayKind::FileDependencies,
+                 clangDeps->fileDependencies);
+        break;
+      }
+      }
     }
   }
 }
@@ -888,10 +917,12 @@ void Serializer::writeInterModuleDependenciesCache(
 
   // Write the core graph
   for (auto &moduleID : cache.getAllModules()) {
-    auto dependencyInfo =
-        cache.findDependencies(moduleID.first, moduleID.second);
-    assert(dependencyInfo.hasValue() && "Expected dependency info.");
-    writeModuleInfo(moduleID, dependencyInfo.getValue());
+    auto dependencyInfos = cache.findAllDependenciesIrrespectiveOfSearchPaths(
+        moduleID.first, moduleID.second);
+    assert(dependencyInfos.hasValue() && "Expected dependency info.");
+    for (auto &dependencyInfo : *dependencyInfos) {
+      writeModuleInfo(moduleID, dependencyInfo);
+    }
   }
 
   return;
