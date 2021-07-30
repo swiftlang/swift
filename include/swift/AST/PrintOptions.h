@@ -346,6 +346,10 @@ struct PrintOptions {
   /// Whether to print 'static' or 'class' on static decls.
   bool PrintStaticKeyword = true;
 
+  /// Whether to print 'mutating', 'nonmutating', or '__consuming' keyword on
+  /// specified decls.
+  bool PrintSelfAccessKindKeyword = true;
+
   /// Whether to print 'override' keyword on overridden decls.
   bool PrintOverrideKeyword = true;
 
