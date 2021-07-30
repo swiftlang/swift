@@ -421,6 +421,19 @@ UnsafeRawBufferPointerTestSuite.test("copyMemory.overflow") {
       from: UnsafeRawBufferPointer(buffer))
 }
 
+// Use copyBytes without contiguous storage
+UnsafeRawBufferPointerTestSuite.test("copyBytes.withoutContiguouseStorage") {
+  let ranges: [Range<UInt8>] = [0..<2, 1..<3, 2..<4, 3..<5]
+  var array = [UInt8](repeating: 0, count: 2)
+  for range in ranges {
+    array.withUnsafeMutableBytes { byte in
+        byte.copyBytes(from: range)
+    }
+    expectEqual(array.count, range.count)
+    expectEqual(array, Array(range))
+  }
+}
+
 UnsafeRawBufferPointerTestSuite.test("copyBytes.sequence.overflow") {
   var buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 3, alignment: MemoryLayout<UInt>.alignment)
   defer { buffer.deallocate() }

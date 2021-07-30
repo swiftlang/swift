@@ -418,6 +418,16 @@ extension Unsafe${Mutable}RawBufferPointer {
     guard let position = _position else {
       return
     }
+    
+    if source.withContiguousStorageIfAvailable({
+      (buffer: UnsafeBufferPointer<C.Element>) -> Void in
+      if let base = buffer.baseAddress {
+        position.copyMemory(from: base, byteCount: buffer.count)
+      }
+    }) != nil {
+      return
+    }
+
     for (index, byteValue) in source.enumerated() {
       position.storeBytes(
         of: byteValue, toByteOffset: index, as: UInt8.self)
