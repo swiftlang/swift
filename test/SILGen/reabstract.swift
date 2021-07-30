@@ -85,14 +85,13 @@ func testInoutOpaque(_ c: C, i: Int) {
 // CHECK:         function_ref @$s10reabstract1CCSiIegly_ACSiytIeglnr_TR
 // CHECK:         partial_apply
 // CHECK:         store
-// CHECK:         load
-// CHECK:         function_ref @$s10reabstract1CCSiytIeglnr_ACSiIegly_TR
-// CHECK:         partial_apply
-// CHECK:         apply
+// CHECK:         [[CLOSURE:%.*]] = struct_extract {{.*}}, #Box.t
+// CHECK:         [[CLOSURE1:%.*]] = copy_value [[CLOSURE]]
+// CHECK:         [[CLOSURE2:%.*]] = begin_borrow [[CLOSURE1]]
+// CHECK:         apply [[CLOSURE2]]
 // CHECK: } // end sil function '$s10reabstract15testInoutOpaque_1iyAA1CC_SitF'
 
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$s10reabstract1CCSiIegly_ACSiytIeglnr_TR : $@convention(thin) (@inout C, @in_guaranteed Int, @guaranteed @callee_guaranteed (@inout C, Int) -> ()) -> @out () {
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$s10reabstract1CCSiytIeglnr_ACSiIegly_TR : $@convention(thin) (@inout C, Int, @guaranteed @callee_guaranteed (@inout C, @in_guaranteed Int) -> @out ()) -> () {
 
 func closureTakingOptional(_ fn: (Int?) -> ()) {}
 closureTakingOptional({ (_: Any) -> () in })
@@ -107,7 +106,6 @@ closureTakingOptional({ (_: Any) -> () in })
 func evenLessFun(_ s: __shared C, _ o: __owned C) {}
 
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$s10reabstract1CCACIeggx_A2CytIegnir_TR : $@convention(thin) (@in_guaranteed C, @in C, @guaranteed @callee_guaranteed (@guaranteed C, @owned C) -> ()) -> @out ()
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$s10reabstract1CCACytIegnir_A2CIeggx_TR : $@convention(thin) (@guaranteed C, @owned C, @guaranteed @callee_guaranteed (@in_guaranteed C, @in C) -> @out ()) -> ()
 func testSharedOwnedOpaque(_ s: C, o: C) {
   let box = Box(t: evenLessFun)
   box.t(s, o)

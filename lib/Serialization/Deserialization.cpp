@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -540,6 +540,36 @@ ModuleFile::readConformanceChecked(llvm::BitstreamCursor &Cursor,
     auto conformance =
       ctx.getInheritedConformance(conformingType,
                                   inheritedConformance.getConcrete());
+    return ProtocolConformanceRef(conformance);
+  }
+
+  case BUILTIN_PROTOCOL_CONFORMANCE: {
+    TypeID conformingTypeID;
+    DeclID protoID;
+    GenericSignatureID genericSigID;
+    BuiltinProtocolConformanceLayout::readRecord(scratch, conformingTypeID,
+                                                 protoID, genericSigID);
+
+    Type conformingType = getType(conformingTypeID);
+
+    auto decl = getDeclChecked(protoID);
+    if (!decl)
+      return decl.takeError();
+
+    auto proto = cast<ProtocolDecl>(decl.get());
+    auto genericSig = getGenericSignatureChecked(genericSigID);
+    if (!genericSig)
+      return genericSig.takeError();
+
+    // Read the conditional requirements.
+    SmallVector<Requirement, 4> conditionalRequirements;
+    auto error = readGenericRequirementsChecked(
+        conditionalRequirements, Cursor);
+    if (error)
+      return std::move(error);
+
+    auto conformance = getContext().getBuiltinConformance(
+        conformingType, proto, *genericSig, conditionalRequirements);
     return ProtocolConformanceRef(conformance);
   }
 
@@ -4315,7 +4345,9 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         DEF_VER_TUPLE_PIECES(Introduced);
         DEF_VER_TUPLE_PIECES(Deprecated);
         DEF_VER_TUPLE_PIECES(Obsoleted);
+        DeclID renameDeclID;
         unsigned platform, messageSize, renameSize;
+
         // Decode the record, pulling the version tuple information.
         serialization::decls_block::AvailableDeclAttrLayout::readRecord(
             scratch, isImplicit, isUnavailable, isDeprecated,
@@ -4323,7 +4355,12 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
             LIST_VER_TUPLE_PIECES(Introduced),
             LIST_VER_TUPLE_PIECES(Deprecated),
             LIST_VER_TUPLE_PIECES(Obsoleted),
-            platform, messageSize, renameSize);
+            platform, renameDeclID, messageSize, renameSize);
+
+        ValueDecl *renameDecl = nullptr;
+        if (renameDeclID) {
+          renameDecl = cast<ValueDecl>(MF.getDecl(renameDeclID));
+        }
 
         StringRef message = blobData.substr(0, messageSize);
         blobData = blobData.substr(messageSize);
@@ -4350,7 +4387,7 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
 
         Attr = new (ctx) AvailableAttr(
           SourceLoc(), SourceRange(),
-          (PlatformKind)platform, message, rename,
+          (PlatformKind)platform, message, rename, renameDecl,
           Introduced, SourceRange(),
           Deprecated, SourceRange(),
           Obsoleted, SourceRange(),
@@ -4473,10 +4510,12 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
 
         Expected<Type> deserialized = MF.getTypeChecked(typeID);
         if (!deserialized) {
-          if (deserialized.errorIsA<XRefNonLoadedModuleError>()) {
+          if (deserialized.errorIsA<XRefNonLoadedModuleError>() ||
+              MF.allowCompilerErrors()) {
             // A custom attribute defined behind an implementation-only import
             // is safe to drop when it can't be deserialized.
-            // rdar://problem/56599179
+            // rdar://problem/56599179. When allowing errors we're doing a best
+            // effort to create a module, so ignore in that case as well.
             consumeError(deserialized.takeError());
             skipAttr = true;
           } else
@@ -4615,21 +4654,6 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
 
         Attr = SPIAccessControlAttr::create(ctx, SourceLoc(),
                                             SourceRange(), spis);
-        break;
-      }
-
-      case decls_block::CompletionHandlerAsync_DECL_ATTR: {
-        bool isImplicit;
-        uint64_t handlerIndex;
-        uint64_t asyncFunctionDeclID;
-        serialization::decls_block::CompletionHandlerAsyncDeclAttrLayout::
-            readRecord(scratch, isImplicit, handlerIndex, asyncFunctionDeclID);
-
-        auto mappedFunctionDecl =
-            cast<AbstractFunctionDecl>(MF.getDecl(asyncFunctionDeclID));
-        Attr = new (ctx) CompletionHandlerAsyncAttr(
-            *mappedFunctionDecl, handlerIndex, /*handlerIndexLoc*/ SourceLoc(),
-            /*atLoc*/ SourceLoc(), /*range*/ SourceRange(), isImplicit);
         break;
       }
 
@@ -6236,9 +6260,15 @@ ModuleFile::loadAllConformances(const Decl *D, uint64_t contextData,
     if (!conformance) {
       auto unconsumedError =
         consumeErrorIfXRefNonLoadedModule(conformance.takeError());
-      if (unconsumedError)
-        fatal(std::move(unconsumedError));
-      return;
+      if (unconsumedError) {
+        // Ignore if allowing errors, it's just doing a best effort to produce
+        // *some* module anyway.
+        if (allowCompilerErrors())
+          consumeError(std::move(unconsumedError));
+        else
+          fatal(std::move(unconsumedError));
+      }
+      continue;
     }
 
     if (conformance.get().isConcrete())
@@ -6359,8 +6389,17 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
           "serialized conformances do not match requirement signature",
           llvm::inconvertibleErrorCode()));
     }
-    while (conformanceCount--)
-      reqConformances.push_back(readConformance(DeclTypeCursor));
+    while (conformanceCount--) {
+      auto conformance = readConformanceChecked(DeclTypeCursor);
+      if (conformance) {
+        reqConformances.push_back(conformance.get());
+      } else if (allowCompilerErrors()) {
+        consumeError(conformance.takeError());
+        reqConformances.push_back(ProtocolConformanceRef::forInvalid());
+      } else {
+        fatal(conformance.takeError());
+      }
+    }
   }
   conformance->setSignatureConformances(reqConformances);
 
@@ -6473,8 +6512,11 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     if (!witnessSubstitutions) {
       // Missing module errors are most likely caused by an
       // implementation-only import hiding types and decls.
-      // rdar://problem/52837313
-      if (witnessSubstitutions.errorIsA<XRefNonLoadedModuleError>()) {
+      // rdar://problem/52837313. Ignore completely if allowing
+      // errors - we're just doing a best effort to create the
+      // module in that case.
+      if (witnessSubstitutions.errorIsA<XRefNonLoadedModuleError>() ||
+          allowCompilerErrors()) {
         consumeError(witnessSubstitutions.takeError());
         isOpaque = true;
       }

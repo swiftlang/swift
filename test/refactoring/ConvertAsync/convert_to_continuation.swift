@@ -12,6 +12,8 @@ func withoutAsyncAlternativeThrowingWithMultipleResults(closure: @escaping (Int?
 func asyncVoidWithoutAlternative(completionHandler2: @escaping () -> Void) {}
 func resultWithoutAlternative(completionHandler2: @escaping (Result<Int, Error>) -> Void) {}
 
+func lottaClosures(x: () -> Void, y: () -> Void) -> Int? { nil }
+
 struct MyError: Error {}
 
 // RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=CREATE-CONTINUATION %s
@@ -173,7 +175,7 @@ func testThrowingContinuationRelayingErrorAndTwoComplexResults(completionHandler
 // THROWING-CONTINUATION-RELAYING-ERROR-AND-TWO-COMPLEX-RESULTS-NEXT:   }
 // THROWING-CONTINUATION-RELAYING-ERROR-AND-TWO-COMPLEX-RESULTS-NEXT: }
 
-// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=THROWING-CONTINUATION-RELAYING-ERROR-AND-COMPLEX-RESULT-WITH-TRAILING-CLOSURE %s
+// RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=THROWING-CONTINUATION-RELAYING-ERROR-AND-COMPLEX-RESULT-WITH-TRAILING-CLOSURE %s
 func testThrowingContinuationRelayingErrorAndComplexResultWithTrailingClosure(completionHandler: @escaping (Int?, Error?) -> Void) {
   withoutAsyncAlternativeThrowing { (theValue, theError) in
     completionHandler(theValue.map { $0 + 1 }, theError)
@@ -185,7 +187,7 @@ func testThrowingContinuationRelayingErrorAndComplexResultWithTrailingClosure(co
 // THROWING-CONTINUATION-RELAYING-ERROR-AND-COMPLEX-RESULT-WITH-TRAILING-CLOSURE-NEXT:       if let error = theError {
 // THROWING-CONTINUATION-RELAYING-ERROR-AND-COMPLEX-RESULT-WITH-TRAILING-CLOSURE-NEXT:         continuation.resume(throwing: error)
 // THROWING-CONTINUATION-RELAYING-ERROR-AND-COMPLEX-RESULT-WITH-TRAILING-CLOSURE-NEXT:       } else {
-// THROWING-CONTINUATION-RELAYING-ERROR-AND-COMPLEX-RESULT-WITH-TRAILING-CLOSURE-NEXT:         guard let result = theValue.map { $0 + 1 }.self else {
+// THROWING-CONTINUATION-RELAYING-ERROR-AND-COMPLEX-RESULT-WITH-TRAILING-CLOSURE-NEXT:         guard let result = (theValue.map { $0 + 1 }) else {
 // THROWING-CONTINUATION-RELAYING-ERROR-AND-COMPLEX-RESULT-WITH-TRAILING-CLOSURE-NEXT:           fatalError("Expected non-nil result in the non-error case")
 // THROWING-CONTINUATION-RELAYING-ERROR-AND-COMPLEX-RESULT-WITH-TRAILING-CLOSURE-NEXT:         }
 // THROWING-CONTINUATION-RELAYING-ERROR-AND-COMPLEX-RESULT-WITH-TRAILING-CLOSURE-NEXT:         continuation.resume(returning: result)
@@ -193,6 +195,27 @@ func testThrowingContinuationRelayingErrorAndComplexResultWithTrailingClosure(co
 // THROWING-CONTINUATION-RELAYING-ERROR-AND-COMPLEX-RESULT-WITH-TRAILING-CLOSURE-NEXT:     }
 // THROWING-CONTINUATION-RELAYING-ERROR-AND-COMPLEX-RESULT-WITH-TRAILING-CLOSURE-NEXT:   }
 // THROWING-CONTINUATION-RELAYING-ERROR-AND-COMPLEX-RESULT-WITH-TRAILING-CLOSURE-NEXT: }
+
+// RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=MULTIPLE-TRAILING-CLOSURES %s
+func testThrowingContinuationRelayingErrorAndComplexResultWithMultipleTrailingClosures(completionHandler: @escaping (Int?, Error?) -> Void) {
+  withoutAsyncAlternativeThrowing { theValue, theError in
+    completionHandler(lottaClosures {} y: {}, theError)
+  }
+}
+// MULTIPLE-TRAILING-CLOSURES:      func testThrowingContinuationRelayingErrorAndComplexResultWithMultipleTrailingClosures() async throws -> Int {
+// MULTIPLE-TRAILING-CLOSURES-NEXT:   return try await withCheckedThrowingContinuation { continuation in
+// MULTIPLE-TRAILING-CLOSURES-NEXT:     withoutAsyncAlternativeThrowing { theValue, theError in
+// MULTIPLE-TRAILING-CLOSURES-NEXT:       if let error = theError {
+// MULTIPLE-TRAILING-CLOSURES-NEXT:         continuation.resume(throwing: error)
+// MULTIPLE-TRAILING-CLOSURES-NEXT:       } else {
+// MULTIPLE-TRAILING-CLOSURES-NEXT:         guard let result = (lottaClosures {} y: {}) else {
+// MULTIPLE-TRAILING-CLOSURES-NEXT:           fatalError("Expected non-nil result in the non-error case")
+// MULTIPLE-TRAILING-CLOSURES-NEXT:         }
+// MULTIPLE-TRAILING-CLOSURES-NEXT:         continuation.resume(returning: result)
+// MULTIPLE-TRAILING-CLOSURES-NEXT:       }
+// MULTIPLE-TRAILING-CLOSURES-NEXT:     }
+// MULTIPLE-TRAILING-CLOSURES-NEXT:   }
+// MULTIPLE-TRAILING-CLOSURES-NEXT: }
 
 // RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=THROWING-CONTINUATION-ALWAYS-RETURNING-ERROR-AND-RESULT %s
 func testAlwaysReturnBothResultAndCompletionHandler(completionHandler: @escaping (Int?, Error?) -> Void) {

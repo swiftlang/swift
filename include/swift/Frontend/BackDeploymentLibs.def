@@ -27,6 +27,5 @@
 BACK_DEPLOYMENT_LIB((5, 0), all, "swiftCompatibility50")
 BACK_DEPLOYMENT_LIB((5, 1), all, "swiftCompatibility51")
 BACK_DEPLOYMENT_LIB((5, 0), executable, "swiftCompatibilityDynamicReplacements")
-BACK_DEPLOYMENT_LIB((5, 5), all, "swiftCompatibilityConcurrency")
                     
 #undef BACK_DEPLOYMENT_LIB

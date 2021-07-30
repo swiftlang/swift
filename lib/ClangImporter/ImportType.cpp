@@ -1883,9 +1883,12 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
 
       param->setInterfaceType(parentType.getType());
 
-      // Workaround until proper const support is handled: Force everything to
-      // be mutating. This implicitly makes the parameter indirect.
-      param->setSpecifier(ParamSpecifier::InOut);
+      if (SwiftContext.getClangModuleLoader()->isCXXMethodMutating(CMD)) {
+        // This implicitly makes the parameter indirect.
+        param->setSpecifier(ParamSpecifier::InOut);
+      } else {
+        param->setSpecifier(ParamSpecifier::Default);
+      }
 
       parameters.push_back(param);
     }

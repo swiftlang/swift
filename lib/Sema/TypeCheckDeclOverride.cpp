@@ -463,7 +463,7 @@ static bool noteFixableMismatchedTypes(ValueDecl *decl, const ValueDecl *base) {
     // input arguments.
     auto *fnType = baseTy->getAs<AnyFunctionType>();
     baseTy = fnType->getResult();
-    Type argTy = FunctionType::composeInput(
+    Type argTy = FunctionType::composeTuple(
         ctx, baseTy->getAs<AnyFunctionType>()->getParams(), false);
     auto diagKind = diag::override_type_mismatch_with_fixits_init;
     unsigned numArgs = baseInit->getParameters()->size();
@@ -1448,7 +1448,6 @@ namespace  {
     UNINTERESTING_ATTR(Exported)
     UNINTERESTING_ATTR(ForbidSerializingReference)
     UNINTERESTING_ATTR(GKInspectable)
-    UNINTERESTING_ATTR(CompletionHandlerAsync)
     UNINTERESTING_ATTR(HasMissingDesignatedInitializers)
     UNINTERESTING_ATTR(IBAction)
     UNINTERESTING_ATTR(IBDesignable)

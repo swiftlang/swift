@@ -1166,6 +1166,27 @@ public:
     }
   }
   
+  void visitMemberRefExpr(MemberRefExpr *e) {
+    // If we're loading a closure-type property out of a generic aggregate,
+    // we might reabstract it under normal circumstances, but since we're
+    // going to apply it immediately here, there's no reason to. We can
+    // invoke the function value at whatever abstraction level we get.
+    assert(isa<VarDecl>(e->getMember().getDecl()));
+
+    // Any writebacks for this access are tightly scoped.
+    FormalEvaluationScope scope(SGF);
+
+    LValue lv = SGF.emitLValue(e, SGFAccessKind::OwnedObjectRead);
+    if (lv.isLastComponentTranslation())
+      lv.dropLastTranslationComponent();
+
+    ManagedValue fn = SGF.emitLoadOfLValue(e, std::move(lv), SGFContext())
+      .getAsSingleValue(SGF, e);
+    
+    setCallee(Callee::forIndirect(fn, lv.getOrigFormalType(),
+                               cast<FunctionType>(lv.getSubstFormalType()), e));
+  }
+  
   void visitAbstractClosureExpr(AbstractClosureExpr *e) {
     // Emit the closure body.
     SGF.SGM.emitClosure(e);
@@ -4001,7 +4022,7 @@ RValue CallEmission::applyEnumElementConstructor(SGFContext C) {
                                 resultFnType, argVals,
                                 std::move(*callSite).forward());
 
-    auto payloadTy = AnyFunctionType::composeInput(SGF.getASTContext(),
+    auto payloadTy = AnyFunctionType::composeTuple(SGF.getASTContext(),
                                                   resultFnType.getParams(),
                                                   /*canonicalVararg*/ true);
     auto arg = RValue(SGF, argVals, payloadTy->getCanonicalType());
@@ -4257,7 +4278,7 @@ CallEmission CallEmission::forApplyExpr(SILGenFunction &SGF, ApplyExpr *e) {
     Expr *arg = apply.callSite->getArg();
 
     SmallVector<AnyFunctionType::Param, 8> params;
-    AnyFunctionType::decomposeInput(arg->getType(), params);
+    AnyFunctionType::decomposeTuple(arg->getType(), params);
 
     PreparedArguments preparedArgs(params, arg);
 

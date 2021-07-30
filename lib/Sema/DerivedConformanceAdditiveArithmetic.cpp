@@ -98,7 +98,7 @@ deriveBodyMathOperator(AbstractFunctionDecl *funcDecl, MathOperator op) {
   auto *nominalTypeExpr = TypeExpr::createImplicitForDecl(
       DeclNameLoc(), nominal, funcDecl,
       funcDecl->mapTypeIntoContext(nominal->getInterfaceType()));
-  auto *initExpr = new (C) ConstructorRefCallExpr(initDRE, nominalTypeExpr);
+  auto *initExpr = ConstructorRefCallExpr::create(C, initDRE, nominalTypeExpr);
 
   // Get operator protocol requirement.
   auto *proto = C.getProtocol(KnownProtocolKind::AdditiveArithmetic);
@@ -229,7 +229,7 @@ deriveBodyPropertyGetter(AbstractFunctionDecl *funcDecl, ProtocolDecl *proto,
   auto *nominalTypeExpr = TypeExpr::createImplicitForDecl(
       DeclNameLoc(), nominal, funcDecl,
       funcDecl->mapTypeIntoContext(nominal->getInterfaceType()));
-  auto *initExpr = new (C) ConstructorRefCallExpr(initDRE, nominalTypeExpr);
+  auto *initExpr = ConstructorRefCallExpr::create(C, initDRE, nominalTypeExpr);
 
   auto createMemberPropertyExpr = [&](VarDecl *member) -> Expr * {
     auto memberType =

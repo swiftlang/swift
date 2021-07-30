@@ -856,8 +856,8 @@ deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl, void *) {
     auto *method = UnresolvedDeclRefExpr::createImplicit(C, C.Id_superEncoder);
 
     // container.superEncoder()
-    auto *superEncoderRef = new (C) DotSyntaxCallExpr(containerExpr,
-                                                      SourceLoc(), method);
+    auto *superEncoderRef =
+        DotSyntaxCallExpr::create(C, containerExpr, SourceLoc(), method);
 
     // encode(to:) expr
     auto *encodeDeclRef = new (C) DeclRefExpr(ConcreteDeclRef(encodeDecl),
@@ -868,8 +868,8 @@ deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl, void *) {
                                           SourceLoc(), /*Implicit=*/true);
 
     // super.encode(to:)
-    auto *encodeCall = new (C) DotSyntaxCallExpr(superRef, SourceLoc(),
-                                                 encodeDeclRef);
+    auto *encodeCall =
+        DotSyntaxCallExpr::create(C, superRef, SourceLoc(), encodeDeclRef);
 
     // super.encode(to: container.superEncoder())
     Expr *args[1] = {superEncoderRef};
@@ -1431,8 +1431,7 @@ deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
 
         // container.superDecoder()
         auto *superDecoderCall =
-          CallExpr::createImplicit(C, superDecoderRef, ArrayRef<Expr *>(),
-                                   ArrayRef<Identifier>());
+            CallExpr::createImplicitEmpty(C, superDecoderRef);
 
         // super
         auto *superRef = new (C) SuperRefExpr(initDecl->getImplicitSelfDecl(),
@@ -1477,9 +1476,7 @@ deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
         auto *superInitRef = UnresolvedDotExpr::createImplicit(C, superRef,
                                                                initName);
         // super.init() call
-        Expr *callExpr = CallExpr::createImplicit(C, superInitRef,
-                                                  ArrayRef<Expr *>(),
-                                                  ArrayRef<Identifier>());
+        Expr *callExpr = CallExpr::createImplicitEmpty(C, superInitRef);
 
         // If super.init throws, try super.init()
         if (superInitDecl->hasThrows())

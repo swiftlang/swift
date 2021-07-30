@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -909,6 +909,8 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
                               decls_block::INHERITED_PROTOCOL_CONFORMANCE);
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
+                              decls_block::BUILTIN_PROTOCOL_CONFORMANCE);
+  BLOCK_RECORD_WITH_NAMESPACE(sil_block,
                               decls_block::NORMAL_PROTOCOL_CONFORMANCE_ID);
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
                               decls_block::PROTOCOL_CONFORMANCE_XREF);
@@ -1607,6 +1609,16 @@ Serializer::writeConformance(ProtocolConformanceRef conformanceRef,
     writeConformance(conf->getInheritedConformance(), abbrCodes, genericEnv);
     break;
   }
+  case ProtocolConformanceKind::Builtin:
+    auto builtin = cast<BuiltinProtocolConformance>(conformance);
+    unsigned abbrCode = abbrCodes[BuiltinProtocolConformanceLayout::Code];
+    auto typeID = addTypeRef(builtin->getType());
+    auto protocolID = addDeclRef(builtin->getProtocol());
+    auto genericSigID = addGenericSignatureRef(builtin->getGenericSignature());
+    BuiltinProtocolConformanceLayout::emitRecord(
+        Out, ScratchRecord, abbrCode, typeID, protocolID, genericSigID);
+    writeGenericRequirements(builtin->getConditionalRequirements(), abbrCodes);
+    break;
   }
 }
 
@@ -2458,6 +2470,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       ENCODE_VER_TUPLE(Deprecated, theAttr->Deprecated)
       ENCODE_VER_TUPLE(Obsoleted, theAttr->Obsoleted)
 
+      auto renameDeclID = S.addDeclRef(theAttr->RenameDecl);
       llvm::SmallString<32> blob;
       blob.append(theAttr->Message);
       blob.append(theAttr->Rename);
@@ -2472,6 +2485,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           LIST_VER_TUPLE_PIECES(Deprecated),
           LIST_VER_TUPLE_PIECES(Obsoleted),
           static_cast<unsigned>(theAttr->Platform),
+          renameDeclID,
           theAttr->Message.size(),
           theAttr->Rename.size(),
           blob);
@@ -2648,21 +2662,6 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       TransposeDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(), origNameId,
           origDeclID, paramIndicesVector);
-      return;
-    }
-
-    case DAK_CompletionHandlerAsync: {
-      auto *attr = cast<CompletionHandlerAsyncAttr>(DA);
-      auto abbrCode =
-          S.DeclTypeAbbrCodes[CompletionHandlerAsyncDeclAttrLayout::Code];
-
-      assert(attr->AsyncFunctionDecl &&
-             "Serializing unresolved completion handler async function decl");
-      auto asyncFuncDeclID = S.addDeclRef(attr->AsyncFunctionDecl);
-
-      CompletionHandlerAsyncDeclAttrLayout::emitRecord(
-          S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(),
-          attr->CompletionHandlerIndex, asyncFuncDeclID);
       return;
     }
     }
@@ -4816,6 +4815,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<SpecializedProtocolConformanceLayout>();
   registerDeclTypeAbbr<InheritedProtocolConformanceLayout>();
   registerDeclTypeAbbr<InvalidProtocolConformanceLayout>();
+  registerDeclTypeAbbr<BuiltinProtocolConformanceLayout>();
   registerDeclTypeAbbr<NormalProtocolConformanceIdLayout>();
   registerDeclTypeAbbr<ProtocolConformanceXrefLayout>();
 

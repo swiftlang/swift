@@ -881,8 +881,27 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     if (Attr->Obsoleted)
       Printer << ", obsoleted: " << Attr->Obsoleted.getValue().getAsString();
 
-    if (!Attr->Rename.empty())
+    if (!Attr->Rename.empty()) {
       Printer << ", renamed: \"" << Attr->Rename << "\"";
+    } else if (Attr->RenameDecl) {
+      Printer << ", renamed: \"";
+      if (auto *Accessor = dyn_cast<AccessorDecl>(Attr->RenameDecl)) {
+        switch (Accessor->getAccessorKind()) {
+        case AccessorKind::Get:
+          Printer << "getter:";
+          break;
+        case AccessorKind::Set:
+          Printer << "setter:";
+          break;
+        default:
+          break;
+        }
+        Printer << Accessor->getStorage()->getName() << "()";
+      } else {
+        Printer << Attr->RenameDecl->getName();
+      }
+      Printer << "\"";
+    }
 
     // If there's no message, but this is specifically an imported
     // "unavailable in Swift" attribute, synthesize a message to look good in
@@ -1088,20 +1107,6 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
 #include "swift/AST/Attr.def"
     llvm_unreachable("handled above");
 
-  case DAK_CompletionHandlerAsync: {
-    auto *attr = cast<CompletionHandlerAsyncAttr>(this);
-    Printer.printAttrName("@completionHandlerAsync");
-    Printer << "(\"";
-    if (attr->AsyncFunctionDecl) {
-      Printer << attr->AsyncFunctionDecl->getName();
-    } else {
-      Printer << attr->AsyncFunctionName;
-    }
-    Printer << "\", completionHandlerIndex: " <<
-        attr->CompletionHandlerIndex << ')';
-    break;
-  }
-
   default:
     assert(DeclAttribute::isDeclModifier(getKind()) &&
            "handled above");
@@ -1237,8 +1242,6 @@ StringRef DeclAttribute::getAttrName() const {
     return "derivative";
   case DAK_Transpose:
     return "transpose";
-  case DAK_CompletionHandlerAsync:
-    return "completionHandlerAsync";
   }
   llvm_unreachable("bad DeclAttrKind");
 }
@@ -1460,11 +1463,22 @@ AvailableAttr::createPlatformAgnostic(ASTContext &C,
     assert(!Obsoleted.empty());
   }
   return new (C) AvailableAttr(
-    SourceLoc(), SourceRange(), PlatformKind::none, Message, Rename,
+    SourceLoc(), SourceRange(), PlatformKind::none, Message, Rename, nullptr,
     NoVersion, SourceRange(),
     NoVersion, SourceRange(),
     Obsoleted, SourceRange(),
     Kind, /* isImplicit */ false);
+}
+
+AvailableAttr *AvailableAttr::createForAlternative(
+    ASTContext &C, AbstractFunctionDecl *AsyncFunc) {
+  llvm::VersionTuple NoVersion;
+  return new (C) AvailableAttr(
+    SourceLoc(), SourceRange(), PlatformKind::none, "", "", AsyncFunc,
+    NoVersion, SourceRange(),
+    NoVersion, SourceRange(),
+    NoVersion, SourceRange(),
+    PlatformAgnosticAvailabilityKind::None, /*Implicit=*/true);
 }
 
 bool AvailableAttr::isActivePlatform(const ASTContext &ctx) const {
@@ -1474,7 +1488,7 @@ bool AvailableAttr::isActivePlatform(const ASTContext &ctx) const {
 AvailableAttr *AvailableAttr::clone(ASTContext &C, bool implicit) const {
   return new (C) AvailableAttr(implicit ? SourceLoc() : AtLoc,
                                implicit ? SourceRange() : getRange(),
-                               Platform, Message, Rename,
+                               Platform, Message, Rename, RenameDecl,
                                Introduced ? *Introduced : llvm::VersionTuple(),
                                implicit ? SourceRange() : IntroducedRange,
                                Deprecated ? *Deprecated : llvm::VersionTuple(),

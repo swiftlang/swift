@@ -33,22 +33,18 @@ public func call(_ wrapper: inout AddressOnlyIntWrapper) -> Int32 { wrapper() }
 
 // CHECK: sil [clang AddressOnlyIntWrapper.callAsFunction] [[NAME]] : $@convention(c) (@inout AddressOnlyIntWrapper) -> Int32
 
-public func index(_ arr: inout ReadOnlyIntArray, _ arg: Int32) -> Int32 { arr[arg] }
+public func index(_ arr: ReadOnlyIntArray, _ arg: Int32) -> Int32 { arr[arg] }
 
-// CHECK: sil @$s4main5indexys5Int32VSo16ReadOnlyIntArrayVz_ADtF : $@convention(thin) (@inout ReadOnlyIntArray, Int32) -> Int32 {
+// CHECK: sil @$s4main5indexys5Int32VSo16ReadOnlyIntArrayV_ADtF : $@convention(thin) (@in_guaranteed ReadOnlyIntArray, Int32) -> Int32 {
 // CHECK: bb0([[ARR:%.*]] : $*ReadOnlyIntArray, [[INDEX:%.*]] : $Int32):
-// CHECK:   [[ARRACCESS:%.*]] = begin_access [modify] [static] [[ARR]] : $*ReadOnlyIntArray
-// CHECK:   [[ARRACCESS2:%.*]] = begin_access [modify] [static] [[ARRACCESS]] : $*ReadOnlyIntArray
-// CHECK:   [[OP:%.*]] = function_ref [[READCLASSNAME:@(_ZNK16ReadOnlyIntArrayixEi|\?\?AReadOnlyIntArray@@QEBAAEBHH@Z)]] : $@convention(c) (@inout ReadOnlyIntArray, Int32) -> UnsafePointer<Int32>
-// CHECK:   [[PTR:%.*]] = apply [[OP]]([[ARRACCESS2]], [[INDEX]]) : $@convention(c) (@inout ReadOnlyIntArray, Int32) -> UnsafePointer<Int32>
-// CHECK: } // end sil function '$s4main5indexys5Int32VSo16ReadOnlyIntArrayVz_ADtF'
+// CHECK:   [[OP:%.*]] = function_ref [[READCLASSNAME:@(_ZNK16ReadOnlyIntArrayixEi|\?\?AReadOnlyIntArray@@QEBAAEBHH@Z)]] : $@convention(c) (@in ReadOnlyIntArray, Int32) -> UnsafePointer<Int32>
+// CHECK:   [[PTR:%.*]] = apply [[OP]]([[ARRACCESS:%.*]], [[INDEX]]) : $@convention(c) (@in ReadOnlyIntArray, Int32) -> UnsafePointer<Int32>
+// CHECK: } // end sil function '$s4main5indexys5Int32VSo16ReadOnlyIntArrayV_ADtF'
 
-// CHECK: sil shared [transparent] @$sSo16ReadOnlyIntArrayVys5Int32VADcig : $@convention(method) (Int32, @inout ReadOnlyIntArray) -> Int32 {
+// CHECK: sil shared [transparent] @$sSo16ReadOnlyIntArrayVys5Int32VADcig : $@convention(method) (Int32, @in_guaranteed ReadOnlyIntArray) -> Int32 {
 // CHECK: bb0([[INDEX:%.*]] : $Int32, [[SELF:%.*]] : $*ReadOnlyIntArray):
-// CHECK:   [[SELFACCESS:%.*]] = begin_access [modify] [static] [[SELF]] : $*ReadOnlyIntArray
-// CHECK:   [[OP:%.*]] = function_ref [[READCLASSNAME]] : $@convention(c) (@inout ReadOnlyIntArray, Int32) -> UnsafePointer<Int32>
-// CHECK:   [[PTR:%.*]] = apply [[OP]]([[SELFACCESS]], [[INDEX]]) : $@convention(c) (@inout ReadOnlyIntArray, Int32) -> UnsafePointer<Int32>
-// CHECK:   end_access [[SELFACCESS]] : $*ReadOnlyIntArray
+// CHECK:   [[OP:%.*]] = function_ref [[READCLASSNAME]] : $@convention(c) (@in ReadOnlyIntArray, Int32) -> UnsafePointer<Int32>
+// CHECK:   [[PTR:%.*]] = apply [[OP]]([[SELFACCESS:%.*]], [[INDEX]]) : $@convention(c) (@in ReadOnlyIntArray, Int32) -> UnsafePointer<Int32>
 // CHECK:   [[PTR2:%.*]] = struct_extract [[PTR]] : $UnsafePointer<Int32>, #UnsafePointer._rawValue
 // CHECK:   pointer_to_address [[PTR2]] : $Builtin.RawPointer to [strict] $*Int32
 // CHECK: } // end sil function '$sSo16ReadOnlyIntArrayVys5Int32VADcig'
@@ -77,18 +73,14 @@ public func index(_ arr: inout NonTrivialIntArrayByVal, _ arg: Int32, _ val: Int
 
 // CHECK: sil @$s4main5indexys5Int32VSo23NonTrivialIntArrayByValVz_A2DtF : $@convention(thin) (@inout NonTrivialIntArrayByVal, Int32, Int32) -> Int32 {
 // CHECK: bb0([[ARR:%.*]] : $*NonTrivialIntArrayByVal, [[INDEX:%.*]] : $Int32, [[NEWVALUE:%.*]] : $Int32):
-// CHECK:   [[ARRACCESS:%.*]] = begin_access [modify] [static] [[ARR]] : $*NonTrivialIntArrayByVal
-// CHECK:   [[ARRACCESS2:%.*]] = begin_access [modify] [static] [[ARRACCESS]] : $*NonTrivialIntArrayByVal
-// CHECK:   [[OP:%.*]] = function_ref [[READWRITECLASSNAMEBYVAL:@(_ZNK23NonTrivialIntArrayByValixEi|\?\?ANonTrivialIntArrayByVal@@QEBAHH@Z)]] : $@convention(c) (@inout NonTrivialIntArrayByVal, Int32) -> Int32
-// CHECK:   [[PTR:%.*]] = apply [[OP]]([[ARRACCESS2]], [[INDEX]]) : $@convention(c) (@inout NonTrivialIntArrayByVal, Int32) -> Int32
+// CHECK:   [[OP:%.*]] = function_ref [[READWRITECLASSNAMEBYVAL:@(_ZNK23NonTrivialIntArrayByValixEi|\?\?ANonTrivialIntArrayByVal@@QEBAHH@Z)]] : $@convention(c) (@in NonTrivialIntArrayByVal, Int32) -> Int32
+// CHECK:   [[PTR:%.*]] = apply [[OP]]([[ARRACCESS:%.*]], [[INDEX]]) : $@convention(c) (@in NonTrivialIntArrayByVal, Int32) -> Int32
 // CHECK: } // end sil function '$s4main5indexys5Int32VSo23NonTrivialIntArrayByValVz_A2DtF'
 
-// CHECK: sil shared [transparent] @$sSo23NonTrivialIntArrayByValVys5Int32VADcig : $@convention(method) (Int32, @inout NonTrivialIntArrayByVal) -> Int32 {
+// CHECK: sil shared [transparent] @$sSo23NonTrivialIntArrayByValVys5Int32VADcig : $@convention(method) (Int32, @in_guaranteed NonTrivialIntArrayByVal) -> Int32 {
 // CHECK: bb0([[NEWVALUE:%.*]] : $Int32, [[INDEX:%.*]] : $*NonTrivialIntArrayByVal):
-// CHECK:   [[SELFACCESS:%.*]] = begin_access [modify] [static] [[INDEX]] : $*NonTrivialIntArrayByVal
-// CHECK:   [[OP:%.*]] = function_ref [[READWRITECLASSNAMEBYVAL]] : $@convention(c) (@inout NonTrivialIntArrayByVal, Int32) -> Int32
-// CHECK:   [[PTR:%.*]] = apply [[OP]]([[SELFACCESS]], [[NEWVALUE]]) : $@convention(c) (@inout NonTrivialIntArrayByVal, Int32) -> Int32
-// CHECK:   end_access [[SELFACCESS]] : $*NonTrivialIntArrayByVal
+// CHECK:   [[OP:%.*]] = function_ref [[READWRITECLASSNAMEBYVAL]] : $@convention(c) (@in NonTrivialIntArrayByVal, Int32) -> Int32
+// CHECK:   [[PTR:%.*]] = apply [[OP]]([[SELFACCESS:%.*]], [[NEWVALUE]]) : $@convention(c) (@in NonTrivialIntArrayByVal, Int32) -> Int32
 // CHECK: } // end sil function '$sSo23NonTrivialIntArrayByValVys5Int32VADcig
 
 public func index(_ arr: inout PtrByVal, _ arg: Int32, _ val: Int32) -> Int32 { arr[arg]![0] }
@@ -142,21 +134,17 @@ public func index(_ arr: inout PtrToPtr, _ arg: Int32, _ val: Int32) -> Int32 { 
 // CHECK:   end_access [[SELFACCESS]] : $*PtrToPtr
 // CHECK: } // end sil function '$sSo05PtrToA0VySpySpys5Int32VGSgGSgADcig
 
-public func index(_ arr: inout ConstOpPtrByVal, _ arg: Int32, _ val: Int32) -> Int32 { arr[arg]![0] }
-// CHECK: sil @$s4main5indexys5Int32VSo15ConstOpPtrByValVz_A2DtF : $@convention(thin) (@inout ConstOpPtrByVal, Int32, Int32) -> Int32 {
-// CHECK: bb0([[ARR:%.*]] : $*ConstOpPtrByVal, [[INDEX:%.*]] : $Int32, [[NEWVALUE:%.*]] : $Int32):
-// CHECK:   [[ARRACCESS:%.*]] = begin_access [modify] [static] [[ARR]] : $*ConstOpPtrByVal
-// CHECK:   [[ARRACCESS2:%.*]] = begin_access [modify] [static] [[ARRACCESS]] : $*ConstOpPtrByVal
-// CHECK:   [[OP:%.*]] = function_ref [[CONSTOPPTRBYVAL:@(_ZNK15ConstOpPtrByValixEi|\?\?AConstOpPtrByVal@@QEBAPEBHH@Z)]] : $@convention(c) (@inout ConstOpPtrByVal, Int32) -> Optional<UnsafePointer<Int32>>
-// CHECK:   [[PTR:%.*]] = apply [[OP]]([[ARRACCESS2]], [[INDEX]]) : $@convention(c) (@inout ConstOpPtrByVal, Int32) -> Optional<UnsafePointer<Int32>>
-// CHECK: } // end sil function '$s4main5indexys5Int32VSo15ConstOpPtrByValVz_A2DtF'
+public func index(_ arr: ConstOpPtrByVal, _ arg: Int32, _ val: Int32) -> Int32 { arr[arg]![0] }
+// CHECK: sil @$s4main5indexys5Int32VSo15ConstOpPtrByValV_A2DtF : $@convention(thin) (ConstOpPtrByVal, Int32, Int32) -> Int32 {
+// CHECK: bb0([[ARR:%.*]] : $ConstOpPtrByVal, [[INDEX:%.*]] : $Int32, [[NEWVALUE:%.*]] : $Int32):
+// CHECK:   [[OP:%.*]] = function_ref [[CONSTOPPTRBYVAL:@(_ZNK15ConstOpPtrByValixEi|\?\?AConstOpPtrByVal@@QEBAPEBHH@Z)]] : $@convention(c) (@in ConstOpPtrByVal, Int32) -> Optional<UnsafePointer<Int32>>
+// CHECK:   [[PTR:%.*]] = apply [[OP]]([[ARRACCESS2:%.*]], [[INDEX]]) : $@convention(c) (@in ConstOpPtrByVal, Int32) -> Optional<UnsafePointer<Int32>>
+// CHECK: } // end sil function '$s4main5indexys5Int32VSo15ConstOpPtrByValV_A2DtF'
 
-// CHECK: sil shared [transparent] @$sSo15ConstOpPtrByValVySPys5Int32VGSgADcig : $@convention(method) (Int32, @inout ConstOpPtrByVal) -> Optional<UnsafePointer<Int32>> {
-// CHECK: bb0([[NEWVALUE:%.*]] : $Int32, [[INDEX:%.*]] : $*ConstOpPtrByVal):
-// CHECK:   [[SELFACCESS:%.*]] = begin_access [modify] [static] [[INDEX]] : $*ConstOpPtrByVal
-// CHECK:   [[OP:%.*]] = function_ref [[CONSTOPPTRBYVAL]] : $@convention(c) (@inout ConstOpPtrByVal, Int32) -> Optional<UnsafePointer<Int32>>
-// CHECK:   [[PTR:%.*]] = apply [[OP]]([[SELFACCESS]], [[NEWVALUE]]) : $@convention(c) (@inout ConstOpPtrByVal, Int32) -> Optional<UnsafePointer<Int32>>
-// CHECK:   end_access [[SELFACCESS]] : $*ConstOpPtrByVal
+// CHECK: sil shared [transparent] @$sSo15ConstOpPtrByValVySPys5Int32VGSgADcig : $@convention(method) (Int32, ConstOpPtrByVal) -> Optional<UnsafePointer<Int32>> {
+// CHECK: bb0([[NEWVALUE:%.*]] : $Int32, [[INDEX:%.*]] : $ConstOpPtrByVal):
+// CHECK:   [[OP:%.*]] = function_ref [[CONSTOPPTRBYVAL]] : $@convention(c) (@in ConstOpPtrByVal, Int32) -> Optional<UnsafePointer<Int32>>
+// CHECK:   [[PTR:%.*]] = apply [[OP]]([[SELFACCESS:%.*]], [[NEWVALUE]]) : $@convention(c) (@in ConstOpPtrByVal, Int32) -> Optional<UnsafePointer<Int32>>
 // CHECK: } // end sil function '$sSo15ConstOpPtrByValVySPys5Int32VGSgADcig
 
 public func index(_ arr: inout ConstPtrByVal, _ arg: Int32, _ val: Int32) -> Int32 { arr[arg]![0] }
@@ -176,12 +164,12 @@ public func index(_ arr: inout ConstPtrByVal, _ arg: Int32, _ val: Int32) -> Int
 // CHECK:   end_access [[SELFACCESS]] : $*ConstPtrByVal
 // CHECK: } // end sil function '$sSo13ConstPtrByValVySPys5Int32VGSgADcig
 
-// CHECK: sil [clang ReadOnlyIntArray.__operatorSubscriptConst] [[READCLASSNAME]] : $@convention(c) (@inout ReadOnlyIntArray, Int32) -> UnsafePointer<Int32>
+// CHECK: sil [clang ReadOnlyIntArray.__operatorSubscriptConst] [[READCLASSNAME]] : $@convention(c) (@in ReadOnlyIntArray, Int32) -> UnsafePointer<Int32>
 // CHECK: sil [clang ReadWriteIntArray.__operatorSubscript] [[READWRITECLASSNAME]] : $@convention(c) (@inout ReadWriteIntArray, Int32) -> UnsafeMutablePointer<Int32>
-// CHECK: sil [clang NonTrivialIntArrayByVal.__operatorSubscriptConst] [[READWRITECLASSNAMEBYVAL]] : $@convention(c) (@inout NonTrivialIntArrayByVal, Int32) -> Int32
+// CHECK: sil [clang NonTrivialIntArrayByVal.__operatorSubscriptConst] [[READWRITECLASSNAMEBYVAL]] : $@convention(c) (@in NonTrivialIntArrayByVal, Int32) -> Int32
 
 // CHECK: sil [clang PtrByVal.__operatorSubscript] [[PTRBYVAL]] : $@convention(c) (@inout PtrByVal, Int32) -> Optional<UnsafeMutablePointer<Int32>>
 // CHECK: sil [clang RefToPtr.__operatorSubscript] [[REFTOPTR]] : $@convention(c) (@inout RefToPtr, Int32) -> UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int32>>>
 // CHECK: sil [clang PtrToPtr.__operatorSubscript] [[PTRTOPTR]] : $@convention(c) (@inout PtrToPtr, Int32) -> Optional<UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int32>>>>
-// CHECK: sil [clang ConstOpPtrByVal.__operatorSubscriptConst] [[CONSTOPPTRBYVAL]] : $@convention(c) (@inout ConstOpPtrByVal, Int32) -> Optional<UnsafePointer<Int32>>
+// CHECK: sil [clang ConstOpPtrByVal.__operatorSubscriptConst] [[CONSTOPPTRBYVAL]] : $@convention(c) (@in ConstOpPtrByVal, Int32) -> Optional<UnsafePointer<Int32>>
 // CHECK: sil [clang ConstPtrByVal.__operatorSubscriptConst] [[CONSTPTRBYVAL]] : $@convention(c) (@inout ConstPtrByVal, Int32) -> Optional<UnsafePointer<Int32>>

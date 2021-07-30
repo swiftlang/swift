@@ -1,14 +1,12 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -parse-stdlib -o %t -module-name someModule -module-link-name module %S/../Inputs/empty.swift
 // RUN: %target-swift-frontend -disable-autolinking-runtime-compatibility-dynamic-replacements -runtime-compatibility-version none -emit-ir -lmagic %s -I %t > %t/out.txt
-// RUN: %target-swift-frontend -disable-autolinking-runtime-compatibility-concurrency -runtime-compatibility-version none -emit-ir -lmagic %s -I %t > %t/out.txt
 // RUN: %FileCheck %s < %t/out.txt
 // RUN: %FileCheck -check-prefix=NO-FORCE-LOAD %s < %t/out.txt
 
 // RUN: %empty-directory(%t/someModule.framework/Modules/someModule.swiftmodule)
 // RUN: mv %t/someModule.swiftmodule %t/someModule.framework/Modules/someModule.swiftmodule/%target-swiftmodule-name
 // RUN: %target-swift-frontend -disable-autolinking-runtime-compatibility-dynamic-replacements -runtime-compatibility-version none -emit-ir -lmagic %s -F %t > %t/framework.txt
-// RUN: %target-swift-frontend -disable-autolinking-runtime-compatibility-concurrency -runtime-compatibility-version none -emit-ir -lmagic %s -F %t > %t/framework.txt
 // RUN: %FileCheck -check-prefix=FRAMEWORK %s < %t/framework.txt
 // RUN: %FileCheck -check-prefix=NO-FORCE-LOAD %s < %t/framework.txt
 
@@ -21,13 +19,11 @@
 // RUN: %FileCheck -check-prefix NO-FORCE-LOAD-CLIENT %s < %t/force-load.txt
 
 // RUN: %target-swift-frontend -disable-autolinking-runtime-compatibility-dynamic-replacements -runtime-compatibility-version none -emit-ir -parse-stdlib -module-name someModule -module-link-name module %S/../Inputs/empty.swift | %FileCheck --check-prefix=NO-FORCE-LOAD %s
-// RUN: %target-swift-frontend -disable-autolinking-runtime-compatibility-concurrency -runtime-compatibility-version none -emit-ir -parse-stdlib -module-name someModule -module-link-name module %S/../Inputs/empty.swift | %FileCheck --check-prefix=NO-FORCE-LOAD %s
 // RUN: %target-swift-frontend -runtime-compatibility-version none -emit-ir -parse-stdlib -module-name someModule -module-link-name module %S/../Inputs/empty.swift -autolink-force-load | %FileCheck --check-prefix=FORCE-LOAD %s
 // RUN: %target-swift-frontend -runtime-compatibility-version none -emit-ir -parse-stdlib -module-name someModule -module-link-name 0module %S/../Inputs/empty.swift -autolink-force-load | %FileCheck --check-prefix=FORCE-LOAD-HEX %s
 
 // RUN: %target-swift-frontend -emit-module -parse-stdlib -o %t -module-name someModule -module-link-name module %S/../Inputs/empty.swift -public-autolink-library anotherLib
 // RUN: %target-swift-frontend -disable-autolinking-runtime-compatibility-dynamic-replacements -runtime-compatibility-version none -emit-ir -lmagic %s -I %t > %t/public-autolink.txt
-// RUN: %target-swift-frontend -disable-autolinking-runtime-compatibility-concurrency -runtime-compatibility-version none -emit-ir -lmagic %s -I %t > %t/public-autolink.txt
 // RUN: %FileCheck %s < %t/public-autolink.txt
 // RUN: %FileCheck -check-prefix=PUBLIC-DEP %s < %t/public-autolink.txt
 

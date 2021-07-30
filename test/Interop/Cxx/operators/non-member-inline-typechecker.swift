@@ -2,8 +2,8 @@
 
 import NonMemberInline
 
-var lhs = LoadableIntWrapper(value: 42)
-var rhs = LoadableIntWrapper(value: 23)
+let lhs = LoadableIntWrapper(value: 42)
+let rhs = LoadableIntWrapper(value: 23)
 
 let resultPlus = lhs + rhs
 let resultMinus = lhs - rhs

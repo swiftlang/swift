@@ -1800,7 +1800,7 @@ public:
 
       SmallVector<AnyFunctionType::Param, 8> Args;
       Type InputExprTy = E->getArg()->getType();
-      AnyFunctionType::decomposeInput(InputExprTy, Args);
+      AnyFunctionType::decomposeTuple(InputExprTy, Args);
       auto Params = FT->getParams();
       if (!equalParamsIgnoringIsolation(Args, Params)) {
         Out << "Argument type does not match parameter type in ApplyExpr:"

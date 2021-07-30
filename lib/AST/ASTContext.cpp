@@ -439,6 +439,10 @@ struct ASTContext::Implementation {
     /// The set of inherited protocol conformances.
     llvm::FoldingSet<InheritedProtocolConformance> InheritedConformances;
 
+    /// The set of builtin protocol conformances.
+    llvm::DenseMap<std::pair<Type, ProtocolDecl *>,
+                   BuiltinProtocolConformance *> BuiltinConformances;
+
     /// The set of substitution maps (uniqued by their storage).
     llvm::FoldingSet<SubstitutionMap::Storage> SubstitutionMaps;
 
@@ -2243,6 +2247,28 @@ ASTContext::getSelfConformance(ProtocolDecl *protocol) {
   return entry;
 }
 
+/// Produce the builtin conformance for some non-nominal to some protocol.
+BuiltinProtocolConformance *
+ASTContext::getBuiltinConformance(
+    Type type, ProtocolDecl *protocol,
+    GenericSignature genericSig,
+    ArrayRef<Requirement> conditionalRequirements
+) {
+  auto key = std::make_pair(type, protocol);
+  AllocationArena arena = getArena(type->getRecursiveProperties());
+  auto &builtinConformances = getImpl().getArena(arena).BuiltinConformances;
+
+  auto &entry = builtinConformances[key];
+  if (!entry) {
+    auto size = BuiltinProtocolConformance::
+        totalSizeToAlloc<Requirement>(conditionalRequirements.size());
+    auto mem = this->Allocate(size, alignof(BuiltinProtocolConformance), arena);
+    entry = new (mem) BuiltinProtocolConformance(
+        type, protocol, genericSig, conditionalRequirements);
+  }
+  return entry;
+}
+
 /// If one of the ancestor conformances already has a matching type, use
 /// that instead.
 static ProtocolConformance *collapseSpecializedConformance(
@@ -2259,6 +2285,7 @@ static ProtocolConformance *collapseSpecializedConformance(
     case ProtocolConformanceKind::Normal:
     case ProtocolConformanceKind::Inherited:
     case ProtocolConformanceKind::Self:
+    case ProtocolConformanceKind::Builtin:
       // If the conformance matches, return it.
       if (conformance->getType()->isEqual(type)) {
         for (auto subConformance : substitutions.getConformances())
@@ -2496,6 +2523,7 @@ size_t ASTContext::Implementation::Arena::getTotalMemory() const {
     // NormalConformances ?
     // SpecializedConformances ?
     // InheritedConformances ?
+    // BuiltinConformances ?
 }
 
 void AbstractFunctionDecl::setForeignErrorConvention(
@@ -3317,7 +3345,7 @@ AnyFunctionType *AnyFunctionType::withExtInfo(ExtInfo info) const {
                                   getParams(), getResult(), info);
 }
 
-void AnyFunctionType::decomposeInput(
+void AnyFunctionType::decomposeTuple(
     Type type, SmallVectorImpl<AnyFunctionType::Param> &result) {
   switch (type->getKind()) {
   case TypeKind::Tuple: {
@@ -3366,7 +3394,7 @@ Type AnyFunctionType::Param::getParameterType(bool forCanonical,
   return type;
 }
 
-Type AnyFunctionType::composeInput(ASTContext &ctx, ArrayRef<Param> params,
+Type AnyFunctionType::composeTuple(ASTContext &ctx, ArrayRef<Param> params,
                                    bool canonicalVararg) {
   SmallVector<TupleTypeElt, 4> elements;
   for (const auto &param : params) {

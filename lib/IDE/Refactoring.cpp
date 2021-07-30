@@ -4449,8 +4449,7 @@ struct AsyncHandlerParamDesc : public AsyncHandlerDesc {
       return AsyncHandlerParamDesc();
 
     bool RequireName = RequireAttributeOrName;
-    if (RequireAttributeOrName &&
-        FD->getAttrs().hasAttribute<CompletionHandlerAsyncAttr>())
+    if (RequireAttributeOrName && FD->getAsyncAlternative())
       RequireName = false;
 
     // Require at least one parameter and void return type
@@ -6802,7 +6801,8 @@ private:
         // Synthesize the force unwrap so that we get the expected results.
         if (TopHandler.getHandlerType() == HandlerType::PARAMS &&
             TopHandler.HasError) {
-          if (auto DRE = dyn_cast<DeclRefExpr>(Elt)) {
+          if (auto DRE =
+                  dyn_cast<DeclRefExpr>(Elt->getSemanticsProvidingExpr())) {
             auto D = DRE->getDecl();
             if (Unwraps.count(D)) {
               Elt = new (getASTContext()) ForceValueExpr(Elt, SourceLoc());
@@ -6901,20 +6901,26 @@ private:
         Scopes.back().Names.insert(ArgName);
         OS << tok::kw_guard << ' ' << tok::kw_let << ' ' << ArgName << ' '
            << tok::equal << ' ';
+
+        // If the argument is a call with a trailing closure, the generated
+        // guard statement will not compile.
+        // e.g. 'guard let result1 = value.map { $0 + 1 } else { ... }'
+        // doesn't compile. Adding parentheses makes the code compile.
+        auto HasTrailingClosure = false;
+        if (auto *CE = dyn_cast<CallExpr>(Arg)) {
+          if (CE->getUnlabeledTrailingClosureIndex().hasValue())
+            HasTrailingClosure = true;
+        }
+
+        if (HasTrailingClosure)
+          OS << tok::l_paren;
+
         convertNode(Arg, /*StartOverride=*/CE->getArgumentLabelLoc(ArgIndex),
                     /*ConvertCalls=*/false);
-        if (auto CE = dyn_cast<CallExpr>(Arg)) {
-          if (CE->hasTrailingClosure()) {
-            // If the argument is a call with trailing closure, the generated
-            // guard statement does not compile.
-            // e.g. 'guard let result1 = value.map { $0 + 1 } else { ... }'
-            // doesn't compile.
-            // Adding a '.self' at the end makes the code compile (although it
-            // will still issue a warning about a trailing closure use inside a
-            // guard condition).
-            OS << tok::period << tok::kw_self;
-          }
-        }
+
+        if (HasTrailingClosure)
+          OS << tok::r_paren;
+
         OS << ' ' << tok::kw_else << ' ' << tok::l_brace << '\n';
         OS << "fatalError" << tok::l_paren;
         OS << "\"Expected non-nil result ";
@@ -7782,14 +7788,11 @@ void addCompletionHandlerAsyncAttrIfNeccessary(
     ASTContext &Ctx, const FuncDecl *FD,
     const AsyncHandlerParamDesc &HandlerDesc,
     SourceEditConsumer &EditConsumer) {
-  if (!Ctx.LangOpts.EnableExperimentalConcurrency)
-    return;
-
   llvm::SmallString<0> HandlerAttribute;
   llvm::raw_svector_ostream OS(HandlerAttribute);
-  OS << "@completionHandlerAsync(\"";
+  OS << "@available(*, renamed: \"";
   HandlerDesc.printAsyncFunctionName(OS);
-  OS << "\", completionHandlerIndex: " << HandlerDesc.Index << ")\n";
+  OS << "\")\n";
   EditConsumer.accept(Ctx.SourceMgr, FD->getAttributeInsertionLoc(false),
                       HandlerAttribute);
 }
@@ -7909,11 +7912,6 @@ bool RefactoringActionAddAsyncAlternative::performChange() {
   AsyncConverter Converter(TheFile, SM, DiagEngine, FD, HandlerDesc);
   if (!Converter.convert())
     return true;
-
-  // Deprecate the synchronous function
-  EditConsumer.accept(SM, FD->getAttributeInsertionLoc(false),
-                      "@available(*, deprecated, message: \"Prefer async "
-                      "alternative instead\")\n");
 
   addCompletionHandlerAsyncAttrIfNeccessary(Ctx, FD, HandlerDesc, EditConsumer);
 

@@ -586,9 +586,9 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
     }
   }
 
-  return makeParserResult(
-      Status, new (Context) PrefixUnaryExpr(
-                  Operator, formUnaryArgument(Context, SubExpr.get())));
+  auto *opCall = PrefixUnaryExpr::create(
+      Context, Operator, formUnaryArgument(Context, SubExpr.get()));
+  return makeParserResult(Status, opCall);
 }
 
 /// expr-keypath-swift:
@@ -1323,9 +1323,9 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
 
       Expr *oper = parseExprOperator();
 
-      Result = makeParserResult(
-          Result, new (Context) PostfixUnaryExpr(
-                      oper, formUnaryArgument(Context, Result.get())));
+      auto *opCall = PostfixUnaryExpr::create(
+          Context, oper, formUnaryArgument(Context, Result.get()));
+      Result = makeParserResult(Result, opCall);
       SyntaxContext->createNodeInPlace(SyntaxKind::PostfixUnaryExpr);
       continue;
     }
