@@ -1018,6 +1018,11 @@ func test_SR14737() {
   }
 }
 
+struct CondConfType<U> {
+  init(_: U)
+}
+extension CondConfType: Equatable where U == Int {}
+
 func testArgsAfterCompletion() {
   enum A { case a }
   enum B { case b }
@@ -1129,4 +1134,7 @@ func testArgsAfterCompletion() {
   // INVALID_MISSINGCONFORMANCE: End completions
 
   overloadedGeneric(x: 1, #^INVALID_MISSINGCONFORMANCE_NOCOMMA?check=INVALID_MISSINGCONFORMANCE^# z: MisingConformance(), y: MissingConformance())
+  overloadedGeneric(x: 1, #^INVALID_MISSINGCONFORMANCE_INDIRECT?check=INVALID_MISSINGCONFORMANCE^#, z: [MissingConformance()], y: [MissingConformance()])
+
+  overloadedGeneric(x: 1, #^INVALID_MISSINGCONFORMANCE_CONSTRAINT?check=INVALID_MISSINGCONFORMANCE^#, z: [CondConfType("foo")], y: [CondConfType("bar")])
 }

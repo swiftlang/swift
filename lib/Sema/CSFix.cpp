@@ -1182,10 +1182,10 @@ bool SkipUnhandledConstructInResultBuilder::diagnose(const Solution &solution,
   return failure.diagnose(asNote);
 }
 
-IgnoreArgumentsAfterCompletion *
-IgnoreArgumentsAfterCompletion:: create(ConstraintSystem &cs,
-                                        ConstraintLocator *locator) {
-  return new (cs.getAllocator()) IgnoreArgumentsAfterCompletion(cs, locator);
+IgnoreFailureAfterCompletionArg *
+IgnoreFailureAfterCompletionArg:: create(ConstraintSystem &cs,
+                                         ConstraintLocator *locator) {
+  return new (cs.getAllocator()) IgnoreFailureAfterCompletionArg(cs, locator);
 }
 
 bool AllowMutatingMemberOnRValueBase::diagnose(const Solution &solution,

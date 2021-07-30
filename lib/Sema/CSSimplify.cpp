@@ -1210,7 +1210,7 @@ public:
     // produce diagnostics) so no need to record a fix for this. Still increase
     // the score to penalize this solution though.
     auto *locator = CS.getConstraintLocator(Locator);
-    auto *fix = IgnoreArgumentsAfterCompletion::create(CS, locator);
+    auto *fix = IgnoreFailureAfterCompletionArg::create(CS, CS.getConstraintLocator(locator->getAnchor()));
     return CS.recordFix(fix, /*impact=*/1);
   }
 
@@ -6222,6 +6222,39 @@ ConstraintSystem::simplifyConstructionConstraint(
   return SolutionKind::Solved;
 }
 
+/// Determines if a failure with the given locator appears within a call or
+/// subscript argument list after the argument containing the code completion
+/// location.
+///
+/// \returns a locator pointing to the containing call/subscript if it meets
+/// these conditions and \c nullptr otherwise
+static ConstraintLocator *isInArgAfterCompletion(ConstraintLocator *loc, ConstraintSystem &cs) {
+  auto fixExpr = simplifyLocatorToAnchor(loc).dyn_cast<Expr*>();
+  auto commonAncestor = fixExpr;
+  auto fixChild = fixExpr;
+  while (commonAncestor && !cs.containsCodeCompletionLoc(commonAncestor)) {
+    fixChild = commonAncestor;
+    commonAncestor = cs.getParentExpr(commonAncestor);
+  }
+
+  if (!commonAncestor || commonAncestor == fixExpr)
+    return nullptr;
+
+  if (auto *TE = dyn_cast<TupleExpr>(commonAncestor)) {
+    assert(TE->getNumElements() >= 2);
+    auto Parent = cs.getParentExpr(TE);
+    if (!Parent || (!isa<CallExpr>(Parent) && !isa<SubscriptExpr>(Parent)))
+      return nullptr;
+    for (auto *E: TE->getElements()) {
+      if (E == fixChild) // found locator element first
+        return nullptr;
+      if (cs.containsCodeCompletionLoc(E)) // found completion element first
+        return cs.getConstraintLocator(Parent);
+    }
+  }
+  return nullptr;
+}
+
 ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
                                  Type type,
                                  Type protocol,
@@ -6339,32 +6372,25 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   if (!shouldAttemptFixes())
     return SolutionKind::Error;
 
-  // when the conformance check fails and is for code completion
-  // get the current saved binding and check the source locator
-  // if from argument conversion do check for which args it relates to here.
-  if (isForCodeCompletion() && typeVar) {
-    auto getArgIdx = [&](ConstraintLocator *loc) -> Optional<unsigned> {
-      SmallVector<LocatorPathElt, 8> path;
-      if (auto applyArg = loc->findLast<LocatorPathElt::ApplyArgToParam>())
-        return applyArg->getArgIdx();
-      return None;
-    };
-
-    if (auto loc = typeVar->getImpl().getBoundLocator()) {
-      auto completionInfo = getCompletionArgInfo(loc->getAnchor(), *this);
-      auto argIdx = getArgIdx(loc);
-      if (completionInfo && argIdx && completionInfo->isBefore(*argIdx)) {
-        auto *fix = IgnoreArgumentsAfterCompletion::create(*this, loc);
-        return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
-      }
-    }
-  }
-
   auto protocolTy = protocol->getDeclaredInterfaceType();
 
   // If this conformance has been fixed already, let's just consider this done.
   if (isFixedRequirement(loc, protocolTy))
     return SolutionKind::Solved;
+
+  // If the non-conforming type originated from a call argument after an
+  // argument containing the code completion location, ignore this failure.
+  // We assume the user is trying to rewrite the callsite without having
+  // first removed the existing arguments in such cases, so failures due to
+  // later arguments shouldn't impact on the viability of this solution.
+  if (isForCodeCompletion() && typeVar) {
+    if (auto loc = typeVar->getImpl().getBoundLocator()) {
+      if (auto newLoc = isInArgAfterCompletion(loc, *this)) {
+        auto *fix = IgnoreFailureAfterCompletionArg::create(*this, newLoc);
+        return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+      }
+    }
+  }
 
   // If this is a generic requirement let's try to record that
   // conformance is missing and consider this a success, which
@@ -11394,38 +11420,16 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
     log << ")\n";
   }
 
-  // All fixes within call arguments after the argument containing the code
-  // completion location are coalesced into a single fix with a fixed impact.
-  // This is so that the exact number and kind of such fixes won't impact the
-  // ranking of different overload choices. Fixes being required in arguments
-  // after the completion point are taken as an indication that the user is
-  // re-writing the call and intends to remove those arguments afterwards.
-  if (isForCodeCompletion()) {
-    auto loc = fix->getLocator();
-    auto isIgnoreArgsFix = [&](ConstraintFix *otherFix) {
-      return otherFix->getKind() == FixKind::IgnoreArgumentsAfterCompletion &&
-        otherFix->getLocator()->getAnchor() == loc->getAnchor();
-    };
-    auto getArgIdx = [&](ConstraintLocator *loc) -> Optional<unsigned> {
-      if (auto applyArg = loc->findLast<LocatorPathElt::ApplyArgToParam>())
-        return applyArg->getArgIdx();
-      return None;
-    };
-
-
-    if (fix->getKind() != FixKind::IgnoreArgumentsAfterCompletion) {
-      // If this fix is within a call arg after the arg containing the code
-      // completion point, remap it to an IgnoreArgumentsAfterCompletion fix.
-      auto *loc = fix->getLocator();
-      auto completionInfo = getCompletionArgInfo(loc->getAnchor(), *this);
-      auto argIdx = getArgIdx(loc);
-      if (completionInfo && argIdx && completionInfo->isBefore(*argIdx))
-        return recordFix(IgnoreArgumentsAfterCompletion::create(*this, loc));
-    } else if (llvm::any_of(getFixes(), isIgnoreArgsFix)) {
-      // If we've already recorded an IgnoreArgumentsAfterCompletion fix for
-      // this anchor, ignore this fix.
-      return false;
-    }
+  if (isForCodeCompletion() && !fix->isWarning()) {
+    // All fixes within call arguments after the argument containing the code
+    // completion point are remapped to a warning, as they're taken to mean the
+    // user intends to re-write the callsite. This ensures the exact number and
+    // kind of these fixes won't impact the scoring of different overload
+    // choices. We still track that this happend via the warning rather than
+    // just adjusting the impact so we can rank overloads that didn't require it
+    // higher in the completion results.
+    if (auto newLoc = isInArgAfterCompletion(fix->getLocator(), *this))
+      return recordFix(IgnoreFailureAfterCompletionArg::create(*this, newLoc));
   }
 
   // Record the fix.
@@ -11850,7 +11854,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::SpecifyClosureParameterType:
   case FixKind::SpecifyClosureReturnType:
   case FixKind::AddQualifierToAccessTopLevelName:
-  case FixKind::IgnoreArgumentsAfterCompletion:
+  case FixKind::IgnoreFailureAfterCompletionArg:
     llvm_unreachable("handled elsewhere");
   }
 

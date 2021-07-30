@@ -336,7 +336,7 @@ enum class FixKind : uint8_t {
   /// Ignore all failures in call or subscript arguments after the argument
   /// containing the code completion location. This is only produced when
   /// solving for code completion.
-  IgnoreArgumentsAfterCompletion,
+  IgnoreFailureAfterCompletionArg,
 };
 
 class ConstraintFix {
@@ -1736,10 +1736,10 @@ public:
          NominalTypeDecl *builder, ConstraintLocator *locator);
 };
 
-class IgnoreArgumentsAfterCompletion final : public ConstraintFix {
-  IgnoreArgumentsAfterCompletion(ConstraintSystem  &cs,
-                                 ConstraintLocator *locator)
-  : ConstraintFix(cs, FixKind::IgnoreArgumentsAfterCompletion, locator) {}
+class IgnoreFailureAfterCompletionArg final : public ConstraintFix {
+  IgnoreFailureAfterCompletionArg(ConstraintSystem  &cs,
+                                  ConstraintLocator *locator)
+  : ConstraintFix(cs, FixKind::IgnoreFailureAfterCompletionArg, locator, true) {}
 
 public:
   std::string getName() const override {
@@ -1751,7 +1751,7 @@ public:
     return false;
   }
 
-  static IgnoreArgumentsAfterCompletion *
+  static IgnoreFailureAfterCompletionArg *
   create(ConstraintSystem &cs, ConstraintLocator *locator);
 };
 

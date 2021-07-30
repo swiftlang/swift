@@ -876,6 +876,18 @@ static void filterSolutions(SolutionApplicationTarget &target,
     return S.getFixedScore().Data[SK_Fix] != 0 &&
         S.getFixedScore() > minScore;
   });
+
+  // If some of the remaining solutions didn't require fixes to ignore failures
+  // in call arguments after the argument containing the completion location,
+  // remove those that did.
+  auto hasIgnoredFailures = [](const Solution &S) {
+    return llvm::any_of(S.Fixes, [&](ConstraintFix *F) {
+      return F->getKind() == FixKind::IgnoreFailureAfterCompletionArg;
+    });
+  };
+  if (llvm::all_of(solutions, hasIgnoredFailures))
+    return;
+  llvm::erase_if(solutions, hasIgnoredFailures);
 }
 
 bool TypeChecker::typeCheckForCodeCompletion(
