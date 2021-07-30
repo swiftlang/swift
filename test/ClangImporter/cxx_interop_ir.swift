@@ -2,7 +2,6 @@
 //
 // We can't yet call member functions correctly on Windows (SR-13129).
 // XFAIL: OS=windows-msvc
-// REQUIRES: SR-14986
 
 import CXXInterop
 
@@ -44,7 +43,7 @@ func basicMethods(a: UnsafeMutablePointer<Methods>) -> Int32 {
 }
 
 // CHECK-LABEL: define hidden swiftcc i32 @"$s6cxx_ir17basicMethodsConst1as5Int32VSpySo0D0VG_tF"(i8* %0)
-// CHECK: [[THIS_PTR1:%.*]] = alloca %TSo7MethodsV, align 8
+// CHECK: [[THIS_PTR1:%.*]] = alloca %TSo7MethodsV, align {{4|8}}
 // CHECK: [[THIS_PTR2:%.*]] = bitcast %TSo7MethodsV* [[THIS_PTR1]] to %class.Methods*
 // CHECK: [[THIS_PTR3:%.*]] = bitcast %TSo7MethodsV* [[THIS_PTR1]] to %class.Methods*
 // CHECK: [[RESULT:%.*]] = call {{(signext )?}}i32 @{{_ZNK7Methods17SimpleConstMethodEi|"\?SimpleConstMethod@Methods@@QEBAHH@Z"}}(%class.Methods* [[THIS_PTR3]], i32{{( signext)?}} 3)
