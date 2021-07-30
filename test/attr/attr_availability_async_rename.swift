@@ -85,6 +85,10 @@ func platformOnly(completionHandler: @escaping () -> Void) { }
 // expected-note@+1 {{'platformOnlyNew()' declared here}}
 func platformOnlyNew() async { }
 
+struct AnotherStruct {
+  var otherInstanceProp: Int { get async { 1 } }
+}
+
 struct SomeStruct {
   @available(*, renamed: "structFunc")
   func structFunc(continuation: @escaping () -> Void) { }
@@ -97,6 +101,31 @@ struct SomeStruct {
 
   // expected-note@+1 2 {{'staticStructFunc()' declared here}}
   static func staticStructFunc() async { }
+
+  // expected-note@+1 3 {{'getter:instanceProp()' declared here}}
+  var instanceProp: Int { get async { 1 } }
+  var regInstanceProp: Int { get { 1 } set { } }
+  // expected-note@+1 {{'getter:classProp()' declared here}}
+  static var classProp: Int { get async { 1 } }
+
+  @available(*, renamed: "getter:instanceProp()")
+  func instanceGetter(completion: @escaping (Int) -> Void) { }
+  @available(*, renamed: "getter:classProp()")
+  static func classGetter(completion: @escaping (Int) -> Void) { }
+  @available(*, renamed: "getter:instanceProp(a:b:)")
+  func argsIgnored(completion: @escaping (Int) -> Void) { }
+  @available(*, renamed: "getter:DoesNotExist.instanceProp()")
+  func baseIgnored(completion: @escaping (Int) -> Void) { }
+
+  @available(*, renamed: "instanceProp()")
+  func noPrefix(completion: @escaping (Int) -> Void) { }
+  @available(*, renamed: "getter:instanceProp()")
+  func argMismatch(arg: Int, completion: @escaping (Int) -> Void) { }
+  @available(*, renamed: "setter:regInstanceProp(newValue:)")
+  func instanceSetter(arg: Int, completion: @escaping (Int) -> Void) { }
+
+  @available(*, renamed: "getter:AnotherStruct.otherInstanceProp()")
+  func otherInstance(completion: @escaping (Int) -> Void) { }
 }
 
 
@@ -328,6 +357,20 @@ class ClassCallingAsyncStuff {
 
     // expected-warning@+1{{consider using asynchronous alternative function}}
     type(of: other).staticStructFunc { }
+
+    // expected-warning@+1{{consider using asynchronous alternative function}}
+    other.instanceGetter { _ in }
+    // expected-warning@+1{{consider using asynchronous alternative function}}
+    other.argsIgnored { _ in }
+    // expected-warning@+1{{consider using asynchronous alternative function}}
+    other.baseIgnored { _ in }
+    // expected-warning@+1{{consider using asynchronous alternative function}}
+    SomeStruct.classGetter { _ in }
+
+    other.noPrefix { _ in }
+    other.argMismatch(arg: 1) { _ in }
+    other.instanceSetter(arg: 1) { _ in }
+    other.otherInstance { _ in }
   }
 
   // no warning

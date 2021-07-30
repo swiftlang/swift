@@ -6576,6 +6576,10 @@ public:
     Bits.AccessorDecl.IsTransparentComputed = 1;
   }
 
+  /// A representation of the name to be displayed to users. \c getNameStr
+  /// for anything other than a getter or setter.
+  void printUserFacingName(llvm::raw_ostream &out) const;
+
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Accessor;
   }

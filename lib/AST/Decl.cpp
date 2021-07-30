@@ -7839,6 +7839,28 @@ bool AccessorDecl::isSimpleDidSet() const {
                            SimpleDidSetRequest{mutableThis}, false);
 }
 
+void AccessorDecl::printUserFacingName(raw_ostream &out) const {
+  switch (getAccessorKind()) {
+  case AccessorKind::Get:
+    out << "getter:";
+    break;
+  case AccessorKind::Set:
+    out << "setter:";
+    break;
+  default:
+    out << getName();
+    return;
+  }
+
+  out << getStorage()->getName() << "(";
+  if (this->isSetter()) {
+    for (const auto *param : *getParameters()) {
+      out << param->getName() << ":";
+    }
+  }
+  out << ")";
+}
+
 StaticSpellingKind FuncDecl::getCorrectStaticSpelling() const {
   assert(getDeclContext()->isTypeContext());
   if (!isStatic())
