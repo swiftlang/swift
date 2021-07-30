@@ -4481,10 +4481,12 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
 
         Expected<Type> deserialized = MF.getTypeChecked(typeID);
         if (!deserialized) {
-          if (deserialized.errorIsA<XRefNonLoadedModuleError>()) {
+          if (deserialized.errorIsA<XRefNonLoadedModuleError>() ||
+              MF.allowCompilerErrors()) {
             // A custom attribute defined behind an implementation-only import
             // is safe to drop when it can't be deserialized.
-            // rdar://problem/56599179
+            // rdar://problem/56599179. When allowing errors we're doing a best
+            // effort to create a module, so ignore in that case as well.
             consumeError(deserialized.takeError());
             skipAttr = true;
           } else
@@ -6244,9 +6246,15 @@ ModuleFile::loadAllConformances(const Decl *D, uint64_t contextData,
     if (!conformance) {
       auto unconsumedError =
         consumeErrorIfXRefNonLoadedModule(conformance.takeError());
-      if (unconsumedError)
-        fatal(std::move(unconsumedError));
-      return;
+      if (unconsumedError) {
+        // Ignore if allowing errors, it's just doing a best effort to produce
+        // *some* module anyway.
+        if (allowCompilerErrors())
+          consumeError(std::move(unconsumedError));
+        else
+          fatal(std::move(unconsumedError));
+      }
+      continue;
     }
 
     if (conformance.get().isConcrete())
@@ -6367,8 +6375,17 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
           "serialized conformances do not match requirement signature",
           llvm::inconvertibleErrorCode()));
     }
-    while (conformanceCount--)
-      reqConformances.push_back(readConformance(DeclTypeCursor));
+    while (conformanceCount--) {
+      auto conformance = readConformanceChecked(DeclTypeCursor);
+      if (conformance) {
+        reqConformances.push_back(conformance.get());
+      } else if (allowCompilerErrors()) {
+        consumeError(conformance.takeError());
+        reqConformances.push_back(ProtocolConformanceRef::forInvalid());
+      } else {
+        fatal(conformance.takeError());
+      }
+    }
   }
   conformance->setSignatureConformances(reqConformances);
 
@@ -6481,8 +6498,11 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     if (!witnessSubstitutions) {
       // Missing module errors are most likely caused by an
       // implementation-only import hiding types and decls.
-      // rdar://problem/52837313
-      if (witnessSubstitutions.errorIsA<XRefNonLoadedModuleError>()) {
+      // rdar://problem/52837313. Ignore completely if allowing
+      // errors - we're just doing a best effort to create the
+      // module in that case.
+      if (witnessSubstitutions.errorIsA<XRefNonLoadedModuleError>() ||
+          allowCompilerErrors()) {
         consumeError(witnessSubstitutions.takeError());
         isOpaque = true;
       }
