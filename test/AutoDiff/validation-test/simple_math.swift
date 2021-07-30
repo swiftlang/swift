@@ -51,8 +51,6 @@ SimpleMathTests.test("FunctionCall") {
   expectEqual(3, gradient(at: 3) { x in foo(x, 4) })
 }
 
-// FIXME(TF-1038): Support differentiable functions returning tuples.
-/*
 SimpleMathTests.test("ResultSelection") {
   func tuple(_ x: Float, _ y: Float) -> (Float, Float) {
     return (x + 1, y + 2)
@@ -68,7 +66,6 @@ SimpleMathTests.test("ResultSelection") {
   expectEqual((1, 0), gradient(at: 3, 3, of: tupleGenericFirst))
   expectEqual((0, 1), gradient(at: 3, 3, of: tupleGenericSecond))
 }
-*/
 
 SimpleMathTests.test("MultipleResults") {
   // Test function returning a tuple of active results.
@@ -135,7 +132,7 @@ func vjpSwapCustom(_ x: inout Float, _ y: inout Float) -> (
 ) {
   swapCustom(&x, &y)
   return ((), {v1, v2 in
-    let tmp = v1; v1 = v2; v2 = v1
+    let tmp = v1; v1 = v2; v2 = tmp
   })
 }
 

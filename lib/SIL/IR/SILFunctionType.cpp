@@ -551,9 +551,7 @@ static CanSILFunctionType getAutoDiffDifferentialType(
     differentialParams.push_back({paramTanType, paramConv});
   }
   SmallVector<SILResultInfo, 1> differentialResults;
-  // TODO(TF-1038): Instead iterate over resultIndices when these are specified
-  // via @differentiable(results:) or similar.
-  for (auto resultIndex : range(originalResults.size())) {
+  for (auto resultIndex : resultIndices->getIndices()) {
     // Handle formal original result.
     if (resultIndex < originalFnTy->getNumResults()) {
       auto &result = originalResults[resultIndex];
@@ -688,9 +686,7 @@ static CanSILFunctionType getAutoDiffPullbackType(
 
   // Collect pullback parameters.
   SmallVector<SILParameterInfo, 1> pullbackParams;
-  // TODO(TF-1038): Instead iterate over resultIndices when these are specified
-  // via @differentiable(results:) or similar.
-  for (auto resultIndex : range(originalResults.size())) {
+  for (auto resultIndex : resultIndices->getIndices()) {
     // Handle formal original result.
     if (resultIndex < originalFnTy->getNumResults()) {
       auto &origRes = originalResults[resultIndex];
