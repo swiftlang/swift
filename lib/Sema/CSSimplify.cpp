@@ -786,7 +786,9 @@ static bool matchCallArgumentsImpl(
       unsigned argIdx = 0;
       for (const auto &binding : parameterBindings) {
         paramToArgMap.push_back(argIdx);
-        argIdx += binding.size();
+        // Ignore argument bindings that were synthesized due to missing args.
+         argIdx += llvm::count_if(
+             binding, [numArgs](unsigned argIdx) { return argIdx < numArgs; });
       }
     }
 
@@ -802,6 +804,10 @@ static bool matchCallArgumentsImpl(
         // needs to move (fromArgIdx) and the argument location
         // it should move to (toArgIdx).
         const auto fromArgIdx = binding[paramBindIdx];
+
+        // Ignore argument bindings that were synthesized due to missing args.
+        if (fromArgIdx >= numArgs)
+          continue;
 
         // Does nothing for variadic tail.
         if (params[paramIdx].isVariadic() && paramBindIdx > 0) {
