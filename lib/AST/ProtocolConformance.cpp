@@ -1664,3 +1664,27 @@ SourceLoc swift::extractNearestSourceLoc(const ProtocolConformanceRef conformanc
   }
   return SourceLoc();
 }
+
+bool ProtocolConformanceRef::hasMissingConformance(ModuleDecl *module) const {
+  if (!isConcrete())
+    return false;
+
+  // Is this a missing Sendable conformance?
+  const ProtocolConformance *concreteConf = getConcrete();
+  const RootProtocolConformance *rootConf = concreteConf->getRootConformance();
+  if (auto builtinConformance = dyn_cast<BuiltinProtocolConformance>(rootConf)){
+    if (builtinConformance->isMissing() && builtinConformance->getProtocol()->isSpecificProtocol(
+            KnownProtocolKind::Sendable)) {
+      return true;
+    }
+  }
+
+  // Check conformances that are part of this conformance.
+  auto subMap = concreteConf->getSubstitutions(module);
+  for (auto conformance : subMap.getConformances()) {
+    if (conformance.hasMissingConformance(module))
+      return true;
+  }
+
+  return false;
+}

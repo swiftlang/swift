@@ -6225,7 +6225,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   case ConstraintKind::LiteralConformsTo: {
     // Check whether this type conforms to the protocol.
     auto conformance = DC->getParentModule()->lookupConformance(
-        type, protocol);
+        type, protocol, /*allowMissing=*/true);
     if (conformance) {
       return recordConformance(conformance);
     }

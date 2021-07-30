@@ -970,8 +970,14 @@ ModuleDecl::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
   return ProtocolConformanceRef::forInvalid();
 }
 
+/// Whether we should create missing conformances to the given protocol.
+static bool shouldCreateMissingConformances(ProtocolDecl *proto) {
+  return proto->isSpecificProtocol(KnownProtocolKind::Sendable);
+}
+
 ProtocolConformanceRef ModuleDecl::lookupConformance(Type type,
-                                                     ProtocolDecl *protocol) {
+                                                     ProtocolDecl *protocol,
+                                                     bool allowMissing) {
   // If we are recursively checking for implicit conformance of a nominal
   // type to Sendable, fail without evaluating this request. This
   // squashes cycles.
@@ -985,18 +991,27 @@ ProtocolConformanceRef ModuleDecl::lookupConformance(Type type,
     }
   }
 
-  return evaluateOrDefault(
+  auto result = evaluateOrDefault(
       getASTContext().evaluator, request, ProtocolConformanceRef::forInvalid());
+
+  // If we aren't supposed to allow missing conformances through for this
+  // protocol, replace the result with an "invalid" result.
+  if (!allowMissing &&
+      shouldCreateMissingConformances(protocol) &&
+      result.hasMissingConformance(this))
+    return ProtocolConformanceRef::forInvalid();
+
+  return result;
 }
 
 /// Retrieve an invalid or missing conformance, as appropriate, when a
 /// legitimate conformance doesn't exist.
 static ProtocolConformanceRef getInvalidOrMissingConformance(
     Type type, ProtocolDecl *proto) {
-  // Introduce "missing" conformances to Sendable, so that type checking
+  // Introduce "missing" conformances when appropriate, so that type checking
   // (and even code generation) can continue.
   ASTContext &ctx = proto->getASTContext();
-  if (proto->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+  if (shouldCreateMissingConformances(proto)) {
     return ProtocolConformanceRef(
         ctx.getBuiltinConformance(
           type, proto, GenericSignature(), { },

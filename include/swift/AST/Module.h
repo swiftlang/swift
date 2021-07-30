@@ -578,10 +578,15 @@ public:
   ///
   /// \param protocol The protocol to which we are computing conformance.
   ///
+  /// \param allowMissing When \c true, the resulting conformance reference
+  /// might include "missing" conformances, which are synthesized for some
+  /// protocols as an error recovery mechanism.
+  ///
   /// \returns The result of the conformance search, which will be
   /// None if the type does not conform to the protocol or contain a
   /// ProtocolConformanceRef if it does conform.
-  ProtocolConformanceRef lookupConformance(Type type, ProtocolDecl *protocol);
+  ProtocolConformanceRef lookupConformance(Type type, ProtocolDecl *protocol,
+                                           bool allowMissing = false);
 
   /// Look for the conformance of the given existential type to the given
   /// protocol.
