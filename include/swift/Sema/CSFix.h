@@ -1737,13 +1737,15 @@ public:
 };
 
 class IgnoreFailureAfterCompletionArg final : public ConstraintFix {
-  IgnoreFailureAfterCompletionArg(ConstraintSystem  &cs,
+  IgnoreFailureAfterCompletionArg(ConstraintSystem &cs,
                                   ConstraintLocator *locator)
-  : ConstraintFix(cs, FixKind::IgnoreFailureAfterCompletionArg, locator, true) {}
+      : ConstraintFix(cs, FixKind::IgnoreFailureAfterCompletionArg, locator,
+                      true) {}
 
 public:
   std::string getName() const override {
-    return "ignore arguments after the code completion position in a call or subscript";
+    return "ignore arguments after the code completion position in a call or "
+           "subscript";
   }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override {
@@ -1751,8 +1753,8 @@ public:
     return false;
   }
 
-  static IgnoreFailureAfterCompletionArg *
-  create(ConstraintSystem &cs, ConstraintLocator *locator);
+  static IgnoreFailureAfterCompletionArg *create(ConstraintSystem &cs,
+                                                 ConstraintLocator *locator);
 };
 
 class AllowTupleSplatForSingleParameter final : public ConstraintFix {

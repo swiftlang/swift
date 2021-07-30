@@ -1183,8 +1183,8 @@ bool SkipUnhandledConstructInResultBuilder::diagnose(const Solution &solution,
 }
 
 IgnoreFailureAfterCompletionArg *
-IgnoreFailureAfterCompletionArg:: create(ConstraintSystem &cs,
-                                         ConstraintLocator *locator) {
+IgnoreFailureAfterCompletionArg::create(ConstraintSystem &cs,
+                                        ConstraintLocator *locator) {
   return new (cs.getAllocator()) IgnoreFailureAfterCompletionArg(cs, locator);
 }
 

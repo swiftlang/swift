@@ -6254,8 +6254,7 @@ static void addSuperKeyword(CodeCompletionResultSink &Sink, DeclContext *DC) {
 
   CodeCompletionResultBuilder Builder(Sink,
                                       CodeCompletionResult::ResultKind::Keyword,
-                                      SemanticContextKind::CurrentNominal,
-                                      {});
+                                      SemanticContextKind::CurrentNominal, {});
   if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
     if (AFD->getOverriddenDecl() != nullptr) {
       Builder.addFlair(CodeCompletionFlairBit::CommonKeywordAtCurrentPosition);
@@ -6750,9 +6749,10 @@ static void deliverCompletionResults(CodeCompletionContext &CompletionContext,
 /// match the lookup results against.
 ///
 /// \Returns true if global lookup should be performed.
-static bool addPossibleParams(
-    const ArgumentTypeCheckCompletionCallback::Result &Ret,
-    SmallVectorImpl<PossibleParamInfo> &Params, SmallVectorImpl<Type> &Types) {
+static bool
+addPossibleParams(const ArgumentTypeCheckCompletionCallback::Result &Ret,
+                  SmallVectorImpl<PossibleParamInfo> &Params,
+                  SmallVectorImpl<Type> &Types) {
 
   if (!Ret.ParamIdx)
     return true;
@@ -6777,7 +6777,7 @@ static bool addPossibleParams(
   assert(PL->size() == ParamsToPass.size());
 
   bool ShowGlobalCompletions = false;
-  for (auto Idx: range(*Ret.ParamIdx, PL->size())) {
+  for (auto Idx : range(*Ret.ParamIdx, PL->size())) {
     bool IsCompletion = Idx == Ret.ParamIdx;
 
     // Stop at the first param claimed by other arguments.
@@ -6785,11 +6785,14 @@ static bool addPossibleParams(
       break;
 
     const AnyFunctionType::Param *P = &ParamsToPass[Idx];
-    bool Required = !PL->get(Idx)->isDefaultArgument() && !PL->get(Idx)->isVariadic();
+    bool Required =
+        !PL->get(Idx)->isDefaultArgument() && !PL->get(Idx)->isVariadic();
 
     if (P->hasLabel() && !(IsCompletion && Ret.IsNoninitialVariadic)) {
       PossibleParamInfo PP(P, Required);
-      if (!llvm::any_of(Params, [&](PossibleParamInfo &Existing){ return PP == Existing; }))
+      if (!llvm::any_of(Params, [&](PossibleParamInfo &Existing) {
+            return PP == Existing;
+          }))
         Params.push_back(std::move(PP));
     } else {
       ShowGlobalCompletions = true;
@@ -6815,7 +6818,7 @@ static void deliverArgumentResults(
 
   if (IncludeSignature && !Results.empty()) {
     Lookup.setHaveLParen(true);
-    for (auto &Result: Results) {
+    for (auto &Result : Results) {
       auto SemanticContext = SemanticContextKind::None;
       NominalTypeDecl *BaseNominal = nullptr;
       Type BaseTy = Result.BaseType;
@@ -6824,7 +6827,9 @@ static void deliverArgumentResults(
           BaseTy = InstanceTy;
         if ((BaseNominal = BaseTy->getAnyNominal())) {
           SemanticContext = SemanticContextKind::CurrentNominal;
-          if (Result.FuncD && Result.FuncD->getDeclContext()->getSelfNominalTypeDecl() != BaseNominal)
+          if (Result.FuncD &&
+              Result.FuncD->getDeclContext()->getSelfNominalTypeDecl() !=
+                  BaseNominal)
             SemanticContext = SemanticContextKind::Super;
         } else if (BaseTy->is<TupleType>()) {
           SemanticContext = SemanticContextKind::CurrentNominal;
@@ -6847,7 +6852,7 @@ static void deliverArgumentResults(
         !Lookup.FoundFunctionCalls || Lookup.FoundFunctionsWithoutFirstKeyword;
   } else if (!Results.empty()) {
     SmallVector<PossibleParamInfo, 8> Params;
-    for (auto &Ret: Results) {
+    for (auto &Ret : Results) {
       shouldPerformGlobalCompletion |=
           addPossibleParams(Ret, Params, ExpectedTypes);
     }
@@ -6855,7 +6860,7 @@ static void deliverArgumentResults(
   }
 
   if (shouldPerformGlobalCompletion) {
-    for (auto &Result: Results) {
+    for (auto &Result : Results) {
       ExpectedTypes.push_back(Result.ExpectedType);
     }
     Lookup.setExpectedTypes(ExpectedTypes, false);
@@ -7040,15 +7045,16 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
     assert(CodeCompleteTokenExpr);
     assert(CurDeclContext);
     ArgumentTypeCheckCompletionCallback Lookup(CodeCompleteTokenExpr);
-    llvm::SaveAndRestore<TypeCheckCompletionCallback*>
-      CompletionCollector(Context.CompletionCallback, &Lookup);
+    llvm::SaveAndRestore<TypeCheckCompletionCallback *> CompletionCollector(
+        Context.CompletionCallback, &Lookup);
     typeCheckContextAt(CurDeclContext, CompletionLoc);
 
     if (!Lookup.gotCallback())
       Lookup.fallbackTypeCheck(CurDeclContext);
 
-    deliverArgumentResults(Lookup.getResults(), ShouldCompleteCallPatternAfterParen,
-                           CompletionLoc, CurDeclContext, CompletionContext, Consumer);
+    deliverArgumentResults(Lookup.getResults(),
+                           ShouldCompleteCallPatternAfterParen, CompletionLoc,
+                           CurDeclContext, CompletionContext, Consumer);
     return true;
   }
   default:

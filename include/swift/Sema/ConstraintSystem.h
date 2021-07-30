@@ -475,8 +475,7 @@ public:
   }
 
   /// Assign a fixed type to this equivalence class.
-  void assignFixedType(Type type,
-                       constraints::ConstraintLocator *loc,
+  void assignFixedType(Type type, constraints::ConstraintLocator *loc,
                        constraints::SavedTypeVariableBindings *record) {
     assert((!getFixedType(0) || getFixedType(0)->isEqual(type)) &&
            "Already has a fixed type!");
@@ -3921,8 +3920,7 @@ public:
   /// \param notifyBindingInference Whether to notify binding inference about
   /// the change to this type variable.
   void assignFixedType(TypeVariableType *typeVar, Type type,
-                       ConstraintLocator *loc,
-                       bool updateState = true,
+                       ConstraintLocator *loc, bool updateState = true,
                        bool notifyBindingInference = true);
 
   /// Determine if the type in question is an Array<T> and, if so, provide the
@@ -5391,15 +5389,13 @@ getCompletionArgInfo(ASTNode anchor, constraints::ConstraintSystem &cs);
 /// \returns the bindings produced by performing this matching, or \c None if
 /// the match failed.
 Optional<MatchCallArgumentResult>
-matchCallArguments(
-    SmallVectorImpl<AnyFunctionType::Param> &args,
-    ArrayRef<AnyFunctionType::Param> params,
-    const ParameterListInfo &paramInfo,
-    Optional<unsigned> unlabeledTrailingClosureIndex,
-    Optional<CompletionArgInfo> completionInfo,
-    bool allowFixes,
-    MatchCallArgumentListener &listener,
-    Optional<TrailingClosureMatching> trailingClosureMatching);
+matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
+                   ArrayRef<AnyFunctionType::Param> params,
+                   const ParameterListInfo &paramInfo,
+                   Optional<unsigned> unlabeledTrailingClosureIndex,
+                   Optional<CompletionArgInfo> completionInfo, bool allowFixes,
+                   MatchCallArgumentListener &listener,
+                   Optional<TrailingClosureMatching> trailingClosureMatching);
 
 ConstraintSystem::TypeMatchResult
 matchCallArguments(ConstraintSystem &cs,

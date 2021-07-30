@@ -42,7 +42,9 @@ MatchCallArgumentListener::~MatchCallArgumentListener() { }
 
 bool MatchCallArgumentListener::extraArgument(unsigned argIdx) { return true; }
 
-bool MatchCallArgumentListener::invalidArgumentsAfterCompletion() { return true; }
+bool MatchCallArgumentListener::invalidArgumentsAfterCompletion() {
+  return true;
+}
 
 Optional<unsigned>
 MatchCallArgumentListener::missingArgument(unsigned paramIdx,
@@ -167,10 +169,10 @@ static bool areConservativelyCompatibleArgumentLabels(
   auto params = fnType->getParams();
   ParameterListInfo paramInfo(params, decl, hasAppliedSelf);
 
-  return matchCallArguments(args, params, paramInfo,
-                            unlabeledTrailingClosureArgIndex,
-                            /*completionInfo*/None, /*allow fixes*/ false,
-                            listener, None).hasValue();
+  return matchCallArguments(
+             args, params, paramInfo, unlabeledTrailingClosureArgIndex,
+             /*completionInfo*/ None, /*allow fixes*/ false, listener, None)
+      .hasValue();
 }
 
 Expr *constraints::getArgumentLabelTargetExpr(Expr *fn) {
@@ -263,14 +265,11 @@ static bool isCodeCompletionTypeVar(Type type) {
   return false;
 }
 
-
 static bool matchCallArgumentsImpl(
     SmallVectorImpl<AnyFunctionType::Param> &args,
-    ArrayRef<AnyFunctionType::Param> params,
-    const ParameterListInfo &paramInfo,
+    ArrayRef<AnyFunctionType::Param> params, const ParameterListInfo &paramInfo,
     Optional<unsigned> unlabeledTrailingClosureArgIndex,
-    Optional<CompletionArgInfo> completionInfo,
-    bool allowFixes,
+    Optional<CompletionArgInfo> completionInfo, bool allowFixes,
     TrailingClosureMatching trailingClosureMatching,
     MatchCallArgumentListener &listener,
     SmallVectorImpl<ParamBinding> &parameterBindings) {
@@ -1007,14 +1006,11 @@ static bool requiresBothTrailingClosureDirections(
   return false;
 }
 
-Optional<MatchCallArgumentResult>
-constraints::matchCallArguments(
+Optional<MatchCallArgumentResult> constraints::matchCallArguments(
     SmallVectorImpl<AnyFunctionType::Param> &args,
-    ArrayRef<AnyFunctionType::Param> params,
-    const ParameterListInfo &paramInfo,
+    ArrayRef<AnyFunctionType::Param> params, const ParameterListInfo &paramInfo,
     Optional<unsigned> unlabeledTrailingClosureArgIndex,
-    Optional<CompletionArgInfo> completionInfo,
-    bool allowFixes,
+    Optional<CompletionArgInfo> completionInfo, bool allowFixes,
     MatchCallArgumentListener &listener,
     Optional<TrailingClosureMatching> trailingClosureMatching) {
 
@@ -1081,7 +1077,7 @@ constraints::matchCallArguments(
 }
 
 bool CompletionArgInfo::allowsMissingArgAt(unsigned argInsertIdx,
-                                              AnyFunctionType::Param param) {
+                                           AnyFunctionType::Param param) {
   // If the argument is before or at the index of the argument containing the
   // completion, the user would likely have already written it if they
   // intended this overload.
@@ -1097,7 +1093,7 @@ bool CompletionArgInfo::allowsMissingArgAt(unsigned argInsertIdx,
 
     Type expectedTy = param.getPlainType()->lookThroughAllOptionalTypes();
     return expectedTy->is<FunctionType>() || expectedTy->isAny() ||
-        expectedTy->isTypeVariableOrMember();
+           expectedTy->isTypeVariableOrMember();
   }
   return true;
 }
@@ -1118,11 +1114,11 @@ constraints::getCompletionArgInfo(ASTNode anchor, ConstraintSystem &CS) {
   auto trailingIdx = arg->getUnlabeledTrailingClosureIndexOfPackedArgument();
   if (auto *PE = dyn_cast<ParenExpr>(arg)) {
     if (CS.containsCodeCompletionLoc(PE->getSubExpr()))
-      return CompletionArgInfo{ 0, trailingIdx, 1};
+      return CompletionArgInfo{0, trailingIdx, 1};
   } else if (auto *TE = dyn_cast<TupleExpr>(arg)) {
     for (unsigned i: indices(TE->getElements())) {
       if (CS.containsCodeCompletionLoc(TE->getElement(i)))
-        return CompletionArgInfo{ i, trailingIdx, TE->getNumElements() };
+        return CompletionArgInfo{i, trailingIdx, TE->getNumElements()};
     }
   }
   return None;
@@ -1168,8 +1164,9 @@ public:
     if (CS.isForCodeCompletion()) {
       if (!CompletionArgInfo)
         CompletionArgInfo = getCompletionArgInfo(Locator.getAnchor(), CS);
-      isAfterCodeCompletionLoc = CompletionArgInfo &&
-        CompletionArgInfo->allowsMissingArgAt(argInsertIdx, param);
+      isAfterCodeCompletionLoc =
+          CompletionArgInfo &&
+          CompletionArgInfo->allowsMissingArgAt(argInsertIdx, param);
     }
 
     auto *argLoc = CS.getConstraintLocator(
@@ -1210,7 +1207,8 @@ public:
     // produce diagnostics) so no need to record a fix for this. Still increase
     // the score to penalize this solution though.
     auto *locator = CS.getConstraintLocator(Locator);
-    auto *fix = IgnoreFailureAfterCompletionArg::create(CS, CS.getConstraintLocator(locator->getAnchor()));
+    auto *fix = IgnoreFailureAfterCompletionArg::create(
+        CS, CS.getConstraintLocator(locator->getAnchor()));
     return CS.recordFix(fix, /*impact=*/1);
   }
 
@@ -3256,7 +3254,6 @@ ConstraintSystem::matchTypesBindTypeVar(
                ? getTypeMatchSuccess()
                : getTypeMatchFailure(locator);
   }
-
 
   auto loc = getConstraintLocator(locator);
   assignFixedType(typeVar, type, loc, /*updateState=*/true,
@@ -6228,8 +6225,9 @@ ConstraintSystem::simplifyConstructionConstraint(
 ///
 /// \returns a locator pointing to the containing call/subscript if it meets
 /// these conditions and \c nullptr otherwise
-static ConstraintLocator *isInArgAfterCompletion(ConstraintLocator *loc, ConstraintSystem &cs) {
-  auto fixExpr = simplifyLocatorToAnchor(loc).dyn_cast<Expr*>();
+static ConstraintLocator *isInArgAfterCompletion(ConstraintLocator *loc,
+                                                 ConstraintSystem &cs) {
+  auto fixExpr = simplifyLocatorToAnchor(loc).dyn_cast<Expr *>();
   auto commonAncestor = fixExpr;
   auto fixChild = fixExpr;
   while (commonAncestor && !cs.containsCodeCompletionLoc(commonAncestor)) {
@@ -6245,7 +6243,7 @@ static ConstraintLocator *isInArgAfterCompletion(ConstraintLocator *loc, Constra
     auto Parent = cs.getParentExpr(TE);
     if (!Parent || (!isa<CallExpr>(Parent) && !isa<SubscriptExpr>(Parent)))
       return nullptr;
-    for (auto *E: TE->getElements()) {
+    for (auto *E : TE->getElements()) {
       if (E == fixChild) // found locator element first
         return nullptr;
       if (cs.containsCodeCompletionLoc(E)) // found completion element first
@@ -7303,8 +7301,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   // subscript without a `keyPath:` label. Add it to the result so that it
   // can be caught by the missing argument label checking later.
   if (isForKeyPathSubscript(*this, memberLocator) ||
-      (mayBeForKeyPathSubscriptWithoutLabel(*this, memberLocator)
-       && includeInaccessibleMembers)) {
+      (mayBeForKeyPathSubscriptWithoutLabel(*this, memberLocator) &&
+       includeInaccessibleMembers)) {
     if (baseTy->isAnyObject()) {
       result.addUnviable(
           OverloadChoice(baseTy, OverloadChoiceKind::KeyPathApplication),
@@ -9114,7 +9112,8 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
   auto closureType =
       FunctionType::get(parameters, inferredClosureType->getResult(),
                         closureExtInfo);
-  assignFixedType(typeVar, closureType, closureLocator, closureLocator);
+  assignFixedType(typeVar, closureType, closureLocator,
+                  /*updateState*/closureLocator);
 
   // If there is a result builder to apply, do so now.
   if (resultBuilderType) {
@@ -9883,7 +9882,7 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
       recordAnyTypeVarAsPotentialHole(valueTy);
     return SolutionKind::Solved;
   }
-  
+
   if (auto bgt = keyPathTy->getAs<BoundGenericType>()) {
     // We have the key path type. Match it to the other ends of the constraint.
     auto kpRootTy = bgt->getGenericArgs()[0];

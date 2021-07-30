@@ -57,9 +57,9 @@ void TypeVariableType::Implementation::print(llvm::raw_ostream &OS) {
 }
 
 SavedTypeVariableBinding::SavedTypeVariableBinding(TypeVariableType *typeVar)
-  : TypeVar(typeVar), Options(typeVar->getImpl().getRawOptions()),
-    ParentOrFixed(typeVar->getImpl().ParentOrFixed),
-    BoundLocator(typeVar->getImpl().BoundLocator) { }
+    : TypeVar(typeVar), Options(typeVar->getImpl().getRawOptions()),
+      ParentOrFixed(typeVar->getImpl().ParentOrFixed),
+      BoundLocator(typeVar->getImpl().BoundLocator) {}
 
 void SavedTypeVariableBinding::restore() {
   TypeVar->getImpl().setRawOptions(Options);

@@ -214,7 +214,8 @@ void ConstraintSystem::applySolution(const Solution &solution) {
     // If we don't already have a fixed type for this type variable,
     // assign the fixed type from the solution.
     if (!getFixedType(binding.first) && !binding.second->hasTypeVariable())
-      assignFixedType(binding.first, binding.second, /*loc=*/nullptr, /*updateState=*/false);
+      assignFixedType(binding.first, binding.second, /*loc=*/nullptr,
+                      /*updateState=*/false);
   }
 
   // Register overload choices.

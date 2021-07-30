@@ -1132,8 +1132,7 @@ swift::lookupSemanticMember(DeclContext *DC, Type ty, DeclName name) {
   return TypeChecker::lookupMember(DC, ty, DeclNameRef(name), None);
 }
 
-void TypeCheckCompletionCallback::
-fallbackTypeCheck(DeclContext *DC) {
+void TypeCheckCompletionCallback::fallbackTypeCheck(DeclContext *DC) {
   assert(!GotCallback);
 
   CompletionContextFinder finder(DC);
@@ -1148,7 +1147,7 @@ fallbackTypeCheck(DeclContext *DC) {
                                              CTP_Unused, Type(),
                                              /*isDiscared=*/true);
   TypeChecker::typeCheckForCodeCompletion(
-      completionTarget, /*needsPrecheck*/true,
+      completionTarget, /*needsPrecheck*/ true,
       [&](const Solution &S) { sawSolution(S); });
 }
 
@@ -1373,8 +1372,8 @@ void KeyPathTypeCheckCompletionCallback::sawSolution(
   }
 }
 
-void ArgumentTypeCheckCompletionCallback::
-sawSolution(const constraints::Solution &S) {
+void ArgumentTypeCheckCompletionCallback::sawSolution(
+    const constraints::Solution &S) {
   TypeCheckCompletionCallback::sawSolution(S);
 
   Type ExpectedTy = getTypeForCompletion(S, CompletionExpr);
@@ -1411,11 +1410,13 @@ sawSolution(const constraints::Solution &S) {
   // argument (e.g. a KeyPath vs WritableKeyPath) so it ends up as a hole.
   // Just assume KeyPath so we show the expected keypath's root type to users
   // rather than '_'.
-  if (SelectedOverload->choice.getKind() == OverloadChoiceKind::KeyPathApplication) {
+  if (SelectedOverload->choice.getKind() ==
+      OverloadChoiceKind::KeyPathApplication) {
     auto Params = FuncTy->getAs<AnyFunctionType>()->getParams();
     if (Params.size() == 1 && Params[0].getPlainType()->is<UnresolvedType>()) {
       auto *KPDecl = CS.getASTContext().getKeyPathDecl();
-      Type KPTy = KPDecl->mapTypeIntoContext(KPDecl->getDeclaredInterfaceType());
+      Type KPTy =
+          KPDecl->mapTypeIntoContext(KPDecl->getDeclaredInterfaceType());
       Type KPValueTy = KPTy->castTo<BoundGenericType>()->getGenericArgs()[1];
       KPTy = BoundGenericType::get(KPDecl, Type(), {BaseTy, KPValueTy});
       FuncTy = FunctionType::get({Params[0].withType(KPTy)}, KPValueTy);
@@ -1424,8 +1425,10 @@ sawSolution(const constraints::Solution &S) {
 
   auto ArgInfo = getCompletionArgInfo(ParentCall, CS);
   auto ArgIdx = ArgInfo->completionIdx;
-  auto Bindings = S.argumentMatchingChoices.find(CS.getConstraintLocator(
-      Locator, ConstraintLocator::ApplyArgument))->second.parameterBindings;
+  auto Bindings = S.argumentMatchingChoices
+                      .find(CS.getConstraintLocator(
+                          Locator, ConstraintLocator::ApplyArgument))
+                      ->second.parameterBindings;
 
   // Find the parameter the completion was bound to (if any), as well as which
   // parameters are already bound (so we don't suggest them even when the args
@@ -1434,15 +1437,14 @@ sawSolution(const constraints::Solution &S) {
   SmallVector<unsigned, 16> ClaimedParams;
   bool IsNoninitialVariadic = false;
 
-  for (auto i: indices(Bindings)) {
+  for (auto i : indices(Bindings)) {
     bool Claimed = false;
-    for (auto j: Bindings[i]) {
+    for (auto j : Bindings[i]) {
       if (j == ArgIdx) {
         assert(!ParamIdx);
         ParamIdx = i;
-        IsNoninitialVariadic = llvm::any_of(Bindings[i], [j](unsigned other) {
-          return other < j;
-        });
+        IsNoninitialVariadic = llvm::any_of(
+            Bindings[i], [j](unsigned other) { return other < j; });
       }
       // Synthesized args don't count.
       if (j < ArgInfo->argCount)
@@ -1459,22 +1461,23 @@ sawSolution(const constraints::Solution &S) {
 
   // If this is a duplicate of any other result, ignore this solution.
   if (llvm::any_of(Results, [&](const Result &R) {
-    if (R.FuncD != FuncD)
-      return false;
-    if (!R.FuncTy->isEqual(FuncTy))
-      return false;
-    if (R.BaseType) {
-      if (!BaseTy || !BaseTy->isEqual(R.BaseType))
-        return false;
-    } else if (BaseTy) {
-      return false;
-    }
-    return R.ParamIdx == ParamIdx &&
-        R.IsNoninitialVariadic == IsNoninitialVariadic;
-  })) {
+        if (R.FuncD != FuncD)
+          return false;
+        if (!R.FuncTy->isEqual(FuncTy))
+          return false;
+        if (R.BaseType) {
+          if (!BaseTy || !BaseTy->isEqual(R.BaseType))
+            return false;
+        } else if (BaseTy) {
+          return false;
+        }
+        return R.ParamIdx == ParamIdx &&
+               R.IsNoninitialVariadic == IsNoninitialVariadic;
+      })) {
     return;
   }
 
-  Results.push_back({ExpectedTy, isa<SubscriptExpr>(ParentCall), FuncD, FuncTy, ArgIdx, ParamIdx,
-      std::move(ClaimedParams), IsNoninitialVariadic, BaseTy, HasLabel});
+  Results.push_back({ExpectedTy, isa<SubscriptExpr>(ParentCall), FuncD, FuncTy,
+                     ArgIdx, ParamIdx, std::move(ClaimedParams),
+                     IsNoninitialVariadic, BaseTy, HasLabel});
 }
