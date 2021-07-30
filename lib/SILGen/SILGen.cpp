@@ -1016,6 +1016,7 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
     postEmitFunction(constant, f);
     return;
   }
+  case SILDeclRef::Kind::AsyncEntryPoint:
   case SILDeclRef::Kind::EntryPoint: {
     f->setBare(IsBare);
 

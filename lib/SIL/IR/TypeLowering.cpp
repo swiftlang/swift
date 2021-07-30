@@ -2553,6 +2553,32 @@ getFunctionInterfaceTypeWithCaptures(TypeConverter &TC,
       innerExtInfo);
 }
 
+static CanAnyFunctionType getAsyncEntryPoint(ASTContext &C) {
+
+  // @main struct Main {
+  //    static func main() async throws {}
+  //    static func $main() async throws { try await main() }
+  //  }
+  //
+  // func @async_main() async -> Void {
+  //   do {
+  //      try await Main.$main()
+  //      exit(0)
+  //   } catch {
+  //      _emitErrorInMain(error)
+  //   }
+  // }
+  //
+  // This generates the type signature for @async_main
+  // TODO: 'Never' return type would be more accurate.
+
+  CanType returnType = C.getVoidType()->getCanonicalType();
+  FunctionType::ExtInfo extInfo =
+      FunctionType::ExtInfoBuilder().withAsync(true).withThrows(false).build();
+  return CanAnyFunctionType::get(/*genericSig*/ nullptr, {}, returnType,
+                                 extInfo);
+}
+
 static CanAnyFunctionType getEntryPointInterfaceType(ASTContext &C) {
   // Use standard library types if we have them; otherwise, fall back to
   // builtins.
@@ -2666,6 +2692,8 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
   case SILDeclRef::Kind::IVarDestroyer:
     return getIVarInitDestroyerInterfaceType(cast<ClassDecl>(vd),
                                              c.isForeign, true);
+  case SILDeclRef::Kind::AsyncEntryPoint:
+    return getAsyncEntryPoint(Context);
   case SILDeclRef::Kind::EntryPoint:
     return getEntryPointInterfaceType(Context);
   }
@@ -2720,6 +2748,7 @@ TypeConverter::getConstantGenericSignature(SILDeclRef c) {
   case SILDeclRef::Kind::StoredPropertyInitializer:
     return vd->getDeclContext()->getGenericSignatureOfContext();
   case SILDeclRef::Kind::EntryPoint:
+  case SILDeclRef::Kind::AsyncEntryPoint:
     llvm_unreachable("Doesn't have generic signature");
   }
 

@@ -268,6 +268,8 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
   // The main entry-point is public.
   if (kind == Kind::EntryPoint)
     return SILLinkage::Public;
+  if (kind == Kind::AsyncEntryPoint)
+    return SILLinkage::Hidden;
 
   // Add External to the linkage (e.g. Public -> PublicExternal) if this is a
   // declaration not a definition.
@@ -443,6 +445,15 @@ SILDeclRef SILDeclRef::getMainDeclEntryPoint(ValueDecl *decl) {
   return result;
 }
 
+SILDeclRef SILDeclRef::getAsyncMainDeclEntryPoint(ValueDecl *decl) {
+  auto *file = cast<FileUnit>(decl->getDeclContext()->getModuleScopeContext());
+  assert(file->getMainDecl() == decl);
+  SILDeclRef result;
+  result.loc = decl;
+  result.kind = Kind::AsyncEntryPoint;
+  return result;
+}
+
 SILDeclRef SILDeclRef::getMainFileEntryPoint(FileUnit *file) {
   assert(file->hasEntryPoint() && !file->getMainDecl());
   SILDeclRef result;
@@ -534,7 +545,7 @@ IsSerialized_t SILDeclRef::isSerialized() const {
     return IsNotSerialized;
   }
 
-  if (kind == Kind::EntryPoint)
+  if (kind == Kind::EntryPoint || kind == Kind::AsyncEntryPoint)
     return IsNotSerialized;
 
   if (isIVarInitializerOrDestroyer())
@@ -910,6 +921,9 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
     return mangler.mangleInitFromProjectedValueEntity(cast<VarDecl>(getDecl()),
                                                       SKind);
 
+  case SILDeclRef::Kind::AsyncEntryPoint: {
+    return "async_Main";
+  }
   case SILDeclRef::Kind::EntryPoint: {
     return getASTContext().getEntryPointFunctionName();
   }
@@ -1236,7 +1250,8 @@ unsigned SILDeclRef::getParameterListCount() const {
     return 1;
 
   // Always uncurried even if the underlying function is curried.
-  if (kind == Kind::DefaultArgGenerator || kind == Kind::EntryPoint)
+  if (kind == Kind::DefaultArgGenerator || kind == Kind::EntryPoint ||
+      kind == Kind::AsyncEntryPoint)
     return 1;
 
   auto *vd = getDecl();
