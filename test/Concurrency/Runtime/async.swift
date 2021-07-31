@@ -1,4 +1,3 @@
-// REQUIRES: rdar79670222
 // RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency %import-libdispatch)
 
 // REQUIRES: executable_test
