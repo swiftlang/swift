@@ -6485,6 +6485,12 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyTransitivelyConformsTo(
   // If the type doesn't conform, let's check whether
   // an Optional or Unsafe{Mutable}Pointer from it would.
 
+  // If the current score is equal to the best score, fail without checking
+  // implicit conversions, because an implicit conversion would lead to a
+  // worse score anyway.
+  if (solverState && solverState->BestScore && CurrentScore == *solverState->BestScore)
+    return SolutionKind::Error;
+
   SmallVector<Type, 4> typesToCheck;
 
   // T -> Optional<T>
