@@ -2,35 +2,42 @@
 
 In some programming languages, a class can inherit the interface of multiple base classes. Known as multiple inheritance, this feature can add significant complexity to the language and is unsupported in Swift. Instead, Swift allows composition of interfaces using protocols.
 
-Consider the following example with a class `Bird` conforming to two protocols `Animal` and `Flyable`.
+Consider the following example with a protocol `Utensil` and various conforming types of specific utensils:
 
 ```swift
-protocol Flyable {
-    func fly()
-}
+protocol Utensil { 
+    var name: String {get set}
+} 
 
-extension Animal {
-    func move() {
-        print("Moving...")
+
+protocol ServingUtensil: Utensil {
+    func serve()
+} 
+
+extension ServingUtensil {
+    func serve() {
+        print("Serving food to guests...")
     }
 }
 
-protocol Animal {
-    func move()
+
+protocol Fork: Utensil {
+    func spear()
 }
 
-extension Flyable {
-    func fly() {
-        print("Flying...")
+extension Fork {
+    func spear() { 
+        print("Spearing food...")
     }
 }
 
-class Bird: Animal, Flyable {
-    // move() and fly() use default implementations
+
+struct CarvingFork: ServingUtensil, Fork {
+    var name = "Carving Fork"
 }
 ```
 
-Since `Animal` and `Flyable` provide default implementations for their protocol requirements, `Bird` can conform to both without implementing `fly()` or `move()` and the default implementation will be used. This effect is similar to class inheritance where a subclass inherits properties, subscripts and methods from a superclass. The default implementation can be overriden by defining `fly()` or `move()` without an `override` keyword.
+Swift protocols can declare interfaces that must be implemented by each conforming type (like abstract class members in other programming languages such as C# or Java), and they can also provide overridable default implementations for those requirements in protocol extensions.
 
 When class inheritance and protocol conformances are used together, subclasses inherit protocol conformances from base classes, introducing additional complexity. For example, the default implementation of a protocol requirement not overridden in the conforming base class also cannot be overridden in any subclass ([SR-103](https://bugs.swift.org/browse/SR-103)).
 
