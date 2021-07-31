@@ -40,7 +40,7 @@ for module_file in os.listdir(sdk_overlay_dir):
     # llvm-bcanalyzer | not grep Unknown
     bcanalyzer_output = subprocess.check_output(["llvm-bcanalyzer",
                                                  module_path])
-    if "Unknown" in bcanalyzer_output:
+    if b"Unknown" in bcanalyzer_output:
         print(bcanalyzer_output)
         sys.exit(1)
 
