@@ -4787,7 +4787,9 @@ ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
   Bits.ProtocolDecl.NumRequirementsInSignature = 0;
   Bits.ProtocolDecl.HasMissingRequirements = false;
   Bits.ProtocolDecl.KnownProtocol = 0;
-    setTrailingWhereClause(TrailingWhere);
+  Bits.ProtocolDecl.HasAssociatedTypes = 0;
+  Bits.ProtocolDecl.HasLazyAssociatedTypes = 0;
+  setTrailingWhereClause(TrailingWhere);
 }
 
 bool ProtocolDecl::isMarkerProtocol() const {
@@ -4806,17 +4808,23 @@ ArrayRef<ProtocolDecl *> ProtocolDecl::getInheritedProtocols() const {
                            {});
 }
 
-llvm::TinyPtrVector<AssociatedTypeDecl *>
+ArrayRef<AssociatedTypeDecl *>
 ProtocolDecl::getAssociatedTypeMembers() const {
-  llvm::TinyPtrVector<AssociatedTypeDecl *> result;
+  if (Bits.ProtocolDecl.HasAssociatedTypes)
+    return AssociatedTypes;
+
+  auto *self = const_cast<ProtocolDecl *>(this);
+  self->Bits.ProtocolDecl.HasAssociatedTypes = 1;
 
   // Clang-imported protocols never have associated types.
   if (hasClangNode())
-    return result;
+    return ArrayRef<AssociatedTypeDecl *>();
 
   // Deserialized @objc protocols never have associated types.
-  if (!getParentSourceFile() && isObjC())
-    return result;
+  if (getParentSourceFile() == nullptr && isObjC())
+    return ArrayRef<AssociatedTypeDecl *>();
+
+  SmallVector<AssociatedTypeDecl *, 2> result;
 
   // Find the associated type declarations.
   for (auto member : getMembers()) {
@@ -4825,7 +4833,8 @@ ProtocolDecl::getAssociatedTypeMembers() const {
     }
   }
 
-  return result;
+  self->AssociatedTypes = getASTContext().AllocateCopy(result);
+  return AssociatedTypes;
 }
 
 ValueDecl *ProtocolDecl::getSingleRequirement(DeclName name) const {
