@@ -86,9 +86,6 @@ std::error_code PlaceholderSwiftModuleScanner::findModuleFilesInDirectory(
     return std::make_error_code(std::errc::not_supported);
   }
   auto &moduleInfo = it->getValue();
-  assert(!moduleInfo.moduleBuffer &&
-         "Placeholder dependency module stubs cannot have an associated buffer");
-
   auto dependencies = ModuleDependencies::forPlaceholderSwiftModuleStub(
       moduleInfo.modulePath, moduleInfo.moduleDocPath,
       moduleInfo.moduleSourceInfoPath);

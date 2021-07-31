@@ -161,7 +161,6 @@ public:
   static std::unique_ptr<ExplicitSwiftModuleLoader>
   create(ASTContext &ctx,
          DependencyTracker *tracker, ModuleLoadingMode loadMode,
-         ArrayRef<std::string> ExplicitModulePaths,
          StringRef ExplicitSwiftModuleMap,
          bool IgnoreSwiftSourceInfoFile);
 
@@ -180,8 +179,6 @@ struct ExplicitModuleInfo {
   std::string moduleDocPath;
   // Path of the .swiftsourceinfo file.
   std::string moduleSourceInfoPath;
-  // Opened buffer for the .swiftmodule file.
-  std::unique_ptr<llvm::MemoryBuffer> moduleBuffer;
   // A flag that indicates whether this module is a framework
   bool isFramework;
 };

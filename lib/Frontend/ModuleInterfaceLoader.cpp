@@ -1441,8 +1441,6 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     genericSubInvocation.getFrontendOptions().DisableImplicitModules = true;
     GenericArgs.push_back("-disable-implicit-swift-modules");
   }
-  genericSubInvocation.getSearchPathOptions().ExplicitSwiftModules =
-    searchPathOpts.ExplicitSwiftModules;
   // Pass down -explicit-swift-module-map-file
   // FIXME: we shouldn't need this. Remove it?
   StringRef explictSwiftModuleMap = searchPathOpts.ExplicitSwiftModuleMap;
@@ -1721,12 +1719,6 @@ bool ExplicitSwiftModuleLoader::findModule(ImportPath::Element ModuleID,
     return false;
   }
   auto &moduleInfo = it->getValue();
-  if (moduleInfo.moduleBuffer) {
-    // We found an explicit module matches the given name, give the buffer
-    // back to the caller side.
-    *ModuleBuffer = std::move(moduleInfo.moduleBuffer);
-    return true;
-  }
 
   // Set IsFramework bit according to the moduleInfo
   IsFramework = moduleInfo.isFramework;
@@ -1815,7 +1807,6 @@ void ExplicitSwiftModuleLoader::collectVisibleTopLevelModuleNames(
 std::unique_ptr<ExplicitSwiftModuleLoader>
 ExplicitSwiftModuleLoader::create(ASTContext &ctx,
     DependencyTracker *tracker, ModuleLoadingMode loadMode,
-    ArrayRef<std::string> ExplicitModulePaths,
     StringRef ExplicitSwiftModuleMap,
     bool IgnoreSwiftSourceInfoFile) {
   auto result = std::unique_ptr<ExplicitSwiftModuleLoader>(
@@ -1826,24 +1817,6 @@ ExplicitSwiftModuleLoader::create(ASTContext &ctx,
   if (!ExplicitSwiftModuleMap.empty()) {
     // Parse a JSON file to collect explicitly built modules.
     Impl.parseSwiftExplicitModuleMap(ExplicitSwiftModuleMap);
-  }
-  // Collect .swiftmodule paths from -swift-module-path
-  // FIXME: remove these.
-  for (auto path: ExplicitModulePaths) {
-    std::string name;
-    // Load the explicit module into a buffer and get its name.
-    std::unique_ptr<llvm::MemoryBuffer> buffer = getModuleName(ctx, path, name);
-    if (buffer) {
-      // Register this module for future loading.
-      auto &entry = Impl.ExplicitModuleMap[name];
-      entry.modulePath = path;
-      entry.moduleBuffer = std::move(buffer);
-    } else {
-      // We cannot read the module content, diagnose.
-      ctx.Diags.diagnose(SourceLoc(),
-                         diag::error_opening_explicit_module_file,
-                         path);
-    }
   }
 
   return result;
