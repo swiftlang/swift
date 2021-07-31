@@ -1,4 +1,4 @@
-# Multiple Inheritance of Classes
+# Multiple Inheritance
 
 In some programming languages, a class can inherit the interface of multiple base classes. Known as multiple inheritance, this feature can add significant complexity to the language and is unsupported in Swift. Instead, Swift allows composition of interfaces using protocols.
 
