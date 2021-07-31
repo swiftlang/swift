@@ -511,7 +511,7 @@ protected:
     IsComputingSemanticMembers : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+1+1+8+16,
+  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+1+1+1+1+8+16,
     /// Whether the \c RequiresClass bit is valid.
     RequiresClassValid : 1,
 
@@ -539,6 +539,12 @@ protected:
 
     /// Whether we have a lazy-loaded requirement signature.
     HasLazyRequirementSignature : 1,
+
+    /// Whether we have computed the list of associated types.
+    HasAssociatedTypes : 1,
+
+    /// Whether we have a lazy-loaded list of associated types.
+    HasLazyAssociatedTypes : 1,
 
     : NumPadBits,
 
@@ -4094,6 +4100,7 @@ class ProtocolDecl final : public NominalTypeDecl {
   SourceLoc ProtocolLoc;
 
   ArrayRef<ProtocolDecl *> InheritedProtocols;
+  ArrayRef<AssociatedTypeDecl *> AssociatedTypes;
 
   struct {
     /// The superclass decl and a bit to indicate whether the
@@ -4192,7 +4199,7 @@ public:
   /// Retrieve the set of AssociatedTypeDecl members of this protocol; this
   /// saves loading the set of members in cases where there's no possibility of
   /// a protocol having nested types (ObjC protocols).
-  llvm::TinyPtrVector<AssociatedTypeDecl *> getAssociatedTypeMembers() const;
+  ArrayRef<AssociatedTypeDecl *> getAssociatedTypeMembers() const;
 
   /// Returns a protocol requirement with the given name, or nullptr if the
   /// name has multiple overloads, or no overloads at all.
@@ -4375,6 +4382,9 @@ public:
 
   void setLazyRequirementSignature(LazyMemberLoader *lazyLoader,
                                    uint64_t requirementSignatureData);
+
+  void setLazyAssociatedTypeMembers(LazyMemberLoader *lazyLoader,
+                                    uint64_t associatedTypesData);
 
 private:
   ArrayRef<Requirement> getCachedRequirementSignature() const;

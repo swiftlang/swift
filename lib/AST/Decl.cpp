@@ -4787,7 +4787,9 @@ ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
   Bits.ProtocolDecl.NumRequirementsInSignature = 0;
   Bits.ProtocolDecl.HasMissingRequirements = false;
   Bits.ProtocolDecl.KnownProtocol = 0;
-    setTrailingWhereClause(TrailingWhere);
+  Bits.ProtocolDecl.HasAssociatedTypes = 0;
+  Bits.ProtocolDecl.HasLazyAssociatedTypes = 0;
+  setTrailingWhereClause(TrailingWhere);
 }
 
 bool ProtocolDecl::isMarkerProtocol() const {
@@ -4806,26 +4808,40 @@ ArrayRef<ProtocolDecl *> ProtocolDecl::getInheritedProtocols() const {
                            {});
 }
 
-llvm::TinyPtrVector<AssociatedTypeDecl *>
+ArrayRef<AssociatedTypeDecl *>
 ProtocolDecl::getAssociatedTypeMembers() const {
-  llvm::TinyPtrVector<AssociatedTypeDecl *> result;
+  if (Bits.ProtocolDecl.HasAssociatedTypes)
+    return AssociatedTypes;
+
+  auto *self = const_cast<ProtocolDecl *>(this);
+  self->Bits.ProtocolDecl.HasAssociatedTypes = 1;
 
   // Clang-imported protocols never have associated types.
   if (hasClangNode())
-    return result;
+    return ArrayRef<AssociatedTypeDecl *>();
 
   // Deserialized @objc protocols never have associated types.
-  if (!getParentSourceFile() && isObjC())
-    return result;
+  if (getParentSourceFile() == nullptr && isObjC())
+    return ArrayRef<AssociatedTypeDecl *>();
 
-  // Find the associated type declarations.
-  for (auto member : getMembers()) {
-    if (auto ATD = dyn_cast<AssociatedTypeDecl>(member)) {
-      result.push_back(ATD);
+  SmallVector<AssociatedTypeDecl *, 2> result;
+  if (Bits.ProtocolDecl.HasLazyAssociatedTypes) {
+    auto &ctx = getASTContext();
+    auto contextData = static_cast<LazyProtocolData *>(
+        ctx.getOrCreateLazyContextData(this, nullptr));
+
+    contextData->loader->loadAssociatedTypes(
+        this, contextData->associatedTypesData, result);
+  } else {
+    for (auto member : getMembers()) {
+      if (auto ATD = dyn_cast<AssociatedTypeDecl>(member)) {
+        result.push_back(ATD);
+      }
     }
   }
 
-  return result;
+  self->AssociatedTypes = getASTContext().AllocateCopy(result);
+  return AssociatedTypes;
 }
 
 ValueDecl *ProtocolDecl::getSingleRequirement(DeclName name) const {
@@ -5188,6 +5204,18 @@ ProtocolDecl::setLazyRequirementSignature(LazyMemberLoader *lazyLoader,
   // FIXME: (transitional) increment the redundant "always-on" counter.
   if (auto *Stats = getASTContext().Stats)
     ++Stats->getFrontendCounters().NumLazyRequirementSignatures;
+}
+
+void
+ProtocolDecl::setLazyAssociatedTypeMembers(LazyMemberLoader *lazyLoader,
+                                           uint64_t associatedTypesData) {
+  assert(!Bits.ProtocolDecl.HasAssociatedTypes);
+  assert(!Bits.ProtocolDecl.HasLazyAssociatedTypes);
+
+  auto contextData = static_cast<LazyProtocolData *>(
+      getASTContext().getOrCreateLazyContextData(this, lazyLoader));
+  contextData->associatedTypesData = associatedTypesData;
+  Bits.ProtocolDecl.HasLazyAssociatedTypes = true;
 }
 
 ArrayRef<Requirement> ProtocolDecl::getCachedRequirementSignature() const {
