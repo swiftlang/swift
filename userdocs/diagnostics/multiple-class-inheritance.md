@@ -2,11 +2,11 @@
 
 In some programming languages, a class can inherit the interface of multiple base classes. Known as multiple inheritance, this feature can add significant complexity to the language and is unsupported in Swift. Instead, Swift allows composition of interfaces using protocols.
 
-Consider the following example with a protocol `Utensil` and various conforming types of specific utensils:
+Consider the following example:
 
 ```swift
 protocol Utensil { 
-    var name: String {get set}
+    var name: String { get }
 } 
 
 
@@ -15,9 +15,7 @@ protocol ServingUtensil: Utensil {
 } 
 
 extension ServingUtensil {
-    func serve() {
-        print("Serving food to guests...")
-    }
+    func serve() { /* ... */ }
 }
 
 
@@ -26,9 +24,7 @@ protocol Fork: Utensil {
 }
 
 extension Fork {
-    func spear() { 
-        print("Spearing food...")
-    }
+    func spear() { /* ... */ }
 }
 
 
