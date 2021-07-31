@@ -9,7 +9,7 @@ protocol Utensil {
     var name: String { get }
 } 
 
-
+/* ------------------------------ Serving Utensil ------------------------------ */
 protocol ServingUtensil: Utensil {
     func serve()
 } 
@@ -18,7 +18,7 @@ extension ServingUtensil {
     func serve() { /* ... */ }
 }
 
-
+/* ------------------------------ Fork ------------------------------ */
 protocol Fork: Utensil {
     func spear()
 }
@@ -27,10 +27,21 @@ extension Fork {
     func spear() { /* ... */ }
 }
 
-
-struct CarvingFork: ServingUtensil, Fork {
-    var name = "Carving Fork"
+/* ------------------------------ Spoon ------------------------------ */
+protocol Spoon: Utensil {
+    func scoop()
 }
+
+extension Spoon {
+    func scoop() {/* ... */}
+}
+
+/* ------------------------------ Concrete Implementations ------------------------------ */
+struct CarvingFork: ServingUtensil, Fork {}
+
+struct Spork: Spoon, Fork {}
+
+struct Ladle: ServingUtensil, Spoon {}
 ```
 
 Swift protocols can declare interfaces that must be implemented by each conforming type (like abstract class members in other programming languages such as C# or Java), and they can also provide overridable default implementations for those requirements in protocol extensions.
