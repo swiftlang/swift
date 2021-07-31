@@ -1181,6 +1181,11 @@ public:
   rewriting::RequirementMachine *getOrCreateRequirementMachine(
       CanGenericSignature sig);
 
+  /// This is a hack to break cycles. Don't introduce new callers of this
+  /// method.
+  bool isRecursivelyConstructingRequirementMachine(
+      CanGenericSignature sig);
+
   /// Retrieve a generic signature with a single unconstrained type parameter,
   /// like `<T>`.
   CanGenericSignature getSingleGenericParameterSignature() const;
