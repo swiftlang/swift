@@ -1346,6 +1346,19 @@ void Serializer::writeGenericRequirements(ArrayRef<Requirement> requirements,
   }
 }
 
+void Serializer::writeAssociatedTypes(ArrayRef<AssociatedTypeDecl *> assocTypes,
+                                      const std::array<unsigned, 256> &abbrCodes) {
+  using namespace decls_block;
+
+  auto assocTypeAbbrCode = abbrCodes[AssociatedTypeLayout::Code];
+
+  for (auto *assocType : assocTypes) {
+    AssociatedTypeLayout::emitRecord(
+        Out, ScratchRecord, assocTypeAbbrCode,
+        addDeclRef(assocType));
+  }
+}
+
 void Serializer::writeASTBlockEntity(GenericSignature sig) {
   using namespace decls_block;
 
@@ -3536,6 +3549,8 @@ public:
     writeGenericParams(proto->getGenericParams());
     S.writeGenericRequirements(
       proto->getRequirementSignature(), S.DeclTypeAbbrCodes);
+    S.writeAssociatedTypes(
+      proto->getAssociatedTypeMembers(), S.DeclTypeAbbrCodes);
     writeMembers(id, proto->getAllMembers(), true);
     writeDefaultWitnessTable(proto);
   }
@@ -4761,6 +4776,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<OpaqueTypeLayout>();
   registerDeclTypeAbbr<PatternBindingLayout>();
   registerDeclTypeAbbr<ProtocolLayout>();
+  registerDeclTypeAbbr<AssociatedTypeLayout>();
   registerDeclTypeAbbr<DefaultWitnessTableLayout>();
   registerDeclTypeAbbr<PrefixOperatorLayout>();
   registerDeclTypeAbbr<PostfixOperatorLayout>();

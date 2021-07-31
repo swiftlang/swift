@@ -1423,6 +1423,11 @@ public:
     llvm_unreachable("unimplemented for ClangImporter");
   }
 
+  void loadAssociatedTypes(const ProtocolDecl *decl, uint64_t contextData,
+                           SmallVectorImpl<AssociatedTypeDecl *> &assocTypes) override {
+    llvm_unreachable("unimplemented for ClangImporter");
+  }
+
   template <typename DeclTy, typename ...Targs>
   DeclTy *createDeclWithClangNode(ClangNode ClangN, AccessLevel access,
                                   Targs &&... Args) {

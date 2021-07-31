@@ -56,7 +56,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 620; // use @available(renamed:) for async alternative warning
+const uint16_t SWIFTMODULE_VERSION_MINOR = 621; // protocol associated type list
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1610,6 +1610,11 @@ namespace decls_block {
     TypeIDField,                 // type being constrained
     BCVBR<16>,                   // size
     BCVBR<8>                     // alignment
+  >;
+
+  using AssociatedTypeLayout = BCRecordLayout<
+    ASSOCIATED_TYPE,
+    DeclIDField                  // associated type decl
   >;
 
   /// Specifies the private discriminator string for a private declaration. This

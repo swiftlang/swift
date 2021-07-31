@@ -4383,6 +4383,9 @@ public:
   void setLazyRequirementSignature(LazyMemberLoader *lazyLoader,
                                    uint64_t requirementSignatureData);
 
+  void setLazyAssociatedTypeMembers(LazyMemberLoader *lazyLoader,
+                                    uint64_t associatedTypesData);
+
 private:
   ArrayRef<Requirement> getCachedRequirementSignature() const;
 

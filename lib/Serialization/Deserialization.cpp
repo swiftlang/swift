@@ -886,6 +886,36 @@ llvm::Error ModuleFile::readGenericRequirementsChecked(
   return llvm::Error::success();
 }
 
+void ModuleFile::readAssociatedTypes(
+                   SmallVectorImpl<AssociatedTypeDecl *> &assocTypes,
+                   llvm::BitstreamCursor &Cursor) {
+  using namespace decls_block;
+
+  BCOffsetRAII lastRecordOffset(Cursor);
+  SmallVector<uint64_t, 8> scratch;
+  StringRef blobData;
+
+  while (true) {
+    lastRecordOffset.reset();
+
+    llvm::BitstreamEntry entry =
+        fatalIfUnexpected(Cursor.advance(AF_DontPopBlockAtEnd));
+    if (entry.Kind != llvm::BitstreamEntry::Record)
+      break;
+
+    scratch.clear();
+    unsigned recordID = fatalIfUnexpected(
+        Cursor.readRecord(entry.ID, scratch, &blobData));
+    if (recordID != ASSOCIATED_TYPE)
+      break;
+
+    DeclID declID;
+    AssociatedTypeLayout::readRecord(scratch, declID);
+
+    assocTypes.push_back(cast<AssociatedTypeDecl>(getDecl(declID)));
+  }
+}
+
 /// Advances past any records that might be part of a requirement signature.
 static llvm::Error skipGenericRequirements(llvm::BitstreamCursor &Cursor) {
   using namespace decls_block;
@@ -911,6 +941,38 @@ static llvm::Error skipGenericRequirements(llvm::BitstreamCursor &Cursor) {
 
     default:
       // This record is not a generic requirement.
+      return llvm::Error::success();
+    }
+
+    lastRecordOffset.reset();
+  }
+  return llvm::Error::success();
+}
+
+/// Advances past any lazy associated type member records.
+static llvm::Error skipAssociatedTypeMembers(llvm::BitstreamCursor &Cursor) {
+  using namespace decls_block;
+
+  BCOffsetRAII lastRecordOffset(Cursor);
+
+  while (true) {
+    Expected<llvm::BitstreamEntry> maybeEntry =
+        Cursor.advance(AF_DontPopBlockAtEnd);
+    if (!maybeEntry)
+      return maybeEntry.takeError();
+    llvm::BitstreamEntry entry = maybeEntry.get();
+    if (entry.Kind != llvm::BitstreamEntry::Record)
+      break;
+
+    Expected<unsigned> maybeRecordID = Cursor.skipRecord(entry.ID);
+    if (!maybeRecordID)
+      return maybeRecordID.takeError();
+    switch (maybeRecordID.get()) {
+    case ASSOCIATED_TYPE:
+      break;
+
+    default:
+      // This record is not an associated type.
       return llvm::Error::success();
     }
 
@@ -3550,6 +3612,11 @@ public:
     proto->setLazyRequirementSignature(&MF,
                                        MF.DeclTypeCursor.GetCurrentBitNo());
     if (llvm::Error Err = skipGenericRequirements(MF.DeclTypeCursor))
+      MF.fatal(std::move(Err));
+
+    proto->setLazyAssociatedTypeMembers(&MF,
+                                        MF.DeclTypeCursor.GetCurrentBitNo());
+    if (llvm::Error Err = skipAssociatedTypeMembers(MF.DeclTypeCursor))
       MF.fatal(std::move(Err));
 
     proto->setMemberLoader(&MF, MF.DeclTypeCursor.GetCurrentBitNo());
@@ -6556,6 +6623,14 @@ void ModuleFile::loadRequirementSignature(const ProtocolDecl *decl,
   BCOffsetRAII restoreOffset(DeclTypeCursor);
   fatalIfNotSuccess(DeclTypeCursor.JumpToBit(contextData));
   readGenericRequirements(reqs, DeclTypeCursor);
+}
+
+void ModuleFile::loadAssociatedTypes(const ProtocolDecl *decl,
+                                     uint64_t contextData,
+                           SmallVectorImpl<AssociatedTypeDecl *> &assocTypes) {
+  BCOffsetRAII restoreOffset(DeclTypeCursor);
+  fatalIfNotSuccess(DeclTypeCursor.JumpToBit(contextData));
+  readAssociatedTypes(assocTypes, DeclTypeCursor);
 }
 
 static Optional<ForeignErrorConvention::Kind>
