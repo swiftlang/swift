@@ -34,4 +34,4 @@ Since `Animal` and `Flyable` provide default implementations for their protocol 
 
 When class inheritance and protocol conformances are used together, subclasses inherit protocol conformances from base classes, introducing additional complexity. For example, the default implementation of a protocol requirement not overridden in the conforming base class also cannot be overridden in any subclass ([SR-103](https://bugs.swift.org/browse/SR-103)).
 
-To learn more about defining and adopting protocols as well as inheritance and subclassing, see the [Protocols](https://docs.swift.org/swift-book/LanguageGuide/Protocols.html) section and the [Inheritance](https://docs.swift.org/swift-book/LanguageGuide/Inheritance.html) section in _The Swift Programming Language_.
+To learn more about defining and adopting protocols, see the [Protocols](https://docs.swift.org/swift-book/LanguageGuide/Protocols.html) section in _The Swift Programming Language_. To learn more about class inheritance, see the [Inheritance](https://docs.swift.org/swift-book/LanguageGuide/Inheritance.html) section in _The Swift Programming Language_.
