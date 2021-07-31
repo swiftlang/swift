@@ -1,4 +1,3 @@
-// REQUIRES: rdar79670222
 // RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking %import-libdispatch)
 
 // REQUIRES: executable_test
