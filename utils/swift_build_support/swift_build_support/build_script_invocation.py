@@ -560,6 +560,13 @@ class BuildScriptInvocation(object):
         builder.add_impl_product(products.LLDB,
                                  is_enabled=self.args.build_lldb)
 
+        # Create a new build-script pipeline for running normal build-script
+        # products as part of the toolchain build and before we ever try to
+        # build build-script-impl SDK bits.
+        builder.begin_pipeline()
+        builder.add_product(products.SwiftStdlibStage2,
+                            is_enabled=self.args.build_swift_stdlib_stage2)
+
         # Begin a new build-script-impl pipeline that builds libraries that we
         # build as part of build-script-impl but that we should eventually move
         # onto build-script products.
