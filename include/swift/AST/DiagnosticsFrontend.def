@@ -251,11 +251,6 @@ ERROR(tbd_not_supported_with_cmo,none,
         "Test-Based InstallAPI (TBD) is not support with cross-module-optimization",
         ())
 
-WARNING(linker_directives_choice_confusion,none,
-        "only one of -emit-ldadd-cfile-path and -module-installname-map-file can be specified;"
-        "the c file won't be generated",
-        ())
-
 ERROR(previous_installname_map_missing,none,
       "cannot open previous install name map from %0",
       (StringRef))

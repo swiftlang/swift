@@ -682,63 +682,6 @@ static bool writeTBDIfNeeded(CompilerInstance &Instance) {
   return writeTBD(Instance.getMainModule(), TBDPath, tbdOpts);
 }
 
-static std::string changeToLdAdd(StringRef ldHide) {
-  SmallString<64> SymbolBuffer;
-  llvm::raw_svector_ostream OS(SymbolBuffer);
-  auto Parts = ldHide.split("$hide$");
-  assert(!Parts.first.empty());
-  assert(!Parts.second.empty());
-  OS << Parts.first << "$add$" << Parts.second;
-  return OS.str().str();
-}
-
-static bool writeLdAddCFileIfNeeded(CompilerInstance &Instance) {
-  const auto &Invocation = Instance.getInvocation();
-  const auto &frontendOpts = Invocation.getFrontendOptions();
-  if (!frontendOpts.InputsAndOutputs.isWholeModule())
-    return false;
-  auto Path = Invocation.getLdAddCFileOutputPathForWholeModule();
-  if (Path.empty())
-    return false;
-  if (!frontendOpts.InputsAndOutputs.isWholeModule()) {
-    Instance.getDiags().diagnose(SourceLoc(),
-                                 diag::tbd_only_supported_in_whole_module);
-    return true;
-  }
-  if (!Invocation.getTBDGenOptions().ModuleInstallNameMapPath.empty()) {
-    Instance.getDiags().diagnose(SourceLoc(),
-                                 diag::linker_directives_choice_confusion);
-    return true;
-  }
-  auto tbdOpts = Invocation.getTBDGenOptions();
-  tbdOpts.LinkerDirectivesOnly = true;
-  auto *module = Instance.getMainModule();
-  auto ldSymbols =
-      getPublicSymbols(TBDGenDescriptor::forModule(module, tbdOpts));
-  std::error_code EC;
-  llvm::raw_fd_ostream OS(Path, EC, llvm::sys::fs::F_None);
-  if (EC) {
-    Instance.getDiags().diagnose(SourceLoc(), diag::error_opening_output, Path,
-                                 EC.message());
-    return true;
-  }
-  OS << "// Automatically generated C source file from the Swift compiler \n"
-     << "// to add removed symbols back to the high-level framework for deployment\n"
-     << "// targets prior to the OS version when these symbols were moved to\n"
-     << "// a low-level framework " << module->getName().str() << ".\n\n";
-  unsigned Idx = 0;
-  for (auto &S: ldSymbols) {
-    SmallString<32> NameBuffer;
-    llvm::raw_svector_ostream NameOS(NameBuffer);
-    NameOS << "ldAdd_" << Idx;
-    OS << "extern const char " << NameOS.str() << " __asm(\"" <<
-      changeToLdAdd(S) << "\");\n";
-    OS << "const char " << NameOS.str() << " = 0;\n";
-    ++ Idx;
-  }
-  return false;
-}
-
 static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
                                           std::unique_ptr<SILModule> SM,
                                           ModuleOrSourceFile MSF,
@@ -881,9 +824,6 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
 
   {
     hadAnyError |= writeTBDIfNeeded(Instance);
-  }
-  {
-    hadAnyError |= writeLdAddCFileIfNeeded(Instance);
   }
 
   return hadAnyError;

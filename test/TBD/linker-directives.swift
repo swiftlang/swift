@@ -17,9 +17,3 @@ public func toast() {}
 
 // CHECK-HAS-NOT-NOT: $ld$hide$os10.15$_$s10ToasterKit5toastyyF
 // CHECK-HAS-NOT-NOT: $ld$hide$os10.7$_$s10ToasterKit5toastyyF
-
-// RUN: %target-swift-frontend -typecheck %s -emit-tbd -emit-tbd-path %t/linker_directives.tbd -emit-ldadd-cfile-path %t/ldAdd.c -module-name AppKit
-// RUN: %FileCheck %s --check-prefix CHECK-C-SYMBOL < %t/ldAdd.c
-
-// CHECK-C-SYMBOL: $ld$add$os10.8$_$s10ToasterKit5toastyyF
-// CHECK-C-SYMBOL: $ld$add$os10.14$_$s10ToasterKit5toastyyF

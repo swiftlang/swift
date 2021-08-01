@@ -787,10 +787,6 @@ def type_info_dump_filter_EQ : Joined<["-"], "type-info-dump-filter=">,
   Flags<[FrontendOption]>,
   HelpText<"One of 'all', 'resilient' or 'fragile'">;
 
-def emit_ldadd_cfile_path
-  : Separate<["-"], "emit-ldadd-cfile-path">, MetaVarName<"<path>">,
-    HelpText<"Generate .c file defining symbols to add back">;
-
 def previous_module_installname_map_file
   : Separate<["-"], "previous-module-installname-map-file">, MetaVarName<"<path>">,
     HelpText<"Path to a Json file indicating module name to installname map for @_originallyDefinedIn">;
