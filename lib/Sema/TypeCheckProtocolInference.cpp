@@ -819,9 +819,14 @@ Type AssociatedTypeInference::computeFixedTypeWitness(
         !conformedProto->inheritsFrom(assocType->getProtocol()))
       continue;
 
-    const auto ty =
-        conformedProto->getGenericSignature()->getCanonicalTypeInContext(
-            structuralTy);
+    auto sig = conformedProto->getGenericSignature();
+
+    // FIXME: The RequirementMachine will assert on re-entrant construction.
+    // We should find a more principled way of breaking this cycle.
+    if (ctx.isRecursivelyConstructingRequirementMachine(sig.getCanonicalSignature()))
+      continue;
+
+    const auto ty = sig->getCanonicalTypeInContext(structuralTy);
 
     // A dependent member type with an identical base and name indicates that
     // the protocol does not same-type constrain it in any way; move on to

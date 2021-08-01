@@ -349,22 +349,36 @@ GenericSignatureImpl::getLocalRequirements(Type depType) const {
     auto rqmResult = computeViaRQM();
     auto gsbResult = computeViaGSB();
 
-    auto typesEqual = [&](Type lhs, Type rhs) {
+    auto typesEqual = [&](Type lhs, Type rhs, bool canonical) {
       if (!lhs || !rhs)
         return !lhs == !rhs;
-      return lhs->isEqual(rhs);
+      if (lhs->isEqual(rhs))
+        return true;
+
+      if (canonical)
+        return false;
+
+      if (getCanonicalTypeInContext(lhs) ==
+          getCanonicalTypeInContext(rhs))
+        return true;
+
+      return false;
     };
 
     auto compare = [&]() {
       // If the types are concrete, we don't care about the rest.
       if (gsbResult.concreteType || rqmResult.concreteType) {
-        if (!typesEqual(gsbResult.concreteType, rqmResult.concreteType))
+        if (!typesEqual(gsbResult.concreteType,
+                        rqmResult.concreteType,
+                        false))
           return false;
 
         return true;
       }
 
-      if (!typesEqual(gsbResult.anchor, rqmResult.anchor))
+      if (!typesEqual(gsbResult.anchor,
+                      rqmResult.anchor,
+                      true))
         return false;
 
       if (gsbResult.layout != rqmResult.layout)
@@ -376,6 +390,11 @@ GenericSignatureImpl::getLocalRequirements(Type depType) const {
       ProtocolType::canonicalizeProtocols(rhsProtos);
 
       if (lhsProtos != rhsProtos)
+        return false;
+
+      if (!typesEqual(gsbResult.superclass,
+                      rqmResult.superclass,
+                      false))
         return false;
 
       return true;
@@ -770,7 +789,11 @@ Type GenericSignatureImpl::getConcreteType(Type type) const {
     auto check = [&]() {
       if (!gsbResult || !rqmResult)
         return !gsbResult == !rqmResult;
-      return gsbResult->isEqual(rqmResult);
+      if (gsbResult->isEqual(rqmResult))
+        return true;
+
+      return (getCanonicalTypeInContext(gsbResult)
+              == getCanonicalTypeInContext(rqmResult));
     };
 
     if (!check()) {

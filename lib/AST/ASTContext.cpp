@@ -1997,6 +1997,22 @@ ASTContext::getOrCreateRequirementMachine(CanGenericSignature sig) {
   return machine;
 }
 
+bool ASTContext::isRecursivelyConstructingRequirementMachine(
+      CanGenericSignature sig) {
+  auto &rewriteCtx = getImpl().TheRewriteContext;
+  if (!rewriteCtx)
+    return false;
+
+  auto arena = getArena(sig);
+  auto &machines = getImpl().getArena(arena).RequirementMachines;
+
+  auto found = machines.find(sig);
+  if (found == machines.end())
+    return false;
+
+  return !found->second->isComplete();
+}
+
 Optional<llvm::TinyPtrVector<ValueDecl *>>
 OverriddenDeclsRequest::getCachedResult() const {
   auto decl = std::get<0>(getStorage());
