@@ -1186,7 +1186,7 @@ public:
   llvm::DenseMap<ASTNode, Type> nodeTypes;
 
   /// The key path component types introduced by this solution.
-  llvm::DenseMap<std::pair<const KeyPathExpr *, unsigned>, TypeBase *>
+  llvm::DenseMap<std::pair<const KeyPathExpr *, unsigned>, Type>
       keyPathComponentTypes;
 
   /// Contextual types introduced by this solution.
@@ -2183,8 +2183,22 @@ private:
   /// run through various diagnostics passes without actually mutating
   /// the types on the nodes.
   llvm::MapVector<ASTNode, Type> NodeTypes;
-  llvm::DenseMap<std::pair<const KeyPathExpr *, unsigned>, TypeBase *>
+
+  /// The nodes for which we have produced types, along with the prior type
+  /// each node had before introducing this type.
+  llvm::SmallVector<std::pair<ASTNode, Type>, 8> addedNodeTypes;
+
+  /// Maps components in a key path expression to their type. Needed because
+  /// KeyPathExpr + Index isn't an \c ASTNode and thus can't be stored in \c
+  /// NodeTypes.
+  llvm::DenseMap<std::pair<const KeyPathExpr *, /*component index=*/unsigned>,
+                 Type>
       KeyPathComponentTypes;
+
+  /// Same as \c addedNodeTypes for \c KeyPathComponentTypes.
+  llvm::SmallVector<
+      std::tuple<const KeyPathExpr *, /*component index=*/unsigned, Type>>
+      addedKeyPathComponentTypes;
 
   /// Maps AST entries to their solution application targets.
   llvm::MapVector<SolutionApplicationTargetsKey, SolutionApplicationTarget>
@@ -2265,10 +2279,6 @@ private:
   /// used for the 'self' of an existential type.
   SmallVector<std::pair<ConstraintLocator *, OpenedArchetypeType *>, 4>
     OpenedExistentialTypes;
-
-  /// The nodes for which we have produced types, along with the prior type
-  /// each node had before introducing this type.
-  llvm::SmallVector<std::pair<ASTNode, Type>, 8> addedNodeTypes;
 
   /// The set of functions that have been transformed by a result builder.
   std::vector<std::pair<AnyFunctionRef, AppliedBuilderTransform>>
@@ -2739,6 +2749,8 @@ public:
 
     unsigned numAddedNodeTypes;
 
+    unsigned numAddedKeyPathComponentTypes;
+
     unsigned numDisabledConstraints;
 
     unsigned numFavoredConstraints;
@@ -2954,10 +2966,15 @@ public:
   /// map is used throughout the expression type checker in order to
   /// avoid mutating expressions until we know we have successfully
   /// type-checked them.
-  void setType(KeyPathExpr *KP, unsigned I, Type T) {
+  void setType(const KeyPathExpr *KP, unsigned I, Type T) {
     assert(KP && "Expected non-null key path parameter!");
     assert(T && "Expected non-null type!");
-    KeyPathComponentTypes[std::make_pair(KP, I)] = T.getPointer();
+
+    Type &entry = KeyPathComponentTypes[{KP, I}];
+    Type oldType = entry;
+    entry = T;
+
+    addedKeyPathComponentTypes.push_back(std::make_tuple(KP, I, oldType));
   }
 
   /// Check to see if we have a type for a node.
