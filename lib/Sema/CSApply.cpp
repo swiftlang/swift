@@ -6178,8 +6178,15 @@ static bool applyTypeToClosureExpr(ConstraintSystem &cs,
                                    Expr *expr, Type toType) {
   // Look through identity expressions, like parens.
   if (auto IE = dyn_cast<IdentityExpr>(expr)) {
-    if (!applyTypeToClosureExpr(cs, IE->getSubExpr(), toType)) return false;
-    cs.setType(IE, toType);
+    if (!applyTypeToClosureExpr(cs, IE->getSubExpr(), toType))
+      return false;
+
+    auto subExprTy = cs.getType(IE->getSubExpr());
+    if (isa<ParenExpr>(IE)) {
+      cs.setType(IE, ParenType::get(cs.getASTContext(), subExprTy));
+    } else {
+      cs.setType(IE, subExprTy);
+    }
     return true;
   }
 
