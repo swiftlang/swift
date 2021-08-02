@@ -1267,7 +1267,8 @@ ERROR(extra_argument_named,none,
 ERROR(extra_argument_positional,none,
       "extra argument in call", ())
 ERROR(extra_arguments_in_call,none,
-      "extra arguments at positions %0 in call", (StringRef))
+      "extra %select{arguments|trailing closures}0 at positions %1 in call",
+       (bool, StringRef))
 ERROR(extra_argument_to_nullary_call,none,
       "argument passed to call that takes no arguments", ())
 ERROR(extra_trailing_closure_in_call,none,

@@ -5197,7 +5197,16 @@ bool ExtraneousArgumentsFailure::diagnoseAsError() {
       },
       [&] { OS << ", "; });
 
-  emitDiagnostic(diag::extra_arguments_in_call, OS.str());
+  bool areTrailingClosures = false;
+  if (auto *argExpr = getArgumentListExprFor(getLocator())) {
+    if (auto i = argExpr->getUnlabeledTrailingClosureIndexOfPackedArgument()) {
+      areTrailingClosures = llvm::all_of(ExtraArgs, [&](auto &pair) {
+        return pair.first >= i;
+      });
+    }
+  }
+
+  emitDiagnostic(diag::extra_arguments_in_call, areTrailingClosures, OS.str());
 
   if (auto overload = getCalleeOverloadChoiceIfAvailable(getLocator())) {
     if (auto *decl = overload->choice.getDeclOrNull()) {
@@ -5248,9 +5257,12 @@ bool ExtraneousArgumentsFailure::diagnoseSingleExtraArgument() const {
   auto argExpr = tuple ? tuple->getElement(index)
                        : cast<ParenExpr>(arguments)->getSubExpr();
 
+  auto trailingClosureIdx =
+      arguments->getUnlabeledTrailingClosureIndexOfPackedArgument();
+  auto isTrailingClosure = trailingClosureIdx && index >= *trailingClosureIdx;
+
   auto loc = argExpr->getLoc();
-  if (tuple && index == tuple->getNumElements() - 1 &&
-      tuple->hasTrailingClosure()) {
+  if (isTrailingClosure) {
     emitDiagnosticAt(loc, diag::extra_trailing_closure_in_call)
         .highlight(argExpr->getSourceRange());
   } else if (ContextualType->getNumParams() == 0) {
