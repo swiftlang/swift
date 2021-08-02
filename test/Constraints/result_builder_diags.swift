@@ -657,7 +657,10 @@ struct MyView {
     } // expected-error {{expected identifier after '.' expression}}
   }
 
-  @TupleBuilder var invalidCaseWithoutDot: some P {
+  // FIXME [OPAQUE SUPPORT]: We definitely need a better error that doesn't
+  // include 'τ_0_0'. This error comes from generating a
+  // `DefaultGenericArgument` fix in `TypeVariableBinding::fixForHole`.
+  @TupleBuilder var invalidCaseWithoutDot: some P { // expected-error {{generic parameter 'τ_0_0' could not be inferred}}
     switch Optional.some(1) {
     case none: 42 // expected-error {{cannot find 'none' in scope}}
     case .some(let x):
@@ -685,7 +688,7 @@ do {
 struct TuplifiedStructWithInvalidClosure {
   var condition: Bool
 
-  @TupleBuilder var unknownParameter: some Any {
+  @TupleBuilder var unknownParameter: some Any { // expected-error {{generic parameter 'τ_0_0' could not be inferred}}
     if let cond = condition {
       let _ = { (arg: UnknownType) in // expected-error {{cannot find type 'UnknownType' in scope}}
       }
@@ -695,7 +698,7 @@ struct TuplifiedStructWithInvalidClosure {
     }
   }
 
-  @TupleBuilder var unknownResult: some Any {
+  @TupleBuilder var unknownResult: some Any { // expected-error {{generic parameter 'τ_0_0' could not be inferred}}
     if let cond = condition {
       let _ = { () -> UnknownType in // expected-error {{cannot find type 'UnknownType' in scope}}
       }
@@ -705,7 +708,7 @@ struct TuplifiedStructWithInvalidClosure {
     }
   }
 
-  @TupleBuilder var multipleLevelsDeep: some Any {
+  @TupleBuilder var multipleLevelsDeep: some Any { // expected-error {{generic parameter 'τ_0_0' could not be inferred}}
     if let cond = condition {
       switch MyError.boom {
       case .boom:

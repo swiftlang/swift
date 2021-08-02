@@ -134,6 +134,10 @@ SIMPLE_LOCATOR_PATH_ELT(MemberRefBase)
 /// base of the locator.
 CUSTOM_LOCATOR_PATH_ELT(OpenedGeneric)
 
+/// This is referring to a type produced by opening an opaque type archetype
+/// type at the base of the locator.
+CUSTOM_LOCATOR_PATH_ELT(OpenedOpaqueArchetype)
+
 /// An optional payload.
 SIMPLE_LOCATOR_PATH_ELT(OptionalPayload)
 

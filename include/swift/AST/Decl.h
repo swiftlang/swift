@@ -2537,7 +2537,10 @@ public:
   OpaqueTypeDecl *getOpaqueResultTypeDecl() const;
 
   /// Get the representative for this value's opaque result type, if it has one.
-  OpaqueReturnTypeRepr *getOpaqueResultTypeRepr() const;
+  /// Returns a `TypeRepr` instead of an `OpaqueReturnTypeRepr` because 'some'
+  /// types might appear in one or more structural positions, e.g.  (some P,
+  /// some Q), or we might have a `NamedOpaqueReturnTypeRepr`.
+  TypeRepr *getOpaqueResultTypeRepr() const;
 
   /// Retrieve the attribute associating this declaration with a
   /// result builder, if there is one.
@@ -2629,26 +2632,30 @@ public:
 /// clients of the opaque type, only exposing the type as something conforming
 /// to a given set of constraints.
 ///
-/// Currently, opaque types do not normally have an explicit spelling in source
-/// code. One is formed implicitly when a declaration is written with an opaque
-/// result type, as in:
+/// An `OpaqueTypeDecl` is formed implicitly when a declaration is written with
+/// an opaque result type, as in the following example:
 ///
 /// func foo() -> some SignedInteger { return 1 }
 ///
-/// The declared type is a special kind of ArchetypeType representing the
-/// abstracted underlying type.
+/// The declared type uses a special kind of archetype type to represent
+/// abstracted types, e.g. `(some P, some Q)` becomes `((opaque archetype 0),
+/// (opaque archetype 1))`.
 class OpaqueTypeDecl : public GenericTypeDecl {
   /// The original declaration that "names" the opaque type. Although a specific
   /// opaque type cannot be explicitly named, oapque types can propagate
   /// arbitrarily through expressions, so we need to know *which* opaque type is
   /// propagated.
   ValueDecl *NamingDecl;
-  
+
   /// The generic signature of the opaque interface to the type. This is the
-  /// outer generic signature with an added generic parameter representing the
-  /// underlying type.
+  /// outer generic signature with added generic parameters representing the
+  /// abstracted underlying types.
   GenericSignature OpaqueInterfaceGenericSignature;
-  
+
+  /// The type repr of the underlying type. Might be null if no source location
+  /// is availble, e.g. if this decl was loaded from a serialized module.
+  OpaqueReturnTypeRepr *UnderlyingInterfaceRepr;
+
   /// The generic parameter that represents the underlying type.
   GenericTypeParamType *UnderlyingInterfaceType;
   
@@ -2661,12 +2668,12 @@ class OpaqueTypeDecl : public GenericTypeDecl {
   mutable Identifier OpaqueReturnTypeIdentifier;
   
 public:
-  OpaqueTypeDecl(ValueDecl *NamingDecl,
-                 GenericParamList *GenericParams,
+  OpaqueTypeDecl(ValueDecl *NamingDecl, GenericParamList *GenericParams,
                  DeclContext *DC,
                  GenericSignature OpaqueInterfaceGenericSignature,
+                 OpaqueReturnTypeRepr *UnderlyingInterfaceRepr,
                  GenericTypeParamType *UnderlyingInterfaceType);
-  
+
   ValueDecl *getNamingDecl() const { return NamingDecl; }
   
   void setNamingDecl(ValueDecl *D) {
@@ -2679,6 +2686,11 @@ public:
   /// This is more complex than just checking `getNamingDecl` because the
   /// function could also be the getter of a storage declaration.
   bool isOpaqueReturnTypeOfFunction(const AbstractFunctionDecl *func) const;
+
+  /// Get the ordinal of the anonymous opaque parameter of this decl with type
+  /// repr `repr`, as introduce implicitly by an occurrence of "some" in return
+  /// position e.g. `func f() -> some P`. Returns -1 if `repr` is not found.
+  unsigned getAnonymousOpaqueParamOrdinal(OpaqueReturnTypeRepr *repr) const;
 
   GenericSignature getOpaqueInterfaceGenericSignature() const {
     return OpaqueInterfaceGenericSignature;

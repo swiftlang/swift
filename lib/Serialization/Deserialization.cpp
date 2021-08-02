@@ -3458,9 +3458,10 @@ public:
       return cast<OpaqueTypeDecl>(declOrOffset.get());
       
     // Create the decl.
-    auto opaqueDecl =
-      new (ctx) OpaqueTypeDecl(nullptr, nullptr, declContext,
-                               interfaceSig, interfaceType);
+    auto opaqueDecl = new (ctx)
+        OpaqueTypeDecl(/*NamingDecl*/ nullptr,
+                       /*GenericParams*/ nullptr, declContext, interfaceSig,
+                       /*UnderlyingInterfaceTypeRepr*/ nullptr, interfaceType);
     declOrOffset = opaqueDecl;
 
     auto namingDecl = cast<ValueDecl>(MF.getDecl(namingDeclID));
@@ -3489,7 +3490,8 @@ public:
     if (genericSig) {
       subs = genericSig->getIdentitySubstitutionMap();
     }
-    auto opaqueTy = OpaqueTypeArchetypeType::get(opaqueDecl, subs);
+    // TODO [OPAQUE SUPPORT]: multiple opaque types
+    auto opaqueTy = OpaqueTypeArchetypeType::get(opaqueDecl, 0, subs);
     auto metatype = MetatypeType::get(opaqueTy);
     opaqueDecl->setInterfaceType(metatype);
     return opaqueDecl;
@@ -5491,7 +5493,9 @@ public:
     if (!subsOrError)
       return subsOrError.takeError();
 
-    return OpaqueTypeArchetypeType::get(opaqueDecl, subsOrError.get());
+    // TODO [OPAQUE SUPPORT]: to support multiple opaque types we will probably
+    // have to serialize the ordinal, which is always 0 for now
+    return OpaqueTypeArchetypeType::get(opaqueDecl, 0, subsOrError.get());
   }
       
   Expected<Type> deserializeNestedArchetypeType(ArrayRef<uint64_t> scratch,
