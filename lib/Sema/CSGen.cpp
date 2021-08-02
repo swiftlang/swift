@@ -4232,9 +4232,17 @@ OriginalArgumentList
 swift::getOriginalArgumentList(Expr *expr) {
   OriginalArgumentList result;
 
-  auto add = [&](Expr *arg, Identifier label, SourceLoc labelLoc) {
-    if (isa<DefaultArgumentExpr>(arg)) {
+  auto oldTrailingClosureIdx =
+      expr->getUnlabeledTrailingClosureIndexOfPackedArgument();
+  Optional<unsigned> newTrailingClosureIdx;
+
+  auto add = [&](unsigned i, Expr *arg, Identifier label, SourceLoc labelLoc) {
+    if (isa<DefaultArgumentExpr>(arg))
       return;
+
+    if (oldTrailingClosureIdx && *oldTrailingClosureIdx == i) {
+      assert(!newTrailingClosureIdx);
+      newTrailingClosureIdx = result.args.size();
     }
 
     if (auto *varargExpr = dyn_cast<VarargExpansionExpr>(arg)) {
@@ -4260,24 +4268,25 @@ swift::getOriginalArgumentList(Expr *expr) {
   if (auto *parenExpr = dyn_cast<ParenExpr>(expr)) {
     result.lParenLoc = parenExpr->getLParenLoc();
     result.rParenLoc = parenExpr->getRParenLoc();
-    result.hasTrailingClosure = parenExpr->hasTrailingClosure();
-    add(parenExpr->getSubExpr(), Identifier(), SourceLoc());
+    add(0, parenExpr->getSubExpr(), Identifier(), SourceLoc());
   } else if (auto *tupleExpr = dyn_cast<TupleExpr>(expr)) {
     result.lParenLoc = tupleExpr->getLParenLoc();
     result.rParenLoc = tupleExpr->getRParenLoc();
-    result.hasTrailingClosure = tupleExpr->hasTrailingClosure();
 
     auto args = tupleExpr->getElements();
     auto labels = tupleExpr->getElementNames();
     auto labelLocs = tupleExpr->getElementNameLocs();
     for (unsigned i = 0, e = args.size(); i != e; ++i) {
       // Implicit TupleExprs don't always store label locations.
-      add(args[i], labels[i],
+      add(i, args[i], labels[i],
           labelLocs.empty() ? SourceLoc() : labelLocs[i]);
     }
   } else {
-    add(expr, Identifier(), SourceLoc());
+    add(0, expr, Identifier(), SourceLoc());
   }
+  assert(oldTrailingClosureIdx.hasValue() == newTrailingClosureIdx.hasValue());
+  assert(!newTrailingClosureIdx || *newTrailingClosureIdx < result.args.size());
 
+  result.unlabeledTrailingClosureIdx = newTrailingClosureIdx;
   return result;
 }
