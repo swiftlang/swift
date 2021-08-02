@@ -93,28 +93,16 @@ func test_multiple_trailing_syntax_without_labels() {
   func mixed_args_1(a: () -> Void, _: () -> Void) {}
   func mixed_args_2(_: () -> Void, a: () -> Void, _: () -> Void) {} // expected-note {{'mixed_args_2(_:a:_:)' declared here}}
 
-  mixed_args_1
-    {}
-    _: {}
+  mixed_args_1 {} _: {}
 
-  mixed_args_1
-    {}  // expected-error {{incorrect argument labels in call (have '_:a:', expected 'a:_:')}}
-    a: {}
+  mixed_args_1 {} a: {}  // expected-error@:16 {{incorrect argument labels in call (have '_:a:', expected 'a:_:')}}
 
-  mixed_args_2
-    {}
-    a: {}
-    _: {}
+  mixed_args_2 {} a: {} _: {}
 
-  mixed_args_2
-    {} // expected-error {{missing argument for parameter 'a' in call}}
-    _: {}
+  mixed_args_2 {} _: {} // expected-error@:18 {{missing argument for parameter 'a' in call}}
 
   // FIXME: not a good diagnostic
-  mixed_args_2
-    {}  // expected-error {{missing argument label 'a:' in call}}
-    _: {}
-    _: {}
+  mixed_args_2 {} _: {} _: {} // expected-error@:16 {{missing argument label 'a:' in call}}
 }
 
 func produce(fn: () -> Int?, default d: () -> Int) -> Int { // expected-note {{declared here}}
