@@ -759,6 +759,10 @@ public:
   /// tag single payloads.
   AvailabilityContext getMultiPayloadEnumTagSinglePayload();
 
+  /// Get the runtime availability of the Objective-C enabled
+  /// swift_isUniquelyReferenced functions.
+  AvailabilityContext getObjCIsUniquelyReferencedAvailability();
+
   /// Get the runtime availability of features introduced in the Swift 5.2
   /// compiler for the target platform.
   AvailabilityContext getSwift52Availability();
