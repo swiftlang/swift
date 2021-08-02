@@ -239,20 +239,22 @@ public struct AsyncStream<Element> {
   ///   instance that it uses to provide elements to the stream and terminate the
   ///   stream when finished.
   ///
-  /// The `AsyncStream.Continuation` received by the `build` closure is appopriate
-  /// for use in concurrent contexts. It is thread safe to send and finish; all
-  /// calls are to the continuation are serialized, however calling this from
-  /// multiple concurrent contexts could result in out-of-order delivery.
+  /// The `AsyncStream.Continuation` received by the `build` closure is
+  /// appopriate for use in concurrent contexts. It is thread safe to send and
+  /// finish; all calls are to the continuation are serialized. However, calling
+  /// this from multiple concurrent contexts could result in out-of-order
+  /// delivery.
   ///
   /// The following example shows an `AsyncStream` created with this
-  /// initializer that produces random numbers on a one-second interval. When
-  /// a private `keepRunning` variable becomes `false`, the inner `while` loop
-  /// exits and the stream finishes.
+  /// initializer that produces 100 random numbers on a one-second interval,
+  /// calling `yield(_:)` to deliver each element to the awaiting call point.
+  /// When the `for` loop exits and the stream finishes by calling the
+  /// continuation's `finish()` method.
   ///
   ///     let stream = AsyncStream<Int>(Int.self,
   ///                                   bufferingPolicy: .bufferingNewest(5)) { continuation in
   ///             Task.detached {
-  ///                 while keepRunning {
+  ///                 for _ in 0..<100 {
   ///                     await Task.sleep(1 * 1_000_000_000)
   ///                     continuation.yield(Int.random(in: 1...10))
   ///                 }

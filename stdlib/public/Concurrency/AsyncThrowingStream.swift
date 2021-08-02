@@ -264,22 +264,23 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
   ///   `AsyncThrowingStream.Continuation` instance that it uses to provide
   ///   elements to the stream and terminate the stream when finished.
   ///
-  /// The `AsyncThrowingStream.Continuation` received by the `build` closure is
+  /// The `AsyncStream.Continuation` received by the `build` closure is
   /// appopriate for use in concurrent contexts. It is thread safe to send and
-  /// finish; all calls are to the continuation are serialized, however calling
-  /// this from multiple concurrent contexts could result in out of order
-  ///  delivery.
+  /// finish; all calls are to the continuation are serialized. However, calling
+  /// this from multiple concurrent contexts could result in out-of-order
+  /// delivery.
   ///
-  /// The following example shows an `AsyncThrowingStream` created with this
-  /// initializer that produces random numbers on a one-second interval. When
-  /// a private `keepRunning` variable becomes `false`, the inner `while` loop
-  /// exits and the stream finishes. If the random number is divisble by 5 with
-  /// no remainder, the stream throws a `MyRandomNumberError`.
+  /// The following example shows an `AsyncStream` created with this
+  /// initializer that produces 100 random numbers on a one-second interval,
+  /// calling `yield(_:)` to deliver each element to the awaiting call point.
+  /// When the `for` loop exits and the stream finishes by calling the
+  /// continuation's `finish()` method. If the random number is divisble by 5
+  /// with no remainder, the stream throws a `MyRandomNumberError`.
   ///
   ///     let stream = AsyncThrowingStream<Int, Error>(Int.self,
   ///                                                  bufferingPolicy: .bufferingNewest(5)) { continuation in
   ///             Task.detached {
-  ///                 while (keepRunning) {
+  ///                 for _ in 0..<100 {
   ///                     await Task.sleep(1 * 1_000_000_000)
   ///                     let random = Int.random(in: 1...10)
   ///                     if (random % 5 == 0) {
