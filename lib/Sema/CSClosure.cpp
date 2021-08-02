@@ -249,12 +249,19 @@ private:
 
   void visitRepeatWhileStmt(RepeatWhileStmt *repeatWhileStmt) {
     if (!isSupportedMultiStatementClosure())
-      llvm_unreachable("Unsupported statement: Do");
+      llvm_unreachable("Unsupported statement: RepeatWhile");
+
+    auto boolDecl = cs.getASTContext().getBoolDecl();
+    assert(boolDecl && "Bool is missing");
+
+    ContextualTypeInfo conditionContext{boolDecl->getDeclaredType(),
+                                        CTP_Condition};
 
     createConjunction(cs,
                       {makeElement(repeatWhileStmt->getCond(),
                                    cs.getConstraintLocator(
-                                       locator, ConstraintLocator::Condition)),
+                                       locator, ConstraintLocator::Condition),
+                                   conditionContext),
                        makeElement(repeatWhileStmt->getBody(), locator)},
                       locator);
   }
@@ -394,14 +401,9 @@ ConstraintSystem::simplifyClosureBodyElementConstraint(
                                        getConstraintLocator(locator));
 
   if (auto *expr = element.dyn_cast<Expr *>()) {
-    // If this expression represents a condition of some labeled statement
-    // it has to be convertible to `Bool`.
-    if (isConditionOfStmt(locator)) {
-      auto boolDecl = getASTContext().getBoolDecl();
-      assert(boolDecl && "Bool is missing");
-
-      SolutionApplicationTarget target(expr, closure, CTP_Condition,
-                                       boolDecl->getDeclaredType(),
+    if (context.purpose != CTP_Unused) {
+      SolutionApplicationTarget target(expr, closure, context.purpose,
+                                       context.getType(),
                                        /*isDiscarded=*/false);
 
       if (generateConstraints(target, FreeTypeVariableBinding::Disallow))
