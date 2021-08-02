@@ -1906,9 +1906,7 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
     assert(oldName || newName && "We can't have oldName and newName out of "
                                  "bounds, otherwise n would be smaller");
 
-    if (oldName == newName ||
-        (argList.hasTrailingClosure && i == argList.args.size() - 1 &&
-         (numMissing > 0 || numExtra > 0 || numWrong > 0)))
+    if (oldName == newName || argList.isUnlabeledTrailingClosureIdx(i))
       continue;
 
     if (!oldName.hasValue() && newName.hasValue()) {
@@ -1988,11 +1986,17 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
     if (i < newNames.size())
       newName = newNames[i];
 
-    if (oldName == newName || (i == n-1 && argList.hasTrailingClosure))
+    if (oldName == newName || argList.isUnlabeledTrailingClosureIdx(i))
       continue;
 
     if (newName.empty()) {
-      // Delete the old name.
+      // If this is a labeled trailing closure, we need to replace with '_'.
+      if (argList.isLabeledTrailingClosureIdx(i)) {
+        diag.fixItReplace(argList.labelLocs[i], "_");
+        continue;
+      }
+
+      // Otherwise, delete the old name.
       diag.fixItRemoveChars(argList.labelLocs[i],
                             argList.args[i]->getStartLoc());
       continue;
@@ -2006,7 +2010,10 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
     if (newNameIsReserved)
       newStr += "`";
 
-    if (oldName.empty()) {
+    // If the argument was previously unlabeled, insert the new label. Note that
+    // we don't do this for labeled trailing closures as they write unlabeled
+    // args as '_:', and therefore need replacement.
+    if (oldName.empty() && !argList.isLabeledTrailingClosureIdx(i)) {
       // Insert the name.
       newStr += ": ";
       diag.fixItInsert(argList.args[i]->getStartLoc(), newStr);
