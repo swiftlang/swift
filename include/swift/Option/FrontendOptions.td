@@ -273,9 +273,6 @@ def debug_constraints_on_line_EQ : Joined<["-"], "debug-constraints-on-line=">,
 def disable_named_lazy_member_loading : Flag<["-"], "disable-named-lazy-member-loading">,
   HelpText<"Disable per-name lazy member loading">;
 
-def requirement_machine_EQ : Joined<["-"], "requirement-machine=">,
-  HelpText<"Control usage of experimental generics implementation: 'on', 'off', or 'verify'">;
-
 def debug_requirement_machine : Flag<["-"], "debug-requirement-machine">,
   HelpText<"Enables debugging output from the generics implementation">;
 
