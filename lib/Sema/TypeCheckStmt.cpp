@@ -596,7 +596,7 @@ static void checkFallthroughPatternBindingsAndTypes(
 /// Check the correctness of a 'fallthrough' statement.
 ///
 /// \returns true if an error occurred.
-static bool checkFallthroughStmt(DeclContext *dc, FallthroughStmt *stmt) {
+bool swift::checkFallthroughStmt(DeclContext *dc, FallthroughStmt *stmt) {
   CaseStmt *fallthroughSource;
   CaseStmt *fallthroughDest;
   ASTContext &ctx = dc->getASTContext();

@@ -186,6 +186,11 @@ private:
     llvm_unreachable("Unimplemented case for closure body");
   }
 
+  void visitFallthroughStmt(FallthroughStmt *fallthroughStmt) {
+    if (!isSupportedMultiStatementClosure())
+      llvm_unreachable("Unsupported statement: Fallthrough");
+  }
+
   void visitIfStmt(IfStmt *ifStmt) {
     if (!isSupportedMultiStatementClosure())
       llvm_unreachable("Unsupported statement: If");
@@ -333,7 +338,6 @@ private:
   UNSUPPORTED_STMT(Case)
   UNSUPPORTED_STMT(Break)
   UNSUPPORTED_STMT(Continue)
-  UNSUPPORTED_STMT(Fallthrough)
   UNSUPPORTED_STMT(Fail)
   UNSUPPORTED_STMT(Throw)
   UNSUPPORTED_STMT(PoundAssert)
@@ -483,6 +487,12 @@ private:
     }
 
     TypeChecker::typeCheckDecl(decl);
+  }
+
+  ASTNode visitFallthroughStmt(FallthroughStmt *fallthroughStmt) {
+    if (checkFallthroughStmt(closure, fallthroughStmt))
+      hadError = true;
+    return fallthroughStmt;
   }
 
   ASTNode visitIfStmt(IfStmt *ifStmt) {
@@ -642,7 +652,6 @@ private:
   UNSUPPORTED_STMT(Case)
   UNSUPPORTED_STMT(Break)
   UNSUPPORTED_STMT(Continue)
-  UNSUPPORTED_STMT(Fallthrough)
   UNSUPPORTED_STMT(Fail)
   UNSUPPORTED_STMT(Throw)
   UNSUPPORTED_STMT(PoundAssert)
