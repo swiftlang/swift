@@ -1128,3 +1128,54 @@ class UnavailableNoArgsSubclassInit: UnavailableNoArgsSuperclassInit {
   // expected-error@-1 {{'init()' is unavailable}}
   // expected-note@-2 {{call to unavailable initializer 'init()' from superclass 'UnavailableNoArgsSuperclassInit' occurs implicitly at the end of this initializer}}
 }
+
+struct TypeWithTrailingClosures {
+  func twoTrailingClosures(a: () -> Void, b: () -> Void) {}
+  func threeTrailingClosures(a: () -> Void, b: () -> Void, c: () -> Void) {}
+  func threeUnlabeledTrailingClosures(_ a: () -> Void, _ b: () -> Void, _ c: () -> Void) {}
+  func variadicTrailingClosures(a: (() -> Void)..., b: Int = 0, c: Int = 0) {}
+}
+
+@available(*, deprecated, renamed: "TypeWithTrailingClosures.twoTrailingClosures(self:a:b:)")
+func twoTrailingClosures(_ x: TypeWithTrailingClosures, a: () -> Void, b: () -> Void) {}
+
+@available(*, deprecated, renamed: "TypeWithTrailingClosures.twoTrailingClosures(self:a:b:)")
+func twoTrailingClosuresWithDefaults(x: TypeWithTrailingClosures, y: Int = 0, z: Int = 0, a: () -> Void, b: () -> Void) {}
+
+@available(*, deprecated, renamed: "TypeWithTrailingClosures.threeTrailingClosures(self:a:b:c:)")
+func threeTrailingClosures(_ x: TypeWithTrailingClosures, a: () -> Void, b: () -> Void, c: () -> Void) {}
+
+@available(*, deprecated, renamed: "TypeWithTrailingClosures.threeTrailingClosures(self:a:b:c:)")
+func threeTrailingClosuresDiffLabels(_: TypeWithTrailingClosures, x: () -> Void, y: () -> Void, z: () -> Void) {}
+
+@available(*, deprecated, renamed: "TypeWithTrailingClosures.threeUnlabeledTrailingClosures(self:_:_:_:)")
+func threeTrailingClosuresRemoveLabels(_ x: TypeWithTrailingClosures, a: () -> Void, b: () -> Void, c: () -> Void) {}
+
+@available(*, deprecated, renamed: "TypeWithTrailingClosures.variadicTrailingClosures(self:a:b:c:)")
+func variadicTrailingClosures(_ x: TypeWithTrailingClosures, a: (() -> Void)...) {}
+
+func testMultipleTrailingClosures(_ x: TypeWithTrailingClosures) {
+  twoTrailingClosures(x) {} b: {} // expected-warning {{'twoTrailingClosures(_:a:b:)' is deprecated: replaced by instance method 'TypeWithTrailingClosures.twoTrailingClosures(a:b:)'}}
+  // expected-note@-1 {{use 'TypeWithTrailingClosures.twoTrailingClosures(a:b:)' instead}} {{3-22=x.twoTrailingClosures}} {{23-24=}} {{none}}
+  x.twoTrailingClosures() {} b: {}
+
+  twoTrailingClosuresWithDefaults(x: x) {} b: {} // expected-warning {{'twoTrailingClosuresWithDefaults(x:y:z:a:b:)' is deprecated: replaced by instance method 'TypeWithTrailingClosures.twoTrailingClosures(a:b:)'}}
+  // expected-note@-1 {{use 'TypeWithTrailingClosures.twoTrailingClosures(a:b:)' instead}} {{3-34=x.twoTrailingClosures}} {{35-39=}} {{none}}
+  x.twoTrailingClosures() {} b: {}
+
+  threeTrailingClosures(x, a: {}) {} c: {} // expected-warning {{'threeTrailingClosures(_:a:b:c:)' is deprecated: replaced by instance method 'TypeWithTrailingClosures.threeTrailingClosures(a:b:c:)'}}
+  // expected-note@-1 {{use 'TypeWithTrailingClosures.threeTrailingClosures(a:b:c:)' instead}} {{3-24=x.threeTrailingClosures}} {{25-28=}} {{none}}
+  x.threeTrailingClosures(a: {}) {} c: {}
+
+  threeTrailingClosuresDiffLabels(x, x: {}) {} z: {} // expected-warning {{'threeTrailingClosuresDiffLabels(_:x:y:z:)' is deprecated: replaced by instance method 'TypeWithTrailingClosures.threeTrailingClosures(a:b:c:)'}}
+  // expected-note@-1 {{use 'TypeWithTrailingClosures.threeTrailingClosures(a:b:c:)' instead}} {{3-34=x.threeTrailingClosures}} {{35-38=}} {{38-39=a}} {{48-49=c}} {{none}}
+  x.threeTrailingClosures(a: {}) {} c: {}
+
+  threeTrailingClosuresRemoveLabels(x, a: {}) {} c: {} // expected-warning {{'threeTrailingClosuresRemoveLabels(_:a:b:c:)' is deprecated: replaced by instance method 'TypeWithTrailingClosures.threeUnlabeledTrailingClosures(_:_:_:)'}}
+  // expected-note@-1 {{use 'TypeWithTrailingClosures.threeUnlabeledTrailingClosures(_:_:_:)' instead}} {{3-36=x.threeUnlabeledTrailingClosures}} {{37-40=}} {{40-43=}} {{50-51=_}} {{none}}
+  x.threeUnlabeledTrailingClosures({}) {} _: {}
+
+  variadicTrailingClosures(x) {} _: {} _: {} // expected-warning {{'variadicTrailingClosures(_:a:)' is deprecated: replaced by instance method 'TypeWithTrailingClosures.variadicTrailingClosures(a:b:c:)'}}
+  // expected-note@-1 {{use 'TypeWithTrailingClosures.variadicTrailingClosures(a:b:c:)' instead}} {{3-27=x.variadicTrailingClosures}} {{28-29=}} {{none}}
+  x.variadicTrailingClosures() {} _: {} _: {}
+}

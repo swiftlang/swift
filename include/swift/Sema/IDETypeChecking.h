@@ -243,7 +243,32 @@ namespace swift {
     SmallVector<SourceLoc, 4> labelLocs;
     SourceLoc lParenLoc;
     SourceLoc rParenLoc;
-    bool hasTrailingClosure = false;
+    Optional<unsigned> unlabeledTrailingClosureIdx;
+
+    /// The number of trailing closures in the argument list.
+    unsigned getNumTrailingClosures() const {
+      if (!unlabeledTrailingClosureIdx)
+        return 0;
+      return args.size() - *unlabeledTrailingClosureIdx;
+    }
+
+    /// Whether any unlabeled or labeled trailing closures are present.
+    bool hasAnyTrailingClosures() const {
+      return unlabeledTrailingClosureIdx.hasValue();
+    }
+
+    /// Whether the given index is for an unlabeled trailing closure.
+    bool isUnlabeledTrailingClosureIdx(unsigned i) const {
+      return unlabeledTrailingClosureIdx && *unlabeledTrailingClosureIdx == i;
+    }
+
+    /// Whether the given index is for a labeled trailing closure in an
+    /// argument list with multiple trailing closures.
+    bool isLabeledTrailingClosureIdx(unsigned i) const {
+      if (!unlabeledTrailingClosureIdx)
+        return false;
+      return i > *unlabeledTrailingClosureIdx && i < args.size();
+    }
   };
 
   /// When applying a solution to a constraint system, the type checker rewrites
