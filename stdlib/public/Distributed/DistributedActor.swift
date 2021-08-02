@@ -44,10 +44,7 @@ public protocol DistributedActor: AnyActor, Identifiable, Hashable, Codable {
     ///
     /// - Parameter transport: the transport this distributed actor instance will
     ///   associated with.
-    init(transport: ActorTransport)
-
-    @available(*, deprecated, renamed: "SomeDistributedActor.resolve(_:using:)")
-    init(resolve id: AnyActorIdentity, using transport: ActorTransport) throws
+    init(transport: ActorTransport) // TODO: remove this, but synthesize unless a different designated initializer is defined
 
     /// Resolves the passed in `identity` against the `transport`, returning
     /// either a local or remote actor reference.

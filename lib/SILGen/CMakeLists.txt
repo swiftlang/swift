@@ -18,6 +18,7 @@ add_swift_host_library(swiftSILGen STATIC
   SILGenConvert.cpp
   SILGenDecl.cpp
   SILGenDestructor.cpp
+  SILGenDistributed.cpp
   SILGenDynamicCast.cpp
   SILGenEpilog.cpp
   SILGenExpr.cpp
