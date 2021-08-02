@@ -186,6 +186,11 @@ private:
     llvm_unreachable("Unimplemented case for closure body");
   }
 
+  void visitDeferStmt(DeferStmt *deferStmt) {
+    if (!isSupportedMultiStatementClosure())
+      llvm_unreachable("Unsupported statement: Defer");
+  }
+
   void visitFallthroughStmt(FallthroughStmt *fallthroughStmt) {
     if (!isSupportedMultiStatementClosure())
       llvm_unreachable("Unsupported statement: Fallthrough");
@@ -331,7 +336,6 @@ private:
       llvm_unreachable("Unsupported statement kind " #STMT);          \
   }
   UNSUPPORTED_STMT(Yield)
-  UNSUPPORTED_STMT(Defer)
   UNSUPPORTED_STMT(DoCatch)
   UNSUPPORTED_STMT(ForEach)
   UNSUPPORTED_STMT(Switch)
@@ -495,6 +499,16 @@ private:
     return fallthroughStmt;
   }
 
+  ASTNode visitDeferStmt(DeferStmt *deferStmt) {
+    TypeChecker::typeCheckDecl(deferStmt->getTempDecl());
+
+    Expr *theCall = deferStmt->getCallExpr();
+    TypeChecker::typeCheckExpression(theCall, closure);
+    deferStmt->setCallExpr(theCall);
+
+    return deferStmt;
+  }
+
   ASTNode visitIfStmt(IfStmt *ifStmt) {
     // Rewrite the condition.
     if (auto condition = rewriteTarget(
@@ -645,7 +659,6 @@ private:
       llvm_unreachable("Unsupported statement kind " #STMT);          \
   }
   UNSUPPORTED_STMT(Yield)
-  UNSUPPORTED_STMT(Defer)
   UNSUPPORTED_STMT(DoCatch)
   UNSUPPORTED_STMT(ForEach)
   UNSUPPORTED_STMT(Switch)
