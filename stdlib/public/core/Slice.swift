@@ -237,9 +237,8 @@ extension Slice {
     if let (_, copied) = self.withContiguousStorageIfAvailable({
       $0._copyContents(initializing: buffer)
     }) {
-      let distance = buffer.distance(from: buffer.startIndex, to: copied)
-      let i = index(startIndex, offsetBy: distance)
-      return (Iterator(_elements: self, _position: i), copied)
+      let position = index(startIndex, offsetBy: copied)
+      return (Iterator(_elements: self, _position: position), copied)
     }
 
     return _copySequenceContents(initializing: buffer)
