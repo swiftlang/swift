@@ -20,7 +20,7 @@ import _Concurrency
 ///
 /// FIXME: !!! We'd need Actor to also conform to this, but don't want to add that conformance in _Concurrency yet.
 @_marker
-public protocol AnyActor: AnyObject {}
+public protocol AnyActor {}
 
 // ==== Distributed Actor -----------------------------------------------------
 
@@ -31,20 +31,14 @@ public protocol AnyActor: AnyObject {}
 /// requirement may conform to this protocol.
 ///
 /// The 'DistributedActor' protocol provides the core functionality of any
-/// distributed actor, which involves transforming actor
-/// which involves enqueuing new partial tasks to be executed at some
-/// point.
+/// distributed actor.
 @available(SwiftStdlib 5.5, *)
-public protocol DistributedActor: AnyActor, Identifiable, Hashable, Codable {
+public protocol DistributedActor:
+//    AnyActor,
+    AnyObject,
+    Identifiable, Hashable, Codable {
 
-    /// Creates new (local) distributed actor instance, bound to the passed transport.
-    ///
-    /// Upon initialization, the `id` field is populated by the transport,
-    /// with an address assigned to this actor.
-    ///
-    /// - Parameter transport: the transport this distributed actor instance will
-    ///   associated with.
-    init(transport: ActorTransport) // TODO: remove this, but synthesize unless a different designated initializer is defined
+  init(transport: ActorTransport) // FIXME(distributed): must remove this
 
     /// Resolves the passed in `identity` against the `transport`, returning
     /// either a local or remote actor reference.

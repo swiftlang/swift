@@ -1202,7 +1202,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
 
   if (auto *classDecl = dyn_cast<ClassDecl>(decl)) {
     addImplicitInheritedConstructorsToClass(classDecl);
-    addImplicitDistributedActorMembersToClass(classDecl);
+    addImplicitDistributedActorMembersToClass(classDecl); // FIXME(distributed): add always this is not just constructors
   }
 
   // Force the memberwise and default initializers if the type has them.
