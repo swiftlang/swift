@@ -210,7 +210,7 @@ public:
   ActiveTaskStatus withEscalatedPriority(JobPriority priority) const {
     assert(priority > getStoredPriority());
     return ActiveTaskStatus(Record,
-                            (Flags & PriorityMask)
+                            (Flags & ~PriorityMask)
                                | IsEscalated | uintptr_t(priority));
   }
   ActiveTaskStatus withoutStoredPriorityEscalation() const {
