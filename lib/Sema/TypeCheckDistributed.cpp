@@ -36,7 +36,7 @@ bool IsDistributedActorRequest::evaluate(
   // Protocols are actors if they inherit from `DistributedActor`.
   if (auto protocol = dyn_cast<ProtocolDecl>(nominal)) {
     auto &ctx = protocol->getASTContext();
-    auto *distributedActorProtocol = ctx.getProtocol(KnownProtocolKind::DistributedActor);
+    auto *distributedActorProtocol = ctx.getDistributedActorDecl(); // getProtocol(KnownProtocolKind::DistributedActor);
     return (protocol == distributedActorProtocol ||
             protocol->inheritsFrom(distributedActorProtocol));
   }
