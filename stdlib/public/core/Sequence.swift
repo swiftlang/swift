@@ -1144,7 +1144,7 @@ extension Sequence {
     return _copySequenceContents(initializing: buffer)
   }
 
-  @inlinable
+  @_alwaysEmitIntoClient
   internal __consuming func _copySequenceContents(
     initializing buffer: UnsafeMutableBufferPointer<Element>
   ) -> (Iterator,UnsafeMutableBufferPointer<Element>.Index) {

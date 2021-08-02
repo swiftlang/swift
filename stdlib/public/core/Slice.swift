@@ -230,7 +230,7 @@ extension Slice: Collection {
 }
 
 extension Slice {
-  @inlinable
+  @_alwaysEmitIntoClient
   public __consuming func _copyContents(
       initializing buffer: UnsafeMutableBufferPointer<Element>
   ) -> (Iterator, UnsafeMutableBufferPointer<Element>.Index) {
