@@ -259,13 +259,14 @@ Constraint::Constraint(ConstraintKind kind, ConstraintFix *fix, Type first,
   std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
 }
 
-Constraint::Constraint(ASTNode node, ConstraintLocator *locator,
+Constraint::Constraint(ASTNode node, ContextualTypeInfo context,
+                       ConstraintLocator *locator,
                        SmallPtrSetImpl<TypeVariableType *> &typeVars)
     : Kind(ConstraintKind::ClosureBodyElement), TheFix(nullptr),
       HasRestriction(false), IsActive(false), IsDisabled(false),
       IsDisabledForPerformance(false), RememberChoice(false), IsFavored(false),
       IsIsolated(false),
-      NumTypeVariables(typeVars.size()), ClosureElement{node},
+      NumTypeVariables(typeVars.size()), ClosureElement{node, context},
       Locator(locator) {
   std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
 }
@@ -1017,12 +1018,19 @@ Constraint *Constraint::createApplicableFunction(
 Constraint *Constraint::createClosureBodyElement(
     ConstraintSystem &cs, ASTNode node, ConstraintLocator *locator,
     ArrayRef<TypeVariableType *> referencedVars) {
+  return createClosureBodyElement(cs, node, ContextualTypeInfo(), locator,
+                                  referencedVars);
+}
+
+Constraint *Constraint::createClosureBodyElement(
+    ConstraintSystem &cs, ASTNode node, ContextualTypeInfo context,
+    ConstraintLocator *locator, ArrayRef<TypeVariableType *> referencedVars) {
   SmallPtrSet<TypeVariableType *, 4> typeVars;
   typeVars.insert(referencedVars.begin(), referencedVars.end());
 
   unsigned size = totalSizeToAlloc<TypeVariableType *>(typeVars.size());
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
-  return new (mem) Constraint(node, locator, typeVars);
+  return new (mem) Constraint(node, context, locator, typeVars);
 }
 
 Optional<TrailingClosureMatching>

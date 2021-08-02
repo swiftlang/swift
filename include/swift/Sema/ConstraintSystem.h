@@ -904,24 +904,6 @@ using OpenedType = std::pair<GenericTypeParamType *, TypeVariableType *>;
 using OpenedTypeMap =
     llvm::DenseMap<GenericTypeParamType *, TypeVariableType *>;
 
-/// Describes contextual type information about a particular expression
-/// within a constraint system.
-struct ContextualTypeInfo {
-  TypeLoc typeLoc;
-
-  ContextualTypePurpose purpose;
-
-  ContextualTypeInfo() : typeLoc(TypeLoc()), purpose(CTP_Unused) {}
-
-  ContextualTypeInfo(Type contextualTy, ContextualTypePurpose purpose)
-      : typeLoc(TypeLoc::withoutLoc(contextualTy)), purpose(purpose) {}
-
-  ContextualTypeInfo(TypeLoc typeLoc, ContextualTypePurpose purpose)
-      : typeLoc(typeLoc), purpose(purpose) {}
-
-  Type getType() const { return typeLoc.getType(); }
-};
-
 /// Describes the information about a case label item that needs to be tracked
 /// within the constraint system.
 struct CaseLabelItemInfo {
@@ -4871,9 +4853,9 @@ private:
 
   /// Simplify a closure body element constraint by generating required
   /// constraints to represent the given element in constraint system.
-  SolutionKind
-  simplifyClosureBodyElementConstraint(ASTNode element, TypeMatchOptions flags,
-                                       ConstraintLocatorBuilder locator);
+  SolutionKind simplifyClosureBodyElementConstraint(
+      ASTNode element, ContextualTypeInfo context, TypeMatchOptions flags,
+      ConstraintLocatorBuilder locator);
 
 public: // FIXME: Public for use by static functions.
   /// Simplify a conversion constraint with a fix applied to it.

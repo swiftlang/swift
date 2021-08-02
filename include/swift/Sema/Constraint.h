@@ -22,7 +22,9 @@
 #include "swift/AST/FunctionRefKind.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
+#include "swift/AST/TypeLoc.h"
 #include "swift/Basic/Debug.h"
+#include "swift/Sema/ConstraintLocator.h"
 #include "swift/Sema/OverloadChoice.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/ilist.h"
@@ -47,6 +49,23 @@ class ConstraintFix;
 class ConstraintLocator;
 class ConstraintSystem;
 enum class TrailingClosureMatching;
+
+/// Describes contextual type information about a particular element
+/// (expression, statement etc.) within a constraint system.
+struct ContextualTypeInfo {
+  TypeLoc typeLoc;
+  ContextualTypePurpose purpose;
+
+  ContextualTypeInfo() : typeLoc(TypeLoc()), purpose(CTP_Unused) {}
+
+  ContextualTypeInfo(Type contextualTy, ContextualTypePurpose purpose)
+      : typeLoc(TypeLoc::withoutLoc(contextualTy)), purpose(purpose) {}
+
+  ContextualTypeInfo(TypeLoc typeLoc, ContextualTypePurpose purpose)
+      : typeLoc(typeLoc), purpose(purpose) {}
+
+  Type getType() const { return typeLoc.getType(); }
+};
 
 /// Describes the kind of constraint placed on one or more types.
 enum class ConstraintKind : char {
@@ -421,6 +440,8 @@ class Constraint final : public llvm::ilist_node<Constraint>,
     struct {
       /// The node itself.
       ASTNode Element;
+      /// Contextual information associated with the element (if any).
+      ContextualTypeInfo Context;
     } ClosureElement;
   };
 
@@ -474,7 +495,8 @@ class Constraint final : public llvm::ilist_node<Constraint>,
              SmallPtrSetImpl<TypeVariableType *> &typeVars);
 
   /// Construct a closure body element constraint.
-  Constraint(ASTNode node, ConstraintLocator *locator,
+  Constraint(ASTNode node, ContextualTypeInfo context,
+             ConstraintLocator *locator,
              SmallPtrSetImpl<TypeVariableType *> &typeVars);
 
   /// Retrieve the type variables buffer, for internal mutation.
@@ -563,6 +585,12 @@ public:
 
   static Constraint *
   createClosureBodyElement(ConstraintSystem &cs, ASTNode node,
+                           ConstraintLocator *locator,
+                           ArrayRef<TypeVariableType *> referencedVars = {});
+
+  static Constraint *
+  createClosureBodyElement(ConstraintSystem &cs, ASTNode node,
+                           ContextualTypeInfo context,
                            ConstraintLocator *locator,
                            ArrayRef<TypeVariableType *> referencedVars = {});
 
@@ -825,6 +853,11 @@ public:
   ASTNode getClosureElement() const {
     assert(Kind == ConstraintKind::ClosureBodyElement);
     return ClosureElement.Element;
+  }
+
+  ContextualTypeInfo getElementContext() const {
+    assert(Kind == ConstraintKind::ClosureBodyElement);
+    return ClosureElement.Context;
   }
 
   /// For an applicable function constraint, retrieve the trailing closure

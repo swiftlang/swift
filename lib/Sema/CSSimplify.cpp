@@ -12593,9 +12593,9 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
         /*flags=*/None, constraint.getLocator());
 
   case ConstraintKind::ClosureBodyElement:
-    return simplifyClosureBodyElementConstraint(constraint.getClosureElement(),
-                                                /*flags=*/None,
-                                                constraint.getLocator());
+    return simplifyClosureBodyElementConstraint(
+        constraint.getClosureElement(), constraint.getElementContext(),
+        /*flags=*/None, constraint.getLocator());
   }
 
   llvm_unreachable("Unhandled ConstraintKind in switch.");

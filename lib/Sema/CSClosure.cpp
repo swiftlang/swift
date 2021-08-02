@@ -92,10 +92,12 @@ static bool isViableElement(ASTNode element) {
   return true;
 }
 
-static void
-createConjunction(ConstraintSystem &cs,
-                  ArrayRef<std::pair<ASTNode, ConstraintLocator *>> elements,
-                  ConstraintLocator *locator) {
+using ElementInfo =
+    std::tuple<ASTNode, ContextualTypeInfo, ConstraintLocator *>;
+
+static void createConjunction(ConstraintSystem &cs,
+                              ArrayRef<ElementInfo> elements,
+                              ConstraintLocator *locator) {
   bool isIsolated = false;
 
   SmallVector<Constraint *, 4> constraints;
@@ -110,8 +112,9 @@ createConjunction(ConstraintSystem &cs,
   }
 
   for (const auto &entry : elements) {
-    ASTNode element = entry.first;
-    ConstraintLocator *elementLoc = entry.second;
+    ASTNode element = std::get<0>(entry);
+    ContextualTypeInfo context = std::get<1>(entry);
+    ConstraintLocator *elementLoc = std::get<2>(entry);
 
     if (!isViableElement(element))
       continue;
@@ -125,11 +128,16 @@ createConjunction(ConstraintSystem &cs,
       element.walk(refFinder);
 
     constraints.push_back(Constraint::createClosureBodyElement(
-        cs, element, elementLoc, refFinder.getReferencedVars()));
+        cs, element, context, elementLoc, refFinder.getReferencedVars()));
   }
 
   cs.addUnsolvedConstraint(Constraint::createConjunction(
       cs, constraints, isIsolated, locator, referencedVars));
+}
+
+ElementInfo makeElement(ASTNode node, ConstraintLocator *locator,
+                        ContextualTypeInfo context = ContextualTypeInfo()) {
+  return std::make_tuple(node, context, locator);
 }
 
 /// Statement visitor that generates constraints for a given closure body.
@@ -182,27 +190,27 @@ private:
     if (!isSupportedMultiStatementClosure())
       llvm_unreachable("Unsupported statement: If");
 
-    SmallVector<std::pair<ASTNode, ConstraintLocator *>> elements;
+    SmallVector<ElementInfo> elements;
 
     // Condition
     {
       auto *condLoc =
         cs.getConstraintLocator(locator, ConstraintLocator::Condition);
-      elements.push_back({ifStmt->getCondPointer(), condLoc});
+      elements.push_back(makeElement(ifStmt->getCondPointer(), condLoc));
     }
 
     // Then Branch
     {
       auto *thenLoc = cs.getConstraintLocator(
         locator, LocatorPathElt::TernaryBranch(/*then=*/true));
-      elements.push_back({ifStmt->getThenStmt(), thenLoc});
+      elements.push_back(makeElement(ifStmt->getThenStmt(), thenLoc));
     }
 
     // Else Branch (if any).
     if (auto *elseStmt = ifStmt->getElseStmt()) {
       auto *elseLoc = cs.getConstraintLocator(
           locator, LocatorPathElt::TernaryBranch(/*then=*/false));
-      elements.push_back({ifStmt->getElseStmt(), elseLoc});
+      elements.push_back(makeElement(ifStmt->getElseStmt(), elseLoc));
     }
 
     createConjunction(cs, elements, locator);
@@ -212,26 +220,24 @@ private:
     if (!isSupportedMultiStatementClosure())
       llvm_unreachable("Unsupported statement: Guard");
 
-    createConjunction(
-        cs,
-        {std::make_pair(
-             guardStmt->getCondPointer(),
-             cs.getConstraintLocator(locator, ConstraintLocator::Condition)),
-         std::make_pair(guardStmt->getBody(), locator)},
-        locator);
+    createConjunction(cs,
+                      {makeElement(guardStmt->getCondPointer(),
+                                   cs.getConstraintLocator(
+                                       locator, ConstraintLocator::Condition)),
+                       makeElement(guardStmt->getBody(), locator)},
+                      locator);
   }
 
   void visitWhileStmt(WhileStmt *whileStmt) {
     if (!isSupportedMultiStatementClosure())
       llvm_unreachable("Unsupported statement: Guard");
 
-    createConjunction(
-        cs,
-        {std::make_pair(
-             whileStmt->getCondPointer(),
-             cs.getConstraintLocator(locator, ConstraintLocator::Condition)),
-         std::make_pair(whileStmt->getBody(), locator)},
-        locator);
+    createConjunction(cs,
+                      {makeElement(whileStmt->getCondPointer(),
+                                   cs.getConstraintLocator(
+                                       locator, ConstraintLocator::Condition)),
+                       makeElement(whileStmt->getBody(), locator)},
+                      locator);
   }
 
   void visitDoStmt(DoStmt *doStmt) {
@@ -245,20 +251,19 @@ private:
     if (!isSupportedMultiStatementClosure())
       llvm_unreachable("Unsupported statement: Do");
 
-    createConjunction(
-        cs,
-        {std::make_pair(
-             repeatWhileStmt->getCond(),
-             cs.getConstraintLocator(locator, ConstraintLocator::Condition)),
-         std::make_pair(repeatWhileStmt->getBody(), locator)},
-        locator);
+    createConjunction(cs,
+                      {makeElement(repeatWhileStmt->getCond(),
+                                   cs.getConstraintLocator(
+                                       locator, ConstraintLocator::Condition)),
+                       makeElement(repeatWhileStmt->getBody(), locator)},
+                      locator);
   }
 
   void visitBraceStmt(BraceStmt *braceStmt) {
     if (isSupportedMultiStatementClosure()) {
-      SmallVector<std::pair<ASTNode, ConstraintLocator *>, 4> elements;
+      SmallVector<ElementInfo, 4> elements;
       for (auto element : braceStmt->getElements()) {
-        elements.push_back(std::make_pair(
+        elements.push_back(makeElement(
             element,
             cs.getConstraintLocator(
                 locator, LocatorPathElt::ClosureBodyElement(element))));
@@ -381,7 +386,8 @@ bool isConditionOfStmt(ConstraintLocatorBuilder locator) {
 
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyClosureBodyElementConstraint(
-    ASTNode element, TypeMatchOptions flags, ConstraintLocatorBuilder locator) {
+    ASTNode element, ContextualTypeInfo context, TypeMatchOptions flags,
+    ConstraintLocatorBuilder locator) {
   auto *closure = castToExpr<ClosureExpr>(locator.getAnchor());
 
   ClosureConstraintGenerator generator(*this, closure,
