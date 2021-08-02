@@ -669,21 +669,6 @@ static void emitDefaultActorInitialization(
                       { self.borrow(SGF, loc).getValue() });
 }
 
-//static void emitDistributedRemoteActorInitialization(
-//    SILGenFunction &SGF, SILLocation loc,
-//    ManagedValue self,
-//    bool addressArg, bool transportArg // FIXME: make those real arguments
-//    ) {
-//  auto &ctx = SGF.getASTContext();
-//  auto builtinName = ctx.getIdentifier(
-//    getBuiltinName(BuiltinValueKind::InitializeDistributedRemoteActor));
-//  auto resultTy = SGF.SGM.Types.getEmptyTupleType();
-//
-//  FullExpr scope(SGF.Cleanups, CleanupLocation(loc));
-//  SGF.B.createBuiltin(loc, builtinName, resultTy, /*subs*/{},
-//                      { self.borrow(SGF, loc).getValue() });
-//}
-
 void SILGenFunction::emitConstructorPrologActorHop(
                                            SILLocation loc,
                                            Optional<ActorIsolation> maybeIso) {
@@ -779,11 +764,6 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
     emitDefaultActorInitialization(*this, PrologueLoc, selfArg);
   }
 
-  // Distributed actor initializers implicitly initialize their transport and id
-  if (selfClassDecl->isDistributedActor() && !isDelegating) {
-    initializeDistributedActorImplicitStorageInit(ctor, selfArg);
-  }
-
   if (!ctor->hasStubImplementation()) {
     assert(selfTy.hasReferenceSemantics() &&
            "can't emit a value type ctor here");
@@ -797,6 +777,11 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
       selfArg = B.createMarkUninitialized(selfDecl, selfArg, MUKind);
       VarLocs[selfDecl] = VarLoc::get(selfArg.getValue());
     }
+  }
+
+  // Distributed actor initializers implicitly initialize their transport and id
+  if (selfClassDecl->isDistributedActor() && !isDelegating) {
+    initializeDistributedActorImplicitStorageInit(ctor, selfArg);
   }
 
   // Prepare the end of initializer location.
@@ -864,6 +849,11 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   emitProfilerIncrement(ctor->getTypecheckedBody());
   // Emit the constructor body.
   emitStmt(ctor->getTypecheckedBody());
+
+  // For distributed actors, emit "actor ready" since we successfully initialized
+  if (selfClassDecl->isDistributedActor() && !isDelegating) {
+    emitDistributedActorReady(ctor, selfArg);
+  }
 
   // Emit the call to super.init() right before exiting from the initializer.
   if (NeedsBoxForSelf) {

@@ -625,14 +625,6 @@ public:
   /// destructor, then implicitly releases the elements of the class.
   void emitDestroyingDestructor(DestructorDecl *dd);
 
-  /// Initialize the distributed actors transport and id.
-  void initializeDistributedActorImplicitStorageInit(
-      ConstructorDecl *ctor, ManagedValue selfArg);
-
-  /// Inject distributed actor and transport interaction code into the destructor.
-  void injectDistributedActorDestructorLifecycleCall(
-      DestructorDecl *dd, SILValue selfValue, SILBasicBlock *continueBB);
-
   /// Generates code for an artificial top-level function that starts an
   /// application based on a main type and optionally a main type.
   void emitArtificialTopLevel(Decl *mainDecl);
@@ -1999,6 +1991,24 @@ public:
                                            CanSILFunctionType fromType,
                                            CanSILFunctionType toType,
                                            bool reorderSelf);
+
+  //===---------------------------------------------------------------------===//
+  // Distributed Actors
+  //===---------------------------------------------------------------------===//
+
+  /// Initialize the distributed actors transport and id.
+  void initializeDistributedActorImplicitStorageInit(
+      ConstructorDecl *ctor, ManagedValue selfArg);
+
+  /// Notify transport that actor has initialized successfully,
+  /// and is ready to receive messages.
+  void emitDistributedActorReady(
+      ConstructorDecl *ctor, ManagedValue selfArg);
+
+  /// Inject distributed actor and transport interaction code into the destructor.
+  void injectDistributedActorDestructorLifecycleCall(
+      DestructorDecl *dd, SILValue selfValue, SILBasicBlock *continueBB);
+
 
   //===--------------------------------------------------------------------===//
   // Declarations
