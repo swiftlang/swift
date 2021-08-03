@@ -271,18 +271,24 @@ private:
     if (!isSupportedMultiStatementClosure())
       llvm_unreachable("Unsupported statement: RepeatWhile");
 
-    auto boolDecl = cs.getASTContext().getBoolDecl();
-    assert(boolDecl && "Bool is missing");
-
-    ContextualTypeInfo conditionContext{boolDecl->getDeclaredType(),
-                                        CTP_Condition};
-
     createConjunction(cs,
                       {makeElement(repeatWhileStmt->getCond(),
                                    cs.getConstraintLocator(
                                        locator, ConstraintLocator::Condition),
-                                   conditionContext),
+                                   getContextForCondition()),
                        makeElement(repeatWhileStmt->getBody(), locator)},
+                      locator);
+  }
+
+  void visitPoundAssertStmt(PoundAssertStmt *poundAssertStmt) {
+    if (!isSupportedMultiStatementClosure())
+      llvm_unreachable("Unsupported statement: PoundAssert");
+
+    createConjunction(cs,
+                      {makeElement(poundAssertStmt->getCondition(),
+                                   cs.getConstraintLocator(
+                                       locator, ConstraintLocator::Condition),
+                                   getContextForCondition())},
                       locator);
   }
 
@@ -352,8 +358,14 @@ private:
   UNSUPPORTED_STMT(Case)
   UNSUPPORTED_STMT(Fail)
   UNSUPPORTED_STMT(Throw)
-  UNSUPPORTED_STMT(PoundAssert)
 #undef UNSUPPORTED_STMT
+
+private:
+  ContextualTypeInfo getContextForCondition() const {
+    auto boolDecl = cs.getASTContext().getBoolDecl();
+    assert(boolDecl && "Bool is missing");
+    return {boolDecl->getDeclaredType(), CTP_Condition};
+  }
 };
 }
 
@@ -602,6 +614,22 @@ private:
     return repeatWhileStmt;
   }
 
+  ASTNode visitPoundAssertStmt(PoundAssertStmt *poundAssertStmt) {
+    // FIXME: This should be done through \c solution instead of
+    //        constraint system.
+    auto &cs = solution.getConstraintSystem();
+    // Rewrite the condition.
+    auto target =
+        *cs.getSolutionApplicationTarget(poundAssertStmt->getCondition());
+
+    if (auto result = rewriteTarget(target))
+      poundAssertStmt->setCondition(result->getAsExpr());
+    else
+      hadError = true;
+
+    return poundAssertStmt;
+  }
+
   ASTNode visitBraceStmt(BraceStmt *braceStmt) {
     for (auto &node : braceStmt->getElements()) {
       if (auto expr = node.dyn_cast<Expr *>()) {
@@ -696,7 +724,6 @@ private:
   UNSUPPORTED_STMT(Case)
   UNSUPPORTED_STMT(Fail)
   UNSUPPORTED_STMT(Throw)
-  UNSUPPORTED_STMT(PoundAssert)
 #undef UNSUPPORTED_STMT
 
 };
