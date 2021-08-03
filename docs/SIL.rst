@@ -3505,6 +3505,7 @@ The operand must have loadable type.
    debug-var-attr ::= 'let'
    debug-var-attr ::= 'name' string-literal
    debug-var-attr ::= 'argno' integer-literal
+   debug-var-attr ::= 'implicit'
 
 ::
 
@@ -3520,12 +3521,13 @@ The operand must have loadable type.
 There are a number of attributes that provide details about the source
 variable that is being described, including the name of the
 variable. For function and closure arguments ``argno`` is the number
-of the function argument starting with 1. The advanced debug variable
-attributes represent source locations and type of the source variable
-when it was originally declared. It is useful when we're indirectly
-associating the SSA value with the source variable (via di-expression,
-for example) in which case SSA value's type is different from that of
-source variable.
+of the function argument starting with 1. A compiler-generated source
+variable will be marked ``implicit`` and optimizers are free to remove
+it even in -Onone. The advanced debug variable attributes represent source
+locations and type of the source variable when it was originally declared.
+It is useful when we're indirectly associating the SSA value with the
+source variable (via di-expression, for example) in which case SSA value's
+type is different from that of source variable.
 
 If the '[poison]' flag is set, then all references within this debug
 value will be overwritten with a sentinel at this point in the

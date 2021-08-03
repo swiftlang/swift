@@ -1726,27 +1726,31 @@ struct SILDebugVariable {
   StringRef Name;
   unsigned ArgNo : 16;
   unsigned Constant : 1;
+  unsigned Implicit : 1;
   Optional<SILType> Type;
   Optional<SILLocation> Loc;
   const SILDebugScope *Scope;
   SILDebugInfoExpression DIExpr;
 
-  SILDebugVariable() : ArgNo(0), Constant(false), Scope(nullptr) {}
+  SILDebugVariable()
+      : ArgNo(0), Constant(false), Implicit(false), Scope(nullptr) {}
   SILDebugVariable(bool Constant, uint16_t ArgNo)
-      : ArgNo(ArgNo), Constant(Constant), Scope(nullptr) {}
+      : ArgNo(ArgNo), Constant(Constant), Implicit(false), Scope(nullptr) {}
   SILDebugVariable(StringRef Name, bool Constant, unsigned ArgNo,
-                   Optional<SILType> AuxType = {},
+                   bool IsImplicit = false, Optional<SILType> AuxType = {},
                    Optional<SILLocation> DeclLoc = {},
                    const SILDebugScope *DeclScope = nullptr,
                    llvm::ArrayRef<SILDIExprElement> ExprElements = {})
-      : Name(Name), ArgNo(ArgNo), Constant(Constant), Type(AuxType),
-        Loc(DeclLoc), Scope(DeclScope), DIExpr(ExprElements) {}
+      : Name(Name), ArgNo(ArgNo), Constant(Constant), Implicit(IsImplicit),
+        Type(AuxType), Loc(DeclLoc), Scope(DeclScope), DIExpr(ExprElements) {}
+
   // We're not comparing DIExpr here because strictly speaking,
   // DIExpr is not part of the debug variable. We simply piggyback
   // it in this class so that's it's easier to carry DIExpr around.
   bool operator==(const SILDebugVariable &V) {
     return ArgNo == V.ArgNo && Constant == V.Constant && Name == V.Name &&
-           Type == V.Type && Loc == V.Loc && Scope == V.Scope;
+           Implicit == V.Implicit && Type == V.Type && Loc == V.Loc &&
+           Scope == V.Scope;
   }
 };
 
@@ -1761,10 +1765,12 @@ class TailAllocatedDebugVariable {
       int_type HasValue : 1;
       /// True if this is a let-binding.
       int_type Constant : 1;
+      /// True if this variable is created by compiler
+      int_type Implicit : 1;
       /// When this is nonzero there is a tail-allocated string storing
       /// variable name present. This typically only happens for
       /// instructions that were created from parsing SIL assembler.
-      int_type NameLength : 14;
+      int_type NameLength : 13;
       /// The source function argument position from left to right
       /// starting with 1 or 0 if this is a local variable.
       int_type ArgNo : 16;
@@ -1786,6 +1792,9 @@ public:
   StringRef getName(const char *buf) const;
   bool isLet() const { return Bits.Data.Constant; }
 
+  bool isImplicit() const { return Bits.Data.Implicit; }
+  void setImplicit(bool V = true) { Bits.Data.Implicit = V; }
+
   Optional<SILDebugVariable>
   get(VarDecl *VD, const char *buf, Optional<SILType> AuxVarType = {},
       Optional<SILLocation> DeclLoc = {},
@@ -1796,11 +1805,11 @@ public:
 
     if (VD)
       return SILDebugVariable(VD->getName().empty() ? "" : VD->getName().str(),
-                              VD->isLet(), getArgNo(), AuxVarType, DeclLoc,
-                              DeclScope, DIExprElements);
-    else
-      return SILDebugVariable(getName(buf), isLet(), getArgNo(), AuxVarType,
+                              VD->isLet(), getArgNo(), isImplicit(), AuxVarType,
                               DeclLoc, DeclScope, DIExprElements);
+    else
+      return SILDebugVariable(getName(buf), isLet(), getArgNo(), isImplicit(),
+                              AuxVarType, DeclLoc, DeclScope, DIExprElements);
   }
 };
 static_assert(sizeof(TailAllocatedDebugVariable) == 4,

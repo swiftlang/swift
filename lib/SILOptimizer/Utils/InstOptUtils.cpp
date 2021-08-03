@@ -222,7 +222,11 @@ bool swift::hasOnlyEndOfScopeOrDestroyUses(SILInstruction *inst) {
       // Include debug uses only in Onone mode.
       if (isDebugUser && inst->getFunction()->getEffectiveOptimizationMode() <=
                              OptimizationMode::NoOptimization)
-        return false;
+        if (auto DbgVarInst = DebugVarCarryingInst(user)) {
+          auto VarInfo = DbgVarInst.getVarInfo();
+          if (VarInfo && !VarInfo->Implicit)
+            return false;
+        }
     }
   }
   return true;

@@ -1198,6 +1198,8 @@ public:
 
     if (Var->ArgNo)
       *this << ", argno " << Var->ArgNo;
+    if (Var->Implicit)
+      *this << ", implicit";
     if (Var->Type) {
       *this << ", type ";
       Var->Type->print(PrintState.OS, PrintState.ASTOptions);

@@ -138,6 +138,7 @@ TailAllocatedDebugVariable::TailAllocatedDebugVariable(
   Bits.Data.HasValue = true;
   Bits.Data.Constant = Var->Constant;
   Bits.Data.ArgNo = Var->ArgNo;
+  Bits.Data.Implicit = Var->Implicit;
   Bits.Data.NameLength = Var->Name.size();
   assert(Bits.Data.ArgNo == Var->ArgNo && "Truncation");
   assert(Bits.Data.NameLength == Var->Name.size() && "Truncation");
@@ -181,6 +182,11 @@ AllocStackInst::AllocStackInst(SILDebugLocation Loc, SILType elementType,
                                  getTrailingObjects<const SILDebugScope *>(),
                                  getTrailingObjects<SILDIExprElement>())
           .getRawValue();
+  if (auto *VD = Loc.getLocation().getAsASTNode<VarDecl>()) {
+    TailAllocatedDebugVariable DbgVar(SILNode::Bits.AllocStackInst.VarInfo);
+    DbgVar.setImplicit(VD->isImplicit() || DbgVar.isImplicit());
+    SILNode::Bits.AllocStackInst.VarInfo = DbgVar.getRawValue();
+  }
   TrailingOperandsList::InitOperandsList(getAllOperands().begin(), this,
                                          TypeDependentOperands);
 }
@@ -312,6 +318,8 @@ DebugValueInst::DebugValueInst(SILDebugLocation DebugLoc, SILValue Operand,
               getTrailingObjects<SILLocation>(),
               getTrailingObjects<const SILDebugScope *>(),
               getTrailingObjects<SILDIExprElement>()) {
+  if (auto *VD = DebugLoc.getLocation().getAsASTNode<VarDecl>())
+    VarInfo.setImplicit(VD->isImplicit() || VarInfo.isImplicit());
   setPoisonRefs(poisonRefs);
 }
 
@@ -331,7 +339,10 @@ DebugValueAddrInst::DebugValueAddrInst(SILDebugLocation DebugLoc,
       VarInfo(Var, getTrailingObjects<char>(), getTrailingObjects<SILType>(),
               getTrailingObjects<SILLocation>(),
               getTrailingObjects<const SILDebugScope *>(),
-              getTrailingObjects<SILDIExprElement>()) {}
+              getTrailingObjects<SILDIExprElement>()) {
+  if (auto *VD = DebugLoc.getLocation().getAsASTNode<VarDecl>())
+    VarInfo.setImplicit(VD->isImplicit() || VarInfo.isImplicit());
+}
 
 DebugValueAddrInst *DebugValueAddrInst::create(SILDebugLocation DebugLoc,
                                                SILValue Operand, SILModule &M,
