@@ -870,8 +870,9 @@ Type ConstraintSystem::openOpaqueType(Type type,
 
 Type ConstraintSystem::openOpaqueTypeRec(Type type,
                                          ConstraintLocatorBuilder locator) {
-  // Early return for efficiency
-  if (!(type && type->hasOpaqueArchetype()))
+  // Early return if `type` is `NULL` or if there are no opaque archetypes (in
+  // which case there is certainly nothing for us to do).
+  if (!type || !type->hasOpaqueArchetype())
     return type;
 
   return type.transform([&](Type type) -> Type {

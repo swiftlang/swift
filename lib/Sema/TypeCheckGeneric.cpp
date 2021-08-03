@@ -243,19 +243,9 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
       requirements.push_back(
           Requirement(RequirementKind::Superclass, paramType, constraintType));
     } else {
-      auto constraints = constraintType->getExistentialLayout();
-      if (auto superclass = constraints.getSuperclass()) {
-        requirements.push_back(
-            Requirement(RequirementKind::Superclass, paramType, superclass));
-      }
-      for (auto protocol : constraints.getProtocols()) {
-        requirements.push_back(
-            Requirement(RequirementKind::Conformance, paramType, protocol));
-      }
-      if (auto layout = constraints.getLayoutConstraint()) {
-        requirements.push_back(
-            Requirement(RequirementKind::Layout, paramType, layout));
-      }
+      // In this case, the constraint type is an existential
+      requirements.push_back(
+          Requirement(RequirementKind::Conformance, paramType, constraintType));
     }
   }
 

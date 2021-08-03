@@ -2834,7 +2834,11 @@ TypeRepr *ValueDecl::getOpaqueResultTypeRepr() const {
     returnRepr = SD->getElementTypeRepr();
   }
 
-  return returnRepr && returnRepr->hasOpaque() ? returnRepr : nullptr;
+  if (returnRepr && returnRepr->hasOpaque()) {
+    return returnRepr;
+  } else {
+    return nullptr;
+  }
 }
 
 OpaqueTypeDecl *ValueDecl::getOpaqueResultTypeDecl() const {

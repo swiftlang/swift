@@ -4247,11 +4247,11 @@ OpaqueTypeArchetypeType::get(OpaqueTypeDecl *Decl, unsigned ordinal,
   // exception of generic base class constraints (handled below).
   (void)newRequirements;
 # ifndef NDEBUG
-  for (auto reqt :
+  for (auto req :
                 Decl->getOpaqueInterfaceGenericSignature().getRequirements()) {
-    auto reqtBase = reqt.getFirstType()->getRootGenericParam();
-    if (reqtBase->isEqual(opaqueParamType)) {
-      assert(reqt.getKind() != RequirementKind::SameType
+    auto reqBase = req.getFirstType()->getRootGenericParam();
+    if (reqBase->isEqual(opaqueParamType)) {
+      assert(req.getKind() != RequirementKind::SameType
              && "supporting where clauses on opaque types requires correctly "
                 "setting up the generic environment for "
                 "OpaqueTypeArchetypeTypes; see comment above");
@@ -4267,8 +4267,8 @@ OpaqueTypeArchetypeType::get(OpaqueTypeDecl *Decl, unsigned ordinal,
         std::move(newRequirements)},
       nullptr);
 
-  auto layout = signature->getLayoutConstraint(opaqueParamType);
-  auto superclass = signature->getSuperclassBound(opaqueParamType);
+  auto reqs = signature->getLocalRequirements(opaqueParamType);
+  auto superclass = reqs.superclass;
   #if !DO_IT_CORRECTLY
     // Ad-hoc substitute the generic parameters of the superclass.
     // If we correctly applied the substitutions to the generic signature
@@ -4277,17 +4277,16 @@ OpaqueTypeArchetypeType::get(OpaqueTypeDecl *Decl, unsigned ordinal,
       superclass = superclass.subst(Substitutions);
     }
   #endif
-  const auto protos = signature->getRequiredProtocols(opaqueParamType);
 
   auto mem = ctx.Allocate(
     OpaqueTypeArchetypeType::totalSizeToAlloc<ProtocolDecl *, Type, LayoutConstraint>(
-      protos.size(), superclass ? 1 : 0, layout ? 1 : 0),
+      reqs.protos.size(), superclass ? 1 : 0, reqs.layout ? 1 : 0),
       alignof(OpaqueTypeArchetypeType),
       arena);
 
   auto newOpaque = ::new (mem)
       OpaqueTypeArchetypeType(Decl, Substitutions, properties, opaqueParamType,
-                              protos, superclass, layout);
+                              reqs.protos, superclass, reqs.layout);
 
   // Create a generic environment and bind the opaque archetype to the
   // opaque interface type from the decl's signature.

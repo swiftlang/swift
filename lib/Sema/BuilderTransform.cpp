@@ -1657,12 +1657,9 @@ Optional<BraceStmt *> TypeChecker::applyResultBuilderBodyTransform(
   // Build a constraint system in which we can check the body of the function.
   ConstraintSystem cs(func, options);
 
-  auto openedResultContextType = cs.openOpaqueTypeRec(
-      resultContextType, cs.getConstraintLocator(
-                             func, ConstraintLocator::ResultBuilderBodyResult));
   if (auto result = cs.matchResultBuilder(
-          func, builderType, resultContextType, openedResultContextType,
-          resultConstraintKind, cs.getConstraintLocator(func->getBody()))) {
+          func, builderType, resultContextType, resultConstraintKind,
+          cs.getConstraintLocator(func->getBody()))) {
     if (result->isFailure())
       return nullptr;
   }
@@ -1721,7 +1718,6 @@ Optional<BraceStmt *> TypeChecker::applyResultBuilderBodyTransform(
 Optional<ConstraintSystem::TypeMatchResult>
 ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
                                      Type bodyResultType,
-                                     Type openedBodyResultType,
                                      ConstraintKind bodyResultConstraintKind,
                                      ConstraintLocatorBuilder locator) {
   auto builder = builderType->getAnyNominal();
@@ -1848,8 +1844,8 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
   }
 
   // Bind the body result type to the type of the transformed expression.
-  addConstraint(bodyResultConstraintKind, transformedType, openedBodyResultType,
-                locator);
+  addConstraint(bodyResultConstraintKind, transformedType,
+                openOpaqueTypeRec(bodyResultType, locator), locator);
   return getTypeMatchSuccess();
 }
 

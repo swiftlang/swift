@@ -5472,8 +5472,6 @@ class OpaqueTypeArchetypeType final : public ArchetypeType,
   GenericEnvironment *Environment;
   
 public:
-  /// Get
-
   /// Get an opaque archetype representing the underlying type of the given
   /// opaque type decl's opaque param with ordinal `ordinal`. For example, in
   /// `(some P, some Q)`, `some P`'s type param would have ordinal 0 and `some

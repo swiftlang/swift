@@ -8947,12 +8947,10 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
   assignFixedType(typeVar, closureType, closureLocator);
 
   // If there is a result builder to apply, do so now.
-  auto openedClosureResultType =
-      openOpaqueTypeRec(closureType->getResult(), closureLocator);
   if (resultBuilderType) {
     if (auto result = matchResultBuilder(
             closure, resultBuilderType, closureType->getResult(),
-            openedClosureResultType, ConstraintKind::Conversion, locator)) {
+            ConstraintKind::Conversion, locator)) {
       return result->isSuccess();
     }
   }

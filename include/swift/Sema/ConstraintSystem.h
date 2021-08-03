@@ -4726,16 +4726,10 @@ public:
 
   /// Apply the given result builder to the closure expression.
   ///
-  /// \param bodyResultType The type which the body of the result builder
-  /// evaluates to, with all opaque archetype types un-opened.
-  /// \param openedBodyResultType The type which the body of the result builder
-  /// evalutes to, with all opaque archetype types opened.
-  ///
   /// \returns \c None when the result builder cannot be applied at all,
   /// otherwise the result of applying the result builder.
   Optional<TypeMatchResult>
   matchResultBuilder(AnyFunctionRef fn, Type builderType, Type bodyResultType,
-                     Type openedBodyResultType,
                      ConstraintKind bodyResultConstraintKind,
                      ConstraintLocatorBuilder locator);
 
