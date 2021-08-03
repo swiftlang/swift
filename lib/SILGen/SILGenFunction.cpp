@@ -510,6 +510,11 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
 void SILGenFunction::emitFunction(FuncDecl *fd) {
   MagicFunctionName = SILGenModule::getMagicFunctionName(fd);
 
+  if (fd->isDistributedActorFactory()) {
+    emitDistributedActorFactory(fd);
+    return;
+  }
+
   auto captureInfo = SGM.M.Types.getLoweredLocalCaptures(SILDeclRef(fd));
   emitProfilerIncrement(fd->getTypecheckedBody());
   emitProlog(captureInfo, fd->getParameters(), fd->getImplicitSelfDecl(), fd,
