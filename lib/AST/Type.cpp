@@ -3772,7 +3772,8 @@ operator()(CanType dependentType, Type conformingReplacementType,
     return ProtocolConformanceRef(conformedProtocol);
 
   return M->lookupConformance(conformingReplacementType,
-                              conformedProtocol);
+                              conformedProtocol,
+                              /*allowMissing=*/true);
 }
 
 ProtocolConformanceRef LookUpConformanceInSubstitutionMap::

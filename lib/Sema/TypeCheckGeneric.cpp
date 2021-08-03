@@ -800,7 +800,7 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
       }
 
       ArrayRef<Requirement> conditionalRequirements;
-      if (req.isSatisfied(conditionalRequirements)) {
+      if (req.isSatisfied(conditionalRequirements, /*allowMissing=*/true)) {
         if (!conditionalRequirements.empty()) {
           assert(req.getKind() == RequirementKind::Conformance);
 
@@ -897,7 +897,7 @@ TypeChecker::checkGenericArguments(ModuleDecl *module,
   while (!worklist.empty()) {
     auto req = worklist.pop_back_val();
     ArrayRef<Requirement> conditionalRequirements;
-    if (!req.isSatisfied(conditionalRequirements))
+    if (!req.isSatisfied(conditionalRequirements, /*allowMissing=*/true))
       return RequirementCheckResult::Failure;
 
     worklist.append(conditionalRequirements.begin(),

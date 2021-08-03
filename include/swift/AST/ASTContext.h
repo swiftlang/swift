@@ -106,6 +106,7 @@ namespace swift {
   class InheritedProtocolConformance;
   class SelfProtocolConformance;
   class SpecializedProtocolConformance;
+  enum class BuiltinConformanceKind;
   class BuiltinProtocolConformance;
   enum class ProtocolConformanceState;
   class Pattern;
@@ -1046,7 +1047,8 @@ public:
   BuiltinProtocolConformance *
   getBuiltinConformance(Type type, ProtocolDecl *protocol,
                         GenericSignature genericSig,
-                        ArrayRef<Requirement> conditionalRequirements);
+                        ArrayRef<Requirement> conditionalRequirements,
+                        BuiltinConformanceKind kind);
 
   /// A callback used to produce a diagnostic for an ill-formed protocol
   /// conformance that was type-checked before we're actually walking the
