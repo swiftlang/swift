@@ -779,11 +779,6 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
     emitDefaultActorInitialization(*this, PrologueLoc, selfArg);
   }
 
-  // Distributed actor initializers implicitly initialize their transport and id
-  if (selfClassDecl->isDistributedActor() && !isDelegating) {
-    initializeDistributedActorImplicitStorageInit(ctor, selfArg);
-  }
-
   if (!ctor->hasStubImplementation()) {
     assert(selfTy.hasReferenceSemantics() &&
            "can't emit a value type ctor here");
@@ -797,6 +792,11 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
       selfArg = B.createMarkUninitialized(selfDecl, selfArg, MUKind);
       VarLocs[selfDecl] = VarLoc::get(selfArg.getValue());
     }
+  }
+
+  // Distributed actor initializers implicitly initialize their transport and id
+  if (selfClassDecl->isDistributedActor() && !isDelegating) {
+    initializeDistributedActorImplicitStorageInit(ctor, selfArg);
   }
 
   // Prepare the end of initializer location.
