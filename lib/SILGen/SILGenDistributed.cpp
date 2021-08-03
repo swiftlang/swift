@@ -125,12 +125,6 @@ emitDistributedActorIdentityInit(SILGenFunction &SGF, ManagedValue selfArg, VarD
 //  assert(transportSILTy);
 
   // === prepare the transport.assignIdentity(_:) function
-//  auto transportArgValue = F.getArgument(0);
-//  auto transportSILTy = transportArgValue->getType();
-//  ManagedValue transportArgManaged = ManagedValue::forUnmanaged(transportArgValue);
-//
-//  fprintf(stderr, "[%s:%d] (%s) transportSILTy\n", __FILE__, __LINE__, __FUNCTION__);
-//  transportSILTy.dump();
 
   AbstractFunctionDecl *assignIdentityFuncDecl = lookupAssignIdentityFunc(C);
 
@@ -139,16 +133,20 @@ emitDistributedActorIdentityInit(SILGenFunction &SGF, ManagedValue selfArg, VarD
 
   // === Open the transport existential before call
   SILValue transportArgValue = F.getArgument(0);
-  ProtocolDecl *transportProtocol = C.getProtocol(KnownProtocolKind::ActorTransport);
-  assert(transportProtocol);
+  SILValue selfArgValue = F.getArgument(0);
+  ProtocolDecl *distributedActorProto = C.getProtocol(KnownProtocolKind::DistributedActor);
+  ProtocolDecl *transportProto = C.getProtocol(KnownProtocolKind::ActorTransport);
+  assert(distributedActorProto);
+  assert(transportProto);
+
   // --- open the transport existential
   OpenedArchetypeType *Opened;
-  auto SwiftType = transportArgValue->getType().getASTType();
-  auto OpenedType =
-      SwiftType->openAnyExistentialType(Opened)->getCanonicalType();
-  auto OpenedSILType = F.getLoweredType(OpenedType);
+  auto transportASTType = transportArgValue->getType().getASTType();
+  auto openedTransportType =
+      transportASTType->openAnyExistentialType(Opened)->getCanonicalType();
+  auto openedTransportSILType = F.getLoweredType(openedTransportType);
   auto archetypeValue = B.createOpenExistentialAddr(
-      loc, transportArgValue, OpenedSILType, OpenedExistentialAccess::Immutable);
+      loc, transportArgValue, openedTransportSILType, OpenedExistentialAccess::Immutable);
 
   // --- prepare `Self.self` metatype
   // TODO: how to get @dynamic_self, do we need it?
@@ -165,33 +163,40 @@ emitDistributedActorIdentityInit(SILGenFunction &SGF, ManagedValue selfArg, VarD
   // --- prepare the witness_method
 //  auto assignIdentityFnSIL = builder.getOrCreateFunction(loc, assignIdentityFnRef, ForDefinition);
 //  SILValue assignIdentityFn = B.createFunctionRefFor(loc, assignIdentityFnSIL);
-   auto *swiftModule = SGF.getModule().getSwiftModule();
-//  auto *swiftModule = SGF.getModule().getDistributedModule(); // FIXME: this is not a thing
-  auto astType = SwiftType; // TODO: renames
-  auto confRef = swiftModule->lookupConformance(
-      astType, transportProtocol); // TODO: was adContext.getAdditiveArithmeticProtocol()
-  assert(!confRef.isInvalid() && "Missing conformance to `ActorTransport`");
+  // Note: it does not matter on what module we perform the lookup,
+  // it is currently ignored. So the Stdlib module is good enough.
+  auto *module = SGF.getModule().getSwiftModule();
+
+  auto transportConfRef = module->lookupConformance(
+      openedTransportType, transportProto);
+  transportConfRef.dump();
+  assert(!transportConfRef.isInvalid() && "Missing conformance to `ActorTransport`");
+  fprintf(stderr, "[%s:%d] (%s) transportConfRef IS OK \n", __FILE__, __LINE__, __FUNCTION__);
+
+//  fprintf(stderr, "[%s:%d] (%s) selfTyDecl\n", __FILE__, __LINE__, __FUNCTION__);
+//  selfTyDecl->getInterfaceType().dump();
+//  fprintf(stderr, "[%s:%d] (%s) distributedActorProto\n", __FILE__, __LINE__, __FUNCTION__);
+
+//  distributedActorProto->dump();
+//  auto distributedActorConfRef = module->lookupConformance(
+//      selfTyDecl->getInterfaceType(), distributedActorProto);
+//  assert(!distributedActorConfRef.isInvalid() && "Missing conformance to `DistributedActor`");
+//  distributedActorConfRef.dump();
 
   auto assignIdentityMethod =
-      transportProtocol->getSingleRequirement(C.Id_assignIdentity);
+      transportProto->getSingleRequirement(C.Id_assignIdentity);
   auto assignIdentityRef = SILDeclRef(assignIdentityMethod);
 
   auto anyActorIdentityDecl = C.getAnyActorIdentityDecl();
   auto anyActorIdentityTy = anyActorIdentityDecl->getInterfaceType();
   auto anyActorIdentitySILTy = SGF.getLoweredType(anyActorIdentityTy);
 
-//  XXXX
-//  auto equatable = hashable.getAssociatedConformance(formalTy,
-//                                                     GenericTypeParamType::get(0, 0, C),
-//                                                     equatableProtocol);
-
   auto assignWitnessMethod = B.createWitnessMethod(
       loc,
-      /*lookupTy*/astType, // formal canonical type ????
-      /*Conformance*/confRef, // like "equatable" XXXX
+      /*lookupTy*/openedTransportType,
+      /*Conformance*/transportConfRef,
       /*member*/assignIdentityRef,
       /*methodTy*/anyActorIdentitySILTy);
-  // FIXME: this is function_ref but we want witness_methodtw
 
   // --- prepare params: {Self.self, /*self=*/transport}
   SmallVector<SILValue, 2> assignParams({});
@@ -202,7 +207,7 @@ emitDistributedActorIdentityInit(SILGenFunction &SGF, ManagedValue selfArg, VarD
   SGF.F.dump();
 
   // --- call transport.assignIdentity(Self.self)
-  SubstitutionMap subs = SubstitutionMap(); // FIXME: needs specific?
+  SubstitutionMap subs = SubstitutionMap();
   auto identity = B.createApply(
       loc, assignWitnessMethod, subs, assignParams);
 
