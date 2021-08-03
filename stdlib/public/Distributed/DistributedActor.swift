@@ -36,7 +36,6 @@ public protocol AnyActor: AnyObject {}
 /// point.
 @available(SwiftStdlib 5.5, *)
 public protocol DistributedActor: AnyActor, Identifiable, Hashable, Codable {
-
     /// Creates new (local) distributed actor instance, bound to the passed transport.
     ///
     /// Upon initialization, the `id` field is populated by the transport,
@@ -45,24 +44,6 @@ public protocol DistributedActor: AnyActor, Identifiable, Hashable, Codable {
     /// - Parameter transport: the transport this distributed actor instance will
     ///   associated with.
     init(transport: ActorTransport)
-
-    @available(*, deprecated, renamed: "SomeDistributedActor.resolve(_:using:)")
-    init(resolve id: AnyActorIdentity, using transport: ActorTransport) throws
-
-    /// Resolves the passed in `identity` against the `transport`, returning
-    /// either a local or remote actor reference.
-    ///
-    /// The transport will be asked to `resolve` the identity and return either
-    /// a local instance or request a proxy to be created for this identity.
-    ///
-    /// A remote distributed actor reference will forward all invocations through
-    /// the transport, allowing it to take over the remote messaging with the
-    /// remote actor instance.
-    ///
-    /// - Parameter identity: identity uniquely identifying a, potentially remote, actor in the system
-    /// - Parameter transport: `transport` which should be used to resolve the `identity`, and be associated with the returned actor
-    static func resolve<Identity>(_ identity: Identity, using transport: ActorTransport)
-      throws -> Self where Identity: ActorIdentity
 
     /// The `ActorTransport` associated with this actor.
     /// It is immutable and equal to the transport passed in the local/resolve
@@ -84,23 +65,6 @@ public protocol DistributedActor: AnyActor, Identifiable, Hashable, Codable {
     /// Conformance to this requirement is synthesized automatically for any
     /// `distributed actor` declaration.
     nonisolated var id: AnyActorIdentity { get }
-}
-
-@available(SwiftStdlib 5.5, *)
-extension DistributedActor {
-
-  public static func resolve<Identity>(_ identity: Identity, using transport: ActorTransport)
-      throws -> Self where Identity: ActorIdentity {
-    switch try transport.resolve(AnyActorIdentity(identity), as: Self.self) {
-    case .resolved(let instance):
-      return instance
-
-    case .makeProxy:
-      // FIXME: this needs actual implementation of distributedActorRemoteCreate
-      let remote: Any = distributedActorRemoteCreate(identity: identity, transport: transport)
-      return remote as! Self
-    }
-  }
 }
 
 // ==== Hashable conformance ---------------------------------------------------

@@ -127,44 +127,22 @@ bool swift::checkDistributedFunction(FuncDecl *func, bool diagnose) {
   return false;
 }
 
-void swift::checkDistributedActorConstructor(ClassDecl *decl, ConstructorDecl *ctor) {
-  // bail out unless distributed actor, only those have special rules to check here
+void swift::checkDistributedActorConstructor(ClassDecl *decl,
+                                             ConstructorDecl *ctor) {
   if (!decl->isDistributedActor())
     return;
 
-  // bail out for synthesized constructors
+  // assume any synthesized constructors are OK.
   if (ctor->isSynthesized())
     return;
 
-  if (ctor->isDistributedActorLocalInit()) {
-    // it is not legal to manually define init(transport:)
-    // TODO: we want to lift this restriction but it is tricky
-    ctor->diagnose(diag::distributed_actor_local_init_explicitly_defined)
-        .fixItRemove(SourceRange(ctor->getStartLoc(), decl->getStartLoc()));
-    // TODO: we should be able to allow this, but then we need to inject
-    //       code or force users to "do the right thing"
+  // can skip convenience inits
+  if (ctor->isConvenienceInit())
     return;
-  }
 
-  if (ctor->isDistributedActorResolveInit()) {
-    // It is illegal for users to attempt defining a resolve initializer;
-    // Suggest removing it entirely, there is no way users can implement this init.
-    ctor->diagnose(diag::distributed_actor_init_resolve_must_not_be_user_defined)
-        .fixItRemove(SourceRange(ctor->getStartLoc(), decl->getStartLoc()));
-    return;
-  }
+  // TODO(distributed): Ensure that all designated initializers take exactly one
+  //  parameter that conforms to the ActorTransport protocol, raising an error
+  //  if not.
 
-  // All user defined initializers on distributed actors must be 'convenience'.
-  //
-  // The only initializer that is allowed to be designated is init(transport:)
-  // which we synthesize on behalf of a distributed actor.
-  //
-  // When checking ctor bodies we'll check
-  if (!ctor->isConvenienceInit()) {
-    ctor->diagnose(diag::distributed_actor_init_user_defined_must_be_convenience,
-                   ctor->getName())
-        .fixItInsert(ctor->getConstructorLoc(), "convenience ");
-    return;
-  }
 }
 
