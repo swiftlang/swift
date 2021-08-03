@@ -29,7 +29,7 @@
 #include "llvm/Support/Program.h"
 #include "llvm/Support/Regex.h"
 #include "llvm/Support/Signals.h"
-#include "llvm/Support/Threading.h"
+#include "llvm/Support/thread.h"
 #include "llvm/Support/raw_ostream.h"
 #include <fstream>
 #if defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
@@ -206,7 +206,9 @@ static void skt_main(skt_args *args);
 int main(int argc, const char **argv) {
   dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0), ^{
     skt_args args = {argc, argv, 0};
-    llvm::llvm_execute_on_thread((void (*)(void *))skt_main, &args);
+    llvm::thread Thread(llvm::thread::DefaultStackSize,
+                        skt_main, &args);
+    Thread.join();
     exit(args.ret);
   });
 
