@@ -209,7 +209,7 @@ Marks a property as being a stored property in a swiftinterface.
 For `@frozen` types, the compiler needs to be able to tell whether a particular
 property is stored or computed to correctly perform type layout.
 
-```
+```swift
 @frozen struct S {
   @_hasStorage var x: Int { get set } // stored
   var y: Int { get set } // computed
