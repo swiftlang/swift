@@ -30,6 +30,8 @@ NOTE(decl_declared_here,none,
      "%0 declared here", (DeclName))
 NOTE(kind_declared_here,none,
      "%0 declared here", (DescriptiveDeclKind))
+NOTE(descriptive_decl_declared_here,none,
+     "'%0' declared here", (StringRef))
 NOTE(implicit_member_declared_here,none,
      "%1 '%0' is implicitly declared", (StringRef, StringRef))
 NOTE(extended_type_declared_here,none,

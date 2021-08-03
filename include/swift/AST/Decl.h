@@ -6220,7 +6220,7 @@ public:
   /// handler if \p asyncAlternative is not set (with the same conditions on
   /// its type as above).
   Optional<unsigned> findPotentialCompletionHandlerParam(
-      AbstractFunctionDecl *asyncAlternative = nullptr) const;
+      const AbstractFunctionDecl *asyncAlternative = nullptr) const;
 
   /// Determine whether this function is implicitly known to have its
   /// parameters of function type be @_unsafeSendable.
@@ -6598,6 +6598,10 @@ public:
     Bits.AccessorDecl.IsTransparent = transparent;
     Bits.AccessorDecl.IsTransparentComputed = 1;
   }
+
+  /// A representation of the name to be displayed to users. \c getNameStr
+  /// for anything other than a getter or setter.
+  void printUserFacingName(llvm::raw_ostream &out) const;
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Accessor;

@@ -7120,7 +7120,7 @@ static bool isPotentialCompletionHandler(const ParamDecl *param) {
 }
 
 Optional<unsigned> AbstractFunctionDecl::findPotentialCompletionHandlerParam(
-    AbstractFunctionDecl *asyncAlternative) const {
+    const AbstractFunctionDecl *asyncAlternative) const {
   const ParameterList *params = getParameters();
   if (params->size() == 0)
     return None;
@@ -7203,7 +7203,7 @@ Optional<unsigned> AbstractFunctionDecl::findPotentialCompletionHandlerParam(
 
     // The next original param should match the current async, so don't
     // increment the async index
-    potentialParam = asyncParamIndex;
+    potentialParam = paramIndex;
     paramIndex++;
   }
   return potentialParam;
@@ -7908,6 +7908,28 @@ bool AccessorDecl::isSimpleDidSet() const {
   auto mutableThis = const_cast<AccessorDecl *>(this);
   return evaluateOrDefault(getASTContext().evaluator,
                            SimpleDidSetRequest{mutableThis}, false);
+}
+
+void AccessorDecl::printUserFacingName(raw_ostream &out) const {
+  switch (getAccessorKind()) {
+  case AccessorKind::Get:
+    out << "getter:";
+    break;
+  case AccessorKind::Set:
+    out << "setter:";
+    break;
+  default:
+    out << getName();
+    return;
+  }
+
+  out << getStorage()->getName() << "(";
+  if (this->isSetter()) {
+    for (const auto *param : *getParameters()) {
+      out << param->getName() << ":";
+    }
+  }
+  out << ")";
 }
 
 StaticSpellingKind FuncDecl::getCorrectStaticSpelling() const {
