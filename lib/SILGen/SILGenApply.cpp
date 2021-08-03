@@ -4415,7 +4415,7 @@ RValue SILGenFunction::emitApply(
   if (auto foreignAsync = calleeTypeInfo.foreign.async) {
     unsigned completionIndex = foreignAsync->completionHandlerParamIndex();
 
-    // Ram the emitted error into the argument list, over the placeholder
+    // Ram the emitted completion into the argument list, over the placeholder
     // we left during the first pass.
     auto &completionArgSlot = const_cast<ManagedValue &>(args[completionIndex]);
 
