@@ -1524,21 +1524,6 @@ TypeChecker::lookupPrecedenceGroup(DeclContext *dc, Identifier name,
   return PrecedenceGroupLookupResult(dc, name, std::move(groups));
 }
 
-static bool canResolveSingleNominalTypeDecl(
-    DeclContext *DC, SourceLoc loc, Identifier ident, ASTContext &Ctx) {
-  auto *TyR = new (Ctx) SimpleIdentTypeRepr(DeclNameLoc(loc),
-                                            DeclNameRef(ident));
-
-  TypeResolutionOptions options{TypeResolverContext::TypeAliasDecl};
-  options |= TypeResolutionFlags::SilenceErrors;
-  const auto result =
-      TypeResolution::forInterface(DC, options, /*unboundTyOpener*/ nullptr,
-                                   /*placeholderHandler*/ nullptr)
-          .resolveType(TyR);
-
-  return !result->hasError();
-}
-
 /// Validate the given operator declaration.
 ///
 /// This establishes key invariants, such as an InfixOperatorDecl's
@@ -1555,15 +1540,13 @@ OperatorPrecedenceGroupRequest::evaluate(Evaluator &evaluator,
     auto loc = IOD->getPrecedenceGroupLoc();
     auto groups = TypeChecker::lookupPrecedenceGroup(dc, name, loc);
 
-    bool wasActuallyADesignatedType = !groups.hasResults() &&
-        ctx.TypeCheckerOpts.EnableOperatorDesignatedTypes &&
-        canResolveSingleNominalTypeDecl(dc, loc, name, ctx);
-
-    if (!wasActuallyADesignatedType)
+    if (groups.hasResults() ||
+        !ctx.TypeCheckerOpts.EnableOperatorDesignatedTypes)
       return groups.getSingleOrDiagnose(loc);
 
-    // Warn about the designated type, then fall through to look up
-    // DefaultPrecedence as though `PrecedenceGroupName` had never been set.
+    // We didn't find the named precedence group and designated types are
+    // enabled, so we will assume that it was actually a designated type. Warn
+    // and fall through as though `PrecedenceGroupName` had never been set.
     ctx.Diags.diagnose(IOD->getColonLoc(),
                        diag::operator_decl_remove_designated_types)
         .fixItRemove({IOD->getColonLoc(), loc});

@@ -30,7 +30,7 @@ prefix operator *^^
 postfix operator ^^*
 
 infix operator **>> : UndeclaredPrecedence
-// expected-error@-1 {{unknown precedence group 'UndeclaredPrecedence'}}
+// expected-warning@-1 {{designated types are no longer used by the compiler}} {{21-43=}}
 
 infix operator **+> : MediumPrecedence, UndeclaredProtocol
 // expected-warning@-1 {{designated types are no longer used by the compiler}} {{39-59=}}
