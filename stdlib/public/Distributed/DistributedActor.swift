@@ -37,15 +37,6 @@ public protocol AnyActor: AnyObject {}
 @available(SwiftStdlib 5.5, *)
 public protocol DistributedActor: AnyActor, Identifiable, Hashable, Codable {
 
-    /// Creates new (local) distributed actor instance, bound to the passed transport.
-    ///
-    /// Upon initialization, the `id` field is populated by the transport,
-    /// with an address assigned to this actor.
-    ///
-    /// - Parameter transport: the transport this distributed actor instance will
-    ///   associated with.
-    init(transport: ActorTransport) // TODO: remove this, but synthesize unless a different designated initializer is defined
-
     /// Resolves the passed in `identity` against the `transport`, returning
     /// either a local or remote actor reference.
     ///

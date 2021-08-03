@@ -139,7 +139,8 @@ emitDistributedActorIdentityInit(SILGenFunction &SGF, ManagedValue selfArg, VarD
 
   // === Open the transport existential before call
   SILValue transportArgValue = F.getArgument(0);
-
+  ProtocolDecl *transportProtocol = C.getProtocol(KnownProtocolKind::ActorTransport);
+  assert(transportProtocol);
   // --- open the transport existential
   OpenedArchetypeType *Opened;
   auto SwiftType = transportArgValue->getType().getASTType();
@@ -161,17 +162,55 @@ emitDistributedActorIdentityInit(SILGenFunction &SGF, ManagedValue selfArg, VarD
   SGF.F.dump();
 
   // === Make the transport.assignIdentity call
-  // --- prepare the call
-  auto assignIdentityFnSIL = builder.getOrCreateFunction(loc, assignIdentityFnRef, ForDefinition);
-  SILValue assignIdentityFn = B.createFunctionRefFor(loc, assignIdentityFnSIL);
-  // FIXME: this is function_ref but we want witness_method
+  // --- prepare the witness_method
+//  auto assignIdentityFnSIL = builder.getOrCreateFunction(loc, assignIdentityFnRef, ForDefinition);
+//  SILValue assignIdentityFn = B.createFunctionRefFor(loc, assignIdentityFnSIL);
+   auto *swiftModule = SGF.getModule().getSwiftModule();
+//  auto *swiftModule = SGF.getModule().getDistributedModule(); // FIXME: this is not a thing
+  auto astType = SwiftType; // TODO: renames
+  auto confRef = swiftModule->lookupConformance(
+      astType, transportProtocol); // TODO: was adContext.getAdditiveArithmeticProtocol()
+  assert(!confRef.isInvalid() && "Missing conformance to `ActorTransport`");
+
+  auto assignIdentityMethod =
+      transportProtocol->getSingleRequirement(C.Id_assignIdentity);
+  auto assignIdentityRef = SILDeclRef(assignIdentityMethod);
+
+  auto anyActorIdentityDecl = C.getAnyActorIdentityDecl();
+  auto anyActorIdentityTy = anyActorIdentityDecl->getInterfaceType();
+  auto anyActorIdentitySILTy = SGF.getLoweredType(anyActorIdentityTy);
+
+//  XXXX
+//  auto equatable = hashable.getAssociatedConformance(formalTy,
+//                                                     GenericTypeParamType::get(0, 0, C),
+//                                                     equatableProtocol);
+
+  auto assignWitnessMethod = B.createWitnessMethod(
+      loc,
+      /*lookupTy*/astType, // formal canonical type ????
+      /*Conformance*/confRef, // like "equatable" XXXX
+      /*member*/assignIdentityRef,
+      /*methodTy*/anyActorIdentitySILTy);
+  // FIXME: this is function_ref but we want witness_methodtw
 
   // --- prepare params: {Self.self, /*self=*/transport}
   SmallVector<SILValue, 2> assignParams({});
   assignParams.emplace_back(metatypeValue);
   assignParams.emplace_back(transportArgValue);
 
-  // ==== Prepare assignment
+  fprintf(stderr, "[%s:%d] (%s) ----------------------------------------------------------------------------\n", __FILE__, __LINE__, __FUNCTION__);
+  SGF.F.dump();
+
+  // --- call transport.assignIdentity(Self.self)
+  SubstitutionMap subs = SubstitutionMap(); // FIXME: needs specific?
+  auto identity = B.createApply(
+      loc, assignWitnessMethod, subs, assignParams);
+
+  fprintf(stderr, "[%s:%d] (%s) ----------------------------------------------------------------------------\n", __FILE__, __LINE__, __FUNCTION__);
+  SGF.F.dump();
+
+  // ==== Assign the identity to stored property
+
   // --- Prepare address of self.id
   auto borrowedSelfArg = selfArg.borrow(SGF, loc);
 
@@ -179,19 +218,7 @@ emitDistributedActorIdentityInit(SILGenFunction &SGF, ManagedValue selfArg, VarD
       loc, borrowedSelfArg.getValue(), var,
       SGF.getLoweredType(var->getInterfaceType()));
 
-  fprintf(stderr, "[%s:%d] (%s) ----------------------------------------------------------------------------\n", __FILE__, __LINE__, __FUNCTION__);
-  SGF.F.dump();
-
-
-  // --- call transport.assignIdentity(Self.self)
-  SubstitutionMap subs = SubstitutionMap(); // FIXME: needs specific?
-  auto identity = B.createApply(loc, assignIdentityFn, subs, assignParams);
-
-
-  fprintf(stderr, "[%s:%d] (%s) ----------------------------------------------------------------------------\n", __FILE__, __LINE__, __FUNCTION__);
-  SGF.F.dump();
-
-  // === Store the assigned identity
+  // --- assign to the property
   B.createAssign(loc, /*src*/identity, /*dest*/idFieldAddr,
                  AssignOwnershipQualifier::Unknown);
 
