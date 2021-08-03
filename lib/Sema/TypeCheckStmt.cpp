@@ -365,7 +365,7 @@ static LabeledStmt *findUnlabeledBreakOrContinueStmtTarget(
 ///
 /// \returns the target, if one was found, or \c nullptr if no such target
 /// exists.
-static LabeledStmt *findBreakOrContinueStmtTarget(
+LabeledStmt *swift::findBreakOrContinueStmtTarget(
     ASTContext &ctx, SourceFile *sourceFile,
     SourceLoc loc, Identifier targetName, SourceLoc targetLoc,
     bool isContinue, DeclContext *dc) {

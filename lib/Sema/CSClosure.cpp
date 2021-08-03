@@ -186,6 +186,11 @@ private:
     llvm_unreachable("Unimplemented case for closure body");
   }
 
+  void visitBreakStmt(BreakStmt *breakStmt) {
+    if (!isSupportedMultiStatementClosure())
+      llvm_unreachable("Unsupported statement: Break");
+  }
+
   void visitDeferStmt(DeferStmt *deferStmt) {
     if (!isSupportedMultiStatementClosure())
       llvm_unreachable("Unsupported statement: Defer");
@@ -340,7 +345,6 @@ private:
   UNSUPPORTED_STMT(ForEach)
   UNSUPPORTED_STMT(Switch)
   UNSUPPORTED_STMT(Case)
-  UNSUPPORTED_STMT(Break)
   UNSUPPORTED_STMT(Continue)
   UNSUPPORTED_STMT(Fail)
   UNSUPPORTED_STMT(Throw)
@@ -491,6 +495,18 @@ private:
     }
 
     TypeChecker::typeCheckDecl(decl);
+  }
+
+  ASTNode visitBreakStmt(BreakStmt *breakStmt) {
+    if (auto target = findBreakOrContinueStmtTarget(
+            closure->getASTContext(), closure->getParentSourceFile(),
+            breakStmt->getLoc(), breakStmt->getTargetName(),
+            breakStmt->getTargetLoc(),
+            /*isContinue=*/false, closure)) {
+      breakStmt->setTarget(target);
+    }
+
+    return breakStmt;
   }
 
   ASTNode visitFallthroughStmt(FallthroughStmt *fallthroughStmt) {
@@ -663,7 +679,6 @@ private:
   UNSUPPORTED_STMT(ForEach)
   UNSUPPORTED_STMT(Switch)
   UNSUPPORTED_STMT(Case)
-  UNSUPPORTED_STMT(Break)
   UNSUPPORTED_STMT(Continue)
   UNSUPPORTED_STMT(Fail)
   UNSUPPORTED_STMT(Throw)
