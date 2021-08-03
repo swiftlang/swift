@@ -6127,6 +6127,14 @@ public:
         && getSILSynthesizeKind() == SILSynthesizeKind::MemberwiseInitializer;
   }
 
+  /// Determines whether this function represents a distributed actor
+  /// initialization factory. Such functions do not have a body that is
+  /// representable in the AST, so it must be synthesized during SILGen.
+  bool isDistributedActorFactory() const {
+    return getBodyKind() == BodyKind::SILSynthesize
+    && getSILSynthesizeKind() == SILSynthesizeKind::DistributedActorFactory;
+  }
+
   /// For a method of a class, checks whether it will require a new entry in the
   /// vtable.
   bool needsNewVTableEntry() const;

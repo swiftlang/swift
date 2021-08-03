@@ -625,6 +625,10 @@ public:
   /// destructor, then implicitly releases the elements of the class.
   void emitDestroyingDestructor(DestructorDecl *dd);
 
+  /// Given a function representing a distributed actor factory, emits the
+  /// corresponding SIL function for it.
+  void emitDistributedActorFactory(FuncDecl *fd);
+
   /// Generates code for an artificial top-level function that starts an
   /// application based on a main type and optionally a main type.
   void emitArtificialTopLevel(Decl *mainDecl);

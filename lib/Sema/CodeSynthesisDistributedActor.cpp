@@ -47,61 +47,49 @@ using namespace swift;
 /// expected to be filled-in during SILGen.
 static void addFactoryResolveFunction(ClassDecl *decl) {
   assert(decl->isDistributedActor());
-  auto &ctx = decl->getASTContext();
+  auto &C = decl->getASTContext();
 
-  {
-    auto &C = ctx;
-    auto conformanceDC = decl;
+  auto mkParam = [&](Identifier argName, Identifier paramName, Type ty) -> ParamDecl* {
+    auto *param = new (C) ParamDecl(SourceLoc(),
+                                    SourceLoc(), argName,
+                                    SourceLoc(), paramName, decl);
+    param->setImplicit();
+    param->setSpecifier(ParamSpecifier::Default);
+    param->setInterfaceType(ty);
+    return param;
+  };
 
-    // Expected type: (Self) -> (ActorAddress, ActorTransport) -> (Self)
-    //
-    // Param: (resolve address: AnyActorAddress)
-    auto addressType = C.getAnyActorIdentityDecl()->getDeclaredInterfaceType();
-    auto *idParamDecl = new (C) ParamDecl(
-        SourceLoc(), SourceLoc(), C.Id_resolve,
-        SourceLoc(), C.Id_id, conformanceDC);
-    idParamDecl->setImplicit();
-    idParamDecl->setSpecifier(ParamSpecifier::Default);
-    idParamDecl->setInterfaceType(addressType);
+  auto addressType = C.getAnyActorIdentityDecl()->getDeclaredInterfaceType();
+  auto transportType = C.getActorTransportDecl()->getDeclaredInterfaceType();
 
-    // Param: (using transport: ActorTransport)
-    auto transportType = C.getActorTransportDecl()->getDeclaredInterfaceType();
-    auto *transportParamDecl = new (C) ParamDecl(
-        SourceLoc(), SourceLoc(), C.Id_using,
-        SourceLoc(), C.Id_transport, conformanceDC);
-    transportParamDecl->setImplicit();
-    transportParamDecl->setSpecifier(ParamSpecifier::Default);
-    transportParamDecl->setInterfaceType(transportType);
+  // (_ id: AnyActorAddress, using transport: ActorTransport)
+  auto *params = ParameterList::create(
+      C,
+      /*LParenLoc=*/SourceLoc(),
+      /*params=*/{  mkParam(Identifier(), C.Id_id, addressType),
+                    mkParam(C.Id_using, C.Id_transport, transportType)
+                  },
+      /*RParenLoc=*/SourceLoc()
+      );
 
-    auto *paramList = ParameterList::create(
-        C,
-        /*LParenLoc=*/SourceLoc(),
-        /*params=*/{idParamDecl, transportParamDecl},
-        /*RParenLoc=*/SourceLoc()
-        );
+  // Func name: resolve(_:using:)
+  DeclName name(C, C.Id_resolve, params);
 
-    // Func name: init(resolve:using:)
-    DeclName name(C, DeclBaseName::createConstructor(), paramList);
+  // Expected type: (Self) -> (ActorAddress, ActorTransport) throws -> (Self)
+  auto *factoryDecl =
+      FuncDecl::createImplicit(C, StaticSpellingKind::KeywordStatic,
+                               name, SourceLoc(),
+                               /*async=*/false,
+                               /*throws=*/true,
+                               /*genericParams=*/nullptr,
+                               params,
+                               /*returnType*/decl->getDeclaredInterfaceType(),
+                               decl);
 
-    auto *initDecl =
-        new (C) ConstructorDecl(name, SourceLoc(),
-                                /*Failable=*/false, SourceLoc(),
-                                /*Async=*/false, SourceLoc(),
-                                /*Throws=*/true, SourceLoc(),
-                                paramList,
-                                /*GenericParams=*/nullptr, conformanceDC);
-    initDecl->setImplicit();
-    // TODO: determine how to mark this as being synthesized by SILGen.
-//    initDecl->setSynthesized();
-//    initDecl->setBodySynthesizer(&createDistributedActor_init_resolve_body);
+  factoryDecl->setDistributedActorFactory();
+  factoryDecl->copyFormalAccessFrom(decl, /*sourceIsParentContext=*/true);
 
-    auto *nonIsoAttr = new (C) NonisolatedAttr(/*IsImplicit*/true);
-    initDecl->getAttrs().add(nonIsoAttr);
-
-    initDecl->copyFormalAccessFrom(decl, /*sourceIsParentContext=*/true);
-
-    decl->addMember(initDecl);
-  }
+  decl->addMember(factoryDecl);
 }
 
 /// Synthesizes an empty body of the `init(transport:)` initializer as:
