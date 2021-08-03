@@ -3238,29 +3238,21 @@ public:
     auto contextID = S.addDeclContextRef(op->getDeclContext());
     auto nameID = S.addDeclBaseNameRef(op->getName());
     auto groupID = S.addDeclRef(op->getPrecedenceGroup());
-    SmallVector<DeclID, 1> designatedNominalTypeDeclIDs;
-    for (auto *decl : op->getDesignatedNominalTypes())
-      designatedNominalTypeDeclIDs.push_back(S.addDeclRef(decl));
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[InfixOperatorLayout::Code];
     InfixOperatorLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode, nameID,
-                                    contextID.getOpaqueValue(), groupID,
-                                    designatedNominalTypeDeclIDs);
+                                    contextID.getOpaqueValue(), groupID);
 
   }
 
   template <typename Layout>
   void visitUnaryOperatorDecl(const OperatorDecl *op) {
     auto contextID = S.addDeclContextRef(op->getDeclContext());
-    SmallVector<DeclID, 1> designatedNominalTypeDeclIDs;
-    for (auto *decl : op->getDesignatedNominalTypes())
-      designatedNominalTypeDeclIDs.push_back(S.addDeclRef(decl));
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[Layout::Code];
     Layout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                        S.addDeclBaseNameRef(op->getName()),
-                       contextID.getOpaqueValue(),
-                       designatedNominalTypeDeclIDs);
+                       contextID.getOpaqueValue());
   }
 
   void visitPrefixOperatorDecl(const PrefixOperatorDecl *op) {

@@ -435,11 +435,12 @@ ERROR(deprecated_operator_body_use_group,PointsToFirstBadToken,
       "use a precedence group instead", ())
 ERROR(operator_decl_no_fixity,none,
       "operator must be declared as 'prefix', 'postfix', or 'infix'", ())
+ERROR(operator_decl_expected_precedencegroup, none,
+      "expected precedence group name after ':' in operator declaration", ())
 
-ERROR(operator_decl_expected_type,none,
-      "expected designated type in operator declaration", ())
-ERROR(operator_decl_trailing_comma,none,
-      "trailing comma in operator declaration", ())
+WARNING(operator_decl_remove_designated_types,none,
+        "designated types are no longer used by the compiler; please remove "
+        "the designated type list from this operator declaration", ())
 
 // PrecedenceGroup
 ERROR(precedencegroup_not_infix,none,
