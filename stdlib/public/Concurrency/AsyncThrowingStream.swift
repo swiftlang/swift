@@ -124,6 +124,9 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
   /// calling one of the `yield` methods, then terminate the stream normally by
   /// calling the `finish()` method. You can also use the continuation's
   /// `finish(throwing:)` method to terminate the stream by throwing an error.
+  ///
+  /// - Note: Unlike other continuations in Swift,
+  /// `AsyncThrowingStream.Continuation` supports escaping.
   public struct Continuation: Sendable {
     /// A type that indicates how the stream terminated.
     ///

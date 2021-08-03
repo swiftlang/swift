@@ -103,6 +103,9 @@ public struct AsyncStream<Element> {
   /// invoked. Use this continuation to provide elements to the stream by
   /// calling one of the `yield` methods, then terminate the stream normally by
   /// calling the `finish()` method.
+  ///
+  /// - Note: Unlike other continuations in Swift, `AsyncStream.Continuation`
+  /// supports escaping.
   public struct Continuation: Sendable {
     /// A type that indicates how the stream terminated.
     ///
