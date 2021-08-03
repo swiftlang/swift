@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2020 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -36,18 +36,16 @@ using namespace Lowering;
 /****************** DISTRIBUTED ACTOR STORAGE INITIALIZATION ******************/
 /******************************************************************************/
 
-// FIXME: this is DUPLICATED from SILGenConstructor (converge the two)
-static ManagedValue emitSelfForMemberInit(SILGenFunction &SGF, SILLocation loc,
-                                          VarDecl *selfDecl) {
-  CanType selfFormalType = selfDecl->getType()->getCanonicalType();
-  if (selfFormalType->hasReferenceSemantics())
-    return SGF.emitRValueForDecl(loc, selfDecl, selfFormalType,
-                                 AccessSemantics::DirectToStorage,
-                                 SGFContext::AllowImmediatePlusZero)
-                                 .getAsSingleValue(SGF, loc);
-  else
-    return SGF.emitAddressOfLocalVarDecl(loc, selfDecl, selfFormalType,
-                                         SGFAccessKind::Write);
+
+static AbstractFunctionDecl*
+lookupAssignIdentityFunc(ASTContext& C) {
+  auto transportDecl = C.getActorTransportDecl();
+
+  for (auto decl : transportDecl->lookupDirect(DeclName(C.Id_assignIdentity)))
+    if (auto funcDecl = dyn_cast<AbstractFunctionDecl>(decl))
+      return funcDecl;
+
+    return nullptr;
 }
 
 /// Synthesize the actorTransport initialization:
@@ -64,7 +62,6 @@ emitDistributedActorTransportInit(SILGenFunction &SGF, ManagedValue selfArg, Var
   auto &B = SGF.B;
   auto &F = SGF.F;
   auto &SGM = SGF.SGM;
-//  auto self = emitSelfForMemberInit(SGF, pattern, selfDecl);
   SILGenFunctionBuilder builder(SGM);
 
   auto loc = SILLocation(ctor);
@@ -78,12 +75,13 @@ emitDistributedActorTransportInit(SILGenFunction &SGF, ManagedValue selfArg, Var
   ManagedValue transportArgManaged = ManagedValue::forUnmanaged(transportArgValue);
   auto transportDecl = C.getActorTransportDecl();
 
+  auto borrowedSelfArg = selfArg.borrow(SGF, loc);
+
   // ----
   auto *selfTyDecl = ctor->getParent()->getSelfNominalTypeDecl();
   auto transportFieldAddr = B.createRefElementAddr(
-      loc, selfArg.borrow(SGF, loc).getValue(), var,
+      loc, borrowedSelfArg.getValue(), var,
       SGF.getLoweredType(var->getInterfaceType()));
-
 
   fprintf(stderr, "[%s:%d] (%s) ----------------------------------------------------------------------------\n", __FILE__, __LINE__, __FUNCTION__);
   SGF.F.dump();
@@ -93,19 +91,10 @@ emitDistributedActorTransportInit(SILGenFunction &SGF, ManagedValue selfArg, Var
                    /*dest*/transportFieldAddr,
                    IsTake, IsNotInitialization);
 
-  B.createEndBorrow(loc, transportArgValue);
+  B.createEndBorrow(loc, borrowedSelfArg.getValue());
 
   fprintf(stderr, "[%s:%d] (%s) ----------------------------------------------------------------------------\n", __FILE__, __LINE__, __FUNCTION__);
   SGF.F.dump();
-}
-
-static AbstractFunctionDecl*
-lookupAssignIdentityFunc(ASTContext& C, ProtocolDecl *transportDecl) {
-  for (auto decl : transportDecl->lookupDirect(DeclName(C.Id_assignIdentity)))
-    if (auto funcDecl = dyn_cast<AbstractFunctionDecl>(decl))
-      return funcDecl;
-
-  return nullptr;
 }
 
 /// Synthesize the distributed actor's identity (`id`) initialization:
@@ -122,7 +111,6 @@ emitDistributedActorIdentityInit(SILGenFunction &SGF, ManagedValue selfArg, VarD
   auto &B = SGF.B;
   auto &F = SGF.F;
   auto &SGM = SGF.SGM;
-  //  auto self = emitSelfForMemberInit(SGF, pattern, selfDecl);
   SILGenFunctionBuilder builder(SGM);
 
   auto loc = SILLocation(ctor);
@@ -131,85 +119,87 @@ emitDistributedActorIdentityInit(SILGenFunction &SGF, ManagedValue selfArg, VarD
   fprintf(stderr, "[%s:%d] (%s) ----------------------------------------------------------------------------\n", __FILE__, __LINE__, __FUNCTION__);
   SGF.F.dump();
 
-  // === prepare `Self.self`
-  auto *selfTyDecl = ctor->getParent()->getSelfNominalTypeDecl();
-  auto selfMetatype = SGF.getLoweredType(selfTyDecl->getInterfaceType());
-  SILValue metatypeValue = B.createMetatype(loc, selfMetatype);
-
   // === prepare ActorTransport type
   // auto transportTy = C.getActorTransportDecl()->getInterfaceType();
 //  auto transportTy = F.getArgumentType(0);
 //  assert(transportSILTy);
 
   // === prepare the transport.assignIdentity(_:) function
-  auto transportArgValue = F.getArgument(0);
-  auto transportSILTy = transportArgValue->getType();
-  ManagedValue transportArgManaged = ManagedValue::forUnmanaged(transportArgValue);
+//  auto transportArgValue = F.getArgument(0);
+//  auto transportSILTy = transportArgValue->getType();
+//  ManagedValue transportArgManaged = ManagedValue::forUnmanaged(transportArgValue);
+//
+//  fprintf(stderr, "[%s:%d] (%s) transportSILTy\n", __FILE__, __LINE__, __FUNCTION__);
+//  transportSILTy.dump();
 
-  fprintf(stderr, "[%s:%d] (%s) transportSILTy\n", __FILE__, __LINE__, __FUNCTION__);
-  transportSILTy.dump();
-
-  auto transportDecl = C.getActorTransportDecl();
-  AbstractFunctionDecl *assignIdentityFuncDecl =
-      lookupAssignIdentityFunc(C, transportDecl);
+  AbstractFunctionDecl *assignIdentityFuncDecl = lookupAssignIdentityFunc(C);
 
   assert(assignIdentityFuncDecl && "Cannot find ActorTransport.assignIdentity!");
   auto assignIdentityFnRef = SILDeclRef(assignIdentityFuncDecl);
 
-  // === Prepare assignment: get the self.id property address
-  SILValue identityArgValue = F.getArgument(0);
-//  ManagedValue transportArgManaged = ManagedValue::forUnmanaged(transportArgValue);
-//  auto transportDecl = C.getActorTransportDecl();
-
   // === Open the transport existential before call
-  SILValue identityArgValue = F.getArgument(0);
-  auto openTransportValue = B.createOpenExistentialAddr(
-      loc, transportArgValue, transportArgValue->getType(), OpenedExistentialAccess::Immutable);
+  SILValue transportArgValue = F.getArgument(0);
 
-  // ----
-  auto identityFieldAddr = B.createRefElementAddr(
-      loc, selfArg.borrow(SGF, loc).getValue(), var,
-      SGF.getLoweredType(var->getInterfaceType()));
+  // --- open the transport existential
+  OpenedArchetypeType *Opened;
+  auto SwiftType = transportArgValue->getType().getASTType();
+  auto OpenedType =
+      SwiftType->openAnyExistentialType(Opened)->getCanonicalType();
+  auto OpenedSILType = F.getLoweredType(OpenedType);
+  auto archetypeValue = B.createOpenExistentialAddr(
+      loc, transportArgValue, OpenedSILType, OpenedExistentialAccess::Immutable);
+
+  // --- prepare `Self.self` metatype
+  // TODO: how to get @dynamic_self, do we need it?
+  //       %14 = metatype $@thick @dynamic_self DA_DefaultDeinit.Type // type-defs: %1; user: %16
+  auto *selfTyDecl = ctor->getParent()->getSelfNominalTypeDecl();
+  auto selfMetatype = SGF.getLoweredType(selfTyDecl->getInterfaceType());
+  SILValue metatypeValue = B.createMetatype(loc, selfMetatype);
 
 
   fprintf(stderr, "[%s:%d] (%s) ----------------------------------------------------------------------------\n", __FILE__, __LINE__, __FUNCTION__);
   SGF.F.dump();
 
-
-  // === Make the call
-  // === prepare the call
+  // === Make the transport.assignIdentity call
+  // --- prepare the call
   auto assignIdentityFnSIL = builder.getOrCreateFunction(loc, assignIdentityFnRef, ForDefinition);
   SILValue assignIdentityFn = B.createFunctionRefFor(loc, assignIdentityFnSIL);
+  // FIXME: this is function_ref but we want witness_method
 
-  // --- Prepare params: {Self.self, /*self=*/transport}
+  // --- prepare params: {Self.self, /*self=*/transport}
   SmallVector<SILValue, 2> assignParams({});
   assignParams.emplace_back(metatypeValue);
   assignParams.emplace_back(transportArgValue);
 
-  // --- borrow self
+  // ==== Prepare assignment
+  // --- Prepare address of self.id
+  auto borrowedSelfArg = selfArg.borrow(SGF, loc);
 
+  auto idFieldAddr = B.createRefElementAddr(
+      loc, borrowedSelfArg.getValue(), var,
+      SGF.getLoweredType(var->getInterfaceType()));
+
+  fprintf(stderr, "[%s:%d] (%s) ----------------------------------------------------------------------------\n", __FILE__, __LINE__, __FUNCTION__);
+  SGF.F.dump();
 
 
   // --- call transport.assignIdentity(Self.self)
   SubstitutionMap subs = SubstitutionMap(); // FIXME: needs specific?
   auto identity = B.createApply(loc, assignIdentityFn, subs, assignParams);
 
-  //  // === TODO: do we need this opening explicitly?
-  //  auto openedTransport = SGF.emitOpenExistential(loc,
-  //                          /*existential*/transportArgManaged,
-  //                          /*loweredOpenedType*/SGF.getLoweredType(C.getActorTransportDecl()->getInterfaceType()), // FIXME: what here?
-  //                          /*accessKind*/AccessKind::Read); // TODO: ??? open_existential_addr immutable_access %0 : $*ActorTransport to $*@opened("838EE680-F364-11EB-A50D-ACDE48001122") ActorTransport
 
+  fprintf(stderr, "[%s:%d] (%s) ----------------------------------------------------------------------------\n", __FILE__, __LINE__, __FUNCTION__);
+  SGF.F.dump();
 
-  InitializationPtr initialization =
-      SGF.emitPatternBindingInitialization(pattern, JumpDest::invalid());
+  // === Store the assigned identity
+  B.createAssign(loc, /*src*/identity, /*dest*/idFieldAddr,
+                 AssignOwnershipQualifier::Unknown);
 
+  B.createEndBorrow(loc, borrowedSelfArg.getValue());
 
-//  fprintf(stderr, "[%s:%d] (%s) IDENT\n", __FILE__, __LINE__, __FUNCTION__);
-//  identity->dump();
-//
-//  FullExpr Scope(SGF.Cleanups, CleanupLocation(var->getParentInitializer()));
-  // SGF.emitExprInto(identity, var->getParentInitializer(), initialization.get());
+  fprintf(stderr, "[%s:%d] (%s) DONE(ID) ----------------------------------------------------------------------------\n", __FILE__, __LINE__, __FUNCTION__);
+  SGF.F.dump();
+
 }
 
 
