@@ -39,6 +39,14 @@ Most notably, default argument expressions are implicitly
 `@_alwaysEmitIntoClient`, which means that adding a default argument to a
 function which did not have one previously does not break ABI.
 
+## `@_assemblyVision`
+
+Forces emission of assembly vision remarks for a function or method, showing
+where various runtime calls and performance impacting hazards are in the code
+at source level after optimization.
+
+Adding this attribute to a type leads to remarks being emitted for all methods.
+
 ## `@_borrowed`
 
 Indicates that the [conservative access pattern](/docs/Lexicon.md#access-pattern)
