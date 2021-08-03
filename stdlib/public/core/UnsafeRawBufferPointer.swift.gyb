@@ -636,35 +636,35 @@ extension Unsafe${Mutable}RawBufferPointer {
   ) -> (unwritten: S.Iterator, initialized: UnsafeMutableBufferPointer<S.Element>) {
     // TODO: Optimize where `C` is a `ContiguousArrayBuffer`.
 
-    var it = source.makeIterator()
-    var idx = startIndex
     let elementStride = MemoryLayout<S.Element>.stride
 
     // This has to be a debug precondition due to the cost of walking over some collections.
     _debugPrecondition(source.underestimatedCount <= (count / elementStride),
       "insufficient space to accommodate source.underestimatedCount elements")
-    guard let base = baseAddress else {
+    guard let base = _position, let end = _end else {
       // this can be a precondition since only an invalid argument should be costly
       _precondition(source.underestimatedCount == 0,
         "no memory available to initialize from source")
-      return (it, UnsafeMutableBufferPointer(start: nil, count: 0))
+      let unwritten = source.makeIterator()
+      return (unwritten, UnsafeMutableBufferPointer(start: nil, count: 0))
     }
 
+    var written = 0
+    var unwritten = source.makeIterator()
     for p in stride(from: base,
       // only advance to as far as the last element that will fit
-      to: base + count - elementStride + 1,
+      to: end - elementStride + 1,
       by: elementStride
     ) {
       // underflow is permitted -- e.g. a sequence into
       // the spare capacity of an Array buffer
-      guard let x = it.next() else { break }
+      guard let x = unwritten.next() else { break }
       p.initializeMemory(as: S.Element.self, repeating: x, count: 1)
-      formIndex(&idx, offsetBy: elementStride)
+      written += 1
     }
 
-    return (it, UnsafeMutableBufferPointer(
-                  start: base.assumingMemoryBound(to: S.Element.self), 
-                  count: idx / elementStride))
+    let start = base.assumingMemoryBound(to: S.Element.self)
+    return (unwritten, UnsafeMutableBufferPointer(start: start, count: written))
   }
   %  end # mutable
 
