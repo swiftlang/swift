@@ -191,6 +191,11 @@ private:
       llvm_unreachable("Unsupported statement: Break");
   }
 
+  void visitContinueStmt(ContinueStmt *continueStmt) {
+    if (!isSupportedMultiStatementClosure())
+      llvm_unreachable("Unsupported statement: Continue");
+  }
+
   void visitDeferStmt(DeferStmt *deferStmt) {
     if (!isSupportedMultiStatementClosure())
       llvm_unreachable("Unsupported statement: Defer");
@@ -345,7 +350,6 @@ private:
   UNSUPPORTED_STMT(ForEach)
   UNSUPPORTED_STMT(Switch)
   UNSUPPORTED_STMT(Case)
-  UNSUPPORTED_STMT(Continue)
   UNSUPPORTED_STMT(Fail)
   UNSUPPORTED_STMT(Throw)
   UNSUPPORTED_STMT(PoundAssert)
@@ -507,6 +511,17 @@ private:
     }
 
     return breakStmt;
+  }
+
+  ASTNode visitContinueStmt(ContinueStmt *continueStmt) {
+    if (auto target = findBreakOrContinueStmtTarget(
+            closure->getASTContext(), closure->getParentSourceFile(),
+            continueStmt->getLoc(), continueStmt->getTargetName(),
+            continueStmt->getTargetLoc(), /*isContinue=*/true, closure)) {
+      continueStmt->setTarget(target);
+    }
+
+    return continueStmt;
   }
 
   ASTNode visitFallthroughStmt(FallthroughStmt *fallthroughStmt) {
@@ -679,7 +694,6 @@ private:
   UNSUPPORTED_STMT(ForEach)
   UNSUPPORTED_STMT(Switch)
   UNSUPPORTED_STMT(Case)
-  UNSUPPORTED_STMT(Continue)
   UNSUPPORTED_STMT(Fail)
   UNSUPPORTED_STMT(Throw)
   UNSUPPORTED_STMT(PoundAssert)
