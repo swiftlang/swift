@@ -264,9 +264,7 @@ public:
 };
 
 /// The size of an allocator slab.
-///
-/// TODO: find the optimal value by experiment.
-static constexpr size_t SlabCapacity = 1024;
+static constexpr size_t SlabCapacity = 1000;
 
 using TaskAllocator = StackAllocator<SlabCapacity>;
 
