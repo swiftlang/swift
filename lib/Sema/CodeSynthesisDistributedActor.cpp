@@ -1,8 +1,8 @@
-//===--- CodeSynthesis.cpp - Type Checking for Declarations ---------------===//
+//===--- CodeSynthesisDistributedActor.cpp --------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -12,11 +12,8 @@
 
 #include "TypeCheckDistributed.h"
 
-#include "CodeSynthesis.h"
 
 #include "TypeChecker.h"
-#include "TypeCheckDecl.h"
-#include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Availability.h"
@@ -24,9 +21,6 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
-#include "swift/AST/PrettyStackTrace.h"
-#include "swift/AST/ProtocolConformance.h"
-#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Defer.h"
 #include "swift/ClangImporter/ClangModule.h"
@@ -39,6 +33,76 @@ using namespace swift;
 /******************************************************************************/
 /******************************* INITIALIZERS *********************************/
 /******************************************************************************/
+
+/// Synthesizes the
+///
+/// \verbatim
+/// actor A {
+///   static resolve(_ address: ActorAddress,
+///                  using transport: ActorTransport) throws -> Self
+/// }
+/// \endverbatim
+///
+/// factory function in the AST, with an empty body. It's body is
+/// expected to be filled-in during SILGen.
+static void addFactoryResolveFunction(ClassDecl *decl) {
+  assert(decl->isDistributedActor());
+  auto &ctx = decl->getASTContext();
+
+  {
+    auto &C = ctx;
+    auto conformanceDC = decl;
+
+    // Expected type: (Self) -> (ActorAddress, ActorTransport) -> (Self)
+    //
+    // Param: (resolve address: AnyActorAddress)
+    auto addressType = C.getAnyActorIdentityDecl()->getDeclaredInterfaceType();
+    auto *idParamDecl = new (C) ParamDecl(
+        SourceLoc(), SourceLoc(), C.Id_resolve,
+        SourceLoc(), C.Id_id, conformanceDC);
+    idParamDecl->setImplicit();
+    idParamDecl->setSpecifier(ParamSpecifier::Default);
+    idParamDecl->setInterfaceType(addressType);
+
+    // Param: (using transport: ActorTransport)
+    auto transportType = C.getActorTransportDecl()->getDeclaredInterfaceType();
+    auto *transportParamDecl = new (C) ParamDecl(
+        SourceLoc(), SourceLoc(), C.Id_using,
+        SourceLoc(), C.Id_transport, conformanceDC);
+    transportParamDecl->setImplicit();
+    transportParamDecl->setSpecifier(ParamSpecifier::Default);
+    transportParamDecl->setInterfaceType(transportType);
+
+    auto *paramList = ParameterList::create(
+        C,
+        /*LParenLoc=*/SourceLoc(),
+        /*params=*/{idParamDecl, transportParamDecl},
+        /*RParenLoc=*/SourceLoc()
+        );
+
+    // Func name: init(resolve:using:)
+    DeclName name(C, DeclBaseName::createConstructor(), paramList);
+
+    auto *initDecl =
+        new (C) ConstructorDecl(name, SourceLoc(),
+                                /*Failable=*/false, SourceLoc(),
+                                /*Async=*/false, SourceLoc(),
+                                /*Throws=*/true, SourceLoc(),
+                                paramList,
+                                /*GenericParams=*/nullptr, conformanceDC);
+    initDecl->setImplicit();
+    // TODO: determine how to mark this as being synthesized by SILGen.
+//    initDecl->setSynthesized();
+//    initDecl->setBodySynthesizer(&createDistributedActor_init_resolve_body);
+
+    auto *nonIsoAttr = new (C) NonisolatedAttr(/*IsImplicit*/true);
+    initDecl->getAttrs().add(nonIsoAttr);
+
+    initDecl->copyFormalAccessFrom(decl, /*sourceIsParentContext=*/true);
+
+    decl->addMember(initDecl);
+  }
+}
 
 /// Synthesizes an empty body of the `init(transport:)` initializer as:
 ///
@@ -449,6 +513,7 @@ void swift::addImplicitDistributedActorMembersToClass(ClassDecl *decl) {
   if (!swift::ensureDistributedModuleLoaded(decl))
     return;
 
+  addFactoryResolveFunction(decl);
   addImplicitDistributedActorStoredProperties(decl);
   addImplicitRemoteActorFunctions(decl);
 //  addImplicitResignIdentity(decl);

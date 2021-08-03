@@ -36,7 +36,6 @@ public protocol AnyActor: AnyObject {}
 public protocol DistributedActor:
     AnyActor,
     Identifiable, Hashable, Codable {
-
     /// Resolves the passed in `identity` against the `transport`, returning
     /// either a local or remote actor reference.
     ///
@@ -72,23 +71,6 @@ public protocol DistributedActor:
     /// Conformance to this requirement is synthesized automatically for any
     /// `distributed actor` declaration.
     nonisolated var id: AnyActorIdentity { get }
-}
-
-@available(SwiftStdlib 5.5, *)
-extension DistributedActor {
-
-  public static func resolve<Identity>(_ identity: Identity, using transport: ActorTransport)
-      throws -> Self where Identity: ActorIdentity {
-    switch try transport.resolve(AnyActorIdentity(identity), as: Self.self) {
-    case .resolved(let instance):
-      return instance
-
-    case .makeProxy:
-      // FIXME: this needs actual implementation of distributedActorRemoteCreate
-      let remote: Any = distributedActorRemoteCreate(identity: identity, transport: transport)
-      return remote as! Self
-    }
-  }
 }
 
 // ==== Hashable conformance ---------------------------------------------------
