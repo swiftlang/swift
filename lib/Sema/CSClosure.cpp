@@ -292,6 +292,29 @@ private:
                       locator);
   }
 
+  void visitThrowStmt(ThrowStmt *throwStmt) {
+    if (!isSupportedMultiStatementClosure())
+      llvm_unreachable("Unsupported statement: Throw");
+
+    Type errType =
+        cs.getASTContext().getErrorDecl()->getDeclaredInterfaceType();
+    if (!errType) {
+      hadError = true;
+      return;
+    }
+
+    auto *errorExpr = throwStmt->getSubExpr();
+
+    createConjunction(
+        cs,
+        {makeElement(
+            errorExpr,
+            cs.getConstraintLocator(
+                locator, LocatorPathElt::ClosureBodyElement(errorExpr)),
+            {errType, CTP_ThrowStmt})},
+        locator);
+  }
+
   void visitBraceStmt(BraceStmt *braceStmt) {
     if (isSupportedMultiStatementClosure()) {
       SmallVector<ElementInfo, 4> elements;
@@ -357,7 +380,6 @@ private:
   UNSUPPORTED_STMT(Switch)
   UNSUPPORTED_STMT(Case)
   UNSUPPORTED_STMT(Fail)
-  UNSUPPORTED_STMT(Throw)
 #undef UNSUPPORTED_STMT
 
 private:
@@ -630,6 +652,19 @@ private:
     return poundAssertStmt;
   }
 
+  ASTNode visitThrowStmt(ThrowStmt *throwStmt) {
+    auto &cs = solution.getConstraintSystem();
+
+    // Rewrite the error.
+    auto target = *cs.getSolutionApplicationTarget(throwStmt->getSubExpr());
+    if (auto result = rewriteTarget(target))
+      throwStmt->setSubExpr(result->getAsExpr());
+    else
+      hadError = true;
+
+    return throwStmt;
+  }
+
   ASTNode visitBraceStmt(BraceStmt *braceStmt) {
     for (auto &node : braceStmt->getElements()) {
       if (auto expr = node.dyn_cast<Expr *>()) {
@@ -723,7 +758,6 @@ private:
   UNSUPPORTED_STMT(Switch)
   UNSUPPORTED_STMT(Case)
   UNSUPPORTED_STMT(Fail)
-  UNSUPPORTED_STMT(Throw)
 #undef UNSUPPORTED_STMT
 
 };
