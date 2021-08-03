@@ -1498,8 +1498,8 @@ llvm::Constant *IRGenModule::getAssociatedTypeWitness(Type type,
   auto witness = llvm::ConstantExpr::getBitCast(typeRef, Int8PtrTy);
   unsigned bit = ProtocolRequirementFlags::AssociatedTypeMangledNameBit;
   auto bitConstant = llvm::ConstantInt::get(IntPtrTy, bit);
-  return llvm::ConstantExpr::getInBoundsGetElementPtr(nullptr, witness,
-                                                      bitConstant);
+  return llvm::ConstantExpr::getInBoundsGetElementPtr(
+    witness->getType()->getPointerElementType(), witness, bitConstant);
 }
 
 static void buildAssociatedTypeValueName(CanType depAssociatedType,
