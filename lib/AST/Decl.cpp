@@ -7310,7 +7310,7 @@ void AbstractFunctionDecl::setBodyToBeReparsed(SourceRange bodyRange) {
 SourceRange AbstractFunctionDecl::getBodySourceRange() const {
   switch (getBodyKind()) {
   case BodyKind::None:
-  case BodyKind::MemberwiseInitializer:
+  case BodyKind::SILSynthesize:
   case BodyKind::Deserialized:
   case BodyKind::Synthesize:
     return SourceRange();
@@ -7625,7 +7625,7 @@ bool AbstractFunctionDecl::hasInlinableBodyText() const {
   case BodyKind::None:
   case BodyKind::Synthesize:
   case BodyKind::Skipped:
-  case BodyKind::MemberwiseInitializer:
+  case BodyKind::SILSynthesize:
     return false;
   }
   llvm_unreachable("covered switch");
@@ -8686,7 +8686,7 @@ ParseAbstractFunctionBodyRequest::getCachedResult() const {
   auto afd = std::get<0>(getStorage());
   switch (afd->getBodyKind()) {
   case BodyKind::Deserialized:
-  case BodyKind::MemberwiseInitializer:
+  case BodyKind::SILSynthesize:
   case BodyKind::None:
   case BodyKind::Skipped:
     return nullptr;
@@ -8707,7 +8707,7 @@ void ParseAbstractFunctionBodyRequest::cacheResult(BraceStmt *value) const {
   auto afd = std::get<0>(getStorage());
   switch (afd->getBodyKind()) {
   case BodyKind::Deserialized:
-  case BodyKind::MemberwiseInitializer:
+  case BodyKind::SILSynthesize:
   case BodyKind::None:
   case BodyKind::Skipped:
     // The body is always empty, so don't cache anything.

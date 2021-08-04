@@ -79,7 +79,7 @@ static bool printDisplayName(const swift::ValueDecl *D, llvm::raw_ostream &OS) {
 
 static bool isMemberwiseInit(swift::ValueDecl *D) {
   if (auto AFD = dyn_cast<AbstractFunctionDecl>(D))
-    return AFD->getBodyKind() == AbstractFunctionDecl::BodyKind::MemberwiseInitializer;
+    return AFD->isMemberwiseInitializer();
   return false;
 }
 

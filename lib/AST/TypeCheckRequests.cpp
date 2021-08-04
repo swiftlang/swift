@@ -1321,7 +1321,7 @@ Optional<BraceStmt *> TypeCheckFunctionBodyRequest::getCachedResult() const {
   auto *afd = std::get<0>(getStorage());
   switch (afd->getBodyKind()) {
   case BodyKind::Deserialized:
-  case BodyKind::MemberwiseInitializer:
+  case BodyKind::SILSynthesize:
   case BodyKind::None:
   case BodyKind::Skipped:
     // These cases don't have any body available.

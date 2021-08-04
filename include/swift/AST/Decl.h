@@ -403,9 +403,12 @@ protected:
   SWIFT_INLINE_BITFIELD(SubscriptDecl, VarDecl, 2,
     StaticSpelling : 2
   );
-  SWIFT_INLINE_BITFIELD(AbstractFunctionDecl, ValueDecl, 3+8+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(AbstractFunctionDecl, ValueDecl, 3+2+8+1+1+1+1+1+1,
     /// \see AbstractFunctionDecl::BodyKind
     BodyKind : 3,
+
+    /// \see AbstractFunctionDecl::SILSynthesizeKind
+    SILSynthesizeKind : 2,
 
     /// Import as member status.
     IAMStatus : 8,
@@ -5773,6 +5776,15 @@ class AbstractFunctionDecl : public GenericContext, public ValueDecl {
   friend class NeedsNewVTableEntryRequest;
 
 public:
+  /// records the kind of SILGen-synthesized body this decl represents
+  enum class SILSynthesizeKind {
+    None,
+    MemberwiseInitializer,
+    DistributedActorFactory
+
+    // This enum currently needs to fit in a 2-bit bitfield.
+  };
+
   enum class BodyKind {
     /// The function did not have a body in the source code file.
     None,
@@ -5792,8 +5804,8 @@ public:
     /// Function body is present and type-checked.
     TypeChecked,
 
-    /// This is a memberwise initializer that will be synthesized by SILGen.
-    MemberwiseInitializer,
+    // Function body will be synthesized by SILGen.
+    SILSynthesize,
 
     /// Function body text was deserialized from a .swiftmodule.
     Deserialized
@@ -5891,6 +5903,14 @@ protected:
 
   void setBodyKind(BodyKind K) {
     Bits.AbstractFunctionDecl.BodyKind = unsigned(K);
+  }
+
+  void setSILSynthesizeKind(SILSynthesizeKind K) {
+    Bits.AbstractFunctionDecl.SILSynthesizeKind = unsigned(K);
+  }
+
+  SILSynthesizeKind getSILSynthesizeKind() const {
+    return SILSynthesizeKind(Bits.AbstractFunctionDecl.SILSynthesizeKind);
   }
 
 public:
@@ -6069,7 +6089,17 @@ public:
   void setIsMemberwiseInitializer() {
     assert(getBodyKind() == BodyKind::None);
     assert(isa<ConstructorDecl>(this));
-    setBodyKind(BodyKind::MemberwiseInitializer);
+    setBodyKind(BodyKind::SILSynthesize);
+    setSILSynthesizeKind(SILSynthesizeKind::MemberwiseInitializer);
+  }
+
+  /// Mark that the body should be filled in to be a factory method for creating
+  /// a distributed actor.
+  void setDistributedActorFactory() {
+    assert(getBodyKind() == BodyKind::None);
+    assert(isa<FuncDecl>(this));
+    setBodyKind(BodyKind::SILSynthesize);
+    setSILSynthesizeKind(SILSynthesizeKind::DistributedActorFactory);
   }
 
   /// Gets the body of this function, stripping the unused portions of #if
@@ -6093,7 +6123,8 @@ public:
   }
 
   bool isMemberwiseInitializer() const {
-    return getBodyKind() == BodyKind::MemberwiseInitializer;
+    return getBodyKind() == BodyKind::SILSynthesize
+        && getSILSynthesizeKind() == SILSynthesizeKind::MemberwiseInitializer;
   }
 
   /// For a method of a class, checks whether it will require a new entry in the
