@@ -10,6 +10,7 @@ protocol A {
   @differentiable(reverse, wrt: x)
   func a(_ x: Tracked<Float>) -> Tracked<Float>
 }
+
 func b(g: A) -> Tracked<Float> {
   return gradient(at: 3) { x in g.a(x) }
 }
