@@ -140,6 +140,14 @@ ElementInfo makeElement(ASTNode node, ConstraintLocator *locator,
   return std::make_tuple(node, context, locator);
 }
 
+static ProtocolDecl *getSequenceProtocol(ASTContext &ctx, SourceLoc loc,
+                                         bool inAsyncContext) {
+  return TypeChecker::getProtocol(ctx, loc,
+                                  inAsyncContext
+                                      ? KnownProtocolKind::AsyncSequence
+                                      : KnownProtocolKind::Sequence);
+}
+
 /// Statement visitor that generates constraints for a given closure body.
 class ClosureConstraintGenerator
     : public StmtVisitor<ClosureConstraintGenerator, void> {
@@ -157,7 +165,126 @@ public:
                              ConstraintLocator *locator)
       : cs(cs), closure(closure), locator(locator) {}
 
+  void visitPattern(Pattern *pattern) {
+    auto parentElement =
+        locator->getLastElementAs<LocatorPathElt::ClosureBodyElement>();
+
+    if (!parentElement) {
+      hadError = true;
+      return;
+    }
+
+    auto *stmt = parentElement->getElement().dyn_cast<Stmt *>();
+    if (stmt && isa<ForEachStmt>(stmt)) {
+      visitForEachPattern(pattern, cast<ForEachStmt>(stmt));
+      return;
+    }
+
+    llvm_unreachable("Unsupported pattern");
+  }
+
 private:
+  void visitForEachPattern(Pattern *pattern, ForEachStmt *forEachStmt) {
+    auto &ctx = cs.getASTContext();
+
+    bool isAsync = forEachStmt->getAwaitLoc().isValid();
+
+    // Verify pattern.
+    {
+      auto contextualPattern =
+          ContextualPattern::forRawPattern(pattern, closure);
+      Type patternType = TypeChecker::typeCheckPattern(contextualPattern);
+
+      if (patternType->hasError()) {
+        hadError = true;
+        return;
+      }
+    }
+
+    auto *sequenceProto =
+        getSequenceProtocol(ctx, forEachStmt->getForLoc(), isAsync);
+    if (!sequenceProto) {
+      hadError = true;
+      return;
+    }
+
+    auto *contextualLocator = cs.getConstraintLocator(
+        locator, LocatorPathElt::ContextualType(CTP_ForEachStmt));
+
+    // Generate constraints to initialize the pattern.
+    auto initType =
+        cs.generateConstraints(pattern, contextualLocator,
+                               /*shouldBindPatternOneWay=*/true,
+                               /*patternBinding=*/nullptr, /*patternIndex=*/0);
+
+    if (!initType) {
+      hadError = true;
+      return;
+    }
+
+    // Type of the sequence associated with for-each statement, should
+    // be determined already.
+    auto *sequenceExpr = forEachStmt->getSequence();
+    auto *sequenceLocator = cs.getConstraintLocator(sequenceExpr);
+
+    Type sequenceType =
+        cs.createTypeVariable(sequenceLocator, TVO_CanBindToNoEscape);
+    // This "workaround" warrants an explanation for posterity.
+    //
+    // The reason why we can't simplify use \c getType(sequenceExpr) here
+    // is due to how dependent member types are handled by \c simplifyTypeImpl
+    // - if the base type didn't change (and it wouldn't because it's a fully
+    // resolved concrete type) after simplification attempt the
+    // whole dependent member type would be just re-created without attempting
+    // to resolve it, so we have to use an intermediary here so that
+    // \c elementType and \c iteratorType can be resolved correctly.
+    cs.addConstraint(ConstraintKind::Conversion, cs.getType(sequenceExpr),
+                     sequenceType, sequenceLocator);
+
+    auto elementAssocType = sequenceProto->getAssociatedType(ctx.Id_Element);
+    Type elementType = DependentMemberType::get(sequenceType, elementAssocType);
+
+    auto iteratorAssocType = sequenceProto->getAssociatedType(
+        isAsync ? ctx.Id_AsyncIterator : ctx.Id_Iterator);
+    Type iteratorType =
+        DependentMemberType::get(sequenceType, iteratorAssocType);
+
+    cs.addConstraint(
+        ConstraintKind::Conversion, elementType, initType,
+        cs.getConstraintLocator(contextualLocator,
+                                ConstraintLocator::SequenceElementType));
+
+    // Reference the makeIterator witness.
+    FuncDecl *makeIterator = isAsync ? ctx.getAsyncSequenceMakeAsyncIterator()
+                                     : ctx.getSequenceMakeIterator();
+
+    Type makeIteratorType =
+        cs.createTypeVariable(locator, TVO_CanBindToNoEscape);
+    cs.addValueWitnessConstraint(LValueType::get(sequenceType), makeIterator,
+                                 makeIteratorType, closure,
+                                 FunctionRefKind::Compound, contextualLocator);
+
+    // After successful constraint generation, let's record
+    // solution application target with all relevant information.
+    {
+      auto target = SolutionApplicationTarget::forForEachStmt(
+          forEachStmt, sequenceProto, closure,
+          /*bindTypeVarsOneWay=*/true,
+          /*contextualPurpose=*/CTP_ForEachSequence);
+
+      auto &targetInfo = target.getForEachStmtInfo();
+
+      targetInfo.sequenceType = sequenceType;
+      targetInfo.elementType = elementType;
+      targetInfo.iteratorType = iteratorType;
+      targetInfo.initType = initType;
+
+      target.setPattern(pattern);
+
+      cs.setSolutionApplicationTarget(forEachStmt, target);
+    }
+  }
+
   void visitDecl(Decl *decl) {
     if (isSupportedMultiStatementClosure()) {
       if (auto patternBinding = dyn_cast<PatternBindingDecl>(decl)) {
@@ -315,6 +442,56 @@ private:
         locator);
   }
 
+  void visitForEachStmt(ForEachStmt *forEachStmt) {
+    if (!isSupportedMultiStatementClosure())
+      llvm_unreachable("Unsupported statement: ForEach");
+
+    bool isAsync = forEachStmt->getAwaitLoc().isValid();
+
+    auto *stmtLoc = cs.getConstraintLocator(locator);
+
+    auto *sequenceProto = getSequenceProtocol(
+        cs.getASTContext(), forEachStmt->getForLoc(), isAsync);
+    if (!sequenceProto) {
+      hadError = true;
+      return;
+    }
+
+    SmallVector<ElementInfo, 4> elements;
+
+    // Sequence expression.
+    {
+      elements.push_back(makeElement(
+          forEachStmt->getSequence(), stmtLoc,
+          {sequenceProto->getDeclaredInterfaceType(), CTP_ForEachSequence}));
+    }
+
+    // For-each pattern.
+    {
+      Pattern *pattern =
+          TypeChecker::resolvePattern(forEachStmt->getPattern(), closure,
+                                      /*isStmtCondition*/ false);
+
+      if (!pattern) {
+        hadError = true;
+        return;
+      }
+
+      elements.push_back(makeElement(pattern, stmtLoc));
+    }
+
+    // `where` clause if any.
+    if (auto *whereClause = forEachStmt->getWhere()) {
+      elements.push_back(
+          makeElement(whereClause, stmtLoc, getContextForCondition()));
+    }
+
+    // Body of the `for-in` loop.
+    elements.push_back(makeElement(forEachStmt->getBody(), stmtLoc));
+
+    createConjunction(cs, elements, locator);
+  }
+
   void visitBraceStmt(BraceStmt *braceStmt) {
     if (isSupportedMultiStatementClosure()) {
       SmallVector<ElementInfo, 4> elements;
@@ -376,7 +553,6 @@ private:
   }
   UNSUPPORTED_STMT(Yield)
   UNSUPPORTED_STMT(DoCatch)
-  UNSUPPORTED_STMT(ForEach)
   UNSUPPORTED_STMT(Switch)
   UNSUPPORTED_STMT(Case)
   UNSUPPORTED_STMT(Fail)
@@ -386,7 +562,7 @@ private:
   ContextualTypeInfo getContextForCondition() const {
     auto boolDecl = cs.getASTContext().getBoolDecl();
     assert(boolDecl && "Bool is missing");
-    return {boolDecl->getDeclaredType(), CTP_Condition};
+    return {boolDecl->getDeclaredInterfaceType(), CTP_Condition};
   }
 };
 }
@@ -470,6 +646,8 @@ ConstraintSystem::simplifyClosureBodyElementConstraint(
   } else if (auto *cond = element.dyn_cast<StmtCondition *>()) {
     if (generateConstraints(*cond, closure))
       return SolutionKind::Error;
+  } else if (auto *pattern = element.dyn_cast<Pattern *>()) {
+    generator.visitPattern(pattern);
   } else {
     generator.visit(element.get<Decl *>());
   }
@@ -665,6 +843,20 @@ private:
     return throwStmt;
   }
 
+  ASTNode visitForEachStmt(ForEachStmt *forEachStmt) {
+    ConstraintSystem &cs = solution.getConstraintSystem();
+
+    auto forEachTarget =
+        rewriteTarget(*cs.getSolutionApplicationTarget(forEachStmt));
+    if (!forEachTarget)
+      hadError = true;
+
+    auto body = visit(forEachStmt->getBody()).get<Stmt *>();
+    forEachStmt->setBody(cast<BraceStmt>(body));
+
+    return forEachStmt;
+  }
+
   ASTNode visitBraceStmt(BraceStmt *braceStmt) {
     for (auto &node : braceStmt->getElements()) {
       if (auto expr = node.dyn_cast<Expr *>()) {
@@ -754,7 +946,6 @@ private:
   }
   UNSUPPORTED_STMT(Yield)
   UNSUPPORTED_STMT(DoCatch)
-  UNSUPPORTED_STMT(ForEach)
   UNSUPPORTED_STMT(Switch)
   UNSUPPORTED_STMT(Case)
   UNSUPPORTED_STMT(Fail)
