@@ -101,6 +101,7 @@ public:
 
   Type getSuperclassBound(
       TypeArrayView<GenericTypeParamType> genericParams,
+      const MutableTerm &lookupTerm,
       const ProtocolGraph &protos,
       RewriteContext &ctx) const;
 
@@ -114,6 +115,7 @@ public:
 
   Type getConcreteType(
       TypeArrayView<GenericTypeParamType> genericParams,
+      const MutableTerm &lookupTerm,
       const ProtocolGraph &protos,
       RewriteContext &ctx) const;
 
@@ -127,6 +129,8 @@ public:
 
   llvm::TinyPtrVector<const ProtocolDecl *>
   getConformsToExcludingSuperclassConformances() const;
+
+  MutableTerm getPrefixAfterStrippingKey(const MutableTerm &lookupTerm) const;
 };
 
 /// Stores all rewrite rules of the form T.[p] => T, where [p] is a property

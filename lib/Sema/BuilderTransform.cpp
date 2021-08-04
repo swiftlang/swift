@@ -205,9 +205,8 @@ class BuilderClosureVisitor
   }
 
 public:
-  BuilderClosureVisitor(ASTContext &ctx, ConstraintSystem *cs,
-                        DeclContext *dc, Type builderType,
-                        Type bodyResultType)
+  BuilderClosureVisitor(ASTContext &ctx, ConstraintSystem *cs, DeclContext *dc,
+                        Type builderType, Type bodyResultType)
       : cs(cs), dc(dc), ctx(ctx), builderType(builderType) {
     builder = builderType->getAnyNominal();
     applied.builderType = builderType;
@@ -238,9 +237,8 @@ public:
           { applied.returnExpr }, { Identifier() });
     }
 
-    applied.returnExpr = cs->buildTypeErasedExpr(applied.returnExpr,
-                                                 dc, applied.bodyResultType,
-                                                 CTP_ReturnStmt);
+    applied.returnExpr = cs->buildTypeErasedExpr(
+        applied.returnExpr, dc, applied.bodyResultType, CTP_ReturnStmt);
 
     applied.returnExpr = cs->generateConstraints(applied.returnExpr, dc);
     if (!applied.returnExpr) {
@@ -1045,12 +1043,12 @@ private:
     switch (target.kind) {
     case ResultBuilderTarget::ReturnValue: {
       // Return the expression.
-      Type bodyResultType =
+      Type bodyResultInterfaceType =
           solution.simplifyType(builderTransform.bodyResultType);
 
-      SolutionApplicationTarget returnTarget(
-          capturedExpr, dc, CTP_ReturnStmt, bodyResultType,
-          /*isDiscarded=*/false);
+      SolutionApplicationTarget returnTarget(capturedExpr, dc, CTP_ReturnStmt,
+                                             bodyResultInterfaceType,
+                                             /*isDiscarded=*/false);
       Expr *resultExpr = nullptr;
       if (auto resultTarget = rewriteTarget(returnTarget))
         resultExpr = resultTarget->getAsExpr();
@@ -1652,7 +1650,7 @@ Optional<BraceStmt *> TypeChecker::applyResultBuilderBodyTransform(
   ConstraintKind resultConstraintKind = ConstraintKind::Conversion;
   if (auto opaque = resultContextType->getAs<OpaqueTypeArchetypeType>()) {
     if (opaque->getDecl()->isOpaqueReturnTypeOfFunction(func)) {
-      resultConstraintKind = ConstraintKind::OpaqueUnderlyingType;
+      resultConstraintKind = ConstraintKind::Equal;
     }
   }
 
@@ -1718,10 +1716,10 @@ Optional<BraceStmt *> TypeChecker::applyResultBuilderBodyTransform(
 }
 
 Optional<ConstraintSystem::TypeMatchResult>
-ConstraintSystem::matchResultBuilder(
-    AnyFunctionRef fn, Type builderType, Type bodyResultType,
-    ConstraintKind bodyResultConstraintKind,
-    ConstraintLocatorBuilder locator) {
+ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
+                                     Type bodyResultType,
+                                     ConstraintKind bodyResultConstraintKind,
+                                     ConstraintLocatorBuilder locator) {
   auto builder = builderType->getAnyNominal();
   assert(builder && "Bad result builder type");
   assert(builder->getAttrs().hasAttribute<ResultBuilderAttr>());
@@ -1846,8 +1844,8 @@ ConstraintSystem::matchResultBuilder(
   }
 
   // Bind the body result type to the type of the transformed expression.
-  addConstraint(bodyResultConstraintKind, transformedType, bodyResultType,
-                locator);
+  addConstraint(bodyResultConstraintKind, transformedType,
+                openOpaqueTypeRec(bodyResultType, locator), locator);
   return getTypeMatchSuccess();
 }
 

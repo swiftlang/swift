@@ -2041,9 +2041,27 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
     return resolveProtocolType(cast<ProtocolTypeRepr>(repr), options);
 
   case TypeReprKind::OpaqueReturn: {
-    // Only valid as the return type of a function, which should be handled
-    // during function decl type checking.
+    // If the opaque type is in a valid position, e.g. part of a function return
+    // type, resolution should happen in the context of an `OpaqueTypeDecl`.
+    // This decl is implicit in the source and is created in such contexts by
+    // evaluation of an `OpaqueResultTypeRequest`.
     auto opaqueRepr = cast<OpaqueReturnTypeRepr>(repr);
+    auto *DC = getDeclContext();
+    if (isa<OpaqueTypeDecl>(DC)) {
+      auto opaqueDecl = cast<OpaqueTypeDecl>(DC);
+      auto outerGenericSignature = opaqueDecl->getNamingDecl()
+                                       ->getInnermostDeclContext()
+                                       ->getGenericSignatureOfContext();
+
+      SubstitutionMap subs;
+      if (outerGenericSignature)
+        subs = outerGenericSignature->getIdentitySubstitutionMap();
+
+      unsigned ordinal = opaqueDecl->getAnonymousOpaqueParamOrdinal(opaqueRepr);
+      return OpaqueTypeArchetypeType::get(opaqueDecl, ordinal, subs);
+    }
+
+    // We are not inside an `OpaqueTypeDecl`, so diagnose an error.
     if (!(options & TypeResolutionFlags::SilenceErrors)) {
       diagnose(opaqueRepr->getOpaqueLoc(),
                diag::unsupported_opaque_type);

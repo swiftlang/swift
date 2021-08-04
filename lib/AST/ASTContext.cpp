@@ -2331,7 +2331,8 @@ BuiltinProtocolConformance *
 ASTContext::getBuiltinConformance(
     Type type, ProtocolDecl *protocol,
     GenericSignature genericSig,
-    ArrayRef<Requirement> conditionalRequirements
+    ArrayRef<Requirement> conditionalRequirements,
+    BuiltinConformanceKind kind
 ) {
   auto key = std::make_pair(type, protocol);
   AllocationArena arena = getArena(type->getRecursiveProperties());
@@ -2343,7 +2344,7 @@ ASTContext::getBuiltinConformance(
         totalSizeToAlloc<Requirement>(conditionalRequirements.size());
     auto mem = this->Allocate(size, alignof(BuiltinProtocolConformance), arena);
     entry = new (mem) BuiltinProtocolConformance(
-        type, protocol, genericSig, conditionalRequirements);
+        type, protocol, genericSig, conditionalRequirements, kind);
   }
   return entry;
 }
@@ -4159,9 +4160,12 @@ DependentMemberType *DependentMemberType::get(Type base,
 }
 
 OpaqueTypeArchetypeType *
-OpaqueTypeArchetypeType::get(OpaqueTypeDecl *Decl,
-                             SubstitutionMap Substitutions)
-{
+OpaqueTypeArchetypeType::get(OpaqueTypeDecl *Decl, unsigned ordinal,
+                             SubstitutionMap Substitutions) {
+  // TODO [OPAQUE SUPPORT]: multiple opaque types
+  assert(ordinal == 0 && "we only support one 'some' type per composite type");
+  auto opaqueParamType = Decl->getUnderlyingInterfaceType();
+
   // TODO: We could attempt to preserve type sugar in the substitution map.
   // Currently archetypes are assumed to be always canonical in many places,
   // though, so doing so would require fixing those places.
@@ -4237,18 +4241,18 @@ OpaqueTypeArchetypeType::get(OpaqueTypeDecl *Decl,
     }
   }
 #else
-  // Assert that there are no same type constraints on the underlying type
-  // or its associated types.
+  // Assert that there are no same type constraints on the opaque type or its
+  // associated types.
   //
   // This should not be possible until we add where clause support, with the
   // exception of generic base class constraints (handled below).
   (void)newRequirements;
 # ifndef NDEBUG
-  for (auto reqt :
+  for (auto req :
                 Decl->getOpaqueInterfaceGenericSignature().getRequirements()) {
-    auto reqtBase = reqt.getFirstType()->getRootGenericParam();
-    if (reqtBase->isEqual(Decl->getUnderlyingInterfaceType())) {
-      assert(reqt.getKind() != RequirementKind::SameType
+    auto reqBase = req.getFirstType()->getRootGenericParam();
+    if (reqBase->isEqual(opaqueParamType)) {
+      assert(req.getKind() != RequirementKind::SameType
              && "supporting where clauses on opaque types requires correctly "
                 "setting up the generic environment for "
                 "OpaqueTypeArchetypeTypes; see comment above");
@@ -4264,9 +4268,8 @@ OpaqueTypeArchetypeType::get(OpaqueTypeDecl *Decl,
         std::move(newRequirements)},
       nullptr);
 
-  auto opaqueInterfaceTy = Decl->getUnderlyingInterfaceType();
-  auto layout = signature->getLayoutConstraint(opaqueInterfaceTy);
-  auto superclass = signature->getSuperclassBound(opaqueInterfaceTy);
+  auto reqs = signature->getLocalRequirements(opaqueParamType);
+  auto superclass = reqs.superclass;
   #if !DO_IT_CORRECTLY
     // Ad-hoc substitute the generic parameters of the superclass.
     // If we correctly applied the substitutions to the generic signature
@@ -4275,25 +4278,23 @@ OpaqueTypeArchetypeType::get(OpaqueTypeDecl *Decl,
       superclass = superclass.subst(Substitutions);
     }
   #endif
-  const auto protos = signature->getRequiredProtocols(opaqueInterfaceTy);
 
   auto mem = ctx.Allocate(
     OpaqueTypeArchetypeType::totalSizeToAlloc<ProtocolDecl *, Type, LayoutConstraint>(
-      protos.size(), superclass ? 1 : 0, layout ? 1 : 0),
+      reqs.protos.size(), superclass ? 1 : 0, reqs.layout ? 1 : 0),
       alignof(OpaqueTypeArchetypeType),
       arena);
-  
-  auto newOpaque = ::new (mem) OpaqueTypeArchetypeType(Decl, Substitutions,
-                                                    properties,
-                                                    opaqueInterfaceTy,
-                                                    protos, superclass, layout);
-  
+
+  auto newOpaque = ::new (mem)
+      OpaqueTypeArchetypeType(Decl, Substitutions, properties, opaqueParamType,
+                              reqs.protos, superclass, reqs.layout);
+
   // Create a generic environment and bind the opaque archetype to the
   // opaque interface type from the decl's signature.
   auto *env = GenericEnvironment::getIncomplete(signature);
-  env->addMapping(GenericParamKey(opaqueInterfaceTy), newOpaque);
+  env->addMapping(GenericParamKey(opaqueParamType), newOpaque);
   newOpaque->Environment = env;
-  
+
   // Look up the insertion point in the folding set again in case something
   // invalidated it above.
   {
@@ -4303,7 +4304,7 @@ OpaqueTypeArchetypeType::get(OpaqueTypeDecl *Decl,
     assert(!existing && "race to create opaque archetype?!");
     set.InsertNode(newOpaque, insertPos);
   }
-  
+
   return newOpaque;
 }
 

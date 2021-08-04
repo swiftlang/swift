@@ -1153,7 +1153,11 @@ ClangNode swift::ide::extensionGetClangNode(const ExtensionDecl *ext) {
   return ClangNode();
 }
 
-std::pair<Type, ConcreteDeclRef> swift::ide::getReferencedDecl(Expr *expr) {
+std::pair<Type, ConcreteDeclRef> swift::ide::getReferencedDecl(Expr *expr,
+                                                               bool semantic) {
+  if (semantic)
+    expr = expr->getSemanticsProvidingExpr();
+
   auto exprTy = expr->getType();
 
   // Look through unbound instance member accesses.
@@ -1219,12 +1223,18 @@ Expr *swift::ide::getBase(ArrayRef<Expr *> ExprStack) {
   Expr *CurrentE = ExprStack.back();
   Expr *ParentE = getContainingExpr(ExprStack, 1);
   Expr *Base = nullptr;
+
   if (auto DSE = dyn_cast_or_null<DotSyntaxCallExpr>(ParentE))
     Base = DSE->getBase();
   else if (auto MRE = dyn_cast<MemberRefExpr>(CurrentE))
     Base = MRE->getBase();
   else if (auto SE = dyn_cast<SubscriptExpr>(CurrentE))
     Base = SE->getBase();
+
+  // Look through curry thunks
+  if (auto ACE = dyn_cast_or_null<AutoClosureExpr>(Base))
+    if (auto *Unwrapped = ACE->getUnwrappedCurryThunkExpr())
+      Base = Unwrapped;
 
   if (Base) {
     while (auto ICE = dyn_cast<ImplicitConversionExpr>(Base))

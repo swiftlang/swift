@@ -1524,46 +1524,6 @@ TypeChecker::lookupPrecedenceGroup(DeclContext *dc, Identifier name,
   return PrecedenceGroupLookupResult(dc, name, std::move(groups));
 }
 
-static NominalTypeDecl *resolveSingleNominalTypeDecl(
-    DeclContext *DC, SourceLoc loc, Identifier ident, ASTContext &Ctx,
-    TypeResolutionFlags flags = TypeResolutionFlags(0)) {
-  auto *TyR = new (Ctx) SimpleIdentTypeRepr(DeclNameLoc(loc),
-                                            DeclNameRef(ident));
-
-  const auto options =
-      TypeResolutionOptions(TypeResolverContext::TypeAliasDecl) | flags;
-
-  const auto result =
-      TypeResolution::forInterface(DC, options,
-                                   // FIXME: Should unbound generics be allowed
-                                   // to appear amongst designated types?
-                                   /*unboundTyOpener*/ nullptr,
-                                   /*placeholderHandler*/ nullptr)
-          .resolveType(TyR);
-
-  if (result->hasError())
-    return nullptr;
-  return result->getAnyNominal();
-}
-
-bool swift::checkDesignatedTypes(OperatorDecl *OD,
-                                 ArrayRef<Located<Identifier>> identifiers) {
-  auto &ctx = OD->getASTContext();
-  auto *DC = OD->getDeclContext();
-
-  SmallVector<NominalTypeDecl *, 1> designatedNominalTypes;
-  for (auto ident : identifiers) {
-    auto *decl = resolveSingleNominalTypeDecl(DC, ident.Loc, ident.Item, ctx);
-    if (!decl)
-      return true;
-
-    designatedNominalTypes.push_back(decl);
-  }
-
-  OD->setDesignatedNominalTypes(ctx.AllocateCopy(designatedNominalTypes));
-  return false;
-}
-
 /// Validate the given operator declaration.
 ///
 /// This establishes key invariants, such as an InfixOperatorDecl's
@@ -1575,49 +1535,26 @@ OperatorPrecedenceGroupRequest::evaluate(Evaluator &evaluator,
   auto &ctx = IOD->getASTContext();
   auto *dc = IOD->getDeclContext();
 
-  auto enableOperatorDesignatedTypes =
-      ctx.TypeCheckerOpts.EnableOperatorDesignatedTypes;
-
-  PrecedenceGroupDecl *group = nullptr;
-
-  auto identifiers = IOD->getIdentifiers();
-  if (!identifiers.empty()) {
-    auto name = identifiers[0].Item;
-    auto loc = identifiers[0].Loc;
-
-    auto canResolveType = [&]() -> bool {
-      return enableOperatorDesignatedTypes &&
-             resolveSingleNominalTypeDecl(dc, loc, name, ctx,
-                                          TypeResolutionFlags::SilenceErrors);
-    };
-
-    // Make sure not to diagnose in the case where we failed to find a
-    // precedencegroup, but we could resolve a type instead.
+  auto name = IOD->getPrecedenceGroupName();
+  if (!name.empty()) {
+    auto loc = IOD->getPrecedenceGroupLoc();
     auto groups = TypeChecker::lookupPrecedenceGroup(dc, name, loc);
-    if (groups.hasResults() || !canResolveType()) {
-      group = groups.getSingleOrDiagnose(loc);
-      identifiers = identifiers.slice(1);
-    }
+
+    if (groups.hasResults() ||
+        !ctx.TypeCheckerOpts.EnableOperatorDesignatedTypes)
+      return groups.getSingleOrDiagnose(loc);
+
+    // We didn't find the named precedence group and designated types are
+    // enabled, so we will assume that it was actually a designated type. Warn
+    // and fall through as though `PrecedenceGroupName` had never been set.
+    ctx.Diags.diagnose(IOD->getColonLoc(),
+                       diag::operator_decl_remove_designated_types)
+        .fixItRemove({IOD->getColonLoc(), loc});
   }
 
-  // Unless operator designed types are enabled, the parser will ensure that
-  // only one identifier is allowed in the clause, which we should have just
-  // handled.
-  assert(identifiers.empty() || enableOperatorDesignatedTypes);
-
-  if (!group) {
-    auto groups = TypeChecker::lookupPrecedenceGroup(
-        dc, ctx.Id_DefaultPrecedence, SourceLoc());
-    group = groups.getSingleOrDiagnose(IOD->getLoc(), /*forBuiltin*/ true);
-  }
-
-  auto nominalTypes = IOD->getDesignatedNominalTypes();
-  if (nominalTypes.empty() && enableOperatorDesignatedTypes) {
-    if (checkDesignatedTypes(IOD, identifiers)) {
-      IOD->setInvalid();
-    }
-  }
-  return group;
+  auto groups = TypeChecker::lookupPrecedenceGroup(
+      dc, ctx.Id_DefaultPrecedence, SourceLoc());
+  return groups.getSingleOrDiagnose(IOD->getLoc(), /*forBuiltin*/ true);
 }
 
 SelfAccessKind

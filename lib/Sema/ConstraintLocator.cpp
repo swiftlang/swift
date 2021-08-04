@@ -60,6 +60,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::DynamicType:
   case ConstraintLocator::SubscriptMember:
   case ConstraintLocator::OpenedGeneric:
+  case ConstraintLocator::OpenedOpaqueArchetype:
   case ConstraintLocator::WrappedValue:
   case ConstraintLocator::GenericParameter:
   case ConstraintLocator::GenericArgument:
@@ -416,6 +417,10 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
     }
     case OpenedGeneric:
       out << "opened generic";
+      break;
+
+    case OpenedOpaqueArchetype:
+      out << "opened opaque archetype";
       break;
 
     case ConditionalRequirement: {

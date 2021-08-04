@@ -67,6 +67,17 @@ and the combination of module path + access path is an "import path".)
 
 See `ImportPath` and the types nested inside it for more on this.
 
+## access pattern
+
+Defines how some particular storage (a property or a subscript) is accessed.
+For example, when accessing a property `let y = a.x`, the compiler could potentially
+use `get` accessor or the `_read` accessor. Similarly, for a modification like
+`a.x += 1`, the compiler could use `get` + `set` or it could use `_modify`.
+
+The access pattern can differ for call-sites which can/cannot see the underlying
+implementation. Clients which cannot see the underlying implementation are said
+to use the conservative access pattern.
+
 ## archetype
 
 A placeholder for a generic parameter or an associated type within a
@@ -475,6 +486,38 @@ See [mandatory passes](#mandatory-passes--mandatory-optimizations).
 
 An implicit representation change that occurs when a value is used with
 a different [abstraction pattern](#abstraction-pattern) from its current representation.
+
+## realization
+
+The process of initializing an ObjC class for use by the ObjC runtime.
+This consists of allocating runtime tracking data, fixing up method lists
+and attaching categories.
+
+This is distinct from the initialization performed by `+initialize`, which
+happens only when the first message (other than `+load`) is sent to the class.
+
+The order of operations is: realization, followed by `+load` (if present),
+followed by `+initialize`. There are few cases where these can happen
+at different times.
+
+- Common case (no `+load` or special attributes): Realization is lazy and
+  happens when the first message is sent to a class. After that, `+initialize`
+  is run.
+- If the class has a `+load` method: `+load`, as the name suggests, runs at
+  load time; it is the ObjC equivalent of a static initializer in C++. For
+  such a class, realization eagerly happens at load time before `+load` runs.
+  (Fun aside: C++ static initializers run after `+load`.) `+initialize` still
+  runs lazily on the first message.
+- If the class is marked [`@_objc_non_lazy_realization`](/docs/ReferenceGuides/UnderscoredAttributes.md#_objc_non_lazy_realization):
+  Realization happens at load time. `+initialize` still runs lazily on the first
+  message.
+
+It's possible to create a class that is realized but not initialized by
+using a runtime function like `objc_getClass` before the class has been used.
+
+See also: Mike Ash's blog post on
+[Objective-C Class Loading and Initialization](https://www.mikeash.com/pyblog/friday-qa-2009-05-22-objective-c-class-loading-and-initialization.html),
+which covers `+load` and `+initialize` in more detail.
 
 ## refutable pattern
 

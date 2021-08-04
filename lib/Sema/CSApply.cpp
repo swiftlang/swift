@@ -5837,8 +5837,9 @@ Expr *ExprRewriter::coerceCallArguments(
   // Apply labels to arguments.
   AnyFunctionType::relabelParams(args, argLabels);
 
-  auto unlabeledTrailingClosureIndex =
+  auto oldTrailingClosureIndex =
       arg->getUnlabeledTrailingClosureIndexOfPackedArgument();
+  Optional<unsigned> newTrailingClosureIndex;
 
   // Determine the parameter bindings that were applied.
   auto *locatorPtr = cs.getConstraintLocator(locator);
@@ -5912,6 +5913,12 @@ Expr *ExprRewriter::coerceCallArguments(
         auto arg = getArg(argIdx);
         auto argType = cs.getType(arg);
 
+        // Update the trailing closure index if needed.
+        if (oldTrailingClosureIndex && *oldTrailingClosureIndex == argIdx) {
+          assert(!newTrailingClosureIndex);
+          newTrailingClosureIndex = newArgs.size();
+        }
+
         // If the argument type exactly matches, this just works.
         if (argType->isEqual(param.getPlainType())) {
           variadicArgs.push_back(arg);
@@ -5973,6 +5980,12 @@ Expr *ExprRewriter::coerceCallArguments(
     unsigned argIdx = parameterBindings[paramIdx].front();
     auto arg = getArg(argIdx);
     auto argType = cs.getType(arg);
+
+    // Update the trailing closure index if needed.
+    if (oldTrailingClosureIndex && *oldTrailingClosureIndex == argIdx) {
+      assert(!newTrailingClosureIndex);
+      newTrailingClosureIndex = newArgs.size();
+    }
 
     // Save the original label location.
     newLabelLocs.push_back(getLabelLoc(argIdx));
@@ -6089,6 +6102,9 @@ Expr *ExprRewriter::coerceCallArguments(
   assert(newArgs.size() == newParams.size());
   assert(newArgs.size() == newLabels.size());
   assert(newArgs.size() == newLabelLocs.size());
+  assert(oldTrailingClosureIndex.hasValue() ==
+         newTrailingClosureIndex.hasValue());
+  assert(!newTrailingClosureIndex || *newTrailingClosureIndex < newArgs.size());
 
   // This is silly. SILGen gets confused if a 'self' parameter is wrapped
   // in a ParenExpr sometimes.
@@ -6096,7 +6112,7 @@ Expr *ExprRewriter::coerceCallArguments(
       (params[0].getValueOwnership() == ValueOwnership::Default ||
        params[0].getValueOwnership() == ValueOwnership::InOut)) {
     assert(newArgs.size() == 1);
-    assert(!unlabeledTrailingClosureIndex);
+    assert(!newTrailingClosureIndex);
     return newArgs[0];
   }
 
@@ -6111,7 +6127,7 @@ Expr *ExprRewriter::coerceCallArguments(
       bool isImplicit = arg->isImplicit();
       arg = new (ctx) ParenExpr(
           lParenLoc, newArgs[0], rParenLoc,
-          static_cast<bool>(unlabeledTrailingClosureIndex));
+          static_cast<bool>(newTrailingClosureIndex));
       arg->setImplicit(isImplicit);
     }
   } else {
@@ -6126,7 +6142,7 @@ Expr *ExprRewriter::coerceCallArguments(
     } else {
       // Build a new TupleExpr, re-using source location information.
       arg = TupleExpr::create(ctx, lParenLoc, rParenLoc, newArgs, newLabels,
-                              newLabelLocs, unlabeledTrailingClosureIndex,
+                              newLabelLocs, newTrailingClosureIndex,
                               /*implicit=*/arg->isImplicit());
     }
   }
@@ -6162,8 +6178,15 @@ static bool applyTypeToClosureExpr(ConstraintSystem &cs,
                                    Expr *expr, Type toType) {
   // Look through identity expressions, like parens.
   if (auto IE = dyn_cast<IdentityExpr>(expr)) {
-    if (!applyTypeToClosureExpr(cs, IE->getSubExpr(), toType)) return false;
-    cs.setType(IE, toType);
+    if (!applyTypeToClosureExpr(cs, IE->getSubExpr(), toType))
+      return false;
+
+    auto subExprTy = cs.getType(IE->getSubExpr());
+    if (isa<ParenExpr>(IE)) {
+      cs.setType(IE, ParenType::get(cs.getASTContext(), subExprTy));
+    } else {
+      cs.setType(IE, subExprTy);
+    }
     return true;
   }
 
@@ -7258,10 +7281,14 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     return cs.cacheType(new (ctx) UnresolvedTypeConversionExpr(expr, toType));
 
   // Use an opaque type to abstract a value of the underlying concrete type.
-  if (toType->getAs<OpaqueTypeArchetypeType>()) {
+  // The full check here would be that `toType` and `fromType` are structually
+  // equal except in any position where `toType` has an opaque archetype. The
+  // below is just an approximate check since the above would be expensive to
+  // verify and still relies on the type checker ensuing `fromType` is
+  // compatible with any opaque archetypes.
+  if (toType->hasOpaqueArchetype())
     return cs.cacheType(new (ctx) UnderlyingToOpaqueExpr(expr, toType));
-  }
-  
+
   llvm_unreachable("Unhandled coercion");
 }
 

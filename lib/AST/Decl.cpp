@@ -2809,7 +2809,7 @@ void ValueDecl::setOverriddenDecls(ArrayRef<ValueDecl *> overridden) {
   request.cacheResult(overriddenVec);
 }
 
-OpaqueReturnTypeRepr *ValueDecl::getOpaqueResultTypeRepr() const {
+TypeRepr *ValueDecl::getOpaqueResultTypeRepr() const {
   TypeRepr *returnRepr = nullptr;
   if (auto *VD = dyn_cast<VarDecl>(this)) {
     if (auto *P = VD->getParentPattern()) {
@@ -2834,7 +2834,11 @@ OpaqueReturnTypeRepr *ValueDecl::getOpaqueResultTypeRepr() const {
     returnRepr = SD->getElementTypeRepr();
   }
 
-  return dyn_cast_or_null<OpaqueReturnTypeRepr>(returnRepr);
+  if (returnRepr && returnRepr->hasOpaque()) {
+    return returnRepr;
+  } else {
+    return nullptr;
+  }
 }
 
 OpaqueTypeDecl *ValueDecl::getOpaqueResultTypeDecl() const {
@@ -7120,7 +7124,7 @@ static bool isPotentialCompletionHandler(const ParamDecl *param) {
 }
 
 Optional<unsigned> AbstractFunctionDecl::findPotentialCompletionHandlerParam(
-    AbstractFunctionDecl *asyncAlternative) const {
+    const AbstractFunctionDecl *asyncAlternative) const {
   const ParameterList *params = getParameters();
   if (params->size() == 0)
     return None;
@@ -7203,7 +7207,7 @@ Optional<unsigned> AbstractFunctionDecl::findPotentialCompletionHandlerParam(
 
     // The next original param should match the current async, so don't
     // increment the async index
-    potentialParam = asyncParamIndex;
+    potentialParam = paramIndex;
     paramIndex++;
   }
   return potentialParam;
@@ -7547,16 +7551,16 @@ void AbstractFunctionDecl::setParameters(ParameterList *BodyParams) {
 }
 
 OpaqueTypeDecl::OpaqueTypeDecl(ValueDecl *NamingDecl,
-                               GenericParamList *GenericParams,
-                               DeclContext *DC,
+                               GenericParamList *GenericParams, DeclContext *DC,
                                GenericSignature OpaqueInterfaceGenericSignature,
+                               OpaqueReturnTypeRepr *UnderlyingInterfaceRepr,
                                GenericTypeParamType *UnderlyingInterfaceType)
-  : GenericTypeDecl(DeclKind::OpaqueType, DC, Identifier(), SourceLoc(), {},
-                    GenericParams),
-    NamingDecl(NamingDecl),
-    OpaqueInterfaceGenericSignature(OpaqueInterfaceGenericSignature),
-    UnderlyingInterfaceType(UnderlyingInterfaceType)
-{
+    : GenericTypeDecl(DeclKind::OpaqueType, DC, Identifier(), SourceLoc(), {},
+                      GenericParams),
+      NamingDecl(NamingDecl),
+      OpaqueInterfaceGenericSignature(OpaqueInterfaceGenericSignature),
+      UnderlyingInterfaceRepr(UnderlyingInterfaceRepr),
+      UnderlyingInterfaceType(UnderlyingInterfaceType) {
   // Always implicit.
   setImplicit();
 }
@@ -7574,6 +7578,15 @@ bool OpaqueTypeDecl::isOpaqueReturnTypeOfFunction(
   }
 
   return false;
+}
+
+unsigned OpaqueTypeDecl::getAnonymousOpaqueParamOrdinal(
+    OpaqueReturnTypeRepr *repr) const {
+  // TODO [OPAQUE SUPPORT]: we will need to generalize here when we allow
+  // multiple "some" types.
+  assert(UnderlyingInterfaceRepr &&
+         "can't do opaque param lookup without underlying interface repr");
+  return repr == UnderlyingInterfaceRepr ? 0 : -1;
 }
 
 Identifier OpaqueTypeDecl::getOpaqueReturnTypeIdentifier() const {
@@ -7908,6 +7921,28 @@ bool AccessorDecl::isSimpleDidSet() const {
   auto mutableThis = const_cast<AccessorDecl *>(this);
   return evaluateOrDefault(getASTContext().evaluator,
                            SimpleDidSetRequest{mutableThis}, false);
+}
+
+void AccessorDecl::printUserFacingName(raw_ostream &out) const {
+  switch (getAccessorKind()) {
+  case AccessorKind::Get:
+    out << "getter:";
+    break;
+  case AccessorKind::Set:
+    out << "setter:";
+    break;
+  default:
+    out << getName();
+    return;
+  }
+
+  out << getStorage()->getName() << "(";
+  if (this->isSetter()) {
+    for (const auto *param : *getParameters()) {
+      out << param->getName() << ":";
+    }
+  }
+  out << ")";
 }
 
 StaticSpellingKind FuncDecl::getCorrectStaticSpelling() const {

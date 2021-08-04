@@ -937,7 +937,7 @@ bool GenericSignatureImpl::areSameTypeParameterInContext(Type type1,
 }
 
 bool GenericSignatureImpl::isRequirementSatisfied(
-    Requirement requirement) const {
+    Requirement requirement, bool allowMissing) const {
   if (requirement.getFirstType()->hasTypeParameter()) {
     auto *genericEnv = getGenericEnvironment();
 
@@ -959,7 +959,7 @@ bool GenericSignatureImpl::isRequirementSatisfied(
   // FIXME: Need to check conditional requirements here.
   ArrayRef<Requirement> conditionalRequirements;
 
-  return requirement.isSatisfied(conditionalRequirements);
+  return requirement.isSatisfied(conditionalRequirements, allowMissing);
 }
 
 SmallVector<Requirement, 4> GenericSignatureImpl::requirementsNotSatisfiedBy(
@@ -1391,12 +1391,14 @@ ProtocolDecl *Requirement::getProtocolDecl() const {
 }
 
 bool
-Requirement::isSatisfied(ArrayRef<Requirement> &conditionalRequirements) const {
+Requirement::isSatisfied(ArrayRef<Requirement> &conditionalRequirements,
+                         bool allowMissing) const {
   switch (getKind()) {
   case RequirementKind::Conformance: {
     auto *proto = getProtocolDecl();
     auto *module = proto->getParentModule();
-    auto conformance = module->lookupConformance(getFirstType(), proto);
+    auto conformance = module->lookupConformance(
+        getFirstType(), proto, allowMissing);
     if (!conformance)
       return false;
 

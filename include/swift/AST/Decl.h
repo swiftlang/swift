@@ -2537,7 +2537,10 @@ public:
   OpaqueTypeDecl *getOpaqueResultTypeDecl() const;
 
   /// Get the representative for this value's opaque result type, if it has one.
-  OpaqueReturnTypeRepr *getOpaqueResultTypeRepr() const;
+  /// Returns a `TypeRepr` instead of an `OpaqueReturnTypeRepr` because 'some'
+  /// types might appear in one or more structural positions, e.g.  (some P,
+  /// some Q), or we might have a `NamedOpaqueReturnTypeRepr`.
+  TypeRepr *getOpaqueResultTypeRepr() const;
 
   /// Retrieve the attribute associating this declaration with a
   /// result builder, if there is one.
@@ -2629,26 +2632,30 @@ public:
 /// clients of the opaque type, only exposing the type as something conforming
 /// to a given set of constraints.
 ///
-/// Currently, opaque types do not normally have an explicit spelling in source
-/// code. One is formed implicitly when a declaration is written with an opaque
-/// result type, as in:
+/// An `OpaqueTypeDecl` is formed implicitly when a declaration is written with
+/// an opaque result type, as in the following example:
 ///
 /// func foo() -> some SignedInteger { return 1 }
 ///
-/// The declared type is a special kind of ArchetypeType representing the
-/// abstracted underlying type.
+/// The declared type uses a special kind of archetype type to represent
+/// abstracted types, e.g. `(some P, some Q)` becomes `((opaque archetype 0),
+/// (opaque archetype 1))`.
 class OpaqueTypeDecl : public GenericTypeDecl {
   /// The original declaration that "names" the opaque type. Although a specific
   /// opaque type cannot be explicitly named, oapque types can propagate
   /// arbitrarily through expressions, so we need to know *which* opaque type is
   /// propagated.
   ValueDecl *NamingDecl;
-  
+
   /// The generic signature of the opaque interface to the type. This is the
-  /// outer generic signature with an added generic parameter representing the
-  /// underlying type.
+  /// outer generic signature with added generic parameters representing the
+  /// abstracted underlying types.
   GenericSignature OpaqueInterfaceGenericSignature;
-  
+
+  /// The type repr of the underlying type. Might be null if no source location
+  /// is availble, e.g. if this decl was loaded from a serialized module.
+  OpaqueReturnTypeRepr *UnderlyingInterfaceRepr;
+
   /// The generic parameter that represents the underlying type.
   GenericTypeParamType *UnderlyingInterfaceType;
   
@@ -2661,12 +2668,12 @@ class OpaqueTypeDecl : public GenericTypeDecl {
   mutable Identifier OpaqueReturnTypeIdentifier;
   
 public:
-  OpaqueTypeDecl(ValueDecl *NamingDecl,
-                 GenericParamList *GenericParams,
+  OpaqueTypeDecl(ValueDecl *NamingDecl, GenericParamList *GenericParams,
                  DeclContext *DC,
                  GenericSignature OpaqueInterfaceGenericSignature,
+                 OpaqueReturnTypeRepr *UnderlyingInterfaceRepr,
                  GenericTypeParamType *UnderlyingInterfaceType);
-  
+
   ValueDecl *getNamingDecl() const { return NamingDecl; }
   
   void setNamingDecl(ValueDecl *D) {
@@ -2679,6 +2686,11 @@ public:
   /// This is more complex than just checking `getNamingDecl` because the
   /// function could also be the getter of a storage declaration.
   bool isOpaqueReturnTypeOfFunction(const AbstractFunctionDecl *func) const;
+
+  /// Get the ordinal of the anonymous opaque parameter of this decl with type
+  /// repr `repr`, as introduce implicitly by an occurrence of "some" in return
+  /// position e.g. `func f() -> some P`. Returns -1 if `repr` is not found.
+  unsigned getAnonymousOpaqueParamOrdinal(OpaqueReturnTypeRepr *repr) const;
 
   GenericSignature getOpaqueInterfaceGenericSignature() const {
     return OpaqueInterfaceGenericSignature;
@@ -3251,7 +3263,8 @@ public:
   ///
   /// This is used by deserialization of module files to report
   /// conformances.
-  void registerProtocolConformance(ProtocolConformance *conformance);
+  void registerProtocolConformance(ProtocolConformance *conformance,
+                                   bool synthesized = false);
 
   void setConformanceLoader(LazyMemberLoader *resolver, uint64_t contextData);
 
@@ -6220,7 +6233,7 @@ public:
   /// handler if \p asyncAlternative is not set (with the same conditions on
   /// its type as above).
   Optional<unsigned> findPotentialCompletionHandlerParam(
-      AbstractFunctionDecl *asyncAlternative = nullptr) const;
+      const AbstractFunctionDecl *asyncAlternative = nullptr) const;
 
   /// Determine whether this function is implicitly known to have its
   /// parameters of function type be @_unsafeSendable.
@@ -6598,6 +6611,10 @@ public:
     Bits.AccessorDecl.IsTransparent = transparent;
     Bits.AccessorDecl.IsTransparentComputed = 1;
   }
+
+  /// A representation of the name to be displayed to users. \c getNameStr
+  /// for anything other than a getter or setter.
+  void printUserFacingName(llvm::raw_ostream &out) const;
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Accessor;
@@ -7271,22 +7288,13 @@ class OperatorDecl : public Decl {
   
   Identifier name;
 
-  ArrayRef<Located<Identifier>> Identifiers;
-  ArrayRef<NominalTypeDecl *> DesignatedNominalTypes;
   SourceLoc getLocFromSource() const { return NameLoc; }
   friend class Decl;
 public:
   OperatorDecl(DeclKind kind, DeclContext *DC, SourceLoc OperatorLoc,
-               Identifier Name, SourceLoc NameLoc,
-               ArrayRef<Located<Identifier>> Identifiers)
-      : Decl(kind, DC), OperatorLoc(OperatorLoc), NameLoc(NameLoc), name(Name),
-        Identifiers(Identifiers) {}
-
-  OperatorDecl(DeclKind kind, DeclContext *DC, SourceLoc OperatorLoc,
-               Identifier Name, SourceLoc NameLoc,
-               ArrayRef<NominalTypeDecl *> DesignatedNominalTypes)
-      : Decl(kind, DC), OperatorLoc(OperatorLoc), NameLoc(NameLoc), name(Name),
-        DesignatedNominalTypes(DesignatedNominalTypes) {}
+               Identifier Name, SourceLoc NameLoc)
+      : Decl(kind, DC), OperatorLoc(OperatorLoc), NameLoc(NameLoc), name(Name)
+  {}
 
   /// Retrieve the operator's fixity, corresponding to the concrete subclass
   /// of the OperatorDecl.
@@ -7313,25 +7321,6 @@ public:
   // OperatorDecls.
   DeclBaseName getBaseName() const { return name; }
 
-  /// Get the list of identifiers after the colon in the operator declaration.
-  ///
-  /// This list includes the names of designated types. For infix operators, the
-  /// first item in the list is a precedence group instead.
-  ///
-  /// \todo These two purposes really ought to be in separate properties and the
-  /// designated type list should be of TypeReprs instead of Identifiers.
-  ArrayRef<Located<Identifier>> getIdentifiers() const {
-    return Identifiers;
-  }
-
-  ArrayRef<NominalTypeDecl *> getDesignatedNominalTypes() const {
-    return DesignatedNominalTypes;
-  }
-
-  void setDesignatedNominalTypes(ArrayRef<NominalTypeDecl *> nominalTypes) {
-    DesignatedNominalTypes = nominalTypes;
-  }
-
   static bool classof(const Decl *D) {
     // Workaround: http://llvm.org/PR35906
     if (DeclKind::Last_Decl == DeclKind::Last_OperatorDecl)
@@ -7347,22 +7336,23 @@ public:
 /// infix operator /+/ : AdditionPrecedence, Numeric
 /// \endcode
 class InfixOperatorDecl : public OperatorDecl {
-  SourceLoc ColonLoc;
+  SourceLoc ColonLoc, PrecedenceGroupLoc;
+  Identifier PrecedenceGroupName;
 
 public:
   InfixOperatorDecl(DeclContext *DC, SourceLoc operatorLoc, Identifier name,
                     SourceLoc nameLoc, SourceLoc colonLoc,
-                    ArrayRef<Located<Identifier>> identifiers)
-      : OperatorDecl(DeclKind::InfixOperator, DC, operatorLoc, name, nameLoc,
-                     identifiers),
-        ColonLoc(colonLoc) {}
+                    Identifier precedenceGroupName,
+                    SourceLoc precedenceGroupLoc)
+      : OperatorDecl(DeclKind::InfixOperator, DC, operatorLoc, name, nameLoc),
+        ColonLoc(colonLoc), PrecedenceGroupLoc(precedenceGroupLoc),
+        PrecedenceGroupName(precedenceGroupName) {}
 
   SourceLoc getEndLoc() const {
-    auto identifiers = getIdentifiers();
-    if (identifiers.empty())
-      return getNameLoc();
+    if (getPrecedenceGroupLoc().isValid())
+      return getPrecedenceGroupLoc();
 
-    return identifiers.back().Loc;
+    return getNameLoc();
   }
 
   SourceRange getSourceRange() const {
@@ -7371,6 +7361,8 @@ public:
 
   SourceLoc getColonLoc() const { return ColonLoc; }
 
+  Identifier getPrecedenceGroupName() const { return PrecedenceGroupName; }
+  SourceLoc getPrecedenceGroupLoc() const { return PrecedenceGroupLoc; }
   PrecedenceGroupDecl *getPrecedenceGroup() const;
 
   static bool classof(const Decl *D) {
@@ -7386,16 +7378,9 @@ public:
 class PrefixOperatorDecl : public OperatorDecl {
 public:
   PrefixOperatorDecl(DeclContext *DC, SourceLoc OperatorLoc, Identifier Name,
-                     SourceLoc NameLoc,
-                     ArrayRef<Located<Identifier>> Identifiers)
-      : OperatorDecl(DeclKind::PrefixOperator, DC, OperatorLoc, Name, NameLoc,
-                     Identifiers) {}
-
-  PrefixOperatorDecl(DeclContext *DC, SourceLoc OperatorLoc, Identifier Name,
-                     SourceLoc NameLoc,
-                     ArrayRef<NominalTypeDecl *> designatedNominalTypes)
-      : OperatorDecl(DeclKind::PrefixOperator, DC, OperatorLoc, Name, NameLoc,
-                     designatedNominalTypes) {}
+                     SourceLoc NameLoc)
+      : OperatorDecl(DeclKind::PrefixOperator, DC, OperatorLoc, Name, NameLoc)
+  {}
 
   SourceRange getSourceRange() const {
     return { getOperatorLoc(), getNameLoc() };
@@ -7414,16 +7399,9 @@ public:
 class PostfixOperatorDecl : public OperatorDecl {
 public:
   PostfixOperatorDecl(DeclContext *DC, SourceLoc OperatorLoc, Identifier Name,
-                      SourceLoc NameLoc,
-                      ArrayRef<Located<Identifier>> Identifiers)
-      : OperatorDecl(DeclKind::PostfixOperator, DC, OperatorLoc, Name, NameLoc,
-                     Identifiers) {}
-
-  PostfixOperatorDecl(DeclContext *DC, SourceLoc OperatorLoc, Identifier Name,
-                      SourceLoc NameLoc,
-                      ArrayRef<NominalTypeDecl *> designatedNominalTypes)
-      : OperatorDecl(DeclKind::PostfixOperator, DC, OperatorLoc, Name, NameLoc,
-                     designatedNominalTypes) {}
+                      SourceLoc NameLoc)
+      : OperatorDecl(DeclKind::PostfixOperator, DC, OperatorLoc, Name, NameLoc)
+  {}
 
   SourceRange getSourceRange() const {
     return { getOperatorLoc(), getNameLoc() };

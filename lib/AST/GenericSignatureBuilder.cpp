@@ -4494,7 +4494,7 @@ bool GenericSignatureBuilder::updateSuperclass(
 
     auto layout =
       LayoutConstraint::getLayoutConstraint(
-        superclass->getClassOrBoundGenericClass()->isObjC()
+        superclass->getClassOrBoundGenericClass()->usesObjCObjectModel()
           ? LayoutConstraintKind::Class
           : LayoutConstraintKind::NativeClass,
         getASTContext());
