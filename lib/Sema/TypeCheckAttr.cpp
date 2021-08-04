@@ -2910,7 +2910,7 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
     // conforms to the specified protocol.
     NominalTypeDecl *NTD = DC->getSelfNominalTypeDecl();
     SmallVector<ProtocolConformance *, 2> conformances;
-    if (!NTD->lookupConformance(DC->getParentModule(), PD, conformances)) {
+    if (!NTD->lookupConformance(PD, conformances)) {
       diagnose(attr->getLocation(),
                diag::implements_attr_protocol_not_conformed_to,
                NTD->getName(), PD->getName())

@@ -3129,7 +3129,7 @@ bool ValueDecl::canInferObjCFromRequirement(ValueDecl *requirement) {
   // If the nominal type doesn't conform to the protocol at all, we
   // cannot infer @objc no matter what we do.
   SmallVector<ProtocolConformance *, 1> conformances;
-  if (!nominal->lookupConformance(getModuleContext(), proto, conformances))
+  if (!nominal->lookupConformance(proto, conformances))
     return false;
 
   // If any of the conformances is attributed to the context in which
