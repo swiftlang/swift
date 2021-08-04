@@ -195,13 +195,25 @@ class TypeMatcher {
     TRIVIAL_CASE(ModuleType)
     TRIVIAL_CASE(DynamicSelfType)
     TRIVIAL_CASE(ArchetypeType)
-    TRIVIAL_CASE(DependentMemberType)
+
+    bool visitDependentMemberType(CanDependentMemberType firstType,
+                                   Type secondType,
+                                   Type sugaredFirstType) {
+      /* If the types match, continue. */
+      if (!Matcher.asDerived().alwaysMismatchTypeParameters() &&
+          firstType->isEqual(secondType))
+        return true;
+
+      /* Otherwise, let the derived class deal with the mismatch. */
+      return mismatch(firstType.getPointer(), secondType,
+                      sugaredFirstType);
+    }
 
     bool visitGenericTypeParamType(CanGenericTypeParamType firstType,
                                    Type secondType,
                                    Type sugaredFirstType) {
       /* If the types match, continue. */
-      if (!Matcher.asDerived().alwaysMismatchGenericParams() &&
+      if (!Matcher.asDerived().alwaysMismatchTypeParameters() &&
           firstType->isEqual(secondType))
         return true;
 
@@ -312,7 +324,7 @@ class TypeMatcher {
 #undef TRIVIAL_CASE
   };
 
-  bool alwaysMismatchGenericParams() const { return false; }
+  bool alwaysMismatchTypeParameters() const { return false; }
 
   ImplClass &asDerived() { return static_cast<ImplClass &>(*this); }
 
