@@ -335,6 +335,9 @@ remapConcreteSubstitutionSchema(CanType concreteType,
 }
 
 namespace {
+  /// Utility class used by unifyConcreteTypes() and unifySuperclasses()
+  /// to walk two concrete types in parallel. Any time there is a mismatch,
+  /// records a new induced rule.
   class ConcreteTypeMatcher : public TypeMatcher<ConcreteTypeMatcher> {
     ArrayRef<Term> lhsSubstitutions;
     ArrayRef<Term> rhsSubstitutions;
@@ -357,14 +360,16 @@ namespace {
 
     bool mismatch(TypeBase *firstType, TypeBase *secondType,
                   Type sugaredFirstType) {
-      if (isa<GenericTypeParamType>(firstType) &&
-          isa<GenericTypeParamType>(secondType)) {
+      bool firstAbstract = firstType->isTypeParameter();
+      bool secondAbstract = secondType->isTypeParameter();
+
+      if (firstAbstract && secondAbstract) {
         // Both sides are type parameters; add a same-type requirement.
-        unsigned lhsIndex = getGenericParamIndex(firstType);
-        unsigned rhsIndex = getGenericParamIndex(secondType);
-        if (lhsSubstitutions[lhsIndex] != rhsSubstitutions[rhsIndex]) {
-          MutableTerm lhsTerm(lhsSubstitutions[lhsIndex]);
-          MutableTerm rhsTerm(rhsSubstitutions[rhsIndex]);
+        auto lhsTerm = getRelativeTermForType(CanType(firstType),
+                                              lhsSubstitutions, ctx);
+        auto rhsTerm = getRelativeTermForType(CanType(secondType),
+                                              rhsSubstitutions, ctx);
+        if (lhsTerm != rhsTerm) {
           if (debug) {
             llvm::dbgs() << "%% Induced rule " << lhsTerm
                          << " == " << rhsTerm << "\n";
@@ -374,12 +379,11 @@ namespace {
         return true;
       }
 
-      if (isa<GenericTypeParamType>(firstType) &&
-          !isa<GenericTypeParamType>(secondType)) {
+      if (firstAbstract && !secondAbstract) {
         // A type parameter is equated with a concrete type; add a concrete
         // type requirement.
-        unsigned lhsIndex = getGenericParamIndex(firstType);
-        MutableTerm subjectTerm(lhsSubstitutions[lhsIndex]);
+        auto subjectTerm = getRelativeTermForType(CanType(firstType),
+                                                  lhsSubstitutions, ctx);
 
         SmallVector<Term, 3> result;
         auto concreteType = remapConcreteSubstitutionSchema(CanType(secondType),
@@ -397,12 +401,11 @@ namespace {
         return true;
       }
 
-      if (!isa<GenericTypeParamType>(firstType) &&
-          isa<GenericTypeParamType>(secondType)) {
+      if (!firstAbstract && secondAbstract) {
         // A concrete type is equated with a type parameter; add a concrete
         // type requirement.
-        unsigned rhsIndex = getGenericParamIndex(secondType);
-        MutableTerm subjectTerm(rhsSubstitutions[rhsIndex]);
+        auto subjectTerm = getRelativeTermForType(CanType(secondType),
+                                                  rhsSubstitutions, ctx);
 
         SmallVector<Term, 3> result;
         auto concreteType = remapConcreteSubstitutionSchema(CanType(firstType),
@@ -420,7 +423,7 @@ namespace {
         return true;
       }
 
-      // Any other kind of type mismatch involves different concrete types on
+      // Any other kind of type mismatch involves conflicting concrete types on
       // both sides, which can only happen on invalid input.
       return false;
     }
@@ -477,6 +480,87 @@ static bool unifyConcreteTypes(
   return false;
 }
 
+/// When a type parameter has two superclasses, we have to both unify the
+/// type constructor arguments, and record the most derived superclass.
+///
+///
+/// For example, if we have this setup:
+///
+///   class Base<T, T> {}
+///   class Middle<U> : Base<T, T> {}
+///   class Derived : Middle<Int> {}
+///
+///   T : Base<U, V>
+///   T : Derived
+///
+/// The most derived superclass requirement is 'T : Derived'.
+///
+/// The corresponding superclass of 'Derived' is 'Base<Int, Int>', so we
+/// unify the type constructor arguments of 'Base<U, V>' and 'Base<Int, Int>',
+/// which generates two induced rules:
+///
+///   U.[concrete: Int] => U
+///   V.[concrete: Int] => V
+///
+/// Returns the most derived superclass, which becomes the new superclass
+/// that gets recorded in the property map.
+static Symbol unifySuperclasses(
+    Symbol lhs, Symbol rhs, RewriteContext &ctx,
+    SmallVectorImpl<std::pair<MutableTerm, MutableTerm>> &inducedRules,
+    bool debug) {
+  if (debug) {
+    llvm::dbgs() << "% Unifying " << lhs << " with " << rhs << "\n";
+  }
+
+  auto lhsType = lhs.getSuperclass();
+  auto rhsType = rhs.getSuperclass();
+
+  auto *lhsClass = lhsType.getClassOrBoundGenericClass();
+  assert(lhsClass != nullptr);
+
+  auto *rhsClass = rhsType.getClassOrBoundGenericClass();
+  assert(rhsClass != nullptr);
+
+  // First, establish the invariant that lhsClass is either equal to, or
+  // is a superclass of rhsClass.
+  if (lhsClass == rhsClass ||
+      lhsClass->isSuperclassOf(rhsClass)) {
+    // Keep going.
+  } else if (rhsClass->isSuperclassOf(lhsClass)) {
+    std::swap(rhs, lhs);
+    std::swap(rhsType, lhsType);
+    std::swap(rhsClass, lhsClass);
+  } else {
+    // FIXME: Diagnose the conflict.
+    if (debug) {
+      llvm::dbgs() << "%% Unrelated superclass types\n";
+    }
+
+    return lhs;
+  }
+
+  if (lhsClass != rhsClass) {
+    // Get the corresponding substitutions for the right hand side.
+    assert(lhsClass->isSuperclassOf(rhsClass));
+    rhsType = rhsType->getSuperclassForDecl(lhsClass)
+                     ->getCanonicalType();
+  }
+
+  // Unify type contructor arguments.
+  ConcreteTypeMatcher matcher(lhs.getSubstitutions(),
+                              rhs.getSubstitutions(),
+                              ctx, inducedRules, debug);
+  if (!matcher.match(lhsType, rhsType)) {
+    if (debug) {
+      llvm::dbgs() << "%% Superclass conflict\n";
+    }
+    return rhs;
+  }
+
+  // Record the more specific class.
+  return rhs;
+}
+
 void PropertyBag::addProperty(
     Symbol property, RewriteContext &ctx,
     SmallVectorImpl<std::pair<MutableTerm, MutableTerm>> &inducedRules,
@@ -496,9 +580,15 @@ void PropertyBag::addProperty(
     return;
 
   case Symbol::Kind::Superclass: {
-    // FIXME: This needs to find the most derived subclass and also call
-    // unifyConcreteTypes()
-    Superclass = property;
+    // FIXME: Also handle superclass vs concrete
+
+    if (Superclass) {
+      Superclass = unifySuperclasses(*Superclass, property,
+                                     ctx, inducedRules, debug);
+    } else {
+      Superclass = property;
+    }
+
     return;
   }
 
