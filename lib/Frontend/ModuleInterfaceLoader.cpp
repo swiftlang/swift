@@ -1722,6 +1722,7 @@ bool ExplicitSwiftModuleLoader::findModule(ImportPath::Element ModuleID,
 
   // Set IsFramework bit according to the moduleInfo
   IsFramework = moduleInfo.isFramework;
+  IsSystemModule = moduleInfo.isSystem;
 
   auto &fs = *Ctx.SourceMgr.getFileSystem();
   // Open .swiftmodule file
