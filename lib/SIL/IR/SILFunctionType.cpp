@@ -1688,11 +1688,6 @@ private:
   }
 
   bool maybeAddForeignErrorParameter() {
-    // A foreign async convention absorbs any error parameter, making it into
-    // an argument to the callback.
-    if (Foreign.async)
-      return false;
-
     if (!Foreign.error ||
         NextOrigParamIndex != Foreign.error->getErrorParameterIndex())
       return false;
@@ -1764,11 +1759,11 @@ void updateResultTypeForForeignInfo(
     return;
   }
 
-  // A foreign async convention means our lowered return type is Void, since
-  // the imported semantic return and/or error type map to the completion
-  // callback's argument(s).
-  auto &C = substFormalResultType->getASTContext();
-  if (auto async = foreignInfo.async) {
+  // A foreign async convention without an error convention means our lowered
+  // return type is Void, since the imported semantic return map to the
+  // completion callback's argument(s).
+  if (!foreignInfo.error) {
+    auto &C = substFormalResultType->getASTContext();
     substFormalResultType = TupleType::getEmpty(C);
     origResultType = AbstractionPattern(genericSig, substFormalResultType);
     return;
@@ -1780,7 +1775,7 @@ void updateResultTypeForForeignInfo(
   // These conventions replace the result type.
   case ForeignErrorConvention::ZeroResult:
   case ForeignErrorConvention::NonZeroResult:
-    assert(substFormalResultType->isVoid());
+    assert(substFormalResultType->isVoid() || foreignInfo.async);
     substFormalResultType = convention.getResultType();
     origResultType = AbstractionPattern(genericSig, substFormalResultType);
     return;
