@@ -7908,23 +7908,21 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
 // nearest ancestor of 'expr' which imposes a minimum precedence on 'expr'.
 // Right now that just means skipping over TupleExpr instances that only exist
 // to hold arguments to binary operators.
-static std::pair<Expr *, unsigned> getPrecedenceParentAndIndex(Expr *expr,
-                                                               Expr *rootExpr)
-{
-  auto parentMap = rootExpr->getParentMap();
-  auto it = parentMap.find(expr);
-  if (it == parentMap.end()) {
+static std::pair<Expr *, unsigned> getPrecedenceParentAndIndex(
+    Expr *expr, llvm::function_ref<Expr *(const Expr *)> getParent) {
+  auto *parent = getParent(expr);
+  if (!parent)
     return { nullptr, 0 };
-  }
-  Expr *parent = it->second;
 
-  // Look through an unresolved chain wrapper expr, as it has no effect on
-  // precedence.
-  if (isa<UnresolvedMemberChainResultExpr>(parent)) {
-    it = parentMap.find(parent);
-    if (it == parentMap.end())
-      return {nullptr, 0};
-    parent = it->second;
+  // Look through an unresolved chain wrappers, try, and await exprs, as they
+  // have no effect on precedence; they will associate the same with any parent
+  // operator as their sub-expression would.
+  while (isa<UnresolvedMemberChainResultExpr>(parent) ||
+         isa<AnyTryExpr>(parent) || isa<AwaitExpr>(parent)) {
+    expr = parent;
+    parent = getParent(parent);
+    if (!parent)
+      return { nullptr, 0 };
   }
 
   // Handle all cases where the answer isn't just going to be { parent, 0 }.
@@ -7935,18 +7933,14 @@ static std::pair<Expr *, unsigned> getPrecedenceParentAndIndex(Expr *expr,
     assert(elemIt != tupleElems.end() && "expr not found in parent TupleExpr");
     unsigned index = elemIt - tupleElems.begin();
 
-    it = parentMap.find(parent);
-    if (it != parentMap.end()) {
-      Expr *gparent = it->second;
-
-      // Was this tuple just constructed for a binop?
-      if (isa<BinaryExpr>(gparent)) {
+    // Was this tuple just constructed for a binop?
+    if (auto *gparent = getParent(tuple)) {
+      if (isa<BinaryExpr>(gparent))
         return { gparent, index };
-      }
     }
 
     // Must be a tuple literal, function arg list, collection, etc.
-    return { parent, index };
+    return { tuple, index };
   } else if (auto ifExpr = dyn_cast<IfExpr>(parent)) {
     unsigned index;
     if (expr == ifExpr->getCondExpr()) {
@@ -8001,11 +7995,11 @@ bool swift::exprNeedsParensInsideFollowingOperator(
 /// the new operator to prevent it from binding incorrectly in the
 /// surrounding context.
 bool swift::exprNeedsParensOutsideFollowingOperator(
-    DeclContext *DC, Expr *expr, Expr *rootExpr,
-    PrecedenceGroupDecl *followingPG) {
+    DeclContext *DC, Expr *expr, PrecedenceGroupDecl *followingPG,
+    llvm::function_ref<Expr *(const Expr *)> getParent) {
   Expr *parent;
   unsigned index;
-  std::tie(parent, index) = getPrecedenceParentAndIndex(expr, rootExpr);
+  std::tie(parent, index) = getPrecedenceParentAndIndex(expr, getParent);
   if (!parent)
     return false;
 
@@ -8013,6 +8007,9 @@ bool swift::exprNeedsParensOutsideFollowingOperator(
     if (!parent->isImplicit())
       return false;
   }
+
+  if (isa<ClosureExpr>(parent) || isa<CollectionExpr>(parent))
+    return false;
 
   if (parent->isInfixOperator()) {
     auto parentPG = TypeChecker::lookupPrecedenceGroupForInfixOperator(DC,
@@ -8044,16 +8041,16 @@ bool swift::exprNeedsParensBeforeAddingNilCoalescing(DeclContext *DC,
   return exprNeedsParensInsideFollowingOperator(DC, expr, asPG);
 }
 
-bool swift::exprNeedsParensAfterAddingNilCoalescing(DeclContext *DC,
-                                                    Expr *expr,
-                                                    Expr *rootExpr) {
+bool swift::exprNeedsParensAfterAddingNilCoalescing(
+    DeclContext *DC, Expr *expr,
+    llvm::function_ref<Expr *(const Expr *)> getParent) {
   auto &ctx = DC->getASTContext();
   auto asPG = TypeChecker::lookupPrecedenceGroup(
                   DC, ctx.Id_NilCoalescingPrecedence, SourceLoc())
                   .getSingle();
   if (!asPG)
     return true;
-  return exprNeedsParensOutsideFollowingOperator(DC, expr, rootExpr, asPG);
+  return exprNeedsParensOutsideFollowingOperator(DC, expr, asPG, getParent);
 }
 
 namespace {

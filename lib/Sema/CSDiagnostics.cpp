@@ -1158,7 +1158,6 @@ ASTNode MissingExplicitConversionFailure::getAnchor() const {
 bool MissingExplicitConversionFailure::diagnoseAsError() {
   auto *DC = getDC();
   auto *anchor = castToExpr(getAnchor());
-  auto *rawAnchor = castToExpr(getRawAnchor());
 
   auto fromType = getFromType();
   auto toType = getToType();
@@ -1184,7 +1183,7 @@ bool MissingExplicitConversionFailure::diagnoseAsError() {
   }
 
   bool needsParensInside = exprNeedsParensBeforeAddingAs(anchor);
-  bool needsParensOutside = exprNeedsParensAfterAddingAs(anchor, rawAnchor);
+  bool needsParensOutside = exprNeedsParensAfterAddingAs(anchor);
 
   llvm::SmallString<2> insertBefore;
   llvm::SmallString<32> insertAfter;
@@ -1324,7 +1323,7 @@ void MissingOptionalUnwrapFailure::offerDefaultValueUnwrapFixIt(
   bool needsParensInside =
       exprNeedsParensBeforeAddingNilCoalescing(DC, const_cast<Expr *>(expr));
   bool needsParensOutside = exprNeedsParensAfterAddingNilCoalescing(
-      DC, const_cast<Expr *>(expr), castToExpr(getRawAnchor()));
+      DC, const_cast<Expr *>(expr), [&](auto *E) { return findParentExpr(E); });
 
   llvm::SmallString<2> insertBefore;
   llvm::SmallString<32> insertAfter;

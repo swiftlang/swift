@@ -1416,7 +1416,12 @@ func rdar74696023() {
   }
 }
 
-func testUnwrapFixIts(x: Int?) {
+extension Int {
+  static var optionalIntMember: Int? { 0 }
+  static var optionalThrowsMember: Int? { get throws { 0 } }
+}
+
+func testUnwrapFixIts(x: Int?) throws {
   let _ = x + 2 // expected-error {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
   // expected-note@-1 {{coalesce using '??' to provide a default when the optional value contains 'nil'}} {{11-11=(}} {{12-12= ?? <#default value#>)}}
   // expected-note@-2 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{12-12=!}}
@@ -1442,4 +1447,40 @@ func testUnwrapFixIts(x: Int?) {
   // expected-note@-1 {{coalesce using '??' to provide a default when the optional value contains 'nil'}} {{16-16= ?? <#default value#>}}
   // expected-note@-2 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{16-16=!}}
   let _ = 2 < x ?? 0
+
+  let _: Int = (.optionalIntMember) // expected-error {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
+  // expected-note@-1 {{coalesce using '??' to provide a default when the optional value contains 'nil'}} {{35-35= ?? <#default value#>}}
+  // expected-note@-2 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{35-35=!}}
+  let _: Int = (.optionalIntMember ?? 0)
+
+  let _ = 1 + .optionalIntMember // expected-error {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
+  // expected-note@-1 {{coalesce using '??' to provide a default when the optional value contains 'nil'}} {{15-15=(}} {{33-33= ?? <#default value#>)}}
+  // expected-note@-2 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{33-33=!}}
+  let _ = 1 + (.optionalIntMember ?? 0)
+
+  let _ = try .optionalThrowsMember + 1 // expected-error {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
+  // expected-note@-1 {{coalesce using '??' to provide a default when the optional value contains 'nil'}} {{15-15=(}} {{36-36= ?? <#default value#>)}}
+  // expected-note@-2 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{36-36=!}}
+  let _ = try (.optionalThrowsMember ?? 0) + 1
+
+  let _ = .optionalIntMember?.bitWidth > 0 // expected-error {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
+  // expected-note@-1 {{coalesce using '??' to provide a default when the optional value contains 'nil'}} {{39-39= ?? <#default value#>}}
+  // expected-note@-2 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{11-11=(}} {{39-39=)!}}
+  let _ = (.optionalIntMember?.bitWidth)! > 0
+  let _ = .optionalIntMember?.bitWidth ?? 0 > 0
+
+  let _ = .random() ? .optionalIntMember : 0 // expected-error {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
+  // expected-note@-1 {{coalesce using '??' to provide a default when the optional value contains 'nil'}} {{41-41= ?? <#default value#>}}
+  // expected-note@-2 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{41-41=!}}
+  let _ = .random() ? .optionalIntMember ?? 0 : 0
+
+  let _: Int = try try try .optionalThrowsMember // expected-error {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
+  // expected-note@-1 {{coalesce using '??' to provide a default when the optional value contains 'nil'}} {{49-49= ?? <#default value#>}}
+  // expected-note@-2 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{49-49=!}}
+  let _: Int = try try try .optionalThrowsMember ?? 0
+
+  let _: Int = try! .optionalThrowsMember // expected-error {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
+  // expected-note@-1 {{coalesce using '??' to provide a default when the optional value contains 'nil'}} {{42-42= ?? <#default value#>}}
+  // expected-note@-2 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{42-42=!}}
+  let _: Int = try! .optionalThrowsMember ?? 0
 }
