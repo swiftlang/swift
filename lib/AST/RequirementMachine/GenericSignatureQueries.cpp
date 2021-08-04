@@ -346,14 +346,31 @@ Type RequirementMachine::getCanonicalTypeInContext(
       verify(prefix);
 
       auto *props = Map.lookUpProperties(prefix);
-      if (props && props->isConcreteType()) {
-        auto concreteType = props->getConcreteType(genericParams,
-                                                   protos, Context);
-        if (!concreteType->hasTypeParameter())
-          return concreteType;
+      if (props) {
+        if (props->isConcreteType()) {
+          auto concreteType = props->getConcreteType(genericParams,
+                                                     protos, Context);
+          if (!concreteType->hasTypeParameter())
+            return concreteType;
 
-        // FIXME: Recursion guard is needed here
-        return getCanonicalTypeInContext(concreteType, genericParams);
+          // FIXME: Recursion guard is needed here
+          return getCanonicalTypeInContext(concreteType, genericParams);
+        }
+
+        // Skip this part if the entire input term is valid, because in that
+        // case we don't want to replace the term with its superclass bound;
+        // unlike a fixed concrete type, the superclass bound only comes into
+        // play when looking up a member type.
+        if (props->hasSuperclassBound() &&
+            prefix.size() != term.size()) {
+          auto superclass = props->getSuperclassBound(genericParams,
+                                                      protos, Context);
+          if (!superclass->hasTypeParameter())
+            return superclass;
+
+          // FIXME: Recursion guard is needed here
+          return getCanonicalTypeInContext(superclass, genericParams);
+        }
       }
 
       return Context.getTypeForTerm(prefix, genericParams, protos);
