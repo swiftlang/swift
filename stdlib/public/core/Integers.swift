@@ -3511,7 +3511,10 @@ public protocol SignedInteger: BinaryInteger, SignedNumeric {
   //
   // generated a call to `static Swift.SignedInteger._maskingAdd(A, A) -> A`
   // when compiled with Swift 5.5 and earlier.
+  @available(*, deprecated, message: "Use &+ instead.")
   static func _maskingAdd(_ lhs: Self, _ rhs: Self) -> Self
+  
+  @available(*, deprecated, message: "Use &- instead.")
   static func _maskingSubtract(_ lhs: Self, _ rhs: Self) -> Self
 }
 
@@ -3640,10 +3643,12 @@ public func numericCast<T: BinaryInteger, U: BinaryInteger>(_ x: T) -> U {
 // Needed to support user-defined types conformance to SignedInteger.
 // We need these defaults to exist, but they are not called.
 extension SignedInteger {
+  @available(*, deprecated, message: "Use &+ instead.")
   public static func _maskingAdd(_ lhs: Self, _ rhs: Self) -> Self {
     fatalError("Should be overridden in a more specific type")
   }
   
+  @available(*, deprecated, message: "Use &- instead.")
   public static func _maskingSubtract(_ lhs: Self, _ rhs: Self) -> Self {
     fatalError("Should be overridden in a more specific type")
   }
@@ -3654,7 +3659,7 @@ extension SignedInteger {
 extension SignedInteger where Self: FixedWidthInteger {
   @available(*, unavailable)
   public static func &+(lhs: Self, rhs: Self) -> Self {
-    return lhs.addingReportingOverflow(rhs).partialValue
+    lhs.addingReportingOverflow(rhs).partialValue
   }
   
   // This may be called in rare situations by binaries compiled with
@@ -3663,12 +3668,12 @@ extension SignedInteger where Self: FixedWidthInteger {
   // types in the standard library would not satisfy the protocol requirements.
   @available(*, deprecated, message: "Use &+ instead.")
   public static func _maskingAdd(_ lhs: Self, _ rhs: Self) -> Self {
-    return lhs.addingReportingOverflow(rhs).partialValue
+    lhs.addingReportingOverflow(rhs).partialValue
   }
 
   @available(*, unavailable)
   public static func &-(lhs: Self, rhs: Self) -> Self {
-    return lhs.subtractingReportingOverflow(rhs).partialValue
+    lhs.subtractingReportingOverflow(rhs).partialValue
   }
   
   // This may be called in rare situations by binaries compiled with
@@ -3677,6 +3682,6 @@ extension SignedInteger where Self: FixedWidthInteger {
   // types in the standard library would not satisfy the protocol requirements.
   @available(*, deprecated, message: "Use &- instead.")
   public static func _maskingSubtract(_ lhs: Self, _ rhs: Self) -> Self {
-    return lhs.subtractingReportingOverflow(rhs).partialValue
+    lhs.subtractingReportingOverflow(rhs).partialValue
   }
 }
