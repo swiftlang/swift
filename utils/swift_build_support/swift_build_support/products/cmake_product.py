@@ -18,6 +18,9 @@ from .. import shell
 
 
 class CMakeProduct(product.Product):
+    def is_verbose(self):
+        return self.args.verbose_build
+
     def build_with_cmake(self, build_targets, build_type, build_args,
                          prefer_just_built_toolchain=False):
         assert self.toolchain.cmake is not None
@@ -28,6 +31,12 @@ class CMakeProduct(product.Product):
         if self.toolchain.distcc_pump:
             cmake_build.append(self.toolchain.distcc_pump)
         cmake_build.extend([self.toolchain.cmake, "--build"])
+
+        # If we are verbose...
+        if self.is_verbose():
+            # And ninja, add a -v.
+            if self.args.cmake_generator == "Ninja":
+                build_args.append('-v')
 
         generator_output_path = ""
         if self.args.cmake_generator == "Ninja":
@@ -82,6 +91,13 @@ class CMakeProduct(product.Product):
 
         if self.toolchain.distcc_pump:
             cmake_build.append(self.toolchain.distcc_pump)
+
+        # If we are verbose...
+        if self.is_verbose():
+            # And ninja, add a -v.
+            if self.args.cmake_generator == "Ninja":
+                build_args.append('-v')
+
         cmake_args = [self.toolchain.cmake, "--build", self.build_dir,
                       "--config", build_type, "--"]
         cmake_build.extend(cmake_args + build_args)
