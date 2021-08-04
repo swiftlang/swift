@@ -387,7 +387,7 @@ static bool unifyConcreteTypes(
           rhsSubstitutions(rhsSubstitutions),
           ctx(ctx), inducedRules(inducedRules), debug(debug) {}
 
-    bool alwaysMismatchGenericParams() const { return true; }
+    bool alwaysMismatchTypeParameters() const { return true; }
 
     bool mismatch(TypeBase *firstType, TypeBase *secondType,
                   Type sugaredFirstType) {
