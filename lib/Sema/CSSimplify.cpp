@@ -12298,6 +12298,12 @@ void ConstraintSystem::addContextualConversionConstraint(
     constraintKind = ConstraintKind::Bind;
     break;
 
+  case CTP_ForEachSequence:
+    // Sequence expression associated with `for-in` loop has to conform
+    // to `Sequence` or `AsyncSequence` protocol depending on the context.
+    constraintKind = ConstraintKind::ConformsTo;
+    break;
+
   case CTP_ArrayElement:
   case CTP_AssignSource:
   case CTP_CalleeResult:

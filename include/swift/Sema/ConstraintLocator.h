@@ -74,6 +74,10 @@ enum ContextualTypePurpose : uint8_t {
                         ///< `if`, `for`, `while` etc.
   CTP_ForEachStmt,      ///< "expression/sequence" associated with 'for-in' loop
                         ///< is expected to conform to 'Sequence' protocol.
+  CTP_ForEachSequence,  ///< Sequence expression associated with `for-in` loop,
+                        ///  this element acts slightly differently compared to
+                        ///  \c CTP_ForEachStmt in a sence that it would
+                        ///  produce conformance constraints.
   CTP_WrappedProperty,  ///< Property type expected to match 'wrappedValue' type
   CTP_ComposedPropertyWrapper, ///< Composed wrapper type expected to match
                                ///< former 'wrappedValue' type

@@ -1733,7 +1733,8 @@ public:
   /// Form a target for a for-each loop.
   static SolutionApplicationTarget forForEachStmt(
       ForEachStmt *stmt, ProtocolDecl *sequenceProto, DeclContext *dc,
-      bool bindPatternVarsOneWay);
+      bool bindPatternVarsOneWay,
+      ContextualTypePurpose purpose = CTP_ForEachStmt);
 
   /// Form a target for a property with an attached property wrapper that is
   /// initialized out-of-line.
@@ -1860,7 +1861,8 @@ public:
   /// Whether this target is for a for-in statement.
   bool isForEachStmt() const {
     return kind == Kind::expression &&
-           getExprContextualTypePurpose() == CTP_ForEachStmt;
+           (getExprContextualTypePurpose() == CTP_ForEachStmt ||
+            getExprContextualTypePurpose() == CTP_ForEachSequence);
   }
 
   /// Whether this is an initialization for an Optional.Some pattern.
@@ -1961,7 +1963,8 @@ public:
 
     assert(kind == Kind::expression);
     assert(expression.contextualPurpose == CTP_Initialization ||
-           expression.contextualPurpose == CTP_ForEachStmt);
+           expression.contextualPurpose == CTP_ForEachStmt ||
+           expression.contextualPurpose == CTP_ForEachSequence);
     expression.pattern = pattern;
   }
 

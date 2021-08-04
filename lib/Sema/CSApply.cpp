@@ -8543,7 +8543,8 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
       break;
     }
 
-    case CTP_ForEachStmt: {
+    case CTP_ForEachStmt:
+    case CTP_ForEachSequence: {
       auto forEachResultTarget = applySolutionToForEachStmt(
           solution, target, rewrittenExpr);
       if (!forEachResultTarget)
