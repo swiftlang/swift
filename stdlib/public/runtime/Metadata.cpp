@@ -3484,6 +3484,10 @@ ExistentialMetatypeValueWitnessTableCacheEntry(unsigned numWitnessTables) {
 SWIFT_RUNTIME_EXPORT
 const ExistentialMetatypeMetadata *
 swift::swift_getExistentialMetatypeMetadata(const Metadata *instanceMetadata) {
+  if (instanceMetadata->getKind() != MetadataKind::Existential
+      && instanceMetadata->getKind() != MetadataKind::ExistentialMetatype)
+    return nullptr;
+
   return &ExistentialMetatypes.getOrInsert(instanceMetadata).first->Data;
 }
 
@@ -3494,7 +3498,6 @@ ExistentialMetatypeCacheEntry::ExistentialMetatypeCacheEntry(
     flags = static_cast<const ExistentialTypeMetadata*>(instanceMetadata)
       ->Flags;
   } else {
-    assert(instanceMetadata->getKind() == MetadataKind::ExistentialMetatype);
     flags = static_cast<const ExistentialMetatypeMetadata*>(instanceMetadata)
       ->Flags;
   }
