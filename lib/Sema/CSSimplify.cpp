@@ -4980,9 +4980,15 @@ bool ConstraintSystem::repairFailures(
 }
 
 bool ConstraintSystem::toImmutablePossible(Type lhs, Type rhs) {
+#if 1
+  if (auto nominal = lhs->getAnyNominal())
+    if (auto func = nominal->implicitConversionTo(rhs))
+      return true;
+#else
   if (rhs->isUnsafeRawPointer() && (lhs->isUnsafeMutableRawPointer() ||
-       lhs->isUnsafeMutablePointer() || lhs->isUnsafePointer()))
+      lhs->isUnsafeMutablePointer() || lhs->isUnsafePointer())) {
     return true; // Unsafe[Mutable][Raw]Pointer -> UnsafeRawPointer
+  }
 
   auto firstGenericArgument = [&](Type ty) -> CanType {
     return dyn_cast<BoundGenericStructType>(ty->getCanonicalType())
@@ -4990,10 +4996,36 @@ bool ConstraintSystem::toImmutablePossible(Type lhs, Type rhs) {
   };
 
   if (lhs->isUnsafeMutablePointer() && rhs->isUnsafePointer() &&
-      firstGenericArgument(lhs) == firstGenericArgument(rhs))
+      firstGenericArgument(lhs) == firstGenericArgument(rhs)) {
+    rhs->dump();
+    lhs->dump();
     return true; // UnsafeMutablePointer<Pointee> -> UnsafePointer<Pointee>
-
+  }
+#endif
   return false;
+}
+
+ConstructorDecl *NominalTypeDecl::implicitConversionTo(Type type) {
+  if (NominalTypeDecl *toNominal = type->getAnyNominal()) {
+    auto &ctx = getASTContext();
+    if (!toNominal->implicitConversionsComputed) {
+      auto implicitArgId = ctx.Id_implicit;
+      for (ExtensionDecl *extension : toNominal->getExtensions())
+        for (Decl *member : extension->getMembers())
+          if (ConstructorDecl *initDecl = dyn_cast<ConstructorDecl>(member)) {
+            ParameterList *args = initDecl->getParameters();
+            if (args->size() == 1 &&
+                args->get(0)->getBaseName().getIdentifier() == implicitArgId)
+              if (auto fromNominal = args->get(0)->getType()->getAnyNominal())
+                (*ctx.implicitConversionsFor(fromNominal, /*create*/true))
+                  [toNominal] = initDecl;
+          }
+      toNominal->implicitConversionsComputed = true;
+    }
+    if (auto *exists = ctx.implicitConversionsFor(this, /*create*/false))
+      return (*exists)[toNominal];
+  }
+  return nullptr;
 }
 
 ConstraintSystem::TypeMatchResult
@@ -11200,6 +11232,8 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
         {getConstraintLocator(locator), restriction});
     return SolutionKind::Solved;
   }
+  case ConversionRestrictionKind::ImplicitConversion:
+    return SolutionKind::Solved;
   }
   
   llvm_unreachable("bad conversion restriction");

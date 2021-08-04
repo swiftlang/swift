@@ -3155,10 +3155,14 @@ protected:
     Bits.NominalTypeDecl.IsComputingSemanticMembers = false;
   }
 
+  bool implicitConversionsComputed = false;
+
   friend class ProtocolType;
 
 public:
   using GenericTypeDecl::getASTContext;
+
+  ConstructorDecl *implicitConversionTo(Type type);
 
   SourceRange getBraces() const { return Braces; }
   

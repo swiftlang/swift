@@ -3839,6 +3839,7 @@ void NominalTypeDecl::addExtension(ExtensionDecl *extension) {
   LastExtension->NextExtension.setPointer(extension);
   LastExtension = extension;
 
+  implicitConversionsComputed = false;
   addedExtension(extension);
 }
 

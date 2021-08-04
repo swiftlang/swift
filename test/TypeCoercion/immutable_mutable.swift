@@ -2,6 +2,23 @@
 
 import Swift
 
+extension UnsafeRawPointer {
+  init(implicit: UnsafeMutableRawPointer) {
+    self.init(implicit)
+  }
+  init(implicit: UnsafeMutablePointer<Pointee>) {
+    self.init(implicit)
+  }
+  init(implicit: UnsafePointer<Pointee>) {
+    self.init(implicit)
+  }
+}
+extension UnsafePointer {
+  init(implicit: UnsafeMutablePointer<Pointee>) {
+    self.init(implicit)
+  }
+}
+
 let optionalMutableRawPointer = UnsafeMutableRawPointer(bitPattern: -3)
 let mutableRawPointer = optionalMutableRawPointer!
 let immutable: UnsafeRawPointer = mutableRawPointer
