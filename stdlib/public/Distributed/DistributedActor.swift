@@ -208,7 +208,7 @@ func __isLocalActor(_ actor: AnyObject) -> Bool {
 /// Called to initialize the distributed-remote actor 'proxy' instance in an actor.
 /// The implementation will call this within the actor's initializer.
 @_silgen_name("swift_distributedActor_remote_initialize")
-func _distributedActorRemoteInitialize(_ actor: AnyObject)
+func _distributedActorRemoteInitialize(_ actorType: Builtin.RawPointer) -> Any
 
 @_silgen_name("swift_distributedActor_remote_create")
 func distributedActorRemoteCreate(identity: Any, transport: Any) -> Any // TODO: make it typed
