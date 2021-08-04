@@ -1550,7 +1550,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
     // Look for types and value decls in other modules. This extra information
     // is mostly for compiler engineers to understand a likely solution at a
     // quick glance.
-    SmallVector<char> strScratch;
+    SmallVector<char, 64> strScratch;
     SmallVector<std::string, 2> notes;
     auto declName = getXRefDeclNameForError();
     if (recordID == XREF_TYPE_PATH_PIECE ||
