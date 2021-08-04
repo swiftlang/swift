@@ -4097,14 +4097,11 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
                        witness->getName(), isSetter, requiredAccess,
                        protoAccessScope.accessLevelForDiagnostics(),
                        proto->getName());
-        if (auto *decl = dyn_cast<AbstractFunctionDecl>(witness)) {
-          auto isMemberwiseInitializer =
-              decl->getBodyKind() ==
-              AbstractFunctionDecl::BodyKind::MemberwiseInitializer;
-          if (isMemberwiseInitializer) {
+
+        if (auto *decl = dyn_cast<AbstractFunctionDecl>(witness))
+          if (decl->isMemberwiseInitializer())
             return;
-          }
-        }
+
         diagnoseWitnessFixAccessLevel(diags, witness, requiredAccess,
                                       isSetter);
       });
