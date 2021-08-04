@@ -833,11 +833,33 @@ static bool isForPatternMatch(SolutionApplicationTarget &target) {
   return false;
 }
 
+static bool hasTypeForCompletion(Solution &solution, CompletionContextFinder &contextAnalyzer) {
+  if (contextAnalyzer.hasCompletionExpr())
+    return solution.hasType(contextAnalyzer.getCompletionExpr());
+
+  assert(contextAnalyzer.hasCompletionKeyPathComponent());
+  return solution.hasType(
+      contextAnalyzer.getKeyPathContainingCompletionComponent(),
+      contextAnalyzer.getKeyPathCompletionComponentIndex());
+}
+
 /// Remove any solutions from the provided vector that both require fixes and have a
 /// score worse than the best.
 static void filterSolutions(SolutionApplicationTarget &target,
                             SmallVectorImpl<Solution> &solutions,
-                            CodeCompletionExpr *completionExpr) {
+                            CompletionContextFinder &contextAnalyzer) {
+  // Ignore solutions that didn't end up involving the completion (e.g. due to
+  // a fix to skip over/ignore it).
+  llvm::erase_if(solutions, [&](Solution &S) {
+    if (hasTypeForCompletion(S, contextAnalyzer))
+      return false;
+    // Catch these in assert builds as solving for code completion shouldn't
+    // allow fixes that skip over or ignore the completion expression.
+    // Continuing on to produce a solution after such fixes is pointless.
+    assert(false && "solution doesn't involve completion");
+    return true;
+  });
+
   // FIXME: this is only needed because in pattern matching position, the
   // code completion expression always becomes an expression pattern, which
   // requires the ~= operator to be defined on the type being matched against.
@@ -852,8 +874,9 @@ static void filterSolutions(SolutionApplicationTarget &target,
   // the other formed solutions (which require fixes). We should generate enum
   // pattern completions separately, but for now ignore the
   // _OptionalNilComparisonType solution.
-  if (isForPatternMatch(target) && completionExpr) {
-    solutions.erase(llvm::remove_if(solutions, [&](const Solution &S) {
+  if (isForPatternMatch(target) && contextAnalyzer.hasCompletionExpr()) {
+    auto completionExpr = contextAnalyzer.getCompletionExpr();
+    llvm::erase_if(solutions, [&](const Solution &S) {
       ASTContext &ctx = S.getConstraintSystem().getASTContext();
       if (!S.hasType(completionExpr))
         return false;
@@ -861,7 +884,7 @@ static void filterSolutions(SolutionApplicationTarget &target,
         if (auto *NTD = ty->getAnyNominal())
           return NTD->getBaseIdentifier() == ctx.Id_OptionalNilComparisonType;
       return false;
-    }), solutions.end());
+    });
   }
 
   if (solutions.size() <= 1)
@@ -965,15 +988,6 @@ bool TypeChecker::typeCheckForCodeCompletion(
     if (!cs.solveForCodeCompletion(target, solutions))
       return CompletionResult::Fallback;
 
-    // FIXME: instead of filtering, expose the score and viability to clients.
-    // Remove any solutions that both require fixes and have a score that is
-    // worse than the best.
-    CodeCompletionExpr *completionExpr = nullptr;
-    if (contextAnalyzer.hasCompletionExpr()) {
-      completionExpr = contextAnalyzer.getCompletionExpr();
-    }
-    filterSolutions(target, solutions, completionExpr);
-
     // Similarly, if the type-check didn't produce any solutions, fall back
     // to type-checking a sub-expression in isolation.
     if (solutions.empty())
@@ -983,19 +997,7 @@ bool TypeChecker::typeCheckForCodeCompletion(
     // closure body it could either be type-checked together with the context
     // or not, it's impossible to say without checking.
     if (contextAnalyzer.locatedInMultiStmtClosure()) {
-      auto &solution = solutions.front();
-
-      bool HasTypeForCompletionNode = false;
-      if (completionExpr) {
-        HasTypeForCompletionNode = solution.hasType(completionExpr);
-      } else {
-        assert(contextAnalyzer.hasCompletionKeyPathComponent());
-        HasTypeForCompletionNode = solution.hasType(
-            contextAnalyzer.getKeyPathContainingCompletionComponent(),
-            contextAnalyzer.getKeyPathCompletionComponentIndex());
-      }
-
-      if (!HasTypeForCompletionNode) {
+      if (!hasTypeForCompletion(solutions.front(), contextAnalyzer)) {
         // At this point we know the code completion node wasn't checked with
         // the closure's surrounding context, so can defer to regular
         // type-checking for the current call to typeCheckExpression. If that
@@ -1007,6 +1009,11 @@ bool TypeChecker::typeCheckForCodeCompletion(
         return CompletionResult::NotApplicable;
       }
     }
+
+    // FIXME: instead of filtering, expose the score and viability to clients.
+    // Remove solutions that skipped over/ignored the code completion point
+    // or that require fixes and have a score that is worse than the best.
+    filterSolutions(target, solutions, contextAnalyzer);
 
     llvm::for_each(solutions, callback);
     return CompletionResult::Ok;
@@ -1372,6 +1379,19 @@ void KeyPathTypeCheckCompletionCallback::sawSolution(
   }
 }
 
+static bool isInPatternMatch(CodeCompletionExpr *CE, ConstraintSystem &CS) {
+  if (auto *TE = dyn_cast_or_null<TupleExpr>(CS.getParentExpr(CE))) {
+    if (!TE->isImplicit() || TE->getNumElements() != 2 ||
+        TE->getElement(0) != CE)
+      return false;
+    if (auto *DRE = dyn_cast<DeclRefExpr>(TE->getElement(1))) {
+      auto Name =  DRE->getDecl()->getName();
+      return Name && Name.isSimpleName("$match");
+    }
+  }
+  return false;
+}
+
 void ArgumentTypeCheckCompletionCallback::sawSolution(
     const constraints::Solution &S) {
   TypeCheckCompletionCallback::sawSolution(S);
@@ -1384,13 +1404,33 @@ void ArgumentTypeCheckCompletionCallback::sawSolution(
 
   Expr *ParentCall = CompletionExpr;
   while (ParentCall &&
-         !(isa<ApplyExpr>(ParentCall) || isa<SubscriptExpr>(ParentCall)))
+         !(isa<CallExpr>(ParentCall) || isa<SubscriptExpr>(ParentCall)))
     ParentCall = CS.getParentExpr(ParentCall);
 
   if (!ParentCall || ParentCall == CompletionExpr) {
+    // FIXME: Handle switch case pattern matching:
+    // enum Foo { case member(x: Int, y: Int, z: Int) }
+    // switch someVal {
+    //   case .member(let x, y: 2, #^HERE^#
+    // }
+    // The expression we get here is <COMPLETION> ~= $match by this point, so
+    // we need to dig out/track more info to suggest all the valid completions
+    // (i.e. `z:`, `let z`, `_`, any integer) and those completions don't
+    // fit well to call/subscript argument completion. For now just maintain
+    // the existing behavior and fall back to global completion.
+    if (!ParentCall && isInPatternMatch(CompletionExpr, CS))
+      return;
+
     assert(false && "no containing call?");
     return;
   }
+
+  auto ArgInfo = getCompletionArgInfo(ParentCall, CS);
+  if (!ArgInfo) {
+    assert(false && "bad parent call match?");
+    return;
+  }
+  auto ArgIdx = ArgInfo->completionIdx;
 
   auto *Locator = CS.getConstraintLocator(ParentCall);
   auto *CalleeLocator = S.getCalleeLocator(Locator);
@@ -1400,10 +1440,10 @@ void ArgumentTypeCheckCompletionCallback::sawSolution(
 
   Type BaseTy = SelectedOverload->choice.getBaseType();
   if (BaseTy)
-    BaseTy = S.simplifyType(BaseTy);
+    BaseTy = S.simplifyType(BaseTy)->getRValueType();
 
   ValueDecl *FuncD = SelectedOverload->choice.getDeclOrNull();
-  Type FuncTy = S.simplifyType(SelectedOverload->openedType);
+  Type FuncTy = S.simplifyType(SelectedOverload->openedType)->getRValueType();
 
   // For completion as the arg in a call to the implicit [keypath: _] subscript
   // the solver can't know what kind of keypath is expected without an actual
@@ -1423,8 +1463,6 @@ void ArgumentTypeCheckCompletionCallback::sawSolution(
     }
   }
 
-  auto ArgInfo = getCompletionArgInfo(ParentCall, CS);
-  auto ArgIdx = ArgInfo->completionIdx;
   auto Bindings = S.argumentMatchingChoices
                       .find(CS.getConstraintLocator(
                           Locator, ConstraintLocator::ApplyArgument))
@@ -1465,12 +1503,10 @@ void ArgumentTypeCheckCompletionCallback::sawSolution(
           return false;
         if (!R.FuncTy->isEqual(FuncTy))
           return false;
-        if (R.BaseType) {
-          if (!BaseTy || !BaseTy->isEqual(R.BaseType))
-            return false;
-        } else if (BaseTy) {
+        if (R.BaseType.isNull() != BaseTy.isNull())
           return false;
-        }
+        if (R.BaseType && !R.BaseType->isEqual(BaseTy))
+          return false;
         return R.ParamIdx == ParamIdx &&
                R.IsNoninitialVariadic == IsNoninitialVariadic;
       })) {

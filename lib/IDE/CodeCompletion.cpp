@@ -6764,20 +6764,24 @@ addPossibleParams(const ArgumentTypeCheckCompletionCallback::Result &Ret,
 
   ArrayRef<AnyFunctionType::Param> ParamsToPass =
       Ret.FuncTy->getAs<AnyFunctionType>()->getParams();
-  ParameterList *PL = nullptr;
 
-  if (auto *FD = dyn_cast<AbstractFunctionDecl>(Ret.FuncD)) {
-    PL = FD->getParameters();
-  } else if (auto *SD = dyn_cast<SubscriptDecl>(Ret.FuncD)) {
-    PL = SD->getIndices();
-  } else {
-    assert(false && "Unhandled decl type?");
-    return true;
+  ParameterList *PL = nullptr;
+  if (Ret.FuncD) {
+    if (auto *FD = dyn_cast<AbstractFunctionDecl>(Ret.FuncD)) {
+      PL = FD->getParameters();
+    } else if (auto *SD = dyn_cast<SubscriptDecl>(Ret.FuncD)) {
+      PL = SD->getIndices();
+    } else if (auto *EED = dyn_cast<EnumElementDecl>(Ret.FuncD)) {
+      PL = EED->getParameterList();
+    } else {
+      // No parameter list for function-type params/variables.
+      assert(isa<VarDecl>(Ret.FuncD) && "Unhandled decl type?");
+    }
   }
-  assert(PL->size() == ParamsToPass.size());
+  assert(!PL || PL->size() == ParamsToPass.size());
 
   bool ShowGlobalCompletions = false;
-  for (auto Idx : range(*Ret.ParamIdx, PL->size())) {
+  for (auto Idx : range(*Ret.ParamIdx, ParamsToPass.size())) {
     bool IsCompletion = Idx == Ret.ParamIdx;
 
     // Stop at the first param claimed by other arguments.
@@ -6786,7 +6790,7 @@ addPossibleParams(const ArgumentTypeCheckCompletionCallback::Result &Ret,
 
     const AnyFunctionType::Param *P = &ParamsToPass[Idx];
     bool Required =
-        !PL->get(Idx)->isDefaultArgument() && !PL->get(Idx)->isVariadic();
+        !(PL && PL->get(Idx)->isDefaultArgument()) && !P->isVariadic();
 
     if (P->hasLabel() && !(IsCompletion && Ret.IsNoninitialVariadic)) {
       PossibleParamInfo PP(P, Required);
@@ -6821,8 +6825,8 @@ static void deliverArgumentResults(
     for (auto &Result : Results) {
       auto SemanticContext = SemanticContextKind::None;
       NominalTypeDecl *BaseNominal = nullptr;
-      Type BaseTy = Result.BaseType;
-      if (BaseTy) {
+      if (Result.BaseType) {
+        Type BaseTy = Result.BaseType;
         if (auto InstanceTy = BaseTy->getMetatypeInstanceType())
           BaseTy = InstanceTy;
         if ((BaseNominal = BaseTy->getAnyNominal())) {
@@ -6831,12 +6835,13 @@ static void deliverArgumentResults(
               Result.FuncD->getDeclContext()->getSelfNominalTypeDecl() !=
                   BaseNominal)
             SemanticContext = SemanticContextKind::Super;
-        } else if (BaseTy->is<TupleType>()) {
+        } else if (BaseTy->is<TupleType>() ||
+                   BaseTy->is<SubstitutableType>()) {
           SemanticContext = SemanticContextKind::CurrentNominal;
         }
       }
       if (Result.IsSubscript) {
-        assert(SemanticContext != SemanticContextKind::None && BaseTy);
+        assert(SemanticContext != SemanticContextKind::None);
         auto *SD = dyn_cast_or_null<SubscriptDecl>(Result.FuncD);
         Lookup.addSubscriptCallPattern(Result.FuncTy->getAs<AnyFunctionType>(),
                                        SD, SemanticContext);
