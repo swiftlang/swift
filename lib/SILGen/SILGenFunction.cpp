@@ -19,6 +19,7 @@
 #include "RValue.h"
 #include "SILGenFunctionBuilder.h"
 #include "Scope.h"
+#include "swift/ABI/MetadataValues.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/FileUnit.h"
@@ -609,14 +610,26 @@ void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
   emitEpilog(ace);
 }
 
+ManagedValue emitBuiltinCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
+                                        SubstitutionMap subs,
+                                        ArrayRef<ManagedValue> args,
+                                        SGFContext C);
+
 void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
   // Create the argc and argv arguments.
   auto entry = B.getInsertionBB();
   auto paramTypeIter = F.getConventions()
                            .getParameterSILTypes(getTypeExpansionContext())
                            .begin();
-  SILValue argc = entry->createFunctionArgument(*paramTypeIter);
-  SILValue argv = entry->createFunctionArgument(*std::next(paramTypeIter));
+
+  SILValue argc;
+  SILValue argv;
+  const bool isAsyncFunc =
+      isa<FuncDecl>(mainDecl) && static_cast<FuncDecl *>(mainDecl)->hasAsync();
+  if (!isAsyncFunc) {
+    argc = entry->createFunctionArgument(*paramTypeIter);
+    argv = entry->createFunctionArgument(*std::next(paramTypeIter));
+  }
 
   switch (mainDecl->getArtificialMainKind()) {
   case ArtificialMainKind::UIApplicationMain: {
@@ -823,13 +836,32 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
     auto builtinInt32Type = SILType::getBuiltinIntegerType(32, getASTContext());
 
     auto *exitBlock = createBasicBlock();
-    B.setInsertionPoint(exitBlock);
     SILValue exitCode =
         exitBlock->createPhiArgument(builtinInt32Type, OwnershipKind::None);
-    auto returnType = F.getConventions().getSingleSILResultType(B.getTypeExpansionContext());
-    if (exitCode->getType() != returnType)
-      exitCode = B.createStruct(moduleLoc, returnType, exitCode);
-    B.createReturn(moduleLoc, exitCode);
+    B.setInsertionPoint(exitBlock);
+
+    if (!mainFunc->hasAsync()) {
+      auto returnType = F.getConventions().getSingleSILResultType(
+          B.getTypeExpansionContext());
+      if (exitCode->getType() != returnType)
+        exitCode = B.createStruct(moduleLoc, returnType, exitCode);
+      B.createReturn(moduleLoc, exitCode);
+    } else {
+      FuncDecl *exitFuncDecl = SGM.getExit();
+      assert(exitFuncDecl && "Failed to find exit function declaration");
+      SILFunction *exitSILFunc = SGM.getFunction(
+          SILDeclRef(exitFuncDecl, SILDeclRef::Kind::Func, /*isForeign*/ true),
+          NotForDefinition);
+
+      SILFunctionType &funcType =
+          *exitSILFunc->getLoweredType().getAs<SILFunctionType>();
+      SILType retType = SILType::getPrimitiveObjectType(
+          funcType.getParameters().front().getInterfaceType());
+      exitCode = B.createStruct(moduleLoc, retType, exitCode);
+      SILValue exitCall = B.createFunctionRef(moduleLoc, exitSILFunc);
+      B.createApply(moduleLoc, exitCall, {}, {exitCode});
+      B.createUnreachable(moduleLoc);
+    }
 
     if (mainFunc->hasThrows()) {
       auto *successBlock = createBasicBlock();
@@ -865,6 +897,107 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
     return;
   }
   }
+}
+
+void SILGenFunction::emitAsyncMainThreadStart(SILDeclRef entryPoint) {
+  auto moduleLoc = RegularLocation::getModuleLocation();
+  auto *entryBlock = B.getInsertionBB();
+  auto paramTypeIter = F.getConventions()
+                           .getParameterSILTypes(getTypeExpansionContext())
+                           .begin();
+
+  entryBlock->createFunctionArgument(*paramTypeIter);            // argc
+  entryBlock->createFunctionArgument(*std::next(paramTypeIter)); // argv
+
+  // Lookup necessary functions
+  swift::ASTContext &ctx = entryPoint.getDecl()->getASTContext();
+
+  B.setInsertionPoint(entryBlock);
+
+  /// Generates a reinterpret_cast for converting
+  /// Builtin.Job -> UnownedJob
+  /// Builtin.Executor -> UnownedSerialExecutor
+  /// These are used by _swiftJobRun, which, ABI-wise, could take
+  /// Builtin.Job or Builtin.Executor, but doesn't.
+  auto createExplodyCastForCall =
+      [this, &moduleLoc](SILValue originalValue, FuncDecl *jobRunFuncDecl,
+                         uint32_t paramIndex) -> SILValue {
+    // The type coming from the _swiftJobRun function
+    Type apiType = jobRunFuncDecl->getParameters()->get(paramIndex)->getType();
+    SILType apiSILType =
+        SILType::getPrimitiveObjectType(apiType->getCanonicalType());
+    // If the types are the same, we don't need to do anything!
+    if (apiSILType == originalValue->getType())
+      return originalValue;
+    return this->B.createUncheckedReinterpretCast(moduleLoc, originalValue,
+                                                  apiSILType);
+  };
+
+  // Call CreateAsyncTask
+  FuncDecl *builtinDecl = cast<FuncDecl>(getBuiltinValueDecl(
+      getASTContext(),
+      ctx.getIdentifier(getBuiltinName(BuiltinValueKind::CreateAsyncTask))));
+
+  auto subs = SubstitutionMap::get(builtinDecl->getGenericSignature(),
+                                   {TupleType::getEmpty(ctx)},
+                                   ArrayRef<ProtocolConformanceRef>{});
+
+  SILValue mainFunctionRef = emitGlobalFunctionRef(moduleLoc, entryPoint);
+
+  // Emit the CreateAsyncTask builtin
+  TaskCreateFlags taskCreationFlagMask(0);
+  SILValue taskFlags =
+      emitWrapIntegerLiteral(moduleLoc, getLoweredType(ctx.getIntType()),
+                             taskCreationFlagMask.getOpaqueValue());
+
+  SILValue task =
+      emitBuiltinCreateAsyncTask(*this, moduleLoc, subs,
+                                 {ManagedValue::forUnmanaged(taskFlags),
+                                  ManagedValue::forUnmanaged(mainFunctionRef)},
+                                 {})
+          .forward(*this);
+  DestructureTupleInst *structure = B.createDestructureTuple(moduleLoc, task);
+  task = structure->getResult(0);
+
+  // Get swiftJobRun
+  FuncDecl *swiftJobRunFuncDecl = SGM.getSwiftJobRun();
+  SILFunction *swiftJobRunSILFunc =
+      SGM.getFunction(SILDeclRef(swiftJobRunFuncDecl, SILDeclRef::Kind::Func),
+                      NotForDefinition);
+  SILValue swiftJobRunFunc =
+      B.createFunctionRefFor(moduleLoc, swiftJobRunSILFunc);
+
+  // Convert task to job
+  SILType JobType = SILType::getPrimitiveObjectType(
+      getBuiltinType(ctx, "Job")->getCanonicalType());
+  SILValue jobResult = B.createBuiltin(
+      moduleLoc,
+      ctx.getIdentifier(getBuiltinName(BuiltinValueKind::ConvertTaskToJob)),
+      JobType, {}, {task});
+  jobResult = createExplodyCastForCall(jobResult, swiftJobRunFuncDecl, 0);
+
+  // Get main executor
+  FuncDecl *getMainExecutorFuncDecl = SGM.getGetMainExecutor();
+  SILFunction *getMainExeutorSILFunc = SGM.getFunction(
+      SILDeclRef(getMainExecutorFuncDecl, SILDeclRef::Kind::Func),
+      NotForDefinition);
+  SILValue getMainExeutorFunc =
+      B.createFunctionRefFor(moduleLoc, getMainExeutorSILFunc);
+  SILValue mainExecutor = B.createApply(moduleLoc, getMainExeutorFunc, {}, {});
+  mainExecutor = createExplodyCastForCall(mainExecutor, swiftJobRunFuncDecl, 1);
+
+  // Run first part synchronously
+  B.createApply(moduleLoc, swiftJobRunFunc, {}, {jobResult, mainExecutor});
+
+  // Start Main loop!
+  FuncDecl *drainQueueFuncDecl = SGM.getAsyncMainDrainQueue();
+  SILFunction *drainQueueSILFunc = SGM.getFunction(
+      SILDeclRef(drainQueueFuncDecl, SILDeclRef::Kind::Func), NotForDefinition);
+  SILValue drainQueueFunc =
+      B.createFunctionRefFor(moduleLoc, drainQueueSILFunc);
+  B.createApply(moduleLoc, drainQueueFunc, {}, {});
+  B.createUnreachable(moduleLoc);
+  return;
 }
 
 void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
