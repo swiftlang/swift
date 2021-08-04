@@ -1687,12 +1687,12 @@ FUNCTION(DefaultActorDeallocateResilient,
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind))
 
-// void swift_distributedActor_remote_initialize(DefaultActor *actor);
+// void swift_distributedActor_remote_initialize(const Metadata *actorType);
 FUNCTION(DistributedActorInitializeRemote,
          swift_distributedActor_remote_initialize, SwiftCC,
          ConcurrencyAvailability,
-         RETURNS(VoidTy),
-         ARGS(RefCountedPtrTy), // TODO also address and transport?
+         RETURNS(OpaquePtrTy),
+         ARGS(TypeMetadataPtrTy),
          ATTRS(NoUnwind))
 
 // OpaqueValue* swift_distributedActor_remote_create(

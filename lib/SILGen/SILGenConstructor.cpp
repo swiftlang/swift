@@ -1193,5 +1193,24 @@ void SILGenFunction::emitDistributedActorFactory(FuncDecl *fd) {
   /// NOTE: this will only be reached if the resolve function is actually
   ///       demanded. For example, by declaring the actor as `public` or
   ///       having at least one call to the resolve init.
-  llvm_unreachable("TODO: implement emitDistributedActorFactory");
+
+  SILLocation loc = fd; // NOTE: forgot if this is the right one for all locs.
+  ClassDecl *actor = cast<ClassDecl>(fd->getDeclContext()->getAsDecl());
+  assert(actor->isDistributedActor());
+
+  // Step 1: get the uninitialized allocation from the runtime system.
+  auto &ctx = getASTContext();
+  auto builtinName = ctx.getIdentifier(
+      getBuiltinName(BuiltinValueKind::InitializeDistributedRemoteActor));
+  auto returnType = getLoweredType(actor->getInterfaceType());
+  auto *metaTypeInfo = F.getArgument(0);
+
+  FullExpr scope(Cleanups, CleanupLocation(fd));
+  auto *result = B.createBuiltin(loc, builtinName, returnType, /*subs*/{},
+                  { metaTypeInfo });
+
+  // TODO: initialize the id and transport fields
+
+
+  B.createReturn(loc, result);
 }
