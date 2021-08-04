@@ -2844,6 +2844,13 @@ public:
         abort();
       }
 
+      // [AST][AutoDiff] Skip implicit GenericTypeParamDecl AST verification. #32343
+      // re-applied from https://github.com/apple/swift/pull/32343
+      // Skip implicit generic param decls. Their depth and index may not be
+      // consistent with the generic context's parameter list.
+      if (GTPD->isImplicit())
+        return;
+
       unsigned currentDepth = DC->getGenericContextDepth();
       if (currentDepth < GTPD->getDepth()) {
         Out << "GenericTypeParamDecl has incorrect depth\n";
