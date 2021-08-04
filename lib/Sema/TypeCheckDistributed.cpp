@@ -136,23 +136,23 @@ void swift::checkDistributedActorConstructor(ClassDecl *decl, ConstructorDecl *c
   if (ctor->isSynthesized())
     return;
 
-  if (ctor->isDistributedActorLocalInit()) {
-    // it is not legal to manually define init(transport:)
-    // TODO: we want to lift this restriction but it is tricky
-    ctor->diagnose(diag::distributed_actor_local_init_explicitly_defined)
-        .fixItRemove(SourceRange(ctor->getStartLoc(), decl->getStartLoc()));
-    // TODO: we should be able to allow this, but then we need to inject
-    //       code or force users to "do the right thing"
-    return;
-  }
-
-  if (ctor->isDistributedActorResolveInit()) {
-    // It is illegal for users to attempt defining a resolve initializer;
-    // Suggest removing it entirely, there is no way users can implement this init.
-    ctor->diagnose(diag::distributed_actor_init_resolve_must_not_be_user_defined)
-        .fixItRemove(SourceRange(ctor->getStartLoc(), decl->getStartLoc()));
-    return;
-  }
+//  if (ctor->isDistributedActorLocalInit()) {
+//    // it is not legal to manually define init(transport:)
+//    // TODO: we want to lift this restriction but it is tricky
+//    ctor->diagnose(diag::distributed_actor_local_init_explicitly_defined)
+//        .fixItRemove(SourceRange(ctor->getStartLoc(), decl->getStartLoc()));
+//    // TODO: we should be able to allow this, but then we need to inject
+//    //       code or force users to "do the right thing"
+//    return;
+//  }
+//
+//  if (ctor->isDistributedActorResolveInit()) {
+//    // It is illegal for users to attempt defining a resolve initializer;
+//    // Suggest removing it entirely, there is no way users can implement this init.
+//    ctor->diagnose(diag::distributed_actor_init_resolve_must_not_be_user_defined)
+//        .fixItRemove(SourceRange(ctor->getStartLoc(), decl->getStartLoc()));
+//    return;
+//  }
 
   // All user defined initializers on distributed actors must be 'convenience'.
   //

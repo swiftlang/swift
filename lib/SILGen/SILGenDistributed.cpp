@@ -55,7 +55,7 @@ lookupAssignIdentityFunc(ASTContext& C) {
 ///     self.actorTransport = transport
 /// // }
 /// \endverbatim
-static InitializationPtr
+static void
 emitDistributedActorTransportInit(SILGenFunction &SGF, ManagedValue selfArg, VarDecl *selfDecl, ConstructorDecl *ctor,
                                   Pattern *pattern, VarDecl *var) {
   auto &C = selfDecl->getASTContext();
@@ -104,7 +104,7 @@ emitDistributedActorTransportInit(SILGenFunction &SGF, ManagedValue selfArg, Var
 ///     self.id = transport.assignIdentity(Self.self)
 /// // }
 /// \endverbatim
-static InitializationPtr
+static void
 emitDistributedActorIdentityInit(SILGenFunction &SGF, ManagedValue selfArg, VarDecl *selfDecl, ConstructorDecl *ctor,
                                  Pattern *pattern, VarDecl *var) {
   auto &C = selfDecl->getASTContext();
@@ -152,7 +152,11 @@ emitDistributedActorIdentityInit(SILGenFunction &SGF, ManagedValue selfArg, VarD
   // TODO: how to get @dynamic_self, do we need it?
   //       %14 = metatype $@thick @dynamic_self DA_DefaultDeinit.Type // type-defs: %1; user: %16
   auto *selfTyDecl = ctor->getParent()->getSelfNominalTypeDecl();
-  auto selfMetatype = SGF.getLoweredType(selfTyDecl->getInterfaceType());
+  // This would be bad: since not ok for generic
+  // auto selfMetatype = SGF.getLoweredType(selfTyDecl->getInterfaceType());
+  auto selfMetatype = SGF.getLoweredType(
+      F.mapTypeIntoContext(selfTyDecl->getInterfaceType()));
+  // selfVarDecl.getType() // TODO: do this; then dont need the self type decl
   SILValue metatypeValue = B.createMetatype(loc, selfMetatype);
 
 
@@ -161,55 +165,60 @@ emitDistributedActorIdentityInit(SILGenFunction &SGF, ManagedValue selfArg, VarD
 
   // === Make the transport.assignIdentity call
   // --- prepare the witness_method
-//  auto assignIdentityFnSIL = builder.getOrCreateFunction(loc, assignIdentityFnRef, ForDefinition);
-//  SILValue assignIdentityFn = B.createFunctionRefFor(loc, assignIdentityFnSIL);
   // Note: it does not matter on what module we perform the lookup,
   // it is currently ignored. So the Stdlib module is good enough.
   auto *module = SGF.getModule().getSwiftModule();
 
-  auto transportConfRef = module->lookupConformance(
-      openedTransportType, transportProto);
-  transportConfRef.dump();
+  // the conformance here is just an abstract thing so we can simplify
+  //  auto transportConfRef = module->lookupConformance(
+  //      openedTransportType, transportProto);
+  auto transportConfRef = ProtocolConformanceRef(transportProto);
   assert(!transportConfRef.isInvalid() && "Missing conformance to `ActorTransport`");
-  fprintf(stderr, "[%s:%d] (%s) transportConfRef IS OK \n", __FILE__, __LINE__, __FUNCTION__);
 
-//  fprintf(stderr, "[%s:%d] (%s) selfTyDecl\n", __FILE__, __LINE__, __FUNCTION__);
-//  selfTyDecl->getInterfaceType().dump();
-//  fprintf(stderr, "[%s:%d] (%s) distributedActorProto\n", __FILE__, __LINE__, __FUNCTION__);
+  fprintf(stderr, "[%s:%d] (%s) selfArg->getType()\n", __FILE__, __LINE__, __FUNCTION__);
+  selfArg.getType().dump();
+  fprintf(stderr, "[%s:%d] (%s) distributedActorProto\n", __FILE__, __LINE__, __FUNCTION__);
+  distributedActorProto->dump();
 
-//  distributedActorProto->dump();
-//  auto distributedActorConfRef = module->lookupConformance(
-//      selfTyDecl->getInterfaceType(), distributedActorProto);
-//  assert(!distributedActorConfRef.isInvalid() && "Missing conformance to `DistributedActor`");
-//  distributedActorConfRef.dump();
+  auto selfTy = F.mapTypeIntoContext(selfTyDecl->getDeclaredInterfaceType()); // TODO: thats just self var devl getType
+
+  auto distributedActorConfRef = module->lookupConformance(
+      selfTy,
+      distributedActorProto);
+  assert(!distributedActorConfRef.isInvalid() && "Missing conformance to `DistributedActor`");
+  distributedActorConfRef.dump();
+
+  //  auto anyActorIdentityDecl = C.getAnyActorIdentityDecl();
 
   auto assignIdentityMethod =
-      transportProto->getSingleRequirement(C.Id_assignIdentity);
+      cast<FuncDecl>(transportProto->getSingleRequirement(C.Id_assignIdentity));
   auto assignIdentityRef = SILDeclRef(assignIdentityMethod);
-
-  auto anyActorIdentityDecl = C.getAnyActorIdentityDecl();
-  auto anyActorIdentityTy = anyActorIdentityDecl->getInterfaceType();
-  auto anyActorIdentitySILTy = SGF.getLoweredType(anyActorIdentityTy);
+  auto assignIdentitySILTy =
+      SGF.getConstantInfo(SGF.getTypeExpansionContext(), assignIdentityRef)
+          .getSILType();
 
   auto assignWitnessMethod = B.createWitnessMethod(
       loc,
       /*lookupTy*/openedTransportType,
       /*Conformance*/transportConfRef,
       /*member*/assignIdentityRef,
-      /*methodTy*/anyActorIdentitySILTy);
+      /*methodTy*/assignIdentitySILTy);
 
-  // --- prepare params: {Self.self, /*self=*/transport}
-  SmallVector<SILValue, 2> assignParams({});
-  assignParams.emplace_back(metatypeValue);
-  assignParams.emplace_back(transportArgValue);
+  // --- prepare conformance subs
+  auto genericSig = assignIdentityMethod->getGenericSignature();
+  genericSig->dump();
+
+  SubstitutionMap subs =
+      SubstitutionMap::get(genericSig,
+                           {openedTransportType, selfTy},
+                           {transportConfRef, distributedActorConfRef});
 
   fprintf(stderr, "[%s:%d] (%s) ----------------------------------------------------------------------------\n", __FILE__, __LINE__, __FUNCTION__);
   SGF.F.dump();
 
   // --- call transport.assignIdentity(Self.self)
-  SubstitutionMap subs = SubstitutionMap();
   auto identity = B.createApply(
-      loc, assignWitnessMethod, subs, assignParams);
+      loc, assignWitnessMethod, subs, {metatypeValue, transportArgValue});
 
   fprintf(stderr, "[%s:%d] (%s) ----------------------------------------------------------------------------\n", __FILE__, __LINE__, __FUNCTION__);
   SGF.F.dump();
@@ -245,20 +254,11 @@ void SILGenFunction::initializeDistributedActorImplicitStorageInit(
   SILLocation prologueLoc = RegularLocation(ctor);
   prologueLoc.markAsPrologue(); // TODO: no idea if this is necessary or makes sense
 
-  fprintf(stderr, "[%s:%d] (%s) EMIT initializeDistributedActorImplicitStorageInit\n", __FILE__, __LINE__, __FUNCTION__);
-  ctor->dump();
-  fprintf(stderr, "[%s:%d] (%s) CLASS---------------------------------------------\n", __FILE__, __LINE__, __FUNCTION__);
-  classDecl->dump();
-  fprintf(stderr, "[%s:%d] (%s) --------------------------------------------------\n", __FILE__, __LINE__, __FUNCTION__);
-
-  // find the transport parameter
-//  SILValue transportArgValue = F.getArgument(0);
-//  ManagedValue transportArgManaged = ManagedValue::forUnmanaged(transportArgValue);
-
   auto transportTy = C.getActorTransportType(); // getProtocol(KnownProtocolKind::ActorTransport);
   auto identityProtoTy = C.getActorIdentityType(); //getProtocol(KnownProtocolKind::ActorIdentity);
   auto anyIdentityTy = C.getAnyActorIdentityType();
 
+  // ==== Find the stored properties we will initialize
   VarDecl *transportMember = nullptr;
   VarDecl *idMember = nullptr;
 
@@ -279,7 +279,7 @@ void SILGenFunction::initializeDistributedActorImplicitStorageInit(
         var->getInterfaceType()->isEqual(transportTy)) {
       transportMember = var;
       fprintf(stderr, "[%s:%d] (%s) FOUND TRANSPORT MEMBER\n", __FILE__, __LINE__, __FUNCTION__);
-      auto transportInit = emitDistributedActorTransportInit(*this, selfArg, selfDecl, ctor, pattern, var);
+      emitDistributedActorTransportInit(*this, selfArg, selfDecl, ctor, pattern, var);
       fprintf(stderr, "[%s:%d] (%s) DONE TRANSPORT MEMBER\n", __FILE__, __LINE__, __FUNCTION__);
     }
     else if (var->getName() == C.Id_id &&
@@ -287,7 +287,7 @@ void SILGenFunction::initializeDistributedActorImplicitStorageInit(
                 var->getInterfaceType()->isEqual(anyIdentityTy))) { // TODO(distributed): stick one way to store, but today we can't yet store the existential
       idMember = var;
       fprintf(stderr, "[%s:%d] (%s) FOUND ID MEMBER\n", __FILE__, __LINE__, __FUNCTION__);
-      auto identityInit = emitDistributedActorIdentityInit(*this, selfArg, selfDecl, ctor, pattern, var);
+      emitDistributedActorIdentityInit(*this, selfArg, selfDecl, ctor, pattern, var);
     }
     if (transportMember && idMember) {
       fprintf(stderr, "[%s:%d] (%s) BREAK ------------------------\n", __FILE__, __LINE__, __FUNCTION__);

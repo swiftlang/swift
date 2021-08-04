@@ -227,6 +227,10 @@ createDistributedActor_init_local(ClassDecl *classDecl,
 
   initDecl->copyFormalAccessFrom(classDecl, /*sourceIsParentContext=*/true);
 
+  // Clone any @available attributes from the actor definition.
+  for (auto attr: classDecl->getAttrs().getAttributes<AvailableAttr>())
+    initDecl->getAttrs().add(attr->clone(C, /*implicit*/true));
+
   return initDecl;
 }
 
@@ -240,15 +244,14 @@ createDistributedActorInit(ClassDecl *classDecl,
   const auto name = requirement->getName();
   auto argumentNames = name.getArgumentNames();
 
-  switch (argumentNames.size()) {
-  case 1: {
-    if (requirement->isDistributedActorLocalInit()) {
-      return createDistributedActor_init_local(classDecl, ctx);
-    }
-
-    break;
-  }
-  }
+//  switch (argumentNames.size()) {
+//  case 1: {
+//    if (requirement->isDistributedActorLocalInit()) {
+//    }
+//
+//    break;
+//  }
+//  }
 
   return nullptr;
 }
@@ -276,14 +279,7 @@ static void collectNonOveriddenDistributedActorInits(
   }
 }
 
-
-/// For a distributed actor, automatically define initializers
-/// that match the DistributedActor requirements.
-static void addImplicitDistributedActorConstructors(ClassDecl *decl) {
-  // Bail out if not a distributed actor definition.
-  if (!decl->isDistributedActor())
-    return;
-
+static void addImplicitDefaultDistributedActorConstructor(ClassDecl *decl) {
   for (auto member : decl->getMembers()) {
     if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
       if (ctor->isRecursiveValidation())
@@ -296,19 +292,19 @@ static void addImplicitDistributedActorConstructors(ClassDecl *decl) {
   // Check whether the user has defined a designated initializer for this actor,
   // if so, we will not synthesize the init(transport:) initializer.
   auto &ctx = decl->getASTContext();
+
+  SmallVector<ConstructorDecl *, 4> nonOverridenCtors;
+  collectNonOveriddenDistributedActorInits( // TODO(distributed): collect required initializers
+      ctx, decl, nonOverridenCtors);
+
+  // TODO(distributed): only if no other required initializers defined
   //  bool foundDesignatedInit = hasUserDefinedDesignatedInit(ctx.evaluator, decl);
   //  if (foundDesignatedInit)
   //    return;
 
-  SmallVector<ConstructorDecl *, 4> nonOverridenCtors;
-  collectNonOveriddenDistributedActorInits(
-      ctx, decl, nonOverridenCtors);
-
-  for (auto *daCtor : nonOverridenCtors) {
-    if (auto ctor = createDistributedActorInit(decl, daCtor, ctx)) {
-      decl->addMember(ctor);
-    }
-  }
+  auto defaultDistributedActorInit =
+      createDistributedActor_init_local(decl, ctx);
+  decl->addMember(defaultDistributedActorInit);
 }
 
 /******************************************************************************/
@@ -633,19 +629,21 @@ static void addImplicitRemoteActorFunctions(ClassDecl *decl) {
 
 /// Entry point for adding all computed members to a distributed actor decl.
 void swift::addImplicitDistributedActorMembersToClass(ClassDecl *decl) {
+  fprintf(stderr, "[%s:%d] (%s) addImplicitDistributedActorMembersToClass\n", __FILE__, __LINE__, __FUNCTION__);
+
   // Bail out if not a distributed actor definition.
   if (!decl->isDistributedActor())
     return;
 
+  // === Ensure the _Distributed module is loaded
   auto &C = decl->getASTContext();
-
   if (!C.getLoadedModule(C.Id_Distributed)) {
     // seems we're missing the _Distributed module, ask to import it explicitly
     decl->diagnose(diag::distributed_actor_needs_explicit_distributed_import);
     return;
   }
 
-  addImplicitDistributedActorConstructors(decl);
+  addImplicitDefaultDistributedActorConstructor(decl);
   addImplicitDistributedActorStoredProperties(decl);
   addImplicitRemoteActorFunctions(decl);
 //  addImplicitResignIdentity(decl);

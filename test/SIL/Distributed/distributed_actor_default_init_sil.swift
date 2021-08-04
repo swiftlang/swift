@@ -3,7 +3,8 @@
 import _Distributed
 
 @available(SwiftStdlib 5.5, *)
-distributed actor SimpleEmptyDistributedActor {}
+distributed actor SimpleEmptyDistributedActor {
+}
 
 //9: @available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
 //10: distributed actor SimpleEmptyDistributedActor {
