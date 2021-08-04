@@ -7281,10 +7281,14 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     return cs.cacheType(new (ctx) UnresolvedTypeConversionExpr(expr, toType));
 
   // Use an opaque type to abstract a value of the underlying concrete type.
-  if (toType->getAs<OpaqueTypeArchetypeType>()) {
+  // The full check here would be that `toType` and `fromType` are structually
+  // equal except in any position where `toType` has an opaque archetype. The
+  // below is just an approximate check since the above would be expensive to
+  // verify and still relies on the type checker ensuing `fromType` is
+  // compatible with any opaque archetypes.
+  if (toType->hasOpaqueArchetype())
     return cs.cacheType(new (ctx) UnderlyingToOpaqueExpr(expr, toType));
-  }
-  
+
   llvm_unreachable("Unhandled coercion");
 }
 
