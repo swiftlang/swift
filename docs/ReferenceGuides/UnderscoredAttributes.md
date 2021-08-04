@@ -132,7 +132,7 @@ already infer from static analysis.
 Changing the implementation in a way that violates the optimizer's assumptions
 about the effects results in undefined behavior.
 
-For more details, see [OptimizerEffects.rst](/docs/Proposals/OptimizerEffects.rst).
+For more details, see [OptimizerEffects.rst](/docs/proposals/OptimizerEffects.rst).
 
 ## `@_exported`
 
