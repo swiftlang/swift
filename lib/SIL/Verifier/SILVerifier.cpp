@@ -1244,6 +1244,12 @@ public:
         DebugVars[argNum] = varInfo->Name;
       }
 
+    // Check the (auxiliary) debug variable scope
+    if (const SILDebugScope *VarDS = varInfo->Scope)
+      require(VarDS->getInlinedFunction() == debugScope->getInlinedFunction(),
+              "Scope of the debug variable should have the same parent function"
+              " as that of instruction.");
+
     // Check debug info expression
     if (const auto &DIExpr = varInfo->DIExpr) {
       for (auto It = DIExpr.element_begin(), ItEnd = DIExpr.element_end();

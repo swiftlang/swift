@@ -1732,6 +1732,10 @@ struct SILDebugVariable {
   const SILDebugScope *Scope;
   SILDebugInfoExpression DIExpr;
 
+  // Use vanilla copy ctor / operator
+  SILDebugVariable(const SILDebugVariable &) = default;
+  SILDebugVariable &operator=(const SILDebugVariable &) = default;
+
   SILDebugVariable()
       : ArgNo(0), Constant(false), Implicit(false), Scope(nullptr) {}
   SILDebugVariable(bool Constant, uint16_t ArgNo)
@@ -1743,6 +1747,10 @@ struct SILDebugVariable {
                    llvm::ArrayRef<SILDIExprElement> ExprElements = {})
       : Name(Name), ArgNo(ArgNo), Constant(Constant), Implicit(IsImplicit),
         Type(AuxType), Loc(DeclLoc), Scope(DeclScope), DIExpr(ExprElements) {}
+
+  /// Created from either AllocStack or AllocBox instruction
+  static Optional<SILDebugVariable>
+  createFromAllocation(const AllocationInst *AI);
 
   // We're not comparing DIExpr here because strictly speaking,
   // DIExpr is not part of the debug variable. We simply piggyback
@@ -1960,6 +1968,11 @@ public:
     auto VI = TailAllocatedDebugVariable(RawValue);
     VI.setArgNo(N);
     SILNode::Bits.AllocStackInst.VarInfo = VI.getRawValue();
+  }
+
+  void setDebugVarScope(const SILDebugScope *NewDS) {
+    if (hasAuxDebugScope())
+      *getTrailingObjects<const SILDebugScope *>() = NewDS;
   }
 
   /// getElementType - Get the type of the allocated memory (as opposed to the
@@ -4681,6 +4694,11 @@ public:
                        VarDeclLoc, VarDeclScope, DIExprElements);
   }
 
+  void setDebugVarScope(const SILDebugScope *NewDS) {
+    if (hasAuxDebugScope())
+      *getTrailingObjects<const SILDebugScope *>() = NewDS;
+  }
+
   /// True if all references within this debug value will be overwritten with a
   /// poison sentinel at this point in the program. This is used in debug builds
   /// when shortening non-trivial value lifetimes to ensure the debugger cannot
@@ -4741,7 +4759,12 @@ public:
 
     return VarInfo.get(getDecl(), getTrailingObjects<char>(), AuxVarType,
                        VarDeclLoc, VarDeclScope, DIExprElements);
-  };
+  }
+
+  void setDebugVarScope(const SILDebugScope *NewDS) {
+    if (hasAuxDebugScope())
+      *getTrailingObjects<const SILDebugScope *>() = NewDS;
+  }
 };
 
 /// An abstract class representing a load from some kind of reference storage.
