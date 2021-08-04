@@ -47,12 +47,12 @@ RequirementMachine::getLocalRequirements(
     return result;
 
   if (props->isConcreteType()) {
-    result.concreteType = props->getConcreteType({}, protos, Context);
+    result.concreteType = props->getConcreteType({}, term, protos, Context);
     return result;
   }
 
   if (props->hasSuperclassBound()) {
-    result.superclass = props->getSuperclassBound({}, protos, Context);
+    result.superclass = props->getSuperclassBound({}, term, protos, Context);
   }
 
   for (const auto *proto : props->getConformsToExcludingSuperclassConformances())
@@ -153,7 +153,7 @@ Type RequirementMachine::getSuperclassBound(Type depType) const {
     return Type();
 
   auto &protos = System.getProtocols();
-  return props->getSuperclassBound({ }, protos, Context);
+  return props->getSuperclassBound({ }, term, protos, Context);
 }
 
 bool RequirementMachine::isConcreteType(Type depType) const {
@@ -183,7 +183,7 @@ Type RequirementMachine::getConcreteType(Type depType) const {
     return Type();
 
   auto &protos = System.getProtocols();
-  return props->getConcreteType({ }, protos, Context);
+  return props->getConcreteType({ }, term, protos, Context);
 }
 
 bool RequirementMachine::areSameTypeParameterInContext(Type depType1,
@@ -349,7 +349,8 @@ Type RequirementMachine::getCanonicalTypeInContext(
       if (props) {
         if (props->isConcreteType()) {
           auto concreteType = props->getConcreteType(genericParams,
-                                                     protos, Context);
+                                                     prefix, protos,
+                                                     Context);
           if (!concreteType->hasTypeParameter())
             return concreteType;
 
@@ -364,7 +365,8 @@ Type RequirementMachine::getCanonicalTypeInContext(
         if (props->hasSuperclassBound() &&
             prefix.size() != term.size()) {
           auto superclass = props->getSuperclassBound(genericParams,
-                                                      protos, Context);
+                                                      prefix, protos,
+                                                      Context);
           if (!superclass->hasTypeParameter())
             return superclass;
 
