@@ -440,6 +440,37 @@ SILGenModule::getCheckExpectedExecutor() {
                                     "_checkExpectedExecutor");
 }
 
+FuncDecl *SILGenModule::getAsyncMainDrainQueue() {
+  return lookupConcurrencyIntrinsic(getASTContext(), AsyncMainDrainQueue,
+                                    "_asyncMainDrainQueue");
+}
+
+FuncDecl *SILGenModule::getGetMainExecutor() {
+  return lookupConcurrencyIntrinsic(getASTContext(), GetMainExecutor,
+                                    "_getMainExecutor");
+}
+
+FuncDecl *SILGenModule::getSwiftJobRun() {
+  return lookupConcurrencyIntrinsic(getASTContext(), SwiftJobRun,
+                                    "_swiftJobRun");
+}
+
+FuncDecl *SILGenModule::getExit() {
+  if (ExitFunc)
+    return *ExitFunc;
+
+  ASTContext &C = getASTContext();
+  ModuleDecl *concurrencyShims =
+      C.getModuleByIdentifier(C.getIdentifier("_SwiftConcurrencyShims"));
+
+  if (!concurrencyShims) {
+    ExitFunc = nullptr;
+    return nullptr;
+  }
+
+  return lookupIntrinsic(*concurrencyShims, ExitFunc, C.getIdentifier("exit"));
+}
+
 ProtocolConformance *SILGenModule::getNSErrorConformanceToError() {
   if (NSErrorConformanceToError)
     return *NSErrorConformanceToError;
@@ -1050,7 +1081,27 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
     auto *decl = constant.getDecl();
     auto *dc = decl->getDeclContext();
     PrettyStackTraceSILFunction X("silgen emitArtificialTopLevel", f);
-    SILGenFunction(*this, *f, dc).emitArtificialTopLevel(decl);
+    // In all cases, a constant.kind == EntryPoint indicates the main entrypoint
+    // to the program, @main.
+    // In the synchronous case, the decl is not async, so emitArtificialTopLevel
+    // emits the error unwrapping and call to MainType.$main() into @main.
+    //
+    // In the async case, emitAsyncMainThreadStart is responsible for generating
+    // the contents of @main. This wraps @async_main in a task, passes that task
+    // to swift_job_run to execute the first thunk, and starts the runloop to
+    // run any additional continuations. The kind is EntryPoint, and the decl is
+    // async.
+    // When the kind is 'AsyncMain', we are generating @async_main. In this
+    // case, emitArtificialTopLevel emits the code for calling MaintType.$main,
+    // unwrapping errors, and calling exit(0) into @async_main to run the
+    // user-specified main function.
+    if (constant.kind == SILDeclRef::Kind::EntryPoint && isa<FuncDecl>(decl) &&
+        static_cast<FuncDecl *>(decl)->hasAsync()) {
+      SILDeclRef mainEntryPoint = SILDeclRef::getAsyncMainDeclEntryPoint(decl);
+      SILGenFunction(*this, *f, dc).emitAsyncMainThreadStart(mainEntryPoint);
+    } else {
+      SILGenFunction(*this, *f, dc).emitArtificialTopLevel(decl);
+    }
     postEmitFunction(constant, f);
     return;
   }
@@ -2033,10 +2084,15 @@ public:
 
     // If the source file contains an artificial main, emit the implicit
     // top-level code.
-    if (auto *mainDecl = sf->getMainDecl())
+    if (auto *mainDecl = sf->getMainDecl()) {
+      if (isa<FuncDecl>(mainDecl) &&
+          static_cast<FuncDecl *>(mainDecl)->hasAsync())
+        emitSILFunctionDefinition(
+            SILDeclRef::getAsyncMainDeclEntryPoint(mainDecl));
       emitSILFunctionDefinition(SILDeclRef::getMainDeclEntryPoint(mainDecl));
+    }
   }
-  
+
   void emitSILFunctionDefinition(SILDeclRef ref) {
     SGM.emitFunctionDefinition(ref, SGM.getFunction(ref, ForDefinition));
   }

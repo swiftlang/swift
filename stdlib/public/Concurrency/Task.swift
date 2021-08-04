@@ -753,7 +753,11 @@ func _enqueueJobGlobalWithDelay(_ delay: UInt64, _ task: Builtin.Job)
 
 @available(SwiftStdlib 5.5, *)
 @_silgen_name("swift_task_asyncMainDrainQueue")
-public func _asyncMainDrainQueue() -> Never
+internal func _asyncMainDrainQueue() -> Never
+
+@available(SwiftStdlib 5.5, *)
+@_silgen_name("swift_task_getMainExecutor")
+internal func _getMainExecutor() -> Builtin.Executor
 
 @available(SwiftStdlib 5.5, *)
 public func _runAsyncMain(@_unsafeSendable _ asyncFun: @escaping () async throws -> ()) {
