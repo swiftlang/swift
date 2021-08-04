@@ -334,43 +334,8 @@ remapConcreteSubstitutionSchema(CanType concreteType,
     }));
 }
 
-/// When a type parameter has two concrete types, we have to unify the
-/// type constructor arguments.
-///
-/// For example, suppose that we have two concrete same-type requirements:
-///
-///   T == Foo<X.Y, Z, String>
-///   T == Foo<Int, A.B, W>
-///
-/// These lower to the following two rules:
-///
-///   T.[concrete: Foo<τ_0_0, τ_0_1, String> with {X.Y, Z}]
-///   T.[concrete: Foo<Int, τ_0_0, τ_0_1> with {A.B, W}]
-///
-/// The two concrete type symbols will be added to the property bag of 'T',
-/// and we will eventually end up in this method, where we will generate three
-/// induced rules:
-///
-///   X.Y.[concrete: Int] => X.Y
-///   A.B => Z
-///   W.[concrete: String] => W
-///
-/// Returns the left hand side on success (it could also return the right hand
-/// side; since we unified the type constructor arguments, it doesn't matter).
-///
-/// Returns true if a conflict was detected.
-static bool unifyConcreteTypes(
-    Symbol lhs, Symbol rhs, RewriteContext &ctx,
-    SmallVectorImpl<std::pair<MutableTerm, MutableTerm>> &inducedRules,
-    bool debug) {
-  auto lhsType = lhs.getConcreteType();
-  auto rhsType = rhs.getConcreteType();
-
-  if (debug) {
-    llvm::dbgs() << "% Unifying " << lhs << " with " << rhs << "\n";
-  }
-
-  class Matcher : public TypeMatcher<Matcher> {
+namespace {
+  class ConcreteTypeMatcher : public TypeMatcher<ConcreteTypeMatcher> {
     ArrayRef<Term> lhsSubstitutions;
     ArrayRef<Term> rhsSubstitutions;
     RewriteContext &ctx;
@@ -378,11 +343,12 @@ static bool unifyConcreteTypes(
     bool debug;
 
   public:
-    Matcher(ArrayRef<Term> lhsSubstitutions,
-            ArrayRef<Term> rhsSubstitutions,
-            RewriteContext &ctx,
-            SmallVectorImpl<std::pair<MutableTerm, MutableTerm>> &inducedRules,
-            bool debug)
+    ConcreteTypeMatcher(ArrayRef<Term> lhsSubstitutions,
+                        ArrayRef<Term> rhsSubstitutions,
+                        RewriteContext &ctx,
+                        SmallVectorImpl<std::pair<MutableTerm,
+                                                  MutableTerm>> &inducedRules,
+                        bool debug)
         : lhsSubstitutions(lhsSubstitutions),
           rhsSubstitutions(rhsSubstitutions),
           ctx(ctx), inducedRules(inducedRules), debug(debug) {}
@@ -459,10 +425,47 @@ static bool unifyConcreteTypes(
       return false;
     }
   };
+}
 
-  Matcher matcher(lhs.getSubstitutions(),
-                  rhs.getSubstitutions(),
-                  ctx, inducedRules, debug);
+/// When a type parameter has two concrete types, we have to unify the
+/// type constructor arguments.
+///
+/// For example, suppose that we have two concrete same-type requirements:
+///
+///   T == Foo<X.Y, Z, String>
+///   T == Foo<Int, A.B, W>
+///
+/// These lower to the following two rules:
+///
+///   T.[concrete: Foo<τ_0_0, τ_0_1, String> with {X.Y, Z}]
+///   T.[concrete: Foo<Int, τ_0_0, τ_0_1> with {A.B, W}]
+///
+/// The two concrete type symbols will be added to the property bag of 'T',
+/// and we will eventually end up in this method, where we will generate three
+/// induced rules:
+///
+///   X.Y.[concrete: Int] => X.Y
+///   A.B => Z
+///   W.[concrete: String] => W
+///
+/// Returns the left hand side on success (it could also return the right hand
+/// side; since we unified the type constructor arguments, it doesn't matter).
+///
+/// Returns true if a conflict was detected.
+static bool unifyConcreteTypes(
+    Symbol lhs, Symbol rhs, RewriteContext &ctx,
+    SmallVectorImpl<std::pair<MutableTerm, MutableTerm>> &inducedRules,
+    bool debug) {
+  auto lhsType = lhs.getConcreteType();
+  auto rhsType = rhs.getConcreteType();
+
+  if (debug) {
+    llvm::dbgs() << "% Unifying " << lhs << " with " << rhs << "\n";
+  }
+
+  ConcreteTypeMatcher matcher(lhs.getSubstitutions(),
+                              rhs.getSubstitutions(),
+                              ctx, inducedRules, debug);
   if (!matcher.match(lhsType, rhsType)) {
     // FIXME: Diagnose the conflict
     if (debug) {
