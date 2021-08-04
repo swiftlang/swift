@@ -769,8 +769,8 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
         /*withoutActuallyEscaping*/ false);
   }
   assert(origFnType->getNumResults() +
-             origFnType->getNumIndirectMutatingParameters() ==
-         1);
+             origFnType->getNumIndirectMutatingParameters() >
+         0);
   if (origFnType->getNumResults() > 0 &&
       origFnType->getResults().front().isFormalDirect()) {
     auto result =

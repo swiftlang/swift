@@ -890,13 +890,13 @@ func vjpNoSemanticResults(_ x: Float) -> (value: Void, pullback: Void) {}
 
 extension InoutParameters {
   func multipleSemanticResults(_ x: inout Float) -> Float { x }
-  @derivative(of: multipleSemanticResults)
+  @derivative(of: multipleSemanticResults, wrt: x)
   func vjpMultipleSemanticResults(_ x: inout Float) -> (
     value: Float, pullback: (Float, inout Float) -> Void
   ) { fatalError() }
 
   func inoutVoid(_ x: Float, _ void: inout Void) -> Float {}
-  @derivative(of: inoutVoid)
+  @derivative(of: inoutVoid, wrt: (x, void))
   func vjpInoutVoidParameter(_ x: Float, _ void: inout Void) -> (
     value: Float, pullback: (Float) -> Float
   ) { fatalError() }

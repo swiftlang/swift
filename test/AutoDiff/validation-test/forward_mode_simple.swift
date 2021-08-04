@@ -1063,8 +1063,6 @@ ForwardModeTests.test("FunctionCall") {
   expectEqual(3, derivative(at: 3) { x in foo(x, 4) })
 }
 
-// FIXME(TF-1038): Support differentiable functions returning tuples.
-/*
 ForwardModeTests.test("ResultSelection") {
   func tuple(_ x: Float, _ y: Float) -> (Float, Float) {
     return (x + 1, y + 2)
@@ -1083,7 +1081,6 @@ ForwardModeTests.test("ResultSelection") {
   expectEqual(1, derivative(at: 3, 3, of: tupleGenericSecond))
   */
 }
-*/
 
 // TODO(TF-983): Support forward-mode differentiation of multiple results.
 /*
