@@ -493,17 +493,6 @@ void PropertyBag::addProperty(
     return;
 
   case Symbol::Kind::Superclass: {
-    auto superclass = property.getSuperclass();
-
-    // A superclass requirement implies a layout requirement.
-    auto layout =
-      LayoutConstraint::getLayoutConstraint(
-        superclass->getClassOrBoundGenericClass()->isObjC()
-          ? LayoutConstraintKind::Class
-          : LayoutConstraintKind::NativeClass,
-        ctx.getASTContext());
-    addProperty(Symbol::forLayout(layout, ctx), ctx, inducedRules, debug);
-
     // FIXME: This needs to find the most derived subclass and also call
     // unifyConcreteTypes()
     Superclass = property;
