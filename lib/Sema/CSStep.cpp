@@ -403,20 +403,6 @@ StepResult ComponentStep::take(bool prevFailed) {
       return finalize(/*isSuccess=*/false);
 #endif
     }
-
-    if (CS.hasFreeTypeVariables()) {
-#ifndef NDEBUG
-      CS.print(llvm::errs());
-      llvm::report_fatal_error("Free type variables left over?");
-#else
-      if (CS.isDebugMode()) {
-        getDebugLogger() << "(failed due to remaining free type variables)\n";
-        CS.print(getDebugLogger(/*indent=*/false));
-      }
-
-      return finalize(/*isSuccess=*/false);
-#endif
-    }
   }
 
   // If this solution is worse than the best solution we've seen so far,
