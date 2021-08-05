@@ -163,6 +163,10 @@ public:
     return Ptr;
   }
 
+  static Symbol fromOpaquePointer(void *ptr) {
+    return Symbol((Storage *) ptr);
+  }
+
   static Symbol forName(Identifier name,
                         RewriteContext &ctx);
 
@@ -222,5 +226,25 @@ public:
 } // end namespace rewriting
 
 } // end namespace swift
+
+namespace llvm {
+  template<> struct DenseMapInfo<swift::rewriting::Symbol> {
+    static swift::rewriting::Symbol getEmptyKey() {
+      return swift::rewriting::Symbol::fromOpaquePointer(
+        llvm::DenseMapInfo<void *>::getEmptyKey());
+    }
+    static swift::rewriting::Symbol getTombstoneKey() {
+      return swift::rewriting::Symbol::fromOpaquePointer(
+        llvm::DenseMapInfo<void *>::getTombstoneKey());
+    }
+    static unsigned getHashValue(swift::rewriting::Symbol Val) {
+      return DenseMapInfo<void *>::getHashValue(Val.getOpaquePointer());
+    }
+    static bool isEqual(swift::rewriting::Symbol LHS,
+                        swift::rewriting::Symbol RHS) {
+      return LHS == RHS;
+    }
+  };
+} // end namespace llvm
 
 #endif
