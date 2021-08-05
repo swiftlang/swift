@@ -517,7 +517,7 @@ static llvm::Constant *buildPrivateMetadata(IRGenModule &IGM,
     llvm::ConstantInt::get(IGM.Int32Ty, 2)
   };
   return llvm::ConstantExpr::getInBoundsGetElementPtr(
-      /*Ty=*/nullptr, var, indices);
+      var->getType()->getPointerElementType(), var, indices);
 }
 
 llvm::Constant *
