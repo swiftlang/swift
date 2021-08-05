@@ -18,7 +18,7 @@ extern "C" {
 SWIFT_REMOTE_MIRROR_LINKAGE
 unsigned long long swift_reflection_classIsSwiftMask = 2;
 
-SWIFT_REMOTE_MIRROR_LINKAGE uint32_t swift_reflection_libraryVersion = 0;
+SWIFT_REMOTE_MIRROR_LINKAGE uint32_t swift_reflection_libraryVersion = 1;
 }
 
 #include "swift/Demangling/Demangler.h"
