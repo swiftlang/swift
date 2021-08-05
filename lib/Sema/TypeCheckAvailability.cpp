@@ -113,6 +113,8 @@ static void forEachOuterDecl(DeclContext *DC, Fn fn) {
     case DeclContextKind::Initializer:
       if (auto *PBI = dyn_cast<PatternBindingInitializer>(DC))
         fn(PBI->getBinding());
+      else if (auto *I = dyn_cast<PropertyWrapperInitializer>(DC))
+        fn(I->getWrappedVar());
       break;
 
     case DeclContextKind::SubscriptDecl:

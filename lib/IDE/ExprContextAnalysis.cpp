@@ -1296,8 +1296,8 @@ class ExprContextAnalyzer {
       auto AFD = dyn_cast<AbstractFunctionDecl>(initDC->getParent());
       if (!AFD)
         return;
-      auto *param = initDC->getParam();
-      recordPossibleType(AFD->mapTypeIntoContext(param->getInterfaceType()));
+      auto *var = initDC->getWrappedVar();
+      recordPossibleType(AFD->mapTypeIntoContext(var->getInterfaceType()));
       break;
     }
     }
