@@ -56,7 +56,7 @@ lookupAssignIdentityFunc(ASTContext& C) {
 /// // }
 /// \endverbatim
 static void
-emitDistributedActorTransportInit(SILGenFunction &SGF, ManagedValue selfArg, VarDecl *selfDecl, ConstructorDecl *ctor,
+emitDistributedActorTransportInit(SILGenFunction &SGF, ManagedValue borrowedSelfArg, VarDecl *selfDecl, ConstructorDecl *ctor,
                                   Pattern *pattern, VarDecl *var) {
   auto &C = selfDecl->getASTContext();
   auto &B = SGF.B;
@@ -75,26 +75,17 @@ emitDistributedActorTransportInit(SILGenFunction &SGF, ManagedValue selfArg, Var
   ManagedValue transportArgManaged = ManagedValue::forUnmanaged(transportArgValue);
   auto transportDecl = C.getActorTransportDecl();
 
-  auto borrowedSelfArg = selfArg.borrow(SGF, loc);
-
   // ----
   auto *selfTyDecl = ctor->getParent()->getSelfNominalTypeDecl();
   auto transportFieldAddr = B.createRefElementAddr(
       loc, borrowedSelfArg.getValue(), var,
       SGF.getLoweredType(var->getInterfaceType()));
 
-  fprintf(stderr, "[%s:%d] (%s) ----------------------------------------------------------------------------\n", __FILE__, __LINE__, __FUNCTION__);
-  SGF.F.dump();
-
+  // ==== Store the transport
   B.createCopyAddr(loc,
                    /*src*/transportArgValue,
                    /*dest*/transportFieldAddr,
-                   IsTake, IsNotInitialization);
-
-  B.createEndBorrow(loc, borrowedSelfArg.getValue());
-
-  fprintf(stderr, "[%s:%d] (%s) ----------------------------------------------------------------------------\n", __FILE__, __LINE__, __FUNCTION__);
-  SGF.F.dump();
+                   IsNotTake, IsInitialization);
 }
 
 /// Synthesize the distributed actor's identity (`id`) initialization:
@@ -105,7 +96,8 @@ emitDistributedActorTransportInit(SILGenFunction &SGF, ManagedValue selfArg, Var
 /// // }
 /// \endverbatim
 static void
-emitDistributedActorIdentityInit(SILGenFunction &SGF, ManagedValue selfArg,
+emitDistributedActorIdentityInit(SILGenFunction &SGF,
+                                 ManagedValue borrowedSelfArg,
                                  VarDecl *selfVarDecl, ConstructorDecl *ctor,
                                  Pattern *pattern, VarDecl *var) {
   auto &C = selfVarDecl->getASTContext();
@@ -119,11 +111,6 @@ emitDistributedActorIdentityInit(SILGenFunction &SGF, ManagedValue selfArg,
 
   fprintf(stderr, "[%s:%d] (%s) ----------------------------------------------------------------------------\n", __FILE__, __LINE__, __FUNCTION__);
   SGF.F.dump();
-
-  // === prepare ActorTransport type
-  // auto transportTy = C.getActorTransportDecl()->getInterfaceType();
-//  auto transportTy = F.getArgumentType(0);
-//  assert(transportSILTy);
 
   // === prepare the transport.assignIdentity(_:) function
 
@@ -175,10 +162,10 @@ emitDistributedActorIdentityInit(SILGenFunction &SGF, ManagedValue selfArg,
   auto transportConfRef = ProtocolConformanceRef(transportProto);
   assert(!transportConfRef.isInvalid() && "Missing conformance to `ActorTransport`");
 
-  fprintf(stderr, "[%s:%d] (%s) selfArg->getType()\n", __FILE__, __LINE__, __FUNCTION__);
-  selfArg.getType().dump();
-  fprintf(stderr, "[%s:%d] (%s) distributedActorProto\n", __FILE__, __LINE__, __FUNCTION__);
-  distributedActorProto->dump();
+//  fprintf(stderr, "[%s:%d] (%s) selfArg->getType()\n", __FILE__, __LINE__, __FUNCTION__);
+//  selfArg.getType().dump();
+//  fprintf(stderr, "[%s:%d] (%s) distributedActorProto\n", __FILE__, __LINE__, __FUNCTION__);
+//  distributedActorProto->dump();
 
   auto selfTy = F.mapTypeIntoContext(selfTyDecl->getDeclaredInterfaceType()); // TODO: thats just self var devl getType
 
@@ -192,7 +179,7 @@ emitDistributedActorIdentityInit(SILGenFunction &SGF, ManagedValue selfArg,
 
   auto assignIdentityMethod =
       cast<FuncDecl>(transportProto->getSingleRequirement(C.Id_assignIdentity));
-  auto assignIdentityRef = SILDeclRef(assignIdentityMethod);
+  auto assignIdentityRef = SILDeclRef(assignIdentityMethod, SILDeclRef::Kind::Func);
   auto assignIdentitySILTy =
       SGF.getConstantInfo(SGF.getTypeExpansionContext(), assignIdentityRef)
           .getSILType();
@@ -214,22 +201,15 @@ emitDistributedActorIdentityInit(SILGenFunction &SGF, ManagedValue selfArg,
                            {openedTransportType, selfTy},
                            {transportConfRef, distributedActorConfRef});
 
-  fprintf(stderr, "[%s:%d] (%s) ----------------------------------------------------------------------------\n", __FILE__, __LINE__, __FUNCTION__);
-  SGF.F.dump();
+  // --- create a temporary storage for the result of the call
+  // it will be deallocated automatically as we exit this scope
+  auto resultTy = SGF.getLoweredType(var->getInterfaceType());
+  auto temp = SGF.emitTemporaryAllocation(loc, resultTy);
 
-  // --- call transport.assignIdentity(Self.self)
-  fprintf(stderr, "[%s:%d] (%s) APPLY\n", __FILE__, __LINE__, __FUNCTION__);
-  fprintf(stderr, "[%s:%d] (%s) assignWitnessMethod->dump();\n", __FILE__, __LINE__, __FUNCTION__);
-  assignWitnessMethod->dump();
-  fprintf(stderr, "[%s:%d] (%s) subs->dump();\n", __FILE__, __LINE__, __FUNCTION__);
-  subs.dump();
-  fprintf(stderr, "[%s:%d] (%s) selfMetatypeValue->dump();\n", __FILE__, __LINE__, __FUNCTION__);
-  selfMetatypeValue->dump();
-  fprintf(stderr, "[%s:%d] (%s) transportArchetypeValue->dump();\n", __FILE__, __LINE__, __FUNCTION__);
-  transportArchetypeValue->dump();
-
-  auto identity = B.createApply(
-      loc, assignWitnessMethod, subs, {selfMetatypeValue, transportArchetypeValue});
+  // ---- actually call transport.assignIdentity(Self.self)
+  B.createApply(
+      loc, assignWitnessMethod, subs,
+      { temp, selfMetatypeValue, transportArchetypeValue});
 
   fprintf(stderr, "[%s:%d] (%s) ----------------------------------------------------------------------------\n", __FILE__, __LINE__, __FUNCTION__);
   SGF.F.dump();
@@ -237,23 +217,17 @@ emitDistributedActorIdentityInit(SILGenFunction &SGF, ManagedValue selfArg,
   // ==== Assign the identity to stored property
 
   // --- Prepare address of self.id
-  auto borrowedSelfArg = selfArg.borrow(SGF, loc);
-
   auto idFieldAddr = B.createRefElementAddr(
       loc, borrowedSelfArg.getValue(), var,
       SGF.getLoweredType(var->getInterfaceType()));
 
   // --- assign to the property
-  B.createAssign(loc, /*src*/identity, /*dest*/idFieldAddr,
-                 AssignOwnershipQualifier::Unknown);
-
-  B.createEndBorrow(loc, borrowedSelfArg.getValue());
+  B.createCopyAddr(loc, /*src*/temp, /*dest*/idFieldAddr,
+                   IsTake, IsInitialization);
 
   fprintf(stderr, "[%s:%d] (%s) DONE(ID) ----------------------------------------------------------------------------\n", __FILE__, __LINE__, __FUNCTION__);
   SGF.F.dump();
-
 }
-
 
 void SILGenFunction::initializeDistributedActorImplicitStorageInit(
     ConstructorDecl *ctor, ManagedValue selfArg) {
@@ -265,15 +239,17 @@ void SILGenFunction::initializeDistributedActorImplicitStorageInit(
   SILLocation prologueLoc = RegularLocation(ctor);
   prologueLoc.markAsPrologue(); // TODO: no idea if this is necessary or makes sense
 
-  auto transportTy = C.getActorTransportType(); // getProtocol(KnownProtocolKind::ActorTransport);
-  auto identityProtoTy = C.getActorIdentityType(); //getProtocol(KnownProtocolKind::ActorIdentity);
+  auto transportTy = C.getActorTransportType();
+  auto identityProtoTy = C.getActorIdentityType();
   auto anyIdentityTy = C.getAnyActorIdentityType();
 
   // ==== Find the stored properties we will initialize
   VarDecl *transportMember = nullptr;
   VarDecl *idMember = nullptr;
 
-  // TODO: maybe getStoredProperties ?
+  auto borrowedSelfArg = selfArg.borrow(*this, prologueLoc);
+
+  // TODO(distributed): getStoredProperties might be better here, avoid the `break;`
   for (auto member : classDecl->getMembers()) {
     PatternBindingDecl *pbd = dyn_cast<PatternBindingDecl>(member);
     if (!pbd) continue;
@@ -289,29 +265,30 @@ void SILGenFunction::initializeDistributedActorImplicitStorageInit(
     if (var->getName() == C.Id_actorTransport &&
         var->getInterfaceType()->isEqual(transportTy)) {
       transportMember = var;
-      fprintf(stderr, "[%s:%d] (%s) FOUND TRANSPORT MEMBER\n", __FILE__, __LINE__, __FUNCTION__);
-      emitDistributedActorTransportInit(*this, selfArg, selfVarDecl, ctor, pattern, var);
-      fprintf(stderr, "[%s:%d] (%s) DONE TRANSPORT MEMBER\n", __FILE__, __LINE__, __FUNCTION__);
-    }
-    else if (var->getName() == C.Id_id &&
+      emitDistributedActorTransportInit(*this, borrowedSelfArg, selfVarDecl, ctor, pattern, var);
+    } else if (var->getName() == C.Id_id &&
                (var->getInterfaceType()->isEqual(identityProtoTy) ||
                 var->getInterfaceType()->isEqual(anyIdentityTy))) { // TODO(distributed): stick one way to store, but today we can't yet store the existential
       idMember = var;
-      fprintf(stderr, "[%s:%d] (%s) FOUND ID MEMBER\n", __FILE__, __LINE__, __FUNCTION__);
-      emitDistributedActorIdentityInit(*this, selfArg, selfVarDecl, ctor, pattern, var);
+      emitDistributedActorIdentityInit(*this, borrowedSelfArg, selfVarDecl, ctor, pattern, var);
     }
     if (transportMember && idMember) {
-      fprintf(stderr, "[%s:%d] (%s) BREAK ------------------------\n", __FILE__, __LINE__, __FUNCTION__);
       break; // we found all properties we care about, break out of the loop early
     }
   }
 
-//  assert(transportMember && "Missing DistributedActor.actorTransport member");
-//  assert(idMember && "Missing DistributedActor.id member");
+  assert(transportMember && "Missing DistributedActor.actorTransport member");
+  assert(idMember && "Missing DistributedActor.id member");
 
   fprintf(stderr, "[%s:%d] (%s) --- DONE DONE DONE DONE DONE DONE -----------------------------------------------------------\n", __FILE__, __LINE__, __FUNCTION__);
   fprintf(stderr, "[%s:%d] (%s) ----------------------------------------------------------------------------\n", __FILE__, __LINE__, __FUNCTION__);
   F.dump();
+}
+
+
+void SILGenFunction::emitDistributedActorReady(
+    ConstructorDecl *ctor, ManagedValue selfArg) {
+  // TODO(distributed): implement actorReady call
 }
 
 /******************************************************************************/

@@ -1743,9 +1743,6 @@ static void checkClassConstructorBody(ClassDecl *classDecl,
     ctx.Diags.diagnose(initKindAndExpr.initExpr->getLoc(), diag::delegation_here);
   }
 
-  if (classDecl->isActor())
-    checkActorConstructorBody(classDecl, ctor, body);
-
   // An inlinable constructor in a class must always be delegating,
   // unless the class is '@_fixed_layout'.
   // Note: This is specifically not using isFormallyResilient. We relax this
@@ -2056,7 +2053,6 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
   // Class constructor checking.
   if (auto *ctor = dyn_cast<ConstructorDecl>(AFD)) {
     if (auto classDecl = ctor->getDeclContext()->getSelfClassDecl()) {
-      checkActorConstructor(classDecl, ctor);
       checkClassConstructorBody(classDecl, ctor, body);
     }
   }
