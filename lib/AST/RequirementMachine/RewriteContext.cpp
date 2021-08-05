@@ -23,7 +23,9 @@ RewriteContext::RewriteContext(ASTContext &ctx)
     : Context(ctx),
       Stats(ctx.Stats),
       SymbolHistogram(Symbol::NumKinds),
-      TermHistogram(4, /*Start=*/1) {
+      TermHistogram(4, /*Start=*/1),
+      RuleTrieHistogram(16, /*Start=*/1),
+      RuleTrieRootHistogram(16)  {
 }
 
 Term RewriteContext::getTermForType(CanType paramType,
@@ -289,5 +291,9 @@ RewriteContext::~RewriteContext() {
     SymbolHistogram.dump(llvm::dbgs(), Symbol::Kinds);
     llvm::dbgs() << "\n* Term length:\n";
     TermHistogram.dump(llvm::dbgs());
+    llvm::dbgs() << "\n* Rule trie fanout:\n";
+    RuleTrieHistogram.dump(llvm::dbgs());
+    llvm::dbgs() << "\n* Rule trie root fanout:\n";
+    RuleTrieRootHistogram.dump(llvm::dbgs());
   }
 }

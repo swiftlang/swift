@@ -191,11 +191,9 @@ public:
     return Symbols[index];
   }
 
-  decltype(Symbols)::const_iterator findSubTerm(Term other) const;
-
-  decltype(Symbols)::iterator findSubTerm(Term other);
-
-  bool rewriteSubTerm(Term lhs, Term rhs);
+  void rewriteSubTerm(decltype(Symbols)::iterator from,
+                      decltype(Symbols)::iterator to,
+                      Term rhs);
 
   void dump(llvm::raw_ostream &out) const;
 

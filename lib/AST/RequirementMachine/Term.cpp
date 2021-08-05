@@ -147,46 +147,21 @@ int MutableTerm::compare(const MutableTerm &other,
   return 0;
 }
 
-/// Find the start of \p other in this term, returning end() if
-/// \p other does not occur as a subterm of this term.
-decltype(MutableTerm::Symbols)::const_iterator
-MutableTerm::findSubTerm(Term other) const {
-  if (other.size() > size())
-    return end();
-
-  return std::search(begin(), end(), other.begin(), other.end());
-}
-
-/// Non-const variant of the above.
-decltype(MutableTerm::Symbols)::iterator
-MutableTerm::findSubTerm(Term other) {
-  if (other.size() > size())
-    return end();
-
-  return std::search(begin(), end(), other.begin(), other.end());
-}
-
-/// Replace the first occurrence of \p lhs in this term with
-/// \p rhs. Note that \p rhs must precede \p lhs in the linear
-/// order on terms. Returns true if the term contained \p lhs;
-/// otherwise returns false, in which case the term remains
-/// unchanged.
-bool MutableTerm::rewriteSubTerm(Term lhs, Term rhs) {
-  // Find the start of lhs in this term.
-  auto found = findSubTerm(lhs);
-
-  // This term cannot be reduced using this rule.
-  if (found == end())
-    return false;
-
+/// Replace the subterm in the range [from,to) with \p rhs.
+///
+/// Note that \p rhs must precede [from,to) in the linear
+/// order on terms.
+void MutableTerm::rewriteSubTerm(
+    decltype(MutableTerm::Symbols)::iterator from,
+    decltype(MutableTerm::Symbols)::iterator to,
+    Term rhs) {
   auto oldSize = size();
-
-  assert(rhs.size() <= lhs.size());
+  unsigned lhsLength = (unsigned)(to - from);
+  assert(rhs.size() <= lhsLength);
 
   // Overwrite the occurrence of the left hand side with the
   // right hand side.
-  auto newIter = std::copy(rhs.begin(), rhs.end(), found);
-  auto oldIter = found + lhs.size();
+  auto newIter = std::copy(rhs.begin(), rhs.end(), from);
 
   // If the right hand side is shorter than the left hand side,
   // then newIter will point to a location before oldIter, eg
@@ -199,16 +174,15 @@ bool MutableTerm::rewriteSubTerm(Term lhs, Term rhs) {
   //
   // Shift everything over to close the gap (by one location,
   // in this case).
-  if (newIter != oldIter) {
-    auto newEnd = std::copy(oldIter, end(), newIter);
+  if (newIter != to) {
+    auto newEnd = std::copy(to, end(), newIter);
 
     // Now, we've moved the gap to the end of the term; close
     // it by shortening the term.
     Symbols.erase(newEnd, end());
   }
 
-  assert(size() == oldSize - lhs.size() + rhs.size());
-  return true;
+  assert(size() == oldSize - lhsLength + rhs.size());
 }
 
 void MutableTerm::dump(llvm::raw_ostream &out) const {

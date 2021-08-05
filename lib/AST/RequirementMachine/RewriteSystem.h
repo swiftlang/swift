@@ -18,6 +18,7 @@
 #include "ProtocolGraph.h"
 #include "Symbol.h"
 #include "Term.h"
+#include "Trie.h"
 
 namespace llvm {
   class raw_ostream;
@@ -46,10 +47,6 @@ public:
 
   const Term &getLHS() const { return LHS; }
   const Term &getRHS() const { return RHS; }
-
-  bool apply(MutableTerm &term) const {
-    return term.rewriteSubTerm(LHS, RHS);
-  }
 
   OverlapKind checkForOverlap(const Rule &other,
                               MutableTerm &t,
@@ -101,6 +98,9 @@ class RewriteSystem final {
   /// as rules introduced by the completion procedure.
   std::vector<Rule> Rules;
 
+  /// A prefix trie of rule left hand sides to optimize lookup.
+  Trie RuleTrie;
+
   /// The graph of all protocols transitively referenced via our set of
   /// rewrite rules, used for the linear order on symbols.
   ProtocolGraph Protos;
@@ -129,6 +129,7 @@ class RewriteSystem final {
 
 public:
   explicit RewriteSystem(RewriteContext &ctx);
+  ~RewriteSystem();
 
   RewriteSystem(const RewriteSystem &) = delete;
   RewriteSystem(RewriteSystem &&) = delete;

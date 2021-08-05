@@ -58,6 +58,8 @@ public:
   /// Histograms.
   Histogram SymbolHistogram;
   Histogram TermHistogram;
+  Histogram RuleTrieHistogram;
+  Histogram RuleTrieRootHistogram;
 
   explicit RewriteContext(ASTContext &ctx);
 

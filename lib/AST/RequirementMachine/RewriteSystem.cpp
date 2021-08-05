@@ -31,6 +31,11 @@ RewriteSystem::RewriteSystem(RewriteContext &ctx)
   DebugCompletion = false;
 }
 
+RewriteSystem::~RewriteSystem() {
+  RuleTrie.updateHistograms(Context.RuleTrieHistogram,
+                            Context.RuleTrieRootHistogram);
+}
+
 void Rule::dump(llvm::raw_ostream &out) const {
   out << LHS << " => " << RHS;
   if (deleted)
@@ -94,6 +99,19 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs) {
 
   unsigned i = Rules.size();
   Rules.emplace_back(Term::get(lhs, Context), Term::get(rhs, Context));
+  auto oldRuleID = RuleTrie.insert(lhs.begin(), lhs.end(), i);
+  if (oldRuleID) {
+    llvm::errs() << "Duplicate rewrite rule!\n";
+    const auto &oldRule = Rules[*oldRuleID];
+    llvm::errs() << "Old rule #" << *oldRuleID << ": ";
+    oldRule.dump(llvm::errs());
+    llvm::errs() << "\nTrying to replay what happened when I simplified this term:\n";
+    DebugSimplify = true;
+    MutableTerm term = lhs;
+    simplify(lhs);
+
+    abort();
+  }
 
   // Check if we have a rule of the form
   //
@@ -145,22 +163,34 @@ bool RewriteSystem::simplify(MutableTerm &term) const {
 
   while (true) {
     bool tryAgain = false;
-    for (const auto &rule : Rules) {
-      if (rule.isDeleted())
-        continue;
 
-      if (DebugSimplify) {
-        llvm::dbgs() << "== Rule " << rule << "\n";
-      }
+    auto from = term.begin();
+    auto end = term.end();
+    while (from < end) {
+      auto ruleID = RuleTrie.find(from, end);
+      if (ruleID) {
+        const auto &rule = Rules[*ruleID];
+        if (!rule.isDeleted()) {
+          if (DebugSimplify) {
+            llvm::dbgs() << "== Rule #" << *ruleID << ": " << rule << "\n";
+          }
 
-      if (rule.apply(term)) {
-        if (DebugSimplify) {
-          llvm::dbgs() << "=== Result " << term << "\n";
+          auto to = from + rule.getLHS().size();
+          assert(std::equal(from, to, rule.getLHS().begin()));
+
+          term.rewriteSubTerm(from, to, rule.getRHS());
+
+          if (DebugSimplify) {
+            llvm::dbgs() << "=== Result " << term << "\n";
+          }
+
+          changed = true;
+          tryAgain = true;
+          break;
         }
-
-        changed = true;
-        tryAgain = true;
       }
+
+      ++from;
     }
 
     if (!tryAgain)
