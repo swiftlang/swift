@@ -844,9 +844,8 @@ Type ConstraintSystem::openType(Type type, OpenedTypeMap &replacements) {
     });
 }
 
-Type ConstraintSystem::openOpaqueType(Type type,
+Type ConstraintSystem::openOpaqueType(OpaqueTypeArchetypeType *opaque,
                                       ConstraintLocatorBuilder locator) {
-  auto opaque = type->castTo<OpaqueTypeArchetypeType>();
   auto opaqueLocator = locator.withPathElement(
       LocatorPathElt::OpenedOpaqueArchetype(opaque->getDecl()));
 
@@ -868,16 +867,16 @@ Type ConstraintSystem::openOpaqueType(Type type,
   return underlyingTyVar;
 }
 
-Type ConstraintSystem::openOpaqueTypeRec(Type type,
-                                         ConstraintLocatorBuilder locator) {
+Type ConstraintSystem::openOpaqueType(Type type,
+                                      ConstraintLocatorBuilder locator) {
   // Early return if `type` is `NULL` or if there are no opaque archetypes (in
   // which case there is certainly nothing for us to do).
   if (!type || !type->hasOpaqueArchetype())
     return type;
 
   return type.transform([&](Type type) -> Type {
-    if (type->is<OpaqueTypeArchetypeType>())
-      return openOpaqueType(type, locator);
+    if (auto *opaqueType = type->getAs<OpaqueTypeArchetypeType>())
+      return openOpaqueType(opaqueType, locator);
     return type;
   });
 }

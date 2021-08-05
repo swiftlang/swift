@@ -1709,7 +1709,7 @@ namespace {
 
       auto joinElementTypes = [&](Optional<Type> elementType) {
         auto openedElementType = elementType.map(
-            [&](Type type) { return CS.openOpaqueTypeRec(type, locator); });
+            [&](Type type) { return CS.openOpaqueType(type, locator); });
 
         const auto elements = expr->getElements();
         unsigned index = 0;
@@ -1829,7 +1829,7 @@ namespace {
 
       auto locator = CS.getConstraintLocator(expr);
       auto contextualType = CS.getContextualType(expr);
-      auto openedType = CS.openOpaqueTypeRec(contextualType, locator);
+      auto openedType = CS.openOpaqueType(contextualType, locator);
 
       // If a contextual type exists for this expression and is a dictionary
       // type, apply it directly.
@@ -2241,7 +2241,7 @@ namespace {
         type = type->getReferenceStorageReferent();
 
         Type replacedType = CS.replaceInferableTypesWithTypeVars(type, locator);
-        Type openedType = CS.openOpaqueTypeRec(replacedType, locator);
+        Type openedType = CS.openOpaqueType(replacedType, locator);
         assert(openedType);
 
         auto *subPattern = cast<TypedPattern>(pattern)->getSubPattern();
