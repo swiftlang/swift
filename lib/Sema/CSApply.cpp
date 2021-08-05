@@ -6021,16 +6021,44 @@ Expr *ExprRewriter::coerceCallArguments(
     };
 
     if (paramInfo.hasExternalPropertyWrapper(paramIdx)) {
-      auto *param = getParameterAt(callee.getDecl(), paramIdx);
+      auto *paramDecl = getParameterAt(callee.getDecl(), paramIdx);
       auto appliedWrapper = appliedPropertyWrappers[appliedWrapperIndex++];
       auto wrapperType = solution.simplifyType(appliedWrapper.wrapperType);
       auto initKind = appliedWrapper.initKind;
 
-      using ValueKind = AppliedPropertyWrapperExpr::ValueKind;
-      ValueKind valueKind = (initKind == PropertyWrapperInitKind::ProjectedValue ?
-                             ValueKind::ProjectedValue : ValueKind::WrappedValue);
+      AppliedPropertyWrapperExpr::ValueKind valueKind;
+      PropertyWrapperValuePlaceholderExpr *generatorArg;
+      auto initInfo = paramDecl->getPropertyWrapperInitializerInfo();
+      if (initKind == PropertyWrapperInitKind::ProjectedValue) {
+        valueKind = AppliedPropertyWrapperExpr::ValueKind::ProjectedValue;
+        generatorArg = initInfo.getProjectedValuePlaceholder();
+      } else {
+        valueKind = AppliedPropertyWrapperExpr::ValueKind::WrappedValue;
+        generatorArg = initInfo.getWrappedValuePlaceholder();
+      }
 
-      arg = AppliedPropertyWrapperExpr::create(ctx, callee, param, arg->getStartLoc(),
+      // Coerce the property wrapper argument type to the input type of
+      // the property wrapper generator function. The wrapper generator
+      // has the same generic signature as the enclosing function, so we
+      // can use substitutions from the callee.
+      Type generatorInputType =
+          generatorArg->getType().subst(callee.getSubstitutions());
+      auto argLoc = getArgLocator(argIdx, paramIdx, param.getParameterFlags());
+
+      if (generatorArg->isAutoClosure()) {
+        auto *closureType = generatorInputType->castTo<FunctionType>();
+        arg = coerceToType(
+            arg, closureType->getResult(),
+            argLoc.withPathElement(ConstraintLocator::AutoclosureResult));
+        arg = cs.buildAutoClosureExpr(arg, closureType, dc);
+      }
+
+      arg = coerceToType(arg, generatorInputType, argLoc);
+
+      // Wrap the argument in an applied property wrapper expr, which will
+      // later turn into a call to the property wrapper generator function.
+      arg = AppliedPropertyWrapperExpr::create(ctx, callee, paramDecl,
+                                               arg->getStartLoc(),
                                                wrapperType, arg, valueKind);
       cs.cacheExprTypes(arg);
     }
