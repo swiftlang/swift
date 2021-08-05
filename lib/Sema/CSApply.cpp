@@ -8420,13 +8420,18 @@ static Optional<SolutionApplicationTarget> applySolutionToInitialization(
   // been subsumed by the backing property.
   if (wrappedVar) {
     ASTContext &ctx = cs.getASTContext();
-    wrappedVar->getParentPatternBinding()->setInitializerSubsumed(0);
     ctx.setSideCachedPropertyWrapperBackingPropertyType(
         wrappedVar, initType->mapTypeOutOfContext());
 
     // Record the semantic initializer on the outermost property wrapper.
     wrappedVar->getAttachedPropertyWrappers().front()
         ->setSemanticInit(initializer);
+
+    // If this is a wrapped parameter, we're done.
+    if (isa<ParamDecl>(wrappedVar))
+      return resultTarget;
+
+    wrappedVar->getParentPatternBinding()->setInitializerSubsumed(0);
   }
 
   // Coerce the pattern to the type of the initializer.
