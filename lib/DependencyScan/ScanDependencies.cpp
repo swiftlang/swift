@@ -734,6 +734,8 @@ static std::string createEncodedModuleKindAndName(ModuleDependencyID id) {
     return "swiftPlaceholder:" + id.first;
   case ModuleDependenciesKind::Clang:
     return "clang:" + id.first;
+  default:
+    llvm_unreachable("Unhandled dependency kind.");
   }
 }
 
@@ -871,6 +873,8 @@ generateFullDependencyGraph(CompilerInstance &instance,
       case ModuleDependenciesKind::Clang:
         dependencyKindAndName = "clang";
         break;
+      default:
+        llvm_unreachable("Unhandled dependency kind.");
       }
       dependencyKindAndName += ":";
       dependencyKindAndName += dep.first;
@@ -944,10 +948,6 @@ static bool diagnoseCycle(CompilerInstance &instance,
   return false;
 }
 
-using CompilerArgInstanceCacheMap =
-    llvm::StringMap<std::pair<std::unique_ptr<CompilerInstance>,
-                              std::unique_ptr<ModuleDependenciesCache>>>;
-
 static void updateCachedInstanceOpts(CompilerInstance &cachedInstance,
                                      const CompilerInstance &invocationInstance,
                                      llvm::StringRef entryArguments) {
@@ -1006,8 +1006,8 @@ forEachBatchEntry(CompilerInstance &invocationInstance,
     } else if (subInstanceMap->count(entry.arguments)) {
       // Use the previously created instance if we've seen the arguments
       // before.
-      pInstance = (*subInstanceMap)[entry.arguments].first.get();
-      pCache = (*subInstanceMap)[entry.arguments].second.get();
+      pInstance = std::get<0>((*subInstanceMap)[entry.arguments]).get();
+      pCache = std::get<2>((*subInstanceMap)[entry.arguments]).get();
       // We must update the search paths of this instance to instead reflect
       // those of the current scanner invocation.
       updateCachedInstanceOpts(*pInstance, invocationInstance, entry.arguments);
@@ -1018,13 +1018,15 @@ forEachBatchEntry(CompilerInstance &invocationInstance,
       llvm::cl::ResetAllOptionOccurrences();
 
       // Create a new instance by the arguments and save it in the map.
+      auto newGlobalCache = std::make_unique<GlobalModuleDependenciesCache>();
       subInstanceMap->insert(
           {entry.arguments,
-           std::make_pair(std::make_unique<CompilerInstance>(),
-                          std::make_unique<ModuleDependenciesCache>())});
+           std::make_tuple(std::make_unique<CompilerInstance>(),
+                           std::move(newGlobalCache),
+                           std::make_unique<ModuleDependenciesCache>(*newGlobalCache))});
 
-      pInstance = (*subInstanceMap)[entry.arguments].first.get();
-      pCache = (*subInstanceMap)[entry.arguments].second.get();
+      pInstance = std::get<0>((*subInstanceMap)[entry.arguments]).get();
+      pCache = std::get<2>((*subInstanceMap)[entry.arguments]).get();
       SmallVector<const char *, 4> args;
       llvm::cl::TokenizeGNUCommandLine(entry.arguments, saver, args);
       CompilerInvocation subInvok = invok;
@@ -1129,7 +1131,7 @@ identifyMainModuleDependencies(CompilerInstance &instance) {
 } // namespace
 
 static void serializeDependencyCache(CompilerInstance &instance,
-                                     const ModuleDependenciesCache &cache) {
+                                     const GlobalModuleDependenciesCache &cache) {
   const FrontendOptions &opts = instance.getInvocation().getFrontendOptions();
   ASTContext &Context = instance.getASTContext();
   auto savePath = opts.SerializedDependencyScannerCachePath;
@@ -1141,7 +1143,7 @@ static void serializeDependencyCache(CompilerInstance &instance,
 }
 
 static void deserializeDependencyCache(CompilerInstance &instance,
-                                       ModuleDependenciesCache &cache) {
+                                       GlobalModuleDependenciesCache &cache) {
   const FrontendOptions &opts = instance.getInvocation().getFrontendOptions();
   ASTContext &Context = instance.getASTContext();
   auto loadPath = opts.SerializedDependencyScannerCachePath;
@@ -1169,10 +1171,11 @@ bool swift::dependencies::scanDependencies(CompilerInstance &instance) {
 
   // `-scan-dependencies` invocations use a single new instance
   // of a module cache
-  ModuleDependenciesCache cache;
-
+  GlobalModuleDependenciesCache globalCache;
   if (opts.ReuseDependencyScannerCache)
-    deserializeDependencyCache(instance, cache);
+    deserializeDependencyCache(instance, globalCache);
+
+  ModuleDependenciesCache cache(globalCache);
 
   // Execute scan
   auto dependenciesOrErr = performModuleScan(instance, cache);
@@ -1180,7 +1183,7 @@ bool swift::dependencies::scanDependencies(CompilerInstance &instance) {
   // Serialize the dependency cache if -serialize-dependency-scan-cache
   // is specified
   if (opts.SerializeDependencyScannerCache)
-    serializeDependencyCache(instance, cache);
+    serializeDependencyCache(instance, globalCache);
   
   if (dependenciesOrErr.getError())
     return true;
@@ -1204,7 +1207,8 @@ bool swift::dependencies::prescanDependencies(CompilerInstance &instance) {
   llvm::raw_fd_ostream out(path, EC, llvm::sys::fs::F_None);
   // `-scan-dependencies` invocations use a single new instance
   // of a module cache
-  ModuleDependenciesCache cache;
+  GlobalModuleDependenciesCache singleUseGlobalCache;
+  ModuleDependenciesCache cache(singleUseGlobalCache);
   if (out.has_error() || EC) {
     Context.Diags.diagnose(SourceLoc(), diag::error_opening_output, path,
                            EC.message());
@@ -1232,7 +1236,8 @@ bool swift::dependencies::batchScanDependencies(
     CompilerInstance &instance, llvm::StringRef batchInputFile) {
   // The primary cache used for scans carried out with the compiler instance
   // we have created
-  ModuleDependenciesCache cache;
+  GlobalModuleDependenciesCache singleUseGlobalCache;
+  ModuleDependenciesCache cache(singleUseGlobalCache);
   (void)instance.getMainModule();
   llvm::BumpPtrAllocator alloc;
   llvm::StringSaver saver(alloc);
@@ -1264,7 +1269,8 @@ bool swift::dependencies::batchPrescanDependencies(
     CompilerInstance &instance, llvm::StringRef batchInputFile) {
   // The primary cache used for scans carried out with the compiler instance
   // we have created
-  ModuleDependenciesCache cache;
+  GlobalModuleDependenciesCache singleUseGlobalCache;
+  ModuleDependenciesCache cache(singleUseGlobalCache);
   (void)instance.getMainModule();
   llvm::BumpPtrAllocator alloc;
   llvm::StringSaver saver(alloc);
@@ -1356,34 +1362,13 @@ swift::dependencies::performModuleScan(CompilerInstance &instance,
                     ASTDelegate))
     return std::make_error_code(std::errc::not_supported);
 
-  // Test dependency cache serialization/deserialization if
-  // `-test-dependency-scan-cache-serialization` is specified.
-  auto *resultCache = &cache;
-  ModuleDependenciesCache loadedCache;
-  if (FEOpts.TestDependencyScannerCacheSerialization) {
-    llvm::SmallString<128> buffer;
-    auto EC = llvm::sys::fs::createTemporaryFile("depscan_cache", "moddepcache",
-                                                 buffer);
-    if (EC) {
-      instance.getDiags().diagnose(
-          SourceLoc(), diag::error_unable_to_make_temporary_file, EC.message());
-    } else {
-      std::string path = buffer.str().str();
-      module_dependency_cache_serialization::writeInterModuleDependenciesCache(
-          instance.getDiags(), path, cache);
-      module_dependency_cache_serialization::readInterModuleDependenciesCache(
-          path, loadedCache);
-      resultCache = &loadedCache;
-    }
-  }
-
   auto dependencyGraph = generateFullDependencyGraph(
-      instance, *resultCache, ASTDelegate,
+      instance, cache, ASTDelegate,
       allModules.getArrayRef(), currentImportPathSet);
   // Update the dependency tracker.
   if (auto depTracker = instance.getDependencyTracker()) {
     for (auto module : allModules) {
-      auto deps = resultCache->findDependencies(module.first,
+      auto deps = cache.findDependencies(module.first,
                                                 {module.second, currentImportPathSet});
       if (!deps)
         continue;
