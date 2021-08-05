@@ -105,9 +105,10 @@ emitDistributedActorTransportInit(SILGenFunction &SGF, ManagedValue selfArg, Var
 /// // }
 /// \endverbatim
 static void
-emitDistributedActorIdentityInit(SILGenFunction &SGF, ManagedValue selfArg, VarDecl *selfDecl, ConstructorDecl *ctor,
+emitDistributedActorIdentityInit(SILGenFunction &SGF, ManagedValue selfArg,
+                                 VarDecl *selfVarDecl, ConstructorDecl *ctor,
                                  Pattern *pattern, VarDecl *var) {
-  auto &C = selfDecl->getASTContext();
+  auto &C = selfVarDecl->getASTContext();
   auto &B = SGF.B;
   auto &F = SGF.F;
   auto &SGM = SGF.SGM;
@@ -133,7 +134,7 @@ emitDistributedActorIdentityInit(SILGenFunction &SGF, ManagedValue selfArg, VarD
 
   // === Open the transport existential before call
   SILValue transportArgValue = F.getArgument(0);
-  SILValue selfArgValue = F.getArgument(0);
+  SILValue selfArgValue = F.getArgument(1);
   ProtocolDecl *distributedActorProto = C.getProtocol(KnownProtocolKind::DistributedActor);
   ProtocolDecl *transportProto = C.getProtocol(KnownProtocolKind::ActorTransport);
   assert(distributedActorProto);
@@ -145,7 +146,7 @@ emitDistributedActorIdentityInit(SILGenFunction &SGF, ManagedValue selfArg, VarD
   auto openedTransportType =
       transportASTType->openAnyExistentialType(Opened)->getCanonicalType();
   auto openedTransportSILType = F.getLoweredType(openedTransportType);
-  auto archetypeValue = B.createOpenExistentialAddr(
+  auto transportArchetypeValue = B.createOpenExistentialAddr(
       loc, transportArgValue, openedTransportSILType, OpenedExistentialAccess::Immutable);
 
   // --- prepare `Self.self` metatype
@@ -154,11 +155,10 @@ emitDistributedActorIdentityInit(SILGenFunction &SGF, ManagedValue selfArg, VarD
   auto *selfTyDecl = ctor->getParent()->getSelfNominalTypeDecl();
   // This would be bad: since not ok for generic
   // auto selfMetatype = SGF.getLoweredType(selfTyDecl->getInterfaceType());
-  auto selfMetatype = SGF.getLoweredType(
-      F.mapTypeIntoContext(selfTyDecl->getInterfaceType()));
+  auto selfMetatype =
+       SGF.getLoweredType(F.mapTypeIntoContext(selfTyDecl->getInterfaceType()));
   // selfVarDecl.getType() // TODO: do this; then dont need the self type decl
-  SILValue metatypeValue = B.createMetatype(loc, selfMetatype);
-
+  SILValue selfMetatypeValue = B.createMetatype(loc, selfMetatype);
 
   fprintf(stderr, "[%s:%d] (%s) ----------------------------------------------------------------------------\n", __FILE__, __LINE__, __FUNCTION__);
   SGF.F.dump();
@@ -206,6 +206,7 @@ emitDistributedActorIdentityInit(SILGenFunction &SGF, ManagedValue selfArg, VarD
 
   // --- prepare conformance subs
   auto genericSig = assignIdentityMethod->getGenericSignature();
+  fprintf(stderr, "[%s:%d] (%s) generic sig\n", __FILE__, __LINE__, __FUNCTION__);
   genericSig->dump();
 
   SubstitutionMap subs =
@@ -217,8 +218,18 @@ emitDistributedActorIdentityInit(SILGenFunction &SGF, ManagedValue selfArg, VarD
   SGF.F.dump();
 
   // --- call transport.assignIdentity(Self.self)
+  fprintf(stderr, "[%s:%d] (%s) APPLY\n", __FILE__, __LINE__, __FUNCTION__);
+  fprintf(stderr, "[%s:%d] (%s) assignWitnessMethod->dump();\n", __FILE__, __LINE__, __FUNCTION__);
+  assignWitnessMethod->dump();
+  fprintf(stderr, "[%s:%d] (%s) subs->dump();\n", __FILE__, __LINE__, __FUNCTION__);
+  subs.dump();
+  fprintf(stderr, "[%s:%d] (%s) selfMetatypeValue->dump();\n", __FILE__, __LINE__, __FUNCTION__);
+  selfMetatypeValue->dump();
+  fprintf(stderr, "[%s:%d] (%s) transportArchetypeValue->dump();\n", __FILE__, __LINE__, __FUNCTION__);
+  transportArchetypeValue->dump();
+
   auto identity = B.createApply(
-      loc, assignWitnessMethod, subs, {metatypeValue, transportArgValue});
+      loc, assignWitnessMethod, subs, {selfMetatypeValue, transportArchetypeValue});
 
   fprintf(stderr, "[%s:%d] (%s) ----------------------------------------------------------------------------\n", __FILE__, __LINE__, __FUNCTION__);
   SGF.F.dump();
@@ -246,7 +257,7 @@ emitDistributedActorIdentityInit(SILGenFunction &SGF, ManagedValue selfArg, VarD
 
 void SILGenFunction::initializeDistributedActorImplicitStorageInit(
     ConstructorDecl *ctor, ManagedValue selfArg) {
-  VarDecl *selfDecl = ctor->getImplicitSelfDecl();
+  VarDecl *selfVarDecl = ctor->getImplicitSelfDecl();
   auto *dc = ctor->getDeclContext();
   auto classDecl = dc->getSelfClassDecl();
   auto &C = classDecl->getASTContext();
@@ -279,7 +290,7 @@ void SILGenFunction::initializeDistributedActorImplicitStorageInit(
         var->getInterfaceType()->isEqual(transportTy)) {
       transportMember = var;
       fprintf(stderr, "[%s:%d] (%s) FOUND TRANSPORT MEMBER\n", __FILE__, __LINE__, __FUNCTION__);
-      emitDistributedActorTransportInit(*this, selfArg, selfDecl, ctor, pattern, var);
+      emitDistributedActorTransportInit(*this, selfArg, selfVarDecl, ctor, pattern, var);
       fprintf(stderr, "[%s:%d] (%s) DONE TRANSPORT MEMBER\n", __FILE__, __LINE__, __FUNCTION__);
     }
     else if (var->getName() == C.Id_id &&
@@ -287,7 +298,7 @@ void SILGenFunction::initializeDistributedActorImplicitStorageInit(
                 var->getInterfaceType()->isEqual(anyIdentityTy))) { // TODO(distributed): stick one way to store, but today we can't yet store the existential
       idMember = var;
       fprintf(stderr, "[%s:%d] (%s) FOUND ID MEMBER\n", __FILE__, __LINE__, __FUNCTION__);
-      emitDistributedActorIdentityInit(*this, selfArg, selfDecl, ctor, pattern, var);
+      emitDistributedActorIdentityInit(*this, selfArg, selfVarDecl, ctor, pattern, var);
     }
     if (transportMember && idMember) {
       fprintf(stderr, "[%s:%d] (%s) BREAK ------------------------\n", __FILE__, __LINE__, __FUNCTION__);
@@ -348,14 +359,14 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
   SILFunctionConventions fnConv(silFnType, SGM.M);
   auto resultType = fnConv.getSILResultType(getTypeExpansionContext());
 
-  auto *selfDecl = fd->getImplicitSelfDecl();
+  auto *selfVarDecl = fd->getImplicitSelfDecl();
 
   SmallVector<SILValue, 8> params;
 
   bindParametersForForwarding(fd->getParameters(), params);
-  bindParameterForForwarding(selfDecl, params);
+  bindParameterForForwarding(selfVarDecl, params);
   auto selfValue = ManagedValue::forUnmanaged(params[params.size() - 1]);
-  auto selfType = selfDecl->getType();
+  auto selfType = selfVarDecl->getType();
 
   // if __isRemoteActor(self) {
   //   ...

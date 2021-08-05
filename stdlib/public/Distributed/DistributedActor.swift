@@ -35,7 +35,7 @@ public protocol AnyActor {}
 @available(SwiftStdlib 5.5, *)
 public protocol DistributedActor:
 //    AnyActor,
-//    AnyObject,
+    AnyObject,
     Identifiable, Hashable, Codable {
 
   init(transport: ActorTransport) // FIXME(distributed): must remove this

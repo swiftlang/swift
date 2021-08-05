@@ -67,8 +67,6 @@ public protocol ActorTransport: Sendable {
   // FIXME: make it Act.ID needs changes in AST gen
   func assignIdentity<Act>(_ actorType: Act.Type) -> AnyActorIdentity
       where Act: DistributedActor
-//  func assignIdentity<Act>(_ actorType: Act.Type) -> Act.ID
-//      where Act: DistributedActor
 
   func actorReady<Act>(_ actor: Act) where Act: DistributedActor
 
