@@ -14,6 +14,7 @@ class StageArgs(object):
     def __init__(self, stage, args):
         self.stage = stage
         self.args = args
+        assert(not isinstance(self.args, StageArgs))
 
     def __getattr__(self, key):
         real_key = '{}{}'.format(key, self.stage.postfix)
