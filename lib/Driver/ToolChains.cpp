@@ -143,10 +143,10 @@ static void addLTOArgs(const OutputInfo &OI, ArgStringList &arguments) {
 }
 
 static void addLinkedLibArgs(const ArgList &Args, ArgStringList &FrontendArgs) {
-  for(auto Arg:Args.getAllArgValues(options::OPT_l))
-  {
-    std::string* lArg = new std::string("-l" + Arg);
-    FrontendArgs.push_back(lArg->c_str());
+  Args.getLastArg(options::OPT_l);
+  for (auto Arg : Args.getAllArgValues(options::OPT_l)) {
+    const std::string lArg("-l" + Arg);
+    FrontendArgs.push_back(Args.MakeArgString(Twine(lArg)));
   }
 }
 
