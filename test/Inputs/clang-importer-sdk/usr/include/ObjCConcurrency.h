@@ -84,6 +84,10 @@ typedef void (^CompletionHandler)(NSString * _Nullable, NSString * _Nullable_res
 -(void)asyncImportSame:(NSString *)operation replyTo:(void (^)(NSInteger))handler __attribute__((swift_async(none)));
 
 -(void)overridableButRunsOnMainThreadWithCompletionHandler:(MAIN_ACTOR_UNSAFE void (^ _Nullable)(NSString *))completion;
+- (void)obtainClosureWithCompletionHandler:(void (^)(void (^_Nullable)(void),
+                                                     NSError *_Nullable,
+                                                     BOOL))completionHandler
+    __attribute__((swift_async_error(zero_argument, 3)));
 @end
 
 @protocol RefrigeratorDelegate<NSObject>
