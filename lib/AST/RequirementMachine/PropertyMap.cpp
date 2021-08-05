@@ -448,8 +448,8 @@ namespace {
 ///
 /// These lower to the following two rules:
 ///
-///   T.[concrete: Foo<τ_0_0, τ_0_1, String> with {X.Y, Z}]
-///   T.[concrete: Foo<Int, τ_0_0, τ_0_1> with {A.B, W}]
+///   T.[concrete: Foo<τ_0_0, τ_0_1, String> with {X.Y, Z}] => T
+///   T.[concrete: Foo<Int, τ_0_0, τ_0_1> with {A.B, W}] => T
 ///
 /// The two concrete type symbols will be added to the property bag of 'T',
 /// and we will eventually end up in this method, where we will generate three
