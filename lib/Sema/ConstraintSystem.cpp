@@ -874,13 +874,29 @@ Type ConstraintSystem::openOpaqueType(Type type, ContextualTypePurpose context,
   if (!type || !type->hasOpaqueArchetype())
     return type;
 
-  if (!(context == CTP_Initialization || context == CTP_ReturnStmt ||
-        context == CTP_ReturnSingleExpr))
+  auto inReturnContext = [](ContextualTypePurpose context) {
+    return context == CTP_ReturnStmt || context == CTP_ReturnSingleExpr;
+  };
+
+  if (!(context == CTP_Initialization || inReturnContext(context)))
     return type;
 
+  auto shouldOpen = [&](OpaqueTypeArchetypeType *opaqueType) {
+    if (!inReturnContext(context))
+      return true;
+
+    if (auto *func = dyn_cast<AbstractFunctionDecl>(DC))
+      return opaqueType->getDecl()->isOpaqueReturnTypeOfFunction(func);
+
+    return true;
+  };
+
   return type.transform([&](Type type) -> Type {
-    if (auto *opaqueType = type->getAs<OpaqueTypeArchetypeType>())
+    auto *opaqueType = type->getAs<OpaqueTypeArchetypeType>();
+
+    if (opaqueType && shouldOpen(opaqueType))
       return openOpaqueType(opaqueType, locator);
+
     return type;
   });
 }
