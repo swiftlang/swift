@@ -867,11 +867,15 @@ Type ConstraintSystem::openOpaqueType(OpaqueTypeArchetypeType *opaque,
   return underlyingTyVar;
 }
 
-Type ConstraintSystem::openOpaqueType(Type type,
+Type ConstraintSystem::openOpaqueType(Type type, ContextualTypePurpose context,
                                       ConstraintLocatorBuilder locator) {
   // Early return if `type` is `NULL` or if there are no opaque archetypes (in
   // which case there is certainly nothing for us to do).
   if (!type || !type->hasOpaqueArchetype())
+    return type;
+
+  if (!(context == CTP_Initialization || context == CTP_ReturnStmt ||
+        context == CTP_ReturnSingleExpr))
     return type;
 
   return type.transform([&](Type type) -> Type {

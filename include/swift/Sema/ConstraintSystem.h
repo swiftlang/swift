@@ -3862,7 +3862,8 @@ private:
 
 public:
   /// Recurse over the given type and open any opaque archetype types.
-  Type openOpaqueType(Type type, ConstraintLocatorBuilder locator);
+  Type openOpaqueType(Type type, ContextualTypePurpose context,
+                      ConstraintLocatorBuilder locator);
 
   /// "Open" the given function type.
   ///
