@@ -38,8 +38,6 @@ public protocol DistributedActor:
     AnyObject,
     Identifiable, Hashable, Codable {
 
-  init(transport: ActorTransport) // FIXME(distributed): must remove this
-
     /// Resolves the passed in `identity` against the `transport`, returning
     /// either a local or remote actor reference.
     ///
@@ -61,7 +59,7 @@ public protocol DistributedActor:
     ///
     /// Conformance to this requirement is synthesized automatically for any
     /// `distributed actor` declaration.
-    nonisolated var actorTransport: ActorTransport { get } // TODO: rename to `transport`?
+    nonisolated var actorTransport: ActorTransport { get } // TODO(distributed): rename to `transport`?
 
     /// Logical identity of this distributed actor.
     ///

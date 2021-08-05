@@ -36,16 +36,40 @@ using namespace Lowering;
 /****************** DISTRIBUTED ACTOR STORAGE INITIALIZATION ******************/
 /******************************************************************************/
 
+static SILArgument*
+getActorTransportArgument(ASTContext& C, SILFunction& F, ConstructorDecl *ctor) {
+  auto *DC = cast<DeclContext>(ctor);
+  auto module = DC->getParentModule();
 
-static AbstractFunctionDecl*
-lookupAssignIdentityFunc(ASTContext& C) {
-  auto transportDecl = C.getActorTransportDecl();
+  auto *transportProto =
+      C.getProtocol(KnownProtocolKind::ActorTransport);
+  Type transportTy = transportProto->getDeclaredInterfaceType();
 
-  for (auto decl : transportDecl->lookupDirect(DeclName(C.Id_assignIdentity)))
-    if (auto funcDecl = dyn_cast<AbstractFunctionDecl>(decl))
-      return funcDecl;
+  fprintf(stderr, "[%s:%d] (%s) LOCATE PARAM!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n", __FILE__, __LINE__, __FUNCTION__);
+  for (auto arg : F.getArguments()) {
+    // TODO(distributed): also be able to locate a generic transport
+    Type argTy = arg->getType().getASTType();
+    auto argDecl = arg->getDecl();
+    argTy->dump();
+    argDecl->dump();
 
-    return nullptr;
+    auto conformsToTransport = module->lookupConformance(
+        argDecl->getInterfaceType(), transportProto);
+
+    // Is it a protocol that conforms to ActorTransport?
+    if (argTy->isEqual(transportTy) || conformsToTransport) {
+      return arg;
+    }
+
+    // Is it some specific ActorTransport?
+    auto result = module->lookupConformance(argTy, transportProto);
+    if (!result.isInvalid()) {
+      return arg;
+    }
+  }
+
+  // did not find argument of ActorTransport type!
+  llvm_unreachable("Missing required ActorTransport argument!");
 }
 
 /// Synthesize the actorTransport initialization:
@@ -56,8 +80,10 @@ lookupAssignIdentityFunc(ASTContext& C) {
 /// // }
 /// \endverbatim
 static void
-emitDistributedActorTransportInit(SILGenFunction &SGF, ManagedValue borrowedSelfArg, VarDecl *selfDecl, ConstructorDecl *ctor,
-                                  Pattern *pattern, VarDecl *var) {
+emitDistributedActorTransportInit(
+    SILGenFunction &SGF, ManagedValue borrowedSelfArg, VarDecl *selfDecl,
+    ConstructorDecl *ctor,
+    Pattern *pattern, VarDecl *var) {
   auto &C = selfDecl->getASTContext();
   auto &B = SGF.B;
   auto &F = SGF.F;
@@ -71,9 +97,9 @@ emitDistributedActorTransportInit(SILGenFunction &SGF, ManagedValue borrowedSelf
   SGF.F.dump();
 
   // ==== Prepare assignment: get the self.transport address
-  SILValue transportArgValue = F.getArgument(0);
-  ManagedValue transportArgManaged = ManagedValue::forUnmanaged(transportArgValue);
-  auto transportDecl = C.getActorTransportDecl();
+  SILValue transportArgValue = getActorTransportArgument(C, F, ctor);
+//  ManagedValue transportArgManaged = ManagedValue::forUnmanaged(transportArgValue);
+//  auto transportDecl = C.getActorTransportDecl();
 
   // ----
   auto *selfTyDecl = ctor->getParent()->getSelfNominalTypeDecl();
@@ -112,16 +138,9 @@ emitDistributedActorIdentityInit(SILGenFunction &SGF,
   fprintf(stderr, "[%s:%d] (%s) ----------------------------------------------------------------------------\n", __FILE__, __LINE__, __FUNCTION__);
   SGF.F.dump();
 
-  // === prepare the transport.assignIdentity(_:) function
-
-  AbstractFunctionDecl *assignIdentityFuncDecl = lookupAssignIdentityFunc(C);
-
-  assert(assignIdentityFuncDecl && "Cannot find ActorTransport.assignIdentity!");
-  auto assignIdentityFnRef = SILDeclRef(assignIdentityFuncDecl);
-
   // === Open the transport existential before call
-  SILValue transportArgValue = F.getArgument(0);
-  SILValue selfArgValue = F.getArgument(1);
+  SILValue transportArgValue = getActorTransportArgument(C, F, ctor);
+  SILValue selfArgValue = F.getSelfArgument();
   ProtocolDecl *distributedActorProto = C.getProtocol(KnownProtocolKind::DistributedActor);
   ProtocolDecl *transportProto = C.getProtocol(KnownProtocolKind::ActorTransport);
   assert(distributedActorProto);
@@ -237,7 +256,7 @@ void SILGenFunction::initializeDistributedActorImplicitStorageInit(
   auto &C = classDecl->getASTContext();
 
   SILLocation prologueLoc = RegularLocation(ctor);
-  prologueLoc.markAsPrologue(); // TODO: no idea if this is necessary or makes sense
+  prologueLoc.markAsPrologue();
 
   auto transportTy = C.getActorTransportType();
   auto identityProtoTy = C.getActorIdentityType();
@@ -267,8 +286,7 @@ void SILGenFunction::initializeDistributedActorImplicitStorageInit(
       transportMember = var;
       emitDistributedActorTransportInit(*this, borrowedSelfArg, selfVarDecl, ctor, pattern, var);
     } else if (var->getName() == C.Id_id &&
-               (var->getInterfaceType()->isEqual(identityProtoTy) ||
-                var->getInterfaceType()->isEqual(anyIdentityTy))) { // TODO(distributed): stick one way to store, but today we can't yet store the existential
+               var->getInterfaceType()->isEqual(anyIdentityTy)) { // TODO(distributed): we'd want to store the existential instead perhaps
       idMember = var;
       emitDistributedActorIdentityInit(*this, borrowedSelfArg, selfVarDecl, ctor, pattern, var);
     }
@@ -351,9 +369,9 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
   //   ...
   // }
   {
-    FuncDecl* isRemoteFn = ctx.getIsRemoteDistributedActor();
-    assert(isRemoteFn &&
-    "Could not find 'is remote' function, is the '_Distributed' module available?");
+    FuncDecl *isRemoteFn = ctx.getIsRemoteDistributedActor();
+    assert(isRemoteFn && "Could not find 'is remote' function, is the "
+                         "'_Distributed' module available?");
 
     ManagedValue selfAnyObject = B.createInitExistentialRef(loc, getLoweredType(ctx.getAnyObjectType()),
                                                             CanType(selfType),

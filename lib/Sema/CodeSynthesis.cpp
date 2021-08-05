@@ -1190,19 +1190,34 @@ static bool shouldAttemptInitializerSynthesis(const NominalTypeDecl *decl) {
   return true;
 }
 
+void TypeChecker::addImplicitDistributedActorMembers(NominalTypeDecl *nominal) {
+  auto decl = dyn_cast<ClassDecl>(nominal);
+
+  if (!decl)
+    return;
+
+  if (!decl->isDistributedActor()) {
+    fprintf(stderr, "[%s:%d] (%s) attempted adding members to NOT distributed actor\n", __FILE__, __LINE__, __FUNCTION__);
+    return;
+  }
+
+  fprintf(stderr, "[%s:%d] (%s) addImplicitDistributedActorMembers\n", __FILE__, __LINE__, __FUNCTION__);
+  addImplicitDistributedActorMembersToClass(decl);
+}
+
 void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   // If we already added implicit initializers, we're done.
   if (decl->addedImplicitInitializers())
     return;
 
   if (!shouldAttemptInitializerSynthesis(decl)) {
+    fprintf(stderr, "[%s:%d] (%s) SKIP IT\n", __FILE__, __LINE__, __FUNCTION__);
     decl->setAddedImplicitInitializers();
     return;
   }
 
   if (auto *classDecl = dyn_cast<ClassDecl>(decl)) {
     addImplicitInheritedConstructorsToClass(classDecl);
-    addImplicitDistributedActorMembersToClass(classDecl); // FIXME(distributed): add always this is not just constructors
   }
 
   // Force the memberwise and default initializers if the type has them.
@@ -1287,11 +1302,12 @@ ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
     break;
   case ImplicitMemberAction::ResolveDistributedActor:
   case ImplicitMemberAction::ResolveDistributedActorIdentity: {
-    // init(transport:) and init(resolve:using:) may be synthesized as part of
-    // derived conformance to the DistributedActor protocol.
-    // If the target should conform to the DistributedActor protocol, check the
-    // conformance here to attempt synthesis.
-    TypeChecker::addImplicitConstructors(target);
+    // Distributed actors may need to get the init(transport:) default init
+    // synthesized implicitly. They do not get the init() initializer.
+    TypeChecker::addImplicitDistributedActorMembers(target);
+
+    // If the target should conform to the DistributedActor protocol,
+    // check the conformance here to attempt synthesis.
     auto *distributedActorProto =
         Context.getProtocol(KnownProtocolKind::DistributedActor);
     (void)evaluateTargetConformanceTo(distributedActorProto);
@@ -1448,24 +1464,6 @@ HasDefaultInitRequest::evaluate(Evaluator &evaluator,
   // We can only synthesize a default init if all the stored properties have an
   // initial value.
   return areAllStoredPropertiesDefaultInitializable(evaluator, decl);
-}
-
-bool
-HasDistributedActorLocalInitRequest::evaluate(Evaluator &evaluator,
-                                                     NominalTypeDecl *nominal) const {
-  if (auto *decl = dyn_cast<ClassDecl>(nominal)) {
-    if (!decl->isDistributedActor())
-      return false;
-
-    for (auto *member : decl->getMembers())
-      if (auto ctor = dyn_cast<ConstructorDecl>(member))
-        if (ctor->isDistributedActorLocalInit())
-          return true;
-  }
-
-  // areAllStoredPropertiesDefaultInitializable(evaluator, decl);
-
-  return false;
 }
 
 /// Synthesizer callback for a function body consisting of "return".

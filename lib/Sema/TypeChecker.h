@@ -513,6 +513,9 @@ bool checkContextualRequirements(GenericTypeDecl *decl,
                                  SourceLoc loc,
                                  DeclContext *dc);
 
+/// Add implicit members to an distributed actor decl.
+void addImplicitDistributedActorMembers(NominalTypeDecl *decl);
+
 /// Add any implicitly-defined constructors required for the given
 /// struct, class or actor.
 void addImplicitConstructors(NominalTypeDecl *typeDecl);

@@ -27,16 +27,10 @@ namespace swift {
 class AbstractFunctionDecl;
 class ConstructorDecl;
 class ActorIsolation;
-class AnyFunctionType;
 class ASTContext;
 class ClassDecl;
-class ClosureExpr;
-class ConcreteDeclRef;
-class CustomAttr;
 class Decl;
 class DeclContext;
-class EnumElementDecl;
-class Expr;
 class FuncDecl;
 class Initializer;
 class PatternBindingDecl;
@@ -45,12 +39,22 @@ class TopLevelCodeDecl;
 class TypeBase;
 class ValueDecl;
 
-/// Check distributed actor isolation rules.
+/******************************************************************************/
+/******************** DISTRIBUTED ACTOR TYPECHECKING **************************/
+/******************************************************************************/
 
 /// The local and resolve distributed actor constructors have special rules to check.
 void checkDistributedActorConstructor(ClassDecl *decl, ConstructorDecl *ctor);
 
+/// Typecheck distributed function, e.g. if parameters conform to right protocol
 bool checkDistributedFunction(FuncDecl *decl, bool diagnose);
+
+/******************************************************************************/
+/******************** DISTRIBUTED ACTOR TYPECHECKING **************************/
+/******************************************************************************/
+
+/// Synthesize the default distributed actor initializer, if necessary.
+void addImplicitConstructorsToDistributedActor(ClassDecl *decl);
 
 /// Synthesis of members which are not directly driven filling in protocol requirements,
 /// such as the default local and resolve constructors, and `_remote_` function stubs.

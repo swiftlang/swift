@@ -385,7 +385,7 @@ ActorIsolationRestriction ActorIsolationRestriction::forDeclaration(
       if (func->isAsyncContext())
         isAccessibleAcrossActors = true;
 
-      // FIXME: move diagnosis out of this function entirely (!)
+      // FIXME(distributed): move diagnosis out of this function entirely (!)
       if (func->isDistributed()) {
         if (auto classDecl = dyn_cast<ClassDecl>(decl->getDeclContext())) {
           if (!classDecl->isDistributedActor()) {
@@ -394,7 +394,7 @@ ActorIsolationRestriction ActorIsolationRestriction::forDeclaration(
                 diag::distributed_actor_func_defined_outside_of_distributed_actor,
                 func->getName());
           }
-        } // TODO: need to handle protocol case here too?
+        } // TODO(distributed): need to handle protocol case here too?
 
         return forDistributedActorSelf(isolation.getActor(),
                                        /*isCrossActor*/ isAccessibleAcrossActors);
@@ -2499,6 +2499,13 @@ void swift::checkFunctionActorIsolation(AbstractFunctionDecl *decl) {
   }
 }
 
+/// Some actor constructors are special, so we need to check rules about them.
+void swift::checkActorConstructor(ClassDecl *decl, ConstructorDecl *ctor) {
+  // bail out unless distributed actor, only those have special rules to check here
+  if (decl->isDistributedActor())
+    checkDistributedActorConstructor(decl, ctor);
+}
+
 void swift::checkInitializerActorIsolation(Initializer *init, Expr *expr) {
 
   ActorIsolationChecker checker(init);
@@ -3037,7 +3044,7 @@ ActorIsolation ActorIsolationRequest::evaluate(
     case ActorIsolation::DistributedActorInstance: {
       /// 'distributed actor independent' implies 'nonisolated'
       if (value->isDistributedActorIndependent()) {
-        // TODO: rename 'distributed actor independent' to 'distributed(nonisolated)'
+        // TODO(distributed): rename 'distributed actor independent' to 'distributed(nonisolated)'
         value->getAttrs().add(
             new (ctx) DistributedActorIndependentAttr(/*IsImplicit=*/true));
         value->getAttrs().add(

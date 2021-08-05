@@ -36,7 +36,7 @@ bool IsDistributedActorRequest::evaluate(
   // Protocols are actors if they inherit from `DistributedActor`.
   if (auto protocol = dyn_cast<ProtocolDecl>(nominal)) {
     auto &ctx = protocol->getASTContext();
-    auto *distributedActorProtocol = ctx.getDistributedActorDecl(); // getProtocol(KnownProtocolKind::DistributedActor);
+    auto *distributedActorProtocol = ctx.getDistributedActorDecl();
     return (protocol == distributedActorProtocol ||
             protocol->inheritsFrom(distributedActorProtocol));
   }
@@ -126,3 +126,51 @@ bool swift::checkDistributedFunction(FuncDecl *func, bool diagnose) {
 
   return false;
 }
+
+void swift::checkDistributedActorConstructor(ClassDecl *decl, ConstructorDecl *ctor) {
+  // bail out unless distributed actor, only those have special rules to check here
+  if (!decl->isDistributedActor())
+    return;
+
+  // Only designated initializers need extra checks
+  if (!ctor->isDesignatedInit())
+    return;
+
+  // === Designated initializers must accept exactly one ActorTransport
+  auto &C = ctor->getASTContext();
+  auto module = ctor->getParentModule();
+
+  SmallVector<ParamDecl*, 2> transportParams;
+  int transportParamsCount = 0;
+  auto transportType = C.getProtocol(KnownProtocolKind::ActorTransport);
+
+  for (auto param : *ctor->getParameters()) {
+    auto paramType = ctor->mapTypeIntoContext(param->getInterfaceType());
+    auto conformance = TypeChecker::conformsToProtocol(paramType, transportType, module);
+    fprintf(stderr, "[%s:%d] (%s) CHECKED CONFORMANCE\n", __FILE__, __LINE__, __FUNCTION__);
+    paramType->dump();
+    transportType->dump();
+    fprintf(stderr, "[%s:%d] (%s) IT IS VALID: %d\n", __FILE__, __LINE__, __FUNCTION__, !conformance.isInvalid());
+
+    if (!conformance.isInvalid()) {
+      transportParamsCount += 1;
+      transportParams.push_back(param);
+    }
+  }
+  // ok! We found exactly one transport parameter
+  if (transportParamsCount == 1)
+    return;
+  
+  // missing transport parameter
+  if (transportParamsCount == 0) {
+    ctor->diagnose(diag::distributed_actor_designated_ctor_missing_transport_param,
+                   ctor->getName());
+    // TODO(distributed): offer fixit to insert 'transport: ActorTransport'
+    return;
+  }
+
+  // TODO(distributed): could list exact parameters
+  ctor->diagnose(diag::distributed_actor_designated_ctor_must_have_one_transport_param,
+                   ctor->getName(), transportParamsCount);
+}
+

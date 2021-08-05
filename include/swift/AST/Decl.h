@@ -3357,8 +3357,6 @@ public:
   /// for types that are not global actors.
   VarDecl *getGlobalActorInstance() const;
 
-  bool hasDistributedActorLocalInitializer() const;
-
   /// Whether this type is a global actor, which can be used as an
   /// attribute to decorate declarations for inclusion in the actor-isolated
   /// state denoted by this type.

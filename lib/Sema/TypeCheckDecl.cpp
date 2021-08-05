@@ -2646,6 +2646,13 @@ static ArrayRef<Decl *> evaluateMembersRequest(
     // We need to add implicit initializers because they
     // affect vtable layout.
     TypeChecker::addImplicitConstructors(nominal);
+
+    if (auto clazz = dyn_cast<ClassDecl>(nominal)) {
+      if (clazz->isDistributedActor()) {
+        fprintf(stderr, "[%s:%d] (%s) ADD DIST STUFF\n", __FILE__, __LINE__, __FUNCTION__);
+        TypeChecker::addImplicitDistributedActorMembers(clazz);
+      }
+    }
   }
 
   // Force any conformances that may introduce more members.
