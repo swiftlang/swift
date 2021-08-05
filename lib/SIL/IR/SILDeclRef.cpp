@@ -853,13 +853,8 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
     auto *silParameterIndices = autodiff::getLoweredParameterIndices(
         derivativeFunctionIdentifier->getParameterIndices(),
         getDecl()->getInterfaceType()->castTo<AnyFunctionType>());
-    auto originalFn =
-        getDecl()->getInterfaceType()->castTo<AnyFunctionType>();
-    SmallVector<AutoDiffSemanticFunctionResultType, 1> semanticResults;
-    autodiff::getFunctionSemanticResultTypes(originalFn, semanticResults);
-    auto numResults = semanticResults.size();
-    auto *resultIndices = IndexSubset::getDefault(
-        getDecl()->getASTContext(), numResults, /*includeAll*/ true);
+    auto *resultIndices = autodiff::getAllFunctionSemanticResultIndices(
+        asAutoDiffOriginalFunction().getAbstractFunctionDecl());
     AutoDiffConfig silConfig(
         silParameterIndices, resultIndices,
         derivativeFunctionIdentifier->getDerivativeGenericSignature());

@@ -32,6 +32,7 @@
 
 namespace swift {
 
+class AbstractFunctionDecl;
 class AnyFunctionType;
 class SourceFile;
 class SILFunctionType;
@@ -574,6 +575,10 @@ void getFunctionSemanticResultTypes(
     AnyFunctionType *functionType,
     SmallVectorImpl<AutoDiffSemanticFunctionResultType> &result,
     GenericEnvironment *genericEnv = nullptr);
+
+/// Returns the indices of all semantic results for a given function.
+IndexSubset *getAllFunctionSemanticResultIndices(
+    const AbstractFunctionDecl *AFD);
 
 /// Returns the lowered SIL parameter indices for the given AST parameter
 /// indices and `AnyfunctionType`.

@@ -490,13 +490,8 @@ matchWitnessDifferentiableAttr(DeclContext *dc, ValueDecl *req,
           witness->getAttrs().add(newAttr);
           success = true;
           // Register derivative function configuration.
-          auto originalFn =
-              witnessAFD->getInterfaceType()->castTo<AnyFunctionType>();
-          SmallVector<AutoDiffSemanticFunctionResultType, 1> semanticResults;
-          autodiff::getFunctionSemanticResultTypes(originalFn, semanticResults);
-          auto numResults = semanticResults.size();
-          auto *resultIndices = IndexSubset::getDefault(
-              ctx, numResults, /*includeAll*/ true);
+          auto *resultIndices =
+              autodiff::getAllFunctionSemanticResultIndices(witnessAFD);
           witnessAFD->addDerivativeFunctionConfiguration(
               {newAttr->getParameterIndices(), resultIndices,
                newAttr->getDerivativeGenericSignature()});

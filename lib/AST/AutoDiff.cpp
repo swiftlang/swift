@@ -211,6 +211,16 @@ void autodiff::getFunctionSemanticResultTypes(
   }
 }
 
+IndexSubset *
+autodiff::getAllFunctionSemanticResultIndices(const AbstractFunctionDecl *AFD) {
+  auto originalFn = AFD->getInterfaceType()->castTo<AnyFunctionType>();
+  SmallVector<AutoDiffSemanticFunctionResultType, 1> semanticResults;
+  autodiff::getFunctionSemanticResultTypes(originalFn, semanticResults);
+  auto numResults = semanticResults.size();
+  return IndexSubset::getDefault(
+    AFD->getASTContext(), numResults, /*includeAll*/ true);
+}
+
 // TODO(TF-874): Simplify this helper. See TF-874 for WIP.
 IndexSubset *
 autodiff::getLoweredParameterIndices(IndexSubset *parameterIndices,

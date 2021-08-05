@@ -5073,12 +5073,8 @@ IndexSubset *DifferentiableAttributeTypeCheckRequest::evaluate(
     }
     getterDecl->getAttrs().add(newAttr);
     // Register derivative function configuration.
-    auto originalFn = getterDecl->getInterfaceType()->castTo<AnyFunctionType>();
-    SmallVector<AutoDiffSemanticFunctionResultType, 1> semanticResults;
-    autodiff::getFunctionSemanticResultTypes(originalFn, semanticResults);
-    auto numResults = semanticResults.size();
-    auto *resultIndices = IndexSubset::getDefault(
-        ctx, numResults, /*includeAll*/ true);
+    auto *resultIndices =
+        autodiff::getAllFunctionSemanticResultIndices(getterDecl);
     getterDecl->addDerivativeFunctionConfiguration(
         {resolvedDiffParamIndices, resultIndices, derivativeGenSig});
     return resolvedDiffParamIndices;
@@ -5519,12 +5515,8 @@ static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
   }
 
   // Register derivative function configuration.
-  auto originalFn = originalAFD->getInterfaceType()->castTo<AnyFunctionType>();
-  SmallVector<AutoDiffSemanticFunctionResultType, 1> semanticResults;
-  autodiff::getFunctionSemanticResultTypes(originalFn, semanticResults);
-  auto numResults = semanticResults.size();
-  auto *resultIndices = IndexSubset::getDefault(
-      Ctx, numResults, /*includeAll*/ true);
+  auto *resultIndices =
+    autodiff::getAllFunctionSemanticResultIndices(originalAFD);
   originalAFD->addDerivativeFunctionConfiguration(
       {resolvedDiffParamIndices, resultIndices,
        derivative->getGenericSignature()});
