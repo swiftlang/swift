@@ -5155,6 +5155,10 @@ public:
     if (isExpressionAlreadyTooComplex)
       return true;
 
+    auto CancellationFlag = getASTContext().TypeCheckerOpts.CancellationFlag;
+    if (CancellationFlag && *CancellationFlag)
+      return true;
+
     auto used = getASTContext().getSolverMemory() + solutionMemory;
     MaxMemory = std::max(used, MaxMemory);
     auto threshold = getASTContext().TypeCheckerOpts.SolverMemoryThreshold;
