@@ -667,9 +667,14 @@ void ModuleFile::loadDerivativeFunctionConfigurations(
     }
     auto derivativeGenSig = derivativeGenSigOrError.get();
     // NOTE(TF-1038): Result indices are currently unsupported in derivative
-    // registration attributes. In the meantime, always use `{0}` (wrt the
-    // first and only result).
-    auto resultIndices = IndexSubset::get(ctx, 1, {0});
+    // registration attributes. In the meantime, always use all results.
+    auto originalFn =
+        originalAFD->getInterfaceType()->castTo<AnyFunctionType>();
+    SmallVector<AutoDiffSemanticFunctionResultType, 1> semanticResults;
+    autodiff::getFunctionSemanticResultTypes(originalFn, semanticResults);
+    auto numResults = semanticResults.size();
+    auto *resultIndices = IndexSubset::getDefault(
+        ctx, numResults, /*includeAll*/ true);
     results.insert({parameterIndices, resultIndices, derivativeGenSig});
   }
 }

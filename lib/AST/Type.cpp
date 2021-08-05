@@ -6444,11 +6444,14 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
   bool hasInoutResult = false;
   for (auto i : range(originalResults.size())) {
     auto originalResult = originalResults[i];
+    auto originalResultType = originalResult.type;
+    // Voids currently have a defined tangent vector, so ignore them.
+    if (originalResultType->isVoid())
+      continue;
     if (originalResult.isInout) {
       hasInoutResult = true;
       continue;
     }
-    auto originalResultType = originalResult.type;
     // Get the original semantic result type's `TangentVector` associated type.
     auto resultTan =
         originalResultType->getAutoDiffTangentSpace(lookupConformance);
@@ -6458,19 +6461,48 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
     resultTanTypes.push_back(resultTanType);
   }
   // Append non-wrt inout result tangent spaces.
-  auto *resultFunctionType = this->getResult()->getAs<AnyFunctionType>();
-  auto sourceFunction = resultFunctionType ? resultFunctionType : this;
-  for (unsigned i : range(sourceFunction->getNumParams())) {
-    auto param = sourceFunction->getParams()[i];
-    if (parameterIndices->contains(i))
-      continue;
-    if (param.isInOut()) {
-      auto resultType = param.getPlainType();
-      auto resultTan = resultType->getAutoDiffTangentSpace(lookupConformance);
-      if (!resultTan)
+  // This uses the logic from getSubsetParameters(), only operating over all
+  // parameter indices and looking for non-wrt indices.
+  SmallVector<AnyFunctionType *, 2> curryLevels;
+  // An inlined version of unwrapCurryLevels().
+  AnyFunctionType *fnTy = this;
+  while (fnTy != nullptr) {
+    curryLevels.push_back(fnTy);
+    fnTy = fnTy->getResult()->getAs<AnyFunctionType>();
+  }
+
+  SmallVector<unsigned, 2> curryLevelParameterIndexOffsets(curryLevels.size());
+  unsigned currentOffset = 0;
+  for (unsigned curryLevelIndex : llvm::reverse(indices(curryLevels))) {
+    curryLevelParameterIndexOffsets[curryLevelIndex] = currentOffset;
+    currentOffset += curryLevels[curryLevelIndex]->getNumParams();
+  }
+
+  if (!makeSelfParamFirst) {
+    std::reverse(curryLevels.begin(), curryLevels.end());
+    std::reverse(curryLevelParameterIndexOffsets.begin(),
+                 curryLevelParameterIndexOffsets.end());
+  }
+
+  for (unsigned curryLevelIndex : indices(curryLevels)) {
+    auto *curryLevel = curryLevels[curryLevelIndex];
+    unsigned parameterIndexOffset =
+        curryLevelParameterIndexOffsets[curryLevelIndex];
+    for (unsigned paramIndex : range(curryLevel->getNumParams())) {
+      if (parameterIndices->contains(parameterIndexOffset + paramIndex))
         continue;
-      auto resultTanType = resultTan->getType();
-      resultTanTypes.push_back(resultTanType);
+
+      auto param = curryLevel->getParams()[paramIndex];
+      if (param.isInOut()) {
+        auto resultType = param.getPlainType();
+        if (resultType->isVoid())
+          continue;
+        auto resultTan = resultType->getAutoDiffTangentSpace(lookupConformance);
+        if (!resultTan)
+          continue;
+        auto resultTanType = resultTan->getType();
+        resultTanTypes.push_back(resultTanType);
+      }
     }
   }
 
@@ -6565,6 +6597,8 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
             std::make_pair(paramType, i));
       }
       if (diffParam.isInOut()) {
+        if (paramType->isVoid())
+          continue;
         inoutParams.push_back(diffParam);
         continue;
       }

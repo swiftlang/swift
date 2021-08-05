@@ -5073,7 +5073,12 @@ IndexSubset *DifferentiableAttributeTypeCheckRequest::evaluate(
     }
     getterDecl->getAttrs().add(newAttr);
     // Register derivative function configuration.
-    auto *resultIndices = IndexSubset::get(ctx, 1, {0});
+    auto originalFn = getterDecl->getInterfaceType()->castTo<AnyFunctionType>();
+    SmallVector<AutoDiffSemanticFunctionResultType, 1> semanticResults;
+    autodiff::getFunctionSemanticResultTypes(originalFn, semanticResults);
+    auto numResults = semanticResults.size();
+    auto *resultIndices = IndexSubset::getDefault(
+        ctx, numResults, /*includeAll*/ true);
     getterDecl->addDerivativeFunctionConfiguration(
         {resolvedDiffParamIndices, resultIndices, derivativeGenSig});
     return resolvedDiffParamIndices;
@@ -5088,7 +5093,11 @@ IndexSubset *DifferentiableAttributeTypeCheckRequest::evaluate(
     return nullptr;
   }
   // Register derivative function configuration.
-  auto *resultIndices = IndexSubset::get(ctx, 1, {0});
+  SmallVector<AutoDiffSemanticFunctionResultType, 1> semanticResults;
+  autodiff::getFunctionSemanticResultTypes(originalFnRemappedTy, semanticResults);
+  auto numResults = semanticResults.size();
+  auto *resultIndices = IndexSubset::getDefault(
+      ctx, numResults, /*includeAll*/ true);
   original->addDerivativeFunctionConfiguration(
       {resolvedDiffParamIndices, resultIndices, derivativeGenSig});
   return resolvedDiffParamIndices;
@@ -5510,7 +5519,12 @@ static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
   }
 
   // Register derivative function configuration.
-  auto *resultIndices = IndexSubset::get(Ctx, 1, {0});
+  auto originalFn = originalAFD->getInterfaceType()->castTo<AnyFunctionType>();
+  SmallVector<AutoDiffSemanticFunctionResultType, 1> semanticResults;
+  autodiff::getFunctionSemanticResultTypes(originalFn, semanticResults);
+  auto numResults = semanticResults.size();
+  auto *resultIndices = IndexSubset::getDefault(
+      Ctx, numResults, /*includeAll*/ true);
   originalAFD->addDerivativeFunctionConfiguration(
       {resolvedDiffParamIndices, resultIndices,
        derivative->getGenericSignature()});
