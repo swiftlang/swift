@@ -1874,12 +1874,10 @@ public:
   }
 
   void visitInfixOperatorDecl(InfixOperatorDecl *IOD) {
-    // FIXME: Handle operator designated types (which also applies to prefix
-    // and postfix operators).
     if (auto *precedenceGroup = IOD->getPrecedenceGroup()) {
-      if (!IOD->getIdentifiers().empty()) {
+      if (!IOD->getPrecedenceGroupName().empty()) {
         checkPrecedenceGroup(precedenceGroup, IOD, IOD->getLoc(),
-                             IOD->getIdentifiers().front().Loc);
+                             IOD->getPrecedenceGroupLoc());
       }
     }
   }

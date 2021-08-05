@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift
+// RUN: %target-run-simple-swift(-Xfrontend -requirement-machine=off)
 // REQUIRES: executable_test
 
 // FIXME(SR-12741): Enable test for all platforms after debugging

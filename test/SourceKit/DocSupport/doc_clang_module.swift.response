@@ -6481,7 +6481,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.kind: source.lang.swift.decl.extension.class,
     key.offset: 5964,
     key.length: 61,
-    key.fully_annotated_decl: "<decl.extension.class>extension <decl.name><ref.class usr=\"c:objc(cs)FooClassBase\">FooClassBase</ref.class></decl.name></decl.extension.class>",
+    key.fully_annotated_decl: "<decl.extension.class><syntaxtype.keyword>extension</syntaxtype.keyword> <decl.name><ref.class usr=\"c:objc(cs)FooClassBase\">FooClassBase</ref.class></decl.name></decl.extension.class>",
     key.extends: {
       key.kind: source.lang.swift.ref.class,
       key.name: "FooClassBase",
@@ -6502,7 +6502,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.kind: source.lang.swift.decl.extension.class,
     key.offset: 6026,
     key.length: 97,
-    key.fully_annotated_decl: "<decl.extension.class>extension <decl.name><ref.class usr=\"c:objc(cs)FooClassBase\">FooClassBase</ref.class></decl.name></decl.extension.class>",
+    key.fully_annotated_decl: "<decl.extension.class><syntaxtype.keyword>extension</syntaxtype.keyword> <decl.name><ref.class usr=\"c:objc(cs)FooClassBase\">FooClassBase</ref.class></decl.name></decl.extension.class>",
     key.extends: {
       key.kind: source.lang.swift.ref.class,
       key.name: "FooClassBase",
@@ -6531,7 +6531,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.kind: source.lang.swift.decl.extension.class,
     key.offset: 6124,
     key.length: 61,
-    key.fully_annotated_decl: "<decl.extension.class>extension <decl.name><ref.class usr=\"c:objc(cs)FooClassBase\">FooClassBase</ref.class></decl.name></decl.extension.class>",
+    key.fully_annotated_decl: "<decl.extension.class><syntaxtype.keyword>extension</syntaxtype.keyword> <decl.name><ref.class usr=\"c:objc(cs)FooClassBase\">FooClassBase</ref.class></decl.name></decl.extension.class>",
     key.extends: {
       key.kind: source.lang.swift.ref.class,
       key.name: "FooClassBase",

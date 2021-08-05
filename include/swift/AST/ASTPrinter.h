@@ -48,6 +48,8 @@ enum class PrintNameContext {
   Normal,
   /// Keyword context, where no keywords are escaped.
   Keyword,
+  /// Keyword for introducing a declarations e.g. 'func', 'struct'.
+  IntroducerKeyword,
   /// Type member context, e.g. properties or enum cases.
   TypeMember,
   /// Generic parameter context, where 'Self' is not escaped.
@@ -214,6 +216,17 @@ public:
     callPrintNamePre(PrintNameContext::Keyword);
     *this << name;
     printNamePost(PrintNameContext::Keyword);
+    *this << Suffix;
+  }
+
+  void printIntroducerKeyword(StringRef name,
+                              const PrintOptions &Opts,
+                              StringRef Suffix = "") {
+    if (Opts.SkipIntroducerKeywords)
+      return;
+    callPrintNamePre(PrintNameContext::IntroducerKeyword);
+    *this << name;
+    printNamePost(PrintNameContext::IntroducerKeyword);
     *this << Suffix;
   }
 

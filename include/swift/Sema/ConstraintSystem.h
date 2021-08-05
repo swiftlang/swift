@@ -792,7 +792,7 @@ struct AppliedBuilderTransform {
   Type builderType;
 
   /// The result type of the body, to which the returned expression will be
-  /// converted.
+  /// converted. Opaque types should be unopened.
   Type bodyResultType;
 
   /// An expression whose value has been recorded for later use.
@@ -1186,7 +1186,7 @@ public:
   llvm::DenseMap<ASTNode, Type> nodeTypes;
 
   /// The key path component types introduced by this solution.
-  llvm::DenseMap<std::pair<const KeyPathExpr *, unsigned>, TypeBase *>
+  llvm::DenseMap<std::pair<const KeyPathExpr *, unsigned>, Type>
       keyPathComponentTypes;
 
   /// Contextual types introduced by this solution.
@@ -2183,8 +2183,22 @@ private:
   /// run through various diagnostics passes without actually mutating
   /// the types on the nodes.
   llvm::MapVector<ASTNode, Type> NodeTypes;
-  llvm::DenseMap<std::pair<const KeyPathExpr *, unsigned>, TypeBase *>
+
+  /// The nodes for which we have produced types, along with the prior type
+  /// each node had before introducing this type.
+  llvm::SmallVector<std::pair<ASTNode, Type>, 8> addedNodeTypes;
+
+  /// Maps components in a key path expression to their type. Needed because
+  /// KeyPathExpr + Index isn't an \c ASTNode and thus can't be stored in \c
+  /// NodeTypes.
+  llvm::DenseMap<std::pair<const KeyPathExpr *, /*component index=*/unsigned>,
+                 Type>
       KeyPathComponentTypes;
+
+  /// Same as \c addedNodeTypes for \c KeyPathComponentTypes.
+  llvm::SmallVector<
+      std::tuple<const KeyPathExpr *, /*component index=*/unsigned, Type>>
+      addedKeyPathComponentTypes;
 
   /// Maps AST entries to their solution application targets.
   llvm::MapVector<SolutionApplicationTargetsKey, SolutionApplicationTarget>
@@ -2265,10 +2279,6 @@ private:
   /// used for the 'self' of an existential type.
   SmallVector<std::pair<ConstraintLocator *, OpenedArchetypeType *>, 4>
     OpenedExistentialTypes;
-
-  /// The nodes for which we have produced types, along with the prior type
-  /// each node had before introducing this type.
-  llvm::SmallVector<std::pair<ASTNode, Type>, 8> addedNodeTypes;
 
   /// The set of functions that have been transformed by a result builder.
   std::vector<std::pair<AnyFunctionRef, AppliedBuilderTransform>>
@@ -2739,6 +2749,8 @@ public:
 
     unsigned numAddedNodeTypes;
 
+    unsigned numAddedKeyPathComponentTypes;
+
     unsigned numDisabledConstraints;
 
     unsigned numFavoredConstraints;
@@ -2954,10 +2966,15 @@ public:
   /// map is used throughout the expression type checker in order to
   /// avoid mutating expressions until we know we have successfully
   /// type-checked them.
-  void setType(KeyPathExpr *KP, unsigned I, Type T) {
+  void setType(const KeyPathExpr *KP, unsigned I, Type T) {
     assert(KP && "Expected non-null key path parameter!");
     assert(T && "Expected non-null type!");
-    KeyPathComponentTypes[std::make_pair(KP, I)] = T.getPointer();
+
+    Type &entry = KeyPathComponentTypes[{KP, I}];
+    Type oldType = entry;
+    entry = T;
+
+    addedKeyPathComponentTypes.push_back(std::make_tuple(KP, I, oldType));
   }
 
   /// Check to see if we have a type for a node.
@@ -3301,9 +3318,8 @@ public:
                      bool isFavored = false);
 
   /// Add the appropriate constraint for a contextual conversion.
-  void addContextualConversionConstraint(
-      Expr *expr, Type conversionType, ContextualTypePurpose purpose,
-      bool isOpaqueReturnType);
+  void addContextualConversionConstraint(Expr *expr, Type conversionType,
+                                         ContextualTypePurpose purpose);
 
   /// Convenience function to pass an \c ArrayRef to \c addJoinConstraint
   Type addJoinConstraint(ConstraintLocator *locator,
@@ -3838,6 +3854,12 @@ public:
   ///
   /// \returns The opened type, or \c type if there are no archetypes in it.
   Type openType(Type type, OpenedTypeMap &replacements);
+
+  /// "Open" an opaque archetype type.
+  Type openOpaqueType(Type type, ConstraintLocatorBuilder locator);
+
+  /// Recurse over the given type and open any opaque archetype types.
+  Type openOpaqueTypeRec(Type type, ConstraintLocatorBuilder locator);
 
   /// "Open" the given function type.
   ///
@@ -4576,12 +4598,6 @@ private:
                                           TypeMatchOptions flags,
                                           ConstraintLocatorBuilder locator);
 
-  /// Attempt to simplify an OpaqueUnderlyingType constraint.
-  SolutionKind simplifyOpaqueUnderlyingTypeConstraint(Type type1,
-                                              Type type2,
-                                              TypeMatchOptions flags,
-                                              ConstraintLocatorBuilder locator);
-  
   /// Attempt to simplify the BridgingConversion constraint.
   SolutionKind simplifyBridgingConstraint(Type type1,
                                          Type type2,
@@ -4712,10 +4728,10 @@ public:
   ///
   /// \returns \c None when the result builder cannot be applied at all,
   /// otherwise the result of applying the result builder.
-  Optional<TypeMatchResult> matchResultBuilder(
-      AnyFunctionRef fn, Type builderType, Type bodyResultType,
-      ConstraintKind bodyResultConstraintKind,
-      ConstraintLocatorBuilder locator);
+  Optional<TypeMatchResult>
+  matchResultBuilder(AnyFunctionRef fn, Type builderType, Type bodyResultType,
+                     ConstraintKind bodyResultConstraintKind,
+                     ConstraintLocatorBuilder locator);
 
   /// Matches a wrapped or projected value parameter type to its backing
   /// property wrapper type by applying the property wrapper.
@@ -5757,9 +5773,9 @@ bool exprNeedsParensBeforeAddingNilCoalescing(DeclContext *DC,
 // Return true if, when replacing "<expr>" with "<expr> as T", parentheses need
 // to be added around the new expression in order to maintain the correct
 // precedence.
-bool exprNeedsParensAfterAddingNilCoalescing(DeclContext *DC,
-                                             Expr *expr,
-                                             Expr *rootExpr);
+bool exprNeedsParensAfterAddingNilCoalescing(
+    DeclContext *DC, Expr *expr,
+    llvm::function_ref<Expr *(const Expr *)> getParent);
 
 /// Return true if, when replacing "<expr>" with "<expr> op <something>",
 /// parentheses must be added around "<expr>" to allow the new operator
@@ -5768,13 +5784,12 @@ bool exprNeedsParensInsideFollowingOperator(DeclContext *DC,
                                             Expr *expr,
                                             PrecedenceGroupDecl *followingPG);
 
-/// Return true if, when replacing "<expr>" with "<expr> op <something>"
-/// within the given root expression, parentheses must be added around
-/// the new operator to prevent it from binding incorrectly in the
-/// surrounding context.
+/// Return true if, when replacing "<expr>" with "<expr> op <something>",
+/// parentheses must be added around the new operator to prevent it from binding
+/// incorrectly in the surrounding context.
 bool exprNeedsParensOutsideFollowingOperator(
-    DeclContext *DC, Expr *expr, Expr *rootExpr,
-    PrecedenceGroupDecl *followingPG);
+    DeclContext *DC, Expr *expr, PrecedenceGroupDecl *followingPG,
+    llvm::function_ref<Expr *(const Expr *)> getParent);
 
 /// Determine whether this is a SIMD operator.
 bool isSIMDOperator(ValueDecl *value);

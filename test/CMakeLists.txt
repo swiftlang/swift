@@ -134,10 +134,20 @@ set(SWIFT_LIT_ARGS "" CACHE STRING "Arguments to pass to lit")
 set(SWIFT_LIT_ENVIRONMENT "" CACHE STRING "Environment to use for lit invocations")
 
 if(NOT SWIFT_INCLUDE_TOOLS)
-  list(APPEND SWIFT_LIT_ARGS
-       "--path=${SWIFT_NATIVE_LLVM_TOOLS_PATH}"
-       "--path=${SWIFT_NATIVE_CLANG_TOOLS_PATH}"
-       "--path=${SWIFT_NATIVE_SWIFT_TOOLS_PATH}")
+  if(SWIFT_RUN_TESTS_WITH_HOST_COMPILER)
+    precondition(CMAKE_Swift_COMPILER MESSAGE "Can only run tests if a Swift compiler is specified")
+    get_filename_component(SWIFT_COMPILER_DIR "${CMAKE_Swift_COMPILER}" DIRECTORY)
+    precondition(SWIFT_COMPILER_DIR)
+    # We assume that we are building against a toolchain where all tools are
+    # next to swiftc.
+    list(APPEND SWIFT_LIT_ARGS
+      "--path=${SWIFT_COMPILER_DIR}")
+  else()
+    list(APPEND SWIFT_LIT_ARGS
+      "--path=${SWIFT_NATIVE_LLVM_TOOLS_PATH}"
+      "--path=${SWIFT_NATIVE_CLANG_TOOLS_PATH}"
+      "--path=${SWIFT_NATIVE_SWIFT_TOOLS_PATH}")
+  endif()
   if(SWIFT_BUILD_STDLIB)
     list(APPEND SWIFT_LIT_ARGS
          "--param" "test_resource_dir=${SWIFTLIB_DIR}")

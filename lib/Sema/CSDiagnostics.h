@@ -903,7 +903,7 @@ private:
                                                   asPG);
   }
 
-  bool exprNeedsParensAfterAddingAs(const Expr *expr, const Expr *rootExpr) {
+  bool exprNeedsParensAfterAddingAs(const Expr *expr) {
     auto *DC = getDC();
     auto asPG = TypeChecker::lookupPrecedenceGroup(
         DC, DC->getASTContext().Id_CastingPrecedence, SourceLoc()).getSingle();
@@ -911,7 +911,8 @@ private:
       return true;
 
     return exprNeedsParensOutsideFollowingOperator(
-        DC, const_cast<Expr *>(expr), const_cast<Expr *>(rootExpr), asPG);
+        DC, const_cast<Expr *>(expr), asPG,
+        [&](auto *E) { return findParentExpr(E); });
   }
 };
 

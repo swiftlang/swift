@@ -169,10 +169,6 @@ def disable_typo_correction : Flag<["-"], "disable-typo-correction">,
 def disable_implicit_swift_modules: Flag<["-"], "disable-implicit-swift-modules">,
   HelpText<"Disable building Swift modules implicitly by the compiler">;
 
-def swift_module_file
-  : Separate<["-"], "swift-module-file">, MetaVarName<"<path>">,
-    HelpText<"Specify Swift module explicitly built from textual interface">;
-
 def explict_swift_module_map
   : Separate<["-"], "explicit-swift-module-map-file">, MetaVarName<"<path>">,
     HelpText<"Specify a JSON file containing information of explict Swift modules">;
@@ -276,9 +272,6 @@ def debug_constraints_on_line_EQ : Joined<["-"], "debug-constraints-on-line=">,
 
 def disable_named_lazy_member_loading : Flag<["-"], "disable-named-lazy-member-loading">,
   HelpText<"Disable per-name lazy member loading">;
-
-def requirement_machine_EQ : Joined<["-"], "requirement-machine=">,
-  HelpText<"Control usage of experimental generics implementation: 'on', 'off', or 'verify'">;
 
 def debug_requirement_machine : Flag<["-"], "debug-requirement-machine">,
   HelpText<"Enables debugging output from the generics implementation">;
@@ -790,10 +783,6 @@ def read_legacy_type_info_path_EQ : Joined<["-"], "read-legacy-type-info-path=">
 def type_info_dump_filter_EQ : Joined<["-"], "type-info-dump-filter=">,
   Flags<[FrontendOption]>,
   HelpText<"One of 'all', 'resilient' or 'fragile'">;
-
-def emit_ldadd_cfile_path
-  : Separate<["-"], "emit-ldadd-cfile-path">, MetaVarName<"<path>">,
-    HelpText<"Generate .c file defining symbols to add back">;
 
 def previous_module_installname_map_file
   : Separate<["-"], "previous-module-installname-map-file">, MetaVarName<"<path>">,

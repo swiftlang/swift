@@ -943,3 +943,73 @@ bb0(%0 : @owned $AnyObject):
   dealloc_stack %1 : $*Optional<AnyObject>
   return %5 : $Optional<AnyObject>
 }
+
+class Klass {
+}
+
+struct NonTrivialStruct {
+ var klass: Klass
+}
+
+sil [ossa] @get_unsafe_struct : $@convention(thin) () -> UnsafeMutablePointer<NonTrivialStruct>
+
+// TODO: Since builtin "truncOrBitCast_Int64_Word" is on a literal, we should be able to get an access path of (#0)
+// CHECK-LABEL: @test_accesspath_offset1
+// CHECK: ###For MemOp:   %8 = load_borrow %7 : $*Klass
+// CHECK: Unidentified   %3 = struct_extract %2 : $UnsafeMutablePointer<NonTrivialStruct>, #UnsafeMutablePointer._rawValue
+// CHECK: Base:   %3 = struct_extract %2 : $UnsafeMutablePointer<NonTrivialStruct>, #UnsafeMutablePointer._rawValue
+// CHECK: Storage: Unidentified   %3 = struct_extract %2 : $UnsafeMutablePointer<NonTrivialStruct>, #UnsafeMutablePointer._rawValue
+// CHECK: Path: (@Unknown,#0)
+// CHECK: Exact Uses {
+// CHECK: }
+// CHECK: Inner Uses {
+// CHECK: }
+// CHECK: Overlapping Uses {
+// CHECK:   %8 = load_borrow %7 : $*Klass
+// CHECK:   Path: (@Unknown,#0)
+// CHECK: }
+sil [ossa] @test_accesspath_offset1 : $@convention(thin) () -> () {
+bb0:
+ %0 = integer_literal $Builtin.Int64, 0
+ %1 = function_ref @get_unsafe_struct : $@convention(thin) () -> UnsafeMutablePointer<NonTrivialStruct>
+ %2 = apply %1() : $@convention(thin) () -> UnsafeMutablePointer<NonTrivialStruct>
+ %3 = struct_extract %2 : $UnsafeMutablePointer<NonTrivialStruct>, #UnsafeMutablePointer._rawValue
+ %4 = builtin "truncOrBitCast_Int64_Word"(%0 : $Builtin.Int64) : $Builtin.Word
+ %5 = pointer_to_address %3 : $Builtin.RawPointer to [strict] $*NonTrivialStruct
+ %6 = index_addr %5 : $*NonTrivialStruct, %4 : $Builtin.Word
+ %7 = struct_element_addr %6 : $*NonTrivialStruct, #NonTrivialStruct.klass
+ %8 = load_borrow %7 : $*Klass
+ end_borrow %8 : $Klass
+ %ret = tuple ()
+ return %ret : $()
+}
+
+// CHECK-LABEL: @test_accesspath_offset2
+// CHECK: ###For MemOp:   %8 = load_borrow %7 : $*Klass                   // user: %9
+// CHECK: Unidentified   %3 = struct_extract %2 : $UnsafeMutablePointer<NonTrivialStruct>, #UnsafeMutablePointer._rawValue // user: %5
+// CHECK: Base:   %3 = struct_extract %2 : $UnsafeMutablePointer<NonTrivialStruct>, #UnsafeMutablePointer._rawValue // user: %5
+// CHECK: Storage: Unidentified   %3 = struct_extract %2 : $UnsafeMutablePointer<NonTrivialStruct>, #UnsafeMutablePointer._rawValue // user: %5
+// CHECK: Path: (@Unknown,#0)
+// CHECK: Exact Uses {
+// CHECK: }
+// CHECK: Inner Uses {
+// CHECK: }
+// CHECK: Overlapping Uses {
+// CHECK:   %8 = load_borrow %7 : $*Klass                   // user: %9
+// CHECK:   Path: (@Unknown,#0)
+// CHECK: }
+sil [ossa] @test_accesspath_offset2 : $@convention(thin) (Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64):
+ %1 = function_ref @get_unsafe_struct : $@convention(thin) () -> UnsafeMutablePointer<NonTrivialStruct>
+ %2 = apply %1() : $@convention(thin) () -> UnsafeMutablePointer<NonTrivialStruct>
+ %3 = struct_extract %2 : $UnsafeMutablePointer<NonTrivialStruct>, #UnsafeMutablePointer._rawValue
+ %4 = builtin "truncOrBitCast_Int64_Word"(%0 : $Builtin.Int64) : $Builtin.Word
+ %5 = pointer_to_address %3 : $Builtin.RawPointer to [strict] $*NonTrivialStruct
+ %6 = index_addr %5 : $*NonTrivialStruct, %4 : $Builtin.Word
+ %7 = struct_element_addr %6 : $*NonTrivialStruct, #NonTrivialStruct.klass
+ %8 = load_borrow %7 : $*Klass
+ end_borrow %8 : $Klass
+ %ret = tuple ()
+ return %ret : $()
+}
+

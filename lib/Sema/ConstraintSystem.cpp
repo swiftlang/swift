@@ -844,6 +844,44 @@ Type ConstraintSystem::openType(Type type, OpenedTypeMap &replacements) {
     });
 }
 
+Type ConstraintSystem::openOpaqueType(Type type,
+                                      ConstraintLocatorBuilder locator) {
+  auto opaque = type->castTo<OpaqueTypeArchetypeType>();
+  auto opaqueLocator = locator.withPathElement(
+      LocatorPathElt::OpenedOpaqueArchetype(opaque->getDecl()));
+
+  // Open the generic signature of the opaque decl, and bind the "outer" generic
+  // params to our context. The remaining axes of freedom on the type variable
+  // corresponding to the underlying type should be the constraints on the
+  // underlying return type.
+  OpenedTypeMap replacements;
+  openGeneric(DC, opaque->getBoundSignature(), opaqueLocator, replacements);
+
+  auto underlyingTyVar = openType(opaque->getInterfaceType(), replacements);
+  assert(underlyingTyVar);
+
+  for (auto param : DC->getGenericSignatureOfContext().getGenericParams()) {
+    addConstraint(ConstraintKind::Bind, openType(param, replacements),
+                  DC->mapTypeIntoContext(param), opaqueLocator);
+  }
+
+  return underlyingTyVar;
+}
+
+Type ConstraintSystem::openOpaqueTypeRec(Type type,
+                                         ConstraintLocatorBuilder locator) {
+  // Early return if `type` is `NULL` or if there are no opaque archetypes (in
+  // which case there is certainly nothing for us to do).
+  if (!type || !type->hasOpaqueArchetype())
+    return type;
+
+  return type.transform([&](Type type) -> Type {
+    if (type->is<OpaqueTypeArchetypeType>())
+      return openOpaqueType(type, locator);
+    return type;
+  });
+}
+
 FunctionType *ConstraintSystem::openFunctionType(
        AnyFunctionType *funcType,
        ConstraintLocatorBuilder locator,
@@ -5379,23 +5417,11 @@ bool SolutionApplicationTarget::infersOpaqueReturnType() const {
   assert(kind == Kind::expression);
   switch (expression.contextualPurpose) {
   case CTP_Initialization:
-    if (Type convertType = expression.convertType.getType()) {
-      return convertType->is<OpaqueTypeArchetypeType>();
-    }
-    return false;
-
   case CTP_ReturnStmt:
   case CTP_ReturnSingleExpr:
-    if (Type convertType = expression.convertType.getType()) {
-      if (auto opaqueType = convertType->getAs<OpaqueTypeArchetypeType>()) {
-        auto dc = getDeclContext();
-        if (auto func = dyn_cast<AbstractFunctionDecl>(dc)) {
-          return opaqueType->getDecl()->isOpaqueReturnTypeOfFunction(func);
-        }
-      }
-    }
+    if (Type convertType = expression.convertType.getType())
+      return convertType->hasOpaqueArchetype();
     return false;
-
   default:
     return false;
   }

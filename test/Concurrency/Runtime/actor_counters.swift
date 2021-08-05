@@ -36,6 +36,11 @@ actor Counter {
   }
 }
 
+// Produce a random priority.
+nonisolated var randomPriority: TaskPriority? {
+  let priorities: [TaskPriority?] = [ .background, .low, .medium, .high, nil ]
+  return priorities.randomElement()!
+}
 
 @available(SwiftStdlib 5.5, *)
 func worker(identity: Int, counters: [Counter], numIterations: Int) async {
@@ -59,8 +64,8 @@ func runTest(numCounters: Int, numWorkers: Int, numIterations: Int) async {
   var workers: [Task.Handle<Void, Error>] = []
   for i in 0..<numWorkers {
     workers.append(
-      detach { [counters] in
-        await Task.sleep(UInt64.random(in: 0..<100) * 1_000_000)
+      Task.detached(priority: randomPriority) { [counters] in
+        await try! Task.sleep(nanoseconds: UInt64.random(in: 0..<100) * 1_000_000)
         await worker(identity: i, counters: counters, numIterations: numIterations)
       }
     )

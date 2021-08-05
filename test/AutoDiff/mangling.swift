@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -enable-experimental-forward-mode-differentiation -module-name=mangling -verify %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -enable-experimental-forward-mode-differentiation -module-name=mangling -verify %s -requirement-machine=off | %FileCheck %s
 
 import _Differentiation
 

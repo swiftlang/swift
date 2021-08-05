@@ -1762,3 +1762,23 @@ func rdar70764991() {
     bar(str, S.foo) // expected-error {{unnamed argument #1 must precede unnamed argument #2}}  {{9-12=}} {{14-14=str}}
   }
 }
+
+func testExtraTrailingClosure() {
+  func foo() {}
+  foo() {} // expected-error@:9 {{extra trailing closure passed in call}}
+  foo {} // expected-error@:7 {{extra trailing closure passed in call}}
+  foo {} x: {} // expected-error@:7 {{argument passed to call that takes no arguments}}
+
+  func bar(_ x: Int) {} // expected-note 2{{'bar' declared here}}
+  bar(5) {} // expected-error@:10 {{extra trailing closure passed in call}}
+  bar(0) {} x: {} // expected-error@:6 {{extra trailing closures at positions #2, #3 in call}}
+  bar(5, "") {} // expected-error@:6 {{extra arguments at positions #2, #3 in call}}
+
+  func baz(_ fn: () -> Void) {} // expected-note {{'baz' declared here}}
+  baz {} x: {} // expected-error@:13 {{extra trailing closure passed in call}}
+  baz({}) {} // expected-error@:11 {{extra trailing closure passed in call}}
+  baz({}) {} y: {} // expected-error@:6 {{extra trailing closures at positions #2, #3 in call}}
+
+  func qux(x: () -> Void, y: () -> Void, z: () -> Void) {} // expected-note {{'qux(x:y:z:)' declared here}}
+  qux() {} m: {} y: {} n: {} z: {} o: {} // expected-error@:6 {{extra trailing closures at positions #2, #4, #6 in call}}
+}

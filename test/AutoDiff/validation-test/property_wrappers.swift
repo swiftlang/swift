@@ -1,6 +1,6 @@
-// RUN: %target-run-simple-swift
+// RUN: %target-run-simple-swift(-Xfrontend -requirement-machine=off)
 // TODO(TF-1254): Support and test forward-mode differentiation.
-// TODO(TF-1254): %target-run-simple-swift(-Xfrontend -enable-experimental-forward-mode-differentiation)
+// TODO(TF-1254): %target-run-simple-swift(-Xfrontend -enable-experimental-forward-mode-differentiation -Xfrontend -requirement-machine=off)
 // REQUIRES: executable_test
 
 import StdlibUnittest
