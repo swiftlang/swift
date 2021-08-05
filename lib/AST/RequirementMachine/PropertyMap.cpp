@@ -291,9 +291,8 @@ static MutableTerm getRelativeTermForType(CanType typeWitness,
   }
 
   // Add the member type names.
-  std::reverse(symbols.begin(), symbols.end());
-  for (auto symbol : symbols)
-    result.add(symbol);
+  for (auto iter = symbols.rbegin(), end = symbols.rend(); iter != end; ++iter)
+    result.add(*iter);
 
   return result;
 }
