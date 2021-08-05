@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeCheckAvailability.h"
+#include "TypeCheckConcurrency.h"
 #include "TypeChecker.h"
 #include "TypeCheckObjC.h"
 #include "MiscDiagnostics.h"
@@ -1872,7 +1873,7 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
     auto argList = getOriginalArgumentList(argExpr);
 
     size_t numElementsWithinParens = argList.args.size();
-    numElementsWithinParens -= argList.hasTrailingClosure;
+    numElementsWithinParens -= argList.getNumTrailingClosures();
     if (selfIndex >= numElementsWithinParens)
       return;
 
@@ -2120,18 +2121,16 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
     return;
   }
 
-  auto argumentLabelsToCheck = llvm::makeArrayRef(argumentLabelIDs);
-  // The argument label for a trailing closure is ignored.
-  if (argList.hasTrailingClosure)
-    argumentLabelsToCheck = argumentLabelsToCheck.drop_back();
-
-  if (std::equal(argumentLabelsToCheck.begin(), argumentLabelsToCheck.end(),
-                 argList.labels.begin())) {
-    // Already matching.
-    return;
+  // If any of the argument labels are mismatched, perform label correction.
+  for (auto i : indices(argList.args)) {
+    // The argument label of an unlabeled trailing closure is ignored.
+    if (argList.isUnlabeledTrailingClosureIdx(i))
+      continue;
+    if (argumentLabelIDs[i] != argList.labels[i]) {
+      diagnoseArgumentLabelError(ctx, argExpr, argumentLabelIDs, false, &diag);
+      return;
+    }
   }
-
-  diagnoseArgumentLabelError(ctx, argExpr, argumentLabelIDs, false, &diag);
 }
 
 // Must be kept in sync with diag::availability_decl_unavailable_rename and
@@ -3480,6 +3479,12 @@ void swift::diagnoseTypeAvailability(const TypeRepr *TR, Type T, SourceLoc loc,
   diagnoseTypeAvailability(T, loc, where, flags);
 }
 
+static void diagnoseMissingConformance(
+    SourceLoc loc, Type type, ProtocolDecl *proto) {
+  assert(proto->isSpecificProtocol(KnownProtocolKind::Sendable));
+  diagnoseMissingSendableConformance(loc, type);
+}
+
 bool
 swift::diagnoseConformanceAvailability(SourceLoc loc,
                                        ProtocolConformanceRef conformance,
@@ -3492,6 +3497,15 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
 
   const ProtocolConformance *concreteConf = conformance.getConcrete();
   const RootProtocolConformance *rootConf = concreteConf->getRootConformance();
+
+  // Diagnose "missing" conformances where we needed a conformance but
+  // didn't have one.
+  if (auto builtinConformance = dyn_cast<BuiltinProtocolConformance>(rootConf)){
+    if (builtinConformance->isMissing()) {
+      diagnoseMissingConformance(loc, builtinConformance->getType(),
+                                 builtinConformance->getProtocol());
+    }
+  }
 
   auto *DC = where.getDeclContext();
 

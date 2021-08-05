@@ -108,7 +108,7 @@ extension _ArrayBuffer {
     if !_isClassOrObjCExistential(Element.self) {
       return _storage.isUniquelyReferencedUnflaggedNative()
     }
-    return _storage.isUniquelyReferencedNative() && _isNative
+    return _storage.isUniquelyReferencedNative()
    }
   
   /// Returns `true` and puts the buffer in a mutable state iff the buffer's

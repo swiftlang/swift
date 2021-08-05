@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -verify %s %S/Inputs/nontrivial_loadable_type.swift
+// RUN: %target-swift-frontend -emit-sil -verify %s %S/Inputs/nontrivial_loadable_type.swift -requirement-machine=off
 // REQUIRES: asserts
 
 // Test property wrapper differentiation coverage for a variety of property

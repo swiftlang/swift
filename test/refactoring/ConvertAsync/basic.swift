@@ -16,12 +16,12 @@ typealias NestedAliasCallback = SomeCallback
 // RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+4):1 | %FileCheck -check-prefix=ASYNC-SIMPLE %s
 // RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+3):6 | %FileCheck -check-prefix=ASYNC-SIMPLE %s
 // RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+2):12 | %FileCheck -check-prefix=ASYNC-SIMPLE %s
-// RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):13 | %FileCheck -check-prefix=ASYNC-SIMPLE %s
-func simple(completion: (String) -> Void) { }
+// RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):20 | %FileCheck -check-prefix=ASYNC-SIMPLE %s
+func simple(/*cs*/ completion: @escaping (String) -> Void /*ce*/) { }
 // ASYNC-SIMPLE: basic.swift [[# @LINE-1]]:1 -> [[# @LINE-1]]:1
 // ASYNC-SIMPLE-NEXT: @available(*, renamed: "simple()")
 // ASYNC-SIMPLE-EMPTY:
-// ASYNC-SIMPLE-NEXT: basic.swift [[# @LINE-4]]:43 -> [[# @LINE-4]]:46
+// ASYNC-SIMPLE-NEXT: basic.swift [[# @LINE-4]]:67 -> [[# @LINE-4]]:70
 // ASYNC-SIMPLE-NEXT: {
 // ASYNC-SIMPLE-NEXT: Task {
 // ASYNC-SIMPLE-NEXT: let result = await simple()
@@ -29,11 +29,11 @@ func simple(completion: (String) -> Void) { }
 // ASYNC-SIMPLE-NEXT: }
 // ASYNC-SIMPLE-NEXT: }
 // ASYNC-SIMPLE-EMPTY:
-// ASYNC-SIMPLE-NEXT: basic.swift [[# @LINE-12]]:46 -> [[# @LINE-12]]:46
+// ASYNC-SIMPLE-NEXT: basic.swift [[# @LINE-12]]:70 -> [[# @LINE-12]]:70
 // ASYNC-SIMPLE-EMPTY:
 // ASYNC-SIMPLE-EMPTY:
 // ASYNC-SIMPLE-EMPTY:
-// ASYNC-SIMPLE-NEXT: basic.swift [[# @LINE-16]]:46 -> [[# @LINE-16]]:46
+// ASYNC-SIMPLE-NEXT: basic.swift [[# @LINE-16]]:70 -> [[# @LINE-16]]:70
 // ASYNC-SIMPLE-NEXT: func simple() async -> String { }
 
 // RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=ASYNC-SIMPLENOLABEL %s
@@ -47,14 +47,14 @@ func simpleWithoutLabel(_ completion: @escaping (String) -> Void) { }
 // ASYNC-SIMPLENOLABEL: func simpleWithoutLabel() async -> String { }
 
 // RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=ASYNC-SIMPLEWITHARG %s
-func simpleWithArg(a: Int, completion: @escaping (String) -> Void) { }
+func simpleWithArg(/*c1s*/ a: Int /*c1e*/, /*c2s*/ completion: @escaping (String) -> Void /*c2e*/) { }
 // ASYNC-SIMPLEWITHARG: {
 // ASYNC-SIMPLEWITHARG-NEXT: Task {
 // ASYNC-SIMPLEWITHARG-NEXT: let result = await simpleWithArg(a: a)
 // ASYNC-SIMPLEWITHARG-NEXT: completion(result)
 // ASYNC-SIMPLEWITHARG-NEXT: }
 // ASYNC-SIMPLEWITHARG-NEXT: }
-// ASYNC-SIMPLEWITHARG: func simpleWithArg(a: Int) async -> String { }
+// ASYNC-SIMPLEWITHARG: func simpleWithArg(/*c1s*/ a: Int /*c1e*/) async -> String { }
 
 // RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=ASYNC-MULTIPLERESULTS %s
 func multipleResults(completion: @escaping (String, Int) -> Void) { }
@@ -381,21 +381,15 @@ protocol MyProtocol {
 func nonCompletion(a: Int) { }
 // NON-COMPLETION: func nonCompletion(a: Int) async { }
 
-// Converted for now, but we shouldn't count this as a completion handler
-// RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=NON-ESCAPING-COMPLETION %s
+// RUN: not %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+2):1
 // RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=NON-ESCAPING-COMPLETION %s
 func nonEscapingCompletion(completion: (Int) -> Void) { }
-// NON-ESCAPING-COMPLETION: func nonEscapingCompletion() async -> Int { }
+// NON-ESCAPING-COMPLETION: func nonEscapingCompletion(completion: (Int) -> Void) async { }
 
 // RUN: not %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+2):1
 // RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=MULTIPLE-RESULTS %s
 func multipleResults(completion: @escaping (Result<String, Error>, Result<String, Error>) -> Void) { }
 // MULTIPLE-RESULTS: func multipleResults(completion: @escaping (Result<String, Error>, Result<String, Error>) -> Void) async { }
-
-// RUN: not %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+2):1
-// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=NOT-LAST %s
-func completionNotLast(completion: @escaping (String) -> Void, a: Int) { }
-// NOT-LAST: func completionNotLast(completion: @escaping (String) -> Void, a: Int) async { }
 
 // RUN: not %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+2):1
 // RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=NON-VOID %s

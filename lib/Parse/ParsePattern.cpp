@@ -168,7 +168,8 @@ bool Parser::startsParameterName(bool isClosure) {
   // If the next token can be an argument label, we might have a name.
   if (nextTok.canBeArgumentLabel()) {
     // If the first name wasn't "isolated", we're done.
-    if (!Tok.isContextualKeyword("isolated"))
+    if (!Tok.isContextualKeyword("isolated") &&
+        !Tok.isContextualKeyword("some"))
       return true;
 
     // "isolated" can be an argument label, but it's also a contextual keyword,

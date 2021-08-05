@@ -229,6 +229,22 @@ extension Slice: Collection {
   }
 }
 
+extension Slice {
+  @_alwaysEmitIntoClient
+  public __consuming func _copyContents(
+      initializing buffer: UnsafeMutableBufferPointer<Element>
+  ) -> (Iterator, UnsafeMutableBufferPointer<Element>.Index) {
+    if let (_, copied) = self.withContiguousStorageIfAvailable({
+      $0._copyContents(initializing: buffer)
+    }) {
+      let position = index(startIndex, offsetBy: copied)
+      return (Iterator(_elements: self, _position: position), copied)
+    }
+
+    return _copySequenceContents(initializing: buffer)
+  }
+}
+
 extension Slice: BidirectionalCollection where Base: BidirectionalCollection {
   @inlinable // generic-performance
   public func index(before i: Index) -> Index {

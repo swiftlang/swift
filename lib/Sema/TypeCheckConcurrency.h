@@ -245,6 +245,9 @@ bool diagnoseNonConcurrentTypesInReference(
     ConcurrentReferenceKind refKind,
     DiagnosticBehavior behavior = DiagnosticBehavior::Unspecified);
 
+/// Produce a diagnostic for a missing conformance to Sendable.
+void diagnoseMissingSendableConformance(SourceLoc loc, Type type);
+
 /// How the concurrent value check should be performed.
 enum class SendableCheck {
   /// Sendable conformance was explicitly stated and should be

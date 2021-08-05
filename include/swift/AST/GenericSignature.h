@@ -373,7 +373,8 @@ public:
   /// T: Foo or T == U (etc.) with the information it knows. This includes
   /// checking against global state, if any/all of the types in the requirement
   /// are concrete, not type parameters.
-  bool isRequirementSatisfied(Requirement requirement) const;
+  bool isRequirementSatisfied(
+      Requirement requirement, bool allowMissing = false) const;
 
   /// Return the requirements of this generic signature that are not also
   /// satisfied by \c otherSig.

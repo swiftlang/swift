@@ -258,7 +258,7 @@ public protocol Numeric: AdditiveArithmetic, ExpressibleByIntegerLiteral {
   static func *=(lhs: inout Self, rhs: Self)
 }
 
-/// A type that can represent both positive and negative values.
+/// A numeric type with a negation operation.
 ///
 /// The `SignedNumeric` protocol extends the operations defined by the
 /// `Numeric` protocol to include a value's additive inverse.

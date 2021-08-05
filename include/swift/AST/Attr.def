@@ -670,6 +670,9 @@ SIMPLE_DECL_ATTR(_assemblyVision, EmitAssemblyVisionRemarks,
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   120)
 
+// If you're adding a new underscored attribute here, please document it in
+// docs/ReferenceGuides/UnderscoredAttributes.md.
+
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

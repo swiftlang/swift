@@ -886,17 +886,10 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     } else if (Attr->RenameDecl) {
       Printer << ", renamed: \"";
       if (auto *Accessor = dyn_cast<AccessorDecl>(Attr->RenameDecl)) {
-        switch (Accessor->getAccessorKind()) {
-        case AccessorKind::Get:
-          Printer << "getter:";
-          break;
-        case AccessorKind::Set:
-          Printer << "setter:";
-          break;
-        default:
-          break;
-        }
-        Printer << Accessor->getStorage()->getName() << "()";
+        SmallString<32> Name;
+        llvm::raw_svector_ostream OS(Name);
+        Accessor->printUserFacingName(OS);
+        Printer << Name.str();
       } else {
         Printer << Attr->RenameDecl->getName();
       }
