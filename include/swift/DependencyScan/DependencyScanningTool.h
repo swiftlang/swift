@@ -59,7 +59,7 @@ public:
 
   /// Writes the current `SharedCache` instance to a specified FileSystem path.
   void serializeCache(llvm::StringRef path);
-  /// Loads an instance of a `ModuleDependenciesCache` to serve as the `SharedCache`
+  /// Loads an instance of a `GlobalModuleDependenciesCache` to serve as the `SharedCache`
   /// from a specified FileSystem path.
   bool loadCache(llvm::StringRef path);
   /// Discard the tool's current `SharedCache` and start anew.
@@ -73,7 +73,7 @@ private:
 
   /// Shared cache of module dependencies, re-used by individual full-scan queries
   /// during the lifetime of this Tool.
-  std::unique_ptr<ModuleDependenciesCache> SharedCache;
+  std::unique_ptr<GlobalModuleDependenciesCache> SharedCache;
 
   /// Shared cache of compiler instances created during batch scanning, corresponding to
   /// command-line options specified in the batch scan input entry.
