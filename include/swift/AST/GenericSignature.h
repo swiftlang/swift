@@ -140,9 +140,6 @@ public:
 
   explicit operator bool() const { return Ptr != 0; }
 
-  /// Whether the given set of requirements involves a type variable.
-  static bool hasTypeVariable(ArrayRef<Requirement> requirements);
-
   friend llvm::hash_code hash_value(GenericSignature sig) {
     using llvm::hash_value;
     return hash_value(sig.getPointer());
@@ -198,9 +195,6 @@ public:
 
   /// Retrieve the requirements.
   ArrayRef<Requirement> getRequirements() const;
-
-  /// Whether this generic signature involves a type variable.
-  bool hasTypeVariable() const;
 
   /// Returns the generic environment that provides fresh contextual types
   /// (archetypes) that correspond to the interface types in this generic
