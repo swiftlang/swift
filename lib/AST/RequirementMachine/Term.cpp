@@ -101,6 +101,7 @@ Term Term::get(const MutableTerm &mutableTerm, RewriteContext &ctx) {
     term->getElements()[i] = mutableTerm[i];
 
   ctx.Terms.InsertNode(term, insertPos);
+  ctx.TermHistogram.add(size);
 
   return term;
 }

@@ -19,6 +19,13 @@
 using namespace swift;
 using namespace rewriting;
 
+RewriteContext::RewriteContext(ASTContext &ctx)
+    : Context(ctx),
+      Stats(ctx.Stats),
+      SymbolHistogram(Symbol::NumKinds),
+      TermHistogram(4, /*Start=*/1) {
+}
+
 Term RewriteContext::getTermForType(CanType paramType,
                                     const ProtocolDecl *proto) {
   return Term::get(getMutableTermForType(paramType, proto), *this);
@@ -271,4 +278,16 @@ Type RewriteContext::getRelativeTypeForTerm(
   return getTypeForSymbolRange(
       term.begin() + prefix.size(), term.end(), genericParam,
       { }, protos, Context);
+}
+
+/// We print stats in the destructor, which should get executed at the end of
+/// a compilation job.
+RewriteContext::~RewriteContext() {
+  if (Context.LangOpts.AnalyzeRequirementMachine) {
+    llvm::dbgs() << "--- Requirement Machine Statistics ---\n";
+    llvm::dbgs() << "\n* Symbol kind:\n";
+    SymbolHistogram.dump(llvm::dbgs(), Symbol::Kinds);
+    llvm::dbgs() << "\n* Term length:\n";
+    TermHistogram.dump(llvm::dbgs());
+  }
 }

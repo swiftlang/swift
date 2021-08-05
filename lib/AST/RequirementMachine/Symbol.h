@@ -109,6 +109,10 @@ public:
     ConcreteType,
   };
 
+  static const unsigned NumKinds = 7;
+
+  static const StringRef Kinds[];
+
 private:
   friend class RewriteContext;
 

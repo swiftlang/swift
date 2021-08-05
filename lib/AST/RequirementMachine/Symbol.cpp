@@ -24,6 +24,16 @@
 using namespace swift;
 using namespace rewriting;
 
+const StringRef Symbol::Kinds[] = {
+  "protocol",
+  "assocty",
+  "generic",
+  "name",
+  "layout",
+  "super",
+  "concrete"
+};
+
 /// Symbols are uniqued and immutable, stored as a single pointer;
 /// the Storage type is the allocated backing storage.
 struct Symbol::Storage final
@@ -209,6 +219,7 @@ Symbol Symbol::forName(Identifier name,
 #endif
 
   ctx.Symbols.InsertNode(symbol, insertPos);
+  ctx.SymbolHistogram.add(unsigned(Kind::Name));
 
   return symbol;
 }
@@ -237,6 +248,7 @@ Symbol Symbol::forProtocol(const ProtocolDecl *proto,
 #endif
 
   ctx.Symbols.InsertNode(symbol, insertPos);
+  ctx.SymbolHistogram.add(unsigned(Kind::Protocol));
 
   return symbol;
 }
@@ -280,6 +292,7 @@ Symbol Symbol::forAssociatedType(ArrayRef<const ProtocolDecl *> protos,
 #endif
 
   ctx.Symbols.InsertNode(symbol, insertPos);
+  ctx.SymbolHistogram.add(unsigned(Kind::AssociatedType));
 
   return symbol;
 }
@@ -310,6 +323,7 @@ Symbol Symbol::forGenericParam(GenericTypeParamType *param,
 #endif
 
   ctx.Symbols.InsertNode(symbol, insertPos);
+  ctx.SymbolHistogram.add(unsigned(Kind::GenericParam));
 
   return symbol;
 }
@@ -336,6 +350,7 @@ Symbol Symbol::forLayout(LayoutConstraint layout,
 #endif
 
   ctx.Symbols.InsertNode(symbol, insertPos);
+  ctx.SymbolHistogram.add(unsigned(Kind::Layout));
 
   return symbol;
 }
@@ -367,6 +382,7 @@ Symbol Symbol::forSuperclass(CanType type, ArrayRef<Term> substitutions,
 #endif
 
   ctx.Symbols.InsertNode(symbol, insertPos);
+  ctx.SymbolHistogram.add(unsigned(Kind::Superclass));
 
   return symbol;
 }
@@ -397,6 +413,7 @@ Symbol Symbol::forConcreteType(CanType type, ArrayRef<Term> substitutions,
 #endif
 
   ctx.Symbols.InsertNode(symbol, insertPos);
+  ctx.SymbolHistogram.add(unsigned(Kind::ConcreteType));
 
   return symbol;
 }

@@ -134,12 +134,7 @@ class RewriteSystem final {
   unsigned DebugCompletion : 1;
 
 public:
-  explicit RewriteSystem(RewriteContext &ctx) : Context(ctx) {
-    DebugSimplify = false;
-    DebugAdd = false;
-    DebugMerge = false;
-    DebugCompletion = false;
-  }
+  explicit RewriteSystem(RewriteContext &ctx);
 
   RewriteSystem(const RewriteSystem &) = delete;
   RewriteSystem(RewriteSystem &&) = delete;

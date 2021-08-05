@@ -23,6 +23,14 @@
 using namespace swift;
 using namespace rewriting;
 
+RewriteSystem::RewriteSystem(RewriteContext &ctx)
+    : Context(ctx) {
+  DebugSimplify = false;
+  DebugAdd = false;
+  DebugMerge = false;
+  DebugCompletion = false;
+}
+
 void Rule::dump(llvm::raw_ostream &out) const {
   out << LHS << " => " << RHS;
   if (deleted)
