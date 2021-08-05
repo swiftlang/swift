@@ -21,7 +21,7 @@ func boom() async throws -> Int {
 @available(SwiftStdlib 5.5, *)
 func test_taskGroup_throws() async {
   let got: Int = try await withThrowingTaskGroup(of: Int.self) { group in
-    group.spawn { try await boom()  }
+    group.addTask { try await boom()  }
 
     do {
       while let r = try await group.next() {
@@ -33,19 +33,24 @@ func test_taskGroup_throws() async {
       let gc = group.isCancelled
       print("group cancelled: \(gc)")
 
-      group.spawn { () async -> Int in
+      group.addTask { () async -> Int in
         let c = Task.isCancelled
         print("task 3 (cancelled: \(c))")
         return 3
       }
 
-      guard let third = try! await group.next() else {
+      switch await group.nextResult() {
+      case .success(let third):
+        print("task group returning normally: \(third)")
+        return third
+
+      case .failure(let error):
+        fatalError("got an erroneous third result")
+
+      case .none:
         print("task group failed to get 3")
         return 0
       }
-
-      print("task group returning normally: \(third)")
-      return third
     }
 
     fatalError("Should have thrown and handled inside the catch block")
