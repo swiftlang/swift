@@ -52,6 +52,10 @@ func simpleWrapperParameterCaller(projection: Projection<Int>) {
 
   testSimpleWrapperParameter($value: projection)
   // CHECK: function_ref @$s26property_wrapper_parameter26testSimpleWrapperParameter5valueyAA0F0VySiG_tFACL_SivpfW : $@convention(thin) (Projection<Int>) -> Wrapper<Int>
+
+  var x: Int = 10
+  testSimpleWrapperParameter(value: x)
+  // CHECK: function_ref @$s26property_wrapper_parameter26testSimpleWrapperParameter5valueyAA0F0VySiG_tFACL_SivpfP : $@convention(thin) (Int) -> Wrapper<Int>
 }
 
 // CHECK-LABEL: sil [ossa] @$s26property_wrapper_parameter18testGenericWrapper5valueyAA0F0VyxG_tlF : $@convention(thin) <T> (@in_guaranteed Wrapper<T>) -> ()
@@ -71,6 +75,41 @@ func genericWrapperCaller(projection: Projection<Int>) {
 
   testGenericWrapper($value: projection)
   // CHECK: function_ref @$s26property_wrapper_parameter18testGenericWrapper5valueyAA0F0VyxG_tlFACL_xvpfW : $@convention(thin) <τ_0_0> (@in Projection<τ_0_0>) -> @out Wrapper<τ_0_0>
+
+  var x: Int = 10
+  testGenericWrapper(value: x)
+  // CHECK: function_ref @$s26property_wrapper_parameter18testGenericWrapper5valueyAA0F0VyxG_tlFACL_xvpfP : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out Wrapper<τ_0_0>
+}
+
+@propertyWrapper
+public struct AutoClosureWrapper<T> {
+  public var wrappedValue: T
+
+  // CHECK-LABEL: sil [ossa] @$s26property_wrapper_parameter18AutoClosureWrapperV12wrappedValueACyxGxyXK_tcfC : $@convention(method) <T> (@noescape @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <T>, @thin AutoClosureWrapper<T>.Type) -> @out AutoClosureWrapper<T>
+  public init(wrappedValue: @autoclosure () -> T) {
+    self.wrappedValue = wrappedValue()
+  }
+
+  public var projectedValue: Projection<T> {
+    Projection(wrappedValue: wrappedValue)
+  }
+
+  public init(projectedValue: Projection<T>) {
+    self.wrappedValue = projectedValue.wrappedValue
+  }
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s26property_wrapper_parameter22testAutoClosureWrapper5valueyAA0efG0VyxG_tlF : $@convention(thin) <T> (@in_guaranteed AutoClosureWrapper<T>) -> ()
+func testAutoClosureWrapper<T>(@AutoClosureWrapper value: T) {
+  // property wrapper backing initializer of value #1 in testAutoClosureWrapper<A>(value:)
+  // CHECK-LABEL: sil private [ossa] @$s26property_wrapper_parameter22testAutoClosureWrapper5valueyAA0efG0VyxG_tlFACL_xvpfP : $@convention(thin) <T> (@noescape @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <T>) -> @out AutoClosureWrapper<T>
+  // CHECK: function_ref @$s26property_wrapper_parameter18AutoClosureWrapperV12wrappedValueACyxGxyXK_tcfC : $@convention(method) <τ_0_0> (@noescape @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <τ_0_0>, @thin AutoClosureWrapper<τ_0_0>.Type) -> @out AutoClosureWrapper<τ_0_0>
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s26property_wrapper_parameter24autoClosureWrapperCalleryyF : $@convention(thin) () -> ()
+func autoClosureWrapperCaller() {
+  testAutoClosureWrapper(value: 10)
+  // CHECK: function_ref @$s26property_wrapper_parameter22testAutoClosureWrapper5valueyAA0efG0VyxG_tlFACL_xvpfP : $@convention(thin) <τ_0_0> (@noescape @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <τ_0_0>) -> @out AutoClosureWrapper<τ_0_0>
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s26property_wrapper_parameter33testSimpleClosureWrapperParameteryyF : $@convention(thin) () -> ()
