@@ -4414,7 +4414,7 @@ RValue SILGenFunction::emitApply(
   }
 
   ExecutorBreadcrumb breadcrumb;
-  
+
   // The presence of `implicitActorHopTarget` indicates that the callee is a
   // synchronous function isolated to an actor other than our own.
   // Such functions require the caller to hop to the callee's executor
@@ -4440,7 +4440,8 @@ RValue SILGenFunction::emitApply(
     }
 
     breadcrumb = emitHopToTargetExecutor(loc, executor);
-  } else if (ExpectedExecutor && substFnType->isAsync()) {
+  } else if (ExpectedExecutor &&
+             (substFnType->isAsync() || calleeTypeInfo.foreign.async)) {
     // Otherwise, if we're in an actor method ourselves, and we're calling into
     // any sort of async function, we'll want to make sure to hop back to our
     // own executor afterward, since the callee could have made arbitrary hops
@@ -4457,8 +4458,10 @@ RValue SILGenFunction::emitApply(
     rawDirectResult = rawDirectResults[0];
   }
 
-  // hop back to the current executor
-  breadcrumb.emit(*this, loc);
+  if (!calleeTypeInfo.foreign.async) {
+    // hop back to the current executor
+    breadcrumb.emit(*this, loc);
+  }
 
   // For objc async calls, lifetime extend the args until the result plan which
   // generates `await_async_continuation`.
@@ -4570,6 +4573,9 @@ RValue SILGenFunction::emitApply(
       B.emitFixLifetime(loc, value);
       B.emitDestroyOperation(loc, value);
     }
+
+    // hop back to the current executor
+    breadcrumb.emit(*this, loc);
   }
 
   return result;
