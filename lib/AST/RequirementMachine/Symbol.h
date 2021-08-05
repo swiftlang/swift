@@ -191,6 +191,8 @@ public:
                                 ArrayRef<Term> substitutions,
                                 RewriteContext &ctx);
 
+  ArrayRef<const ProtocolDecl *> getRootProtocols() const;
+
   int compare(Symbol other, const ProtocolGraph &protos) const;
 
   Symbol transformConcreteSubstitutions(

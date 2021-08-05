@@ -1063,16 +1063,21 @@ RewriteSystem::buildPropertyMap(PropertyMap &map,
     if (rule.isDeleted())
       continue;
 
-    const auto &lhs = rule.getLHS();
+    auto lhs = rule.getLHS();
+    auto rhs = rule.getRHS();
 
     // Collect all rules of the form T.[p] => T where T is canonical.
     auto property = lhs.back();
     if (!property.isProperty())
       continue;
 
-    MutableTerm key(lhs.begin(), lhs.end() - 1);
-    if (key != rule.getRHS())
+    if (lhs.size() - 1 != rhs.size())
       continue;
+
+    if (!std::equal(rhs.begin(), rhs.end(), lhs.begin()))
+      continue;
+
+    MutableTerm key(rhs);
 
 #ifndef NDEBUG
     assert(!simplify(key) &&

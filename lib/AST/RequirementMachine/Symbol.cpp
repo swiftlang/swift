@@ -418,6 +418,34 @@ Symbol Symbol::forConcreteType(CanType type, ArrayRef<Term> substitutions,
   return symbol;
 }
 
+/// Given that this symbol is the first symbol of a term, return the
+/// "domain" of the term.
+///
+/// - If the first symbol is a protocol symbol [P], the domain is P.
+/// - If the first symbol is an associated type symbol [P1&...&Pn],
+///   the domain is {P1, ..., Pn}.
+/// - If the first symbol is a generic parameter symbol, the domain is
+///   the empty set {}.
+/// - Anything else will assert.
+ArrayRef<const ProtocolDecl *> Symbol::getRootProtocols() const {
+  switch (getKind()) {
+  case Symbol::Kind::Protocol:
+  case Symbol::Kind::AssociatedType:
+    return getProtocols();
+
+  case Symbol::Kind::GenericParam:
+    return ArrayRef<const ProtocolDecl *>();
+
+  case Symbol::Kind::Name:
+  case Symbol::Kind::Layout:
+  case Symbol::Kind::Superclass:
+  case Symbol::Kind::ConcreteType:
+    break;
+  }
+
+  llvm_unreachable("Bad root symbol");
+}
+
 /// Linear order on symbols.
 ///
 /// First, we order different kinds as follows, from smallest to largest:

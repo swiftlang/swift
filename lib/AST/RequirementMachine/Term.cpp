@@ -106,40 +106,20 @@ Term Term::get(const MutableTerm &mutableTerm, RewriteContext &ctx) {
   return term;
 }
 
+/// Find the start of \p other in this term, returning end() if
+/// \p other does not occur as a subterm of this term.
+ArrayRef<Symbol>::iterator Term::findSubTerm(Term other) const {
+  if (other.size() > size())
+    return end();
+
+  return std::search(begin(), end(), other.begin(), other.end());
+}
+
 void Term::Storage::Profile(llvm::FoldingSetNodeID &id) const {
   id.AddInteger(Size);
 
   for (auto symbol : getElements())
     id.AddPointer(symbol.getOpaquePointer());
-}
-
-/// Returns the "domain" of this term by looking at the first symbol.
-///
-/// - If the first symbol is a protocol symbol [P], the domain is P.
-/// - If the first symbol is an associated type symbol [P1&...&Pn],
-///   the domain is {P1, ..., Pn}.
-/// - If the first symbol is a generic parameter symbol, the domain is
-///   the empty set {}.
-/// - Anything else will assert.
-ArrayRef<const ProtocolDecl *> MutableTerm::getRootProtocols() const {
-  auto symbol = *begin();
-
-  switch (symbol.getKind()) {
-  case Symbol::Kind::Protocol:
-  case Symbol::Kind::AssociatedType:
-    return symbol.getProtocols();
-
-  case Symbol::Kind::GenericParam:
-    return ArrayRef<const ProtocolDecl *>();
-
-  case Symbol::Kind::Name:
-  case Symbol::Kind::Layout:
-  case Symbol::Kind::Superclass:
-  case Symbol::Kind::ConcreteType:
-    break;
-  }
-
-  llvm_unreachable("Bad root symbol");
 }
 
 /// Shortlex order on terms.
@@ -170,7 +150,7 @@ int MutableTerm::compare(const MutableTerm &other,
 /// Find the start of \p other in this term, returning end() if
 /// \p other does not occur as a subterm of this term.
 decltype(MutableTerm::Symbols)::const_iterator
-MutableTerm::findSubTerm(const MutableTerm &other) const {
+MutableTerm::findSubTerm(Term other) const {
   if (other.size() > size())
     return end();
 
@@ -179,7 +159,7 @@ MutableTerm::findSubTerm(const MutableTerm &other) const {
 
 /// Non-const variant of the above.
 decltype(MutableTerm::Symbols)::iterator
-MutableTerm::findSubTerm(const MutableTerm &other) {
+MutableTerm::findSubTerm(Term other) {
   if (other.size() > size())
     return end();
 
@@ -191,8 +171,7 @@ MutableTerm::findSubTerm(const MutableTerm &other) {
 /// order on terms. Returns true if the term contained \p lhs;
 /// otherwise returns false, in which case the term remains
 /// unchanged.
-bool MutableTerm::rewriteSubTerm(const MutableTerm &lhs,
-                                 const MutableTerm &rhs) {
+bool MutableTerm::rewriteSubTerm(Term lhs, Term rhs) {
   // Find the start of lhs in this term.
   auto found = findSubTerm(lhs);
 

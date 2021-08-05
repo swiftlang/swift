@@ -77,6 +77,21 @@ public:
 
   static Term get(const MutableTerm &term, RewriteContext &ctx);
 
+  OverlapKind checkForOverlap(Term other,
+                              MutableTerm &t,
+                              MutableTerm &v) const;
+
+  ArrayRef<Symbol>::iterator findSubTerm(Term other) const;
+
+  /// Returns true if this term contains, or is equal to, \p other.
+  bool containsSubTerm(Term other) const {
+    return findSubTerm(other) != end();
+  }
+
+  ArrayRef<const ProtocolDecl *> getRootProtocols() const {
+    return begin()->getRootProtocols();
+  }
+
   void dump(llvm::raw_ostream &out) const;
 
   friend bool operator==(Term lhs, Term rhs) {
@@ -144,7 +159,9 @@ public:
 
   size_t size() const { return Symbols.size(); }
 
-  ArrayRef<const ProtocolDecl *> getRootProtocols() const;
+  ArrayRef<const ProtocolDecl *> getRootProtocols() const {
+    return begin()->getRootProtocols();
+  }
 
   decltype(Symbols)::const_iterator begin() const { return Symbols.begin(); }
   decltype(Symbols)::const_iterator end() const { return Symbols.end(); }
@@ -174,22 +191,11 @@ public:
     return Symbols[index];
   }
 
-  decltype(Symbols)::const_iterator findSubTerm(
-      const MutableTerm &other) const;
+  decltype(Symbols)::const_iterator findSubTerm(Term other) const;
 
-  decltype(Symbols)::iterator findSubTerm(
-      const MutableTerm &other);
+  decltype(Symbols)::iterator findSubTerm(Term other);
 
-  /// Returns true if this term contains, or is equal to, \p other.
-  bool containsSubTerm(const MutableTerm &other) const {
-    return findSubTerm(other) != end();
-  }
-
-  bool rewriteSubTerm(const MutableTerm &lhs, const MutableTerm &rhs);
-
-  OverlapKind checkForOverlap(const MutableTerm &other,
-                              MutableTerm &t,
-                              MutableTerm &v) const;
+  bool rewriteSubTerm(Term lhs, Term rhs);
 
   void dump(llvm::raw_ostream &out) const;
 

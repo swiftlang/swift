@@ -36,16 +36,16 @@ class RewriteContext;
 ///
 /// Out-of-line methods are documented in RewriteSystem.cpp.
 class Rule final {
-  MutableTerm LHS;
-  MutableTerm RHS;
+  Term LHS;
+  Term RHS;
   bool deleted;
 
 public:
-  Rule(const MutableTerm &lhs, const MutableTerm &rhs)
+  Rule(Term lhs, Term rhs)
       : LHS(lhs), RHS(rhs), deleted(false) {}
 
-  const MutableTerm &getLHS() const { return LHS; }
-  const MutableTerm &getRHS() const { return RHS; }
+  const Term &getLHS() const { return LHS; }
+  const Term &getRHS() const { return RHS; }
 
   bool apply(MutableTerm &term) const {
     return term.rewriteSubTerm(LHS, RHS);
@@ -79,12 +79,6 @@ public:
   /// Returns the length of the left hand side.
   unsigned getDepth() const {
     return LHS.size();
-  }
-
-  /// Partial order on rules orders rules by their left hand side.
-  int compare(const Rule &other,
-              const ProtocolGraph &protos) const {
-    return LHS.compare(other.LHS, protos);
   }
 
   void dump(llvm::raw_ostream &out) const;

@@ -89,7 +89,7 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs) {
   }
 
   unsigned i = Rules.size();
-  Rules.emplace_back(lhs, rhs);
+  Rules.emplace_back(Term::get(lhs, Context), Term::get(rhs, Context));
 
   // Check if we have a rule of the form
   //
@@ -171,9 +171,11 @@ void RewriteSystem::simplifyRightHandSides() {
     if (rule.isDeleted())
       continue;
 
-    auto rhs = rule.getRHS();
-    simplify(rhs);
-    rule = Rule(rule.getLHS(), rhs);
+    MutableTerm rhs(rule.getRHS());
+    if (!simplify(rhs))
+      continue;
+
+    rule = Rule(rule.getLHS(), Term::get(rhs, Context));
   }
 
 #ifndef NDEBUG
