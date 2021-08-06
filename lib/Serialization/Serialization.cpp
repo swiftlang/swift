@@ -4544,6 +4544,11 @@ public:
                                      S.addTypeRef(dictTy->getValueType()));
   }
 
+  void visitVariadicSequenceType(const VariadicSequenceType *seqTy) {
+    using namespace decls_block;
+    serializeSimpleWrapper<VariadicSequenceTypeLayout>(seqTy->getBaseType());
+  }
+
   void visitOptionalType(const OptionalType *optionalTy) {
     using namespace decls_block;
     serializeSimpleWrapper<OptionalTypeLayout>(optionalTy->getBaseType());
@@ -4747,6 +4752,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<SILFunctionTypeLayout>();
   registerDeclTypeAbbr<ArraySliceTypeLayout>();
   registerDeclTypeAbbr<DictionaryTypeLayout>();
+  registerDeclTypeAbbr<VariadicSequenceTypeLayout>();
   registerDeclTypeAbbr<ReferenceStorageTypeLayout>();
   registerDeclTypeAbbr<UnboundGenericTypeLayout>();
   registerDeclTypeAbbr<OptionalTypeLayout>();
