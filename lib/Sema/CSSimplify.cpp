@@ -12006,7 +12006,7 @@ void ConstraintSystem::addContextualConversionConstraint(
   // Add the constraint.
   auto *convertTypeLocator =
       getConstraintLocator(expr, LocatorPathElt::ContextualType(purpose));
-  auto openedType = openOpaqueTypeRec(conversionType, convertTypeLocator);
+  auto openedType = openOpaqueType(conversionType, purpose, convertTypeLocator);
   addConstraint(constraintKind, getType(expr), openedType, convertTypeLocator,
                 /*isFavored*/ true);
 }
