@@ -903,41 +903,31 @@ OwnershipRAUWHelper::OwnershipRAUWHelper(OwnershipFixupContext &inputCtx,
   //
   // NOTE: We also need to handle this here since a pointer_to_address is not a
   // valid base value for an access path since it doesn't refer to any storage.
-  {
-    auto baseProj =
-        getUnderlyingObjectStoppingAtObjectToAddrProjections(newValue);
-    if (isa<PointerToAddressInst>(baseProj)) {
-      return;
-    }
-  }
+  BorrowedAddress borrowedAddress(newValue);
+  if (!borrowedAddress.mayBeBorrowed)
+    return;
 
-  auto accessPathWithBase = AccessPathWithBase::compute(newValue);
-  if (!accessPathWithBase.base) {
+  if (!borrowedAddress.interiorPointerOp) {
     // Invalidate!
     ctx = nullptr;
     return;
   }
 
-  auto &intPtr = ctx->extraAddressFixupInfo.intPtrOp;
-  intPtr = InteriorPointerOperand::inferFromResult(accessPathWithBase.base);
-  if (!intPtr) {
-    // We can optimize! Do not invalidate!
-    return;
-  }
-
-  auto borrowedValue = intPtr.getSingleBaseValue();
+  ctx->extraAddressFixupInfo.intPtrOp = borrowedAddress.interiorPointerOp;
+  auto borrowedValue = borrowedAddress.interiorPointerOp.getSingleBaseValue();
   if (!borrowedValue) {
     // Invalidate!
     ctx = nullptr;
     return;
   }
 
+  auto *intPtrInst =
+    cast<SingleValueInstruction>(borrowedAddress.interiorPointerOp.getUser());
+  auto checkBase = [&](SILValue srcAddr) {
+    return (srcAddr == intPtrInst) ? SILValue(intPtrInst) : SILValue();
+  };
   // This cloner check must match the later cloner invocation in
   // replaceAddressUses()
-  auto *intPtrUser = cast<SingleValueInstruction>(intPtr->getUser());
-  auto checkBase = [&](SILValue srcAddr) {
-    return (srcAddr == intPtrUser) ? SILValue(intPtrUser) : SILValue();
-  };
   if (!canCloneUseDefChain(newValue, checkBase)) {
     ctx = nullptr;
     return;

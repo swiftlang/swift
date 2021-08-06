@@ -727,6 +727,8 @@ struct InteriorPointerOperand {
     return kind != InteriorPointerOperandKind::Invalid && operand;
   }
 
+  SILInstruction *getUser() const { return operand->getUser(); }
+
   /// If \p op has a user that is an interior pointer, return a valid
   /// value. Otherwise, return None.
   static InteriorPointerOperand get(Operand *op) {
@@ -833,6 +835,25 @@ private:
   /// its usage since it assumes the code passed in is well formed.
   InteriorPointerOperand(Operand *op, InteriorPointerOperandKind kind)
       : operand(op), kind(kind) {}
+};
+
+/// Utility to check if an address may originate from a borrowed value. If so,
+/// then uses of the address cannot be replaced without ensuring that they are
+/// also within the same scope.
+///
+/// If mayBeBorrowed is false, then there is no enclosing borrow scope and
+/// interiorPointerOp is irrelevant.
+///
+/// If mayBeBorrowed is true, then interiorPointerOp refers to the operand that
+/// converts a non-address value into the address from which the contructor's
+/// address is derived. If the best-effort to find an InteriorPointerOperand
+/// fails, then interiorPointerOp remains invalid, and clients must be
+/// conservative.
+struct BorrowedAddress {
+  bool mayBeBorrowed = true;
+  InteriorPointerOperand interiorPointerOp;
+
+  BorrowedAddress(SILValue address);
 };
 
 class OwnedValueIntroducerKind {
