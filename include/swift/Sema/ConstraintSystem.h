@@ -1706,6 +1706,10 @@ public:
   static SolutionApplicationTarget forUninitializedWrappedVar(
       VarDecl *wrappedVar);
 
+  /// Form a target for a synthesized property wrapper initializer.
+  static SolutionApplicationTarget forPropertyWrapperInitializer(
+      VarDecl *wrappedVar, DeclContext *dc, Expr *initializer);
+
   Expr *getAsExpr() const {
     switch (kind) {
     case Kind::expression:
@@ -1813,7 +1817,7 @@ public:
   bool isOptionalSomePatternInit() const {
     return kind == Kind::expression &&
         expression.contextualPurpose == CTP_Initialization &&
-        isa<OptionalSomePattern>(expression.pattern) &&
+        dyn_cast_or_null<OptionalSomePattern>(expression.pattern) &&
         !expression.pattern->isImplicit();
   }
 
@@ -1837,7 +1841,9 @@ public:
 
     // Don't create property wrapper generator functions for static variables and
     // local variables with initializers.
-    if (wrappedVar->isStatic() || wrappedVar->getDeclContext()->isLocalContext())
+    bool hasInit = expression.propertyWrapper.hasInitialWrappedValue;
+    if (wrappedVar->isStatic() ||
+        (hasInit && wrappedVar->getDeclContext()->isLocalContext()))
       return false;
 
     return expression.propertyWrapper.innermostWrappedValueInit == apply;

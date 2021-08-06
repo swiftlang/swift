@@ -2138,10 +2138,10 @@ void ASTMangler::appendContext(const DeclContext *ctx, StringRef useModuleName) 
       auto wrapperInit = cast<PropertyWrapperInitializer>(ctx);
       switch (wrapperInit->getKind()) {
       case PropertyWrapperInitializer::Kind::WrappedValue:
-        appendBackingInitializerEntity(wrapperInit->getParam());
+        appendBackingInitializerEntity(wrapperInit->getWrappedVar());
         break;
       case PropertyWrapperInitializer::Kind::ProjectedValue:
-        appendInitFromProjectedValueEntity(wrapperInit->getParam());
+        appendInitFromProjectedValueEntity(wrapperInit->getWrappedVar());
         break;
       }
       return;
