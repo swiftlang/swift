@@ -62,7 +62,14 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs) {
   assert(!lhs.empty());
   assert(!rhs.empty());
 
-  // Simplify the rule as much as possible with the rules we have so far.
+  // First, simplify terms appearing inside concrete substitutions before
+  // doing anything else.
+  if (lhs.back().isSuperclassOrConcreteType())
+    lhs.back() = simplifySubstitutionsInSuperclassOrConcreteSymbol(lhs.back());
+  else if (rhs.back().isSuperclassOrConcreteType())
+    rhs.back() = simplifySubstitutionsInSuperclassOrConcreteSymbol(rhs.back());
+
+  // Now simplify both sides as much as possible with the rules we have so far.
   //
   // This avoids unnecessary work in the completion algorithm.
   simplify(lhs);
@@ -78,9 +85,6 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs) {
   // right hand side.
   if (result < 0)
     std::swap(lhs, rhs);
-
-  if (lhs.back().isSuperclassOrConcreteType())
-    lhs.back() = simplifySubstitutionsInSuperclassOrConcreteSymbol(lhs.back());
 
   assert(lhs.compare(rhs, Protos) > 0);
 
