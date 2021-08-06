@@ -2084,8 +2084,10 @@ void Serializer::writePatternBindingInitializer(PatternBindingDecl *binding,
   StringRef initStr;
   SmallString<128> scratch;
   auto varDecl = binding->getAnchoringVarDecl(bindingIndex);
+  assert((varDecl || allowCompilerErrors()) &&
+         "Serializing PDB without anchoring VarDecl");
   if (binding->hasInitStringRepresentation(bindingIndex) &&
-      varDecl->isInitExposedToClients()) {
+      varDecl && varDecl->isInitExposedToClients()) {
     initStr = binding->getInitStringRepresentation(bindingIndex, scratch);
   }
 
