@@ -408,6 +408,15 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
             continue;
           paramIndices.push_back(index);
         }
+        auto blockParamIndex = [paramIndices](unsigned long i) {
+          // The non-error, non-flag block parameter (formal types of the
+          // completion handler's arguments) indices are the same as the the
+          // parameter (lowered types of the completion handler's arguments)
+          // indices but shifted by 1 corresponding to the fact that the lowered
+          // completion handler has a block_storage argument but the formal type
+          // does not.
+          return paramIndices[i] - 1;
+        };
         if (auto resumeTuple = dyn_cast<TupleType>(resumeType)) {
           assert(paramIndices.size() == resumeTuple->getNumElements());
           assert(params.size() == resumeTuple->getNumElements()
@@ -421,7 +430,8 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
                 F->mapTypeIntoContext(resumeTuple.getElementTypes()[i])
                     ->getCanonicalType(),
                 /*arg*/ params[paramIndices[i]],
-                /*argFormalType*/ blockParams[i].getParameterType());
+                /*argFormalType*/
+                blockParams[blockParamIndex(i)].getParameterType());
           }
         } else {
           assert(paramIndices.size() == 1);
@@ -430,7 +440,8 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
                           /*destFormalType*/
                           F->mapTypeIntoContext(resumeType)->getCanonicalType(),
                           /*arg*/ params[paramIndices[0]],
-                          /*argFormalType*/ blockParams[0].getParameterType());
+                          /*argFormalType*/
+                          blockParams[blockParamIndex(0)].getParameterType());
         }
         
         // Resume the continuation with the composed bridged result.
