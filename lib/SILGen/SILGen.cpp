@@ -1256,11 +1256,8 @@ void SILGenModule::emitDifferentiabilityWitnessesForFunction(
               diffAttr->getDerivativeGenericSignature()) &&
              "Type-checking should resolve derivative generic signatures for "
              "all original SIL functions with generic signatures");
-      auto numResults =
-          F->getLoweredFunctionType()->getNumResults() +
-          F->getLoweredFunctionType()->getNumIndirectMutatingParameters();
-      auto *resultIndices = IndexSubset::getDefault(
-          getASTContext(), numResults, /*includeAll*/ true);
+      auto *resultIndices =
+          autodiff::getAllFunctionSemanticResultIndices(AFD);
       auto witnessGenSig =
           autodiff::getDifferentiabilityWitnessGenericSignature(
               AFD->getGenericSignature(),
@@ -1289,11 +1286,8 @@ void SILGenModule::emitDifferentiabilityWitnessesForFunction(
       auto witnessGenSig =
           autodiff::getDifferentiabilityWitnessGenericSignature(
               origAFD->getGenericSignature(), AFD->getGenericSignature());
-      auto numResults =
-          origFn->getLoweredFunctionType()->getNumResults() +
-          origFn->getLoweredFunctionType()->getNumIndirectMutatingParameters();
-      auto *resultIndices = IndexSubset::getDefault(
-          getASTContext(), numResults, /*includeAll*/ true);
+      auto *resultIndices =
+          autodiff::getAllFunctionSemanticResultIndices(origAFD);
       AutoDiffConfig config(derivAttr->getParameterIndices(), resultIndices,
                             witnessGenSig);
       emitDifferentiabilityWitness(origAFD, origFn,

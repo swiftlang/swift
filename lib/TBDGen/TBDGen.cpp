@@ -730,22 +730,27 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
 
   // Add derivative function symbols.
   for (const auto *differentiableAttr :
-       AFD->getAttrs().getAttributes<DifferentiableAttr>())
+       AFD->getAttrs().getAttributes<DifferentiableAttr>()) {
+    auto *resultIndices =
+        autodiff::getAllFunctionSemanticResultIndices(AFD);
     addDerivativeConfiguration(
         differentiableAttr->getDifferentiabilityKind(),
         AFD,
         AutoDiffConfig(differentiableAttr->getParameterIndices(),
-                       IndexSubset::get(AFD->getASTContext(), 1, {0}),
+                       resultIndices,
                        differentiableAttr->getDerivativeGenericSignature()));
+  }
   for (const auto *derivativeAttr :
-       AFD->getAttrs().getAttributes<DerivativeAttr>())
+       AFD->getAttrs().getAttributes<DerivativeAttr>()) {
+    auto *resultIndices = autodiff::getAllFunctionSemanticResultIndices(
+        derivativeAttr->getOriginalFunction(AFD->getASTContext()));
     addDerivativeConfiguration(
         DifferentiabilityKind::Reverse,
         derivativeAttr->getOriginalFunction(AFD->getASTContext()),
         AutoDiffConfig(derivativeAttr->getParameterIndices(),
-                       IndexSubset::get(AFD->getASTContext(), 1, {0}),
+                       resultIndices,
                        AFD->getGenericSignature()));
-
+  }
   visitDefaultArguments(AFD, AFD->getParameters());
 
   if (AFD->hasAsync()) {
