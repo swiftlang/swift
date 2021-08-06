@@ -422,6 +422,11 @@ ConstraintSystem::SolverState::~SolverState() {
          "Expected constraint system to have this solver state!");
   CS.solverState = nullptr;
 
+  // If constraint system ended up being in an invalid state
+  // let's just drop the state without attempting to rollback.
+  if (CS.inInvalidState())
+    return;
+
   // Make sure that all of the retired constraints have been returned
   // to constraint system.
   assert(!hasRetiredConstraints());
@@ -513,6 +518,10 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
 }
 
 ConstraintSystem::SolverScope::~SolverScope() {
+  // Don't attempt to rollback from an incorrect state.
+  if (cs.inInvalidState())
+    return;
+
   // Erase the end of various lists.
   while (cs.TypeVariables.size() > numTypeVariables)
     cs.TypeVariables.pop_back();
