@@ -170,3 +170,30 @@ func testGeneric2<T: AnyObject, U>(x: GenericObject<T>, y: U) async throws {
 // CHECK:   [[RESULT_1_BUF:%.*]] = tuple_element_addr [[RESULT_BUF]] {{.*}}, 1
 // CHECK:   store %2 to [trivial] [[RESULT_1_BUF]]
 
+// CHECK-LABEL: sil {{.*}}@${{.*}}22testSlowServerFromMain
+@MainActor
+func testSlowServerFromMain(slowServer: SlowServer) async throws {
+  // CHECK: hop_to_executor %6 : $MainActor
+  // CHECK: [[RESUME_BUF:%.*]] = alloc_stack $Int
+  // CHECK: [[STRINGINIT:%.*]] = function_ref @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF :
+  // CHECK: [[ARG:%.*]] = apply [[STRINGINIT]]
+  // CHECK: [[METHOD:%.*]] = objc_method {{.*}} $@convention(objc_method) (NSString, @convention(block) (Int) -> (), SlowServer) -> ()
+  // CHECK: [[CONT:%.*]] = get_async_continuation_addr Int, [[RESUME_BUF]]
+  // CHECK: [[WRAPPED:%.*]] = struct $UnsafeContinuation<Int, Never> ([[CONT]] : $Builtin.RawUnsafeContinuation)
+  // CHECK: [[BLOCK_STORAGE:%.*]] = alloc_stack $@block_storage UnsafeContinuation<Int, Never>
+  // CHECK: [[CONT_SLOT:%.*]] = project_block_storage [[BLOCK_STORAGE]]
+  // CHECK: store [[WRAPPED]] to [trivial] [[CONT_SLOT]]
+  // CHECK: [[BLOCK_IMPL:%.*]] = function_ref @[[INT_COMPLETION_BLOCK:.*]] : $@convention(c) (@inout_aliasable @block_storage UnsafeContinuation<Int, Never>, Int) -> ()
+  // CHECK: [[BLOCK:%.*]] = init_block_storage_header [[BLOCK_STORAGE]] {{.*}}, invoke [[BLOCK_IMPL]]
+  // CHECK: apply [[METHOD]]([[ARG]], [[BLOCK]], %0)
+  // CHECK: [[COPY:%.*]] = copy_value [[ARG]]
+  // CHECK: destroy_value [[ARG]]
+  // CHECK: await_async_continuation [[CONT]] {{.*}}, resume [[RESUME:bb[0-9]+]]
+  // CHECK: [[RESUME]]:
+  // CHECK: [[RESULT:%.*]] = load [trivial] [[RESUME_BUF]]
+  // CHECK: fix_lifetime [[COPY]]
+  // CHECK: destroy_value [[COPY]]
+  // CHECK: hop_to_executor %6 : $MainActor
+  // CHECK: dealloc_stack [[RESUME_BUF]]
+  let _: Int = await slowServer.doSomethingSlow("mail")
+}
