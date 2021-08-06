@@ -4208,10 +4208,15 @@ ConstructorDecl *NominalTypeDecl::getDefaultInitializer() const {
                            SynthesizeDefaultInitRequest{mutableThis}, nullptr);
 }
 
-bool NominalTypeDecl::hasDistributedActorLocalInitializer() const {
+bool NominalTypeDecl::hasUserDefinedDesignatedInit() const {
+  // Imported decls don't have a designated initializer defined by the user.
+  if (hasClangNode())
+    return false;
+
   auto &ctx = getASTContext();
   auto *mutableThis = const_cast<NominalTypeDecl *>(this);
-  return evaluateOrDefault(ctx.evaluator, HasDistributedActorLocalInitRequest{mutableThis},
+  return evaluateOrDefault(ctx.evaluator,
+                           HasUserDefinedDesignatedInitRequest{mutableThis},
                            false);
 }
 
@@ -4242,7 +4247,7 @@ void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
         if ((member.isSimpleName() || argumentNames.front() == Context.Id_from)) {
           action.emplace(ImplicitMemberAction::ResolveDecodable);
         } else if (argumentNames.front() == Context.Id_transport) {
-          action.emplace(ImplicitMemberAction::ResolveDistributedActor);
+          action.emplace(ImplicitMemberAction::ResolveDistributedActorTransport);
         }
       } else if (!baseName.isSpecial() &&
            baseName.getIdentifier() == Context.Id_encode &&

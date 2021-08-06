@@ -3367,7 +3367,11 @@ public:
   /// for types that are not global actors.
   VarDecl *getGlobalActorInstance() const;
 
-  bool hasDistributedActorLocalInitializer() const;
+  /// Check if the declaration has an user-defined initializer.
+  /// If so, we may want to e.g. not generate a default initializer etc.
+  ///
+  /// \returns true if the decl has an user-defined designated initializer.
+  bool hasUserDefinedDesignatedInit() const;
 
   /// Whether this type is a global actor, which can be used as an
   /// attribute to decorate declarations for inclusion in the actor-isolated

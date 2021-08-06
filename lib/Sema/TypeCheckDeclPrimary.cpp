@@ -2406,6 +2406,10 @@ public:
                      /*distributed=*/CD->isDistributedActor());
     }
 
+    if (CD->isDistributedActor()) {
+      TypeChecker::checkDistributedActor(CD);
+    }
+
     // Force lowering of stored properties.
     (void) CD->getStoredProperties();
 

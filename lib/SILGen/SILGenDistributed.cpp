@@ -36,6 +36,44 @@ using namespace Lowering;
 /****************** DISTRIBUTED ACTOR STORAGE INITIALIZATION ******************/
 /******************************************************************************/
 
+/// Get the `ActorTransport` parameter of the constructor.
+/// Sema should have guaranteed that there is exactly one of them for any
+/// designated initializer of a distributed actor.
+static SILArgument*
+getActorTransportArgument(ASTContext& C, SILFunction& F, ConstructorDecl *ctor) {
+  auto *DC = cast<DeclContext>(ctor);
+  auto module = DC->getParentModule();
+
+  auto *transportProto =
+      C.getProtocol(KnownProtocolKind::ActorTransport);
+  Type transportTy = transportProto->getDeclaredInterfaceType();
+
+  for (auto arg : F.getArguments()) {
+    // TODO(distributed): also be able to locate a generic transport
+    Type argTy = arg->getType().getASTType();
+    auto argDecl = arg->getDecl();
+    argTy->dump();
+    argDecl->dump();
+
+    auto conformsToTransport = module->lookupConformance(
+        argDecl->getInterfaceType(), transportProto);
+
+    // Is it a protocol that conforms to ActorTransport?
+    if (argTy->isEqual(transportTy) || conformsToTransport) {
+      return arg;
+    }
+
+    // Is it some specific ActorTransport?
+    auto result = module->lookupConformance(argTy, transportProto);
+    if (!result.isInvalid()) {
+      return arg;
+    }
+  }
+
+  // did not find argument of ActorTransport type!
+  llvm_unreachable("Missing required ActorTransport argument!");
+}
+
 
 static AbstractFunctionDecl*
 lookupAssignIdentityFunc(ASTContext& C) {
@@ -56,8 +94,11 @@ lookupAssignIdentityFunc(ASTContext& C) {
 /// // }
 /// \endverbatim
 static void
-emitDistributedActorTransportInit(SILGenFunction &SGF, ManagedValue borrowedSelfArg, VarDecl *selfDecl, ConstructorDecl *ctor,
-                                  Pattern *pattern, VarDecl *var) {
+emitDistributedActorTransportInit(
+    SILGenFunction &SGF,
+    ManagedValue borrowedSelfArg, VarDecl *selfDecl,
+    ConstructorDecl *ctor,
+    Pattern *pattern, VarDecl *var) {
   auto &C = selfDecl->getASTContext();
   auto &B = SGF.B;
   auto &F = SGF.F;
@@ -71,7 +112,7 @@ emitDistributedActorTransportInit(SILGenFunction &SGF, ManagedValue borrowedSelf
   SGF.F.dump();
 
   // ==== Prepare assignment: get the self.transport address
-  SILValue transportArgValue = F.getArgument(0);
+  SILValue transportArgValue = getActorTransportArgument(C, F, ctor);
   ManagedValue transportArgManaged = ManagedValue::forUnmanaged(transportArgValue);
   auto transportDecl = C.getActorTransportDecl();
 
@@ -96,10 +137,11 @@ emitDistributedActorTransportInit(SILGenFunction &SGF, ManagedValue borrowedSelf
 /// // }
 /// \endverbatim
 static void
-emitDistributedActorIdentityInit(SILGenFunction &SGF,
-                                 ManagedValue borrowedSelfArg,
-                                 VarDecl *selfVarDecl, ConstructorDecl *ctor,
-                                 Pattern *pattern, VarDecl *var) {
+emitDistributedActorIdentityInit(
+    SILGenFunction &SGF,
+    ManagedValue borrowedSelfArg, VarDecl *selfVarDecl,
+    ConstructorDecl *ctor,
+    Pattern *pattern, VarDecl *var) {
   auto &C = selfVarDecl->getASTContext();
   auto &B = SGF.B;
   auto &F = SGF.F;
@@ -120,8 +162,8 @@ emitDistributedActorIdentityInit(SILGenFunction &SGF,
   auto assignIdentityFnRef = SILDeclRef(assignIdentityFuncDecl);
 
   // === Open the transport existential before call
-  SILValue transportArgValue = F.getArgument(0);
-  SILValue selfArgValue = F.getArgument(1);
+  SILValue transportArgValue = getActorTransportArgument(C, F, ctor);
+  SILValue selfArgValue = F.getSelfArgument();
   ProtocolDecl *distributedActorProto = C.getProtocol(KnownProtocolKind::DistributedActor);
   ProtocolDecl *transportProto = C.getProtocol(KnownProtocolKind::ActorTransport);
   assert(distributedActorProto);
@@ -137,8 +179,6 @@ emitDistributedActorIdentityInit(SILGenFunction &SGF,
       loc, transportArgValue, openedTransportSILType, OpenedExistentialAccess::Immutable);
 
   // --- prepare `Self.self` metatype
-  // TODO: how to get @dynamic_self, do we need it?
-  //       %14 = metatype $@thick @dynamic_self DA_DefaultDeinit.Type // type-defs: %1; user: %16
   auto *selfTyDecl = ctor->getParent()->getSelfNominalTypeDecl();
   // This would be bad: since not ok for generic
   // auto selfMetatype = SGF.getLoweredType(selfTyDecl->getInterfaceType());
@@ -161,11 +201,6 @@ emitDistributedActorIdentityInit(SILGenFunction &SGF,
   //      openedTransportType, transportProto);
   auto transportConfRef = ProtocolConformanceRef(transportProto);
   assert(!transportConfRef.isInvalid() && "Missing conformance to `ActorTransport`");
-
-//  fprintf(stderr, "[%s:%d] (%s) selfArg->getType()\n", __FILE__, __LINE__, __FUNCTION__);
-//  selfArg.getType().dump();
-//  fprintf(stderr, "[%s:%d] (%s) distributedActorProto\n", __FILE__, __LINE__, __FUNCTION__);
-//  distributedActorProto->dump();
 
   auto selfTy = F.mapTypeIntoContext(selfTyDecl->getDeclaredInterfaceType()); // TODO: thats just self var devl getType
 
@@ -235,6 +270,13 @@ void SILGenFunction::initializeDistributedActorImplicitStorageInit(
   auto *dc = ctor->getDeclContext();
   auto classDecl = dc->getSelfClassDecl();
   auto &C = classDecl->getASTContext();
+
+  // Only designated initializers get the lifecycle handling injected
+  if (!ctor->isDesignatedInit()) {
+    fprintf(stderr, "[%s:%d] (%s) NOT DESIGNATED INIT SKIP\n", __FILE__, __LINE__, __FUNCTION__);
+
+    return;
+  }
 
   SILLocation prologueLoc = RegularLocation(ctor);
   prologueLoc.markAsPrologue(); // TODO: no idea if this is necessary or makes sense

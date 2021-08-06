@@ -40,78 +40,6 @@ using namespace swift;
 /******************************* INITIALIZERS *********************************/
 /******************************************************************************/
 
-// ==== Distributed Actor: Local Initializer -----------------------------------
-
-/// Creates a new \c CallExpr representing
-///
-///     transport.assignIdentity(Self.self)
-///
-/// \param C The AST context to create the expression in.
-/// \param DC The \c DeclContext to create any decls in.
-/// \param base The base expression to make the call on.
-/// \param returnType The return type of the call.
-/// \param param The parameter to the call.
-static CallExpr *
-createCall_DistributedActor_transport_assignIdentity(ASTContext &C,
-                                                    DeclContext *DC,
-                                                    Expr *base, Type returnType,
-                                                    Type param) {
-  // (_ actorType:)
-  auto *paramDecl = new (C) ParamDecl(SourceLoc(),
-                                      SourceLoc(), Identifier(),
-                                      SourceLoc(), C.Id_actorType, DC);
-  paramDecl->setImplicit();
-  paramDecl->setSpecifier(ParamSpecifier::Default);
-  paramDecl->setInterfaceType(returnType);
-
-  // transport.assignIdentity(_:) expr
-  auto *paramList = ParameterList::createWithoutLoc(paramDecl);
-  auto *unboundCall = UnresolvedDotExpr::createImplicit(C, base,
-                                                        C.Id_assignIdentity,
-                                                        paramList);
-
-  // DC->mapTypeIntoContext(param->getInterfaceType());
-  auto *selfTypeExpr = TypeExpr::createImplicit(param, C);
-  auto *dotSelfTypeExpr = new (C) DotSelfExpr(selfTypeExpr, SourceLoc(),
-                                              SourceLoc(), param);
-
-  // Full bound self.assignIdentity(Self.self) call
-  Expr *args[1] = {dotSelfTypeExpr};
-  Identifier argLabels[1] = {Identifier()};
-  return CallExpr::createImplicit(C, unboundCall, C.AllocateCopy(args),
-                                  C.AllocateCopy(argLabels));
-}
-
-
-/// Creates a new \c CallExpr representing
-///
-///     transport.actorReady(self)
-static CallExpr *
-createCall_DistributedActor_transport_actorReady(ASTContext &C,
-                                                 DeclContext *DC,
-                                                 Expr *base, Type actorType,
-                                                 Expr *initalizedSelf) {
-  // (_ actor:)
-  auto *paramDecl = new (C) ParamDecl(SourceLoc(),
-                                      SourceLoc(), Identifier(),
-                                      SourceLoc(), C.Id_actor, DC);
-  paramDecl->setImplicit();
-  paramDecl->setSpecifier(ParamSpecifier::Default);
-  paramDecl->setInterfaceType(actorType);
-
-  // transport.actorReady(_:) expr
-  auto *paramList = ParameterList::createWithoutLoc(paramDecl);
-  auto *unboundCall = UnresolvedDotExpr::createImplicit(C, base,
-                                                        C.Id_actorReady,
-                                                        paramList);
-
-  // Full bound transport.actorReady(self) call
-  Expr *args[1] = {initalizedSelf};
-  Identifier argLabels[1] = {Identifier()};
-  return CallExpr::createImplicit(C, unboundCall, C.AllocateCopy(args),
-                                  C.AllocateCopy(argLabels));
-}
-
 /// Synthesizes an empty body of the `init(transport:)` initializer as:
 ///
 /// ```
@@ -122,7 +50,7 @@ createCall_DistributedActor_transport_actorReady(ASTContext &C,
 ///
 /// \param initDecl The function decl whose body to synthesize.
 static std::pair<BraceStmt *, bool>
-createBody_DistributedActor_init_transport(AbstractFunctionDecl *initDecl, void *) {
+createBody_DistributedActor_init_default(AbstractFunctionDecl *initDecl, void *) {
   auto *funcDC = cast<DeclContext>(initDecl);
   ASTContext &C = funcDC->getASTContext();
 
@@ -177,7 +105,7 @@ createDistributedActor_init_default(ClassDecl *classDecl,
                               /*GenericParams=*/nullptr, conformanceDC);
   initDecl->setImplicit();
   initDecl->setSynthesized();
-  initDecl->setBodySynthesizer(&createBody_DistributedActor_init_transport);
+  initDecl->setBodySynthesizer(&createBody_DistributedActor_init_default);
 
   auto *nonIsoAttr = new (C) NonisolatedAttr(/*IsImplicit*/true);
   initDecl->getAttrs().add(nonIsoAttr);
@@ -191,77 +119,23 @@ createDistributedActor_init_default(ClassDecl *classDecl,
   return initDecl;
 }
 
-/// Detects which initializer to create, and does so.
-static ConstructorDecl *
-createDistributedActorInit(ClassDecl *classDecl,
-                           ConstructorDecl *requirement,
-                           ASTContext &ctx) {
-  assert(classDecl->isDistributedActor());
-
-  const auto name = requirement->getName();
-  auto argumentNames = name.getArgumentNames();
-
-//  switch (argumentNames.size()) {
-//  case 1: {
-//    if (requirement->isDistributedActorLocalInit()) {
-//    }
-//
-//    break;
-//  }
-//  }
-
-  return nullptr;
-}
-
-static void collectNonOveriddenDistributedActorInits(
-    ASTContext& Context,
-    ClassDecl *actorDecl,
-    SmallVectorImpl<ConstructorDecl *> &results) {
-  assert(actorDecl->isDistributedActor());
-  auto protoDecl = Context.getDistributedActorDecl();// getProtocol(KnownProtocolKind::DistributedActor);
-
-  NLOptions subOptions = (NL_QualifiedDefault | NL_IgnoreAccessControl);
-  SmallVector<ValueDecl *, 4> lookupResults;
-  actorDecl->lookupQualified(
-      protoDecl, DeclNameRef::createConstructor(),
-      subOptions, lookupResults);
-
-  for (auto decl : lookupResults) {
-    // Distributed Actor Constructor
-    auto daCtor = cast<ConstructorDecl>(decl);
-
-    // TODO: Don't require it if overriden
-    //    if (!overriddenInits.count(daCtor))
-    results.push_back(daCtor);
-  }
-}
-
 static void addImplicitDefaultDistributedActorConstructor(ClassDecl *decl) {
-  for (auto member : decl->getMembers()) {
-    if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
-      if (ctor->isRecursiveValidation())
-        return;
-    }
-  }
-
+  fprintf(stderr, "[%s:%d] (%s) addImplicitDefaultDistributedActorConstructor\n", __FILE__, __LINE__, __FUNCTION__);
   decl->setAddedImplicitInitializers();
 
   // Check whether the user has defined a designated initializer for this actor,
   // if so, we will not synthesize the init(transport:) initializer.
+  bool foundDesignatedInit = decl->hasUserDefinedDesignatedInit();
+  if (foundDesignatedInit) {
+    fprintf(stderr, "[%s:%d] (%s) FOUND DESIGNATED INIT SKIP SYNTHESIS\n", __FILE__, __LINE__, __FUNCTION__);
+    decl->dump();
+    return;
+  }
+
+  fprintf(stderr, "[%s:%d] (%s) MAKE DESIGNATED INIT SYNTHESIS\n", __FILE__, __LINE__, __FUNCTION__);
   auto &ctx = decl->getASTContext();
-
-  SmallVector<ConstructorDecl *, 4> nonOverridenCtors;
-  collectNonOveriddenDistributedActorInits( // TODO(distributed): collect required initializers
-      ctx, decl, nonOverridenCtors);
-
-  // TODO(distributed): only if no other required initializers defined
-  //  bool foundDesignatedInit = hasUserDefinedDesignatedInit(ctx.evaluator, decl);
-  //  if (foundDesignatedInit)
-  //    return;
-
-  auto defaultDistributedActorInit =
-      createDistributedActor_init_default(decl, ctx);
-  decl->addMember(defaultDistributedActorInit);
+  auto init = createDistributedActor_init_default(decl, ctx);
+  decl->addMember(init);
 }
 
 /******************************************************************************/
@@ -586,8 +460,6 @@ static void addImplicitRemoteActorFunctions(ClassDecl *decl) {
 
 /// Entry point for adding all computed members to a distributed actor decl.
 void swift::addImplicitDistributedActorMembersToClass(ClassDecl *decl) {
-  fprintf(stderr, "[%s:%d] (%s) addImplicitDistributedActorMembersToClass\n", __FILE__, __LINE__, __FUNCTION__);
-
   // Bail out if not a distributed actor definition.
   if (!decl->isDistributedActor())
     return;

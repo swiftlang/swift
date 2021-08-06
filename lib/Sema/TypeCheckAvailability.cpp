@@ -1684,6 +1684,7 @@ static void diagnosePotentialConcurrencyUnavailability(
   fixAvailability(ReferenceRange, ReferenceDC, RequiredRange, Context);
 }
 
+// TODO(concurrency): implement checkDistributedAvailability
 
 void TypeChecker::checkConcurrencyAvailability(SourceRange ReferenceRange,
                                                const DeclContext *ReferenceDC) {

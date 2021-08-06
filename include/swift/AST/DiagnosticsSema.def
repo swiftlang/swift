@@ -4581,6 +4581,14 @@ ERROR(distributed_actor_func_static,none,
 ERROR(distributed_actor_func_not_in_distributed_actor,none,
       "'distributed' function can only be declared within 'distributed actor'",
       ())
+ERROR(distributed_actor_designated_ctor_must_have_one_transport_param,none,
+      "designated distributed actor initializer %0 must accept exactly one"
+      "ActorTransport parameter, found %1",
+      (DeclName, int))
+ERROR(distributed_actor_designated_ctor_missing_transport_param,none,
+      "designated distributed actor initializer %0 is missing required "
+      "ActorTransport parameter",
+      (DeclName))
 ERROR(distributed_actor_independent_property_must_be_let,none,
       "_distributedActorIndependent can be applied to properties, however they must be 'let'",
       ())
