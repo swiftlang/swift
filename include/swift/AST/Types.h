@@ -5045,6 +5045,21 @@ public:
   }
 };
 
+/// The type T..., which is sugar for a sequence of argument values.
+class VariadicSequenceType : public UnarySyntaxSugarType {
+  VariadicSequenceType(const ASTContext &ctx, Type base,
+                       RecursiveTypeProperties properties)
+    : UnarySyntaxSugarType(TypeKind::VariadicSequence, ctx, base, properties) {}
+
+public:
+  /// Return a uniqued variadic sequence type with the specified base type.
+  static VariadicSequenceType *get(Type baseTy);
+
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::VariadicSequence;
+  }
+};
+
 /// ProtocolType - A protocol type describes an abstract interface implemented
 /// by another type.
 class ProtocolType : public NominalType {
@@ -6239,7 +6254,7 @@ inline bool CanType::isActuallyCanonicalOrNull() const {
 
 inline Type TupleTypeElt::getVarargBaseTy() const {
   TypeBase *T = getType().getPointer();
-  if (auto *AT = dyn_cast<ArraySliceType>(T))
+  if (auto *AT = dyn_cast<VariadicSequenceType>(T))
     return AT->getBaseType();
   if (auto *BGT = dyn_cast<BoundGenericType>(T)) {
     // It's the stdlib Array<T>.

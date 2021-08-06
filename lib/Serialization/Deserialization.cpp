@@ -5901,6 +5901,18 @@ public:
     return OptionalType::get(baseTy.get());
   }
 
+  Expected<Type> deserializeVariadicSequenceType(ArrayRef<uint64_t> scratch,
+                                                 StringRef blobData) {
+    TypeID baseID;
+    decls_block::VariadicSequenceTypeLayout::readRecord(scratch, baseID);
+
+    auto baseTy = MF.getTypeChecked(baseID);
+    if (!baseTy)
+      return baseTy.takeError();
+
+    return VariadicSequenceType::get(baseTy.get());
+  }
+
   Expected<Type> deserializeUnboundGenericType(ArrayRef<uint64_t> scratch,
                                                StringRef blobData) {
     DeclID genericID;
@@ -6024,6 +6036,7 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
   CASE(ArraySlice)
   CASE(Dictionary)
   CASE(Optional)
+  CASE(VariadicSequence)
   CASE(UnboundGeneric)
   CASE(Error)
 

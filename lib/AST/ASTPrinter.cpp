@@ -5128,6 +5128,11 @@ public:
       Printer << "?";
   }
 
+  void visitVariadicSequenceType(VariadicSequenceType *T) {
+    visit(T->getBaseType());
+    Printer << "...";
+  }
+
   void visitProtocolType(ProtocolType *T) {
     printQualifiedType(T);
   }

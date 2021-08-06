@@ -1561,6 +1561,7 @@ Type SugarType::getSinglyDesugaredTypeSlow() {
   case TypeKind::TypeAlias:
     llvm_unreachable("bound type alias types always have an underlying type");
   case TypeKind::ArraySlice:
+  case TypeKind::VariadicSequence:
     implDecl = Context->getArrayDecl();
     break;
   case TypeKind::Optional:
@@ -4972,6 +4973,18 @@ case TypeKind::Id:
       return *this;
 
     return OptionalType::get(baseTy);
+  }
+
+  case TypeKind::VariadicSequence: {
+    auto seq = cast<VariadicSequenceType>(base);
+    auto baseTy = seq->getBaseType().transformRec(fn);
+    if (!baseTy)
+      return Type();
+
+    if (baseTy.getPointer() == seq->getBaseType().getPointer())
+      return *this;
+
+    return VariadicSequenceType::get(baseTy);
   }
 
   case TypeKind::Dictionary: {
