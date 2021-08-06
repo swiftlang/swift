@@ -844,9 +844,8 @@ Type ConstraintSystem::openType(Type type, OpenedTypeMap &replacements) {
     });
 }
 
-Type ConstraintSystem::openOpaqueType(Type type,
+Type ConstraintSystem::openOpaqueType(OpaqueTypeArchetypeType *opaque,
                                       ConstraintLocatorBuilder locator) {
-  auto opaque = type->castTo<OpaqueTypeArchetypeType>();
   auto opaqueLocator = locator.withPathElement(
       LocatorPathElt::OpenedOpaqueArchetype(opaque->getDecl()));
 
@@ -868,16 +867,36 @@ Type ConstraintSystem::openOpaqueType(Type type,
   return underlyingTyVar;
 }
 
-Type ConstraintSystem::openOpaqueTypeRec(Type type,
-                                         ConstraintLocatorBuilder locator) {
+Type ConstraintSystem::openOpaqueType(Type type, ContextualTypePurpose context,
+                                      ConstraintLocatorBuilder locator) {
   // Early return if `type` is `NULL` or if there are no opaque archetypes (in
   // which case there is certainly nothing for us to do).
   if (!type || !type->hasOpaqueArchetype())
     return type;
 
+  auto inReturnContext = [](ContextualTypePurpose context) {
+    return context == CTP_ReturnStmt || context == CTP_ReturnSingleExpr;
+  };
+
+  if (!(context == CTP_Initialization || inReturnContext(context)))
+    return type;
+
+  auto shouldOpen = [&](OpaqueTypeArchetypeType *opaqueType) {
+    if (!inReturnContext(context))
+      return true;
+
+    if (auto *func = dyn_cast<AbstractFunctionDecl>(DC))
+      return opaqueType->getDecl()->isOpaqueReturnTypeOfFunction(func);
+
+    return true;
+  };
+
   return type.transform([&](Type type) -> Type {
-    if (type->is<OpaqueTypeArchetypeType>())
-      return openOpaqueType(type, locator);
+    auto *opaqueType = type->getAs<OpaqueTypeArchetypeType>();
+
+    if (opaqueType && shouldOpen(opaqueType))
+      return openOpaqueType(opaqueType, locator);
+
     return type;
   });
 }

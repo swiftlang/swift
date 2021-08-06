@@ -3855,11 +3855,15 @@ public:
   /// \returns The opened type, or \c type if there are no archetypes in it.
   Type openType(Type type, OpenedTypeMap &replacements);
 
-  /// "Open" an opaque archetype type.
-  Type openOpaqueType(Type type, ConstraintLocatorBuilder locator);
+private:
+  /// "Open" an opaque archetype type, similar to \c openType.
+  Type openOpaqueType(OpaqueTypeArchetypeType *type,
+                      ConstraintLocatorBuilder locator);
 
+public:
   /// Recurse over the given type and open any opaque archetype types.
-  Type openOpaqueTypeRec(Type type, ConstraintLocatorBuilder locator);
+  Type openOpaqueType(Type type, ContextualTypePurpose context,
+                      ConstraintLocatorBuilder locator);
 
   /// "Open" the given function type.
   ///
