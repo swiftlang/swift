@@ -18,6 +18,14 @@
 #include "swift/AST/SourceFile.h"
 using namespace swift;
 
+ModuleDependenciesKind& operator++(ModuleDependenciesKind& e) {
+  if (e == ModuleDependenciesKind::LastKind) {
+    llvm_unreachable("Attempting to incrementa last enum value on ModuleDependenciesKind");
+  }
+  e = ModuleDependenciesKind(static_cast<std::underlying_type<ModuleDependenciesKind>::type>(e) + 1);
+  return e;
+}
+
 ModuleDependenciesStorageBase::~ModuleDependenciesStorageBase() { }
 
 bool ModuleDependencies::isSwiftModule() const {
@@ -131,34 +139,18 @@ void ModuleDependencies::addBridgingModuleDependency(
     swiftStorage->bridgingModuleDependencies.push_back(module.str());
 }
 
-llvm::StringMap<ModuleDependenciesCache::ModuleDependenciesVector> &
-ModuleDependenciesCache::getDependenciesMap(ModuleDependenciesKind kind) {
-  switch (kind) {
-  case ModuleDependenciesKind::SwiftTextual:
-    return SwiftTextualModuleDependencies;
-  case ModuleDependenciesKind::SwiftBinary:
-    return SwiftBinaryModuleDependencies;
-  case ModuleDependenciesKind::SwiftPlaceholder:
-    return SwiftPlaceholderModuleDependencies;
-  case ModuleDependenciesKind::Clang:
-    return ClangModuleDependencies;
-  }
-  llvm_unreachable("invalid dependency kind");
+llvm::StringMap<ModuleDependenciesVector> &
+GlobalModuleDependenciesCache::getDependenciesMap(ModuleDependenciesKind kind) {
+  auto it = ModuleDependenciesKindMap.find(kind);
+  assert(it != ModuleDependenciesKindMap.end() && "invalid dependency kind");
+  return it->second;
 }
 
-const llvm::StringMap<ModuleDependenciesCache::ModuleDependenciesVector> &
-ModuleDependenciesCache::getDependenciesMap(ModuleDependenciesKind kind) const {
-  switch (kind) {
-  case ModuleDependenciesKind::SwiftTextual:
-    return SwiftTextualModuleDependencies;
-  case ModuleDependenciesKind::SwiftBinary:
-    return SwiftBinaryModuleDependencies;
-  case ModuleDependenciesKind::SwiftPlaceholder:
-    return SwiftPlaceholderModuleDependencies;
-  case ModuleDependenciesKind::Clang:
-    return ClangModuleDependencies;
-  }
-  llvm_unreachable("invalid dependency kind");
+const llvm::StringMap<ModuleDependenciesVector> &
+GlobalModuleDependenciesCache::getDependenciesMap(ModuleDependenciesKind kind) const {
+  auto it = ModuleDependenciesKindMap.find(kind);
+  assert(it != ModuleDependenciesKindMap.end() && "invalid dependency kind");
+  return it->second;
 }
 
 static std::string moduleBasePath(const StringRef modulePath) {
@@ -190,23 +182,36 @@ static bool moduleContainedInImportPathSet(const ModuleDependencies &module,
                                            const llvm::StringSet<> &importPaths)
 {
   std::string modulePath = "";
-  if (auto *swiftDep = module.getAsSwiftTextualModule()) {
-    if (swiftDep->swiftInterfaceFile)
-      modulePath = *(swiftDep->swiftInterfaceFile);
-    else {
-      // If we encountered a Swift textual dependency without an interface
-      // file, we are seeing the main scan module itself. This means that
-      // our search-path disambiguation is not necessary here.
+  switch (module.getKind()) {
+    case swift::ModuleDependenciesKind::SwiftTextual: {
+      auto *swiftDep = module.getAsSwiftTextualModule();
+      if (swiftDep->swiftInterfaceFile)
+        modulePath = *(swiftDep->swiftInterfaceFile);
+      else {
+        // If we encountered a Swift textual dependency without an interface
+        // file, we are seeing the main scan module itself. This means that
+        // our search-path disambiguation is not necessary here.
+        return true;
+      }
+      break;
+    }
+    case swift::ModuleDependenciesKind::SwiftBinary: {
+      auto *swiftBinaryDep = module.getAsSwiftBinaryModule();
+      modulePath = swiftBinaryDep->compiledModulePath;
+      break;
+    }
+    case swift::ModuleDependenciesKind::Clang: {
+      auto *clangDep = module.getAsClangModule();
+      modulePath = clangDep->moduleMapFile;
+      break;
+    }
+    case swift::ModuleDependenciesKind::SwiftPlaceholder: {
+      // Placeholders are resolved as `true` because they are not associated with
+      // any specific search path.
       return true;
     }
-  } else if (auto *swiftBinaryDep = module.getAsSwiftBinaryModule()) {
-    modulePath = swiftBinaryDep->compiledModulePath;
-  } else if (auto *placehodlerDep = module.getAsPlaceholderDependencyModule()) {
-    // Placeholders are resolved as `true` because they are not associated with
-    // any specific search path.
-    return true;
-  } else if (auto *clangDep = module.getAsClangModule()) {
-    modulePath = clangDep->moduleMapFile;
+    default:
+      llvm_unreachable("Unhandled dependency kind.");
   }
 
   if (moduleContainedInImportPathSet(modulePath, importPaths)) {
@@ -215,56 +220,35 @@ static bool moduleContainedInImportPathSet(const ModuleDependencies &module,
   return false;
 }
 
-bool ModuleDependenciesCache::hasDependencies(
-    StringRef moduleName,
-    ModuleLookupSpecifics details) const {
-  if (!details.kind) {
-    return hasDependencies(moduleName,
-                           {ModuleDependenciesKind::SwiftTextual,
-                            details.currentSearchPaths}) ||
-        hasDependencies(moduleName,
-                        {ModuleDependenciesKind::SwiftBinary,
-                         details.currentSearchPaths}) ||
-        hasDependencies(moduleName,
-                        {ModuleDependenciesKind::SwiftPlaceholder,
-                         details.currentSearchPaths}) ||
-        hasDependencies(moduleName,
-                        {ModuleDependenciesKind::Clang,
-                         details.currentSearchPaths});
+GlobalModuleDependenciesCache::GlobalModuleDependenciesCache()  {
+  for (auto kind = ModuleDependenciesKind::FirstKind;
+       kind != ModuleDependenciesKind::LastKind; ++kind) {
+    ModuleDependenciesKindMap.insert(
+        {kind, llvm::StringMap<ModuleDependenciesVector>()});
   }
 
-  const auto &map = getDependenciesMap(*details.kind);
-  auto known = map.find(moduleName);
-  if (known != map.end()) {
-    assert(!known->second.empty());
-    for (auto &dep : known->second) {
-      if (moduleContainedInImportPathSet(dep, details.currentSearchPaths))
-        return true;
-    }
-    return false;
-  }
-  return false;
+  ModuleDependenciesKindMap.insert(
+      {ModuleDependenciesKind::SwiftBinary,
+       llvm::StringMap<ModuleDependenciesVector>()});
+  ModuleDependenciesKindMap.insert(
+      {ModuleDependenciesKind::SwiftPlaceholder,
+       llvm::StringMap<ModuleDependenciesVector>()});
+  ModuleDependenciesKindMap.insert(
+      {ModuleDependenciesKind::Clang,
+       llvm::StringMap<ModuleDependenciesVector>()});
 }
 
-Optional<ModuleDependencies> ModuleDependenciesCache::findDependencies(
+Optional<ModuleDependencies> GlobalModuleDependenciesCache::findDependencies(
     StringRef moduleName,
     ModuleLookupSpecifics details) const {
   if (!details.kind) {
-    if (auto swiftTextualDep = findDependencies(
-            moduleName,
-            {ModuleDependenciesKind::SwiftTextual, details.currentSearchPaths}))
-      return swiftTextualDep;
-    else if (auto swiftBinaryDep = findDependencies(
-            moduleName,
-            {ModuleDependenciesKind::SwiftBinary, details.currentSearchPaths}))
-      return swiftBinaryDep;
-    else if (auto swiftPlaceholderDep = findDependencies(
-            moduleName,
-            {ModuleDependenciesKind::SwiftPlaceholder, details.currentSearchPaths}))
-      return swiftPlaceholderDep;
-    else
-      return findDependencies(moduleName,
-                              {ModuleDependenciesKind::Clang, details.currentSearchPaths});
+    for (auto kind = ModuleDependenciesKind::FirstKind;
+         kind != ModuleDependenciesKind::LastKind; ++kind) {
+      auto dep = findDependencies(moduleName, {kind, details.currentSearchPaths});
+      if (dep.hasValue())
+        return dep.getValue();
+    }
+    return None;
   }
 
   const auto &map = getDependenciesMap(*details.kind);
@@ -280,24 +264,23 @@ Optional<ModuleDependencies> ModuleDependenciesCache::findDependencies(
   return None;
 }
 
-Optional<ModuleDependenciesCache::ModuleDependenciesVector>
-ModuleDependenciesCache::findAllDependenciesIrrespectiveOfSearchPaths(
+bool GlobalModuleDependenciesCache::hasDependencies(
+    StringRef moduleName,
+    ModuleLookupSpecifics details) const {
+  return findDependencies(moduleName, details).hasValue();
+}
+
+Optional<ModuleDependenciesVector>
+GlobalModuleDependenciesCache::findAllDependenciesIrrespectiveOfSearchPaths(
     StringRef moduleName, Optional<ModuleDependenciesKind> kind) const {
   if (!kind) {
-    if (auto swiftTextualDeps = findAllDependenciesIrrespectiveOfSearchPaths(
-            moduleName, ModuleDependenciesKind::SwiftTextual))
-      return swiftTextualDeps;
-    else if (auto swiftBinaryDeps =
-                 findAllDependenciesIrrespectiveOfSearchPaths(
-                     moduleName, ModuleDependenciesKind::SwiftBinary))
-      return swiftBinaryDeps;
-    else if (auto swiftPlaceholderDeps =
-                 findAllDependenciesIrrespectiveOfSearchPaths(
-                     moduleName, ModuleDependenciesKind::SwiftPlaceholder))
-      return swiftPlaceholderDeps;
-    else
-      return findAllDependenciesIrrespectiveOfSearchPaths(
-          moduleName, ModuleDependenciesKind::Clang);
+    for (auto kind = ModuleDependenciesKind::FirstKind;
+         kind != ModuleDependenciesKind::LastKind; ++kind) {
+      auto deps = findAllDependenciesIrrespectiveOfSearchPaths(moduleName, kind);
+      if (deps.hasValue())
+        return deps.getValue();
+    }
+    return None;
   }
 
   const auto &map = getDependenciesMap(*kind);
@@ -311,18 +294,31 @@ ModuleDependenciesCache::findAllDependenciesIrrespectiveOfSearchPaths(
 
 static std::string modulePathForVerification(const ModuleDependencies &module) {
   std::string existingModulePath = "";
-  if (auto *swiftDep = module.getAsSwiftTextualModule()) {
-    if (swiftDep->swiftInterfaceFile)
-      existingModulePath = *(swiftDep->swiftInterfaceFile);
-  } else if (auto *swiftBinaryDep = module.getAsSwiftBinaryModule()) {
-    existingModulePath = swiftBinaryDep->compiledModulePath;
-  } else if (auto *clangDep = module.getAsClangModule()) {
-    existingModulePath = clangDep->moduleMapFile;
+  switch (module.getKind()) {
+    case swift::ModuleDependenciesKind::SwiftTextual: {
+      auto *swiftDep = module.getAsSwiftTextualModule();
+      if (swiftDep->swiftInterfaceFile)
+        existingModulePath = *(swiftDep->swiftInterfaceFile);
+      break;
+    }
+    case swift::ModuleDependenciesKind::SwiftBinary: {
+      auto *swiftBinaryDep = module.getAsSwiftBinaryModule();
+      existingModulePath = swiftBinaryDep->compiledModulePath;
+      break;
+    }
+    case swift::ModuleDependenciesKind::Clang: {
+      auto *clangDep = module.getAsClangModule();
+      existingModulePath = clangDep->moduleMapFile;
+      break;
+    }
+    case swift::ModuleDependenciesKind::SwiftPlaceholder:
+    default:
+      llvm_unreachable("Unhandled dependency kind.");
   }
   return existingModulePath;
 }
 
-void ModuleDependenciesCache::recordDependencies(
+const ModuleDependencies* GlobalModuleDependenciesCache::recordDependencies(
     StringRef moduleName,
     ModuleDependencies dependencies) {
   auto kind = dependencies.getKind();
@@ -332,24 +328,107 @@ void ModuleDependenciesCache::recordDependencies(
     // Ensure that the existing dependencies objects are at a different path.
     // i.e. do not record duplicate dependencies.
     auto newModulePath = modulePathForVerification(dependencies);
-    bool newEntry = true;
     for (auto &existingDeps : map[moduleName]) {
       if (modulePathForVerification(existingDeps) == newModulePath)
-        newEntry = false;
+        return &existingDeps;
     }
-    if (newEntry)
-      map[moduleName].emplace_back(std::move(dependencies));
+
+    map[moduleName].emplace_back(std::move(dependencies));
+    return map[moduleName].end()-1;
   } else {
     map.insert({moduleName, ModuleDependenciesVector{std::move(dependencies)}});
     AllModules.push_back({moduleName.str(), kind});
+    return &(map[moduleName].front());
   }
 }
 
-void ModuleDependenciesCache::updateDependencies(
+const ModuleDependencies* GlobalModuleDependenciesCache::updateDependencies(
     ModuleDependencyID moduleID, ModuleDependencies dependencies) {
   auto &map = getDependenciesMap(moduleID.second);
   auto known = map.find(moduleID.first);
   assert(known != map.end() && "Not yet added to map");
-  assert(known->second.size() == 1 && "Cannot update dependency with multiple candidates.");
+  assert(known->second.size() == 1 &&
+         "Cannot update dependency with multiple candidates.");
   known->second[0] = std::move(dependencies);
+  return &(known->second[0]);
+}
+
+llvm::StringMap<const ModuleDependencies*> &
+ModuleDependenciesCache::getDependencyReferencesMap(ModuleDependenciesKind kind) {
+  auto it = ModuleDependenciesKindMap.find(kind);
+  assert(it != ModuleDependenciesKindMap.end() && "invalid dependency kind");
+  return it->second;
+}
+
+const llvm::StringMap<const ModuleDependencies*> &
+ModuleDependenciesCache::getDependencyReferencesMap(ModuleDependenciesKind kind) const {
+  auto it = ModuleDependenciesKindMap.find(kind);
+  assert(it != ModuleDependenciesKindMap.end() && "invalid dependency kind");
+  return it->second;
+}
+
+ModuleDependenciesCache::ModuleDependenciesCache(GlobalModuleDependenciesCache &globalCache)
+: globalCache(globalCache) {
+  for (auto kind = ModuleDependenciesKind::FirstKind;
+     kind != ModuleDependenciesKind::LastKind; ++kind) {
+    ModuleDependenciesKindMap.insert(
+                         {kind, llvm::StringMap<const ModuleDependencies *>()});
+  }
+}
+
+Optional<const ModuleDependencies*> ModuleDependenciesCache::findDependencies(
+    StringRef moduleName, Optional<ModuleDependenciesKind> kind) const {
+  if (!kind) {
+    for (auto kind = ModuleDependenciesKind::FirstKind;
+         kind != ModuleDependenciesKind::LastKind; ++kind) {
+      auto dep = findDependencies(moduleName, kind);
+      if (dep.hasValue())
+        return dep.getValue();
+    }
+    return None;
+  }
+
+  const auto &map = getDependencyReferencesMap(*kind);
+  auto known = map.find(moduleName);
+  if (known != map.end())
+    return known->second;
+
+  return None;
+}
+
+Optional<ModuleDependencies>
+ModuleDependenciesCache::findDependencies(StringRef moduleName,
+                                          ModuleLookupSpecifics details) const {
+  // 1. Query the local scan results
+  // 2. If no module found, query the global cache using the module details
+  // lookup
+  auto localResult = findDependencies(moduleName, details.kind);
+  if (localResult.hasValue())
+    return *(localResult.getValue());
+  else
+    return globalCache.findDependencies(moduleName, details);
+}
+
+bool ModuleDependenciesCache::hasDependencies(
+    StringRef moduleName, ModuleLookupSpecifics details) const {
+  return findDependencies(moduleName, details).hasValue();
+}
+
+void ModuleDependenciesCache::recordDependencies(
+    StringRef moduleName, ModuleDependencies dependencies) {
+  auto globalDepPtr = globalCache.recordDependencies(moduleName, dependencies);
+  auto kind = globalDepPtr->getKind();
+  auto &map = getDependencyReferencesMap(kind);
+  assert(map.count(moduleName) == 0 && "Already added to map");
+  map.insert({moduleName, globalDepPtr});
+}
+
+void ModuleDependenciesCache::updateDependencies(
+    ModuleDependencyID moduleID, ModuleDependencies dependencies) {
+  auto globalDepRef = globalCache.updateDependencies(moduleID, dependencies);
+  auto &map = getDependencyReferencesMap(moduleID.second);
+  auto known = map.find(moduleID.first);
+  if (known != map.end())
+    map.erase(known);
+  map.insert({moduleID.first, globalDepRef});
 }
