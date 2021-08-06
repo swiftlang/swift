@@ -1069,7 +1069,6 @@ withSemanticAnalysis(CompilerInstance &Instance, FrontendObserver *observer,
 static bool performScanDependencies(CompilerInstance &Instance) {
   auto batchScanInput =
       Instance.getASTContext().SearchPathOpts.BatchScanInputFilePath;
-  ModuleDependenciesCache SingleUseCache;
   if (batchScanInput.empty()) {
     if (Instance.getInvocation().getFrontendOptions().ImportPrescan)
       return dependencies::prescanDependencies(Instance);
