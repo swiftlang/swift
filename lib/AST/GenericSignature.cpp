@@ -1301,31 +1301,6 @@ unsigned GenericSignatureImpl::getGenericParamOrdinal(
   return GenericParamKey(param).findIndexIn(getGenericParams());
 }
 
-bool GenericSignature::hasTypeVariable() const {
-  return GenericSignature::hasTypeVariable(getRequirements());
-}
-
-bool GenericSignature::hasTypeVariable(ArrayRef<Requirement> requirements) {
-  for (const auto &req : requirements) {
-    if (req.getFirstType()->hasTypeVariable())
-      return true;
-
-    switch (req.getKind()) {
-    case RequirementKind::Layout:
-      break;
-
-    case RequirementKind::Conformance:
-    case RequirementKind::SameType:
-    case RequirementKind::Superclass:
-      if (req.getSecondType()->hasTypeVariable())
-        return true;
-      break;
-    }
-  }
-
-  return false;
-}
-
 void GenericSignature::Profile(llvm::FoldingSetNodeID &id) const {
   return GenericSignature::Profile(id, getPointer()->getGenericParams(),
                                      getPointer()->getRequirements());
