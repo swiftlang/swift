@@ -206,8 +206,8 @@ ConcreteToArchetypeConvertUInt8(t: b, t2: f)
 // x -> x where x is not a class.
 // CHECK-LABEL: sil shared [noinline] @$s37specialize_unconditional_checked_cast31ConcreteToArchetypeConvertUInt8{{[_0-9a-zA-Z]*}}3Not{{.*}}Tg5 : $@convention(thin) (NotUInt8, NotUInt8) -> NotUInt8 {
 // CHECK: bb0(%0 : $NotUInt8, %1 : $NotUInt8):
-// CHECK-NEXT: debug_value %0
-// CHECK-NEXT: return %0
+// CHECK: debug_value %0
+// CHECK: return %0
 
 // x -> y where x is not a class but y is a class.
 // CHECK-LABEL: sil shared [noinline] @$s37specialize_unconditional_checked_cast31ConcreteToArchetypeConvertUInt8{{[_0-9a-zA-Z]*}}FAA1CC_Tg5 : $@convention(thin) (NotUInt8, @guaranteed C) -> @owned C {
@@ -260,7 +260,7 @@ ConcreteToArchetypeConvertC(t: c, t2: e)
 // x -> y where x and y are unrelated classes.
 // CHECK-LABEL: sil shared [noinline] @$s37specialize_unconditional_checked_cast27ConcreteToArchetypeConvertC{{[_0-9a-zA-Z]*}}FAA1EC_Tg5 : $@convention(thin) (@guaranteed C, @guaranteed E) -> @owned E {
 // CHECK: bb0(%0 : $C, %1 : $E):
-// CHECK-NEXT: builtin "int_trap"
+// CHECK:      builtin "int_trap"
 // CHECK-NEXT: unreachable
 // CHECK-NEXT: }
 

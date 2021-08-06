@@ -9,7 +9,8 @@ import Foundation
 class Myclass : NSObject {
 
 // CHECK-LABEL: sil hidden [thunk] @$s4test7MyclassC3fooyySSFTo
-// CHECK-NEXT: bb0(%0 : $NSString, %1 : $Myclass):
+// CHECK:       bb0(%0 : $NSString, %1 : $Myclass):
+// CHECK-NEXT:   debug_value
 // CHECK-NEXT:   tuple ()
 // CHECK-NEXT:   return
   @objc func foo(_ s: String) {

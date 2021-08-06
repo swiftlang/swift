@@ -308,6 +308,24 @@ struct DebugVarCarryingInst {
     }
     llvm_unreachable("covered switch");
   }
+
+  void setDebugVarScope(const SILDebugScope *NewDS) {
+    switch (kind) {
+    case Kind::Invalid:
+      llvm_unreachable("Invalid?!");
+    case Kind::DebugValue:
+      cast<DebugValueInst>(inst)->setDebugVarScope(NewDS);
+      break;
+    case Kind::DebugValueAddr:
+      cast<DebugValueAddrInst>(inst)->setDebugVarScope(NewDS);
+      break;
+    case Kind::AllocStack:
+      cast<AllocStackInst>(inst)->setDebugVarScope(NewDS);
+      break;
+    case Kind::AllocBox:
+      llvm_unreachable("Not implemented");
+    }
+  }
 };
 
 } // end namespace swift

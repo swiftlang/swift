@@ -291,9 +291,8 @@ static MutableTerm getRelativeTermForType(CanType typeWitness,
   }
 
   // Add the member type names.
-  std::reverse(symbols.begin(), symbols.end());
-  for (auto symbol : symbols)
-    result.add(symbol);
+  for (auto iter = symbols.rbegin(), end = symbols.rend(); iter != end; ++iter)
+    result.add(*iter);
 
   return result;
 }
@@ -449,8 +448,8 @@ namespace {
 ///
 /// These lower to the following two rules:
 ///
-///   T.[concrete: Foo<τ_0_0, τ_0_1, String> with {X.Y, Z}]
-///   T.[concrete: Foo<Int, τ_0_0, τ_0_1> with {A.B, W}]
+///   T.[concrete: Foo<τ_0_0, τ_0_1, String> with {X.Y, Z}] => T
+///   T.[concrete: Foo<Int, τ_0_0, τ_0_1> with {A.B, W}] => T
 ///
 /// The two concrete type symbols will be added to the property bag of 'T',
 /// and we will eventually end up in this method, where we will generate three
@@ -1063,16 +1062,21 @@ RewriteSystem::buildPropertyMap(PropertyMap &map,
     if (rule.isDeleted())
       continue;
 
-    const auto &lhs = rule.getLHS();
+    auto lhs = rule.getLHS();
+    auto rhs = rule.getRHS();
 
     // Collect all rules of the form T.[p] => T where T is canonical.
     auto property = lhs.back();
     if (!property.isProperty())
       continue;
 
-    MutableTerm key(lhs.begin(), lhs.end() - 1);
-    if (key != rule.getRHS())
+    if (lhs.size() - 1 != rhs.size())
       continue;
+
+    if (!std::equal(rhs.begin(), rhs.end(), lhs.begin()))
+      continue;
+
+    MutableTerm key(rhs);
 
 #ifndef NDEBUG
     assert(!simplify(key) &&
