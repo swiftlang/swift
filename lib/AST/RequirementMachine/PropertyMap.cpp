@@ -650,21 +650,10 @@ void PropertyBag::copyPropertiesFrom(const PropertyBag *next,
   }
 }
 
-/// Look for an property bag corresponding to the given key, returning nullptr
-/// if one has not been recorded.
-PropertyBag *
-PropertyMap::getPropertiesIfPresent(const MutableTerm &key) const {
-  assert(!key.empty());
- 
-  for (const auto &props : Map) {
-    int compare = props->getKey().compare(key, Protos);
-    if (compare == 0)
-      return props.get();
-    if (compare > 0)
-      return nullptr;
-  }
-
-  return nullptr;
+PropertyMap::~PropertyMap() {
+  Trie.updateHistograms(Context.PropertyTrieHistogram,
+                        Context.PropertyTrieRootHistogram);
+  clear();
 }
 
 /// Look for an property bag corresponding to a suffix of the given key.
@@ -672,20 +661,8 @@ PropertyMap::getPropertiesIfPresent(const MutableTerm &key) const {
 /// Returns nullptr if no information is known about this key.
 PropertyBag *
 PropertyMap::lookUpProperties(const MutableTerm &key) const {
-  if (auto *props = getPropertiesIfPresent(key))
-    return props;
-
-  auto begin = key.begin() + 1;
-  auto end = key.end();
-
-  while (begin != end) {
-    MutableTerm suffix(begin, end);
-
-    if (auto *suffixClass = getPropertiesIfPresent(suffix))
-      return suffixClass;
-
-    ++begin;
-  }
+  if (auto result = Trie.find(key.rbegin(), key.rend()))
+    return *result;
 
   return nullptr;
 }
@@ -698,13 +675,10 @@ PropertyBag *
 PropertyMap::getOrCreateProperties(const MutableTerm &key) {
   assert(!key.empty());
 
-  if (!Map.empty()) {
-    const auto &lastEquivClass = Map.back();
-    int compare = lastEquivClass->getKey().compare(key, Protos);
-    if (compare == 0)
-      return lastEquivClass.get();
-
-    assert(compare < 0 && "Must record property bags in sorted order");
+  if (!Entries.empty()) {
+    const auto &lastEntry = Entries.back();
+    if (lastEntry->getKey() == key)
+      return lastEntry;
   }
 
   auto *props = new PropertyBag(key);
@@ -733,13 +707,31 @@ PropertyMap::getOrCreateProperties(const MutableTerm &key) {
   if (auto *next = lookUpProperties(key))
     props->copyPropertiesFrom(next, Context);
 
-  Map.emplace_back(props);
+  // Here is where we make the assumption that if the new key is not equal to
+  // the key of the last entry, then it is larger than any key already in the
+  // map.
+  Entries.push_back(props);
+  auto oldProps = Trie.insert(key.rbegin(), key.rend(), props);
+  if (oldProps) {
+    llvm::errs() << "Duplicate property map entry for " << key << "\n";
+    llvm::errs() << "Old:\n";
+    (*oldProps)->dump(llvm::errs());
+    llvm::errs() << "\n";
+    llvm::errs() << "New:\n";
+    props->dump(llvm::errs());
+    llvm::errs() << "\n";
+    abort();
+  }
 
   return props;
 }
 
 void PropertyMap::clear() {
-  Map.clear();
+  for (auto *props : Entries)
+    delete props;
+
+  Trie.clear();
+  Entries.clear();
   ConcreteTypeInDomainMap.clear();
 }
 
@@ -757,7 +749,7 @@ void PropertyMap::addProperty(
 /// For each fully-concrete type, find the shortest term having that concrete type.
 /// This is later used by computeConstraintTermForTypeWitness().
 void PropertyMap::computeConcreteTypeInDomainMap() {
-  for (const auto &props : Map) {
+  for (const auto &props : Entries) {
     if (!props->isConcreteType())
       continue;
 
@@ -787,7 +779,7 @@ void PropertyMap::computeConcreteTypeInDomainMap() {
 
 void PropertyMap::concretizeNestedTypesFromConcreteParents(
     SmallVectorImpl<std::pair<MutableTerm, MutableTerm>> &inducedRules) const {
-  for (const auto &props : Map) {
+  for (const auto &props : Entries) {
     if (props->getConformsTo().empty())
       continue;
 
@@ -1030,7 +1022,7 @@ MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
 
 void PropertyMap::dump(llvm::raw_ostream &out) const {
   out << "Property map: {\n";
-  for (const auto &props : Map) {
+  for (const auto &props : Entries) {
     out << "  ";
     props->dump(out);
     out << "\n";

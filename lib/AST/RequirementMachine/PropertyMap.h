@@ -23,7 +23,6 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include <algorithm>
-#include <memory>
 #include <vector>
 
 #include "ProtocolGraph.h"
@@ -139,7 +138,8 @@ public:
 /// Out-of-line methods are documented in PropertyMap.cpp.
 class PropertyMap {
   RewriteContext &Context;
-  std::vector<std::unique_ptr<PropertyBag>> Map;
+  std::vector<PropertyBag *> Entries;
+  Trie<PropertyBag *, MatchKind::Longest> Trie;
 
   using ConcreteTypeInDomain = std::pair<CanType, ArrayRef<const ProtocolDecl *>>;
   llvm::DenseMap<ConcreteTypeInDomain, MutableTerm> ConcreteTypeInDomainMap;
@@ -148,7 +148,6 @@ class PropertyMap {
   unsigned DebugConcreteUnification : 1;
   unsigned DebugConcretizeNestedTypes : 1;
 
-  PropertyBag *getPropertiesIfPresent(const MutableTerm &key) const;
   PropertyBag *getOrCreateProperties(const MutableTerm &key);
 
   PropertyMap(const PropertyMap &) = delete;
@@ -163,6 +162,8 @@ public:
     DebugConcreteUnification = false;
     DebugConcretizeNestedTypes = false;
   }
+
+  ~PropertyMap();
 
   PropertyBag *lookUpProperties(const MutableTerm &key) const;
 
