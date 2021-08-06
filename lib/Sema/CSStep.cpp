@@ -384,6 +384,7 @@ StepResult ComponentStep::take(bool prevFailed) {
       getDebugLogger() << ")\n";
     }
 
+    CS.InvalidState = true;
     return finalize(/*isSuccess=*/false);
 #endif
   }
@@ -400,6 +401,7 @@ StepResult ComponentStep::take(bool prevFailed) {
         getDebugLogger() << ")\n";
       }
 
+      CS.InvalidState = true;
       return finalize(/*isSuccess=*/false);
 #endif
     }
