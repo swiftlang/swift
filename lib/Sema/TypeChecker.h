@@ -231,7 +231,6 @@ enum class CheckedCastContextKind {
 };
 
 namespace TypeChecker {
-Type getArraySliceType(SourceLoc loc, Type elementType);
 Type getOptionalType(SourceLoc loc, Type elementType);
 
 /// Bind an UnresolvedDeclRefExpr by performing name lookup and
