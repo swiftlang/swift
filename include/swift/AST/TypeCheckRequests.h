@@ -2065,6 +2065,7 @@ enum class ImplicitMemberAction : uint8_t {
   ResolveDecodable,
   ResolveDistributedActor,
   ResolveDistributedActorIdentity,
+  ResolveDistributedActorTransport,
 };
 
 class ResolveImplicitMemberRequest

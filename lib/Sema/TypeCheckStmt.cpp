@@ -2053,6 +2053,7 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
   // Class constructor checking.
   if (auto *ctor = dyn_cast<ConstructorDecl>(AFD)) {
     if (auto classDecl = ctor->getDeclContext()->getSelfClassDecl()) {
+      // checkActorConstructor(classDecl, ctor);
       checkClassConstructorBody(classDecl, ctor, body);
     }
   }

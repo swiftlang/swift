@@ -985,6 +985,8 @@ HasUserDefinedDesignatedInitRequest::evaluate(Evaluator &evaluator,
   return false;
 }
 
+// TODO(distributed): duplicated of NominalTypeDecl::hasUserDefinedDesignatedInit,
+//                    remove this static version?
 static bool hasUserDefinedDesignatedInit(Evaluator &eval,
                                          NominalTypeDecl *decl) {
   // Imported decls don't have a designated initializer defined by the user.
@@ -1191,6 +1193,7 @@ static bool shouldAttemptInitializerSynthesis(const NominalTypeDecl *decl) {
 }
 
 void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
+  fprintf(stderr, "[%s:%d] (%s) ADD IMPLICIT\n", __FILE__, __LINE__, __FUNCTION__);
   // If we already added implicit initializers, we're done.
   if (decl->addedImplicitInitializers())
     return;
@@ -1202,7 +1205,6 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
 
   if (auto *classDecl = dyn_cast<ClassDecl>(decl)) {
     addImplicitInheritedConstructorsToClass(classDecl);
-    addImplicitDistributedActorMembersToClass(classDecl); // FIXME(distributed): add always this is not just constructors
   }
 
   // Force the memberwise and default initializers if the type has them.
@@ -1286,17 +1288,19 @@ ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
   }
     break;
   case ImplicitMemberAction::ResolveDistributedActor:
+  case ImplicitMemberAction::ResolveDistributedActorTransport:
   case ImplicitMemberAction::ResolveDistributedActorIdentity: {
     // init(transport:) and init(resolve:using:) may be synthesized as part of
     // derived conformance to the DistributedActor protocol.
     // If the target should conform to the DistributedActor protocol, check the
     // conformance here to attempt synthesis.
-    TypeChecker::addImplicitConstructors(target);
+    // FIXME(distributed): invoke the requirement adding explicitly here
+     TypeChecker::addImplicitConstructors(target);
     auto *distributedActorProto =
         Context.getProtocol(KnownProtocolKind::DistributedActor);
     (void)evaluateTargetConformanceTo(distributedActorProto);
-  }
     break;
+  }
   }
   return std::make_tuple<>();
 }
