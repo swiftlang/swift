@@ -852,8 +852,7 @@ public:
   llvm::PointerType *getEnumValueWitnessTablePtrTy();
 
   void unimplemented(SourceLoc, StringRef Message);
-  LLVM_ATTRIBUTE_NORETURN
-  void fatal_unimplemented(SourceLoc, StringRef Message);
+  [[noreturn]] void fatal_unimplemented(SourceLoc, StringRef Message);
   void error(SourceLoc loc, const Twine &message);
 
   bool useDllStorage();
