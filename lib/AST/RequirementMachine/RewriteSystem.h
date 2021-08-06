@@ -98,8 +98,9 @@ class RewriteSystem final {
   /// as rules introduced by the completion procedure.
   std::vector<Rule> Rules;
 
-  /// A prefix trie of rule left hand sides to optimize lookup.
-  Trie RuleTrie;
+  /// A prefix trie of rule left hand sides to optimize lookup. The value
+  /// type is an index into the Rules array defined above.
+  Trie<unsigned, MatchKind::Shortest> Trie;
 
   /// The graph of all protocols transitively referenced via our set of
   /// rewrite rules, used for the linear order on symbols.

@@ -20,12 +20,18 @@ namespace swift {
 
 namespace rewriting {
 
+enum class MatchKind {
+  Shortest,
+  Longest
+};
+
+template<typename ValueType, MatchKind Kind>
 class Trie {
 public:
   struct Node;
 
   struct Entry {
-    Optional<unsigned> RuleID;
+    Optional<ValueType> Value;
     Node *Children = nullptr;
   };
 
@@ -47,8 +53,10 @@ public:
     rootStats.add(Root.Entries.size());
   }
 
-  /// The destructor deletes all nodes.
-  ~Trie() {
+  /// Delete all entries from the trie.
+  void clear() {
+    Root.Entries.clear();
+
     for (auto iter = Nodes.rbegin(); iter != Nodes.rend(); ++iter) {
       auto *node = *iter;
       delete node;
@@ -57,12 +65,16 @@ public:
     Nodes.clear();
   }
 
+  ~Trie() {
+    clear();
+  }
+
   /// Insert an entry with the key given by the range [begin, end).
   /// Returns the old value if the trie already had an entry for this key;
   /// this is actually an invariant violation, but we can produce a better
   /// assertion further up the stack.
   template<typename Iter>
-  Optional<unsigned> insert(Iter begin, Iter end, unsigned ruleID) {
+  Optional<ValueType> insert(Iter begin, Iter end, ValueType value) {
     assert(begin != end);
     auto *node = &Root;
 
@@ -71,10 +83,10 @@ public:
       ++begin;
 
       if (begin == end) {
-        if (entry.RuleID)
-          return entry.RuleID;
+        if (entry.Value)
+          return entry.Value;
 
-        entry.RuleID = ruleID;
+        entry.Value = value;
         return None;
       }
 
@@ -87,26 +99,38 @@ public:
     }
   }
 
-  /// Find the shortest prefix of the range given by [begin,end).
+  /// Find the shortest or longest prefix of the range given by [begin,end),
+  /// depending on whether the Kind template parameter was bound to
+  /// MatchKind::Shortest or MatchKind::Longest.
   template<typename Iter>
-  Optional<unsigned>
+  Optional<ValueType>
   find(Iter begin, Iter end) const {
     assert(begin != end);
     auto *node = &Root;
+
+    Optional<ValueType> bestMatch = None;
 
     while (true) {
       auto found = node->Entries.find(*begin);
       ++begin;
 
       if (found == node->Entries.end())
-        return None;
+        return bestMatch;
 
       const auto &entry = found->second;
-      if (begin == end || entry.RuleID)
-        return entry.RuleID;
+
+      if (entry.Value) {
+        if (Kind == MatchKind::Shortest)
+          return entry.Value;
+
+        bestMatch = entry.Value;
+      }
+
+      if (begin == end)
+        return bestMatch;
 
       if (entry.Children == nullptr)
-        return None;
+        return bestMatch;
 
       node = entry.Children;
     }
