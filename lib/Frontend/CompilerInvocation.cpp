@@ -422,8 +422,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableExperimentalConcurrency |=
     Args.hasArg(OPT_enable_experimental_concurrency);
 
-  Opts.EnableExperimentalOpaqueReturnTypes |=
-      Args.hasArg(OPT_enable_experimental_opaque_return_types);
+  Opts.EnableExperimentalNamedOpaqueTypes |=
+      Args.hasArg(OPT_enable_experimental_named_opaque_types);
+
+  Opts.EnableExperimentalStructuralOpaqueTypes |=
+      Args.hasArg(OPT_enable_experimental_structural_opaque_types);
 
   Opts.EnableExperimentalDistributed |=
     Args.hasArg(OPT_enable_experimental_distributed);
