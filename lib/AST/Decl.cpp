@@ -6528,7 +6528,7 @@ void ParamDecl::setNonEphemeralIfPossible() {
 
 Type ParamDecl::getVarargBaseTy(Type VarArgT) {
   TypeBase *T = VarArgT.getPointer();
-  if (auto *AT = dyn_cast<ArraySliceType>(T))
+  if (auto *AT = dyn_cast<VariadicSequenceType>(T))
     return AT->getBaseType();
   if (auto *BGT = dyn_cast<BoundGenericType>(T)) {
     // It's the stdlib Array<T>.

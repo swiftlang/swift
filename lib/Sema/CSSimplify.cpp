@@ -8900,7 +8900,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
       // If external parameter is variadic it translates into an array in
       // the body of the closure.
       internalType =
-          param.isVariadic() ? ArraySliceType::get(typeVar) : Type(typeVar);
+          param.isVariadic() ? VariadicSequenceType::get(typeVar) : Type(typeVar);
 
       auto externalType = param.getOldType();
 

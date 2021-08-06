@@ -2166,9 +2166,10 @@ static Type validateParameterType(ParamDecl *decl) {
   }
 
   if (decl->isVariadic()) {
-    Ty = TypeChecker::getArraySliceType(decl->getStartLoc(), Ty);
-    if (Ty->hasError()) {
-      decl->setInvalid();
+    Ty = VariadicSequenceType::get(Ty);
+    if (!ctx.getArrayDecl()) {
+      ctx.Diags.diagnose(decl->getTypeRepr()->getLoc(),
+                         diag::sugar_type_not_found, 0);
       return ErrorType::get(ctx);
     }
 

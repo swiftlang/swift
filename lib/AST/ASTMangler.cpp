@@ -1132,6 +1132,12 @@ void ASTMangler::appendType(Type type, const ValueDecl *forDecl) {
       appendOperator("XSa");
       return;
 
+    case TypeKind::VariadicSequence:
+      assert(DWARFMangling && "sugared types are only legal for the debugger");
+      appendType(cast<VariadicSequenceType>(tybase)->getBaseType());
+      appendOperator("XSa");
+      return;
+
     case TypeKind::Optional:
       assert(DWARFMangling && "sugared types are only legal for the debugger");
       appendType(cast<OptionalType>(tybase)->getBaseType());
