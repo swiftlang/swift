@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -verify %s
+// RUN: %target-swift-frontend -emit-sil -verify -requirement-machine=off %s
 
 // Test differentiation transform diagnostics.
 

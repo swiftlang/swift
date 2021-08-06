@@ -572,7 +572,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
       }
       return false;
     };
-    if (auto *VD = getReferencedDecl(Call).second.getDecl())
+    if (auto *VD = getReferencedDecl(Call, /*semantic=*/false).second.getDecl())
       if (handleDecl(VD, Call->getSourceRange()))
         return true;
 

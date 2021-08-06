@@ -28,8 +28,9 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/ForeignAsyncConvention.h"
-#include "swift/SIL/FormalLinkage.h"
+#include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/TypeLowering.h"
@@ -191,7 +192,8 @@ static const clang::Type *prependParameterType(
 SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
     CanSILFunctionType blockType, CanType continuationTy,
     AbstractionPattern origFormalType, CanGenericSignature sig,
-    ForeignAsyncConvention convention) {
+    ForeignAsyncConvention convention,
+    Optional<ForeignErrorConvention> foreignError) {
   // Extract the result and error types from the continuation type.
   auto resumeType = cast<BoundGenericType>(continuationTy).getGenericArgs()[0];
 
@@ -360,10 +362,12 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
         errorScope.pop();
         SGF.B.createBranch(loc, returnBB);
         SGF.B.emitBlock(noneErrorBB);
+      } else if (foreignError) {
+        resumeIntrinsic = getResumeUnsafeThrowingContinuation();
       } else {
         resumeIntrinsic = getResumeUnsafeContinuation();
       }
-            
+
       auto loweredResumeTy = SGF.getLoweredType(AbstractionPattern::getOpaque(),
                                             F->mapTypeIntoContext(resumeType));
       

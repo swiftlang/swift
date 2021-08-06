@@ -1050,8 +1050,7 @@ static void wakeOverrides(ProcessOverrideJob *nextOverride,
     nextOverride = cur->NextJob.getAsPreprocessedOverride();
 
     if (hasAlreadyActivated ||
-        !targetPriority ||
-        cur->getPriority() != *targetPriority)
+        !targetPriority)
       cur->wakeAndAbandon();
     else
       hasAlreadyActivated = cur->wakeAndActivate();
@@ -1214,8 +1213,7 @@ void DefaultActorImpl::giveUpThread(RunningJobInfo runner) {
     }
 
     bool hasMoreJobs = (bool) newState.FirstJob;
-    bool hasOverrideAtNewPriority =
-      (runner.Priority < oldState.Flags.getMaxPriority());
+    bool hasOverrideAtNewPriority = false;
     bool hasActiveInlineJob = newState.Flags.hasActiveInlineJob();
     bool needsNewProcessJob = hasMoreJobs && !hasOverrideAtNewPriority;
 
@@ -1316,8 +1314,7 @@ Job *DefaultActorImpl::claimNextJobOrGiveUp(bool actorIsOwned,
 
       // If the actor is out of work, or its priority doesn't match our
       // priority, don't try to take over the actor.
-      if (!oldState.FirstJob ||
-          oldState.Flags.getMaxPriority() != runner.Priority) {
+      if (!oldState.FirstJob) {
 
         // The only change we need here is inline-runner bookkeeping.
         if (!tryUpdateForInlineRunner())
@@ -1399,8 +1396,7 @@ Job *DefaultActorImpl::claimNextJobOrGiveUp(bool actorIsOwned,
     // FIXME: should this be an exact match in priority instead of
     // potentially running jobs with too high a priority?
     Job *jobToRun;
-    if (oldState.Flags.getMaxPriority() <= runner.Priority &&
-        newFirstJob) {
+    if (newFirstJob) {
       jobToRun = newFirstJob;
       newState.FirstJob = getNextJobInQueue(newFirstJob);
       newState.Flags.setStatus(Status::Running);
@@ -1646,7 +1642,7 @@ void DefaultActorImpl::enqueue(Job *job) {
 
     // If we need an override job, create it (if necessary) and
     // register it with the queue.
-    bool needsOverride = !wasIdle && newPriority != oldPriority;
+    bool needsOverride = false;
     if (needsOverride) {
       overrideJob.addToState(this, newState);
     } else {

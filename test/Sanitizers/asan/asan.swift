@@ -12,9 +12,6 @@
 // REQUIRES: executable_test
 // REQUIRES: asan_runtime
 
-// rdar://problem/47367694 tracks re-enabling this test for backward deployment.
-// UNSUPPORTED: remote_run
-
 // Make sure we can handle swifterror. LLVM's address sanitizer pass needs to
 // ignore swifterror addresses.
 

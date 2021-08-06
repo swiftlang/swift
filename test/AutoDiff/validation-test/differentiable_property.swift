@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift
+// RUN: %target-run-simple-swift(-Xfrontend -requirement-machine=off)
 // REQUIRES: executable_test
 
 // An end-to-end test that we can differentiate property accesses, with custom

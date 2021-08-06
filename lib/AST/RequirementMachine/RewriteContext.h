@@ -18,7 +18,9 @@
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/Support/Allocator.h"
-#include "RewriteSystem.h"
+#include "Histogram.h"
+#include "Symbol.h"
+#include "Term.h"
 
 namespace swift {
 
@@ -50,10 +52,16 @@ class RewriteContext final {
   ASTContext &Context;
 
 public:
-  /// Statistical counters.
+  /// Statistics.
   UnifiedStatsReporter *Stats;
 
-  RewriteContext(ASTContext &ctx) : Context(ctx), Stats(ctx.Stats) {}
+  /// Histograms.
+  Histogram SymbolHistogram;
+  Histogram TermHistogram;
+  Histogram RuleTrieHistogram;
+  Histogram RuleTrieRootHistogram;
+
+  explicit RewriteContext(ASTContext &ctx);
 
   Term getTermForType(CanType paramType, const ProtocolDecl *proto);
 
@@ -73,6 +81,8 @@ public:
   Type getRelativeTypeForTerm(
                       const MutableTerm &term, const MutableTerm &prefix,
                       const ProtocolGraph &protos) const;
+
+  ~RewriteContext();
 };
 
 } // end namespace rewriting

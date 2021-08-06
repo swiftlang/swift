@@ -3193,8 +3193,9 @@ public:
   }
 };
 
-
-/// Use an opaque type to abstract a value of the underlying concrete type.
+/// Use an opaque type to abstract a value of the underlying concrete type,
+/// possibly nested inside other types. E.g. can perform coversions "T --->
+/// (opaque type)" and "S<T> ---> S<(opaque type)>".
 class UnderlyingToOpaqueExpr : public ImplicitConversionExpr {
 public:
   UnderlyingToOpaqueExpr(Expr *subExpr, Type ty)

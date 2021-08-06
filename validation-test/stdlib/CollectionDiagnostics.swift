@@ -154,6 +154,52 @@ struct CollectionWithNonDefaultSubSequence: Collection {
   public subscript(position: Int) -> Int { position }
 }
 
+// expected-error@+2 {{type 'MutableCollectionWithNonDefaultSubSequence' does not conform to protocol 'MutableCollection'}}
+// expected-error@+1 {{unavailable subscript 'subscript(_:)' was used to satisfy a requirement of protocol 'MutableCollection'}}
+struct MutableCollectionWithNonDefaultSubSequence: MutableCollection {
+  public var startIndex: Int
+  public var endIndex: Int
+
+  public typealias SubSequence = Self
+
+  public func index(after i: Int) -> Int { i+1 }
+  public subscript(position: Int) -> Int {
+    get { position }
+    set { _ = newValue }
+  }
+
+  public subscript(bounds: Range<Index>) -> Self {
+    Self(startIndex: bounds.startIndex, endIndex: bounds.endIndex)
+  }
+}
+
+struct MutableCollectionWithDefaultSubSequence: MutableCollection {
+  public var startIndex: Int
+  public var endIndex: Int
+
+  public func index(after i: Int) -> Int { i+1 }
+  public subscript(position: Int) -> Int {
+    get { position }
+    set { _ = newValue }
+  }
+}
+
+func subscriptMutableCollectionIgnored() {
+  let cs: MutableCollectionWithNonDefaultSubSequence
+  cs = .init(startIndex: 0, endIndex: 10)
+
+  let badSlice: Slice<MutableCollectionWithNonDefaultSubSequence>
+  badSlice = cs[0..<2] // expected-error {{'subscript(_:)' is unavailable}}
+  cs[3..<5] = badSlice // expected-error {{'subscript(_:)' is unavailable}}
+
+  let ds: MutableCollectionWithDefaultSubSequence
+  ds = .init(startIndex: 0, endIndex: 10)
+
+  let goodSlice: Slice<MutableCollectionWithDefaultSubSequence>
+  goodSlice = ds[0..<2]
+  ds[3..<5] = goodSlice
+}
+
 // FIXME: Remove -verify-ignore-unknown.
 // <unknown>:0: error: unexpected note produced: possibly intended match
 // <unknown>:0: error: unexpected note produced: possibly intended match

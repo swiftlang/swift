@@ -389,6 +389,10 @@ private:
   readGenericRequirementsChecked(SmallVectorImpl<Requirement> &requirements,
                                  llvm::BitstreamCursor &Cursor);
 
+  /// Read a list of associated type declarations in a protocol.
+  void readAssociatedTypes(SmallVectorImpl<AssociatedTypeDecl *> &assocTypes,
+                           llvm::BitstreamCursor &Cursor);
+
   /// Populates the protocol's default witness table.
   ///
   /// Returns true if there is an error.
@@ -708,6 +712,10 @@ public:
   void
   loadRequirementSignature(const ProtocolDecl *proto, uint64_t contextData,
                            SmallVectorImpl<Requirement> &requirements) override;
+
+  void
+  loadAssociatedTypes(const ProtocolDecl *proto, uint64_t contextData,
+                      SmallVectorImpl<AssociatedTypeDecl *> &assocTypes) override;
 
   Optional<StringRef> getGroupNameById(unsigned Id) const;
   Optional<StringRef> getSourceFileNameById(unsigned Id) const;

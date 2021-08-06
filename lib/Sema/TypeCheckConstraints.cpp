@@ -508,23 +508,24 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
   // given by the initializer.
   if (auto var = pattern->getSingleVar()) {
     if (auto opaque = var->getOpaqueResultTypeDecl()) {
-      if (auto convertedInit = dyn_cast<UnderlyingToOpaqueExpr>(init)) {
-        auto underlyingType = convertedInit->getSubExpr()->getType()
-            ->mapTypeOutOfContext();
-        auto underlyingSubs = SubstitutionMap::get(
-          opaque->getOpaqueInterfaceGenericSignature(),
-          [&](SubstitutableType *t) -> Type {
-            if (t->isEqual(opaque->getUnderlyingInterfaceType())) {
-              return underlyingType;
-            }
-            return Type(t);
-          },
-          LookUpConformanceInModule(opaque->getModuleContext()));
-        
-        opaque->setUnderlyingTypeSubstitutions(underlyingSubs);
-      } else {
-        var->diagnose(diag::opaque_type_var_no_underlying_type);
-      }
+      init->forEachChildExpr([&](Expr *expr) -> Expr * {
+        if (auto coercionExpr = dyn_cast<UnderlyingToOpaqueExpr>(expr)) {
+          auto underlyingType =
+              coercionExpr->getSubExpr()->getType()->mapTypeOutOfContext();
+          auto underlyingSubs = SubstitutionMap::get(
+              opaque->getOpaqueInterfaceGenericSignature(),
+              [&](SubstitutableType *t) -> Type {
+                if (t->isEqual(opaque->getUnderlyingInterfaceType())) {
+                  return underlyingType;
+                }
+                return Type(t);
+              },
+              LookUpConformanceInModule(opaque->getModuleContext()));
+
+          opaque->setUnderlyingTypeSubstitutions(underlyingSubs);
+        }
+        return expr;
+      });
     }
   }
 

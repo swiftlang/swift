@@ -1057,7 +1057,7 @@ protocol Other1 {
     ],
     key.offset: 209,
     key.length: 185,
-    key.fully_annotated_decl: "<decl.extension.struct>extension <decl.name><ref.struct usr=\"s:16UnderscoredProto1AV\">A</ref.struct></decl.name> : <ref.protocol usr=\"s:16UnderscoredProto01_A6Proto2P\">_UnderscoredProto2</ref.protocol> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr=\"s:16UnderscoredProto1AVAASSRszlE1Txmfp\">T</ref.generic_type_param> == <ref.struct usr=\"s:SS\">String</ref.struct></decl.generic_type_requirement></decl.extension.struct>",
+    key.fully_annotated_decl: "<decl.extension.struct><syntaxtype.keyword>extension</syntaxtype.keyword> <decl.name><ref.struct usr=\"s:16UnderscoredProto1AV\">A</ref.struct></decl.name> : <ref.protocol usr=\"s:16UnderscoredProto01_A6Proto2P\">_UnderscoredProto2</ref.protocol> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr=\"s:16UnderscoredProto1AVAASSRszlE1Txmfp\">T</ref.generic_type_param> == <ref.struct usr=\"s:SS\">String</ref.struct></decl.generic_type_requirement></decl.extension.struct>",
     key.conforms: [
       {
         key.kind: source.lang.swift.ref.protocol,
@@ -1527,7 +1527,7 @@ protocol Other1 {
     ],
     key.offset: 1393,
     key.length: 59,
-    key.fully_annotated_decl: "<decl.extension.struct>extension <decl.name><ref.struct usr=\"s:16UnderscoredProto1DV\">D</ref.struct></decl.name> : <ref.protocol usr=\"s:16UnderscoredProto05_SomeB0P\">_SomeProto</ref.protocol> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr=\"s:16UnderscoredProto1DVAASQRzrlE1Txmfp\">T</ref.generic_type_param> : <ref.protocol usr=\"s:SQ\">Equatable</ref.protocol></decl.generic_type_requirement></decl.extension.struct>",
+    key.fully_annotated_decl: "<decl.extension.struct><syntaxtype.keyword>extension</syntaxtype.keyword> <decl.name><ref.struct usr=\"s:16UnderscoredProto1DV\">D</ref.struct></decl.name> : <ref.protocol usr=\"s:16UnderscoredProto05_SomeB0P\">_SomeProto</ref.protocol> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr=\"s:16UnderscoredProto1DVAASQRzrlE1Txmfp\">T</ref.generic_type_param> : <ref.protocol usr=\"s:SQ\">Equatable</ref.protocol></decl.generic_type_requirement></decl.extension.struct>",
     key.conforms: [
       {
         key.kind: source.lang.swift.ref.protocol,

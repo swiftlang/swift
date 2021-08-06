@@ -1,6 +1,6 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -warn-concurrency
 
-func acceptSendable<T: Sendable>(_: T) { } // expected-note{{required by global function 'acceptSendable' where 'T' = '() -> Void'}}
+func acceptSendable<T: Sendable>(_: T) { }
 
 class NotSendable { }
 
@@ -19,15 +19,10 @@ func testSendableBuiltinConformances(
   acceptSendable((i, label: sf))
   acceptSendable(funSendable)
 
-  // Errors
-  acceptSendable((i, ns)) // expected-error{{global function 'acceptSendable' requires that 'NotSendable' conform to 'Sendable'}}
-  acceptSendable(nsf) // expected-error{{type '() -> Void' cannot conform to 'Sendable'}}
-  // expected-note@-1{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
-  acceptSendable((nsf, i)) // expected-error{{type '() -> Void' cannot conform to 'Sendable'}}
-  // expected-note@-1{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
-  // expected-note@-2{{requirement from conditional conformance of '(() -> Void, Int)' to 'Sendable'}}
-  acceptSendable(funNotSendable) // expected-error{{type '() -> Void' cannot conform to 'Sendable'}}
-  // expected-note@-1{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
-  // expected-note@-2{{requirement from conditional conformance of '(Int, () -> Void, NotSendable.Type)' to 'Sendable'}}
-  acceptSendable((i, ns)) // expected-error{{global function 'acceptSendable' requires that 'NotSendable' conform to 'Sendable'}}
+  // Complaints about missing Sendable conformances
+  acceptSendable((i, ns)) // expected-warning{{type 'NotSendable' does not conform to the 'Sendable' protocol}}
+  acceptSendable(nsf) // expected-warning{{function type '() -> Void' must be marked '@Sendable' to conform to 'Sendable'}}
+  acceptSendable((nsf, i)) // expected-warning{{function type '() -> Void' must be marked '@Sendable' to conform to 'Sendable'}}
+  acceptSendable(funNotSendable) // expected-warning{{function type '() -> Void' must be marked '@Sendable' to conform to 'Sendable'}}
+  acceptSendable((i, ns)) // expected-warning{{type 'NotSendable' does not conform to the 'Sendable' protocol}}
 }

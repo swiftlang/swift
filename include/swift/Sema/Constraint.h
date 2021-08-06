@@ -154,9 +154,6 @@ enum class ConstraintKind : char {
   /// The first type is a function type, the second is the function's
   /// result type.
   FunctionResult,
-  /// The first type is a type that's a candidate to be the underlying type of
-  /// the second opaque archetype.
-  OpaqueUnderlyingType,
   /// The first type will be equal to the second type, but only when the
   /// second type has been fully determined (and mapped down to a concrete
   /// type). At that point, this constraint will be treated like an `Equal`
@@ -604,7 +601,6 @@ public:
     case ConstraintKind::DynamicCallableApplicableFunction:
     case ConstraintKind::BindOverload:
     case ConstraintKind::OptionalObject:
-    case ConstraintKind::OpaqueUnderlyingType:
     case ConstraintKind::OneWayEqual:
     case ConstraintKind::OneWayBindParam:
     case ConstraintKind::DefaultClosureType:

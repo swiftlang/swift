@@ -2008,6 +2008,15 @@ public:
       verifyCheckedBase(E);
     }
 
+    void verifyChecked(ParenExpr *E) {
+      PrettyStackTraceExpr debugStack(Ctx, "verifying ParenExpr", E);
+      if (!isa<ParenType>(E->getType().getPointer())) {
+        Out << "ParenExpr not of ParenType\n";
+        abort();
+      }
+      verifyCheckedBase(E);
+    }
+
     void verifyChecked(AnyTryExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verifying AnyTryExpr", E);
 
