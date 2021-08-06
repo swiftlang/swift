@@ -2147,6 +2147,11 @@ private:
   /// explored.
   size_t MaxMemory = 0;
 
+  /// Flag to indicate to the solver that the system is in invalid
+  /// state and it shouldn't proceed but instead produce a fallback
+  /// diagnostic.
+  bool InvalidState = false;
+
   /// Cached member lookups.
   llvm::DenseMap<std::pair<Type, DeclNameRef>, Optional<LookupResult>>
     MemberLookups;
@@ -2645,6 +2650,11 @@ public:
 
     Phase = newPhase;
   }
+
+  /// Check whether constraint system is in valid state e.g.
+  /// has left-over active/inactive constraints which should
+  /// have been simplified.
+  bool inInvalidState() const { return InvalidState; }
 
   /// Cache the types of the given expression and all subexpressions.
   void cacheExprTypes(Expr *expr) {

@@ -422,6 +422,11 @@ ConstraintSystem::SolverState::~SolverState() {
          "Expected constraint system to have this solver state!");
   CS.solverState = nullptr;
 
+  // If constraint system ended up being in an invalid state
+  // let's just drop the state without attempting to rollback.
+  if (CS.inInvalidState())
+    return;
+
   // Make sure that all of the retired constraints have been returned
   // to constraint system.
   assert(!hasRetiredConstraints());
@@ -513,6 +518,10 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
 }
 
 ConstraintSystem::SolverScope::~SolverScope() {
+  // Don't attempt to rollback from an incorrect state.
+  if (cs.inInvalidState())
+    return;
+
   // Erase the end of various lists.
   while (cs.TypeVariables.size() > numTypeVariables)
     cs.TypeVariables.pop_back();
@@ -1384,6 +1393,13 @@ void ConstraintSystem::solveImpl(SmallVectorImpl<Solution> &solutions) {
   if (failedConstraint)
     return;
 
+  // Attempt to solve a constraint system already in an invalid
+  // state should be immediately aborted.
+  if (inInvalidState()) {
+    solutions.clear();
+    return;
+  }
+
   // Allocate new solver scope, so constraint system
   // could be restored to its original state afterwards.
   // Otherwise there is a risk that some of the constraints
@@ -1426,6 +1442,14 @@ void ConstraintSystem::solveImpl(SmallVectorImpl<Solution> &solutions) {
     // or error, which means that current path is inconsistent.
     {
       auto result = advance(step.get(), prevFailed);
+
+      // If execution of this step let constraint system in an
+      // invalid state, let's drop all of the solutions and abort.
+      if (inInvalidState()) {
+        solutions.clear();
+        return;
+      }
+
       switch (result.getKind()) {
       // It was impossible to solve this step, let's note that
       // for followup steps, to propogate the error.
