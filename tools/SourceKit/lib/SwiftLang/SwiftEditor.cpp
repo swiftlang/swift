@@ -27,6 +27,7 @@
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Demangling/ManglingUtils.h"
 #include "swift/Frontend/Frontend.h"
@@ -83,7 +84,13 @@ void EditorDiagConsumer::handleDiagnostic(SourceManager &SM,
   }
 
   // Filter out benign diagnostics for editing.
-  if (Info.ID == diag::lex_editor_placeholder.ID)
+  // oslog_invalid_log_message is spuriously output for live issues as modules
+  // in the index build are built without function bodies (including inline
+  // functions). OSLogOptimization expects SIL for bodies and hence errors
+  // when there isn't any. Ignore in live issues for now and re-evaluate if
+  // this (not having SIL for inline functions) becomes a more widespread issue.
+  if (Info.ID == diag::lex_editor_placeholder.ID ||
+      Info.ID == diag::oslog_invalid_log_message.ID)
     return;
 
   bool IsNote = (Info.Kind == DiagnosticKind::Note);
