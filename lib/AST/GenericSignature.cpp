@@ -1540,3 +1540,180 @@ int swift::compareDependentTypes(Type type1, Type type2) {
 
   return 0;
 }
+
+void GenericSignature::verify() const {
+  auto canSig = getCanonicalSignature();
+
+  PrettyStackTraceGenericSignature debugStack("checking", canSig);
+
+  auto canonicalRequirements = canSig.getRequirements();
+
+  // We collect conformance requirements to check that they're minimal.
+  llvm::SmallDenseMap<CanType, SmallVector<ProtocolDecl *, 2>, 2> conformances;
+
+  // Check that the requirements satisfy certain invariants.
+  for (unsigned idx : indices(canonicalRequirements)) {
+    debugStack.setRequirement(idx);
+
+    const auto &reqt = canonicalRequirements[idx];
+
+    // Left-hand side must be a canonical type parameter.
+    if (reqt.getKind() != RequirementKind::SameType) {
+      if (!reqt.getFirstType()->isTypeParameter()) {
+        llvm::errs() << "Left-hand side must be a type parameter: ";
+        reqt.dump(llvm::errs());
+        llvm::errs() << "\n";
+        abort();
+      }
+
+      if (!canSig->isCanonicalTypeInContext(reqt.getFirstType())) {
+        llvm::errs() << "Left-hand side is not canonical: ";
+        reqt.dump(llvm::errs());
+        llvm::errs() << "\n";
+        abort();
+      }
+    }
+
+    // Check canonicalization of requirement itself.
+    switch (reqt.getKind()) {
+    case RequirementKind::Superclass:
+      if (!canSig->isCanonicalTypeInContext(reqt.getSecondType())) {
+        llvm::errs() << "Right-hand side is not canonical: ";
+        reqt.dump(llvm::errs());
+        llvm::errs() << "\n";
+        abort();
+      }
+      break;
+
+    case RequirementKind::Layout:
+      break;
+
+    case RequirementKind::SameType: {
+      auto isCanonicalAnchor = [&](Type type) {
+        if (auto *dmt = type->getAs<DependentMemberType>())
+          return canSig->isCanonicalTypeInContext(dmt->getBase());
+        return type->is<GenericTypeParamType>();
+      };
+
+      auto firstType = reqt.getFirstType();
+      auto secondType = reqt.getSecondType();
+      if (!isCanonicalAnchor(firstType)) {
+        llvm::errs() << "Left hand side does not have a canonical parent: ";
+        reqt.dump(llvm::errs());
+        llvm::errs() << "\n";
+        abort();
+      }
+
+      if (reqt.getSecondType()->isTypeParameter()) {
+        if (!isCanonicalAnchor(secondType)) {
+          llvm::errs() << "Right hand side does not have a canonical parent: ";
+          reqt.dump(llvm::errs());
+          llvm::errs() << "\n";
+          abort();
+        }
+        if (compareDependentTypes(firstType, secondType) >= 0) {
+          llvm::errs() << "Out-of-order type parameters: ";
+          reqt.dump(llvm::errs());
+          llvm::errs() << "\n";
+          abort();
+        }
+      } else {
+        if (!canSig->isCanonicalTypeInContext(secondType)) {
+          llvm::errs() << "Right hand side is not canonical: ";
+          reqt.dump(llvm::errs());
+          llvm::errs() << "\n";
+          abort();
+        }
+      }
+      break;
+    }
+
+    case RequirementKind::Conformance:
+      // Collect all conformance requirements on each type parameter.
+      conformances[CanType(reqt.getFirstType())].push_back(
+          reqt.getProtocolDecl());
+      break;
+    }
+
+    // From here on, we're only interested in requirements beyond the first.
+    if (idx == 0) continue;
+
+    // Make sure that the left-hand sides are in nondecreasing order.
+    const auto &prevReqt = canonicalRequirements[idx-1];
+    int compareLHS =
+      compareDependentTypes(prevReqt.getFirstType(), reqt.getFirstType());
+    if (compareLHS > 0) {
+      llvm::errs() << "Out-of-order left-hand side: ";
+      reqt.dump(llvm::errs());
+      llvm::errs() << "\n";
+      abort();
+    }
+
+    // If we have two same-type requirements where the left-hand sides differ
+    // but fall into the same equivalence class, we can check the form.
+    if (compareLHS < 0 && reqt.getKind() == RequirementKind::SameType &&
+        prevReqt.getKind() == RequirementKind::SameType &&
+        canSig->areSameTypeParameterInContext(prevReqt.getFirstType(),
+                                              reqt.getFirstType())) {
+      // If it's a it's a type parameter, make sure the equivalence class is
+      // wired together sanely.
+      if (prevReqt.getSecondType()->isTypeParameter()) {
+        if (!prevReqt.getSecondType()->isEqual(reqt.getFirstType())) {
+          llvm::errs() << "Same-type requirement within an equiv. class "
+                       << "is out-of-order: ";
+          reqt.dump(llvm::errs());
+          llvm::errs() << "\n";
+          abort();
+        }
+      } else {
+        // Otherwise, the concrete types must match up.
+        if (!prevReqt.getSecondType()->isEqual(reqt.getSecondType())) {
+          llvm::errs() << "Inconsistent concrete requirement in equiv. class: ";
+          reqt.dump(llvm::errs());
+          llvm::errs() << "\n";
+          abort();
+        }
+      }
+    }
+
+    // If we have a concrete same-type requirement, we shouldn't have any
+    // other requirements on the same type.
+    if (reqt.getKind() == RequirementKind::SameType &&
+        !reqt.getSecondType()->isTypeParameter()) {
+      if (compareLHS >= 0) {
+        llvm::errs() << "Concrete subject type should not have "
+                     << "any other requirements: ";
+        reqt.dump(llvm::errs());
+        llvm::errs() << "\n";
+        abort();
+      }
+    }
+
+    if (prevReqt.compare(reqt) >= 0) {
+      llvm::errs() << "Out-of-order requirement: ";
+      reqt.dump(llvm::errs());
+      llvm::errs() << "\n";
+      abort();
+    }
+  }
+
+  // Make sure we don't have redundant protocol conformance requirements.
+  for (auto pair : conformances) {
+    const auto &protos = pair.second;
+    auto canonicalProtos = protos;
+
+    // canonicalizeProtocols() will sort them and filter out any protocols that
+    // are refined by other protocols in the list. It should be a no-op at this
+    // point.
+    ProtocolType::canonicalizeProtocols(canonicalProtos);
+
+    if (protos.size() != canonicalProtos.size()) {
+      llvm::errs() << "Redundant conformance requirements in signature\n";
+      abort();
+    }
+    if (!std::equal(protos.begin(), protos.end(), canonicalProtos.begin())) {
+      llvm::errs() << "Out-of-order conformance requirements\n";
+      abort();
+    }
+  }
+}
