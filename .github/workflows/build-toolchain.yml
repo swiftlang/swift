@@ -5,11 +5,13 @@ on:
     branches:
       - swiftwasm
       - swiftwasm-release/5.3
+      - swiftwasm-release/5.4
       - swiftwasm-release/5.5
   pull_request:
     branches:
       - swiftwasm
       - swiftwasm-release/5.3
+      - swiftwasm-release/5.4
       - swiftwasm-release/5.5
 jobs:
   build_toolchain:
