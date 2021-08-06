@@ -50,7 +50,7 @@ class PropertyBag {
   friend class PropertyMap;
 
   /// The fully reduced term whose properties are recorded in this property bag.
-  MutableTerm Key;
+  Term Key;
 
   /// All protocols this type conforms to.
   llvm::TinyPtrVector<const ProtocolDecl *> ConformsTo;
@@ -72,7 +72,7 @@ class PropertyBag {
   /// ConformsTo list.
   llvm::TinyPtrVector<ProtocolConformance *> ConcreteConformances;
 
-  explicit PropertyBag(const MutableTerm &key) : Key(key) {}
+  explicit PropertyBag(Term key) : Key(key) {}
 
   void addProperty(Symbol property,
                    RewriteContext &ctx,
@@ -87,7 +87,7 @@ class PropertyBag {
   PropertyBag &operator=(PropertyBag &&) = delete;
 
 public:
-  const MutableTerm &getKey() const { return Key; }
+  Term getKey() const { return Key; }
   void dump(llvm::raw_ostream &out) const;
 
   bool hasSuperclassBound() const {
@@ -142,13 +142,13 @@ class PropertyMap {
   Trie<PropertyBag *, MatchKind::Longest> Trie;
 
   using ConcreteTypeInDomain = std::pair<CanType, ArrayRef<const ProtocolDecl *>>;
-  llvm::DenseMap<ConcreteTypeInDomain, MutableTerm> ConcreteTypeInDomainMap;
+  llvm::DenseMap<ConcreteTypeInDomain, Term> ConcreteTypeInDomainMap;
 
   const ProtocolGraph &Protos;
   unsigned DebugConcreteUnification : 1;
   unsigned DebugConcretizeNestedTypes : 1;
 
-  PropertyBag *getOrCreateProperties(const MutableTerm &key);
+  PropertyBag *getOrCreateProperties(Term key);
 
   PropertyMap(const PropertyMap &) = delete;
   PropertyMap(PropertyMap &&) = delete;
@@ -170,7 +170,7 @@ public:
   void dump(llvm::raw_ostream &out) const;
 
   void clear();
-  void addProperty(const MutableTerm &key, Symbol property,
+  void addProperty(Term key, Symbol property,
                    SmallVectorImpl<std::pair<MutableTerm, MutableTerm>> &inducedRules);
 
   void computeConcreteTypeInDomainMap();
@@ -179,14 +179,14 @@ public:
 
 private:
   void concretizeNestedTypesFromConcreteParent(
-                   const MutableTerm &key, RequirementKind requirementKind,
+                   Term key, RequirementKind requirementKind,
                    CanType concreteType, ArrayRef<Term> substitutions,
                    ArrayRef<const ProtocolDecl *> conformsTo,
                    llvm::TinyPtrVector<ProtocolConformance *> &conformances,
                    SmallVectorImpl<std::pair<MutableTerm, MutableTerm>> &inducedRules) const;
 
   MutableTerm computeConstraintTermForTypeWitness(
-      const MutableTerm &key, CanType concreteType, CanType typeWitness,
+      Term key, CanType concreteType, CanType typeWitness,
       const MutableTerm &subjectType, ArrayRef<Term> substitutions) const;
 };
 

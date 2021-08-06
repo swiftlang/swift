@@ -672,14 +672,10 @@ PropertyMap::lookUpProperties(const MutableTerm &key) const {
 ///
 /// This must be called in monotonically non-decreasing key order.
 PropertyBag *
-PropertyMap::getOrCreateProperties(const MutableTerm &key) {
-  assert(!key.empty());
-
-  if (!Entries.empty()) {
-    const auto &lastEntry = Entries.back();
-    if (lastEntry->getKey() == key)
-      return lastEntry;
-  }
+PropertyMap::getOrCreateProperties(Term key) {
+  auto next = Trie.find(key.rbegin(), key.rend());
+  if (next && (*next)->getKey() == key)
+    return *next;
 
   auto *props = new PropertyBag(key);
 
@@ -704,12 +700,9 @@ PropertyMap::getOrCreateProperties(const MutableTerm &key) {
   //
   // Since 'A' has no proper suffix with additional properties, the next
   // property bag of 'A' is nullptr.
-  if (auto *next = lookUpProperties(key))
-    props->copyPropertiesFrom(next, Context);
+  if (next)
+    props->copyPropertiesFrom(*next, Context);
 
-  // Here is where we make the assumption that if the new key is not equal to
-  // the key of the last entry, then it is larger than any key already in the
-  // map.
   Entries.push_back(props);
   auto oldProps = Trie.insert(key.rbegin(), key.rend(), props);
   if (oldProps) {
@@ -738,7 +731,7 @@ void PropertyMap::clear() {
 /// Record a protocol conformance, layout or superclass constraint on the given
 /// key. Must be called in monotonically non-decreasing key order.
 void PropertyMap::addProperty(
-    const MutableTerm &key, Symbol property,
+    Term key, Symbol property,
     SmallVectorImpl<std::pair<MutableTerm, MutableTerm>> &inducedRules) {
   assert(property.isProperty());
   auto *props = getOrCreateProperties(key);
@@ -763,12 +756,8 @@ void PropertyMap::computeConcreteTypeInDomainMap() {
     auto concreteTypeKey = std::make_pair(concreteType, domain);
 
     auto found = ConcreteTypeInDomainMap.find(concreteTypeKey);
-    if (found != ConcreteTypeInDomainMap.end()) {
-      const auto &otherTerm = found->second;
-      assert(props->Key.compare(otherTerm, Protos) > 0 &&
-             "Out-of-order keys?");
+    if (found != ConcreteTypeInDomainMap.end())
       continue;
-    }
 
     auto inserted = ConcreteTypeInDomainMap.insert(
         std::make_pair(concreteTypeKey, props->Key));
@@ -857,7 +846,7 @@ void PropertyMap::concretizeNestedTypesFromConcreteParents(
 ///    T.[P:B] => U.V
 ///
 void PropertyMap::concretizeNestedTypesFromConcreteParent(
-    const MutableTerm &key, RequirementKind requirementKind,
+    Term key, RequirementKind requirementKind,
     CanType concreteType, ArrayRef<Term> substitutions,
     ArrayRef<const ProtocolDecl *> conformsTo,
     llvm::TinyPtrVector<ProtocolConformance *> &conformances,
@@ -920,7 +909,7 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
                      << " of " << concreteType << " is " << typeWitness << "\n";
       }
 
-      MutableTerm subjectType = key;
+      MutableTerm subjectType(key);
       subjectType.add(Symbol::forAssociatedType(proto, assocType->getName(),
                                                 Context));
 
@@ -936,7 +925,7 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
         }
 
         // Add a rule T.[P:A] => T.
-        constraintType = key;
+        constraintType = MutableTerm(key);
       } else {
         constraintType = computeConstraintTermForTypeWitness(
             key, concreteType, typeWitness, subjectType,
@@ -977,7 +966,7 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
 ///
 ///        T.[P:A] => V
 MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
-    const MutableTerm &key, CanType concreteType, CanType typeWitness,
+    Term key, CanType concreteType, CanType typeWitness,
     const MutableTerm &subjectType, ArrayRef<Term> substitutions) const {
   if (!typeWitness->hasTypeParameter()) {
     // Check if we have a shorter representative we can use.
@@ -986,12 +975,13 @@ MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
 
     auto found = ConcreteTypeInDomainMap.find(concreteTypeKey);
     if (found != ConcreteTypeInDomainMap.end()) {
-      if (found->second != subjectType) {
+      MutableTerm result(found->second);
+      if (result != subjectType) {
         if (DebugConcretizeNestedTypes) {
           llvm::dbgs() << "^^ Type witness can re-use property bag of "
                        << found->second << "\n";
         }
-        return found->second;
+        return result;
       }
     }
   }
@@ -1048,7 +1038,11 @@ RewriteSystem::buildPropertyMap(PropertyMap &map,
                                 unsigned maxDepth) {
   map.clear();
 
-  std::vector<std::pair<MutableTerm, Symbol>> properties;
+  // PropertyMap::addRule() requires that shorter rules are added
+  // before longer rules, so that it can perform lookups on suffixes and call
+  // PropertyBag::copyPropertiesFrom(). However, we don't have to perform a
+  // full sort by term order here; a bucket sort by term length suffices.
+  SmallVector<std::vector<std::pair<Term, Symbol>>, 4> properties;
 
   for (const auto &rule : Rules) {
     if (rule.isDeleted())
@@ -1068,31 +1062,19 @@ RewriteSystem::buildPropertyMap(PropertyMap &map,
     if (!std::equal(rhs.begin(), rhs.end(), lhs.begin()))
       continue;
 
-    MutableTerm key(rhs);
-
-#ifndef NDEBUG
-    assert(!simplify(key) &&
-           "Right hand side of a property rule should already be reduced");
-#endif
-
-    properties.emplace_back(key, property);
+    if (rhs.size() >= properties.size())
+      properties.resize(rhs.size() + 1);
+    properties[rhs.size()].emplace_back(rhs, property);
   }
-
-  // PropertyMap::addRule() requires that shorter rules are added
-  // before longer rules, so that it can perform lookups on suffixes and call
-  // PropertyBag::copyPropertiesFrom().
-  std::sort(properties.begin(), properties.end(),
-            [&](const std::pair<MutableTerm, Symbol> &lhs,
-                const std::pair<MutableTerm, Symbol> &rhs) -> bool {
-              return lhs.first.compare(rhs.first, Protos) < 0;
-            });
 
   // Merging multiple superclass or concrete type rules can induce new rules
   // to unify concrete type constructor arguments.
   SmallVector<std::pair<MutableTerm, MutableTerm>, 3> inducedRules;
 
-  for (auto pair : properties) {
-    map.addProperty(pair.first, pair.second, inducedRules);
+  for (const auto &bucket : properties) {
+    for (auto pair : bucket) {
+      map.addProperty(pair.first, pair.second, inducedRules);
+    }
   }
 
   // We collect terms with fully concrete types so that we can re-use them
