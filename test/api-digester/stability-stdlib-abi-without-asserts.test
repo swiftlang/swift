@@ -72,4 +72,11 @@ Protocol Error has added inherited protocol Sendable
 Protocol Error has generic signature change from to <Self : Swift.Sendable>
 Enum Never has added a conformance to an existing protocol Identifiable
 
+// These haven't actually been removed; they are simply marked unavailable.
+// This seems to be a false positive in the ABI checker. This is not an ABI
+// break because the symbols are still present, and is not a source break
+// because FixedWidthInteger still has these operations.
+Func SignedInteger.&+(_:_:) has been removed
+Func SignedInteger.&-(_:_:) has been removed
+
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
