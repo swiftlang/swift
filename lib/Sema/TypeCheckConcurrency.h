@@ -45,6 +45,7 @@ class ProtocolConformance;
 class TopLevelCodeDecl;
 class TypeBase;
 class ValueDecl;
+class VarDecl;
 
 /// Add notes suggesting the addition of 'async', as appropriate,
 /// to a diagnostic for a function that isn't an async context.
@@ -57,8 +58,7 @@ void checkActorConstructor(ClassDecl *decl, ConstructorDecl *ctor);
 void checkActorConstructorBody(ClassDecl *decl, ConstructorDecl *ctor, BraceStmt *body);
 void checkInitializerActorIsolation(Initializer *init, Expr *expr);
 void checkEnumElementActorIsolation(EnumElementDecl *element, Expr *expr);
-void checkPropertyWrapperActorIsolation(
-    PatternBindingDecl *binding, Expr *expr);
+void checkPropertyWrapperActorIsolation(VarDecl *wrappedVar, Expr *expr);
 
 /// Determine the isolation of a particular closure.
 ///

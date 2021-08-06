@@ -2612,8 +2612,8 @@ void swift::checkEnumElementActorIsolation(
 }
 
 void swift::checkPropertyWrapperActorIsolation(
-   PatternBindingDecl *binding, Expr *expr) {
-  ActorIsolationChecker checker(binding->getDeclContext());
+    VarDecl *wrappedVar, Expr *expr) {
+  ActorIsolationChecker checker(wrappedVar->getDeclContext());
   expr->walk(checker);
 }
 
