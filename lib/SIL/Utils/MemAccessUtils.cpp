@@ -1015,7 +1015,8 @@ LLVM_ATTRIBUTE_USED void AccessPath::dump() const { print(llvm::dbgs()); }
 void AccessPathWithBase::print(raw_ostream &os) const {
   if (base)
     os << "Base: " << base;
-
+  else
+    os << "Base: unidentified\n";
   accessPath.print(os);
 }
 
