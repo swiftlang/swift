@@ -362,22 +362,16 @@ StepResult ComponentStep::take(bool prevFailed) {
     return finalize(/*isSuccess=*/false);
   }
 
-#ifdef NDEBUG
   auto printConstraints = [&](const ConstraintList &constraints) {
     for (auto &constraint : constraints)
       constraint.print(getDebugLogger(), &CS.getASTContext().SourceMgr);
   };
-#endif
 
   // If we don't have any disjunction or type variable choices left, we're done
   // solving. Make sure we don't have any unsolved constraints left over, using
   // report_fatal_error to make sure we trap in debug builds and fail the step
   // in release builds.
   if (!CS.ActiveConstraints.empty()) {
-#ifndef NDEBUG
-    CS.print(llvm::errs());
-    llvm::report_fatal_error("Active constraints left over?");
-#else
     if (CS.isDebugMode()) {
       getDebugLogger() << "(failed due to remaining active constraints:\n";
       printConstraints(CS.ActiveConstraints);
@@ -386,15 +380,10 @@ StepResult ComponentStep::take(bool prevFailed) {
 
     CS.InvalidState = true;
     return finalize(/*isSuccess=*/false);
-#endif
   }
 
   if (!CS.solverState->allowsFreeTypeVariables()) {
     if (!CS.InactiveConstraints.empty()) {
-#ifndef NDEBUG
-      CS.print(llvm::errs());
-      llvm::report_fatal_error("Inactive constraints left over?");
-#else
       if (CS.isDebugMode()) {
         getDebugLogger() << "(failed due to remaining inactive constraints:\n";
         printConstraints(CS.InactiveConstraints);
@@ -403,7 +392,6 @@ StepResult ComponentStep::take(bool prevFailed) {
 
       CS.InvalidState = true;
       return finalize(/*isSuccess=*/false);
-#endif
     }
   }
 
