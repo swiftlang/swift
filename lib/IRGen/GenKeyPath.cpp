@@ -256,6 +256,10 @@ getAccessorForComputedComponent(IRGenModule &IGM,
                                forwardingSubs,
                                &ignoreWitnessMetadata,
                                forwardedArgs);
+    } else if (IGM.Triple.isOSBinFormatWasm()) {
+      // wasm: Add null swift.type pointer to match signature even when there is
+      // no generic environment.
+      forwardedArgs.add(llvm::ConstantPointerNull::get(IGM.TypeMetadataPtrTy));
     }
     auto fnPtr =
         FunctionPointer::forDirect(IGM, accessorFn, /*secondaryValue*/ nullptr,
