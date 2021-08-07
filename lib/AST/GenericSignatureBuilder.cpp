@@ -7848,43 +7848,9 @@ static Optional<Requirement> createRequirement(RequirementKind kind,
   }
 }
 
-/// Determine the canonical ordering of requirements.
-static unsigned getRequirementKindOrder(RequirementKind kind) {
-  switch (kind) {
-  case RequirementKind::Conformance: return 2;
-  case RequirementKind::Superclass: return 0;
-  case RequirementKind::SameType: return 3;
-  case RequirementKind::Layout: return 1;
-  }
-  llvm_unreachable("unhandled kind");
-}
-
 static int compareRequirements(const Requirement *lhsPtr,
                                const Requirement *rhsPtr) {
-  auto &lhs = *lhsPtr;
-  auto &rhs = *rhsPtr;
-
-  int compareLHS =
-    compareDependentTypes(lhs.getFirstType(), rhs.getFirstType());
-
-  if (compareLHS != 0)
-    return compareLHS;
-
-  int compareKind = (getRequirementKindOrder(lhs.getKind()) -
-                     getRequirementKindOrder(rhs.getKind()));
-
-  if (compareKind != 0)
-    return compareKind;
-
-  // We should only have multiple conformance requirements.
-  assert(lhs.getKind() == RequirementKind::Conformance);
-
-  int compareProtos =
-    TypeDecl::compare(lhs.getProtocolDecl(), rhs.getProtocolDecl());
-
-  assert(compareProtos != 0 && "Duplicate conformance requirement");
-
-  return compareProtos;
+  return lhsPtr->compare(*rhsPtr);
 }
 
 void GenericSignatureBuilder::enumerateRequirements(
@@ -8113,7 +8079,7 @@ static void checkGenericSignature(CanGenericSignature canSig,
              "Concrete subject type should not have any other requirements");
     }
 
-    assert(compareRequirements(&prevReqt, &reqt) < 0 &&
+    assert(prevReqt.compare(reqt) < 0 &&
            "Out-of-order requirements");
   }
 }

@@ -1431,6 +1431,41 @@ bool Requirement::canBeSatisfied() const {
   llvm_unreachable("Bad requirement kind");
 }
 
+/// Determine the canonical ordering of requirements.
+static unsigned getRequirementKindOrder(RequirementKind kind) {
+  switch (kind) {
+  case RequirementKind::Conformance: return 2;
+  case RequirementKind::Superclass: return 0;
+  case RequirementKind::SameType: return 3;
+  case RequirementKind::Layout: return 1;
+  }
+  llvm_unreachable("unhandled kind");
+}
+
+/// Linear order on requirements in a generic signature.
+int Requirement::compare(const Requirement &other) const {
+  int compareLHS =
+    compareDependentTypes(getFirstType(), other.getFirstType());
+
+  if (compareLHS != 0)
+    return compareLHS;
+
+  int compareKind = (getRequirementKindOrder(getKind()) -
+                     getRequirementKindOrder(other.getKind()));
+
+  if (compareKind != 0)
+    return compareKind;
+
+  // We should only have multiple conformance requirements.
+  assert(getKind() == RequirementKind::Conformance);
+
+  int compareProtos =
+    TypeDecl::compare(getProtocolDecl(), other.getProtocolDecl());
+
+  assert(compareProtos != 0 && "Duplicate conformance requirement");
+  return compareProtos;
+}
+
 /// Compare two associated types.
 int swift::compareAssociatedTypes(AssociatedTypeDecl *assocType1,
                                   AssociatedTypeDecl *assocType2) {
