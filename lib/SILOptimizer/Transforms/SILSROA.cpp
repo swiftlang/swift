@@ -202,7 +202,8 @@ createAllocas(llvm::SmallVector<AllocStackInst *, 4> &NewAllocations) {
     // TODO: Add op_fragment support for tuple type
     for (unsigned EltNo : indices(TT->getElementTypes())) {
       SILType EltTy = Type.getTupleElementType(EltNo);
-      NewAllocations.push_back(B.createAllocStack(Loc, EltTy, {}));
+      NewAllocations.push_back(
+          B.createAllocStack(Loc, EltTy, {}, AI->hasDynamicLifetime()));
     }
   } else {
     assert(SD && "SD should not be null since either it or TT must be set at "
@@ -217,7 +218,7 @@ createAllocas(llvm::SmallVector<AllocStackInst *, 4> &NewAllocations) {
 
       NewAllocations.push_back(B.createAllocStack(
           Loc, Type.getFieldType(VD, M, TypeExpansionContext(B.getFunction())),
-          NewDebugVarInfo));
+          NewDebugVarInfo, AI->hasDynamicLifetime()));
     }
   }
 }
