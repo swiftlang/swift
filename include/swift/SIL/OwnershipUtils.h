@@ -649,6 +649,7 @@ public:
     RefElementAddr,
     RefTailAddr,
     OpenExistentialBox,
+    ProjectBox,
     StoreBorrow,
   };
 
@@ -676,6 +677,8 @@ public:
       return Kind::RefTailAddr;
     case SILInstructionKind::OpenExistentialBoxInst:
       return Kind::OpenExistentialBox;
+    case SILInstructionKind::ProjectBoxInst:
+      return Kind::ProjectBox;
     case SILInstructionKind::StoreBorrowInst:
       return Kind::StoreBorrow;
     }
@@ -694,6 +697,8 @@ public:
       return Kind::RefTailAddr;
     case ValueKind::OpenExistentialBoxInst:
       return Kind::OpenExistentialBox;
+    case ValueKind::ProjectBoxInst:
+      return Kind::ProjectBox;
     case ValueKind::StoreBorrowInst:
       return Kind::StoreBorrow;
     }
@@ -747,6 +752,7 @@ struct InteriorPointerOperand {
     case InteriorPointerOperandKind::RefElementAddr:
     case InteriorPointerOperandKind::RefTailAddr:
     case InteriorPointerOperandKind::OpenExistentialBox:
+    case InteriorPointerOperandKind::ProjectBox:
     case InteriorPointerOperandKind::StoreBorrow: {
       // Ok, we have a valid instruction. Return the relevant operand.
       auto *op =
@@ -788,6 +794,8 @@ struct InteriorPointerOperand {
       return cast<RefTailAddrInst>(operand->getUser());
     case InteriorPointerOperandKind::OpenExistentialBox:
       return cast<OpenExistentialBoxInst>(operand->getUser());
+    case InteriorPointerOperandKind::ProjectBox:
+      return cast<ProjectBoxInst>(operand->getUser());
     case InteriorPointerOperandKind::StoreBorrow:
       return cast<StoreBorrowInst>(operand->getUser());
     }

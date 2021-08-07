@@ -729,7 +729,8 @@ bool InteriorPointerOperand::findTransitiveUsesForAddress(
         isa<BeginAccessInst>(user) || isa<TailAddrInst>(user) ||
         isa<IndexAddrInst>(user) || isa<StoreBorrowInst>(user) ||
         isa<UnconditionalCheckedCastAddrInst>(user) ||
-        isa<UncheckedAddrCastInst>(user)) {
+        isa<UncheckedAddrCastInst>(user)
+        || isa<MarkFunctionEscapeInst>(user)) {
       for (SILValue r : user->getResults()) {
         llvm::copy(r->getUses(), std::back_inserter(worklist));
       }
