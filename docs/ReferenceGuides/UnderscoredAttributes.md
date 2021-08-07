@@ -272,7 +272,7 @@ class C {
 
 (Note that it is "inherit", not "inherits", unlike below.)
 
-Marks that a `@Sendable async` closure argument should inherited the actor
+Marks that a `@Sendable async` closure argument should inherit the actor
 context (i.e. what actor it should be run on) based on the declaration site
 of the closure. This is different from the typical behavior, where the closure
 may be runnable anywhere unless its type specifically declares that it will
