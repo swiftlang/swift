@@ -1590,6 +1590,11 @@ public:
     return cloneProjection(cast, sourceOper);
   }
 
+  SILValue visitNestedAccess(BeginAccessInst *access) {
+    // The cloner does not currently know how to handle begin_access
+    return SILValue();
+  }
+
   SILValue visitAccessProjection(SingleValueInstruction *projectedAddr,
                                  Operand *sourceOper) {
     return cloneProjection(projectedAddr, sourceOper);
