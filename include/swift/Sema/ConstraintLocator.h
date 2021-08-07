@@ -72,6 +72,9 @@ enum ContextualTypePurpose : uint8_t {
                              ///< result type.
   CTP_Condition,        ///< Condition expression of various statements e.g.
                         ///< `if`, `for`, `while` etc.
+  CTP_CaseStmt,         ///< A single case statement associated with a `switch` or
+                        ///  a `do-catch` statement. It has to be convertible
+                        ///  to a type of a switch subject or an `Error` type.
   CTP_ForEachStmt,      ///< "expression/sequence" associated with 'for-in' loop
                         ///< is expected to conform to 'Sequence' protocol.
   CTP_ForEachSequence,  ///< Sequence expression associated with `for-in` loop,

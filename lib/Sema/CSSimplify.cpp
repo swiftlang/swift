@@ -12311,6 +12311,7 @@ void ConstraintSystem::addContextualConversionConstraint(
   case CTP_Condition:
   case CTP_Unused:
   case CTP_YieldByValue:
+  case CTP_CaseStmt:
   case CTP_ThrowStmt:
   case CTP_EnumCaseRawValue:
   case CTP_DefaultParameter:

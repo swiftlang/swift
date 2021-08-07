@@ -660,6 +660,7 @@ Optional<Diag<Type, Type>> GenericArgumentsMismatchFailure::getDiagnosticFor(
   case CTP_WrappedProperty:
     return diag::wrapped_value_mismatch;
 
+  case CTP_CaseStmt:
   case CTP_ThrowStmt:
   case CTP_ForEachStmt:
   case CTP_ForEachSequence:
@@ -2470,6 +2471,7 @@ getContextualNilDiagnostic(ContextualTypePurpose CTP) {
   case CTP_ReturnStmt:
     return diag::cannot_convert_to_return_type_nil;
 
+  case CTP_CaseStmt:
   case CTP_ThrowStmt:
   case CTP_ForEachStmt:
   case CTP_ForEachSequence:
@@ -3213,6 +3215,7 @@ ContextualFailure::getDiagnosticFor(ContextualTypePurpose context,
   case CTP_WrappedProperty:
     return diag::wrapped_value_mismatch;
 
+  case CTP_CaseStmt:
   case CTP_ThrowStmt:
   case CTP_ForEachStmt:
   case CTP_ForEachSequence:
