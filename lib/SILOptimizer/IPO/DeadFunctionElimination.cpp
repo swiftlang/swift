@@ -142,14 +142,10 @@ class DeadFunctionAndGlobalElimination {
   }
 
   /// Marks a function as alive.
-  void makeAlive(SILFunction *F, StringRef Context) {
-    if (F) {
-      AliveFunctionsAndTables.insert(F);
-      assert(F && "function does not exist");
-      Worklist.insert(F);
-    } else {
-      llvm::dbgs() << "Found garbage in " << Context << "\n";
-    }
+  void makeAlive(SILFunction *F) {
+    AliveFunctionsAndTables.insert(F);
+    assert(F && "function does not exist");
+    Worklist.insert(F);
   }
 
   /// Marks all contained functions and witness tables of a witness table as
@@ -177,7 +173,7 @@ class DeadFunctionAndGlobalElimination {
           if (F) {
             MethodInfo *MI = getMethodInfo(fd, /*isWitnessMethod*/ true);
             if (MI->methodIsCalled || !F->isDefinition())
-              ensureAlive(F, "void makeAlive(SILWitnessTable *WT)");
+              ensureAlive(F);
           }
         } break;
 
@@ -210,7 +206,7 @@ class DeadFunctionAndGlobalElimination {
     AliveFunctionsAndTables.insert(global);
     for (const SILInstruction &initInst : *global) {
       if (auto *fRef = dyn_cast<FunctionRefInst>(&initInst))
-        ensureAlive(fRef->getReferencedFunction(), "referenced from initializer");
+        ensureAlive(fRef->getReferencedFunction());
     }
   }
 
@@ -220,7 +216,7 @@ class DeadFunctionAndGlobalElimination {
   ensureKeyPathComponentIsAlive(const KeyPathPatternComponent &component) {
     component.visitReferencedFunctionsAndMethods(
       [this](SILFunction *F) {
-       ensureAlive(F, "ensureKeyPathComponentIsAlive");
+       ensureAlive(F);
       },
       [this](SILDeclRef method) {
         if (method.isForeign) {
@@ -244,9 +240,9 @@ class DeadFunctionAndGlobalElimination {
   }
 
   /// Marks a function as alive if it is not alive yet.
-  void ensureAlive(SILFunction *F, StringRef Context) {
+  void ensureAlive(SILFunction *F) {
     if (!isAlive(F))
-      makeAlive(F, Context);
+      makeAlive(F);
   }
 
   /// Marks a global variable as alive if it is not alive yet.
@@ -299,7 +295,7 @@ class DeadFunctionAndGlobalElimination {
       if (!isAlive(FImpl.F) &&
           canHaveSameImplementation(FD, MethodCl,
                                     FImpl.Impl.get<ClassDecl *>())) {
-        makeAlive(FImpl.F, "ensureAliveClassMethod");
+        makeAlive(FImpl.F);
       } else {
         allImplsAreCalled = false;
       }
@@ -320,9 +316,9 @@ class DeadFunctionAndGlobalElimination {
             Module->lookUpWitnessTable(Conf,
                                        /*deserializeLazily*/ false);
         if (!WT || isAlive(WT))
-          makeAlive(FImpl.F, "ensureAliveProtocolMethod");
+          makeAlive(FImpl.F);
       } else {
-        makeAlive(FImpl.F, "ensureAliveProtocolMethod");
+        makeAlive(FImpl.F);
       }
     }
   }
@@ -350,11 +346,11 @@ class DeadFunctionAndGlobalElimination {
           MethodInfo *mi = getMethodInfo(funcDecl, /*isWitnessTable*/ false);
           ensureAliveClassMethod(mi, dyn_cast<FuncDecl>(funcDecl), MethodCl);
         } else if (auto *FRI = dyn_cast<FunctionRefInst>(&I)) {
-          ensureAlive(FRI->getReferencedFunction(), F->getName());
+          ensureAlive(FRI->getReferencedFunction());
         } else if (auto *FRI = dyn_cast<DynamicFunctionRefInst>(&I)) {
-          ensureAlive(FRI->getInitiallyReferencedFunction(), F->getName());
+          ensureAlive(FRI->getInitiallyReferencedFunction());
         } else if (auto *FRI = dyn_cast<PreviousDynamicFunctionRefInst>(&I)) {
-          ensureAlive(FRI->getInitiallyReferencedFunction(), F->getName());
+          ensureAlive(FRI->getInitiallyReferencedFunction());
         } else if (auto *KPI = dyn_cast<KeyPathInst>(&I)) {
           for (auto &component : KPI->getPattern()->getComponents())
             ensureKeyPathComponentIsAlive(component);
@@ -410,18 +406,18 @@ class DeadFunctionAndGlobalElimination {
     for (SILFunction &F : *Module) {
       if (isAnchorFunction(&F)) {
         LLVM_DEBUG(llvm::dbgs() << "  anchor function: " << F.getName() <<"\n");
-        ensureAlive(&F, "findAnchors");
+        ensureAlive(&F);
       }
 
       // Make sure that functions referenced by _specialize(target: targetFun())
       // are kept alive.
       F.forEachSpecializeAttrTargetFunction(
-          [this](SILFunction *targetFun) { ensureAlive(targetFun, "forEachSpecializeAttrTargetFunction"); });
+          [this](SILFunction *targetFun) { ensureAlive(targetFun); });
 
       if (!F.shouldOptimize()) {
         LLVM_DEBUG(llvm::dbgs() << "  anchor a no optimization function: "
                                 << F.getName() << "\n");
-        ensureAlive(&F, "findAnchors.shouldOptimize");
+        ensureAlive(&F);
       }
     }
     
@@ -497,8 +493,6 @@ class DeadFunctionAndGlobalElimination {
           continue;
 
         SILFunction *F = entry. getMethodWitness().Witness;
-        if (!F)
-          continue;
         auto *fd = cast<AbstractFunctionDecl>(
                      entry.getMethodWitness().Requirement.getDecl());
         MethodInfo *mi = getMethodInfo(fd, /*isWitnessTable*/ true);
@@ -519,7 +513,7 @@ class DeadFunctionAndGlobalElimination {
         if (entry.getMethod().kind == SILDeclRef::Kind::Deallocator ||
             entry.getMethod().kind == SILDeclRef::Kind::IVarDestroyer) {
           // Destructors are alive because they are called from swift_release
-          ensureAlive(entry.getImplementation(), "findAnchorsInTables.vtable");
+          ensureAlive(entry.getImplementation());
           continue;
         }
 
@@ -603,11 +597,11 @@ class DeadFunctionAndGlobalElimination {
     }
     // Check differentiability witness entries.
     for (auto &dw : Module->getDifferentiabilityWitnessList()) {
-      ensureAlive(dw.getOriginalFunction(), "findAnchorsInTables.differentiability");
+      ensureAlive(dw.getOriginalFunction());
       if (dw.getJVP())
-        ensureAlive(dw.getJVP(), "findAnchorsInTables.differentiability");
+        ensureAlive(dw.getJVP());
       if (dw.getVJP())
-        ensureAlive(dw.getVJP(), "findAnchorsInTables.differentiability");
+        ensureAlive(dw.getVJP());
     }
   }
 

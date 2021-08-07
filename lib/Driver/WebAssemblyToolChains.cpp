@@ -57,10 +57,7 @@ ToolChain::InvocationInfo toolchains::WebAssembly::constructInvocation(
 
   addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
                          file_types::TY_Object);
-  addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
-                         file_types::TY_LLVM_BC);
   addInputsOfType(Arguments, context.InputActions, file_types::TY_Object);
-  addInputsOfType(Arguments, context.InputActions, file_types::TY_LLVM_BC);
 
   Arguments.push_back("-o");
   Arguments.push_back(
@@ -161,12 +158,6 @@ toolchains::WebAssembly::constructInvocation(const DynamicLinkJobAction &job,
     Arguments.push_back(context.Args.MakeArgString(Twine("@") + linkFile));
   } else {
     llvm::report_fatal_error(linkFile + " not found");
-  }
-
-  if (context.Args.hasArg(options::OPT_no_stdlib_link)) {
-    Arguments.push_back("-lswiftStandaloneRuntime");
-  } else {
-    Arguments.push_back("-lswiftCore");
   }
 
   // Explicitly pass the target to the linker

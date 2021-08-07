@@ -43,8 +43,6 @@ mkdir -p "$TARGET_STDLIB_BUILD_DIR/test-$HOST_SUFFIX"
 # Run tests
 $RUN_TEST_BIN --build-dir "$TARGET_STDLIB_BUILD_DIR" --target wasi-wasm32 \
   "$TARGET_STDLIB_BUILD_DIR/test-wasi-wasm32/stdlib"
-$RUN_TEST_BIN --build-dir "$TARGET_STDLIB_BUILD_DIR" --target wasi-wasm32 \
-  "$TARGET_STDLIB_BUILD_DIR/test-wasi-wasm32/LTO"
 
 if [[ "$(uname)" == "Linux" ]]; then
   echo "Skip running all test suites for Linux"
