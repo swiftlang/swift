@@ -452,7 +452,8 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
   if (auto conversion =
           locator->findLast<LocatorPathElt::ImplicitConversion>()) {
     if (conversion->is(ConversionRestrictionKind::DoubleToCGFloat) ||
-        conversion->is(ConversionRestrictionKind::CGFloatToDouble)) {
+        conversion->is(ConversionRestrictionKind::CGFloatToDouble) ||
+        conversion->is(ConversionRestrictionKind::ImplicitConversion)) {
       return getConstraintLocator(
           ASTNode(), {*conversion, ConstraintLocator::ApplyFunction,
                       ConstraintLocator::ConstructorMember});

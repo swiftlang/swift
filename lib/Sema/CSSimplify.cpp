@@ -3635,6 +3635,10 @@ static bool repairOutOfOrderArgumentsInBinaryFunction(
   return false;
 }
 
+/// Switch between restrictions mechanism and original PR using
+/// ConversionRestrictionKind::PointerToPointer in repairFailures().
+static bool useRestrictions = true;
+
 /// Attempt to repair typing failures and record fixes if needed.
 /// \return true if at least some of the failures has been repaired
 /// successfully, which allows type matcher to continue.
@@ -4972,21 +4976,56 @@ bool ConstraintSystem::repairFailures(
   }
 
   // Accept mutable pointers in the place of immutables.
-  if (toImmutablePossible(lhs, rhs))
+  if (implicitConversionAvailable(lhs, rhs))
     conversionsOrFixes.push_back(
         ConversionRestrictionKind::PointerToPointer);
 
   return !conversionsOrFixes.empty();
 }
 
-bool ConstraintSystem::toImmutablePossible(Type lhs, Type rhs) {
-#if 1
-  if (auto nominal = lhs->getAnyNominal())
-    if (auto func = nominal->implicitConversionTo(rhs))
-      return true;
-#else
-  if (rhs->isUnsafeRawPointer() && (lhs->isUnsafeMutableRawPointer() ||
-      lhs->isUnsafeMutablePointer() || lhs->isUnsafePointer())) {
+bool ConstraintSystem::implicitConversionAvailable(Type fromType, Type toType) {
+#if 01 // Determine implicit conversions from init(implicit:) constructors
+  fprintf(stderr, "\n\nFROM  %p ", fromType.getPointer());
+  fromType->dump();
+  fprintf(stderr, "TO %p ", toType.getPointer());
+  toType->dump();
+  if (NominalTypeDecl *toNominal = toType->getAnyNominal()) {
+    auto typeKey = ^TypeBase *(Type t) {
+        return t->getAnyNominal()->getInterfaceType()
+                ->getCanonicalType().getPointer();
+    };
+    TypeBase *toBase = typeKey(toType);
+    auto &ctx = getASTContext();
+    if (!toNominal->setConversionsComputed()) {
+      auto implicitArgId = ctx.Id_implicit;
+      for (ExtensionDecl *extension : toNominal->getExtensions()) {
+        Type extType = extension->getDeclaredInterfaceType()->getCanonicalType();
+        fprintf(stderr, "\nEXT %p ", extType.getPointer());
+        extType->dump();
+        for (Decl *member : extension->getMembers())
+          if (ConstructorDecl *initDecl = dyn_cast<ConstructorDecl>(member)) {
+            ParameterList *args = initDecl->getParameters();
+            if (args->size() == 1 &&
+                args->get(0)->getBaseName().getIdentifier() == implicitArgId) {
+              Type argType = args->get(0)->getType()->getCanonicalType();
+              fprintf(stderr, "ARG %p ", argType.getPointer());
+              argType->dump();
+              (*ctx.implicitConversionsTo(typeKey(extType), /*create*/true))
+                [typeKey(argType)].push_back(initDecl);
+            }
+          }
+      }
+    }
+    if (auto *exists = ctx.implicitConversionsTo(toBase, /*create*/false)) {
+      for (ConstructorDecl *initFunc : (*exists)[typeKey(fromType)])
+        // More detailed check of conversion here...
+        if (initFunc != nullptr)
+          return true;
+    }
+  }
+#else // Original hard coded rules.
+  if (toType->isUnsafeRawPointer() && (fromType->isUnsafeMutableRawPointer() ||
+         fromType->isUnsafeMutablePointer() || fromType->isUnsafePointer())) {
     return true; // Unsafe[Mutable][Raw]Pointer -> UnsafeRawPointer
   }
 
@@ -4995,37 +5034,14 @@ bool ConstraintSystem::toImmutablePossible(Type lhs, Type rhs) {
       ->getGenericArgs()[0]->getCanonicalType();
   };
 
-  if (lhs->isUnsafeMutablePointer() && rhs->isUnsafePointer() &&
-      firstGenericArgument(lhs) == firstGenericArgument(rhs)) {
-    rhs->dump();
-    lhs->dump();
+  if (fromType->isUnsafeMutablePointer() && toType->isUnsafePointer() &&
+      firstGenericArgument(fromType) == firstGenericArgument(toType)) {
+    toType->dump();
+    fromType->dump();
     return true; // UnsafeMutablePointer<Pointee> -> UnsafePointer<Pointee>
   }
 #endif
   return false;
-}
-
-ConstructorDecl *NominalTypeDecl::implicitConversionTo(Type type) {
-  if (NominalTypeDecl *toNominal = type->getAnyNominal()) {
-    auto &ctx = getASTContext();
-    if (!toNominal->implicitConversionsComputed) {
-      auto implicitArgId = ctx.Id_implicit;
-      for (ExtensionDecl *extension : toNominal->getExtensions())
-        for (Decl *member : extension->getMembers())
-          if (ConstructorDecl *initDecl = dyn_cast<ConstructorDecl>(member)) {
-            ParameterList *args = initDecl->getParameters();
-            if (args->size() == 1 &&
-                args->get(0)->getBaseName().getIdentifier() == implicitArgId)
-              if (auto fromNominal = args->get(0)->getType()->getAnyNominal())
-                (*ctx.implicitConversionsFor(fromNominal, /*create*/true))
-                  [toNominal] = initDecl;
-          }
-      toNominal->implicitConversionsComputed = true;
-    }
-    if (auto *exists = ctx.implicitConversionsFor(this, /*create*/false))
-      return (*exists)[toNominal];
-  }
-  return nullptr;
 }
 
 ConstraintSystem::TypeMatchResult
@@ -5374,7 +5390,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       if (kind >= ConstraintKind::Subtype &&
           nominal1->getDecl() != nominal2->getDecl() &&
           ((nominal1->isCGFloatType() || nominal2->isCGFloatType()) &&
-           (nominal1->isDouble() || nominal2->isDouble()))) {
+           (nominal1->isDouble() || nominal2->isDouble())) ||
+          useRestrictions && implicitConversionAvailable(type1, type2)) {
         ConstraintLocatorBuilder location{locator};
         // Look through all value-to-optional promotions to allow
         // conversions like Double -> CGFloat?? and vice versa.
@@ -5442,14 +5459,17 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                       rawElt.getAs<LocatorPathElt::ImplicitConversion>()) {
                 auto convKind = elt->getConversionKind();
                 return convKind == ConversionRestrictionKind::DoubleToCGFloat ||
-                       convKind == ConversionRestrictionKind::CGFloatToDouble;
+                       convKind == ConversionRestrictionKind::CGFloatToDouble ||
+                       convKind == ConversionRestrictionKind::ImplicitConversion;
               }
               return false;
             })) {
           conversionsOrFixes.push_back(
               desugar1->isCGFloatType()
-                  ? ConversionRestrictionKind::CGFloatToDouble
-                  : ConversionRestrictionKind::DoubleToCGFloat);
+                  ? ConversionRestrictionKind::CGFloatToDouble :
+              desugar2->isCGFloatType()
+                  ? ConversionRestrictionKind::DoubleToCGFloat :
+                    ConversionRestrictionKind::ImplicitConversion);
         }
       }
 
@@ -11177,7 +11197,8 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
   }
 
   case ConversionRestrictionKind::DoubleToCGFloat:
-  case ConversionRestrictionKind::CGFloatToDouble: {
+  case ConversionRestrictionKind::CGFloatToDouble:
+  case ConversionRestrictionKind::ImplicitConversion: {
     // Prefer CGFloat -> Double over other way araund.
     auto impact =
         restriction == ConversionRestrictionKind::CGFloatToDouble ? 1 : 10;
@@ -11224,16 +11245,17 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
                              memberTy, DC, FunctionRefKind::DoubleApply,
                              /*outerAlternatives=*/{}, memberLoc);
 
+    Identifier label;
+    if (restriction == ConversionRestrictionKind::ImplicitConversion)
+      label = getASTContext().Id_implicit;
     addConstraint(ConstraintKind::ApplicableFunction,
-                  FunctionType::get({FunctionType::Param(type1)}, type2),
+                  FunctionType::get({FunctionType::Param(type1, label)}, type2),
                   memberTy, applicationLoc);
 
     ImplicitValueConversions.push_back(
         {getConstraintLocator(locator), restriction});
     return SolutionKind::Solved;
   }
-  case ConversionRestrictionKind::ImplicitConversion:
-    return SolutionKind::Solved;
   }
   
   llvm_unreachable("bad conversion restriction");

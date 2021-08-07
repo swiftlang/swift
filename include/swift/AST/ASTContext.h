@@ -366,16 +366,16 @@ private:
   llvm::BumpPtrAllocator &
   getAllocator(AllocationArena arena = AllocationArena::Permanent) const;
 
-  llvm::DenseMap<NominalTypeDecl *,
-    llvm::DenseMap<NominalTypeDecl *, ConstructorDecl *>> ConversionMap;
+  llvm::DenseMap<TypeBase *, llvm::DenseMap<TypeBase *,
+    SmallVector<ConstructorDecl *, 2>>> ImplicitConversionMap;
 
 public:
-  llvm::DenseMap<NominalTypeDecl *, ConstructorDecl *> *implicitConversionsFor(
-                                  NominalTypeDecl *typeDecl, bool create) {
-    auto map = ConversionMap.find(typeDecl);
-    if (map != ConversionMap.end())
-      return &map->getSecond();
-    return create ? &ConversionMap[typeDecl] : nullptr;
+  llvm::DenseMap<TypeBase *, SmallVector<ConstructorDecl *, 2>>
+    *implicitConversionsTo(TypeBase *toType, bool create) {
+    auto constructorsByFromType = ImplicitConversionMap.find(toType);
+    if (constructorsByFromType != ImplicitConversionMap.end())
+      return &constructorsByFromType->getSecond();
+    return create ? &ImplicitConversionMap[toType] : nullptr;
   }
 
   /// Allocate - Allocate memory from the ASTContext bump pointer.

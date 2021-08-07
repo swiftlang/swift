@@ -3162,7 +3162,11 @@ protected:
 public:
   using GenericTypeDecl::getASTContext;
 
-  ConstructorDecl *implicitConversionTo(Type type);
+  bool setConversionsComputed() {
+    bool wasComputed = implicitConversionsComputed;
+    implicitConversionsComputed = true;
+    return wasComputed;
+  }
 
   SourceRange getBraces() const { return Braces; }
   

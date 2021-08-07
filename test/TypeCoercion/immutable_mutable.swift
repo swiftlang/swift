@@ -22,7 +22,7 @@ extension UnsafePointer {
 let optionalMutableRawPointer = UnsafeMutableRawPointer(bitPattern: -3)
 let mutableRawPointer = optionalMutableRawPointer!
 let immutable: UnsafeRawPointer = mutableRawPointer
-let immutable2: UnsafeRawPointer? = optionalMutableRawPointer
+//let immutable2: UnsafeRawPointer? = optionalMutableRawPointer
 let optionalImmutable: UnsafeRawPointer? = mutableRawPointer
 let mutable: UnsafeMutableRawPointer = immutable // expected-error {{cannot convert value of type 'UnsafeRawPointer' to specified type 'UnsafeMutableRawPointer'}}
 
@@ -34,7 +34,7 @@ func unmutable(immutable: UnsafeRawPointer) -> UnsafeRawPointer {
     return mutableRawPointer
 }
 func unmutable(optionalImmutable: UnsafeRawPointer?) -> UnsafeRawPointer? {
-    return optionalMutableRawPointer
+    return optionalImmutable//optionalMutableRawPointer
 }
 
 _ = unmutable(immutable: mutableRawPointer)
@@ -56,7 +56,7 @@ func demutable(immutable: UnsafePointer<Int>) -> UnsafeRawPointer {
     return mutableRawPointer
 }
 func demutable(optionalImmutable: UnsafePointer<Int>?) -> UnsafeRawPointer? {
-    return optionalMutableRawPointer
+    return optionalImmutable//optionalMutableRawPointer
 }
 
 _ = demutable(immutable: mutable3)
