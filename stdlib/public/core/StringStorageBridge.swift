@@ -63,6 +63,12 @@ extension Collection {
   @_effects(readonly)
   func boyerMooreSearch<C>(for needle: C) -> Range<Index>?
   where C: BidirectionalCollection, C.Element == Element, Element: Hashable {
+    if needle.count > count {
+      return nil
+    }
+    if needle.count == count {
+      return elementsEqual(needle) ? startIndex ..< endIndex : nil
+    }
     var skipTable:[Element : Int] = [:]
     skipTable.reserveCapacity(needle.count)
     var offset = 0
@@ -83,6 +89,12 @@ extension Collection {
   @_effects(readonly)
   func boyerMooreSearch<C>(for needle: C) -> Range<Index>?
   where C: BidirectionalCollection, C.Element == UInt8, Element == UInt8 {
+    if needle.count > count {
+      return nil
+    }
+    if needle.count == count {
+      return elementsEqual(needle) ? startIndex ..< endIndex : nil
+    }
     if needle.count < 256 {
       var skipTableStorage: TableStorage =
       (0, 0, 0, 0, 0, 0, 0, 0,
