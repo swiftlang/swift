@@ -689,7 +689,7 @@ private:
       // `storage` may still be invalid. If both `storage` and `foundStorage`
       // are invalid, this check passes, but we return an invalid storage
       // below.
-      if (!result.storage->hasIdenticalBase(foundStorage))
+      if (!result.storage->hasIdenticalStorage(foundStorage))
         result.storage = AccessedStorage();
       if (result.base != foundBase)
         result.base = SILValue();
@@ -777,7 +777,7 @@ bool AccessPath::contains(AccessPath subPath) const {
   if (!isValid() || !subPath.isValid()) {
     return false;
   }
-  if (!storage.hasIdenticalBase(subPath.storage)) {
+  if (!storage.hasIdenticalStorage(subPath.storage)) {
     return false;
   }
   // Does the offset index match?
@@ -1228,7 +1228,7 @@ bool AccessPathDefUseTraversal::pushPhiUses(const SILPhiArgument *phi,
   // looking through it. If the phi input differ the its storage is invalid.
   auto phiPath = AccessPath::compute(phi);
   if (phiPath.isValid()) {
-    assert(phiPath.getStorage().hasIdenticalBase(storage)
+    assert(phiPath.getStorage().hasIdenticalStorage(storage)
            && "inconsistent phi storage");
     // If the phi paths have different offsets, its path has unknown offset.
     if (phiPath.getOffset() == AccessPath::UnknownOffset) {
@@ -1699,8 +1699,8 @@ void swift::checkSwitchEnumBlockArg(SILPhiArgument *arg) {
   }
 }
 
-bool swift::isPossibleFormalAccessBase(const AccessedStorage &storage,
-                                       SILFunction *F) {
+bool swift::isPossibleFormalAccessStorage(const AccessedStorage &storage,
+                                          SILFunction *F) {
   switch (storage.getKind()) {
   case AccessedStorage::Nested:
     assert(false && "don't pass nested storage to this helper");

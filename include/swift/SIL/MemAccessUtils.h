@@ -485,7 +485,7 @@ public:
   /// This compares only the AccessedStorage base class bits, ignoring the
   /// subclass bits. It is used for hash lookup equality, so it should not
   /// perform any additional lookups or dereference memory outside itself.
-  bool hasIdenticalBase(const AccessedStorage &other) const {
+  bool hasIdenticalStorage(const AccessedStorage &other) const {
     if (getKind() != other.getKind())
       return false;
 
@@ -609,7 +609,7 @@ private:
   template <bool (AccessedStorage::*IsUniqueFn)() const>
   bool isDistinctFrom(const AccessedStorage &other) const {
     if ((this->*IsUniqueFn)()) {
-      if ((other.*IsUniqueFn)() && !hasIdenticalBase(other))
+      if ((other.*IsUniqueFn)() && !hasIdenticalStorage(other))
         return true;
 
       if (other.isObjectAccess())
@@ -706,7 +706,7 @@ template <> struct DenseMapInfo<swift::AccessedStorage> {
   }
 
   static bool isEqual(swift::AccessedStorage LHS, swift::AccessedStorage RHS) {
-    return LHS.hasIdenticalBase(RHS);
+    return LHS.hasIdenticalStorage(RHS);
   }
 };
 
@@ -944,8 +944,9 @@ public:
 
   bool operator==(AccessPath other) const {
     return
-      storage.hasIdenticalBase(other.storage) && pathNode == other.pathNode &&
-      offset == other.offset;
+      storage.hasIdenticalStorage(other.storage)
+      && pathNode == other.pathNode
+      && offset == other.offset;
   }
   bool operator!=(AccessPath other) const { return !(*this == other); }
 
@@ -1220,8 +1221,8 @@ void checkSwitchEnumBlockArg(SILPhiArgument *arg);
 /// This is not a member of AccessedStorage because it only makes sense to use
 /// in SILGen before access markers are emitted, or when verifying access
 /// markers.
-bool isPossibleFormalAccessBase(const AccessedStorage &storage,
-                                SILFunction *F);
+bool isPossibleFormalAccessStorage(const AccessedStorage &storage,
+                                   SILFunction *F);
 
 /// Perform a RAUW operation on begin_access with it's own source operand.
 /// Then erase the begin_access and all associated end_access instructions.
