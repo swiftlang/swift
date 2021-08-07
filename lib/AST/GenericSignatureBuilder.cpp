@@ -2482,44 +2482,6 @@ auto PotentialArchetype::getRepresentative() const -> PotentialArchetype * {
   return result;
 }
 
-/// Canonical ordering for dependent types.
-int swift::compareDependentTypes(Type type1, Type type2) {
-  // Fast-path check for equality.
-  if (type1->isEqual(type2)) return 0;
-
-  // Ordering is as follows:
-  // - Generic params
-  auto gp1 = type1->getAs<GenericTypeParamType>();
-  auto gp2 = type2->getAs<GenericTypeParamType>();
-  if (gp1 && gp2)
-    return GenericParamKey(gp1) < GenericParamKey(gp2) ? -1 : +1;
-
-  // A generic parameter is always ordered before a nested type.
-  if (static_cast<bool>(gp1) != static_cast<bool>(gp2))
-    return gp1 ? -1 : +1;
-
-  // - Dependent members
-  auto depMemTy1 = type1->castTo<DependentMemberType>();
-  auto depMemTy2 = type2->castTo<DependentMemberType>();
-
-  // - by base, so t_0_n.`P.T` < t_1_m.`P.T`
-  if (int compareBases =
-        compareDependentTypes(depMemTy1->getBase(), depMemTy2->getBase()))
-    return compareBases;
-
-  // - by name, so t_n_m.`P.T` < t_n_m.`P.U`
-  if (int compareNames = depMemTy1->getName().str().compare(
-                                                  depMemTy2->getName().str()))
-    return compareNames;
-
-  auto *assocType1 = depMemTy1->getAssocType();
-  auto *assocType2 = depMemTy2->getAssocType();
-  if (int result = compareAssociatedTypes(assocType1, assocType2))
-    return result;
-
-  return 0;
-}
-
 /// Compare two dependent paths to determine which is better.
 static int compareDependentPaths(ArrayRef<AssociatedTypeDecl *> path1,
                                  ArrayRef<AssociatedTypeDecl *> path2) {

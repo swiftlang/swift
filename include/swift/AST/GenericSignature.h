@@ -475,6 +475,8 @@ inline bool CanGenericSignature::isActuallyCanonicalOrNull() const {
 int compareAssociatedTypes(AssociatedTypeDecl *assocType1,
                            AssociatedTypeDecl *assocType2);
 
+int compareDependentTypes(Type type1, Type type2);
+
 } // end namespace swift
 
 namespace llvm {
