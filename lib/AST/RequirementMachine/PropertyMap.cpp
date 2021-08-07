@@ -650,21 +650,10 @@ void PropertyBag::copyPropertiesFrom(const PropertyBag *next,
   }
 }
 
-/// Look for an property bag corresponding to the given key, returning nullptr
-/// if one has not been recorded.
-PropertyBag *
-PropertyMap::getPropertiesIfPresent(const MutableTerm &key) const {
-  assert(!key.empty());
- 
-  for (const auto &props : Map) {
-    int compare = props->getKey().compare(key, Protos);
-    if (compare == 0)
-      return props.get();
-    if (compare > 0)
-      return nullptr;
-  }
-
-  return nullptr;
+PropertyMap::~PropertyMap() {
+  Trie.updateHistograms(Context.PropertyTrieHistogram,
+                        Context.PropertyTrieRootHistogram);
+  clear();
 }
 
 /// Look for an property bag corresponding to a suffix of the given key.
@@ -672,20 +661,8 @@ PropertyMap::getPropertiesIfPresent(const MutableTerm &key) const {
 /// Returns nullptr if no information is known about this key.
 PropertyBag *
 PropertyMap::lookUpProperties(const MutableTerm &key) const {
-  if (auto *props = getPropertiesIfPresent(key))
-    return props;
-
-  auto begin = key.begin() + 1;
-  auto end = key.end();
-
-  while (begin != end) {
-    MutableTerm suffix(begin, end);
-
-    if (auto *suffixClass = getPropertiesIfPresent(suffix))
-      return suffixClass;
-
-    ++begin;
-  }
+  if (auto result = Trie.find(key.rbegin(), key.rend()))
+    return *result;
 
   return nullptr;
 }
@@ -695,17 +672,10 @@ PropertyMap::lookUpProperties(const MutableTerm &key) const {
 ///
 /// This must be called in monotonically non-decreasing key order.
 PropertyBag *
-PropertyMap::getOrCreateProperties(const MutableTerm &key) {
-  assert(!key.empty());
-
-  if (!Map.empty()) {
-    const auto &lastEquivClass = Map.back();
-    int compare = lastEquivClass->getKey().compare(key, Protos);
-    if (compare == 0)
-      return lastEquivClass.get();
-
-    assert(compare < 0 && "Must record property bags in sorted order");
-  }
+PropertyMap::getOrCreateProperties(Term key) {
+  auto next = Trie.find(key.rbegin(), key.rend());
+  if (next && (*next)->getKey() == key)
+    return *next;
 
   auto *props = new PropertyBag(key);
 
@@ -730,23 +700,38 @@ PropertyMap::getOrCreateProperties(const MutableTerm &key) {
   //
   // Since 'A' has no proper suffix with additional properties, the next
   // property bag of 'A' is nullptr.
-  if (auto *next = lookUpProperties(key))
-    props->copyPropertiesFrom(next, Context);
+  if (next)
+    props->copyPropertiesFrom(*next, Context);
 
-  Map.emplace_back(props);
+  Entries.push_back(props);
+  auto oldProps = Trie.insert(key.rbegin(), key.rend(), props);
+  if (oldProps) {
+    llvm::errs() << "Duplicate property map entry for " << key << "\n";
+    llvm::errs() << "Old:\n";
+    (*oldProps)->dump(llvm::errs());
+    llvm::errs() << "\n";
+    llvm::errs() << "New:\n";
+    props->dump(llvm::errs());
+    llvm::errs() << "\n";
+    abort();
+  }
 
   return props;
 }
 
 void PropertyMap::clear() {
-  Map.clear();
+  for (auto *props : Entries)
+    delete props;
+
+  Trie.clear();
+  Entries.clear();
   ConcreteTypeInDomainMap.clear();
 }
 
 /// Record a protocol conformance, layout or superclass constraint on the given
 /// key. Must be called in monotonically non-decreasing key order.
 void PropertyMap::addProperty(
-    const MutableTerm &key, Symbol property,
+    Term key, Symbol property,
     SmallVectorImpl<std::pair<MutableTerm, MutableTerm>> &inducedRules) {
   assert(property.isProperty());
   auto *props = getOrCreateProperties(key);
@@ -757,7 +742,7 @@ void PropertyMap::addProperty(
 /// For each fully-concrete type, find the shortest term having that concrete type.
 /// This is later used by computeConstraintTermForTypeWitness().
 void PropertyMap::computeConcreteTypeInDomainMap() {
-  for (const auto &props : Map) {
+  for (const auto &props : Entries) {
     if (!props->isConcreteType())
       continue;
 
@@ -771,12 +756,8 @@ void PropertyMap::computeConcreteTypeInDomainMap() {
     auto concreteTypeKey = std::make_pair(concreteType, domain);
 
     auto found = ConcreteTypeInDomainMap.find(concreteTypeKey);
-    if (found != ConcreteTypeInDomainMap.end()) {
-      const auto &otherTerm = found->second;
-      assert(props->Key.compare(otherTerm, Protos) > 0 &&
-             "Out-of-order keys?");
+    if (found != ConcreteTypeInDomainMap.end())
       continue;
-    }
 
     auto inserted = ConcreteTypeInDomainMap.insert(
         std::make_pair(concreteTypeKey, props->Key));
@@ -787,7 +768,7 @@ void PropertyMap::computeConcreteTypeInDomainMap() {
 
 void PropertyMap::concretizeNestedTypesFromConcreteParents(
     SmallVectorImpl<std::pair<MutableTerm, MutableTerm>> &inducedRules) const {
-  for (const auto &props : Map) {
+  for (const auto &props : Entries) {
     if (props->getConformsTo().empty())
       continue;
 
@@ -865,7 +846,7 @@ void PropertyMap::concretizeNestedTypesFromConcreteParents(
 ///    T.[P:B] => U.V
 ///
 void PropertyMap::concretizeNestedTypesFromConcreteParent(
-    const MutableTerm &key, RequirementKind requirementKind,
+    Term key, RequirementKind requirementKind,
     CanType concreteType, ArrayRef<Term> substitutions,
     ArrayRef<const ProtocolDecl *> conformsTo,
     llvm::TinyPtrVector<ProtocolConformance *> &conformances,
@@ -928,7 +909,7 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
                      << " of " << concreteType << " is " << typeWitness << "\n";
       }
 
-      MutableTerm subjectType = key;
+      MutableTerm subjectType(key);
       subjectType.add(Symbol::forAssociatedType(proto, assocType->getName(),
                                                 Context));
 
@@ -944,7 +925,7 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
         }
 
         // Add a rule T.[P:A] => T.
-        constraintType = key;
+        constraintType = MutableTerm(key);
       } else {
         constraintType = computeConstraintTermForTypeWitness(
             key, concreteType, typeWitness, subjectType,
@@ -985,7 +966,7 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
 ///
 ///        T.[P:A] => V
 MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
-    const MutableTerm &key, CanType concreteType, CanType typeWitness,
+    Term key, CanType concreteType, CanType typeWitness,
     const MutableTerm &subjectType, ArrayRef<Term> substitutions) const {
   if (!typeWitness->hasTypeParameter()) {
     // Check if we have a shorter representative we can use.
@@ -994,12 +975,13 @@ MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
 
     auto found = ConcreteTypeInDomainMap.find(concreteTypeKey);
     if (found != ConcreteTypeInDomainMap.end()) {
-      if (found->second != subjectType) {
+      MutableTerm result(found->second);
+      if (result != subjectType) {
         if (DebugConcretizeNestedTypes) {
           llvm::dbgs() << "^^ Type witness can re-use property bag of "
                        << found->second << "\n";
         }
-        return found->second;
+        return result;
       }
     }
   }
@@ -1030,7 +1012,7 @@ MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
 
 void PropertyMap::dump(llvm::raw_ostream &out) const {
   out << "Property map: {\n";
-  for (const auto &props : Map) {
+  for (const auto &props : Entries) {
     out << "  ";
     props->dump(out);
     out << "\n";
@@ -1056,7 +1038,11 @@ RewriteSystem::buildPropertyMap(PropertyMap &map,
                                 unsigned maxDepth) {
   map.clear();
 
-  std::vector<std::pair<MutableTerm, Symbol>> properties;
+  // PropertyMap::addRule() requires that shorter rules are added
+  // before longer rules, so that it can perform lookups on suffixes and call
+  // PropertyBag::copyPropertiesFrom(). However, we don't have to perform a
+  // full sort by term order here; a bucket sort by term length suffices.
+  SmallVector<std::vector<std::pair<Term, Symbol>>, 4> properties;
 
   for (const auto &rule : Rules) {
     if (rule.isDeleted())
@@ -1076,31 +1062,19 @@ RewriteSystem::buildPropertyMap(PropertyMap &map,
     if (!std::equal(rhs.begin(), rhs.end(), lhs.begin()))
       continue;
 
-    MutableTerm key(rhs);
-
-#ifndef NDEBUG
-    assert(!simplify(key) &&
-           "Right hand side of a property rule should already be reduced");
-#endif
-
-    properties.emplace_back(key, property);
+    if (rhs.size() >= properties.size())
+      properties.resize(rhs.size() + 1);
+    properties[rhs.size()].emplace_back(rhs, property);
   }
-
-  // PropertyMap::addRule() requires that shorter rules are added
-  // before longer rules, so that it can perform lookups on suffixes and call
-  // PropertyBag::copyPropertiesFrom().
-  std::sort(properties.begin(), properties.end(),
-            [&](const std::pair<MutableTerm, Symbol> &lhs,
-                const std::pair<MutableTerm, Symbol> &rhs) -> bool {
-              return lhs.first.compare(rhs.first, Protos) < 0;
-            });
 
   // Merging multiple superclass or concrete type rules can induce new rules
   // to unify concrete type constructor arguments.
   SmallVector<std::pair<MutableTerm, MutableTerm>, 3> inducedRules;
 
-  for (auto pair : properties) {
-    map.addProperty(pair.first, pair.second, inducedRules);
+  for (const auto &bucket : properties) {
+    for (auto pair : bucket) {
+      map.addProperty(pair.first, pair.second, inducedRules);
+    }
   }
 
   // We collect terms with fully concrete types so that we can re-use them
