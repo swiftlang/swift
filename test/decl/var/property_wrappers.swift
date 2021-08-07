@@ -64,7 +64,7 @@ struct MissingValue<T> { }
 struct StaticValue {
   static var wrappedValue: Int = 17
 }
-// expected-error@-3{{property wrapper type 'StaticValue' does not contain a non-static property named 'wrappedValue'}}{{20-20=var wrappedValue: <#Value#>}}
+// expected-error@-3{{property wrapper type 'StaticValue' does not contain a non-static property named 'wrappedValue'}}{{21-21=var wrappedValue: <#Value#>}}
 
 
 // expected-error@+1{{'@propertyWrapper' attribute cannot be applied to this declaration}}
