@@ -24,6 +24,8 @@
             "remote": { "id": "apple/swift-tools-support-core" } },
         "swiftpm": {
             "remote": { "id": "apple/swift-package-manager" } },
+        "swift-package-editor": {
+            "remote": { "id": "owenv/swift-package-editor" } },
         "swift-syntax": {
             "remote": { "id": "apple/swift-syntax" } },
         "swift-system": {
@@ -75,6 +77,7 @@
                 "llbuild": "main",
                 "swift-tools-support-core": "main",
                 "swiftpm": "main",
+                "swift-package-editor": "main",
                 "swift-argument-parser": "0.4.4",
                 "swift-atomics": "0.0.3",
                 "swift-collections": "0.0.4",
@@ -195,6 +198,7 @@
                 "llbuild": "main",
                 "swift-tools-support-core": "main",
                 "swiftpm": "main",
+                "swift-package-editor": "main",
                 "swift-argument-parser": "0.4.4",
                 "swift-atomics": "0.0.3",
                 "swift-collections": "0.0.4",
@@ -230,6 +234,7 @@
                 "llbuild": "main",
                 "swift-tools-support-core": "main",
                 "swiftpm": "main",
+                "swift-package-editor": "main",
                 "swift-argument-parser": "0.4.4",
                 "swift-atomics": "0.0.3",
                 "swift-collections": "0.0.4",                
