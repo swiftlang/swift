@@ -26,24 +26,19 @@ namespace swift {
 
 class AbstractFunctionDecl;
 class ConstructorDecl;
-class ActorIsolation;
-class AnyFunctionType;
 class ASTContext;
 class ClassDecl;
-class ClosureExpr;
-class ConcreteDeclRef;
-class CustomAttr;
 class Decl;
 class DeclContext;
-class EnumElementDecl;
 class Expr;
 class FuncDecl;
 class Initializer;
 class PatternBindingDecl;
 class ProtocolConformance;
-class TopLevelCodeDecl;
-class TypeBase;
 class ValueDecl;
+
+// Diagnose an error if the _Distributed module is not loaded.
+bool ensureDistributedModuleLoaded(Decl *decl);
 
 /// Check distributed actor isolation rules.
 

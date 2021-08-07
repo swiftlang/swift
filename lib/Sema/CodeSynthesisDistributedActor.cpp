@@ -119,25 +119,6 @@ createDistributedActor_init_default(ClassDecl *classDecl,
   return initDecl;
 }
 
-static void addImplicitDefaultDistributedActorConstructor(ClassDecl *decl) {
-  fprintf(stderr, "[%s:%d] (%s) addImplicitDefaultDistributedActorConstructor\n", __FILE__, __LINE__, __FUNCTION__);
-  decl->setAddedImplicitInitializers();
-
-  // Check whether the user has defined a designated initializer for this actor,
-  // if so, we will not synthesize the init(transport:) initializer.
-  bool foundDesignatedInit = decl->hasUserDefinedDesignatedInit();
-  if (foundDesignatedInit) {
-    fprintf(stderr, "[%s:%d] (%s) FOUND DESIGNATED INIT SKIP SYNTHESIS\n", __FILE__, __LINE__, __FUNCTION__);
-    decl->dump();
-    return;
-  }
-
-  fprintf(stderr, "[%s:%d] (%s) MAKE DESIGNATED INIT SYNTHESIS\n", __FILE__, __LINE__, __FUNCTION__);
-  auto &ctx = decl->getASTContext();
-  auto init = createDistributedActor_init_default(decl, ctx);
-  decl->addMember(init);
-}
-
 /******************************************************************************/
 /******************************** DEINIT **************************************/
 /******************************************************************************/
@@ -464,15 +445,10 @@ void swift::addImplicitDistributedActorMembersToClass(ClassDecl *decl) {
   if (!decl->isDistributedActor())
     return;
 
-  // === Ensure the _Distributed module is loaded
-  auto &C = decl->getASTContext();
-  if (!C.getLoadedModule(C.Id_Distributed)) {
-    // seems we're missing the _Distributed module, ask to import it explicitly
-    decl->diagnose(diag::distributed_actor_needs_explicit_distributed_import);
+  // If the _Distributed module is missing we cannot synthesize anything.
+  if (!swift::ensureDistributedModuleLoaded(decl))
     return;
-  }
 
-  addImplicitDefaultDistributedActorConstructor(decl);
   addImplicitDistributedActorStoredProperties(decl);
   addImplicitRemoteActorFunctions(decl);
 //  addImplicitResignIdentity(decl);

@@ -31,6 +31,20 @@ using namespace swift;
 
 // ==== ------------------------------------------------------------------------
 
+bool swift::ensureDistributedModuleLoaded(Decl *decl) {
+  fprintf(stderr, "[%s:%d] (%s) ensureDistributedModuleLoaded\n", __FILE__, __LINE__, __FUNCTION__);
+  auto &C = decl->getASTContext();
+  if (!C.getLoadedModule(C.Id_Distributed)) {
+    // seems we're missing the _Distributed module, ask to import it explicitly
+    decl->diagnose(diag::distributed_actor_needs_explicit_distributed_import);
+    return false;
+  }
+
+  return true;
+}
+
+// ==== ------------------------------------------------------------------------
+
 bool IsDistributedActorRequest::evaluate(
     Evaluator &evaluator, NominalTypeDecl *nominal) const {
   // Protocols are actors if they inherit from `DistributedActor`.
@@ -183,14 +197,21 @@ void TypeChecker::checkDistributedActor(const ClassDecl *decl) {
 
   auto mutableDecl = const_cast<ClassDecl*>(decl);
 
+  // ==== Constructors
+  // --- Get the default initializer
+  // If applicable, this will the default 'init(transport:)' initializer
+  (void)mutableDecl->getDefaultInitializer();
+
+  // --- Check all constructors
+  for (auto member : decl->getMembers())
+    if (auto ctor = dyn_cast<ConstructorDecl>(member))
+      checkDistributedActorConstructor(decl, ctor);
+
+  // ==== Properties
+  // Synthesize properties
+  // TODO: those could technically move to DerivedConformance style
   swift::addImplicitDistributedActorMembersToClass(mutableDecl);
 
-  for (auto member : decl->getMembers()) {
-    if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
-      fprintf(stderr, "[%s:%d] (%s) CHECK CTOR\n", __FILE__, __LINE__, __FUNCTION__);
-      member->dump();
-      checkDistributedActorConstructor(decl, ctor);
-    }
-  }
+  // ==== Functions
 }
 
