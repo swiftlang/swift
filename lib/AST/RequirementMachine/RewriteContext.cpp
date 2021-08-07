@@ -25,7 +25,9 @@ RewriteContext::RewriteContext(ASTContext &ctx)
       SymbolHistogram(Symbol::NumKinds),
       TermHistogram(4, /*Start=*/1),
       RuleTrieHistogram(16, /*Start=*/1),
-      RuleTrieRootHistogram(16)  {
+      RuleTrieRootHistogram(16),
+      PropertyTrieHistogram(16, /*Start=*/1),
+      PropertyTrieRootHistogram(16) {
 }
 
 Term RewriteContext::getTermForType(CanType paramType,
@@ -295,5 +297,9 @@ RewriteContext::~RewriteContext() {
     RuleTrieHistogram.dump(llvm::dbgs());
     llvm::dbgs() << "\n* Rule trie root fanout:\n";
     RuleTrieRootHistogram.dump(llvm::dbgs());
+    llvm::dbgs() << "\n* Property trie fanout:\n";
+    PropertyTrieHistogram.dump(llvm::dbgs());
+    llvm::dbgs() << "\n* Property trie root fanout:\n";
+    PropertyTrieRootHistogram.dump(llvm::dbgs());
   }
 }
