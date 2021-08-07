@@ -54,10 +54,6 @@ public:
     return LHS.checkForOverlap(other.LHS, t, v);
   }
 
-  bool canReduceLeftHandSide(const Rule &other) const {
-    return LHS.containsSubTerm(other.LHS);
-  }
-
   /// Returns if the rule was deleted.
   bool isDeleted() const {
     return deleted;
@@ -168,7 +164,9 @@ public:
   computeConfluentCompletion(unsigned maxIterations,
                              unsigned maxDepth);
 
-  void simplifyRightHandSides();
+  void simplifyRewriteSystem();
+
+  void verify() const;
 
   std::pair<CompletionResult, unsigned>
   buildPropertyMap(PropertyMap &map,
