@@ -106,15 +106,6 @@ Term Term::get(const MutableTerm &mutableTerm, RewriteContext &ctx) {
   return term;
 }
 
-/// Find the start of \p other in this term, returning end() if
-/// \p other does not occur as a subterm of this term.
-ArrayRef<Symbol>::iterator Term::findSubTerm(Term other) const {
-  if (other.size() > size())
-    return end();
-
-  return std::search(begin(), end(), other.begin(), other.end());
-}
-
 void Term::Storage::Profile(llvm::FoldingSetNodeID &id) const {
   id.AddInteger(Size);
 

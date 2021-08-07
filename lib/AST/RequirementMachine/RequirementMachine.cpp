@@ -391,7 +391,10 @@ void RequirementMachine::computeCompletion() {
 
     // Simplify right hand sides in preparation for building the
     // property map.
-    System.simplifyRightHandSides();
+    System.simplifyRewriteSystem();
+
+    // Check invariants.
+    System.verify();
 
     // Build the property map, which also performs concrete term
     // unification; if this added any new rules, run the completion

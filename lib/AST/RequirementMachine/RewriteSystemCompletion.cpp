@@ -500,29 +500,6 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
     if (newRule.getDepth() > maxDepth)
       return std::make_pair(CompletionResult::MaxDepth, steps);
 
-    // Check if the new rule X == Y obsoletes any existing rules.
-    for (unsigned j : indices(Rules)) {
-      // A rule does not obsolete itself.
-      if (i == j)
-        continue;
-
-      auto &rule = Rules[j];
-
-      // Ignore rules that have already been obsoleted.
-      if (rule.isDeleted())
-        continue;
-
-      // If this rule reduces some existing rule, delete the existing rule.
-      if (rule.canReduceLeftHandSide(newRule)) {
-        if (DebugCompletion) {
-          llvm::dbgs() << "$ Deleting rule " << rule << " because "
-                       << "its left hand side contains " << newRule
-                       << "\n";
-        }
-        rule.markDeleted();
-      }
-    }
-
     // If this new rule merges any associated types, process the merge now
     // before we continue with the completion procedure. This is important
     // to perform incrementally since merging is required to repair confluence

@@ -81,13 +81,6 @@ public:
                               MutableTerm &t,
                               MutableTerm &v) const;
 
-  ArrayRef<Symbol>::iterator findSubTerm(Term other) const;
-
-  /// Returns true if this term contains, or is equal to, \p other.
-  bool containsSubTerm(Term other) const {
-    return findSubTerm(other) != end();
-  }
-
   ArrayRef<const ProtocolDecl *> getRootProtocols() const {
     return begin()->getRootProtocols();
   }
