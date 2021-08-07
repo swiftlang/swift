@@ -249,6 +249,14 @@ public:
   const Driver &getDriver() const { return D; }
   const llvm::Triple &getTriple() const { return Triple; }
 
+  static void addLinkedLibArgs(const llvm::opt::ArgList &Args,
+                               llvm::opt::ArgStringList &FrontendArgs);
+
+  static void addArgsFromGroupExcept(const llvm::opt::ArgList &Args,
+                                     llvm::opt::ArgStringList &FrontendArgs,
+                                     llvm::opt::OptSpecifier groupID,
+                                     llvm::opt::OptSpecifier exceptID);
+
   /// Construct a Job for the action \p JA, taking the given information into
   /// account.
   ///
