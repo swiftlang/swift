@@ -222,39 +222,47 @@ static SILValue getCallerArg(FullApplySite fullApply, unsigned paramIndex) {
 static StorageAccessInfo
 transformCalleeStorage(const StorageAccessInfo &storage,
                        FullApplySite fullApply) {
-  switch (storage.getKind()) {
-  case AccessedStorage::Box:
-  case AccessedStorage::Stack:
+  if (storage.isLocal()) {
     // Do not merge local storage.
     return StorageAccessInfo(AccessedStorage(), storage);
+  }
+  // Remap reference storage. The caller's argument becomes the new object. The
+  // old storage info is inherited.
+  if (storage.isReference()) {
+    auto object = storage.getObject();
+    if (auto *arg = dyn_cast<SILFunctionArgument>(object)) {
+      if (SILValue argVal = getCallerArg(fullApply, arg->getIndex())) {
+        // Remap this storage info. The argument source value is now the new
+        // object. The old storage info is inherited.
+        auto callerStorage = storage.transformReference(argVal);
+        return StorageAccessInfo(callerStorage, storage);
+      }
+    }
+    // Continue using the callee value as the storage object.
+    return storage;
+  }
+  switch (storage.getKind()) {
+  case AccessedStorage::Box:
+  case AccessedStorage::Class:
+  case AccessedStorage::Tail:
+  case AccessedStorage::Stack:
+    llvm_unreachable("Handled immediately above");
+  case AccessedStorage::Nested:
+    llvm_unreachable("Nested storage should not be used here");
   case AccessedStorage::Global:
     // Global accesses is universal.
     return storage;
-  case AccessedStorage::Class:
-  case AccessedStorage::Tail: {
-    // If the object's value is an argument, translate it into a value on the
-    // caller side.
-    SILValue obj = storage.getObject();
-    if (auto *arg = dyn_cast<SILFunctionArgument>(obj)) {
-      SILValue argVal = getCallerArg(fullApply, arg->getIndex());
-      if (argVal) {
-        unsigned idx = (storage.getKind() == AccessedStorage::Class)
-                           ? storage.getPropertyIndex()
-                           : AccessedStorage::TailIndex;
-        // Remap this storage info. The argument source value is now the new
-        // object. The old storage info is inherited.
-        return StorageAccessInfo(AccessedStorage::forClass(argVal, idx),
-                                 storage);
-      }
-    }
-    // Otherwise, continue to reference the value in the callee because we don't
-    // have any better placeholder for a callee-defined object.
+  case AccessedStorage::Yield:
+    // Continue to hold on to yields from the callee because we don't have
+    // any better placeholder in the callee.
     return storage;
-  }
+  case AccessedStorage::Unidentified:
+    // For unidentified storage, continue to reference the value in the callee
+    // because we don't have any better placeholder for a callee-defined object.
+    return storage;
   case AccessedStorage::Argument: {
     // Transitively search for the storage base in the caller.
-    SILValue argVal = getCallerArg(fullApply, storage.getParamIndex());
-    if (argVal) {
+    if (SILValue argVal = getCallerArg(fullApply, storage.getParamIndex())) {
       // Remap the argument source value and inherit the old storage info.
       if (auto calleeStorage = AccessedStorage::compute(argVal))
         return StorageAccessInfo(calleeStorage, storage);
@@ -267,21 +275,12 @@ transformCalleeStorage(const StorageAccessInfo &storage,
     // AccessedStorage::compute returns an invalid SILValue, which won't
     // pass SIL verification.
     //
-    // FIXME: In case argVal is invalid, support Unidentified access for invalid
-    // values. This would also be useful for partially invalidating results.
+    // TODO: To handle invalid argVal, consider allowing Unidentified access for
+    // invalid values. This may be useful for partially invalidating results.
     return StorageAccessInfo(
-        AccessedStorage(argVal, AccessedStorage::Unidentified), storage);
+      AccessedStorage(storage.getValue(), AccessedStorage::Unidentified),
+      storage);
   }
-  case AccessedStorage::Nested:
-    llvm_unreachable("Unexpected nested access");
-  case AccessedStorage::Yield:
-    // Continue to hold on to yields from the callee because we don't have
-    // any better placeholder in the callee.
-    return storage;
-  case AccessedStorage::Unidentified:
-    // For unidentified storage, continue to reference the value in the callee
-    // because we don't have any better placeholder for a callee-defined object.
-    return storage;
   }
   llvm_unreachable("unhandled kind");
 }

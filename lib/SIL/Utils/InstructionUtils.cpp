@@ -135,6 +135,9 @@ SILValue swift::stripSinglePredecessorArgs(SILValue V) {
 SILValue swift::stripCastsWithoutMarkDependence(SILValue v) {
   while (true) {
     v = stripSinglePredecessorArgs(v);
+    if (isa<MarkDependenceInst>(v))
+      return v;
+
     if (auto *svi = dyn_cast<SingleValueInstruction>(v)) {
       if (isRCIdentityPreservingCast(svi)
           || isa<UncheckedTrivialBitCastInst>(v)
