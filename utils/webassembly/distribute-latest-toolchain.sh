@@ -23,8 +23,9 @@ github() {
   curl --header "authorization: Bearer $GITHUB_TOKEN" "$@"
 }
 
-latest_run=$(github "${gh_api}/repos/${repository}/actions/workflows/${workflow_name}/runs?branch=${branch}&status=success" \
-  | jq ".workflow_runs | map(select(.head_branch == \"$branch\")) | sort_by(.run_number) | last")
+# workaround: if status=success option is given, the API doesn't return the latest runs list, so remove it temporarily.
+latest_run=$(github "${gh_api}/repos/${repository}/actions/workflows/${workflow_name}/runs?branch=${branch}" \
+  | jq ".workflow_runs | map(select(.head_branch == \"$branch\")) | map(select(.conclusion == \"success\")) | sort_by(.run_number) | last")
 
 if [ -z "$latest_run" ] || [ "$latest_run" == "null" ]; then
   echo "No successful runs available"
