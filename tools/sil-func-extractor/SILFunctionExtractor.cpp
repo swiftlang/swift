@@ -258,10 +258,9 @@ int main(int argc, char **argv) {
   if (EnableObjCInterop == llvm::cl::BOU_UNSET) {
     Invocation.getLangOptions().EnableObjCInterop =
         Invocation.getLangOptions().Target.isOSDarwin();
-  } else if (EnableObjCInterop == llvm::cl::BOU_TRUE) {
-    Invocation.getLangOptions().EnableObjCInterop = true;
   } else {
-    Invocation.getLangOptions().EnableObjCInterop = false;
+    Invocation.getLangOptions().EnableObjCInterop =
+        EnableObjCInterop == llvm::cl::BOU_TRUE;
   }
 
   SILOptions &Opts = Invocation.getSILOptions();
