@@ -319,6 +319,15 @@ IRGenFunction::emitLoadOfRelativePointer(Address addr, bool isFar,
   if (!isFar) {
     value = Builder.CreateSExt(value, IGM.IntPtrTy);
   }
+  // WebAssembly target uses only absolute pointers.
+  // See https://forums.swift.org/t/wasm-support/16087/17 for more details.
+  if (IGM.TargetInfo.OutputObjectFormat == llvm::Triple::Wasm) {
+    auto *uncastPointer = Builder.CreateIntToPtr(value, IGM.Int8PtrTy);
+    auto uncastPointerAddress = Address(uncastPointer, IGM.getPointerAlignment());
+    auto pointer = Builder.CreateBitCast(uncastPointerAddress, expectedType);
+    return pointer.getAddress();
+  }
+
   auto *addrInt = Builder.CreatePtrToInt(addr.getAddress(), IGM.IntPtrTy);
   auto *uncastPointerInt = Builder.CreateAdd(addrInt, value);
   auto *uncastPointer = Builder.CreateIntToPtr(uncastPointerInt, IGM.Int8PtrTy);
