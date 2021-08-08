@@ -1670,11 +1670,12 @@ public:
           SourceLoc &arrowLoc,
           TypeExpr *&explicitResultType,
           SourceLoc &inLocm,
-          SmallVectorImpl<Identifier> &varsForSynthesizedGuard);
+          SmallVectorImpl<Identifier> &weakGuardVars);
 
   Expr *parseExprAnonClosureArg();
-  GuardStmt *synthesizedGuardStmt(SmallVectorImpl<Identifier> &varsForSynthesizedGuard,
-                                  SourceLoc guardLoc);
+  void synthesizeGuardStmts(SmallVectorImpl<ASTNode> &closureBodyElements,
+                            SmallVectorImpl<Identifier> &weakGuardVars,
+                            SourceLoc guardLoc);
   ParserResult<Expr> parseExprList(tok LeftTok, tok RightTok,
                                    syntax::SyntaxKind Kind);
 

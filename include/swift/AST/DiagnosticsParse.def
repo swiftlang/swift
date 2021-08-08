@@ -1598,6 +1598,12 @@ ERROR(attr_unowned_invalid_specifier,none,
 ERROR(attr_unowned_expected_rparen,none,
       "expected ')' after specifier for 'unowned'", ())
 
+// weak
+ERROR(attr_weak_invalid_specifier,none,
+      "expected 'weak' or 'weak(guard)'", ())
+ERROR(attr_weak_expected_rparen,none,
+      "expected ')' after specifier for 'weak'", ())
+
 // warn_unused_result
 WARNING(attr_warn_unused_result_removed,none,
         "'warn_unused_result' attribute behavior is now the default", ())
