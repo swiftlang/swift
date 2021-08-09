@@ -5606,6 +5606,9 @@ static unsigned getOptionalEvaluationDepth(Expr *expr, Expr *target) {
       expr = open->getExistentialValue();
 
     // Otherwise, look through implicit conversions.
+    } else if (auto call = dyn_cast<CallExpr>(expr)) {
+//      expr->dump();
+      return depth;
     } else {
       expr = cast<ImplicitConversionExpr>(expr)->getSubExpr();
     }
@@ -6634,7 +6637,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
         break;
 
       if (cs.implicitConversionAvailable(fromType->lookThroughAllOptionalTypes(),
-                                 toType->lookThroughAllOptionalTypes()))
+                                         toType->lookThroughAllOptionalTypes()))
         break;
 
       // HACK: Fix problem related to Swift 4 mode (with assertions),
@@ -6860,17 +6863,19 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     case ConversionRestrictionKind::DoubleToCGFloat:
     case ConversionRestrictionKind::ImplicitConversion: {
       auto conversionKind = knownRestriction->second;
+      ConstructorDecl *implicitConstructor = nullptr;
+      Identifier label;
+      if (conversionKind == ConversionRestrictionKind::ImplicitConversion) {
+//        fromType->dump(); toType->dump();
+        implicitConstructor = cs.implicitConversionAvailable(fromType, toType);
+        label = cs.getASTContext().Id_implicit;
+      }
 
       auto *argExpr = locator.trySimplifyToExpr();
       assert(argExpr);
 
       // Load the value for conversion.
       argExpr = cs.coerceToRValue(argExpr);
-
-      Identifier label;
-      if (knownRestriction->second ==
-          ConversionRestrictionKind::ImplicitConversion)
-        label = cs.getASTContext().Id_implicit;
 
       auto *implicitInit =
           CallExpr::createImplicit(ctx, TypeExpr::createImplicit(toType, ctx),
@@ -6903,6 +6908,10 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
             ASTNode(), {LocatorPathElt::ImplicitConversion(conversionKind),
                         ConstraintLocator::ApplyFunction,
                         ConstraintLocator::ConstructorMember}));
+
+        if (implicitConstructor) // Hack overload to constructor for implicit
+          overload.choice = OverloadChoice(toType, implicitConstructor,
+                                           overload.choice.getFunctionRefKind());
 
         solution.overloadChoices.insert({memberLoc, overload});
       }

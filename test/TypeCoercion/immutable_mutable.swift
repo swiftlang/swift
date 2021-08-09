@@ -18,6 +18,11 @@ extension UnsafePointer {
     self.init(implicit)
   }
 }
+extension UnsafePointer where Pointee == Int {
+  init(implicit: UnsafeMutablePointer<Int>) {
+    self.init(implicit)
+  }
+}
 
 let optionalMutableRawPointer = UnsafeMutableRawPointer(bitPattern: -3)
 let mutableRawPointer = optionalMutableRawPointer!
@@ -70,3 +75,28 @@ array.withUnsafeMutableBufferPointer {
     _ = demutable(immutable: $0.baseAddress!)
     _ = demutable(optionalImmutable: $0.baseAddress)
 }
+
+extension Int {
+  init(implicit: Int8) {
+    self.init(implicit)
+  }
+  init(implicit: Int16) {
+    self.init(implicit)
+  }
+  init(implicit: Int32) {
+    self.init(implicit)
+  }
+}
+extension Int32 {
+  init(implicit: Int8) {
+    self.init(implicit)
+  }
+  init(implicit: Int16) {
+    self.init(implicit)
+  }
+}
+
+let a: Int32 = 997
+let b: Int = a
+let c: Int8 = 97
+let d: Int = c

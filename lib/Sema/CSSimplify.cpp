@@ -4978,50 +4978,68 @@ bool ConstraintSystem::repairFailures(
   // Accept mutable pointers in the place of immutables.
   if (implicitConversionAvailable(lhs, rhs))
     conversionsOrFixes.push_back(
-        ConversionRestrictionKind::PointerToPointer);
+        ConversionRestrictionKind::ImplicitConversion);
 
   return !conversionsOrFixes.empty();
 }
 
-bool ConstraintSystem::implicitConversionAvailable(Type fromType, Type toType) {
+ConstructorDecl *ConstraintSystem::implicitConversionAvailable(Type fromType, Type toType) {
 #if 01 // Determine implicit conversions from init(implicit:) constructors
-  fprintf(stderr, "\n\nFROM  %p ", fromType.getPointer());
-  fromType->dump();
-  fprintf(stderr, "TO %p ", toType.getPointer());
-  toType->dump();
+  static bool trace = false;
+  if (trace) {
+    fprintf(stderr, "\n\nFROM  %p ", fromType.getPointer());
+    fromType->dump();
+    fprintf(stderr, "TO %p ", toType.getPointer());
+    toType->dump();
+  }
   if (NominalTypeDecl *toNominal = toType->getAnyNominal()) {
-    auto typeKey = ^TypeBase *(Type t) {
-        return t->getAnyNominal()->getInterfaceType()
-                ->getCanonicalType().getPointer();
-    };
-    TypeBase *toBase = typeKey(toType);
     auto &ctx = getASTContext();
     if (!toNominal->setConversionsComputed()) {
       auto implicitArgId = ctx.Id_implicit;
       for (ExtensionDecl *extension : toNominal->getExtensions()) {
         Type extType = extension->getDeclaredInterfaceType()->getCanonicalType();
-        fprintf(stderr, "\nEXT %p ", extType.getPointer());
-        extType->dump();
+        int arged = 0;
         for (Decl *member : extension->getMembers())
           if (ConstructorDecl *initDecl = dyn_cast<ConstructorDecl>(member)) {
-            ParameterList *args = initDecl->getParameters();
-            if (args->size() == 1 &&
-                args->get(0)->getBaseName().getIdentifier() == implicitArgId) {
-              Type argType = args->get(0)->getType()->getCanonicalType();
-              fprintf(stderr, "ARG %p ", argType.getPointer());
-              argType->dump();
-              (*ctx.implicitConversionsTo(typeKey(extType), /*create*/true))
-                [typeKey(argType)].push_back(initDecl);
+            ParameterList *parameters = initDecl->getParameters();
+            if (parameters->size() == 1 &&
+                parameters->get(0)->getBaseName() == implicitArgId) {
+              Type fromType = parameters->get(0)->getType()->getCanonicalType();
+              if (trace) {
+                if (!arged++) {
+                  fprintf(stderr, "\nEXT %p ", extType.getPointer());
+                  extType->dump();
+                }
+                fprintf(stderr, "ARG %p ", fromType.getPointer());
+                fromType->dump();
+              }
+              initDecl->getResultInterfaceType();
+              (*ctx.implicitConversionsTo(extType->getAnyNominal(),
+                /*create*/true))[fromType->getAnyNominal()].push_back(initDecl);
             }
           }
       }
     }
-    if (auto *exists = ctx.implicitConversionsTo(toBase, /*create*/false)) {
-      for (ConstructorDecl *initFunc : (*exists)[typeKey(fromType)])
-        // More detailed check of conversion here...
-        if (initFunc != nullptr)
-          return true;
-    }
+    if (auto *exists = ctx.implicitConversionsTo(toNominal, /*create*/false))
+      for (ConstructorDecl *initDecl : (*exists)[fromType->getAnyNominal()])
+        if (ExtensionDecl *ext = dyn_cast<ExtensionDecl>(initDecl->getParent()))
+          if (Type argType = initDecl->getParameters()->get(0)->getType())
+            if (Type extType = initDecl->getResultInterfaceType()) {
+              // More rigourous check of conversion here...
+              if (trace) {
+                fprintf(stderr, "ARG2 %p ", argType.getPointer());
+                argType->getCanonicalType()->dump();
+                fprintf(stderr, "EXT2 %p ", argType.getPointer());
+                extType->getCanonicalType()->dump();
+              }
+              if (argType->getCanonicalType() == fromType->getCanonicalType() ||
+                  (extType->isUnsafeRawPointer() &&
+                   (fromType->isUnsafeMutablePointer() || fromType->isUnsafePointer()))) {
+                if (trace)
+                  fprintf(stderr, "SELECTED\n");
+                return initDecl;
+              }
+            }
   }
 #else // Original hard coded rules.
   if (toType->isUnsafeRawPointer() && (fromType->isUnsafeMutableRawPointer() ||
@@ -5041,7 +5059,7 @@ bool ConstraintSystem::implicitConversionAvailable(Type fromType, Type toType) {
     return true; // UnsafeMutablePointer<Pointee> -> UnsafePointer<Pointee>
   }
 #endif
-  return false;
+  return nullptr;
 }
 
 ConstraintSystem::TypeMatchResult

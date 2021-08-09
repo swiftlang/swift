@@ -465,6 +465,10 @@ public:
     // Approximate this for the purposes of being able to invoke @objc methods
     // by considering tuples of ObjC-representable types to not use metadata.
     if (auto tuple = dyn_cast<TupleExpr>(E)) {
+      if (!tuple->getType()->is<TupleType>()) {
+        tuple->getType()->dump();
+        return false;
+      }
       for (auto elt : tuple->getType()->castTo<TupleType>()->getElements()) {
         if (!elt.getType()->isRepresentableIn(ForeignLanguage::ObjectiveC,
                                               CurDC))

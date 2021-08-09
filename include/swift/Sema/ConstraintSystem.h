@@ -565,7 +565,7 @@ enum class SolutionCompareResult {
 /// declaration was opened, which may involve type variables.
 struct SelectedOverload {
   /// The overload choice.
-  const OverloadChoice choice;
+  OverloadChoice choice; // HACK HACK HACK
 
   /// The opened type of the base of the reference to this overload, if
   /// we're referencing a member.
@@ -4244,7 +4244,7 @@ public:
                       ConstraintLocatorBuilder locator);
 
   /// Is an implicit conversion available from fromType to toType.
-  bool implicitConversionAvailable(Type fromType, Type toType);
+  ConstructorDecl *implicitConversionAvailable(Type fromType, Type toType);
 
   /// Subroutine of \c matchTypes(), which matches up two tuple types.
   ///

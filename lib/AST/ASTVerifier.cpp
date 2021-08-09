@@ -1136,6 +1136,10 @@ public:
     }
 
     void verifyChecked(TupleExpr *E) {
+      if (!E->getType()->is<TupleType>()) {
+          E->getType()->dump();
+          return;
+      }
       const TupleType *exprTy = E->getType()->castTo<TupleType>();
       for_each(exprTy->getElements().begin(), exprTy->getElements().end(),
                E->getElements().begin(),
