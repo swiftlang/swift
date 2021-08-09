@@ -371,7 +371,7 @@ private:
 
   /// Emits one last diagnostic, logs the error, and then aborts for the stack
   /// trace.
-  LLVM_ATTRIBUTE_NORETURN void fatal(llvm::Error error) const;
+  [[noreturn]] void fatal(llvm::Error error) const;
   void fatalIfNotSuccess(llvm::Error error) const {
     if (error)
       fatal(std::move(error));
