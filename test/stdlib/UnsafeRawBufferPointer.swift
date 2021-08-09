@@ -128,40 +128,88 @@ UnsafeRawBufferPointerTestSuite.test("initFromArray") {
   expectEqual(array2, array1)
 }
 
-UnsafeRawBufferPointerTestSuite.test("initializeMemory(as:from:).underflow") {
-  let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 30, alignment: MemoryLayout<UInt>.alignment)
+UnsafeRawBufferPointerTestSuite.test("initializeMemory(as:from:).overflow") {
+  let buffer = UnsafeMutableRawBufferPointer.allocate(
+    byteCount: MemoryLayout<Int64>.stride * 3 + 3,
+    alignment: MemoryLayout<Int64>.alignment
+  )
   defer { buffer.deallocate() }
   let source = stride(from: 5 as Int64, to: 0, by: -1)
   if _isDebugAssertConfiguration() {
     expectCrashLater()
   }
-  var (it, bound) = buffer.initializeMemory(as: Int64.self, from: source)
-  let idx = bound.endIndex * MemoryLayout<Int64>.stride
-  expectEqual(it.next()!, 2)
-  expectEqual(idx, 24)
-  let expected: [Int64] = [5,4,3]
-  expected.withUnsafeBytes { expectEqualSequence($0,buffer[0..<idx]) }
-  expectEqualSequence([5, 4, 3],bound)
+  var (unwritten, written) = buffer.initializeMemory(as: Int64.self, from: source)
+  expectEqual(unwritten.next(), Optional(2))
+  let expected = source.dropLast(2)
+  expectEqual(written.count, expected.count)
+  let limit = written.count * MemoryLayout<Int64>.stride
+  expectLT(limit, buffer.count)
+  expected.withUnsafeBytes { expectEqualSequence($0, buffer[0..<limit]) }
+  expectEqualSequence(expected, written)
 }
 
-UnsafeRawBufferPointerTestSuite.test("initializeMemory(as:from:).overflow") {
-  let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 30, alignment: MemoryLayout<UInt>.alignment)
+UnsafeRawBufferPointerTestSuite.test(
+  "initializeMemory(as:from:).sequence.partialfill"
+) {
+  let buffer = UnsafeMutableRawBufferPointer.allocate(
+    byteCount: MemoryLayout<Int64>.stride * 16,
+    alignment: MemoryLayout<Int64>.alignment
+  )
+  defer { buffer.deallocate() }
+  let source = stride(from: 5 as Int64, to: 0, by: -1)
+  var (unwritten, written) = buffer.initializeMemory(as: Int64.self, from: source)
+  expectNil(unwritten.next())
+  let expected = Array(source)
+  expectEqual(written.count, expected.count)
+  let limit = written.count * MemoryLayout<Int64>.stride
+  expectLT(limit, buffer.count)
+  expected.withUnsafeBytes { expectEqualSequence($0, buffer[0..<limit]) }
+  expectEqualSequence(expected, written)
+}
+
+UnsafeRawBufferPointerTestSuite.test(
+  "initializeMemory(as:from:).collection.partialfill"
+) {
+  let buffer = UnsafeMutableRawBufferPointer.allocate(
+    byteCount: MemoryLayout<Int64>.stride * 16,
+    alignment: MemoryLayout<Int64>.alignment
+  )
   defer { buffer.deallocate() }
   let source: [Int64] = [5, 4, 3, 2, 1]
-  if _isDebugAssertConfiguration() {
-    expectCrashLater()
-  }
-  var (it,bound) = buffer.initializeMemory(as: Int64.self, from: source)
-  let idx = bound.endIndex * MemoryLayout<Int64>.stride
-  expectEqual(it.next()!, 2)
-  expectEqual(idx, 24)
-  let expected: [Int64] = [5,4,3]
-  expected.withUnsafeBytes { expectEqualSequence($0,buffer[0..<idx]) }
-  expectEqualSequence([5, 4, 3],bound)
+  var (unwritten, written) = buffer.initializeMemory(as: Int64.self, from: source)
+  expectNil(unwritten.next())
+  expectEqual(written.count, source.count)
+  let limit = written.count * MemoryLayout<Int64>.stride
+  expectLT(limit, buffer.count)
+  source.withUnsafeBytes { expectEqualSequence($0, buffer[0..<limit]) }
+  expectEqualSequence(source, written)
 }
 
-UnsafeRawBufferPointerTestSuite.test("initializeMemory(as:from:).exact") {
-  let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 24, alignment: MemoryLayout<UInt>.alignment)
+UnsafeRawBufferPointerTestSuite.test(
+  "initializeMemory(as:from:).sequence.exact"
+) {
+  let buffer = UnsafeMutableRawBufferPointer.allocate(
+    byteCount: MemoryLayout<Int64>.stride * 3,
+    alignment: MemoryLayout<Int64>.alignment
+  )
+  defer { buffer.deallocate() }
+  let source = stride(from: 5 as Int64, to: 2, by: -1)
+  var (unwritten, written) = buffer.initializeMemory(as: Int64.self, from: source)
+  expectNil(unwritten.next())
+  expectEqual(written.endIndex, Array(source).count)
+  expectEqual(written.endIndex * MemoryLayout<Int64>.stride, buffer.endIndex)
+  let expected = Array(source)
+  expected.withUnsafeBytes { expectEqualSequence($0, buffer) }
+  expectEqualSequence(expected, written)
+}
+
+UnsafeRawBufferPointerTestSuite.test(
+  "initializeMemory(as:from:).collection.exact"
+) {
+  let buffer = UnsafeMutableRawBufferPointer.allocate(
+    byteCount: MemoryLayout<Int64>.stride * 3,
+    alignment: MemoryLayout<Int64>.alignment
+  )
   defer { buffer.deallocate() }
   let source: [Int64] = [5, 4, 3]
   var (it,bound) = buffer.initializeMemory(as: Int64.self, from: source)
@@ -172,20 +220,34 @@ UnsafeRawBufferPointerTestSuite.test("initializeMemory(as:from:).exact") {
   expectEqualSequence([5, 4, 3],bound)
 }
 
-UnsafeRawBufferPointerTestSuite.test("initializeMemory(as:from:).invalidNilPtr") {
+UnsafeRawBufferPointerTestSuite.test("initializeMemory(as:from:).invalidNilPtr.Collection") {
   let buffer = UnsafeMutableRawBufferPointer(start: nil, count: 0)
   let source: [Int64] = [5, 4, 3, 2, 1]
   expectCrashLater()
   _ = buffer.initializeMemory(as: Int64.self, from: source)
 }
 
-UnsafeRawBufferPointerTestSuite.test("initializeMemory(as:from:).validNilPtr") {
+UnsafeRawBufferPointerTestSuite.test("initializeMemory(as:from:).invalidNilPtr.Sequence") {
   let buffer = UnsafeMutableRawBufferPointer(start: nil, count: 0)
-  let source: [Int64] = []
+  let source = stride(from: Int64.zero, to: 10, by: 2)
+  expectCrashLater()
+  _ = buffer.initializeMemory(as: Int64.self, from: source)
+}
+
+UnsafeRawBufferPointerTestSuite.test("initializeMemory(as:from:).validNilPtr.Collection") {
+  let buffer = UnsafeMutableRawBufferPointer(start: nil, count: 0)
+  let source = EmptyCollection<Int64>()
   var (it, bound) = buffer.initializeMemory(as: Int64.self, from: source)
-  let idx = bound.endIndex * MemoryLayout<Int64>.stride
   expectNil(it.next())
-  expectEqual(idx, source.endIndex)
+  expectEqual(bound.startIndex, bound.endIndex)
+}
+
+UnsafeRawBufferPointerTestSuite.test("initializeMemory(as:from:).validNilPtr.Sequence") {
+  let buffer = UnsafeMutableRawBufferPointer(start: nil, count: 0)
+  let source = IteratorSequence(EmptyCollection<Int64>().makeIterator())
+  var (it, bound) = buffer.initializeMemory(as: Int64.self, from: source)
+  expectNil(it.next())
+  expectEqual(bound.startIndex, bound.endIndex)
 }
 
 
