@@ -2865,7 +2865,7 @@ private:
   ///
   /// \param solutions The set of solutions to filter.
   ///
-  /// \param minimize The flag which idicates if the
+  /// \param minimize The flag which indicates if the
   /// set of solutions should be filtered even if there is
   /// no single best solution, see `findBestSolution` for
   /// more details.
@@ -3125,7 +3125,7 @@ public:
                        ArrayRef<ConstraintLocator::PathElement> path,
                        unsigned summaryFlags);
 
-  /// Retrive the constraint locator for the given anchor and
+  /// Retreive the constraint locator for the given anchor and
   /// path, uniqued and automatically infer the summary flags
   ConstraintLocator *
   getConstraintLocator(ASTNode anchor,

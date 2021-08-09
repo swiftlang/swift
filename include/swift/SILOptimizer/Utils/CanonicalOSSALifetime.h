@@ -267,7 +267,7 @@ private:
 
   /// Record all interesting debug_value instructions here rather then treating
   /// them like a normal use. An interesting debug_value is one that may lie
-  /// outisde the pruned liveness at the time it is discovered.
+  /// outside the pruned liveness at the time it is discovered.
   llvm::SmallPtrSet<DebugValueInst *, 8> debugValues;
 
   /// Visited set for general def-use traversal that prevents revisiting values.
