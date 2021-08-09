@@ -8491,8 +8491,13 @@ bool ClassDecl::isRootDefaultActor(ModuleDecl *M,
 
 bool ClassDecl::isNativeNSObjectSubclass() const {
   // @objc actors implicitly inherit from NSObject.
-  if (isActor() && getAttrs().hasAttribute<ObjCAttr>())
-    return true;
+  if (isActor()) {
+    if (getAttrs().hasAttribute<ObjCAttr>()) {
+      return true;
+    }
+    ClassDecl *superclass = getSuperclassDecl();
+    return superclass && superclass->isNSObject();
+  }
 
   // For now, non-actor classes cannot use the native NSObject subclass.
   // Eventually we should roll this out to more classes that directly
