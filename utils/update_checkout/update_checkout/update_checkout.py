@@ -436,7 +436,7 @@ def full_target_name(repository, target):
 
 def skip_list_for_platform(config):
     # If there is a platforms key only include the repo if the
-    # plaform is in the list
+    # platform is in the list
     skip_list = []
     platform_name = platform.system()
 

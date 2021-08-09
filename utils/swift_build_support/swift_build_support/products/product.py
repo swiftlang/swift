@@ -77,7 +77,7 @@ class Product(object):
         """is_ignore_install_all_product -> bool
 
         Whether this product is to ignore the install-all directive
-        and insted always respect its own should_install.
+        and instead always respect its own should_install.
         This is useful when we run -install-all but have products
         which should never be installed into the toolchain
         (e.g. earlyswiftdriver)

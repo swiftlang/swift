@@ -136,7 +136,7 @@ class HostSpecificConfiguration(object):
                 # standard library, whereas the other targets can build a
                 # slightly smaller subset which is faster to build.
                 #
-                # NOTE: We currently do not seperate testing options for
+                # NOTE: We currently do not separate testing options for
                 # stage1/stage2 compiler. This can change with time.
                 if stage_dependent_args.build_swift_stdlib_unittest_extra or \
                         args.validation_test or args.long_test or \

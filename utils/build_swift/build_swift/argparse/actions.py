@@ -324,7 +324,7 @@ class ToggleFalseAction(_ToggleAction):
 # -----------------------------------------------------------------------------
 
 class UnsupportedAction(Action):
-    """Action that denotes an unsupported argument or opiton and subsequently
+    """Action that denotes an unsupported argument or option and subsequently
     raises an ArgumentError.
     """
 

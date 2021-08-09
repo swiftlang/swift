@@ -441,7 +441,7 @@ Here are the necessary changes:
    This ensures when an app is built for deployment targets prior to the symbols' move,
    the app will look for these symbols in ToasterKit instead of ToasterKitCore.
 
-More generally, mutliple availabilities can be specified, like so:
+More generally, mutiple availabilities can be specified, like so:
 
 ```swift
 @available(toasterOS 42, bowlOS 54, mugOS 54, *)
