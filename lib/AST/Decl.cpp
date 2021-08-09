@@ -6821,6 +6821,9 @@ ParamDecl::getDefaultValueStringRepresentation(
           return ".init()";
         }
 
+        if (isImplicit())
+          return StringRef();
+        
         auto &sourceMgr = getASTContext().SourceMgr;
         return extractInlinableText(sourceMgr, wrappedValue, scratch);
       }
