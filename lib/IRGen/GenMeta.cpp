@@ -847,8 +847,10 @@ namespace {
           B.getAddrOfCurrentPosition(IGM.ProtocolRequirementStructTy);
         int offset = WitnessTableFirstRequirementOffset;
         auto firstReqAdjustment = llvm::ConstantInt::get(IGM.Int32Ty, -offset);
-        address = llvm::ConstantExpr::getGetElementPtr(nullptr, address,
-                                                       firstReqAdjustment);
+        address = llvm::ConstantExpr::getGetElementPtr(
+            cast<llvm::PointerType>(address->getType()->getScalarType())
+                ->getElementType(),
+            address, firstReqAdjustment);
 
         IGM.defineProtocolRequirementsBaseDescriptor(Proto, address);
       }

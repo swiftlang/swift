@@ -688,13 +688,17 @@ void IRGenModule::emitRuntimeRegistration() {
       llvm::ConstantInt::get(Int32Ty, 0),
     };
     auto begin = llvm::ConstantExpr::getGetElementPtr(
-        /*Ty=*/nullptr, protocols, beginIndices);
+        cast<llvm::PointerType>(protocols->getType()->getScalarType())
+            ->getElementType(),
+        protocols, beginIndices);
     llvm::Constant *endIndices[] = {
       llvm::ConstantInt::get(Int32Ty, 0),
       llvm::ConstantInt::get(Int32Ty, SwiftProtocols.size()),
     };
     auto end = llvm::ConstantExpr::getGetElementPtr(
-        /*Ty=*/nullptr, protocols, endIndices);
+        cast<llvm::PointerType>(protocols->getType()->getScalarType())
+            ->getElementType(),
+        protocols, endIndices);
 
     RegIGF.Builder.CreateCall(getRegisterProtocolsFn(), {begin, end});
   }
@@ -706,14 +710,18 @@ void IRGenModule::emitRuntimeRegistration() {
       llvm::ConstantInt::get(Int32Ty, 0),
     };
     auto begin = llvm::ConstantExpr::getGetElementPtr(
-        /*Ty=*/nullptr, conformances, beginIndices);
+        cast<llvm::PointerType>(conformances->getType()->getScalarType())
+            ->getElementType(),
+        conformances, beginIndices);
     llvm::Constant *endIndices[] = {
       llvm::ConstantInt::get(Int32Ty, 0),
       llvm::ConstantInt::get(Int32Ty, ProtocolConformances.size()),
     };
     auto end = llvm::ConstantExpr::getGetElementPtr(
-        /*Ty=*/nullptr, conformances, endIndices);
-    
+        cast<llvm::PointerType>(conformances->getType()->getScalarType())
+            ->getElementType(),
+        conformances, endIndices);
+
     RegIGF.Builder.CreateCall(getRegisterProtocolConformancesFn(), {begin, end});
   }
 
@@ -725,13 +733,17 @@ void IRGenModule::emitRuntimeRegistration() {
       llvm::ConstantInt::get(Int32Ty, 0),
     };
     auto begin = llvm::ConstantExpr::getGetElementPtr(
-        /*Ty=*/nullptr, records, beginIndices);
+        cast<llvm::PointerType>(records->getType()->getScalarType())
+            ->getElementType(),
+        records, beginIndices);
     llvm::Constant *endIndices[] = {
       llvm::ConstantInt::get(Int32Ty, 0),
       llvm::ConstantInt::get(Int32Ty, RuntimeResolvableTypes.size()),
     };
     auto end = llvm::ConstantExpr::getGetElementPtr(
-        /*Ty=*/nullptr, records, endIndices);
+        cast<llvm::PointerType>(records->getType()->getScalarType())
+            ->getElementType(),
+        records, endIndices);
 
     RegIGF.Builder.CreateCall(getRegisterTypeMetadataRecordsFn(), {begin, end});
   }
@@ -2468,7 +2480,10 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
     };
     // Return the address of the initialized object itself (and not the address
     // to a reference to it).
-    addr = llvm::ConstantExpr::getGetElementPtr(nullptr, gvar, Indices);
+    addr = llvm::ConstantExpr::getGetElementPtr(
+        cast<llvm::PointerType>(gvar->getType()->getScalarType())
+            ->getElementType(),
+        gvar, Indices);
   }
   addr = llvm::ConstantExpr::getBitCast(
       addr,

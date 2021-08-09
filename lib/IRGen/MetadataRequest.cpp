@@ -269,7 +269,10 @@ llvm::Constant *IRGenModule::getAddrOfStringForMetadataRef(
       return addr;
 
     auto bitConstant = llvm::ConstantInt::get(IntPtrTy, 1);
-    return llvm::ConstantExpr::getGetElementPtr(nullptr, addr, bitConstant);
+    return llvm::ConstantExpr::getGetElementPtr(
+        cast<llvm::PointerType>(addr->getType()->getScalarType())
+            ->getElementType(),
+        addr, bitConstant);
   };
 
   // Check whether we already have an entry with this name.
