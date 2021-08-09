@@ -24,7 +24,6 @@
 #include "swift/Runtime/HeapObject.h"
 #include "TaskGroupPrivate.h"
 #include "TaskPrivate.h"
-#include "AsyncCall.h"
 #include "Debug.h"
 #include "Error.h"
 
