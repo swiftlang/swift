@@ -23,6 +23,7 @@
 #include "swift/Option/Options.h"
 #include "swift/SymbolGraphGen/SymbolGraphGen.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
@@ -235,7 +236,7 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
   // don't need to print these errors.
   CI.removeDiagnosticConsumer(&DiagPrinter);
   
-  SmallVector<ModuleDecl *> Overlays;
+  SmallVector<ModuleDecl *, 8> Overlays;
   M->findDeclaredCrossImportOverlaysTransitive(Overlays);
   for (const auto *OM : Overlays) {
     auto CIM = CI.getASTContext().getModuleByName(OM->getNameStr());
