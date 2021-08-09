@@ -165,7 +165,7 @@ public:
                              ConstraintLocator *locator)
       : cs(cs), closure(closure), locator(locator) {}
 
-  void visitPattern(Pattern *pattern) {
+  void visitPattern(Pattern *pattern, ContextualTypeInfo context) {
     auto parentElement =
         locator->getLastElementAs<LocatorPathElt::ClosureBodyElement>();
 
@@ -174,13 +174,57 @@ public:
       return;
     }
 
-    auto *stmt = parentElement->getElement().dyn_cast<Stmt *>();
-    if (stmt && isa<ForEachStmt>(stmt)) {
-      visitForEachPattern(pattern, cast<ForEachStmt>(stmt));
-      return;
+    if (auto *stmt = parentElement->getElement().dyn_cast<Stmt *>()) {
+      if (isa<ForEachStmt>(stmt)) {
+        visitForEachPattern(pattern, cast<ForEachStmt>(stmt));
+        return;
+      }
+
+      if (isa<CaseStmt>(stmt)) {
+        visitCaseItemPattern(pattern, context);
+        return;
+      }
     }
 
     llvm_unreachable("Unsupported pattern");
+  }
+
+  void visitCaseItem(CaseLabelItem *caseItem, ContextualTypeInfo context) {
+    assert(context.purpose == CTP_CaseStmt);
+
+    // Resolve the pattern.
+    auto *pattern = caseItem->getPattern();
+    if (!caseItem->isPatternResolved()) {
+      pattern = TypeChecker::resolvePattern(pattern, closure,
+                                            /*isStmtCondition=*/false);
+      if (!pattern) {
+        hadError = true;
+        return;
+      }
+    }
+
+    // Let's generate constraints for pattern + where clause.
+    // The assumption is that this shouldn't be too complex
+    // to handle, but if it turns out to be false, this could
+    // always be converted into a conjunction.
+
+    // Generate constraints for pattern.
+    visitPattern(pattern, context);
+
+    auto *guardExpr = caseItem->getGuardExpr();
+
+    // Generate constraints for `where` clause (if any).
+    if (guardExpr) {
+      guardExpr = cs.generateConstraints(guardExpr, closure);
+      if (!guardExpr) {
+        hadError = true;
+        return;
+      }
+    }
+
+    // Save information about case item so it could be referenced during
+    // solution application.
+    cs.setCaseLabelItemInfo(caseItem, {pattern, guardExpr});
   }
 
 private:
@@ -283,6 +327,39 @@ private:
 
       cs.setSolutionApplicationTarget(forEachStmt, target);
     }
+  }
+
+  void visitCaseItemPattern(Pattern *pattern, ContextualTypeInfo context) {
+    Type patternType =
+        cs.generateConstraints(pattern, locator, /*bindPatternVarsOneWay=*/true,
+                               /*patternBinding=*/nullptr, /*patternIndex=*/0);
+
+    if (!patternType) {
+      hadError = true;
+      return;
+    }
+
+    // Convert the contextual type to the pattern, which establishes the
+    // bindings.
+    cs.addConstraint(ConstraintKind::Conversion, context.getType(), patternType,
+                     locator);
+
+    // For any pattern variable that has a parent variable (i.e., another
+    // pattern variable with the same name in the same case), require that
+    // the types be equivalent.
+    pattern->forEachNode([&](Pattern *pattern) {
+      auto namedPattern = dyn_cast<NamedPattern>(pattern);
+      if (!namedPattern)
+        return;
+
+      auto var = namedPattern->getDecl();
+      if (auto parentVar = var->getParentVarDecl()) {
+        cs.addConstraint(
+            ConstraintKind::Equal, cs.getType(parentVar), cs.getType(var),
+            cs.getConstraintLocator(
+                locator, LocatorPathElt::PatternMatch(namedPattern)));
+      }
+    });
   }
 
   void visitDecl(Decl *decl) {
@@ -492,8 +569,58 @@ private:
     createConjunction(cs, elements, locator);
   }
 
+  void visitCaseStmt(CaseStmt *caseStmt) {
+    if (!isSupportedMultiStatementClosure())
+      llvm_unreachable("Unsupported statement: Case");
+
+    Type contextualTy;
+
+    {
+      auto parent =
+          locator->castLastElementTo<LocatorPathElt::ClosureBodyElement>()
+              .getElement();
+
+      if (parent.isStmt(StmtKind::Switch)) {
+        auto *switchStmt = cast<SwitchStmt>(parent.get<Stmt *>());
+        contextualTy = cs.getType(switchStmt->getSubjectExpr());
+      } else if (parent.isStmt(StmtKind::DoCatch)) {
+        contextualTy = cs.getASTContext().getExceptionType();
+      } else {
+        hadError = true;
+        return;
+      }
+    }
+
+    bindSwitchCasePatternVars(closure, caseStmt);
+
+    auto *caseLoc = cs.getConstraintLocator(
+        locator, LocatorPathElt::ClosureBodyElement(caseStmt));
+
+    SmallVector<ElementInfo, 4> elements;
+    for (auto &caseLabelItem : caseStmt->getMutableCaseLabelItems()) {
+      elements.push_back(
+          makeElement(&caseLabelItem, caseLoc, {contextualTy, CTP_CaseStmt}));
+    }
+
+    elements.push_back(makeElement(caseStmt->getBody(), caseLoc));
+
+    createConjunction(cs, elements, caseLoc);
+  }
+
   void visitBraceStmt(BraceStmt *braceStmt) {
     if (isSupportedMultiStatementClosure()) {
+      if (isChildOf(StmtKind::Case)) {
+        auto *caseStmt = cast<CaseStmt>(
+            locator->castLastElementTo<LocatorPathElt::ClosureBodyElement>()
+                .asStmt());
+
+        for (auto caseBodyVar : caseStmt->getCaseBodyVariablesOrEmptyArray()) {
+          auto parentVar = caseBodyVar->getParentVarDecl();
+          assert(parentVar && "Case body variables always have parents");
+          cs.setType(caseBodyVar, cs.getType(parentVar));
+        }
+      }
+
       SmallVector<ElementInfo, 4> elements;
       for (auto element : braceStmt->getElements()) {
         elements.push_back(makeElement(
@@ -554,7 +681,6 @@ private:
   UNSUPPORTED_STMT(Yield)
   UNSUPPORTED_STMT(DoCatch)
   UNSUPPORTED_STMT(Switch)
-  UNSUPPORTED_STMT(Case)
   UNSUPPORTED_STMT(Fail)
 #undef UNSUPPORTED_STMT
 
@@ -563,6 +689,15 @@ private:
     auto boolDecl = cs.getASTContext().getBoolDecl();
     assert(boolDecl && "Bool is missing");
     return {boolDecl->getDeclaredInterfaceType(), CTP_Condition};
+  }
+
+  bool isChildOf(StmtKind kind) {
+    if (locator->getPath().empty())
+      return false;
+
+    auto parentElt =
+        locator->getLastElementAs<LocatorPathElt::ClosureBodyElement>();
+    return parentElt ? parentElt->getElement().isStmt(kind) : false;
   }
 };
 }
@@ -647,7 +782,9 @@ ConstraintSystem::simplifyClosureBodyElementConstraint(
     if (generateConstraints(*cond, closure))
       return SolutionKind::Error;
   } else if (auto *pattern = element.dyn_cast<Pattern *>()) {
-    generator.visitPattern(pattern);
+    generator.visitPattern(pattern, context);
+  } else if (auto *caseItem = element.dyn_cast<CaseLabelItem *>()) {
+    generator.visitCaseItem(caseItem, context);
   } else {
     generator.visit(element.get<Decl *>());
   }
@@ -857,6 +994,22 @@ private:
     return forEachStmt;
   }
 
+  ASTNode visitCaseStmt(CaseStmt *caseStmt) {
+    // Translate the patterns and guard expressions for each case label item.
+    for (auto &caseItem : caseStmt->getMutableCaseLabelItems()) {
+      SolutionApplicationTarget caseTarget(&caseItem, closure);
+      if (!rewriteTarget(caseTarget)) {
+        hadError = true;
+      }
+    }
+
+    // Translate the body.
+    auto *newBody = visit(caseStmt->getBody()).get<Stmt *>();
+    caseStmt->setBody(cast<BraceStmt>(newBody));
+
+    return caseStmt;
+  }
+
   ASTNode visitBraceStmt(BraceStmt *braceStmt) {
     for (auto &node : braceStmt->getElements()) {
       if (auto expr = node.dyn_cast<Expr *>()) {
@@ -947,7 +1100,6 @@ private:
   UNSUPPORTED_STMT(Yield)
   UNSUPPORTED_STMT(DoCatch)
   UNSUPPORTED_STMT(Switch)
-  UNSUPPORTED_STMT(Case)
   UNSUPPORTED_STMT(Fail)
 #undef UNSUPPORTED_STMT
 

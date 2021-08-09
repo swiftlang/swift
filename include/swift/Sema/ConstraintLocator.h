@@ -990,7 +990,15 @@ public:
     if (auto *cond = node.dyn_cast<StmtCondition *>())
       return cond;
 
+    if (auto *caseItem = node.dyn_cast<CaseLabelItem *>())
+      return caseItem;
+
     llvm_unreachable("unhandled ASTNode element kind");
+  }
+
+  Stmt *asStmt() const {
+    auto node = ASTNode::getFromOpaqueValue(getStoredPointer());
+    return node.get<Stmt *>();
   }
 
   static bool classof(const LocatorPathElt *elt) {
