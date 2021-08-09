@@ -1411,6 +1411,10 @@ namespace {
     std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
       return { true, stmt };
     }
+
+    std::pair<bool, Pattern *> walkToPatternPre(Pattern *pattern) override {
+      return {false, pattern};
+    }
   };
 } // end anonymous namespace
 
