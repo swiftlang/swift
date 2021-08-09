@@ -1861,6 +1861,9 @@ WARNING(spi_attribute_on_import_of_public_module,none,
         (DeclName, StringRef))
 
 // Opaque return types
+ERROR(structural_opaque_types_are_experimental,none,
+      "'opaque' types cannot be nested inside other types; "
+      "structural 'opaque' types are an experimental feature", ())
 ERROR(opaque_type_invalid_constraint,none,
       "an 'opaque' type must specify only 'Any', 'AnyObject', protocols, "
       "and/or a base class", ())
