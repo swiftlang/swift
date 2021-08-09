@@ -1034,7 +1034,7 @@ static void checkAccessedAddress(Operand *memOper, StorageMap &Accesses) {
 
   // Some identifiable addresses can also be recognized as local initialization
   // or other patterns that don't qualify as formal access.
-  if (!isPossibleFormalAccessBase(storage, memInst->getFunction()))
+  if (!isPossibleFormalAccessStorage(storage, memInst->getFunction()))
     return;
 
   // A box or stack variable may represent lvalues, but they can only conflict
