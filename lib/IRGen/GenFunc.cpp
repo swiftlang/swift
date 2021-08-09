@@ -1275,8 +1275,6 @@ static llvm::Value *emitPartialApplicationForwarder(IRGenModule &IGM,
         FunctionPointer::Kind(
             FunctionPointer::BasicKind::AsyncFunctionPointer)));
 
-    subIGF.setupAsync(asyncContextIdx);
-
     //auto *calleeAFP = staticFnPtr->getDirectPointer();
     LinkEntity entity = LinkEntity::forPartialApplyForwarder(fwd);
     assert(!asyncFunctionPtr &&
