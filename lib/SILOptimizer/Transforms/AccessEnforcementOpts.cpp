@@ -428,7 +428,7 @@ BeginAccessInst *AccessConflictAndMergeAnalysis::findMergeableOutOfScopeAccess(
   auto identicalStorageIter = llvm::find_if(
       state.outOfScopeConflictFreeAccesses, [&](BeginAccessInst *bai) {
         auto storageInfo = result.getAccessInfo(bai);
-        return storageInfo.hasIdenticalBase(currStorageInfo);
+        return storageInfo.hasIdenticalStorage(currStorageInfo);
       });
   if (identicalStorageIter == state.outOfScopeConflictFreeAccesses.end())
     return nullptr;
@@ -484,7 +484,7 @@ void AccessConflictAndMergeAnalysis::insertOutOfScopeAccess(
   auto identicalStorageIter = llvm::find_if(
       state.outOfScopeConflictFreeAccesses, [&](BeginAccessInst *bai) {
         auto storageInfo = result.getAccessInfo(bai);
-        return storageInfo.hasIdenticalBase(currStorageInfo);
+        return storageInfo.hasIdenticalStorage(currStorageInfo);
       });
   if (identicalStorageIter == state.outOfScopeConflictFreeAccesses.end())
     state.outOfScopeConflictFreeAccesses.insert(beginAccess);
