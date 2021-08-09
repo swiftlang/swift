@@ -767,10 +767,9 @@ DisableImplicitConcurrencyImport("disable-implicit-concurrency-module-import",
                                  llvm::cl::desc("Disable implicit import of _Concurrency module"),
                                  llvm::cl::init(false));
 
-static llvm::cl::opt<bool> EnableExperimentalOpaqueReturnTypes(
-    "enable-experimental-opaque-return-types",
-    llvm::cl::desc(
-        "Enable experimental extensions to opaque return type support"),
+static llvm::cl::opt<bool> EnableExperimentalNamedOpaqueTypes(
+    "enable-experimental-named-opaque-types",
+    llvm::cl::desc("Enable experimental support for named opaque result types"),
     llvm::cl::Hidden, llvm::cl::cat(Category), llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
@@ -3875,8 +3874,8 @@ int main(int argc, char *argv[]) {
   if (options::DisableImplicitConcurrencyImport) {
     InitInvok.getLangOptions().DisableImplicitConcurrencyModuleImport = true;
   }
-  if (options::EnableExperimentalOpaqueReturnTypes) {
-    InitInvok.getLangOptions().EnableExperimentalOpaqueReturnTypes = true;
+  if (options::EnableExperimentalNamedOpaqueTypes) {
+    InitInvok.getLangOptions().EnableExperimentalNamedOpaqueTypes = true;
   }
 
   if (options::EnableExperimentalDistributed) {

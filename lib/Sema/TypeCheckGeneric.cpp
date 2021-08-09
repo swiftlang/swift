@@ -116,6 +116,14 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
   auto *dc = originatingDecl->getInnermostDeclContext();
   auto &ctx = dc->getASTContext();
 
+  // Support for structural opaque result types is hidden behind a compiler flag
+  // until the proposal gets approved.
+  if (!ctx.LangOpts.EnableExperimentalStructuralOpaqueTypes &&
+      !isa<OpaqueReturnTypeRepr>(repr)) {
+    ctx.Diags.diagnose(repr->getLoc(), diag::structural_opaque_types_are_experimental);
+    return nullptr;
+  }
+
   // Protocol requirements can't have opaque return types.
   //
   // TODO: Maybe one day we could treat this as sugar for an associated type.
@@ -136,8 +144,8 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
       out << "associatedtype " << placeholder << ": ";
       // FIXME [OPAQUE SUPPORT]: to produce the right associate type for the
       // replacement in general, we would need to recurse into the type repr and
-      // replace every `OpaqueReturnType` with its 'base'. Things get trickier
-      // when we allow named opaque return types.
+      // replace every `OpaqueReturnType` with its 'constraint'. Things get
+      // trickier when we allow named opaque return types.
       if (isa<OpaqueReturnTypeRepr>(repr)) {
         cast<OpaqueReturnTypeRepr>(repr)->getConstraint()->print(out);
       } else {
