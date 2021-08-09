@@ -5156,7 +5156,7 @@ public:
       return true;
 
     auto CancellationFlag = getASTContext().TypeCheckerOpts.CancellationFlag;
-    if (CancellationFlag && *CancellationFlag)
+    if (CancellationFlag && CancellationFlag->load(std::memory_order_relaxed))
       return true;
 
     auto used = getASTContext().getSolverMemory() + solutionMemory;

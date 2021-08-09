@@ -599,7 +599,7 @@ namespace swift {
     /// typechecking should be aborted at the next possible opportunity.
     /// This is used by SourceKit to cancel requests for which the result is no
     /// longer of interest.
-    std::shared_ptr<bool> CancellationFlag = nullptr;
+    std::shared_ptr<std::atomic<bool>> CancellationFlag = nullptr;
 
     /// If non-zero, abort the switch statement exhaustiveness checker if
     /// the Space::minus function is called more than this many times.
