@@ -255,7 +255,6 @@ void IRGenThunk::emit() {
     auto asyncContextIdx = Signature::forAsyncEntry(
                                IGF.IGM, origTy, /*useSpecialConvention*/ false)
                                .getAsyncContextIndex();
-    IGF.setupAsync(asyncContextIdx);
 
     auto entity = LinkEntity::forDispatchThunk(declRef);
     emitAsyncFunctionEntry(IGF, *asyncLayout, entity, asyncContextIdx);
