@@ -145,6 +145,26 @@ extension Unsafe${Mutable}RawBufferPointer: Sequence {
   public func makeIterator() -> Iterator {
     return Iterator(_position: _position, _end: _end)
   }
+
+  /// Copies the elements of `self` to the memory at `destination.baseAddress`,
+  /// stopping when either `self` or `destination` is exhausted.
+  ///
+  /// - Returns: an iterator over any remaining elements of `self` and the
+  ///   number of elements copied.
+  @inlinable // unsafe-performance
+  @_alwaysEmitIntoClient
+  public func _copyContents(
+    initializing destination: UnsafeMutableBufferPointer<UInt8>
+  ) -> (Iterator, UnsafeMutableBufferPointer<UInt8>.Index) {
+    guard let s = _position, let e = _end, e > s, !destination.isEmpty else {
+      return (makeIterator(), 0)
+    }
+    let destinationAddress = destination.baseAddress._unsafelyUnwrappedUnchecked
+    let d = UnsafeMutableRawPointer(destinationAddress)
+    let n = Swift.min(destination.count, self.count)
+    d.copyMemory(from: s, byteCount: n)
+    return (Iterator(_position: s.advanced(by: n), _end: e), n)
+  }
 }
 
 extension Unsafe${Mutable}RawBufferPointer: ${Mutable}Collection {
