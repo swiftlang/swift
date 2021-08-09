@@ -42,6 +42,9 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)testGetUTF8Contents;
 - (void)testGetASCIIContents;
 - (void)testRangeOfString;
+- (void)testRangeOfStringSpecificWithNeedle:(NSString *)needle
+                                   haystack:(NSString *)haystack
+                                          n:(NSInteger)n;
 - (void)testHash;
 - (void)testCompare;
 - (void)testCompare2;
