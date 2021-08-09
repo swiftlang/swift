@@ -54,9 +54,13 @@ static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal,
   switch (vars.size()) {
   case 0:
     if (!allowMissing) {
+      std::string fixIt = "var wrappedValue: <#Value#>";
+      auto fixitLocation = nominal->getBraces().Start;
       nominal->diagnose(diag::property_wrapper_no_value_property,
-                        nominal->getDeclaredType(), name);
+                        nominal->getDeclaredType(), name)
+        .fixItInsertAfter(fixitLocation, fixIt);
     }
+
     return nullptr;
 
   case 1:
