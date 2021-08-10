@@ -20,7 +20,6 @@
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Type.h"
-#include <cassert>
 
 namespace swift {
 
@@ -37,10 +36,16 @@ class PatternBindingDecl;
 class ProtocolConformance;
 class ValueDecl;
 
+
+/******************************************************************************/
+/********************* Distributed Actor Type Checking ************************/
+/******************************************************************************/
+
 // Diagnose an error if the _Distributed module is not loaded.
 bool ensureDistributedModuleLoaded(Decl *decl);
 
-/// Check distributed actor isolation rules.
+/// Check for illegal property declarations (e.g. re-declaring transport or id)
+void checkDistributedActorProperties(const ClassDecl *decl);
 
 /// The local and resolve distributed actor constructors have special rules to check.
 void checkDistributedActorConstructor(const ClassDecl *decl, ConstructorDecl *ctor);

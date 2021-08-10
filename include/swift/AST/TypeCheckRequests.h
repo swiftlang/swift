@@ -2250,6 +2250,24 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Checks if the _Distributed module is available.
+class DistributedModuleIsAvailableRequest
+    : public SimpleRequest<DistributedModuleIsAvailableRequest, bool(Decl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  bool evaluate(Evaluator &evaluator, Decl *decl) const;
+
+public:
+  // Cached.
+  bool isCached() const { return true; }
+};
+
 /// Computes an initializer context for a parameter with a default argument.
 class DefaultArgumentInitContextRequest
     : public SimpleRequest<DefaultArgumentInitContextRequest,

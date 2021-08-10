@@ -32,15 +32,23 @@ using namespace swift;
 // ==== ------------------------------------------------------------------------
 
 bool swift::ensureDistributedModuleLoaded(Decl *decl) {
-  fprintf(stderr, "[%s:%d] (%s) ensureDistributedModuleLoaded\n", __FILE__, __LINE__, __FUNCTION__);
   auto &C = decl->getASTContext();
-  if (!C.getLoadedModule(C.Id_Distributed)) {
-    // seems we're missing the _Distributed module, ask to import it explicitly
-    decl->diagnose(diag::distributed_actor_needs_explicit_distributed_import);
-    return false;
-  }
+  auto moduleAvailable = evaluateOrDefault(
+      C.evaluator, DistributedModuleIsAvailableRequest{decl}, false);
+  return moduleAvailable;
+}
 
-  return true;
+bool
+DistributedModuleIsAvailableRequest::evaluate(Evaluator &evaluator,
+                                              Decl *decl) const {
+  auto &C = decl->getASTContext();
+
+  if (C.getLoadedModule(C.Id_Distributed))
+    return true;
+
+  // seems we're missing the _Distributed module, ask to import it explicitly
+  decl->diagnose(diag::distributed_actor_needs_explicit_distributed_import);
+  return false;
 }
 
 // ==== ------------------------------------------------------------------------
@@ -50,7 +58,7 @@ bool IsDistributedActorRequest::evaluate(
   // Protocols are actors if they inherit from `DistributedActor`.
   if (auto protocol = dyn_cast<ProtocolDecl>(nominal)) {
     auto &ctx = protocol->getASTContext();
-    auto *distributedActorProtocol = ctx.getDistributedActorDecl(); // getProtocol(KnownProtocolKind::DistributedActor);
+    auto *distributedActorProtocol = ctx.getDistributedActorDecl();
     return (protocol == distributedActorProtocol ||
             protocol->inheritsFrom(distributedActorProtocol));
   }
@@ -141,14 +149,31 @@ bool swift::checkDistributedFunction(FuncDecl *func, bool diagnose) {
   return false;
 }
 
+void swift::checkDistributedActorProperties(const ClassDecl *decl) {
+  auto &C = decl->getASTContext();
+
+  for (auto member : decl->getMembers()) {
+    if (auto prop = dyn_cast<VarDecl>(member)) {
+      auto id = prop->getName();
+      if (id == C.Id_actorTransport ||
+          id == C.Id_id) {
+        prop->diagnose(diag::distributed_actor_user_defined_special_property,
+                      id);
+      }
+    }
+  }
+}
+
 void swift::checkDistributedActorConstructor(const ClassDecl *decl, ConstructorDecl *ctor) {
-  fprintf(stderr, "[%s:%d] (%s) checkDistributedActorConstructor\n", __FILE__, __LINE__, __FUNCTION__);
   // bail out unless distributed actor, only those have special rules to check here
   if (!decl->isDistributedActor())
     return;
 
   // Only designated initializers need extra checks
   if (!ctor->isDesignatedInit())
+    return;
+
+  if (!swift::ensureDistributedModuleLoaded(ctor))
     return;
 
   // === Designated initializers must accept exactly one ActorTransport
@@ -163,19 +188,12 @@ void swift::checkDistributedActorConstructor(const ClassDecl *decl, ConstructorD
   for (auto param : *ctor->getParameters()) {
     auto paramTy = ctor->mapTypeIntoContext(param->getInterfaceType());
     auto conformance = TypeChecker::conformsToProtocol(paramTy, protocolDecl, module);
-    fprintf(stderr, "[%s:%d] (%s) CHECKED CONFORMANCE\n", __FILE__, __LINE__, __FUNCTION__);
-    paramTy->dump();
-    protocolDecl->dump();
-    fprintf(stderr, "[%s:%d] (%s) IT IS VALID: %d\n", __FILE__, __LINE__, __FUNCTION__, !conformance.isInvalid());
 
     if (paramTy->isEqual(protocolTy) || !conformance.isInvalid()) {
       transportParamsCount += 1;
       transportParams.push_back(param);
     }
   }
-  // ok! We found exactly one transport parameter
-  if (transportParamsCount == 1)
-    return;
 
   // missing transport parameter
   if (transportParamsCount == 0) {
@@ -185,6 +203,10 @@ void swift::checkDistributedActorConstructor(const ClassDecl *decl, ConstructorD
     return;
   }
 
+  // ok! We found exactly one transport parameter
+  if (transportParamsCount == 1)
+    return;
+
   // TODO(distributed): could list exact parameters
   ctor->diagnose(diag::distributed_actor_designated_ctor_must_have_one_transport_param,
                  ctor->getName(), transportParamsCount);
@@ -192,15 +214,16 @@ void swift::checkDistributedActorConstructor(const ClassDecl *decl, ConstructorD
 
 // ==== ------------------------------------------------------------------------
 
-void TypeChecker::checkDistributedActor(const ClassDecl *decl) {
-  fprintf(stderr, "[%s:%d] (%s) CHECK DIST\n", __FILE__, __LINE__, __FUNCTION__);
-
-  auto mutableDecl = const_cast<ClassDecl*>(decl);
+void TypeChecker::checkDistributedActor(ClassDecl *decl) {
+  // ==== Ensure the _Distributed module is available,
+  // without it there's no reason to check the decl in more detail anyway.
+  if (!swift::ensureDistributedModuleLoaded(decl))
+    return;
 
   // ==== Constructors
   // --- Get the default initializer
   // If applicable, this will the default 'init(transport:)' initializer
-  (void)mutableDecl->getDefaultInitializer();
+  (void)decl->getDefaultInitializer();
 
   // --- Check all constructors
   for (auto member : decl->getMembers())
@@ -208,9 +231,12 @@ void TypeChecker::checkDistributedActor(const ClassDecl *decl) {
       checkDistributedActorConstructor(decl, ctor);
 
   // ==== Properties
-  // Synthesize properties
+  // --- Check for any illegal re-definitions
+  checkDistributedActorProperties(decl);
+
+  // --- Synthesize properties
   // TODO: those could technically move to DerivedConformance style
-  swift::addImplicitDistributedActorMembersToClass(mutableDecl);
+  swift::addImplicitDistributedActorMembersToClass(decl);
 
   // ==== Functions
 }

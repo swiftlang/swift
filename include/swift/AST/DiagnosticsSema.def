@@ -4589,6 +4589,10 @@ ERROR(distributed_actor_designated_ctor_missing_transport_param,none,
       "designated distributed actor initializer %0 is missing required "
       "ActorTransport parameter",
       (DeclName))
+ERROR(distributed_actor_user_defined_special_property,none,
+      "property %0 cannot be defined explicitly, as it conflicts with "
+      "distributed actor synthesized stored property",
+      (DeclName))
 ERROR(distributed_actor_independent_property_must_be_let,none,
       "_distributedActorIndependent can be applied to properties, however they must be 'let'",
       ())
