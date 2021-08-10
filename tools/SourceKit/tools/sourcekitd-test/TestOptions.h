@@ -114,6 +114,7 @@ struct TestOptions {
   bool CollectActionables = false;
   bool isAsyncRequest = false;
   bool timeRequest = false;
+  bool measureInstructions = false;
   bool DisableImplicitConcurrencyModuleImport = false;
   llvm::Optional<unsigned> CompletionCheckDependencyInterval;
   unsigned repeatRequest = 1;
