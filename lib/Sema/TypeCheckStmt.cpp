@@ -1421,21 +1421,7 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
 
     // Otherwise, complain.  Start with more specific diagnostics.
 
-    // Diagnose unused literals that were translated to implicit
-    // constructor calls during CSApply / ExprRewriter::convertLiteral.
-    if (call->isImplicit()) {
-      Expr *arg = call->getArg();
-      if (auto *TE = dyn_cast<TupleExpr>(arg))
-        if (TE->getNumElements() == 1)
-          arg = TE->getElement(0);
-
-      if (auto *LE = dyn_cast<LiteralExpr>(arg)) {
-        diagnoseIgnoredLiteral(Context, LE);
-        return;
-      }
-    }
-
-    // Other unused constructor calls.
+    // Diagnose unused constructor calls.
     if (callee && isa<ConstructorDecl>(callee) && !call->isImplicit()) {
       DE.diagnose(fn->getLoc(), diag::expression_unused_init_result,
                callee->getDeclContext()->getDeclaredInterfaceType())

@@ -875,28 +875,7 @@ constantFoldAndCheckIntegerConversions(BuiltinInst *BI,
 template<unsigned N>
 static bool tryExtractLiteralText(FloatLiteralInst *flitInst,
                                   SmallString<N> &fpStr) {
-
-  Expr *expr = flitInst->getLoc().getAsASTNode<Expr>();
-  if (!expr)
-    return false;
-
-  // 'expr' may not be a FloatLiteralExpr since 'flitInst' could have been
-  // created by the ConstantFolder by folding floating-point constructor calls.
-  // So we iterate through the sequence of folded constructors if any, and
-  // try to extract the FloatLiteralExpr.
-  while (auto *callExpr = dyn_cast<CallExpr>(expr)) {
-    if (callExpr->getNumArguments() != 1 ||
-         !dyn_cast<ConstructorRefCallExpr>(callExpr->getFn()))
-      break;
-
-    auto *tupleExpr = dyn_cast<TupleExpr>(callExpr->getArg());
-    if (!tupleExpr)
-      break;
-
-    expr = tupleExpr->getElement(0);
-  }
-
-  auto *flitExpr = dyn_cast<FloatLiteralExpr>(expr);
+  auto *flitExpr = flitInst->getLoc().getAsASTNode<FloatLiteralExpr>();
   if (!flitExpr)
     return false;
 
@@ -1074,27 +1053,8 @@ bool isLossyUnderflow(APFloat srcVal, BuiltinFloatType *srcType,
 /// This function determines whether the float literal in the given
 /// SIL instruction is specified using hex-float notation in the Swift source.
 bool isHexLiteralInSource(FloatLiteralInst *flitInst) {
-  Expr *expr = flitInst->getLoc().getAsASTNode<Expr>();
-  if (!expr)
-    return false;
-
-  // Iterate through a sequence of folded implicit constructors if any, and
-  // try to extract the FloatLiteralExpr.
-  while (auto *callExpr = dyn_cast<CallExpr>(expr)) {
-    if (!callExpr->isImplicit() || callExpr->getNumArguments() != 1 ||
-        !dyn_cast<ConstructorRefCallExpr>(callExpr->getFn()))
-      break;
-
-    auto *tupleExpr = dyn_cast<TupleExpr>(callExpr->getArg());
-    if (!tupleExpr)
-      break;
-
-    expr = tupleExpr->getElement(0);
-  }
-  auto *flitExpr = dyn_cast<FloatLiteralExpr>(expr);
-  if (!flitExpr)
-    return false;
-  return flitExpr->getDigitsText().startswith("0x");
+  auto *flitExpr = flitInst->getLoc().getAsASTNode<FloatLiteralExpr>();
+  return flitExpr && flitExpr->getDigitsText().startswith("0x");
 }
 
 bool maybeExplicitFPCons(BuiltinInst *BI, const BuiltinInfo &Builtin) {
