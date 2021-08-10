@@ -4626,8 +4626,6 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
       proto->getASTContext().Diags.diagnose(Loc, diag::type_does_not_conform,
                                             Adoptee,
                                             Proto->getDeclaredInterfaceType());
-      Adoptee->dump();
-      assert(false && "diag::type_does_not_conform");
       Conformance->setInvalid();
     }
     return;
@@ -5090,8 +5088,6 @@ void swift::diagnoseConformanceFailure(Type T,
 
   diags.diagnose(ComplainLoc, diag::type_does_not_conform,
                  T, Proto->getDeclaredInterfaceType());
-  T->dump();
-  assert(false && "diag::type_does_not_conform");
 }
 
 void ConformanceChecker::diagnoseOrDefer(

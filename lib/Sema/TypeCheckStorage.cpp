@@ -168,14 +168,6 @@ StoredPropertiesRequest::evaluate(Evaluator &evaluator,
       }
   }
 
-
-  if (auto classDecl = dyn_cast<ClassDecl>(decl)) {
-    if (classDecl->isDistributedActor()) {
-      fprintf(stderr, "[%s:%d] (%s) StoredPropertiesRequest::evaluate == count:%d \n", __FILE__, __LINE__, __FUNCTION__, results.size());
-      decl->dump();
-    }
-  }
-
   return decl->getASTContext().AllocateCopy(results);
 }
 
