@@ -595,6 +595,26 @@ private:
     createConjunction(cs, elements, switchLoc);
   }
 
+  void visitDoCatchStmt(DoCatchStmt *doStmt) {
+    if (!isSupportedMultiStatementClosure())
+      llvm_unreachable("Unsupported statement: DoCatch");
+
+    auto *doLoc = cs.getConstraintLocator(
+        locator, LocatorPathElt::ClosureBodyElement(doStmt));
+
+    SmallVector<ElementInfo, 4> elements;
+
+    // First, let's record a body of `do` statement.
+    elements.push_back(makeElement(doStmt->getBody(), doLoc));
+
+    // After that has been type-checked, let's switch to
+    // individual `catch` statements.
+    for (auto *catchStmt : doStmt->getCatches())
+      elements.push_back(makeElement(catchStmt, doLoc));
+
+    createConjunction(cs, elements, doLoc);
+  }
+
   void visitCaseStmt(CaseStmt *caseStmt) {
     if (!isSupportedMultiStatementClosure())
       llvm_unreachable("Unsupported statement: Case");
@@ -705,7 +725,6 @@ private:
       llvm_unreachable("Unsupported statement kind " #STMT);          \
   }
   UNSUPPORTED_STMT(Yield)
-  UNSUPPORTED_STMT(DoCatch)
   UNSUPPORTED_STMT(Fail)
 #undef UNSUPPORTED_STMT
 
@@ -1055,6 +1074,18 @@ private:
     return switchStmt;
   }
 
+  ASTNode visitDoCatchStmt(DoCatchStmt *doStmt) {
+    // Translate the body.
+    auto newBody = visit(doStmt->getBody());
+    doStmt->setBody(newBody.get<Stmt *>());
+
+    // Visit the catch blocks.
+    for (auto catchStmt : doStmt->getCatches())
+      visitCaseStmt(catchStmt);
+
+    return doStmt;
+  }
+
   ASTNode visitCaseStmt(CaseStmt *caseStmt) {
     // Translate the patterns and guard expressions for each case label item.
     for (auto &caseItem : caseStmt->getMutableCaseLabelItems()) {
@@ -1159,7 +1190,6 @@ private:
       llvm_unreachable("Unsupported statement kind " #STMT);          \
   }
   UNSUPPORTED_STMT(Yield)
-  UNSUPPORTED_STMT(DoCatch)
   UNSUPPORTED_STMT(Fail)
 #undef UNSUPPORTED_STMT
 
