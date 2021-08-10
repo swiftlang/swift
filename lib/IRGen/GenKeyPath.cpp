@@ -678,7 +678,10 @@ emitMetadataTypeRefForKeyPath(IRGenModule &IGM, CanType type,
   // Mask the bottom bit to tell the key path runtime this is a mangled name
   // rather than a direct reference.
   auto bitConstant = llvm::ConstantInt::get(IGM.IntPtrTy, 1);
-  return llvm::ConstantExpr::getGetElementPtr(nullptr, constant, bitConstant);
+  return llvm::ConstantExpr::getGetElementPtr(
+      cast<llvm::PointerType>(constant->getType()->getScalarType())
+          ->getElementType(),
+      constant, bitConstant);
 }
 
 static unsigned getClassFieldIndex(ClassDecl *classDecl, VarDecl *property) {
