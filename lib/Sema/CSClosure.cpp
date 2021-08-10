@@ -569,6 +569,32 @@ private:
     createConjunction(cs, elements, locator);
   }
 
+  void visitSwitchStmt(SwitchStmt *switchStmt) {
+    if (!isSupportedMultiStatementClosure())
+      llvm_unreachable("Unsupported statement: Switch");
+
+    auto *switchLoc = cs.getConstraintLocator(
+        locator, LocatorPathElt::ClosureBodyElement(switchStmt));
+
+    SmallVector<ElementInfo, 4> elements;
+    {
+      auto *subjectExpr = switchStmt->getSubjectExpr();
+      {
+        elements.push_back(makeElement(subjectExpr, switchLoc));
+
+        SolutionApplicationTarget target(subjectExpr, closure, CTP_Unused,
+                                         Type(), /*isDiscarded=*/false);
+
+        cs.setSolutionApplicationTarget(switchStmt, target);
+      }
+
+      for (auto rawCase : switchStmt->getRawCases())
+        elements.push_back(makeElement(rawCase, switchLoc));
+    }
+
+    createConjunction(cs, elements, switchLoc);
+  }
+
   void visitCaseStmt(CaseStmt *caseStmt) {
     if (!isSupportedMultiStatementClosure())
       llvm_unreachable("Unsupported statement: Case");
@@ -680,7 +706,6 @@ private:
   }
   UNSUPPORTED_STMT(Yield)
   UNSUPPORTED_STMT(DoCatch)
-  UNSUPPORTED_STMT(Switch)
   UNSUPPORTED_STMT(Fail)
 #undef UNSUPPORTED_STMT
 
@@ -994,6 +1019,42 @@ private:
     return forEachStmt;
   }
 
+  ASTNode visitSwitchStmt(SwitchStmt *switchStmt) {
+    ConstraintSystem &cs = solution.getConstraintSystem();
+
+    // Rewrite the switch subject.
+    auto subjectTarget =
+        rewriteTarget(*cs.getSolutionApplicationTarget(switchStmt));
+    if (subjectTarget) {
+      switchStmt->setSubjectExpr(subjectTarget->getAsExpr());
+    } else {
+      hadError = true;
+    }
+
+    // Visit the raw cases.
+    bool limitExhaustivityChecks = false;
+    for (auto rawCase : switchStmt->getRawCases()) {
+      if (auto decl = rawCase.dyn_cast<Decl *>()) {
+        visitDecl(decl);
+        continue;
+      }
+
+      auto caseStmt = cast<CaseStmt>(rawCase.get<Stmt *>());
+      visitCaseStmt(caseStmt);
+
+      // Check restrictions on '@unknown'.
+      if (caseStmt->hasUnknownAttr()) {
+        checkUnknownAttrRestrictions(cs.getASTContext(), caseStmt,
+                                     limitExhaustivityChecks);
+      }
+    }
+
+    TypeChecker::checkSwitchExhaustiveness(switchStmt, closure,
+                                           limitExhaustivityChecks);
+
+    return switchStmt;
+  }
+
   ASTNode visitCaseStmt(CaseStmt *caseStmt) {
     // Translate the patterns and guard expressions for each case label item.
     for (auto &caseItem : caseStmt->getMutableCaseLabelItems()) {
@@ -1099,7 +1160,6 @@ private:
   }
   UNSUPPORTED_STMT(Yield)
   UNSUPPORTED_STMT(DoCatch)
-  UNSUPPORTED_STMT(Switch)
   UNSUPPORTED_STMT(Fail)
 #undef UNSUPPORTED_STMT
 
