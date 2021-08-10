@@ -1248,10 +1248,6 @@
           "moduleName": "cake",
           "genericSig": "<τ_0_0 where τ_0_0 : cake.PSuper>",
           "sugared_genericSig": "<Self where Self : cake.PSuper>",
-          "intro_Macosx": "10.15",
-          "intro_iOS": "13",
-          "intro_tvOS": "13",
-          "intro_watchOS": "6",
           "funcSelfKind": "NonMutating"
         }
       ],

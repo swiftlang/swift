@@ -1135,10 +1135,6 @@
           "usr": "s:4cake6PSuperPAAE9futureFooyyF",
           "moduleName": "cake",
           "genericSig": "<Self where Self : cake.PSuper>",
-          "intro_Macosx": "10.15",
-          "intro_iOS": "13",
-          "intro_tvOS": "13",
-          "intro_watchOS": "6",
           "funcSelfKind": "NonMutating"
         }
       ],
