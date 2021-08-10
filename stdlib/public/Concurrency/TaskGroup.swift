@@ -599,6 +599,20 @@ public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
     return try await _taskGroupWaitNext(group: _group)
   }
 
+  @_silgen_name("$sScg10nextResults0B0Oyxq_GSgyYaKF")
+  @usableFromInline
+  mutating func nextResultForABI() async throws -> Result<ChildTaskResult, Failure>? {
+    do {
+      guard let success: ChildTaskResult = try await _taskGroupWaitNext(group: _group) else {
+        return nil
+      }
+
+      return .success(success)
+    } catch {
+      return .failure(error as! Failure) // as!-safe, because we are only allowed to throw Failure (Error)
+    }
+  }
+
   /// Wait for the next child task to complete,
   /// and return a result containing either
   /// the value that the child task returned or the error that it threw.
@@ -632,16 +646,9 @@ public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
   ///   containing the error that the child task threw.
   ///
   /// - SeeAlso: `next()`
-  public mutating func nextResult() async throws -> Result<ChildTaskResult, Failure>? {
-    do {
-      guard let success: ChildTaskResult = try await _taskGroupWaitNext(group: _group) else {
-        return nil
-      }
-
-      return .success(success)
-    } catch {
-      return .failure(error as! Failure) // as!-safe, because we are only allowed to throw Failure (Error)
-    }
+  @_alwaysEmitIntoClient
+  public mutating func nextResult() async -> Result<ChildTaskResult, Failure>? {
+    return try! await nextResultForABI()
   }
 
   /// A Boolean value that indicates whether the group has any remaining tasks.
