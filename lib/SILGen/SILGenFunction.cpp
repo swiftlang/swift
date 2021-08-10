@@ -510,42 +510,49 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
 void SILGenFunction::emitFunction(FuncDecl *fd) {
   MagicFunctionName = SILGenModule::getMagicFunctionName(fd);
 
-  if (fd->isDistributedActorFactory()) {
-    emitDistributedActorFactory(fd);
-    return;
-  }
-
   auto captureInfo = SGM.M.Types.getLoweredLocalCaptures(SILDeclRef(fd));
   emitProfilerIncrement(fd->getTypecheckedBody());
   emitProlog(captureInfo, fd->getParameters(), fd->getImplicitSelfDecl(), fd,
              fd->getResultInterfaceType(), fd->hasThrows(), fd->getThrowsLoc());
   prepareEpilog(true, fd->hasThrows(), CleanupLocation(fd));
 
-  if (llvm::any_of(
-          *fd->getParameters(),
-          [](ParamDecl *p){ return p->hasAttachedPropertyWrapper(); })) {
-    // If any parameters have property wrappers, emit the local auxiliary
-    // variables before emitting the function body.
-    LexicalScope BraceScope(*this, CleanupLocation(fd));
-    for (auto *param : *fd->getParameters()) {
-      param->visitAuxiliaryDecls([&](VarDecl *auxiliaryVar) {
-        SILLocation WrapperLoc(auxiliaryVar);
-        WrapperLoc.markAsPrologue();
-        if (auto *patternBinding = auxiliaryVar->getParentPatternBinding())
-          visitPatternBindingDecl(patternBinding);
-
-        visit(auxiliaryVar);
-      });
-    }
-
-    emitStmt(fd->getTypecheckedBody());
+  if (fd->isDistributedActorFactory()) {
+    // Synthesize the factory function body
+    emitDistributedActorFactory(fd);
   } else {
-    emitStmt(fd->getTypecheckedBody());
+    // Emit the actual function body as usual
+    if (llvm::any_of(
+            *fd->getParameters(),
+            [](ParamDecl *p){ return p->hasAttachedPropertyWrapper(); })) {
+      // If any parameters have property wrappers, emit the local auxiliary
+      // variables before emitting the function body.
+      LexicalScope BraceScope(*this, CleanupLocation(fd));
+      for (auto *param : *fd->getParameters()) {
+        param->visitAuxiliaryDecls([&](VarDecl *auxiliaryVar) {
+          SILLocation WrapperLoc(auxiliaryVar);
+          WrapperLoc.markAsPrologue();
+          if (auto *patternBinding = auxiliaryVar->getParentPatternBinding())
+            visitPatternBindingDecl(patternBinding);
+
+          visit(auxiliaryVar);
+        });
+      }
+
+      emitStmt(fd->getTypecheckedBody());
+    } else {
+      emitStmt(fd->getTypecheckedBody());
+    }
   }
 
   emitEpilog(fd);
 
   mergeCleanupBlocks();
+
+  if (fd->isDistributedActorFactory()) {
+    fprintf(stderr, "[%s:%d] (%s) DONEDONEDONEDONEDONEDONEDONEDONEDONEDONEDONEDONE\n", __FILE__, __LINE__, __FUNCTION__);
+    F.dump();
+    fprintf(stderr, "[%s:%d] (%s) DONEDONEDONEDONEDONEDONEDONEDONEDONEDONEDONEDONE\n", __FILE__, __LINE__, __FUNCTION__);
+  }
 }
 
 void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {

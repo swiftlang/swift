@@ -2196,7 +2196,6 @@ namespace {
         // distributed actor, in which case we need to diagnose it.
         if (auto classDecl = dyn_cast<ClassDecl>(member->getDeclContext())) {
           if (classDecl->isDistributedActor()) {
-            fprintf(stderr, "[%s:%d] (%s) HERE\n", __FILE__, __LINE__, __FUNCTION__);
             ctx.Diags.diagnose(memberLoc, diag::distributed_actor_isolated_method);
             noteIsolatedActorMember(member, context);
             return true;

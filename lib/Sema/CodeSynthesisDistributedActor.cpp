@@ -31,19 +31,19 @@
 using namespace swift;
 
 /******************************************************************************/
-/******************************* INITIALIZERS *********************************/
+/******************************* RESOLVE FUNCTION *****************************/
 /******************************************************************************/
 
 /// Synthesizes the
 ///
 /// \verbatim
-/// actor A {
-///   static resolve(_ address: ActorAddress,
-///                  using transport: ActorTransport) throws -> Self
+/// static resolve(_ address: ActorAddress,
+///                using transport: ActorTransport) throws -> Self {
+///   <filled in by SILGenDistributed>
 /// }
 /// \endverbatim
 ///
-/// factory function in the AST, with an empty body. It's body is
+/// factory function in the AST, with an empty body. Its body is
 /// expected to be filled-in during SILGen.
 static void addFactoryResolveFunction(ClassDecl *decl) {
   assert(decl->isDistributedActor());
@@ -62,11 +62,11 @@ static void addFactoryResolveFunction(ClassDecl *decl) {
   auto addressType = C.getAnyActorIdentityDecl()->getDeclaredInterfaceType();
   auto transportType = C.getActorTransportDecl()->getDeclaredInterfaceType();
 
-  // (_ id: AnyActorAddress, using transport: ActorTransport)
+  // (_ identity: AnyActorIdentity, using transport: ActorTransport)
   auto *params = ParameterList::create(
       C,
       /*LParenLoc=*/SourceLoc(),
-      /*params=*/{  mkParam(Identifier(), C.Id_id, addressType),
+      /*params=*/{  mkParam(Identifier(), C.Id_identity, addressType),
                     mkParam(C.Id_using, C.Id_transport, transportType)
                   },
       /*RParenLoc=*/SourceLoc()
@@ -75,7 +75,7 @@ static void addFactoryResolveFunction(ClassDecl *decl) {
   // Func name: resolve(_:using:)
   DeclName name(C, C.Id_resolve, params);
 
-  // Expected type: (Self) -> (ActorAddress, ActorTransport) throws -> (Self)
+  // Expected type: (Self) -> (AnyActorIdentity, ActorTransport) throws -> (Self)
   auto *factoryDecl =
       FuncDecl::createImplicit(C, StaticSpellingKind::KeywordStatic,
                                name, SourceLoc(),
@@ -86,11 +86,15 @@ static void addFactoryResolveFunction(ClassDecl *decl) {
                                /*returnType*/decl->getDeclaredInterfaceType(),
                                decl);
 
-  factoryDecl->setDistributedActorFactory();
+  factoryDecl->setDistributedActorFactory(); // TODO(distributed): should we mark this specifically as the resolve factory?
   factoryDecl->copyFormalAccessFrom(decl, /*sourceIsParentContext=*/true);
 
   decl->addMember(factoryDecl);
 }
+
+/******************************************************************************/
+/***************************** DEFAULT INITIALIZER ****************************/
+/******************************************************************************/
 
 /// Synthesizes an empty body of the `init(transport:)` initializer as:
 ///

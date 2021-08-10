@@ -48,8 +48,11 @@ public protocol DistributedActor:
     ///
     /// - Parameter identity: identity uniquely identifying a, potentially remote, actor in the system
     /// - Parameter transport: `transport` which should be used to resolve the `identity`, and be associated with the returned actor
-    static func resolve<Identity>(_ identity: Identity, using transport: ActorTransport)
-      throws -> Self where Identity: ActorIdentity
+// FIXME: move to generic identity here; depends on
+//    static func resolve<Identity>(_ identity: Identity, using transport: ActorTransport)
+//      throws -> Self where Identity: ActorIdentity
+    static func resolve(_ identity: AnyActorIdentity, using transport: ActorTransport)
+      throws -> Self
 
     /// The `ActorTransport` associated with this actor.
     /// It is immutable and equal to the transport passed in the local/resolve

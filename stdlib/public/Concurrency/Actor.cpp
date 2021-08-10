@@ -1752,33 +1752,23 @@ void swift::swift_defaultActor_deallocateResilient(HeapObject *actor) {
                       metadata->getInstanceAlignMask());
 }
 
-// TODO: rename initialize to allocate throughout htis built-in. Delete `swift_distributedActor_remote_create` throughout.
-OpaqueValue* swift::swift_distributedActor_remote_initialize(Metadata *actorType) {
+OpaqueValue*
+swift::swift_distributedActor_remote_initialize(const Metadata *actorType) {
   auto *classMetadata = actorType->getClassObject();
 
-  // TODOs:
-  //  1. make this allocation smaller
-  //  2. if we are going to keep the remote flag in the header,
-  //     allocate that header and mark / register this as being remote instance.
-
+  // TODO(distributed): make this allocation smaller
   HeapObject *alloc = swift_allocObject(classMetadata,
                            classMetadata->getInstanceSize(),
                            classMetadata->getInstanceAlignMask());
 
+  // TODO(distributed): if we are going to keep the remote flag in the header,
+  //                    allocate that header and mark / register this as being remote instance.
+
   return reinterpret_cast<OpaqueValue*>(alloc);
 }
 
-// TODO: missing implementation of creating a proxy for the remote actor
-OpaqueValue* swift::swift_distributedActor_remote_create(OpaqueValue *identity,
-                                                         OpaqueValue *transport) {
-  assert(false && "swift_distributedActor_remote_create is not implemented yet!");
-}
-
-void swift::swift_distributedActor_destroy(DefaultActor *_actor) { // FIXME: remove distributed C++ impl not needed?
-  // TODO: need to resign the address before we destroy:
-  //       something like: actor.transport.resignIdentity(actor.address)
-
-  // FIXME: if this is a proxy, we would destroy a bit differently I guess? less memory was allocated etc.
+void swift::swift_distributedActor_destroy(DefaultActor *_actor) {
+  // FIXME(distributed): if this is a proxy, we would destroy a bit differently I guess? less memory was allocated etc.
   asImpl(_actor)->destroy(); // today we just replicate what defaultActor_destroy does
 }
 
@@ -1786,7 +1776,7 @@ bool swift::swift_distributed_actor_is_remote(DefaultActor *_actor) {
   return asImpl(_actor)->isDistributedRemote();
 }
 
-/// FIXME: only exists for the quick-and-dirty MainActor implementation.
+/// FIXME: only exists for the quick-and-dirtraKASASAasasy MainActor implementation.
 namespace swift {
   Metadata* MainActorMetadata = nullptr;
 }
