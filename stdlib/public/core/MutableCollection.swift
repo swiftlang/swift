@@ -182,16 +182,31 @@ where SubSequence: MutableCollection
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R?
 
-  /// Call `body(p)`, where `p` is a pointer to the collection's
-  /// mutable contiguous storage.  If no such storage exists, it is
-  /// first created.  If the collection does not support an internal
-  /// representation in a form of mutable contiguous storage, `body` is not
-  /// called and `nil` is returned.
+  /// Executes a closure on the collection's contiguous storage.
+  ///
+  /// This method calls `body(p)`, where `p` is a pointer to the collection’s
+  /// contiguous storage. If no such storage exists, the collection creates it.
+  /// If the collection doesn’t support an internal representation in a form of
+  /// contiguous storage, the method doesn’t call `body` and returns `nil`.
   ///
   /// Often, the optimizer can eliminate bounds- and uniqueness-checks
   /// within an algorithm, but when that fails, invoking the
-  /// same algorithm on `body`\ 's argument lets you trade safety for
+  /// same algorithm on `body`'s argument lets you trade safety for
   /// speed.
+  ///
+  /// Successive calls to this method do not necessarily provide the same
+  /// pointer every time.
+  ///
+  /// This method makes no gurantees about the state of the collection if
+  /// the closure throws an error. Any changes made before the throw may
+  /// or may not be reflected in the collection. This is because the closure
+  /// could receive direct access to the collection's internal storage, or a
+  /// temporary copy. Therefore, the closure should always provide any necessary
+  /// cleanup.
+  ///
+  /// - Parameter body: A closure that receives an in-out
+  /// `UnsafeMutableBufferPointer` to the first element in the collection's
+  /// contiguous storage.
   mutating func withContiguousMutableStorageIfAvailable<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R?
