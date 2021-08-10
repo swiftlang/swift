@@ -69,22 +69,22 @@ public let ObjectiveCBridgingStubs = [
   BenchmarkInfo(name: "ObjectiveCBridgeStringGetUTF8Contents",
     runFunction: run_ObjectiveCBridgeStringGetUTF8Contents, tags: ts,
     setUpFunction: setup_StringBridgeBenchmark),
-  BenchmarkInfo(name: "ObjectiveCBridgeStringRangeOfString",
+  BenchmarkInfo(name: "ObjectiveCBridgeStringRangeOfString", //should be BridgeString.find.mixed
     runFunction: run_ObjectiveCBridgeStringRangeOfString, tags: ts,
     setUpFunction: setup_StringBridgeBenchmark),
-  BenchmarkInfo(name: "ObjectiveCBridgeStringRangeOfStringAllSwift",
+  BenchmarkInfo(name: "BridgeString.find.native",
     runFunction: run_ObjectiveCBridgeStringRangeOfStringAllSwift, tags: bs,
     setUpFunction: setup_SpecificRangeOfStringBridging),
-  BenchmarkInfo(name: "ObjectiveCBridgeStringRangeOfStringAllSwiftNonASCII",
+  BenchmarkInfo(name: "BridgeString.find.native.nonASCII",
     runFunction: run_ObjectiveCBridgeStringRangeOfStringAllSwiftNonASCII, tags: bs,
     setUpFunction: setup_SpecificRangeOfStringBridging),
-  BenchmarkInfo(name: "ObjectiveCBridgeStringRangeOfStringAllSwiftLongHaystack",
+  BenchmarkInfo(name: "BridgeString.find.native.long",
     runFunction: run_ObjectiveCBridgeStringRangeOfStringAllSwiftLongHaystack, tags: bs,
     setUpFunction: setup_SpecificRangeOfStringBridging),
-  BenchmarkInfo(name: "ObjectiveCBridgeStringRangeOfStringAllSwiftLongHaystackLongNeedle",
+  BenchmarkInfo(name: "BridgeString.find.native.longBoth",
     runFunction: run_ObjectiveCBridgeStringRangeOfStringAllSwiftLongHaystackLongNeedle, tags: bs,
     setUpFunction: setup_SpecificRangeOfStringBridging),
-  BenchmarkInfo(name: "ObjectiveCBridgeStringRangeOfStringAllSwiftLongHaystackNonASCII",
+  BenchmarkInfo(name: "BridgeString.find.native.longNonASCII",
     runFunction: run_ObjectiveCBridgeStringRangeOfStringAllSwiftLongHaystackNonASCII, tags: bs,
     setUpFunction: setup_SpecificRangeOfStringBridging),
   BenchmarkInfo(name: "ObjectiveCBridgeStringHash",
@@ -433,7 +433,7 @@ func run_rangeOfStringSpecific(needle: String, haystack: String, N: Int) {
 
 @inline(never)
 public func run_ObjectiveCBridgeStringRangeOfStringAllSwift(N: Int) {
-  run_rangeOfStringSpecific(needle: "y", haystack: "The quick brown fox jumps over the lazy dog", N: N)
+  run_rangeOfStringSpecific(needle: "y", haystack: "The quick brown fox jumps over the lazy dog", N: 100 * N)
 }
 
 var longNativeASCII: String! = nil
@@ -457,7 +457,7 @@ public func run_ObjectiveCBridgeStringRangeOfStringAllSwiftLongHaystackNonASCII(
 
 @inline(never)
 public func run_ObjectiveCBridgeStringRangeOfStringAllSwiftNonASCII(N: Int) {
-  run_rangeOfStringSpecific(needle: "ü", haystack: "The quick brown fox jump over the lazy dogü", N: N)
+  run_rangeOfStringSpecific(needle: "ü", haystack: "The quick brown fox jump over the lazy dogü", N: 100 * N)
 }
 
 @inline(never)
