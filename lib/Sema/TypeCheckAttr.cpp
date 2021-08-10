@@ -1903,7 +1903,9 @@ synthesizeMainBody(AbstractFunctionDecl *fn, void *arg) {
                                                       DeclNameLoc(),
                                                       /*implicit=*/true);
     funcExpr->setType(runner->getInterfaceType());
-    auto *callExpr = CallExpr::createImplicit(context, funcExpr, memberRefExpr, {});
+    auto *argList =
+        ArgumentList::forImplicitUnlabeled(context, {memberRefExpr});
+    auto *callExpr = CallExpr::createImplicit(context, funcExpr, argList);
     returnedExpr = callExpr;
   } else if (mainFunction->hasThrows()) {
     auto *tryExpr = new (context) TryExpr(
@@ -3044,9 +3046,9 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
     }
 
     // Diagnose and ignore arguments.
-    if (attr->getArg()) {
+    if (attr->hasArgs()) {
       diagnose(attr->getLocation(), diag::result_builder_arguments)
-        .highlight(attr->getArg()->getSourceRange());
+        .highlight(attr->getArgs()->getSourceRange());
     }
 
     // Complain if this isn't the primary result-builder attribute.

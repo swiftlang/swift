@@ -76,10 +76,8 @@ createCall_DistributedActor_transport_assignIdentity(ASTContext &C,
                                               SourceLoc(), param);
 
   // Full bound self.assignIdentity(Self.self) call
-  Expr *args[1] = {dotSelfTypeExpr};
-  Identifier argLabels[1] = {Identifier()};
-  return CallExpr::createImplicit(C, unboundCall, C.AllocateCopy(args),
-                                  C.AllocateCopy(argLabels));
+  auto *argList = ArgumentList::forImplicitUnlabeled(C, {dotSelfTypeExpr});
+  return CallExpr::createImplicit(C, unboundCall, argList);
 }
 
 
@@ -106,10 +104,8 @@ createCall_DistributedActor_transport_actorReady(ASTContext &C,
                                                         paramList);
 
   // Full bound transport.actorReady(self) call
-  Expr *args[1] = {initalizedSelf};
-  Identifier argLabels[1] = {Identifier()};
-  return CallExpr::createImplicit(C, unboundCall, C.AllocateCopy(args),
-                                  C.AllocateCopy(argLabels));
+  auto *argList = ArgumentList::forImplicitUnlabeled(C, {initalizedSelf});
+  return CallExpr::createImplicit(C, unboundCall, argList);
 }
 
 /// Synthesizes the body of the `init(transport:)` initializer as:
@@ -515,9 +511,9 @@ static void addImplicitResignIdentity(ClassDecl *decl) {
   auto *resignFuncRefRef = UnresolvedDotExpr::createImplicit(
       C, varTransportExpr, C.Id_resignIdentity, paramList);
 
+  auto *argList = ArgumentList::forImplicitUnlabeled(C, {varIdExpr});
   Expr *resignIdentityCall = CallExpr::createImplicit(C, resignFuncRefRef,
-                                                     { varIdExpr },
-                                                     { Identifier() });
+                                                      argList);
   statements.push_back(resignIdentityCall);
 
   BraceStmt *newBody = BraceStmt::create(C, SourceLoc(), statements, SourceLoc(),
@@ -689,8 +685,9 @@ synthesizeRemoteFuncStubBody(AbstractFunctionDecl *func, void *context) {
   column->setType(uintType);
   column->setBuiltinInitializer(uintInit);
 
-  auto *call = CallExpr::createImplicit(
-      ctx, ref, { className, funcName, file, line, column }, {});
+  auto *argList = ArgumentList::forImplicitUnlabeled(
+      ctx, {className, funcName, file, line, column});
+  auto *call = CallExpr::createImplicit(ctx, ref, argList);
   call->setType(ctx.getNeverType());
   call->setThrows(false);
 
