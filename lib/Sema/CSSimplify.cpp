@@ -4985,37 +4985,38 @@ bool ConstraintSystem::repairFailures(
 
 ConstructorDecl *ConstraintSystem::implicitConversionAvailable(Type fromType, Type toType) {
 #if 01 // Determine implicit conversions from init(implicit:) constructors
-  static bool trace = false;
-  if (trace) {
-    fprintf(stderr, "\n\nFROM  %p ", fromType.getPointer());
-    fromType->dump();
-    fprintf(stderr, "TO %p ", toType.getPointer());
-    toType->dump();
-  }
+  static int called = 0;
+  static const char *from = 0 ? "\nFROM" : nullptr;
+  auto trace = [](const char *prefix, Type ty) {
+    if (!from)
+      return;
+    if (prefix == from)
+      called++;
+    fprintf(stderr, prefix == from ? "%s %p #%d " :  "%s %p ",
+            prefix, ty.getPointer(), called);
+    ty->dump();
+  };
+  trace(from, fromType);
+  trace("TO", toType);
   if (NominalTypeDecl *toNominal = toType->getAnyNominal()) {
     auto &ctx = getASTContext();
     if (!toNominal->setConversionsComputed()) {
       auto implicitArgId = ctx.Id_implicit;
+      int arged = 0;
       for (ExtensionDecl *extension : toNominal->getExtensions()) {
         Type extType = extension->getDeclaredInterfaceType()->getCanonicalType();
-        int arged = 0;
         for (Decl *member : extension->getMembers())
           if (ConstructorDecl *initDecl = dyn_cast<ConstructorDecl>(member)) {
             ParameterList *parameters = initDecl->getParameters();
             if (parameters->size() == 1 &&
                 parameters->get(0)->getBaseName() == implicitArgId) {
-              Type fromType = parameters->get(0)->getType()->getCanonicalType();
-              if (trace) {
-                if (!arged++) {
-                  fprintf(stderr, "\nEXT %p ", extType.getPointer());
-                  extType->dump();
-                }
-                fprintf(stderr, "ARG %p ", fromType.getPointer());
-                fromType->dump();
-              }
+              Type argType = parameters->get(0)->getType()->getCanonicalType();
+              if (!arged++)
+                trace("\nEXT", extType);
+              trace(" ARG", argType);
               initDecl->getResultInterfaceType();
               (*ctx.implicitConversionsTo(extType->getAnyNominal(),
-                /*create*/true))[fromType->getAnyNominal()].push_back(initDecl);
+                /*create*/true))[argType->getAnyNominal()].push_back(initDecl);
             }
           }
       }
@@ -5025,18 +5026,14 @@ ConstructorDecl *ConstraintSystem::implicitConversionAvailable(Type fromType, Ty
         if (ExtensionDecl *ext = dyn_cast<ExtensionDecl>(initDecl->getParent()))
           if (Type argType = initDecl->getParameters()->get(0)->getType())
             if (Type extType = initDecl->getResultInterfaceType()) {
+              extType = initDecl->getParent()->mapTypeIntoContext(extType);
               // More rigourous check of conversion here...
-              if (trace) {
-                fprintf(stderr, "ARG2 %p ", argType.getPointer());
-                argType->getCanonicalType()->dump();
-                fprintf(stderr, "EXT2 %p ", argType.getPointer());
-                extType->getCanonicalType()->dump();
-              }
+              trace("EXT2", extType);
+              trace("ARG2", argType);
               if (argType->getCanonicalType() == fromType->getCanonicalType() ||
                   (extType->isUnsafeRawPointer() &&
                    (fromType->isUnsafeMutablePointer() || fromType->isUnsafePointer()))) {
-                if (trace)
-                  fprintf(stderr, "SELECTED\n");
+                trace("SELECTED", initDecl->getInterfaceType());
                 return initDecl;
               }
             }
@@ -5405,7 +5402,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         }
       }
 
-      if (kind >= ConstraintKind::Subtype &&
+#if 0
+      if (0 && kind >= ConstraintKind::Subtype &&
           nominal1->getDecl() != nominal2->getDecl() &&
           ((nominal1->isCGFloatType() || nominal2->isCGFloatType()) &&
            (nominal1->isDouble() || nominal2->isDouble())) ||
@@ -5483,13 +5481,14 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
               return false;
             })) {
           conversionsOrFixes.push_back(
-              desugar1->isCGFloatType()
-                  ? ConversionRestrictionKind::CGFloatToDouble :
-              desugar2->isCGFloatType()
-                  ? ConversionRestrictionKind::DoubleToCGFloat :
+//              desugar1->isCGFloatType()
+//                  ? ConversionRestrictionKind::CGFloatToDouble :
+//              desugar2->isCGFloatType()
+//                  ? ConversionRestrictionKind::DoubleToCGFloat :
                     ConversionRestrictionKind::ImplicitConversion);
         }
       }
+#endif
 
       break;
     }

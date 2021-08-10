@@ -6909,11 +6909,15 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                         ConstraintLocator::ApplyFunction,
                         ConstraintLocator::ConstructorMember}));
 
-        if (implicitConstructor) // Hack overload to constructor for implicit
-          overload.choice = OverloadChoice(toType, implicitConstructor,
-                                           overload.choice.getFunctionRefKind());
-
-        solution.overloadChoices.insert({memberLoc, overload});
+        if (implicitConstructor) { // Hack overload to constructor for implicits
+          SelectedOverload implicitOverload = {
+            OverloadChoice(toType, implicitConstructor,
+                           overload.choice.getFunctionRefKind()),
+            overload.openedFullType, overload.openedType, overload.boundType};
+          solution.overloadChoices.insert({memberLoc, implicitOverload});
+        }
+        else
+          solution.overloadChoices.insert({memberLoc, overload});
       }
 
       // Record the implicit call's parameter bindings and match direction.

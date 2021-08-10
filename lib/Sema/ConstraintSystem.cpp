@@ -183,6 +183,9 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
           getASTContext(), castToExpr(locator->getAnchor()));
       if (!literalProtocol)
         continue;
+//      fprintf(stderr, "HERE ");
+//      (locator->getAnchor()).dump();
+//      fprintf(stderr, "\n");
 
       // If the protocol has a default type, check it.
       if (auto defaultType = TypeChecker::getDefaultType(literalProtocol, DC)) {

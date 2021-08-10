@@ -1,6 +1,18 @@
 // RUN: %target-typecheck-verify-swift -parse-stdlib
 
 import Swift
+import Foundation
+
+extension Double {
+  init(implicit: CGFloat) {
+    self.init(implicit)
+  }
+}
+extension CGFloat {
+  init(implicit: Double) {
+    self.init(implicit)
+  }
+}
 
 extension UnsafeRawPointer {
   init(implicit: UnsafeMutableRawPointer) {
@@ -23,6 +35,10 @@ extension UnsafePointer where Pointee == Int {
     self.init(implicit)
   }
 }
+
+let x: Double = 99.1
+let y: CGFloat = x
+let z: Double? = y
 
 let optionalMutableRawPointer = UnsafeMutableRawPointer(bitPattern: -3)
 let mutableRawPointer = optionalMutableRawPointer!
