@@ -182,14 +182,27 @@ static const clang::Type *prependParameterType(
   return clangCtx.getPointerType(newFnTy).getTypePtr();
 }
 
-SILFunction *
-SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
-                                         CanSILFunctionType blockType,
-                                         CanType continuationTy,
-                                         CanGenericSignature sig,
-                                         ForeignAsyncConvention convention) {
+SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
+    CanSILFunctionType blockType, CanType continuationTy,
+    AbstractionPattern origFormalType, CanGenericSignature sig,
+    ForeignAsyncConvention convention) {
   // Extract the result and error types from the continuation type.
   auto resumeType = cast<BoundGenericType>(continuationTy).getGenericArgs()[0];
+
+  CanAnyFunctionType completionHandlerOrigTy = [&]() {
+    auto completionHandlerOrigTy =
+        origFormalType.getObjCMethodAsyncCompletionHandlerForeignType(convention, Types);
+    Optional<CanAnyFunctionType> maybeCompletionHandlerOrigTy;
+    if (auto fnTy =
+            dyn_cast<AnyFunctionType>(completionHandlerOrigTy)) {
+      maybeCompletionHandlerOrigTy = fnTy;
+    } else {
+      maybeCompletionHandlerOrigTy = cast<AnyFunctionType>(
+          completionHandlerOrigTy.getOptionalObjectType());
+    }
+    return maybeCompletionHandlerOrigTy.getValue();
+  }();
+  auto blockParams = completionHandlerOrigTy.getParams();
 
   // Build up the implementation function type, which matches the
   // block signature with an added block storage argument that points at the
@@ -208,7 +221,7 @@ SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
       getASTContext(),
       blockType->getClangTypeInfo().getType(),
       getASTContext().getClangTypeForIRGen(blockStorageTy));
-  
+
   auto implTy = SILFunctionType::get(sig,
          blockType->getExtInfo().intoBuilder()
            .withRepresentation(SILFunctionTypeRepresentation::CFunctionPointer)
@@ -356,15 +369,13 @@ SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
         auto resumeArgBuf = SGF.emitTemporaryAllocation(loc,
                                               loweredResumeTy.getAddressType());
 
-        auto prepareArgument = [&](SILValue destBuf, ManagedValue arg) {
+        auto prepareArgument = [&](SILValue destBuf, CanType destFormalType,
+                                   ManagedValue arg, CanType argFormalType) {
           // Convert the ObjC argument to the bridged Swift representation we
           // want.
-          ManagedValue bridgedArg = SGF.emitBridgedToNativeValue(loc,
-                                       arg.copy(SGF, loc),
-                                       arg.getType().getASTType(),
-                                       // FIXME: pass down formal type
-                                       destBuf->getType().getASTType(),
-                                       destBuf->getType().getObjectType());
+          ManagedValue bridgedArg = SGF.emitBridgedToNativeValue(
+              loc, arg.copy(SGF, loc), argFormalType, destFormalType,
+              destBuf->getType().getObjectType());
           // Force-unwrap an argument that comes to us as Optional if it's
           // formally non-optional in the return.
           if (bridgedArg.getType().getOptionalObjectType()
@@ -388,6 +399,15 @@ SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
             continue;
           paramIndices.push_back(index);
         }
+        auto blockParamIndex = [paramIndices](unsigned long i) {
+          // The non-error, non-flag block parameter (formal types of the
+          // completion handler's arguments) indices are the same as the the
+          // parameter (lowered types of the completion handler's arguments)
+          // indices but shifted by 1 corresponding to the fact that the lowered
+          // completion handler has a block_storage argument but the formal type
+          // does not.
+          return paramIndices[i] - 1;
+        };
         if (auto resumeTuple = dyn_cast<TupleType>(resumeType)) {
           assert(paramIndices.size() == resumeTuple->getNumElements());
           assert(params.size() == resumeTuple->getNumElements()
@@ -395,12 +415,24 @@ SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
           for (unsigned i : indices(resumeTuple.getElementTypes())) {
             auto resumeEltBuf = SGF.B.createTupleElementAddr(loc,
                                                              resumeArgBuf, i);
-            prepareArgument(resumeEltBuf, params[paramIndices[i]]);
+            prepareArgument(
+                /*destBuf*/ resumeEltBuf,
+                /*destFormalType*/
+                F->mapTypeIntoContext(resumeTuple.getElementTypes()[i])
+                    ->getCanonicalType(),
+                /*arg*/ params[paramIndices[i]],
+                /*argFormalType*/
+                blockParams[blockParamIndex(i)].getParameterType());
           }
         } else {
           assert(paramIndices.size() == 1);
           assert(params.size() == 2 + (bool)errorIndex + (bool)flagIndex);
-          prepareArgument(resumeArgBuf, params[paramIndices[0]]);
+          prepareArgument(/*destBuf*/ resumeArgBuf,
+                          /*destFormalType*/
+                          F->mapTypeIntoContext(resumeType)->getCanonicalType(),
+                          /*arg*/ params[paramIndices[0]],
+                          /*argFormalType*/
+                          blockParams[blockParamIndex(0)].getParameterType());
         }
         
         // Resume the continuation with the composed bridged result.
