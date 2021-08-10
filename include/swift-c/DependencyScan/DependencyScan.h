@@ -337,6 +337,30 @@ swiftscan_batch_scan_result_create(swiftscan_scanner_t scanner,
 SWIFTSCAN_PUBLIC swiftscan_import_set_t swiftscan_import_set_create(
     swiftscan_scanner_t scanner, swiftscan_scan_invocation_t invocation);
 
+//=== Scanner Cache Operations --------------------------------------------===//
+// The following operations expose an implementation detail of the dependency
+// scanner: its module dependencies cache. This is done in order
+// to allow clients to perform incremental dependency scans by having the
+// scanner's state be serializable and re-usable.
+
+/// For the specified \c scanner instance, serialize its state to the specified file-system \c path .
+SWIFTSCAN_PUBLIC void
+swiftscan_scanner_cache_serialize(swiftscan_scanner_t scanner,
+                                  const char * path);
+
+/// For the specified \c scanner instance, load in scanner state from a file at
+/// the specified file-system \c path .
+SWIFTSCAN_PUBLIC bool
+swiftscan_scanner_cache_load(swiftscan_scanner_t scanner,
+                             const char * path);
+
+/// For the specified \c scanner instance, reset its internal state, ensuring subsequent
+/// scanning queries are done "from-scratch".
+SWIFTSCAN_PUBLIC void
+swiftscan_scanner_cache_reset(swiftscan_scanner_t scanner);
+
+//===----------------------------------------------------------------------===//
+
 SWIFTSCAN_END_DECLS
 
 #endif // SWIFT_C_DEPENDENCY_SCAN_H

@@ -1,32 +1,13 @@
 // RUN: %empty-directory(%t)
 // RUN: mkdir -p %t/clang-module-cache
 
-// RUN: %target-swift-frontend -scan-dependencies -module-cache-path %t/clang-module-cache %s -o %t/deps.json -I %S/Inputs/CHeaders -I %S/Inputs/Swift -emit-dependencies -emit-dependencies-path %t/deps.d -import-objc-header %S/Inputs/CHeaders/Bridging.h -swift-version 4
-// Check the contents of the JSON output
-// RUN: %FileCheck -check-prefix CHECK_NO_CLANG_TARGET %s < %t/deps.json
+// Run the scanner once, emitting the serialized scanner cache
+// RUN: %target-swift-frontend -scan-dependencies -Rdependency-scan-cache -serialize-dependency-scan-cache -dependency-scan-cache-path %t/cache.moddepcache -module-cache-path %t/clang-module-cache %s -o %t/deps_initial.json -I %S/Inputs/CHeaders -I %S/Inputs/Swift -import-objc-header %S/Inputs/CHeaders/Bridging.h -swift-version 4 2>&1 | %FileCheck %s -check-prefix CHECK-REMARK-SAVE
+
+// Run the scanner again, but now re-using previously-serialized cache
+// RUN: %target-swift-frontend -scan-dependencies -Rdependency-scan-cache -load-dependency-scan-cache -dependency-scan-cache-path %t/cache.moddepcache -module-cache-path %t/clang-module-cache %s -o %t/deps.json -I %S/Inputs/CHeaders -I %S/Inputs/Swift -import-objc-header %S/Inputs/CHeaders/Bridging.h -swift-version 4 2>&1 | %FileCheck %s -check-prefix CHECK-REMARK-LOAD
 
 // Check the contents of the JSON output
-// RUN: %FileCheck %s -check-prefix CHECK-NO-SEARCH-PATHS < %t/deps.json
-
-// Check the make-style dependencies file
-// RUN: %FileCheck %s -check-prefix CHECK-MAKE-DEPS < %t/deps.d
-
-// Check that the JSON parses correctly into the canonical Swift data
-// structures.
-
-// RUN: mkdir -p %t/PrintGraph
-// RUN: cp %S/Inputs/PrintGraph.swift %t/main.swift
-// RUN: %target-build-swift %S/Inputs/ModuleDependencyGraph.swift %t/main.swift -o %t/main
-// RUN: %target-codesign %t/main
-// RUN: %target-run %t/main %t/deps.json
-
-// Ensure that scanning with `-clang-target` makes sure that Swift modules' respecitve PCM-dependency-build-argument sets do not contain target triples.
-// RUN: %target-swift-frontend -scan-dependencies -module-cache-path %t/clang-module-cache %s -o %t/deps_clang_target.json -I %S/Inputs/CHeaders -I %S/Inputs/Swift -import-objc-header %S/Inputs/CHeaders/Bridging.h -swift-version 4 -clang-target %target-cpu-apple-macosx10.14
-// Check the contents of the JSON output
-// RUN: %FileCheck -check-prefix CHECK_CLANG_TARGET %s < %t/deps_clang_target.json
-
-// Ensure that round-trip serialization does not affect result
-// RUN: %target-swift-frontend -scan-dependencies -test-dependency-scan-cache-serialization -module-cache-path %t/clang-module-cache %s -o %t/deps.json -I %S/Inputs/CHeaders -I %S/Inputs/Swift -import-objc-header %S/Inputs/CHeaders/Bridging.h -swift-version 4
 // RUN: %FileCheck %s < %t/deps.json
 
 // REQUIRES: executable_test
@@ -37,12 +18,15 @@ import E
 import G
 import SubE
 
+// CHECK-REMARK-SAVE: remark: Serializing module scanning dependency cache to:
+// CHECK-REMARK-LOAD: remark: Re-using serialized module scanning dependency cache from:
+
 // CHECK: "mainModuleName": "deps"
 
 /// --------Main module
 // CHECK-LABEL: "modulePath": "deps.swiftmodule",
 // CHECK-NEXT: sourceFiles
-// CHECK-NEXT: module_deps.swift
+// CHECK-NEXT: module_deps_cache_reuse.swift
 // CHECK-NEXT: ],
 // CHECK-NEXT: "directDependencies": [
 // CHECK-NEXT:   {
@@ -183,13 +167,10 @@ import SubE
 // CHECK: "-swift-version"
 // CHECK: "5"
 // CHECK: ],
-// CHECK_NO_CLANG_TARGET: "extraPcmArgs": [
-// CHECK_NO_CLANG_TARGET-NEXT:   "-Xcc",
-// CHECK_NO_CLANG_TARGET-NEXT:   "-target",
-// CHECK_CLANG_TARGET: "extraPcmArgs": [
-// CHECK_CLANG_TARGET-NEXT:   "-Xcc",
-// CHECK_CLANG_TARGET-NEXT:   "-fapinotes-swift-version={{.*}}"
-// CHECK_CLANG_TARGET-NEXT:   ]
+// CHECK" "extraPcmArgs": [
+// CHECK"   "-target",
+// CHECK"   "-fapinotes-swift-version=5"
+// CHECK" ]
 
 /// --------Swift module Swift
 // CHECK-LABEL: "modulePath": "Swift.swiftmodule",
@@ -212,15 +193,3 @@ import SubE
 
 /// --------Clang module SwiftShims
 // CHECK-LABEL: "modulePath": "SwiftShims.pcm",
-
-// CHECK-NO-SEARCH-PATHS-NOT: "-prebuilt-module-cache-path"
-
-// Check make-style dependencies
-// CHECK-MAKE-DEPS: module_deps.swift
-// CHECK-MAKE-DEPS-SAME: A.swiftinterface
-// CHECK-MAKE-DEPS-SAME: G.swiftinterface
-// CHECK-MAKE-DEPS-SAME: B.h
-// CHECK-MAKE-DEPS-SAME: F.h
-// CHECK-MAKE-DEPS-SAME: Bridging.h
-// CHECK-MAKE-DEPS-SAME: BridgingOther.h
-// CHECK-MAKE-DEPS-SAME: module.modulemap

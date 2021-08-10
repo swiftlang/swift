@@ -197,11 +197,14 @@ void ClangImporter::recordModuleDependencies(
     std::string PCMPath;
     std::string ModuleMapPath;
   };
+  auto &ctx = Impl.SwiftContext;
+  auto currentSwiftSearchPathSet = ctx.getAllModuleSearchPathsSet();
 
   for (const auto &clangModuleDep : clangDependencies.DiscoveredModules) {
     // If we've already cached this information, we're done.
-    if (cache.hasDependencies(clangModuleDep.ModuleName,
-                              ModuleDependenciesKind::Clang))
+    if (cache.hasDependencies(
+                    clangModuleDep.ModuleName,
+                    {ModuleDependenciesKind::Clang, currentSwiftSearchPathSet}))
       continue;
 
     // File dependencies for this module.
@@ -303,9 +306,12 @@ void ClangImporter::recordModuleDependencies(
 Optional<ModuleDependencies> ClangImporter::getModuleDependencies(
     StringRef moduleName, ModuleDependenciesCache &cache,
     InterfaceSubContextDelegate &delegate) {
+  auto &ctx = Impl.SwiftContext;
+  auto currentSwiftSearchPathSet = ctx.getAllModuleSearchPathsSet();
   // Check whether there is already a cached result.
   if (auto found = cache.findDependencies(
-          moduleName, ModuleDependenciesKind::Clang))
+          moduleName,
+          {ModuleDependenciesKind::Clang, currentSwiftSearchPathSet}))
     return found;
 
   // Retrieve or create the shared state.
@@ -319,7 +325,7 @@ Optional<ModuleDependencies> ClangImporter::getModuleDependencies(
   }
 
   // Determine the command-line arguments for dependency scanning.
-  auto &ctx = Impl.SwiftContext;
+
   std::vector<std::string> commandLineArgs =
     getClangDepScanningInvocationArguments(ctx, *importHackFile);
 
@@ -338,14 +344,19 @@ Optional<ModuleDependencies> ClangImporter::getModuleDependencies(
 
   // Record module dependencies for each module we found.
   recordModuleDependencies(cache, *clangDependencies);
-  return cache.findDependencies(moduleName, ModuleDependenciesKind::Clang);
+            return cache.findDependencies(
+                    moduleName,
+                    {ModuleDependenciesKind::Clang, currentSwiftSearchPathSet});
 }
 
 bool ClangImporter::addBridgingHeaderDependencies(
     StringRef moduleName,
     ModuleDependenciesCache &cache) {
+  auto &ctx = Impl.SwiftContext;
+  auto currentSwiftSearchPathSet = ctx.getAllModuleSearchPathsSet();
   auto targetModule = *cache.findDependencies(
-      moduleName, ModuleDependenciesKind::SwiftTextual);
+              moduleName,
+              {ModuleDependenciesKind::SwiftTextual,currentSwiftSearchPathSet});
 
   // If we've already recorded bridging header dependencies, we're done.
   auto swiftDeps = targetModule.getAsSwiftTextualModule();
@@ -360,7 +371,6 @@ bool ClangImporter::addBridgingHeaderDependencies(
   std::string bridgingHeader = *targetModule.getBridgingHeader();
 
   // Determine the command-line arguments for dependency scanning.
-  auto &ctx = Impl.SwiftContext;
   std::vector<std::string> commandLineArgs =
     getClangDepScanningInvocationArguments(ctx, bridgingHeader);
 

@@ -123,7 +123,7 @@ ErrorOr<ModuleDependencies> ModuleDependencyScanner::scanInterfaceFile(
     std::string InPath = moduleInterfacePath.str();
     auto compiledCandidates = getCompiledCandidates(Ctx, moduleName.str(),
                                                     InPath);
-    Result = ModuleDependencies::forSwiftInterface(InPath,
+    Result = ModuleDependencies::forSwiftTextualModule(InPath,
                                                    compiledCandidates,
                                                    Args,
                                                    PCMArgs,
@@ -164,15 +164,19 @@ ErrorOr<ModuleDependencies> ModuleDependencyScanner::scanInterfaceFile(
 Optional<ModuleDependencies> SerializedModuleLoaderBase::getModuleDependencies(
     StringRef moduleName, ModuleDependenciesCache &cache,
     InterfaceSubContextDelegate &delegate) {
+  auto currentSearchPathSet = Ctx.getAllModuleSearchPathsSet();
   // Check whether we've cached this result.
   if (auto found = cache.findDependencies(
-          moduleName, ModuleDependenciesKind::SwiftTextual))
+           moduleName,
+           {ModuleDependenciesKind::SwiftTextual, currentSearchPathSet}))
     return found;
   if (auto found = cache.findDependencies(
-          moduleName, ModuleDependenciesKind::SwiftBinary))
+            moduleName,
+            {ModuleDependenciesKind::SwiftBinary, currentSearchPathSet}))
     return found;
   if (auto found = cache.findDependencies(
-          moduleName, ModuleDependenciesKind::SwiftPlaceholder))
+            moduleName,
+            {ModuleDependenciesKind::SwiftPlaceholder, currentSearchPathSet}))
     return found;
 
   auto moduleId = Ctx.getIdentifier(moduleName);

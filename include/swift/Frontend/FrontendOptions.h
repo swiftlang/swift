@@ -297,6 +297,18 @@ public:
   /// of the main Swift module's source files.
   bool ImportPrescan = false;
 
+  /// After performing a dependency scanning action, serialize the scanner's internal state.
+  bool SerializeDependencyScannerCache = false;
+
+  /// Load and re-use a prior serialized dependency scanner cache.
+  bool ReuseDependencyScannerCache = false;
+
+  /// The path at which to either serialize or deserialize the dependency scanner cache.
+  std::string SerializedDependencyScannerCachePath;
+
+  /// Emit remarks indicating use of the serialized module dependency scanning cache
+  bool EmitDependencyScannerCacheRemarks = false;
+
   /// When performing an incremental build, ensure that cross-module incremental
   /// build metadata is available in any swift modules emitted by this frontend
   /// job.
