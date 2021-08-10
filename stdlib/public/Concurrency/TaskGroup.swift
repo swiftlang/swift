@@ -552,12 +552,12 @@ public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
   ///     group.addTask { 1 }
   ///     group.addTask { 2 }
   ///
-  ///     await print(group.next())
+  ///     print(await group.next())
   ///     // Prints either "2" or "1".
   ///
   /// If there aren't any pending tasks in the task group,
   /// this method returns `nil`,
-  /// which lets you write like the following
+  /// which lets you write the following
   /// to wait for a single task to complete:
   ///
   ///     if let first = try await group.next() {
