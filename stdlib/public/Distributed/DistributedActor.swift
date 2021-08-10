@@ -18,9 +18,9 @@ import _Concurrency
 /// Shared "base" protocol for both (local) `Actor` and (potentially remote)
 /// `DistributedActor`.
 ///
-/// FIXME: !!! We'd need Actor to also conform to this, but don't want to add that conformance in _Concurrency yet.
+/// FIXME(distributed): We'd need Actor to also conform to this, but don't want to add that conformance in _Concurrency yet.
 @_marker
-public protocol AnyActor: AnyObject {}
+public protocol AnyActor: Sendable, AnyObject {}
 
 // ==== Distributed Actor -----------------------------------------------------
 
@@ -205,13 +205,8 @@ func __isLocalActor(_ actor: AnyObject) -> Bool {
 
 // ==== Proxy Actor lifecycle --------------------------------------------------
 
-/// Called to initialize the distributed-remote actor 'proxy' instance in an actor.
-/// The implementation will call this within the actor's initializer.
 @_silgen_name("swift_distributedActor_remote_initialize")
 func _distributedActorRemoteInitialize(_ actorType: Builtin.RawPointer) -> Any
-
-@_silgen_name("swift_distributedActor_remote_create")
-func distributedActorRemoteCreate(identity: Any, transport: Any) -> Any // TODO: make it typed
 
 /// Called to destroy the default actor instance in an actor.
 /// The implementation will call this within the actor's deinit.
