@@ -1825,12 +1825,6 @@ protected:
     Bits.SugarType.HasCachedType = true;
   }
 
-  void setUnderlyingType(Type type) {
-    assert(!Bits.SugarType.HasCachedType && "Cached type already set");
-    Bits.SugarType.HasCachedType = true;
-    UnderlyingType = type.getPointer();
-  }
-
 public:
   /// Remove one level of top-level sugar from this type.
   Type getSinglyDesugaredTypeSlow();
