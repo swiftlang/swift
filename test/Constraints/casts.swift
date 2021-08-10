@@ -535,3 +535,17 @@ protocol PP2: PP1 { }
 extension Optional: PP1 where Wrapped == PP2 { }
 
 nil is PP1 // expected-error {{'nil' requires a contextual type}}
+
+// SR-15039
+enum ChangeType<T> {
+  case initial(T)
+  case delta(previous: T, next: T)
+  case unset
+
+  var delta: (previous: T?, next: T)? { nil }
+}
+
+extension ChangeType where T == String? {
+  var foo: String? { return self.delta?.previous as? String } // OK
+  var bar: String? { self.delta?.next }
+}
