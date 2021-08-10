@@ -509,6 +509,32 @@ static void setRefactoringFields(sourcekitd_object_t &Req, TestOptions Opts,
   sourcekitd_request_dictionary_set_int64(Req, KeyLength, Opts.Length);
 }
 
+/// Returns the number of instructions executed by the SourceKit process since
+/// its launch. If SourceKit is running in-process this is the instruction count
+/// of the current process. If it's running out-of process it is the instruction
+/// count of the XPC process.
+int64_t getSourceKitInstructionCount() {
+  sourcekitd_object_t Req =
+      sourcekitd_request_dictionary_create(nullptr, nullptr, 0);
+  sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestStatistics);
+  sourcekitd_response_t Resp = sourcekitd_send_request_sync(Req);
+  sourcekitd_variant_t Info = sourcekitd_response_get_value(Resp);
+  sourcekitd_variant_t Results =
+      sourcekitd_variant_dictionary_get_value(Info, KeyResults);
+  __block size_t InstructionCount = 0;
+  sourcekitd_variant_array_apply(
+      Results, ^bool(size_t index, sourcekitd_variant_t value) {
+        auto UID = sourcekitd_variant_dictionary_get_uid(value, KeyKind);
+        if (UID == KindStatInstructionCount) {
+          InstructionCount =
+              sourcekitd_variant_dictionary_get_int64(value, KeyValue);
+          return false;
+        }
+        return true;
+      });
+  return InstructionCount;
+}
+
 static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
   if (!Opts.JsonRequestPath.empty())
     return handleJsonRequestPath(Opts.JsonRequestPath, Opts);
@@ -1140,8 +1166,19 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     sourcekitd_request_release(files);
   }
 
+  int64_t BeforeInstructions;
+  if (Opts.measureInstructions)
+    BeforeInstructions = getSourceKitInstructionCount();
+
   if (!Opts.isAsyncRequest) {
     sourcekitd_response_t Resp = sendRequestSync(Req, Opts);
+
+    if (Opts.measureInstructions) {
+      int64_t AfterInstructions = getSourceKitInstructionCount();
+      llvm::errs() << "request instructions: "
+                   << (AfterInstructions - BeforeInstructions);
+    }
+
     sourcekitd_request_release(Req);
     return handleResponse(Resp, Opts, SemaName, std::move(SourceBuf),
                           &InitOpts)
@@ -1169,6 +1206,12 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     llvm::report_fatal_error(
         "-async not supported when sourcekitd is built without blocks support");
 #endif
+
+    if (Opts.measureInstructions) {
+      int64_t AfterInstructions = getSourceKitInstructionCount();
+      llvm::errs() << "request instructions: "
+                   << (AfterInstructions - BeforeInstructions);
+    }
 
     sourcekitd_request_release(Req);
     return 0;
