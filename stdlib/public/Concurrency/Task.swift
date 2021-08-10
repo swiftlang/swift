@@ -26,13 +26,14 @@ import Swift
 /// It's not a programming error to discard a reference to a task
 /// without waiting for that task to finish or canceling it.
 /// A task runs whether or not you keep a reference to it.
-/// However, if you discard a task's handle, you give up the ability
+/// However, if you discard the reference to a task,
+/// you give up the ability
 /// to wait for that task's result or cancel the task.
 ///
 /// To support operations on the current task,
 /// which can be either a detached task or a child task,
-/// `Task` also exposes class methods like `yield()` and `currentPriority`.
-/// Because all such functions are asynchronous,
+/// `Task` also exposes class methods like `yield()`.
+/// Because these methods are asynchronous,
 /// they're always invoked as part of an existing task.
 ///
 /// Only code that's running as part of the task can interact with that task,
@@ -92,13 +93,13 @@ public struct Task<Success, Failure: Error>: Sendable {
 extension Task {
   /// Wait for the task to complete, returning its result or throwing an error.
   ///
-  /// If the task hasn't completed,
+  /// If the task hasn't completed yet,
   /// its priority increases to that of the current task.
   /// Note that this might not be as effective as
   /// creating the task with the correct priority,
   /// depending on the executor's scheduling details.
   ///
-  /// If the task throws an error, this method propogates that error.
+  /// If the task throws an error, this property propogates that error.
   /// Tasks that respond to cancellation by throwing `Task.CancellationError`
   /// have that error propogated here upon cancellation.
   ///
@@ -111,7 +112,7 @@ extension Task {
 
   /// Wait for the task to complete, returning its result or its error.
   ///
-  /// If the task hasn't completed, its priority increases to the
+  /// If the task hasn't completed yet, its priority increases to the
   /// priority of the current task. Note that this isn't as effective as
   /// creating the task with the correct priority.
   ///
@@ -150,15 +151,14 @@ extension Task {
 extension Task where Failure == Never {
   /// Wait for the task to complete, returning its result.
   ///
-  /// If the task hasn't completed,
+  /// If the task hasn't completed yet,
   /// its priority increases to that of the current task.
   /// Note that this might not be as effective as
   /// creating the task with the correct priority,
   /// depending on the executor's scheduling details.
   ///
-  /// Because this method is nonthrowing,
-  /// if the task checks for cancellation,
-  /// it needs to handle cancellation using an approach like returning `nil`
+  /// Tasks that never throw an error can still check for cancellation,
+  /// but they need to use an approach like returning `nil`
   /// instead of throwing an error.
   public var value: Success {
     get async {
@@ -458,7 +458,7 @@ extension Task where Failure == Never {
   /// so the operation is treated more like an asynchronous extension
   /// to the synchronous operation.
   ///
-  /// You need to keep a reference to the detached task
+  /// You need to keep a reference to the task
   /// if you want to cancel it by calling the `Task.cancel()` method.
   /// Discarding your reference to a detached task
   /// doesn't implicitly cancel that task,
@@ -506,7 +506,7 @@ extension Task where Failure == Error {
   /// so the operation is treated more like an asynchronous extension
   /// to the synchronous operation.
   ///
-  /// You need to keep a reference to the detached task
+  /// You need to keep a reference to the task
   /// if you want to cancel it by calling the `Task.cancel()` method.
   /// Discarding your reference to a detached task
   /// doesn't implicitly cancel that task,
@@ -747,7 +747,7 @@ public struct UnsafeCurrentTask {
   /// A Boolean value that indicates whether the current task was canceled.
   ///
   /// After the value of this property is `true`, it remains `true` indefinitely.
-  /// There is no way to uncancel the operation.
+  /// There is no way to uncancel a task.
   ///
   /// - SeeAlso: `checkCancellation()`
   public var isCancelled: Bool {
