@@ -291,6 +291,71 @@ class Product(object):
 
         return toolchain_file
 
+    def get_linux_abi(self, arch):
+        # Map tuples of (platform, arch) to ABI
+        #
+        # E.x.: Hard ABI or Soft ABI for Linux map to gnueabihf
+        arch_platform_to_abi = {
+            # For now always map to hard float ABI.
+            'armv7': ('arm', 'gnueabihf')
+        }
+
+        # Default is just arch, gnu
+        sysroot_arch, abi = arch_platform_to_abi.get(arch, (arch, 'gnu'))
+        return sysroot_arch, abi
+
+    def get_linux_sysroot(self, platform, arch):
+        if not self.is_cross_compile_target('{}-{}'.format(platform, arch)):
+            return None
+        sysroot_arch, abi = self.get_linux_abi(arch)
+        # $ARCH-$PLATFORM-$ABI
+        # E.x.: aarch64-linux-gnu
+        sysroot_dirname = '{}-{}-{}'.format(sysroot_arch, platform, abi)
+        return os.path.join(os.sep, 'usr', sysroot_dirname)
+
+    def get_linux_target(self, platform, arch):
+        sysroot_arch, abi = self.get_linux_abi(arch)
+        return '{}-unknown-linux-{}'.format(sysroot_arch, abi)
+
+    def generate_linux_toolchain_file(self, platform, arch):
+        shell.makedirs(self.build_dir)
+        toolchain_file = os.path.join(self.build_dir, 'BuildScriptToolchain.cmake')
+
+        toolchain_args = {}
+
+        toolchain_args['CMAKE_SYSTEM_NAME'] = 'Linux'
+        toolchain_args['CMAKE_SYSTEM_PROCESSOR'] = arch
+
+        # We only set the actual sysroot if we are actually cross
+        # compiling. This is important since otherwise cmake seems to change the
+        # RUNPATH to be a relative rather than an absolute path, breaking
+        # certain cmark tests (and maybe others).
+        maybe_sysroot = self.get_linux_sysroot(platform, arch)
+        if maybe_sysroot is not None:
+            toolchain_args['CMAKE_SYSROOT'] = maybe_sysroot
+
+        target = self.get_linux_target(platform, arch)
+        if self.toolchain.cc.endswith('clang'):
+            toolchain_args['CMAKE_C_COMPILER_TARGET'] = target
+        if self.toolchain.cxx.endswith('clang++'):
+            toolchain_args['CMAKE_CXX_COMPILER_TARGET'] = target
+        # Swift always supports cross compiling.
+        toolchain_args['CMAKE_Swift_COMPILER_TARGET'] = target
+        toolchain_args['CMAKE_FIND_ROOT_PATH_MODE_PROGRAM'] = 'NEVER'
+        toolchain_args['CMAKE_FIND_ROOT_PATH_MODE_LIBRARY'] = 'ONLY'
+        toolchain_args['CMAKE_FIND_ROOT_PATH_MODE_INCLUDE'] = 'ONLY'
+        toolchain_args['CMAKE_FIND_ROOT_PATH_MODE_PACKAGE'] = 'ONLY'
+
+        # Sort by the key so that we always produce the same toolchain file
+        data = sorted(toolchain_args.items(), key=lambda x: x[0])
+        if not self.args.dry_run:
+            with open(toolchain_file, 'w') as f:
+                f.writelines("set({} {})\n".format(k, v) for k, v in data)
+        else:
+            print("DRY_RUN! Writing Toolchain file to path: {}".format(toolchain_file))
+
+        return toolchain_file
+
     def common_cross_c_flags(self, platform, arch):
         cross_flags = []
 

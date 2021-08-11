@@ -1752,6 +1752,8 @@ bool SILParser::parseSILDebugVar(SILDebugVariable &Var) {
       Var.Constant = false;
     } else if (Key == "loc") {
       Var.Constant = false;
+    } else if (Key == "implicit") {
+      Var.Implicit = true;
     } else {
       P.diagnose(P.Tok, diag::sil_dbg_unknown_key, Key);
       return true;
@@ -4103,7 +4105,12 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       SILDebugVariable VarInfo;
       if (parseSILDebugVar(VarInfo) || parseSILDebugLocation(InstLoc, B))
         return true;
-      ResultVal = B.createAllocStack(InstLoc, Ty, VarInfo, hasDynamicLifetime);
+      // It doesn't make sense to attach a debug var info if the name is empty
+      if (VarInfo.Name.size())
+        ResultVal =
+            B.createAllocStack(InstLoc, Ty, VarInfo, hasDynamicLifetime);
+      else
+        ResultVal = B.createAllocStack(InstLoc, Ty, {}, hasDynamicLifetime);
     } else {
       assert(Opcode == SILInstructionKind::MetatypeInst);
       if (parseSILDebugLocation(InstLoc, B))

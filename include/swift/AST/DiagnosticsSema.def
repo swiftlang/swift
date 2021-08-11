@@ -30,6 +30,8 @@ NOTE(decl_declared_here,none,
      "%0 declared here", (DeclName))
 NOTE(kind_declared_here,none,
      "%0 declared here", (DescriptiveDeclKind))
+NOTE(descriptive_decl_declared_here,none,
+     "'%0' declared here", (StringRef))
 NOTE(implicit_member_declared_here,none,
      "%1 '%0' is implicitly declared", (StringRef, StringRef))
 NOTE(extended_type_declared_here,none,
@@ -1267,7 +1269,8 @@ ERROR(extra_argument_named,none,
 ERROR(extra_argument_positional,none,
       "extra argument in call", ())
 ERROR(extra_arguments_in_call,none,
-      "extra arguments at positions %0 in call", (StringRef))
+      "extra %select{arguments|trailing closures}0 at positions %1 in call",
+       (bool, StringRef))
 ERROR(extra_argument_to_nullary_call,none,
       "argument passed to call that takes no arguments", ())
 ERROR(extra_trailing_closure_in_call,none,
@@ -1858,9 +1861,17 @@ WARNING(spi_attribute_on_import_of_public_module,none,
         (DeclName, StringRef))
 
 // Opaque return types
+ERROR(structural_opaque_types_are_experimental,none,
+      "'opaque' types cannot be nested inside other types; "
+      "structural 'opaque' types are an experimental feature", ())
 ERROR(opaque_type_invalid_constraint,none,
       "an 'opaque' type must specify only 'Any', 'AnyObject', protocols, "
       "and/or a base class", ())
+NOTE(opaque_of_optional_rewrite,none,
+      "did you mean to write an optional of an 'opaque' type?", ())
+ERROR(more_than_one_opaque_type,none,
+      "%0 contains multiple 'opaque' types, but only one 'opaque' type is "
+      "supported", (TypeRepr*))
 ERROR(inferred_opaque_type,none,
       "property definition has inferred type %0, involving the 'some' "
       "return type of another declaration", (Type))
@@ -4059,9 +4070,6 @@ WARNING(trailing_closure_requires_parens,none,
         " statement; pass as a parenthesized argument to silence this warning",
         ())
 
-ERROR(opaque_type_var_no_init,none,
-      "property declares an opaque return type, but has no initializer "
-      "expression from which to infer an underlying type", ())
 ERROR(opaque_type_no_underlying_type_candidates,none,
       "function declares an opaque return type, but has no return statements "
       "in its body from which to infer an underlying type", ())
@@ -4073,6 +4081,9 @@ NOTE(opaque_type_underlying_type_candidate_here,none,
 ERROR(opaque_type_self_referential_underlying_type,none,
       "function opaque return type was inferred as %0, which defines the "
       "opaque type in terms of itself", (Type))
+ERROR(opaque_type_var_no_init,none,
+      "property declares an opaque return type, but has no initializer "
+      "expression from which to infer an underlying type", ())
 ERROR(opaque_type_var_no_underlying_type,none,
       "property declares an opaque return type, but cannot infer the "
       "underlying type from its initializer expression", ())
@@ -4515,6 +4526,11 @@ ERROR(concurrent_value_inherit,none,
       "`Sendable` class %1 cannot inherit from another class"
       "%select{| other than 'NSObject'}0",
       (bool, DeclName))
+ERROR(non_sendable_type,none,
+      "type %0 does not conform to the 'Sendable' protocol", (Type))
+ERROR(non_sendable_function_type,none,
+     "function type %0 must be marked '@Sendable' to conform to 'Sendable'",
+      (Type))
 
 WARNING(unchecked_conformance_not_special,none,
       "@unchecked conformance to %0 has no meaning", (Type))

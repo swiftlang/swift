@@ -448,7 +448,7 @@ public:
   /// the byte content.
   ///
   /// If a copy needs to be made, it will be allocated out of the provided
-  /// \p Buffer.
+  /// \p Buffer. If \p IndentToStrip is '~0U', the indent is auto-detected.
   static StringRef getEncodedStringSegment(StringRef Str,
                                            SmallVectorImpl<char> &Buffer,
                                            bool IsFirstSegment = false,

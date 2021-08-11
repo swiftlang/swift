@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/IDE/CodeCompletion.h"
+#include "CodeCompletionDiagnostics.h"
 #include "CodeCompletionResultBuilder.h"
 #include "ExprContextAnalysis.h"
 #include "swift/AST/ASTPrinter.h"
@@ -33,6 +34,7 @@
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/IDE/CodeCompletionCache.h"
 #include "swift/IDE/CodeCompletionResultPrinter.h"
+#include "swift/IDE/ModuleSourceFileInfo.h"
 #include "swift/IDE/Utils.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Sema/IDETypeChecking.h"
@@ -808,8 +810,10 @@ CodeCompletionResult::withFlair(CodeCompletionFlair newFlair,
     return new (*Sink.Allocator) CodeCompletionResult(
         getSemanticContext(), newFlair, getNumBytesToErase(),
         getCompletionString(), getAssociatedDeclKind(), isSystem(),
-        getModuleName(), getNotRecommendedReason(), getBriefDocComment(),
-        getAssociatedUSRs(), getDeclKeywords(), getExpectedTypeRelation(),
+        getModuleName(), getSourceFilePath(), getNotRecommendedReason(),
+        getDiagnosticSeverity(), getDiagnosticMessage(),
+        getBriefDocComment(), getAssociatedUSRs(), getDeclKeywords(),
+        getExpectedTypeRelation(),
         isOperator() ? getOperatorKind() : CodeCompletionOperatorKind::None);
   } else {
     return new (*Sink.Allocator) CodeCompletionResult(
@@ -854,6 +858,8 @@ void CodeCompletionResultBuilder::setAssociatedDecl(const Decl *D) {
 
   if (D->getAttrs().getDeprecated(D->getASTContext()))
     setNotRecommended(NotRecommendedReason::Deprecated);
+  else if (D->getAttrs().getSoftDeprecated(D->getASTContext()))
+    setNotRecommended(NotRecommendedReason::SoftDeprecated);
 }
 
 namespace {
@@ -1320,11 +1326,25 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
       }
     }
 
-    return new (*Sink.Allocator) CodeCompletionResult(
+    CodeCompletionResult *result = new (*Sink.Allocator) CodeCompletionResult(
         SemanticContext, Flair, NumBytesToErase, CCS, AssociatedDecl,
         ModuleName, NotRecReason, copyString(*Sink.Allocator, BriefComment),
         copyAssociatedUSRs(*Sink.Allocator, AssociatedDecl),
         copyArray(*Sink.Allocator, CommentWords), ExpectedTypeRelation);
+    if (!result->isSystem())
+      result->setSourceFilePath(getSourceFilePathForDecl(AssociatedDecl));
+    if (NotRecReason != NotRecommendedReason::None) {
+      // FIXME: We should generate the message lazily.
+      if (const auto *VD = dyn_cast<ValueDecl>(AssociatedDecl)) {
+        CodeCompletionDiagnosticSeverity severity;
+        SmallString<256> message;
+        llvm::raw_svector_ostream messageOS(message);
+        if (!getCompletionDiagnostics(NotRecReason, VD, severity, messageOS))
+          result->setDiagnostics(severity,
+                                 copyString(*Sink.Allocator, message));
+      }
+    }
+    return result;
   }
 
   case CodeCompletionResult::ResultKind::Keyword:
@@ -2173,7 +2193,8 @@ public:
     }
   }
 
-  void collectImportedModules(llvm::StringSet<> &ImportedModules) {
+  void collectImportedModules(llvm::StringSet<> &directImportedModules,
+                              llvm::StringSet<> &allImportedModules) {
     SmallVector<ImportedModule, 16> Imported;
     SmallVector<ImportedModule, 16> FurtherImported;
     CurrDeclContext->getParentSourceFile()->getImportedModules(
@@ -2181,10 +2202,14 @@ public:
         {ModuleDecl::ImportFilterKind::Exported,
          ModuleDecl::ImportFilterKind::Default,
          ModuleDecl::ImportFilterKind::ImplementationOnly});
+
+    for (ImportedModule &imp : Imported)
+      directImportedModules.insert(imp.importedModule->getNameStr());
+
     while (!Imported.empty()) {
       ModuleDecl *MD = Imported.back().importedModule;
       Imported.pop_back();
-      if (!ImportedModules.insert(MD->getNameStr()).second)
+      if (!allImportedModules.insert(MD->getNameStr()).second)
         continue;
       FurtherImported.clear();
       MD->getImportedModules(FurtherImported,
@@ -2215,8 +2240,9 @@ public:
     SmallVector<Identifier, 0> ModuleNames;
     Ctx.getVisibleTopLevelModuleNames(ModuleNames);
 
-    llvm::StringSet<> ImportedModules;
-    collectImportedModules(ImportedModules);
+    llvm::StringSet<> directImportedModules;
+    llvm::StringSet<> allImportedModules;
+    collectImportedModules(directImportedModules, allImportedModules);
 
     auto mainModuleName = CurrModule->getName();
     for (auto ModuleName : ModuleNames) {
@@ -2227,8 +2253,11 @@ public:
       Optional<NotRecommendedReason> Reason = None;
 
       // Imported modules are not recommended.
-      if (ImportedModules.count(MD->getNameStr()) != 0)
+      if (directImportedModules.contains(MD->getNameStr())) {
         Reason = NotRecommendedReason::RedundantImport;
+      } else if (allImportedModules.contains(MD->getNameStr())) {
+        Reason = NotRecommendedReason::RedundantImportIndirect;
+      }
 
       addModuleName(MD, Reason);
     }
@@ -2635,7 +2664,7 @@ public:
     }
 
     // If the reference is 'async', all types must be 'Sendable'.
-    if (implicitlyAsync && T) {
+    if (ctx.LangOpts.WarnConcurrency && implicitlyAsync && T) {
       auto *M = CurrDeclContext->getParentModule();
       if (isa<VarDecl>(VD)) {
         if (!isSendableType(M, T)) {
@@ -4349,7 +4378,7 @@ public:
       // Check for conformance to the literal protocol.
       if (auto *NTD = T->getAnyNominal()) {
         SmallVector<ProtocolConformance *, 2> conformances;
-        if (NTD->lookupConformance(CurrModule, P, conformances)) {
+        if (NTD->lookupConformance(P, conformances)) {
           addTypeAnnotation(builder, T);
           builder.setExpectedTypeRelation(typeRelation);
           return;
@@ -6558,6 +6587,37 @@ static void postProcessResults(MutableArrayRef<CodeCompletionResult *> results,
   }
 }
 
+static void copyAllKnownSourceFileInfo(
+    ASTContext &Ctx, CodeCompletionResultSink &Sink) {
+  assert(Sink.SourceFiles.empty());
+
+  SmallVector<ModuleDecl *, 8> loadedModules;
+  loadedModules.reserve(Ctx.getNumLoadedModules());
+  for (auto &entry : Ctx.getLoadedModules())
+    loadedModules.push_back(entry.second);
+
+  auto &result = Sink.SourceFiles;
+  for (auto *M : loadedModules) {
+    // We don't need to check system modules.
+    if (M->isSystemModule())
+      continue;
+
+    M->collectBasicSourceFileInfo([&](const BasicSourceFileInfo &info) {
+      if (info.getFilePath().empty())
+        return;
+      
+      bool isUpToDate = false;
+      if (info.isFromSourceFile()) {
+        // 'SourceFile' is always "up-to-date" because we've just loaded.
+        isUpToDate = true;
+      } else {
+        isUpToDate = isSourceFileUpToDate(info, Ctx);
+      }
+      result.emplace_back(copyString(*Sink.Allocator, info.getFilePath()), isUpToDate);
+    });
+  }
+}
+
 static void deliverCompletionResults(CodeCompletionContext &CompletionContext,
                                      CompletionLookup &Lookup,
                                      DeclContext *DC,
@@ -6676,6 +6736,10 @@ static void deliverCompletionResults(CodeCompletionContext &CompletionContext,
   postProcessResults(CompletionContext.getResultSink().Results,
                      CompletionContext.CodeCompletionKind, DC,
                      /*Sink=*/nullptr);
+
+  if (CompletionContext.requiresSourceFileInfo())
+    copyAllKnownSourceFileInfo(SF.getASTContext(),
+                               CompletionContext.getResultSink());
 
   Consumer.handleResultsAndModules(CompletionContext, RequestedModules, DC);
 }
@@ -7377,6 +7441,22 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 }
 
 void PrintingCodeCompletionConsumer::handleResults(
+    CodeCompletionContext &context) {
+  if (context.requiresSourceFileInfo() &&
+      !context.getResultSink().SourceFiles.empty()) {
+    OS << "Known module source files\n";
+    for (auto &entry : context.getResultSink().SourceFiles) {
+      OS << (entry.IsUpToDate ? " + "  : " - ");
+      OS << entry.FilePath;
+      OS << "\n";
+    }
+    this->RequiresSourceFileInfo = true;
+  }
+  auto results = context.takeResults();
+  handleResults(results);
+}
+
+void PrintingCodeCompletionConsumer::handleResults(
     MutableArrayRef<CodeCompletionResult *> Results) {
   unsigned NumResults = 0;
   for (auto Result : Results) {
@@ -7406,6 +7486,35 @@ void PrintingCodeCompletionConsumer::handleResults(
     StringRef comment = Result->getBriefDocComment();
     if (IncludeComments && !comment.empty()) {
       OS << "; comment=" << comment;
+    }
+
+    if (RequiresSourceFileInfo) {
+      StringRef sourceFilePath = Result->getSourceFilePath();
+      if (!sourceFilePath.empty()) {
+        OS << "; source=" << sourceFilePath;
+      }
+    }
+
+    if (Result->getDiagnosticSeverity() !=
+        CodeCompletionDiagnosticSeverity::None) {
+      OS << "; diagnostics=" << comment;
+      switch (Result->getDiagnosticSeverity()) {
+      case CodeCompletionDiagnosticSeverity::Error:
+        OS << "error";
+        break;
+      case CodeCompletionDiagnosticSeverity::Warning:
+        OS << "warning";
+        break;
+      case CodeCompletionDiagnosticSeverity::Remark:
+        OS << "remark";
+        break;
+      case CodeCompletionDiagnosticSeverity::Note:
+        OS << "note";
+        break;
+      case CodeCompletionDiagnosticSeverity::None:
+        llvm_unreachable("none");
+      }
+      OS << ":" << Result->getDiagnosticMessage();
     }
 
     OS << "\n";
@@ -7545,7 +7654,7 @@ void SimpleCachingCodeCompletionConsumer::handleResultsAndModules(
                        &context.getResultSink());
   }
 
-  handleResults(context.takeResults());
+  handleResults(context);
 }
 
 //===----------------------------------------------------------------------===//

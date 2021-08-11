@@ -1825,12 +1825,6 @@ protected:
     Bits.SugarType.HasCachedType = true;
   }
 
-  void setUnderlyingType(Type type) {
-    assert(!Bits.SugarType.HasCachedType && "Cached type already set");
-    Bits.SugarType.HasCachedType = true;
-    UnderlyingType = type.getPointer();
-  }
-
 public:
   /// Remove one level of top-level sugar from this type.
   Type getSinglyDesugaredTypeSlow();
@@ -5045,6 +5039,21 @@ public:
   }
 };
 
+/// The type T..., which is sugar for a sequence of argument values.
+class VariadicSequenceType : public UnarySyntaxSugarType {
+  VariadicSequenceType(const ASTContext &ctx, Type base,
+                       RecursiveTypeProperties properties)
+    : UnarySyntaxSugarType(TypeKind::VariadicSequence, ctx, base, properties) {}
+
+public:
+  /// Return a uniqued variadic sequence type with the specified base type.
+  static VariadicSequenceType *get(Type baseTy);
+
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::VariadicSequence;
+  }
+};
+
 /// ProtocolType - A protocol type describes an abstract interface implemented
 /// by another type.
 class ProtocolType : public NominalType {
@@ -5472,13 +5481,13 @@ class OpaqueTypeArchetypeType final : public ArchetypeType,
   GenericEnvironment *Environment;
   
 public:
-  /// Get 
-  
   /// Get an opaque archetype representing the underlying type of the given
-  /// opaque type decl.
-  static OpaqueTypeArchetypeType *get(OpaqueTypeDecl *Decl,
+  /// opaque type decl's opaque param with ordinal `ordinal`. For example, in
+  /// `(some P, some Q)`, `some P`'s type param would have ordinal 0 and `some
+  /// Q`'s type param would have ordinal 1.
+  static OpaqueTypeArchetypeType *get(OpaqueTypeDecl *Decl, unsigned ordinal,
                                       SubstitutionMap Substitutions);
-  
+
   OpaqueTypeDecl *getDecl() const {
     return OpaqueDecl;
   }
@@ -5509,7 +5518,7 @@ public:
   ///
   /// then the underlying type of `some P` would be ordinal 0, and `some Q` would be ordinal 1.
   unsigned getOrdinal() const {
-    // TODO: multiple opaque types
+    // TODO [OPAQUE SUPPORT]: multiple opaque types
     return 0;
   }
   
@@ -6239,7 +6248,7 @@ inline bool CanType::isActuallyCanonicalOrNull() const {
 
 inline Type TupleTypeElt::getVarargBaseTy() const {
   TypeBase *T = getType().getPointer();
-  if (auto *AT = dyn_cast<ArraySliceType>(T))
+  if (auto *AT = dyn_cast<VariadicSequenceType>(T))
     return AT->getBaseType();
   if (auto *BGT = dyn_cast<BoundGenericType>(T)) {
     // It's the stdlib Array<T>.

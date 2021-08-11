@@ -10,7 +10,7 @@ extension String: P, Q { func paul() {}; mutating func priscilla() {}; func quin
 extension Array: P, Q { func paul() {}; mutating func priscilla() {}; func quinn() {} }
 
 class C {}
-class D: C, P, Q { func paul() {}; func priscilla() {}; func quinn() {} }
+class D: C, P, Q { func paul() {}; func priscilla() {}; func quinn() {}; func d() {} }
 
 let property: some P = 1
 let deflessLet: some P // expected-error{{has no initializer}} {{educational-notes=opaque-type-inference}}
@@ -75,17 +75,19 @@ struct Test {
 
 let zingle = {() -> some P in 1 } // expected-error{{'some' types are only implemented}}
 
+
+// Support for structural opaque result types is hidden behind a compiler flag
+// until the proposal gets approved.
+func twoOpaqueTypes() -> (some P, some P) { return (1, 2) } // expected-error{{'opaque' types cannot be nested inside other types}}
+func asArrayElem() -> (some P)! { return [1] } // expected-error{{'opaque' types cannot be nested inside other types}}
+
 // Invalid positions
 
 typealias Foo = some P // expected-error{{'some' types are only implemented}}
 
 func blibble(blobble: some P) {} // expected-error{{'some' types are only implemented}}
-
-let blubble: () -> some P = { 1 } // expected-error{{'some' types are only implemented}}
-
 func blib() -> P & some Q { return 1 } // expected-error{{'some' should appear at the beginning}}
-func blab() -> (P, some Q) { return (1, 2) } // expected-error{{'some' types are only implemented}}
-func blob() -> (some P) -> P { return { $0 } } // expected-error{{'some' types are only implemented}}
+func blab() -> some P? { return 1 } // expected-error{{must specify only}} expected-note{{did you mean to write an optional of an 'opaque' type?}}
 func blorb<T: some P>(_: T) { } // expected-error{{'some' types are only implemented}}
 func blub<T>() -> T where T == some P { return 1 } // expected-error{{'some' types are only implemented}} expected-error{{cannot convert}}
 

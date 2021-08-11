@@ -14,10 +14,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/Module.h"
@@ -72,6 +73,34 @@ SourceRange TypeRepr::getSourceRange() const {
 #include "swift/AST/TypeReprNodes.def"
   }
   llvm_unreachable("unknown kind!");
+}
+
+bool TypeRepr::findIf(llvm::function_ref<bool(TypeRepr *)> pred) {
+  struct Walker : ASTWalker {
+    llvm::function_ref<bool(TypeRepr *)> Pred;
+    bool FoundIt;
+
+    explicit Walker(llvm::function_ref<bool(TypeRepr *)> pred)
+        : Pred(pred), FoundIt(false) {}
+
+    bool walkToTypeReprPre(TypeRepr *ty) override {
+      // Returning false skips any child nodes. If we "found it", we can bail by
+      // returning false repeatedly back up the type tree.
+      return !(FoundIt || (FoundIt = Pred(ty)));
+    }
+  };
+
+  Walker walker(pred);
+  walk(walker);
+  return walker.FoundIt;
+}
+
+// TODO [OPAQUE SUPPORT]: We should probably use something like `Type`'s
+// `RecursiveProperties` to track this instead of computing it.
+bool TypeRepr::hasOpaque() {
+  // TODO [OPAQUE SUPPORT]: In the future we will also need to check if `this`
+  // is a `NamedOpaqueReturnTypeRepr`.
+  return findIf([](TypeRepr *ty) { return isa<OpaqueReturnTypeRepr>(ty); });
 }
 
 /// Standard allocator for TypeReprs.

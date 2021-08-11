@@ -362,22 +362,36 @@ StepResult ComponentStep::take(bool prevFailed) {
     return finalize(/*isSuccess=*/false);
   }
 
+  auto printConstraints = [&](const ConstraintList &constraints) {
+    for (auto &constraint : constraints)
+      constraint.print(getDebugLogger(), &CS.getASTContext().SourceMgr);
+  };
+
   // If we don't have any disjunction or type variable choices left, we're done
   // solving. Make sure we don't have any unsolved constraints left over, using
-  // report_fatal_error to make sure we trap in release builds instead of
-  // potentially miscompiling.
+  // report_fatal_error to make sure we trap in debug builds and fail the step
+  // in release builds.
   if (!CS.ActiveConstraints.empty()) {
-    CS.print(llvm::errs());
-    llvm::report_fatal_error("Active constraints left over?");
+    if (CS.isDebugMode()) {
+      getDebugLogger() << "(failed due to remaining active constraints:\n";
+      printConstraints(CS.ActiveConstraints);
+      getDebugLogger() << ")\n";
+    }
+
+    CS.InvalidState = true;
+    return finalize(/*isSuccess=*/false);
   }
+
   if (!CS.solverState->allowsFreeTypeVariables()) {
     if (!CS.InactiveConstraints.empty()) {
-      CS.print(llvm::errs());
-      llvm::report_fatal_error("Inactive constraints left over?");
-    }
-    if (CS.hasFreeTypeVariables()) {
-      CS.print(llvm::errs());
-      llvm::report_fatal_error("Free type variables left over?");
+      if (CS.isDebugMode()) {
+        getDebugLogger() << "(failed due to remaining inactive constraints:\n";
+        printConstraints(CS.InactiveConstraints);
+        getDebugLogger() << ")\n";
+      }
+
+      CS.InvalidState = true;
+      return finalize(/*isSuccess=*/false);
     }
   }
 
@@ -636,59 +650,6 @@ bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
     if (declA->getBaseIdentifier().isArithmeticOperator() &&
         TypeChecker::isDeclRefinementOf(declA, declB)) {
       return skip("subtype");
-    }
-  }
-
-  // If the solver already found a solution with a choice that did not
-  // introduce any conversions (i.e., the score is not worse than the
-  // current score), we can skip any generic operators with conformance
-  // requirements that are not satisfied by any known argument types.
-  auto argFnType = CS.getAppliedDisjunctionArgumentFunction(Disjunction);
-  auto checkRequirementsEarly = [&]() -> bool {
-    auto bestScore = getBestScore(Solutions);
-    if (!(bestScore && choice.isGenericOperator() && argFnType))
-      return false;
-
-    auto currentScore = getCurrentScore();
-    for (unsigned i = 0; i < NumScoreKinds; ++i) {
-      if (i == SK_NonDefaultLiteral)
-        continue;
-
-      if (bestScore->Data[i] > currentScore.Data[i])
-        return false;
-    }
-
-    return true;
-  };
-  if (checkRequirementsEarly()) {
-    Constraint *constraint = choice;
-    auto *decl = constraint->getOverloadChoice().getDecl();
-    if (decl->getBaseIdentifier().isArithmeticOperator()) {
-      auto *useDC = constraint->getOverloadUseDC();
-      auto choiceType = CS.getEffectiveOverloadType(
-          constraint->getLocator(), constraint->getOverloadChoice(),
-          /*allowMembers=*/true, useDC);
-      auto choiceFnType = choiceType->getAs<FunctionType>();
-      auto genericFnType = decl->getInterfaceType()->getAs<GenericFunctionType>();
-      auto signature = genericFnType->getGenericSignature();
-
-      for (auto argParamPair : llvm::zip(argFnType->getParams(),
-                                         choiceFnType->getParams())) {
-        auto argType = std::get<0>(argParamPair).getPlainType();
-        auto paramType = std::get<1>(argParamPair).getPlainType();
-
-        // Only check argument types with no type variables that will be matched
-        // against a plain type parameter.
-        argType = argType->getCanonicalType()->getWithoutSpecifierType();
-        if (argType->hasTypeVariable() || !paramType->isTypeParameter())
-          continue;
-
-        for (auto *protocol : signature->getRequiredProtocols(paramType)) {
-          if (!TypeChecker::conformsToProtocol(argType, protocol,
-                                               useDC->getParentModule()))
-            return skip("unsatisfied");
-        }
-      }
     }
   }
 

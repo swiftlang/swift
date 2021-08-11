@@ -359,16 +359,6 @@ bool TypeResolution::areSameType(Type type1, Type type2) const {
   return areSameType(depMem1->getBase(), depMem2->getBase());
 }
 
-Type TypeChecker::getArraySliceType(SourceLoc loc, Type elementType) {
-  ASTContext &ctx = elementType->getASTContext();
-  if (!ctx.getArrayDecl()) {
-    ctx.Diags.diagnose(loc, diag::sugar_type_not_found, 0);
-    return ErrorType::get(ctx);
-  }
-
-  return ArraySliceType::get(elementType);
-}
-
 Type TypeChecker::getOptionalType(SourceLoc loc, Type elementType) {
   ASTContext &ctx = elementType->getASTContext();
   if (!ctx.getOptionalDecl()) {
@@ -2041,9 +2031,27 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
     return resolveProtocolType(cast<ProtocolTypeRepr>(repr), options);
 
   case TypeReprKind::OpaqueReturn: {
-    // Only valid as the return type of a function, which should be handled
-    // during function decl type checking.
+    // If the opaque type is in a valid position, e.g. part of a function return
+    // type, resolution should happen in the context of an `OpaqueTypeDecl`.
+    // This decl is implicit in the source and is created in such contexts by
+    // evaluation of an `OpaqueResultTypeRequest`.
     auto opaqueRepr = cast<OpaqueReturnTypeRepr>(repr);
+    auto *DC = getDeclContext();
+    if (isa<OpaqueTypeDecl>(DC)) {
+      auto opaqueDecl = cast<OpaqueTypeDecl>(DC);
+      auto outerGenericSignature = opaqueDecl->getNamingDecl()
+                                       ->getInnermostDeclContext()
+                                       ->getGenericSignatureOfContext();
+
+      SubstitutionMap subs;
+      if (outerGenericSignature)
+        subs = outerGenericSignature->getIdentitySubstitutionMap();
+
+      unsigned ordinal = opaqueDecl->getAnonymousOpaqueParamOrdinal(opaqueRepr);
+      return OpaqueTypeArchetypeType::get(opaqueDecl, ordinal, subs);
+    }
+
+    // We are not inside an `OpaqueTypeDecl`, so diagnose an error.
     if (!(options & TypeResolutionFlags::SilenceErrors)) {
       diagnose(opaqueRepr->getOpaqueLoc(),
                diag::unsupported_opaque_type);
@@ -3586,12 +3594,17 @@ NeverNullType TypeResolver::resolveArrayType(ArrayTypeRepr *repr,
     return ErrorType::get(getASTContext());
   }
 
-  auto sliceTy =
-    TypeChecker::getArraySliceType(repr->getBrackets().Start, baseTy);
-  if (sliceTy->hasError())
-    return ErrorType::get(getASTContext());
+  ASTContext &ctx = baseTy->getASTContext();
+  // If the standard library isn't loaded, we ought to let the user know
+  // something has gone terribly wrong, since the rest of the compiler is going
+  // to assume it can canonicalize [T] to Array<T>.
+  if (!ctx.getArrayDecl()) {
+    ctx.Diags.diagnose(repr->getBrackets().Start,
+                       diag::sugar_type_not_found, 0);
+    return ErrorType::get(ctx);
+  }
 
-  return sliceTy;
+  return ArraySliceType::get(baseTy);
 }
 
 NeverNullType

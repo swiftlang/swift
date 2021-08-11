@@ -1312,7 +1312,7 @@ public:
 
     // Determine whether this nominal type is _ObjectiveCBridgeable.
     SmallVector<ProtocolConformance *, 2> conformances;
-    if (!nominal->lookupConformance(&owningPrinter.M, proto, conformances))
+    if (!nominal->lookupConformance(proto, conformances))
       return nullptr;
 
     // Dig out the Objective-C type.

@@ -6,6 +6,9 @@
 #define MAIN_ACTOR __attribute__((__swift_attr__("@MainActor")))
 #define MAIN_ACTOR_UNSAFE __attribute__((__swift_attr__("@_unsafeMainActor")))
 
+#define NS_EXTENSIBLE_STRING_ENUM __attribute__((swift_wrapper(struct)));
+typedef NSString *Flavor NS_EXTENSIBLE_STRING_ENUM;
+
 @protocol ServiceProvider
 @property(readonly) NSArray<NSString *> *allOperations;
 -(void)allOperationsWithCompletionHandler:(void (^)(NSArray<NSString *> *))completion;
@@ -24,7 +27,7 @@ typedef void (^CompletionHandler)(NSString * _Nullable, NSString * _Nullable_res
 -(BOOL)findAnswerFailinglyWithError:(NSError * _Nullable * _Nullable)error completion:(void (^)(NSString *_Nullable, NSError * _Nullable))handler __attribute__((swift_name("findAnswerFailingly(completionHandler:)")));
 -(void)findQAndAWithCompletionHandler:(void (^)(NSString *_Nullable_result, NSString *_Nullable answer, NSError * _Nullable))handler;
 -(void)findQuestionableAnswersWithCompletionHandler:(CompletionHandler)handler;
--(void)doSomethingFun:(NSString *)operation then:(void (^)(void))completionHandler;
+-(void)doSomethingFun:(NSString *)operation then:(void (^)())completionHandler;
 -(void)getFortuneAsynchronouslyWithCompletionHandler:(void (^)(NSString *_Nullable, NSError * _Nullable))handler;
 -(void)getMagicNumberAsynchronouslyWithSeed:(NSInteger)seed completionHandler:(void (^)(NSInteger, NSError * _Nullable))handler;
 @property(readwrite) void (^completionHandler)(NSInteger);
@@ -84,6 +87,12 @@ typedef void (^CompletionHandler)(NSString * _Nullable, NSString * _Nullable_res
 -(void)asyncImportSame:(NSString *)operation replyTo:(void (^)(NSInteger))handler __attribute__((swift_async(none)));
 
 -(void)overridableButRunsOnMainThreadWithCompletionHandler:(MAIN_ACTOR_UNSAFE void (^ _Nullable)(NSString *))completion;
+- (void)obtainClosureWithCompletionHandler:(void (^)(void (^_Nullable)(void),
+                                                     NSError *_Nullable,
+                                                     BOOL))completionHandler
+    __attribute__((swift_async_error(zero_argument, 3)));
+- (void)getIceCreamFlavorWithCompletionHandler:
+    (void (^)(Flavor flavor, NSError *__nullable error))completionHandler;
 @end
 
 @protocol RefrigeratorDelegate<NSObject>

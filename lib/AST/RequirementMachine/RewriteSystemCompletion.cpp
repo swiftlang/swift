@@ -26,7 +26,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/Range.h"
 #include "llvm/ADT/FoldingSet.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 #include <deque>
@@ -82,12 +84,9 @@ Symbol Symbol::prependPrefixToConcreteSubstitutions(
 /// Note that this relation is not commutative; we need to check
 /// for overlap between both (X and Y) and (Y and X).
 OverlapKind
-MutableTerm::checkForOverlap(const MutableTerm &other,
-                             MutableTerm &t,
-                             MutableTerm &v) const {
-  assert(!empty());
-  assert(!other.empty());
-
+Term::checkForOverlap(Term other,
+                      MutableTerm &t,
+                      MutableTerm &v) const {
   if (*this == other) {
     // If this term is equal to the other term, we have an overlap.
     t = MutableTerm();
@@ -408,7 +407,7 @@ RewriteSystem::computeCriticalPair(const Rule &lhs, const Rule &rhs) const {
     // Compute the term TYV.
     t.append(rhs.getRHS());
     t.append(v);
-    return std::make_pair(lhs.getRHS(), t);
+    return std::make_pair(MutableTerm(lhs.getRHS()), t);
   }
 
   case OverlapKind::Second: {
@@ -500,29 +499,6 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
     const auto &newRule = Rules[i];
     if (newRule.getDepth() > maxDepth)
       return std::make_pair(CompletionResult::MaxDepth, steps);
-
-    // Check if the new rule X == Y obsoletes any existing rules.
-    for (unsigned j : indices(Rules)) {
-      // A rule does not obsolete itself.
-      if (i == j)
-        continue;
-
-      auto &rule = Rules[j];
-
-      // Ignore rules that have already been obsoleted.
-      if (rule.isDeleted())
-        continue;
-
-      // If this rule reduces some existing rule, delete the existing rule.
-      if (rule.canReduceLeftHandSide(newRule)) {
-        if (DebugCompletion) {
-          llvm::dbgs() << "$ Deleting rule " << rule << " because "
-                       << "its left hand side contains " << newRule
-                       << "\n";
-        }
-        rule.markDeleted();
-      }
-    }
 
     // If this new rule merges any associated types, process the merge now
     // before we continue with the completion procedure. This is important

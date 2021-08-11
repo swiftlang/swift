@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeCheckAvailability.h"
+#include "TypeCheckConcurrency.h"
 #include "TypeChecker.h"
 #include "TypeCheckObjC.h"
 #include "MiscDiagnostics.h"
@@ -113,6 +114,8 @@ static void forEachOuterDecl(DeclContext *DC, Fn fn) {
     case DeclContextKind::Initializer:
       if (auto *PBI = dyn_cast<PatternBindingInitializer>(DC))
         fn(PBI->getBinding());
+      else if (auto *I = dyn_cast<PropertyWrapperInitializer>(DC))
+        fn(I->getWrappedVar());
       break;
 
     case DeclContextKind::SubscriptDecl:
@@ -1872,7 +1875,7 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
     auto argList = getOriginalArgumentList(argExpr);
 
     size_t numElementsWithinParens = argList.args.size();
-    numElementsWithinParens -= argList.hasTrailingClosure;
+    numElementsWithinParens -= argList.getNumTrailingClosures();
     if (selfIndex >= numElementsWithinParens)
       return;
 
@@ -2120,18 +2123,16 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
     return;
   }
 
-  auto argumentLabelsToCheck = llvm::makeArrayRef(argumentLabelIDs);
-  // The argument label for a trailing closure is ignored.
-  if (argList.hasTrailingClosure)
-    argumentLabelsToCheck = argumentLabelsToCheck.drop_back();
-
-  if (std::equal(argumentLabelsToCheck.begin(), argumentLabelsToCheck.end(),
-                 argList.labels.begin())) {
-    // Already matching.
-    return;
+  // If any of the argument labels are mismatched, perform label correction.
+  for (auto i : indices(argList.args)) {
+    // The argument label of an unlabeled trailing closure is ignored.
+    if (argList.isUnlabeledTrailingClosureIdx(i))
+      continue;
+    if (argumentLabelIDs[i] != argList.labels[i]) {
+      diagnoseArgumentLabelError(ctx, argExpr, argumentLabelIDs, false, &diag);
+      return;
+    }
   }
-
-  diagnoseArgumentLabelError(ctx, argExpr, argumentLabelIDs, false, &diag);
 }
 
 // Must be kept in sync with diag::availability_decl_unavailable_rename and
@@ -2183,26 +2184,6 @@ describeRename(ASTContext &ctx, const AvailableAttr *attr, const ValueDecl *D,
 
   // We don't have enough information.
   return ReplacementDeclKind::None;
-}
-
-/// Returns a value that can be used to select between accessor kinds in
-/// diagnostics.
-///
-/// This is correlated with diag::availability_deprecated and others.
-static std::pair<unsigned, DeclName>
-getAccessorKindAndNameForDiagnostics(const ValueDecl *D) {
-  // This should always be one more than the last AccessorKind supported in
-  // the diagnostics. If you need to change it, change the assertion below as
-  // well.
-  static const unsigned NOT_ACCESSOR_INDEX = 2;
-
-  if (auto *accessor = dyn_cast<AccessorDecl>(D)) {
-    DeclName Name = accessor->getStorage()->getName();
-    assert(accessor->isGetterOrSetter());
-    return {static_cast<unsigned>(accessor->getAccessorKind()), Name};
-  }
-
-  return {NOT_ACCESSOR_INDEX, D->getName()};
 }
 
 void TypeChecker::diagnoseIfDeprecated(SourceRange ReferenceRange,
@@ -3480,6 +3461,12 @@ void swift::diagnoseTypeAvailability(const TypeRepr *TR, Type T, SourceLoc loc,
   diagnoseTypeAvailability(T, loc, where, flags);
 }
 
+static void diagnoseMissingConformance(
+    SourceLoc loc, Type type, ProtocolDecl *proto) {
+  assert(proto->isSpecificProtocol(KnownProtocolKind::Sendable));
+  diagnoseMissingSendableConformance(loc, type);
+}
+
 bool
 swift::diagnoseConformanceAvailability(SourceLoc loc,
                                        ProtocolConformanceRef conformance,
@@ -3492,6 +3479,15 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
 
   const ProtocolConformance *concreteConf = conformance.getConcrete();
   const RootProtocolConformance *rootConf = concreteConf->getRootConformance();
+
+  // Diagnose "missing" conformances where we needed a conformance but
+  // didn't have one.
+  if (auto builtinConformance = dyn_cast<BuiltinProtocolConformance>(rootConf)){
+    if (builtinConformance->isMissing()) {
+      diagnoseMissingConformance(loc, builtinConformance->getType(),
+                                 builtinConformance->getProtocol());
+    }
+  }
 
   auto *DC = where.getDeclContext();
 

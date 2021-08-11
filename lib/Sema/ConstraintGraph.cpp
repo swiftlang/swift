@@ -37,7 +37,14 @@ using namespace constraints;
 ConstraintGraph::ConstraintGraph(ConstraintSystem &cs) : CS(cs) { }
 
 ConstraintGraph::~ConstraintGraph() {
-  assert(Changes.empty() && "Scope stack corrupted");
+#ifndef NDEBUG
+  // If constraint system is in an invalid state, it's
+  // possible that constraint graph is corrupted as well
+  // so let's not attempt to check change log.
+  if (!CS.inInvalidState())
+    assert(Changes.empty() && "Scope stack corrupted");
+#endif
+
   for (unsigned i = 0, n = TypeVariables.size(); i != n; ++i) {
     auto &impl = TypeVariables[i]->getImpl();
     delete impl.getGraphNode();
@@ -412,6 +419,11 @@ ConstraintGraphScope::ConstraintGraphScope(ConstraintGraph &CG)
 }
 
 ConstraintGraphScope::~ConstraintGraphScope() {
+  // Don't attempt to rollback if constraint system ended up
+  // in an invalid state.
+  if (CG.CS.inInvalidState())
+    return;
+
   // Pop changes off the stack until we hit the change could we had prior to
   // introducing this scope.
   assert(CG.Changes.size() >= NumChanges && "Scope stack corrupted");

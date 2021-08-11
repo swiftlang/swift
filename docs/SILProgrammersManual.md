@@ -161,6 +161,9 @@ idioms, it becomes overly burdensome to evolve these APIs over time.
 
 ## `AccessedStorage` and `AccessPath`
 
+TODO: move this section to a separate document and refer to it from
+SIL.rst.
+
 The `AccessedStorage` and `AccessPath` types formalize memory access
 in SIL. Given an address-typed SIL value, it is possible to
 reliably identify the storage location of the accessed
@@ -193,17 +196,17 @@ address is immutable for the duration of its access scope
 
 Computing `AccessedStorage` and `AccessPath` for any given SIL address
 involves a use-def traversal to determine the origin of the
-address. It may traverse operations on address, pointer, box, and
-reference types. The logic that formalizes which SIL operations may be
-involved in the def-use chain is encapsulated with the
-`AccessUseDefChainVisitor`. The traversal can be customized by
-implementing this visitor. Customization is not expected to change the
-meaning of AccessedStorage or AccessPath. Rather, it is intended for
-additional pass-specific book-keeping or for higher-level convenience
-APIs that operate on the use-def chain bypassing AccessedStorage
-completely.
+address. It may traverse operations on values of type address,
+Builtin.RawPointer, box, and reference. The logic that
+formalizes which SIL operations may be involved in the def-use chain
+is encapsulated with the `AccessUseDefChainVisitor`. The traversal can
+be customized by implementing this visitor. Customization is not
+expected to change the meaning of AccessedStorage or
+AccessPath. Rather, it is intended for additional pass-specific
+book-keeping or for higher-level convenience APIs that operate on the
+use-def chain bypassing AccessedStorage completely.
 
-Access def-use chains are divided by four points: the "root", the
+Access def-use chains are divided by four points: the object "root", the
 access "base", the outer-most "access" scope, and the "address" of a
 memory operation. For example:
 ```
@@ -222,18 +225,28 @@ memory operation. For example:
   end_access %access : $*S
 ```
 
+OR
+
+```
+  %root    = alloc_box $S
+  %base    = project_box %root : ${ var S }
+  %access  = begin_access [read] [static] %base : $*S
+  %address = struct_element_addr %access : $*S, #.field
+  %value   = load [trivial] %address : $*Int64
+  end_access %access : $*S
+```
+
 #### Reference root
 
 The first part of the def-use chain computes the formal access base
-from the root of the object (e.g. `alloc_ref ->
-ref_element_addr`). The reference root might be a locally allocated
-object, a function argument, a function result, or a reference loaded
-from storage. There is no enforcement on the type of operation that
-can produce a reference; however, only reference types or
-Builtin.BridgeObject types are only allowed in this part of the
+from the root of the object (e.g. `alloc_ref -> ref_element_addr` and
+`alloc_box -> project_box`). The reference root might be a locally
+allocated object, a function argument, a function result, or a
+reference loaded from storage. There is no enforcement on the type of
+operation that can produce a reference; however, only reference types, Builtin.BridgeObject types, and box types are allowed in this part of the
 def-use chain. The reference root is the greatest common ancestor in
 the def-use graph that can identify an object by a single SILValue. If
-the root as an `alloc_ref`, then it is *uniquely identified*. The
+the root is an `alloc_ref`, then it is *uniquely identified*. The
 def-use chain from the root to the base may contain reference casts
 (`isRCIdentityPreservingCast`) and phis.
 
@@ -268,18 +281,28 @@ formal access base. The reference root is only one component of an
 `AccessedStorage` location. AccessedStorage also identifies the class
 property being accessed within that object.
 
+A reference root may be borrowed, so the use-def path from the base to
+the root may cross a borrow scope. This means that uses of one base
+may not be replaced with a different base even if it has the same
+AccessedStorage because they may not be contained within the same
+borrow scope. However, this is the only part of the access path that
+may be borrowed. Address uses with the same base can be substituted
+without checking the borrow scope.
+
 #### Access base
 
-The access base is the SILValue produced by an instruction that
-directly identifies the kind of storage being accessed without further
-use-def traversal. Common access bases are `alloc_box`, `alloc_stack`,
-`global_addr`, `ref_element_addr`, and function arguments (see
+The access base is the address or Builtin.RawPointer type SILValue
+produced by an instruction that directly identifies the kind of
+storage being accessed without further use-def traversal. Common
+access bases are `alloc_stack`, `global_addr`,
+`ref_element_addr`, `project_box`, and function arguments (see
 `AccessedStorage::Kind`).
 
 The access base is the same as the "root" SILValue for all storage
-kinds except global and class storage. Global storage has no root. For
-class storage the root is the SILValue that identifies object,
-described as the "reference root" above.
+kinds except global and reference storage. Reference storage includes
+class, tail and box storage. Global storage has no root. For reference
+storage the root is the SILValue that identifies object, described as
+the "reference root" above.
 
 "Box" storage is uniquely identified by an `alloc_box`
 instruction. Therefore, we consider the `alloc_box` to be the base of
@@ -287,10 +310,16 @@ the access. Box storage does not apply to all box types or box
 projections, which may instead originate from arguments or indirect
 enums for example.
 
+An access scope, identified by a `begin_access` marker, may only occur
+on the def-use path between the access base and any address
+projections. The def-use path from the root to the base cannot cross
+an access scope. Likewise, the def-use between an access projection
+and the memory operation cannot cross an access scope.
+
 Typically, the base is the address-type source operand of a
 `begin_access`. However, the path from the access base to the
 `begin_access` may include *storage casts* (see
-`isAccessedStorageCast`). It may involve address, pointer, and box
+`isAccessedStorageCast`). It may involve address an pointer
 types, and may traverse phis. For some kinds of storage, the base may
 itself even be a non-address pointer. For phis that cannot be uniquely
 resolved, the base may even be a box type.
@@ -322,9 +351,9 @@ which address storage is always uniquely determined. Currently, if a
 (non-address) phi on the access path from `base` to `access` does not
 have a common base, then it is considered an invalid access (the
 AccessedStorage object is not valid). SIL verification ensures that a
-formal access always has valid AccessedStorage (WIP). In other words, the
-source of a `begin_access` marker must be a single, non-phi base. In
-the future, for further simplicity, we may generally disallow box and
+formal access always has valid AccessedStorage (WIP). In other words,
+the source of a `begin_access` marker must be a single, non-phi
+base. In the future, for further simplicity, we may also disallow
 pointer phis unless they have a common base.
 
 Not all SIL memory access is part of a formal access, but the
@@ -334,8 +363,8 @@ the use-def search does not begin at a `begin_access` marker. For
 non-formal access, SIL verification is not as strict. An invalid
 access is allowed, but handled conservatively. This is safe as long as
 those non-formal accesses can never alias with class and global
-storage. Class and global access is always guarded by formal access
-markers--at least until static markers are stripped from SIL.
+storage. Class and global access must always be guarded by formal
+access markers--at least until static markers are stripped from SIL.
 
 #### Nested access
 

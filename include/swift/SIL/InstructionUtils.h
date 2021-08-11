@@ -27,10 +27,6 @@ SILValue getUnderlyingObject(SILValue V);
 
 SILValue getUnderlyingObjectStopAtMarkDependence(SILValue V);
 
-/// Given an address look through address to address projections and indexing
-/// insts.
-SILValue getUnderlyingObjectStoppingAtObjectToAddrProjections(SILValue v);
-
 SILValue stripSinglePredecessorArgs(SILValue V);
 
 /// Return the underlying SILValue after stripping off all casts from the

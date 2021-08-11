@@ -14,16 +14,12 @@ import Swift
 
 @available(SwiftStdlib 5.5, *)
 extension Task where Success == Never, Failure == Never {
-  /// Suspends the current task for _at least_ the given duration
-  /// in nanoseconds.
-  ///
-  /// This function does _not_ block the underlying thread.
+  @available(*, deprecated, renamed: "Task.sleep(nanoseconds:)")
   public static func sleep(_ duration: UInt64) async {
-    let currentTask = Builtin.getCurrentAsyncTask()
-    let priority = getJobFlags(currentTask).priority ?? Task.currentPriority._downgradeUserInteractive
-
     return await Builtin.withUnsafeContinuation { (continuation: Builtin.RawUnsafeContinuation) -> Void in
-      let job = _taskCreateNullaryContinuationJob(priority: Int(priority.rawValue), continuation: continuation)
+      let job = _taskCreateNullaryContinuationJob(
+          priority: Int(Task.currentPriority.rawValue),
+          continuation: continuation)
       _enqueueJobGlobalWithDelay(duration, job)
     }
   }

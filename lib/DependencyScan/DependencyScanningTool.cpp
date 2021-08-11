@@ -25,7 +25,7 @@ namespace swift {
 namespace dependencies {
 
 DependencyScanningTool::DependencyScanningTool()
-    : SharedCache(std::make_unique<ModuleDependenciesCache>()),
+    : SharedCache(std::make_unique<GlobalModuleDependenciesCache>()),
       VersionedPCMInstanceCacheCache(
           std::make_unique<CompilerArgInstanceCacheMap>()),
       PDC(), Alloc(), Saver(Alloc) {}
@@ -40,8 +40,10 @@ DependencyScanningTool::getDependencies(
     return EC;
   auto Instance = std::move(*InstanceOrErr);
 
+  // Local scan cache instance, wrapping the shared global cache.
+  ModuleDependenciesCache cache(*SharedCache);
   // Execute the scanning action, retreiving the in-memory result
-  auto DependenciesOrErr = performModuleScan(*Instance.get(), *SharedCache);
+  auto DependenciesOrErr = performModuleScan(*Instance.get(), cache);
   if (DependenciesOrErr.getError())
     return std::make_error_code(std::errc::not_supported);
   auto Dependencies = std::move(*DependenciesOrErr);
@@ -78,8 +80,10 @@ DependencyScanningTool::getDependencies(
         BatchInput.size(), std::make_error_code(std::errc::invalid_argument));
   auto Instance = std::move(*InstanceOrErr);
 
+  // Local scan cache instance, wrapping the shared global cache.
+  ModuleDependenciesCache cache(*SharedCache);
   auto BatchScanResults = performBatchModuleScan(
-      *Instance.get(), *SharedCache, VersionedPCMInstanceCacheCache.get(),
+      *Instance.get(), cache, VersionedPCMInstanceCacheCache.get(),
       Saver, BatchInput);
 
   return BatchScanResults;
@@ -97,7 +101,7 @@ bool DependencyScanningTool::loadCache(llvm::StringRef path) {
   SourceManager SM;
   DiagnosticEngine Diags(SM);
   Diags.addConsumer(PDC);
-  SharedCache = std::make_unique<ModuleDependenciesCache>();
+  SharedCache = std::make_unique<GlobalModuleDependenciesCache>();
   bool readFailed =
       module_dependency_cache_serialization::readInterModuleDependenciesCache(
           path, *SharedCache);
@@ -108,7 +112,7 @@ bool DependencyScanningTool::loadCache(llvm::StringRef path) {
 }
 
 void DependencyScanningTool::resetCache() {
-  SharedCache.reset(new ModuleDependenciesCache());
+  SharedCache.reset(new GlobalModuleDependenciesCache());
 }
 
 llvm::ErrorOr<std::unique_ptr<CompilerInstance>>

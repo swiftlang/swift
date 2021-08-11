@@ -16,6 +16,7 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/LinearLifetimeChecker.h"
 #include "swift/SIL/Projection.h"
+#include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
 
@@ -717,7 +718,8 @@ bool InteriorPointerOperand::findTransitiveUsesForAddress(
         isa<AssignByWrapperInst>(user) || isa<BeginUnpairedAccessInst>(user) ||
         isa<EndUnpairedAccessInst>(user) || isa<WitnessMethodInst>(user) ||
         isa<SwitchEnumAddrInst>(user) || isa<CheckedCastAddrBranchInst>(user) ||
-        isa<SelectEnumAddrInst>(user) || isa<InjectEnumAddrInst>(user)) {
+        isa<SelectEnumAddrInst>(user) || isa<InjectEnumAddrInst>(user) ||
+        isa<IsUniqueInst>(user)) {
       continue;
     }
 
@@ -729,7 +731,8 @@ bool InteriorPointerOperand::findTransitiveUsesForAddress(
         isa<BeginAccessInst>(user) || isa<TailAddrInst>(user) ||
         isa<IndexAddrInst>(user) || isa<StoreBorrowInst>(user) ||
         isa<UnconditionalCheckedCastAddrInst>(user) ||
-        isa<UncheckedAddrCastInst>(user)) {
+        isa<UncheckedAddrCastInst>(user)
+        || isa<MarkFunctionEscapeInst>(user)) {
       for (SILValue r : user->getResults()) {
         llvm::copy(r->getUses(), std::back_inserter(worklist));
       }
@@ -784,6 +787,46 @@ bool InteriorPointerOperand::findTransitiveUsesForAddress(
   // We were able to recognize all of the uses of the address, so return false
   // that we did not find any errors.
   return foundError;
+}
+
+// Determine whether \p address may be in a borrow scope and if so record the
+// InteriorPointerOperand that produces the address from a guaranteed value.
+BorrowedAddress::BorrowedAddress(SILValue address) {
+  assert(address->getType().isAddress());
+
+  auto storageWithBase = AccessedStorageWithBase::compute(address);
+  switch (storageWithBase.storage.getKind()) {
+  case AccessedStorage::Argument:
+  case AccessedStorage::Stack:
+  case AccessedStorage::Global:
+  // Unidentified storage is from an "escaped pointer", so it need not be
+  // restricted to a borrow scope.
+  case AccessedStorage::Unidentified:
+    this->mayBeBorrowed = false;
+    return;
+  case AccessedStorage::Box:
+  case AccessedStorage::Yield:
+  case AccessedStorage::Class:
+  case AccessedStorage::Tail:
+    // The base object might be within a borrow scope.
+    break;
+  case AccessedStorage::Nested:
+    llvm_unreachable("unexpected storage");
+  };
+  auto base = storageWithBase.base;
+  if (!base)
+    return; // bail on unexpected patterns
+
+  auto intPtrOp = InteriorPointerOperand::inferFromResult(base);
+  if (!intPtrOp)
+    return;
+
+  SILValue nonAddressValue = intPtrOp.operand->get();
+  if (nonAddressValue->getOwnershipKind() != OwnershipKind::Guaranteed) {
+    this->mayBeBorrowed = false;
+    return;
+  }
+  this->interiorPointerOp = intPtrOp;
 }
 
 //===----------------------------------------------------------------------===//

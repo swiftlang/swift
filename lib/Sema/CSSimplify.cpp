@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "CSDiagnostics.h"
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -28,8 +29,8 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangModule.h"
-#include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/CSFix.h"
+#include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Compiler.h"
@@ -1620,7 +1621,6 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
     subKind = ConstraintKind::Conversion;
     break;
 
-  case ConstraintKind::OpaqueUnderlyingType:
   case ConstraintKind::Bind:
   case ConstraintKind::BindParam:
   case ConstraintKind::BindToPointerType:
@@ -1765,7 +1765,6 @@ static bool matchFunctionRepresentations(FunctionType::ExtInfo einfo1,
     }
     return true;
 
-  case ConstraintKind::OpaqueUnderlyingType:
   case ConstraintKind::BridgingConversion:
   case ConstraintKind::ApplicableFunction:
   case ConstraintKind::DynamicCallableApplicableFunction:
@@ -2167,7 +2166,6 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::Conversion:
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::OperatorArgumentConversion:
-  case ConstraintKind::OpaqueUnderlyingType:
     subKind = ConstraintKind::Subtype;
     break;
 
@@ -5156,7 +5154,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       return formUnsolvedResult();
     }
 
-    case ConstraintKind::OpaqueUnderlyingType:
     case ConstraintKind::ApplicableFunction:
     case ConstraintKind::DynamicCallableApplicableFunction:
     case ConstraintKind::BindOverload:
@@ -6225,7 +6222,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   case ConstraintKind::LiteralConformsTo: {
     // Check whether this type conforms to the protocol.
     auto conformance = DC->getParentModule()->lookupConformance(
-        type, protocol);
+        type, protocol, /*allowMissing=*/true);
     if (conformance) {
       return recordConformance(conformance);
     }
@@ -6485,6 +6482,12 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyTransitivelyConformsTo(
   // If the type doesn't conform, let's check whether
   // an Optional or Unsafe{Mutable}Pointer from it would.
 
+  // If the current score is equal to the best score, fail without checking
+  // implicit conversions, because an implicit conversion would lead to a
+  // worse score anyway.
+  if (solverState && solverState->BestScore && CurrentScore == *solverState->BestScore)
+    return SolutionKind::Error;
+
   SmallVector<Type, 4> typesToCheck;
 
   // T -> Optional<T>
@@ -6633,8 +6636,12 @@ static ConstraintFix *maybeWarnAboutExtraneousCast(
   }
 
   // Except for forced cast expressions, if optionals are more than a single
-  // level difference, we don't need to record any fix.
-  if (!isExpr<ForcedCheckedCastExpr>(anchor) && extraOptionals > 1)
+  // level difference or there is a single level between the types but an extra
+  // level of optional is added to subexpr via OptionalEvaluationExpr, we don't
+  // need to record any fix.
+  if (!isExpr<ForcedCheckedCastExpr>(anchor) &&
+      (extraOptionals > 1 ||
+       isExpr<OptionalEvaluationExpr>(castExpr->getSubExpr())))
     return nullptr;
 
   // Always succeed
@@ -7029,8 +7036,7 @@ allFromConditionalConformances(DeclContext *DC, Type baseTy,
 
     if (auto *protocol = candidateDC->getSelfProtocolDecl()) {
       SmallVector<ProtocolConformance *, 4> conformances;
-      if (!NTD->lookupConformance(DC->getParentModule(), protocol,
-                                  conformances))
+      if (!NTD->lookupConformance(protocol, conformances))
         return false;
 
       // This is opportunistic, there should be a way to narrow the
@@ -8897,7 +8903,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
       // If external parameter is variadic it translates into an array in
       // the body of the closure.
       internalType =
-          param.isVariadic() ? ArraySliceType::get(typeVar) : Type(typeVar);
+          param.isVariadic() ? VariadicSequenceType::get(typeVar) : Type(typeVar);
 
       auto externalType = param.getOldType();
 
@@ -9033,36 +9039,6 @@ ConstraintSystem::simplifyDynamicTypeOfConstraint(
   // It's definitely not either kind of metatype, so we can
   // report failure right away.
   return SolutionKind::Error;
-}
-
-ConstraintSystem::SolutionKind
-ConstraintSystem::simplifyOpaqueUnderlyingTypeConstraint(Type type1, Type type2,
-                                             TypeMatchOptions flags,
-                                             ConstraintLocatorBuilder locator) {
-  // Open the second type, which must be an opaque archetype, to try to
-  // infer the first type using its constraints.
-  auto opaque2 = type2->castTo<OpaqueTypeArchetypeType>();
-
-  // Open the generic signature of the opaque decl, and bind the "outer" generic
-  // params to our context. The remaining axes of freedom on the type variable
-  // corresponding to the underlying type should be the constraints on the
-  // underlying return type.
-  OpenedTypeMap replacements;
-  openGeneric(DC, opaque2->getBoundSignature(), locator, replacements);
-
-  auto underlyingTyVar = openType(opaque2->getInterfaceType(),
-                                  replacements);
-  assert(underlyingTyVar);
-  
-  for (auto param : DC->getGenericSignatureOfContext().getGenericParams()) {
-    addConstraint(ConstraintKind::Bind,
-                  openType(param, replacements),
-                  DC->mapTypeIntoContext(param),
-                  locator);
-  }
-
-  addConstraint(ConstraintKind::Equal, type1, underlyingTyVar, locator);
-  return getTypeMatchSuccess();
 }
 
 ConstraintSystem::SolutionKind
@@ -11700,10 +11676,6 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
   case ConstraintKind::OperatorArgumentConversion:
     return addArgumentConversionConstraintImpl(kind, first, second, locator);
 
-  case ConstraintKind::OpaqueUnderlyingType:
-    return simplifyOpaqueUnderlyingTypeConstraint(first, second,
-                                                  subflags, locator);
-
   case ConstraintKind::BridgingConversion:
     return simplifyBridgingConstraint(first, second, subflags, locator);
 
@@ -11986,8 +11958,7 @@ void ConstraintSystem::addConstraint(ConstraintKind kind, Type first,
 }
 
 void ConstraintSystem::addContextualConversionConstraint(
-    Expr *expr, Type conversionType, ContextualTypePurpose purpose,
-    bool isOpaqueReturnType) {
+    Expr *expr, Type conversionType, ContextualTypePurpose purpose) {
   if (conversionType.isNull())
     return;
 
@@ -11996,11 +11967,13 @@ void ConstraintSystem::addContextualConversionConstraint(
   switch (purpose) {
   case CTP_ReturnStmt:
   case CTP_ReturnSingleExpr:
-  case CTP_Initialization:
-    if (isOpaqueReturnType)
-      constraintKind = ConstraintKind::OpaqueUnderlyingType;
+  case CTP_Initialization: {
+    if (conversionType->is<OpaqueTypeArchetypeType>())
+      constraintKind = ConstraintKind::Equal;
+    // Alternatively, we might have a nested opaque archetype, e.g. `(some P)?`.
+    // In that case, we want `ConstraintKind::Conversion`.
     break;
-
+  }
   case CTP_CallArgument:
     constraintKind = ConstraintKind::ArgumentConversion;
     break;
@@ -12036,8 +12009,9 @@ void ConstraintSystem::addContextualConversionConstraint(
   // Add the constraint.
   auto *convertTypeLocator =
       getConstraintLocator(expr, LocatorPathElt::ContextualType(purpose));
-  addConstraint(constraintKind, getType(expr), conversionType,
-                convertTypeLocator, /*isFavored*/ true);
+  auto openedType = openOpaqueType(conversionType, purpose, convertTypeLocator);
+  addConstraint(constraintKind, getType(expr), openedType, convertTypeLocator,
+                /*isFavored*/ true);
 }
 
 void ConstraintSystem::addFixConstraint(ConstraintFix *fix, ConstraintKind kind,
@@ -12106,8 +12080,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   case ConstraintKind::Subtype:
   case ConstraintKind::Conversion:
   case ConstraintKind::ArgumentConversion:
-  case ConstraintKind::OperatorArgumentConversion:
-  case ConstraintKind::OpaqueUnderlyingType: {
+  case ConstraintKind::OperatorArgumentConversion: {
     // Relational constraints.
 
     // If there is a fix associated with this constraint, apply it.

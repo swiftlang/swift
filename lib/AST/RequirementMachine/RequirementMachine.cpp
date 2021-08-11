@@ -171,6 +171,13 @@ void RewriteSystemBuilder::addRequirement(const Requirement &req,
     // A superclass requirement T : C<X, Y> becomes a rewrite rule
     //
     //   T.[superclass: C<X, Y>] => T
+    //
+    // Together with a rewrite rule
+    //
+    //   T.[layout: L] => T
+    //
+    // Where 'L' is either AnyObject or _NativeObject, depending on the
+    // ancestry of C.
     auto otherType = CanType(req.getSecondType());
 
     SmallVector<Term, 1> substitutions;
@@ -180,6 +187,16 @@ void RewriteSystemBuilder::addRequirement(const Requirement &req,
     constraintTerm = subjectTerm;
     constraintTerm.add(Symbol::forSuperclass(otherType, substitutions,
                                              Context));
+    Rules.emplace_back(subjectTerm, constraintTerm);
+
+    constraintTerm = subjectTerm;
+    auto layout =
+      LayoutConstraint::getLayoutConstraint(
+        otherType->getClassOrBoundGenericClass()->usesObjCObjectModel()
+          ? LayoutConstraintKind::Class
+          : LayoutConstraintKind::NativeClass,
+        Context.getASTContext());
+    constraintTerm.add(Symbol::forLayout(layout, Context));
     break;
   }
 
@@ -374,7 +391,10 @@ void RequirementMachine::computeCompletion() {
 
     // Simplify right hand sides in preparation for building the
     // property map.
-    System.simplifyRightHandSides();
+    System.simplifyRewriteSystem();
+
+    // Check invariants.
+    System.verify();
 
     // Build the property map, which also performs concrete term
     // unification; if this added any new rules, run the completion

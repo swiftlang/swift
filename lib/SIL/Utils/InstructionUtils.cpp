@@ -62,20 +62,6 @@ SILValue swift::getUnderlyingObject(SILValue v) {
   }
 }
 
-SILValue
-swift::getUnderlyingObjectStoppingAtObjectToAddrProjections(SILValue v) {
-  if (!v->getType().isAddress())
-    return SILValue();
-
-  while (true) {
-    auto v2 = lookThroughAddressToAddressProjections(v);
-    v2 = stripIndexingInsts(v2);
-    if (v2 == v)
-      return v2;
-    v = v2;
-  }
-}
-
 SILValue swift::getUnderlyingObjectStopAtMarkDependence(SILValue v) {
   while (true) {
     SILValue v2 = stripCastsWithoutMarkDependence(v);
@@ -135,6 +121,9 @@ SILValue swift::stripSinglePredecessorArgs(SILValue V) {
 SILValue swift::stripCastsWithoutMarkDependence(SILValue v) {
   while (true) {
     v = stripSinglePredecessorArgs(v);
+    if (isa<MarkDependenceInst>(v))
+      return v;
+
     if (auto *svi = dyn_cast<SingleValueInstruction>(v)) {
       if (isRCIdentityPreservingCast(svi)
           || isa<UncheckedTrivialBitCastInst>(v)

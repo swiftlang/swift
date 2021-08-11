@@ -250,6 +250,10 @@ option(SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER
        "Use the host compiler and not the internal clang to build the swift runtime"
        FALSE)
 
+option(SWIFT_RUN_TESTS_WITH_HOST_COMPILER
+       "Run tests against the host compiler and not the just built swift"
+       FALSE)
+
 set(SWIFT_SDKS "" CACHE STRING
     "If non-empty, limits building target binaries only to specified SDKs (despite other SDKs being available)")
 

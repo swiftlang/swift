@@ -97,7 +97,8 @@ struct SwiftCodeCompletionConsumer
   }
   void clearContext() { swiftContext = SwiftCompletionInfo(); }
 
-  void handleResults(MutableArrayRef<CodeCompletionResult *> Results) override {
+  void handleResults(CodeCompletionContext &context) override {
+    MutableArrayRef<CodeCompletionResult *> Results = context.takeResults();
     assert(swiftContext.swiftASTContext);
     handleResultsImpl(Results, swiftContext);
   }

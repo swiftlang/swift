@@ -326,6 +326,38 @@ DeclAttributes::getDeprecated(const ASTContext &ctx) const {
   return conditional;
 }
 
+const AvailableAttr *
+DeclAttributes::getSoftDeprecated(const ASTContext &ctx) const {
+  const AvailableAttr *conditional = nullptr;
+  const AvailableAttr *bestActive = findMostSpecificActivePlatform(ctx);
+  for (auto Attr : *this) {
+    if (auto AvAttr = dyn_cast<AvailableAttr>(Attr)) {
+      if (AvAttr->isInvalid())
+        continue;
+
+      if (AvAttr->hasPlatform() &&
+          (!bestActive || AvAttr != bestActive))
+        continue;
+
+      if (!AvAttr->isActivePlatform(ctx) &&
+          !AvAttr->isLanguageVersionSpecific() &&
+          !AvAttr->isPackageDescriptionVersionSpecific())
+        continue;
+
+      Optional<llvm::VersionTuple> DeprecatedVersion = AvAttr->Deprecated;
+      if (!DeprecatedVersion.hasValue())
+        continue;
+
+      llvm::VersionTuple ActiveVersion = AvAttr->getActiveVersion(ctx);
+
+      if (DeprecatedVersion.getValue() > ActiveVersion) {
+        conditional = AvAttr;
+      }
+    }
+  }
+  return conditional;
+}
+
 void DeclAttributes::dump(const Decl *D) const {
   StreamPrinter P(llvm::errs());
   PrintOptions PO = PrintOptions::printEverything();
@@ -886,17 +918,10 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     } else if (Attr->RenameDecl) {
       Printer << ", renamed: \"";
       if (auto *Accessor = dyn_cast<AccessorDecl>(Attr->RenameDecl)) {
-        switch (Accessor->getAccessorKind()) {
-        case AccessorKind::Get:
-          Printer << "getter:";
-          break;
-        case AccessorKind::Set:
-          Printer << "setter:";
-          break;
-        default:
-          break;
-        }
-        Printer << Accessor->getStorage()->getName() << "()";
+        SmallString<32> Name;
+        llvm::raw_svector_ostream OS(Name);
+        Accessor->printUserFacingName(OS);
+        Printer << Name.str();
       } else {
         Printer << Attr->RenameDecl->getName();
       }

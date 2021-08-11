@@ -98,6 +98,11 @@ public:
     return Union.get<ProtocolDecl*>();
   }
 
+  /// Determine whether this conformance (or a conformance it depends on)
+  /// involves a "missing" conformance anywhere. Such conformances
+  /// cannot be depended on to always exist.
+  bool hasMissingConformance(ModuleDecl *module) const;
+
   using OpaqueValue = void*;
   OpaqueValue getOpaqueValue() const { return Union.getOpaqueValue(); }
   static ProtocolConformanceRef getFromOpaqueValue(OpaqueValue value) {

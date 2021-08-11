@@ -574,12 +574,14 @@ AbstractionPattern AbstractionPattern::getFunctionResultType() const {
         // If there's a single argument, abstract it according to its formal type
         // in the ObjC signature.
         unsigned callbackResultIndex = 0;
-        if (callbackErrorIndex && callbackResultIndex >= *callbackErrorIndex)
-          ++callbackResultIndex;
-        if (callbackErrorFlagIndex
-            && callbackResultIndex >= *callbackErrorFlagIndex)
-          ++callbackResultIndex;
-
+        for (auto index : indices(callbackParamTy->getParamTypes())) {
+          if (callbackErrorIndex && index == *callbackErrorIndex)
+            continue;
+          if (callbackErrorFlagIndex && index == *callbackErrorFlagIndex)
+            continue;
+          callbackResultIndex = index;
+          break;
+        }
         auto clangResultType = callbackParamTy
           ->getParamType(callbackResultIndex)
           .getTypePtr();

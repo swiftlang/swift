@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -emit-module -module-name tf1202 -emit-module-path %t/tf1202.swiftmodule %S/Inputs/tf1202-differentiability-witness-dead-function-elimination.swift
-// RUN: %target-build-swift -I%t -emit-module -O %s
+// RUN: %target-build-swift -emit-module -module-name tf1202 -emit-module-path %t/tf1202.swiftmodule %S/Inputs/tf1202-differentiability-witness-dead-function-elimination.swift -Xfrontend -requirement-machine=off
+// RUN: %target-build-swift -I%t -emit-module -O %s -Xfrontend -requirement-machine=off
 
 // TF-1202: test bug where DeadFunctionElimination eliminated the
 // SILFunction for `func identity<T>` even though a differentiability witness for it
