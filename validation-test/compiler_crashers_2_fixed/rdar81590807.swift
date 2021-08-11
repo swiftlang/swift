@@ -5,7 +5,10 @@
 // RUN: %target-run %t/main > %t/log 2>&1 || true
 // RUN: %FileCheck %s < %t/log
 
-// REQUIRES: rdar81804817
+// Unsupported because the crash on continueIncorrect is just an illegal 
+// instruction rather than a nice fatal error.
+// UNSUPPORTED: swift_test_mode_optimize
+// UNSUPPORTED: swift_test_mode_optimize_size
 
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx || OS=ios
