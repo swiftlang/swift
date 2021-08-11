@@ -609,7 +609,7 @@ ModuleFile::readConformanceChecked(llvm::BitstreamCursor &Cursor,
       module = getAssociatedModule();
 
     SmallVector<ProtocolConformance *, 2> conformances;
-    nominal->lookupConformance(module, proto, conformances);
+    nominal->lookupConformance(proto, conformances);
     PrettyStackTraceModuleFile traceMsg(
         "If you're seeing a crash here, check that your SDK and dependencies "
         "are at least as new as the versions used to build", *this);

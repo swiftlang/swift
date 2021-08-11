@@ -7036,8 +7036,7 @@ allFromConditionalConformances(DeclContext *DC, Type baseTy,
 
     if (auto *protocol = candidateDC->getSelfProtocolDecl()) {
       SmallVector<ProtocolConformance *, 4> conformances;
-      if (!NTD->lookupConformance(DC->getParentModule(), protocol,
-                                  conformances))
+      if (!NTD->lookupConformance(protocol, conformances))
         return false;
 
       // This is opportunistic, there should be a way to narrow the

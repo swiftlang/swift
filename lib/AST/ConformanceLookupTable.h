@@ -445,8 +445,7 @@ public:
   /// conformances found for this protocol and nominal type.
   ///
   /// \returns true if any conformances were found. 
-  bool lookupConformance(ModuleDecl *module,
-                         NominalTypeDecl *nominal,
+  bool lookupConformance(NominalTypeDecl *nominal,
                          ProtocolDecl *protocol, 
                          SmallVectorImpl<ProtocolConformance *> &conformances);
 

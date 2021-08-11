@@ -2639,9 +2639,7 @@ getForeignRepresentable(Type type, ForeignLanguage language,
           if (auto objcBridgeable
                 = ctx.getProtocol(KnownProtocolKind::ObjectiveCBridgeable)) {
             SmallVector<ProtocolConformance *, 1> conformances;
-            if (nominal->lookupConformance(dc->getParentModule(),
-                                           objcBridgeable,
-                                           conformances))
+            if (nominal->lookupConformance(objcBridgeable, conformances))
               break;
           }
         }
