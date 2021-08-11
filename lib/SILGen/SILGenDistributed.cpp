@@ -422,6 +422,8 @@ void SILGenFunction::emitDistributedActorFactory(FuncDecl *fd) {
     auto selfMetatype =
         getLoweredType(F.mapTypeIntoContext(selfArg.getType().getASTType()));
     SILValue selfMetatypeValue = B.createMetatype(loc, selfMetatype);
+    fprintf(stderr, "[%s:%d] (%s)     SILValue selfMetatypeValue = B.createMetatype(loc, selfMetatype);\n", __FILE__, __LINE__, __FUNCTION__);
+    selfMetatypeValue->dump();
 
     // --- get the uninitialized allocation from the runtime system.
     FullExpr scope(Cleanups, CleanupLocation(fd));
@@ -435,10 +437,13 @@ void SILGenFunction::emitDistributedActorFactory(FuncDecl *fd) {
         /*subs*/ {},
         {selfMetatypeValue});
 
-    // ==== Initialize identity and transport
+//    ManagedValue remoteCast =
+//        B.createUncheckedBitCast(loc, ManagedValue::forUnmanaged(remote), returnTy);
+
+    // ==== Initialize distributed actor properties
     // --- Store the identity: self.id = identity
-    emitDistributedActorIdentityStore(
-        C, *this, /*actorSelf*/remote, fd, identityArg);
+//    emitDistributedActorIdentityStore(
+//        C, *this, /*actorSelf*/remote, fd, identityArg);
 
     // --- Store the transport: self.transport = transport
     // FIXME(distributed): IMPLEMENT:
@@ -447,6 +452,7 @@ void SILGenFunction::emitDistributedActorFactory(FuncDecl *fd) {
 
     // ==== Return the fully initialized remote instance
     B.createReturn(loc, remote);
+//    B.createReturn(loc, remoteCast);
 
  //   // ==== Branch to return the fully initialized remote instance
 //    B.createBranch(loc, returnBB, {remote});

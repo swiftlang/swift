@@ -1465,8 +1465,16 @@ static ValueDecl *getDefaultActorInitDestroy(ASTContext &ctx,
 static ValueDecl *getDistributedActorInitializeRemote(ASTContext &ctx,
                                                       Identifier id) {
   return getBuiltinFunction(ctx, id, _thin,
-                            _parameters(_nativeObject),
+                            _generics(_unrestricted), // TODO(distributed): restrict to DistributedActor
+                            _parameters(_metatype(_typeparam(0))),
+//                            _parameters(_nativeObject),
                             _rawPointer);
+
+//  return getBuiltinFunction(ctx, id, _thin,
+//                            _generics(_unrestricted), // TODO(distributed): restrict to DistributedActor
+//                            _parameters(_metatype(_typeparam(0))),
+// //                            _parameters(_nativeObject),
+//                            _rawPointer);
 }
 
 static ValueDecl *getDistributedActorDestroy(ASTContext &ctx,

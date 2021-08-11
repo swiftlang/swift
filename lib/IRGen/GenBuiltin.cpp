@@ -389,14 +389,23 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
 
   if (Builtin.ID == BuiltinValueKind::InitializeDistributedRemoteActor) {
     auto fn = IGF.IGM.getDistributedActorInitializeRemoteFn();
-    auto actor = args.claimNext();
-    actor = IGF.Builder.CreateBitCast(actor, IGF.IGM.RefCountedPtrTy);
-    // init(resolve address, using transport)
-    auto call = IGF.Builder.CreateCall(fn, {
-      actor
-      // TODO: might have to carry `address, transport` depending on how we implement the resolve initializers
-    });
+    auto actorTy = args.claimNext();
+    fprintf(stderr, "[%s:%d] (%s) ARGUMENT ONE\n", __FILE__, __LINE__, __FUNCTION__);
+    actorTy->dump();
+    fprintf(stderr, "[%s:%d] (%s) ARGUMENT ONE CAST\n", __FILE__, __LINE__, __FUNCTION__);
+    actorTy = IGF.Builder.CreateBitCast(actorTy, IGF.IGM.TypeMetadataPtrTy);
+    actorTy->dump();
+    auto call = IGF.Builder.CreateCall(fn, { actorTy });
     call->setCallingConv(IGF.IGM.SwiftCC);
+    call->setDoesNotThrow();
+    fprintf(stderr, "[%s:%d] (%s) CALL\n", __FILE__, __LINE__, __FUNCTION__);
+    call->dump();
+
+    // Cast back to opaque value
+//    auto result = IGF.Builder.CreateBitCast(call, IGF.IGM.OpaquePtrTy);
+//    out.add(result);
+    out.add(call);
+
     return;
   }
 
