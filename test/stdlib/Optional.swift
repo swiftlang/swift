@@ -417,4 +417,16 @@ OptionalTests.test("unsafelyUnwrapped nil")
   _blackHole(empty.unsafelyUnwrapped)
 }
 
+OptionalTests.test("take") {
+  var x: Int? = 128
+
+  expectEqual(x.take(), 128)
+  expectEqual(x, nil)
+
+  var y: Int? = nil
+
+  expectEqual(y.take(), nil)
+  expectEqual(y, nil)
+}
+
 runAllTests()
