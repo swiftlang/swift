@@ -56,7 +56,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 624; // new BodyKind for AbstractFunctionDecl
+const uint16_t SWIFTMODULE_VERSION_MINOR = 625; // is concurrency checked?
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -797,6 +797,7 @@ namespace options_block {
     IS_IMPLICIT_DYNAMIC_ENABLED,
     IS_ALLOW_MODULE_WITH_COMPILER_ERRORS_ENABLED,
     MODULE_ABI_NAME,
+    IS_CONCURRENCY_CHECKED,
   };
 
   using SDKPathLayout = BCRecordLayout<
@@ -842,6 +843,10 @@ namespace options_block {
   using ModuleABINameLayout = BCRecordLayout<
     MODULE_ABI_NAME,
     BCBlob
+  >;
+
+  using IsConcurrencyCheckedLayout = BCRecordLayout<
+    IS_CONCURRENCY_CHECKED
   >;
 }
 

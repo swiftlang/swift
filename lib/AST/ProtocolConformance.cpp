@@ -1665,23 +1665,30 @@ SourceLoc swift::extractNearestSourceLoc(const ProtocolConformanceRef conformanc
 }
 
 bool ProtocolConformanceRef::hasMissingConformance(ModuleDecl *module) const {
+  return forEachMissingConformance(module,
+      [](BuiltinProtocolConformance *builtin) {
+        return true;
+      });
+}
+
+bool ProtocolConformanceRef::forEachMissingConformance(
+    ModuleDecl *module,
+    llvm::function_ref<bool(BuiltinProtocolConformance *missing)> fn) const {
   if (!isConcrete())
     return false;
 
-  // Is this a missing Sendable conformance?
-  const ProtocolConformance *concreteConf = getConcrete();
-  const RootProtocolConformance *rootConf = concreteConf->getRootConformance();
+  // Is this a missing conformance?
+  ProtocolConformance *concreteConf = getConcrete();
+  RootProtocolConformance *rootConf = concreteConf->getRootConformance();
   if (auto builtinConformance = dyn_cast<BuiltinProtocolConformance>(rootConf)){
-    if (builtinConformance->isMissing() && builtinConformance->getProtocol()->isSpecificProtocol(
-            KnownProtocolKind::Sendable)) {
+    if (builtinConformance->isMissing() && fn(builtinConformance))
       return true;
-    }
   }
 
   // Check conformances that are part of this conformance.
   auto subMap = concreteConf->getSubstitutions(module);
   for (auto conformance : subMap.getConformances()) {
-    if (conformance.hasMissingConformance(module))
+    if (conformance.forEachMissingConformance(module, fn))
       return true;
   }
 

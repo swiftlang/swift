@@ -3461,9 +3461,9 @@ void swift::diagnoseTypeAvailability(const TypeRepr *TR, Type T, SourceLoc loc,
 }
 
 static void diagnoseMissingConformance(
-    SourceLoc loc, Type type, ProtocolDecl *proto) {
+    SourceLoc loc, Type type, ProtocolDecl *proto, ModuleDecl *module) {
   assert(proto->isSpecificProtocol(KnownProtocolKind::Sendable));
-  diagnoseMissingSendableConformance(loc, type);
+  diagnoseMissingSendableConformance(loc, type, module);
 }
 
 bool
@@ -3484,7 +3484,8 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
   if (auto builtinConformance = dyn_cast<BuiltinProtocolConformance>(rootConf)){
     if (builtinConformance->isMissing()) {
       diagnoseMissingConformance(loc, builtinConformance->getType(),
-                                 builtinConformance->getProtocol());
+                                 builtinConformance->getProtocol(),
+                                 where.getDeclContext()->getParentModule());
     }
   }
 

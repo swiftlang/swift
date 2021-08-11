@@ -975,6 +975,9 @@ ModuleDecl *CompilerInstance::getMainModule() const {
     }
     if (Invocation.getFrontendOptions().EnableLibraryEvolution)
       MainModule->setResilienceStrategy(ResilienceStrategy::Resilient);
+    if (Invocation.getLangOptions().WarnConcurrency ||
+        Invocation.getLangOptions().isSwiftVersionAtLeast(6))
+      MainModule->setIsConcurrencyChecked(true);
 
     // Register the main module with the AST context.
     Context->addLoadedModule(MainModule);
