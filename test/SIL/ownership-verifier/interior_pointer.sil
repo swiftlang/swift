@@ -103,6 +103,18 @@ bb0(%0 : @owned $Box<T>, %1 : $*Int):
   return %4 : $()
 }
 
+// CHECK-NOT: Function: 'isunique_test'
+sil [ossa] @isunique_test : $@convention(thin) <T> (@owned Box<T>, @in Int) -> () {
+bb0(%0 : @owned $Box<T>, %1 : $*Int):
+  %2 = begin_borrow %0 : $Box<T>
+  %3 = ref_element_addr %2 : $Box<T>, #Box.t
+  %4 = is_unique %3 : $*T
+  end_borrow %2 : $Box<T>
+  destroy_value %0 : $Box<T>
+  %5 = tuple ()
+  return %5 : $()
+}
+
 // CHECK-LABEL: Error#: 0. Begin Error in Function: 'store_borrow_result_used_outside_of_borrow_lifetime'
 // CHECK-NEXT: Found outside of lifetime use?!
 // CHECK-NEXT: Value:   %1 = begin_borrow %0 : $Builtin.NativeObject    // users: %4, %3
