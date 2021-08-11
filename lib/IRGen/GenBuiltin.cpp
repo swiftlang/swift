@@ -29,6 +29,7 @@
 #include "GenCall.h"
 #include "GenCast.h"
 #include "GenConcurrency.h"
+#include "GenDistributed.h"
 #include "GenPointerAuth.h"
 #include "GenIntegerLiteral.h"
 #include "IRGenFunction.h"
@@ -388,34 +389,14 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   }
 
   if (Builtin.ID == BuiltinValueKind::InitializeDistributedRemoteActor) {
-    auto fn = IGF.IGM.getDistributedActorInitializeRemoteFn();
-    auto actorTy = args.claimNext();
-    fprintf(stderr, "[%s:%d] (%s) ARGUMENT ONE\n", __FILE__, __LINE__, __FUNCTION__);
-    actorTy->dump();
-    fprintf(stderr, "[%s:%d] (%s) ARGUMENT ONE CAST\n", __FILE__, __LINE__, __FUNCTION__);
-    actorTy = IGF.Builder.CreateBitCast(actorTy, IGF.IGM.TypeMetadataPtrTy);
-    actorTy->dump();
-    auto call = IGF.Builder.CreateCall(fn, { actorTy });
-    call->setCallingConv(IGF.IGM.SwiftCC);
-    call->setDoesNotThrow();
-    fprintf(stderr, "[%s:%d] (%s) CALL\n", __FILE__, __LINE__, __FUNCTION__);
-    call->dump();
-
-    // Cast back to opaque value
-//    auto result = IGF.Builder.CreateBitCast(call, IGF.IGM.OpaquePtrTy);
-//    out.add(result);
-    out.add(call);
-
+    auto actorMetatype = args.claimNext();
+    emitDistributedActorInitializeRemote(IGF, actorMetatype, out);
     return;
   }
 
   if (Builtin.ID == BuiltinValueKind::DestroyDistributedActor) {
-    auto fn = IGF.IGM.getDistributedActorDestroyFn();
     auto actor = args.claimNext();
-    actor = IGF.Builder.CreateBitCast(actor, IGF.IGM.RefCountedPtrTy);
-    auto call = IGF.Builder.CreateCall(fn, {actor});
-    call->setCallingConv(IGF.IGM.SwiftCC);
-    call->setDoesNotThrow();
+    emitDistributedActorDestroy(IGF, actor);
     return;
   }
 
