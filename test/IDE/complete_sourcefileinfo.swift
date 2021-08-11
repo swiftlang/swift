@@ -26,46 +26,46 @@ func test() {
   #^GLOBAL^#
 }
 // GLOBAL-LABEL: Known module source files
-// GLOBAL-DAG: + {{.*}}/test/IDE/complete_sourcefileinfo.swift
-// GLOBAL-DAG: + {{.*}}/Sources/MyModule1.swift
-// GLOBAL-DAG: + {{.*}}/Sources/MyModule2.swift
+// GLOBAL-DAG: + {{.*}}{{[/\\]}}test{{[/\\]}}IDE{{[/\\]}}complete_sourcefileinfo.swift
+// GLOBAL-DAG: + {{.*}}{{[/\\]}}Sources{{[/\\]}}MyModule1.swift
+// GLOBAL-DAG: + {{.*}}{{[/\\]}}Sources{{[/\\]}}MyModule2.swift
 // GLOBAL-LABEL: Begin completions
 // GLOBAL-DAG: Decl[Struct]/OtherModule[Swift]/IsSystem: String[#String#]; name=String{{$}}
-// GLOBAL-DAG: Decl[Struct]/OtherModule[MyModule]: MyStruct[#MyStruct#]; name=MyStruct; source={{.*}}/Sources/MyModule1.swift
-// GLOBAL-DAG: Decl[GlobalVar]/CurrModule: globalValue[#Int#]; name=globalValue; source={{.*}}/test/IDE/complete_sourcefileinfo.swift
+// GLOBAL-DAG: Decl[Struct]/OtherModule[MyModule]: MyStruct[#MyStruct#]; name=MyStruct; source={{.*}}{{[/\\]}}Sources{{[/\\]}}MyModule1.swift
+// GLOBAL-DAG: Decl[GlobalVar]/CurrModule: globalValue[#Int#]; name=globalValue; source={{.*}}{{[/\\]}}test{{[/\\]}}IDE{{[/\\]}}complete_sourcefileinfo.swift
 
 // GLOBAL_MOD-LABEL: Known module source files
-// GLOBAL_MOD-DAG: + {{.*}}/test/IDE/complete_sourcefileinfo.swift
-// GLOBAL_MOD-DAG: + {{.*}}/Sources/MyModule1.swift
-// GLOBAL_MOD-DAG: - {{.*}}/Sources/MyModule2.swift
+// GLOBAL_MOD-DAG: + {{.*}}{{[/\\]}}test{{[/\\]}}IDE{{[/\\]}}complete_sourcefileinfo.swift
+// GLOBAL_MOD-DAG: + {{.*}}{{[/\\]}}Sources{{[/\\]}}MyModule1.swift
+// GLOBAL_MOD-DAG: - {{.*}}{{[/\\]}}Sources{{[/\\]}}MyModule2.swift
 // GLOBAL_MOD-LABEL: Begin completions
 // GLOBAL_MOD-DAG: Decl[Struct]/OtherModule[Swift]/IsSystem: String[#String#]; name=String{{$}}
-// GLOBAL_MOD-DAG: Decl[Struct]/OtherModule[MyModule]: MyStruct[#MyStruct#]; name=MyStruct; source={{.*}}/Sources/MyModule1.swift
-// GLOBAL_MOD-DAG: Decl[GlobalVar]/CurrModule: globalValue[#Int#]; name=globalValue; source={{.*}}/test/IDE/complete_sourcefileinfo.swift
+// GLOBAL_MOD-DAG: Decl[Struct]/OtherModule[MyModule]: MyStruct[#MyStruct#]; name=MyStruct; source={{.*}}{{[/\\]}}Sources{{[/\\]}}MyModule1.swift
+// GLOBAL_MOD-DAG: Decl[GlobalVar]/CurrModule: globalValue[#Int#]; name=globalValue; source={{.*}}{{[/\\]}}test{{[/\\]}}IDE{{[/\\]}}complete_sourcefileinfo.swift
 
 func test(val: MyStruct) {
   val.#^MEMBER^#
 }
 // MEMBER-LABEL: Known module source files
-// MEMBER-DAG: + {{.*}}/test/IDE/complete_sourcefileinfo.swift
-// MEMBER-DAG: + {{.*}}/Sources/MyModule1.swift
-// MEMBER-DAG: + {{.*}}/Sources/MyModule2.swift
+// MEMBER-DAG: + {{.*}}{{[/\\]}}test{{[/\\]}}IDE{{[/\\]}}complete_sourcefileinfo.swift
+// MEMBER-DAG: + {{.*}}{{[/\\]}}Sources{{[/\\]}}MyModule1.swift
+// MEMBER-DAG: + {{.*}}{{[/\\]}}Sources{{[/\\]}}MyModule2.swift
 // MEMBER-LABEL: Begin completions, 5 items
 // MEMBER-DAG: Keyword[self]/CurrNominal:          self[#MyStruct#]; name=self{{$}}
-// MEMBER-DAG: Decl[InstanceVar]/CurrNominal:      propertyInType[#Int#]; name=propertyInType; source={{.*}}/Sources/MyModule1.swift
-// MEMBER-DAG: Decl[InstanceMethod]/CurrNominal:   funcInType({#x: Int#})[#Void#]; name=funcInType(x:); source={{.*}}/Sources/MyModule1.swift
-// MEMBER-DAG: Decl[InstanceVar]/CurrNominal:      propertyInExtension[#String#]; name=propertyInExtension; source={{.*}}/Sources/MyModule2.swift
-// MEMBER-DAG: Decl[InstanceMethod]/CurrNominal:   funcInExtension()[#String#]; name=funcInExtension(); source={{.*}}/Sources/MyModule2.swift
+// MEMBER-DAG: Decl[InstanceVar]/CurrNominal:      propertyInType[#Int#]; name=propertyInType; source={{.*}}{{[/\\]}}Sources{{[/\\]}}MyModule1.swift
+// MEMBER-DAG: Decl[InstanceMethod]/CurrNominal:   funcInType({#x: Int#})[#Void#]; name=funcInType(x:); source={{.*}}{{[/\\]}}Sources{{[/\\]}}MyModule1.swift
+// MEMBER-DAG: Decl[InstanceVar]/CurrNominal:      propertyInExtension[#String#]; name=propertyInExtension; source={{.*}}{{[/\\]}}Sources{{[/\\]}}MyModule2.swift
+// MEMBER-DAG: Decl[InstanceMethod]/CurrNominal:   funcInExtension()[#String#]; name=funcInExtension(); source={{.*}}{{[/\\]}}Sources{{[/\\]}}MyModule2.swift
 // MEMBER: End completions
 
 // MEMBER_MOD-LABEL: Known module source files
-// MEMBER_MOD-DAG: + {{.*}}/test/IDE/complete_sourcefileinfo.swift
-// MEMBER_MOD-DAG: + {{.*}}/Sources/MyModule1.swift
-// MEMBER_MOD-DAG: - {{.*}}/Sources/MyModule2.swift
+// MEMBER_MOD-DAG: + {{.*}}{{[/\\]}}test{{[/\\]}}IDE{{[/\\]}}complete_sourcefileinfo.swift
+// MEMBER_MOD-DAG: + {{.*}}{{[/\\]}}Sources{{[/\\]}}MyModule1.swift
+// MEMBER_MOD-DAG: - {{.*}}{{[/\\]}}Sources{{[/\\]}}MyModule2.swift
 // MEMBER_MOD-LABEL: Begin completions, 5 items
 // MEMBER_MOD-DAG: Keyword[self]/CurrNominal:          self[#MyStruct#]; name=self{{$}}
-// MEMBER_MOD-DAG: Decl[InstanceVar]/CurrNominal:      propertyInType[#Int#]; name=propertyInType; source={{.*}}/Sources/MyModule1.swift
-// MEMBER_MOD-DAG: Decl[InstanceMethod]/CurrNominal:   funcInType({#x: Int#})[#Void#]; name=funcInType(x:); source={{.*}}/Sources/MyModule1.swift
-// MEMBER_MOD-DAG: Decl[InstanceVar]/CurrNominal:      propertyInExtension[#String#]; name=propertyInExtension; source={{.*}}/Sources/MyModule2.swift
-// MEMBER_MOD-DAG: Decl[InstanceMethod]/CurrNominal:   funcInExtension()[#String#]; name=funcInExtension(); source={{.*}}/Sources/MyModule2.swift
+// MEMBER_MOD-DAG: Decl[InstanceVar]/CurrNominal:      propertyInType[#Int#]; name=propertyInType; source={{.*}}{{[/\\]}}Sources{{[/\\]}}MyModule1.swift
+// MEMBER_MOD-DAG: Decl[InstanceMethod]/CurrNominal:   funcInType({#x: Int#})[#Void#]; name=funcInType(x:); source={{.*}}{{[/\\]}}Sources{{[/\\]}}MyModule1.swift
+// MEMBER_MOD-DAG: Decl[InstanceVar]/CurrNominal:      propertyInExtension[#String#]; name=propertyInExtension; source={{.*}}{{[/\\]}}Sources{{[/\\]}}MyModule2.swift
+// MEMBER_MOD-DAG: Decl[InstanceMethod]/CurrNominal:   funcInExtension()[#String#]; name=funcInExtension(); source={{.*}}{{[/\\]}}Sources{{[/\\]}}MyModule2.swift
 // MEMBER_MOD: End completions
