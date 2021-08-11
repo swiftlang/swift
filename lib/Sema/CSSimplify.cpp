@@ -4984,7 +4984,7 @@ bool ConstraintSystem::repairFailures(
 }
 
 ConstructorDecl *ConstraintSystem::implicitConversionAvailable(Type fromType, Type toType) {
-#if 01 // Determine implicit conversions from init(implicit:) constructors
+#if 01 // Determine implicit conversions from init([_] implicit:) constructors
   static int called = 0;
   static const char *from = 0 ? "\nFROM" : nullptr;
   auto trace = [](const char *prefix, Type ty) {
@@ -5000,27 +5000,28 @@ ConstructorDecl *ConstraintSystem::implicitConversionAvailable(Type fromType, Ty
   trace("TO", toType);
   if (NominalTypeDecl *toNominal = toType->getAnyNominal()) {
     auto &ctx = getASTContext();
-    if (!toNominal->setConversionsComputed()) {
-      auto implicitArgId = ctx.Id_implicit;
-      int arged = 0;
+    auto implicitArgId = ctx.Id_implicit;
+    if (!toNominal->setConversionsComputed())
       for (ExtensionDecl *extension : toNominal->getExtensions()) {
-        Type extType = extension->getDeclaredInterfaceType()->getCanonicalType();
+        Type extType = extension->getExtendedType()->getCanonicalType();
+        int arged = 0;
         for (Decl *member : extension->getMembers())
           if (ConstructorDecl *initDecl = dyn_cast<ConstructorDecl>(member)) {
             ParameterList *parameters = initDecl->getParameters();
-            if (parameters->size() == 1 &&
-                parameters->get(0)->getBaseName() == implicitArgId) {
-              Type argType = parameters->get(0)->getType()->getCanonicalType();
+            ParamDecl *param; // could be @implicit instead..
+            if (parameters->size() == 1 && (param = parameters->get(0)) &&
+                (param->getArgumentName() == implicitArgId ||
+                 param->getParameterName() == implicitArgId)) {
+              Type argType = param->getType()->getCanonicalType();
               if (!arged++)
                 trace("\nEXT", extType);
               trace(" ARG", argType);
-              initDecl->getResultInterfaceType();
               (*ctx.implicitConversionsTo(extType->getAnyNominal(),
                 /*create*/true))[argType->getAnyNominal()].push_back(initDecl);
             }
           }
       }
-    }
+
     if (auto *exists = ctx.implicitConversionsTo(toNominal, /*create*/false))
       for (ConstructorDecl *initDecl : (*exists)[fromType->getAnyNominal()])
         if (ExtensionDecl *ext = dyn_cast<ExtensionDecl>(initDecl->getParent()))
@@ -5038,7 +5039,7 @@ ConstructorDecl *ConstraintSystem::implicitConversionAvailable(Type fromType, Ty
               }
             }
   }
-#else // Original hard coded rules.
+#else // Original hard coded rules for unsafe pointers.
   if (toType->isUnsafeRawPointer() && (fromType->isUnsafeMutableRawPointer() ||
          fromType->isUnsafeMutablePointer() || fromType->isUnsafePointer())) {
     return true; // Unsafe[Mutable][Raw]Pointer -> UnsafeRawPointer
