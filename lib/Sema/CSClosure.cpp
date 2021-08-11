@@ -387,7 +387,7 @@ private:
     if (isa<VarDecl>(decl))
       return;
 
-    llvm_unreachable("Unimplemented case for closure body");
+    // Other declarations will be handled at application time.
   }
 
   void visitBreakStmt(BreakStmt *breakStmt) {
