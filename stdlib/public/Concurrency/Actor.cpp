@@ -686,7 +686,7 @@ public:
   /// Properly construct an actor, except for the heap header.
   void initialize(bool isDistributedRemote = false) {
     auto flags = Flags();
-    flags.setIsDistributedRemote(true);
+    flags.setIsDistributedRemote(isDistributedRemote);
     new (&CurrentState) std::atomic<State>(State{JobRef(), flags});
   }
 
@@ -1751,38 +1751,6 @@ void swift::swift_defaultActor_deallocateResilient(HeapObject *actor) {
                       metadata->getInstanceAlignMask());
 }
 
-OpaqueValue*
-swift::swift_distributedActor_remote_initialize(const Metadata *actorType) {
-  auto *classMetadata = actorType->getClassObject();
-
-  // TODO(distributed): make this allocation smaller
-  // ==== Allocate the memory for the remote instance
-  HeapObject *alloc = swift_allocObject(classMetadata,
-                           classMetadata->getInstanceSize(),
-                           classMetadata->getInstanceAlignMask());
-
-  // TODO(distributed): a remote one does not have to have the "real"
-  //  default actor body, e.g. we don't need an executor at all; so
-  //  we can allocate more efficiently and only share the flags/status field
-  //  between the both memory representations
-  // --- Currently we ride on the DefaultActorImpl to reuse the memory layout
-  // of the flags etc. So initialize the default actor into the allocation.
-  auto actor = asImpl(reinterpret_cast<DefaultActor*>(alloc));
-  actor->initialize(/*remote*/true);
-  assert(actor->isDistributedRemote());
-
-  return reinterpret_cast<OpaqueValue*>(actor);
-}
-
-void swift::swift_distributedActor_destroy(DefaultActor *_actor) {
-  // FIXME(distributed): if this is a proxy, we would destroy a bit differently I guess? less memory was allocated etc.
-  asImpl(_actor)->destroy(); // today we just replicate what defaultActor_destroy does
-}
-
-bool swift::swift_distributed_actor_is_remote(DefaultActor *_actor) {
-  return asImpl(_actor)->isDistributedRemote();
-}
-
 /// FIXME: only exists for the quick-and-dirtraKASASAasasy MainActor implementation.
 namespace swift {
   Metadata* MainActorMetadata = nullptr;
@@ -1988,9 +1956,42 @@ static void swift_task_enqueueImpl(Job *job, ExecutorRef executor) {
 #define OVERRIDE_ACTOR COMPATIBILITY_OVERRIDE
 #include COMPATIBILITY_OVERRIDE_INCLUDE_PATH
 
+
 /*****************************************************************************/
 /***************************** DISTRIBUTED ACTOR *****************************/
 /*****************************************************************************/
+
+OpaqueValue*
+swift::swift_distributedActor_remote_initialize(const Metadata *actorType) {
+  auto *classMetadata = actorType->getClassObject();
+
+  // TODO(distributed): make this allocation smaller
+  // ==== Allocate the memory for the remote instance
+  HeapObject *alloc = swift_allocObject(classMetadata,
+                                        classMetadata->getInstanceSize(),
+                                        classMetadata->getInstanceAlignMask());
+
+  // TODO(distributed): a remote one does not have to have the "real"
+  //  default actor body, e.g. we don't need an executor at all; so
+  //  we can allocate more efficiently and only share the flags/status field
+  //  between the both memory representations
+  // --- Currently we ride on the DefaultActorImpl to reuse the memory layout
+  // of the flags etc. So initialize the default actor into the allocation.
+  auto actor = asImpl(reinterpret_cast<DefaultActor*>(alloc));
+  actor->initialize(/*remote*/true);
+  assert(actor->isDistributedRemote());
+
+  return reinterpret_cast<OpaqueValue*>(actor);
+}
+
+void swift::swift_distributedActor_destroy(DefaultActor *_actor) {
+  // FIXME(distributed): if this is a proxy, we would destroy a bit differently I guess? less memory was allocated etc.
+  asImpl(_actor)->destroy(); // today we just replicate what defaultActor_destroy does
+}
+
+bool swift::swift_distributed_actor_is_remote(DefaultActor *_actor) {
+  return asImpl(_actor)->isDistributedRemote();
+}
 
 bool DefaultActorImpl::isDistributedRemote() {
   auto state = CurrentState.load(std::memory_order_relaxed);
