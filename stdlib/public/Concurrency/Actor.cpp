@@ -113,7 +113,7 @@ class ExecutorTrackingInfo {
   /// information about the current thread, if any.
   ///
   /// TODO: this is obviously runtime-internal and therefore not
-  /// reasonable to make ABI. We might want to also provide a way 
+  /// reasonable to make ABI. We might want to also provide a way
   /// for generated code to efficiently query the identity of the
   /// current executor, in order to do a cheap comparison to avoid
   /// doing all the work to suspend the task when we're already on
@@ -684,7 +684,9 @@ class DefaultActorImpl : public HeapObject {
 
 public:
   /// Properly construct an actor, except for the heap header.
-  void initialize(Flags flags = Flags()) {
+  void initialize(bool isDistributedRemote = false) {
+    auto flags = Flags();
+    flags.setIsDistributedRemote(true);
     new (&CurrentState) std::atomic<State>(State{JobRef(), flags});
   }
 
@@ -713,7 +715,7 @@ public:
   /// Note that a distributed *local* actor instance is the same as any other
   /// ordinary default (local) actor, and no special handling is needed for them.
   bool isDistributedRemote();
-  
+
 private:
   void deallocateUnconditional();
 
@@ -908,7 +910,7 @@ public:
       IsAbandoned = true;
       shouldDelete = IsResolvedByJob && IsResolvedByActor;
     });
-    if (shouldDelete) delete this;    
+    if (shouldDelete) delete this;
   }
 
   /// Called by the job to notify the actor that the job has successfully
@@ -923,7 +925,7 @@ public:
       IsResolvedByJob = true;
       shouldDelete = IsResolvedByJob && IsResolvedByActor;
     });
-    if (shouldDelete) delete this;    
+    if (shouldDelete) delete this;
   }
 
   /// Called by the job to wait for the actor to resolve what the job
@@ -1233,7 +1235,7 @@ void DefaultActorImpl::giveUpThread(RunningJobInfo runner) {
       // Try again.
       continue;
     }
-    
+
 #if SWIFT_TASK_PRINTF_DEBUG
 #  define LOG_STATE_TRANSITION                                                  \
     fprintf(stderr, "[%lu] actor %p transitioned from %zx to %zx (%s)\n",       \
@@ -1356,7 +1358,7 @@ Job *DefaultActorImpl::claimNextJobOrGiveUp(bool actorIsOwned,
         continue;
       LOG_STATE_TRANSITION;
       _swift_tsan_acquire(this);
-      
+
       // If that succeeded, we can proceed to the main body.
       oldState = newState;
       runner.setRunning();
@@ -1426,7 +1428,7 @@ Job *DefaultActorImpl::claimNextJobOrGiveUp(bool actorIsOwned,
       continue;
     }
     LOG_STATE_TRANSITION;
-    
+
     // We successfully updated the state.
 
     // If we're giving up the thread with jobs remaining, we need
@@ -1751,9 +1753,6 @@ void swift::swift_defaultActor_deallocateResilient(HeapObject *actor) {
 
 OpaqueValue*
 swift::swift_distributedActor_remote_initialize(const Metadata *actorType) {
-  fprintf(stderr, "[%s:%d] (%s) ================================================================\n", __FILE__, __LINE__, __FUNCTION__);
-  fprintf(stderr, "[%s:%d] (%s) ================================================================\n", __FILE__, __LINE__, __FUNCTION__);
-  fprintf(stderr, "[%s:%d] (%s) swift_distributedActor_remote_initialize =======================\n", __FILE__, __LINE__, __FUNCTION__);
   auto *classMetadata = actorType->getClassObject();
 
   // TODO(distributed): make this allocation smaller
@@ -1762,26 +1761,17 @@ swift::swift_distributedActor_remote_initialize(const Metadata *actorType) {
                            classMetadata->getInstanceSize(),
                            classMetadata->getInstanceAlignMask());
 
-  // --- Currently we ride on the DefaultActorImpl to reuse the memory layout
-  // of the flags etc. So initialize the default actor into the allocation.
-  new (alloc) DefaultActorImpl();
-
-
   // TODO(distributed): a remote one does not have to have the "real"
   //  default actor body, e.g. we don't need an executor at all; so
   //  we can allocate more efficiently and only share the flags/status field
   //  between the both memory representations
-  auto _actor = reinterpret_cast<DefaultActor>(alloc);
-  auto flags = DefaultActorImpl.Flags();
-  flags.setIsDistributedRemote(true);
-  flags.setIsDistributed(true);
-  auto defaultActor = asImpl(_actor);
-  defaultActor->initialize(flags);
+  // --- Currently we ride on the DefaultActorImpl to reuse the memory layout
+  // of the flags etc. So initialize the default actor into the allocation.
+  auto actor = asImpl(reinterpret_cast<DefaultActor*>(alloc));
+  actor->initialize(/*remote*/true);
+  assert(actor->isDistributedRemote());
 
-  assert(defaultActor->isDistributedRemote());
-  assert(defaultActor->isDistributed());
-
-  return reinterpret_cast<OpaqueValue*>(alloc);
+  return reinterpret_cast<OpaqueValue*>(actor);
 }
 
 void swift::swift_distributedActor_destroy(DefaultActor *_actor) {

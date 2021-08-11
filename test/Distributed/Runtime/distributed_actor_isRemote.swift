@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-distributed -parse-as-library) -emit-sil | %FileCheck %s --dump-input=always
+// RUN: %target-run-simple-swift(-Onone -Xfrontend -g -Xfrontend -enable-experimental-distributed -parse-as-library) | %FileCheck %s --dump-input=always
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -92,7 +92,7 @@ func __isLocalActor(_ actor: AnyObject) -> Bool {
 
 @available(SwiftStdlib 5.5, *)
 func test_remote() async {
-  let address = ActorAddress(parse: "")
+  let address = ActorAddress(parse: "sact://127.0.0.1/example#1234")
   let transport = FakeTransport()
 
   print("HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH")
@@ -107,11 +107,13 @@ func test_remote() async {
 //  assert(__isLocalActor(remote) == false, "should be remote")
 //  assert(__isRemoteActor(remote) == true, "should be remote")
 
-//  // Check the id and transport are the right values, and not trash memory
-//  print("remote.id = \(remote.id)")
+  // Check the id and transport are the right values, and not trash memory
+  print("remote.id = \(remote.id)") // CHECK: NEIN
+  print("remote.transport = \(remote.actorTransport)") // CHECK: NEIN
 //  assert(AnyActorIdentity(address) == remote.id)
 
   print("done") // CHECK: done
+  let xxx = remote
 }
 
 @available(SwiftStdlib 5.5, *)

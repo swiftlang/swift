@@ -2010,7 +2010,7 @@ public:
       ConstructorDecl *ctor, ManagedValue selfArg);
 
   /// Inject distributed actor and transport interaction code into the destructor.
-  void injectDistributedActorDestructorLifecycleCall(
+  void emitDistributedActor_resignAddress(
       DestructorDecl *dd, SILValue selfValue, SILBasicBlock *continueBB);
 
 
