@@ -850,11 +850,6 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   // Emit the constructor body.
   emitStmt(ctor->getTypecheckedBody());
 
-  // For distributed actors, emit "actor ready" since we successfully initialized
-  if (selfClassDecl->isDistributedActor() && !isDelegating) {
-    emitDistributedActorReady(ctor, selfArg);
-  }
-
   // Emit the call to super.init() right before exiting from the initializer.
   if (NeedsBoxForSelf) {
     if (auto *SI = ctor->getSuperInitCall()) {
@@ -929,12 +924,18 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
     // problem.
     ReturnDest = std::move(ReturnDest).translate(getTopCleanup());
   }
-  
+
   // Emit the epilog and post-matter.
   auto returnLoc = emitEpilog(ctor, /*UsesCustomEpilog*/true);
 
   // Unpop our selfArg cleanup, so we can forward.
   std::move(SelfCleanupSave).pop();
+
+  // TODO(distributed): rdar://81783599 if this is a distributed actor, jump to the distributedReady block?
+  //  // For distributed actors, emit "actor ready" since we successfully initialized
+  //  if (selfClassDecl->isDistributedActor() && !isDelegating) {
+  //    emitDistributedActorReady(ctor, selfArg);
+  //  }
 
   // Finish off the epilog by returning.  If this is a failable ctor, then we
   // actually jump to the failure epilog to keep the invariant that there is

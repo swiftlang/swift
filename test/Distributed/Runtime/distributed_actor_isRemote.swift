@@ -1,17 +1,17 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-distributed -parse-as-library) | %FileCheck %s --dump-input=always
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-distributed -parse-as-library) -emit-sil | %FileCheck %s --dump-input=always
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
 // rdar://76038845
-// UNSUPPORTED: use_os_stdlib
-// UNSUPPORTED: back_deployment_runtime
+// UN_SUPPORTED: use_os_stdlib
+// UN_SUPPORTED: back_deployment_runtime
 
 // rdar://77798215
-// UNSUPPORTED: OS=windows-msvc
+// UN_SUPPORTED: OS=windows-msvc
 
-// REQUIRES: rdar78290608
+// RE_QUIRES: rdar78290608
 
 import _Distributed
 
@@ -57,7 +57,7 @@ struct FakeTransport: ActorTransport {
     fatalError("not implemented:\(#function)")
   }
 
-  func resolve<Act>(_ identity: Act.ID, as actorType: Act.Type)
+  func resolve<Act>(_ identity: AnyActorIdentity, as actorType: Act.Type)
   throws -> ActorResolved<Act>
       where Act: DistributedActor {
     .makeProxy
@@ -75,7 +75,7 @@ struct FakeTransport: ActorTransport {
   }
 
   func resignIdentity(_ id: AnyActorIdentity) {
-    print("ready id:\(id)")
+    print("resign id:\(id)")
   }
 }
 
@@ -95,15 +95,21 @@ func test_remote() async {
   let address = ActorAddress(parse: "")
   let transport = FakeTransport()
 
-  let local = SomeSpecificDistributedActor(transport: transport)
-  _ = local.id
-  assert(__isLocalActor(local) == true, "should be local")
-  assert(__isRemoteActor(local) == false, "should be local")
+  print("HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH")
+//  let local = SomeSpecificDistributedActor(transport: transport)
+//  assert(__isLocalActor(local) == true, "should be local")
+//  assert(__isRemoteActor(local) == false, "should be local")
+//  print("local.id = \(local.id)") // CHECK: NEIN
+//  assert(AnyActorIdentity(address) == local.id)
 
   // assume it always makes a remote one
-  let remote = try! SomeSpecificDistributedActor(resolve: .init(address), using: transport)
-  assert(__isLocalActor(remote) == false, "should be remote")
-  assert(__isRemoteActor(remote) == true, "should be remote")
+  let remote = try! SomeSpecificDistributedActor.resolve(.init(address), using: transport)
+//  assert(__isLocalActor(remote) == false, "should be remote")
+//  assert(__isRemoteActor(remote) == true, "should be remote")
+
+//  // Check the id and transport are the right values, and not trash memory
+//  print("remote.id = \(remote.id)")
+//  assert(AnyActorIdentity(address) == remote.id)
 
   print("done") // CHECK: done
 }

@@ -618,6 +618,7 @@ class DefaultActorImpl : public HeapObject {
       Status_width = 3,
 
       HasActiveInlineJob = 3,
+
       IsDistributedRemote = 4,
 
       MaxPriority = 8,
@@ -683,11 +684,7 @@ class DefaultActorImpl : public HeapObject {
 
 public:
   /// Properly construct an actor, except for the heap header.
-  /// \param isDistributedRemote When true sets the IsDistributedRemote flag
-  void initialize(bool isDistributedRemote = false) {
-    // TODO: this is just a simple implementation, rather we would want to allocate a proxy
-    auto flags = Flags();
-    flags.setIsDistributedRemote(isDistributedRemote);
+  void initialize(Flags flags = Flags()) {
     new (&CurrentState) std::atomic<State>(State{JobRef(), flags});
   }
 
@@ -1754,15 +1751,35 @@ void swift::swift_defaultActor_deallocateResilient(HeapObject *actor) {
 
 OpaqueValue*
 swift::swift_distributedActor_remote_initialize(const Metadata *actorType) {
+  fprintf(stderr, "[%s:%d] (%s) ================================================================\n", __FILE__, __LINE__, __FUNCTION__);
+  fprintf(stderr, "[%s:%d] (%s) ================================================================\n", __FILE__, __LINE__, __FUNCTION__);
+  fprintf(stderr, "[%s:%d] (%s) swift_distributedActor_remote_initialize =======================\n", __FILE__, __LINE__, __FUNCTION__);
   auto *classMetadata = actorType->getClassObject();
 
   // TODO(distributed): make this allocation smaller
+  // ==== Allocate the memory for the remote instance
   HeapObject *alloc = swift_allocObject(classMetadata,
                            classMetadata->getInstanceSize(),
                            classMetadata->getInstanceAlignMask());
 
-  // TODO(distributed): if we are going to keep the remote flag in the header,
-  //                    allocate that header and mark / register this as being remote instance.
+  // --- Currently we ride on the DefaultActorImpl to reuse the memory layout
+  // of the flags etc. So initialize the default actor into the allocation.
+  new (alloc) DefaultActorImpl();
+
+
+  // TODO(distributed): a remote one does not have to have the "real"
+  //  default actor body, e.g. we don't need an executor at all; so
+  //  we can allocate more efficiently and only share the flags/status field
+  //  between the both memory representations
+  auto _actor = reinterpret_cast<DefaultActor>(alloc);
+  auto flags = DefaultActorImpl.Flags();
+  flags.setIsDistributedRemote(true);
+  flags.setIsDistributed(true);
+  auto defaultActor = asImpl(_actor);
+  defaultActor->initialize(flags);
+
+  assert(defaultActor->isDistributedRemote());
+  assert(defaultActor->isDistributed());
 
   return reinterpret_cast<OpaqueValue*>(alloc);
 }
@@ -1987,5 +2004,5 @@ static void swift_task_enqueueImpl(Job *job, ExecutorRef executor) {
 
 bool DefaultActorImpl::isDistributedRemote() {
   auto state = CurrentState.load(std::memory_order_relaxed);
-  return state.Flags.isDistributedRemote() == 1;
+  return state.Flags.isDistributedRemote();
 }
