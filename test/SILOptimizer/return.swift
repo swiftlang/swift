@@ -166,8 +166,10 @@ func testSR13753() {
       get { 0 }
       set { }
     }
-    x // expected-error {{missing return in a closure expected to return 'Int'; did you mean to return the last expression?}} {{5-5=return }}
-    // expected-warning@-1 {{variable is unused}}
+    x
+    // expected-error@-1 {{missing return in closure expected to return 'Int'}}
+    // expected-note@-2 {{did you mean to return the last expression?}} {{5-5=return }}
+    // expected-warning@-3 {{variable is unused}}
   }
 
   func f() -> Int {
@@ -175,8 +177,10 @@ func testSR13753() {
         get { 0 }
         set { }
     }
-    x // expected-error {{missing return in a function expected to return 'Int'; did you mean to return the last expression?}} {{5-5=return }}
-    // expected-warning@-1 {{variable is unused}}
+    x
+    // expected-error@-1 {{missing return in local function expected to return 'Int'}}
+    // expected-note@-2 {{did you mean to return the last expression?}} {{5-5=return }}
+    // expected-warning@-3 {{variable is unused}}
   } 
 
   let _ : () -> Int = {
@@ -185,7 +189,7 @@ func testSR13753() {
       set { }
     }
     x // expected-warning {{variable is unused}}
-  } // expected-error {{missing return in a closure expected to return 'Int'}}
+  } // expected-error {{missing return in closure expected to return 'Int'}}
 
   func f1() -> Int {
     var x : UInt {
@@ -193,7 +197,7 @@ func testSR13753() {
         set { }
     }
     x // expected-warning {{variable is unused}}
-  } // expected-error {{missing return in a function expected to return 'Int'}}
+  } // expected-error {{missing return in local function expected to return 'Int'}}
 
   let _ : () -> Int = {
     var x : Int = 0 // expected-warning {{variable 'x' was never used; consider replacing with '_' or removing it}}

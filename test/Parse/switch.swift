@@ -205,15 +205,15 @@ case (_, 2), (var a, _): // expected-error {{'a' must be bound in every pattern}
 
 case (var a, 2), (1, var b): // expected-error {{'a' must be bound in every pattern}} expected-error {{'b' must be bound in every pattern}}
   ()
-case (var a, 2): // expected-error {{'case' label in a 'switch' should have at least one executable statement}} {{17-17= break}}
+case (var a, 2): // expected-error {{'case' label in a 'switch' must have at least one executable statement}} {{17-17= break}}
 case (1, _):
   ()
 
-case (_, 2): // expected-error {{'case' label in a 'switch' should have at least one executable statement}} {{13-13= break}}
+case (_, 2): // expected-error {{'case' label in a 'switch' must have at least one executable statement}} {{13-13= break}}
 case (1, var a):
   ()
 
-case (var a, 2): // expected-error {{'case' label in a 'switch' should have at least one executable statement}} {{17-17= break}}
+case (var a, 2): // expected-error {{'case' label in a 'switch' must have at least one executable statement}} {{17-17= break}}
 case (1, var b):
   ()
 

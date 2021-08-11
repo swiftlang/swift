@@ -170,7 +170,6 @@ func SR14747() {
     return 5
   }
   var r = g() // expected-note {{captured value declared here}}
-  // expected-warning@-1 {{variable 'r' was never mutated; consider changing to 'let' constant}}
 }
 
 class class77933460 {}
@@ -180,5 +179,4 @@ func func77933460() {
   // expected-error@-1 {{closure captures 'obj' before it is declared}}
   // expected-note@-2 {{captured here}}
   // expected-note@-3 {{captured value declared here}}
-  // expected-warning@-4 {{variable 'obj' was never mutated; consider changing to 'let' constant}}
 }
