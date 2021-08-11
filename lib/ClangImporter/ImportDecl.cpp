@@ -1843,6 +1843,7 @@ static void applyAvailableAttribute(Decl *decl, AvailabilityContext &info,
                                       targetPlatform(C.LangOpts),
                                       /*Message=*/StringRef(),
                                       /*Rename=*/StringRef(),
+                                      /*RenameDecl=*/nullptr,
                                       info.getOSVersion().getLowerEndpoint(),
                                       /*IntroducedRange*/SourceRange(),
                                       /*Deprecated=*/noVersion,
@@ -2671,6 +2672,7 @@ namespace {
           attr = new (ctx) AvailableAttr(
               SourceLoc(), SourceRange(), PlatformKind::none,
               /*Message*/StringRef(), ctx.AllocateCopy(renamed.str()),
+              /*RenameDecl=*/nullptr,
               /*Introduced*/introducedVersion, SourceRange(),
               /*Deprecated*/llvm::VersionTuple(), SourceRange(),
               /*Obsoleted*/llvm::VersionTuple(), SourceRange(),
@@ -8084,27 +8086,21 @@ static bool suppressOverriddenMethods(ClangImporter::Implementation &importer,
 void addCompletionHandlerAttribute(Decl *asyncImport,
                                    ArrayRef<Decl *> members,
                                    ASTContext &SwiftContext) {
-  auto *ayncFunc = dyn_cast_or_null<AbstractFunctionDecl>(asyncImport);
-  if (!ayncFunc)
-    return;
+  auto *asyncFunc = dyn_cast_or_null<AbstractFunctionDecl>(asyncImport);
+  // Completion handler functions can be imported as getters, but the decl
+  // given back from the import is the property. Grab the underlying getter
+  if (auto *property = dyn_cast_or_null<AbstractStorageDecl>(asyncImport))
+    asyncFunc = property->getAccessor(AccessorKind::Get);
 
-  auto errorConvention = ayncFunc->getForeignErrorConvention();
-  auto asyncConvention = ayncFunc->getForeignAsyncConvention();
-  if (!asyncConvention)
+  if (!asyncFunc)
     return;
-
-  unsigned completionIndex = asyncConvention->completionHandlerParamIndex();
-  if (errorConvention &&
-      completionIndex >= errorConvention->getErrorParameterIndex()) {
-    completionIndex--;
-  }
 
   for (auto *member : members) {
-    if (member != asyncImport) {
+    // Only add the attribute to functions that don't already have availability
+    if (member != asyncImport && isa<AbstractFunctionDecl>(member) &&
+        !member->getAttrs().hasAttribute<AvailableAttr>()) {
       member->getAttrs().add(
-          new (SwiftContext) CompletionHandlerAsyncAttr(
-              cast<AbstractFunctionDecl>(*asyncImport), completionIndex,
-              SourceLoc(), SourceLoc(), SourceRange(), /*implicit*/ true));
+          AvailableAttr::createForAlternative(SwiftContext, asyncFunc));
     }
   }
 }
@@ -8616,6 +8612,7 @@ void ClangImporter::Implementation::importAttributes(
       auto AvAttr = new (C) AvailableAttr(SourceLoc(), SourceRange(),
                                           platformK.getValue(),
                                           message, swiftReplacement,
+                                          /*RenameDecl=*/nullptr,
                                           introduced,
                                           /*IntroducedRange=*/SourceRange(),
                                           deprecated,

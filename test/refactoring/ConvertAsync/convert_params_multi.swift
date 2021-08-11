@@ -1,6 +1,8 @@
-func manyWithError(_ completion: (String?, Int?, Error?) -> Void) { }
-func mixed(_ completion: (String?, Int) -> Void) { }
-func mixedError(_ completion: (String?, Int, Error?) -> Void) { }
+// REQUIRES: concurrency
+
+func manyWithError(_ completion: @escaping (String?, Int?, Error?) -> Void) { }
+func mixed(_ completion: @escaping (String?, Int) -> Void) { }
+func mixedError(_ completion: @escaping (String?, Int, Error?) -> Void) { }
 
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=MANYBOUND %s
 manyWithError { res1, res2, err in

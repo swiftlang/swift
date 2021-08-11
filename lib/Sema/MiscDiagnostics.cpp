@@ -4673,8 +4673,17 @@ public:
           if (!asyncFunc)
             return {false, call};
           ctx.Diags.diagnose(call->getLoc(), diag::warn_use_async_alternative);
-          ctx.Diags.diagnose(asyncFunc->getLoc(), diag::decl_declared_here,
-                             asyncFunc->getName());
+
+          if (auto *accessor = dyn_cast<AccessorDecl>(asyncFunc)) {
+            SmallString<32> name;
+            llvm::raw_svector_ostream os(name);
+            accessor->printUserFacingName(os);
+            ctx.Diags.diagnose(asyncFunc->getLoc(),
+                               diag::descriptive_decl_declared_here, name);
+          } else {
+            ctx.Diags.diagnose(asyncFunc->getLoc(), diag::decl_declared_here,
+                               asyncFunc->getName());
+          }
         }
       }
     }
