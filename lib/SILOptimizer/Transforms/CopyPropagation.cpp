@@ -488,7 +488,7 @@ void CopyPropagation::run() {
       // Dead borrow scopes must be removed as uses before canonicalizing the
       // outer copy.
       if (auto *beginBorrow = dyn_cast<BeginBorrowInst>(borrow.value)) {
-        if (hasOnlyEndOfScopeOrDestroyUses(beginBorrow)) {
+        if (hasOnlyEndOfScopeOrEndOfLifetimeUses(beginBorrow)) {
           deleter.recursivelyDeleteUsersIfDead(beginBorrow);
         }
       }

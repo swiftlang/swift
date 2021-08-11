@@ -134,3 +134,22 @@ bb0(%0 : @owned $K):
   %r = tuple ()
   return %r : $()
 }
+
+sil [ossa] @test_end_lifetime : $@convention(thin) (@owned K) -> () {
+bb0(%0 : @owned $K):
+  %1 = begin_borrow %0 : $K
+  %2 = ref_element_addr %1 : $K, #K.x
+  %3 = begin_access [read] [dynamic] %2 : $*B
+  %4 = load_borrow %3 : $*B
+  end_borrow %4 : $B
+  end_access %3 : $*B
+  %cast = unchecked_ref_cast %1 : $K to $Builtin.NativeObject
+  %conv1 = unchecked_ownership_conversion %cast : $Builtin.NativeObject, @guaranteed to @owned
+  end_borrow %1 : $K
+  end_lifetime %0 : $K
+  %conv2 = unchecked_ref_cast %conv1 : $Builtin.NativeObject to $K
+  dealloc_ref %conv2 : $K
+  %r = tuple ()
+  return %r : $()
+}
+
