@@ -3,7 +3,7 @@ set(generated_tests UnicodeGraphemeBreakTest.cpp.gyb)
 handle_gyb_sources(
     gyb_dependency_targets
     generated_tests
-    ${SWIFT_HOST_VARIANT_ARCH})
+    ARCH ${SWIFT_HOST_VARIANT_ARCH})
 
 add_swift_unittest(SwiftBasicTests
   BlotMapVectorTest.cpp
