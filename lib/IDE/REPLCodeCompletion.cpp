@@ -165,7 +165,8 @@ public:
   REPLCodeCompletionConsumer(REPLCompletions &Completions)
       : Completions(Completions) {}
 
-  void handleResults(MutableArrayRef<CodeCompletionResult *> Results) override {
+  void handleResults(CodeCompletionContext &context) override {
+    MutableArrayRef<CodeCompletionResult *> Results = context.takeResults();
     CodeCompletionContext::sortCompletionResults(Results);
     for (auto Result : Results) {
       std::string InsertableString = toInsertableString(Result);
