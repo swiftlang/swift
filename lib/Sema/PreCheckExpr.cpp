@@ -1412,6 +1412,8 @@ namespace {
       return { true, stmt };
     }
 
+    bool walkToDeclPre(Decl *D) override { return isa<PatternBindingDecl>(D); }
+
     std::pair<bool, Pattern *> walkToPatternPre(Pattern *pattern) override {
       return {false, pattern};
     }
