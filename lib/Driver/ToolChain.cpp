@@ -287,28 +287,12 @@ mergeBatchInputs(ArrayRef<const Job *> jobs,
   return false;
 }
 
-/// Remove space for -l arg values from \c Args and add to \c FrontendArgs
 void ToolChain::addLinkedLibArgs(const llvm::opt::ArgList &Args,
                                  llvm::opt::ArgStringList &FrontendArgs) {
   Args.getLastArg(options::OPT_l);
   for (auto Arg : Args.getAllArgValues(options::OPT_l)) {
     const std::string lArg("-l" + Arg);
     FrontendArgs.push_back(Args.MakeArgString(Twine(lArg)));
-  }
-}
-
-/// Add all values of a \c groupID from \c Args to \c FrontendArgs .
-/// except for \c exceptID .
-void ToolChain::addArgsFromGroupExcept(const llvm::opt::ArgList &Args,
-                                       llvm::opt::ArgStringList &FrontendArgs,
-                                       llvm::opt::OptSpecifier groupID,
-                                       llvm::opt::OptSpecifier exceptID) {
-  for (auto *Arg : Args) {
-    if (Arg->getOption().matches(groupID) &&
-        !Arg->getOption().matches(exceptID)) {
-      Arg->claim();
-      Arg->render(Args, FrontendArgs);
-    }
   }
 }
 

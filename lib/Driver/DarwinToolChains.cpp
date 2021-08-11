@@ -796,9 +796,8 @@ toolchains::Darwin::constructInvocation(const DynamicLinkJobAction &job,
   Arguments.push_back("-no_objc_category_merging");
 
   // These custom arguments should be right before the object file at the end.
-  ToolChain::addArgsFromGroupExcept(context.Args, Arguments,
-                                    options::OPT_linker_option_Group,
-                                    options::OPT_l);
+  context.Args.AddAllArgsExcept(Arguments, {options::OPT_linker_option_Group},
+                                {options::OPT_l});
   ToolChain::addLinkedLibArgs(context.Args, Arguments);
   context.Args.AddAllArgValues(Arguments, options::OPT_Xlinker);
 
