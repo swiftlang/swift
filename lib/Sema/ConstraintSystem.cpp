@@ -5878,7 +5878,6 @@ bool TypeVarBindingProducer::requiresOptionalAdjustment(
     if (auto *nominalBindingDecl = type->getAnyNominal()) {
       SmallVector<ProtocolConformance *, 2> conformances;
       conformsToExprByNilLiteral = nominalBindingDecl->lookupConformance(
-          CS.DC->getParentModule(),
           CS.getASTContext().getProtocol(
               KnownProtocolKind::ExpressibleByNilLiteral),
           conformances);

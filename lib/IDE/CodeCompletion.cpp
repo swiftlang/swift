@@ -4349,7 +4349,7 @@ public:
       // Check for conformance to the literal protocol.
       if (auto *NTD = T->getAnyNominal()) {
         SmallVector<ProtocolConformance *, 2> conformances;
-        if (NTD->lookupConformance(CurrModule, P, conformances)) {
+        if (NTD->lookupConformance(P, conformances)) {
           addTypeAnnotation(builder, T);
           builder.setExpectedTypeRelation(typeRelation);
           return;

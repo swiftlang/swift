@@ -1232,7 +1232,7 @@ LookupConformanceInModuleRequest::evaluate(
 
   // Find the (unspecialized) conformance.
   SmallVector<ProtocolConformance *, 2> conformances;
-  if (!nominal->lookupConformance(mod, protocol, conformances)) {
+  if (!nominal->lookupConformance(protocol, conformances)) {
     if (!protocol->isSpecificProtocol(KnownProtocolKind::Sendable))
       return getInvalidOrMissingConformance(type, protocol);
 

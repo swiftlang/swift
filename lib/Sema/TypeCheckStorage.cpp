@@ -128,8 +128,7 @@ static void computeLoweredStoredProperties(NominalTypeDecl *decl) {
 
       if (auto actorProto = ctx.getProtocol(KnownProtocolKind::Actor)) {
         SmallVector<ProtocolConformance *, 1> conformances;
-        classDecl->lookupConformance(
-            decl->getModuleContext(), actorProto, conformances);
+        classDecl->lookupConformance(actorProto, conformances);
         for (auto conformance : conformances)
           TypeChecker::checkConformance(conformance->getRootNormalConformance());
       }
@@ -138,8 +137,7 @@ static void computeLoweredStoredProperties(NominalTypeDecl *decl) {
       if (classDecl->isDistributedActor()) {
         if (auto actorProto = ctx.getProtocol(KnownProtocolKind::DistributedActor)) {
           SmallVector<ProtocolConformance *, 1> conformances;
-          classDecl->lookupConformance(
-              decl->getModuleContext(), actorProto, conformances);
+          classDecl->lookupConformance(actorProto, conformances);
           for (auto conformance : conformances)
             TypeChecker::checkConformance(conformance->getRootNormalConformance());
         }

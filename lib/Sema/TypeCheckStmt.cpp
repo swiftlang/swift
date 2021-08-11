@@ -229,8 +229,7 @@ static void tryDiagnoseUnnecessaryCastOverOptionSet(ASTContext &Ctx,
   if (!optionSetType)
     return;
   SmallVector<ProtocolConformance *, 4> conformances;
-  if (!(optionSetType &&
-        NTD->lookupConformance(module, optionSetType, conformances)))
+  if (!(optionSetType && NTD->lookupConformance(optionSetType, conformances)))
     return;
 
   auto *CE = dyn_cast<CallExpr>(E);
