@@ -5,6 +5,8 @@
 // RUN: %target-run %t/main > %t/log 2>&1 || true
 // RUN: %FileCheck %s < %t/log
 
+// REQUIRES: rdar81804817
+
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx || OS=ios
 
