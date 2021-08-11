@@ -326,6 +326,38 @@ DeclAttributes::getDeprecated(const ASTContext &ctx) const {
   return conditional;
 }
 
+const AvailableAttr *
+DeclAttributes::getSoftDeprecated(const ASTContext &ctx) const {
+  const AvailableAttr *conditional = nullptr;
+  const AvailableAttr *bestActive = findMostSpecificActivePlatform(ctx);
+  for (auto Attr : *this) {
+    if (auto AvAttr = dyn_cast<AvailableAttr>(Attr)) {
+      if (AvAttr->isInvalid())
+        continue;
+
+      if (AvAttr->hasPlatform() &&
+          (!bestActive || AvAttr != bestActive))
+        continue;
+
+      if (!AvAttr->isActivePlatform(ctx) &&
+          !AvAttr->isLanguageVersionSpecific() &&
+          !AvAttr->isPackageDescriptionVersionSpecific())
+        continue;
+
+      Optional<llvm::VersionTuple> DeprecatedVersion = AvAttr->Deprecated;
+      if (!DeprecatedVersion.hasValue())
+        continue;
+
+      llvm::VersionTuple ActiveVersion = AvAttr->getActiveVersion(ctx);
+
+      if (DeprecatedVersion.getValue() > ActiveVersion) {
+        conditional = AvAttr;
+      }
+    }
+  }
+  return conditional;
+}
+
 void DeclAttributes::dump(const Decl *D) const {
   StreamPrinter P(llvm::errs());
   PrintOptions PO = PrintOptions::printEverything();

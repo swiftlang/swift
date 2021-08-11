@@ -568,6 +568,14 @@ enum class CompletionKind {
   TypeAttrBeginning,
 };
 
+enum class CodeCompletionDiagnosticSeverity: uint8_t {
+  None,
+  Error,
+  Warning,
+  Remark,
+  Note,
+};
+
 /// A single code completion result.
 class CodeCompletionResult {
   friend class CodeCompletionResultBuilder;
@@ -607,7 +615,9 @@ public:
   enum class NotRecommendedReason {
     None = 0,
     RedundantImport,
+    RedundantImportIndirect,
     Deprecated,
+    SoftDeprecated,
     InvalidAsyncContext,
     CrossActorReference,
     VariableUsedInOwnDefinition,
@@ -633,10 +643,13 @@ public:
 private:
   CodeCompletionString *CompletionString;
   StringRef ModuleName;
+  StringRef SourceFilePath;
   StringRef BriefDocComment;
   ArrayRef<StringRef> AssociatedUSRs;
   ArrayRef<std::pair<StringRef, StringRef>> DocWords;
   unsigned TypeDistance : 3;
+  unsigned DiagnosticSeverity: 3;
+  StringRef DiagnosticMessage;
 
 public:
   /// Constructs a \c Pattern, \c Keyword or \c BuiltinOperator result.
@@ -663,6 +676,7 @@ public:
            getOperatorKind() != CodeCompletionOperatorKind::None);
     AssociatedKind = 0;
     IsSystem = 0;
+    DiagnosticSeverity = 0;
   }
 
   /// Constructs a \c Keyword result.
@@ -683,6 +697,7 @@ public:
     assert(CompletionString);
     AssociatedKind = static_cast<unsigned>(Kind);
     IsSystem = 0;
+    DiagnosticSeverity = 0;
   }
 
   /// Constructs a \c Literal result.
@@ -700,6 +715,7 @@ public:
         TypeDistance(TypeDistance) {
     AssociatedKind = static_cast<unsigned>(LiteralKind);
     IsSystem = 0;
+    DiagnosticSeverity = 0;
     assert(CompletionString);
   }
 
@@ -727,6 +743,7 @@ public:
     assert(AssociatedDecl && "should have a decl");
     AssociatedKind = unsigned(getCodeCompletionDeclKind(AssociatedDecl));
     IsSystem = getDeclIsSystem(AssociatedDecl);
+    DiagnosticSeverity = 0;
     assert(CompletionString);
     if (isOperator())
       KnownOperatorKind =
@@ -740,9 +757,10 @@ public:
                        CodeCompletionFlair Flair, unsigned NumBytesToErase,
                        CodeCompletionString *CompletionString,
                        CodeCompletionDeclKind DeclKind, bool IsSystem,
-                       StringRef ModuleName,
+                       StringRef ModuleName, StringRef SourceFilePath,
                        CodeCompletionResult::NotRecommendedReason NotRecReason,
-                       StringRef BriefDocComment,
+                       CodeCompletionDiagnosticSeverity diagSeverity,
+                       StringRef DiagnosticMessage, StringRef BriefDocComment,
                        ArrayRef<StringRef> AssociatedUSRs,
                        ArrayRef<std::pair<StringRef, StringRef>> DocWords,
                        ExpectedTypeRelation TypeDistance,
@@ -752,9 +770,11 @@ public:
         SemanticContext(unsigned(SemanticContext)), Flair(unsigned(Flair.toRaw())),
         NotRecommended(unsigned(NotRecReason)), IsSystem(IsSystem),
         NumBytesToErase(NumBytesToErase), CompletionString(CompletionString),
-        ModuleName(ModuleName), BriefDocComment(BriefDocComment),
-        AssociatedUSRs(AssociatedUSRs), DocWords(DocWords),
-        TypeDistance(TypeDistance) {
+        ModuleName(ModuleName), SourceFilePath(SourceFilePath),
+        BriefDocComment(BriefDocComment), AssociatedUSRs(AssociatedUSRs),
+        DocWords(DocWords), TypeDistance(TypeDistance),
+        DiagnosticSeverity(unsigned(diagSeverity)),
+        DiagnosticMessage(DiagnosticMessage) {
     AssociatedKind = static_cast<unsigned>(DeclKind);
     assert(CompletionString);
     assert(!isOperator() ||
@@ -853,6 +873,29 @@ public:
     return DocWords;
   }
 
+  void setSourceFilePath(StringRef value) {
+    SourceFilePath = value;
+  }
+
+  void setDiagnostics(CodeCompletionDiagnosticSeverity severity, StringRef message) {
+    DiagnosticSeverity = static_cast<unsigned>(severity);
+    DiagnosticMessage = message;
+  }
+
+  CodeCompletionDiagnosticSeverity getDiagnosticSeverity() const {
+    return static_cast<CodeCompletionDiagnosticSeverity>(DiagnosticSeverity);
+  }
+
+  StringRef getDiagnosticMessage() const {
+    return DiagnosticMessage;
+  }
+
+  /// Returns the source file path where the associated decl was declared.
+  /// Returns an empty string if the information is not available.
+  StringRef getSourceFilePath() const {
+    return SourceFilePath;
+  }
+
   /// Print a debug representation of the code completion result to \p OS.
   void printPrefix(raw_ostream &OS) const;
   SWIFT_DEBUG_DUMP;
@@ -863,6 +906,15 @@ public:
   static CodeCompletionOperatorKind
   getCodeCompletionOperatorKind(CodeCompletionString *str);
   static bool getDeclIsSystem(const Decl *D);
+};
+
+/// A pair of a file path and its up-to-date-ness.
+struct SourceFileAndUpToDate {
+  StringRef FilePath;
+  bool IsUpToDate;
+
+  SourceFileAndUpToDate(StringRef FilePath, bool IsUpToDate)
+      : FilePath(FilePath), IsUpToDate(IsUpToDate) {}
 };
 
 struct CodeCompletionResultSink {
@@ -877,11 +929,13 @@ struct CodeCompletionResultSink {
 
   /// Whether to annotate the results with XML.
   bool annotateResult = false;
+  bool requiresSourceFileInfo = false;
 
   /// Whether to emit object literals if desired.
   bool includeObjectLiterals = true;
 
   std::vector<CodeCompletionResult *> Results;
+  std::vector<SourceFileAndUpToDate> SourceFiles;
 
   /// A single-element cache for module names stored in Allocator, keyed by a
   /// clang::Module * or swift::ModuleDecl *.
@@ -950,7 +1004,10 @@ public:
       : Cache(Cache) {}
 
   void setAnnotateResult(bool flag) { CurrentResults.annotateResult = flag; }
-  bool getAnnotateResult() { return CurrentResults.annotateResult; }
+  bool getAnnotateResult() const { return CurrentResults.annotateResult; }
+
+  void setRequiresSourceFileInfo(bool flag) { CurrentResults.requiresSourceFileInfo = flag; }
+  bool requiresSourceFileInfo() const { return CurrentResults.requiresSourceFileInfo; }
 
   void setIncludeObjectLiterals(bool flag) {
     CurrentResults.includeObjectLiterals = flag;
@@ -995,8 +1052,7 @@ struct SimpleCachingCodeCompletionConsumer : public CodeCompletionConsumer {
                                DeclContext *DCForModules) override;
 
   /// Clients should override this method to receive \p Results.
-  virtual void handleResults(
-      MutableArrayRef<CodeCompletionResult *> Results) = 0;
+  virtual void handleResults(CodeCompletionContext &context) = 0;
 };
 
 /// A code completion result consumer that prints the results to a
@@ -1007,6 +1063,7 @@ class PrintingCodeCompletionConsumer
   bool IncludeKeywords;
   bool IncludeComments;
   bool PrintAnnotatedDescription;
+  bool RequiresSourceFileInfo = false;
 
 public:
  PrintingCodeCompletionConsumer(llvm::raw_ostream &OS,
@@ -1018,7 +1075,8 @@ public:
        IncludeComments(IncludeComments),
        PrintAnnotatedDescription(PrintAnnotatedDescription) {}
 
- void handleResults(MutableArrayRef<CodeCompletionResult *> Results) override;
+  void handleResults(CodeCompletionContext &context) override;
+  void handleResults(MutableArrayRef<CodeCompletionResult *> Results);
 };
 
 /// Create a factory for code completion callbacks.

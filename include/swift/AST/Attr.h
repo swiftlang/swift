@@ -2088,6 +2088,10 @@ public:
   /// a declaration is deprecated on all deployment targets, or null otherwise.
   const AvailableAttr *getDeprecated(const ASTContext &ctx) const;
 
+  /// Returns the first @available attribute that indicates
+  /// a declaration will be deprecated in the future, or null otherwise.
+  const AvailableAttr *getSoftDeprecated(const ASTContext &ctx) const;
+
   SWIFT_DEBUG_DUMPER(dump(const Decl *D = nullptr));
   void print(ASTPrinter &Printer, const PrintOptions &Options,
              const Decl *D = nullptr) const;

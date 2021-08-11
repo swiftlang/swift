@@ -2186,26 +2186,6 @@ describeRename(ASTContext &ctx, const AvailableAttr *attr, const ValueDecl *D,
   return ReplacementDeclKind::None;
 }
 
-/// Returns a value that can be used to select between accessor kinds in
-/// diagnostics.
-///
-/// This is correlated with diag::availability_deprecated and others.
-static std::pair<unsigned, DeclName>
-getAccessorKindAndNameForDiagnostics(const ValueDecl *D) {
-  // This should always be one more than the last AccessorKind supported in
-  // the diagnostics. If you need to change it, change the assertion below as
-  // well.
-  static const unsigned NOT_ACCESSOR_INDEX = 2;
-
-  if (auto *accessor = dyn_cast<AccessorDecl>(D)) {
-    DeclName Name = accessor->getStorage()->getName();
-    assert(accessor->isGetterOrSetter());
-    return {static_cast<unsigned>(accessor->getAccessorKind()), Name};
-  }
-
-  return {NOT_ACCESSOR_INDEX, D->getName()};
-}
-
 void TypeChecker::diagnoseIfDeprecated(SourceRange ReferenceRange,
                                        const ExportContext &Where,
                                        const ValueDecl *DeprecatedDecl,

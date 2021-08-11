@@ -13,7 +13,9 @@
 #include "swift/IDE/CodeCompletionCache.h"
 #include "swift/Basic/Cache.h"
 #include "llvm/ADT/APInt.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/StringMap.h"
 #include "llvm/Support/EndianStream.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -151,15 +153,22 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
   auto stringCount = read32le(strings);
   assert(strings + stringCount == end && "incorrect file size");
   (void)stringCount; // so it is not seen as "unused" in release builds.
+  llvm::DenseMap<uint32_t, StringRef> knownStrings;
   
   // STRINGS
   auto getString = [&](uint32_t index) -> StringRef {
     if (index == ~0u)
       return "";
+    auto found = knownStrings.find(index);
+    if (found != knownStrings.end()) {
+      return found->second;
+    }
 
     const char *p = strings + index;
     auto size = read32le(p);
-    return copyString(*V.Sink.Allocator, StringRef(p, size));
+    auto str = copyString(*V.Sink.Allocator, StringRef(p, size));
+    knownStrings[index] = str;
+    return str;
   };
 
   // CHUNKS
@@ -194,45 +203,44 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
     auto context = static_cast<SemanticContextKind>(*cursor++);
     auto notRecommended =
         static_cast<CodeCompletionResult::NotRecommendedReason>(*cursor++);
+    auto diagSeverity =
+        static_cast<CodeCompletionDiagnosticSeverity>(*cursor++);
     auto isSystem = static_cast<bool>(*cursor++);
     auto numBytesToErase = static_cast<unsigned>(*cursor++);
-    auto oldCursor = cursor;
     auto chunkIndex = read32le(cursor);
-    auto IntLength = cursor - oldCursor;
     auto moduleIndex = read32le(cursor);
+    auto sourceFilePathIndex = read32le(cursor);
     auto briefDocIndex = read32le(cursor);
+    auto diagMessageIndex = read32le(cursor);
+
     auto assocUSRCount = read32le(cursor);
-    auto assocUSRsIndex = read32le(cursor);
+    SmallVector<StringRef, 4> assocUSRs;
+    for (unsigned i = 0; i < assocUSRCount; ++i) {
+      assocUSRs.push_back(getString(read32le(cursor)));
+    }
+
     auto declKeywordCount = read32le(cursor);
-    auto declKeywordIndex = read32le(cursor);
+    SmallVector<std::pair<StringRef, StringRef>, 4> declKeywords;
+    for (unsigned i = 0; i < declKeywordCount; ++i) {
+      auto first = getString(read32le(cursor));
+      auto second = getString(read32le(cursor));
+      declKeywords.push_back(std::make_pair(first, second));
+    }
 
     CodeCompletionString *string = getCompletionString(chunkIndex);
     auto moduleName = getString(moduleIndex);
+    auto sourceFilePath = getString(sourceFilePathIndex);
     auto briefDocComment = getString(briefDocIndex);
-    SmallVector<StringRef, 4> assocUSRs;
-    for (unsigned i = 0; i < assocUSRCount; ++i) {
-      auto usr = getString(assocUSRsIndex);
-      assocUSRs.push_back(usr);
-      assocUSRsIndex += usr.size() + IntLength;
-    }
-
-    SmallVector<std::pair<StringRef, StringRef>, 4> declKeywords;
-    for (unsigned i = 0; i < declKeywordCount; ++i) {
-      auto first = getString(declKeywordIndex);
-      declKeywordIndex += first.size() + IntLength;
-      auto second = getString(declKeywordIndex);
-      declKeywordIndex += second.size() + IntLength;
-      declKeywords.push_back(std::make_pair(first, second));
-    }
+    auto diagMessage = getString(diagMessageIndex);
 
     CodeCompletionResult *result = nullptr;
     if (kind == CodeCompletionResult::Declaration) {
       result = new (*V.Sink.Allocator) CodeCompletionResult(
           context, CodeCompletionFlair(), numBytesToErase, string,
-          declKind, isSystem, moduleName, notRecommended, briefDocComment,
+          declKind, isSystem, moduleName, sourceFilePath, notRecommended,
+          diagSeverity, diagMessage, briefDocComment,
           copyArray(*V.Sink.Allocator, ArrayRef<StringRef>(assocUSRs)),
-          copyArray(*V.Sink.Allocator,
-                    ArrayRef<std::pair<StringRef, StringRef>>(declKeywords)),
+          copyArray(*V.Sink.Allocator, ArrayRef<std::pair<StringRef, StringRef>>(declKeywords)),
           CodeCompletionResult::Unknown, opKind);
     } else {
       result = new (*V.Sink.Allocator)
@@ -310,14 +318,20 @@ static void writeCachedModule(llvm::raw_ostream &out,
   endian::Writer chunksLE(chunks, little);
   std::string strings_;
   llvm::raw_string_ostream strings(strings_);
+  llvm::StringMap<uint32_t> knownStrings;
 
-  auto addString = [&strings](StringRef str) {
+  auto addString = [&strings, &knownStrings](StringRef str) {
     if (str.empty())
       return ~0u;
+    auto found = knownStrings.find(str);
+    if (found != knownStrings.end()) {
+      return found->second;
+    }
     auto size = strings.tell();
     endian::Writer LE(strings, little);
     LE.write(static_cast<uint32_t>(str.size()));
     strings << str;
+    knownStrings[str] = size;
     return static_cast<uint32_t>(size);
   };
 
@@ -358,32 +372,26 @@ static void writeCachedModule(llvm::raw_ostream &out,
         LE.write(static_cast<uint8_t>(CodeCompletionOperatorKind::None));
       LE.write(static_cast<uint8_t>(R->getSemanticContext()));
       LE.write(static_cast<uint8_t>(R->getNotRecommendedReason()));
+      LE.write(static_cast<uint8_t>(R->getDiagnosticSeverity()));
       LE.write(static_cast<uint8_t>(R->isSystem()));
       LE.write(static_cast<uint8_t>(R->getNumBytesToErase()));
       LE.write(
           static_cast<uint32_t>(addCompletionString(R->getCompletionString())));
       LE.write(addString(R->getModuleName()));      // index into strings
+      LE.write(addString(R->getSourceFilePath()));  // index into strings
       LE.write(addString(R->getBriefDocComment())); // index into strings
+      LE.write(addString(R->getDiagnosticMessage())); // index into strings
+
       LE.write(static_cast<uint32_t>(R->getAssociatedUSRs().size()));
-      if (R->getAssociatedUSRs().empty()) {
-        LE.write(static_cast<uint32_t>(~0u));
-      } else {
-        LE.write(addString(R->getAssociatedUSRs()[0]));
-        for (unsigned i = 1; i < R->getAssociatedUSRs().size(); ++i) {
-          addString(R->getAssociatedUSRs()[i]); // ignore result
-        }
+      for (unsigned i = 0; i < R->getAssociatedUSRs().size(); ++i) {
+        LE.write(addString(R->getAssociatedUSRs()[i]));
       }
+
       auto AllKeywords = R->getDeclKeywords();
       LE.write(static_cast<uint32_t>(AllKeywords.size()));
-      if (AllKeywords.empty()) {
-        LE.write(static_cast<uint32_t>(~0u));
-      } else {
-        LE.write(addString(AllKeywords[0].first));
-        addString(AllKeywords[0].second);
-        for (unsigned i = 1; i < AllKeywords.size(); ++i) {
-          addString(AllKeywords[i].first);
-          addString(AllKeywords[i].second);
-        }
+      for (unsigned i = 0; i < AllKeywords.size(); ++i) {
+        LE.write(addString(AllKeywords[i].first));
+        LE.write(addString(AllKeywords[i].second));
       }
     }
   }
