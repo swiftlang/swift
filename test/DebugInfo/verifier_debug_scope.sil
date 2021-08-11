@@ -1,0 +1,17 @@
+// RUN: not --crash %target-swift-frontend %s -g -emit-sil -sil-verify-all
+import Swift
+
+func foo(_ x: Int)
+func bar(_ x: Int)
+
+sil_scope 1 { loc "file.swift":2:6 parent @foo : $@convention(thin) (Int) -> () }
+sil_scope 2 { loc "file.swift":6:2 parent @bar : $@convention(thin) (Int) -> () }
+
+sil hidden @foo : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  // The scope of the debug variable needs to have the same root function as the
+  // debug scope on instruction
+  debug_value %0 : $Int, let, (name "x", loc "file.swift":8:7, scope 1), loc "file.swift":9:4, scope 2
+  %r = tuple()
+  return %r : $()
+}

@@ -5472,13 +5472,13 @@ class OpaqueTypeArchetypeType final : public ArchetypeType,
   GenericEnvironment *Environment;
   
 public:
-  /// Get 
-  
   /// Get an opaque archetype representing the underlying type of the given
-  /// opaque type decl.
-  static OpaqueTypeArchetypeType *get(OpaqueTypeDecl *Decl,
+  /// opaque type decl's opaque param with ordinal `ordinal`. For example, in
+  /// `(some P, some Q)`, `some P`'s type param would have ordinal 0 and `some
+  /// Q`'s type param would have ordinal 1.
+  static OpaqueTypeArchetypeType *get(OpaqueTypeDecl *Decl, unsigned ordinal,
                                       SubstitutionMap Substitutions);
-  
+
   OpaqueTypeDecl *getDecl() const {
     return OpaqueDecl;
   }
@@ -5509,7 +5509,7 @@ public:
   ///
   /// then the underlying type of `some P` would be ordinal 0, and `some Q` would be ordinal 1.
   unsigned getOrdinal() const {
-    // TODO: multiple opaque types
+    // TODO [OPAQUE SUPPORT]: multiple opaque types
     return 0;
   }
   

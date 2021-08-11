@@ -7,7 +7,8 @@
 // RUN: echo "\"modulePath\": \"%/t/inputs/Darwin.swiftmodule\"," >> %/t/inputs/map.json
 // RUN: echo "\"docPath\": \"%/t/inputs/Darwin.swiftdoc\"," >> %/t/inputs/map.json
 // RUN: echo "\"sourceInfoPath\": \"%/t/inputs/Darwin.swiftsourceinfo\"," >> %/t/inputs/map.json
-// RUN: echo "\"isFramework\": false" >> %/t/inputs/map.json
+// RUN: echo "\"isFramework\": false," >> %/t/inputs/map.json
+// RUN: echo "\"isSystem\": true" >> %/t/inputs/map.json
 // RUN: echo "}]" >> %/t/inputs/map.json
 
 // RUN: %target-swift-frontend -scan-dependencies -module-cache-path %t/clang-module-cache %s -placeholder-dependency-module-map-file %t/inputs/map.json -o %t/deps.json

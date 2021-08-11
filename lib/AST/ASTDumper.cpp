@@ -1145,43 +1145,23 @@ namespace {
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
-    void printOperatorIdentifiers(OperatorDecl *OD) {
-      auto identifiers = OD->getIdentifiers();
-      for (auto index : indices(identifiers)) {
-        OS.indent(Indent + 2);
-        OS << "identifier #" << index << " " << identifiers[index].Item;
-        if (index != identifiers.size() - 1)
-          OS << "\n";
-      }
-    }
-
     void visitInfixOperatorDecl(InfixOperatorDecl *IOD) {
       printCommon(IOD, "infix_operator_decl");
       OS << " " << IOD->getName();
-      if (!IOD->getIdentifiers().empty()) {
-        OS << "\n";
-        printOperatorIdentifiers(IOD);
-      }
+      if (!IOD->getPrecedenceGroupName().empty())
+        OS << " precedence_group_name=" << IOD->getPrecedenceGroupName();
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
     void visitPrefixOperatorDecl(PrefixOperatorDecl *POD) {
       printCommon(POD, "prefix_operator_decl");
       OS << " " << POD->getName();
-      if (!POD->getIdentifiers().empty()) {
-        OS << "\n";
-        printOperatorIdentifiers(POD);
-      }
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
     void visitPostfixOperatorDecl(PostfixOperatorDecl *POD) {
       printCommon(POD, "postfix_operator_decl");
       OS << " " << POD->getName();
-      if (!POD->getIdentifiers().empty()) {
-        OS << "\n";
-        printOperatorIdentifiers(POD);
-      }
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 

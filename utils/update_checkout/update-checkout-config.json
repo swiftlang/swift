@@ -59,6 +59,8 @@
             "remote": { "id": "apple/sourcekit-lsp" } },
         "swift-format": {
             "remote": { "id": "apple/swift-format" } },
+        "swift-installer-scripts": {
+            "remote": { "id": "apple/swift-installer-scripts" } },
         "llvm-project": {
             "remote": { "id": "apple/llvm-project" } }
     },
@@ -73,7 +75,7 @@
                 "llbuild": "main",
                 "swift-tools-support-core": "main",
                 "swiftpm": "main",
-                "swift-argument-parser": "0.4.3",
+                "swift-argument-parser": "0.4.4",
                 "swift-atomics": "0.0.3",
                 "swift-collections": "0.0.4",
                 "swift-crypto": "1.1.5",
@@ -93,7 +95,8 @@
                 "cmake": "v3.19.6",
                 "indexstore-db": "main",
                 "sourcekit-lsp": "main",
-                "swift-format": "main"
+                "swift-format": "main",
+                "swift-installer-scripts": "main"
             }
         },
        "release/5.5": {
@@ -121,7 +124,8 @@
                 "cmake": "v3.16.5",
                 "indexstore-db": "release/5.5",
                 "sourcekit-lsp": "release/5.5",
-                "swift-format": "main"
+                "swift-format": "main",
+                "swift-installer-scripts": "main"
             }
         },
         "release/5.5-05142021": {
@@ -149,7 +153,8 @@
                  "cmake": "v3.16.5",
                  "indexstore-db": "release/5.5",
                  "sourcekit-lsp": "release/5.5",
-                 "swift-format": "main"
+                 "swift-format": "main",
+                 "swift-installer-scripts": "main"
              }
         },
         "concurrency-5.5-abi-2": {
@@ -177,7 +182,8 @@
                 "cmake": "v3.16.5",
                 "indexstore-db": "release/5.5",
                 "sourcekit-lsp": "release/5.5",
-                "swift-format": "main"
+                "swift-format": "main",
+                "swift-installer-scripts": "main"
             }
         },
         "rebranch": {
@@ -189,14 +195,14 @@
                 "llbuild": "main",
                 "swift-tools-support-core": "main",
                 "swiftpm": "main",
-                "swift-argument-parser": "0.3.0",
+                "swift-argument-parser": "0.4.4",
                 "swift-atomics": "0.0.3",
-                "swift-collections": "0.0.4",                
+                "swift-collections": "0.0.4",
                 "swift-crypto": "1.1.5",
                 "swift-driver": "main",
                 "swift-numerics": "0.1.0",
                 "swift-syntax": "main",
-                "swift-system": "0.0.2",                
+                "swift-system": "0.0.2",
                 "swift-stress-tester": "main",
                 "swift-corelibs-xctest": "main",
                 "swift-corelibs-foundation": "main",
@@ -205,11 +211,12 @@
                 "swift-xcode-playground-support": "main",
                 "ninja": "release",
                 "icu": "release-65-1",
-                "yams": "3.0.1",
+                "yams": "4.0.2",
                 "cmake": "v3.19.6",
                 "indexstore-db": "main",
                 "sourcekit-lsp": "main",
-                "swift-format": "main"
+                "swift-format": "main",
+                "swift-installer-scripts": "main"
             }
         },
         "next" : {
@@ -223,7 +230,7 @@
                 "llbuild": "main",
                 "swift-tools-support-core": "main",
                 "swiftpm": "main",
-                "swift-argument-parser": "0.4.3",
+                "swift-argument-parser": "0.4.4",
                 "swift-atomics": "0.0.3",
                 "swift-collections": "0.0.4",                
                 "swift-crypto": "1.1.5",                
@@ -243,7 +250,8 @@
                 "cmake": "v3.19.6",
                 "indexstore-db": "main",
                 "sourcekit-lsp": "main",
-                "swift-format": "main"
+                "swift-format": "main",
+                "swift-installer-scripts": "main"
             }
         },
        "swift-3.0-branch" : {
@@ -263,7 +271,8 @@
                 "ninja": "release",
                 "indexstore-db": "main",
                 "sourcekit-lsp": "main",
-                "swift-format": "main"
+                "swift-format": "main",
+                "swift-installer-scripts": "main"
             }
         },
         "swift-3.1-branch" : {
@@ -284,7 +293,8 @@
                 "ninja": "release",
                 "indexstore-db": "main",
                 "sourcekit-lsp": "main",
-                "swift-format": "main"
+                "swift-format": "main",
+                "swift-installer-scripts": "main"
             }
         },
         "swift-4.0-branch" : {
@@ -305,7 +315,8 @@
                 "ninja": "release",
                 "indexstore-db": "main",
                 "sourcekit-lsp": "main",
-                "swift-format": "main"
+                "swift-format": "main",
+                "swift-installer-scripts": "main"
             }
         },
         "swift-4.1-branch" : {
@@ -326,7 +337,8 @@
                 "ninja": "release",
                 "indexstore-db": "main",
                 "sourcekit-lsp": "main",
-                "swift-format": "main"
+                "swift-format": "main",
+                "swift-installer-scripts": "main"
             }
         },
         "swift-4.2-branch" : {
@@ -347,7 +359,8 @@
                 "ninja": "release",
                 "indexstore-db": "main",
                 "sourcekit-lsp": "main",
-                "swift-format": "main"
+                "swift-format": "main",
+                "swift-installer-scripts": "main"
             }
         },
         "swift-5.0-branch" : {
@@ -369,7 +382,8 @@
                 "icu": "release-61-1",
                 "indexstore-db": "main",
                 "sourcekit-lsp": "main",
-                "swift-format": "main"
+                "swift-format": "main",
+                "swift-installer-scripts": "main"
             }
         },
        "swift-5.1-branch" : {
@@ -391,7 +405,8 @@
                 "icu": "release-61-1",
                 "indexstore-db": "swift-5.1-branch",
                 "sourcekit-lsp": "swift-5.1-branch",
-                "swift-format": "main"
+                "swift-format": "main",
+                "swift-installer-scripts": "main"
             }
         },
        "swift-5.2-branch": {
@@ -415,7 +430,8 @@
                 "cmake": "v3.15.1",
                 "indexstore-db": "swift-5.2-branch",
                 "sourcekit-lsp": "swift-5.2-branch",
-                "swift-format": "main"
+                "swift-format": "main",
+                "swift-installer-scripts": "main"
             }
         },
        "release/5.3": {
@@ -439,7 +455,8 @@
                 "cmake": "v3.16.5",
                 "indexstore-db": "release/5.3",
                 "sourcekit-lsp": "release/5.3",
-                "swift-format": "main"
+                "swift-format": "main",
+                "swift-installer-scripts": "main"
             }
         },
         "release/5.4": {
@@ -466,7 +483,8 @@
                 "cmake": "v3.16.5",
                 "indexstore-db": "release/5.4",
                 "sourcekit-lsp": "release/5.4",
-                "swift-format": "main"
+                "swift-format": "main",
+                "swift-installer-scripts": "main"
             }
         },
        "release/5.3-20201012": {
@@ -490,7 +508,8 @@
                 "cmake": "v3.16.5",
                 "indexstore-db": "release/5.3-20201012",
                 "sourcekit-lsp": "release/5.3-20201012",
-                "swift-format": "main"
+                "swift-format": "main",
+                "swift-installer-scripts": "main"
             }
         }
     }

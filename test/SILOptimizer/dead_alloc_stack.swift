@@ -21,6 +21,7 @@ func g<T : P>(_ x : T) -> Bool {
 
 // CHECK-LABEL: sil @$s16dead_alloc_stack6testitySbAA1XVF
 // CHECK:      bb0({{.*}}):
+// CHECK-NEXT:   debug_value
 // CHECK-NEXT:   integer_literal
 // CHECK-NEXT:   struct
 // CHECK-NEXT:   return

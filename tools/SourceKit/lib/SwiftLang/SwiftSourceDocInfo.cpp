@@ -352,6 +352,7 @@ private:
         return ExternalParamNameTag;
       return "tuple.element.argument_label";
     case PrintNameContext::Keyword:
+    case PrintNameContext::IntroducerKeyword:
       return SyntaxKeywordTag;
     case PrintNameContext::GenericParameter:
       return GenericParamNameTag;
@@ -1058,6 +1059,8 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
       // differentiate them.
       PrintOptions PO;
       PO.SkipAttributes = true;
+      PO.PrintStaticKeyword = false;
+      PO.PrintSelfAccessKindKeyword = false;
       PO.SkipIntroducerKeywords = true;
       PO.ArgAndParamPrinting =
           PrintOptions::ArgAndParamPrintingMode::ArgumentOnly;

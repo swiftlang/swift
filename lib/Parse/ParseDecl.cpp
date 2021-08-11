@@ -8115,8 +8115,8 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
   // designated protocol. These both look like identifiers, so we
   // parse them both as identifiers here and sort it out in type
   // checking.
-  SourceLoc colonLoc;
-  SmallVector<Located<Identifier>, 4> identifiers;
+  SourceLoc colonLoc, groupLoc;
+  Identifier groupName;
   if (Tok.is(tok::colon)) {
     SyntaxParsingContext GroupCtxt(SyntaxContext,
                                    SyntaxKind::OperatorPrecedenceAndTypes);
@@ -8131,43 +8131,40 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
       return makeParserCodeCompletionResult<OperatorDecl>();
     }
 
+    SyntaxParsingContext ListCtxt(SyntaxContext, SyntaxKind::IdentifierList);
+
+    (void)parseIdentifier(groupName, groupLoc,
+                          diag::operator_decl_expected_precedencegroup,
+                          /*diagnoseDollarPrefix=*/false);
+
     if (Context.TypeCheckerOpts.EnableOperatorDesignatedTypes) {
-      if (Tok.is(tok::identifier)) {
-        SyntaxParsingContext GroupCtxt(SyntaxContext,
-                                       SyntaxKind::IdentifierList);
+      // Designated types have been removed; consume the list (mainly for source
+      // compatibility with old swiftinterfaces) and emit a warning.
 
-        Identifier name;
-        auto loc = consumeIdentifier(name, /*diagnoseDollarPrefix=*/false);
-        identifiers.emplace_back(name, loc);
-
-        while (Tok.is(tok::comma)) {
-          auto comma = consumeToken();
-
-          if (Tok.is(tok::identifier)) {
-            Identifier name;
-            auto loc = consumeIdentifier(name, /*diagnoseDollarPrefix=*/false);
-            identifiers.emplace_back(name, loc);
-          } else {
-            if (Tok.isNot(tok::eof)) {
-              auto otherTokLoc = consumeToken();
-              diagnose(otherTokLoc, diag::operator_decl_expected_type);
-            } else {
-              diagnose(comma, diag::operator_decl_trailing_comma);
-            }
-          }
-        }
-      }
-    } else if (Tok.is(tok::identifier)) {
-      SyntaxParsingContext GroupCtxt(SyntaxContext,
-                                     SyntaxKind::IdentifierList);
-
-      Identifier name;
-      auto nameLoc = consumeIdentifier(name, /*diagnoseDollarPrefix=*/false);
-      identifiers.emplace_back(name, nameLoc);
+      // These SourceLocs point to the ends of the designated type list. If
+      // `typesEndLoc` never becomes valid, we didn't find any designated types.
+      SourceLoc typesStartLoc = Tok.getLoc();
+      SourceLoc typesEndLoc;
 
       if (isPrefix || isPostfix) {
+        // These have no precedence group, so we already parsed the first entry
+        // in the designated types list. Retroactively include it in the range.
+        typesStartLoc = colonLoc;
+        typesEndLoc = groupLoc;
+      }
+
+      while (consumeIf(tok::comma, typesEndLoc)) {
+        if (Tok.isNot(tok::eof))
+          typesEndLoc = consumeToken();
+      }
+
+      if (typesEndLoc.isValid())
+        diagnose(typesStartLoc, diag::operator_decl_remove_designated_types)
+            .fixItRemove({typesStartLoc, typesEndLoc});
+    } else {
+      if (isPrefix || isPostfix) {
         diagnose(colonLoc, diag::precedencegroup_not_infix)
-            .fixItRemove({colonLoc, nameLoc});
+            .fixItRemove({colonLoc, groupLoc});
       }
       // Nothing to complete here, simply consume the token.
       if (Tok.is(tok::code_complete))
@@ -8183,10 +8180,7 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
     } else {
       auto Diag = diagnose(lBraceLoc, diag::deprecated_operator_body);
       if (Tok.is(tok::r_brace)) {
-        SourceLoc lastGoodLoc =
-            !identifiers.empty() ? identifiers.back().Loc : SourceLoc();
-        if (lastGoodLoc.isInvalid())
-          lastGoodLoc = NameLoc;
+        SourceLoc lastGoodLoc = groupLoc.isValid() ? groupLoc : NameLoc;
         SourceLoc lastGoodLocEnd = Lexer::getLocForEndOfToken(SourceMgr,
                                                               lastGoodLoc);
         SourceLoc rBraceEnd = Lexer::getLocForEndOfToken(SourceMgr, Tok.getLoc());
@@ -8199,18 +8193,16 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
   }
 
   OperatorDecl *res;
-  if (Attributes.hasAttribute<PrefixAttr>())
+  if (isPrefix)
     res = new (Context)
-        PrefixOperatorDecl(CurDeclContext, OperatorLoc, Name, NameLoc,
-                           Context.AllocateCopy(identifiers));
-  else if (Attributes.hasAttribute<PostfixAttr>())
+        PrefixOperatorDecl(CurDeclContext, OperatorLoc, Name, NameLoc);
+  else if (isPostfix)
     res = new (Context)
-        PostfixOperatorDecl(CurDeclContext, OperatorLoc, Name, NameLoc,
-                            Context.AllocateCopy(identifiers));
+        PostfixOperatorDecl(CurDeclContext, OperatorLoc, Name, NameLoc);
   else
     res = new (Context)
         InfixOperatorDecl(CurDeclContext, OperatorLoc, Name, NameLoc, colonLoc,
-                          Context.AllocateCopy(identifiers));
+                          groupName, groupLoc);
 
   diagnoseOperatorFixityAttributes(*this, Attributes, res);
 

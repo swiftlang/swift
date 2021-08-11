@@ -275,6 +275,21 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     return { false, E };
   }
 
+  auto doStopTraversal = [&]() -> std::pair<bool, Expr *> {
+    Cancelled = true;
+    return { false, nullptr };
+  };
+
+  // Skip the synthesized curry thunks and just walk over the unwrapped
+  // expression
+  if (auto *ACE = dyn_cast<AutoClosureExpr>(E)) {
+    if (auto *SubExpr = ACE->getUnwrappedCurryThunkExpr()) {
+      if (!SubExpr->walk(*this))
+        return doStopTraversal();
+      return { false, E };
+    }
+  }
+
   if (!SEWalker.walkToExprPre(E)) {
     return { false, E };
   }
@@ -291,29 +306,8 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     return { false, E };
   };
 
-  auto doStopTraversal = [&]() -> std::pair<bool, Expr *> {
-    Cancelled = true;
-    return { false, nullptr };
-  };
-
   if (auto *CtorRefE = dyn_cast<ConstructorRefCallExpr>(E))
     CtorRefs.push_back(CtorRefE);
-
-  if (auto *ACE = dyn_cast<AutoClosureExpr>(E)) {
-    if (auto *SubExpr = ACE->getUnwrappedCurryThunkExpr()) {
-      if (auto *DRE = dyn_cast<DeclRefExpr>(SubExpr)) {
-        if (!passReference(DRE->getDecl(), DRE->getType(),
-                           DRE->getNameLoc(),
-                           ReferenceMetaData(getReferenceKind(Parent.getAsExpr(), DRE),
-                                             OpAccess)))
-          return doStopTraversal();
-
-        return doSkipChildren();
-      }
-    }
-
-    return { true, E };
-  }
 
   if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
     auto *FD = dyn_cast<FuncDecl>(DRE->getDecl());

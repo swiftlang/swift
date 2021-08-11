@@ -1,5 +1,5 @@
-// RUN: %target-build-swift %s
-// RUN: %target-swift-frontend -c -g -Xllvm -verify-di-holes=true %s
+// RUN: %target-build-swift %s -Xfrontend -requirement-machine=off
+// RUN: %target-swift-frontend -c -g -Xllvm -verify-di-holes=true %s -requirement-machine=off
 
 // rdar://74087329 (DI verification failure with trampoline blocks in VJP)
 

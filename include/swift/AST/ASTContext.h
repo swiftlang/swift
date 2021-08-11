@@ -37,6 +37,7 @@
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/Allocator.h"
@@ -105,6 +106,7 @@ namespace swift {
   class InheritedProtocolConformance;
   class SelfProtocolConformance;
   class SpecializedProtocolConformance;
+  enum class BuiltinConformanceKind;
   class BuiltinProtocolConformance;
   enum class ProtocolConformanceState;
   class Pattern;
@@ -758,6 +760,10 @@ public:
   /// tag single payloads.
   AvailabilityContext getMultiPayloadEnumTagSinglePayload();
 
+  /// Get the runtime availability of the Objective-C enabled
+  /// swift_isUniquelyReferenced functions.
+  AvailabilityContext getObjCIsUniquelyReferencedAvailability();
+
   /// Get the runtime availability of features introduced in the Swift 5.2
   /// compiler for the target platform.
   AvailabilityContext getSwift52Availability();
@@ -853,6 +859,13 @@ public:
       StringRef moduleName,
       ModuleDependenciesCache &cache,
       InterfaceSubContextDelegate &delegate);
+
+  /// Compute the extra implicit framework search paths on Apple platforms:
+  /// $SDKROOT/System/Library/Frameworks/ and $SDKROOT/Library/Frameworks/.
+  std::vector<std::string> getDarwinImplicitFrameworkSearchPaths() const;
+
+  /// Return a set of all possible filesystem locations where modules can be found.
+  llvm::StringSet<> getAllModuleSearchPathsSet() const;
 
   /// Load extensions to the given nominal type from the external
   /// module loaders.
@@ -1034,7 +1047,8 @@ public:
   BuiltinProtocolConformance *
   getBuiltinConformance(Type type, ProtocolDecl *protocol,
                         GenericSignature genericSig,
-                        ArrayRef<Requirement> conditionalRequirements);
+                        ArrayRef<Requirement> conditionalRequirements,
+                        BuiltinConformanceKind kind);
 
   /// A callback used to produce a diagnostic for an ill-formed protocol
   /// conformance that was type-checked before we're actually walking the
@@ -1171,6 +1185,11 @@ public:
   /// Retrieve or create a term rewriting system for answering queries on
   /// type parameters written against the given generic signature.
   rewriting::RequirementMachine *getOrCreateRequirementMachine(
+      CanGenericSignature sig);
+
+  /// This is a hack to break cycles. Don't introduce new callers of this
+  /// method.
+  bool isRecursivelyConstructingRequirementMachine(
       CanGenericSignature sig);
 
   /// Retrieve a generic signature with a single unconstrained type parameter,

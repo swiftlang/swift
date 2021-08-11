@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-library-evolution -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -enable-library-evolution
 // REQUIRES: concurrency
 
 class C1 { }
@@ -27,7 +27,6 @@ struct GS2<T> {
 }
 
 func acceptCV<T: Sendable>(_: T) { }
-// expected-note@-1 6{{where 'T' =}}
 
 // Example that was triggering circular dependencies.
 struct Signature { }
@@ -86,6 +85,7 @@ struct HasFunctions {
   var cfp: @convention(c) () -> Void
 }
 
+@available(SwiftStdlib 5.5, *)
 @globalActor
 actor MyGlobalActor {
   static let shared = MyGlobalActor()
@@ -103,22 +103,22 @@ func testCV(
   fps: FrozenPublicStruct, fpe: FrozenPublicEnum,
   hf: HasFunctions
 ) {
-  acceptCV(c1) // expected-error{{'C1' conform to 'Sendable'}}
+  acceptCV(c1) // expected-warning{{type 'C1' does not conform to the 'Sendable' protocol}}
   acceptCV(c2)
   acceptCV(c3)
   acceptCV(c4)
   acceptCV(s1)
-  acceptCV(e1) // expected-error{{'E1' conform to 'Sendable'}}
+  acceptCV(e1) // expected-warning{{type 'E1' does not conform to the 'Sendable'}}
   acceptCV(e2)
   acceptCV(gs1)
-  acceptCV(gs2) // expected-error{{'GS2<Int>' conform to 'Sendable'}}
+  acceptCV(gs2) // expected-warning{{type 'GS2<Int>' does not conform to the 'Sendable' protocol}}
 
   // Not available due to recursive conformance dependencies.
-  acceptCV(bc) // expected-error{{global function 'acceptCV' requires that 'Bitcode' conform to 'Sendable'}}
+  acceptCV(bc) // expected-warning{{type 'Bitcode' does not conform to the 'Sendable' protocol}}
 
   // Not available due to "public".
-  acceptCV(ps) // expected-error{{global function 'acceptCV' requires that 'PublicStruct' conform to 'Sendable'}}
-  acceptCV(pe) // expected-error{{global function 'acceptCV' requires that 'PublicEnum' conform to 'Sendable'}}
+  acceptCV(ps) // expected-warning{{type 'PublicStruct' does not conform to the 'Sendable' protocol}}
+  acceptCV(pe) // expected-warning{{type 'PublicEnum' does not conform to the 'Sendable' protocol}}
 
   // Public is okay when also @frozen.
   acceptCV(fps)

@@ -123,6 +123,8 @@ public:
   explicit SILDebugInfoExpression(llvm::ArrayRef<SILDIExprElement> EL)
       : Elements(EL.begin(), EL.end()) {}
 
+  void clear() { Elements.clear(); }
+
   size_t getNumElements() const { return Elements.size(); }
 
   using iterator = typename decltype(Elements)::iterator;
@@ -149,6 +151,15 @@ public:
 
   void push_back(const SILDIExprElement &Element) {
     Elements.push_back(Element);
+  }
+
+  void appendElements(llvm::ArrayRef<SILDIExprElement> NewElements) {
+    if (NewElements.size())
+      Elements.append(NewElements.begin(), NewElements.end());
+  }
+
+  void append(const SILDebugInfoExpression &Tail) {
+    appendElements(Tail.Elements);
   }
 
   /// The iterator for SILDIExprOperand
@@ -208,6 +219,9 @@ public:
 
   /// Return true if this expression is not empty
   inline operator bool() const { return Elements.size(); }
+
+  /// Create a op_fragment expression
+  static SILDebugInfoExpression createFragment(VarDecl *Field);
 };
 } // end namespace swift
 #endif
