@@ -25,9 +25,8 @@ func run(on object: PFXObject) async throws {
   // CHECK: performSingleBothy13
   print(try await object.performSingleBothy13()())
 
-  // Reenable with rdar://81625544
-  // CHECK  performSingleBothy21
-  //  print(try await object.performSingleBothy21()())
+  // CHECK: performSingleBothy21
+  print(try await object.performSingleBothy21()())
   
   // CHECK: performSingleBothy23
   print(try await object.performSingleBothy23()())
