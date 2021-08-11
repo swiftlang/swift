@@ -5560,51 +5560,6 @@ ERROR(specialize_target_function_of_type_not_found, none,
 NOTE(specialize_found_function_of_type, none,
       "found function %0 of type %1", (DeclName, Type))
 
-//------------------------------------------------------------------------------
-// MARK: Variable usage diagnostics
-//------------------------------------------------------------------------------
-
-WARNING(pbd_never_used_stmtcond, NoUsage,
-        "value %0 was defined but never used; consider replacing "
-        "with boolean test",
-        (Identifier))
-WARNING(unused_setter_parameter, NoUsage,
-        "setter argument %0 was never used, but the property was accessed",
-        (Identifier))
-NOTE(fixit_for_unused_setter_parameter, none,
-     "did you mean to use %0 instead of accessing the property's current value?", (Identifier))
-
-WARNING(pbd_never_used, NoUsage,
-        "initialization of %select{variable|immutable value}1 %0 was never used"
-        "; consider replacing with assignment to '_' or removing it",
-        (Identifier, unsigned))
-
-
-WARNING(capture_never_used, NoUsage,
-        "capture %0 was never used",
-        (Identifier))
-
-WARNING(immutable_value_duplicate_reference, none,
-        "immutable value referenced by %0 is already referenced by %1; "
-        "consider removing it and replacing all uses of %0 with %1",
-        (Identifier, Identifier))
-        
-NOTE(value_initial_reference, none,
-     "initially referenced here", ())
-WARNING(variable_never_used, NoUsage,
-        "%select{variable|immutable value}1 %0 was never used; "
-        "consider replacing with '_' or removing it",
-        (Identifier, unsigned))
-WARNING(immutable_value_never_used_but_assigned, NoUsage,
-        "immutable value %0 was never used; consider removing it",
-        (Identifier))
-WARNING(variable_never_mutated, none,
-        "variable %0 was never mutated; "
-        "consider %select{removing 'var' to make it|changing to 'let'}1 constant",
-        (Identifier, bool))
-WARNING(variable_never_read, none,
-        "variable %0 was written to, but never read",
-        (Identifier))
 WARNING(observe_keypath_property_not_objc_dynamic, none,
         "passing reference to non-'@objc dynamic' property %0 to KVO method %1 "
         "may lead to unexpected behavior or runtime trap", (DeclName, DeclName))

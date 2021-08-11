@@ -321,7 +321,7 @@ func testTuple(_ x : Int) -> Int {
 
 struct TestComputedPropertyStruct {
   var x : Int {
-    get {} // expected-error {{missing return in a function expected to return 'Int'}}
+    get {} // expected-error {{missing return in getter expected to return 'Int'}}
     nonmutating set {}
   }
 }
@@ -1389,8 +1389,6 @@ func foo2() {
   let x = 5
   if x < 0, let x = Optional(1) { }
   // expected-warning@-1 {{immutable value 'x' was never used; consider replacing with '_' or removing it}}
-  // expected-warning@-2 {{will never be executed}}
-  // expected-note@-3 {{condition always evaluates to false}}
 }
 
 class ForwardReference {
