@@ -15,7 +15,6 @@
 
 #include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
-#include "swift/AST/ForeignInfo.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/AbstractionPattern.h"
 
@@ -28,6 +27,11 @@ public:
   CanSILFunctionType substFnType;
   Optional<AbstractionPattern> origResultType;
   CanType substResultType;
+  struct ForeignInfo {
+    Optional<ForeignErrorConvention> error;
+    Optional<ForeignAsyncConvention> async;
+    ImportAsMemberStatus self;
+  };
   ForeignInfo foreign;
 
 private:
@@ -44,8 +48,8 @@ public:
                  Optional<SILFunctionTypeRepresentation> overrideRep = None)
       : origFormalType(llvm::None), substFnType(substFnType),
         origResultType(origResultType),
-        substResultType(substResultType), foreign{foreignSelf, foreignError,
-                                                  foreignAsync},
+        substResultType(substResultType), foreign{foreignError, foreignAsync,
+                                                  foreignSelf},
         overrideRep(overrideRep) {}
 
   CalleeTypeInfo(CanSILFunctionType substFnType,

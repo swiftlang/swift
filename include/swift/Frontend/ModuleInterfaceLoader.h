@@ -161,6 +161,7 @@ public:
   static std::unique_ptr<ExplicitSwiftModuleLoader>
   create(ASTContext &ctx,
          DependencyTracker *tracker, ModuleLoadingMode loadMode,
+         ArrayRef<std::string> ExplicitModulePaths,
          StringRef ExplicitSwiftModuleMap,
          bool IgnoreSwiftSourceInfoFile);
 
@@ -179,11 +180,10 @@ struct ExplicitModuleInfo {
   std::string moduleDocPath;
   // Path of the .swiftsourceinfo file.
   std::string moduleSourceInfoPath;
+  // Opened buffer for the .swiftmodule file.
+  std::unique_ptr<llvm::MemoryBuffer> moduleBuffer;
   // A flag that indicates whether this module is a framework
   bool isFramework;
-  // A flag that indicates whether this module is a system module
-  // Set the default to be false.
-  bool isSystem = false;
 };
 
 /// Parser of explicit module maps passed into the compiler.
@@ -242,18 +242,7 @@ private:
     SmallString<32> Buffer;
     return Saver.save(cast<llvm::yaml::ScalarNode>(N)->getValue(Buffer));
   }
-
-  static bool parseBoolValue(StringRef val) {
-    auto valStr = val.str();
-    valStr.erase(std::remove(valStr.begin(), valStr.end(), '\n'), valStr.end());
-    if (valStr.compare("true") == 0)
-      return true;
-    else if (valStr.compare("false") == 0)
-      return false;
-    else
-      llvm_unreachable("Unexpected JSON value for isFramework");
-  }
-
+  
   bool parseSingleModuleEntry(llvm::yaml::Node &node,
                               llvm::StringMap<ExplicitModuleInfo> &moduleMap) {
     using namespace llvm::yaml;
@@ -274,9 +263,14 @@ private:
       } else if (key == "sourceInfoPath") {
         result.moduleSourceInfoPath = val.str();
       } else if (key == "isFramework") {
-        result.isFramework = parseBoolValue(val);
-      } else if (key == "isSystem") {
-        result.isSystem = parseBoolValue(val);
+        auto valStr = val.str();
+        valStr.erase(std::remove(valStr.begin(), valStr.end(), '\n'), valStr.end());
+        if (valStr.compare("true") == 0)
+          result.isFramework = true;
+        else if (valStr.compare("false") == 0)
+          result.isFramework = false;
+        else
+          llvm_unreachable("Unexpected JSON value for isFramework");
       } else {
         // Being forgiving for future fields.
         continue;

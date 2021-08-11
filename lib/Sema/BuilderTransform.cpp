@@ -205,8 +205,9 @@ class BuilderClosureVisitor
   }
 
 public:
-  BuilderClosureVisitor(ASTContext &ctx, ConstraintSystem *cs, DeclContext *dc,
-                        Type builderType, Type bodyResultType)
+  BuilderClosureVisitor(ASTContext &ctx, ConstraintSystem *cs,
+                        DeclContext *dc, Type builderType,
+                        Type bodyResultType)
       : cs(cs), dc(dc), ctx(ctx), builderType(builderType) {
     builder = builderType->getAnyNominal();
     applied.builderType = builderType;
@@ -237,8 +238,9 @@ public:
           { applied.returnExpr }, { Identifier() });
     }
 
-    applied.returnExpr = cs->buildTypeErasedExpr(
-        applied.returnExpr, dc, applied.bodyResultType, CTP_ReturnStmt);
+    applied.returnExpr = cs->buildTypeErasedExpr(applied.returnExpr,
+                                                 dc, applied.bodyResultType,
+                                                 CTP_ReturnStmt);
 
     applied.returnExpr = cs->generateConstraints(applied.returnExpr, dc);
     if (!applied.returnExpr) {
@@ -975,8 +977,7 @@ struct ResultBuilderTarget {
 /// Handles the rewrite of the body of a closure to which a result builder
 /// has been applied.
 class BuilderClosureRewriter
-    : public StmtVisitor<BuilderClosureRewriter, NullablePtr<Stmt>,
-                         ResultBuilderTarget> {
+    : public StmtVisitor<BuilderClosureRewriter, Stmt *, ResultBuilderTarget> {
   ASTContext &ctx;
   const Solution &solution;
   DeclContext *dc;
@@ -1043,12 +1044,12 @@ private:
     switch (target.kind) {
     case ResultBuilderTarget::ReturnValue: {
       // Return the expression.
-      Type bodyResultInterfaceType =
+      Type bodyResultType =
           solution.simplifyType(builderTransform.bodyResultType);
 
-      SolutionApplicationTarget returnTarget(capturedExpr, dc, CTP_ReturnStmt,
-                                             bodyResultInterfaceType,
-                                             /*isDiscarded=*/false);
+      SolutionApplicationTarget returnTarget(
+          capturedExpr, dc, CTP_ReturnStmt, bodyResultType,
+          /*isDiscarded=*/false);
       Expr *resultExpr = nullptr;
       if (auto resultTarget = rewriteTarget(returnTarget))
         resultExpr = resultTarget->getAsExpr();
@@ -1137,9 +1138,8 @@ public:
         solution(solution), dc(dc), builderTransform(builderTransform),
         rewriteTarget(rewriteTarget) { }
 
-  NullablePtr<Stmt>
-  visitBraceStmt(BraceStmt *braceStmt, ResultBuilderTarget target,
-                 Optional<ResultBuilderTarget> innerTarget = None) {
+  Stmt *visitBraceStmt(BraceStmt *braceStmt, ResultBuilderTarget target,
+                       Optional<ResultBuilderTarget> innerTarget = None) {
     std::vector<ASTNode> newElements;
 
     // If there is an "inner" target corresponding to this brace, declare
@@ -1179,7 +1179,7 @@ public:
         // "throw" statements produce no value. Transform them directly.
         if (auto throwStmt = dyn_cast<ThrowStmt>(stmt)) {
           if (auto newStmt = visitThrowStmt(throwStmt)) {
-            newElements.push_back(newStmt.get());
+            newElements.push_back(stmt);
           }
           continue;
         }
@@ -1190,7 +1190,7 @@ public:
 
         declareTemporaryVariable(captured.first, newElements);
 
-        auto finalStmt = visit(
+        Stmt *finalStmt = visit(
             stmt,
             ResultBuilderTarget{ResultBuilderTarget::TemporaryVar,
                                   std::move(captured)});
@@ -1200,7 +1200,7 @@ public:
         if (!finalStmt)
           return nullptr;
 
-        newElements.push_back(finalStmt.get());
+        newElements.push_back(finalStmt);
         continue;
       }
 
@@ -1250,7 +1250,7 @@ public:
                              braceStmt->getRBraceLoc());
   }
 
-  NullablePtr<Stmt> visitIfStmt(IfStmt *ifStmt, ResultBuilderTarget target) {
+  Stmt *visitIfStmt(IfStmt *ifStmt, ResultBuilderTarget target) {
     // Rewrite the condition.
     if (auto condition = rewriteTarget(
             SolutionApplicationTarget(ifStmt->getCond(), dc)))
@@ -1266,10 +1266,7 @@ public:
             temporaryVar, {target.captured.second[0]}),
           ResultBuilderTarget::forAssign(
             capturedThen.first, {capturedThen.second.front()}));
-    if (!newThen)
-      return nullptr;
-
-    ifStmt->setThenStmt(newThen.get());
+    ifStmt->setThenStmt(newThen);
 
     // Look for a #available condition. If there is one, we need to check
     // that the resulting type of the "then" doesn't refer to any types that
@@ -1341,28 +1338,23 @@ public:
             dyn_cast_or_null<BraceStmt>(ifStmt->getElseStmt())) {
       // Translate the "else" branch when it's a stmt-brace.
       auto capturedElse = takeCapturedStmt(elseBraceStmt);
-      auto newElse = visitBraceStmt(
+      Stmt *newElse = visitBraceStmt(
           elseBraceStmt,
           ResultBuilderTarget::forAssign(
             temporaryVar, {target.captured.second[1]}),
           ResultBuilderTarget::forAssign(
             capturedElse.first, {capturedElse.second.front()}));
-      if (!newElse)
-        return nullptr;
-
-      ifStmt->setElseStmt(newElse.get());
+      ifStmt->setElseStmt(newElse);
     } else if (auto elseIfStmt = cast_or_null<IfStmt>(ifStmt->getElseStmt())){
       // Translate the "else" branch when it's an else-if.
       auto capturedElse = takeCapturedStmt(elseIfStmt);
       std::vector<ASTNode> newElseElements;
       declareTemporaryVariable(capturedElse.first, newElseElements);
-      auto newElseElt =
-          visitIfStmt(elseIfStmt, ResultBuilderTarget::forAssign(
-                                      capturedElse.first, capturedElse.second));
-      if (!newElseElt)
-        return nullptr;
-
-      newElseElements.push_back(newElseElt.get());
+      newElseElements.push_back(
+          visitIfStmt(
+            elseIfStmt,
+            ResultBuilderTarget::forAssign(
+              capturedElse.first, capturedElse.second)));
       newElseElements.push_back(
           initializeTarget(
             ResultBuilderTarget::forAssign(
@@ -1386,25 +1378,23 @@ public:
     return ifStmt;
   }
 
-  NullablePtr<Stmt> visitDoStmt(DoStmt *doStmt, ResultBuilderTarget target) {
+  Stmt *visitDoStmt(DoStmt *doStmt, ResultBuilderTarget target) {
     // Each statement turns into a (potential) temporary variable
     // binding followed by the statement itself.
     auto body = cast<BraceStmt>(doStmt->getBody());
     auto captured = takeCapturedStmt(body);
 
-    auto newInnerBody =
-        visitBraceStmt(body, target,
-                       ResultBuilderTarget::forAssign(
-                           captured.first, {captured.second.front()}));
-    if (!newInnerBody)
-      return nullptr;
-
-    doStmt->setBody(cast<BraceStmt>(newInnerBody.get()));
+    auto newInnerBody = cast<BraceStmt>(
+        visitBraceStmt(
+          body,
+          target,
+          ResultBuilderTarget::forAssign(
+            captured.first, {captured.second.front()})));
+    doStmt->setBody(newInnerBody);
     return doStmt;
   }
 
-  NullablePtr<Stmt> visitSwitchStmt(SwitchStmt *switchStmt,
-                                    ResultBuilderTarget target) {
+  Stmt *visitSwitchStmt(SwitchStmt *switchStmt, ResultBuilderTarget target) {
     // Translate the subject expression.
     ConstraintSystem &cs = solution.getConstraintSystem();
     auto subjectTarget =
@@ -1449,8 +1439,7 @@ public:
     return switchStmt;
   }
 
-  NullablePtr<Stmt> visitCaseStmt(CaseStmt *caseStmt,
-                                  ResultBuilderTarget target) {
+  Stmt *visitCaseStmt(CaseStmt *caseStmt, ResultBuilderTarget target) {
     // Translate the patterns and guard expressions for each case label item.
     for (auto &caseLabelItem : caseStmt->getMutableCaseLabelItems()) {
       SolutionApplicationTarget caseLabelTarget(&caseLabelItem, dc);
@@ -1461,19 +1450,19 @@ public:
     // Transform the body of the case.
     auto body = cast<BraceStmt>(caseStmt->getBody());
     auto captured = takeCapturedStmt(body);
-    auto newInnerBody =
-        visitBraceStmt(body, target,
-                       ResultBuilderTarget::forAssign(
-                           captured.first, {captured.second.front()}));
-    if (!newInnerBody)
-      return nullptr;
+    auto newInnerBody = cast<BraceStmt>(
+        visitBraceStmt(
+          body,
+          target,
+          ResultBuilderTarget::forAssign(
+            captured.first, {captured.second.front()})));
+    caseStmt->setBody(newInnerBody);
 
-    caseStmt->setBody(cast<BraceStmt>(newInnerBody.get()));
     return caseStmt;
   }
 
-  NullablePtr<Stmt> visitForEachStmt(ForEachStmt *forEachStmt,
-                                     ResultBuilderTarget target) {
+  Stmt *visitForEachStmt(
+      ForEachStmt *forEachStmt, ResultBuilderTarget target) {
     // Translate the for-each loop header.
     ConstraintSystem &cs = solution.getConstraintSystem();
     auto forEachTarget =
@@ -1503,14 +1492,13 @@ public:
     // will append the result of executing the loop body to the array.
     auto body = forEachStmt->getBody();
     auto capturedBody = takeCapturedStmt(body);
-    auto newBody = visitBraceStmt(
-        body, ResultBuilderTarget::forExpression(arrayAppendCall),
-        ResultBuilderTarget::forAssign(capturedBody.first,
-                                       {capturedBody.second.front()}));
-    if (!newBody)
-      return nullptr;
-
-    forEachStmt->setBody(cast<BraceStmt>(newBody.get()));
+    auto newBody = cast<BraceStmt>(
+        visitBraceStmt(
+          body,
+          ResultBuilderTarget::forExpression(arrayAppendCall),
+          ResultBuilderTarget::forAssign(
+            capturedBody.first, {capturedBody.second.front()})));
+    forEachStmt->setBody(newBody);
     outerBodySteps.push_back(forEachStmt);
 
     // Step 3. Perform the buildArray() call to turn the array of results
@@ -1522,11 +1510,11 @@ public:
 
     // Form a brace statement to put together the three main steps for the
     // for-each loop translation outlined above.
-    return BraceStmt::create(ctx, forEachStmt->getStartLoc(), outerBodySteps,
-                             newBody.get()->getEndLoc());
+    return BraceStmt::create(
+        ctx, forEachStmt->getStartLoc(), outerBodySteps, newBody->getEndLoc());
   }
 
-  NullablePtr<Stmt> visitThrowStmt(ThrowStmt *throwStmt) {
+  Stmt *visitThrowStmt(ThrowStmt *throwStmt) {
     // Rewrite the error.
     auto target = *solution.getConstraintSystem()
         .getSolutionApplicationTarget(throwStmt);
@@ -1538,14 +1526,12 @@ public:
     return throwStmt;
   }
 
-  NullablePtr<Stmt> visitThrowStmt(ThrowStmt *throwStmt,
-                                   ResultBuilderTarget target) {
+  Stmt *visitThrowStmt(ThrowStmt *throwStmt, ResultBuilderTarget target) {
     llvm_unreachable("Throw statements produce no value");
   }
 
 #define UNHANDLED_RESULT_BUILDER_STMT(STMT) \
-  NullablePtr<Stmt> \
-  visit##STMT##Stmt(STMT##Stmt *stmt, ResultBuilderTarget target) { \
+  Stmt *visit##STMT##Stmt(STMT##Stmt *stmt, ResultBuilderTarget target) { \
     llvm_unreachable("Function builders do not allow statement of kind " \
                      #STMT); \
   }
@@ -1577,12 +1563,12 @@ BraceStmt *swift::applyResultBuilderTransform(
           rewriteTarget) {
   BuilderClosureRewriter rewriter(solution, dc, applied, rewriteTarget);
   auto captured = rewriter.takeCapturedStmt(body);
-  auto result = rewriter.visitBraceStmt(
-      body, ResultBuilderTarget::forReturn(applied.returnExpr),
-      ResultBuilderTarget::forAssign(captured.first, captured.second));
-  if (!result)
-    return nullptr;
-  return cast<BraceStmt>(result.get());
+  return cast_or_null<BraceStmt>(
+    rewriter.visitBraceStmt(
+      body,
+      ResultBuilderTarget::forReturn(applied.returnExpr),
+      ResultBuilderTarget::forAssign(
+        captured.first, captured.second)));
 }
 
 Optional<BraceStmt *> TypeChecker::applyResultBuilderBodyTransform(
@@ -1650,7 +1636,7 @@ Optional<BraceStmt *> TypeChecker::applyResultBuilderBodyTransform(
   ConstraintKind resultConstraintKind = ConstraintKind::Conversion;
   if (auto opaque = resultContextType->getAs<OpaqueTypeArchetypeType>()) {
     if (opaque->getDecl()->isOpaqueReturnTypeOfFunction(func)) {
-      resultConstraintKind = ConstraintKind::Equal;
+      resultConstraintKind = ConstraintKind::OpaqueUnderlyingType;
     }
   }
 
@@ -1716,10 +1702,10 @@ Optional<BraceStmt *> TypeChecker::applyResultBuilderBodyTransform(
 }
 
 Optional<ConstraintSystem::TypeMatchResult>
-ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
-                                     Type bodyResultType,
-                                     ConstraintKind bodyResultConstraintKind,
-                                     ConstraintLocatorBuilder locator) {
+ConstraintSystem::matchResultBuilder(
+    AnyFunctionRef fn, Type builderType, Type bodyResultType,
+    ConstraintKind bodyResultConstraintKind,
+    ConstraintLocatorBuilder locator) {
   auto builder = builderType->getAnyNominal();
   assert(builder && "Bad result builder type");
   assert(builder->getAttrs().hasAttribute<ResultBuilderAttr>());
@@ -1844,8 +1830,7 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
   }
 
   // Bind the body result type to the type of the transformed expression.
-  addConstraint(bodyResultConstraintKind, transformedType,
-                openOpaqueType(bodyResultType, CTP_ReturnStmt, locator),
+  addConstraint(bodyResultConstraintKind, transformedType, bodyResultType,
                 locator);
   return getTypeMatchSuccess();
 }

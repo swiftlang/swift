@@ -63,7 +63,7 @@ infix operator =#=
 
 infix operator +++=
 infix operator *** : A
-infix operator --- : ; // expected-error {{expected precedence group name after ':' in operator declaration}}
+infix operator --- : ;
 
 precedencegroup { // expected-error {{expected identifier after 'precedencegroup'}}
   associativity: right

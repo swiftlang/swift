@@ -785,19 +785,6 @@ public:
   }
 };
 
-class LocatorPathElt::OpenedOpaqueArchetype final
-    : public StoredPointerElement<OpaqueTypeDecl> {
-public:
-  OpenedOpaqueArchetype(OpaqueTypeDecl *decl)
-      : StoredPointerElement(PathElementKind::OpenedOpaqueArchetype, decl) {}
-
-  OpaqueTypeDecl *getDecl() const { return getStoredPointer(); }
-
-  static bool classof(const LocatorPathElt *elt) {
-    return elt->getKind() == ConstraintLocator::OpenedOpaqueArchetype;
-  }
-};
-
 class LocatorPathElt::KeyPathDynamicMember final : public StoredPointerElement<NominalTypeDecl> {
 public:
   KeyPathDynamicMember(NominalTypeDecl *keyPathDecl)

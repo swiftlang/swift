@@ -35,7 +35,7 @@ struct ProtocolInfo {
   llvm::TinyPtrVector<const ProtocolDecl *> AllInherited;
 
   /// Associated types defined in the protocol itself.
-  ArrayRef<AssociatedTypeDecl *> AssociatedTypes;
+  llvm::TinyPtrVector<AssociatedTypeDecl *> AssociatedTypes;
 
   /// Associated types from all inherited protocols, not including duplicates or
   /// those defined in the protocol itself. Computed by
@@ -64,7 +64,7 @@ struct ProtocolInfo {
   }
 
   ProtocolInfo(ArrayRef<ProtocolDecl *> inherited,
-               ArrayRef<AssociatedTypeDecl *> &&types,
+               llvm::TinyPtrVector<AssociatedTypeDecl *> &&types,
                ArrayRef<Requirement> reqs)
     : Inherited(inherited),
       AssociatedTypes(types),

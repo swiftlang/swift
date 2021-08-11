@@ -2809,7 +2809,7 @@ void ValueDecl::setOverriddenDecls(ArrayRef<ValueDecl *> overridden) {
   request.cacheResult(overriddenVec);
 }
 
-TypeRepr *ValueDecl::getOpaqueResultTypeRepr() const {
+OpaqueReturnTypeRepr *ValueDecl::getOpaqueResultTypeRepr() const {
   TypeRepr *returnRepr = nullptr;
   if (auto *VD = dyn_cast<VarDecl>(this)) {
     if (auto *P = VD->getParentPattern()) {
@@ -2834,11 +2834,7 @@ TypeRepr *ValueDecl::getOpaqueResultTypeRepr() const {
     returnRepr = SD->getElementTypeRepr();
   }
 
-  if (returnRepr && returnRepr->hasOpaque()) {
-    return returnRepr;
-  } else {
-    return nullptr;
-  }
+  return dyn_cast_or_null<OpaqueReturnTypeRepr>(returnRepr);
 }
 
 OpaqueTypeDecl *ValueDecl::getOpaqueResultTypeDecl() const {
@@ -4791,9 +4787,7 @@ ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
   Bits.ProtocolDecl.NumRequirementsInSignature = 0;
   Bits.ProtocolDecl.HasMissingRequirements = false;
   Bits.ProtocolDecl.KnownProtocol = 0;
-  Bits.ProtocolDecl.HasAssociatedTypes = 0;
-  Bits.ProtocolDecl.HasLazyAssociatedTypes = 0;
-  setTrailingWhereClause(TrailingWhere);
+    setTrailingWhereClause(TrailingWhere);
 }
 
 bool ProtocolDecl::isMarkerProtocol() const {
@@ -4812,40 +4806,26 @@ ArrayRef<ProtocolDecl *> ProtocolDecl::getInheritedProtocols() const {
                            {});
 }
 
-ArrayRef<AssociatedTypeDecl *>
+llvm::TinyPtrVector<AssociatedTypeDecl *>
 ProtocolDecl::getAssociatedTypeMembers() const {
-  if (Bits.ProtocolDecl.HasAssociatedTypes)
-    return AssociatedTypes;
-
-  auto *self = const_cast<ProtocolDecl *>(this);
-  self->Bits.ProtocolDecl.HasAssociatedTypes = 1;
+  llvm::TinyPtrVector<AssociatedTypeDecl *> result;
 
   // Clang-imported protocols never have associated types.
   if (hasClangNode())
-    return ArrayRef<AssociatedTypeDecl *>();
+    return result;
 
   // Deserialized @objc protocols never have associated types.
-  if (getParentSourceFile() == nullptr && isObjC())
-    return ArrayRef<AssociatedTypeDecl *>();
+  if (!getParentSourceFile() && isObjC())
+    return result;
 
-  SmallVector<AssociatedTypeDecl *, 2> result;
-  if (Bits.ProtocolDecl.HasLazyAssociatedTypes) {
-    auto &ctx = getASTContext();
-    auto contextData = static_cast<LazyProtocolData *>(
-        ctx.getOrCreateLazyContextData(this, nullptr));
-
-    contextData->loader->loadAssociatedTypes(
-        this, contextData->associatedTypesData, result);
-  } else {
-    for (auto member : getMembers()) {
-      if (auto ATD = dyn_cast<AssociatedTypeDecl>(member)) {
-        result.push_back(ATD);
-      }
+  // Find the associated type declarations.
+  for (auto member : getMembers()) {
+    if (auto ATD = dyn_cast<AssociatedTypeDecl>(member)) {
+      result.push_back(ATD);
     }
   }
 
-  self->AssociatedTypes = getASTContext().AllocateCopy(result);
-  return AssociatedTypes;
+  return result;
 }
 
 ValueDecl *ProtocolDecl::getSingleRequirement(DeclName name) const {
@@ -5208,18 +5188,6 @@ ProtocolDecl::setLazyRequirementSignature(LazyMemberLoader *lazyLoader,
   // FIXME: (transitional) increment the redundant "always-on" counter.
   if (auto *Stats = getASTContext().Stats)
     ++Stats->getFrontendCounters().NumLazyRequirementSignatures;
-}
-
-void
-ProtocolDecl::setLazyAssociatedTypeMembers(LazyMemberLoader *lazyLoader,
-                                           uint64_t associatedTypesData) {
-  assert(!Bits.ProtocolDecl.HasAssociatedTypes);
-  assert(!Bits.ProtocolDecl.HasLazyAssociatedTypes);
-
-  auto contextData = static_cast<LazyProtocolData *>(
-      getASTContext().getOrCreateLazyContextData(this, lazyLoader));
-  contextData->associatedTypesData = associatedTypesData;
-  Bits.ProtocolDecl.HasLazyAssociatedTypes = true;
 }
 
 ArrayRef<Requirement> ProtocolDecl::getCachedRequirementSignature() const {
@@ -7124,7 +7092,7 @@ static bool isPotentialCompletionHandler(const ParamDecl *param) {
 }
 
 Optional<unsigned> AbstractFunctionDecl::findPotentialCompletionHandlerParam(
-    const AbstractFunctionDecl *asyncAlternative) const {
+    AbstractFunctionDecl *asyncAlternative) const {
   const ParameterList *params = getParameters();
   if (params->size() == 0)
     return None;
@@ -7207,7 +7175,7 @@ Optional<unsigned> AbstractFunctionDecl::findPotentialCompletionHandlerParam(
 
     // The next original param should match the current async, so don't
     // increment the async index
-    potentialParam = paramIndex;
+    potentialParam = asyncParamIndex;
     paramIndex++;
   }
   return potentialParam;
@@ -7551,16 +7519,16 @@ void AbstractFunctionDecl::setParameters(ParameterList *BodyParams) {
 }
 
 OpaqueTypeDecl::OpaqueTypeDecl(ValueDecl *NamingDecl,
-                               GenericParamList *GenericParams, DeclContext *DC,
+                               GenericParamList *GenericParams,
+                               DeclContext *DC,
                                GenericSignature OpaqueInterfaceGenericSignature,
-                               OpaqueReturnTypeRepr *UnderlyingInterfaceRepr,
                                GenericTypeParamType *UnderlyingInterfaceType)
-    : GenericTypeDecl(DeclKind::OpaqueType, DC, Identifier(), SourceLoc(), {},
-                      GenericParams),
-      NamingDecl(NamingDecl),
-      OpaqueInterfaceGenericSignature(OpaqueInterfaceGenericSignature),
-      UnderlyingInterfaceRepr(UnderlyingInterfaceRepr),
-      UnderlyingInterfaceType(UnderlyingInterfaceType) {
+  : GenericTypeDecl(DeclKind::OpaqueType, DC, Identifier(), SourceLoc(), {},
+                    GenericParams),
+    NamingDecl(NamingDecl),
+    OpaqueInterfaceGenericSignature(OpaqueInterfaceGenericSignature),
+    UnderlyingInterfaceType(UnderlyingInterfaceType)
+{
   // Always implicit.
   setImplicit();
 }
@@ -7578,15 +7546,6 @@ bool OpaqueTypeDecl::isOpaqueReturnTypeOfFunction(
   }
 
   return false;
-}
-
-unsigned OpaqueTypeDecl::getAnonymousOpaqueParamOrdinal(
-    OpaqueReturnTypeRepr *repr) const {
-  // TODO [OPAQUE SUPPORT]: we will need to generalize here when we allow
-  // multiple "some" types.
-  assert(UnderlyingInterfaceRepr &&
-         "can't do opaque param lookup without underlying interface repr");
-  return repr == UnderlyingInterfaceRepr ? 0 : -1;
 }
 
 Identifier OpaqueTypeDecl::getOpaqueReturnTypeIdentifier() const {
@@ -7921,28 +7880,6 @@ bool AccessorDecl::isSimpleDidSet() const {
   auto mutableThis = const_cast<AccessorDecl *>(this);
   return evaluateOrDefault(getASTContext().evaluator,
                            SimpleDidSetRequest{mutableThis}, false);
-}
-
-void AccessorDecl::printUserFacingName(raw_ostream &out) const {
-  switch (getAccessorKind()) {
-  case AccessorKind::Get:
-    out << "getter:";
-    break;
-  case AccessorKind::Set:
-    out << "setter:";
-    break;
-  default:
-    out << getName();
-    return;
-  }
-
-  out << getStorage()->getName() << "(";
-  if (this->isSetter()) {
-    for (const auto *param : *getParameters()) {
-      out << param->getName() << ":";
-    }
-  }
-  out << ")";
 }
 
 StaticSpellingKind FuncDecl::getCorrectStaticSpelling() const {

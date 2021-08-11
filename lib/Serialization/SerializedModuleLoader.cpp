@@ -88,10 +88,18 @@ Optional<bool> forEachModuleSearchPath(
   // Apple platforms have extra implicit framework search paths:
   // $SDKROOT/System/Library/Frameworks/ and $SDKROOT/Library/Frameworks/.
   if (Ctx.LangOpts.Target.isOSDarwin()) {
-    for (const auto &path : Ctx.getDarwinImplicitFrameworkSearchPaths())
-      if (auto result =
-          callback(path, SearchPathKind::Framework, /*isSystem=*/true))
-        return result;
+    SmallString<128> scratch;
+    scratch = Ctx.SearchPathOpts.SDKPath;
+    llvm::sys::path::append(scratch, "System", "Library", "Frameworks");
+    if (auto result =
+            callback(scratch, SearchPathKind::Framework, /*isSystem=*/true))
+      return result;
+
+    scratch = Ctx.SearchPathOpts.SDKPath;
+    llvm::sys::path::append(scratch, "Library", "Frameworks");
+    if (auto result =
+            callback(scratch, SearchPathKind::Framework, /*isSystem=*/true))
+      return result;
   }
 
   for (auto importPath : Ctx.SearchPathOpts.RuntimeLibraryImportPaths) {

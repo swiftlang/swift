@@ -4424,8 +4424,6 @@ struct AsyncHandlerDesc {
     });
   }
 
-  // TODO: If we have an async alternative we should check its result types
-  //       for whether to unwrap or not
   bool shouldUnwrap(swift::Type Ty) const {
     return HasError && Ty->isOptional();
   }
@@ -4435,71 +4433,60 @@ struct AsyncHandlerDesc {
 /// information about that completion handler and its index within the function
 /// declaration.
 struct AsyncHandlerParamDesc : public AsyncHandlerDesc {
-  /// Enum to represent the position of the completion handler param within
-  /// the parameter list. Given `(A, B, C, D)`:
-  ///   - A is `First`
-  ///   - B and C are `Middle`
-  ///   - D is `Last`
-  /// The position is `Only` if there's a single parameter that is the
-  /// completion handler and `None` if there is no handler.
-  enum class Position {
-    First, Middle, Last, Only, None
-  };
-
   /// The function the completion handler is a parameter of.
   const FuncDecl *Func = nullptr;
   /// The index of the completion handler in the function that declares it.
-  unsigned Index = 0;
-  /// The async alternative, if one is found.
-  const AbstractFunctionDecl *Alternative = nullptr;
+  int Index = -1;
 
   AsyncHandlerParamDesc() : AsyncHandlerDesc() {}
   AsyncHandlerParamDesc(const AsyncHandlerDesc &Handler, const FuncDecl *Func,
-                        unsigned Index,
-                        const AbstractFunctionDecl *Alternative)
-      : AsyncHandlerDesc(Handler), Func(Func), Index(Index),
-        Alternative(Alternative) {}
+                        int Index)
+      : AsyncHandlerDesc(Handler), Func(Func), Index(Index) {}
 
   static AsyncHandlerParamDesc find(const FuncDecl *FD,
                                     bool RequireAttributeOrName) {
-    if (!FD || FD->hasAsync() || FD->hasThrows() ||
-        !FD->getResultInterfaceType()->isVoid())
+    if (!FD || FD->hasAsync() || FD->hasThrows())
       return AsyncHandlerParamDesc();
 
-    const auto *Alternative = FD->getAsyncAlternative();
-    Optional<unsigned> Index =
-        FD->findPotentialCompletionHandlerParam(Alternative);
-    if (!Index)
+    bool RequireName = RequireAttributeOrName;
+    if (RequireAttributeOrName && FD->getAsyncAlternative())
+      RequireName = false;
+
+    // Require at least one parameter and void return type
+    auto *Params = FD->getParameters();
+    if (Params->size() == 0 || !FD->getResultInterfaceType()->isVoid())
       return AsyncHandlerParamDesc();
 
-    bool RequireName = RequireAttributeOrName && !Alternative;
-    return AsyncHandlerParamDesc(
-        AsyncHandlerDesc::get(FD->getParameters()->get(*Index), RequireName),
-        FD, *Index, Alternative);
+    // Assume the handler is the last parameter for now
+    int Index = Params->size() - 1;
+    const ParamDecl *Param = Params->get(Index);
+
+    // Callback must not be attributed with @autoclosure
+    if (Param->isAutoClosure())
+      return AsyncHandlerParamDesc();
+
+    return AsyncHandlerParamDesc(AsyncHandlerDesc::get(Param, RequireName), FD,
+                                 Index);
   }
 
-  /// Build an @available attribute with the name of the async alternative as
-  /// the \c renamed argument, followed by a newline.
-  SmallString<128> buildRenamedAttribute() const {
-    SmallString<128> AvailabilityAttr;
-    llvm::raw_svector_ostream OS(AvailabilityAttr);
-
-    // If there's an alternative then there must already be an attribute,
-    // don't add another.
-    if (!isValid() || Alternative)
-      return AvailabilityAttr;
+  /// Print the name of the function with the completion handler, without
+  /// the completion handler parameter, to \p OS. That is, the name of the
+  /// async alternative function.
+  void printAsyncFunctionName(llvm::raw_ostream &OS) const {
+    if (!Func || Index < 0)
+      return;
 
     DeclName Name = Func->getName();
-    OS << "@available(*, renamed: \"" << Name.getBaseName() << "(";
+    OS << Name.getBaseName();
+
+    OS << tok::l_paren;
     ArrayRef<Identifier> ArgNames = Name.getArgumentNames();
     for (size_t I = 0; I < ArgNames.size(); ++I) {
-      if (I != Index) {
+      if (I != (size_t)Index) {
         OS << ArgNames[I] << tok::colon;
       }
     }
-    OS << ")\")\n";
-
-    return AvailabilityAttr;
+    OS << tok::r_paren;
   }
 
   /// Retrieves the parameter decl for the completion handler parameter, or
@@ -4507,30 +4494,12 @@ struct AsyncHandlerParamDesc : public AsyncHandlerDesc {
   const ParamDecl *getHandlerParam() const {
     if (!isValid())
       return nullptr;
-    return cast<ParamDecl>(getHandler());
-  }
-
-  /// See \c Position
-  Position handlerParamPosition() const {
-    if (!isValid())
-      return Position::None;
-    const auto *Params = Func->getParameters();
-    if (Params->size() == 1)
-      return Position::Only;
-    if (Index == 0)
-      return Position::First;
-    if (Index == Params->size() - 1)
-      return Position::Last;
-    return Position::Middle;
+    return Func->getParameters()->get(Index);
   }
 
   bool operator==(const AsyncHandlerParamDesc &Other) const {
     return Handler == Other.Handler && Type == Other.Type &&
            HasError == Other.HasError && Index == Other.Index;
-  }
-
-  bool alternativeIsAccessor() const {
-    return Alternative && isa<AccessorDecl>(Alternative);
   }
 };
 
@@ -5657,18 +5626,10 @@ private:
     if (AfterTarget && !E->isImplicit()) {
       if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
         if (auto *D = DRE->getDecl()) {
-          // Only care about references that aren't declared, as seen decls will
+          // Only care about references that aren't declared as seen decls will
           // be renamed (if necessary) during the refactoring.
-          if (!D->isImplicit() && !DeclaredDecls.count(D)) {
+          if (!D->isImplicit() && !DeclaredDecls.count(D))
             ReferencedDecls.insert(D);
-
-            // Also add the async alternative of a function to prevent
-            // collisions if a call is replaced with the alternative.
-            if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
-              if (auto *Alternative = AFD->getAsyncAlternative())
-                ReferencedDecls.insert(Alternative);
-            }
-          }
         }
       }
     } else if (E == Target.dyn_cast<Expr *>()) {
@@ -5752,16 +5713,8 @@ private:
         if (auto *D = DRE->getDecl()) {
           // If we have a reference that isn't declared in the same scope,
           // increment the number of references to that decl.
-          if (!D->isImplicit() && !ScopeStack.back().DeclaredDecls.count(D)) {
+          if (!D->isImplicit() && !ScopeStack.back().DeclaredDecls.count(D))
             (*ScopeStack.back().ReferencedDecls)[D] += 1;
-
-            // Also add the async alternative of a function to prevent
-            // collisions if a call is replaced with the alternative.
-            if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
-              if (auto *Alternative = AFD->getAsyncAlternative())
-                (*ScopeStack.back().ReferencedDecls)[Alternative] += 1;
-            }
-          }
         }
       }
     }
@@ -5968,8 +5921,7 @@ public:
         convertNode(FD->getBody());
       }
     } else {
-      convertNode(StartNode, /*StartOverride=*/{}, /*ConvertCalls=*/true,
-                  /*IncludeComments=*/false);
+      convertNode(StartNode);
     }
     return !DiagEngine.hadAnyError();
   }
@@ -5984,11 +5936,11 @@ public:
   bool createLegacyBody() {
     assert(Buffer.empty() &&
            "AsyncConverter can only be used once");
-
-    if (!canCreateLegacyBody())
+    if (!canCreateLegacyBody()) {
       return false;
-
+    }
     FuncDecl *FD = cast<FuncDecl>(StartNode.get<Decl *>());
+
     OS << tok::l_brace << "\n"; // start function body
     OS << "Task " << tok::l_brace << "\n";
     addHoistedNamedCallback(FD, TopHandler, TopHandler.getNameStr(), [&]() {
@@ -5996,12 +5948,7 @@ public:
         OS << tok::kw_try << " ";
       }
       OS << "await ";
-
-      // Since we're *creating* the async alternative here, there shouldn't
-      // already be one. Thus, just assume that the call to the alternative is
-      // the same as the call to the old completion handler function, minus the
-      // completion handler arg.
-      addForwardingCallTo(FD, /*HandlerReplacement=*/"");
+      addCallToAsyncMethod(FD, TopHandler);
     });
     OS << "\n";
     OS << tok::r_brace << "\n"; // end 'Task'
@@ -6038,9 +5985,8 @@ public:
     // fnWithHandler(args...) { ... }
     auto ClosureStr =
         getAsyncWrapperCompletionClosure("continuation", TopHandler);
-    addForwardingCallTo(FD, /*HandlerReplacement=*/ClosureStr);
+    addForwardingCallTo(FD, TopHandler, /*HandlerReplacement=*/ClosureStr);
 
-    OS << "\n";
     OS << tok::r_brace << "\n"; // end continuation closure
     OS << tok::r_brace << "\n"; // end function body
     return true;
@@ -6205,18 +6151,18 @@ private:
       llvm_unreachable("Should not have an invalid handler here");
     }
 
-    OS << tok::r_brace; // end closure
+    OS << tok::r_brace << "\n"; // end closure
     return OutputStr;
   }
 
   /// Retrieves the location for the start of a comment attached to the token
   /// at the provided location, or the location itself if there is no comment.
-  SourceLoc getLocIncludingPrecedingComment(SourceLoc Loc) {
-    auto Tokens = SF->getAllTokens();
-    auto TokenIter = token_lower_bound(Tokens, Loc);
-    if (TokenIter != Tokens.end() && TokenIter->hasComment())
-      return TokenIter->getCommentStart();
-    return Loc;
+  SourceLoc getLocIncludingPrecedingComment(SourceLoc loc) {
+    auto tokens = SF->getAllTokens();
+    auto tokenIter = token_lower_bound(tokens, loc);
+    if (tokenIter != tokens.end() && tokenIter->hasComment())
+      return tokenIter->getCommentStart();
+    return loc;
   }
 
   /// If the provided SourceLoc has a preceding comment, print it out. Returns
@@ -6272,13 +6218,14 @@ private:
   }
 
   void convertNode(ASTNode Node, SourceLoc StartOverride = {},
-                   bool ConvertCalls = true,
-                   bool IncludePrecedingComment = true) {
+                   bool ConvertCalls = true) {
     if (!StartOverride.isValid())
       StartOverride = Node.getStartLoc();
 
-    // Make sure to include any preceding comments attached to the loc
-    if (IncludePrecedingComment)
+    // Unless this is the start node, make sure to include any preceding
+    // comments attached to the loc. If it's the start node, the attached
+    // comment is outside the range of the transform.
+    if (Node != StartNode)
       StartOverride = getLocIncludingPrecedingComment(StartOverride);
 
     llvm::SaveAndRestore<SourceLoc> RestoreLoc(LastAddedLoc, StartOverride);
@@ -6465,14 +6412,14 @@ private:
       //    calls in the continuation block)
       if (NestedExprCount == 0 && !Scopes.back().isWrappedInContination()) {
         // If the refactoring is on the call itself, do not require the callee
-        // to have the @available attribute or a completion-like name.
+        // to have the @completionHandlerAsync attribute or a completion-like
+        // name.
         auto HandlerDesc = AsyncHandlerParamDesc::find(
             getUnderlyingFunc(CE->getFn()),
             /*RequireAttributeOrName=*/StartNode.dyn_cast<Expr *>() != CE);
-        if (HandlerDesc.isValid()) {
+        if (HandlerDesc.isValid())
           return addCustom(CE->getSourceRange(),
                            [&]() { addHoistedCallback(CE, HandlerDesc); });
-        }
       }
     }
 
@@ -6591,7 +6538,6 @@ private:
   void addFuncDecl(const FuncDecl *FD) {
     auto *Params = FD->getParameters();
     auto *HandlerParam = TopHandler.getHandlerParam();
-    auto ParamPos = TopHandler.handlerParamPosition();
 
     // If the completion handler parameter has a default argument, the async
     // version is effectively @discardableResult, as not all the callers care
@@ -6600,57 +6546,22 @@ private:
       OS << tok::at_sign << "discardableResult" << "\n";
 
     // First chunk: start -> the parameter to remove (if any)
-    SourceLoc LeftEndLoc;
-    switch (ParamPos) {
-    case AsyncHandlerParamDesc::Position::None:
-    case AsyncHandlerParamDesc::Position::Only:
-    case AsyncHandlerParamDesc::Position::First:
-      // Handler is the first param (or there is none), so only include the (
-      LeftEndLoc = Params->getLParenLoc().getAdvancedLoc(1);
-      break;
-    case AsyncHandlerParamDesc::Position::Middle:
-      // Handler is somewhere in the middle of the params, so we need to
-      // include any comments and comma up until the handler
-      LeftEndLoc = Params->get(TopHandler.Index)->getStartLoc();
-      LeftEndLoc = getLocIncludingPrecedingComment(LeftEndLoc);
-      break;
-    case AsyncHandlerParamDesc::Position::Last:
-      // Handler is the last param, which means we don't want the comma. This
-      // is a little annoying since we *do* want the comments past for the
-      // last parameter
+    SourceLoc LeftEndLoc = Params->getLParenLoc().getAdvancedLoc(1);
+    if (TopHandler.Index - 1 >= 0) {
       LeftEndLoc = Lexer::getLocForEndOfToken(
           SM, Params->get(TopHandler.Index - 1)->getEndLoc());
-      // Skip to the end of any comments
-      Token Next = Lexer::getTokenAtLocation(SM, LeftEndLoc,
-                                             CommentRetentionMode::None);
-      if (Next.getKind() != tok::NUM_TOKENS)
-        LeftEndLoc = Next.getLoc();
-      break;
     }
     addRange(FD->getSourceRangeIncludingAttrs().Start, LeftEndLoc);
 
     // Second chunk: end of the parameter to remove -> right parenthesis
-    SourceLoc MidStartLoc;
+    SourceLoc MidStartLoc = LeftEndLoc;
     SourceLoc MidEndLoc = Params->getRParenLoc().getAdvancedLoc(1);
-    switch (ParamPos) {
-    case AsyncHandlerParamDesc::Position::None:
-      // No handler param, so make sure to include them all
-      MidStartLoc = LeftEndLoc;
-      break;
-    case AsyncHandlerParamDesc::Position::First:
-    case AsyncHandlerParamDesc::Position::Middle:
-      // Handler param is either the first or one of the middle params. Skip
-      // past it but make sure to include comments preceding the param after
-      // the handler
-      MidStartLoc = Params->get(TopHandler.Index + 1)->getStartLoc();
-      MidStartLoc = getLocIncludingPrecedingComment(MidStartLoc);
-      break;
-    case AsyncHandlerParamDesc::Position::Only:
-    case AsyncHandlerParamDesc::Position::Last:
-      // Handler param is last, this is easy since there's no other params
-      // to copy over
-      MidStartLoc = Params->getRParenLoc();
-      break;
+    if (TopHandler.isValid()) {
+      if ((size_t)(TopHandler.Index + 1) < Params->size()) {
+        MidStartLoc = Params->get(TopHandler.Index + 1)->getStartLoc();
+      } else {
+        MidStartLoc = Params->getRParenLoc();
+      }
     }
     addRange(MidStartLoc, MidEndLoc);
 
@@ -7073,7 +6984,7 @@ private:
     llvm::SaveAndRestore<bool> RestoreHoisting(Hoisting, true);
 
     auto ArgList = callArgs(CE);
-    if (HandlerDesc.Index >= ArgList.ref().size()) {
+    if ((size_t)HandlerDesc.Index >= ArgList.ref().size()) {
       DiagEngine.diagnose(CE->getStartLoc(), diag::missing_callback_arg);
       return;
     }
@@ -7110,7 +7021,8 @@ private:
       if (CompletionHandler.isValid()) {
         if (auto CalledFunc = getUnderlyingFunc(CE->getFn())) {
           StringRef HandlerName = Lexer::getCharSourceRangeFromSourceRange(
-              SM, CallbackArg->getSourceRange()).str();
+                                      SM, CallbackArg->getSourceRange())
+                                      .str();
           addHoistedNamedCallback(
               CalledFunc, CompletionHandler, HandlerName, [&] {
                 InlinePatternsToPrint InlinePatterns;
@@ -7130,9 +7042,12 @@ private:
   /// completion handler in the function that's called by \p CE and \p ArgList
   /// are the arguments being passed in \p CE.
   void addHoistedClosureCallback(const CallExpr *CE,
-                                 const AsyncHandlerParamDesc &HandlerDesc,
+                                 const AsyncHandlerDesc &HandlerDesc,
                                  const ClosureExpr *Callback,
                                  PtrArrayRef<Expr *> ArgList) {
+    auto *Callee = getUnderlyingFunc(CE->getFn());
+    assert(Callee);
+
     ArrayRef<const ParamDecl *> CallbackParams =
         Callback->getParameters()->getArray();
     auto CallbackBody = Callback->getBody();
@@ -7165,7 +7080,7 @@ private:
       if (ErrParam)
         UnwrapParams.insert(ErrParam);
       CallbackClassifier::classifyInto(
-          Blocks, HandlerDesc.Func, SuccessParams, HandledSwitches, DiagEngine,
+          Blocks, Callee, SuccessParams, HandledSwitches, DiagEngine,
           UnwrapParams, ErrParam, HandlerDesc.Type, CallbackBody);
     }
 
@@ -7404,8 +7319,7 @@ private:
                     const ClassifiedBlock &SuccessBlock,
                     ArrayRef<const ParamDecl *> SuccessParams,
                     const InlinePatternsToPrint &InlinePatterns,
-                    const AsyncHandlerParamDesc &HandlerDesc,
-                    bool AddDeclarations) {
+                    const AsyncHandlerDesc &HandlerDesc, bool AddDeclarations) {
     // Print the bindings to match the completion handler success parameters,
     // making sure to omit in the case of a Void return.
     if (!SuccessParams.empty() && !HandlerDesc.willAsyncReturnVoid()) {
@@ -7449,74 +7363,23 @@ private:
       OS << tok::kw_try << " ";
     }
     OS << "await ";
+    addRange(CE->getStartLoc(), CE->getFn()->getEndLoc(),
+             /*ToEndOfToken=*/true);
 
-    // Try to replace the name with that of the alternative. Use the existing
-    // name if for some reason that's not possible.
-    bool NameAdded = false;
-    if (HandlerDesc.Alternative) {
-      const ValueDecl *Named = HandlerDesc.Alternative;
-      if (auto *Accessor = dyn_cast<AccessorDecl>(HandlerDesc.Alternative))
-        Named = Accessor->getStorage();
-      if (!Named->getBaseName().isSpecial()) {
-        Names.try_emplace(HandlerDesc.Func,
-                          Named->getBaseName().getIdentifier());
-        convertNode(CE->getFn(), /*StartOverride=*/{}, /*ConvertCalls=*/false,
-                    /*IncludeComments=*/false);
-        NameAdded = true;
-      }
-    }
-    if (!NameAdded) {
-      addRange(CE->getStartLoc(), CE->getFn()->getEndLoc(),
-               /*ToEndOfToken=*/true);
-    }
-
-    if (!HandlerDesc.alternativeIsAccessor())
-      OS << tok::l_paren;
-
-    size_t ConvertedArgIndex = 0;
-    ArrayRef<ParamDecl *> AlternativeParams;
-    if (HandlerDesc.Alternative)
-      AlternativeParams = HandlerDesc.Alternative->getParameters()->getArray();
-    ArrayRef<Identifier> ArgLabels = CE->getArgumentLabels();
-    for (size_t I = 0, E = Args.size(); I < E; ++I) {
-      if (I == HandlerDesc.Index || isa<DefaultArgumentExpr>(Args[I]))
+    OS << tok::l_paren;
+    size_t realArgCount = 0;
+    for (size_t I = 0, E = Args.size() - 1; I < E; ++I) {
+      if (isa<DefaultArgumentExpr>(Args[I]))
         continue;
 
-      if (ConvertedArgIndex > 0)
+      if (realArgCount > 0)
         OS << tok::comma << " ";
-
-      if (HandlerDesc.Alternative) {
-        // Skip argument if it's defaulted and has a different name
-        while (ConvertedArgIndex < AlternativeParams.size() &&
-               AlternativeParams[ConvertedArgIndex]->isDefaultArgument() &&
-               AlternativeParams[ConvertedArgIndex]->getArgumentName() !=
-               ArgLabels[I]) {
-          ConvertedArgIndex++;
-        }
-
-        if (ConvertedArgIndex < AlternativeParams.size()) {
-          // Could have a different argument label (or none), so add it instead
-          auto Name = AlternativeParams[ConvertedArgIndex]->getArgumentName();
-          if (!Name.empty())
-            OS << Name << ": ";
-          convertNode(Args[I], /*StartOverride=*/{}, /*ConvertCalls=*/false);
-
-          ConvertedArgIndex++;
-          continue;
-        }
-
-        // Fallthrough if arguments don't match up for some reason
-      }
-
-      // Can't just add the range as we need to perform replacements. Also
-      // make sure to include the argument label (if any)
+      // Can't just add the range as we need to perform replacements
       convertNode(Args[I], /*StartOverride=*/CE->getArgumentLabelLoc(I),
                   /*ConvertCalls=*/false);
-      ConvertedArgIndex++;
+      realArgCount++;
     }
-
-    if (!HandlerDesc.alternativeIsAccessor())
-      OS << tok::r_paren;
+    OS << tok::r_paren;
   }
 
   void addFallbackCatch(const ParamDecl *ErrParam) {
@@ -7690,44 +7553,51 @@ private:
     }
   }
 
+  /// Adds the call to an 'async' version of \p FD, where \p HanderDesc
+  /// describes the async completion handler of \p FD. This does not add an
+  /// 'await' keyword.
+  void addCallToAsyncMethod(const FuncDecl *FD,
+                            const AsyncHandlerDesc &HandlerDesc) {
+    // The call to the async function is the same as the call to the old
+    // completion handler function, minus the completion handler arg.
+    addForwardingCallTo(FD, HandlerDesc, /*HandlerReplacement*/ "");
+  }
+
   /// Adds a forwarding call to the old completion handler function, with
   /// \p HandlerReplacement that allows for a custom replacement or, if empty,
   /// removal of the completion handler closure.
-  void addForwardingCallTo(const FuncDecl *FD, StringRef HandlerReplacement) {
+  void addForwardingCallTo(
+      const FuncDecl *FD, const AsyncHandlerDesc &HandlerDesc,
+      StringRef HandlerReplacement, bool CanUseTrailingClosure = true) {
     OS << FD->getBaseName() << tok::l_paren;
 
     auto *Params = FD->getParameters();
-    size_t ConvertedArgsIndex = 0;
-    for (size_t I = 0, E = Params->size(); I < E; ++I) {
-      if (I == TopHandler.Index) {
+    for (auto Param : *Params) {
+      if (Param == HandlerDesc.getHandler()) {
         /// If we're not replacing the handler with anything, drop it.
         if (HandlerReplacement.empty())
           continue;
 
-        // Use a trailing closure if the handler is the last param
-        if (I == E - 1) {
+        // If this is the last param, and we can use a trailing closure, do so.
+        if (CanUseTrailingClosure && Param == Params->back()) {
           OS << tok::r_paren << " ";
           OS << HandlerReplacement;
           return;
         }
-
         // Otherwise fall through to do the replacement.
       }
 
-      if (ConvertedArgsIndex > 0)
+      if (Param != Params->front())
         OS << tok::comma << " ";
 
-      const auto *Param = Params->get(I);
       if (!Param->getArgumentName().empty())
         OS << Param->getArgumentName() << tok::colon << " ";
 
-      if (I == TopHandler.Index) {
+      if (Param == HandlerDesc.getHandler()) {
         OS << HandlerReplacement;
       } else {
         OS << Param->getParameterName();
       }
-
-      ConvertedArgsIndex++;
     }
     OS << tok::r_paren;
   }
@@ -7912,6 +7782,21 @@ private:
   }
 };
 
+/// Adds an attribute to describe a completion handler function's async
+/// alternative if necessary.
+void addCompletionHandlerAsyncAttrIfNeccessary(
+    ASTContext &Ctx, const FuncDecl *FD,
+    const AsyncHandlerParamDesc &HandlerDesc,
+    SourceEditConsumer &EditConsumer) {
+  llvm::SmallString<0> HandlerAttribute;
+  llvm::raw_svector_ostream OS(HandlerAttribute);
+  OS << "@available(*, renamed: \"";
+  HandlerDesc.printAsyncFunctionName(OS);
+  OS << "\")\n";
+  EditConsumer.accept(Ctx.SourceMgr, FD->getAttributeInsertionLoc(false),
+                      HandlerAttribute);
+}
+
 } // namespace asyncrefactorings
 
 bool RefactoringActionConvertCallToAsyncAlternative::isApplicable(
@@ -8028,11 +7913,7 @@ bool RefactoringActionAddAsyncAlternative::performChange() {
   if (!Converter.convert())
     return true;
 
-  // Add a reference to the async function so that warnings appear when the
-  // synchronous function is used in an async context
-  SmallString<128> AvailabilityAttr = HandlerDesc.buildRenamedAttribute();
-  EditConsumer.accept(SM, FD->getAttributeInsertionLoc(false),
-                      AvailabilityAttr);
+  addCompletionHandlerAsyncAttrIfNeccessary(Ctx, FD, HandlerDesc, EditConsumer);
 
   AsyncConverter LegacyBodyCreator(TheFile, SM, DiagEngine, FD, HandlerDesc);
   if (LegacyBodyCreator.createLegacyBody()) {
@@ -8074,15 +7955,10 @@ bool RefactoringActionAddAsyncWrapper::performChange() {
   if (!Converter.createAsyncWrapper())
     return true;
 
-  // Add a reference to the async function so that warnings appear when the
-  // synchronous function is used in an async context
-  SmallString<128> AvailabilityAttr = HandlerDesc.buildRenamedAttribute();
-  EditConsumer.accept(SM, FD->getAttributeInsertionLoc(false),
-                      AvailabilityAttr);
+  addCompletionHandlerAsyncAttrIfNeccessary(Ctx, FD, HandlerDesc, EditConsumer);
 
   // Add the async wrapper.
   Converter.insertAfter(FD, EditConsumer);
-
   return false;
 }
 

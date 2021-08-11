@@ -1,5 +1,4 @@
 // REQUIRES: OS=macosx
-// REQUIRES: executable_test
 
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %S/Inputs/interop.swift -emit-library -module-name InteropTest -o %t/%target-library-name(InteropTest)

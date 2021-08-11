@@ -1350,19 +1350,6 @@ void Serializer::writeGenericRequirements(ArrayRef<Requirement> requirements,
   }
 }
 
-void Serializer::writeAssociatedTypes(ArrayRef<AssociatedTypeDecl *> assocTypes,
-                                      const std::array<unsigned, 256> &abbrCodes) {
-  using namespace decls_block;
-
-  auto assocTypeAbbrCode = abbrCodes[AssociatedTypeLayout::Code];
-
-  for (auto *assocType : assocTypes) {
-    AssociatedTypeLayout::emitRecord(
-        Out, ScratchRecord, assocTypeAbbrCode,
-        addDeclRef(assocType));
-  }
-}
-
 void Serializer::writeASTBlockEntity(GenericSignature sig) {
   using namespace decls_block;
 
@@ -1629,8 +1616,7 @@ Serializer::writeConformance(ProtocolConformanceRef conformanceRef,
     auto protocolID = addDeclRef(builtin->getProtocol());
     auto genericSigID = addGenericSignatureRef(builtin->getGenericSignature());
     BuiltinProtocolConformanceLayout::emitRecord(
-        Out, ScratchRecord, abbrCode, typeID, protocolID, genericSigID,
-        static_cast<unsigned>(builtin->getBuiltinConformanceKind()));
+        Out, ScratchRecord, abbrCode, typeID, protocolID, genericSigID);
     writeGenericRequirements(builtin->getConditionalRequirements(), abbrCodes);
     break;
   }
@@ -3242,21 +3228,29 @@ public:
     auto contextID = S.addDeclContextRef(op->getDeclContext());
     auto nameID = S.addDeclBaseNameRef(op->getName());
     auto groupID = S.addDeclRef(op->getPrecedenceGroup());
+    SmallVector<DeclID, 1> designatedNominalTypeDeclIDs;
+    for (auto *decl : op->getDesignatedNominalTypes())
+      designatedNominalTypeDeclIDs.push_back(S.addDeclRef(decl));
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[InfixOperatorLayout::Code];
     InfixOperatorLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode, nameID,
-                                    contextID.getOpaqueValue(), groupID);
+                                    contextID.getOpaqueValue(), groupID,
+                                    designatedNominalTypeDeclIDs);
 
   }
 
   template <typename Layout>
   void visitUnaryOperatorDecl(const OperatorDecl *op) {
     auto contextID = S.addDeclContextRef(op->getDeclContext());
+    SmallVector<DeclID, 1> designatedNominalTypeDeclIDs;
+    for (auto *decl : op->getDesignatedNominalTypes())
+      designatedNominalTypeDeclIDs.push_back(S.addDeclRef(decl));
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[Layout::Code];
     Layout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                        S.addDeclBaseNameRef(op->getName()),
-                       contextID.getOpaqueValue());
+                       contextID.getOpaqueValue(),
+                       designatedNominalTypeDeclIDs);
   }
 
   void visitPrefixOperatorDecl(const PrefixOperatorDecl *op) {
@@ -3546,8 +3540,6 @@ public:
     writeGenericParams(proto->getGenericParams());
     S.writeGenericRequirements(
       proto->getRequirementSignature(), S.DeclTypeAbbrCodes);
-    S.writeAssociatedTypes(
-      proto->getAssociatedTypeMembers(), S.DeclTypeAbbrCodes);
     writeMembers(id, proto->getAllMembers(), true);
     writeDefaultWitnessTable(proto);
   }
@@ -4773,7 +4765,6 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<OpaqueTypeLayout>();
   registerDeclTypeAbbr<PatternBindingLayout>();
   registerDeclTypeAbbr<ProtocolLayout>();
-  registerDeclTypeAbbr<AssociatedTypeLayout>();
   registerDeclTypeAbbr<DefaultWitnessTableLayout>();
   registerDeclTypeAbbr<PrefixOperatorLayout>();
   registerDeclTypeAbbr<PostfixOperatorLayout>();

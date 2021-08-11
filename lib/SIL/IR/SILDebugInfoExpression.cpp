@@ -58,10 +58,3 @@ void SILDebugInfoExpression::op_iterator::increment() {
       Remain = Remain.drop_front(Current.size());
   }
 }
-
-SILDebugInfoExpression SILDebugInfoExpression::createFragment(VarDecl *Field) {
-  assert(Field);
-  return SILDebugInfoExpression(
-      {SILDIExprElement::createOperator(SILDIExprOperator::Fragment),
-       SILDIExprElement::createDecl(Field)});
-}

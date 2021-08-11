@@ -1906,7 +1906,9 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
     assert(oldName || newName && "We can't have oldName and newName out of "
                                  "bounds, otherwise n would be smaller");
 
-    if (oldName == newName || argList.isUnlabeledTrailingClosureIdx(i))
+    if (oldName == newName ||
+        (argList.hasTrailingClosure && i == argList.args.size() - 1 &&
+         (numMissing > 0 || numExtra > 0 || numWrong > 0)))
       continue;
 
     if (!oldName.hasValue() && newName.hasValue()) {
@@ -1986,17 +1988,11 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
     if (i < newNames.size())
       newName = newNames[i];
 
-    if (oldName == newName || argList.isUnlabeledTrailingClosureIdx(i))
+    if (oldName == newName || (i == n-1 && argList.hasTrailingClosure))
       continue;
 
     if (newName.empty()) {
-      // If this is a labeled trailing closure, we need to replace with '_'.
-      if (argList.isLabeledTrailingClosureIdx(i)) {
-        diag.fixItReplace(argList.labelLocs[i], "_");
-        continue;
-      }
-
-      // Otherwise, delete the old name.
+      // Delete the old name.
       diag.fixItRemoveChars(argList.labelLocs[i],
                             argList.args[i]->getStartLoc());
       continue;
@@ -2010,10 +2006,7 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
     if (newNameIsReserved)
       newStr += "`";
 
-    // If the argument was previously unlabeled, insert the new label. Note that
-    // we don't do this for labeled trailing closures as they write unlabeled
-    // args as '_:', and therefore need replacement.
-    if (oldName.empty() && !argList.isLabeledTrailingClosureIdx(i)) {
+    if (oldName.empty()) {
       // Insert the name.
       newStr += ": ";
       diag.fixItInsert(argList.args[i]->getStartLoc(), newStr);
@@ -2650,13 +2643,11 @@ public:
 /// An AST walker that determines the underlying type of an opaque return decl
 /// from its associated function body.
 class OpaqueUnderlyingTypeChecker : public ASTWalker {
-  using Candidate = std::pair<Expr *, Type>;
-
   ASTContext &Ctx;
   AbstractFunctionDecl *Implementation;
   OpaqueTypeDecl *OpaqueDecl;
   BraceStmt *Body;
-  SmallVector<Candidate, 4> Candidates;
+  SmallVector<std::pair<Expr*, Type>, 4> Candidates;
 
   bool HasInvalidReturn = false;
 
@@ -2687,15 +2678,24 @@ public:
       Implementation->diagnose(diag::opaque_type_no_underlying_type_candidates);
       return;
     }
-
+    
     // Check whether all of the underlying type candidates match up.
-    // TODO [OPAQUE SUPPORT]: multiple opaque types
+    auto opaqueTypeInContext =
+      Implementation->mapTypeIntoContext(OpaqueDecl->getDeclaredInterfaceType());
     Type underlyingType = Candidates.front().second;
-    bool mismatch =
-        std::any_of(Candidates.begin() + 1, Candidates.end(),
-                    [&](Candidate &otherCandidate) {
-                      return !underlyingType->isEqual(otherCandidate.second);
-                    });
+    
+    bool mismatch = false;
+    for (auto otherCandidate : llvm::makeArrayRef(Candidates).slice(1)) {
+      // Disregard tautological candidates.
+      if (otherCandidate.second->isEqual(opaqueTypeInContext))
+        continue;
+        
+      if (!underlyingType->isEqual(otherCandidate.second)) {
+        mismatch = true;
+        break;
+      }
+    }
+    
     if (mismatch) {
       Implementation->diagnose(
           diag::opaque_type_mismatched_underlying_type_candidates);
@@ -2709,8 +2709,6 @@ public:
     
     // The underlying type can't be defined recursively
     // in terms of the opaque type itself.
-    auto opaqueTypeInContext = Implementation->mapTypeIntoContext(
-        OpaqueDecl->getDeclaredInterfaceType());
     auto isSelfReferencing = underlyingType.findIf([&](Type t) -> bool {
       return t->isEqual(opaqueTypeInContext);
     });
@@ -2742,11 +2740,14 @@ public:
   
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
     if (auto underlyingToOpaque = dyn_cast<UnderlyingToOpaqueExpr>(E)) {
+      assert(E->getType()->isEqual(
+       Implementation->mapTypeIntoContext(OpaqueDecl->getDeclaredInterfaceType()))
+             && "unexpected opaque type in function body");
+      
       Candidates.push_back(std::make_pair(underlyingToOpaque->getSubExpr(),
                                   underlyingToOpaque->getSubExpr()->getType()));
-      return {false, E};
     }
-    return {true, E};
+    return std::make_pair(false, E);
   }
 
   std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
@@ -4694,17 +4695,8 @@ public:
           if (!asyncFunc)
             return {false, call};
           ctx.Diags.diagnose(call->getLoc(), diag::warn_use_async_alternative);
-
-          if (auto *accessor = dyn_cast<AccessorDecl>(asyncFunc)) {
-            SmallString<32> name;
-            llvm::raw_svector_ostream os(name);
-            accessor->printUserFacingName(os);
-            ctx.Diags.diagnose(asyncFunc->getLoc(),
-                               diag::descriptive_decl_declared_here, name);
-          } else {
-            ctx.Diags.diagnose(asyncFunc->getLoc(), diag::decl_declared_here,
-                               asyncFunc->getName());
-          }
+          ctx.Diags.diagnose(asyncFunc->getLoc(), diag::decl_declared_here,
+                             asyncFunc->getName());
         }
       }
     }

@@ -138,7 +138,6 @@ TailAllocatedDebugVariable::TailAllocatedDebugVariable(
   Bits.Data.HasValue = true;
   Bits.Data.Constant = Var->Constant;
   Bits.Data.ArgNo = Var->ArgNo;
-  Bits.Data.Implicit = Var->Implicit;
   Bits.Data.NameLength = Var->Name.size();
   assert(Bits.Data.ArgNo == Var->ArgNo && "Truncation");
   assert(Bits.Data.NameLength == Var->Name.size() && "Truncation");
@@ -161,59 +160,19 @@ StringRef TailAllocatedDebugVariable::getName(const char *buf) const {
   return StringRef();
 }
 
-Optional<SILDebugVariable>
-SILDebugVariable::createFromAllocation(const AllocationInst *AI) {
-  Optional<SILDebugVariable> VarInfo;
-  if (const auto *ASI = dyn_cast_or_null<AllocStackInst>(AI))
-    VarInfo = ASI->getVarInfo();
-  // TODO: Support AllocBoxInst
-
-  if (!VarInfo)
-    return VarInfo;
-
-  // Copy everything but the DIExpr
-  VarInfo->DIExpr.clear();
-
-  // Coalesce the debug loc attached on AI into VarInfo
-  SILType Type = AI->getType();
-  SILLocation InstLoc = AI->getLoc();
-  const SILDebugScope *InstDS = AI->getDebugScope();
-  if (!VarInfo->Type)
-    VarInfo->Type = Type;
-  if (!VarInfo->Loc)
-    VarInfo->Loc = InstLoc;
-  if (!VarInfo->Scope)
-    VarInfo->Scope = InstDS;
-
-  return VarInfo;
-}
-
 AllocStackInst::AllocStackInst(SILDebugLocation Loc, SILType elementType,
                                ArrayRef<SILValue> TypeDependentOperands,
-                               SILFunction &F, Optional<SILDebugVariable> Var,
+                               SILFunction &F,
+                               Optional<SILDebugVariable> Var,
                                bool hasDynamicLifetime)
     : InstructionBase(Loc, elementType.getAddressType()),
-      SILDebugVariableSupplement(Var ? Var->DIExpr.getNumElements() : 0,
-                                 Var ? Var->Type.hasValue() : false,
-                                 Var ? Var->Loc.hasValue() : false,
-                                 Var ? Var->Scope != nullptr : false),
-      dynamicLifetime(hasDynamicLifetime) {
+    dynamicLifetime(hasDynamicLifetime) {
   SILNode::Bits.AllocStackInst.NumOperands =
     TypeDependentOperands.size();
   assert(SILNode::Bits.AllocStackInst.NumOperands ==
          TypeDependentOperands.size() && "Truncation");
   SILNode::Bits.AllocStackInst.VarInfo =
-      TailAllocatedDebugVariable(Var, getTrailingObjects<char>(),
-                                 getTrailingObjects<SILType>(),
-                                 getTrailingObjects<SILLocation>(),
-                                 getTrailingObjects<const SILDebugScope *>(),
-                                 getTrailingObjects<SILDIExprElement>())
-          .getRawValue();
-  if (auto *VD = Loc.getLocation().getAsASTNode<VarDecl>()) {
-    TailAllocatedDebugVariable DbgVar(SILNode::Bits.AllocStackInst.VarInfo);
-    DbgVar.setImplicit(VD->isImplicit() || DbgVar.isImplicit());
-    SILNode::Bits.AllocStackInst.VarInfo = DbgVar.getRawValue();
-  }
+    TailAllocatedDebugVariable(Var, getTrailingObjects<char>()).getRawValue();
   TrailingOperandsList::InitOperandsList(getAllOperands().begin(), this,
                                          TypeDependentOperands);
 }
@@ -338,15 +297,14 @@ SILType AllocBoxInst::getAddressType() const {
 DebugValueInst::DebugValueInst(SILDebugLocation DebugLoc, SILValue Operand,
                                SILDebugVariable Var, bool poisonRefs)
     : UnaryInstructionBase(DebugLoc, Operand),
-      SILDebugVariableSupplement(Var.DIExpr.getNumElements(),
-                                 Var.Type.hasValue(), Var.Loc.hasValue(),
-                                 Var.Scope),
+      NumDIExprOperands(Var.DIExpr.getNumElements()),
+      HasAuxDebugVariableType(Var.Type.hasValue()),
+      AuxVariableSourceLoc((Var.Loc.hasValue() ? SILSourceLocKind::Loc : 0) |
+                           (Var.Scope ? SILSourceLocKind::Scope : 0)),
       VarInfo(Var, getTrailingObjects<char>(), getTrailingObjects<SILType>(),
               getTrailingObjects<SILLocation>(),
               getTrailingObjects<const SILDebugScope *>(),
               getTrailingObjects<SILDIExprElement>()) {
-  if (auto *VD = DebugLoc.getLocation().getAsASTNode<VarDecl>())
-    VarInfo.setImplicit(VD->isImplicit() || VarInfo.isImplicit());
   setPoisonRefs(poisonRefs);
 }
 
@@ -360,16 +318,14 @@ DebugValueInst *DebugValueInst::create(SILDebugLocation DebugLoc,
 DebugValueAddrInst::DebugValueAddrInst(SILDebugLocation DebugLoc,
                                        SILValue Operand, SILDebugVariable Var)
     : UnaryInstructionBase(DebugLoc, Operand),
-      SILDebugVariableSupplement(Var.DIExpr.getNumElements(),
-                                 Var.Type.hasValue(), Var.Loc.hasValue(),
-                                 Var.Scope),
+      NumDIExprOperands(Var.DIExpr.getNumElements()),
+      HasAuxDebugVariableType(Var.Type.hasValue()),
+      AuxVariableSourceLoc((Var.Loc.hasValue() ? SILSourceLocKind::Loc : 0) |
+                           (Var.Scope ? SILSourceLocKind::Scope : 0)),
       VarInfo(Var, getTrailingObjects<char>(), getTrailingObjects<SILType>(),
               getTrailingObjects<SILLocation>(),
               getTrailingObjects<const SILDebugScope *>(),
-              getTrailingObjects<SILDIExprElement>()) {
-  if (auto *VD = DebugLoc.getLocation().getAsASTNode<VarDecl>())
-    VarInfo.setImplicit(VD->isImplicit() || VarInfo.isImplicit());
-}
+              getTrailingObjects<SILDIExprElement>()) {}
 
 DebugValueAddrInst *DebugValueAddrInst::create(SILDebugLocation DebugLoc,
                                                SILValue Operand, SILModule &M,

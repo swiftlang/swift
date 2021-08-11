@@ -349,36 +349,22 @@ GenericSignatureImpl::getLocalRequirements(Type depType) const {
     auto rqmResult = computeViaRQM();
     auto gsbResult = computeViaGSB();
 
-    auto typesEqual = [&](Type lhs, Type rhs, bool canonical) {
+    auto typesEqual = [&](Type lhs, Type rhs) {
       if (!lhs || !rhs)
         return !lhs == !rhs;
-      if (lhs->isEqual(rhs))
-        return true;
-
-      if (canonical)
-        return false;
-
-      if (getCanonicalTypeInContext(lhs) ==
-          getCanonicalTypeInContext(rhs))
-        return true;
-
-      return false;
+      return lhs->isEqual(rhs);
     };
 
     auto compare = [&]() {
       // If the types are concrete, we don't care about the rest.
       if (gsbResult.concreteType || rqmResult.concreteType) {
-        if (!typesEqual(gsbResult.concreteType,
-                        rqmResult.concreteType,
-                        false))
+        if (!typesEqual(gsbResult.concreteType, rqmResult.concreteType))
           return false;
 
         return true;
       }
 
-      if (!typesEqual(gsbResult.anchor,
-                      rqmResult.anchor,
-                      true))
+      if (!typesEqual(gsbResult.anchor, rqmResult.anchor))
         return false;
 
       if (gsbResult.layout != rqmResult.layout)
@@ -390,11 +376,6 @@ GenericSignatureImpl::getLocalRequirements(Type depType) const {
       ProtocolType::canonicalizeProtocols(rhsProtos);
 
       if (lhsProtos != rhsProtos)
-        return false;
-
-      if (!typesEqual(gsbResult.superclass,
-                      rqmResult.superclass,
-                      false))
         return false;
 
       return true;
@@ -789,11 +770,7 @@ Type GenericSignatureImpl::getConcreteType(Type type) const {
     auto check = [&]() {
       if (!gsbResult || !rqmResult)
         return !gsbResult == !rqmResult;
-      if (gsbResult->isEqual(rqmResult))
-        return true;
-
-      return (getCanonicalTypeInContext(gsbResult)
-              == getCanonicalTypeInContext(rqmResult));
+      return gsbResult->isEqual(rqmResult);
     };
 
     if (!check()) {
@@ -937,7 +914,7 @@ bool GenericSignatureImpl::areSameTypeParameterInContext(Type type1,
 }
 
 bool GenericSignatureImpl::isRequirementSatisfied(
-    Requirement requirement, bool allowMissing) const {
+    Requirement requirement) const {
   if (requirement.getFirstType()->hasTypeParameter()) {
     auto *genericEnv = getGenericEnvironment();
 
@@ -959,7 +936,7 @@ bool GenericSignatureImpl::isRequirementSatisfied(
   // FIXME: Need to check conditional requirements here.
   ArrayRef<Requirement> conditionalRequirements;
 
-  return requirement.isSatisfied(conditionalRequirements, allowMissing);
+  return requirement.isSatisfied(conditionalRequirements);
 }
 
 SmallVector<Requirement, 4> GenericSignatureImpl::requirementsNotSatisfiedBy(
@@ -1301,6 +1278,31 @@ unsigned GenericSignatureImpl::getGenericParamOrdinal(
   return GenericParamKey(param).findIndexIn(getGenericParams());
 }
 
+bool GenericSignature::hasTypeVariable() const {
+  return GenericSignature::hasTypeVariable(getRequirements());
+}
+
+bool GenericSignature::hasTypeVariable(ArrayRef<Requirement> requirements) {
+  for (const auto &req : requirements) {
+    if (req.getFirstType()->hasTypeVariable())
+      return true;
+
+    switch (req.getKind()) {
+    case RequirementKind::Layout:
+      break;
+
+    case RequirementKind::Conformance:
+    case RequirementKind::SameType:
+    case RequirementKind::Superclass:
+      if (req.getSecondType()->hasTypeVariable())
+        return true;
+      break;
+    }
+  }
+
+  return false;
+}
+
 void GenericSignature::Profile(llvm::FoldingSetNodeID &id) const {
   return GenericSignature::Profile(id, getPointer()->getGenericParams(),
                                      getPointer()->getRequirements());
@@ -1366,14 +1368,12 @@ ProtocolDecl *Requirement::getProtocolDecl() const {
 }
 
 bool
-Requirement::isSatisfied(ArrayRef<Requirement> &conditionalRequirements,
-                         bool allowMissing) const {
+Requirement::isSatisfied(ArrayRef<Requirement> &conditionalRequirements) const {
   switch (getKind()) {
   case RequirementKind::Conformance: {
     auto *proto = getProtocolDecl();
     auto *module = proto->getParentModule();
-    auto conformance = module->lookupConformance(
-        getFirstType(), proto, allowMissing);
+    auto conformance = module->lookupConformance(getFirstType(), proto);
     if (!conformance)
       return false;
 

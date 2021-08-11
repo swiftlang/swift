@@ -5686,10 +5686,8 @@ static bool renameCouldMatch(const ValueDecl *original,
   if (original == candidate)
     return false;
 
-  // Kinds have to match, but we want to allow eg. an accessor to match
-  // a function
-  if (candidate->getKind() != original->getKind() &&
-      !(isa<FuncDecl>(candidate) && isa<FuncDecl>(original)))
+  // Kinds have to match
+  if (candidate->getKind() != original->getKind())
     return false;
 
   // Instance can't match static/class function
@@ -5763,24 +5761,12 @@ ValueDecl *RenamedDeclRequest::evaluate(Evaluator &evaluator,
       objc_translation::isVisibleToObjC(attached, minAccess);
 
   SmallVector<ValueDecl *, 4> lookupResults;
-  SmallVector<AbstractFunctionDecl *, 4> asyncResults;
   lookupReplacedDecl(nameRef, attr, attached, lookupResults);
 
   ValueDecl *renamedDecl = nullptr;
   auto attachedFunc = dyn_cast<AbstractFunctionDecl>(attached);
+  bool candidateHasAsync = false;
   for (auto candidate : lookupResults) {
-    // If the name is a getter or setter, grab the underlying accessor (if any)
-    if (parsedName.IsGetter || parsedName.IsSetter) {
-      auto *VD = dyn_cast<VarDecl>(candidate);
-      if (!VD)
-        continue;
-
-      candidate = VD->getAccessor(parsedName.IsGetter ? AccessorKind::Get :
-                                                        AccessorKind::Set);
-      if (!candidate)
-        continue;
-    }
-
     if (!renameCouldMatch(attached, candidate, attachedIsObjcVisible,
                           minAccess))
       continue;
@@ -5789,8 +5775,7 @@ ValueDecl *RenamedDeclRequest::evaluate(Evaluator &evaluator,
       // Require both functions to be async/not. Async alternatives are handled
       // below if there's no other matches
       if (attachedFunc->hasAsync() != candidateFunc->hasAsync()) {
-        if (candidateFunc->hasAsync())
-          asyncResults.push_back(candidateFunc);
+        candidateHasAsync |= candidateFunc->hasAsync();
         continue;
       }
 
@@ -5811,10 +5796,18 @@ ValueDecl *RenamedDeclRequest::evaluate(Evaluator &evaluator,
 
   // Try to match up an async alternative instead (ie. one where the
   // completion handler has been removed).
-  if (!renamedDecl && !asyncResults.empty()) {
-    for (AbstractFunctionDecl *candidate : asyncResults) {
+  if (!renamedDecl && candidateHasAsync) {
+    for (ValueDecl *candidate : lookupResults) {
+      auto *candidateFunc = dyn_cast<AbstractFunctionDecl>(candidate);
+      if (!candidateFunc || !candidateFunc->hasAsync())
+        continue;
+
+      if (!renameCouldMatch(attached, candidate, attachedIsObjcVisible,
+                            minAccess))
+        continue;
+
       Optional<unsigned> completionHandler =
-          attachedFunc->findPotentialCompletionHandlerParam(candidate);
+          attachedFunc->findPotentialCompletionHandlerParam(candidateFunc);
       if (!completionHandler)
         continue;
 

@@ -269,7 +269,7 @@ extension Task where Success == Never, Failure == Never {
       }
 
       // Otherwise, query the system.
-      return TaskPriority(rawValue: UInt8(_getCurrentThreadPriority()))
+      return TaskPriority(rawValue: UInt8(0))
     }
   }
 }
@@ -632,10 +632,11 @@ extension Task where Success == Never, Failure == Never {
   /// As such,
   /// this method isn't necessarily a way to avoid resource starvation.
   public static func yield() async {
+    let currentTask = Builtin.getCurrentAsyncTask()
+    let priority = getJobFlags(currentTask).priority ?? Task.currentPriority._downgradeUserInteractive
+
     return await Builtin.withUnsafeContinuation { (continuation: Builtin.RawUnsafeContinuation) -> Void in
-      let job = _taskCreateNullaryContinuationJob(
-          priority: Int(Task.currentPriority.rawValue),
-          continuation: continuation)
+      let job = _taskCreateNullaryContinuationJob(priority: Int(priority.rawValue), continuation: continuation)
       _enqueueJobGlobal(job)
     }
   }
@@ -707,8 +708,7 @@ public struct UnsafeCurrentTask {
   /// - SeeAlso: `TaskPriority`
   /// - SeeAlso: `Task.currentPriority`
   public var priority: TaskPriority {
-    getJobFlags(_task).priority ?? TaskPriority(
-        rawValue: UInt8(_getCurrentThreadPriority()))
+    getJobFlags(_task).priority ?? .unspecified
   }
 
   /// Cancel the current task.

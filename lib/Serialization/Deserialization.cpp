@@ -547,10 +547,8 @@ ModuleFile::readConformanceChecked(llvm::BitstreamCursor &Cursor,
     TypeID conformingTypeID;
     DeclID protoID;
     GenericSignatureID genericSigID;
-    unsigned builtinConformanceKind;
     BuiltinProtocolConformanceLayout::readRecord(scratch, conformingTypeID,
-                                                 protoID, genericSigID,
-                                                 builtinConformanceKind);
+                                                 protoID, genericSigID);
 
     Type conformingType = getType(conformingTypeID);
 
@@ -571,8 +569,7 @@ ModuleFile::readConformanceChecked(llvm::BitstreamCursor &Cursor,
       return std::move(error);
 
     auto conformance = getContext().getBuiltinConformance(
-        conformingType, proto, *genericSig, conditionalRequirements,
-        static_cast<BuiltinConformanceKind>(builtinConformanceKind));
+        conformingType, proto, *genericSig, conditionalRequirements);
     return ProtocolConformanceRef(conformance);
   }
 
@@ -889,36 +886,6 @@ llvm::Error ModuleFile::readGenericRequirementsChecked(
   return llvm::Error::success();
 }
 
-void ModuleFile::readAssociatedTypes(
-                   SmallVectorImpl<AssociatedTypeDecl *> &assocTypes,
-                   llvm::BitstreamCursor &Cursor) {
-  using namespace decls_block;
-
-  BCOffsetRAII lastRecordOffset(Cursor);
-  SmallVector<uint64_t, 8> scratch;
-  StringRef blobData;
-
-  while (true) {
-    lastRecordOffset.reset();
-
-    llvm::BitstreamEntry entry =
-        fatalIfUnexpected(Cursor.advance(AF_DontPopBlockAtEnd));
-    if (entry.Kind != llvm::BitstreamEntry::Record)
-      break;
-
-    scratch.clear();
-    unsigned recordID = fatalIfUnexpected(
-        Cursor.readRecord(entry.ID, scratch, &blobData));
-    if (recordID != ASSOCIATED_TYPE)
-      break;
-
-    DeclID declID;
-    AssociatedTypeLayout::readRecord(scratch, declID);
-
-    assocTypes.push_back(cast<AssociatedTypeDecl>(getDecl(declID)));
-  }
-}
-
 /// Advances past any records that might be part of a requirement signature.
 static llvm::Error skipGenericRequirements(llvm::BitstreamCursor &Cursor) {
   using namespace decls_block;
@@ -944,38 +911,6 @@ static llvm::Error skipGenericRequirements(llvm::BitstreamCursor &Cursor) {
 
     default:
       // This record is not a generic requirement.
-      return llvm::Error::success();
-    }
-
-    lastRecordOffset.reset();
-  }
-  return llvm::Error::success();
-}
-
-/// Advances past any lazy associated type member records.
-static llvm::Error skipAssociatedTypeMembers(llvm::BitstreamCursor &Cursor) {
-  using namespace decls_block;
-
-  BCOffsetRAII lastRecordOffset(Cursor);
-
-  while (true) {
-    Expected<llvm::BitstreamEntry> maybeEntry =
-        Cursor.advance(AF_DontPopBlockAtEnd);
-    if (!maybeEntry)
-      return maybeEntry.takeError();
-    llvm::BitstreamEntry entry = maybeEntry.get();
-    if (entry.Kind != llvm::BitstreamEntry::Record)
-      break;
-
-    Expected<unsigned> maybeRecordID = Cursor.skipRecord(entry.ID);
-    if (!maybeRecordID)
-      return maybeRecordID.takeError();
-    switch (maybeRecordID.get()) {
-    case ASSOCIATED_TYPE:
-      break;
-
-    default:
-      // This record is not an associated type.
       return llvm::Error::success();
     }
 
@@ -3461,10 +3396,9 @@ public:
       return cast<OpaqueTypeDecl>(declOrOffset.get());
       
     // Create the decl.
-    auto opaqueDecl = new (ctx)
-        OpaqueTypeDecl(/*NamingDecl*/ nullptr,
-                       /*GenericParams*/ nullptr, declContext, interfaceSig,
-                       /*UnderlyingInterfaceTypeRepr*/ nullptr, interfaceType);
+    auto opaqueDecl =
+      new (ctx) OpaqueTypeDecl(nullptr, nullptr, declContext,
+                               interfaceSig, interfaceType);
     declOrOffset = opaqueDecl;
 
     auto namingDecl = cast<ValueDecl>(MF.getDecl(namingDeclID));
@@ -3493,8 +3427,7 @@ public:
     if (genericSig) {
       subs = genericSig->getIdentitySubstitutionMap();
     }
-    // TODO [OPAQUE SUPPORT]: multiple opaque types
-    auto opaqueTy = OpaqueTypeArchetypeType::get(opaqueDecl, 0, subs);
+    auto opaqueTy = OpaqueTypeArchetypeType::get(opaqueDecl, subs);
     auto metatype = MetatypeType::get(opaqueTy);
     opaqueDecl->setInterfaceType(metatype);
     return opaqueDecl;
@@ -3619,11 +3552,6 @@ public:
     if (llvm::Error Err = skipGenericRequirements(MF.DeclTypeCursor))
       MF.fatal(std::move(Err));
 
-    proto->setLazyAssociatedTypeMembers(&MF,
-                                        MF.DeclTypeCursor.GetCurrentBitNo());
-    if (llvm::Error Err = skipAssociatedTypeMembers(MF.DeclTypeCursor))
-      MF.fatal(std::move(Err));
-
     proto->setMemberLoader(&MF, MF.DeclTypeCursor.GetCurrentBitNo());
 
     return proto;
@@ -3634,16 +3562,27 @@ public:
                                             StringRef blobData) {
     IdentifierID nameID;
     DeclContextID contextID;
+    ArrayRef<uint64_t> designatedNominalTypeDeclIDs;
 
-    OperatorLayout::readRecord(scratch, nameID, contextID);
+    OperatorLayout::readRecord(scratch, nameID, contextID,
+                               designatedNominalTypeDeclIDs);
 
     Identifier name = MF.getIdentifier(nameID);
     PrettySupplementalDeclNameTrace trace(name);
 
     auto DC = MF.getDeclContext(contextID);
 
+    SmallVector<NominalTypeDecl *, 1> designatedNominalTypes;
+    for (auto id : designatedNominalTypeDeclIDs) {
+      Expected<Decl *> nominal = MF.getDeclChecked(id);
+      if (!nominal)
+        return nominal.takeError();
+      designatedNominalTypes.push_back(cast<NominalTypeDecl>(nominal.get()));
+    }
+
     auto result = MF.createDecl<OperatorDecl>(
-        DC, SourceLoc(), name, SourceLoc());
+        DC, SourceLoc(), name, SourceLoc(),
+        ctx.AllocateCopy(designatedNominalTypes));
 
     declOrOffset = result;
     return result;
@@ -3666,9 +3605,11 @@ public:
     IdentifierID nameID;
     DeclContextID contextID;
     DeclID precedenceGroupID;
+    ArrayRef<uint64_t> designatedNominalTypeDeclIDs;
 
     decls_block::InfixOperatorLayout::readRecord(scratch, nameID, contextID,
-                                                 precedenceGroupID);
+                                                 precedenceGroupID,
+                                                 designatedNominalTypeDeclIDs);
     Identifier name = MF.getIdentifier(nameID);
     PrettySupplementalDeclNameTrace trace(name);
 
@@ -3678,9 +3619,18 @@ public:
 
     auto DC = MF.getDeclContext(contextID);
 
+    SmallVector<NominalTypeDecl *, 1> designatedNominalTypes;
+    for (auto id : designatedNominalTypeDeclIDs) {
+      Expected<Decl *> nominal = MF.getDeclChecked(id);
+      if (!nominal)
+        return nominal.takeError();
+      designatedNominalTypes.push_back(cast<NominalTypeDecl>(nominal.get()));
+    }
+
     auto result = MF.createDecl<InfixOperatorDecl>(
-        DC, SourceLoc(), name, SourceLoc(), SourceLoc(), Identifier(),
-        SourceLoc());
+        DC, SourceLoc(), name, SourceLoc(), SourceLoc(),
+        ArrayRef<Located<Identifier>>{});
+    result->setDesignatedNominalTypes(ctx.AllocateCopy(designatedNominalTypes));
     ctx.evaluator.cacheOutput(
         OperatorPrecedenceGroupRequest{result},
         std::move(cast_or_null<PrecedenceGroupDecl>(precedenceGroup.get())));
@@ -5474,9 +5424,7 @@ public:
     if (!subsOrError)
       return subsOrError.takeError();
 
-    // TODO [OPAQUE SUPPORT]: to support multiple opaque types we will probably
-    // have to serialize the ordinal, which is always 0 for now
-    return OpaqueTypeArchetypeType::get(opaqueDecl, 0, subsOrError.get());
+    return OpaqueTypeArchetypeType::get(opaqueDecl, subsOrError.get());
   }
       
   Expected<Type> deserializeNestedArchetypeType(ArrayRef<uint64_t> scratch,
@@ -6608,14 +6556,6 @@ void ModuleFile::loadRequirementSignature(const ProtocolDecl *decl,
   BCOffsetRAII restoreOffset(DeclTypeCursor);
   fatalIfNotSuccess(DeclTypeCursor.JumpToBit(contextData));
   readGenericRequirements(reqs, DeclTypeCursor);
-}
-
-void ModuleFile::loadAssociatedTypes(const ProtocolDecl *decl,
-                                     uint64_t contextData,
-                           SmallVectorImpl<AssociatedTypeDecl *> &assocTypes) {
-  BCOffsetRAII restoreOffset(DeclTypeCursor);
-  fatalIfNotSuccess(DeclTypeCursor.JumpToBit(contextData));
-  readAssociatedTypes(assocTypes, DeclTypeCursor);
 }
 
 static Optional<ForeignErrorConvention::Kind>

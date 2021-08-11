@@ -1746,8 +1746,20 @@ public:
   void visitOperatorDecl(OperatorDecl *OD) {
     TypeChecker::checkDeclAttributes(OD);
     checkRedeclaration(OD);
-    if (auto *IOD = dyn_cast<InfixOperatorDecl>(OD))
+    auto &Ctx = OD->getASTContext();
+    if (auto *IOD = dyn_cast<InfixOperatorDecl>(OD)) {
       (void)IOD->getPrecedenceGroup();
+    } else {
+      auto nominalTypes = OD->getDesignatedNominalTypes();
+      const auto wantsDesignatedTypes =
+          Ctx.TypeCheckerOpts.EnableOperatorDesignatedTypes;
+      if (nominalTypes.empty() && wantsDesignatedTypes) {
+        auto identifiers = OD->getIdentifiers();
+        if (checkDesignatedTypes(OD, identifiers))
+          OD->setInvalid();
+      }
+      return;
+    }
     checkAccessControl(OD);
   }
 

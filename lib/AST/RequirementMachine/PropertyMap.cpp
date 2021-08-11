@@ -144,7 +144,6 @@ static unsigned getGenericParamIndex(Type type) {
 static Type getTypeFromSubstitutionSchema(Type schema,
                                           ArrayRef<Term> substitutions,
                               TypeArrayView<GenericTypeParamType> genericParams,
-                                          const MutableTerm &prefix,
                                           const ProtocolGraph &protos,
                                           RewriteContext &ctx) {
   assert(!schema->isTypeParameter() && "Must have a concrete type here");
@@ -155,25 +154,9 @@ static Type getTypeFromSubstitutionSchema(Type schema,
   return schema.transformRec([&](Type t) -> Optional<Type> {
     if (t->is<GenericTypeParamType>()) {
       auto index = getGenericParamIndex(t);
-      auto substitution = substitutions[index];
 
-      // Prepend the prefix of the lookup key to the substitution.
-      if (prefix.empty()) {
-        // Skip creation of a new MutableTerm in the case where the
-        // prefix is empty.
-        return ctx.getTypeForTerm(substitution, genericParams, protos);
-      } else if (substitution.size() == 1 &&
-                 substitution[0].getKind() == Symbol::Kind::Protocol) {
-        // If the prefix is non-empty and the substitution is the
-        // protocol 'Self' type for some protocol, just use the prefix.
-        return ctx.getTypeForTerm(prefix, genericParams, protos);
-      } else {
-        // Otherwise build a new term by appending the substitution
-        // to the prefix.
-        MutableTerm result(prefix);
-        result.append(substitution);
-        return ctx.getTypeForTerm(result, genericParams, protos);
-      }
+      return ctx.getTypeForTerm(substitutions[index],
+                                genericParams, protos);
     }
 
     assert(!t->isTypeParameter());
@@ -181,60 +164,32 @@ static Type getTypeFromSubstitutionSchema(Type schema,
   });
 }
 
-/// Given a term \p lookupTerm whose suffix must equal this property bag's
-/// key, return a new term with that suffix stripped off. Will be empty if
-/// \p lookupTerm exactly equals the key.
-MutableTerm
-PropertyBag::getPrefixAfterStrippingKey(const MutableTerm &lookupTerm) const {
-  assert(lookupTerm.size() >= Key.size());
-  auto prefixBegin = lookupTerm.begin();
-  auto prefixEnd = lookupTerm.end() - Key.size();
-  assert(std::equal(prefixEnd, lookupTerm.end(), Key.begin()) &&
-         "This is not the bag you're looking for");
-  return MutableTerm(prefixBegin, prefixEnd);
-}
-
-/// Get the superclass bound for \p lookupTerm, whose suffix must be the term
-/// represented by this property bag.
-///
-/// The original \p lookupTerm is important in case the concrete type has
-/// substitutions. For example, if \p lookupTerm is [P:A].[U:B], and this
-/// property bag records that the suffix [U:B] has a superclass symbol
-/// [superclass: Cache<τ_0_0> with <[U:C]>], then we actually need to
-/// apply the substitution τ_0_0 := [P:A].[U:C] to the type 'Cache<τ_0_0>'.
+/// Get the superclass bound for the term represented by this property bag.
 ///
 /// Asserts if this property bag does not have a superclass bound.
 Type PropertyBag::getSuperclassBound(
     TypeArrayView<GenericTypeParamType> genericParams,
-    const MutableTerm &lookupTerm,
     const ProtocolGraph &protos,
     RewriteContext &ctx) const {
-  MutableTerm prefix = getPrefixAfterStrippingKey(lookupTerm);
   return getTypeFromSubstitutionSchema(Superclass->getSuperclass(),
                                        Superclass->getSubstitutions(),
-                                       genericParams, prefix,
-                                       protos, ctx);
+                                       genericParams,
+                                       protos,
+                                       ctx);
 }
 
 /// Get the concrete type of the term represented by this property bag.
 ///
-/// The original \p lookupTerm is important in case the concrete type has
-/// substitutions. For example, if \p lookupTerm is [P:A].[U:B], and this
-/// property bag records that the suffix [U:B] has a concrete type symbol
-/// [concrete: Array<τ_0_0> with <[U:C]>], then we actually need to
-/// apply the substitution τ_0_0 := [P:A].[U:C] to the type 'Array<τ_0_0>'.
-///
 /// Asserts if this property bag is not concrete.
 Type PropertyBag::getConcreteType(
     TypeArrayView<GenericTypeParamType> genericParams,
-    const MutableTerm &lookupTerm,
     const ProtocolGraph &protos,
     RewriteContext &ctx) const {
-  MutableTerm prefix = getPrefixAfterStrippingKey(lookupTerm);
   return getTypeFromSubstitutionSchema(ConcreteType->getConcreteType(),
                                        ConcreteType->getSubstitutions(),
-                                       genericParams, prefix,
-                                       protos, ctx);
+                                       genericParams,
+                                       protos,
+                                       ctx);
 }
 
 /// Computes the term corresponding to a member type access on a substitution.
@@ -291,8 +246,9 @@ static MutableTerm getRelativeTermForType(CanType typeWitness,
   }
 
   // Add the member type names.
-  for (auto iter = symbols.rbegin(), end = symbols.rend(); iter != end; ++iter)
-    result.add(*iter);
+  std::reverse(symbols.begin(), symbols.end());
+  for (auto symbol : symbols)
+    result.add(symbol);
 
   return result;
 }
@@ -342,102 +298,6 @@ remapConcreteSubstitutionSchema(CanType concreteType,
     }));
 }
 
-namespace {
-  /// Utility class used by unifyConcreteTypes() and unifySuperclasses()
-  /// to walk two concrete types in parallel. Any time there is a mismatch,
-  /// records a new induced rule.
-  class ConcreteTypeMatcher : public TypeMatcher<ConcreteTypeMatcher> {
-    ArrayRef<Term> lhsSubstitutions;
-    ArrayRef<Term> rhsSubstitutions;
-    RewriteContext &ctx;
-    SmallVectorImpl<std::pair<MutableTerm, MutableTerm>> &inducedRules;
-    bool debug;
-
-  public:
-    ConcreteTypeMatcher(ArrayRef<Term> lhsSubstitutions,
-                        ArrayRef<Term> rhsSubstitutions,
-                        RewriteContext &ctx,
-                        SmallVectorImpl<std::pair<MutableTerm,
-                                                  MutableTerm>> &inducedRules,
-                        bool debug)
-        : lhsSubstitutions(lhsSubstitutions),
-          rhsSubstitutions(rhsSubstitutions),
-          ctx(ctx), inducedRules(inducedRules), debug(debug) {}
-
-    bool alwaysMismatchTypeParameters() const { return true; }
-
-    bool mismatch(TypeBase *firstType, TypeBase *secondType,
-                  Type sugaredFirstType) {
-      bool firstAbstract = firstType->isTypeParameter();
-      bool secondAbstract = secondType->isTypeParameter();
-
-      if (firstAbstract && secondAbstract) {
-        // Both sides are type parameters; add a same-type requirement.
-        auto lhsTerm = getRelativeTermForType(CanType(firstType),
-                                              lhsSubstitutions, ctx);
-        auto rhsTerm = getRelativeTermForType(CanType(secondType),
-                                              rhsSubstitutions, ctx);
-        if (lhsTerm != rhsTerm) {
-          if (debug) {
-            llvm::dbgs() << "%% Induced rule " << lhsTerm
-                         << " == " << rhsTerm << "\n";
-          }
-          inducedRules.emplace_back(lhsTerm, rhsTerm);
-        }
-        return true;
-      }
-
-      if (firstAbstract && !secondAbstract) {
-        // A type parameter is equated with a concrete type; add a concrete
-        // type requirement.
-        auto subjectTerm = getRelativeTermForType(CanType(firstType),
-                                                  lhsSubstitutions, ctx);
-
-        SmallVector<Term, 3> result;
-        auto concreteType = remapConcreteSubstitutionSchema(CanType(secondType),
-                                                            rhsSubstitutions,
-                                                            ctx, result);
-
-        MutableTerm constraintTerm(subjectTerm);
-        constraintTerm.add(Symbol::forConcreteType(concreteType, result, ctx));
-
-        if (debug) {
-          llvm::dbgs() << "%% Induced rule " << subjectTerm
-                       << " == " << constraintTerm << "\n";
-        }
-        inducedRules.emplace_back(subjectTerm, constraintTerm);
-        return true;
-      }
-
-      if (!firstAbstract && secondAbstract) {
-        // A concrete type is equated with a type parameter; add a concrete
-        // type requirement.
-        auto subjectTerm = getRelativeTermForType(CanType(secondType),
-                                                  rhsSubstitutions, ctx);
-
-        SmallVector<Term, 3> result;
-        auto concreteType = remapConcreteSubstitutionSchema(CanType(firstType),
-                                                            lhsSubstitutions,
-                                                            ctx, result);
-
-        MutableTerm constraintTerm(subjectTerm);
-        constraintTerm.add(Symbol::forConcreteType(concreteType, result, ctx));
-
-        if (debug) {
-          llvm::dbgs() << "%% Induced rule " << subjectTerm
-                       << " == " << constraintTerm << "\n";
-        }
-        inducedRules.emplace_back(subjectTerm, constraintTerm);
-        return true;
-      }
-
-      // Any other kind of type mismatch involves conflicting concrete types on
-      // both sides, which can only happen on invalid input.
-      return false;
-    }
-  };
-}
-
 /// When a type parameter has two concrete types, we have to unify the
 /// type constructor arguments.
 ///
@@ -448,8 +308,8 @@ namespace {
 ///
 /// These lower to the following two rules:
 ///
-///   T.[concrete: Foo<τ_0_0, τ_0_1, String> with {X.Y, Z}] => T
-///   T.[concrete: Foo<Int, τ_0_0, τ_0_1> with {A.B, W}] => T
+///   T.[concrete: Foo<τ_0_0, τ_0_1, String> with {X.Y, Z}]
+///   T.[concrete: Foo<Int, τ_0_0, τ_0_1> with {A.B, W}]
 ///
 /// The two concrete type symbols will be added to the property bag of 'T',
 /// and we will eventually end up in this method, where we will generate three
@@ -474,9 +334,99 @@ static bool unifyConcreteTypes(
     llvm::dbgs() << "% Unifying " << lhs << " with " << rhs << "\n";
   }
 
-  ConcreteTypeMatcher matcher(lhs.getSubstitutions(),
-                              rhs.getSubstitutions(),
-                              ctx, inducedRules, debug);
+  class Matcher : public TypeMatcher<Matcher> {
+    ArrayRef<Term> lhsSubstitutions;
+    ArrayRef<Term> rhsSubstitutions;
+    RewriteContext &ctx;
+    SmallVectorImpl<std::pair<MutableTerm, MutableTerm>> &inducedRules;
+    bool debug;
+
+  public:
+    Matcher(ArrayRef<Term> lhsSubstitutions,
+            ArrayRef<Term> rhsSubstitutions,
+            RewriteContext &ctx,
+            SmallVectorImpl<std::pair<MutableTerm, MutableTerm>> &inducedRules,
+            bool debug)
+        : lhsSubstitutions(lhsSubstitutions),
+          rhsSubstitutions(rhsSubstitutions),
+          ctx(ctx), inducedRules(inducedRules), debug(debug) {}
+
+    bool alwaysMismatchGenericParams() const { return true; }
+
+    bool mismatch(TypeBase *firstType, TypeBase *secondType,
+                  Type sugaredFirstType) {
+      if (isa<GenericTypeParamType>(firstType) &&
+          isa<GenericTypeParamType>(secondType)) {
+        // Both sides are type parameters; add a same-type requirement.
+        unsigned lhsIndex = getGenericParamIndex(firstType);
+        unsigned rhsIndex = getGenericParamIndex(secondType);
+        if (lhsSubstitutions[lhsIndex] != rhsSubstitutions[rhsIndex]) {
+          MutableTerm lhsTerm(lhsSubstitutions[lhsIndex]);
+          MutableTerm rhsTerm(rhsSubstitutions[rhsIndex]);
+          if (debug) {
+            llvm::dbgs() << "%% Induced rule " << lhsTerm
+                         << " == " << rhsTerm << "\n";
+          }
+          inducedRules.emplace_back(lhsTerm, rhsTerm);
+        }
+        return true;
+      }
+
+      if (isa<GenericTypeParamType>(firstType) &&
+          !isa<GenericTypeParamType>(secondType)) {
+        // A type parameter is equated with a concrete type; add a concrete
+        // type requirement.
+        unsigned lhsIndex = getGenericParamIndex(firstType);
+        MutableTerm subjectTerm(lhsSubstitutions[lhsIndex]);
+
+        SmallVector<Term, 3> result;
+        auto concreteType = remapConcreteSubstitutionSchema(CanType(secondType),
+                                                            rhsSubstitutions,
+                                                            ctx, result);
+
+        MutableTerm constraintTerm(subjectTerm);
+        constraintTerm.add(Symbol::forConcreteType(concreteType, result, ctx));
+
+        if (debug) {
+          llvm::dbgs() << "%% Induced rule " << subjectTerm
+                       << " == " << constraintTerm << "\n";
+        }
+        inducedRules.emplace_back(subjectTerm, constraintTerm);
+        return true;
+      }
+
+      if (!isa<GenericTypeParamType>(firstType) &&
+          isa<GenericTypeParamType>(secondType)) {
+        // A concrete type is equated with a type parameter; add a concrete
+        // type requirement.
+        unsigned rhsIndex = getGenericParamIndex(secondType);
+        MutableTerm subjectTerm(rhsSubstitutions[rhsIndex]);
+
+        SmallVector<Term, 3> result;
+        auto concreteType = remapConcreteSubstitutionSchema(CanType(firstType),
+                                                            lhsSubstitutions,
+                                                            ctx, result);
+
+        MutableTerm constraintTerm(subjectTerm);
+        constraintTerm.add(Symbol::forConcreteType(concreteType, result, ctx));
+
+        if (debug) {
+          llvm::dbgs() << "%% Induced rule " << subjectTerm
+                       << " == " << constraintTerm << "\n";
+        }
+        inducedRules.emplace_back(subjectTerm, constraintTerm);
+        return true;
+      }
+
+      // Any other kind of type mismatch involves different concrete types on
+      // both sides, which can only happen on invalid input.
+      return false;
+    }
+  };
+
+  Matcher matcher(lhs.getSubstitutions(),
+                  rhs.getSubstitutions(),
+                  ctx, inducedRules, debug);
   if (!matcher.match(lhsType, rhsType)) {
     // FIXME: Diagnose the conflict
     if (debug) {
@@ -486,87 +436,6 @@ static bool unifyConcreteTypes(
   }
 
   return false;
-}
-
-/// When a type parameter has two superclasses, we have to both unify the
-/// type constructor arguments, and record the most derived superclass.
-///
-///
-/// For example, if we have this setup:
-///
-///   class Base<T, T> {}
-///   class Middle<U> : Base<T, T> {}
-///   class Derived : Middle<Int> {}
-///
-///   T : Base<U, V>
-///   T : Derived
-///
-/// The most derived superclass requirement is 'T : Derived'.
-///
-/// The corresponding superclass of 'Derived' is 'Base<Int, Int>', so we
-/// unify the type constructor arguments of 'Base<U, V>' and 'Base<Int, Int>',
-/// which generates two induced rules:
-///
-///   U.[concrete: Int] => U
-///   V.[concrete: Int] => V
-///
-/// Returns the most derived superclass, which becomes the new superclass
-/// that gets recorded in the property map.
-static Symbol unifySuperclasses(
-    Symbol lhs, Symbol rhs, RewriteContext &ctx,
-    SmallVectorImpl<std::pair<MutableTerm, MutableTerm>> &inducedRules,
-    bool debug) {
-  if (debug) {
-    llvm::dbgs() << "% Unifying " << lhs << " with " << rhs << "\n";
-  }
-
-  auto lhsType = lhs.getSuperclass();
-  auto rhsType = rhs.getSuperclass();
-
-  auto *lhsClass = lhsType.getClassOrBoundGenericClass();
-  assert(lhsClass != nullptr);
-
-  auto *rhsClass = rhsType.getClassOrBoundGenericClass();
-  assert(rhsClass != nullptr);
-
-  // First, establish the invariant that lhsClass is either equal to, or
-  // is a superclass of rhsClass.
-  if (lhsClass == rhsClass ||
-      lhsClass->isSuperclassOf(rhsClass)) {
-    // Keep going.
-  } else if (rhsClass->isSuperclassOf(lhsClass)) {
-    std::swap(rhs, lhs);
-    std::swap(rhsType, lhsType);
-    std::swap(rhsClass, lhsClass);
-  } else {
-    // FIXME: Diagnose the conflict.
-    if (debug) {
-      llvm::dbgs() << "%% Unrelated superclass types\n";
-    }
-
-    return lhs;
-  }
-
-  if (lhsClass != rhsClass) {
-    // Get the corresponding substitutions for the right hand side.
-    assert(lhsClass->isSuperclassOf(rhsClass));
-    rhsType = rhsType->getSuperclassForDecl(lhsClass)
-                     ->getCanonicalType();
-  }
-
-  // Unify type contructor arguments.
-  ConcreteTypeMatcher matcher(lhs.getSubstitutions(),
-                              rhs.getSubstitutions(),
-                              ctx, inducedRules, debug);
-  if (!matcher.match(lhsType, rhsType)) {
-    if (debug) {
-      llvm::dbgs() << "%% Superclass conflict\n";
-    }
-    return rhs;
-  }
-
-  // Record the more specific class.
-  return rhs;
 }
 
 void PropertyBag::addProperty(
@@ -588,15 +457,20 @@ void PropertyBag::addProperty(
     return;
 
   case Symbol::Kind::Superclass: {
-    // FIXME: Also handle superclass vs concrete
+    auto superclass = property.getSuperclass();
 
-    if (Superclass) {
-      Superclass = unifySuperclasses(*Superclass, property,
-                                     ctx, inducedRules, debug);
-    } else {
-      Superclass = property;
-    }
+    // A superclass requirement implies a layout requirement.
+    auto layout =
+      LayoutConstraint::getLayoutConstraint(
+        superclass->getClassOrBoundGenericClass()->isObjC()
+          ? LayoutConstraintKind::Class
+          : LayoutConstraintKind::NativeClass,
+        ctx.getASTContext());
+    addProperty(Symbol::forLayout(layout, ctx), ctx, inducedRules, debug);
 
+    // FIXME: This needs to find the most derived subclass and also call
+    // unifyConcreteTypes()
+    Superclass = property;
     return;
   }
 
@@ -1062,21 +936,16 @@ RewriteSystem::buildPropertyMap(PropertyMap &map,
     if (rule.isDeleted())
       continue;
 
-    auto lhs = rule.getLHS();
-    auto rhs = rule.getRHS();
+    const auto &lhs = rule.getLHS();
 
     // Collect all rules of the form T.[p] => T where T is canonical.
     auto property = lhs.back();
     if (!property.isProperty())
       continue;
 
-    if (lhs.size() - 1 != rhs.size())
+    MutableTerm key(lhs.begin(), lhs.end() - 1);
+    if (key != rule.getRHS())
       continue;
-
-    if (!std::equal(rhs.begin(), rhs.end(), lhs.begin()))
-      continue;
-
-    MutableTerm key(rhs);
 
 #ifndef NDEBUG
     assert(!simplify(key) &&

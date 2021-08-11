@@ -707,7 +707,7 @@ static Type validateTypedPattern(TypedPattern *TP, TypeResolution resolution) {
   // property definition.
   auto &Context = resolution.getASTContext();
   auto *Repr = TP->getTypeRepr();
-  if (Repr && Repr->hasOpaque()) {
+  if (Repr && isa<OpaqueReturnTypeRepr>(Repr)) {
     auto named = dyn_cast<NamedPattern>(
                            TP->getSubPattern()->getSemanticsProvidingPattern());
     if (!named) {

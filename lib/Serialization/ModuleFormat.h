@@ -56,7 +56,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 623; // remove designated types
+const uint16_t SWIFTMODULE_VERSION_MINOR = 620; // use @available(renamed:) for async alternative warning
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1427,7 +1427,8 @@ namespace decls_block {
   using UnaryOperatorLayout = BCRecordLayout<
     Code, // ID field
     IdentifierIDField,  // name
-    DeclContextIDField  // context decl
+    DeclContextIDField, // context decl
+    BCArray<DeclIDField> // designated types
   >;
 
   using PrefixOperatorLayout = UnaryOperatorLayout<PREFIX_OPERATOR_DECL>;
@@ -1437,7 +1438,8 @@ namespace decls_block {
     INFIX_OPERATOR_DECL,
     IdentifierIDField, // name
     DeclContextIDField,// context decl
-    DeclIDField        // precedence group
+    DeclIDField,       // precedence group
+    BCArray<DeclIDField> // designated types
   >;
 
   using PrecedenceGroupLayout = BCRecordLayout<
@@ -1610,11 +1612,6 @@ namespace decls_block {
     BCVBR<8>                     // alignment
   >;
 
-  using AssociatedTypeLayout = BCRecordLayout<
-    ASSOCIATED_TYPE,
-    DeclIDField                  // associated type decl
-  >;
-
   /// Specifies the private discriminator string for a private declaration. This
   /// identifies the declaration's original source file in some opaque way.
   using PrivateDiscriminatorLayout = BCRecordLayout<
@@ -1678,8 +1675,7 @@ namespace decls_block {
     BUILTIN_PROTOCOL_CONFORMANCE,
     TypeIDField, // the conforming type
     DeclIDField, // the protocol
-    GenericSignatureIDField, // the generic signature
-    BCFixed<2> // the builtin conformance kind
+    GenericSignatureIDField // the generic signature
     // the (optional) conditional requirements follow
   >;
 

@@ -539,10 +539,6 @@ public:
   void writeGenericRequirements(ArrayRef<Requirement> requirements,
                                 const std::array<unsigned, 256> &abbrCodes);
 
-  /// Writes a protocol's associated type table.
-  void writeAssociatedTypes(ArrayRef<AssociatedTypeDecl *> assocTypes,
-                            const std::array<unsigned, 256> &abbrCodes);
-
   bool allowCompilerErrors() const;
 };
 

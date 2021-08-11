@@ -588,10 +588,8 @@ ClangNode extensionGetClangNode(const ExtensionDecl *ext);
 
 /// Utility for finding the referenced declaration from a call, which might
 /// include a second level of function application for a 'self.' expression,
-/// or a curry thunk, etc. If \p semantic is true then the underlying semantic
-/// expression of \p expr is used.
-std::pair<Type, ConcreteDeclRef> getReferencedDecl(Expr *expr,
-                                                   bool semantic = true);
+/// or a curry thunk, etc.
+std::pair<Type, ConcreteDeclRef> getReferencedDecl(Expr *expr);
 
 /// Whether the last expression in \p ExprStack is being called.
 bool isBeingCalled(ArrayRef<Expr*> ExprStack);

@@ -5,4 +5,3 @@ assert({ () -> Bool in
 }(), "")
 
 var x = ({ () -> String in return "s" })()
-var y = ((({ () -> String in return "s" })))()

@@ -323,8 +323,7 @@ enum MyEnum {
 // CHECKFOO:       "vendor":
 // CHECKFOO:     }
 // CHECKFOO:   },
-// CHECKFOO:   "relationships": [
-// CHECKFOO:       "target": "s:s8SendableP",
+// CHECKFOO:   "relationships": [],
 // CHECKFOO:   "symbols": [
 // CHECKFOO:     {
 // CHECKFOO:       "accessLevel": "internal",

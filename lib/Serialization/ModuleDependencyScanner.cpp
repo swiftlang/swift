@@ -86,6 +86,9 @@ std::error_code PlaceholderSwiftModuleScanner::findModuleFilesInDirectory(
     return std::make_error_code(std::errc::not_supported);
   }
   auto &moduleInfo = it->getValue();
+  assert(!moduleInfo.moduleBuffer &&
+         "Placeholder dependency module stubs cannot have an associated buffer");
+
   auto dependencies = ModuleDependencies::forPlaceholderSwiftModuleStub(
       moduleInfo.modulePath, moduleInfo.moduleDocPath,
       moduleInfo.moduleSourceInfoPath);
@@ -162,19 +165,15 @@ ErrorOr<ModuleDependencies> ModuleDependencyScanner::scanInterfaceFile(
 Optional<ModuleDependencies> SerializedModuleLoaderBase::getModuleDependencies(
     StringRef moduleName, ModuleDependenciesCache &cache,
     InterfaceSubContextDelegate &delegate) {
-  auto currentSearchPathSet = Ctx.getAllModuleSearchPathsSet();
   // Check whether we've cached this result.
   if (auto found = cache.findDependencies(
-           moduleName,
-           {ModuleDependenciesKind::SwiftTextual, currentSearchPathSet}))
+          moduleName, ModuleDependenciesKind::SwiftTextual))
     return found;
   if (auto found = cache.findDependencies(
-            moduleName,
-            {ModuleDependenciesKind::SwiftBinary, currentSearchPathSet}))
+          moduleName, ModuleDependenciesKind::SwiftBinary))
     return found;
   if (auto found = cache.findDependencies(
-            moduleName,
-            {ModuleDependenciesKind::SwiftPlaceholder, currentSearchPathSet}))
+          moduleName, ModuleDependenciesKind::SwiftPlaceholder))
     return found;
 
   auto moduleId = Ctx.getIdentifier(moduleName);

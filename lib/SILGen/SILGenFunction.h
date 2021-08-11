@@ -1876,16 +1876,14 @@ public:
                                        SILValue foreignErrorSlot,
                                  const ForeignErrorConvention &foreignError);
 
-  SILValue emitForeignErrorBlock(SILLocation loc, SILBasicBlock *errorBB,
-                                 Optional<ManagedValue> errorSlot,
-                                 Optional<ForeignAsyncConvention> foreignAsync);
+  void emitForeignErrorBlock(SILLocation loc, SILBasicBlock *errorBB,
+                             Optional<ManagedValue> errorSlot);
 
-  SILValue emitForeignErrorCheck(SILLocation loc,
-                                 SmallVectorImpl<ManagedValue> &directResults,
-                                 ManagedValue errorSlot,
-                                 bool suppressErrorCheck,
-                                 const ForeignErrorConvention &foreignError,
-                                 Optional<ForeignAsyncConvention> foreignAsync);
+  void emitForeignErrorCheck(SILLocation loc,
+                             SmallVectorImpl<ManagedValue> &directResults,
+                             ManagedValue errorSlot,
+                             bool suppressErrorCheck,
+                             const ForeignErrorConvention &foreignError);
 
   //===--------------------------------------------------------------------===//
   // Re-abstraction thunks

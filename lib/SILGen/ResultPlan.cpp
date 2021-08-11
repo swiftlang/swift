@@ -37,8 +37,7 @@ public:
   InPlaceInitializationResultPlan(Initialization *init) : init(init) {}
 
   RValue finish(SILGenFunction &SGF, SILLocation loc, CanType substType,
-                ArrayRef<ManagedValue> &directResults,
-                SILValue bridgedForeignError) override {
+                ArrayRef<ManagedValue> &directResults) override {
     init->finishInitialization(SGF);
     return RValue::forInContext();
   }
@@ -170,8 +169,7 @@ public:
   }
 
   RValue finish(SILGenFunction &SGF, SILLocation loc, CanType substType,
-                ArrayRef<ManagedValue> &directResults,
-                SILValue bridgedForeignError) override {
+                ArrayRef<ManagedValue> &directResults) override {
     assert(resultBox && "never emitted temporary?!");
     
     // Lower the unabstracted result type.
@@ -211,8 +209,7 @@ public:
         rep(rep) {}
 
   RValue finish(SILGenFunction &SGF, SILLocation loc, CanType substType,
-                ArrayRef<ManagedValue> &directResults,
-                SILValue bridgedForeignError) override {
+                ArrayRef<ManagedValue> &directResults) override {
     // Lower the unabstracted result type.
     auto &substTL = SGF.getTypeLowering(substType);
 
@@ -312,10 +309,8 @@ public:
         temporary(std::move(temporary)) {}
 
   RValue finish(SILGenFunction &SGF, SILLocation loc, CanType substType,
-                ArrayRef<ManagedValue> &directResults,
-                SILValue bridgedForeignError) override {
-    RValue subResult = subPlan->finish(SGF, loc, substType, directResults,
-                                       bridgedForeignError);
+                ArrayRef<ManagedValue> &directResults) override {
+    RValue subResult = subPlan->finish(SGF, loc, substType, directResults);
     assert(subResult.isInContext() && "sub-plan didn't emit into context?");
     (void)subResult;
 
@@ -344,10 +339,8 @@ public:
       : init(init), subPlan(std::move(subPlan)) {}
 
   RValue finish(SILGenFunction &SGF, SILLocation loc, CanType substType,
-                ArrayRef<ManagedValue> &directResults,
-                SILValue bridgedForeignError) override {
-    RValue subResult = subPlan->finish(SGF, loc, substType, directResults,
-                                       bridgedForeignError);
+                ArrayRef<ManagedValue> &directResults) override {
+    RValue subResult = subPlan->finish(SGF, loc, substType, directResults);
     ManagedValue value = std::move(subResult).getAsSingleValue(SGF, loc);
 
     init->copyOrInitValueInto(SGF, loc, value, /*init*/ true);
@@ -381,17 +374,15 @@ public:
   }
 
   RValue finish(SILGenFunction &SGF, SILLocation loc, CanType substType,
-                ArrayRef<ManagedValue> &directResults,
-                SILValue bridgedForeignError) override {
+                ArrayRef<ManagedValue> &directResults) override {
     RValue tupleRV(substType);
 
     // Finish all the component tuples.
     auto substTupleType = cast<TupleType>(substType);
     assert(substTupleType.getElementTypes().size() == eltPlans.size());
     for (auto i : indices(substTupleType.getElementTypes())) {
-      RValue eltRV =
-          eltPlans[i]->finish(SGF, loc, substTupleType.getElementType(i),
-                              directResults, bridgedForeignError);
+      RValue eltRV = eltPlans[i]->finish(
+          SGF, loc, substTupleType.getElementType(i), directResults);
       tupleRV.addElement(std::move(eltRV));
     }
 
@@ -437,14 +428,12 @@ public:
   }
 
   RValue finish(SILGenFunction &SGF, SILLocation loc, CanType substType,
-                ArrayRef<ManagedValue> &directResults,
-                SILValue bridgedForeignError) override {
+                ArrayRef<ManagedValue> &directResults) override {
     auto substTupleType = cast<TupleType>(substType);
     assert(substTupleType.getElementTypes().size() == eltPlans.size());
     for (auto i : indices(substTupleType.getElementTypes())) {
       auto eltType = substTupleType.getElementType(i);
-      RValue eltRV = eltPlans[i]->finish(SGF, loc, eltType, directResults,
-                                         bridgedForeignError);
+      RValue eltRV = eltPlans[i]->finish(SGF, loc, eltType, directResults);
       assert(eltRV.isInContext());
       (void)eltRV;
     }
@@ -493,11 +482,9 @@ public:
                                     AbstractionPattern origFormalType,
                                     SILLocation loc) override {
     // Get the current continuation for the task.
-    bool throws =
-        calleeTypeInfo.foreign.async->completionHandlerErrorParamIndex()
-            .hasValue() ||
-        calleeTypeInfo.foreign.error.hasValue();
-
+    bool throws = calleeTypeInfo.foreign.async
+        ->completionHandlerErrorParamIndex().hasValue();
+    
     continuation = SGF.B.createGetAsyncContinuationAddr(loc, resumeBuf,
                                calleeTypeInfo.substResultType, throws);
 
@@ -547,8 +534,7 @@ public:
             cast<SILFunctionType>(
                 impFnTy->mapTypeOutOfContext()->getCanonicalType(sig)),
             continuationTy->mapTypeOutOfContext()->getCanonicalType(sig),
-            origFormalType, sig, *calleeTypeInfo.foreign.async,
-            calleeTypeInfo.foreign.error);
+            origFormalType, sig, *calleeTypeInfo.foreign.async);
     auto impRef = SGF.B.createFunctionRef(loc, impl);
     
     // Initialize the block object for the completion handler.
@@ -568,95 +554,18 @@ public:
   }
 
   RValue finish(SILGenFunction &SGF, SILLocation loc, CanType substType,
-                ArrayRef<ManagedValue> &directResults,
-                SILValue bridgedForeignError) override {
+                ArrayRef<ManagedValue> &directResults) override {
     // There should be no direct results from the call.
     assert(directResults.empty());
     
     // Await the continuation we handed off to the completion handler.
     SILBasicBlock *resumeBlock = SGF.createBasicBlock();
     SILBasicBlock *errorBlock = nullptr;
-    bool throws =
-        calleeTypeInfo.foreign.async->completionHandlerErrorParamIndex()
-            .hasValue() ||
-        calleeTypeInfo.foreign.error.hasValue();
-    if (throws) {
+    auto errorParamIndex = calleeTypeInfo.foreign.async->completionHandlerErrorParamIndex();
+    if (errorParamIndex) {
       errorBlock = SGF.createBasicBlock(FunctionSection::Postmatter);
     }
-
-    auto *awaitBB = SGF.B.getInsertionBB();
-    if (bridgedForeignError) {
-      // Avoid a critical edge from the block which branches to the await and
-      // foreign error blocks to the await block (to which the error block will
-      // be made to branch in a moment) by introducing a trampoline which will
-      // branch to the await block.
-      awaitBB = SGF.createBasicBlock();
-      SGF.B.createBranch(loc, awaitBB);
-
-      // Finish emitting the foreign error block:
-      // (1) fulfill the unsafe continuation with the foreign error
-      // (2) branch to the await block
-      {
-        // First, fulfill the unsafe continuation with the foreign error.
-        // Currently, that block's code looks something like
-        //     %foreignError = ... : $*Optional<NSError>
-        //     %converter = function_ref _convertNSErrorToError(_:)
-        //     %error = apply %converter(%foreignError)
-        //     [... insert here ...]
-        //     destroy_value %error
-        //     destroy_value %foreignError
-        // Insert code to fulfill it after the native %error is defined.  That
-        // code should structure the RawUnsafeContinuation (continuation) into
-        // an appropriately typed UnsafeContinuation and then pass that together
-        // with (a copy of) the error to
-        // _resumeUnsafeThrowingContinuationWithError.
-        // [foreign_error_block_with_foreign_async_convention]
-        SGF.B.setInsertionPoint(
-            ++bridgedForeignError->getDefiningInstruction()->getIterator());
-
-        auto continuationDecl = SGF.getASTContext().getUnsafeContinuationDecl();
-
-        auto errorTy = SGF.getASTContext().getExceptionType();
-        auto continuationBGT =
-            BoundGenericType::get(continuationDecl, Type(),
-                                  {calleeTypeInfo.substResultType, errorTy});
-        auto env = SGF.F.getGenericEnvironment();
-        auto sig = env ? env->getGenericSignature().getCanonicalSignature()
-                       : CanGenericSignature();
-        auto mappedContinuationTy =
-            continuationBGT->mapTypeOutOfContext()->getCanonicalType(sig);
-        auto resumeType =
-            cast<BoundGenericType>(mappedContinuationTy).getGenericArgs()[0];
-        auto continuationTy = continuationBGT->getCanonicalType();
-
-        auto errorIntrinsic =
-            SGF.SGM.getResumeUnsafeThrowingContinuationWithError();
-        Type replacementTypes[] = {
-            SGF.F.mapTypeIntoContext(resumeType)->getCanonicalType()};
-        auto subs = SubstitutionMap::get(errorIntrinsic->getGenericSignature(),
-                                         replacementTypes,
-                                         ArrayRef<ProtocolConformanceRef>{});
-        auto wrappedContinuation = SGF.B.createStruct(
-            loc, SILType::getPrimitiveObjectType(continuationTy),
-            {continuation});
-
-        auto continuationMV =
-            ManagedValue::forUnmanaged(SILValue(wrappedContinuation));
-        SGF.emitApplyOfLibraryIntrinsic(
-            loc, errorIntrinsic, subs,
-            {continuationMV,
-             ManagedValue::forUnmanaged(bridgedForeignError).copy(SGF, loc)},
-            SGFContext());
-
-        // Second, emit a branch from the end of the foreign error block to the
-        // await block, to await the continuation which was just fulfilled.
-        SGF.B.setInsertionPoint(
-            bridgedForeignError->getDefiningInstruction()->getParent());
-        SGF.B.createBranch(loc, awaitBB);
-      }
-
-      SGF.B.emitBlock(awaitBB);
-    }
+    
     SGF.B.createAwaitAsyncContinuation(loc, continuation, resumeBlock, errorBlock);
     
     // Propagate an error if we have one.
@@ -746,23 +655,14 @@ public:
   }
 
   RValue finish(SILGenFunction &SGF, SILLocation loc, CanType substType,
-                ArrayRef<ManagedValue> &directResults,
-                SILValue bridgedForeignError) override {
-    return subPlan->finish(SGF, loc, substType, directResults,
-                           bridgedForeignError);
+                ArrayRef<ManagedValue> &directResults) override {
+    return subPlan->finish(SGF, loc, substType, directResults);
   }
 
   void
   gatherIndirectResultAddrs(SILGenFunction &SGF, SILLocation loc,
                             SmallVectorImpl<SILValue> &outList) const override {
     subPlan->gatherIndirectResultAddrs(SGF, loc, outList);
-  }
-
-  ManagedValue
-  emitForeignAsyncCompletionHandler(SILGenFunction &SGF,
-                                    AbstractionPattern origFormalType,
-                                    SILLocation loc) override {
-    return subPlan->emitForeignAsyncCompletionHandler(SGF, origFormalType, loc);
   }
 
   Optional<std::pair<ManagedValue, ManagedValue>>
@@ -795,7 +695,12 @@ public:
 ResultPlanPtr ResultPlanBuilder::buildTopLevelResult(Initialization *init,
                                                      SILLocation loc) {
   // First check if we have a foreign error and/or async convention.
-  if (auto foreignError = calleeTypeInfo.foreign.error) {
+  if (auto foreignAsync = calleeTypeInfo.foreign.async) {
+    // Create a result plan that gets the result schema from the completion
+    // handler callback's arguments.
+    // completion handler.
+    return ResultPlanPtr(new ForeignAsyncInitializationPlan(SGF, loc, calleeTypeInfo));
+  } else if (auto foreignError = calleeTypeInfo.foreign.error) {
     // Handle the foreign error first.
     //
     // The plan needs to be built using the formal result type after foreign-error
@@ -804,8 +709,7 @@ ResultPlanPtr ResultPlanBuilder::buildTopLevelResult(Initialization *init,
     // These conventions make the formal result type ().
     case ForeignErrorConvention::ZeroResult:
     case ForeignErrorConvention::NonZeroResult:
-      assert(calleeTypeInfo.substResultType->isVoid() ||
-             calleeTypeInfo.foreign.async);
+      assert(calleeTypeInfo.substResultType->isVoid());
       allResults.clear();
       break;
 
@@ -830,21 +734,10 @@ ResultPlanPtr ResultPlanBuilder::buildTopLevelResult(Initialization *init,
     }
     }
 
-    ResultPlanPtr subPlan;
-    if (auto foreignAsync = calleeTypeInfo.foreign.async) {
-      subPlan = ResultPlanPtr(
-          new ForeignAsyncInitializationPlan(SGF, loc, calleeTypeInfo));
-    } else {
-      subPlan = build(init, calleeTypeInfo.origResultType.getValue(),
-                      calleeTypeInfo.substResultType);
-    }
+    ResultPlanPtr subPlan = build(init, calleeTypeInfo.origResultType.getValue(),
+                                  calleeTypeInfo.substResultType);
     return ResultPlanPtr(new ForeignErrorInitializationPlan(
         SGF, loc, calleeTypeInfo, std::move(subPlan)));
-  } else if (auto foreignAsync = calleeTypeInfo.foreign.async) {
-    // Create a result plan that gets the result schema from the completion
-    // handler callback's arguments.
-    return ResultPlanPtr(
-        new ForeignAsyncInitializationPlan(SGF, loc, calleeTypeInfo));
   } else {
     // Otherwise, we can just call build.
     return build(init, calleeTypeInfo.origResultType.getValue(),

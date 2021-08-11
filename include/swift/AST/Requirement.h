@@ -81,8 +81,7 @@ public:
   /// \param conditionalRequirements An out parameter initialized to an
   /// array of requirements that the caller must check to ensure this
   /// requirement is completely satisfied.
-  bool isSatisfied(ArrayRef<Requirement> &conditionalRequirements,
-                   bool allowMissing = false) const;
+  bool isSatisfied(ArrayRef<Requirement> &conditionalRequirements) const;
 
   /// Determines if this substituted requirement can ever be satisfied,
   /// possibly with additional substitutions.

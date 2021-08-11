@@ -236,7 +236,7 @@ public:
   ActiveTaskStatus withEscalatedPriority(JobPriority priority) const {
     assert(priority > getStoredPriority());
     return ActiveTaskStatus(Record,
-                            (Flags & ~PriorityMask)
+                            (Flags & PriorityMask)
                                | IsEscalated | uintptr_t(priority));
   }
   ActiveTaskStatus withoutStoredPriorityEscalation() const {
@@ -264,7 +264,9 @@ public:
 };
 
 /// The size of an allocator slab.
-static constexpr size_t SlabCapacity = 1000;
+///
+/// TODO: find the optimal value by experiment.
+static constexpr size_t SlabCapacity = 1024;
 
 using TaskAllocator = StackAllocator<SlabCapacity>;
 

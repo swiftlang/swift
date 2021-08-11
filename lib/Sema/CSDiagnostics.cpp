@@ -227,16 +227,12 @@ ValueDecl *RequirementFailure::getDeclRef() const {
     // diagnostic directly to its declaration without desugaring.
     if (auto *alias = dyn_cast<TypeAliasType>(type.getPointer()))
       return alias->getDecl();
+
+    if (auto *opaque = type->getAs<OpaqueTypeArchetypeType>())
+      return opaque->getDecl();
+
     return type->getAnyGeneric();
   };
-
-  // TODO: potentially we are tracking more information than we need to here
-  // because the decl might also availiable via the contextual type. In the long
-  // run we probably want to refactor to get rid of get/set contextual.
-  if (auto opaqueLocator =
-          getLocator()->findFirst<LocatorPathElt::OpenedOpaqueArchetype>()) {
-    return opaqueLocator->getDecl();
-  }
 
   // If the locator is for a result builder body result type, the requirement
   // came from the function's return type.
@@ -256,6 +252,12 @@ ValueDecl *RequirementFailure::getDeclRef() const {
     // type, local function etc.
     if (contextualPurpose == CTP_ReturnStmt ||
         contextualPurpose == CTP_ReturnSingleExpr) {
+      // In case of opaque result type, let's point to the declaration
+      // associated with the type itself (since it has one) instead of
+      // declarer.
+      if (auto *opaque = contextualTy->getAs<OpaqueTypeArchetypeType>())
+        return opaque->getDecl();
+
       return cast<ValueDecl>(getDC()->getAsDecl());
     }
 
@@ -1158,6 +1160,7 @@ ASTNode MissingExplicitConversionFailure::getAnchor() const {
 bool MissingExplicitConversionFailure::diagnoseAsError() {
   auto *DC = getDC();
   auto *anchor = castToExpr(getAnchor());
+  auto *rawAnchor = castToExpr(getRawAnchor());
 
   auto fromType = getFromType();
   auto toType = getToType();
@@ -1183,7 +1186,7 @@ bool MissingExplicitConversionFailure::diagnoseAsError() {
   }
 
   bool needsParensInside = exprNeedsParensBeforeAddingAs(anchor);
-  bool needsParensOutside = exprNeedsParensAfterAddingAs(anchor);
+  bool needsParensOutside = exprNeedsParensAfterAddingAs(anchor, rawAnchor);
 
   llvm::SmallString<2> insertBefore;
   llvm::SmallString<32> insertAfter;
@@ -1323,7 +1326,7 @@ void MissingOptionalUnwrapFailure::offerDefaultValueUnwrapFixIt(
   bool needsParensInside =
       exprNeedsParensBeforeAddingNilCoalescing(DC, const_cast<Expr *>(expr));
   bool needsParensOutside = exprNeedsParensAfterAddingNilCoalescing(
-      DC, const_cast<Expr *>(expr), [&](auto *E) { return findParentExpr(E); });
+      DC, const_cast<Expr *>(expr), castToExpr(getRawAnchor()));
 
   llvm::SmallString<2> insertBefore;
   llvm::SmallString<32> insertAfter;
@@ -5194,16 +5197,7 @@ bool ExtraneousArgumentsFailure::diagnoseAsError() {
       },
       [&] { OS << ", "; });
 
-  bool areTrailingClosures = false;
-  if (auto *argExpr = getArgumentListExprFor(getLocator())) {
-    if (auto i = argExpr->getUnlabeledTrailingClosureIndexOfPackedArgument()) {
-      areTrailingClosures = llvm::all_of(ExtraArgs, [&](auto &pair) {
-        return pair.first >= i;
-      });
-    }
-  }
-
-  emitDiagnostic(diag::extra_arguments_in_call, areTrailingClosures, OS.str());
+  emitDiagnostic(diag::extra_arguments_in_call, OS.str());
 
   if (auto overload = getCalleeOverloadChoiceIfAvailable(getLocator())) {
     if (auto *decl = overload->choice.getDeclOrNull()) {
@@ -5254,12 +5248,9 @@ bool ExtraneousArgumentsFailure::diagnoseSingleExtraArgument() const {
   auto argExpr = tuple ? tuple->getElement(index)
                        : cast<ParenExpr>(arguments)->getSubExpr();
 
-  auto trailingClosureIdx =
-      arguments->getUnlabeledTrailingClosureIndexOfPackedArgument();
-  auto isTrailingClosure = trailingClosureIdx && index >= *trailingClosureIdx;
-
   auto loc = argExpr->getLoc();
-  if (isTrailingClosure) {
+  if (tuple && index == tuple->getNumElements() - 1 &&
+      tuple->hasTrailingClosure()) {
     emitDiagnosticAt(loc, diag::extra_trailing_closure_in_call)
         .highlight(argExpr->getSourceRange());
   } else if (ContextualType->getNumParams() == 0) {
@@ -5637,6 +5628,7 @@ bool MissingGenericArgumentsFailure::diagnoseAsError() {
 
   if (!isScoped) {
     auto anchor = getAnchor();
+    assert(anchor.is<Expr *>() || anchor.is<TypeRepr *>());
     return diagnoseForAnchor(anchor, Parameters);
   }
 

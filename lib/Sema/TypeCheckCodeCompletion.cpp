@@ -288,18 +288,18 @@ public:
         new (C) ParenExpr(argList.lParenLoc,
                           argList.args[0],
                           argList.rParenLoc,
-                          argList.hasAnyTrailingClosures());
+                          argList.hasTrailingClosure);
       result->setImplicit();
       return result;
     }
 
     return TupleExpr::create(C,
                              argList.lParenLoc,
-                             argList.rParenLoc,
                              argList.args,
                              argList.labels,
                              argList.labelLocs,
-                             argList.unlabeledTrailingClosureIdx,
+                             argList.rParenLoc,
+                             argList.hasTrailingClosure,
                              /*implicit=*/true);
   }
 

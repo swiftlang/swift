@@ -60,10 +60,9 @@ public:
 /// Context data for protocols.
 class LazyProtocolData : public LazyIterableDeclContextData {
 public:
-  /// The context data used for loading a requirement signature.
+  /// The context data used for loading all of the members of the iterable
+  /// context.
   uint64_t requirementSignatureData = 0;
-  /// The context data used for loading the list of associated types.
-  uint64_t associatedTypesData = 0;
 };
 
 /// A class that can lazily load members from a serialized format.
@@ -100,11 +99,6 @@ public:
   virtual void
   loadRequirementSignature(const ProtocolDecl *proto, uint64_t contextData,
                            SmallVectorImpl<Requirement> &requirements) = 0;
-
-  /// Loads the associated types of a protocol.
-  virtual void
-  loadAssociatedTypes(const ProtocolDecl *proto, uint64_t contextData,
-                      SmallVectorImpl<AssociatedTypeDecl *> &assocTypes) = 0;
 
   /// Returns the replaced decl for a given @_dynamicReplacement(for:) attribute.
   virtual ValueDecl *

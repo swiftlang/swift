@@ -191,17 +191,11 @@ extension _SmallString: RandomAccessCollection, MutableCollection {
 
   @inlinable  @inline(__always)
   internal subscript(_ bounds: Range<Index>) -> SubSequence {
-    get {
-      // TODO(String performance): In-vector-register operation
-      return self.withUTF8 { utf8 in
-        let rebased = UnsafeBufferPointer(rebasing: utf8[bounds])
-        return _SmallString(rebased)._unsafelyUnwrappedUnchecked
-      }
+    // TODO(String performance): In-vector-register operation
+    return self.withUTF8 { utf8 in
+      let rebased = UnsafeBufferPointer(rebasing: utf8[bounds])
+      return _SmallString(rebased)._unsafelyUnwrappedUnchecked
     }
-    // This setter is required for _SmallString to be a valid MutableCollection.
-    // Since _SmallString is internal and this setter unused, we cheat.
-    @_alwaysEmitIntoClient set { fatalError() }
-    @_alwaysEmitIntoClient _modify { fatalError() }
   }
 }
 

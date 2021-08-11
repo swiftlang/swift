@@ -476,7 +476,6 @@ static bool escapeKeywordInContext(StringRef keyword, PrintNameContext context){
   case PrintNameContext::Attribute:
     return isKeyword;
   case PrintNameContext::Keyword:
-  case PrintNameContext::IntroducerKeyword:
     return false;
 
   case PrintNameContext::ClassDynamicSelf:
@@ -878,7 +877,7 @@ private:
   bool shouldPrintPattern(const Pattern *P);
   void printPatternType(const Pattern *P);
   void printAccessors(const AbstractStorageDecl *ASD);
-  void printSelfAccessKindModifiersIfNeeded(const FuncDecl *FD);
+  void printMutabilityModifiersIfNeeded(const FuncDecl *FD);
   void printMembersOfDecl(Decl * NTD, bool needComma = false,
                           bool openBracket = true, bool closeBracket = true);
   void printMembers(ArrayRef<Decl *> members, bool needComma = false,
@@ -1144,7 +1143,6 @@ void PrintAST::printAttributes(const Decl *D) {
   if (isa<FuncDecl>(D)) {
     Options.ExcludeAttrList.push_back(DAK_Mutating);
     Options.ExcludeAttrList.push_back(DAK_NonMutating);
-    Options.ExcludeAttrList.push_back(DAK_Consuming);
   }
 
   D->getAttrs().print(Printer, Options, D);
@@ -1293,9 +1291,10 @@ void PrintAST::printPattern(const Pattern *pattern) {
     break;
 
   case PatternKind::Binding:
-    Printer.printIntroducerKeyword(
-        cast<BindingPattern>(pattern)->isLet() ? "let" : "var",
-        Options, " ");
+    if (!Options.SkipIntroducerKeywords)
+      Printer << (cast<BindingPattern>(pattern)->isLet() ? tok::kw_let
+                                                         : tok::kw_var)
+              << " ";
     printPattern(cast<BindingPattern>(pattern)->getSubPattern());
   }
 }
@@ -1902,27 +1901,16 @@ void PrintAST::printBodyIfNecessary(const AbstractFunctionDecl *decl) {
   printBraceStmt(decl->getBody(), /*newlineIfEmpty*/!isa<AccessorDecl>(decl));
 }
 
-void PrintAST::printSelfAccessKindModifiersIfNeeded(const FuncDecl *FD) {
-  if (!Options.PrintSelfAccessKindKeyword)
-    return;
-
+void PrintAST::printMutabilityModifiersIfNeeded(const FuncDecl *FD) {
   const auto *AD = dyn_cast<AccessorDecl>(FD);
 
-  switch (FD->getSelfAccessKind()) {
-  case SelfAccessKind::Mutating:
-    if ((!AD || AD->isAssumedNonMutating()) &&
-        !Options.excludeAttrKind(DAK_Mutating))
-      Printer.printKeyword("mutating", Options, " ");
-    break;
-  case SelfAccessKind::NonMutating:
-    if (AD && AD->isExplicitNonMutating() &&
-        !Options.excludeAttrKind(DAK_NonMutating))
-      Printer.printKeyword("nonmutating", Options, " ");
-    break;
-  case SelfAccessKind::Consuming:
-    if (!Options.excludeAttrKind(DAK_Consuming))
-      Printer.printKeyword("__consuming", Options, " ");
-    break;
+  if (FD->isMutating()) {
+    if (AD == nullptr || AD->isAssumedNonMutating())
+      if (!Options.excludeAttrKind(DAK_Mutating))
+        Printer.printKeyword("mutating", Options, " ");
+  } else if (AD && AD->isExplicitNonMutating() &&
+             !Options.excludeAttrKind(DAK_Mutating)) {
+    Printer.printKeyword("nonmutating", Options, " ");
   }
 }
 
@@ -2049,7 +2037,7 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
       return true;
     if (!PrintAccessorBody) {
       Printer << " ";
-      printSelfAccessKindModifiersIfNeeded(Accessor);
+      printMutabilityModifiersIfNeeded(Accessor);
 
       Printer.printKeyword(getAccessorLabel(Accessor->getAccessorKind()), Options);
 
@@ -2283,7 +2271,7 @@ static void getModuleEntities(ImportDecl *Import,
 
 void PrintAST::visitImportDecl(ImportDecl *decl) {
   printAttributes(decl);
-  Printer.printIntroducerKeyword("import", Options, " ");
+  Printer << tok::kw_import << " ";
 
   switch (decl->getImportKind()) {
   case ImportKind::Module:
@@ -2403,7 +2391,7 @@ void PrintAST::printSynthesizedExtension(Type ExtendedType,
   if (Options.BracketOptions.shouldOpenExtension(ExtDecl)) {
     printDocumentationComment(ExtDecl);
     printAttributes(ExtDecl);
-    Printer.printIntroducerKeyword("extension", Options, " ");
+    Printer << tok::kw_extension << " ";
 
     printExtendedTypeName(TypeLoc::withoutLoc(ExtendedType));
     printInherited(ExtDecl);
@@ -2441,7 +2429,7 @@ void PrintAST::printExtension(ExtensionDecl *decl) {
   if (Options.BracketOptions.shouldOpenExtension(decl)) {
     printDocumentationComment(decl);
     printAttributes(decl);
-    Printer.printIntroducerKeyword("extension", Options, " ");
+    Printer << "extension ";
     recordDeclLoc(decl, [&]{
       // We cannot extend sugared types.
       Type extendedType = decl->getExtendedType();
@@ -2973,7 +2961,8 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
   printAccess(decl);
-  Printer.printIntroducerKeyword("typealias", Options, " ");
+  if (!Options.SkipIntroducerKeywords)
+    Printer << tok::kw_typealias << " ";
   printContextIfNeeded(decl);
   recordDeclLoc(decl,
     [&]{
@@ -3016,7 +3005,8 @@ void PrintAST::visitGenericTypeParamDecl(GenericTypeParamDecl *decl) {
 void PrintAST::visitAssociatedTypeDecl(AssociatedTypeDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
-  Printer.printIntroducerKeyword("associatedtype", Options, " ");
+  if (!Options.SkipIntroducerKeywords)
+    Printer << tok::kw_associatedtype << " ";
   recordDeclLoc(decl,
     [&]{
       Printer.printName(decl->getName(), PrintNameContext::TypeMember);
@@ -3045,7 +3035,8 @@ void PrintAST::visitEnumDecl(EnumDecl *decl) {
     printSourceRange(CharSourceRange(Ctx.SourceMgr, decl->getStartLoc(),
                               decl->getBraces().Start.getAdvancedLoc(-1)), Ctx);
   } else {
-    Printer.printIntroducerKeyword("enum", Options, " ");
+    if (!Options.SkipIntroducerKeywords)
+      Printer << tok::kw_enum << " ";
     printContextIfNeeded(decl);
     recordDeclLoc(decl,
       [&]{
@@ -3072,7 +3063,8 @@ void PrintAST::visitStructDecl(StructDecl *decl) {
     printSourceRange(CharSourceRange(Ctx.SourceMgr, decl->getStartLoc(),
                               decl->getBraces().Start.getAdvancedLoc(-1)), Ctx);
   } else {
-    Printer.printIntroducerKeyword("struct", Options, " ");
+    if (!Options.SkipIntroducerKeywords)
+      Printer << tok::kw_struct << " ";
     printContextIfNeeded(decl);
     recordDeclLoc(decl,
       [&]{
@@ -3099,8 +3091,13 @@ void PrintAST::visitClassDecl(ClassDecl *decl) {
     printSourceRange(CharSourceRange(Ctx.SourceMgr, decl->getStartLoc(),
                               decl->getBraces().Start.getAdvancedLoc(-1)), Ctx);
   } else {
-    Printer.printIntroducerKeyword(
-        decl->isExplicitActor() ? "actor" : "class", Options, " ");
+    if (!Options.SkipIntroducerKeywords) {
+      if (decl->isExplicitActor()) {
+        Printer.printKeyword("actor", Options, " ");
+      } else {
+        Printer << tok::kw_class << " ";
+      }
+    }
     printContextIfNeeded(decl);
     recordDeclLoc(decl,
       [&]{
@@ -3129,7 +3126,8 @@ void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
     printSourceRange(CharSourceRange(Ctx.SourceMgr, decl->getStartLoc(),
                               decl->getBraces().Start.getAdvancedLoc(-1)), Ctx);
   } else {
-    Printer.printIntroducerKeyword("protocol", Options, " ");
+    if (!Options.SkipIntroducerKeywords)
+      Printer << tok::kw_protocol << " ";
     printContextIfNeeded(decl);
     recordDeclLoc(decl,
       [&]{
@@ -3209,12 +3207,20 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
     Printer << "@_hasStorage ";
   printAttributes(decl);
   printAccess(decl);
-  if (decl->isStatic() && Options.PrintStaticKeyword)
-    printStaticKeyword(decl->getCorrectStaticSpelling());
-  if (decl->getKind() == DeclKind::Var || Options.PrintParameterSpecifiers) {
-    // Map all non-let specifiers to 'var'.  This is not correct, but
-    // SourceKit relies on this for info about parameter decls.
-    Printer.printIntroducerKeyword(decl->isLet() ? "let" : "var", Options, " ");
+  if (!Options.SkipIntroducerKeywords) {
+    if (decl->isStatic() && Options.PrintStaticKeyword)
+      printStaticKeyword(decl->getCorrectStaticSpelling());
+    if (decl->getKind() == DeclKind::Var
+        || Options.PrintParameterSpecifiers) {
+      // Map all non-let specifiers to 'var'.  This is not correct, but
+      // SourceKit relies on this for info about parameter decls.
+      if (decl->isLet())
+        Printer << tok::kw_let;
+      else
+        Printer << tok::kw_var;
+
+      Printer << " ";
+    }
   }
   printContextIfNeeded(decl);
   recordDeclLoc(decl,
@@ -3425,8 +3431,10 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
   // Explicitly print 'mutating' and 'nonmutating' if needed.
-  printSelfAccessKindModifiersIfNeeded(decl);
-
+  printMutabilityModifiersIfNeeded(decl);
+  if (decl->isConsuming()) {
+    Printer.printKeyword("__consuming", Options, " ");
+  }
   switch (auto kind = decl->getAccessorKind()) {
   case AccessorKind::Get:
   case AccessorKind::Address:
@@ -3484,12 +3492,16 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
                                                SourceRange(StartLoc, EndLoc));
     printSourceRange(Range, Ctx);
   } else {
-    if (decl->isStatic() && Options.PrintStaticKeyword)
-      printStaticKeyword(decl->getCorrectStaticSpelling());
+    if (!Options.SkipIntroducerKeywords) {
+      if (decl->isStatic() && Options.PrintStaticKeyword)
+        printStaticKeyword(decl->getCorrectStaticSpelling());
 
-    printSelfAccessKindModifiersIfNeeded(decl);
-    Printer.printIntroducerKeyword("func", Options, " ");
-
+      printMutabilityModifiersIfNeeded(decl);
+      if (decl->isConsuming() && !decl->getAttrs().hasAttribute<ConsumingAttr>()) {
+        Printer.printKeyword("__consuming", Options, " ");
+      }
+      Printer << tok::kw_func << " ";
+    }
     printContextIfNeeded(decl);
     recordDeclLoc(decl,
       [&]{ // Name
@@ -3647,7 +3659,7 @@ void PrintAST::visitEnumCaseDecl(EnumCaseDecl *decl) {
     printDocumentationComment(elems[0]);
     printAttributes(elems[0]);
   }
-  Printer.printIntroducerKeyword("case", Options, " ");
+  Printer << tok::kw_case << " ";
 
   llvm::interleave(elems.begin(), elems.end(),
     [&](EnumElementDecl *elt) {
@@ -3661,7 +3673,7 @@ void PrintAST::visitEnumElementDecl(EnumElementDecl *decl) {
   // In cases where there is no parent EnumCaseDecl (such as imported or
   // deserialized elements), print the element independently.
   printAttributes(decl);
-  Printer.printIntroducerKeyword("case", Options, " ");
+  Printer << tok::kw_case << " ";
   printEnumElement(decl);
 }
 
@@ -3669,7 +3681,8 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
   printAccess(decl);
-  if (decl->isStatic() && Options.PrintStaticKeyword)
+  if (!Options.SkipIntroducerKeywords && decl->isStatic() &&
+      Options.PrintStaticKeyword)
     printStaticKeyword(decl->getCorrectStaticSpelling());
   printContextIfNeeded(decl);
   recordDeclLoc(decl, [&]{
@@ -3769,17 +3782,26 @@ void PrintAST::visitDestructorDecl(DestructorDecl *decl) {
 
 void PrintAST::visitInfixOperatorDecl(InfixOperatorDecl *decl) {
   Printer.printKeyword("infix", Options, " ");
-  Printer.printIntroducerKeyword("operator", Options, " ");
+  Printer << tok::kw_operator << " ";
   recordDeclLoc(decl,
     [&]{
       Printer.printName(decl->getName());
     });
   if (auto *group = decl->getPrecedenceGroup())
     Printer << " : " << group->getName();
+  auto designatedNominalTypes = decl->getDesignatedNominalTypes();
+  auto first = true;
+  for (auto typeDecl : designatedNominalTypes) {
+    if (first && !decl->getPrecedenceGroup())
+      Printer << " : " << typeDecl->getName();
+    else
+      Printer << ", " << typeDecl->getName();
+    first = false;
+  }
 }
 
 void PrintAST::visitPrecedenceGroupDecl(PrecedenceGroupDecl *decl) {
-  Printer.printIntroducerKeyword("precedencegroup", Options, " ");
+  Printer << tok::kw_precedencegroup << " ";
   recordDeclLoc(decl,
     [&]{
       Printer.printName(decl->getName());
@@ -3839,20 +3861,38 @@ void PrintAST::visitPrecedenceGroupDecl(PrecedenceGroupDecl *decl) {
 
 void PrintAST::visitPrefixOperatorDecl(PrefixOperatorDecl *decl) {
   Printer.printKeyword("prefix", Options, " ");
-  Printer.printIntroducerKeyword("operator", Options, " ");
+  Printer << tok::kw_operator << " ";
   recordDeclLoc(decl,
     [&]{
       Printer.printName(decl->getName());
     });
+  auto designatedNominalTypes = decl->getDesignatedNominalTypes();
+  auto first = true;
+  for (auto typeDecl : designatedNominalTypes) {
+    if (first)
+      Printer << " : " << typeDecl->getName();
+    else
+      Printer << ", " << typeDecl->getName();
+    first = false;
+  }
 }
 
 void PrintAST::visitPostfixOperatorDecl(PostfixOperatorDecl *decl) {
   Printer.printKeyword("postfix", Options, " ");
-  Printer.printIntroducerKeyword("operator", Options, " ");
+  Printer << tok::kw_operator << " ";
   recordDeclLoc(decl,
     [&]{
       Printer.printName(decl->getName());
     });
+  auto designatedNominalTypes = decl->getDesignatedNominalTypes();
+  auto first = true;
+  for (auto typeDecl : designatedNominalTypes) {
+    if (first)
+      Printer << " : " << typeDecl->getName();
+    else
+      Printer << ", " << typeDecl->getName();
+    first = false;
+  }
 }
 
 void PrintAST::visitModuleDecl(ModuleDecl *decl) { }

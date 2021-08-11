@@ -262,7 +262,7 @@ Type ASTBuilder::resolveOpaqueType(NodePointer opaqueDescriptor,
     auto opaqueDecl = parentModule->lookupOpaqueResultType(mangledName);
     if (!opaqueDecl)
       return Type();
-    // TODO [OPAQUE SUPPORT]: multiple opaque types
+    // TODO: multiple opaque types
     assert(ordinal == 0 && "not implemented");
     if (ordinal != 0)
       return Type();
@@ -275,7 +275,7 @@ Type ASTBuilder::resolveOpaqueType(NodePointer opaqueDescriptor,
     SubstitutionMap subs = createSubstitutionMapFromGenericArgs(
         opaqueDecl->getGenericSignature(), allArgs,
         LookUpConformanceInModule(parentModule));
-    return OpaqueTypeArchetypeType::get(opaqueDecl, ordinal, subs);
+    return OpaqueTypeArchetypeType::get(opaqueDecl, subs);
   }
   
   // TODO: named opaque types

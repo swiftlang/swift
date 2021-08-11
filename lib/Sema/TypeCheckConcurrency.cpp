@@ -552,12 +552,7 @@ bool swift::isSendableType(ModuleDecl *module, Type type) {
   if (!proto)
     return true;
 
-  auto conformance = TypeChecker::conformsToProtocol(type, proto, module);
-  if (conformance.isInvalid())
-    return false;
-
-  // Look for missing Sendable conformances.
-  return !conformance.hasMissingConformance(module);
+  return !TypeChecker::conformsToProtocol(type, proto, module).isInvalid();
 }
 
 static bool diagnoseNonConcurrentParameter(
@@ -656,17 +651,6 @@ bool swift::diagnoseNonConcurrentTypesInReference(
   }
 
   return false;
-}
-
-void swift::diagnoseMissingSendableConformance(SourceLoc loc, Type type) {
-  ASTContext &ctx = type->getASTContext();
-  if (type->is<FunctionType>()) {
-    ctx.Diags.diagnose(loc, diag::non_sendable_function_type, type)
-      .warnUntilSwiftVersion(6);
-  } else {
-    ctx.Diags.diagnose(loc, diag::non_sendable_type, type)
-      .warnUntilSwiftVersion(6);
-  }
 }
 
 /// Determine whether this is the main actor type.
@@ -3715,7 +3699,6 @@ NormalProtocolConformance *GetImplicitSendableRequest::evaluate(
     conformance->setSourceKindAndImplyingConformance(
         ConformanceEntryKind::Synthesized, nullptr);
 
-    nominal->registerProtocolConformance(conformance, /*synthesized=*/true);
     return conformance;
   };
 

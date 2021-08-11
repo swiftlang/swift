@@ -3772,8 +3772,7 @@ operator()(CanType dependentType, Type conformingReplacementType,
     return ProtocolConformanceRef(conformedProtocol);
 
   return M->lookupConformance(conformingReplacementType,
-                              conformedProtocol,
-                              /*allowMissing=*/true);
+                              conformedProtocol);
 }
 
 ProtocolConformanceRef LookUpConformanceInSubstitutionMap::
@@ -4709,7 +4708,7 @@ case TypeKind::Id:
          return newSubs[index];
        },
        LookUpConformanceInModule(opaque->getDecl()->getModuleContext()));
-    return OpaqueTypeArchetypeType::get(opaque->getDecl(), opaque->getOrdinal(),
+    return OpaqueTypeArchetypeType::get(opaque->getDecl(),
                                         newSubMap);
   }
   case TypeKind::NestedArchetype: {

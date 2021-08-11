@@ -829,8 +829,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.DebugRequirementMachine = Args.hasArg(
       OPT_debug_requirement_machine);
-  Opts.AnalyzeRequirementMachine = Args.hasArg(
-      OPT_analyze_requirement_machine);
 
   if (const Arg *A = Args.getLastArg(OPT_requirement_machine_step_limit)) {
     unsigned limit;
@@ -1100,6 +1098,9 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
   Opts.DisableModulesValidateSystemDependencies |=
       Args.hasArg(OPT_disable_modules_validate_system_headers);
 
+  for (auto A: Args.filtered(OPT_swift_module_file)) {
+    Opts.ExplicitSwiftModules.push_back(resolveSearchPath(A->getValue()));
+  }
   if (const Arg *A = Args.getLastArg(OPT_explict_swift_module_map))
     Opts.ExplicitSwiftModuleMap = A->getValue();
   for (auto A: Args.filtered(OPT_candidate_module_file)) {

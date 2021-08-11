@@ -3248,8 +3248,7 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
     // Find the conformance for this overridden protocol.
     auto overriddenConformance =
       DC->getParentModule()->lookupConformance(Adoptee,
-                                               overridden->getProtocol(),
-                                               /*allowMissing=*/true);
+                                               overridden->getProtocol());
     if (overriddenConformance.isInvalid() ||
         !overriddenConformance.isConcrete())
       continue;
@@ -5181,7 +5180,7 @@ TypeChecker::containsProtocol(Type T, ProtocolDecl *Proto, ModuleDecl *M,
 ProtocolConformanceRef
 TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto, ModuleDecl *M) {
   // Look up conformance in the module.
-  auto lookupResult = M->lookupConformance(T, Proto, /*alllowMissing=*/true);
+  auto lookupResult = M->lookupConformance(T, Proto);
   if (lookupResult.isInvalid()) {
     return ProtocolConformanceRef::forInvalid();
   }

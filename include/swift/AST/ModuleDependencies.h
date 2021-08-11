@@ -63,12 +63,6 @@ enum class ModuleDependenciesKind : int8_t {
   Clang,
 };
 
-/// Details of a given module used for dependency scanner cache queries.
-struct ModuleLookupSpecifics {
-  Optional<ModuleDependenciesKind> kind;
-  llvm::StringSet<> currentSearchPaths;
-};
-
 /// Base class for the variant storage of ModuleDependencies.
 ///
 /// This class is mostly an implementation detail for \c ModuleDependencies.
@@ -413,25 +407,21 @@ using ModuleDependencyID = std::pair<std::string, ModuleDependenciesKind>;
 /// A cache describing the set of module dependencies that has been queried
 /// thus far.
 class ModuleDependenciesCache {
-  using ModuleDependenciesVector = llvm::SmallVector<ModuleDependencies, 1>;
-
   /// All cached module dependencies, in the order in which they were
   /// encountered.
   std::vector<ModuleDependencyID> AllModules;
 
   /// Dependencies for Textual Swift modules that have already been computed.
-  /// This maps a module's id (name, kind) to a vector of Dependency objects, which correspond
-  /// to instances of the same module that may have been found in different sets of search paths.
-  llvm::StringMap<ModuleDependenciesVector> SwiftTextualModuleDependencies;
+  llvm::StringMap<ModuleDependencies> SwiftTextualModuleDependencies;
 
   /// Dependencies for Binary Swift modules that have already been computed.
-  llvm::StringMap<ModuleDependenciesVector> SwiftBinaryModuleDependencies;
+  llvm::StringMap<ModuleDependencies> SwiftBinaryModuleDependencies;
 
   /// Dependencies for Swift placeholder dependency modules that have already been computed.
-  llvm::StringMap<ModuleDependenciesVector> SwiftPlaceholderModuleDependencies;
+  llvm::StringMap<ModuleDependencies> SwiftPlaceholderModuleDependencies;
 
   /// Dependencies for Clang modules that have already been computed.
-  llvm::StringMap<ModuleDependenciesVector> ClangModuleDependencies;
+  llvm::StringMap<ModuleDependencies> ClangModuleDependencies;
 
   /// Additional information needed for Clang dependency scanning.
   ClangModuleDependenciesCacheImpl *clangImpl = nullptr;
@@ -447,9 +437,9 @@ class ModuleDependenciesCache {
 
   /// Retrieve the dependencies map that corresponds to the given dependency
   /// kind.
-  llvm::StringMap<ModuleDependenciesVector> &getDependenciesMap(
+  llvm::StringMap<ModuleDependencies> &getDependenciesMap(
       ModuleDependenciesKind kind);
-  const llvm::StringMap<ModuleDependenciesVector> &getDependenciesMap(
+  const llvm::StringMap<ModuleDependencies> &getDependenciesMap(
       ModuleDependenciesKind kind) const;
 
 public:
@@ -479,21 +469,12 @@ public:
 
   /// Whether we have cached dependency information for the given module.
   bool hasDependencies(StringRef moduleName,
-                       ModuleLookupSpecifics details) const;
+                       Optional<ModuleDependenciesKind> kind) const;
 
-  /// Look for module dependencies for a module with the given name given current search paths.
+  /// Look for module dependencies for a module with the given name.
   ///
   /// \returns the cached result, or \c None if there is no cached entry.
   Optional<ModuleDependencies> findDependencies(
-      StringRef moduleName,
-      ModuleLookupSpecifics details) const;
-
-  /// Look for module dependencies for a module with the given name.
-  /// This method has a deliberately-obtuse name to indicate that it is not to be used for general
-  /// queries.
-  ///
-  /// \returns the cached result, or \c None if there is no cached entry.
-  Optional<ModuleDependenciesVector> findAllDependenciesIrrespectiveOfSearchPaths(
       StringRef moduleName,
       Optional<ModuleDependenciesKind> kind) const;
 

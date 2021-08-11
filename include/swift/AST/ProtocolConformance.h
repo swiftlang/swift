@@ -993,15 +993,6 @@ public:
   }
 };
 
-/// Describes the kind of a builtin conformance.
-enum class BuiltinConformanceKind {
-  // A builtin conformance that has been synthesized by the implementation.
-  Synthesized = 0,
-  // A missing conformance that we have nonetheless synthesized so that
-  // we can diagnose it later.
-  Missing,
-};
-
 /// A builtin conformance appears when a non-nominal type has a
 /// conformance that is synthesized by the implementation.
 class BuiltinProtocolConformance final : public RootProtocolConformance,
@@ -1011,8 +1002,7 @@ class BuiltinProtocolConformance final : public RootProtocolConformance,
 
   ProtocolDecl *protocol;
   GenericSignature genericSig;
-  size_t numConditionalRequirements : 31;
-  unsigned builtinConformanceKind : 1;
+  size_t numConditionalRequirements;
 
   size_t numTrailingObjects(OverloadToken<Requirement>) const {
     return numConditionalRequirements;
@@ -1020,8 +1010,7 @@ class BuiltinProtocolConformance final : public RootProtocolConformance,
 
   BuiltinProtocolConformance(Type conformingType, ProtocolDecl *protocol,
                              GenericSignature genericSig,
-                             ArrayRef<Requirement> conditionalRequirements,
-                             BuiltinConformanceKind kind);
+                             ArrayRef<Requirement> conditionalRequirements);
 
 public:
   /// Get the protocol being conformed to.
@@ -1033,16 +1022,6 @@ public:
   /// within the conforming type.
   GenericSignature getGenericSignature() const {
     return genericSig;
-  }
-
-  BuiltinConformanceKind getBuiltinConformanceKind() const {
-    return static_cast<BuiltinConformanceKind>(builtinConformanceKind);
-  }
-
-  /// Whether this represents a "missing" conformance that should be diagnosed
-  /// later.
-  bool isMissing() const {
-    return getBuiltinConformanceKind() == BuiltinConformanceKind::Missing;
   }
 
   /// Get any requirements that must be satisfied for this conformance to apply.

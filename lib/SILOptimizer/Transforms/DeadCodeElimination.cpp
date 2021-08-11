@@ -74,10 +74,6 @@ static bool seemsUseful(SILInstruction *I) {
       return true;
   }
 
-  // Is useful if it's associating with a function argument
-  if (isa<DebugValueInst>(I) || isa<DebugValueAddrInst>(I))
-    return isa<SILFunctionArgument>(I->getOperand(0));
-
   return false;
 }
 

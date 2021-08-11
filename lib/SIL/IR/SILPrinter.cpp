@@ -1198,8 +1198,6 @@ public:
 
     if (Var->ArgNo)
       *this << ", argno " << Var->ArgNo;
-    if (Var->Implicit)
-      *this << ", implicit";
     if (Var->Type) {
       *this << ", type ";
       Var->Type->print(PrintState.OS, PrintState.ASTOptions);
@@ -1212,8 +1210,7 @@ public:
     if (AVI->hasDynamicLifetime())
       *this << "[dynamic_lifetime] ";
     *this << AVI->getElementType();
-    printDebugVar(AVI->getVarInfo(),
-                  &AVI->getModule().getASTContext().SourceMgr);
+    printDebugVar(AVI->getVarInfo());
   }
 
   void printAllocRefInstBase(AllocRefInstBase *ARI) {
@@ -1248,8 +1245,7 @@ public:
     if (ABI->hasDynamicLifetime())
       *this << "[dynamic_lifetime] ";
     *this << ABI->getType();
-    printDebugVar(ABI->getVarInfo(),
-                  &ABI->getModule().getASTContext().SourceMgr);
+    printDebugVar(ABI->getVarInfo());
   }
 
   void printSubstitutions(SubstitutionMap Subs,

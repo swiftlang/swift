@@ -184,8 +184,7 @@ public:
   SILFunction *getOrCreateForeignAsyncCompletionHandlerImplFunction(
       CanSILFunctionType blockType, CanType continuationTy,
       AbstractionPattern origFormalType, CanGenericSignature sig,
-      ForeignAsyncConvention convention,
-      Optional<ForeignErrorConvention> foreignError);
+      ForeignAsyncConvention convention);
 
   /// Determine whether the given class has any instance variables that
   /// need to be destroyed.

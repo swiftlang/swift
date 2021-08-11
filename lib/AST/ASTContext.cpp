@@ -41,7 +41,6 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/RawComment.h"
-#include "swift/AST/SearchPathOptions.h"
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SourceFile.h"
@@ -414,6 +413,17 @@ struct ASTContext::Implementation {
     llvm::FoldingSet<LayoutConstraintInfo> LayoutConstraints;
     llvm::FoldingSet<OpaqueTypeArchetypeType> OpaqueArchetypes;
 
+    llvm::FoldingSet<GenericSignatureImpl> GenericSignatures;
+
+    /// Stored generic signature builders for canonical generic signatures.
+    llvm::DenseMap<GenericSignature, std::unique_ptr<GenericSignatureBuilder>>
+      GenericSignatureBuilders;
+
+    /// Stored requirement machines for canonical generic signatures.
+    llvm::DenseMap<GenericSignature,
+                   std::unique_ptr<rewriting::RequirementMachine>>
+      RequirementMachines;
+
     /// The set of function types.
     llvm::FoldingSet<FunctionType> FunctionTypes;
 
@@ -474,12 +484,6 @@ struct ASTContext::Implementation {
   llvm::FoldingSet<AutoDiffDerivativeFunctionIdentifier>
       AutoDiffDerivativeFunctionIdentifiers;
 
-  llvm::FoldingSet<GenericSignatureImpl> GenericSignatures;
-
-  /// Stored generic signature builders for canonical generic signatures.
-  llvm::DenseMap<GenericSignature, std::unique_ptr<GenericSignatureBuilder>>
-    GenericSignatureBuilders;
-
   /// A cache of information about whether particular nominal types
   /// are representable in a foreign language.
   llvm::DenseMap<NominalTypeDecl *, ForeignRepresentationInfo>
@@ -537,14 +541,6 @@ struct ASTContext::Implementation {
 
   /// Memory allocation arena for the term rewriting system.
   std::unique_ptr<rewriting::RewriteContext> TheRewriteContext;
-
-  /// Stored requirement machines for canonical generic signatures.
-  ///
-  /// This should come after TheRewriteContext above, since various destructors
-  /// compile stats in the histograms stored in our RewriteContext.
-  llvm::DenseMap<GenericSignature,
-                 std::unique_ptr<rewriting::RequirementMachine>>
-    RequirementMachines;
 };
 
 ASTContext::Implementation::Implementation()
@@ -1649,23 +1645,20 @@ Optional<ModuleDependencies> ASTContext::getModuleDependencies(
     bool cacheOnly) {
   // Retrieve the dependencies for this module.
   if (cacheOnly) {
-    auto searchPathSet = getAllModuleSearchPathsSet();
     // Check whether we've cached this result.
     if (!isUnderlyingClangModule) {
-      if (auto found = cache.findDependencies(
-              moduleName,
-              {ModuleDependenciesKind::SwiftTextual, searchPathSet}))
+      if (auto found = cache.findDependencies(moduleName,
+                                              ModuleDependenciesKind::SwiftTextual))
         return found;
-      if (auto found = cache.findDependencies(
-              moduleName, {ModuleDependenciesKind::SwiftBinary, searchPathSet}))
+      if (auto found = cache.findDependencies(moduleName,
+                                              ModuleDependenciesKind::SwiftTextual))
         return found;
-      if (auto found = cache.findDependencies(
-              moduleName,
-              {ModuleDependenciesKind::SwiftPlaceholder, searchPathSet}))
+      if (auto found = cache.findDependencies(moduleName,
+                                              ModuleDependenciesKind::SwiftPlaceholder))
         return found;
     }
-    if (auto found = cache.findDependencies(
-            moduleName, {ModuleDependenciesKind::Clang, searchPathSet}))
+    if (auto found = cache.findDependencies(moduleName,
+                                            ModuleDependenciesKind::Clang))
       return found;
   } else {
     for (auto &loader : getImpl().ModuleLoaders) {
@@ -1673,8 +1666,8 @@ Optional<ModuleDependencies> ASTContext::getModuleDependencies(
           loader.get() != getImpl().TheClangModuleLoader)
         continue;
 
-      if (auto dependencies =
-              loader->getModuleDependencies(moduleName, cache, delegate))
+      if (auto dependencies = loader->getModuleDependencies(moduleName, cache,
+                                                            delegate))
         return dependencies;
     }
   }
@@ -1695,65 +1688,6 @@ ASTContext::getSwiftModuleDependencies(StringRef moduleName,
       return dependencies;
   }
   return None;
-}
-
-namespace {
-  static StringRef
-  pathStringFromFrameworkSearchPath(const SearchPathOptions::FrameworkSearchPath &next) {
-    return next.Path;
-  };
-}
-
-std::vector<std::string> ASTContext::getDarwinImplicitFrameworkSearchPaths()
-const {
-  assert(LangOpts.Target.isOSDarwin());
-  SmallString<128> systemFrameworksScratch;
-  systemFrameworksScratch = SearchPathOpts.SDKPath;
-  llvm::sys::path::append(systemFrameworksScratch, "System", "Library", "Frameworks");
-
-  SmallString<128> frameworksScratch;
-  frameworksScratch = SearchPathOpts.SDKPath;
-  llvm::sys::path::append(frameworksScratch, "Library", "Frameworks");
-  return {systemFrameworksScratch.str().str(), frameworksScratch.str().str()};
-}
-
-llvm::StringSet<> ASTContext::getAllModuleSearchPathsSet()
-const {
-  llvm::StringSet<> result;
-  result.insert(SearchPathOpts.ImportSearchPaths.begin(),
-                SearchPathOpts.ImportSearchPaths.end());
-
-  // Framework paths are "special", they contain more than path strings,
-  // but path strings are all we care about here.
-  using FrameworkPathView = ArrayRefView<SearchPathOptions::FrameworkSearchPath,
-                                         StringRef,
-                                         pathStringFromFrameworkSearchPath>;
-  FrameworkPathView frameworkPathsOnly{SearchPathOpts.FrameworkSearchPaths};
-  result.insert(frameworkPathsOnly.begin(), frameworkPathsOnly.end());
-
-  if (LangOpts.Target.isOSDarwin()) {
-    auto implicitFrameworkSearchPaths = getDarwinImplicitFrameworkSearchPaths();
-    result.insert(implicitFrameworkSearchPaths.begin(),
-                  implicitFrameworkSearchPaths.end());
-  }
-  result.insert(SearchPathOpts.RuntimeLibraryImportPaths.begin(),
-                SearchPathOpts.RuntimeLibraryImportPaths.end());
-
-  // ClangImporter special-cases the path for SwiftShims, so do the same here
-  // If there are no shims in the resource dir, add a search path in the SDK.
-  SmallString<128> shimsPath(SearchPathOpts.RuntimeResourcePath);
-  llvm::sys::path::append(shimsPath, "shims");
-  if (!llvm::sys::fs::exists(shimsPath)) {
-    shimsPath = SearchPathOpts.SDKPath;
-    llvm::sys::path::append(shimsPath, "usr", "lib", "swift", "shims");
-  }
-  result.insert(shimsPath.str());
-
-  // Clang system modules are found in the SDK root
-  SmallString<128> clangSysRootPath(SearchPathOpts.SDKPath);
-  llvm::sys::path::append(clangSysRootPath, "usr", "include");
-  result.insert(clangSysRootPath.str());
-  return result;
 }
 
 void ASTContext::loadExtensions(NominalTypeDecl *nominal,
@@ -1842,6 +1776,18 @@ void ASTContext::addLoadedModule(ModuleDecl *M) {
   getImpl().LoadedModules[M->getName()] = M;
 }
 
+static AllocationArena getArena(GenericSignature genericSig) {
+  if (!genericSig)
+    return AllocationArena::Permanent;
+
+  if (genericSig.hasTypeVariable()) {
+    assert(false && "Unsubstituted type variable leaked into generic signature");
+    return AllocationArena::ConstraintSolver;
+  }
+
+  return AllocationArena::Permanent;
+}
+
 void ASTContext::registerGenericSignatureBuilder(
                                        GenericSignature sig,
                                        GenericSignatureBuilder &&builder) {
@@ -1849,7 +1795,9 @@ void ASTContext::registerGenericSignatureBuilder(
     return;
 
   auto canSig = sig.getCanonicalSignature();
-  auto &genericSignatureBuilders = getImpl().GenericSignatureBuilders;
+  auto arena = getArena(sig);
+  auto &genericSignatureBuilders =
+      getImpl().getArena(arena).GenericSignatureBuilders;
   auto known = genericSignatureBuilders.find(canSig);
   if (known != genericSignatureBuilders.end()) {
     ++NumRegisteredGenericSignatureBuildersAlready;
@@ -1871,7 +1819,9 @@ GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
 
   // Check whether we already have a generic signature builder for this
   // signature and module.
-  auto &genericSignatureBuilders = getImpl().GenericSignatureBuilders;
+  auto arena = getArena(sig);
+  auto &genericSignatureBuilders =
+      getImpl().getArena(arena).GenericSignatureBuilders;
   auto known = genericSignatureBuilders.find(sig);
   if (known != genericSignatureBuilders.end())
     return known->second.get();
@@ -1949,13 +1899,16 @@ GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
 
 rewriting::RequirementMachine *
 ASTContext::getOrCreateRequirementMachine(CanGenericSignature sig) {
+  assert(!sig.hasTypeVariable());
+
   auto &rewriteCtx = getImpl().TheRewriteContext;
   if (!rewriteCtx)
     rewriteCtx.reset(new rewriting::RewriteContext(*this));
 
   // Check whether we already have a requirement machine for this
   // signature.
-  auto &machines = getImpl().RequirementMachines;
+  auto arena = getArena(sig);
+  auto &machines = getImpl().getArena(arena).RequirementMachines;
 
   auto &machinePtr = machines[sig];
   if (machinePtr) {
@@ -1979,21 +1932,6 @@ ASTContext::getOrCreateRequirementMachine(CanGenericSignature sig) {
   machine->addGenericSignature(sig);
 
   return machine;
-}
-
-bool ASTContext::isRecursivelyConstructingRequirementMachine(
-      CanGenericSignature sig) {
-  auto &rewriteCtx = getImpl().TheRewriteContext;
-  if (!rewriteCtx)
-    return false;
-
-  auto &machines = getImpl().RequirementMachines;
-
-  auto found = machines.find(sig);
-  if (found == machines.end())
-    return false;
-
-  return !found->second->isComplete();
 }
 
 Optional<llvm::TinyPtrVector<ValueDecl *>>
@@ -2314,8 +2252,7 @@ BuiltinProtocolConformance *
 ASTContext::getBuiltinConformance(
     Type type, ProtocolDecl *protocol,
     GenericSignature genericSig,
-    ArrayRef<Requirement> conditionalRequirements,
-    BuiltinConformanceKind kind
+    ArrayRef<Requirement> conditionalRequirements
 ) {
   auto key = std::make_pair(type, protocol);
   AllocationArena arena = getArena(type->getRecursiveProperties());
@@ -2327,7 +2264,7 @@ ASTContext::getBuiltinConformance(
         totalSizeToAlloc<Requirement>(conditionalRequirements.size());
     auto mem = this->Allocate(size, alignof(BuiltinProtocolConformance), arena);
     entry = new (mem) BuiltinProtocolConformance(
-        type, protocol, genericSig, conditionalRequirements, kind);
+        type, protocol, genericSig, conditionalRequirements);
   }
   return entry;
 }
@@ -4143,12 +4080,9 @@ DependentMemberType *DependentMemberType::get(Type base,
 }
 
 OpaqueTypeArchetypeType *
-OpaqueTypeArchetypeType::get(OpaqueTypeDecl *Decl, unsigned ordinal,
-                             SubstitutionMap Substitutions) {
-  // TODO [OPAQUE SUPPORT]: multiple opaque types
-  assert(ordinal == 0 && "we only support one 'some' type per composite type");
-  auto opaqueParamType = Decl->getUnderlyingInterfaceType();
-
+OpaqueTypeArchetypeType::get(OpaqueTypeDecl *Decl,
+                             SubstitutionMap Substitutions)
+{
   // TODO: We could attempt to preserve type sugar in the substitution map.
   // Currently archetypes are assumed to be always canonical in many places,
   // though, so doing so would require fixing those places.
@@ -4224,18 +4158,18 @@ OpaqueTypeArchetypeType::get(OpaqueTypeDecl *Decl, unsigned ordinal,
     }
   }
 #else
-  // Assert that there are no same type constraints on the opaque type or its
-  // associated types.
+  // Assert that there are no same type constraints on the underlying type
+  // or its associated types.
   //
   // This should not be possible until we add where clause support, with the
   // exception of generic base class constraints (handled below).
   (void)newRequirements;
 # ifndef NDEBUG
-  for (auto req :
+  for (auto reqt :
                 Decl->getOpaqueInterfaceGenericSignature().getRequirements()) {
-    auto reqBase = req.getFirstType()->getRootGenericParam();
-    if (reqBase->isEqual(opaqueParamType)) {
-      assert(req.getKind() != RequirementKind::SameType
+    auto reqtBase = reqt.getFirstType()->getRootGenericParam();
+    if (reqtBase->isEqual(Decl->getUnderlyingInterfaceType())) {
+      assert(reqt.getKind() != RequirementKind::SameType
              && "supporting where clauses on opaque types requires correctly "
                 "setting up the generic environment for "
                 "OpaqueTypeArchetypeTypes; see comment above");
@@ -4251,8 +4185,9 @@ OpaqueTypeArchetypeType::get(OpaqueTypeDecl *Decl, unsigned ordinal,
         std::move(newRequirements)},
       nullptr);
 
-  auto reqs = signature->getLocalRequirements(opaqueParamType);
-  auto superclass = reqs.superclass;
+  auto opaqueInterfaceTy = Decl->getUnderlyingInterfaceType();
+  auto layout = signature->getLayoutConstraint(opaqueInterfaceTy);
+  auto superclass = signature->getSuperclassBound(opaqueInterfaceTy);
   #if !DO_IT_CORRECTLY
     // Ad-hoc substitute the generic parameters of the superclass.
     // If we correctly applied the substitutions to the generic signature
@@ -4261,23 +4196,25 @@ OpaqueTypeArchetypeType::get(OpaqueTypeDecl *Decl, unsigned ordinal,
       superclass = superclass.subst(Substitutions);
     }
   #endif
+  const auto protos = signature->getRequiredProtocols(opaqueInterfaceTy);
 
   auto mem = ctx.Allocate(
     OpaqueTypeArchetypeType::totalSizeToAlloc<ProtocolDecl *, Type, LayoutConstraint>(
-      reqs.protos.size(), superclass ? 1 : 0, reqs.layout ? 1 : 0),
+      protos.size(), superclass ? 1 : 0, layout ? 1 : 0),
       alignof(OpaqueTypeArchetypeType),
       arena);
-
-  auto newOpaque = ::new (mem)
-      OpaqueTypeArchetypeType(Decl, Substitutions, properties, opaqueParamType,
-                              reqs.protos, superclass, reqs.layout);
-
+  
+  auto newOpaque = ::new (mem) OpaqueTypeArchetypeType(Decl, Substitutions,
+                                                    properties,
+                                                    opaqueInterfaceTy,
+                                                    protos, superclass, layout);
+  
   // Create a generic environment and bind the opaque archetype to the
   // opaque interface type from the decl's signature.
   auto *env = GenericEnvironment::getIncomplete(signature);
-  env->addMapping(GenericParamKey(opaqueParamType), newOpaque);
+  env->addMapping(GenericParamKey(opaqueInterfaceTy), newOpaque);
   newOpaque->Environment = env;
-
+  
   // Look up the insertion point in the folding set again in case something
   // invalidated it above.
   {
@@ -4287,7 +4224,7 @@ OpaqueTypeArchetypeType::get(OpaqueTypeDecl *Decl, unsigned ordinal,
     assert(!existing && "race to create opaque archetype?!");
     set.InsertNode(newOpaque, insertPos);
   }
-
+  
   return newOpaque;
 }
 
@@ -4472,21 +4409,21 @@ GenericSignature::get(TypeArrayView<GenericTypeParamType> params,
   assert(!params.empty());
 
 #ifndef NDEBUG
-  for (auto req : requirements) {
+  for (auto req : requirements)
     assert(req.getFirstType()->isTypeParameter());
-    assert(!req.getFirstType()->hasTypeVariable());
-    assert(req.getKind() == RequirementKind::Layout ||
-           !req.getSecondType()->hasTypeVariable());
-  }
 #endif
 
   // Check for an existing generic signature.
   llvm::FoldingSetNodeID ID;
   GenericSignatureImpl::Profile(ID, params, requirements);
 
+  auto arena = GenericSignature::hasTypeVariable(requirements)
+                   ? AllocationArena::ConstraintSolver
+                   : AllocationArena::Permanent;
+
   auto &ctx = getASTContext(params, requirements);
   void *insertPos;
-  auto &sigs = ctx.getImpl().GenericSignatures;
+  auto &sigs = ctx.getImpl().getArena(arena).GenericSignatures;
   if (auto *sig = sigs.FindNodeOrInsertPos(ID, insertPos)) {
     if (isKnownCanonical)
       sig->CanonicalSignatureOrASTContext = &ctx;
@@ -4501,7 +4438,7 @@ GenericSignature::get(TypeArrayView<GenericTypeParamType> params,
   void *mem = ctx.Allocate(bytes, alignof(GenericSignatureImpl));
   auto *newSig =
       new (mem) GenericSignatureImpl(params, requirements, isKnownCanonical);
-  ctx.getImpl().GenericSignatures.InsertNode(newSig, insertPos);
+  ctx.getImpl().getArena(arena).GenericSignatures.InsertNode(newSig, insertPos);
   return newSig;
 }
 

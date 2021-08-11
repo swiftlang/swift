@@ -4752,7 +4752,8 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   if (VarDecl *Decl = i->getDecl()) {
     DbgTy = DebugTypeInfo::getLocalVariable(
         Decl, RealTy, getTypeInfo(SILVal->getType()));
-  } else if (!SILTy.hasArchetype() && !VarInfo->Name.empty()) {
+  } else if (i->getFunction()->isBare() && !SILTy.hasArchetype() &&
+             !VarInfo->Name.empty()) {
     // Preliminary support for .sil debug information.
     DbgTy = DebugTypeInfo::getFromTypeInfo(RealTy, getTypeInfo(SILTy));
   } else
@@ -5159,12 +5160,7 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
     }
   }
 
-  SILType SILTy;
-  if (auto MaybeSILTy = VarInfo->Type)
-    // If there is auxiliary type info, use it
-    SILTy = *MaybeSILTy;
-  else
-    SILTy = i->getType();
+  SILType SILTy = i->getType();
   auto RealType = SILTy.getASTType();
   DebugTypeInfo DbgTy;
   if (Decl) {
