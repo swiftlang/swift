@@ -718,7 +718,8 @@ bool InteriorPointerOperand::findTransitiveUsesForAddress(
         isa<AssignByWrapperInst>(user) || isa<BeginUnpairedAccessInst>(user) ||
         isa<EndUnpairedAccessInst>(user) || isa<WitnessMethodInst>(user) ||
         isa<SwitchEnumAddrInst>(user) || isa<CheckedCastAddrBranchInst>(user) ||
-        isa<SelectEnumAddrInst>(user) || isa<InjectEnumAddrInst>(user)) {
+        isa<SelectEnumAddrInst>(user) || isa<InjectEnumAddrInst>(user) ||
+        isa<IsUniqueInst>(user)) {
       continue;
     }
 
