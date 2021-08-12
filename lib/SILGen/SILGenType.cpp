@@ -1100,7 +1100,7 @@ public:
       return;
 
     // Emit any default argument generators.
-    SGM.emitDefaultArgGenerators(EED, EED->getParameterList());
+    SGM.emitArgumentGenerators(EED, EED->getParameterList());
   }
 
   void visitPatternBindingDecl(PatternBindingDecl *pd) {
@@ -1135,7 +1135,7 @@ public:
   }
 
   void visitSubscriptDecl(SubscriptDecl *sd) {
-    SGM.emitDefaultArgGenerators(sd, sd->getIndices());
+    SGM.emitArgumentGenerators(sd, sd->getIndices());
     visitAbstractStorageDecl(sd);
   }
 
@@ -1261,7 +1261,7 @@ public:
   }
 
   void visitSubscriptDecl(SubscriptDecl *sd) {
-    SGM.emitDefaultArgGenerators(sd, sd->getIndices());
+    SGM.emitArgumentGenerators(sd, sd->getIndices());
     visitAbstractStorageDecl(sd);
   }
 
