@@ -236,8 +236,21 @@ static EnumDecl *addImplicitCodingKeys(NominalTypeDecl *target) {
   return addImplicitCodingKeys(target, caseIdentifiers, C.Id_CodingKeys);
 }
 
+namespace {
+  /// Container for a set of functions that produces notes used when a
+  /// synthesized conformance fails.
+  struct DelayedNotes : public std::vector<std::function<void()>> {
+    ~DelayedNotes() {
+      for (const auto &fn : *this) {
+        fn();
+      }
+    }
+  };
+}
+
 static EnumDecl *validateCodingKeysType(const DerivedConformance &derived,
-                                        TypeDecl *_codingKeysTypeDecl) {
+                                        TypeDecl *_codingKeysTypeDecl,
+                                        DelayedNotes &delayedNotes) {
   auto &C = derived.Context;
   // CodingKeys may be a typealias. If so, follow the alias to its canonical
   // type. We are creating a copy here, so we can hold on to the original
@@ -258,17 +271,22 @@ static EnumDecl *validateCodingKeysType(const DerivedConformance &derived,
     SourceLoc loc = codingKeysTypeDecl ? codingKeysTypeDecl->getLoc()
                                        : cast<TypeDecl>(_codingKeysTypeDecl)->getLoc();
 
-    C.Diags.diagnose(loc, diag::codable_codingkeys_type_does_not_conform_here,
-                     derived.getProtocolType());
+    delayedNotes.push_back([=] {
+      ASTContext &C = derived.getProtocolType()->getASTContext();
+      C.Diags.diagnose(loc, diag::codable_codingkeys_type_does_not_conform_here,
+                       derived.getProtocolType());
+    });
     return nullptr;
   }
 
   auto *codingKeysDecl =
       dyn_cast_or_null<EnumDecl>(codingKeysType->getAnyNominal());
   if (!codingKeysDecl) {
-    codingKeysTypeDecl->diagnose(
-        diag::codable_codingkeys_type_is_not_an_enum_here,
-        derived.getProtocolType());
+    delayedNotes.push_back([=] {
+      codingKeysTypeDecl->diagnose(
+          diag::codable_codingkeys_type_is_not_an_enum_here,
+          derived.getProtocolType());
+    });
     return nullptr;
   }
 
@@ -282,8 +300,10 @@ static EnumDecl *validateCodingKeysType(const DerivedConformance &derived,
 /// \param codingKeysTypeDecl The \c CodingKeys enum decl to validate.
 static bool validateCodingKeysEnum(const DerivedConformance &derived,
                                llvm::SmallMapVector<Identifier, VarDecl *, 8> varDecls,
-                               TypeDecl *codingKeysTypeDecl) {
-  auto *codingKeysDecl = validateCodingKeysType(derived, codingKeysTypeDecl);
+                               TypeDecl *codingKeysTypeDecl,
+                               DelayedNotes &delayedNotes) {
+  auto *codingKeysDecl = validateCodingKeysType(
+      derived, codingKeysTypeDecl, delayedNotes);
   if (!codingKeysDecl)
     return false;
 
@@ -297,8 +317,10 @@ static bool validateCodingKeysEnum(const DerivedConformance &derived,
   for (auto elt : codingKeysDecl->getAllElements()) {
     auto it = varDecls.find(elt->getBaseIdentifier());
     if (it == varDecls.end()) {
-      elt->diagnose(diag::codable_extraneous_codingkey_case_here,
-                    elt->getBaseIdentifier());
+      delayedNotes.push_back([=] {
+        elt->diagnose(diag::codable_extraneous_codingkey_case_here,
+                      elt->getBaseIdentifier());
+      });
       // TODO: Investigate typo-correction here; perhaps the case name was
       //       misspelled and we can provide a fix-it.
       varDeclsAreValid = false;
@@ -315,8 +337,13 @@ static bool validateCodingKeysEnum(const DerivedConformance &derived,
           it->second->getTypeReprOrParentPatternTypeRepr(),
           it->second->getType(),
       };
-      it->second->diagnose(diag::codable_non_conforming_property_here,
-                           derived.getProtocolType(), typeLoc);
+
+      auto var = it->second;
+      auto proto = derived.getProtocolType();
+      delayedNotes.push_back([=] {
+        var->diagnose(diag::codable_non_conforming_property_here,
+                      proto, typeLoc);
+      });
       varDeclsAreValid = false;
     } else {
       // The property was valid. Remove it from the list.
@@ -350,8 +377,10 @@ static bool validateCodingKeysEnum(const DerivedConformance &derived,
       // The var was not default initializable, and did not have an explicit
       // initial value.
       varDeclsAreValid = false;
-      entry.second->diagnose(diag::codable_non_decoded_property_here,
-                             derived.getProtocolType(), entry.first);
+      delayedNotes.push_back([=] {
+        entry.second->diagnose(diag::codable_non_decoded_property_here,
+                               derived.getProtocolType(), entry.first);
+      });
     }
   }
 
@@ -359,7 +388,8 @@ static bool validateCodingKeysEnum(const DerivedConformance &derived,
 }
 
 static bool validateCodingKeysEnum_enum(const DerivedConformance &derived,
-                                        TypeDecl *codingKeysTypeDecl) {
+                                        TypeDecl *codingKeysTypeDecl,
+                                        DelayedNotes &delayedNotes) {
   auto *enumDecl = dyn_cast<EnumDecl>(derived.Nominal);
   if (!enumDecl) {
     return false;
@@ -369,16 +399,18 @@ static bool validateCodingKeysEnum_enum(const DerivedConformance &derived,
     caseNames.insert(elt->getBaseIdentifier());
   }
 
-  auto *codingKeysDecl = validateCodingKeysType(derived,
-                                                codingKeysTypeDecl);
+  auto *codingKeysDecl = validateCodingKeysType(
+      derived, codingKeysTypeDecl, delayedNotes);
   if (!codingKeysDecl)
     return false;
 
   bool casesAreValid = true;
   for (auto *elt : codingKeysDecl->getAllElements()) {
     if (!caseNames.contains(elt->getBaseIdentifier())) {
-      elt->diagnose(diag::codable_extraneous_codingkey_case_here,
-                    elt->getBaseIdentifier());
+      delayedNotes.push_back([=] {
+        elt->diagnose(diag::codable_extraneous_codingkey_case_here,
+                      elt->getBaseIdentifier());
+      });
       casesAreValid = false;
     }
   }
@@ -388,7 +420,8 @@ static bool validateCodingKeysEnum_enum(const DerivedConformance &derived,
 
 /// Looks up and validates a CodingKeys enum for the given DerivedConformance.
 /// If a CodingKeys enum does not exist, one will be derived.
-static bool validateCodingKeysEnum(const DerivedConformance &derived) {
+static bool validateCodingKeysEnum(const DerivedConformance &derived,
+                                   DelayedNotes &delayedNotes) {
   auto &C = derived.Context;
 
   auto codingKeysDecls =
@@ -403,13 +436,16 @@ static bool validateCodingKeysEnum(const DerivedConformance &derived) {
                           : codingKeysDecls.front();
   auto *codingKeysTypeDecl = dyn_cast<TypeDecl>(result);
   if (!codingKeysTypeDecl) {
-    result->diagnose(diag::codable_codingkeys_type_is_not_an_enum_here,
-                     derived.getProtocolType());
+    delayedNotes.push_back([=] {
+      result->diagnose(diag::codable_codingkeys_type_is_not_an_enum_here,
+                       derived.getProtocolType());
+    });
     return false;
   }
 
   if (dyn_cast<EnumDecl>(derived.Nominal)) {
-    return validateCodingKeysEnum_enum(derived, codingKeysTypeDecl);
+    return validateCodingKeysEnum_enum(
+        derived, codingKeysTypeDecl, delayedNotes);
   } else {
 
     // Look through all var decls in the given type.
@@ -426,7 +462,8 @@ static bool validateCodingKeysEnum(const DerivedConformance &derived) {
       properties[getVarNameForCoding(varDecl)] = varDecl;
     }
 
-    return validateCodingKeysEnum(derived, properties, codingKeysTypeDecl);
+    return validateCodingKeysEnum(
+        derived, properties, codingKeysTypeDecl, delayedNotes);
   }
 }
 
@@ -435,7 +472,8 @@ static bool validateCodingKeysEnum(const DerivedConformance &derived) {
 ///
 /// \param elementDecl The \c EnumElementDecl to validate against.
 static bool validateCaseCodingKeysEnum(const DerivedConformance &derived,
-                                       EnumElementDecl *elementDecl) {
+                                       EnumElementDecl *elementDecl,
+                                       DelayedNotes &delayedNotes) {
   auto &C = derived.Context;
   auto *enumDecl = dyn_cast<EnumDecl>(derived.Nominal);
   if (!enumDecl) {
@@ -471,8 +509,10 @@ static bool validateCaseCodingKeysEnum(const DerivedConformance &derived,
 
   auto *codingKeysTypeDecl = dyn_cast<TypeDecl>(result);
   if (!codingKeysTypeDecl) {
-    result->diagnose(diag::codable_codingkeys_type_is_not_an_enum_here,
-                     derived.getProtocolType());
+    delayedNotes.push_back([=] {
+      result->diagnose(diag::codable_codingkeys_type_is_not_an_enum_here,
+                       derived.getProtocolType());
+    });
     return false;
   }
 
@@ -490,7 +530,8 @@ static bool validateCaseCodingKeysEnum(const DerivedConformance &derived,
     }
   }
 
-  return validateCodingKeysEnum(derived, properties, codingKeysTypeDecl);
+  return validateCodingKeysEnum(
+      derived, properties, codingKeysTypeDecl, delayedNotes);
 }
 
 /// Creates a new var decl representing
@@ -1815,7 +1856,8 @@ static ValueDecl *deriveDecodable_init(DerivedConformance &derived) {
 /// not, attempts to synthesize one for it.
 ///
 /// \param requirement The requirement we want to synthesize.
-static bool canSynthesize(DerivedConformance &derived, ValueDecl *requirement) {
+static bool canSynthesize(DerivedConformance &derived, ValueDecl *requirement,
+                          DelayedNotes &delayedNotes) {
   // Before we attempt to look up (or more importantly, synthesize) a CodingKeys
   // entity on target, we need to make sure the type is otherwise valid.
   //
@@ -1851,8 +1893,11 @@ static bool canSynthesize(DerivedConformance &derived, ValueDecl *requirement) {
 
       if (result.empty()) {
         // No super initializer for us to call.
-        superclassDecl->diagnose(diag::decodable_no_super_init_here,
-                                 requirement->getName(), memberName);
+        delayedNotes.push_back([=] {
+          superclassDecl->diagnose(diag::decodable_no_super_init_here,
+                                   requirement->getName(), memberName);
+        });
+
         return false;
       } else if (result.size() > 1) {
         // There are multiple results for this lookup. We'll end up producing a
@@ -1865,28 +1910,35 @@ static bool canSynthesize(DerivedConformance &derived, ValueDecl *requirement) {
         auto conformanceDC = derived.getConformanceContext();
         if (!initializer->isDesignatedInit()) {
           // We must call a superclass's designated initializer.
-          initializer->diagnose(diag::decodable_super_init_not_designated_here,
-                                requirement->getName(), memberName);
+          delayedNotes.push_back([=] {
+            initializer->diagnose(
+                diag::decodable_super_init_not_designated_here,
+                requirement->getName(), memberName);
+          });
           return false;
         } else if (!initializer->isAccessibleFrom(conformanceDC)) {
           // Cannot call an inaccessible method.
-          auto accessScope = initializer->getFormalAccessScope(conformanceDC);
-          initializer->diagnose(diag::decodable_inaccessible_super_init_here,
-                                requirement->getName(), memberName,
-                                accessScope.accessLevelForDiagnostics());
+          delayedNotes.push_back([=] {
+            auto accessScope = initializer->getFormalAccessScope(conformanceDC);
+            initializer->diagnose(diag::decodable_inaccessible_super_init_here,
+                                  requirement->getName(), memberName,
+                                  accessScope.accessLevelForDiagnostics());
+          });
           return false;
         } else if (initializer->isFailable()) {
           // We can't call super.init() if it's failable, since init(from:)
           // isn't failable.
-          initializer->diagnose(diag::decodable_super_init_is_failable_here,
-                                requirement->getName(), memberName);
+          delayedNotes.push_back([=] {
+            initializer->diagnose(diag::decodable_super_init_is_failable_here,
+                                  requirement->getName(), memberName);
+          });
           return false;
         }
       }
     }
   }
 
-  if (!validateCodingKeysEnum(derived)) {
+  if (!validateCodingKeysEnum(derived, delayedNotes)) {
     return false;
   }
 
@@ -1896,10 +1948,12 @@ static bool canSynthesize(DerivedConformance &derived, ValueDecl *requirement) {
     for (auto *elementDecl : enumDecl->getAllElements()) {
       bool duplicate = false;
       if (!caseNames.insert(elementDecl->getBaseIdentifier())) {
-        elementDecl->diagnose(diag::codable_enum_duplicate_case_name_here,
-                             derived.getProtocolType(),
-                             derived.Nominal->getDeclaredType(),
-                             elementDecl->getBaseIdentifier());
+        delayedNotes.push_back([=] {
+          elementDecl->diagnose(diag::codable_enum_duplicate_case_name_here,
+                               derived.getProtocolType(),
+                               derived.Nominal->getDeclaredType(),
+                               elementDecl->getBaseIdentifier());
+        });
         allValid = false;
         duplicate = true;
       }
@@ -1925,17 +1979,20 @@ static bool canSynthesize(DerivedConformance &derived, ValueDecl *requirement) {
               userDefinedParam = inserted.first->second;
             }
 
-            userDefinedParam->diagnose(diag::codable_enum_duplicate_parameter_name_here,
-                                  derived.getProtocolType(),
-                                  derived.Nominal->getDeclaredType(),
-                                  paramIdentifier,
-                                  elementDecl->getBaseIdentifier());
+            delayedNotes.push_back([=] {
+              userDefinedParam->diagnose(diag::codable_enum_duplicate_parameter_name_here,
+                                    derived.getProtocolType(),
+                                    derived.Nominal->getDeclaredType(),
+                                    paramIdentifier,
+                                    elementDecl->getBaseIdentifier());
+            });
             allValid = false;
           }
         }
       }
 
-      if (!duplicate && !validateCaseCodingKeysEnum(derived, elementDecl)) {
+      if (!duplicate &&
+          !validateCaseCodingKeysEnum(derived, elementDecl, delayedNotes)) {
         allValid = false;
       }
     }
@@ -1989,7 +2046,8 @@ ValueDecl *DerivedConformance::deriveEncodable(ValueDecl *requirement) {
 
   // Check other preconditions for synthesized conformance.
   // This synthesizes a CodingKeys enum if possible.
-  if (!canSynthesize(*this, requirement)) {
+  DelayedNotes delayedNotes;
+  if (!canSynthesize(*this, requirement, delayedNotes)) {
     ConformanceDecl->diagnose(diag::type_does_not_conform,
                               Nominal->getDeclaredType(), getProtocolType());
     requirement->diagnose(diag::no_witnesses, diag::RequirementKind::Func,
@@ -1998,6 +2056,7 @@ ValueDecl *DerivedConformance::deriveEncodable(ValueDecl *requirement) {
 
     return nullptr;
   }
+  assert(delayedNotes.empty());
 
   return deriveEncodable_encode(*this);
 }
@@ -2019,7 +2078,8 @@ ValueDecl *DerivedConformance::deriveDecodable(ValueDecl *requirement) {
 
   // Check other preconditions for synthesized conformance.
   // This synthesizes a CodingKeys enum if possible.
-  if (!canSynthesize(*this, requirement)) {
+  DelayedNotes delayedNotes;
+  if (!canSynthesize(*this, requirement, delayedNotes)) {
     ConformanceDecl->diagnose(diag::type_does_not_conform,
                               Nominal->getDeclaredType(), getProtocolType());
     requirement->diagnose(diag::no_witnesses, diag::RequirementKind::Constructor,
@@ -2028,6 +2088,7 @@ ValueDecl *DerivedConformance::deriveDecodable(ValueDecl *requirement) {
 
     return nullptr;
   }
+  assert(delayedNotes.empty());
 
   return deriveDecodable_init(*this);
 }
