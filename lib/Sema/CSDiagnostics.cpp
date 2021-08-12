@@ -5872,6 +5872,38 @@ static bool hasMissingElseInChain(IfStmt *ifStmt) {
 
 void SkipUnhandledConstructInResultBuilderFailure::diagnosePrimary(
     bool asNote) {
+
+  if (auto *decl = unhandled.dyn_cast<Decl *>()) {
+    if (auto *PB = dyn_cast<PatternBindingDecl>(decl)) {
+      // Diagnose all of the patterns without explicit initializers.
+      bool diagnosed = false;
+      for (unsigned i : range(PB->getNumPatternEntries())) {
+        if (PB->isExplicitlyInitialized(i))
+          continue;
+
+        auto *pattern = PB->getPattern(i);
+
+        StringRef name;
+
+        if (auto *TP = dyn_cast<TypedPattern>(pattern)) {
+          if (auto *NP = dyn_cast<NamedPattern>(TP->getSubPattern()))
+            name = NP->getNameStr();
+        }
+
+        emitDiagnosticAt(
+            pattern->getLoc(),
+            diag::result_builder_requires_explicit_var_initialization,
+            !name.empty(), name, builder->getName())
+            .fixItInsertAfter(pattern->getEndLoc(), " = <#value#>");
+
+        diagnosed = true;
+      }
+
+      if (diagnosed)
+        return;
+    }
+  }
+
   if (auto stmt = unhandled.dyn_cast<Stmt *>()) {
     emitDiagnostic(asNote ? diag::note_result_builder_control_flow
                           : diag::result_builder_control_flow,
