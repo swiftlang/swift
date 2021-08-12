@@ -1132,6 +1132,12 @@ void ASTMangler::appendType(Type type, const ValueDecl *forDecl) {
       appendOperator("XSa");
       return;
 
+    case TypeKind::VariadicSequence:
+      assert(DWARFMangling && "sugared types are only legal for the debugger");
+      appendType(cast<VariadicSequenceType>(tybase)->getBaseType());
+      appendOperator("XSa");
+      return;
+
     case TypeKind::Optional:
       assert(DWARFMangling && "sugared types are only legal for the debugger");
       appendType(cast<OptionalType>(tybase)->getBaseType());
@@ -2138,10 +2144,10 @@ void ASTMangler::appendContext(const DeclContext *ctx, StringRef useModuleName) 
       auto wrapperInit = cast<PropertyWrapperInitializer>(ctx);
       switch (wrapperInit->getKind()) {
       case PropertyWrapperInitializer::Kind::WrappedValue:
-        appendBackingInitializerEntity(wrapperInit->getParam());
+        appendBackingInitializerEntity(wrapperInit->getWrappedVar());
         break;
       case PropertyWrapperInitializer::Kind::ProjectedValue:
-        appendInitFromProjectedValueEntity(wrapperInit->getParam());
+        appendInitFromProjectedValueEntity(wrapperInit->getWrappedVar());
         break;
       }
       return;

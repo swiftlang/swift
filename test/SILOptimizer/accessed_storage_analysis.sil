@@ -67,7 +67,7 @@ bb0(%0 : $Int):
 }
 
 // CHECK-LABEL: @readIdentifiedBoxArg
-// CHECK: [read] Argument %0 = argument of bb0 : ${ var Int }
+// CHECK: [read] Box %0 = argument of bb0 : ${ var Int }
 sil @readIdentifiedBoxArg : $@convention(thin) (@guaranteed { var Int }) -> Int {
 bb0(%0 : ${ var Int }):
   %1 = project_box %0 : ${ var Int }, 0
@@ -78,7 +78,7 @@ bb0(%0 : ${ var Int }):
 }
 
 // CHECK-LABEL: @writeIdentifiedBoxArg
-// CHECK: [modify] Argument %0 = argument of bb0 : ${ var Int }
+// CHECK: [modify] Box %0 = argument of bb0 : ${ var Int }
 sil @writeIdentifiedBoxArg : $@convention(thin) (@guaranteed { var Int }, Int) -> () {
 bb0(%0 : ${ var Int }, %1 : $Int):
   %2 = project_box %0 : ${ var Int }, 0
@@ -90,7 +90,7 @@ bb0(%0 : ${ var Int }, %1 : $Int):
 }
 
 // CHECK-LABEL: @readWriteIdentifiedBoxArg
-// CHECK: [modify] Argument %0 = argument of bb0 : ${ var Int }
+// CHECK: [modify] Box %0 = argument of bb0 : ${ var Int }
 sil @readWriteIdentifiedBoxArg : $@convention(thin) (@guaranteed { var Int }, Int) -> Int {
 bb0(%0 : ${ var Int }, %1 : $Int):
   %2 = function_ref @writeIdentifiedBoxArg : $@convention(thin) (@guaranteed { var Int }, Int) -> ()
@@ -634,7 +634,7 @@ enum IndirectEnum {
 }
 
 // CHECK-LABEL: @readUnidentifiedArgCaller
-// CHECK:   unidentified accesses: read
+// CHECK: Box %{{.*}} = argument of bb2 : ${ var Int }
 sil @readUnidentifiedArgCaller : $@convention(thin) (@guaranteed IndirectEnum, Int) -> Int {
 bb0(%0 : $IndirectEnum, %1 : $Int):
   switch_enum %0 : $IndirectEnum, case #IndirectEnum.V!enumelt: bb2, default bb1

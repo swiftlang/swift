@@ -13,7 +13,7 @@ func asyncThrowsOnCancel() async throws -> Int {
   // terrible suspend-spin-loop -- do not do this
   // only for purposes of demonstration
   while Task.isCancelled {
-    await Task.sleep(1_000_000_000)
+    try? await Task.sleep(nanoseconds: 1_000_000_000)
   }
 
   throw CancellationError()

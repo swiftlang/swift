@@ -134,6 +134,9 @@ def cancel_on_subsequent_request_EQ : Joined<["-"], "cancel-on-subsequent-reques
 def time_request : Flag<["-"], "time-request">,
   HelpText<"Print the time taken to process the request">;
 
+def measure_instructions : Flag<["-"], "measure-instructions">,
+  HelpText<"Measure how many instructions the execution of this request took in the SourceKit process.">;
+
 def repeat_request : Separate<["-"], "repeat-request">,
   HelpText<"Repeat the request n times">, MetaVarName<"<n>">;
 def repeat_request_EQ : Joined<["-"], "repeat-request=">, Alias<repeat_request>;

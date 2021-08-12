@@ -1706,6 +1706,10 @@ public:
   static SolutionApplicationTarget forUninitializedWrappedVar(
       VarDecl *wrappedVar);
 
+  /// Form a target for a synthesized property wrapper initializer.
+  static SolutionApplicationTarget forPropertyWrapperInitializer(
+      VarDecl *wrappedVar, DeclContext *dc, Expr *initializer);
+
   Expr *getAsExpr() const {
     switch (kind) {
     case Kind::expression:
@@ -1813,7 +1817,7 @@ public:
   bool isOptionalSomePatternInit() const {
     return kind == Kind::expression &&
         expression.contextualPurpose == CTP_Initialization &&
-        isa<OptionalSomePattern>(expression.pattern) &&
+        dyn_cast_or_null<OptionalSomePattern>(expression.pattern) &&
         !expression.pattern->isImplicit();
   }
 
@@ -1837,7 +1841,9 @@ public:
 
     // Don't create property wrapper generator functions for static variables and
     // local variables with initializers.
-    if (wrappedVar->isStatic() || wrappedVar->getDeclContext()->isLocalContext())
+    bool hasInit = expression.propertyWrapper.hasInitialWrappedValue;
+    if (wrappedVar->isStatic() ||
+        (hasInit && wrappedVar->getDeclContext()->isLocalContext()))
       return false;
 
     return expression.propertyWrapper.innermostWrappedValueInit == apply;
@@ -2140,6 +2146,11 @@ private:
   /// High-water mark of measured memory usage in any sub-scope we
   /// explored.
   size_t MaxMemory = 0;
+
+  /// Flag to indicate to the solver that the system is in invalid
+  /// state and it shouldn't proceed but instead produce a fallback
+  /// diagnostic.
+  bool InvalidState = false;
 
   /// Cached member lookups.
   llvm::DenseMap<std::pair<Type, DeclNameRef>, Optional<LookupResult>>
@@ -2639,6 +2650,11 @@ public:
 
     Phase = newPhase;
   }
+
+  /// Check whether constraint system is in valid state e.g.
+  /// has left-over active/inactive constraints which should
+  /// have been simplified.
+  bool inInvalidState() const { return InvalidState; }
 
   /// Cache the types of the given expression and all subexpressions.
   void cacheExprTypes(Expr *expr) {

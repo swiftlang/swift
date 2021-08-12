@@ -60,6 +60,8 @@ public:
   Histogram TermHistogram;
   Histogram RuleTrieHistogram;
   Histogram RuleTrieRootHistogram;
+  Histogram PropertyTrieHistogram;
+  Histogram PropertyTrieRootHistogram;
 
   explicit RewriteContext(ASTContext &ctx);
 

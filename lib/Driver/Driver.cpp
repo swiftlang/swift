@@ -178,8 +178,6 @@ static void validateDependencyScanningArgs(DiagnosticEngine &diags,
       args.getLastArg(options::OPT_reuse_dependency_scan_cache);
   const Arg *CacheSerializationPath =
       args.getLastArg(options::OPT_dependency_scan_cache_path);
-  const Arg *TestSerialization = args.getLastArg(
-      options::OPT_debug_test_dependency_scan_cache_serialization);
 
   if (ExternalDependencyMap && !ScanDependencies) {
     diags.diagnose(SourceLoc(), diag::error_requirement_not_met,
@@ -201,11 +199,6 @@ static void validateDependencyScanningArgs(DiagnosticEngine &diags,
   if (ReuseCache && !ScanDependencies) {
     diags.diagnose(SourceLoc(), diag::error_requirement_not_met,
                    "-load-dependency-scan-cache", "-scan-dependencies");
-  }
-  if (TestSerialization && !ScanDependencies) {
-    diags.diagnose(SourceLoc(), diag::error_requirement_not_met,
-                   "-test-dependency-scan-cache-serialization",
-                   "-scan-dependencies");
   }
   if (SerializeCache && !CacheSerializationPath) {
     diags.diagnose(SourceLoc(), diag::error_requirement_not_met,

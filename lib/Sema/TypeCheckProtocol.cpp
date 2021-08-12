@@ -6222,8 +6222,7 @@ swift::findWitnessedObjCRequirements(const ValueDecl *witness,
       // Dig out the conformance.
       if (!conformance.hasValue()) {
         SmallVector<ProtocolConformance *, 2> conformances;
-        nominal->lookupConformance(dc->getParentModule(), proto,
-                                   conformances);
+        nominal->lookupConformance(proto, conformances);
         if (conformances.size() == 1)
           conformance = conformances.front();
         else

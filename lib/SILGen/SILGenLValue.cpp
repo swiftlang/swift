@@ -619,7 +619,7 @@ SILValue UnenforcedAccess::beginAccess(SILGenFunction &SGF, SILLocation loc,
 
   auto storage = AccessedStorage::compute(address);
   // Unsafe access may have invalid storage (e.g. a RawPointer).
-  if (storage && !isPossibleFormalAccessBase(storage, &SGF.F))
+  if (storage && !isPossibleFormalAccessStorage(storage, &SGF.F))
     return address;
 
   auto BAI =

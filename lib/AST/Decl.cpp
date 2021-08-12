@@ -3133,7 +3133,7 @@ bool ValueDecl::canInferObjCFromRequirement(ValueDecl *requirement) {
   // If the nominal type doesn't conform to the protocol at all, we
   // cannot infer @objc no matter what we do.
   SmallVector<ProtocolConformance *, 1> conformances;
-  if (!nominal->lookupConformance(getModuleContext(), proto, conformances))
+  if (!nominal->lookupConformance(proto, conformances))
     return false;
 
   // If any of the conformances is attributed to the context in which
@@ -6528,7 +6528,7 @@ void ParamDecl::setNonEphemeralIfPossible() {
 
 Type ParamDecl::getVarargBaseTy(Type VarArgT) {
   TypeBase *T = VarArgT.getPointer();
-  if (auto *AT = dyn_cast<ArraySliceType>(T))
+  if (auto *AT = dyn_cast<VariadicSequenceType>(T))
     return AT->getBaseType();
   if (auto *BGT = dyn_cast<BoundGenericType>(T)) {
     // It's the stdlib Array<T>.
@@ -8491,8 +8491,13 @@ bool ClassDecl::isRootDefaultActor(ModuleDecl *M,
 
 bool ClassDecl::isNativeNSObjectSubclass() const {
   // @objc actors implicitly inherit from NSObject.
-  if (isActor() && getAttrs().hasAttribute<ObjCAttr>())
-    return true;
+  if (isActor()) {
+    if (getAttrs().hasAttribute<ObjCAttr>()) {
+      return true;
+    }
+    ClassDecl *superclass = getSuperclassDecl();
+    return superclass && superclass->isNSObject();
+  }
 
   // For now, non-actor classes cannot use the native NSObject subclass.
   // Eventually we should roll this out to more classes that directly

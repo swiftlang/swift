@@ -1988,19 +1988,6 @@ bool AssignmentFailure::diagnoseAsError() {
   // If the expression is the result of a call, it is an rvalue, not a mutable
   // lvalue.
   if (auto *AE = dyn_cast<ApplyExpr>(immutableExpr)) {
-    // Handle literals, which are a call to the conversion function.
-    auto argsTuple =
-        dyn_cast<TupleExpr>(AE->getArg()->getSemanticsProvidingExpr());
-    if (isa<CallExpr>(AE) && AE->isImplicit() && argsTuple &&
-        argsTuple->getNumElements() == 1) {
-      if (auto LE = dyn_cast<LiteralExpr>(
-              argsTuple->getElement(0)->getSemanticsProvidingExpr())) {
-        emitDiagnosticAt(Loc, DeclDiagnostic, "literals are not mutable")
-            .highlight(LE->getSourceRange());
-        return true;
-      }
-    }
-
     std::string name = "call";
     if (isa<PrefixUnaryExpr>(AE) || isa<PostfixUnaryExpr>(AE))
       name = "unary operator";

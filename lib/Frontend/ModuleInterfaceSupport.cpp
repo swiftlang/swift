@@ -502,7 +502,7 @@ public:
                                           const NominalTypeDecl *nominal,
                                           ProtocolDecl *proto) {
     SmallVector<ProtocolConformance *, 4> conformances;
-    nominal->lookupConformance(M, proto, conformances);
+    nominal->lookupConformance(proto, conformances);
     return llvm::all_of(conformances,
                         [M](const ProtocolConformance *conformance) -> bool {
       return M == conformance->getDeclContext()->getParentModule();

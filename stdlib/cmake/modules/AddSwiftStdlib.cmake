@@ -729,7 +729,7 @@ function(_add_swift_target_library_single target name)
     handle_gyb_sources(
         gyb_dependency_targets
         SWIFTLIB_SINGLE_GYB_SOURCES
-        "${SWIFTLIB_SINGLE_ARCHITECTURE}")
+        ARCH "${SWIFTLIB_SINGLE_ARCHITECTURE}")
     set(SWIFTLIB_SINGLE_SOURCES ${SWIFTLIB_SINGLE_SOURCES}
       ${SWIFTLIB_SINGLE_GYB_SOURCES})
   endif()

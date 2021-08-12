@@ -1561,6 +1561,7 @@ Type SugarType::getSinglyDesugaredTypeSlow() {
   case TypeKind::TypeAlias:
     llvm_unreachable("bound type alias types always have an underlying type");
   case TypeKind::ArraySlice:
+  case TypeKind::VariadicSequence:
     implDecl = Context->getArrayDecl();
     break;
   case TypeKind::Optional:
@@ -2638,9 +2639,7 @@ getForeignRepresentable(Type type, ForeignLanguage language,
           if (auto objcBridgeable
                 = ctx.getProtocol(KnownProtocolKind::ObjectiveCBridgeable)) {
             SmallVector<ProtocolConformance *, 1> conformances;
-            if (nominal->lookupConformance(dc->getParentModule(),
-                                           objcBridgeable,
-                                           conformances))
+            if (nominal->lookupConformance(objcBridgeable, conformances))
               break;
           }
         }
@@ -4972,6 +4971,18 @@ case TypeKind::Id:
       return *this;
 
     return OptionalType::get(baseTy);
+  }
+
+  case TypeKind::VariadicSequence: {
+    auto seq = cast<VariadicSequenceType>(base);
+    auto baseTy = seq->getBaseType().transformRec(fn);
+    if (!baseTy)
+      return Type();
+
+    if (baseTy.getPointer() == seq->getBaseType().getPointer())
+      return *this;
+
+    return VariadicSequenceType::get(baseTy);
   }
 
   case TypeKind::Dictionary: {

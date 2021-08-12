@@ -394,6 +394,7 @@ struct ASTContext::Implementation {
     llvm::DenseMap<llvm::PointerIntPair<TypeBase*, 3, unsigned>,
                    ExistentialMetatypeType*> ExistentialMetatypeTypes;
     llvm::DenseMap<Type, ArraySliceType*> ArraySliceTypes;
+    llvm::DenseMap<Type, VariadicSequenceType*> VariadicSequenceTypes;
     llvm::DenseMap<std::pair<Type, Type>, DictionaryType *> DictionaryTypes;
     llvm::DenseMap<Type, OptionalType*> OptionalTypes;
     llvm::DenseMap<Type, ParenType*> SimpleParenTypes; // Most are simple
@@ -2569,6 +2570,7 @@ size_t ASTContext::Implementation::Arena::getTotalMemory() const {
     llvm::capacity_in_bytes(ArraySliceTypes) +
     llvm::capacity_in_bytes(DictionaryTypes) +
     llvm::capacity_in_bytes(OptionalTypes) +
+    llvm::capacity_in_bytes(VariadicSequenceTypes) +
     llvm::capacity_in_bytes(SimpleParenTypes) +
     llvm::capacity_in_bytes(ParenTypes) +
     llvm::capacity_in_bytes(ReferenceStorageTypes) +
@@ -3452,7 +3454,7 @@ Type AnyFunctionType::Param::getParameterType(bool forCanonical,
     else if (forCanonical)
       type = BoundGenericType::get(arrayDecl, Type(), {type});
     else
-      type = ArraySliceType::get(type);
+      type = VariadicSequenceType::get(type);
   }
   return type;
 }
@@ -4022,6 +4024,18 @@ ArraySliceType *ArraySliceType::get(Type base) {
   if (entry) return entry;
 
   return entry = new (C, arena) ArraySliceType(C, base, properties);
+}
+
+VariadicSequenceType *VariadicSequenceType::get(Type base) {
+  auto properties = base->getRecursiveProperties();
+  auto arena = getArena(properties);
+
+  const ASTContext &C = base->getASTContext();
+
+  VariadicSequenceType *&entry = C.getImpl().getArena(arena).VariadicSequenceTypes[base];
+  if (entry) return entry;
+
+  return entry = new (C, arena) VariadicSequenceType(C, base, properties);
 }
 
 DictionaryType *DictionaryType::get(Type keyType, Type valueType) {

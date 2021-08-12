@@ -3239,16 +3239,13 @@ public:
   /// Look for conformances of this nominal type to the given
   /// protocol.
   ///
-  /// \param module The module from which we initiate the search.
-  /// FIXME: This is currently unused.
-  ///
   /// \param protocol The protocol whose conformance is requested.
   /// \param conformances Will be populated with the set of protocol
   /// conformances found for this protocol.
   ///
   /// \returns true if any conformances were found. 
   bool lookupConformance(
-         ModuleDecl *module, ProtocolDecl *protocol,
+         ProtocolDecl *protocol,
          SmallVectorImpl<ProtocolConformance *> &conformances) const;
 
   /// Retrieve all of the protocols that this nominal type conforms to.

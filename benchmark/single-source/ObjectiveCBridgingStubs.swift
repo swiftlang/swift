@@ -18,6 +18,7 @@ import ObjectiveCTests
 
 let t: [BenchmarkCategory] = [.validation, .bridging]
 let ts: [BenchmarkCategory] = [.validation, .String, .bridging]
+let bs: [BenchmarkCategory] = [.String, .bridging]
 
 public let ObjectiveCBridgingStubs = [
   BenchmarkInfo(name: "ObjectiveCBridgeStubDataAppend",
@@ -68,9 +69,24 @@ public let ObjectiveCBridgingStubs = [
   BenchmarkInfo(name: "ObjectiveCBridgeStringGetUTF8Contents",
     runFunction: run_ObjectiveCBridgeStringGetUTF8Contents, tags: ts,
     setUpFunction: setup_StringBridgeBenchmark),
-  BenchmarkInfo(name: "ObjectiveCBridgeStringRangeOfString",
+  BenchmarkInfo(name: "ObjectiveCBridgeStringRangeOfString", //should be BridgeString.find.mixed
     runFunction: run_ObjectiveCBridgeStringRangeOfString, tags: ts,
     setUpFunction: setup_StringBridgeBenchmark),
+  BenchmarkInfo(name: "BridgeString.find.native",
+    runFunction: run_ObjectiveCBridgeStringRangeOfStringAllSwift, tags: bs,
+    setUpFunction: setup_SpecificRangeOfStringBridging),
+  BenchmarkInfo(name: "BridgeString.find.native.nonASCII",
+    runFunction: run_ObjectiveCBridgeStringRangeOfStringAllSwiftNonASCII, tags: bs,
+    setUpFunction: setup_SpecificRangeOfStringBridging),
+  BenchmarkInfo(name: "BridgeString.find.native.long",
+    runFunction: run_ObjectiveCBridgeStringRangeOfStringAllSwiftLongHaystack, tags: bs,
+    setUpFunction: setup_SpecificRangeOfStringBridging),
+  BenchmarkInfo(name: "BridgeString.find.native.longBoth",
+    runFunction: run_ObjectiveCBridgeStringRangeOfStringAllSwiftLongHaystackLongNeedle, tags: bs,
+    setUpFunction: setup_SpecificRangeOfStringBridging),
+  BenchmarkInfo(name: "BridgeString.find.native.longNonASCII",
+    runFunction: run_ObjectiveCBridgeStringRangeOfStringAllSwiftLongHaystackNonASCII, tags: bs,
+    setUpFunction: setup_SpecificRangeOfStringBridging),
   BenchmarkInfo(name: "ObjectiveCBridgeStringHash",
     runFunction: run_ObjectiveCBridgeStringHash, tags: ts,
     setUpFunction: setup_StringBridgeBenchmark),
@@ -406,6 +422,47 @@ public func run_ObjectiveCBridgeStringRangeOfString(N: Int) {
     }
   }
   #endif
+}
+
+@inline(__always)
+func run_rangeOfStringSpecific(needle: String, haystack: String, N: Int) {
+#if _runtime(_ObjC)
+  b.testRangeOfStringSpecific(withNeedle: needle, haystack: haystack, n: N)
+#endif
+}
+
+@inline(never)
+public func run_ObjectiveCBridgeStringRangeOfStringAllSwift(N: Int) {
+  run_rangeOfStringSpecific(needle: "y", haystack: "The quick brown fox jumps over the lazy dog", N: 100 * N)
+}
+
+var longNativeASCII: String! = nil
+var longNativeNonASCII: String! = nil
+public func setup_SpecificRangeOfStringBridging() {
+  setup_StringBridgeBenchmark()
+  longNativeASCII = Array(repeating: "The quick brown fox jump over the lazy dog", count: 1000).joined() + "s"
+  longNativeNonASCII = "ü" + longNativeASCII + "ö"
+  
+}
+
+@inline(never)
+public func run_ObjectiveCBridgeStringRangeOfStringAllSwiftLongHaystack(N: Int) {
+  run_rangeOfStringSpecific(needle: "s", haystack: longNativeASCII, N: N)
+}
+
+@inline(never)
+public func run_ObjectiveCBridgeStringRangeOfStringAllSwiftLongHaystackNonASCII(N: Int) {
+  run_rangeOfStringSpecific(needle: "s", haystack: longNativeNonASCII, N: N)
+}
+
+@inline(never)
+public func run_ObjectiveCBridgeStringRangeOfStringAllSwiftNonASCII(N: Int) {
+  run_rangeOfStringSpecific(needle: "ü", haystack: "The quick brown fox jump over the lazy dogü", N: 100 * N)
+}
+
+@inline(never)
+public func run_ObjectiveCBridgeStringRangeOfStringAllSwiftLongHaystackLongNeedle(N: Int) {
+  run_rangeOfStringSpecific(needle: "The quick brown fox jump over the lazy dogs", haystack: longNativeASCII, N: N)
 }
 
 @inline(never)

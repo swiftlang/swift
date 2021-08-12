@@ -298,10 +298,13 @@ namespace swift {
     /// Enable experimental concurrency model.
     bool EnableExperimentalConcurrency = false;
 
-    /// Enable experimental support for additional opaque return type features,
-    /// i.e. named opaque return types (with 'where' clause support), and opaque
-    /// types in nested position within the function return type.
-    bool EnableExperimentalOpaqueReturnTypes = false;
+    /// Enable experimental support for named opaque result types, e.g.
+    /// `func f() -> <T> T`.
+    bool EnableExperimentalNamedOpaqueTypes = false;
+
+    /// Enable experimental support for structural opaque result types, e.g.
+    /// `func f() -> (some P)?`.
+    bool EnableExperimentalStructuralOpaqueTypes = false;
 
     /// Enable experimental flow-sensitive concurrent captures.
     bool EnableExperimentalFlowSensitiveConcurrentCaptures = false;

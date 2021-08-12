@@ -1020,16 +1020,11 @@ SILGenFunction::emitBlockToFunc(SILLocation loc,
       loc, thunkedFn, SILType::getPrimitiveObjectType(loweredFuncTy));
 }
 
-static ManagedValue emitCBridgedToNativeValue(SILGenFunction &SGF,
-                                              SILLocation loc,
-                                              ManagedValue v,
-                                              CanType bridgedType,
-                                              CanType nativeType,
-                                              SILType loweredNativeTy,
-                                              bool isCallResult,
-                                              SGFContext C) {
+static ManagedValue emitCBridgedToNativeValue(
+    SILGenFunction &SGF, SILLocation loc, ManagedValue v, CanType bridgedType,
+    SILType loweredBridgedTy, CanType nativeType, SILType loweredNativeTy,
+    int bridgedOptionalsToUnwrap, bool isCallResult, SGFContext C) {
   assert(loweredNativeTy.isObject());
-  SILType loweredBridgedTy = v.getType();
   if (loweredNativeTy == loweredBridgedTy.getObjectType())
     return v;
 
@@ -1040,37 +1035,50 @@ static ManagedValue emitCBridgedToNativeValue(SILGenFunction &SGF,
     if (!bridgedObjectType) {
       auto helper = [&](SILGenFunction &SGF, SILLocation loc, SGFContext C) {
         auto loweredNativeObjectTy = loweredNativeTy.getOptionalObjectType();
-        return emitCBridgedToNativeValue(SGF, loc, v, bridgedType,
-                                         nativeObjectType,
-                                         loweredNativeObjectTy,
-                                         isCallResult, C);
+        return emitCBridgedToNativeValue(
+            SGF, loc, v, bridgedType, loweredBridgedTy, nativeObjectType,
+            loweredNativeObjectTy, bridgedOptionalsToUnwrap, isCallResult, C);
       };
       return SGF.emitOptionalSome(loc, loweredNativeTy, helper, C);
     }
 
     // Optional-to-optional.
-    auto helper =
-        [=](SILGenFunction &SGF, SILLocation loc, ManagedValue v,
-            SILType loweredNativeObjectTy, SGFContext C) {
-      return emitCBridgedToNativeValue(SGF, loc, v, bridgedObjectType,
-                                       nativeObjectType, loweredNativeObjectTy,
-                                       isCallResult, C);
+    auto helper = [=](SILGenFunction &SGF, SILLocation loc, ManagedValue v,
+                      SILType loweredNativeObjectTy, SGFContext C) {
+      return emitCBridgedToNativeValue(
+          SGF, loc, v, bridgedObjectType,
+          loweredBridgedTy.getOptionalObjectType(), nativeObjectType,
+          loweredNativeObjectTy, bridgedOptionalsToUnwrap, isCallResult, C);
     };
     return SGF.emitOptionalToOptional(loc, v, loweredNativeTy, helper, C);
   }
+  if (auto bridgedObjectType = bridgedType.getOptionalObjectType()) {
+    return emitCBridgedToNativeValue(
+        SGF, loc, v, bridgedObjectType,
+        loweredBridgedTy.getOptionalObjectType(), nativeType, loweredNativeTy,
+        bridgedOptionalsToUnwrap + 1, isCallResult, C);
+  }
+
+  auto unwrapBridgedOptionals = [&](ManagedValue v) {
+    for (int i = 0; i < bridgedOptionalsToUnwrap; ++i) {
+      v = SGF.emitPreconditionOptionalHasValue(loc, v,
+                                               /*implicit*/ true);
+    };
+    return v;
+  };
 
   // Bridge ObjCBool, DarwinBoolean, WindowsBool to Bool when requested.
   if (nativeType == SGF.SGM.Types.getBoolType()) {
     if (bridgedType == SGF.SGM.Types.getObjCBoolType()) {
-      return emitBridgeForeignBoolToBool(SGF, loc, v,
+      return emitBridgeForeignBoolToBool(SGF, loc, unwrapBridgedOptionals(v),
                                          SGF.SGM.getObjCBoolToBoolFn());
     }
     if (bridgedType == SGF.SGM.Types.getDarwinBooleanType()) {
-      return emitBridgeForeignBoolToBool(SGF, loc, v,
+      return emitBridgeForeignBoolToBool(SGF, loc, unwrapBridgedOptionals(v),
                                          SGF.SGM.getDarwinBooleanToBoolFn());
     }
     if (bridgedType == SGF.SGM.Types.getWindowsBoolType()) {
-      return emitBridgeForeignBoolToBool(SGF, loc, v,
+      return emitBridgeForeignBoolToBool(SGF, loc, unwrapBridgedOptionals(v),
                                          SGF.SGM.getWindowsBoolToBoolFn());
     }
   }
@@ -1080,8 +1088,8 @@ static ManagedValue emitCBridgedToNativeValue(SILGenFunction &SGF,
     auto bridgedMetaTy = cast<AnyMetatypeType>(bridgedType);
     if (bridgedMetaTy->hasRepresentation() &&
         bridgedMetaTy->getRepresentation() == MetatypeRepresentation::ObjC) {
-      SILValue native =
-        SGF.B.emitObjCToThickMetatype(loc, v.getValue(), loweredNativeTy);
+      SILValue native = SGF.B.emitObjCToThickMetatype(
+          loc, unwrapBridgedOptionals(v).getValue(), loweredNativeTy);
       // *NOTE*: ObjCMetatypes are trivial types. They only gain ARC semantics
       // when they are converted to an object via objc_metatype_to_object.
       assert(!v.hasCleanup() && "Metatypes are trivial and should not have "
@@ -1097,7 +1105,8 @@ static ManagedValue emitCBridgedToNativeValue(SILGenFunction &SGF,
           == AnyFunctionType::Representation::Block
         && nativeFTy->getRepresentation()
           != AnyFunctionType::Representation::Block) {
-      return SGF.emitBlockToFunc(loc, v, bridgedFTy, nativeFTy,
+      return SGF.emitBlockToFunc(loc, unwrapBridgedOptionals(v), bridgedFTy,
+                                 nativeFTy,
                                  loweredNativeTy.castTo<SILFunctionType>());
     }
   }
@@ -1106,8 +1115,10 @@ static ManagedValue emitCBridgedToNativeValue(SILGenFunction &SGF,
   if (auto conformance =
         SGF.SGM.getConformanceToObjectiveCBridgeable(loc, nativeType)) {
     if (auto result = emitBridgeObjectiveCToNative(SGF, loc, v, bridgedType,
-                                                   conformance))
-      return *result;
+                                                   conformance)) {
+      --bridgedOptionalsToUnwrap;
+      return unwrapBridgedOptionals(*result);
+    }
 
     assert(SGF.SGM.getASTContext().Diags.hadAnyError() &&
            "Bridging code should have complained");
@@ -1118,7 +1129,8 @@ static ManagedValue emitCBridgedToNativeValue(SILGenFunction &SGF,
   if (nativeType->isAny()) {
     // If this is not a call result, use the normal erasure logic.
     if (!isCallResult) {
-      return SGF.emitTransformedValue(loc, v, bridgedType, nativeType, C);
+      return SGF.emitTransformedValue(loc, unwrapBridgedOptionals(v),
+                                      bridgedType, nativeType, C);
     }
 
     // Otherwise, we use more complicated logic that handles results that
@@ -1130,7 +1142,8 @@ static ManagedValue emitCBridgedToNativeValue(SILGenFunction &SGF,
     CanType anyObjectTy =
       SGF.getASTContext().getAnyObjectType()->getCanonicalType();
     if (bridgedType != anyObjectTy) {
-      v = SGF.emitTransformedValue(loc, v, bridgedType, anyObjectTy);
+      v = SGF.emitTransformedValue(loc, unwrapBridgedOptionals(v), bridgedType,
+                                   anyObjectTy);
     }
 
     // TODO: Ever need to handle +0 values here?
@@ -1143,8 +1156,8 @@ static ManagedValue emitCBridgedToNativeValue(SILGenFunction &SGF,
     // Bitcast to Optional. This provides a barrier to the optimizer to prevent
     // it from attempting to eliminate null checks.
     auto optionalBridgedTy = SILType::getOptionalType(loweredBridgedTy);
-    auto optionalMV =
-      SGF.B.createUncheckedBitCast(loc, v, optionalBridgedTy);
+    auto optionalMV = SGF.B.createUncheckedBitCast(
+        loc, unwrapBridgedOptionals(v), optionalBridgedTy);
     return SGF.emitApplyOfLibraryIntrinsic(loc,
                            SGF.getASTContext().getBridgeAnyObjectToAny(),
                            SubstitutionMap(), optionalMV, C)
@@ -1153,9 +1166,9 @@ static ManagedValue emitCBridgedToNativeValue(SILGenFunction &SGF,
 
   // Bridge NSError to Error.
   if (bridgedType == SGF.SGM.Types.getNSErrorType())
-    return SGF.emitBridgedToNativeError(loc, v);
+    return SGF.emitBridgedToNativeError(loc, unwrapBridgedOptionals(v));
 
-  return v;
+  return unwrapBridgedOptionals(v);
 }
 
 ManagedValue SILGenFunction::emitBridgedToNativeValue(SILLocation loc,
@@ -1166,8 +1179,10 @@ ManagedValue SILGenFunction::emitBridgedToNativeValue(SILLocation loc,
                                                       SGFContext C,
                                                       bool isCallResult) {
   loweredNativeTy = loweredNativeTy.getObjectType();
-  return emitCBridgedToNativeValue(*this, loc, v, bridgedType, nativeType,
-                                   loweredNativeTy, isCallResult, C);
+  SILType loweredBridgedTy = v.getType();
+  return emitCBridgedToNativeValue(
+      *this, loc, v, bridgedType, loweredBridgedTy, nativeType, loweredNativeTy,
+      /*bridgedOptionalsToUnwrap=*/0, isCallResult, C);
 }
 
 /// Bridge a possibly-optional foreign error type to Error.

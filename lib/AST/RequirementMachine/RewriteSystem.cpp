@@ -32,8 +32,8 @@ RewriteSystem::RewriteSystem(RewriteContext &ctx)
 }
 
 RewriteSystem::~RewriteSystem() {
-  RuleTrie.updateHistograms(Context.RuleTrieHistogram,
-                            Context.RuleTrieRootHistogram);
+  Trie.updateHistograms(Context.RuleTrieHistogram,
+                        Context.RuleTrieRootHistogram);
 }
 
 void Rule::dump(llvm::raw_ostream &out) const {
@@ -99,7 +99,7 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs) {
 
   unsigned i = Rules.size();
   Rules.emplace_back(Term::get(lhs, Context), Term::get(rhs, Context));
-  auto oldRuleID = RuleTrie.insert(lhs.begin(), lhs.end(), i);
+  auto oldRuleID = Trie.insert(lhs.begin(), lhs.end(), i);
   if (oldRuleID) {
     llvm::errs() << "Duplicate rewrite rule!\n";
     const auto &oldRule = Rules[*oldRuleID];
@@ -167,7 +167,7 @@ bool RewriteSystem::simplify(MutableTerm &term) const {
     auto from = term.begin();
     auto end = term.end();
     while (from < end) {
-      auto ruleID = RuleTrie.find(from, end);
+      auto ruleID = Trie.find(from, end);
       if (ruleID) {
         const auto &rule = Rules[*ruleID];
         if (!rule.isDeleted()) {
@@ -200,18 +200,60 @@ bool RewriteSystem::simplify(MutableTerm &term) const {
   return changed;
 }
 
-void RewriteSystem::simplifyRightHandSides() {
-  for (auto &rule : Rules) {
+/// Delete any rules whose left hand sides can be reduced by other rules,
+/// and reduce the right hand sides of all remaining rules as much as
+/// possible.
+///
+/// Must be run after the completion procedure, since the deletion of
+/// rules is only valid to perform if the rewrite system is confluent.
+void RewriteSystem::simplifyRewriteSystem() {
+  for (auto ruleID : indices(Rules)) {
+    auto &rule = Rules[ruleID];
     if (rule.isDeleted())
       continue;
 
+    // First, see if the left hand side of this rule can be reduced using
+    // some other rule.
+    auto lhs = rule.getLHS();
+    auto begin = lhs.begin();
+    auto end = lhs.end();
+    while (begin < end) {
+      if (auto otherRuleID = Trie.find(begin++, end)) {
+        // A rule does not obsolete itself.
+        if (*otherRuleID == ruleID)
+          continue;
+
+        // Ignore other deleted rules.
+        if (Rules[*otherRuleID].isDeleted())
+          continue;
+
+        if (DebugCompletion) {
+          const auto &otherRule = Rules[ruleID];
+          llvm::dbgs() << "$ Deleting rule " << rule << " because "
+                       << "its left hand side contains " << otherRule
+                       << "\n";
+        }
+
+        rule.markDeleted();
+        break;
+      }
+    }
+
+    // If the rule was deleted above, skip the rest.
+    if (rule.isDeleted())
+      continue;
+
+    // Now, try to reduce the right hand side.
     MutableTerm rhs(rule.getRHS());
     if (!simplify(rhs))
       continue;
 
+    // If the right hand side was further reduced, update the rule.
     rule = Rule(rule.getLHS(), Term::get(rhs, Context));
   }
+}
 
+void RewriteSystem::verify() const {
 #ifndef NDEBUG
 
 #define ASSERT_RULE(expr) \

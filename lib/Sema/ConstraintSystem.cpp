@@ -5287,7 +5287,14 @@ SolutionApplicationTarget::SolutionApplicationTarget(
 void SolutionApplicationTarget::maybeApplyPropertyWrapper() {
   assert(kind == Kind::expression);
   assert(expression.contextualPurpose == CTP_Initialization);
-  auto singleVar = expression.pattern->getSingleVar();
+
+  VarDecl *singleVar;
+  if (auto *pattern = expression.pattern) {
+    singleVar = pattern->getSingleVar();
+  } else {
+    singleVar = expression.propertyWrapper.wrappedVar;
+  }
+
   if (!singleVar)
     return;
 
@@ -5417,6 +5424,23 @@ SolutionApplicationTarget::forUninitializedWrappedVar(VarDecl *wrappedVar) {
   return SolutionApplicationTarget(wrappedVar);
 }
 
+SolutionApplicationTarget
+SolutionApplicationTarget::forPropertyWrapperInitializer(
+    VarDecl *wrappedVar, DeclContext *dc, Expr *initializer) {
+  SolutionApplicationTarget target(
+      initializer, dc, CTP_Initialization, wrappedVar->getType(),
+      /*isDiscarded=*/false);
+  target.expression.propertyWrapper.wrappedVar = wrappedVar;
+  if (auto *patternBinding = wrappedVar->getParentPatternBinding()) {
+    auto index = patternBinding->getPatternEntryIndexForVarDecl(wrappedVar);
+    target.expression.initialization.patternBinding = patternBinding;
+    target.expression.initialization.patternBindingIndex = index;
+    target.expression.pattern = patternBinding->getPattern(index);
+  }
+  target.maybeApplyPropertyWrapper();
+  return target;
+}
+
 ContextualPattern
 SolutionApplicationTarget::getContextualPattern() const {
   assert(kind == Kind::expression);
@@ -5491,6 +5515,14 @@ void ConstraintSystem::diagnoseFailureFor(SolutionApplicationTarget target) {
   SWIFT_DEFER { setPhase(ConstraintSystemPhase::Finalization); };
 
   auto &DE = getASTContext().Diags;
+
+  // If constraint system is in invalid state always produce
+  // a fallback diagnostic that asks to file a bug.
+  if (inInvalidState()) {
+    DE.diagnose(target.getLoc(), diag::failed_to_produce_diagnostic);
+    return;
+  }
+
   if (auto expr = target.getAsExpr()) {
     if (auto *assignment = dyn_cast<AssignExpr>(expr)) {
       if (isa<DiscardAssignmentExpr>(assignment->getDest()))
@@ -5846,7 +5878,6 @@ bool TypeVarBindingProducer::requiresOptionalAdjustment(
     if (auto *nominalBindingDecl = type->getAnyNominal()) {
       SmallVector<ProtocolConformance *, 2> conformances;
       conformsToExprByNilLiteral = nominalBindingDecl->lookupConformance(
-          CS.DC->getParentModule(),
           CS.getASTContext().getProtocol(
               KnownProtocolKind::ExpressibleByNilLiteral),
           conformances);

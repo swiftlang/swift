@@ -449,7 +449,7 @@ public:
 
     SmallVector<ProtocolConformance *, 1> conformances;
     auto errorTypeProto = ctx.getProtocol(KnownProtocolKind::Error);
-    if (ED->lookupConformance(&M, errorTypeProto, conformances)) {
+    if (ED->lookupConformance(errorTypeProto, conformances)) {
       bool hasDomainCase = std::any_of(ED->getAllElements().begin(),
                                        ED->getAllElements().end(),
                                        [](const EnumElementDecl *elem) {
