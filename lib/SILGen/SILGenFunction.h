@@ -376,6 +376,10 @@ public:
   /// a local variable.
   llvm::DenseMap<ValueDecl*, VarLoc> VarLocs;
 
+  /// The local auxiliary declarations for the parameters of this function that
+  /// need to be emitted inside the next brace statement.
+  llvm::SmallVector<VarDecl *, 2> LocalAuxiliaryDecls;
+
   // Context information for tracking an `async let` child task.
   struct AsyncLetChildTask {
     SILValue asyncLet; // RawPointer to the async let state
