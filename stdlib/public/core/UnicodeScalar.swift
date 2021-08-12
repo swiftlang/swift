@@ -337,8 +337,8 @@ extension Unicode.Scalar {
   ///     }
   @inlinable
   public init?(_ v: Int) {
-    if let us = Unicode.Scalar(UInt32(v)) {
-      self = us
+    if let exact = UInt32(exactly: v) {
+      self.init(exact)
     } else {
       return nil
     }
