@@ -1677,9 +1677,6 @@ inline bool isErrorResult(GenericSignatureBuilder::ConstraintResult result) {
   llvm_unreachable("unhandled result");
 }
 
-/// Canonical ordering for dependent types.
-int compareDependentTypes(Type type1, Type type2);
-
 template<typename T>
 Type GenericSignatureBuilder::Constraint<T>::getSubjectDependentType(
                       TypeArrayView<GenericTypeParamType> genericParams) const {

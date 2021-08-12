@@ -1430,3 +1430,105 @@ bool Requirement::canBeSatisfied() const {
 
   llvm_unreachable("Bad requirement kind");
 }
+
+/// Determine the canonical ordering of requirements.
+static unsigned getRequirementKindOrder(RequirementKind kind) {
+  switch (kind) {
+  case RequirementKind::Conformance: return 2;
+  case RequirementKind::Superclass: return 0;
+  case RequirementKind::SameType: return 3;
+  case RequirementKind::Layout: return 1;
+  }
+  llvm_unreachable("unhandled kind");
+}
+
+/// Linear order on requirements in a generic signature.
+int Requirement::compare(const Requirement &other) const {
+  int compareLHS =
+    compareDependentTypes(getFirstType(), other.getFirstType());
+
+  if (compareLHS != 0)
+    return compareLHS;
+
+  int compareKind = (getRequirementKindOrder(getKind()) -
+                     getRequirementKindOrder(other.getKind()));
+
+  if (compareKind != 0)
+    return compareKind;
+
+  // We should only have multiple conformance requirements.
+  assert(getKind() == RequirementKind::Conformance);
+
+  int compareProtos =
+    TypeDecl::compare(getProtocolDecl(), other.getProtocolDecl());
+
+  assert(compareProtos != 0 && "Duplicate conformance requirement");
+  return compareProtos;
+}
+
+/// Compare two associated types.
+int swift::compareAssociatedTypes(AssociatedTypeDecl *assocType1,
+                                  AssociatedTypeDecl *assocType2) {
+  // - by name.
+  if (int result = assocType1->getName().str().compare(
+                                              assocType2->getName().str()))
+    return result;
+
+  // Prefer an associated type with no overrides (i.e., an anchor) to one
+  // that has overrides.
+  bool hasOverridden1 = !assocType1->getOverriddenDecls().empty();
+  bool hasOverridden2 = !assocType2->getOverriddenDecls().empty();
+  if (hasOverridden1 != hasOverridden2)
+    return hasOverridden1 ? +1 : -1;
+
+  // - by protocol, so t_n_m.`P.T` < t_n_m.`Q.T` (given P < Q)
+  auto proto1 = assocType1->getProtocol();
+  auto proto2 = assocType2->getProtocol();
+  if (int compareProtocols = TypeDecl::compare(proto1, proto2))
+    return compareProtocols;
+
+  // Error case: if we have two associated types with the same name in the
+  // same protocol, just tie-break based on address.
+  if (assocType1 != assocType2)
+    return assocType1 < assocType2 ? -1 : +1;
+
+  return 0;
+}
+
+/// Canonical ordering for type parameters.
+int swift::compareDependentTypes(Type type1, Type type2) {
+  // Fast-path check for equality.
+  if (type1->isEqual(type2)) return 0;
+
+  // Ordering is as follows:
+  // - Generic params
+  auto gp1 = type1->getAs<GenericTypeParamType>();
+  auto gp2 = type2->getAs<GenericTypeParamType>();
+  if (gp1 && gp2)
+    return GenericParamKey(gp1) < GenericParamKey(gp2) ? -1 : +1;
+
+  // A generic parameter is always ordered before a nested type.
+  if (static_cast<bool>(gp1) != static_cast<bool>(gp2))
+    return gp1 ? -1 : +1;
+
+  // - Dependent members
+  auto depMemTy1 = type1->castTo<DependentMemberType>();
+  auto depMemTy2 = type2->castTo<DependentMemberType>();
+
+  // - by base, so t_0_n.`P.T` < t_1_m.`P.T`
+  if (int compareBases =
+        compareDependentTypes(depMemTy1->getBase(), depMemTy2->getBase()))
+    return compareBases;
+
+  // - by name, so t_n_m.`P.T` < t_n_m.`P.U`
+  if (int compareNames = depMemTy1->getName().str().compare(
+                                                  depMemTy2->getName().str()))
+    return compareNames;
+
+  auto *assocType1 = depMemTy1->getAssocType();
+  auto *assocType2 = depMemTy2->getAssocType();
+  if (int result = compareAssociatedTypes(assocType1, assocType2))
+    return result;
+
+  return 0;
+}
