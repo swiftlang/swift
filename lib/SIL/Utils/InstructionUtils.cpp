@@ -280,14 +280,13 @@ bool swift::isEndOfScopeMarker(SILInstruction *user) {
     return false;
   case SILInstructionKind::EndAccessInst:
   case SILInstructionKind::EndBorrowInst:
-  case SILInstructionKind::EndLifetimeInst:
     return true;
   }
 }
 
 bool swift::isIncidentalUse(SILInstruction *user) {
   return isEndOfScopeMarker(user) || user->isDebugInstruction() ||
-         isa<FixLifetimeInst>(user);
+         isa<FixLifetimeInst>(user) || isa<EndLifetimeInst>(user);
 }
 
 bool swift::onlyAffectsRefCount(SILInstruction *user) {
