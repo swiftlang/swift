@@ -82,6 +82,76 @@ func genericWrapperCaller(projection: Projection<Int>) {
 }
 
 @propertyWrapper
+struct ImplementationDetail<T> {
+  var wrappedValue: T
+
+  // CHECK-LABEL: sil hidden [ossa] @$s26property_wrapper_parameter20ImplementationDetailV12wrappedValueACyxGx_tcfC : $@convention(method) <T> (@in T, @thin ImplementationDetail<T>.Type) -> @out ImplementationDetail<T>
+  init(wrappedValue: T) {
+    self.wrappedValue = wrappedValue
+  }
+}
+
+
+struct TestStructInit {
+  // property wrapper backing initializer of number #1 in TestStructInit.init(number:message:)
+  // CHECK-LABEL: sil private [ossa] @$s26property_wrapper_parameter14TestStructInitV6number7messageAcA7WrapperVySiG_SStcfcADL_SivpfP : $@convention(thin) (Int) -> Wrapper<Int>
+
+  // property wrapper init from projected value of number #1 in TestStructInit.init(number:message:)
+  // CHECK-LABEL: sil private [ossa] @$s26property_wrapper_parameter14TestStructInitV6number7messageAcA7WrapperVySiG_SStcfcADL_SivpfW : $@convention(thin) (Projection<Int>) -> Wrapper<Int>
+
+  // CHECK-LABEL: sil hidden [ossa] @$s26property_wrapper_parameter14TestStructInitV6number7messageAcA7WrapperVySiG_SStcfC : $@convention(method) (Wrapper<Int>, @owned String, @thin TestStructInit.Type) -> TestStructInit
+  init(@Wrapper number: Int, @ImplementationDetail message: String) {
+    // CHECK: debug_value %0 : $Wrapper<Int>, let, name "_number"
+    // CHECK: debug_value %1 : $String, let, name "message"
+    // CHECK: alloc_stack $ImplementationDetail<String>
+    // CHECK" function_ref @$s26property_wrapper_parameter20ImplementationDetailV12wrappedValueACyxGx_tcfC : $@convention(method) <τ_0_0> (@in τ_0_0, @thin ImplementationDetail<τ_0_0>.Type) -> @out ImplementationDetail<τ_0_0>
+
+    _ = number
+    _ = _number
+
+    _ = message
+    _ = _message
+
+    // getter of number #1 in TestStructInit.init(number:message:)
+    // CHECK-LABEL: sil private [ossa] @$s26property_wrapper_parameter14TestStructInitV6number7messageAcA7WrapperVySiG_SStcfcADL_Sivg : $@convention(thin) (Wrapper<Int>) -> Int
+
+    // getter of message #1 in TestStructInit.init(number:message:)
+    // CHECK-LABEL: sil private [ossa] @$s26property_wrapper_parameter14TestStructInitV6number7messageAcA7WrapperVySiG_SStcfcAEL_SSvg : $@convention(thin) (@guaranteed ImplementationDetail<String>) -> @owned String
+  }
+}
+
+class TestClassInit {
+  // property wrapper backing initializer of number #1 in TestClassInit.init(number:message:)
+  // CHECK-LABEL: sil private [ossa] @$s26property_wrapper_parameter13TestClassInitC6number7messageAcA7WrapperVySiG_SStcfcADL_SivpfP : $@convention(thin) (Int) -> Wrapper<Int>
+
+  // property wrapper init from projected value of number #1 in TestClassInit.init(number:message:)
+  // CHECK-LABEL: sil private [ossa] @$s26property_wrapper_parameter13TestClassInitC6number7messageAcA7WrapperVySiG_SStcfcADL_SivpfW : $@convention(thin) (Projection<Int>) -> Wrapper<Int>
+
+  // TestClassInit.__allocating_init(number:message:)
+  // CHECK-LABEL: sil hidden [exact_self_class] [ossa] @$s26property_wrapper_parameter13TestClassInitC6number7messageAcA7WrapperVySiG_SStcfC : $@convention(method) (Wrapper<Int>, @owned String, @thick TestClassInit.Type) -> @owned TestClassInit
+  // CHECK-NOT: alloc_stack $ImplementationDetail<String>
+
+  // CHECK-LABEL: sil hidden [ossa] @$s26property_wrapper_parameter13TestClassInitC6number7messageAcA7WrapperVySiG_SStcfc : $@convention(method) (Wrapper<Int>, @owned String, @owned TestClassInit) -> @owned TestClassInit
+  init(@Wrapper number: Int, @ImplementationDetail message: String) {
+    // CHECK: debug_value %0 : $Wrapper<Int>, let, name "_number"
+    // CHECK: debug_value %1 : $String, let, name "message"
+    // CHECK: alloc_stack $ImplementationDetail<String>
+
+    _ = number
+    _ = _number
+
+    _ = message
+    _ = _message
+
+    // getter of number #1 in TestClassInit.init(number:message:)
+    // CHECK-LABEL: sil private [ossa] @$s26property_wrapper_parameter13TestClassInitC6number7messageAcA7WrapperVySiG_SStcfcADL_Sivg : $@convention(thin) (Wrapper<Int>) -> Int
+
+    // getter of message #1 in TestClassInit.init(number:message:)
+    // CHECK-LABEL: sil private [ossa] @$s26property_wrapper_parameter13TestClassInitC6number7messageAcA7WrapperVySiG_SStcfcAEL_SSvg : $@convention(thin) (@guaranteed ImplementationDetail<String>) -> @owned String
+  }
+}
+
+@propertyWrapper
 public struct AutoClosureWrapper<T> {
   public var wrappedValue: T
 
