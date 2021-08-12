@@ -211,13 +211,13 @@ bool swift::isIntermediateRelease(SILInstruction *inst,
   return false;
 }
 
-bool swift::hasOnlyEndOfScopeOrDestroyUses(SILInstruction *inst) {
+bool swift::hasOnlyEndOfScopeOrEndOfLifetimeUses(SILInstruction *inst) {
   for (SILValue result : inst->getResults()) {
     for (Operand *use : result->getUses()) {
       SILInstruction *user = use->getUser();
       bool isDebugUser = user->isDebugInstruction();
-      if (!isa<DestroyValueInst>(user) && !isEndOfScopeMarker(user) &&
-          !isDebugUser)
+      if (!isa<DestroyValueInst>(user) && !isa<EndLifetimeInst>(user) &&
+          !isEndOfScopeMarker(user) && !isDebugUser)
         return false;
       // Include debug uses only in Onone mode.
       if (isDebugUser && inst->getFunction()->getEffectiveOptimizationMode() <=
@@ -306,7 +306,7 @@ static bool isScopeAffectingInstructionDead(SILInstruction *inst,
   }
   // If the instruction has any use other than end of scope use or destroy_value
   // use, bail out.
-  if (!hasOnlyEndOfScopeOrDestroyUses(inst)) {
+  if (!hasOnlyEndOfScopeOrEndOfLifetimeUses(inst)) {
     return false;
   }
   // If inst is a copy or beginning of scope, inst is dead, since we know that
@@ -468,8 +468,8 @@ void InstructionDeleter::deleteWithUses(SILInstruction *inst, bool fixLifetimes,
       auto uses = llvm::to_vector<4>(result->getUses());
       for (Operand *use : uses) {
         SILInstruction *user = use->getUser();
-        assert(forceDeleteUsers || isIncidentalUse(user)
-               || isa<DestroyValueInst>(user));
+        assert(forceDeleteUsers || isIncidentalUse(user) ||
+               isa<DestroyValueInst>(user));
         assert(!isa<BranchInst>(user) && "can't delete phis");
 
         toDeleteInsts.push_back(user);
@@ -574,7 +574,7 @@ void InstructionDeleter::recursivelyForceDeleteUsersAndFixLifetimes(
   if (isIncidentalUse(inst) || isa<DestroyValueInst>(inst)) {
     forceDelete(inst);
     return;
-  }
+    }
   forceDeleteAndFixLifetimes(inst);
 }
 
