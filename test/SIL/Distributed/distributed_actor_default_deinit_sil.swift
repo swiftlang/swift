@@ -10,7 +10,7 @@ distributed actor SimpleEmptyDistributedActor {
 // ==== deinit must invoke transport.resignIdentity() when it is local
 
 // CHECK: // SimpleEmptyDistributedActor.deinit
-// CHECK: sil hidden [available 12.0] @$s36distributed_actor_default_deinit_sil27SimpleEmptyDistributedActorCfd : $@convention(method) (@guaranteed SimpleEmptyDistributedActor) -> @owned Builtin.NativeObject {
+// sil hidden [available 12.0] @$s36distributed_actor_default_deinit_sil27SimpleEmptyDistributedActorCfd : $@convention(method) (@guaranteed SimpleEmptyDistributedActor) -> @owned Builtin.NativeObject {
 // CHECK: [[SELF:%[0-9]+]] "self"
 // CHECK: bb0(%0 : $SimpleEmptyDistributedActor):
 // CHECK:  debug_value %0 : $SimpleEmptyDistributedActor, let, name "self", argno 1 

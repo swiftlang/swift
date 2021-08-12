@@ -256,8 +256,6 @@ static void emitDistributedActorStore_init_assignIdentity(
   auto *module = SGF.getModule().getSwiftModule();
 
   // the conformance here is just an abstract thing so we can simplify
-  //  auto transportConfRef = module->lookupConformance(
-  //      openedTransportType, transportProto);
   auto transportConfRef = ProtocolConformanceRef(transportProto);
   assert(!transportConfRef.isInvalid() && "Missing conformance to `ActorTransport`");
 
@@ -415,8 +413,6 @@ void SILGenFunction::emitDistributedActorReady(
   auto *module = getModule().getSwiftModule();
 
   // the conformance here is just an abstract thing so we can simplify
-  //  auto transportConfRef = module->lookupConformance(
-  //      openedTransportType, transportProto);
   auto transportConfRef = ProtocolConformanceRef(transportProto);
   assert(!transportConfRef.isInvalid() && "Missing conformance to `ActorTransport`");
 
@@ -487,10 +483,9 @@ void SILGenFunction::emitDistributedActorFactory(FuncDecl *fd) {
       transportArg->getType().getASTType()->isEqual(C.getActorTransportType()));
 
   // --- Parameter: self
-//  ClassDecl *selfDecl = cast<ClassDecl>(fd->getDeclContext()->getAsDecl());
   auto *selfTyDecl = fd->getParent()->getSelfNominalTypeDecl();
   assert(selfTyDecl->isDistributedActor());
-  auto selfTy = F.mapTypeIntoContext(selfTyDecl->getDeclaredInterfaceType()); // TODO: thats just self var devl getType
+  auto selfTy = F.mapTypeIntoContext(selfTyDecl->getDeclaredInterfaceType());
 
   // ManagedValue selfArg = B.createInputFunctionArgument(selfTy, selfDecl);
   VarDecl *selfVarDecl = fd->getImplicitSelfDecl();
@@ -823,6 +818,8 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
       B.createBranch(loc, returnBB, {result});
     }
   }
+
+  // TODO: to use a emitAndBranch local function, since these four blocks are so similar
 
   {
     B.emitBlock(remoteErrorBB);

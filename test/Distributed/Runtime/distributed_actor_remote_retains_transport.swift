@@ -8,7 +8,7 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
-// RE_QUIRES: rdar78290608
+// REQUIRES: rdar78290608
 
 import _Distributed
 
