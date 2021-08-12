@@ -11385,6 +11385,10 @@ ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyPointerToCPointerRestriction(
     Type type1, Type type2, TypeMatchOptions flags,
     ConstraintLocatorBuilder locator) {
+  // Make sure that solutions with implicit pointer conversions
+  // are always worse than the ones without them.
+  increaseScore(SK_ImplicitValueConversion);
+
   auto &ctx = getASTContext();
 
   PointerTypeKind swiftPtrKind, cPtrKind;

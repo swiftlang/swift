@@ -1,5 +1,3 @@
-// %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -import-objc-header %S/Inputs/overloaded_async_method.h %s -typecheck -verify
-
 // RUN: %empty-directory(%t)
 
 // RUN: %gyb %s -o %t/swift_to_c_pointer_conversions.swift
@@ -235,4 +233,13 @@ func test_raw_ptr_optional_to_optional_conversion(
       const_opt_uint_${Size}_ptr_func(${Ptr}) // expected-error {{}}
     % end
   % end
+}
+
+// Check that implicit conversions don't make expressions ambiguous
+func test_overloaded_ref_is_not_ambiguous() {
+  func overloaded_func() -> UnsafeRawPointer { fatalError() }
+  func overloaded_func() -> UnsafePointer<Int8> { fatalError() }
+
+  const_char_ptr_func(overloaded_func()) // Ok
+  const_opt_char_ptr_func(overloaded_func()) // Ok
 }
