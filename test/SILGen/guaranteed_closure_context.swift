@@ -63,7 +63,6 @@ func guaranteed_captures() {
   // CHECK-NOT: copy_value [[MUTABLE_RETAINABLE_BOX]]
   // CHECK-NOT: copy_value [[MUTABLE_ADDRESS_ONLY_BOX]]
   // CHECK-NOT: copy_value [[IMMUTABLE_RETAINABLE]]
-  // CHECK-NOT: destroy_value [[IMMUTABLE_AO_BOX]]
 
   escape(captureEverything)
 }
