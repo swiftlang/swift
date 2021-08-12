@@ -38,7 +38,7 @@ func test_mutable_raw_pointer(ptr: UnsafeMutableRawPointer) {
   % end
 }
 
-%for TestPtrSize in ['16', '32', '64']:
+%for TestPtrSize in ['8', '16', '32', '64']:
 // Immutable pointers can be converted only to their immutable (regardless of sign) counterparts.
 func test_${TestPtrSize}_bit_ptrs(sptr: UnsafePointer<Int${TestPtrSize}>,
                                   uptr: UnsafePointer<UInt${TestPtrSize}>,
@@ -112,7 +112,7 @@ func test_${TestPtrSize}_bit_ptrs(sptr: UnsafePointer<Int${TestPtrSize}>,
 
 % end
 
-%for TestPtrSize in ['16', '32', '64']:
+%for TestPtrSize in ['8', '16', '32', '64']:
 // Mutable pointers can be converted to both immutable and mutable pointers when
 // passed to C/ObjC imported functions.
 func test_mutable_${TestPtrSize}_bit_ptrs(sptr: UnsafeMutablePointer<Int${TestPtrSize}>,
