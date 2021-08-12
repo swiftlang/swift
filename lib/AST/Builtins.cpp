@@ -1462,10 +1462,18 @@ static ValueDecl *getDefaultActorInitDestroy(ASTContext &ctx,
                             _void);
 }
 
-static ValueDecl *getDistributedActorInitDestroy(ASTContext &ctx,
+static ValueDecl *getDistributedActorInitializeRemote(ASTContext &ctx,
+                                                      Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _generics(_unrestricted), // TODO(distributed): restrict to DistributedActor
+                            _parameters(_metatype(_typeparam(0))),
+                            _rawPointer);
+}
+
+static ValueDecl *getDistributedActorDestroy(ASTContext &ctx,
                                                  Identifier id) {
   return getBuiltinFunction(ctx, id, _thin,
-                            _parameters(_nativeObject), // TODO: no idea if to pass more here?
+                            _parameters(_nativeObject),
                             _void);
 }
 
@@ -2808,8 +2816,10 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return getDefaultActorInitDestroy(Context, Id);
 
   case BuiltinValueKind::InitializeDistributedRemoteActor:
+    return getDistributedActorInitializeRemote(Context, Id);
+
   case BuiltinValueKind::DestroyDistributedActor:
-    return getDistributedActorInitDestroy(Context, Id);
+    return getDistributedActorDestroy(Context, Id);
 
   case BuiltinValueKind::StartAsyncLet:
   case BuiltinValueKind::StartAsyncLetWithLocalBuffer:

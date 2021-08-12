@@ -1684,7 +1684,6 @@ static void diagnosePotentialConcurrencyUnavailability(
   fixAvailability(ReferenceRange, ReferenceDC, RequiredRange, Context);
 }
 
-
 void TypeChecker::checkConcurrencyAvailability(SourceRange ReferenceRange,
                                                const DeclContext *ReferenceDC) {
   // Check the availability of concurrency runtime support.

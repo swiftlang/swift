@@ -113,7 +113,7 @@ class ExecutorTrackingInfo {
   /// information about the current thread, if any.
   ///
   /// TODO: this is obviously runtime-internal and therefore not
-  /// reasonable to make ABI. We might want to also provide a way 
+  /// reasonable to make ABI. We might want to also provide a way
   /// for generated code to efficiently query the identity of the
   /// current executor, in order to do a cheap comparison to avoid
   /// doing all the work to suspend the task when we're already on
@@ -618,6 +618,7 @@ class DefaultActorImpl : public HeapObject {
       Status_width = 3,
 
       HasActiveInlineJob = 3,
+
       IsDistributedRemote = 4,
 
       MaxPriority = 8,
@@ -683,9 +684,7 @@ class DefaultActorImpl : public HeapObject {
 
 public:
   /// Properly construct an actor, except for the heap header.
-  /// \param isDistributedRemote When true sets the IsDistributedRemote flag
   void initialize(bool isDistributedRemote = false) {
-    // TODO: this is just a simple implementation, rather we would want to allocate a proxy
     auto flags = Flags();
     flags.setIsDistributedRemote(isDistributedRemote);
     new (&CurrentState) std::atomic<State>(State{JobRef(), flags});
@@ -716,7 +715,7 @@ public:
   /// Note that a distributed *local* actor instance is the same as any other
   /// ordinary default (local) actor, and no special handling is needed for them.
   bool isDistributedRemote();
-  
+
 private:
   void deallocateUnconditional();
 
@@ -911,7 +910,7 @@ public:
       IsAbandoned = true;
       shouldDelete = IsResolvedByJob && IsResolvedByActor;
     });
-    if (shouldDelete) delete this;    
+    if (shouldDelete) delete this;
   }
 
   /// Called by the job to notify the actor that the job has successfully
@@ -926,7 +925,7 @@ public:
       IsResolvedByJob = true;
       shouldDelete = IsResolvedByJob && IsResolvedByActor;
     });
-    if (shouldDelete) delete this;    
+    if (shouldDelete) delete this;
   }
 
   /// Called by the job to wait for the actor to resolve what the job
@@ -1236,7 +1235,7 @@ void DefaultActorImpl::giveUpThread(RunningJobInfo runner) {
       // Try again.
       continue;
     }
-    
+
 #if SWIFT_TASK_PRINTF_DEBUG
 #  define LOG_STATE_TRANSITION                                                  \
     fprintf(stderr, "[%lu] actor %p transitioned from %zx to %zx (%s)\n",       \
@@ -1359,7 +1358,7 @@ Job *DefaultActorImpl::claimNextJobOrGiveUp(bool actorIsOwned,
         continue;
       LOG_STATE_TRANSITION;
       _swift_tsan_acquire(this);
-      
+
       // If that succeeded, we can proceed to the main body.
       oldState = newState;
       runner.setRunning();
@@ -1429,7 +1428,7 @@ Job *DefaultActorImpl::claimNextJobOrGiveUp(bool actorIsOwned,
       continue;
     }
     LOG_STATE_TRANSITION;
-    
+
     // We successfully updated the state.
 
     // If we're giving up the thread with jobs remaining, we need
@@ -1752,30 +1751,6 @@ void swift::swift_defaultActor_deallocateResilient(HeapObject *actor) {
                       metadata->getInstanceAlignMask());
 }
 
-// TODO: most likely where we'd need to create the "proxy instance" instead? (most likely remove this and use swift_distributedActor_remote_create instead)
-void swift::swift_distributedActor_remote_initialize(DefaultActor *_actor) { // FIXME: remove distributed C++ impl not needed?
-  auto actor = asImpl(_actor);
-  actor->initialize(/*remote=*/true);
-}
-
-// TODO: missing implementation of creating a proxy for the remote actor
-OpaqueValue* swift::swift_distributedActor_remote_create(OpaqueValue *identity,
-                                                         OpaqueValue *transport) {
-  assert(false && "swift_distributedActor_remote_create is not implemented yet!");
-}
-
-void swift::swift_distributedActor_destroy(DefaultActor *_actor) { // FIXME: remove distributed C++ impl not needed?
-  // TODO: need to resign the address before we destroy:
-  //       something like: actor.transport.resignIdentity(actor.address)
-
-  // FIXME: if this is a proxy, we would destroy a bit differently I guess? less memory was allocated etc.
-  asImpl(_actor)->destroy(); // today we just replicate what defaultActor_destroy does
-}
-
-bool swift::swift_distributed_actor_is_remote(DefaultActor *_actor) {
-  return asImpl(_actor)->isDistributedRemote();
-}
-
 /// FIXME: only exists for the quick-and-dirty MainActor implementation.
 namespace swift {
   Metadata* MainActorMetadata = nullptr;
@@ -1981,11 +1956,48 @@ static void swift_task_enqueueImpl(Job *job, ExecutorRef executor) {
 #define OVERRIDE_ACTOR COMPATIBILITY_OVERRIDE
 #include COMPATIBILITY_OVERRIDE_INCLUDE_PATH
 
+
 /*****************************************************************************/
 /***************************** DISTRIBUTED ACTOR *****************************/
 /*****************************************************************************/
 
+OpaqueValue*
+swift::swift_distributedActor_remote_initialize(const Metadata *actorType) {
+  auto *classMetadata = actorType->getClassObject();
+
+  // TODO(distributed): make this allocation smaller
+  // ==== Allocate the memory for the remote instance
+  HeapObject *alloc = swift_allocObject(classMetadata,
+                                        classMetadata->getInstanceSize(),
+                                        classMetadata->getInstanceAlignMask());
+
+  // TODO: remove this memset eventually, today we only do this to not have
+  //       to modify the destructor logic, as releasing zeroes is no-op
+  memset(alloc + 1, 0, classMetadata->getInstanceSize() - sizeof(HeapObject));
+
+  // TODO(distributed): a remote one does not have to have the "real"
+  //  default actor body, e.g. we don't need an executor at all; so
+  //  we can allocate more efficiently and only share the flags/status field
+  //  between the both memory representations
+  // --- Currently we ride on the DefaultActorImpl to reuse the memory layout
+  // of the flags etc. So initialize the default actor into the allocation.
+  auto actor = asImpl(reinterpret_cast<DefaultActor*>(alloc));
+  actor->initialize(/*remote*/true);
+  assert(actor->isDistributedRemote());
+
+  return reinterpret_cast<OpaqueValue*>(actor);
+}
+
+void swift::swift_distributedActor_destroy(DefaultActor *_actor) {
+  // FIXME(distributed): if this is a proxy, we would destroy a bit differently I guess? less memory was allocated etc.
+  asImpl(_actor)->destroy(); // today we just replicate what defaultActor_destroy does
+}
+
+bool swift::swift_distributed_actor_is_remote(DefaultActor *_actor) {
+  return asImpl(_actor)->isDistributedRemote();
+}
+
 bool DefaultActorImpl::isDistributedRemote() {
   auto state = CurrentState.load(std::memory_order_relaxed);
-  return state.Flags.isDistributedRemote() == 1;
+  return state.Flags.isDistributedRemote();
 }

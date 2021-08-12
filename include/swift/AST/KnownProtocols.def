@@ -96,6 +96,7 @@ PROTOCOL(Differentiable)
 
 // Distributed Actors
 PROTOCOL(DistributedActor)
+PROTOCOL(ActorIdentity)
 PROTOCOL(ActorTransport)
 
 PROTOCOL(AsyncSequence)

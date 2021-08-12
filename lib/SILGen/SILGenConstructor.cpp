@@ -669,21 +669,6 @@ static void emitDefaultActorInitialization(
                       { self.borrow(SGF, loc).getValue() });
 }
 
-static void emitDistributedRemoteActorInitialization(
-    SILGenFunction &SGF, SILLocation loc,
-    ManagedValue self,
-    bool addressArg, bool transportArg // FIXME: make those real arguments
-    ) {
-  auto &ctx = SGF.getASTContext();
-  auto builtinName = ctx.getIdentifier(
-    getBuiltinName(BuiltinValueKind::InitializeDistributedRemoteActor));
-  auto resultTy = SGF.SGM.Types.getEmptyTupleType();
-
-  FullExpr scope(SGF.Cleanups, CleanupLocation(loc));
-  SGF.B.createBuiltin(loc, builtinName, resultTy, /*subs*/{},
-                      { self.borrow(SGF, loc).getValue() });
-}
-
 void SILGenFunction::emitConstructorPrologActorHop(
                                            SILLocation loc,
                                            Optional<ActorIsolation> maybeIso) {
@@ -776,17 +761,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   if (selfClassDecl->isRootDefaultActor() && !isDelegating) {
     SILLocation PrologueLoc(selfDecl);
     PrologueLoc.markAsPrologue();
-
-    if (selfClassDecl->isDistributedActor() &&
-        ctor->isDistributedActorResolveInit()) {
-      auto addressArg  = false; // TODO: get the address argument
-      auto transportArg  = false; // TODO: get the transport argument
-      emitDistributedRemoteActorInitialization(*this, PrologueLoc,
-          selfArg, addressArg, transportArg);
-    } else {
-      // is normal (default) actor
-      emitDefaultActorInitialization(*this, PrologueLoc, selfArg);
-    }
+    emitDefaultActorInitialization(*this, PrologueLoc, selfArg);
   }
 
   if (!ctor->hasStubImplementation()) {
@@ -802,6 +777,11 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
       selfArg = B.createMarkUninitialized(selfDecl, selfArg, MUKind);
       VarLocs[selfDecl] = VarLoc::get(selfArg.getValue());
     }
+  }
+
+  // Distributed actor initializers implicitly initialize their transport and id
+  if (selfClassDecl->isDistributedActor() && !isDelegating) {
+    initializeDistributedActorImplicitStorageInit(ctor, selfArg);
   }
 
   // Prepare the end of initializer location.
@@ -944,12 +924,18 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
     // problem.
     ReturnDest = std::move(ReturnDest).translate(getTopCleanup());
   }
-  
+
   // Emit the epilog and post-matter.
   auto returnLoc = emitEpilog(ctor, /*UsesCustomEpilog*/true);
 
   // Unpop our selfArg cleanup, so we can forward.
   std::move(SelfCleanupSave).pop();
+
+  // TODO(distributed): rdar://81783599 if this is a distributed actor, jump to the distributedReady block?
+  //  // For distributed actors, emit "actor ready" since we successfully initialized
+  //  if (selfClassDecl->isDistributedActor() && !isDelegating) {
+  //    emitDistributedActorReady(ctor, selfArg);
+  //  }
 
   // Finish off the epilog by returning.  If this is a failable ctor, then we
   // actually jump to the failure epilog to keep the invariant that there is
@@ -1211,3 +1197,4 @@ void SILGenFunction::emitIVarInitializer(SILDeclRef ivarInitializer) {
 
   emitEpilog(loc);
 }
+

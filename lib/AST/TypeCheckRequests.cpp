@@ -1034,10 +1034,13 @@ void swift::simple_display(llvm::raw_ostream &out,
     out << "resolve Decodable.init(from:)";
     break;
   case ImplicitMemberAction::ResolveDistributedActor:
-    out << "resolve DistributedActor[init(transport:), init(resolve:using:)]";
+    out << "resolve DistributedActor";
     break;
   case ImplicitMemberAction::ResolveDistributedActorIdentity:
     out << "resolve DistributedActor.id";
+    break;
+  case ImplicitMemberAction::ResolveDistributedActorTransport:
+    out << "resolve DistributedActor.actorTransport";
     break;
   }
 }
@@ -1318,7 +1321,7 @@ Optional<BraceStmt *> TypeCheckFunctionBodyRequest::getCachedResult() const {
   auto *afd = std::get<0>(getStorage());
   switch (afd->getBodyKind()) {
   case BodyKind::Deserialized:
-  case BodyKind::MemberwiseInitializer:
+  case BodyKind::SILSynthesize:
   case BodyKind::None:
   case BodyKind::Skipped:
     // These cases don't have any body available.

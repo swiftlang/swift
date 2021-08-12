@@ -52,7 +52,8 @@ actor A2: DistributedActor {
   init(transport: ActorTransport) {
     fatalError()
   }
-  init(resolve id: AnyActorIdentity, using transport: ActorTransport) throws {
+
+  static func resolve(_ identity: AnyActorIdentity, using transport: ActorTransport) throws -> Self {
     fatalError()
   }
 }
@@ -60,6 +61,7 @@ actor A2: DistributedActor {
 @available(SwiftStdlib 5.5, *)
 class C2: DistributedActor {
   // expected-error@-1{{non-actor type 'C2' cannot conform to the 'Actor' protocol}}
+  // expected-error@-2{{non-final class 'C2' cannot conform to `Sendable`; use `@unchecked Sendable`}}
   nonisolated var id: AnyActorIdentity {
     fatalError()
   }
@@ -70,7 +72,7 @@ class C2: DistributedActor {
   required init(transport: ActorTransport) {
     fatalError()
   }
-  required init(resolve id: AnyActorIdentity, using transport: ActorTransport) throws {
+  static func resolve(_ identity: AnyActorIdentity, using transport: ActorTransport) throws -> Self {
     fatalError()
   }
 }

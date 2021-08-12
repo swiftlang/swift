@@ -48,7 +48,7 @@ public protocol ActorTransport: Sendable {
   ///
   /// Detecting liveness of such remote actors shall be offered / by transport libraries
   /// by other means, such as "watching an actor for termination" or similar.
-  func resolve<Act>(_ identity: AnyActorIdentity, as actorType: Act.Type) throws -> ActorResolved<Act>
+  func resolve<Act>(_ identity: AnyActorIdentity, as actorType: Act.Type) throws -> ActorResolved<Act> // TODO(distributed): make just optional
       where Act: DistributedActor
 
   // ==== ---------------------------------------------------------------------
@@ -64,11 +64,8 @@ public protocol ActorTransport: Sendable {
   /// E.g. if an actor is created under address `addr1` then immediately invoking
   /// `transport.resolve(address: addr1, as: Greeter.self)` MUST return a reference
   /// to the same actor.
-  // FIXME: make it Act.ID needs changes in AST gen
   func assignIdentity<Act>(_ actorType: Act.Type) -> AnyActorIdentity
       where Act: DistributedActor
-//  func assignIdentity<Act>(_ actorType: Act.Type) -> Act.ID
-//      where Act: DistributedActor
 
   func actorReady<Act>(_ actor: Act) where Act: DistributedActor
 

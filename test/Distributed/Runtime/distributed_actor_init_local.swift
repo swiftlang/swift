@@ -14,6 +14,9 @@ import _Distributed
 
 @available(SwiftStdlib 5.5, *)
 distributed actor LocalWorker {
+  init(transport: ActorTransport) {
+    defer { transport.actorReady(self) } // FIXME(distributed): rdar://81783599 this should be injected automatically
+  }
 }
 
 // ==== Fake Transport ---------------------------------------------------------
@@ -21,7 +24,7 @@ distributed actor LocalWorker {
 @available(SwiftStdlib 5.5, *)
 struct ActorAddress: ActorIdentity {
   let address: String
-  init(parse address : String) {
+  init(parse address: String) {
     self.address = address
   }
 }
@@ -32,9 +35,8 @@ struct FakeTransport: ActorTransport {
     fatalError("not implemented:\(#function)")
   }
 
-  func resolve<Act>(_ identity: Act.ID, as actorType: Act.Type)
-      throws -> ActorResolved<Act>
-      where Act: DistributedActor {
+  func resolve<Act>(_ identity: AnyActorIdentity, as actorType: Act.Type)
+      throws -> ActorResolved<Act> where Act: DistributedActor {
     fatalError("not implemented:\(#function)")
   }
 
@@ -50,7 +52,7 @@ struct FakeTransport: ActorTransport {
   }
 
   func resignIdentity(_ id: AnyActorIdentity) {
-    print("ready id:\(id)")
+    print("resign id:\(id)")
   }
 }
 
@@ -61,8 +63,9 @@ func test() {
   let transport = FakeTransport()
 
   _ = LocalWorker(transport: transport)
-  // CHECK: assign type:LocalWorker, id:[[ID:.*]]
-  // CHECK: ready actor:main.LocalWorker, id:AnyActorIdentity([[ID]])
+  // CHECK: assign type:LocalWorker, id:ActorAddress(address: "[[ID:.*]]")
+  // CHECK: ready actor:main.LocalWorker, id:AnyActorIdentity(ActorAddress(address: "[[ID]]"))
+  // CHECK: resign id:AnyActorIdentity(ActorAddress(address: "[[ID]]"))
 }
 
 @available(SwiftStdlib 5.5, *)
