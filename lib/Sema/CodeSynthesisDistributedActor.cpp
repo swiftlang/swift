@@ -45,6 +45,7 @@ using namespace swift;
 ///
 /// factory function in the AST, with an empty body. Its body is
 /// expected to be filled-in during SILGen.
+// TODO(distributed): move this synthesis to DerivedConformance style
 static void addFactoryResolveFunction(ClassDecl *decl) {
   assert(decl->isDistributedActor());
   auto &C = decl->getASTContext();
@@ -127,6 +128,7 @@ createStoredProperty(ClassDecl *classDecl, ASTContext &ctx,
 /// Adds the following, fairly special, properties to each distributed actor:
 /// - actorTransport
 /// - id
+// TODO(distributed): move this synthesis to DerivedConformance style
 static void addImplicitDistributedActorStoredProperties(ClassDecl *decl) {
   assert(decl->isDistributedActor());
 
