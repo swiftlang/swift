@@ -1,4 +1,4 @@
-//===--- TypeCheckDistributed.h - Distributed -------------------*- C++ -*-===//
+//===-- TypeCheckDistributed.h - Distributed actor typechecking -*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -20,35 +20,26 @@
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Type.h"
-#include <cassert>
 
 namespace swift {
 
-class AbstractFunctionDecl;
-class ConstructorDecl;
-class ActorIsolation;
-class AnyFunctionType;
-class ASTContext;
 class ClassDecl;
-class ClosureExpr;
-class ConcreteDeclRef;
-class CustomAttr;
+class ConstructorDecl;
 class Decl;
-class DeclContext;
-class EnumElementDecl;
-class Expr;
 class FuncDecl;
-class Initializer;
-class PatternBindingDecl;
-class ProtocolConformance;
-class TopLevelCodeDecl;
-class TypeBase;
-class ValueDecl;
 
-/// Check distributed actor isolation rules.
+/******************************************************************************/
+/********************* Distributed Actor Type Checking ************************/
+/******************************************************************************/
+
+// Diagnose an error if the _Distributed module is not loaded.
+bool ensureDistributedModuleLoaded(Decl *decl);
+
+/// Check for illegal property declarations (e.g. re-declaring transport or id)
+void checkDistributedActorProperties(const ClassDecl *decl);
 
 /// The local and resolve distributed actor constructors have special rules to check.
-void checkDistributedActorConstructor(ClassDecl *decl, ConstructorDecl *ctor);
+void checkDistributedActorConstructor(const ClassDecl *decl, ConstructorDecl *ctor);
 
 bool checkDistributedFunction(FuncDecl *decl, bool diagnose);
 

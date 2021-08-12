@@ -516,26 +516,32 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
              fd->getResultInterfaceType(), fd->hasThrows(), fd->getThrowsLoc());
   prepareEpilog(true, fd->hasThrows(), CleanupLocation(fd));
 
-  if (llvm::any_of(
-          *fd->getParameters(),
-          [](ParamDecl *p){ return p->hasAttachedPropertyWrapper(); })) {
-    // If any parameters have property wrappers, emit the local auxiliary
-    // variables before emitting the function body.
-    LexicalScope BraceScope(*this, CleanupLocation(fd));
-    for (auto *param : *fd->getParameters()) {
-      param->visitAuxiliaryDecls([&](VarDecl *auxiliaryVar) {
-        SILLocation WrapperLoc(auxiliaryVar);
-        WrapperLoc.markAsPrologue();
-        if (auto *patternBinding = auxiliaryVar->getParentPatternBinding())
-          visitPatternBindingDecl(patternBinding);
-
-        visit(auxiliaryVar);
-      });
-    }
-
-    emitStmt(fd->getTypecheckedBody());
+  if (fd->isDistributedActorFactory()) {
+    // Synthesize the factory function body
+    emitDistributedActorFactory(fd);
   } else {
-    emitStmt(fd->getTypecheckedBody());
+    // Emit the actual function body as usual
+    if (llvm::any_of(
+            *fd->getParameters(),
+            [](ParamDecl *p){ return p->hasAttachedPropertyWrapper(); })) {
+      // If any parameters have property wrappers, emit the local auxiliary
+      // variables before emitting the function body.
+      LexicalScope BraceScope(*this, CleanupLocation(fd));
+      for (auto *param : *fd->getParameters()) {
+        param->visitAuxiliaryDecls([&](VarDecl *auxiliaryVar) {
+          SILLocation WrapperLoc(auxiliaryVar);
+          WrapperLoc.markAsPrologue();
+          if (auto *patternBinding = auxiliaryVar->getParentPatternBinding())
+            visitPatternBindingDecl(patternBinding);
+
+          visit(auxiliaryVar);
+        });
+      }
+
+      emitStmt(fd->getTypecheckedBody());
+    } else {
+      emitStmt(fd->getTypecheckedBody());
+    }
   }
 
   emitEpilog(fd);

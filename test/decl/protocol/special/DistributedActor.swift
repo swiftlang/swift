@@ -1,10 +1,8 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-distributed
+// RUN: %target-typecheck-verify-swift -enable-experimental-distributed -verify-ignore-unknown
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
 import _Distributed
-
-// Synthesis of distributed actors.
 
 @available(SwiftStdlib 5.5, *)
 distributed actor D1 {
@@ -13,17 +11,45 @@ distributed actor D1 {
 
 @available(SwiftStdlib 5.5, *)
 distributed actor D2 {
-  let actorTransport: String // expected-error{{invalid redeclaration of synthesized implementation for protocol requirement 'actorTransport'}}
-  let id: String // expected-error{{invalid redeclaration of synthesized implementation for protocol requirement 'id'}}
+  // expected-error@-1{{actor 'D2' has no initializers}}
+  let actorTransport: String
+  // expected-error@-1{{property 'actorTransport' cannot be defined explicitly, as it conflicts with distributed actor synthesized stored property}}
+  // expected-error@-2{{invalid redeclaration of synthesized implementation for protocol requirement 'actorTransport'}}
+  // expected-note@-3{{stored property 'actorTransport' without initial value prevents synthesized initializers}}
+}
+
+@available(SwiftStdlib 5.5, *)
+distributed actor D3 {
+  var id: Int { 0 }
+  // expected-error@-1{{property 'id' cannot be defined explicitly, as it conflicts with distributed actor synthesized stored property}}
+  // expected-error@-2{{invalid redeclaration of synthesized implementation for protocol requirement 'id'}}
+}
+
+@available(SwiftStdlib 5.5, *)
+distributed actor D4 {
+  // expected-error@-1{{actor 'D4' has no initializers}}
+  // expected-error@-2{{type 'D4' does not conform to protocol 'DistributedActor'}}
+  let actorTransport: String
+  // expected-error@-1{{invalid redeclaration of synthesized property 'actorTransport'}}
+  // expected-error@-2{{property 'actorTransport' cannot be defined explicitly, as it conflicts with distributed actor synthesized stored property}}
+  // expected-note@-3{{stored property 'actorTransport' without initial value prevents synthesized initializers}}
+  let id: AnyActorIdentity
+  // expected-error@-1{{invalid redeclaration of synthesized property 'id'}}
+  // expected-error@-2{{property 'id' cannot be defined explicitly, as it conflicts with distributed actor synthesized stored property}}
+  // expected-note@-3{{stored property 'id' without initial value prevents synthesized initializers}}
+  // expected-note@-4{{candidate exactly matches}}
 }
 
 // ==== Tests ------------------------------------------------------------------
 
-// Make sure the conformances actually happen.
+// Make sure the conformances have been added implicitly.
 @available(SwiftStdlib 5.5, *)
-func acceptActor<Act: DistributedActor>(_: Act.Type) { }
+func acceptDistributedActor<Act: DistributedActor>(_: Act.Type) { }
+@available(SwiftStdlib 5.5, *)
+func acceptAnyActor<Act: AnyActor>(_: Act.Type) { }
 
 @available(SwiftStdlib 5.5, *)
 func testConformance() {
-  acceptActor(D1.self)
+  acceptDistributedActor(D1.self)
+  acceptAnyActor(D1.self)
 }

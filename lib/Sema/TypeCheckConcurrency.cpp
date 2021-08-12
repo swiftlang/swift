@@ -2196,7 +2196,6 @@ namespace {
         // distributed actor, in which case we need to diagnose it.
         if (auto classDecl = dyn_cast<ClassDecl>(member->getDeclContext())) {
           if (classDecl->isDistributedActor()) {
-            fprintf(stderr, "[%s:%d] (%s) HERE\n", __FILE__, __LINE__, __FUNCTION__);
             ctx.Diags.diagnose(memberLoc, diag::distributed_actor_isolated_method);
             noteIsolatedActorMember(member, context);
             return true;
@@ -2515,92 +2514,7 @@ void swift::checkFunctionActorIsolation(AbstractFunctionDecl *decl) {
   }
 }
 
-/// Some actor constructors are special, so we need to check rules about them.
-void swift::checkActorConstructor(ClassDecl *decl, ConstructorDecl *ctor) {
-  // bail out unless distributed actor, only those have special rules to check here
-  if (decl->isDistributedActor())
-    checkDistributedActorConstructor(decl, ctor);
-}
-
-void swift::checkActorConstructorBody(ClassDecl *classDecl,
-                                      ConstructorDecl *ctor,
-                                      BraceStmt *body) {
-  // we only have additional checks for distributed actor initializers
-  if (!classDecl->isDistributedActor())
-    return;
-
-  // our synthesized constructors don't need any of those checks
-  // (i.e. the resolve/local constructor would not delegate anywhere etc)
-  if (ctor->isSynthesized())
-    return;
-
-  if (ctor->isDistributedActorLocalInit() ||
-      ctor->isDistributedActorResolveInit()) {
-    // it is illegal-to re-declare those explicitly, and this is already diagnosed
-    // on the decl-level; no need to proceed diagnosing anything about the body here.
-    return;
-  }
-
-  // it is convenience initializer, but does it properly delegate to the designated one?
-  auto initKindAndExpr = ctor->getDelegatingOrChainedInitKind();
-  bool isDelegating = initKindAndExpr.initKind == BodyInitKind::Delegating;
-
-  /// the constructor didn't delegate anywhere, but it should have!
-  if (!isDelegating ||
-      !initKindAndExpr.initExpr ||
-      !initKindAndExpr.initExpr->getFn()) {
-    // the resolve-initializer of course must never actually delegate to the local one
-    ctor->diagnose(diag::distributed_actor_init_must_delegate_to_local_init,
-                   ctor->getName())
-        .fixItInsert(ctor->getStartLoc(), "self.init(transport: transport)"); // FIXME: how to get better position?
-    // we're done here, it is not delegating or does delegate anywhere
-    return;
-  }
-
-  // we're dealing with a convenience constructor,
-  // which are required to eventually delegate to init(transport:)
-  auto fn = initKindAndExpr.initExpr->getFn();
-  bool delegatedToLocalInit = false;
-  bool delegatedToResolveInit = false;
-  Expr *resolveInitApplyExpr = nullptr;
-  while (fn && !delegatedToLocalInit && !delegatedToResolveInit) {
-    if (auto otherCtorRef = dyn_cast<OtherConstructorDeclRefExpr>(fn)) {
-      auto otherCtorDecl = otherCtorRef->getDecl();
-      if (otherCtorDecl->isDistributedActorLocalInit()) {
-        delegatedToLocalInit = true;
-      } else if (otherCtorDecl->isDistributedActorResolveInit()) {
-        resolveInitApplyExpr = initKindAndExpr.initExpr;
-        delegatedToResolveInit = true;
-      } else {
-        // it delegated to some other constructor; it may still have a chance
-        // to get it right and eventually delegate to init(transport:),
-        // so we keep searching.
-        initKindAndExpr = otherCtorDecl->getDelegatingOrChainedInitKind();
-        fn = initKindAndExpr.initExpr ?
-          initKindAndExpr.initExpr->getFn() : nullptr;
-      }
-    } else {
-      // break out of the loop, seems the constructor didn't delegate to anything next
-      fn = nullptr;
-    }
-  }
-  if (delegatedToResolveInit) {
-    assert(resolveInitApplyExpr);
-    ctor->diagnose(diag::distributed_actor_init_must_not_delegate_to_resolve_init,
-                   ctor->getName())
-        .fixItRemove(resolveInitApplyExpr->getSourceRange());
-    // fallthrough, suggest that initializers must instead delegate to init(transport:)
-  }
-
-  if (!delegatedToLocalInit) {
-    ctor->diagnose(diag::distributed_actor_init_must_delegate_to_local_init,
-                   ctor->getName())
-        .fixItInsert(ctor->getStartLoc(), "self.init(transport: transport)"); // FIXME: how to get better position?
-  }
-}
-
 void swift::checkInitializerActorIsolation(Initializer *init, Expr *expr) {
-
   ActorIsolationChecker checker(init);
   expr->walk(checker);
 }

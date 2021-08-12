@@ -445,14 +445,6 @@ InitKindRequest::evaluate(Evaluator &evaluator, ConstructorDecl *decl) const {
       }
     }
 
-    // the init(transport:) initializer of a distributed actor is special, as
-    // it ties the actors lifecycle with the transport. As such, it must always
-    // be invoked by any other initializer, just like a designated initializer.
-    if (auto clazz = dyn_cast<ClassDecl>(decl->getDeclContext())) {
-      if (clazz->isDistributedActor() && decl->isDistributedActorLocalInit())
-        return CtorInitializerKind::Designated;
-    }
-
     if (decl->getDeclContext()->getExtendedProtocolDecl()) {
       return CtorInitializerKind::Convenience;
     }

@@ -2466,7 +2466,7 @@ void LifetimeChecker::processUninitializedRelease(SILInstruction *Release,
       auto classDecl = TheMemory.getASTType().getClassOrBoundGenericClass();
       if (classDecl && classDecl->isRootDefaultActor()) {
         if (classDecl->isDistributedActor())
-          emitDistributedActorDestroy(B, Loc, Pointer);
+          emitDistributedActorDestroy(B, Loc, Pointer); // FIXME(distributed): this will be different only for if it is 'remote'
         else
           emitDefaultActorDestroy(B, Loc, Pointer);
       }

@@ -1687,22 +1687,14 @@ FUNCTION(DefaultActorDeallocateResilient,
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind))
 
-// void swift_distributedActor_remote_initialize(DefaultActor *actor);
+// OpaqueValue* swift_distributedActor_remote_initialize(
+//    const Metadata *actorType
+// );
 FUNCTION(DistributedActorInitializeRemote,
          swift_distributedActor_remote_initialize, SwiftCC,
          ConcurrencyAvailability,
-         RETURNS(VoidTy),
-         ARGS(RefCountedPtrTy), // TODO also address and transport?
-         ATTRS(NoUnwind))
-
-// OpaqueValue* swift_distributedActor_remote_create(
-//     OpaqueValue *identity,
-//     OpaqueValue *transport);
-FUNCTION(DistributedActorRemoteCreate,
-         swift_distributedActor_remote_create, SwiftCC,
-         ConcurrencyAvailability,
-         RETURNS(OpaquePtrTy), // TODO: is this the right type here?
-         ARGS(OpaquePtrTy, OpaquePtrTy),
+         RETURNS(OpaquePtrTy),
+         ARGS(TypeMetadataPtrTy),
          ATTRS(NoUnwind))
 
 // void swift_distributedActor_destroy(DefaultActor *actor); // TODO: ProxyActor *proxy?

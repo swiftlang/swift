@@ -14,17 +14,22 @@ import _Distributed
 
 @available(SwiftStdlib 5.5, *)
 distributed actor SomeSpecificDistributedActor {
-  distributed func hello() async throws -> String {
-    "local impl"
+  let name: String
+  let surname: String
+  let age: Int
+
+  init(name: String, transport: ActorTransport) {
+    self.name = name
+    self.surname = "Surname"
+    self.age = 42
   }
-}
 
-@available(SwiftStdlib 5.5, *)
-extension SomeSpecificDistributedActor {
+  deinit {
+    print("deinit \(self.id)")
+  }
 
-  @_dynamicReplacement(for: _remote_hello())
-  nonisolated func _remote_impl_hello() async throws -> String {
-    return "remote impl (address: \(self.id))"
+  distributed func hello() async throws -> String {
+    "Hello, from \(name)"
   }
 }
 
@@ -78,37 +83,18 @@ struct FakeTransport: ActorTransport {
 
 // ==== Execute ----------------------------------------------------------------
 
-@_silgen_name("swift_distributed_actor_is_remote")
-func __isRemoteActor(_ actor: AnyObject) -> Bool
-
-func __isLocalActor(_ actor: AnyObject) -> Bool {
-  return !__isRemoteActor(actor)
-}
-
-// ==== Execute ----------------------------------------------------------------
-
 @available(SwiftStdlib 5.5, *)
 func test_remote() async {
   let address = ActorAddress(parse: "sact://127.0.0.1/example#1234")
   let transport = FakeTransport()
 
-  let local = SomeSpecificDistributedActor(transport: transport)
-  assert(__isLocalActor(local) == true, "should be local")
-  assert(__isRemoteActor(local) == false, "should be local")
-  print("isRemote(local) = \(__isRemoteActor(local))") // CHECK: isRemote(local) = false
-  print("local.id = \(local.id)") // CHECK: local.id = AnyActorIdentity(ActorAddress(address: "xxx"))
-  print("local.transport = \(local.actorTransport)") // CHECK: local.transport = FakeTransport()
-
-  // assume it always makes a remote one
-  let remote = try! SomeSpecificDistributedActor.resolve(.init(address), using: transport)
-  assert(__isLocalActor(remote) == false, "should be remote")
-  assert(__isRemoteActor(remote) == true, "should be remote")
-  print("isRemote(remote) = \(__isRemoteActor(remote))") // CHECK: isRemote(remote) = true
-
+  var remote: SomeSpecificDistributedActor? =
+      try! SomeSpecificDistributedActor.resolve(.init(address), using: transport)
   // Check the id and transport are the right values, and not trash memory
-  print("remote.id = \(remote.id)") // CHECK: remote.id = AnyActorIdentity(ActorAddress(address: "sact://127.0.0.1/example#1234"))
-  print("remote.transport = \(remote.actorTransport)") // CHECK: remote.transport = FakeTransport()
+  print("remote.id = \(remote!.id)") // CHECK: remote.id = AnyActorIdentity(ActorAddress(address: "sact://127.0.0.1/example#1234"))
+  print("remote.transport = \(remote!.actorTransport)") // CHECK: remote.transport = FakeTransport()
 
+  remote = nil // CHECK: deinit AnyActorIdentity(ActorAddress(address: "sact://127.0.0.1/example#1234"))
   print("done") // CHECK: done
 }
 
