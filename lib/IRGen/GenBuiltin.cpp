@@ -29,6 +29,7 @@
 #include "GenCall.h"
 #include "GenCast.h"
 #include "GenConcurrency.h"
+#include "GenDistributed.h"
 #include "GenPointerAuth.h"
 #include "GenIntegerLiteral.h"
 #include "IRGenFunction.h"
@@ -388,25 +389,14 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   }
 
   if (Builtin.ID == BuiltinValueKind::InitializeDistributedRemoteActor) {
-    auto fn = IGF.IGM.getDistributedActorInitializeRemoteFn();
-    auto actor = args.claimNext();
-    actor = IGF.Builder.CreateBitCast(actor, IGF.IGM.RefCountedPtrTy);
-    // init(resolve address, using transport)
-    auto call = IGF.Builder.CreateCall(fn, {
-      actor
-      // TODO: might have to carry `address, transport` depending on how we implement the resolve initializers
-    });
-    call->setCallingConv(IGF.IGM.SwiftCC);
+    auto actorMetatype = args.claimNext();
+    emitDistributedActorInitializeRemote(IGF, actorMetatype, out);
     return;
   }
 
   if (Builtin.ID == BuiltinValueKind::DestroyDistributedActor) {
-    auto fn = IGF.IGM.getDistributedActorDestroyFn();
     auto actor = args.claimNext();
-    actor = IGF.Builder.CreateBitCast(actor, IGF.IGM.RefCountedPtrTy);
-    auto call = IGF.Builder.CreateCall(fn, {actor});
-    call->setCallingConv(IGF.IGM.SwiftCC);
-    call->setDoesNotThrow();
+    emitDistributedActorDestroy(IGF, actor);
     return;
   }
 

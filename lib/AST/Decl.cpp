@@ -4208,13 +4208,6 @@ ConstructorDecl *NominalTypeDecl::getDefaultInitializer() const {
                            SynthesizeDefaultInitRequest{mutableThis}, nullptr);
 }
 
-bool NominalTypeDecl::hasDistributedActorLocalInitializer() const {
-  auto &ctx = getASTContext();
-  auto *mutableThis = const_cast<NominalTypeDecl *>(this);
-  return evaluateOrDefault(ctx.evaluator, HasDistributedActorLocalInitRequest{mutableThis},
-                           false);
-}
-
 void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
   // Silently break cycles here because we can't be sure when and where a
   // request to synthesize will come from yet.
@@ -4242,7 +4235,7 @@ void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
         if ((member.isSimpleName() || argumentNames.front() == Context.Id_from)) {
           action.emplace(ImplicitMemberAction::ResolveDecodable);
         } else if (argumentNames.front() == Context.Id_transport) {
-          action.emplace(ImplicitMemberAction::ResolveDistributedActor);
+          action.emplace(ImplicitMemberAction::ResolveDistributedActorTransport);
         }
       } else if (!baseName.isSpecial() &&
            baseName.getIdentifier() == Context.Id_encode &&
@@ -7305,7 +7298,7 @@ void AbstractFunctionDecl::setBodyToBeReparsed(SourceRange bodyRange) {
 SourceRange AbstractFunctionDecl::getBodySourceRange() const {
   switch (getBodyKind()) {
   case BodyKind::None:
-  case BodyKind::MemberwiseInitializer:
+  case BodyKind::SILSynthesize:
   case BodyKind::Deserialized:
   case BodyKind::Synthesize:
     return SourceRange();
@@ -7620,7 +7613,7 @@ bool AbstractFunctionDecl::hasInlinableBodyText() const {
   case BodyKind::None:
   case BodyKind::Synthesize:
   case BodyKind::Skipped:
-  case BodyKind::MemberwiseInitializer:
+  case BodyKind::SILSynthesize:
     return false;
   }
   llvm_unreachable("covered switch");
@@ -8053,45 +8046,6 @@ bool ConstructorDecl::isObjCZeroParameterWithLongSelector() const {
     return false;
 
   return params->get(0)->getInterfaceType()->isVoid();
-}
-
-bool ConstructorDecl::isDistributedActorLocalInit() const {
-  auto name = getName();
-  auto argumentNames = name.getArgumentNames();
-
-  if (argumentNames.size() != 1)
-    return false;
-
-  auto &C = getASTContext();
-  if (argumentNames[0] != C.Id_transport)
-    return false;
-
-  auto *params = getParameters();
-  assert(params->size() == 1);
-
-  auto transportType = C.getActorTransportDecl()->getDeclaredInterfaceType();
-  return params->get(0)->getInterfaceType()->isEqual(transportType);
-}
-
-// TODO: remove resolve init in favor of resolve function?
-bool ConstructorDecl::isDistributedActorResolveInit() const {
-  auto name = getName();
-  auto argumentNames = name.getArgumentNames();
-
-  if (argumentNames.size() != 2)
-    return false;
-
-  auto &C = getASTContext();
-  if (argumentNames[0] != C.Id_resolve ||
-      argumentNames[1] != C.Id_using)
-    return false;
-
-  auto *params = getParameters();
-  auto identityType = C.getAnyActorIdentityDecl()->getDeclaredInterfaceType();
-  auto transportType = C.getActorTransportDecl()->getDeclaredInterfaceType();
-
-  return params->get(0)->getInterfaceType()->isEqual(identityType) &&
-         params->get(1)->getInterfaceType()->isEqual(transportType);
 }
 
 
@@ -8720,7 +8674,7 @@ ParseAbstractFunctionBodyRequest::getCachedResult() const {
   auto afd = std::get<0>(getStorage());
   switch (afd->getBodyKind()) {
   case BodyKind::Deserialized:
-  case BodyKind::MemberwiseInitializer:
+  case BodyKind::SILSynthesize:
   case BodyKind::None:
   case BodyKind::Skipped:
     return nullptr;
@@ -8741,7 +8695,7 @@ void ParseAbstractFunctionBodyRequest::cacheResult(BraceStmt *value) const {
   auto afd = std::get<0>(getStorage());
   switch (afd->getBodyKind()) {
   case BodyKind::Deserialized:
-  case BodyKind::MemberwiseInitializer:
+  case BodyKind::SILSynthesize:
   case BodyKind::None:
   case BodyKind::Skipped:
     // The body is always empty, so don't cache anything.

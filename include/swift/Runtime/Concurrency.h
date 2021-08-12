@@ -716,18 +716,9 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_defaultActor_deallocateResilient(HeapObject *actor);
 
 /// Initialize the runtime storage for a distributed remote actor.
-// TODO: this may end up being removed as we move to the "proxy creation" below
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_distributedActor_remote_initialize(DefaultActor *actor);
-
-/// Create a proxy object that will serve as remote distributed actor instance.
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-OpaqueValue* swift_distributedActor_remote_create(
-  /* +1 */OpaqueValue *identity,
-  /* +1 */OpaqueValue *transport
-  // metadata for identity
-  // metadata for transport
-);
+OpaqueValue*
+swift_distributedActor_remote_initialize(const Metadata *actorType);
 
 /// Destroy the runtime storage for a default actor.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
