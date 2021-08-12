@@ -1751,7 +1751,7 @@ void swift::swift_defaultActor_deallocateResilient(HeapObject *actor) {
                       metadata->getInstanceAlignMask());
 }
 
-/// FIXME: only exists for the quick-and-dirtraKASASAasasy MainActor implementation.
+/// FIXME: only exists for the quick-and-dirty MainActor implementation.
 namespace swift {
   Metadata* MainActorMetadata = nullptr;
 }

@@ -445,8 +445,6 @@ void SILGenFunction::emitDistributedActorReady(
 
   // --- prepare conformance subs
   auto genericSig = actorReadyMethod->getGenericSignature();
-  fprintf(stderr, "[%s:%d] (%s) GENERIC SIG\n", __FILE__, __LINE__, __FUNCTION__);
-  genericSig->dump();
 
   SubstitutionMap subs =
       SubstitutionMap::get(genericSig,
@@ -477,9 +475,6 @@ void SILGenFunction::emitDistributedActorFactory(FuncDecl *fd) {
 
   auto &C = getASTContext();
   SILLocation loc = fd;
-
-  fd->dump();
-  F.dump();
 
   // ==== Prepare argument references
   // --- Parameter: identity
@@ -535,15 +530,11 @@ void SILGenFunction::emitDistributedActorFactory(FuncDecl *fd) {
     // type: SpecificDistributedActor
     auto returnTy = getLoweredType(
         F.mapTypeIntoContext(selfTyDecl->getDeclaredInterfaceType()));
-    fprintf(stderr, "[%s:%d] (%s) auto returnTy = selfArg.getType().getDeclaredInterfaceType();\n", __FILE__, __LINE__, __FUNCTION__);
-    returnTy.dump();
 
     // type: SpecificDistributedActor.Type
     auto selfMetatype =
         getLoweredType(F.mapTypeIntoContext(selfArg.getType().getASTType()));
     SILValue selfMetatypeValue = B.createMetatype(loc, selfMetatype);
-    fprintf(stderr, "[%s:%d] (%s)     SILValue selfMetatypeValue = B.createMetatype(loc, selfMetatype);\n", __FILE__, __LINE__, __FUNCTION__);
-    selfMetatypeValue->dump();
 
     // --- get the uninitialized allocation from the runtime system.
     FullExpr scope(Cleanups, CleanupLocation(fd));
@@ -595,9 +586,6 @@ void SILGenFunction::emitDistributedActorFactory(FuncDecl *fd) {
 //      B.createThrow(loc, error);
 //    }
   }
-
-  fprintf(stderr, "[%s:%d] (%s) DONE HERE\n", __FILE__, __LINE__, __FUNCTION__);
-  F.dump();
 }
 
 /******************************************************************************/

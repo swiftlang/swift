@@ -207,7 +207,8 @@ void swift::checkDistributedActorConstructor(const ClassDecl *decl, ConstructorD
   if (transportParamsCount == 1)
     return;
 
-  // TODO(distributed): could list exact parameters
+  // TODO(distributed): rdar://81824959 report the error on the offending (2nd) matching parameter
+  //                    Or maybe we can issue a note about the other offending params?
   ctor->diagnose(diag::distributed_actor_designated_ctor_must_have_one_transport_param,
                  ctor->getName(), transportParamsCount);
 }
@@ -222,7 +223,7 @@ void TypeChecker::checkDistributedActor(ClassDecl *decl) {
 
   // ==== Constructors
   // --- Get the default initializer
-  // If applicable, this will the default 'init(transport:)' initializer
+  // If applicable, this will create the default 'init(transport:)' initializer
   (void)decl->getDefaultInitializer();
 
   // --- Check all constructors

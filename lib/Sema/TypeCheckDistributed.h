@@ -1,4 +1,4 @@
-//===--- TypeCheckDistributed.h - Distributed -------------------*- C++ -*-===//
+//===-- TypeCheckDistributed.h - Distributed actor typechecking -*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -23,19 +23,10 @@
 
 namespace swift {
 
-class AbstractFunctionDecl;
-class ConstructorDecl;
-class ASTContext;
 class ClassDecl;
+class ConstructorDecl;
 class Decl;
-class DeclContext;
-class Expr;
 class FuncDecl;
-class Initializer;
-class PatternBindingDecl;
-class ProtocolConformance;
-class ValueDecl;
-
 
 /******************************************************************************/
 /********************* Distributed Actor Type Checking ************************/

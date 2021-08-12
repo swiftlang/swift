@@ -96,8 +96,8 @@ func test_remote() async {
   assert(__isLocalActor(local) == true, "should be local")
   assert(__isRemoteActor(local) == false, "should be local")
   print("isRemote(local) = \(__isRemoteActor(local))") // CHECK: isRemote(local) = false
-  print("local.id = \(local.id)") // CHECK: local.id = AnyActorIdentity(ActorAddress(address: "sact://127.0.0.1/example#1234"))
-  print("local.transport = \(local.id)") // CHECK: local.transport = FakeTransport()
+  print("local.id = \(local.id)") // CHECK: local.id = AnyActorIdentity(ActorAddress(address: "xxx"))
+  print("local.transport = \(local.actorTransport)") // CHECK: local.transport = FakeTransport()
 
   // assume it always makes a remote one
   let remote = try! SomeSpecificDistributedActor.resolve(.init(address), using: transport)
@@ -110,7 +110,6 @@ func test_remote() async {
   print("remote.transport = \(remote.actorTransport)") // CHECK: remote.transport = FakeTransport()
 
   print("done") // CHECK: done
-  let xxx = remote
 }
 
 @available(SwiftStdlib 5.5, *)

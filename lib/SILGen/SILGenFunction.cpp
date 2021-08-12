@@ -547,12 +547,6 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
   emitEpilog(fd);
 
   mergeCleanupBlocks();
-
-  if (fd->isDistributedActorFactory()) {
-    fprintf(stderr, "[%s:%d] (%s) DONEDONEDONEDONEDONEDONEDONEDONEDONEDONEDONEDONE\n", __FILE__, __LINE__, __FUNCTION__);
-    F.dump();
-    fprintf(stderr, "[%s:%d] (%s) DONEDONEDONEDONEDONEDONEDONEDONEDONEDONEDONEDONE\n", __FILE__, __LINE__, __FUNCTION__);
-  }
 }
 
 void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {

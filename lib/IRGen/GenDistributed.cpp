@@ -31,8 +31,6 @@
 using namespace swift;
 using namespace irgen;
 
-namespace {} // end anonymous namespace
-
 llvm::Value *irgen::emitDistributedActorInitializeRemote(
     IRGenFunction &IGF, llvm::Value *actorMetatype, Explosion &out) {
   auto fn = IGF.IGM.getDistributedActorInitializeRemoteFn();

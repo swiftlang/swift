@@ -2514,14 +2514,7 @@ void swift::checkFunctionActorIsolation(AbstractFunctionDecl *decl) {
   }
 }
 
-/// Some actor constructors are special, so we need to check rules about them.
-void swift::checkActorConstructor(ClassDecl *decl, ConstructorDecl *ctor) {
-  if (decl->isDistributedActor())
-    checkDistributedActorConstructor(decl, ctor);
-}
-
 void swift::checkInitializerActorIsolation(Initializer *init, Expr *expr) {
-
   ActorIsolationChecker checker(init);
   expr->walk(checker);
 }

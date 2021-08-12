@@ -48,7 +48,8 @@ public protocol DistributedActor:
     ///
     /// - Parameter identity: identity uniquely identifying a, potentially remote, actor in the system
     /// - Parameter transport: `transport` which should be used to resolve the `identity`, and be associated with the returned actor
-// FIXME: move to generic identity here; depends on
+// FIXME: Partially blocked on SE-309, because then we can store ActorIdentity directly
+//        We want to move to accepting a generic or existential identity here
 //    static func resolve<Identity>(_ identity: Identity, using transport: ActorTransport)
 //      throws -> Self where Identity: ActorIdentity
     static func resolve(_ identity: AnyActorIdentity, using transport: ActorTransport)
