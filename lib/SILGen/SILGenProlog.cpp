@@ -244,6 +244,10 @@ struct ArgumentInitHelper {
   }
 
   void emitParam(ParamDecl *PD) {
+    PD->visitAuxiliaryDecls([&](VarDecl *localVar) {
+      SGF.LocalAuxiliaryDecls.push_back(localVar);
+    });
+
     if (PD->hasExternalPropertyWrapper()) {
       PD = cast<ParamDecl>(PD->getPropertyWrapperBackingProperty());
     }
