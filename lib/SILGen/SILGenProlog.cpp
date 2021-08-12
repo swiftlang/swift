@@ -306,6 +306,10 @@ static void makeArgument(Type ty, ParamDecl *decl,
 
 void SILGenFunction::bindParameterForForwarding(ParamDecl *param,
                                      SmallVectorImpl<SILValue> &parameters) {
+  if (param->hasExternalPropertyWrapper()) {
+    param = cast<ParamDecl>(param->getPropertyWrapperBackingProperty());
+  }
+
   makeArgument(param->getType(), param, parameters, *this);
 }
 
