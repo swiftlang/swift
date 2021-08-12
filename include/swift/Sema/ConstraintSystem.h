@@ -4872,6 +4872,12 @@ public: // FIXME: Public for use by static functions.
                                      TypeMatchOptions flags,
                                      ConstraintLocatorBuilder locator);
 
+  /// Simplify a conversion between Swift and C pointers.
+  SolutionKind
+  simplifyPointerToCPointerRestriction(Type type1, Type type2,
+                                       TypeMatchOptions flags,
+                                       ConstraintLocatorBuilder locator);
+
 public:
   /// Simplify the system of constraints, by breaking down complex
   /// constraints into simpler constraints.
