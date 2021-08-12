@@ -1971,6 +1971,10 @@ swift::swift_distributedActor_remote_initialize(const Metadata *actorType) {
                                         classMetadata->getInstanceSize(),
                                         classMetadata->getInstanceAlignMask());
 
+  // TODO: remove this memset eventually, today we only do this to not have
+  //       to modify the destructor logic, as releasing zeroes is no-op
+  memset(alloc + 1, 0, classMetadata->getInstanceSize() - sizeof(HeapObject));
+
   // TODO(distributed): a remote one does not have to have the "real"
   //  default actor body, e.g. we don't need an executor at all; so
   //  we can allocate more efficiently and only share the flags/status field

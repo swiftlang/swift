@@ -996,8 +996,6 @@ HasUserDefinedDesignatedInitRequest::evaluate(Evaluator &evaluator,
   return false;
 }
 
-// TODO(distributed): duplicated of NominalTypeDecl::hasUserDefinedDesignatedInit,
-//                    remove this static version?
 static bool hasUserDefinedDesignatedInit(Evaluator &eval,
                                          NominalTypeDecl *decl) {
   // Imported decls don't have a designated initializer defined by the user.

@@ -4208,18 +4208,6 @@ ConstructorDecl *NominalTypeDecl::getDefaultInitializer() const {
                            SynthesizeDefaultInitRequest{mutableThis}, nullptr);
 }
 
-bool NominalTypeDecl::hasUserDefinedDesignatedInit() const {
-  // Imported decls don't have a designated initializer defined by the user.
-  if (hasClangNode())
-    return false;
-
-  auto &ctx = getASTContext();
-  auto *mutableThis = const_cast<NominalTypeDecl *>(this);
-  return evaluateOrDefault(ctx.evaluator,
-                           HasUserDefinedDesignatedInitRequest{mutableThis},
-                           false);
-}
-
 void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
   // Silently break cycles here because we can't be sure when and where a
   // request to synthesize will come from yet.

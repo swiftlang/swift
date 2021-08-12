@@ -173,9 +173,6 @@ void swift::checkDistributedActorConstructor(const ClassDecl *decl, ConstructorD
   if (!ctor->isDesignatedInit())
     return;
 
-  if (!swift::ensureDistributedModuleLoaded(ctor))
-    return;
-
   // === Designated initializers must accept exactly one ActorTransport
   auto &C = ctor->getASTContext();
   auto module = ctor->getParentModule();
