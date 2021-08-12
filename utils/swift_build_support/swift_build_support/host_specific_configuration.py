@@ -55,7 +55,7 @@ class HostSpecificConfiguration(object):
             else:
                 stdlib_targets_to_build = set(stdlib_targets_to_configure)
 
-        if stage_dependent_args.stdlib_deployment_targets and \
+        if hasattr(stage_dependent_args, 'stdlib_deployment_targets') and \
            stage_dependent_args.stdlib_deployment_targets == []:
             stdlib_targets_to_configure = []
             stdlib_targets_to_build = []
