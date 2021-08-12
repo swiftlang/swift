@@ -245,11 +245,6 @@ struct ArgumentInitHelper {
 
   void emitParam(ParamDecl *PD) {
     if (PD->hasExternalPropertyWrapper()) {
-      auto initInfo = PD->getPropertyWrapperInitializerInfo();
-      if (initInfo.hasSynthesizedInitializers()) {
-        SGF.SGM.emitPropertyWrapperBackingInitializer(PD);
-      }
-
       PD = cast<ParamDecl>(PD->getPropertyWrapperBackingProperty());
     }
 
