@@ -459,6 +459,14 @@ void ASTMangler::beginManglingWithAutoDiffOriginalFunction(
     appendOperator(attr->Name);
     return;
   }
+  // For imported Clang declarations, use the Clang name in order to match how
+  // DifferentiationMangler handles these.
+  auto clangDecl = getClangDeclForMangling(afd);
+  if (clangDecl) {
+    beginManglingWithoutPrefix();
+    appendOperator(clangDecl->getName());
+    return;
+  }
   beginMangling();
   if (auto *cd = dyn_cast<ConstructorDecl>(afd))
     appendConstructorEntity(cd, /*isAllocating*/ !cd->isConvenienceInit());

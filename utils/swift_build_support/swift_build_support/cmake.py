@@ -153,6 +153,7 @@ class CMake(object):
             define("CMAKE_Swift_COMPILER:PATH", toolchain.swiftc)
         define("CMAKE_LIBTOOL:PATH", toolchain.libtool)
         define("CMAKE_AR:PATH", toolchain.ar)
+        define("CMAKE_RANLIB:PATH", toolchain.ranlib)
 
         if args.cmake_generator == 'Xcode':
             define("CMAKE_CONFIGURATION_TYPES",
