@@ -475,6 +475,21 @@ func voidAndErrorCompletion(completion: @escaping (Void, Error?) -> Void) {}
 // VOID-AND-ERROR-HANDLER-NEXT: }
 // VOID-AND-ERROR-HANDLER: func voidAndErrorCompletion() async throws {}
 
+// RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix VOID-RESULT-HANDLER %s
+func voidResultCompletion(completion: @escaping (Result<Void, Error>) -> Void) {}
+// VOID-RESULT-HANDLER:      {
+// VOID-RESULT-HANDLER-NEXT:   Task {
+// VOID-RESULT-HANDLER-NEXT:     do {
+// VOID-RESULT-HANDLER-NEXT:       try await voidResultCompletion()
+// VOID-RESULT-HANDLER-NEXT:       completion(.success(()))
+// VOID-RESULT-HANDLER-NEXT:     } catch {
+// VOID-RESULT-HANDLER-NEXT:       completion(.failure(error))
+// VOID-RESULT-HANDLER-NEXT:     }
+// VOID-RESULT-HANDLER-NEXT:   }
+// VOID-RESULT-HANDLER-NEXT: }
+// VOID-RESULT-HANDLER:      func voidResultCompletion() async throws {
+
+
 // 2. Check that the various ways to call a function (and the positions the
 //    refactoring is called from) are handled correctly
 
