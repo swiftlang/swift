@@ -86,25 +86,3 @@ enum EError : P { // expected-error{{type 'EError' does not conform to protocol 
   subscript() -> Int { 0 } // expected-note{{candidate has non-matching type '() -> Int'}}
   func f() -> Int { 0 } // expected-note{{candidate has non-matching type '() -> Int'}}
 }
-
-// Settable storage members with a 'Self' result type may not be used with an
-// existential base.
-protocol P5 {
-}
-extension P5 {
-  var prop: Self {
-    get { self }
-    set { }
-  }
-
-  subscript() -> Self {
-    get { self }
-    set { }
-  }
-}
-func takesP5(p5: P5) {
-  _ = p5[]
-  // expected-error@-1{{member 'subscript' cannot be used on value of protocol type 'P5'; use a generic constraint instead}}
-  _ = p5.prop
-  // expected-error@-1{{member 'prop' cannot be used on value of protocol type 'P5'; use a generic constraint instead}}
-}
