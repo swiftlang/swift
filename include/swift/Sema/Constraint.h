@@ -269,7 +269,7 @@ enum class ConversionRestrictionKind {
   /// Implicit conversion from a value of CGFloat type to a value of Double type
   /// via an implicit Double initializer call passing a CGFloat value.
   CGFloatToDouble,
-  /// Implicit conversion where an init(implicit:) initializer is vailable
+  /// Implicit conversion where an init(implicit:) initializer is available.
   ImplicitConversion,
 };
 

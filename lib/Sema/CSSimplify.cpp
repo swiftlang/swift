@@ -5000,7 +5000,6 @@ ConstructorDecl *ConstraintSystem::implicitConversionAvailable(Type fromType, Ty
   trace("TO", toType);
   if (NominalTypeDecl *toNominal = toType->getAnyNominal()) {
     auto &ctx = getASTContext();
-    auto implicitArgId = ctx.Id_implicit;
     if (!toNominal->setConversionsComputed())
       for (ExtensionDecl *extension : toNominal->getExtensions()) {
         Type extType = extension->getExtendedType()->getCanonicalType();
@@ -5010,8 +5009,8 @@ ConstructorDecl *ConstraintSystem::implicitConversionAvailable(Type fromType, Ty
             ParameterList *parameters = initDecl->getParameters();
             ParamDecl *param; // could be @implicit instead..
             if (parameters->size() == 1 && (param = parameters->get(0)) &&
-                (param->getArgumentName() == implicitArgId ||
-                 param->getParameterName() == implicitArgId)) {
+                (param->getArgumentName() == ctx.Id_implicit ||
+                 param->getParameterName() == ctx.Id_implicit)) {
               Type argType = param->getType()->getCanonicalType();
               if (!arged++)
                 trace("\nEXT", extType);

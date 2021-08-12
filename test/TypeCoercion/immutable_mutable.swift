@@ -5,12 +5,47 @@ import Foundation
 
 extension Double {
   init(implicit: CGFloat) {
+    print("Double.init(implicit: CGFloat)")
     self.init(implicit)
   }
 }
 extension CGFloat {
   init(implicit: Double) {
+    print("CGFloat.init(implicit: Double)")
     self.init(implicit)
+  }
+}
+public struct III {
+  var i: Int
+}
+extension Int {
+  init(implicit: Int16) {
+    print("Int.init(implicit: Int16)")
+    self.init(implicit)
+  }
+  init(implicit: Int32) {
+    print("Int.init(implicit: Int32)")
+    self.init(implicit)
+  }
+  init(_ implicit: III) {
+    print("Int.init(implicit: I)")
+    self.init(implicit.i)
+  }
+}
+extension Int32 {
+  init(implicit: Int8) {
+    print("Int32.init(implicit: Int8)")
+    self.init(implicit)
+  }
+  init(implicit: Int16) {
+    print("Int32.init(implicit: Int16)")
+    self.init(implicit)
+  }
+}
+extension III {
+  public init(_ implicit: Int) {
+    print("III.init(implicit: Int)")
+    self.init(i: implicit)
   }
 }
 
@@ -39,6 +74,15 @@ extension UnsafePointer where Pointee == Int {
 let x: Double = 99.1
 let y: CGFloat = x
 let z: Double? = y
+
+let a: Int32 = 997
+let b: Int = a
+let c: Int8 = 97
+let d: Int = c // expected-error {{cannot convert value of type 'Int8' to specified type 'Int'}}
+let e = III(i: 888)
+let f: Int = e
+let h: Int16 = 45
+let j: Int32 = h
 
 let optionalMutableRawPointer = UnsafeMutableRawPointer(bitPattern: -3)
 let mutableRawPointer = optionalMutableRawPointer!
@@ -91,28 +135,3 @@ array.withUnsafeMutableBufferPointer {
     _ = demutable(immutable: $0.baseAddress!)
     _ = demutable(optionalImmutable: $0.baseAddress)
 }
-
-extension Int {
-  init(implicit: Int8) {
-    self.init(implicit)
-  }
-  init(implicit: Int16) {
-    self.init(implicit)
-  }
-  init(implicit: Int32) {
-    self.init(implicit)
-  }
-}
-extension Int32 {
-  init(implicit: Int8) {
-    self.init(implicit)
-  }
-  init(implicit: Int16) {
-    self.init(implicit)
-  }
-}
-
-let a: Int32 = 997
-let b: Int = a
-let c: Int8 = 97
-let d: Int = c
