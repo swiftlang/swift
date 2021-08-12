@@ -181,7 +181,7 @@ private:
       if (auto expr = node.dyn_cast<Expr *>()) {
         // Rewrite the expression.
         if (auto rewrittenExpr = rewriteExpr(expr))
-          node = expr;
+          node = rewrittenExpr;
         else
           hadError = true;
       } else if (auto stmt = node.dyn_cast<Stmt *>()) {
