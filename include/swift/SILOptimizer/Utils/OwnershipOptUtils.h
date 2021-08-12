@@ -144,6 +144,11 @@ public:
 private:
   SILBasicBlock::iterator replaceAddressUses(SingleValueInstruction *oldValue,
                                              SILValue newValue);
+
+  void invalidate() {
+    ctx->clear();
+    ctx = nullptr;
+  }
 };
 
 /// A utility composed ontop of OwnershipFixupContext that knows how to replace
@@ -175,6 +180,12 @@ public:
 
   /// Perform the actual RAUW.
   SILBasicBlock::iterator perform();
+
+private:
+  void invalidate() {
+    ctx->clear();
+    ctx = nullptr;
+  }
 };
 
 /// An abstraction over LoadInst/LoadBorrowInst so one can handle both types of
