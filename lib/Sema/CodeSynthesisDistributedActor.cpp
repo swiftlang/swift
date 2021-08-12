@@ -93,76 +93,6 @@ static void addFactoryResolveFunction(ClassDecl *decl) {
 }
 
 /******************************************************************************/
-/******************************** DEINIT **************************************/
-/******************************************************************************/
-
-/// A distributed actor's deinit MUST call `transport.resignIdentity` before it
-/// is deallocated.
-static void addImplicitResignIdentity(ClassDecl *decl) {
-  auto &C = decl->getASTContext();
-
-  DestructorDecl *existingDeinit = decl->getDestructor();
-  assert(existingDeinit);
-
-  DestructorDecl *deinitDecl = existingDeinit ? existingDeinit :
-      new (C) DestructorDecl(SourceLoc(), decl);
-//  DestructorDecl *deinitDecl = new (C) DestructorDecl(SourceLoc(), decl);
-
-  BraceStmt *body = deinitDecl->getBody();
-
-  // == Copy all existing statements to the new deinit
-  SmallVector<ASTNode, 2> statements; // TODO: how to init at body statements count size?
-  for (auto stmt : body->getElements())
-    statements.push_back(stmt); // TODO: copy?
-
-  // TODO: INJECT THIS AS FIRST THING IN A DEFER {}
-
-  // == Inject the lifecycle 'resignIdentity' interaction
-  // ==== self
-  auto *selfRef = DerivedConformance::createSelfDeclRef(deinitDecl);
-
-  // ==== `self.actorTransport`
-  auto *varTransportExpr = UnresolvedDotExpr::createImplicit(C, selfRef,
-                                                           C.Id_actorTransport);
-
-  // ==== `self.id`
-  auto *varIdExpr = UnresolvedDotExpr::createImplicit(C, selfRef, C.Id_id);
-
-  // ==== `self.transport.resignIdentity(self.actorAddress)`
-  //  auto resignIdentityRef = new (C) DeclRefExpr(varTransportExpr,
-  //  DeclNameLoc(), /*implicit=*/true);
-  //  resignIdentityRef->setThrows(false);
-  auto resignFuncDecls =
-      C.getActorTransportDecl()->lookupDirect(C.Id_resignIdentity);
-  assert(resignFuncDecls.size() == 1);
-  AbstractFunctionDecl *resignFuncDecl =
-      dyn_cast<AbstractFunctionDecl>(resignFuncDecls.front());
-  auto resignFuncRef = new (C) DeclRefExpr(resignFuncDecl, DeclNameLoc(),
-                                           /*implicit=*/true);
-
-  auto *idParam = new (C) ParamDecl(
-      SourceLoc(), SourceLoc(), Identifier(),
-      SourceLoc(), C.Id_id, decl);
-  idParam->setInterfaceType(C.getActorIdentityDecl()->getInterfaceType());
-  idParam->setSpecifier(ParamSpecifier::Default);
-  idParam->setImplicit();
-  auto *paramList = ParameterList::createWithoutLoc(idParam);
-
-  auto *resignFuncRefRef = UnresolvedDotExpr::createImplicit(
-      C, varTransportExpr, C.Id_resignIdentity, paramList);
-
-  Expr *resignIdentityCall = CallExpr::createImplicit(C, resignFuncRefRef,
-                                                     { varIdExpr },
-                                                     { Identifier() });
-  statements.push_back(resignIdentityCall);
-
-  BraceStmt *newBody = BraceStmt::create(C, SourceLoc(), statements, SourceLoc(),
-                                         /*implicit=*/true);
-
-  deinitDecl->setBody(newBody, AbstractFunctionDecl::BodyKind::TypeChecked); // FIXME: no idea if Parsed is right, we are NOT type checked I guess?
-}
-
-/******************************************************************************/
 /******************************** PROPERTIES **********************************/
 /******************************************************************************/
 
@@ -425,5 +355,4 @@ void swift::addImplicitDistributedActorMembersToClass(ClassDecl *decl) {
   addFactoryResolveFunction(decl);
   addImplicitDistributedActorStoredProperties(decl);
   addImplicitRemoteActorFunctions(decl);
-//  addImplicitResignIdentity(decl);
 }
