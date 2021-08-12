@@ -470,3 +470,51 @@ do {
     instance[static_invariantSelfSubscript: ()] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1_TypeMemberOnInstanceAndViceVersa'; use a generic constraint instead}}
   }
 }
+
+// Settable storage members with a 'Self' result type may not be used with an
+// existential base.
+protocol P2 {
+  subscript() -> Self { get set }
+
+  var prop: Self { get set }
+}
+func takesP2(p2: P2) {
+  _ = p2[]
+  // expected-error@-1{{member 'subscript' cannot be used on value of protocol type 'P2'; use a generic constraint instead}}
+  _ = p2.prop
+  // expected-error@-1{{member 'prop' cannot be used on value of protocol type 'P2'; use a generic constraint instead}}
+}
+
+protocol MiscTestsProto {
+  associatedtype Assoc
+  func runce<A>(_: A)
+  func spoon(_: Self)
+
+  associatedtype R : IteratorProtocol, Sequence
+  func getR() -> R
+
+  subscript(intToAssoc _: Int) -> Assoc { get }
+  subscript(intToInt _: Int) -> Int { get }
+}
+do {
+  func miscTests(_ arg: MiscTestsProto) { // ok
+    arg.runce(5)
+
+    do {
+      // FIXME: Crummy diagnostics.
+      var x = arg.getR() // expected-error{{member 'getR' cannot be used on value of protocol type 'MiscTestsProto'; use a generic constraint instead}}
+      x.makeIterator()
+      x.next()
+      x.nonexistent()
+    }
+
+    var _: Int = arg[intToInt: 17]
+    _ = arg[intToAssoc: 17] // expected-error{{member 'subscript' cannot be used on value of protocol type 'MiscTestsProto'; use a generic constraint instead}}
+  }
+
+  func existentialSequence(_ e: Sequence) {
+    var x = e.makeIterator() // expected-error{{member 'makeIterator' cannot be used on value of protocol type 'Sequence'; use a generic constraint instead}}
+    x.next()
+    x.nonexistent()
+  }
+}

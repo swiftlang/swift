@@ -56,15 +56,6 @@ func otherExistential<T : EqualComparable>(_ t1: T) {
   _ = t1 as EqualComparable & OtherEqualComparable // expected-error{{value of type 'T' does not conform to 'EqualComparable & OtherEqualComparable' in coercion}}
 }
 
-protocol Runcible {
-  func runce<A>(_ x: A)
-  func spoon(_ x: Self)
-}
-
-func testRuncible(_ x: Runcible) { // Ok
-  x.runce(5)
-}
-
 //===----------------------------------------------------------------------===//
 // Overloading
 //===----------------------------------------------------------------------===//

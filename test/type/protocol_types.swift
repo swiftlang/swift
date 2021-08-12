@@ -68,9 +68,32 @@ protocol HasAssoc {
   func foo()
 }
 
+do {
+  enum MyError : Error {
+    case bad(Any)
+  }
+
+  func checkIt(_ js: Any) throws {
+    switch js {
+    case let dbl as HasAssoc:
+      throw MyError.bad(dbl)
+
+    default:
+      fatalError("wrong")
+    }
+  }
+}
+
 func testHasAssoc(_ x: Any, _: HasAssoc) {
   if let p = x as? HasAssoc {
     p.foo() // don't crash here.
+  }
+
+  struct ConformingType : HasAssoc {
+    typealias Assoc = Int
+    func foo() {}
+
+    func method() -> HasAssoc {}
   }
 }
 

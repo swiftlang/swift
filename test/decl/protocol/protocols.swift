@@ -264,55 +264,6 @@ struct WrongIsEqual : IsEqualComparable { // expected-error{{type 'WrongIsEqual'
 }
 
 //===----------------------------------------------------------------------===//
-// Using values of existential type.
-//===----------------------------------------------------------------------===//
-
-func existentialSequence(_ e: Sequence) {
-  var x = e.makeIterator() // expected-error{{member 'makeIterator' cannot be used on value of protocol type 'Sequence'; use a generic constraint instead}}
-  x.next()
-  x.nonexistent()
-}
-
-protocol HasSequenceAndStream {
-  associatedtype R : IteratorProtocol, Sequence
-  func getR() -> R
-}
-
-func existentialSequenceAndStreamType(_ h: HasSequenceAndStream) {
-  // FIXME: Crummy diagnostics.
-  var x = h.getR() // expected-error{{member 'getR' cannot be used on value of protocol type 'HasSequenceAndStream'; use a generic constraint instead}}
-  x.makeIterator()
-  x.next()
-
-  x.nonexistent()
-}
-
-//===----------------------------------------------------------------------===//
-// Subscripting
-//===----------------------------------------------------------------------===//
-protocol IntIntSubscriptable {
-  subscript (i: Int) -> Int { get }
-}
-
-protocol IntSubscriptable {
-  associatedtype Element
-  subscript (i: Int) -> Element { get }
-}
-
-struct DictionaryIntInt {
-  subscript (i: Int) -> Int {
-    get {
-      return i
-    }
-  }
-}
-
-func testSubscripting(_ iis: IntIntSubscriptable, i_s: IntSubscriptable) { // Ok
-  var i: Int = iis[17] 
-  var i2 = i_s[17] // expected-error{{member 'subscript' cannot be used on value of protocol type 'IntSubscriptable'; use a generic constraint instead}}
-}
-
-//===----------------------------------------------------------------------===//
 // Static methods
 //===----------------------------------------------------------------------===//
 protocol StaticP {
