@@ -431,6 +431,8 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
       }
     }
 
+    simplifyRewriteSystem();
+
     again = false;
     for (const auto &pair : resolvedCriticalPairs) {
       // Check if we've already done too much work.

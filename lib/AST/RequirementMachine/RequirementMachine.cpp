@@ -389,10 +389,6 @@ void RequirementMachine::computeCompletion() {
 
     checkCompletionResult();
 
-    // Simplify right hand sides in preparation for building the
-    // property map.
-    System.simplifyRewriteSystem();
-
     // Check invariants.
     System.verify();
 
