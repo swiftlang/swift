@@ -5870,68 +5870,79 @@ static bool hasMissingElseInChain(IfStmt *ifStmt) {
   return false;
 }
 
+bool SkipUnhandledConstructInResultBuilderFailure::diagnosePatternBinding(
+    PatternBindingDecl *PB) const {
+  bool diagnosed = false;
+
+  for (unsigned i : range(PB->getNumPatternEntries())) {
+    auto *pattern = PB->getPattern(i);
+
+    // Each variable bound by the pattern must be stored.
+    {
+      SmallVector<VarDecl *, 8> variables;
+      pattern->collectVariables(variables);
+
+      bool diagnosedStorage = false;
+      for (auto *var : variables)
+        diagnosedStorage |= diagnoseStorage(var);
+
+      // if storage has been diagnosed, let's move to the next entry.
+      if (diagnosedStorage) {
+        diagnosed = true;
+        continue;
+      }
+    }
+
+    // Diagnose all of the patterns without explicit initializers.
+    if (PB->isExplicitlyInitialized(i))
+      continue;
+
+    StringRef name;
+
+    if (auto *TP = dyn_cast<TypedPattern>(pattern)) {
+      if (auto *NP = dyn_cast<NamedPattern>(TP->getSubPattern()))
+        name = NP->getNameStr();
+    }
+
+    emitDiagnosticAt(pattern->getLoc(),
+                     diag::result_builder_requires_explicit_var_initialization,
+                     !name.empty(), name, builder->getName())
+        .fixItInsertAfter(pattern->getEndLoc(), " = <#value#>");
+
+    diagnosed = true;
+  }
+
+  return diagnosed;
+}
+
+bool SkipUnhandledConstructInResultBuilderFailure::diagnoseStorage(
+    VarDecl *var) const {
+  enum class PropertyKind : unsigned { lazy, wrapped, computed };
+
+  if (var->getImplInfo().isSimpleStored())
+    return false;
+
+  PropertyKind kind;
+  if (var->getAttrs().hasAttribute<LazyAttr>()) {
+    kind = PropertyKind::lazy;
+  } else if (var->hasAttachedPropertyWrapper()) {
+    kind = PropertyKind::wrapped;
+  } else {
+    kind = PropertyKind::computed;
+  }
+
+  emitDiagnosticAt(var, diag::cannot_declare_computed_var_in_result_builder,
+                   static_cast<unsigned>(kind));
+  return true;
+}
+
 void SkipUnhandledConstructInResultBuilderFailure::diagnosePrimary(
     bool asNote) {
 
   if (auto *decl = unhandled.dyn_cast<Decl *>()) {
-    if (auto *PB = dyn_cast<PatternBindingDecl>(decl)) {
-      // Tailored diagnostics for computed properties.
-      if (!PB->hasStorage()) {
-      }
-
-      enum class PropertyKind : unsigned { lazy, wrapped, computed };
-
-      // Diagnose all of the patterns without explicit initializers.
-      bool diagnosed = false;
-      for (unsigned i : range(PB->getNumPatternEntries())) {
-        auto *pattern = PB->getPattern(i);
-
-        // Each variable bound by the pattern must be stored.
-        SmallVector<VarDecl *, 8> variables;
-        pattern->collectVariables(variables);
-
-        for (auto *var : variables) {
-          if (var->getImplInfo().isSimpleStored())
-            continue;
-
-          PropertyKind kind;
-          if (var->getAttrs().hasAttribute<LazyAttr>()) {
-            kind = PropertyKind::lazy;
-          } else if (var->hasAttachedPropertyWrapper()) {
-            kind = PropertyKind::wrapped;
-          } else {
-            kind = PropertyKind::computed;
-          }
-
-          emitDiagnosticAt(PB->getLoc(),
-                           diag::cannot_declare_computed_var_in_result_builder,
-                           static_cast<unsigned>(kind));
-
-          diagnosed = true;
-        }
-
-        if (PB->isExplicitlyInitialized(i))
-          continue;
-
-        StringRef name;
-
-        if (auto *TP = dyn_cast<TypedPattern>(pattern)) {
-          if (auto *NP = dyn_cast<NamedPattern>(TP->getSubPattern()))
-            name = NP->getNameStr();
-        }
-
-        emitDiagnosticAt(
-            pattern->getLoc(),
-            diag::result_builder_requires_explicit_var_initialization,
-            !name.empty(), name, builder->getName())
-            .fixItInsertAfter(pattern->getEndLoc(), " = <#value#>");
-
-        diagnosed = true;
-      }
-
-      if (diagnosed)
-        return;
-    }
+    auto *PB = dyn_cast<PatternBindingDecl>(decl);
+    if (PB && diagnosePatternBinding(PB))
+      return;
   }
 
   if (auto stmt = unhandled.dyn_cast<Stmt *>()) {
