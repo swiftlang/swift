@@ -6,6 +6,7 @@
 
 struct G<T> {
   class Inner {}
+  struct InnerG<T> {}
 }
 class C<T> {}
 
@@ -57,6 +58,7 @@ protocol P1 {
   func invariantSelf8(_: G<(Self) -> Void>)
   func invariantSelf9(_: G<() -> Self>)
   func invariantSelf10(_: P1 & C<Self>)
+  func invariantSelf11() -> G<Self>.InnerG<Void>
   func invariantAssoc1(_: inout Q)
   func invariantAssoc2(_: (inout Q) -> Void)
   func invariantAssoc3(_: inout Array<() -> Q>)
@@ -67,6 +69,7 @@ protocol P1 {
   func invariantAssoc8(_: G<(Q) -> Void>)
   func invariantAssoc9(_: G<() -> Q>)
   func invariantAssoc10(_: P1 & C<Q>)
+  func invariantAssoc11() -> G<Q>.InnerG<Void>
 
   // Properties
   var covariantSelfPropSimple: Self { get }
@@ -115,6 +118,7 @@ protocol P1 {
   var invariantSelfProp8: (G<(Self) -> Void>) -> Void { get }
   var invariantSelfProp9: (G<() -> Self>) -> Void { get }
   var invariantSelfProp10: (P1 & C<Self>) -> Void { get }
+  var invariantSelfProp11: G<Self>.InnerG<Void> { get }
   var invariantAssocProp1: (inout Q) -> Void { get }
   var invariantAssocProp2: ((inout Q) -> Void) -> Void { get }
   var invariantAssocProp3: (inout Array<() -> Q>) -> Void { get }
@@ -125,6 +129,7 @@ protocol P1 {
   var invariantAssocProp8: (G<(Q) -> Void>) { get }
   var invariantAssocProp9: (G<() -> Q>) -> Void { get }
   var invariantAssocProp10: (P1 & C<Q>) -> Void { get }
+  var invariantAssocProp11: G<Q>.InnerG<Void> { get }
 
   // Subscripts
   subscript(covariantSelfSubscriptSimple _: Void) -> Self { get }
@@ -168,6 +173,7 @@ protocol P1 {
   subscript(invariantSelfSubscript5 _: G<(Self) -> Void>) -> Void { get }
   subscript(invariantSelfSubscript6 _: G<() -> Self>) -> Void { get }
   subscript(invariantSelfSubscript7 _: P1 & C<Self>) -> Void { get }
+  subscript(invariantSelfSubscript8 _: Void) -> G<Self>.InnerG<Void> { get }
   subscript(invariantAssocSubscript1 _: G<Q>) -> Void { get }
   subscript(invariantAssocSubscript2 _: Void) -> G<Q> { get }
   subscript(invariantAssocSubscript3 _: Void) -> G<Q>.Inner { get }
@@ -175,6 +181,7 @@ protocol P1 {
   subscript(invariantAssocSubscript5 _: G<(Q) -> Void>) -> Void { get }
   subscript(invariantAssocSubscript6 _: G<() -> Q>) -> Void { get }
   subscript(invariantAssocSubscript7 _: P1 & C<Q>) -> Void { get }
+  subscript(invariantAssocSubscript8 _: Void) -> G<Q>.InnerG<Void> { get }
 }
 @available(macOS 10.15, *)
 extension P1 {
@@ -273,16 +280,16 @@ do {
     arg.invariantSelf4(0) // expected-error {{member 'invariantSelf4' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'G<P1>'}}
     arg.invariantSelf5() // expected-error {{member 'invariantSelf5' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // FIXME: Should be diagnosed.
-//    arg.invariantSelf6()
+    arg.invariantSelf6() // expected-error {{member 'invariantSelf6' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     arg.invariantSelf7(0) // expected-error {{member 'invariantSelf7' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type '(G<P1>) -> Void'}}
     arg.invariantSelf8(0) // expected-error {{member 'invariantSelf8' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'G<(P1) -> Void>'}}
     arg.invariantSelf9(0) // expected-error {{member 'invariantSelf9' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'G<() -> P1>'}}
-    // FIXME: Should be diagnosed.
-//    arg.invariantSelf10(0)
+    arg.invariantSelf10(0) // expected-error {{member 'invariantSelf10' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
+    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'C<P1>'}}
+    arg.invariantSelf11() // expected-error {{member 'invariantSelf11' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     arg.invariantAssoc1(0) // expected-error {{member 'invariantAssoc1' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     // FIXME: Silence these since we cannot make use of the member anyway.
     // expected-error@-2 {{cannot convert value of type 'Int' to expected argument type 'P1.Q'}}
@@ -293,16 +300,16 @@ do {
     arg.invariantAssoc4(0) // expected-error {{member 'invariantAssoc4' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'G<P1.Q>'}}
     arg.invariantAssoc5() // expected-error {{member 'invariantAssoc5' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // FIXME: Should be diagnosed.
-//    arg.invariantAssoc6()
+    arg.invariantAssoc6() // expected-error {{member 'invariantAssoc6' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     arg.invariantAssoc7(0) // expected-error {{member 'invariantAssoc7' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type '(G<P1.Q>) -> Void'}}
     arg.invariantAssoc8(0) // expected-error {{member 'invariantAssoc8' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'G<(P1.Q) -> Void>'}}
     arg.invariantAssoc9(0) // expected-error {{member 'invariantAssoc9' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'G<() -> P1.Q>'}}
-    // FIXME: Should be diagnosed.
-//    arg.invariantAssoc10(0)
+    arg.invariantAssoc10(0) // expected-error {{member 'invariantAssoc10' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
+    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'C<P1.Q>'}}
+    arg.invariantAssoc11() // expected-error {{member 'invariantAssoc11' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
 
     arg.contravariantSelfProp1 // expected-error {{member 'contravariantSelfProp1' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     arg.contravariantSelfProp2 // expected-error {{member 'contravariantSelfProp2' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
@@ -333,25 +340,23 @@ do {
     arg.invariantSelfProp3 // expected-error {{member 'invariantSelfProp3' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     arg.invariantSelfProp4 // expected-error {{member 'invariantSelfProp4' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     arg.invariantSelfProp5 // expected-error {{member 'invariantSelfProp5' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // FIXME: Should be diagnosed.
-//    arg.invariantSelfProp6
+    arg.invariantSelfProp6 // expected-error {{member 'invariantSelfProp6' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     arg.invariantSelfProp7 // expected-error {{member 'invariantSelfProp7' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     arg.invariantSelfProp8 // expected-error {{member 'invariantSelfProp8' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     arg.invariantSelfProp9 // expected-error {{member 'invariantSelfProp9' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // FIXME: Should be diagnosed.
-//    arg.invariantSelfProp10
+    arg.invariantSelfProp10 // expected-error {{member 'invariantSelfProp10' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
+    arg.invariantSelfProp11 // expected-error {{member 'invariantSelfProp11' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     arg.invariantAssocProp1 // expected-error {{member 'invariantAssocProp1' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     arg.invariantAssocProp2 // expected-error {{member 'invariantAssocProp2' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     arg.invariantAssocProp3 // expected-error {{member 'invariantAssocProp3' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     arg.invariantAssocProp4 // expected-error {{member 'invariantAssocProp4' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     arg.invariantAssocProp5 // expected-error {{member 'invariantAssocProp5' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // FIXME: Should be diagnosed.
-//    arg.invariantAssocProp6
+    arg.invariantAssocProp6 // expected-error {{member 'invariantAssocProp6' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     arg.invariantAssocProp7 // expected-error {{member 'invariantAssocProp7' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     arg.invariantAssocProp8 // expected-error {{member 'invariantAssocProp8' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     arg.invariantAssocProp9 // expected-error {{member 'invariantAssocProp9' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // FIXME: Should be diagnosed.
-//    arg.invariantAssocProp10
+    arg.invariantAssocProp10 // expected-error {{member 'invariantAssocProp10' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
+    arg.invariantAssocProp11 // expected-error {{member 'invariantAssocProp11' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
 
     arg[contravariantSelfSubscript1: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     // FIXME: Silence these since we cannot make use of the member anyway.
@@ -394,30 +399,30 @@ do {
     // FIXME: Silence these since we cannot make use of the member anyway.
     // expected-error@-2 {{cannot convert value of type 'Int' to expected argument type 'G<P1>'}}
     arg[invariantSelfSubscript2: ()] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // FIXME: Should be diagnosed.
-//    arg[invariantSelfSubscript3: ()]
+    arg[invariantSelfSubscript3: ()] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     arg[invariantSelfSubscript4: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type '(G<P1>) -> Void'}}
     arg[invariantSelfSubscript5: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'G<(P1) -> Void>'}}
     arg[invariantSelfSubscript6: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'G<() -> P1>'}}
-    // FIXME: Should be diagnosed.
-//    arg[invariantSelfSubscript7: 0]
+    arg[invariantSelfSubscript7: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
+    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'C<P1>'}}
+    arg[invariantSelfSubscript8: ()] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     arg[invariantAssocSubscript1: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     // FIXME: Silence these since we cannot make use of the member anyway.
     // expected-error@-2 {{cannot convert value of type 'Int' to expected argument type 'G<P1.Q>'}}
     arg[invariantAssocSubscript2: ()] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // FIXME: Should be diagnosed.
-//    arg[invariantAssocSubscript3: ()]
+    arg[invariantAssocSubscript3: ()] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     arg[invariantAssocSubscript4: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type '(G<P1.Q>) -> Void'}}
     arg[invariantAssocSubscript5: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'G<(P1.Q) -> Void>'}}
     arg[invariantAssocSubscript6: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'G<() -> P1.Q>'}}
-    // FIXME: Should be diagnosed.
-//    arg[invariantAssocSubscript7: 0]
+    arg[invariantAssocSubscript7: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
+    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'C<P1.Q>'}}
+    arg[invariantAssocSubscript8: ()] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
   }
 }
 
