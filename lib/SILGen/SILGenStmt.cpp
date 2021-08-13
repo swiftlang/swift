@@ -282,7 +282,19 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
   const unsigned ThrowStmtType    = 3;
   const unsigned UnknownStmtType  = 4;
   unsigned StmtType = UnknownStmtType;
-  
+
+  // Emit local auxiliary declarations.
+  if (!SGF.LocalAuxiliaryDecls.empty()) {
+    for (auto *var : SGF.LocalAuxiliaryDecls) {
+      if (auto *patternBinding = var->getParentPatternBinding())
+        SGF.visit(patternBinding);
+
+      SGF.visit(var);
+    }
+
+    SGF.LocalAuxiliaryDecls.clear();
+  }
+
   for (auto &ESD : S->getElements()) {
     
     if (auto D = ESD.dyn_cast<Decl*>())
