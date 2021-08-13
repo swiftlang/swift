@@ -244,12 +244,11 @@ struct ArgumentInitHelper {
   }
 
   void emitParam(ParamDecl *PD) {
-    if (PD->hasExternalPropertyWrapper()) {
-      auto initInfo = PD->getPropertyWrapperInitializerInfo();
-      if (initInfo.hasSynthesizedInitializers()) {
-        SGF.SGM.emitPropertyWrapperBackingInitializer(PD);
-      }
+    PD->visitAuxiliaryDecls([&](VarDecl *localVar) {
+      SGF.LocalAuxiliaryDecls.push_back(localVar);
+    });
 
+    if (PD->hasExternalPropertyWrapper()) {
       PD = cast<ParamDecl>(PD->getPropertyWrapperBackingProperty());
     }
 
@@ -307,6 +306,10 @@ static void makeArgument(Type ty, ParamDecl *decl,
 
 void SILGenFunction::bindParameterForForwarding(ParamDecl *param,
                                      SmallVectorImpl<SILValue> &parameters) {
+  if (param->hasExternalPropertyWrapper()) {
+    param = cast<ParamDecl>(param->getPropertyWrapperBackingProperty());
+  }
+
   makeArgument(param->getType(), param, parameters, *this);
 }
 
