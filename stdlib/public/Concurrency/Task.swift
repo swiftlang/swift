@@ -37,7 +37,7 @@ import Swift
 /// with by end-users directly, unless implementing a scheduler.
 @available(SwiftStdlib 5.5, *)
 @frozen
-public struct Task<Success, Failure: Error>: Sendable {
+public struct Task<Success: Sendable, Failure: Error>: Sendable {
   @usableFromInline
   internal let _task: Builtin.NativeObject
 
