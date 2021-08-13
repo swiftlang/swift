@@ -442,19 +442,19 @@ protocol P1_TypeMemberOnInstanceAndViceVersa {
   subscript(invariantSelfSubscript _: Void) -> G<Self> { get }
 }
 do {
+  // Test that invalid reference errors prevail over unsupported existential
+  // member accesses.
   func test(protoMeta: P1_TypeMemberOnInstanceAndViceVersa.Protocol,
             existMeta: P1_TypeMemberOnInstanceAndViceVersa.Type,
             instance: P1_TypeMemberOnInstanceAndViceVersa) {
     // P1_TypeMemberOnInstanceAndViceVersa.Protocol
-    // FIXME: These should be diagnosed as invalid references.
-    protoMeta.static_invariantSelfMethod() // expected-error {{member 'static_invariantSelfMethod' cannot be used on value of protocol type 'P1_TypeMemberOnInstanceAndViceVersa.Protocol'; use a generic constraint instead}}
-    protoMeta.static_invariantSelfProp // expected-error {{member 'static_invariantSelfProp' cannot be used on value of protocol type 'P1_TypeMemberOnInstanceAndViceVersa.Protocol'; use a generic constraint instead}}
-    protoMeta[static_invariantSelfSubscript: ()] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1_TypeMemberOnInstanceAndViceVersa.Protocol'; use a generic constraint instead}}
+    protoMeta.static_invariantSelfMethod() // expected-error {{static member 'static_invariantSelfMethod' cannot be used on protocol metatype 'P1_TypeMemberOnInstanceAndViceVersa.Protocol'}}
+    protoMeta.static_invariantSelfProp // expected-error {{static member 'static_invariantSelfProp' cannot be used on protocol metatype 'P1_TypeMemberOnInstanceAndViceVersa.Protocol'}}
+    protoMeta[static_invariantSelfSubscript: ()] // expected-error {{static member 'subscript' cannot be used on protocol metatype 'P1_TypeMemberOnInstanceAndViceVersa.Protocol'}}
     _ = protoMeta.covariantSelfMethod // ok
     protoMeta.invariantSelfMethod // expected-error {{member 'invariantSelfMethod' cannot be used on value of protocol type 'P1_TypeMemberOnInstanceAndViceVersa.Protocol'; use a generic constraint instead}}
-    // FIXME: These should be diagnosed as invalid references.
-    protoMeta.invariantSelfProp // expected-error {{member 'invariantSelfProp' cannot be used on value of protocol type 'P1_TypeMemberOnInstanceAndViceVersa.Protocol'; use a generic constraint instead}}
-    protoMeta[invariantSelfSubscript: ()] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1_TypeMemberOnInstanceAndViceVersa.Protocol'; use a generic constraint instead}}
+    protoMeta.invariantSelfProp // expected-error {{instance member 'invariantSelfProp' cannot be used on type 'P1_TypeMemberOnInstanceAndViceVersa'}}
+    protoMeta[invariantSelfSubscript: ()] // expected-error {{instance member 'subscript' cannot be used on type 'P1_TypeMemberOnInstanceAndViceVersa'}}
 
     // P1_TypeMemberOnInstanceAndViceVersa.Type
     _ = existMeta.static_covariantSelfMethod // ok
@@ -463,16 +463,14 @@ do {
     existMeta.static_invariantSelfMethod // expected-error {{member 'static_invariantSelfMethod' cannot be used on value of protocol type 'P1_TypeMemberOnInstanceAndViceVersa.Type'; use a generic constraint instead}}
     existMeta.static_invariantSelfProp // expected-error {{member 'static_invariantSelfProp' cannot be used on value of protocol type 'P1_TypeMemberOnInstanceAndViceVersa.Type'; use a generic constraint instead}}
     existMeta[static_invariantSelfSubscript: ()] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1_TypeMemberOnInstanceAndViceVersa.Type'; use a generic constraint instead}}
-    // FIXME: These should be diagnosed as invalid references.
-    existMeta.invariantSelfMethod // expected-error {{member 'invariantSelfMethod' cannot be used on value of protocol type 'P1_TypeMemberOnInstanceAndViceVersa.Type'; use a generic constraint instead}}
-    existMeta.invariantSelfProp // expected-error {{member 'invariantSelfProp' cannot be used on value of protocol type 'P1_TypeMemberOnInstanceAndViceVersa.Type'; use a generic constraint instead}}
-    existMeta[invariantSelfSubscript: ()] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1_TypeMemberOnInstanceAndViceVersa.Type'; use a generic constraint instead}}
+    existMeta.invariantSelfMethod // expected-error {{instance member 'invariantSelfMethod' cannot be used on type 'P1_TypeMemberOnInstanceAndViceVersa'}}
+    existMeta.invariantSelfProp // expected-error {{instance member 'invariantSelfProp' cannot be used on type 'P1_TypeMemberOnInstanceAndViceVersa'}}
+    existMeta[invariantSelfSubscript: ()] // expected-error {{instance member 'subscript' cannot be used on type 'P1_TypeMemberOnInstanceAndViceVersa'}}
 
     // P1_TypeMemberOnInstanceAndViceVersa
-    // FIXME: These should be diagnosed as invalid references.
-    instance.static_invariantSelfMethod // expected-error {{member 'static_invariantSelfMethod' cannot be used on value of protocol type 'P1_TypeMemberOnInstanceAndViceVersa'; use a generic constraint instead}}
-    instance.static_invariantSelfProp // expected-error {{member 'static_invariantSelfProp' cannot be used on value of protocol type 'P1_TypeMemberOnInstanceAndViceVersa'; use a generic constraint instead}}
-    instance[static_invariantSelfSubscript: ()] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1_TypeMemberOnInstanceAndViceVersa'; use a generic constraint instead}}
+    instance.static_invariantSelfMethod // expected-error {{static member 'static_invariantSelfMethod' cannot be used on instance of type 'P1_TypeMemberOnInstanceAndViceVersa'}}
+    instance.static_invariantSelfProp // expected-error {{static member 'static_invariantSelfProp' cannot be used on instance of type 'P1_TypeMemberOnInstanceAndViceVersa'}}
+    instance[static_invariantSelfSubscript: ()] // expected-error {{static member 'subscript' cannot be used on instance of type 'P1_TypeMemberOnInstanceAndViceVersa'}}
   }
 }
 
