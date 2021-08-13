@@ -305,7 +305,7 @@ static const std::vector<std::string> URLProtocols = {
   // Use RegexStrURL:
   "acap", "afp", "afs", "cid", "data", "fax", "feed", "file", "ftp", "go",
   "gopher", "http", "https", "imap", "ldap", "mailserver", "mid", "modem",
-  "news", "nntp", "opaquelocktoken", "pop", "prospero", "rdar", "rtsp", "service"
+  "news", "nntp", "opaquelocktoken", "pop", "prospero", "rdar", "rtsp", "service",
   "sip", "soap.beep", "soap.beeps", "tel", "telnet", "tip", "tn3270", "urn",
   "vemmi", "wais", "xcdoc", "z39.50r","z39.50s",
 

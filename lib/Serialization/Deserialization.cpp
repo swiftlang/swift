@@ -6556,8 +6556,8 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     } else {
       fatal(deserializedWitness.takeError());
     }
-    
-    assert(!req || isOpaque || witness ||
+
+    assert(allowCompilerErrors() || !req || isOpaque || witness ||
            req->getAttrs().hasAttribute<OptionalAttr>() ||
            req->getAttrs().isUnavailable(getContext()));
     if (!witness && !isOpaque) {
