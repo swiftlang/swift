@@ -147,6 +147,43 @@ SimpleMathTests.test("MultipleResultsWithCustomPullback") {
   expectEqual((10, 5), gradient(at: 5, 10, of: multiply_swapCustom))
 }
 
+// Test functions returning tuples.
+@differentiable(reverse)
+func swapTuple(_ x: Float, _ y: Float) -> (Float, Float) {
+  return (y, x)
+}
+
+@differentiable(reverse)
+func swapTupleCustom(_ x: Float, _ y: Float) -> (Float, Float) {
+  return (y, x)
+}
+@derivative(of: swapTupleCustom)
+func vjpSwapTupleCustom(_ x: Float, _ y: Float) -> (
+  value: (Float, Float), pullback: (Float, Float) -> (Float, Float)
+) {
+  return (swapTupleCustom(x, y), {v1, v2 in
+    return (v2, v1)
+  })
+}
+
+SimpleMathTests.test("ReturningTuples") {
+  func multiply_swapTuple(_ x: Float, _ y: Float) -> Float {
+    let result = swapTuple(x, y)
+    return result.0 * result.1
+  }
+
+  expectEqual((4, 3), gradient(at: 3, 4, of: multiply_swapTuple))
+  expectEqual((10, 5), gradient(at: 5, 10, of: multiply_swapTuple))
+
+  func multiply_swapTupleCustom(_ x: Float, _ y: Float) -> Float {
+    let result = swapTupleCustom(x, y)
+    return result.0 * result.1
+  }
+
+  expectEqual((4, 3), gradient(at: 3, 4, of: multiply_swapTupleCustom))
+  expectEqual((10, 5), gradient(at: 5, 10, of: multiply_swapTupleCustom))
+}
+
 SimpleMathTests.test("CaptureLocal") {
   let z: Float = 10
   func foo(_ x: Float) -> Float {

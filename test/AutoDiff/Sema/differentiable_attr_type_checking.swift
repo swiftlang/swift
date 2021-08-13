@@ -696,6 +696,19 @@ extension InoutParameters {
   mutating func mutatingMethod(_ other: Self) -> Self {}
 }
 
+// Test tuple results.
+
+extension InoutParameters {
+  @differentiable(reverse)
+  static func tupleResults(_ x: Self) -> (Self, Self) {}
+
+  @differentiable(reverse)
+  static func tupleResultsInt(_ x: Self) -> (Int, Self) {}
+
+  @differentiable(reverse)
+  static func tupleResultsInt2(_ x: Self) -> (Self, Int) {}
+}
+
 // Test accessors: `set`, `_read`, `_modify`.
 
 struct Accessors: Differentiable {

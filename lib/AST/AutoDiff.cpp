@@ -196,8 +196,16 @@ void autodiff::getFunctionSemanticResultTypes(
           functionType->getResult()->getAs<AnyFunctionType>()) {
     formalResultType = resultFunctionType->getResult();
   }
-  if (!formalResultType->isEqual(ctx.TheEmptyTupleType))
-    result.push_back({remap(formalResultType), /*isInout*/ false});
+  if (!formalResultType->isEqual(ctx.TheEmptyTupleType)) {
+    // Separate tuple elements into individual results.
+    if (formalResultType->is<TupleType>()) {
+      for (auto elt : formalResultType->castTo<TupleType>()->getElements()) {
+        result.push_back({remap(elt.getType()), /*isInout*/ false});
+      }
+    } else {
+      result.push_back({remap(formalResultType), /*isInout*/ false});
+    }
+  }
 
   // Collect `inout` parameters as semantic results.
   for (auto param : functionType->getParams())

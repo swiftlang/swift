@@ -902,6 +902,22 @@ extension InoutParameters {
   ) { fatalError() }
 }
 
+// Test tuple results.
+
+extension InoutParameters {
+  func tupleResults(_ x: Float) -> (Float, Float) { (x, x) }
+  @derivative(of: tupleResults, wrt: x)
+  func vjpTupleResults(_ x: Float) -> (
+    value: (Float, Float), pullback: (Float, Float) -> Float
+  ) { fatalError() }
+
+  func tupleResultsInt(_ x: Float) -> (Int, Float) { (1, x) }
+  @derivative(of: tupleResultsInt, wrt: x)
+  func vjpTupleResults(_ x: Float) -> (
+    value: (Int, Float), pullback: (Float) -> Float
+  ) { fatalError() }
+}
+
 // Test original/derivative function `inout` parameter mismatches.
 
 extension InoutParameters {
