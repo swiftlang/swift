@@ -457,7 +457,9 @@ static void printShortFormAvailable(ArrayRef<const DeclAttribute *> Attrs,
     for (auto *DA : Attrs) {
       auto *AvailAttr = cast<AvailableAttr>(DA);
       assert(AvailAttr->Introduced.hasValue());
-      if (isShortFormAvailabilityImpliedByOther(AvailAttr, Attrs))
+      // Avoid omitting available attribute when we are printing module interface.
+      if (!Options.IsForSwiftInterface &&
+          isShortFormAvailabilityImpliedByOther(AvailAttr, Attrs))
         continue;
       Printer << platformString(AvailAttr->Platform) << " "
               << AvailAttr->Introduced.getValue().getAsString() << ", ";
