@@ -136,6 +136,25 @@ public:
     }
   }
 
+  /// Find all keys that begin with the given symbol. Fn must take a single
+  /// argument of type ValueType.
+  template<typename Fn>
+  void findAll(Symbol symbol, Fn fn) {
+    auto found = Root.Entries.find(symbol);
+    if (found == Root.Entries.end())
+      return;
+
+    const auto &entry = found->second;
+
+    if (entry.Value)
+      fn(*entry.Value);
+
+    if (entry.Children == nullptr)
+      return;
+
+    visitChildren(entry.Children, fn);
+  }
+
   /// Find all keys that either match a prefix of [begin,end), or where
   /// [begin,end) matches a prefix of the key. Fn must take a single
   /// argument of type ValueType.

@@ -199,7 +199,7 @@ void RewriteSystem::processMergedAssociatedTypes() {
     const auto &lhs = pair.first;
     const auto &rhs = pair.second;
 
-    // If we have X.[P1:T] => Y.[P2:T], add a new pair of rules:
+    // If we have X.[P2:T] => Y.[P1:T], add a new pair of rules:
     // X.[P1:T] => X.[P1&P2:T]
     // X.[P2:T] => X.[P1&P2:T]
     if (DebugMerge) {
@@ -217,17 +217,18 @@ void RewriteSystem::processMergedAssociatedTypes() {
     mergedTerm.back() = mergedSymbol;
 
     // Add the rule X.[P1:T] => X.[P1&P2:T].
-    addRule(lhs, mergedTerm);
-
-    // Add the rule X.[P1:T] => X.[P1&P2:T].
     addRule(rhs, mergedTerm);
 
-    // Collect new rules here so that we're not adding rules while iterating
-    // over the rules list.
+    // Add the rule X.[P2:T] => X.[P1&P2:T].
+    addRule(lhs, mergedTerm);
+
+    // Collect new rules here so that we're not adding rules while traversing
+    // the trie.
     SmallVector<std::pair<MutableTerm, MutableTerm>, 2> inducedRules;
 
     // Look for conformance requirements on [P1:T] and [P2:T].
-    for (const auto &otherRule : Rules) {
+    auto visitRule = [&](unsigned ruleID) {
+      const auto &otherRule = Rules[ruleID];
       const auto &otherLHS = otherRule.getLHS();
       if (otherLHS.size() == 2 &&
           otherLHS[1].getKind() == Symbol::Kind::Protocol) {
@@ -260,7 +261,13 @@ void RewriteSystem::processMergedAssociatedTypes() {
           inducedRules.emplace_back(newLHS, newRHS);
         }
       }
-    }
+    };
+
+    // Visit rhs first to preserve the ordering of protocol requirements in the
+    // the property map. This is just for aesthetic purposes in the debug dump,
+    // it doesn't change behavior.
+    Trie.findAll(rhs.back(), visitRule);
+    Trie.findAll(lhs.back(), visitRule);
 
     // Now add the new rules.
     for (const auto &pair : inducedRules)
