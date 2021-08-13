@@ -20,7 +20,7 @@ dummy {
 }
 
 dummy {
-  var observedVar: Int = 123 { // expected-error {{closure containing a declaration cannot be used with result builder 'DummyBuilder'}}
+  var observedVar: Int = 123 { // expected-error {{cannot declare local observed variable in result builder}}
     didSet {}
   }
 
@@ -28,7 +28,7 @@ dummy {
 }
 
 dummy {
-  var observedVar: Int = 123 { // expected-error {{closure containing a declaration cannot be used with result builder 'DummyBuilder'}}
+  var observedVar: Int = 123 { // expected-error {{cannot declare local observed variable in result builder}}
     willSet {}
   }
 

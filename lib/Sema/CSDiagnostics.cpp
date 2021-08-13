@@ -5877,7 +5877,8 @@ bool SkipUnhandledConstructInResultBuilderFailure::diagnosePatternBinding(
   for (unsigned i : range(PB->getNumPatternEntries())) {
     auto *pattern = PB->getPattern(i);
 
-    // Each variable bound by the pattern must be stored.
+    // Each variable bound by the pattern must be stored and cannot have
+    // observers.
     {
       SmallVector<VarDecl *, 8> variables;
       pattern->collectVariables(variables);
@@ -5917,7 +5918,7 @@ bool SkipUnhandledConstructInResultBuilderFailure::diagnosePatternBinding(
 
 bool SkipUnhandledConstructInResultBuilderFailure::diagnoseStorage(
     VarDecl *var) const {
-  enum class PropertyKind : unsigned { lazy, wrapped, computed };
+  enum class PropertyKind : unsigned { lazy, wrapped, computed, observed };
 
   if (var->getImplInfo().isSimpleStored())
     return false;
@@ -5927,6 +5928,8 @@ bool SkipUnhandledConstructInResultBuilderFailure::diagnoseStorage(
     kind = PropertyKind::lazy;
   } else if (var->hasAttachedPropertyWrapper()) {
     kind = PropertyKind::wrapped;
+  } else if (var->hasObservers()) {
+    kind = PropertyKind::observed;
   } else {
     kind = PropertyKind::computed;
   }
