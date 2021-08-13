@@ -60,6 +60,12 @@ config.darwin_enable_maccatalyst = "@SWIFT_ENABLE_MACCATALYST@" == "TRUE"
 config.darwin_maccatalyst_build_flavor = "@BUILD_FLAVOR@"
 config.darwin_osx_variant_suffix = "@DEFAULT_OSX_VARIANT_SUFFIX@"
 
+# If we are not testing against the host compiler, we are testing against the
+# just built compiler. Add that as a feature so we can conditionally mark tests
+# as requiring a just_built_compiler.
+config.testing_against_host_compiler = \
+    "@SWIFT_RUN_TESTS_WITH_HOST_COMPILER@" == "TRUE"
+
 # Please remember to handle empty strings and/or unset variables correctly.
 
 if "@SWIFT_ASAN_BUILD@" == "TRUE":
