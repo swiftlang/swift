@@ -10,12 +10,12 @@ struct DummyBuilder { // expected-note 5 {{struct 'DummyBuilder' declared here}}
 func dummy<T>(@DummyBuilder _: () -> T) {}
 
 dummy {
-  var computedVar: Int { return 123 } // expected-error {{closure containing a declaration cannot be used with result builder 'DummyBuilder'}}
+  var computedVar: Int { return 123 } // expected-error {{cannot declare local computed variable in result builder}}
   ()
 }
 
 dummy {
-  lazy var lazyVar: Int = 123 // expected-error {{closure containing a declaration cannot be used with result builder 'DummyBuilder'}}
+  lazy var lazyVar: Int = 123 // expected-error {{cannot declare local lazy variable in result builder}}
   ()
 }
 
@@ -40,7 +40,7 @@ dummy {
 }
 
 dummy {
-  @Wrapper var wrappedVar: Int = 123 // expected-error {{closure containing a declaration cannot be used with result builder 'DummyBuilder'}}
+  @Wrapper var wrappedVar: Int = 123 // expected-error {{cannot declare local wrapped variable in result builder}}
   ()
 }
 

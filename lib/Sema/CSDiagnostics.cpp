@@ -5875,13 +5875,43 @@ void SkipUnhandledConstructInResultBuilderFailure::diagnosePrimary(
 
   if (auto *decl = unhandled.dyn_cast<Decl *>()) {
     if (auto *PB = dyn_cast<PatternBindingDecl>(decl)) {
+      // Tailored diagnostics for computed properties.
+      if (!PB->hasStorage()) {
+      }
+
+      enum class PropertyKind : unsigned { lazy, wrapped, computed };
+
       // Diagnose all of the patterns without explicit initializers.
       bool diagnosed = false;
       for (unsigned i : range(PB->getNumPatternEntries())) {
+        auto *pattern = PB->getPattern(i);
+
+        // Each variable bound by the pattern must be stored.
+        SmallVector<VarDecl *, 8> variables;
+        pattern->collectVariables(variables);
+
+        for (auto *var : variables) {
+          if (var->getImplInfo().isSimpleStored())
+            continue;
+
+          PropertyKind kind;
+          if (var->getAttrs().hasAttribute<LazyAttr>()) {
+            kind = PropertyKind::lazy;
+          } else if (var->hasAttachedPropertyWrapper()) {
+            kind = PropertyKind::wrapped;
+          } else {
+            kind = PropertyKind::computed;
+          }
+
+          emitDiagnosticAt(PB->getLoc(),
+                           diag::cannot_declare_computed_var_in_result_builder,
+                           static_cast<unsigned>(kind));
+
+          diagnosed = true;
+        }
+
         if (PB->isExplicitlyInitialized(i))
           continue;
-
-        auto *pattern = PB->getPattern(i);
 
         StringRef name;
 
