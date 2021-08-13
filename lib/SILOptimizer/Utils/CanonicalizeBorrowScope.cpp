@@ -782,6 +782,8 @@ bool CanonicalizeBorrowScope::canonicalizeFunctionArgument(
 
   initBorrow(BorrowedValue(arg));
 
+  SWIFT_DEFER { liveness.clear(); };
+
   RewriteInnerBorrowUses innerRewriter(*this);
   beginVisitBorrowScopeUses(); // reset the def/use worklist
   bool succeed = visitBorrowScopeUses(borrowedValue.value, innerRewriter);
