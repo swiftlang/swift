@@ -952,6 +952,9 @@ public:
         if (ValueVariables.insert(shadow).second)
           ValueDomPoints.push_back({shadow, getActiveDominancePoint()});
       }
+      auto inst = cast<llvm::Instruction>(shadow);
+      llvm::IRBuilder<> builder(inst->getNextNode());
+      shadow = builder.CreateLoad(shadow);
     }
 
     return shadow;
