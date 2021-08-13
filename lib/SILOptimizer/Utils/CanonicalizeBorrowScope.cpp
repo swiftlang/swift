@@ -778,9 +778,13 @@ bool CanonicalizeBorrowScope::consolidateBorrowScope() {
 
 bool CanonicalizeBorrowScope::canonicalizeFunctionArgument(
     SILFunctionArgument *arg) {
-  LLVM_DEBUG(llvm::dbgs() << "*** Canonicalize Borrow: " << borrowedValue);
+  BorrowedValue borrow(arg);
+  if (!borrow)
+    return false;
 
-  initBorrow(BorrowedValue(arg));
+  initBorrow(borrow);
+
+  LLVM_DEBUG(llvm::dbgs() << "*** Canonicalize Borrow: " << borrowedValue);
 
   SWIFT_DEFER { liveness.clear(); };
 
