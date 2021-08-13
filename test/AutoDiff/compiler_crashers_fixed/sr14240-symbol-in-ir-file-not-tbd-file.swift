@@ -1,5 +1,7 @@
 // RUN: %target-run-simple-swift(-Xfrontend -requirement-machine=off)
 
+// REQUIRES: executable_test
+
 // SR-14240: Error: symbol 'powTJfSSpSr' (powTJfSSpSr) is in generated IR file,
 // but not in TBD file.
 
