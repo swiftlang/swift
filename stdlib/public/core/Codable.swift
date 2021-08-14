@@ -5556,7 +5556,7 @@ extension Dictionary: Encodable where Key: Encodable, Value: Encodable {
         let codingKey = _DictionaryCodingKey(intValue: key as! Int)!
         try container.encode(value, forKey: codingKey)
       }
-    } else if let _ = Key.self as? CodingKeyRepresentable.Type {
+    } else if Key.self is CodingKeyRepresentable.Type {
       // Since the keys are CodingKeyRepresentable, we can use the `codingKey`
       // to create `_DictionaryCodingKey` instances.
       var container = encoder.container(keyedBy: _DictionaryCodingKey.self)
