@@ -5630,7 +5630,7 @@ extension Dictionary: Decodable where Key: Decodable, Value: Decodable {
           throw DecodingError.dataCorruptedError(
             forKey: dictionaryCodingKey,
             in: container,
-            debugDescription: "..."
+            debugDescription: "Could not convert key to type \(Key.self)"
           )
         }
         let value: Value = try container.decode(
