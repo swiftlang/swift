@@ -1494,9 +1494,19 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
     SerializationOptions serializationOpts =
         Invocation.computeSerializationOptions(outs, Instance.getMainModule());
 
+    // Infer if this is an emit-module job part of an incremental build,
+    // vs a partial emit-module job (with primary files) or other kinds.
+    // We may want to rely on a flag instead to differentiate them.
+    const bool isEmitModuleSeparately =
+        Action == FrontendOptions::ActionType::EmitModuleOnly &&
+        MSF.is<ModuleDecl *>() &&
+        Instance.getInvocation()
+            .getTypeCheckerOptions()
+            .SkipFunctionBodies == FunctionBodySkipping::NonInlinableWithoutTypes;
     const bool canEmitIncrementalInfoIntoModule =
         !serializationOpts.DisableCrossModuleIncrementalInfo &&
-        (Action == FrontendOptions::ActionType::MergeModules);
+        (Action == FrontendOptions::ActionType::MergeModules ||
+         isEmitModuleSeparately);
     if (canEmitIncrementalInfoIntoModule) {
       const auto alsoEmitDotFile =
           Instance.getInvocation()
