@@ -86,11 +86,7 @@ def run_build_script_helper(action, host_target, product, args):
     script_path = os.path.join(
         product.source_dir, 'Utilities', 'build-script-helper.py')
 
-    install_destdir = args.install_destdir
-    if swiftpm.SwiftPM.has_cross_compile_hosts(args):
-        install_destdir = swiftpm.SwiftPM.get_install_destdir(args,
-                                                              host_target,
-                                                              product.build_dir)
+    install_destdir = product.host_install_destdir(host_target)
     toolchain_path = product.native_toolchain_path(host_target)
 
     # Pass Dispatch directory down if we built it

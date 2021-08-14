@@ -104,9 +104,7 @@ def _get_toolchain_path(host_target, product, args):
     # this logic initially was inside run_build_script_helper
     # and was factored out so it can be used in testing as well
 
-    toolchain_path = swiftpm.SwiftPM.get_install_destdir(args,
-                                                         host_target,
-                                                         product.build_dir)
+    toolchain_path = product.host_install_destdir(host_target)
     if platform.system() == 'Darwin':
         # The prefix is an absolute path, so concatenate without os.path.
         toolchain_path += \
