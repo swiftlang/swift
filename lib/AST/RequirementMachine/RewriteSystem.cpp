@@ -127,28 +127,6 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs) {
     MergedAssociatedTypes.emplace_back(lhs, rhs);
   }
 
-  // Since we added a new rule, we have to check for overlaps between the
-  // new rule and all existing rules.
-  for (unsigned j : indices(Rules)) {
-    // A rule does not overlap with itself.
-    if (i == j)
-      continue;
-
-    // We don't have to check for overlap with deleted rules.
-    if (Rules[j].isDeleted())
-      continue;
-
-    // The overlap check is not commutative so we have to check both
-    // directions.
-    Worklist.emplace_back(i, j);
-    Worklist.emplace_back(j, i);
-
-    if (DebugCompletion) {
-      llvm::dbgs() << "$ Queued up (" << i << ", " << j << ") and ";
-      llvm::dbgs() << "(" << j << ", " << i << ")\n";
-    }
-  }
-
   // Tell the caller that we added a new rule.
   return true;
 }

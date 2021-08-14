@@ -13,7 +13,7 @@
 #ifndef SWIFT_REWRITESYSTEM_H
 #define SWIFT_REWRITESYSTEM_H
 
-#include <algorithm>
+#include "llvm/ADT/DenseSet.h"
 
 #include "ProtocolGraph.h"
 #include "Symbol.h"
@@ -47,12 +47,6 @@ public:
 
   const Term &getLHS() const { return LHS; }
   const Term &getRHS() const { return RHS; }
-
-  OverlapKind checkForOverlap(const Rule &other,
-                              MutableTerm &t,
-                              MutableTerm &v) const {
-    return LHS.checkForOverlap(other.LHS, t, v);
-  }
 
   /// Returns if the rule was deleted.
   bool isDeleted() const {
@@ -114,9 +108,8 @@ class RewriteSystem final {
   /// See RewriteSystem::processMergedAssociatedTypes() for details.
   std::vector<std::pair<MutableTerm, MutableTerm>> MergedAssociatedTypes;
 
-  /// A list of pending pairs for checking overlap in the completion
-  /// procedure.
-  std::deque<std::pair<unsigned, unsigned>> Worklist;
+  /// Pairs of rules which have already been checked for overlap.
+  llvm::DenseSet<std::pair<unsigned, unsigned>> CheckedOverlaps;
 
   /// Set these to true to enable debugging output.
   unsigned DebugSimplify : 1;
@@ -176,8 +169,9 @@ public:
   void dump(llvm::raw_ostream &out) const;
 
 private:
-  Optional<std::pair<MutableTerm, MutableTerm>>
-  computeCriticalPair(const Rule &lhs, const Rule &rhs) const;
+  std::pair<MutableTerm, MutableTerm>
+  computeCriticalPair(ArrayRef<Symbol>::const_iterator from,
+                      const Rule &lhs, const Rule &rhs) const;
 
   Symbol mergeAssociatedTypes(Symbol lhs, Symbol rhs) const;
   void processMergedAssociatedTypes();

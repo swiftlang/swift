@@ -16,6 +16,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Statistic.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/Support/Allocator.h"
 #include "Histogram.h"
@@ -44,6 +45,9 @@ class RewriteContext final {
   /// Folding set for uniquing terms.
   llvm::FoldingSet<Term::Storage> Terms;
 
+  /// Cache for associated type declarations.
+  llvm::DenseMap<Symbol, AssociatedTypeDecl *> AssocTypes;
+
   RewriteContext(const RewriteContext &) = delete;
   RewriteContext(RewriteContext &&) = delete;
   RewriteContext &operator=(const RewriteContext &) = delete;
@@ -70,7 +74,7 @@ public:
   MutableTerm getMutableTermForType(CanType paramType,
                                     const ProtocolDecl *proto);
 
-  ASTContext &getASTContext() { return Context; }
+  ASTContext &getASTContext() const { return Context; }
 
   Type getTypeForTerm(Term term,
                       TypeArrayView<GenericTypeParamType> genericParams,
@@ -83,6 +87,9 @@ public:
   Type getRelativeTypeForTerm(
                       const MutableTerm &term, const MutableTerm &prefix,
                       const ProtocolGraph &protos) const;
+
+  AssociatedTypeDecl *getAssociatedTypeForSymbol(Symbol symbol,
+                                                 const ProtocolGraph &protos);
 
   ~RewriteContext();
 };

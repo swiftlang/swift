@@ -13,7 +13,7 @@
 #ifndef SWIFT_RQM_TRIE_H
 #define SWIFT_RQM_TRIE_H
 
-#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/MapVector.h"
 #include "Histogram.h"
 
 namespace swift {
@@ -36,7 +36,7 @@ public:
   };
 
   struct Node {
-    llvm::SmallDenseMap<Symbol, Entry, 1> Entries;
+    llvm::SmallMapVector<Symbol, Entry, 1> Entries;
   };
 
 private:
@@ -133,6 +133,72 @@ public:
         return bestMatch;
 
       node = entry.Children;
+    }
+  }
+
+  /// Find all keys that begin with the given symbol. Fn must take a single
+  /// argument of type ValueType.
+  template<typename Fn>
+  void findAll(Symbol symbol, Fn fn) {
+    auto found = Root.Entries.find(symbol);
+    if (found == Root.Entries.end())
+      return;
+
+    const auto &entry = found->second;
+
+    if (entry.Value)
+      fn(*entry.Value);
+
+    if (entry.Children == nullptr)
+      return;
+
+    visitChildren(entry.Children, fn);
+  }
+
+  /// Find all keys that either match a prefix of [begin,end), or where
+  /// [begin,end) matches a prefix of the key. Fn must take a single
+  /// argument of type ValueType.
+  template<typename Iter, typename Fn>
+  void findAll(Iter begin, Iter end, Fn fn) {
+    assert(begin != end);
+    auto *node = &Root;
+
+    while (true) {
+      auto found = node->Entries.find(*begin);
+      ++begin;
+
+      if (found == node->Entries.end())
+        return;
+
+      const auto &entry = found->second;
+
+      if (entry.Value)
+        fn(*entry.Value);
+
+      if (entry.Children == nullptr)
+        return;
+
+      node = entry.Children;
+
+      if (begin == end) {
+        visitChildren(node, fn);
+        return;
+      }
+    }
+  }
+
+private:
+  /// Depth-first traversal of all children of the given node, including
+  /// the node itself. Fn must take a single argument of type ValueType.
+  template<typename Fn>
+  void visitChildren(Node *node, Fn fn) {
+    for (const auto &pair : node->Entries) {
+      const auto &entry = pair.second;
+      if (entry.Value)
+        fn(*entry.Value);
+
+      if (entry.Children)
+        visitChildren(entry.Children, fn);
     }
   }
 };

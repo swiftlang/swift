@@ -67,95 +67,6 @@ Symbol Symbol::prependPrefixToConcreteSubstitutions(
     }, ctx);
 }
 
-/// Check if this term overlaps with \p other for the purposes
-/// of the Knuth-Bendix completion algorithm.
-///
-/// An overlap occurs if one of the following two cases holds:
-///
-/// 1) If this == TUV and other == U.
-/// 2) If this == TU and other == UV.
-///
-/// In both cases, we return the subterms T and V, together with
-/// an 'overlap kind' identifying the first or second case.
-///
-/// If both rules have identical left hand sides, either case could
-/// apply, but we arbitrarily pick case 1.
-///
-/// Note that this relation is not commutative; we need to check
-/// for overlap between both (X and Y) and (Y and X).
-OverlapKind
-Term::checkForOverlap(Term other,
-                      MutableTerm &t,
-                      MutableTerm &v) const {
-  if (*this == other) {
-    // If this term is equal to the other term, we have an overlap.
-    t = MutableTerm();
-    v = MutableTerm();
-    return OverlapKind::First;
-  }
-
-  if (size() > other.size()) {
-    // If this term is longer than the other term, check if it contains
-    // the other term.
-    auto first1 = begin();
-    while (first1 <= end() - other.size()) {
-      if (std::equal(other.begin(), other.end(), first1)) {
-        // We have an overlap.
-        t = MutableTerm(begin(), first1);
-        v = MutableTerm(first1 + other.size(), end());
-
-        // If both T and V are empty, we have two equal terms, which
-        // should have been handled above.
-        assert(!t.empty() || !v.empty());
-        assert(t.size() + other.size() + v.size() == size());
-
-        return OverlapKind::First;
-      }
-
-      ++first1;
-    }
-  }
-
-  // Finally, check if a suffix of this term is equal to a prefix of
-  // the other term.
-  unsigned count = std::min(size(), other.size());
-  auto first1 = end() - count;
-  auto last2 = other.begin() + count;
-
-  // Initial state, depending on size() <=> other.size():
-  //
-  // ABC   -- count = 3, first1 = this[0], last2 = other[3]
-  // XYZ
-  //
-  // ABC   -- count = 2, first1 = this[1], last2 = other[2]
-  //  XY
-  //
-  // ABC   -- count = 3, first1 = this[0], last2 = other[3]
-  // XYZW
-
-  // Advance by 1, since we don't need to check for full containment
-  ++first1;
-  --last2;
-
-  while (last2 != other.begin()) {
-    if (std::equal(other.begin(), last2, first1)) {
-      t = MutableTerm(begin(), first1);
-      v = MutableTerm(last2, other.end());
-
-      assert(!t.empty());
-      assert(!v.empty());
-      assert(t.size() + other.size() - v.size() == size());
-
-      return OverlapKind::Second;
-    }
-
-    ++first1;
-    --last2;
-  }
-
-  return OverlapKind::None;
-}
-
 /// If we have two symbols [P:T] and [Q:T], produce a merged symbol:
 ///
 /// - If P inherits from Q, this is just [P:T].
@@ -288,7 +199,7 @@ void RewriteSystem::processMergedAssociatedTypes() {
     const auto &lhs = pair.first;
     const auto &rhs = pair.second;
 
-    // If we have X.[P1:T] => Y.[P2:T], add a new pair of rules:
+    // If we have X.[P2:T] => Y.[P1:T], add a new pair of rules:
     // X.[P1:T] => X.[P1&P2:T]
     // X.[P2:T] => X.[P1&P2:T]
     if (DebugMerge) {
@@ -306,17 +217,18 @@ void RewriteSystem::processMergedAssociatedTypes() {
     mergedTerm.back() = mergedSymbol;
 
     // Add the rule X.[P1:T] => X.[P1&P2:T].
-    addRule(lhs, mergedTerm);
-
-    // Add the rule X.[P1:T] => X.[P1&P2:T].
     addRule(rhs, mergedTerm);
 
-    // Collect new rules here so that we're not adding rules while iterating
-    // over the rules list.
+    // Add the rule X.[P2:T] => X.[P1&P2:T].
+    addRule(lhs, mergedTerm);
+
+    // Collect new rules here so that we're not adding rules while traversing
+    // the trie.
     SmallVector<std::pair<MutableTerm, MutableTerm>, 2> inducedRules;
 
     // Look for conformance requirements on [P1:T] and [P2:T].
-    for (const auto &otherRule : Rules) {
+    auto visitRule = [&](unsigned ruleID) {
+      const auto &otherRule = Rules[ruleID];
       const auto &otherLHS = otherRule.getLHS();
       if (otherLHS.size() == 2 &&
           otherLHS[1].getKind() == Symbol::Kind::Protocol) {
@@ -349,7 +261,13 @@ void RewriteSystem::processMergedAssociatedTypes() {
           inducedRules.emplace_back(newLHS, newRHS);
         }
       }
-    }
+    };
+
+    // Visit rhs first to preserve the ordering of protocol requirements in the
+    // the property map. This is just for aesthetic purposes in the debug dump,
+    // it doesn't change behavior.
+    Trie.findAll(rhs.back(), visitRule);
+    Trie.findAll(lhs.back(), visitRule);
 
     // Now add the new rules.
     for (const auto &pair : inducedRules)
@@ -359,7 +277,9 @@ void RewriteSystem::processMergedAssociatedTypes() {
   MergedAssociatedTypes.clear();
 }
 
-/// Compute a critical pair from two rewrite rules.
+/// Compute a critical pair from the left hand sides of two rewrite rules,
+/// where \p rhs begins at \p from, which must be an iterator pointing
+/// into \p lhs.
 ///
 /// There are two cases:
 ///
@@ -388,15 +308,11 @@ void RewriteSystem::processMergedAssociatedTypes() {
 /// concrete substitution 'X' to get 'A.X'; the new concrete term
 /// is now rooted at the same level as A.B in the rewrite system,
 /// not just B.
-Optional<std::pair<MutableTerm, MutableTerm>>
-RewriteSystem::computeCriticalPair(const Rule &lhs, const Rule &rhs) const {
-  MutableTerm t, v;
-
-  switch (lhs.checkForOverlap(rhs, t, v)) {
-  case OverlapKind::None:
-    return None;
-
-  case OverlapKind::First: {
+std::pair<MutableTerm, MutableTerm>
+RewriteSystem::computeCriticalPair(ArrayRef<Symbol>::const_iterator from,
+                                   const Rule &lhs, const Rule &rhs) const {
+  auto end = lhs.getLHS().end();
+  if (from + rhs.getLHS().size() < end) {
     // lhs == TUV -> X, rhs == U -> Y.
 
     // Note: This includes the case where the two rules have exactly
@@ -405,31 +321,31 @@ RewriteSystem::computeCriticalPair(const Rule &lhs, const Rule &rhs) const {
     // In this case, T and V are both empty.
 
     // Compute the term TYV.
+    MutableTerm t(lhs.getLHS().begin(), from);
     t.append(rhs.getRHS());
-    t.append(v);
+    t.append(from + rhs.getLHS().size(), lhs.getLHS().end());
     return std::make_pair(MutableTerm(lhs.getRHS()), t);
-  }
-
-  case OverlapKind::Second: {
+  } else {
     // lhs == TU -> X, rhs == UV -> Y.
 
-    if (v.back().isSuperclassOrConcreteType()) {
-      v.back() = v.back().prependPrefixToConcreteSubstitutions(
+    // Compute the term T.
+    MutableTerm t(lhs.getLHS().begin(), from);
+
+    // Compute the term XV.
+    MutableTerm xv(lhs.getRHS());
+    xv.append(rhs.getLHS().begin() + (lhs.getLHS().end() - from),
+              rhs.getLHS().end());
+
+    if (xv.back().isSuperclassOrConcreteType()) {
+      xv.back() = xv.back().prependPrefixToConcreteSubstitutions(
           t, Context);
     }
 
-    // Compute the term XV.
-    MutableTerm xv;
-    xv.append(lhs.getRHS());
-    xv.append(v);
-
     // Compute the term TY.
     t.append(rhs.getRHS());
+
     return std::make_pair(xv, t);
   }
-  }
-
-  llvm_unreachable("Bad overlap kind");
 }
 
 /// Computes the confluent completion using the Knuth-Bendix algorithm.
@@ -448,64 +364,99 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
                                           unsigned maxDepth) {
   unsigned steps = 0;
 
-  // The worklist must be processed in first-in-first-out order, to ensure
-  // that we resolve all overlaps among the initial set of rules before
-  // moving on to overlaps between rules introduced by completion.
-  while (!Worklist.empty()) {
-    // Check if we've already done too much work.
-    if (Rules.size() > maxIterations)
-      return std::make_pair(CompletionResult::MaxIterations, steps);
+  bool again = false;
 
-    auto next = Worklist.front();
-    Worklist.pop_front();
+  do {
+    std::vector<std::pair<MutableTerm, MutableTerm>> resolvedCriticalPairs;
 
-    const auto &lhs = Rules[next.first];
-    const auto &rhs = Rules[next.second];
+    // For every rule, looking for other rules that overlap with this rule.
+    for (unsigned i = 0, e = Rules.size(); i < e; ++i) {
+      const auto &lhs = Rules[i];
+      if (lhs.isDeleted())
+        continue;
 
-    if (DebugCompletion) {
-      llvm::dbgs() << "$ Check for overlap: (#" << next.first << ") ";
-      llvm::dbgs() << lhs << "\n";
-      llvm::dbgs() << "                -vs- (#" << next.second << ") ";
-      llvm::dbgs() << rhs << ":\n";
-    }
+      // Look up every suffix of this rule in the trie using findAll(). This
+      // will find both kinds of overlap:
+      //
+      // 1) rules whose left hand side is fully contained in [from,to)
+      // 2) rules whose left hand side has a prefix equal to [from,to)
+      auto from = lhs.getLHS().begin();
+      auto to = lhs.getLHS().end();
+      while (from < to) {
+        Trie.findAll(from, to, [&](unsigned j) {
+          // We don't have to consider the same pair of rules more than once,
+          // since those critical pairs were already resolved.
+          if (!CheckedOverlaps.insert(std::make_pair(i, j)).second)
+            return;
 
-    auto pair = computeCriticalPair(lhs, rhs);
-    if (!pair) {
-      if (DebugCompletion) {
-        llvm::dbgs() << " no overlap\n\n";
+          const auto &rhs = Rules[j];
+          if (rhs.isDeleted())
+            return;
+
+          if (from == lhs.getLHS().begin()) {
+            // While every rule will have an overlap of the first kind
+            // with itself, it's not useful to consider since the
+            // resulting trivial pair is always trivial.
+            if (i == j)
+              return;
+
+            // If the first rule's left hand side is a proper prefix
+            // of the second rule's left hand side, don't do anything.
+            //
+            // We will find the 'opposite' overlap later, where the two
+            // rules are swapped around. Then it becomes an overlap of
+            // the first kind, and will be handled as such.
+            if (rhs.getLHS().size() > lhs.getLHS().size())
+              return;
+          }
+
+          // Try to repair the confluence violation by adding a new rule.
+          resolvedCriticalPairs.push_back(computeCriticalPair(from, lhs, rhs));
+
+          if (DebugCompletion) {
+            const auto &pair = resolvedCriticalPairs.back();
+
+            llvm::dbgs() << "$ Overlapping rules: (#" << i << ") ";
+            llvm::dbgs() << lhs << "\n";
+            llvm::dbgs() << "                -vs- (#" << j << ") ";
+            llvm::dbgs() << rhs << ":\n";
+            llvm::dbgs() << "$$ First term of critical pair is "
+                         << pair.first << "\n";
+            llvm::dbgs() << "$$ Second term of critical pair is "
+                         << pair.second << "\n\n";
+          }
+        });
+
+        ++from;
       }
-      continue;
     }
 
-    MutableTerm first, second;
+    simplifyRewriteSystem();
 
-    // We have a critical pair (X, Y).
-    std::tie(first, second) = *pair;
+    again = false;
+    for (const auto &pair : resolvedCriticalPairs) {
+      // Check if we've already done too much work.
+      if (Rules.size() > maxIterations)
+        return std::make_pair(CompletionResult::MaxIterations, steps);
 
-    if (DebugCompletion) {
-      llvm::dbgs() << "$$ First term of critical pair is " << first << "\n";
-      llvm::dbgs() << "$$ Second term of critical pair is " << second << "\n\n";
+      if (!addRule(pair.first, pair.second))
+        continue;
+
+      // Check if the new rule is too long.
+      if (Rules.back().getDepth() > maxDepth)
+        return std::make_pair(CompletionResult::MaxDepth, steps);
+
+      // Only count a 'step' once we add a new rule.
+      ++steps;
+      again = true;
     }
-    unsigned i = Rules.size();
 
-    // Try to repair the confluence violation by adding a new rule
-    // X == Y.
-    if (!addRule(first, second))
-      continue;
-
-    // Only count a 'step' once we add a new rule.
-    ++steps;
-
-    const auto &newRule = Rules[i];
-    if (newRule.getDepth() > maxDepth)
-      return std::make_pair(CompletionResult::MaxDepth, steps);
-
-    // If this new rule merges any associated types, process the merge now
+    // If the added rules merged any associated types, process the merges now
     // before we continue with the completion procedure. This is important
     // to perform incrementally since merging is required to repair confluence
     // violations.
     processMergedAssociatedTypes();
-  }
+  } while (again);
 
   return std::make_pair(CompletionResult::Success, steps);
 }
