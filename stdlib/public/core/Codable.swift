@@ -5623,10 +5623,21 @@ extension Dictionary: Decodable where Key: Decodable, Value: Decodable {
     } else if let codingKeyRepresentableType = Key.self as? CodingKeyRepresentable.Type {
       // The keys are CodingKeyRepresentable, so we should be able to expect a keyed container.
       let container = try decoder.container(keyedBy: _DictionaryCodingKey.self)
-      for key in container.allKeys {
-        let value = try container.decode(Value.self, forKey: key)
-        let k = codingKeyRepresentableType.init(codingKey: key)
-        self.dict[k as! Key] = value
+      for dictionaryCodingKey in container.allKeys {
+        guard let key: Key = codingKeyRepresentableType.init(
+          codingKey: dictionaryCodingKey
+        ) as? Key else {
+          throw DecodingError.dataCorruptedError(
+            forKey: dictionaryCodingKey,
+            in: container,
+            debugDescription: "..."
+          )
+        }
+        let value: Value = try container.decode(
+          Value.self,
+          forKey: dictionaryCodingKey
+        )
+        self[key] = value
       }
     } else {
       // We should have encoded as an array of alternating key-value pairs.
