@@ -272,7 +272,7 @@ public:
                                              SILType type);
 
   using SILBuilder::createUncheckedRefCast;
-  ManagedValue createUncheckedRefCast(SILLocation loc, ManagedValue original,
+  ManagedValue createUncheckedRefCast(SILLocation loc, ManagedValue value,
                                       SILType type);
 
   using SILBuilder::createUncheckedAddrCast;

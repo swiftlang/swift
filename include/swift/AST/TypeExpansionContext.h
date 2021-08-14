@@ -89,6 +89,10 @@ public:
       other.expansion == this->expansion;
   }
 
+  bool operator!=(const TypeExpansionContext &other) const {
+    return !operator==(other);
+  }
+
   bool operator<(const TypeExpansionContext other) const {
     assert(other.inContext != this->inContext ||
            other.isContextWholeModule == this->isContextWholeModule);

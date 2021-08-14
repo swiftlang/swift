@@ -31,7 +31,7 @@ void SILGenFunction::prepareEpilog(bool hasDirectResults, bool isThrowing,
     for (auto directResult : fnConv.getDirectSILResults()) {
       SILType resultType = F.getLoweredType(F.mapTypeIntoContext(
           fnConv.getSILType(directResult, getTypeExpansionContext())));
-      epilogBB->createPhiArgument(resultType, ValueOwnershipKind::Owned);
+      epilogBB->createPhiArgument(resultType, OwnershipKind::Owned);
     }
   }
 
@@ -49,7 +49,7 @@ void SILGenFunction::prepareEpilog(bool hasDirectResults, bool isThrowing,
 void SILGenFunction::prepareRethrowEpilog(CleanupLocation cleanupLoc) {
   auto exnType = SILType::getExceptionType(getASTContext());
   SILBasicBlock *rethrowBB = createBasicBlock(FunctionSection::Postmatter);
-  rethrowBB->createPhiArgument(exnType, ValueOwnershipKind::Owned);
+  rethrowBB->createPhiArgument(exnType, OwnershipKind::Owned);
   ThrowDest = JumpDest(rethrowBB, getCleanupsDepth(), cleanupLoc);
 }
 
@@ -79,8 +79,7 @@ static Optional<SILLocation>
 prepareForEpilogBlockEmission(SILGenFunction &SGF, SILLocation topLevel,
                               SILBasicBlock *epilogBB,
                               SmallVectorImpl<SILValue> &directResults) {
-  SILLocation implicitReturnFromTopLevel =
-      ImplicitReturnLocation::getImplicitReturnLoc(topLevel);
+  ImplicitReturnLocation implicitReturnFromTopLevel(topLevel);
 
   // If the current BB we are inserting into isn't terminated, and we require a
   // return, then we
@@ -146,7 +145,7 @@ prepareForEpilogBlockEmission(SILGenFunction &SGF, SILLocation topLevel,
 
   // Move the epilog block to the end of the ordinary section.
   auto endOfOrdinarySection = SGF.StartOfPostmatter;
-  SGF.B.moveBlockTo(epilogBB, endOfOrdinarySection);
+  SGF.F.moveBlockBefore(epilogBB, endOfOrdinarySection);
 
   // Emit the epilog into the epilog bb. Its arguments are the
   // direct results.
@@ -160,7 +159,7 @@ prepareForEpilogBlockEmission(SILGenFunction &SGF, SILLocation topLevel,
   // epilog logic is simplified.)
   //
   // Otherwise make the ret instruction part of the cleanups.
-  auto cleanupLoc = CleanupLocation::get(topLevel);
+  auto cleanupLoc = CleanupLocation(topLevel);
   return cleanupLoc;
 }
 
@@ -184,7 +183,7 @@ SILGenFunction::emitEpilogBB(SILLocation topLevel) {
                                         ReturnDest.getDepth()) &&
          "emitting epilog in wrong scope");
 
-  auto cleanupLoc = CleanupLocation::get(topLevel);
+  auto cleanupLoc = CleanupLocation(topLevel);
   Cleanups.emitCleanupsForReturn(cleanupLoc, NotForUnwind);
 
   // Build the return value.  We don't do this if there are no direct
@@ -222,7 +221,7 @@ emitEpilog(SILLocation TopLevel, bool UsesCustomEpilog) {
 
     // Return () if no return value was given.
     if (!returnValue)
-      returnValue = emitEmptyTuple(CleanupLocation::get(TopLevel));
+      returnValue = emitEmptyTuple(CleanupLocation(TopLevel));
 
     B.createReturn(returnLoc, returnValue);
   }
@@ -282,7 +281,7 @@ static bool prepareExtraEpilog(SILGenFunction &SGF, JumpDest &dest,
   // Reposition the block to the end of the postmatter section
   // unless we're emitting into a single predecessor.
   if (reposition) {
-    SGF.B.moveBlockTo(epilogBB, SGF.F.end());
+    SGF.F.moveBlockBefore(epilogBB, SGF.F.end());
   }
 
   SGF.B.setInsertionPoint(epilogBB);
@@ -298,7 +297,7 @@ void SILGenFunction::emitRethrowEpilog(SILLocation topLevel) {
 
   Cleanups.emitCleanupsForReturn(ThrowDest.getCleanupLocation(), IsForUnwind);
 
-  B.createThrow(throwLoc, exn);
+  B.createThrow(CleanupLocation(throwLoc), exn);
 
   ThrowDest = JumpDest::invalid();
 }

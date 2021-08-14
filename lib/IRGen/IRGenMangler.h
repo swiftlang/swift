@@ -15,6 +15,7 @@
 
 #include "IRGenModule.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/AutoDiff.h"
 #include "swift/AST/ProtocolAssociations.h"
 #include "swift/IRGen/ValueWitness.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -51,6 +52,20 @@ public:
     return finalize();
   }
 
+  std::string mangleDerivativeDispatchThunk(
+      const AbstractFunctionDecl *func,
+      AutoDiffDerivativeFunctionIdentifier *derivativeId) {
+    beginManglingWithAutoDiffOriginalFunction(func);
+    auto kind = Demangle::getAutoDiffFunctionKind(derivativeId->getKind());
+    AutoDiffConfig config(
+        derivativeId->getParameterIndices(),
+        IndexSubset::get(func->getASTContext(), 1, {0}),
+        derivativeId->getDerivativeGenericSignature());
+    appendAutoDiffFunctionParts("TJ", kind, config);
+    appendOperator("Tj");
+    return finalize();
+  }
+
   std::string mangleConstructorDispatchThunk(const ConstructorDecl *ctor,
                                              bool isAllocating) {
     beginMangling();
@@ -62,6 +77,20 @@ public:
   std::string mangleMethodDescriptor(const FuncDecl *func) {
     beginMangling();
     appendEntity(func);
+    appendOperator("Tq");
+    return finalize();
+  }
+
+  std::string mangleDerivativeMethodDescriptor(
+      const AbstractFunctionDecl *func,
+      AutoDiffDerivativeFunctionIdentifier *derivativeId) {
+    beginManglingWithAutoDiffOriginalFunction(func);
+    auto kind = Demangle::getAutoDiffFunctionKind(derivativeId->getKind());
+    AutoDiffConfig config(
+        derivativeId->getParameterIndices(),
+        IndexSubset::get(func->getASTContext(), 1, {0}),
+        derivativeId->getDerivativeGenericSignature());
+    appendAutoDiffFunctionParts("TJ", kind, config);
     appendOperator("Tq");
     return finalize();
   }
@@ -120,6 +149,11 @@ public:
 
   std::string mangleNoncanonicalTypeMetadata(Type type) {
     return mangleTypeSymbol(type, "MN");
+  }
+
+  std::string mangleCanonicalPrespecializedGenericTypeCachingOnceToken(
+      const NominalTypeDecl *decl) {
+    return mangleNominalTypeSymbol(decl, "Mz");
   }
 
   std::string mangleNoncanonicalSpecializedGenericTypeMetadataCache(Type type) {
@@ -392,6 +426,11 @@ public:
                                       const ProtocolDecl *Proto) {
     beginMangling();
     appendProtocolConformance(Conformance);
+
+    // appendProtocolConformance() sets CurGenericSignature; clear it out
+    // before calling appendAssociatedTypePath().
+    CurGenericSignature = nullptr;
+
     bool isFirstAssociatedTypeIdentifier = true;
     appendAssociatedTypePath(AssociatedType, isFirstAssociatedTypeIdentifier);
     appendAnyGenericType(Proto);
@@ -410,6 +449,10 @@ public:
   }
 
   void appendAssociatedTypePath(CanType associatedType, bool &isFirst) {
+    // In the mangling format, the "short associated type" optimization is
+    // not performed when mangling an associated type path.
+    assert(!CurGenericSignature && "Caller needs to explicitly clear the signature");
+
     if (auto memberType = dyn_cast<DependentMemberType>(associatedType)) {
       appendAssociatedTypePath(memberType.getBase(), isFirst);
       appendAssociatedTypeName(memberType);
@@ -449,6 +492,7 @@ public:
   std::string mangleOutlinedCopyFunction(CanType ty,
                                          CanGenericSignature sig) {
     beginMangling();
+    bindGenericParameters(sig);
     appendType(ty);
     if (sig)
       appendGenericSignature(sig);
@@ -458,6 +502,7 @@ public:
   std::string mangleOutlinedConsumeFunction(CanType ty,
                                             CanGenericSignature sig) {
     beginMangling();
+    bindGenericParameters(sig);
     appendType(ty);
     if (sig)
       appendGenericSignature(sig);
@@ -468,6 +513,7 @@ public:
   std::string mangleOutlinedRetainFunction(CanType t,
                                            CanGenericSignature sig) {
     beginMangling();
+    bindGenericParameters(sig);
     appendType(t);
     if (sig)
       appendGenericSignature(sig);
@@ -477,6 +523,7 @@ public:
   std::string mangleOutlinedReleaseFunction(CanType t,
                                             CanGenericSignature sig) {
     beginMangling();
+    bindGenericParameters(sig);
     appendType(t);
     if (sig)
       appendGenericSignature(sig);
@@ -487,6 +534,7 @@ public:
   std::string mangleOutlinedInitializeWithTakeFunction(CanType t,
                                                        CanGenericSignature sig) {
     beginMangling();
+    bindGenericParameters(sig);
     appendType(t);
     if (sig)
       appendGenericSignature(sig);
@@ -496,6 +544,7 @@ public:
   std::string mangleOutlinedInitializeWithCopyFunction(CanType t,
                                                        CanGenericSignature sig) {
     beginMangling();
+    bindGenericParameters(sig);
     appendType(t);
     if (sig)
       appendGenericSignature(sig);
@@ -505,6 +554,7 @@ public:
   std::string mangleOutlinedAssignWithTakeFunction(CanType t,
                                                    CanGenericSignature sig) {
     beginMangling();
+    bindGenericParameters(sig);
     appendType(t);
     if (sig)
       appendGenericSignature(sig);
@@ -514,6 +564,7 @@ public:
   std::string mangleOutlinedAssignWithCopyFunction(CanType t,
                                                    CanGenericSignature sig) {
     beginMangling();
+    bindGenericParameters(sig);
     appendType(t);
     if (sig)
       appendGenericSignature(sig);
@@ -523,6 +574,7 @@ public:
   std::string mangleOutlinedDestroyFunction(CanType t,
                                             CanGenericSignature sig) {
     beginMangling();
+    bindGenericParameters(sig);
     appendType(t);
     if (sig)
       appendGenericSignature(sig);
@@ -537,11 +589,8 @@ public:
   }
 
   SymbolicMangling mangleTypeForReflection(IRGenModule &IGM,
-                                           Type Ty);
-  
-  SymbolicMangling mangleProtocolConformanceForReflection(IRGenModule &IGM,
-                                            Type Ty,
-                                            ProtocolConformanceRef conformance);
+                                           CanGenericSignature genericSig,
+                                           CanType Ty);
 
   std::string mangleTypeForLLVMTypeName(CanType Ty);
 

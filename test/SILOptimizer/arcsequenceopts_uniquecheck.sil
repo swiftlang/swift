@@ -51,10 +51,13 @@ bb3:
   return %273 : $()
 
 bb4:
-  br bb5
+  br bb6
+
+bb5:
+  br bb6
 
 // CHECK-NOT: strong_release
-bb5:
+bb6:
   strong_release %0 : $MD5
   br bb1(%13 : $Builtin.Int32)
 

@@ -23,6 +23,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Platform.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -1005,7 +1006,64 @@ namespace {
       : PODSingleScalarTypeInfo(storage, size, std::move(spareBits), align) {}
   };
 
-  /// A TypeInfo implementation for bare non-null pointers (like `void *`).
+  /// A TypeInfo implementation for pointers that are:
+  /// - valid (i.e. non-null, and generally >= LeastValidPointerValue),
+  /// - aligned (i.e. have zero low bits up to some bit), and
+  /// - trivial (i.e. not reference-counted or otherwise managed).
+  ///
+  /// These properties make it suitable for unmanaged pointers with special
+  /// uses in the ABI.
+  class AlignedRawPointerTypeInfo final :
+    public PODSingleScalarTypeInfo<AlignedRawPointerTypeInfo,
+                                   LoadableTypeInfo> {
+    Alignment PointeeAlign;
+  public:
+    AlignedRawPointerTypeInfo(llvm::Type *storage,
+                              Size size, SpareBitVector &&spareBits,
+                              Alignment align, Alignment pointeeAlign)
+      : PODSingleScalarTypeInfo(storage, size, std::move(spareBits), align),
+        PointeeAlign(pointeeAlign) {}
+
+    bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
+      return true;
+    }
+
+    PointerInfo getPointerInfo() const {
+      return PointerInfo::forAligned(PointeeAlign);
+    }
+
+    unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
+      return getPointerInfo().getExtraInhabitantCount(IGM);
+    }
+
+    APInt getFixedExtraInhabitantValue(IRGenModule &IGM, unsigned bits,
+                                       unsigned index) const override {
+      return getPointerInfo()
+               .getFixedExtraInhabitantValue(IGM, bits, index, 0);
+    }
+
+    llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
+                                         Address src,
+                                         SILType T,
+                                         bool isOutlined) const override {
+      return getPointerInfo().getExtraInhabitantIndex(IGF, src);
+    }
+
+    void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,
+                              Address dest, SILType T,
+                              bool isOutlined) const override {
+      getPointerInfo().storeExtraInhabitant(IGF, index, dest);
+    }
+  };
+
+  /// A TypeInfo implementation for Builtin.RawPointer.  We intentionally
+  /// do not make any assumptions about values of this type except that
+  /// they are not the special "null" extra inhabitant; as a result, an
+  /// Optional<Builtin.RawPointer> can reliably carry an arbitrary
+  /// bit-pattern of its size without fear of corruption.  Since the
+  /// primary uses of Builtin.RawPointer are the unsafe pointer APIs,
+  /// that is exactly what we want.  It does mean that Builtin.RawPointer
+  /// is usually a suboptimal type for representing known-valid pointers.
   class RawPointerTypeInfo final :
     public PODSingleScalarTypeInfo<RawPointerTypeInfo, LoadableTypeInfo> {
   public:
@@ -1207,20 +1265,23 @@ TypeConverter::createPrimitive(llvm::Type *type, Size size, Alignment align) {
                                align);
 }
 
-/// Constructs a type info which performs simple loads and stores of
-/// the given IR type, given that it's a pointer to an aligned pointer
-/// type.
-const LoadableTypeInfo *
-TypeConverter::createPrimitiveForAlignedPointer(llvm::PointerType *type,
-                                                Size size,
-                                                Alignment align,
-                                                Alignment pointerAlignment) {
+static SpareBitVector getSpareBitsForAlignedPointer(IRGenModule &IGM,
+                                                    Alignment pointeeAlign) {
+  // FIXME: this is little-endian
   SpareBitVector spareBits = IGM.TargetInfo.PointerSpareBits;
-  for (unsigned bit = 0; Alignment(1 << bit) != pointerAlignment; ++bit) {
+  for (unsigned bit = 0; Alignment(1ull << bit) != pointeeAlign; ++bit) {
     spareBits.setBit(bit);
   }
+  return spareBits;
+}
 
-  return new PrimitiveTypeInfo(type, size, std::move(spareBits), align);
+static LoadableTypeInfo *createAlignedPointerTypeInfo(IRGenModule &IGM,
+                                                      llvm::Type *ty,
+                                                      Alignment pointeeAlign) {
+  return new AlignedRawPointerTypeInfo(ty, IGM.getPointerSize(),
+                              getSpareBitsForAlignedPointer(IGM, pointeeAlign),
+                                       IGM.getPointerAlignment(),
+                                       pointeeAlign);
 }
 
 /// Constructs a fixed-size type info which asserts if you try to copy
@@ -1298,6 +1359,7 @@ static llvm::StringLiteral platformsWithLegacyLayouts[][2] = {
   {"iphonesimulator", "x86_64"},
   {"macosx", "x86_64"},
   {"watchos", "armv7k"},
+  {"watchos", "arm64_32"},
   {"watchsimulator", "i386"}
 };
 
@@ -1364,8 +1426,9 @@ TypeConverter::TypeConverter(IRGenModule &IGM)
   }
 
   bool error = readLegacyTypeInfo(*fs, path);
-  if (error)
-    llvm::report_fatal_error("Cannot read '" + path + "'");
+  if (error) {
+    IGM.error(SourceLoc(), "Cannot read legacy layout file at '" + path + "'");
+  }
 }
 
 TypeConverter::~TypeConverter() {
@@ -1400,7 +1463,7 @@ CanGenericSignature IRGenModule::getCurGenericContext() {
 }
 
 GenericEnvironment *TypeConverter::getGenericEnvironment() {
-  return CurGenericSignature->getGenericEnvironment();
+  return CurGenericSignature.getGenericEnvironment();
 }
 
 GenericEnvironment *IRGenModule::getGenericEnvironment() {
@@ -1424,11 +1487,20 @@ const TypeInfo &IRGenModule::getWitnessTablePtrTypeInfo() {
 
 const LoadableTypeInfo &TypeConverter::getWitnessTablePtrTypeInfo() {
   if (WitnessTablePtrTI) return *WitnessTablePtrTI;
-  WitnessTablePtrTI =
-    createPrimitiveForAlignedPointer(IGM.WitnessTablePtrTy,
-                                     IGM.getPointerSize(),
-                                     IGM.getPointerAlignment(),
-                                     IGM.getWitnessTableAlignment());
+
+  auto spareBits =
+    getSpareBitsForAlignedPointer(IGM, IGM.getWitnessTableAlignment());
+
+  // This is sub-optimal because it doesn't consider that there are
+  // also potential extra inhabitants in witnesss table pointers, but
+  // it's what we're currently doing, so we might be stuck.
+  // TODO: it's likely that this never matters in the current ABI,
+  // so we can just switch to using AlignedRawPointerTypeInfo; but
+  // we need to check that first.
+  WitnessTablePtrTI = new PrimitiveTypeInfo(IGM.WitnessTablePtrTy,
+                                            IGM.getPointerSize(),
+                                            std::move(spareBits),
+                                            IGM.getPointerAlignment());
   WitnessTablePtrTI->NextConverted = FirstType;
   FirstType = WitnessTablePtrTI;
   return *WitnessTablePtrTI;
@@ -1436,6 +1508,7 @@ const LoadableTypeInfo &TypeConverter::getWitnessTablePtrTypeInfo() {
 
 const SpareBitVector &IRGenModule::getWitnessTablePtrSpareBits() const {
   // Witness tables are pointers and have pointer spare bits.
+  // FIXME: this is not what we use in getWitnessTablePtrTypeInfo()
   return TargetInfo.PointerSpareBits;
 }
 
@@ -1451,6 +1524,34 @@ const TypeInfo &TypeConverter::getTypeMetadataPtrTypeInfo() {
   TypeMetadataPtrTI->NextConverted = FirstType;
   FirstType = TypeMetadataPtrTI;
   return *TypeMetadataPtrTI;
+}
+
+const TypeInfo &IRGenModule::getSwiftContextPtrTypeInfo() {
+  return Types.getSwiftContextPtrTypeInfo();
+}
+
+const TypeInfo &TypeConverter::getSwiftContextPtrTypeInfo() {
+  if (SwiftContextPtrTI) return *SwiftContextPtrTI;
+  SwiftContextPtrTI = createUnmanagedStorageType(IGM.SwiftContextPtrTy,
+                                                 ReferenceCounting::Unknown,
+                                                 /*isOptional*/false);
+  SwiftContextPtrTI->NextConverted = FirstType;
+  FirstType = SwiftContextPtrTI;
+  return *SwiftContextPtrTI;
+}
+
+const TypeInfo &IRGenModule::getTaskContinuationFunctionPtrTypeInfo() {
+  return Types.getTaskContinuationFunctionPtrTypeInfo();
+}
+
+const TypeInfo &TypeConverter::getTaskContinuationFunctionPtrTypeInfo() {
+  if (TaskContinuationFunctionPtrTI) return *TaskContinuationFunctionPtrTI;
+  TaskContinuationFunctionPtrTI = createUnmanagedStorageType(
+      IGM.TaskContinuationFunctionPtrTy, ReferenceCounting::Unknown,
+      /*isOptional*/ false);
+  TaskContinuationFunctionPtrTI->NextConverted = FirstType;
+  FirstType = TaskContinuationFunctionPtrTI;
+  return *TaskContinuationFunctionPtrTI;
 }
 
 const LoadableTypeInfo &
@@ -1519,6 +1620,47 @@ const LoadableTypeInfo &TypeConverter::getRawPointerTypeInfo() {
   RawPointerTI->NextConverted = FirstType;
   FirstType = RawPointerTI;
   return *RawPointerTI;
+}
+
+const LoadableTypeInfo &IRGenModule::getRawUnsafeContinuationTypeInfo() {
+  return Types.getRawUnsafeContinuationTypeInfo();
+}
+
+const LoadableTypeInfo &TypeConverter::getRawUnsafeContinuationTypeInfo() {
+  if (RawUnsafeContinuationTI) return *RawUnsafeContinuationTI;
+
+  // A Builtin.RawUnsafeContinuation is an AsyncTask*, which is a heap
+  // object aligned to 2*alignof(void*).  Incomplete tasks are
+  // self-owning, which is to say that pointers to them can be held
+  // reliably without retaining or releasing until the task starts
+  // running again.
+  //
+  // TODO: It is possible to retain and release task pointers, which means
+  // they can be used directly as Swift function contexts.  Preserve this
+  // information to optimize closure-creation (partial apply).
+  auto ty = IGM.Int8PtrTy;
+  auto pointeeAlign = Alignment(2 * IGM.getPointerAlignment().getValue());
+  RawUnsafeContinuationTI =
+    createAlignedPointerTypeInfo(IGM, ty, pointeeAlign);
+  RawUnsafeContinuationTI->NextConverted = FirstType;
+  FirstType = RawUnsafeContinuationTI;
+  return *RawUnsafeContinuationTI;
+}
+
+const LoadableTypeInfo &TypeConverter::getJobTypeInfo() {
+  if (JobTI) return *JobTI;
+
+  // A Builtin.Job is a Job*, which is an arbitrary pointer aligned to
+  // 2*alignof(void*).  Jobs are self-owning, which is to say that
+  // they're valid until they are scheduled, and then they're responsible
+  // for destroying themselves.  (Jobs are often interior pointers into
+  // an AsyncTask*, but that's not guaranteed.)
+  auto ty = IGM.SwiftJobPtrTy;
+  auto pointeeAlign = Alignment(2 * IGM.getPointerAlignment().getValue());
+  JobTI = createAlignedPointerTypeInfo(IGM, ty, pointeeAlign);
+  JobTI->NextConverted = FirstType;
+  FirstType = JobTI;
+  return *JobTI;
 }
 
 const LoadableTypeInfo &TypeConverter::getEmptyTypeInfo() {
@@ -1674,7 +1816,7 @@ ArchetypeType *TypeConverter::getExemplarArchetype(ArchetypeType *t) {
   // Dig out the canonical generic environment.
   auto genericSig = genericEnv->getGenericSignature();
   auto canGenericSig = genericSig.getCanonicalSignature();
-  auto canGenericEnv = canGenericSig->getGenericEnvironment();
+  auto canGenericEnv = canGenericSig.getGenericEnvironment();
   if (canGenericEnv == genericEnv) return t;
 
   // Map the archetype out of its own generic environment and into the
@@ -1872,7 +2014,9 @@ convertPrimitiveBuiltin(IRGenModule &IGM, CanType canTy) {
       = convertPrimitiveBuiltin(IGM,
                                 vecTy->getElementType()->getCanonicalType());
 
-    auto llvmVecTy = llvm::VectorType::get(elementTy, vecTy->getNumElements());
+    auto llvmVecTy =
+        llvm::FixedVectorType::get(elementTy, vecTy->getNumElements());
+
     unsigned bitSize = size.getValue() * vecTy->getNumElements() * 8;
     if (!llvm::isPowerOf2_32(bitSize))
       bitSize = llvm::NextPowerOf2(bitSize);
@@ -1925,6 +2069,12 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
                            getFixedBufferAlignment(IGM));
   case TypeKind::BuiltinRawPointer:
     return &getRawPointerTypeInfo();
+  case TypeKind::BuiltinRawUnsafeContinuation:
+    return &getRawUnsafeContinuationTypeInfo();
+  case TypeKind::BuiltinJob:
+    return &getJobTypeInfo();
+  case TypeKind::BuiltinExecutor:
+    return &getExecutorTypeInfo();
   case TypeKind::BuiltinIntegerLiteral:
     return &getIntegerLiteralTypeInfo();
   case TypeKind::BuiltinFloat:
@@ -1936,6 +2086,20 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
     std::tie(llvmTy, size, align) = convertPrimitiveBuiltin(IGM, ty);
     align = IGM.getCappedAlignment(align);
     return createPrimitive(llvmTy, size, align);
+  }
+  case TypeKind::BuiltinDefaultActorStorage: {
+    // Builtin.DefaultActorStorage represents the extra storage
+    // (beyond the heap header) of a default actor.  It is
+    // fixed-size and totally opaque.
+    auto numWords = NumWords_DefaultActor;
+
+    auto ty = llvm::StructType::create(IGM.getLLVMContext(),
+                                 llvm::ArrayType::get(IGM.Int8PtrTy, numWords),
+                                       "swift.defaultactor");
+    auto size = IGM.getPointerSize() * numWords;
+    auto align = Alignment(2 * IGM.getPointerAlignment().getValue());
+    auto spareBits = SpareBitVector::getConstant(size.getValueInBits(), false);
+    return new PrimitiveTypeInfo(ty, size, std::move(spareBits), align);
   }
 
   case TypeKind::PrimaryArchetype:
@@ -2381,16 +2545,16 @@ unsigned IRGenModule::getBuiltinIntegerWidth(BuiltinIntegerWidth w) {
   llvm_unreachable("impossible width value");
 }
 
-void IRGenFunction::setLocalSelfMetadata(CanType selfClass,
-                                         bool isExactSelfClass,
-                                         llvm::Value *value,
-                                         IRGenFunction::LocalSelfKind kind) {
-  assert(!LocalSelf && "already have local self metadata");
-  LocalSelf = value;
+void IRGenFunction::setDynamicSelfMetadata(CanType selfClass,
+                                           bool isExactSelfClass,
+                                           llvm::Value *value,
+                                           IRGenFunction::DynamicSelfKind kind) {
+  assert(!SelfValue && "already have local self metadata");
+  SelfValue = value;
   assert(selfClass->getClassOrBoundGenericClass()
          && "self type not a class?");
-  LocalSelfIsExact = isExactSelfClass;
-  LocalSelfType = selfClass;
+  SelfTypeIsExact = isExactSelfClass;
+  SelfType = selfClass;
   SelfKind = kind;
 }
 
@@ -2403,7 +2567,7 @@ bool TypeConverter::isExemplarArchetype(ArchetypeType *arch) const {
   // Dig out the canonical generic environment.
   auto genericSig = genericEnv->getGenericSignature();
   auto canGenericSig = genericSig.getCanonicalSignature();
-  auto canGenericEnv = canGenericSig->getGenericEnvironment();
+  auto canGenericEnv = canGenericSig.getGenericEnvironment();
 
   // If this archetype is in the canonical generic environment, it's an
   // exemplar archetype.

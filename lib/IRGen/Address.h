@@ -112,6 +112,7 @@ class StackAddress {
 
   /// In a normal function, the result of llvm.stacksave or null.
   /// In a coroutine, the result of llvm.coro.alloca.alloc.
+  /// In an async function, the result of the taskAlloc call.
   llvm::Value *ExtraInfo;
 
 public:

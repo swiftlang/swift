@@ -1,0 +1,10 @@
+#ifndef TEST_INTEROP_CXX_VALUE_WITNESS_TABLE_INPUTS_WITNESS_LAYOUT_H
+#define TEST_INTEROP_CXX_VALUE_WITNESS_TABLE_INPUTS_WITNESS_LAYOUT_H
+
+struct Empty { };
+
+struct I8Size { char value; };
+
+struct I32Size { char value[3]; char other; };
+
+#endif // TEST_INTEROP_CXX_VALUE_WITNESS_TABLE_INPUTS_WITNESS_LAYOUT_H

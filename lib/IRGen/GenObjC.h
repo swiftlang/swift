@@ -88,6 +88,10 @@ namespace irgen {
   Callee getObjCMethodCallee(IRGenFunction &IGF, const ObjCMethod &method,
                              llvm::Value *selfValue, CalleeInfo &&info);
 
+  /// Prepare a callee for an Objective-C method with the `objc_direct` attribute.
+  Callee getObjCDirectMethodCallee(CalleeInfo &&info, const FunctionPointer &fn,
+                                   llvm::Value *selfValue);
+
   /// Emit a partial application of an Objective-C method to its 'self'
   /// argument.
   void emitObjCPartialApplication(IRGenFunction &IGF,

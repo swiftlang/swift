@@ -1,0 +1,26 @@
+@objcMembers class /*Outer:def*/Outer {
+  let /*outerProp:def*/<base>outerProp</base> = 10
+
+  @objcMembers class /*Inner:def*/Inner {
+    let /*prop:def*/prop = 20
+    let /*tuple:def*/tuple = (1, 4)
+    let /*namedTuple:def*/namedTuple = (x: 1, y: 3)
+    let /*array:def*/array = [1, 2, 3]
+    let /*dict:def*/dict = ["foo": Outer()]
+  }
+}
+
+// Valid
+_ = #keyPath(/*Outer*/Outer . /*Inner*/Inner . /*prop*/prop)
+_ = #keyPath(/*Outer*/Outer . /*Inner*/Inner . /*array*/array)
+_ = #keyPath(/*Outer*/Outer . /*Inner*/Inner . /*dict*/dict . someKey)
+_ = #keyPath(/*Outer*/Outer . /*Inner*/Inner . /*dict*/dict . someKey . /*outerProp*/<base>outerProp</base>)
+
+// Invalid but resolved
+_ = #keyPath(/*Outer*/Outer . /*Inner*/Inner . /*tuple*/tuple)
+_ = #keyPath(/*Outer*/Outer . /*Inner*/Inner . /*namedTuple*/namedTuple)
+_ = #keyPath(/*Outer*/Outer . /*Inner*/Inner . /*array*/array[0] . hashValue)
+
+// FIXME: Invalid and not resolved
+_ = #keyPath(/*Outer:unknown*/Outer . /*Inner:unknown*/Inner . /*dict:unknown*/dict . someKey . undefined)
+

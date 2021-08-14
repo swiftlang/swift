@@ -1,0 +1,9 @@
+// swift-interface-format-version: 1.0
+// swift-module-flags: -target x86_64-apple-macos10.9 -module-name Swift -parse-stdlib
+
+// If the test fails, this error will be emitted twice, not once.
+// expected-error@-4 {{failed to build module 'Swift'; this SDK is not supported by the compiler}}
+
+public struct BadType {
+  public var property: UndeclaredType { get set } // expected-error {{cannot find type 'UndeclaredType' in scope}}
+}

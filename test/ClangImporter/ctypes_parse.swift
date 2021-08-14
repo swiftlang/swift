@@ -37,7 +37,7 @@ func testAnonEnum() {
   a = AnonConst2
 #if os(Windows)
   verifyIsInt(&a)
-#elseif arch(i386) || arch(arm)
+#elseif arch(i386) || arch(arm) || arch(arm64_32)
   verifyIsUInt64(&a)
 #elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
   verifyIsUInt(&a)
@@ -205,7 +205,7 @@ func testFunctionPointers() {
   useFunctionPointer(wrapper.a)
   _ = wrapper.b as (@convention(c) (CInt) -> CInt)
 
-  var anotherFP: @convention(c) (CInt, CLong, UnsafeMutableRawPointer?) -> Void
+  var anotherFP: @convention(c) (Int, CLong, UnsafeMutableRawPointer?) -> Void
     = getFunctionPointer2()
 
   var sizedFP: (@convention(c) (CInt, CInt, UnsafeMutableRawPointer?) -> Void)?

@@ -45,6 +45,7 @@ set(SWIFTLIB_ESSENTIAL
   CollectionAlgorithms.swift
   Comparable.swift
   CompilerProtocols.swift
+  Sendable.swift
   ContiguousArray.swift
   ContiguouslyStored.swift
   ClosedRange.swift
@@ -60,7 +61,6 @@ set(SWIFTLIB_ESSENTIAL
   DictionaryVariant.swift
   DropWhile.swift
   Dump.swift
-  EitherSequence.swift
   EmptyCollection.swift
   Equatable.swift
   ErrorType.swift
@@ -209,14 +209,11 @@ set(SWIFTLIB_SOURCES
   Availability.swift
   CollectionDifference.swift
   CollectionOfOne.swift
-  DiscontiguousSlice.swift
   Diffing.swift
   FloatingPointRandom.swift
   Mirror.swift
   PlaygroundDisplay.swift
   CommandLine.swift
-  RangeSet.swift
-  RangeSetStorage.swift
   SliceBuffer.swift
   SIMDVector.swift
   UnfoldSequence.swift
@@ -227,6 +224,7 @@ set(SWIFTLIB_SOURCES
 
 set(SWIFTLIB_GYB_SOURCES
   ${SWIFTLIB_ESSENTIAL_GYB_SOURCES}
+  SIMDConcreteOperations.swift.gyb
   SIMDVectorTypes.swift.gyb
   Tuple.swift.gyb
   )
@@ -259,19 +257,13 @@ else()
   endif()
 endif()
 
-if(SWIFT_PRIMARY_VARIANT_SDK STREQUAL ANDROID)
-  # workaround for libatomic needing to be after object files for swiftCore.so
-  list(APPEND swift_core_private_link_libraries atomic)
-elseif(SWIFT_PRIMARY_VARIANT_SDK STREQUAL CYGWIN)
+if(SWIFT_PRIMARY_VARIANT_SDK STREQUAL CYGWIN)
   # TODO(compnerd) cache this variable to permit re-configuration
   execute_process(COMMAND "cygpath" "-u" "$ENV{SYSTEMROOT}" OUTPUT_VARIABLE ENV_SYSTEMROOT)
   list(APPEND swift_core_private_link_libraries "${ENV_SYSTEMROOT}/system32/psapi.dll")
 elseif(SWIFT_PRIMARY_VARIANT_SDK STREQUAL FREEBSD)
   find_library(EXECINFO_LIBRARY execinfo)
   list(APPEND swift_core_private_link_libraries ${EXECINFO_LIBRARY})
-  # workaround for libatomic needing to be after object files for swiftCore.so
-  list(APPEND swift_core_private_link_libraries
-    ${SWIFTLIB_DIR}/clang/lib/freebsd/libclang_rt.builtins-${SWIFT_PRIMARY_VARIANT_ARCH}.a)
 elseif(SWIFT_PRIMARY_VARIANT_SDK STREQUAL LINUX)
   if(SWIFT_BUILD_STATIC_STDLIB)
     list(APPEND swift_core_private_link_libraries)
@@ -294,6 +286,7 @@ endif()
 
 # STAGING: Temporarily avoids having to write #fileID in Swift.swiftinterface.
 list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-enable-experimental-concise-pound-file")
+list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-enable-ossa-modules")
 
 if(SWIFT_CHECK_ESSENTIAL_STDLIB)
   add_swift_target_library(swift_stdlib_essential ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IS_STDLIB_CORE

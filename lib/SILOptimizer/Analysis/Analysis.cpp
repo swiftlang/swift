@@ -20,6 +20,7 @@
 #include "swift/SILOptimizer/Analysis/ClassHierarchyAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/IVAnalysis.h"
+#include "swift/SILOptimizer/Analysis/NonLocalAccessBlockAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ProtocolConformanceAnalysis.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
@@ -59,4 +60,8 @@ SILAnalysis *swift::createBasicCalleeAnalysis(SILModule *M) {
 
 SILAnalysis *swift::createProtocolConformanceAnalysis(SILModule *M) {
   return new ProtocolConformanceAnalysis(M);
+}
+
+SILAnalysis *swift::createNonLocalAccessBlockAnalysis(SILModule *M) {
+  return new NonLocalAccessBlockAnalysis();
 }

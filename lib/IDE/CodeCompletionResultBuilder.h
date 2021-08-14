@@ -48,12 +48,12 @@ struct ExpectedTypeContext {
   ///
   /// Since the input may be incomplete, we take into account that the types are
   /// only a hint.
-  bool isSingleExpressionBody = false;
+  bool isImplicitSingleExpressionReturn = false;
   bool preferNonVoid = false;
 
   bool empty() const { return possibleTypes.empty(); }
   bool requiresNonVoid() const {
-    if (isSingleExpressionBody)
+    if (isImplicitSingleExpressionReturn)
       return false;
     if (preferNonVoid)
       return true;
@@ -65,9 +65,9 @@ struct ExpectedTypeContext {
   }
 
   ExpectedTypeContext() = default;
-  ExpectedTypeContext(ArrayRef<Type> types, bool isSingleExpressionBody)
+  ExpectedTypeContext(ArrayRef<Type> types, bool isImplicitSingleExprReturn)
       : possibleTypes(types.begin(), types.end()),
-        isSingleExpressionBody(isSingleExpressionBody) {}
+        isImplicitSingleExpressionReturn(isImplicitSingleExprReturn) {}
 };
 
 class CodeCompletionResultBuilder {
@@ -76,6 +76,7 @@ class CodeCompletionResultBuilder {
   CodeCompletionResultSink &Sink;
   CodeCompletionResult::ResultKind Kind;
   SemanticContextKind SemanticContext;
+  CodeCompletionFlair Flair;
   unsigned NumBytesToErase = 0;
   const Decl *AssociatedDecl = nullptr;
   Optional<CodeCompletionLiteralKind> LiteralKind;
@@ -89,9 +90,8 @@ class CodeCompletionResultBuilder {
       CodeCompletionResult::Unknown;
   bool Cancelled = false;
   ArrayRef<std::pair<StringRef, StringRef>> CommentWords;
-  bool IsNotRecommended = false;
   CodeCompletionResult::NotRecommendedReason NotRecReason =
-    CodeCompletionResult::NotRecommendedReason::NoReason;
+      CodeCompletionResult::NotRecommendedReason::None;
   StringRef BriefDocComment = StringRef();
 
   void addChunkWithText(CodeCompletionString::Chunk::ChunkKind Kind,
@@ -148,12 +148,15 @@ public:
   void setLiteralKind(CodeCompletionLiteralKind kind) { LiteralKind = kind; }
   void setKeywordKind(CodeCompletionKeywordKind kind) { KeywordKind = kind; }
   void setNotRecommended(CodeCompletionResult::NotRecommendedReason Reason) {
-    IsNotRecommended = true;
     NotRecReason = Reason;
   }
 
   void setSemanticContext(SemanticContextKind Kind) {
     SemanticContext = Kind;
+  }
+
+  void addFlair(CodeCompletionFlair Options) {
+    Flair |= Options;
   }
 
   void
@@ -226,8 +229,19 @@ public:
 
   void addThrows() {
     addChunkWithTextNoCopy(
-       CodeCompletionString::Chunk::ChunkKind::ThrowsKeyword,
+       CodeCompletionString::Chunk::ChunkKind::EffectsSpecifierKeyword,
        " throws");
+  }
+
+  void addAnnotatedAsync() {
+    addAsync();
+    getLastChunk().setIsAnnotation();
+  }
+
+  void addAsync() {
+    addChunkWithTextNoCopy(
+       CodeCompletionString::Chunk::ChunkKind::EffectsSpecifierKeyword,
+       " async");
   }
 
   void addDeclDocCommentWords(ArrayRef<std::pair<StringRef, StringRef>> Pairs) {
@@ -242,7 +256,8 @@ public:
 
   void addRethrows() {
     addChunkWithTextNoCopy(
-        CodeCompletionString::Chunk::ChunkKind::RethrowsKeyword, " rethrows");
+        CodeCompletionString::Chunk::ChunkKind::EffectsSpecifierKeyword,
+        " rethrows");
   }
 
   void addAnnotatedLeftParen() {
@@ -345,6 +360,12 @@ public:
       addTypeAnnotation(Annotation);
   }
 
+  void addAttributeKeyword(StringRef Name, StringRef Annotation) {
+    addChunkWithText(CodeCompletionString::Chunk::ChunkKind::Attribute, Name);
+    if (!Annotation.empty())
+      addTypeAnnotation(Annotation);
+  }
+
   StringRef escapeKeyword(StringRef Word, bool escapeAllKeywords,
                           llvm::SmallString<16> &EscapedKeyword) {
     EscapedKeyword.clear();
@@ -369,39 +390,39 @@ public:
 
   void addCallParameterColon() {
     addChunkWithText(CodeCompletionString::Chunk::ChunkKind::
-                     CallParameterColon, ": ");
+                     CallArgumentColon, ": ");
   }
 
   void addSimpleNamedParameter(StringRef name) {
-    withNestedGroup(CodeCompletionString::Chunk::ChunkKind::CallParameterBegin, [&] {
+    withNestedGroup(CodeCompletionString::Chunk::ChunkKind::CallArgumentBegin, [&] {
       // Use internal, since we don't want the name to be outside the
       // placeholder.
       addChunkWithText(
-          CodeCompletionString::Chunk::ChunkKind::CallParameterInternalName,
+          CodeCompletionString::Chunk::ChunkKind::CallArgumentInternalName,
           name);
     });
   }
 
   void addSimpleTypedParameter(StringRef Annotation, bool IsVarArg = false) {
-    withNestedGroup(CodeCompletionString::Chunk::ChunkKind::CallParameterBegin, [&] {
+    withNestedGroup(CodeCompletionString::Chunk::ChunkKind::CallArgumentBegin, [&] {
       addChunkWithText(
-          CodeCompletionString::Chunk::ChunkKind::CallParameterType,
+          CodeCompletionString::Chunk::ChunkKind::CallArgumentType,
           Annotation);
       if (IsVarArg)
         addEllipsis();
     });
   }
 
-  void addCallParameter(Identifier Name, Identifier LocalName, Type Ty,
-                        Type ContextTy, bool IsVarArg, bool IsInOut, bool IsIUO,
-                        bool isAutoClosure, bool useUnderscoreLabel,
-                        bool isLabeledTrailingClosure);
+  void addCallArgument(Identifier Name, Identifier LocalName, Type Ty,
+                       Type ContextTy, bool IsVarArg, bool IsInOut, bool IsIUO,
+                       bool isAutoClosure, bool useUnderscoreLabel,
+                       bool isLabeledTrailingClosure);
 
-  void addCallParameter(Identifier Name, Type Ty, Type ContextTy = Type()) {
-    addCallParameter(Name, Identifier(), Ty, ContextTy,
-                     /*IsVarArg=*/false, /*IsInOut=*/false, /*isIUO=*/false,
-                     /*isAutoClosure=*/false, /*useUnderscoreLabel=*/false,
-                     /*isLabeledTrailingClosure=*/false);
+  void addCallArgument(Identifier Name, Type Ty, Type ContextTy = Type()) {
+    addCallArgument(Name, Identifier(), Ty, ContextTy,
+                    /*IsVarArg=*/false, /*IsInOut=*/false, /*isIUO=*/false,
+                    /*isAutoClosure=*/false, /*useUnderscoreLabel=*/false,
+                    /*isLabeledTrailingClosure=*/false);
   }
 
   void addGenericParameter(StringRef Name) {

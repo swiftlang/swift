@@ -63,6 +63,24 @@ void ImportSet::Profile(
   }
 }
 
+void ImportSet::dump() const {
+  llvm::errs() << "HasHeaderImportModule: " << HasHeaderImportModule << "\n";
+
+  llvm::errs() << "TopLevelImports:";
+  for (auto import : getTopLevelImports()) {
+    llvm::errs() << "\n- ";
+    simple_display(llvm::errs(), import);
+  }
+  llvm::errs() << "\n";
+
+  llvm::errs() << "TransitiveImports:";
+  for (auto import : getTransitiveImports()) {
+    llvm::errs() << "\n- ";
+    simple_display(llvm::errs(), import);
+  }
+  llvm::errs() << "\n";
+}
+
 static void collectExports(ImportedModule next,
                            SmallVectorImpl<ImportedModule> &stack) {
   SmallVector<ImportedModule, 4> exports;
@@ -174,7 +192,6 @@ ImportSet &ImportCache::getImportSet(const DeclContext *dc) {
   imports.emplace_back(ImportPath::Access(), mod);
 
   if (file) {
-    // Should include both SPI & non-SPI.
     file->getImportedModules(imports,
                              {ModuleDecl::ImportFilterKind::Default,
                               ModuleDecl::ImportFilterKind::ImplementationOnly,
@@ -259,7 +276,6 @@ ImportCache::getAllAccessPathsNotShadowedBy(const ModuleDecl *mod,
   stack.emplace_back(ImportPath::Access(), currentMod);
 
   if (auto *file = dyn_cast<FileUnit>(dc)) {
-    // Should include both SPI & non-SPI
     file->getImportedModules(stack,
                              {ModuleDecl::ImportFilterKind::Default,
                               ModuleDecl::ImportFilterKind::ImplementationOnly,

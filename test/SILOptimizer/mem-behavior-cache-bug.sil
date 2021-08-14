@@ -1,0 +1,110 @@
+// RUN: %sil-opt -temp-rvalue-opt %s -o /dev/null 
+
+// This test exposes a bug in the MemBehavior cache invalidation mechanism.
+// With this bug, the optimizer aborts with a SIL memory lifetime failure
+// (only on linux).
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+public struct Complex<RealType> where RealType : FloatingPoint {
+  @usableFromInline
+  @_hasStorage internal var x: RealType { get set }
+  @usableFromInline
+  @_hasStorage internal var y: RealType { get set }
+  init(_ real: RealType, _ imaginary: RealType)
+}
+
+extension Complex {
+  var phase: RealType { get }
+}
+
+extension Complex {
+  public static func log(_ z: Complex<RealType>, _ b: Bool) -> Complex<RealType>
+}
+
+sil [ossa] @callee : $@convention(method) <RealType where RealType : FloatingPoint> (@in_guaranteed Complex<RealType>) -> @out RealType
+
+sil [ossa] @test : $@convention(method) <RealType where RealType : FloatingPoint> (@in_guaranteed Complex<RealType>, Bool, @thin Complex<RealType>.Type) -> @out Complex<RealType> {
+bb0(%0 : $*Complex<RealType>, %1 : $*Complex<RealType>, %2 : $Bool, %3 : $@thin Complex<RealType>.Type):
+  debug_value_addr %1 : $*Complex<RealType>, let, name "z", argno 1
+  debug_value %2 : $Bool, let, name "b", argno 2
+  debug_value %3 : $@thin Complex<RealType>.Type, let, name "self", argno 3
+  %7 = alloc_stack $RealType, let, name "θ"
+  %8 = alloc_stack $Complex<RealType>
+  copy_addr %1 to [initialization] %8 : $*Complex<RealType>
+  %10 = function_ref @callee : $@convention(method) <τ_0_0 where τ_0_0 : FloatingPoint> (@in_guaranteed Complex<τ_0_0>) -> @out τ_0_0
+  %11 = apply %10<RealType>(%7, %8) : $@convention(method) <τ_0_0 where τ_0_0 : FloatingPoint> (@in_guaranteed Complex<τ_0_0>) -> @out τ_0_0
+  destroy_addr %8 : $*Complex<RealType>
+  dealloc_stack %8 : $*Complex<RealType>
+  %14 = integer_literal $Builtin.Int1, -1
+  %15 = struct_extract %2 : $Bool, #Bool._value
+  %16 = builtin "cmp_eq_Int1"(%15 : $Builtin.Int1, %14 : $Builtin.Int1) : $Builtin.Int1
+  cond_br %16, bb1, bb2
+
+bb1:
+  %18 = metatype $@thick RealType.Type
+  %19 = alloc_stack $RealType
+  %20 = witness_method $RealType, #FloatingPoint.infinity!getter : <Self where Self : FloatingPoint> (Self.Type) -> () -> Self : $@convention(witness_method: FloatingPoint) <τ_0_0 where τ_0_0 : FloatingPoint> (@thick τ_0_0.Type) -> @out τ_0_0
+  %21 = apply %20<RealType>(%19, %18) : $@convention(witness_method: FloatingPoint) <τ_0_0 where τ_0_0 : FloatingPoint> (@thick τ_0_0.Type) -> @out τ_0_0
+  %22 = alloc_stack $RealType
+  copy_addr [take] %7 to [initialization] %22 : $*RealType
+  %24 = alloc_stack $Complex<RealType>
+  %25 = alloc_stack $RealType
+  copy_addr [take] %19 to [initialization] %25 : $*RealType
+  %27 = struct_element_addr %24 : $*Complex<RealType>, #Complex.x
+  copy_addr [take] %25 to [initialization] %27 : $*RealType
+  dealloc_stack %25 : $*RealType
+  %30 = alloc_stack $RealType
+  copy_addr [take] %22 to [initialization] %30 : $*RealType
+  %32 = struct_element_addr %24 : $*Complex<RealType>, #Complex.y
+  copy_addr [take] %30 to [initialization] %32 : $*RealType
+  dealloc_stack %30 : $*RealType
+  copy_addr %24 to [initialization] %0 : $*Complex<RealType>
+  destroy_addr %24 : $*Complex<RealType>
+  dealloc_stack %24 : $*Complex<RealType>
+  %38 = tuple ()
+  dealloc_stack %22 : $*RealType
+  dealloc_stack %19 : $*RealType
+  dealloc_stack %7 : $*RealType
+  br bb3
+
+bb2:
+  %43 = metatype $@thick RealType.Type
+  %44 = alloc_stack $RealType
+  %45 = witness_method $RealType, #FloatingPoint.infinity!getter : <Self where Self : FloatingPoint> (Self.Type) -> () -> Self : $@convention(witness_method: FloatingPoint) <τ_0_0 where τ_0_0 : FloatingPoint> (@thick τ_0_0.Type) -> @out τ_0_0
+  %46 = apply %45<RealType>(%44, %43) : $@convention(witness_method: FloatingPoint) <τ_0_0 where τ_0_0 : FloatingPoint> (@thick τ_0_0.Type) -> @out τ_0_0
+  %47 = alloc_stack $RealType
+  copy_addr [take] %7 to [initialization] %47 : $*RealType
+  %49 = alloc_stack $Complex<RealType>
+  %50 = alloc_stack $RealType
+  copy_addr [take] %44 to [initialization] %50 : $*RealType
+  %52 = struct_element_addr %49 : $*Complex<RealType>, #Complex.x
+  copy_addr [take] %50 to [initialization] %52 : $*RealType
+  dealloc_stack %50 : $*RealType
+  %55 = alloc_stack $RealType
+  copy_addr [take] %47 to [initialization] %55 : $*RealType
+  %57 = struct_element_addr %49 : $*Complex<RealType>, #Complex.y
+  copy_addr [take] %55 to [initialization] %57 : $*RealType
+  dealloc_stack %55 : $*RealType
+  copy_addr %49 to [initialization] %0 : $*Complex<RealType>
+  destroy_addr %49 : $*Complex<RealType>
+  dealloc_stack %49 : $*Complex<RealType>
+  %63 = tuple ()
+  dealloc_stack %47 : $*RealType
+  dealloc_stack %44 : $*RealType
+  dealloc_stack %7 : $*RealType
+  br bb3
+
+bb3:
+  %68 = tuple ()
+  return %68 : $()
+}
+
+sil_property #Complex.x<τ_0_0 where τ_0_0 : FloatingPoint> ()
+sil_property #Complex.y<τ_0_0 where τ_0_0 : FloatingPoint> ()
+
+

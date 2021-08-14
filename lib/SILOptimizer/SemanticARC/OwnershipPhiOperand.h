@@ -64,6 +64,9 @@ public:
     }
   }
 
+  operator const Operand *() const { return op; }
+  operator Operand *() { return op; }
+
   Operand *getOperand() const { return op; }
   SILValue getValue() const { return op->get(); }
   SILType getType() const { return op->get()->getType(); }
@@ -88,6 +91,7 @@ public:
     case Kind::Struct:
       return false;
     }
+    llvm_unreachable("unhandled operand kind!");
   }
 
   bool operator<(const OwnershipPhiOperand &other) const {
@@ -113,6 +117,7 @@ public:
           });
     }
     }
+    llvm_unreachable("unhandled operand kind!");
   }
 };
 

@@ -28,7 +28,6 @@ class TypeRepr;
 class ComponentIdentTypeRepr;
 class GenericEnvironment;
 class GenericSignature;
-class GenericSignatureBuilder;
 
 /// Flags that describe the context of type checking a pattern or
 /// type.
@@ -36,37 +35,31 @@ enum class TypeResolutionFlags : uint16_t {
   /// Whether to allow unspecified types within a pattern.
   AllowUnspecifiedTypes = 1 << 0,
 
-  /// Whether an unavailable protocol can be referenced.
-  AllowUnavailableProtocol = 1 << 1,
-
-  /// Whether we should allow references to unavailable types.
-  AllowUnavailable = 1 << 2,
-
   /// Whether the given type can override the type of a typed pattern.
-  OverrideType = 1 << 3,
+  OverrideType = 1 << 1,
 
   /// Whether we are validating the type for SIL.
   // FIXME: Move this flag to TypeResolverContext.
-  SILType = 1 << 4,
+  SILType = 1 << 2,
 
   /// Whether we are parsing a SIL file.  Not the same as SILType,
   /// because the latter is not set if we're parsing an AST type.
-  SILMode = 1 << 5,
+  SILMode = 1 << 3,
 
   /// Whether this is a resolution based on a non-inferred type pattern.
-  FromNonInferredPattern = 1 << 6,
+  FromNonInferredPattern = 1 << 4,
 
   /// Whether we are at the direct base of a type expression.
-  Direct = 1 << 7,
+  Direct = 1 << 5,
 
   /// Whether we should not produce diagnostics if the type is invalid.
-  SilenceErrors = 1 << 8,
+  SilenceErrors = 1 << 6,
 
   /// Whether to allow module declaration types.
-  AllowModule = 1 << 9,
+  AllowModule = 1 << 7,
 
   /// Make internal @usableFromInline and @inlinable decls visible.
-  AllowInlinable = 1 << 10,
+  AllowUsableFromInline = 1 << 8,
 };
 
 /// Type resolution contexts that require special handling.
@@ -90,6 +83,9 @@ enum class TypeResolverContext : uint8_t {
 
   /// Whether this is a variadic function input.
   VariadicFunctionInput,
+
+  /// Whether this is an 'inout' function input.
+  InoutFunctionInput,
 
   /// Whether we are in the result type of a function, including multi-level
   /// tuple return values. See also: TypeResolutionFlags::Direct
@@ -134,6 +130,9 @@ enum class TypeResolverContext : uint8_t {
 
   /// Whether this is the type of an editor placeholder.
   EditorPlaceholderExpr,
+
+  /// Whether this is an "inherited" type.
+  Inherited,
 };
 
 /// Options that determine how type resolution should work.
@@ -204,6 +203,7 @@ public:
     case Context::None:
     case Context::FunctionInput:
     case Context::VariadicFunctionInput:
+    case Context::InoutFunctionInput:
     case Context::FunctionResult:
     case Context::ExtensionBinding:
     case Context::SubscriptDecl:
@@ -214,6 +214,7 @@ public:
     case Context::GenericRequirement:
     case Context::ImmediateOptionalTypeArgument:
     case Context::AbstractFunctionDecl:
+    case Context::Inherited:
       return false;
     }
     llvm_unreachable("unhandled kind");
@@ -280,6 +281,10 @@ public:
 /// \returns the \c null type on failure.
 using OpenUnboundGenericTypeFn = llvm::function_ref<Type(UnboundGenericType *)>;
 
+/// A function reference used to handle a PlaceholderTypeRepr.
+using HandlePlaceholderTypeReprFn =
+    llvm::function_ref<Type(ASTContext &, PlaceholderTypeRepr *)>;
+
 /// Handles the resolution of types within a given declaration context,
 /// which might involve resolving generic parameters to a particular
 /// stage.
@@ -288,30 +293,23 @@ class TypeResolution {
   TypeResolutionStage stage;
   TypeResolutionOptions options;
   OpenUnboundGenericTypeFn unboundTyOpener;
+  HandlePlaceholderTypeReprFn placeholderHandler;
 
 private:
-  union {
-    /// The generic environment used to map to archetypes.
-    GenericEnvironment *genericEnv;
+  /// The generic environment used to map to archetypes.
+  GenericEnvironment *genericEnv;
 
-    /// The generic signature
-    struct {
-      /// The generic signature to use for type resolution.
-      GenericSignature genericSig;
-
-      /// The generic signature builder that will answer queries about
-      /// generic types.
-      mutable GenericSignatureBuilder *builder;
-    } complete;
-  };
+  /// The generic signature to use for type resolution.
+  GenericSignature genericSig;
 
   TypeResolution(DeclContext *dc, TypeResolutionStage stage,
                  TypeResolutionOptions options,
-                 OpenUnboundGenericTypeFn unboundTyOpener)
+                 OpenUnboundGenericTypeFn unboundTyOpener,
+                 HandlePlaceholderTypeReprFn placeholderHandler)
       : dc(dc), stage(stage), options(options),
-        unboundTyOpener(unboundTyOpener) {}
-
-  GenericSignatureBuilder *getGenericSignatureBuilder() const;
+        unboundTyOpener(unboundTyOpener),
+        placeholderHandler(placeholderHandler),
+        genericEnv(nullptr) {}
 
   /// Retrieves the generic signature for the context, or NULL if there is
   /// no generic signature to resolve types.
@@ -321,30 +319,34 @@ public:
   /// Form a type resolution for the structure of a type, which does not
   /// attempt to resolve member types of type parameters to a particular
   /// associated type.
-  static TypeResolution forStructural(DeclContext *dc,
-                                      TypeResolutionOptions opts,
-                                      OpenUnboundGenericTypeFn unboundTyOpener);
+  static TypeResolution
+  forStructural(DeclContext *dc, TypeResolutionOptions opts,
+                OpenUnboundGenericTypeFn unboundTyOpener,
+                HandlePlaceholderTypeReprFn placeholderHandler);
 
   /// Form a type resolution for an interface type, which is a complete
   /// description of the type using generic parameters.
-  static TypeResolution forInterface(DeclContext *dc,
-                                     TypeResolutionOptions opts,
-                                     OpenUnboundGenericTypeFn unboundTyOpener);
+  static TypeResolution
+  forInterface(DeclContext *dc, TypeResolutionOptions opts,
+               OpenUnboundGenericTypeFn unboundTyOpener,
+               HandlePlaceholderTypeReprFn placeholderHandler);
 
   /// Form a type resolution for a contextual type, which is a complete
   /// description of the type using the archetypes of the given declaration
   /// context.
-  static TypeResolution forContextual(DeclContext *dc,
-                                      TypeResolutionOptions opts,
-                                      OpenUnboundGenericTypeFn unboundTyOpener);
+  static TypeResolution
+  forContextual(DeclContext *dc, TypeResolutionOptions opts,
+                OpenUnboundGenericTypeFn unboundTyOpener,
+                HandlePlaceholderTypeReprFn placeholderHandler);
 
   /// Form a type resolution for a contextual type, which is a complete
   /// description of the type using the archetypes of the given generic
   /// environment.
-  static TypeResolution forContextual(DeclContext *dc,
-                                      GenericEnvironment *genericEnv,
-                                      TypeResolutionOptions opts,
-                                      OpenUnboundGenericTypeFn unboundTyOpener);
+  static TypeResolution
+  forContextual(DeclContext *dc, GenericEnvironment *genericEnv,
+                TypeResolutionOptions opts,
+                OpenUnboundGenericTypeFn unboundTyOpener,
+                HandlePlaceholderTypeReprFn placeholderHandler);
 
 public:
   TypeResolution withOptions(TypeResolutionOptions opts) const;
@@ -364,6 +366,10 @@ public:
 
   OpenUnboundGenericTypeFn getUnboundTypeOpener() const {
     return unboundTyOpener;
+  }
+
+  HandlePlaceholderTypeReprFn getPlaceholderHandler() const {
+    return placeholderHandler;
   }
 
   /// Resolves a TypeRepr to a type.
@@ -398,6 +404,41 @@ public:
   /// Determine whether the given two types are equivalent within this
   /// type resolution context.
   bool areSameType(Type type1, Type type2) const;
+
+  /// Resolve a reference to the given type declaration within a particular
+  /// context.
+  ///
+  /// This routine aids unqualified name lookup for types by performing the
+  /// resolution necessary to rectify the declaration found by name lookup with
+  /// the declaration context from which name lookup started.
+  ///
+  /// \param typeDecl The type declaration found by name lookup.
+  /// \param foundDC The declaration context this type reference was found in.
+  /// \param isSpecialized Whether the type will have generic arguments applied.
+  ///
+  /// \returns the resolved type.
+  Type resolveTypeInContext(TypeDecl *typeDecl, DeclContext *foundDC,
+                            bool isSpecialized) const;
+
+  /// Apply generic arguments to the unbound generic type represented by the
+  /// given declaration and parent type.
+  ///
+  /// This function requires the correct number of generic arguments,
+  /// whereas applyGenericArguments emits diagnostics in those cases.
+  ///
+  /// \param decl The declaration that the resulting bound generic type
+  /// shall reference.
+  /// \param parentTy The parent type.
+  /// \param loc The source location for diagnostic reporting.
+  /// \param genericArgs The list of generic arguments to apply.
+  ///
+  /// \returns A BoundGenericType bound to the given arguments, or null on
+  /// error.
+  ///
+  /// \see applyGenericArguments
+  Type applyUnboundGenericArguments(GenericTypeDecl *decl, Type parentTy,
+                                    SourceLoc loc,
+                                    ArrayRef<Type> genericArgs) const;
 };
 
 } // end namespace swift

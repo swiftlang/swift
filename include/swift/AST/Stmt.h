@@ -180,6 +180,7 @@ public:
   ASTNode getLastElement() const { return getElements().back(); }
 
   void setFirstElement(ASTNode node) { getElements().front() = node; }
+  void setLastElement(ASTNode node) { getElements().back() = node; }
 
   /// The elements contained within the BraceStmt.
   MutableArrayRef<ASTNode> getElements() {
@@ -340,11 +341,17 @@ class alignas(8) PoundAvailableInfo final :
   /// This is filled in by Sema.
   VersionRange VariantAvailableRange;
 
+  /// Indicates that the expression is checking if a version range 
+  /// is **not** available.
+  bool _isUnavailability;
+
   PoundAvailableInfo(SourceLoc PoundLoc, SourceLoc LParenLoc,
-                     ArrayRef<AvailabilitySpec *> queries, SourceLoc RParenLoc)
+                     ArrayRef<AvailabilitySpec *> queries, SourceLoc RParenLoc,
+                     bool isUnavailability)
    : PoundLoc(PoundLoc), LParenLoc(LParenLoc), RParenLoc(RParenLoc),
      NumQueries(queries.size()), AvailableRange(VersionRange::empty()),
-     VariantAvailableRange(VersionRange::empty()) {
+     VariantAvailableRange(VersionRange::empty()), 
+     _isUnavailability(isUnavailability) {
     std::uninitialized_copy(queries.begin(), queries.end(),
                             getTrailingObjects<AvailabilitySpec *>());
   }
@@ -353,7 +360,8 @@ public:
   static PoundAvailableInfo *create(ASTContext &ctx, SourceLoc PoundLoc,
                                     SourceLoc LParenLoc,
                                     ArrayRef<AvailabilitySpec *> queries,
-                                    SourceLoc RParenLoc);
+                                    SourceLoc RParenLoc,
+                                    bool isUnavailability);
   
   ArrayRef<AvailabilitySpec *> getQueries() const {
     return llvm::makeArrayRef(getTrailingObjects<AvailabilitySpec *>(),
@@ -378,6 +386,8 @@ public:
   void setVariantAvailableRange(const VersionRange &Range) {
     VariantAvailableRange = Range;
   }
+
+  bool isUnavailability() const { return _isUnavailability; }
 };
 
 
@@ -725,6 +735,8 @@ public:
 /// \endcode
 class ForEachStmt : public LabeledStmt {
   SourceLoc ForLoc;
+  SourceLoc TryLoc;
+  SourceLoc AwaitLoc;
   Pattern *Pat;
   SourceLoc InLoc;
   Expr *Sequence;
@@ -740,12 +752,12 @@ class ForEachStmt : public LabeledStmt {
   Expr *convertElementExpr = nullptr;
 
 public:
-  ForEachStmt(LabeledStmtInfo LabelInfo, SourceLoc ForLoc, Pattern *Pat,
-              SourceLoc InLoc, Expr *Sequence, SourceLoc WhereLoc,
+  ForEachStmt(LabeledStmtInfo LabelInfo, SourceLoc ForLoc, SourceLoc TryLoc, SourceLoc AwaitLoc, 
+              Pattern *Pat, SourceLoc InLoc, Expr *Sequence, SourceLoc WhereLoc,
               Expr *WhereExpr, BraceStmt *Body, Optional<bool> implicit = None)
     : LabeledStmt(StmtKind::ForEach, getDefaultImplicitFlag(implicit, ForLoc),
                   LabelInfo),
-      ForLoc(ForLoc), Pat(nullptr), InLoc(InLoc), Sequence(Sequence),
+      ForLoc(ForLoc), TryLoc(TryLoc), AwaitLoc(AwaitLoc), Pat(nullptr), InLoc(InLoc), Sequence(Sequence),
       WhereLoc(WhereLoc), WhereExpr(WhereExpr), Body(Body) {
     setPattern(Pat);
   }
@@ -777,6 +789,9 @@ public:
 
   /// getWhereLoc - Retrieve the location of the 'where' keyword.
   SourceLoc getWhereLoc() const { return WhereLoc; }
+
+  SourceLoc getAwaitLoc() const { return AwaitLoc; }
+  SourceLoc getTryLoc() const { return TryLoc; }
   
   /// getPattern - Retrieve the pattern describing the iteration variables.
   /// These variables will only be visible within the body of the loop.
@@ -1104,15 +1119,19 @@ class SwitchStmt final : public LabeledStmt,
   friend TrailingObjects;
 
   SourceLoc SwitchLoc, LBraceLoc, RBraceLoc;
+  /// The location of the last token in the 'switch' statement. For valid
+  /// 'switch' statements this is the same as \c RBraceLoc. If the '}' is
+  /// missing this points to the last token before the '}' was expected.
+  SourceLoc EndLoc;
   Expr *SubjectExpr;
 
   SwitchStmt(LabeledStmtInfo LabelInfo, SourceLoc SwitchLoc, Expr *SubjectExpr,
              SourceLoc LBraceLoc, unsigned CaseCount, SourceLoc RBraceLoc,
-             Optional<bool> implicit = None)
+             SourceLoc EndLoc, Optional<bool> implicit = None)
     : LabeledStmt(StmtKind::Switch, getDefaultImplicitFlag(implicit, SwitchLoc),
                   LabelInfo),
       SwitchLoc(SwitchLoc), LBraceLoc(LBraceLoc), RBraceLoc(RBraceLoc),
-      SubjectExpr(SubjectExpr) {
+      EndLoc(EndLoc), SubjectExpr(SubjectExpr) {
     Bits.SwitchStmt.CaseCount = CaseCount;
   }
 
@@ -1123,8 +1142,18 @@ public:
                             SourceLoc LBraceLoc,
                             ArrayRef<ASTNode> Cases,
                             SourceLoc RBraceLoc,
+                            SourceLoc EndLoc,
                             ASTContext &C);
-  
+
+  static SwitchStmt *createImplicit(LabeledStmtInfo LabelInfo,
+                                    Expr *SubjectExpr, ArrayRef<ASTNode> Cases,
+                                    ASTContext &C) {
+    return SwitchStmt::create(LabelInfo, /*SwitchLoc=*/SourceLoc(), SubjectExpr,
+                              /*LBraceLoc=*/SourceLoc(), Cases,
+                              /*RBraceLoc=*/SourceLoc(), /*EndLoc=*/SourceLoc(),
+                              C);
+  }
+
   /// Get the source location of the 'switch' keyword.
   SourceLoc getSwitchLoc() const { return SwitchLoc; }
   /// Get the source location of the opening brace.
@@ -1135,8 +1164,8 @@ public:
   SourceLoc getLoc() const { return SwitchLoc; }
 
   SourceLoc getStartLoc() const { return getLabelLocOrKeywordLoc(SwitchLoc); }
-  SourceLoc getEndLoc() const { return RBraceLoc; }
-  
+  SourceLoc getEndLoc() const { return EndLoc; }
+
   /// Get the subject expression of the switch.
   Expr *getSubjectExpr() const { return SubjectExpr; }
   void setSubjectExpr(Expr *e) { SubjectExpr = e; }

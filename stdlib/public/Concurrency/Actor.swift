@@ -13,43 +13,41 @@
 import Swift
 @_implementationOnly import _SwiftConcurrencyShims
 
-/// Common protocol to which all actor classes conform.
+/// Common protocol to which all actors conform.
 ///
-/// The \c Actor protocol provides the core functionality of an actor class,
-/// which involves enqueuing new partial tasks to be executed at some
-/// point. Actor classes implicitly conform to this protocol as part of their
-/// primary class definition.
-public protocol Actor: AnyObject {
-  /// Enqueue a new partial task that will be executed in the actor's context.
-  func enqueue(partialTask: PartialAsyncTask)
+/// The `Actor` protocol generalizes over all actor types. Actor types
+/// implicitly conform to this protocol.
+@available(SwiftStdlib 5.5, *)
+public protocol Actor: AnyObject, Sendable {
+
+  /// Retrieve the executor for this actor as an optimized, unowned
+  /// reference.
+  ///
+  /// This property must always evaluate to the same executor for a
+  /// given actor instance, and holding on to the actor must keep the
+  /// executor alive.
+  ///
+  /// This property will be implicitly accessed when work needs to be
+  /// scheduled onto this actor.  These accesses may be merged,
+  /// eliminated, and rearranged with other work, and they may even
+  /// be introduced when not strictly required.  Visible side effects
+  /// are therefore strongly discouraged within this property.
+  nonisolated var unownedExecutor: UnownedSerialExecutor { get }
 }
 
-/// A native actor queue, which schedules partial tasks onto a serial queue.
-public struct _NativeActorQueue {
-  // TODO: This is just a stub for now
-}
+/// Called to initialize the default actor instance in an actor.
+/// The implementation will call this within the actor's initializer.
+@available(SwiftStdlib 5.5, *)
+@_silgen_name("swift_defaultActor_initialize")
+public func _defaultActorInitialize(_ actor: AnyObject)
 
-/// The default type to be used for an actor's queue when an actor does not
-/// provide its own implementation of `enqueue(partialTask:)`.
-public typealias _DefaultActorQueue = _NativeActorQueue
+/// Called to destroy the default actor instance in an actor.
+/// The implementation will call this within the actor's deinit.
+@available(SwiftStdlib 5.5, *)
+@_silgen_name("swift_defaultActor_destroy")
+public func _defaultActorDestroy(_ actor: AnyObject)
 
-/// Called to create a new default actor queue instance for a class of the given
-/// type.  The implementation will call this within the actor's initializer to
-/// initialize the actor queue.
-public func _defaultActorQueueCreate(
-  _ actorClass: AnyObject.Type
-) -> _DefaultActorQueue {
-  _DefaultActorQueue()
-}
-
-/// Called by the synthesized implementation of enqueue(partialTask:).
-///
-/// The implementation is provided with the address of the synthesized instance
-/// property for the actor queue, so that it need not be at a fixed offset.
-public func _defaultActorQueueEnqueuePartialTask(
-  actor: AnyObject,
-  queue: inout _DefaultActorQueue,
-  partialTask: PartialAsyncTask
-) {
-  // TODO: Implement queueing.
-}
+@available(SwiftStdlib 5.5, *)
+@_silgen_name("swift_task_enqueueMainExecutor")
+@usableFromInline
+internal func _enqueueOnMain(_ job: UnownedJob)

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-parser-lookup
+// RUN: %target-typecheck-verify-swift
 
 // Test redeclaration checking in local context.
 
@@ -98,4 +98,17 @@ func stmtTest() {
 func fullNameTest() {
   let x = 123 // expected-warning {{never used}}
   func x() {}
+}
+
+// For source compatibility, allow duplicate parameter labels on
+// protocol requirements.
+protocol SillyProtocol {
+  init(x: Int, x: Int)
+  init(a x: Int, b x: Int)
+
+  func foo(x: Int, x: Int)
+  func foo(a x: Int, b x: Int)
+
+  subscript(x: Int, x: Int) -> Int { get }
+  subscript(a x: Int, b x: Int) -> Int { get }
 }

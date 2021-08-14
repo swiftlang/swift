@@ -161,7 +161,7 @@ enum GenericFixedLayout<T> {
 // CHECK-SAME: }>
 
 // CHECK: @"$s27enum_value_semantics_future18GenericFixedLayoutOWV" = internal constant %swift.enum_vwtable
-// CHECK: [[EXTRA_DATA_PATTERN:@[0-9]+]] = internal constant { i64 } zeroinitializer
+// CHECK: [[EXTRA_DATA_PATTERN:@[0-9]+]] = internal constant <{ i64 }> zeroinitializer
 
 // CHECK-LABEL: @"$s27enum_value_semantics_future18GenericFixedLayoutOMn" = hidden constant
 // CHECK-SAME:    [16 x i8*]* @"$s27enum_value_semantics_future18GenericFixedLayoutOMI"
@@ -177,7 +177,7 @@ enum GenericFixedLayout<T> {
 //   Value witness table.
 // CHECK-SAME:    i32 trunc (i64 sub (i64 ptrtoint (%swift.enum_vwtable* @"$s27enum_value_semantics_future18GenericFixedLayoutOWV" to i64), i64 ptrtoint (i32* getelementptr inbounds (<{ i32, i32, i32, i32, i32, i16, i16 }>, <{ i32, i32, i32, i32, i32, i16, i16 }>* @"$s27enum_value_semantics_future18GenericFixedLayoutOMP", i32 0, i32 3) to i64)) to i32)
 //   Extra data pattern.
-// CHECK-SAME: i32 trunc (i64 sub (i64 ptrtoint ({ i64 }* [[EXTRA_DATA_PATTERN]] to i64), i64 ptrtoint (i32* getelementptr inbounds (<{ i32, i32, i32, i32, i32, i16, i16 }>, <{ i32, i32, i32, i32, i32, i16, i16 }>* @"$s27enum_value_semantics_future18GenericFixedLayoutOMP", i32 0, i32 4) to i64)) to i32)
+// CHECK-SAME: i32 trunc (i64 sub (i64 ptrtoint (<{ i64 }>* [[EXTRA_DATA_PATTERN]] to i64), i64 ptrtoint (i32* getelementptr inbounds (<{ i32, i32, i32, i32, i32, i16, i16 }>, <{ i32, i32, i32, i32, i32, i16, i16 }>* @"$s27enum_value_semantics_future18GenericFixedLayoutOMP", i32 0, i32 4) to i64)) to i32)
 // CHECK-SAME:  }>
 
 sil @single_payload_nontrivial_copy_destroy : $(@owned SinglePayloadNontrivial) -> () {

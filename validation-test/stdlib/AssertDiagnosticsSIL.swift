@@ -3,5 +3,5 @@
 func assertionFailure_isNotNoreturn() -> Int {
   _ = 0 // Don't implicitly return the assertionFailure call.
   assertionFailure("")
-} // expected-error {{missing return in a function expected to return 'Int'}}
+} // expected-error {{missing return in global function expected to return 'Int'}}
 

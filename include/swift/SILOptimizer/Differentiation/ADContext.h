@@ -45,9 +45,9 @@ namespace autodiff {
 
 /// Stores `apply` instruction information calculated by VJP generation.
 struct NestedApplyInfo {
-  /// The differentiation indices that are used to differentiate this `apply`
+  /// The differentiation config that is used to differentiate this `apply`
   /// instruction.
-  SILAutoDiffIndices indices;
+  AutoDiffConfig config;
   /// The original pullback type before reabstraction. `None` if the pullback
   /// type is not reabstracted.
   Optional<CanSILFunctionType> originalPullbackType;
@@ -115,10 +115,15 @@ private:
   mutable FuncDecl *cachedPlusFn = nullptr;
   /// `AdditiveArithmetic.+=` declaration.
   mutable FuncDecl *cachedPlusEqualFn = nullptr;
+  /// `AdditiveArithmetic.zero` declaration.
+  mutable AccessorDecl *cachedZeroGetter = nullptr;
 
 public:
   /// Construct an ADContext for the given module.
   explicit ADContext(SILModuleTransform &transform);
+
+  // No copying.
+  ADContext(const ADContext &) = delete;
 
   //--------------------------------------------------------------------------//
   // General utilities
@@ -198,6 +203,7 @@ public:
 
   FuncDecl *getPlusDecl() const;
   FuncDecl *getPlusEqualDecl() const;
+  AccessorDecl *getAdditiveArithmeticZeroGetter() const;
 
   /// Cleans up all the internal state.
   void cleanUp();
@@ -265,6 +271,10 @@ public:
   emitNondifferentiabilityError(SourceLoc loc, DifferentiationInvoker invoker,
                                 Diag<T...> diag, U &&... args);
 };
+
+raw_ostream &getADDebugStream();
+SILLocation getValidLocation(SILValue v);
+SILLocation getValidLocation(SILInstruction *inst);
 
 template <typename... T, typename... U>
 InFlightDiagnostic

@@ -1,66 +1,78 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
+// RUN: %target-typecheck-verify-swift 
 // REQUIRES: concurrency
 
-// Synthesis of for actor classes.
-import _Concurrency
+// Synthesis of conformances for actors.
 
-actor class A1 {
+@available(SwiftStdlib 5.5, *)
+actor A1 {
   var x: Int = 17
 }
 
-actor class A2: Actor {
+@available(SwiftStdlib 5.5, *)
+actor A2: Actor {
   var x: Int = 17
 }
 
-actor class A3<T>: Actor {
+@available(SwiftStdlib 5.5, *)
+actor A3<T>: Actor {
   var x: Int = 17
 }
 
-actor class A4: A1 {
+@available(SwiftStdlib 5.5, *)
+actor A4: A1 { // expected-error{{actor types do not support inheritance}}
 }
 
-actor class A5: A2 {
+@available(SwiftStdlib 5.5, *)
+actor A5: A2 { // expected-error{{actor types do not support inheritance}}
 }
 
-actor class A6: A1, Actor { // expected-error{{redundant conformance of 'A6' to protocol 'Actor'}}
+@available(SwiftStdlib 5.5, *)
+actor A6: A1, Actor { // expected-error{{redundant conformance of 'A6' to protocol 'Actor'}}
   // expected-note@-1{{'A6' inherits conformance to protocol 'Actor' from superclass here}}
+  // expected-error@-2{{actor types do not support inheritance}}
 }
 
 // Explicitly satisfying the requirement.
 
-actor class A7 {
+@available(SwiftStdlib 5.5, *)
+actor A7 {
   // Okay: satisfy the requirement explicitly
-  @actorIndependent func enqueue(partialTask: PartialAsyncTask) { }
+  nonisolated func enqueue(_ job: UnownedJob) { }
 }
 
-// A non-actor class can conform to the Actor protocol, if it does it properly.
+// A non-actor can conform to the Actor protocol, if it does it properly.
+@available(SwiftStdlib 5.5, *)
 class C1: Actor {
-  func enqueue(partialTask: PartialAsyncTask) { }
+  // expected-error@-1{{non-actor type 'C1' cannot conform to the 'Actor' protocol}}
+  // expected-error@-2{{non-final class 'C1' cannot conform to `Sendable`; use `@unchecked Sendable`}}
+  nonisolated var unownedExecutor: UnownedSerialExecutor {
+    fatalError("")
+  }
 }
 
-// Bad actors, that incorrectly try to satisfy the various requirements.
-
-// Method that is not usable as a witness.
-actor class BA1 {
-  func enqueue(partialTask: PartialAsyncTask) { } // expected-error{{actor-isolated instance method 'enqueue(partialTask:)' cannot be used to satisfy a protocol requirement; did you mean to make it an asychronous handler?}}
+@available(SwiftStdlib 5.5, *)
+class C2: Actor {
+  // expected-error@-1{{non-actor type 'C2' cannot conform to the 'Actor' protocol}}
+  // expected-error@-2{{non-final class 'C2' cannot conform to `Sendable`; use `@unchecked Sendable`}}
+  // FIXME: this should be an isolation violation
+  var unownedExecutor: UnownedSerialExecutor {
+    fatalError("")
+  }
 }
 
-// Method that isn't part of the main class definition cannot be used to
-// satisfy the requirement, because then it would not have a vtable slot.
-actor class BA2 { }
-
-extension BA2 {
-  // expected-error@+1{{'enqueue(partialTask:)' can only be implemented in the definition of actor class 'BA2'}}
-  @actorIndependent func enqueue(partialTask: PartialAsyncTask) { }
-}
-
-// No synthesis for non-actor classes.
-class C2: Actor { // expected-error{{type 'C2' does not conform to protocol 'Actor'}}
+@available(SwiftStdlib 5.5, *)
+class C3: Actor {
+  // expected-error@-1{{type 'C3' does not conform to protocol 'Actor'}}
+  // expected-error@-2{{non-actor type 'C3' cannot conform to the 'Actor' protocol}}
+  // expected-error@-3{{non-final class 'C3' cannot conform to `Sendable`; use `@unchecked Sendable`}}
+  nonisolated func enqueue(_ job: UnownedJob) { }
 }
 
 // Make sure the conformances actually happen.
+@available(SwiftStdlib 5.5, *)
 func acceptActor<T: Actor>(_: T.Type) { }
 
+@available(SwiftStdlib 5.5, *)
 func testConformance() {
   acceptActor(A1.self)
   acceptActor(A2.self)

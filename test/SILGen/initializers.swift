@@ -1136,7 +1136,7 @@ class MemberInitsHelper<T> { }
 
 extension MemberInits {
   // CHECK-LABEL: sil [ossa] @$s21failable_initializers11MemberInitsVyACySayqd__GGSayACyqd__GGcADRszSQRd__lufC : $@convention(method) <Value><T where Value == Array<T>, T : Equatable> (@owned Array<MemberInits<T>>, @thin MemberInits<Array<T>>.Type) -> @owned MemberInits<Array<T>> {
-  public init<T>(_ array: [MemberInits<T>]) where Value == [T] {
+  public init<T>(_ array: Array<MemberInits<T>>) where Value == Array<T> {
     box = nil
 
     // CHECK: [[INIT_FN:%.*]] = function_ref @$s21failable_initializers11MemberInitsV5value33_4497B2E9306011E5BAC13C07BEAC2557LLSSvpfi : $@convention(thin) <τ_0_0 where τ_0_0 : Equatable> () -> @owned String

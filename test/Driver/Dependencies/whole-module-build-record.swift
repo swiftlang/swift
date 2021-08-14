@@ -10,8 +10,8 @@
 // CHECK-FIRST-NOT: warning
 // CHECK-FIRST: Produced main.o
 
-// CHECK-RECORD-DAG: "./main.swift": [
-// CHECK-RECORD-DAG: "./other.swift": [
+// CHECK-RECORD-DAG: "{{(./)?}}main.swift": [
+// CHECK-RECORD-DAG: "{{(./)?}}other.swift": [
 
 
 // RUN: touch -t 201401240006 %t/other.swift

@@ -35,8 +35,6 @@ func foo(val: MyStruct) {
 // RUN:   %t/test.swift \
 // RUN: )
 // RUN: INPUT_DIR=%S/Inputs/checkdeps
-// RUN: DEPCHECK_INTERVAL=1
-// RUN: SLEEP_TIME=2
 
 // RUN: cp -R $INPUT_DIR/MyProject %t/
 // RUN: cp -R $INPUT_DIR/ClangFW.framework %t/Frameworks/
@@ -44,26 +42,27 @@ func foo(val: MyStruct) {
 // RUN: %target-swift-frontend -emit-module -module-name SwiftFW -o %t/Frameworks/SwiftFW.framework/Modules/SwiftFW.swiftmodule/%target-swiftmodule-name $INPUT_DIR/SwiftFW_src/Funcs.swift
 
 // RUN: cp %t/State1.swift %t/test.swift
+// RUN: touch -t 202001010101 %t/test.swift
 
 // RUN: %sourcekitd-test \
-// RUN:   -req=global-config -req-opts=completion_check_dependency_interval=${DEPCHECK_INTERVAL} == \
+// RUN:   -req=global-config -req-opts=completion_check_dependency_interval=0 == \
 
 // RUN:   -shell -- echo "### Initial" == \
 // RUN:   -req=complete -pos=5:4 %t/test.swift -- ${COMPILER_ARGS[@]} == \
 
-// RUN:   -shell -- sleep ${SLEEP_TIME} == \
 // RUN:   -shell -- echo "### Modify own file - 1" == \
 // RUN:   -shell -- cp %t/State2.swift %t/test.swift == \
+// RUN:   -shell -- touch -t 210001010101 %t/test.swift == \
 // RUN:   -req=complete -pos=5:9 %t/test.swift -- ${COMPILER_ARGS[@]} == \
 
-// RUN:   -shell -- sleep ${SLEEP_TIME} == \
 // RUN:   -shell -- echo "### Modify own file - 2" == \
 // RUN:   -shell -- cp %t/State1.swift %t/test.swift == \
+// RUN:   -shell -- touch -t 210001010102 %t/test.swift == \
 // RUN:   -req=complete -pos=5:4 %t/test.swift -- ${COMPILER_ARGS[@]} == \
 
-// RUN:   -shell -- sleep ${SLEEP_TIME} == \
 // RUN:   -shell -- echo "### Modify own file - 3" == \
 // RUN:   -shell -- cp %t/State2.swift %t/test.swift == \
+// RUN:   -shell -- touch -t 210001010103 %t/test.swift == \
 // RUN:   -req=complete -pos=5:9 %t/test.swift -- ${COMPILER_ARGS[@]} \
 // RUN:   | %FileCheck %s
 

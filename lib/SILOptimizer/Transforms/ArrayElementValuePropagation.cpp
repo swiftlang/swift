@@ -125,9 +125,21 @@ bool ArrayAllocation::recursivelyCollectUses(ValueBase *Def) {
   for (auto *Opd : Def->getUses()) {
     auto *User = Opd->getUser();
     // Ignore reference counting and debug instructions.
-    if (isa<RefCountingInst>(User) ||
-        isa<DebugValueInst>(User))
+    if (isa<RefCountingInst>(User) || isa<DebugValueInst>(User) ||
+        isa<DestroyValueInst>(User) || isa<EndBorrowInst>(User))
       continue;
+
+    if (auto *CVI = dyn_cast<CopyValueInst>(User)) {
+      if (!recursivelyCollectUses(CVI))
+        return false;
+      continue;
+    }
+
+    if (auto *BBI = dyn_cast<BeginBorrowInst>(User)) {
+      if (!recursivelyCollectUses(BBI))
+        return false;
+      continue;
+    }
 
     // Array value projection.
     if (auto *SEI = dyn_cast<StructExtractInst>(User)) {
@@ -202,7 +214,10 @@ bool ArrayAllocation::replaceGetElements() {
     if (ConstantIndex == None)
       continue;
 
-    assert(*ConstantIndex >= 0 && "Must have a positive index");
+    // ElementValueMap keys are unsigned. Avoid implicit signed-unsigned
+    // conversion from an invalid index to a valid index.
+    if (*ConstantIndex < 0)
+      continue;
 
     auto EltValueIt = ElementValueMap.find(*ConstantIndex);
     if (EltValueIt == ElementValueMap.end())
@@ -282,11 +297,8 @@ bool ArrayAllocation::replaceAppendContentOf() {
     ArraySemanticsCall AppendContentsOf(AppendContentOfCall);
     assert(AppendContentsOf && "Must be AppendContentsOf call");
 
-    NominalTypeDecl *AppendSelfArray = AppendContentsOf.getSelf()->getType().
-    getASTType()->getAnyNominal();
-
     // In case if it's not an Array, but e.g. an ContiguousArray
-    if (AppendSelfArray != Ctx.getArrayDecl())
+    if (!AppendContentsOf.getSelf()->getType().getASTType()->isArray())
       continue;
 
     SILType ArrayType = ArrayValue->getType();
@@ -312,11 +324,6 @@ public:
 
   void run() override {
     auto &Fn = *getFunction();
-
-    // FIXME: Update for ownership.
-    if (Fn.hasOwnership())
-      return;
-
     bool Changed = false;
 
     for (auto &BB :Fn) {
@@ -326,7 +333,7 @@ public:
           if (!ALit.analyze(Apply))
             continue;
 
-          // First optimization: replace getElemente calls.
+          // First optimization: replace getElement calls.
           if (ALit.replaceGetElements()) {
             Changed = true;
             // Re-do the analysis if the SIL changed.

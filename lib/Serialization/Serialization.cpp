@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -19,6 +19,7 @@
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/FileSystem.h"
+#include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IndexSubset.h"
@@ -30,12 +31,12 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/AST/RawComment.h"
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeVisitor.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/STLExtras.h"
@@ -46,10 +47,13 @@
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Strings.h"
+#include "clang/AST/DeclTemplate.h"
+#include "swift/SymbolGraphGen/SymbolGraphOptions.h"
+#include "swift/SymbolGraphGen/SymbolGraphGen.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
-#include "llvm/Bitcode/RecordLayout.h"
+#include "llvm/Bitcode/BitcodeConvenience.h"
 #include "llvm/Bitstream/BitstreamWriter.h"
 #include "llvm/Config/config.h"
 #include "llvm/Support/Allocator.h"
@@ -72,9 +76,7 @@ using namespace llvm::support;
 using swift::version::Version;
 using llvm::BCBlockRAII;
 
-ASTContext &SerializerBase::getASTContext() {
-  return M->getASTContext();
-}
+ASTContext &SerializerBase::getASTContext() const { return M->getASTContext(); }
 
 /// Used for static_assert.
 static constexpr bool declIDFitsIn32Bits() {
@@ -434,6 +436,45 @@ namespace {
       }
     }
   };
+
+  // Side table information for serializing the table keyed under
+  // \c DeclFingerprintsLayout.
+  class DeclFingerprintsTableInfo {
+  public:
+    using key_type = DeclID;
+    using key_type_ref = const key_type &;
+    using data_type = Fingerprint;
+    using data_type_ref = const data_type &;
+    using hash_value_type = uint32_t;
+    using offset_type = unsigned;
+
+    hash_value_type ComputeHash(key_type_ref key) {
+      return llvm::hash_value(static_cast<uint32_t>(key));
+    }
+
+    std::pair<unsigned, unsigned>
+    EmitKeyDataLength(raw_ostream &out, key_type_ref key, data_type_ref data) {
+      endian::Writer writer(out, little);
+      // No need to write the key or value length; they're both constant.
+      const unsigned valueLen = Fingerprint::DIGEST_LENGTH;
+      return {sizeof(uint32_t), valueLen};
+    }
+
+    void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
+      static_assert(declIDFitsIn32Bits(), "DeclID too large");
+      assert(len == sizeof(uint32_t));
+      endian::Writer writer(out, little);
+      writer.write<uint32_t>(key);
+    }
+
+    void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
+                  unsigned len) {
+      static_assert(declIDFitsIn32Bits(), "DeclID too large");
+      assert(len == Fingerprint::DIGEST_LENGTH);
+      endian::Writer writer(out, little);
+      out << data;
+    }
+  };
 } // end anonymous namespace
 
 static ModuleDecl *getModule(ModuleOrSourceFile DC) {
@@ -586,12 +627,26 @@ DeclID Serializer::addDeclRef(const Decl *D, bool allowTypeAliasXRef) {
 }
 
 serialization::TypeID Serializer::addTypeRef(Type ty) {
+  Type typeToSerialize = ty;
+  if (ty) {
+    if (auto nominalDecl = ty->getAnyNominal()) {
+      if (auto structDecl = dyn_cast<StructDecl>(nominalDecl)) {
+        if (auto templateInstantiationType =
+                structDecl->getTemplateInstantiationType()) {
+          typeToSerialize = templateInstantiationType;
+        }
+      }
+    }
+  }
+
 #ifndef NDEBUG
-  PrettyStackTraceType trace(M->getASTContext(), "serializing", ty);
-  assert((!ty || !ty->hasError()) && "Serializing error type");
+  PrettyStackTraceType trace(M->getASTContext(), "serializing", typeToSerialize);
+  assert((allowCompilerErrors() || !typeToSerialize ||
+          !typeToSerialize->hasError()) &&
+         "serializing type with an error");
 #endif
 
-  return TypesToSerialize.addRef(ty);
+  return TypesToSerialize.addRef(typeToSerialize);
 }
 
 serialization::ClangTypeID Serializer::addClangTypeRef(const clang::Type *ty) {
@@ -755,6 +810,8 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(options_block, IS_TESTABLE);
   BLOCK_RECORD(options_block, ARE_PRIVATE_IMPORTS_ENABLED);
   BLOCK_RECORD(options_block, RESILIENCE_STRATEGY);
+  BLOCK_RECORD(options_block, IS_ALLOW_MODULE_WITH_COMPILER_ERRORS_ENABLED);
+  BLOCK_RECORD(options_block, MODULE_ABI_NAME);
 
   BLOCK(INPUT_BLOCK);
   BLOCK_RECORD(input_block, IMPORTED_MODULE);
@@ -797,7 +854,9 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(index_block, PRECEDENCE_GROUPS);
   BLOCK_RECORD(index_block, NESTED_TYPE_DECLS);
   BLOCK_RECORD(index_block, DECL_MEMBER_NAMES);
+  BLOCK_RECORD(index_block, DECL_FINGERPRINTS);
   BLOCK_RECORD(index_block, ORDERED_TOP_LEVEL_DECLS);
+  BLOCK_RECORD(index_block, EXPORTED_PRESPECIALIZATION_DECLS);
 
   BLOCK(DECL_MEMBER_TABLES_BLOCK);
   BLOCK_RECORD(decl_member_tables_block, DECL_MEMBERS);
@@ -845,6 +904,8 @@ void Serializer::writeBlockInfoBlock() {
                               decls_block::SPECIALIZED_PROTOCOL_CONFORMANCE);
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
                               decls_block::INHERITED_PROTOCOL_CONFORMANCE);
+  BLOCK_RECORD_WITH_NAMESPACE(sil_block,
+                              decls_block::BUILTIN_PROTOCOL_CONFORMANCE);
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
                               decls_block::NORMAL_PROTOCOL_CONFORMANCE_ID);
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
@@ -900,10 +961,25 @@ void Serializer::writeHeader(const SerializationOptions &options) {
     size_t compatibilityVersionStringLength =
         versionString.tell() - shortVersionStringLength - 1;
     versionString << ")/" << version::getSwiftFullVersion();
+    auto userModuleMajor = options.UserModuleVersion.getMajor();
+    auto userModuleMinor = 0;
+    if (auto minor = options.UserModuleVersion.getMinor()) {
+      userModuleMinor = *minor;
+    }
+    auto userModuleSubminor = 0;
+    if (auto subMinor = options.UserModuleVersion.getSubminor()) {
+      userModuleSubminor = *subMinor;
+    }
+    auto userModuleBuild = 0;
+    if (auto build = options.UserModuleVersion.getBuild()) {
+      userModuleBuild = *build;
+    }
     Metadata.emit(ScratchRecord,
                   SWIFTMODULE_VERSION_MAJOR, SWIFTMODULE_VERSION_MINOR,
                   shortVersionStringLength,
                   compatibilityVersionStringLength,
+                  userModuleMajor, userModuleMinor,
+                  userModuleSubminor, userModuleBuild,
                   versionString.str());
 
     Target.emit(ScratchRecord, M->getASTContext().LangOpts.Target.str());
@@ -913,6 +989,11 @@ void Serializer::writeHeader(const SerializationOptions &options) {
 
       options_block::IsSIBLayout IsSIB(Out);
       IsSIB.emit(ScratchRecord, options.IsSIB);
+
+      if (options.StaticLibrary) {
+        options_block::IsStaticLibraryLayout IsStaticLibrary(Out);
+        IsStaticLibrary.emit(ScratchRecord);
+      }
 
       if (M->isTestingEnabled()) {
         options_block::IsTestableLayout IsTestable(Out);
@@ -932,6 +1013,17 @@ void Serializer::writeHeader(const SerializationOptions &options) {
       if (M->getResilienceStrategy() != ResilienceStrategy::Default) {
         options_block::ResilienceStrategyLayout Strategy(Out);
         Strategy.emit(ScratchRecord, unsigned(M->getResilienceStrategy()));
+      }
+
+      if (allowCompilerErrors()) {
+        options_block::IsAllowModuleWithCompilerErrorsEnabledLayout
+            AllowErrors(Out);
+        AllowErrors.emit(ScratchRecord);
+      }
+
+      if (M->getABIName() != M->getName()) {
+        options_block::ModuleABINameLayout ABIName(Out);
+        ABIName.emit(ScratchRecord, M->getABIName().str());
       }
 
       if (options.SerializeOptionsForDebugging) {
@@ -1055,11 +1147,7 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
   ImportSet privateImportSet =
       getImportsAsSet(M, ModuleDecl::ImportFilterKind::Default);
   ImportSet spiImportSet =
-      getImportsAsSet(M, {
-          ModuleDecl::ImportFilterKind::Exported,
-          ModuleDecl::ImportFilterKind::Default,
-          ModuleDecl::ImportFilterKind::SPIAccessControl
-      });
+      getImportsAsSet(M, ModuleDecl::ImportFilterKind::SPIAccessControl);
 
   auto clangImporter =
     static_cast<ClangImporter *>(M->getASTContext().getClangModuleLoader());
@@ -1130,6 +1218,10 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
   if (!options.ModuleLinkName.empty()) {
     LinkLibrary.emit(ScratchRecord, serialization::LibraryKind::Library,
                      options.AutolinkForceLoad, options.ModuleLinkName);
+  }
+  for (auto dependentLib : options.PublicDependentLibraries) {
+    LinkLibrary.emit(ScratchRecord, serialization::LibraryKind::Library,
+                     options.AutolinkForceLoad, dependentLib);
   }
 }
 
@@ -1254,6 +1346,19 @@ void Serializer::writeGenericRequirements(ArrayRef<Requirement> requirements,
   }
 }
 
+void Serializer::writeAssociatedTypes(ArrayRef<AssociatedTypeDecl *> assocTypes,
+                                      const std::array<unsigned, 256> &abbrCodes) {
+  using namespace decls_block;
+
+  auto assocTypeAbbrCode = abbrCodes[AssociatedTypeLayout::Code];
+
+  for (auto *assocType : assocTypes) {
+    AssociatedTypeLayout::emitRecord(
+        Out, ScratchRecord, assocTypeAbbrCode,
+        addDeclRef(assocType));
+  }
+}
+
 void Serializer::writeASTBlockEntity(GenericSignature sig) {
   using namespace decls_block;
 
@@ -1264,7 +1369,7 @@ void Serializer::writeASTBlockEntity(GenericSignature sig) {
   // have to encode them manually because one of them has a declaration with
   // module context (which can happen in SIL).
   bool mustEncodeParamsManually =
-      llvm::any_of(sig->getGenericParams(),
+      llvm::any_of(sig.getGenericParams(),
                    [](const GenericTypeParamType *paramTy) {
     auto *decl = paramTy->getDecl();
     return decl && decl->getDeclContext()->isModuleScopeContext();
@@ -1273,7 +1378,7 @@ void Serializer::writeASTBlockEntity(GenericSignature sig) {
   if (!mustEncodeParamsManually) {
     // Record the generic parameters.
     SmallVector<uint64_t, 4> rawParamIDs;
-    for (auto *paramTy : sig->getGenericParams()) {
+    for (auto *paramTy : sig.getGenericParams()) {
       rawParamIDs.push_back(addTypeRef(paramTy));
     }
 
@@ -1283,7 +1388,7 @@ void Serializer::writeASTBlockEntity(GenericSignature sig) {
   } else {
     // Record the generic parameters.
     SmallVector<uint64_t, 4> rawParamIDs;
-    for (auto *paramTy : sig->getGenericParams()) {
+    for (auto *paramTy : sig.getGenericParams()) {
       auto *decl = paramTy->getDecl();
 
       // For a full environment, add the name and canonicalize the param type.
@@ -1299,7 +1404,7 @@ void Serializer::writeASTBlockEntity(GenericSignature sig) {
                                           rawParamIDs);
   }
 
-  writeGenericRequirements(sig->getRequirements(), DeclTypeAbbrCodes);
+  writeGenericRequirements(sig.getRequirements(), DeclTypeAbbrCodes);
 }
 
 void Serializer::writeASTBlockEntity(const SubstitutionMap substitutions) {
@@ -1350,8 +1455,10 @@ void Serializer::writeASTBlockEntity(
     const NormalProtocolConformance *conformance) {
   using namespace decls_block;
 
+  PrettyStackTraceConformance trace("serializing", conformance);
+
   // The conformance must be complete, or we can't serialize it.
-  assert(conformance->isComplete());
+  assert(conformance->isComplete() || allowCompilerErrors());
   assert(NormalConformancesToSerialize.hasRef(conformance));
 
   auto protocol = conformance->getProtocol();
@@ -1370,11 +1477,15 @@ void Serializer::writeASTBlockEntity(
   });
 
   conformance->forEachValueWitness([&](ValueDecl *req, Witness witness) {
+      PrettyStackTraceDecl traceValueWitness(
+          "serializing value witness for requirement", req);
+
       ++numValueWitnesses;
       data.push_back(addDeclRef(req));
       data.push_back(addDeclRef(witness.getDecl()));
       assert(witness.getDecl() || req->getAttrs().hasAttribute<OptionalAttr>()
-             || req->getAttrs().isUnavailable(req->getASTContext()));
+             || req->getAttrs().isUnavailable(req->getASTContext())
+             || allowCompilerErrors());
 
       // If there is no witness, we're done.
       if (!witness.getDecl()) return;
@@ -1408,6 +1519,7 @@ void Serializer::writeASTBlockEntity(
                                               numTypeWitnesses,
                                               numValueWitnesses,
                                               numSignatureConformances,
+                                              conformance->isUnchecked(),
                                               data);
 
   // Write requirement signature conformances.
@@ -1506,6 +1618,17 @@ Serializer::writeConformance(ProtocolConformanceRef conformanceRef,
     writeConformance(conf->getInheritedConformance(), abbrCodes, genericEnv);
     break;
   }
+  case ProtocolConformanceKind::Builtin:
+    auto builtin = cast<BuiltinProtocolConformance>(conformance);
+    unsigned abbrCode = abbrCodes[BuiltinProtocolConformanceLayout::Code];
+    auto typeID = addTypeRef(builtin->getType());
+    auto protocolID = addDeclRef(builtin->getProtocol());
+    auto genericSigID = addGenericSignatureRef(builtin->getGenericSignature());
+    BuiltinProtocolConformanceLayout::emitRecord(
+        Out, ScratchRecord, abbrCode, typeID, protocolID, genericSigID,
+        static_cast<unsigned>(builtin->getBuiltinConformanceKind()));
+    writeGenericRequirements(builtin->getConditionalRequirements(), abbrCodes);
+    break;
   }
 }
 
@@ -1537,9 +1660,13 @@ static bool shouldSerializeMember(Decl *D) {
   case DeclKind::Extension:
   case DeclKind::Module:
   case DeclKind::PrecedenceGroup:
+    if (D->getASTContext().LangOpts.AllowModuleWithCompilerErrors)
+      return false;
     llvm_unreachable("decl should never be a member");
 
   case DeclKind::MissingMember:
+    if (D->getASTContext().LangOpts.AllowModuleWithCompilerErrors)
+      return false;
     llvm_unreachable("should never need to reserialize a member placeholder");
 
   case DeclKind::IfConfig:
@@ -1922,6 +2049,8 @@ getStableSelfAccessKind(swift::SelfAccessKind MM) {
 # define DECL(KIND, PARENT)\
 LLVM_ATTRIBUTE_UNUSED \
 static void verifyAttrSerializable(const KIND ## Decl *D) {\
+  if (D->Decl::getASTContext().LangOpts.AllowModuleWithCompilerErrors)\
+    return;\
   for (auto Attr : D->getAttrs()) {\
     assert(Attr->canAppearOnDecl(D) && "attribute cannot appear on a " #KIND);\
   }\
@@ -1955,8 +2084,10 @@ void Serializer::writePatternBindingInitializer(PatternBindingDecl *binding,
   StringRef initStr;
   SmallString<128> scratch;
   auto varDecl = binding->getAnchoringVarDecl(bindingIndex);
+  assert((varDecl || allowCompilerErrors()) &&
+         "Serializing PDB without anchoring VarDecl");
   if (binding->hasInitStringRepresentation(bindingIndex) &&
-      varDecl->isInitExposedToClients()) {
+      varDecl && varDecl->isInitExposedToClients()) {
     initStr = binding->getInitStringRepresentation(bindingIndex, scratch);
   }
 
@@ -2054,6 +2185,9 @@ void Serializer::writeASTBlockEntity(const DeclContext *DC) {
   }
 }
 
+#define SIMPLE_CASE(TYPENAME, VALUE) \
+  case swift::TYPENAME::VALUE: return uint8_t(serialization::TYPENAME::VALUE);
+
 static ForeignErrorConventionKind getRawStableForeignErrorConventionKind(
                                     ForeignErrorConvention::Kind kind) {
   switch (kind) {
@@ -2103,13 +2237,27 @@ static uint8_t getRawStableVarDeclIntroducer(swift::VarDecl::Introducer intr) {
 static uint8_t getRawStableAutoDiffDerivativeFunctionKind(
     swift::AutoDiffDerivativeFunctionKind kind) {
   switch (kind) {
-  case swift::AutoDiffDerivativeFunctionKind::JVP:
-    return uint8_t(serialization::AutoDiffDerivativeFunctionKind::JVP);
-  case swift::AutoDiffDerivativeFunctionKind::VJP:
-    return uint8_t(serialization::AutoDiffDerivativeFunctionKind::VJP);
+  SIMPLE_CASE(AutoDiffDerivativeFunctionKind, JVP)
+  SIMPLE_CASE(AutoDiffDerivativeFunctionKind, VJP)
   }
   llvm_unreachable("bad derivative function kind");
 }
+
+/// Translate from the AST differentiability kind enum to the Serialization enum
+/// values, which are guaranteed to be stable.
+static uint8_t getRawStableDifferentiabilityKind(
+    swift::DifferentiabilityKind diffKind) {
+  switch (diffKind) {
+  SIMPLE_CASE(DifferentiabilityKind, NonDifferentiable)
+  SIMPLE_CASE(DifferentiabilityKind, Forward)
+  SIMPLE_CASE(DifferentiabilityKind, Reverse)
+  SIMPLE_CASE(DifferentiabilityKind, Normal)
+  SIMPLE_CASE(DifferentiabilityKind, Linear)
+  }
+  llvm_unreachable("bad differentiability kind");
+}
+
+#undef SIMPLE_CASE
 
 /// Returns true if the declaration of \p decl depends on \p problemContext
 /// based on lexical nesting.
@@ -2148,6 +2296,8 @@ static bool contextDependsOn(const NominalTypeDecl *decl,
 static void collectDependenciesFromType(llvm::SmallSetVector<Type, 4> &seen,
                                         Type ty,
                                         const DeclContext *excluding) {
+  if (!ty)
+    return;
   ty.visit([&](Type next) {
     auto *nominal = next->getAnyNominal();
     if (!nominal)
@@ -2176,8 +2326,8 @@ static SmallVector<Type, 4> collectDependenciesFromType(Type ty) {
 class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
   Serializer &S;
   DeclID id;
+  SmallVectorImpl<DeclID> &exportedPrespecializationDecls;
   bool didVerifyAttrs = false;
-
   template <typename DeclKind>
   void verifyAttrSerializable(const DeclKind *D) {
     ::verifyAttrSerializable(D);
@@ -2332,6 +2482,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       ENCODE_VER_TUPLE(Deprecated, theAttr->Deprecated)
       ENCODE_VER_TUPLE(Obsoleted, theAttr->Obsoleted)
 
+      auto renameDeclID = S.addDeclRef(theAttr->RenameDecl);
       llvm::SmallString<32> blob;
       blob.append(theAttr->Message);
       blob.append(theAttr->Rename);
@@ -2346,6 +2497,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           LIST_VER_TUPLE_PIECES(Deprecated),
           LIST_VER_TUPLE_PIECES(Obsoleted),
           static_cast<unsigned>(theAttr->Platform),
+          renameDeclID,
           theAttr->Message.size(),
           theAttr->Rename.size(),
           blob);
@@ -2441,7 +2593,8 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       auto theAttr = cast<CustomAttr>(DA);
       CustomDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                        theAttr->isImplicit(),
-                                       S.addTypeRef(theAttr->getType()));
+                                       S.addTypeRef(theAttr->getType()),
+                                       theAttr->isArgUnsafe());
       return;
     }
 
@@ -2469,7 +2622,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
 
       DifferentiableDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(),
-          attr->isLinear(),
+          getRawStableDifferentiabilityKind(attr->getDifferentiabilityKind()),
           S.addGenericSignatureRef(attr->getDerivativeGenericSignature()),
           paramIndicesVector);
       return;
@@ -2550,8 +2703,8 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           storage->hasPrivateAccessor()));
 
     if (shouldEmitFilenameForPrivate || shouldEmitPrivateDiscriminator) {
-      auto topLevelContext = value->getDeclContext()->getModuleScopeContext();
-      if (auto *enclosingFile = dyn_cast<FileUnit>(topLevelContext)) {
+      auto topLevelSubcontext = value->getDeclContext()->getModuleScopeContext();
+      if (auto *enclosingFile = dyn_cast<FileUnit>(topLevelSubcontext)) {
         if (shouldEmitPrivateDiscriminator) {
           Identifier discriminator =
               enclosingFile->getDiscriminatorForPrivateValue(value);
@@ -2622,6 +2775,22 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
                                              resultTypeID);
   }
 
+  void writeForeignAsyncConvention(const ForeignAsyncConvention &fac) {
+    using namespace decls_block;
+    TypeID completionHandlerTypeID = S.addTypeRef(fac.completionHandlerType());
+    unsigned rawErrorParameterIndex = fac.completionHandlerErrorParamIndex()
+      .map([](unsigned index) { return index + 1; }).getValueOr(0);
+    unsigned rawErrorFlagParameterIndex = fac.completionHandlerFlagParamIndex()
+      .map([](unsigned index) { return index + 1; }).getValueOr(0);
+    auto abbrCode = S.DeclTypeAbbrCodes[ForeignAsyncConventionLayout::Code];
+    ForeignAsyncConventionLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                             completionHandlerTypeID,
+                                             fac.completionHandlerParamIndex(),
+                                             rawErrorParameterIndex,
+                                             rawErrorFlagParameterIndex,
+                                             fac.completionHandlerFlagIsErrorOnZero());
+  }
+
   void writeGenericParams(const GenericParamList *genericParams) {
     using namespace decls_block;
 
@@ -2655,7 +2824,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
   /// \param members The decls within the context.
   /// \param isClass True if the context could be a class context (class,
   ///        class extension, or protocol).
-  void writeMembers(DeclID parentID, DeclRange members, bool isClass) {
+  void writeMembers(DeclID parentID, ArrayRef<Decl *> members, bool isClass) {
     using namespace decls_block;
 
     SmallVector<DeclID, 16> memberIDs;
@@ -2708,6 +2877,12 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
 
     // Retrieve the type of the pattern.
     auto getPatternType = [&] {
+      if (!pattern->hasType()) {
+        if (S.allowCompilerErrors())
+          return ErrorType::get(S.getASTContext());
+        llvm_unreachable("all nodes should have types");
+      }
+
       Type type = pattern->getType();
 
       // If we have a contextual type, map out to an interface type.
@@ -2790,7 +2965,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
 
     SmallVector<DeclID, 16> witnessIDs;
 
-    for (auto member : proto->getMembers()) {
+    for (auto member : proto->getAllMembers()) {
       if (auto *value = dyn_cast<ValueDecl>(member)) {
         auto witness = proto->getDefaultWitness(value);
         if (!witness)
@@ -2860,12 +3035,18 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
   }
 
 public:
-  DeclSerializer(Serializer &S, DeclID id) : S(S), id(id) {}
+  DeclSerializer(Serializer &S, DeclID id,
+                 SmallVectorImpl<DeclID> &exportedPrespecializationDecls)
+      : S(S), id(id),
+        exportedPrespecializationDecls(exportedPrespecializationDecls) {}
   ~DeclSerializer() {
     assert(didVerifyAttrs);
   }
 
   void visit(const Decl *D) {
+    if (D->isInvalid())
+      writeDeclErrorFlag();
+
     // Emit attributes (if any).
     for (auto Attr : D->getAttrs())
       writeDeclAttribute(D, Attr);
@@ -2873,11 +3054,50 @@ public:
     if (auto *value = dyn_cast<ValueDecl>(D))
       writeDiscriminatorsIfNeeded(value);
 
+    if (auto *afd = dyn_cast<AbstractFunctionDecl>(D)) {
+      noteUseOfExportedPrespecialization(afd);
+    }
+
     DeclVisitor<DeclSerializer>::visit(const_cast<Decl *>(D));
+  }
+
+  void writeDeclErrorFlag() {
+    using namespace decls_block;
+    unsigned abbrCode = S.DeclTypeAbbrCodes[ErrorFlagLayout::Code];
+    ErrorFlagLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode);
+  }
+
+  void noteUseOfExportedPrespecialization(const AbstractFunctionDecl *afd) {
+    for (auto *A : afd->getAttrs().getAttributes<SpecializeAttr>()) {
+      auto *SA = cast<SpecializeAttr>(A);
+      if (!SA->isExported())
+        continue;
+      if (auto *targetFunctionDecl = SA->getTargetFunctionDecl(afd)) {
+        exportedPrespecializationDecls.push_back(S.addDeclRef(afd));
+      }
+    }
   }
 
   /// If this gets referenced, we forgot to handle a decl.
   void visitDecl(const Decl *) = delete;
+
+  /// Add all of the inherited entries to the result vector.
+  ///
+  /// \returns the number of entries added.
+  unsigned addInherited(ArrayRef<InheritedEntry> inheritedEntries,
+                        SmallVectorImpl<TypeID> &result) {
+    for (const auto &inherited : inheritedEntries) {
+      assert(!inherited.getType() || !inherited.getType()->hasArchetype());
+      TypeID typeRef = S.addTypeRef(inherited.getType());
+
+      // Encode "unchecked" in the low bit.
+      typeRef = (typeRef << 1) | (inherited.isUnchecked ? 0x01 : 0x00);
+
+      result.push_back(typeRef);
+    }
+
+    return inheritedEntries.size();
+  }
 
   void visitExtensionDecl(const ExtensionDecl *extension) {
     using namespace decls_block;
@@ -2902,11 +3122,8 @@ public:
                           ConformanceLookupKind::All);
 
     SmallVector<TypeID, 8> inheritedAndDependencyTypes;
-    for (auto inherited : extension->getInherited()) {
-      assert(!inherited.getType()->hasArchetype());
-      inheritedAndDependencyTypes.push_back(S.addTypeRef(inherited.getType()));
-    }
-    size_t numInherited = inheritedAndDependencyTypes.size();
+    size_t numInherited = addInherited(
+        extension->getInherited(), inheritedAndDependencyTypes);
 
     llvm::SmallSetVector<Type, 4> dependencies;
     collectDependenciesFromType(
@@ -2951,7 +3168,7 @@ public:
     for (auto *genericParams : llvm::reverse(allGenericParams))
       writeGenericParams(genericParams);
 
-    writeMembers(id, extension->getMembers(), isClassExtension);
+    writeMembers(id, extension->getAllMembers(), isClassExtension);
     S.writeConformances(conformances, S.DeclTypeAbbrCodes);
   }
 
@@ -2999,10 +3216,14 @@ public:
     auto associativity = getRawStableAssociativity(group->getAssociativity());
 
     SmallVector<DeclID, 8> relations;
-    for (auto &rel : group->getHigherThan())
+    for (auto &rel : group->getHigherThan()) {
+      assert(rel.Group && "Undiagnosed invalid precedence group!");
       relations.push_back(S.addDeclRef(rel.Group));
-    for (auto &rel : group->getLowerThan())
+    }
+    for (auto &rel : group->getLowerThan()) {
+      assert(rel.Group && "Undiagnosed invalid precedence group!");
       relations.push_back(S.addDeclRef(rel.Group));
+    }
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[PrecedenceGroupLayout::Code];
     PrecedenceGroupLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
@@ -3019,29 +3240,21 @@ public:
     auto contextID = S.addDeclContextRef(op->getDeclContext());
     auto nameID = S.addDeclBaseNameRef(op->getName());
     auto groupID = S.addDeclRef(op->getPrecedenceGroup());
-    SmallVector<DeclID, 1> designatedNominalTypeDeclIDs;
-    for (auto *decl : op->getDesignatedNominalTypes())
-      designatedNominalTypeDeclIDs.push_back(S.addDeclRef(decl));
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[InfixOperatorLayout::Code];
     InfixOperatorLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode, nameID,
-                                    contextID.getOpaqueValue(), groupID,
-                                    designatedNominalTypeDeclIDs);
+                                    contextID.getOpaqueValue(), groupID);
 
   }
 
   template <typename Layout>
   void visitUnaryOperatorDecl(const OperatorDecl *op) {
     auto contextID = S.addDeclContextRef(op->getDeclContext());
-    SmallVector<DeclID, 1> designatedNominalTypeDeclIDs;
-    for (auto *decl : op->getDesignatedNominalTypes())
-      designatedNominalTypeDeclIDs.push_back(S.addDeclRef(decl));
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[Layout::Code];
     Layout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                        S.addDeclBaseNameRef(op->getName()),
-                       contextID.getOpaqueValue(),
-                       designatedNominalTypeDeclIDs);
+                       contextID.getOpaqueValue());
   }
 
   void visitPrefixOperatorDecl(const PrefixOperatorDecl *op) {
@@ -3136,10 +3349,8 @@ public:
                           ConformanceLookupKind::All);
 
     SmallVector<TypeID, 4> inheritedAndDependencyTypes;
-    for (auto inherited : theStruct->getInherited()) {
-      assert(!inherited.getType()->hasArchetype());
-      inheritedAndDependencyTypes.push_back(S.addTypeRef(inherited.getType()));
-    }
+    unsigned numInherited = addInherited(
+        theStruct->getInherited(), inheritedAndDependencyTypes);
 
     llvm::SmallSetVector<Type, 4> dependencyTypes;
     for (Requirement req : theStruct->getGenericRequirements()) {
@@ -3162,12 +3373,12 @@ public:
                                             theStruct->getGenericSignature()),
                              rawAccessLevel,
                              conformances.size(),
-                             theStruct->getInherited().size(),
+                             numInherited,
                              inheritedAndDependencyTypes);
 
 
     writeGenericParams(theStruct->getGenericParams());
-    writeMembers(id, theStruct->getMembers(), false);
+    writeMembers(id, theStruct->getAllMembers(), false);
     S.writeConformances(conformances, S.DeclTypeAbbrCodes);
   }
 
@@ -3181,10 +3392,8 @@ public:
                           ConformanceLookupKind::All);
 
     SmallVector<TypeID, 4> inheritedAndDependencyTypes;
-    for (auto inherited : theEnum->getInherited()) {
-      assert(!inherited.getType()->hasArchetype());
-      inheritedAndDependencyTypes.push_back(S.addTypeRef(inherited.getType()));
-    }
+    unsigned numInherited = addInherited(
+        theEnum->getInherited(), inheritedAndDependencyTypes);
 
     llvm::SmallSetVector<Type, 4> dependencyTypes;
     for (const EnumElementDecl *nextElt : theEnum->getAllElements()) {
@@ -3220,11 +3429,11 @@ public:
                             S.addTypeRef(theEnum->getRawType()),
                             rawAccessLevel,
                             conformances.size(),
-                            theEnum->getInherited().size(),
+                            numInherited,
                             inheritedAndDependencyTypes);
 
     writeGenericParams(theEnum->getGenericParams());
-    writeMembers(id, theEnum->getMembers(), false);
+    writeMembers(id, theEnum->getAllMembers(), false);
     S.writeConformances(conformances, S.DeclTypeAbbrCodes);
   }
 
@@ -3239,10 +3448,8 @@ public:
                           ConformanceLookupKind::NonInherited);
 
     SmallVector<TypeID, 4> inheritedAndDependencyTypes;
-    for (auto inherited : theClass->getInherited()) {
-      assert(!inherited.getType()->hasArchetype());
-      inheritedAndDependencyTypes.push_back(S.addTypeRef(inherited.getType()));
-    }
+    unsigned numInherited = addInherited(
+        theClass->getInherited(), inheritedAndDependencyTypes);
 
     llvm::SmallSetVector<Type, 4> dependencyTypes;
     if (theClass->hasSuperclass()) {
@@ -3272,6 +3479,7 @@ public:
                             contextID.getOpaqueValue(),
                             theClass->isImplicit(),
                             theClass->isObjC(),
+                            theClass->isExplicitActor(),
                             mutableClass->inheritsSuperclassInitializers(),
                             mutableClass->hasMissingDesignatedInitializers(),
                             S.addGenericSignatureRef(
@@ -3279,11 +3487,11 @@ public:
                             S.addTypeRef(theClass->getSuperclass()),
                             rawAccessLevel,
                             conformances.size(),
-                            theClass->getInherited().size(),
+                            numInherited,
                             inheritedAndDependencyTypes);
 
     writeGenericParams(theClass->getGenericParams());
-    writeMembers(id, theClass->getMembers(), true);
+    writeMembers(id, theClass->getAllMembers(), true);
     S.writeConformances(conformances, S.DeclTypeAbbrCodes);
   }
 
@@ -3296,11 +3504,15 @@ public:
     SmallVector<TypeID, 4> inheritedAndDependencyTypes;
     llvm::SmallSetVector<Type, 4> dependencyTypes;
 
+    unsigned numInherited = addInherited(
+        proto->getInherited(), inheritedAndDependencyTypes);
+
+    // Separately collect inherited protocol types as dependencies.
     for (auto element : proto->getInherited()) {
-      assert(!element.getType()->hasArchetype());
-      inheritedAndDependencyTypes.push_back(S.addTypeRef(element.getType()));
-      if (element.getType()->is<ProtocolType>())
-        dependencyTypes.insert(element.getType());
+      auto elementType = element.getType();
+      assert(!elementType || !elementType->hasArchetype());
+      if (elementType && elementType->is<ProtocolType>())
+        dependencyTypes.insert(elementType);
     }
 
     for (Requirement req : proto->getRequirementSignature()) {
@@ -3326,13 +3538,15 @@ public:
                                  ->requiresClass(),
                                proto->isObjC(),
                                proto->existentialTypeSupported(),
-                               rawAccessLevel, proto->getInherited().size(),
+                               rawAccessLevel, numInherited,
                                inheritedAndDependencyTypes);
 
     writeGenericParams(proto->getGenericParams());
     S.writeGenericRequirements(
       proto->getRequirementSignature(), S.DeclTypeAbbrCodes);
-    writeMembers(id, proto->getMembers(), true);
+    S.writeAssociatedTypes(
+      proto->getAssociatedTypeMembers(), S.DeclTypeAbbrCodes);
+    writeMembers(id, proto->getAllMembers(), true);
     writeDefaultWitnessTable(proto);
   }
 
@@ -3355,7 +3569,7 @@ public:
     for (auto accessor : accessors.Decls)
       arrayFields.push_back(S.addDeclRef(accessor));
 
-    if (auto backingInfo = var->getPropertyWrapperBackingPropertyInfo()) {
+    if (auto backingInfo = var->getPropertyWrapperAuxiliaryVariables()) {
       if (backingInfo.backingVar) {
         ++numBackingProperties;
         arrayFields.push_back(S.addDeclRef(backingInfo.backingVar));
@@ -3434,7 +3648,7 @@ public:
         getRawStableDefaultArgumentKind(argKind),
         defaultArgumentText);
 
-    if (interfaceType->hasError()) {
+    if (interfaceType->hasError() && !S.allowCompilerErrors()) {
       param->getDeclContext()->printContext(llvm::errs());
       interfaceType->dump(llvm::errs());
       llvm_unreachable("error in interface type of parameter");
@@ -3494,6 +3708,8 @@ public:
 
     if (auto errorConvention = fn->getForeignErrorConvention())
       writeForeignErrorConvention(*errorConvention);
+    if (auto asyncConvention = fn->getForeignAsyncConvention())
+      writeForeignAsyncConvention(*asyncConvention);
 
     writeInlinableBodyTextIfNeeded(fn);
   }
@@ -3554,6 +3770,7 @@ public:
                                uint8_t(getStableSelfAccessKind(
                                                   fn->getSelfAccessKind())),
                                fn->hasForcedStaticDispatch(),
+                               fn->hasAsync(),
                                fn->hasThrows(),
                                S.addGenericSignatureRef(
                                                   fn->getGenericSignature()),
@@ -3575,6 +3792,8 @@ public:
 
     if (auto errorConvention = fn->getForeignErrorConvention())
       writeForeignErrorConvention(*errorConvention);
+    if (auto asyncConvention = fn->getForeignAsyncConvention())
+      writeForeignAsyncConvention(*asyncConvention);
 
     writeInlinableBodyTextIfNeeded(fn);
   }
@@ -3712,6 +3931,7 @@ public:
                                   ctor->isImplicit(),
                                   ctor->isObjC(),
                                   ctor->hasStubImplementation(),
+                                  ctor->hasAsync(),
                                   ctor->hasThrows(),
                                   getStableCtorInitializerKind(
                                     ctor->getInitKind()),
@@ -3729,6 +3949,8 @@ public:
 
     if (auto errorConvention = ctor->getForeignErrorConvention())
       writeForeignErrorConvention(*errorConvention);
+    if (auto asyncConvention = ctor->getForeignAsyncConvention())
+      writeForeignAsyncConvention(*asyncConvention);
 
     writeInlinableBodyTextIfNeeded(ctor);
   }
@@ -3778,11 +4000,33 @@ public:
   }
 };
 
+/// When allowing modules with errors there may be cases where there's little
+/// point in serializing a declaration and doing so would create a maintenance
+/// burden on the deserialization side. Returns \c true if the given declaration
+/// should be skipped and \c false otherwise.
+static bool canSkipWhenInvalid(const Decl *D) {
+  // There's no point writing out the deinit when its context is not a class
+  // as nothing would be able to reference it
+  if (auto *deinit = dyn_cast<DestructorDecl>(D)) {
+    if (!isa<ClassDecl>(D->getDeclContext()))
+      return true;
+  }
+  return false;
+}
+
 void Serializer::writeASTBlockEntity(const Decl *D) {
   using namespace decls_block;
 
   PrettyStackTraceDecl trace("serializing", D);
   assert(DeclsToSerialize.hasRef(D));
+
+  if (D->isInvalid()) {
+    assert(allowCompilerErrors() &&
+           "cannot create a module with an invalid decl");
+
+    if (canSkipWhenInvalid(D))
+      return;
+  }
 
   BitOffset initialOffset = Out.GetCurrentBitNo();
   SWIFT_DEFER {
@@ -3793,7 +4037,6 @@ void Serializer::writeASTBlockEntity(const Decl *D) {
     }
   };
 
-  assert(!D->isInvalid() && "cannot create a module with an invalid decl");
   if (isDeclXRef(D)) {
     writeCrossReference(D);
     return;
@@ -3801,7 +4044,9 @@ void Serializer::writeASTBlockEntity(const Decl *D) {
 
   assert(!D->hasClangNode() && "imported decls should use cross-references");
 
-  DeclSerializer(*this, DeclsToSerialize.addRef(D)).visit(D);
+  DeclSerializer(*this, DeclsToSerialize.addRef(D),
+                 exportedPrespecializationDecls)
+      .visit(D);
 }
 
 #define SIMPLE_CASE(TYPENAME, VALUE) \
@@ -3818,18 +4063,6 @@ static uint8_t getRawStableFunctionTypeRepresentation(
   SIMPLE_CASE(FunctionTypeRepresentation, CFunctionPointer)
   }
   llvm_unreachable("bad calling convention");
-}
-
-/// Translate from the AST differentiability kind enum to the Serialization enum
-/// values, which are guaranteed to be stable.
-static uint8_t getRawStableDifferentiabilityKind(
-    swift::DifferentiabilityKind diffKind) {
-  switch (diffKind) {
-  SIMPLE_CASE(DifferentiabilityKind, NonDifferentiable)
-  SIMPLE_CASE(DifferentiabilityKind, Normal)
-  SIMPLE_CASE(DifferentiabilityKind, Linear)
-  }
-  llvm_unreachable("bad differentiability kind");
 }
 
 /// Translate from the AST function representation enum to the Serialization enum
@@ -3964,16 +4197,30 @@ public:
   /// If this gets referenced, we forgot to handle a type.
   void visitType(const TypeBase *) = delete;
 
-  void visitErrorType(const ErrorType *) {
-    llvm_unreachable("should not serialize an invalid type");
+  void visitErrorType(const ErrorType *ty) {
+    if (S.allowCompilerErrors()) {
+      using namespace decls_block;
+      unsigned abbrCode = S.DeclTypeAbbrCodes[ErrorTypeLayout::Code];
+      ErrorTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                  S.addTypeRef(ty->getOriginalType()));
+      return;
+    }
+    llvm_unreachable("should not serialize an ErrorType");
   }
 
   void visitUnresolvedType(const UnresolvedType *) {
-    llvm_unreachable("should not serialize an invalid type");
+    // If for some reason we have an unresolved type while compiling with
+    // errors, just serialize an ErrorType and continue.
+    if (S.getASTContext().LangOpts.AllowModuleWithCompilerErrors) {
+      visitErrorType(
+          cast<ErrorType>(ErrorType::get(S.getASTContext()).getPointer()));
+      return;
+    }
+    llvm_unreachable("should not serialize an UnresolvedType");
   }
 
-  void visitHoleType(const HoleType *) {
-    llvm_unreachable("should not serialize an invalid type");
+  void visitPlaceholderType(const PlaceholderType *) {
+    llvm_unreachable("should not serialize a PlaceholderType");
   }
 
   void visitModuleType(const ModuleType *) {
@@ -4172,9 +4419,10 @@ public:
       FunctionParamLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode,
           S.addDeclBaseNameRef(param.getLabel()),
+          S.addDeclBaseNameRef(param.getInternalLabel()),
           S.addTypeRef(param.getPlainType()), paramFlags.isVariadic(),
           paramFlags.isAutoClosure(), paramFlags.isNonEphemeral(), rawOwnership,
-          paramFlags.isNoDerivative());
+          paramFlags.isIsolated(), paramFlags.isNoDerivative());
     }
   }
 
@@ -4186,6 +4434,7 @@ public:
       S.getASTContext().LangOpts.UseClangFunctionTypes
       ? S.addClangTypeRef(fnTy->getClangTypeInfo().getType())
       : ClangTypeID(0);
+    auto globalActor = S.addTypeRef(fnTy->getGlobalActor());
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[FunctionTypeLayout::Code];
     FunctionTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
@@ -4193,9 +4442,11 @@ public:
         getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
         clangType,
         fnTy->isNoEscape(),
+        fnTy->isSendable(),
         fnTy->isAsync(),
         fnTy->isThrowing(),
-        getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()));
+        getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()),
+        globalActor);
 
     serializeFunctionTypeParams(fnTy);
   }
@@ -4208,8 +4459,9 @@ public:
     GenericFunctionTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
         S.addTypeRef(fnTy->getResult()),
         getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
-        fnTy->isAsync(), fnTy->isThrowing(),
+        fnTy->isSendable(), fnTy->isAsync(), fnTy->isThrowing(),
         getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()),
+        S.addTypeRef(fnTy->getGlobalActor()),
         S.addGenericSignatureRef(genericSig));
 
     serializeFunctionTypeParams(fnTy);
@@ -4286,7 +4538,7 @@ public:
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[SILFunctionTypeLayout::Code];
     SILFunctionTypeLayout::emitRecord(
-        S.Out, S.ScratchRecord, abbrCode,
+        S.Out, S.ScratchRecord, abbrCode, fnTy->isSendable(),
         fnTy->isAsync(), stableCoroutineKind, stableCalleeConvention,
         stableRepresentation, fnTy->isPseudogeneric(), fnTy->isNoEscape(),
         stableDiffKind, fnTy->hasErrorResult(), fnTy->getParameters().size(),
@@ -4309,6 +4561,11 @@ public:
     DictionaryTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                      S.addTypeRef(dictTy->getKeyType()),
                                      S.addTypeRef(dictTy->getValueType()));
+  }
+
+  void visitVariadicSequenceType(const VariadicSequenceType *seqTy) {
+    using namespace decls_block;
+    serializeSimpleWrapper<VariadicSequenceTypeLayout>(seqTy->getBaseType());
   }
 
   void visitOptionalType(const OptionalType *optionalTy) {
@@ -4400,7 +4657,9 @@ class ClangToSwiftBasicWriter :
 
 public:
   ClangToSwiftBasicWriter(Serializer &S, SmallVectorImpl<uint64_t> &record)
-    : S(S), Record(record), Types(*this) {}
+    : swift::DataStreamBasicWriter<ClangToSwiftBasicWriter>(
+        S.getASTContext().getClangModuleLoader()->getClangASTContext()),
+      S(S), Record(record), Types(*this) {}
 
   void writeUInt64(uint64_t value) {
     Record.push_back(value);
@@ -4512,10 +4771,14 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<SILFunctionTypeLayout>();
   registerDeclTypeAbbr<ArraySliceTypeLayout>();
   registerDeclTypeAbbr<DictionaryTypeLayout>();
+  registerDeclTypeAbbr<VariadicSequenceTypeLayout>();
   registerDeclTypeAbbr<ReferenceStorageTypeLayout>();
   registerDeclTypeAbbr<UnboundGenericTypeLayout>();
   registerDeclTypeAbbr<OptionalTypeLayout>();
   registerDeclTypeAbbr<DynamicSelfTypeLayout>();
+
+  registerDeclTypeAbbr<ErrorFlagLayout>();
+  registerDeclTypeAbbr<ErrorTypeLayout>();
 
   registerDeclTypeAbbr<ClangTypeLayout>();
 
@@ -4531,6 +4794,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<OpaqueTypeLayout>();
   registerDeclTypeAbbr<PatternBindingLayout>();
   registerDeclTypeAbbr<ProtocolLayout>();
+  registerDeclTypeAbbr<AssociatedTypeLayout>();
   registerDeclTypeAbbr<DefaultWitnessTableLayout>();
   registerDeclTypeAbbr<PrefixOperatorLayout>();
   registerDeclTypeAbbr<PostfixOperatorLayout>();
@@ -4561,6 +4825,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<SubstitutionMapLayout>();
 
   registerDeclTypeAbbr<ForeignErrorConventionLayout>();
+  registerDeclTypeAbbr<ForeignAsyncConventionLayout>();
   registerDeclTypeAbbr<AbstractClosureExprLayout>();
   registerDeclTypeAbbr<PatternBindingInitializerLayout>();
   registerDeclTypeAbbr<DefaultArgumentInitializerLayout>();
@@ -4580,6 +4845,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<SpecializedProtocolConformanceLayout>();
   registerDeclTypeAbbr<InheritedProtocolConformanceLayout>();
   registerDeclTypeAbbr<InvalidProtocolConformanceLayout>();
+  registerDeclTypeAbbr<BuiltinProtocolConformanceLayout>();
   registerDeclTypeAbbr<NormalProtocolConformanceIdLayout>();
   registerDeclTypeAbbr<ProtocolConformanceXrefLayout>();
 
@@ -4776,6 +5042,27 @@ writeDeclMembersTable(const decl_member_tables_block::DeclMembersLayout &mems,
   }
 
   mems.emit(scratch, tableOffset, hashTableBlob);
+}
+
+static void
+writeDeclFingerprintsTable(const index_block::DeclFingerprintsLayout &fpl,
+                           const Serializer::DeclFingerprintsTable &table) {
+  SmallVector<uint64_t, 8> scratch;
+  llvm::SmallString<4096> hashTableBlob;
+  uint32_t tableOffset;
+  {
+    llvm::OnDiskChainedHashTableGenerator<DeclFingerprintsTableInfo> generator;
+    for (auto &entry : table) {
+      generator.insert(entry.first, entry.second);
+    }
+
+    llvm::raw_svector_ostream blobStream(hashTableBlob);
+    // Make sure that no bucket is at offset 0
+    endian::write<uint32_t>(blobStream, 0, little);
+    tableOffset = generator.Emit(blobStream);
+  }
+
+  fpl.emit(scratch, tableOffset, hashTableBlob);
 }
 
 namespace {
@@ -5022,7 +5309,8 @@ static void collectInterestingNestedDeclarations(
         if (!nominalParent) {
           const DeclContext *DC = member->getDeclContext();
           nominalParent = DC->getSelfNominalTypeDecl();
-          assert(nominalParent && "parent context is not a type or extension");
+          assert((nominalParent || S.allowCompilerErrors()) &&
+                 "parent context is not a type or extension");
         }
         nestedTypeDecls[nestedType->getName()].push_back({
           S.addDeclRef(nominalParent),
@@ -5033,7 +5321,7 @@ static void collectInterestingNestedDeclarations(
 
     // Recurse into nested declarations.
     if (auto iterable = dyn_cast<IterableDeclContext>(member)) {
-      collectInterestingNestedDeclarations(S, iterable->getMembers(),
+      collectInterestingNestedDeclarations(S, iterable->getAllMembers(),
                                            operatorMethodDecls,
                                            objcMethods, nestedTypeDecls,
                                            derivativeConfigs,
@@ -5050,6 +5338,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
   LocalTypeHashTableGenerator localTypeGenerator, opaqueReturnTypeGenerator;
   ExtensionTable extensionDecls;
   UniquedDerivativeFunctionConfigTable uniquedDerivativeConfigs;
+  DeclFingerprintsTable declFingerprints;
   bool hasLocalTypes = false;
   bool hasOpaqueReturnTypes = false;
 
@@ -5087,8 +5376,10 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
           .push_back({ getKindForTable(D), addDeclRef(D) });
       } else if (auto ED = dyn_cast<ExtensionDecl>(D)) {
         const NominalTypeDecl *extendedNominal = ED->getExtendedNominal();
-        extensionDecls[extendedNominal->getName()]
-          .push_back({ extendedNominal, addDeclRef(D) });
+        if (extendedNominal) {
+          extensionDecls[extendedNominal->getName()]
+            .push_back({ extendedNominal, addDeclRef(D) });
+        }
       } else if (auto OD = dyn_cast<OperatorDecl>(D)) {
         operatorDecls[OD->getName()]
           .push_back({ getStableFixity(OD->getFixity()), addDeclRef(D) });
@@ -5109,7 +5400,10 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
       // derived conformance (for example, ==), force them to be
       // serialized.
       if (auto IDC = dyn_cast<IterableDeclContext>(D)) {
-        collectInterestingNestedDeclarations(*this, IDC->getMembers(),
+        if (auto bodyFP = IDC->getBodyFingerprint()) {
+          declFingerprints.insert({addDeclRef(D), *bodyFP});
+        }
+        collectInterestingNestedDeclarations(*this, IDC->getAllMembers(),
                                              operatorMethodDecls, objcMethods,
                                              nestedTypeDecls,
                                              uniquedDerivativeConfigs);
@@ -5139,7 +5433,10 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
       localTypeGenerator.insert(MangledName, addDeclRef(TD));
 
       if (auto IDC = dyn_cast<IterableDeclContext>(TD)) {
-        collectInterestingNestedDeclarations(*this, IDC->getMembers(),
+        if (auto bodyFP = IDC->getBodyFingerprint()) {
+          declFingerprints.insert({addDeclRef(TD), *bodyFP});
+        }
+        collectInterestingNestedDeclarations(*this, IDC->getAllMembers(),
                                              operatorMethodDecls, objcMethods,
                                              nestedTypeDecls,
                                              uniquedDerivativeConfigs,
@@ -5148,6 +5445,11 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
     }
     
     for (auto OTD : opaqueReturnTypeDecls) {
+      // FIXME: We should delay parsing function bodies so these type decls
+      //        don't even get added to the file.
+      if (OTD->getDeclContext()->getInnermostSkippedFunctionContext())
+        continue;
+
       hasOpaqueReturnTypes = true;
       Mangle::ASTMangler Mangler;
       auto MangledName = Mangler.mangleOpaqueTypeDecl(OTD);
@@ -5197,12 +5499,22 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
     OrderedDecls.emit(ScratchRecord, index_block::ORDERED_TOP_LEVEL_DECLS,
                       orderedTopLevelDecls);
 
+    index_block::OrderedDeclsLayout ExportedPrespecializationDecls(Out);
+    ExportedPrespecializationDecls.emit(
+        ScratchRecord, index_block::EXPORTED_PRESPECIALIZATION_DECLS,
+        exportedPrespecializationDecls);
+
     index_block::ObjCMethodTableLayout ObjCMethodTable(Out);
     writeObjCMethodTable(ObjCMethodTable, objcMethods);
 
     if (!nestedTypeDecls.empty()) {
       index_block::NestedTypeDeclsLayout NestedTypeDeclsTable(Out);
       writeNestedTypeDeclsTable(NestedTypeDeclsTable, nestedTypeDecls);
+    }
+
+    if (!declFingerprints.empty()) {
+      index_block::DeclFingerprintsLayout DeclsFingerprints(Out);
+      writeDeclFingerprintsTable(DeclsFingerprints, declFingerprints);
     }
 
     // Convert uniqued derivative function config table to serialization-
@@ -5212,7 +5524,8 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
       for (auto config : entry.second) {
         std::string paramIndices = config.first.str().str();
         auto genSigID = addGenericSignatureRef(config.second);
-        derivativeConfigs[entry.first].push_back({paramIndices, genSigID});
+        derivativeConfigs[entry.first].push_back(
+          {std::string(paramIndices), genSigID});
       }
     }
     index_block::DerivativeFunctionConfigTableLayout DerivativeConfigTable(Out);
@@ -5273,13 +5586,17 @@ void Serializer::writeToStream(
     S.writeInputBlock(options);
     S.writeSIL(SILMod, options.SerializeAllSIL);
     S.writeAST(DC);
-    if (options.ExperimentalCrossModuleIncrementalInfo && DepGraph) {
+    if (!options.DisableCrossModuleIncrementalInfo && DepGraph) {
       fine_grained_dependencies::writeFineGrainedDependencyGraph(
           S.Out, *DepGraph, fine_grained_dependencies::Purpose::ForSwiftModule);
     }
   }
 
   S.writeToStream(os);
+}
+
+bool Serializer::allowCompilerErrors() const {
+  return getASTContext().LangOpts.AllowModuleWithCompilerErrors;
 }
 
 void swift::serializeToBuffers(
@@ -5389,5 +5706,24 @@ void swift::serialize(ModuleOrSourceFile DC,
       writeSourceInfoToStream(out, DC);
       return false;
     });
+  }
+
+  if (!options.SymbolGraphOutputDir.empty()) {
+    if (DC.is<ModuleDecl *>()) {
+      auto *M = DC.get<ModuleDecl*>();
+      FrontendStatsTracer tracer(getContext(DC).Stats,
+                                 "Serialization, symbolgraph");
+      symbolgraphgen::SymbolGraphOptions SGOpts {
+        options.SymbolGraphOutputDir,
+        M->getASTContext().LangOpts.Target,
+        /* PrettyPrint */false,
+        AccessLevel::Public,
+        /*EmitSynthesizedMembers*/true,
+        /*PrintMessages*/false,
+        /*EmitInheritedDocs*/options.SkipSymbolGraphInheritedDocs,
+        /*IncludeSPISymbols*/options.IncludeSPISymbolsInSymbolGraph,
+      };
+      symbolgraphgen::emitSymbolGraphForModule(M, SGOpts);
+    }
   }
 }

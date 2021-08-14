@@ -20,6 +20,17 @@ bb0(%0 : @owned $Builtin.NativeObject):
   return %1 : $Builtin.NativeObject
 }
 
+// CHECK-LABEL: sil [serialized] [ossa] @test_poison
+// CHECK: bb0(%0 : @owned $Builtin.NativeObject):
+// CHECK-NEXT: destroy_value [poison] %0 : $Builtin.NativeObject
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil [serialized] [ossa] @test_poison : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  destroy_value [poison] %0 : $Builtin.NativeObject
+  %2 = tuple ()
+  return %2 : $()
+}
 
 // CHECK-LABEL: sil [serialized] [ossa] @test_strong_copy_unowned_value : $@convention(thin) (@owned @sil_unowned Builtin.NativeObject) -> @owned Builtin.NativeObject {
 // CHECK: bb0([[T0:%[0-9]+]] : @owned $@sil_unowned Builtin.NativeObject):
@@ -32,3 +43,4 @@ bb0(%0 : @owned $@sil_unowned Builtin.NativeObject):
   destroy_value %0 : $@sil_unowned Builtin.NativeObject
   return %1 : $Builtin.NativeObject
 }
+

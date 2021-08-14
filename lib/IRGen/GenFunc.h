@@ -55,7 +55,6 @@ namespace irgen {
       CanSILFunctionType outType, Explosion &out, bool isOutlined);
   CanType getArgumentLoweringType(CanType type, SILParameterInfo paramInfo,
                                   bool isNoEscape);
-
 } // end namespace irgen
 } // end namespace swift
 

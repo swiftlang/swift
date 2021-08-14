@@ -223,7 +223,7 @@ extension String: BidirectionalCollection {
 
 extension String {
   @frozen
-  public struct Iterator: IteratorProtocol {
+  public struct Iterator: IteratorProtocol, Sendable {
     @usableFromInline
     internal var _guts: _StringGuts
 

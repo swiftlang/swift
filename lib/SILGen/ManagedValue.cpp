@@ -37,6 +37,24 @@ ManagedValue ManagedValue::copy(SILGenFunction &SGF, SILLocation loc) const {
   return SGF.emitManagedRValueWithCleanup(buf, lowering);
 }
 
+// Emit an unmanaged copy of this value
+// WARNING: Callers of this API should manage the cleanup of this value!
+ManagedValue ManagedValue::unmanagedCopy(SILGenFunction &SGF,
+                                         SILLocation loc) const {
+  auto &lowering = SGF.getTypeLowering(getType());
+  if (lowering.isTrivial())
+    return *this;
+
+  if (getType().isObject()) {
+    auto copy = SGF.B.emitCopyValueOperation(loc, getValue());
+    return ManagedValue::forUnmanaged(copy);
+  }
+
+  SILValue buf = SGF.emitTemporaryAllocation(loc, getType());
+  SGF.B.createCopyAddr(loc, getValue(), buf, IsNotTake, IsInitialization);
+  return ManagedValue::forUnmanaged(buf);
+}
+
 /// Emit a copy of this value with independent ownership.
 ManagedValue ManagedValue::formalAccessCopy(SILGenFunction &SGF,
                                             SILLocation loc) {
@@ -228,7 +246,7 @@ bool ManagedValue::isPlusOne(SILGenFunction &SGF) const {
 
   // If we have an object and the object has any ownership, the same
   // property applies.
-  if (getType().isObject() && getOwnershipKind() == ValueOwnershipKind::None)
+  if (getType().isObject() && getOwnershipKind() == OwnershipKind::None)
     return true;
 
   return hasCleanup();

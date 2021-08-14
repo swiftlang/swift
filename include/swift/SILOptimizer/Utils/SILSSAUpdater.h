@@ -14,6 +14,7 @@
 #define SWIFT_SIL_SILSSAUPDATER_H
 
 #include "llvm/Support/Allocator.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
 
@@ -49,12 +50,18 @@ class SILSSAUpdater {
 
   SILType type;
 
+  ValueOwnershipKind ownershipKind;
+
   // The SSAUpdaterTraits specialization uses this sentinel to mark 'new' phi
   // nodes (all the incoming edge arguments have this sentinel set).
   std::unique_ptr<SILUndef, void (*)(SILUndef *)> phiSentinel;
 
   // If not null updated with inserted 'phi' nodes (SILArgument).
   SmallVectorImpl<SILPhiArgument *> *insertedPhis;
+
+  // Used to delete branch instructions when they are replaced for adding
+  // phi arguments.
+  InstructionDeleter deleter;
 
   // Not copyable.
   void operator=(const SILSSAUpdater &) = delete;
@@ -65,12 +72,14 @@ public:
       SmallVectorImpl<SILPhiArgument *> *insertedPhis = nullptr);
   ~SILSSAUpdater();
 
+  InstructionDeleter &getDeleter() { return deleter; }
+
   void setInsertedPhis(SmallVectorImpl<SILPhiArgument *> *inputInsertedPhis) {
     insertedPhis = inputInsertedPhis;
   }
 
-  /// Initialize for a use of a value of type.
-  void initialize(SILType type);
+  /// Initialize for a use of a value of type and ownershipKind
+  void initialize(SILType type, ValueOwnershipKind ownershipKind);
 
   bool hasValueForBlock(SILBasicBlock *block) const;
   void addAvailableValue(SILBasicBlock *block, SILValue value);

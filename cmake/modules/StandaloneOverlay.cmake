@@ -58,9 +58,17 @@ set(SWIFT_NATIVE_CLANG_TOOLS_PATH "${TOOLCHAIN_DIR}/usr/bin" CACHE STRING
 set(SWIFT_NATIVE_SWIFT_TOOLS_PATH "${TOOLCHAIN_DIR}/usr/bin" CACHE STRING
   "Path to Swift tools that are executable on the build machine.")
 
+# NOTE: The initialization in stdlib/CMakeLists.txt will be bypassed if we
+# directly invoke CMake for this directory, so we initialize the variables
+# related to library evolution here as well.
+
+option(SWIFT_STDLIB_STABLE_ABI
+  "Should stdlib be built with stable ABI (library evolution, resilience)."
+  TRUE)
+
 option(SWIFT_ENABLE_MODULE_INTERFACES
   "Generate .swiftinterface files alongside .swiftmodule files."
-  TRUE)
+  "${SWIFT_STDLIB_STABLE_ABI}")
 
 set(SWIFT_STDLIB_BUILD_TYPE "${CMAKE_BUILD_TYPE}" CACHE STRING
   "Build type for the Swift standard library and SDK overlays.")

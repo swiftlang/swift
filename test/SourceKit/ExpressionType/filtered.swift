@@ -1,7 +1,4 @@
-// RUN: %sourcekitd-test -req=collect-type %s -req-opts=expectedtypes='s:8filtered4ProtP;s:8filtered5Prot1P' -- %s | %FileCheck %s -check-prefix=BOTH
-// RUN: %sourcekitd-test -req=collect-type %s -req-opts=expectedtypes='s:8filtered5Prot1P' -- %s | %FileCheck %s -check-prefix=PROTO1
-// RUN: %sourcekitd-test -req=collect-type %s -req-opts=expectedtypes='s:8filtered6Proto2P' -- %s | %FileCheck %s -check-prefix=PROTO2
-
+// RUN lines at the end - offset sensitive
 protocol Prot {}
 
 protocol Prot1 {}
@@ -39,54 +36,58 @@ class Proto2Conformer: Proto2 {}
 func foo(_ c: Proto2Conformer) { _ = c }
 
 // BOTH: <ExpressionTypes>
-// BOTH: (503, 507): Clas
+// BOTH: (126, 130): Clas
 // BOTH: conforming to: s:8filtered4ProtP
-// BOTH: (545, 549): Clas
+// BOTH: (168, 172): Clas
 // BOTH: conforming to: s:8filtered4ProtP
-// BOTH: (609, 613): Stru
-// BOTH: conforming to: s:8filtered4ProtP
-// BOTH: conforming to: s:8filtered5Prot1P
-// BOTH: (651, 655): Stru
+// BOTH: (232, 236): Stru
 // BOTH: conforming to: s:8filtered4ProtP
 // BOTH: conforming to: s:8filtered5Prot1P
-// BOTH: (811, 838): Clas
-// BOTH: conforming to: s:8filtered4ProtP
-// BOTH: (811, 832): Clas
-// BOTH: conforming to: s:8filtered4ProtP
-// BOTH: (811, 821): Clas
-// BOTH: conforming to: s:8filtered4ProtP
-// BOTH: (811, 815): Clas
-// BOTH: conforming to: s:8filtered4ProtP
-// BOTH: (877, 904): Stru
+// BOTH: (274, 278): Stru
 // BOTH: conforming to: s:8filtered4ProtP
 // BOTH: conforming to: s:8filtered5Prot1P
-// BOTH: (877, 898): Stru
+// BOTH: (434, 461): Clas
+// BOTH: conforming to: s:8filtered4ProtP
+// BOTH: (434, 455): Clas
+// BOTH: conforming to: s:8filtered4ProtP
+// BOTH: (434, 444): Clas
+// BOTH: conforming to: s:8filtered4ProtP
+// BOTH: (434, 438): Clas
+// BOTH: conforming to: s:8filtered4ProtP
+// BOTH: (500, 527): Stru
 // BOTH: conforming to: s:8filtered4ProtP
 // BOTH: conforming to: s:8filtered5Prot1P
-// BOTH: (877, 887): Stru
+// BOTH: (500, 521): Stru
 // BOTH: conforming to: s:8filtered4ProtP
 // BOTH: conforming to: s:8filtered5Prot1P
-// BOTH: (877, 881): Stru
+// BOTH: (500, 510): Stru
+// BOTH: conforming to: s:8filtered4ProtP
+// BOTH: conforming to: s:8filtered5Prot1P
+// BOTH: (500, 504): Stru
 // BOTH: conforming to: s:8filtered4ProtP
 // BOTH: conforming to: s:8filtered5Prot1P
 // BOTH: </ExpressionTypes>
 
 // PROTO1: <ExpressionTypes>
-// PROTO1: (609, 613): Stru
+// PROTO1: (232, 236): Stru
 // PROTO1: conforming to: s:8filtered5Prot1P
-// PROTO1: (651, 655): Stru
+// PROTO1: (274, 278): Stru
 // PROTO1: conforming to: s:8filtered5Prot1P
-// PROTO1: (877, 904): Stru
+// PROTO1: (500, 527): Stru
 // PROTO1: conforming to: s:8filtered5Prot1P
-// PROTO1: (877, 898): Stru
+// PROTO1: (500, 521): Stru
 // PROTO1: conforming to: s:8filtered5Prot1P
-// PROTO1: (877, 887): Stru
+// PROTO1: (500, 510): Stru
 // PROTO1: conforming to: s:8filtered5Prot1P
-// PROTO1: (877, 881): Stru
+// PROTO1: (500, 504): Stru
 // PROTO1: conforming to: s:8filtered5Prot1P
 // PROTO1: </ExpressionTypes>
 
 // PROTO2: <ExpressionTypes>
-// PROTO2: (999, 1000): Proto2Conformer
+// PROTO2: (622, 623): Proto2Conformer
 // PROTO2: conforming to: s:8filtered6Proto2P
 // PROTO2: </ExpressionTypes>
+
+// RUN: %sourcekitd-test -req=collect-type %s -req-opts=expectedtypes='[s:8filtered4ProtP;s:8filtered5Prot1P]' -- %s | %FileCheck %s -check-prefix=BOTH
+// RUN: %sourcekitd-test -req=collect-type %s -req-opts=expectedtypes='[s:8filtered5Prot1P]' -- %s | %FileCheck %s -check-prefix=PROTO1
+// RUN: %sourcekitd-test -req=collect-type %s -req-opts=expectedtypes='[s:8filtered6Proto2P]' -- %s | %FileCheck %s -check-prefix=PROTO2

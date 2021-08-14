@@ -126,17 +126,41 @@ class LinkEntity {
     /// or a class.
     DispatchThunk,
 
+    /// A derivative method dispatch thunk.  The pointer is a
+    /// AbstractFunctionDecl* inside a protocol or a class, and the secondary
+    /// pointer is an AutoDiffDerivativeFunctionIdentifier*.
+    DispatchThunkDerivative,
+
     /// A method dispatch thunk for an initializing constructor.  The pointer
     /// is a ConstructorDecl* inside a class.
     DispatchThunkInitializer,
 
-    /// A method dispatch thunk for an allocating constructor.  The pointer is a
-    /// ConstructorDecl* inside a protocol or a class.
+    /// A method dispatch thunk for an allocating constructor.  The pointer is
+    /// a ConstructorDecl* inside a protocol or a class.
     DispatchThunkAllocator,
+
+    /// An async function pointer for a method dispatch thunk.  The pointer is
+    /// a FuncDecl* inside a protocol or a class.
+    DispatchThunkAsyncFunctionPointer,
+
+    /// An async function pointer for a method dispatch thunk for an
+    /// initializing constructor.  The pointer is a ConstructorDecl* inside a
+    /// class.
+    DispatchThunkInitializerAsyncFunctionPointer,
+
+    /// An async function pointer for a method dispatch thunk for an allocating
+    /// constructor.  The pointer is a ConstructorDecl* inside a protocol or
+    /// a class.
+    DispatchThunkAllocatorAsyncFunctionPointer,
 
     /// A method descriptor.  The pointer is a FuncDecl* inside a protocol
     /// or a class.
     MethodDescriptor,
+
+    /// A derivative method descriptor.  The pointer is a AbstractFunctionDecl*
+    /// inside a protocol or a class, and the secondary pointer is an
+    /// AutoDiffDerivativeFunctionIdentifier*.
+    MethodDescriptorDerivative,
 
     /// A method descriptor for an initializing constructor.  The pointer
     /// is a ConstructorDecl* inside a class.
@@ -286,6 +310,18 @@ class LinkEntity {
     /// The pointer is a AbstractStorageDecl*.
     DynamicallyReplaceableFunctionImpl,
 
+    /// The once token used by cacheCanonicalSpecializedMetadata, by way of
+    /// swift_getCanonicalSpecializedMetadata and
+    /// swift_getCanonicalPrespecializedGenericMetadata, to
+    /// ensure that canonical prespecialized generic records are only added to
+    /// the metadata cache once.
+    CanonicalPrespecializedGenericTypeCachingOnceToken,
+
+    /// The same as AsyncFunctionPointer but with a different stored value, for
+    /// use by TBDGen.
+    /// The pointer is an AbstractFunctionDecl*.
+    AsyncFunctionPointerAST,
+
     /// The pointer is a SILFunction*.
     DynamicallyReplaceableFunctionKey,
 
@@ -344,7 +380,8 @@ class LinkEntity {
     /// ProtocolConformance*.
     ProtocolWitnessTableLazyCacheVariable,
 
-    /// A SIL differentiability witness.
+    /// A SIL differentiability witness. The pointer is a
+    /// SILDifferentiabilityWitness*.
     DifferentiabilityWitness,
 
     // Everything following this is a type kind.
@@ -399,10 +436,31 @@ class LinkEntity {
     /// The pointer is a canonical TypeBase*.
     NoncanonicalSpecializedGenericTypeMetadata,
 
-    /// A cache variable for noncanonical specialized type metadata, to be 
+    /// A cache variable for noncanonical specialized type metadata, to be
     /// passed to swift_getCanonicalSpecializedMetadata.
     /// The pointer is a canonical TypeBase*.
     NoncanonicalSpecializedGenericTypeMetadataCacheVariable,
+
+    /// Provides the data required to invoke an async function using the async
+    /// calling convention in the form of the size of the context to allocate
+    /// and the relative address of the function to call with that allocated
+    /// context.
+    /// The pointer is a SILFunction*.
+    AsyncFunctionPointer,
+
+    /// The thunk provided for partially applying a function at some values
+    /// which are captured.
+    /// The pointer is an llvm::Function*.
+    PartialApplyForwarder,
+
+    /// An async function pointer to a partial apply forwarder.
+    /// The pointer is the llvm::Function* for a partial apply forwarder.
+    PartialApplyForwarderAsyncFunctionPointer,
+
+    /// An async function pointer to a function which is known to exist whose
+    /// name is known.
+    /// The pointer is a const char* of the name.
+    KnownAsyncFunctionPointer,
   };
   friend struct llvm::DenseMapInfo<LinkEntity>;
 
@@ -411,7 +469,7 @@ class LinkEntity {
   }
 
   static bool isDeclKind(Kind k) {
-    return k <= Kind::DynamicallyReplaceableFunctionImpl;
+    return k <= Kind::AsyncFunctionPointerAST;
   }
   static bool isTypeKind(Kind k) {
     return k >= Kind::ProtocolWitnessTableLazyAccessFunction;
@@ -521,8 +579,7 @@ class LinkEntity {
     for (const auto &reqt : proto->getRequirementSignature()) {
       if (reqt.getKind() == RequirementKind::Conformance &&
           reqt.getFirstType()->getCanonicalType() == associatedType &&
-          reqt.getSecondType()->castTo<ProtocolType>()->getDecl() ==
-                                                                requirement) {
+          reqt.getProtocolDecl() == requirement) {
         return index;
       }
       ++index;
@@ -546,7 +603,7 @@ class LinkEntity {
     auto &reqt = proto->getRequirementSignature()[index];
     assert(reqt.getKind() == RequirementKind::Conformance);
     return { reqt.getFirstType()->getCanonicalType(),
-             reqt.getSecondType()->castTo<ProtocolType>()->getDecl() };
+             reqt.getProtocolDecl() };
   }
 
   static std::pair<CanType, ProtocolDecl*>
@@ -585,6 +642,16 @@ public:
   static LinkEntity forDispatchThunk(SILDeclRef declRef) {
     assert(isValidResilientMethodRef(declRef));
 
+    if (declRef.isAutoDiffDerivativeFunction()) {
+      LinkEntity entity;
+      // The derivative function for any decl is always a method (not an
+      // initializer).
+      entity.setForDecl(Kind::DispatchThunkDerivative, declRef.getDecl());
+      entity.SecondaryPointer =
+          declRef.getAutoDiffDerivativeFunctionIdentifier();
+      return entity;
+    }
+
     LinkEntity::Kind kind;
     switch (declRef.kind) {
     case SILDeclRef::Kind::Func:
@@ -607,6 +674,16 @@ public:
 
   static LinkEntity forMethodDescriptor(SILDeclRef declRef) {
     assert(isValidResilientMethodRef(declRef));
+
+    if (declRef.isAutoDiffDerivativeFunction()) {
+      LinkEntity entity;
+      // The derivative function for any decl is always a method (not an
+      // initializer).
+      entity.setForDecl(Kind::MethodDescriptorDerivative, declRef.getDecl());
+      entity.SecondaryPointer =
+          declRef.getAutoDiffDerivativeFunctionIdentifier();
+      return entity;
+    }
 
     LinkEntity::Kind kind;
     switch (declRef.kind) {
@@ -842,7 +919,8 @@ public:
   }
 
   static LinkEntity
-  forSILFunction(SILFunction *F, bool IsDynamicallyReplaceableImplementation) {
+  forSILFunction(SILFunction *F,
+                 bool IsDynamicallyReplaceableImplementation=false) {
     LinkEntity entity;
     entity.Pointer = F;
     entity.SecondaryPointer = nullptr;
@@ -1040,6 +1118,14 @@ public:
   }
 
   static LinkEntity
+  forCanonicalPrespecializedGenericTypeCachingOnceToken(NominalTypeDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::CanonicalPrespecializedGenericTypeCachingOnceToken,
+                      decl);
+    return entity;
+  }
+
+  static LinkEntity
   forSpecializedGenericSwiftMetaclassStub(CanType concreteType) {
     LinkEntity entity;
     entity.setForType(Kind::CanonicalSpecializedGenericSwiftMetaclassStub,
@@ -1073,6 +1159,105 @@ public:
     return entity;
   }
 
+  static LinkEntity forAsyncFunctionPointer(LinkEntity other) {
+    LinkEntity entity;
+    entity.Pointer = other.Pointer;
+    entity.SecondaryPointer = nullptr;
+
+    switch (other.getKind()) {
+    case LinkEntity::Kind::SILFunction:
+      entity.Data = LINKENTITY_SET_FIELD(
+          Kind, unsigned(LinkEntity::Kind::AsyncFunctionPointer));
+      break;
+
+    case LinkEntity::Kind::DispatchThunk:
+      entity.Data = LINKENTITY_SET_FIELD(
+          Kind, unsigned(LinkEntity::Kind::DispatchThunkAsyncFunctionPointer));
+      break;
+
+    case LinkEntity::Kind::DispatchThunkInitializer:
+      entity.Data = LINKENTITY_SET_FIELD(
+          Kind, unsigned(LinkEntity::Kind::DispatchThunkInitializerAsyncFunctionPointer));
+      break;
+
+    case LinkEntity::Kind::DispatchThunkAllocator:
+      entity.Data = LINKENTITY_SET_FIELD(
+          Kind, unsigned(LinkEntity::Kind::DispatchThunkAllocatorAsyncFunctionPointer));
+      break;
+    case LinkEntity::Kind::PartialApplyForwarder:
+      entity.Data = LINKENTITY_SET_FIELD(
+          Kind, unsigned(LinkEntity::Kind::PartialApplyForwarderAsyncFunctionPointer));
+      break;
+
+    default:
+      llvm_unreachable("Link entity kind cannot have an async function pointer");
+    }
+
+    return entity;
+  }
+
+  static LinkEntity forAsyncFunctionPointer(AbstractFunctionDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::AsyncFunctionPointerAST, decl);
+    return entity;
+  }
+
+  static LinkEntity forKnownAsyncFunctionPointer(const char *name) {
+    LinkEntity entity;
+    entity.Pointer = const_cast<char *>(name);
+    entity.SecondaryPointer = nullptr;
+    entity.Data =
+        LINKENTITY_SET_FIELD(Kind, unsigned(Kind::KnownAsyncFunctionPointer));
+    return entity;
+  }
+
+  LinkEntity getUnderlyingEntityForAsyncFunctionPointer() const {
+    LinkEntity entity;
+    entity.Pointer = Pointer;
+    entity.SecondaryPointer = nullptr;
+
+    switch (getKind()) {
+    case LinkEntity::Kind::AsyncFunctionPointer:
+      entity.Data = LINKENTITY_SET_FIELD(
+          Kind, unsigned(LinkEntity::Kind::SILFunction));
+      break;
+
+    case LinkEntity::Kind::DispatchThunkAsyncFunctionPointer:
+      entity.Data = LINKENTITY_SET_FIELD(
+          Kind, unsigned(LinkEntity::Kind::DispatchThunk));
+      break;
+
+    case LinkEntity::Kind::DispatchThunkInitializerAsyncFunctionPointer:
+      entity.Data = LINKENTITY_SET_FIELD(
+          Kind, unsigned(LinkEntity::Kind::DispatchThunkInitializer));
+      break;
+
+    case LinkEntity::Kind::DispatchThunkAllocatorAsyncFunctionPointer:
+      entity.Data = LINKENTITY_SET_FIELD(
+          Kind, unsigned(LinkEntity::Kind::DispatchThunkAllocator));
+      break;
+
+    case LinkEntity::Kind::PartialApplyForwarderAsyncFunctionPointer:
+      entity.Data = LINKENTITY_SET_FIELD(
+          Kind, unsigned(LinkEntity::Kind::PartialApplyForwarder));
+      break;
+
+    default:
+      llvm_unreachable("Link entity is not an async function pointer");
+    }
+
+    return entity;
+  }
+
+  static LinkEntity forPartialApplyForwarder(llvm::Function *function) {
+    LinkEntity entity;
+    entity.Pointer = function;
+    entity.SecondaryPointer = nullptr;
+    entity.Data =
+        LINKENTITY_SET_FIELD(Kind, unsigned(Kind::PartialApplyForwarder));
+    return entity;
+  }
+
   void mangle(llvm::raw_ostream &out) const;
   void mangle(SmallVectorImpl<char> &buffer) const;
   std::string mangleAsString() const;
@@ -1095,14 +1280,15 @@ public:
   }
 
   bool hasSILFunction() const {
-    return getKind() == Kind::SILFunction ||
+    return getKind() == Kind::AsyncFunctionPointer ||
            getKind() == Kind::DynamicallyReplaceableFunctionVariable ||
-           getKind() == Kind::DynamicallyReplaceableFunctionKey;
+           getKind() == Kind::DynamicallyReplaceableFunctionKey ||
+           getKind() == Kind::SILFunction;
   }
 
   SILFunction *getSILFunction() const {
     assert(hasSILFunction());
-    return reinterpret_cast<SILFunction*>(Pointer);
+    return reinterpret_cast<SILFunction *>(Pointer);
   }
 
   SILGlobalVariable *getSILGlobalVariable() const {
@@ -1148,6 +1334,15 @@ public:
     assert(getKind() == Kind::AssociatedTypeWitnessTableAccessFunction);
     return reinterpret_cast<ProtocolDecl*>(Pointer);
   }
+
+  AutoDiffDerivativeFunctionIdentifier *
+  getAutoDiffDerivativeFunctionIdentifier() const {
+    assert(getKind() == Kind::DispatchThunkDerivative ||
+           getKind() == Kind::MethodDescriptorDerivative);
+    return reinterpret_cast<AutoDiffDerivativeFunctionIdentifier*>(
+        SecondaryPointer);
+  }
+
   bool isDynamicallyReplaceable() const {
     assert(getKind() == Kind::SILFunction);
     return LINKENTITY_GET_FIELD(Data, IsDynamicallyReplaceableImpl);
@@ -1222,6 +1417,7 @@ struct IRLinkage {
   static const IRLinkage InternalWeakODR;
   static const IRLinkage Internal;
 
+  static const IRLinkage ExternalCommon;
   static const IRLinkage ExternalImport;
   static const IRLinkage ExternalWeakImport;
   static const IRLinkage ExternalExport;

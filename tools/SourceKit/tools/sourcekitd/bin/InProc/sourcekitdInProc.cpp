@@ -13,6 +13,7 @@
 #include "sourcekitd/Internal.h"
 
 #include "SourceKit/Support/Concurrency.h"
+#include "SourceKit/Support/Logging.h"
 #include "SourceKit/Support/UIdent.h"
 
 #include "llvm/ADT/SmallString.h"
@@ -32,53 +33,7 @@
 
 using namespace SourceKit;
 
-static llvm::sys::Mutex GlobalHandlersMtx;
-static sourcekitd_uid_handler_t UidMappingHandler;
-static sourcekitd_str_from_uid_handler_t StrFromUidMappingHandler;
-
-void
-sourcekitd_set_uid_handler(sourcekitd_uid_handler_t handler) {
-  llvm::sys::ScopedLock L(GlobalHandlersMtx);
-  sourcekitd_uid_handler_t newHandler = Block_copy(handler);
-  Block_release(UidMappingHandler);
-  UidMappingHandler = newHandler;
-}
-
-void
-sourcekitd_set_uid_handlers(sourcekitd_uid_from_str_handler_t uid_from_str,
-                            sourcekitd_str_from_uid_handler_t str_from_uid) {
-  llvm::sys::ScopedLock L(GlobalHandlersMtx);
-
-  sourcekitd_uid_handler_t newUIDFromStrHandler = Block_copy(uid_from_str);
-  Block_release(UidMappingHandler);
-  UidMappingHandler = newUIDFromStrHandler;
-
-  sourcekitd_str_from_uid_handler_t newStrFromUIDHandler = Block_copy(str_from_uid);
-  Block_release(StrFromUidMappingHandler);
-  StrFromUidMappingHandler = newStrFromUIDHandler;
-}
-
-sourcekitd_uid_t sourcekitd::SKDUIDFromUIdent(UIdent UID) {
-  if (void *Tag = UID.getTag())
-    return reinterpret_cast<sourcekitd_uid_t>(Tag);
-
-  if (UidMappingHandler) {
-    sourcekitd_uid_t skduid = UidMappingHandler(UID.c_str());
-    if (skduid) {
-      UID.setTag(skduid);
-      return skduid;
-    }
-  }
-
-  return reinterpret_cast<sourcekitd_uid_t>(UID.getAsOpaqueValue());
-}
-
-UIdent sourcekitd::UIdentFromSKDUID(sourcekitd_uid_t uid) {
-  if (StrFromUidMappingHandler)
-    return UIdent(StrFromUidMappingHandler(uid));
-
-  return UIdent::getFromOpaqueValue(uid);
-}
+static void postNotification(sourcekitd_response_t Notification);
 
 static void getToolchainPrefixPath(llvm::SmallVectorImpl<char> &Path) {
 #if defined(_WIN32)
@@ -90,34 +45,62 @@ static void getToolchainPrefixPath(llvm::SmallVectorImpl<char> &Path) {
   if (!GetModuleFileNameA(static_cast<HINSTANCE>(mbi.AllocationBase), path,
                           MAX_PATH))
     llvm_unreachable("call to GetModuleFileNameA failed");
-  auto parent =
-      llvm::sys::path::parent_path(llvm::sys::path::parent_path(path));
+  auto parent = llvm::sys::path::parent_path(path);
   Path.append(parent.begin(), parent.end());
 #else
   // This silly cast below avoids a C++ warning.
   Dl_info info;
   if (dladdr((void *)(uintptr_t)sourcekitd_initialize, &info) == 0)
     llvm_unreachable("Call to dladdr() failed");
-
   // We now have the path to the shared lib, move to the parent prefix path.
-  auto parent = llvm::sys::path::parent_path(
-      llvm::sys::path::parent_path(info.dli_fname));
+  auto parent = llvm::sys::path::parent_path(info.dli_fname);
   Path.append(parent.begin(), parent.end());
 #endif
+
+#if defined(SOURCEKIT_UNVERSIONED_FRAMEWORK_BUNDLE)
+  // Path points to e.g. "usr/lib/sourcekitdInProc.framework/"
+  const unsigned NestingLevel = 2;
+#elif defined(SOURCEKIT_VERSIONED_FRAMEWORK_BUNDLE)
+  // Path points to e.g. "usr/lib/sourcekitdInProc.framework/Versions/Current/"
+  const unsigned NestingLevel = 4;
+#else
+  // Path points to e.g. "usr/lib/"
+  const unsigned NestingLevel = 1;
+#endif
+
+  // Get it to "usr"
+  for (unsigned i = 0; i < NestingLevel; ++i)
+    llvm::sys::path::remove_filename(Path);
 }
 
-std::string sourcekitd::getRuntimeLibPath() {
+static std::string getRuntimeLibPath() {
   llvm::SmallString<128> libPath;
   getToolchainPrefixPath(libPath);
   llvm::sys::path::append(libPath, "lib");
   return libPath.str().str();
 }
 
-std::string sourcekitd::getDiagnosticDocumentationPath() {
+static std::string getDiagnosticDocumentationPath() {
   llvm::SmallString<128> docPath;
   getToolchainPrefixPath(docPath);
   llvm::sys::path::append(docPath, "share", "doc", "swift", "diagnostics");
   return docPath.str().str();
+}
+
+void sourcekitd_initialize(void) {
+  if (sourcekitd::initializeClient()) {
+    LOG_INFO_FUNC(High, "initializing");
+    sourcekitd::initializeService(getRuntimeLibPath(),
+                                  getDiagnosticDocumentationPath(),
+                                  postNotification);
+  }
+}
+
+void sourcekitd_shutdown(void) {
+  if (sourcekitd::shutdownClient()) {
+    LOG_INFO_FUNC(High, "shutting down");
+    sourcekitd::shutdownService();
+  }
 }
 
 void sourcekitd::set_interrupted_connection_handler(
@@ -179,7 +162,7 @@ sourcekitd_set_notification_handler(sourcekitd_response_receiver_t receiver) {
   });
 }
 
-void sourcekitd::postNotification(sourcekitd_response_t Notification) {
+void postNotification(sourcekitd_response_t Notification) {
   WorkQueue::dispatchOnMain([=]{
     if (!NotificationReceiver) {
       sourcekitd_response_dispose(Notification);

@@ -17,19 +17,20 @@
 #ifndef SWIFT_AST_NAME_LOOKUP_H
 #define SWIFT_AST_NAME_LOOKUP_H
 
-#include "llvm/ADT/SmallVector.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Module.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/NullablePtr.h"
 #include "swift/Basic/SourceLoc.h"
+#include "swift/Basic/SourceManager.h"
+#include "llvm/ADT/SmallVector.h"
 
 namespace swift {
 class ASTContext;
 class DeclName;
-class GenericSignatureBuilder;
 class Type;
 class TypeDecl;
 class ValueDecl;
@@ -227,7 +228,7 @@ enum class UnqualifiedLookupFlags {
   IncludeOuterResults   = 1 << 4,
   // This lookup should include results that are @inlinable or
   // @usableFromInline.
-  IncludeInlineableAndUsableFromInline = 1 << 5,
+  IncludeUsableFromInline = 1 << 5,
 };
 
 using UnqualifiedLookupOptions = OptionSet<UnqualifiedLookupFlags>;
@@ -414,6 +415,23 @@ public:
                  DynamicLookupInfo dynamicLookupInfo = {}) override;
 };
 
+/// Filters out decls that are not usable based on their source location, eg.
+/// a decl inside its own initializer or a non-type decl before its definition.
+class UsableFilteringDeclConsumer final : public VisibleDeclConsumer {
+  const SourceManager &SM;
+  const DeclContext *DC;
+  SourceLoc Loc;
+  VisibleDeclConsumer &ChainedConsumer;
+
+public:
+  UsableFilteringDeclConsumer(const SourceManager &SM, const DeclContext *DC,
+                              SourceLoc loc, VisibleDeclConsumer &consumer)
+      : SM(SM), DC(DC), Loc(loc), ChainedConsumer(consumer) {}
+
+  void foundDecl(ValueDecl *D, DeclVisibilityKind reason,
+                 DynamicLookupInfo dynamicLookupInfo) override;
+};
+
 /// Remove any declarations in the given set that were overridden by
 /// other declarations in that set.
 ///
@@ -469,7 +487,7 @@ void lookupVisibleMemberDecls(VisibleDeclConsumer &Consumer,
                               bool includeInstanceMembers,
                               bool includeDerivedRequirements,
                               bool includeProtocolExtensionMembers,
-                              GenericSignatureBuilder *GSB = nullptr);
+                              GenericSignature genericSig = GenericSignature());
 
 namespace namelookup {
 
@@ -485,6 +503,19 @@ void filterForDiscriminator(SmallVectorImpl<Result> &results,
 
 } // end namespace namelookup
 
+/// Describes an inherited nominal entry.
+struct InheritedNominalEntry : Located<NominalTypeDecl *> {
+  /// The location of the "unchecked" attribute, if present.
+  SourceLoc uncheckedLoc;
+
+  InheritedNominalEntry() { }
+
+  InheritedNominalEntry(
+    NominalTypeDecl *item, SourceLoc loc,
+    SourceLoc uncheckedLoc
+  ) : Located(item, loc), uncheckedLoc(uncheckedLoc) { }
+};
+
 /// Retrieve the set of nominal type declarations that are directly
 /// "inherited" by the given declaration at a particular position in the
 /// list of "inherited" types.
@@ -493,7 +524,7 @@ void filterForDiscriminator(SmallVectorImpl<Result> &results,
 /// AnyObject type, set \c anyObject true.
 void getDirectlyInheritedNominalTypeDecls(
     llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
-    unsigned i, llvm::SmallVectorImpl<Located<NominalTypeDecl *>> &result,
+    unsigned i, llvm::SmallVectorImpl<InheritedNominalEntry> &result,
     bool &anyObject);
 
 /// Retrieve the set of nominal type declarations that are directly
@@ -501,7 +532,7 @@ void getDirectlyInheritedNominalTypeDecls(
 /// and splitting out the components of compositions.
 ///
 /// If we come across the AnyObject type, set \c anyObject true.
-SmallVector<Located<NominalTypeDecl *>, 4> getDirectlyInheritedNominalTypeDecls(
+SmallVector<InheritedNominalEntry, 4> getDirectlyInheritedNominalTypeDecls(
     llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
     bool &anyObject);
 
@@ -537,9 +568,7 @@ public:
                VisibleDeclConsumer &Consumer)
       : SM(SM), Loc(Loc), Consumer(Consumer) {}
 
-  void checkValueDecl(ValueDecl *D, DeclVisibilityKind Reason) {
-    Consumer.foundDecl(D, Reason);
-  }
+  void checkValueDecl(ValueDecl *D, DeclVisibilityKind Reason);
 
   void checkPattern(const Pattern *Pat, DeclVisibilityKind Reason);
   

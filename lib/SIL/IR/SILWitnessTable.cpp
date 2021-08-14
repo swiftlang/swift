@@ -187,7 +187,7 @@ bool SILWitnessTable::enumerateWitnessTableConditionalConformances(
     if (req.getKind() != RequirementKind::Conformance)
       continue;
 
-    auto proto = req.getSecondType()->castTo<ProtocolType>()->getDecl();
+    auto proto = req.getProtocolDecl();
 
     if (Lowering::TypeConverter::protocolRequiresWitnessTable(proto)) {
       if (fn(conformanceIndex, req.getFirstType()->getCanonicalType(), proto))

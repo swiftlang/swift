@@ -24,37 +24,35 @@ bb0:
 // CHECK-LABEL: sil @test_function_ref
 // CHECK:   [[ORIG_FN_REF:%.*]] = function_ref @basic : $@convention(thin) (Float) -> Float
 // CHECK:   [[ORIG_FN:%.*]] = thin_to_thick_function [[ORIG_FN_REF]]
-// CHECK:   [[JVP_FN_REF:%.*]] = differentiability_witness_function [jvp] [parameters 0] [results 0] @basic
+// CHECK:   [[JVP_FN_REF:%.*]] = differentiability_witness_function [jvp] [reverse] [parameters 0] [results 0] @basic
 // CHECK:   [[JVP_FN:%.*]] = thin_to_thick_function [[JVP_FN_REF]]
-// CHECK:   [[VJP_FN_REF:%.*]] = differentiability_witness_function [vjp] [parameters 0] [results 0] @basic
+// CHECK:   [[VJP_FN_REF:%.*]] = differentiability_witness_function [vjp] [reverse] [parameters 0] [results 0] @basic
 // CHECK:   [[VJP_FN:%.*]] = thin_to_thick_function [[VJP_FN_REF]]
 // CHECK:   differentiable_function [parameters 0] [results 0] [[ORIG_FN]] : $@callee_guaranteed (Float) -> Float with_derivative {[[JVP_FN]] : $@callee_guaranteed (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float), [[VJP_FN]] : $@callee_guaranteed (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)}
 // CHECK: }
 
 // Test `differentiable_function_extract` instructions.
 
-sil @test_differentiable_function_extract : $@convention(thin) (@differentiable @callee_guaranteed (Float) -> Float) -> () {
-bb0(%0 : $@differentiable @callee_guaranteed (Float) -> Float):
-  %1 = differentiable_function_extract [original] %0 : $@differentiable @callee_guaranteed (Float) -> Float
+sil @test_differentiable_function_extract : $@convention(thin) (@differentiable(reverse) @callee_guaranteed (Float) -> Float) -> () {
+bb0(%0 : $@differentiable(reverse) @callee_guaranteed (Float) -> Float):
+  %1 = differentiable_function_extract [original] %0 : $@differentiable(reverse) @callee_guaranteed (Float) -> Float
   %2 = differentiable_function [parameters 0] [results 0] %1 : $@callee_guaranteed (Float) -> Float
   %void = tuple ()
   return %void : $()
 }
 
 // CHECK-LABEL: sil @test_differentiable_function_extract
-// CHECK: bb0([[ARG:%.*]] : $@differentiable @callee_guaranteed (Float) -> Float):
+// CHECK: bb0([[ARG:%.*]] : $@differentiable(reverse) @callee_guaranteed (Float) -> Float):
 // CHECK:   [[ORIG_FN:%.*]] = differentiable_function_extract [original] [[ARG]]
 // CHECK:   [[JVP_FN:%.*]] = differentiable_function_extract [jvp] [[ARG]]
-// CHECK:   strong_retain [[JVP_FN]]
 // CHECK:   [[VJP_FN:%.*]] = differentiable_function_extract [vjp] [[ARG]]
-// CHECK:   strong_retain [[VJP_FN]]
 // CHECK:   differentiable_function [parameters 0] [results 0] [[ORIG_FN]] : {{.*}} with_derivative {[[JVP_FN]] : {{.*}}, [[VJP_FN]] : {{.*}}}
 // CHECK: }
 
 // Test `witness_method` instructions.
 
 protocol Protocol {
-  @differentiable(wrt: x)
+  @differentiable(reverse, wrt: x)
   func method(_ x: Float) -> Float
 }
 
@@ -102,7 +100,7 @@ bb0(%0 : $*T):
 // Test `class_method` instructions.
 
 class Class {
-  @differentiable(wrt: x)
+  @differentiable(reverse, wrt: x)
   func method(_ x: Float) -> Float
 }
 
@@ -134,8 +132,6 @@ bb0(%0 : $Class):
 // CHECK-LABEL: sil @test_class_method_partial_apply
 // CHECK: bb0([[ARG:%.*]] : $Class):
 // CHECK:  [[ORIG_FN:%.*]] = class_method [[ARG]] : $Class, #Class.method
-// CHECK:  strong_retain [[ARG]]
-// CHECK:  strong_retain [[ARG]]
 // CHECK:  [[ORIG_FN_PARTIALLY_APPLIED:%.*]] = partial_apply [callee_guaranteed] [[ORIG_FN]]([[ARG]])
 // CHECK:  [[JVP_FN:%.*]] = class_method [[ARG]] : $Class, #Class.method!jvp.SU
 // CHECK:  [[JVP_FN_PARTIALLY_APPLIED:%.*]] = partial_apply [callee_guaranteed] [[JVP_FN]]([[ARG]])

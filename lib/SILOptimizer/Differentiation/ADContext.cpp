@@ -18,6 +18,7 @@
 
 #include "swift/SILOptimizer/Differentiation/ADContext.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 
 using llvm::DenseMap;
@@ -92,6 +93,17 @@ FuncDecl *ADContext::getPlusEqualDecl() const {
     assert(cachedPlusEqualFn && "AdditiveArithmetic.+= not found");
   }
   return cachedPlusEqualFn;
+}
+
+AccessorDecl *ADContext::getAdditiveArithmeticZeroGetter() const {
+  if (cachedZeroGetter)
+    return cachedZeroGetter;
+  auto zeroDeclLookup = getAdditiveArithmeticProtocol()
+      ->lookupDirect(getASTContext().Id_zero);
+  auto *zeroDecl = cast<VarDecl>(zeroDeclLookup.front());
+  assert(zeroDecl->isProtocolRequirement());
+  cachedZeroGetter = zeroDecl->getOpaqueAccessor(AccessorKind::Get);
+  return cachedZeroGetter;
 }
 
 void ADContext::cleanUp() {

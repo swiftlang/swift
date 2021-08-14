@@ -4,7 +4,7 @@
 // RUN: %FileCheck %s < %t/Library.txt
 
 // CHECK: import FooKit
-// CHECK: import FooKit_SECRET
+// CHECK-NOT: import FooKit_SECRET
 
 import FooKit
 @_implementationOnly import FooKit_SECRET

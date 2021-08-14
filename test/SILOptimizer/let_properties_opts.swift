@@ -2,9 +2,7 @@
 // RUN: %target-swift-frontend -module-name let_properties_opts -primary-file %s -O -emit-sil | %FileCheck %s
 
 // REQUIRES: optimized_stdlib
-
-// See https://bugs.swift.org/browse/SR-12370
-// XFAIL: OS=linux-androideabi && CPU=armv7
+// REQUIRES: tmpdisable
 
 // Test propagation of non-static let properties with compile-time constant values.
 

@@ -53,6 +53,7 @@
 #define DEBUG_TYPE "array-property-opt"
 
 #include "ArrayOpt.h"
+#include "swift/SILOptimizer/Analysis/ArraySemantic.h"
 #include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
@@ -62,6 +63,7 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/LoopInfo.h"
+#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/SILCloner.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/Support/CommandLine.h"
@@ -86,23 +88,26 @@ class ArrayPropertiesAnalysis {
   llvm::DenseMap<SILFunction *, uint32_t> InstCountCache;
   llvm::SmallSet<SILValue, 16> HoistableArray;
 
-  SmallPtrSet<SILBasicBlock *, 16> ReachingBlocks;
-  SmallPtrSet<SILBasicBlock *, 16> CachedExitingBlocks;
+  BasicBlockSet ReachingBlocks;
+  SmallVector<SILBasicBlock *, 16> CachedExitingBlocks;
 
   // This controls the max instructions the analysis can scan before giving up
   const uint32_t AnalysisThreshold = 5000;
   // This controls the max threshold for instruction count in the loop
   const uint32_t LoopInstCountThreshold = 500;
 
+  bool reachingBlocksComputed = false;
+
 public:
   ArrayPropertiesAnalysis(SILLoop *L, DominanceAnalysis *DA)
       : Fun(L->getHeader()->getParent()), Loop(L), Preheader(nullptr),
-        DomTree(DA->get(Fun)) {}
+        DomTree(DA->get(Fun)), ReachingBlocks(Fun) {}
 
   /// Check if it is profitable to specialize a loop when you see an apply
   /// instruction. We consider it is not profitable to specialize the loop when:
   /// 1. The callee is not found in the module, or cannot be determined
-  /// 2. The number of instructions the analysis scans has exceeded the AnalysisThreshold
+  /// 2. The number of instructions the analysis scans has exceeded the
+  /// AnalysisThreshold
   uint32_t checkProfitabilityRecursively(SILFunction *Callee) {
     if (!Callee)
       return AnalysisThreshold;
@@ -118,7 +123,8 @@ public:
     for (auto &BB : *Callee) {
       for (auto &I : BB) {
         if (InstCount++ >= AnalysisThreshold) {
-          LLVM_DEBUG(llvm::dbgs() << "ArrayPropertyOpt: Disabled Reason - Exceeded Analysis Threshold in "
+          LLVM_DEBUG(llvm::dbgs() << "ArrayPropertyOpt: Disabled Reason - "
+                                     "Exceeded Analysis Threshold in "
                                   << BB.getParent()->getName() << "\n");
           InstCountCache[Callee] = AnalysisThreshold;
           return AnalysisThreshold;
@@ -126,8 +132,10 @@ public:
         if (auto Apply = FullApplySite::isa(&I)) {
           auto Callee = Apply.getReferencedFunctionOrNull();
           if (!Callee) {
-            LLVM_DEBUG(llvm::dbgs() << "ArrayPropertyOpt: Disabled Reason - Found opaque code in "
-                                    << BB.getParent()->getName() << "\n");
+            LLVM_DEBUG(
+                llvm::dbgs()
+                << "ArrayPropertyOpt: Disabled Reason - Found opaque code in "
+                << BB.getParent()->getName() << "\n");
             LLVM_DEBUG(Apply.dump());
             LLVM_DEBUG(I.getOperand(0)->dump());
           }
@@ -182,9 +190,11 @@ public:
     if (!FoundHoistable)
       return false;
 
-    // If the LoopInstCount exceeds the threshold, we will disable the optimization on this loop
-    // For loops of deeper nesting we increase the threshold by an additional 10%
-    if (LoopInstCount > LoopInstCountThreshold * (1 + (Loop->getLoopDepth() - 1) / 10)) {
+    // If the LoopInstCount exceeds the threshold, we will disable the
+    // optimization on this loop For loops of deeper nesting we increase the
+    // threshold by an additional 10%
+    if (LoopInstCount >
+        LoopInstCountThreshold * (1 + (Loop->getLoopDepth() - 1) / 10)) {
       LLVM_DEBUG(llvm::dbgs() << "Exceeded LoopInstCountThreshold\n");
       return false;
     }
@@ -205,8 +215,9 @@ public:
       }
     }
 
-    LLVM_DEBUG(llvm::dbgs() << "Profitable ArrayPropertyOpt in "
-                            << Loop->getLoopPreheader()->getParent()->getName() << "\n");
+    LLVM_DEBUG(llvm::dbgs()
+               << "Profitable ArrayPropertyOpt in "
+               << Loop->getLoopPreheader()->getParent()->getName() << "\n");
     LLVM_DEBUG(Loop->dump());
     return true;
   }
@@ -216,7 +227,7 @@ private:
   /// Strip the struct load and the address projection to the location
   /// holding the array struct.
   SILValue stripArrayStructLoad(SILValue V) {
-    if (auto LI = dyn_cast<LoadInst>(V)) {
+    if (auto LI = dyn_cast<LoadInst>(lookThroughCopyValueInsts(V))) {
       auto Val = LI->getOperand();
       // We could have two arrays in a surrounding container so we can only
       // strip off the 'array struct' project.
@@ -232,18 +243,19 @@ private:
     return V;
   }
 
-  SmallPtrSetImpl<SILBasicBlock *> &getReachingBlocks() {
-    if (ReachingBlocks.empty()) {
+  BasicBlockSet &getReachingBlocks() {
+    if (!reachingBlocksComputed) {
       SmallVector<SILBasicBlock *, 8> Worklist;
       ReachingBlocks.insert(Preheader);
       Worklist.push_back(Preheader);
       while (!Worklist.empty()) {
         SILBasicBlock *BB = Worklist.pop_back_val();
         for (auto PI = BB->pred_begin(), PE = BB->pred_end(); PI != PE; ++PI) {
-          if (ReachingBlocks.insert(*PI).second)
+          if (ReachingBlocks.insert(*PI))
             Worklist.push_back(*PI);
         }
       }
+      reachingBlocksComputed = true;
     }
     return ReachingBlocks;
   }
@@ -254,12 +266,15 @@ private:
   /// new array onto it.
   bool checkSafeArrayAddressUses(UserList &AddressUsers) {
     for (auto *UseInst : AddressUsers) {
-
       if (UseInst->isDebugInstruction())
         continue;
 
       if (isa<DeallocStackInst>(UseInst)) {
         // Handle destruction of a local array.
+        continue;
+      }
+
+      if (isa<LoadInst>(UseInst)) {
         continue;
       }
 
@@ -269,7 +284,7 @@ private:
 
         // Check if this escape can reach the current loop.
         if (!Loop->contains(UseInst->getParent()) &&
-            !getReachingBlocks().count(UseInst->getParent())) {
+            !getReachingBlocks().contains(UseInst->getParent())) {
           continue;
         }
         LLVM_DEBUG(llvm::dbgs()
@@ -346,12 +361,10 @@ private:
     return false;
   }
 
-  SmallPtrSetImpl<SILBasicBlock *> &getLoopExitingBlocks() {
+  SmallVectorImpl<SILBasicBlock *> &getLoopExitingBlocks() {
     if (!CachedExitingBlocks.empty())
       return CachedExitingBlocks;
-    SmallVector<SILBasicBlock *, 16> ExitingBlocks;
-    Loop->getExitingBlocks(ExitingBlocks);
-    CachedExitingBlocks.insert(ExitingBlocks.begin(), ExitingBlocks.end());
+    Loop->getExitingBlocks(CachedExitingBlocks);
     return CachedExitingBlocks;
   }
 
@@ -402,7 +415,7 @@ private:
     if (!Call.canHoist(Preheader->getTerminator(), DomTree))
       return false;
 
-    SmallVector<unsigned, 4> AccessPath;
+    SmallVector<int, 4> AccessPath;
     SILValue ArrayContainer =
       StructUseCollector::getAccessPath(Arr, AccessPath);
 
@@ -430,11 +443,13 @@ namespace {
 /// in a set of basic blocks. Updates the dominator tree with the cloned blocks.
 /// However, the client needs to update the dominator of the exit blocks.
 ///
-/// FIXME: SILCloner is used to cloned CFG regions by multiple clients. All
-/// functionality for generating valid SIL (including the DomTree) should be
-/// handled by the common SILCloner.
+/// FIXME: All functionality for generating valid SIL (including the DomTree)
+/// should be handled by the common SILCloner. Currently, SILCloner only updates
+/// the DomTree for original (non-cloned) blocks when splitting edges. The
+/// cloned blocks won't be mapped to dominator nodes until fixDomTree()
+/// runs. However, since SILCloner always handles single-entry regions,
+/// fixDomTree() could be part of SILCloner itself.
 class RegionCloner : public SILCloner<RegionCloner> {
-  DominanceInfo &DomTree;
   SILBasicBlock *StartBB;
 
   friend class SILInstructionVisitor<RegionCloner>;
@@ -442,25 +457,10 @@ class RegionCloner : public SILCloner<RegionCloner> {
 
 public:
   RegionCloner(SILBasicBlock *EntryBB, DominanceInfo &DT)
-      : SILCloner<RegionCloner>(*EntryBB->getParent()), DomTree(DT),
-        StartBB(EntryBB) {}
+      : SILCloner<RegionCloner>(*EntryBB->getParent(), &DT), StartBB(EntryBB) {}
 
   SILBasicBlock *cloneRegion(ArrayRef<SILBasicBlock *> exitBBs) {
-    assert (DomTree.getNode(StartBB) != nullptr && "Can't cloned dead code");
-
-    // We need to split any edge from a non cond_br basic block leading to a
-    // exit block. After cloning this edge will become critical if it came from
-    // inside the cloned region. The SSAUpdater can't handle critical non
-    // cond_br edges.
-    //
-    // FIXME: remove this in the next commit. The SILCloner will always do it.
-    for (auto *BB : exitBBs) {
-      SmallVector<SILBasicBlock *, 8> Preds(BB->getPredecessorBlocks());
-      for (auto *Pred : Preds)
-        if (!isa<CondBranchInst>(Pred->getTerminator()) &&
-            !isa<BranchInst>(Pred->getTerminator()))
-          splitEdgesFromTo(Pred, BB, &DomTree, nullptr);
-    }
+    assert(DomTree->getNode(StartBB) != nullptr && "Can't cloned dead code");
 
     cloneReachableBlocks(StartBB, exitBBs);
 
@@ -477,25 +477,25 @@ protected:
   void fixDomTree() {
     for (auto *BB : originalPreorderBlocks()) {
       auto *ClonedBB = getOpBasicBlock(BB);
-      auto *OrigDomBB = DomTree.getNode(BB)->getIDom()->getBlock();
+      auto *OrigDomBB = DomTree->getNode(BB)->getIDom()->getBlock();
       if (BB == StartBB) {
         // The cloned start node shares the same dominator as the original node.
-        auto *ClonedNode = DomTree.addNewBlock(ClonedBB, OrigDomBB);
+        auto *ClonedNode = DomTree->addNewBlock(ClonedBB, OrigDomBB);
         (void)ClonedNode;
         assert(ClonedNode);
         continue;
       }
       // Otherwise, map the dominator structure using the mapped block.
-      DomTree.addNewBlock(ClonedBB, getOpBasicBlock(OrigDomBB));
+      DomTree->addNewBlock(ClonedBB, getOpBasicBlock(OrigDomBB));
     }
   }
 
   SILValue getMappedValue(SILValue V) {
     if (auto *BB = V->getParentBlock()) {
-      if (!DomTree.dominates(StartBB, BB)) {
+      if (!DomTree->dominates(StartBB, BB)) {
         // Must be a value that dominates the start basic block.
-        assert(DomTree.dominates(BB, StartBB) &&
-               "Must dominated the start of the cloned region");
+        assert(DomTree->dominates(BB, StartBB)
+               && "Must dominated the start of the cloned region");
         return V;
       }
     }
@@ -519,7 +519,7 @@ protected:
       return;
 
     // Update SSA form.
-    SSAUp.initialize(V->getType());
+    SSAUp.initialize(V->getType(), V.getOwnershipKind());
     SSAUp.addAvailableValue(OrigBB, V);
     SILValue NewVal = getMappedValue(V);
     SSAUp.addAvailableValue(getOpBasicBlock(OrigBB), NewVal);
@@ -755,10 +755,6 @@ class SwiftArrayPropertyOptPass : public SILFunctionTransform {
   void run() override {
     auto *Fn = getFunction();
 
-    // FIXME: Add support for ownership.
-    if (Fn->hasOwnership())
-      return;
-
     // Don't hoist array property calls at Osize.
     if (Fn->optimizeForSize())
       return;
@@ -792,7 +788,6 @@ class SwiftArrayPropertyOptPass : public SILFunctionTransform {
 
     // Specialize the identified loop nest based on the 'array.props' calls.
     if (HasChanged) {
-      LLVM_DEBUG(getFunction()->viewCFG());
       DominanceInfo *DT = DA->get(getFunction());
 
       // Process specialized loop-nests in loop-tree post-order (bottom-up).
@@ -803,9 +798,8 @@ class SwiftArrayPropertyOptPass : public SILFunctionTransform {
         ArrayPropertiesSpecializer(DT, LA, HoistableLoopNest).run();
 
       // Verify that no illegal critical edges were created.
-      getFunction()->verifyCriticalEdges();
-
-      LLVM_DEBUG(getFunction()->viewCFG());
+      if (getFunction()->getModule().getOptions().VerifyAll)
+        getFunction()->verifyCriticalEdges();
 
       // We preserve the dominator tree. Let's invalidate everything
       // else.

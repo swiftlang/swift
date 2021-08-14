@@ -34,10 +34,10 @@ using namespace fine_grained_dependencies;
 
 AbstractSourceFileDepGraphFactory::AbstractSourceFileDepGraphFactory(
     bool hadCompilationError, StringRef swiftDeps,
-    StringRef fileFingerprint, bool emitDotFileAfterConstruction,
+    Fingerprint fileFingerprint, bool emitDotFileAfterConstruction,
     DiagnosticEngine &diags)
     : hadCompilationError(hadCompilationError), swiftDeps(swiftDeps.str()),
-      fileFingerprint(fileFingerprint.str()),
+      fileFingerprint(fileFingerprint),
       emitDotFileAfterConstruction(emitDotFileAfterConstruction), diags(diags) {
 }
 
@@ -60,11 +60,11 @@ void AbstractSourceFileDepGraphFactory::addSourceFileNodesToGraph() {
   g.findExistingNodePairOrCreateAndAddIfNew(
       DependencyKey::createKeyForWholeSourceFile(DeclAspect::interface,
                                                  swiftDeps),
-      StringRef(fileFingerprint));
+      Fingerprint{fileFingerprint});
 }
 
 void AbstractSourceFileDepGraphFactory::addADefinedDecl(
-    const DependencyKey &interfaceKey, Optional<StringRef> fingerprint) {
+    const DependencyKey &interfaceKey, Optional<Fingerprint> fingerprint) {
 
   auto nodePair =
       g.findExistingNodePairOrCreateAndAddIfNew(interfaceKey, fingerprint);
@@ -101,6 +101,19 @@ void AbstractSourceFileDepGraphFactory::addAUsedDecl(
   // func foo(_: Int) { print("Hello Int") }
   // Although main.swift needs to get recompiled, the commented-out code below
   // prevents that.
+
+  auto nullableUse = g.findExistingNode(useKey);
+  assert(nullableUse.isNonNull() && "Use must be an already-added provides");
+  auto *useNode = nullableUse.get();
+  assert(useNode->getIsProvides() && "Use (using node) must be a provides");
+  g.addArc(defNode, useNode);
+}
+
+void AbstractSourceFileDepGraphFactory::addAnExternalDependency(
+    const DependencyKey &defKey, const DependencyKey &useKey,
+    Optional<Fingerprint> maybeFP) {
+  auto *defNode = g.findExistingNodeOrCreateIfNew(defKey, maybeFP,
+                                                  false /* = !isProvides */);
 
   auto nullableUse = g.findExistingNode(useKey);
   assert(nullableUse.isNonNull() && "Use must be an already-added provides");

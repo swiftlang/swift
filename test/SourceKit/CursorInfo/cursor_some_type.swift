@@ -23,6 +23,7 @@ func test(value: S) {
 // DECLSITE: source.lang.swift.decl.function.method.instance (13:15-13:27)
 // DECLSITE-NEXT: foo(x:)
 // DECLSITE-NEXT: s:4Test1SV3foo1xQrx_tlF
+// DECLSITE-NEXT: source.lang.swift
 // DECLSITE-NEXT: <T> (S) -> (T) -> some Base & Proto
 // DECLSITE-NEXT: $s1xQrx_tcluD
 // DECLSITE-NEXT: <Declaration>public func foo&lt;T&gt;(x: <Type usr=[[T_USR:.*]]>T</Type>) -&gt; some <Type usr=[[Base_USR:.*]]>Base</Type> &amp; <Type usr=[[Proto_USR:.*]]>Proto</Type></Declaration>
@@ -32,6 +33,7 @@ func test(value: S) {
 // PROTO_AFTER_SOME: source.lang.swift.ref.protocol (1:17-1:22)
 // PROTO_AFTER_SOME-NEXT: Proto
 // PROTO_AFTER_SOME-NEXT: s:4Test5ProtoP
+// PROTO_AFTER_SOME-NEXT: source.lang.swift
 // PROTO_AFTER_SOME-NEXT: Proto.Protocol
 // PROTO_AFTER_SOME-NEXT: $s4Test5Proto_pmD
 // PROTO_AFTER_SOME-NEXT: <Declaration>public protocol Proto</Declaration>
@@ -41,8 +43,9 @@ func test(value: S) {
 // USESITE: source.lang.swift.ref.function.method.instance (13:15-13:27)
 // USESITE-NEXT: foo(x:)
 // USESITE-NEXT: s:4Test1SV3foo1xQrx_tlF
+// USESITE-NEXT: source.lang.swift
 // USESITE-NEXT: <T> (S) -> (T) -> some Base & Proto
 // USESITE-NEXT: $s1xQrx_tcluD
 // USESITE-NEXT: <Container>$s4Test1SVD</Container>
-// USESITE-NEXT: <Declaration>public func foo&lt;T&gt;(x: T) -&gt; some <Type usr=[[Base_USR:.*]]>Base</Type> &amp; <Type usr=[[Proto_USR:.*]]>Proto</Type></Declaration>
-// USESITE-NEXT: <decl.function.method.instance><syntaxtype.keyword>public</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>foo</decl.name>&lt;<decl.generic_type_param usr=[[T_USR:.*]]><decl.generic_type_param.name>T</decl.generic_type_param.name></decl.generic_type_param>&gt;(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label>: <decl.var.parameter.type>T</decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><syntaxtype.keyword>some</syntaxtype.keyword> <ref.class usr=[[Base_USR]]>Base</ref.class> &amp; <ref.protocol usr=[[Proto_USR]]>Proto</ref.protocol></decl.function.returntype></decl.function.method.instance>
+// USESITE-NEXT: <Declaration>public func foo&lt;T&gt;(x: <Type usr="s:4Test1SV3foo1xQrx_tlFQO1Txmfp">T</Type>) -&gt; some <Type usr=[[Base_USR:.*]]>Base</Type> &amp; <Type usr=[[Proto_USR:.*]]>Proto</Type></Declaration>
+// USESITE-NEXT: <decl.function.method.instance><syntaxtype.keyword>public</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>foo</decl.name>&lt;<decl.generic_type_param usr="s:4Test1SV3foo1xQrx_tlFQO1Txmfp"><decl.generic_type_param.name>T</decl.generic_type_param.name></decl.generic_type_param>&gt;(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.generic_type_param usr="s:4Test1SV3foo1xQrx_tlFQO1Txmfp">T</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><syntaxtype.keyword>some</syntaxtype.keyword> <ref.class usr=[[Base_USR]]>Base</ref.class> &amp; <ref.protocol usr=[[Proto_USR]]>Proto</ref.protocol></decl.function.returntype></decl.function.method.instance>

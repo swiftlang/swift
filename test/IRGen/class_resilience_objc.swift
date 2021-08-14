@@ -9,6 +9,9 @@
 // XFAIL: CPU=arm64_32
 // REQUIRES: objc_interop
 
+// rdar://77399307
+// UNSUPPORTED: CPU=arm64, CPU=arm64e
+
 import Foundation
 import resilient_struct
 import resilient_objc_class

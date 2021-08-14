@@ -2,7 +2,7 @@
 
 import _Differentiation
 
-@differentiable
+@differentiable(reverse)
 func bar(_ x: Float) -> Float {
   return Float(floatToIntNoDerivative(x))
 }

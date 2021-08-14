@@ -105,6 +105,12 @@ public:
   /// stream, the result is "-".
   std::string outputFilename() const { return PSPs.OutputFilename; }
 
+  std::string indexUnitOutputFilename() const {
+    if (!PSPs.IndexUnitOutputFilename.empty())
+      return PSPs.IndexUnitOutputFilename;
+    return outputFilename();
+  }
+
   /// If there are explicit primary inputs (i.e. designated with -primary-input
   /// or -primary-filelist), the paths specific to those inputs (other than the
   /// input file path itself) are kept here. If there are no explicit primary
@@ -121,17 +127,17 @@ public:
   // FrontendInputsAndOutputs. They merely make the call sites
   // a bit shorter. Add more forwarding methods as needed.
 
-  std::string dependenciesFilePath() const {
+  StringRef getDependenciesFilePath() const {
     return getPrimarySpecificPaths().SupplementaryOutputs.DependenciesFilePath;
   }
-  std::string loadedModuleTracePath() const {
+  StringRef getLoadedModuleTracePath() const {
     return getPrimarySpecificPaths().SupplementaryOutputs.LoadedModuleTracePath;
   }
-  std::string serializedDiagnosticsPath() const {
+  StringRef getSerializedDiagnosticsPath() const {
     return getPrimarySpecificPaths().SupplementaryOutputs
         .SerializedDiagnosticsPath;
   }
-  std::string fixItsOutputPath() const {
+  StringRef getFixItsOutputPath() const {
     return getPrimarySpecificPaths().SupplementaryOutputs.FixItsOutputPath;
   }
 };

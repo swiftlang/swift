@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-sil %s -o /dev/null -verify
+// RUN: %target-swift-emit-sil %s -verify | %FileCheck %s
 
 func testUnreachableAfterReturn() -> Int {
   var x: Int = 3
@@ -145,4 +145,14 @@ func testUnreachableCatchClause() {
   } catch ErrorEnum.someError { // expected-warning {{case will never be executed}}
     print("some error")
   }
+}
+
+func sr13639() -> Int {
+  return Foo.bar
+  struct Foo { // no-warning
+    static var bar = 0
+    // CHECK: sil private @$s16unreachable_code7sr13639SiyF3FooL_V7fooFuncyyF : $@convention(method) (Foo) -> ()
+    func fooFunc() {}
+  }
+  func appendix() {} // no-warning
 }

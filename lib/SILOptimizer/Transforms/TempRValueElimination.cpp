@@ -17,7 +17,9 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-temp-rvalue-opt"
+
 #include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
@@ -61,30 +63,36 @@ namespace {
 /// it finds cases in which it is easy to determine that the source is
 /// unmodified during the copy destination's lifetime. Thus, the destination can
 /// be viewed as a short-lived "rvalue".
+///
+/// As a second optimization, also stores into temporaries are handled. This is
+/// a simple form of redundant-load-elimination (RLE).
+///
+///   %temp = alloc_stack $T
+///   store %src to [initialization] %temp : $*T
+///   // no writes to %temp
+///   %v = load [take] %temp : $*T
+///   dealloc_stack %temp : $*T
+///
+/// TODO: Check if we still need to handle stores when RLE supports OSSA.
 class TempRValueOptPass : public SILFunctionTransform {
-  AliasAnalysis *aa = nullptr;
-
-  bool collectLoads(Operand *userOp, SILInstruction *userInst,
-                    SingleValueInstruction *addr, SILValue srcObject,
+  bool collectLoads(Operand *addressUse, CopyAddrInst *originalCopy,
                     SmallPtrSetImpl<SILInstruction *> &loadInsts);
   bool collectLoadsFromProjection(SingleValueInstruction *projection,
-                                  SILValue srcAddr,
+                                  CopyAddrInst *originalCopy,
                                   SmallPtrSetImpl<SILInstruction *> &loadInsts);
 
-  bool
-  checkNoSourceModification(CopyAddrInst *copyInst, SILValue copySrc,
-                            const SmallPtrSetImpl<SILInstruction *> &useInsts);
+  SILInstruction *getLastUseWhileSourceIsNotModified(
+    CopyAddrInst *copyInst, const SmallPtrSetImpl<SILInstruction *> &useInsts,
+    AliasAnalysis *aa);
 
   bool
-  checkTempObjectDestroy(AllocStackInst *tempObj, CopyAddrInst *copyInst,
-                         ValueLifetimeAnalysis::Frontier &tempAddressFrontier);
+  checkTempObjectDestroy(AllocStackInst *tempObj, CopyAddrInst *copyInst);
 
-  bool canApplyBeTreatedAsLoad(Operand *tempObjUser, ApplySite apply,
-                               SILValue srcAddr);
+  bool extendAccessScopes(CopyAddrInst *copyInst, SILInstruction *lastUseInst,
+                          AliasAnalysis *aa);
 
-  bool tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst);
-  std::pair<SILBasicBlock::iterator, bool>
-  tryOptimizeStoreIntoTemp(StoreInst *si);
+  void tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst);
+  SILBasicBlock::iterator tryOptimizeStoreIntoTemp(StoreInst *si);
 
   void run() override;
 };
@@ -92,62 +100,16 @@ class TempRValueOptPass : public SILFunctionTransform {
 } // anonymous namespace
 
 bool TempRValueOptPass::collectLoadsFromProjection(
-    SingleValueInstruction *projection, SILValue srcAddr,
+    SingleValueInstruction *projection, CopyAddrInst *originalCopy,
     SmallPtrSetImpl<SILInstruction *> &loadInsts) {
-  if (!srcAddr) {
-    LLVM_DEBUG(
-        llvm::dbgs()
-        << "  Temp has addr_projection use?! Can not yet promote to value"
-        << *projection);
-    return false;
-  }
-
   // Transitively look through projections on stack addresses.
   for (auto *projUseOper : projection->getUses()) {
     auto *user = projUseOper->getUser();
     if (user->isTypeDependentOperand(*projUseOper))
       continue;
 
-    if (!collectLoads(projUseOper, user, projection, srcAddr, loadInsts))
+    if (!collectLoads(projUseOper, originalCopy, loadInsts))
       return false;
-  }
-  return true;
-}
-
-/// Check if \p tempObjUser, passed to the apply instruction, is only loaded,
-/// but not modified and if \p srcAddr is not modified as well.
-bool TempRValueOptPass::canApplyBeTreatedAsLoad(
-    Operand *tempObjUser, ApplySite apply, SILValue srcAddr) {
-  // Check if the function can just read from tempObjUser.
-  auto convention = apply.getArgumentConvention(*tempObjUser);
-  if (!convention.isGuaranteedConvention()) {
-    LLVM_DEBUG(llvm::dbgs() << "  Temp consuming use may write/destroy "
-                               "its source"
-                            << *apply.getInstruction());
-    return false;
-  }
-
-  if (srcAddr) {
-    // If the function may write to the source of the copy_addr, the apply
-    // cannot be treated as a load: all (potential) writes of the source must
-    // appear _after_ all loads of the temporary. But in case of a function call
-    // we don't know in which order the writes and loads are executed inside the
-    // called function. The source may be written before the temporary is
-    // loaded, which would make the optization invalid.
-    if (aa->mayWriteToMemory(apply.getInstruction(), srcAddr))
-      return false;
-  } else {
-    // If we do not have an src address, but are indirect, bail. We would need
-    // to perform function signature specialization to change the functions
-    // signature to pass something direct.
-    if (convention.isIndirectConvention()) {
-      LLVM_DEBUG(
-          llvm::dbgs()
-          << "  Temp used to materialize value for indirect convention?! Can "
-             "not remove temporary without func sig opts"
-          << *apply.getInstruction());
-      return false;
-    }
   }
   return true;
 }
@@ -165,12 +127,15 @@ bool TempRValueOptPass::canApplyBeTreatedAsLoad(
 /// location at \address. The temporary must be initialized by the original copy
 /// and never written to again. Therefore, collectLoads disallows any operation
 /// that may write to memory at \p address.
-bool TempRValueOptPass::collectLoads(
-    Operand *userOp, SILInstruction *user, SingleValueInstruction *address,
-    SILValue srcAddr, SmallPtrSetImpl<SILInstruction *> &loadInsts) {
+bool TempRValueOptPass::
+collectLoads(Operand *addressUse, CopyAddrInst *originalCopy,
+             SmallPtrSetImpl<SILInstruction *> &loadInsts) {
+  SILInstruction *user = addressUse->getUser();
+  SILValue address = addressUse->get();
+
   // All normal uses (loads) must be in the initialization block.
   // (The destroy and dealloc are commonly in a different block though.)
-  SILBasicBlock *block = address->getParent();
+  SILBasicBlock *block = originalCopy->getParent();
   if (user->getParent() != block)
     return false;
 
@@ -189,9 +154,27 @@ bool TempRValueOptPass::collectLoads(
     LLVM_DEBUG(llvm::dbgs()
                << "  Temp use may write/destroy its source" << *user);
     return false;
-  case SILInstructionKind::BeginAccessInst:
-    return cast<BeginAccessInst>(user)->getAccessKind() == SILAccessKind::Read;
+  case SILInstructionKind::BeginAccessInst: {
+    auto *beginAccess = cast<BeginAccessInst>(user);
+    if (beginAccess->getAccessKind() != SILAccessKind::Read)
+      return false;
 
+    // We don't have to recursively call collectLoads for the beginAccess
+    // result, because a SILAccessKind::Read already guarantees that there are
+    // no writes to the beginAccess result address (or any projection from it).
+    // But we have to register the end-accesses as loads to correctly mark the
+    // end-of-lifetime of the tempObj.
+    //
+    //   %addr = begin_access [read]
+    //      ... // there can be no writes to %addr here
+    //   end_acess %addr   // <- This is where the use actually ends.
+    for (EndAccessInst *endAccess : beginAccess->getEndAccesses()) {
+      if (endAccess->getParent() != block)
+        return false;
+      loadInsts.insert(endAccess);
+    }
+    return true;
+  }
   case SILInstructionKind::MarkDependenceInst: {
     auto mdi = cast<MarkDependenceInst>(user);
     // If the user is the base operand of the MarkDependenceInst we can return
@@ -202,8 +185,7 @@ bool TempRValueOptPass::collectLoads(
     // If the user is the value operand of the MarkDependenceInst we have to
     // transitively explore its uses until we reach a load or return false
     for (auto *mdiUseOper : mdi->getUses()) {
-      if (!collectLoads(mdiUseOper, mdiUseOper->getUser(), mdi, srcAddr,
-                        loadInsts))
+      if (!collectLoads(mdiUseOper, originalCopy, loadInsts))
         return false;
     }
     return true;
@@ -213,38 +195,36 @@ bool TempRValueOptPass::collectLoads(
       return false;
      LLVM_FALLTHROUGH;
   case SILInstructionKind::ApplyInst:
-  case SILInstructionKind::TryApplyInst: {
-    if (!canApplyBeTreatedAsLoad(userOp, ApplySite(user), srcAddr))
+  case SILInstructionKind::TryApplyInst:
+  case SILInstructionKind::BeginApplyInst: {
+    auto convention = ApplySite(user).getArgumentConvention(*addressUse);
+    if (!convention.isGuaranteedConvention())
       return false;
-    // Everything is okay with the function call. Register it as a "load".
+
+    loadInsts.insert(user);
+    if (auto *beginApply = dyn_cast<BeginApplyInst>(user)) {
+      // Register 'end_apply'/'abort_apply' as loads as well
+      // 'checkNoSourceModification' should check instructions until
+      // 'end_apply'/'abort_apply'.
+      for (auto tokenUse : beginApply->getTokenResult()->getUses()) {
+        SILInstruction *tokenUser = tokenUse->getUser();
+        if (tokenUser->getParent() != block)
+          return false;
+        loadInsts.insert(tokenUser);
+      }
+    }
+    return true;
+  }
+  case SILInstructionKind::YieldInst: {
+    auto *yield = cast<YieldInst>(user);
+    auto convention = yield->getArgumentConventionForOperand(*addressUse);
+    if (!convention.isGuaranteedConvention())
+      return false;
+
     loadInsts.insert(user);
     return true;
   }
-  case SILInstructionKind::BeginApplyInst: {
-    if (!canApplyBeTreatedAsLoad(userOp, ApplySite(user), srcAddr))
-      return false;
-
-    auto beginApply = cast<BeginApplyInst>(user);
-    // Register 'end_apply'/'abort_apply' as loads as well
-    // 'checkNoSourceModification' should check instructions until
-    // 'end_apply'/'abort_apply'.
-    for (auto tokenUse : beginApply->getTokenResult()->getUses()) {
-      SILInstruction *user = tokenUse->getUser();
-      if (user->getParent() != block)
-        return false;
-      loadInsts.insert(tokenUse->getUser());
-    }
-    return true;
-  }
   case SILInstructionKind::OpenExistentialAddrInst: {
-    // If we do not have an srcAddr, bail. We do not support promoting this yet.
-    if (!srcAddr) {
-      LLVM_DEBUG(llvm::dbgs() << "  Temp has open_existential_addr use?! Can "
-                                 "not yet promote to value"
-                              << *user);
-      return false;
-    }
-
     // We only support open existential addr if the access is immutable.
     auto *oeai = cast<OpenExistentialAddrInst>(user);
     if (oeai->getAccessKind() != OpenedExistentialAccess::Immutable) {
@@ -253,7 +233,7 @@ bool TempRValueOptPass::collectLoads(
                               << *user);
       return false;
     }
-    return collectLoadsFromProjection(oeai, srcAddr, loadInsts);
+    return collectLoadsFromProjection(oeai, originalCopy, loadInsts);
   }
   case SILInstructionKind::UncheckedTakeEnumDataAddrInst: {
     // In certain cases, unchecked_take_enum_data_addr invalidates the
@@ -267,15 +247,15 @@ bool TempRValueOptPass::collectLoads(
       return false;
     }
 
-    return collectLoadsFromProjection(utedai, srcAddr, loadInsts);
+    return collectLoadsFromProjection(utedai, originalCopy, loadInsts);
   }
   case SILInstructionKind::StructElementAddrInst:
   case SILInstructionKind::TupleElementAddrInst:
-  case SILInstructionKind::UncheckedAddrCastInst: {
+  case SILInstructionKind::UncheckedAddrCastInst:
     return collectLoadsFromProjection(cast<SingleValueInstruction>(user),
-                                      srcAddr, loadInsts);
-  }
-  case SILInstructionKind::LoadInst:
+                                      originalCopy, loadInsts);
+
+  case SILInstructionKind::LoadInst: {
     // Loads are the end of the data flow chain. The users of the load can't
     // access the temporary storage.
     //
@@ -285,20 +265,18 @@ bool TempRValueOptPass::collectLoads(
     // function. So if we have such a load [take], we /must/ have a
     // reinitialization or an alloc_stack that does not fit the pattern we are
     // expecting from SILGen. Be conservative and return false.
-    if (auto *li = dyn_cast<LoadInst>(user)) {
-      if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Take) {
-        return false;
-      }
+    auto *li = cast<LoadInst>(user);
+    if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Take &&
+        // Only accept load [take] if it takes the whole temporary object.
+        // load [take] from a projection would destroy only a part of the
+        // temporary and we don't handle this.
+        address != originalCopy->getDest()) {
+      return false;
     }
     loadInsts.insert(user);
     return true;
-
+  }
   case SILInstructionKind::LoadBorrowInst:
-    // If we do not have a source addr, we must be trying to eliminate a
-    // store. Until we check that the source object is not destroyed within the
-    // given range, we need bail.
-    if (!srcAddr)
-      return false;
     loadInsts.insert(user);
     return true;
   case SILInstructionKind::FixLifetimeInst:
@@ -313,26 +291,40 @@ bool TempRValueOptPass::collectLoads(
       LLVM_DEBUG(llvm::dbgs() << "  Temp written or taken" << *user);
       return false;
     }
+    // As with load [take], only accept copy_addr [take] if it takes the whole
+    // temporary object.
+    if (copyFromTmp->isTakeOfSrc() && address != originalCopy->getDest())
+      return false;
     loadInsts.insert(copyFromTmp);
     return true;
   }
   }
 }
 
-/// Checks if the copy's source can be modified within the temporary's lifetime.
+/// Checks if the source of \p copyInst is not modified within the temporary's
+/// lifetime, i.e. is not modified before the last use of \p useInsts.
+///
+/// If there are no source modifications with the lifetime, returns the last
+/// user (or copyInst if there are no uses at all).
+/// Otherwise, returns a nullptr.
 ///
 /// Unfortunately, we cannot simply use the destroy points as the lifetime end,
 /// because they can be in a different basic block (that's what SILGen
 /// generates). Instead we guarantee that all normal uses are within the block
 /// of the temporary and look for the last use, which effectively ends the
 /// lifetime.
-bool TempRValueOptPass::checkNoSourceModification(
-    CopyAddrInst *copyInst, SILValue copySrc,
-    const SmallPtrSetImpl<SILInstruction *> &useInsts) {
+SILInstruction *TempRValueOptPass::getLastUseWhileSourceIsNotModified(
+    CopyAddrInst *copyInst, const SmallPtrSetImpl<SILInstruction *> &useInsts,
+    AliasAnalysis *aa) {
+  if (useInsts.empty())
+    return copyInst;
   unsigned numLoadsFound = 0;
-  auto iter = std::next(copyInst->getIterator());
+  SILValue copySrc = copyInst->getSrc();
+
   // We already checked that the useful lifetime of the temporary ends in
-  // the initialization block.
+  // the initialization block. Iterate over the instructions of the block,
+  // starting at copyInst, until we get to the last user.
+  auto iter = std::next(copyInst->getIterator());
   auto iterEnd = copyInst->getParent()->end();
   for (; iter != iterEnd; ++iter) {
     SILInstruction *inst = &*iter;
@@ -342,17 +334,79 @@ bool TempRValueOptPass::checkNoSourceModification(
 
     // If this is the last use of the temp we are ok. After this point,
     // modifications to the source don't matter anymore.
-    if (numLoadsFound == useInsts.size())
-      return true;
+    // Note that we are assuming here that if an instruction loads and writes
+    // to copySrc at the same time (like a copy_addr could do), the write
+    // takes effect after the load.
+    if (numLoadsFound == useInsts.size()) {
+      // Function calls are an exception: in a called function a potential
+      // modification of copySrc could occur _before_ the read of the temporary.
+      if ((FullApplySite::isa(inst) || isa<YieldInst>(inst)) &&
+          aa->mayWriteToMemory(inst, copySrc)) {
+        return nullptr;
+      }
+
+      return inst;
+    }
 
     if (aa->mayWriteToMemory(inst, copySrc)) {
       LLVM_DEBUG(llvm::dbgs() << "  Source modified by" << *iter);
-      return false;
+      return nullptr;
     }
   }
   // For some reason, not all normal uses have been seen between the copy and
   // the end of the initialization block. We should never reach here.
-  return false;
+  return nullptr;
+}
+
+/// Tries to move an end_access down to extend the access scope over all uses
+/// of the temporary. For example:
+///
+///   %a = begin_access %src
+///   copy_addr %a to [initialization] %temp : $*T
+///   end_access %a
+///   use %temp
+///
+/// We must not replace %temp with %a after the end_access. Instead we try to
+/// move the end_access after "use %temp".
+bool TempRValueOptPass::extendAccessScopes(
+    CopyAddrInst *copyInst, SILInstruction *lastUseInst, AliasAnalysis *aa) {
+
+  SILValue copySrc = copyInst->getSrc();
+  EndAccessInst *endAccessToMove = nullptr;
+  auto begin = std::next(copyInst->getIterator());
+  auto end = std::next(lastUseInst->getIterator());
+
+  for (SILInstruction &inst : make_range(begin, end)) {
+    if (auto *endAccess = dyn_cast<EndAccessInst>(&inst)) {
+      // To keep things simple, we can just move a single end_access. Also, we
+      // cannot move an end_access over a (non-aliasing) end_access.
+      if (endAccessToMove)
+        return false;
+      // Is this the end of an access scope of the copy-source?
+      if (!aa->isNoAlias(copySrc, endAccess->getSource())) {
+        assert(endAccess->getBeginAccess()->getAccessKind() ==
+                 SILAccessKind::Read &&
+               "a may-write end_access should not be in the copysrc lifetime");
+        endAccessToMove = endAccess;
+      }
+    } else if (endAccessToMove) {
+      // We cannot move an end_access over a begin_access. This would destroy
+      // the proper nesting of accesses.
+      if (isa<BeginAccessInst>(&inst) || isa<BeginUnpairedAccessInst>(inst))
+        return false;
+      // Don't extend a read-access scope over a (potential) write.
+      // Note that inst can be a function call containing other access scopes.
+      // But doing the mayWriteToMemory check, we know that the function can
+      // only contain read accesses (to the same memory location). So it's fine
+      // to move endAccessToMove even over such a function call.
+      if (aa->mayWriteToMemory(&inst, endAccessToMove->getSource()))
+        return false;
+    }
+  }
+  if (endAccessToMove)
+    endAccessToMove->moveAfter(lastUseInst);
+
+  return true;
 }
 
 /// Return true if the \p tempObj, which is initialized by \p copyInst, is
@@ -366,13 +420,7 @@ bool TempRValueOptPass::checkNoSourceModification(
 /// releasing it. Rather than detecting unbalanced load releases, simply check
 /// that tempObj is destroyed directly on all paths.
 bool TempRValueOptPass::checkTempObjectDestroy(
-    AllocStackInst *tempObj, CopyAddrInst *copyInst,
-    ValueLifetimeAnalysis::Frontier &tempAddressFrontier) {
-  // If the original copy was a take, then replacing all uses cannot affect
-  // the lifetime.
-  if (copyInst->isTakeOfSrc())
-    return true;
-
+    AllocStackInst *tempObj, CopyAddrInst *copyInst) {
   // ValueLifetimeAnalysis is not normally used for address types. It does not
   // reason about the lifetime of the in-memory object. However the utility can
   // be abused here to check that the address is directly destroyed on all
@@ -391,6 +439,7 @@ bool TempRValueOptPass::checkTempObjectDestroy(
   }
   // Find the boundary of tempObj's address lifetime, starting at copyInst.
   ValueLifetimeAnalysis vla(copyInst, users);
+  ValueLifetimeAnalysis::Frontier tempAddressFrontier;
   if (!vla.computeFrontier(tempAddressFrontier,
                            ValueLifetimeAnalysis::DontModifyCFG)) {
     return false;
@@ -411,15 +460,8 @@ bool TempRValueOptPass::checkTempObjectDestroy(
     if (isa<DestroyAddrInst>(lastUser))
       continue;
 
-    if (auto *li = dyn_cast<LoadInst>(lastUser)) {
-      if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Take) {
-        continue;
-      }
-    }
-
     if (auto *cai = dyn_cast<CopyAddrInst>(lastUser)) {
       assert(cai->getSrc() == tempObj && "collectLoads checks for writes");
-      assert(!copyInst->isTakeOfSrc() && "checked above");
       if (cai->isTakeOfSrc())
         continue;
     }
@@ -429,23 +471,23 @@ bool TempRValueOptPass::checkTempObjectDestroy(
 }
 
 /// Tries to perform the temporary rvalue copy elimination for \p copyInst
-bool TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
+void TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
   if (!copyInst->isInitializationOfDest())
-    return false;
+    return;
 
   auto *tempObj = dyn_cast<AllocStackInst>(copyInst->getDest());
   if (!tempObj)
-    return false;
+    return;
 
-  // The copy's source address must not be a scoped instruction, like
-  // begin_borrow. When the temporary object is eliminated, it's uses are
-  // replaced with the copy's source. Therefore, the source address must be
-  // valid at least until the next instruction that may write to or destroy the
-  // source. End-of-scope markers, such as end_borrow, do not write to or
-  // destroy memory, so scoped addresses are not valid replacements.
-  SILValue copySrc = stripAccessMarkers(copyInst->getSrc());
-
+  bool isOSSA = copyInst->getFunction()->hasOwnership();
+  
+  SILValue copySrc = copyInst->getSrc();
   assert(tempObj != copySrc && "can't initialize temporary with itself");
+
+  // If the source of the copyInst is taken, we must insert a compensating
+  // destroy_addr. This must be done at the right spot: after the last use
+  // tempObj, but before any (potential) re-initialization of the source.
+  bool needToInsertDestroy = copyInst->isTakeOfSrc();
 
   // Scan all uses of the temporary storage (tempObj) to verify they all refer
   // to the value initialized by this copy. It is sufficient to check that the
@@ -458,98 +500,96 @@ bool TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
     if (user == copyInst)
       continue;
 
-    // Destroys and deallocations are allowed to be in a different block.
-    if (isa<DestroyAddrInst>(user) || isa<DeallocStackInst>(user))
+    // Deallocations are allowed to be in a different block.
+    if (isa<DeallocStackInst>(user))
       continue;
 
-    // Same for load [take] on the top level temp object. SILGen always takes
-    // whole values from temporaries. If we have load [take] on projections from
-    // our base, we fail since those would be re-initializations.
-    if (auto *li = dyn_cast<LoadInst>(user)) {
-      if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Take) {
-        continue;
+    // Also, destroys are allowed to be in a different block.
+    if (isa<DestroyAddrInst>(user)) {
+      if (!isOSSA && needToInsertDestroy) {
+        // In non-OSSA mode, for the purpose of inserting the destroy of
+        // copySrc, we have to be conservative and assume that the lifetime of
+        // tempObj goes beyond it's last use - until the final destroy_addr.
+        // Otherwise we would risk of inserting the destroy too early.
+        // So we just treat the destroy_addr as any other use of tempObj.
+        if (user->getParent() != copyInst->getParent())
+          return;
+        loadInsts.insert(user);
       }
+      continue;
     }
 
-    if (!collectLoads(useOper, user, tempObj, copySrc, loadInsts))
-      return false;
+    if (!collectLoads(useOper, copyInst, loadInsts))
+      return;
   }
 
-  // Check if the source is modified within the lifetime of the temporary.
-  if (!checkNoSourceModification(copyInst, copySrc, loadInsts))
-    return false;
+  AliasAnalysis *aa = getPassManager()->getAnalysis<AliasAnalysis>(getFunction());
 
-  ValueLifetimeAnalysis::Frontier tempAddressFrontier;
-  if (!checkTempObjectDestroy(tempObj, copyInst, tempAddressFrontier))
-    return false;
+  // Check if the source is modified within the lifetime of the temporary.
+  SILInstruction *lastLoadInst =
+    getLastUseWhileSourceIsNotModified(copyInst, loadInsts, aa);
+  if (!lastLoadInst)
+    return;
+
+  // We cannot insert the destroy of copySrc after lastLoadInst if copySrc is
+  // re-initialized by exactly this instruction.
+  // This is a corner case, but can happen if lastLoadInst is a copy_addr.
+  // Example:
+  //   copy_addr [take] %copySrc to [initialization] %tempObj   // copyInst
+  //   copy_addr [take] %tempObj to [initialization] %copySrc   // lastLoadInst
+  if (needToInsertDestroy && lastLoadInst != copyInst &&
+      !isa<DestroyAddrInst>(lastLoadInst) &&
+      aa->mayWriteToMemory(lastLoadInst, copySrc))
+    return;
+
+  if (!isOSSA && !checkTempObjectDestroy(tempObj, copyInst))
+    return;
+
+  if (!extendAccessScopes(copyInst, lastLoadInst, aa))
+    return;
 
   LLVM_DEBUG(llvm::dbgs() << "  Success: replace temp" << *tempObj);
 
-  // Do a "replaceAllUses" by either deleting the users or replacing them with
-  // the source address. Note: we must not delete the original copyInst because
-  // it would crash the instruction iteration in run(). Instead the copyInst
-  // gets identical Src and Dest operands.
+  if (needToInsertDestroy) {
+    // Compensate the [take] of the original copyInst.
+    SILBuilderWithScope::insertAfter(lastLoadInst, [&] (SILBuilder &builder) {
+      builder.createDestroyAddr(builder.getInsertionPoint()->getLoc(), copySrc);
+    });
+  }
+
+  // * Replace all uses of the tempObj with the copySrc.
   //
-  // NOTE: We delete instructions at the end to allow us to use
-  // tempAddressFrontier to insert compensating destroys for load [take].
-  SmallVector<SILInstruction *, 4> toDelete;
+  // * Delete the destroy(s) of tempObj (to compensate the removal of the
+  //   original copyInst): either by erasing the destroy_addr or by converting
+  //   load/copy_addr [take] into copying instructions.
+  //
+  // Note: we must not delete the original copyInst because it would crash the
+  // instruction iteration in run(). Instead the copyInst gets identical Src and
+  // Dest operands.
   while (!tempObj->use_empty()) {
     Operand *use = *tempObj->use_begin();
     SILInstruction *user = use->getUser();
+
     switch (user->getKind()) {
     case SILInstructionKind::DestroyAddrInst:
-      if (copyInst->isTakeOfSrc()) {
-        use->set(copySrc);
-      } else {
-        user->dropAllReferences();
-        toDelete.push_back(user);
-      }
-      break;
     case SILInstructionKind::DeallocStackInst:
-      user->dropAllReferences();
-      toDelete.push_back(user);
+      user->eraseFromParent();
       break;
     case SILInstructionKind::CopyAddrInst: {
       auto *cai = cast<CopyAddrInst>(user);
       if (cai != copyInst) {
         assert(cai->getSrc() == tempObj);
-        if (cai->isTakeOfSrc() && !copyInst->isTakeOfSrc())
+        if (cai->isTakeOfSrc())
           cai->setIsTakeOfSrc(IsNotTake);
       }
       use->set(copySrc);
       break;
     }
     case SILInstructionKind::LoadInst: {
-      // If we do not have a load [take] or we have a load [take] and our
-      // copy_addr takes the source, just do the normal thing of setting the
-      // load to use the copyInst's source.
       auto *li = cast<LoadInst>(user);
-      if (li->getOwnershipQualifier() != LoadOwnershipQualifier::Take ||
-          copyInst->isTakeOfSrc()) {
-        use->set(copyInst->getSrc());
-        break;
-      }
-
-      // Otherwise, since copy_addr is not taking src, we need to ensure that we
-      // insert a copy of our value. We do that by creating a load [copy] at the
-      // copy_addr inst and RAUWing the load [take] with that. We then insert
-      // destroy_value for the load [copy] at all points where we had destroys
-      // that are not the specific take that we were optimizing.
-      SILBuilderWithScope builder(copyInst);
-      SILValue newLoad = builder.emitLoadValueOperation(
-          copyInst->getLoc(), copyInst->getSrc(), LoadOwnershipQualifier::Copy);
-      for (auto *inst : tempAddressFrontier) {
-        assert(inst->getIterator() != inst->getParent()->begin() &&
-               "Should have caught this when checking destructor");
-        auto prevInst = std::prev(inst->getIterator());
-        if (&*prevInst == li)
-          continue;
-        SILBuilderWithScope builder(prevInst);
-        builder.emitDestroyValueOperation(prevInst->getLoc(), newLoad);
-      }
-      li->replaceAllUsesWith(newLoad);
-      li->dropAllReferences();
-      toDelete.push_back(li);
+      if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Take)
+        li->setOwnershipQualifier(LoadOwnershipQualifier::Copy);
+      use->set(copySrc);
       break;
     }
 
@@ -562,29 +602,26 @@ bool TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
     }
   }
 
-  while (!toDelete.empty()) {
-    toDelete.pop_back_val()->eraseFromParent();
-  }
   tempObj->eraseFromParent();
-  return true;
+  invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
 }
 
-std::pair<SILBasicBlock::iterator, bool>
+SILBasicBlock::iterator
 TempRValueOptPass::tryOptimizeStoreIntoTemp(StoreInst *si) {
   // If our store is an assign, bail.
   if (si->getOwnershipQualifier() == StoreOwnershipQualifier::Assign)
-    return {std::next(si->getIterator()), false};
+    return std::next(si->getIterator());
 
   auto *tempObj = dyn_cast<AllocStackInst>(si->getDest());
   if (!tempObj) {
-    return {std::next(si->getIterator()), false};
+    return std::next(si->getIterator());
   }
 
   // If our tempObj has a dynamic lifetime (meaning it is conditionally
   // initialized, conditionally taken, etc), we can not convert its uses to SSA
   // while eliminating it simply. So bail.
   if (tempObj->hasDynamicLifetime()) {
-    return {std::next(si->getIterator()), false};
+    return std::next(si->getIterator());
   }
 
   // Scan all uses of the temporary storage (tempObj) to verify they all refer
@@ -598,31 +635,23 @@ TempRValueOptPass::tryOptimizeStoreIntoTemp(StoreInst *si) {
     if (user == si)
       continue;
 
-    // Destroys and deallocations are allowed to be in a different block.
-    if (isa<DestroyAddrInst>(user) || isa<DeallocStackInst>(user))
-      continue;
-
-    // Same for load [take] on the top level temp object. SILGen always takes
-    // whole values from temporaries. If we have load [take] on projections from
-    // our base, we fail since those would be re-initializations.
-    if (auto *li = dyn_cast<LoadInst>(user)) {
-      if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Take) {
-        continue;
-      }
-    }
-
-    // We pass in SILValue() since we do not have a source address.
-    if (!collectLoads(useOper, user, tempObj, SILValue(), loadInsts))
-      return {std::next(si->getIterator()), false};
-
     // Bail if there is any kind of user which is not handled in the code below.
     switch (user->getKind()) {
-      case SILInstructionKind::CopyAddrInst:
+      case SILInstructionKind::DestroyAddrInst:
+      case SILInstructionKind::DeallocStackInst:
+      case SILInstructionKind::LoadInst:
       case SILInstructionKind::FixLifetimeInst:
+        break;
+      case SILInstructionKind::CopyAddrInst:
+        if (cast<CopyAddrInst>(user)->getDest() == tempObj)
+          return std::next(si->getIterator());
+        break;
       case SILInstructionKind::MarkDependenceInst:
-        continue;
+        if (cast<MarkDependenceInst>(user)->getValue() == tempObj)
+          return std::next(si->getIterator());
+        break;
       default:
-        return {std::next(si->getIterator()), false};
+        return std::next(si->getIterator());
     }
   }
 
@@ -690,11 +719,13 @@ TempRValueOptPass::tryOptimizeStoreIntoTemp(StoreInst *si) {
       break;
     }
     case SILInstructionKind::MarkDependenceInst: {
-      SILBuilderWithScope builder(user);
       auto mdi = cast<MarkDependenceInst>(user);
-      auto newInst = builder.createMarkDependence(user->getLoc(), mdi->getValue(), si->getSrc());
+      assert(mdi->getBase() == tempObj);
+      SILBuilderWithScope builder(user);
+      auto newInst = builder.createMarkDependence(user->getLoc(),
+                       mdi->getValue(), si->getSrc());
       mdi->replaceAllUsesWith(newInst);
-      toDelete.push_back(user);
+      toDelete.push_back(mdi);
       break;
     }
     // ASSUMPTION: no operations that may be handled by this default clause can
@@ -715,7 +746,8 @@ TempRValueOptPass::tryOptimizeStoreIntoTemp(StoreInst *si) {
   auto nextIter = std::next(si->getIterator());
   si->eraseFromParent();
   tempObj->eraseFromParent();
-  return {nextIter, true};
+  invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+  return nextIter;
 }
 
 //===----------------------------------------------------------------------===//
@@ -727,11 +759,8 @@ void TempRValueOptPass::run() {
   LLVM_DEBUG(llvm::dbgs() << "Copy Peephole in Func "
                           << getFunction()->getName() << "\n");
 
-  aa = getPassManager()->getAnalysis<AliasAnalysis>();
-  bool changed = false;
-
   // Find all copy_addr instructions.
-  llvm::SmallVector<CopyAddrInst *, 8> deadCopies;
+  llvm::SmallSetVector<CopyAddrInst *, 8> deadCopies;
   for (auto &block : *getFunction()) {
     // Increment the instruction iterator only after calling
     // tryOptimizeCopyIntoTemp because the instruction after CopyInst might be
@@ -740,23 +769,20 @@ void TempRValueOptPass::run() {
       if (auto *copyInst = dyn_cast<CopyAddrInst>(&*ii)) {
         // In case of success, this may delete instructions, but not the
         // CopyInst itself.
-        changed |= tryOptimizeCopyIntoTemp(copyInst);
+        tryOptimizeCopyIntoTemp(copyInst);
         // Remove identity copies which either directly result from successfully
         // calling tryOptimizeCopyIntoTemp or was created by an earlier
         // iteration, where another copy_addr copied the temporary back to the
         // source location.
-        if (stripAccessMarkers(copyInst->getSrc()) == copyInst->getDest()) {
-          changed = true;
-          deadCopies.push_back(copyInst);
+        if (copyInst->getSrc() == copyInst->getDest()) {
+          deadCopies.insert(copyInst);
         }
         ++ii;
         continue;
       }
 
       if (auto *si = dyn_cast<StoreInst>(&*ii)) {
-        bool madeSingleChange;
-        std::tie(ii, madeSingleChange) = tryOptimizeStoreIntoTemp(si);
-        changed |= madeSingleChange;
+        ii = tryOptimizeStoreIntoTemp(si);
         continue;
       }
 
@@ -764,28 +790,26 @@ void TempRValueOptPass::run() {
     }
   }
 
-  // Delete the copies and any unused address operands.
-  // The same copy may have been added multiple times.
-  sortUnique(deadCopies);
+  auto callbacks = InstModCallbacks().onDelete(
+    [](SILInstruction *instToKill) {
+      // SimplifyInstruction is not in the business of removing
+      // copy_addr. If it were, then we would need to update deadCopies.
+      assert(!isa<CopyAddrInst>(instToKill));
+      instToKill->eraseFromParent();
+    }
+  );
+
+  DeadEndBlocks deBlocks(getFunction());
   for (auto *deadCopy : deadCopies) {
-    assert(changed);
     auto *srcInst = deadCopy->getSrc()->getDefiningInstruction();
     deadCopy->eraseFromParent();
     // Simplify any access scope markers that were only used by the dead
     // copy_addr and other potentially unused addresses.
     if (srcInst) {
-      if (SILValue result = simplifyInstruction(srcInst)) {
-        replaceAllSimplifiedUsesAndErase(
-            srcInst, result, [](SILInstruction *instToKill) {
-              // SimplifyInstruction is not in the business of removing
-              // copy_addr. If it were, then we would need to update deadCopies.
-              assert(!isa<CopyAddrInst>(instToKill));
-              instToKill->eraseFromParent();
-            });
-      }
+      simplifyAndReplaceAllSimplifiedUsesAndErase(srcInst, callbacks, &deBlocks);
     }
   }
-  if (changed) {
+  if (!deadCopies.empty()) {
     invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 }

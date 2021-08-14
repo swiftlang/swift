@@ -96,12 +96,15 @@ bb1:
   cond_br undef, bb3, bb4
 
 bb2:
-  br bb4
+  br bb5
 
 bb3:
   unreachable
 
 bb4:
+  br bb5
+
+bb5:
   destroy_value %0 : $Builtin.NativeObject
   %9999 = tuple()
   return %9999 : $()
@@ -117,13 +120,16 @@ bb1:
   cond_br undef, bb3, bb4
 
 bb2:
-  br bb4
+  br bb5
 
 bb3:
   destroy_value %0 : $Builtin.NativeObject
   unreachable
 
 bb4:
+  br bb5
+
+bb5:
   destroy_value %0 : $Builtin.NativeObject
   %9999 = tuple()
   return %9999 : $()

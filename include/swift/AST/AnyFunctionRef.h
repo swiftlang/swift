@@ -18,6 +18,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/Types.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -103,6 +104,18 @@ public:
     return TheFunction.get<AbstractClosureExpr *>()->getSingleExpressionBody();
   }
 
+  ParameterList *getParameters() const {
+    if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
+      return AFD->getParameters();
+    return TheFunction.get<AbstractClosureExpr *>()->getParameters();
+  }
+
+  bool hasExternalPropertyWrapperParameters() const {
+    return llvm::any_of(*getParameters(), [](const ParamDecl *param) {
+      return param->hasExternalPropertyWrapper();
+    });
+  }
+
   Type getType() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD->getInterfaceType();
@@ -166,18 +179,23 @@ public:
     return TheFunction.dyn_cast<AbstractClosureExpr*>();
   }
 
-  bool isDeferBody() const {
-    if (auto *fd = dyn_cast_or_null<FuncDecl>(getAbstractFunctionDecl()))
-      return fd->isDeferBody();
-    return false;
-  }
-
   /// Return true if this closure is passed as an argument to a function and is
   /// known not to escape from that function.  In this case, captures can be
   /// more efficient.
   bool isKnownNoEscape() const {
     if (hasType() && !getType()->hasError())
       return getType()->castTo<AnyFunctionType>()->isNoEscape();
+    return false;
+  }
+
+  /// Whether this function is @Sendable.
+  bool isSendable() const {
+    if (!hasType())
+      return false;
+
+    if (auto *fnType = getType()->getAs<AnyFunctionType>())
+      return fnType->isSendable();
+
     return false;
   }
 
@@ -192,9 +210,9 @@ public:
     llvm_unreachable("unexpected AnyFunctionRef representation");
   }
   
-  SourceLoc getLoc() const {
+  SourceLoc getLoc(bool SerializedOK = true) const {
     if (auto afd = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
-      return afd->getLoc();
+      return afd->getLoc(SerializedOK);
     }
     if (auto ce = TheFunction.dyn_cast<AbstractClosureExpr *>()) {
       return ce->getLoc();
@@ -251,7 +269,7 @@ public:
   }
 
   friend SourceLoc extractNearestSourceLoc(AnyFunctionRef fn) {
-    return fn.getLoc();
+    return fn.getLoc(/*SerializedOK=*/false);
   }
 
 private:

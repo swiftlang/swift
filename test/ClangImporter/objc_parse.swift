@@ -184,8 +184,12 @@ func keyedSubscripting(_ b: B, idx: A, a: A) {
   dict[NSString()] = a
   let value = dict[NSString()]
 
-  dict[nil] = a // expected-error {{'nil' is not compatible with expected argument type 'NSCopying'}}
-  let q = dict[nil]  // expected-error {{'nil' is not compatible with expected argument type 'NSCopying'}}
+  // notes attached to the partially matching declarations for both following subscripts:
+  // - override subscript(_: Any) -> Any? -> 'nil' is not compatible with expected argument type 'Any' at position #1
+  // - open subscript(key: NSCopying) -> Any? { get set } -> 'nil' is not compatible with expected argument type 'NSCopying' at position #1
+
+  dict[nil] = a // expected-error {{no exact matches in call to subscript}}
+  let q = dict[nil]  // expected-error {{no exact matches in call to subscript}}
   _ = q
 }
 
@@ -540,10 +544,12 @@ func testStrangeSelectors(obj: StrangeSelectors) {
 
 func testProtocolQualified(_ obj: CopyableNSObject, cell: CopyableSomeCell,
                            plainObj: NSObject, plainCell: SomeCell) {
-  _ = obj as NSObject // expected-error {{'CopyableNSObject' (aka 'NSCopying & NSObjectProtocol') is not convertible to 'NSObject'; did you mean to use 'as!' to force downcast?}} {{11-13=as!}}
+  _ = obj as NSObject // expected-error {{'CopyableNSObject' (aka 'NSCopying & NSObjectProtocol') is not convertible to 'NSObject'}} 
+  // expected-note@-1 {{did you mean to use 'as!' to force downcast?}} {{11-13=as!}}
   _ = obj as NSObjectProtocol
   _ = obj as NSCopying
-  _ = obj as SomeCell // expected-error {{'CopyableNSObject' (aka 'NSCopying & NSObjectProtocol') is not convertible to 'SomeCell'; did you mean to use 'as!' to force downcast?}} {{11-13=as!}}
+  _ = obj as SomeCell // expected-error {{'CopyableNSObject' (aka 'NSCopying & NSObjectProtocol') is not convertible to 'SomeCell'}}
+  // expected-note@-1 {{did you mean to use 'as!' to force downcast?}} {{11-13=as!}}
 
   _ = cell as NSObject
   _ = cell as NSObjectProtocol

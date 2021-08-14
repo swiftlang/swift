@@ -1,10 +1,5 @@
-// RUN: %empty-directory(%t)
-// RUN: %gyb %s -o %t/FloatingPoint.swift
-// RUN: %line-directive %t/FloatingPoint.swift -- %target-build-swift -parse-stdlib %t/FloatingPoint.swift -o %t/a.out
-// RUN: %target-codesign %t/a.out
-// RUN: %line-directive %t/FloatingPoint.swift -- %target-run %t/a.out
+// RUN: %target-run-simple-swiftgyb(-parse-stdlib)
 // REQUIRES: executable_test
-// REQUIRES: rdar49026133
 
 import Swift
 import StdlibUnittest
@@ -118,17 +113,17 @@ FloatingPoint.test("BinaryFloatingPoint/genericIntegerConversion") {
 FloatingPoint.test("BinaryFloatingPoint/genericFloatingPointConversion") {
   func convert<
     T: BinaryFloatingPoint, U: BinaryFloatingPoint
-  >(exactly value: T, to: U.Type) -> U { U(exactly: value) }
+  >(exactly value: T, to: U.Type) -> U? { U(exactly: value) }
   
   expectEqual(convert(exactly: 0 as Float, to: Double.self), 0.0)
   expectEqual(convert(exactly: -0.0 as Float, to: Double.self), -0.0)
   expectEqual(
-    convert(exactly: -0.0 as Float, to: Double.self).sign,
+    convert(exactly: -0.0 as Float, to: Double.self)?.sign,
     FloatingPointSign.minus)
   expectEqual(convert(exactly: 0 as Double, to: Float.self), 0.0 as Float)
   expectEqual(convert(exactly: -0.0 as Double, to: Float.self), -0.0 as Float)
   expectEqual(
-    convert(exactly: -0.0 as Double, to: Float.self).sign,
+    convert(exactly: -0.0 as Double, to: Float.self)?.sign,
     FloatingPointSign.minus)
   expectEqual(convert(exactly: 1 as Float, to: Double.self), 1.0)
   expectEqual(convert(exactly: -1 as Float, to: Double.self), -1.0)
@@ -248,15 +243,20 @@ FloatingPoint.test("BinaryFloatingPoint/genericFloatingPointConversion") {
       from: Double._convert(from: Float.leastNonzeroMagnitude).value).value,
     Float.leastNonzeroMagnitude)
 
-  // Let's make sure that the correct value is returned when two representable
-  // values are equally close to the original value.
-  let bitPattern: UInt64 = 0b01111111111_0000000000000000000000110000000000000000000000000000
-  var z = Double(bitPattern: bitPattern)
-  expectEqual(Float._convert(from: z).value, Float(z))
+  if #available(macOS 11, iOS 14, watchOS 7, tvOS 14, *) {
+    // The behavior tested here was introduced in
+    // https://github.com/apple/swift/pull/30194
 
-  z = Double(Float.greatestFiniteMagnitude) +
-      Double(Float.greatestFiniteMagnitude.ulp / 2)
-  expectEqual(Float._convert(from: z).value, Float(z))
+    // Let's make sure that the correct value is returned when two representable
+    // values are equally close to the original value.
+    let bitPattern: UInt64 = 0b01111111111_0000000000000000000000110000000000000000000000000000
+    var z = Double(bitPattern: bitPattern)
+    expectEqual(Float._convert(from: z).value, Float(z))
+
+    z = Double(Float.greatestFiniteMagnitude) +
+    Double(Float.greatestFiniteMagnitude.ulp / 2)
+    expectEqual(Float._convert(from: z).value, Float(z))
+  }
 }
 
 func positiveOne<T: ExpressibleByIntegerLiteral>() -> T {
@@ -827,10 +827,11 @@ FloatingPoint.test("${FloatSelf}/{Comparable,Hashable,Equatable}") {
       //  If either lhs or rhs is signaling, or if both are quiet NaNs, the
       //  result is a quiet NaN.
       if lhs.isSignalingNaN || rhs.isSignalingNaN || (lhs.isNaN && rhs.isNaN) {
-        expectTrue(min.isQuietNaN)
-        expectTrue(max.isQuietNaN)
-        expectTrue(minMag.isQuietNaN)
-        expectTrue(maxMag.isQuietNaN)
+        // FIXME: <rdar://problem/48917925>
+        // expectTrue(min.isQuietNaN)
+        // expectTrue(max.isQuietNaN)
+        // expectTrue(minMag.isQuietNaN)
+        // expectTrue(maxMag.isQuietNaN)
       }
       //  If only one of lhs and rhs is NaN, the result of the min/max
       //  operations is always the other value.  While contrary to all other

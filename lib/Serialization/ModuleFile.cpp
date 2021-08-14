@@ -91,8 +91,7 @@ static bool isTargetTooNew(const llvm::Triple &moduleTarget,
 }
 
 ModuleFile::ModuleFile(std::shared_ptr<const ModuleFileSharedCore> core)
-    : Core(core),
-      DeserializedTypeCallback([](Type ty) {}) {
+    : Core(core) {
   assert(!core->hasError());
 
   DeclTypeCursor = core->DeclTypeCursor;
@@ -118,12 +117,18 @@ ModuleFile::ModuleFile(std::shared_ptr<const ModuleFileSharedCore> core)
   allocateBuffer(Identifiers, core->Identifiers);
 }
 
-Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc) {
+bool ModuleFile::allowCompilerErrors() const {
+  return getContext().LangOpts.AllowModuleWithCompilerErrors;
+}
+
+Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
+                                            bool recoverFromIncompatibility) {
   PrettyStackTraceModuleFile stackEntry(*this);
 
   assert(!hasError() && "error already detected; should not call this");
   assert(!FileContext && "already associated with an AST module");
   FileContext = file;
+  Status status = Status::Valid;
 
   ModuleDecl *M = file->getParentModule();
   if (M->getName().str() != Core->Name)
@@ -134,12 +139,14 @@ Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc) {
   llvm::Triple moduleTarget(llvm::Triple::normalize(Core->TargetTriple));
   if (!areCompatibleArchitectures(moduleTarget, ctx.LangOpts.Target) ||
       !areCompatibleOSs(moduleTarget, ctx.LangOpts.Target)) {
-    return error(Status::TargetIncompatible);
-  }
-  if (ctx.LangOpts.EnableTargetOSChecking &&
-      !M->isResilient() &&
-      isTargetTooNew(moduleTarget, ctx.LangOpts.Target)) {
-    return error(Status::TargetTooNew);
+    status = Status::TargetIncompatible;
+    if (!recoverFromIncompatibility)
+      return error(status);
+  } else if (ctx.LangOpts.EnableTargetOSChecking && !M->isResilient() &&
+             isTargetTooNew(moduleTarget, ctx.LangOpts.Target)) {
+    status = Status::TargetTooNew;
+    if (!recoverFromIncompatibility)
+      return error(status);
   }
 
   for (const auto &searchPath : Core->SearchPaths)
@@ -240,7 +247,7 @@ Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc) {
                                                            None);
   }
 
-  return Status::Valid;
+  return status;
 }
 
 bool ModuleFile::mayHaveDiagnosticsPointingAtBuffer() const {
@@ -348,11 +355,11 @@ OpaqueTypeDecl *ModuleFile::lookupOpaqueResultType(StringRef MangledName) {
 
   if (!Core->OpaqueReturnTypeDecls)
     return nullptr;
-  
+
   auto iter = Core->OpaqueReturnTypeDecls->find(MangledName);
   if (iter == Core->OpaqueReturnTypeDecls->end())
     return nullptr;
-  
+
   return cast<OpaqueTypeDecl>(getDecl(*iter));
 }
 
@@ -499,6 +506,10 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
       if (Dep.isExported())
         ID->getAttrs().add(
             new (Ctx) ExportedAttr(/*IsImplicit=*/false));
+      if (Dep.isImplementationOnly())
+        ID->getAttrs().add(
+            new (Ctx) ImplementationOnlyAttr(/*IsImplicit=*/false));
+
       ImportDecls.push_back(ID);
     }
     Bits.ComputedImportDecls = true;
@@ -650,6 +661,24 @@ void ModuleFile::loadDerivativeFunctionConfigurations(
   }
 }
 
+Optional<Fingerprint>
+ModuleFile::loadFingerprint(const IterableDeclContext *IDC) const {
+  PrettyStackTraceDecl trace("loading fingerprints for", IDC->getDecl());
+
+  assert(IDC->wasDeserialized());
+  assert(IDC->getDeclID() != 0);
+
+  if (!Core->DeclFingerprints) {
+    return None;
+  }
+
+  auto it = Core->DeclFingerprints->find(IDC->getDeclID());
+  if (it == Core->DeclFingerprints->end()) {
+    return None;
+  }
+  return *it;
+}
+
 TinyPtrVector<ValueDecl *>
 ModuleFile::loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,
                              uint64_t contextData) {
@@ -736,7 +765,7 @@ void ModuleFile::lookupClassMember(ImportPath::Access accessPath,
         auto vd = cast<ValueDecl>(getDecl(item.second));
         if (!vd->getName().matchesRef(name))
           continue;
-        
+
         auto dc = vd->getDeclContext();
         while (!dc->getParent()->isModuleScopeContext())
           dc = dc->getParent();
@@ -765,7 +794,13 @@ void ModuleFile::lookupClassMembers(ImportPath::Access accessPath,
   if (!accessPath.empty()) {
     for (const auto &list : Core->ClassMembersForDynamicLookup->data()) {
       for (auto item : list) {
-        auto vd = cast<ValueDecl>(getDecl(item.second));
+        auto decl = getDeclChecked(item.second);
+        if (!decl) {
+          llvm::consumeError(decl.takeError());
+          continue;
+        }
+
+        auto vd = cast<ValueDecl>(decl.get());
         auto dc = vd->getDeclContext();
         while (!dc->getParent()->isModuleScopeContext())
           dc = dc->getParent();
@@ -779,10 +814,17 @@ void ModuleFile::lookupClassMembers(ImportPath::Access accessPath,
   }
 
   for (const auto &list : Core->ClassMembersForDynamicLookup->data()) {
-    for (auto item : list)
-      consumer.foundDecl(cast<ValueDecl>(getDecl(item.second)),
+    for (auto item : list) {
+        auto decl = getDeclChecked(item.second);
+        if (!decl) {
+          llvm::consumeError(decl.takeError());
+          continue;
+        }
+
+      consumer.foundDecl(cast<ValueDecl>(decl.get()),
                          DeclVisibilityKind::DynamicLookup,
                          DynamicLookupInfo::AnyObject);
+    }
   }
 }
 
@@ -839,6 +881,20 @@ void ModuleFile::getTopLevelDecls(
         continue;
       }
 
+      if (!getContext().LangOpts.EnableDeserializationRecovery)
+        fatal(declOrError.takeError());
+      consumeError(declOrError.takeError());
+      continue;
+    }
+    results.push_back(declOrError.get());
+  }
+}
+
+void ModuleFile::getExportedPrespecializations(
+    SmallVectorImpl<Decl *> &results) {
+  for (DeclID entry : Core->ExportedPrespecializationDecls) {
+    Expected<Decl *> declOrError = getDeclChecked(entry);
+    if (!declOrError) {
       if (!getContext().LangOpts.EnableDeserializationRecovery)
         fatal(declOrError.takeError());
       consumeError(declOrError.takeError());
@@ -927,16 +983,90 @@ Optional<CommentInfo> ModuleFile::getCommentForDecl(const Decl *D) const {
   return getCommentForDeclByUSR(USRBuffer.str());
 }
 
-Optional<BasicDeclLocs>
-ModuleFile::getBasicDeclLocsForDecl(const Decl *D) const {
-  assert(D);
+void ModuleFile::collectBasicSourceFileInfo(
+    llvm::function_ref<void(const BasicSourceFileInfo &)> callback) const {
+  if (Core->SourceFileListData.empty())
+    return;
+  assert(!Core->SourceLocsTextData.empty());
 
+  auto *Cursor = Core->SourceFileListData.bytes_begin();
+  auto *End = Core->SourceFileListData.bytes_end();
+  while (Cursor < End) {
+    // FilePath (byte offset in 'SourceLocsTextData').
+    auto fileID = endian::readNext<uint32_t, little, unaligned>(Cursor);
+
+    // InterfaceHashIncludingTypeMembers (fixed length string).
+    auto fpStrIncludingTypeMembers = StringRef{reinterpret_cast<const char *>(Cursor),
+                           Fingerprint::DIGEST_LENGTH};
+    Cursor += Fingerprint::DIGEST_LENGTH;
+
+    // InterfaceHashExcludingTypeMembers (fixed length string).
+    auto fpStrExcludingTypeMembers = StringRef{reinterpret_cast<const char *>(Cursor),
+                           Fingerprint::DIGEST_LENGTH};
+    Cursor += Fingerprint::DIGEST_LENGTH;
+
+    // LastModified (nanoseconds since epoch).
+    auto timestamp = endian::readNext<uint64_t, little, unaligned>(Cursor);
+    // FileSize (num of bytes).
+    auto fileSize = endian::readNext<uint64_t, little, unaligned>(Cursor);
+
+    assert(fileID < Core->SourceLocsTextData.size());
+    auto filePath = Core->SourceLocsTextData.substr(fileID);
+    size_t terminatorOffset = filePath.find('\0');
+    filePath = filePath.slice(0, terminatorOffset);
+
+    auto fingerprintIncludingTypeMembers =
+      Fingerprint::fromString(fpStrIncludingTypeMembers);
+    if (!fingerprintIncludingTypeMembers) {
+      llvm::errs() << "Unconvertible fingerprint including type members'"
+                   << fpStrIncludingTypeMembers << "'\n";
+      abort();
+    }
+    auto fingerprintExcludingTypeMembers =
+      Fingerprint::fromString(fpStrExcludingTypeMembers);
+    if (!fingerprintExcludingTypeMembers) {
+      llvm::errs() << "Unconvertible fingerprint excluding type members'"
+                   << fpStrExcludingTypeMembers << "'\n";
+      abort();
+    }
+    callback(BasicSourceFileInfo(filePath,
+                                 fingerprintIncludingTypeMembers.getValue(),
+                                 fingerprintExcludingTypeMembers.getValue(),
+                                 llvm::sys::TimePoint<>(std::chrono::nanoseconds(timestamp)),
+                                 fileSize));
+  }
+}
+
+static StringRef readLocString(const char *&Data, StringRef StringData) {
+  auto Str =
+      StringData.substr(endian::readNext<uint32_t, little, unaligned>(Data));
+  size_t TerminatorOffset = Str.find('\0');
+  assert(TerminatorOffset != StringRef::npos && "unterminated string data");
+  return Str.slice(0, TerminatorOffset);
+}
+
+static void readRawLoc(ExternalSourceLocs::RawLoc &Loc, const char *&Data,
+                       StringRef StringData) {
+  Loc.Offset = endian::readNext<uint32_t, little, unaligned>(Data);
+  Loc.Line = endian::readNext<uint32_t, little, unaligned>(Data);
+  Loc.Column = endian::readNext<uint32_t, little, unaligned>(Data);
+
+  Loc.Directive.Offset = endian::readNext<uint32_t, little, unaligned>(Data);
+  Loc.Directive.LineOffset = endian::readNext<int32_t, little, unaligned>(Data);
+  Loc.Directive.Length = endian::readNext<uint32_t, little, unaligned>(Data);
+  Loc.Directive.Name = readLocString(Data, StringData);
+}
+
+Optional<ExternalSourceLocs::RawLocs>
+ModuleFile::getExternalRawLocsForDecl(const Decl *D) const {
+  assert(D);
   // Keep these as assertions instead of early exits to ensure that we are not
   // doing extra work.  These cases should be handled by clients of this API.
   assert(!D->hasClangNode() &&
          "cannot find comments for Clang decls in Swift modules");
   assert(D->getDeclContext()->getModuleScopeContext() == FileContext &&
          "Decl is from a different serialized file");
+
   if (!Core->DeclUSRsTable)
     return None;
   // Future compilers may not provide BasicDeclLocsData anymore.
@@ -944,6 +1074,7 @@ ModuleFile::getBasicDeclLocsForDecl(const Decl *D) const {
     return None;
   if (D->isImplicit())
     return None;
+
   // Compute the USR.
   llvm::SmallString<128> USRBuffer;
   llvm::raw_svector_ostream OS(USRBuffer);
@@ -953,52 +1084,39 @@ ModuleFile::getBasicDeclLocsForDecl(const Decl *D) const {
   auto It = Core->DeclUSRsTable->find(OS.str());
   if (It == Core->DeclUSRsTable->end())
     return None;
+
   auto UsrId = *It;
-  uint32_t NumSize = 4;
-  // Size of BasicDeclLocs in the buffer.
-  // FilePathOffset + LocNum * LineColumn
-  uint32_t LineColumnCount = 3;
   uint32_t RecordSize =
-    NumSize + // Offset into source filename blob
-    NumSize + // Offset into doc ranges blob
-    NumSize * 2 * LineColumnCount; // Line/column of: Loc, StartLoc, EndLoc
+      4 +        // Source filename offset
+      4 +        // Doc ranges offset
+      4 * 3 * 7; // Loc/StartLoc/EndLoc each have 7 4-byte fields
   uint32_t RecordOffset = RecordSize * UsrId;
   assert(RecordOffset < Core->BasicDeclLocsData.size());
   assert(Core->BasicDeclLocsData.size() % RecordSize == 0);
-  BasicDeclLocs Result;
   auto *Record = Core->BasicDeclLocsData.data() + RecordOffset;
-  auto ReadNext = [&Record]() {
-    return endian::readNext<uint32_t, little, unaligned>(Record);
-  };
 
-  auto FilePath = Core->SourceLocsTextData.substr(ReadNext());
-  size_t TerminatorOffset = FilePath.find('\0');
-  assert(TerminatorOffset != StringRef::npos && "unterminated string data");
-  Result.SourceFilePath = FilePath.slice(0, TerminatorOffset);
+  ExternalSourceLocs::RawLocs Result;
+  Result.SourceFilePath = readLocString(Record, Core->SourceLocsTextData);
 
-  const auto DocRangesOffset = ReadNext();
+  const auto DocRangesOffset =
+      endian::readNext<uint32_t, little, unaligned>(Record);
   if (DocRangesOffset) {
     assert(!Core->DocRangesData.empty());
     const auto *Data = Core->DocRangesData.data() + DocRangesOffset;
     const auto NumLocs = endian::readNext<uint32_t, little, unaligned>(Data);
     assert(NumLocs);
 
-    for (uint32_t i = 0; i < NumLocs; ++i) {
-      LineColumn LC;
-      LC.Line = endian::readNext<uint32_t, little, unaligned>(Data);
-      LC.Column = endian::readNext<uint32_t, little, unaligned>(Data);
-      auto Length = endian::readNext<uint32_t, little, unaligned>(Data);
-      Result.DocRanges.push_back(std::make_pair(LC, Length));
+    for (uint32_t I = 0; I < NumLocs; ++I) {
+      auto &Range =
+          Result.DocRanges.emplace_back(ExternalSourceLocs::RawLoc(), 0);
+      readRawLoc(Range.first, Data, Core->SourceLocsTextData);
+      Range.second = endian::readNext<uint32_t, little, unaligned>(Data);
     }
   }
 
-#define READ_FIELD(X)                                                         \
-Result.X.Line = ReadNext();                                                   \
-Result.X.Column = ReadNext();
-  READ_FIELD(Loc)
-  READ_FIELD(StartLoc)
-  READ_FIELD(EndLoc)
-#undef READ_FIELD
+  readRawLoc(Result.Loc, Record, Core->SourceLocsTextData);
+  readRawLoc(Result.StartLoc, Record, Core->SourceLocsTextData);
+  readRawLoc(Result.EndLoc, Record, Core->SourceLocsTextData);
   return Result;
 }
 
@@ -1063,7 +1181,7 @@ ModuleFile::getSourceOrderForDecl(const Decl *D) const {
   return Triple.getValue().SourceOrder;
 }
 
-void ModuleFile::collectAllGroups(std::vector<StringRef> &Names) const {
+void ModuleFile::collectAllGroups(SmallVectorImpl<StringRef> &Names) const {
   if (!Core->GroupNamesMap)
     return;
   for (auto It = Core->GroupNamesMap->begin(); It != Core->GroupNamesMap->end();
@@ -1144,9 +1262,9 @@ bool SerializedASTFile::getAllGenericSignatures(
   return true;
 }
 
-Decl *SerializedASTFile::getMainDecl() const {
+ValueDecl *SerializedASTFile::getMainDecl() const {
   assert(hasEntryPoint());
-  return File.getDecl(File.getEntryPointDeclID());
+  return cast_or_null<ValueDecl>(File.getDecl(File.getEntryPointDeclID()));
 }
 
 const version::Version &SerializedASTFile::getLanguageVersionBuiltWith() const {

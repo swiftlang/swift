@@ -124,7 +124,7 @@ bb0(%0 : $*U):
   return %7 : $()
 } // end sil function 'simple_generic_caller3'
 
-// Check that partial specialization is not peformed for generic type parameters where
+// Check that partial specialization is not performed for generic type parameters where
 // the substitution contains an open existential.
 // CHECK-LABEL: sil @simple_generic_caller4 : $@convention(thin) (@in P, Builtin.Int1) -> ()
 // CHECK: function_ref @$s21simple_generic_calleexBi1_Bi1_Rs_r0_lIetiy_Tp5 : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_1 == Builtin.Int1> (@in τ_0_0, Builtin.Int1) -> ()

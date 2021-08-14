@@ -22,7 +22,7 @@ extension NormalClass: NormalProto {
 }
 
 @_spi(X)
-public struct BadStruct {} // expected-note 27 {{type declared here}}
+public struct BadStruct {} // expected-note 34 {{type declared here}}
 @_spi(X)
 public protocol BadProto {} // expected-note 20 {{type declared here}}
 @_spi(X)
@@ -107,7 +107,6 @@ public protocol TestAssocTypeWhereClause {
 
 public enum TestRawType: IntLike { // expected-error {{cannot use struct 'IntLike' here; it is SPI}}
   case x = 1
-  // FIXME: expected-error@-1 {{cannot use conformance of 'IntLike' to 'Equatable' here; the conformance is declared as SPI}}
 }
 
 public class TestSubclass: BadClass { // expected-error {{cannot use class 'BadClass' here; it is SPI}}
@@ -170,33 +169,36 @@ extension Array: TestConstrainedExtensionProto where Element == BadStruct { // e
 //  higherThan: BadPrecedence
 //}
 
-public struct PublicStructStoredProperties {
+@frozen public struct PublicStructStoredProperties {
   public var publiclyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
   internal var internallyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
   private var privatelyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
   private let letIsLikeVar = [BadStruct]() // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
+  // expected-error@-1 {{struct 'BadStruct' cannot be used in a property initializer in a '@frozen' type because it is SPI}}
 
   private var computedIsOkay: BadStruct? { return nil } // okay
   private static var staticIsOkay: BadStruct? // okay
   @usableFromInline internal var computedUFIIsNot: BadStruct? { return nil } // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
 }
 
-@usableFromInline internal struct UFIStructStoredProperties {
+@frozen @usableFromInline internal struct UFIStructStoredProperties {
   @usableFromInline var publiclyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
   internal var internallyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
   private var privatelyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
   private let letIsLikeVar = [BadStruct]() // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
+  // expected-error@-1 {{struct 'BadStruct' cannot be used in a property initializer in a '@frozen' type because it is SPI}}
 
   private var computedIsOkay: BadStruct? { return nil } // okay
   private static var staticIsOkay: BadStruct? // okay
   @usableFromInline internal var computedUFIIsNot: BadStruct? { return nil } // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
 }
 
-public class PublicClassStoredProperties {
+@_fixed_layout public class PublicClassStoredProperties {
   public var publiclyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
   internal var internallyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
   private var privatelyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
   private let letIsLikeVar = [BadStruct]() // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
+  // expected-error@-1 {{struct 'BadStruct' cannot be used in a property initializer in a '@frozen' type because it is SPI}}
 
   private var computedIsOkay: BadStruct? { return nil } // okay
   private static var staticIsOkay: BadStruct? // okay
@@ -210,6 +212,13 @@ public struct NormalProtoAssocHolder<T: NormalProto> {
   public var value: T.Assoc
 }
 public func testConformanceInBoundGeneric(_: NormalProtoAssocHolder<NormalStruct>) {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; the conformance is declared as SPI}}
+
+public struct OuterGenericHolder<T> {
+  public struct Nested where T : NormalProto {
+    public var value: T.Assoc
+  }
+}
+public func testConformanceInNestedNonGeneric(_: OuterGenericHolder<NormalStruct>.Nested) {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; the conformance is declared as SPI}}
 
 public class SubclassOfNormalClass: NormalClass {}
 
@@ -242,15 +251,24 @@ protocol InternalAssociatedTypeProto {
 public struct PublicInferredAssociatedTypeImpl {
   public func takesAssoc(_: NormalStruct) {}
 }
-extension PublicInferredAssociatedTypeImpl: PublicAssociatedTypeProto {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' in associated type 'Self.Assoc' (inferred as 'NormalStruct'); the conformance is declared as SPI}}
-extension PublicInferredAssociatedTypeImpl: UFIAssociatedTypeProto {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' in associated type 'Self.Assoc' (inferred as 'NormalStruct'); the conformance is declared as SPI}}
+extension PublicInferredAssociatedTypeImpl: PublicAssociatedTypeProto {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; the conformance is declared as SPI}}
+// expected-note@-1 {{in associated type 'Self.Assoc' (inferred as 'NormalStruct')}}
+
+extension PublicInferredAssociatedTypeImpl: UFIAssociatedTypeProto {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; the conformance is declared as SPI}}
+// expected-note@-1 {{in associated type 'Self.Assoc' (inferred as 'NormalStruct')}}
+
 extension PublicInferredAssociatedTypeImpl: InternalAssociatedTypeProto {} // okay
 
 @usableFromInline struct UFIInferredAssociatedTypeImpl {
   public func takesAssoc(_: NormalStruct) {}
 }
-extension UFIInferredAssociatedTypeImpl: PublicAssociatedTypeProto {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' in associated type 'Self.Assoc' (inferred as 'NormalStruct'); the conformance is declared as SPI}}
-extension UFIInferredAssociatedTypeImpl: UFIAssociatedTypeProto {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' in associated type 'Self.Assoc' (inferred as 'NormalStruct'); the conformance is declared as SPI}}
+
+extension UFIInferredAssociatedTypeImpl: PublicAssociatedTypeProto {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; the conformance is declared as SPI}}
+// expected-note@-1 {{in associated type 'Self.Assoc' (inferred as 'NormalStruct')}}
+
+extension UFIInferredAssociatedTypeImpl: UFIAssociatedTypeProto {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; the conformance is declared as SPI}}
+// expected-note@-1 {{in associated type 'Self.Assoc' (inferred as 'NormalStruct')}}
+
 extension UFIInferredAssociatedTypeImpl: InternalAssociatedTypeProto {} // okay
 
 struct InternalInferredAssociatedTypeImpl {
@@ -264,8 +282,12 @@ public struct PublicExplicitAssociatedTypeImpl {
   public typealias Assoc = NormalStruct
   public func takesAssoc(_: NormalStruct) {}
 }
-extension PublicExplicitAssociatedTypeImpl: PublicAssociatedTypeProto {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' in associated type 'Self.Assoc' (inferred as 'NormalStruct'); the conformance is declared as SPI}}
-extension PublicExplicitAssociatedTypeImpl: UFIAssociatedTypeProto {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' in associated type 'Self.Assoc' (inferred as 'NormalStruct'); the conformance is declared as SPI}}
+extension PublicExplicitAssociatedTypeImpl: PublicAssociatedTypeProto {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; the conformance is declared as SPI}}
+// expected-note@-1 {{in associated type 'Self.Assoc' (inferred as 'NormalStruct')}}
+
+extension PublicExplicitAssociatedTypeImpl: UFIAssociatedTypeProto {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; the conformance is declared as SPI}}
+// expected-note@-1 {{in associated type 'Self.Assoc'}}
+
 extension PublicExplicitAssociatedTypeImpl: InternalAssociatedTypeProto {} // okay
 
 
@@ -276,7 +298,8 @@ public protocol BaseProtoWithNoRequirement {
 public protocol RefinedProto: BaseProtoWithNoRequirement where Assoc: NormalProto {
 }
 
-public struct RefinedProtoImpl: RefinedProto { // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' in associated type 'Self.Assoc' (inferred as 'NormalStruct'); the conformance is declared as SPI}}
+public struct RefinedProtoImpl: RefinedProto { // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; the conformance is declared as SPI}}
+// expected-note@-1 {{in associated type 'Self.Assoc' (inferred as 'NormalStruct')}}
   public func takesAssoc(_: NormalStruct) {}
 }
 
@@ -291,17 +314,23 @@ public protocol SlightlyMoreComplicatedRequirement {
   associatedtype Assoc: Collection where Assoc.Element: NormalProto
   func takesAssoc(_: Assoc)
 }
-public struct SlightlyMoreComplicatedRequirementImpl: SlightlyMoreComplicatedRequirement { // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' in associated type 'Self.Assoc.Element' (inferred as 'NormalStruct'); the conformance is declared as SPI}}
+public struct SlightlyMoreComplicatedRequirementImpl: SlightlyMoreComplicatedRequirement { // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; the conformance is declared as SPI}}
+// expected-note@-1 {{in associated type 'Self.Assoc.Element' (inferred as 'NormalStruct')}}
   public func takesAssoc(_: [NormalStruct]) {}
 }
-public struct RequirementsHandleSubclassesToo: SlightlyMoreComplicatedRequirement { // expected-error {{cannot use conformance of 'NormalClass' to 'NormalProto' in associated type 'Self.Assoc.Element' (inferred as 'SubclassOfNormalClass'); the conformance is declared as SPI}}
+public struct RequirementsHandleSubclassesToo: SlightlyMoreComplicatedRequirement { // expected-error {{cannot use conformance of 'NormalClass' to 'NormalProto' here; the conformance is declared as SPI}}
+// expected-note@-1 {{in associated type 'Self.Assoc.Element' (inferred as 'SubclassOfNormalClass')}}
   public func takesAssoc(_: [SubclassOfNormalClass]) {}
 }
 
-public struct RequirementsHandleSpecializationsToo: SlightlyMoreComplicatedRequirement { // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' in associated type 'Self.Assoc.Element' (inferred as 'ConditionalGenericStruct<NormalStruct>'); the conformance is declared as SPI}}
+public struct RequirementsHandleSpecializationsToo: SlightlyMoreComplicatedRequirement { // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; the conformance is declared as SPI}}
+// expected-note@-1 {{in associated type 'Self.Assoc.Element' (inferred as 'ConditionalGenericStruct<NormalStruct>')}}
+
   public func takesAssoc(_: [ConditionalGenericStruct<NormalStruct>]) {}
 }
 
-public struct ClassConstrainedGenericArg<T: NormalClass>: PublicAssociatedTypeProto { // expected-error {{cannot use conformance of 'NormalClass' to 'NormalProto' in associated type 'Self.Assoc' (inferred as 'T'); the conformance is declared as SPI}}
+public struct ClassConstrainedGenericArg<T: NormalClass>: PublicAssociatedTypeProto { // expected-error {{cannot use conformance of 'NormalClass' to 'NormalProto' here; the conformance is declared as SPI}}
+// expected-note@-1 {{in associated type 'Self.Assoc' (inferred as 'T')}}
+
   public func takesAssoc(_: T) {}
 }

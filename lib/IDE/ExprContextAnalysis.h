@@ -82,7 +82,7 @@ class ExprContextInfo {
   SmallVector<PossibleParamInfo, 2> PossibleParams;
   SmallVector<FunctionTypeAndDecl, 2> PossibleCallees;
   Expr *AnalyzedExpr = nullptr;
-  bool singleExpressionBody = false;
+  bool implicitSingleExpressionReturn = false;
 
 public:
   ExprContextInfo(DeclContext *DC, Expr *TargetExpr);
@@ -90,12 +90,14 @@ public:
   // Returns a list of possible context types.
   ArrayRef<Type> getPossibleTypes() const { return PossibleTypes; }
 
-  /// Whether the type context comes from a single-expression body, e.g.
-  /// `foo({ here })`.
+  /// Whether the type context comes from a single-expression body without
+  /// and explicit return e.g. `foo({ <here> })` and not foo({ return <here>}).
   ///
-  /// If the input may be incomplete, such as in code-completion, take into
+  /// Since the input may be incomplete, such as in code-completion, take into
   /// account that the types returned by `getPossibleTypes()` are only a hint.
-  bool isSingleExpressionBody() const { return singleExpressionBody; }
+  bool isImplicitSingleExpressionReturn() const {
+    return implicitSingleExpressionReturn;
+  }
 
   // Returns a list of possible argument label names.
   // Valid only if \c getKind() is \c CallArgument.

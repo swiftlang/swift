@@ -55,6 +55,7 @@ SwiftNativeNSBaseTestSuite.test("UnwantedCdtors")
   .skip(.iOSSimulatorAny(/*Range(0...13), reason: */"lazy objc naming is not available on these OSes"))
   .skip(.tvOSSimulatorAny(/*TODO: 0...13, reason: */"lazy objc naming is not available on these OSes"))
   .skip(.watchOSSimulatorAny(/*TODO: 0...6, reason: */"lazy objc naming is not available on these OSes"))
+  .skip(.always("rdar://78931257 This test crashes on macOS 12"))
   .code {
   expectTrue(TestSwiftNativeNSBase_UnwantedCdtors())
 }

@@ -45,6 +45,10 @@ public:
   }
 
   /// Retrieve the dependent type.
+  CanType getDependentType() const;
+
+  /// Retrieve the dependent type, possibly sugared with the builder's generic
+  /// parameters.
   Type getDependentType(GenericSignatureBuilder &builder) const;
 
   /// Retrieve the concrete type, or a null type if this result doesn't store

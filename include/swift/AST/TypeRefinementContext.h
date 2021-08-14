@@ -154,23 +154,24 @@ private:
 
   SourceRange SrcRange;
 
-  /// Runtime availability information for the code in this context.
+  /// A canonical availiability info for this context, computed top-down from the root
+  /// context (compilation deployment target).
   AvailabilityContext AvailabilityInfo;
 
-  /// Runtime availability information as explicitly declared by attributes
-  /// for the inlinable code in this context. Compared to AvailabilityInfo,
-  /// this is not bounded to the minimum deployment OS version.
-  AvailabilityContext AvailabilityInfoExplicit;
+  /// If this context was annotated with an availability attribute, this property captures that.
+  /// It differs from the above `AvailabilityInfo` by being independent of the deployment target,
+  /// and is used for providing availability attribute redundancy warning diagnostics.
+  AvailabilityContext ExplicitAvailabilityInfo;
 
   std::vector<TypeRefinementContext *> Children;
 
   TypeRefinementContext(ASTContext &Ctx, IntroNode Node,
                         TypeRefinementContext *Parent, SourceRange SrcRange,
                         const AvailabilityContext &Info,
-                        const AvailabilityContext &InfoExplicit);
+                        const AvailabilityContext &ExplicitInfo);
 
 public:
-
+  
   /// Create the root refinement context for the given SourceFile.
   static TypeRefinementContext *createRoot(SourceFile *SF,
                                            const AvailabilityContext &Info);
@@ -179,9 +180,9 @@ public:
   static TypeRefinementContext *createForDecl(ASTContext &Ctx, Decl *D,
                                               TypeRefinementContext *Parent,
                                               const AvailabilityContext &Info,
-                                              const AvailabilityContext &InfoExplicit,
+                                              const AvailabilityContext &ExplicitInfo,
                                               SourceRange SrcRange);
-
+  
   /// Create a refinement context for the Then branch of the given IfStmt.
   static TypeRefinementContext *
   createForIfStmtThen(ASTContext &Ctx, IfStmt *S, TypeRefinementContext *Parent,
@@ -248,17 +249,15 @@ public:
   SourceRange getSourceRange() const { return SrcRange; }
 
   /// Returns the information on what can be assumed present at run time when
-  /// running code contained in this context, taking into account the minimum
-  /// deployment target.
+  /// running code contained in this context.
   const AvailabilityContext &getAvailabilityInfo() const {
     return AvailabilityInfo;
   }
 
-  /// Returns the information on what can be assumed present at run time when
-  /// running code contained in this context if it were to be inlined,
-  /// without considering the minimum deployment target.
-  const AvailabilityContext &getAvailabilityInfoExplicit() const {
-    return AvailabilityInfoExplicit;
+  /// Returns the information on what availability was specified by the programmer
+  /// on this context (if any).
+  const AvailabilityContext &getExplicitAvailabilityInfo() const {
+    return ExplicitAvailabilityInfo;
   }
 
   /// Adds a child refinement context.

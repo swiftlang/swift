@@ -1,5 +1,5 @@
-#ifndef TEST_INTEROP_CXX_TEMPLATES_INPUTS_DECL_WITH_DEFINITION_H
-#define TEST_INTEROP_CXX_TEMPLATES_INPUTS_DECL_WITH_DEFINITION_H
+#ifndef TEST_INTEROP_CXX_TEMPLATES_INPUTS_PARTIALLY_PRE_DEFINED_CLASS_TEMPLATE_H
+#define TEST_INTEROP_CXX_TEMPLATES_INPUTS_PARTIALLY_PRE_DEFINED_CLASS_TEMPLATE_H
 
 template<class T>
 struct MagicWrapper {
@@ -21,4 +21,4 @@ inline MagicWrapper<IntWrapper> forceInstantiation() {
 // instantiated though, the Swift compiler needs to instantiate them.
 typedef MagicWrapper<IntWrapper> PartiallyPreDefinedMagicallyWrappedInt;
 
-#endif // TEST_INTEROP_CXX_TEMPLATES_INPUTS_DECL_WITH_DEFINITION_H
+#endif // TEST_INTEROP_CXX_TEMPLATES_INPUTS_PARTIALLY_PRE_DEFINED_CLASS_TEMPLATE_H

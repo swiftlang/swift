@@ -33,5 +33,6 @@ AVAILABILITY_PLATFORM(macOSApplicationExtension, "application extensions for mac
 AVAILABILITY_PLATFORM(macCatalyst, "Mac Catalyst")
 AVAILABILITY_PLATFORM(macCatalystApplicationExtension, "application extensions for Mac Catalyst")
 AVAILABILITY_PLATFORM(OpenBSD, "OpenBSD")
+AVAILABILITY_PLATFORM(Windows, "Windows")
 
 #undef AVAILABILITY_PLATFORM

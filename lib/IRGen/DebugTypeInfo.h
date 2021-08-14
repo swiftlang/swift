@@ -36,22 +36,23 @@ class TypeInfo;
 /// This data structure holds everything needed to emit debug info
 /// for a type.
 class DebugTypeInfo {
+protected:
   /// The type we need to emit may be different from the type
   /// mentioned in the Decl, for example, stripped of qualifiers.
   TypeBase *Type = nullptr;
   /// Needed to determine the size of basic types and to determine
   /// the storage type for undefined variables.
   llvm::Type *StorageType = nullptr;
-  Size size = Size(0);
-  Alignment align = Alignment();
+  Optional<Size> size;
+  Alignment align;
   bool DefaultAlignment = true;
   bool IsMetadataType = false;
 
 public:
   DebugTypeInfo() = default;
-  DebugTypeInfo(swift::Type Ty, llvm::Type *StorageTy, Size SizeInBytes,
-                Alignment AlignInBytes, bool HasDefaultAlignment,
-                bool IsMetadataType);
+  DebugTypeInfo(swift::Type Ty, llvm::Type *StorageTy,
+                Optional<Size> SizeInBytes, Alignment AlignInBytes,
+                bool HasDefaultAlignment, bool IsMetadataType);
 
   /// Create type for a local variable.
   static DebugTypeInfo getLocalVariable(VarDecl *Decl,
@@ -92,24 +93,44 @@ public:
   }
 
   llvm::Type *getStorageType() const {
-    assert((StorageType || size.isZero()) &&
-           "only defined types may have a size");
+    if (size && size->isZero())
+      assert(StorageType && "only defined types may have a size");
     return StorageType;
   }
-  Size getSize() const { return size; }
+  Optional<Size> getSize() const { return size; }
   void setSize(Size NewSize) { size = NewSize; }
   Alignment getAlignment() const { return align; }
   bool isNull() const { return Type == nullptr; }
   bool isForwardDecl() const { return StorageType == nullptr; }
   bool isMetadataType() const { return IsMetadataType; }
   bool hasDefaultAlignment() const { return DefaultAlignment; }
-  
+
   bool operator==(DebugTypeInfo T) const;
   bool operator!=(DebugTypeInfo T) const;
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
   LLVM_DUMP_METHOD void dump() const;
 #endif
 };
+
+/// A DebugTypeInfo with a defined size (that may be 0).
+class CompletedDebugTypeInfo : public DebugTypeInfo {
+  CompletedDebugTypeInfo(DebugTypeInfo DbgTy) : DebugTypeInfo(DbgTy) {}
+public:
+  static Optional<CompletedDebugTypeInfo> get(DebugTypeInfo DbgTy) {
+    if (!DbgTy.getSize())
+      return {};
+    return CompletedDebugTypeInfo(DbgTy);
+  }
+
+  static Optional<CompletedDebugTypeInfo>
+  getFromTypeInfo(swift::Type Ty, const TypeInfo &Info) {
+    return CompletedDebugTypeInfo::get(
+        DebugTypeInfo::getFromTypeInfo(Ty, Info));
+  }
+
+  Size::int_type getSizeValue() const { return size->getValue(); }
+};
+
 }
 }
 

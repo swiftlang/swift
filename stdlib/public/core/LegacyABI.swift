@@ -82,7 +82,7 @@ extension String {
 
 extension String.UTF16View {
   // Swift 5.x: This was accidentally shipped as inlinable, but was never used
-  // from an inlinable context. The definition is kept around for techincal ABI
+  // from an inlinable context. The definition is kept around for technical ABI
   // compatibility (even though it shouldn't matter), but is unused.
   @inlinable @inline(__always)
   internal var _shortHeuristic: Int { return 32 }

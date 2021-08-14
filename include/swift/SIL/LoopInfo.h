@@ -60,6 +60,8 @@ public:
     }
   }
 
+  SILFunction *getFunction() const { return getHeader()->getParent(); }
+
 private:
   friend class llvm::LoopInfoBase<SILBasicBlock, SILLoop>;
 

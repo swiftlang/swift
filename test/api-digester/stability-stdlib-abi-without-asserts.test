@@ -1,22 +1,3 @@
-// Welcome, Build Wrangler!
-//
-// A failure in this test indicates that there is a potential ABI breaking
-// change in the Standard Library. If you observe a failure, please reach out to
-// the Standard Library team directly to make sure we resolve this quickly!
-//
-// Instead of XFAILing this test, please consider extending the list of expected
-// changes at the bottom. (In addition to ignoring the current set of ABI breaks,
-// XFAILing this test also silences any future ABI breaks that may land on this
-// branch, which isn't ideal.)
-//
-// You can find a diff of what needs to be added in the output of the failed
-// test run. The order of lines doesn't matter, and you can also include
-// comments to refer to any bugs you filed.
-//
-// Thanks! -- Your friendly stdlib engineers
-
-// REQUIRES: OS=macosx
-// REQUIRES: swift_stdlib_no_asserts
 // RUN: %empty-directory(%t.tmp)
 // mkdir %t.tmp/module-cache && mkdir %t.tmp/dummy.sdk
 // RUN: %api-digester -diagnose-sdk -module Swift -o %t.tmp/changes.txt -module-cache-path %t.tmp/module-cache -sdk %t.tmp/dummy.sdk -abi -avoid-location -v
@@ -24,9 +5,47 @@
 // RUN: %clang -E -P -x c %t.tmp/changes.txt -o - | sed '/^\s*$/d' | sort > %t.tmp/changes.txt.tmp
 // RUN: diff -u %t.tmp/stability-stdlib-abi.swift.expected %t.tmp/changes.txt.tmp
 
+// *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment below.)
+
+// Welcome, Build Wrangler!
+//
+// This file lists APIs that have recently changed in a way that potentially
+// indicates an ABI- or source-breaking problem.
+//
+// A failure in this test indicates that there is a potential breaking change in
+// the Standard Library. If you observe a failure outside of a PR test, please
+// reach out to the Standard Library team directly to make sure this gets
+// resolved quickly! If your own PR fails in this test, you probably have an
+// ABI- or source-breaking change in your commits. Please go and fix it.
+//
+// Please DO NOT DISABLE THIS TEST. In addition to ignoring the current set of
+// ABI breaks, XFAILing this test also silences any future ABI breaks that may
+// land on this branch, which simply generates extra work for the next person
+// that picks up the mess.
+//
+// Instead of disabling this test, you'll need to extend the list of expected
+// changes at the bottom. (You'll also need to do this if your own PR triggers
+// false positives, or if you have special permission to break things.) You can
+// find a diff of what needs to be added in the output of the failed test run.
+// The order of lines doesn't matter, and you can also include comments to refer
+// to any bugs you filed.
+//
+// Thank you for your help ensuring the stdlib remains compatible with its past!
+//                                            -- Your friendly stdlib engineers
+
+// REQUIRES: swift_stdlib_no_asserts
+
+// *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
+
+// SR-13362
+// We currently only have a baseline for Intel CPUs on macOS.
+// REQUIRES: OS=macosx && CPU=x86_64
+
 // The digester can incorrectly register a generic signature change when
 // declarations are shuffled. rdar://problem/46618883
 // UNSUPPORTED: swift_evolve
+
+// *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
 
 Func _prespecialize() is a new API without @available attribute
 Func _stdlib_isOSVersionAtLeastOrVariantVersionAtLeast(_:_:_:_:_:_:) is a new API without @available attribute
@@ -35,3 +54,29 @@ Func _stdlib_isOSVersionAtLeastOrVariantVersionAtLeast(_:_:_:_:_:_:) is a new AP
 Func _getMetadataSection(_:) is a new API without @available attribute
 Func _getMetadataSectionCount() is a new API without @available attribute
 Func _getMetadataSectionName(_:) is a new API without @available attribute
+
+Func Collection.removingSubranges(_:) has been removed
+Func Collection.subranges(of:) has been removed
+Func Collection.subranges(where:) has been removed
+Func MutableCollection.moveSubranges(_:to:) has been removed
+Func MutableCollection.removeSubranges(_:) has been removed
+Func RangeReplaceableCollection.removeSubranges(_:) has been removed
+Struct AnyHashable has added a conformance to an existing protocol _HasCustomAnyHashableRepresentation
+Struct DiscontiguousSlice has been removed
+Struct RangeSet has been removed
+Subscript Collection.subscript(_:) has been removed
+Subscript MutableCollection.subscript(_:) has been removed
+Protocol CodingKey has added inherited protocol Sendable
+Protocol CodingKey has generic signature change from <Self : Swift.CustomDebugStringConvertible, Self : Swift.CustomStringConvertible> to <Self : Swift.CustomDebugStringConvertible, Self : Swift.CustomStringConvertible, Self : Swift.Sendable>
+Protocol Error has added inherited protocol Sendable
+Protocol Error has generic signature change from to <Self : Swift.Sendable>
+Enum Never has added a conformance to an existing protocol Identifiable
+
+// These haven't actually been removed; they are simply marked unavailable.
+// This seems to be a false positive in the ABI checker. This is not an ABI
+// break because the symbols are still present, and is not a source break
+// because FixedWidthInteger still has these operations.
+Func SignedInteger.&+(_:_:) has been removed
+Func SignedInteger.&-(_:_:) has been removed
+
+// *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)

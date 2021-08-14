@@ -40,7 +40,7 @@ sil @guaranteed_user : $@convention(thin) (@guaranteed Klass) -> ()
 ///////////
 
 // We should never optimize this. If we did this would become a thunk, so we
-// know that just be checking NFC we have proven no optimization has occured.
+// know that just be checking NFC we have proven no optimization has occurred.
 //
 // CHECK-LABEL: sil @never_explode_trivial : $@convention(thin) (BigTrivial) -> () {
 // CHECK: } // end sil function 'never_explode_trivial'

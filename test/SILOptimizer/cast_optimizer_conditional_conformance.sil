@@ -100,9 +100,9 @@ bb6:
 // bbs...
 // CHECK: [[UNWRAP:%.*]] = unchecked_take_enum_data_addr [[OPT]] : $*Optional<HasFoo>, #Optional.some!enumelt
 // CHECK: copy_addr [take] [[UNWRAP]] to [initialization] [[EXIS]] : $*HasFoo
-// CHECK: [[OPEN:%.*]] = open_existential_addr immutable_access [[EXIS]] : $*HasFoo to $*@opened("4E16CBC0-FD9F-11E8-A311-D0817AD9F6DD") HasFoo
-// CHECK: [[WM:%.*]] = witness_method $@opened("4E16CBC0-FD9F-11E8-A311-D0817AD9F6DD") HasFoo, #HasFoo.foo : <Self where Self : HasFoo> (Self) -> () -> (), [[OPEN]] : $*@opened("4E16CBC0-FD9F-11E8-A311-D0817AD9F6DD") HasFoo : $@convention(witness_method: HasFoo) <τ_0_0 where τ_0_0 : HasFoo> (@in_guaranteed τ_0_0) -> ()
-// CHECK: apply [[WM]]<@opened("4E16CBC0-FD9F-11E8-A311-D0817AD9F6DD") HasFoo>([[OPEN]]) : $@convention(witness_method: HasFoo) <τ_0_0 where τ_0_0 : HasFoo> (@in_guaranteed τ_0_0) -> ()
+// CHECK: [[OPEN:%.*]] = open_existential_addr immutable_access [[EXIS]] : $*HasFoo to $*@opened("5E16CBC0-FD9F-11E8-A311-D0817AD9F6DD") HasFoo
+// CHECK: [[WM:%.*]] = witness_method $@opened("5E16CBC0-FD9F-11E8-A311-D0817AD9F6DD") HasFoo, #HasFoo.foo : <Self where Self : HasFoo> (Self) -> () -> (), [[OPEN]] : $*@opened("5E16CBC0-FD9F-11E8-A311-D0817AD9F6DD") HasFoo : $@convention(witness_method: HasFoo) <τ_0_0 where τ_0_0 : HasFoo> (@in_guaranteed τ_0_0) -> ()
+// CHECK: apply [[WM]]<@opened("5E16CBC0-FD9F-11E8-A311-D0817AD9F6DD") HasFoo>([[OPEN]]) : $@convention(witness_method: HasFoo) <τ_0_0 where τ_0_0 : HasFoo> (@in_guaranteed τ_0_0) -> ()
 // CHECK-LABEL: } // end sil function 'testSpecializedS1Negative'
 sil shared [noinline] @testSpecializedS1Negative : $@convention(thin) (S1<Int8>) -> () {
 bb0(%0 : $S1<Int8>):
@@ -131,9 +131,9 @@ bb4:
   copy_addr [take] %14 to [initialization] %3 : $*HasFoo
   dealloc_stack %6 : $*Optional<HasFoo>
   dealloc_stack %4 : $*S1<Int8>
-  %18 = open_existential_addr immutable_access %3 : $*HasFoo to $*@opened("4E16CBC0-FD9F-11E8-A311-D0817AD9F6DD") HasFoo
-  %19 = witness_method $@opened("4E16CBC0-FD9F-11E8-A311-D0817AD9F6DD") HasFoo, #HasFoo.foo : <Self where Self : HasFoo> (Self) -> () -> (), %18 : $*@opened("4E16CBC0-FD9F-11E8-A311-D0817AD9F6DD") HasFoo : $@convention(witness_method: HasFoo) <τ_0_0 where τ_0_0 : HasFoo> (@in_guaranteed τ_0_0) -> ()
-  %20 = apply %19<@opened("4E16CBC0-FD9F-11E8-A311-D0817AD9F6DD") HasFoo>(%18) : $@convention(witness_method: HasFoo) <τ_0_0 where τ_0_0 : HasFoo> (@in_guaranteed τ_0_0) -> ()
+  %18 = open_existential_addr immutable_access %3 : $*HasFoo to $*@opened("5E16CBC0-FD9F-11E8-A311-D0817AD9F6DD") HasFoo
+  %19 = witness_method $@opened("5E16CBC0-FD9F-11E8-A311-D0817AD9F6DD") HasFoo, #HasFoo.foo : <Self where Self : HasFoo> (Self) -> () -> (), %18 : $*@opened("5E16CBC0-FD9F-11E8-A311-D0817AD9F6DD") HasFoo : $@convention(witness_method: HasFoo) <τ_0_0 where τ_0_0 : HasFoo> (@in_guaranteed τ_0_0) -> ()
+  %20 = apply %19<@opened("5E16CBC0-FD9F-11E8-A311-D0817AD9F6DD") HasFoo>(%18) : $@convention(witness_method: HasFoo) <τ_0_0 where τ_0_0 : HasFoo> (@in_guaranteed τ_0_0) -> ()
   destroy_addr %3 : $*HasFoo
   br bb6
 

@@ -30,7 +30,7 @@ import StdlibUnittest
 #elseif canImport(Glibc)
   import Glibc
 #elseif os(Windows)
-  import MSVCRT
+  import CRT
   import WinSDK
 #else
 #error("Unsupported platform")

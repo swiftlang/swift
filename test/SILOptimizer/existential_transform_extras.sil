@@ -174,9 +174,9 @@ bb0(%0 : $*P, %1 : $*P):
   %4 = alloc_stack $P
   copy_addr %0 to [initialization] %4 : $*P
   destroy_addr %0 : $*P
-  %6 = open_existential_addr immutable_access %4 : $*P to $*@opened("3CB58EC4-ECED-11E8-9798-D0817AD4059B") P
-  %7 = witness_method $@opened("3CB58EC4-ECED-11E8-9798-D0817AD4059B") P, #P.foo : <Self where Self : P> (Self) -> () -> Int32, %6 : $*@opened("3CB58EC4-ECED-11E8-9798-D0817AD4059B") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
-  %8 = apply %7<@opened("3CB58EC4-ECED-11E8-9798-D0817AD4059B") P>(%6) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
+  %6 = open_existential_addr immutable_access %4 : $*P to $*@opened("4CB58EC4-ECED-11E8-9798-D0817AD4059B") P
+  %7 = witness_method $@opened("4CB58EC4-ECED-11E8-9798-D0817AD4059B") P, #P.foo : <Self where Self : P> (Self) -> () -> Int32, %6 : $*@opened("4CB58EC4-ECED-11E8-9798-D0817AD4059B") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
+  %8 = apply %7<@opened("4CB58EC4-ECED-11E8-9798-D0817AD4059B") P>(%6) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
   %9 = alloc_stack $P
   copy_addr %1 to [initialization] %9 : $*P
   destroy_addr %1 : $*P

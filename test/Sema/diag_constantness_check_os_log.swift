@@ -185,3 +185,44 @@ func testLogMessageWrappingDiagnostics() {
   _osLogTestHelper(nonConstantFunction("key", fallback: "A literal message"))
     // expected-error@-1{{argument must be a string interpolation}}
 }
+
+// Test closure expressions
+
+func funcAcceptingClosure<T>(_ x: () -> T) -> T {
+  return x()
+}
+
+func normalFunction() {}
+
+func testCallsWithinClosures(formatOpt: OSLogIntegerFormatting) {
+  funcAcceptingClosure {
+    _osLogTestHelper("Minimum integer value: \(Int.min, format: formatOpt)")
+      // expected-error@-1 {{argument must be a static method or property of 'OSLogIntegerFormatting'}}
+  }
+  funcAcceptingClosure {
+    _osLogTestHelper("Minimum integer value: \(Int.min, format: formatOpt)")
+      // expected-error@-1 {{argument must be a static method or property of 'OSLogIntegerFormatting'}}
+    _osLogTestHelper("Maximum integer value: \(Int.max, format: formatOpt)")
+      // expected-error@-1 {{argument must be a static method or property of 'OSLogIntegerFormatting'}}
+  }
+  funcAcceptingClosure {
+    funcAcceptingClosure {
+      _osLogTestHelper("Minimum integer value: \(Int.min, format: formatOpt)")
+        // expected-error@-1 {{argument must be a static method or property of 'OSLogIntegerFormatting'}}
+    }
+  }
+  funcAcceptingClosure {
+    normalFunction()
+    funcAcceptingClosure {
+      _osLogTestHelper("Minimum integer value: \(Int.min, format: formatOpt)")
+        // expected-error@-1 {{argument must be a static method or property of 'OSLogIntegerFormatting'}}
+    }
+  }
+  funcAcceptingClosure {
+    _osLogTestHelper("Minimum integer value: \(Int.min, format: .hex)")
+  }
+  funcAcceptingClosure {
+    _osLogTestHelper("Minimum integer value: \(Int.min, format: .hex)")
+    _osLogTestHelper("Maximum integer value: \(Int.max, privacy: .public)")
+  }
+}

@@ -407,7 +407,7 @@ getSubstitutionsForCallee(SILModule &module, CanSILFunctionType baseCalleeType,
   unsigned baseDepth = 0;
   SubstitutionMap baseSubMap;
   if (auto baseClassSig = baseClassDecl->getGenericSignatureOfContext()) {
-    baseDepth = baseClassSig->getGenericParams().back()->getDepth() + 1;
+    baseDepth = baseClassSig.getGenericParams().back()->getDepth() + 1;
 
     // Compute the type of the base class, starting from the
     // derived class type and the type of the method's self
@@ -434,7 +434,7 @@ getSubstitutionsForCallee(SILModule &module, CanSILFunctionType baseCalleeType,
   // parameters from the derived class.
   unsigned origDepth = 0;
   if (auto calleeClassSig = calleeClassDecl->getGenericSignatureOfContext())
-    origDepth = calleeClassSig->getGenericParams().back()->getDepth() + 1;
+    origDepth = calleeClassSig.getGenericParams().back()->getDepth() + 1;
 
   auto baseCalleeSig = baseCalleeType->getInvocationGenericSignature();
 
@@ -453,7 +453,8 @@ replaceApplyInst(SILBuilder &builder, SILLocation loc, ApplyInst *oldAI,
                  SILValue newFn, SubstitutionMap newSubs,
                  ArrayRef<SILValue> newArgs, ArrayRef<SILValue> newArgBorrows) {
   auto *newAI =
-      builder.createApply(loc, newFn, newSubs, newArgs, oldAI->isNonThrowing());
+      builder.createApply(loc, newFn, newSubs, newArgs,
+                          oldAI->getApplyOptions());
 
   if (!newArgBorrows.empty()) {
     for (SILValue arg : newArgBorrows) {
@@ -461,9 +462,11 @@ replaceApplyInst(SILBuilder &builder, SILLocation loc, ApplyInst *oldAI,
     }
   }
 
-  // Check if any casting is required for the return value.
+  // Check if any casting is required for the return value.  newAI cannot be a
+  // guaranteed value, so this cast cannot generate borrow scopes and it can be
+  // used anywhere the original oldAI was used.
   auto castRes = castValueToABICompatibleType(
-      &builder, loc, newAI, newAI->getType(), oldAI->getType());
+    &builder, loc, newAI, newAI->getType(), oldAI->getType(), /*usePoints*/ {});
 
   oldAI->replaceAllUsesWith(castRes.first);
   return {newAI, castRes.second};
@@ -491,7 +494,7 @@ replaceTryApplyInst(SILBuilder &builder, SILLocation loc, TryApplyInst *oldTAI,
     resultBB = normalBB;
   } else {
     resultBB = builder.getFunction().createBasicBlockBefore(normalBB);
-    resultBB->createPhiArgument(newResultTy, ValueOwnershipKind::Owned);
+    resultBB->createPhiArgument(newResultTy, OwnershipKind::Owned);
   }
 
   // We can always just use the original error BB because we'll be
@@ -502,7 +505,8 @@ replaceTryApplyInst(SILBuilder &builder, SILLocation loc, TryApplyInst *oldTAI,
   // Note that this makes this block temporarily double-terminated!
   // We won't fix that until deleteDevirtualizedApply.
   auto newTAI =
-      builder.createTryApply(loc, newFn, newSubs, newArgs, resultBB, errorBB);
+      builder.createTryApply(loc, newFn, newSubs, newArgs, resultBB, errorBB,
+                             oldTAI->getApplyOptions());
 
   if (!newArgBorrows.empty()) {
     builder.setInsertionPoint(normalBB->begin());
@@ -519,8 +523,11 @@ replaceTryApplyInst(SILBuilder &builder, SILLocation loc, TryApplyInst *oldTAI,
     builder.setInsertionPoint(resultBB);
 
     SILValue resultValue = resultBB->getArgument(0);
+    // resultValue cannot be a guaranteed value, so this cast cannot generate
+    // borrow scopes and it can be used anywhere the original oldAI was
+    // used--usePoints are not required.
     std::tie(resultValue, std::ignore) = castValueToABICompatibleType(
-        &builder, loc, resultValue, newResultTy, oldResultTy);
+        &builder, loc, resultValue, newResultTy, oldResultTy, /*usePoints*/ {});
     builder.createBranch(loc, normalBB, {resultValue});
   }
 
@@ -536,7 +543,7 @@ replaceBeginApplyInst(SILBuilder &builder, SILLocation loc,
                       ArrayRef<SILValue> newArgBorrows) {
   bool changedCFG = false;
   auto *newBAI = builder.createBeginApply(loc, newFn, newSubs, newArgs,
-                                          oldBAI->isNonThrowing());
+                                          oldBAI->getApplyOptions());
 
   // Forward the token.
   oldBAI->getTokenResult()->replaceAllUsesWith(newBAI->getTokenResult());
@@ -548,8 +555,12 @@ replaceBeginApplyInst(SILBuilder &builder, SILLocation loc,
   for (auto i : indices(oldYields)) {
     auto oldYield = oldYields[i];
     auto newYield = newYields[i];
+    // Insert any end_borrow if the yielded value before the token's uses.
+    SmallVector<SILInstruction *, 4> users(
+      makeUserIteratorRange(oldBAI->getTokenResult()->getUses()));
     auto yieldCastRes = castValueToABICompatibleType(
-        &builder, loc, newYield, newYield->getType(), oldYield->getType());
+      &builder, loc, newYield, newYield->getType(), oldYield->getType(),
+      users);
     oldYield->replaceAllUsesWith(yieldCastRes.first);
     changedCFG |= yieldCastRes.second;
   }
@@ -584,8 +595,11 @@ replacePartialApplyInst(SILBuilder &builder, SILLocation loc,
       builder.createPartialApply(loc, newFn, newSubs, newArgs, convention);
 
   // Check if any casting is required for the partially-applied function.
+  // A non-guaranteed cast needs no usePoints.
+  assert(newPAI->getOwnershipKind() != OwnershipKind::Guaranteed);
   auto castRes = castValueToABICompatibleType(
-      &builder, loc, newPAI, newPAI->getType(), oldPAI->getType());
+    &builder, loc, newPAI, newPAI->getType(), oldPAI->getType(),
+    /*usePoints*/ {});
   oldPAI->replaceAllUsesWith(castRes.first);
 
   return {newPAI, castRes.second};
@@ -768,7 +782,7 @@ swift::devirtualizeClassMethod(FullApplySite applySite,
            applySite.getFunction()->getTypeExpansionContext())) {
     auto castRes = castValueToABICompatibleType(
         &builder, loc, *indirectResultArgIter, indirectResultArgIter->getType(),
-        resultTy);
+        resultTy, {applySite.getInstruction()});
     newArgs.push_back(castRes.first);
     changedCFG |= castRes.second;
     ++indirectResultArgIter;
@@ -780,15 +794,17 @@ swift::devirtualizeClassMethod(FullApplySite applySite,
     auto paramType =
         substConv.getSILType(param, builder.getTypeExpansionContext());
     SILValue arg = *paramArgIter;
-    if (builder.hasOwnership() && arg->getType().isObject()
-        && arg.getOwnershipKind() == ValueOwnershipKind::Owned
-        && param.isGuaranteed()) {
+    if (builder.hasOwnership() && arg->getType().isObject() &&
+        arg.getOwnershipKind() == OwnershipKind::Owned &&
+        param.isGuaranteed()) {
       SILBuilderWithScope borrowBuilder(applySite.getInstruction(), builder);
       arg = borrowBuilder.createBeginBorrow(loc, arg);
       newArgBorrows.push_back(arg);
     }
-    auto argCastRes = castValueToABICompatibleType(&builder, loc, arg,
-                                       paramArgIter->getType(), paramType);
+    auto argCastRes =
+      castValueToABICompatibleType(&builder, loc, arg,
+                                   paramArgIter->getType(), paramType,
+                                   {applySite.getInstruction()});
 
     newArgs.push_back(argCastRes.first);
     changedCFG |= argCastRes.second;
@@ -900,7 +916,7 @@ getWitnessMethodSubstitutions(
   unsigned baseDepth = 0;
   auto *rootConformance = conformance->getRootConformance();
   if (auto witnessSig = rootConformance->getGenericSignature())
-    baseDepth = witnessSig->getGenericParams().back()->getDepth() + 1;
+    baseDepth = witnessSig.getGenericParams().back()->getDepth() + 1;
 
   // If the witness has a class-constrained 'Self' generic parameter,
   // we have to build a new substitution map that shifts all generic
@@ -1006,18 +1022,19 @@ devirtualizeWitnessMethod(ApplySite applySite, SILFunction *f,
     auto paramType =
         substConv.getSILArgumentType(substArgIdx++, typeExpansionContext);
     if (arg->getType() != paramType) {
-      if (argBuilder.hasOwnership()
-          && applySite.getKind() != ApplySiteKind::PartialApplyInst
-          && arg->getType().isObject()
-          && arg.getOwnershipKind() == ValueOwnershipKind::Owned
-          && paramInfo.isGuaranteedConvention()) {
+      if (argBuilder.hasOwnership() &&
+          applySite.getKind() != ApplySiteKind::PartialApplyInst &&
+          arg->getType().isObject() &&
+          arg.getOwnershipKind() == OwnershipKind::Owned &&
+          paramInfo.isGuaranteedConvention()) {
         SILBuilderWithScope borrowBuilder(applySite.getInstruction(),
                                           argBuilder);
         arg = borrowBuilder.createBeginBorrow(applySite.getLoc(), arg);
         borrowedArgs.push_back(arg);
       }
       auto argCastRes = castValueToABICompatibleType(
-          &argBuilder, applySite.getLoc(), arg, arg->getType(), paramType);
+        &argBuilder, applySite.getLoc(), arg, arg->getType(), paramType,
+        applySite.getInstruction());
       arg = argCastRes.first;
       changedCFG |= argCastRes.second;
     }

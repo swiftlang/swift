@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "gsil-gen"
+#define DEBUG_TYPE "sil-based-debuginfo-gen"
 #include "swift/AST/SILOptions.h"
 #include "swift/SIL/SILPrintContext.h"
 #include "swift/SIL/SILModule.h"
@@ -25,12 +25,12 @@ namespace {
 /// A pass for generating debug info on SIL level.
 ///
 /// This pass is only enabled if SILOptions::SILOutputFileNameForDebugging is
-/// set (i.e. if the -gsil command line option is specified).
+/// set (i.e. if the -sil-based-debuginfo frontend option is specified).
 /// The pass writes all SIL functions into one or multiple output files,
 /// depending on the size of the SIL. The names of the output files are derived
 /// from the main output file.
 ///
-///     output file name = <main-output-filename>.gsil_<n>.sil
+///     output file name = <main-output-filename>.sil_dbg_<n>.sil
 ///
 /// Where <n> is a consecutive number. The files are stored in the same
 /// same directory as the main output file.
@@ -104,7 +104,7 @@ class SILDebugInfoGenerator : public SILModuleTransform {
 
       std::string FileName;
       llvm::raw_string_ostream NameOS(FileName);
-      NameOS << FileBaseName << ".gsil_" << FileIdx++ << ".sil";
+      NameOS << FileBaseName << ".sil_dbg_" << FileIdx++ << ".sil";
       NameOS.flush();
 
       char *FileNameBuf = (char *)M->allocate(FileName.size() + 1, 1);
@@ -125,8 +125,8 @@ class SILDebugInfoGenerator : public SILModuleTransform {
         PrintedFuncs.push_back(F);
 
         // Set the debug scope for the function.
-        SILLocation::DebugLoc DL(Ctx.LCS.LineNum, 1, FileNameBuf);
-        RegularLocation Loc(DL);
+        RegularLocation Loc(SILLocation::FilenameAndLocation::alloc(
+             Ctx.LCS.LineNum, 1,FileNameBuf, *M));
         SILDebugScope *Scope = new (*M) SILDebugScope(Loc, F);
         F->setSILDebugScope(Scope);
 
@@ -151,14 +151,18 @@ class SILDebugInfoGenerator : public SILModuleTransform {
               continue;
             }
             SILLocation Loc = I->getLoc();
-            SILLocation::DebugLoc DL(Ctx.LineNums[I], 1, FileNameBuf);
-            assert(DL.Line && "no line set for instruction");
-            if (Loc.is<ReturnLocation>() || Loc.is<ImplicitReturnLocation>()) {
-              Loc.setDebugInfoLoc(DL);
-              I->setDebugLocation(SILDebugLocation(Loc, Scope));
+            auto *filePos = SILLocation::FilenameAndLocation::alloc(
+                Ctx.LineNums[I], 1, FileNameBuf, *M);
+            assert(filePos->line && "no line set for instruction");
+            if (Loc.is<ReturnLocation>()) {
+              I->setDebugLocation(
+                SILDebugLocation(ReturnLocation(filePos), Scope));
+            } else if (Loc.is<ImplicitReturnLocation>()) {
+              I->setDebugLocation(
+                SILDebugLocation(ImplicitReturnLocation(filePos), Scope));
             } else {
-              RegularLocation RLoc(DL);
-              I->setDebugLocation(SILDebugLocation(RLoc, Scope));
+              I->setDebugLocation(
+                SILDebugLocation(RegularLocation(filePos), Scope));
             }
           }
         }

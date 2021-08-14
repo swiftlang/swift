@@ -14,7 +14,7 @@ import Swift
 import SwiftShims
 
 #if os(Windows)
-import MSVCRT
+import CRT
 import WinSDK
 #endif
 

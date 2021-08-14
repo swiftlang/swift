@@ -31,10 +31,6 @@ SWIFT_REQUEST(NameLookup, DirectOperatorLookupRequest,
 SWIFT_REQUEST(NameLookup, DirectPrecedenceGroupLookupRequest,
               TinyPtrVector<PrecedenceGroupDecl *>(OperatorLookupDescriptor),
               Uncached, NoLocationInfo)
-SWIFT_REQUEST(NameLookup, ExpandASTScopeRequest,
-              ast_scope::ASTScopeImpl* (ast_scope::ASTScopeImpl*, ast_scope::ScopeCreator*),
-              SeparatelyCached,
-              NoLocationInfo)
 SWIFT_REQUEST(NameLookup, ExtendedNominalRequest,
               NominalTypeDecl *(ExtensionDecl *), SeparatelyCached,
               NoLocationInfo)

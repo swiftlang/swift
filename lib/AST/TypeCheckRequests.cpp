@@ -468,41 +468,6 @@ void DefaultTypeRequest::cacheResult(Type value) const {
   cacheEntry = value;
 }
 
-bool PropertyWrapperTypeInfoRequest::isCached() const {
-  auto nominal = std::get<0>(getStorage());
-  return nominal->getAttrs().hasAttribute<PropertyWrapperAttr>();;
-}
-
-bool AttachedPropertyWrappersRequest::isCached() const {
-  auto var = std::get<0>(getStorage());
-  return !var->getAttrs().isEmpty();
-}
-
-bool AttachedPropertyWrapperTypeRequest::isCached() const {
-  auto var = std::get<0>(getStorage());
-  return !var->getAttrs().isEmpty();
-}
-
-bool PropertyWrapperBackingPropertyTypeRequest::isCached() const {
-  auto var = std::get<0>(getStorage());
-  return !var->getAttrs().isEmpty();
-}
-
-bool PropertyWrapperBackingPropertyInfoRequest::isCached() const {
-  auto var = std::get<0>(getStorage());
-  return !var->getAttrs().isEmpty();
-}
-
-bool PropertyWrapperMutabilityRequest::isCached() const {
-  auto var = std::get<0>(getStorage());
-  return !var->getAttrs().isEmpty();
-}
-
-bool PropertyWrapperLValuenessRequest::isCached() const {
-  auto var = std::get<0>(getStorage());
-  return !var->getAttrs().isEmpty();
-}
-
 void swift::simple_display(
     llvm::raw_ostream &out, const PropertyWrapperTypeInfo &propertyWrapper) {
   out << "{ ";
@@ -515,10 +480,21 @@ void swift::simple_display(
 
 void swift::simple_display(
     llvm::raw_ostream &out,
-    const PropertyWrapperBackingPropertyInfo &backingInfo) {
+    const PropertyWrapperInitializerInfo &initInfo) {
+  out << "{";
+  if (initInfo.hasInitFromWrappedValue())
+    initInfo.getInitFromWrappedValue()->dump(out);
+  if (initInfo.hasInitFromProjectedValue())
+    initInfo.getInitFromProjectedValue()->dump(out);
+  out << " }";
+}
+
+void swift::simple_display(
+    llvm::raw_ostream &out,
+    const PropertyWrapperAuxiliaryVariables &auxiliaryVars) {
   out << "{ ";
-  if (backingInfo.backingVar)
-    backingInfo.backingVar->dumpRef(out);
+  if (auxiliaryVars.backingVar)
+    auxiliaryVars.backingVar->dumpRef(out);
   out << " }";
 }
 
@@ -590,16 +566,6 @@ void swift::simple_display(llvm::raw_ostream &out,
 
   out << ", allowUsableFromInline: "
       << (value.allowUsableFromInline ? "true" : "false");
-}
-
-//----------------------------------------------------------------------------//
-// FunctionBuilder-related requests.
-//----------------------------------------------------------------------------//
-
-bool AttachedFunctionBuilderRequest::isCached() const {
-  // Only needs to be cached if there are any custom attributes.
-  auto var = std::get<0>(getStorage());
-  return var->getAttrs().hasAttribute<CustomAttr>();
 }
 
 //----------------------------------------------------------------------------//
@@ -991,7 +957,7 @@ void InterfaceTypeRequest::cacheResult(Type type) const {
   auto *decl = std::get<0>(getStorage());
   if (type) {
     assert(!type->hasTypeVariable() && "Type variable in interface type");
-    assert(!type->hasHole() && "Type hole in interface type");
+    assert(!type->hasPlaceholder() && "Type placeholder in interface type");
     assert(!type->is<InOutType>() && "Interface type must be materializable");
     assert(!type->hasArchetype() && "Archetype in interface type");
   }
@@ -1067,6 +1033,15 @@ void swift::simple_display(llvm::raw_ostream &out,
   case ImplicitMemberAction::ResolveDecodable:
     out << "resolve Decodable.init(from:)";
     break;
+  case ImplicitMemberAction::ResolveDistributedActor:
+    out << "resolve DistributedActor";
+    break;
+  case ImplicitMemberAction::ResolveDistributedActorIdentity:
+    out << "resolve DistributedActor.id";
+    break;
+  case ImplicitMemberAction::ResolveDistributedActorTransport:
+    out << "resolve DistributedActor.actorTransport";
+    break;
   }
 }
 
@@ -1105,19 +1080,19 @@ void ValueWitnessRequest::cacheResult(Witness type) const {
 }
 
 //----------------------------------------------------------------------------//
-// PreCheckFunctionBuilderRequest computation.
+// PreCheckResultBuilderRequest computation.
 //----------------------------------------------------------------------------//
 
 void swift::simple_display(llvm::raw_ostream &out,
-                           FunctionBuilderBodyPreCheck value) {
+                           ResultBuilderBodyPreCheck value) {
   switch (value) {
-  case FunctionBuilderBodyPreCheck::Okay:
+  case ResultBuilderBodyPreCheck::Okay:
     out << "okay";
     break;
-  case FunctionBuilderBodyPreCheck::HasReturnStmt:
+  case ResultBuilderBodyPreCheck::HasReturnStmt:
     out << "has return statement";
     break;
-  case FunctionBuilderBodyPreCheck::Error:
+  case ResultBuilderBodyPreCheck::Error:
     out << "error";
     break;
   }
@@ -1276,7 +1251,7 @@ void CheckRedeclarationRequest::writeDependencySink(
 
 void LookupAllConformancesInContextRequest::writeDependencySink(
     evaluator::DependencyCollector &tracker,
-    ProtocolConformanceLookupResult conformances) const {
+    const ProtocolConformanceLookupResult &conformances) const {
   for (auto conformance : conformances) {
     tracker.addPotentialMember(conformance->getProtocol());
   }
@@ -1346,7 +1321,7 @@ Optional<BraceStmt *> TypeCheckFunctionBodyRequest::getCachedResult() const {
   auto *afd = std::get<0>(getStorage());
   switch (afd->getBodyKind()) {
   case BodyKind::Deserialized:
-  case BodyKind::MemberwiseInitializer:
+  case BodyKind::SILSynthesize:
   case BodyKind::None:
   case BodyKind::Skipped:
     // These cases don't have any body available.
@@ -1467,8 +1442,12 @@ void swift::simple_display(llvm::raw_ostream &out, CustomAttrTypeKind value) {
     out << "non-generic";
     return;
 
-  case CustomAttrTypeKind::PropertyDelegate:
-    out << "property-delegate";
+  case CustomAttrTypeKind::PropertyWrapper:
+    out << "property-wrapper";
+    return;
+
+  case CustomAttrTypeKind::GlobalActor:
+    out << "global-actor";
     return;
   }
   llvm_unreachable("bad kind");
@@ -1487,12 +1466,46 @@ void CustomAttrTypeRequest::cacheResult(Type value) const {
   attr->setType(value);
 }
 
+bool ActorIsolation::requiresSubstitution() const {
+  switch (kind) {
+  case ActorInstance:
+  case DistributedActorInstance:
+  case Independent:
+  case Unspecified:
+    return false;
+
+  case GlobalActor:
+  case GlobalActorUnsafe:
+    return getGlobalActor()->hasTypeParameter();
+  }
+  llvm_unreachable("unhandled actor isolation kind!");
+}
+
+ActorIsolation ActorIsolation::subst(SubstitutionMap subs) const {
+  switch (kind) {
+  case ActorInstance:
+  case DistributedActorInstance:
+  case Independent:
+  case Unspecified:
+    return *this;
+
+  case GlobalActor:
+  case GlobalActorUnsafe:
+    return forGlobalActor(
+        getGlobalActor().subst(subs), kind == GlobalActorUnsafe);
+  }
+  llvm_unreachable("unhandled actor isolation kind!");
+}
 
 void swift::simple_display(
     llvm::raw_ostream &out, const ActorIsolation &state) {
   switch (state) {
     case ActorIsolation::ActorInstance:
       out << "actor-isolated to instance of " << state.getActor()->getName();
+      break;
+
+    case ActorIsolation::DistributedActorInstance:
+      out << "distributed-actor-isolated to instance of " << state.getActor()->getName();
       break;
 
     case ActorIsolation::Independent:
@@ -1504,8 +1517,12 @@ void swift::simple_display(
       break;
 
     case ActorIsolation::GlobalActor:
+    case ActorIsolation::GlobalActorUnsafe:
       out << "actor-isolated to global actor "
           << state.getGlobalActor().getString();
+
+      if (state == ActorIsolation::GlobalActorUnsafe)
+        out << "(unsafe)";
       break;
   }
 }

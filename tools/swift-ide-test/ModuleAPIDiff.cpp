@@ -740,12 +740,12 @@ public:
     if (!GS)
       return None;
     sma::GenericSignature ResultGS;
-    for (auto *GTPT : GS->getGenericParams()) {
+    for (auto *GTPT : GS.getGenericParams()) {
       sma::GenericParam ResultGP;
       ResultGP.Name = convertToIdentifier(GTPT->getName());
       ResultGS.GenericParams.emplace_back(std::move(ResultGP));
     }
-    for (auto &Req : GS->getRequirements()) {
+    for (auto &Req : GS.getRequirements()) {
       switch (Req.getKind()) {
       case RequirementKind::Superclass:
       case RequirementKind::Conformance:

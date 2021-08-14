@@ -70,13 +70,8 @@ func sr3758() {
   // CHECK: [[CLOSURE:%.+]] = function_ref @$s29implicitly_unwrapped_optional6sr3758yyFyypSgcfU_ : $@convention(thin) (@in_guaranteed Optional<Any>) -> ()
   // CHECK: [[F:%.+]] = thin_to_thick_function [[CLOSURE]] : $@convention(thin) (@in_guaranteed Optional<Any>) -> () to $@callee_guaranteed (@in_guaranteed Optional<Any>) -> ()
   // CHECK: [[BORROWED_F:%.*]] = begin_borrow [[F]]
-  // CHECK: [[CALLEE:%.+]] = copy_value [[BORROWED_F]] : $@callee_guaranteed (@in_guaranteed Optional<Any>) -> ()
-  // CHECK: [[BORROWED_CALLEE:%.*]] = begin_borrow [[CALLEE]]
-  // CHECK: = apply [[BORROWED_CALLEE]]({{%.+}}) : $@callee_guaranteed (@in_guaranteed Optional<Any>) -> ()
-  // CHECK: end_borrow [[BORROWED_CALLEE]]
-  // destroy_value [[CALLEE]]
+  // CHECK: = apply [[BORROWED_F]]({{%.+}}) : $@callee_guaranteed (@in_guaranteed Optional<Any>) -> ()
   // CHECK: end_borrow [[BORROWED_F]]
-  // CHECK: destroy_value [[F]]
   let f: ((Any?) -> Void) = { (arg: Any!) in }
   f(nil)
 } // CHECK: end sil function '$s29implicitly_unwrapped_optional6sr3758yyF'

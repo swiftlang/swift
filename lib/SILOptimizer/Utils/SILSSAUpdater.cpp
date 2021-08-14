@@ -34,13 +34,14 @@ void SILSSAUpdater::deallocateSentinel(SILUndef *undef) {
 }
 
 SILSSAUpdater::SILSSAUpdater(SmallVectorImpl<SILPhiArgument *> *phis)
-    : blockToAvailableValueMap(nullptr),
+    : blockToAvailableValueMap(nullptr), ownershipKind(OwnershipKind::None),
       phiSentinel(nullptr, deallocateSentinel), insertedPhis(phis) {}
 
 SILSSAUpdater::~SILSSAUpdater() = default;
 
-void SILSSAUpdater::initialize(SILType inputType) {
+void SILSSAUpdater::initialize(SILType inputType, ValueOwnershipKind kind) {
   type = inputType;
+  ownershipKind = kind;
 
   phiSentinel = std::unique_ptr<SILUndef, void (*)(SILUndef *)>(
       SILUndef::getSentinelValue(inputType, this),
@@ -59,6 +60,7 @@ bool SILSSAUpdater::hasValueForBlock(SILBasicBlock *block) const {
 /// Indicate that a rewritten value is available in the specified block with the
 /// specified value.
 void SILSSAUpdater::addAvailableValue(SILBasicBlock *block, SILValue value) {
+  assert(value.getOwnershipKind().isCompatibleWith(ownershipKind));
   (*blockToAvailableValueMap)[block] = value;
 }
 
@@ -227,11 +229,11 @@ SILValue SILSSAUpdater::getValueInMiddleOfBlock(SILBasicBlock *block) {
   }
 
   // Create a new phi node.
-  SILPhiArgument *phiArg =
-      block->createPhiArgument(type, ValueOwnershipKind::Owned);
-  for (auto &pair : predVals)
-    addNewEdgeValueToBranch(pair.first->getTerminator(), block, pair.second);
-
+  SILPhiArgument *phiArg = block->createPhiArgument(type, OwnershipKind::Owned);
+  for (auto &pair : predVals) {
+    addNewEdgeValueToBranch(pair.first->getTerminator(), block, pair.second,
+                            deleter);
+  }
   if (insertedPhis)
     insertedPhis->push_back(phiArg);
 
@@ -317,7 +319,7 @@ public:
                                  SILSSAUpdater *ssaUpdater) {
     // Add the argument to the block.
     SILValue phi(
-        block->createPhiArgument(ssaUpdater->type, ValueOwnershipKind::Owned));
+        block->createPhiArgument(ssaUpdater->type, ssaUpdater->ownershipKind));
 
     // Mark all predecessor blocks with the sentinel undef value.
     SmallVector<SILBasicBlock *, 4> predBlockList(
@@ -325,7 +327,8 @@ public:
 
     for (auto *predBlock : predBlockList) {
       TermInst *ti = predBlock->getTerminator();
-      addNewEdgeValueToBranch(ti, block, ssaUpdater->phiSentinel.get());
+      addNewEdgeValueToBranch(ti, block, ssaUpdater->phiSentinel.get(),
+                              ssaUpdater->deleter);
     }
 
     return phi;

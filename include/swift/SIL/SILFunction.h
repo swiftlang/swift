@@ -21,14 +21,12 @@
 #include "swift/AST/Availability.h"
 #include "swift/AST/ResilienceExpansion.h"
 #include "swift/Basic/ProfileCounter.h"
+#include "swift/SIL/SwiftObjectHeader.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILLinkage.h"
 #include "swift/SIL/SILPrintContext.h"
-
-/// The symbol name used for the program entry point function.
-#define SWIFT_ENTRY_POINT_FUNCTION "main"
 
 namespace swift {
 
@@ -37,6 +35,7 @@ class SILInstruction;
 class SILModule;
 class SILFunctionBuilder;
 class SILProfiler;
+class BasicBlockBitfield;
 
 namespace Lowering {
 class TypeLowering;
@@ -131,7 +130,11 @@ private:
 /// zero or more SIL SILBasicBlock objects that contain the SILInstruction
 /// objects making up the function.
 class SILFunction
-  : public llvm::ilist_node<SILFunction>, public SILAllocated<SILFunction> {
+  : public llvm::ilist_node<SILFunction>, public SILAllocated<SILFunction>,
+    public SwiftObjectHeader {
+    
+  static SwiftMetatype registeredMetatype;
+    
 public:
   using BlockListType = llvm::iplist<SILBasicBlock>;
 
@@ -147,6 +150,8 @@ private:
   friend class SILBasicBlock;
   friend class SILModule;
   friend class SILFunctionBuilder;
+  template <typename, unsigned> friend class BasicBlockData;
+  friend class BasicBlockBitfield;
 
   /// Module - The SIL module that the function belongs to.
   SILModule &Module;
@@ -191,6 +196,16 @@ private:
 
   Identifier ObjCReplacementFor;
 
+  /// The head of a single-linked list of currently alive BasicBlockBitfield.
+  BasicBlockBitfield *newestAliveBitfield = nullptr;
+
+  /// A monotonically increasing ID which is incremented whenever a
+  /// BasicBlockBitfield is constructed.
+  /// Usually this stays below 100000, so a 32-bit unsigned is more than
+  /// sufficient.
+  /// For details see BasicBlockBitfield::bitfieldID;
+  unsigned currentBitfieldID = 1;
+
   /// The function's set of semantics attributes.
   ///
   /// TODO: Why is this using a std::string? Why don't we use uniqued
@@ -213,6 +228,11 @@ private:
   /// This is the number of uses of this SILFunction inside the SIL.
   /// It does not include references from debug scopes.
   unsigned RefCount = 0;
+
+  /// Used to verify if a BasicBlockData is not valid anymore.
+  /// This counter is incremented every time a BasicBlockData re-assigns new
+  /// block indices.
+  unsigned BlockListChangeIdx = 0;
 
   /// The function's bare attribute. Bare means that the function is SIL-only
   /// and does not require debug info.
@@ -300,6 +320,9 @@ private:
   /// The function's effects attribute.
   unsigned EffectsKindAttr : NumEffectsKindBits;
 
+  /// The function is in a statically linked module.
+  unsigned IsStaticallyLinked : 1;
+
   static void
   validateSubclassScope(SubclassScope scope, IsThunk_t isThunk,
                         const GenericSpecializationInformation *genericInfo) {
@@ -370,6 +393,10 @@ private:
   void setHasOwnership(bool newValue) { HasOwnership = newValue; }
 
 public:
+  static void registerBridgedMetatype(SwiftMetatype metatype) {
+    registeredMetatype = metatype;
+  }
+
   ~SILFunction();
 
   SILModule &getModule() const { return Module; }
@@ -519,6 +546,12 @@ public:
     WasDeserializedCanonical = val;
   }
 
+  bool isStaticallyLinked() const { return IsStaticallyLinked; }
+
+  void setIsStaticallyLinked(bool value) {
+    IsStaticallyLinked = value;
+  }
+
   /// Returns true if this is a reabstraction thunk of escaping function type
   /// whose single argument is a potentially non-escaping closure. i.e. the
   /// thunks' function argument may itself have @inout_aliasable parameters.
@@ -587,15 +620,18 @@ public:
     return getLoweredFunctionType()->hasIndirectFormalResults();
   }
 
-  /// Returns true if this function either has a self metadata argument or
-  /// object that Self metadata may be derived from.
+  /// Returns true if this function ie either a class method, or a
+  /// closure that captures the 'self' value or its metatype.
+  ///
+  /// If this returns true, DynamicSelfType can be used in the body
+  /// of the function.
   ///
   /// Note that this is not the same as hasSelfParam().
   ///
-  /// For closures that capture DynamicSelfType, hasSelfMetadataParam()
+  /// For closures that capture DynamicSelfType, hasDynamicSelfMetadata()
   /// is true and hasSelfParam() is false. For methods on value types,
-  /// hasSelfParam() is true and hasSelfMetadataParam() is false.
-  bool hasSelfMetadataParam() const;
+  /// hasSelfParam() is true and hasDynamicSelfMetadata() is false.
+  bool hasDynamicSelfMetadata() const;
 
   /// Return the mangled name of this SILFunction.
   StringRef getName() const { return Name; }
@@ -802,7 +838,8 @@ public:
     DeclCtxt = (DS ? DebugScope->Loc.getAsDeclContext() : nullptr);
   }
 
-  /// Initialize the debug scope for debug info on SIL level (-gsil).
+  /// Initialize the debug scope for debug info on SIL level
+  /// (-sil-based-debuginfo).
   void setSILDebugScope(const SILDebugScope *DS) {
     DebugScope = DS;
   }
@@ -956,7 +993,16 @@ public:
   SILType mapTypeIntoContext(SILType type) const;
 
   /// Converts the given function definition to a declaration.
-  void convertToDeclaration();
+  void convertToDeclaration() {
+    assert(isDefinition() && "Can only convert definitions to declarations");
+    clear();
+  }
+
+  void clear();
+
+  /// Like `clear`, but does not call `dropAllReferences`, which is the
+  /// responsibility of the caller.
+  void eraseAllBlocks();
 
   /// Return the identity substitutions necessary to forward this call if it is
   /// generic.
@@ -965,9 +1011,6 @@ public:
   //===--------------------------------------------------------------------===//
   // Block List Access
   //===--------------------------------------------------------------------===//
-
-  BlockListType &getBlocks() { return BlockList; }
-  const BlockListType &getBlocks() const { return BlockList; }
 
   using iterator = BlockListType::iterator;
   using reverse_iterator = BlockListType::reverse_iterator;
@@ -992,9 +1035,31 @@ public:
   SILBasicBlock *createBasicBlockAfter(SILBasicBlock *afterBB);
   SILBasicBlock *createBasicBlockBefore(SILBasicBlock *beforeBB);
 
-  /// Splice the body of \p F into this function at end.
-  void spliceBody(SILFunction *F) {
-    getBlocks().splice(begin(), F->getBlocks());
+  /// Removes and destroys \p BB;
+  void eraseBlock(SILBasicBlock *BB) {
+    assert(BB->getParent() == this);
+    BlockList.erase(BB);
+  }
+
+  /// Transfer all blocks of \p F into this function, at the begin of the block
+  /// list.
+  void moveAllBlocksFromOtherFunction(SILFunction *F);
+  
+  /// Transfer \p blockInOtherFunction of another function into this function,
+  /// before \p insertPointInThisFunction.
+  void moveBlockFromOtherFunction(SILBasicBlock *blockInOtherFunction,
+                                  iterator insertPointInThisFunction);
+
+  /// Move block \p BB to immediately before the iterator \p IP.
+  ///
+  /// The block must be part of this function.
+  void moveBlockBefore(SILBasicBlock *BB, SILFunction::iterator IP);
+
+  /// Move block \p BB to immediately after block \p After.
+  ///
+  /// The block must be part of this function.
+  void moveBlockAfter(SILBasicBlock *BB, SILBasicBlock *After) {
+    moveBlockBefore(BB, std::next(After->getIterator()));
   }
 
   /// Return the unique basic block containing a return inst if it
@@ -1084,8 +1149,8 @@ public:
     return getArguments().back();
   }
 
-  const SILArgument *getSelfMetadataArgument() const {
-    assert(hasSelfMetadataParam() && "This method can only be called if the "
+  const SILArgument *getDynamicSelfMetadata() const {
+    assert(hasDynamicSelfMetadata() && "This method can only be called if the "
            "SILFunction has a self-metadata parameter");
     return getArguments().back();
   }
@@ -1098,12 +1163,15 @@ public:
   /// invariants.
   void verify(bool SingleFunction = true) const;
 
+  /// Verifies the lifetime of memory locations in the function.
+  void verifyMemoryLifetime();
+
   /// Run the SIL ownership verifier to check for ownership invariant failures.
   ///
   /// NOTE: The ownership verifier is always run when performing normal IR
   /// verification, so this verification can be viewed as a subset of
   /// SILFunction::verify.
-  void verifyOwnership(DeadEndBlocks *deadEndBlocks = nullptr) const;
+  void verifyOwnership(DeadEndBlocks *deadEndBlocks) const;
 
   /// Verify that all non-cond-br critical edges have been split.
   ///

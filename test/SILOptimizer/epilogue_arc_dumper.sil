@@ -74,9 +74,12 @@ bb0(%0 : $foo):
 
 bb1:
   strong_release %0 : $foo
-  cond_br undef, bb1, bb2
+  cond_br undef, bb2, bb3
 
 bb2:
+  br bb1
+
+bb3:
   %3 = tuple ()
   return %3 : $()
 }
@@ -92,9 +95,12 @@ bb0(%0 : $foo):
   br bb1
 
 bb1:
-  cond_br undef, bb1, bb2
+  cond_br undef, bb2, bb3
 
 bb2:
+  br bb1
+
+bb3:
   %3 = tuple ()
   return %3 : $()
 }

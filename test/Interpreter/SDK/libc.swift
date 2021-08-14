@@ -14,7 +14,7 @@
 #elseif canImport(Glibc)
   import Glibc
 #elseif os(Windows)
-  import MSVCRT
+  import CRT
 
   let S_IRUSR: Int32 = ucrt._S_IREAD
   let S_IWUSR: Int32 = 0

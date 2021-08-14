@@ -97,6 +97,10 @@ public:
     Values.append(values.begin(), values.end());
   }
 
+  void insert(unsigned index, llvm::Value *value) {
+    Values.insert(Values.begin() + index, value);
+  }
+
   /// Return an array containing the given range of values.  The values
   /// are not claimed.
   ArrayRef<llvm::Value*> getRange(unsigned from, unsigned to) const {
@@ -150,11 +154,6 @@ public:
   llvm::Value *getLastClaimed() {
     assert(NextValue > 0);
     return Values[NextValue-1];
-  }
-
-  llvm::Value *peek(unsigned n) {
-    assert(n < Values.size());
-    return Values[n];
   }
 
   /// Claim and remove the last item in the array.

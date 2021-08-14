@@ -274,7 +274,7 @@ func caller() {
 To understand the constraints that Swift puts on `inout` parameters, let's take
 a look at the mental model for introduced in the [Ownership
 manifesto](OwnershipManifesto.md) and in [SE-0176 Enforce Exclusive Access to
-Memory](https://github.com/apple/swift-evolution/blob/master/proposals/0176-enforce-exclusive-access-to-memory.md).
+Memory](https://github.com/apple/swift-evolution/blob/main/proposals/0176-enforce-exclusive-access-to-memory.md).
 When the caller binds a storage reference to an `inout` parameter, it starts a
 non-instantaneous access to the whole value that occupies the storage. This
 access ends when the callee returns.  Overlapping accesses are not allowed, and
@@ -307,7 +307,7 @@ provide the following guarantees:
 
 - `inout` are backed by initialized memory on function entry and function exit
   (an implication of the copy-in/copy-out semantics). Destroying the object in
-  `inout` requires using unsafe construts. Therefore, in safe Swift `inout`
+  `inout` requires using unsafe constructs. Therefore, in safe Swift `inout`
   parameters are backed by initialized memory throughout function execution.
 
 - `inout` parameters don't alias each other or any other values that program is
@@ -407,13 +407,13 @@ void printInt(const int &value);
 ```swift
 // C++ header imported in Swift.
 
-void printInt(_ value: UnsafePointer<Int>)
+func printInt(_ value: UnsafePointer<Int>)
 ```
 
 ```swift
 // Usage example.
 
-void caller() {
+func caller() {
   var x = 42
   printInt(&x) // OK
 
@@ -450,13 +450,13 @@ void printInt(const int &value);
 ```swift
 // C++ header imported in Swift.
 
-void printInt(_ value: Int)
+func printInt(_ value: Int)
 ```
 
 ```swift
 // Usage example.
 
-void caller() {
+func caller() {
   let x = 42
   printInt(y) // OK
 }
@@ -1033,7 +1033,7 @@ in all Swift code, but it is feasible for local variables of concrete types.
 An example where it is not possible to maintain precise destruction semantics
 for C++ classes is in a generic Swift function that is called with a C++ class
 as a type parameter. In this case, we must be able to compile one definition of
-a Swift function, which must work regradless of the nature of the type (be it a
+a Swift function, which must work regardless of the nature of the type (be it a
 Swift type or a C++ class). This limitation does not seem too bad, because RAII
 types are not often passed as type parameters to templates in C++, which creates
 a reason to believe it will not be common in Swift either.
@@ -1804,7 +1804,7 @@ dynamically, some are undefined behavior.
 
 The backdoors are disallowed by the exclusivity rule (from [SE-0176 Enforce
 Exclusive Access to
-Memory](https://github.com/apple/swift-evolution/blob/master/proposals/0176-enforce-exclusive-access-to-memory.md)):
+Memory](https://github.com/apple/swift-evolution/blob/main/proposals/0176-enforce-exclusive-access-to-memory.md)):
 
 > two accesses to the same variable are not allowed to overlap unless both
 > accesses are reads
@@ -2842,7 +2842,7 @@ public:
 // C++ header imported in Swift.
 
 struct MyCxxContainer {
-  public subscript(_ i: Int) { get set }
+  public subscript(_ i: Int) -> Double { get set }
 }
 ```
 
@@ -2875,7 +2875,7 @@ struct MyCxxCollection {
 
 Swift has an equivalent for C++'s `operator()`: `callAsFunction` (introduced in
 [SE-0253: Callable values of user-defined nominal
-types](https://github.com/apple/swift-evolution/blob/master/proposals/0253-callable.md)).
+types](https://github.com/apple/swift-evolution/blob/main/proposals/0253-callable.md)).
 
 ```c++
 // C++ header.
@@ -2922,7 +2922,7 @@ non-throwing Swift functions. If a C++ function called from Swift throws an
 exception that is not caught within the C++ code, the program will terminate.
 
 This approach is similar to that taken by the [Python interop
-library](https://github.com/pvieito/PythonKit/blob/master/PythonKit/Python.swift),
+library](https://github.com/pvieito/PythonKit/blob/main/PythonKit/Python.swift),
 which also terminates the program by default if a Python exception is raised and
 not caught within the Python code.
 
@@ -3197,7 +3197,7 @@ UTF-8 data.
 class Employee {
 public:
   std::string DebugDescription() const;
-  [[swift::import_as_std_string]] std::string SeriaziledAsProtobuf() const;
+  [[swift::import_as_std_string]] std::string SerializedAsProtobuf() const;
 };
 ```
 
@@ -3470,7 +3470,7 @@ A sidecar annotation file allows to add arbitrary attributes to declarations
 parsed from a header file. You can find examples of such files in the [apinotes
 directory](../apinotes). APINotes files
 are handled by the [APINotes library in
-Clang](https://github.com/apple/llvm-project/tree/apple/master/clang/lib/APINotes).
+Clang](https://github.com/apple/llvm-project/tree/apple/main/clang/lib/APINotes).
 Clang reads an APINotes file alongside the header file; Clang injects attributes
 specified by APINotes into the AST parsed from the header.
 

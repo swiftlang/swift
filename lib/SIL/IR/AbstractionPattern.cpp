@@ -18,6 +18,7 @@
 #define DEBUG_TYPE "libsil"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
@@ -123,32 +124,42 @@ AbstractionPattern TypeConverter::getAbstractionPattern(EnumElementDecl *decl) {
   return AbstractionPattern(genericSig, type);
 }
 
-AbstractionPattern::EncodedForeignErrorInfo
-AbstractionPattern::EncodedForeignErrorInfo::encode(
-                         const Optional<ForeignErrorConvention> &foreignError) {
-  EncodedForeignErrorInfo errorInfo;
-  if (foreignError.hasValue()) {
-    errorInfo =
-      EncodedForeignErrorInfo(foreignError->getErrorParameterIndex(),
+AbstractionPattern::EncodedForeignInfo
+AbstractionPattern::EncodedForeignInfo::encode(
+                         const Optional<ForeignErrorConvention> &foreignError,
+                         const Optional<ForeignAsyncConvention> &foreignAsync) {
+  // Foreign async convention takes precedence.
+  if (foreignAsync.hasValue()) {
+    return EncodedForeignInfo(EncodedForeignInfo::Async,
+                              foreignAsync->completionHandlerParamIndex(),
+                              foreignAsync->completionHandlerErrorParamIndex(),
+                              foreignAsync->completionHandlerFlagParamIndex(),
+                              foreignAsync->completionHandlerFlagIsErrorOnZero());
+  } else if (foreignError.hasValue()) {
+    return EncodedForeignInfo(EncodedForeignInfo::Error,
+                              foreignError->getErrorParameterIndex(),
                               foreignError->isErrorParameterReplacedWithVoid(),
                               foreignError->stripsResultOptionality());
+  } else {
+    return {};
   }
-  return errorInfo;
 }
 
 AbstractionPattern
 AbstractionPattern::getObjCMethod(CanType origType,
                                   const clang::ObjCMethodDecl *method,
-                         const Optional<ForeignErrorConvention> &foreignError) {
-  auto errorInfo = EncodedForeignErrorInfo::encode(foreignError);
+                         const Optional<ForeignErrorConvention> &foreignError,
+                         const Optional<ForeignAsyncConvention> &foreignAsync) {
+  auto errorInfo = EncodedForeignInfo::encode(foreignError, foreignAsync);
   return getObjCMethod(origType, method, errorInfo);
 }
 
 AbstractionPattern
 AbstractionPattern::getCurriedObjCMethod(CanType origType,
                                          const clang::ObjCMethodDecl *method,
-                         const Optional<ForeignErrorConvention> &foreignError) {
-  auto errorInfo = EncodedForeignErrorInfo::encode(foreignError);
+                         const Optional<ForeignErrorConvention> &foreignError,
+                         const Optional<ForeignAsyncConvention> &foreignAsync) {
+  auto errorInfo = EncodedForeignInfo::encode(foreignError, foreignAsync);
   return getCurriedObjCMethod(origType, method, errorInfo);
 }
 
@@ -165,13 +176,13 @@ AbstractionPattern
 AbstractionPattern::getCurriedCXXMethod(CanType origType,
                                         const AbstractFunctionDecl *function) {
   auto clangMethod = cast<clang::CXXMethodDecl>(function->getClangDecl());
-  return getCurriedCXXMethod(origType, clangMethod);
+  return getCurriedCXXMethod(origType, clangMethod, function->getImportAsMemberStatus());
 }
 
 AbstractionPattern AbstractionPattern::getCurriedCXXOperatorMethod(
     CanType origType, const AbstractFunctionDecl *function) {
   auto clangMethod = cast<clang::CXXMethodDecl>(function->getClangDecl());
-  return getCurriedCXXOperatorMethod(origType, clangMethod);
+  return getCurriedCXXOperatorMethod(origType, clangMethod, function->getImportAsMemberStatus());
 }
 
 AbstractionPattern
@@ -194,6 +205,7 @@ AbstractionPattern::getOptional(AbstractionPattern object) {
   case Kind::PartialCurriedCXXOperatorMethodType:
   case Kind::OpaqueFunction:
   case Kind::OpaqueDerivativeFunction:
+  case Kind::ObjCCompletionHandlerArgumentsType:
     llvm_unreachable("cannot add optionality to non-type abstraction");
   case Kind::Opaque:
     return AbstractionPattern::getOpaque();
@@ -301,16 +313,15 @@ bool AbstractionPattern::matchesTuple(CanTupleType substType) {
     return true;
   case Kind::Tuple:
     return getNumTupleElements_Stored() == substType->getNumElements();
+  case Kind::ObjCCompletionHandlerArgumentsType:
   case Kind::ClangType:
   case Kind::Type:
   case Kind::Discard: {
-    if (isTypeParameter())
+    if (isTypeParameterOrOpaqueArchetype())
       return true;
     auto type = getType();
     if (auto tuple = dyn_cast<TupleType>(type))
       return (tuple->getNumElements() == substType->getNumElements());
-    if (isa<OpaqueTypeArchetypeType>(type))
-      return true;
     return false;
   }
   }
@@ -390,6 +401,25 @@ AbstractionPattern::getTupleElementType(unsigned index) const {
       return AbstractionPattern::getOpaque();
     return AbstractionPattern(getGenericSignature(),
                               getCanTupleElementType(getType(), index));
+      
+  case Kind::ObjCCompletionHandlerArgumentsType: {
+    // Match up the tuple element with the parameter from the Clang block type,
+    // skipping the error parameter and flag indexes if any.
+    auto callback = cast<clang::FunctionProtoType>(getClangType());
+    auto errorIndex = getEncodedForeignInfo()
+      .getAsyncCompletionHandlerErrorParamIndex();
+    auto flagIndex = getEncodedForeignInfo()
+      .getAsyncCompletionHandlerErrorFlagParamIndex();
+    unsigned paramIndex = index;
+    if (errorIndex && paramIndex >= *errorIndex)
+      ++paramIndex;
+    if (flagIndex && paramIndex >= *flagIndex)
+      ++paramIndex;
+    return AbstractionPattern(getGenericSignature(),
+                              getCanTupleElementType(getType(), index),
+                              callback->getParamType(paramIndex).getTypePtr());
+  }
+    
   }
   llvm_unreachable("bad kind");
 }
@@ -456,6 +486,7 @@ AbstractionPattern AbstractionPattern::getFunctionResultType() const {
   switch (getKind()) {
   case Kind::Invalid:
     llvm_unreachable("querying invalid abstraction pattern!");
+  case Kind::ObjCCompletionHandlerArgumentsType:
   case Kind::Tuple:
     llvm_unreachable("abstraction pattern for tuple cannot be function");
   case Kind::Opaque:
@@ -487,7 +518,7 @@ AbstractionPattern AbstractionPattern::getFunctionResultType() const {
                               getGenericSignatureForFunctionComponent(),
                               getResultType(getType()),
                               getObjCMethod(),
-                              getEncodedForeignErrorInfo());
+                              getEncodedForeignInfo());
   case Kind::CurriedCFunctionAsMethodType:
     return getPartialCurriedCFunctionAsMethod(
                                       getGenericSignatureForFunctionComponent(),
@@ -496,16 +527,84 @@ AbstractionPattern AbstractionPattern::getFunctionResultType() const {
                                       getImportAsMemberStatus());
   case Kind::CurriedCXXMethodType:
     return getPartialCurriedCXXMethod(getGenericSignatureForFunctionComponent(),
-                                      getResultType(getType()), getCXXMethod());
+                                      getResultType(getType()), getCXXMethod(),
+                                      getImportAsMemberStatus());
   case Kind::CurriedCXXOperatorMethodType:
     return getPartialCurriedCXXOperatorMethod(
         getGenericSignatureForFunctionComponent(), getResultType(getType()),
-        getCXXMethod());
+        getCXXMethod(), getImportAsMemberStatus());
   case Kind::PartialCurriedObjCMethodType:
-  case Kind::ObjCMethodType:
+  case Kind::ObjCMethodType: {
+    // If this is a foreign async function, the result type comes from the
+    // completion callback argument to the original method. Line up the
+    // result abstraction pattern with that callback argument.
+    if (getEncodedForeignInfo().getKind() == EncodedForeignInfo::IsAsync) {
+      auto paramIndex
+        = getEncodedForeignInfo().getAsyncCompletionHandlerParamIndex();
+      
+      auto callbackParamTy = getObjCMethod()->parameters()[paramIndex]
+                                            ->getType()
+                                            ->getPointeeType()
+                                            ->getAs<clang::FunctionProtoType>();
+      
+      // The result comprises the non-error argument(s) to the callback, if
+      // any.
+      
+      auto callbackErrorIndex = getEncodedForeignInfo()
+                                    .getAsyncCompletionHandlerErrorParamIndex();
+      auto callbackErrorFlagIndex = getEncodedForeignInfo()
+                                .getAsyncCompletionHandlerErrorFlagParamIndex();
+      assert((!callbackErrorIndex.hasValue()
+              || callbackParamTy->getNumParams() > *callbackErrorIndex)
+             && "completion handler has invalid error param index?!");
+      assert((!callbackErrorFlagIndex.hasValue()
+              || callbackParamTy->getNumParams() > *callbackErrorFlagIndex)
+             && "completion handler has invalid error param index?!");
+      unsigned numNonErrorParams
+        = callbackParamTy->getNumParams() - callbackErrorIndex.hasValue()
+                                          - callbackErrorFlagIndex.hasValue();
+            
+      switch (numNonErrorParams) {
+      case 0:
+        // If there are no result arguments, then the imported result type is
+        // Void, with no interesting abstraction properties.
+        return AbstractionPattern(TupleType::getEmpty(getType()->getASTContext()));
+          
+      case 1: {
+        // If there's a single argument, abstract it according to its formal type
+        // in the ObjC signature.
+        unsigned callbackResultIndex = 0;
+        for (auto index : indices(callbackParamTy->getParamTypes())) {
+          if (callbackErrorIndex && index == *callbackErrorIndex)
+            continue;
+          if (callbackErrorFlagIndex && index == *callbackErrorFlagIndex)
+            continue;
+          callbackResultIndex = index;
+          break;
+        }
+        auto clangResultType = callbackParamTy
+          ->getParamType(callbackResultIndex)
+          .getTypePtr();
+        
+        return AbstractionPattern(getGenericSignatureForFunctionComponent(),
+                                  getResultType(getType()), clangResultType);
+      }
+          
+      default:
+        // If there are multiple results, we have a special abstraction pattern
+        // form to represent the mapping from block parameters to tuple elements
+        // in the return type.
+        return AbstractionPattern::getObjCCompletionHandlerArgumentsType(
+                      getGenericSignatureForFunctionComponent(),
+                      getResultType(getType()), callbackParamTy,
+                      getEncodedForeignInfo());
+      }
+    }
+    
     return AbstractionPattern(getGenericSignatureForFunctionComponent(),
                               getResultType(getType()),
                               getObjCMethod()->getReturnType().getTypePtr());
+  }
   case Kind::OpaqueFunction:
     return getOpaque();
   case Kind::OpaqueDerivativeFunction:
@@ -514,6 +613,79 @@ AbstractionPattern AbstractionPattern::getFunctionResultType() const {
     return getTuple(elements);
   }
   llvm_unreachable("bad kind");
+}
+
+AbstractionPattern
+AbstractionPattern::getObjCMethodAsyncCompletionHandlerType(
+                                     CanType swiftCompletionHandlerType) const {
+  switch (getKind()) {
+  case Kind::PartialCurriedObjCMethodType:
+  case Kind::ObjCMethodType: {
+    // Create an abstraction pattern using the original ObjC type of the
+    // completion handler.
+    assert(getEncodedForeignInfo().getKind() == EncodedForeignInfo::IsAsync);
+    auto paramIndex = getEncodedForeignInfo().getAsyncCompletionHandlerParamIndex();
+    auto callbackParamTy = getObjCMethod()->parameters()[paramIndex]
+                                          ->getType().getTypePtr();
+    
+    CanGenericSignature patternSig;
+    if (auto origSig = getGenericSignature()) {
+      patternSig = origSig;
+    } else if (auto genFnTy = dyn_cast<GenericFunctionType>(getType())) {
+      patternSig = genFnTy->getGenericSignature().getCanonicalSignature();
+    }
+    
+    return AbstractionPattern(patternSig,
+                              swiftCompletionHandlerType, callbackParamTy);
+  }
+  case Kind::Opaque:
+  case Kind::OpaqueFunction:
+  case Kind::OpaqueDerivativeFunction:
+  case Kind::Type:
+    return AbstractionPattern(getGenericSignature(),
+                              swiftCompletionHandlerType);
+  case Kind::Invalid:
+  case Kind::Tuple:
+  case Kind::Discard:
+  case Kind::ClangType:
+  case Kind::CFunctionAsMethodType:
+  case Kind::PartialCurriedCFunctionAsMethodType:
+  case Kind::CXXMethodType:
+  case Kind::PartialCurriedCXXMethodType:
+  case Kind::CXXOperatorMethodType:
+  case Kind::PartialCurriedCXXOperatorMethodType:
+  case Kind::CurriedObjCMethodType:
+  case Kind::CurriedCFunctionAsMethodType:
+  case Kind::CurriedCXXMethodType:
+  case Kind::CurriedCXXOperatorMethodType:
+  case Kind::ObjCCompletionHandlerArgumentsType:
+    swift_unreachable("not appropriate for this kind");
+  }
+  llvm_unreachable("covered switch");
+}
+
+
+CanType AbstractionPattern::getObjCMethodAsyncCompletionHandlerForeignType(
+    ForeignAsyncConvention convention,
+    Lowering::TypeConverter &TC
+) const {
+  auto nativeCHTy = convention.completionHandlerType();
+
+  // Use the abstraction pattern we're lowering against in order to lower
+  // the completion handler type, so we can preserve C/ObjC distinctions that
+  // normally get abstracted away by the importer.
+  auto completionHandlerNativeOrigTy = getObjCMethodAsyncCompletionHandlerType(nativeCHTy);
+  
+  // Bridge the Swift completion handler type back to its
+  // foreign representation.
+  auto foreignCHTy = TC.getLoweredBridgedType(completionHandlerNativeOrigTy,
+                                    nativeCHTy,
+                                    Bridgeability::Full,
+                                    SILFunctionTypeRepresentation::ObjCMethod,
+                                    TypeConverter::ForArgument)
+    ->getCanonicalType();
+
+  return foreignCHTy;
 }
 
 AbstractionPattern
@@ -607,10 +779,19 @@ AbstractionPattern::getFunctionParamType(unsigned index) const {
     auto params = cast<AnyFunctionType>(getType()).getParams();
     auto paramType = params[index].getParameterType();
 
-    // The first parameter holds the left-hand-side operand, which gets passed
-    // to the C++ function as the this pointer.
-    if (index == 0)
-      return getCXXMethodSelfPattern(paramType);
+    // See importer::isImportedAsStatic
+    bool isStatic = getImportAsMemberStatus().isStatic();
+    if (isStatic) {
+      // The first parameter holds the left-hand-side operand, which gets passed
+      // to the C++ function as the this pointer.
+      if (index == 0)
+        return getCXXMethodSelfPattern(paramType);
+    } else {
+      // The last parameter is 'self'.
+      if (getKind() == Kind::CXXOperatorMethodType &&
+          index == params.size() - 1)
+        return getCXXMethodSelfPattern(params.back().getParameterType());
+    }
 
     // A parameter of type () does not correspond to a Clang parameter.
     if (paramType->isVoid())
@@ -620,7 +801,7 @@ AbstractionPattern::getFunctionParamType(unsigned index) const {
     auto methodType = getCXXMethod()->getType().getTypePtr();
     return AbstractionPattern(
         getGenericSignatureForFunctionComponent(), paramType,
-        getClangFunctionParameterType(methodType, index - 1));
+        getClangFunctionParameterType(methodType, index - (isStatic ? 1 : 0)));
   }
   case Kind::CurriedObjCMethodType: {
     auto params = cast<AnyFunctionType>(getType()).getParams();
@@ -648,13 +829,13 @@ AbstractionPattern::getFunctionParamType(unsigned index) const {
 
     // Otherwise, we're talking about the formal parameter clause.
     auto method = getObjCMethod();
-    auto errorInfo = getEncodedForeignErrorInfo();
+    auto errorInfo = getEncodedForeignInfo();
 
     unsigned paramIndex = index;
-    if (errorInfo.hasErrorParameter()) {
-      auto errorParamIndex = errorInfo.getErrorParameterIndex();
+    if (errorInfo.hasValue()) {
+      auto errorParamIndex = errorInfo.getForeignParamIndex();
 
-      if (!errorInfo.isErrorParameterReplacedWithVoid()) {
+      if (!errorInfo.hasErrorParameterReplacedWithVoid()) {
         if (paramIndex >= errorParamIndex) {
           ++paramIndex;
         }
@@ -709,15 +890,14 @@ AbstractionPattern AbstractionPattern::getOptionalObjectType() const {
   case Kind::Tuple:
   case Kind::OpaqueFunction:
   case Kind::OpaqueDerivativeFunction:
+  case Kind::ObjCCompletionHandlerArgumentsType:
     llvm_unreachable("pattern for function or tuple cannot be for optional");
 
   case Kind::Opaque:
     return *this;
 
   case Kind::Type:
-    if (isTypeParameter())
-      return AbstractionPattern::getOpaque();
-    if (isa<OpaqueTypeArchetypeType>(getType()))
+    if (isTypeParameterOrOpaqueArchetype())
       return AbstractionPattern::getOpaque();
     return AbstractionPattern(getGenericSignature(),
                               ::getOptionalObjectType(getType()));
@@ -755,6 +935,7 @@ AbstractionPattern AbstractionPattern::getReferenceStorageReferentType() const {
   case Kind::Tuple:
   case Kind::OpaqueFunction:
   case Kind::OpaqueDerivativeFunction:
+  case Kind::ObjCCompletionHandlerArgumentsType:
     return *this;
   case Kind::Type:
     return AbstractionPattern(getGenericSignature(),
@@ -815,12 +996,15 @@ void AbstractionPattern::print(raw_ostream &out) const {
   case Kind::CurriedCFunctionAsMethodType:
   case Kind::PartialCurriedCFunctionAsMethodType:
   case Kind::CFunctionAsMethodType:
+  case Kind::ObjCCompletionHandlerArgumentsType:
     out << (getKind() == Kind::ClangType
               ? "AP::ClangType(" :
             getKind() == Kind::CurriedCFunctionAsMethodType
               ? "AP::CurriedCFunctionAsMethodType(" :
             getKind() == Kind::PartialCurriedCFunctionAsMethodType
-              ? "AP::PartialCurriedCFunctionAsMethodType("
+              ? "AP::PartialCurriedCFunctionAsMethodType(" :
+            getKind() == Kind::ObjCCompletionHandlerArgumentsType
+              ? "AP::ObjCCompletionHandlerArgumentsType("
               : "AP::CFunctionAsMethodType(");
     if (auto sig = getGenericSignature()) {
       sig->print(out);
@@ -838,6 +1022,12 @@ void AbstractionPattern::print(raw_ostream &out) const {
         out << "instance, self=" << status.getSelfIndex();
       } else if (status.isStatic()) {
         out << "static";
+      }
+    }
+    if (hasStoredForeignInfo()) {
+      if (auto errorIndex
+          = getEncodedForeignInfo().getAsyncCompletionHandlerErrorParamIndex()){
+        out << ", errorParamIndex=" << *errorIndex;
       }
     }
     out << ")";
@@ -877,14 +1067,31 @@ void AbstractionPattern::print(raw_ostream &out) const {
               ? "AP::CurriedObjCMethodType("
               : "AP::PartialCurriedObjCMethodType(");
     getType().dump(out);
-    auto errorInfo = getEncodedForeignErrorInfo();
-    if (errorInfo.hasValue()) {
-      if (errorInfo.hasErrorParameter())
-        out << ", errorParameter=" << errorInfo.getErrorParameterIndex();
-      if (errorInfo.isErrorParameterReplacedWithVoid())
+    auto errorInfo = getEncodedForeignInfo();
+    switch (errorInfo.getKind()) {
+    case EncodedForeignInfo::IsNotForeign:
+      break;
+    
+    case EncodedForeignInfo::IsError:
+      out << ", errorParameter=" << errorInfo.getErrorParamIndex();
+      if (errorInfo.hasErrorParameterReplacedWithVoid())
         out << ", replacedWithVoid";
-      if (errorInfo.stripsResultOptionality())
+      if (errorInfo.errorStripsResultOptionality())
         out << ", stripsResultOptionality";
+      break;
+        
+    case EncodedForeignInfo::IsAsync:
+      out << ", completionHandlerParameter=" << errorInfo.getAsyncCompletionHandlerParamIndex();
+      if (auto errorParam = errorInfo.getAsyncCompletionHandlerErrorParamIndex()) {
+        out << " (errorParam=" << *errorParam;
+        if (auto errorFlag = errorInfo.getAsyncCompletionHandlerErrorFlagParamIndex()) {
+          out << ", errorFlagParam=" << *errorFlag
+              << (errorInfo.isCompletionErrorFlagZeroOnError()
+                    ? ", zeroOnError"
+                    : ", nonzeroOnError");
+        }
+        out << ')';
+      }
     }
     out << ", ";
     getObjCMethod()->dump(out);
@@ -954,13 +1161,12 @@ AbstractionPattern
 AbstractionPattern::unsafeGetSubstFieldType(ValueDecl *member,
                                             CanType origMemberInterfaceType)
 const {
+  assert(origMemberInterfaceType);
   if (isTypeParameterOrOpaqueArchetype()) {
     // Fall back to the generic abstraction pattern for the member.
     auto sig = member->getDeclContext()->getGenericSignatureOfContext();
-    CanType memberTy = origMemberInterfaceType
-      ? origMemberInterfaceType
-      : member->getInterfaceType()->getCanonicalType(sig);
-    return AbstractionPattern(sig.getCanonicalSignature(), memberTy);
+    return AbstractionPattern(sig.getCanonicalSignature(),
+                              origMemberInterfaceType);
   }
 
   switch (getKind()) {
@@ -976,6 +1182,9 @@ const {
                      "struct/enum type");
   case Kind::OpaqueDerivativeFunction:
     llvm_unreachable("should not have an opaque derivative function pattern "
+                     "matching a struct/enum type");
+  case Kind::ObjCCompletionHandlerArgumentsType:
+    llvm_unreachable("should not have a completion handler argument pattern "
                      "matching a struct/enum type");
   case Kind::PartialCurriedObjCMethodType:
   case Kind::CurriedObjCMethodType:

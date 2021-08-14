@@ -1,0 +1,344 @@
+---
+Name:            CloudKit
+Decls:           
+  - Name:            8CloudKit14CKSubscriptionO
+    Size:            0
+    Alignment:       1
+    ExtraInhabitants: 0
+  - Name:            8CloudKit24CKRecordKeyValueIteratorV
+    Size:            12
+    Alignment:       4
+    ExtraInhabitants: 4096
+  - Name:            So11CKContainerC8CloudKitE11ApplicationO
+    Size:            0
+    Alignment:       1
+    ExtraInhabitants: 0
+  - Name:            So7CKShareC8CloudKitE14SystemFieldKeyO
+    Size:            0
+    Alignment:       1
+    ExtraInhabitants: 0
+  - Name:            So8CKRecordC8CloudKitE10SystemTypeO
+    Size:            0
+    Alignment:       1
+    ExtraInhabitants: 0
+  - Name:            So8CKRecordC8CloudKitE14SystemFieldKeyO
+    Size:            0
+    Alignment:       1
+    ExtraInhabitants: 0
+...
+---
+Name:            CoreAudio
+Decls:           
+  - Name:            9CoreAudio013UnsafeMutableB17BufferListPointerV
+    Size:            4
+    Alignment:       4
+    ExtraInhabitants: 1
+...
+---
+Name:            CoreGraphics
+Decls:           
+  - Name:            12CoreGraphics14CGPathFillRuleO
+    Size:            1
+    Alignment:       1
+    ExtraInhabitants: 254
+...
+---
+Name:            Dispatch
+Decls:           
+  - Name:            8Dispatch0A12DataIteratorV
+    Size:            16
+    Alignment:       4
+    ExtraInhabitants: 4096
+  - Name:            8Dispatch0A12TimeIntervalO
+    Size:            5
+    Alignment:       4
+    ExtraInhabitants: 251
+  - Name:            8Dispatch0A13WorkItemFlagsV
+    Size:            4
+    Alignment:       4
+    ExtraInhabitants: 0
+  - Name:            8Dispatch0A3QoSV
+    Size:            8
+    Alignment:       4
+    ExtraInhabitants: 250
+  - Name:            8Dispatch0A3QoSV0B6SClassO
+    Size:            1
+    Alignment:       1
+    ExtraInhabitants: 250
+  - Name:            8Dispatch0A4DataV
+    Size:            4
+    Alignment:       4
+    ExtraInhabitants: 4096
+  - Name:            8Dispatch0A4DataV11DeallocatorO
+    Size:            8
+    Alignment:       4
+    ExtraInhabitants: 4094
+  - Name:            8Dispatch0A4TimeV
+    Size:            8
+    Alignment:       8
+    ExtraInhabitants: 0
+  - Name:            8Dispatch0A8WallTimeV
+    Size:            8
+    Alignment:       8
+    ExtraInhabitants: 0
+  - Name:            8Dispatch0A9PredicateO
+    Size:            4
+    Alignment:       4
+    ExtraInhabitants: 1
+  - Name:            So14OS_dispatch_ioC8DispatchE10CloseFlagsV
+    Size:            4
+    Alignment:       4
+    ExtraInhabitants: 0
+  - Name:            So14OS_dispatch_ioC8DispatchE10StreamTypeO
+    Size:            1
+    Alignment:       1
+    ExtraInhabitants: 254
+  - Name:            So14OS_dispatch_ioC8DispatchE13IntervalFlagsV
+    Size:            4
+    Alignment:       4
+    ExtraInhabitants: 0
+  - Name:            So17OS_dispatch_queueC8DispatchE10AttributesV
+    Size:            8
+    Alignment:       8
+    ExtraInhabitants: 0
+  - Name:            So17OS_dispatch_queueC8DispatchE19GlobalQueuePriorityO
+    Size:            1
+    Alignment:       1
+    ExtraInhabitants: 252
+  - Name:            So17OS_dispatch_queueC8DispatchE20AutoreleaseFrequencyO
+    Size:            1
+    Alignment:       1
+    ExtraInhabitants: 253
+  - Name:            So18OS_dispatch_sourceC8DispatchE10TimerFlagsV
+    Size:            4
+    Alignment:       4
+    ExtraInhabitants: 0
+  - Name:            So18OS_dispatch_sourceC8DispatchE12ProcessEventV
+    Size:            4
+    Alignment:       4
+    ExtraInhabitants: 0
+  - Name:            So18OS_dispatch_sourceC8DispatchE13MachSendEventV
+    Size:            4
+    Alignment:       4
+    ExtraInhabitants: 0
+  - Name:            So18OS_dispatch_sourceC8DispatchE15FileSystemEventV
+    Size:            4
+    Alignment:       4
+    ExtraInhabitants: 0
+  - Name:            So18OS_dispatch_sourceC8DispatchE19MemoryPressureEventV
+    Size:            4
+    Alignment:       4
+    ExtraInhabitants: 0
+...
+---
+Name:            Foundation
+Decls:           
+  - Name:            10Foundation10CocoaErrorV
+    Size:            4
+    Alignment:       4
+    ExtraInhabitants: 4096
+  - Name:            10Foundation10CocoaErrorV4CodeV
+    Size:            4
+    Alignment:       4
+    ExtraInhabitants: 0
+  - Name:            10Foundation10POSIXErrorV
+    Size:            4
+    Alignment:       4
+    ExtraInhabitants: 4096
+  - Name:            10Foundation10URLRequestV
+    Size:            4
+    Alignment:       4
+    ExtraInhabitants: 4096
+  - Name:            10Foundation11JSONDecoderC19KeyDecodingStrategyO
+    Size:            8
+    Alignment:       4
+    ExtraInhabitants: 4094
+  - Name:            10Foundation11JSONDecoderC20DataDecodingStrategyO
+    Size:            8
+    Alignment:       4
+    ExtraInhabitants: 4094
+  - Name:            10Foundation11JSONDecoderC20DateDecodingStrategyO
+    Size:            9
+    Alignment:       4
+    ExtraInhabitants: 253
+  - Name:            10Foundation11JSONDecoderC34NonConformingFloatDecodingStrategyO
+    Size:            36
+    Alignment:       4
+    ExtraInhabitants: 252
+  - Name:            10Foundation11JSONEncoderC16OutputFormattingV
+    Size:            4
+    Alignment:       4
+    ExtraInhabitants: 0
+  - Name:            10Foundation11JSONEncoderC19KeyEncodingStrategyO
+    Size:            8
+    Alignment:       4
+    ExtraInhabitants: 4094
+  - Name:            10Foundation11JSONEncoderC20DataEncodingStrategyO
+    Size:            8
+    Alignment:       4
+    ExtraInhabitants: 4094
+  - Name:            10Foundation11JSONEncoderC20DateEncodingStrategyO
+    Size:            9
+    Alignment:       4
+    ExtraInhabitants: 253
+  - Name:            10Foundation11JSONEncoderC34NonConformingFloatEncodingStrategyO
+    Size:            36
+    Alignment:       4
+    ExtraInhabitants: 252
+  - Name:            10Foundation11MeasurementV
+    Size:            16
+    Alignment:       8
+    ExtraInhabitants: 4096
+  - Name:            10Foundation12CharacterSetV
+    Size:            4
+    Alignment:       4
+    ExtraInhabitants: 4096
+  - Name:            10Foundation12DateIntervalV
+    Size:            16
+    Alignment:       8
+    ExtraInhabitants: 0
+  - Name:            10Foundation12NotificationV
+    Size:            24
+    Alignment:       4
+    ExtraInhabitants: 4096
+  - Name:            10Foundation12URLQueryItemV
+    Size:            4
+    Alignment:       4
+    ExtraInhabitants: 4096
+  - Name:            10Foundation13URLComponentsV
+    Size:            4
+    Alignment:       4
+    ExtraInhabitants: 4096
+  - Name:            10Foundation14DateComponentsV
+    Size:            4
+    Alignment:       4
+    ExtraInhabitants: 4096
+  - Name:            10Foundation16ErrorUserInfoKeyV
+    Size:            12
+    Alignment:       4
+    ExtraInhabitants: 253
+  - Name:            10Foundation17URLResourceValuesV
+    Size:            8
+    Alignment:       4
+    ExtraInhabitants: 4096
+  - Name:            10Foundation18NSIndexSetIteratorV
+    Size:            13
+    Alignment:       4
+    ExtraInhabitants: 4096
+  - Name:            10Foundation20PersonNameComponentsV
+    Size:            4
+    Alignment:       4
+    ExtraInhabitants: 4096
+  - Name:            10Foundation25NSFastEnumerationIteratorV
+    Size:            109
+    Alignment:       4
+    ExtraInhabitants: 4096
+  - Name:            10Foundation3URLV
+    Size:            4
+    Alignment:       4
+    ExtraInhabitants: 4096
+  - Name:            10Foundation4DataV11DeallocatorO
+    Size:            8
+    Alignment:       4
+    ExtraInhabitants: 4092
+  - Name:            10Foundation4DataV8IteratorV
+    Size:            52
+    Alignment:       4
+    ExtraInhabitants: 252
+  - Name:            10Foundation4DateV
+    Size:            8
+    Alignment:       8
+    ExtraInhabitants: 0
+  - Name:            10Foundation4UUIDV
+    Size:            16
+    Alignment:       1
+    ExtraInhabitants: 0
+  - Name:            10Foundation6LocaleV
+    Size:            5
+    Alignment:       4
+    ExtraInhabitants: 4096
+  - Name:            10Foundation8CalendarV
+    Size:            8
+    Alignment:       4
+    ExtraInhabitants: 4096
+  - Name:            10Foundation8CalendarV10IdentifierO
+    Size:            1
+    Alignment:       1
+    ExtraInhabitants: 240
+  - Name:            10Foundation8CalendarV14MatchingPolicyO
+    Size:            1
+    Alignment:       1
+    ExtraInhabitants: 252
+  - Name:            10Foundation8CalendarV15SearchDirectionO
+    Size:            1
+    Alignment:       1
+    ExtraInhabitants: 254
+  - Name:            10Foundation8CalendarV18RepeatedTimePolicyO
+    Size:            1
+    Alignment:       1
+    ExtraInhabitants: 254
+  - Name:            10Foundation8CalendarV9ComponentO
+    Size:            1
+    Alignment:       1
+    ExtraInhabitants: 240
+  - Name:            10Foundation8IndexSetV
+    Size:            4
+    Alignment:       4
+    ExtraInhabitants: 4096
+  - Name:            10Foundation8IndexSetV0B0V
+    Size:            20
+    Alignment:       4
+    ExtraInhabitants: 0
+  - Name:            10Foundation8IndexSetV9RangeViewV
+    Size:            12
+    Alignment:       4
+    ExtraInhabitants: 4096
+  - Name:            10Foundation8TimeZoneV
+    Size:            5
+    Alignment:       4
+    ExtraInhabitants: 4096
+  - Name:            10Foundation8URLErrorV
+    Size:            4
+    Alignment:       4
+    ExtraInhabitants: 4096
+  - Name:            10Foundation8URLErrorV4CodeV
+    Size:            4
+    Alignment:       4
+    ExtraInhabitants: 0
+  - Name:            10Foundation9IndexPathV
+    Size:            9
+    Alignment:       4
+    ExtraInhabitants: 252
+  - Name:            10Foundation9MachErrorV
+    Size:            4
+    Alignment:       4
+    ExtraInhabitants: 4096
+  - Name:            8Dispatch0A4DataV10FoundationE6RegionV
+    Size:            16
+    Alignment:       4
+    ExtraInhabitants: 4096
+  - Name:            SS10FoundationE8EncodingV
+    Size:            4
+    Alignment:       4
+    ExtraInhabitants: 0
+...
+---
+Name:            Intents
+Decls:           
+  - Name:            7Intents10INShortcutO
+    Size:            4
+    Alignment:       4
+    ExtraInhabitants: 2
+...
+---
+Name:            os
+Decls:           
+  - Name:            2os12OSSignpostIDV
+    Size:            8
+    Alignment:       8
+    ExtraInhabitants: 0
+  - Name:            So9OS_os_logC0B0E8CategoryV
+    Size:            12
+    Alignment:       4
+    ExtraInhabitants: 253
+...

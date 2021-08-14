@@ -193,8 +193,7 @@ public:
     // intrinsics are atomic today.
     if (I->getIntrinsicID() != llvm::Intrinsic::not_intrinsic)
       return false;
-    return (I->getCalledFunction()->getName().find("nonatomic") !=
-            llvm::StringRef::npos);
+    return (I->getCalledFunction()->getName().contains("nonatomic"));
   }
 
   bool isAtomic(CallInst *I) {
@@ -378,7 +377,7 @@ private:
 
   Type *getNamedOpaquePtrTy(StringRef name) {
     auto &M = getModule();
-    if (auto *ty = M.getTypeByName(name)) {
+    if (auto *ty = llvm::StructType::getTypeByName(M.getContext(), name)) {
       return ty->getPointerTo();
     }
 

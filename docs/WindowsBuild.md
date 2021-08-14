@@ -11,6 +11,7 @@ The commands below (with the exception of installing Visual Studio) must be ente
 An easy way to get most of the tools to build Swift is using the [Visual Studio installer](https://www.visualstudio.com/downloads/). This command installs all needed Visual Studio components as well as Python, Git, CMake and Ninja:
 
 ```
+curl.exe -sOL https://aka.ms/vs/16/release/vs_community.exe
 vs_community ^
   --add Component.CPython3.x64 ^
   --add Microsoft.VisualStudio.Component.Git ^
@@ -19,6 +20,7 @@ vs_community ^
   --add Microsoft.VisualStudio.Component.VC.Tools.x86.x64 ^
   --add Microsoft.VisualStudio.Component.Windows10SDK ^
   --add Microsoft.VisualStudio.Component.Windows10SDK.17763
+del /q vs_community.exe
 ```
 
 If you prefer you can install everything by hand, but make sure to include "Programming Languages|Visual C++" and "Windows and Web Development|Universal Windows App Development|Windows SDK" in your installation. The components listed above are required.
@@ -135,11 +137,13 @@ cmake -B "S:\b\1" ^
 ninja -C S:\b\1
 ```
 
+> **NOTE:** Linking with debug information (`-D LLVM_ENABLE_PDB=YES`) is very memory intensive.  When building with parallel jobs, it is possible to consume upwards of 32 GiB of RAM.  You can append `-D LLVM_PARALLEL_LINK_JOBS=N -D DLLVM_PARALLEL_LINK_JOBS=N` to reduce the number of parallel link operations to `N` which should help reduce the memory pressure.  You may need to set this to a low number (e.g. 1) if you see build failures due to memory exhaustion.
+
 ## Running Swift tests on Windows
 
 ```cmd
-path S:\Library\icu-67\usr\bin;S:\b\1\bin;S:\b\1\tools\swift\libdispatch-prefix\bin;%PATH%;%ProgramFiles%\Git\usr\bin
-ninja -C S:\b\toolchain check-swift
+path S:\Library\icu-67\usr\bin;S:\b\1\bin;S:\b\1\tools\swift\libdispatch-windows-x86_64-prefix\bin;%PATH%;%ProgramFiles%\Git\usr\bin
+ninja -C S:\b\1 check-swift
 ```
 
 ## Build swift-corelibs-libdispatch
@@ -177,6 +181,7 @@ cmake -B S:\b\3 ^
   -D ICU_I18N_LIBRARY_RELEASE=S:\library\icu-67\usr\lib\icuin67.lib ^
   -D ICU_ROOT=S:\Library\icu-67\usr ^
   -D ICU_UC_LIBRARY_RELEASE=S:\Library\icu-67\usr\lib\icuuc67.lib ^
+  -D LIBXML2_DEFINITIONS="/DLIBXML_STATIC" ^
   -D LIBXML2_LIBRARY=S:\Library\libxml2-development\usr\lib\libxml2s.lib ^
   -D LIBXML2_INCLUDE_DIR=S:\Library\libxml2-development\usr\include\libxml2 ^
   -D ENABLE_TESTING=NO ^

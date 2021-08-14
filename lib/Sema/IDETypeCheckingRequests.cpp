@@ -44,22 +44,99 @@ void swift::registerIDETypeCheckRequestFunctions(Evaluator &evaluator) {
                                      ideTypeCheckRequestFunctions);
 }
 
+/// Consider the following example
+///
+/// \code
+/// protocol FontStyle {}
+/// struct FontStyleOne: FontStyle {}
+/// extension FontStyle where Self == FontStyleOne {
+///     static var one: FontStyleOne { FontStyleOne() }
+/// }
+/// func foo<T: FontStyle>(x: T) {}
+///
+/// func case1() {
+///     foo(x: .#^COMPLETE^#) // extension should be considered applied here
+/// }
+/// func case2<T: FontStyle>(x: T) {
+///     x.#^COMPLETE_2^# // extension should not be considered applied here
+/// }
+/// \endcode
+/// We want to consider the extension applied in the first case but not the
+/// second case. In the first case the constraint `T: FontStyle` from the
+/// definition of `foo` should be considered an 'at-least' constraint and any
+/// additional constraints on `T` (like `T == FonstStyleOne`) can be
+/// fulfilled by picking a more specialized version of `T`.
+/// However, in the second case, `T: FontStyle` should be considered an
+/// 'at-most' constraint and we can't make the assumption that `x` has a more
+/// specialized type.
+///
+/// After type-checking we cannot easily differentiate the two cases. In both
+/// we have a unresolved dot completion on a primary archetype that
+/// conforms to `FontStyle`.
+///
+/// To tell them apart, we apply the following heuristic: If the primary
+/// archetype refers to a generic parameter that is not visible in the current
+/// decl context (i.e. the current decl context is not a child context of the
+/// parameter's decl context), it is not the type of a variable visible
+/// in the current decl context. Hence, we must be in the first case and
+/// consider all extensions applied, otherwise we should only consider those
+/// extensions applied whose requirements are fulfilled.
+class ContainsSpecializableArchetype : public TypeWalker {
+  const DeclContext *DC;
+  bool Result = false;
+  ContainsSpecializableArchetype(const DeclContext *DC) : DC(DC) {}
+
+  Action walkToTypePre(Type T) override {
+    if (auto *Archetype = T->getAs<ArchetypeType>()) {
+      if (auto *GenericTypeParam =
+              Archetype->mapTypeOutOfContext()->getAs<GenericTypeParamType>()) {
+        if (auto GenericTypeParamDecl = GenericTypeParam->getDecl()) {
+          bool ParamMaybeVisibleInCurrentContext =
+              (DC == GenericTypeParamDecl->getDeclContext() ||
+               DC->isChildContextOf(GenericTypeParamDecl->getDeclContext()));
+          if (!ParamMaybeVisibleInCurrentContext) {
+            Result = true;
+            return Action::Stop;
+          }
+        }
+      }
+    }
+    return Action::Continue;
+  }
+
+public:
+  static bool check(const DeclContext *DC, Type T) {
+    if (!T->hasArchetype()) {
+      // Fast path, we don't have an archetype to check.
+      return false;
+    }
+    ContainsSpecializableArchetype Checker(DC);
+    T.walk(Checker);
+    return Checker.Result;
+  }
+};
+
 static bool isExtensionAppliedInternal(const DeclContext *DC, Type BaseTy,
                                        const ExtensionDecl *ED) {
   // We can't do anything if the base type has unbound generic parameters.
   // We can't leak type variables into another constraint system.
+  // For check on specializable archetype see comment on
+  // ContainsSpecializableArchetype.
   if (BaseTy->hasTypeVariable() || BaseTy->hasUnboundGenericType() ||
-      BaseTy->hasUnresolvedType() || BaseTy->hasError())
+      BaseTy->hasUnresolvedType() || BaseTy->hasError() ||
+      ContainsSpecializableArchetype::check(DC, BaseTy))
     return true;
 
   if (!ED->isConstrainedExtension())
     return true;
 
   GenericSignature genericSig = ED->getGenericSignature();
+  auto *module = DC->getParentModule();
   SubstitutionMap substMap = BaseTy->getContextSubstitutionMap(
-      DC->getParentModule(), ED->getExtendedNominal());
-  return areGenericRequirementsSatisfied(DC, genericSig, substMap,
-                                         /*isExtension=*/true);
+      module, ED->getExtendedNominal());
+  return TypeChecker::checkGenericArguments(
+      module, genericSig.getRequirements(),
+      QuerySubstitutionMap{substMap}) == RequirementCheckResult::Success;
 }
 
 static bool isMemberDeclAppliedInternal(const DeclContext *DC, Type BaseTy,
@@ -73,6 +150,13 @@ static bool isMemberDeclAppliedInternal(const DeclContext *DC, Type BaseTy,
       BaseTy->hasUnresolvedType() || BaseTy->hasError())
     return true;
 
+  if (isa<TypeAliasDecl>(VD) && BaseTy->is<ProtocolType>()) {
+    // The protocol doesn't satisfy its own generic signature (static members
+    // of the protocol are not visible on the protocol itself) but we can still
+    // access typealias declarations on it.
+    return true;
+  }
+
   const GenericContext *genericDecl = VD->getAsGenericContext();
   if (!genericDecl)
     return true;
@@ -80,10 +164,15 @@ static bool isMemberDeclAppliedInternal(const DeclContext *DC, Type BaseTy,
   if (!genericSig)
     return true;
 
+  auto *module = DC->getParentModule();
   SubstitutionMap substMap = BaseTy->getContextSubstitutionMap(
-      DC->getParentModule(), VD->getDeclContext());
-  return areGenericRequirementsSatisfied(DC, genericSig, substMap,
-                                         /*isExtension=*/false);
+      module, VD->getDeclContext());
+
+  // Note: we treat substitution failure as success, to avoid tripping
+  // up over generic parameters introduced by the declaration itself.
+  return TypeChecker::checkGenericArguments(
+      module, genericSig.getRequirements(),
+      QuerySubstitutionMap{substMap}) != RequirementCheckResult::Failure;
 }
 
 bool

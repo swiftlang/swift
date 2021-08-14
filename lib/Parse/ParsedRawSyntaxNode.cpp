@@ -17,58 +17,16 @@ using namespace swift;
 using namespace swift::syntax;
 using namespace llvm;
 
-ParsedRawSyntaxNode
-ParsedRawSyntaxNode::makeDeferred(SyntaxKind k,
-                                  MutableArrayRef<ParsedRawSyntaxNode> deferredNodes,
-                                  SyntaxParsingContext &ctx) {
-  CharSourceRange range;
-  if (deferredNodes.empty()) {
-    return ParsedRawSyntaxNode(k, range, {});
-  }
-  ParsedRawSyntaxNode *newPtr =
-    ctx.getScratchAlloc().Allocate<ParsedRawSyntaxNode>(deferredNodes.size());
-
-#ifndef NDEBUG
-  ParsedRawSyntaxRecorder::verifyElementRanges(deferredNodes);
-#endif
-  auto ptr = newPtr;
-  for (auto &node : deferredNodes) {
-    // Cached range.
-    if (!node.isNull() && !node.isMissing()) {
-      auto nodeRange = node.getDeferredRange();
-      if (nodeRange.isValid()) {
-        if (range.isInvalid())
-          range = nodeRange;
-        else
-          range.widen(nodeRange);
-      }
-    }
-
-    // uninitialized move;
-    :: new (static_cast<void *>(ptr++)) ParsedRawSyntaxNode(std::move(node));
-  }
-  return ParsedRawSyntaxNode(k, range,
-                             makeMutableArrayRef(newPtr, deferredNodes.size()));
+ParsedRawSyntaxNode ParsedRawSyntaxNode::getDeferredChild(
+    size_t ChildIndex, const SyntaxParsingContext *SyntaxContext) const {
+  assert(isDeferredLayout());
+  return SyntaxContext->getRecorder().getDeferredChild(*this, ChildIndex);
 }
 
-ParsedRawSyntaxNode
-ParsedRawSyntaxNode::makeDeferred(Token tok,
-                                  const ParsedTrivia &leadingTrivia,
-                                  const ParsedTrivia &trailingTrivia,
-                                  SyntaxParsingContext &ctx) {
-  CharSourceRange tokRange = tok.getRange();
-  size_t piecesCount = leadingTrivia.size() + trailingTrivia.size();
-  ParsedTriviaPiece *piecesPtr = nullptr;
-  if (piecesCount > 0) {
-    piecesPtr = ctx.getScratchAlloc().Allocate<ParsedTriviaPiece>(piecesCount);
-    std::uninitialized_copy(leadingTrivia.begin(), leadingTrivia.end(),
-                            piecesPtr);
-    std::uninitialized_copy(trailingTrivia.begin(), trailingTrivia.end(),
-                            piecesPtr + leadingTrivia.size());
-  }
-  return ParsedRawSyntaxNode(tok.getKind(), tokRange.getStart(),
-                             tokRange.getByteLength(), piecesPtr,
-                             leadingTrivia.size(), trailingTrivia.size());
+size_t ParsedRawSyntaxNode::getDeferredNumChildren(
+    const SyntaxParsingContext *SyntaxContext) const {
+  assert(isDeferredLayout());
+  return SyntaxContext->getRecorder().getDeferredNumChildren(*this);
 }
 
 void ParsedRawSyntaxNode::dump() const {
@@ -76,12 +34,14 @@ void ParsedRawSyntaxNode::dump() const {
   llvm::errs() << '\n';
 }
 
-void ParsedRawSyntaxNode::dump(llvm::raw_ostream &OS, unsigned Indent) const {
+void ParsedRawSyntaxNode::dump(llvm::raw_ostream &OS,
+                               const SyntaxParsingContext *Context,
+                               unsigned Indent) const {
   for (decltype(Indent) i = 0; i < Indent; ++i)
     OS << ' ';
   OS << '(';
 
-  switch (DK) {
+  switch (getDataKind()) {
     case DataKind::Null:
       OS << "<NULL>";
       break;
@@ -97,9 +57,15 @@ void ParsedRawSyntaxNode::dump(llvm::raw_ostream &OS, unsigned Indent) const {
     case DataKind::DeferredLayout:
       dumpSyntaxKind(OS, getKind());
       OS << " [deferred]";
-      for (const auto &child : getDeferredChildren()) {
-        OS << "\n";
-        child.dump(OS, Indent + 2);
+      if (Context) {
+        size_t numChildren = getDeferredNumChildren(Context);
+        for (size_t i = 0; i < numChildren; ++i) {
+          auto child = getDeferredChild(i, Context);
+          OS << "\n";
+          child.dump(OS, Context, Indent + 2);
+        }
+      } else {
+        OS << " (unknown children)";
       }
       break;
     case DataKind::DeferredToken:

@@ -11,6 +11,10 @@
 // RUN: %{python} %S/../gen-output-file-map.py -o %t %S
 // RUN: cd %t && %target-swiftc_driver -typecheck -output-file-map %t/output.json -incremental -module-name main -verify-incremental-dependencies %s
 
+// This test is overly sensitive to the evolving contents of the Foundation
+// overlay in the SDK.
+// REQUIRES: rdar78797454
+
 import Foundation
 
 // expected-provides {{LookupFactory}}
@@ -19,6 +23,7 @@ import Foundation
 // expected-conformance {{ObjectiveC.NSObjectProtocol}}
 // expected-conformance {{Foundation._KeyValueCodingAndObserving}}
 // expected-conformance {{Foundation._KeyValueCodingAndObservingPublishing}}
+// expected-conformance {{Foundation._KeyValueCodingAndObservingSequence}}
 // expected-conformance {{Swift.Hashable}}
 // expected-conformance {{Swift.Equatable}}
 // expected-conformance {{Swift.CustomDebugStringConvertible}}
@@ -57,7 +62,6 @@ import Foundation
 // expected-member {{Swift.Hashable.callAsFunction}}
 // expected-member {{Swift.Encodable.callAsFunction}}
 // expected-member {{Swift.Decodable.callAsFunction}}
-// expected-member {{Foundation._OptionalForKVO.callAsFunction}}
 
 // expected-provides {{AnyObject}}
 func lookupOnAnyObject(object: AnyObject) { // expected-provides {{lookupOnAnyObject}}
@@ -72,3 +76,15 @@ func lookupOnAnyObject(object: AnyObject) { // expected-provides {{lookupOnAnyOb
 // expected-member {{Swift.CVarArg.someMethod}}
 // expected-member {{Swift.CustomStringConvertible.someMethod}}
 // expected-member {{Swift.CustomDebugStringConvertible.someMethod}}
+// expected-member {{Swift.Equatable.someMember}}
+// expected-member{{Swift.CVarArg.someMember}}
+// expected-member{{Foundation._KeyValueCodingAndObservingPublishing.someMember}}
+// expected-member{{Foundation._KeyValueCodingAndObserving.someMember}}
+// expected-member{{Swift.CustomDebugStringConvertible.someMember}}
+// expected-member{{Swift.CustomStringConvertible.someMember}}
+// expected-member{{Swift.Hashable.someMember}}
+// expected-member{{Swift.Sendable.callAsFunction}}
+// expected-member{{Foundation._KeyValueCodingAndObservingSequence.someMethod}}
+// expected-member{{Foundation._KeyValueCodingAndObservingSequence.someMember}}
+// expected-member{{Foundation.EncodableWithConfiguration.callAsFunction}}
+// expected-member{{Foundation.DecodableWithConfiguration.callAsFunction}}

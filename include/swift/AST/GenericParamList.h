@@ -81,8 +81,6 @@ class RequirementRepr {
     : SeparatorLoc(SeparatorLoc), Kind(Kind), Invalid(false),
       FirstType(FirstType), SecondLayout(SecondLayout) { }
 
-  void printImpl(ASTPrinter &OS) const;
-
 public:
   /// Construct a new type-constraint requirement.
   ///
@@ -324,6 +322,9 @@ public:
     if (WhereLoc.isInvalid())
       return SourceRange();
 
+    if (Requirements.empty())
+      return WhereLoc;
+
     auto endLoc = Requirements.back().getSourceRange().End;
     return SourceRange(WhereLoc, endLoc);
   }
@@ -336,14 +337,15 @@ public:
   /// to the given DeclContext.
   GenericParamList *clone(DeclContext *dc) const;
 
-  void print(raw_ostream &OS) const;
-  SWIFT_DEBUG_DUMP;
-
   bool walk(ASTWalker &walker);
 
   /// Finds a generic parameter declaration by name. This should only
   /// be used from the SIL parser.
   GenericTypeParamDecl *lookUpGenericParam(Identifier name) const;
+
+  SWIFT_DEBUG_DUMP;
+  void print(raw_ostream &OS, const PrintOptions &PO = PrintOptions()) const;
+  void print(ASTPrinter &Printer, const PrintOptions &PO) const;
 };
   
 /// A trailing where clause.
@@ -352,16 +354,18 @@ class alignas(RequirementRepr) TrailingWhereClause final :
   friend TrailingObjects;
 
   SourceLoc WhereLoc;
+  SourceLoc EndLoc;
 
   /// The number of requirements. The actual requirements are tail-allocated.
   unsigned NumRequirements;
 
-  TrailingWhereClause(SourceLoc whereLoc,
+  TrailingWhereClause(SourceLoc whereLoc, SourceLoc endLoc,
                       ArrayRef<RequirementRepr> requirements);
 
 public:
   /// Create a new trailing where clause with the given set of requirements.
-  static TrailingWhereClause *create(ASTContext &ctx, SourceLoc whereLoc,
+  static TrailingWhereClause *create(ASTContext &ctx,
+                                     SourceLoc whereLoc, SourceLoc endLoc,
                                      ArrayRef<RequirementRepr> requirements);
 
   /// Retrieve the location of the 'where' keyword.
@@ -379,8 +383,7 @@ public:
 
   /// Compute the source range containing this trailing where clause.
   SourceRange getSourceRange() const {
-    return SourceRange(WhereLoc,
-                       getRequirements().back().getSourceRange().End);
+    return SourceRange(WhereLoc, EndLoc);
   }
 
   void print(llvm::raw_ostream &OS, bool printWhereKeyword) const;

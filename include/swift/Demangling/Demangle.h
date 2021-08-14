@@ -63,6 +63,7 @@ struct DemangleOptions {
   bool DisplayStdlibModule = true;
   bool DisplayObjCModule = true;
   bool PrintForTypeName = false;
+  bool ShowAsyncResumePartial = true;
 
   /// If this is nonempty, entities in this module name will not be qualified.
   llvm::StringRef HidingCurrentModule;
@@ -115,6 +116,21 @@ enum class FunctionSigSpecializationParamKind : unsigned {
   SROA = 1 << 8,
   GuaranteedToOwned = 1 << 9,
   ExistentialToGeneric = 1 << 10,
+};
+
+enum class AutoDiffFunctionKind : char {
+  JVP = 'f',
+  VJP = 'r',
+  Differential = 'd',
+  Pullback = 'p',
+};
+
+enum class MangledDifferentiabilityKind : char {
+  NonDifferentiable = 0,
+  Forward = 'f',
+  Reverse = 'r',
+  Normal = 'd',
+  Linear = 'l',
 };
 
 /// The pass that caused the specialization to occur. We use this to make sure

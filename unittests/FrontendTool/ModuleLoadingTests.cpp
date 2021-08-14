@@ -12,10 +12,12 @@
 
 #include "gtest/gtest.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Serialization/Validation.h"
+#include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/VirtualFileSystem.h"
 
@@ -99,13 +101,16 @@ protected:
     langOpts.Target = llvm::Triple(llvm::sys::getDefaultTargetTriple());
     SearchPathOptions searchPathOpts;
     ClangImporterOptions clangImpOpts;
+    symbolgraphgen::SymbolGraphOptions symbolGraphOpts;
+    SILOptions silOpts;
     auto ctx =
         ASTContext::get(langOpts, typeckOpts, searchPathOpts, clangImpOpts,
-                        sourceMgr, diags);
+                        symbolGraphOpts, sourceMgr, diags);
 
     ctx->addModuleInterfaceChecker(
       std::make_unique<ModuleInterfaceCheckerImpl>(*ctx, cacheDir,
-        prebuiltCacheDir, ModuleInterfaceLoaderOptions()));
+        prebuiltCacheDir, ModuleInterfaceLoaderOptions(),
+        swift::RequireOSSAModules_t(silOpts)));
 
     auto loader = ModuleInterfaceLoader::create(
         *ctx, *static_cast<ModuleInterfaceCheckerImpl*>(

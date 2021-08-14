@@ -29,6 +29,7 @@ class ModuleDecl;
 class SILDeserializer;
 class SILFunction;
 class SILGlobalVariable;
+class SILProperty;
 class SILModule;
 class SILVTable;
 class SILWitnessTable;
@@ -69,10 +70,16 @@ public:
   SILDifferentiabilityWitness *
   lookupDifferentiabilityWitness(SILDifferentiabilityWitnessKey key);
 
-  /// Invalidate the cached entries for deserialized SILFunctions.
-  void invalidateCaches();
-
-  bool invalidateFunction(SILFunction *F);
+  /// Invalidate the cached entries for deserialized state. Must be
+  /// called when erasing deserialized state in the SILModule.
+  void invalidateAllCaches();
+  bool invalidateFunction(SILFunction *f);
+  bool invalidateGlobalVariable(SILGlobalVariable *gv);
+  bool invalidateVTable(SILVTable *vt);
+  bool invalidateWitnessTable(SILWitnessTable *wt);
+  bool invalidateDefaultWitnessTable(SILDefaultWitnessTable *wt);
+  bool invalidateProperty(SILProperty *p);
+  bool invalidateDifferentiabilityWitness(SILDifferentiabilityWitness *w);
 
   /// Deserialize all SILFunctions, VTables, and WitnessTables for
   /// a given Module.

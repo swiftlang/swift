@@ -64,9 +64,7 @@ public:
       case RequirementKind::Conformance: {
         auto type = reqt.getFirstType()->getCanonicalType();
         assert(type->isTypeParameter());
-        auto requirement =
-          cast<ProtocolType>(reqt.getSecondType()->getCanonicalType())
-            ->getDecl();
+        auto requirement = reqt.getProtocolDecl();
 
         // ObjC protocols do not have witnesses.
         if (!Lowering::TypeConverter::protocolRequiresWitnessTable(requirement))

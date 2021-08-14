@@ -33,7 +33,7 @@ class ArgumentScope {
 
 public:
   ArgumentScope(SILGenFunction &SGF, SILLocation loc)
-      : normalScope(SGF.Cleanups, CleanupLocation::get(loc)),
+      : normalScope(SGF.Cleanups, CleanupLocation(loc)),
         formalEvalScope(SGF), loc(loc) {}
 
   ~ArgumentScope() {
@@ -60,6 +60,8 @@ public:
   void verify() {
     formalEvalScope.verify();
   }
+
+  bool isValid() const { return normalScope.isValid(); }
 
 private:
   void popImpl() {

@@ -636,7 +636,7 @@ extension ArraySlice: RangeReplaceableCollection {
   ///     print(emptyArray.isEmpty)
   ///     // Prints "true"
   @inlinable
-  @_semantics("array.init")
+  @_semantics("array.init.empty")
   public init() {
     _buffer = _Buffer()
   }
@@ -726,6 +726,7 @@ extension ArraySlice: RangeReplaceableCollection {
 
   /// Construct a ArraySlice of `count` uninitialized elements.
   @inlinable
+  @_semantics("array.init")
   internal init(_uninitializedCount count: Int) {
     _precondition(count >= 0, "Can't construct ArraySlice with count < 0")
     // Note: Sinking this constructor into an else branch below causes an extra
@@ -866,7 +867,7 @@ extension ArraySlice: RangeReplaceableCollection {
   internal mutating func _reserveCapacityAssumingUniqueBuffer(oldCount: Int) {
     // Due to make_mutable hoisting the situation can arise where we hoist
     // _makeMutableAndUnique out of loop and use it to replace
-    // _makeUniqueAndReserveCapacityIfNotUnique that preceeds this call. If the
+    // _makeUniqueAndReserveCapacityIfNotUnique that precedes this call. If the
     // array was empty _makeMutableAndUnique does not replace the empty array
     // buffer by a unique buffer (it just replaces it by the empty array
     // singleton).
@@ -1078,6 +1079,7 @@ extension ArraySlice: RangeReplaceableCollection {
   //===--- algorithms -----------------------------------------------------===//
 
   @inlinable
+  @available(*, deprecated, renamed: "withContiguousMutableStorageIfAvailable")
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
@@ -1515,3 +1517,22 @@ extension ArraySlice {
         shiftedToStartIndex: _startIndex))
   }
 }
+
+extension ArraySlice: Sendable, UnsafeSendable
+  where Element: Sendable { }
+
+#if INTERNAL_CHECKS_ENABLED
+extension ArraySlice {
+  // This allows us to test the `_copyContents` implementation in
+  // `_SliceBuffer`. (It's like `_copyToContiguousArray` but it always makes a
+  // copy.)
+  @_alwaysEmitIntoClient
+  public func _copyToNewArray() -> [Element] {
+    Array(unsafeUninitializedCapacity: self.count) { buffer, count in
+      var (it, c) = self._buffer._copyContents(initializing: buffer)
+      _precondition(it.next() == nil)
+      count = c
+    }
+  }
+}
+#endif

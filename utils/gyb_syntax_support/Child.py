@@ -12,7 +12,8 @@ class Child(object):
     def __init__(self, name, kind, description=None, is_optional=False,
                  token_choices=None, text_choices=None, node_choices=None,
                  collection_element_name=None,
-                 classification=None, force_classification=False):
+                 classification=None, force_classification=False, 
+                 is_indented=False, requires_leading_newline=False):
         """
         If a classification is passed, it specifies the color identifiers in 
         that subtree should inherit for syntax coloring. Must be a member of 
@@ -29,12 +30,14 @@ class Child(object):
         self.collection_element_name = collection_element_name
         self.classification = classification_by_name(classification)
         self.force_classification = force_classification
+        self.is_indented = is_indented
+        self.requires_leading_newline = requires_leading_newline
 
-        # If the child has "token" anywhere in the kind, it's considered
+        # If the child ends with "token" in the kind, it's considered
         # a token node. Grab the existing reference to that token from the
         # global list.
         self.token_kind = \
-            self.syntax_kind if "Token" in self.syntax_kind else None
+            self.syntax_kind if self.syntax_kind.endswith("Token") else None
         self.token = SYNTAX_TOKEN_MAP.get(self.token_kind)
 
         self.is_optional = is_optional

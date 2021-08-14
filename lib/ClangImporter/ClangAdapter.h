@@ -38,7 +38,7 @@ class ObjCPropertyDecl;
 class ParmVarDecl;
 class QualType;
 class Sema;
-class SwiftNewtypeAttr;
+class SwiftNewTypeAttr;
 class Type;
 class TypedefNameDecl;
 }
@@ -107,7 +107,7 @@ OmissionTypeName getClangTypeNameForOmission(clang::ASTContext &ctx,
                                              clang::QualType type);
 
 /// Find the swift_newtype attribute on the given typedef, if present.
-clang::SwiftNewtypeAttr *getSwiftNewtypeAttr(const clang::TypedefNameDecl *decl,
+clang::SwiftNewTypeAttr *getSwiftNewtypeAttr(const clang::TypedefNameDecl *decl,
                                              ImportNameVersion version);
 
 /// Retrieve a bit vector containing the non-null argument
@@ -137,7 +137,11 @@ bool isNSString(clang::QualType);
 bool hasNativeSwiftDecl(const clang::Decl *decl);
 
 /// Translation API nullability from an API note into an optional kind.
-OptionalTypeKind translateNullability(clang::NullabilityKind kind);
+///
+/// \param stripNonResultOptionality Whether strip optionality from
+/// \c _Nullable but not \c _Nullable_result.
+OptionalTypeKind translateNullability(
+    clang::NullabilityKind kind, bool stripNonResultOptionality = false);
 
 /// Determine whether the given method is a required initializer
 /// of the given class.

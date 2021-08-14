@@ -1,0 +1,885 @@
+// RUN: %target-sil-opt -module-name Swift -enable-sil-verify-all -semantic-arc-opts -sil-semantic-arc-peepholes-lifetime-joining %s | %FileCheck %s
+// REQUIRES: swift_stdlib_asserts
+
+// NOTE: Some of our tests here depend on borrow elimination /not/ running!
+// Please do not add it to clean up the IR like we did in
+// semanticarcopts-loadcopy-to-loadborrow!
+
+sil_stage canonical
+
+import Builtin
+
+//////////////////
+// Declarations //
+//////////////////
+
+typealias AnyObject = Builtin.AnyObject
+
+enum MyNever {}
+enum FakeOptional<T> {
+case none
+case some(T)
+}
+
+sil [ossa] @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+sil [ossa] @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+sil [ossa] @get_owned_obj : $@convention(thin) () -> @owned Builtin.NativeObject
+sil [ossa] @unreachable_guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> MyNever
+sil [ossa] @inout_user : $@convention(thin) (@inout FakeOptional<NativeObjectPair>) -> ()
+sil [ossa] @get_native_object : $@convention(thin) () -> @owned Builtin.NativeObject
+
+struct NativeObjectPair {
+  var obj1 : Builtin.NativeObject
+  var obj2 : Builtin.NativeObject
+}
+
+sil [ossa] @get_object_pair : $@convention(thin) () -> @owned NativeObjectPair
+
+struct FakeOptionalNativeObjectPairPair {
+  var pair1 : FakeOptional<NativeObjectPair>
+  var pair2 : FakeOptional<NativeObjectPair>
+}
+sil [ossa] @inout_user2 : $@convention(thin) (@inout FakeOptionalNativeObjectPairPair) -> ()
+
+sil [ossa] @get_nativeobject_pair : $@convention(thin) () -> @owned NativeObjectPair
+sil [ossa] @consume_nativeobject_pair : $@convention(thin) (@owned NativeObjectPair) -> ()
+
+protocol MyFakeAnyObject : Klass {
+  func myFakeMethod()
+}
+
+final class Klass {
+  var base: Klass
+  let baseLet: Klass
+}
+
+extension Klass : MyFakeAnyObject {
+  func myFakeMethod()
+}
+sil [ossa] @guaranteed_klass_user : $@convention(thin) (@guaranteed Klass) -> ()
+sil [ossa] @guaranteed_fakeoptional_klass_user : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> ()
+sil [ossa] @guaranteed_fakeoptional_classlet_user : $@convention(thin) (@guaranteed FakeOptional<ClassLet>) -> ()
+
+struct MyInt {
+  var value: Builtin.Int32
+}
+
+struct StructWithDataAndOwner {
+  var data : Builtin.Int32
+  var owner : Klass
+}
+
+struct StructMemberTest {
+  var c : Klass
+  var s : StructWithDataAndOwner
+  var t : (Builtin.Int32, StructWithDataAndOwner)
+}
+
+class ClassLet {
+  @_hasStorage let aLet: Klass
+  @_hasStorage var aVar: Klass
+  @_hasStorage let aLetTuple: (Klass, Klass)
+  @_hasStorage let anOptionalLet: FakeOptional<Klass>
+
+  @_hasStorage let anotherLet: ClassLet
+}
+
+class SubclassLet: ClassLet {}
+
+sil_global [let] @a_let_global : $Klass
+sil_global @a_var_global : $Klass
+
+enum EnumWithIndirectCase {
+case first
+indirect case second(Builtin.NativeObject)
+}
+
+struct StructWithEnumWithIndirectCaseField {
+  var i: Builtin.Int23
+  var field : EnumWithIndirectCase
+}
+
+sil [ossa] @get_fakeoptional_nativeobject : $@convention(thin) () -> @owned FakeOptional<Builtin.NativeObject>
+
+struct NativeObjectWrapper {
+  var innerWrapper : Builtin.NativeObject
+}
+
+sil @owned_user_object_pair : $@convention(thin) (@owned NativeObjectPair) -> ()
+
+///////////
+// Tests //
+///////////
+
+// CHECK-LABEL: sil [ossa] @join_liveranges_in_same_block_1 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK-NOT: copy_value
+// CHECK: } // end sil function 'join_liveranges_in_same_block_1'
+sil [ossa] @join_liveranges_in_same_block_1 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = copy_value %0 : $Builtin.NativeObject
+  destroy_value %0 : $Builtin.NativeObject
+  destroy_value %1 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @join_liveranges_in_same_block_2 : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+// CHECK-NOT: copy_value
+// CHECK: } // end sil function 'join_liveranges_in_same_block_2'
+sil [ossa] @join_liveranges_in_same_block_2 : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = copy_value %0 : $Builtin.NativeObject
+  destroy_value %0 : $Builtin.NativeObject
+  return %1 : $Builtin.NativeObject
+}
+
+// CHECK-LABEL: sil [ossa] @join_liveranges_in_same_block_3 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK-NOT: copy_value
+// CHECK: } // end sil function 'join_liveranges_in_same_block_3'
+sil [ossa] @join_liveranges_in_same_block_3 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = copy_value %0 : $Builtin.NativeObject
+  br bb1
+
+bb1:
+  destroy_value %0 : $Builtin.NativeObject
+  %f = function_ref @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  apply %f(%1) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  br bb2
+
+bb2:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @join_liveranges_in_same_block_4 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK-NOT: copy_value
+// CHECK: } // end sil function 'join_liveranges_in_same_block_4'
+sil [ossa] @join_liveranges_in_same_block_4 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = copy_value %0 : $Builtin.NativeObject
+  br bb1
+
+bb1:
+  destroy_value %0 : $Builtin.NativeObject
+  %f = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %f(%1) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %f2 = function_ref @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  apply %f2(%1) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  br bb2
+
+bb2:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @donot_join_liveranges_in_same_block_1 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK: copy_value
+// CHECK: } // end sil function 'donot_join_liveranges_in_same_block_1'
+sil [ossa] @donot_join_liveranges_in_same_block_1 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = copy_value %0 : $Builtin.NativeObject
+  br bb1
+
+bb1:
+  %f = function_ref @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  apply %f(%1) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  destroy_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Forwarding case.
+//
+// CHECK-LABEL: sil [ossa] @donot_join_liveranges_in_same_block_2 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK-NOT: copy_value
+// CHECK: } // end sil function 'donot_join_liveranges_in_same_block_2'
+sil [ossa] @donot_join_liveranges_in_same_block_2 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = copy_value %0 : $Builtin.NativeObject
+  br bb1
+
+bb1:
+  destroy_value %0 : $Builtin.NativeObject
+  %2 = unchecked_ref_cast %1 : $Builtin.NativeObject to $Builtin.NativeObject
+  %f = function_ref @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  apply %f(%2) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Forwarding case. We need LiveRanges for this.
+//
+// CHECK-LABEL: sil [ossa] @donot_join_liveranges_in_same_block_3 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK: copy_value
+// CHECK: } // end sil function 'donot_join_liveranges_in_same_block_3'
+sil [ossa] @donot_join_liveranges_in_same_block_3 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = copy_value %0 : $Builtin.NativeObject
+  br bb1
+
+bb1:
+  %2 = unchecked_ref_cast %0 : $Builtin.NativeObject to $Builtin.NativeObject
+  destroy_value %2 : $Builtin.NativeObject
+  %f = function_ref @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  apply %f(%1) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Now test cases where we find our consumer is in the return block or is a
+// return itself.
+//
+// CHECK-LABEL: sil [ossa] @join_liveranges_not_same_block_with_consuming_return : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+// CHECK-NOT: copy_value
+// CHECK: } // end sil function 'join_liveranges_not_same_block_with_consuming_return'
+sil [ossa] @join_liveranges_not_same_block_with_consuming_return : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = copy_value %0 : $Builtin.NativeObject
+  br bb1
+
+bb1:
+  destroy_value %0 : $Builtin.NativeObject
+  br bb2
+
+bb2:
+  return %1 : $Builtin.NativeObject
+}
+
+// CHECK-LABEL: sil [ossa] @join_liveranges_not_same_block_consumed_in_return_block : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK-NOT: copy_value
+// CHECK: } // end sil function 'join_liveranges_not_same_block_consumed_in_return_block'
+sil [ossa] @join_liveranges_not_same_block_consumed_in_return_block : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = copy_value %0 : $Builtin.NativeObject
+  br bb1
+
+bb1:
+  destroy_value %0 : $Builtin.NativeObject
+  br bb2
+
+bb2:
+  %f = function_ref @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  apply %f(%1) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @donot_join_liveranges_not_same_block_1 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK: copy_value
+// CHECK: } // end sil function 'donot_join_liveranges_not_same_block_1'
+sil [ossa] @donot_join_liveranges_not_same_block_1 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = copy_value %0 : $Builtin.NativeObject
+  br bb1
+
+bb1:
+  destroy_value %0 : $Builtin.NativeObject
+  br bb2
+
+bb2:
+  %f = function_ref @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  apply %f(%1) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @donot_join_liveranges_not_same_block_2 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK: copy_value
+// CHECK: } // end sil function 'donot_join_liveranges_not_same_block_2'
+sil [ossa] @donot_join_liveranges_not_same_block_2 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = copy_value %0 : $Builtin.NativeObject
+  br bb1
+
+bb1:
+  %f = function_ref @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  apply %f(%1) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  br bb2
+
+bb2:
+  destroy_value %0 : $Builtin.NativeObject
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @join_liverange_multiple_destroy_value : $@convention(thin) () -> () {
+// CHECK-NOT: copy_value
+// CHECK-NOT: destroy_value
+// CHECK: } // end sil function 'join_liverange_multiple_destroy_value'
+sil [ossa] @join_liverange_multiple_destroy_value : $@convention(thin) () -> () {
+bb0:
+  %consumingUse = function_ref @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  %constructingUse = function_ref @get_owned_obj : $@convention(thin) () -> @owned Builtin.NativeObject
+  %obj = apply %constructingUse() : $@convention(thin) () -> @owned Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb1:
+  %obj2 = copy_value %obj : $Builtin.NativeObject
+  destroy_value %obj : $Builtin.NativeObject
+  cond_br undef, bb1a, bb1b
+
+bb1a:
+  apply %consumingUse(%obj2) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  br bb3
+
+bb1b:
+  apply %consumingUse(%obj2) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  br bb3
+
+bb2:
+  apply %consumingUse(%obj) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  br bb4
+
+bb3:
+  br bb4
+
+bb4:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @join_liverange_forwarding_chain_1 : $@convention(thin) () -> () {
+// CHECK-NOT: copy_value
+// CHECK-NOT: destroy_value
+// CHECK: } // end sil function 'join_liverange_forwarding_chain_1'
+sil [ossa] @join_liverange_forwarding_chain_1 : $@convention(thin) () -> () {
+bb0:
+  %consumingUse = function_ref @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  %constructingUse = function_ref @get_owned_obj : $@convention(thin) () -> @owned Builtin.NativeObject
+  %obj = apply %constructingUse() : $@convention(thin) () -> @owned Builtin.NativeObject
+
+  %obj2 = copy_value %obj : $Builtin.NativeObject
+  destroy_value %obj : $Builtin.NativeObject
+  %obj3 = unchecked_ref_cast %obj2 : $Builtin.NativeObject to $Builtin.NativeObject
+  apply %consumingUse(%obj3) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @join_liverange_multiple_destroy_value_forwarding_chain_1 : $@convention(thin) () -> () {
+// CHECK-NOT: copy_value
+// CHECK-NOT: destroy_value
+// CHECK: } // end sil function 'join_liverange_multiple_destroy_value_forwarding_chain_1'
+sil [ossa] @join_liverange_multiple_destroy_value_forwarding_chain_1 : $@convention(thin) () -> () {
+bb0:
+  %consumingUse = function_ref @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  %constructingUse = function_ref @get_owned_obj : $@convention(thin) () -> @owned Builtin.NativeObject
+  %obj = apply %constructingUse() : $@convention(thin) () -> @owned Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb1:
+  %obj2 = copy_value %obj : $Builtin.NativeObject
+  destroy_value %obj : $Builtin.NativeObject
+  %obj3 = unchecked_ref_cast %obj2 : $Builtin.NativeObject to $Builtin.NativeObject
+  cond_br undef, bb1a, bb1b
+
+bb1a:
+  apply %consumingUse(%obj3) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  br bb3
+
+bb1b:
+  apply %consumingUse(%obj3) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  br bb3
+
+bb2:
+  apply %consumingUse(%obj) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  br bb4
+
+bb3:
+  br bb4
+
+bb4:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @join_liverange_multiple_destroy_value_forwarding_chain_2 : $@convention(thin) () -> () {
+// CHECK-NOT: copy_value
+// CHECK-NOT: destroy_value
+// CHECK: } // end sil function 'join_liverange_multiple_destroy_value_forwarding_chain_2'
+sil [ossa] @join_liverange_multiple_destroy_value_forwarding_chain_2 : $@convention(thin) () -> () {
+bb0:
+  %consumingUse = function_ref @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  %constructingUse = function_ref @get_owned_obj : $@convention(thin) () -> @owned Builtin.NativeObject
+  %obj = apply %constructingUse() : $@convention(thin) () -> @owned Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb1:
+  %obj2 = copy_value %obj : $Builtin.NativeObject
+  %obj3 = unchecked_ref_cast %obj2 : $Builtin.NativeObject to $Builtin.NativeObject
+  destroy_value %obj : $Builtin.NativeObject
+  cond_br undef, bb1a, bb1b
+
+bb1a:
+  apply %consumingUse(%obj3) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  br bb3
+
+bb1b:
+  apply %consumingUse(%obj3) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  br bb3
+
+bb2:
+  apply %consumingUse(%obj) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  br bb4
+
+bb3:
+  br bb4
+
+bb4:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We do not support destructures and other multiple value instructions yet...
+//
+// CHECK-LABEL: sil [ossa] @join_liverange_multiple_destroy_value_forwarding_chain_3 : $@convention(thin) () -> () {
+// CHECK: copy_value
+// CHECK: destroy_value
+// CHECK: } // end sil function 'join_liverange_multiple_destroy_value_forwarding_chain_3'
+sil [ossa] @join_liverange_multiple_destroy_value_forwarding_chain_3 : $@convention(thin) () -> () {
+bb0:
+  %consumingUse = function_ref @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  %constructingUse = function_ref @get_owned_obj : $@convention(thin) () -> @owned Builtin.NativeObject
+  %obj = apply %constructingUse() : $@convention(thin) () -> @owned Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb1:
+  %obj2 = copy_value %obj : $Builtin.NativeObject
+  %obj2a = struct $NativeObjectWrapper(%obj2 : $Builtin.NativeObject)
+  (%obj3) = destructure_struct %obj2a : $NativeObjectWrapper
+  destroy_value %obj : $Builtin.NativeObject
+  cond_br undef, bb1a, bb1b
+
+bb1a:
+  apply %consumingUse(%obj3) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  br bb3
+
+bb1b:
+  apply %consumingUse(%obj3) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  br bb3
+
+bb2:
+  apply %consumingUse(%obj) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  br bb4
+
+bb3:
+  br bb4
+
+bb4:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// This case succeeds since our borrow scope does not overlap with our
+// forwarding region.
+//
+// CHECK-LABEL: sil [ossa] @join_live_range_with_borrowscopes_succeed_1 : $@convention(thin) () -> () {
+// CHECK-NOT: copy_value
+// CHECK-NOT: destroy_value
+// CHECK: } // end sil function 'join_live_range_with_borrowscopes_succeed_1'
+sil [ossa] @join_live_range_with_borrowscopes_succeed_1 : $@convention(thin) () -> () {
+bb0:
+  %consumingUse = function_ref @owned_user_object_pair : $@convention(thin) (@owned NativeObjectPair) -> ()
+  %constructingUse = function_ref @get_object_pair : $@convention(thin) () -> @owned NativeObjectPair
+  %obj = apply %constructingUse() : $@convention(thin) () -> @owned NativeObjectPair
+  %borrowedObj = begin_borrow %obj : $NativeObjectPair
+  %obj1 = struct_extract %borrowedObj : $NativeObjectPair, #NativeObjectPair.obj1
+  %guaranteedUse = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %guaranteedUse(%obj1) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  end_borrow %borrowedObj : $NativeObjectPair
+  %2 = copy_value %obj : $NativeObjectPair
+  br bb1
+
+bb1:
+  destroy_value %obj : $NativeObjectPair
+  apply %consumingUse(%2) : $@convention(thin) (@owned NativeObjectPair) -> ()
+  br bb2
+
+bb2:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// In this case, we validate that we can perform the optimization with
+// forwarding insts.
+//
+// CHECK-LABEL: sil [ossa] @join_live_range_with_borrowscopes_succeed_2 : $@convention(thin) () -> () {
+// CHECK-NOT: copy_value
+// CHECK: } // end sil function 'join_live_range_with_borrowscopes_succeed_2'
+sil [ossa] @join_live_range_with_borrowscopes_succeed_2 : $@convention(thin) () -> () {
+bb0:
+  %obj = alloc_ref $Klass
+  %borrowedObj = begin_borrow %obj : $Klass
+  end_borrow %borrowedObj : $Klass
+  %2 = copy_value %obj : $Klass
+  br bb1
+
+bb1:
+  destroy_value %obj : $Klass
+  %3 = unchecked_ref_cast %2 : $Klass to $Builtin.NativeObject
+  %consumingUse = function_ref @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  apply %consumingUse(%3) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  br bb2
+
+bb2:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Here we succeed even though %2's lifetime ends at the unchecked_ref_cast, we
+// are able to know that
+//
+// CHECK-LABEL: sil [ossa] @join_live_range_with_borrowscopes_succeed_3 : $@convention(thin) () -> () {
+// CHECK-NOT: copy_value
+// CHECK: } // end sil function 'join_live_range_with_borrowscopes_succeed_3'
+sil [ossa] @join_live_range_with_borrowscopes_succeed_3 : $@convention(thin) () -> () {
+bb0:
+  %obj = alloc_ref $Klass
+  %borrowedObj = begin_borrow %obj : $Klass
+  end_borrow %borrowedObj : $Klass
+  %2 = copy_value %obj : $Klass
+  br bb1
+
+bb1:
+  %3 = unchecked_ref_cast %2 : $Klass to $Builtin.NativeObject
+  destroy_value %obj : $Klass
+  %consumingUse = function_ref @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  apply %consumingUse(%3) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  br bb2
+
+bb2:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// In this case we fail since we don't want to have to deal with splitting the
+// scope of %borrowedObj at %3.
+//
+// CHECK-LABEL: sil [ossa] @join_live_range_with_borrowscopes_fail_1 : $@convention(thin) () -> () {
+// CHECK: copy_value
+// CHECK: } // end sil function 'join_live_range_with_borrowscopes_fail_1'
+sil [ossa] @join_live_range_with_borrowscopes_fail_1 : $@convention(thin) () -> () {
+bb0:
+  %obj = alloc_ref $Klass
+  %borrowedObj = begin_borrow %obj : $Klass
+  %2 = copy_value %obj : $Klass
+  br bb1
+
+bb1:
+  %3 = unchecked_ref_cast %2 : $Klass to $Builtin.NativeObject
+  end_borrow %borrowedObj : $Klass
+  destroy_value %obj : $Klass
+  %consumingUse = function_ref @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  apply %consumingUse(%3) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  br bb2
+
+bb2:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// This case succeeds since our borrow scope does not overlap with our
+// forwarding region.
+sil [ossa] @join_live_range_with_borrowscopes_multipledestroys_succeed_1 : $@convention(thin) () -> () {
+bb0:
+  %consumingUse = function_ref @owned_user_object_pair : $@convention(thin) (@owned NativeObjectPair) -> ()
+  %constructingUse = function_ref @get_object_pair : $@convention(thin) () -> @owned NativeObjectPair
+  %obj = apply %constructingUse() : $@convention(thin) () -> @owned NativeObjectPair
+  %borrowedObj = begin_borrow %obj : $NativeObjectPair
+  %obj1 = struct_extract %borrowedObj : $NativeObjectPair, #NativeObjectPair.obj1
+  %guaranteedUse = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %guaranteedUse(%obj1) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  end_borrow %borrowedObj : $NativeObjectPair
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = copy_value %obj : $NativeObjectPair
+  destroy_value %obj : $NativeObjectPair
+  apply %consumingUse(%2) : $@convention(thin) (@owned NativeObjectPair) -> ()
+  br bb3
+
+bb2:
+  destroy_value %obj : $NativeObjectPair
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// In this case, we validate that we can perform the optimization with
+// forwarding insts.
+//
+// CHECK-LABEL: sil [ossa] @join_live_range_with_borrowscopes_multipledestroys_succeed_2 : $@convention(thin) () -> () {
+// CHECK-NOT: copy_value
+// CHECK: } // end sil function 'join_live_range_with_borrowscopes_multipledestroys_succeed_2'
+sil [ossa] @join_live_range_with_borrowscopes_multipledestroys_succeed_2 : $@convention(thin) () -> () {
+bb0:
+  %obj = alloc_ref $Klass
+  %borrowedObj = begin_borrow %obj : $Klass
+  // We cheat and use end_borrow so we don't optimize this borrow.
+  end_borrow %borrowedObj : $Klass
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = copy_value %obj : $Klass
+  destroy_value %obj : $Klass
+  %3 = unchecked_ref_cast %2 : $Klass to $Builtin.NativeObject
+  %consumingUse = function_ref @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  apply %consumingUse(%3) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  br bb3
+
+bb2:
+  destroy_value %obj : $Klass
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @join_live_range_with_borrowscopes_multipledestroys_succeed_3 : $@convention(thin) () -> () {
+// CHECK-NOT: copy_value
+// CHECK: } // end sil function 'join_live_range_with_borrowscopes_multipledestroys_succeed_3'
+sil [ossa] @join_live_range_with_borrowscopes_multipledestroys_succeed_3 : $@convention(thin) () -> () {
+bb0:
+  %obj = alloc_ref $Klass
+  %borrowedObj = begin_borrow %obj : $Klass
+  cond_br undef, bb1, bb2
+
+bb1:
+  end_borrow %borrowedObj : $Klass
+  %2 = copy_value %obj : $Klass
+  %3 = unchecked_ref_cast %2 : $Klass to $Builtin.NativeObject
+  destroy_value %obj : $Klass
+  %consumingUse = function_ref @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  apply %consumingUse(%3) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  br bb3
+
+bb2:
+  end_borrow %borrowedObj : $Klass
+  destroy_value %obj : $Klass
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @join_live_range_with_borrowscopes_multipledestroys_succeed_4 : $@convention(thin) () -> () {
+// CHECK-NOT: copy_value
+// CHECK: } // end sil function 'join_live_range_with_borrowscopes_multipledestroys_succeed_4'
+sil [ossa] @join_live_range_with_borrowscopes_multipledestroys_succeed_4 : $@convention(thin) () -> () {
+bb0:
+  %obj = alloc_ref $Klass
+  %borrowedObj = begin_borrow %obj : $Klass
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = copy_value %obj : $Klass
+  end_borrow %borrowedObj : $Klass
+  %3 = unchecked_ref_cast %2 : $Klass to $Builtin.NativeObject
+  destroy_value %obj : $Klass
+  %consumingUse = function_ref @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  apply %consumingUse(%3) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  br bb3
+
+bb2:
+  end_borrow %borrowedObj : $Klass
+  destroy_value %obj : $Klass
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @join_live_range_with_borrowscopes_multipledestroys_succeed_5 : $@convention(thin) () -> () {
+// CHECK-NOT: copy_value
+// CHECK: } // end sil function 'join_live_range_with_borrowscopes_multipledestroys_succeed_5'
+sil [ossa] @join_live_range_with_borrowscopes_multipledestroys_succeed_5 : $@convention(thin) () -> () {
+bb0:
+  %obj = alloc_ref $Klass
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = copy_value %obj : $Klass
+  %3 = unchecked_ref_cast %2 : $Klass to $Builtin.NativeObject
+  destroy_value %obj : $Klass
+  %4 = unchecked_ref_cast %3 : $Builtin.NativeObject to $Klass
+  %5 = unchecked_ref_cast %4 : $Klass to $Builtin.NativeObject
+  %consumingUse = function_ref @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  apply %consumingUse(%5) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  br bb3
+
+bb2:
+  destroy_value %obj : $Klass
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @join_live_range_with_borrowscopes_multipledestroys_succeed_6 : $@convention(thin) () -> () {
+// CHECK-NOT: copy_value
+// CHECK: } // end sil function 'join_live_range_with_borrowscopes_multipledestroys_succeed_6'
+sil [ossa] @join_live_range_with_borrowscopes_multipledestroys_succeed_6 : $@convention(thin) () -> () {
+bb0:
+  %obj = alloc_ref $Klass
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = copy_value %obj : $Klass
+  %3 = unchecked_ref_cast %2 : $Klass to $Builtin.NativeObject
+  destroy_value %obj : $Klass
+  br bb1a
+
+bb1a:
+  %consumingUse = function_ref @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  apply %consumingUse(%3) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  br bb3
+
+bb2:
+  destroy_value %obj : $Klass
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @join_live_range_with_borrowscopes_multipledestroys_succeed_7 : $@convention(thin) () -> () {
+// CHECK-NOT: copy_value
+// CHECK: } // end sil function 'join_live_range_with_borrowscopes_multipledestroys_succeed_7'
+sil [ossa] @join_live_range_with_borrowscopes_multipledestroys_succeed_7 : $@convention(thin) () -> () {
+bb0:
+  %obj = alloc_ref $Klass
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = copy_value %obj : $Klass
+  %3 = unchecked_ref_cast %2 : $Klass to $Builtin.NativeObject
+  destroy_value %obj : $Klass
+  cond_br undef, bb1a, bb1b
+
+bb1a:
+  %consumingUse = function_ref @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  apply %consumingUse(%3) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  br bb1c
+
+bb1b:
+  destroy_value %3 : $Builtin.NativeObject
+  br bb1c
+
+bb1c:
+  br bb3
+
+bb2:
+  destroy_value %obj : $Klass
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @join_live_range_with_borrowscopes_multipledestroys_fail_2 : $@convention(thin) () -> () {
+// CHECK: copy_value
+// CHECK: } // end sil function 'join_live_range_with_borrowscopes_multipledestroys_fail_2'
+sil [ossa] @join_live_range_with_borrowscopes_multipledestroys_fail_2 : $@convention(thin) () -> () {
+bb0:
+  %obj = alloc_ref $Klass
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = copy_value %obj : $Klass
+  %3 = unchecked_ref_cast %2 : $Klass to $Builtin.NativeObject
+  %consumingUse = function_ref @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  apply %consumingUse(%3) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  destroy_value %obj : $Klass
+  br bb3
+
+bb2:
+  destroy_value %obj : $Klass
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// In this case we fail since we don't want to have to deal with splitting the
+// scope of %borrowedObj at %3.
+//
+// CHECK-LABEL: sil [ossa] @join_live_range_with_borrowscopes_multipledestroys_fail_1 : $@convention(thin) () -> () {
+// CHECK: copy_value
+// CHECK: } // end sil function 'join_live_range_with_borrowscopes_multipledestroys_fail_1'
+sil [ossa] @join_live_range_with_borrowscopes_multipledestroys_fail_1 : $@convention(thin) () -> () {
+bb0:
+  %obj = alloc_ref $Klass
+  %borrowedObj = begin_borrow %obj : $Klass
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = copy_value %obj : $Klass
+  %3 = unchecked_ref_cast %2 : $Klass to $Builtin.NativeObject
+  end_borrow %borrowedObj : $Klass
+  destroy_value %obj : $Klass
+  %consumingUse = function_ref @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  apply %consumingUse(%3) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  br bb3
+
+bb2:
+  end_borrow %borrowedObj : $Klass
+  destroy_value %obj : $Klass
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Make sure we leave only one copy in bb2 and no destroys
+//
+// CHECK-LABEL: sil [ossa] @join_test_with_forwarding_inst : $@convention(thin) () -> @owned FakeOptional<Builtin.NativeObject> {
+// CHECK: bb2:
+// CHECK: copy_value
+// CHECK-NOT: destroy_value
+// CHECK-NOT: copy_value
+// CHECK:   br bb3(
+// CHECK: } // end sil function 'join_test_with_forwarding_inst'
+sil [ossa] @join_test_with_forwarding_inst : $@convention(thin) () -> @owned FakeOptional<Builtin.NativeObject> {
+bb0:
+  %allocStack = alloc_stack $Builtin.NativeObject
+  %0 = function_ref @get_fakeoptional_nativeobject : $@convention(thin) () -> @owned FakeOptional<Builtin.NativeObject>
+  %1 = apply %0() : $@convention(thin) () -> @owned FakeOptional<Builtin.NativeObject>
+  cond_br undef, bb1, bb2
+
+bb1:
+  destroy_value %1 : $FakeOptional<Builtin.NativeObject>
+  %2 = enum $FakeOptional<Builtin.NativeObject>, #FakeOptional.none!enumelt
+  br bb3(%2 : $FakeOptional<Builtin.NativeObject>)
+
+bb2:
+  %3 = unchecked_enum_data %1 : $FakeOptional<Builtin.NativeObject>, #FakeOptional.some!enumelt
+  %4 = copy_value %3 : $Builtin.NativeObject
+  store %3 to [init] %allocStack : $*Builtin.NativeObject
+  %4c = copy_value %4 : $Builtin.NativeObject
+  destroy_value %4 : $Builtin.NativeObject
+  %5 = enum $FakeOptional<Builtin.NativeObject>, #FakeOptional.some!enumelt, %4c : $Builtin.NativeObject
+  destroy_addr %allocStack : $*Builtin.NativeObject
+  br bb3(%5 : $FakeOptional<Builtin.NativeObject>)
+
+bb3(%result : @owned $FakeOptional<Builtin.NativeObject>):
+  dealloc_stack %allocStack : $*Builtin.NativeObject
+  return %result : $FakeOptional<Builtin.NativeObject>
+}

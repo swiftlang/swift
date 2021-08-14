@@ -10,7 +10,7 @@ extension String: P, Q { func paul() {}; mutating func priscilla() {}; func quin
 extension Array: P, Q { func paul() {}; mutating func priscilla() {}; func quinn() {} }
 
 class C {}
-class D: C, P, Q { func paul() {}; func priscilla() {}; func quinn() {} }
+class D: C, P, Q { func paul() {}; func priscilla() {}; func quinn() {}; func d() {} }
 
 let property: some P = 1
 let deflessLet: some P // expected-error{{has no initializer}} {{educational-notes=opaque-type-inference}}
@@ -75,17 +75,19 @@ struct Test {
 
 let zingle = {() -> some P in 1 } // expected-error{{'some' types are only implemented}}
 
+
+// Support for structural opaque result types is hidden behind a compiler flag
+// until the proposal gets approved.
+func twoOpaqueTypes() -> (some P, some P) { return (1, 2) } // expected-error{{'opaque' types cannot be nested inside other types}}
+func asArrayElem() -> (some P)! { return [1] } // expected-error{{'opaque' types cannot be nested inside other types}}
+
 // Invalid positions
 
 typealias Foo = some P // expected-error{{'some' types are only implemented}}
 
 func blibble(blobble: some P) {} // expected-error{{'some' types are only implemented}}
-
-let blubble: () -> some P = { 1 } // expected-error{{'some' types are only implemented}}
-
 func blib() -> P & some Q { return 1 } // expected-error{{'some' should appear at the beginning}}
-func blab() -> (P, some Q) { return (1, 2) } // expected-error{{'some' types are only implemented}}
-func blob() -> (some P) -> P { return { $0 } } // expected-error{{'some' types are only implemented}}
+func blab() -> some P? { return 1 } // expected-error{{must specify only}} expected-note{{did you mean to write an optional of an 'opaque' type?}}
 func blorb<T: some P>(_: T) { } // expected-error{{'some' types are only implemented}}
 func blub<T>() -> T where T == some P { return 1 } // expected-error{{'some' types are only implemented}} expected-error{{cannot convert}}
 
@@ -383,20 +385,26 @@ protocol P_51641323 {
 func rdar_51641323() {
   struct Foo: P_51641323 {
     var foo: some P_51641323 { // expected-note {{required by opaque return type of property 'foo'}}
-      {} // expected-error {{type '() -> ()' cannot conform to 'P_51641323'; only concrete types such as structs, enums and classes can conform to protocols}}
+      {} // expected-error {{type '() -> ()' cannot conform to 'P_51641323'}} expected-note {{only concrete types such as structs, enums and classes can conform to protocols}}
     }
   }
 }
 
 // Protocol requirements cannot have opaque return types
 protocol OpaqueProtocolRequirement {
-  // expected-error@+1 {{cannot be the return type of a protocol requirement}}{{3-3=associatedtype <#AssocType#>\n}}{{20-26=<#AssocType#>}}
-  func method() -> some P
+  // expected-error@+1 {{cannot be the return type of a protocol requirement}}{{3-3=associatedtype <#AssocType#>: P\n}}{{21-27=<#AssocType#>}}
+  func method1() -> some P
 
-  // expected-error@+1 {{cannot be the return type of a protocol requirement}}{{3-3=associatedtype <#AssocType#>\n}}{{13-19=<#AssocType#>}}
+  // expected-error@+1 {{cannot be the return type of a protocol requirement}}{{3-3=associatedtype <#AssocType#>: C & P & Q\n}}{{21-35=<#AssocType#>}}
+  func method2() -> some C & P & Q
+
+  // expected-error@+1 {{cannot be the return type of a protocol requirement}}{{3-3=associatedtype <#AssocType#>: Nonsense\n}}{{21-34=<#AssocType#>}}
+  func method3() -> some Nonsense
+
+  // expected-error@+1 {{cannot be the return type of a protocol requirement}}{{3-3=associatedtype <#AssocType#>: P\n}}{{13-19=<#AssocType#>}}
   var prop: some P { get }
 
-  // expected-error@+1 {{cannot be the return type of a protocol requirement}}{{3-3=associatedtype <#AssocType#>\n}}{{18-24=<#AssocType#>}}
+  // expected-error@+1 {{cannot be the return type of a protocol requirement}}{{3-3=associatedtype <#AssocType#>: P\n}}{{18-24=<#AssocType#>}}
   subscript() -> some P { get }
 }
 
@@ -485,3 +493,28 @@ protocol SomeProtocolA {}
 protocol SomeProtocolB {}
 struct SomeStructC: SomeProtocolA, SomeProtocolB {}
 let someProperty: SomeProtocolA & some SomeProtocolB = SomeStructC() // expected-error {{'some' should appear at the beginning of a composition}}{{35-40=}}{{19-19=some }}
+
+// An opaque result type on a protocol extension member effectively
+// contains an invariant reference to 'Self', and therefore cannot
+// be referenced on an existential type.
+
+protocol OpaqueProtocol {}
+extension OpaqueProtocol {
+  var asSome: some OpaqueProtocol { return self }
+  func getAsSome() -> some OpaqueProtocol { return self }
+  subscript(_: Int) -> some OpaqueProtocol { return self }
+}
+
+func takesOpaqueProtocol(existential: OpaqueProtocol) {
+  // this is not allowed:
+  _ = existential.asSome // expected-error{{member 'asSome' cannot be used on value of protocol type 'OpaqueProtocol'; use a generic constraint instead}}
+  _ = existential.getAsSome() // expected-error{{member 'getAsSome' cannot be used on value of protocol type 'OpaqueProtocol'; use a generic constraint instead}}
+  _ = existential[0] // expected-error{{member 'subscript' cannot be used on value of protocol type 'OpaqueProtocol'; use a generic constraint instead}}
+}
+
+func takesOpaqueProtocol<T : OpaqueProtocol>(generic: T) {
+  // these are all OK:
+  _ = generic.asSome
+  _ = generic.getAsSome()
+  _ = generic[0]
+}

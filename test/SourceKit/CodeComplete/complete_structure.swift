@@ -40,8 +40,8 @@ func test1(_ x: S1) {
 // S1_DOT: {name:method4}({params:{t:Int}, {t:Int}})
 // S1_DOT: {name:method5}({params:{t:&Int}, {n:b:}{t: &Int}})
 // FIXME: put throws in a range!
-// S1_DOT: {name:method6}({params:{l:c:}{t: Int}}){throws: throws}
-// S1_DOT: {name:method7}({params:{l:callback:}{t: () throws -> ()}}){throws: rethrows}
+// S1_DOT: {name:method6}({params:{l:c:}{t: Int}}) throws
+// S1_DOT: {name:method7}({params:{l:callback:}{t: () throws -> ()}}) rethrows
 // S1_DOT: {name:method8}({params:{l:d:}{t: (T, U) -> T}, {n:e:}{t: (T) -> U}})
 // S1_DOT: {name:v1}
 // S1_DOT: {name:v2}

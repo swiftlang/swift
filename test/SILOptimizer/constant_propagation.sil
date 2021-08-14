@@ -700,8 +700,6 @@ class AnObject {}
 // CHECK-LABEL: sil @replace_unconditional_check_cast_failure
 // CHECK:  bb2:
 // CHECK:  alloc_stack $AnObject
-// CHECK:  store undef to %0
-// CHECK:  dealloc_stack
 // CHECK:  builtin "int_trap"()
 // CHECK:  unreachable
 

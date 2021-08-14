@@ -61,7 +61,7 @@ bb3(%35 : $()):                                   // Preds: bb2
 
 //CHECK-LABEL: remove_dead_args
 //CHECK-NOT: br bb2([[VAR_21:%[0-9]+]] : $Bool)
-//CHECK: bb2:
+//CHECK: bb3:
 //CHECK-NEXT: tuple ()
 //CHECK-NEXT: return
 sil @remove_dead_args: $@convention(thin) (Int32) -> () {
@@ -723,3 +723,92 @@ bb10(%18 : $Builtin.Int1):                        // Preds: bb2 bb5 bb9
   return %19 : $Bool                              // id: %19
 }
 
+// --- Test simplifyArguments; unwrap enum argument
+// This optimization should not be defeated by the existence of other
+// (unrelated) block arguments
+struct Payload {
+  init()
+}
+
+enum MyEnum {
+  case payload(Payload)
+}
+
+enum ThreeWay {
+  case one
+  case two
+  case three
+  @_implements(Equatable, ==(_:_:)) static func __derived_enum_equals(_ a: ThreeWay, _ b: ThreeWay) -> Bool
+  var hashValue: Int { get }
+  func hash(into hasher: inout Hasher)
+}
+
+// CHECK-LABEL: sil hidden [noinline] @testUnwrapEnumArg : $@convention(thin) () -> () {
+// CHECK: bb0:
+// CHECK:   br bb1(undef : $Builtin.Int64, %{{.*}} : $Payload)
+// CHECK: bb1(%{{.*}} : $Builtin.Int64, %{{.*}} : $Payload):
+// CHECK:   alloc_stack $Payload
+// CHECK:   switch_enum undef : $ThreeWay, case #ThreeWay.one!enumelt: bb4, case #ThreeWay.two!enumelt: bb2, case #ThreeWay.three!enumelt: bb3
+// CHECK: bb2:
+// CHECK:   [[P2:%.*]] = load %{{.*}} : $*Payload
+// CHECK:   enum $MyEnum, #MyEnum.payload!enumelt, [[P2]] : $Payload
+// CHECK:   dealloc_stack %{{.*}} : $*Payload
+// CHECK:   br bb1(undef : $Builtin.Int64, [[P2]] : $Payload)
+// CHECK: bb3:
+// CHECK:   [[P3:%.*]] = load %{{.*}} : $*Payload
+// CHECK:   enum $MyEnum, #MyEnum.payload!enumelt, [[P3]] : $Payload
+// CHECK:   dealloc_stack %{{.*}} : $*Payload
+// CHECK:   br bb7
+// CHECK: bb4:
+// CHECK:   [[P4:%.*]] = load %{{.*}} : $*Payload
+// CHECK:   enum $MyEnum, #MyEnum.payload!enumelt, [[P4]] : $Payload
+// CHECK:   dealloc_stack %{{.*}} : $*Payload
+// CHECK:   cond_br undef, bb5, bb6
+// CHECK: bb5:
+// CHECK:   br bb7
+// CHECK: bb6:
+// CHECK:   br bb1(undef : $Builtin.Int64, [[P4]] : $Payload)
+// CHECK: bb7:
+// CHECK:   return %{{.*}} : $()
+// CHECK-LABEL: } // end sil function 'testUnwrapEnumArg'
+sil hidden [noinline] @testUnwrapEnumArg : $@convention(thin) () -> () {
+bb0:
+  %0 = struct $Payload (undef : $_UIntBuffer<UInt8>)
+  %1 = enum $MyEnum, #MyEnum.payload!enumelt, %0 : $Payload
+  br bb1(undef : $Builtin.Int64, %1 : $MyEnum)
+
+bb1(%3 : $Builtin.Int64, %4 : $MyEnum):
+  %5 = alloc_stack $Payload
+  %6 = unchecked_enum_data %4 : $MyEnum, #MyEnum.payload!enumelt
+  store %6 to %5 : $*Payload
+  %8 = builtin "cmp_eq_Int64"(%3 : $Builtin.Int64, undef : $Builtin.Int64) : $Builtin.Int1
+  switch_enum undef : $ThreeWay, case #ThreeWay.one!enumelt: bb4, case #ThreeWay.two!enumelt: bb2, case #ThreeWay.three!enumelt: bb3
+
+bb2:
+  %10 = load %5 : $*Payload
+  %11 = enum $MyEnum, #MyEnum.payload!enumelt, %10 : $Payload
+  dealloc_stack %5 : $*Payload
+  br bb6(%11 : $MyEnum)
+
+bb3:
+  %14 = load %5 : $*Payload
+  %15 = enum $MyEnum, #MyEnum.payload!enumelt, %14 : $Payload
+  dealloc_stack %5 : $*Payload
+  br bb7
+
+bb4:
+  %18 = load %5 : $*Payload
+  %19 = enum $MyEnum, #MyEnum.payload!enumelt, %18 : $Payload
+  dealloc_stack %5 : $*Payload
+  cond_br undef, bb7, bb5
+
+bb5:
+  br bb6(%19 : $MyEnum)
+
+bb6(%23 : $MyEnum):
+  br bb1(undef : $Builtin.Int64, %23 : $MyEnum)
+
+bb7:
+  %25 = tuple ()
+  return %25 : $()
+}

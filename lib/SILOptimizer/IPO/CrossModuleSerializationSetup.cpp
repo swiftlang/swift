@@ -45,6 +45,7 @@ class CrossModuleSerializationSetup {
   llvm::SmallVector<SILFunction *, 16> workList;
   llvm::SmallPtrSet<SILFunction *, 16> functionsHandled;
 
+  llvm::DenseMap<SILType, bool> typesChecked;
   llvm::SmallPtrSet<TypeBase *, 16> typesHandled;
 
   SILModule &M;
@@ -61,6 +62,8 @@ class CrossModuleSerializationSetup {
   bool canSerialize(SILFunction *F, bool lookIntoThunks);
 
   bool canSerialize(SILInstruction *inst, bool lookIntoThunks);
+
+  bool canSerialize(SILType type);
 
   void setUpForSerialization(SILFunction *F);
 
@@ -320,6 +323,12 @@ bool CrossModuleSerializationSetup::canSerialize(SILFunction *F,
 
 bool CrossModuleSerializationSetup::canSerialize(SILInstruction *inst,
                                                  bool lookIntoThunks) {
+
+  for (SILValue result : inst->getResults()) {
+    if (!canSerialize(result->getType()))
+      return false;
+  }
+
   if (auto *FRI = dyn_cast<FunctionRefBaseInst>(inst)) {
     SILFunction *callee = FRI->getReferencedFunctionOrNull();
     return canUseFromInline(callee, lookIntoThunks);
@@ -342,6 +351,31 @@ bool CrossModuleSerializationSetup::canSerialize(SILInstruction *inst,
   }
   
   return true;
+}
+
+bool CrossModuleSerializationSetup::canSerialize(SILType type) {
+  auto iter = typesChecked.find(type);
+  if (iter != typesChecked.end())
+    return iter->getSecond();
+
+  ModuleDecl *mod = M.getSwiftModule();
+  bool success = !type.getASTType().findIf(
+    [mod](Type rawSubType) {
+      CanType subType = rawSubType->getCanonicalType();
+      if (NominalTypeDecl *subNT = subType->getNominalOrBoundGenericNominal()) {
+      
+        // Exclude types which are defined in an @_implementationOnly imported
+        // module. Such modules are not transitively available.
+        if (!mod->canBeUsedForCrossModuleOptimization(subNT)) {
+          llvm::dbgs() << " === " << mod->getName() << ", " <<
+            subNT->getParentModule()->getName() << ", " << subNT->getName() << '\n';
+          return true;
+        }
+      }
+      return false;
+    });
+  typesChecked[type] = success;
+  return success;
 }
 
 /// Returns true if the function \p func can be used from a serialized function.

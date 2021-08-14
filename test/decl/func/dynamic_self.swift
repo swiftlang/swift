@@ -24,9 +24,9 @@ enum E0 {
 class C0 {
   func f() -> Self { } // okay
 
-  func g(_ ds: Self) { } // expected-error{{covariant 'Self' can only appear as the type of a property, subscript or method result; did you mean 'C0'?}}
+  func g(_ ds: Self) { } // expected-error{{covariant 'Self' or 'Self?' can only appear as the type of a property, subscript or method result; did you mean 'C0'?}}
 
-  func h(_ ds: Self) -> Self { } // expected-error{{covariant 'Self' can only appear as the type of a property, subscript or method result; did you mean 'C0'?}}
+  func h(_ ds: Self) -> Self { } // expected-error{{covariant 'Self' or 'Self?' can only appear as the type of a property, subscript or method result; did you mean 'C0'?}}
 }
 
 protocol P0 {
@@ -44,7 +44,7 @@ extension P0 {
   }
 }
 
-protocol P1: class {
+protocol P1: AnyObject {
   func f() -> Self // okay
 
   func g(_ ds: Self) // okay
@@ -85,7 +85,8 @@ class C1 {
     var x: Int = self // expected-error{{cannot convert value of type 'Self.Type' to specified type 'Int'}}
 
     // Can't utter Self within the body of a method.
-    var c1 = C1(int: 5) as Self // expected-error{{'C1' is not convertible to 'Self'; did you mean to use 'as!' to force downcast?}}
+    var c1 = C1(int: 5) as Self // expected-error{{'C1' is not convertible to 'Self'}}
+    // expected-note@-1{{did you mean to use 'as!' to force downcast?}} {{25-27=as!}}
 
     if b { return self.init(int: 5) }
 

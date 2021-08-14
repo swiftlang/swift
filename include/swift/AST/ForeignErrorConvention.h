@@ -198,6 +198,7 @@ public:
     case NonNilError:
       return false;
     }
+    llvm_unreachable("unhandled foreign error kind!");
   }
 
   bool operator==(ForeignErrorConvention other) const {

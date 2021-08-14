@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend -typecheck -verify %s
-// REQUIRES: asserts
 
 // TF-1167: `OverrideMatcher::match` crash due to meaningless assertion:
 // `assert(false)`. The assertion was triggered when parameter indices
@@ -14,11 +13,11 @@ public protocol Base {
   associatedtype Output: Differentiable
 
   // expected-error @+1 {{@differentiable attribute used without importing module '_Differentiation'}}
-  @differentiable(wrt: self)
+  @differentiable(reverse, wrt: self)
   func callAsFunction(_ input: Input) -> Output
 }
 public protocol Derived: Base {
   // expected-error @+1 {{@differentiable attribute used without importing module '_Differentiation'}}
-  @differentiable
+  @differentiable(reverse)
   func callAsFunction(_ input: Input) -> Output
 }

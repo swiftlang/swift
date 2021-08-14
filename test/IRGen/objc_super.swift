@@ -4,6 +4,7 @@
 
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop
+// REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
 
 import gizmo
 
@@ -45,7 +46,7 @@ class Hoozit : Gizmo {
     // CHECK: [[T1:%.*]] = bitcast %swift.type* [[T0]] to [[CLASS]]*
     // CHECK: store [[CLASS]]* [[T1]], [[CLASS]]** {{.*}}, align 8
     // CHECK: load i8*, i8** @"\01L_selector(frame)"
-    // CHECK: call void bitcast (void ()* @objc_msgSendSuper2_stret to void ([[NSRECT]]*, [[SUPER]]*, i8*)*)([[NSRECT]]* noalias nocapture sret {{.*}}, [[SUPER]]* {{.*}}, i8* {{.*}})
+    // CHECK: call void bitcast (void ()* @objc_msgSendSuper2_stret to void ([[NSRECT]]*, [[SUPER]]*, i8*)*)([[NSRECT]]* noalias nocapture sret({{.*}}) {{.*}}, [[SUPER]]* {{.*}}, i8* {{.*}})
     return NSInsetRect(super.frame(), 2.0, 2.0)
   }
   // CHECK: }
@@ -136,5 +137,5 @@ class GenericRuncer<T> : Gizmo {
 }
 
 // CHECK: define internal swiftcc void [[PARTIAL_FORWARDING_THUNK]](%swift.refcounted* swiftself %0) {{.*}} {
-// CHECK: @"$ss12StaticStringV14withUTF8BufferyxxSRys5UInt8VGXElFxAFXEfU_"
+// CHECK: @"$ss12StaticStringV14withUTF8BufferyxxSRys5UInt8VGXElFxAFXEfU_yt_Tgq5"
 // CHECK: }

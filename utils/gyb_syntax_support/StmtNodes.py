@@ -74,7 +74,8 @@ STMT_NODES = [
              Child('GuardResult', kind='Expr'),
          ]),
 
-    # for-in-stmt -> label? ':'? 'for' 'case'? pattern 'in' expr 'where'?
+    # for-in-stmt -> label? ':'? 
+    #   'for' 'try'? 'await'? 'case'? pattern 'in' expr 'where'?
     #   expr code-block ';'?
     Node('ForInStmt', kind='Stmt',
          traits=['WithCodeBlock', 'Labeled'],
@@ -84,6 +85,11 @@ STMT_NODES = [
              Child('LabelColon', kind='ColonToken',
                    is_optional=True),
              Child('ForKeyword', kind='ForToken'),
+             Child('TryKeyword', kind='TryToken', 
+                   is_optional=True),
+             Child('AwaitKeyword', kind='IdentifierToken',
+                   classification='Keyword',
+                   text_choices=['await'], is_optional=True),
              Child('CaseKeyword', kind='CaseToken',
                    is_optional=True),
              Child('Pattern', kind='Pattern'),
@@ -192,6 +198,7 @@ STMT_NODES = [
                    node_choices=[
                        Child('Expression', kind='Expr'),
                        Child('Availablity', kind='AvailabilityCondition'),
+                       Child('Unavailablity', kind='UnavailabilityCondition'),
                        Child('MatchingPattern',
                              kind='MatchingPatternCondition'),
                        Child('OptionalBinding',
@@ -228,6 +235,16 @@ STMT_NODES = [
              Child('TypeAnnotation', kind='TypeAnnotation',
                    is_optional=True),
              Child('Initializer', kind='InitializerClause'),
+         ]),
+
+    # unavailability-condition -> '#unavailable' '(' availability-spec ')'
+    Node('UnavailabilityCondition', kind='Syntax',
+         children=[
+             Child('PoundUnavailableKeyword', kind='PoundUnavailableToken'),
+             Child('LeftParen', kind='LeftParenToken'),
+             Child('AvailabilitySpec', kind='AvailabilitySpecList',
+                   collection_element_name='AvailabilityArgument'),
+             Child('RightParen', kind='RightParenToken'),
          ]),
 
     # condition-list -> condition

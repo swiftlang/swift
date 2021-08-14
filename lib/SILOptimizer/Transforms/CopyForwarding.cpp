@@ -1508,6 +1508,23 @@ class CopyForwardingPass : public SILFunctionTransform
     if (!EnableCopyForwarding && !EnableDestroyHoisting)
       return;
 
+    // This pass assumes that the ownership lifetime of a value in a memory
+    // locations can be determined by analyzing operations on the memory
+    // address. However, in non-OSSA code, this is not guaranteed. For example,
+    // this is valid non-OSSA SIL:
+    //
+    // bb0(%0 : $AnyObject):
+    //   %alloc1 = alloc_stack $AnyObject
+    //   store %0 to %objaddr : $*AnyObject
+    //   %ref = load %objaddr : $*AnyObject
+    //   %alloc2 = alloc_stack $ObjWrapper
+    //   # The in-memory reference is destroyed before retaining the loaded ref.
+    //   copy_addr [take] %alloc1 to [initialization] %alloc2 : $*ObjWrapper
+    //   retain_value %ref : $AnyObject
+    //   destroy_addr %alloc2 : $*ObjWrapper
+    if (!getFunction()->hasOwnership())
+      return;
+
     LLVM_DEBUG(llvm::dbgs() << "Copy Forwarding in Func "
                             << getFunction()->getName() << "\n");
 

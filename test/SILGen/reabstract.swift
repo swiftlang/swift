@@ -21,7 +21,6 @@ func test0() {
 // CHECK-NEXT: [[T5:%.*]] = convert_function [[T4]]
 // CHECK-NEXT: [[CVT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[T5]]
 // CHECK: destroy_value [[T5]]
-// CHECK-NEXT: destroy_value [[T2]]
 // CHECK:      [[T0:%.*]] = function_ref @$s10reabstract6takeFn{{[_0-9a-zA-Z]*}}F
 // CHECK-NEXT: apply [[T0]]<Int>([[CVT]])
 // CHECK-NEXT: tuple ()
@@ -34,6 +33,7 @@ func test0() {
 // MANDATORY:      reabstract.liftOptional
 // MANDATORY-NEXT: [[T1:%.*]] = function_ref @$s10reabstract12liftOptional{{[_0-9a-zA-Z]*}}F
 // MANDATORY-NEXT: [[T2:%.*]] = thin_to_thick_function [[T1]]
+// MANDATORY-NEXT: strong_retain [[T2]]
 // MANDATORY-NEXT: [[CVT:%.*]] = convert_escape_to_noescape [[T2]]
 // MANDATORY-NEXT: //{{.*}}reabstraction thunk
 // MANDATORY-NEXT: [[T3:%.*]] = function_ref [[THUNK:@.*]] :
@@ -85,14 +85,13 @@ func testInoutOpaque(_ c: C, i: Int) {
 // CHECK:         function_ref @$s10reabstract1CCSiIegly_ACSiytIeglnr_TR
 // CHECK:         partial_apply
 // CHECK:         store
-// CHECK:         load
-// CHECK:         function_ref @$s10reabstract1CCSiytIeglnr_ACSiIegly_TR
-// CHECK:         partial_apply
-// CHECK:         apply
+// CHECK:         [[CLOSURE:%.*]] = struct_extract {{.*}}, #Box.t
+// CHECK:         [[CLOSURE1:%.*]] = copy_value [[CLOSURE]]
+// CHECK:         [[CLOSURE2:%.*]] = begin_borrow [[CLOSURE1]]
+// CHECK:         apply [[CLOSURE2]]
 // CHECK: } // end sil function '$s10reabstract15testInoutOpaque_1iyAA1CC_SitF'
 
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$s10reabstract1CCSiIegly_ACSiytIeglnr_TR : $@convention(thin) (@inout C, @in_guaranteed Int, @guaranteed @callee_guaranteed (@inout C, Int) -> ()) -> @out () {
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$s10reabstract1CCSiytIeglnr_ACSiIegly_TR : $@convention(thin) (@inout C, Int, @guaranteed @callee_guaranteed (@inout C, @in_guaranteed Int) -> @out ()) -> () {
 
 func closureTakingOptional(_ fn: (Int?) -> ()) {}
 closureTakingOptional({ (_: Any) -> () in })
@@ -107,7 +106,6 @@ closureTakingOptional({ (_: Any) -> () in })
 func evenLessFun(_ s: __shared C, _ o: __owned C) {}
 
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$s10reabstract1CCACIeggx_A2CytIegnir_TR : $@convention(thin) (@in_guaranteed C, @in C, @guaranteed @callee_guaranteed (@guaranteed C, @owned C) -> ()) -> @out ()
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$s10reabstract1CCACytIegnir_A2CIeggx_TR : $@convention(thin) (@guaranteed C, @owned C, @guaranteed @callee_guaranteed (@in_guaranteed C, @in C) -> @out ()) -> ()
 func testSharedOwnedOpaque(_ s: C, o: C) {
   let box = Box(t: evenLessFun)
   box.t(s, o)

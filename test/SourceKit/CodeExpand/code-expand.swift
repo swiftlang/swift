@@ -37,7 +37,7 @@ dispatch_after(<#T##when: dispatch_time_t##dispatch_time_t#>, <#T##queue: dispat
 // CHECK-NEXT: <#code#>
 // CHECK-NEXT: }
 
-@_functionBuilder
+@resultBuilder
 struct MyBuilder {}
 func acceptBuilder<Result>(@MyBuilder body: () -> Result) {}
 do {
@@ -242,3 +242,9 @@ func inactiveWithTrailing() {
   // CHECK-NEXT: <#code#>
 }
 #endif
+
+expandClosureWithInternalParameterNames {
+  withtrail(<#T##callback: (Int, Int) -> Bool##(_ a: Int, _ b: Int) -> Bool#>)
+// CHECK: withtrail { a, b in
+// CHECK-NEXT: <#code#>
+}

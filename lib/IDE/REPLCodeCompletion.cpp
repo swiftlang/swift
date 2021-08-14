@@ -38,8 +38,7 @@ static std::string toInsertableString(CodeCompletionResult *Result) {
     switch (C.getKind()) {
     case CodeCompletionString::Chunk::ChunkKind::AccessControlKeyword:
     case CodeCompletionString::Chunk::ChunkKind::OverrideKeyword:
-    case CodeCompletionString::Chunk::ChunkKind::ThrowsKeyword:
-    case CodeCompletionString::Chunk::ChunkKind::RethrowsKeyword:
+    case CodeCompletionString::Chunk::ChunkKind::EffectsSpecifierKeyword:
     case CodeCompletionString::Chunk::ChunkKind::DeclAttrKeyword:
     case CodeCompletionString::Chunk::ChunkKind::DeclIntroducer:
     case CodeCompletionString::Chunk::ChunkKind::Keyword:
@@ -68,23 +67,23 @@ static std::string toInsertableString(CodeCompletionResult *Result) {
         Str += C.getText();
       break;
 
-    case CodeCompletionString::Chunk::ChunkKind::CallParameterName:
-    case CodeCompletionString::Chunk::ChunkKind::CallParameterInternalName:
-    case CodeCompletionString::Chunk::ChunkKind::CallParameterColon:
+    case CodeCompletionString::Chunk::ChunkKind::CallArgumentName:
+    case CodeCompletionString::Chunk::ChunkKind::CallArgumentInternalName:
+    case CodeCompletionString::Chunk::ChunkKind::CallArgumentColon:
     case CodeCompletionString::Chunk::ChunkKind::DeclAttrParamKeyword:
     case CodeCompletionString::Chunk::ChunkKind::DeclAttrParamColon:
-    case CodeCompletionString::Chunk::ChunkKind::CallParameterType:
-    case CodeCompletionString::Chunk::ChunkKind::CallParameterClosureType:
+    case CodeCompletionString::Chunk::ChunkKind::CallArgumentType:
+    case CodeCompletionString::Chunk::ChunkKind::CallArgumentClosureType:
     case CodeCompletionString::Chunk::ChunkKind::OptionalBegin:
-    case CodeCompletionString::Chunk::ChunkKind::CallParameterBegin:
-    case CodeCompletionString::Chunk::ChunkKind::CallParameterTypeBegin:
+    case CodeCompletionString::Chunk::ChunkKind::CallArgumentBegin:
+    case CodeCompletionString::Chunk::ChunkKind::CallArgumentTypeBegin:
     case CodeCompletionString::Chunk::ChunkKind::GenericParameterBegin:
     case CodeCompletionString::Chunk::ChunkKind::GenericParameterName:
     case CodeCompletionString::Chunk::ChunkKind::TypeAnnotation:
     case CodeCompletionString::Chunk::ChunkKind::TypeAnnotationBegin:
       return Str;
 
-    case CodeCompletionString::Chunk::ChunkKind::CallParameterClosureExpr:
+    case CodeCompletionString::Chunk::ChunkKind::CallArgumentClosureExpr:
       Str += " {";
       Str += C.getText();
       break;
@@ -166,7 +165,8 @@ public:
   REPLCodeCompletionConsumer(REPLCompletions &Completions)
       : Completions(Completions) {}
 
-  void handleResults(MutableArrayRef<CodeCompletionResult *> Results) override {
+  void handleResults(CodeCompletionContext &context) override {
+    MutableArrayRef<CodeCompletionResult *> Results = context.takeResults();
     CodeCompletionContext::sortCompletionResults(Results);
     for (auto Result : Results) {
       std::string InsertableString = toInsertableString(Result);

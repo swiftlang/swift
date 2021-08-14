@@ -19,14 +19,16 @@
 #ifndef SWIFT_FOREIGN_INFO_H
 #define SWIFT_FOREIGN_INFO_H
 
+#include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/Decl.h"
 
 namespace swift {
 
 struct ForeignInfo {
-  ImportAsMemberStatus Self;
-  Optional<ForeignErrorConvention> Error;
+  ImportAsMemberStatus self;
+  Optional<ForeignErrorConvention> error;
+  Optional<ForeignAsyncConvention> async;
 };
 
 } // end namespace swift

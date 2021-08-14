@@ -14,6 +14,8 @@
 #define SWIFT_AST_FILEUNIT_H
 
 #include "swift/AST/Module.h"
+#include "swift/AST/RawComment.h"
+#include "swift/Basic/BasicSourceInfo.h"
 
 namespace swift {
 static inline unsigned alignOfFileUnit();
@@ -110,6 +112,9 @@ public:
                             const ModuleDecl *importedModule,
                             SmallSetVector<Identifier, 4> &spiGroups) const {};
 
+  virtual Optional<Fingerprint>
+  loadFingerprint(const IterableDeclContext *IDC) const { return None; }
+
 protected:
   /// Look up an operator declaration. Do not call directly, use
   /// \c DirectOperatorLookupRequest instead.
@@ -159,11 +164,12 @@ public:
     return None;
   }
 
-  virtual Optional<BasicDeclLocs> getBasicLocsForDecl(const Decl *D) const {
+  virtual Optional<ExternalSourceLocs::RawLocs>
+  getExternalRawLocsForDecl(const Decl *D) const {
     return None;
   }
 
-  virtual void collectAllGroups(std::vector<StringRef> &Names) const {}
+  virtual void collectAllGroups(SmallVectorImpl<StringRef> &Names) const {}
 
   /// Returns an implementation-defined "discriminator" for \p D, which
   /// distinguishes \p D from other declarations in the same module with the
@@ -179,6 +185,9 @@ public:
   /// This does a simple local lookup, not recursively looking through imports.
   /// The order of the results is not guaranteed to be meaningful.
   virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {}
+
+  virtual void
+  getExportedPrespecializations(SmallVectorImpl<Decl *> &results) const {}
 
   /// Finds top-level decls in this file filtered by their attributes.
   ///
@@ -264,7 +273,7 @@ public:
     return dyn_cast_or_null<ClassDecl>(getMainDecl());
   }
   bool hasMainDecl() const { return getMainDecl(); }
-  virtual Decl *getMainDecl() const { return nullptr; }
+  virtual ValueDecl *getMainDecl() const { return nullptr; }
   FuncDecl *getMainFunc() const {
     return dyn_cast_or_null<FuncDecl>(getMainDecl());
   }
@@ -395,6 +404,9 @@ public:
                  SmallVectorImpl<GenericSignature> &genericSignatures) {
     return false;
   }
+
+  virtual void collectBasicSourceFileInfo(
+      llvm::function_ref<void(const BasicSourceFileInfo &)> callback) const {}
 
   static bool classof(const FileUnit *file) {
     return file->getKind() == FileUnitKind::SerializedAST ||

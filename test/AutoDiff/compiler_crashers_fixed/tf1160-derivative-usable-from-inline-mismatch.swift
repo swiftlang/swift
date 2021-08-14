@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend -c %s -verify
-// REQUIRES: asserts
 
 // TF-1160: Linker error for `@usableFromInline` derivative function but
 // non-`@usableFromInline` internal original function.

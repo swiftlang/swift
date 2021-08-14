@@ -170,3 +170,6 @@ extension CollectionOfOne: CustomReflectable {
     return Mirror(self, children: ["element": _element])
   }
 }
+
+extension CollectionOfOne: Sendable where Element: Sendable { }
+extension CollectionOfOne.Iterator: Sendable where Element: Sendable { }

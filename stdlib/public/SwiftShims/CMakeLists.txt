@@ -10,6 +10,7 @@ set(sources
   MetadataSections.h
   Random.h
   RefCount.h
+  Reflection.h
   RuntimeShims.h
   RuntimeStubs.h
   SwiftStdbool.h
@@ -21,39 +22,10 @@ set(sources
   UnicodeShims.h
   Visibility.h
   _SwiftConcurrency.h
+  _SwiftDistributed.h
 
-  CoreMediaOverlayShims.h
   DispatchOverlayShims.h
-  NetworkOverlayShims.h
-  OSOverlayShims.h
-  ObjectiveCOverlayShims.h
-  SafariServicesOverlayShims.h
-  AppKitOverlayShims.h
-  UIKitOverlayShims.h
   XCTestOverlayShims.h
-  XPCOverlayShims.h
-
-  CoreFoundationOverlayShims.h
-  CFCharacterSetShims.h
-  CFHashingShims.h
-
-  FoundationOverlayShims.h
-  FoundationShimSupport.h
-  NSCalendarShims.h
-  NSCharacterSetShims.h
-  NSCoderShims.h
-  NSDataShims.h
-  NSDictionaryShims.h
-  NSErrorShims.h
-  NSFileManagerShims.h
-  NSIndexPathShims.h
-  NSIndexSetShims.h
-  NSKeyedArchiverShims.h
-  NSLocaleShims.h
-  NSTimeZoneShims.h
-  NSUndoManagerShims.h
-
-  ClockKitOverlayShims.h
 
   module.modulemap
   )
@@ -110,7 +82,8 @@ endif()
 # First extract the "version" used for Clang's resource directory.
 string(REGEX MATCH "[0-9]+\\.[0-9]+(\\.[0-9]+)?" CLANG_VERSION
   "${LLVM_PACKAGE_VERSION}")
-if(NOT SWIFT_INCLUDE_TOOLS AND SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER)
+if(NOT SWIFT_INCLUDE_TOOLS AND
+   (SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER OR SWIFT_PREBUILT_CLANG))
   if(SWIFT_COMPILER_IS_MSVC_LIKE)
     execute_process(COMMAND ${CMAKE_C_COMPILER} /clang:-print-resource-dir
       OUTPUT_VARIABLE clang_headers_location
@@ -223,8 +196,8 @@ endif()
 # need to use a different version of the headers than the installed Clang. This
 # should be used in conjunction with clang-resource-dir-symlink.
 file(TO_CMAKE_PATH "${LLVM_LIBRARY_OUTPUT_INTDIR}"
-  _SWIFT_SHIMS_PATH_TO_CLANG_BUILD)
-swift_install_in_component(DIRECTORY "${_SWIFT_SHIMS_PATH_TO_CLANG_BUILD}/lib/clang"
+  _SWIFT_SHIMS_PATH_TO_CLANG_LIB_BUILD)
+swift_install_in_component(DIRECTORY "${_SWIFT_SHIMS_PATH_TO_CLANG_LIB_BUILD}/clang"
                            DESTINATION "lib"
                            COMPONENT clang-builtin-headers-in-clang-resource-dir
                            PATTERN "*.h")

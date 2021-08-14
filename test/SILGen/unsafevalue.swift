@@ -42,10 +42,12 @@ public struct UnsafeValue<Element: AnyObject> {
   // CHECK:   return [[RESULT]]
   // CHECK: } // end sil function '$s11unsafevalue11UnsafeValueV14unsafelyAssignACyxGxh_tcfC'
   //
-  // CANONICAL-LABEL: sil [transparent] [serialized] @$s11unsafevalue11UnsafeValueV14unsafelyAssignACyxGxh_tcfC : $@convention(method) <Element where Element : AnyObject> (@guaranteed Element, @thin UnsafeValue<Element>.Type) -> UnsafeValue<Element> {
+  // CANONICAL-LABEL: sil [transparent] @$s11unsafevalue11UnsafeValueV14unsafelyAssignACyxGxh_tcfC : $@convention(method) <Element where Element : AnyObject> (@guaranteed Element, @thin UnsafeValue<Element>.Type) -> UnsafeValue<Element> {
   // CANONICAL: bb0([[INPUT_ELEMENT:%.*]] : $Element,
   // CANONICAL-NEXT: debug_value
+  // CANONICAL-NEXT: strong_retain [[INPUT_ELEMENT]]
   // CANONICAL-NEXT: [[UNMANAGED_ELEMENT:%.*]] = ref_to_unmanaged [[INPUT_ELEMENT]]
+  // CANONICAL-NEXT: strong_release [[INPUT_ELEMENT]]
   // CANONICAL-NEXT: [[RESULT:%.*]] = struct $UnsafeValue<Element> ([[UNMANAGED_ELEMENT]] : $@sil_unmanaged Element)
   // CANONICAL-NEXT: return [[RESULT]]
   // CANONICAL: } // end sil function '$s11unsafevalue11UnsafeValueV14unsafelyAssignACyxGxh_tcfC'
@@ -82,7 +84,7 @@ public struct UnsafeValue<Element: AnyObject> {
   // CHECK:  destroy_value [[COPY_BOX]]
   // CHECK: } // end sil function '$s11unsafevalue11UnsafeValueV20withGuaranteeingBase4base_qd_0_qd___qd_0_xXEtr0_lF'
   //
-  // CANONICAL-LABEL: sil [transparent] [serialized] @$s11unsafevalue11UnsafeValueV20withGuaranteeingBase4base_qd_0_qd___qd_0_xXEtr0_lF :
+  // CANONICAL-LABEL: sil [transparent] @$s11unsafevalue11UnsafeValueV20withGuaranteeingBase4base_qd_0_qd___qd_0_xXEtr0_lF :
   // CANONICAL: bb0([[RESULT:%.*]] : $*Result, [[BASE:%.*]] : $*Base, [[CLOSURE:%.*]] : $@noescape @callee_guaranteed {{.*}}, [[UNSAFE_VALUE:%.*]] : $UnsafeValue<Element>):
   // CANONICAL:  [[UNMANAGED_VALUE:%.*]] = struct_extract [[UNSAFE_VALUE]]
   // CANONICAL:  [[UNOWNED_REF:%.*]] = unmanaged_to_ref [[UNMANAGED_VALUE]]

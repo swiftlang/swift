@@ -427,42 +427,34 @@ StringRef swift::matchLeadingTypeName(StringRef name,
   // ending of the type name.
   auto nameWords = camel_case::getWords(name);
   auto typeWords = camel_case::getWords(typeName.Name);
-  auto nameWordIter = nameWords.begin(),
-    nameWordIterEnd = nameWords.end();
-  auto typeWordRevIter = typeWords.rbegin(),
-    typeWordRevIterEnd = typeWords.rend();
+  auto nameWordIter = nameWords.begin();
+  auto typeWordRevIter = typeWords.rbegin();
 
   // Find the last instance of the first word in the name within
   // the words in the type name.
-  typeWordRevIter = std::find_if(typeWordRevIter, typeWordRevIterEnd,
-                                 [nameWordIter](StringRef word) {
-    return matchNameWordToTypeWord(*nameWordIter, word);
-  });
+  typeWordRevIter = std::find_if(
+      typeWordRevIter, typeWords.rend(), [nameWordIter](StringRef word) {
+        return matchNameWordToTypeWord(*nameWordIter, word);
+      });
 
   // If we didn't find the first word in the name at all, we're
   // done.
-  if (typeWordRevIter == typeWordRevIterEnd)
+  if (typeWordRevIter == typeWords.rend())
     return name;
 
   // Now, match from the first word up until the end of the type name.
-  auto typeWordIter = typeWordRevIter.base(),
-    typeWordIterEnd = typeWords.end();
-  ++nameWordIter;
-
-  // FIXME: Use std::mismatch once we update to C++14.
-  while (typeWordIter != typeWordIterEnd &&
-         nameWordIter != nameWordIterEnd &&
-         matchNameWordToTypeWord(*nameWordIter, *typeWordIter)) {
-    ++typeWordIter;
-    ++nameWordIter;
-  }
+  std::advance(nameWordIter, 1);
+  WordIterator typeMismatch = typeWords.end(), nameMismatch = nameWords.end();
+  std::tie(typeMismatch, nameMismatch) =
+      std::mismatch(typeWordRevIter.base(), typeWords.end(), nameWordIter,
+                    nameWords.end(), matchNameWordToTypeWord);
 
   // If we didn't reach the end of the type name, don't match.
-  if (typeWordIter != typeWordIterEnd)
+  if (typeMismatch != typeWords.end())
     return name;
 
   // Chop of the beginning of the name.
-  return nameWordIter.getRestOfStr();
+  return nameMismatch.getRestOfStr();
 }
 
 StringRef StringScratchSpace::copyString(StringRef string) {
@@ -1220,6 +1212,8 @@ bool swift::omitNeedlessWords(StringRef &baseName,
                               bool returnsSelf,
                               bool isProperty,
                               const InheritedNameSet *allPropertyNames,
+                              Optional<unsigned> completionHandlerIndex,
+                              Optional<StringRef> completionHandlerName,
                               StringScratchSpace &scratch) {
   bool anyChanges = false;
   OmissionTypeName resultType = returnsSelf ? contextType : givenResultType;
@@ -1287,10 +1281,52 @@ bool swift::omitNeedlessWords(StringRef &baseName,
     }
   }
 
+  // If the base name of a method imported as "async" starts with the word
+  // "get", drop the "get".
+  bool isAsync = completionHandlerIndex.hasValue();
+  if (isAsync && camel_case::getFirstWord(baseName) == "get" &&
+      baseName.size() > 3) {
+    baseName = baseName.substr(3);
+    anyChanges = true;
+  }
+
   // If needed, split the base name.
   if (!argNames.empty() &&
       splitBaseName(baseName, argNames[0], paramTypes[0], firstParamName))
     anyChanges = true;
+
+  // If this is an asynchronous function where the completion handler is
+  // the first parameter, strip off WithCompletion(Handler) from the base name.
+  if (isAsync && *completionHandlerIndex == 0) {
+    if (auto newBaseName = stripWithCompletionHandlerSuffix(baseName)) {
+      baseName = *newBaseName;
+      anyChanges = true;
+    }
+  }
+
+  // For a method imported as "async", drop the "Asynchronously" suffix from
+  // the base name. It is redundant with 'async'.
+  const StringRef asynchronously = "Asynchronously";
+  if (isAsync && camel_case::getLastWord(baseName) == asynchronously &&
+      baseName.size() > asynchronously.size()) {
+    baseName = baseName.drop_back(asynchronously.size());
+    anyChanges = true;
+  }
+
+  // If this is an asynchronous function where the completion handler is
+  // past the first parameter the corresponding name has some additional
+  // information prior to the completion-handled suffix, append that
+  // additional text to the base name.
+  if (isAsync && *completionHandlerIndex >= 1 && completionHandlerName) {
+    if (auto extraParamText = stripWithCompletionHandlerSuffix(
+            *completionHandlerName)) {
+      SmallString<32> newBaseName;
+      newBaseName += baseName;
+      appendSentenceCase(newBaseName, *extraParamText);
+      baseName = scratch.copyString(newBaseName);
+      anyChanges = true;
+    }
+  }
 
   // Omit needless words based on parameter types.
   for (unsigned i = 0, n = argNames.size(); i != n; ++i) {
@@ -1323,4 +1359,32 @@ bool swift::omitNeedlessWords(StringRef &baseName,
   }
 
   return lowercaseAcronymsForReturn();
+}
+
+Optional<StringRef> swift::stripWithCompletionHandlerSuffix(StringRef name) {
+  if (name.endswith("WithCompletionHandler")) {
+    return name.drop_back(strlen("WithCompletionHandler"));
+  }
+
+  if (name.endswith("WithCompletion")) {
+    return name.drop_back(strlen("WithCompletion"));
+  }
+
+  if (name.endswith("WithCompletionBlock")) {
+    return name.drop_back(strlen("WithCompletionBlock"));
+  }
+
+  if (name.endswith("WithBlock")) {
+    return name.drop_back(strlen("WithBlock"));
+  }
+
+  if (name.endswith("WithReplyTo")) {
+    return name.drop_back(strlen("WithReplyTo"));
+  }
+
+  if (name.endswith("WithReply")) {
+    return name.drop_back(strlen("WithReply"));
+  }
+
+  return None;
 }

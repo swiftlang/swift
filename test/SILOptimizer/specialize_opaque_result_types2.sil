@@ -1,0 +1,48 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -disable-availability-checking -primary-file %S/Inputs/specialize_opaque_result_types.swift -enable-library-evolution -module-name A -emit-sib -o %t/A.sib
+// RUN: %target-swift-frontend -emit-sil -primary-file %s -enable-library-evolution -O -module-name A %t/A.sib -o - | %FileCheck %s
+
+// REQUIRES: CPU=x86_64
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+typealias SomeButt = @_opaqueReturnTypeOf("$s1A19exportsOpaqueReturnQryF", 0) opaque
+
+sil @$foobar : $@convention(thin) () -> @out SomeButt   {
+bb0(%0 : $*Int):
+  %1 = integer_literal $Builtin.Int64, 0          // user: %2
+  %2 = struct $Int (%1 : $Builtin.Int64)          // user: %3
+  store %2 to %0 : $*Int                          // id: %3
+  %4 = tuple ()                                   // user: %5
+  return %4 : $()                                 // id: %5
+}
+
+sil @getGenericClosure_closure : $@convention(thin) <T> (@owned <τ_0_0> { var τ_0_0 } <T>) -> @out T
+
+sil [noinline] @getGenericClosure : $@convention(thin) <T> (@in T) -> @owned @callee_owned () -> @out T {
+bb0(%0 : $*T):
+  debug_value_addr %0 : $*T, let, name "t" // id: %1
+  %2 = function_ref @getGenericClosure_closure : $@convention(thin) <τ_0_0> (@owned <τ_0_0> { var τ_0_0 } <τ_0_0>) -> @out τ_0_0 // user: %5
+  %3 = alloc_box $<τ_0_0> { var τ_0_0 } <T>                               // users: %4, %5, %5
+  %3a = project_box %3 : $<τ_0_0> { var τ_0_0 } <T>, 0
+  copy_addr %0 to [initialization] %3a : $*T     // id: %4
+  %5 = partial_apply %2<T>(%3) : $@convention(thin) <τ_0_0> (@owned <τ_0_0> { var τ_0_0 } <τ_0_0>) -> @out τ_0_0 // user: %7
+  destroy_addr %0 : $*T                           // id: %6
+  return %5 : $@callee_owned () -> @out T       // id: %7
+}
+
+// CHECK-LABEL: sil shared [noinline] @$s17getGenericClosure1A19exportsOpaqueReturnQryFQOyQo__Tg5 : $@convention(thin) (Int) -> @owned @callee_owned () -> @out Int {
+// CHECK:  alloc_box $<τ_0_0> { var τ_0_0 } <Int>
+// CHECK: } // end sil function '$s17getGenericClosure1A19exportsOpaqueReturnQryFQOyQo__Tg5'
+
+sil [transparent] [serialized] @specializePartialApplies : $@convention(thin) (@in SomeButt) -> () {
+bb0(%0 : $*SomeButt):
+  %5 = function_ref @getGenericClosure : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @owned @callee_owned () -> @out τ_0_0
+  %8 = apply %5<SomeButt>(%0) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @owned @callee_owned () -> @out τ_0_0
+  %15 = tuple()
+  return %15 : $()
+}

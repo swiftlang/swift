@@ -1,0 +1,98 @@
+//===--- SIMDConcreteIntegers.swift.gyb -----------------------*- swift -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2021 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+// RUN: %empty-directory(%t)
+// RUN: %gyb -DCMAKE_SIZEOF_VOID_P=%target-ptrsize %s -o %t/SIMDConcreteIntegers.swift
+// RUN: %line-directive %t/SIMDConcreteIntegers.swift -- %target-build-swift %t/SIMDConcreteIntegers.swift -o %t/a.out
+// RUN: %target-codesign %t/a.out
+// RUN: %line-directive %t/SIMDConcreteIntegers.swift -- %target-run %t/a.out
+// REQUIRES: executable_test
+
+import StdlibUnittest
+
+%{
+from __future__ import division
+from SwiftIntTypes import all_integer_types
+word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
+storagescalarCounts = [2,4,8,16,32,64]
+vectorscalarCounts = storagescalarCounts + [3]
+}%
+
+func genericComparisons<T>(
+  _ a: T, _ b: T
+) -> (
+  eq: SIMDMask<T.MaskStorage>,
+  ne: SIMDMask<T.MaskStorage>,
+  lt: SIMDMask<T.MaskStorage>,
+  le: SIMDMask<T.MaskStorage>,
+  gt: SIMDMask<T.MaskStorage>,
+  ge: SIMDMask<T.MaskStorage>
+) where T: SIMD, T.Scalar: Comparable {(
+  eq: a .== b,
+  ne: a .!= b,
+  lt: a .<  b,
+  le: a .<= b,
+  gt: a .>  b,
+  ge: a .>= b
+)}
+
+func genericArithmetic<T>(
+  _ a: T, _ b: T
+) -> (
+  add: T, sub: T, mul: T
+) where T: SIMD, T.Scalar: FixedWidthInteger {(
+  add: a &+ b,
+  sub: a &- b,
+  mul: a &* b
+)}
+
+%for int in all_integer_types(word_bits):
+% Scalar = int.stdlib_name
+% for n in vectorscalarCounts:
+%  Vector = "SIMD" + str(n) + "<" + Scalar + ">"
+%  storageN = 4 if n == 3 else n
+%  s = "s" if int.is_signed else "u"
+%  Builtin = "Vec" + str(storageN) + "xInt" + str(int.bits)
+var ${Scalar}x${n}_TestSuite = TestSuite("${Scalar}x${n}")
+
+${Scalar}x${n}_TestSuite.test("comparisons") {
+  let a = ${Vector}.random(in: ${Scalar}.min ... .max)
+  expectTrue(all(a .== a))
+  expectFalse(any(a .!= a))
+  expectFalse(any(a .== a &+ ${Vector}(repeating: 1)))
+  expectTrue(all(a .!= a &+ ${Vector}(repeating: 1)))
+  
+  let b = a.replacing(
+    with: ${Vector}.random(in: ${Scalar}.min ... .max),
+    where: .random()
+  )
+  let (eq,ne,lt,le,gt,ge) = genericComparisons(a, b)
+  expectEqual(eq, a .== b)
+  expectEqual(ne, a .!= b)
+  expectEqual(lt, a .<  b)
+  expectEqual(le, a .<= b)
+  expectEqual(gt, a .>  b)
+  expectEqual(ge, a .>= b)
+}
+
+${Scalar}x${n}_TestSuite.test("arithmetic") {
+  let a = ${Vector}.random(in: ${Scalar}.min ... .max)
+  let b = ${Vector}.random(in: ${Scalar}.min ... .max)
+  let (add,sub,mul) = genericArithmetic(a, b)
+  expectEqual(add, a &+ b)
+  expectEqual(sub, a &- b)
+  expectEqual(mul, a &* b)
+}
+
+% end
+%end
+
+runAllTests()

@@ -315,7 +315,7 @@ visitDocComment(const DocComment *DC, TypeOrExtensionDecl SynthesizedTarget) {
 
   {
     // Print line and column number.
-    auto Loc = D->getLoc();
+    auto Loc = D->getLoc(/*SerializedOK=*/true);
     if (Loc.isValid()) {
       const auto &SM = D->getASTContext().SourceMgr;
       StringRef FileName = SM.getDisplayNameForLoc(Loc);
@@ -359,7 +359,8 @@ visitDocComment(const DocComment *DC, TypeOrExtensionDecl SynthesizedTarget) {
   }
 
   {
-    PrintOptions PO = PrintOptions::printInterface();
+    PrintOptions PO = PrintOptions::printInterface(
+        D->getASTContext().TypeCheckerOpts.PrintFullConvention);
     PO.PrintAccess = false;
     PO.AccessFilter = AccessLevel::Private;
     PO.PrintDocumentationComments = false;

@@ -1,4 +1,7 @@
 Name: ImportAsMember
+Classes:
+- Name: IAMPrivateChild
+  SwiftName: IAMPrivateParent.Child
 Globals:
 - Name: IAMStruct1APINoteVar
   SwiftName: Struct1.newApiNoteVar

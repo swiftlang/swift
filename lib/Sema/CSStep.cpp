@@ -16,7 +16,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "CSStep.h"
+#include "TypeChecker.h"
 #include "swift/AST/Types.h"
+#include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
@@ -125,7 +128,7 @@ void SplitterStep::computeFollowupSteps(
     unsigned solutionIndex = components[i].solutionIndex;
 
     // If there are no dependencies, build a normal component step.
-    if (components[i].dependsOn.empty()) {
+    if (components[i].getDependencies().empty()) {
       steps.push_back(std::make_unique<ComponentStep>(
           CS, solutionIndex, &Components[i], std::move(components[i]),
           PartialSolutions[solutionIndex]));
@@ -135,7 +138,7 @@ void SplitterStep::computeFollowupSteps(
     // Note that the partial results from any dependencies of this component
     // need not be included in the final merged results, because they'll
     // already be part of the partial results for this component.
-    for (auto dependsOn : components[i].dependsOn) {
+    for (auto dependsOn : components[i].getDependencies()) {
       IncludeInMergedResults[dependsOn] = false;
     }
 
@@ -265,13 +268,13 @@ StepResult DependentComponentSplitterStep::take(bool prevFailed) {
 
   // Figure out the sets of partial solutions that this component depends on.
   SmallVector<const SmallVector<Solution, 4> *, 2> dependsOnSets;
-  for (auto index : Component.dependsOn) {
+  for (auto index : Component.getDependencies()) {
     dependsOnSets.push_back(&AllPartialSolutions[index]);
   }
 
   // Produce all combinations of partial solutions for the inputs.
   SmallVector<std::unique_ptr<SolverStep>, 4> followup;
-  SmallVector<unsigned, 2> indices(Component.dependsOn.size(), 0);
+  SmallVector<unsigned, 2> indices(Component.getDependencies().size(), 0);
   auto dependsOnSetsRef = llvm::makeArrayRef(dependsOnSets);
   do {
     // Form the set of input partial solutions.
@@ -279,11 +282,11 @@ StepResult DependentComponentSplitterStep::take(bool prevFailed) {
     for (auto index : swift::indices(indices)) {
       dependsOnSolutions.push_back(&(*dependsOnSets[index])[indices[index]]);
     }
+    ContextualSolutions.push_back(std::make_unique<SmallVector<Solution, 2>>());
 
-    followup.push_back(
-        std::make_unique<ComponentStep>(CS, Index, Constraints, Component,
-                                         std::move(dependsOnSolutions),
-                                         Solutions));
+    followup.push_back(std::make_unique<ComponentStep>(
+        CS, Index, Constraints, Component, std::move(dependsOnSolutions),
+        *ContextualSolutions.back()));
   } while (nextCombination(dependsOnSetsRef, indices));
 
   /// Wait until all of the component steps are done.
@@ -291,13 +294,18 @@ StepResult DependentComponentSplitterStep::take(bool prevFailed) {
 }
 
 StepResult DependentComponentSplitterStep::resume(bool prevFailed) {
+  for (auto &ComponentStepSolutions : ContextualSolutions) {
+    Solutions.append(std::make_move_iterator(ComponentStepSolutions->begin()),
+                     std::make_move_iterator(ComponentStepSolutions->end()));
+  }
   return done(/*isSuccess=*/!Solutions.empty());
 }
 
 void DependentComponentSplitterStep::print(llvm::raw_ostream &Out) {
   Out << "DependentComponentSplitterStep for dependencies on [";
-  interleave(Component.dependsOn, [&](unsigned index) { Out << index; },
-             [&] { Out << ", "; });
+  interleave(
+      Component.getDependencies(), [&](unsigned index) { Out << index; },
+      [&] { Out << ", "; });
   Out << "]\n";
 }
 
@@ -341,7 +349,7 @@ StepResult ComponentStep::take(bool prevFailed) {
       (!disjunction || bestBindings->favoredOverDisjunction(disjunction))) {
     // Produce a type variable step.
     return suspend(
-        std::make_unique<TypeVariableStep>(CS, *bestBindings, Solutions));
+        std::make_unique<TypeVariableStep>(*bestBindings, Solutions));
   } else if (disjunction) {
     // Produce a disjunction step.
     return suspend(
@@ -354,22 +362,36 @@ StepResult ComponentStep::take(bool prevFailed) {
     return finalize(/*isSuccess=*/false);
   }
 
+  auto printConstraints = [&](const ConstraintList &constraints) {
+    for (auto &constraint : constraints)
+      constraint.print(getDebugLogger(), &CS.getASTContext().SourceMgr);
+  };
+
   // If we don't have any disjunction or type variable choices left, we're done
   // solving. Make sure we don't have any unsolved constraints left over, using
-  // report_fatal_error to make sure we trap in release builds instead of
-  // potentially miscompiling.
+  // report_fatal_error to make sure we trap in debug builds and fail the step
+  // in release builds.
   if (!CS.ActiveConstraints.empty()) {
-    CS.print(llvm::errs());
-    llvm::report_fatal_error("Active constraints left over?");
+    if (CS.isDebugMode()) {
+      getDebugLogger() << "(failed due to remaining active constraints:\n";
+      printConstraints(CS.ActiveConstraints);
+      getDebugLogger() << ")\n";
+    }
+
+    CS.InvalidState = true;
+    return finalize(/*isSuccess=*/false);
   }
+
   if (!CS.solverState->allowsFreeTypeVariables()) {
     if (!CS.InactiveConstraints.empty()) {
-      CS.print(llvm::errs());
-      llvm::report_fatal_error("Inactive constraints left over?");
-    }
-    if (CS.hasFreeTypeVariables()) {
-      CS.print(llvm::errs());
-      llvm::report_fatal_error("Free type variables left over?");
+      if (CS.isDebugMode()) {
+        getDebugLogger() << "(failed due to remaining inactive constraints:\n";
+        printConstraints(CS.InactiveConstraints);
+        getDebugLogger() << ")\n";
+      }
+
+      CS.InvalidState = true;
+      return finalize(/*isSuccess=*/false);
     }
   }
 
@@ -445,13 +467,15 @@ void TypeVariableStep::setup() {
     PO.PrintTypesForDebugging = true;
     auto &log = getDebugLogger();
 
+    auto initialBindings = Producer.getCurrentBindings();
     log << "Initial bindings: ";
-    interleave(InitialBindings.begin(), InitialBindings.end(),
-               [&](const Binding &binding) {
-                 log << TypeVar->getString(PO)
-                     << " := " << binding.BindingType->getString(PO);
-               },
-               [&log] { log << ", "; });
+    interleave(
+        initialBindings.begin(), initialBindings.end(),
+        [&](const Binding &binding) {
+          log << TypeVar->getString(PO)
+              << " := " << binding.BindingType->getString(PO);
+        },
+        [&log] { log << ", "; });
 
     log << '\n';
   }
@@ -504,8 +528,15 @@ StepResult DisjunctionStep::resume(bool prevFailed) {
     auto score = getBestScore(Solutions);
 
     if (!choice.isGenericOperator() && choice.isSymmetricOperator()) {
-      if (!BestNonGenericScore || score < BestNonGenericScore)
+      if (!BestNonGenericScore || score < BestNonGenericScore) {
         BestNonGenericScore = score;
+        if (shouldSkipGenericOperators()) {
+          // The disjunction choice producer shouldn't do the work
+          // to partition the generic operator choices if generic
+          // operators are going to be skipped.
+          Producer.setNeedsGenericOperatorOrdering(false);
+        }
+      }
     }
 
     AnySolved = true;
@@ -524,28 +555,103 @@ StepResult DisjunctionStep::resume(bool prevFailed) {
   return take(prevFailed);
 }
 
+bool IsDeclRefinementOfRequest::evaluate(Evaluator &evaluator,
+                                         ValueDecl *declA,
+                                         ValueDecl *declB) const {
+  auto *typeA = declA->getInterfaceType()->getAs<GenericFunctionType>();
+  auto *typeB = declB->getInterfaceType()->getAs<GenericFunctionType>();
+
+  if (!typeA || !typeB)
+    return false;
+
+  auto genericSignatureA = typeA->getGenericSignature();
+  auto genericSignatureB = typeB->getGenericSignature();
+
+  // Substitute generic parameters with their archetypes in each generic function.
+  Type substTypeA = typeA->substGenericArgs(
+      genericSignatureA.getGenericEnvironment()->getForwardingSubstitutionMap());
+  Type substTypeB = typeB->substGenericArgs(
+      genericSignatureB.getGenericEnvironment()->getForwardingSubstitutionMap());
+
+  // Attempt to substitute archetypes from the second type with archetypes in the
+  // same structural position in the first type.
+  TypeSubstitutionMap substMap;
+  substTypeB = substTypeB->substituteBindingsTo(substTypeA,
+      [&](ArchetypeType *origType, CanType substType,
+          ArchetypeType *, ArrayRef<ProtocolConformanceRef>) -> CanType {
+    auto interfaceTy =
+        origType->getInterfaceType()->getCanonicalType()->getAs<SubstitutableType>();
+
+    // Make sure any duplicate bindings are equal to the one already recorded.
+    // Otherwise, the substitution has conflicting generic arguments.
+    auto bound = substMap.find(interfaceTy);
+    if (bound != substMap.end() && !bound->second->isEqual(substType))
+      return CanType();
+
+    substMap[interfaceTy] = substType;
+    return substType;
+  });
+
+  if (!substTypeB)
+    return false;
+
+  auto result = TypeChecker::checkGenericArguments(
+      declA->getDeclContext()->getParentModule(),
+      genericSignatureB.getRequirements(),
+      QueryTypeSubstitutionMap{ substMap });
+
+  if (result != RequirementCheckResult::Success)
+    return false;
+
+  return substTypeA->isEqual(substTypeB);
+}
+
+bool TypeChecker::isDeclRefinementOf(ValueDecl *declA, ValueDecl *declB) {
+  return evaluateOrDefault(declA->getASTContext().evaluator,
+                           IsDeclRefinementOfRequest{ declA, declB },
+                           false);
+}
+
 bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
   auto &ctx = CS.getASTContext();
 
-  bool attemptFixes = CS.shouldAttemptFixes();
-  // Enable all disabled choices in "diagnostic" mode.
-  if (!attemptFixes && choice.isDisabled()) {
+  auto skip = [&](std::string reason) -> bool {
     if (CS.isDebugMode()) {
       auto &log = getDebugLogger();
-      log << "(skipping ";
+      log << "(skipping " + reason + " ";
       choice.print(log, &ctx.SourceMgr);
       log << '\n';
     }
 
     return true;
-  }
+  };
 
-  // Skip unavailable overloads unless solver is in the "diagnostic" mode.
-  if (!attemptFixes && choice.isUnavailable())
-    return true;
+
+  // Skip disabled overloads in the diagnostic mode if they do not have a
+  // fix attached to them e.g. overloads where labels didn't match up.
+  if (choice.isDisabled())
+    return skip("disabled");
+
+  // Skip unavailable overloads (unless in dignostic mode).
+  if (choice.isUnavailable() && !CS.shouldAttemptFixes())
+    return skip("unavailable");
 
   if (ctx.TypeCheckerOpts.DisableConstraintSolverPerformanceHacks)
     return false;
+
+  // If the solver already found a solution with a better overload choice that
+  // can be unconditionally substituted by the current choice, skip the current
+  // choice.
+  if (LastSolvedChoice && LastSolvedChoice->second == getCurrentScore() &&
+      choice.isGenericOperator()) {
+    auto *declA = LastSolvedChoice->first->getOverloadChoice().getDecl();
+    auto *declB = static_cast<Constraint *>(choice)->getOverloadChoice().getDecl();
+
+    if (declA->getBaseIdentifier().isArithmeticOperator() &&
+        TypeChecker::isDeclRefinementOf(declA, declB)) {
+      return skip("subtype");
+    }
+  }
 
   // Don't attempt to solve for generic operators if we already have
   // a non-generic solution.
@@ -557,14 +663,16 @@ bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
   //        solution.
   if (BestNonGenericScore && choice.isGenericOperator()) {
     auto &score = BestNonGenericScore->Data;
-    // Let's skip generic overload choices only in case if
-    // non-generic score indicates that there were no forced
-    // unwrappings of optional(s), no unavailable overload
-    // choices present in the solution, no fixes required,
-    // and there are no non-trivial function conversions.
-    if (score[SK_ForceUnchecked] == 0 && score[SK_Unavailable] == 0 &&
-        score[SK_Fix] == 0 && score[SK_FunctionConversion] == 0)
-      return true;
+
+    // Not all of the unary operators have `CGFloat` overloads,
+    // so in order to preserve previous behavior (and overall
+    // best solution) with implicit Double<->CGFloat conversion
+    // we need to allow attempting generic operators for such cases.
+    if (score[SK_ImplicitValueConversion] > 0 && choice.isUnaryOperator())
+      return false;
+
+    if (shouldSkipGenericOperators())
+      return skip("generic");
   }
 
   return false;
@@ -578,13 +686,15 @@ bool DisjunctionStep::shouldStopAt(const DisjunctionChoice &choice) const {
   auto delta = LastSolvedChoice->second - getCurrentScore();
   bool hasUnavailableOverloads = delta.Data[SK_Unavailable] > 0;
   bool hasFixes = delta.Data[SK_Fix] > 0;
+  bool hasAsyncMismatch = delta.Data[SK_AsyncInSyncMismatch] > 0;
   auto isBeginningOfPartition = choice.isBeginningOfPartition();
 
   // Attempt to short-circuit evaluation of this disjunction only
-  // if the disjunction choice we are comparing to did not involve
-  // selecting unavailable overloads or result in fixes being
-  // applied to reach a solution.
-  return !hasUnavailableOverloads && !hasFixes &&
+  // if the disjunction choice we are comparing to did not involve:
+  //   1. selecting unavailable overloads
+  //   2. result in fixes being applied to reach a solution
+  //   3. selecting an overload that results in an async/sync mismatch
+  return !hasUnavailableOverloads && !hasFixes && !hasAsyncMismatch &&
          (isBeginningOfPartition ||
           shortCircuitDisjunctionAt(choice, lastChoice));
 }
@@ -614,21 +724,6 @@ bool DisjunctionStep::shortCircuitDisjunctionAt(
     Constraint *currentChoice, Constraint *lastSuccessfulChoice) const {
   auto &ctx = CS.getASTContext();
 
-  // If the successfully applied constraint is favored, we'll consider that to
-  // be the "best".
-  if (lastSuccessfulChoice->isFavored() && !currentChoice->isFavored()) {
-#if !defined(NDEBUG)
-    if (lastSuccessfulChoice->getKind() == ConstraintKind::BindOverload) {
-      auto overloadChoice = lastSuccessfulChoice->getOverloadChoice();
-      assert((!overloadChoice.isDecl() ||
-              !overloadChoice.getDecl()->getAttrs().isUnavailable(ctx)) &&
-             "Unavailable decl should not be favored!");
-    }
-#endif
-
-    return true;
-  }
-
   // Anything without a fix is better than anything with a fix.
   if (currentChoice->getFix() && !lastSuccessfulChoice->getFix())
     return true;
@@ -654,16 +749,6 @@ bool DisjunctionStep::shortCircuitDisjunctionAt(
   // Implicit conversions are better than checked casts.
   if (currentChoice->getKind() == ConstraintKind::CheckedCast)
     return true;
-
-  // If we have a SIMD operator, and the prior choice was not a SIMD
-  // Operator, we're done.
-  if (currentChoice->getKind() == ConstraintKind::BindOverload &&
-      isSIMDOperator(currentChoice->getOverloadChoice().getDecl()) &&
-      lastSuccessfulChoice->getKind() == ConstraintKind::BindOverload &&
-      !isSIMDOperator(lastSuccessfulChoice->getOverloadChoice().getDecl()) &&
-      !ctx.TypeCheckerOpts.SolverEnableOperatorDesignatedTypes) {
-    return true;
-  }
 
   return false;
 }

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-parser-lookup
+// RUN: %target-typecheck-verify-swift
 
 var func6 : (_ fn : (Int,Int) -> Int) -> ()
 var func6a : ((Int, Int) -> Int) -> ()
@@ -119,7 +119,6 @@ assert(f0(1) == 1)
 var selfRef = { selfRef() }
 // expected-note@-1 2{{through reference here}}
 // expected-error@-2 {{circular reference}}
-// expected-error@-3 {{unable to infer closure type in the current context}}
 
 var nestedSelfRef = {
   var recursive = { nestedSelfRef() }
@@ -152,6 +151,7 @@ func anonymousClosureArgsInClosureWithArgs() {
 
 func doStuff(_ fn : @escaping () -> Int) {}
 func doVoidStuff(_ fn : @escaping () -> ()) {}
+func doVoidStuffNonEscaping(_ fn: () -> ()) {}
 
 // <rdar://problem/16193162> Require specifying self for locations in code where strong reference cycles are likely
 class ExplicitSelfRequiredTest {
@@ -403,7 +403,7 @@ Void(0) // expected-error{{argument passed to call that takes no arguments}}
 _ = {0}
 
 // <rdar://problem/22086634> "multi-statement closures require an explicit return type" should be an error not a note
-let samples = {   // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{16-16= () -> <#Result#> in }}
+let samples = {   // expected-error {{cannot infer return type for closure with multiple statements; add explicit type to disambiguate}} {{16-16= () -> <#Result#> in }}
           if (i > 10) { return true }
           else { return false }
         }()
@@ -485,7 +485,7 @@ func lvalueCapture<T>(c: GenericClass<T>) {
 }
 
 // Don't expose @lvalue-ness in diagnostics.
-let closure = { // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{16-16= () -> <#Result#> in }}
+let closure = { // expected-error {{cannot infer return type for closure with multiple statements; add explicit type to disambiguate}} {{16-16= () -> <#Result#> in }}
   var helper = true
   return helper
 }
@@ -528,4 +528,169 @@ class SR3186 {
     let v = sr3186 { f in { [unowned self, f] x in x != 1000 ? f(x + 1) : "success" } }(0)
     print("\(v)")
   }
+}
+
+// Apply the explicit 'self' rule even if it referrs to a capture, if
+// we're inside a nested closure
+class SR14120 {
+  func operation() {}
+
+  func test1() {
+    doVoidStuff { [self] in
+      operation()
+    }
+  }
+
+  func test2() {
+    doVoidStuff { [self] in
+      doVoidStuff {
+        // expected-error@+3 {{call to method 'operation' in closure requires explicit use of 'self'}}
+        // expected-note@-2 {{capture 'self' explicitly to enable implicit 'self' in this closure}}
+        // expected-note@+1 {{reference 'self.' explicitly}}
+        operation()
+      }
+    }
+  }
+
+  func test3() {
+    doVoidStuff { [self] in
+      doVoidStuff { [self] in
+        operation()
+      }
+    }
+  }
+
+  func test4() {
+    doVoidStuff { [self] in
+      doVoidStuff {
+        self.operation()
+      }
+    }
+  }
+
+  func test5() {
+    doVoidStuff { [self] in
+      doVoidStuffNonEscaping {
+        operation()
+      }
+    }
+  }
+
+  func test6() {
+    doVoidStuff { [self] in
+      doVoidStuff { [self] in
+        doVoidStuff {
+          // expected-error@+3 {{call to method 'operation' in closure requires explicit use of 'self'}}
+          // expected-note@-2 {{capture 'self' explicitly to enable implicit 'self' in this closure}}
+          // expected-note@+1 {{reference 'self.' explicitly}}
+          operation()
+        }
+      }
+    }
+  }
+}
+
+// SR-14678
+func call<T>(_ : Int, _ f: () -> (T, Int)) -> (T, Int) {
+  f()
+}
+
+func testSR14678() -> (Int, Int) {
+  call(1) { // expected-error {{cannot convert return expression of type '((), Int)' to return type '(Int, Int)'}}
+     (print("hello"), 0)
+  }
+}
+
+func testSR14678_Optional() -> (Int, Int)? {
+  call(1) { // expected-error {{cannot convert return expression of type '((), Int)' to return type '(Int, Int)'}}
+     (print("hello"), 0)
+  }
+}
+
+// SR-13239
+func callit<T>(_ f: () -> T) -> T {
+  f()
+}
+
+func callitArgs<T>(_ : Int, _ f: () -> T) -> T {
+  f()
+}
+
+func callitArgsFn<T>(_ : Int, _ f: () -> () -> T) -> T {
+  f()()
+}
+
+func callitGenericArg<T>(_ a: T, _ f: () -> T) -> T { 
+  f()
+}
+
+func callitTuple<T>(_ : Int, _ f: () -> (T, Int)) -> T {
+  f().0
+}
+
+func callitVariadic<T>(_ fs: () -> T...) -> T {
+  fs.first!()
+}
+
+func testSR13239_Tuple() -> Int {
+  // expected-error@+2{{conflicting arguments to generic parameter 'T' ('()' vs. 'Int')}}
+  // expected-note@+1:3{{generic parameter 'T' inferred as 'Int' from context}}
+  callitTuple(1) { // expected-note@:18{{generic parameter 'T' inferred as '()' from closure return expression}}
+    (print("hello"), 0) 
+  }
+}
+
+func testSR13239() -> Int {
+  // expected-error@+2{{conflicting arguments to generic parameter 'T' ('()' vs. 'Int')}}
+  // expected-note@+1:3{{generic parameter 'T' inferred as 'Int' from context}}
+  callit { // expected-note@:10{{generic parameter 'T' inferred as '()' from closure return expression}}
+    print("hello")
+  }
+}
+
+func testSR13239_Args() -> Int {
+  // expected-error@+2{{conflicting arguments to generic parameter 'T' ('()' vs. 'Int')}}
+  // expected-note@+1:3{{generic parameter 'T' inferred as 'Int' from context}}
+  callitArgs(1) { // expected-note@:17{{generic parameter 'T' inferred as '()' from closure return expression}}
+    print("hello") 
+  }
+}
+
+func testSR13239_ArgsFn() -> Int {
+  // expected-error@+2{{conflicting arguments to generic parameter 'T' ('()' vs. 'Int')}}
+  // expected-note@+1:3{{generic parameter 'T' inferred as 'Int' from context}}
+  callitArgsFn(1) { // expected-note@:19{{generic parameter 'T' inferred as '()' from closure return expression}}
+    { print("hello") } 
+  }
+}
+
+func testSR13239MultiExpr() -> Int {
+  callit {
+    print("hello") 
+    return print("hello") // expected-error {{cannot convert return expression of type '()' to return type 'Int'}}
+  }
+}
+
+func testSR13239_GenericArg() -> Int {
+  // Generic argument is inferred as Int from first argument literal, so no conflict in this case.
+  callitGenericArg(1) {
+    print("hello") // expected-error {{cannot convert value of type '()' to closure result type 'Int'}}
+  }
+}
+
+func testSR13239_Variadic() -> Int {
+  // expected-error@+2{{conflicting arguments to generic parameter 'T' ('()' vs. 'Int')}}
+  // expected-note@+1:3{{generic parameter 'T' inferred as 'Int' from context}}
+  callitVariadic({ // expected-note@:18{{generic parameter 'T' inferred as '()' from closure return expression}}
+    print("hello")
+  })
+}
+
+func testSR13239_Variadic_Twos() -> Int {
+  // expected-error@+1{{cannot convert return expression of type '()' to return type 'Int'}}
+  callitVariadic({
+    print("hello")
+  }, {
+    print("hello")
+  })
 }

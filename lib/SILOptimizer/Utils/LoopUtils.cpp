@@ -32,7 +32,7 @@ static SILBasicBlock *createInitialPreheader(SILBasicBlock *Header) {
   llvm::SmallVector<SILValue, 8> Args;
   for (auto *HeaderArg : Header->getArguments()) {
     Args.push_back(Preheader->createPhiArgument(HeaderArg->getType(),
-                                                ValueOwnershipKind::Owned));
+                                                OwnershipKind::Owned));
   }
 
   // Create the branch to the header.
@@ -127,8 +127,8 @@ static SILBasicBlock *insertBackedgeBlock(SILLoop *L, DominanceInfo *DT,
   // the backedge block which correspond to any PHI nodes in the header block.
   SmallVector<SILValue, 6> BBArgs;
   for (auto *BBArg : Header->getArguments()) {
-    BBArgs.push_back(BEBlock->createPhiArgument(BBArg->getType(),
-                                                ValueOwnershipKind::Owned));
+    BBArgs.push_back(
+        BEBlock->createPhiArgument(BBArg->getType(), OwnershipKind::Owned));
   }
 
   // Arbitrarily pick one of the predecessor's branch locations.
@@ -169,61 +169,6 @@ static SILBasicBlock *insertBackedgeBlock(SILLoop *L, DominanceInfo *DT,
   return BEBlock;
 }
 
-/// Canonicalize loop exit blocks so that they only have predecessors inside the
-/// loop.
-static bool canonicalizeLoopExitBlocks(SILLoop *L, DominanceInfo *DT,
-                                       SILLoopInfo *LI) {
-  assert(L && "We assume that L is not null");
-
-  bool Changed = false;
-  SmallVector<SILBasicBlock *, 8> ExitingBlocks;
-  L->getExitingBlocks(ExitingBlocks);
-
-  for (auto *ExitingBlock : ExitingBlocks) {
-    for (unsigned i : indices(ExitingBlock->getSuccessors())) {
-      // We have to look up our exiting blocks each time around the loop since
-      // if we split a critical edge, the exiting block will have a new
-      // terminator implying a new successor list. The new non-critical edge
-      // though will be placed at the same spot in the new terminator where the
-      // critical edge was in the old terminator. Thus as long as we use
-      // indices, we will visit all exiting block edges appropriately and not
-      // deal with touching stale memory.
-      auto Succs = ExitingBlock->getSuccessors();
-      auto *SuccBB = Succs[i].getBB();
-
-      // Add only exit block successors by skipping blocks in the loop.
-      if (LI->getLoopFor(SuccBB) == L)
-        continue;
-
-// This is unfortunate but necessary since splitCriticalEdge may change IDs.
-#ifndef NDEBUG
-      llvm::SmallString<5> OldExitingBlockName;
-      LLVM_DEBUG({
-        llvm::raw_svector_ostream buffer(OldExitingBlockName);
-        ExitingBlock->printAsOperand(buffer);
-      });
-      llvm::SmallString<5> OldSuccBBName;
-      LLVM_DEBUG({
-        llvm::raw_svector_ostream buffer(OldSuccBBName);
-        SuccBB->printAsOperand(buffer);
-      });
-#endif
-
-      // Split any critical edges in between exiting block and succ iter.
-      if (splitCriticalEdge(ExitingBlock->getTerminator(), i, DT, LI)) {
-        LLVM_DEBUG(llvm::dbgs() << "Split critical edge from "
-                                << OldExitingBlockName << " NewID: ";
-                   ExitingBlock->printAsOperand(llvm::dbgs());
-                   llvm::dbgs() << " -> OldID: " << OldSuccBBName << " NewID: ";
-                   SuccBB->printAsOperand(llvm::dbgs()); llvm::dbgs() << "\n");
-        Changed = true;
-      }
-    }
-  }
-
-  return Changed;
-}
-
 /// Canonicalize the loop for rotation and downstream passes.
 ///
 /// Create a single preheader and single latch block.
@@ -232,14 +177,12 @@ static bool canonicalizeLoopExitBlocks(SILLoop *L, DominanceInfo *DT,
 /// them before merging the latch. See LLVM's separateNestedLoop.
 bool swift::canonicalizeLoop(SILLoop *L, DominanceInfo *DT, SILLoopInfo *LI) {
   bool ChangedCFG = false;
+
   if (!L->getLoopPreheader()) {
     insertPreheader(L, DT, LI);
     assert(L->getLoopPreheader() && "L should have a pre-header now");
     ChangedCFG = true;
   }
-
-  ChangedCFG |= canonicalizeLoopExitBlocks(L, DT, LI);
-
   if (!L->getLoopLatch())
     ChangedCFG |= (insertBackedgeBlock(L, DT, LI) != nullptr);
 
@@ -251,7 +194,7 @@ bool swift::canonicalizeAllLoops(DominanceInfo *DT, SILLoopInfo *LI) {
   bool MadeChange = false;
   llvm::SmallVector<std::pair<SILLoop *, bool>, 16> Worklist;
   for (auto *L : LI->getTopLevelLoops())
-    Worklist.push_back({L, L->empty()});
+    Worklist.push_back({L, L->isInnermost()});
 
   while (Worklist.size()) {
     SILLoop *L;
@@ -261,7 +204,7 @@ bool swift::canonicalizeAllLoops(DominanceInfo *DT, SILLoopInfo *LI) {
     if (!VisitedAlready) {
       Worklist.push_back({L, true});
       for (auto *Subloop : L->getSubLoopRange()) {
-        Worklist.push_back({Subloop, Subloop->empty()});
+        Worklist.push_back({Subloop, Subloop->isInnermost()});
       }
       continue;
     }
@@ -282,7 +225,7 @@ void SILLoopVisitor::run() {
   // worklist.
   llvm::SmallVector<std::pair<SILLoop *, bool>, 32> Worklist;
   for (auto *L : LI->getTopLevelLoops()) {
-    Worklist.push_back({L, L->empty()});
+    Worklist.push_back({L, L->isInnermost()});
   }
 
   while (Worklist.size()) {
@@ -293,7 +236,7 @@ void SILLoopVisitor::run() {
     if (!Visited) {
       Worklist.push_back({L, true});
       for (auto *SubLoop : L->getSubLoops()) {
-        Worklist.push_back({SubLoop, SubLoop->empty()});
+        Worklist.push_back({SubLoop, SubLoop->isInnermost()});
       }
       continue;
     }

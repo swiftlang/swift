@@ -7,8 +7,8 @@ import _Differentiation
 
 // - MARK: DiagnoseInvalidEscapingCaptures
 
-func nonEscapingUseOfDifferentiableFunction(_ f: @differentiable (Float) -> Float) {}
-func testDiagnoseInvalidEscapingCaptures(_ f: @differentiable (Float) -> Float) {
+func nonEscapingUseOfDifferentiableFunction(_ f: @differentiable(reverse) (Float) -> Float) {}
+func testDiagnoseInvalidEscapingCaptures(_ f: @differentiable(reverse) (Float) -> Float) {
   // Should not be diagnosed as invalid escaping capture.
   nonEscapingUseOfDifferentiableFunction { f($0) }
 }

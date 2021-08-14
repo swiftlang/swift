@@ -73,7 +73,7 @@ highlighting the parts that you think are important.
 Remember that the [Swift Code of Conduct][] applies whenever you are
 participating in the Swift project.
 
-[Swift Code of Conduct]: https://swift.org/community/#code-of-conduct
+[Swift Code of Conduct]: https://swift.org/code-of-conduct/
 
 ### I didn't get a response from someone. What should I do?
 
@@ -124,7 +124,7 @@ If you had an active discussion with someone on how to implement your change,
 you can `@` mention them in the PR description and ask for code review.
 If you directly implemented the change without any guidance from anyone else,
 `@` mention someone from GitHub's suggested reviewers. If GitHub doesn't
-make any suggestions, ask the [Code Owner](/CODE_OWNERS.txt) based on the
+make any suggestions, ask the [Code Owner](https://github.com/apple/swift/blob/main/CODE_OWNERS.TXT) based on the
 component for your change. Please ask someone though! We don't want you to get
 stuck because you were not sure who to ask for code review.
 

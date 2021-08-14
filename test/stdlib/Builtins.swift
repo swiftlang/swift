@@ -165,7 +165,7 @@ tests.test("array value witnesses") {
   expectEqual(NoisyLifeCount, NoisyDeathCount)
 }
 
-protocol Classy : class {}
+protocol Classy : AnyObject {}
 class A : Classy {}
 class B : A {}
 class C : B {}

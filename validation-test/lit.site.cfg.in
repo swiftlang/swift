@@ -29,12 +29,16 @@ config.variant_sdk = "@VARIANT_SDK@"
 config.swift_test_results_dir = \
     lit_config.params.get("swift_test_results_dir", "@SWIFT_TEST_RESULTS_DIR@")
 
+config.swift_driver_test_options = "@SWIFT_DRIVER_TEST_OPTIONS@"
+config.swift_frontend_test_options = "@SWIFT_FRONTEND_TEST_OPTIONS@"
+
 # --- Darwin Configuration ---
 config.darwin_xcrun_toolchain = "@SWIFT_DARWIN_XCRUN_TOOLCHAIN@"
 
 # --- Android Configuration ---
 config.android_ndk_path = "@SWIFT_ANDROID_NDK_PATH@"
 config.android_ndk_gcc_version = "@SWIFT_ANDROID_NDK_GCC_VERSION@"
+config.android_api_level = "@SWIFT_ANDROID_API_LEVEL@"
 
 # --- Windows MSVC Configuration ---
 config.swift_stdlib_msvc_runtime = None
@@ -52,6 +56,7 @@ else:
 config.coverage_mode = "@SWIFT_ANALYZE_CODE_COVERAGE@"
 config.lldb_build_root = "@LLDB_BUILD_DIR@"
 config.libdispatch_build_path = "@SWIFT_PATH_TO_LIBDISPATCH_BUILD@"
+config.libdispatch_static_build_path = "@SWIFT_PATH_TO_LIBDISPATCH_STATIC_BUILD@"
 
 if "@SWIFT_ASAN_BUILD@" == "TRUE":
     config.available_features.add("asan")

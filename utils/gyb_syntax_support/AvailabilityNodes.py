@@ -70,7 +70,7 @@ AVAILABILITY_NODES = [
                    restricted or 'swift' if the availability should be
                    restricted based on a Swift version.
                    '''),
-             Child('Version', kind='VersionTuple'),
+             Child('Version', kind='VersionTuple', is_optional=True),
          ]),
 
     # version-tuple -> integer-literal

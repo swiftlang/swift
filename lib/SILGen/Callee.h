@@ -13,7 +13,9 @@
 #ifndef SWIFT_SILGEN_CALLEE_H
 #define SWIFT_SILGEN_CALLEE_H
 
+#include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
+#include "swift/AST/ForeignInfo.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/AbstractionPattern.h"
 
@@ -22,11 +24,11 @@ namespace Lowering {
 
 class CalleeTypeInfo {
 public:
+  Optional<AbstractionPattern> origFormalType;
   CanSILFunctionType substFnType;
   Optional<AbstractionPattern> origResultType;
   CanType substResultType;
-  Optional<ForeignErrorConvention> foreignError;
-  ImportAsMemberStatus foreignSelf;
+  ForeignInfo foreign;
 
 private:
   Optional<SILFunctionTypeRepresentation> overrideRep;
@@ -37,18 +39,21 @@ public:
   CalleeTypeInfo(CanSILFunctionType substFnType,
                  AbstractionPattern origResultType, CanType substResultType,
                  const Optional<ForeignErrorConvention> &foreignError,
+                 const Optional<ForeignAsyncConvention> &foreignAsync,
                  ImportAsMemberStatus foreignSelf,
                  Optional<SILFunctionTypeRepresentation> overrideRep = None)
-      : substFnType(substFnType), origResultType(origResultType),
-        substResultType(substResultType), foreignError(foreignError),
-        foreignSelf(foreignSelf), overrideRep(overrideRep) {}
+      : origFormalType(llvm::None), substFnType(substFnType),
+        origResultType(origResultType),
+        substResultType(substResultType), foreign{foreignSelf, foreignError,
+                                                  foreignAsync},
+        overrideRep(overrideRep) {}
 
   CalleeTypeInfo(CanSILFunctionType substFnType,
                  AbstractionPattern origResultType, CanType substResultType,
                  Optional<SILFunctionTypeRepresentation> overrideRep = None)
-      : substFnType(substFnType), origResultType(origResultType),
-        substResultType(substResultType), foreignError(), foreignSelf(),
-        overrideRep(overrideRep) {}
+      : origFormalType(llvm::None), substFnType(substFnType),
+        origResultType(origResultType), substResultType(substResultType),
+        foreign(), overrideRep(overrideRep) {}
 
   SILFunctionTypeRepresentation getOverrideRep() const {
     return overrideRep.getValueOr(substFnType->getRepresentation());

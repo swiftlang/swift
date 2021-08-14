@@ -56,6 +56,7 @@ StringRef swift::ide::api::getDeclKindStr(const DeclKind Value, bool lower) {
     }
 #include "swift/AST/DeclNodes.def"
     }
+    llvm_unreachable("Unhandled DeclKind in switch.");
   } else {
     return getDeclKindStrRaw(Value);
   }
@@ -98,9 +99,8 @@ CommonDiffItem(SDKNodeKind NodeKind, NodeAnnotation DiffKind,
   assert(!ChildIndex.empty() && "Child index is empty.");
   llvm::SmallVector<StringRef, 4> Pieces;
   ChildIndex.split(Pieces, ":");
-  std::transform(Pieces.begin(), Pieces.end(),
-                 std::back_inserter(ChildIndexPieces),
-                 [](StringRef Piece) { return std::stoi(Piece.str()); });
+  llvm::transform(Pieces, std::back_inserter(ChildIndexPieces),
+                  [](StringRef Piece) { return std::stoi(Piece.str()); });
 }
 
 StringRef swift::ide::api::CommonDiffItem::head() {

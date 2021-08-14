@@ -26,10 +26,11 @@
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/RawComment.h"
 #include "swift/AST/USRGeneration.h"
-#include "swift/Demangling/Demangle.h"
+#include "swift/Basic/BasicSourceInfo.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/PrimitiveParsing.h"
 #include "swift/Basic/LLVMInitialize.h"
+#include "swift/Demangling/Demangle.h"
 #include "swift/Driver/FrontendUtil.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
@@ -265,6 +266,12 @@ static llvm::cl::list<std::string>
 BuildConfigs("D", llvm::cl::desc("Conditional compilation flags"),
              llvm::cl::cat(Category));
 
+static llvm::cl::opt<bool>
+ParseAsLibrary("parse-as-library",
+               llvm::cl::desc("Parse '-source-filename' as a library source file"),
+               llvm::cl::cat(Category),
+               llvm::cl::init(false));
+
 static llvm::cl::opt<std::string>
 SDK("sdk", llvm::cl::desc("path to the SDK to build against"),
     llvm::cl::cat(Category));
@@ -379,12 +386,6 @@ ObjCForwardDeclarations("enable-objc-forward-declarations",
     llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
-InferImportAsMember("enable-infer-import-as-member",
-    llvm::cl::desc("Infer when a global could be imported as a member"),
-    llvm::cl::cat(Category),
-    llvm::cl::init(false));
-
-static llvm::cl::opt<bool>
 EnableSwift3ObjCInference("enable-swift3-objc-inference",
     llvm::cl::desc("Enable Swift 3's @objc inference rules"),
     llvm::cl::cat(Category),
@@ -463,6 +464,12 @@ CodeCOmpletionAnnotateResults("code-completion-annotate-results",
                               llvm::cl::desc("annotate completion results with XML"),
                               llvm::cl::cat(Category),
                               llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
+CodeCompletionSourceFileInfo("code-completion-sourcefileinfo",
+                             llvm::cl::desc("print module source file information"),
+                             llvm::cl::cat(Category),
+                             llvm::cl::init(false));
 
 static llvm::cl::opt<std::string>
 DebugClientDiscriminator("debug-client-discriminator",
@@ -737,11 +744,6 @@ static llvm::cl::opt<bool>
                      llvm::cl::desc("Enable C++ interop."),
                      llvm::cl::cat(Category), llvm::cl::init(false));
 
-static llvm::cl::opt<std::string>
-GraphVisPath("output-request-graphviz",
-             llvm::cl::desc("Emit GraphViz output visualizing the request graph."),
-             llvm::cl::cat(Category));
-
 static llvm::cl::opt<bool>
 CanonicalizeType("canonicalize-type", llvm::cl::Hidden,
                    llvm::cl::cat(Category), llvm::cl::init(false));
@@ -761,6 +763,34 @@ static llvm::cl::opt<bool>
 EnableExperimentalConcurrency("enable-experimental-concurrency",
                               llvm::cl::desc("Enable experimental concurrency model"),
                               llvm::cl::init(false));
+static llvm::cl::opt<bool>
+WarnConcurrency("warn-concurrency",
+                llvm::cl::desc("Additional concurrency warnings"),
+                llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
+DisableImplicitConcurrencyImport("disable-implicit-concurrency-module-import",
+                                 llvm::cl::desc("Disable implicit import of _Concurrency module"),
+                                 llvm::cl::init(false));
+
+static llvm::cl::opt<bool> EnableExperimentalNamedOpaqueTypes(
+    "enable-experimental-named-opaque-types",
+    llvm::cl::desc("Enable experimental support for named opaque result types"),
+    llvm::cl::Hidden, llvm::cl::cat(Category), llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
+EnableExperimentalDistributed("enable-experimental-distributed",
+                              llvm::cl::desc("Enable experimental distributed actors and functions"),
+                              llvm::cl::init(false));
+
+static llvm::cl::list<std::string>
+AccessNotesPath("access-notes-path", llvm::cl::desc("Path to access notes file"),
+                llvm::cl::cat(Category));
+
+static llvm::cl::opt<bool>
+AllowCompilerErrors("allow-compiler-errors",
+                    llvm::cl::desc("Whether to attempt to continue despite compiler errors"),
+                    llvm::cl::init(false));
 
 } // namespace options
 
@@ -889,7 +919,8 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
                             bool CodeCompletionDiagnostics,
                             bool CodeCompletionKeywords,
                             bool CodeCompletionComments,
-                            bool CodeCompletionAnnotateResults) {
+                            bool CodeCompletionAnnotateResults,
+                            bool CodeCompletionSourceFileInfo) {
   std::unique_ptr<ide::OnDiskCodeCompletionCache> OnDiskCache;
   if (!options::CompletionCachePath.empty()) {
     OnDiskCache = std::make_unique<ide::OnDiskCodeCompletionCache>(
@@ -898,6 +929,7 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
   ide::CodeCompletionCache CompletionCache(OnDiskCache.get());
   ide::CodeCompletionContext CompletionContext(CompletionCache);
   CompletionContext.setAnnotateResult(CodeCompletionAnnotateResults);
+  CompletionContext.setRequiresSourceFileInfo(CodeCompletionSourceFileInfo);
 
   // Create a CodeCompletionConsumer.
   std::unique_ptr<ide::CodeCompletionConsumer> Consumer(
@@ -923,6 +955,7 @@ struct CompletionTestToken {
   StringRef Name;
   SmallVector<StringRef, 1> CheckPrefixes;
   StringRef Skip;
+  StringRef Xfail;
   Optional<bool> IncludeKeywords = None;
   Optional<bool> IncludeComments = None;
 
@@ -1001,6 +1034,10 @@ struct CompletionTestToken {
         }
         if (Key == "skip") {
           Result.Skip = Value;
+          continue;
+        }
+        if (Key == "xfail") {
+          Result.Xfail = Value;
           continue;
         }
         Error = "unknown option (" + Key.str() + ") for token";
@@ -1087,7 +1124,9 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
                                  StringRef SourceFilename,
                                  bool CodeCompletionDiagnostics,
                                  bool CodeCompletionKeywords,
-                                 bool CodeCompletionComments) {
+                                 bool CodeCompletionComments,
+                                 bool CodeCompletionAnnotateResults,
+                                 bool CodeCompletionSourceFileInfo) {
   auto FileBufOrErr = llvm::MemoryBuffer::getFile(SourceFilename);
   if (!FileBufOrErr) {
     llvm::errs() << "error opening input file: "
@@ -1166,6 +1205,7 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
 
   // Process tokens.
   SmallVector<StringRef, 0> FailedTokens;
+  SmallVector<StringRef, 0> UPassTokens;
   for (const auto &Token : CCTokens) {
     if (!options::CodeCompletionToken.empty() &&
         options::CodeCompletionToken != Token.Name)
@@ -1183,6 +1223,11 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
     if (!Token.Skip.empty()) {
       llvm::errs() << "Skipped: " << Token.Skip << "\n";
       continue;
+    }
+
+    bool failureExpected = !Token.Xfail.empty();
+    if (failureExpected) {
+      llvm::errs() << "Xfail: " << Token.Xfail << "\n";
     }
 
     auto IncludeKeywords = CodeCompletionKeywords;
@@ -1212,11 +1257,14 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
           // Create a CodeCompletionConsumer.
           std::unique_ptr<ide::CodeCompletionConsumer> Consumer(
               new ide::PrintingCodeCompletionConsumer(OS, IncludeKeywords,
-                                                      IncludeComments));
+                                                      IncludeComments,
+                                                      CodeCompletionAnnotateResults));
 
           // Create a factory for code completion callbacks that will feed the
           // Consumer.
           ide::CodeCompletionContext CompletionContext(CompletionCache);
+          CompletionContext.setAnnotateResult(CodeCompletionAnnotateResults);
+          CompletionContext.setRequiresSourceFileInfo(CodeCompletionSourceFileInfo);
           std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
               ide::makeCodeCompletionCallbacksFactory(CompletionContext,
                                                       *Consumer));
@@ -1291,23 +1339,37 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
       }
     }
 
-    if (isFileCheckFailed) {
+    if (isFileCheckFailed == failureExpected) {
+      // Success. The result may be huge. Remove the result if it's succeeded.
+      llvm::sys::fs::remove(resultFilename);
+    } else if (isFileCheckFailed) {
+      // Unexpectedly failed.
       FailedTokens.push_back(Token.Name);
     } else {
-      // The result may be huge. Remove the result if it's succeeded.
-      llvm::sys::fs::remove(resultFilename);
+      // Unexpectedly passed.
+      UPassTokens.push_back(Token.Name);
     }
   }
 
+  if (FailedTokens.empty() && UPassTokens.empty())
+    return 0;
+
+  llvm::errs() << "----\n";
   if (!FailedTokens.empty()) {
-    llvm::errs() << "----\n";
     llvm::errs() << "Unexpected failures: ";
     llvm::interleave(
         FailedTokens, [&](StringRef name) { llvm::errs() << name; },
         [&]() { llvm::errs() << ", "; });
+    llvm::errs() << "\n";
   }
-
-  return !FailedTokens.empty();
+  if (!UPassTokens.empty()) {
+    llvm::errs() << "Unexpected passes: ";
+    llvm::interleave(
+        UPassTokens, [&](StringRef name) { llvm::errs() << name; },
+        [&]() { llvm::errs() << ", "; });
+    llvm::errs() << "\n";
+  }
+  return 1;
 }
 
 static int doREPLCodeCompletion(const CompilerInvocation &InitInvok,
@@ -2268,7 +2330,8 @@ static int doPrintLocalTypes(const CompilerInvocation &InitInvok,
     for (auto LTD : LocalTypeDecls) {
       Mangle::ASTMangler Mangler;
       std::string MangledName = Mangler.mangleTypeForDebugger(
-          LTD->getDeclaredInterfaceType(), LTD->getDeclContext());
+          LTD->getDeclaredInterfaceType(),
+          LTD->getInnermostDeclContext()->getGenericSignatureOfContext());
       MangledNames.push_back(MangledName);
     }
 
@@ -2490,9 +2553,20 @@ static int doPrintModuleGroups(const CompilerInvocation &InitInvok,
 
 static void printModuleMetadata(ModuleDecl *MD) {
   auto &OS = llvm::outs();
+  OS << "user module version: " << MD->getUserModuleVersion().getAsString() << "\n";
+  OS << "fingerprint=" << MD->getFingerprint().getRawValue() << "\n";
   MD->collectLinkLibraries([&](LinkLibrary lib) {
     OS << "link library: " << lib.getName()
        << ", force load: " << (lib.shouldForceLoad() ? "true" : "false") << "\n";
+  });
+  MD->collectBasicSourceFileInfo([&](const BasicSourceFileInfo &info) {
+    OS << "filepath=" << info.getFilePath() << "; ";
+    OS << "hash=" << info.getInterfaceHashIncludingTypeMembers().getRawValue() << "; ";
+    OS << "hashExcludingTypeMembers="
+       << info.getInterfaceHashExcludingTypeMembers().getRawValue() << "; ";
+    OS << "mtime=" << info.getLastModified() << "; ";
+    OS << "size=" << info.getFileSize();
+    OS << "\n";
   });
 }
 
@@ -2581,6 +2655,14 @@ static int doPrintModules(const CompilerInvocation &InitInvok,
   if (!Stdlib) {
     llvm::errs() << "Failed loading stdlib\n";
     return 1;
+  }
+
+  // If needed, load _Concurrency library so that the Clang importer can use it.
+  if (Context.LangOpts.EnableExperimentalConcurrency) {
+    if (!getModuleByFullName(Context, Context.Id_Concurrency)) {
+      llvm::errs() << "Failed loading _Concurrency library\n";
+      return 1;
+    }
   }
 
   int ExitCode = 0;
@@ -2692,7 +2774,8 @@ static int doPrintSwiftFileInterface(const CompilerInvocation &InitInvok,
   else
     Printer.reset(new StreamPrinter(llvm::outs()));
 
-  PrintOptions Options = PrintOptions::printSwiftFileInterface();
+  PrintOptions Options = PrintOptions::printSwiftFileInterface(
+      InitInvok.getFrontendOptions().PrintFullConvention);
   if (options::PrintOriginalSourceText)
     Options.PrintOriginalSourceText = true;
   printSwiftSourceInterface(*CI.getPrimarySourceFile(), *Printer, Options);
@@ -3003,30 +3086,16 @@ public:
     }
   }
 
-  void printSerializedLoc(Decl *D) {
-    auto moduleLoc = cast<FileUnit>(D->getDeclContext()->getModuleScopeContext())->
-      getBasicLocsForDecl(D);
-    if (!moduleLoc.hasValue())
-      return;
-    if (!moduleLoc->Loc.isValid())
-      return;
-    OS << moduleLoc->SourceFilePath
-       << ":" << moduleLoc->Loc.Line
-       << ":" << moduleLoc->Loc.Column << ": ";
-  }
-
   bool walkToDeclPre(Decl *D) override {
     if (D->isImplicit())
       return true;
 
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
-      SourceLoc Loc = D->getLoc();
+      SourceLoc Loc = D->getLoc(/*SerializedOK=*/true);
       if (Loc.isValid()) {
         auto LineAndColumn = SM.getPresumedLineAndColumnForLoc(Loc);
         OS << SM.getDisplayNameForLoc(Loc)
            << ":" << LineAndColumn.first << ":" << LineAndColumn.second << ": ";
-      } else {
-        printSerializedLoc(D);
       }
       OS << Decl::getKindName(VD->getKind()) << "/";
       printDeclName(VD);
@@ -3039,13 +3108,11 @@ public:
       printDocComment(D);
       OS << "\n";
     } else if (isa<ExtensionDecl>(D)) {
-      SourceLoc Loc = D->getLoc();
+      SourceLoc Loc = D->getLoc(/*SerializedOK=*/true);
       if (Loc.isValid()) {
         auto LineAndColumn = SM.getPresumedLineAndColumnForLoc(Loc);
         OS << SM.getDisplayNameForLoc(Loc)
         << ":" << LineAndColumn.first << ":" << LineAndColumn.second << ": ";
-      } else {
-        printSerializedLoc(D);
       }
       OS << Decl::getKindName(D->getKind()) << "/";
       OS << " ";
@@ -3251,8 +3318,8 @@ static int doPrintTypeInterface(const CompilerInvocation &InitInvok,
   StreamPrinter Printer(llvm::outs());
   std::string Error;
   std::string TypeName;
-  if (printTypeInterface(SemaT.DC->getParentModule(), SemaT.Ty, Printer,
-                         TypeName, Error)) {
+  if (printTypeInterface(SemaT.ValueD->getDeclContext()->getParentModule(),
+                         SemaT.Ty, Printer, TypeName, Error)) {
     llvm::errs() << Error;
     return 1;
   }
@@ -3380,7 +3447,8 @@ public:
 private:
   void tryDemangleType(Type T, const DeclContext *DC, CharSourceRange range) {
     Mangle::ASTMangler Mangler;
-    std::string mangledName(Mangler.mangleTypeForDebugger(T, DC));
+    auto sig = DC->getGenericSignatureOfContext();
+    std::string mangledName(Mangler.mangleTypeForDebugger(T, sig));
     Type ReconstructedType = DC->mapTypeIntoContext(
         Demangle::getTypeForMangling(Ctx, mangledName));
     Stream << "type: ";
@@ -3797,8 +3865,6 @@ int main(int argc, char *argv[]) {
   InitInvok.setSDKPath(options::SDK);
   InitInvok.getLangOptions().CollectParsedToken = true;
   InitInvok.getLangOptions().BuildSyntaxTree = true;
-  InitInvok.getLangOptions().RequestEvaluatorGraphVizPath =
-    options::GraphVisPath;
   InitInvok.getLangOptions().EnableCrossImportOverlays =
     options::EnableCrossImportOverlays;
   if (options::DisableObjCInterop) {
@@ -3815,12 +3881,23 @@ int main(int argc, char *argv[]) {
   if (options::EnableExperimentalConcurrency) {
     InitInvok.getLangOptions().EnableExperimentalConcurrency = true;
   }
+  if (options::WarnConcurrency) {
+    InitInvok.getLangOptions().WarnConcurrency = true;
+  }
+  if (options::DisableImplicitConcurrencyImport) {
+    InitInvok.getLangOptions().DisableImplicitConcurrencyModuleImport = true;
+  }
+  if (options::EnableExperimentalNamedOpaqueTypes) {
+    InitInvok.getLangOptions().EnableExperimentalNamedOpaqueTypes = true;
+  }
 
-  // We disable source location resolutions from .swiftsourceinfo files by
-  // default to match sourcekitd-test's and ide clients' expected behavior
-  // (passing optimize-for-ide in the global configuration request).
-  if (!options::EnableSwiftSourceInfo)
-    InitInvok.getFrontendOptions().IgnoreSwiftSourceInfo = true;
+  if (options::EnableExperimentalDistributed) {
+    // distributed implies concurrency features:
+    InitInvok.getLangOptions().EnableExperimentalConcurrency = true;
+    // enable 'distributed' parsing and features
+    InitInvok.getLangOptions().EnableExperimentalDistributed = true;
+  }
+
   if (!options::Triple.empty())
     InitInvok.setTargetTriple(options::Triple);
   if (!options::SwiftVersion.empty()) {
@@ -3838,6 +3915,14 @@ int main(int argc, char *argv[]) {
     // Honor the *last* -module-cache-path specified.
     InitInvok.getClangImporterOptions().ModuleCachePath =
         options::ModuleCachePath[options::ModuleCachePath.size()-1];
+  }
+  if (!options::AccessNotesPath.empty()) {
+    InitInvok.getFrontendOptions().AccessNotesPath =
+        options::AccessNotesPath[options::AccessNotesPath.size()-1];
+  }
+  if (options::ParseAsLibrary) {
+    InitInvok.getFrontendOptions().InputMode =
+        swift::FrontendOptions::ParseInputMode::SwiftLibrary;
   }
   InitInvok.getClangImporterOptions().PrecompiledHeaderOutputDir =
     options::PCHOutputDir;
@@ -3862,14 +3947,10 @@ int main(int argc, char *argv[]) {
       options::CodeCompleteInitsInPostfixExpr;
   InitInvok.getLangOptions().CodeCompleteCallPatternHeuristics |=
       options::CodeCompleteCallPatternHeuristics;
-  InitInvok.getLangOptions().InferImportAsMember |=
-    options::InferImportAsMember;
   InitInvok.getLangOptions().EnableSwift3ObjCInference =
     options::EnableSwift3ObjCInference;
   InitInvok.getClangImporterOptions().ImportForwardDeclarations |=
     options::ObjCForwardDeclarations;
-  InitInvok.getClangImporterOptions().InferImportAsMember |=
-    options::InferImportAsMember;
   if (!options::ResourceDir.empty()) {
     InitInvok.setRuntimeResourcePath(options::ResourceDir);
   }
@@ -3891,6 +3972,12 @@ int main(int argc, char *argv[]) {
       options::ExplicitSwiftModuleMap;
     InitInvok.getFrontendOptions().DisableImplicitModules = true;
   }
+
+  if (options::AllowCompilerErrors) {
+    InitInvok.getFrontendOptions().AllowModuleWithCompilerErrors = true;
+    InitInvok.getLangOptions().AllowModuleWithCompilerErrors = true;
+  }
+
   // Process the clang arguments last and allow them to override previously
   // set options.
   if (!CCArgs.empty()) {
@@ -3904,7 +3991,8 @@ int main(int argc, char *argv[]) {
 
   PrintOptions PrintOpts;
   if (options::PrintInterface) {
-    PrintOpts = PrintOptions::printModuleInterface();
+    PrintOpts = PrintOptions::printModuleInterface(
+        InitInvok.getFrontendOptions().PrintFullConvention);
   } else if (options::PrintInterfaceForDoc) {
     PrintOpts = PrintOptions::printDocInterface();
   } else {
@@ -3965,7 +4053,9 @@ int main(int argc, char *argv[]) {
                                      options::SourceFilename,
                                      options::CodeCompletionDiagnostics,
                                      options::CodeCompletionKeywords,
-                                     options::CodeCompletionComments);
+                                     options::CodeCompletionComments,
+                                     options::CodeCOmpletionAnnotateResults,
+                                     options::CodeCompletionSourceFileInfo);
     break;
 
   case ActionType::CodeCompletion:
@@ -3980,7 +4070,8 @@ int main(int argc, char *argv[]) {
                                 options::CodeCompletionDiagnostics,
                                 options::CodeCompletionKeywords,
                                 options::CodeCompletionComments,
-                                options::CodeCOmpletionAnnotateResults);
+                                options::CodeCOmpletionAnnotateResults,
+                                options::CodeCompletionSourceFileInfo);
     break;
 
   case ActionType::REPLCodeCompletion:

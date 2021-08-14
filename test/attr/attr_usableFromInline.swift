@@ -155,3 +155,11 @@ public struct TestGenericSubscripts {
 
 @usableFromInline typealias TestGenericAlias<T: InternalProtocol> = T // expected-warning {{type referenced from a generic parameter of a '@usableFromInline' type alias should be '@usableFromInline' or public}}
 @usableFromInline typealias TestGenericAliasWhereClause<T> = T where T: InternalProtocol // expected-warning {{type referenced from a generic requirement of a '@usableFromInline' type alias should be '@usableFromInline' or public}}
+
+@usableFromInline struct GenericStruct<T> {
+  @usableFromInline struct Nested where T : InternalProtocol {}
+  // expected-error@-1 {{type referenced from a generic requirement of a '@usableFromInline' struct must be '@usableFromInline' or public}}
+
+  @usableFromInline func nonGenericWhereClause() where T : InternalProtocol {}
+  // expected-error@-1 {{type referenced from a generic requirement of a '@usableFromInline' instance method must be '@usableFromInline' or public}}
+}

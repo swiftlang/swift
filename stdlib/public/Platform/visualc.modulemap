@@ -16,11 +16,6 @@ module visualc [system] {
     export *
   }
 
-  module vadefs {
-    header "vadefs.h"
-    export *
-  }
-
   module vcruntime {
     header "vcruntime.h"
     export *

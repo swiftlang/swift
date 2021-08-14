@@ -126,7 +126,7 @@ namespace {
 } // end anonymous namespace
 
 void Expr::setType(Type T) {
-  assert(!T || !T->hasTypeVariable() || !T->hasHole());
+  assert(!T || !T->hasTypeVariable() || !T->hasPlaceholder());
   Ty = T;
 }
 
@@ -320,6 +320,7 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
 
   NO_REFERENCE(OpaqueValue);
   NO_REFERENCE(PropertyWrapperValuePlaceholder);
+  NO_REFERENCE(AppliedPropertyWrapper);
   NO_REFERENCE(DefaultArgument);
 
   PASS_THROUGH_REFERENCE(BindOptional, getSubExpr);
@@ -634,6 +635,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::RebindSelfInConstructor:
   case ExprKind::OpaqueValue:
   case ExprKind::PropertyWrapperValuePlaceholder:
+  case ExprKind::AppliedPropertyWrapper:
   case ExprKind::DefaultArgument:
   case ExprKind::BindOptional:
   case ExprKind::OptionalEvaluation:
@@ -1227,7 +1229,18 @@ UnresolvedSpecializeExpr *UnresolvedSpecializeExpr::create(ASTContext &ctx,
                                              UnresolvedParams, RAngleLoc);
 }
 
+CaptureListEntry::CaptureListEntry(PatternBindingDecl *PBD) : PBD(PBD) {
+  assert(PBD);
+  assert(PBD->getSingleVar() &&
+         "Capture lists only support single-var patterns");
+}
+
+VarDecl *CaptureListEntry::getVar() const {
+  return PBD->getSingleVar();
+}
+
 bool CaptureListEntry::isSimpleSelfCapture() const {
+  auto *Var = getVar();
   auto &ctx = Var->getASTContext();
 
   if (Var->getName() != ctx.Id_self)
@@ -1237,10 +1250,10 @@ bool CaptureListEntry::isSimpleSelfCapture() const {
     if (attr->get() == ReferenceOwnership::Weak)
       return false;
 
-  if (Init->getPatternList().size() != 1)
+  if (PBD->getPatternList().size() != 1)
     return false;
 
-  auto *expr = Init->getInit(0);
+  auto *expr = PBD->getInit(0);
 
   if (auto *DRE = dyn_cast<DeclRefExpr>(expr)) {
     if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
@@ -1263,7 +1276,7 @@ CaptureListExpr *CaptureListExpr::create(ASTContext &ctx,
   auto *expr = ::new(mem) CaptureListExpr(captureList, closureBody);
 
   for (auto capture : captureList)
-    capture.Var->setParentCaptureList(expr);
+    capture.getVar()->setParentCaptureList(expr);
 
   return expr;
 }
@@ -1501,11 +1514,20 @@ PropertyWrapperValuePlaceholderExpr *
 PropertyWrapperValuePlaceholderExpr::create(ASTContext &ctx, SourceRange range,
                                             Type ty, Expr *wrappedValue,
                                             bool isAutoClosure) {
-  auto *placeholder =
-      new (ctx) OpaqueValueExpr(range, ty, /*isPlaceholder=*/true);
+  OpaqueValueExpr *placeholder = nullptr;
+  if (ty)
+    placeholder = new (ctx) OpaqueValueExpr(range, ty, /*isPlaceholder=*/true);
 
   return new (ctx) PropertyWrapperValuePlaceholderExpr(
       range, ty, placeholder, wrappedValue, isAutoClosure);
+}
+
+AppliedPropertyWrapperExpr *
+AppliedPropertyWrapperExpr::create(ASTContext &ctx, ConcreteDeclRef callee,
+                                   const ParamDecl *param,
+                                   SourceLoc loc, Type Ty, Expr *value,
+                                   AppliedPropertyWrapperExpr::ValueKind kind) {
+  return new (ctx) AppliedPropertyWrapperExpr(callee, param, loc, Ty, value, kind);
 }
 
 const ParamDecl *DefaultArgumentExpr::getParamDecl() const {
@@ -1757,6 +1779,30 @@ Expr *CallExpr::getDirectCallee() const {
   }
 }
 
+PrefixUnaryExpr *PrefixUnaryExpr::create(ASTContext &ctx, Expr *fn,
+                                         Expr *operand, Type ty) {
+  return new (ctx) PrefixUnaryExpr(fn, operand, ty);
+}
+
+PostfixUnaryExpr *PostfixUnaryExpr::create(ASTContext &ctx, Expr *fn,
+                                           Expr *operand, Type ty) {
+  return new (ctx) PostfixUnaryExpr(fn, operand, ty);
+}
+
+BinaryExpr *BinaryExpr::create(ASTContext &ctx, Expr *lhs, Expr *fn, Expr *rhs,
+                               bool implicit, Type ty) {
+  auto *packedArg = TupleExpr::createImplicit(ctx, {lhs, rhs}, /*labels*/ {});
+  computeSingleArgumentType(ctx, packedArg, /*implicit*/ true,
+                            [](Expr *E) { return E->getType(); });
+  return new (ctx) BinaryExpr(fn, packedArg, implicit, ty);
+}
+
+DotSyntaxCallExpr *DotSyntaxCallExpr::create(ASTContext &ctx, Expr *fnExpr,
+                                             SourceLoc dotLoc, Expr *baseExpr,
+                                             Type ty) {
+  return new (ctx) DotSyntaxCallExpr(fnExpr, dotLoc, baseExpr, ty);
+}
+
 SourceLoc DotSyntaxCallExpr::getLoc() const {
   if (isImplicit()) {
     SourceLoc baseLoc = getBase()->getLoc();
@@ -1782,6 +1828,13 @@ SourceLoc DotSyntaxCallExpr::getEndLoc() const {
   }
 
   return getFn()->getEndLoc();
+}
+
+ConstructorRefCallExpr *ConstructorRefCallExpr::create(ASTContext &ctx,
+                                                       Expr *fnExpr,
+                                                       Expr *baseExpr,
+                                                       Type ty) {
+  return new (ctx) ConstructorRefCallExpr(fnExpr, baseExpr, ty);
 }
 
 void ExplicitCastExpr::setCastType(Type type) {
@@ -1920,10 +1973,11 @@ void AbstractClosureExpr::setParameterList(ParameterList *P) {
 Type AbstractClosureExpr::getResultType(
     llvm::function_ref<Type(Expr *)> getType) const {
   auto *E = const_cast<AbstractClosureExpr *>(this);
-  if (getType(E)->hasError())
-    return getType(E);
+  Type T = getType(E);
+  if (!T || T->hasError())
+    return T;
 
-  return getType(E)->castTo<FunctionType>()->getResult();
+  return T->castTo<FunctionType>()->getResult();
 }
 
 bool AbstractClosureExpr::isBodyThrowing() const {
@@ -1974,10 +2028,10 @@ FORWARD_SOURCE_LOCS_TO(ClosureExpr, Body.getPointer())
 
 Expr *ClosureExpr::getSingleExpressionBody() const {
   assert(hasSingleExpressionBody() && "Not a single-expression body");
-  auto body = getBody()->getFirstElement();
+  auto body = getBody()->getLastElement();
   if (auto stmt = body.dyn_cast<Stmt *>()) {
     if (auto braceStmt = dyn_cast<BraceStmt>(stmt))
-      return braceStmt->getFirstElement().get<Expr *>();
+      return braceStmt->getLastElement().get<Expr *>();
 
     return cast<ReturnStmt>(stmt)->getResult();
   }
@@ -1989,7 +2043,7 @@ bool ClosureExpr::hasEmptyBody() const {
 }
 
 void ClosureExpr::setExplicitResultType(Type ty) {
-  assert(ty && !ty->hasTypeVariable() && !ty->hasHole());
+  assert(ty && !ty->hasTypeVariable() && !ty->hasPlaceholder());
   ExplicitResultTypeAndBodyState.getPointer()
       ->setType(MetatypeType::get(ty));
 }
@@ -2003,7 +2057,7 @@ void AutoClosureExpr::setBody(Expr *E) {
 }
 
 Expr *AutoClosureExpr::getSingleExpressionBody() const {
-  return cast<ReturnStmt>(Body->getFirstElement().get<Stmt *>())->getResult();
+  return cast<ReturnStmt>(Body->getLastElement().get<Stmt *>())->getResult();
 }
 
 Expr *AutoClosureExpr::getUnwrappedCurryThunkExpr() const {
@@ -2031,6 +2085,7 @@ Expr *AutoClosureExpr::getUnwrappedCurryThunkExpr() const {
 
   switch (getThunkKind()) {
   case AutoClosureExpr::Kind::None:
+  case AutoClosureExpr::Kind::AsyncLet:
     break;
 
   case AutoClosureExpr::Kind::SingleCurryThunk: {
@@ -2347,7 +2402,7 @@ KeyPathExpr::Component::Component(ASTContext *ctxForCopyingLabels,
     : Decl(decl), SubscriptIndexExpr(indexExpr), KindValue(kind),
       ComponentType(type), Loc(loc)
 {
-  assert(kind != Kind::TupleElement || subscriptLabels.empty());
+  assert(kind == Kind::Subscript || kind == Kind::UnresolvedSubscript);
   assert(subscriptLabels.size() == indexHashables.size()
          || indexHashables.empty());
   SubscriptLabelsData = subscriptLabels.data();
@@ -2386,6 +2441,7 @@ void KeyPathExpr::Component::setSubscriptIndexHashableConformances(
   case Kind::Identity:
   case Kind::TupleElement:
   case Kind::DictionaryKey:
+  case Kind::CodeCompletion:
     llvm_unreachable("no hashable conformances for this kind");
   }
 }

@@ -17,12 +17,12 @@
 // RUN: %target-typecheck-verify-swift -sdk %t/sdk -I %t/sdk/usr/lib/swift/ -module-cache-path %t/MCP -prebuilt-module-cache-path %t/prebuilt
 // RUN: %{python} %S/../ModuleCache/Inputs/check-is-forwarding-module.py %t/MCP/Swifty-*.swiftmodule
 
-// Actually change a file in the SDK, to check that we're tracking dependencies
+// Actually change a file in the SDK, to check that we're not tracking system dependencies
 // at all.
 // RUN: rm -rf %t/MCP
 // RUN: echo "void unrelated();" >> %t/sdk/usr/include/Platform.h
 // RUN: %target-typecheck-verify-swift -sdk %t/sdk -I %t/sdk/usr/lib/swift/ -module-cache-path %t/MCP -prebuilt-module-cache-path %t/prebuilt
-// RUN: not %{python} %S/../ModuleCache/Inputs/check-is-forwarding-module.py %t/MCP/Swifty-*.swiftmodule
+// RUN: %{python} %S/../ModuleCache/Inputs/check-is-forwarding-module.py %t/MCP/Swifty-*.swiftmodule
 
 // Without the prebuilt cache everything should still work; it'll just take time
 // because we have to build the interfaces.

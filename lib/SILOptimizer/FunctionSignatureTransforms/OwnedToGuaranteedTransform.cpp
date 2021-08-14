@@ -161,7 +161,7 @@ FunctionSignatureTransform::OwnedToGuaranteedTransformFunctionParameters() {
 
     // Now we need to replace the FunctionArgument so that we have the correct
     // ValueOwnershipKind.
-    AD.Arg->setOwnershipKind(ValueOwnershipKind::Guaranteed);
+    AD.Arg->setOwnershipKind(OwnershipKind::Guaranteed);
   }
 }
 

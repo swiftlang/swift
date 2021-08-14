@@ -1,6 +1,6 @@
-// RUN: %target-run-simple-swift
+// RUN: %target-run-simple-swift(-Xfrontend -requirement-machine=off)
 // NOTE: Verify whether forward-mode differentiation crashes. It currently does.
-// RUN: not --crash %target-swift-frontend -enable-experimental-forward-mode-differentiation -emit-sil %s
+// RUN: not --crash %target-swift-frontend -enable-experimental-forward-mode-differentiation -emit-sil %s -requirement-machine=off
 // REQUIRES: executable_test
 
 import StdlibUnittest
@@ -10,33 +10,33 @@ var ClassTests = TestSuite("ClassDifferentiation")
 
 ClassTests.test("TrivialMember") {
   final class C: Differentiable {
-    @differentiable
+    @differentiable(reverse)
     var float: Float
 
     @noDerivative
     final var noDerivative: Float = 1
 
-    @differentiable
+    @differentiable(reverse)
     init(_ float: Float) {
       self.float = float
     }
 
-    @differentiable
+    @differentiable(reverse)
     convenience init(convenience x: Float) {
       self.init(x)
     }
 
-    @differentiable
+    @differentiable(reverse)
     func method(_ x: Float) -> Float {
       x * float
     }
 
-    @differentiable
+    @differentiable(reverse)
     func testNoDerivative() -> Float {
       noDerivative
     }
 
-    @differentiable
+    @differentiable(reverse)
     static func controlFlow(_ c1: C, _ c2: C, _ flag: Bool) -> Float {
       var result: Float = 0
       if flag {
@@ -49,31 +49,31 @@ ClassTests.test("TrivialMember") {
     }
   }
   // Test class initializer differentiation.
-  expectEqual(10, pullback(at: 3, in: { C($0) })(.init(float: 10)))
-  expectEqual(10, pullback(at: 3, in: { C(convenience: $0) })(.init(float: 10)))
+  expectEqual(10, pullback(at: 3, of: { C($0) })(.init(float: 10)))
+  expectEqual(10, pullback(at: 3, of: { C(convenience: $0) })(.init(float: 10)))
   // Test class method differentiation.
-  expectEqual((.init(float: 3), 10), gradient(at: C(10), 3, in: { c, x in c.method(x) }))
-  expectEqual(.init(float: 0), gradient(at: C(10), in: { c in c.testNoDerivative() }))
+  expectEqual((.init(float: 3), 10), gradient(at: C(10), 3, of: { c, x in c.method(x) }))
+  expectEqual(.init(float: 0), gradient(at: C(10), of: { c in c.testNoDerivative() }))
   expectEqual((.init(float: 20), .init(float: 10)),
-              gradient(at: C(10), C(20), in: { c1, c2 in C.controlFlow(c1, c2, true) }))
+              gradient(at: C(10), C(20), of: { c1, c2 in C.controlFlow(c1, c2, true) }))
 }
 
 ClassTests.test("NontrivialMember") {
   final class C: Differentiable {
-    @differentiable
+    @differentiable(reverse)
     var float: Tracked<Float>
 
-    @differentiable
+    @differentiable(reverse)
     init(_ float: Tracked<Float>) {
       self.float = float
     }
 
-    @differentiable
+    @differentiable(reverse)
     func method(_ x: Tracked<Float>) -> Tracked<Float> {
       x * float
     }
 
-    @differentiable
+    @differentiable(reverse)
     static func controlFlow(_ c1: C, _ c2: C, _ flag: Bool) -> Tracked<Float> {
       var result: Tracked<Float> = 0
       if flag {
@@ -85,60 +85,60 @@ ClassTests.test("NontrivialMember") {
     }
   }
   // Test class initializer differentiation.
-  expectEqual(10, pullback(at: 3, in: { C($0) })(.init(float: 10)))
+  expectEqual(10, pullback(at: 3, of: { C($0) })(.init(float: 10)))
   // Test class method differentiation.
-  expectEqual((.init(float: 3), 10), gradient(at: C(10), 3, in: { c, x in c.method(x) }))
+  expectEqual((.init(float: 3), 10), gradient(at: C(10), 3, of: { c, x in c.method(x) }))
   expectEqual((.init(float: 20), .init(float: 10)),
-              gradient(at: C(10), C(20), in: { c1, c2 in C.controlFlow(c1, c2, true) }))
+              gradient(at: C(10), C(20), of: { c1, c2 in C.controlFlow(c1, c2, true) }))
 }
 
 ClassTests.test("GenericNontrivialMember") {
   final class C<T: Differentiable>: Differentiable where T == T.TangentVector {
-    @differentiable
+    @differentiable(reverse)
     var x: Tracked<T>
 
-    @differentiable
+    @differentiable(reverse)
     init(_ x: T) {
       self.x = Tracked(x)
     }
 
-    @differentiable
+    @differentiable(reverse)
     convenience init(convenience x: T) {
       self.init(x)
     }
   }
   // Test class initializer differentiation.
-  expectEqual(10, pullback(at: 3, in: { C<Float>($0) })(.init(x: 10)))
-  expectEqual(10, pullback(at: 3, in: { C<Float>(convenience: $0) })(.init(x: 10)))
+  expectEqual(10, pullback(at: 3, of: { C<Float>($0) })(.init(x: 10)))
+  expectEqual(10, pullback(at: 3, of: { C<Float>(convenience: $0) })(.init(x: 10)))
 }
 
 // TF-1149: Test class with loadable type but address-only `TangentVector` type.
 ClassTests.test("AddressOnlyTangentVector") {
   final class C<T: Differentiable>: Differentiable {
-    @differentiable
+    @differentiable(reverse)
     var stored: T
 
-    @differentiable
+    @differentiable(reverse)
     init(_ stored: T) {
       self.stored = stored
     }
 
-    @differentiable
+    @differentiable(reverse)
     func method(_ x: T) -> T {
       stored
     }
   }
   // Test class initializer differentiation.
-  expectEqual(10, pullback(at: 3, in: { C<Float>($0) })(.init(stored: 10)))
+  expectEqual(10, pullback(at: 3, of: { C<Float>($0) })(.init(stored: 10)))
   // Test class method differentiation.
   expectEqual((.init(stored: Float(1)), 0),
-              gradient(at: C<Float>(3), 3, in: { c, x in c.method(x) }))
+              gradient(at: C<Float>(3), 3, of: { c, x in c.method(x) }))
 }
 
 // TF-1175: Test whether class-typed arguments are not marked active.
 ClassTests.test("ClassArgumentActivity") {
   class C: Differentiable {
-    @differentiable
+    @differentiable(reverse)
     var x: Float
 
     init(_ x: Float) {
@@ -159,8 +159,8 @@ ClassTests.test("ClassArgumentActivity") {
     return c.x
   }
   // FIXME(TF-1175): Find a robust solution so that derivatives are correct.
-  // expectEqual((100, 20), valueWithGradient(at: 10, in: squared))
-  expectEqual((100, 1), valueWithGradient(at: 10, in: squared))
+  // expectEqual((100, 20), valueWithGradient(at: 10, of: squared))
+  expectEqual((100, 1), valueWithGradient(at: 10, of: squared))
 }
 
 ClassTests.test("FinalClassMethods") {
@@ -180,7 +180,7 @@ ClassTests.test("FinalClassMethods") {
 
 ClassTests.test("ClassMethods") {
   class Super {
-    @differentiable(wrt: x)
+    @differentiable(reverse, wrt: x)
     func f(_ x: Tracked<Float>) -> Tracked<Float> {
       return 2 * x
     }
@@ -201,14 +201,14 @@ ClassTests.test("ClassMethods") {
   }
 
   class SubOverride: Super {
-    @differentiable(wrt: x)
+    @differentiable(reverse, wrt: x)
     override func f(_ x: Tracked<Float>) -> Tracked<Float> {
       return 3 * x
     }
   }
 
   class SubOverrideCustomDerivatives: Super {
-    @differentiable(wrt: x)
+    @differentiable(reverse, wrt: x)
     override func f(_ x: Tracked<Float>) -> Tracked<Float> {
       return 3 * x
     }
@@ -245,7 +245,7 @@ ClassTests.test("ClassMethods - wrt self") {
       self.base = base
     }
 
-    @differentiable(wrt: (self, x))
+    @differentiable(reverse, wrt: (self, x))
     func f(_ x: Tracked<Float>) -> Tracked<Float> {
       return base * x
     }
@@ -269,19 +269,19 @@ ClassTests.test("ClassMethods - wrt self") {
   }
 
   final class SubOverride: Super {
-    @differentiable
+    @differentiable(reverse)
     override init(base: Tracked<Float>) {
       super.init(base: base)
     }
 
-    @differentiable(wrt: (self, x))
+    @differentiable(reverse, wrt: (self, x))
     override func f(_ x: Tracked<Float>) -> Tracked<Float> {
       return 3 * x
     }
   }
 
   final class SubOverrideCustomDerivatives: Super {
-    @differentiable
+    @differentiable(reverse)
     override init(base: Tracked<Float>) {
       super.init(base: base)
     }
@@ -293,8 +293,8 @@ ClassTests.test("ClassMethods - wrt self") {
       return (SubOverrideCustomDerivatives(base: base), { x in x.base * 2 })
     }
 
-    @differentiable(wrt: (self, x))
-    @differentiable(wrt: x)
+    @differentiable(reverse, wrt: (self, x))
+    @differentiable(reverse, wrt: x)
     override func f(_ x: Tracked<Float>) -> Tracked<Float> {
       return 3 * x
     }
@@ -334,7 +334,7 @@ ClassTests.test("ClassMethods - wrt self") {
 
 ClassTests.test("ClassMethods - generic") {
   class Super<T: Differentiable & FloatingPoint> where T == T.TangentVector {
-    @differentiable(wrt: x)
+    @differentiable(reverse, wrt: x)
     func f(_ x: Tracked<T>) -> Tracked<T> {
       return Tracked<T>(2) * x
     }
@@ -355,14 +355,14 @@ ClassTests.test("ClassMethods - generic") {
   }
 
   class SubOverride<T: Differentiable & FloatingPoint>: Super<T> where T == T.TangentVector {
-    @differentiable(wrt: x)
+    @differentiable(reverse, wrt: x)
     override func f(_ x: Tracked<T>) -> Tracked<T> {
       return x
     }
   }
 
   class SubSpecializeOverride: Super<Float> {
-    @differentiable(wrt: x)
+    @differentiable(reverse, wrt: x)
     override func f(_ x: Tracked<Float>) -> Tracked<Float> {
       return 3 * x
     }
@@ -370,7 +370,7 @@ ClassTests.test("ClassMethods - generic") {
 
   class SubOverrideCustomDerivatives<T: Differentiable & FloatingPoint>: Super<T>
   where T == T.TangentVector {
-    @differentiable(wrt: x)
+    @differentiable(reverse, wrt: x)
     override func f(_ x: Tracked<T>) -> Tracked<T> {
       return Tracked<T>(3) * x
     }
@@ -392,7 +392,7 @@ ClassTests.test("ClassMethods - generic") {
 
 #if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
   class SubSpecializeOverrideCustomDerivatives: Super<Float80> {
-    @differentiable(wrt: x)
+    @differentiable(reverse, wrt: x)
     override func f(_ x: Tracked<Float80>) -> Tracked<Float80> {
       return 3 * x
     }
@@ -414,7 +414,7 @@ ClassTests.test("ClassMethods - generic") {
   func classValueWithGradient<T: Differentiable & FloatingPoint>(
     _ c: Super<T>
   ) -> (T, T) where T == T.TangentVector {
-    let (x,y) =  valueWithGradient(at: Tracked<T>(1), in: {
+    let (x,y) =  valueWithGradient(at: Tracked<T>(1), of: {
         c.f($0) })
     return (x.value, y.value)
   }
@@ -435,13 +435,13 @@ ClassTests.test("ClassMethods - closure captures") {
     }
 
     // Case 1: generated VJP.
-    @differentiable
+    @differentiable(reverse)
     func apply1(to x: Tracked<Float>) -> Tracked<Float> {
       return coefficient * x
     }
 
     // Case 2: custom VJP capturing `self`.
-    @differentiable(wrt: (x))
+    @differentiable(reverse, wrt: (x))
     func apply2(to x: Tracked<Float>) -> Tracked<Float> {
       return coefficient * x
     }
@@ -454,7 +454,7 @@ ClassTests.test("ClassMethods - closure captures") {
     }
 
     // Case 3: custom VJP capturing `self.coefficient`.
-    @differentiable(wrt: x)
+    @differentiable(reverse, wrt: x)
     func apply3(to x: Tracked<Float>) -> Tracked<Float> {
       return coefficient * x
     }
@@ -474,7 +474,7 @@ ClassTests.test("ClassMethods - closure captures") {
     m.coefficient += 1
     return result
   }
-  expectEqual(10, gradient(at: 1, in: f1))
+  expectEqual(10, gradient(at: 1, of: f1))
 
   func f2(_ x: Tracked<Float>) -> Tracked<Float> {
     let m = Multiplier(10)
@@ -482,7 +482,7 @@ ClassTests.test("ClassMethods - closure captures") {
     m.coefficient += 1
     return result
   }
-  expectEqual(11, gradient(at: 1, in: f2))
+  expectEqual(11, gradient(at: 1, of: f2))
 
   func f3(_ x: Tracked<Float>) -> Tracked<Float> {
     let m = Multiplier(10)
@@ -490,17 +490,17 @@ ClassTests.test("ClassMethods - closure captures") {
     m.coefficient += 1
     return result
   }
-  expectEqual(10, gradient(at: 1, in: f3))
+  expectEqual(10, gradient(at: 1, of: f3))
 }
 
 ClassTests.test("ClassProperties") {
   class Super: Differentiable {
-    @differentiable
+    @differentiable(reverse)
     var base: Tracked<Float>
 
     init(base: Tracked<Float>) { self.base = base }
 
-    @differentiable
+    @differentiable(reverse)
     var squared: Tracked<Float> { base * base }
 
     @derivative(of: squared)
@@ -511,7 +511,7 @@ ClassTests.test("ClassProperties") {
   }
 
   class Sub1: Super {
-    @differentiable
+    @differentiable(reverse)
     override var squared: Tracked<Float> { base * base }
   }
 
@@ -535,7 +535,7 @@ ClassTests.test("LetProperties") {
   let bar = Bar()
   let grad = gradient(at: bar) { bar in (bar.x.x * bar.x.x).value }
   expectEqual(Bar.TangentVector(x: .init(x: 6.0)), grad)
-  bar.move(along: grad)
+  bar.move(by: grad)
   expectEqual(8.0, bar.x.x)
 }
 

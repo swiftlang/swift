@@ -31,7 +31,7 @@ namespace swift {
 /// Projections over the aggregate that do not access the struct are ignored.
 ///
 /// StructLoads records loads of the struct value.
-/// StructAddressUsers records other uses of the struct address.
+/// StructAddressUsers records all uses of the struct address.
 /// StructValueUsers records direct uses of the loaded struct.
 ///
 /// Projections of the struct over its elements are all similarly recorded in
@@ -63,7 +63,7 @@ public:
   /// Do not form a path with an IndexAddrInst because we have no way to
   /// distinguish between indexing and subelement access. The same index could
   /// either refer to the next element (indexed) or a subelement.
-  static SILValue getAccessPath(SILValue V, SmallVectorImpl<unsigned>& Path) {
+  static SILValue getAccessPath(SILValue V, SmallVectorImpl<int> &Path) {
     V = stripCasts(V);
     if (auto *IA = dyn_cast<IndexAddrInst>(V)) {
       // Don't include index_addr projections in the access path. We could if
@@ -89,7 +89,7 @@ public:
   VisitedSet Visited;
 
   /// Collect all uses of the value at the given address.
-  void collectUses(ValueBase *V, ArrayRef<unsigned> AccessPath) {
+  void collectUses(ValueBase *V, ArrayRef<int> AccessPath) {
     // Save our old indent and increment.
     // Collect all users of the address and loads.
     collectAddressUses(V, AccessPath, nullptr);
@@ -125,6 +125,9 @@ public:
     if (!ElementAddressUsers.empty())
       return false;
     for (SILInstruction *user : StructAddressUsers) {
+      // ignore load users
+      if (isa<LoadInst>(user))
+        continue;
       if (user != use1 && user != use2)
         return false;
     }
@@ -142,7 +145,7 @@ protected:
   /// StructVal is invalid, then the value is the address of the Struct. If
   /// StructVal is valid, the value is the address of an element within the
   /// Struct.
-  void collectAddressUses(ValueBase *V, ArrayRef<unsigned> AccessPathSuffix,
+  void collectAddressUses(ValueBase *V, ArrayRef<int> AccessPathSuffix,
                           Operand *StructVal) {
     for (auto *UI : V->getUses()) {
       // Keep the operand, not the instruction in the visited set. The same
@@ -184,6 +187,7 @@ protected:
         // Found a use of the struct at the given access path.
         if (auto *LoadI = dyn_cast<LoadInst>(UseInst)) {
           StructLoads.push_back(LoadI);
+          StructAddressUsers.push_back(LoadI);
           continue;
         }
 

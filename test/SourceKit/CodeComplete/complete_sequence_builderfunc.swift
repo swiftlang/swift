@@ -3,7 +3,7 @@ struct Empty: Entity {
     var value: Void = ()
 }
 
-@_functionBuilder
+@resultBuilder
 struct Builder {
   static func buildBlock() ->  { Empty() }
   static func buildBlock<T: Entity>(_ t: T) -> T { t }

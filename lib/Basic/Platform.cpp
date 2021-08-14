@@ -147,6 +147,7 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   switch (triple.getOS()) {
   case llvm::Triple::UnknownOS:
     llvm_unreachable("unknown OS");
+  case llvm::Triple::ZOS:
   case llvm::Triple::Ananas:
   case llvm::Triple::CloudABI:
   case llvm::Triple::DragonFly:
@@ -159,7 +160,6 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   case llvm::Triple::Minix:
   case llvm::Triple::RTEMS:
   case llvm::Triple::NaCl:
-  case llvm::Triple::CNK:
   case llvm::Triple::AIX:
   case llvm::Triple::CUDA:
   case llvm::Triple::NVCL:
@@ -254,6 +254,7 @@ getArchForAppleTargetSpecificModuleTriple(const llvm::Triple &triple) {
 
   return llvm::StringSwitch<StringRef>(tripleArchName)
               .Cases("arm64", "aarch64", "arm64")
+              .Cases("arm64_32", "aarch64_32", "arm64_32")
               .Cases("x86_64", "amd64", "x86_64")
               .Cases("i386", "i486", "i586", "i686", "i786", "i886", "i986",
                      "i386")

@@ -1,0 +1,36 @@
+// RUN: %target-sil-opt -arc-sequence-opts %s
+
+import Builtin
+import Swift
+
+class Klass {
+}
+
+// Test to make sure there is no crash in EpilogueArcAnalysis, while querying the state of unreachable block bb1
+sil @foo : $@convention(thin) (@owned Klass) -> () {
+bb0(%arg : $Klass):
+  strong_retain %arg : $Klass
+  %0 = enum $Optional<Klass>, #Optional.none!enumelt
+  br bb2(%0 : $Optional<Klass>)
+
+bb1: // unreachable
+  %1 = enum $Optional<Klass>, #Optional.some!enumelt, undef : $Klass
+  br bb2(%1 : $Optional<Klass>)
+
+bb2(%2 : $Optional<Klass>):
+  switch_enum %2 : $Optional<Klass>, case #Optional.some!enumelt: bb3, case #Optional.none!enumelt: bb4
+
+bb3:
+  br bb5
+
+bb4:
+  br bb5
+
+bb5:
+ release_value %2 : $Optional<Klass>
+ strong_release %arg : $Klass
+ strong_release %arg : $Klass
+ %res = tuple ()
+ return %res : $()
+}
+

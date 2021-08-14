@@ -1,5 +1,6 @@
 target_sources(swiftSIL PRIVATE
   AbstractionPattern.cpp
+  ApplySite.cpp
   Bridging.cpp
   Linker.cpp
   Notifications.cpp
@@ -10,6 +11,7 @@ target_sources(swiftSIL PRIVATE
   SILBuilder.cpp
   SILConstants.cpp
   SILCoverageMap.cpp
+  SILDebugInfoExpression.cpp
   SILDebugScope.cpp
   SILDeclRef.cpp
   SILDefaultWitnessTable.cpp

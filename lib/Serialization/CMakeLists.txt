@@ -1,4 +1,4 @@
-set_swift_llvm_is_available()
+
 add_swift_host_library(swiftSerialization STATIC
   Deserialization.cpp
   DeserializeSIL.cpp
@@ -16,5 +16,7 @@ add_swift_host_library(swiftSerialization STATIC
   )
 target_link_libraries(swiftSerialization PRIVATE
   swiftClangImporter
-  swiftSIL)
+  swiftSIL
+  swiftSymbolGraphGen)
 
+set_swift_llvm_is_available(swiftSerialization)

@@ -42,11 +42,16 @@ using namespace fine_grained_dependencies;
 // MARK: Emitting and reading SourceFileDepGraph
 //==============================================================================
 
-Optional<SourceFileDepGraph> SourceFileDepGraph::loadFromPath(StringRef path) {
+Optional<SourceFileDepGraph>
+SourceFileDepGraph::loadFromPath(StringRef path, const bool allowSwiftModule) {
+  const bool treatAsModule =
+      allowSwiftModule &&
+      path.endswith(file_types::getExtension(file_types::TY_SwiftModuleFile));
   auto bufferOrError = llvm::MemoryBuffer::getFile(path);
   if (!bufferOrError)
     return None;
-  return loadFromBuffer(*bufferOrError.get());
+  return treatAsModule ? loadFromSwiftModuleBuffer(*bufferOrError.get())
+                       : loadFromBuffer(*bufferOrError.get());
 }
 
 Optional<SourceFileDepGraph>
@@ -109,7 +114,7 @@ void SourceFileDepGraph::forEachArc(
 
 InterfaceAndImplementationPair<SourceFileDepGraphNode>
 SourceFileDepGraph::findExistingNodePairOrCreateAndAddIfNew(
-    const DependencyKey &interfaceKey, Optional<StringRef> fingerprint) {
+    const DependencyKey &interfaceKey, Optional<Fingerprint> fingerprint) {
 
   // Optimization for whole-file users:
   if (interfaceKey.getKind() == NodeKind::sourceFileProvide &&
@@ -145,7 +150,7 @@ SourceFileDepGraph::findExistingNodePairOrCreateAndAddIfNew(
 }
 
 SourceFileDepGraphNode *SourceFileDepGraph::findExistingNodeOrCreateIfNew(
-    const DependencyKey &key, const Optional<StringRef> fingerprint,
+    const DependencyKey &key, const Optional<Fingerprint> fingerprint,
     const bool isProvides) {
   SourceFileDepGraphNode *result = memoizedNodes.findExistingOrCreateIfNew(
       key, [&](DependencyKey key) -> SourceFileDepGraphNode * {
@@ -186,12 +191,9 @@ std::string DependencyKey::demangleTypeAsContext(StringRef s) {
 DependencyKey DependencyKey::createKeyForWholeSourceFile(DeclAspect aspect,
                                                          StringRef swiftDeps) {
   assert(!swiftDeps.empty());
-  const std::string context = DependencyKey::computeContextForProvidedEntity<
-      NodeKind::sourceFileProvide>(swiftDeps);
-  const std::string name =
-      DependencyKey::computeNameForProvidedEntity<NodeKind::sourceFileProvide>(
-          swiftDeps);
-  return DependencyKey(NodeKind::sourceFileProvide, aspect, context, name);
+  return DependencyKey::Builder(NodeKind::sourceFileProvide, aspect)
+      .withName(swiftDeps)
+      .build();
 }
 
 //==============================================================================
@@ -240,7 +242,6 @@ std::string DependencyKey::humanReadableName() const {
   switch (kind) {
   case NodeKind::member:
     return demangleTypeAsContext(context) + "." + name;
-  case NodeKind::incrementalExternalDepend:
   case NodeKind::externalDepend:
   case NodeKind::sourceFileProvide:
     return llvm::sys::path::filename(name).str();
@@ -271,12 +272,9 @@ raw_ostream &fine_grained_dependencies::operator<<(raw_ostream &out,
 bool DependencyKey::verify() const {
   assert((getKind() != NodeKind::externalDepend || isInterface()) &&
          "All external dependencies must be interfaces.");
-  assert((getKind() != NodeKind::incrementalExternalDepend || isInterface()) &&
-         "All incremental external dependencies must be interfaces.");
   switch (getKind()) {
   case NodeKind::topLevel:
   case NodeKind::dynamicLookup:
-  case NodeKind::incrementalExternalDepend:
   case NodeKind::externalDepend:
   case NodeKind::sourceFileProvide:
     assert(context.empty() && !name.empty() && "Must only have a name");
@@ -307,7 +305,6 @@ void DependencyKey::verifyNodeKindNames() {
       CHECK_NAME(potentialMember)
       CHECK_NAME(member)
       CHECK_NAME(dynamicLookup)
-      CHECK_NAME(incrementalExternalDepend)
       CHECK_NAME(externalDepend)
       CHECK_NAME(sourceFileProvide)
     case NodeKind::kindCount:
@@ -339,9 +336,9 @@ void DepGraphNode::dump() const {
 void DepGraphNode::dump(raw_ostream &os) const {
   key.dump(os);
   if (fingerprint.hasValue())
-    llvm::errs() << "fingerprint: " << fingerprint.getValue() << "";
+    os << "fingerprint: " << fingerprint.getValue() << "";
   else
-    llvm::errs() << "no fingerprint";
+    os << "no fingerprint";
 }
 
 void SourceFileDepGraphNode::dump() const {

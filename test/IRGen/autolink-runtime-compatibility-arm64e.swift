@@ -1,5 +1,7 @@
 // REQUIRES: CPU=arm64e,OS=ios
 
+// REQUIRES: rdar70772670
+
 // Doesn't autolink compatibility library because target OS doesn't need it
 // RUN: %target-swift-frontend -target arm64e-apple-ios11.0  -emit-ir -parse-stdlib %s | %FileCheck -check-prefix=NO-FORCE-LOAD %s
 

@@ -1,17 +1,16 @@
-// RUN: %target-sil-opt %s -module-name=sildeclref_parse | %target-sil-opt -module-name=sildeclref_parse | %FileCheck %s
-
+// RUN: %target-sil-opt %s -module-name=sildeclref_parse -requirement-machine off | %target-sil-opt -module-name=sildeclref_parse -requirement-machine off | %FileCheck %s
 // Parse AutoDiff derivative SILDeclRefs via `witness_method` and `class_method` instructions.
 
 import Swift
 import _Differentiation
 
 protocol Protocol {
-  @differentiable(wrt: (x, y))
+  @differentiable(reverse, wrt: (x, y))
   func f(_ x: Float, _ y: Float) -> Float
 }
 
 class Class<T> {
-  @differentiable(wrt: (x, y) where T: Differentiable)
+  @differentiable(reverse, wrt: (x, y) where T: Differentiable)
   func f(_ x: T, _ y: Float) -> T
 }
 

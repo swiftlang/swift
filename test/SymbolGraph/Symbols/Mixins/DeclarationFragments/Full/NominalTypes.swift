@@ -50,8 +50,12 @@ public protocol P {}
 // STRUCT-NEXT:   },
 // STRUCT-NEXT:   {
 // STRUCT-NEXT:     "kind": "text",
-// STRUCT-NEXT:     "spelling": " T"
+// STRUCT-NEXT:     "spelling": " "
 // STRUCT-NEXT:   },
+// STRUCT-NEXT:   {
+// STRUCT-NEXT:     "kind": "typeIdentifier",
+// STRUCT-NEXT:     "spelling": "T"
+// STRUCT-NEXT:   }
 // STRUCT-NEXT:   {
 // STRUCT-NEXT:     "kind": "text",
 // STRUCT-NEXT:     "spelling": " : "
@@ -97,8 +101,12 @@ public class C<T> where T: Sequence {}
 // CLASS-NEXT:   },
 // CLASS-NEXT:   {
 // CLASS-NEXT:     "kind": "text",
-// CLASS-NEXT:     "spelling": " T"
+// CLASS-NEXT:     "spelling": " "
 // CLASS-NEXT:   },
+// CLASS-NEXT:   {
+// CLASS-NEXT:     "kind": "typeIdentifier",
+// CLASS-NEXT:     "spelling": "T"
+// CLASS-NEXT:   }
 // CLASS-NEXT:   {
 // CLASS-NEXT:     "kind": "text",
 // CLASS-NEXT:     "spelling": " : "
@@ -144,8 +152,12 @@ public enum E<T> where T: Sequence {}
 // ENUM-NEXT:   },
 // ENUM-NEXT:   {
 // ENUM-NEXT:     "kind": "text",
-// ENUM-NEXT:     "spelling": " T"
+// ENUM-NEXT:     "spelling": " "
 // ENUM-NEXT:   },
+// ENUM-NEXT:   {
+// ENUM-NEXT:     "kind": "typeIdentifier",
+// ENUM-NEXT:     "spelling": "T"
+// ENUM-NEXT:   }
 // ENUM-NEXT:   {
 // ENUM-NEXT:     "kind": "text",
 // ENUM-NEXT:     "spelling": " : "
@@ -192,8 +204,12 @@ public typealias TA<T> = S<T> where T: Sequence
 // TYPEALIAS-NEXT:   },
 // TYPEALIAS-NEXT:   {
 // TYPEALIAS-NEXT:     "kind": "text",
-// TYPEALIAS-NEXT:     "spelling": "<T"
+// TYPEALIAS-NEXT:     "spelling": "<"
 // TYPEALIAS-NEXT:   },
+// TYPEALIAS-NEXT:   {
+// TYPEALIAS-NEXT:     "kind": "typeIdentifier",
+// TYPEALIAS-NEXT:     "spelling": "T"
+// TYPEALIAS-NEXT:   }
 // TYPEALIAS-NEXT:   {
 // TYPEALIAS-NEXT:     "kind": "text",
 // TYPEALIAS-NEXT:     "spelling": "> "
@@ -204,8 +220,12 @@ public typealias TA<T> = S<T> where T: Sequence
 // TYPEALIAS-NEXT:   },
 // TYPEALIAS-NEXT:   {
 // TYPEALIAS-NEXT:     "kind": "text",
-// TYPEALIAS-NEXT:     "spelling": " T"
+// TYPEALIAS-NEXT:     "spelling": " "
 // TYPEALIAS-NEXT:   },
+// TYPEALIAS-NEXT:   {
+// TYPEALIAS-NEXT:     "kind": "typeIdentifier",
+// TYPEALIAS-NEXT:     "spelling": "T"
+// TYPEALIAS-NEXT:   }
 // TYPEALIAS-NEXT:   {
 // TYPEALIAS-NEXT:     "kind": "text",
 // TYPEALIAS-NEXT:     "spelling": " : "

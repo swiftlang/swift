@@ -1,0 +1,1 @@
+public actor Bar {}

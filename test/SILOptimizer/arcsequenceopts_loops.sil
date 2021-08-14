@@ -21,9 +21,12 @@ bb0(%0 : $Builtin.NativeObject):
   br bb1
 
 bb1:
-  cond_br undef, bb1, bb2
+  cond_br undef, bb2, bb3
 
 bb2:
+  br bb1
+
+bb3:
   strong_release %0 : $Builtin.NativeObject
   return undef : $()
 }
@@ -39,9 +42,12 @@ bb0(%0 : $Builtin.NativeObject):
 
 bb1:
   strong_release %0 : $Builtin.NativeObject
-  cond_br undef, bb1, bb2
+  cond_br undef, bb2, bb3
 
 bb2:
+  br bb1
+
+bb3:
   strong_release %0 : $Builtin.NativeObject
   return undef : $()
 }
@@ -57,9 +63,12 @@ bb0(%0 : $Builtin.NativeObject):
 
 bb1:
   strong_retain %0 : $Builtin.NativeObject
-  cond_br undef, bb1, bb2
+  cond_br undef, bb2, bb3
 
 bb2:
+  br bb1
+
+bb3:
   strong_release %0 : $Builtin.NativeObject
   return undef : $()
 }
@@ -75,9 +84,12 @@ bb0(%0 : $Builtin.NativeObject):
 bb1:
   strong_retain %0 : $Builtin.NativeObject
   strong_release %0 : $Builtin.NativeObject
-  cond_br undef, bb1, bb2
+  cond_br undef, bb2, bb3
 
 bb2:
+  br bb1
+
+bb3:
   strong_release %0 : $Builtin.NativeObject
   return undef : $()
 }
@@ -99,9 +111,12 @@ bb1:
   strong_retain %0 : $Builtin.NativeObject
   apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
   strong_release %0 : $Builtin.NativeObject
-  cond_br undef, bb1, bb2
+  cond_br undef, bb2, bb3
 
 bb2:
+  br bb1
+
+bb3:
   strong_release %0 : $Builtin.NativeObject
   return undef : $()
 }
@@ -120,9 +135,12 @@ bb1:
   strong_retain %0 : $Builtin.NativeObject
   apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
   strong_release %0 : $Builtin.NativeObject
-  cond_br undef, bb1, bb2
+  cond_br undef, bb2, bb3
 
 bb2:
+  br bb1
+
+bb3:
   strong_release %0 : $Builtin.NativeObject
   strong_release %0 : $Builtin.NativeObject
   return undef : $()
@@ -149,9 +167,12 @@ bb0(%0 : $Builtin.NativeObject):
 bb1:
   strong_retain %0 : $Builtin.NativeObject
   strong_release %0 : $Builtin.NativeObject
-  cond_br undef, bb1, bb2
+  cond_br undef, bb2, bb3
 
 bb2:
+  br bb1
+
+bb3:
   strong_release %0 : $Builtin.NativeObject
   return undef : $()
 }
@@ -173,9 +194,12 @@ bb0(%0 : $Builtin.NativeObject):
 bb1:
   strong_retain %0 : $Builtin.NativeObject
   strong_release %0 : $Builtin.NativeObject
-  cond_br undef, bb1, bb2
+  cond_br undef, bb2, bb3
 
 bb2:
+  br bb1
+
+bb3:
   apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
   apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
   strong_release %0 : $Builtin.NativeObject
@@ -204,9 +228,12 @@ bb0(%0 : $Builtin.NativeObject):
 bb1:
   strong_retain %0 : $Builtin.NativeObject
   strong_release %0 : $Builtin.NativeObject
-  cond_br undef, bb1, bb2
+  cond_br undef, bb2, bb3
 
 bb2:
+  br bb1
+
+bb3:
   apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
   strong_release %0 : $Builtin.NativeObject
   return undef : $()
@@ -224,12 +251,18 @@ bb1:
   br bb2
 
 bb2:
-  cond_br undef, bb2, bb3
+  cond_br undef, bb3, bb4
 
 bb3:
-  cond_br undef, bb1, bb4
+  br bb2
 
 bb4:
+  cond_br undef, bb5, bb6
+
+bb5:
+  br bb1
+
+bb6:
   strong_release %0 : $Builtin.NativeObject
   return undef : $()
 }
@@ -248,12 +281,18 @@ bb1:
 
 bb2:
   strong_release %0 : $Builtin.NativeObject
-  cond_br undef, bb2, bb3
+  cond_br undef, bb3, bb4
 
 bb3:
-  cond_br undef, bb1, bb4
+  br bb2
 
 bb4:
+  cond_br undef, bb5, bb6
+
+bb5:
+  br bb1
+
+bb6:
   strong_release %0 : $Builtin.NativeObject
   return undef : $()
 }
@@ -272,12 +311,18 @@ bb1:
 
 bb2:
   strong_retain %0 : $Builtin.NativeObject
-  cond_br undef, bb2, bb3
+  cond_br undef, bb3, bb4
 
 bb3:
-  cond_br undef, bb1, bb4
+  br bb2
 
 bb4:
+  cond_br undef, bb5, bb6
+
+bb5:
+  br bb1
+
+bb6:
   strong_release %0 : $Builtin.NativeObject
   return undef : $()
 }
@@ -295,18 +340,27 @@ bb1:
   cond_br undef, bb2, bb3
 
 bb2:
-  cond_br undef, bb1, bb4
+  br bb1
 
 bb3:
-  cond_br undef, bb1, bb5
+  cond_br undef, bb4, bb5
 
 bb4:
-  br bb6
+  br bb1
 
 bb5:
-  br bb6
+  cond_br undef, bb6, bb7
 
 bb6:
+  br bb1
+
+bb7:
+  br bb8
+
+bb8:
+  br bb9
+
+bb9:
   strong_release %0 : $Builtin.NativeObject
   return undef : $()
 }
@@ -314,23 +368,12 @@ bb6:
 // CHECK-LABEL: sil @loop_multiple_exits_multiple_insertion_points : $@convention(thin) (Builtin.NativeObject) -> () {
 // CHECK: bb0
 // CHECK: strong_retain
-// CHECK-NOT: strong_release
-// CHECK: bb1
 // CHECK-NOT: strong_retain
-// CHECK-NOT: strong_release
-// CHECK: bb2
-// CHECK-NOT: strong_retain
-// CHECK-NOT: strong_release
-// CHECK: bb3
-// CHECK-NOT: strong_retain
-// CHECK-NOT: strong_release
-// CHECK: bb4
-// CHECK: strong_release
-// CHECK: bb5
 // CHECK-NOT: strong_release
 // CHECK: bb6
+// CHECK: strong_release
 // CHECK-NOT: strong_release
-// CHECK: bb7
+// CHECK: bb8
 // CHECK: strong_release
 sil @loop_multiple_exits_multiple_insertion_points : $@convention(thin) (Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject):
@@ -338,22 +381,28 @@ bb0(%0 : $Builtin.NativeObject):
   br bb1
 
 bb1:
-  cond_br undef, bb2, bb3
+  cond_br undef, bb2, bb4
 
 bb2:
-  cond_br undef, bb1, bb4
+  cond_br undef, bb3, bb6
 
 bb3:
-  strong_release %0 : $Builtin.NativeObject
-  cond_br undef, bb1, bb5
+  br bb1
 
 bb4:
-  br bb6
+  strong_release %0 : $Builtin.NativeObject
+  cond_br undef, bb5, bb7
 
 bb5:
-  br bb6
+  br bb1
 
 bb6:
+  br bb8
+
+bb7:
+  br bb8
+
+bb8:
   strong_release %0 : $Builtin.NativeObject
   return undef : $()
 }
@@ -378,13 +427,20 @@ bb0(%0 : $Builtin.NativeObject):
 bb1:
   cond_br undef, bb2, bb3
 
+
 bb2:
-  cond_br undef, bb1, bb4
+  cond_br undef, bb2a, bb4
+
+bb2a:
+  br bb1
 
 bb3:
   strong_release %0 : $Builtin.NativeObject
-  cond_br undef, bb1, bb5
+  cond_br undef, bb3a, bb5
 
+bb3a:
+  br bb1
+  
 bb4:
   strong_retain %0 : $Builtin.NativeObject
   br bb6
@@ -449,7 +505,10 @@ bb2:
 
 bb3:
   strong_release %0 : $Builtin.NativeObject
-  cond_br undef, bb1, bb4
+  cond_br undef, bb3a, bb4
+
+bb3a:
+  br bb1
 
 bb4:
   strong_release %0 : $Builtin.NativeObject
@@ -477,10 +536,16 @@ bb3:
 
 bb4:
   strong_release %0 : $Builtin.NativeObject
-  cond_br undef, bb2, bb5
+  cond_br undef, bb4a, bb5
+
+bb4a:
+  br bb2
 
 bb5:
-  cond_br undef, bb1, bb6
+  cond_br undef, bb5a, bb6
+
+bb5a:
+  br bb1
 
 bb6:
   strong_release %0 : $Builtin.NativeObject

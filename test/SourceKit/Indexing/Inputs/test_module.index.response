@@ -172,7 +172,16 @@
     {
       key.kind: source.lang.swift.decl.extension.class,
       key.name: "C2",
-      key.usr: "s:e:s:11test_module2C2C6SECRETyyF"
+      key.usr: "s:e:s:11test_module2C2C10publicFuncyyF",
+      key.entities: [
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.name: "publicFunc()",
+          key.usr: "s:11test_module2C2C10publicFuncyyF",
+          key.is_dynamic: 1,
+          key.effective_access: source.decl.effective_access.public
+        }
+      ]
     }
   ]
 }

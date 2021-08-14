@@ -32,17 +32,20 @@ sil_vtable Bar {
 // CHECK: bb0(%0 : $Int32, %1 : $Bar):
 // CHECK:   class_method
 // CHECK:   apply
-// CHECK:   cond_br {{.*}}, bb3({{.*}} : $Builtin.Int32), bb1
+// CHECK:   cond_br {{.*}}, bb2, bb1
 
 // CHECK: bb1:
-// CHECK:   br bb2({{.*}} : $Builtin.Int32, {{.*}} : $Builtin.Int32, {{.*}}: $Int32)
+// CHECK-NEXT:   br bb3({{.*}} : $Builtin.Int32, {{.*}} : $Builtin.Int32, {{.*}}: $Int32)
 
-// CHECK: bb2({{.*}}: $Builtin.Int32, {{.*}} : $Builtin.Int32, {{.*}} : $Int32):
+// CHECK: bb3({{.*}}: $Builtin.Int32, {{.*}} : $Builtin.Int32, {{.*}} : $Int32):
 // CHECK:   class_method
 // CHECK:   apply
-// CHECK:   cond_br {{%.*}}, bb3({{.*}} : $Builtin.Int32), bb2({{.*}} : $Builtin.Int32, {{.*}} : $Builtin.Int32, {{.*}} : $Int32)
+// CHECK:   cond_br {{%.*}}, bb5, bb4
 
-// CHECK: bb3({{.*}} : $Builtin.Int32):
+// CHECK: bb5:
+// CHECK-NEXT:   br bb6({{.*}} : $Builtin.Int32)
+
+// CHECK: bb6({{.*}} : $Builtin.Int32):
 // CHECK:   [[STRUCT:%.*]] = struct $Int32 ({{%.*}} : $Builtin.Int32)
 // CHECK:   return [[STRUCT]] : $Int32
 // CHECK: } // end sil function 'looprotate'
@@ -339,12 +342,12 @@ bb0(%a0 : $Int32):
 // CHECK: bb0:
 // CHECK:  cond_br
 // CHECK: bb1:
-// CHECK:  br bb2
-// CHECK: bb2({{%.*}} : $Builtin.Int32, [[WORD:%.*]] : $Builtin.Int32
+// CHECK:  br bb3
+// CHECK: bb3({{%.*}} : $Builtin.Int32, [[WORD:%.*]] : $Builtin.Int32
 // CHECK:  [[STRUCT:%[0-9]+]] = struct $Int32 ([[WORD]]
 // CHECK:  apply {{.*}}([[STRUCT]])
 // CHECK:  cond_br
-// CHECK: bb3({{.*}}):
+// CHECK: bb6({{.*}}):
 // CHECK:  return
 sil @struct_arg : $@convention(thin) () -> () {
 bb0:
@@ -383,18 +386,18 @@ bb2:
 // CHECK:   cond_br
 // Loop Header
 // CHECK: bb1:
-// CHECK-NEXT: br bb2
-// CHECK: bb2:
-// CHECK:   cond_br %{{.*}}, bb3, bb5
+// CHECK-NEXT: br bb3
 // CHECK: bb3:
+// CHECK:   cond_br %{{.*}}, bb4, bb8
+// CHECK: bb4:
 // CHECK:   apply
-// CHECK:   br bb4(
-// CHECK: bb4(%[[ARG:[0-9]*]]
-// CHECK-NEXT: cond_br %{{.*}}, bb6, bb2
-// CHECK: bb5:
+// CHECK:   br bb5(
+// CHECK: bb5(%[[ARG:[0-9]*]]
+// CHECK-NEXT: cond_br %{{.*}}, bb7, bb6
+// CHECK: bb8:
 // CHECK:   apply
-// CHECK:   br bb4(%
-// CHECK: bb6
+// CHECK:   br bb5(%
+// CHECK: bb9
 // CHECK:   return
 sil @insert_backedge_block : $@convention(thin) (@owned @callee_owned () -> Builtin.Int32) -> () {
 bb0(%0 : $@callee_owned () -> Builtin.Int32):

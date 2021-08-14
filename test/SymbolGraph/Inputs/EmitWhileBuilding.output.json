@@ -1,0 +1,11 @@
+{
+    "": {
+        "swift-dependencies": "./EmitWhileBuilding-main.swiftdeps"
+    },
+    "EmitWhileBuilding.swift": {
+        "object": "./EmitWhileBuilding.o",
+        "swiftmodule": "./EmitWhileBuilding_partial.swiftmodule",
+        "dependencies": "./EmitWhileBuilding.d",
+        "swift-dependencies": "./EmitWhileBuilding.swiftdeps"
+    }
+}

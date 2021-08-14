@@ -472,6 +472,8 @@ namespace {
       case SILDeclRef::Kind::EnumElement:
       case SILDeclRef::Kind::GlobalAccessor:
       case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
+      case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
+      case SILDeclRef::Kind::EntryPoint:
         llvm_unreachable("Method does not have a selector");
 
       case SILDeclRef::Kind::Destroyer:
@@ -657,8 +659,18 @@ Callee irgen::getObjCMethodCallee(IRGenFunction &IGF,
   Selector selector(method);
   llvm::Value *selectorValue = IGF.emitObjCSelectorRefLoad(selector.str());
 
-  auto fn = FunctionPointer::forDirect(messenger, sig);
+  auto fn =
+      FunctionPointer::forDirect(FunctionPointer::Kind::Function, messenger,
+                                 /*secondaryValue*/ nullptr, sig);
   return Callee(std::move(info), fn, receiverValue, selectorValue);
+}
+
+Callee irgen::getObjCDirectMethodCallee(CalleeInfo &&info, const FunctionPointer &fn,
+                                        llvm::Value *selfValue) {
+  // Direct calls to Objective-C methods have a selector value of `undef`.
+  auto selectorType = fn.getFunctionType()->getParamType(1);
+  auto selectorValue = llvm::UndefValue::get(selectorType);
+  return Callee(std::move(info), fn, selfValue, selectorValue);
 }
 
 /// Call [self allocWithZone: nil].
@@ -701,8 +713,8 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
     llvm::Function::Create(fwdTy, llvm::Function::InternalLinkage,
                            MANGLE_AS_STRING(OBJC_PARTIAL_APPLY_THUNK_SYM),
                            &IGM.Module);
-  fwd->setCallingConv(
-      expandCallingConv(IGM, SILFunctionTypeRepresentation::Thick));
+  fwd->setCallingConv(expandCallingConv(
+      IGM, SILFunctionTypeRepresentation::Thick, false/*isAsync*/));
 
   fwd->setAttributes(attrs);
   // Merge initial attributes with attrs.
@@ -1174,9 +1186,11 @@ irgen::emitObjCMethodDescriptorParts(IRGenModule &IGM,
   /// with numbers that used to represent stack offsets for each of these
   /// elements.
   CanSILFunctionType methodType = getObjCMethodType(IGM, method);
-  descriptor.typeEncoding =
-      getObjCEncodingForMethod(IGM, methodType, /*extended*/ false, method);
   
+  bool useExtendedEncoding =
+    method->hasAsync() && !isa<ProtocolDecl>(method->getDeclContext());
+  descriptor.typeEncoding = getObjCEncodingForMethod(
+      IGM, methodType, /*extended*/ useExtendedEncoding, method);
   /// The third element is the method implementation pointer.
   if (!concrete) {
     descriptor.impl = nullptr;

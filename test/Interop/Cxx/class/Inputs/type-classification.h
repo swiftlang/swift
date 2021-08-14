@@ -1,5 +1,5 @@
-#ifndef TEST_INTEROP_CXX_CLASS_INPUTS_LOADABLE_TYPES_H
-#define TEST_INTEROP_CXX_CLASS_INPUTS_LOADABLE_TYPES_H
+#ifndef TEST_INTEROP_CXX_CLASS_INPUTS_TYPE_CLASSIFICATION_H
+#define TEST_INTEROP_CXX_CLASS_INPUTS_TYPE_CLASSIFICATION_H
 
 struct EmptyStruct {};
 
@@ -112,6 +112,17 @@ struct StructWithSubobjectPrivateDefaultedDestructor {
   StructWithPrivateDefaultedDestructor subobject;
 };
 
+struct StructWithDeletedDestructor {
+  ~StructWithDeletedDestructor() = delete;
+};
+
+struct StructWithInheritedDeletedDestructor
+    : StructWithDeletedDestructor {};
+
+struct StructWithSubobjectDeletedDestructor {
+  StructWithDeletedDestructor subobject;
+};
+
 // Tests for common sets of special member functions.
 
 struct StructTriviallyCopyableMovable {
@@ -157,6 +168,8 @@ struct StructDeletedDestructor {
 
 struct StructWithCopyConstructorAndValue {
   int value;
+  StructWithCopyConstructorAndValue() : value(0) {}
+  StructWithCopyConstructorAndValue(int value) : value(value) {}
   StructWithCopyConstructorAndValue(
       const StructWithCopyConstructorAndValue &other)
       : value(other.value) {}
@@ -169,8 +182,17 @@ struct StructWithSubobjectCopyConstructorAndValue {
 struct StructWithCopyConstructorAndSubobjectCopyConstructorAndValue {
   StructWithCopyConstructorAndValue member;
   StructWithCopyConstructorAndSubobjectCopyConstructorAndValue(
+      StructWithCopyConstructorAndValue member)
+      : member(member) {}
+  StructWithCopyConstructorAndSubobjectCopyConstructorAndValue(
       const StructWithCopyConstructorAndSubobjectCopyConstructorAndValue &other)
       : member(other.member) {}
 };
 
-#endif
+template<class> struct DependentParent { struct Child { }; };
+
+struct HasUnsupportedUsingShadow : DependentParent<int> {
+  using typename DependentParent<int>::Child;
+};
+
+#endif // TEST_INTEROP_CXX_CLASS_INPUTS_TYPE_CLASSIFICATION_H

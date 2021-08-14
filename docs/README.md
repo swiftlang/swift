@@ -86,9 +86,6 @@ documentation, please create a thread on the Swift forums under the
 
 ## Explanations
 
-- [ByteTree.md](/docs/ByteTree.md):
-  Describes the ByteTree binary format used for serializing syntax trees
-  in `libSyntax`.
 - [WebAssembly.md](/docs/WebAssembly.md):
   Explains some decisions that were made while implementing the WebAssembly target.
 
@@ -180,9 +177,17 @@ documentation, please create a thread on the Swift forums under the
   <!-- NOTE: Outdated -->
 - [Lexicon.md](/docs/Lexicon.md):
   Canonical reference for terminology used throughout the project.
-  
+- [UnderscoredAttributes.md](/docs/ReferenceGuides/UnderscoredAttributes.md):
+  Documents semantics for underscored (unstable) attributes.
+
 ### ABI
 
+- [CallConvSummary.rst](/docs/ABI/CallConvSummary.rst):
+	A concise summary of the calling conventions used for C/C++, Objective-C
+	and Swift on Apple platforms.  Contains references to source documents,
+	where further detail is required.
+- [CallingConvention.rst](/docs/ABI/CallingConvention.rst):
+  Describes in detail the Swift calling convention.
 - [GenericSignature.md](/docs/ABI/GenericSignature.md):
   Describes what generic signatures are and how they are used in the ABI,
   including the algorithms for minimization and canonicalization.
@@ -194,9 +199,6 @@ documentation, please create a thread on the Swift forums under the
 - [Mangling.rst](/docs/ABI/Mangling.rst):
   Describes the stable mangling scheme, which produces unique symbols for
   ABI-public declarations.
-- [RegisterUsage.md](/docs/ABI/RegisterUsage.md):
-  Summarizes the register allocation for ARM64 and x86_64 calling conventions,
-  including the context register (self) and error return register.
 - [TypeLayout.rst](/docs/ABI/TypeLayout.rst):
   Describes the algorithms/strategies for fragile struct and tuple layout;
   class layout; fragile enum layout; and existential container layout.
@@ -271,7 +273,7 @@ You can see the status of different proposals at
 - [ErrorHandlingRationale.rst](/docs/ErrorHandlingRationale.rst):
   Surveys error-handling in a variety of languages, and describes the rationale
   behind the design of error handling in Swift.
-- [weak.rst](/docs/weak.rst):
+- [WeakReferences.md](/docs/WeakReferences.md):
   Discusses weak references, including the designs in different languages,
   and proposes changes to Swift (pre-1.0).
   <!-- NOTE: Outdated -->
@@ -282,7 +284,7 @@ These documents are known to be out-of-date and are superseded by other
 documentation, primarily [The Swift Programming Language][] (TSPL).
 They are preserved mostly for historical interest.
 
-- [AccessControl.rst](/docs/AccessControl.rst)
+- [AccessControl.md](/docs/AccessControl.md)
 - [Arrays.rst](/docs/Arrays.rst)
   <!-- Has additional notes on bridging that may be of general interest? -->
 - [Generics.rst](/docs/Generics.rst)
@@ -307,7 +309,7 @@ The documents in this section might be worth breaking up into several documents,
 and linking one document from the other. Breaking up into components will
 provide greater clarity to contributors wanting to add new documentation.
 
-- [ARCOptimization.rst](/docs/ARCOptimization.rst):
+- [ARCOptimization.md](/docs/ARCOptimization.md):
   Covers how ARC optimization works, with several examples.
   TODO: Not clear if this is intended to be an explanation or a reference guide.
 - [CompilerPerformance.md](/docs/CompilerPerformance.md):

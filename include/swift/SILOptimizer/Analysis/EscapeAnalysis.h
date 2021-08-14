@@ -832,11 +832,6 @@ public:
     /// Propagates the escape states through the graph.
     void propagateEscapeStates();
 
-    /// Remove a value from the graph. Do not delete the mapped node, but reset
-    /// mappedValue if it is set to this value, and make sure that the node
-    /// cannot be looked up with getNode().
-    void removeFromGraph(ValueBase *V);
-
     enum class Traversal { Follow, Backtrack, Halt };
 
     /// Traverse backward from startNode, following predecessor edges.
@@ -989,8 +984,13 @@ private:
   /// The allocator for the connection graphs in Function2ConGraph.
   llvm::SpecificBumpPtrAllocator<FunctionInfo> Allocator;
 
+  // TODO: Use per-function caches, at least for Resilient types, to use Maximal
+  // expansion.
+
   /// Cache for isPointer().
   PointerKindCache pointerKindCache;
+  /// Cache for checking the aggregate pointerness of class properties.
+  PointerKindCache classPropertiesKindCache;
 
   SILModule *M;
 
@@ -1013,6 +1013,12 @@ private:
   PointerKind findRecursivePointerKind(SILType Ty, const SILFunction &F) const;
 
   PointerKind findCachedPointerKind(SILType Ty, const SILFunction &F) const;
+
+  PointerKind findClassPropertiesPointerKind(SILType Ty,
+                                             const SILFunction &F) const;
+
+  PointerKind findCachedClassPropertiesKind(SILType Ty,
+                                            const SILFunction &F) const;
 
   // Returns true if the type \p Ty must be a reference or must transitively
   // contain a reference and no other pointer or address type.
@@ -1114,6 +1120,10 @@ private:
   bool canEscapeToUsePoint(SILValue value, SILInstruction *usePoint,
                            ConnectionGraph *conGraph);
 
+  /// Common implementation for mayReleaseReferenceContent and
+  /// mayReleaseAddressContent.
+  bool mayReleaseContent(SILValue releasedPtr, SILValue liveAddress);
+
   friend struct ::CGForDotView;
 
 public:
@@ -1158,9 +1168,43 @@ public:
   /// Note that if \p RI is a retain-instruction always false is returned.
   bool canEscapeTo(SILValue V, RefCountingInst *RI);
 
+  /// Returns true if the value \p V can escape to the destroy_value instruction
+  /// \p DVI.
+  bool canEscapeTo(SILValue V, DestroyValueInst *DVI);
+
   /// Return true if \p releasedReference deinitialization may release memory
-  /// pointed to by \p accessedAddress.
-  bool mayReleaseContent(SILValue releasedReference, SILValue accessedAddress);
+  /// pointed to by \p liveAddress.
+  ///
+  /// This determines whether a direct release of \p releasedReference, such as
+  /// destroy_value or strong_release may release memory pointed to by \p
+  /// liveAddress. It can also be used to determine whether passing a
+  /// reference-type call argument may release \p liveAddress.
+  ///
+  /// This does not distinguish between a call that releases \p
+  /// releasedReference directly, vs. a call that releases one of indirect
+  /// references.The side effects of releasing any object reachable from \p
+  /// releasedReference are a strict subset of the side effects of directly
+  /// releasing the parent reference.
+  bool mayReleaseReferenceContent(SILValue releasedReference,
+                                  SILValue liveAddress) {
+    assert(!releasedReference->getType().isAddress() &&
+           "expected a potentially nontrivial value, not an address");
+    return mayReleaseContent(releasedReference, liveAddress);
+  }
+
+  /// Return true if accessing memory at \p accessedAddress may release memory
+  /// pointed to by \p liveAddress.
+  ///
+  /// This makes sense for determining whether accessing indirect call argument
+  /// \p accessedAddress may release memory pointed to by \p liveAddress.
+  ///
+  /// "Access" to the memory can be any release of a reference pointed to by \p
+  /// accessedAddress, so '@in' and '@inout' are handled the same.
+  bool mayReleaseAddressContent(SILValue accessedAddress,
+                                SILValue liveAddress) {
+    assert(accessedAddress->getType().isAddress() && "expected an address");
+    return mayReleaseContent(accessedAddress, liveAddress);
+  }
 
   /// Returns true if the pointers \p V1 and \p V2 can possibly point to the
   /// same memory.
@@ -1187,10 +1231,6 @@ public:
 
   /// Notify the analysis about changed witness or vtables.
   virtual void invalidateFunctionTables() override { }
-
-  virtual void handleDeleteNotification(SILNode *N) override;
-
-  virtual bool needsNotifications() override { return true; }
 
   virtual void verify() const override;
 

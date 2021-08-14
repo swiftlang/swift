@@ -1,0 +1,1162 @@
+// RUN: %target-sil-opt -copy-propagation -canonical-ossa-rewrite-borrows -enable-sil-verify-all %s | %FileCheck %s
+//
+// Most CopyPropagation tests are still in copy_propagation_opaque.sil.
+//
+// Mandatory copy propagation does not handles borrows yet.
+
+// REQUIRES: asserts
+
+sil_stage canonical
+
+import Builtin
+
+typealias AnyObject = Builtin.AnyObject
+
+class B { }
+
+class C {
+  var a: Int64
+}
+
+sil [ossa] @dummy : $@convention(thin) () -> ()
+sil [ossa] @getOwnedC : $@convention(thin) () -> (@owned C)
+sil [ossa] @takeOwnedC : $@convention(thin) (@owned C) -> ()
+sil [ossa] @takeOwnedCTwice : $@convention(thin) (@owned C, @owned C) -> ()
+sil [ossa] @takeGuaranteedC : $@convention(thin) (@guaranteed C) -> ()
+sil [ossa] @accessRawP : $@convention(method) (Builtin.RawPointer) -> ()
+
+struct NativeObjectPair {
+  var obj1 : Builtin.NativeObject
+  var obj2 : Builtin.NativeObject
+}
+
+struct HasObject {
+  var object: C
+}
+
+struct HasObjectAndInt {
+  var object: C
+  var value: Builtin.Int64
+}
+
+struct Wrapper {
+  var hasObject: HasObjectAndInt
+}
+
+struct MultiWrapper {
+  var hasObject0: HasObjects
+  var hasObject1: HasObjects
+}
+
+struct HasObjects {
+  var object0: C
+  var object1: C
+}
+
+struct UInt64 {
+  @_hasStorage public var _value: Builtin.Int64 { get set }
+  init(_value: Builtin.Int64)
+}
+
+struct Int64 {
+  @_hasStorage public var _value: Builtin.Int64 { get set }
+  init(_value: Builtin.Int64)
+}
+
+internal struct _StringObject {
+  @usableFromInline
+  @_hasStorage internal var _countAndFlagsBits: UInt64 { get set }
+  @usableFromInline
+  @_hasStorage internal var _object: Builtin.BridgeObject { get set }
+  init(_countAndFlagsBits: UInt64, _object: Builtin.BridgeObject)
+}
+
+struct _StringGuts {
+  @_hasStorage internal var _object: _StringObject { get set }
+  init(_object: _StringObject)
+}
+
+public struct String {
+  @_hasStorage var _guts: _StringGuts { get set }
+  init(_guts: _StringGuts)
+}
+
+extension String {
+  public struct UTF16View {
+    @_hasStorage internal var _guts: _StringGuts { get set }
+    init(_guts: _StringGuts)
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Test OperandOwnership::InteriorPointer
+// -----------------------------------------------------------------------------
+
+// CHECK-TRACE-LABEL: *** CopyPropagation: testInteriorPointer
+//
+// CHECK-LABEL: sil [ossa] @testInteriorPointer : $@convention(thin) (@guaranteed C) -> Int64 {
+// CHECK: bb0(%0 : @guaranteed $C):
+// CHECK-NEXT: begin_borrow
+// CHECK-NEXT: ref_element_addr
+// CHECK-NEXT: load
+// CHECK-NEXT: end_borrow
+// CHECK-NEXT: return
+// CHECK-LABEL: } // end sil function 'testInteriorPointer'
+sil [ossa] @testInteriorPointer : $@convention(thin) (@guaranteed C) -> Int64 {
+bb0(%0 : @guaranteed $C):
+  %copy1 = copy_value %0 : $C
+  %borrow = begin_borrow %copy1 : $C
+  %adr = ref_element_addr %borrow : $C, #C.a
+  %val = load [trivial] %adr : $*Int64
+  %copy2 = copy_value %borrow : $C
+  end_borrow %borrow : $C
+  destroy_value %copy1 : $C
+  destroy_value %copy2 : $C
+  return %val : $Int64
+}
+
+// CHECK-TRACE-LABEL: *** CopyPropagation: testExtract
+//
+// CHECK-LABEL: sil [ossa] @testExtract : $@convention(thin) (@guaranteed NativeObjectPair) -> @owned Builtin.NativeObject {
+// CHECK: bb0(%0 : @guaranteed $NativeObjectPair):
+// CHECK-NEXT:  [[B:%.*]] = begin_borrow %0 : $NativeObjectPair
+// CHECK-NEXT:  [[E:%.*]] = struct_extract [[B]] : $NativeObjectPair, #NativeObjectPair.obj1
+// CHECK-NEXT:  [[C:%.*]] = copy_value [[E]] : $Builtin.NativeObject
+// CHECK-NEXT:  end_borrow
+// CHECK-NEXT:  return [[C]] : $Builtin.NativeObject
+// CHECK-LABEL: } // end sil function 'testExtract'
+sil [ossa] @testExtract : $@convention(thin) (@guaranteed NativeObjectPair) -> @owned Builtin.NativeObject {
+bb0(%0 : @guaranteed $NativeObjectPair):
+  %copy1 = copy_value %0 : $NativeObjectPair
+  %borrow = begin_borrow %copy1 : $NativeObjectPair
+  %copy2 = copy_value %borrow : $NativeObjectPair
+  %val = struct_extract %borrow : $NativeObjectPair, #NativeObjectPair.obj1
+  %copy3 = copy_value %val : $Builtin.NativeObject
+  end_borrow %borrow : $NativeObjectPair
+  %copy4 = copy_value %copy3 : $Builtin.NativeObject
+  destroy_value %copy1 : $NativeObjectPair
+  destroy_value %copy2 : $NativeObjectPair
+  destroy_value %copy3 : $Builtin.NativeObject
+  return %copy4 : $Builtin.NativeObject
+}
+
+// =============================================================================
+// Test consolidateBorrowScope
+// =============================================================================
+
+// Test a basic copy with an outer use.
+//
+// CHECK-LABEL: sil [ossa] @testBorrowOuterUse : $@convention(thin) (@owned C) -> () {
+// CHECK: bb0(%0 : @owned $C):
+// CHECK-NOT: begin_borrow
+// CHECK-NOT: copy
+// CHECK: apply %{{.*}}(%0) : $@convention(thin) (@owned C) -> ()
+// CHECK-NOT: destroy
+// CHECK: } // end sil function 'testBorrowOuterUse'
+sil [ossa] @testBorrowOuterUse : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  %1 = begin_borrow %0 : $C
+  %copy = copy_value %1 : $C
+  end_borrow %1 : $C
+  %f1 = function_ref @takeOwnedC : $@convention(thin) (@owned C) -> ()
+  %call2 = apply %f1(%copy) : $@convention(thin) (@owned C) -> ()
+  destroy_value %0 : $C
+  %99 = tuple ()
+  return %99 : $()
+}
+
+// Remove nested borrow scopes for multiple levels of struct_extracts.
+//
+// CHECK-LABEL: sil [ossa] @testMultiBlockBorrow : $@convention(thin) (@guaranteed C) -> () {
+// CHECK: bb0(%0 : @guaranteed $C):
+// CHECK-NOT: borrow
+// CHECK-NOT: copy
+// CHECK: cond_br undef, bb1, bb2
+// CHECK: bb1:
+// CHECK-NOT: borrow
+// CHECK-NOT: copy
+// CHECK:   [[CP1:%.*]] = copy_value %0 : $C
+// CHECK:   apply %{{.*}}([[CP1]]) : $@convention(thin) (@owned C) -> ()
+// CHECK-NOT: destroy
+// CHECK:   br bb3
+// CHECK: bb2:
+// CHECK-NOT: borrow
+// CHECK-NOT: copy
+// CHECK-NOT: destroy
+// CHECK:   br bb3
+// CHECK: bb3:
+// CHECK-NOT: destroy
+// CHECK:   [[CP3:%.*]] = copy_value %0 : $C
+// CHECK:   apply %1([[CP3]]) : $@convention(thin) (@owned C) -> ()
+// CHECK-NOT: destroy
+// CHECK-LABEL: } // end sil function 'testMultiBlockBorrow'
+sil [ossa] @testMultiBlockBorrow : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %f = function_ref @takeOwnedC : $@convention(thin) (@owned C) -> ()
+  %borrow = begin_borrow %0 : $C
+  %copy0a = copy_value %borrow : $C
+  %copy0b = copy_value %borrow : $C
+  cond_br undef, bb1, bb2
+bb1:
+  %copy1a = copy_value %borrow : $C
+  end_borrow %borrow : $C
+  %copy1b = copy_value %copy1a : $C
+  %call1 = apply %f(%copy1a) : $@convention(thin) (@owned C) -> ()
+  destroy_value %copy1b : $C
+  br bb3
+bb2:
+  end_borrow %borrow : $C
+  br bb3
+bb3:
+  destroy_value %copy0a : $C
+
+  %call2 = apply %f(%copy0b) : $@convention(thin) (@owned C) -> ()
+  %result = tuple ()
+  return %result : $()
+}
+
+// Consolidate a local borrow scope with post-dominating destroy.
+//
+// CHECK-LABEL: sil [ossa] @testLocalBorrowPostDomDestroy : $@convention(thin) (@owned C) -> () {
+// CHECK:        [[OUTERCOPY:%.*]] = copy_value %0 : $C
+// CHECK-NEXT:   [[BORROW:%.*]] = begin_borrow %0 : $C
+// CHECK-NOT:    copy_value
+// CHECK:        end_borrow [[BORROW]] : $C
+// CHECK-NEXT:   cond_br undef, bb1, bb2
+// CHECK:      bb1:
+// CHECK-NEXT:   [[COPY:%.*]] = copy_value [[OUTERCOPY]] : $C
+// CHECK-NEXT:   apply %{{.*}}([[COPY]]) : $@convention(thin) (@owned C) -> ()
+// CHECK-NEXT:   br bb3
+// CHECK:      bb2:
+// CHECK-NEXT:   br bb3
+// CHECK:      bb3:
+// CHECK-NEXT:   destroy_value [[OUTERCOPY]] : $C
+// CHECK-NEXT:   destroy_value %0 : $C
+// CHECK-LABEL: } // end sil function 'testLocalBorrowPostDomDestroy'
+sil [ossa] @testLocalBorrowPostDomDestroy : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  // force a pointer escape so the outer owned lifetime is not canonicalized.
+  %1 = unchecked_ownership_conversion %0 : $C, @owned to @unowned
+  %f = function_ref @takeOwnedC : $@convention(thin) (@owned C) -> ()
+  %borrow = begin_borrow %0 : $C
+  %copy3 = copy_value %borrow : $C
+  // Force the borrow not to be eliminated early.
+  %fguaranteed = function_ref @takeGuaranteedC : $@convention(thin) (@guaranteed C) -> ()
+  %call0 = apply %fguaranteed(%borrow) : $@convention(thin) (@guaranteed C) -> ()
+  end_borrow %borrow : $C
+  cond_br undef, bb1, bb2
+bb1:
+  %copy6 = copy_value %copy3 : $C
+  %call7 = apply %f(%copy6) : $@convention(thin) (@owned C) -> ()
+  br bb3
+bb2:
+  br bb3
+bb3:
+  destroy_value %copy3 : $C
+  destroy_value %0 : $C
+  %result = tuple ()
+  return %result : $()
+}
+
+// Consolidate a local borrow scope without a post-dominating destroy.
+//
+// CHECK-LABEL: sil [ossa] @testLocalBorrowNoPostDomDestroy : $@convention(thin) (@owned C) -> () {
+// CHECK:        [[OUTERCOPY:%.*]] = copy_value %0 : $C
+// CHECK-NEXT:   [[BORROW:%.*]] = begin_borrow %0 : $C
+// CHECK-NOT:    copy_value
+// CHECK:        end_borrow [[BORROW]] : $C
+// CHECK-NEXT:   cond_br undef, bb1, bb2
+// CHECK:      bb1:
+// CHECK-NEXT:   apply %{{.*}}([[OUTERCOPY]]) : $@convention(thin) (@guaranteed C) -> ()
+// CHECK-NEXT:   apply %{{.*}}([[OUTERCOPY]]) : $@convention(thin) (@owned C) -> ()
+// CHECK-NEXT:   br bb3
+// CHECK:      bb2:
+// CHECK-NEXT:   apply %{{.*}}([[OUTERCOPY]]) : $@convention(thin) (@guaranteed C) -> ()
+// CHECK-NEXT:   destroy_value [[OUTERCOPY]] : $C
+// CHECK-NEXT:   br bb3
+// CHECK:      bb3:
+// CHECK-NEXT:   destroy_value %0 : $C
+// CHECK-LABEL: } // end sil function 'testLocalBorrowNoPostDomDestroy'
+sil [ossa] @testLocalBorrowNoPostDomDestroy : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  // force a pointer escape so the outer owned lifetime is not canonicalized.
+  %1 = unchecked_ownership_conversion %0 : $C, @owned to @unowned
+  %fowned = function_ref @takeOwnedC : $@convention(thin) (@owned C) -> ()
+  %fguaranteed = function_ref @takeGuaranteedC : $@convention(thin) (@guaranteed C) -> ()
+  %borrow = begin_borrow %0 : $C
+  %copy3 = copy_value %borrow : $C
+  // Force the borrow not to be eliminated early.
+  %call0 = apply %fguaranteed(%borrow) : $@convention(thin) (@guaranteed C) -> ()
+  end_borrow %borrow : $C
+  cond_br undef, bb1, bb2
+bb1:
+  %call7 = apply %fguaranteed(%copy3) : $@convention(thin) (@guaranteed C) -> ()
+  %call8 = apply %fowned(%copy3) : $@convention(thin) (@owned C) -> ()
+  br bb3
+bb2:
+  %call10 = apply %fguaranteed(%copy3) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %copy3 : $C
+  br bb3
+bb3:
+  destroy_value %0 : $C
+  %result = tuple ()
+  return %result : $()
+}
+
+// CHECK-LABEL: sil [ossa] @testLocalBorrowDoubleConsume : $@convention(thin) (@owned C) -> () {
+// CHECK:   [[OUTERCOPY:%.*]] = copy_value %0 : $C
+// CHECK-NEXT:  begin_borrow %0 : $C
+// CHECK-NOT:   copy
+// CHECK:       end_borrow
+// CHECK-NEXT:  cond_br undef, bb1, bb2
+// CHECK:     bb1:
+// CHECK-NEXT:  apply %{{.*}}([[OUTERCOPY]]) : $@convention(thin) (@guaranteed C) -> ()
+// CHECK-NEXT:  [[ARGCOPY:%.*]] = copy_value [[OUTERCOPY]] : $C
+// CHECK-NEXT:  apply %2([[OUTERCOPY]], [[ARGCOPY:%.*]]) : $@convention(thin) (@owned C, @owned C) -> ()
+// CHECK-NEXT:  br bb3
+// CHECK:     bb2:
+// CHECK-NEXT:  apply %{{.*}}([[OUTERCOPY]]) : $@convention(thin) (@guaranteed C) -> ()
+//
+// This copy would be eliminated if the outer lifetime were also canonicalized (no unchecked_ownership_conversion)
+// CHECK-NEXT:  [[COPY2:%.*]] = copy_value [[OUTERCOPY]] : $C
+// CHECK-NEXT:  destroy_value [[COPY2]] : $C
+// CHECK-NEXT:  destroy_value %4 : $C
+// CHECK-NEXT:  br bb3
+// CHECK: bb3:
+// CHECK-NEXT:  destroy_value %0 : $C
+// CHECK-LABEL: } // end sil function 'testLocalBorrowDoubleConsume'
+sil [ossa] @testLocalBorrowDoubleConsume : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  // force a pointer escape so the outer owned lifetime is not canonicalized.
+  %1 = unchecked_ownership_conversion %0 : $C, @owned to @unowned
+  %fowned = function_ref @takeOwnedCTwice : $@convention(thin) (@owned C, @owned C) -> ()
+  %fguaranteed = function_ref @takeGuaranteedC : $@convention(thin) (@guaranteed C) -> ()
+  %borrow = begin_borrow %0 : $C
+  %copy3 = copy_value %borrow : $C
+  %copy4 = copy_value %borrow : $C
+  // Force the borrow not to be eliminated early.
+  %call0 = apply %fguaranteed(%borrow) : $@convention(thin) (@guaranteed C) -> ()
+  end_borrow %borrow : $C
+  cond_br undef, bb1, bb2
+bb1:
+  %call7 = apply %fguaranteed(%copy3) : $@convention(thin) (@guaranteed C) -> ()
+  %call8 = apply %fowned(%copy3, %copy4) : $@convention(thin) (@owned C, @owned C) -> ()
+  br bb3
+bb2:
+  %call10 = apply %fguaranteed(%copy3) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %copy3 : $C
+  destroy_value %copy4 : $C
+  br bb3
+bb3:
+  destroy_value %0 : $C
+  %result = tuple ()
+  return %result : $()
+}
+
+// Consolidate this local borrowscope even though it has a
+// PointerEscape. The escaping value can be assumed not to be used
+// outside the borrow scope.
+//
+// CHECK-LABEL: sil [ossa] @testBorrowEscape : $@convention(thin) (@guaranteed C) -> () {
+// CHECK:       [[BORROW:%.*]] = begin_borrow %0 : $C
+// CHECK-NOT:   copy_value
+// CHECK:       end_borrow [[BORROW]] : $C
+// CHECK-NEXT:  cond_br undef, bb1, bb2
+// CHECK:     bb1:
+// CHECK:       [[COPY:%.*]] = copy_value %0 : $C
+// CHECK:       apply %{{.*}}([[COPY]]) : $@convention(thin) (@owned C) -> ()
+// CHECK:       br bb3
+// CHECK:     bb2:
+// CHECK-NEXT:  br bb3
+// CHECK:     bb3:
+// CHECK-NOT:   destroy
+// CHECK-LABEL: } // end sil function 'testBorrowEscape'
+sil [ossa] @testBorrowEscape : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %borrow = begin_borrow %0 : $C
+  // force a pointer escape so the borrow is not canonicalized.
+  %1 = unchecked_ownership_conversion %borrow : $C, @guaranteed to @unowned
+  %copy3 = copy_value %borrow : $C
+  end_borrow %borrow : $C
+  cond_br undef, bb1, bb2
+bb1:
+  %f = function_ref @takeOwnedC : $@convention(thin) (@owned C) -> ()
+  %call7 = apply %f(%copy3) : $@convention(thin) (@owned C) -> ()
+  br bb3
+bb2:
+  destroy_value %copy3 : $C
+  br bb3
+bb3:
+  %result = tuple ()
+  return %result : $()
+}
+
+// A sub-borrow begins within the outer borrow scope but extends
+// beyond the end of the outer scope. Treat it like an outer use.
+//
+// CHECK-LABEL: sil [ossa] @testInterleavedBorrow : $@convention(thin) () -> @owned C {
+// CHECK:        [[ALLOC:%.*]] = alloc_ref $C
+// CHECK-NEXT:   [[B1:%.*]] = begin_borrow [[ALLOC]]
+// CHECK-NOT:    copy
+// CHECK:        [[B2:%.*]] = begin_borrow [[ALLOC]]
+// CHECK-NOT:    copy
+// CHECK:        end_borrow [[B1]] : $C
+// CHECK-NEXT:   apply %0([[B2]]) : $@convention(thin) (@guaranteed C) -> ()
+// CHECK-NEXT:   end_borrow [[B2]] : $C
+// CHECK-NEXT:   return [[ALLOC]] : $C
+// CHECK-LABEL: } // end sil function 'testInterleavedBorrow'
+sil [ossa] @testInterleavedBorrow : $@convention(thin) () -> @owned C {
+bb0:
+  %f = function_ref @takeGuaranteedC : $@convention(thin) (@guaranteed C) -> ()
+  %0 = alloc_ref $C
+  %1 = begin_borrow %0 : $C
+  %2 = copy_value %1 : $C
+  // Force the borrow not to be eliminated early.
+  %fguaranteed = function_ref @takeGuaranteedC : $@convention(thin) (@guaranteed C) -> ()
+  %call0 = apply %fguaranteed(%1) : $@convention(thin) (@guaranteed C) -> ()
+  %3 = begin_borrow %2 : $C
+  %call1 = apply %fguaranteed(%3) : $@convention(thin) (@guaranteed C) -> ()
+  end_borrow %1 : $C
+  apply %f(%3) : $@convention(thin) (@guaranteed C) -> ()
+  end_borrow %3 : $C
+  destroy_value %2 : $C
+  return %0 : $C
+}
+
+// A sub-borrow begins within the outer borrow scope but extends
+// beyond the end of the outer scope into different blocks. Treat it
+// like an outer use.
+//
+// CHECK-LABEL: sil [ossa] @testInterleavedBorrowCrossBlock : $@convention(thin) () -> @owned C {
+// CHECK:        [[ALLOC:%.*]] = alloc_ref $C
+// CHECK:        [[B1:%.*]] = begin_borrow [[ALLOC]]
+// CHECK:        apply %{{.*}}([[B1]]) : $@convention(thin) (@guaranteed C) -> ()
+// CHECK-NEXT:   [[B2:%.*]] = begin_borrow [[ALLOC]]
+// CHECK-NEXT:   end_borrow [[B1]] : $C
+// CHECK-NEXT:   cond_br undef, bb1, bb2
+// CHECK:      bb1:
+// CHECK:        apply %{{.*}}([[B2]]) : $@convention(thin) (@guaranteed C) -> ()
+// CHECK-NEXT:   end_borrow [[B2]] : $C
+// CHECK-NEXT:   br bb3
+// CHECK:      bb2:
+// CHECK-NEXT:   end_borrow [[B2]] : $C
+// CHECK-NEXT:   br bb3
+// CHECK:      bb3:
+// CHECK-NEXT:   return [[ALLOC]] : $C
+// CHECK-LABEL: } // end sil function 'testInterleavedBorrowCrossBlock'
+sil [ossa] @testInterleavedBorrowCrossBlock : $@convention(thin) () -> @owned C {
+bb0:
+  %0 = alloc_ref $C
+  %f = function_ref @takeGuaranteedC : $@convention(thin) (@guaranteed C) -> ()
+  %1 = begin_borrow %0 : $C
+  %2 = copy_value %1 : $C
+  apply %f(%1) : $@convention(thin) (@guaranteed C) -> ()
+  %3 = begin_borrow %2 : $C
+  end_borrow %1 : $C
+  cond_br undef, bb1, bb2
+bb1:
+  apply %f(%3) : $@convention(thin) (@guaranteed C) -> ()
+  end_borrow %3 : $C
+  br bb3
+bb2:
+  end_borrow %3 : $C
+  br bb3
+bb3:
+  destroy_value %2 : $C
+  return %0 : $C
+}
+
+// Test a nested borrow scope that has different inner vs. outer
+// properties on different branches. If any one of the inner borrow's
+// uses are outside the outer borrow, then all of them need to be
+// considered "outer uses". Otherwise, when we cleanup the lifetime of
+// the new outer copy, it won't cover then entire inner borrow scope.
+//
+// CHECK-LABEL: sil [ossa] @testNestedBorrowInsideAndOutsideUse : $@convention(thin) () -> () {
+// CHECK: [[ALLOC:%.*]] = alloc_ref $C
+// CHECK: [[B1:%.*]] = begin_borrow [[ALLOC]] : $C
+// CHECK-NOT: borrow
+// CHECK: bb1:
+// CHECK-NEXT: end_borrow [[B1]] : $C
+// CHECK-NEXT: destroy_value [[ALLOC]] : $C
+// CHECK-NEXT: br bb3
+// CHECK: bb2:
+// CHECK-NEXT: end_borrow %1 : $C
+// CHECK-NEXT: destroy_value %0 : $C
+// CHECK-NEXT: br bb3
+// CHECK: bb3:
+// CHECK-NOT: destroy
+// CHECK-LABEL: } // end sil function 'testNestedBorrowInsideAndOutsideUse'
+sil [ossa] @testNestedBorrowInsideAndOutsideUse : $@convention(thin) () -> () {
+bb0:
+  %alloc = alloc_ref $C
+  %borrow1 = begin_borrow %alloc : $C
+  %copy1 = copy_value %borrow1 : $C
+  %borrow2 = begin_borrow %copy1 : $C
+  %addr = ref_element_addr %borrow2 : $C, #C.a
+  cond_br undef, bb1, bb2
+bb1:
+  // inside use
+  end_borrow %borrow2 : $C
+  destroy_value %copy1 : $C
+  end_borrow %borrow1 : $C
+  br bb3
+bb2:
+  end_borrow %borrow1 : $C
+  // outside use
+  end_borrow %borrow2 : $C
+  destroy_value %copy1 : $C
+  br bb3
+bb3:
+  destroy_value %alloc : $C
+  %99 = tuple ()
+  return %99 : $()
+}
+
+// The ref_to_unmanaged escapes the pointer. consolidateBorrowScopes
+// needs to bail-out even though it's already recursively processing a
+// forwarding operation (destructure_struct).
+//
+// CHECK-LABEL: sil [ossa] @testEscapingForward : $@convention(method) (@guaranteed HasObject) -> () {
+// CHECK:   begin_borrow %0 : $HasObject
+// CHECK:   copy_value
+// CHECK:   destructure_struct
+// CHECK:   end_borrow
+// CHECK:   ref_to_unmanaged
+// CHECK:   destroy_value
+// CHECK-LABEL: } // end sil function 'testEscapingForward'
+sil [ossa] @testEscapingForward : $@convention(method) (@guaranteed HasObject) -> () {
+bb0(%0 : @guaranteed $HasObject):
+  %1 = begin_borrow %0 : $HasObject
+  %2 = copy_value %1 : $HasObject
+  %3 = destructure_struct %2 : $HasObject
+  end_borrow %1 : $HasObject
+  %5 = ref_to_unmanaged %3 : $C to $@sil_unmanaged C
+  destroy_value %3 : $C
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// =============================================================================
+// Test reborrows
+// =============================================================================
+
+// Extend the lifetime of an owned value through a nested borrow scope
+// with cross-block reborrows. Its lifetime must be extended past the
+// end_borrow of the phi.
+//
+// TODO: CanonicalizeOSSA currently bails out on reborrows.
+//
+// CHECK-LABEL: sil [ossa] @testSubReborrowExtension : $@convention(thin) () -> () {
+// CHECK: bb0:
+// CHECK:   [[ALLOC:%.*]] = alloc_ref $C
+// CHECK:   [[CP:%.*]] = copy_value %0 : $C
+// CHECK:   [[BORROW:%.*]] = begin_borrow %0 : $C
+// CHECK:   cond_br undef, bb1, bb2
+// CHECK: bb1:
+// CHECK:   br bb3([[CP]] : $C, [[BORROW]] : $C)
+// CHECK: bb2:
+// CHECK:   br bb3([[CP]] : $C, [[BORROW]] : $C)
+// CHECK: bb3([[OWNEDPHI:%.*]] : @owned $C, [[BORROWPHI:%.*]] @guaranteed $C
+// CHECK:   end_borrow [[BORROWPHI]]
+// CHECK:   destroy_value [[OWNEDPHI]] : $C
+// CHECK:   destroy_value %0 : $C
+// CHECK-LABEL: } // end sil function 'testSubReborrowExtension'
+sil [ossa] @testSubReborrowExtension : $@convention(thin) () -> () {
+bb0:
+  %alloc = alloc_ref $C
+  %copy = copy_value %alloc : $C
+  %borrow = begin_borrow %alloc : $C
+  cond_br undef, bb1, bb2
+bb1:
+  br bb3(%copy : $C, %borrow: $C)
+bb2:
+  br bb3(%copy : $C, %borrow: $C)
+bb3(%phi : @owned $C, %borrowphi : @guaranteed $C):
+  end_borrow %borrowphi : $C
+  destroy_value %phi : $C
+  destroy_value %alloc : $C
+  %99 = tuple ()
+  return %99 : $()
+}
+
+// Test a cross-block reborrow and a live nested copy of the reborrow:
+//   def: borrow
+//   use: phi reborrow (in the same block as the borrow)
+//   copy reborrowed phi
+//   end reborrow
+//   copy outside borrow scope.
+//
+// consolidateBorrow only processes the SSA borrow scope, not the
+// extended borrow scope, and it does not process the borrow scope
+// introduced by the phi. Therefore, it should leave the in-scope copy
+// alone-- it will be treated like the definition of a separate OSSA
+// lifetime. The inner copy's lifetime will be canonicalized, removing
+// outercopy.
+//
+// CHECK-LABEL: sil [ossa] @testLiveCopyAfterReborrow : $@convention(thin) () -> () {
+// CHECK: [[ALLOC:%.*]] = alloc_ref $C
+// CHECK: bb3([[BORROWPHI:%.*]] : @guaranteed $C):
+// CHECK: [[COPY:%.*]] = copy_value [[BORROWPHI]]
+// CHECK: end_borrow [[BORROWPHI]] : $C
+// CHECK-NOT: copy_value
+// CHECK-NOT: destroy_value
+// CHECK: apply
+// CHECK: destroy_value [[COPY]]
+// CHECK: destroy_value [[ALLOC]] : $C
+// CHECK-LABEL: } // end sil function 'testLiveCopyAfterReborrow'
+sil [ossa] @testLiveCopyAfterReborrow : $@convention(thin) () -> () {
+bb0:
+  %alloc = alloc_ref $C
+  cond_br undef, bb1, bb2
+bb1:
+  %borrow1 = begin_borrow %alloc : $C
+  br bb3(%borrow1: $C)
+bb2:
+  %borrow2 = begin_borrow %alloc : $C
+  br bb3(%borrow2: $C)
+bb3(%borrowphi : @guaranteed $C):
+  %innercopy = copy_value %borrowphi : $C
+  end_borrow %borrowphi : $C
+  %outercopy = copy_value %innercopy : $C
+  destroy_value %innercopy : $C
+  %f = function_ref @takeGuaranteedC : $@convention(thin) (@guaranteed C) -> ()
+  apply %f(%outercopy) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %outercopy : $C
+  destroy_value %alloc : $C
+  %99 = tuple ()
+  return %99 : $()
+}
+
+// Test a cross-block reborrow and a dead nested copy of the reborrow:
+//   def: borrow
+//   use: phi reborrow (in the same block as the borrow)
+//   copy reborrowed phi
+//   end reborrow
+//   use of copied reborrow outside borrow scope.
+//
+// consolidateBorrow only processes the SSA borrow scope, not the
+// extended borrow scope, and it does not process the borrow scope
+// introduced by the phi. Therefore, it should leave the in-scope copy alone--
+// it will be treated like the definition of a separate OSSA lifetime.
+// The inner copy's lifetime will be canonicalized, removing
+// outercopy.
+//
+// CHECK-LABEL: sil [ossa] @testDeadCopyAfterReborrow : $@convention(thin) () -> () {
+// CHECK: [[ALLOC:%.*]] = alloc_ref $C
+// CHECK: bb3([[BORROWPHI:%.*]] : @guaranteed $C):
+// CHECK-NOT: copy_value
+// CHECK: end_borrow [[BORROWPHI]] : $C
+// CHECK-NOT: copy_value
+// CHECK: destroy_value [[ALLOC]] : $C
+// CHECK-LABEL: } // end sil function 'testDeadCopyAfterReborrow'
+sil [ossa] @testDeadCopyAfterReborrow : $@convention(thin) () -> () {
+bb0:
+  %alloc = alloc_ref $C
+  cond_br undef, bb1, bb2
+bb1:
+  %borrow1 = begin_borrow %alloc : $C
+  br bb3(%borrow1: $C)
+bb2:
+  %borrow2 = begin_borrow %alloc : $C
+  br bb3(%borrow2: $C)
+bb3(%borrowphi : @guaranteed $C):
+  %innercopy = copy_value %borrowphi : $C
+  end_borrow %borrowphi : $C
+  %outercopy = copy_value %innercopy : $C
+  destroy_value %innercopy : $C
+  destroy_value %outercopy : $C
+  destroy_value %alloc : $C
+  %99 = tuple ()
+  return %99 : $()
+}
+
+// Test a reborrow with a nested borrow with an outside use
+//   def: borrowphi
+//   nested borrow -- consolidated borrow scope
+//   inner copy -- removed when rewriting nested borrow
+//   end nested borrow
+//   middle copy -- when consolidating borrow scope,
+//                  its operand is replace with a copy of borrowphi
+//                  then removed when borrowphi's copy is canonicalized
+//   end borrowphi
+//   outer copy -- removed when borrowphi's copy is canonicalized
+//
+// CHECK-LABEL: sil [ossa] @testNestedReborrowOutsideUse : $@convention(thin) () -> () {
+// CHECK:        [[ALLOC:%.*]] = alloc_ref $C
+// CHECK:      bb3([[BORROWPHI:%.*]] : @guaranteed $C):
+// CHECK-NEXT:   begin_borrow [[BORROWPHI]] : $C
+// CHECK-NOT:    copy
+// CHECK:        end_borrow
+// CHECK-NEXT:   end_borrow
+// CHECK-NEXT:   destroy_value [[ALLOC]] : $C
+// CHECK-LABEL: } // end sil function 'testNestedReborrowOutsideUse'
+sil [ossa] @testNestedReborrowOutsideUse : $@convention(thin) () -> () {
+bb0:
+  %alloc = alloc_ref $C
+  cond_br undef, bb1, bb2
+bb1:
+  %borrow1 = begin_borrow %alloc : $C
+  br bb3(%borrow1: $C)
+bb2:
+  %borrow2 = begin_borrow %alloc : $C
+  br bb3(%borrow2: $C)
+bb3(%borrowphi : @guaranteed $C):
+  %nestedborrow = begin_borrow %borrowphi : $C
+  %innercopy = copy_value %nestedborrow : $C
+  %f = function_ref @takeGuaranteedC : $@convention(thin) (@guaranteed C) -> ()
+  apply %f(%nestedborrow) : $@convention(thin) (@guaranteed C) -> ()
+  end_borrow %nestedborrow : $C
+  %middlecopy = copy_value %innercopy : $C
+  end_borrow %borrowphi : $C
+  %outercopy = copy_value %middlecopy : $C
+  destroy_value %innercopy : $C
+  destroy_value %middlecopy : $C
+  destroy_value %outercopy : $C
+  destroy_value %alloc : $C
+  %99 = tuple ()
+  return %99 : $()
+}
+
+// Test a reborrow of an owned-and-copied def that does not dominate
+// the extended borrow scope.
+//
+// CHECK-LABEL: sil [ossa] @testOwnedReborrow : $@convention(thin) (@owned C) -> () {
+// CHECK: bb1:
+// CHECK:   destroy_value %0 : $C
+// CHECK:   [[CALL:%.*]] = apply %{{.*}}() : $@convention(thin) () -> @owned C
+// CHECK:   [[COPY1:%.*]] = copy_value [[CALL]] : $C
+// CHECK:   begin_borrow [[COPY1]] : $C
+// CHECK:   destroy_value [[CALL]] : $C
+// CHECK:   br bb3(%{{.*}} : $C, [[COPY1]] : $C)
+// CHECK: bb2:
+// CHECK:   begin_borrow %0 : $C
+// CHECK:   br bb3(%{{.*}} : $C, %0 : $C)
+// CHECK: bb3(%{{.*}} : @guaranteed $C, [[COPYPHI:%.*]] : @owned $C):
+// CHECK:   end_borrow
+// CHECK:   destroy_value [[COPYPHI]] : $C
+// CHECK-LABEL: } // end sil function 'testOwnedReborrow'
+sil [ossa] @testOwnedReborrow : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  cond_br undef, bb1, bb2
+bb1:
+  destroy_value %0 : $C
+  %f = function_ref @getOwnedC : $@convention(thin) () -> (@owned C)
+  %owned1 = apply %f() : $@convention(thin) () -> (@owned C)
+  %copy1 = copy_value %owned1 : $C
+  %borrow1 = begin_borrow %copy1 : $C
+  destroy_value %owned1 : $C
+  br bb3(%borrow1 : $C, %copy1 : $C)
+bb2:
+  %borrow2 = begin_borrow %0 : $C
+  br bb3(%borrow2 : $C, %0 : $C)
+bb3(%borrow3 : @guaranteed $C, %copy3 : @owned $C):
+  end_borrow %borrow3 : $C
+  destroy_value %copy3 : $C
+  %result = tuple ()
+  return %result : $()
+}
+
+// =============================================================================
+// Test hoisting forwarding instructions out of borrow scopes
+// =============================================================================
+
+// Test conversion from struct_extract to destructure.
+//
+// TODO: Remove the inner borrow scope becaues its outer value is
+// already guaranteed and it only has instantaneous uses. Then shrink
+// the outer borrow scope, hoist the destructure, rewrite the destroy
+// to be of the destructured valud, and finally also remove the dead
+// outer borrow scope. See rdar://79149830 (Shrink borrow scopes in
+// CanonicalizeBorrowScope)
+//
+// CHECK-LABEL: sil [ossa] @testDestructureConversion : $@convention(thin) (@owned Wrapper) -> () {
+// CHECK: bb0(%0 : @owned $Wrapper):
+// CHECK-NOT: copy
+// CHECK:   [[BORROW:%.*]] = begin_borrow %0 : $Wrapper
+// CHECK:   [[SPLIT:%.*]] = destructure_struct [[BORROW]] : $Wrapper
+// CHECK:   [[BORROWINNER:%.*]] = begin_borrow [[SPLIT]] : $HasObjectAndInt
+// CHECK:   debug_value [[BORROWINNER]] : $HasObjectAndInt, let, name "self", argno 1
+// CHECK:   struct_extract [[BORROWINNER]] : $HasObjectAndInt, #HasObjectAndInt.value
+// CHECK:   end_borrow [[BORROWINNER]] : $HasObjectAndInt
+// CHECK:   destroy_value %0 : $Wrapper
+// CHECK-LABEL: } // end sil function 'testDestructureConversion'
+sil [ossa] @testDestructureConversion : $@convention(thin) (@owned Wrapper) -> () {
+bb0(%0 : @owned $Wrapper):
+  %1 = begin_borrow %0 : $Wrapper
+  %2 = struct_extract %1 : $Wrapper, #Wrapper.hasObject
+  // This copy is only used by a nested borrow scope.
+  %3 = copy_value %2 : $HasObjectAndInt
+  // This borrow scope is only used by debug_value and extracting a trivial member
+  %4 = begin_borrow %3 : $HasObjectAndInt
+  debug_value %4 : $HasObjectAndInt, let, name "self", argno 1
+  %6 = struct_extract %4 : $HasObjectAndInt, #HasObjectAndInt.value
+  %7 = builtin "and_Int64"(%6 : $Builtin.Int64, undef : $Builtin.Int64) : $Builtin.Int64
+  end_borrow %4 : $HasObjectAndInt
+  end_borrow %1 : $Wrapper
+  destroy_value %3 : $HasObjectAndInt
+  destroy_value %0 : $Wrapper
+  %99 = tuple ()
+  return %99 : $()
+}
+
+// Test two inner forwards with one inner and one outer use.
+// Check that the destroy is removed after sinking the destructure.
+//
+// CHECK-LABEL: sil [ossa] @testForwardBorrow1 : $@convention(thin) (@owned Wrapper) -> () {
+// CHECK:       bb0(%0 : @owned $Wrapper):
+// CHECK-NEXT:   [[BORROW:%.*]] = begin_borrow %0 : $Wrapper
+// CHECK-NEXT:   [[DSIN1:%.*]] = destructure_struct [[BORROW]] : $Wrapper
+// CHECK-NEXT:   ([[DSIN2:%.*]], %{{.*}}) = destructure_struct [[DSIN1]] : $HasObjectAndInt
+// CHECK:        apply %{{.*}}([[DSIN2]]) : $@convention(thin) (@guaranteed C) -> ()
+// CHECK-NEXT:   end_borrow [[BORROW]] : $Wrapper
+// CHECK:        [[DSOUT1:%.*]] = destructure_struct %0 : $Wrapper
+// CHECK-NEXT:   ([[DSOUT2:%.*]], %{{.*}}) = destructure_struct [[DSOUT1]] : $HasObjectAndInt
+// CHECK:        apply %{{.*}}([[DSOUT2]]) : $@convention(thin) (@owned C) -> ()
+// CHECK-NEXT:   tuple
+// CHECK-NEXT:   return
+// CHECK-LABEL: } // end sil function 'testForwardBorrow1'
+sil [ossa] @testForwardBorrow1 : $@convention(thin) (@owned Wrapper) -> () {
+bb0(%0 : @owned $Wrapper):
+  %1 = begin_borrow %0 : $Wrapper
+  %2 = destructure_struct %1 : $Wrapper
+  (%3, %4) = destructure_struct %2 : $HasObjectAndInt
+  %copy3 = copy_value %3 : $C
+  %f1 = function_ref @takeGuaranteedC : $@convention(thin) (@guaranteed C) -> ()
+  %call1 = apply %f1(%3) : $@convention(thin) (@guaranteed C) -> ()
+  end_borrow %1 : $Wrapper
+  %f2 = function_ref @takeOwnedC : $@convention(thin) (@owned C) -> ()
+  %call2 = apply %f2(%copy3) : $@convention(thin) (@owned C) -> ()
+  destroy_value %0 : $Wrapper
+  %99 = tuple ()
+  return %99 : $()
+}
+
+// Test two inner forwards where the copy has both and inner and outer uses.
+//
+// CHECK-LABEL: sil [ossa] @testForwardBorrow2 : $@convention(thin) (@owned Wrapper) -> () {
+// CHECK:       bb0(%0 : @owned $Wrapper):
+// CHECK-NEXT:   [[BORROW:%.*]] = begin_borrow %0 : $Wrapper
+// CHECK-NEXT:   [[DSIN1:%.*]] = destructure_struct [[BORROW]] : $Wrapper
+// CHECK-NEXT:   ([[DSIN2:%.*]], %{{.*}}) = destructure_struct [[DSIN1]] : $HasObjectAndInt
+// CHECK:        apply %{{.*}}([[DSIN2]]) : $@convention(thin) (@guaranteed C) -> ()
+// CHECK-NEXT:   end_borrow [[BORROW]] : $Wrapper
+// CHECK:        [[DSOUT1:%.*]] = destructure_struct %0 : $Wrapper
+// CHECK-NEXT:   ([[DSOUT2:%.*]], %{{.*}}) = destructure_struct [[DSOUT1]] : $HasObjectAndInt
+// CHECK:        apply %{{.*}}([[DSOUT2]]) : $@convention(thin) (@owned C) -> ()
+// CHECK-NEXT:   tuple
+// CHECK-NEXT:   return
+// CHECK-LABEL: } // end sil function 'testForwardBorrow2'
+sil [ossa] @testForwardBorrow2 : $@convention(thin) (@owned Wrapper) -> () {
+bb0(%0 : @owned $Wrapper):
+  %1 = begin_borrow %0 : $Wrapper
+  %2 = destructure_struct %1 : $Wrapper
+  (%3, %4) = destructure_struct %2 : $HasObjectAndInt
+  %copy3 = copy_value %3 : $C
+  %f1 = function_ref @takeGuaranteedC : $@convention(thin) (@guaranteed C) -> ()
+  %call1 = apply %f1(%copy3) : $@convention(thin) (@guaranteed C) -> ()
+  end_borrow %1 : $Wrapper
+  %f2 = function_ref @takeOwnedC : $@convention(thin) (@owned C) -> ()
+  %call2 = apply %f2(%copy3) : $@convention(thin) (@owned C) -> ()
+  destroy_value %0 : $Wrapper
+  %99 = tuple ()
+  return %99 : $()
+}
+
+// Test two inner forwards with no inner use.
+// Remove the borrow and inner forwards.
+//
+// CHECK-LABEL: sil [ossa] @testForwardBorrow3 : $@convention(thin) (@owned Wrapper) -> () {
+// CHECK:       bb0(%0 : @owned $Wrapper):
+// CHECK-NOT:    borrow
+// CHECK-NOT:    copy
+// CHECK:        [[DSOUT1:%.*]] = destructure_struct %0 : $Wrapper
+// CHECK-NEXT:   ([[DSOUT2:%.*]], %{{.*}}) = destructure_struct [[DSOUT1]] : $HasObjectAndInt
+// CHECK-NEXT:   apply %{{.*}}([[DSOUT2]]) : $@convention(thin) (@owned C) -> ()
+// CHECK-NEXT:   tuple
+// CHECK-NEXT:   return
+// CHECK-LABEL: } // end sil function 'testForwardBorrow3'
+sil [ossa] @testForwardBorrow3 : $@convention(thin) (@owned Wrapper) -> () {
+bb0(%0 : @owned $Wrapper):
+  %1 = begin_borrow %0 : $Wrapper
+  %2 = destructure_struct %1 : $Wrapper
+  (%3, %4) = destructure_struct %2 : $HasObjectAndInt
+  %copy3 = copy_value %3 : $C
+  end_borrow %1 : $Wrapper
+  %f = function_ref @takeOwnedC : $@convention(thin) (@owned C) -> ()
+  %call = apply %f(%copy3) : $@convention(thin) (@owned C) -> ()
+  destroy_value %0 : $Wrapper
+  %99 = tuple ()
+  return %99 : $()
+}
+
+// Test an inner forwards with two results where both results are owned
+// but one has no outer uses.
+// Need to create two new destroys in this case.
+//
+//
+// CHECK-LABEL: sil [ossa] @testForwardBorrow4 : $@convention(thin) (@owned MultiWrapper) -> () {
+// CHECK: bb0(%0 : @owned $MultiWrapper):
+// CHECK-NEXT:   (%1, %2) = destructure_struct %0 : $MultiWrapper
+// CHECK-NEXT:   destroy_value %2 : $HasObjects
+// CHECK-NEXT:   ([[VAL:%.*]], %5) = destructure_struct %1 : $HasObjects
+// CHECK-NEXT:   destroy_value %5 : $C
+// CHECK-NOT:    borrow
+// CHECK:        apply %{{.*}}([[VAL]]) : $@convention(thin) (@owned C) -> ()
+// CHECK-NOT:    destroy
+// CHECK-LABEL: } // end sil function 'testForwardBorrow4'
+sil [ossa] @testForwardBorrow4 : $@convention(thin) (@owned MultiWrapper) -> () {
+bb0(%0 : @owned $MultiWrapper):
+  %1 = begin_borrow %0 : $MultiWrapper
+  (%2, %3) = destructure_struct %1 : $MultiWrapper
+  (%4, %5) = destructure_struct %2 : $HasObjects
+  %copy = copy_value %4 : $C
+  end_borrow %1 : $MultiWrapper
+  %f2 = function_ref @takeOwnedC : $@convention(thin) (@owned C) -> ()
+  %call = apply %f2(%copy) : $@convention(thin) (@owned C) -> ()
+  destroy_value %0 : $MultiWrapper
+  %99 = tuple ()
+  return %99 : $()
+}
+
+// Test a nested forwarding.
+// Remove the copy within the outer borrow scope.
+// Remove the copy outside the borrow scopes before the final destructure.
+//
+// TODO: Remove the remaining copy+destructure. It's only use is a
+// borrow before it is destructured again later. This should be done
+// by the SemanticARC pass that normally combines a copied live range
+// with its source live range when the guaranteed uses are within the
+// outer scope. But that analysis needs to "see through" destructures.
+//
+// CHECK-LABEL: sil shared [ossa] @testForwardBorrow5 : $@convention(method) (@owned HasObjectAndInt) -> () {
+// CHECK: bb0(%0 : @owned $HasObjectAndInt):
+// CHECK-NEXT:  %1 = copy_value %0 : $HasObjectAndInt
+// CHECK-NEXT:  (%2, %3) = destructure_struct %1 : $HasObjectAndInt
+// CHECK-NEXT:  %4 = begin_borrow %2 : $C
+// CHECK-NEXT:  %5 = ref_tail_addr %4 : $C, $Builtin.Int8
+// CHECK-NEXT:  %6 = index_addr %5 : $*Builtin.Int8, undef : $Builtin.Word
+// CHECK-NEXT:  %7 = address_to_pointer %6 : $*Builtin.Int8 to $Builtin.RawPointer
+// CHECK-NEXT:  end_borrow %4 : $C
+// CHECK-NEXT:  destroy_value %2 : $C
+// CHECK:       apply %{{.*}}(%7) : $@convention(method) (Builtin.RawPointer) -> ()
+// CHECK-NEXT:  ([[OBJ:%.*]], %{{.*}}) = destructure_struct %0 : $HasObjectAndInt
+// CHECK-NEXT:  [[EXIS:%.*]] = init_existential_ref [[OBJ]] : $C : $C, $AnyObject
+// CHECK-NEXT:  fix_lifetime [[EXIS]] : $AnyObject
+// CHECK-NEXT:  destroy_value [[EXIS]] : $AnyObject
+// CHECK-NOT:   destroy
+// CHECK-LABEL: } // end sil function 'testForwardBorrow5'
+sil shared [ossa] @testForwardBorrow5 : $@convention(method) (@owned HasObjectAndInt) -> () {
+bb0(%0 : @owned $HasObjectAndInt):
+  %1 = begin_borrow %0 : $HasObjectAndInt
+  %2 = struct_extract %1 : $HasObjectAndInt, #HasObjectAndInt.object
+  %3 = copy_value %2 : $C
+  %4 = begin_borrow %3 : $C
+  %5 = ref_tail_addr %4 : $C, $Builtin.Int8
+  end_borrow %1 : $HasObjectAndInt
+  %7 = index_addr %5 : $*Builtin.Int8, undef : $Builtin.Word
+  %8 = address_to_pointer %7 : $*Builtin.Int8 to $Builtin.RawPointer
+  end_borrow %4 : $C
+  destroy_value %3 : $C
+  // function_ref accessRawP
+  %11 = function_ref @accessRawP : $@convention(method) (Builtin.RawPointer) -> ()
+  %12 = apply %11(%8) : $@convention(method) (Builtin.RawPointer) -> ()
+  %13 = copy_value %0 : $HasObjectAndInt
+  (%14, %15) = destructure_struct %13 : $HasObjectAndInt
+  %16 = init_existential_ref %14 : $C : $C, $AnyObject
+  fix_lifetime %16 : $AnyObject
+  destroy_value %16 : $AnyObject
+  destroy_value %0 : $HasObjectAndInt
+  %20 = tuple ()
+  return %20 : $()
+}
+
+// Test removing copies within an outer borrow scope with no outer uses.
+//
+// TODO: The redundant borrow scope should be removed by a SemanticARC pass.
+//
+// CHECK-LABEL: sil [ossa] @testBorrowCopy : $@convention(thin) (@guaranteed C) -> Int64 {
+// CHECK: bb0(%0 : @guaranteed $C):
+// CHECK-NEXT:  %1 = begin_borrow %0 : $C
+// CHECK-NEXT:  %2 = begin_borrow %1 : $C
+// CHECK-NEXT:  %3 = ref_element_addr %2 : $C, #C.a
+// CHECK-NEXT:  %4 = load [trivial] %3 : $*Int64
+// CHECK-NEXT:  end_borrow %2 : $C
+// CHECK-NEXT:  end_borrow %1 : $C
+// CHECK-NEXT:  return %4 : $Int64
+// CHECK-LABEL: } // end sil function 'testBorrowCopy'
+sil [ossa] @testBorrowCopy : $@convention(thin) (@guaranteed C) -> Int64 {
+bb0(%0 : @guaranteed $C):
+  %borrow = begin_borrow %0 : $C
+  %copy = copy_value %borrow : $C
+  %borrow2 = begin_borrow %copy : $C
+  %adr = ref_element_addr %borrow2 : $C, #C.a
+  %val = load [trivial] %adr : $*Int64
+  end_borrow %borrow2 : $C
+  destroy_value %copy : $C
+  end_borrow %borrow : $C
+  return %val : $Int64
+}
+
+// Test removing copies of a guaranteed argument.
+//
+// CHECK-LABEL: sil [ossa] @testCopyArg : $@convention(thin) (@guaranteed C) -> Int64 {
+// CHECK: bb0(%0 : @guaranteed $C):
+// CHECK-NEXT:  %1 = begin_borrow %0 : $C
+// CHECK-NEXT:  %2 = ref_element_addr %1 : $C, #C.a
+// CHECK-NEXT:  %3 = load [trivial] %2 : $*Int64
+// CHECK-NEXT:  end_borrow %1 : $C
+// CHECK-NEXT:  return %3 : $Int64
+// CHECK-LABEL: } // end sil function 'testCopyArg'
+sil [ossa] @testCopyArg : $@convention(thin) (@guaranteed C) -> Int64 {
+bb0(%0 : @guaranteed $C):
+  %copy = copy_value %0 : $C
+  %borrow2 = begin_borrow %copy : $C
+  %adr = ref_element_addr %borrow2 : $C, #C.a
+  %val = load [trivial] %adr : $*Int64
+  end_borrow %borrow2 : $C
+  destroy_value %copy : $C
+  return %val : $Int64
+}
+
+// TODO: Remove this copy inside a borrow scope by shrinking the scope .
+// rdar://79149830 (Shrink borrow scopes in CanonicalizeBorrowScope)
+//
+// Note: shrinking borrow scopes needs to happen even when most borrow
+// scopes are eliminated because some "defined" borrow scopes cannot be removed.
+//
+// CHECK-LABEL: sil [ossa] @testUselessBorrow : $@convention(thin) (@owned HasObject) -> () {
+// CHECK:   [[BORROW:%.*]] = begin_borrow %0 : $HasObject
+// CHECK:   [[ELT:%.*]] = destructure_struct [[BORROW]] : $HasObject
+// CHECK:   [[CP:%.*]] = copy_value [[ELT]] : $C
+// CHECK:   apply %{{.*}}([[CP]]) : $@convention(thin) (@owned C) -> ()
+// CHECK:   end_borrow [[BORROW]] : $HasObject
+// CHECK:   destroy_value %0 : $HasObject
+// CHECK-LABEL: } // end sil function 'testUselessBorrow'
+sil [ossa] @testUselessBorrow : $@convention(thin) (@owned HasObject) -> () {
+bb0(%0 : @owned $HasObject):
+  %borrow = begin_borrow %0 : $HasObject
+  %object = struct_extract %borrow : $HasObject, #HasObject.object
+  %copy = copy_value %object : $C
+  %f = function_ref @takeOwnedC : $@convention(thin) (@owned C) -> ()
+  %call = apply %f(%copy) : $@convention(thin) (@owned C) -> ()
+  end_borrow %borrow : $HasObject
+  destroy_value %0 : $HasObject
+  %20 = tuple ()
+  return %20 : $()
+}
+
+// Test a more complicated/realistic example of useless borrows
+//
+// TODO: Remove this copy inside a borrow scope by shrinking the scope .
+// rdar://79149830 (Shrink borrow scopes in CanonicalizeBorrowScope)
+//
+// It only has one trivial struct_extract. But copy propagation
+// currently only removes completely dead borrows.
+// Removing this borrow scope will unblock removal of the final remaining copy_value:
+//    %_ = copy_value %_ : $String.UTF16View
+//
+// CHECK-LABEL: sil [ossa] @testUselessBorrowString : $@convention(thin) (@owned String) -> () {
+// CHECK: bb0(%0 : @owned $String):
+// CHECK-NEXT:   [[DESTRUCTURE:%.*]] = destructure_struct %0 : $String
+// CHECK-NEXT:   [[UTF16:%.*]] = struct $String.UTF16View ([[DESTRUCTURE]] : $_StringGuts)
+// CHECK-NEXT:   br bb1
+// CHECK:      bb1:
+// CHECK-NEXT:   [[COPY:%.*]] = copy_value [[UTF16]] : $String.UTF16View
+// CHECK-NEXT:   [[GUTS:%.*]] = destructure_struct [[COPY]] : $String.UTF16View
+// CHECK-NEXT:   [[OBJ:%.*]] = destructure_struct [[GUTS]] : $_StringGuts
+// CHECK-NEXT:   [[BORROW:%.*]] = begin_borrow [[OBJ]] : $_StringObject
+// CHECK-NEXT:   cond_br undef, bb2, bb3
+// CHECK:      bb2:
+// CHECK:        br bb4
+// CHECK:      bb3:
+// CHECK:        br bb4
+// CHECK:      bb4:
+// CHECK-NEXT:   debug_value [[BORROW]] : $_StringObject, let, name "self", argno 1
+// CHECK-NEXT:   cond_br undef, bb5, bb6
+// CHECK:      bb5:
+// CHECK-NEXT:   end_borrow [[BORROW]] : $_StringObject
+// CHECK-NEXT:   destroy_value [[OBJ]] : $_StringObject
+// CHECK-NEXT:   br bb1
+// CHECK:      bb6:
+// CHECK-NEXT:   struct_extract [[BORROW]] : $_StringObject, #_StringObject._countAndFlagsBits
+// CHECK-NEXT:   end_borrow [[BORROW]] : $_StringObject
+// CHECK-NEXT:   destroy_value [[OBJ]] : $_StringObject
+// CHECK-NEXT:   struct_extract %{{.*}} : $UInt64, #UInt64._value
+// CHECK-NEXT:   builtin "and_Int64"(%{{.*}} : $Builtin.Int64, undef : $Builtin.Int64) : $Builtin.Int64
+// CHECK-NEXT:   cond_br undef, bb7, bb8
+// CHECK:      bb7:
+// CHECK:        br bb1
+// CHECK:      bb8:
+// CHECK-NEXT:   destroy_value [[UTF16]] : $String.UTF16View
+// CHECK-LABEL: } // end sil function 'testUselessBorrowString'
+sil [ossa] @testUselessBorrowString : $@convention(thin) (@owned String) -> () {
+bb0(%0 : @owned $String):
+  %1 = begin_borrow %0 : $String
+  %2 = struct_extract %1 : $String, #String._guts
+  %3 = copy_value %2 : $_StringGuts
+  %4 = struct $String.UTF16View (%3 : $_StringGuts)
+  end_borrow %1 : $String
+  br bb1
+
+bb1:
+  %7 = begin_borrow %4 : $String.UTF16View
+  %8 = struct_extract %7 : $String.UTF16View, #String.UTF16View._guts
+  %9 = struct_extract %8 : $_StringGuts, #_StringGuts._object
+  %10 = copy_value %9 : $_StringObject
+  %11 = begin_borrow %10 : $_StringObject
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb4
+
+bb3:
+  br bb4
+
+bb4:
+  end_borrow %7 : $String.UTF16View
+  debug_value %11 : $_StringObject, let, name "self", argno 1
+  cond_br undef, bb5, bb6
+
+bb5:
+  end_borrow %11 : $_StringObject
+  destroy_value %10 : $_StringObject
+  br bb1
+
+bb6:
+  %21 = struct_extract %11 : $_StringObject, #_StringObject._countAndFlagsBits
+  end_borrow %11 : $_StringObject
+  destroy_value %10 : $_StringObject
+  %24 = struct_extract %21 : $UInt64, #UInt64._value
+  %25 = builtin "and_Int64"(%24 : $Builtin.Int64, undef : $Builtin.Int64) : $Builtin.Int64
+  cond_br undef, bb7, bb8
+
+bb7:
+  br bb1
+
+bb8:
+  destroy_value %4 : $String.UTF16View
+  destroy_value %0 : $String
+  %30 = tuple ()
+  return %30 : $()
+} // end sil function 'testUselessBorrow'
+
+// Test recursively visiting a guaranteed borrow that is copied within
+// the borrow scope and used by a debug_value.
+// The copy_value will be deleted when processing the struct.
+//
+// CHECK-LABEL: sil [ossa] @testCopiedDebugValue : $@convention(method) (@guaranteed String) -> @owned String.UTF16View {
+// CHECK: [[DS:%.*]] = destructure_struct %0 : $String
+// CHECK-NEXT:  [[ST:%.*]] = struct $String.UTF16View ([[DS]] : $_StringGuts)
+// CHECK-NEXT:  [[CP:%.*]] = copy_value [[ST]] : $String.UTF16View
+// CHECK-NEXT:  return [[CP]] : $String.UTF16View
+// CHECK-LABEL: } // end sil function 'testCopiedDebugValue'
+sil [ossa] @testCopiedDebugValue : $@convention(method) (@guaranteed String) -> @owned String.UTF16View {
+bb0(%0 : @guaranteed $String):
+  debug_value %0 : $String, let, name "self", argno 1
+  %2 = destructure_struct %0 : $String
+  %3 = copy_value %2 : $_StringGuts
+  debug_value %3 : $_StringGuts, let, name "guts"
+  %5 = struct $String.UTF16View (%3 : $_StringGuts)
+  return %5 : $String.UTF16View
+}

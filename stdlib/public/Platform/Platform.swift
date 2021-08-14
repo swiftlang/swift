@@ -13,10 +13,6 @@
 import SwiftShims
 import SwiftOverlayShims
 
-#if os(Windows)
-import ucrt
-#endif
-
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 //===----------------------------------------------------------------------===//
 // MacTypes.h

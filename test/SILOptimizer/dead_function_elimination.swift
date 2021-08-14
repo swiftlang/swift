@@ -168,11 +168,29 @@ internal func donotEliminate() {
   return
 }
 
+func callingGlobalFuncPtr() {
+  GFStr.globalFuncPtr()
+}
+
+func aliveReferencedFunc() {
+}
+
+struct GFStr {
+  static var globalFuncPtr: () -> () = callingGlobalFuncPtr
+  static var aliveFuncPtr: () -> () = aliveReferencedFunc
+}
+
+public func keepPtrAlive() {
+  GFStr.aliveFuncPtr()
+}
+
 // CHECK-NOT: sil {{.*}}inCycleA
 // CHECK-NOT: sil {{.*}}inCycleB
 // CHECK-NOT: sil {{.*}}DeadMethod
 // CHECK-NOT: sil {{.*}}DeadWitness
 // CHECK-NOT: sil {{.*}}publicClassMethod
+// CHECK-NOT: sil {{.*}}callingGlobalFuncPtr
+// CHECK-NOT: sil_global {{.*}}globalFuncPtr
 
 // CHECK-TESTING: sil {{.*}}inCycleA
 // CHECK-TESTING: sil {{.*}}inCycleB
@@ -180,7 +198,9 @@ internal func donotEliminate() {
 // CHECK-TESTING: sil {{.*}}publicClassMethod
 // CHECK-TESTING: sil {{.*}}DeadWitness
 
+// CHECK-LABEL: sil_global hidden @$s25dead_function_elimination5GFStrV12aliveFuncPtryycvpZ
 // CHECK-LABEL: @$s25dead_function_elimination14donotEliminateyyF
+// CHECK-LABEL: sil @$s25dead_function_elimination12keepPtrAliveyyF
 
 // CHECK-LABEL: sil_vtable Base
 // CHECK: aliveMethod

@@ -31,6 +31,10 @@ class Ninja(product.Product):
         return False
 
     @classmethod
+    def is_before_build_script_impl_product(cls):
+        return False
+
+    @classmethod
     def new_builder(cls, args, toolchain, workspace, host):
         return NinjaBuilder(cls, args, toolchain, workspace)
 
@@ -55,20 +59,19 @@ class NinjaBuilder(product.ProductBuilder):
         env = None
         if platform.system() == "Darwin":
             sysroot = xcrun.sdk_path("macosx")
-            osx_version_min = self.args.darwin_deployment_version_osx
             assert sysroot is not None
             env = {
-                "CXX": self.toolchain.cxx,
+                "CXX": shell._quote(self.toolchain.cxx),
                 "CFLAGS": (
-                    "-isysroot {sysroot} -mmacosx-version-min={osx_version}"
-                ).format(sysroot=sysroot, osx_version=osx_version_min),
+                    "-isysroot {sysroot}"
+                ).format(sysroot=shell._quote(sysroot)),
                 "LDFLAGS": (
-                    "-isysroot {sysroot} -mmacosx-version-min={osx_version}"
-                ).format(sysroot=sysroot, osx_version=osx_version_min),
+                    "-isysroot {sysroot}"
+                ).format(sysroot=shell._quote(sysroot)),
             }
         elif self.toolchain.cxx:
             env = {
-                "CXX": self.toolchain.cxx,
+                "CXX": shell._quote(self.toolchain.cxx),
             }
 
         # Ninja can only be built in-tree.  Copy the source tree to the build

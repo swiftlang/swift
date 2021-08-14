@@ -22,13 +22,16 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Subsystems.h"
+#include "llvm/ADT/DenseMap.h"
 
 using namespace swift;
 using namespace swift::unittest;
+using namespace swift::constraints::inference;
 
 SemaTest::SemaTest()
     : Context(*ASTContext::get(LangOpts, TypeCheckerOpts, SearchPathOpts,
-                               ClangImporterOpts, SourceMgr, Diags)) {
+                               ClangImporterOpts, SymbolGraphOpts,
+                               SourceMgr, Diags)) {
   INITIALIZE_LLVM();
 
   registerParseRequestFunctions(Context.evaluator);
@@ -73,4 +76,72 @@ Type SemaTest::getStdlibType(StringRef name) const {
   }
 
   return Type();
+}
+
+NominalTypeDecl *SemaTest::getStdlibNominalTypeDecl(StringRef name) const {
+  auto typeName = Context.getIdentifier(name);
+
+  auto *stdlib = Context.getStdlibModule();
+
+  llvm::SmallVector<ValueDecl *, 4> results;
+  stdlib->lookupValue(typeName, NLKind::UnqualifiedLookup, results);
+
+  if (results.size() != 1)
+    return nullptr;
+
+  return dyn_cast<NominalTypeDecl>(results.front());
+}
+
+VarDecl *SemaTest::addExtensionVarMember(NominalTypeDecl *decl,
+                                         StringRef name, Type type) const {
+  auto *ext = ExtensionDecl::create(Context, SourceLoc(), nullptr, { }, DC,
+                                    nullptr);
+  decl->addExtension(ext);
+  ext->setExtendedNominal(decl);
+
+  auto *VD = new (Context) VarDecl(/*isStatic=*/ true, VarDecl::Introducer::Var,
+                                   /*nameLoc=*/ SourceLoc(),
+                                   Context.getIdentifier(name), ext);
+
+  ext->addMember(VD);
+  auto *pat = new (Context) NamedPattern(VD);
+  VD->setNamingPattern(pat);
+  pat->setType(type);
+
+  return VD;
+}
+
+ProtocolType *SemaTest::createProtocol(llvm::StringRef protocolName,
+                                       Type parent) {
+  auto *PD = new (Context)
+      ProtocolDecl(DC, SourceLoc(), SourceLoc(),
+                   Context.getIdentifier(protocolName), /*Inherited=*/{},
+                   /*trailingWhere=*/nullptr);
+  PD->setImplicit();
+
+  return ProtocolType::get(PD, parent, Context);
+}
+
+BindingSet SemaTest::inferBindings(ConstraintSystem &cs,
+                                   TypeVariableType *typeVar) {
+  llvm::SmallDenseMap<TypeVariableType *, BindingSet> cache;
+
+  for (auto *typeVar : cs.getTypeVariables()) {
+    if (!typeVar->getImpl().hasRepresentativeOrFixed())
+      cache.insert({typeVar, cs.getBindingsFor(typeVar, /*finalize=*/false)});
+  }
+
+  for (auto *typeVar : cs.getTypeVariables()) {
+    auto cachedBindings = cache.find(typeVar);
+    if (cachedBindings == cache.end())
+      continue;
+
+    auto &bindings = cachedBindings->getSecond();
+    bindings.inferTransitiveProtocolRequirements(cache);
+    bindings.finalize(cache);
+  }
+
+  auto result = cache.find(typeVar);
+  assert(result != cache.end());
+  return result->second;
 }

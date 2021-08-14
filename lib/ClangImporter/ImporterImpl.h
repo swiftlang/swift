@@ -41,6 +41,7 @@
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/SmallSet.h"
+#include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/Path.h"
 #include <set>
@@ -141,6 +142,13 @@ enum class ImportTypeKind {
   /// * Bridging that requires type conversions is allowed.
   /// Parameters are always considered CF-audited.
   Parameter,
+
+  /// Import the type of a parameter to a completion handler that can indicate
+  /// a thrown error.
+  ///
+  /// Special handling:
+  /// * _Nullable_result is treated as _Nonnull rather than _Nullable_result.
+  CompletionHandlerResultParameter,
 
   /// Import the type of a parameter declared with
   /// \c CF_RETURNS_RETAINED.
@@ -249,11 +257,16 @@ public:
   /// should be inlucded in the cutoff of imported deprecated APIs marked
   /// unavailable.
   bool treatDeprecatedAsUnavailable(const clang::Decl *clangDecl,
-                                    const llvm::VersionTuple &version) const;
+                                    const llvm::VersionTuple &version,
+                                    bool isAsync) const;
 
   /// The message to embed for implicitly unavailability if a deprecated
   /// API is now unavailable.
   std::string deprecatedAsUnavailableMessage;
+
+  /// The message to embed for implicit async unavailability based on
+  /// deprecation.
+  std::string asyncDeprecatedAsUnavailableMessage;
 
   PlatformAvailability(const LangOptions &opts);
 
@@ -321,7 +334,6 @@ public:
   ASTContext &SwiftContext;
 
   const bool ImportForwardDeclarations;
-  const bool InferImportAsMember;
   const bool DisableSwiftBridgeAttr;
   const bool BridgingHeaderExplicitlyRequested;
   const bool DisableOverlayModules;
@@ -392,6 +404,15 @@ private:
 
   /// Clang arguments used to create the Clang invocation.
   std::vector<std::string> ClangArgs;
+
+  /// Mapping from Clang swift_attr attribute text to the Swift source buffer
+  /// IDs that contain that attribute text. These are re-used when parsing the
+  /// Swift attributes on import.
+  llvm::StringMap<unsigned> ClangSwiftAttrSourceBuffers;
+
+  /// Mapping from modules in which a Clang swift_attr attribute occurs, to be
+  /// used when parsing the attribute text.
+  llvm::SmallDenseMap<ModuleDecl *, SourceFile *> ClangSwiftAttrSourceFiles;
 
 public:
   /// Mapping of already-imported declarations.
@@ -464,6 +485,15 @@ public:
   /// Keep track of subscript declarations based on getter/setter
   /// pairs.
   llvm::DenseMap<std::pair<FuncDecl *, FuncDecl *>, SubscriptDecl *> Subscripts;
+
+  /// Keep track of getter/setter pairs for functions imported from C++
+  /// subscript operators based on the type in which they are declared and
+  /// the type of their parameter.
+  ///
+  /// `.first` corresponds to a getter
+  /// `.second` corresponds to a setter
+  llvm::MapVector<std::pair<NominalTypeDecl *, Type>,
+                  std::pair<FuncDecl *, FuncDecl *>> cxxSubscripts;
 
   /// Keeps track of the Clang functions that have been turned into
   /// properties.
@@ -653,6 +683,19 @@ public:
     decl->setImplicitlyUnwrappedOptional(true);
   }
 
+  void recordUnsafeConcurrencyForDecl(
+      ValueDecl *decl, bool isUnsafeSendable, bool isUnsafeMainActor) {
+    if (isUnsafeSendable) {
+      decl->getAttrs().add(
+          new (SwiftContext) UnsafeSendableAttr(/*implicit=*/true));
+    }
+
+    if (isUnsafeMainActor) {
+      decl->getAttrs().add(
+          new (SwiftContext) UnsafeMainActorAttr(/*implicit=*/true));
+    }
+  }
+
   /// Retrieve the Clang AST context.
   clang::ASTContext &getClangASTContext() const {
     return Instance->getASTContext();
@@ -722,6 +765,30 @@ public:
                       bool fullyQualified,
                       llvm::raw_ostream &os);
 
+  /// Emit a diagnostic, taking care not to interrupt a diagnostic that's
+  /// already in flight.
+  template<typename ...Args>
+  void diagnose(Args &&...args) {
+    // If we're in the middle of pretty-printing, suppress diagnostics.
+    if (SwiftContext.Diags.isPrettyPrintingDecl()) {
+      return;
+    }
+
+    SwiftContext.Diags.diagnose(std::forward<Args>(args)...);
+  }
+
+  /// Emit a diagnostic, taking care not to interrupt a diagnostic that's
+  /// already in flight.
+  template<typename ...Args>
+  void diagnose(SourceLoc loc, Args &&...args) {
+    // If we're in the middle of pretty-printing, suppress diagnostics.
+    if (SwiftContext.Diags.isPrettyPrintingDecl()) {
+      return;
+    }
+
+    SwiftContext.Diags.diagnose(loc, std::forward<Args>(args)...);
+  }
+
   /// Import the given Clang identifier into Swift.
   ///
   /// \param identifier The Clang identifier to map into Swift.
@@ -761,6 +828,14 @@ public:
   /// Map a Clang identifier name to its imported Swift equivalent.
   StringRef getSwiftNameFromClangName(StringRef name);
 
+  /// Retrieve the Swift source buffer ID that corresponds to the given
+  /// swift_attr attribute text, creating one if necessary.
+  unsigned getClangSwiftAttrSourceBuffer(StringRef attributeText);
+
+  /// Retrieve the placeholder source file for use in parsing Swift attributes
+  /// in the given module.
+  SourceFile &getClangSwiftAttrSourceFile(ModuleDecl &module);
+
   /// Import attributes from the given Clang declaration to its Swift
   /// equivalent.
   ///
@@ -770,6 +845,9 @@ public:
   /// being imported into, which may affect info from API notes.
   void importAttributes(const clang::NamedDecl *ClangDecl, Decl *MappedDecl,
                         const clang::ObjCContainerDecl *NewContext = nullptr);
+
+  Type applyParamAttributes(const clang::ParmVarDecl *param, Type type,
+                            bool &isUnsafeSendable, bool &isUnsafeMainActor);
 
   /// If we already imported a given decl, return the corresponding Swift decl.
   /// Otherwise, return nullptr.
@@ -803,10 +881,11 @@ public:
   ///
   /// \returns The imported declaration, or null if this declaration could
   /// not be represented in Swift.
-  Decl *importDeclReal(const clang::NamedDecl *ClangDecl, Version version) {
+  Decl *importDeclReal(const clang::NamedDecl *ClangDecl, Version version,
+                       bool useCanonicalDecl = true) {
     return importDeclAndCacheImpl(ClangDecl, version,
                                   /*SuperfluousTypedefsAreTransparent=*/false,
-                                  /*UseCanonicalDecl*/true);
+                                  /*UseCanonicalDecl*/ useCanonicalDecl);
   }
 
   /// Import a cloned version of the given declaration, which is part of
@@ -835,8 +914,34 @@ public:
   ///
   /// \returns The imported declaration context, or null if it could not
   /// be converted.
-  DeclContext *importDeclContextImpl(const clang::DeclContext *dc);
+  DeclContext *importDeclContextImpl(const clang::Decl *ImportingDecl,
+                                     const clang::DeclContext *dc);
 
+private:
+  /// Declarations currently being imported by \c importDeclForDeclContext().
+  /// Used to break cycles when a swift_name attribute is circular in a way that
+  /// can't be resolved, or there is some other cycle through
+  /// \c importDeclContextOf().
+  llvm::SmallVector<std::tuple<const clang::Decl *, StringRef,
+                               const clang::NamedDecl *, Version, bool>, 8>
+      contextDeclsBeingImported;
+
+  /// Records which contexts \c importDeclForDeclContext() has already warned
+  /// were unimportable.
+  llvm::SmallPtrSet<const clang::NamedDecl *, 4> contextDeclsWarnedAbout;
+
+  /// Exactly equivalent to \c importDecl(), except with additional
+  /// cycle-breaking code.
+  ///
+  /// \param writtenName The name that should be used for the declaration
+  ///        in cycle diagnostics.
+  Decl *importDeclForDeclContext(const clang::Decl *ImportingDecl,
+                                 StringRef writtenName,
+                                 const clang::NamedDecl *ClangDecl,
+                                 Version version,
+                                 bool UseCanonicalDecl = true);
+
+public:
   /// Import the declaration context of a given Clang declaration into
   /// Swift.
   ///
@@ -920,6 +1025,9 @@ public:
   /// After this has been called, the Foundation module will or won't be loaded
   /// into the ASTContext.
   ModuleDecl *tryLoadFoundationModule();
+
+  /// Returns whether or not the "Foundation" module can be imported, without loading it.
+  bool canImportFoundationModule();
 
   /// Retrieves the Swift wrapper for the given Clang module, creating
   /// it if necessary.
@@ -1033,7 +1141,8 @@ public:
   importType(clang::QualType type, ImportTypeKind kind,
              bool allowNSUIntegerAsInt, Bridgeability topLevelBridgeability,
              OptionalTypeKind optional = OTK_ImplicitlyUnwrappedOptional,
-             bool resugarNSErrorPointer = true);
+             bool resugarNSErrorPointer = true,
+             Optional<unsigned> completionHandlerErrorParamIndex = None);
 
   /// Import the given Clang type into Swift.
   ///
@@ -1077,13 +1186,11 @@ public:
   ///   to system APIs.
   /// \param name The name of the function.
   /// \param[out] parameterList The parameters visible inside the function body.
-  ImportedType
-  importFunctionParamsAndReturnType(DeclContext *dc,
-                                    const clang::FunctionDecl *clangDecl,
-                                    ArrayRef<const clang::ParmVarDecl *> params,
-                                    bool isVariadic, bool isFromSystemModule,
-                                    DeclName name,
-                                    ParameterList *&parameterList);
+  ImportedType importFunctionParamsAndReturnType(
+      DeclContext *dc, const clang::FunctionDecl *clangDecl,
+      ArrayRef<const clang::ParmVarDecl *> params, bool isVariadic,
+      bool isFromSystemModule, DeclName name, ParameterList *&parameterList,
+      ArrayRef<GenericTypeParamDecl *> genericParams);
 
   /// Import the given function return type.
   ///
@@ -1110,15 +1217,21 @@ public:
   /// \param argNames The argument names
   ///
   /// \returns The imported parameter list on success, or null on failure
-  ParameterList *
-  importFunctionParameterList(DeclContext *dc,
-                              const clang::FunctionDecl *clangDecl,
-                              ArrayRef<const clang::ParmVarDecl *> params,
-                              bool isVariadic, bool allowNSUIntegerAsInt,
-                              ArrayRef<Identifier> argNames);
+  ParameterList *importFunctionParameterList(
+      DeclContext *dc, const clang::FunctionDecl *clangDecl,
+      ArrayRef<const clang::ParmVarDecl *> params, bool isVariadic,
+      bool allowNSUIntegerAsInt, ArrayRef<Identifier> argNames,
+      ArrayRef<GenericTypeParamDecl *> genericParams);
 
   ImportedType importPropertyType(const clang::ObjCPropertyDecl *clangDecl,
                                   bool isFromSystemModule);
+
+  /// Determines what the type of an effectful, computed read-only property
+  /// would be, if the given method were imported as such a property.
+  ImportedType importEffectfulPropertyType(const clang::ObjCMethodDecl *decl,
+                                            DeclContext *dc,
+                                            importer::ImportedName name,
+                                            bool isFromSystemModule);
 
   /// Attempt to infer a default argument for a parameter with the
   /// given Clang \c type, \c baseName, and optionality.
@@ -1310,6 +1423,11 @@ public:
     llvm_unreachable("unimplemented for ClangImporter");
   }
 
+  void loadAssociatedTypes(const ProtocolDecl *decl, uint64_t contextData,
+                           SmallVectorImpl<AssociatedTypeDecl *> &assocTypes) override {
+    llvm_unreachable("unimplemented for ClangImporter");
+  }
+
   template <typename DeclTy, typename ...Targs>
   DeclTy *createDeclWithClangNode(ClangNode ClangN, AccessLevel access,
                                   Targs &&... Args) {
@@ -1425,12 +1543,20 @@ public:
 
 namespace importer {
 
+/// Whether this is a forward declaration of a type. We ignore forward
+/// declarations in certain cases, and instead process the real declarations.
+bool isForwardDeclOfType(const clang::Decl *decl);
+
 /// Whether we should suppress the import of the given Clang declaration.
 bool shouldSuppressDeclImport(const clang::Decl *decl);
 
 /// Identifies certain UIKit constants that used to have overlay equivalents,
 /// but are now renamed using the swift_name attribute.
 bool isSpecialUIKitStructZeroProperty(const clang::NamedDecl *decl);
+
+/// \returns true if this operator should be made a static function
+/// even if imported as a non-static member function.
+bool isImportedAsStatic(clang::OverloadedOperatorKind op);
 
 /// Add command-line arguments for a normal import of Clang code.
 void getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
@@ -1472,16 +1598,14 @@ class SwiftNameLookupExtension : public clang::ModuleFileExtension {
   ASTContext &swiftCtx;
   ClangSourceBufferImporter &buffersForDiagnostics;
   const PlatformAvailability &availability;
-  const bool inferImportAsMember;
 
 public:
   SwiftNameLookupExtension(std::unique_ptr<SwiftLookupTable> &pchLookupTable,
                            LookupTableMap &tables, ASTContext &ctx,
                            ClangSourceBufferImporter &buffersForDiagnostics,
-                           const PlatformAvailability &avail, bool inferIAM)
+                           const PlatformAvailability &avail)
       : pchLookupTable(pchLookupTable), lookupTables(tables), swiftCtx(ctx),
-        buffersForDiagnostics(buffersForDiagnostics), availability(avail),
-        inferImportAsMember(inferIAM) {}
+        buffersForDiagnostics(buffersForDiagnostics), availability(avail) {}
 
   clang::ModuleFileExtensionMetadata getExtensionMetadata() const override;
   llvm::hash_code hashExtension(llvm::hash_code code) const override;
@@ -1495,6 +1619,14 @@ public:
                         clang::serialization::ModuleFile &mod,
                         const llvm::BitstreamCursor &stream) override;
 };
+
+/// Determines whether the given swift_attr attribute describes the main
+/// actor.
+///
+/// \returns None if this is not a main-actor attribute, and a Boolean
+/// indicating whether (unsafe) was provided in the attribute otherwise.
+Optional<bool> isMainActorAttr(
+    ASTContext &ctx, const clang::SwiftAttrAttr *swiftAttr);
 
 }
 }

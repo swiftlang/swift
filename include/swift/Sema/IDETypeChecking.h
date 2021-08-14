@@ -136,11 +136,6 @@ namespace swift {
   /// Type check a function body element which is at \p TagetLoc .
   bool typeCheckASTNodeAtLoc(DeclContext *DC, SourceLoc TargetLoc);
 
-  /// Typecheck top-level code parsed during code completion.
-  ///
-  /// \returns true on success, false on error.
-  bool typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
-
   LookupResult
   lookupSemanticMember(DeclContext *DC, Type ty, DeclName name);
 
@@ -211,6 +206,33 @@ namespace swift {
   /// the decl context.
   ProtocolDecl *resolveProtocolName(DeclContext *dc, StringRef Name);
 
+  /// Reported type of a variable declaration.
+  struct VariableTypeInfo {
+    /// The start of the variable identifier.
+    uint32_t Offset;
+
+    /// The length of the variable identifier.
+    uint32_t Length;
+
+    /// Whether the variable has an explicit type annotation.
+    bool HasExplicitType;
+
+    /// The start of the printed type in a separate string buffer.
+    uint32_t TypeOffset;
+
+    VariableTypeInfo(uint32_t Offset, uint32_t Length, bool HasExplicitType,
+                     uint32_t TypeOffset);
+  };
+
+  /// Collect type information for every variable declaration in \c SF
+  /// within the given range into \c VariableTypeInfos.
+  /// All types will be printed to \c OS and the type offsets of the
+  /// \c VariableTypeInfos will index into the string that backs this
+  /// stream.
+  void collectVariableType(SourceFile &SF, SourceRange Range,
+                           std::vector<VariableTypeInfo> &VariableTypeInfos,
+                           llvm::raw_ostream &OS);
+
   /// FIXME: All of the below goes away once CallExpr directly stores its
   /// arguments.
 
@@ -221,7 +243,32 @@ namespace swift {
     SmallVector<SourceLoc, 4> labelLocs;
     SourceLoc lParenLoc;
     SourceLoc rParenLoc;
-    bool hasTrailingClosure = false;
+    Optional<unsigned> unlabeledTrailingClosureIdx;
+
+    /// The number of trailing closures in the argument list.
+    unsigned getNumTrailingClosures() const {
+      if (!unlabeledTrailingClosureIdx)
+        return 0;
+      return args.size() - *unlabeledTrailingClosureIdx;
+    }
+
+    /// Whether any unlabeled or labeled trailing closures are present.
+    bool hasAnyTrailingClosures() const {
+      return unlabeledTrailingClosureIdx.hasValue();
+    }
+
+    /// Whether the given index is for an unlabeled trailing closure.
+    bool isUnlabeledTrailingClosureIdx(unsigned i) const {
+      return unlabeledTrailingClosureIdx && *unlabeledTrailingClosureIdx == i;
+    }
+
+    /// Whether the given index is for a labeled trailing closure in an
+    /// argument list with multiple trailing closures.
+    bool isLabeledTrailingClosureIdx(unsigned i) const {
+      if (!unlabeledTrailingClosureIdx)
+        return false;
+      return i > *unlabeledTrailingClosureIdx && i < args.size();
+    }
   };
 
   /// When applying a solution to a constraint system, the type checker rewrites
@@ -255,9 +302,9 @@ namespace swift {
                             bool IncludeProtocolRequirements = true,
                             bool Transitive = false);
 
-  /// Enumerates the various kinds of "build" functions within a function
+  /// Enumerates the various kinds of "build" functions within a result
   /// builder.
-  enum class FunctionBuilderBuildFunction {
+  enum class ResultBuilderBuildFunction {
     BuildBlock,
     BuildExpression,
     BuildOptional,
@@ -268,21 +315,24 @@ namespace swift {
     BuildFinalResult,
   };
 
-  /// Try to infer the component type of a function builder from the type
+  /// Try to infer the component type of a result builder from the type
   /// of buildBlock or buildExpression, if it was there.
-  Type inferFunctionBuilderComponentType(NominalTypeDecl *builder);
+  Type inferResultBuilderComponentType(NominalTypeDecl *builder);
 
-  /// Print the declaration for a function builder "build" function, for use
+  /// Print the declaration for a result builder "build" function, for use
   /// in Fix-Its, code completion, and so on.
-  void printFunctionBuilderBuildFunction(
+  void printResultBuilderBuildFunction(
       NominalTypeDecl *builder, Type componentType,
-      FunctionBuilderBuildFunction function,
+      ResultBuilderBuildFunction function,
       Optional<std::string> stubIndent, llvm::raw_ostream &out);
 
   /// Compute the insertion location, indentation string, and component type
-  /// for a Fix-It that adds a new build* function to a function builder.
+  /// for a Fix-It that adds a new build* function to a result builder.
   std::tuple<SourceLoc, std::string, Type>
-  determineFunctionBuilderBuildFixItInfo(NominalTypeDecl *builder);
+  determineResultBuilderBuildFixItInfo(NominalTypeDecl *builder);
+
+  /// Just a proxy to swift::contextUsesConcurrencyFeatures() from lib/IDE code.
+  bool completionContextUsesConcurrencyFeatures(const DeclContext *dc);
 }
 
 #endif

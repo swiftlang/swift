@@ -376,7 +376,7 @@ extension ManagedBufferPointer {
   }
 
   /// Returns `true` if `self` holds the only strong reference to its
-  /// buffer. Otherwise, returns `false`.
+  /// buffer; otherwise, returns `false`.
   ///
   /// See `isKnownUniquelyReferenced` for details.
   @inlinable

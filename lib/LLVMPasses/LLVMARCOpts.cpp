@@ -116,6 +116,12 @@ static bool canonicalizeInputFunction(Function &F, ARCEntryPointBuilder &B,
           ++NumNoopDeleted;
           continue;
         }
+        if (!CI.use_empty()) {
+          // Do not get RC identical value here, could end up with a
+          // crash in replaceAllUsesWith as the type maybe different.
+          CI.replaceAllUsesWith(CI.getArgOperand(0));
+          Changed = true;
+        }
         // Rewrite unknown retains into swift_retains.
         NativeRefs.insert(ArgVal);
         for (auto &X : UnknownObjectRetains[ArgVal]) {
@@ -138,12 +144,17 @@ static bool canonicalizeInputFunction(Function &F, ARCEntryPointBuilder &B,
           ++NumNoopDeleted;
           continue;
         }
-
+        if (!CI.use_empty()) {
+          // Do not get RC identical value here, could end up with a
+          // crash in replaceAllUsesWith as the type maybe different.
+          CI.replaceAllUsesWith(CI.getArgOperand(0));
+          Changed = true;
+        }
         // Have not encountered a strong retain/release. keep it in the
         // unknown retain/release list for now. It might get replaced
         // later.
-        if (NativeRefs.find(ArgVal) == NativeRefs.end()) {
-           UnknownObjectRetains[ArgVal].push_back(&CI);
+        if (!NativeRefs.contains(ArgVal)) {
+          UnknownObjectRetains[ArgVal].push_back(&CI);
         } else {
           B.setInsertPoint(&CI);
           B.createRetain(ArgVal, &CI);
@@ -189,7 +200,7 @@ static bool canonicalizeInputFunction(Function &F, ARCEntryPointBuilder &B,
         // Have not encountered a strong retain/release. keep it in the
         // unknown retain/release list for now. It might get replaced
         // later.
-        if (NativeRefs.find(ArgVal) == NativeRefs.end()) {
+        if (!NativeRefs.contains(ArgVal)) {
           UnknownObjectReleases[ArgVal].push_back(&CI);
         } else {
           B.setInsertPoint(&CI);

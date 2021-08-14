@@ -184,8 +184,8 @@ class SomeClass {
 // Implicit conversions (in this case to @convention(block)) are ok.
 @_silgen_name("whatever") 
 func takeNoEscapeAsObjCBlock(_: @noescape @convention(block) () -> Void)  // expected-error{{unknown attribute 'noescape'}}
-func takeNoEscapeTest2(_ fn : @noescape () -> ()) {  // expected-error{{unknown attribute 'noescape'}}
-  takeNoEscapeAsObjCBlock(fn)
+func takeNoEscapeTest2(_ fn : @noescape () -> ()) {  // expected-error{{unknown attribute 'noescape'}} expected-note {{parameter 'fn' is implicitly non-escaping}}
+  takeNoEscapeAsObjCBlock(fn) // expected-error {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
 }
 
 // Autoclosure implies noescape..
@@ -290,14 +290,14 @@ typealias CompletionHandler = (_ success: Bool) -> ()
 
 var escape : CompletionHandlerNE
 var escapeOther : CompletionHandler
-func doThing1(_ completion: (_ success: Bool) -> ()) {
-  escape = completion
+func doThing1(_ completion: (_ success: Bool) -> ()) { // expected-note {{parameter 'completion' is implicitly non-escaping}}
+  escape = completion // expected-error {{assigning non-escaping parameter 'completion' to an @escaping closure}}
 }
 func doThing2(_ completion: CompletionHandlerNE) {
   escape = completion
 }
-func doThing3(_ completion: CompletionHandler) {
-  escape = completion
+func doThing3(_ completion: CompletionHandler) { // expected-note {{parameter 'completion' is implicitly non-escaping}}
+  escape = completion // expected-error {{assigning non-escaping parameter 'completion' to an @escaping closure}}
 }
 func doThing4(_ completion: @escaping CompletionHandler) {
   escapeOther = completion

@@ -539,12 +539,29 @@ void FunctionSideEffects::analyzeInstruction(SILInstruction *I) {
         true;
     Traps = true;
     return;
-  case SILInstructionKind::LoadInst:
-    getEffectsOn(cast<LoadInst>(I)->getOperand())->Reads = true;
+  case SILInstructionKind::LoadBorrowInst: {
+    auto *effects = getEffectsOn(cast<LoadBorrowInst>(I)->getOperand());
+    effects->Reads = true;
     return;
-  case SILInstructionKind::StoreInst:
-    getEffectsOn(cast<StoreInst>(I)->getDest())->Writes = true;
+  }
+  case SILInstructionKind::LoadInst: {
+    auto *li = cast<LoadInst>(I);
+    auto *effects = getEffectsOn(cast<LoadInst>(I)->getOperand());
+    effects->Reads = true;
+    if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Take)
+      effects->Writes = true;
+    if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Copy)
+      effects->Retains = true;
     return;
+  }
+  case SILInstructionKind::StoreInst: {
+    auto *si = cast<StoreInst>(I);
+    auto *effects = getEffectsOn(si->getDest());
+    effects->Writes = true;
+    if (si->getOwnershipQualifier() == StoreOwnershipQualifier::Assign)
+      effects->Releases = true;
+    return;
+  }
   case SILInstructionKind::CondFailInst:
     Traps = true;
     return;

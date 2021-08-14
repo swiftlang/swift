@@ -13,7 +13,10 @@
 import SwiftShims
 
 #if INTERNAL_CHECKS_ENABLED
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+// "9999" means: enable if linked with a built library, but not when linked with
+// the OS libraries.
+// Note: this must not be changed to a "real" OS version.
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
 @_silgen_name("swift_COWChecksEnabled")
 public func _COWChecksEnabled() -> Bool
 #endif
@@ -460,6 +463,9 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   @_alwaysEmitIntoClient
   internal var isImmutable: Bool {
     get {
+      // "9999" means: enable if linked with a built library, but not when
+      // linked with the OS libraries.
+      // Note: this must not be changed to a "real" OS version.
       if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
         if (_COWChecksEnabled()) {
           return capacity == 0 || _swift_isImmutableCOWBuffer(_storage)
@@ -468,20 +474,22 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
       return true
     }
     nonmutating set {
+      // "9999" means: enable if linked with a built library, but not when
+      // linked with the OS libraries.
+      // Note: this must not be changed to a "real" OS version.
       if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
         if (_COWChecksEnabled()) {
-          if newValue {
-            if capacity > 0 {
-              let wasImmutable = _swift_setImmutableCOWBuffer(_storage, true)
+          // Make sure to not modify the empty array singleton (which has a
+          // capacity of 0).
+          if capacity > 0 {
+            let wasImmutable = _swift_setImmutableCOWBuffer(_storage, newValue)
+            if newValue {
               _internalInvariant(!wasImmutable,
                 "re-setting immutable array buffer to immutable")
+            } else {
+              _internalInvariant(wasImmutable,
+                "re-setting mutable array buffer to mutable")
             }
-          } else {
-            _internalInvariant(capacity > 0,
-              "setting empty array buffer to mutable")
-             let wasImmutable = _swift_setImmutableCOWBuffer(_storage, false)
-            _internalInvariant(wasImmutable,
-              "re-setting mutable array buffer to mutable")
           }
         }
       }
@@ -490,6 +498,9 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   
   @_alwaysEmitIntoClient
   internal var isMutable: Bool {
+      // "9999" means: enable if linked with a built library, but not when
+      // linked with the OS libraries.
+      // Note: this must not be changed to a "real" OS version.
     if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
       if (_COWChecksEnabled()) {
         return !_swift_isImmutableCOWBuffer(_storage)
@@ -645,12 +656,17 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
     return target + initializedCount
   }
 
-  public __consuming func _copyContents(
+  @inlinable
+  internal __consuming func _copyContents(
     initializing buffer: UnsafeMutableBufferPointer<Element>
-  ) -> (Iterator,UnsafeMutableBufferPointer<Element>.Index) {
-    // This customization point is not implemented for internal types.
-    // Accidentally calling it would be a catastrophic performance bug.
-    fatalError("unsupported")
+  ) -> (Iterator, UnsafeMutableBufferPointer<Element>.Index) {
+    guard buffer.count > 0 else { return (makeIterator(), 0) }
+    let c = Swift.min(self.count, buffer.count)
+    buffer.baseAddress!.initialize(
+      from: firstElementAddress,
+      count: c)
+    _fixLifetime(owner)
+    return (IndexingIterator(_elements: self, _position: c), c)
   }
 
   /// Returns a `_SliceBuffer` containing the given `bounds` of values
@@ -698,7 +714,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
 
   /// Puts the buffer in an immutable state.
   ///
-  /// - Precondition: The buffer must be mutable.
+  /// - Precondition: The buffer must be mutable or the empty array singleton.
   ///
   /// - Warning: After a call to `endCOWMutation` the buffer must not be mutated
   ///   until the next call of `beginCOWMutation`.

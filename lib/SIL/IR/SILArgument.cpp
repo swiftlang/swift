@@ -27,28 +27,11 @@ SILArgument::SILArgument(ValueKind subClassKind,
                          SILBasicBlock *inputParentBlock, SILType type,
                          ValueOwnershipKind ownershipKind,
                          const ValueDecl *inputDecl)
-    : ValueBase(subClassKind, type, IsRepresentative::Yes),
+    : ValueBase(subClassKind, type),
       parentBlock(inputParentBlock), decl(inputDecl) {
   Bits.SILArgument.VOKind = static_cast<unsigned>(ownershipKind);
   inputParentBlock->insertArgument(inputParentBlock->args_end(), this);
 }
-
-SILArgument::SILArgument(ValueKind subClassKind,
-                         SILBasicBlock *inputParentBlock,
-                         SILBasicBlock::arg_iterator argArrayInsertPt,
-                         SILType type, ValueOwnershipKind ownershipKind,
-                         const ValueDecl *inputDecl)
-    : ValueBase(subClassKind, type, IsRepresentative::Yes),
-      parentBlock(inputParentBlock), decl(inputDecl) {
-  Bits.SILArgument.VOKind = static_cast<unsigned>(ownershipKind);
-  // Function arguments need to have a decl.
-  assert(!inputParentBlock->getParent()->isBare() &&
-                 inputParentBlock->getParent()->size() == 1
-             ? decl != nullptr
-             : true);
-  inputParentBlock->insertArgument(argArrayInsertPt, this);
-}
-
 
 SILFunction *SILArgument::getFunction() {
   return getParent()->getParent();
@@ -61,6 +44,33 @@ const SILFunction *SILArgument::getFunction() const {
 SILModule &SILArgument::getModule() const {
   return getFunction()->getModule();
 }
+
+unsigned SILArgument::getIndex() const {
+  for (auto p : llvm::enumerate(getParent()->getArguments())) {
+    if (p.value() == this) {
+      return p.index();
+    }
+  }
+  llvm_unreachable("SILArgument not argument of its parent BB");
+}
+
+bool SILFunctionArgument::isIndirectResult() const {
+  auto numIndirectResults =
+      getFunction()->getConventions().getNumIndirectSILResults();
+  return getIndex() < numIndirectResults;
+}
+
+SILArgumentConvention SILFunctionArgument::getArgumentConvention() const {
+  return getFunction()->getConventions().getSILArgumentConvention(getIndex());
+}
+
+/// Given that this is an entry block argument, and given that it does
+/// not correspond to an indirect result, return the corresponding
+/// SILParameterInfo.
+SILParameterInfo SILFunctionArgument::getKnownParameterInfo() const {
+  return getFunction()->getConventions().getParamInfoForSILArg(getIndex());
+}
+
 
 //===----------------------------------------------------------------------===//
 //                              SILBlockArgument
@@ -149,6 +159,12 @@ bool SILPhiArgument::getIncomingPhiValues(
     returnedPhiValues.push_back(incomingValue);
   }
   return true;
+}
+
+Operand *SILPhiArgument::getIncomingPhiOperand(SILBasicBlock *predBlock) const {
+  if (!isPhiArgument())
+    return nullptr;
+  return getIncomingPhiOperandForPred(getParent(), predBlock, getIndex());
 }
 
 bool SILPhiArgument::getIncomingPhiOperands(
@@ -300,7 +316,15 @@ TermInst *SILPhiArgument::getSingleTerminator() const {
   return const_cast<SILBasicBlock *>(predBlock)->getTerminator();
 }
 
-const SILPhiArgument *BranchInst::getArgForOperand(const Operand *oper) const {
+TermInst *SILPhiArgument::getTerminatorForResult() const {
+  if (auto *termInst = getSingleTerminator()) {
+    if (!isa<BranchInst>(termInst) && !isa<CondBranchInst>(termInst))
+      return termInst;
+  }
+  return nullptr;
+}
+
+SILPhiArgument *BranchInst::getArgForOperand(const Operand *oper) {
   assert(oper->getUser() == this);
   return cast<SILPhiArgument>(
       getDestBB()->getArgument(oper->getOperandNumber()));

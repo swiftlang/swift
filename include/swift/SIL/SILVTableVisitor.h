@@ -45,21 +45,7 @@ template <class T> class SILVTableVisitor {
     SILDeclRef constant(fd, SILDeclRef::Kind::Func);
     maybeAddEntry(constant);
 
-    for (auto *diffAttr : fd->getAttrs().getAttributes<DifferentiableAttr>()) {
-      auto jvpConstant = constant.asAutoDiffDerivativeFunction(
-          AutoDiffDerivativeFunctionIdentifier::get(
-              AutoDiffDerivativeFunctionKind::JVP,
-              diffAttr->getParameterIndices(),
-              diffAttr->getDerivativeGenericSignature(), fd->getASTContext()));
-      maybeAddEntry(jvpConstant);
-
-      auto vjpConstant = constant.asAutoDiffDerivativeFunction(
-          AutoDiffDerivativeFunctionIdentifier::get(
-              AutoDiffDerivativeFunctionKind::VJP,
-              diffAttr->getParameterIndices(),
-              diffAttr->getDerivativeGenericSignature(), fd->getASTContext()));
-      maybeAddEntry(vjpConstant);
-    }
+    maybeAddAutoDiffDerivativeMethods(constant);
   }
 
   void maybeAddConstructor(ConstructorDecl *cd) {
@@ -72,21 +58,7 @@ template <class T> class SILVTableVisitor {
     SILDeclRef constant(cd, SILDeclRef::Kind::Allocator);
     maybeAddEntry(constant);
 
-    for (auto *diffAttr : cd->getAttrs().getAttributes<DifferentiableAttr>()) {
-      auto jvpConstant = constant.asAutoDiffDerivativeFunction(
-          AutoDiffDerivativeFunctionIdentifier::get(
-              AutoDiffDerivativeFunctionKind::JVP,
-              diffAttr->getParameterIndices(),
-              diffAttr->getDerivativeGenericSignature(), cd->getASTContext()));
-      maybeAddEntry(jvpConstant);
-
-      auto vjpConstant = constant.asAutoDiffDerivativeFunction(
-          AutoDiffDerivativeFunctionIdentifier::get(
-              AutoDiffDerivativeFunctionKind::VJP,
-              diffAttr->getParameterIndices(),
-              diffAttr->getDerivativeGenericSignature(), cd->getASTContext()));
-      maybeAddEntry(vjpConstant);
-    }
+    maybeAddAutoDiffDerivativeMethods(constant);
   }
 
   void maybeAddAccessors(AbstractStorageDecl *asd) {
@@ -120,8 +92,11 @@ template <class T> class SILVTableVisitor {
       //   replace the vtable entry for B.f(); a call to A.f()
       //   will correctly dispatch to the implementation of B.f()
       //   in the subclass.
+      auto *UseDC = declRef.getDecl()->getDeclContext();
       if (!baseRef.getDecl()->isAccessibleFrom(
-            declRef.getDecl()->getDeclContext()))
+            UseDC,
+            /*forConformance=*/false,
+            /*allowUsableFromInline=*/true))
         break;
 
       asDerived().addMethodOverride(baseRef, declRef);
@@ -142,13 +117,31 @@ template <class T> class SILVTableVisitor {
       asDerived().addPlaceholder(placeholder);
   }
 
+  void maybeAddAutoDiffDerivativeMethods(SILDeclRef constant) {
+    auto *D = constant.getDecl();
+    for (auto *diffAttr : D->getAttrs().getAttributes<DifferentiableAttr>()) {
+      maybeAddEntry(constant.asAutoDiffDerivativeFunction(
+          AutoDiffDerivativeFunctionIdentifier::get(
+              AutoDiffDerivativeFunctionKind::JVP,
+              diffAttr->getParameterIndices(),
+              diffAttr->getDerivativeGenericSignature(),
+              D->getASTContext())));
+      maybeAddEntry(constant.asAutoDiffDerivativeFunction(
+          AutoDiffDerivativeFunctionIdentifier::get(
+              AutoDiffDerivativeFunctionKind::VJP,
+              diffAttr->getParameterIndices(),
+              diffAttr->getDerivativeGenericSignature(),
+              D->getASTContext())));
+    }
+  }
+
 protected:
   void addVTableEntries(ClassDecl *theClass) {
     // Imported classes do not have a vtable.
     if (!theClass->hasKnownSwiftImplementation())
       return;
 
-    for (auto member : theClass->getSemanticMembers())
+    for (auto member : theClass->getABIMembers())
       maybeAddMember(member);
   }
 };

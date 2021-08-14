@@ -301,13 +301,13 @@ bb0(%0 : $*Builtin.NativeObject):
   checked_cast_addr_br take_always Builtin.NativeObject in %0 : $*Builtin.NativeObject to Builtin.NativeObject in %stack0 : $*Builtin.NativeObject, bb1, bb2
 
 bb1:
+  destroy_addr %stack0 : $*Builtin.NativeObject
   br bb3
 
 bb2:
   br bb3
 
 bb3:
-  destroy_addr %stack0 : $*Builtin.NativeObject
   dealloc_stack %stack0 : $*Builtin.NativeObject
   %9999 = tuple()
   return %9999 : $()
@@ -326,6 +326,7 @@ bb1:
   br bb3
 
 bb2:
+  destroy_addr %0 : $*Builtin.NativeObject
   br bb3
 
 bb3:
@@ -382,6 +383,38 @@ sil [ossa] @pointer_to_address_is_assumed_to_be_safe : $@convention(thin) (@owne
 bb0(%0 : @owned $Builtin.NativeObject):
   %1 = alloc_stack $Builtin.NativeObject
   store %0 to [init] %1 : $*Builtin.NativeObject
+  %2 = load_borrow %1 : $*Builtin.NativeObject
+  %gUser = function_ref @guaranteedUser : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %gUser(%2) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  end_borrow %2 : $Builtin.NativeObject
+  %3 = address_to_pointer %1 : $*Builtin.NativeObject to $Builtin.RawPointer
+  %4 = mark_dependence %3 : $Builtin.RawPointer on %1 : $*Builtin.NativeObject
+  %rawPointerUser = function_ref @useRawPointer : $@convention(thin) (Builtin.RawPointer) -> ()
+  apply %rawPointerUser(%4) : $@convention(thin) (Builtin.RawPointer) -> ()
+  destroy_addr %1 : $*Builtin.NativeObject
+  dealloc_stack %1 : $*Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+struct Bool {
+  var _value: Builtin.Int1
+}
+
+sil [ossa] @test_withisunique : $@convention(method) <Element> (@inout Builtin.NativeObject) -> Bool {
+bb0(%0 : $*Builtin.NativeObject):
+  %1 = is_unique %0 : $*Builtin.NativeObject    
+  %2 = struct $Bool (%1 : $Builtin.Int1)        
+  %3 = load_borrow %0 : $*Builtin.NativeObject 
+  end_borrow %3 : $Builtin.NativeObject
+  return %2 : $Bool
+}
+ 
+sil [ossa] @test_valuemetatype : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = alloc_stack $Builtin.NativeObject
+  store %0 to [init] %1 : $*Builtin.NativeObject
+  %3a = value_metatype $@thick Builtin.NativeObject.Type, %1 : $*Builtin.NativeObject
   %2 = load_borrow %1 : $*Builtin.NativeObject
   %gUser = function_ref @guaranteedUser : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
   apply %gUser(%2) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()

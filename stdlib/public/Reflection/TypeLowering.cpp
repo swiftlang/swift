@@ -260,9 +260,18 @@ bool RecordTypeInfo::readExtraInhabitantIndex(remote::MemoryReader &reader,
                                               int *extraInhabitantIndex) const {
   switch (SubKind) {
   case RecordKind::Invalid:
-  case RecordKind::OpaqueExistential:
   case RecordKind::ClosureContext:
     return false;
+
+  case RecordKind::OpaqueExistential: {
+    if (Fields.size() != 1) {
+      return false;
+    }
+    auto metadata = Fields[0];
+    auto metadataFieldAddress = address + metadata.Offset;
+    return metadata.TI.readExtraInhabitantIndex(
+      reader, metadataFieldAddress, extraInhabitantIndex);
+  }
 
   case RecordKind::ThickFunction: {
     if (Fields.size() != 2) {
@@ -384,7 +393,7 @@ public:
                    /*BitwiseTakable*/ true,
                    EnumKind::NoPayloadEnum, Cases) {
     assert(Cases.size() >= 2);
-//    assert(getNumPayloadCases() == 0);
+    assert(getNumPayloadCases() == 0);
   }
 
   bool readExtraInhabitantIndex(remote::MemoryReader &reader,
@@ -428,7 +437,7 @@ public:
     : EnumTypeInfo(Size, Alignment, Stride, NumExtraInhabitants,
                    BitwiseTakable, EnumKind::SinglePayloadEnum, Cases) {
     assert(Cases[0].TR != 0);
-//    assert(getNumPayloadCases() == 1);
+    assert(getNumPayloadCases() == 1);
   }
 
   bool readExtraInhabitantIndex(remote::MemoryReader &reader,
@@ -546,6 +555,7 @@ public:
     assert(Cases[1].TR != 0);
     assert(getNumPayloadCases() > 1);
     assert(getSize() > getPayloadSize());
+    assert(getCases().size() > 1);
   }
 
   bool readExtraInhabitantIndex(remote::MemoryReader &reader,
@@ -1556,6 +1566,10 @@ public:
     return true;
   }
 
+  bool visitSILBoxTypeWithLayoutTypeRef(const SILBoxTypeWithLayoutTypeRef *SB) {
+    return true;
+  }
+
   bool
   visitForeignClassTypeRef(const ForeignClassTypeRef *F) {
     return true;
@@ -1680,6 +1694,11 @@ public:
   }
 
   MetatypeRepresentation
+  visitSILBoxTypeWithLayoutTypeRef(const SILBoxTypeWithLayoutTypeRef *SB) {
+    return MetatypeRepresentation::Thin;
+  }
+
+  MetatypeRepresentation
   visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP) {
     DEBUG_LOG(fprintf(stderr, "Unresolved generic TypeRef: "); GTP->dump());
     return MetatypeRepresentation::Unknown;
@@ -1748,14 +1767,14 @@ class EnumTypeInfoBuilder {
     if (TI == nullptr) {
       DEBUG_LOG(fprintf(stderr, "No TypeInfo for case type: "); TR->dump());
       Invalid = true;
-      return;
+      static TypeInfo emptyTI;
+      Cases.push_back({Name, /*offset=*/0, /*value=*/-1, TR, emptyTI});
+    } else {
+      Size = std::max(Size, TI->getSize());
+      Alignment = std::max(Alignment, TI->getAlignment());
+      BitwiseTakable &= TI->isBitwiseTakable();
+      Cases.push_back({Name, /*offset=*/0, /*value=*/-1, TR, *TI});
     }
-
-    Size = std::max(Size, TI->getSize());
-    Alignment = std::max(Alignment, TI->getAlignment());
-    BitwiseTakable &= TI->isBitwiseTakable();
-
-    Cases.push_back({Name, /*offset=*/0, /*value=*/-1, TR, *TI});
   }
 
 public:
@@ -1782,6 +1801,7 @@ public:
       } else {
         PayloadCases.push_back(Case);
         auto *CaseTR = getCaseTypeRef(Case);
+        assert(CaseTR != nullptr);
         auto *CaseTI = TC.getTypeInfo(CaseTR, ExternalTypeInfo);
         addCase(Case.Name, CaseTR, CaseTI);
       }
@@ -2121,7 +2141,9 @@ public:
       return TC.getReferenceTypeInfo(Kind, ReferenceTI->getReferenceCounting());
 
     if (auto *EnumTI = dyn_cast<EnumTypeInfo>(TI)) {
-      if (EnumTI->isOptional() && Kind == ReferenceKind::Weak) {
+      if (EnumTI->isOptional() &&
+          (Kind == ReferenceKind::Weak || Kind == ReferenceKind::Unowned ||
+           Kind == ReferenceKind::Unmanaged)) {
         auto *TI = TC.getTypeInfo(EnumTI->getCases()[0].TR, ExternalTypeInfo);
         return rebuildStorageTypeInfo(TI, Kind);
       }
@@ -2173,6 +2195,12 @@ public:
 #include "swift/AST/ReferenceStorage.def"
 
   const TypeInfo *visitSILBoxTypeRef(const SILBoxTypeRef *SB) {
+    return TC.getReferenceTypeInfo(ReferenceKind::Strong,
+                                   ReferenceCounting::Native);
+  }
+
+  const TypeInfo *
+  visitSILBoxTypeWithLayoutTypeRef(const SILBoxTypeWithLayoutTypeRef *SB) {
     return TC.getReferenceTypeInfo(ReferenceKind::Strong,
                                    ReferenceCounting::Native);
   }

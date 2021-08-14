@@ -1,0 +1,8 @@
+// swift-interface-format-version: 1.0
+// swift-compiler-version: Apple Swift version 5.3 (swiftlang-1200.0.29.2 clang-1200.0.30.1)
+// swift-module-flags: -target arm64-apple-macos11.0 -enable-objc-interop -enable-library-evolution -swift-version 5 -enforce-exclusivity=checked -O -module-name CoreFeatures
+@_exported import CoreFeatures
+import Foundation
+import Swift
+extension RootObject : CoreFeatures.ReactiveRootProtocol {
+}

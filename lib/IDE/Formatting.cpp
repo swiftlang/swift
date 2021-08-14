@@ -333,7 +333,7 @@ public:
 
   std::pair<unsigned, unsigned> indentLineAndColumn() {
     if (InnermostCtx)
-      return SM.getPresumedLineAndColumnForLoc(InnermostCtx->ContextLoc);
+      return SM.getLineAndColumnInBuffer(InnermostCtx->ContextLoc);
     return std::make_pair(0, 0);
   }
 
@@ -2048,7 +2048,7 @@ private:
   }
 
   Optional<IndentContext>
-  getIndentContextFromInherits(ArrayRef<TypeLoc> Inherits,
+  getIndentContextFromInherits(ArrayRef<InheritedEntry> Inherits,
                                SourceLoc ContextLoc) {
     if (Inherits.empty())
       return None;
@@ -2586,18 +2586,17 @@ private:
 
         ListAligner Aligner(SM, TargetLocation, ContextLoc, L, R);
         for (auto &Entry: ParentCapture->getCaptureList()) {
-          if (auto *PBD = Entry.Init) {
-            NodesToSkip.insert(PBD);
-            SourceRange Range = PBD->getSourceRangeIncludingAttrs();
-            Aligner.updateAlignment(Range, PBD);
+          auto *PBD = Entry.PBD;
+          NodesToSkip.insert(PBD);
+          SourceRange Range = PBD->getSourceRangeIncludingAttrs();
+          Aligner.updateAlignment(Range, PBD);
 
-            if (isTargetContext(Range)) {
-              Aligner.setAlignmentIfNeeded(CtxOverride);
-              return IndentContext {
-                Range.Start,
-                !OutdentChecker::hasOutdent(SM, Range, PBD)
-              };
-            }
+          if (isTargetContext(Range)) {
+            Aligner.setAlignmentIfNeeded(CtxOverride);
+            return IndentContext {
+              Range.Start,
+              !OutdentChecker::hasOutdent(SM, Range, PBD)
+            };
           }
         }
         return Aligner.getContextAndSetAlignment(CtxOverride);

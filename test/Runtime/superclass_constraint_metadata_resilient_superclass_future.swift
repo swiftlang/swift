@@ -1,4 +1,3 @@
-// REQUIRES: rdar61345988
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -emit-library -enable-library-evolution -module-name Framework -module-link-name Framework %S/Inputs/public_struct_with_generic_arg_swift_class_constrained.swift -o %t/%target-library-name(Framework) -emit-module-path %t/Framework.swiftmodule -target %module-target-future
 // RUN: %target-codesign %t/libFramework.dylib
@@ -8,9 +7,9 @@
 // RUN: %target-run %t/main | %FileCheck %S/Inputs/print_subclass/main.swift
 
 // REQUIRES: executable_test
-// REQUIRES: rdar61345988
 // REQUIRES: OS=macosx
 // UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 import Swift
 import Framework

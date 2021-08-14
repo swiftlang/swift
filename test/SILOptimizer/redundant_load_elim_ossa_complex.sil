@@ -1,0 +1,849 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -redundant-load-elim | %FileCheck %s
+// TODO : Add a version with semantic-arc-opts when #34971 is landed or DCE is enabled on OSSA
+
+sil_stage canonical
+
+import Builtin
+
+class Klass {
+}
+
+struct NonTrivialStruct {
+  var val:Klass
+}
+
+struct PairKlass {
+  var val1 : Klass
+  var val2 : Klass
+}
+
+struct TripleKlass {
+  var val1 : Klass
+  var val2 : Klass
+  var val3 : Klass
+}
+
+public enum FakeOptional<T> {
+  case none
+  case some(T)
+}
+sil [ossa] @use_klass : $@convention(thin) (@owned Klass) -> ()
+sil [ossa] @use_nontrivialstruct : $@convention(thin) (@owned NonTrivialStruct) -> ()
+
+// CHECK-LABEL: sil [ossa] @rle_simple1 :
+// CHECK: load
+// CHECK-NOT: load 
+// CHECK-LABEL: } // end sil function 'rle_simple1'
+sil [ossa] @rle_simple1 : $@convention(thin) (@in NonTrivialStruct) -> @owned Klass {
+bb0(%0 : $*NonTrivialStruct):
+  %ele = struct_element_addr %0 : $*NonTrivialStruct, #NonTrivialStruct.val
+  %val1 = load [copy] %ele : $*Klass
+  %val2 = load [take] %ele : $*Klass
+  destroy_value %val2 : $Klass
+  return %val1 : $Klass
+}
+
+// CHECK-LABEL: sil [ossa] @rle_simple2 :
+// CHECK: load
+// CHECK-NOT: load 
+// CHECK-LABEL: } // end sil function 'rle_simple2'
+sil [ossa] @rle_simple2 : $@convention(thin) (@in NonTrivialStruct) -> @owned Klass {
+bb0(%0 : $*NonTrivialStruct):
+  %ele = struct_element_addr %0 : $*NonTrivialStruct, #NonTrivialStruct.val
+  %val1 = load [copy] %ele : $*Klass
+  cond_br undef, bb1, bb2
+
+bb1:
+  %val2 = load [take] %ele : $*Klass
+  destroy_value %val2 : $Klass
+  br bb3
+
+bb2:
+  destroy_addr %ele : $*Klass
+  br bb3
+
+bb3:
+  return %val1 : $Klass
+}
+
+// CHECK-LABEL: sil [ossa] @rle_simple3 :
+// CHECK: load
+// CHECK-NOT: load 
+// CHECK-LABEL: } // end sil function 'rle_simple3'
+sil [ossa] @rle_simple3 : $@convention(thin) (@in NonTrivialStruct) -> @owned Klass {
+bb0(%0 : $*NonTrivialStruct):
+  %ele = struct_element_addr %0 : $*NonTrivialStruct, #NonTrivialStruct.val
+  %val1 = load [copy] %ele : $*Klass
+  br bb1
+
+bb1:
+  %val2 = load [copy] %ele : $*Klass
+  destroy_value %val2 : $Klass
+  cond_br undef, bb1a, bb3
+
+bb1a:
+  br bb1
+
+bb3:
+  destroy_addr %ele : $*Klass
+  return %val1 : $Klass
+}
+
+// CHECK-LABEL: sil [ossa] @rle_needscopy1 :
+// CHECK: load
+// CHECK-NOT: load 
+// CHECK-LABEL: } // end sil function 'rle_needscopy1'
+sil [ossa] @rle_needscopy1 : $@convention(thin) (@in NonTrivialStruct) -> @owned Klass {
+bb0(%0 : $*NonTrivialStruct):
+  %ele = struct_element_addr %0 : $*NonTrivialStruct, #NonTrivialStruct.val
+  %val1 = load [copy] %ele : $*Klass
+  cond_br undef, bb1, bb2
+
+bb1:
+  unreachable
+
+bb2:
+  cond_br undef, bb3, bb4
+
+bb3:
+  br bb5
+
+bb4:
+  br bb5
+
+bb5:
+  %val2 = load [take] %ele : $*Klass
+  destroy_value %val2 : $Klass
+  return %val1 : $Klass
+}
+
+// CHECK-LABEL: sil [ossa] @rle_needscopy2 : 
+// CHECK: load
+// CHECK-NOT: load 
+// CHECK-LABEL: } // end sil function 'rle_needscopy2'
+// rle opt will need to insert struct inst
+sil [ossa] @rle_needscopy2 : $@convention(thin) (@in NonTrivialStruct) -> () {
+bb0(%0 : $*NonTrivialStruct):
+  %1 = struct_element_addr %0 : $*NonTrivialStruct, #NonTrivialStruct.val
+  %2 = load [copy] %1 : $*Klass
+  %3 = load [take] %0 : $*NonTrivialStruct
+  destroy_value %2 : $Klass
+  destroy_value %3 : $NonTrivialStruct
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @rle_needscopy3 : 
+// CHECK: load
+// CHECK-NOT: load 
+// CHECK-LABEL: } // end sil function 'rle_needscopy3'
+sil [ossa] @rle_needscopy3 : $@convention(thin) (@in NonTrivialStruct) -> @owned Klass {
+bb0(%0 : $*NonTrivialStruct):
+  %ele = struct_element_addr %0 : $*NonTrivialStruct, #NonTrivialStruct.val
+  %val1 = load [copy] %ele : $*Klass
+  %val2 = load [take] %ele : $*Klass
+  destroy_value %val2 : $Klass
+  return %val1 : $Klass
+}
+
+// CHECK-LABEL: sil [ossa] @rle_needscopy5 : 
+// CHECK: load
+// CHECK: load
+// CHECK-NOT: load 
+// CHECK-LABEL: } // end sil function 'rle_needscopy5'
+sil [ossa] @rle_needscopy5 : $@convention(thin) (@in (Klass, Klass)) -> () {
+bb0(%0 : $*(Klass, Klass)):
+  %1 = tuple_element_addr %0 : $*(Klass, Klass), 0
+  %2 = load [copy] %1 : $*Klass
+  %3 = tuple_element_addr %0 : $*(Klass, Klass), 1 
+  %4 = load [copy] %3 : $*Klass
+  %5 = load [take] %0 : $*(Klass, Klass)
+  destroy_value %2 : $Klass
+  destroy_value %4 : $Klass
+  destroy_value %5 : $(Klass, Klass)
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @rle_needscopy6 : 
+// CHECK: load
+// CHECK-NOT: load 
+// CHECK-LABEL: } // end sil function 'rle_needscopy6'
+sil [ossa] @rle_needscopy6 : $@convention(thin) (@in NonTrivialStruct) -> () {
+bb0(%0 : $*NonTrivialStruct):
+  %1 = struct_element_addr %0 : $*NonTrivialStruct, #NonTrivialStruct.val
+  %2 = load [copy] %1 : $*Klass
+  %3 = load [copy] %0 : $*NonTrivialStruct
+  %4 = load [copy] %1 : $*Klass
+  destroy_addr %0 : $*NonTrivialStruct
+  destroy_value %2 : $Klass
+  destroy_value %3 : $NonTrivialStruct
+  destroy_value %4 : $Klass
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @rle_needsborrow1 : 
+// CHECK-NOT: load 
+// CHECK-LABEL: } // end sil function 'rle_needsborrow1'
+// rle opt will need to insert struct_extract
+sil [ossa] @rle_needsborrow1 : $@convention(thin) (@owned NonTrivialStruct) -> () {
+bb0(%0 : @owned $NonTrivialStruct):
+  %1 = alloc_stack $NonTrivialStruct
+  store %0 to [init] %1 : $*NonTrivialStruct
+  %2 = struct_element_addr %1 : $*NonTrivialStruct, #NonTrivialStruct.val
+  %3 = load [copy] %2 : $*Klass
+  %4 = load [take] %1 : $*NonTrivialStruct
+  destroy_value %4 : $NonTrivialStruct
+  destroy_value %3 : $Klass
+  dealloc_stack %1 : $*NonTrivialStruct
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @rle_needsborrow2 : 
+// CHECK-NOT: load 
+// CHECK-LABEL: } // end sil function 'rle_needsborrow2'
+// rle opt will need to insert tuple_extract
+sil [ossa] @rle_needsborrow2 : $@convention(thin) (@owned (Klass, Klass)) -> () {
+bb0(%0 : @owned $(Klass, Klass)):
+  %1 = alloc_stack $(Klass, Klass)
+  store %0 to [init] %1 : $*(Klass, Klass)
+  %2 = tuple_element_addr %1 : $*(Klass, Klass), 0
+  %3 = load [copy] %2 : $*Klass
+  %4 = tuple_element_addr %1 : $*(Klass, Klass), 1
+  %5 = load [copy] %4 : $*Klass
+  %6 = load [take] %1 : $*(Klass, Klass)
+  destroy_value %6 : $(Klass, Klass)
+  destroy_value %5 : $Klass
+  destroy_value %3 : $Klass
+  dealloc_stack %1 : $*(Klass, Klass)
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @rle_needscopyandborrow1 : 
+// CHECK: load
+// CHECK-NOT: load 
+// CHECK-LABEL: } // end sil function 'rle_needscopyandborrow1'
+sil [ossa] @rle_needscopyandborrow1 : $@convention(thin) (@in NonTrivialStruct) -> () {
+bb0(%0 : $*NonTrivialStruct):
+  %1 = struct_element_addr %0 : $*NonTrivialStruct, #NonTrivialStruct.val
+  %2 = load [copy] %0 : $*NonTrivialStruct
+  %3 = load [copy] %1 : $*Klass
+  %4 = load [copy] %1 : $*Klass
+  destroy_addr %0 : $*NonTrivialStruct
+  destroy_value %2 : $NonTrivialStruct
+  destroy_value %3 : $Klass
+  destroy_value %4 : $Klass
+  %res = tuple ()
+  return %res : $()
+}
+
+// Test to make sure we generate only one copy_value of the load
+// CHECK-LABEL: sil [ossa] @rle_nodoublecopy1 : 
+// CHECK: load
+// CHECK: copy_value
+// CHECK-NOT: copy_value
+// CHECK-NOT: load 
+// CHECK-LABEL: } // end sil function 'rle_nodoublecopy1'
+sil [ossa] @rle_nodoublecopy1 : $@convention(thin) (@in NonTrivialStruct) -> @owned Klass {
+bb0(%0 : $*NonTrivialStruct):
+  %ele = struct_element_addr %0 : $*NonTrivialStruct, #NonTrivialStruct.val
+  %val1 = load [copy] %ele : $*Klass
+  br bb1
+
+bb1:
+  %val2 = load [take] %ele : $*Klass
+  destroy_value %val2 : $Klass
+  return %val1 : $Klass
+}
+
+// Test to make sure we generate only one copy_value of the load
+// CHECK-LABEL: sil [ossa] @rle_nodoublecopy2 : 
+// CHECK: load
+// CHECK: copy_value
+// CHECK-NOT: copy_value
+// CHECK-NOT: load 
+// CHECK-LABEL: } // end sil function 'rle_nodoublecopy2'
+sil [ossa] @rle_nodoublecopy2 : $@convention(thin) (@in NonTrivialStruct) -> @owned Klass {
+bb0(%0 : $*NonTrivialStruct):
+  %ele = struct_element_addr %0 : $*NonTrivialStruct, #NonTrivialStruct.val
+  %val1 = load [copy] %ele : $*Klass
+  cond_br undef, bb1, bb2
+
+bb1:
+  unreachable
+
+bb2:
+  cond_br undef, bb3, bb4
+
+bb3:
+  %val2 = load [take] %ele : $*Klass
+  destroy_value %val2 : $Klass
+  br bb5
+
+bb4:
+  destroy_addr %ele : $*Klass
+  br bb5
+
+bb5:
+  return %val1 : $Klass
+}
+
+// CHECK-LABEL: sil [ossa] @rle_noopt1 : 
+// CHECK: load
+// CHECK: load 
+// CHECK-LABEL: } // end sil function 'rle_noopt1'
+sil [ossa] @rle_noopt1 : $@convention(thin) (@in PairKlass) -> () {
+bb0(%0 : $*PairKlass):
+  %1 = struct_element_addr %0 : $*PairKlass, #PairKlass.val1
+  %2 = load [copy] %1 : $*Klass
+  %3 = load [take] %0 : $*PairKlass
+  destroy_value %2 : $Klass
+  destroy_value %3 : $PairKlass
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @rle_noopt2 : 
+// CHECK: load
+// CHECK: load 
+// CHECK-LABEL: } // end sil function 'rle_noopt2'
+sil [ossa] @rle_noopt2 : $@convention(thin) (@in TripleKlass) -> () {
+bb0(%0 : $*TripleKlass):
+  %1 = struct_element_addr %0 : $*TripleKlass, #TripleKlass.val1
+  %2 = load [copy] %1 : $*Klass
+  %1a = struct_element_addr %0 : $*TripleKlass, #TripleKlass.val2
+  %2a = load [copy] %1a : $*Klass
+  %3 = load [take] %0 : $*TripleKlass
+  destroy_value %2a : $Klass
+  destroy_value %2 : $Klass
+  destroy_value %3 : $TripleKlass
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @rle_test_all_field_loads1 : 
+// CHECK-LABEL: } // end sil function 'rle_test_all_field_loads1'
+sil [ossa] @rle_test_all_field_loads1 : $@convention(thin) (@in PairKlass) -> () {
+bb0(%0 : $*PairKlass):
+  %1 = struct_element_addr %0 : $*PairKlass, #PairKlass.val1
+  %2 = load [copy] %1 : $*Klass
+  %1a = struct_element_addr %0 : $*PairKlass, #PairKlass.val2
+  %2a = load [copy] %1a : $*Klass
+  %3 = load [take] %0 : $*PairKlass
+  destroy_value %2a : $Klass
+  destroy_value %2 : $Klass
+  destroy_value %3 : $PairKlass
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @rle_test_all_field_loads2 : 
+// CHECK: load
+// CHECK: load
+// CHECK: load
+// CHECK-NOT: load 
+// CHECK-LABEL: } // end sil function 'rle_test_all_field_loads2'
+sil [ossa] @rle_test_all_field_loads2 : $@convention(thin) (@in TripleKlass) -> () {
+bb0(%0 : $*TripleKlass):
+  %1 = struct_element_addr %0 : $*TripleKlass, #TripleKlass.val1
+  %2 = load [copy] %1 : $*Klass
+  %1a = struct_element_addr %0 : $*TripleKlass, #TripleKlass.val2
+  %2a = load [copy] %1a : $*Klass
+  %1b = struct_element_addr %0 : $*TripleKlass, #TripleKlass.val3
+  %2b = load [copy] %1b : $*Klass
+  %3 = load [take] %0 : $*TripleKlass
+  destroy_value %2b : $Klass
+  destroy_value %2a : $Klass
+  destroy_value %2 : $Klass
+  destroy_value %3 : $TripleKlass
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @rle_redundantload_does_not_postdominate1 : 
+// CHECK: load
+// CHECK-NOT: load 
+// CHECK-LABEL: } // end sil function 'rle_redundantload_does_not_postdominate1'
+sil [ossa] @rle_redundantload_does_not_postdominate1 : $@convention(thin) (@in NonTrivialStruct) -> () {
+bb0(%0 : $*NonTrivialStruct):
+  %ele = struct_element_addr %0 : $*NonTrivialStruct, #NonTrivialStruct.val
+  %val1 = load [copy] %ele : $*Klass
+  cond_br undef, bb1, bb2
+
+bb1:
+  destroy_addr %ele : $*Klass
+  br bb6
+
+bb2:
+  cond_br undef, bb3, bb4
+
+bb3:
+  br bb5
+
+bb4:
+  br bb5
+
+bb5:
+  %val2 = load [take] %ele : $*Klass
+  destroy_value %val2 : $Klass
+  br bb6
+
+bb6:
+  destroy_value %val1 : $Klass
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @rle_redundantload_does_not_postdominate2 : 
+// CHECK: load
+// CHECK-NOT: load 
+// CHECK-LABEL: } // end sil function 'rle_redundantload_does_not_postdominate2'
+sil [ossa] @rle_redundantload_does_not_postdominate2 : $@convention(thin) (@in NonTrivialStruct, @owned Klass) -> () {
+bb0(%0 : $*NonTrivialStruct, %1 : @owned $Klass):
+  %ele = struct_element_addr %0 : $*NonTrivialStruct, #NonTrivialStruct.val
+  %val1 = load [copy] %ele : $*Klass
+  br bb1 
+
+bb1:
+  %val2 = load [take] %ele : $*Klass
+  destroy_value %val2 : $Klass
+  %copy0 = copy_value %1 : $Klass
+  store %copy0 to [init] %ele : $*Klass
+  cond_br undef, bb1a, bb2
+
+bb1a:
+  br bb1
+  
+bb2:
+  destroy_addr %ele : $*Klass
+  destroy_value %1 : $Klass
+  destroy_value %val1 : $Klass
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @rle_redundantload_does_not_postdominate3 : 
+// CHECK: load
+// CHECK-NOT: load 
+// CHECK-LABEL: } // end sil function 'rle_redundantload_does_not_postdominate3'
+sil [ossa] @rle_redundantload_does_not_postdominate3 : $@convention(thin) (@in NonTrivialStruct) -> () {
+bb0(%0 : $*NonTrivialStruct):
+  %ele = struct_element_addr %0 : $*NonTrivialStruct, #NonTrivialStruct.val
+  %val1 = load [copy] %ele : $*Klass
+  br bb1 
+
+bb1:
+  %val2 = load [copy] %ele : $*Klass
+  destroy_value %val2 : $Klass
+  cond_br undef, bb1a, bb2
+
+bb1a:
+  br bb1
+  
+bb2:
+  destroy_addr %ele : $*Klass
+  destroy_value %val1 : $Klass
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @rle_redundantload_does_not_postdominate4 : 
+// CHECK: load
+// CHECK-NOT: load 
+// CHECK-LABEL: } // end sil function 'rle_redundantload_does_not_postdominate4'
+sil [ossa] @rle_redundantload_does_not_postdominate4 : $@convention(thin) (@in NonTrivialStruct) -> () {
+bb0(%0 : $*NonTrivialStruct):
+  %ele = struct_element_addr %0 : $*NonTrivialStruct, #NonTrivialStruct.val
+  %val1 = load [copy] %ele : $*Klass
+  br bb1 
+
+bb1:
+  %val2 = load [copy] %ele : $*Klass
+  %func = function_ref @use_klass : $@convention(thin) (@owned Klass) -> ()
+  %funcres = apply %func(%val2) : $@convention(thin) (@owned Klass) -> ()
+  cond_br undef, bb1a, bb2
+
+bb1a:
+  br bb1
+  
+bb2:
+  destroy_addr %ele : $*Klass
+  destroy_value %val1 : $Klass
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @rle_merging_loads : 
+// CHECK-LABEL: } // end sil function 'rle_merging_loads'
+sil [ossa] @rle_merging_loads : $@convention(thin) (@in NonTrivialStruct) -> () {
+bb0(%0 : $*NonTrivialStruct):
+  %ele = struct_element_addr %0 : $*NonTrivialStruct, #NonTrivialStruct.val
+  cond_br undef, bb1, bb2
+
+bb1:
+  %val1 = load [copy] %ele : $*Klass
+  br bb3(%val1 : $Klass)
+
+bb2:
+  %val2 = load [copy] %ele : $*Klass
+  br bb3(%val2 : $Klass)
+
+bb3(%val3 : @owned $Klass):
+  %val4 = load [take] %ele : $*Klass
+  destroy_value %val4 : $Klass
+  destroy_value %val3 : $Klass
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @rle_needsmultiplecopies1 : 
+// CHECK: load
+// CHECK-NOT: load 
+// CHECK-LABEL: } // end sil function 'rle_needsmultiplecopies1'
+sil [ossa] @rle_needsmultiplecopies1 : $@convention(thin) (@in NonTrivialStruct) -> () {
+bb0(%0 : $*NonTrivialStruct):
+  %2 = load [copy] %0 : $*NonTrivialStruct
+  %3 = load [copy] %0 : $*NonTrivialStruct
+  %4 = load [copy] %0 : $*NonTrivialStruct
+  destroy_addr %0 : $*NonTrivialStruct
+  destroy_value %2 : $NonTrivialStruct
+  destroy_value %3: $NonTrivialStruct
+  destroy_value %4 : $NonTrivialStruct
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @rle_needsmultiplecopies2 : 
+// CHECK: load
+// CHECK-NOT: load 
+// CHECK-LABEL: } // end sil function 'rle_needsmultiplecopies2'
+sil [ossa] @rle_needsmultiplecopies2 : $@convention(thin) (@in NonTrivialStruct) -> @owned Klass {
+bb0(%0 : $*NonTrivialStruct):
+  %ele = struct_element_addr %0 : $*NonTrivialStruct, #NonTrivialStruct.val
+  %val1 = load [copy] %ele : $*Klass
+  cond_br undef, bb1, bb2
+
+bb1:
+  unreachable
+
+bb2:
+  cond_br undef, bb3, bb4
+
+bb3:
+  br bb5
+
+bb4:
+  br bb5
+
+bb5:
+  %val2 = load [copy] %ele : $*Klass
+  %val3 = load [take] %ele : $*Klass
+  destroy_value %val2 : $Klass
+  destroy_value %val3 : $Klass
+  return %val1 : $Klass
+}
+
+// CHECK-LABEL: sil [ossa] @rle_needsmuultiplecopies3 : 
+// CHECK-LABEL: } // end sil function 'rle_needsmuultiplecopies3'
+sil [ossa] @rle_needsmuultiplecopies3 : $@convention(thin) (@in NonTrivialStruct) -> () {
+bb0(%0 : $*NonTrivialStruct):
+  %ele = struct_element_addr %0 : $*NonTrivialStruct, #NonTrivialStruct.val
+  cond_br undef, bb1, bb2
+
+bb1:
+  %val1 = load [copy] %ele : $*Klass
+  br bb3(%val1 : $Klass)
+
+bb2:
+  %val2 = load [copy] %ele : $*Klass
+  br bb3(%val2 : $Klass)
+
+bb3(%val3 : @owned $Klass):
+  %val4 = load [copy] %ele : $*Klass
+  %val5 = load [take] %ele : $*Klass
+  destroy_value %val5 : $Klass
+  destroy_value %val4 : $Klass
+  destroy_value %val3 : $Klass
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @rle_needsmultiplecopies4 : 
+// CHECK: load
+// CHECK-NOT: load 
+// CHECK-LABEL: } // end sil function 'rle_needsmultiplecopies4'
+sil [ossa] @rle_needsmultiplecopies4 : $@convention(thin) (@in NonTrivialStruct) -> () {
+bb0(%0 : $*NonTrivialStruct):
+  %2 = load [copy] %0 : $*NonTrivialStruct
+  %3 = load [copy] %0 : $*NonTrivialStruct
+  destroy_value %3: $NonTrivialStruct
+  %4 = load [copy] %0 : $*NonTrivialStruct
+  destroy_addr %0 : $*NonTrivialStruct
+  destroy_value %2 : $NonTrivialStruct
+  destroy_value %4 : $NonTrivialStruct
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @rle_needsmultiplecopies5 : 
+// CHECK: load
+// CHECK-NOT: load 
+// CHECK-LABEL: } // end sil function 'rle_needsmultiplecopies5'
+sil [ossa] @rle_needsmultiplecopies5 : $@convention(thin) (@in NonTrivialStruct) -> () {
+bb0(%0 : $*NonTrivialStruct):
+  %2 = load [copy] %0 : $*NonTrivialStruct
+  destroy_value %2 : $NonTrivialStruct
+  %3 = load [copy] %0 : $*NonTrivialStruct
+  destroy_value %3: $NonTrivialStruct
+  %4 = load [copy] %0 : $*NonTrivialStruct
+  destroy_value %4 : $NonTrivialStruct
+  destroy_addr %0 : $*NonTrivialStruct
+  %res = tuple ()
+  return %res : $()
+}
+
+
+// This test shows why we need to always create a proactive copy of the forwarded phi arg
+// CHECK-LABEL: reuse_silargument_multiple_bb_forwarding :
+// CHECK-NOT: load
+// CHECK-LABEL: } // end sil function 'reuse_silargument_multiple_bb_forwarding'
+sil hidden [ossa] @reuse_silargument_multiple_bb_forwarding : $@convention(thin) (@owned Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass):
+  %1 = alloc_stack $NonTrivialStruct, var, name "x"
+  cond_br undef, bb1, bb2
+
+bb1:
+  cond_br undef, bb3, bb4
+
+bb2:
+  cond_br undef, bb5, bb6
+
+bb3:
+  %7 = struct_element_addr %1 : $*NonTrivialStruct, #NonTrivialStruct.val
+  store %0 to [init] %7 : $*Klass
+  br bb7
+
+bb4:
+  %10 = struct_element_addr %1 : $*NonTrivialStruct, #NonTrivialStruct.val
+  store %0 to [init] %10 : $*Klass
+  br bb7
+
+bb5:
+  %13 = struct_element_addr %1 : $*NonTrivialStruct, #NonTrivialStruct.val
+  store %0 to [init] %13 : $*Klass
+  br bb8
+
+bb6:
+  %16 = struct_element_addr %1 : $*NonTrivialStruct, #NonTrivialStruct.val
+  store %0 to [init] %16 : $*Klass
+  br bb8
+
+bb7:
+  br bb10
+
+bb8:
+  cond_br undef, bb9, bb8a
+
+bb8a:
+ br bb10
+
+bb9:
+  %21 = struct_element_addr %1 : $*NonTrivialStruct, #NonTrivialStruct.val
+  %22 = load [copy] %21 : $*Klass
+  %23 = function_ref @use_klass : $@convention(thin) (@owned Klass) -> ()
+  %24 = apply %23(%22) : $@convention(thin) (@owned Klass) -> ()
+  br bb10
+
+bb10:
+  %26 = struct_element_addr %1 : $*NonTrivialStruct, #NonTrivialStruct.val
+  %27 = load [take] %26 : $*Klass
+  dealloc_stack %1 : $*NonTrivialStruct
+  return %27 : $Klass
+}
+
+// CHECK-LABEL: sil [ossa] @load_to_load_conflicting_branches_diamond :
+// CHECK: bb0(
+// CHECK: = load
+// CHECK: bb1:
+// CHECK-NOT: = load
+// CHECK: store
+// CHECK-NOT: = load
+// CHECK: bb2:
+// CHECK: bb3([[A:%[0-9]+]] : @owned $Klass):
+// CHECK-NOT: = load
+// CHECK: apply %{{[0-9]+}}([[A]])
+// CHECK-LABEL: } // end sil function 'load_to_load_conflicting_branches_diamond'
+sil [ossa] @load_to_load_conflicting_branches_diamond : $@convention(thin) (@inout Klass, @owned Klass) -> () {
+bb0(%0 : $*Klass, %1 : @owned $Klass):
+  %2 = load [copy] %0 : $*Klass
+  cond_br undef, bb1, bb2
+
+bb1:
+  %4 = load [take] %0 : $*Klass
+  %5 = function_ref @use_klass : $@convention(thin) (@owned Klass) -> ()
+  %6 = apply %5(%4) : $@convention(thin) (@owned Klass) -> ()
+  store %1 to [init] %0 : $*Klass
+  %11 = load [copy] %0 : $*Klass
+  %12 = function_ref @use_klass : $@convention(thin) (@owned Klass) -> ()
+  %13 = apply %12(%11) : $@convention(thin) (@owned Klass) -> ()
+  br bb3
+
+bb2:
+  %16 = load [copy] %0 : $*Klass
+  %17 = function_ref @use_klass : $@convention(thin) (@owned Klass) -> ()
+  %18 = apply %17(%16) : $@convention(thin) (@owned Klass) -> ()
+  %19 = function_ref @use_klass : $@convention(thin) (@owned Klass) -> ()
+  %20 = apply %19(%1) : $@convention(thin) (@owned Klass) -> ()
+  br bb3
+
+bb3:
+  %21 = load [copy] %0 : $*Klass
+  %22 = function_ref @use_klass : $@convention(thin) (@owned Klass) -> ()
+  %23 = apply %22(%21) : $@convention(thin) (@owned Klass) -> ()
+  destroy_value %2 : $Klass
+  %24 = tuple ()
+  return %24 : $()
+}
+
+
+// CHECK-LABEL: sil [ossa] @store_and_load_to_load_branches_diamond :
+// CHECK: bb3
+// CHECK-NOT: = load
+// CHECK-LABEL: } // end sil function 'store_and_load_to_load_branches_diamond'
+sil [ossa] @store_and_load_to_load_branches_diamond : $@convention(thin) (@inout NonTrivialStruct, @owned NonTrivialStruct) -> () {
+bb0(%0 : $*NonTrivialStruct, %1 : @owned $NonTrivialStruct):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = load [copy] %0 : $*NonTrivialStruct
+  %func = function_ref @use_nontrivialstruct : $@convention(thin) (@owned NonTrivialStruct) -> ()
+  %funcres = apply %func(%1) : $@convention(thin) (@owned NonTrivialStruct) -> ()
+  br bb3(%2 : $NonTrivialStruct)
+
+bb2:
+  store %1 to [assign] %0 : $*NonTrivialStruct
+  %3 = load [copy] %0 : $*NonTrivialStruct
+  br bb3(%3 : $NonTrivialStruct)
+
+bb3(%4 : @owned $NonTrivialStruct):
+  %21 = load [copy] %0 : $*NonTrivialStruct
+  %22 = function_ref @use_nontrivialstruct : $@convention(thin) (@owned NonTrivialStruct) -> ()
+  %23 = apply %22(%21) : $@convention(thin) (@owned NonTrivialStruct) -> ()
+  destroy_value %4 : $NonTrivialStruct
+  %24 = tuple ()
+  return %24 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @rle_forwarding_arg_in_diff_region :
+// CHECK: bb3
+// CHECK-NOT: = load
+// CHECK-LABEL: } // end sil function 'rle_forwarding_arg_in_diff_region'
+sil [ossa] @rle_forwarding_arg_in_diff_region : $@convention(thin) (@in NonTrivialStruct) -> @owned Klass {
+bb0(%0 : $*NonTrivialStruct):
+  %ele = struct_element_addr %0 : $*NonTrivialStruct, #NonTrivialStruct.val
+  %val1 = load [copy] %ele : $*Klass
+  cond_br undef, bb1, bb2
+
+bb1:
+  unreachable
+
+bb2:
+  cond_br undef, bb3, bb4
+
+bb3:
+  br bb5
+
+bb4:
+  br bb5
+
+bb5:
+  br bb6
+
+bb6:
+  %val2 = load [copy] %ele : $*Klass
+  destroy_value %val2 : $Klass
+  cond_br undef, bb6a, bb7
+
+bb6a:
+  br bb6
+
+bb7:
+  destroy_addr %ele : $*Klass
+  return %val1 : $Klass
+}
+
+// CHECK-LABEL: @rle_fixlifetimeof_intermediate_phis :
+// CHECK: load
+// CHECK-NOT: load
+// CHECK-LABEL: end sil function 'rle_fixlifetimeof_intermediate_phis'
+sil [ossa] @rle_fixlifetimeof_intermediate_phis : $@convention(thin) (@in NonTrivialStruct, @owned Klass, @owned Klass) -> @owned Klass {
+bb0(%0 : $*NonTrivialStruct, %1 : @owned $Klass, %2 : @owned $Klass):
+  %ele = struct_element_addr %0 : $*NonTrivialStruct, #NonTrivialStruct.val
+  %val1 = load [copy] %ele : $*Klass
+  cond_br undef, bb1, bb2
+
+bb1:
+  store %2 to [assign] %ele : $*Klass
+  br bb3
+
+bb2:
+  destroy_value %2 : $Klass
+  br bb3
+
+bb3:
+  cond_br undef, bb4, bb8
+
+bb4:
+  cond_br undef, bb5, bb6
+
+bb5:
+  %val2 = load [copy] %ele : $*Klass
+  destroy_value %val2 : $Klass
+  store %1 to [assign] %ele : $*Klass
+  br bb7
+
+bb6:
+  destroy_value %1 : $Klass
+  br bb7
+
+bb7:
+  br bb9
+
+bb8:
+  destroy_value %1 : $Klass
+  br bb9
+
+bb9:
+  %val3 = load [take] %ele : $*Klass
+  destroy_value %val3 : $Klass
+  return %val1 : $Klass
+}
+
+// CHECK-LABEL: @rle_ownershipkindmergetest :
+// CHECK-NOT: load
+// CHECK-LABEL: end sil function 'rle_ownershipkindmergetest'
+sil [ossa] @rle_ownershipkindmergetest : $@convention(thin) (@owned FakeOptional<Klass>) -> () {
+bb0(%0 : @owned $FakeOptional<Klass>):
+  %3 = alloc_stack $FakeOptional<Klass>
+  store %0 to [init] %3 : $*FakeOptional<Klass>
+  cond_br undef, bb1, bb2
+
+bb1:
+  %4 = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  store %4 to [assign] %3 : $*FakeOptional<Klass>
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %49 = load [copy] %3 : $*FakeOptional<Klass>
+  destroy_value %49 : $FakeOptional<Klass>
+  destroy_addr %3 : $*FakeOptional<Klass>
+  dealloc_stack %3 : $*FakeOptional<Klass>
+  %res = tuple ()
+  return %res : $()
+}

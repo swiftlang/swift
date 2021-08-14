@@ -259,7 +259,7 @@ class JustAClass2: ImposeClassReq1 {
   var someProperty = 0
 }
 
-extension ImposeClassReq1 where Self: AnyObject {
+extension ImposeClassReq1 where Self: AnyObject { // expected-warning {{redundant constraint 'Self' : 'AnyObject'}}
   var wrappingProperty1: Int {
     get { return someProperty }
     set { someProperty = newValue }

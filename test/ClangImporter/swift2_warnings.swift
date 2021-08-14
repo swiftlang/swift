@@ -8,8 +8,7 @@ import ImportAsMember.A
 import AppKit
 
 func testOldTypeNames() {
-  var ps: NSPostingStyle? // expected-error{{'NSPostingStyle' has been renamed to 'NotificationQueue.PostingStyle'}}{{11-25=NotificationQueue.PostingStyle}}
-
+  let _: NSPostingStyle? // expected-error{{'NSPostingStyle' has been renamed to 'NotificationQueue.PostingStyle'}}{{10-24=NotificationQueue.PostingStyle}}
 
   _ = NSPostingStyle(rawValue: 1) // expected-error{{'NSPostingStyle' has been renamed to 'NotificationQueue.PostingStyle'}}{{7-21=NotificationQueue.PostingStyle}}
 

@@ -1,0 +1,28 @@
+
+// RUN: %target-sil-opt -enable-sil-verify-all %s -mem2reg -enable-library-evolution | %FileCheck %s
+
+import Builtin
+import Swift
+
+public struct ResilientStruct {
+    var x: AnyObject
+}
+
+// CHECK-LABEL: sil [ossa] @mem2reg_debug_value_addr :
+// CHECK:       bb0(%0 : $*ResilientStruct):
+// CHECK-NEXT:    %1 = load [copy] %0 : $*ResilientStruct
+// CHECK-NEXT:    debug_value %1 : $ResilientStruct
+// CHECK-NEXT:    destroy_value %1 : $ResilientStruct
+// CHECK-LABEL: } // end sil function 'mem2reg_debug_value_addr'
+sil [ossa] @mem2reg_debug_value_addr : $@convention(thin) (@in_guaranteed ResilientStruct) -> () {
+bb0(%0 : $*ResilientStruct):
+  %1 = alloc_stack $ResilientStruct
+  %2 = load [copy] %0 : $*ResilientStruct
+  store %2 to [init] %1 : $*ResilientStruct
+  debug_value_addr %1 : $*ResilientStruct
+  %3 = load [take] %1 : $*ResilientStruct
+  destroy_value %3 : $ResilientStruct
+  dealloc_stack %1 : $*ResilientStruct
+  %4 = tuple ()
+  return %4 : $()
+}

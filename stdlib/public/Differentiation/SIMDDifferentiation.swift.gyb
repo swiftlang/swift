@@ -31,11 +31,6 @@ where
   Scalar.TangentVector: BinaryFloatingPoint
 {
   public typealias TangentVector = SIMD${n}
-
-  @inlinable
-  public var zeroTangentVectorInitializer: () -> TangentVector {
-    { .init(repeating: 0) }
-  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -165,7 +160,6 @@ where
 extension SIMD
 where
   Self: Differentiable,
-  TangentVector: SIMD,
   Scalar: BinaryFloatingPoint,
   Self.TangentVector == Self
 {
@@ -318,7 +312,6 @@ where
 extension SIMD
 where
   Self: Differentiable,
-  TangentVector: SIMD,
   Scalar: BinaryFloatingPoint & Differentiable,
   Self.TangentVector == Self,
   Scalar.TangentVector == Scalar
@@ -444,7 +437,6 @@ where
 extension SIMD
 where
   Self: Differentiable,
-  Self.TangentVector: SIMD,
   Scalar: BinaryFloatingPoint & Differentiable,
   Self.TangentVector == Self,
   Scalar.TangentVector == Scalar

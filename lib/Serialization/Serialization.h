@@ -72,7 +72,7 @@ protected:
 public:
   SerializerBase(ArrayRef<unsigned char> signature, ModuleOrSourceFile DC);
 
-  ASTContext &getASTContext();
+  ASTContext &getASTContext() const;
 };
 
 class Serializer : public SerializerBase {
@@ -104,6 +104,8 @@ class Serializer : public SerializerBase {
   /// IdentifierIDs, except that 0 will always represent the empty identifier.
   uint32_t /*IdentifierID*/ LastUniquedStringID =
       serialization::NUM_SPECIAL_IDS - 1;
+
+  SmallVector<DeclID, 16> exportedPrespecializationDecls;
 
   /// Helper for serializing entities in the AST block object graph.
   ///
@@ -276,6 +278,11 @@ public:
   using UniquedDerivativeFunctionConfigTable = llvm::MapVector<
       Identifier,
       llvm::SmallSetVector<std::pair<Identifier, GenericSignature>, 4>>;
+
+  // In-memory representation of what will eventually be an on-disk
+  // hash table of the fingerprint associated with a serialized
+  // iterable decl context. It is keyed by that context's decl ID.
+  using DeclFingerprintsTable = llvm::MapVector<uint32_t, Fingerprint>;
 
 private:
   /// A map from identifiers to methods and properties with the given name.
@@ -531,6 +538,12 @@ public:
   /// Writes a set of generic requirements.
   void writeGenericRequirements(ArrayRef<Requirement> requirements,
                                 const std::array<unsigned, 256> &abbrCodes);
+
+  /// Writes a protocol's associated type table.
+  void writeAssociatedTypes(ArrayRef<AssociatedTypeDecl *> assocTypes,
+                            const std::array<unsigned, 256> &abbrCodes);
+
+  bool allowCompilerErrors() const;
 };
 
 /// Serialize module documentation to the given stream.

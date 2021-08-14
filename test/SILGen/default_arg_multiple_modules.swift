@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -emit-module-path=%t/default_arg_other.swiftmodule -module-name=default_arg_other %S/Inputs/default_arg_other.swift
-// RUN: %target-swift-emit-silgen -module-name default_arg_multiple_modules -I %t %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
+// RUN: %target-swift-emit-silgen -module-name default_arg_multiple_modules -I %t %s | %FileCheck %s
 
 import default_arg_other
 

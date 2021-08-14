@@ -31,6 +31,7 @@ namespace swift {
 
 class ConcreteDeclRef;
 class ProtocolConformance;
+enum class EffectKind : uint8_t;
 
 /// A ProtocolConformanceRef is a handle to a protocol conformance which
 /// may be either concrete or abstract.
@@ -96,6 +97,11 @@ public:
   ProtocolDecl *getAbstract() const {
     return Union.get<ProtocolDecl*>();
   }
+
+  /// Determine whether this conformance (or a conformance it depends on)
+  /// involves a "missing" conformance anywhere. Such conformances
+  /// cannot be depended on to always exist.
+  bool hasMissingConformance(ModuleDecl *module) const;
 
   using OpaqueValue = void*;
   OpaqueValue getOpaqueValue() const { return Union.getOpaqueValue(); }
@@ -170,7 +176,12 @@ public:
   /// Get any additional requirements that are required for this conformance to
   /// be satisfied.
   ArrayRef<Requirement> getConditionalRequirements() const;
+
+  bool hasEffect(EffectKind kind) const;
 };
+
+void simple_display(llvm::raw_ostream &out, ProtocolConformanceRef conformanceRef);
+SourceLoc extractNearestSourceLoc(const ProtocolConformanceRef conformanceRef);
 
 } // end namespace swift
 

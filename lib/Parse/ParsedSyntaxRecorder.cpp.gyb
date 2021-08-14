@@ -85,7 +85,7 @@ bool ParsedSyntaxRecorder::formExactLayoutFor(syntax::SyntaxKind Kind,
 %         param_type = "Parsed%s" % child.type_name
 %         if child.is_optional:
 %            param_type = "Optional<%s>" % param_type
-%         child_params.append("%s %s" % (param_type, child.name))
+%         child_params.append("%s &&%s" % (param_type, child.name))
 %         child_move_args.append("std::move(%s)" % (child.name))
 %     child_params = ', '.join(child_params)
 %     child_move_args = ', '.join(child_move_args)
@@ -98,7 +98,8 @@ ParsedSyntaxRecorder::record${node.syntax_kind}(MutableArrayRef<ParsedRawSyntaxN
 
 Parsed${node.name}
 ParsedSyntaxRecorder::defer${node.syntax_kind}(MutableArrayRef<ParsedRawSyntaxNode> layout, SyntaxParsingContext &SPCtx) {
-  auto raw = ParsedRawSyntaxNode::makeDeferred(SyntaxKind::${node.syntax_kind}, layout, SPCtx);
+  auto raw = SPCtx.getRecorder().makeDeferred(SyntaxKind::${node.syntax_kind},
+                                              layout, SPCtx);
   return Parsed${node.name}(std::move(raw));
 }
 
@@ -132,8 +133,8 @@ Parsed${node.name}
 ParsedSyntaxRecorder::defer${node.syntax_kind}(
     MutableArrayRef<ParsedRawSyntaxNode> layout,
     SyntaxParsingContext &SPCtx) {
-  auto raw = ParsedRawSyntaxNode::makeDeferred(SyntaxKind::${node.syntax_kind},
-                             layout, SPCtx);
+  auto raw = SPCtx.getRecorder().makeDeferred(SyntaxKind::${node.syntax_kind},
+                                              layout, SPCtx);
   return Parsed${node.name}(std::move(raw));
 }
 
@@ -157,7 +158,8 @@ ParsedSyntaxRecorder::makeBlank${node.syntax_kind}(SourceLoc loc,
   ParsedRawSyntaxNode raw;
   if (SPCtx.shouldDefer()) {
     // FIXME: 'loc' is not preserved when capturing a deferred layout.
-    raw = ParsedRawSyntaxNode::makeDeferred(SyntaxKind::${node.syntax_kind}, {}, SPCtx);
+    raw = SPCtx.getRecorder().makeDeferred(SyntaxKind::${node.syntax_kind},
+                                           {}, SPCtx);
   } else {
     raw = SPCtx.getRecorder().recordEmptyRawSyntaxCollection(SyntaxKind::${node.syntax_kind}, loc);
   }

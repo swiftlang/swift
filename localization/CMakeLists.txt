@@ -1,6 +1,8 @@
-add_custom_target(diagnostic-database)
+set(diagnostic_witness "${CMAKE_BINARY_DIR}/share/swift/diagnostics/generated")
 
-add_custom_command(TARGET diagnostic-database
+add_custom_command(
+  OUTPUT
+    ${diagnostic_witness}
   COMMAND
     ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/diagnostics/ ${CMAKE_BINARY_DIR}/share/swift/diagnostics/
   COMMAND
@@ -10,11 +12,17 @@ add_custom_command(TARGET diagnostic-database
     "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swift-serialize-diagnostics"
       --input-file-path ${CMAKE_BINARY_DIR}/share/swift/diagnostics/en.yaml
       --output-directory ${CMAKE_BINARY_DIR}/share/swift/diagnostics/
+  COMMAND
+    ${CMAKE_COMMAND} -E touch ${diagnostic_witness}
+  DEPENDS
+    swift-def-to-yaml-converter
+    swift-serialize-diagnostics
+    # Add files in diagnostics subdirectory when they're created
 )
 
+add_custom_target(diagnostic-database DEPENDS ${diagnostic_witness})
+
 add_dependencies(swift-frontend diagnostic-database)
-add_dependencies(diagnostic-database swift-serialize-diagnostics)
-add_dependencies(diagnostic-database swift-def-to-yaml-converter)
 
 swift_install_in_component(
   DIRECTORY ${CMAKE_BINARY_DIR}/share/swift/diagnostics/

@@ -1,6 +1,7 @@
 @_exported import indirects
 
 public struct StructFromDirect {
+  public init() {}
   public func method() {}
   public var property: Int {
     get { return 0 }

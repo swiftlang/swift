@@ -3,6 +3,11 @@
 // REQUIRES: swift-remoteast-test
 // REQUIRES: objc_interop
 
+// This is an interpreter test that cannot use swift-darwin-postprocess.py to
+// work around the DYLD_LIBRARY_LOAD bug in recent dylds. We need to find an
+// alternative workaround for it, such as bumping this test's deployment target.
+// REQUIRES: rdar78933143
+
 import Foundation
 
 @_silgen_name("printMetadataType")

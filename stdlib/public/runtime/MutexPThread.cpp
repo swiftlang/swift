@@ -20,6 +20,13 @@
 #endif
 
 #if defined(_POSIX_THREADS) && !defined(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
+
+// Notes: swift::fatalError is not shared between libswiftCore and libswift_Concurrency
+// and libswift_Concurrency uses swift_Concurrency_fatalError instead.
+#ifndef SWIFT_FATAL_ERROR
+#define SWIFT_FATAL_ERROR swift::fatalError
+#endif
+
 #include "swift/Runtime/Mutex.h"
 
 #include "swift/Runtime/Debug.h"
@@ -32,8 +39,8 @@ using namespace swift;
   do {                                                                         \
     int errorcode = PThreadFunction;                                           \
     if (errorcode != 0) {                                                      \
-      fatalError(/* flags = */ 0, "'%s' failed with error '%s'(%d)\n",         \
-                 #PThreadFunction, errorName(errorcode), errorcode);           \
+      SWIFT_FATAL_ERROR(/* flags = */ 0, "'%s' failed with error '%s'(%d)\n",  \
+                        #PThreadFunction, errorName(errorcode), errorcode);    \
     }                                                                          \
   } while (false)
 
@@ -44,8 +51,8 @@ using namespace swift;
       return true;                                                             \
     if (returnFalseOnEBUSY && errorcode == EBUSY)                              \
       return false;                                                            \
-    fatalError(/* flags = */ 0, "'%s' failed with error '%s'(%d)\n",           \
-               #PThreadFunction, errorName(errorcode), errorcode);             \
+    SWIFT_FATAL_ERROR(/* flags = */ 0, "'%s' failed with error '%s'(%d)\n",    \
+                      #PThreadFunction, errorName(errorcode), errorcode);      \
   } while (false)
 
 static const char *errorName(int errorcode) {
@@ -113,6 +120,29 @@ bool MutexPlatformHelper::try_lock(pthread_mutex_t &mutex) {
   returnTrueOrReportError(pthread_mutex_trylock(&mutex),
                           /* returnFalseOnEBUSY = */ true);
 }
+
+#if HAS_OS_UNFAIR_LOCK
+
+void MutexPlatformHelper::init(os_unfair_lock &lock, bool checked) {
+  (void)checked; // Unfair locks are always checked.
+  lock = OS_UNFAIR_LOCK_INIT;
+}
+
+void MutexPlatformHelper::destroy(os_unfair_lock &lock) {}
+
+void MutexPlatformHelper::lock(os_unfair_lock &lock) {
+  os_unfair_lock_lock(&lock);
+}
+
+void MutexPlatformHelper::unlock(os_unfair_lock &lock) {
+  os_unfair_lock_unlock(&lock);
+}
+
+bool MutexPlatformHelper::try_lock(os_unfair_lock &lock) {
+  return os_unfair_lock_trylock(&lock);
+}
+
+#endif
 
 void ReadWriteLockPlatformHelper::init(pthread_rwlock_t &rwlock) {
   reportError(pthread_rwlock_init(&rwlock, nullptr));

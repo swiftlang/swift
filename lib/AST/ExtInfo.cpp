@@ -34,6 +34,10 @@ bool operator==(ClangTypeInfo lhs, ClangTypeInfo rhs) {
   return false;
 }
 
+bool operator!=(ClangTypeInfo lhs, ClangTypeInfo rhs) {
+  return !(lhs == rhs);
+}
+
 ClangTypeInfo ClangTypeInfo::getCanonical() const {
   if (!type)
     return ClangTypeInfo();

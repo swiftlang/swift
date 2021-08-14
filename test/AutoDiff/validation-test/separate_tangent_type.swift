@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift
+// RUN: %target-run-simple-swift(-Xfrontend -requirement-machine=off)
 // REQUIRES: executable_test
 
 import StdlibUnittest
@@ -7,7 +7,7 @@ import StdlibUnittest
 #elseif canImport(Glibc)
   import Glibc
 #elseif os(Windows)
-  import ucrt
+  import CRT
 #else
 #error("Unsupported platform")
 #endif
@@ -17,9 +17,9 @@ import DifferentiationUnittest
 var SeparateTangentTypeTests = TestSuite("SeparateTangentType")
 
 struct DifferentiableSubset : Differentiable {
-  @differentiable(wrt: self)
+  @differentiable(reverse, wrt: self)
   var w: Tracked<Float>
-  @differentiable(wrt: self)
+  @differentiable(reverse, wrt: self)
   var b: Tracked<Float>
   @noDerivative var flag: Bool
 
@@ -28,9 +28,9 @@ struct DifferentiableSubset : Differentiable {
     var w: Tracked<Float>
     var b: Tracked<Float>
   }
-  mutating func move(along v: TangentVector) {
-    w.move(along: v.w)
-    b.move(along: v.b)
+  mutating func move(by v: TangentVector) {
+    w.move(by: v.w)
+    b.move(by: v.b)
   }
 }
 

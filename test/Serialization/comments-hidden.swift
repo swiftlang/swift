@@ -92,9 +92,9 @@ private class PrivateClass {
 // TESTING: InternalClass Documentation
 // TESTING: Internal Function Documentation
 
-// SOURCE-LOC: comments-hidden.swift:37:15: Func/PublicClass.__UnderscoredPublic RawComment=none BriefComment=none DocCommentAsXML=none
-// SOURCE-LOC: comments-hidden.swift:39:10: Constructor/PublicClass.init RawComment=none BriefComment=none DocCommentAsXML=none
-// SOURCE-LOC: comments-hidden.swift:41:10: Subscript/PublicClass.subscript RawComment=none BriefComment=none DocCommentAsXML=none
-// SOURCE-LOC: comments-hidden.swift:43:10: Constructor/PublicClass.init RawComment=none BriefComment=none DocCommentAsXML=none
-// SOURCE-LOC: comments-hidden.swift:45:10: Subscript/PublicClass.subscript RawComment=none BriefComment=none DocCommentAsXML=none
-// SOURCE-LOC: comments-hidden.swift:52:15: Func/-= RawComment=none BriefComment=none DocCommentAsXML=none
+// SOURCE-LOC: comments-hidden.swift:37:15: Func/PublicClass.__UnderscoredPublic
+// SOURCE-LOC: comments-hidden.swift:39:10: Constructor/PublicClass.init
+// SOURCE-LOC: comments-hidden.swift:41:10: Subscript/PublicClass.subscript
+// SOURCE-LOC: comments-hidden.swift:43:10: Constructor/PublicClass.init
+// SOURCE-LOC: comments-hidden.swift:45:10: Subscript/PublicClass.subscript
+// SOURCE-LOC: comments-hidden.swift:52:15: Func/-=

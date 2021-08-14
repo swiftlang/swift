@@ -5,6 +5,9 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_CASE_5 | %FileCheck %s -check-prefix=NO_RESULTS
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_CASE_6 | %FileCheck %s -check-prefix=NO_RESULTS
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_ENUM_CASE_DECL | %FileCheck %s -check-prefix=TYPE_IN_ENUM_CASE_DECL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_TYPE_IN_ENUM_CASE_DECL | %FileCheck %s -check-prefix=NESTED_TYPE_IN_ENUM_CASE_DECL
+
 // NO_RESULTS: found code completion token
 // NO_RESULTS-NOT: Begin completions
 
@@ -33,3 +36,20 @@ enum EnumCase6 : Int {
   case Foo = super.#^ENUM_CASE_6^#
 }
 
+enum EnumCase7 {
+  case foo(#^TYPE_IN_ENUM_CASE_DECL^#)
+}
+// TYPE_IN_ENUM_CASE_DECL: Begin completions
+// TYPE_IN_ENUM_CASE_DECL-DAG: Decl[Enum]/CurrModule:                   EnumCase7[#EnumCase7#];
+// TYPE_IN_ENUM_CASE_DECL: End completions
+
+struct Wrapper {
+  struct Nested {}
+}
+enum EnumCase8 {
+  case foo(Wrapper.#^NESTED_TYPE_IN_ENUM_CASE_DECL^#)
+}
+// NESTED_TYPE_IN_ENUM_CASE_DECL: Begin completions, 2 items
+// NESTED_TYPE_IN_ENUM_CASE_DECL-DAG: Decl[Struct]/CurrNominal:           Nested[#Wrapper.Nested#];
+// NESTED_TYPE_IN_ENUM_CASE_DECL-DAG: Keyword/None:                       Type[#Wrapper.Type#];
+// NESTED_TYPE_IN_ENUM_CASE_DECL: End completions

@@ -385,6 +385,8 @@ EXPR_NODES = [
 
     Node('ClosureSignature', kind='Syntax',
          children=[
+             Child('Attributes', kind='AttributeList', 
+                   collection_element_name='Attribute', is_optional=True),
              Child('Capture', kind='ClosureCaptureSignature',
                    is_optional=True),
              Child('Input', kind='Syntax', is_optional=True,
@@ -543,7 +545,8 @@ EXPR_NODES = [
              Child('RootExpr', kind='Expr', is_optional=True,
                    node_choices=[
                        Child('IdentifierExpr', kind='IdentifierExpr'),
-                       Child('SpecializeExpr', kind='SpecializeExpr')
+                       Child('SpecializeExpr', kind='SpecializeExpr'),
+                       Child('OptionalChainingExpr', kind='OptionalChainingExpr'),
                    ]),
              Child('Expression', kind='Expr'),
          ]),
@@ -589,6 +592,13 @@ EXPR_NODES = [
                    is_optional=True),
              Child('Name', kind='Expr'),
              Child('RightParen', kind='RightParenToken'),
+         ]),
+
+    # postfix '#if' expession
+    Node('PostfixIfConfigExpr', kind='Expr',
+         children=[
+             Child('Base', kind='Expr', is_optional=True),
+             Child('Config', kind='IfConfigDecl'),
          ]),
 
     # <#content#>

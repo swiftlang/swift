@@ -18,6 +18,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Effects.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ForeignAsyncConvention.h"
@@ -229,7 +230,7 @@ class Verifier : public ASTWalker {
   typedef llvm::PointerIntPair<DeclContext *, 1, bool> ClosureDiscriminatorKey;
   llvm::DenseMap<ClosureDiscriminatorKey, SmallBitVector>
       ClosureDiscriminators;
-  DeclContext *CanonicalTopLevelContext = nullptr;
+  DeclContext *CanonicalTopLevelSubcontext = nullptr;
 
   Verifier(PointerUnion<ModuleDecl *, SourceFile *> M, DeclContext *DC)
       : M(M),
@@ -474,7 +475,7 @@ public:
       case AbstractFunctionDecl::BodyKind::None:
       case AbstractFunctionDecl::BodyKind::TypeChecked:
       case AbstractFunctionDecl::BodyKind::Skipped:
-      case AbstractFunctionDecl::BodyKind::MemberwiseInitializer:
+      case AbstractFunctionDecl::BodyKind::SILSynthesize:
       case AbstractFunctionDecl::BodyKind::Deserialized:
         return true;
 
@@ -898,9 +899,9 @@ public:
     DeclContext *getCanonicalDeclContext(DeclContext *DC) {
       // All we really need to do is use a single TopLevelCodeDecl.
       if (auto topLevel = dyn_cast<TopLevelCodeDecl>(DC)) {
-        if (!CanonicalTopLevelContext)
-          CanonicalTopLevelContext = topLevel;
-        return CanonicalTopLevelContext;
+        if (!CanonicalTopLevelSubcontext)
+          CanonicalTopLevelSubcontext = topLevel;
+        return CanonicalTopLevelSubcontext;
       }
 
       // TODO: check for uniqueness of initializer contexts?
@@ -1041,9 +1042,7 @@ public:
       case StmtConditionElement::CK_Boolean: {
         auto *E = elt.getBoolean();
         if (shouldVerifyChecked(E))
-          checkSameType(E->getType(),
-                        Ctx.getBoolDecl()->getDeclaredInterfaceType(),
-                        "condition type");
+          checkSameType(E->getType(), Ctx.getBoolType(), "condition type");
         break;
       }
 
@@ -1385,8 +1384,7 @@ public:
       
       // Ensure we don't convert an array to a void pointer this way.
       
-      if (fromElement->getNominalOrBoundGenericNominal() == Ctx.getArrayDecl()
-          && toElement->isEqual(Ctx.TheEmptyTupleType)) {
+      if (fromElement->isArray() && toElement->isVoid()) {
         Out << "InOutToPointer is converting an array to a void pointer; "
                "ArrayToPointer should be used instead:\n";
         E->dump(Out);
@@ -1409,7 +1407,7 @@ public:
       // The source may be optionally inout.
       auto fromArray = E->getSubExpr()->getType()->getInOutObjectType();
       
-      if (fromArray->getNominalOrBoundGenericNominal() != Ctx.getArrayDecl()) {
+      if (!fromArray->isArray()) {
         Out << "ArrayToPointer does not convert from array:\n";
         E->dump(Out);
         Out << "\n";
@@ -1430,8 +1428,7 @@ public:
       PrettyStackTraceExpr debugStack(Ctx,
                                       "verifying StringToPointer", E);
       
-      if (E->getSubExpr()->getType()->getNominalOrBoundGenericNominal()
-            != Ctx.getStringDecl()) {
+      if (!E->getSubExpr()->getType()->isString()) {
         Out << "StringToPointer does not convert from string:\n";
         E->dump(Out);
         Out << "\n";
@@ -1761,6 +1758,26 @@ public:
       }
     }
 
+    /// A version of AnyFunctionType::equalParams() that ignores "isolated"
+    /// parameters, which aren't represented in the type system.
+    static bool equalParamsIgnoringIsolation(
+        ArrayRef<AnyFunctionType::Param> a,
+        ArrayRef<AnyFunctionType::Param> b) {
+      auto withoutIsolation = [](AnyFunctionType::Param param) {
+        return param.withFlags(param.getParameterFlags().withIsolated(false));
+      };
+
+      if (a.size() != b.size())
+        return false;
+
+      for (unsigned i = 0, n = a.size(); i != n; ++i) {
+        if (withoutIsolation(a[i]) != withoutIsolation(b[i]))
+          return false;
+      }
+
+      return true;
+    }
+
     void verifyChecked(ApplyExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verifying ApplyExpr", E);
 
@@ -1783,9 +1800,9 @@ public:
 
       SmallVector<AnyFunctionType::Param, 8> Args;
       Type InputExprTy = E->getArg()->getType();
-      AnyFunctionType::decomposeInput(InputExprTy, Args);
+      AnyFunctionType::decomposeTuple(InputExprTy, Args);
       auto Params = FT->getParams();
-      if (!AnyFunctionType::equalParams(Args, Params)) {
+      if (!equalParamsIgnoringIsolation(Args, Params)) {
         Out << "Argument type does not match parameter type in ApplyExpr:"
                "\nArgument type: ";
         InputExprTy.print(Out);
@@ -1802,20 +1819,28 @@ public:
         E->dump(Out);
         Out << "\n";
         abort();
-      } else if (E->throws() && !FT->isThrowing()) {
-        Out << "apply expression is marked as throwing, but function operand"
-               "does not have a throwing function type\n";
-        E->dump(Out);
-        Out << "\n";
-        abort();
+      } else if (E->throws() && !FT->isThrowing() && !E->implicitlyThrows()) {
+        PolymorphicEffectKind rethrowingKind = PolymorphicEffectKind::Invalid;
+        if (auto DRE = dyn_cast<DeclRefExpr>(E->getFn())) {
+          if (auto fnDecl = dyn_cast<AbstractFunctionDecl>(DRE->getDecl())) {
+            rethrowingKind = fnDecl->getPolymorphicEffectKind(EffectKind::Throws);
+          }
+        } else if (auto OCDRE = dyn_cast<OtherConstructorDeclRefExpr>(E->getFn())) {
+          if (auto fnDecl = dyn_cast<AbstractFunctionDecl>(OCDRE->getDecl())) {
+            rethrowingKind = fnDecl->getPolymorphicEffectKind(EffectKind::Throws);
+          }
+        }
+
+        if (rethrowingKind != PolymorphicEffectKind::ByConformance &&
+            rethrowingKind != PolymorphicEffectKind::Always) {
+          Out << "apply expression is marked as throwing, but function operand"
+                 "does not have a throwing function type\n";
+          E->dump(Out);
+          Out << "\n";
+          abort();
+        }
       }
 
-      if (E->isSuper() != E->getArg()->isSuperExpr()) {
-        Out << "Function application's isSuper() bit mismatch.\n";
-        E->dump(Out);
-        Out << "\n";
-        abort();
-      }
       verifyCheckedBase(E);
     }
 
@@ -1980,6 +2005,15 @@ public:
         abort();
       }
 
+      verifyCheckedBase(E);
+    }
+
+    void verifyChecked(ParenExpr *E) {
+      PrettyStackTraceExpr debugStack(Ctx, "verifying ParenExpr", E);
+      if (!isa<ParenType>(E->getType().getPointer())) {
+        Out << "ParenExpr not of ParenType\n";
+        abort();
+      }
       verifyCheckedBase(E);
     }
 
@@ -2197,22 +2231,20 @@ public:
       auto keyPathTy = E->getKeyPath()->getType();
       auto resultTy = E->getType();
       
-      if (auto nom = keyPathTy->getAs<NominalType>()) {
-        if (nom->getDecl() == Ctx.getAnyKeyPathDecl()) {
-          // AnyKeyPath application is <T> rvalue T -> rvalue Any?
-          if (baseTy->is<LValueType>()) {
-            Out << "AnyKeyPath application base is not an rvalue\n";
-            abort();
-          }
-          auto resultObjTy = resultTy->getOptionalObjectType();
-          if (!resultObjTy || !resultObjTy->isAny()) {
-            Out << "AnyKeyPath application result must be Any?\n";
-            abort();
-          }
-          return;
+      if (keyPathTy->isAnyKeyPath()) {
+        // AnyKeyPath application is <T> rvalue T -> rvalue Any?
+        if (baseTy->is<LValueType>()) {
+          Out << "AnyKeyPath application base is not an rvalue\n";
+          abort();
         }
+        auto resultObjTy = resultTy->getOptionalObjectType();
+        if (!resultObjTy || !resultObjTy->isAny()) {
+          Out << "AnyKeyPath application result must be Any?\n";
+          abort();
+        }
+        return;
       } else if (auto bgt = keyPathTy->getAs<BoundGenericType>()) {
-        if (bgt->getDecl() == Ctx.getPartialKeyPathDecl()) {
+        if (keyPathTy->isPartialKeyPath()) {
           // PartialKeyPath<T> application is rvalue T -> rvalue Any
           if (!baseTy->isEqual(bgt->getGenericArgs()[0])) {
             Out << "PartialKeyPath application base doesn't match type\n";
@@ -2223,7 +2255,7 @@ public:
             abort();
           }
           return;
-        } else if (bgt->getDecl() == Ctx.getKeyPathDecl()) {
+        } else if (keyPathTy->isKeyPath()) {
           // KeyPath<T, U> application is rvalue T -> rvalue U
           if (!baseTy->isEqual(bgt->getGenericArgs()[0])) {
             Out << "KeyPath application base doesn't match type\n";
@@ -2234,7 +2266,7 @@ public:
             abort();
           }
           return;
-        } else if (bgt->getDecl() == Ctx.getWritableKeyPathDecl()) {
+        } else if (keyPathTy->isWritableKeyPath()) {
           // WritableKeyPath<T, U> application is
           //    lvalue T -> lvalue U
           // or rvalue T -> rvalue U
@@ -2256,7 +2288,7 @@ public:
             abort();
           }
           return;
-        } else if (bgt->getDecl() == Ctx.getReferenceWritableKeyPathDecl()) {
+        } else if (keyPathTy->isReferenceWritableKeyPath()) {
           // ReferenceWritableKeyPath<T, U> application is
           //    rvalue T -> lvalue U
           // or lvalue T -> lvalue U
@@ -2620,6 +2652,41 @@ public:
         abort();
       }
 
+      // Tracking for those Objective-C requirements that have witnesses.
+      llvm::SmallDenseSet<std::pair<ObjCSelector, char>> hasObjCWitnessMap;
+      bool populatedObjCWitnesses = false;
+      auto populateObjCWitnesses = [&] {
+        if (populatedObjCWitnesses)
+          return;
+
+        populatedObjCWitnesses = true;
+        for (auto req : proto->getMembers()) {
+          if (auto reqFunc = dyn_cast<AbstractFunctionDecl>(req)) {
+            if (normal->hasWitness(reqFunc)) {
+              hasObjCWitnessMap.insert(
+                  {reqFunc->getObjCSelector(), reqFunc->isInstanceMember()});
+            }
+          }
+        }
+      };
+
+      // Check whether there is a witness with the same selector and kind as
+      // this requirement.
+      auto hasObjCWitness = [&](ValueDecl *req) {
+        if (!proto->isObjC())
+          return false;
+
+        auto func = dyn_cast<AbstractFunctionDecl>(req);
+        if (!func)
+          return false;
+
+        populateObjCWitnesses();
+
+        std::pair<ObjCSelector, char> key(
+            func->getObjCSelector(), func->isInstanceMember());
+        return hasObjCWitnessMap.count(key) > 0;
+      };
+
       // Check that a normal protocol conformance is complete.
       for (auto member : proto->getMembers()) {
         if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
@@ -2649,7 +2716,6 @@ public:
         if (isa<AccessorDecl>(member))
           continue;
 
-
         if (auto req = dyn_cast<ValueDecl>(member)) {
           if (!normal->hasWitness(req)) {
             if ((req->getAttrs().isUnavailable(Ctx) ||
@@ -2657,6 +2723,10 @@ public:
                 proto->isObjC()) {
               continue;
             }
+
+            // Check if *any* witness matches the Objective-C selector.
+            if (hasObjCWitness(req))
+              continue;
 
             dumpRef(decl);
             Out << " is missing witness for "
@@ -2699,8 +2769,7 @@ public:
             abort();
           }
 
-          auto reqProto =
-            req.getSecondType()->castTo<ProtocolType>()->getDecl();
+          auto reqProto = req.getProtocolDecl();
           if (reqProto != conformances[idx].getRequirement()) {
             Out << "error: wrong protocol in signature conformances: have "
               << conformances[idx].getRequirement()->getName().str()
@@ -2893,8 +2962,7 @@ public:
       // Verify that the optionality of the result type of the
       // initializer matches the failability of the initializer.
       if (!CD->isInvalid() &&
-          CD->getDeclContext()->getDeclaredInterfaceType()->getAnyNominal() !=
-              Ctx.getOptionalDecl()) {
+          !CD->getDeclContext()->getDeclaredInterfaceType()->isOptional()) {
         bool resultIsOptional = (bool) CD->getResultInterfaceType()
             ->getOptionalObjectType();
         auto declIsOptional = CD->isFailable();
@@ -3634,15 +3702,36 @@ public:
   };
 } // end anonymous namespace
 
+static bool shouldVerifyGivenContext(const ASTContext &ctx) {
+  using ASTVerifierOverrideKind = LangOptions::ASTVerifierOverrideKind;
+  switch (ctx.LangOpts.ASTVerifierOverride) {
+  case ASTVerifierOverrideKind::EnableVerifier:
+    return true;
+  case ASTVerifierOverrideKind::DisableVerifier:
+    return false;
+  case ASTVerifierOverrideKind::NoOverride:
+#ifndef NDEBUG
+    // asserts. Default behavior is to run.
+    return true;
+#else
+    // no-asserts. Default behavior is not to run the verifier.
+    return false;
+#endif
+  }
+  llvm_unreachable("Covered switch isn't covered?!");
+}
+
 void swift::verify(SourceFile &SF) {
-#if !(defined(NDEBUG) || defined(SWIFT_DISABLE_AST_VERIFIER))
+  if (!shouldVerifyGivenContext(SF.getASTContext()))
+    return;
   Verifier verifier(SF, &SF);
   SF.walk(verifier);
-#endif
 }
 
 bool swift::shouldVerify(const Decl *D, const ASTContext &Context) {
-#if !(defined(NDEBUG) || defined(SWIFT_DISABLE_AST_VERIFIER))
+  if (!shouldVerifyGivenContext(Context))
+    return false;
+
   if (const auto *ED = dyn_cast<ExtensionDecl>(D)) {
     return shouldVerify(ED->getExtendedNominal(), Context);
   }
@@ -3654,15 +3743,13 @@ bool swift::shouldVerify(const Decl *D, const ASTContext &Context) {
   }
 
   return true;
-#else
-  return false;
-#endif
 }
 
 void swift::verify(Decl *D) {
-#if !(defined(NDEBUG) || defined(SWIFT_DISABLE_AST_VERIFIER))
+  if (!shouldVerifyGivenContext(D->getASTContext()))
+    return;
+
   Verifier V = Verifier::forDecl(D);
   D->walk(V);
-#endif
 }
 

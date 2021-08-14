@@ -108,7 +108,7 @@ macro(configure_sdks_darwin)
   set(macosx_arch "x86_64" "arm64")
   set(iphoneos_arch "arm64" "arm64e" "armv7")
   set(appletvos_arch "arm64")
-  set(watchos_arch "armv7k")
+  set(watchos_arch "armv7k" "arm64_32")
 
   set(macosx_ver "10.9")
   set(iphoneos_ver "8.0")
@@ -478,6 +478,12 @@ function (swift_benchmark_compile_archopts)
       list(APPEND SWIFT_BENCH_OBJFILES "${objfile}")
       list(APPEND bench_library_swiftmodules "${swiftmodule}")
 
+      # Only set "enable-cxx-interop" for tests in the "cxx-source" directory.
+      set(cxx_options "")
+      if ("${module_name_path}" MATCHES ".*cxx-source/.*")
+        list(APPEND cxx_options "-Xfrontend" "-enable-cxx-interop" "-I" "${srcdir}/utils/CxxTests/")
+      endif()
+
       if ("${bench_flags}" MATCHES "-whole-module.*")
         set(output_option "-o" "${objfile}")
       else()
@@ -501,6 +507,7 @@ function (swift_benchmark_compile_archopts)
           "-module-name" "${module_name}"
           "-emit-module-path" "${swiftmodule}"
           "-I" "${objdir}"
+          ${cxx_options}
           ${output_option}
           "${source}")
       if (SWIFT_BENCHMARK_EMIT_SIB)
@@ -518,6 +525,7 @@ function (swift_benchmark_compile_archopts)
             ${SWIFT_BENCHMARK_EXTRA_FLAGS}
             "-module-name" "${module_name}"
             "-I" "${objdir}"
+            ${cxx_options}
             "-emit-sib"
             "-o" "${sibfile}"
             "${source}")
@@ -582,6 +590,8 @@ function (swift_benchmark_compile_archopts)
       "-whole-module-optimization"
       "-emit-module" "-module-name" "${module_name}"
       "-I" "${objdir}"
+      "-Xfrontend" "-enable-cxx-interop"
+      "-I" "${srcdir}/utils/CxxTests/"
       "-o" "${objdir}/${module_name}.o"
       "${source}")
   list(APPEND SWIFT_BENCH_OBJFILES "${objdir}/${module_name}.o")

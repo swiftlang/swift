@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend -emit-sil %s
-// REQUIRES: asserts
 
 // TF-1315: Pullback subset thunk generation crash due to unmapped parameter
 // index for `inout` differentiability parameters.
@@ -15,7 +14,7 @@ func vjpFoo(_ x: Int, _ y: Float, _ z: inout Float) -> (
   fatalError()
 }
 
-@differentiable
+@differentiable(reverse)
 func TF_1315(_ x: Float) -> Float {
   var x = x
   // The call to `foo` below triggers pullback subset parameter thunk generation.

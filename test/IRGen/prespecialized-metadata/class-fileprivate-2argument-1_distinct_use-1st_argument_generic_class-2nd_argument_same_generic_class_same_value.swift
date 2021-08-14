@@ -67,7 +67,7 @@
 //   CHECK-apple-SAME:         }*,
 //   CHECK-apple-SAME:         i8*, 
 //   CHECK-apple-SAME:         i8* 
-//   CHECK-apple-SAME:       }* @_DATA__TtC4mainP[[UNIQUE_ID_2:[0-9A-Z_]+]]5Value to [[INT]]
+//   CHECK-apple-SAME:       }* @"_DATA_$s4main5Value[[UNIQUE_ID_1]]LLCyAA9Argument1ACLLCySiGAGGMf" to [[INT]]
 //   CHECK-apple-SAME:     ), 
 //   CHECK-apple-SAME:     [[INT]] 2
 //   CHECK-apple-SAME:   ), 
@@ -228,7 +228,7 @@ doit()
 //      CHECK: entry:
 //      CHECK:   [[ERASED_ARGUMENT1:%[0-9]+]] = bitcast %swift.type* [[ARGUMENT1_METADATA]] to i8*
 //      CHECK:   [[ERASED_ARGUMENT2:%[0-9]+]] = bitcast %swift.type* [[ARGUMENT2_METADATA]] to i8*
-//      CHECK:   {{%[0-9]+}} = call swiftcc %swift.metadata_response @__swift_instantiateGenericMetadata(
+//      CHECK:   {{%[0-9]+}} = call swiftcc %swift.metadata_response @__swift_instantiateCanonicalPrespecializedGenericMetadata(
 //      CHECK:     [[INT]] [[METADATA_REQUEST]], 
 //      CHECK:     i8* [[ERASED_ARGUMENT1]], 
 //      CHECK:     i8* [[ERASED_ARGUMENT2]], 

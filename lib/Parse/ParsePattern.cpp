@@ -17,6 +17,7 @@
 #include "swift/Parse/Parser.h"
 
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/GenericParamList.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/SourceFile.h"
@@ -38,6 +39,12 @@ using namespace swift::syntax;
 static DefaultArgumentKind getDefaultArgKind(Expr *init) {
   if (!init)
     return DefaultArgumentKind::None;
+
+  // Parse an as-written 'nil' expression as the special NilLiteral kind,
+  // which is emitted by the caller and can participate in rethrows
+  // checking.
+  if (isa<NilLiteralExpr>(init))
+    return DefaultArgumentKind::NilLiteral;
 
   auto magic = dyn_cast<MagicIdentifierLiteralExpr>(init);
   if (!magic)
@@ -70,7 +77,7 @@ static ParserStatus parseDefaultArgument(
   SourceLoc equalLoc = P.consumeToken();
 
   if (P.SF.Kind == SourceFileKind::Interface) {
-    // Swift module interfaces don't synthesize inherited intializers and
+    // Swift module interfaces don't synthesize inherited initializers and
     // instead include them explicitly in subclasses. Since the
     // \c DefaultArgumentKind of these initializers is \c Inherited, this is
     // represented textually as `= super` in the interface.
@@ -144,22 +151,41 @@ static ParserStatus parseDefaultArgument(
 
 /// Determine whether we are at the start of a parameter name when
 /// parsing a parameter.
-static bool startsParameterName(Parser &parser, bool isClosure) {
+bool Parser::startsParameterName(bool isClosure) {
   // '_' cannot be a type, so it must be a parameter name.
-  if (parser.Tok.is(tok::kw__))
+  if (Tok.is(tok::kw__))
     return true;
 
   // To have a parameter name here, we need a name.
-  if (!parser.Tok.canBeArgumentLabel())
+  if (!Tok.canBeArgumentLabel())
     return false;
 
-  // If the next token can be an argument label or is ':', this is a name.
-  const auto &nextTok = parser.peekToken();
-  if (nextTok.is(tok::colon) || nextTok.canBeArgumentLabel())
+  // If the next token is ':', this is a name.
+  const auto &nextTok = peekToken();
+  if (nextTok.is(tok::colon))
     return true;
 
-  if (parser.isOptionalToken(nextTok)
-      || parser.isImplicitlyUnwrappedOptionalToken(nextTok))
+  // If the next token can be an argument label, we might have a name.
+  if (nextTok.canBeArgumentLabel()) {
+    // If the first name wasn't "isolated", we're done.
+    if (!Tok.isContextualKeyword("isolated") &&
+        !Tok.isContextualKeyword("some"))
+      return true;
+
+    // "isolated" can be an argument label, but it's also a contextual keyword,
+    // so look ahead one more token (two total) see if we have a ':' that would
+    // indicate that this is an argument label.
+    return lookahead<bool>(2, [&](CancellableBacktrackingScope &) {
+      if (Tok.is(tok::colon))
+        return true; // isolated :
+
+      // isolated x :
+      return Tok.canBeArgumentLabel() && nextTok.is(tok::colon);
+    });
+  }
+
+  if (isOptionalToken(nextTok)
+      || isImplicitlyUnwrappedOptionalToken(nextTok))
     return false;
 
   // The identifier could be a name or it could be a type. In a closure, we
@@ -232,26 +258,51 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       }
     }
     
-    // ('inout' | '__shared' | '__owned')?
+    // ('inout' | '__shared' | '__owned' | isolated)?
     bool hasSpecifier = false;
     while (Tok.is(tok::kw_inout) ||
-           (Tok.is(tok::identifier) &&
-            (Tok.getRawText().equals("__shared") ||
-             Tok.getRawText().equals("__owned")))) {
+           Tok.isContextualKeyword("__shared") ||
+           Tok.isContextualKeyword("__owned") ||
+           Tok.isContextualKeyword("isolated")) {
+
+      if (Tok.isContextualKeyword("isolated")) {
+        // did we already find an 'isolated' type modifier?
+        if (param.IsolatedLoc.isValid()) {
+          diagnose(Tok, diag::parameter_specifier_repeated)
+              .fixItRemove(Tok.getLoc());
+          consumeToken();
+          continue;
+        }
+
+        // is this 'isolated' token the identifier of an argument label?
+        bool partOfArgumentLabel = lookahead<bool>(1, [&](CancellableBacktrackingScope &) {
+          if (Tok.is(tok::colon))
+            return true;  // isolated :
+
+          // isolated x :
+          return Tok.canBeArgumentLabel() && peekToken().is(tok::colon);
+        });
+
+        if (partOfArgumentLabel)
+          break;
+
+        // consume 'isolated' as type modifier
+        param.IsolatedLoc = consumeToken();
+        continue;
+      }
+
       if (!hasSpecifier) {
         if (Tok.is(tok::kw_inout)) {
           // This case is handled later when mapping to ParamDecls for
           // better fixits.
           param.SpecifierKind = ParamDecl::Specifier::InOut;
           param.SpecifierLoc = consumeToken();
-        } else if (Tok.is(tok::identifier) &&
-                   Tok.getRawText().equals("__shared")) {
+        } else if (Tok.isContextualKeyword("__shared")) {
           // This case is handled later when mapping to ParamDecls for
           // better fixits.
           param.SpecifierKind = ParamDecl::Specifier::Shared;
           param.SpecifierLoc = consumeToken();
-        } else if (Tok.is(tok::identifier) &&
-                   Tok.getRawText().equals("__owned")) {
+        } else if (Tok.isContextualKeyword("__owned")) {
           // This case is handled later when mapping to ParamDecls for
           // better fixits.
           param.SpecifierKind = ParamDecl::Specifier::Owned;
@@ -273,14 +324,16 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       diagnose(Tok, diag::parameter_let_var_as_attr, Tok.getText())
         .fixItReplace(Tok.getLoc(), "`" + Tok.getText().str() + "`");
     }
-    
-    if (startsParameterName(*this, isClosure)) {
+
+    if (startsParameterName(isClosure)) {
       // identifier-or-none for the first name
-      param.FirstNameLoc = consumeArgumentLabel(param.FirstName);
+      param.FirstNameLoc = consumeArgumentLabel(param.FirstName,
+                                                /*diagnoseDollarPrefix=*/!isClosure);
 
       // identifier-or-none? for the second name
       if (Tok.canBeArgumentLabel())
-        param.SecondNameLoc = consumeArgumentLabel(param.SecondName);
+        param.SecondNameLoc = consumeArgumentLabel(param.SecondName,
+                                                   /*diagnoseDollarPrefix=*/true);
 
       // Operators, closures, and enum elements cannot have API names.
       if ((paramContext == ParameterContextKind::Operator ||
@@ -342,18 +395,22 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       }
 
       if (isBareType && paramContext == ParameterContextKind::EnumElement) {
-        auto type = parseType(diag::expected_parameter_type, false);
+        auto type = parseType(diag::expected_parameter_type);
         status |= type;
         param.Type = type.getPtrOrNull();
         param.FirstName = Identifier();
         param.FirstNameLoc = SourceLoc();
         param.SecondName = Identifier();
         param.SecondNameLoc = SourceLoc();
-      } else if (isBareType) {
+      } else if (isBareType && !Tok.is(tok::code_complete)) {
         // Otherwise, if this is a bare type, then the user forgot to name the
         // parameter, e.g. "func foo(Int) {}"
+        // Don't enter this case if the element could only be parsed as a bare
+        // type because a code completion token is positioned here. In this case
+        // the user is about to type the parameter label and we shouldn't
+        // suggest types.
         SourceLoc typeStartLoc = Tok.getLoc();
-        auto type = parseType(diag::expected_parameter_type, false);
+        auto type = parseType(diag::expected_parameter_type);
         status |= type;
         param.Type = type.getPtrOrNull();
 
@@ -396,7 +453,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         status.setIsParseError();
       }
     }
-                        
+
     // '...'?
     if (Tok.isEllipsis()) {
       Tok.setKind(tok::ellipsis);
@@ -529,18 +586,42 @@ mapParsedParameters(Parser &parser,
                                                              "__owned",
                                                              parsingEnumElt);
       }
+
+      if (paramInfo.IsolatedLoc.isValid()) {
+        type = new (parser.Context) IsolatedTypeRepr(
+            type, paramInfo.IsolatedLoc);
+        param->setIsolated();
+      }
+
       param->setTypeRepr(type);
 
-      // If there is `@autoclosure` attribute associated with the type
-      // let's mark that in the declaration as well, because it
-      // belongs to both type flags and declaration.
-      if (auto *ATR = dyn_cast<AttributedTypeRepr>(type)) {
-        auto &attrs = ATR->getAttrs();
-        // At this point we actually don't know if that's valid to mark
-        // this parameter declaration as `autoclosure` because type has
-        // not been resolved yet - it should either be a function type
-        // or typealias with underlying function type.
-        param->setAutoClosure(attrs.has(TypeAttrKind::TAK_autoclosure));
+      // Dig through the type to find any attributes or modifiers that are
+      // associated with the type but should also be reflected on the
+      // declaration.
+      {
+        auto unwrappedType = type;
+        while (true) {
+          if (auto *ATR = dyn_cast<AttributedTypeRepr>(unwrappedType)) {
+            auto &attrs = ATR->getAttrs();
+            // At this point we actually don't know if that's valid to mark
+            // this parameter declaration as `autoclosure` because type has
+            // not been resolved yet - it should either be a function type
+            // or typealias with underlying function type.
+            param->setAutoClosure(attrs.has(TypeAttrKind::TAK_autoclosure));
+
+            unwrappedType = ATR->getTypeRepr();
+            continue;
+          }
+
+          if (auto *STR = dyn_cast<SpecifierTypeRepr>(unwrappedType)) {
+            if (isa<IsolatedTypeRepr>(STR))
+              param->setIsolated(true);
+            unwrappedType = STR->getBase();
+            continue;;
+          }
+
+          break;
+        }
       }
     } else if (paramInfo.SpecifierLoc.isValid()) {
       StringRef specifier;
@@ -761,7 +842,7 @@ Parser::parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
 
 /// Parse a function definition signature.
 ///   func-signature:
-///     func-arguments 'async'? func-throws? func-signature-result?
+///     func-arguments ('async'|'reasync')? func-throws? func-signature-result?
 ///   func-signature-result:
 ///     '->' type
 ///
@@ -772,6 +853,7 @@ Parser::parseFunctionSignature(Identifier SimpleName,
                                ParameterList *&bodyParams,
                                DefaultArgumentInfo &defaultArgs,
                                SourceLoc &asyncLoc,
+                               bool &reasync,
                                SourceLoc &throwsLoc,
                                bool &rethrows,
                                TypeRepr *&retType) {
@@ -786,8 +868,11 @@ Parser::parseFunctionSignature(Identifier SimpleName,
   FullName = DeclName(Context, SimpleName, NamePieces);
 
   // Check for the 'async' and 'throws' keywords.
+  reasync = false;
   rethrows = false;
-  parseAsyncThrows(SourceLoc(), asyncLoc, throwsLoc, &rethrows);
+  Status |= parseEffectsSpecifiers(SourceLoc(),
+                                   asyncLoc, &reasync,
+                                   throwsLoc, &rethrows);
 
   // If there's a trailing arrow, parse the rest as the result type.
   SourceLoc arrowLoc;
@@ -800,9 +885,9 @@ Parser::parseFunctionSignature(Identifier SimpleName,
       arrowLoc = consumeToken(tok::colon);
     }
 
-    // Check for 'throws' and 'rethrows' after the arrow, but
-    // before the type, and correct it.
-    parseAsyncThrows(arrowLoc, asyncLoc, throwsLoc, &rethrows);
+    // Check for effect specifiers after the arrow, but before the return type,
+    // and correct it.
+    parseEffectsSpecifiers(arrowLoc, asyncLoc, &reasync, throwsLoc, &rethrows);
 
     ParserResult<TypeRepr> ResultType =
         parseDeclResultType(diag::expected_type_function_result);
@@ -811,8 +896,8 @@ Parser::parseFunctionSignature(Identifier SimpleName,
     if (Status.isErrorOrHasCompletion())
       return Status;
 
-    // Check for 'throws' and 'rethrows' after the type and correct it.
-    parseAsyncThrows(arrowLoc, asyncLoc, throwsLoc, &rethrows);
+    // Check for effect specifiers after the type and correct it.
+    parseEffectsSpecifiers(arrowLoc, asyncLoc, &reasync, throwsLoc, &rethrows);
   } else {
     // Otherwise, we leave retType null.
     retType = nullptr;
@@ -821,52 +906,116 @@ Parser::parseFunctionSignature(Identifier SimpleName,
   return Status;
 }
 
-void Parser::parseAsyncThrows(
-    SourceLoc existingArrowLoc, SourceLoc &asyncLoc, SourceLoc &throwsLoc,
-    bool *rethrows) {
-  if (shouldParseExperimentalConcurrency() &&
-      Tok.isContextualKeyword("async")) {
-    asyncLoc = consumeToken();
+bool Parser::isEffectsSpecifier(const Token &T) {
+  // NOTE: If this returns 'true', that token must be handled in
+  //       'parseEffectsSpecifiers()'.
 
-    if (existingArrowLoc.isValid()) {
-      diagnose(asyncLoc, diag::async_or_throws_in_wrong_position, 2)
-        .fixItRemove(asyncLoc)
-        .fixItInsert(existingArrowLoc, "async ");
+  if (T.isContextualKeyword("async") ||
+      T.isContextualKeyword("reasync"))
+    return true;
+
+  if (T.isAny(tok::kw_throws, tok::kw_rethrows) ||
+      (T.isAny(tok::kw_throw, tok::kw_try) && !T.isAtStartOfLine()))
+    return true;
+
+  return false;
+}
+
+ParserStatus Parser::parseEffectsSpecifiers(SourceLoc existingArrowLoc,
+                                            SourceLoc &asyncLoc,
+                                            bool *reasync,
+                                            SourceLoc &throwsLoc,
+                                            bool *rethrows) {
+  ParserStatus status;
+
+  while (true) {
+    // 'async'
+    bool isReasync = (shouldParseExperimentalConcurrency() &&
+                      Tok.isContextualKeyword("reasync"));
+    if (Tok.isContextualKeyword("async") ||
+        isReasync) {
+      if (asyncLoc.isValid()) {
+        diagnose(Tok, diag::duplicate_effects_specifier, Tok.getText())
+            .highlight(asyncLoc)
+            .fixItRemove(Tok.getLoc());
+      } else if (!reasync && isReasync) {
+        // Replace 'reasync' with 'async' unless it's allowed.
+        diagnose(Tok, diag::reasync_function_type)
+            .fixItReplace(Tok.getLoc(), "async");
+      } else if (existingArrowLoc.isValid()) {
+        SourceLoc insertLoc = existingArrowLoc;
+        if (throwsLoc.isValid() &&
+            SourceMgr.isBeforeInBuffer(throwsLoc, insertLoc))
+          insertLoc = throwsLoc;
+        diagnose(Tok, diag::async_or_throws_in_wrong_position,
+                 (reasync && isReasync) ? "reasync" : "async")
+            .fixItRemove(Tok.getLoc())
+            .fixItInsert(insertLoc,
+                         (reasync && isReasync) ? "reasync " : "async ");
+      } else if (throwsLoc.isValid()) {
+        // 'async' cannot be after 'throws'.
+        assert(existingArrowLoc.isInvalid());
+        diagnose(Tok, diag::async_after_throws,
+                 reasync && isReasync,
+                 rethrows && *rethrows)
+            .fixItRemove(Tok.getLoc())
+            .fixItInsert(throwsLoc, isReasync ? "reasync " : "async ");
+      }
+      if (asyncLoc.isInvalid()) {
+        if (reasync)
+          *reasync = isReasync;
+        asyncLoc = Tok.getLoc();
+      }
+      consumeToken();
+      continue;
     }
+
+    // 'throws'/'rethrows', or diagnose 'throw'/'try'.
+    if (Tok.isAny(tok::kw_throws, tok::kw_rethrows) ||
+        (Tok.isAny(tok::kw_throw, tok::kw_try) && !Tok.isAtStartOfLine())) {
+      bool isRethrows = Tok.is(tok::kw_rethrows);
+
+      if (throwsLoc.isValid()) {
+        diagnose(Tok, diag::duplicate_effects_specifier, Tok.getText())
+            .highlight(throwsLoc)
+            .fixItRemove(Tok.getLoc());
+      } else if (Tok.isAny(tok::kw_throw, tok::kw_try)) {
+        // Replace 'throw' or 'try' with 'throws'.
+        diagnose(Tok, diag::throw_in_function_type)
+            .fixItReplace(Tok.getLoc(), "throws");
+      } else if (!rethrows && isRethrows) {
+        // Replace 'rethrows' with 'throws' unless it's allowed.
+        diagnose(Tok, diag::rethrowing_function_type)
+            .fixItReplace(Tok.getLoc(), "throws");
+      } else if (existingArrowLoc.isValid()) {
+        diagnose(Tok, diag::async_or_throws_in_wrong_position, Tok.getText())
+            .fixItRemove(Tok.getLoc())
+            .fixItInsert(existingArrowLoc, (Tok.getText() + " ").str());
+      }
+
+      if (throwsLoc.isInvalid()) {
+        if (rethrows)
+          *rethrows = isRethrows;
+        throwsLoc = Tok.getLoc();
+      }
+      consumeToken();
+      continue;
+    }
+
+    // Code completion.
+    if (Tok.is(tok::code_complete) && !Tok.isAtStartOfLine() &&
+        !existingArrowLoc.isValid()) {
+      if (CodeCompletion)
+        CodeCompletion->completeEffectsSpecifier(asyncLoc.isValid(),
+                                                 throwsLoc.isValid());
+      consumeToken(tok::code_complete);
+      status.setHasCodeCompletionAndIsError();
+      continue;
+    }
+
+    break;
   }
-
-  if (Tok.isAny(tok::kw_throws, tok::kw_throw, tok::kw_try) ||
-      (rethrows && Tok.is(tok::kw_rethrows))) {
-    // If we allowed parsing rethrows, record whether we did in fact parse it.
-    if (rethrows)
-      *rethrows = Tok.is(tok::kw_rethrows);
-
-    // Replace 'throw' or 'try' with 'throws'.
-    if (Tok.isAny(tok::kw_throw, tok::kw_try)) {
-      diagnose(Tok, diag::throw_in_function_type)
-        .fixItReplace(Tok.getLoc(), "throws");
-    }
-
-    StringRef keyword = Tok.getText();
-    throwsLoc = consumeToken();
-
-    if (existingArrowLoc.isValid()) {
-      diagnose(throwsLoc, diag::async_or_throws_in_wrong_position,
-               rethrows ? (*rethrows ? 1 : 0) : 0)
-        .fixItRemove(throwsLoc)
-        .fixItInsert(existingArrowLoc, (keyword + " ").str());
-    }
-
-    if (shouldParseExperimentalConcurrency() &&
-        Tok.isContextualKeyword("async")) {
-      asyncLoc = consumeToken();
-
-      diagnose(asyncLoc, diag::async_after_throws, rethrows && *rethrows)
-        .fixItRemove(asyncLoc)
-        .fixItInsert(
-          existingArrowLoc.isValid() ? existingArrowLoc : throwsLoc, "async ");
-    }
-  }
+  return status;
 }
 
 /// Parse a pattern with an optional type annotation.
@@ -898,8 +1047,8 @@ ParserResult<Pattern> Parser::parseTypedPattern() {
       // Disable this tentative parse when in code-completion mode, otherwise
       // code-completion may enter the delayed-decl state twice.
       if (Tok.isFollowingLParen() && !L->isCodeCompletion()) {
-        BacktrackingScope backtrack(*this);
-        
+        CancellableBacktrackingScope backtrack(*this);
+
         // Create a local context if needed so we can parse trailing closures.
         LocalContext dummyContext;
         Optional<ContextChange> contextChange;
@@ -975,7 +1124,7 @@ ParserResult<Pattern> Parser::parsePattern() {
   case tok::identifier: {
     PatternCtx.setCreateSyntax(SyntaxKind::IdentifierPattern);
     Identifier name;
-    SourceLoc loc = consumeIdentifier(&name);
+    SourceLoc loc = consumeIdentifier(name, /*diagnoseDollarPrefix=*/true);
     if (Tok.isIdentifierOrUnderscore() && !Tok.isContextualDeclKeyword())
       diagnoseConsecutiveIDs(name.str(), loc,
                              introducer == VarDecl::Introducer::Let
@@ -990,7 +1139,7 @@ ParserResult<Pattern> Parser::parsePattern() {
       // code complete anything here -- we expect an identifier.
       consumeToken(tok::code_complete);
     }
-    return nullptr;
+    return makeParserCodeCompletionStatus();
     
   case tok::kw_var:
   case tok::kw_let: {
@@ -1054,7 +1203,7 @@ Parser::parsePatternTupleElement() {
 
   // If the tuple element has a label, parse it.
   if (Tok.is(tok::identifier) && peekToken().is(tok::colon)) {
-    LabelLoc = consumeIdentifier(&Label);
+    LabelLoc = consumeIdentifier(Label, /*diagnoseDollarPrefix=*/true);
     consumeToken(tok::colon);
   }
 
@@ -1193,7 +1342,7 @@ ParserResult<Pattern> Parser::parseMatchingPattern(bool isExprBasic) {
 
   if (SyntaxContext->isEnabled()) {
     if (auto UPES = PatternCtx.popIf<ParsedUnresolvedPatternExprSyntax>()) {
-      PatternCtx.addSyntax(UPES->getDeferredPattern());
+      PatternCtx.addSyntax(UPES->getDeferredPattern(SyntaxContext));
     } else {
       PatternCtx.setCreateSyntax(SyntaxKind::ExpressionPattern);
     }

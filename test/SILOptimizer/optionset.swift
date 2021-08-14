@@ -23,7 +23,7 @@ let globalTestOptions: TestOptions = [.first, .second, .third, .fourth]
 // CHECK-NEXT:   builtin
 // CHECK-NEXT:   integer_literal {{.*}}, 15
 // CHECK-NEXT:   struct $Int
-// CHECK-NEXT:   struct $TestOptions
+// CHECK:        struct $TestOptions
 // CHECK-NEXT:   return
 public func returnTestOptions() -> TestOptions {
     return [.first, .second, .third, .fourth]
@@ -32,8 +32,8 @@ public func returnTestOptions() -> TestOptions {
 // CHECK-LABEL: sil @{{.*}}returnEmptyTestOptions{{.*}}
 // CHECK-NEXT: bb0:
 // CHECK-NEXT:   integer_literal {{.*}}, 0
-// CHECK-NEXT:   builtin "onFastPath"() : $()
 // CHECK-NEXT:   struct $Int
+// CHECK:        builtin "onFastPath"() : $()
 // CHECK-NEXT:   struct $TestOptions
 // CHECK-NEXT:   return
 public func returnEmptyTestOptions() -> TestOptions {

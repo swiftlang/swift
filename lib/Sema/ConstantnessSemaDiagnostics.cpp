@@ -60,23 +60,26 @@ static bool isOSLogDynamicObject(NominalTypeDecl *nominal) {
 /// Return true iff the parameter \p param of function \c funDecl is required to
 /// be a constant. This is true if either the function is an os_log function or
 /// it is an atomics operation and the parameter represents the ordering.
-static bool isParamRequiredToBeConstant(FuncDecl *funcDecl, ParamDecl *param) {
+static bool isParamRequiredToBeConstant(AbstractFunctionDecl *funcDecl, ParamDecl *param) {
   assert(funcDecl && param && "funcDecl and param must not be null");
+  Type paramType;
+  NominalTypeDecl *nominal;
+  StructDecl *structDecl;
   if (hasSemanticsAttr(funcDecl, semantics::OSLOG_REQUIRES_CONSTANT_ARGUMENTS))
     return true;
   if (hasSemanticsAttr(funcDecl, semantics::OSLOG_LOG_WITH_LEVEL)) {
     // We are looking at a top-level os_log function that accepts level and
     // possibly custom log object. Those need not be constants, but every other
     // parameter must be.
-    Type paramType = param->getType();
-    NominalTypeDecl *nominal = paramType->getNominalOrBoundGenericNominal();
+    paramType = param->getType();
+    nominal = paramType->getNominalOrBoundGenericNominal();
     return !nominal || !isOSLogDynamicObject(nominal);
   }
   if (!hasSemanticsAttr(funcDecl,
                         semantics::ATOMICS_REQUIRES_CONSTANT_ORDERINGS))
     return false;
-  Type paramType = param->getType();
-  StructDecl *structDecl = paramType->getStructOrBoundGenericStruct();
+  paramType = param->getType();
+  structDecl = paramType->getStructOrBoundGenericStruct();
   if (!structDecl)
     return false;
   return isAtomicOrderingDecl(structDecl);
@@ -105,7 +108,7 @@ static Expr *checkConstantness(Expr *expr) {
   expressionsToCheck.push_back(expr);
   while (!expressionsToCheck.empty()) {
     Expr *expr = expressionsToCheck.pop_back_val();
-    // Lookthrough identity_expr, tuple and inject_into_optional expressions.
+    // Lookthrough identity_expr, tuple, binary_expr and inject_into_optional expressions.
     if (IdentityExpr *identityExpr = dyn_cast<IdentityExpr>(expr)) {
       expressionsToCheck.push_back(identityExpr->getSubExpr());
       continue;
@@ -113,6 +116,10 @@ static Expr *checkConstantness(Expr *expr) {
     if (TupleExpr *tupleExpr = dyn_cast<TupleExpr>(expr)) {
       for (Expr *element : tupleExpr->getElements())
         expressionsToCheck.push_back(element);
+      continue;
+    }
+    if (BinaryExpr *binaryExpr = dyn_cast<BinaryExpr>(expr)) {
+      expressionsToCheck.push_back(binaryExpr->getArg());
       continue;
     }
     if (InjectIntoOptionalExpr *optionalExpr =
@@ -156,7 +163,7 @@ static Expr *checkConstantness(Expr *expr) {
       Decl *declContext = paramDecl->getDeclContext()->getAsDecl();
       if (!declContext)
         return expr;
-      FuncDecl *funcDecl = dyn_cast<FuncDecl>(declContext);
+      AbstractFunctionDecl *funcDecl = dyn_cast<AbstractFunctionDecl>(declContext);
       if (!funcDecl || !isParamRequiredToBeConstant(funcDecl, paramDecl))
         return expr;
       continue;
@@ -194,47 +201,17 @@ static Expr *checkConstantness(Expr *expr) {
   return nullptr;
 }
 
-/// Return true iff the norminal type decl \c numberDecl is a known stdlib
-/// integer decl.
-static bool isStdlibInteger(NominalTypeDecl *numberDecl) {
-  ASTContext &astCtx = numberDecl->getASTContext();
-  return (numberDecl == astCtx.getIntDecl() ||
-          numberDecl == astCtx.getInt8Decl() ||
-          numberDecl == astCtx.getInt16Decl() ||
-          numberDecl == astCtx.getInt32Decl() ||
-          numberDecl == astCtx.getInt64Decl() ||
-          numberDecl == astCtx.getUIntDecl() ||
-          numberDecl == astCtx.getUInt8Decl() ||
-          numberDecl == astCtx.getUInt16Decl() ||
-          numberDecl == astCtx.getUInt32Decl() ||
-          numberDecl == astCtx.getUInt64Decl());
-}
-
 /// Return true iff the given \p type is a Stdlib integer type.
 static bool isIntegerType(Type type) {
-  NominalTypeDecl *nominalDecl = type->getNominalOrBoundGenericNominal();
-  return nominalDecl && isStdlibInteger(nominalDecl);
+  return type->isInt() || type->isInt8() || type->isInt16() ||
+         type->isInt32() || type->isInt64() || type->isUInt() ||
+         type->isUInt8() || type->isUInt16() || type->isUInt32() ||
+         type->isUInt64();
 }
 
-/// Return true iff the norminal type decl \c numberDecl is a known stdlib float
-/// decl.
-static bool isStdlibFloat(NominalTypeDecl *numberDecl) {
-  ASTContext &astCtx = numberDecl->getASTContext();
-  return (numberDecl == astCtx.getFloatDecl() ||
-          numberDecl == astCtx.getFloat80Decl() ||
-          numberDecl == astCtx.getDoubleDecl());
-}
-
-/// Return true iff the given \p type is a Bool type.
+/// Return true iff the given \p type is a Float type.
 static bool isFloatType(Type type) {
-  NominalTypeDecl *nominalDecl = type->getNominalOrBoundGenericNominal();
-  return nominalDecl && isStdlibFloat(nominalDecl);
-}
-
-/// Return true iff the given \p type is a String type.
-static bool isStringType(Type type) {
-  NominalTypeDecl *nominalDecl = type->getNominalOrBoundGenericNominal();
-  return nominalDecl && nominalDecl == type->getASTContext().getStringDecl();
+  return type->isFloat() || type->isDouble() || type->isFloat80();
 }
 
 /// Given an error expression \p errorExpr, diagnose the error based on the type
@@ -243,7 +220,7 @@ static bool isStringType(Type type) {
 /// Otherwise, if the expression is a nominal type, report that it must be
 /// static member of the type.
 static void diagnoseError(Expr *errorExpr, const ASTContext &astContext,
-                          FuncDecl *funcDecl) {
+                          AbstractFunctionDecl *funcDecl) {
   DiagnosticEngine &diags = astContext.Diags;
   Type exprType = errorExpr->getType();
   SourceLoc errorLoc = errorExpr->getLoc();
@@ -269,7 +246,7 @@ static void diagnoseError(Expr *errorExpr, const ASTContext &astContext,
     diags.diagnose(errorLoc, diag::oslog_arg_must_be_bool_literal);
     return;
   }
-  if (isStringType(exprType)) {
+  if (exprType->isString()) {
     diags.diagnose(errorLoc, diag::oslog_arg_must_be_string_literal);
     return;
   }
@@ -318,9 +295,9 @@ static void diagnoseConstantArgumentRequirementOfCall(const CallExpr *callExpr,
   assert(callExpr && callExpr->getType() &&
          "callExpr should have a valid type");
   ValueDecl *calledDecl = callExpr->getCalledValue();
-  if (!calledDecl || !isa<FuncDecl>(calledDecl))
+  if (!calledDecl || !isa<AbstractFunctionDecl>(calledDecl))
     return;
-  FuncDecl *callee = cast<FuncDecl>(calledDecl);
+  AbstractFunctionDecl *callee = cast<AbstractFunctionDecl>(calledDecl);
 
   // Collect argument indices that are required to be constants.
   SmallVector<unsigned, 4> constantArgumentIndices;
@@ -358,25 +335,56 @@ static void diagnoseConstantArgumentRequirementOfCall(const CallExpr *callExpr,
 void swift::diagnoseConstantArgumentRequirement(
     const Expr *expr, const DeclContext *declContext) {
   class ConstantReqCallWalker : public ASTWalker {
-    const ASTContext &astContext;
+    DeclContext *DC;
 
   public:
-    ConstantReqCallWalker(ASTContext &ctx) : astContext(ctx) {}
+    ConstantReqCallWalker(DeclContext *DC) : DC(DC) {}
 
     // Descend until we find a call expressions. Note that the input expression
     // could be an assign expression or another expression that contains the
     // call.
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      if (!expr || isa<ErrorExpr>(expr) || !expr->getType())
+      // Handle closure expressions separately as we may need to
+      // manually descend into the body.
+      if (auto *closureExpr = dyn_cast<ClosureExpr>(expr)) {
+        return walkToClosureExprPre(closureExpr);
+      }
+      // Interpolated expressions' bodies will be type checked
+      // separately so exit early to avoid duplicate diagnostics.
+      if (!expr || isa<ErrorExpr>(expr) || !expr->getType() ||
+          isa<InterpolatedStringLiteralExpr>(expr))
         return {false, expr};
       if (auto *callExpr = dyn_cast<CallExpr>(expr)) {
-        diagnoseConstantArgumentRequirementOfCall(callExpr, astContext);
-        return {false, expr};
+        diagnoseConstantArgumentRequirementOfCall(callExpr, DC->getASTContext());
       }
       return {true, expr};
     }
+    
+    std::pair<bool, Expr *> walkToClosureExprPre(ClosureExpr *closure) {
+      if (closure->hasSingleExpressionBody()) {
+        // Single expression closure bodies are not visited directly
+        // by the ASTVisitor, so we must descend into the body manually
+        // and set the DeclContext to that of the closure.
+        DC = closure;
+        return {true, closure};
+      }
+      return {false, closure};
+    }
+    
+    Expr *walkToExprPost(Expr *expr) override {
+      if (auto *closureExpr = dyn_cast<ClosureExpr>(expr)) {
+        // Reset the DeclContext to the outer scope if we descended
+        // into a closure expr.
+        DC = closureExpr->getParent();
+      }
+      return expr;
+    }
+    
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
+      return {true, stmt};
+    }
   };
 
-  ConstantReqCallWalker walker(declContext->getASTContext());
+  ConstantReqCallWalker walker(const_cast<DeclContext *>(declContext));
   const_cast<Expr *>(expr)->walk(walker);
 }

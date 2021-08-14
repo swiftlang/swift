@@ -483,6 +483,20 @@ bb0(%0 : @owned $@callee_owned () -> @out U):
   return %8 : $()
 }
 
+sil [transparent] [serialized] [ossa] @mightApplyGuaranteed : $@convention(thin) <U where U : P> (@guaranteed @callee_guaranteed () -> @out U) -> () {
+// CHECK: bb0
+bb0(%0 : @guaranteed $@callee_guaranteed () -> @out U):
+  debug_value %0 : $@callee_guaranteed () -> @out U
+  %3 = alloc_stack $U
+  %4 = apply %0(%3) : $@callee_guaranteed () -> @out U
+  destroy_addr %3 : $*U
+  dealloc_stack %3 : $*U
+  %8 = tuple ()
+// CHECK: return
+  return %8 : $()
+}
+
+
 // CHECK-LABEL: sil [ossa] @callWithAutoclosure
 sil [ossa] @callWithAutoclosure : $@convention(thin) <T where T : P> (@in T) -> () {
 // CHECK: bb0
@@ -509,6 +523,36 @@ bb0(%0 : $*T):
   // CHECK: return
   return %9 : $()
 }
+
+// CHECK-LABEL: sil [ossa] @callWithAutoclosure_2 : $@convention(thin) <T where T : P> (@in T) -> () {
+sil [ossa] @callWithAutoclosure_2 : $@convention(thin) <T where T : P> (@in T) -> () {
+// CHECK: bb0
+bb0(%0 : $*T):
+  // CHECK: debug_value_addr
+  debug_value_addr %0 : $*T
+  // CHECK: function_ref @mightApply
+  %2 = function_ref @mightApply : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@owned @callee_owned () -> @out τ_0_0) -> ()
+  %3 = function_ref @closure_to_specialize : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@owned <τ_0_0> { var τ_0_0 } <τ_0_0>) -> @out τ_0_0
+  // CHECK-NOT: alloc_box
+  // CHECK: [[STACK:%[0-9a-zA-Z_]+]] = alloc_stack $T
+  %4 = alloc_box $<τ_0_0> { var τ_0_0 } <T>
+  %4a = project_box %4 : $<τ_0_0> { var τ_0_0 } <T>, 0
+  %4copy = copy_value %4 : $<τ_0_0> { var τ_0_0 } <T>
+  // CHECK: copy_addr %0 to [initialization] [[STACK]] : $*T
+  copy_addr %0 to [initialization] %4a : $*T
+  // CHECK: [[CLOSURE:%[0-9a-zA-Z]+]] = function_ref @$s21closure_to_specializeTf0ns_n
+  // CHECK: partial_apply [[CLOSURE]]<T>([[STACK]])
+  %6 = partial_apply %3<T>(%4copy) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@owned <τ_0_0> { var τ_0_0 } <τ_0_0>) -> @out τ_0_0
+  %7 = apply %2<T>(%6) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@owned @callee_owned () -> @out τ_0_0) -> ()
+  // CHECK: destroy_addr [[STACK]] : $*T
+  // CHECK: dealloc_stack [[STACK]] : $*T
+  destroy_addr %0 : $*T
+  destroy_value %4 : $<τ_0_0> { var τ_0_0 } <T>
+  %9 = tuple ()
+  // CHECK: return
+  return %9 : $()
+}
+// CHECK: } // end sil function 'callWithAutoclosure_2'
 
 // CHECK-LABEL: sil shared [ossa] @$s21closure_to_specializeTf0ns_n : $@convention(thin) <T where T : P> (@inout_aliasable T) -> @out T
 sil shared [ossa] @closure_to_specialize : $@convention(thin) <T where T : P> (@owned <τ_0_0> { var τ_0_0 } <T>) -> @out T {
@@ -636,6 +680,11 @@ bb0(%0 : $Int, %1 : @owned $<τ_0_0 where τ_0_0 : Count> { var S<τ_0_0> } <T>)
   %6 = function_ref @get : $@convention(method) <τ_0_0 where τ_0_0 : Count> (@in S<τ_0_0>) -> Int
   %7 = apply %6<T>(%4) : $@convention(method) <τ_0_0 where τ_0_0 : Count> (@in S<τ_0_0>) -> Int
   %8 = apply %3(%0, %7) : $@convention(thin) (Int, Int) -> Bool
+  %9 = copy_value %1 : $<τ_0_0 where τ_0_0 : Count> { var S<τ_0_0> } <T>
+  %10 = project_box %9 : $<τ_0_0 where τ_0_0 : Count> { var S<τ_0_0> } <T>, 0
+  copy_addr %10 to [initialization] %4 : $*S<T>
+  destroy_value %9 : $<τ_0_0 where τ_0_0 : Count> { var S<τ_0_0> } <T>
+  destroy_addr %4 : $*S<T>
   dealloc_stack %4 : $*S<T>
   destroy_value %1 : $<τ_0_0 where τ_0_0 : Count> { var S<τ_0_0> } <T>
 // CHECK: return
@@ -970,51 +1019,6 @@ bb2:
   destroy_value %1 : ${ var Int }
   %r = tuple ()
   return %r : $()
-}
-
-// CHECK-LABEL: sil [ossa] @nesting_and_unreachable_critical_edge
-// CHECK:      bb0(%0 : $Int):
-// CHECK-NEXT:   [[BOX:%[0-9]+]] = alloc_stack $Int
-// CHECK-NEXT:   [[STACK1:%[0-9]+]] = alloc_stack $Bool
-// CHECK-NEXT:   cond_br
-// CHECK:      bb1:
-// CHECK-NEXT:   [[STACK2:%[0-9]+]] = alloc_stack $Bool
-// CHECK-NEXT:   cond_br
-// CHECK:      bb2:
-// CHECK-NEXT:   dealloc_stack [[STACK2]]
-// CHECK-NEXT:   br bb4
-// CHECK:      bb3:
-// CHECK:        store
-// CHECK:        dealloc_stack [[STACK2]]
-// CHECK-NEXT:   dealloc_stack [[STACK1]]
-// CHECK-NEXT:   dealloc_stack [[BOX]]
-// CHECK-NEXT:   tuple
-// CHECK-NEXT:   return
-// CHECK:      bb4:
-// CHECK-NEXT:   unreachable
-sil [ossa] @nesting_and_unreachable_critical_edge : $@convention(thin) (Int) -> () {
-bb0(%0 : $Int):
-  %1 = alloc_box ${ var Int }
-  %as1 = alloc_stack $Bool
-  %1a = project_box %1 : ${ var Int }, 0
-  cond_br undef, bb1, bb3
-
-bb1:
-  %as2 = alloc_stack $Bool
-  cond_br undef, bb2, bb3
-
-bb2:
-  store %0 to [trivial] %1a : $*Int
-  %3 = load [trivial] %1a : $*Int
-  dealloc_stack %as2 : $*Bool
-  dealloc_stack %as1 : $*Bool
-  destroy_value %1 : ${ var Int }
-  %r = tuple ()
-  return %r : $()
-
-bb3:
-  destroy_value %1 : ${ var Int }
-  unreachable
 }
 
 // Test that

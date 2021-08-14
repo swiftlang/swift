@@ -139,3 +139,7 @@ extension KeyValuePairs: CustomDebugStringConvertible {
     return _makeKeyValuePairDescription()
   }
 }
+
+// TODO: Remove UnsafeSendable when we have tuples conforming
+extension KeyValuePairs: Sendable, UnsafeSendable
+    where Key: Sendable, Value: Sendable { }

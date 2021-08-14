@@ -172,7 +172,9 @@ printTypeInterface(ModuleDecl *M, Type Ty, ASTPrinter &Printer,
   }
   Ty = Ty->getRValueType();
   if (auto ND = Ty->getNominalOrBoundGenericNominal()) {
-    PrintOptions Options = PrintOptions::printTypeInterface(Ty.getPointer());
+    PrintOptions Options = PrintOptions::printTypeInterface(
+        Ty.getPointer(),
+        Ty->getASTContext().TypeCheckerOpts.PrintFullConvention);
     ND->print(Printer, Options);
     printTypeNameToString(Ty, TypeName);
     return false;
@@ -200,15 +202,13 @@ static void adjustPrintOptions(PrintOptions &AdjustedOptions) {
   AdjustedOptions.VarInitializers = false;
 }
 
-ArrayRef<StringRef>
-swift::ide::collectModuleGroups(ModuleDecl *M, std::vector<StringRef> &Scratch) {
+void swift::ide::collectModuleGroups(ModuleDecl *M,
+                                     SmallVectorImpl<StringRef> &Into) {
   for (auto File : M->getFiles()) {
-    File->collectAllGroups(Scratch);
+    File->collectAllGroups(Into);
   }
-  std::sort(Scratch.begin(), Scratch.end(), [](StringRef L, StringRef R) {
-    return L.compare_lower(R) < 0;
-  });
-  return llvm::makeArrayRef(Scratch);
+  std::sort(Into.begin(), Into.end(),
+            [](StringRef L, StringRef R) { return L.compare_lower(R) < 0; });
 }
 
 /// Determine whether the given extension has a Clang node that
@@ -247,7 +247,8 @@ static bool printModuleInterfaceDecl(Decl *D,
     // a cross-module extension.
     if (!extensionHasClangNode(Ext)) {
       auto ExtendedNominal = Ext->getExtendedNominal();
-      if (Ext->getModuleContext() == ExtendedNominal->getModuleContext())
+      if (!ExtendedNominal ||
+          Ext->getModuleContext() == ExtendedNominal->getModuleContext())
         return false;
     }
   }
@@ -360,8 +361,9 @@ static bool printModuleInterfaceDecl(Decl *D,
               Opened |= ET.Ext->print(Printer, Options);
               if (ET.IsSynthesized)
                 Options.clearSynthesizedExtension();
-              if (Options.BracketOptions.shouldCloseExtension(ET.Ext))
+              if (Options.BracketOptions.shouldCloseExtension(ET.Ext)) {
                 Printer << "\n";
+              }
             }
           });
         Options.BracketOptions = BracketOptions();
@@ -421,7 +423,7 @@ getDeclsFromCrossImportOverlay(ModuleDecl *Overlay, ModuleDecl *Declaring,
         return false;
 
       // Ignore an imports of modules also imported by the underlying module.
-      if (PrevImported.find(Imported) != PrevImported.end())
+      if (PrevImported.contains(Imported))
         return false;
     }
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
@@ -606,8 +608,14 @@ void swift::ide::printModuleInterface(
     }
 
     auto ShouldPrintImport = [&](ImportDecl *ImportD) -> bool {
+      if (ImportD->getAttrs().hasAttribute<ImplementationOnlyAttr>())
+        return false;
+
       if (!TargetClangMod)
         return true;
+      if (ImportD->getModule() == TargetMod)
+        return false;
+
       auto ImportedMod = ImportD->getClangModule();
       if (!ImportedMod)
         return true;
@@ -800,7 +808,7 @@ static SourceLoc getDeclStartPosition(SourceFile &File) {
   for (auto D : File.getTopLevelDecls()) {
     if (tryUpdateStart(D->getStartLoc())) {
       tryUpdateStart(D->getAttrs().getStartLoc());
-      auto RawComment = D->getRawComment();
+      auto RawComment = D->getRawComment(/*SerializedOK=*/false);
       if (!RawComment.isEmpty())
         tryUpdateStart(RawComment.Comments.front().Range.getStart());
     }

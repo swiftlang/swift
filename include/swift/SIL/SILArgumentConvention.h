@@ -32,7 +32,6 @@ struct SILArgumentConvention {
     Indirect_Out,
     Direct_Owned,
     Direct_Unowned,
-    Direct_Deallocating,
     Direct_Guaranteed,
   } Value;
 
@@ -86,7 +85,6 @@ struct SILArgumentConvention {
       case SILArgumentConvention::Indirect_Out:
       case SILArgumentConvention::Direct_Unowned:
       case SILArgumentConvention::Direct_Owned:
-      case SILArgumentConvention::Direct_Deallocating:
       case SILArgumentConvention::Direct_Guaranteed:
         return false;
     }
@@ -105,7 +103,6 @@ struct SILArgumentConvention {
     case SILArgumentConvention::Indirect_Out:
     case SILArgumentConvention::Indirect_InoutAliasable:
     case SILArgumentConvention::Direct_Unowned:
-    case SILArgumentConvention::Direct_Deallocating:
       return false;
     }
     llvm_unreachable("covered switch isn't covered?!");
@@ -123,7 +120,6 @@ struct SILArgumentConvention {
     case SILArgumentConvention::Indirect_InoutAliasable:
     case SILArgumentConvention::Direct_Unowned:
     case SILArgumentConvention::Direct_Owned:
-    case SILArgumentConvention::Direct_Deallocating:
       return false;
     }
     llvm_unreachable("covered switch isn't covered?!");
@@ -143,7 +139,6 @@ struct SILArgumentConvention {
     case SILArgumentConvention::Direct_Unowned:
     case SILArgumentConvention::Direct_Guaranteed:
     case SILArgumentConvention::Direct_Owned:
-    case SILArgumentConvention::Direct_Deallocating:
       return false;
     }
     llvm_unreachable("covered switch isn't covered?!");

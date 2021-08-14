@@ -1,3 +1,4 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-deadfuncelim | %FileCheck --check-prefix=KEEP %s
 // RUN: %target-sil-opt -enable-sil-verify-all %s -sil-deadfuncelim | %FileCheck %s
 
 sil_stage canonical
@@ -6,7 +7,7 @@ import Builtin
 import Swift
 
 // This function needs to be removed.
-// CHECK-NOT: @remove_me
+// KEEP-NOT: @remove_me
 
 sil private @remove_me : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
 bb0(%0 : $Builtin.Int64):
@@ -15,3 +16,32 @@ bb0(%0 : $Builtin.Int64):
   %4 = tuple_extract %3 : $(Builtin.Int64, Builtin.Int1), 0
   return %4: $Builtin.Int64
 }
+
+sil_global @globalFunctionPointer : $@callee_guaranteed () -> () = {
+  %0 = function_ref @alivePrivateFunc : $@convention(thin) () -> ()
+  %initval = thin_to_thick_function %0 : $@convention(thin) () -> () to $@callee_guaranteed () -> ()
+}
+
+// CHECK-LABEL: sil private @alivePrivateFunc
+sil private @alivePrivateFunc : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
+
+// KEEP-NOT: @privateFunctionPointer
+sil_global private @privateFunctionPointer : $@callee_guaranteed () -> () = {
+  %0 = function_ref @deadPrivateFunc : $@convention(thin) () -> ()
+  %initval = thin_to_thick_function %0 : $@convention(thin) () -> () to $@callee_guaranteed () -> ()
+}
+
+// KEEP-NOT: @deadPrivateFunc
+sil private @deadPrivateFunc : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @privateFunctionPointer : $*@callee_guaranteed () -> ()
+  %1 = load %0 : $*@callee_guaranteed () -> ()
+  %2 = apply %1() : $@callee_guaranteed () -> ()
+  %3 = tuple ()
+  return %3 : $()
+}
+

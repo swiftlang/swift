@@ -136,6 +136,7 @@
 
 @interface A(BoolStuff)
 - setEnabled:(BOOL)enabled;
++ (void)setGlobal:(BOOL)global;
 @end
 
 @interface AlmostSubscriptable

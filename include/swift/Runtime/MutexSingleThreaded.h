@@ -22,6 +22,7 @@
 namespace swift {
 
 typedef void* ConditionHandle;
+typedef void* ConditionMutexHandle;
 typedef void* MutexHandle;
 typedef void* ReadWriteLockHandle;
 
@@ -44,6 +45,9 @@ struct ConditionPlatformHelper {
 
 struct MutexPlatformHelper {
   static constexpr MutexHandle staticInit() { return nullptr; }
+  static constexpr ConditionMutexHandle conditionStaticInit() {
+    return nullptr;
+  }
   static void init(MutexHandle &mutex, bool checked = false) {}
   static void destroy(MutexHandle &mutex) {}
   static void lock(MutexHandle &mutex) {}

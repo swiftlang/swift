@@ -616,6 +616,7 @@ static MetadataResponse emitNominalPrespecializedGenericMetadataRef(
     return MetadataResponse::handle(IGF, request, call);
   }
   }
+  llvm_unreachable("unhandled metadata canonicality");
 }
 
 static llvm::Value *
@@ -1297,6 +1298,24 @@ namespace {
     }
 
     MetadataResponse
+    visitBuiltinRawUnsafeContinuationType(CanBuiltinRawUnsafeContinuationType type,
+                                          DynamicMetadataRequest request) {
+      return emitDirectMetadataRef(type);
+    }
+
+    MetadataResponse
+    visitBuiltinJobType(CanBuiltinJobType type,
+                        DynamicMetadataRequest request) {
+      return emitDirectMetadataRef(type);
+    }
+
+    MetadataResponse
+    visitBuiltinExecutorType(CanBuiltinExecutorType type,
+                             DynamicMetadataRequest request) {
+      return emitDirectMetadataRef(type);
+    }
+
+    MetadataResponse
     visitBuiltinFloatType(CanBuiltinFloatType type,
                           DynamicMetadataRequest request) {
       return emitDirectMetadataRef(type);
@@ -1363,13 +1382,15 @@ namespace {
         return ParameterFlags()
             .withValueOwnership(flags.getValueOwnership())
             .withVariadic(flags.isVariadic())
-            .withAutoClosure(flags.isAutoClosure());
+            .withAutoClosure(flags.isAutoClosure())
+            .withNoDerivative(flags.isNoDerivative())
+            .withIsolated(flags.isIsolated());
       };
 
-      bool hasFlags = false;
+      bool hasParameterFlags = false;
       for (auto param : params) {
         if (!getABIParameterFlags(param.getParameterFlags()).isNone()) {
-          hasFlags = true;
+          hasParameterFlags = true;
           break;
         }
       }
@@ -1407,20 +1428,39 @@ namespace {
         metadataDifferentiabilityKind =
             FunctionMetadataDifferentiabilityKind::Linear;
         break;
+      case DifferentiabilityKind::Forward:
+        metadataDifferentiabilityKind =
+            FunctionMetadataDifferentiabilityKind::Forward;
+        break;
+      case DifferentiabilityKind::Reverse:
+        metadataDifferentiabilityKind =
+            FunctionMetadataDifferentiabilityKind::Reverse;
+        break;
       }
 
-      auto flagsVal = FunctionTypeFlags()
-                          .withNumParameters(numParams)
-                          .withConvention(metadataConvention)
-                          .withAsync(type->isAsync())
-                          .withThrows(type->isThrowing())
-                          .withParameterFlags(hasFlags)
-                          .withEscaping(isEscaping)
-                          .withDifferentiabilityKind(
-                              metadataDifferentiabilityKind);
+      auto flags = FunctionTypeFlags()
+                       .withNumParameters(numParams)
+                       .withConvention(metadataConvention)
+                       .withAsync(type->isAsync())
+                       .withConcurrent(type->isSendable())
+                       .withThrows(type->isThrowing())
+                       .withParameterFlags(hasParameterFlags)
+                       .withEscaping(isEscaping)
+                       .withDifferentiable(type->isDifferentiable())
+                       .withGlobalActor(!type->getGlobalActor().isNull());
 
-      auto flags = llvm::ConstantInt::get(IGF.IGM.SizeTy,
-                                          flagsVal.getIntValue());
+      auto flagsVal = llvm::ConstantInt::get(IGF.IGM.SizeTy,
+                                             flags.getIntValue());
+      llvm::Value *diffKindVal = nullptr;
+      if (type->isDifferentiable()) {
+        assert(metadataDifferentiabilityKind.isDifferentiable());
+        diffKindVal = llvm::ConstantInt::get(
+            IGF.IGM.SizeTy, metadataDifferentiabilityKind.getIntValue());
+      } else if (type->getGlobalActor()) {
+        diffKindVal = llvm::ConstantInt::get(
+            IGF.IGM.SizeTy,
+            FunctionMetadataDifferentiabilityKind::NonDifferentiable);
+      }
 
       auto collectParameters =
           [&](llvm::function_ref<void(unsigned, llvm::Value *,
@@ -1438,12 +1478,12 @@ namespace {
       auto constructSimpleCall =
           [&](llvm::SmallVectorImpl<llvm::Value *> &arguments)
           -> llvm::Constant * {
-        arguments.push_back(flags);
+        arguments.push_back(flagsVal);
 
         collectParameters([&](unsigned i, llvm::Value *typeRef,
                               ParameterFlags flags) {
           arguments.push_back(typeRef);
-          if (hasFlags)
+          if (hasParameterFlags)
             arguments.push_back(
                 llvm::ConstantInt::get(IGF.IGM.Int32Ty, flags.getIntValue()));
         });
@@ -1473,7 +1513,8 @@ namespace {
       case 1:
       case 2:
       case 3: {
-        if (!hasFlags) {
+        if (!hasParameterFlags && !type->isDifferentiable() &&
+            !type->getGlobalActor()) {
           llvm::SmallVector<llvm::Value *, 8> arguments;
           auto *metadataFn = constructSimpleCall(arguments);
           auto *call = IGF.Builder.CreateCall(metadataFn, arguments);
@@ -1481,43 +1522,58 @@ namespace {
           return setLocal(CanType(type), MetadataResponse::forComplete(call));
         }
 
-        // If function type has parameter flags, let's emit
-        // the most general function to retrieve them.
+        // If function type has parameter flags or is differentiable or has a
+        // global actor, emit the most general function to retrieve them.
         LLVM_FALLTHROUGH;
       }
 
       default:
-        assert(!params.empty() && "0 parameter case is specialized!");
+        assert((!params.empty() || type->isDifferentiable() ||
+                type->getGlobalActor()) &&
+               "0 parameter case should be specialized unless it is a "
+               "differentiable function or has a global actor");
 
         auto *const Int32Ptr = IGF.IGM.Int32Ty->getPointerTo();
         llvm::SmallVector<llvm::Value *, 8> arguments;
 
-        arguments.push_back(flags);
+        arguments.push_back(flagsVal);
+
+        if (diffKindVal) {
+          arguments.push_back(diffKindVal);
+        }
 
         ConstantInitBuilder paramFlags(IGF.IGM);
         auto flagsArr = paramFlags.beginArray();
 
-        auto arrayTy =
-            llvm::ArrayType::get(IGF.IGM.TypeMetadataPtrTy, numParams);
-        Address parameters = IGF.createAlloca(
-            arrayTy, IGF.IGM.getTypeMetadataAlignment(), "function-parameters");
+        Address parameters;
+        if (!params.empty()) {
+          auto arrayTy =
+              llvm::ArrayType::get(IGF.IGM.TypeMetadataPtrTy, numParams);
+          parameters = IGF.createAlloca(
+              arrayTy, IGF.IGM.getTypeMetadataAlignment(), "function-parameters");
 
-        IGF.Builder.CreateLifetimeStart(parameters,
-                                        IGF.IGM.getPointerSize() * numParams);
+          IGF.Builder.CreateLifetimeStart(parameters,
+                                          IGF.IGM.getPointerSize() * numParams);
 
-        collectParameters([&](unsigned i, llvm::Value *typeRef,
-                              ParameterFlags flags) {
-          auto argPtr = IGF.Builder.CreateStructGEP(parameters, i,
-                                                    IGF.IGM.getPointerSize());
-          IGF.Builder.CreateStore(typeRef, argPtr);
-          if (i == 0)
-            arguments.push_back(argPtr.getAddress());
+          collectParameters([&](unsigned i, llvm::Value *typeRef,
+                                ParameterFlags flags) {
+            auto argPtr = IGF.Builder.CreateStructGEP(parameters, i,
+                                                      IGF.IGM.getPointerSize());
+            IGF.Builder.CreateStore(typeRef, argPtr);
+            if (i == 0)
+              arguments.push_back(argPtr.getAddress());
 
-          if (hasFlags)
-            flagsArr.addInt32(flags.getIntValue());
-        });
+            if (hasParameterFlags)
+              flagsArr.addInt32(flags.getIntValue());
+          });
+        } else {
+          auto parametersPtr =
+              llvm::ConstantPointerNull::get(
+                IGF.IGM.TypeMetadataPtrTy->getPointerTo());
+          arguments.push_back(parametersPtr);
+        }
 
-        if (hasFlags) {
+        if (hasParameterFlags) {
           auto *flagsVar = flagsArr.finishAndCreateGlobal(
               "parameter-flags", IGF.IGM.getPointerAlignment(),
               /* constant */ true);
@@ -1529,8 +1585,18 @@ namespace {
 
         arguments.push_back(result);
 
-        auto call = IGF.Builder.CreateCall(IGF.IGM.getGetFunctionMetadataFn(),
-                                           arguments);
+        if (Type globalActor = type->getGlobalActor()) {
+          arguments.push_back(
+              IGF.emitAbstractTypeMetadataRef(globalActor->getCanonicalType()));
+        }
+
+        auto *getMetadataFn = type->getGlobalActor()
+            ? IGF.IGM.getGetFunctionMetadataGlobalActorFn()
+            : type->isDifferentiable()
+              ? IGF.IGM.getGetFunctionMetadataDifferentiableFn()
+              : IGF.IGM.getGetFunctionMetadataFn();
+
+        auto call = IGF.Builder.CreateCall(getMetadataFn, arguments);
         call->setDoesNotThrow();
 
         if (parameters.isValid())
@@ -1573,7 +1639,7 @@ namespace {
 
     MetadataResponse visitDynamicSelfType(CanDynamicSelfType type,
                                           DynamicMetadataRequest request) {
-      return MetadataResponse::forComplete(IGF.getLocalSelfMetadata());
+      return MetadataResponse::forComplete(IGF.getDynamicSelfMetadata());
     }
       
     MetadataResponse emitExistentialTypeMetadata(CanType type,
@@ -1701,10 +1767,16 @@ namespace {
       llvm_unreachable("error type should not appear in IRGen");
     }
 
-    MetadataResponse visitSILBlockStorageType(CanSILBlockStorageType type,
-                                              DynamicMetadataRequest request) {
-      llvm_unreachable("cannot ask for metadata of block storage");
+    // These types are artificial types used for internal purposes and
+    // should never appear in a metadata request.
+#define INTERNAL_ONLY_TYPE(ID)                                               \
+    MetadataResponse visit##ID##Type(Can##ID##Type type,                     \
+                                     DynamicMetadataRequest request) {       \
+      llvm_unreachable("cannot ask for metadata of compiler-internal type"); \
     }
+    INTERNAL_ONLY_TYPE(SILBlockStorage)
+    INTERNAL_ONLY_TYPE(BuiltinDefaultActorStorage)
+#undef INTERNAL_ONLY_TYPE
 
     MetadataResponse visitSILBoxType(CanSILBoxType type,
                                      DynamicMetadataRequest request) {
@@ -2005,6 +2077,9 @@ MetadataResponse irgen::emitGenericTypeMetadataAccessFunction(
 
   auto request = params.claimNext();
 
+  bool checkPrespecialized =
+      IGM.IRGen.metadataPrespecializationsForType(nominal).size() > 0;
+
   auto numArguments = genericArgs.Types.size();
 
   llvm::Value *result;
@@ -2017,8 +2092,17 @@ MetadataResponse irgen::emitGenericTypeMetadataAccessFunction(
       IGF.Builder.CreateBitCast(argsBuffer.getAddress(), IGM.Int8PtrTy);
 
     // Make the call.
-    auto call = IGF.Builder.CreateCall(IGM.getGetGenericMetadataFn(),
-                                         {request, arguments, descriptor});
+    llvm::CallInst *call;
+    if (checkPrespecialized) {
+      call = IGF.Builder.CreateCall(
+          IGM.getGetCanonicalPrespecializedGenericMetadataFn(),
+          {request, arguments, descriptor,
+           IGM.getAddrOfCanonicalPrespecializedGenericTypeCachingOnceToken(
+               nominal)});
+    } else {
+      call = IGF.Builder.CreateCall(IGM.getGetGenericMetadataFn(),
+                                    {request, arguments, descriptor});
+    }
     call->setDoesNotThrow();
     call->setCallingConv(IGM.SwiftCC);
     call->addAttribute(llvm::AttributeList::FunctionIndex,
@@ -2031,7 +2115,8 @@ MetadataResponse irgen::emitGenericTypeMetadataAccessFunction(
     // Factor out the buffer shuffling for metadata accessors that take their
     // arguments directly, so that the accessor function itself only needs to
     // materialize the nominal type descriptor and call this thunk.
-    auto generateThunkFn = [&IGM](IRGenFunction &subIGF) {
+    auto generateThunkFn = [&IGM,
+                            checkPrespecialized](IRGenFunction &subIGF) {
       subIGF.CurFn->setDoesNotAccessMemory();
       subIGF.CurFn->setCallingConv(IGM.SwiftCC);
       IGM.setHasNoFramePointer(subIGF.CurFn);
@@ -2042,6 +2127,10 @@ MetadataResponse irgen::emitGenericTypeMetadataAccessFunction(
       auto arg1 = params.claimNext();
       auto arg2 = params.claimNext();
       auto descriptor = params.claimNext();
+      llvm::Value *token = nullptr;
+      if (checkPrespecialized) {
+        token = params.claimNext();
+      }
 
       // Allocate a buffer with enough storage for the arguments.
       auto argsBufferTy =
@@ -2066,23 +2155,47 @@ MetadataResponse irgen::emitGenericTypeMetadataAccessFunction(
       // Make the call.
       auto argsAddr = subIGF.Builder.CreateBitCast(argsBuffer.getAddress(),
                                                    IGM.Int8PtrTy);
-      auto result = subIGF.Builder.CreateCall(IGM.getGetGenericMetadataFn(),
-                                             {request, argsAddr, descriptor});
+
+      llvm::Value *result;
+      if (checkPrespecialized) {
+        result = subIGF.Builder.CreateCall(
+            IGM.getGetCanonicalPrespecializedGenericMetadataFn(),
+            {request, argsAddr, descriptor, token});
+      } else {
+        result = subIGF.Builder.CreateCall(IGM.getGetGenericMetadataFn(),
+                                           {request, argsAddr, descriptor});
+      }
       subIGF.Builder.CreateRet(result);
     };
-    auto thunkFn = IGM.getOrCreateHelperFunction(
-        "__swift_instantiateGenericMetadata",
-        IGM.TypeMetadataResponseTy,
-        {
-          IGM.SizeTy, // request
-          IGM.Int8PtrTy, // arg 0
-          IGM.Int8PtrTy, // arg 1
-          IGM.Int8PtrTy, // arg 2
-          IGM.TypeContextDescriptorPtrTy // type context descriptor
-        },
-        generateThunkFn,
-        /*noinline*/true);
-    
+    llvm::Constant *thunkFn;
+    if (checkPrespecialized) {
+      thunkFn = IGM.getOrCreateHelperFunction(
+          "__swift_instantiateCanonicalPrespecializedGenericMetadata",
+          IGM.TypeMetadataResponseTy,
+          {
+              IGM.SizeTy,                     // request
+              IGM.Int8PtrTy,                  // arg 0
+              IGM.Int8PtrTy,                  // arg 1
+              IGM.Int8PtrTy,                  // arg 2
+              IGM.TypeContextDescriptorPtrTy, // type context descriptor
+              IGM.OnceTy->getPointerTo()      // token pointer
+          },
+          generateThunkFn,
+          /*noinline*/ true);
+    } else {
+      thunkFn = IGM.getOrCreateHelperFunction(
+          "__swift_instantiateGenericMetadata", IGM.TypeMetadataResponseTy,
+          {
+              IGM.SizeTy,                    // request
+              IGM.Int8PtrTy,                 // arg 0
+              IGM.Int8PtrTy,                 // arg 1
+              IGM.Int8PtrTy,                 // arg 2
+              IGM.TypeContextDescriptorPtrTy // type context descriptor
+          },
+          generateThunkFn,
+          /*noinline*/ true);
+    }
+
     // Call out to the helper.
     auto arg0 = numArguments >= 1
       ? IGF.Builder.CreateBitCast(params.claimNext(), IGM.Int8PtrTy)
@@ -2094,8 +2207,17 @@ MetadataResponse irgen::emitGenericTypeMetadataAccessFunction(
       ? IGF.Builder.CreateBitCast(params.claimNext(), IGM.Int8PtrTy)
       : llvm::UndefValue::get(IGM.Int8PtrTy);
 
-    auto call = IGF.Builder.CreateCall(thunkFn,
-                                       {request, arg0, arg1, arg2, descriptor});
+    llvm::CallInst *call;
+    if (checkPrespecialized) {
+      auto *token =
+          IGM.getAddrOfCanonicalPrespecializedGenericTypeCachingOnceToken(
+              nominal);
+      call = IGF.Builder.CreateCall(
+          thunkFn, {request, arg0, arg1, arg2, descriptor, token});
+    } else {
+      call = IGF.Builder.CreateCall(thunkFn,
+                                    {request, arg0, arg1, arg2, descriptor});
+    }
     call->setDoesNotAccessMemory();
     call->setDoesNotThrow();
     call->setCallingConv(IGM.SwiftCC);
@@ -2750,8 +2872,8 @@ IRGenFunction::emitTypeMetadataRef(CanType type,
 
   // If we're asking for the metadata of the type that dynamic Self is known
   // to be equal to, we can just use the self metadata.
-  if (LocalSelfIsExact && LocalSelfType == type) {
-    return MetadataResponse::forComplete(getLocalSelfMetadata());
+  if (SelfTypeIsExact && SelfType == type) {
+    return MetadataResponse::forComplete(getDynamicSelfMetadata());
   }
   
   if (type->hasArchetype() ||
@@ -2873,10 +2995,14 @@ public:
       // A thin function looks like a plain pointer.
       // FIXME: Except for extra inhabitants?
       return C.TheRawPointerType;
-    case SILFunctionType::Representation::Thick:
+    case SILFunctionType::Representation::Thick: {
       // All function types look like () -> ().
       // FIXME: It'd be nice not to have to call through the runtime here.
-      return CanFunctionType::get({}, C.TheEmptyTupleType);
+      //
+      // FIXME: Verify ExtInfo state is correct, not working by accident.
+      CanFunctionType::ExtInfo info;
+      return CanFunctionType::get({}, C.TheEmptyTupleType, info);
+    }
     case SILFunctionType::Representation::Block:
       // All block types look like AnyObject.
       return C.getAnyObjectType();
@@ -3072,10 +3198,13 @@ namespace {
         // A thin function looks like a plain pointer.
         // FIXME: Except for extra inhabitants?
         return emitFromValueWitnessTable(C.TheRawPointerType);
-      case SILFunctionType::Representation::Thick:
+      case SILFunctionType::Representation::Thick: {
         // All function types look like () -> ().
+        // FIXME: Verify ExtInfo state is correct, not working by accident.
+        CanFunctionType::ExtInfo info;
         return emitFromValueWitnessTable(
-                 CanFunctionType::get({}, C.TheEmptyTupleType));
+            CanFunctionType::get({}, C.TheEmptyTupleType, info));
+      }
       case SILFunctionType::Representation::Block:
         // All block types look like AnyObject.
         return emitFromValueWitnessTable(C.getAnyObjectType());
@@ -3282,7 +3411,7 @@ llvm::Value *irgen::emitClassHeapMetadataRef(IRGenFunction &IGF, CanType type,
                                              bool allowUninitialized) {
   assert(request.canResponseStatusBeIgnored() &&
          "emitClassHeapMetadataRef only supports satisfied requests");
-  assert(type->mayHaveSuperclass());
+  assert(type->mayHaveSuperclass() || type->isTypeErasedGenericClassType());
 
   // Archetypes may or may not be ObjC classes and need unwrapping to get at
   // the class object.
@@ -3297,7 +3426,7 @@ llvm::Value *irgen::emitClassHeapMetadataRef(IRGenFunction &IGF, CanType type,
     return classPtr;
   }
   
-  if (ClassDecl *theClass = type->getClassOrBoundGenericClass()) {
+  if (ClassDecl *theClass = dyn_cast_or_null<ClassDecl>(type->getAnyNominal())) {
     if (!hasKnownSwiftMetadata(IGF.IGM, theClass)) {
       llvm::Value *result =
         emitObjCHeapMetadataRef(IGF, theClass, allowUninitialized);

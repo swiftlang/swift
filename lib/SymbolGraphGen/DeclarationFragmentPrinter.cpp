@@ -96,6 +96,7 @@ void
 DeclarationFragmentPrinter::printNamePre(PrintNameContext Context) {
   switch (Context) {
   case PrintNameContext::Keyword:
+  case PrintNameContext::IntroducerKeyword:
     openFragment(FragmentKind::Keyword);
     break;
   case PrintNameContext::GenericParameter:
@@ -140,8 +141,14 @@ void DeclarationFragmentPrinter::printTypeRef(Type T, const TypeDecl *RefTo,
   USR.clear();
 
   auto ShouldLink = Name.str() != "Self";
-  if (const auto *TD = T->getAnyNominal()) {
-    if (SG->isImplicitlyPrivate(TD)) {
+  if (T) {
+    if (const auto *TD = T->getAnyNominal()) {
+      if (SG->isImplicitlyPrivate(TD)) {
+        ShouldLink = false;
+      }
+    }
+
+    if (T->isTypeParameter()) {
       ShouldLink = false;
     }
   }
@@ -149,6 +156,8 @@ void DeclarationFragmentPrinter::printTypeRef(Type T, const TypeDecl *RefTo,
   if (ShouldLink) {
     llvm::raw_svector_ostream OS(USR);
     ide::printDeclUSR(RefTo, OS);
+    if (ReferencedDecls)
+      ReferencedDecls->insert(RefTo);
   }
   closeFragment();
 }

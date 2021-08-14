@@ -50,15 +50,15 @@ dynamic func testComposition() -> some Composition {
 }
 
 // CHECK-LABEL: struct_decl{{.*}}Builder
-@_functionBuilder
+@resultBuilder
 struct Builder {
   static func buildBlock(_ params: P...) -> ConcreteP {
     return ConcreteP()
   }
 }
 
-// CHECK-LABEL: TestFunctionBuilder
-class TestFunctionBuilder {
+// CHECK-LABEL: TestResultBuilder
+class TestResultBuilder {
   // CHECK-LABEL: testTransformFnBody
   @Builder dynamic var testTransformFnBody: some P {
     // CHECK: return_stmt

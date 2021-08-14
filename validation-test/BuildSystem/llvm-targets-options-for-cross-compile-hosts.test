@@ -1,0 +1,25 @@
+# REQUIRES: standalone_build
+# REQUIRES: OS=macosx
+
+# RUN: %empty-directory(%t)
+# RUN: mkdir -p %t
+# RUN: SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --llvm-ninja-targets="lib/all clangDependencyScanning" --cross-compile-hosts=iphoneos-arm64e --cmake %cmake  2>&1 | %FileCheck --check-prefix=LLVM-NINJA-TARGETS-APPLY-TO-CROSS-COMPILE-HOSTS-TOO-CHECK %s
+
+# LLVM-NINJA-TARGETS-APPLY-TO-CROSS-COMPILE-HOSTS-TOO-CHECK: cmake --build {{.*}}/llvm-{{[^/]*}} lib/all clangDependencyScanning
+# LLVM-NINJA-TARGETS-APPLY-TO-CROSS-COMPILE-HOSTS-TOO-CHECK: cmake --build {{.*}}/llvm-iphoneos-arm64e {{.*}} lib/all clangDependencyScanning
+
+
+# RUN: %empty-directory(%t)
+# RUN: mkdir -p %t
+# RUN: SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --llvm-ninja-targets="lib/all clangDependencyScanning" --llvm-ninja-targets-for-cross-compile-hosts="bin/clang" --cross-compile-hosts=iphoneos-arm64e --cmake %cmake 2>&1 | %FileCheck --check-prefix=LLVM-NINJA-TARGETS-FOR-CROSS-COMPILE-HOSTS-CHECK %s
+
+# LLVM-NINJA-TARGETS-FOR-CROSS-COMPILE-HOSTS-CHECK: cmake --build {{.*}}/llvm-{{[^/]*}} lib/all clangDependencyScanning
+# LLVM-NINJA-TARGETS-FOR-CROSS-COMPILE-HOSTS-CHECK: cmake --build {{.*}}/llvm-iphoneos-arm64e {{.*}} bin/clang
+
+
+# RUN: %empty-directory(%t)
+# RUN: mkdir -p %t
+# RUN: SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --llvm-ninja-targets-for-cross-compile-hosts="bin/clang" --cross-compile-hosts=iphoneos-arm64e --cmake %cmake 2>&1 | %FileCheck --check-prefix=ONLY-LLVM-NINJA-TARGETS-FOR-CROSS-COMPILE-HOSTS-CHECK %s
+
+# ONLY-LLVM-NINJA-TARGETS-FOR-CROSS-COMPILE-HOSTS-CHECK: cmake --build {{.*}}/llvm-{{[^/]*}} all
+# ONLY-LLVM-NINJA-TARGETS-FOR-CROSS-COMPILE-HOSTS-CHECK: cmake --build {{.*}}/llvm-iphoneos-arm64e {{.*}} bin/clang

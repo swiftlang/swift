@@ -13,19 +13,17 @@
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
 
 using namespace swift;
 
 /// Invoke \p visitor for each reachable block in \p f in worklist order (at
 /// least one predecessor has been visited).
-bool ReachableBlocks::visit(SILFunction *f,
-                            function_ref<bool(SILBasicBlock *)> visitor) {
-  assert(visited.empty() && "blocks already visited");
-
+bool ReachableBlocks::visit(function_ref<bool(SILBasicBlock *)> visitor) {
   // Walk over the CFG, starting at the entry block, until all reachable blocks
   // are visited.
-  SILBasicBlock *entryBB = f->getEntryBlock();
+  SILBasicBlock *entryBB = visited.getFunction()->getEntryBlock();
   SmallVector<SILBasicBlock *, 8> worklist = {entryBB};
   visited.insert(entryBB);
   while (!worklist.empty()) {
@@ -34,7 +32,7 @@ bool ReachableBlocks::visit(SILFunction *f,
       return false;
 
     for (auto &succ : bb->getSuccessors()) {
-      if (visited.insert(succ).second)
+      if (visited.insert(succ))
         worklist.push_back(succ);
     }
   }
@@ -44,6 +42,13 @@ bool ReachableBlocks::visit(SILFunction *f,
 /// Remove all instructions in the body of \p bb in safe manner by using
 /// undef.
 void swift::clearBlockBody(SILBasicBlock *bb) {
+
+  for (SILArgument *arg : bb->getArguments()) {
+    arg->replaceAllUsesWithUndef();
+    // To appease the ownership verifier, just set to None.
+    arg->setOwnershipKind(OwnershipKind::None);
+  }
+
   // Instructions in the dead block may be used by other dead blocks.  Replace
   // any uses of them with undef values.
   while (!bb->empty()) {
@@ -66,9 +71,9 @@ void swift::removeDeadBlock(SILBasicBlock *bb) {
 }
 
 bool swift::removeUnreachableBlocks(SILFunction &f) {
-  ReachableBlocks reachable;
+  ReachableBlocks reachable(&f);
   // Visit all the blocks without doing any extra work.
-  reachable.visit(&f, [](SILBasicBlock *) { return true; });
+  reachable.visit([](SILBasicBlock *) { return true; });
 
   // Remove the blocks we never reached. Assume the entry block is visited.
   // Reachable's visited set contains dangling pointers during this loop.
@@ -83,7 +88,99 @@ bool swift::removeUnreachableBlocks(SILFunction &f) {
   return changed;
 }
 
-void BasicBlockCloner::updateSSAAfterCloning() {
+//===----------------------------------------------------------------------===//
+//                             BasicBlock Cloning
+//===----------------------------------------------------------------------===//
+
+// Return true if a guaranteed terminator result can be borrowed such that the
+// nested borrow scope covers all its uses.
+static bool canBorrowGuaranteedResult(SILValue guaranteedResult) {
+  if (guaranteedResult.getOwnershipKind() != OwnershipKind::Guaranteed) {
+    // Either this terminator forwards an owned value, or it is some legal
+    // conversion to a non-guaranteed value. Either way, not interesting.
+    return true;
+  }
+  SmallVector<Operand *, 16> usePoints;
+  return findInnerTransitiveGuaranteedUses(guaranteedResult, usePoints);
+}
+
+bool swift::canCloneTerminator(TermInst *termInst) {
+  // TODO: this is an awkward way to check for guaranteed terminator results.
+  for (Operand &oper : termInst->getAllOperands()) {
+    if (oper.getOperandOwnership() != OperandOwnership::ForwardingBorrow)
+      continue;
+
+    if (!ForwardingOperand(&oper).visitForwardedValues(
+          [&](SILValue termResult) {
+            return canBorrowGuaranteedResult(termResult);
+          })) {
+        return false;
+    }
+  }
+  return true;
+}
+
+/// Given a terminator result, either from the original or the cloned block,
+/// update OSSA for any phis created for the result during edge splitting.
+void BasicBlockCloner::updateOSSATerminatorResult(SILPhiArgument *termResult) {
+  assert(termResult->isTerminatorResult() && "precondition");
+
+  // If the terminator result is used by a phi, then it is invalid OSSA
+  // which was created by edge splitting.
+  for (Operand *termUse : termResult->getUses()) {
+    if (auto phiOper = PhiOperand(termUse)) {
+      createBorrowScopeForPhiOperands(phiOper.getValue());
+    }
+  }
+}
+
+// Cloning does not invalidate ownership lifetime. When it clones values, it
+// also either clones the consumes, or creates the necessary phis that consume
+// the new values on all paths.  However, cloning may create new phis of
+// inner guaranteed values. Since phis are reborrows, they are only allowed to
+// use BorrowedValues. Therefore, we must create nested borrow scopes for any
+// new phis whose arguments aren't BorrowedValues. Note that other newly created
+// phis are themselves BorrowedValues, so only one level of nested borrow is
+// needed per value, per new phi that the value reaches.
+void BasicBlockCloner::updateOSSAAfterCloning() {
+  SmallVector<SILPhiArgument *, 4> updateSSAPhis;
+  if (!origBB->getParent()->hasOwnership()) {
+    updateSSAAfterCloning(updateSSAPhis);
+    return;
+  }
+
+  // If the original basic block has terminator results, then all phis in the
+  // exit blocks are new phis that used to be terminator results.
+  //
+  // Create nested borrow scopes for terminator results that were converted to
+  // phis during edge splitting. This is simpler to check before SSA update.
+  //
+  // This assumes that the phis introduced by update-SSA below cannot be users
+  // of the phis that were created in exitBBs during block cloning. Otherwise
+  // borrowPhiArguments would handle them twice.
+  auto *termInst = origBB->getTerminator();
+  // FIXME: cond_br args should not exist in OSSA
+  if (!isa<BranchInst>(termInst) && !isa<CondBranchInst>(termInst)) {
+    // Update all of the terminator results.
+    for (auto *succBB : origBB->getSuccessorBlocks()) {
+      for (SILArgument *termResult : succBB->getArguments()) {
+        updateOSSATerminatorResult(cast<SILPhiArgument>(termResult));
+      }
+    }
+  }
+
+  // Update SSA form before calling OSSA update utilities to maintain a layering
+  // of SIL invariants.
+  updateSSAAfterCloning(updateSSAPhis);
+
+  // Create nested borrow scopes for phis created during SSA update.
+  for (auto *phi : updateSSAPhis) {
+    createBorrowScopeForPhiOperands(phi);
+  }
+}
+
+void BasicBlockCloner::updateSSAAfterCloning(
+    SmallVectorImpl<SILPhiArgument *> &newPhis) {
   // All instructions should have been checked by canCloneInstruction. But we
   // still need to check the arguments.
   for (auto arg : origBB->getArguments()) {
@@ -94,9 +191,9 @@ void BasicBlockCloner::updateSSAAfterCloning() {
   if (!needsSSAUpdate)
     return;
 
-  SILSSAUpdater ssaUpdater;
+  SILSSAUpdater ssaUpdater(&newPhis);
   for (auto availValPair : availVals) {
-    ValueBase *inst = availValPair.first;
+    auto inst = availValPair.first;
     if (inst->use_empty())
       continue;
 
@@ -107,7 +204,7 @@ void BasicBlockCloner::updateSSAAfterCloning() {
     for (auto *use : inst->getUses())
       useList.push_back(UseWrapper(use));
 
-    ssaUpdater.initialize(inst->getType());
+    ssaUpdater.initialize(inst->getType(), inst.getOwnershipKind());
     ssaUpdater.addAvailableValue(origBB, inst);
     ssaUpdater.addAvailableValue(getNewBB(), newResult);
 
@@ -129,28 +226,6 @@ void BasicBlockCloner::updateSSAAfterCloning() {
   }
 }
 
-// FIXME: Remove this. SILCloner should not create critical edges.
-bool BasicBlockCloner::splitCriticalEdges(DominanceInfo *domInfo,
-                                          SILLoopInfo *loopInfo) {
-  bool changed = false;
-  // Remove any critical edges that the EdgeThreadingCloner may have
-  // accidentally created.
-  for (unsigned succIdx = 0, succEnd = origBB->getSuccessors().size();
-       succIdx != succEnd; ++succIdx) {
-    if (nullptr
-        != splitCriticalEdge(origBB->getTerminator(), succIdx, domInfo,
-                             loopInfo))
-      changed |= true;
-  }
-  for (unsigned succIdx = 0, succEnd = getNewBB()->getSuccessors().size();
-       succIdx != succEnd; ++succIdx) {
-    auto *newBB = splitCriticalEdge(getNewBB()->getTerminator(), succIdx,
-                                    domInfo, loopInfo);
-    changed |= (newBB != nullptr);
-  }
-  return changed;
-}
-
 void BasicBlockCloner::sinkAddressProjections() {
   // Because the address projections chains will be disjoint (an instruction
   // in one chain cannot use the result of an instruction in another chain),
@@ -169,7 +244,7 @@ void BasicBlockCloner::sinkAddressProjections() {
     deleter.trackIfDead(&*ii);
     ii = nextII;
   }
-  deleter.cleanUpDeadInstructions();
+  deleter.cleanupDeadInstructions();
 }
 
 // Populate 'projections' with the chain of address projections leading
@@ -267,10 +342,19 @@ bool SinkAddressProjections::cloneProjections() {
   return true;
 }
 
-void StaticInitCloner::add(SILInstruction *initVal) {
+bool StaticInitCloner::add(SILInstruction *initVal) {
   // Don't schedule an instruction twice for cloning.
   if (numOpsToClone.count(initVal) != 0)
-    return;
+    return true;
+
+  if (auto *funcRef = dyn_cast<FunctionRefInst>(initVal)) {
+    // We cannot inline non-public functions into functions which are serialized.
+    if (!getBuilder().isInsertingIntoGlobal() &&
+        getBuilder().getFunction().isSerialized() &&
+        !funcRef->getReferencedFunction()->hasValidLinkageForFragileRef()) {
+      return false;
+    }
+  }
 
   ArrayRef<Operand> operands = initVal->getAllOperands();
   numOpsToClone[initVal] = operands.size();
@@ -281,9 +365,11 @@ void StaticInitCloner::add(SILInstruction *initVal) {
   } else {
     // Recursively add all operands.
     for (const Operand &operand : operands) {
-      add(cast<SingleValueInstruction>(operand.get()));
+      if (!add(cast<SingleValueInstruction>(operand.get())))
+        return false;
     }
   }
+  return true;
 }
 
 SingleValueInstruction *

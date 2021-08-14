@@ -13,11 +13,15 @@
 #ifndef SWIFT_AST_RAW_COMMENT_H
 #define SWIFT_AST_RAW_COMMENT_H
 
-#include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
-#include "swift/Basic/SourceManager.h"
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/StringRef.h"
 
 namespace swift {
+
+class SourceFile;
+class SourceManager;
+
 struct SingleRawComment {
   enum class CommentKind {
     OrdinaryLine,  ///< Any normal // comments
@@ -30,12 +34,10 @@ struct SingleRawComment {
   StringRef RawText;
 
   unsigned Kind : 8;
-  unsigned StartColumn : 16;
-  unsigned StartLine;
-  unsigned EndLine;
+  unsigned ColumnIndent : 16;
 
   SingleRawComment(CharSourceRange Range, const SourceManager &SourceMgr);
-  SingleRawComment(StringRef RawText, unsigned StartColumn);
+  SingleRawComment(StringRef RawText, unsigned ColumnIndent);
 
   SingleRawComment(const SingleRawComment &) = default;
   SingleRawComment &operator=(const SingleRawComment &) = default;
@@ -76,20 +78,6 @@ struct CommentInfo {
   RawComment Raw;
   uint32_t Group;
   uint32_t SourceOrder;
-};
-
-struct LineColumn {
-  uint32_t Line = 0;
-  uint32_t Column = 0;
-  bool isValid() const { return Line && Column; }
-};
-
-struct BasicDeclLocs {
-  StringRef SourceFilePath;
-  SmallVector<std::pair<LineColumn, uint32_t>, 4> DocRanges;
-  LineColumn Loc;
-  LineColumn StartLoc;
-  LineColumn EndLoc;
 };
 
 } // namespace swift

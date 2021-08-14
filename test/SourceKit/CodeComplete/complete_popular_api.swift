@@ -77,13 +77,13 @@ struct OuterNominal {
 // POPULAR_STMT_0-LABEL: Results for filterText: [
 // POPULAR_STMT_0:   argColor
 // POPULAR_STMT_0:   localColor
+// POPULAR_STMT_0:   good()
 // POPULAR_STMT_0:   fromDerivedColor
 // POPULAR_STMT_0:   fromSuperColor
-// POPULAR_STMT_0:   good()
-// POPULAR_STMT_0:   fromOuterNominalColor
 // POPULAR_STMT_0:   DDModuleColor
-// POPULAR_STMT_0:   CCModuleColor
 // POPULAR_STMT_0:   EEModuleColor
+// POPULAR_STMT_0:   CCModuleColor
+// POPULAR_STMT_0:   fromOuterNominalColor
 // POPULAR_STMT_0:   globalColor
 // POPULAR_STMT_0:   okay()
 // POPULAR_STMT_0:   ModuleCollaborate
@@ -94,11 +94,11 @@ struct OuterNominal {
 // POPULAR_STMT_0:   localColor
 // POPULAR_STMT_0:   fromDerivedColor
 // POPULAR_STMT_0:   fromSuperColor
+// POPULAR_STMT_0:   DDModuleColor
+// POPULAR_STMT_0:   EEModuleColor
+// POPULAR_STMT_0:   CCModuleColor
 // POPULAR_STMT_0:   fromOuterNominalColor
 // POPULAR_STMT_0:   globalColor
-// POPULAR_STMT_0:   DDModuleColor
-// POPULAR_STMT_0:   CCModuleColor
-// POPULAR_STMT_0:   EEModuleColor
 // POPULAR_STMT_0:   ModuleCollaborate
 // POPULAR_STMT_0:   BBModuleColor
 // POPULAR_STMT_0:   AAModuleColor

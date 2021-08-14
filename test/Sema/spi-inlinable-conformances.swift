@@ -67,7 +67,7 @@ public struct NormalProtoAssocHolder<T: NormalProto> {
   _ = x
   // FIXME: We get this error twice: once for the TypeExpr and once for the implicit init.
   _ = NormalProtoAssocHolder<NormalStruct>() // expected-error 2 {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; the conformance is declared as SPI}}
-  _ = NormalProtoAssocHolder(nil as NormalStruct?) // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; the conformance is declared as SPI}}
+  _ = NormalProtoAssocHolder(nil as NormalStruct?) // expected-error 2{{cannot use conformance of 'NormalStruct' to 'NormalProto' here; the conformance is declared as SPI}}
 }
 
 @_spi(AcceptInSPI)

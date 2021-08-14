@@ -99,7 +99,7 @@ createAvailableAttr(PlatformKind Platform,
   return new (Context) AvailableAttr(
       SourceLoc(), SourceRange(), Platform,
       /*Message=*/StringRef(),
-      /*Rename=*/StringRef(),
+      /*Rename=*/StringRef(), /*RenameDecl=*/nullptr,
         Introduced, /*IntroducedRange=*/SourceRange(),
         Deprecated, /*DeprecatedRange=*/SourceRange(),
         Obsoleted, /*ObsoletedRange=*/SourceRange(),
@@ -144,13 +144,8 @@ static bool isBetterThan(const AvailableAttr *newAttr,
     return true;
 
   // If they belong to the same platform, the one that introduces later wins.
-  if (prevAttr->Platform == newAttr->Platform) {
-    if (newAttr->isUnconditionallyUnavailable())
-      return true;
-    if (prevAttr->isUnconditionallyUnavailable())
-      return false;
+  if (prevAttr->Platform == newAttr->Platform)
     return prevAttr->Introduced.getValue() < newAttr->Introduced.getValue();
-  }
 
   // If the new attribute's platform inherits from the old one, it wins.
   return inheritsAvailabilityFromPlatform(newAttr->Platform,
@@ -163,12 +158,10 @@ AvailabilityInference::annotatedAvailableRange(const Decl *D, ASTContext &Ctx) {
 
   for (auto Attr : D->getAttrs()) {
     auto *AvailAttr = dyn_cast<AvailableAttr>(Attr);
-    if (AvailAttr == nullptr ||
+    if (AvailAttr == nullptr || !AvailAttr->Introduced.hasValue() ||
         !AvailAttr->isActivePlatform(Ctx) ||
         AvailAttr->isLanguageVersionSpecific() ||
-        AvailAttr->isPackageDescriptionVersionSpecific() ||
-        (!AvailAttr->Introduced.hasValue() &&
-         !AvailAttr->isUnconditionallyUnavailable())) {
+        AvailAttr->isPackageDescriptionVersionSpecific()) {
       continue;
     }
 
@@ -178,9 +171,6 @@ AvailabilityInference::annotatedAvailableRange(const Decl *D, ASTContext &Ctx) {
 
   if (!bestAvailAttr)
     return None;
-
-  if (bestAvailAttr->isUnconditionallyUnavailable())
-      return AvailabilityContext(VersionRange::empty());
 
   return AvailabilityContext{
     VersionRange::allGTE(bestAvailAttr->Introduced.getValue())};
@@ -269,6 +259,9 @@ AvailabilityContext ASTContext::getSwift50Availability() {
     return AvailabilityContext(
                             VersionRange::allGTE(llvm::VersionTuple(12,2)));
   } else if (target.isWatchOS()) {
+    if (target.getArch() == llvm::Triple::ArchType::x86_64)
+      return AvailabilityContext::alwaysAvailable();
+
     return AvailabilityContext(
                             VersionRange::allGTE(llvm::VersionTuple(5,2)));
   } else {
@@ -334,7 +327,19 @@ ASTContext::getIntermodulePrespecializedGenericMetadataAvailability() {
 }
 
 AvailabilityContext ASTContext::getConcurrencyAvailability() {
+  return getSwift55Availability();
+}
+
+AvailabilityContext ASTContext::getDifferentiationAvailability() {
   return getSwiftFutureAvailability();
+}
+
+AvailabilityContext ASTContext::getMultiPayloadEnumTagSinglePayload() {
+  return getSwift56Availability();
+}
+
+AvailabilityContext ASTContext::getObjCIsUniquelyReferencedAvailability() {
+  return getSwift56Availability();
 }
 
 AvailabilityContext ASTContext::getSwift52Availability() {
@@ -399,6 +404,40 @@ AvailabilityContext ASTContext::getSwift53Availability() {
 }
 
 AvailabilityContext ASTContext::getSwift54Availability() {
+  auto target = LangOpts.Target;
+
+  if (target.isMacOSX()) {
+    return AvailabilityContext(
+        VersionRange::allGTE(llvm::VersionTuple(11, 3, 0)));
+  } else if (target.isiOS()) {
+    return AvailabilityContext(
+        VersionRange::allGTE(llvm::VersionTuple(14, 5, 0)));
+  } else if (target.isWatchOS()) {
+    return AvailabilityContext(
+        VersionRange::allGTE(llvm::VersionTuple(7, 4, 0)));
+  } else {
+    return AvailabilityContext::alwaysAvailable();
+  }
+}
+
+AvailabilityContext ASTContext::getSwift55Availability() {
+  auto target = LangOpts.Target;
+
+  if (target.isMacOSX() ) {
+    return AvailabilityContext(
+        VersionRange::allGTE(llvm::VersionTuple(12, 0, 0)));
+  } else if (target.isiOS()) {
+    return AvailabilityContext(
+        VersionRange::allGTE(llvm::VersionTuple(15, 0, 0)));
+  } else if (target.isWatchOS()) {
+    return AvailabilityContext(
+        VersionRange::allGTE(llvm::VersionTuple(8, 0, 0)));
+  } else {
+    return AvailabilityContext::alwaysAvailable();
+  }
+}
+
+AvailabilityContext ASTContext::getSwift56Availability() {
   return getSwiftFutureAvailability();
 }
 

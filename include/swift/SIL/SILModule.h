@@ -21,6 +21,7 @@
 #include "swift/AST/Builtins.h"
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/SILOptions.h"
+#include "swift/Basic/IndexTrie.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/ProfileCounter.h"
 #include "swift/Basic/Range.h"
@@ -55,6 +56,48 @@ class Output;
 } // end namespace llvm
 
 namespace swift {
+
+/// The payload for the FixedSizeSlab.
+/// This is a super-class rather than a member of FixedSizeSlab to make bridging
+/// with libswift easier.
+class FixedSizeSlabPayload {
+public:
+  /// The capacity of the payload.
+  static constexpr size_t capacity = 64 * sizeof(uintptr_t);
+
+private:
+  friend class SILModule;
+
+  /// The magic number which is stored in overflowGuard.
+  static constexpr uintptr_t magicNumber = (uintptr_t)0xdeadbeafdeadbeafull;
+
+  /// The payload.
+  char data[capacity];
+  
+  /// Used for a cheap buffer overflow check - in the spirit of libgmalloc.
+  uintptr_t overflowGuard = magicNumber;
+
+public:
+  void operator=(const FixedSizeSlabPayload &) = delete;
+  void operator delete(void *Ptr, size_t) = delete;
+
+  /// Returns the payload pointing to \p T.
+  template<typename T> T *dataFor() { return (T *)(&data[0]); }
+
+  /// Returns the payload pointing to const \p T
+  template<typename T> const T *dataFor() const { return (const T *)(&data[0]); }
+};
+
+/// A fixed size slab of memory, which can be allocated and freed by the
+/// SILModule at (basically) zero cost.
+/// See SILModule::allocSlab().
+class FixedSizeSlab : public llvm::ilist_node<FixedSizeSlab>,
+                      public SILAllocated<FixedSizeSlab>,
+                      public FixedSizeSlabPayload {
+public:
+  void operator=(const FixedSizeSlab &) = delete;
+  void operator delete(void *Ptr, size_t) = delete;
+};
 
 class AnyFunctionType;
 class ASTContext;
@@ -128,6 +171,7 @@ public:
   };
 
   using ActionCallback = std::function<void()>;
+  using SlabList = llvm::simple_ilist<FixedSizeSlab>;
 
 private:
   friend KeyPathPattern;
@@ -149,6 +193,23 @@ private:
 
   /// Allocator that manages the memory of all the pieces of the SILModule.
   mutable llvm::BumpPtrAllocator BPA;
+
+  /// The list of freed slabs, which can be reused.
+  SlabList freeSlabs;
+  
+  /// For consistency checking.
+  size_t numAllocatedSlabs = 0;
+
+  /// When an instruction is "deleted" from the SIL, it is put into this list.
+  /// The instructions in this list are eventually deleted for real in
+  /// flushDeletedInsts(), which is called by the pass manager after each pass
+  /// run.
+  /// In other words: instruction deletion is deferred to the end of a pass.
+  ///
+  /// This avoids dangling instruction pointers within the run of a pass and in
+  /// analysis caches. Note that the analysis invalidation mechanism ensures
+  /// that analysis caches are invalidated before flushDeletedInsts().
+  llvm::iplist<SILInstruction> scheduledForDeletion;
 
   /// The swift Module associated with this SILModule.
   ModuleDecl *TheSwiftModule;
@@ -237,7 +298,7 @@ private:
   llvm::DenseMap<Identifier, BuiltinInfo> BuiltinIDCache;
 
   /// This is the set of undef values we've created, for uniquing purposes.
-  llvm::DenseMap<std::pair<SILType, unsigned>, SILUndef *> UndefValues;
+  llvm::DenseMap<SILType, SILUndef *> UndefValues;
 
   /// The stage of processing this module is at.
   SILStage Stage;
@@ -255,6 +316,26 @@ private:
 
   /// The indexed profile data to be used for PGO, or nullptr.
   std::unique_ptr<llvm::IndexedInstrProfReader> PGOReader;
+
+  /// A trie of integer indices that gives pointer identity to a path of
+  /// projections, shared between all functions in the module.
+  std::unique_ptr<IndexTrieNode> indexTrieRoot;
+
+  /// A mapping from opened archetypes to the instructions which define them.
+  ///
+  /// The value is either a SingleValueInstrution or a PlaceholderValue, in case
+  /// an opened-archetype definition is lookedup during parsing or deserializing
+  /// SIL, where opened archetypes can be forward referenced.
+  ///
+  /// In theory we wouldn't need to have the SILFunction in the key, because
+  /// opened archetypes _should_ be unique across the module. But currently
+  /// in some rare cases SILGen re-uses the same opened archetype for multiple
+  /// functions.
+  using OpenedArchetypeKey = std::pair<ArchetypeType*, SILFunction*>;
+  llvm::DenseMap<OpenedArchetypeKey, SILValue> openedArchetypeDefs;
+
+  /// The number of PlaceholderValues in openedArchetypeDefs.
+  int numUnresolvedOpenedArchetypes = 0;
 
   /// The options passed into this SILModule.
   const SILOptions &Options;
@@ -274,10 +355,6 @@ private:
 
   /// Action to be executed for serializing the SILModule.
   ActionCallback SerializeSILAction;
-
-  /// A list of clients that need to be notified when an instruction
-  /// invalidation message is sent.
-  llvm::SetVector<DeleteNotificationHandler*> NotificationHandlers;
 
   SILModule(llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
             Lowering::TypeConverter &TC, const SILOptions &Options);
@@ -323,15 +400,36 @@ public:
     regDeserializationNotificationHandlerForAllFuncOME = true;
   }
 
-  /// Add a delete notification handler \p Handler to the module context.
-  void registerDeleteNotificationHandler(DeleteNotificationHandler* Handler);
+  /// Returns the instruction which defines an opened archetype, e.g. an
+  /// open_existential_addr.
+  ///
+  /// In case the opened archetype is not defined yet (e.g. during parsing or
+  /// deserilization), a PlaceholderValue is returned. This should not be the
+  /// case outside of parsing or deserialization.
+  SILValue getOpenedArchetypeDef(CanArchetypeType archetype,
+                                 SILFunction *inFunction);
 
-  /// Remove the delete notification handler \p Handler from the module context.
-  void removeDeleteNotificationHandler(DeleteNotificationHandler* Handler);
+  /// Returns the instruction which defines an opened archetype, e.g. an
+  /// open_existential_addr.
+  ///
+  /// In contrast to getOpenedArchetypeDef, it is required that all opened
+  /// archetypes are resolved.
+  SingleValueInstruction *getOpenedArchetypeInst(CanArchetypeType archetype,
+                                                 SILFunction *inFunction) {
+    return cast<SingleValueInstruction>(getOpenedArchetypeDef(archetype,
+                                                              inFunction));
+  }
 
-  /// Send the invalidation message that \p V is being deleted to all
-  /// registered handlers. The order of handlers is deterministic but arbitrary.
-  void notifyDeleteHandlers(SILNode *node);
+  /// Returns true if there are unresolved opened archetypes in the module.
+  ///
+  /// This should only be the case during parsing or deserialization.
+  bool hasUnresolvedOpenedArchetypeDefinitions();
+
+  /// Called by SILBuilder whenever a new instruction is created and inserted.
+  void notifyAddedInstruction(SILInstruction *inst);
+
+  /// Called after an instruction is moved from one function to another.
+  void notifyMovedInstruction(SILInstruction *inst, SILFunction *fromFunction);
 
   /// Set a serialization action.
   void setSerializeSILAction(ActionCallback SerializeSILAction);
@@ -655,6 +753,8 @@ public:
     PGOReader = std::move(IPR);
   }
 
+  IndexTrieNode *getIndexTrieRoot() { return indexTrieRoot.get(); }
+
   /// Can value operations (copies and destroys) on the given lowered type
   /// be performed in this module?
   bool isTypeABIAccessible(SILType type,
@@ -726,6 +826,22 @@ public:
     return static_cast<T *>(allocate(sizeof(T) * Count, alignof(T)));
   }
 
+  /// Allocates a slab of memory.
+  ///
+  /// This has (almost) zero cost, because for the first time, the allocation is
+  /// done with the BPA.
+  /// Subsequent allocations are reusing the already freed slabs.
+  FixedSizeSlab *allocSlab();
+  
+  /// Frees a slab.
+  ///
+  /// This has (almost) zero cost, because the slab is just put into the
+  /// freeSlabs list.
+  void freeSlab(FixedSizeSlab *slab);
+  
+  /// Frees all slabs of a list.
+  void freeAllSlabs(SlabList &slabs);
+
   template <typename T>
   MutableArrayRef<T> allocateCopy(ArrayRef<T> Array) const {
     MutableArrayRef<T> result(allocate<T>(Array.size()), Array.size());
@@ -741,8 +857,17 @@ public:
   /// Allocate memory for an instruction using the module's internal allocator.
   void *allocateInst(unsigned Size, unsigned Align) const;
 
-  /// Deallocate memory of an instruction.
-  void deallocateInst(SILInstruction *I);
+  /// Called before \p I is removed from its basic block and scheduled for
+  /// deletion.
+  void willDeleteInstruction(SILInstruction *I);
+
+  /// Schedules the (already removed) instruction \p I for deletion.
+  /// See scheduledForDeletion for details.
+  void scheduleForDeletion(SILInstruction *I);
+
+  /// Deletes all scheuled instructions for real.
+  /// See scheduledForDeletion for details.
+  void flushDeletedInsts();
 
   /// Looks up the llvm intrinsic ID and type for the builtin function.
   ///

@@ -34,6 +34,38 @@ public func withLeakChecking(
     file: file, line: line)
 }
 
+@inlinable
+@_semantics("autodiff.nonvarying")
+public func withoutDerivative<T, R>(at x: T, in body: (T) -> R) -> R
+{
+  body(x)
+}
+
+public extension Differentiable {
+  /// Applies the given closure to the derivative of `self`.
+  ///
+  /// Returns `self` like an identity function. When the return value is used in
+  /// a context where it is differentiated with respect to, applies the given
+  /// closure to the derivative of the return value.
+  @inlinable
+  @differentiable(reverse, wrt: self)
+  func withDerivative(_ body: @escaping (inout TangentVector) -> Void) -> Self {
+    return self
+  }
+
+  @inlinable
+  @derivative(of: withDerivative)
+  internal func _vjpWithDerivative(
+    _ body: @escaping (inout TangentVector) -> Void
+  ) -> (value: Self, pullback: (TangentVector) -> TangentVector) {
+    return (self, { grad in
+      var grad = grad
+      body(&grad)
+      return grad
+    })
+  }
+}
+
 public extension TestSuite {
   /// Execute test function and check expected leak count.
   func testWithLeakChecking(
@@ -68,12 +100,12 @@ public struct Tracked<T> {
   }
   internal var handle: Box
 
-  @differentiable(where T: Differentiable, T == T.TangentVector)
+  @differentiable(reverse where T: Differentiable, T == T.TangentVector)
   public init(_ value: T) {
     self.handle = Box(value)
   }
 
-  @differentiable(where T: Differentiable, T == T.TangentVector)
+  @differentiable(reverse where T: Differentiable, T == T.TangentVector)
   public var value: T {
     get { handle.value }
     set { handle.value = newValue }
@@ -101,12 +133,12 @@ public struct NonresilientTracked<T> {
   @usableFromInline
   internal var handle: Box
 
-  @differentiable(where T: Differentiable, T == T.TangentVector)
+  @differentiable(reverse where T: Differentiable, T == T.TangentVector)
   public init(_ value: T) {
     self.handle = Box(value)
   }
 
-  @differentiable(where T: Differentiable, T == T.TangentVector)
+  @differentiable(reverse where T: Differentiable, T == T.TangentVector)
   public var value: T {
     get { handle.value }
     set { handle.value = newValue }
@@ -164,8 +196,7 @@ extension ${Self}: Equatable where T: Equatable {
   }
 }
 
-extension ${Self}: SignedNumeric & Numeric
-where T: SignedNumeric, T == T.Magnitude {
+extension ${Self}: Numeric where T: Numeric {
   public typealias Magnitude = ${Self}<T.Magnitude>
 
   public init?<U>(exactly source: U) where U: BinaryInteger {
@@ -182,6 +213,12 @@ where T: SignedNumeric, T == T.Magnitude {
 
   public static func *= (lhs: inout ${Self}, rhs: ${Self}) {
     lhs = lhs * rhs
+  }
+}
+
+extension ${Self}: SignedNumeric where T: SignedNumeric, T == T.Magnitude {
+  public prefix static func - (operand: ${Self}) -> ${Self} {
+    ${Self}(-operand.value)
   }
 }
 
@@ -325,41 +362,41 @@ where T: Differentiable & FloatingPoint, T == T.TangentVector {
 // Differential operators for `${Self}<T>`.
 
 public func gradient<T, R: FloatingPoint>(
-  at x: T, in f: @differentiable (T) -> ${Self}<R>
+  at x: T, of f: @differentiable(reverse) (T) -> ${Self}<R>
 ) -> T.TangentVector where R.TangentVector == R {
-  return pullback(at: x, in: f)(1)
+  return pullback(at: x, of: f)(1)
 }
 
 public func gradient<T, U, R: FloatingPoint>(
-  at x: T, _ y: U, in f: @differentiable (T, U) -> ${Self}<R>
+  at x: T, _ y: U, of f: @differentiable(reverse) (T, U) -> ${Self}<R>
 ) -> (T.TangentVector, U.TangentVector) where R.TangentVector == R {
-  return pullback(at: x, y, in: f)(1)
+  return pullback(at: x, y, of: f)(1)
 }
 
 public func derivative<T: FloatingPoint, R>(
-  at x: ${Self}<T>, in f: @differentiable (${Self}<T>) -> R
+  at x: ${Self}<T>, of f: @differentiable(reverse) (${Self}<T>) -> R
 ) -> R.TangentVector where T.TangentVector == T {
-  return differential(at: x, in: f)(1)
+  return differential(at: x, of: f)(1)
 }
 
 public func derivative<T: FloatingPoint, U: FloatingPoint, R>(
   at x: ${Self}<T>, _ y: ${Self}<U>,
-  in f: @differentiable (${Self}<T>, ${Self}<U>) -> R
+  of f: @differentiable(reverse) (${Self}<T>, ${Self}<U>) -> R
 ) -> R.TangentVector where T.TangentVector == T, U.TangentVector == U {
-  return differential(at: x, y, in: f)(1, 1)
+  return differential(at: x, y, of: f)(1, 1)
 }
 
 public func valueWithGradient<T, R: FloatingPoint>(
-  at x: T, in f: @differentiable (T) -> ${Self}<R>
+  at x: T, of f: @differentiable(reverse) (T) -> ${Self}<R>
 ) -> (value: ${Self}<R>, gradient: T.TangentVector) {
-  let (y, pullback) = valueWithPullback(at: x, in: f)
+  let (y, pullback) = valueWithPullback(at: x, of: f)
   return (y, pullback(1))
 }
 
 public func valueWithDerivative<T: FloatingPoint, R>(
-  at x: ${Self}<T>, in f: @differentiable (${Self}<T>) -> R
+  at x: ${Self}<T>, of f: @differentiable(reverse) (${Self}<T>) -> R
 ) -> (value: R, derivative: R.TangentVector) {
-  let (y, differential) = valueWithDifferential(at: x, in: f)
+  let (y, differential) = valueWithDifferential(at: x, of: f)
   return (y, differential(1))
 }
 

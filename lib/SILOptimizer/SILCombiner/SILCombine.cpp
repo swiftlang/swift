@@ -19,15 +19,23 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-combine"
+
 #include "SILCombiner.h"
+#include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/SILBridgingUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
+#include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
+#include "swift/SILOptimizer/Analysis/NonLocalAccessBlockAnalysis.h"
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
-#include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/SILOptimizer/PassManager/PassManager.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/CanonicalOSSALifetime.h"
+#include "swift/SILOptimizer/Utils/CanonicalizeBorrowScope.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeInstruction.h"
+#include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/StackNesting.h"
@@ -41,6 +49,17 @@ using namespace swift;
 STATISTIC(NumCombined, "Number of instructions combined");
 STATISTIC(NumDeadInst, "Number of dead insts eliminated");
 
+static llvm::cl::opt<bool> EnableSinkingOwnedForwardingInstToUses(
+    "silcombine-owned-code-sinking",
+    llvm::cl::desc("Enable sinking of owened forwarding insts"),
+    llvm::cl::init(true), llvm::cl::Hidden);
+
+// Allow disabling general optimization for targetted unit tests.
+static llvm::cl::opt<bool> EnableSILCombineCanonicalize(
+    "sil-combine-canonicalize",
+    llvm::cl::desc("Canonicalization during sil-combine"), llvm::cl::init(true),
+    llvm::cl::Hidden);
+
 //===----------------------------------------------------------------------===//
 //                              Utility Methods
 //===----------------------------------------------------------------------===//
@@ -53,17 +72,10 @@ STATISTIC(NumDeadInst, "Number of dead insts eliminated");
 /// worklist (this significantly speeds up SILCombine on code where many
 /// instructions are dead or constant).
 void SILCombiner::addReachableCodeToWorklist(SILBasicBlock *BB) {
-  llvm::SmallVector<SILBasicBlock *, 256> Worklist;
+  BasicBlockWorklist Worklist(BB);
   llvm::SmallVector<SILInstruction *, 128> InstrsForSILCombineWorklist;
-  llvm::SmallPtrSet<SILBasicBlock *, 32> Visited;
 
-  Worklist.push_back(BB);
-  do {
-    BB = Worklist.pop_back_val();
-
-    // We have now visited this block!  If we've already been here, ignore it.
-    if (!Visited.insert(BB).second) continue;
-
+  while (SILBasicBlock *BB = Worklist.pop()) {
     for (SILBasicBlock::iterator BBI = BB->begin(), E = BB->end(); BBI != E; ) {
       SILInstruction *Inst = &*BBI;
       ++BBI;
@@ -90,9 +102,10 @@ void SILCombiner::addReachableCodeToWorklist(SILBasicBlock *BB) {
     }
 
     // Recursively visit successors.
-    for (auto SI = BB->succ_begin(), SE = BB->succ_end(); SI != SE; ++SI)
-      Worklist.push_back(*SI);
-  } while (!Worklist.empty());
+    for (SILBasicBlock *Succ : BB->getSuccessors()) {
+      Worklist.pushIfNotVisited(Succ);
+    }
+  }
 
   // Once we've found all of the instructions to add to the worklist, add them
   // in reverse order. This way SILCombine will visit from the top of the
@@ -112,9 +125,10 @@ class SILCombineCanonicalize final : CanonicalizeInstruction {
   bool changed = false;
 
 public:
-  SILCombineCanonicalize(
-      SmallSILInstructionWorklist<256> &Worklist)
-      : CanonicalizeInstruction(DEBUG_TYPE), Worklist(Worklist) {}
+  SILCombineCanonicalize(SmallSILInstructionWorklist<256> &Worklist,
+                         DeadEndBlocks &deadEndBlocks)
+      : CanonicalizeInstruction(DEBUG_TYPE, deadEndBlocks), Worklist(Worklist) {
+  }
 
   void notifyNewInstruction(SILInstruction *inst) override {
     Worklist.add(inst);
@@ -138,11 +152,153 @@ public:
   }
 
   bool tryCanonicalize(SILInstruction *inst) {
+    if (!EnableSILCombineCanonicalize)
+      return false;
+
     changed = false;
     canonicalize(inst);
     return changed;
   }
 };
+
+bool SILCombiner::trySinkOwnedForwardingInst(SingleValueInstruction *svi) {
+  if (auto *consumingUse = svi->getSingleConsumingUse()) {
+    auto *consumingUser = consumingUse->getUser();
+
+    // If our user is already in the same block, we don't move it further.
+    if (svi->getParent() == consumingUser->getParent())
+      return false;
+
+    // Otherwise, make sure our instruction does not have any non-debug uses
+    // that are non-lifetime ending. If so, we return.
+    if (llvm::any_of(getNonDebugUses(svi),
+                     [](Operand *use) { return !use->isLifetimeEnding(); }))
+      return false;
+
+    // Otherwise, delete all of the debug uses so we don't have to sink them as
+    // well and then return true so we process svi in its new position.
+    deleteAllDebugUses(svi, getInstModCallbacks());
+    svi->moveBefore(consumingUser);
+    MadeChange = true;
+
+    // NOTE: We return false here so that our caller doesn't delete the
+    // instruction and instead tries to simplify it.
+    return false;
+  }
+
+  // If we have multiple consuming uses, then we know that our
+  // forwarding inst must be live out of the current block and thus we
+  // might be able to duplicate/sink.
+  if (llvm::any_of(getNonDebugUses(svi),
+                   [](Operand *use) { return !use->isLifetimeEnding(); }))
+    return false;
+
+  while (!svi->use_empty()) {
+    auto *sviUse = *svi->use_begin();
+    auto *sviUser = sviUse->getUser();
+
+    if (auto *dvi = dyn_cast<DestroyValueInst>(sviUser)) {
+      dvi->setOperand(svi->getOperand(0));
+      Worklist.add(dvi);
+      continue;
+    }
+
+    if (sviUser->isDebugInstruction()) {
+      eraseInstFromFunction(*sviUser);
+      continue;
+    }
+
+    auto *newSVI = svi->clone(sviUser);
+    Worklist.add(newSVI);
+    sviUse->set(newSVI);
+  }
+
+  eraseInstFromFunction(*svi);
+  MadeChange = true;
+  return true;
+}
+
+/// Canonicalize each extended OSSA lifetime that contains an instruction newly
+/// created during this SILCombine iteration.
+void SILCombiner::canonicalizeOSSALifetimes() {
+  if (!enableCopyPropagation || !Builder.hasOwnership())
+    return;
+
+  SmallSetVector<SILValue, 16> defsToCanonicalize;
+  for (auto *trackedInst : *Builder.getTrackingList()) {
+    if (trackedInst->isDeleted())
+      continue;
+
+    if (auto *cvi = dyn_cast<CopyValueInst>(trackedInst)) {
+      SILValue def = CanonicalizeOSSALifetime::getCanonicalCopiedDef(cvi);
+
+      // getCanonicalCopiedDef returns a copy whenever that the copy's source is
+      // guaranteed. In that case, find the root of the borrowed lifetime. If it
+      // is a function argument, then a simple guaranteed canonicalization can
+      // be performed. Canonicalizing other borrow scopes is not handled by
+      // SILCombine because it's not a single-lifetime canonicalization.
+      // Instead, SILCombine treats a copy that uses a borrowed value as a
+      // separate owned live range. Handling the compensation code across the
+      // borrow scope boundary requires post processing in a particular order.
+      // The copy propagation pass knows how to handle that. To avoid complexity
+      // and ensure fast convergence, rewriting borrow scopes should not be
+      // combined with other unrelated transformations.
+      if (auto *copy = dyn_cast<CopyValueInst>(def)) {
+        if (SILValue borrowDef =
+                CanonicalizeBorrowScope::getCanonicalBorrowedDef(
+                    copy->getOperand())) {
+          if (isa<SILFunctionArgument>(borrowDef)) {
+            def = borrowDef;
+          }
+        }
+      }
+      defsToCanonicalize.insert(def);
+    }
+  }
+  if (defsToCanonicalize.empty())
+    return;
+
+  // Remove instructions deleted during canonicalization from SILCombine's
+  // worklist. CanonicalizeOSSALifetime invalidates operands before invoking
+  // the deletion callback.
+  //
+  // Note: a simpler approach would be to drain the Worklist before
+  // canonicalizing OSSA, then callbacks could be completely removed from
+  // CanonicalizeOSSALifetime.
+  auto canonicalizeCallbacks =
+      InstModCallbacks().onDelete([this](SILInstruction *instToDelete) {
+        eraseInstFromFunction(*instToDelete,
+                              false /*do not add operands to the worklist*/);
+      });
+  InstructionDeleter deleter(std::move(canonicalizeCallbacks));
+
+  DominanceInfo *domTree = DA->get(&Builder.getFunction());
+  CanonicalizeOSSALifetime canonicalizer(
+      false /*prune debug*/, false /*poison refs*/, NLABA, domTree, deleter);
+  CanonicalizeBorrowScope borrowCanonicalizer(deleter);
+
+  while (!defsToCanonicalize.empty()) {
+    SILValue def = defsToCanonicalize.pop_back_val();
+    if (auto functionArg = dyn_cast<SILFunctionArgument>(def)) {
+      if (!borrowCanonicalizer.canonicalizeFunctionArgument(functionArg))
+        continue;
+    } else if (!canonicalizer.canonicalizeValueLifetime(def)) {
+      continue;
+    }
+    MadeChange = true;
+
+    // Canonicalization may rewrite many copies and destroys within a single
+    // extended lifetime, but the extended lifetime of each canonical def is
+    // non-overlapping. If def was successfully canonicalized, simply add it
+    // and its users to the SILCombine worklist.
+    if (auto *inst = def->getDefiningInstruction()) {
+      Worklist.add(inst);
+    }
+    for (auto *use : def->getUses()) {
+      Worklist.add(use->getUser());
+    }
+  }
+}
 
 bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
   MadeChange = false;
@@ -153,7 +309,7 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
   // Add reachable instructions to our worklist.
   addReachableCodeToWorklist(&*F.begin());
 
-  SILCombineCanonicalize scCanonicalize(Worklist);
+  SILCombineCanonicalize scCanonicalize(Worklist, deadEndBlocks);
 
   // Process until we run out of items in our worklist.
   while (!Worklist.isEmpty()) {
@@ -183,7 +339,31 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
     }
 
     // If we have reached this point, all attempts to do simple simplifications
-    // have failed. Prepare to SILCombine.
+    // have failed. First if we have an owned forwarding value, we try to
+    // sink. Otherwise, we perform the actual SILCombine operation.
+    if (EnableSinkingOwnedForwardingInstToUses) {
+      // If we have an ownership forwarding single value inst that forwards
+      // through its first argument and it is trivially duplicatable, see if it
+      // only has consuming uses. If so, we can duplicate the instruction into
+      // the consuming use blocks and destroy any destroy_value uses of it that
+      // we see. This makes it easier for SILCombine to fold instructions with
+      // owned paramaters since chains of these values will be in the same
+      // block.
+      if (auto *svi = dyn_cast<SingleValueInstruction>(I)) {
+        if ((isa<FirstArgOwnershipForwardingSingleValueInst>(svi) ||
+             isa<OwnershipForwardingConversionInst>(svi)) &&
+            SILValue(svi).getOwnershipKind() == OwnershipKind::Owned) {
+          // Try to sink the value. If we sank the value and deleted it,
+          // continue. If we didn't optimize or sank but we are still able to
+          // optimize further, we fall through to SILCombine below.
+          if (trySinkOwnedForwardingInst(svi)) {
+            continue;
+          }
+        }
+      }
+    }
+
+    // Then begin... SILCombine.
     Builder.setInsertionPoint(I);
 
 #ifndef NDEBUG
@@ -205,17 +385,22 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
       MadeChange = true;
     }
 
-    // Our tracking list has been accumulating instructions created by the
-    // SILBuilder during this iteration. Go through the tracking list and add
-    // its contents to the worklist and then clear said list in preparation for
-    // the next iteration.
-    auto &TrackingList = *Builder.getTrackingList();
-    for (SILInstruction *I : TrackingList) {
-      LLVM_DEBUG(llvm::dbgs() << "SC: add " << *I
-                              << " from tracking list to worklist\n");
-      Worklist.add(I);
+    // Eliminate copies created that this SILCombine iteration may have
+    // introduced during OSSA-RAUW.
+    canonicalizeOSSALifetimes();
+
+    // Builder's tracking list has been accumulating instructions created by the
+    // during this SILCombine iteration. To finish this iteration, go through
+    // the tracking list and add its contents to the worklist and then clear
+    // said list in preparation for the next iteration.
+    for (SILInstruction *I : *Builder.getTrackingList()) {
+      if (!I->isDeleted()) {
+        LLVM_DEBUG(llvm::dbgs()
+                   << "SC: add " << *I << " from tracking list to worklist\n");
+        Worklist.add(I);
+      }
     }
-    TrackingList.clear();
+    Builder.getTrackingList()->clear();
   }
 
   Worklist.resetChecked();
@@ -233,7 +418,7 @@ bool SILCombiner::runOnFunction(SILFunction &F) {
   }
 
   if (invalidatedStackNesting) {
-    StackNesting().correctStackNesting(&F);
+    StackNesting::fixNesting(&F);
   }
 
   // Cleanup the builder and return whether or not we made any changes.
@@ -249,6 +434,56 @@ void SILCombiner::eraseInstIncludingUsers(SILInstruction *inst) {
   eraseInstFromFunction(*inst);
 }
 
+/// Runs an instruction pass in libswift.
+void SILCombiner::runSwiftInstructionPass(SILInstruction *inst,
+                              void (*runFunction)(BridgedInstructionPassCtxt)) {
+  Worklist.setLibswiftPassInvocation(&libswiftPassInvocation);
+  runFunction({ {inst->asSILNode()}, {&libswiftPassInvocation} });
+  Worklist.setLibswiftPassInvocation(nullptr);
+  libswiftPassInvocation.finishedPassRun();
+}
+
+/// Registered briged instruction pass run functions.
+static llvm::StringMap<BridgedInstructionPassRunFn> libswiftInstPasses;
+static bool passesRegistered = false;
+
+// Called from libswift's initializeLibSwift().
+void SILCombine_registerInstructionPass(BridgedStringRef name,
+                                        BridgedInstructionPassRunFn runFn) {
+  libswiftInstPasses[getStringRef(name)] = runFn;
+  passesRegistered = true;
+}
+
+#define SWIFT_INSTRUCTION_PASS_COMMON(INST, TAG, LEGACY_RUN) \
+SILInstruction *SILCombiner::visit##INST(INST *inst) {                     \
+  static BridgedInstructionPassRunFn runFunction = nullptr;                \
+  static bool runFunctionSet = false;                                      \
+  if (!runFunctionSet) {                                                   \
+    runFunction = libswiftInstPasses[TAG];                                 \
+    if (!runFunction && passesRegistered) {                                \
+      llvm::errs() << "Swift pass " << TAG << " is not registered\n";      \
+      abort();                                                             \
+    }                                                                      \
+    runFunctionSet = true;                                                 \
+  }                                                                        \
+  if (!runFunction) {                                                      \
+    LEGACY_RUN;                                                            \
+  }                                                                        \
+  runSwiftInstructionPass(inst, runFunction);                              \
+  return nullptr;                                                          \
+}                                                                          \
+
+#define PASS(ID, TAG, DESCRIPTION)
+
+#define SWIFT_INSTRUCTION_PASS(INST, TAG) \
+  SWIFT_INSTRUCTION_PASS_COMMON(INST, TAG, { return nullptr; })
+
+#define SWIFT_INSTRUCTION_PASS_WITH_LEGACY(INST, TAG) \
+  SWIFT_INSTRUCTION_PASS_COMMON(INST, TAG, { return legacyVisit##INST(inst); })
+
+#include "swift/SILOptimizer/PassManager/Passes.def"
+
+#undef SWIFT_INSTRUCTION_PASS_COMMON
 
 //===----------------------------------------------------------------------===//
 //                                Entry Points
@@ -262,17 +497,24 @@ class SILCombine : public SILFunctionTransform {
   
   /// The entry point to the transformation.
   void run() override {
-    auto *AA = PM->getAnalysis<AliasAnalysis>();
+    auto *AA = PM->getAnalysis<AliasAnalysis>(getFunction());
     auto *DA = PM->getAnalysis<DominanceAnalysis>();
     auto *PCA = PM->getAnalysis<ProtocolConformanceAnalysis>();
     auto *CHA = PM->getAnalysis<ClassHierarchyAnalysis>();
+    auto *NLABA = PM->getAnalysis<NonLocalAccessBlockAnalysis>();
+
+    bool enableCopyPropagation = getOptions().EnableCopyPropagation;
+    if (getOptions().EnableOSSAModules) {
+      enableCopyPropagation = !getOptions().DisableCopyPropagation;
+    }
 
     SILOptFunctionBuilder FuncBuilder(*this);
     // Create a SILBuilder with a tracking list for newly added
     // instructions, which we will periodically move to our worklist.
     SILBuilder B(*getFunction(), &TrackingList);
-    SILCombiner Combiner(FuncBuilder, B, AA, DA, PCA, CHA,
-                         getOptions().RemoveRuntimeAsserts);
+    SILCombiner Combiner(this, FuncBuilder, B, AA, DA, PCA, CHA, NLABA,
+                         getOptions().RemoveRuntimeAsserts,
+                         enableCopyPropagation);
     bool Changed = Combiner.runOnFunction(*getFunction());
     assert(TrackingList.empty() &&
            "TrackingList should be fully processed by SILCombiner");
@@ -282,24 +524,22 @@ class SILCombine : public SILFunctionTransform {
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
     }
   }
-  
-  void handleDeleteNotification(SILNode *node) override {
-    auto I = dyn_cast<SILInstruction>(node);
-    if (!I) return;
-
-    // Linear searching the tracking list doesn't hurt because usually it only
-    // contains a few elements.
-    auto Iter = std::find(TrackingList.begin(), TrackingList.end(), I);
-    if (Iter != TrackingList.end())
-      TrackingList.erase(Iter);      
-  }
-  
-  bool needsNotifications() override { return true; }
-
 };
 
 } // end anonymous namespace
 
 SILTransform *swift::createSILCombine() {
   return new SILCombine();
+}
+
+//===----------------------------------------------------------------------===//
+//                          SwiftFunctionPassContext
+//===----------------------------------------------------------------------===//
+
+void LibswiftPassInvocation::eraseInstruction(SILInstruction *inst) {
+  if (silCombiner) {
+    silCombiner->eraseInstFromFunction(*inst);
+  } else {
+    inst->eraseFromParent();
+  }
 }

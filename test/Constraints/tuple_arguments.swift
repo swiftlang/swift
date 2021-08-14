@@ -1361,6 +1361,8 @@ do {
 
   let _: ((Int, Int)) -> () = { _ = ($0, $1) } // expected-error {{closure tuple parameter '(Int, Int)' does not support destructuring}}
   let _: ((Int, Int)) -> () = { t, u in _ = (t, u) } // expected-error {{closure tuple parameter '(Int, Int)' does not support destructuring}} {{33-37=(arg)}} {{41-41=let (t, u) = arg; }}
+  let _: ((Int, Int)) -> () = { x, y in } 
+  // expected-error@-1 {{closure tuple parameter '(Int, Int)' does not support destructuring}} {{33-37=(arg)}} {{40-40= let (x, y) = arg; }}
 
   let _: (Int, Int) -> () = { _ = $0 } // expected-error {{contextual closure type '(Int, Int) -> ()' expects 2 arguments, but 1 was used in closure body}}
   let _: (Int, Int) -> () = { _ = ($0.0, $0.1) } // expected-error {{contextual closure type '(Int, Int) -> ()' expects 2 arguments, but 1 was used in closure body}}
@@ -1468,11 +1470,11 @@ let _ = sr4745.enumerated().map { (count, element) in "\(count): \(element)" }
 // SR-4738
 
 let sr4738 = (1, (2, 3))
-[sr4738].map { (x, (y, z)) -> Int in x + y + z }
+[sr4738].map { (x, (y, z)) -> Int in x + y + z } // expected-note 2 {{'x' declared here}}
 // expected-error@-1 {{closure tuple parameter does not support destructuring}} {{20-26=arg1}} {{38-38=let (y, z) = arg1; }}
 // expected-warning@-2 {{unnamed parameters must be written with the empty name '_'}} {{20-20=_: }}
-// expected-error@-3 {{cannot find type 'y' in scope}}
-// expected-error@-4 {{cannot find type 'z' in scope}}
+// expected-error@-3 {{cannot find 'y' in scope; did you mean 'x'?}}
+// expected-error@-4 {{cannot find 'z' in scope; did you mean 'x'?}}
 
 // rdar://problem/31892961
 let r31892961_1 = [1: 1, 2: 2]
@@ -1482,9 +1484,8 @@ let r31892961_2 = [1, 2, 3]
 let _: [Int] = r31892961_2.enumerated().map { ((index, val)) in
   // expected-error@-1 {{closure tuple parameter does not support destructuring}} {{48-60=arg0}} {{3-3=\n  let (index, val) = arg0\n  }}
   // expected-warning@-2 {{unnamed parameters must be written with the empty name '_'}} {{48-48=_: }}
-  // expected-error@-3 {{cannot find type 'index' in scope}}
-  // expected-error@-4 {{cannot find type 'val' in scope}}
   val + 1
+  // expected-error@-1 {{cannot find 'val' in scope}}
 }
 
 let r31892961_3 = (x: 1, y: 42)
@@ -1695,7 +1696,7 @@ class Mappable<T> {
 }
 
 let x = Mappable(())
-// expected-note@-1 2{{'x' declared here}}
+// expected-note@-1 4{{'x' declared here}}
 x.map { (_: Void) in return () }
 x.map { (_: ()) in () }
 

@@ -89,6 +89,8 @@ static bool isPlatformActiveForTarget(PlatformKind Platform,
       return Target.isWatchOS();
     case PlatformKind::OpenBSD:
       return Target.isOSOpenBSD();
+    case PlatformKind::Windows:
+      return Target.isOSWindows();
     case PlatformKind::none:
       llvm_unreachable("handled above");
   }

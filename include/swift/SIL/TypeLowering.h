@@ -813,6 +813,9 @@ public:
 
   /// True if a protocol uses witness tables for dynamic dispatch.
   static bool protocolRequiresWitnessTable(ProtocolDecl *P) {
+    if (P->isMarkerProtocol())
+      return false;
+
     return swift::protocolRequiresWitnessTable(getProtocolDispatchStrategy(P));
   }
   

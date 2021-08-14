@@ -30,7 +30,7 @@ extension _AbstractStringStorage {
                   "Range out of bounds")
 
     let range = Range(
-      uncheckedBounds: (aRange.location, aRange.location+aRange.length))
+      _uncheckedBounds: (aRange.location, aRange.location+aRange.length))
     let str = asString
     str._copyUTF16CodeUnits(
       into: UnsafeMutableBufferPointer(start: buffer, count: range.count),

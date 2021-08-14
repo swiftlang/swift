@@ -23,6 +23,7 @@
 #include "swift/Runtime/Portability.h"
 #include "Private.h"
 #include "WeakReference.h"
+#include "../SwiftShims/Reflection.h"
 #include <cassert>
 #include <cinttypes>
 #include <cstdio>
@@ -82,6 +83,7 @@ namespace {
 class FieldType {
   const Metadata *type;
   bool indirect;
+  bool var = false;
   TypeReferenceOwnership referenceOwnership;
 public:
 
@@ -97,6 +99,8 @@ public:
   const TypeReferenceOwnership getReferenceOwnership() const { return referenceOwnership; }
   bool isIndirect() const { return indirect; }
   void setIndirect(bool value) { indirect = value; }
+  bool isVar() const { return var; }
+  void setIsVar(bool value) { var = value; }
   void setReferenceOwnership(TypeReferenceOwnership newOwnership) {
     referenceOwnership = newOwnership;
   }
@@ -292,7 +296,10 @@ struct TupleImpl : ReflectionMirrorImpl {
     // Get the nth element.
     auto &elt = Tuple->getElement(i);
 
-    return FieldType(elt.Type);
+    FieldType result(elt.Type);
+    // All tuples are mutable.
+    result.setIsVar(true);
+    return result;
   }
 
   AnyReturn subscript(intptr_t i, const char **outName,
@@ -431,6 +438,7 @@ getFieldAt(const Metadata *base, unsigned index) {
   auto fieldType = FieldType(typeInfo.getMetadata());
   fieldType.setIndirect(field.isIndirectCase());
   fieldType.setReferenceOwnership(typeInfo.getReferenceOwnership());
+  fieldType.setIsVar(field.isVar());
   return {name, fieldType};
 }
 
@@ -674,7 +682,8 @@ struct ClassImpl : ReflectionMirrorImpl {
       fieldOffset = Clas->getFieldOffsets()[i];
     } else {
   #if SWIFT_OBJC_INTEROP
-      Ivar *ivars = class_copyIvarList((Class)Clas, nullptr);
+      Ivar *ivars = class_copyIvarList(
+          reinterpret_cast<Class>(const_cast<ClassMetadata *>(Clas)), nullptr);
       fieldOffset = ivar_getOffset(ivars[i]);
       free(ivars);
   #else
@@ -751,37 +760,35 @@ struct ClassImpl : ReflectionMirrorImpl {
 #if SWIFT_OBJC_INTEROP
 // Implementation for ObjC classes.
 struct ObjCClassImpl : ClassImpl {
-  intptr_t count() {
+  intptr_t count() override {
     // ObjC makes no guarantees about the state of ivars, so we can't safely
     // introspect them in the general case.
     return 0;
   }
-  
-  intptr_t childOffset(intptr_t i) {
+
+  intptr_t childOffset(intptr_t i) override {
     swift::crash("Cannot get children of Objective-C objects.");
   }
 
   const FieldType childMetadata(intptr_t i, const char **outName,
-                                void (**outFreeFunc)(const char *)) {
+                                void (**outFreeFunc)(const char *)) override {
     swift::crash("Cannot get children of Objective-C objects.");
   }
 
   AnyReturn subscript(intptr_t i, const char **outName,
-                      void (**outFreeFunc)(const char *)) {
+                      void (**outFreeFunc)(const char *)) override {
     swift::crash("Cannot get children of Objective-C objects.");
   }
 
-  virtual intptr_t recursiveCount() {
-    return 0;
-  }
+  virtual intptr_t recursiveCount() override { return 0; }
 
-  virtual intptr_t recursiveChildOffset(intptr_t index) {
+  virtual intptr_t recursiveChildOffset(intptr_t index) override {
     swift::crash("Cannot get children of Objective-C objects.");
   }
-  virtual const FieldType recursiveChildMetadata(intptr_t index,
-                                                 const char **outName,
-                                                 void (**outFreeFunc)(const char *))
-  {
+
+  virtual const FieldType
+  recursiveChildMetadata(intptr_t index, const char **outName,
+                         void (**outFreeFunc)(const char *)) override {
     swift::crash("Cannot get children of Objective-C objects.");
   }
 };
@@ -992,17 +999,20 @@ intptr_t swift_reflectionMirror_recursiveCount(const Metadata *type) {
 // func _getChildMetadata(
 //   type: Any.Type,
 //   index: Int,
-//   outName: UnsafeMutablePointer<UnsafePointer<CChar>?>,
-//   outFreeFunc: UnsafeMutablePointer<NameFreeFunc?>
+//   fieldMetadata: UnsafeMutablePointer<_FieldReflectionMetadata>
 // ) -> Any.Type
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 const Metadata *swift_reflectionMirror_recursiveChildMetadata(
                                        const Metadata *type,
                                        intptr_t index,
-                                       const char **outName,
-                                       void (**outFreeFunc)(const char *)) {
+                                       _FieldReflectionMetadata* field) {
   return call(nullptr, type, type, [&](ReflectionMirrorImpl *impl) {
-    return impl->recursiveChildMetadata(index, outName, outFreeFunc).getType();
+    FieldType fieldInfo = impl->recursiveChildMetadata(index, &field->name,
+        &field->freeFunc);
+
+    field->isStrong = fieldInfo.getReferenceOwnership().isStrong();
+    field->isVar = fieldInfo.isVar();
+    return fieldInfo.getType();
   });
 }
 

@@ -131,9 +131,8 @@ static void addReturnValueImpl(SILBasicBlock *RetBB, SILBasicBlock *NewRetBB,
       // Forward the existing return argument to a new BBArg.
       MergedBB = RetBB->split(RetInst->getIterator());
       SILValue OldRetVal = RetInst->getOperand(0);
-      RetInst->setOperand(
-          0, MergedBB->createPhiArgument(OldRetVal->getType(),
-                                         ValueOwnershipKind::Owned));
+      RetInst->setOperand(0, MergedBB->createPhiArgument(OldRetVal->getType(),
+                                                         OwnershipKind::Owned));
       Builder.setInsertionPoint(RetBB);
       Builder.createBranch(Loc, MergedBB, {OldRetVal});
     }
@@ -186,7 +185,7 @@ emitApplyWithRethrow(SILBuilder &Builder, SILLocation Loc, SILValue FuncRef,
     Builder.emitBlock(ErrorBB);
     SILValue Error = ErrorBB->createPhiArgument(
         fnConv.getSILErrorType(F.getTypeExpansionContext()),
-        ValueOwnershipKind::Owned);
+        OwnershipKind::Owned);
     cleanupCallArguments(Builder, Loc, CallArgs,
                          CallArgIndicesThatNeedEndBorrow);
     addThrowValue(ErrorBB, Error);
@@ -198,7 +197,7 @@ emitApplyWithRethrow(SILBuilder &Builder, SILLocation Loc, SILValue FuncRef,
   Builder.emitBlock(NormalBB);
   SILValue finalArgument = Builder.getInsertionBB()->createPhiArgument(
       fnConv.getSILResultType(F.getTypeExpansionContext()),
-      ValueOwnershipKind::Owned);
+      OwnershipKind::Owned);
   cleanupCallArguments(Builder, Loc, CallArgs, CallArgIndicesThatNeedEndBorrow);
   return finalArgument;
 }
@@ -268,8 +267,11 @@ static SILValue emitInvocation(SILBuilder &Builder,
   // or de-facto?
   if (!CanSILFuncTy->hasErrorResult() ||
       CalleeFunc->findThrowBB() == CalleeFunc->end()) {
+    ApplyOptions Options;
+    if (isNonThrowing)
+      Options |= ApplyFlags::DoesNotThrow;
     auto *AI = Builder.createApply(CalleeFunc->getLocation(), FuncRefInst, Subs,
-                                   CallArgs, isNonThrowing);
+                                   CallArgs, Options);
     cleanupCallArguments(Builder, Loc, CallArgs, ArgsNeedEndBorrow);
     return AI;
   }
@@ -483,7 +485,8 @@ emitTypeCheck(SILBasicBlock *FailedTypeCheckBB, SubstitutableType *ParamTy,
                                         {GenericMTVal, SpecializedMTVal});
 
   auto *SuccessBB = Builder.getFunction().createBasicBlock();
-  Builder.createCondBranch(Loc, Cmp, SuccessBB, FailedTypeCheckBB);
+  auto *FailBB = createSplitBranchTarget(FailedTypeCheckBB, Builder, Loc);
+  Builder.createCondBranch(Loc, Cmp, SuccessBB, FailBB);
   Builder.emitBlock(SuccessBB);
 }
 
@@ -510,7 +513,8 @@ void EagerDispatch::emitIsTrivialCheck(SILBasicBlock *FailedTypeCheckBB,
   auto IsPOD = Builder.createBuiltin(Loc, Ctx.getIdentifier("ispod"), BoolTy,
                                      SubMap, {GenericMT});
   auto *SuccessBB = Builder.getFunction().createBasicBlock();
-  Builder.createCondBranch(Loc, IsPOD, SuccessBB, FailedTypeCheckBB);
+  auto *FailBB = createSplitBranchTarget(FailedTypeCheckBB, Builder, Loc);
+  Builder.createCondBranch(Loc, IsPOD, SuccessBB, FailBB);
   Builder.emitBlock(SuccessBB);
 }
 
@@ -542,14 +546,16 @@ void EagerDispatch::emitTrivialAndSizeCheck(SILBasicBlock *FailedTypeCheckBB,
                                         {ParamSize, LayoutSize});
 
   auto *SuccessBB1 = Builder.getFunction().createBasicBlock();
-  Builder.createCondBranch(Loc, Cmp, SuccessBB1, FailedTypeCheckBB);
+  auto *FailBB1 = createSplitBranchTarget(FailedTypeCheckBB, Builder, Loc);
+  Builder.createCondBranch(Loc, Cmp, SuccessBB1, FailBB1);
   Builder.emitBlock(SuccessBB1);
   // Emit a check that it is a pod object.
   // TODO: Perform this check before all the fixed size checks!
   auto IsPOD = Builder.createBuiltin(Loc, Ctx.getIdentifier("ispod"),
                                          BoolTy, SubMap, { GenericMT });
   auto *SuccessBB2 = Builder.getFunction().createBasicBlock();
-  Builder.createCondBranch(Loc, IsPOD, SuccessBB2, FailedTypeCheckBB);
+  auto *FailBB2 = createSplitBranchTarget(FailedTypeCheckBB, Builder, Loc);
+  Builder.createCondBranch(Loc, IsPOD, SuccessBB2, FailBB2);
   Builder.emitBlock(SuccessBB2);
 }
 
@@ -580,11 +586,11 @@ void EagerDispatch::emitRefCountedObjectCheck(SILBasicBlock *FailedTypeCheckBB,
                                         {CanBeClass, ClassConst});
 
   auto *SuccessBB = Builder.getFunction().createBasicBlock();
-  auto *MayBeCallsCheckBB = Builder.getFunction().createBasicBlock();
-  Builder.createCondBranch(Loc, Cmp1, SuccessBB,
-                           MayBeCallsCheckBB);
+  auto *MayBeClassCheckBB = Builder.getFunction().createBasicBlock();
+  auto *SwiftClassBB = createSplitBranchTarget(SuccessBB, Builder, Loc);
+  Builder.createCondBranch(Loc, Cmp1, SwiftClassBB, MayBeClassCheckBB);
 
-  Builder.emitBlock(MayBeCallsCheckBB);
+  Builder.emitBlock(MayBeClassCheckBB);
 
   auto MayBeClassConst =
       Builder.createIntegerLiteral(Loc, Int8Ty, 2);
@@ -594,8 +600,9 @@ void EagerDispatch::emitRefCountedObjectCheck(SILBasicBlock *FailedTypeCheckBB,
                                         {CanBeClass, MayBeClassConst});
 
   auto *IsClassCheckBB = Builder.getFunction().createBasicBlock();
-  Builder.createCondBranch(Loc, Cmp2, IsClassCheckBB,
-                           FailedTypeCheckBB);
+  auto *FailClassCheckBB =
+    createSplitBranchTarget(FailedTypeCheckBB, Builder, Loc);
+  Builder.createCondBranch(Loc, Cmp2, IsClassCheckBB, FailClassCheckBB);
 
   Builder.emitBlock(IsClassCheckBB);
 
@@ -610,7 +617,9 @@ void EagerDispatch::emitRefCountedObjectCheck(SILBasicBlock *FailedTypeCheckBB,
   auto Member = Members[0];
   auto BoolValue =
       Builder.emitStructExtract(Loc, IsClassRuntimeCheck, Member, BoolTy);
-  Builder.createCondBranch(Loc, BoolValue, SuccessBB, FailedTypeCheckBB);
+  auto *FailBB = createSplitBranchTarget(FailedTypeCheckBB, Builder, Loc);
+  auto *ObjCOrExistentialBB = createSplitBranchTarget(SuccessBB, Builder, Loc);
+  Builder.createCondBranch(Loc, BoolValue, ObjCOrExistentialBB, FailBB);
 
   Builder.emitBlock(SuccessBB);
 }
@@ -726,7 +735,7 @@ SILValue EagerDispatch::emitArgumentConversion(
                                            LoadOwnershipQualifier::Take);
     } else {
       Val = Builder.emitLoadBorrowOperation(Loc, CastArg);
-      if (Val.getOwnershipKind() == ValueOwnershipKind::Guaranteed)
+      if (Val.getOwnershipKind() == OwnershipKind::Guaranteed)
         ArgAtIndexNeedsEndBorrow.push_back(CallArgs.size());
     }
     CallArgs.push_back(Val);
@@ -882,7 +891,11 @@ void EagerSpecializerTransform::run() {
   // removed.
   for (auto *SA : attrsToRemove)
     F.removeSpecializeAttr(SA);
-  F.verify();
+
+  // If any specializations were created, reverify the original body now that it
+  // has checks.
+  if (!newFunctions.empty())
+    F.verify();
 
   for (SILFunction *newF : newFunctions) {
     addFunctionToPassManagerWorklist(newF, nullptr);

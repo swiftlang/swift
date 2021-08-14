@@ -10,7 +10,7 @@ sil @do_something : $@convention(thin) () -> ()
 sil @getit : $@convention(thin) (Int64, Int64) -> Int64
 sil @sink : $@convention(thin) (Int64, Int64, Int64, Int64) -> ()
 
-// Check if SimplifyCFG can optimize this function in reasonabl time.
+// Check if SimplifyCFG can optimize this function in reasonable time.
 
 // CHECK-LABEL: sil @testit
 

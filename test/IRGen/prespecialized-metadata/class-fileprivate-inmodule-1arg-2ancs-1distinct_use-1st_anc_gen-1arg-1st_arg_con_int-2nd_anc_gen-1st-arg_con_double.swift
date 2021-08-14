@@ -126,7 +126,7 @@
 //   CHECK-apple-SAME:         }*,
 //   CHECK-apple-SAME:         i8*,
 //   CHECK-apple-SAME:         i8*
-//   CHECK-apple-SAME:       }* @_DATA__TtC4mainP[[UNIQUE_ID_2:[0-9A-Za-z_]+]]5Value to [[INT]]
+//   CHECK-apple-SAME:       }* @"_DATA_$s4main5Value[[UNIQUE_ID_1]]CySSGMf" to [[INT]]
 //   CHECK-apple-SAME:     ),
 //   CHECK-apple-SAME:     [[INT]] 2
 //   CHECK-apple-SAME:   ),
@@ -239,7 +239,7 @@ doit()
 //      CHECK: define internal swiftcc %swift.metadata_response @"$s4main9Ancestor2[[UNIQUE_ID_1]]CMa"([[INT]] [[METADATA_REQUEST:%[0-9]+]], %swift.type* %1) #{{[0-9]+}} {
 //      CHECK: entry:
 //      CHECK:   [[ERASED_TYPE:%[0-9]+]] = bitcast %swift.type* %1 to i8*
-//      CHECK:   {{%[0-9]+}} = call swiftcc %swift.metadata_response @__swift_instantiateGenericMetadata(
+//      CHECK:   {{%[0-9]+}} = call swiftcc %swift.metadata_response @__swift_instantiateCanonicalPrespecializedGenericMetadata(
 // CHECK-SAME:     [[INT]] [[METADATA_REQUEST]], 
 // CHECK-SAME:     i8* [[ERASED_TYPE]], 
 // CHECK-SAME:     i8* undef, 
@@ -256,7 +256,7 @@ doit()
 //      CHECK: define internal swiftcc %swift.metadata_response @"$s4main9Ancestor1[[UNIQUE_ID_1]]CMa"([[INT]] [[METADATA_REQUEST:%[0-9]+]], %swift.type* %1) #{{[0-9]+}} {
 //      CHECK: entry:
 //      CHECK:   [[ERASED_TYPE:%[0-9]+]] = bitcast %swift.type* %1 to i8*
-//      CHECK:   {{%[0-9]+}} = call swiftcc %swift.metadata_response @__swift_instantiateGenericMetadata(
+//      CHECK:   {{%[0-9]+}} = call swiftcc %swift.metadata_response @__swift_instantiateCanonicalPrespecializedGenericMetadata(
 // CHECK-SAME:     [[INT]] [[METADATA_REQUEST]], 
 // CHECK-SAME:     i8* [[ERASED_TYPE]], 
 // CHECK-SAME:     i8* undef, 
@@ -273,7 +273,7 @@ doit()
 //      CHECK: define internal swiftcc %swift.metadata_response @"$s4main5Value[[UNIQUE_ID_1]]CMa"([[INT]] [[METADATA_REQUEST:%[0-9]+]], %swift.type* %1) #{{[0-9]+}} {
 //      CHECK: entry:
 //      CHECK:   [[ERASED_TYPE:%[0-9]+]] = bitcast %swift.type* %1 to i8*
-//      CHECK:   {{%[0-9]+}} = call swiftcc %swift.metadata_response @__swift_instantiateGenericMetadata(
+//      CHECK:   {{%[0-9]+}} = call swiftcc %swift.metadata_response @__swift_instantiateCanonicalPrespecializedGenericMetadata(
 // CHECK-SAME:     [[INT]] [[METADATA_REQUEST]], 
 // CHECK-SAME:     i8* [[ERASED_TYPE]], 
 // CHECK-SAME:     i8* undef, 

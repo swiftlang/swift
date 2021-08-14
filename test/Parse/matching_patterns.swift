@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 4 -I %S/Inputs -enable-source-import -disable-parser-lookup
+// RUN: %target-typecheck-verify-swift -swift-version 4 -I %S/Inputs -enable-source-import
 
 import imported_enums
 

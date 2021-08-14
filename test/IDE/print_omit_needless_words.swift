@@ -273,17 +273,11 @@
 // Verify that we get the Swift name from the original declaration.
 // CHECK-OMIT-NEEDLESS-WORDS-LABEL: protocol OMWWiggle
 // CHECK-OMIT-NEEDLESS-WORDS-NEXT: func joinSub()
-// CHECK-OMIT-NEEDLESS-WORDS-NEXT: func wiggle1()
-// CHECK-OMIT-NEEDLESS-WORDS-NEXT: @available(swift, obsoleted: 3, renamed: "wiggle1()")
-// CHECK-OMIT-NEEDLESS-WORDS-NEXT: func conflicting1()
 // CHECK-OMIT-NEEDLESS-WORDS-NEXT: var wiggleProp1: Int { get }
 // CHECK-OMIT-NEEDLESS-WORDS-NEXT: @available(swift, obsoleted: 3, renamed: "wiggleProp1")
 // CHECK-OMIT-NEEDLESS-WORDS-NEXT: var conflictingProp1: Int { get }
 
 // CHECK-OMIT-NEEDLESS-WORDS-LABEL: protocol OMWWaggle
-// CHECK-OMIT-NEEDLESS-WORDS-NEXT: func waggle1()
-// CHECK-OMIT-NEEDLESS-WORDS-NEXT: @available(swift, obsoleted: 3, renamed: "waggle1()")
-// CHECK-OMIT-NEEDLESS-WORDS-NEXT: func conflicting1()
 // CHECK-OMIT-NEEDLESS-WORDS-NEXT: var waggleProp1: Int { get }
 // CHECK-OMIT-NEEDLESS-WORDS-NEXT: @available(swift, obsoleted: 3, renamed: "waggleProp1")
 // CHECK-OMIT-NEEDLESS-WORDS-NEXT: var conflictingProp1: Int { get }
@@ -319,7 +313,6 @@
 // CHECK-OMIT-NEEDLESS-WORDS-NEXT: @available(swift, obsoleted: 3, renamed: "veryCarefullyBurn()")
 // CHECK-OMIT-NEEDLESS-WORDS-NEXT: func veryCarefullyBurnGarbage4DTypeRefMask_t()
 
-// CHECK-OMIT-NEEDLESS-WORDS-DIAGS: inconsistent Swift name for Objective-C method 'conflicting1' in 'OMWSub' ('waggle1()' in 'OMWWaggle' vs. 'wiggle1()' in 'OMWWiggle')
 // CHECK-OMIT-NEEDLESS-WORDS-DIAGS: inconsistent Swift name for Objective-C property 'conflictingProp1' in 'OMWSub' ('waggleProp1' in 'OMWWaggle' vs. 'wiggleProp1' in 'OMWSuper')
 
 // Don't drop the 'error'.

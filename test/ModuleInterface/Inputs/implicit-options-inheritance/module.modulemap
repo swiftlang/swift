@@ -1,0 +1,4 @@
+module CIMod {
+  header "CIMod.h"
+  export *
+}

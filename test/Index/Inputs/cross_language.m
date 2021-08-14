@@ -6,7 +6,7 @@
 // CHECK: [[@LINE-1]]:12 | class/Swift | MyCls1 | [[MyCls1_USR]] |
 // CHECK: [[@LINE-2]]:19 | extension/ObjC | ext_in_objc | c:@M@cross_language@objc(cy)MyCls1@ext_in_objc |
 -(void)someMethFromObjC;
-// CHECK: [[@LINE-1]]:8 | instance-method/ObjC | someMethFromObjC | [[someMethFromObjC_USR:.*]] | -[ext_in_objc someMethFromObjC]
+// CHECK: [[@LINE-1]]:8 | instance-method/ObjC | someMethFromObjC | [[someMethFromObjC_USR:.*]] | -[MyCls1(ext_in_objc) someMethFromObjC]
 @end
 
 void test1() {

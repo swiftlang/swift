@@ -60,6 +60,11 @@ BUILTIN_TYPE(BB, "Builtin.UnsafeValueBuffer")
 // shaped like AnyObject (normal mangling yXl).
 BUILTIN_POINTER_TYPE(BO, "Builtin.UnknownObject")
 
+BUILTIN_POINTER_TYPE(Bc, "Builtin.RawUnsafeContinuation")
+BUILTIN_TYPE(BD, "Builtin.DefaultActorStorage")
+BUILTIN_TYPE(Be, "Builtin.Executor")
+BUILTIN_POINTER_TYPE(Bj, "Builtin.Job")
+
 // Int8 vector types
 BUILTIN_VECTOR_TYPE(Bi8_, Int8, 2)
 BUILTIN_VECTOR_TYPE(Bi8_, Int8, 3)

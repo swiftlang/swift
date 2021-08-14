@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -64,6 +64,12 @@ public func getUInt64(_ x: UInt64) -> UInt64 { return _opaqueIdentity(x) }
 
 @inline(never)
 public func getUInt(_ x: UInt) -> UInt { return _opaqueIdentity(x) }
+
+#if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
+@available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
+@inline(never)
+public func getFloat16(_ x: Float16) -> Float16 { return _opaqueIdentity(x) }
+#endif
 
 @inline(never)
 public func getFloat32(_ x: Float32) -> Float32 { return _opaqueIdentity(x) }

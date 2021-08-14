@@ -972,17 +972,35 @@ void DiagnosticVerifier::handleDiagnostic(SourceManager &SM,
     CapturedDiagnostics.emplace_back(message, StringRef(), Info.Kind, Info.Loc,
                                      0, 0, fixIts, eduNotes);
   }
+
+  // If this diagnostic came from a different SourceManager (as can happen
+  // while compiling a module interface), translate its SourceLocs to match the
+  // verifier's SourceManager.
+  if (&SM != &(this->SM)) {
+    auto &capturedDiag = CapturedDiagnostics.back();
+    auto &correctSM = this->SM;
+
+    capturedDiag.Loc = correctSM.getLocForForeignLoc(capturedDiag.Loc, SM);
+    for (auto &fixIt : capturedDiag.FixIts) {
+      auto newStart = correctSM.getLocForForeignLoc(fixIt.getRange().getStart(),
+                                                    SM);
+      fixIt.getRange() = CharSourceRange(newStart,
+                                         fixIt.getRange().getByteLength());
+    }
+  }
 }
 
 /// Once all diagnostics have been captured, perform verification.
 bool DiagnosticVerifier::finishProcessing() {
   DiagnosticVerifier::Result Result = {false, false};
 
-  for (auto &BufferID : BufferIDs) {
-    DiagnosticVerifier::Result FileResult = verifyFile(BufferID);
-    Result.HadError |= FileResult.HadError;
-    Result.HadUnexpectedDiag |= FileResult.HadUnexpectedDiag;
-  }
+  ArrayRef<unsigned> BufferIDLists[2] = { BufferIDs, AdditionalBufferIDs };
+  for (ArrayRef<unsigned> BufferIDList : BufferIDLists)
+    for (auto &BufferID : BufferIDList) {
+      DiagnosticVerifier::Result FileResult = verifyFile(BufferID);
+      Result.HadError |= FileResult.HadError;
+      Result.HadUnexpectedDiag |= FileResult.HadUnexpectedDiag;
+    }
   if (!IgnoreUnknown) {
     bool HadError = verifyUnknown(SM, CapturedDiagnostics);
     Result.HadError |= HadError;

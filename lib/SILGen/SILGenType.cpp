@@ -97,7 +97,7 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
     auto derivedFnType =
         Types.getConstantInfo(TypeExpansionContext::minimal(), derived)
             .SILFnType;
-    implFn = getOrCreateAutoDiffClassMethodThunk(derived, derivedFnType);
+    implFn = getOrCreateDerivativeVTableThunk(derived, derivedFnType);
   } else {
     implFn = getFunction(derived, NotForDefinition);
   }
@@ -111,7 +111,7 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
   bool baseLessVisibleThanDerived =
     (!usesObjCDynamicDispatch &&
      !derivedDecl->isFinal() &&
-     derivedDecl->isEffectiveLinkageMoreVisibleThan(baseDecl));
+     derivedDecl->isMoreVisibleThan(baseDecl));
 
   // Determine the derived thunk type by lowering the derived type against the
   // abstraction pattern of the base.
@@ -184,9 +184,7 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
   if (auto existingThunk = M.lookUpFunction(name))
     return SILVTable::Entry(base, existingThunk, implKind, false);
 
-  GenericEnvironment *genericEnv = nullptr;
-  if (auto genericSig = overrideInfo.FormalType.getOptGenericSignature())
-    genericEnv = genericSig->getGenericEnvironment();
+  auto *genericEnv = overrideInfo.FormalType.getOptGenericSignature().getGenericEnvironment();
 
   // Emit the thunk.
   SILLocation loc(derivedDecl);
@@ -498,8 +496,7 @@ public:
     if (!Conformance)
       return nullptr;
 
-    PrettyStackTraceConformance trace(SGM.getASTContext(),
-                                      "generating SIL witness table",
+    PrettyStackTraceConformance trace("generating SIL witness table",
                                       Conformance);
 
     auto *proto = Conformance->getProtocol();
@@ -886,8 +883,7 @@ public:
   }
 
   void emit() {
-    PrettyStackTraceConformance trace(SGM.getASTContext(),
-                                      "generating SIL witness table",
+    PrettyStackTraceConformance trace("generating SIL witness table",
                                       conformance);
 
     // Add entries for all the requirements.
@@ -1036,16 +1032,13 @@ public:
   void emitType() {
     SGM.emitLazyConformancesForType(theType);
 
+    for (Decl *member : theType->getABIMembers())
+      visit(member);
+
     // Build a vtable if this is a class.
     if (auto theClass = dyn_cast<ClassDecl>(theType)) {
-      for (Decl *member : theClass->getSemanticMembers())
-        visit(member);
-
       SILGenVTable genVTable(SGM, theClass);
       genVTable.emitVTable();
-    } else {
-      for (Decl *member : theType->getMembers())
-        visit(member);
     }
 
     // Build a default witness table if this is a protocol that needs one.
@@ -1065,10 +1058,9 @@ public:
     // are existential and do not have witness tables.
     for (auto *conformance : theType->getLocalConformances(
                                ConformanceLookupKind::NonInherited)) {
-      if (conformance->isComplete()) {
-        if (auto *normal = dyn_cast<NormalProtocolConformance>(conformance))
-          SGM.getWitnessTable(normal);
-      }
+      assert(conformance->isComplete());
+      if (auto *normal = dyn_cast<NormalProtocolConformance>(conformance))
+        SGM.getWitnessTable(normal);
     }
   }
 
@@ -1108,7 +1100,7 @@ public:
       return;
 
     // Emit any default argument generators.
-    SGM.emitDefaultArgGenerators(EED, EED->getParameterList());
+    SGM.emitArgumentGenerators(EED, EED->getParameterList());
   }
 
   void visitPatternBindingDecl(PatternBindingDecl *pd) {
@@ -1134,17 +1126,16 @@ public:
 
     // If this variable has an attached property wrapper with an initialization
     // function, emit the backing initializer function.
-    if (auto wrapperInfo = vd->getPropertyWrapperBackingPropertyInfo()) {
-      if (wrapperInfo.initializeFromOriginal && !vd->isStatic()) {
-        SGM.emitPropertyWrapperBackingInitializer(vd);
-      }
+    auto initInfo = vd->getPropertyWrapperInitializerInfo();
+    if (initInfo.hasInitFromWrappedValue() && !vd->isStatic()) {
+      SGM.emitPropertyWrapperBackingInitializer(vd);
     }
 
     visitAbstractStorageDecl(vd);
   }
 
   void visitSubscriptDecl(SubscriptDecl *sd) {
-    SGM.emitDefaultArgGenerators(sd, sd->getIndices());
+    SGM.emitArgumentGenerators(sd, sd->getIndices());
     visitAbstractStorageDecl(sd);
   }
 
@@ -1181,7 +1172,7 @@ public:
 
   /// Emit SIL functions for all the members of the extension.
   void emitExtension(ExtensionDecl *e) {
-    for (Decl *member : e->getMembers())
+    for (Decl *member : e->getABIMembers())
       visit(member);
 
     if (!isa<ProtocolDecl>(e->getExtendedNominal())) {
@@ -1189,10 +1180,9 @@ public:
       // extension.
       for (auto *conformance : e->getLocalConformances(
                                  ConformanceLookupKind::All)) {
-        if (conformance->isComplete()) {
-          if (auto *normal =dyn_cast<NormalProtocolConformance>(conformance))
-            SGM.getWitnessTable(normal);
-        }
+        assert(conformance->isComplete());
+        if (auto *normal =dyn_cast<NormalProtocolConformance>(conformance))
+          SGM.getWitnessTable(normal);
       }
     }
   }
@@ -1271,7 +1261,7 @@ public:
   }
 
   void visitSubscriptDecl(SubscriptDecl *sd) {
-    SGM.emitDefaultArgGenerators(sd, sd->getIndices());
+    SGM.emitArgumentGenerators(sd, sd->getIndices());
     visitAbstractStorageDecl(sd);
   }
 

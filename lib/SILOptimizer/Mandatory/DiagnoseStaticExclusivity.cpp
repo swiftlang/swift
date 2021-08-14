@@ -711,7 +711,8 @@ checkAccessSummary(ApplySite Apply, AccessState &State,
 
     // A valid AccessedStorage should always be found because Unsafe accesses
     // are not tracked by AccessSummaryAnalysis.
-    const AccessedStorage &Storage = identifyCapturedStorage(Argument);
+    auto Storage = AccessedStorage::computeInScope(Argument);
+    assert(Storage && "captured address must have valid storage");
     auto AccessIt = State.Accesses->find(Storage);
 
     // Are there any accesses in progress at the time of the call?
@@ -745,7 +746,8 @@ static void checkCaptureAccess(ApplySite Apply, AccessState &State) {
 
     // A valid AccessedStorage should always be found because Unsafe accesses
     // are not tracked by AccessSummaryAnalysis.
-    const AccessedStorage &Storage = identifyCapturedStorage(argOper.get());
+    auto Storage = AccessedStorage::computeInScope(argOper.get());
+    assert(Storage && "captured address must have valid storage");
 
     // Are there any accesses in progress at the time of the call?
     auto AccessIt = State.Accesses->find(Storage);
@@ -754,7 +756,7 @@ static void checkCaptureAccess(ApplySite Apply, AccessState &State) {
 
     // The unknown argument access is considered a modify of the root subpath.
     auto argAccess = RecordedAccess(SILAccessKind::Modify, Apply.getLoc(),
-                                    State.ASA->getSubPathTrieRoot());
+                                    Apply.getModule().getIndexTrieRoot());
 
     // Construct a conflicting RecordedAccess if one doesn't already exist.
     const AccessInfo &info = AccessIt->getSecond();
@@ -964,20 +966,20 @@ static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO,
 // Check that the given address-type operand is guarded by begin/end access
 // markers.
 static void checkAccessedAddress(Operand *memOper, StorageMap &Accesses) {
-  SILValue address = getAddressAccess(memOper->get());
+  SILValue accessBegin = getAccessScope(memOper->get());
   SILInstruction *memInst = memOper->getUser();
 
-  auto error = [address, memInst]() {
+  auto error = [accessBegin, memInst]() {
     llvm::dbgs() << "Memory access not protected by begin_access:\n";
     memInst->printInContext(llvm::dbgs());
-    llvm::dbgs() << "Accessing: " << address;
+    llvm::dbgs() << "Accessing: " << accessBegin;
     llvm::dbgs() << "In function:\n";
     memInst->getFunction()->print(llvm::dbgs());
     abort();
   };
 
   // Check if this address is guarded by an access.
-  if (auto *BAI = dyn_cast<BeginAccessInst>(address)) {
+  if (auto *BAI = dyn_cast<BeginAccessInst>(accessBegin)) {
     if (BAI->getEnforcement() == SILAccessEnforcement::Unsafe)
       return;
 
@@ -1017,13 +1019,12 @@ static void checkAccessedAddress(Operand *memOper, StorageMap &Accesses) {
       return;
   }
 
-  const AccessedStorage &storage = findAccessedStorage(address);
-  // findAccessedStorage may return an invalid storage object if the address
-  // producer is not recognized by its allowlist. For the purpose of
-  // verification, we assume that this can only happen for local
-  // initialization, not a formal memory access. The strength of
-  // verification rests on the completeness of the opcode list inside
-  // findAccessedStorage.
+  auto storage = AccessedStorage::compute(accessBegin);
+  // AccessedStorage::compute may return an invalid storage object if the
+  // address producer is not recognized by its allowlist. For the purpose of
+  // verification, we assume that this can only happen for local initialization,
+  // not a formal memory access. The strength of verification rests on the
+  // completeness of the opcode list inside AccessedStorage::compute.
   //
   // For the purpose of verification, an unidentified access is
   // unenforced. These occur in cases like global addressors and local buffers
@@ -1033,7 +1034,7 @@ static void checkAccessedAddress(Operand *memOper, StorageMap &Accesses) {
 
   // Some identifiable addresses can also be recognized as local initialization
   // or other patterns that don't qualify as formal access.
-  if (!isPossibleFormalAccessBase(storage, memInst->getFunction()))
+  if (!isPossibleFormalAccessStorage(storage, memInst->getFunction()))
     return;
 
   // A box or stack variable may represent lvalues, but they can only conflict
@@ -1053,25 +1054,39 @@ static void checkAccessedAddress(Operand *memOper, StorageMap &Accesses) {
 
 namespace {
 
-class DiagnoseStaticExclusivity : public SILFunctionTransform {
+/// TODO: This is currently a module transform to ensure that source-level
+/// diagnostics, like DiagnoseInvalidCaptures run on closures (in addition to
+/// other callees) before this pass processes their parent functions. Otherwise,
+/// AccessSummaryAnalysis may crash on invalid SIL. Fix the pass manager to
+/// ensure that closures are always diagnosed before their parent. Then add an
+/// SCC transform to ensure that the previous diagnostic pass runs on all
+/// functions in the SCC before the next diagnostic pass. This will handle
+/// closures that call back into their parent. Then this can be converted to an
+/// SCC transform.
+class DiagnoseStaticExclusivity : public SILModuleTransform {
 public:
   DiagnoseStaticExclusivity() {}
 
 private:
   void run() override {
-    // Don't rerun diagnostics on deserialized functions.
-    if (getFunction()->wasDeserializedCanonical())
-      return;
+    for (auto &function : *getModule()) {
+      if (!function.isDefinition())
+        continue;
 
-    SILFunction *Fn = getFunction();
-    // This is a staging flag. Eventually the ability to turn off static
-    // enforcement will be removed.
-    if (!Fn->getModule().getOptions().EnforceExclusivityStatic)
-      return;
+      // Don't rerun diagnostics on deserialized functions.
+      if (function.wasDeserializedCanonical())
+        continue;
 
-    PostOrderFunctionInfo *PO = getAnalysis<PostOrderAnalysis>()->get(Fn);
-    auto *ASA = getAnalysis<AccessSummaryAnalysis>();
-    checkStaticExclusivity(*Fn, PO, ASA);
+      // This is a staging flag. Eventually the ability to turn off static
+      // enforcement will be removed.
+      if (!function.getModule().getOptions().EnforceExclusivityStatic)
+        continue;
+
+      PostOrderFunctionInfo *PO =
+        getAnalysis<PostOrderAnalysis>()->get(&function);
+      auto *ASA = getAnalysis<AccessSummaryAnalysis>();
+      checkStaticExclusivity(function, PO, ASA);
+    }
   }
 };
 

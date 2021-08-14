@@ -66,6 +66,7 @@ public:
 
   Demangle::NodeFactory &getNodeFactory() { return Factory; }
 
+  Type decodeMangledType(NodePointer node);
   Type createBuiltinType(StringRef builtinName, StringRef mangledName);
 
   TypeDecl *createTypeDecl(NodePointer node);
@@ -94,8 +95,10 @@ public:
 
   Type createTupleType(ArrayRef<Type> eltTypes, StringRef labels);
 
-  Type createFunctionType(ArrayRef<Demangle::FunctionParam<Type>> params,
-                          Type output, FunctionTypeFlags flags);
+  Type createFunctionType(
+      ArrayRef<Demangle::FunctionParam<Type>> params,
+      Type output, FunctionTypeFlags flags,
+      FunctionMetadataDifferentiabilityKind diffKind, Type globalActor);
 
   Type createImplFunctionType(
     Demangle::ImplParameterConvention calleeConvention,
@@ -126,6 +129,18 @@ public:
 #include "swift/AST/ReferenceStorage.def"
 
   Type createSILBoxType(Type base);
+  using BuiltSILBoxField = llvm::PointerIntPair<Type, 1>;
+  using BuiltSubstitution = std::pair<Type, Type>;
+  using BuiltRequirement = swift::Requirement;
+  using BuiltLayoutConstraint = swift::LayoutConstraint;
+  Type createSILBoxTypeWithLayout(ArrayRef<BuiltSILBoxField> Fields,
+                                  ArrayRef<BuiltSubstitution> Substitutions,
+                                  ArrayRef<BuiltRequirement> Requirements);
+
+  bool isExistential(Type type) {
+    return type->isExistentialType();
+  }
+
 
   Type createObjCClassType(StringRef name);
 
@@ -148,6 +163,11 @@ public:
   Type createDictionaryType(Type key, Type value);
 
   Type createParenType(Type base);
+
+  LayoutConstraint getLayoutConstraint(LayoutConstraintKind kind);
+  LayoutConstraint getLayoutConstraintWithSizeAlign(LayoutConstraintKind kind,
+                                                    unsigned size,
+                                                    unsigned alignment);
 
 private:
   bool validateParentType(TypeDecl *decl, Type parent);

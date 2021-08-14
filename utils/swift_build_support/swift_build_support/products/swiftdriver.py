@@ -27,6 +27,10 @@ from .. import shell
 from .. import targets
 
 
+# SwiftDriver is a standalone compiler-driver application written in
+# Swift. This build product is *the* driver product that is
+# installed into a resulting toolchain. It is built-with and depends-on
+# other build products of this build (compiler, package-manager, etc).
 class SwiftDriver(product.Product):
     @classmethod
     def product_source_name(cls):
@@ -34,6 +38,10 @@ class SwiftDriver(product.Product):
 
     @classmethod
     def is_build_script_impl_product(cls):
+        return False
+
+    @classmethod
+    def is_before_build_script_impl_product(cls):
         return False
 
     def should_build(self, host_target):
@@ -94,6 +102,12 @@ def run_build_script_helper(action, host_target, product, args):
     foundation_build_dir = os.path.join(
         build_root, '%s-%s' % ('foundation', host_target))
 
+    # Pass the swift lit tests if we're testing and the Swift tests were built
+    swift_build_dir = os.path.join(
+        build_root, 'swift-{}'.format(host_target))
+    lit_test_dir = os.path.join(
+        swift_build_dir, 'test-{}'.format(host_target))
+
     is_release = product.is_release()
     configuration = 'release' if is_release else 'debug'
     helper_cmd = [
@@ -114,6 +128,15 @@ def run_build_script_helper(action, host_target, product, args):
         helper_cmd += [
             '--foundation-build-dir', foundation_build_dir
         ]
+    if os.path.exists(lit_test_dir) and action == 'test':
+        helper_cmd += [
+            '--lit-test-dir', lit_test_dir
+        ]
+    # Pass Cross compile host info
+    if swiftpm.SwiftPM.has_cross_compile_hosts(args):
+        helper_cmd += ['--cross-compile-hosts']
+        for cross_compile_host in args.cross_compile_hosts:
+            helper_cmd += [cross_compile_host]
     if args.verbose_build:
         helper_cmd.append('--verbose')
 

@@ -37,6 +37,7 @@ namespace irgen {
 class HeapLayout : public StructLayout {
   SmallVector<SILType, 8> ElementTypes;
   NecessaryBindings Bindings;
+  unsigned BindingsIndex;
   mutable llvm::Constant *privateMetadata = nullptr;
   
 public:
@@ -44,8 +45,8 @@ public:
              ArrayRef<SILType> elementTypes,
              ArrayRef<const TypeInfo *> elementTypeInfos,
              llvm::StructType *typeToFill = 0,
-             NecessaryBindings &&bindings = {});
-  
+             NecessaryBindings &&bindings = {}, unsigned bindingsIndex = 0);
+
   /// True if the heap object carries type bindings.
   ///
   /// If true, the first element of the heap layout will be the type metadata
@@ -56,6 +57,12 @@ public:
   
   const NecessaryBindings &getBindings() const {
     return Bindings;
+  }
+
+  unsigned getBindingsIndex() const { return BindingsIndex; }
+
+  unsigned getIndexAfterBindings() const {
+    return BindingsIndex + (hasBindings() ? 1 : 0);
   }
 
   /// Get the types of the elements.

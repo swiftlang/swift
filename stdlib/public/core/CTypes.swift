@@ -56,11 +56,11 @@ public typealias CLong = Int
 /// The C 'long long' type.
 public typealias CLongLong = Int64
 
+#if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
 /// The C '_Float16' type.
-@available(iOS 14.0, watchOS 7.0, tvOS 14.0, *)
-@available(macOS, unavailable)
-@available(macCatalyst, unavailable)
+@available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
 public typealias CFloat16 = Float16
+#endif
 
 /// The C 'float' type.
 public typealias CFloat = Float
@@ -124,7 +124,7 @@ public typealias CBool = Bool
 /// Opaque pointers are used to represent C pointers to types that
 /// cannot be represented in Swift, such as incomplete struct types.
 @frozen
-public struct OpaquePointer {
+public struct OpaquePointer: Sendable {
   @usableFromInline
   internal var _rawValue: Builtin.RawPointer
 
@@ -235,7 +235,7 @@ extension UInt {
 /// A wrapper around a C `va_list` pointer.
 #if arch(arm64) && !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(Windows))
 @frozen
-public struct CVaListPointer {
+public struct CVaListPointer: Sendable {
   @usableFromInline // unsafe-performance
   internal var _value: (__stack: UnsafeMutablePointer<Int>?,
                         __gr_top: UnsafeMutablePointer<Int>?,

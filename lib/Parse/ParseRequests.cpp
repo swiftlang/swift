@@ -19,6 +19,7 @@
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Subsystems.h"
 #include "swift/Syntax/SyntaxArena.h"
@@ -39,7 +40,7 @@ namespace swift {
 void swift::simple_display(llvm::raw_ostream &out,
                            const FingerprintAndMembers &value) {
   if (value.fingerprint)
-    simple_display(out, value.fingerprint.getValue());
+    simple_display(out, *value.fingerprint);
   else
     out << "<no fingerprint>";
   out << ", ";
@@ -51,6 +52,8 @@ ParseMembersRequest::evaluate(Evaluator &evaluator,
                               IterableDeclContext *idc) const {
   SourceFile *sf = idc->getAsGenericContext()->getParentSourceFile();
   ASTContext &ctx = idc->getDecl()->getASTContext();
+  auto fileUnit
+    = dyn_cast<FileUnit>(idc->getAsGenericContext()->getModuleScopeContext());
   if (!sf) {
     // If there is no parent source file, this is a deserialized or synthesized
     // declaration context, in which case `getMembers()` has all of the members.
@@ -62,7 +65,11 @@ ParseMembersRequest::evaluate(Evaluator &evaluator,
       }
     }
 
-    return FingerprintAndMembers{None, ctx.AllocateCopy(members)};
+    Optional<Fingerprint> fp = None;
+    if (!idc->getDecl()->isImplicit() && fileUnit) {
+      fp = fileUnit->loadFingerprint(idc);
+    }
+    return FingerprintAndMembers{fp, ctx.AllocateCopy(members)};
   }
 
   unsigned bufferID = *sf->getBufferID();
@@ -86,7 +93,7 @@ BraceStmt *ParseAbstractFunctionBodyRequest::evaluate(
 
   switch (afd->getBodyKind()) {
   case BodyKind::Deserialized:
-  case BodyKind::MemberwiseInitializer:
+  case BodyKind::SILSynthesize:
   case BodyKind::None:
   case BodyKind::Skipped:
     return nullptr;
@@ -201,7 +208,7 @@ ParseSourceFileRequest::getCachedResult() const {
     syntaxRoot.emplace(*rootPtr);
 
   return SourceFileParsingResult{*decls, SF->AllCollectedTokens,
-                                 SF->InterfaceHash, syntaxRoot};
+                                 SF->InterfaceHasher, syntaxRoot};
 }
 
 void ParseSourceFileRequest::cacheResult(SourceFileParsingResult result) const {
@@ -209,7 +216,7 @@ void ParseSourceFileRequest::cacheResult(SourceFileParsingResult result) const {
   assert(!SF->Decls);
   SF->Decls = result.TopLevelDecls;
   SF->AllCollectedTokens = result.CollectedTokens;
-  SF->InterfaceHash = result.InterfaceHash;
+  SF->InterfaceHasher = result.InterfaceHasher;
 
   if (auto &root = result.SyntaxRoot)
     SF->SyntaxRoot = std::make_unique<SourceFileSyntax>(std::move(*root));

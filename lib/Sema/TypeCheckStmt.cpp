@@ -16,6 +16,8 @@
 
 #include "TypeChecker.h"
 #include "TypeCheckAvailability.h"
+#include "TypeCheckConcurrency.h"
+#include "TypeCheckDistributed.h"
 #include "TypeCheckType.h"
 #include "MiscDiagnostics.h"
 #include "swift/Subsystems.h"
@@ -39,6 +41,7 @@
 #include "swift/Basic/TopCollection.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/LocalContext.h"
+#include "swift/Parse/Parser.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Syntax/TokenKinds.h"
 #include "llvm/ADT/DenseMap.h"
@@ -55,26 +58,6 @@
 using namespace swift;
 
 #define DEBUG_TYPE "TypeCheckStmt"
-
-#ifndef NDEBUG
-/// Determine whether the given context is for the backing property of a
-/// property wrapper.
-static bool isPropertyWrapperBackingInitContext(DeclContext *dc) {
-  auto initContext = dyn_cast<Initializer>(dc);
-  if (!initContext) return false;
-
-  auto patternInitContext = dyn_cast<PatternBindingInitializer>(initContext);
-  if (!patternInitContext) return false;
-
-  auto binding = patternInitContext->getBinding();
-  if (!binding) return false;
-
-  auto singleVar = binding->getSingleVar();
-  if (!singleVar) return false;
-
-  return singleVar->getOriginalWrappedProperty() != nullptr;
-}
-#endif
 
 namespace {
   class ContextualizeClosures : public ASTWalker {
@@ -119,28 +102,15 @@ namespace {
       if (auto CapE = dyn_cast<CaptureListExpr>(E)) {
         if (isa<AutoClosureExpr>(ParentDC)) {
           for (auto &Cap : CapE->getCaptureList()) {
-            Cap.Init->setDeclContext(ParentDC);
-            Cap.Var->setDeclContext(ParentDC);
+            Cap.PBD->setDeclContext(ParentDC);
+            Cap.getVar()->setDeclContext(ParentDC);
           }
         }
       }
 
       // Explicit closures start their own sequence.
       if (auto CE = dyn_cast<ClosureExpr>(E)) {
-        // In the repl, the parent top-level context may have been re-written.
-        if (CE->getParent() != ParentDC) {
-          if ((CE->getParent()->getContextKind() !=
-                    ParentDC->getContextKind()) ||
-              ParentDC->getContextKind() != DeclContextKind::TopLevelCodeDecl) {
-            // If a closure is nested within an auto closure, we'll need to update
-            // its parent to the auto closure parent.
-            assert((ParentDC->getContextKind() ==
-                      DeclContextKind::AbstractClosureExpr ||
-                    isPropertyWrapperBackingInitContext(ParentDC)) &&
-                   "Incorrect parent decl context for closure");
-            CE->setParent(ParentDC);
-          }
-        }
+        CE->setParent(ParentDC);
 
         // If the closure was type checked within its enclosing context,
         // we need to walk into it with a new sequence.
@@ -260,8 +230,7 @@ static void tryDiagnoseUnnecessaryCastOverOptionSet(ASTContext &Ctx,
   if (!optionSetType)
     return;
   SmallVector<ProtocolConformance *, 4> conformances;
-  if (!(optionSetType &&
-        NTD->lookupConformance(module, optionSetType, conformances)))
+  if (!(optionSetType && NTD->lookupConformance(optionSetType, conformances)))
     return;
 
   auto *CE = dyn_cast<CallExpr>(E);
@@ -450,6 +419,89 @@ static LabeledStmt *findBreakOrContinueStmtTarget(
   return nullptr;
 }
 
+bool TypeChecker::typeCheckStmtConditionElement(StmtConditionElement &elt,
+                                                bool &isFalsable,
+                                                DeclContext *dc) {
+  auto &Context = dc->getASTContext();
+  if (elt.getKind() == StmtConditionElement::CK_Availability) {
+    isFalsable = true;
+
+    // Reject inlinable code using availability macros.
+    PoundAvailableInfo *info = elt.getAvailability();
+    if (auto *decl = dc->getAsDecl()) {
+      if (decl->getAttrs().hasAttribute<InlinableAttr>() ||
+          decl->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+        for (auto queries : info->getQueries())
+          if (auto availSpec =
+                  dyn_cast<PlatformVersionConstraintAvailabilitySpec>(queries))
+            if (availSpec->getMacroLoc().isValid()) {
+              Context.Diags.diagnose(
+                  availSpec->getMacroLoc(),
+                  swift::diag::availability_macro_in_inlinable,
+                  decl->getDescriptiveKind());
+              break;
+            }
+    }
+
+    return false;
+  }
+
+  if (auto E = elt.getBooleanOrNull()) {
+    assert(!E->getType() && "the bool condition is already type checked");
+    bool hadError = TypeChecker::typeCheckCondition(E, dc);
+    elt.setBoolean(E);
+    isFalsable = true;
+    return hadError;
+  }
+  assert(elt.getKind() != StmtConditionElement::CK_Boolean);
+
+  // This is cleanup goop run on the various paths where type checking of the
+  // pattern binding fails.
+  auto typeCheckPatternFailed = [&] {
+    elt.getPattern()->setType(ErrorType::get(Context));
+    elt.getInitializer()->setType(ErrorType::get(Context));
+
+    elt.getPattern()->forEachVariable([&](VarDecl *var) {
+      // Don't change the type of a variable that we've been able to
+      // compute a type for.
+      if (var->hasInterfaceType() && !var->isInvalid())
+        return;
+      var->setInvalid();
+    });
+  };
+
+  // Resolve the pattern.
+  assert(!elt.getPattern()->hasType() &&
+         "the pattern binding condition is already type checked");
+  auto *pattern = TypeChecker::resolvePattern(elt.getPattern(), dc,
+                                              /*isStmtCondition*/ true);
+  if (!pattern) {
+    typeCheckPatternFailed();
+    return true;
+  }
+  elt.setPattern(pattern);
+
+  TypeChecker::diagnoseDuplicateBoundVars(pattern);
+
+  // Check the pattern, it allows unspecified types because the pattern can
+  // provide type information.
+  auto contextualPattern = ContextualPattern::forRawPattern(pattern, dc);
+  Type patternType = TypeChecker::typeCheckPattern(contextualPattern);
+  if (patternType->hasError()) {
+    typeCheckPatternFailed();
+    return true;
+  }
+
+  // If the pattern didn't get a type, it's because we ran into some
+  // unknown types along the way. We'll need to check the initializer.
+  auto init = elt.getInitializer();
+  bool hadError = TypeChecker::typeCheckBinding(pattern, init, dc, patternType);
+  elt.setPattern(pattern);
+  elt.setInitializer(init);
+  isFalsable |= pattern->isRefutablePattern();
+  return hadError;
+}
+
 /// Type check the given 'if', 'while', or 'guard' statement condition.
 ///
 /// \param stmt The conditional statement to type-check, which will be modified
@@ -458,88 +510,12 @@ static LabeledStmt *findBreakOrContinueStmtTarget(
 /// \returns true if an error occurred, false otherwise.
 static bool typeCheckConditionForStatement(LabeledConditionalStmt *stmt,
                                            DeclContext *dc) {
-  auto &Context = dc->getASTContext();
   bool hadError = false;
   bool hadAnyFalsable = false;
   auto cond = stmt->getCond();
   for (auto &elt : cond) {
-    if (elt.getKind() == StmtConditionElement::CK_Availability) {
-      hadAnyFalsable = true;
-
-      // Reject inlinable code using availability macros.
-      PoundAvailableInfo *info = elt.getAvailability();
-      if (auto *decl = dc->getAsDecl()) {
-        if (decl->getAttrs().hasAttribute<InlinableAttr>() ||
-            decl->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
-          for (auto queries : info->getQueries())
-            if (auto availSpec =
-                  dyn_cast<PlatformVersionConstraintAvailabilitySpec>(queries))
-              if (availSpec->getMacroLoc().isValid()) {
-                Context.Diags.diagnose(
-                    availSpec->getMacroLoc(),
-                    swift::diag::availability_macro_in_inlinable,
-                    decl->getDescriptiveKind());
-                break;
-              }
-      }
-
-      continue;
-    }
-
-    if (auto E = elt.getBooleanOrNull()) {
-      assert(!E->getType() && "the bool condition is already type checked");
-      hadError |= TypeChecker::typeCheckCondition(E, dc);
-      elt.setBoolean(E);
-      hadAnyFalsable = true;
-      continue;
-    }
-    assert(elt.getKind() != StmtConditionElement::CK_Boolean);
-
-    // This is cleanup goop run on the various paths where type checking of the
-    // pattern binding fails.
-    auto typeCheckPatternFailed = [&] {
-      hadError = true;
-      elt.getPattern()->setType(ErrorType::get(Context));
-      elt.getInitializer()->setType(ErrorType::get(Context));
-
-      elt.getPattern()->forEachVariable([&](VarDecl *var) {
-        // Don't change the type of a variable that we've been able to
-        // compute a type for.
-        if (var->hasInterfaceType() && !var->isInvalid())
-          return;
-        var->setInvalid();
-      });
-    };
-
-    // Resolve the pattern.
-    assert(!elt.getPattern()->hasType() &&
-           "the pattern binding condition is already type checked");
-    auto *pattern = TypeChecker::resolvePattern(elt.getPattern(), dc,
-                                                /*isStmtCondition*/ true);
-    if (!pattern) {
-      typeCheckPatternFailed();
-      continue;
-    }
-    elt.setPattern(pattern);
-
-    TypeChecker::diagnoseDuplicateBoundVars(pattern);
-
-    // Check the pattern, it allows unspecified types because the pattern can
-    // provide type information.
-    auto contextualPattern = ContextualPattern::forRawPattern(pattern, dc);
-    Type patternType = TypeChecker::typeCheckPattern(contextualPattern);
-    if (patternType->hasError()) {
-      typeCheckPatternFailed();
-      continue;
-    }
-
-    // If the pattern didn't get a type, it's because we ran into some
-    // unknown types along the way. We'll need to check the initializer.
-    auto init = elt.getInitializer();
-    hadError |= TypeChecker::typeCheckBinding(pattern, init, dc, patternType);
-    elt.setPattern(pattern);
-    elt.setInitializer(init);
-    hadAnyFalsable |= pattern->isRefutablePattern();
+    hadError |=
+        TypeChecker::typeCheckStmtConditionElement(elt, hadAnyFalsable, dc);
   }
 
   // If the binding is not refutable, and there *is* an else, reject it as
@@ -677,7 +653,7 @@ public:
     if (S2 == nullptr)
       return true;
     S = S2;
-    performStmtDiagnostics(getASTContext(), S);
+    performStmtDiagnostics(S, DC);
     return false;
   }
 
@@ -788,7 +764,6 @@ public:
       assert(DiagnosticSuppression::isEnabled(getASTContext().Diags) &&
              "Diagnosing and AllowUnresolvedTypeVariables don't seem to mix");
       options |= TypeCheckExprFlags::LeaveClosureBodyUnchecked;
-      options |= TypeCheckExprFlags::AllowUnresolvedTypeVariables;
     }
 
     ContextualTypePurpose ctp = CTP_ReturnStmt;
@@ -1282,16 +1257,6 @@ static void diagnoseIgnoredLiteral(ASTContext &Ctx, LiteralExpr *LE) {
 }
 
 void TypeChecker::checkIgnoredExpr(Expr *E) {
-  // For parity with C, several places in the grammar accept multiple
-  // comma-separated expressions and then bind them together as an implicit
-  // tuple.  Break these apart and check them separately.
-  if (E->isImplicit() && isa<TupleExpr>(E)) {
-    for (auto Elt : cast<TupleExpr>(E)->getElements()) {
-      checkIgnoredExpr(Elt);
-    }
-    return;
-  }
-
   // Skip checking if there is no type, which presumably means there was a
   // type error.
   if (!E->getType()) {
@@ -1456,21 +1421,7 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
 
     // Otherwise, complain.  Start with more specific diagnostics.
 
-    // Diagnose unused literals that were translated to implicit
-    // constructor calls during CSApply / ExprRewriter::convertLiteral.
-    if (call->isImplicit()) {
-      Expr *arg = call->getArg();
-      if (auto *TE = dyn_cast<TupleExpr>(arg))
-        if (TE->getNumElements() == 1)
-          arg = TE->getElement(0);
-
-      if (auto *LE = dyn_cast<LiteralExpr>(arg)) {
-        diagnoseIgnoredLiteral(Context, LE);
-        return;
-      }
-    }
-
-    // Other unused constructor calls.
+    // Diagnose unused constructor calls.
     if (callee && isa<ConstructorDecl>(callee) && !call->isImplicit()) {
       DE.diagnose(fn->getLoc(), diag::expression_unused_init_result,
                callee->getDeclContext()->getDeclaredInterfaceType())
@@ -1480,8 +1431,8 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
     
     SourceRange SR1 = call->getArg()->getSourceRange(), SR2;
     if (auto *BO = dyn_cast<BinaryExpr>(call)) {
-      SR1 = BO->getArg()->getElement(0)->getSourceRange();
-      SR2 = BO->getArg()->getElement(1)->getSourceRange();
+      SR1 = BO->getLHS()->getSourceRange();
+      SR2 = BO->getRHS()->getSourceRange();
     }
     
     // Otherwise, produce a generic diagnostic.
@@ -1530,7 +1481,6 @@ void StmtChecker::typeCheckASTNode(ASTNode &node) {
       options |= TypeCheckExprFlags::IsDiscarded;
     if (LeaveBraceStmtBodyUnchecked) {
       options |= TypeCheckExprFlags::LeaveClosureBodyUnchecked;
-      options |= TypeCheckExprFlags::AllowUnresolvedTypeVariables;
     }
 
     auto resultTy =
@@ -1607,20 +1557,23 @@ void TypeChecker::typeCheckASTNode(ASTNode &node, DeclContext *DC,
   stmtChecker.typeCheckASTNode(node);
 }
 
-static Type getFunctionBuilderType(FuncDecl *FD) {
-  Type builderType = FD->getFunctionBuilderType();
+static Type getResultBuilderType(FuncDecl *FD) {
+  Type builderType = FD->getResultBuilderType();
 
   // For getters, fall back on looking on the attribute on the storage.
   if (!builderType) {
     auto accessor = dyn_cast<AccessorDecl>(FD);
     if (accessor && accessor->getAccessorKind() == AccessorKind::Get) {
-      builderType = accessor->getStorage()->getFunctionBuilderType();
+      builderType = accessor->getStorage()->getResultBuilderType();
     }
   }
 
   return builderType;
 }
 
+/// Attempts to build an implicit call within the provided constructor
+/// to the provided class's zero-argument super initializer.
+/// @returns nullptr if there was an error and a diagnostic was emitted.
 static Expr* constructCallToSuperInit(ConstructorDecl *ctor,
                                       ClassDecl *ClDecl) {
   ASTContext &Context = ctor->getASTContext();
@@ -1628,7 +1581,7 @@ static Expr* constructCallToSuperInit(ConstructorDecl *ctor,
                                               SourceLoc(), /*Implicit=*/true);
   Expr *r = UnresolvedDotExpr::createImplicit(
       Context, superRef, DeclBaseName::createConstructor());
-  r = CallExpr::createImplicit(Context, r, { }, { });
+  r = CallExpr::createImplicitEmpty(Context, r);
 
   if (ctor->hasThrows())
     r = new (Context) TryExpr(SourceLoc(), r, Type(), /*implicit=*/true);
@@ -1667,7 +1620,7 @@ static bool checkSuperInit(ConstructorDecl *fromCtor,
     }
     return true;
   }
-  
+
   // For an implicitly generated super.init() call, make sure there's
   // only one designated initializer.
   if (implicitlyGenerated) {
@@ -1696,11 +1649,21 @@ static bool checkSuperInit(ConstructorDecl *fromCtor,
     }
 
     // Make sure we can reference the designated initializer correctly.
-    auto fragileKind = fromCtor->getFragileFunctionKind();
-    if (fragileKind.kind != FragileFunctionKind::None) {
-      TypeChecker::diagnoseInlinableDeclRef(
-          fromCtor->getLoc(), ctor, fromCtor,
-          fragileKind);
+    auto loc = fromCtor->getLoc();
+    const bool didDiagnose = diagnoseDeclAvailability(
+        ctor, loc, nullptr,
+        ExportContext::forFunctionBody(fromCtor, loc));
+    if (didDiagnose) {
+      fromCtor->diagnose(diag::availability_unavailable_implicit_init,
+                         ctor->getDescriptiveKind(), ctor->getName(),
+                         superclassDecl->getName());
+    }
+
+    // Not allowed to implicitly generate a super.init() call if the init
+    // is async; that would hide the 'await' from the programmer.
+    if (ctor->hasAsync()) {
+      fromCtor->diagnose(diag::implicit_async_super_init);
+      return true; // considered an error
     }
   }
 
@@ -1843,12 +1806,23 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(Evaluator &evaluator,
 
     std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
       if (auto *brace = dyn_cast<BraceStmt>(S)) {
+        auto braceCharRange = Lexer::getCharSourceRangeFromSourceRange(
+            SM, brace->getSourceRange());
+        // Unless this brace contains the loc, there's nothing to do.
+        if (!braceCharRange.contains(Loc))
+          return {false, S};
+
+        // Reset the node found in a parent context.
+        if (!brace->isImplicit())
+          FoundNode = nullptr;
+
         for (ASTNode &node : brace->getElements()) {
           if (SM.isBeforeInBuffer(Loc, node.getStartLoc()))
             break;
 
           // NOTE: We need to check the character loc here because the target
-          // loc can be inside the last token of the node. i.e. interpolated string.
+          // loc can be inside the last token of the node. i.e. interpolated
+          // string.
           SourceLoc endLoc = Lexer::getLocForEndOfToken(SM, node.getEndLoc());
           if (SM.isBeforeInBuffer(endLoc, Loc) || endLoc == Loc)
             continue;
@@ -1860,8 +1834,9 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(Evaluator &evaluator,
 
           // Walk into the node to narrow down.
           node.walk(*this);
-        }
 
+          break;
+        }
         // Already walked into.
         return {false, nullptr};
       }
@@ -1917,30 +1892,52 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(Evaluator &evaluator,
 
   // Function builder function doesn't support partial type checking.
   if (auto *func = dyn_cast<FuncDecl>(DC)) {
-    if (Type builderType = getFunctionBuilderType(func)) {
+    if (Type builderType = getResultBuilderType(func)) {
       auto optBody =
-          TypeChecker::applyFunctionBuilderBodyTransform(func, builderType);
-      if (!optBody || !*optBody)
-        return true;
-      // Wire up the function body now.
-      func->setBody(*optBody, AbstractFunctionDecl::BodyKind::TypeChecked);
-      return false;
+          TypeChecker::applyResultBuilderBodyTransform(func, builderType);
+      if (optBody && *optBody) {
+        // Wire up the function body now.
+        func->setBody(*optBody, AbstractFunctionDecl::BodyKind::TypeChecked);
+        return false;
+      }
+      // FIXME: We failed to apply the result builder transform. Fall back to
+      // just type checking the node that contains the code completion token.
+      // This may be missing some context from the result builder but in
+      // practice it often contains sufficient information to provide a decent
+      // level of code completion that's better than providing nothing at all.
+      // The proper solution would be to only partially type check the result
+      // builder so that this fall back would not be necessary.
     } else if (func->hasSingleExpressionBody() &&
                 func->getResultInterfaceType()->isVoid()) {
        // The function returns void.  We don't need an explicit return, no matter
        // what the type of the expression is.  Take the inserted return back out.
-      func->getBody()->setFirstElement(func->getSingleExpressionBody());
+      func->getBody()->setLastElement(func->getSingleExpressionBody());
     }
   }
 
   // The enclosing closure might be a single expression closure or a function
   // builder closure. In such cases, the body elements are type checked with
   // the closure itself. So we need to try type checking the enclosing closure
-  // signature first.
+  // signature first unless it has already been type checked.
   if (auto CE = dyn_cast<ClosureExpr>(DC)) {
-    swift::typeCheckASTNodeAtLoc(CE->getParent(), CE->getLoc());
-    if (CE->getBodyState() != ClosureExpr::BodyState::ReadyForTypeChecking)
-      return false;
+    if (CE->getBodyState() == ClosureExpr::BodyState::Parsed) {
+      swift::typeCheckASTNodeAtLoc(CE->getParent(), CE->getLoc());
+      // We need the actor isolation of the closure to be set so that we can
+      // annotate results that are on the same global actor.
+      // Since we are evaluating TypeCheckASTNodeAtLocRequest for every closure
+      // from outermost to innermost, we don't want to call checkActorIsolation,
+      // because that would cause actor isolation to be checked multiple times
+      // for nested closures. Instead, call determineClosureActorIsolation
+      // directly and set the closure's actor isolation manually. We can
+      // guarantee of that the actor isolation of enclosing closures have their
+      // isolation checked before nested ones are being checked by the way
+      // TypeCheckASTNodeAtLocRequest is called multiple times, as described
+      // above.
+      auto ActorIsolation = determineClosureActorIsolation(CE);
+      CE->setActorIsolation(ActorIsolation);
+      if (CE->getBodyState() != ClosureExpr::BodyState::ReadyForTypeChecking)
+        return false;
+    }
   }
 
   TypeChecker::typeCheckASTNode(finder.getRef(), DC,
@@ -1961,7 +1958,7 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
   BraceStmt *body = AFD->getBody();
   assert(body && "Expected body to type-check");
 
-  // It's possible we sythesized an already type-checked body, in which case
+  // It's possible we synthesized an already type-checked body, in which case
   // we're done.
   if (AFD->isBodyTypeChecked())
     return body;
@@ -1978,9 +1975,9 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
 
   bool alreadyTypeChecked = false;
   if (auto *func = dyn_cast<FuncDecl>(AFD)) {
-    if (Type builderType = getFunctionBuilderType(func)) {
+    if (Type builderType = getResultBuilderType(func)) {
       if (auto optBody =
-              TypeChecker::applyFunctionBuilderBodyTransform(
+              TypeChecker::applyResultBuilderBodyTransform(
                 func, builderType)) {
         if (!*optBody)
           return errorBody();
@@ -1994,7 +1991,7 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
                func->getResultInterfaceType()->isVoid()) {
       // The function returns void.  We don't need an explicit return, no matter
       // what the type of the expression is.  Take the inserted return back out.
-      body->setFirstElement(func->getSingleExpressionBody());
+      body->setLastElement(func->getSingleExpressionBody());
     }
   } else if (isa<ConstructorDecl>(AFD) &&
              (body->empty() ||
@@ -2028,12 +2025,12 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
   // that we have eagerly converted something like `{ fatalError() }`
   // into `{ return fatalError() }` that has to be corrected here.
   if (isa<FuncDecl>(AFD) && cast<FuncDecl>(AFD)->hasSingleExpressionBody()) {
-    if (auto *stmt = body->getFirstElement().dyn_cast<Stmt *>()) {
+    if (auto *stmt = body->getLastElement().dyn_cast<Stmt *>()) {
       if (auto *retStmt = dyn_cast<ReturnStmt>(stmt)) {
         if (retStmt->isImplicit() && retStmt->hasResult()) {
           auto returnType = retStmt->getResult()->getType();
           if (returnType && returnType->isUninhabited())
-            body->setFirstElement(retStmt->getResult());
+            body->setLastElement(retStmt->getResult());
         }
       }
     }
@@ -2054,14 +2051,19 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
   if (!hadError)
     performAbstractFuncDeclDiagnostics(AFD);
 
-  TypeChecker::checkFunctionEffects(AFD);
   TypeChecker::computeCaptures(AFD);
+  if (!AFD->getDeclContext()->isLocalContext()) {
+    checkFunctionActorIsolation(AFD);
+    checkFunctionAsyncUsage(AFD);
+    TypeChecker::checkFunctionEffects(AFD);
+  }
 
   return hadError ? errorBody() : body;
 }
 
 bool TypeChecker::typeCheckClosureBody(ClosureExpr *closure) {
-  TypeChecker::checkParameterList(closure->getParameters());
+  TypeChecker::checkClosureAttributes(closure);
+  TypeChecker::checkParameterList(closure->getParameters(), closure);
 
   BraceStmt *body = closure->getBody();
 
@@ -2096,6 +2098,7 @@ void TypeChecker::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
   BraceStmt *Body = TLCD->getBody();
   StmtChecker(TLCD).typeCheckStmt(Body);
   TLCD->setBody(Body);
+  checkTopLevelActorIsolation(TLCD);
   checkTopLevelEffects(TLCD);
   performTopLevelDeclDiagnostics(TLCD);
 }

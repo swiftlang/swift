@@ -46,6 +46,9 @@ class FrontendInputsAndOutputs {
   /// Punt where needed to enable batch mode experiments.
   bool AreBatchModeChecksBypassed = false;
 
+  /// Recover missing inputs. Note that recovery itself is users responsibility.
+  bool ShouldRecoverMissingInputs = false;
+
 public:
   bool areBatchModeChecksBypassed() const { return AreBatchModeChecksBypassed; }
   void setBypassBatchModeChecks(bool bbc) { AreBatchModeChecksBypassed = bbc; }
@@ -65,6 +68,9 @@ public:
   void setIsSingleThreadedWMO(bool istw) { IsSingleThreadedWMO = istw; }
 
   bool isWholeModule() const { return !hasPrimaryInputs(); }
+
+  bool shouldRecoverMissingInputs() { return ShouldRecoverMissingInputs; }
+  void setShouldRecoverMissingInputs() { ShouldRecoverMissingInputs = true; }
 
   // Readers:
 
@@ -103,6 +109,11 @@ public:
   /// If \p fn returns true, exit early and return true.
   bool
   forEachPrimaryInput(llvm::function_ref<bool(const InputFile &)> fn) const;
+
+  /// Iterates over primary inputs, exposing their unique ordered index
+  /// If \p fn returns true, exit early and return true.
+  bool forEachPrimaryInputWithIndex(
+      llvm::function_ref<bool(const InputFile &, unsigned index)> fn) const;
 
   /// If \p fn returns true, exit early and return true.
   bool
@@ -177,7 +188,8 @@ private:
   friend struct InterfaceSubContextDelegateImpl;
   void setMainAndSupplementaryOutputs(
       ArrayRef<std::string> outputFiles,
-      ArrayRef<SupplementaryOutputPaths> supplementaryOutputs);
+      ArrayRef<SupplementaryOutputPaths> supplementaryOutputs,
+      ArrayRef<std::string> outputFilesForIndexUnits = None);
 
 public:
   unsigned countOfInputsProducingMainOutputs() const;
@@ -198,12 +210,17 @@ public:
       llvm::function_ref<bool(const InputFile &)> fn) const;
 
   std::vector<std::string> copyOutputFilenames() const;
+  std::vector<std::string> copyIndexUnitOutputFilenames() const;
 
   void forEachOutputFilename(llvm::function_ref<void(StringRef)> fn) const;
 
   /// Gets the name of the specified output filename.
   /// If multiple files are specified, the last one is returned.
   std::string getSingleOutputFilename() const;
+
+  /// Gets the name of the specified output filename to record in the index unit
+  /// output files. If multiple are specified, the last one is returned.
+  std::string getSingleIndexUnitOutputFilename() const;
 
   bool isOutputFilenameStdout() const;
   bool isOutputFileDirectory() const;
@@ -232,8 +249,6 @@ public:
 
   bool hasDependenciesPath() const;
   bool hasReferenceDependenciesPath() const;
-  bool hasSwiftRangesPath() const;
-  bool hasCompiledSourcePath() const;
   bool hasObjCHeaderOutputPath() const;
   bool hasLoadedModuleTracePath() const;
   bool hasModuleOutputPath() const;

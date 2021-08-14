@@ -50,7 +50,7 @@ bb0(%0 : @owned $SwiftGizmo):
 
 sil [ossa] @$s12objc_dealloc10SwiftGizmoC1xAA1XCfgTo : $@convention(objc_method) (SwiftGizmo) -> @autoreleased X {
 bb0(%0 : @unowned $SwiftGizmo):
-  %1 = begin_borrow %0 : $SwiftGizmo
+  %1 = unchecked_ownership_conversion %0 : $SwiftGizmo, @unowned to @guaranteed
   %2 = ref_element_addr %1 : $SwiftGizmo, #SwiftGizmo.x      // user: %2
   %3 = load [copy] %2 : $*X                              // users: %4, %3
   end_borrow %1 : $SwiftGizmo
@@ -92,7 +92,7 @@ bb0(%0 : @unowned $SwiftGizmo):
   // CHECK-NEXT: [[XADDR:%[.a-zA-Z0-9]+]] = bitcast i8* [[IVAR_ADDR]] to %T12objc_dealloc1XC**
   // CHECK-NEXT: [[X:%[a-zA-Z0-9]+]] = load %T12objc_dealloc1XC*, %T12objc_dealloc1XC** [[XADDR]], align 8
   // CHECK-NEXT: call void bitcast (void (%swift.refcounted*)* @swift_release to void (%T12objc_dealloc1XC*)*)(%T12objc_dealloc1XC* [[X]])
-  %3 = begin_borrow %0 : $SwiftGizmo
+  %3 = unchecked_ownership_conversion %0 : $SwiftGizmo, @unowned to @guaranteed
   %4 = ref_element_addr %3 : $SwiftGizmo, #SwiftGizmo.x      // user: %4
   destroy_addr %4 : $*X                           // id: %4
   end_borrow %3 : $SwiftGizmo

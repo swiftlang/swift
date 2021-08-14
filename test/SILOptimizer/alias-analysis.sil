@@ -1,0 +1,60 @@
+// RUN: %target-sil-opt %s -aa-kind=all -aa-dump -o /dev/null | %FileCheck %s
+
+// General black-box alias analysis tests. White-box unit tests are
+// specific to the aa-kind, such as basic-aa.sil and typed-access-tb-aa.sil.
+
+// REQUIRES: asserts
+
+sil_stage canonical
+
+import Swift
+import SwiftShims
+import Builtin
+
+struct MyStruct {
+  @_hasStorage @_hasInitialValue var i: Int64 { get set }
+  @_hasStorage @_hasInitialValue var j: Int64 { get set }
+}
+
+struct OuterStruct {
+  @_hasStorage @_hasInitialValue var s: MyStruct { get set }
+}
+
+// Test overlaping access on a different path; the user has misused an index offset
+// CHECK-LABEL: @testOffsetBehindProjection
+// CHECK: PAIR #28.
+// CHECK:   %4 = load %3 : $*Int64
+// CHECK:   %6 = load %5 : $*Int64
+// CHECK: MayAlias
+sil shared @testOffsetBehindProjection : $@convention(thin) (@inout MyStruct) -> () {
+bb0(%0 : $*MyStruct):
+  %1 = struct_element_addr %0 : $*MyStruct, #MyStruct.i
+  %2 = integer_literal $Builtin.Word, 1
+  %3 = index_addr %1 : $*Int64, %2 : $Builtin.Word
+  %4 = load %3 : $*Int64
+  // load from a different subobject overlaps
+  %5 = struct_element_addr %0 : $*MyStruct, #MyStruct.j
+  %6 = load %5 : $*Int64
+  %99 = tuple ()
+  return %99 : $()
+}
+
+// CHECK-LABEL: @testOffsetsBehindProjectionOverlap
+// CHECK: PAIR #28.
+// CHECK:   %3 = load %2 : $*Int64
+// CHECK:   %7 = load %6 : $*Int64
+// CHECK: MayAlias
+sil shared @testOffsetsBehindProjectionOverlap : $@convention(thin) (@inout OuterStruct) -> () {
+bb0(%0 : $*OuterStruct):
+  %1 = struct_element_addr %0 : $*OuterStruct, #OuterStruct.s
+  %2 = struct_element_addr %1 : $*MyStruct, #MyStruct.i
+  %3 = load %2 : $*Int64
+  // Loading from a different index within the same subobject still appears to overlap.
+  // Indexing from a subobject is always considered an unknown index.
+  %4 = integer_literal $Builtin.Word, 1
+  %5 = index_addr %1 : $*MyStruct, %4 : $Builtin.Word
+  %6 = struct_element_addr %5 : $*MyStruct, #MyStruct.i
+  %7 = load %6 : $*Int64
+  %99 = tuple ()
+  return %99 : $()
+}

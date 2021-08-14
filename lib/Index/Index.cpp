@@ -16,6 +16,7 @@
 #include "swift/AST/Comment.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/GenericParamList.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -26,6 +27,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/IDE/SourceEntityWalker.h"
+#include "swift/IDE/Utils.h"
 #include "swift/Markup/Markup.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "llvm/ADT/APInt.h"
@@ -77,7 +79,7 @@ static bool printDisplayName(const swift::ValueDecl *D, llvm::raw_ostream &OS) {
 
 static bool isMemberwiseInit(swift::ValueDecl *D) {
   if (auto AFD = dyn_cast<AbstractFunctionDecl>(D))
-    return AFD->getBodyKind() == AbstractFunctionDecl::BodyKind::MemberwiseInitializer;
+    return AFD->isMemberwiseInitializer();
   return false;
 }
 
@@ -438,6 +440,57 @@ private:
     return true;
   }
 
+  /// Extensions redeclare all generic parameters of their extended type to add
+  /// their additional restrictions. There are two issues with this model for
+  /// indexing:
+  ///  - The generic paramter declarations of the extension are implicit so we
+  ///    wouldn't report them in the index. Any usage of the generic param in
+  ///    the extension references this implicit declaration so we don't include
+  ///    it in the index either.
+  ///  - The implicit re-declarations have their own USRs so any usage of a
+  ///    generic parameter inside an extension would use a different USR than
+  ///    declaration of the param in the extended type.
+  ///
+  /// To fix these issues, we replace the reference to the implicit generic
+  /// parameter defined in the extension by a reference to the generic paramter
+  /// defined in the extended type.
+  ///
+  /// \returns the canonicalized replaced generic param decl if it can be found
+  ///          or \p GenParam otherwise.
+  ValueDecl *
+  canonicalizeGenericTypeParamDeclForIndex(GenericTypeParamDecl *GenParam) {
+    auto Extension = dyn_cast_or_null<ExtensionDecl>(
+        GenParam->getDeclContext()->getAsDecl());
+    if (!Extension) {
+      // We are not referencing a generic paramter defined in an extension.
+      // Nothing to do.
+      return GenParam;
+    }
+    assert(GenParam->isImplicit() &&
+           "Generic param decls in extension should always be implicit and "
+           "shadow a generic param in the extended type.");
+    assert(Extension->getExtendedNominal() &&
+           "The implict generic types on the extension should only be created "
+           "if the extended type was found");
+
+    auto ExtendedTypeGenSig =
+        Extension->getExtendedNominal()->getGenericSignature();
+    assert(ExtendedTypeGenSig && "Extension is generic but extended type not?");
+
+    // The generic parameter in the extension has the same depths and index
+    // as the one in the extended type.
+    for (auto ExtendedTypeGenParam : ExtendedTypeGenSig.getGenericParams()) {
+      if (ExtendedTypeGenParam->getIndex() == GenParam->getIndex() &&
+          ExtendedTypeGenParam->getDepth() == GenParam->getDepth()) {
+        assert(ExtendedTypeGenParam->getDecl() &&
+               "The generic parameter defined on the extended type cannot be "
+               "implicit.");
+        return ExtendedTypeGenParam->getDecl();
+      }
+    }
+    llvm_unreachable("Can't find the generic parameter in the extended type");
+  }
+
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
                           TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
                           ReferenceMetaData Data) override {
@@ -454,6 +507,11 @@ private:
     if (CtorTyRef)
       if (!reportRef(CtorTyRef, Loc, Info, Data.AccKind))
         return false;
+
+    if (auto *GenParam = dyn_cast<GenericTypeParamDecl>(D)) {
+      D = canonicalizeGenericTypeParamDeclForIndex(GenParam);
+    }
+
     if (!reportRef(D, Loc, Info, Data.AccKind))
       return false;
 
@@ -559,7 +617,8 @@ private:
 
   bool reportRelatedRef(ValueDecl *D, SourceLoc Loc, bool isImplicit, SymbolRoleSet Relations, Decl *Related);
   bool reportRelatedTypeRef(const TypeLoc &Ty, SymbolRoleSet Relations, Decl *Related);
-  bool reportInheritedTypeRefs(ArrayRef<TypeLoc> Inherited, Decl *Inheritee);
+  bool reportInheritedTypeRefs(
+      ArrayRef<InheritedEntry> Inherited, Decl *Inheritee);
   NominalTypeDecl *getTypeLocAsNominalTypeDecl(const TypeLoc &Ty);
 
   bool reportPseudoGetterDecl(VarDecl *D) {
@@ -602,7 +661,7 @@ private:
   getLineColAndOffset(SourceLoc Loc) {
     if (Loc.isInvalid())
       return std::make_tuple(0, 0, None);
-    auto lineAndColumn = SrcMgr.getPresumedLineAndColumnForLoc(Loc, BufferID);
+    auto lineAndColumn = SrcMgr.getLineAndColumnInBuffer(Loc, BufferID);
     unsigned offset = SrcMgr.getLocOffsetInBuffer(Loc, BufferID);
     return std::make_tuple(lineAndColumn.first, lineAndColumn.second, offset);
   }
@@ -629,6 +688,22 @@ private:
       return false;
 
     return true;
+  }
+
+  // Are there members or conformances in \c D that should be indexed?
+  bool shouldIndexMembers(ExtensionDecl *D) {
+    for (auto Member : D->getMembers())
+      if (auto VD = dyn_cast<ValueDecl>(Member))
+        if (shouldIndex(VD, /*IsRef=*/false))
+          return true;
+
+    for (auto Inherit : D->getInherited())
+      if (auto T = Inherit.getType())
+        if (T->getAnyNominal() &&
+            shouldIndex(T->getAnyNominal(), /*IsRef=*/false))
+          return true;
+
+    return false;
   }
 
   /// Reports all implicit member value decl conformances that \p D introduces
@@ -924,7 +999,7 @@ bool IndexSwiftASTWalker::reportRelatedRef(ValueDecl *D, SourceLoc Loc, bool isI
   return !Cancelled;
 }
 
-bool IndexSwiftASTWalker::reportInheritedTypeRefs(ArrayRef<TypeLoc> Inherited, Decl *Inheritee) {
+bool IndexSwiftASTWalker::reportInheritedTypeRefs(ArrayRef<InheritedEntry> Inherited, Decl *Inheritee) {
   for (auto Base : Inherited) {
     if (!reportRelatedTypeRef(Base, (SymbolRoleSet) SymbolRole::RelationBaseOf, Inheritee))
       return false;
@@ -1066,6 +1141,10 @@ bool IndexSwiftASTWalker::reportExtension(ExtensionDecl *D) {
   if (!NTD)
     return true;
   if (!shouldIndex(NTD, /*IsRef=*/false))
+    return true;
+
+  // Don't index "empty" extensions in imported modules.
+  if (IsModuleFile && !shouldIndexMembers(D))
     return true;
 
   IndexSymbol Info;
@@ -1279,10 +1358,6 @@ bool IndexSwiftASTWalker::initIndexSymbol(ExtensionDecl *ExtD, ValueDecl *Extend
   return false;
 }
 
-static NominalTypeDecl *getNominalParent(ValueDecl *D) {
-  return D->getDeclContext()->getSelfNominalTypeDecl();
-}
-
 bool IndexSwiftASTWalker::initFuncDeclIndexSymbol(FuncDecl *D,
                                                   IndexSymbol &Info) {
   if (initIndexSymbol(D, D->getLoc(/*SerializedOK*/false), /*IsRef=*/false, Info))
@@ -1317,81 +1392,13 @@ bool IndexSwiftASTWalker::initFuncDeclIndexSymbol(FuncDecl *D,
   return false;
 }
 
-static bool isSuperRefExpr(Expr *E) {
-  if (!E)
-    return false;
-  if (isa<SuperRefExpr>(E))
-    return true;
-  if (auto LoadE = dyn_cast<LoadExpr>(E))
-    return isSuperRefExpr(LoadE->getSubExpr());
-  return false;
-}
-
-static bool isDynamicCall(Expr *BaseE, ValueDecl *D) {
-  // The call is 'dynamic' if the method is not of a struct/enum and the
-  // receiver is not 'super'. Note that if the receiver is 'super' that
-  // does not mean that the call is statically determined (an extension
-  // method may have injected itself in the super hierarchy).
-  // For our purposes 'dynamic' means that the method call cannot invoke
-  // a method in a subclass.
-  auto TyD = getNominalParent(D);
-  if (!TyD)
-    return false;
-  if (isa<StructDecl>(TyD) || isa<EnumDecl>(TyD))
-    return false;
-  if (isSuperRefExpr(BaseE))
-    return false;
-  if (BaseE->getType()->is<MetatypeType>())
-    return false;
-
-  return true;
-}
-
-static Expr *getUnderlyingFunc(Expr *Fn) {
-  Fn = Fn->getSemanticsProvidingExpr();
-  if (auto *DRE = dyn_cast<DeclRefExpr>(Fn))
-    return DRE;
-  if (auto ApplyE = dyn_cast<SelfApplyExpr>(Fn))
-    return getUnderlyingFunc(ApplyE->getFn());
-  if (auto *ACE = dyn_cast<AutoClosureExpr>(Fn)) {
-    if (auto *Unwrapped = ACE->getUnwrappedCurryThunkExpr())
-      return getUnderlyingFunc(Unwrapped);
-  }
-  return Fn;
-}
-
-static bool isBeingCalled(Expr *Target, ArrayRef<Expr*> ExprStack) {
-  if (!Target)
-    return false;
-  Target = getUnderlyingFunc(Target);
-
-  for (Expr *E: reverse(ExprStack)) {
-    auto *AE = dyn_cast<ApplyExpr>(E);
-    if (!AE || AE->isImplicit())
-      continue;
-    if (isa<ConstructorRefCallExpr>(AE) && AE->getArg() == Target)
-      return true;
-    if (isa<SelfApplyExpr>(AE))
-      continue;
-    if (getUnderlyingFunc(AE->getFn()) == Target)
-      return true;
-  }
-  return false;
-}
-
 bool IndexSwiftASTWalker::initFuncRefIndexSymbol(ValueDecl *D, SourceLoc Loc,
                                                  IndexSymbol &Info) {
 
   if (initIndexSymbol(D, Loc, /*IsRef=*/true, Info))
     return true;
 
-  Expr *CurrentE = getCurrentExpr();
-  if (!CurrentE)
-    return false;
-
-  Expr *ParentE = getParentExpr();
-
-  if (!isa<AbstractStorageDecl>(D) && !isBeingCalled(CurrentE, ExprStack))
+  if (!isa<AbstractStorageDecl>(D) && !ide::isBeingCalled(ExprStack))
     return false;
 
   Info.roles |= (unsigned)SymbolRole::Call;
@@ -1400,31 +1407,20 @@ bool IndexSwiftASTWalker::initFuncRefIndexSymbol(ValueDecl *D, SourceLoc Loc,
       return true;
   }
 
-  Expr *BaseE = nullptr;
-  if (auto DotE = dyn_cast_or_null<DotSyntaxCallExpr>(ParentE))
-    BaseE = DotE->getBase();
-  else if (auto MembE = dyn_cast<MemberRefExpr>(CurrentE))
-    BaseE = MembE->getBase();
-  else if (auto SubsE = dyn_cast<SubscriptExpr>(CurrentE))
-    BaseE = SubsE->getBase();
-
-  if (!BaseE || BaseE == CurrentE)
+  Expr *BaseE = ide::getBase(ExprStack);
+  if (!BaseE)
     return false;
 
-  if (Type ReceiverTy = BaseE->getType()) {
-    if (auto LVT = ReceiverTy->getAs<LValueType>())
-      ReceiverTy = LVT->getObjectType();
-    else if (auto MetaT = ReceiverTy->getAs<MetatypeType>())
-      ReceiverTy = MetaT->getInstanceType();
+  if (ide::isDynamicCall(BaseE, D))
+    Info.roles |= (unsigned)SymbolRole::Dynamic;
 
-    if (auto TyD = ReceiverTy->getAnyNominal()) {
-      if (addRelation(Info, (SymbolRoleSet) SymbolRole::RelationReceivedBy, TyD))
-        return true;
-      if (isDynamicCall(BaseE, D))
-        Info.roles |= (unsigned)SymbolRole::Dynamic;
-    }
+  SmallVector<NominalTypeDecl *, 1> Types;
+  ide::getReceiverType(BaseE, Types);
+  for (auto *ReceiverTy : Types) {
+    if (addRelation(Info, (SymbolRoleSet) SymbolRole::RelationReceivedBy,
+                    ReceiverTy))
+      return true;
   }
-
   return false;
 }
 

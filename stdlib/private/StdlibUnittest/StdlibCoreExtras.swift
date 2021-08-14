@@ -17,7 +17,7 @@ import Darwin
 #elseif canImport(Glibc)
 import Glibc
 #elseif os(Windows)
-import MSVCRT
+import CRT
 #endif
 
 #if _runtime(_ObjC)
@@ -128,14 +128,14 @@ public struct TypeIdentifier : Hashable, Comparable {
   internal var objectID : ObjectIdentifier {
     return ObjectIdentifier(value)
   }
-}
 
-public func < (lhs: TypeIdentifier, rhs: TypeIdentifier) -> Bool {
-  return lhs.objectID < rhs.objectID
-}
+  public static func < (lhs: TypeIdentifier, rhs: TypeIdentifier) -> Bool {
+    return lhs.objectID < rhs.objectID
+  }
 
-public func == (lhs: TypeIdentifier, rhs: TypeIdentifier) -> Bool {
-  return lhs.objectID == rhs.objectID
+  public static func == (lhs: TypeIdentifier, rhs: TypeIdentifier) -> Bool {
+    return lhs.objectID == rhs.objectID
+  }
 }
 
 extension TypeIdentifier

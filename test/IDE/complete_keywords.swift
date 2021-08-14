@@ -1,100 +1,5 @@
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_1 > %t.top1
-// RUN: %FileCheck %s -check-prefix=KW_DECL_STMT < %t.top1
-// RUN: %FileCheck %s -check-prefix=KW_NO_RETURN < %t.top1
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_2 > %t.top2
-// RUN: %FileCheck %s -check-prefix=KW_DECL_STMT < %t.top2
-// RUN: %FileCheck %s -check-prefix=KW_NO_RETURN < %t.top2
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_AFTER_IF_1 > %t.top3
-// RUN: %FileCheck %s -check-prefix=KW_DECL_STMT < %t.top3
-// RUN: %FileCheck %s -check-prefix=KW_NO_RETURN < %t.top3
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_AFTER_IF_ELSE_1 | %FileCheck %s -check-prefix=AFTER_IF_ELSE
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=AFTER_IF_1 > %t.if1
-// RUN: %FileCheck %s -check-prefix=KW_DECL_STMT < %t.if1
-// RUN: %FileCheck %s -check-prefix=KW_RETURN < %t.if1
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=AFTER_IF_ELSE_1 | %FileCheck %s -check-prefix=AFTER_IF_ELSE
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FUNC_BODY_1 > %t.func1
-// RUN: %FileCheck %s -check-prefix=KW_DECL_STMT < %t.func1
-// RUN: %FileCheck %s -check-prefix=KW_RETURN < %t.func1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FUNC_BODY_2 > %t.func2
-// RUN: %FileCheck %s -check-prefix=KW_DECL_STMT < %t.func2
-// RUN: %FileCheck %s -check-prefix=KW_RETURN < %t.func2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FUNC_BODY_3 > %t.func3
-// RUN: %FileCheck %s -check-prefix=KW_DECL_STMT < %t.func3
-// RUN: %FileCheck %s -check-prefix=KW_RETURN < %t.func3
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FUNC_BODY_4 > %t.func4
-// RUN: %FileCheck %s -check-prefix=KW_DECL_STMT < %t.func4
-// RUN: %FileCheck %s -check-prefix=KW_RETURN < %t.func4
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FUNC_BODY_5 > %t.func5
-// RUN: %FileCheck %s -check-prefix=KW_DECL_STMT < %t.func5
-// RUN: %FileCheck %s -check-prefix=KW_RETURN < %t.func5
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_CLOSURE_1 > %t.clos1
-// RUN: %FileCheck %s -check-prefix=KW_DECL_STMT < %t.clos1
-// RUN: %FileCheck %s -check-prefix=KW_RETURN < %t.clos1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_CLOSURE_2 > %t.clos2
-// RUN: %FileCheck %s -check-prefix=KW_DECL_STMT < %t.clos2
-// RUN: %FileCheck %s -check-prefix=KW_RETURN < %t.clos2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_CLOSURE_3 > %t.clos3
-// RUN: %FileCheck %s -check-prefix=KW_DECL_STMT < %t.clos3
-// RUN: %FileCheck %s -check-prefix=KW_RETURN < %t.clos3
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_CLOSURE_4 > %t.clos4
-// RUN: %FileCheck %s -check-prefix=KW_DECL_STMT < %t.clos4
-// RUN: %FileCheck %s -check-prefix=KW_RETURN < %t.clos4
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_SUBSCRIPT_1 > %t.subs
-// RUN: %FileCheck %s -check-prefix=KW_DECL_STMT < %t.subs
-// RUN: %FileCheck %s -check-prefix=KW_RETURN < %t.subs
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_INIT_1 > %t.init
-// RUN: %FileCheck %s -check-prefix=KW_DECL_STMT < %t.init
-// RUN: %FileCheck %s -check-prefix=KW_RETURN < %t.init
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_NOMINAL_DECL_1 | %FileCheck %s -check-prefix=KW_DECL
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_NOMINAL_DECL_2 | %FileCheck %s -check-prefix=KW_DECL
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_NOMINAL_DECL_3 | %FileCheck %s -check-prefix=KW_DECL
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_NOMINAL_DECL_4 | %FileCheck %s -check-prefix=KW_DECL
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_NOMINAL_DECL_5 | %FileCheck %s -check-prefix=KW_DECL
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_NOMINAL_DECL_6 | %FileCheck %s -check-prefix=KW_DECL
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_NOMINAL_DECL_7 | %FileCheck %s -check-prefix=KW_DECL
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_NOMINAL_DECL_8 | %FileCheck %s -check-prefix=KW_DECL
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_NOMINAL_DECL_9 | %FileCheck %s -check-prefix=KW_DECL
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_NOMINAL_DECL_10 | %FileCheck %s -check-prefix=KW_DECL
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUPER_KEYWORD0 | %FileCheck %s -check-prefix=SUPER_KEYWORD0
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUPER_KEYWORD1 | %FileCheck %s -check-prefix=SUPER_KEYWORD1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUPER_KEYWORD2 | %FileCheck %s -check-prefix=SUPER_KEYWORD2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUPER_KEYWORD3 | %FileCheck %s -check-prefix=SUPER_KEYWORD3
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_1 > %t.expr1
-// RUN: %FileCheck %s -check-prefix=KW_EXPR < %t.expr1
-// RUN: %FileCheck %s -check-prefix=KW_EXPR_NEG < %t.expr1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_2 > %t.expr2
-// RUN: %FileCheck %s -check-prefix=KW_EXPR < %t.expr2
-// RUN: %FileCheck %s -check-prefix=KW_EXPR_NEG < %t.expr2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_3 > %t.expr3
-// RUN: %FileCheck %s -check-prefix=KW_EXPR < %t.expr3
-// RUN: %FileCheck %s -check-prefix=KW_EXPR_NEG < %t.expr3
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_4 > %t.expr4
-// RUN: %FileCheck %s -check-prefix=KW_EXPR < %t.expr4
-// RUN: %FileCheck %s -check-prefix=KW_EXPR_NEG < %t.expr4
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_5 > %t.expr5
-// RUN: %FileCheck %s -check-prefix=KW_EXPR < %t.expr5
-// RUN: %FileCheck %s -check-prefix=KW_EXPR_NEG < %t.expr5
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_6 > %t.expr6
-// RUN: %FileCheck %s -check-prefix=KW_EXPR < %t.expr6
-// RUN: %FileCheck %s -check-prefix=KW_EXPR_NEG < %t.expr6
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SWITCH_TOP | %FileCheck %s -check-prefix=KW_CASE
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SWITCH_IN_CASE | %FileCheck %s -check-prefix=KW_CASE
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONTEXT_UINT32 | %FileCheck %s -check-prefix=CONTEXT_UINT32
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONTEXT_STATICSTRING | %FileCheck %s -check-prefix=CONTEXT_STATICSTRING
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t
 
 // KW_RETURN: Keyword[return]/None: return{{; name=.+$}}
 // KW_NO_RETURN-NOT: Keyword[return]
@@ -121,6 +26,7 @@
 // KW_DECL-DAG: Keyword/None: override{{; name=.+$}}
 // KW_DECL-DAG: Keyword/None: postfix{{; name=.+$}}
 // KW_DECL-DAG: Keyword/None: prefix{{; name=.+$}}
+// KW_DECL_DAG: Keyword[precedencegroup]: precedencegroup{{; name=.+$}}
 // KW_DECL-DAG: Keyword[private]/None: private{{; name=.+$}}
 // KW_DECL-DAG: Keyword[protocol]/None: protocol{{; name=.+$}}
 // KW_DECL-DAG: Keyword[public]/None: public{{; name=.+$}}
@@ -134,38 +40,185 @@
 // KW_DECL-DAG: Keyword/None: weak{{; name=.+$}}
 // KW_DECL: End completions
 
+// KW_DECL_PROTOCOL: Begin completions
+// KW_DECL_PROTOCOL-DAG: Keyword[class]/None/Flair[RareKeyword]: class{{; name=.+$}}
+// KW_DECL_PROTOCOL-DAG: Keyword/None: convenience{{; name=.+$}}
+// KW_DECL_PROTOCOL-DAG: Keyword[deinit]/None: deinit{{; name=.+$}}
+// KW_DECL_PROTOCOL-DAG: Keyword/None: dynamic{{; name=.+$}}
+// KW_DECL_PROTOCOL-DAG: Keyword[enum]/None/Flair[RareKeyword]: enum{{; name=.+$}}
+// KW_DECL_PROTOCOL-DAG: Keyword[extension]/None/Flair[RareKeyword]: extension{{; name=.+$}}
+// KW_DECL_PROTOCOL-DAG: Keyword/None: final{{; name=.+$}}
+// KW_DECL_PROTOCOL-DAG: Keyword[func]/None: func{{; name=.+$}}
+// KW_DECL_PROTOCOL-DAG: Keyword[import]/None/Flair[RareKeyword]: import{{; name=.+$}}
+// KW_DECL_PROTOCOL-DAG: Keyword/None: infix{{; name=.+$}}
+// KW_DECL_PROTOCOL-DAG: Keyword[init]/None: init{{; name=.+$}}
+// KW_DECL_PROTOCOL-DAG: Keyword[internal]/None: internal{{; name=.+$}}
+// KW_DECL_PROTOCOL-DAG: Keyword/None: lazy{{; name=.+$}}
+// KW_DECL_PROTOCOL-DAG: Keyword[let]/None: let{{; name=.+$}}
+// KW_DECL_PROTOCOL-DAG: Keyword/None: mutating{{; name=.+$}}
+// KW_DECL_PROTOCOL-DAG: Keyword/None: nonmutating{{; name=.+$}}
+// KW_DECL_PROTOCOL-DAG: Keyword[operator]/None/Flair[RareKeyword]: operator{{; name=.+$}}
+// KW_DECL_PROTOCOL-DAG: Keyword/None: optional{{; name=.+$}}
+// KW_DECL_PROTOCOL-DAG: Keyword/None: override{{; name=.+$}}
+// KW_DECL_PROTOCOL-DAG: Keyword/None: postfix{{; name=.+$}}
+// KW_DECL_PROTOCOL-DAG: Keyword/None: prefix{{; name=.+$}}
+// KW_DECL_PROTOCOL-DAG: Keyword[precedencegroup]/None/Flair[RareKeyword]: precedencegroup{{; name=.+$}}
+// KW_DECL_PROTOCOL-DAG: Keyword[private]/None: private{{; name=.+$}}
+// KW_DECL_PROTOCOL-DAG: Keyword[protocol]/None/Flair[RareKeyword]: protocol{{; name=.+$}}
+// KW_DECL_PROTOCOL-DAG: Keyword[public]/None: public{{; name=.+$}}
+// KW_DECL_PROTOCOL-DAG: Keyword/None: required{{; name=.+$}}
+// KW_DECL_PROTOCOL-DAG: Keyword[static]/None: static{{; name=.+$}}
+// KW_DECL_PROTOCOL-DAG: Keyword[struct]/None/Flair[RareKeyword]: struct{{; name=.+$}}
+// KW_DECL_PROTOCOL-DAG: Keyword[subscript]/None: subscript{{; name=.+$}}
+// KW_DECL_PROTOCOL-DAG: Keyword[typealias]/None: typealias{{; name=.+$}}
+// KW_DECL_PROTOCOL-DAG: Keyword/None: unowned{{; name=.+$}}
+// KW_DECL_PROTOCOL-DAG: Keyword[var]/None: var{{; name=.+$}}
+// KW_DECL_PROTOCOL-DAG: Keyword/None: weak{{; name=.+$}}
+// KW_DECL_PROTOCOL: End completions
+
+// KW_DECL_TYPECONTEXT: Begin completions
+// KW_DECL_TYPECONTEXT-DAG: Keyword[class]/None: class{{; name=.+$}}
+// KW_DECL_TYPECONTEXT-DAG: Keyword/None: convenience{{; name=.+$}}
+// KW_DECL_TYPECONTEXT-DAG: Keyword[deinit]/None: deinit{{; name=.+$}}
+// KW_DECL_TYPECONTEXT-DAG: Keyword/None: dynamic{{; name=.+$}}
+// KW_DECL_TYPECONTEXT-DAG: Keyword[enum]/None: enum{{; name=.+$}}
+// KW_DECL_TYPECONTEXT-DAG: Keyword[extension]/None/Flair[RareKeyword]: extension{{; name=.+$}}
+// KW_DECL_TYPECONTEXT-DAG: Keyword/None: final{{; name=.+$}}
+// KW_DECL_TYPECONTEXT-DAG: Keyword[func]/None: func{{; name=.+$}}
+// KW_DECL_TYPECONTEXT-DAG: Keyword[import]/None/Flair[RareKeyword]: import{{; name=.+$}}
+// KW_DECL_TYPECONTEXT-DAG: Keyword/None: infix{{; name=.+$}}
+// KW_DECL_TYPECONTEXT-DAG: Keyword[init]/None: init{{; name=.+$}}
+// KW_DECL_TYPECONTEXT-DAG: Keyword[internal]/None: internal{{; name=.+$}}
+// KW_DECL_TYPECONTEXT-DAG: Keyword/None: lazy{{; name=.+$}}
+// KW_DECL_TYPECONTEXT-DAG: Keyword[let]/None: let{{; name=.+$}}
+// KW_DECL_TYPECONTEXT-DAG: Keyword/None: mutating{{; name=.+$}}
+// KW_DECL_TYPECONTEXT-DAG: Keyword/None: nonmutating{{; name=.+$}}
+// KW_DECL_TYPECONTEXT-DAG: Keyword[operator]/None/Flair[RareKeyword]: operator{{; name=.+$}}
+// KW_DECL_TYPECONTEXT-DAG: Keyword/None: optional{{; name=.+$}}
+// KW_DECL_TYPECONTEXT-DAG: Keyword/None: override{{; name=.+$}}
+// KW_DECL_TYPECONTEXT-DAG: Keyword/None: postfix{{; name=.+$}}
+// KW_DECL_TYPECONTEXT-DAG: Keyword/None: prefix{{; name=.+$}}
+// KW_DECL_TYPECONTEXT-DAG: Keyword[precedencegroup]/None/Flair[RareKeyword]: precedencegroup{{; name=.+$}}
+// KW_DECL_TYPECONTEXT-DAG: Keyword[private]/None: private{{; name=.+$}}
+// KW_DECL_TYPECONTEXT-DAG: Keyword[protocol]/None/Flair[RareKeyword]: protocol{{; name=.+$}}
+// KW_DECL_TYPECONTEXT-DAG: Keyword[public]/None: public{{; name=.+$}}
+// KW_DECL_TYPECONTEXT-DAG: Keyword/None: required{{; name=.+$}}
+// KW_DECL_TYPECONTEXT-DAG: Keyword[static]/None: static{{; name=.+$}}
+// KW_DECL_TYPECONTEXT-DAG: Keyword[struct]/None: struct{{; name=.+$}}
+// KW_DECL_TYPECONTEXT-DAG: Keyword[subscript]/None: subscript{{; name=.+$}}
+// KW_DECL_TYPECONTEXT-DAG: Keyword[typealias]/None: typealias{{; name=.+$}}
+// KW_DECL_TYPECONTEXT-DAG: Keyword/None: unowned{{; name=.+$}}
+// KW_DECL_TYPECONTEXT-DAG: Keyword[var]/None: var{{; name=.+$}}
+// KW_DECL_TYPECONTEXT-DAG: Keyword/None: weak{{; name=.+$}}
+// KW_DECL_TYPECONTEXT: End completions
+
+
+// KW_DECL_STMT_TOPLEVEL: Begin completions
+//
+// Declaration keywords.
+//
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword[class]/None: class{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword/None: convenience{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword[deinit]/None: deinit{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword/None: dynamic{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword[enum]/None: enum{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword[extension]/None: extension{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword/None: final{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword[func]/None: func{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword[import]/None: import{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword/None: infix{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword[init]/None: init{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword[internal]/None: internal{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword/None: lazy{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword[let]/None: let{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword/None: mutating{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword/None: nonmutating{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword[operator]/None: operator{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword/None: optional{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword/None: override{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword/None: postfix{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword[precedencegroup]/None: precedencegroup{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword/None: prefix{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword[private]/None: private{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword[protocol]/None: protocol{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword[public]/None: public{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword/None: required{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword[static]/None: static{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword[struct]/None: struct{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword[subscript]/None: subscript{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword[typealias]/None: typealias{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword/None: unowned{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword[var]/None: var{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword/None: weak{{; name=.+$}}
+//
+// Statement keywords.
+//
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword[if]/None: if{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword[do]/None: do{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword[else]/None: else{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword[for]/None: for{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword[in]/None: in{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword[while]/None: while{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword[break]/None: break{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword[continue]/None: continue{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword[fallthrough]/None: fallthrough{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword[switch]/None: switch{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword[case]/None: case{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword[default]/None: default{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword[where]/None: where{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword[catch]/None: catch{{; name=.+$}}
+//
+// Misc.
+//
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword[throw]/None: throw{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword[try]/None: try{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword[try]/None: try!{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword[try]/None: try?{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword[#function]/None{{(/TypeRelation\[Identical\])?}}: #function[#String#]{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword[#file]/None{{(/TypeRelation\[Identical\])?}}: #file[#String#]{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword[#line]/None{{(/TypeRelation\[Identical\])?}}: #line[#Int#]{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword[#column]/None{{(/TypeRelation\[Identical\])?}}: #column[#Int#]{{; name=.+$}}
+//
+// Literals
+//
+// KW_DECL_STMT_TOPLEVEL-DAG: Literal[Boolean]/None: false[#Bool#]{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Literal[Boolean]/None: true[#Bool#]{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Literal[Nil]/None: nil{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL: End completions
+
 // KW_DECL_STMT: Begin completions
 //
 // Declaration keywords.
 //
-// KW_DECL_STMT-DAG: Keyword[class]/None: class{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword/None: convenience{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword[deinit]/None: deinit{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword/None: dynamic{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword[enum]/None: enum{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword[extension]/None: extension{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword/None: final{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[class]/None/Flair[RareKeyword]: class{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword/None/Flair[RareKeyword]: convenience{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[deinit]/None/Flair[RareKeyword]: deinit{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword/None/Flair[RareKeyword]: dynamic{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[enum]/None/Flair[RareKeyword]: enum{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[extension]/None/Flair[RareKeyword]: extension{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword/None/Flair[RareKeyword]: final{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword[func]/None: func{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword[import]/None: import{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword/None: infix{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword[init]/None: init{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword[internal]/None: internal{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword/None: lazy{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[import]/None/Flair[RareKeyword]: import{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword/None/Flair[RareKeyword]: infix{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[init]/None/Flair[RareKeyword]: init{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[internal]/None/Flair[RareKeyword]: internal{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword/None/Flair[RareKeyword]: lazy{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword[let]/None: let{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword/None: mutating{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword/None: nonmutating{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword[operator]/None: operator{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword/None: optional{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword/None: override{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword/None: postfix{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword/None: prefix{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword[private]/None: private{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword[protocol]/None: protocol{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword[public]/None: public{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword/None: required{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword[static]/None: static{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword[struct]/None: struct{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword[subscript]/None: subscript{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[operator]/None/Flair[RareKeyword]: operator{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword/None/Flair[RareKeyword]: optional{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword/None/Flair[RareKeyword]: override{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword/None/Flair[RareKeyword]: postfix{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[precedencegroup]/None/Flair[RareKeyword]: precedencegroup{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword/None/Flair[RareKeyword]: prefix{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[private]/None/Flair[RareKeyword]: private{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[protocol]/None/Flair[RareKeyword]: protocol{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[public]/None/Flair[RareKeyword]: public{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword/None/Flair[RareKeyword]: required{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[static]/None/Flair[RareKeyword]: static{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[struct]/None/Flair[RareKeyword]: struct{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[subscript]/None/Flair[RareKeyword]: subscript{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword[typealias]/None: typealias{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword/None: unowned{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword[var]/None: var{{; name=.+$}}
@@ -249,114 +302,114 @@
 // KW_EXPR_NEG-NOT: Keyword{{.*}}break
 // KW_EXPR_NEG: End completions
 
-#^TOP_LEVEL_1^#
+#^TOP_LEVEL_1?check=KW_DECL_STMT_TOPLEVEL;check=KW_NO_RETURN^#
 
 for _ in 1...10 {
-  #^TOP_LEVEL_2^#
+  #^TOP_LEVEL_2?check=KW_DECL_STMT;check=KW_NO_RETURN^#
 }
 
-if true {} #^TOP_LEVEL_AFTER_IF_1^#
+if true {} #^TOP_LEVEL_AFTER_IF_1?check=KW_DECL_STMT;check=KW_NO_RETURN^#
 
-if true {} else #^TOP_LEVEL_AFTER_IF_ELSE_1^# {}
+if true {} else #^TOP_LEVEL_AFTER_IF_ELSE_1?check=AFTER_IF_ELSE^# {}
 
 // AFTER_IF_ELSE: Begin completions, 1 items
 // AFTER_IF_ELSE: Keyword[if]/None: if;
 
 func testAfterIf1() {
-  if true {} #^AFTER_IF_1^#
+  if true {} #^AFTER_IF_1?check=KW_DECL_STMT;check=KW_RETURN^#
 }
 func testAfterIfElse1() {
-  if true {} else #^AFTER_IF_ELSE_1^# {}
+  if true {} else #^AFTER_IF_ELSE_1?check=AFTER_IF_ELSE^# {}
 }
 
 func testInFuncBody1() {
-  #^IN_FUNC_BODY_1^#
+  #^IN_FUNC_BODY_1?check=KW_DECL_STMT;check=KW_RETURN^#
 }
 
 struct InStructFunc {
   func testInFuncBody2() {
-    #^IN_FUNC_BODY_2^#
+    #^IN_FUNC_BODY_2?check=KW_DECL_STMT;check=KW_RETURN^#
   }
 }
 
 enum InEnumFunc {
   func testInFuncBody3() {
-    #^IN_FUNC_BODY_3^#
+    #^IN_FUNC_BODY_3?check=KW_DECL_STMT;check=KW_RETURN^#
   }
 }
 
 class InClassFunc {
   func testInFuncBody4() {
-    #^IN_FUNC_BODY_4^#
+    #^IN_FUNC_BODY_4?check=KW_DECL_STMT;check=KW_RETURN^#
   }
 }
 
 class InClassFunc {
   class Nested {
     func testInFuncBody5() {
-      #^IN_FUNC_BODY_5^#
+      #^IN_FUNC_BODY_5?check=KW_DECL_STMT;check=KW_RETURN^#
     }
   }
 }
 
 func testInClosure1() {
-  { #^IN_CLOSURE_1^# }
+  { #^IN_CLOSURE_1?check=KW_DECL_STMT;check=KW_RETURN^# }
 }
 func testInClosure2() {
-  { #^IN_CLOSURE_2^#
+  { #^IN_CLOSURE_2?check=KW_DECL_STMT;check=KW_RETURN^#
 }
 struct InVarClosureInit {
-  let x = { #^IN_CLOSURE_3^# }()
+  let x = { #^IN_CLOSURE_3?check=KW_DECL_STMT;check=KW_RETURN^# }()
 }
 
-{ #^IN_CLOSURE_4^# }
+{ #^IN_CLOSURE_4?check=KW_DECL_STMT;check=KW_RETURN^# }
 
 struct InSubscript {
-  subscript(x: Int) -> Int { #^IN_SUBSCRIPT_1^# }
+  subscript(x: Int) -> Int { #^IN_SUBSCRIPT_1?check=KW_DECL_STMT;check=KW_RETURN^# }
 }
 
 struct InInit {
-  init?() { #^IN_INIT_1^# }
+  init?() { #^IN_INIT_1?check=KW_DECL_STMT;check=KW_RETURN^# }
 }
 
 struct InStruct {
-  #^IN_NOMINAL_DECL_1^#
+  #^IN_NOMINAL_DECL_1?check=KW_DECL_TYPECONTEXT^#
 }
 
 enum InEnum {
-  #^IN_NOMINAL_DECL_2^#
+  #^IN_NOMINAL_DECL_2?check=KW_DECL_TYPECONTEXT^#
 }
 
 class InClass {
-  #^IN_NOMINAL_DECL_3^#
+  #^IN_NOMINAL_DECL_3?check=KW_DECL_TYPECONTEXT^#
 }
 
 protocol InProtocol {
-  #^IN_NOMINAL_DECL_4^#
+  #^IN_NOMINAL_DECL_4?check=KW_DECL_PROTOCOL^#
 }
 
 struct AfterOtherKeywords1 {
-  public #^IN_NOMINAL_DECL_5^#
+  public #^IN_NOMINAL_DECL_5?check=KW_DECL_TYPECONTEXT^#
 }
 
 struct AfterOtherKeywords2 {
-  mutating #^IN_NOMINAL_DECL_6^#
+  mutating #^IN_NOMINAL_DECL_6?check=KW_DECL_TYPECONTEXT^#
 }
 
 class AfterOtherKeywords3 {
-  override #^IN_NOMINAL_DECL_7^#
+  override #^IN_NOMINAL_DECL_7?check=KW_DECL_TYPECONTEXT^#
 }
 
 class AfterOtherKeywords4 {
-  public override #^IN_NOMINAL_DECL_8^#
+  public override #^IN_NOMINAL_DECL_8?check=KW_DECL_TYPECONTEXT^#
 }
 
 extension InStruct {
-  #^IN_NOMINAL_DECL_9^#
+  #^IN_NOMINAL_DECL_9?check=KW_DECL_TYPECONTEXT^#
 }
 
 extension InProtocol {
-  #^IN_NOMINAL_DECL_10^#
+  #^IN_NOMINAL_DECL_10?check=KW_DECL_TYPECONTEXT^#
 }
 
 class SuperSuperClass {
@@ -388,32 +441,32 @@ extension SubClass {
 }
 
 func inExpr1() {
-  (#^EXPR_1^#)
+  (#^EXPR_1?check=KW_EXPR;check=KW_EXPR_NEG^#)
 }
 func inExpr2() {
-  let x = #^EXPR_2^#
+  let x = #^EXPR_2?check=KW_EXPR;check=KW_EXPR_NEG^#
 }
 func inExpr3() {
-  if #^EXPR_3^# {}
+  if #^EXPR_3?check=KW_EXPR;check=KW_EXPR_NEG^# {}
 }
 func inExpr4() {
   let x = 1
-  x + #^EXPR_4^#
+  x + #^EXPR_4?check=KW_EXPR;check=KW_EXPR_NEG^#
 }
 func inExpr5() {
   var x: Int
-  x = #^EXPR_5^#
+  x = #^EXPR_5?check=KW_EXPR;check=KW_EXPR_NEG^#
 }
 func inExpr6() -> Int {
-  return #^EXPR_6^#
+  return #^EXPR_6?check=KW_EXPR;check=KW_EXPR_NEG^#
 }
 
 func inSwitch(val: Int) {
   switch val {
-  #^SWITCH_TOP^#
+  #^SWITCH_TOP?check=KW_CASE^#
   case 1:
     foo()
-  #^SWITCH_IN_CASE^#
+  #^SWITCH_IN_CASE?check=KW_CASE^#
   }
 // KW_CASE: Begin completions
 // KW_CASE-DAG: Keyword[case]/None:                 case; name=case
@@ -438,4 +491,16 @@ func testContextualType() {
 // CONTEXT_STATICSTRING-DAG: Keyword[#column]/None:              #column[#Int#]; name=#column
 // CONTEXT_STATICSTRING-DAG: Keyword[#dsohandle]/None:           #dsohandle[#UnsafeRawPointer#]; name=#dsohandle
 // CONTEXT_STATICSTRING: End completions
+}
+
+class Base {
+  func foo() {}
+}
+class Derivied: Base {
+  override func foo() {
+    #^OVERRIDE^#
+// OVERRIDE: Begin completions
+// OVERRIDE-DAG: Keyword[super]/CurrNominal/Flair[CommonKeyword]: super[#Base#]; name=super
+// OVERRIDE: End completions
+  }
 }

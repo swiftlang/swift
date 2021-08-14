@@ -14,6 +14,7 @@
 #define SWIFT_SERIALIZATION_SERIALIZATIONOPTIONS_H
 
 #include "swift/Basic/LLVM.h"
+#include "llvm/Support/VersionTuple.h"
 
 namespace swift {
 
@@ -30,6 +31,10 @@ namespace swift {
     const char *OutputPath = nullptr;
     const char *DocOutputPath = nullptr;
     const char *SourceInfoOutputPath = nullptr;
+    std::string SymbolGraphOutputDir;
+    bool SkipSymbolGraphInheritedDocs = true;
+    bool IncludeSPISymbolsInSymbolGraph = false;
+    llvm::VersionTuple UserModuleVersion;
 
     StringRef GroupInfoPath;
     StringRef ImportedHeader;
@@ -126,12 +131,14 @@ namespace swift {
       uint64_t getSize() const { return Size; }
     };
     ArrayRef<FileDependency> Dependencies;
+    ArrayRef<std::string> PublicDependentLibraries;
 
     bool AutolinkForceLoad = false;
     bool SerializeAllSIL = false;
     bool SerializeOptionsForDebugging = false;
     bool IsSIB = false;
-    bool ExperimentalCrossModuleIncrementalInfo = false;
+    bool DisableCrossModuleIncrementalInfo = false;
+    bool StaticLibrary = false;
   };
 
 } // end namespace swift

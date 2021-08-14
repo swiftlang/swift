@@ -56,10 +56,14 @@ enum Color : Int {
     return nil
   }
 
-  var rawValue: Double {
-  // expected-error@-1 {{invalid redeclaration of synthesized implementation for protocol requirement 'rawValue'}}
+  var rawValue: Double { // expected-note {{found this candidate}}
     return 1.0
   }
+}
+
+func useRawValue(of color: Color) {
+  _ = color.rawValue
+  // expected-error@-1 {{ambiguous use of 'rawValue'}}
 }
 
 var colorRaw: Color.RawValue = 7.5
@@ -204,8 +208,7 @@ func sr8150_mutable(obj: SR8150Box) {
     sr8150_helper1(opt)
     // expected-error@-1 {{cannot convert value of type 'Bar?' to expected argument type 'Double'}} {{23-23=?.rawValue ?? <#default value#>}}
     sr8150_helper1(opt ?? Bar.a)
-    // expected-error@-1 {{no exact matches in call to global function 'sr8150_helper1'}}
-    // expected-note@-2  {{candidate expects value of type 'Bar' for parameter #0}} {{20-20=(}} {{32-32=).rawValue}}
+    // expected-error@-1 {{cannot convert value of type 'Bar' to expected argument type 'Double'}} {{20-20=(}} {{32-32=).rawValue}}
     let _: Double? = opt
     // expected-error@-1 {{cannot convert value of type 'Bar?' to specified type 'Double?'}} {{25-25=?.rawValue}}
   }

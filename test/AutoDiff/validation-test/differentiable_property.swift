@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift
+// RUN: %target-run-simple-swift(-Xfrontend -requirement-machine=off)
 // REQUIRES: executable_test
 
 // An end-to-end test that we can differentiate property accesses, with custom
@@ -20,7 +20,7 @@ extension TangentSpace : Differentiable {
 struct Space {
   /// `x` is a computed property with a custom vjp.
   var x: Tracked<Float> {
-    @differentiable
+    @differentiable(reverse)
     get { storedX }
     set { storedX = newValue }
   }
@@ -32,7 +32,7 @@ struct Space {
 
   private var storedX: Tracked<Float>
 
-  @differentiable
+  @differentiable(reverse)
   var y: Tracked<Float>
 
   init(x: Tracked<Float>, y: Tracked<Float>) {
@@ -43,9 +43,9 @@ struct Space {
 
 extension Space : Differentiable {
   typealias TangentVector = TangentSpace
-  mutating func move(along direction: TangentSpace) {
-    x.move(along: direction.x)
-    y.move(along: direction.y)
+  mutating func move(by offset: TangentSpace) {
+    x.move(by: offset.x)
+    y.move(by: offset.y)
   }
 }
 
@@ -67,7 +67,7 @@ E2EDifferentiablePropertyTests.testWithLeakChecking("stored property") {
 
 struct GenericMemberWrapper<T : Differentiable> : Differentiable {
   // Stored property.
-  @differentiable
+  @differentiable(reverse)
   var x: T
 
   func vjpX() -> (T, (T.TangentVector) -> GenericMemberWrapper.TangentVector) {
@@ -113,9 +113,9 @@ struct ProductSpaceOtherTangent {
 
 extension ProductSpaceOtherTangent : Differentiable {
   typealias TangentVector = ProductSpaceOtherTangentTangentSpace
-  mutating func move(along direction: ProductSpaceOtherTangentTangentSpace) {
-    x.move(along: direction.x)
-    y.move(along: direction.y)
+  mutating func move(by offset: ProductSpaceOtherTangentTangentSpace) {
+    x.move(by: offset.x)
+    y.move(by: offset.y)
   }
 }
 
@@ -132,7 +132,7 @@ E2EDifferentiablePropertyTests.testWithLeakChecking("fieldwise product space, ot
 E2EDifferentiablePropertyTests.testWithLeakChecking("computed property") {
   struct TF_544 : Differentiable {
     var value: Tracked<Float>
-    @differentiable
+    @differentiable(reverse)
     var computed: Tracked<Float> {
       get { value }
       set { value = newValue }

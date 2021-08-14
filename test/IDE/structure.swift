@@ -221,7 +221,7 @@ class SubscriptTest {
   // CHECK:   return 0
   // CHECK: }
   // CHECK: set(<param>value</param>) {
-  // CHECK:   <call><name>print</name>(value)</call>
+  // CHECK:   <call><name>print</name>(<arg>value</arg>)</call>
   // CHECK: }</subscript>
 }
 
@@ -319,16 +319,16 @@ thirdCall("""
   }())
   """)
 """)
-// CHECK: <call><name>thirdCall</name>("""
+// CHECK: <call><name>thirdCall</name>(<arg>"""
 // CHECK-NEXT: \("""
 // CHECK-NEXT:   \(<call><name><closure><brace>{
 // CHECK-NEXT:   return <call><name>a</name>()</call>
 // CHECK-NEXT:   }</brace></closure></name>()</call>)
 // CHECK-NEXT:   """)
-// CHECK-NEXT: """)</call>
+// CHECK-NEXT: """</arg>)</call>
 
 fourthCall(a: @escaping () -> Int)
 // CHECK: <call><name>fourthCall</name>(<arg><name>a</name>: @escaping () -> Int</arg>)</call>
 
-// CHECK: <call><name>foo</name> <closure><brace>{ [unowned <lvar><name>self</name></lvar>, <lvar><name>x</name></lvar>] in _ }</brace></closure></call>
+// CHECK: <call><name>foo</name> <arg><closure><brace>{ [unowned <lvar><name>self</name></lvar>, <lvar><name>x</name></lvar>] in _ }</brace></closure></arg></call>
 foo { [unowned self, x] in _ }

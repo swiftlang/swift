@@ -70,7 +70,6 @@ bool FunctionSignatureTransform::DeadArgumentAnalyzeParameters() {
       for (auto &AD : TransformDescriptor.ArgumentDescList) {
         if (AD.IsEntirelyDead) {
           AD.IsEntirelyDead = false;
-          break;
         }
       }
       TransformDescriptor.shouldModifySelfArgument =

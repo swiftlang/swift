@@ -28,6 +28,6 @@ add_custom_command(OUTPUT "${dest}"
 add_custom_target("symlink_abi_checker_data" ALL
                   DEPENDS "${dest}"
                   COMMENT "Symlinking ABI checker baseline data to ${dest}")
-if(TARGET swift-api-digester)
-  add_dependencies(swift-api-digester symlink_abi_checker_data)
+if(TARGET swift-frontend)
+  add_dependencies(swift-frontend symlink_abi_checker_data)
 endif()

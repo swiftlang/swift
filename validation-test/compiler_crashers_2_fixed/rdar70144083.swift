@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -emit-ir %s -enable-experimental-concurrency
 
+// REQUIRES: concurrency
+
 public protocol AsyncIteratorProtocol {
     associatedtype Element
     associatedtype Failure: Error

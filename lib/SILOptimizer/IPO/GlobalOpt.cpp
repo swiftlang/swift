@@ -236,7 +236,7 @@ static void removeToken(SILValue Op) {
     if (!(GAI->use_empty() || GAI->hasOneUse()))
       return;
     // If it is not a *_token global variable, bail.
-    if (!Global || Global->getName().find("_token") == StringRef::npos)
+    if (!Global || !Global->getName().contains("_token"))
       return;
     GAI->getModule().eraseGlobalVariable(Global);
     GAI->replaceAllUsesWithUndef();
@@ -388,7 +388,8 @@ replaceLoadsByKnownValue(SILFunction *InitF, SILGlobalVariable *SILG,
     StaticInitCloner cloner(initCall);
     SmallVector<SILInstruction *, 8> insertedInsts;
     cloner.setTrackingList(&insertedInsts);
-    cloner.add(initVal);
+    if (!cloner.add(initVal))
+      continue;
 
     // Replace all loads from the addressor with the initial value of the global.
     replaceLoadsFromGlobal(initCall, initVal, cloner);
@@ -456,8 +457,9 @@ bool SILGlobalOpt::optimizeInitializer(SILFunction *AddrF,
 
   // Remove "once" call from the addressor.
   removeToken(CallToOnce->getOperand(0));
-  eraseUsesOfInstruction(CallToOnce);
-  recursivelyDeleteTriviallyDeadInstructions(CallToOnce, true);
+  InstructionDeleter deleter;
+  deleter.forceDeleteWithUsers(CallToOnce);
+  deleter.cleanupDeadInstructions();
 
   // Create the constant initializer of the global variable.
   StaticInitCloner::appendToInitializer(SILG, InitVal);
@@ -693,7 +695,8 @@ void SILGlobalOpt::optimizeGlobalAccess(SILGlobalVariable *SILG,
       continue;
 
     StaticInitCloner cloner(globalAddr);
-    cloner.add(initVal);
+    if (!cloner.add(initVal))
+      continue;
 
     // Replace all loads from the addressor with the initial value of the global.
     replaceLoadsFromGlobal(globalAddr, initVal, cloner);
@@ -816,11 +819,15 @@ bool SILGlobalOpt::run() {
   for (auto &allocPair : globalAllocPairs) {
     HasChanged |= tryRemoveGlobalAlloc(allocPair.first, allocPair.second);
   }
-
-  // Erase the instructions that we have marked for deletion.
-  for (auto *inst : InstToRemove) {
-    eraseUsesOfInstruction(inst);
-    inst->eraseFromParent();
+  if (HasChanged) {
+    // Erase the instructions that we have marked for deletion.
+    InstructionDeleter deleter;
+    for (auto *inst : InstToRemove) {
+      deleter.forceDeleteWithUsers(inst);
+    }
+    deleter.cleanupDeadInstructions();
+  } else {
+    assert(InstToRemove.empty());
   }
 
   for (auto &global : Module->getSILGlobals()) {

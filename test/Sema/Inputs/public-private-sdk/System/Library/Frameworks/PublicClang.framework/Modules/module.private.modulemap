@@ -1,0 +1,4 @@
+framework module PublicClang_Private {
+  umbrella header "PublicClang_Private.h"
+  export *
+}

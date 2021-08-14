@@ -169,7 +169,7 @@ internal func _cocoaStringSubscript(
 @_effects(releasenone)
 private func _NSStringCopyUTF8(
   _ o: _StringSelectorHolder,
-  into bufPtr: UnsafeMutableBufferPointer<UInt8>
+  into bufPtr: UnsafeMutableRawBufferPointer
 ) -> Int? {
   let ptr = bufPtr.baseAddress._unsafelyUnwrappedUnchecked
   let len = o.length
@@ -193,7 +193,7 @@ private func _NSStringCopyUTF8(
 @_effects(releasenone)
 internal func _cocoaStringCopyUTF8(
   _ target: _CocoaString,
-  into bufPtr: UnsafeMutableBufferPointer<UInt8>
+  into bufPtr: UnsafeMutableRawBufferPointer
 ) -> Int? {
   return _NSStringCopyUTF8(_objc(target), into: bufPtr)
 }
@@ -206,7 +206,7 @@ private func _NSStringUTF8Count(
   var remainingRange = _SwiftNSRange(location: 0, length: 0)
   var usedLen = 0
   let success = 0 != o.getBytes(
-    UnsafeMutablePointer<UInt8>(Builtin.inttoptr_Word(0._builtinWordValue)),
+    UnsafeMutableRawPointer(Builtin.inttoptr_Word(0._builtinWordValue)),
     maxLength: 0,
     usedLength: &usedLen,
     encoding: _cocoaUTF8Encoding,
@@ -296,7 +296,7 @@ internal enum _KnownCocoaString {
   case storage
   case shared
   case cocoa
-#if !(arch(i386) || arch(arm) || arch(wasm32))
+#if !(arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32))
   case tagged
 #endif
 #if arch(arm64)
@@ -306,7 +306,7 @@ internal enum _KnownCocoaString {
   @inline(__always)
   init(_ str: _CocoaString) {
 
-#if !(arch(i386) || arch(arm))
+#if !(arch(i386) || arch(arm) || arch(arm64_32))
     if _isObjCTaggedPointer(str) {
 #if arch(arm64)
       if let _ = getConstantTaggedCocoaContents(str) {
@@ -332,7 +332,7 @@ internal enum _KnownCocoaString {
   }
 }
 
-#if !(arch(i386) || arch(arm))
+#if !(arch(i386) || arch(arm) || arch(arm64_32))
 
 // Resiliently write a tagged _CocoaString's contents into a buffer.
 // TODO: move this to the Foundation overlay and reimplement it with
@@ -340,7 +340,7 @@ internal enum _KnownCocoaString {
 @_effects(releasenone) // @opaque
 internal func _bridgeTagged(
   _ cocoa: _CocoaString,
-  intoUTF8 bufPtr: UnsafeMutableBufferPointer<UInt8>
+  intoUTF8 bufPtr: UnsafeMutableRawBufferPointer
 ) -> Int? {
   _internalInvariant(_isObjCTaggedPointer(cocoa))
   return _cocoaStringCopyUTF8(cocoa, into: bufPtr)
@@ -351,7 +351,9 @@ internal func _bridgeTagged(
 private func _NSStringASCIIPointer(_ str: _StringSelectorHolder) -> UnsafePointer<UInt8>? {
  // TODO(String bridging): Is there a better interface here? Ideally we'd be
   // able to ask for UTF8 rather than just ASCII
-  return str._fastCStringContents(0)?._asUInt8
+  //TODO(String bridging): Unconditionally asking for nul-terminated contents is
+  // overly conservative and hurts perf with some NSStrings
+  return str._fastCStringContents(1)?._asUInt8
 }
 
 @_effects(readonly) // @opaque
@@ -360,7 +362,7 @@ private func _withCocoaASCIIPointer<R>(
   requireStableAddress: Bool,
   work: (UnsafePointer<UInt8>) -> R?
 ) -> R? {
-  #if !(arch(i386) || arch(arm))
+  #if !(arch(i386) || arch(arm) || arch(arm64_32))
   if _isObjCTaggedPointer(str) {
     if let ptr = getConstantTaggedCocoaContents(str)?.asciiContentsPointer {
       return work(ptr)
@@ -500,7 +502,7 @@ internal func _bridgeCocoaString(_ cocoaString: _CocoaString) -> _StringGuts {
   case .shared:
     return _unsafeUncheckedDowncast(
       cocoaString, to: __SharedStringStorage.self).asString._guts
-#if !(arch(i386) || arch(arm))
+#if !(arch(i386) || arch(arm) || arch(arm64_32))
   case .tagged:
     return _StringGuts(_SmallString(taggedCocoa: cocoaString))
 #if arch(arm64)
@@ -527,7 +529,7 @@ internal func _bridgeCocoaString(_ cocoaString: _CocoaString) -> _StringGuts {
     let immutableCopy
       = _stdlib_binary_CFStringCreateCopy(cocoaString)
 
-#if !(arch(i386) || arch(arm))
+#if !(arch(i386) || arch(arm) || arch(arm64_32))
     if _isObjCTaggedPointer(immutableCopy) {
       return _StringGuts(_SmallString(taggedCocoa: immutableCopy))
     }

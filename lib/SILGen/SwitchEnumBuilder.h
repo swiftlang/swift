@@ -13,6 +13,7 @@
 #ifndef SWIFT_SILGEN_SWITCHENUMBUILDER_H
 #define SWIFT_SILGEN_SWITCHENUMBUILDER_H
 
+#include "ArgumentScope.h"
 #include "Scope.h"
 
 namespace swift {
@@ -52,7 +53,7 @@ struct SwitchCaseBranchDest {
 /// This scope is also exposed to the debug info.
 class SwitchCaseFullExpr {
   SILGenFunction &SGF;
-  Scope scope;
+  ArgumentScope scope;
   CleanupLocation loc;
   SwitchCaseBranchDest branchDest;
 
@@ -132,14 +133,14 @@ private:
 
   SILGenBuilder &builder;
   SILLocation loc;
-  ManagedValue optional;
+  ManagedValue subjectExprOperand;
   llvm::Optional<DefaultCaseData> defaultBlockData;
   llvm::SmallVector<NormalCaseData, 8> caseDataArray;
 
 public:
   SwitchEnumBuilder(SILGenBuilder &builder, SILLocation loc,
-                    ManagedValue optional)
-      : builder(builder), loc(loc), optional(optional) {}
+                    ManagedValue subjectExprOperand)
+      : builder(builder), loc(loc), subjectExprOperand(subjectExprOperand) {}
 
   void addDefaultCase(
       SILBasicBlock *defaultBlock, SwitchCaseBranchDest branchDest,

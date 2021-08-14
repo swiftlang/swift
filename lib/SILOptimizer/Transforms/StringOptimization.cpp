@@ -39,6 +39,7 @@ namespace {
 ///   * Replaces x.append(y) with x = x + y if x and y are constant strings.
 ///   * Replaces _typeName(T.self) with a constant string if T is statically
 ///     known.
+///   * Replaces String(literal).utf8CString with the string literal itself.
 ///
 /// This pass must run on high-level SIL, where semantic calls are still in
 /// place.
@@ -92,6 +93,7 @@ private:
                             llvm::DenseMap<SILValue, SILValue> &storedStrings);
   bool optimizeStringConcat(ApplyInst *concatCall);
   bool optimizeTypeName(ApplyInst *typeNameCall);
+  bool optimizeGetCString(ApplyInst *getCStringCall);
 
   static ApplyInst *isSemanticCall(SILInstruction *inst, StringRef attr,
                                    unsigned numArgs);
@@ -152,6 +154,13 @@ bool StringOptimization::optimizeBlock(SILBasicBlock &block) {
     }
     if (ApplyInst *typeName = isSemanticCall(inst, semantics::TYPENAME, 2)) {
       if (optimizeTypeName(typeName)) {
+        changed = true;
+        continue;
+      }
+    }
+    if (ApplyInst *getCString = isSemanticCall(inst,
+                                       semantics::STRING_GET_UTF8_CSTRING, 1)) {
+      if (optimizeGetCString(getCString)) {
         changed = true;
         continue;
       }
@@ -291,7 +300,7 @@ bool StringOptimization::optimizeTypeName(ApplyInst *typeNameCall) {
 
   auto metatype = metatypeInst->getType().getAs<MetatypeType>();
   Type ty = metatype->getInstanceType();
-  if (ty->hasArchetype())
+  if (ty->hasArchetype() || ty->hasDynamicSelfType())
     return false;
   
   // Usually the "qualified" parameter of _typeName() is a constant boolean.
@@ -328,6 +337,50 @@ bool StringOptimization::optimizeTypeName(ApplyInst *typeNameCall) {
   return true;
 }
 
+/// Replaces a String initializer followed by String.utf8CString with a
+/// (UTF8 encoded) string literal.
+///
+/// Note that string literals are always generated with a trailing 0-byte.
+bool StringOptimization::optimizeGetCString(ApplyInst *getCStringCall) {
+  // Is this a String.utf8CString of a literal String?
+  StringInfo stringInfo = getStringInfo(getCStringCall->getArgument(0));
+  if (!stringInfo.isConstant())
+    return false;
+
+  StringLiteralInst *literal = nullptr;
+  bool changed = false;
+  SmallVector<SILInstruction *, 16> workList;
+  workList.push_back(getCStringCall);
+
+  /// String.utf8CString returns an array of Int8. Search for ref_tail_addr of
+  /// the array buffer.
+  while (!workList.empty()) {
+    SILInstruction *inst = workList.pop_back_val();
+    // Look through string_extract which extract the buffer from the array.
+    if (isa<StructExtractInst>(inst) || inst == getCStringCall) {
+      for (Operand *use : cast<SingleValueInstruction>(inst)->getUses()) {
+        workList.push_back(use->getUser());
+      }
+      continue;
+    }
+    if (auto *rta = dyn_cast<RefTailAddrInst>(inst)) {
+      // Replace the ref_tail_addr with a pointer_to_address of the string
+      // literal.
+      if (!literal) {
+        // Build the literal if we don't have one, yet.
+        SILBuilder builder(getCStringCall);
+        literal = builder.createStringLiteral(getCStringCall->getLoc(),
+                    stringInfo.str, StringLiteralInst::Encoding::UTF8);
+      }
+      SILBuilder builder(rta);
+      auto *strAddr = builder.createPointerToAddress(rta->getLoc(), literal,
+                        rta->getType(), /*isStrict*/ false);
+      rta->replaceAllUsesWith(strAddr);
+      changed = true;
+    }
+  }
+  return changed;
+}
 
 /// Returns the apply instruction if \p inst is a call of a function which has
 /// a semantic attribute \p attr and exactly \p numArgs arguments.
@@ -418,11 +471,60 @@ void StringOptimization::invalidateModifiedObjects(SILInstruction *inst,
   }
 }
 
+/// If \p value is a struct_extract, return its operand and field.
+static std::pair<SILValue, VarDecl *> skipStructExtract(SILValue value) {
+  if (auto *sei = dyn_cast<StructExtractInst>(value))
+    return {sei->getOperand(), sei->getField()};
+
+  // Look through function calls, which do the struct_extract in the callee.
+  // This specifically targets
+  //    String(stringInterpolation: DefaultStringInterpolation)
+  // which is not inlined in the high level pipeline (due to the specified
+  // effects).
+  auto *apply = dyn_cast<ApplyInst>(value);
+  if (!apply)
+    return {value, nullptr};
+  
+  SILFunction *callee = apply->getReferencedFunctionOrNull();
+  if (!callee || !callee->isDefinition())
+    return {value, nullptr};
+
+  // `String(stringInterpolation: DefaultStringInterpolation)` has only a single
+  // basic block. Avoid the effort of searching all blocks for a `return`.
+  auto *ret = dyn_cast<ReturnInst>(callee->getEntryBlock()->getTerminator());
+  if (!ret)
+    return {value, nullptr};
+
+  auto *sei = dyn_cast<StructExtractInst>(ret->getOperand());
+  if (!sei)
+    return {value, nullptr};
+  
+  auto *arg = dyn_cast<SILFunctionArgument>(sei->getOperand());
+  if (!arg)
+    return {value, nullptr};
+
+  value = apply->getArgument(arg->getIndex());
+  return {value, sei->getField()};
+}
+
 /// Returns information about value if it's a constant string.
 StringOptimization::StringInfo StringOptimization::getStringInfo(SILValue value) {
   if (!value)
     return StringInfo::unknown();
   
+  // Look through struct_extract(struct(value)).
+  // This specifically targets calls to
+  //    String(stringInterpolation: DefaultStringInterpolation)
+  // which are not inlined in the high level pipeline.
+  VarDecl *field = nullptr;
+  std::tie(value, field) = skipStructExtract(value);
+  if (field) {
+    auto *si = dyn_cast<StructInst>(value);
+    if (!si)
+      return StringInfo::unknown();
+    value = si->getFieldValue(field);
+  }
+
   auto *apply = dyn_cast<ApplyInst>(value);
   if (!apply) {
     return getStringFromStaticLet(value);

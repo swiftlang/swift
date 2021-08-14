@@ -42,6 +42,14 @@
 // RUN: %target-swift-frontend -typecheck-module-from-interface -I %t %t/Merged.swiftinterface
 // RUN: %target-swift-frontend -typecheck-module-from-interface -I %t %t/Merged.private.swiftinterface -module-name Merged
 
+/// Both the public and private textual interfaces should have
+/// SPI information with `-library-level spi`.
+// RUN: %target-swift-frontend -typecheck %s -emit-module-interface-path %t/SPIModule.swiftinterface -emit-private-module-interface-path %t/SPIModule.private.swiftinterface -enable-library-evolution -swift-version 5 -I %t -module-name SPIModule -library-level spi
+// RUN: %FileCheck -check-prefix=CHECK-PRIVATE %s < %t/SPIModule.swiftinterface
+// RUN: %FileCheck -check-prefix=CHECK-PRIVATE %s < %t/SPIModule.private.swiftinterface
+// RUN: %target-swift-frontend -typecheck-module-from-interface -I %t %t/SPIModule.swiftinterface
+// RUN: %target-swift-frontend -typecheck-module-from-interface -I %t %t/SPIModule.private.swiftinterface -module-name SPIModule
+
 @_spi(HelperSPI) @_spi(OtherSPI) @_spi(OtherSPI) import SPIHelper
 // CHECK-PUBLIC: import SPIHelper
 // CHECK-PRIVATE: @_spi(OtherSPI) @_spi(HelperSPI) import SPIHelper
@@ -65,8 +73,8 @@ public func foo() {}
 }
 
 @_spi(MySPI) public extension SPIClassLocal {
-// CHECK-PRIVATE: @_spi(MySPI) extension SPIClassLocal
-// CHECK-PUBLIC-NOT: extension SPIClassLocal
+// CHECK-PRIVATE: @_spi(MySPI) extension {{.+}}.SPIClassLocal
+// CHECK-PUBLIC-NOT: extension {{.+}}.SPIClassLocal
 
   @_spi(MySPI) func extensionMethod() {}
   // CHECK-PRIVATE: @_spi(MySPI) public func extensionMethod
@@ -102,8 +110,8 @@ private class PrivateClassLocal {}
 // CHECK-PUBLIC-NOT: useOfSPITypeOk
 
 @_spi(LocalSPI) extension SPIClass {
-  // CHECK-PRIVATE: @_spi(LocalSPI) extension SPIClass
-  // CHECK-PUBLIC-NOT: SPIClass
+  // CHECK-PRIVATE: @_spi(LocalSPI) extension SPIHelper.SPIClass
+  // CHECK-PUBLIC-NOT: SPIHelper.SPIClass
 
   @_spi(LocalSPI) public func extensionSPIMethod() {}
   // CHECK-PRIVATE: @_spi(LocalSPI) public func extensionSPIMethod()
@@ -174,7 +182,7 @@ private protocol PrivateConstraint {}
 
 @_spi(LocalSPI)
 extension PublicType: SPIProto2 where T: SPIProto2 {}
-// CHECK-PRIVATE: extension PublicType : {{.*}}.SPIProto2 where T : {{.*}}.SPIProto2
+// CHECK-PRIVATE: extension {{.*}}.PublicType : {{.*}}.SPIProto2 where T : {{.*}}.SPIProto2
 // CHECK-PUBLIC-NOT: _ConstraintThatIsNotPartOfTheAPIOfThisLibrary
 
 public protocol LocalPublicProto {}
@@ -200,3 +208,11 @@ extension IOIPublicStruct : LocalPublicProto {}
 extension PublicType: SPIProto where T: PrivateConstraint {}
 // CHECK-PRIVATE: extension {{.*}}.PublicType : {{.*}}.SPIProto where T : _ConstraintThatIsNotPartOfTheAPIOfThisLibrary
 // CHECK-PUBLIC-NOT: _ConstraintThatIsNotPartOfTheAPIOfThisLibrary
+
+// Preserve SPI information when printing indirect conformances via
+// an internal protocol. rdar://73082943
+@_spi(S) public protocol SPIProtocol {}
+internal protocol InternalProtocol: SPIProtocol {}
+public struct PublicStruct2: InternalProtocol {}
+// CHECK-PRIVATE: @_spi(S) extension {{.*}}PublicStruct2 : {{.*}}.SPIProtocol
+// CHECK-PUBLIC-NOT: SPIProtocol

@@ -1,0 +1,3 @@
+module ConvertBoolObjC {
+  header "convert_bool_objc.h"
+}

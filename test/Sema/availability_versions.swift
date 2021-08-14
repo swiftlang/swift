@@ -309,7 +309,6 @@ class SubOfClassWithUnavailableInitializer : SuperWithWithUnavailableInitializer
 class ClassWithUnavailableProperties {
     // expected-note@-1 4{{add @available attribute to enclosing class}}
 
-  @available(OSX, introduced: 10.9) // expected-error {{stored properties cannot be marked potentially unavailable with '@available'}}
   var nonLazyAvailableOn10_9Stored: Int = 9
 
   @available(OSX, introduced: 10.51) // expected-error {{stored properties cannot be marked potentially unavailable with '@available'}}
@@ -538,17 +537,17 @@ enum CompassPoint {
 
   case WithAvailableByEnumPayload(p : EnumIntroducedOn10_51)
 
+  // expected-error@+1 {{enum cases with associated values cannot be marked potentially unavailable with '@available'}}
   @available(OSX, introduced: 10.52)
   case WithAvailableByEnumElementPayload(p : EnumIntroducedOn10_52)
 
+  // expected-error@+1 2{{enum cases with associated values cannot be marked potentially unavailable with '@available'}}
   @available(OSX, introduced: 10.52)
   case WithAvailableByEnumElementPayload1(p : EnumIntroducedOn10_52), WithAvailableByEnumElementPayload2(p : EnumIntroducedOn10_52)
 
   case WithUnavailablePayload(p : EnumIntroducedOn10_52) // expected-error {{'EnumIntroducedOn10_52' is only available in macOS 10.52 or newer}}
-      // expected-note@-1 {{add @available attribute to enclosing case}}
 
-    case WithUnavailablePayload1(p : EnumIntroducedOn10_52), WithUnavailablePayload2(p : EnumIntroducedOn10_52) // expected-error 2{{'EnumIntroducedOn10_52' is only available in macOS 10.52 or newer}}
-      // expected-note@-1 2{{add @available attribute to enclosing case}}
+  case WithUnavailablePayload1(p : EnumIntroducedOn10_52), WithUnavailablePayload2(p : EnumIntroducedOn10_52) // expected-error 2{{'EnumIntroducedOn10_52' is only available in macOS 10.52 or newer}}
 }
 
 @available(OSX, introduced: 10.52)
@@ -788,33 +787,26 @@ class UnavailableClassExtendingUnavailableClass : ClassAvailableOn10_51 {
 // Method availability is contravariant
 
 class SuperWithAlwaysAvailableMembers {
-
-  required init() {} // expected-note {{overridden declaration is here}}
-
-  func shouldAlwaysBeAvailableMethod() { // expected-note 2 {{overridden declaration is here}}
+  func shouldAlwaysBeAvailableMethod() { // expected-note {{overridden declaration is here}}
   }
   
-  var shouldAlwaysBeAvailableProperty: Int { // expected-note 2 {{overridden declaration is here}}
+  var shouldAlwaysBeAvailableProperty: Int { // expected-note {{overridden declaration is here}}
     get { return 9 }
     set(newVal) {}
   }
 
   var setterShouldAlwaysBeAvailableProperty: Int {
     get { return 9 }
-    set(newVal) {} // expected-note 2 {{overridden declaration is here}}
+    set(newVal) {} // expected-note {{overridden declaration is here}}
   }
 
   var getterShouldAlwaysBeAvailableProperty: Int {
-    get { return 9 } // expected-note 2 {{overridden declaration is here}}
+    get { return 9 } // expected-note {{overridden declaration is here}}
     set(newVal) {}
   }
 }
 
 class SubWithLimitedMemberAvailability : SuperWithAlwaysAvailableMembers {
-
-  @available(OSX, introduced: 10.51)
-  required init() {} // expected-error {{overriding 'init' must be as available as declaration it overrides}}
-
   @available(OSX, introduced: 10.51)
   override func shouldAlwaysBeAvailableMethod() { // expected-error {{overriding 'shouldAlwaysBeAvailableMethod' must be as available as declaration it overrides}}
   }
@@ -835,35 +827,6 @@ class SubWithLimitedMemberAvailability : SuperWithAlwaysAvailableMembers {
   override var getterShouldAlwaysBeAvailableProperty: Int {
     @available(OSX, introduced: 10.51)
     get { return 9 } // expected-error {{overriding getter for 'getterShouldAlwaysBeAvailableProperty' must be as available as declaration it overrides}}
-    set(newVal) {}
-  }
-}
-
-class SubWithUnavailableMembers : SuperWithAlwaysAvailableMembers {
-
-  @available(OSX, unavailable)
-  required init() {}
-
-  @available(OSX, unavailable)
-  override func shouldAlwaysBeAvailableMethod() { // expected-warning {{overriding 'shouldAlwaysBeAvailableMethod' must be as available as declaration it overrides}}
-  }
-
-  @available(OSX, unavailable)
-  override var shouldAlwaysBeAvailableProperty: Int { // expected-warning {{overriding 'shouldAlwaysBeAvailableProperty' must be as available as declaration it overrides}}
-    get { return 10 }
-    set(newVal) {}
-  }
-
-  override var setterShouldAlwaysBeAvailableProperty: Int {
-    get { return 9 }
-    @available(OSX, unavailable)
-    set(newVal) {} // expected-warning {{overriding setter for 'setterShouldAlwaysBeAvailableProperty' must be as available as declaration it overrides}}
-    // This is a terrible diagnostic. rdar://problem/20427938
-  }
-
-  override var getterShouldAlwaysBeAvailableProperty: Int {
-    @available(OSX, unavailable)
-    get { return 9 } // expected-warning {{overriding getter for 'getterShouldAlwaysBeAvailableProperty' must be as available as declaration it overrides}}
     set(newVal) {}
   }
 }
@@ -919,7 +882,7 @@ protocol ProtocolAvailableOn10_51 {
 }
 
 @available(OSX, introduced: 10.9)
-protocol ProtocolAvailableOn10_9InheritingFromProtocolAvailableOn10_51 : ProtocolAvailableOn10_51 {
+protocol ProtocolAvailableOn10_9InheritingFromProtocolAvailableOn10_51 : ProtocolAvailableOn10_51 { // expected-error {{'ProtocolAvailableOn10_51' is only available in macOS 10.51 or newer}}
 }
 
 @available(OSX, introduced: 10.51)
@@ -962,6 +925,14 @@ func GenericWhereClause<T>(_ t: T) where T: ProtocolAvailableOn10_51 { // expect
 
 func GenericSignature<T : ProtocolAvailableOn10_51>(_ t: T) { // expected-error * {{'ProtocolAvailableOn10_51' is only available in macOS 10.51 or newer}}
       // expected-note@-1 * {{add @available attribute to enclosing global function}}
+}
+
+struct GenericType<T> { // expected-note {{add @available attribute to enclosing generic struct}}
+  func nonGenericWhereClause() where T : ProtocolAvailableOn10_51 {} // expected-error {{'ProtocolAvailableOn10_51' is only available in macOS 10.51 or newer}}
+  // expected-note@-1 {{add @available attribute to enclosing instance method}}
+
+  struct NestedType where T : ProtocolAvailableOn10_51 {} // expected-error {{'ProtocolAvailableOn10_51' is only available in macOS 10.51 or newer}}
+  // expected-note@-1 2{{add @available attribute to enclosing struct}}
 }
 
 // Extensions
@@ -1365,11 +1336,9 @@ enum EnumForFixit {
       // expected-note@-1 2{{add @available attribute to enclosing enum}} {{1-1=@available(macOS 10.51, *)\n}}
   case CaseWithUnavailablePayload(p: ClassAvailableOn10_51)
       // expected-error@-1 {{'ClassAvailableOn10_51' is only available in macOS 10.51 or newer}}
-      // expected-note@-2 {{add @available attribute to enclosing case}} {{3-3=@available(macOS 10.51, *)\n  }}
 
   case CaseWithUnavailablePayload2(p: ClassAvailableOn10_51), WithoutPayload
       // expected-error@-1 {{'ClassAvailableOn10_51' is only available in macOS 10.51 or newer}}
-      // expected-note@-2 {{add @available attribute to enclosing case}} {{3-3=@available(macOS 10.51, *)\n  }}
       
 }
 
@@ -1416,7 +1385,7 @@ protocol ProtocolWithRequirementMentioningUnavailable {
 
 protocol HasMethodF {
   associatedtype T
-  func f(_ p: T) // expected-note 5{{protocol requirement here}}
+  func f(_ p: T) // expected-note 3{{protocol requirement here}}
 }
 
 class TriesToConformWithFunctionIntroducedOn10_51 : HasMethodF {
@@ -1467,7 +1436,8 @@ extension HasNoMethodF1 : HasMethodF {
 class HasNoMethodF2 { }
 @available(OSX, introduced: 10.51)
 extension HasNoMethodF2 : HasMethodF {
-  func f(_ p: Int) { } // expected-error {{protocol 'HasMethodF' requires 'f' to be available in macOS 10.50.0 and newer}}
+  // This is OK, because the conformance was introduced by an extension.
+  func f(_ p: Int) { }
 }
 
 @available(OSX, introduced: 10.51)
@@ -1481,7 +1451,7 @@ extension HasNoMethodF3 : HasMethodF {
 
 @available(OSX, introduced: 10.51)
 protocol HasMethodFOn10_51 {
-  func f(_ p: Int) // expected-note {{protocol requirement here}}
+  func f(_ p: Int)
 }
 
 class ConformsToUnavailableProtocolWithUnavailableWitness : HasMethodFOn10_51 {
@@ -1493,7 +1463,8 @@ class ConformsToUnavailableProtocolWithUnavailableWitness : HasMethodFOn10_51 {
 class HasNoMethodF4 { }
 @available(OSX, introduced: 10.52)
 extension HasNoMethodF4 : HasMethodFOn10_51 {
-  func f(_ p: Int) { } // expected-error {{protocol 'HasMethodFOn10_51' requires 'f' to be available in macOS 10.51 and newer}}
+  // This is OK, because the conformance was introduced by an extension.
+  func f(_ p: Int) { }
 }
 
 @available(OSX, introduced: 10.51)
@@ -1528,17 +1499,14 @@ extension TakesClassAvailableOn10_51_B : HasTakesClassAvailableOn10_51 {
 }
 
 
-// We do not want potential unavailability to play a role in picking a witness for a
-// protocol requirement. Rather, the witness should be chosen, regardless of its
-// potential unavailability, and then it should be diagnosed if it is less available
-// than the protocol requires.
-class TestAvailabilityDoesNotAffectWitnessCandidacy : HasMethodF {
-  // Test that we choose the more specialized witness even though it is
-  // less available than the protocol requires and there is a less specialized
-  // witness that has suitable availability.
+// We want conditional availability to play a role in picking a witness for a
+// protocol requirement.
+class TestAvailabilityAffectsWitnessCandidacy : HasMethodF {
+  // Test that we choose the less specialized witness, because the more specialized
+  // witness is conditionally unavailable.
 
   @available(OSX, introduced: 10.51)
-  func f(_ p: Int) { } // expected-error {{protocol 'HasMethodF' requires 'f' to be available in macOS 10.50.0 and newer}}
+  func f(_ p: Int) { }
 
   func f<T>(_ p: T) { }
 }

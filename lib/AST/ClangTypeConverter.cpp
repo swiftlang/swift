@@ -12,13 +12,14 @@
 //
 // This file implements generation of Clang AST types from Swift AST types for
 // types that are representable in Objective-C interfaces.
-// Large chunks of the code are lightly modified versions of the code in
-// IRGen/GenClangType.cpp (which should eventually go away), so make sure
-// to keep the two in sync.
-// The three major differences are that, in this file:
+//
+// The usage of ClangTypeConverter at the AST level means that we may
+// encounter ill-formed types and/or sugared types. To avoid crashing and
+// keeping sugar as much as possible (in case the generated Clang type needs
+// to be surfaced to the user):
+//
 // 1. We fail gracefully instead of asserting/UB.
 // 2. We try to keep clang sugar instead of discarding it.
-// 3. We use getAs instead of cast as we handle Swift types with sugar.
 //
 //===----------------------------------------------------------------------===//
 
@@ -80,6 +81,10 @@ getClangBuiltinTypeFromKind(const clang::ASTContext &context,
   case clang::BuiltinType::Id:                                                 \
     return context.SingletonId;
 #include "clang/Basic/AArch64SVEACLETypes.def"
+#define PPC_VECTOR_TYPE(Name, Id, Size)                                        \
+  case clang::BuiltinType::Id:                                                 \
+    return context.Id##Ty;
+#include "clang/Basic/PPCTypes.def"
   }
 
   // Not a valid BuiltinType.
@@ -118,6 +123,10 @@ const clang::ASTContext &clangCtx) {
 const clang::Type *ClangTypeConverter::getFunctionType(
     ArrayRef<AnyFunctionType::Param> params, Type resultTy,
     AnyFunctionType::Representation repr) {
+
+#if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
+  return nullptr;
+#endif
 
   auto resultClangTy = convert(resultTy);
   if (resultClangTy.isNull())
@@ -161,6 +170,10 @@ const clang::Type *ClangTypeConverter::getFunctionType(
 const clang::Type *ClangTypeConverter::getFunctionType(
     ArrayRef<SILParameterInfo> params, Optional<SILResultInfo> result,
     SILFunctionType::Representation repr) {
+
+#if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
+  return nullptr;
+#endif
 
   // Using the interface type is sufficient as type parameters get mapped to
   // `id`, since ObjC lightweight generics use type erasure. (See also: SE-0057)
@@ -207,6 +220,7 @@ const clang::Type *ClangTypeConverter::getFunctionType(
   case SILFunctionType::Representation::Closure:
     llvm_unreachable("Expected a C-compatible representation.");
   }
+  llvm_unreachable("unhandled representation!");
 }
 
 clang::QualType ClangTypeConverter::convertMemberType(NominalTypeDecl *DC,
@@ -347,13 +361,13 @@ ClangTypeConverter::reverseBuiltinTypeMapping(StructType *type) {
         // Handle Int and UInt specially. On Apple platforms, these map to
         // the NSInteger and NSUInteger typedefs. So try that if the typedefs
         // are available, to ensure we get consistent ObjC @encode strings.
-        if (swiftType->getAnyNominal() == Context.getIntDecl()) {
+        if (swiftType->isInt()) {
           auto NSIntegerTy = getClangBuiltinTypeFromTypedef(sema, "NSInteger");
           if (!NSIntegerTy.isNull()) {
             Cache.insert({swiftType->getCanonicalType(), NSIntegerTy});
             return;
           }
-        } else if (swiftType->getAnyNominal() == Context.getUIntDecl()) {
+        } else if (swiftType->isUInt()) {
           auto NSUIntegerTy = getClangBuiltinTypeFromTypedef(sema, "NSUInteger");
           if (!NSUIntegerTy.isNull()) {
             Cache.insert({swiftType->getCanonicalType(), NSUIntegerTy});
@@ -562,8 +576,10 @@ ClangTypeConverter::visitBoundGenericType(BoundGenericType *type) {
   case StructKind::Invalid:
     return clang::QualType();
 
-  case StructKind::UnsafeMutablePointer:
   case StructKind::Unmanaged:
+    return convert(argCanonicalTy);
+
+  case StructKind::UnsafeMutablePointer:
   case StructKind::AutoreleasingUnsafeMutablePointer: {
     auto clangTy = convert(argCanonicalTy);
     if (clangTy.isNull())
@@ -571,7 +587,10 @@ ClangTypeConverter::visitBoundGenericType(BoundGenericType *type) {
     return ClangASTContext.getPointerType(clangTy);
   }
   case StructKind::UnsafePointer: {
-    return ClangASTContext.getPointerType(convert(argCanonicalTy).withConst());
+    auto clangTy = convert(argCanonicalTy);
+    if (clangTy.isNull())
+      return clang::QualType();
+    return ClangASTContext.getPointerType(clangTy.withConst());
   }
 
   case StructKind::CFunctionPointer: {
@@ -591,6 +610,8 @@ ClangTypeConverter::visitBoundGenericType(BoundGenericType *type) {
 
   case StructKind::SIMD: {
     clang::QualType scalarTy = convert(argCanonicalTy);
+    if (scalarTy.isNull())
+      return clang::QualType();
     auto numEltsString = swiftStructDecl->getName().str();
     numEltsString.consume_front("SIMD");
     unsigned numElts;
@@ -622,13 +643,44 @@ clang::QualType ClangTypeConverter::visitEnumType(EnumType *type) {
 }
 
 clang::QualType ClangTypeConverter::visitFunctionType(FunctionType *type) {
-  // We must've already computed it before if applicable.
-  return clang::QualType(type->getClangTypeInfo().getType(), 0);
+  const clang::Type *clangTy = nullptr;
+  auto repr = type->getRepresentation();
+  bool useClangTypes = type->getASTContext().LangOpts.UseClangFunctionTypes;
+  if (useClangTypes && (getSILFunctionLanguage(convertRepresentation(repr)) ==
+                        SILFunctionLanguage::C)) {
+    clangTy = type->getClangTypeInfo().getType();
+  } else if (!useClangTypes || repr == FunctionTypeRepresentation::Swift) {
+    // C function pointer types themselves are not bridged but their components
+    // can be. If a component is an @convention(block) function, it may be
+    // bridged to a Swift function type.
+    auto newRepr = (repr == FunctionTypeRepresentation::Swift
+                        ? FunctionTypeRepresentation::Block
+                        : repr);
+    clangTy = getFunctionType(type->getParams(), type->getResult(), newRepr);
+  }
+  return clang::QualType(clangTy, 0);
 }
 
 clang::QualType ClangTypeConverter::visitSILFunctionType(SILFunctionType *type) {
-  // We must've already computed it before if applicable.
-  return clang::QualType(type->getClangTypeInfo().getType(), 0);
+  const clang::Type *clangTy = nullptr;
+  auto repr = type->getRepresentation();
+  bool useClangTypes = type->getASTContext().LangOpts.UseClangFunctionTypes;
+  if (useClangTypes &&
+      (getSILFunctionLanguage(repr) == SILFunctionLanguage::C)) {
+    clangTy = type->getClangTypeInfo().getType();
+  } else if (!useClangTypes || repr == SILFunctionTypeRepresentation::Thick) {
+    // C function pointer types themselves are not bridged but their components
+    // can be. If a component is an @convention(block) function, it may be
+    // bridged to a Swift function type.
+    auto newRepr = (repr == SILFunctionTypeRepresentation::Thick
+                        ? SILFunctionTypeRepresentation::Block
+                        : repr);
+    auto results = type->getResults();
+    auto optionalResult =
+        results.empty() ? None : llvm::Optional<SILResultInfo>(results[0]);
+    clangTy = getFunctionType(type->getParameters(), optionalResult, newRepr);
+  }
+  return clang::QualType(clangTy, 0);
 }
 
 clang::QualType
@@ -805,4 +857,40 @@ Decl *ClangTypeConverter::getSwiftDeclForExportedClangDecl(
   // declarations are never redeclarations.
   auto it = ReversedExportMap.find(decl);
   return (it != ReversedExportMap.end() ? it->second : nullptr);
+}
+
+std::unique_ptr<TemplateInstantiationError>
+ClangTypeConverter::getClangTemplateArguments(
+    const clang::TemplateParameterList *templateParams,
+    ArrayRef<Type> genericArgs,
+    SmallVectorImpl<clang::TemplateArgument> &templateArgs) {
+  assert(templateArgs.size() == 0);
+  assert(genericArgs.size() == templateParams->size());
+
+  // Keep track of the types we failed to convert so we can return a useful
+  // error.
+  SmallVector<Type, 2> failedTypes;
+  for (clang::NamedDecl *param : *templateParams) {
+    // Note: all template parameters must be template type parameters. This is
+    // verified when we import the Clang decl.
+    auto templateParam = cast<clang::TemplateTypeParmDecl>(param);
+    auto replacement = genericArgs[templateParam->getIndex()];
+    auto qualType = convert(replacement);
+    if (qualType.isNull()) {
+      failedTypes.push_back(replacement);
+      // Find all the types we can't convert.
+      continue;
+    }
+    templateArgs.push_back(clang::TemplateArgument(qualType));
+  }
+  if (failedTypes.empty())
+    return nullptr;
+  // Clear "templateArgs" to prevent the clients from accidently reading a
+  // partially converted set of template arguments.
+  templateArgs.clear();
+  auto errorInfo = std::make_unique<TemplateInstantiationError>();
+  llvm::for_each(failedTypes, [&errorInfo](auto type) {
+    errorInfo->failedTypes.push_back(type);
+  });
+  return errorInfo;
 }

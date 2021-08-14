@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %swift -c -primary-file %s -enable-large-loadable-types -Xllvm -sil-print-after=loadable-address -sil-verify-all -o %t/big_types_generic.o 2>&1 | %FileCheck %s
+// RUN: %swift -c -primary-file %s -Xllvm -sil-print-after=loadable-address -sil-verify-all -o %t/big_types_generic.o 2>&1 | %FileCheck %s
 
 struct Big<T> {
   var a0 : T
@@ -66,4 +66,30 @@ func useStuff() {
   print(generic(1)!.1)
   print(generic2(1).0)
   print(generic2(1).1)
+}
+
+
+public struct BigThing<T> {
+  var x: (Int64, Int64, Int64, Int64) = (0, 0, 0, 0)
+  var y: (Int64, Int64, Int64, Int64) = (0, 0, 0, 0)
+  var z: (Int64, Int64, Int64, Int64) = (0, 0, 0, 0)
+}
+
+public protocol P {}
+
+public protocol Assoc {
+ associatedtype A
+ func foo() -> A
+}
+
+extension Int : P {}
+
+public struct DefineSome : Assoc {
+   public func foo() -> some P {
+     return 5
+   }
+}
+
+public func abiIndirect() -> BigThing<DefineSome.A> {
+  return BigThing<DefineSome.A>()
 }

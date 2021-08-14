@@ -1,0 +1,68 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -mem2reg | %FileCheck %s
+
+import Builtin
+import Swift
+
+sil [ossa] @_Ts5printFT3valSi_T_ : $@convention(thin) (Int64) -> ()
+
+// CHECK-LABEL: sil [ossa] @liveness0 :
+// CHECK-NOT: alloc_stack
+sil [ossa] @liveness0 : $@convention(thin) (Int64) -> () {
+bb0(%0 : $Int64):
+  %1 = alloc_stack $Int64, var, name "x"
+  store %0 to [trivial] %1 : $*Int64
+  %3 = integer_literal $Builtin.Int64, 10
+  %5 = struct_extract %0 : $Int64, #Int64._value
+  %6 = builtin "cmp_eq_Int64"(%5 : $Builtin.Int64, %3 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %6, bb1, bb5
+
+bb1:
+  %8 = alloc_stack $Int64, var, name "y"
+  %9 = integer_literal $Builtin.Int64, 20
+  %10 = struct $Int64 (%9 : $Builtin.Int64)
+  store %10 to [trivial] %8 : $*Int64
+  %12 = integer_literal $Builtin.Int64, 3
+  %14 = struct_extract %0 : $Int64, #Int64._value
+  %15 = builtin "cmp_sgt_Int64"(%14 : $Builtin.Int64, %12 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %15, bb2, bb3
+
+bb2:
+  %17 = integer_literal $Builtin.Int64, 0
+  %18 = struct $Int64 (%17 : $Builtin.Int64)
+  store %18 to [trivial] %8 : $*Int64
+  br bb4
+
+bb3:
+  %21 = integer_literal $Builtin.Int64, 2
+  %22 = struct $Int64 (%21 : $Builtin.Int64)
+  store %22 to [trivial] %8 : $*Int64
+  br bb4
+
+bb4:
+  // function_ref
+  %25 = function_ref @_Ts5printFT3valSi_T_ : $@convention(thin) (Int64) -> ()
+  %26 = load [trivial] %8 : $*Int64
+  %27 = integer_literal $Builtin.Int64, 2
+  %28 = integer_literal $Builtin.Int1, -1
+  %30 = struct_extract %26 : $Int64, #Int64._value
+  %31 = builtin "sadd_with_overflow_Int64"(%30 : $Builtin.Int64, %27 : $Builtin.Int64, %28 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %32 = tuple_extract %31 : $(Builtin.Int64, Builtin.Int1), 0
+  %33 = tuple_extract %31 : $(Builtin.Int64, Builtin.Int1), 1
+  %34 = struct $Int64 (%32 : $Builtin.Int64)
+  cond_fail %33 : $Builtin.Int1
+  %36 = apply %25(%34) : $@convention(thin) (Int64) -> ()
+  dealloc_stack %8 : $*Int64
+  br bb6
+
+bb5:
+  br bb6
+
+// We don't need a PHI node here because the value is dead!
+// CHECK: bb5:
+bb6:
+  dealloc_stack %1 : $*Int64
+  %40 = tuple ()
+  return %40 : $()
+}
+// CHECK-LABEL: } // end sil function 'liveness0'
+

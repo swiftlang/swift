@@ -20,30 +20,40 @@
 #ifndef SWIFT_SILOPTIMIZER_UTILS_INSTOPTUTILS_H
 #define SWIFT_SILOPTIMIZER_UTILS_INSTOPTUTILS_H
 
+#include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ClassHierarchyAnalysis.h"
 #include "swift/SILOptimizer/Analysis/EpilogueARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
+#include "swift/SILOptimizer/Utils/InstModCallbacks.h"
+#include "swift/SILOptimizer/Utils/UpdatingInstructionIterator.h"
 #include "llvm/ADT/SmallPtrSet.h"
-#include <functional>
-#include <utility>
 
 namespace swift {
 
 class DominanceInfo;
+class DeadEndBlocks;
 template <class T> class NullablePtr;
 
-/// Transform a Use Range (Operand*) into a User Range (SILInstruction*)
+/// Transform a Use Range (Operand*) into a User Range (SILInstruction *)
 using UserTransform = std::function<SILInstruction *(Operand *)>;
 using ValueBaseUserRange =
     TransformRange<iterator_range<ValueBase::use_iterator>, UserTransform>;
 
-inline ValueBaseUserRange
-makeUserRange(iterator_range<ValueBase::use_iterator> range) {
+template <typename Range>
+inline TransformRange<Range, UserTransform> makeUserRange(Range range) {
   auto toUser = [](Operand *operand) { return operand->getUser(); };
   return makeTransformRange(range, UserTransform(toUser));
+}
+
+/// Transform a use_iterator range (Operand*) into an llvm::iterator_range
+/// of users (SILInstruction *)
+inline iterator_range<llvm::mapped_iterator<ValueBase::use_iterator, UserTransform>>
+makeUserIteratorRange(iterator_range<ValueBase::use_iterator> useRange) {
+  auto toUser = [](Operand *operand) { return operand->getUser(); };
+  return llvm::map_range(useRange, UserTransform(toUser));
 }
 
 using DeadInstructionSet = llvm::SmallSetVector<SILInstruction *, 8>;
@@ -56,120 +66,12 @@ NullablePtr<SILInstruction> createIncrementBefore(SILValue ptr,
 NullablePtr<SILInstruction> createDecrementBefore(SILValue ptr,
                                                   SILInstruction *insertpt);
 
-/// A utility for deleting one or more instructions belonging to a function, and
-/// cleaning up any dead code resulting from deleting those instructions. Use
-/// this utility instead of
-/// \c recursivelyDeleteTriviallyDeadInstruction.
-class InstructionDeleter {
-private:
-  // A set vector of instructions that are found to be dead. The ordering
-  // of instructions in this set is important as when a dead instruction is
-  // removed, new instructions will be generated to fix the lifetime of the
-  // instruction's operands. This has to be deterministic.
-  SmallSetVector<SILInstruction *, 8> deadInstructions;
+/// Get the insertion point after \p val.
+Optional<SILBasicBlock::iterator> getInsertAfterPoint(SILValue val);
 
-  void deleteInstruction(SILInstruction *inst,
-                         llvm::function_ref<void(SILInstruction *)> callback,
-                         bool fixOperandLifetimes);
-
-public:
-  InstructionDeleter() {}
-
-  /// If the instruction \p inst is dead, record it so that it can be cleaned
-  /// up.
-  void trackIfDead(SILInstruction *inst);
-
-  /// If the instruction \p inst is dead, delete it immediately and record
-  /// its operands so that they can be cleaned up later.
-  void deleteIfDead(
-      SILInstruction *inst,
-      llvm::function_ref<void(SILInstruction *)> callback =
-          [](SILInstruction *) {});
-
-  /// Delete the instruction \p inst and record instructions that may become
-  /// dead because of the removal of \c inst. This function will add necessary
-  /// ownership instructions to fix the lifetimes of the operands of \c inst to
-  /// compensate for its deletion. This function will not clean up dead code
-  /// resulting from the instruction's removal. To do so, invoke the method \c
-  /// cleanupDeadCode of this instance, once the SIL of the contaning function
-  /// is made consistent.
-  ///
-  /// \pre the function containing \c inst must be using ownership SIL.
-  /// \pre the instruction to be deleted must not have any use other than
-  /// incidental uses.
-  ///
-  /// \param callback a callback called whenever an instruction
-  /// is deleted.
-  void forceDeleteAndFixLifetimes(
-      SILInstruction *inst,
-      llvm::function_ref<void(SILInstruction *)> callback =
-          [](SILInstruction *) {});
-
-  /// Delete the instruction \p inst and record instructions that may become
-  /// dead because of the removal of \c inst. If in ownership SIL, use the
-  /// \c forceDeleteAndFixLifetimes function instead, unless under special
-  /// circumstances where the client must handle fixing lifetimes of the
-  /// operands of the deleted instructions. This function will not fix the
-  /// lifetimes of the operands of \c inst once it is deleted. This function
-  /// will not clean up dead code resulting from the instruction's removal. To
-  /// do so, invoke the method \c cleanupDeadCode of this instance, once the SIL
-  /// of the contaning function is made consistent.
-  ///
-  /// \pre the instruction to be deleted must not have any use other than
-  /// incidental uses.
-  ///
-  /// \param callback a callback called whenever an instruction
-  /// is deleted.
-  void forceDelete(
-      SILInstruction *inst,
-      llvm::function_ref<void(SILInstruction *)> callback =
-          [](SILInstruction *) {});
-
-  /// Clean up dead instructions that are tracked by this instance and all
-  /// instructions that transitively become dead.
-  ///
-  /// \pre the function contaning dead instructions must be consistent (i.e., no
-  /// under or over releases). Note that if \c forceDelete call leaves the
-  /// function body in an inconsistent state, it needs to be made consistent
-  /// before this method is invoked.
-  ///
-  /// \param callback a callback called whenever an instruction is deleted.
-  void
-  cleanUpDeadInstructions(llvm::function_ref<void(SILInstruction *)> callback =
-                              [](SILInstruction *) {});
-
-  /// Recursively visit users of \c inst  (including \c inst)and delete
-  /// instructions that are dead (including \c inst). Invoke the \c callback on
-  /// instructions that are deleted.
-  void recursivelyDeleteUsersIfDead(
-      SILInstruction *inst,
-      llvm::function_ref<void(SILInstruction *)> callback =
-                                    [](SILInstruction *) {});
-
-  /// Recursively visit users of \c inst  (including \c inst)and force delete
-  /// them. Also, destroy the consumed operands of the deleted instructions
-  /// whenever necessary. Invoke the \c callback on instructions that are
-  /// deleted.
-  void recursivelyForceDeleteUsersAndFixLifetimes(
-      SILInstruction *inst,
-      llvm::function_ref<void(SILInstruction *)> callback =
-          [](SILInstruction *) {});
-};
-
-/// If \c inst is dead, delete it and recursively eliminate all code that
-/// becomes dead because of that. If more than one instruction must
-/// be checked/deleted use the \c InstructionDeleter utility.
-///
-/// This function will add necessary compensation code to fix the lifetimes of
-/// the operands of the deleted instructions.
-///
-/// \pre the SIL function containing the instruction is assumed to be
-/// consistent, i.e., does not have under or over releases.
-///
-/// \param callback a callback called whenever an instruction is deleted.
-void eliminateDeadInstruction(
-    SILInstruction *inst, llvm::function_ref<void(SILInstruction *)> callback =
-                              [](SILInstruction *) {});
+/// True if this instruction's only uses are debug_value (in -O mode),
+/// destroy_value, end_lifetime or end-of-scope instruction such as end_borrow.
+bool hasOnlyEndOfScopeOrEndOfLifetimeUses(SILInstruction *inst);
 
 /// Return the number of @inout arguments passed to the given apply site.
 unsigned getNumInOutArguments(FullApplySite applySite);
@@ -182,11 +84,10 @@ unsigned getNumInOutArguments(FullApplySite applySite);
 /// \param inst The ArrayRef of instructions to be deleted.
 /// \param force If Force is set, don't check if the top level instructions
 ///        are considered dead - delete them regardless.
-/// \param callback a callback called whenever an instruction is deleted.
+/// \param callbacks The inst mod callbacks used to delete instructions.
 void recursivelyDeleteTriviallyDeadInstructions(
     ArrayRef<SILInstruction *> inst, bool force = false,
-    llvm::function_ref<void(SILInstruction *)> callback = [](SILInstruction *) {
-    });
+    InstModCallbacks callbacks = InstModCallbacks());
 
 /// If the given instruction is dead, delete it along with its dead
 /// operands. Note this utility must be phased out and replaced by
@@ -196,11 +97,13 @@ void recursivelyDeleteTriviallyDeadInstructions(
 /// \param inst The instruction to be deleted.
 /// \param force If Force is set, don't check if the top level instruction is
 ///        considered dead - delete it regardless.
-/// \param callback a callback called whenever an instruction is deleted.
+/// \param callbacks InstModCallback used to delete instructions.
 void recursivelyDeleteTriviallyDeadInstructions(
     SILInstruction *inst, bool force = false,
-    llvm::function_ref<void(SILInstruction *)> callback = [](SILInstruction *) {
-    });
+    InstModCallbacks callbacks = InstModCallbacks());
+
+/// True if this instruction can be deleted if all its uses can also be deleted.
+bool isInstructionTriviallyDeletable(SILInstruction *inst);
 
 /// Perform a fast local check to see if the instruction is dead.
 ///
@@ -215,12 +118,6 @@ bool isIntermediateRelease(SILInstruction *inst, EpilogueARCFunctionInfo *erfi);
 /// instruction.
 void collectUsesOfValue(SILValue V,
                         llvm::SmallPtrSetImpl<SILInstruction *> &Insts);
-
-/// Recursively erase all of the uses of the instruction (but not the
-/// instruction itself)
-void eraseUsesOfInstruction(
-    SILInstruction *inst, llvm::function_ref<void(SILInstruction *)> callback =
-                              [](SILInstruction *) {});
 
 /// Recursively erase all of the uses of the value (but not the
 /// value itself)
@@ -256,16 +153,20 @@ getConcreteValueOfExistentialBox(AllocExistentialBoxInst *existentialBox,
 SILValue getConcreteValueOfExistentialBoxAddr(SILValue addr,
                                               SILInstruction *ignoreUser);
 
-FullApplySite findApplyFromDevirtualizedResult(SILValue value);
-
 /// Cast a value into the expected, ABI compatible type if necessary.
 /// This may happen e.g. when:
 /// - a type of the return value is a subclass of the expected return type.
 /// - actual return type and expected return type differ in optionality.
 /// - both types are tuple-types and some of the elements need to be casted.
+///
+/// \p usePoints is required when \p value has guaranteed ownership. It must be
+/// the last users of the returned, casted value. A usePoint cannot be a
+/// BranchInst (a phi is never the last guaranteed user). \p builder's current
+/// insertion point must dominate all \p usePoints.
 std::pair<SILValue, bool /* changedCFG */>
 castValueToABICompatibleType(SILBuilder *builder, SILLocation Loc,
-                             SILValue value, SILType srcTy, SILType destTy);
+                             SILValue value, SILType srcTy, SILType destTy,
+                             ArrayRef<SILInstruction *> usePoints);
 /// Peek through trivial Enum initialization, typically for pointless
 /// Optionals.
 ///
@@ -302,50 +203,184 @@ SILLinkage getSpecializedLinkage(SILFunction *f, SILLinkage linkage);
 /// Tries to perform jump-threading on all checked_cast_br instruction in
 /// function \p Fn.
 bool tryCheckedCastBrJumpThreading(
-    SILFunction *fn, DominanceInfo *dt,
-    SmallVectorImpl<SILBasicBlock *> &blocksForWorklist);
+    SILFunction *fn, DominanceInfo *dt, DeadEndBlocks *deBlocks,
+    SmallVectorImpl<SILBasicBlock *> &blocksForWorklist,
+    bool EnableOSSARewriteTerminator);
 
-/// A structure containing callbacks that are called when an instruction is
-/// removed or added.
-struct InstModCallbacks {
-  static const std::function<void(SILInstruction *)> defaultDeleteInst;
-  static const std::function<void(SILInstruction *)> defaultCreatedNewInst;
-  static const std::function<void(SILValue, SILValue)> defaultReplaceValueUsesWith;
-  static const std::function<void(SingleValueInstruction *, SILValue)>
-      defaultEraseAndRAUWSingleValueInst;
+/// A utility for deleting one or more instructions belonging to a function, and
+/// cleaning up any dead code resulting from deleting those instructions. Use
+/// this utility instead of \p recursivelyDeleteTriviallyDeadInstruction
+/// as follows:
+///   InstructionDeleter deleter;
+///   deleter.deleteIfDead(instruction);
+///   deleter.cleanupDeadInstructions();
+///
+/// This is designed to be used with a single 'onDelete' callback, which is
+/// invoked consistently just before deleting each instruction. It's usually
+/// used to avoid iterator invalidation (see the updatingIterator() factory
+/// method). The other InstModCallbacks should generally be handled at a higher
+/// level, and avoided altogether if possible. The following two are supported
+/// for flexibility:
+///
+/// callbacks.createdNewInst() is invoked incrementally when it fixes lifetimes
+/// while deleting a set of instructions, but the SIL may still be invalid
+/// relative to the new instruction.
+///
+/// callbacks.notifyWillBeDeletedFunc() is invoked when a dead instruction is
+/// first recognized and was not already passed in by the client. During the
+/// callback, the to-be-deleted instruction has valid SIL. It's operands and
+/// uses can be inspected and cached. It will be deleted later during
+/// cleanupDeadInstructions().
+///
+/// Note that the forceDelete* APIs only invoke notifyWillBeDeletedFunc() when
+/// an operand's definition will become dead after force-deleting the specified
+/// instruction. Some clients force-delete related instructions one at a
+/// time. It is the client's responsiblity to invoke notifyWillBeDeletedFunc()
+/// on those explicitly deleted instructions if needed.
+class InstructionDeleter {
+  /// A set vector of instructions that are found to be dead. The ordering of
+  /// instructions in this set is important as when a dead instruction is
+  /// removed, new instructions will be generated to fix the lifetime of the
+  /// instruction's operands. This has to be deterministic.
+  SmallSetVector<SILInstruction *, 8> deadInstructions;
 
-  std::function<void(SILInstruction *)> deleteInst =
-      InstModCallbacks::defaultDeleteInst;
-  std::function<void(SILInstruction *)> createdNewInst =
-      InstModCallbacks::defaultCreatedNewInst;
-  std::function<void(SILValue, SILValue)>
-      replaceValueUsesWith =
-          InstModCallbacks::defaultReplaceValueUsesWith;
-  std::function<void(SingleValueInstruction *, SILValue)>
-      eraseAndRAUWSingleValueInst =
-          InstModCallbacks::defaultEraseAndRAUWSingleValueInst;
+  UpdatingInstructionIteratorRegistry iteratorRegistry;
 
-  InstModCallbacks(decltype(deleteInst) deleteInst,
-                   decltype(createdNewInst) createdNewInst,
-                   decltype(replaceValueUsesWith) replaceValueUsesWith)
-      : deleteInst(deleteInst), createdNewInst(createdNewInst),
-        replaceValueUsesWith(replaceValueUsesWith),
-        eraseAndRAUWSingleValueInst(
-            InstModCallbacks::defaultEraseAndRAUWSingleValueInst) {}
+public:
+  InstructionDeleter(InstModCallbacks chainedCallbacks = InstModCallbacks())
+      : deadInstructions(), iteratorRegistry(chainedCallbacks) {}
 
-  InstModCallbacks(
-      decltype(deleteInst) deleteInst, decltype(createdNewInst) createdNewInst,
-      decltype(replaceValueUsesWith) replaceValueUsesWith,
-      decltype(eraseAndRAUWSingleValueInst) eraseAndRAUWSingleValueInst)
-      : deleteInst(deleteInst), createdNewInst(createdNewInst),
-        replaceValueUsesWith(replaceValueUsesWith),
-        eraseAndRAUWSingleValueInst(eraseAndRAUWSingleValueInst) {}
+  UpdatingInstructionIteratorRegistry &getIteratorRegistry() {
+    return iteratorRegistry;
+  }
 
-  InstModCallbacks() = default;
-  ~InstModCallbacks() = default;
-  InstModCallbacks(const InstModCallbacks &) = default;
-  InstModCallbacks(InstModCallbacks &&) = default;
+  InstModCallbacks &getCallbacks() { return iteratorRegistry.getCallbacks(); }
+
+  llvm::iterator_range<UpdatingInstructionIterator>
+  updatingRange(SILBasicBlock *bb) {
+    return iteratorRegistry.makeIteratorRange(bb);
+  }
+
+  llvm::iterator_range<UpdatingReverseInstructionIterator>
+  updatingReverseRange(SILBasicBlock *bb) {
+    return iteratorRegistry.makeReverseIteratorRange(bb);
+  }
+
+  bool hadCallbackInvocation() const {
+    return const_cast<InstructionDeleter *>(this)
+        ->getCallbacks()
+        .hadCallbackInvocation();
+  }
+
+  /// If the instruction \p inst is dead, record it so that it can be cleaned
+  /// up.
+  ///
+  /// Calls callbacks.notifyWillBeDeleted().
+  bool trackIfDead(SILInstruction *inst);
+
+  /// Track this instruction as dead even if it has side effects. Used to enable
+  /// the deletion of a bunch of instructions at the same time.
+  ///
+  /// Calls callbacks.notifyWillBeDeleted().
+  void forceTrackAsDead(SILInstruction *inst);
+
+  /// If the instruction \p inst is dead, delete it immediately along with its
+  /// destroys and scope-ending uses. If any operand definitions will become
+  /// dead after deleting this instruction, track them so they can be deleted
+  /// later during cleanUpDeadInstructions().
+  ///
+  /// Calls callbacks.notifyWillBeDeleted().
+  bool deleteIfDead(SILInstruction *inst);
+
+  /// Delete the instruction \p inst, ignoring its side effects. If any operand
+  /// definitions will become dead after deleting this instruction, track them
+  /// so they can be deleted later during cleanUpDeadInstructions(). This
+  /// function will add necessary ownership instructions to fix the lifetimes of
+  /// the operands of \p inst to compensate for its deletion.
+  ///
+  /// \pre the function containing \p inst must be using ownership SIL.
+  /// \pre the instruction to be deleted must not have any use other than
+  /// incidental uses.
+  ///
+  /// callbacks.notifyWillBeDeleted will not be called for \p inst but will be
+  /// called for any other instructions that become dead as a result.
+  void forceDeleteAndFixLifetimes(SILInstruction *inst);
+
+  /// Delete the instruction \p inst and record instructions that may become
+  /// dead because of the removal of \c inst. If in ownership SIL, use the
+  /// \c forceDeleteAndFixLifetimes function instead, unless under special
+  /// circumstances where the client must handle fixing lifetimes of the
+  /// operands of the deleted instructions. This function will not fix the
+  /// lifetimes of the operands of \c inst once it is deleted. This function
+  /// will not clean up dead code resulting from the instruction's removal. To
+  /// do so, invoke the method \c cleanupDeadCode of this instance, once the SIL
+  /// of the contaning function is made consistent.
+  ///
+  /// \pre the instruction to be deleted must not have any use other than
+  /// incidental uses.
+  ///
+  /// callbacks.notifyWillBeDeleted will not be called for \p inst but will be
+  /// called for any other instructions that become dead as a result.
+  void forceDelete(SILInstruction *inst);
+
+  /// Recursively delete all of the uses of the instruction before deleting the
+  /// instruction itself. Does not fix lifetimes.
+  ///
+  /// callbacks.notifyWillBeDeleted will not be called for \p inst but will
+  /// be called for any other instructions that become dead as a result.
+  void forceDeleteWithUsers(SILInstruction *inst) {
+    deleteWithUses(inst, /*fixLifetimes*/ false, /*forceDeleteUsers*/ true);
+  }
+
+  /// Clean up dead instructions that are tracked by this instance and all
+  /// instructions that transitively become dead.
+  ///
+  /// \pre the function contaning dead instructions must be consistent (i.e., no
+  /// under or over releases). Note that if \c forceDelete call leaves the
+  /// function body in an inconsistent state, it needs to be made consistent
+  /// before this method is invoked.
+  ///
+  /// callbacks.notifyWillBeDeletedFunc will only be called for instructions
+  /// that become dead during cleanup but were not already tracked.
+  void cleanupDeadInstructions();
+
+  /// Recursively visit users of \p inst and delete instructions that are dead
+  /// including \p inst.
+  ///
+  /// callbacks.notifyWillBeDeletedFunc will be called for any dead
+  /// instructions.
+  void recursivelyDeleteUsersIfDead(SILInstruction *inst);
+
+  /// Recursively visit users of \p inst and force delete them including \p
+  /// inst. Also, destroy the consumed operands of the deleted instructions
+  /// whenever necessary.
+  ///
+  /// callbacks.notifyWillBeDeletedFunc will not be called for \p inst or its
+  /// users but will be called for any other instructions that become dead as a
+  /// result.
+  void recursivelyForceDeleteUsersAndFixLifetimes(SILInstruction *inst);
+
+private:
+  void deleteWithUses(SILInstruction *inst, bool fixLifetimes,
+                      bool forceDeleteUsers = false);
 };
+
+/// If \c inst is dead, delete it and recursively eliminate all code that
+/// becomes dead because of that. If more than one instruction must
+/// be checked/deleted use the \c InstructionDeleter utility.
+///
+/// This function will add necessary compensation code to fix the lifetimes of
+/// the operands of the deleted instructions.
+///
+/// \pre the SIL function containing the instruction is assumed to be
+/// consistent, i.e., does not have under or over releases.
+///
+/// \p callbacks is used to delete each instruction. However, the callback
+/// cannot be used to update instruction iterators since other instructions to
+/// be deleted remain in the instruction list. If set to nullptr, we use the
+/// default instruction modification callback structure.
+void eliminateDeadInstruction(SILInstruction *inst,
+                              InstModCallbacks callbacks = InstModCallbacks());
 
 /// Get all consumed arguments of a partial_apply.
 ///
@@ -611,6 +646,57 @@ bool tryOptimizeApplyOfPartialApply(
 FullApplySite cloneFullApplySiteReplacingCallee(FullApplySite applySite,
                                                 SILValue newCallee,
                                                 SILBuilderContext &builderCtx);
+
+/// This is a low level routine that makes all uses of \p svi uses of \p
+/// newValue (ignoring end scope markers) and then deletes \p svi and all end
+/// scope markers. Then returns the next inst to process.
+SILBasicBlock::iterator replaceAllUsesAndErase(SingleValueInstruction *svi,
+                                               SILValue newValue,
+                                               InstModCallbacks &callbacks);
+
+/// This API is equivalent to performing \p use->set(\p newValue) except that:
+///
+/// 1. If the user of \p use is an end scope, this API no-opts. This API is only
+///    used in contexts where we are rewriting uses and are not interesting in
+///    end scope instructions since we are moving uses from one scope to another
+///    scope.
+///
+/// 2. If the user of \p use is not an end scope, but is a lifetime ending use
+///    of \p use->get(), we insert a destroy_value|end_borrow as appropriate on
+///    \p use->get() to ensure \p use->get()'s lifetime is still ended. We
+///    assume that if \p use->getUser() is lifetime ending, that our caller has
+///    ensured that we can end \p newValue's lifetime.
+SILBasicBlock::iterator replaceSingleUse(Operand *use, SILValue newValue,
+                                         InstModCallbacks &callbacks);
+
+/// Creates a copy of \p value and inserts additional control equivalent copy
+/// and destroy at leaking blocks to adjust ownership and make available for use
+/// at \p inBlock.
+SILValue
+makeCopiedValueAvailable(SILValue value, SILBasicBlock *inBlock);
+
+/// Given a newly created @owned value \p value without any uses, this utility
+/// inserts control equivalent copy and destroy at leaking blocks to adjust
+/// ownership and make \p value available for use at \p inBlock.
+///
+/// inBlock must be the only point at which \p value will be consumed. If this
+/// consuming point is within a loop, this will create and return a copy of \p
+/// value inside \p inBlock.
+SILValue
+makeNewValueAvailable(SILValue value, SILBasicBlock *inBlock);
+
+/// Given an ssa value \p value, create destroy_values at leaking blocks
+///
+/// Warning: This does not properly cleanup an OSSA lifetime with a consuming
+/// use blocks inside a loop relative to \p value. The client must create
+/// separate copies for any uses within the loop.
+void endLifetimeAtLeakingBlocks(SILValue value,
+                                ArrayRef<SILBasicBlock *> userBBs);
+
+/// Given a forwarding instruction, eliminate it if all of its users are debug
+/// instructions and ownership uses.
+bool tryEliminateOnlyOwnershipUsedForwardingInst(
+    SingleValueInstruction *forwardingInst, InstModCallbacks &callbacks);
 
 } // end namespace swift
 

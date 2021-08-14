@@ -24,6 +24,7 @@
 #include "swift/AST/ResilienceExpansion.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/Debug.h"
+#include "swift/Basic/Fingerprint.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceLoc.h"
@@ -57,6 +58,7 @@ namespace swift {
   class GenericTypeParamType;
   class InfixOperatorDecl;
   class InfixOperatorLookupResult;
+  enum class PlatformKind: uint8_t;
   class PrecedenceGroupDecl;
   class ProtocolDecl;
   class Requirement;
@@ -157,6 +159,9 @@ enum class ConformanceLookupKind : unsigned {
   OnlyExplicit,
   /// All conformances except for inherited ones.
   NonInherited,
+  /// All conformances except structurally-derived conformances, of which
+  /// Sendable is the only one.
+  NonStructural,
 };
 
 /// Describes a diagnostic for a conflict between two protocol
@@ -613,6 +618,10 @@ public:
   /// is also included.
   unsigned getSemanticDepth() const;
 
+  /// Returns if this extension is always available on the current deployment
+  /// target. Used for conformance lookup disambiguation.
+  bool isAlwaysAvailableConformanceContext() const;
+
   /// \returns true if traversal was aborted, false otherwise.
   bool walkContext(ASTWalker &Walker);
 
@@ -732,6 +741,8 @@ class IterableDeclContext {
 
   static IterableDeclContext *castDeclToIterableDeclContext(const Decl *D);
 
+  friend class LookupAllConformancesInContextRequest;
+
   /// Retrieve the \c ASTContext in which this iterable context occurs.
   ASTContext &getASTContext() const;
 
@@ -776,10 +787,17 @@ public:
   /// the implementation.
   ArrayRef<Decl *> getParsedMembers() const;
 
-  /// Get all the members that are semantically within this context,
-  /// including any implicitly-synthesized members.
+  /// Get all of the members within this context that can affect ABI, including
+  /// any implicitly-synthesized members.
+  ///
   /// The resulting list of members will be stable across translation units.
-  ArrayRef<Decl *> getSemanticMembers() const;
+  ArrayRef<Decl *> getABIMembers() const;
+
+  /// Get all of the members within this context, including any
+  /// implicitly-synthesized members.
+  ///
+  /// The resulting list of members will be stable across translation units.
+  ArrayRef<Decl *> getAllMembers() const;
 
   /// Retrieve the set of members in this context without loading any from the
   /// associated lazy loader; this should only be used as part of implementing
@@ -870,9 +888,7 @@ public:
 
   /// Return a hash of all tokens in the body for dependency analysis, if
   /// available.
-  Optional<std::string> getBodyFingerprint() const;
-
-  bool areTokensHashedForThisBodyInsteadOfInterfaceHash() const;
+  Optional<Fingerprint> getBodyFingerprint() const;
 
 private:
   /// Add a member to the list for iteration purposes, but do not notify the

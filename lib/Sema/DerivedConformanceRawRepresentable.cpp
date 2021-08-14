@@ -128,8 +128,8 @@ deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl, void *) {
   }
 
   auto selfRef = DerivedConformance::createSelfDeclRef(toRawDecl);
-  auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), selfRef,
-                                       SourceLoc(), cases, SourceLoc(), C);
+  auto switchStmt =
+      SwitchStmt::createImplicit(LabeledStmtInfo(), selfRef, cases, C);
   auto body = BraceStmt::create(C, SourceLoc(),
                                 ASTNode(switchStmt),
                                 SourceLoc());
@@ -207,7 +207,8 @@ struct RuntimeVersionCheck {
 
     // availableInfo = "#available(\(platformSpec), \(otherSpec))"
     auto availableInfo = PoundAvailableInfo::create(
-        C, SourceLoc(), SourceLoc(), { platformSpec, otherSpec }, SourceLoc());
+        C, SourceLoc(), SourceLoc(), { platformSpec, otherSpec }, SourceLoc(),
+        false);
 
     // This won't be filled in by TypeCheckAvailability because we have
     // invalid SourceLocs in this area of the AST.
@@ -291,8 +292,7 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
   assert(rawTy);
   rawTy = initDecl->mapTypeIntoContext(rawTy);
 
-  bool isStringEnum =
-    (rawTy->getNominalOrBoundGenericNominal() == C.getStringDecl());
+  bool isStringEnum = rawTy->isString();
   llvm::SmallVector<Expr *, 16> stringExprs;
 
   Type enumType = parentDC->getDeclaredTypeInContext();
@@ -385,8 +385,8 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
     auto *CallExpr = CallExpr::create(C, Fun, Args, {}, {}, false, false);
     switchArg = CallExpr;
   }
-  auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), switchArg,
-                                       SourceLoc(), cases, SourceLoc(), C);
+  auto switchStmt =
+      SwitchStmt::createImplicit(LabeledStmtInfo(), switchArg, cases, C);
   auto body = BraceStmt::create(C, SourceLoc(),
                                 ASTNode(switchStmt),
                                 SourceLoc());
@@ -404,12 +404,9 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
 
 
   assert([&]() -> bool {
-    auto equatableProto = TypeChecker::getProtocol(C, enumDecl->getLoc(),
-                                                   KnownProtocolKind::Equatable);
-    if (!equatableProto) {
-      return false;
-    }
-    return !TypeChecker::conformsToProtocol(rawType, equatableProto, enumDecl).isInvalid();
+    return TypeChecker::conformsToKnownProtocol(
+        rawType, KnownProtocolKind::Equatable,
+        derived.getParentModule());
   }());
 
   auto *rawDecl = new (C)
@@ -425,6 +422,7 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
   auto initDecl =
     new (C) ConstructorDecl(name, SourceLoc(),
                             /*Failable=*/ true, /*FailabilityLoc=*/SourceLoc(),
+                            /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
                             /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                             paramList,
                             /*GenericParams=*/nullptr, parentDC);
@@ -464,14 +462,8 @@ bool DerivedConformance::canDeriveRawRepresentable(DeclContext *DC,
 
   // The raw type must be Equatable, so that we have a suitable ~= for
   // synthesized switch statements.
-  auto equatableProto =
-      TypeChecker::getProtocol(enumDecl->getASTContext(), enumDecl->getLoc(),
-                               KnownProtocolKind::Equatable);
-  if (!equatableProto)
-    return false;
-
-  if (TypeChecker::conformsToProtocol(rawType, equatableProto, DC)
-          .isInvalid())
+  if (!TypeChecker::conformsToKnownProtocol(rawType, KnownProtocolKind::Equatable,
+                                            DC->getParentModule()))
     return false;
 
   auto &C = type->getASTContext();

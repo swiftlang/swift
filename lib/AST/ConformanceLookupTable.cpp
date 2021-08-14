@@ -141,7 +141,17 @@ void ConformanceLookupTable::destroy() {
 }
 
 namespace {
-  using ConformanceConstructionInfo = Located<ProtocolDecl *>;
+  struct ConformanceConstructionInfo : public Located<ProtocolDecl *> {
+    /// The location of the "unchecked" attribute, if this
+    const SourceLoc uncheckedLoc;
+
+    ConformanceConstructionInfo() { }
+
+    ConformanceConstructionInfo(
+      ProtocolDecl *item, SourceLoc loc,
+      SourceLoc uncheckedLoc
+    ) : Located(item, loc), uncheckedLoc(uncheckedLoc) { }
+  };
 }
 
 template<typename NominalFunc, typename ExtensionFunc>
@@ -195,14 +205,14 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
       loader.first->loadAllConformances(next, loader.second, conformances);
       loadAllConformances(next, conformances);
       for (auto conf : conformances) {
-        protocols.push_back({conf->getProtocol(), SourceLoc()});
+        protocols.push_back({conf->getProtocol(), SourceLoc(), SourceLoc()});
       }
     } else if (next->getParentSourceFile()) {
       bool anyObject = false;
       for (const auto &found :
                getDirectlyInheritedNominalTypeDecls(next, anyObject)) {
         if (auto proto = dyn_cast<ProtocolDecl>(found.Item))
-          protocols.push_back({proto, found.Loc});
+          protocols.push_back({proto, found.Loc, found.uncheckedLoc});
       }
     }
 
@@ -282,7 +292,9 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
           // its inherited protocols directly.
           auto source = ConformanceSource::forExplicit(ext);
           for (auto locAndProto : protos)
-            addProtocol(locAndProto.Item, locAndProto.Loc, source);
+            addProtocol(
+              locAndProto.Item, locAndProto.Loc,
+              source.withUncheckedLoc(locAndProto.uncheckedLoc));
         });
     break;
 
@@ -471,8 +483,10 @@ void ConformanceLookupTable::addInheritedProtocols(
   bool anyObject = false;
   for (const auto &found :
           getDirectlyInheritedNominalTypeDecls(decl, anyObject)) {
-    if (auto proto = dyn_cast<ProtocolDecl>(found.Item))
-      addProtocol(proto, found.Loc, source);
+    if (auto proto = dyn_cast<ProtocolDecl>(found.Item)) {
+      addProtocol(
+        proto, found.Loc, source.withUncheckedLoc(found.uncheckedLoc));
+    }
   }
 }
 
@@ -529,6 +543,18 @@ ConformanceLookupTable::Ordering ConformanceLookupTable::compareConformances(
                                    ConformanceEntry *lhs,
                                    ConformanceEntry *rhs,
                                    bool &diagnoseSuperseded) {
+  // If only one of the conformances is unconditionally available on the
+  // current deployment target, pick that one.
+  //
+  // FIXME: Conformance lookup should really depend on source location for
+  // this to be 100% correct.
+  if (lhs->getDeclContext()->isAlwaysAvailableConformanceContext() !=
+      rhs->getDeclContext()->isAlwaysAvailableConformanceContext()) {
+    return (lhs->getDeclContext()->isAlwaysAvailableConformanceContext()
+            ? Ordering::Before
+            : Ordering::After);
+  }
+
   // If one entry is fixed and the other is not, we have our answer.
   if (lhs->isFixed() != rhs->isFixed()) {
     // If the non-fixed conformance is not replaceable, we have a failure to
@@ -831,7 +857,8 @@ ConformanceLookupTable::getConformance(NominalTypeDecl *nominal,
 
     auto normalConf =
         ctx.getConformance(conformingType, protocol, conformanceLoc,
-                           conformingDC, ProtocolConformanceState::Incomplete);
+                           conformingDC, ProtocolConformanceState::Incomplete,
+                           entry->Source.getUncheckedLoc().isValid());
     // Invalid code may cause the getConformance call below to loop, so break
     // the infinite recursion by setting this eagerly to shortcircuit with the
     // early return at the start of this function.
@@ -923,7 +950,6 @@ void ConformanceLookupTable::registerProtocolConformance(
 }
 
 bool ConformanceLookupTable::lookupConformance(
-       ModuleDecl *module, 
        NominalTypeDecl *nominal,
        ProtocolDecl *protocol, 
        SmallVectorImpl<ProtocolConformance *> &conformances) {
@@ -955,9 +981,7 @@ bool ConformanceLookupTable::lookupConformance(
 void ConformanceLookupTable::lookupConformances(
        NominalTypeDecl *nominal,
        DeclContext *dc,
-       ConformanceLookupKind lookupKind,
-       SmallVectorImpl<ProtocolDecl *> *protocols,
-       SmallVectorImpl<ProtocolConformance *> *conformances,
+       std::vector<ProtocolConformance *> *conformances,
        SmallVectorImpl<ConformanceDiagnostic> *diagnostics) {
   // We need to expand all implied conformances before we can find
   // those conformances that pertain to this declaration context.
@@ -979,36 +1003,6 @@ void ConformanceLookupTable::lookupConformances(
                    [&](ConformanceEntry *entry) {
                      if (entry->isSuperseded())
                        return true;
-
-                     // If we are to filter out this result, do so now.
-                     switch (lookupKind) {
-                     case ConformanceLookupKind::OnlyExplicit:
-                       switch (entry->getKind()) {
-                       case ConformanceEntryKind::Explicit:
-                       case ConformanceEntryKind::Synthesized:
-                         break;
-                       case ConformanceEntryKind::Implied:
-                       case ConformanceEntryKind::Inherited:
-                         return false;
-                       }
-                       break;
-                     case ConformanceLookupKind::NonInherited:
-                       switch (entry->getKind()) {
-                       case ConformanceEntryKind::Explicit:
-                       case ConformanceEntryKind::Synthesized:
-                       case ConformanceEntryKind::Implied:
-                         break;
-                       case ConformanceEntryKind::Inherited:
-                         return false;
-                       }
-                       break;
-                     case ConformanceLookupKind::All:
-                       break;
-                     }
-
-                     // Record the protocol.
-                     if (protocols)
-                       protocols->push_back(entry->getProtocol());
 
                      // Record the conformance.
                      if (conformances) {

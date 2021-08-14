@@ -67,7 +67,7 @@ bb0(%0 : $Int):
 }
 
 // CHECK-LABEL: @readIdentifiedBoxArg
-// CHECK: [read] Argument %0 = argument of bb0 : ${ var Int }
+// CHECK: [read] Box %0 = argument of bb0 : ${ var Int }
 sil @readIdentifiedBoxArg : $@convention(thin) (@guaranteed { var Int }) -> Int {
 bb0(%0 : ${ var Int }):
   %1 = project_box %0 : ${ var Int }, 0
@@ -78,7 +78,7 @@ bb0(%0 : ${ var Int }):
 }
 
 // CHECK-LABEL: @writeIdentifiedBoxArg
-// CHECK: [modify] Argument %0 = argument of bb0 : ${ var Int }
+// CHECK: [modify] Box %0 = argument of bb0 : ${ var Int }
 sil @writeIdentifiedBoxArg : $@convention(thin) (@guaranteed { var Int }, Int) -> () {
 bb0(%0 : ${ var Int }, %1 : $Int):
   %2 = project_box %0 : ${ var Int }, 0
@@ -90,7 +90,7 @@ bb0(%0 : ${ var Int }, %1 : $Int):
 }
 
 // CHECK-LABEL: @readWriteIdentifiedBoxArg
-// CHECK: [modify] Argument %0 = argument of bb0 : ${ var Int }
+// CHECK: [modify] Box %0 = argument of bb0 : ${ var Int }
 sil @readWriteIdentifiedBoxArg : $@convention(thin) (@guaranteed { var Int }, Int) -> Int {
 bb0(%0 : ${ var Int }, %1 : $Int):
   %2 = function_ref @writeIdentifiedBoxArg : $@convention(thin) (@guaranteed { var Int }, Int) -> ()
@@ -527,6 +527,31 @@ bb0(%0 : $Int):
   return %v : $()
 }
 
+// CHECK-LABEL: @testCopiedNoEscape
+// CHECK:   [read] Stack %3 = alloc_stack $Int
+sil [ossa] @testCopiedNoEscape : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %s1 = alloc_stack $Int
+  store %0 to [trivial] %s1 : $*Int
+  %s2 = alloc_stack $Int
+  store %0 to [trivial] %s2 : $*Int
+  %f = function_ref @testDirectlyAppliedClosure : $@convention(thin) (@inout Int, @inout_aliasable Int) -> ()
+  %pa = partial_apply [callee_guaranteed] %f(%s2) : $@convention(thin) (@inout Int, @inout_aliasable Int) -> ()
+  %copy = copy_value %pa : $@callee_guaranteed (@inout Int) -> ()
+  %borrow = begin_borrow %copy : $@callee_guaranteed (@inout Int) -> ()
+  %npa = convert_escape_to_noescape %borrow : $@callee_guaranteed (@inout Int) -> () to $@noescape @callee_guaranteed (@inout Int) -> ()
+  %access = begin_access [modify] [dynamic] %s1 : $*Int
+  %call = apply %npa(%access) : $@noescape @callee_guaranteed (@inout Int) -> ()
+  end_access %access : $*Int
+  end_borrow %borrow : $@callee_guaranteed (@inout Int) -> ()
+  destroy_value %copy : $@callee_guaranteed (@inout Int) -> ()
+  destroy_value %pa : $@callee_guaranteed (@inout Int) -> ()
+  dealloc_stack %s2 : $*Int
+  dealloc_stack %s1 : $*Int
+  %v = tuple ()
+  return %v : $()
+}
+
 // CHECK: @testDirectlyAppliedClosure
 // CHECK:   [read] Argument %1 = argument of bb0 : $*Int
 sil private @testDirectlyAppliedClosure : $@convention(thin) (@inout Int, @inout_aliasable Int) -> () {
@@ -609,7 +634,7 @@ enum IndirectEnum {
 }
 
 // CHECK-LABEL: @readUnidentifiedArgCaller
-// CHECK:   unidentified accesses: read
+// CHECK: Box %{{.*}} = argument of bb2 : ${ var Int }
 sil @readUnidentifiedArgCaller : $@convention(thin) (@guaranteed IndirectEnum, Int) -> Int {
 bb0(%0 : $IndirectEnum, %1 : $Int):
   switch_enum %0 : $IndirectEnum, case #IndirectEnum.V!enumelt: bb2, default bb1
@@ -638,7 +663,7 @@ class BaseClass {
 class SubClass : BaseClass {}
 
 // CHECK-LABEL: @testElementAddressPhiAccess
-// CHECK: [read] [no_nested_conflict] Class %{{.*}} = upcast %0 : $SubClass to $BaseClass
+// CHECK: [read] [no_nested_conflict] Class %{{.*}} = argument of bb0 : $SubClass
 // CHECK: Field: @_hasInitialValue var f: Float
 sil @testElementAddressPhiAccess : $@convention(thin) (@guaranteed SubClass) -> () {
 bb0(%0 : $SubClass):

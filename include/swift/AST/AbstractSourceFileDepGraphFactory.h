@@ -13,6 +13,7 @@
 #ifndef SWIFT_AST_SOURCE_FILE_DEP_GRAPH_CONSTRUCTOR_H
 #define SWIFT_AST_SOURCE_FILE_DEP_GRAPH_CONSTRUCTOR_H
 
+#include "swift/AST/Decl.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/FineGrainedDependencies.h"
 
@@ -31,7 +32,7 @@ protected:
   const std::string swiftDeps;
 
   /// The fingerprint of the whole file
-  const std::string fileFingerprint;
+  Fingerprint fileFingerprint;
 
   /// For debugging
   const bool emitDotFileAfterConstruction;
@@ -46,7 +47,7 @@ public:
   /// See the instance variable comments for explanation.
   AbstractSourceFileDepGraphFactory(bool hadCompilationError,
                                     StringRef swiftDeps,
-                                    StringRef fileFingerprint,
+                                    Fingerprint fileFingerprint,
                                     bool emitDotFileAfterConstruction,
                                     DiagnosticEngine &diags);
 
@@ -65,13 +66,46 @@ private:
   virtual void addAllUsedDecls() = 0;
 
 protected:
+  /// Given an array of Decls or pairs of them in \p declsOrPairs
+  /// create node pairs for context and name
+  template <NodeKind kind, typename ContentsT>
+  void addAllDefinedDeclsOfAGivenType(std::vector<ContentsT> &contentsVec) {
+    for (const auto &declOrPair : contentsVec) {
+      auto fp =
+          AbstractSourceFileDepGraphFactory::getFingerprintIfAny(declOrPair);
+      auto key = DependencyKey::Builder{kind, DeclAspect::interface}
+                    .withContext(declOrPair)
+                    .withName(declOrPair)
+                    .build();
+      addADefinedDecl(key, fp);
+    }
+  }
+
   /// Add an pair of interface, implementation nodes to the graph, which
   /// represent some \c Decl defined in this source file. \param key the
   /// interface key of the pair
   void addADefinedDecl(const DependencyKey &key,
-                       Optional<StringRef> fingerprint);
+                       Optional<Fingerprint> fingerprint);
 
   void addAUsedDecl(const DependencyKey &def, const DependencyKey &use);
+
+  /// Add an external dependency node to the graph. If the provided fingerprint
+  /// is not \c None, it is added to the def key.
+  void addAnExternalDependency(const DependencyKey &def,
+                               const DependencyKey &use,
+                               Optional<Fingerprint> dependencyFingerprint);
+
+  static Optional<Fingerprint>
+  getFingerprintIfAny(std::pair<const NominalTypeDecl *, const ValueDecl *>) {
+    return None;
+  }
+
+  static Optional<Fingerprint> getFingerprintIfAny(const Decl *d) {
+    if (const auto *idc = dyn_cast<IterableDeclContext>(d)) {
+      return idc->getBodyFingerprint();
+    }
+    return None;
+  }
 };
 
 } // namespace fine_grained_dependencies

@@ -169,9 +169,14 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   }
 
   // Enable address top-byte ignored in the ARM64 backend.
-  if (Triple.getArch() == llvm::Triple::aarch64) {
+  if (Triple.getArch() == llvm::Triple::aarch64 ||
+      Triple.getArch() == llvm::Triple::aarch64_32) {
     arguments.push_back("-Xllvm");
     arguments.push_back("-aarch64-use-tbi");
+  }
+
+  if (output.getPrimaryOutputType() == file_types::TY_SwiftModuleFile) {
+    arguments.push_back("-warn-on-potentially-unavailable-enum-case");
   }
 
   // Enable or disable ObjC interop appropriately for the platform
@@ -217,6 +222,10 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments,
                        options::OPT_warn_swift3_objc_inference_minimal,
                        options::OPT_warn_swift3_objc_inference_complete);
+  inputArgs.AddLastArg(arguments,
+                       options::OPT_enable_actor_data_race_checks,
+                       options::OPT_disable_actor_data_race_checks);
+  inputArgs.AddLastArg(arguments, options::OPT_warn_concurrency);
   inputArgs.AddLastArg(arguments, options::OPT_warn_implicit_overrides);
   inputArgs.AddLastArg(arguments, options::OPT_typo_correction_limit);
   inputArgs.AddLastArg(arguments, options::OPT_enable_app_extension);
@@ -230,6 +239,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_import_underlying_module);
   inputArgs.AddLastArg(arguments, options::OPT_module_cache_path);
   inputArgs.AddLastArg(arguments, options::OPT_module_link_name);
+  inputArgs.AddLastArg(arguments, options::OPT_module_abi_name);
   inputArgs.AddLastArg(arguments, options::OPT_nostdimport);
   inputArgs.AddLastArg(arguments, options::OPT_parse_stdlib);
   inputArgs.AddLastArg(arguments, options::OPT_resource_dir);
@@ -246,6 +256,8 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
                        options::OPT_no_warnings_as_errors);
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_recover_EQ);
+  inputArgs.AddLastArg(arguments,
+                       options::OPT_sanitize_address_use_odr_indicator);
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_coverage_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_static);
   inputArgs.AddLastArg(arguments, options::OPT_swift_version);
@@ -268,8 +280,6 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_debug_diagnostic_names);
   inputArgs.AddLastArg(arguments, options::OPT_print_educational_notes);
   inputArgs.AddLastArg(arguments, options::OPT_diagnostic_style);
-  inputArgs.AddLastArg(arguments, options::OPT_disable_parser_lookup);
-  inputArgs.AddLastArg(arguments, options::OPT_enable_parser_lookup);
   inputArgs.AddLastArg(arguments,
                        options::OPT_enable_experimental_concise_pound_file);
   inputArgs.AddLastArg(
@@ -278,6 +288,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
       options::OPT_disable_fuzzy_forward_scan_trailing_closure_matching);
   inputArgs.AddLastArg(arguments,
                        options::OPT_verify_incremental_dependencies);
+  inputArgs.AddLastArg(arguments, options::OPT_access_notes_path);
 
   // Pass on any build config options
   inputArgs.AddAllArgs(arguments, options::OPT_D);
@@ -496,15 +507,30 @@ ToolChain::constructInvocation(const CompileJobAction &job,
 
   // Add the output file argument if necessary.
   if (context.Output.getPrimaryOutputType() != file_types::TY_Nothing) {
+    auto IndexUnitOutputs = context.Output.getIndexUnitOutputFilenames();
+
     if (context.shouldUseMainOutputFileListInFrontendInvocation()) {
       Arguments.push_back("-output-filelist");
       Arguments.push_back(context.getTemporaryFilePath("outputs", ""));
       II.FilelistInfos.push_back({Arguments.back(),
                                   context.Output.getPrimaryOutputType(),
                                   FilelistInfo::WhichFiles::Output});
+      if (!IndexUnitOutputs.empty()) {
+        Arguments.push_back("-index-unit-output-path-filelist");
+        Arguments.push_back(context.getTemporaryFilePath("index-unit-outputs",
+                                                         ""));
+        II.FilelistInfos.push_back({
+          Arguments.back(), file_types::TY_IndexUnitOutputPath,
+          FilelistInfo::WhichFiles::IndexUnitOutputPaths});
+      }
     } else {
       for (auto FileName : context.Output.getPrimaryOutputFilenames()) {
         Arguments.push_back("-o");
+        Arguments.push_back(context.Args.MakeArgString(FileName));
+      }
+
+      for (auto FileName : IndexUnitOutputs) {
+        Arguments.push_back("-index-unit-output-path");
         Arguments.push_back(context.Args.MakeArgString(FileName));
       }
     }
@@ -556,6 +582,12 @@ ToolChain::constructInvocation(const CompileJobAction &job,
       options::
           OPT_disable_autolinking_runtime_compatibility_dynamic_replacements);
 
+  if (context.OI.CompilerMode == OutputInfo::Mode::SingleCompile) {
+    context.Args.AddLastArg(Arguments, options::OPT_emit_symbol_graph);
+    context.Args.AddLastArg(Arguments, options::OPT_emit_symbol_graph_dir);
+  }
+  context.Args.AddLastArg(Arguments, options::OPT_include_spi_symbols);
+
   return II;
 }
 
@@ -599,6 +631,8 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
     return "-emit-imported-modules";
   case file_types::TY_JSONDependencies:
     return "-scan-dependencies";
+  case file_types::TY_JSONFeatures:
+    return "-emit-supported-features";
   case file_types::TY_IndexData:
     return "-typecheck";
   case file_types::TY_Remapping:
@@ -619,8 +653,7 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
   case file_types::TY_ObjCHeader:
   case file_types::TY_Image:
   case file_types::TY_SwiftDeps:
-  case file_types::TY_SwiftRanges:
-  case file_types::TY_CompiledSource:
+  case file_types::TY_ExternalSwiftDeps:
   case file_types::TY_ModuleTrace:
   case file_types::TY_TBD:
   case file_types::TY_YAMLOptRecord:
@@ -631,6 +664,7 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
   case file_types::TY_SwiftSourceInfoFile:
   case file_types::TY_SwiftCrossImportDir:
   case file_types::TY_SwiftOverlayFile:
+  case file_types::TY_IndexUnitOutputPath:
     llvm_unreachable("Output type can never be primary output.");
   case file_types::TY_INVALID:
     llvm_unreachable("Invalid type ID");
@@ -765,10 +799,6 @@ void ToolChain::JobContext::addFrontendSupplementaryOutputArguments(
                    "-emit-dependencies-path");
   addOutputsOfType(arguments, Output, Args, file_types::TY_SwiftDeps,
                    "-emit-reference-dependencies-path");
-  addOutputsOfType(arguments, Output, Args, file_types::TY_SwiftRanges,
-                   "-emit-swift-ranges-path");
-  addOutputsOfType(arguments, Output, Args, file_types::TY_CompiledSource,
-                   "-emit-compiled-source-path");
   addOutputsOfType(arguments, Output, Args, file_types::TY_ModuleTrace,
                    "-emit-loaded-module-trace-path");
   addOutputsOfType(arguments, Output, Args, file_types::TY_TBD,
@@ -870,6 +900,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_ClangModuleFile:
     case file_types::TY_IndexData:
     case file_types::TY_JSONDependencies:
+    case file_types::TY_JSONFeatures:
       llvm_unreachable("Cannot be output from backend job");
     case file_types::TY_Swift:
     case file_types::TY_dSYM:
@@ -880,8 +911,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_ObjCHeader:
     case file_types::TY_Image:
     case file_types::TY_SwiftDeps:
-    case file_types::TY_SwiftRanges:
-    case file_types::TY_CompiledSource:
+    case file_types::TY_ExternalSwiftDeps:
     case file_types::TY_Remapping:
     case file_types::TY_ModuleTrace:
     case file_types::TY_YAMLOptRecord:
@@ -892,6 +922,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_SwiftSourceInfoFile:
     case file_types::TY_SwiftCrossImportDir:
     case file_types::TY_SwiftOverlayFile:
+    case file_types::TY_IndexUnitOutputPath:
       llvm_unreachable("Output type can never be primary output.");
     case file_types::TY_INVALID:
       llvm_unreachable("Invalid type ID");
@@ -944,7 +975,8 @@ ToolChain::constructInvocation(const BackendJobAction &job,
   Arguments.push_back(context.Args.MakeArgString(getTriple().str()));
 
   // Enable address top-byte ignored in the ARM64 backend.
-  if (getTriple().getArch() == llvm::Triple::aarch64) {
+  if (getTriple().getArch() == llvm::Triple::aarch64 ||
+      getTriple().getArch() == llvm::Triple::aarch64_32) {
     Arguments.push_back("-Xllvm");
     Arguments.push_back("-aarch64-use-tbi");
   }
@@ -1042,11 +1074,13 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
   addOutputsOfType(Arguments, context.Output, context.Args, file_types::TY_TBD,
                    "-emit-tbd-path");
 
+  context.Args.AddLastArg(Arguments, options::OPT_emit_symbol_graph);
+  context.Args.AddLastArg(Arguments, options::OPT_emit_symbol_graph_dir);
+  context.Args.AddLastArg(Arguments, options::OPT_include_spi_symbols);
+
   context.Args.AddLastArg(Arguments, options::OPT_import_objc_header);
 
-  context.Args.AddLastArg(
-      Arguments,
-      options::OPT_enable_experimental_cross_module_incremental_build);
+  context.Args.AddLastArg(Arguments, options::OPT_disable_incremental_imports);
 
   Arguments.push_back("-module-name");
   Arguments.push_back(context.Args.MakeArgString(context.OI.ModuleName));

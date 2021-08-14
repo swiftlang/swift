@@ -64,6 +64,22 @@ struct SequenceTraits<
   static SourceFileDepGraphNode &element(IO &, NodeVec &vec, size_t index);
 };
 
+template <> struct ScalarTraits<swift::Fingerprint> {
+  static void output(const swift::Fingerprint &fp, void *c, raw_ostream &os) {
+    os << fp.getRawValue();
+  }
+  static StringRef input(StringRef s, void *, swift::Fingerprint &fp) {
+    if (auto convertedFP = swift::Fingerprint::fromString(s))
+      fp = convertedFP.getValue();
+    else {
+      llvm::errs() << "Failed to convert fingerprint '" << s << "'\n";
+      exit(1);
+    }
+    return StringRef();
+  }
+  static QuotingType mustQuote(StringRef S) { return needsQuotes(S); }
+};
+
 } // namespace yaml
 } // namespace llvm
 
@@ -93,8 +109,6 @@ void ScalarEnumerationTraits<swift::fine_grained_dependencies::NodeKind>::
   io.enumCase(value, "member", NodeKind::member);
   io.enumCase(value, "dynamicLookup", NodeKind::dynamicLookup);
   io.enumCase(value, "externalDepend", NodeKind::externalDepend);
-  io.enumCase(value, "incrementalExternalDepend",
-              NodeKind::incrementalExternalDepend);
   io.enumCase(value, "sourceFileProvide", NodeKind::sourceFileProvide);
 }
 
@@ -202,7 +216,7 @@ int main(int argc, char *argv[]) {
   }
 
   case ActionType::BinaryToYAML: {
-    auto fg = SourceFileDepGraph::loadFromPath(options::InputFilename);
+    auto fg = SourceFileDepGraph::loadFromPath(options::InputFilename, true);
     if (!fg) {
       llvm::errs() << "Failed to read dependency file\n";
       return 1;

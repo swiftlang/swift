@@ -15,9 +15,12 @@
 // a particular constraint was derived.
 //
 //===----------------------------------------------------------------------===//
+#include "swift/Sema/ConstraintLocator.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Types.h"
+#include "swift/AST/ProtocolConformance.h"
+#include "swift/Sema/Constraint.h"
 #include "swift/Sema/ConstraintLocator.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "llvm/ADT/StringExtras.h"
@@ -44,7 +47,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::ClosureResult:
   case ConstraintLocator::ClosureBody:
   case ConstraintLocator::ConstructorMember:
-  case ConstraintLocator::FunctionBuilderBodyResult:
+  case ConstraintLocator::ResultBuilderBodyResult:
   case ConstraintLocator::InstanceType:
   case ConstraintLocator::AutoclosureResult:
   case ConstraintLocator::OptionalPayload:
@@ -54,11 +57,14 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::ParentType:
   case ConstraintLocator::ExistentialSuperclassType:
   case ConstraintLocator::LValueConversion:
-  case ConstraintLocator::RValueAdjustment:
+  case ConstraintLocator::DynamicType:
   case ConstraintLocator::SubscriptMember:
   case ConstraintLocator::OpenedGeneric:
+  case ConstraintLocator::OpenedOpaqueArchetype:
+  case ConstraintLocator::WrappedValue:
   case ConstraintLocator::GenericParameter:
   case ConstraintLocator::GenericArgument:
+  case ConstraintLocator::TupleType:
   case ConstraintLocator::NamedTupleElement:
   case ConstraintLocator::TupleElement:
   case ConstraintLocator::ProtocolRequirement:
@@ -66,6 +72,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::KeyPathComponent:
   case ConstraintLocator::ConditionalRequirement:
   case ConstraintLocator::TypeParameterRequirement:
+  case ConstraintLocator::ConformanceRequirement:
   case ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice:
   case ConstraintLocator::DynamicLookupResult:
   case ConstraintLocator::ContextualType:
@@ -82,6 +89,8 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::PatternMatch:
   case ConstraintLocator::ArgumentAttribute:
   case ConstraintLocator::UnresolvedMemberChainResult:
+  case ConstraintLocator::PlaceholderType:
+  case ConstraintLocator::ImplicitConversion:
     return 0;
 
   case ConstraintLocator::FunctionArgument:
@@ -115,7 +124,7 @@ bool ConstraintLocator::isKeyPathType() const {
   // The format of locator should be `<keypath expr> -> key path type`
   if (!anchor || !isExpr<KeyPathExpr>(anchor) || path.size() != 1)
     return false;
-  return path.back().getKind() == ConstraintLocator::KeyPathType;
+  return path.back().is<LocatorPathElt::KeyPathType>();
 }
 
 bool ConstraintLocator::isKeyPathRoot() const {
@@ -168,14 +177,22 @@ bool ConstraintLocator::isForKeyPathDynamicMemberLookup() const {
   return !path.empty() && path.back().isKeyPathDynamicMember();
 }
 
-bool ConstraintLocator::isForKeyPathComponent() const {
+bool ConstraintLocator::isInKeyPathComponent() const {
   return llvm::any_of(getPath(), [&](const LocatorPathElt &elt) {
     return elt.isKeyPathComponent();
   });
 }
 
+bool ConstraintLocator::isForKeyPathComponentResult() const {
+  return isLastElement<LocatorPathElt::KeyPathComponentResult>();
+}
+
 bool ConstraintLocator::isForGenericParameter() const {
   return isLastElement<LocatorPathElt::GenericParameter>();
+}
+
+bool ConstraintLocator::isForWrappedValue() const {
+  return isLastElement<LocatorPathElt::WrappedValue>();
 }
 
 bool ConstraintLocator::isForSequenceElementType() const {
@@ -198,14 +215,20 @@ bool ConstraintLocator::isForOptionalTry() const {
   return directlyAt<OptionalTryExpr>();
 }
 
-bool ConstraintLocator::isForFunctionBuilderBodyResult() const {
-  return isFirstElement<LocatorPathElt::FunctionBuilderBodyResult>();
+bool ConstraintLocator::isForResultBuilderBodyResult() const {
+  return isFirstElement<LocatorPathElt::ResultBuilderBodyResult>();
 }
 
 GenericTypeParamType *ConstraintLocator::getGenericParameter() const {
   // Check whether we have a path that terminates at a generic parameter.
   return isForGenericParameter() ?
       castLastElementTo<LocatorPathElt::GenericParameter>().getType() : nullptr;
+}
+
+Type ConstraintLocator::getWrappedValue() const {
+  return isForWrappedValue()
+             ? castLastElementTo<LocatorPathElt::WrappedValue>().getType()
+             : Type();
 }
 
 void ConstraintLocator::dump(SourceManager *sm) const {
@@ -260,6 +283,12 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
       out << "generic parameter '" << gpElt.getType()->getString(PO) << "'";
       break;
     }
+    case WrappedValue: {
+      auto wrappedValueElt = elt.castTo<LocatorPathElt::WrappedValue>();
+      out << "composed property wrapper type '"
+          << wrappedValueElt.getType()->getString(PO) << "'";
+      break;
+    }
     case ApplyArgument:
       out << "apply argument";
       break;
@@ -300,8 +329,8 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
       out << "function result";
       break;
 
-    case FunctionBuilderBodyResult:
-      out << "function builder body result";
+    case ResultBuilderBodyResult:
+      out << "result builder body result";
       break;
 
     case SequenceElementType:
@@ -329,6 +358,12 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
       out << "member reference base";
       break;
 
+    case TupleType: {
+      auto tupleElt = elt.castTo<LocatorPathElt::TupleType>();
+      out << "tuple type '" << tupleElt.getType()->getString(PO) << "'";
+      break;
+    }
+
     case NamedTupleElement: {
       auto tupleElt = elt.castTo<LocatorPathElt::NamedTupleElement>();
       out << "named tuple element #" << llvm::utostr(tupleElt.getIndex());
@@ -350,8 +385,8 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
       out << "@lvalue-to-inout conversion";
       break;
 
-    case RValueAdjustment:
-      out << "rvalue adjustment";
+    case DynamicType:
+      out << "`.dynamicType` reference";
       break;
 
     case SubscriptMember:
@@ -384,6 +419,10 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
       out << "opened generic";
       break;
 
+    case OpenedOpaqueArchetype:
+      out << "opened opaque archetype";
+      break;
+
     case ConditionalRequirement: {
       auto reqElt = elt.castTo<LocatorPathElt::ConditionalRequirement>();
       out << "conditional requirement #" << llvm::utostr(reqElt.getIndex());
@@ -394,6 +433,15 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
       auto reqElt = elt.castTo<LocatorPathElt::TypeParameterRequirement>();
       out << "type parameter requirement #" << llvm::utostr(reqElt.getIndex());
       dumpReqKind(reqElt.getRequirementKind());
+      break;
+    }
+
+    case ConformanceRequirement: {
+      auto *conformance =
+          elt.castTo<LocatorPathElt::ConformanceRequirement>().getConformance();
+      out << "conformance requirement (";
+      conformance->getProtocol()->dumpRef(out);
+      out << ")";
       break;
     }
 
@@ -471,6 +519,14 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
       case AttrLoc::Attribute::Escaping:
         out << "@escaping";
         break;
+
+      case AttrLoc::Attribute::Concurrent:
+        out << "@Sendable";
+        break;
+
+      case AttrLoc::Attribute::GlobalActor:
+        out << "@<global actor>";
+        break;
       }
 
       break;
@@ -478,6 +534,15 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
 
     case UnresolvedMemberChainResult:
       out << "unresolved chain result";
+      break;
+
+    case PlaceholderType:
+      out << "placeholder type";
+      break;
+
+    case ConstraintLocator::ImplicitConversion:
+      auto convElt = elt.castTo<LocatorPathElt::ImplicitConversion>();
+      out << "implicit conversion " << getName(convElt.getConversionKind());
       break;
     }
   }

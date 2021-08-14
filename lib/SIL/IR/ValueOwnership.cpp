@@ -46,7 +46,7 @@ public:
 #define CONSTANT_OWNERSHIP_INST(OWNERSHIP, INST)                               \
   ValueOwnershipKind ValueOwnershipKindClassifier::visit##INST##Inst(          \
       INST##Inst *Arg) {                                                       \
-    return ValueOwnershipKind::OWNERSHIP;                                      \
+    return OwnershipKind::OWNERSHIP;                                           \
   }
 
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
@@ -149,7 +149,10 @@ CONSTANT_OWNERSHIP_INST(Unowned, RawPointerToRef)
 CONSTANT_OWNERSHIP_INST(Unowned, ObjCProtocol)
 CONSTANT_OWNERSHIP_INST(Unowned, ValueToBridgeObject)
 CONSTANT_OWNERSHIP_INST(None, GetAsyncContinuation)
-CONSTANT_OWNERSHIP_INST(Unowned, GetAsyncContinuationAddr)
+CONSTANT_OWNERSHIP_INST(None, GetAsyncContinuationAddr)
+CONSTANT_OWNERSHIP_INST(None, ThinToThickFunction)
+CONSTANT_OWNERSHIP_INST(None, ExtractExecutor)
+
 #undef CONSTANT_OWNERSHIP_INST
 
 #define CONSTANT_OR_NONE_OWNERSHIP_INST(OWNERSHIP, INST)                       \
@@ -157,9 +160,9 @@ CONSTANT_OWNERSHIP_INST(Unowned, GetAsyncContinuationAddr)
       INST##Inst *I) {                                                         \
     if (I->getType().isTrivial(*I->getFunction()) ||                           \
         I->getType().isAddress()) {                                            \
-      return ValueOwnershipKind::None;                                         \
+      return OwnershipKind::None;                                              \
     }                                                                          \
-    return ValueOwnershipKind::OWNERSHIP;                                      \
+    return OwnershipKind::OWNERSHIP;                                           \
   }
 CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, StructExtract)
 CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, TupleExtract)
@@ -206,9 +209,6 @@ CONSTANT_OR_NONE_OWNERSHIP_INST(Owned, MarkUninitialized)
 // a performance perspective.
 CONSTANT_OR_NONE_OWNERSHIP_INST(Unowned, UncheckedBitwiseCast)
 
-// A thin_to_thick instruction can return a trivial (@noescape) type.
-CONSTANT_OR_NONE_OWNERSHIP_INST(Owned, ThinToThickFunction)
-
 #undef CONSTANT_OR_NONE_OWNERSHIP_INST
 
 // For a forwarding instruction, we loop over all operands and make sure that
@@ -218,7 +218,7 @@ ValueOwnershipKindClassifier::visitForwardingInst(SILInstruction *i,
                                                   ArrayRef<Operand> ops) {
   // A forwarding inst without operands must be trivial.
   if (ops.empty())
-    return ValueOwnershipKind::None;
+    return OwnershipKind::None;
 
   auto mergedValue = ValueOwnershipKind::merge(makeOptionalTransformRange(
       ops, [&i](const Operand &op) -> Optional<ValueOwnershipKind> {
@@ -227,23 +227,25 @@ ValueOwnershipKindClassifier::visitForwardingInst(SILInstruction *i,
         return op.get().getOwnershipKind();
       }));
 
-  if (!mergedValue.hasValue()) {
+  if (!mergedValue) {
     // If we have mismatched SILOwnership and sil ownership is not enabled,
     // just return None for staging purposes. If SILOwnership is enabled, then
     // we must assert!
     if (!i->getModule().getOptions().VerifySILOwnership) {
-      return ValueOwnershipKind::None;
+      return OwnershipKind::None;
     }
     llvm_unreachable("Forwarding inst with mismatching ownership kinds?!");
   }
 
-  return mergedValue.getValue();
+  return mergedValue;
 }
 
 #define FORWARDING_OWNERSHIP_INST(INST)                                        \
   ValueOwnershipKind ValueOwnershipKindClassifier::visit##INST##Inst(          \
       INST##Inst *I) {                                                         \
-    return I->getOwnershipKind();                                              \
+    return I->getType().isTrivial(*I->getFunction())                           \
+               ? ValueOwnershipKind(OwnershipKind::None)                       \
+               : I->getForwardingOwnershipKind();                              \
   }
 FORWARDING_OWNERSHIP_INST(BridgeObjectToRef)
 FORWARDING_OWNERSHIP_INST(ConvertFunction)
@@ -260,6 +262,7 @@ FORWARDING_OWNERSHIP_INST(UncheckedValueCast)
 FORWARDING_OWNERSHIP_INST(UncheckedEnumData)
 FORWARDING_OWNERSHIP_INST(SelectEnum)
 FORWARDING_OWNERSHIP_INST(Enum)
+FORWARDING_OWNERSHIP_INST(MarkDependence)
 // NOTE: init_existential_ref from a reference counting perspective is not
 // considered to be "owned" since it doesn't affect reference counts. That being
 // said in the past, we wanted to conceptually treat it as an owned value that
@@ -284,29 +287,19 @@ ValueOwnershipKind ValueOwnershipKindClassifier::visitSILUndef(SILUndef *arg) {
   return arg->getOwnershipKind();
 }
 
+ValueOwnershipKind ValueOwnershipKindClassifier::
+visitPlaceholderValue(PlaceholderValue *v) {
+  return OwnershipKind::None;
+}
+
+ValueOwnershipKind ValueOwnershipKindClassifier::
+visitMultipleValueInstructionResult(MultipleValueInstructionResult *Result) {
+  return Result->getOwnershipKind();
+}
+
 ValueOwnershipKind
 ValueOwnershipKindClassifier::visitSILPhiArgument(SILPhiArgument *Arg) {
   return Arg->getOwnershipKind();
-}
-
-ValueOwnershipKind ValueOwnershipKindClassifier::visitDestructureStructResult(
-    DestructureStructResult *Result) {
-  return Result->getOwnershipKind();
-}
-
-ValueOwnershipKind ValueOwnershipKindClassifier::visitDestructureTupleResult(
-    DestructureTupleResult *Result) {
-  return Result->getOwnershipKind();
-}
-
-ValueOwnershipKind ValueOwnershipKindClassifier::visitBeginApplyResult(
-    BeginApplyResult *Result) {
-  return Result->getOwnershipKind();
-}
-
-ValueOwnershipKind ValueOwnershipKindClassifier::visitBeginCOWMutationResult(
-    BeginCOWMutationResult *Result) {
-  return Result->getOwnershipKind();
 }
 
 ValueOwnershipKind ValueOwnershipKindClassifier::visitSILFunctionArgument(
@@ -314,24 +307,18 @@ ValueOwnershipKind ValueOwnershipKindClassifier::visitSILFunctionArgument(
   return Arg->getOwnershipKind();
 }
 
-// This is a forwarding instruction through only one of its arguments.
-ValueOwnershipKind
-ValueOwnershipKindClassifier::visitMarkDependenceInst(MarkDependenceInst *MDI) {
-  return MDI->getOwnershipKind();
-}
-
 ValueOwnershipKind ValueOwnershipKindClassifier::visitApplyInst(ApplyInst *ai) {
   auto *f = ai->getFunction();
   bool isTrivial = ai->getType().isTrivial(*f);
   // Quick is trivial check.
   if (isTrivial)
-    return ValueOwnershipKind::None;
+    return OwnershipKind::None;
 
   SILFunctionConventions fnConv(ai->getSubstCalleeType(), f->getModule());
   auto results = fnConv.getDirectSILResults();
   // No results => None.
   if (results.empty())
-    return ValueOwnershipKind::None;
+    return OwnershipKind::None;
 
   // Otherwise, map our results to their ownership kinds and then merge them!
   auto resultOwnershipKinds =
@@ -343,17 +330,17 @@ ValueOwnershipKind ValueOwnershipKindClassifier::visitApplyInst(ApplyInst *ai) {
     llvm_unreachable("Forwarding inst with mismatching ownership kinds?!");
   }
 
-  return *mergedOwnershipKind;
+  return mergedOwnershipKind;
 }
 
 ValueOwnershipKind ValueOwnershipKindClassifier::visitLoadInst(LoadInst *LI) {
   switch (LI->getOwnershipQualifier()) {
   case LoadOwnershipQualifier::Take:
   case LoadOwnershipQualifier::Copy:
-    return ValueOwnershipKind::Owned;
+    return OwnershipKind::Owned;
   case LoadOwnershipQualifier::Unqualified:
   case LoadOwnershipQualifier::Trivial:
-    return ValueOwnershipKind::None;
+    return OwnershipKind::None;
   }
 
   llvm_unreachable("Unhandled LoadOwnershipQualifier in switch.");
@@ -362,8 +349,8 @@ ValueOwnershipKind ValueOwnershipKindClassifier::visitLoadInst(LoadInst *LI) {
 ValueOwnershipKind
 ValueOwnershipKindClassifier::visitPartialApplyInst(PartialApplyInst *PA) {
   if (PA->isOnStack())
-    return ValueOwnershipKind::None;
-  return ValueOwnershipKind::Owned;
+    return OwnershipKind::None;
+  return OwnershipKind::Owned;
 }
 
 //===----------------------------------------------------------------------===//
@@ -379,7 +366,7 @@ struct ValueOwnershipKindBuiltinVisitor
                                         llvm::Intrinsic::ID ID) {
     // LLVM intrinsics do not traffic in ownership, so if we have a result, it
     // must be any.
-    return ValueOwnershipKind::None;
+    return OwnershipKind::None;
   }
 
 #define BUILTIN(ID, NAME, ATTRS)                                               \
@@ -392,7 +379,7 @@ struct ValueOwnershipKindBuiltinVisitor
 #define CONSTANT_OWNERSHIP_BUILTIN(OWNERSHIP, ID)                              \
   ValueOwnershipKind ValueOwnershipKindBuiltinVisitor::visit##ID(              \
       BuiltinInst *BI, StringRef Attr) {                                       \
-    return ValueOwnershipKind::OWNERSHIP;                                      \
+    return OwnershipKind::OWNERSHIP;                                           \
   }
 // This returns a value at +1 that is destroyed strictly /after/ the
 // UnsafeGuaranteedEnd. This provides the guarantee that we want.
@@ -543,6 +530,31 @@ CONSTANT_OWNERSHIP_BUILTIN(None, PoundAssert)
 CONSTANT_OWNERSHIP_BUILTIN(None, TypePtrAuthDiscriminator)
 CONSTANT_OWNERSHIP_BUILTIN(None, IntInstrprofIncrement)
 CONSTANT_OWNERSHIP_BUILTIN(None, GlobalStringTablePointer)
+CONSTANT_OWNERSHIP_BUILTIN(None, GetCurrentAsyncTask)
+CONSTANT_OWNERSHIP_BUILTIN(None, CancelAsyncTask)
+CONSTANT_OWNERSHIP_BUILTIN(Owned, CreateAsyncTask)
+CONSTANT_OWNERSHIP_BUILTIN(Owned, CreateAsyncTaskInGroup)
+CONSTANT_OWNERSHIP_BUILTIN(None, ConvertTaskToJob)
+CONSTANT_OWNERSHIP_BUILTIN(None, InitializeDefaultActor)
+CONSTANT_OWNERSHIP_BUILTIN(None, DestroyDefaultActor)
+CONSTANT_OWNERSHIP_BUILTIN(None, InitializeDistributedRemoteActor)
+CONSTANT_OWNERSHIP_BUILTIN(None, DestroyDistributedActor)
+CONSTANT_OWNERSHIP_BUILTIN(Owned, AutoDiffCreateLinearMapContext)
+CONSTANT_OWNERSHIP_BUILTIN(None, AutoDiffProjectTopLevelSubcontext)
+CONSTANT_OWNERSHIP_BUILTIN(None, AutoDiffAllocateSubcontext)
+CONSTANT_OWNERSHIP_BUILTIN(None, GetCurrentExecutor)
+CONSTANT_OWNERSHIP_BUILTIN(None, ResumeNonThrowingContinuationReturning)
+CONSTANT_OWNERSHIP_BUILTIN(None, ResumeThrowingContinuationReturning)
+CONSTANT_OWNERSHIP_BUILTIN(None, ResumeThrowingContinuationThrowing)
+CONSTANT_OWNERSHIP_BUILTIN(None, BuildOrdinarySerialExecutorRef)
+CONSTANT_OWNERSHIP_BUILTIN(None, BuildDefaultActorExecutorRef)
+CONSTANT_OWNERSHIP_BUILTIN(None, BuildMainActorExecutorRef)
+CONSTANT_OWNERSHIP_BUILTIN(None, StartAsyncLet)
+CONSTANT_OWNERSHIP_BUILTIN(None, EndAsyncLet)
+CONSTANT_OWNERSHIP_BUILTIN(None, StartAsyncLetWithLocalBuffer)
+CONSTANT_OWNERSHIP_BUILTIN(None, EndAsyncLetLifetime)
+CONSTANT_OWNERSHIP_BUILTIN(None, CreateTaskGroup)
+CONSTANT_OWNERSHIP_BUILTIN(None, DestroyTaskGroup)
 
 #undef CONSTANT_OWNERSHIP_BUILTIN
 
@@ -551,14 +563,15 @@ CONSTANT_OWNERSHIP_BUILTIN(None, GlobalStringTablePointer)
   ValueOwnershipKind ValueOwnershipKindBuiltinVisitor::visit##ID(              \
       BuiltinInst *BI, StringRef Attr) {                                       \
     if (BI->getType().isTrivial(*BI->getFunction())) {                         \
-      return ValueOwnershipKind::None;                                         \
+      return OwnershipKind::None;                                              \
     }                                                                          \
-    return ValueOwnershipKind::Unowned;                                        \
+    return OwnershipKind::Unowned;                                             \
   }
 UNOWNED_OR_NONE_DEPENDING_ON_RESULT(CmpXChg)
 UNOWNED_OR_NONE_DEPENDING_ON_RESULT(AtomicLoad)
 UNOWNED_OR_NONE_DEPENDING_ON_RESULT(ExtractElement)
 UNOWNED_OR_NONE_DEPENDING_ON_RESULT(InsertElement)
+UNOWNED_OR_NONE_DEPENDING_ON_RESULT(ShuffleVector)
 UNOWNED_OR_NONE_DEPENDING_ON_RESULT(ZeroInitializer)
 #undef UNOWNED_OR_NONE_DEPENDING_ON_RESULT
 
@@ -581,7 +594,30 @@ ValueOwnershipKindClassifier::visitBuiltinInst(BuiltinInst *BI) {
 //                            Top Level Entrypoint
 //===----------------------------------------------------------------------===//
 
-ValueOwnershipKind SILValue::getOwnershipKind() const {
+ValueOwnershipKind ValueBase::getOwnershipKind() const {
+  // If we do not have an undef, we should always be able to get to our function
+  // here. If we do not have ownership enabled, just return none for everything
+  // to short circuit ownership optimizations. Since SILUndef in either case
+  // will be ValueOwnershipKind::None, we will not get any wonky behavior here.
+  //
+  // We assume that any time we are in SILBuilder and call this without having a
+  // value in a block yet, ossa is enabled.
+  if (auto *block = getParentBlock()) {
+    auto *f = block->getParent();
+    // If our block isn't in a function, then it must be in a global
+    // variable. We don't verify ownership there so just return
+    // OwnershipKind::None.
+    if (!f)
+      return OwnershipKind::None;
+
+    // Now that we know that we do have a block/function, check if we have
+    // ownership.
+    if (!f->hasOwnership())
+      return OwnershipKind::None;
+  }
+
   ValueOwnershipKindClassifier Classifier;
-  return Classifier.visit(const_cast<ValueBase *>(Value));
+  auto result = Classifier.visit(const_cast<ValueBase *>(this));
+  assert(result && "Returned ownership kind invalid on values");
+  return result;
 }

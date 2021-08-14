@@ -383,14 +383,13 @@ static void writeEpilogue(raw_ostream &os) {
 }
 
 bool swift::printAsObjC(raw_ostream &os, ModuleDecl *M,
-                        StringRef bridgingHeader,
-                        AccessLevel minRequiredAccess) {
+                        StringRef bridgingHeader) {
   llvm::PrettyStackTraceString trace("While generating Objective-C header");
 
   SmallPtrSet<ImportModuleTy, 8> imports;
   std::string moduleContentsBuf;
   llvm::raw_string_ostream moduleContents{moduleContentsBuf};
-  printModuleContentsAsObjC(moduleContents, imports, *M, minRequiredAccess);
+  printModuleContentsAsObjC(moduleContents, imports, *M);
   std::string macroGuard = (llvm::Twine(M->getNameStr().upper()) + "_SWIFT_H").str();
   writePrologue(os, M->getASTContext(), macroGuard);
   writeImports(os, imports, *M, bridgingHeader);

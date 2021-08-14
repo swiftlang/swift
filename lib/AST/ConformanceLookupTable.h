@@ -85,6 +85,9 @@ class ConformanceLookupTable {
   class ConformanceSource {
     llvm::PointerIntPair<void *, 2, ConformanceEntryKind> Storage;
 
+    /// The location of the "unchecked" attribute, if there is one.
+    SourceLoc uncheckedLoc;
+
     ConformanceSource(void *ptr, ConformanceEntryKind kind) 
       : Storage(ptr, kind) { }
 
@@ -123,6 +126,14 @@ class ConformanceLookupTable {
       return ConformanceSource(typeDecl, ConformanceEntryKind::Synthesized);
     }
 
+    /// Return a new conformance source with the given location of "@unchecked".
+    ConformanceSource withUncheckedLoc(SourceLoc uncheckedLoc) {
+      ConformanceSource result(*this);
+      if (uncheckedLoc.isValid())
+        result.uncheckedLoc = uncheckedLoc;
+      return result;
+    }
+
     /// Retrieve the kind of conformance formed from this source.
     ConformanceEntryKind getKind() const { return Storage.getInt(); }
 
@@ -147,6 +158,11 @@ class ConformanceLookupTable {
       }
 
       llvm_unreachable("Unhandled ConformanceEntryKind in switch.");
+    }
+
+    /// The location of the @unchecked attribute, if any.
+    SourceLoc getUncheckedLoc() const {
+      return uncheckedLoc;
     }
 
     /// For an inherited conformance, retrieve the class declaration
@@ -429,17 +445,14 @@ public:
   /// conformances found for this protocol and nominal type.
   ///
   /// \returns true if any conformances were found. 
-  bool lookupConformance(ModuleDecl *module,
-                         NominalTypeDecl *nominal,
+  bool lookupConformance(NominalTypeDecl *nominal,
                          ProtocolDecl *protocol, 
                          SmallVectorImpl<ProtocolConformance *> &conformances);
 
   /// Look for all of the conformances within the given declaration context.
   void lookupConformances(NominalTypeDecl *nominal,
                           DeclContext *dc,
-                          ConformanceLookupKind lookupKind,
-                          SmallVectorImpl<ProtocolDecl *> *protocols,
-                          SmallVectorImpl<ProtocolConformance *> *conformances,
+                          std::vector<ProtocolConformance *> *conformances,
                           SmallVectorImpl<ConformanceDiagnostic> *diagnostics);
 
   /// Retrieve the complete set of protocols to which this nominal

@@ -1,0 +1,9 @@
+module UserA {
+    header "user-a.h"
+    export *
+}
+
+module UserB {
+    header "user-b.h"
+    export *
+}

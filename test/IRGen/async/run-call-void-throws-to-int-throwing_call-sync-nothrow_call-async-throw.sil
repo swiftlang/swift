@@ -1,19 +1,22 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift-dylib(%t/%target-library-name(PrintShims)) %S/../../Inputs/print-shims.swift -module-name PrintShims -emit-module -emit-module-path %t/PrintShims.swiftmodule
 // RUN: %target-codesign %t/%target-library-name(PrintShims)
-// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -emit-ir -I %t -L %t -lPrintShim | %FileCheck %s --check-prefix=CHECK-LL
-// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -module-name main -o %t/main -I %t -L %t -lPrintShims %target-rpath(%t) 
+// RUN: %target-build-swift  -g -parse-sil %s -emit-ir -I %t -L %t -lPrintShim | %FileCheck %s --check-prefix=CHECK-LL
+// RUN: %target-build-swift  -g -parse-sil %s -module-name main -o %t/main -I %t -L %t -lPrintShims %target-rpath(%t)
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main %t/%target-library-name(PrintShims) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize_none
+// REQUIRES: concurrency
 // UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 
 import Builtin
 import Swift
 import PrintShims
+import _Concurrency
 
 sil public_external @printInt64 : $@convention(thin) (Int64) -> ()
 
@@ -61,7 +64,7 @@ sil_witness_table hidden E: Error module main {
 }
 
 
-sil hidden @call : $@convention(thin) () -> () {
+sil hidden @call : $@async @convention(thin) () -> () {
 bb0:
   %voidThrowsToInt = function_ref @voidThrowsToInt : $@async @convention(thin) () -> (Int64, @error Error)
   try_apply %voidThrowsToInt() : $@async @convention(thin) () -> (Int64, @error Error), normal bb1, error bb3
@@ -97,11 +100,12 @@ bb5:
   br bb2
 }
 
-// CHECK-LL: define hidden swiftcc void @voidThrowsToInt(%swift.context* {{%[0-9]*}}) {{#[0-9]*}} {
+// CHECK-LL: @voidThrowsToIntTu =
+// CHECK-LL: define hidden swift{{(tail)?}}cc void @voidThrowsToInt(%swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}}
 sil hidden @voidThrowsToInt : $@async @convention(thin) () -> (Int64, @error Error) {
 entry:
-  %syncVoidThrowsToInt = function_ref @syncVoidThrowsToInt : $@convention(thin) () -> (Int64, @error Error)
-  try_apply %syncVoidThrowsToInt() : $@convention(thin) () -> (Int64, @error Error), normal success1, error error1
+  %syncVoidThrowsToInt = function_ref @syncVoidThrowsToInt : $@async @convention(thin) () -> (Int64, @error Error)
+  try_apply %syncVoidThrowsToInt() : $@async @convention(thin) () -> (Int64, @error Error), normal success1, error error1
 success1(%out1 : $Int64):
   %asyncVoidThrowsToInt = function_ref @asyncVoidThrowsToInt : $@async @convention(thin) () -> (Int64, @error Error)
   try_apply %asyncVoidThrowsToInt() : $@async @convention(thin) () -> (Int64, @error Error), normal success2, error error2
@@ -115,7 +119,7 @@ error(%error : $Error):
   throw %error : $Error
 }
 
-sil hidden @syncVoidThrowsToInt : $@convention(thin) () -> (Int64, @error Error) {
+sil hidden @syncVoidThrowsToInt : $@async @convention(thin) () -> (Int64, @error Error) {
 bb0:
   %int_literal = integer_literal $Builtin.Int64, 1          // user: %2
   %Int64 = struct $Int64 (%int_literal : $Builtin.Int64)          // user: %3
@@ -136,18 +140,34 @@ bb0:
   throw %error : $Error
 }
 
-sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
-bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
-  %call = function_ref @call : $@convention(thin) () -> () // CHECK: 42
-  %result = apply %call() : $@convention(thin) () -> ()
 
-  %2 = integer_literal $Builtin.Int32, 0
-  %3 = struct $Int32 (%2 : $Builtin.Int32)
-  return %3 : $Int32
+sil @test_case : $@convention(thin) @async () -> () {
+  %call = function_ref @call : $@async @convention(thin) () -> () // CHECK: 42
+  %result = apply %call() : $@async @convention(thin) () -> ()
+
+  %void = tuple()
+  return %void : $()
 }
 
+// Defined in _Concurrency
+sil @$ss13_runAsyncMainyyyyYaKcF : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> @error Error) -> ()
 
+sil @no_throw_to_throw_think : $@convention(thin) @async (@guaranteed @async @callee_guaranteed () -> ()) -> @error Error {
+bb0(%0 :$@async @callee_guaranteed () -> ()):
+  %void = apply %0() : $@async @callee_guaranteed () -> ()
+  return %void : $()
+}
 
-
-
-
+// main
+sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+  %test_case_nothrow = function_ref @test_case : $@convention(thin) @async () -> ()
+  %thick_test_case = thin_to_thick_function %test_case_nothrow : $@convention(thin) @async () -> () to $@callee_guaranteed @async () -> ()
+  %thunk = function_ref @no_throw_to_throw_think : $@convention(thin) @async (@guaranteed @async @callee_guaranteed () -> ()) -> @error Error
+  %throwing = partial_apply [callee_guaranteed] %thunk(%thick_test_case) : $@convention(thin) @async (@guaranteed @async @callee_guaranteed () -> ()) -> @error Error
+  %runAsyncMain = function_ref @$ss13_runAsyncMainyyyyYaKcF : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> @error Error) -> ()
+  %result = apply %runAsyncMain(%throwing) : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> @error Error) -> ()
+  %out_literal = integer_literal $Builtin.Int32, 0
+  %out = struct $Int32 (%out_literal : $Builtin.Int32)
+  return %out : $Int32
+}

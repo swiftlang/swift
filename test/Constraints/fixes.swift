@@ -77,7 +77,8 @@ func forgotOptionalBang(_ a: A, obj: AnyObject) {
 
 func forgotAnyObjectBang(_ obj: AnyObject) {
   var a = A()
-  a = obj // expected-error{{'AnyObject' is not convertible to 'A'; did you mean to use 'as!' to force downcast?}}{{10-10= as! A}}
+  a = obj // expected-error{{'AnyObject' is not convertible to 'A'}}
+  //expected-note@-1 {{did you mean to use 'as!' to force downcast?}} {{10-10= as! A}}
   _ = a
 }
 
@@ -358,5 +359,5 @@ func testKeyPathSubscriptArgFixes(_ fn: @escaping () -> Int) {
 
 func sr12426(a: Any, _ str: String?) {
   a == str // expected-error {{binary operator '==' cannot be applied to operands of type 'Any' and 'String?'}}
-  // expected-note@-1 {{overloads for '==' exist with these partially matching parameter lists: (CodingUserInfoKey, CodingUserInfoKey), (String, String)}}
+  // expected-note@-1 {{overloads for '==' exist with these partially matching parameter lists: (String, String)}}
 }

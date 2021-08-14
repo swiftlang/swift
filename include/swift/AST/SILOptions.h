@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -18,14 +18,15 @@
 #ifndef SWIFT_AST_SILOPTIONS_H
 #define SWIFT_AST_SILOPTIONS_H
 
-#include "swift/Basic/Sanitizers.h"
-#include "swift/Basic/OptionSet.h"
+#include "swift/Basic/FunctionBodySkipping.h"
 #include "swift/Basic/OptimizationMode.h"
+#include "swift/Basic/OptionSet.h"
+#include "swift/Basic/Sanitizers.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Remarks/RemarkFormat.h"
-#include <string>
 #include <climits>
+#include <string>
 
 namespace swift {
 
@@ -43,6 +44,16 @@ public:
   /// Remove all runtime assertions during optimizations.
   bool RemoveRuntimeAsserts = false;
 
+  /// Force-run SIL copy propagation to shorten object lifetime in whatever
+  /// optimization pipeline is currently used.
+  /// When this is 'false' the pipeline has default behavior.
+  bool EnableCopyPropagation = false;
+
+  /// Disable SIL copy propagation to preserve object lifetime in whatever
+  /// optimization pipeline is currently used.
+  /// When this is 'false' the pipeline has default behavior.
+  bool DisableCopyPropagation = false;
+
   /// Controls whether the SIL ARC optimizations are run.
   bool EnableARCOptimizations = true;
 
@@ -53,6 +64,9 @@ public:
   /// Controls whether to turn on speculative devirtualization.
   /// It is turned off by default.
   bool EnableSpeculativeDevirtualization = false;
+
+  /// Controls whether to emit actor data-race checks.
+  bool EnableActorDataRaceChecks = false;
 
   /// Should we run any SIL performance optimizations
   ///
@@ -88,8 +102,13 @@ public:
   /// and go from OSSA to non-ownership SIL.
   bool StopOptimizationBeforeLoweringOwnership = false;
 
-  /// Whether to skip emitting non-inlinable function bodies.
-  bool SkipNonInlinableFunctionBodies = false;
+  /// Do we always serialize SIL in OSSA form?
+  ///
+  /// If this is disabled we do not serialize in OSSA form when optimizing.
+  bool EnableOSSAModules = false;
+
+  // The kind of function bodies to skip emitting.
+  FunctionBodySkipping SkipFunctionBodies = FunctionBodySkipping::None;
 
   /// Optimization mode being used.
   OptimizationMode OptMode = OptimizationMode::NotSet;
@@ -126,7 +145,11 @@ public:
   /// Don't generate code using partial_apply in SIL generation.
   bool DisableSILPartialApply = false;
 
-  /// The name of the SIL outputfile if compiled with SIL debugging (-gsil).
+  /// Print debug information into the SIL file
+  bool PrintDebugInfo = false;
+
+  /// The name of the SIL outputfile if compiled with SIL debugging
+  /// (-sil-based-debuginfo).
   std::string SILOutputFileNameForDebugging;
 
   /// If set to true, compile with the SIL Ownership Model enabled.
@@ -152,6 +175,10 @@ public:
   /// Emit extra exclusvity markers for memory access and verify coverage.
   bool VerifyExclusivity = false;
 
+  /// When building the stdlib with opts should we lower ownership after
+  /// serialization? Otherwise we do before.
+  bool SerializeStdlibWithOwnershipWithOpts = true;
+
   /// Calls to the replaced method inside of the replacement method will call
   /// the previous implementation.
   ///
@@ -161,9 +188,6 @@ public:
   ///     original() // calls original() implementation if true
   /// }
   bool EnableDynamicReplacementCanCallPreviousImplementation = true;
-
-  /// Enable large loadable types IRGen pass.
-  bool EnableLargeLoadableTypes = true;
 
   /// The name of the file to which the backend should save optimization
   /// records.

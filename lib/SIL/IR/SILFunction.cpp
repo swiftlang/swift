@@ -10,8 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#define DEBUG_TYPE "sil-function"
+
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
+#include "swift/SIL/SILBridging.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
@@ -24,12 +27,15 @@
 #include "swift/Basic/OptimizationMode.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/Optional.h"
+#include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/GraphWriter.h"
 #include "clang/AST/Decl.h"
 
 using namespace swift;
 using namespace Lowering;
+
+STATISTIC(MaxBitfieldID, "Max value of SILFunction::currentBitfieldID");
 
 SILSpecializeAttr::SILSpecializeAttr(bool exported, SpecializationKind kind,
                                      GenericSignature specializedSig,
@@ -119,6 +125,8 @@ SILFunction::create(SILModule &M, SILLinkage linkage, StringRef name,
   return fn;
 }
 
+SwiftMetatype SILFunction::registeredMetatype;
+
 SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage, StringRef Name,
                          CanSILFunctionType LoweredType,
                          GenericEnvironment *genericEnv,
@@ -130,7 +138,8 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage, StringRef Name,
                          const SILDebugScope *DebugScope,
                          IsDynamicallyReplaceable_t isDynamic,
                          IsExactSelfClass_t isExactSelfClass)
-    : Module(Module), Availability(AvailabilityContext::alwaysAvailable())  {
+    : SwiftObjectHeader(registeredMetatype),
+      Module(Module), Availability(AvailabilityContext::alwaysAvailable())  {
   init(Linkage, Name, LoweredType, genericEnv, Loc, isBareSILFunction, isTrans,
        isSerialized, entryCount, isThunk, classSubclassScope, inlineStrategy,
        E, DebugScope, isDynamic, isExactSelfClass);
@@ -173,6 +182,7 @@ void SILFunction::init(SILLinkage Linkage, StringRef Name,
   this->Zombie = false;
   this->HasOwnership = true,
   this->WasDeserializedCanonical = false;
+  this->IsStaticallyLinked = false;
   this->IsWithoutActuallyEscapingThunk = false;
   this->OptMode = unsigned(OptimizationMode::NotSet);
   this->EffectsKindAttr = unsigned(E);
@@ -196,20 +206,15 @@ SILFunction::~SILFunction() {
 
   auto &M = getModule();
   for (auto &BB : *this) {
-    for (auto I = BB.begin(), E = BB.end(); I != E;) {
-      auto Inst = &*I;
-      ++I;
-      SILInstruction::destroy(Inst);
-      // TODO: It is only safe to directly deallocate an
-      // instruction if this BB is being removed in scope
-      // of destructing a SILFunction.
-      M.deallocateInst(Inst);
-    }
-    BB.InstList.clearAndLeakNodesUnsafely();
+    BB.eraseAllInstructions(M);
   }
 
   assert(RefCount == 0 &&
          "Function cannot be deleted while function_ref's still exist");
+  assert(!newestAliveBitfield &&
+         "Not all BasicBlockBitfields deleted at function destruction");
+  if (currentBitfieldID > MaxBitfieldID)
+    MaxBitfieldID = currentBitfieldID;
 }
 
 void SILFunction::createProfiler(ASTNode Root, SILDeclRef forDecl,
@@ -244,10 +249,10 @@ void SILFunction::numberValues(llvm::DenseMap<const SILNode*, unsigned> &
     for (auto &I : BB) {
       auto results = I.getResults();
       if (results.empty()) {
-        ValueToNumberMap[&I] = idx++;
+        ValueToNumberMap[I.asSILNode()] = idx++;
       } else {
         // Assign the instruction node the first result ID.
-        ValueToNumberMap[&I] = idx;
+        ValueToNumberMap[I.asSILNode()] = idx;
         for (auto result : results) {
           ValueToNumberMap[result] = idx++;
         }
@@ -357,17 +362,53 @@ bool SILFunction::isWeakImported() const {
 }
 
 SILBasicBlock *SILFunction::createBasicBlock() {
-  return new (getModule()) SILBasicBlock(this, nullptr, false);
+  SILBasicBlock *newBlock = new (getModule()) SILBasicBlock(this);
+  BlockList.push_back(newBlock);
+  return newBlock;
 }
 
 SILBasicBlock *SILFunction::createBasicBlockAfter(SILBasicBlock *afterBB) {
-  assert(afterBB);
-  return new (getModule()) SILBasicBlock(this, afterBB, /*after*/ true);
+  SILBasicBlock *newBlock = new (getModule()) SILBasicBlock(this);
+  BlockList.insertAfter(afterBB->getIterator(), newBlock);
+  return newBlock;
 }
 
 SILBasicBlock *SILFunction::createBasicBlockBefore(SILBasicBlock *beforeBB) {
-  assert(beforeBB);
-  return new (getModule()) SILBasicBlock(this, beforeBB, /*after*/ false);
+  SILBasicBlock *newBlock = new (getModule()) SILBasicBlock(this);
+  BlockList.insert(beforeBB->getIterator(), newBlock);
+  return newBlock;
+}
+
+void SILFunction::moveAllBlocksFromOtherFunction(SILFunction *F) {
+  BlockList.splice(begin(), F->BlockList);
+  
+  SILModule &mod = getModule();
+  for (SILBasicBlock &block : *this) {
+    for (SILInstruction &inst : block) {
+      mod.notifyMovedInstruction(&inst, F);
+    }
+  }
+}
+
+void SILFunction::moveBlockFromOtherFunction(SILBasicBlock *blockInOtherFunction,
+                                iterator insertPointInThisFunction) {
+  SILFunction *otherFunc = blockInOtherFunction->getParent();
+  assert(otherFunc != this);
+  BlockList.splice(insertPointInThisFunction, otherFunc->BlockList,
+                   blockInOtherFunction);
+
+  SILModule &mod = getModule();
+  for (SILInstruction &inst : *blockInOtherFunction) {
+    mod.notifyMovedInstruction(&inst, otherFunc);
+  }
+}
+
+void SILFunction::moveBlockBefore(SILBasicBlock *BB, SILFunction::iterator IP) {
+  assert(BB->getParent() == this);
+  if (SILFunction::iterator(BB) == IP)
+    return;
+  BlockList.remove(BB);
+  BlockList.insert(IP, BB);
 }
 
 //===----------------------------------------------------------------------===//
@@ -571,7 +612,7 @@ void SILFunction::viewCFGOnly() const {
 }
 
 
-bool SILFunction::hasSelfMetadataParam() const {
+bool SILFunction::hasDynamicSelfMetadata() const {
   auto paramTypes =
       getConventions().getParameterSILTypes(TypeExpansionContext::minimal());
   if (paramTypes.empty())
@@ -642,10 +683,13 @@ bool SILFunction::isExternallyUsedSymbol() const {
                                          getModule().isWholeModule());
 }
 
-void SILFunction::convertToDeclaration() {
-  assert(isDefinition() && "Can only convert definitions to declarations");
+void SILFunction::clear() {
   dropAllReferences();
-  getBlocks().clear();
+  eraseAllBlocks();
+}
+
+void SILFunction::eraseAllBlocks() {
+  BlockList.clear();
 }
 
 SubstitutionMap SILFunction::getForwardingSubstitutionMap() {

@@ -1176,14 +1176,27 @@ bb0(%0 : $*Builtin.Int64, %1 : $Builtin.NativeObject):
   return %6 : $(Builtin.Int64, Builtin.Int64)
 }
 
-sil @dont_crash_on_index_addr_projection : $@convention(thin) (Builtin.RawPointer) -> Int {
+sil @dont_crash_on_index_addr_projection : $@convention(thin) (Builtin.RawPointer) -> (Int, Int, Int, Int) {
 bb0(%0 : $Builtin.RawPointer):
-  %3 = integer_literal $Builtin.Word, 4294967295
+  // Negative (valid constant index)
+  %3 = integer_literal $Builtin.Word, 4294967295 // '0xffffffff'
   %4 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*Int
-  // Just check if we can handle an index_addr projection with the special value of 0xffffffff
   %5 = index_addr %4 : $*Int, %3 : $Builtin.Word
   %6 = load %5 : $*Int
-  return %6 : $Int
+  // TailIndex (invalid constant index)
+  %7 = integer_literal $Builtin.Word, 2147483647 // '0x7fffffff'
+  %8 = index_addr %4 : $*Int, %7 : $Builtin.Word
+  %9 = load %8 : $*Int
+  // UnknownOffset (valid index)
+  %10 = integer_literal $Builtin.Word, 3221225472 // '0xC0000000'
+  %11 = index_addr %4 : $*Int, %10 : $Builtin.Word
+  %12 = load %11 : $*Int
+  // Root (unused/invalid index))
+  %13 = integer_literal $Builtin.Word, 2147483648 // '0x80000000'
+  %14 = index_addr %4 : $*Int, %13 : $Builtin.Word
+  %15 = load %14 : $*Int
+  %99 = tuple (%6 : $Int, %9 : $Int, %12 : $Int, %15 : $Int)
+  return %99 : $(Int, Int, Int, Int)
 }
 
 sil @overwrite_int : $@convention(thin) (@inout Int, Int) -> ()

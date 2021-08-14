@@ -137,6 +137,40 @@ public:
       break;
     }
 
+    switch (F->getDifferentiabilityKind().Value) {
+    case FunctionMetadataDifferentiabilityKind::NonDifferentiable:
+      break;
+
+    case FunctionMetadataDifferentiabilityKind::Forward:
+      printField("differentiable", "forward");
+      break;
+
+    case FunctionMetadataDifferentiabilityKind::Reverse:
+      printField("differentiable", "reverse");
+      break;
+
+    case FunctionMetadataDifferentiabilityKind::Normal:
+      printField("differentiable", "normal");
+      break;
+
+    case FunctionMetadataDifferentiabilityKind::Linear:
+      printField("differentiable", "linear");
+      break;
+    }
+
+    if (auto globalActor = F->getGlobalActor()) {
+      fprintf(file, "\n");
+      Indent += 2;
+      printHeader("global-actor");
+      {
+        Indent += 2;
+        printRec(globalActor);
+        fprintf(file, ")");
+        Indent -= 2;
+      }
+      Indent += 2;
+    }
+
     fprintf(file, "\n");
     Indent += 2;
     printHeader("parameters");
@@ -164,6 +198,9 @@ public:
         printHeader("owned");
         break;
       }
+
+      if (flags.isIsolated())
+        printHeader("isolated");
 
       if (flags.isVariadic())
         printHeader("variadic");
@@ -257,8 +294,52 @@ public:
 #include "swift/AST/ReferenceStorage.def"
 
   void visitSILBoxTypeRef(const SILBoxTypeRef *SB) {
-    printHeader("sil_box");
-    printRec(SB->getBoxedType());
+    printHeader("sil_box");  printRec(SB->getBoxedType());
+    fprintf(file, ")");
+  }
+
+  void visitSILBoxTypeWithLayoutTypeRef(const SILBoxTypeWithLayoutTypeRef *SB) {
+    printHeader("sil_box_with_layout\n");
+    Indent += 2;
+    printHeader("layout\n");
+    Indent += 2;
+    for (auto &f : SB->getFields()) {
+      printHeader(f.isMutable() ? "var" : "let");
+      printRec(f.getType());
+      fprintf(file, ")");
+    }
+    Indent -= 2;
+    fprintf(file, ")\n");
+    printHeader("generic_signature\n");
+    Indent += 2;
+    for (auto &subst : SB->getSubstitutions()) {
+      printHeader("substitution");
+      printRec(subst.first);
+      printRec(subst.second);
+      fprintf(file, ")");
+    }
+    Indent -= 2;
+    for (auto &req : SB->getRequirements()) {
+      printHeader("requirement ");
+      switch (req.getKind()) {
+      case RequirementKind::Conformance:
+      case RequirementKind::Superclass:
+        printRec(req.getFirstType());
+        fprintf(file, " : ");
+        printRec(req.getSecondType());
+        break;
+      case RequirementKind::SameType:
+        printRec(req.getFirstType());
+        fprintf(file, " == ");
+        printRec(req.getSecondType());
+        break;
+      case RequirementKind::Layout:
+        fprintf(file, "layout requirement");
+        break;
+      }
+      fprintf(file, ")");
+    }
+    fprintf(file, ")");
     fprintf(file, ")");
   }
 
@@ -383,6 +464,10 @@ struct TypeRefIsConcrete
 
   bool visitSILBoxTypeRef(const SILBoxTypeRef *SB) {
     return visit(SB->getBoxedType());
+  }
+
+  bool visitSILBoxTypeWithLayoutTypeRef(const SILBoxTypeWithLayoutTypeRef *SB) {
+    return true;
   }
 };
 
@@ -534,6 +619,9 @@ public:
         parent->addChild(input, Dem);
         input = parent;
       };
+      if (flags.isNoDerivative()) {
+        wrapInput(Node::Kind::NoDerivative);
+      }
       switch (flags.getValueOwnership()) {
       case ValueOwnership::Default:
         /* nothing */
@@ -547,6 +635,9 @@ public:
       case ValueOwnership::Owned:
         wrapInput(Node::Kind::Owned);
         break;
+      }
+      if (flags.isIsolated()) {
+        wrapInput(Node::Kind::Isolated);
       }
 
       inputs.push_back({input, flags.isVariadic()});
@@ -612,8 +703,40 @@ public:
     result->addChild(resultTy, Dem);
 
     auto funcNode = Dem.createNode(kind);
+    if (auto globalActor = F->getGlobalActor()) {
+      auto node = Dem.createNode(Node::Kind::GlobalActorFunctionType);
+      auto globalActorNode = visit(globalActor);
+      node->addChild(globalActorNode, Dem);
+      funcNode->addChild(node, Dem);
+    }
+
+    if (F->getFlags().isDifferentiable()) {
+      MangledDifferentiabilityKind mangledKind;
+      switch (F->getDifferentiabilityKind().Value) {
+#define CASE(X) case FunctionMetadataDifferentiabilityKind::X: \
+        mangledKind = MangledDifferentiabilityKind::X; break;
+
+      CASE(NonDifferentiable)
+      CASE(Forward)
+      CASE(Reverse)
+      CASE(Normal)
+      CASE(Linear)
+#undef CASE
+      }
+
+      funcNode->addChild(
+          Dem.createNode(
+            Node::Kind::DifferentiableFunctionType,
+            (Node::IndexType)mangledKind),
+          Dem);
+    }
+
     if (F->getFlags().isThrowing())
       funcNode->addChild(Dem.createNode(Node::Kind::ThrowsAnnotation), Dem);
+    if (F->getFlags().isSendable()) {
+      funcNode->addChild(
+          Dem.createNode(Node::Kind::ConcurrentFunctionType), Dem);
+    }
     if (F->getFlags().isAsync())
       funcNode->addChild(Dem.createNode(Node::Kind::AsyncAnnotation), Dem);
     funcNode->addChild(parameters, Dem);
@@ -712,6 +835,74 @@ public:
   Demangle::NodePointer visitSILBoxTypeRef(const SILBoxTypeRef *SB) {
     auto node = Dem.createNode(Node::Kind::SILBoxType);
     node->addChild(visit(SB->getBoxedType()), Dem);
+    return node;
+  }
+
+  Demangle::NodePointer
+  visitSILBoxTypeWithLayoutTypeRef(const SILBoxTypeWithLayoutTypeRef *SB) {
+    auto node = Dem.createNode(Node::Kind::SILBoxTypeWithLayout);
+    auto layout = Dem.createNode(Node::Kind::SILBoxLayout);
+    for (auto &f : SB->getFields()) {
+      auto field =
+          Dem.createNode(f.isMutable() ? Node::Kind::SILBoxMutableField
+                                       : Node::Kind::SILBoxImmutableField);
+      field->addChild(visit(f.getType()), Dem);
+      layout->addChild(field, Dem);
+    }
+    node->addChild(layout, Dem);
+
+    auto signature = Dem.createNode(Node::Kind::DependentGenericSignature);
+    auto addCount = [&](unsigned count) {
+      signature->addChild(
+          Dem.createNode(Node::Kind::DependentGenericParamCount, count), Dem);
+    };
+    unsigned depth = 0;
+    unsigned index = 0;
+    for (auto &s : SB->getSubstitutions())
+      if (auto *param = dyn_cast<GenericTypeParameterTypeRef>(s.first)) {
+        while (param->getDepth() > depth) {
+          addCount(index);
+          ++depth, index = 0;
+        }
+        assert(index == param->getIndex() && "generic params out of order");
+        ++index;
+      }
+    for (auto &req : SB->getRequirements()) {
+      switch (req.getKind()) {
+      case RequirementKind::Conformance:
+      case RequirementKind::Superclass:
+      case RequirementKind::SameType: {
+        Node::Kind kind;
+        switch (req.getKind()) {
+        case RequirementKind::Conformance:
+          kind = Node::Kind::DependentGenericConformanceRequirement;
+          break;
+        case RequirementKind::Superclass:
+          // A DependentGenericSuperclasseRequirement kind seems to be missing.
+          kind = Node::Kind::DependentGenericConformanceRequirement;
+          break;
+        case RequirementKind::SameType:
+          kind = Node::Kind::DependentGenericSameTypeRequirement;
+          break;
+        default:
+          llvm_unreachable("unreachable");
+        }
+        auto r = Dem.createNode(kind);
+        r->addChild(visit(req.getFirstType()), Dem);
+        r->addChild(visit(req.getSecondType()), Dem);
+        signature->addChild(r, Dem);
+        break;
+      }
+      case RequirementKind::Layout:
+        // Not implemented.
+        break;
+      }
+    }
+    node->addChild(signature, Dem);
+    auto list = Dem.createNode(Node::Kind::TypeList);
+    for (auto &subst : SB->getSubstitutions())
+      list->addChild(visit(subst.second), Dem);
+    node->addChild(list, Dem);
     return node;
   }
 
@@ -869,10 +1060,16 @@ public:
       SubstitutedParams.push_back(Param.withType(visit(typeRef)));
     }
 
+    const TypeRef *globalActorType = nullptr;
+    if (F->getGlobalActor())
+      globalActorType = visit(F->getGlobalActor());
+
     auto SubstitutedResult = visit(F->getResult());
 
     return FunctionTypeRef::create(Builder, SubstitutedParams,
-                                   SubstitutedResult, F->getFlags());
+                                   SubstitutedResult, F->getFlags(),
+                                   F->getDifferentiabilityKind(),
+                                   globalActorType);
   }
 
   const TypeRef *
@@ -919,6 +1116,11 @@ public:
 
   const TypeRef *visitSILBoxTypeRef(const SILBoxTypeRef *SB) {
     return SILBoxTypeRef::create(Builder, visit(SB->getBoxedType()));
+  }
+
+  const TypeRef *
+  visitSILBoxTypeWithLayoutTypeRef(const SILBoxTypeWithLayoutTypeRef *SB) {
+    return SB;
   }
 
   const TypeRef *visitOpaqueTypeRef(const OpaqueTypeRef *O) {
@@ -985,8 +1187,14 @@ public:
 
     auto SubstitutedResult = visit(F->getResult());
 
+    const TypeRef *globalActorType = nullptr;
+    if (F->getGlobalActor())
+      globalActorType = visit(F->getGlobalActor());
+
     return FunctionTypeRef::create(Builder, SubstitutedParams,
-                                   SubstitutedResult, F->getFlags());
+                                   SubstitutedResult, F->getFlags(),
+                                   F->getDifferentiabilityKind(),
+                                   globalActorType);
   }
 
   const TypeRef *
@@ -1105,10 +1313,13 @@ public:
     return SILBoxTypeRef::create(Builder, visit(SB->getBoxedType()));
   }
 
-  const TypeRef *visitOpaqueTypeRef(const OpaqueTypeRef *O) {
-    return O;
+  const TypeRef *
+  visitSILBoxTypeWithLayoutTypeRef(const SILBoxTypeWithLayoutTypeRef *SB) {
+    return SB;
   }
-    
+
+  const TypeRef *visitOpaqueTypeRef(const OpaqueTypeRef *O) { return O; }
+
   const TypeRef *visitOpaqueArchetypeTypeRef(const OpaqueArchetypeTypeRef *O) {
     std::vector<const TypeRef *> newArgsBuffer;
     for (auto argList : O->getArgumentLists()) {

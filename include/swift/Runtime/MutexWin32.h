@@ -25,6 +25,7 @@
 namespace swift {
 
 typedef CONDITION_VARIABLE ConditionHandle;
+typedef SRWLOCK ConditionMutexHandle;
 typedef SRWLOCK MutexHandle;
 typedef SRWLOCK ReadWriteLockHandle;
 
@@ -51,6 +52,9 @@ struct ConditionPlatformHelper {
 
 struct MutexPlatformHelper {
   static constexpr MutexHandle staticInit() { return SRWLOCK_INIT; }
+  static constexpr ConditionMutexHandle conditionStaticInit() {
+    return SRWLOCK_INIT;
+  }
   static void init(MutexHandle &mutex, bool checked = false) {
     InitializeSRWLock(&mutex);
   }

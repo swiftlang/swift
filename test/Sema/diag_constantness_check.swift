@@ -328,3 +328,99 @@ func testAtomicOrderingConstantness(
   _ = atomicInt.load(ordering: myOrder)
     // expected-error@-1 {{ordering argument must be a static method or property of 'AtomicLoadOrdering'}}
 }
+
+// Test that the check can handle ranges
+@_semantics("oslog.requires_constant_arguments")
+func constantRange(x: Range<Int>) {}
+
+@_semantics("oslog.requires_constant_arguments")
+func constantClosedRange(x: ClosedRange<Int>) {}
+
+func testConstantRange(x: Int) {
+  constantRange(x: 0..<5)
+  constantRange(x: 0..<x)
+    // expected-error@-1 {{argument must be an integer literal}}
+  constantClosedRange(x: 0...10)
+  constantClosedRange(x: x...10)
+    // expected-error@-1 {{argument must be an integer literal}}
+}
+
+struct ConstructorTest {
+  @_semantics("oslog.requires_constant_arguments")
+  init(x: Int) { }
+
+  @_semantics("oslog.requires_constant_arguments")
+  init(_ x: Int) { }
+}
+
+func testConstructorAnnotation(x: Int) {
+  let _ = ConstructorTest(x: 10)
+  let _ = ConstructorTest(x: x)
+    // expected-error@-1 {{argument must be an integer literal}}
+  let _ = ConstructorTest(10)
+  let _ = ConstructorTest(x)
+    // expected-error@-1 {{argument must be an integer literal}}
+}
+
+// Test closure expressions
+
+func funcAcceptingClosure<T>(_ x: () -> T) -> T {
+  return x()
+}
+
+func normalFunction() {}
+
+@_semantics("oslog.requires_constant_arguments")
+func constantArgumentFunctionReturningIntCollection(_ constArg: Int) -> Array<Int> {
+  return [constArg, constArg, constArg]
+}
+
+@_semantics("oslog.requires_constant_arguments")
+func constantArgumentFunctionReturningInt(_ constArg: Int) -> Int {
+  return constArg
+}
+
+func testCallsWithinClosures(s: String, x: Int) {
+  funcAcceptingClosure {
+    constantArgumentFunction(s)
+    // expected-error@-1 {{argument must be a string literal}}
+  }
+  funcAcceptingClosure {
+    constantArgumentFunction(s)
+    // expected-error@-1 {{argument must be a string literal}}
+    constantArgumentFunction(s)
+    // expected-error@-1 {{argument must be a string literal}}
+  }
+  funcAcceptingClosure {
+    funcAcceptingClosure {
+      constantArgumentFunction(s)
+        // expected-error@-1 {{argument must be a string literal}}
+    }
+  }
+  funcAcceptingClosure {
+    normalFunction()
+    funcAcceptingClosure {
+      constantArgumentFunction(s)
+        // expected-error@-1 {{argument must be a string literal}}
+    }
+  }
+  let _ =
+    funcAcceptingClosure {
+      constantArgumentFunctionReturningIntCollection(x)
+        // expected-error@-1 {{argument must be an integer literal}}
+    }
+    .filter { $0 > 0 }
+    .map { $0 + 1 }
+  let _ =
+    funcAcceptingClosure {
+      constantArgumentFunctionReturningInt(x)
+        // expected-error@-1 {{argument must be an integer literal}}
+    } + 10 * x
+  let _ = { constantArgumentFunctionReturningIntCollection(x) }
+    // expected-error@-1 {{argument must be an integer literal}}
+  funcAcceptingClosure {
+    constantArgumentFunction(1)
+    constantArgumentFunction("string literal")
+    constantArgumentFunction("string with a single interpolation \(x)")
+  }
+}

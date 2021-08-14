@@ -215,6 +215,7 @@ static FrontendInputsAndOutputs resolveSymbolicLinksInInputs(
       ++primaryCount;
     }
     assert(primaryCount < 2 && "cannot handle multiple primaries");
+
     replacementInputsAndOutputs.addInput(
         InputFile(newFilename.str(), newIsPrimary, input.getBuffer()));
   }
@@ -275,8 +276,8 @@ bool ide::initCompilerInvocation(
     DiagnosticEngine &Diags, StringRef UnresolvedPrimaryFile,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     const std::string &runtimeResourcePath,
-    const std::string &diagnosticDocumentationPath,
-    bool shouldOptimizeForIDE, time_t sessionTimestamp, std::string &Error) {
+    const std::string &diagnosticDocumentationPath, time_t sessionTimestamp,
+    std::string &Error) {
   SmallVector<const char *, 16> Args;
   // Make sure to put '-resource-dir' and '-diagnostic-documentation-path' at
   // the top to allow overriding them with the passed in arguments.
@@ -293,25 +294,38 @@ bool ide::initCompilerInvocation(
   StreamDiagConsumer DiagConsumer(ErrOS);
   Diags.addConsumer(DiagConsumer);
 
-  bool HadError = driver::getSingleFrontendInvocationFromDriverArguments(
-      Args, Diags, [&](ArrayRef<const char *> FrontendArgs) {
-    return Invocation.parseArgs(FrontendArgs, Diags);
-  }, /*ForceNoOutputs=*/true);
+  bool InvocationCreationFailed =
+      driver::getSingleFrontendInvocationFromDriverArguments(
+          Args, Diags,
+          [&](ArrayRef<const char *> FrontendArgs) {
+            return Invocation.parseArgs(FrontendArgs, Diags);
+          },
+          /*ForceNoOutputs=*/true);
 
   // Remove the StreamDiagConsumer as it's no longer needed.
   Diags.removeConsumer(DiagConsumer);
 
-  if (HadError) {
-    Error = std::string(ErrOS.str());
+  Error = std::string(ErrOS.str());
+  if (InvocationCreationFailed) {
     return true;
   }
 
+  std::string SymlinkResolveError;
   Invocation.getFrontendOptions().InputsAndOutputs =
       resolveSymbolicLinksInInputs(
           Invocation.getFrontendOptions().InputsAndOutputs,
-          UnresolvedPrimaryFile, FileSystem, Error);
-  if (!Error.empty())
+          UnresolvedPrimaryFile, FileSystem, SymlinkResolveError);
+
+  // SourceKit functionalities want to proceed even if there are missing inputs.
+  Invocation.getFrontendOptions().InputsAndOutputs
+      .setShouldRecoverMissingInputs();
+
+  if (!SymlinkResolveError.empty()) {
+    // resolveSymbolicLinksInInputs fails if the unresolved primary file is not
+    // in the input files. We can't recover from that.
+    Error += SymlinkResolveError;
     return true;
+  }
 
   ClangImporterOptions &ImporterOpts = Invocation.getClangImporterOptions();
   ImporterOpts.DetailedPreprocessingRecord = true;
@@ -341,15 +355,6 @@ bool ide::initCompilerInvocation(
 
   // We don't care about LLVMArgs
   FrontendOpts.LLVMArgs.clear();
-
-  // SwiftSourceInfo files provide source location information for decls coming
-  // from loaded modules. For most IDE use cases it either has an undesirable
-  // impact on performance with no benefit (code completion), results in stale
-  // locations being used instead of more up-to-date indexer locations (cursor
-  // info), or has no observable effect (diagnostics, which are filtered to just
-  // those with a location in the primary file, and everything else).
-  if (shouldOptimizeForIDE)
-    FrontendOpts.IgnoreSwiftSourceInfo = true;
 
   // To save the time for module validation, consider the lifetime of ASTManager
   // as a single build session.
@@ -915,8 +920,8 @@ void ide::collectModuleNames(StringRef SDKPath,
                                std::vector<std::string> &Modules) {
   std::string SDKName = getSDKName(SDKPath);
   std::string lowerSDKName = StringRef(SDKName).lower();
-  bool isOSXSDK = StringRef(lowerSDKName).find("macosx") != StringRef::npos;
-  bool isDeviceOnly = StringRef(lowerSDKName).find("iphoneos") != StringRef::npos;
+  bool isOSXSDK = StringRef(lowerSDKName).contains("macosx");
+  bool isDeviceOnly = StringRef(lowerSDKName).contains("iphoneos");
   auto Mods = isOSXSDK ? getOSXModuleList() : getiOSModuleList();
   Modules.insert(Modules.end(), Mods.begin(), Mods.end());
   if (isDeviceOnly) {
@@ -944,8 +949,7 @@ DeclNameViewer::DeclNameViewer(StringRef Text): IsValid(true), HasParen(false) {
     return;
   if ((IsValid = Labels.back().empty())) {
     Labels.pop_back();
-    std::transform(Labels.begin(), Labels.end(), Labels.begin(),
-        [](StringRef Label) {
+    llvm::transform(Labels, Labels.begin(), [](StringRef Label) {
       return Label == "_" ? StringRef() : Label;
     });
   }
@@ -1012,6 +1016,23 @@ accept(SourceManager &SM, RegionType Type, ArrayRef<Replacement> Replacements) {
     Impl.accept(SM, Replacement.Range, Replacement.Text);
   }
 }
+
+void swift::ide::SourceEditTextConsumer::
+accept(SourceManager &SM, RegionType Type, ArrayRef<Replacement> Replacements) {
+  for (const auto &Replacement: Replacements) {
+    CharSourceRange Range = Replacement.Range;
+    unsigned BufID = SM.findBufferContainingLoc(Range.getStart());
+    auto Path(SM.getIdentifierForBuffer(BufID));
+    auto Start = SM.getLineAndColumnInBuffer(Range.getStart());
+    auto End = SM.getLineAndColumnInBuffer(Range.getEnd());
+
+    OS << "// " << Path.str() << " ";
+    OS << Start.first << ":" << Start.second << " -> ";
+    OS << End.first << ":" << End.second << "\n";
+    OS << Replacement.Text << "\n";
+  }
+}
+
 namespace {
 class ClangFileRewriterHelper {
   unsigned InterestedId;
@@ -1092,6 +1113,14 @@ accept(SourceManager &SM, RegionType RegionType,
   }
 }
 
+void swift::ide::BroadcastingSourceEditConsumer::accept(
+    SourceManager &SM, RegionType RegionType,
+    ArrayRef<Replacement> Replacements) {
+  for (auto &Consumer : Consumers) {
+    Consumer->accept(SM, RegionType, Replacements);
+  }
+}
+
 bool swift::ide::isFromClang(const Decl *D) {
   if (getEffectiveClangNode(D))
     return true;
@@ -1124,7 +1153,11 @@ ClangNode swift::ide::extensionGetClangNode(const ExtensionDecl *ext) {
   return ClangNode();
 }
 
-std::pair<Type, ConcreteDeclRef> swift::ide::getReferencedDecl(Expr *expr) {
+std::pair<Type, ConcreteDeclRef> swift::ide::getReferencedDecl(Expr *expr,
+                                                               bool semantic) {
+  if (semantic)
+    expr = expr->getSemanticsProvidingExpr();
+
   auto exprTy = expr->getType();
 
   // Look through unbound instance member accesses.
@@ -1155,4 +1188,118 @@ std::pair<Type, ConcreteDeclRef> swift::ide::getReferencedDecl(Expr *expr) {
   }
 
   return std::make_pair(exprTy, refDecl);
+}
+
+bool swift::ide::isBeingCalled(ArrayRef<Expr *> ExprStack) {
+  if (ExprStack.empty())
+    return false;
+
+  Expr *Target = ExprStack.back();
+  auto UnderlyingDecl = getReferencedDecl(Target).second;
+  for (Expr *E: reverse(ExprStack)) {
+    auto *AE = dyn_cast<ApplyExpr>(E);
+    if (!AE || AE->isImplicit())
+      continue;
+    if (isa<ConstructorRefCallExpr>(AE) && AE->getArg() == Target)
+      return true;
+    if (isa<SelfApplyExpr>(AE))
+      continue;
+    if (getReferencedDecl(AE->getFn()).second == UnderlyingDecl)
+      return true;
+  }
+  return false;
+}
+
+static Expr *getContainingExpr(ArrayRef<Expr *> ExprStack, size_t index) {
+  if (ExprStack.size() > index)
+    return ExprStack.end()[-std::ptrdiff_t(index + 1)];
+  return nullptr;
+}
+
+Expr *swift::ide::getBase(ArrayRef<Expr *> ExprStack) {
+  if (ExprStack.empty())
+    return nullptr;
+
+  Expr *CurrentE = ExprStack.back();
+  Expr *ParentE = getContainingExpr(ExprStack, 1);
+  Expr *Base = nullptr;
+
+  if (auto DSE = dyn_cast_or_null<DotSyntaxCallExpr>(ParentE))
+    Base = DSE->getBase();
+  else if (auto MRE = dyn_cast<MemberRefExpr>(CurrentE))
+    Base = MRE->getBase();
+  else if (auto SE = dyn_cast<SubscriptExpr>(CurrentE))
+    Base = SE->getBase();
+
+  // Look through curry thunks
+  if (auto ACE = dyn_cast_or_null<AutoClosureExpr>(Base))
+    if (auto *Unwrapped = ACE->getUnwrappedCurryThunkExpr())
+      Base = Unwrapped;
+
+  if (Base) {
+    while (auto ICE = dyn_cast<ImplicitConversionExpr>(Base))
+      Base = ICE->getSubExpr();
+    // DotSyntaxCallExpr with getBase() == CurrentE (ie. the current call is
+    // the base of another expression)
+    if (Base == CurrentE)
+      return nullptr;
+  }
+  return Base;
+}
+
+bool swift::ide::isDynamicCall(Expr *Base, ValueDecl *D) {
+  auto TyD = D->getDeclContext()->getSelfNominalTypeDecl();
+  if (!TyD)
+    return false;
+
+  if (isa<StructDecl>(TyD) || isa<EnumDecl>(TyD) || D->isFinal())
+    return false;
+
+  // super.method()
+  // TODO: Should be dynamic if `D` is marked as dynamic and @objc, but in
+  //       that case we really need to change the role the index outputs as
+  //       well - the overrides we'd want to include are from the type of
+  //       super up to `D`
+  if (Base->isSuperExpr())
+    return false;
+
+  // `SomeType.staticOrClassMethod()`
+  if (isa<TypeExpr>(Base))
+    return false;
+
+  // `type(of: foo).staticOrClassMethod()`, not "dynamic" if the instance type
+  // is a struct/enum or if it is a class and the function is a static method
+  // (rather than a class method).
+  if (auto IT = Base->getType()->getAs<MetatypeType>()) {
+    auto InstanceType = IT->getInstanceType();
+    if (InstanceType->getStructOrBoundGenericStruct() ||
+        InstanceType->getEnumOrBoundGenericEnum())
+      return false;
+    if (InstanceType->getClassOrBoundGenericClass() && D->isFinal())
+      return false;
+  }
+
+  return true;
+}
+
+void swift::ide::getReceiverType(Expr *Base,
+                                 SmallVectorImpl<NominalTypeDecl *> &Types) {
+  Type ReceiverTy = Base->getType();
+  if (!ReceiverTy)
+    return;
+
+  if (auto LVT = ReceiverTy->getAs<LValueType>())
+    ReceiverTy = LVT->getObjectType();
+  else if (auto MetaT = ReceiverTy->getAs<MetatypeType>())
+    ReceiverTy = MetaT->getInstanceType();
+  else if (auto SelfT = ReceiverTy->getAs<DynamicSelfType>())
+    ReceiverTy = SelfT->getSelfType();
+
+  // TODO: Handle generics and composed protocols
+  if (auto OpenedTy = ReceiverTy->getAs<OpenedArchetypeType>())
+    ReceiverTy = OpenedTy->getOpenedExistentialType();
+
+  if (auto TyD = ReceiverTy->getAnyNominal()) {
+    Types.push_back(TyD);
+  }
 }

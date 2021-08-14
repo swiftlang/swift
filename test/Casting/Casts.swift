@@ -15,16 +15,18 @@
 // -----------------------------------------------------------------------------
 // RUN: %empty-directory(%t)
 //
-// RUN: %target-build-swift -swift-version 5 -g -Onone -Xfrontend -enable-experimental-concurrency -module-name a %s -o %t/a.swift5.Onone.out
+// RUN: %target-build-swift -swift-version 5 -g -Onone  -module-name a %s -o %t/a.swift5.Onone.out
 // RUN: %target-codesign %t/a.swift5.Onone.out
 // RUN: %target-run %t/a.swift5.Onone.out
 //
-// RUN: %target-build-swift -swift-version 5 -g -O -Xfrontend -enable-experimental-concurrency -module-name a %s -o %t/a.swift5.O.out
+// RUN: %target-build-swift -swift-version 5 -g -O  -module-name a %s -o %t/a.swift5.O.out
 // RUN: %target-codesign %t/a.swift5.O.out
 // RUN: %target-run %t/a.swift5.O.out
 //
 // REQUIRES: executable_test
+// REQUIRES: concurrency
 // UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 import StdlibUnittest
 #if _runtime(_ObjC)
@@ -165,7 +167,7 @@ CastsTests.test("Dynamic casts of CF types to protocol existentials (SR-2289)")
     reason: "This test behaves unpredictably in optimized mode."))
 .code {
   expectTrue(isP(10 as Int))
-  if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+  if #available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *) {
     expectTrue(isP(CFBitVector.makeImmutable(from: [10, 20])))
     expectTrue(isP(CFMutableBitVector.makeMutable(from: [10, 20])))
   }
@@ -193,7 +195,7 @@ CastsTests.test("Casting struct -> Obj-C -> Protocol fails (SR-3871, SR-5590, SR
 
 
 protocol P4552 {}
-if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+if #available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *) {
 CastsTests.test("Casting Any(Optional(T)) -> Protocol fails (SR-4552)") {
   struct S: P4552 {
     let tracker = LifetimeTracked(13)
@@ -255,7 +257,7 @@ CastsTests.test("Store Swift metatype in ObjC property and cast back to Any.Type
   let sValue2 = a.sVar as? Any.Type
   let objcValue2 = a.objcVar as? Any.Type
   expectTrue(sValue2 == b)
-  if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+  if #available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *) {
     expectTrue(sValue2 == objcValue2)
     expectTrue(objcValue2 == b)
   }
@@ -301,7 +303,7 @@ CastsTests.test("Casts from @objc Type") {
   let user = User(name: "Kermit")
   let exporter: Exporter = UserExporter()
 
-  if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+  if #available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *) {
     expectTrue(exporter.type is User.Type)
   }
   expectNotNil(exporter.export(item: user))
@@ -317,7 +319,7 @@ CastsTests.test("Conditional NSNumber -> Bool casts") {
 #endif
 
 // rdar://45217461 ([dynamic casting] [SR-8964]: Type check operator (is) fails for Any! variable holding an Error (struct) value)
-if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+if #available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *) {
 CastsTests.test("Casts from Any(struct) to Error (SR-8964)") {
   struct MyError: Error { }
 
@@ -341,7 +343,7 @@ CastsTests.test("Dynamic cast to ObjC protocol") {
 #endif
 
 // SR-6126
-if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+if #available(macOS 11.3, iOS 14.5, tvOS 14.5, watchOS 7.4, *) {
 CastsTests.test("Nil handling for Optionals and Arrays (SR-6126)") {
   func check(_ arg: Int??) -> String {
     switch arg {
@@ -391,7 +393,7 @@ CastsTests.test("Swift Protocol Metatypes don't self-conform") {
   let a = SwiftProtocol.self
   // `is P.Protocol` tests whether the argument is a subtype of P.
   // In particular, the protocol identifier `P.self` is such a subtype.
-  if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+  if #available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *) {
     expectNotNil(runtimeCast(a, to: SwiftProtocol.Protocol.self)) // Fixed by rdar://58991956
   }
   expectNotNil(a as? SwiftProtocol.Protocol)
@@ -444,7 +446,7 @@ CastsTests.test("Self-conformance for Error.self")
 @objc protocol ObjCProtocol {}
 CastsTests.test("ObjC Protocol Metatypes self-conform") {
   let a = ObjCProtocol.self
-  if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+  if #available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *) {
     expectNotNil(runtimeCast(a, to: ObjCProtocol.Protocol.self))
   }
   expectNotNil(a as? ObjCProtocol.Protocol)
@@ -470,7 +472,7 @@ CastsTests.test("String/NSString extension compat") {
 #endif
 
 protocol P1999 {}
-if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+if #available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *) {
 CastsTests.test("Cast Any(Optional(class)) to Protocol type (SR-1999)") {
   class Foo: P1999 { }
 
@@ -521,12 +523,7 @@ class ClassInt: Equatable, Hashable {
   static func == (lhs: ClassInt, rhs: ClassInt) -> Bool {return true}
   func hash(into hasher: inout Hasher) {}
 }
-CastsTests.test("AnyHashable(Class) -> Obj-C -> Class")
-.skip(.custom({
-      !_isDebugAssertConfiguration()
-    },
-    reason: "Cast optimizer breaks this test"))
-.code {
+CastsTests.test("AnyHashable(Class) -> Obj-C -> Class") {
   let a = ClassInt()
   let b = runtimeCast(a, to: AnyHashable.self)!
   let c = _bridgeAnythingToObjectiveC(b)
@@ -625,6 +622,7 @@ CastsTests.test("NSNull?.none -> Any? should set outer nil") {
 }
 #endif
 
+if #available(macOS 11.3, iOS 14.5, tvOS 14.5, watchOS 7.4, *) {
 CastsTests.test("Int??.some(nil) => Int??? should inject naturally") {
   let a: Int?? = .some(nil)
   let b = a as? Int???
@@ -633,7 +631,9 @@ CastsTests.test("Int??.some(nil) => Int??? should inject naturally") {
   let e = d!
   expectNil(e)
 }
+}
 
+if #available(macOS 11.3, iOS 14.5, tvOS 14.5, watchOS 7.4, *) {
 CastsTests.test("Int??.some(nil) => String??? should inject naturally") {
   let a: Int?? = .some(nil)
   let b = runtimeCast(a, to: String???.self)
@@ -642,7 +642,9 @@ CastsTests.test("Int??.some(nil) => String??? should inject naturally") {
   let e = d!
   expectNil(e)
 }
+}
 
+if #available(macOS 11.3, iOS 14.5, tvOS 14.5, watchOS 7.4, *) {
 CastsTests.test("Int??.some(nil) => Any??? should inject naturally") {
   let a: Int?? = .some(nil)
   let b = a as? Any???
@@ -650,6 +652,7 @@ CastsTests.test("Int??.some(nil) => Any??? should inject naturally") {
   let d = c!
   let e = d!
   expectNil(e)
+}
 }
 
 #if _runtime(_ObjC)
@@ -758,6 +761,247 @@ CastsTests.test("Async function types") {
   expectTrue(asyncFnType is (() async -> Void).Type)
   expectFalse(fnType is (() async -> Void).Type)
   expectFalse(asyncFnType is (() -> Void).Type)
+}
+
+// `Optional<Int>` is Hashable, so it must cast to AnyHashable,
+// even if it contains a nil.  (This was broken in 5.3 and earlier,
+// but was fixed by the new dynamic cast runtime.)
+CastsTests.test("Optional nil -> AnyHashable") {
+  let a : Int? = nil
+  expectNotNil(a as? AnyHashable)
+}
+
+#if _runtime(_ObjC)
+// See below for notes about missing Linux functionality
+// that prevents us from running this test there.
+CastsTests.test("AnyObject.Type -> AnyObject") {
+  class C {}
+  let a = C.self
+  let b = a as? AnyObject.Type
+  expectNotNil(b)
+  // Note: On macOS, the following cast generates a call to
+  // `swift_dynamicCastMetatypeToObjectConditional` That function is currently
+  // unimplemented on Linux, so this cast always fails on Linux.
+  let c = b as? AnyObject
+  expectNotNil(c)
+  // Note: The following cast currently succeeds on Linux only by stuffing the
+  // source into a `__SwiftValue` container, which breaks the checks below.
+  let d = runtimeCast(b, to: AnyObject.self)
+  expectNotNil(d)
+  let e = c as? C.Type
+  expectNotNil(e)
+  let f = runtimeCast(d, to: C.Type.self)
+  expectNotNil(f)
+  // Verify that the round-trip casts yield exactly the same pointer.  In
+  // particular, none of the casts above should fall back on stuffing the source
+  // into a `__SwiftValue` container.
+  expectTrue(c! === a)
+  expectTrue(d! === a)
+  expectTrue(e! === a)
+  expectTrue(f! === a)
+}
+#endif
+
+protocol Fruit {}
+CastsTests.test("Generic type validation [SR-13812]") {
+  func check<A, B>(a: A.Type, b: B.Type) -> Bool {
+    return (a is B.Type)
+  }
+  struct Apple: Fruit {}
+  expectFalse(check(a: Apple.self, b: Fruit.self))
+  expectFalse(Apple.self is Fruit.Protocol)
+  expectTrue(Apple.self is Fruit.Type)
+}
+
+CastsTests.test("Cast failure for Any! holding Error struct [SR-8964]") {
+  struct MyError: Error {}
+  let a: Any! = MyError()
+  let b: Any = a
+  expectTrue(b is Error)
+}
+
+CastsTests.test("Cannot cast from Any? to Existential [SR-1999]") {
+  let a = Float(1) as Any as? Float
+  expectNotNil(a)
+
+  let b = Float(1) as Any as? CustomStringConvertible
+  expectNotNil(b)
+
+  let c = Optional.some(Float(1)) as Any as? Float
+  expectNotNil(c)
+
+  let d = Optional.some(Float(1)) as Any as? CustomStringConvertible
+  expectNotNil(d)
+}
+
+protocol A {}
+CastsTests.test("Failing cast from Any to Optional<Protocol> [SR-6279]") {
+  struct B: A {}
+
+  // If we have an optional instance, stored as an `Any`
+  let b: A? = B()
+  let c = b as Any
+
+  // This fails to cast, should succeed.
+  let d = c as? A
+  expectNotNil(d)
+
+  // There is a workaround, but not ideal.
+  func cast<T, U>(_ t: T, to: U.Type) -> U? {
+    return t as? U
+  }
+  let f = cast(c, to: Any?.self) as? A
+  expectNotNil(f)
+}
+
+protocol SuperProtocol{}
+CastsTests.test("Casting Objects retained from KeyPaths to Protocols is not working properly") {
+  // This is the simplified reproduction from rdar://59844232 which doesn't
+  // actually use KeyPaths
+  class SubClass : SuperProtocol{}
+  let value = SubClass() as Any? as Any
+
+  expectNotNil(value as? SubClass)
+  expectNotNil(value as? SuperProtocol)
+}
+
+#if _runtime(_ObjC)
+// Known to still be broken, but we can document the issue here
+public protocol SomeProtocol {}
+extension NSString: SomeProtocol {}
+CastsTests.test("NSDictionary -> Dictionary casting [SR-12025]") {
+  // Create NSDictionary with one entry
+  var a = NSMutableDictionary()
+  a[NSString("key")] = NSString("value")
+
+  let v = NSString("value")
+  let v2 = v as? SomeProtocol
+  expectNotNil(v2)
+
+  // Test casting of the dictionary
+  let b = a as? [String:SomeProtocol]
+  expectFailure { expectNotNil(b) } // Expect non-nil, but see nil
+  let c = a as? [String:Any]
+  expectNotNil(c)  // Non-nil (as expected)
+  let d = c as? [String:SomeProtocol]
+  expectNotNil(d) // Non-nil (as expected)
+}
+#endif
+
+// Casting optionals to AnyHashable is a little peculiar
+// TODO: It would be nice if AnyHashable(Optional("Foo")) == AnyHashable("Foo")
+// (including as dictionary keys).  That would make this a lot less confusing.
+CastsTests.test("Optional cast to AnyHashable") {
+  let d: [String?: String] = ["FooKey": "FooValue", nil: "NilValue"]
+  // In Swift 5.3, this cast DOES unwrap the non-nil key
+  // We've deliberately tried to preserve that behavior in Swift 5.4
+  let d2 = d as [AnyHashable: String]
+
+  // After SR-9047, all four of the following should work:
+  let d3 = d2["FooKey" as String? as AnyHashable]
+  expectNil(d3)
+  let d4 = d2["FooKey" as String?]
+  expectNil(d4)
+  let d5 = d2["FooKey"]
+  expectNotNil(d5)
+  let d6 = d2["FooKey" as AnyHashable]
+  expectNotNil(d6)
+
+  // The nil key should be preserved and still function
+  let d7 = d2[String?.none as AnyHashable]
+  expectNotNil(d7)
+
+  // Direct casts via the runtime unwrap the optional
+  let a: String = "Foo"
+  let ah: AnyHashable = a
+  let b: String? = a
+  let bh = runtimeCast(b, to: AnyHashable.self)
+  expectEqual(bh, ah)
+
+  // Direct casts that don't go through the runtime don't unwrap the optional
+  // This is inconsistent with the runtime cast behavior above.  We should
+  // probably change the runtime behavior above to work the same as this,
+  // but that should wait until SR-9047 lands.
+  let x: String = "Baz"
+  let xh = x as AnyHashable
+  let y: String? = x
+  let yh = y as AnyHashable // Doesn't unwrap the optional
+  // xh is AnyHashable("Baz")
+  // yh is AnyHashable(Optional("Baz"))
+  expectNotEqual(xh, yh)
+}
+
+// Repeatedly casting to AnyHashable should still test equal.
+// (This was broken for a while because repeatedly casting to
+// AnyHashable could end up with multiple nested AnyHashables.)
+// rdar://75180619
+CastsTests.test("Recursive AnyHashable") {
+  struct P: Hashable {
+    var x: Int
+  }
+  struct S {
+    var x: AnyHashable?
+    init<T: Hashable>(_ x: T?) {
+      self.x = x
+    }
+  }
+  let p = P(x: 0)
+  let hp = p as AnyHashable?
+  print(hp.debugDescription)
+  let s = S(hp)
+  print(s.x.debugDescription)
+  expectEqual(s.x, hp)
+  expectEqual(s.x, p)
+}
+
+// SR-14635 (aka rdar://78224322)
+#if _runtime(_ObjC)
+CastsTests.test("Do not overuse __SwiftValue") {
+  struct Bar {}
+  // This used to succeed because of overeager __SwiftValue
+  // boxing (and __SwiftValue does satisfy NSCopying)
+  expectFalse(Bar() is NSCopying)
+  expectFalse(Bar() as Any is NSCopying)
+
+  // This seems unavoidable?
+  // `Bar() as! AnyObject` gets boxed as a __SwiftValue,
+  // and __SwiftValue does conform to NSCopying
+  expectTrue(Bar() as! AnyObject is NSCopying)
+
+  class Foo {}
+  // Foo does not conform to NSCopying
+  // (This used to succeed due to over-eager __SwiftValue boxing)
+  expectFalse(Foo() is NSCopying)
+  expectFalse(Foo() as Any is NSCopying)
+
+  // A type that really does conform should cast to NSCopying
+  class Foo2: NSCopying {
+    func copy(with: NSZone?) -> Any { return self }
+  }
+  expectTrue(Foo2() is NSCopying)
+  expectTrue(Foo2() is AnyObject)
+}
+#endif
+
+#if _runtime(_ObjC)
+CastsTests.test("Artificial subclass protocol conformance") {
+  class SwiftClass: NSObject {}
+  let subclass: AnyClass = objc_allocateClassPair(SwiftClass.self,
+                                                  "ArtificialSwiftSubclass", 0)!
+  objc_registerClassPair(subclass)
+  expectFalse(subclass is P.Type)
+}
+#endif
+
+CastsTests.test("Do not overuse __SwiftValue (non-ObjC)") {
+  struct Bar {}
+  // This should succeed because this is what __SwiftValue boxing is for
+  expectTrue(Bar() is AnyObject)
+  expectTrue(Bar() as Any is AnyObject)
+
+  class Foo {}
+  // Any class type can be cast to AnyObject
+  expectTrue(Foo() is AnyObject)
 }
 
 runAllTests()

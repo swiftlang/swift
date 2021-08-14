@@ -12,6 +12,8 @@
 
 #include "llvm/Support/JSON.h"
 #include "llvm/Support/Path.h"
+#include "swift/AST/ASTContext.h"
+#include "swift/AST/FileSystem.h"
 #include "swift/SymbolGraphGen/SymbolGraphGen.h"
 
 #include "SymbolGraphASTWalker.h"
@@ -22,28 +24,26 @@ using namespace symbolgraphgen;
 namespace {
 int serializeSymbolGraph(SymbolGraph &SG,
                          const SymbolGraphOptions &Options) {
-  SmallString<256> FileName(SG.M.getNameStr());
+  SmallString<256> FileName;
+  FileName.append(SG.M.getNameStr());
   if (SG.ExtendedModule.hasValue()) {
     FileName.push_back('@');
     FileName.append(SG.ExtendedModule.getValue()->getNameStr());
+  } else if (SG.DeclaringModule.hasValue()) {
+    // Treat cross-import overlay modules as "extensions" of their declaring module
+    FileName.push_back('@');
+    FileName.append(SG.DeclaringModule.getValue()->getNameStr());
   }
   FileName.append(".symbols.json");
 
   SmallString<1024> OutputPath(Options.OutputDir);
   llvm::sys::path::append(OutputPath, FileName);
 
-  std::error_code Error;
-  llvm::raw_fd_ostream OS(OutputPath, Error, llvm::sys::fs::FA_Write);
-  if (Error) {
-    llvm::errs() << "Couldn't open output file '" << OutputPath
-        << " for writing: "
-        << Error.message() << "\n";
-    return EXIT_FAILURE;
-  }
-
-  llvm::json::OStream J(OS, Options.PrettyPrint ? 2 : 0);
-  SG.serialize(J);
-  return EXIT_SUCCESS;
+  return withOutputFile(SG.M.getASTContext().Diags, OutputPath, [&](raw_ostream &OS) {
+    llvm::json::OStream J(OS, Options.PrettyPrint ? 2 : 0);
+    SG.serialize(J);
+    return false;
+  });
 }
 
 } // end anonymous namespace
@@ -58,16 +58,18 @@ symbolgraphgen::emitSymbolGraphForModule(ModuleDecl *M,
   SmallVector<Decl *, 64> ModuleDecls;
   M->getDisplayDecls(ModuleDecls);
 
-  llvm::errs() << ModuleDecls.size()
-      << " top-level declarations in this module.\n";
+  if (Options.PrintMessages)
+    llvm::errs() << ModuleDecls.size()
+        << " top-level declarations in this module.\n";
 
   for (auto *Decl : ModuleDecls) {
     Walker.walk(Decl);
   }
 
-  llvm::errs()
-    << "Found " << Walker.MainGraph.Nodes.size() << " symbols and "
-    << Walker.MainGraph.Edges.size() << " relationships.\n";
+  if (Options.PrintMessages)
+    llvm::errs()
+      << "Found " << Walker.MainGraph.Nodes.size() << " symbols and "
+      << Walker.MainGraph.Edges.size() << " relationships.\n";
 
   int Success = EXIT_SUCCESS;
 
@@ -81,4 +83,32 @@ symbolgraphgen::emitSymbolGraphForModule(ModuleDecl *M,
   }
 
   return Success;
+}
+
+int symbolgraphgen::
+printSymbolGraphForDecl(const ValueDecl *D, Type BaseTy,
+                        bool InSynthesizedExtension,
+                        const SymbolGraphOptions &Options,
+                        llvm::raw_ostream &OS,
+                        SmallVectorImpl<PathComponent> &ParentContexts,
+                        SmallVectorImpl<FragmentInfo> &FragmentInfo) {
+  if (!Symbol::supportsKind(D->getKind()))
+    return EXIT_FAILURE;
+
+  llvm::json::OStream JOS(OS, Options.PrettyPrint ? 2 : 0);
+  ModuleDecl *MD = D->getModuleContext();
+  SymbolGraphASTWalker Walker(*MD, Options);
+  markup::MarkupContext MarkupCtx;
+  SymbolGraph Graph(Walker, *MD, None, MarkupCtx, None,
+                    /*IsForSingleNode=*/true);
+  NominalTypeDecl *NTD = InSynthesizedExtension
+      ? BaseTy->getAnyNominal()
+      : nullptr;
+
+  Symbol MySym(&Graph, D, NTD, BaseTy);
+  MySym.getPathComponents(ParentContexts);
+  MySym.getFragmentInfo(FragmentInfo);
+  Graph.recordNode(MySym);
+  Graph.serialize(JOS);
+  return EXIT_SUCCESS;
 }

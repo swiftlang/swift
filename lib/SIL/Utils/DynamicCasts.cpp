@@ -152,7 +152,7 @@ classifyDynamicCastToProtocol(ModuleDecl *M, CanType source, CanType target,
 
   // AnyHashable is a special case: although it's a struct, there maybe another
   // type conforming to it and to the TargetProtocol at the same time.
-  if (SourceNominalTy == SourceNominalTy->getASTContext().getAnyHashableDecl())
+  if (source->isAnyHashable())
     return DynamicCastFeasibility::MaySucceed;
 
   // If we are in a whole-module compilation and
@@ -206,6 +206,50 @@ static CanType getHashableExistentialType(ModuleDecl *M) {
     M->getASTContext().getProtocol(KnownProtocolKind::Hashable);
   if (!hashable) return CanType();
   return hashable->getDeclaredInterfaceType()->getCanonicalType();
+}
+
+static bool canBeExistential(CanType ty) {
+  // If ty is an archetype, conservatively assume it's an existential.
+  return ty.isAnyExistentialType() || ty->is<ArchetypeType>();
+}
+
+static bool canBeClass(CanType ty) {
+  // If ty is an archetype, conservatively assume it's an existential.
+  return ty.getClassOrBoundGenericClass() || ty->is<ArchetypeType>();
+}
+
+bool SILDynamicCastInst::isRCIdentityPreserving() const {
+  // Casts which cast from a trivial type, like a metatype, to something which
+  // is retainable (or vice versa), like an AnyObject, are not RC identity
+  // preserving.
+  // On some platforms such casts dynamically allocate a ref-counted box for the
+  // metatype. Naturally that is the place where a new rc-identity begins.
+  // Therefore such a cast is introducing a new rc identical object.
+  //
+  // If RCIdentityAnalysis would look through such a cast, ARC optimizations
+  // would get confused and might eliminate a retain of such an object
+  // completely.
+  SILFunction &f = *getFunction();
+  if (getSourceLoweredType().isTrivial(f) != getTargetLoweredType().isTrivial(f))
+    return false;
+
+  CanType source = getSourceFormalType();
+  CanType target = getTargetFormalType();
+
+  // An existential may be holding a reference to a bridgeable struct.
+  // In this case, ARC on the existential affects the refcount of the container
+  // holding the struct, not the class to which the struct is bridged.
+  // Therefore, don't assume RC identity when casting between existentials and
+  // classes (and also between two existentials).
+  if (canBeExistential(source) &&
+      (canBeClass(target) || canBeExistential(target)))
+    return false;
+
+  // And vice versa.
+  if (canBeClass(source) && canBeExistential(target))
+    return false;
+
+  return true;
 }
 
 /// Check if a given type conforms to _BridgedToObjectiveC protocol.
@@ -373,7 +417,7 @@ swift::classifyDynamicCast(ModuleDecl *M,
 
   // Casts from AnyHashable.
   if (auto sourceStruct = dyn_cast<StructType>(source)) {
-    if (sourceStruct->getDecl() == M->getASTContext().getAnyHashableDecl()) {
+    if (sourceStruct->isAnyHashable()) {
       if (auto hashable = getHashableExistentialType(M)) {
         // Succeeds if Hashable can be cast to the target type.
         return classifyDynamicCastFromProtocol(M, hashable, target,
@@ -384,7 +428,7 @@ swift::classifyDynamicCast(ModuleDecl *M,
 
   // Casts to AnyHashable.
   if (auto targetStruct = dyn_cast<StructType>(target)) {
-    if (targetStruct->getDecl() == M->getASTContext().getAnyHashableDecl()) {
+    if (targetStruct->isAnyHashable()) {
       // Succeeds if the source type can be dynamically cast to Hashable.
       // Hashable is not actually a legal existential type right now, but
       // the check doesn't care about that.
@@ -559,12 +603,12 @@ swift::classifyDynamicCast(ModuleDecl *M,
     if (targetClass) {
       // Imported Objective-C generics don't check the generic parameters, which
       // are lost at runtime.
-      if (sourceClass->usesObjCGenericsModel()) {
+      if (sourceClass->isTypeErasedGenericClass()) {
       
         if (sourceClass == targetClass)
           return DynamicCastFeasibility::WillSucceed;
         
-        if (targetClass->usesObjCGenericsModel()) {
+        if (targetClass->isTypeErasedGenericClass()) {
           // If both classes are ObjC generics, the cast may succeed if the
           // classes are related, irrespective of their generic parameters.
 
@@ -689,8 +733,7 @@ swift::classifyDynamicCast(ModuleDecl *M,
   if (auto sourceStruct = dyn_cast<BoundGenericStructType>(source)) {
     if (auto targetStruct = dyn_cast<BoundGenericStructType>(target)) {
       // Both types have to be the same kind of collection.
-      auto typeDecl = sourceStruct->getDecl();
-      if (typeDecl == targetStruct->getDecl()) {
+      if (sourceStruct->getDecl() == targetStruct->getDecl()) {
         auto sourceArgs = sourceStruct.getGenericArgs();
         auto targetArgs = targetStruct.getGenericArgs();
 
@@ -698,15 +741,14 @@ swift::classifyDynamicCast(ModuleDecl *M,
         // a cast can always succeed on an empty collection.
 
         // Arrays and sets.
-        if (typeDecl == M->getASTContext().getArrayDecl() ||
-            typeDecl == M->getASTContext().getSetDecl()) {
+        if (sourceStruct->isArray() || sourceStruct->isSet()) {
           auto valueFeasibility =
             classifyDynamicCast(M, sourceArgs[0], targetArgs[0]);
           return atWorst(valueFeasibility,
                          DynamicCastFeasibility::MaySucceed);
 
         // Dictionaries.
-        } else if (typeDecl == M->getASTContext().getDictionaryDecl()) {
+        } else if (sourceStruct->isDictionary()) {
           auto keyFeasibility =
             classifyDynamicCast(M, sourceArgs[0], targetArgs[0]);
           auto valueFeasibility =
@@ -948,7 +990,7 @@ namespace {
         } else {
           // switch enum always start as @owned.
           SILValue sourceObjectValue = someBB->createPhiArgument(
-              loweredSourceObjectType, ValueOwnershipKind::Owned);
+              loweredSourceObjectType, OwnershipKind::Owned);
           objectSource = Source(sourceObjectValue, sourceObjectType);
         }
 
@@ -985,8 +1027,8 @@ namespace {
       if (target.isAddress()) {
         return target.asAddressSource();
       } else {
-        SILValue result = contBB->createPhiArgument(target.LoweredType,
-                                                    ValueOwnershipKind::Owned);
+        SILValue result =
+            contBB->createPhiArgument(target.LoweredType, OwnershipKind::Owned);
         return target.asScalarSource(result);
       }
     }

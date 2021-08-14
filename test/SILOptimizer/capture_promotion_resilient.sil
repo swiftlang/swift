@@ -8,8 +8,8 @@ public struct ResilientStruct {
   var x : Int64
 }
 
-sil @closure0 : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <ResilientStruct>) -> () {
-bb0(%0 : $<τ_0_0> { var τ_0_0 } <ResilientStruct>):
+sil [ossa] @closure0 : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <ResilientStruct>) -> () {
+bb0(%0 : @guaranteed $<τ_0_0> { var τ_0_0 } <ResilientStruct>):
   %1 = project_box %0 : $<τ_0_0> { var τ_0_0 } <ResilientStruct>, 0
   %2 = tuple ()
   return %2 : $()
@@ -17,24 +17,23 @@ bb0(%0 : $<τ_0_0> { var τ_0_0 } <ResilientStruct>):
 
 // Primarily don't crash.
 
-// CHECK-LABEL: sil @$s8closure0Tf2i_n : $@convention(thin) (ResilientStruct) -> () {
+// CHECK-LABEL: sil [ossa] @$s8closure0Tf2i_n : $@convention(thin) (ResilientStruct) -> () {
 // CHECK: bb0(%0 : $ResilientStruct):
 // CHECK:   return {{.*}} : $()
 // CHECK: }
 
-// CHECK: sil @test_capture_promotion : $@convention(thin) (@in_guaranteed ResilientStruct) -> @owned @callee_guaranteed () -> () {
+// CHECK: sil [ossa] @test_capture_promotion : $@convention(thin) (@in_guaranteed ResilientStruct) -> @owned @callee_guaranteed () -> () {
 // CHECK: bb0([[ARG:%.*]] : $*ResilientStruct):
 // CHECK:   [[BOX:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <ResilientStruct>
 // CHECK:   [[F1:%.*]] = project_box [[BOX]]
 // CHECK:   [[F2:%.*]] = project_box [[BOX]]
 // CHECK:   copy_addr [[ARG]] to [initialization] [[F2]] : $*ResilientStruct
 // CHECK:   [[F:%.*]] = function_ref @$s8closure0Tf2i_n : $@convention(thin) (ResilientStruct) -> () // user: %8
-// CHECK:   [[R:%.*]] = load [[F1]] : $*ResilientStruct
+// CHECK:   [[R:%.*]] = load [trivial] [[F1]] : $*ResilientStruct
 // CHECK:   [[C:%.*]] = partial_apply [callee_guaranteed] [[F]]([[R]])
 // CHECK:   return [[C]] : $@callee_guaranteed () -> ()
 // CHECK: }
-
-sil @test_capture_promotion : $@convention(thin) (@in_guaranteed ResilientStruct) -> @owned @callee_guaranteed () -> () {
+sil [ossa] @test_capture_promotion : $@convention(thin) (@in_guaranteed ResilientStruct) -> @owned @callee_guaranteed () -> () {
 bb0(%0 : $*ResilientStruct):
   %1 = alloc_box $<τ_0_0> { var τ_0_0 } <ResilientStruct>
   %2 = project_box %1 : $<τ_0_0> { var τ_0_0 } <ResilientStruct>, 0
@@ -44,12 +43,12 @@ bb0(%0 : $*ResilientStruct):
   return %5 : $@callee_guaranteed () -> ()
 }
 
-// CHECK-LABEL: sil [serializable] @test_capture_promotion_2
+// CHECK-LABEL: sil [serializable] [ossa] @test_capture_promotion_2 :
 // CHECK:  [[F:%.*]] = function_ref @closure0 : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <ResilientStruct>) -> ()
 // CHECK:  [[C:%.*]] = partial_apply [callee_guaranteed] [[F]]({{.*}}) : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <ResilientStruct>) -> ()
 // CHECK:  return [[C]]
-
-sil [serializable] @test_capture_promotion_2 : $@convention(thin) (@in_guaranteed ResilientStruct) -> @owned @callee_guaranteed () -> () {
+// CHECK: } // end sil function 'test_capture_promotion_2'
+sil [serializable] [ossa] @test_capture_promotion_2 : $@convention(thin) (@in_guaranteed ResilientStruct) -> @owned @callee_guaranteed () -> () {
 bb0(%0 : $*ResilientStruct):
   %1 = alloc_box $<τ_0_0> { var τ_0_0 } <ResilientStruct>
   %2 = project_box %1 : $<τ_0_0> { var τ_0_0 } <ResilientStruct>, 0

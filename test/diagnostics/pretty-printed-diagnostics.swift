@@ -128,7 +128,7 @@ foo(b:
 // CHECK: [[#LINE-1]] |
 // CHECK: [[#LINE]]   | let x = { () -> Result in
 // CHECK:             |          +++++++++++++++++
-// CHECK:             |         ^ error: unable to infer complex closure return type; add explicit type to disambiguate
+// CHECK:             |         ^ error: cannot infer return type for closure with multiple statements; add explicit type to disambiguate
 // CHECK: [[#LINE+1]] |   let y = 1
 
 // CHECK: SOURCE_DIR{{[/\]+}}test{{[/\]+}}diagnostics{{[/\]+}}pretty-printed-diagnostics.swift:[[#LINE:]]:8
@@ -136,8 +136,6 @@ foo(b:
 // CHECK: [[#LINE]]   | struct B: Decodable {
 // CHECK:             |        ^ error: type 'B' does not conform to protocol 'Decodable'
 // CHECK: [[#LINE+1]] |   let a: Foo
-// CHECK:             |       ^ note: cannot automatically synthesize 'Decodable' because 'Foo' does not conform to 'Decodable'
-// CHECK: [[#LINE+2]] | }
 // CHECK: Swift.Decodable:2:5
 // CHECK: 1 | public protocol Decodable {
 // CHECK: 2 |     init(from decoder: Decoder) throws
@@ -154,7 +152,7 @@ foo(b:
 // CHECK: SOURCE_DIR{{[/\]+}}test{{[/\]+}}diagnostics{{[/\]+}}pretty-printed-diagnostics.swift:[[#LINE:]]:20
 // CHECK: [[#LINE-1]] |
 // CHECK: [[#LINE]]   | let 👍👍👍 = {
-// CHECK:    | --> error: unable to infer complex closure return type; add explicit type to disambiguate [insert ' () -> <#Result#> in ']
+// CHECK:    | --> error: cannot infer return type for closure with multiple statements; add explicit type to disambiguate [insert ' () -> <#Result#> in ']
 // CHECK: [[#LINE+1]] |   let y = 1
 
 // CHECK: SOURCE_DIR{{[/\]+}}test{{[/\]+}}diagnostics{{[/\]+}}pretty-printed-diagnostics.swift:[[#LINE:]]:5

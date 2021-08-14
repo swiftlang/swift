@@ -442,6 +442,9 @@ public:
 ///
 /// \param allPropertyNames The set of property names in the enclosing context.
 ///
+/// \param completionHandlerIndex For an 'async' function, the index of the
+/// completion handler in argNames.
+///
 /// \param scratch Scratch space that will be used for modifications beyond
 /// just chopping names.
 ///
@@ -455,7 +458,12 @@ bool omitNeedlessWords(StringRef &baseName,
                        bool returnsSelf,
                        bool isProperty,
                        const InheritedNameSet *allPropertyNames,
+                       Optional<unsigned> completionHandlerIndex,
+                       Optional<StringRef> completionHandlerName,
                        StringScratchSpace &scratch);
+
+/// If the name has a completion-handler suffix, strip off that suffix.
+Optional<StringRef> stripWithCompletionHandlerSuffix(StringRef name);
 
 } // end namespace swift
 

@@ -15,8 +15,11 @@
 
 #include "llvm/Support/JSON.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/Type.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Markup/Markup.h"
+#include "swift/SymbolGraphGen/PathComponent.h"
+#include "swift/SymbolGraphGen/FragmentInfo.h"
 
 namespace swift {
 namespace symbolgraphgen {
@@ -30,7 +33,10 @@ class Symbol {
   /// The symbol graph in which this symbol resides.
   SymbolGraph *Graph;
   const ValueDecl *VD;
+  Type BaseType;
   const NominalTypeDecl *SynthesizedBaseTypeDecl;
+
+  std::pair<StringRef, StringRef> getKind(const ValueDecl *VD) const;
 
   void serializeKind(StringRef Identifier, StringRef DisplayName,
                      llvm::json::OStream &OS) const;
@@ -70,9 +76,12 @@ class Symbol {
 
   void serializeAvailabilityMixin(llvm::json::OStream &OS) const;
 
+  void serializeSPIMixin(llvm::json::OStream &OS) const;
+
 public:
   Symbol(SymbolGraph *Graph, const ValueDecl *VD,
-         const NominalTypeDecl *SynthesizedBaseTypeDecl);
+         const NominalTypeDecl *SynthesizedBaseTypeDecl,
+         Type BaseTypeForSubstitution = Type());
 
   void serialize(llvm::json::OStream &OS) const;
 
@@ -84,24 +93,33 @@ public:
     return VD;
   }
 
-  Type getSynthesizedBaseType() const {
-    if (SynthesizedBaseTypeDecl) {
-      return SynthesizedBaseTypeDecl->getDeclaredInterfaceType();
-    } else {
-      return Type();
-    }
+  Type getBaseType() const {
+    return BaseType;
   }
 
   const NominalTypeDecl *getSynthesizedBaseTypeDecl() const {
     return SynthesizedBaseTypeDecl;
   }
 
-  void getPathComponents(SmallVectorImpl<SmallString<32>> &Components) const;
+  /// Reteive the path components associated with this symbol, from outermost
+  /// to innermost (this symbol).
+  void getPathComponents(SmallVectorImpl<PathComponent> &Components) const;
+
+  /// Retrieve information about all symbols referenced in the declaration
+  /// fragment printed for this symbol.
+  void getFragmentInfo(SmallVectorImpl<FragmentInfo> &FragmentInfo) const;
 
   /// Print the symbol path to an output stream.
   void printPath(llvm::raw_ostream &OS) const;
 
   void getUSR(SmallVectorImpl<char> &USR) const;
+  
+  /// If this symbol is inheriting docs from a parent class, protocol, or default
+  /// implementation, returns that decl. Returns null if there are no docs or if
+  /// the symbol has its own doc comments to render.
+  const ValueDecl *getDeclInheritingDocs() const;
+
+  static bool supportsKind(DeclKind Kind);
 };
 
 } // end namespace symbolgraphgen
@@ -117,6 +135,7 @@ template <> struct DenseMapInfo<Symbol> {
       DenseMapInfo<SymbolGraph *>::getEmptyKey(),
       DenseMapInfo<const swift::ValueDecl *>::getEmptyKey(),
       DenseMapInfo<const swift::NominalTypeDecl *>::getTombstoneKey(),
+      DenseMapInfo<swift::Type>::getEmptyKey(),
     };
   }
   static inline Symbol getTombstoneKey() {
@@ -124,6 +143,7 @@ template <> struct DenseMapInfo<Symbol> {
       DenseMapInfo<SymbolGraph *>::getTombstoneKey(),
       DenseMapInfo<const swift::ValueDecl *>::getTombstoneKey(),
       DenseMapInfo<const swift::NominalTypeDecl *>::getTombstoneKey(),
+      DenseMapInfo<swift::Type>::getTombstoneKey(),
     };
   }
   static unsigned getHashValue(const Symbol S) {
@@ -131,13 +151,16 @@ template <> struct DenseMapInfo<Symbol> {
     H ^= DenseMapInfo<SymbolGraph *>::getHashValue(S.getGraph());
     H ^= DenseMapInfo<const swift::ValueDecl *>::getHashValue(S.getSymbolDecl());
     H ^= DenseMapInfo<const swift::NominalTypeDecl *>::getHashValue(S.getSynthesizedBaseTypeDecl());
+    H ^= DenseMapInfo<swift::Type>::getHashValue(S.getBaseType());
     return H;
   }
   static bool isEqual(const Symbol LHS, const Symbol RHS) {
     return LHS.getGraph() == RHS.getGraph() &&
         LHS.getSymbolDecl() == RHS.getSymbolDecl() &&
         LHS.getSynthesizedBaseTypeDecl() ==
-            RHS.getSynthesizedBaseTypeDecl();
+            RHS.getSynthesizedBaseTypeDecl() &&
+        DenseMapInfo<swift::Type>::
+            isEqual(LHS.getBaseType(), RHS.getBaseType());
   }
 };
 } // end namespace llvm

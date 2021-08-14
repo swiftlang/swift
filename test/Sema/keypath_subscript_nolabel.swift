@@ -19,13 +19,7 @@ struct S3 {
   subscript(v v: KeyPath<S3, Int>) -> Int { get { 0 } set(newValue) {} }
 }
 var s3 = S3()
-// TODO(diagnostics): This should actually be a diagnostic that correctly identifies that in the presence
-// of a missing label, there are two options for resolution: 'keyPath' and 'v:' and to offer the user
-// a choice.
-// Today, the ExprTypeChecker identifies the disjunction with two of these possibilities, but 
-// filters out some of the terms based on label mismatch (but not implicit keypath terms, for example).
-// It should probably not do that.
-s3[\.x] = 10 // expected-error {{missing argument label 'keyPath:' in subscript}} {{4-4=keyPath: }}
+s3[\.x] = 10 // expected-error {{missing argument label 'v:' in subscript}} {{4-4=v: }}
 
 struct S4 {
   var x : Int = 0

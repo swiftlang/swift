@@ -32,7 +32,7 @@ extension AllConcrete {
   // Derivative generic signature: `<T where T == Float>`
   //    Witness generic signature: `<T where T == Float>`
   @_silgen_name("allconcrete_where_gensig_constrained")
-  @differentiable(where T == Float)
+  @differentiable(reverse where T == Float)
   func whereClauseGenericSignatureConstrained() -> AllConcrete {
     return self
   }
@@ -47,8 +47,8 @@ extension AllConcrete where T == Float {
 }
 
 // CHECK-LABEL: // differentiability witness for allconcrete_where_gensig_constrained
-// CHECK-NEXT: sil_differentiability_witness hidden [parameters 0] [results 0] <T where T == Float> @allconcrete_where_gensig_constrained : $@convention(method) <T> (AllConcrete<T>) -> AllConcrete<T> {
-// CHECK-NEXT:   jvp: @AD__allconcrete_where_gensig_constrained__jvp_src_0_wrt_0_SfRszl : $@convention(method) (AllConcrete<Float>) -> (AllConcrete<Float>, @owned @callee_guaranteed (AllConcrete<Float>.TangentVector) -> AllConcrete<Float>.TangentVector)
+// CHECK-NEXT: sil_differentiability_witness hidden [reverse] [parameters 0] [results 0] <T where T == Float> @allconcrete_where_gensig_constrained : $@convention(method) <T> (AllConcrete<T>) -> AllConcrete<T> {
+// CHECK-NEXT:   jvp: @allconcrete_where_gensig_constrainedSfRszlTJfSpSr : $@convention(method) (AllConcrete<Float>) -> (AllConcrete<Float>, @owned @callee_guaranteed (AllConcrete<Float>.TangentVector) -> AllConcrete<Float>.TangentVector)
 // CHECK-NEXT: }
 
 // If a `@differentiable` or `@derivative` attribute satisfies two conditions:
@@ -63,7 +63,7 @@ extension AllConcrete where T == Float {
   // Derivative generic signature: `<T where T == Float>`
   //    Witness generic signature: none
   @_silgen_name("allconcrete_original_gensig")
-  @differentiable
+  @differentiable(reverse)
   func originalGenericSignature() -> AllConcrete {
     return self
   }
@@ -76,15 +76,15 @@ extension AllConcrete where T == Float {
   }
 
 // CHECK-LABEL: // differentiability witness for allconcrete_original_gensig
-// CHECK-NEXT: sil_differentiability_witness hidden [parameters 0] [results 0] @allconcrete_original_gensig : $@convention(method) (AllConcrete<Float>) -> AllConcrete<Float> {
-// CHECK-NEXT:   jvp: @AD__allconcrete_original_gensig__jvp_src_0_wrt_0 : $@convention(method) (AllConcrete<Float>) -> (AllConcrete<Float>, @owned @callee_guaranteed (AllConcrete<Float>.TangentVector) -> AllConcrete<Float>.TangentVector)
+// CHECK-NEXT: sil_differentiability_witness hidden [reverse] [parameters 0] [results 0] @allconcrete_original_gensig : $@convention(method) (AllConcrete<Float>) -> AllConcrete<Float> {
+// CHECK-NEXT:   jvp: @allconcrete_original_gensigTJfSpSr : $@convention(method) (AllConcrete<Float>) -> (AllConcrete<Float>, @owned @callee_guaranteed (AllConcrete<Float>.TangentVector) -> AllConcrete<Float>.TangentVector)
 // CHECK-NEXT: }
 
   //   Original generic signature: `<T where T == Float>`
   // Derivative generic signature: `<T where T == Float>` (explicit `where` clause)
   //    Witness generic signature: none
   @_silgen_name("allconcrete_where_gensig")
-  @differentiable(where T == Float)
+  @differentiable(reverse where T == Float)
   func whereClauseGenericSignature() -> AllConcrete {
     return self
   }
@@ -97,8 +97,8 @@ extension AllConcrete where T == Float {
   }
 
 // CHECK-LABEL: // differentiability witness for allconcrete_where_gensig
-// CHECK-NEXT: sil_differentiability_witness hidden [parameters 0] [results 0] @allconcrete_where_gensig : $@convention(method) (AllConcrete<Float>) -> AllConcrete<Float> {
-// CHECK-NEXT:   jvp: @AD__allconcrete_where_gensig__jvp_src_0_wrt_0 : $@convention(method) (AllConcrete<Float>) -> (AllConcrete<Float>, @owned @callee_guaranteed (AllConcrete<Float>.TangentVector) -> AllConcrete<Float>.TangentVector)
+// CHECK-NEXT: sil_differentiability_witness hidden [reverse] [parameters 0] [results 0] @allconcrete_where_gensig : $@convention(method) (AllConcrete<Float>) -> AllConcrete<Float> {
+// CHECK-NEXT:   jvp: @allconcrete_where_gensigTJfSpSr : $@convention(method) (AllConcrete<Float>) -> (AllConcrete<Float>, @owned @callee_guaranteed (AllConcrete<Float>.TangentVector) -> AllConcrete<Float>.TangentVector)
 // CHECK-NEXT: }
 }
 
@@ -113,7 +113,7 @@ extension NotAllConcrete {
   // Derivative generic signature: `<T, U where T == Float>`
   //    Witness generic signature: `<T, U where T == Float>` (not all concrete)
   @_silgen_name("notallconcrete_where_gensig_constrained")
-  @differentiable(where T == Float)
+  @differentiable(reverse where T == Float)
   func whereClauseGenericSignatureConstrained() -> NotAllConcrete {
     return self
   }
@@ -128,8 +128,8 @@ extension NotAllConcrete where T == Float {
 }
 
 // CHECK-LABEL: // differentiability witness for notallconcrete_where_gensig_constrained
-// CHECK-NEXT: sil_differentiability_witness hidden [parameters 0] [results 0] <T, U where T == Float> @notallconcrete_where_gensig_constrained : $@convention(method) <T, U> (NotAllConcrete<T, U>) -> NotAllConcrete<T, U> {
-// CHECK-NEXT:   jvp: @AD__notallconcrete_where_gensig_constrained__jvp_src_0_wrt_0_SfRszr0_l : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 == Float> (NotAllConcrete<Float, τ_0_1>) -> (NotAllConcrete<Float, τ_0_1>, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (τ_0_0) -> τ_0_1 for <NotAllConcrete<Float, τ_0_1>.TangentVector, NotAllConcrete<Float, τ_0_1>.TangentVector>)
+// CHECK-NEXT: sil_differentiability_witness hidden [reverse] [parameters 0] [results 0] <T, U where T == Float> @notallconcrete_where_gensig_constrained : $@convention(method) <T, U> (NotAllConcrete<T, U>) -> NotAllConcrete<T, U> {
+// CHECK-NEXT:   jvp: @notallconcrete_where_gensig_constrainedSfRszr0_lTJfSpSr : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 == Float> (NotAllConcrete<Float, τ_0_1>) -> (NotAllConcrete<Float, τ_0_1>, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (τ_0_0) -> τ_0_1 for <NotAllConcrete<Float, τ_0_1>.TangentVector, NotAllConcrete<Float, τ_0_1>.TangentVector>)
 // CHECK-NEXT: }
 
 extension NotAllConcrete where T == Float {
@@ -137,7 +137,7 @@ extension NotAllConcrete where T == Float {
   // Derivative generic signature: `<T, U where T == Float>`
   //    Witness generic signature: `<T, U where T == Float>` (not all concrete)
   @_silgen_name("notallconcrete_original_gensig")
-  @differentiable
+  @differentiable(reverse)
   func originalGenericSignature() -> NotAllConcrete {
     return self
   }
@@ -150,15 +150,15 @@ extension NotAllConcrete where T == Float {
   }
 
 // CHECK-LABEL: // differentiability witness for notallconcrete_original_gensig
-// CHECK-NEXT: sil_differentiability_witness hidden [parameters 0] [results 0] <T, U where T == Float> @notallconcrete_original_gensig : $@convention(method) <T, U where T == Float> (NotAllConcrete<Float, U>) -> NotAllConcrete<Float, U> {
-// CHECK-NEXT:   jvp: @AD__notallconcrete_original_gensig__jvp_src_0_wrt_0_SfRszr0_l : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 == Float> (NotAllConcrete<Float, τ_0_1>) -> (NotAllConcrete<Float, τ_0_1>, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (τ_0_0) -> τ_0_1 for <NotAllConcrete<Float, τ_0_1>.TangentVector, NotAllConcrete<Float, τ_0_1>.TangentVector>)
+// CHECK-NEXT: sil_differentiability_witness hidden [reverse] [parameters 0] [results 0] <T, U where T == Float> @notallconcrete_original_gensig : $@convention(method) <T, U where T == Float> (NotAllConcrete<Float, U>) -> NotAllConcrete<Float, U> {
+// CHECK-NEXT:   jvp: @notallconcrete_original_gensigSfRszr0_lTJfSpSr : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 == Float> (NotAllConcrete<Float, τ_0_1>) -> (NotAllConcrete<Float, τ_0_1>, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (τ_0_0) -> τ_0_1 for <NotAllConcrete<Float, τ_0_1>.TangentVector, NotAllConcrete<Float, τ_0_1>.TangentVector>)
 // CHECK-NEXT: }
 
   //   Original generic signature: `<T, U where T == Float>`
   // Derivative generic signature: `<T, U where T == Float>` (explicit `where` clause)
   //    Witness generic signature: `<T, U where T == Float>` (not all concrete)
   @_silgen_name("notallconcrete_where_gensig")
-  @differentiable(where T == Float)
+  @differentiable(reverse where T == Float)
   func whereClauseGenericSignature() -> NotAllConcrete {
     return self
   }
@@ -171,7 +171,7 @@ extension NotAllConcrete where T == Float {
   }
 
 // CHECK-LABEL: // differentiability witness for notallconcrete_where_gensig
-// CHECK-NEXT: sil_differentiability_witness hidden [parameters 0] [results 0] <T, U where T == Float> @notallconcrete_where_gensig : $@convention(method) <T, U where T == Float> (NotAllConcrete<Float, U>) -> NotAllConcrete<Float, U> {
-// CHECK-NEXT:   jvp: @AD__notallconcrete_where_gensig__jvp_src_0_wrt_0_SfRszr0_l : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 == Float> (NotAllConcrete<Float, τ_0_1>) -> (NotAllConcrete<Float, τ_0_1>, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (τ_0_0) -> τ_0_1 for <NotAllConcrete<Float, τ_0_1>.TangentVector, NotAllConcrete<Float, τ_0_1>.TangentVector>)
+// CHECK-NEXT: sil_differentiability_witness hidden [reverse] [parameters 0] [results 0] <T, U where T == Float> @notallconcrete_where_gensig : $@convention(method) <T, U where T == Float> (NotAllConcrete<Float, U>) -> NotAllConcrete<Float, U> {
+// CHECK-NEXT:   jvp: @notallconcrete_where_gensigSfRszr0_lTJfSpSr : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 == Float> (NotAllConcrete<Float, τ_0_1>) -> (NotAllConcrete<Float, τ_0_1>, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (τ_0_0) -> τ_0_1 for <NotAllConcrete<Float, τ_0_1>.TangentVector, NotAllConcrete<Float, τ_0_1>.TangentVector>)
 // CHECK-NEXT: }
 }

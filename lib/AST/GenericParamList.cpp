@@ -110,9 +110,9 @@ GenericTypeParamDecl *GenericParamList::lookUpGenericParam(
 }
 
 TrailingWhereClause::TrailingWhereClause(
-                       SourceLoc whereLoc,
+                       SourceLoc whereLoc, SourceLoc endLoc,
                        ArrayRef<RequirementRepr> requirements)
-  : WhereLoc(whereLoc),
+  : WhereLoc(whereLoc), EndLoc(endLoc),
     NumRequirements(requirements.size())
 {
   std::uninitialized_copy(requirements.begin(), requirements.end(),
@@ -122,8 +122,9 @@ TrailingWhereClause::TrailingWhereClause(
 TrailingWhereClause *TrailingWhereClause::create(
                        ASTContext &ctx,
                        SourceLoc whereLoc,
+                       SourceLoc endLoc,
                        ArrayRef<RequirementRepr> requirements) {
   unsigned size = totalSizeToAlloc<RequirementRepr>(requirements.size());
   void *mem = ctx.Allocate(size, alignof(TrailingWhereClause));
-  return new (mem) TrailingWhereClause(whereLoc, requirements);
+  return new (mem) TrailingWhereClause(whereLoc, endLoc, requirements);
 }

@@ -1,6 +1,10 @@
-// This file is used by Sema/availability_versions_multi.swift to
+// This file was used by Sema/availability_versions_multi.swift to
 // test that we build enough of the type refinement context as needed to
 // validate declarations when resolving declaration signatures.
+//
+// These days, we don't validate availability in secondary files at all,
+// so the test here is just to make sure we don't crash.
+//
 // This file relies on the minimum deployment target for OS X being 10.9.
 
 @available(OSX, introduced: 99.52)
@@ -18,11 +22,9 @@ class OtherIntroduced99_51 {
     _ = PrivateIntroduced99_52()
   }
 
-  // This method uses a 99_52 only type in its signature, so validating
-  // the declaration should produce an availability error
-  func returns99_52() -> OtherIntroduced99_52 { // expected-error {{'OtherIntroduced99_52' is only available in macOS 99.52 or newer}}
-      // expected-note@-1 {{add @available attribute to enclosing instance method}}
-
+  // This method uses a 99_52 only type in its signature, but we don't
+  // validate it since it comes from a secondary file.
+  func returns99_52() -> OtherIntroduced99_52 {
     // Body is not type checked (by design) so no error is expected for unavailable type used in return.
     return OtherIntroduced99_52()
   }
@@ -86,5 +88,4 @@ extension OtherIntroduced99_51 {
 class OtherIntroduced99_53 {
 }
 
-var globalFromOtherOn99_52 : OtherIntroduced99_52? = nil // expected-error {{'OtherIntroduced99_52' is only available in macOS 99.52 or newer}}
-    // expected-note@-1 {{add @available attribute to enclosing var}}
+var globalFromOtherOn99_52 : OtherIntroduced99_52? = nil

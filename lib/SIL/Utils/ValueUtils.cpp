@@ -16,8 +16,7 @@
 
 using namespace swift;
 
-Optional<ValueOwnershipKind>
-swift::mergeSILValueOwnership(ArrayRef<SILValue> values) {
+ValueOwnershipKind swift::mergeSILValueOwnership(ArrayRef<SILValue> values) {
   auto range = makeTransformRange(values,
                                   [](SILValue v) {
                                     assert(v->getType().isObject());

@@ -8,7 +8,7 @@
 // unnecessary.
 // ONONE-NOT: @__swift_fixLifetime
 
-// CHECK-objc-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @test(%T11fixlifetime1CC* %0, %objc_object* %1, i8** %2, i8* %3, %swift.refcounted* %4, %T11fixlifetime3AggV* noalias nocapture dereferenceable({{.*}}) %5) {{.*}} {
+// CHECK-objc-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @test(%T11fixlifetime1CC* %0, %objc_object* %1, i8** %2, i8* %3, %swift.refcounted* %4, %T11fixlifetime3AggV* noalias nocapture dereferenceable({{.*}}) %5, {{(i64|i32)}} %6, {{(i64|i32)}} %7) {{.*}} {
 // CHECK-objc: entry:
 // CHECK-objc:  call void bitcast (void (%swift.refcounted*)* @__swift_fixLifetime to void (%T11fixlifetime1CC*)*)(%T11fixlifetime1CC*
 // CHECK-objc:  call void bitcast (void (%swift.refcounted*)* @__swift_fixLifetime to void (%objc_object*)*)(%objc_object*
@@ -16,9 +16,11 @@
 // CHECK-objc:  call void bitcast (void (%swift.refcounted*)* @__swift_fixLifetime to void (%T11fixlifetime1CC*)*)(%T11fixlifetime1CC*
 // CHECK-objc:  call void bitcast (void (%swift.refcounted*)* @__swift_fixLifetime to void (%objc_object*)*)(%objc_object*
 // CHECK-objc:  call void @__swift_fixLifetime(%swift.refcounted*
+// CHECK-objc:  [[TEMP:%.*]] = inttoptr {{(i64|i32)}} %6 to %objc_object*
+// CHECK-objc:  call void bitcast (void (%swift.refcounted*)* @__swift_fixLifetime to void (%objc_object*)*)(%objc_object* [[TEMP]])
 // CHECK-objc:  call void bitcast (void (%swift.refcounted*)* @__swift_fixLifetime to void (%T11fixlifetime1CC**)*)(%T11fixlifetime1CC**
 
-// CHECK-native-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @test(%T11fixlifetime1CC* %0, %swift.refcounted* %1, i8** %2, i8* %3, %swift.refcounted* %4, %T11fixlifetime3AggV* noalias nocapture dereferenceable({{.*}}) %5) {{.*}} {
+// CHECK-native-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @test(%T11fixlifetime1CC* %0, %swift.refcounted* %1, i8** %2, i8* %3, %swift.refcounted* %4, %T11fixlifetime3AggV* noalias nocapture dereferenceable({{.*}}) %5, {{(i64|i32)}} %6, {{(i64|i32)}} %7) {{.*}} {
 // CHECK-native: entry:
 // CHECK-native:  call void bitcast (void (%swift.refcounted*)* @__swift_fixLifetime to void (%T11fixlifetime1CC*)*)(%T11fixlifetime1CC*
 // CHECK-native:  call void @__swift_fixLifetime(%swift.refcounted*
@@ -44,17 +46,23 @@ struct Agg {
   var f : F
 }
 
+enum MyOptional<T> {
+  case none
+  case some(T)
+}
+
 sil [Onone] @test
-  : $@convention(thin) (C, P, @callee_owned () -> (), Agg) -> () {
-bb0(%0 : $C, %1 : $P, %2 : $@callee_owned () -> (), %3 : $Agg):
+  : $@convention(thin) (C, P, @callee_owned () -> (), Agg, @guaranteed MyOptional<P>) -> () {
+bb0(%0 : $C, %1 : $P, %2 : $@callee_owned () -> (), %3 : $Agg, %4 : $MyOptional<P>):
   fix_lifetime %0 : $C
   fix_lifetime %1 : $P
   fix_lifetime %2 : $@callee_owned () -> ()
   fix_lifetime %3 : $Agg
+  fix_lifetime %4 : $MyOptional<P>
 
-  %4 = alloc_stack $C
-  fix_lifetime %4 : $*C
-  dealloc_stack %4 : $*C
+  %5 = alloc_stack $C
+  fix_lifetime %5 : $*C
+  dealloc_stack %5 : $*C
   %9999 = tuple()
   return %9999 : $()
 }

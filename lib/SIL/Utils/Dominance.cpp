@@ -114,6 +114,16 @@ properlyDominates(SILInstruction *I1, SILInstruction *I2) {
   return true;
 }
 
+bool PostDominanceInfo::properlyDominates(SILValue A, SILInstruction *B) {
+  if (auto *Inst = A->getDefiningInstruction()) {
+    return properlyDominates(Inst, B);
+  }
+  if (auto *Arg = dyn_cast<SILArgument>(A)) {
+    return dominates(Arg->getParent(), B->getParent());
+  }
+  return false;
+}
+
 void PostDominanceInfo::verify() const {
   // Recompute.
   //

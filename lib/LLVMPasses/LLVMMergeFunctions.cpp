@@ -664,6 +664,9 @@ static bool isEligibleFunction(Function *F) {
 
   if (F->getFunctionType()->isVarArg())
     return false;
+
+  if (F->getCallingConv() == CallingConv::SwiftTail)
+    return false;
   
   unsigned Benefit = getBenefit(F);
   if (Benefit < FunctionMergeThreshold)
@@ -683,7 +686,7 @@ bool SwiftMergeFunctions::runOnModule(Module &M) {
     // If invoked from IRGen in the compiler, those options are already set.
     // If invoked from swift-llvm-opt, derive the options from the target triple.
     Triple triple(M.getTargetTriple());
-    ptrAuthEnabled = (triple.getSubArch() == Triple::AArch64SubArch_E);
+    ptrAuthEnabled = (triple.getSubArch() == Triple::AArch64SubArch_arm64e);
     ptrAuthKey = (unsigned)clang::PointerAuthSchema::ARM8_3Key::ASIA;
     ptrAuthOptionsSet = true;
   }
@@ -1225,7 +1228,11 @@ void SwiftMergeFunctions::writeThunk(Function *ToFunc, Function *Thunk,
   }
 
   CallInst *CI = Builder.CreateCall(ToFunc, Args);
-  CI->setTailCall();
+  bool isSwiftTailCall =
+   ToFunc->getCallingConv() == CallingConv::SwiftTail &&
+   Thunk->getCallingConv() == CallingConv::SwiftTail;
+  CI->setTailCallKind(
+    isSwiftTailCall ? llvm::CallInst::TCK_MustTail : llvm::CallInst::TCK_Tail);
   CI->setCallingConv(ToFunc->getCallingConv());
   CI->setAttributes(ToFunc->getAttributes());
   if (Thunk->getReturnType()->isVoidTy()) {

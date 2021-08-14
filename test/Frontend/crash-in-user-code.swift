@@ -7,12 +7,12 @@
 // UNSUPPORTED: OS=ios
 // UNSUPPORTED: OS=tvos
 // UNSUPPORTED: OS=watchos
-
-// XFAIL: MSVC_VER=15.0
+// UNSUPPORTED: MSVC_VER=15.0
 
 // CHECK: Stack dump:
 // CHECK-NEXT: Program arguments:
 // CHECK-NEXT: Swift version
+// CHECK-NEXT: Compiling with effective version
 // CHECK-NEXT: Contents of {{.*}}.filelist.txt:
 // CHECK-NEXT: ---
 // CHECK-NEXT: crash-in-user-code.swift

@@ -22,8 +22,7 @@ ManagedValue Scope::popPreservingValue(ManagedValue mv) {
   // stack location that will be destroyed by this scope.
   assert(mv && mv.getType().isObject() &&
          (mv.getType().isTrivial(cleanups.SGF.F) ||
-          mv.getOwnershipKind() == ValueOwnershipKind::None ||
-          mv.hasCleanup()));
+          mv.getOwnershipKind() == OwnershipKind::None || mv.hasCleanup()));
   CleanupCloner cloner(cleanups.SGF, mv);
   SILValue value = mv.forward(cleanups.SGF);
   pop();

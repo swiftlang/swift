@@ -111,6 +111,11 @@ bool SILLoop::canDuplicate(SILInstruction *I) const {
   if (isa<DynamicMethodBranchInst>(I))
     return false;
 
+  // Can't duplicate get/await_async_continuation.
+  if (isa<AwaitAsyncContinuationInst>(I) ||
+      isa<GetAsyncContinuationAddrInst>(I) || isa<GetAsyncContinuationInst>(I))
+    return false;
+
   // Some special cases above that aren't considered isTriviallyDuplicatable
   // return true early.
   assert(I->isTriviallyDuplicatable() &&

@@ -21,3 +21,8 @@ module AutolinkElfCPragmaTransitive {
 module AutolinkModuleMapLink {
   link "autolink-module-map-link"
 }
+
+module AtomicBoolModule {
+  header "atomic_bool.h"
+  export *
+}

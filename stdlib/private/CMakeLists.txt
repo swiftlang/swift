@@ -8,6 +8,9 @@ if(SWIFT_BUILD_SDK_OVERLAY)
   if(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
     add_subdirectory(DifferentiationUnittest)
   endif()
+endif()
+
+if(SWIFT_BUILD_SDK_OVERLAY OR SWIFT_BUILD_TEST_SUPPORT_MODULES)
   add_subdirectory(RuntimeUnittest)
   add_subdirectory(StdlibUnicodeUnittest)
   add_subdirectory(StdlibCollectionUnittest)
@@ -18,15 +21,26 @@ if(SWIFT_BUILD_SDK_OVERLAY)
   # SwiftPrivateThreadExtras to ensure that the dependency targets are setup in
   # the correct order for Windows.
   add_subdirectory(StdlibUnittest)
+endif()
 
+if(SWIFT_BUILD_SDK_OVERLAY)
   add_subdirectory(OSLog)
 
   if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     add_subdirectory(StdlibUnittestFoundationExtras)
   endif()
-  # Currently SwiftReflectionTest cannot be built on Windows, due to 
-  # dependencies on POSIX symbols 
+  # Currently SwiftReflectionTest cannot be built on Windows, due to
+  # dependencies on POSIX symbols
   if (SWIFT_INCLUDE_TESTS AND (NOT CMAKE_SYSTEM_NAME STREQUAL "Windows"))
     add_subdirectory(SwiftReflectionTest)
   endif()
 endif()
+
+# Keep in sync with stdlib/tools/CMakeLists.txt: swift-reflection-test is
+# only used when testing dynamic stdlib.
+if(SWIFT_BUILD_DYNAMIC_STDLIB AND SWIFT_INCLUDE_TESTS)
+  # NOTE create a stub BlocksRuntime library that can be used for the
+  # reflection tests
+  add_subdirectory(BlocksRuntimeStubs)
+endif()
+

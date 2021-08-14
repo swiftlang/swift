@@ -181,6 +181,9 @@ public:
   /// @available.
   virtual void completeDeclAttrParam(DeclAttrKind DK, int Index) {};
 
+  /// Complete 'async' and 'throws' at effects specifier position.
+  virtual void completeEffectsSpecifier(bool hasAsync, bool hasThrows) {};
+
   /// Complete within a precedence group decl or after a colon in an
   /// operator decl.
   virtual void completeInPrecedenceGroup(SyntaxKind SK) {};
@@ -227,6 +230,11 @@ public:
   virtual void completeGenericRequirement() {};
 
   virtual void completeStmtLabel(StmtKind ParentKind) {};
+
+  virtual
+  void completeForEachPatternBeginning(bool hasTry, bool hasAwait) {};
+
+  virtual void completeTypeAttrBeginning() {};
 
   /// Signals that the AST for the all the delayed-parsed code was
   /// constructed.  No \c complete*() callbacks will be done after this.

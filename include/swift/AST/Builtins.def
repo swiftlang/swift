@@ -498,11 +498,22 @@ BUILTIN_SIL_OPERATION(ApplyDerivative, "applyDerivative", Special)
 /// applyTranspose
 BUILTIN_SIL_OPERATION(ApplyTranspose, "applyTranspose", Special)
 
-/// differentiableFunction
-BUILTIN_SIL_OPERATION(DifferentiableFunction, "differentiableFunction", Special)
+/// withUnsafeContinuation<T> : (Builtin.RawUnsafeContinuation -> ()) async -> T
+///
+/// Unsafely capture the current continuation and pass it to the given
+/// function value. Returns a value of type T when the continuation is
+/// resumed.
+BUILTIN_SIL_OPERATION(WithUnsafeContinuation, "withUnsafeContinuation", Special)
 
-/// linearFunction
-BUILTIN_SIL_OPERATION(LinearFunction, "linearFunction", Special)
+/// withUnsafeThrowingContinuation<T> : (Builtin.RawUnsafeContinuation -> ()) async throws -> T
+///
+/// Unsafely capture the current continuation and pass it to the given
+/// function value. Returns a value of type T or throws an error when
+/// the continuation is resumed.
+BUILTIN_SIL_OPERATION(WithUnsafeThrowingContinuation, "withUnsafeThrowingContinuation", Special)
+
+/// Force the current task to be rescheduled on the specified actor.
+BUILTIN_SIL_OPERATION(HopToActor, "hopToActor", None)
 
 #undef BUILTIN_SIL_OPERATION
 
@@ -607,11 +618,19 @@ BUILTIN_MISC_OPERATION(AtomicStore, "atomicstore", "", Special)
 /// AtomicRMW has type (Builtin.RawPointer, T) -> T.
 BUILTIN_MISC_OPERATION(AtomicRMW, "atomicrmw", "", IntegerOrRawPointer)
 
+/// convertTaskToJob : (Builtin.NativePointer) -> Builtin.Job
+///
+/// Convert a task pointer into a job pointer.
+BUILTIN_MISC_OPERATION(ConvertTaskToJob, "convertTaskToJob", "n", Special)
+
 /// ExtractElement has type (Vector<N, T>, Int32) -> T
 BUILTIN_MISC_OPERATION(ExtractElement, "extractelement", "n", Special)
 
 /// InsertElement has type (Vector<N, T>, T, Int32) -> Vector<N, T>.
 BUILTIN_MISC_OPERATION(InsertElement, "insertelement", "n", Special)
+
+// Shufflevector has type (VecN<T>, VecN<T>, VecM<Int32>) -> VecM<T>
+BUILTIN_MISC_OPERATION(ShuffleVector, "shufflevector", "n", Special)
 
 /// StaticReport has type (Builtin.Int1, Builtin.Int1, Builtin.RawPointer) -> ()
 BUILTIN_MISC_OPERATION(StaticReport, "staticReport", "", Special)
@@ -641,8 +660,6 @@ BUILTIN_MISC_OPERATION(UToUCheckedTrunc, "u_to_u_checked_trunc", "n", Special)
 
 /// IntToFPWithOverflow has type (Integer) -> Float
 BUILTIN_MISC_OPERATION(IntToFPWithOverflow, "itofp_with_overflow", "n", Special)
-
-// FIXME: shufflevector
 
 /// zeroInitializer has type <T> () -> T
 BUILTIN_MISC_OPERATION(ZeroInitializer, "zeroInitializer", "n", Special)
@@ -704,6 +721,40 @@ BUILTIN_MISC_OPERATION(TypePtrAuthDiscriminator, "typePtrAuthDiscriminator", "n"
 //  int_instrprof_increment has type (Builtin.RawPointer, Builtin.Int64, Builtin.Int32, Builtin.Int32) -> ().
 BUILTIN_MISC_OPERATION(IntInstrprofIncrement, "int_instrprof_increment", "", Special)
 
+/// Initialize the default-actor instance in a default actor object.
+BUILTIN_MISC_OPERATION(InitializeDefaultActor, "initializeDefaultActor", "", Special)
+
+/// Destroy the default-actor instance in a default actor object.
+BUILTIN_MISC_OPERATION(DestroyDefaultActor, "destroyDefaultActor", "", Special)
+
+/// Allocate a "proxy" for a distributed remote actor.  TODO(distributed) change the name of this to create throughout.
+BUILTIN_MISC_OPERATION(InitializeDistributedRemoteActor,
+                       "initializeDistributedRemoteActor", "", Special)
+
+/// Destroy the distributed-actor instance in a "proxy" actor object.
+BUILTIN_MISC_OPERATION(DestroyDistributedActor,
+                       "destroyDistributedActor", "", Special)
+
+/// Resume a non-throwing continuation normally with the given result.
+BUILTIN_MISC_OPERATION(ResumeNonThrowingContinuationReturning,
+                       "resumeNonThrowingContinuationReturning", "", Special)
+
+/// Resume a throwing continuation normally with the given result.
+BUILTIN_MISC_OPERATION(ResumeThrowingContinuationReturning,
+                       "resumeThrowingContinuationReturning", "", Special)
+
+/// Resume a throwing continuation abnormally with the given error.
+BUILTIN_MISC_OPERATION(ResumeThrowingContinuationThrowing,
+                       "resumeThrowingContinuationThrowing", "", Special)
+
+/// Create a task group.
+BUILTIN_MISC_OPERATION(CreateTaskGroup,
+                       "createTaskGroup", "", Special)
+
+/// Destroy a task group.
+BUILTIN_MISC_OPERATION(DestroyTaskGroup,
+                       "destroyTaskGroup", "", Special)
+
 // BUILTIN_MISC_OPERATION_WITH_SILGEN - Miscellaneous operations that are
 // specially emitted during SIL generation.
 //
@@ -717,12 +768,117 @@ BUILTIN_MISC_OPERATION(IntInstrprofIncrement, "int_instrprof_increment", "", Spe
   BUILTIN_MISC_OPERATION(Id, Name, Attrs, Overload)
 #endif
 
+// getCurrentExecutor: () async -> Builtin.Executor?
+//
+// Retrieve the ExecutorRef on which the current asynchronous
+// function is executing, or nil if the function isn't running
+// anywhere in particular.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(GetCurrentExecutor, "getCurrentExecutor", "", Special)
+
+// getCurrentAsyncTask: () -> Builtin.NativeObject
+//
+// Retrieve the pointer to the task in which the current asynchronous
+// function is executing.
+//
+// This is readnone because, within the world modeled by SIL, the
+// current async task of a thread never changes.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(GetCurrentAsyncTask, "getCurrentAsyncTask", "n", Special)
+
+/// cancelAsyncTask(): (Builtin.NativeObject) -> Void
+///
+/// Cancel the given asynchronous task.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(CancelAsyncTask, "cancelAsyncTask", "", Special)
+
+/// startAsyncLet()<T>: (
+///     __owned @Sendable @escaping () async throws -> T
+/// ) -> Builtin.RawPointer
+///
+/// DEPRECATED. startAsyncLetWithLocalBuffer is used instead.
+///
+/// Create, initialize and start a new async-let and associated task.
+/// Returns an AsyncLet* that must be passed to endAsyncLet for destruction.
+BUILTIN_MISC_OPERATION(StartAsyncLet, "startAsyncLet", "", Special)
+
+/// startAsyncLetWithLocalBuffer()<T>: (
+///     __owned @Sendable @escaping () async throws -> T,
+///     _ resultBuf: Builtin.RawPointer
+/// ) -> Builtin.RawPointer
+///
+/// Create, initialize and start a new async-let and associated task, with a
+/// locally-allocated buffer assigned to receive the result if the task
+/// completes.
+/// Returns an AsyncLet* that must be passed to endAsyncLetLifetime for
+/// destruction.
+BUILTIN_MISC_OPERATION(StartAsyncLetWithLocalBuffer, "startAsyncLetWithLocalBuffer", "", Special)
+
+/// endAsyncLet(): (Builtin.RawPointer) -> Void
+///
+/// DEPRECATED. The swift_asyncLet_finish intrinsic and endAsyncLetLifetime
+/// builtin are used instead.
+///
+/// Ends and destroys an async-let.
+/// The ClosureLifetimeFixup pass adds a second operand to the builtin to
+/// ensure that optimizations keep the stack-allocated closure arguments alive
+/// until the endAsyncLet.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(EndAsyncLet, "endAsyncLet", "", Special)
+
+/// endAsyncLetLifetime(): (Builtin.RawPointer) -> Void
+///
+/// Marks the end of an async-let's lifetime.
+/// The ClosureLifetimeFixup pass adds a second operand to the builtin to
+/// ensure that optimizations keep the stack-allocated closure arguments alive
+/// until the endAsyncLet.
+BUILTIN_MISC_OPERATION(EndAsyncLetLifetime, "endAsyncLetLifetime", "", Special)
+
+/// createAsyncTask(): (
+///     Int,                            // task-creation flags
+///     @escaping () async throws -> T  // function
+/// ) -> Builtin.NativeObject
+///
+/// Create a new asynchronous task, given flags, options, and a function to
+/// execute.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTask,
+    "createAsyncTask", "", Special)
+
+/// createAsyncTaskInGroup(): (
+///     Int,                            // flags
+///     Builtin.RawPointer,             // group
+///     @escaping () async throws -> T  // function
+/// ) -> Builtin.NativeObject
+///
+/// Create a new asynchronous task future, given flags, a parent task,
+/// task group and a function to execute.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTaskInGroup,
+    "createAsyncTaskInGroup", "", Special)
+
 /// globalStringTablePointer has type String -> Builtin.RawPointer.
 /// It returns an immortal, global string table pointer for strings constructed
 /// from string literals. We consider it effects as readnone meaning that it
 /// does not read any memory (note that even though it reads from a string, it
 /// is a pure value and therefore we can consider it as readnone).
 BUILTIN_MISC_OPERATION_WITH_SILGEN(GlobalStringTablePointer, "globalStringTablePointer", "n", Special)
+
+// autoDiffCreateLinearMapContext: (Builtin.Word) -> Builtin.NativeObject
+BUILTIN_MISC_OPERATION_WITH_SILGEN(AutoDiffCreateLinearMapContext, "autoDiffCreateLinearMapContext", "n", Special)
+
+// autoDiffProjectTopLevelSubcontext: (Builtin.NativeObject) -> Builtin.RawPointer
+BUILTIN_MISC_OPERATION_WITH_SILGEN(AutoDiffProjectTopLevelSubcontext, "autoDiffProjectTopLevelSubcontext", "n", Special)
+
+// autoDiffAllocateSubcontext: (Builtin.NativeObject, Builtin.Word) -> Builtin.RawPointer
+BUILTIN_MISC_OPERATION_WITH_SILGEN(AutoDiffAllocateSubcontext, "autoDiffAllocateSubcontext", "", Special)
+
+/// Build a Builtin.Executor value from an "ordinary" serial executor
+/// reference.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(BuildOrdinarySerialExecutorRef,
+                                   "buildOrdinarySerialExecutorRef", "n", Special)
+
+/// Build a Builtin.Executor value from a default actor reference.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(BuildDefaultActorExecutorRef,
+                                   "buildDefaultActorExecutorRef", "n", Special)
+
+/// Build a Builtin.Executor value for the main actor.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(BuildMainActorExecutorRef,
+                                   "buildMainActorExecutorRef", "n", Special)
 
 #undef BUILTIN_MISC_OPERATION_WITH_SILGEN
 

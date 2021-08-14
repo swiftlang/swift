@@ -25,6 +25,7 @@ struct Str {
 
 sil @unknown : $@convention(thin) () -> ()
 sil @load_string : $@convention(thin) (@in_guaranteed String) -> String
+sil @guaranteed_user : $@convention(thin) (@guaranteed Klass) -> ()
 
 sil @inguaranteed_user_without_result : $@convention(thin) (@in_guaranteed Klass) -> () {
 bb0(%0 : $*Klass):
@@ -456,6 +457,25 @@ bb3:
   return %9 : $()
 }
 
+// CHECK-LABEL: sil @lifetime_beyond_last_use :
+// CHECK-NOT: copy_addr
+// CHECK:   [[V:%[0-9]+]] = load %0
+// CHECK:   apply {{%[0-9]+}}([[V]])
+// CHECK:   destroy_addr %0
+// CHECK: } // end sil function 'lifetime_beyond_last_use'
+sil @lifetime_beyond_last_use : $@convention(thin) (@in Klass) -> () {
+bb0(%0 : $*Klass):
+  %2 = alloc_stack $Klass
+  copy_addr [take] %0 to [initialization] %2 : $*Klass
+  %4 = load %2 : $*Klass
+  %5 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Klass) -> ()
+  %6 = apply %5(%4) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_addr %2 : $*Klass
+  dealloc_stack %2 : $*Klass
+  %9 = tuple ()
+  return %9 : $()
+}
+
 // Make sure that we can eliminate temporaries passed via a temporary rvalue to
 // an @in_guaranteed function.
 //
@@ -599,9 +619,9 @@ bb1:
   %10 = alloc_stack $P
   copy_addr %9 to [initialization] %10 : $*P
   destroy_addr %2 : $*Optional<P>
-  %13 = open_existential_addr immutable_access %10 : $*P to $*@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P
-  %14 = witness_method $@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P, #P.foo : <Self where Self : P> (Self) -> () -> (), %13 : $*@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
-  %15 = apply %14<@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P>(%13) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  %13 = open_existential_addr immutable_access %10 : $*P to $*@opened("6E7A6328-EF75-11E9-A383-D0817AD3F637") P
+  %14 = witness_method $@opened("6E7A6328-EF75-11E9-A383-D0817AD3F637") P, #P.foo : <Self where Self : P> (Self) -> () -> (), %13 : $*@opened("6E7A6328-EF75-11E9-A383-D0817AD3F637") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  %15 = apply %14<@opened("6E7A6328-EF75-11E9-A383-D0817AD3F637") P>(%13) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
   destroy_addr %10 : $*P
   dealloc_stack %10 : $*P
   dealloc_stack %2 : $*Optional<P>
@@ -632,10 +652,10 @@ bb1:
   %9 = unchecked_take_enum_data_addr %2 : $*Optional<P>, #Optional.some!enumelt
   %10 = alloc_stack $P
   copy_addr %9 to [initialization] %10 : $*P
-  %13 = open_existential_addr immutable_access %10 : $*P to $*@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P
+  %13 = open_existential_addr immutable_access %10 : $*P to $*@opened("7E7A6328-EF75-11E9-A383-D0817AD3F637") P
   destroy_addr %2 : $*Optional<P>
-  %14 = witness_method $@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P, #P.foo : <Self where Self : P> (Self) -> () -> (), %13 : $*@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
-  %15 = apply %14<@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P>(%13) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  %14 = witness_method $@opened("7E7A6328-EF75-11E9-A383-D0817AD3F637") P, #P.foo : <Self where Self : P> (Self) -> () -> (), %13 : $*@opened("7E7A6328-EF75-11E9-A383-D0817AD3F637") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  %15 = apply %14<@opened("7E7A6328-EF75-11E9-A383-D0817AD3F637") P>(%13) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
   destroy_addr %10 : $*P
   dealloc_stack %10 : $*P
   dealloc_stack %2 : $*Optional<P>
@@ -683,12 +703,13 @@ bb0(%0 : $*Builtin.NativeObject):
   return %v : $()
 }
 
-// Remove a copy that is released via a load as long as it was a copy [take].
 // CHECK-LABEL: sil @takeWithLoadRelease : $@convention(thin) (@in Builtin.NativeObject) -> () {
 // CHECK: bb0(%0 : $*Builtin.NativeObject):
-// CHECK:   [[V:%.*]] = load %0 : $*Builtin.NativeObject
-// CHECK:   apply %{{.*}}([[V]]) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
-// CHECK:   release_value [[V]] : $Builtin.NativeObject
+// CHECK:   [[STK:%.*]] = alloc_stack $Builtin.NativeObject
+// CHECK:   copy_addr [take] %0 to [initialization] [[STK]] : $*Builtin.NativeObject
+// CHECK:   [[VAL:%.*]] = load [[STK]] : $*Builtin.NativeObject
+// CHECK:   apply %{{.*}}([[VAL]]) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+// CHECK:   release_value [[VAL]] : $Builtin.NativeObject
 // CHECK-LABEL: } // end sil function 'takeWithLoadRelease'
 sil @takeWithLoadRelease : $@convention(thin) (@in Builtin.NativeObject) -> () {
 bb0(%0 : $*Builtin.NativeObject):

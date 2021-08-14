@@ -307,7 +307,8 @@ struct NotEquatable {}
 func arrayComparison(_ x: [NotEquatable], y: [NotEquatable], p: UnsafeMutablePointer<NotEquatable>) {
   var x = x
   // Don't allow implicit array-to-pointer conversions in operators.
-  let a: Bool = x == y // expected-error{{referencing operator function '==' on 'Array' requires that 'NotEquatable' conform to 'Equatable'}}
+  // There is a note attached to declaration - requirement from conditional conformance of '[NotEquatable]' to 'Equatable'
+  let a: Bool = x == y // expected-error{{operator function '==' requires that 'NotEquatable' conform to 'Equatable'}}
   let _: Bool = p == &x  // Allowed!
 }
 

@@ -23,6 +23,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testNested2 | %FileCheck %s -check-prefix=testNested2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testCycle1 | %FileCheck %s -check-prefix=testCycle1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testCycle2 | %FileCheck %s -check-prefix=testCycle2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testSubscriptOnProtocolExt | %FileCheck %s -check-prefix=testSubscriptOnProtocolExt
 
 struct Point {
   var x: Int
@@ -384,4 +385,27 @@ struct CycleC<T> {
 func testCycle2(r: CycleA<Point>) {
   r.#^testCycle2^#
 // testCycle2: Begin completions
+}
+
+protocol DynamicLookupProto {
+    associatedtype Content
+}
+extension DynamicLookupProto {
+    subscript<T>(dynamicMember key: KeyPath<Content, T>) -> T {
+      fatalError()
+    }
+}
+
+@dynamicMemberLookup
+struct DynamicLookupConcrete : DynamicLookupProto {
+    typealias Content = Point
+}
+
+func testSubscriptOnProtocolExtension(dyn: DynamicLookupConcrete) {
+    dyn.#^testSubscriptOnProtocolExt^#
+// testSubscriptOnProtocolExt: Begin completions
+// testSubscriptOnProtocolExt: Keyword[self]/CurrNominal:          self[#DynamicLookupConcrete#];
+// testSubscriptOnProtocolExt: Decl[InstanceVar]/CurrNominal:      x[#Int#];
+// testSubscriptOnProtocolExt: Decl[InstanceVar]/CurrNominal:      y[#Int#];
+// testSubscriptOnProtocolExt: End completions
 }

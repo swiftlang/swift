@@ -30,7 +30,7 @@
 // Android NDK <r21 do not provide `__aeabi_d2h` in the compiler runtime,
 // provide shims in that case.
 #if (defined(__ANDROID__) && defined(__ARM_ARCH_7A__) && defined(__ARM_EABI__)) || \
-  ((defined(__i686__) || defined(__x86_64__)) && !defined(__APPLE__))
+  ((defined(__i386__) || defined(__i686__) || defined(__x86_64__)) && !defined(__APPLE__))
 
 #include "../SwiftShims/Visibility.h"
 
@@ -118,20 +118,6 @@ SWIFT_RUNTIME_EXPORT unsigned short __gnu_f2h_ieee(float f) {
 }
 
 #endif
-
-static unsigned long long toEncoding(double d) {
-  unsigned long long e;
-  static_assert(sizeof e == sizeof d, "double and ull must have the same size");
-  __builtin_memcpy(&e, &d, sizeof d);
-  return e;
-}
-
-static double fromEncoding(unsigned long long e) {
-  double d;
-  static_assert(sizeof d == sizeof e, "double and ull must have the same size");
-  __builtin_memcpy(&d, &e, sizeof e);
-  return d;
-}
 
 // Input in xmm0, result in di. We can get that calling convention in C++
 // by returning uint16 instead of Float16, which we don't have (or else

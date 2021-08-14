@@ -18,14 +18,8 @@
 
 using namespace swift;
 
-void StackNesting::setup(SILFunction *F) {
-  SmallVector<BlockInfo *, 8> WorkList;
-  llvm::DenseMap<SILBasicBlock *, BlockInfo *> BlockMapping;
-
-  // We use pointers to BlockInfo structs. Therefore it's important that the
-  // BlockInfos vector is never re-allocated.
-  BlockInfos.clear();
-  BlockInfos.reserve(F->size());
+void StackNesting::setup() {
+  SmallVector<SILBasicBlock *, 8> WorkList;
 
   // Start with the function entry block and add blocks while walking down along
   // the successor edges.
@@ -33,14 +27,14 @@ void StackNesting::setup(SILFunction *F) {
   // a higher bit-number than it's outer parent location.
   // This ordering is only important for inserting multiple deallocation
   // instructions (see below).
-  BlockInfos.emplace_back(F->getEntryBlock());
-  BlockInfo *EntryBI = &BlockInfos.back();
-  BlockMapping[F->getEntryBlock()] = EntryBI;
-  WorkList.push_back(EntryBI);
+  auto Entry = BlockInfos.entry();
+  WorkList.push_back(&Entry.block);
+  Entry.data.visited = true;
 
   while (!WorkList.empty()) {
-    BlockInfo *BI = WorkList.pop_back_val();
-    for (SILInstruction &I : *BI->Block) {
+    SILBasicBlock *Block = WorkList.pop_back_val();
+    BlockInfo &BI = BlockInfos[Block];
+    for (SILInstruction &I : *Block) {
       if (I.isAllocatingStack()) {
         auto Alloc = cast<SingleValueInstruction>(&I);
         // Register this stack location.
@@ -48,38 +42,32 @@ void StackNesting::setup(SILFunction *F) {
         StackLoc2BitNumbers[Alloc] = CurrentBitNumber;
         StackLocs.push_back(StackLoc(Alloc));
 
-        BI->StackInsts.push_back(Alloc);
-
+        BI.StackInsts.push_back(Alloc);
       } else if (I.isDeallocatingStack()) {
         auto *AllocInst = cast<SingleValueInstruction>(I.getOperand(0));
-        if (!BI->StackInsts.empty() && BI->StackInsts.back() == AllocInst) {
+        if (!BI.StackInsts.empty() && BI.StackInsts.back() == AllocInst) {
           // As an optimization, we ignore perfectly nested alloc-dealloc pairs
           // inside a basic block.
           // Actually, this catches most of the cases and keeps our bitsets
           // small.
           assert(StackLocs.back().Alloc == AllocInst);
           StackLocs.pop_back();
-          BI->StackInsts.pop_back();
+          BI.StackInsts.pop_back();
         } else {
           // Register the stack deallocation.
-          BI->StackInsts.push_back(&I);
+          BI.StackInsts.push_back(&I);
         }
       }
     }
-    for (auto *SuccBB : BI->Block->getSuccessorBlocks()) {
-      BlockInfo *&SuccBI = BlockMapping[SuccBB];
-      if (!SuccBI) {
+    for (SILBasicBlock *SuccBB : Block->getSuccessorBlocks()) {
+      BlockInfo &SuccBI = BlockInfos[SuccBB];
+      if (!SuccBI.visited) {
         // Push the next reachable block onto the WorkList.
-        BlockInfos.emplace_back(SuccBB);
-        SuccBI = &BlockInfos.back();
-        WorkList.push_back(SuccBI);
+        WorkList.push_back(SuccBB);
+        SuccBI.visited = true;
       }
-      // Cache the successors in our own list.
-      BI->Successors.push_back(SuccBI);
     }
   }
-  assert(EntryBI == &BlockInfos[0] &&
-         "BlockInfo vector should not re-allocate");
 
   unsigned NumLocs = StackLocs.size();
   for (unsigned Idx = 0; Idx < NumLocs; ++Idx) {
@@ -96,8 +84,8 @@ bool StackNesting::solve() {
 
   // Initialize all bit fields to 1s, expect 0s for the entry block.
   bool initVal = false;
-  for (BlockInfo &BI : BlockInfos) {
-    BI.AliveStackLocsAtEntry.resize(StackLocs.size(), initVal);
+  for (auto bd : BlockInfos) {
+    bd.data.AliveStackLocsAtEntry.resize(StackLocs.size(), initVal);
     initVal = true;
   }
 
@@ -111,24 +99,22 @@ bool StackNesting::solve() {
   do {
     changed = false;
 
-    for (BlockInfo &BI : BlockInfos) {
-      Bits = BI.AliveStackLocsAtEntry;
-      for (SILInstruction *StackInst : BI.StackInsts) {
+    for (auto bd : BlockInfos) {
+      Bits = bd.data.AliveStackLocsAtEntry;
+      for (SILInstruction *StackInst : bd.data.StackInsts) {
         if (StackInst->isAllocatingStack()) {
           Bits.set(bitNumberForAlloc(StackInst));
         } else if (StackInst->isDeallocatingStack()) {
           Bits.reset(bitNumberForDealloc(StackInst));
         }
       }
-      if (Bits != BI.AliveStackLocsAtExit) {
-        BI.AliveStackLocsAtExit = Bits;
-        assert(!(BI.Block->getTerminator()->isFunctionExiting() && Bits.any())
-               && "stack location is missing dealloc");
+      if (Bits != bd.data.AliveStackLocsAtExit) {
+        bd.data.AliveStackLocsAtExit = Bits;
         changed = true;
       }
       // Merge the bits into the successors.
-      for (BlockInfo *SuccBI : BI.Successors) {
-        SuccBI->AliveStackLocsAtEntry &= Bits;
+      for (SILBasicBlock *SuccBB : bd.block.getSuccessorBlocks()) {
+        BlockInfos[SuccBB].AliveStackLocsAtEntry &= Bits;
       }
     }
   } while (changed);
@@ -138,15 +124,17 @@ bool StackNesting::solve() {
   do {
     changed = false;
 
-    // It's a backward dataflow problem.
-    for (BlockInfo &BI : llvm::reverse(BlockInfos)) {
+   for (auto bd : llvm::reverse(BlockInfos)) {
       // Collect the alive-bits (at the block exit) from the successor blocks.
-      for (BlockInfo *SuccBI : BI.Successors) {
-        BI.AliveStackLocsAtExit |= SuccBI->AliveStackLocsAtEntry;
+      for (SILBasicBlock *SuccBB : bd.block.getSuccessorBlocks()) {
+        bd.data.AliveStackLocsAtExit |= BlockInfos[SuccBB].AliveStackLocsAtEntry;
       }
-      Bits = BI.AliveStackLocsAtExit;
+      Bits = bd.data.AliveStackLocsAtExit;
+      assert(!(bd.data.visited && bd.block.getTerminator()->isFunctionExiting()
+               && Bits.any())
+             && "stack location is missing dealloc");
 
-      if (isa<UnreachableInst>(BI.Block->getTerminator())) {
+      if (isa<UnreachableInst>(bd.block.getTerminator())) {
         // We treat unreachable as an implicit deallocation for all locations
         // which are still alive at this point.
         for (int BitNr = Bits.find_first(); BitNr >= 0;
@@ -156,9 +144,9 @@ bool StackNesting::solve() {
           // a "real" deallocation instruction (see below).
           Bits |= StackLocs[BitNr].AliveLocs;
         }
-        BI.AliveStackLocsAtExit = Bits;
+        bd.data.AliveStackLocsAtExit = Bits;
       }
-      for (SILInstruction *StackInst : llvm::reverse(BI.StackInsts)) {
+      for (SILInstruction *StackInst : llvm::reverse(bd.data.StackInsts)) {
         if (StackInst->isAllocatingStack()) {
           int BitNr = bitNumberForAlloc(StackInst);
           if (Bits != StackLocs[BitNr].AliveLocs) {
@@ -180,8 +168,8 @@ bool StackNesting::solve() {
           Bits |= StackLocs[bitNumberForDealloc(StackInst)].AliveLocs;
         }
       }
-      if (Bits != BI.AliveStackLocsAtEntry) {
-        BI.AliveStackLocsAtEntry = Bits;
+      if (Bits != bd.data.AliveStackLocsAtEntry) {
+        bd.data.AliveStackLocsAtEntry = Bits;
         changed = true;
       }
     }
@@ -246,26 +234,25 @@ bool StackNesting::insertDeallocs(const BitVector &AliveBefore,
 //   dealloc_stack %1
 StackNesting::Changes StackNesting::insertDeallocsAtBlockBoundaries() {
   Changes changes = Changes::None;
-  for (const BlockInfo &BI : llvm::reverse(BlockInfos)) {
-    for (unsigned SuccIdx = 0, NumSuccs = BI.Successors.size();
-         SuccIdx < NumSuccs; ++SuccIdx) {
-
-      BlockInfo *SuccBI = BI.Successors[SuccIdx];
-      if (SuccBI->AliveStackLocsAtEntry == BI.AliveStackLocsAtExit)
+   for (auto bd : llvm::reverse(BlockInfos)) {
+    // Collect the alive-bits (at the block exit) from the successor blocks.
+    for (auto succAndIdx : llvm::enumerate(bd.block.getSuccessorBlocks())) {
+      BlockInfo &SuccBI = BlockInfos[succAndIdx.value()];
+      if (SuccBI.AliveStackLocsAtEntry == bd.data.AliveStackLocsAtExit)
         continue;
 
       // Insert deallocations for all locations which are alive at the end of
       // the current block, but not at the begin of the successor block.
-      SILBasicBlock *InsertionBlock = SuccBI->Block;
+      SILBasicBlock *InsertionBlock = succAndIdx.value();
       if (!InsertionBlock->getSinglePredecessorBlock()) {
         // If the current block is not the only predecessor of the successor
         // block, we have to insert a new block where we can add the
         // deallocations.
-        InsertionBlock = splitEdge(BI.Block->getTerminator(), SuccIdx);
+        InsertionBlock = splitEdge(bd.block.getTerminator(), succAndIdx.index());
         changes = Changes::CFG;
       }
-      if (insertDeallocs(BI.AliveStackLocsAtExit, SuccBI->AliveStackLocsAtEntry,
-                         &InsertionBlock->front(), None)) {
+      if (insertDeallocs(bd.data.AliveStackLocsAtExit,
+                SuccBI.AliveStackLocsAtEntry, &InsertionBlock->front(), None)) {
         if (changes == Changes::None)
           changes = Changes::Instructions;
       }
@@ -274,17 +261,17 @@ StackNesting::Changes StackNesting::insertDeallocsAtBlockBoundaries() {
   return changes;
 }
 
-bool StackNesting::adaptDeallocs() {
+StackNesting::Changes StackNesting::adaptDeallocs() {
   bool InstChanged = false;
   BitVector Bits(StackLocs.size());
 
   // Visit all blocks. Actually the order doesn't matter, but let's to it in
   // the same order as in solve().
-  for (const BlockInfo &BI : llvm::reverse(BlockInfos)) {
-    Bits = BI.AliveStackLocsAtExit;
+   for (auto bd : llvm::reverse(BlockInfos)) {
+    Bits = bd.data.AliveStackLocsAtExit;
 
     // Insert/remove deallocations inside blocks.
-    for (SILInstruction *StackInst : llvm::reverse(BI.StackInsts)) {
+    for (SILInstruction *StackInst : llvm::reverse(bd.data.StackInsts)) {
       if (StackInst->isAllocatingStack()) {
         // For allocations we just update the bit-set.
         int BitNr = bitNumberForAlloc(StackInst);
@@ -314,45 +301,44 @@ bool StackNesting::adaptDeallocs() {
         Bits |= StackLocs[BitNr].AliveLocs;
       }
     }
-    assert(Bits == BI.AliveStackLocsAtEntry && "dataflow didn't converge");
+    assert(Bits == bd.data.AliveStackLocsAtEntry && "dataflow didn't converge");
   }
-  return InstChanged;
+  return InstChanged ? Changes::Instructions : Changes::None;
 }
 
-StackNesting::Changes StackNesting::correctStackNesting(SILFunction *F) {
-  setup(F);
-  if (!solve())
-    return Changes::None;
+StackNesting::Changes StackNesting::fixNesting(SILFunction *F) {
+  Changes changes = Changes::None;
+  {
+    StackNesting SN(F);
+    if (!SN.analyze())
+      return Changes::None;
 
-  // Insert deallocs at block boundaries. This might be necessary in CFG sub
-  // graphs which don't  reach a function exit, but only an unreachable.
-  Changes changes = insertDeallocsAtBlockBoundaries();
-  if (changes != Changes::None) {
+    // Insert deallocs at block boundaries. This might be necessary in CFG sub
+    // graphs which don't  reach a function exit, but only an unreachable.
+    changes = SN.insertDeallocsAtBlockBoundaries();
+    if (changes == Changes::None) {
+      // Do the real work: extend lifetimes by moving deallocs.
+      return SN.adaptDeallocs();
+    }
+  }
+  {
     // Those inserted deallocs make it necessary to re-compute the analysis.
-    setup(F);
-    solve();
+    StackNesting SN(F);
+    SN.analyze();
+    // Do the real work: extend lifetimes by moving deallocs.
+    return std::max(SN.adaptDeallocs(), changes);
   }
-  // Do the real work: extend lifetimes by moving deallocs.
-  if (adaptDeallocs()) {
-    if (changes == Changes::None)
-      changes = Changes::Instructions;
-  }
-
-  return changes;
 }
 
 void StackNesting::dump() const {
-  for (const BlockInfo &BI : BlockInfos) {
-    if (!BI.Block)
-      continue;
-
-    llvm::dbgs() << "Block " << BI.Block->getDebugID();
+  for (auto bd : BlockInfos) {
+    llvm::dbgs() << "Block " << bd.block.getDebugID();
     llvm::dbgs() << ": entry-bits=";
-    dumpBits(BI.AliveStackLocsAtEntry);
+    dumpBits(bd.data.AliveStackLocsAtEntry);
     llvm::dbgs() << ": exit-bits=";
-    dumpBits(BI.AliveStackLocsAtExit);
+    dumpBits(bd.data.AliveStackLocsAtExit);
     llvm::dbgs() << '\n';
-    for (SILInstruction *StackInst : BI.StackInsts) {
+    for (SILInstruction *StackInst : bd.data.StackInsts) {
       if (StackInst->isAllocatingStack()) {
         auto AllocInst = cast<SingleValueInstruction>(StackInst);
         int BitNr = StackLoc2BitNumbers.lookup(AllocInst);
@@ -366,11 +352,6 @@ void StackNesting::dump() const {
                         "    " << *StackInst;
       }
     }
-    llvm::dbgs() << "  successors:";
-    for (BlockInfo *SuccBI : BI.Successors) {
-      llvm::dbgs() << ' ' << SuccBI->Block->getDebugID();
-    }
-    llvm::dbgs() << '\n';
   }
 }
 

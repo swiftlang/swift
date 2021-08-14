@@ -27,7 +27,7 @@ add_swift_target_library(swiftDarwin ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_
       ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
       -Xfrontend -disable-objc-attr-requires-foundation-module
     LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
-    TARGET_SDKS ALL_APPLE_PLATFORMS
+    TARGET_SDKS ALL_APPLE_PLATFORMS FREESTANDING
     INSTALL_IN_COMPONENT sdk-overlay
 
     DEPENDS ${darwin_depends})
@@ -48,8 +48,8 @@ add_swift_target_library(swiftGlibc ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_O
     INSTALL_IN_COMPONENT sdk-overlay
     DEPENDS glibc_modulemap)
 
-add_swift_target_library(swiftMSVCRT ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
-    msvcrt.swift
+add_swift_target_library(swiftCRT ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
+    ucrt.swift
     ${swift_platform_sources}
     POSIXError.swift
 
@@ -119,6 +119,13 @@ foreach(sdk ${SWIFT_SDKS})
       list(APPEND glibc_modulemap_target_list ${copy_glibc_modulemap_static})
     endif()
 
+    set(glibc_header_out "${module_dir}/SwiftGlibc.h")
+    handle_gyb_source_single(glibc_header_target
+        SOURCE "SwiftGlibc.h.gyb"
+        OUTPUT "${glibc_header_out}"
+        FLAGS "-DCMAKE_SDK=${sdk}")
+    list(APPEND glibc_modulemap_target_list ${glibc_header_target})
+
     # If this SDK is a target for a non-native host, except if it's for Android
     # with its own native sysroot, create a native modulemap without a sysroot
     # prefix. This is the one we'll install instead.
@@ -150,9 +157,15 @@ foreach(sdk ${SWIFT_SDKS})
     swift_install_in_component(FILES "${glibc_modulemap_out}"
                                DESTINATION "lib/swift/${arch_subdir}"
                                COMPONENT sdk-overlay)
+    swift_install_in_component(FILES "${glibc_header_out}"
+                               DESTINATION "lib/swift/${arch_subdir}"
+                               COMPONENT sdk-overlay)
 
     if(SWIFT_BUILD_STATIC_STDLIB)
       swift_install_in_component(FILES "${glibc_modulemap_out}"
+                                 DESTINATION "lib/swift_static/${arch_subdir}"
+                                 COMPONENT sdk-overlay)
+      swift_install_in_component(FILES "${glibc_header_out}"
                                  DESTINATION "lib/swift_static/${arch_subdir}"
                                  COMPONENT sdk-overlay)
     endif()

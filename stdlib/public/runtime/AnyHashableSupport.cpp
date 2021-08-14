@@ -29,6 +29,10 @@ struct HashableConformanceKey {
   /// The lookup key, the metadata of a type that is possibly derived
   /// from a type that conforms to `Hashable`.
   const Metadata *derivedType;
+
+  friend llvm::hash_code hash_value(const HashableConformanceKey &key) {
+    return llvm::hash_value(key.derivedType);
+  }
 };
 
 struct HashableConformanceEntry {
@@ -48,12 +52,12 @@ struct HashableConformanceEntry {
       : derivedType(key.derivedType),
         baseTypeThatConformsToHashable(baseTypeThatConformsToHashable) {}
 
-  int compareWithKey(const HashableConformanceKey &key) const {
-    if (key.derivedType != derivedType) {
-      return (uintptr_t(key.derivedType) < uintptr_t(derivedType) ? -1 : 1);
-    } else {
-      return 0;
-    }
+  bool matchesKey(const HashableConformanceKey &key) {
+    return derivedType == key.derivedType;
+  }
+
+  friend llvm::hash_code hash_value(const HashableConformanceEntry &value) {
+    return hash_value(HashableConformanceKey{value.derivedType});
   }
 
   static size_t
@@ -70,16 +74,18 @@ struct HashableConformanceEntry {
 
 // FIXME(performance): consider merging this cache into the regular
 // protocol conformance cache.
-static ConcurrentMap<HashableConformanceEntry, /*Destructor*/ false>
-  HashableConformances;
+static ConcurrentReadableHashMap<HashableConformanceEntry> HashableConformances;
 
 template <bool KnownToConformToHashable>
 SWIFT_ALWAYS_INLINE static const Metadata *
 findHashableBaseTypeImpl(const Metadata *type) {
   // Check the cache first.
-  if (HashableConformanceEntry *entry =
-          HashableConformances.find(HashableConformanceKey{type})) {
-    return entry->baseTypeThatConformsToHashable;
+  {
+    auto snapshot = HashableConformances.snapshot();
+    if (const HashableConformanceEntry *entry =
+            snapshot.find(HashableConformanceKey{type})) {
+      return entry->baseTypeThatConformsToHashable;
+    }
   }
 
   auto witnessTable =
@@ -93,8 +99,13 @@ findHashableBaseTypeImpl(const Metadata *type) {
   const auto *conformance = witnessTable->getDescription();
   const Metadata *baseTypeThatConformsToHashable =
     findConformingSuperclass(type, conformance);
-  HashableConformances.getOrInsert(HashableConformanceKey{type},
-                                   baseTypeThatConformsToHashable);
+  HashableConformanceKey key{type};
+  HashableConformances.getOrInsert(key, [&](HashableConformanceEntry *entry,
+                                            bool created) {
+    if (created)
+      new (entry) HashableConformanceEntry(key, baseTypeThatConformsToHashable);
+    return true; // Keep the new entry.
+  });
   return baseTypeThatConformsToHashable;
 }
 

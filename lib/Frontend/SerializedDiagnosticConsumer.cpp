@@ -84,6 +84,9 @@ struct SharedState : llvm::RefCountedBase<SharedState> {
   /// The collection of files used.
   llvm::DenseMap<const char *, unsigned> Files;
 
+  /// The collection of categories used.
+  llvm::DenseMap<const char *, unsigned> Categories;
+
   using DiagFlagsTy =
       llvm::DenseMap<const void *, std::pair<unsigned, StringRef>>;
 
@@ -187,6 +190,9 @@ private:
   // Record identifier for the file.
   unsigned getEmitFile(StringRef Filename);
 
+  // Record identifier for the category.
+  unsigned getEmitCategory(StringRef Category);
+
   /// Add a source location to a record.
   void addLocToRecord(SourceLoc Loc,
                       SourceManager &SM,
@@ -231,6 +237,23 @@ unsigned SerializedDiagnosticConsumer::getEmitFile(StringRef Filename) {
   Record.push_back(Filename.size());
   State->Stream.EmitRecordWithBlob(State->Abbrevs.get(RECORD_FILENAME),
                                    Record, Filename.data());
+
+  return entry;
+}
+
+unsigned SerializedDiagnosticConsumer::getEmitCategory(StringRef Category) {
+  unsigned &entry = State->Categories[Category.data()];
+  if (entry)
+    return entry;
+
+  // Lazily generate the record for the category.
+  entry = State->Categories.size();
+  RecordData Record;
+  Record.push_back(RECORD_CATEGORY);
+  Record.push_back(entry);
+  Record.push_back(Category.size());
+  State->Stream.EmitRecordWithBlob(State->Abbrevs.get(RECORD_CATEGORY), Record,
+                                   Category.data());
 
   return entry;
 }
@@ -469,8 +492,13 @@ emitDiagnosticMessage(SourceManager &SM,
   Record.push_back(getDiagnosticLevel(Kind));
   addLocToRecord(Loc, SM, filename, Record);
 
-  // FIXME: Swift diagnostics currently have no category.
-  Record.push_back(0);
+  // Emit the category.
+  if (!Info.Category.empty()) {
+    Record.push_back(getEmitCategory(Info.Category));
+  } else {
+    Record.push_back(0);
+  }
+
   // FIXME: Swift diagnostics currently have no flags.
   Record.push_back(0);
 

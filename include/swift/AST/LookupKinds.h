@@ -51,7 +51,7 @@ enum NLOptions : unsigned {
   NL_IncludeAttributeImplements = 1 << 5,
 
   // Include @usableFromInline and @inlinable
-  NL_IncludeUsableFromInlineAndInlineable = 1 << 6,
+  NL_IncludeUsableFromInline = 1 << 6,
 
   /// The default set of options used for qualified name lookup.
   ///

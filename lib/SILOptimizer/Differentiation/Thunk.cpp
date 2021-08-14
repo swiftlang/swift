@@ -24,6 +24,7 @@
 #include "swift/AST/Requirement.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
+#include "swift/SILOptimizer/Utils/DifferentiationMangler.h"
 
 namespace swift {
 namespace autodiff {
@@ -60,7 +61,7 @@ CanGenericSignature buildThunkSignature(SILFunction *fn, bool inheritGenericSig,
     if (auto genericSig =
             fn->getLoweredFunctionType()->getSubstGenericSignature()) {
       builder.addGenericSignature(genericSig);
-      depth = genericSig->getGenericParams().back()->getDepth() + 1;
+      depth = genericSig.getGenericParams().back()->getDepth() + 1;
     }
   }
 
@@ -75,8 +76,8 @@ CanGenericSignature buildThunkSignature(SILFunction *fn, bool inheritGenericSig,
   builder.addRequirement(newRequirement, source, nullptr);
 
   auto genericSig = std::move(builder).computeGenericSignature(
-      SourceLoc(), /*allowConcreteGenericParams=*/true);
-  genericEnv = genericSig->getGenericEnvironment();
+      /*allowConcreteGenericParams=*/true);
+  genericEnv = genericSig.getGenericEnvironment();
 
   newArchetype =
       genericEnv->mapTypeIntoContext(newGenericParam)->castTo<ArchetypeType>();
@@ -103,7 +104,7 @@ CanGenericSignature buildThunkSignature(SILFunction *fn, bool inheritGenericSig,
       },
       MakeAbstractConformanceForGenericType());
 
-  return genericSig->getCanonicalSignature();
+  return genericSig.getCanonicalSignature();
 }
 
 CanSILFunctionType buildThunkType(SILFunction *fn,
@@ -323,7 +324,7 @@ SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
 
   Mangle::ASTMangler mangler;
   std::string name = mangler.mangleReabstractionThunkHelper(
-      thunkType, fromInterfaceType, toInterfaceType, Type(),
+      thunkType, fromInterfaceType, toInterfaceType, Type(), Type(),
       module.getSwiftModule());
 
   auto *thunk = fb.getOrCreateSharedFunction(
@@ -424,8 +425,7 @@ SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
   }
 
   auto *fnArg = thunk->getArgumentsWithoutIndirectResults().back();
-  auto *apply = builder.createApply(loc, fnArg, SubstitutionMap(), arguments,
-                                    /*isNonThrowing*/ false);
+  auto *apply = builder.createApply(loc, fnArg, SubstitutionMap(), arguments);
 
   // Get return elements.
   SmallVector<SILValue, 4> results;
@@ -496,12 +496,14 @@ SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
   // Owned values need to be destroyed.
   for (auto arg : valuesToCleanup) {
     switch (arg.getOwnershipKind()) {
-    case ValueOwnershipKind::Guaranteed:
+    case OwnershipKind::Any:
+      llvm_unreachable("value with any ownership kind?!");
+    case OwnershipKind::Guaranteed:
       builder.emitEndBorrowOperation(loc, arg);
       break;
-    case ValueOwnershipKind::Owned:
-    case ValueOwnershipKind::Unowned:
-    case ValueOwnershipKind::None:
+    case OwnershipKind::Owned:
+    case OwnershipKind::Unowned:
+    case OwnershipKind::None:
       builder.emitDestroyOperation(loc, arg);
       break;
     }
@@ -558,10 +560,11 @@ getOrCreateSubsetParametersThunkForLinearMap(
     SILOptFunctionBuilder &fb, SILFunction *parentThunk,
     CanSILFunctionType origFnType, CanSILFunctionType linearMapType,
     CanSILFunctionType targetType, AutoDiffDerivativeFunctionKind kind,
-    SILAutoDiffIndices desiredIndices, SILAutoDiffIndices actualIndices) {
+    const AutoDiffConfig &desiredConfig, const AutoDiffConfig &actualConfig,
+    ADContext &adContext) {
   LLVM_DEBUG(getADDebugStream()
              << "Getting a subset parameters thunk for " << linearMapType
-             << " from " << actualIndices << " to " << desiredIndices << '\n');
+             << " from " << actualConfig << " to " << desiredConfig << '\n');
 
   assert(!linearMapType->getCombinedSubstitutions());
   assert(!targetType->getCombinedSubstitutions());
@@ -572,26 +575,14 @@ getOrCreateSubsetParametersThunkForLinearMap(
                                   /*withoutActuallyEscaping*/ true,
                                   DifferentiationThunkKind::Reabstraction);
 
-  // TODO(TF-685): Use more principled mangling for thunks.
-  std::string thunkName;
-  switch (kind) {
-  case AutoDiffDerivativeFunctionKind::JVP:
-    thunkName = "differential";
-    break;
-  case AutoDiffDerivativeFunctionKind::VJP:
-    thunkName = "pullback";
-  }
-  Mangle::ASTMangler mangler;
+  Mangle::DifferentiationMangler mangler;
   auto fromInterfaceType =
       linearMapType->mapTypeOutOfContext()->getCanonicalType();
-  auto toInterfaceType = targetType->mapTypeOutOfContext()->getCanonicalType();
-  CanType dynamicSelfType;
-  thunkName = "AD__" +
-              mangler.mangleReabstractionThunkHelper(
-                  thunkType, fromInterfaceType, toInterfaceType,
-                  dynamicSelfType, parentThunk->getModule().getSwiftModule()) +
-              "_" + desiredIndices.mangle() + "_" + thunkName;
-  thunkName += "_index_subset_thunk";
+
+  auto thunkName = mangler.mangleLinearMapSubsetParametersThunk(
+      fromInterfaceType, kind.getLinearMapKind(),
+      actualConfig.parameterIndices, actualConfig.resultIndices,
+      desiredConfig.parameterIndices);
 
   auto loc = parentThunk->getLocation();
   auto *thunk = fb.getOrCreateSharedFunction(
@@ -601,19 +592,26 @@ getOrCreateSubsetParametersThunkForLinearMap(
   if (!thunk->empty())
     return {thunk, interfaceSubs};
 
-  // TODO(TF-1206): Enable ownership in all differentiation thunks.
-  thunk->setOwnershipEliminated();
   thunk->setGenericEnvironment(genericEnv);
   auto *entry = thunk->createBasicBlock();
-  SILBuilder builder(entry);
+  TangentBuilder builder(entry, adContext);
   createEntryArguments(thunk);
 
   // Get arguments.
   SmallVector<SILValue, 4> arguments;
   SmallVector<AllocStackInst *, 4> localAllocations;
+  SmallVector<SILValue, 4> valuesToCleanup;
+  auto cleanupValues = [&]() {
+    for (auto value : llvm::reverse(valuesToCleanup))
+      builder.emitDestroyOperation(loc, value);
+
+    for (auto *alloc : llvm::reverse(localAllocations))
+      builder.createDeallocStack(loc, alloc);
+  };
 
   // Build a `.zero` argument for the given `Differentiable`-conforming type.
-  auto buildZeroArgument = [&](SILType zeroSILType) {
+  auto buildZeroArgument = [&](SILParameterInfo zeroSILParameter) {
+    auto zeroSILType = zeroSILParameter.getSILStorageInterfaceType();
     auto zeroSILObjType = zeroSILType.getObjectType();
     auto zeroType = zeroSILType.getASTType();
     auto *swiftMod = parentThunk->getModule().getSwiftModule();
@@ -624,13 +622,19 @@ getOrCreateSubsetParametersThunkForLinearMap(
     case TangentSpace::Kind::TangentVector: {
       auto *buf = builder.createAllocStack(loc, zeroSILObjType);
       localAllocations.push_back(buf);
-      emitZeroIntoBuffer(builder, zeroType, buf, loc);
+      builder.emitZeroIntoBuffer(loc, buf, IsInitialization);
       if (zeroSILType.isAddress()) {
         arguments.push_back(buf);
+        if (zeroSILParameter.isGuaranteed()) {
+          valuesToCleanup.push_back(buf);
+        }
       } else {
         auto arg = builder.emitLoadValueOperation(loc, buf,
                                                   LoadOwnershipQualifier::Take);
         arguments.push_back(arg);
+        if (zeroSILParameter.isGuaranteed()) {
+          valuesToCleanup.push_back(arg);
+        }
       }
       break;
     }
@@ -640,10 +644,11 @@ getOrCreateSubsetParametersThunkForLinearMap(
     }
   };
 
-  // `actualIndices` and `desiredIndices` are with respect to the original
-  // function. However, the differential parameters and pullback results may
-  // already be w.r.t. a subset. We create a map between the original function's
-  // actual parameter indices and the linear map's actual indices.
+  // The indices in `actualConfig` and `desiredConfig` are with respect to the
+  // original function. However, the differential parameters and pullback
+  // results may already be w.r.t. a subset. We create a map between the
+  // original function's actual parameter indices and the linear map's actual
+  // indices.
   // Example:
   //   Original: (T0, T1, T2) -> R
   //   Actual indices: 0, 2
@@ -652,17 +657,17 @@ getOrCreateSubsetParametersThunkForLinearMap(
   //   Desired indices w.r.t. original: 2
   //   Desired indices w.r.t. linear map: 1
   SmallVector<unsigned, 4> actualParamIndicesMap(
-      actualIndices.parameters->getCapacity(), UINT_MAX);
+      actualConfig.parameterIndices->getCapacity(), UINT_MAX);
   {
     unsigned indexInBitVec = 0;
-    for (auto index : actualIndices.parameters->getIndices()) {
+    for (auto index : actualConfig.parameterIndices->getIndices()) {
       actualParamIndicesMap[index] = indexInBitVec;
       ++indexInBitVec;
     }
   }
   auto mapOriginalParameterIndex = [&](unsigned index) -> unsigned {
     auto mappedIndex = actualParamIndicesMap[index];
-    assert(mappedIndex < actualIndices.parameters->getCapacity());
+    assert(mappedIndex < actualConfig.parameterIndices->getCapacity());
     return mappedIndex;
   };
 
@@ -680,17 +685,16 @@ getOrCreateSubsetParametersThunkForLinearMap(
     auto toArgIter = thunk->getArgumentsWithoutIndirectResults().begin();
     auto useNextArgument = [&]() { arguments.push_back(*toArgIter++); };
     // Iterate over actual indices.
-    for (unsigned i : actualIndices.parameters->getIndices()) {
+    for (unsigned i : actualConfig.parameterIndices->getIndices()) {
       // If index is desired, use next argument.
-      if (desiredIndices.isWrtParameter(i)) {
+      if (desiredConfig.isWrtParameter(i)) {
         useNextArgument();
       }
       // Otherwise, construct and use a zero argument.
       else {
-        auto zeroSILType =
-            linearMapType->getParameters()[mapOriginalParameterIndex(i)]
-                .getSILStorageInterfaceType();
-        buildZeroArgument(zeroSILType);
+        auto zeroSILParameter =
+            linearMapType->getParameters()[mapOriginalParameterIndex(i)];
+        buildZeroArgument(zeroSILParameter);
       }
     }
     break;
@@ -708,7 +712,7 @@ getOrCreateSubsetParametersThunkForLinearMap(
     };
     // Collect pullback arguments.
     unsigned pullbackResultIndex = 0;
-    for (unsigned i : actualIndices.parameters->getIndices()) {
+    for (unsigned i : actualConfig.parameterIndices->getIndices()) {
       auto origParamInfo = origFnType->getParameters()[i];
       // Skip original `inout` parameters. All non-indirect-result pullback
       // arguments (including `inout` arguments) are appended to `arguments`
@@ -723,7 +727,7 @@ getOrCreateSubsetParametersThunkForLinearMap(
       if (resultInfo.isFormalDirect())
         continue;
       // If index is desired, use next pullback indirect result.
-      if (desiredIndices.isWrtParameter(i)) {
+      if (desiredConfig.isWrtParameter(i)) {
         useNextIndirectResult();
         continue;
       }
@@ -742,14 +746,12 @@ getOrCreateSubsetParametersThunkForLinearMap(
 
   // Get the linear map thunk argument and apply it.
   auto *linearMap = thunk->getArguments().back();
-  auto *ai = builder.createApply(loc, linearMap, SubstitutionMap(), arguments,
-                                 /*isNonThrowing*/ false);
+  auto *ai = builder.createApply(loc, linearMap, SubstitutionMap(), arguments);
 
   // If differential thunk, deallocate local allocations and directly return
   // `apply` result.
   if (kind == AutoDiffDerivativeFunctionKind::JVP) {
-    for (auto *alloc : llvm::reverse(localAllocations))
-      builder.createDeallocStack(loc, alloc);
+    cleanupValues();
     builder.createReturn(loc, ai);
     return {thunk, interfaceSubs};
   }
@@ -763,7 +765,7 @@ getOrCreateSubsetParametersThunkForLinearMap(
   // Collect pullback `inout` arguments in type order.
   unsigned inoutArgIdx = 0;
   SILFunctionConventions origConv(origFnType, thunk->getModule());
-  for (auto paramIdx : actualIndices.parameters->getIndices()) {
+  for (auto paramIdx : actualConfig.parameterIndices->getIndices()) {
     auto paramInfo = origConv.getParameters()[paramIdx];
     if (!paramInfo.isIndirectMutating())
       continue;
@@ -771,19 +773,19 @@ getOrCreateSubsetParametersThunkForLinearMap(
     unsigned mappedParamIdx = mapOriginalParameterIndex(paramIdx);
     allResults.insert(allResults.begin() + mappedParamIdx, inoutArg);
   }
-  assert(allResults.size() == actualIndices.parameters->getNumIndices() &&
+  assert(allResults.size() == actualConfig.parameterIndices->getNumIndices() &&
          "Number of pullback results should match number of differentiability "
          "parameters");
 
   SmallVector<SILValue, 8> results;
-  for (unsigned i : actualIndices.parameters->getIndices()) {
+  for (unsigned i : actualConfig.parameterIndices->getIndices()) {
     unsigned mappedIndex = mapOriginalParameterIndex(i);
     // If result is desired:
     // - Do nothing if result is indirect.
     //   (It was already forwarded to the `apply` instruction).
     // - Push it to `results` if result is direct.
     auto result = allResults[mappedIndex];
-    if (desiredIndices.isWrtParameter(i)) {
+    if (desiredConfig.isWrtParameter(i)) {
       if (result->getType().isObject())
         results.push_back(result);
     }
@@ -796,8 +798,7 @@ getOrCreateSubsetParametersThunkForLinearMap(
     }
   }
   // Deallocate local allocations and return final direct result.
-  for (auto *alloc : llvm::reverse(localAllocations))
-    builder.createDeallocStack(loc, alloc);
+  cleanupValues();
   auto result = joinElements(results, builder, loc);
   builder.createReturn(loc, result);
 
@@ -807,12 +808,12 @@ getOrCreateSubsetParametersThunkForLinearMap(
 std::pair<SILFunction *, SubstitutionMap>
 getOrCreateSubsetParametersThunkForDerivativeFunction(
     SILOptFunctionBuilder &fb, SILValue origFnOperand, SILValue derivativeFn,
-    AutoDiffDerivativeFunctionKind kind, SILAutoDiffIndices desiredIndices,
-    SILAutoDiffIndices actualIndices) {
+    AutoDiffDerivativeFunctionKind kind, const AutoDiffConfig &desiredConfig,
+    const AutoDiffConfig &actualConfig, ADContext &adContext) {
   LLVM_DEBUG(getADDebugStream()
              << "Getting a subset parameters thunk for derivative function "
              << derivativeFn << " of the original function " << origFnOperand
-             << " from " << actualIndices << " to " << desiredIndices << '\n');
+             << " from " << actualConfig << " to " << desiredConfig << '\n');
 
   auto origFnType = origFnOperand->getType().castTo<SILFunctionType>();
   auto &module = fb.getModule();
@@ -821,8 +822,8 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
   // Compute target type for thunking.
   auto derivativeFnType = derivativeFn->getType().castTo<SILFunctionType>();
   auto targetType = origFnType->getAutoDiffDerivativeFunctionType(
-      desiredIndices.parameters, desiredIndices.results, kind, module.Types,
-      lookupConformance);
+      desiredConfig.parameterIndices, desiredConfig.resultIndices, kind,
+      module.Types, lookupConformance);
   auto *caller = derivativeFn->getFunction();
   if (targetType->hasArchetype()) {
     auto substTargetType =
@@ -849,7 +850,7 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
   StringRef origName;
   if (auto *origFnRef =
           peerThroughFunctionConversions<FunctionRefInst>(origFnOperand)) {
-    origName = origFnRef->getInitiallyReferencedFunction()->getName();
+    origName = origFnRef->getReferencedFunction()->getName();
   } else if (auto *origMethodInst =
                  peerThroughFunctionConversions<MethodInst>(origFnOperand)) {
     origName = origMethodInst->getMember()
@@ -858,26 +859,11 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
                    ->getNameStr();
   }
   assert(!origName.empty() && "Original function name could not be resolved");
-  // TODO(TF-685): Use more principled mangling for thunks.
-  std::string thunkName;
-  switch (kind) {
-  case AutoDiffDerivativeFunctionKind::JVP:
-    thunkName = "jvp";
-    break;
-  case AutoDiffDerivativeFunctionKind::VJP:
-    thunkName = "vjp";
-  }
-  Mangle::ASTMangler mangler;
-  auto fromInterfaceType =
-      derivativeFnType->mapTypeOutOfContext()->getCanonicalType();
-  auto toInterfaceType = targetType->mapTypeOutOfContext()->getCanonicalType();
-  CanType dynamicSelfType;
-  thunkName = "AD__orig_" + origName.str() + "_" +
-              mangler.mangleReabstractionThunkHelper(
-                  thunkType, fromInterfaceType, toInterfaceType,
-                  dynamicSelfType, module.getSwiftModule()) +
-              "_" + desiredIndices.mangle() + "_" + thunkName;
-  thunkName += "_subset_parameters_thunk";
+  Mangle::DifferentiationMangler mangler;
+  auto thunkName = mangler.mangleDerivativeFunctionSubsetParametersThunk(
+      origName, targetType->mapTypeOutOfContext()->getCanonicalType(),
+      kind, actualConfig.parameterIndices, actualConfig.resultIndices,
+      desiredConfig.parameterIndices);
 
   auto loc = origFnOperand.getLoc();
   auto *thunk = fb.getOrCreateSharedFunction(
@@ -902,7 +888,7 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
   SILValue assocRef;
   if (auto *derivativeFnRef =
           peerThroughFunctionConversions<FunctionRefInst>(derivativeFn)) {
-    auto *assoc = derivativeFnRef->getReferencedFunctionOrNull();
+    auto *assoc = derivativeFnRef->getReferencedFunction();
     assocRef = builder.createFunctionRef(loc, assoc);
   } else if (auto *assocMethodInst =
                  peerThroughFunctionConversions<WitnessMethodInst>(
@@ -937,8 +923,7 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
   assert(arguments.size() ==
          derivativeFnType->getNumParameters() +
              derivativeFnType->getNumIndirectFormalResults());
-  auto *apply = builder.createApply(loc, assocRef, assocSubstMap, arguments,
-                                    /*isNonThrowing*/ false);
+  auto *apply = builder.createApply(loc, assocRef, assocSubstMap, arguments);
 
   // Extract all direct results.
   SmallVector<SILValue, 8> directResults;
@@ -962,7 +947,8 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
   std::tie(linearMapThunk, linearMapSubs) =
       getOrCreateSubsetParametersThunkForLinearMap(
           fb, thunk, origFnType, unsubstLinearMapType,
-          unsubstLinearMapTargetType, kind, desiredIndices, actualIndices);
+          unsubstLinearMapTargetType, kind, desiredConfig, actualConfig,
+          adContext);
 
   auto *linearMapThunkFRI = builder.createFunctionRef(loc, linearMapThunk);
   SILValue thunkedLinearMap = linearMap;

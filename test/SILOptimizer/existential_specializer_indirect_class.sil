@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -O -wmo -enable-sil-verify-all -sil-disable-pass=DeadFunctionElimination %s | %FileCheck %s
+// RUN: %target-sil-opt -O -wmo -enable-sil-verify-all -sil-disable-pass=DeadFunctionAndGlobalElimination %s | %FileCheck %s
 
 sil_stage canonical
 
@@ -25,8 +25,8 @@ bb0(%0 : $*ClassProtocol):
 // CHECK-NEXT: //
 // CHECK-NEXT: bb0(%0 : $*τ_0_0):
   // CHECK-NEXT: [[INPUT:%1]] = load %0
-  // CHECK-NEXT: [[METHOD:%.*]] = witness_method $C, #ClassProtocol.method
   // CHECK-NEXT: [[ARG:%.*]] = unchecked_ref_cast [[INPUT]]
+  // CHECK-NEXT: [[METHOD:%.*]] = witness_method $C, #ClassProtocol.method
   // CHECK-NEXT: apply [[METHOD]]<C>([[ARG]])
   // CHECK-NEXT: return undef
   

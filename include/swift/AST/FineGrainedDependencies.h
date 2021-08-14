@@ -13,7 +13,9 @@
 #ifndef SWIFT_AST_FINE_GRAINED_DEPENDENCIES_H
 #define SWIFT_AST_FINE_GRAINED_DEPENDENCIES_H
 
+#include "swift/AST/EvaluatorDependencies.h"
 #include "swift/Basic/Debug.h"
+#include "swift/Basic/Fingerprint.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/NullablePtr.h"
 #include "swift/Basic/Range.h"
@@ -56,11 +58,14 @@
 //==============================================================================
 
 namespace swift {
+class Decl;
 class DependencyTracker;
 class DiagnosticEngine;
 class FrontendOptions;
 class ModuleDecl;
 class SourceFile;
+class NominalTypeDecl;
+class ValueDecl;
 
 /// Use a new namespace to help keep the experimental code from clashing.
 namespace fine_grained_dependencies {
@@ -351,7 +356,7 @@ private:
 ///
 /// \Note The returned graph should not be escaped from the callback.
 bool withReferenceDependencies(
-    llvm::PointerUnion<ModuleDecl *, SourceFile *> MSF,
+    llvm::PointerUnion<const ModuleDecl *, const SourceFile *> MSF,
     const DependencyTracker &depTracker, StringRef outputPath,
     bool alsoEmitDotFile, llvm::function_ref<bool(SourceFileDepGraph &&)>);
 
@@ -416,6 +421,57 @@ class DependencyKey {
   // For import/export
   friend ::llvm::yaml::MappingTraits<DependencyKey>;
 
+public:
+  class Builder {
+  private:
+    const NodeKind kind;
+    const DeclAspect aspect;
+    const DeclContext *context;
+    StringRef name;
+
+  private:
+    // A private copy constructor so our clients are forced to use the
+    // move-only builder interface.
+    explicit Builder(NodeKind kind, DeclAspect aspect,
+                     const DeclContext *context, StringRef name)
+        : kind(kind), aspect(aspect), context(context), name(name) {}
+
+  public:
+    /// Creates a DependencyKey::Builder from the given \p kind and \p aspect
+    /// with a \c null context and empty name.
+    explicit Builder(NodeKind kind, DeclAspect aspect)
+        : kind(kind), aspect(aspect), context(nullptr), name("") {}
+
+  public:
+    /// Consumes this builder and returns a dependency key created from its
+    /// data.
+    DependencyKey build() &&;
+
+  public:
+    /// Extracts the data from the given \p ref into a this builder.
+    Builder fromReference(const evaluator::DependencyCollector::Reference &ref);
+
+  public:
+    /// Extracts the context data from the given declaration, if any.
+    Builder withContext(const Decl *D) &&;
+    /// Extracts the context data from the given decl-member pair, if any.
+    Builder withContext(std::pair<const NominalTypeDecl *, const ValueDecl *>
+                            holderAndMember) &&;
+
+  public:
+    /// Copies the name data for the given swiftdeps file into this builder.
+    Builder withName(StringRef swiftDeps) &&;
+    /// Copies the name of the given declaration into this builder, if any.
+    Builder withName(const Decl *decl) &&;
+    /// Extracts the name from the given decl-member pair, if any.
+    Builder withName(std::pair<const NominalTypeDecl *, const ValueDecl *>
+                         holderAndMember) &&;
+
+  private:
+    static StringRef getTopLevelName(const Decl *decl);
+  };
+
+private:
   NodeKind kind;
   DeclAspect aspect;
   /// The mangled context type name of the holder for \ref potentialMember, \ref
@@ -479,15 +535,6 @@ public:
   }
   bool isInterface() const { return getAspect() == DeclAspect::interface; }
 
-  /// Create just the interface half of the keys for a provided Decl or Decl
-  /// pair
-  template <NodeKind kind, typename Entity>
-  static DependencyKey createForProvidedEntityInterface(Entity);
-
-  /// Given some type of provided entity compute the context field of the key.
-  template <NodeKind kind, typename Entity>
-  static std::string computeContextForProvidedEntity(Entity);
-
   DependencyKey correspondingImplementation() const {
     return withAspect(DeclAspect::implementation);
   }
@@ -495,10 +542,6 @@ public:
   DependencyKey withAspect(DeclAspect aspect) const {
     return DependencyKey(kind, aspect, context, name);
   }
-
-  /// Given some type of provided entity compute the name field of the key.
-  template <NodeKind kind, typename Entity>
-  static std::string computeNameForProvidedEntity(Entity);
 
   static DependencyKey createKeyForWholeSourceFile(DeclAspect,
                                                    StringRef swiftDeps);
@@ -599,7 +642,7 @@ class DepGraphNode {
   /// frontend creates an interface node,
   //  it adds a dependency to it from the implementation source file node (which
   //  has the intefaceHash as its fingerprint).
-  Optional<std::string> fingerprint;
+  Optional<Fingerprint> fingerprint;
 
   friend ::llvm::yaml::MappingTraits<DepGraphNode>;
 
@@ -607,14 +650,7 @@ public:
   /// See \ref SourceFileDepGraphNode::SourceFileDepGraphNode().
   DepGraphNode() : key(), fingerprint() {}
 
-  /// See SourceFileDepGraphNode::SourceFileDepGraphNode(...) and
-  /// ModuleDepGraphNode::ModuleDepGraphNode(...) Don't set swiftDeps on
-  /// creation because this field can change if a node is moved.
-  DepGraphNode(DependencyKey key, Optional<StringRef> fingerprint)
-      : DepGraphNode(key, fingerprint ? fingerprint->str()
-                                      : Optional<std::string>()) {}
-
-  DepGraphNode(DependencyKey key, Optional<std::string> fingerprint)
+  DepGraphNode(DependencyKey key, Optional<Fingerprint> fingerprint)
       : key(key), fingerprint(fingerprint) {}
   DepGraphNode(const DepGraphNode &other) = default;
 
@@ -630,12 +666,7 @@ public:
     this->key = key;
   }
 
-  const Optional<StringRef> getFingerprint() const {
-    if (fingerprint) {
-      return StringRef(fingerprint.getValue());
-    }
-    return None;
-  }
+  const Optional<Fingerprint> getFingerprint() const { return fingerprint; }
   /// When driver reads a SourceFileDepGraphNode, it may be a node that was
   /// created to represent a name-lookup (a.k.a a "depend") in the frontend. In
   /// that case, the node represents an entity that resides in some other file
@@ -644,9 +675,7 @@ public:
   /// (someday) have a fingerprint. In order to preserve the
   /// ModuleDepGraphNode's identity but bring its fingerprint up to date, it
   /// needs to set the fingerprint *after* the node has been created.
-  void setFingerprint(Optional<StringRef> fp) {
-    fingerprint = fp ? fp->str() : Optional<std::string>();
-  }
+  void setFingerprint(Optional<Fingerprint> fp) { fingerprint = fp; }
 
   SWIFT_DEBUG_DUMP;
   void dump(llvm::raw_ostream &os) const;
@@ -693,7 +722,7 @@ public:
   SourceFileDepGraphNode() : DepGraphNode() {}
 
   /// Used by the frontend to build nodes.
-  SourceFileDepGraphNode(DependencyKey key, Optional<StringRef> fingerprint,
+  SourceFileDepGraphNode(DependencyKey key, Optional<Fingerprint> fingerprint,
                          bool isProvides)
       : DepGraphNode(key, fingerprint), isProvides(isProvides) {
     assert(key.verify());
@@ -827,14 +856,14 @@ public:
   /// file itself.
   InterfaceAndImplementationPair<SourceFileDepGraphNode>
   findExistingNodePairOrCreateAndAddIfNew(const DependencyKey &interfaceKey,
-                                          Optional<StringRef> fingerprint);
+                                          Optional<Fingerprint> fingerprint);
 
   NullablePtr<SourceFileDepGraphNode>
   findExistingNode(const DependencyKey &key);
 
   SourceFileDepGraphNode *
   findExistingNodeOrCreateIfNew(const DependencyKey &key,
-                                const Optional<StringRef> fingerprint,
+                                const Optional<Fingerprint> fingerprint,
                                 bool isProvides);
 
   /// \p Use is the Node that must be rebuilt when \p def changes.
@@ -845,8 +874,10 @@ public:
   }
 
   /// Read a swiftdeps file at \p path and return a SourceFileDepGraph if
-  /// successful.
-  Optional<SourceFileDepGraph> static loadFromPath(StringRef);
+  /// successful. If \p allowSwiftModule is true, try to load the information
+  /// from a swiftmodule file if appropriate.
+  Optional<SourceFileDepGraph> static loadFromPath(
+      StringRef, bool allowSwiftModule = false);
 
   /// Read a swiftdeps file from \p buffer and return a SourceFileDepGraph if
   /// successful.

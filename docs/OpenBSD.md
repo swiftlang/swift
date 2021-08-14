@@ -1,6 +1,6 @@
 # Getting started with Swift on OpenBSD
 
-Swift builds and runs on OpenBSD (tested on 6.8-beta), with some special considerations.
+Swift builds and runs on OpenBSD (tested on 6.8), with some special considerations.
 
 ## Preparing
 
@@ -39,19 +39,19 @@ Download the sources with the [Getting Started](/docs/HowToGuides/GettingStarted
 {
   "ssh-clone-pattern": "git@github.com:%s.git",
   "https-clone-pattern": "https://github.com/%s.git",
-  "default-branch-scheme": "master",
+  "default-branch-scheme": "main",
   "repos": {
     "cmark": { "remote": { "id": "apple/swift-cmark" } },
     "llvm-project": { "remote": { "id": "apple/llvm-project" } },
     "swift": { "remote": { "id": "apple/swift" } }
   },
   "branch-schemes": {
-    "master": {
-      "aliases": [ "master", "swift/master" ],
+    "main": {
+      "aliases": [ "main", "swift/main" ],
       "repos": {
-        "cmark": "master",
-        "llvm-project": "swift/master",
-        "swift": "master"
+        "cmark": "main",
+        "llvm-project": "swift/main",
+        "swift": "main"
       }
     }
   }
@@ -66,7 +66,7 @@ These options are:
 * `--skip-build-clang-tools-extra` and `--skip-build-compiler-rt`: to ensure LLVM builds cleanly,
 * `--extra-cmake-options=`
   * `-DCMAKE_DISABLE_FIND_PACKAGE_Backtrace=TRUE,-DCMAKE_DISABLE_FIND_PACKAGE_LibXml2=TRUE,-DLLVM_VERSION_SUFFIX=''`: to ensure LLVM builds cleanly,
-  * `-DSWIFT_BUILD_SOURCEKIT=OFF,-DSWIFT_BUILD_SYNTAXPARSERLIB=OFF`: to ensure Swift does not attempt to build libdispatch, which is not yet supported on OpenBSD,
+  * `-DSWIFT_BUILD_SOURCEKIT=OFF,-DSWIFT_BUILD_SYNTAXPARSERLIB=OFF,-DSWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY=OFF`: to ensure Swift does not attempt to build libdispatch, which is not yet supported on OpenBSD,
   * `-DSWIFT_USE_LINKER=lld`: to specify that `lld` should be used over `gold`,
   * `-DCMAKE_INSTALL_DIR=/usr/local"`: to set the correct platform install directory.
 
@@ -81,8 +81,12 @@ $ ./utils/build-script \
         -DLLVM_VERSION_SUFFIX='',\
         -DSWIFT_BUILD_SOURCEKIT=OFF,\
         -DSWIFT_BUILD_SYNTAXPARSERLIB=OFF,\
+        -DSWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY=OFF,\
+        -DSWIFT_IMPLICIT_CONCURRENCY_IMPORT=OFF,\
         -DSWIFT_USE_LINKER=lld,\
         -DCMAKE_INSTALL_DIR=/usr/local"
 ```
 
 You may wish to also supply the flag `--llvm-targets-to-build=host`, to speed up the LLVM build slightly.
+
+For debug builds especially, consider also installing the `llvm` package and setting `-DCMAKE_AR=/usr/local/bin/llvm-ar` and `-DCMAKE_RANLIB=/usr/local/bin/llvm-ranlib` with the `extra-cmake-options` flag, to work around problems creating indexes to archives containing object files with large numbers of section headers.

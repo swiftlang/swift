@@ -26,6 +26,7 @@
 
 SEMANTICS_ATTR(STRING_EQUALS, "string.equals")
 SEMANTICS_ATTR(STRING_MAKE_UTF8, "string.makeUTF8")
+SEMANTICS_ATTR(STRING_GET_UTF8_CSTRING, "string.getUTF8CString")
 SEMANTICS_ATTR(STRING_ESCAPE_PERCENT_GET, "string.escapePercent.get")
 SEMANTICS_ATTR(STRING_CONCAT, "string.concat")
 SEMANTICS_ATTR(STRING_APPEND, "string.append")
@@ -105,6 +106,11 @@ SEMANTICS_ATTR(KEYPATH_KVC_KEY_PATH_STRING, "keypath.kvcKeyPathString")
 /// mind that if the function itself is inlined, one will lose the optremark so
 /// consider inlining where to put these.
 SEMANTICS_ATTR(FORCE_EMIT_OPT_REMARK_PREFIX, "optremark")
+
+/// An attribute that when attached to a class causes instances of the class to
+/// be forbidden from having associated objects set upon them. This is only used
+/// for testing purposes.
+SEMANTICS_ATTR(OBJC_FORBID_ASSOCIATED_OBJECTS, "objc.forbidAssociatedObjects")
 
 #undef SEMANTICS_ATTR
 

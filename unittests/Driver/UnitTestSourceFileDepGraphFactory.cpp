@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "UnitTestSourceFileDepGraphFactory.h"
+#include "MockingFineGrainedDependencyGraphs.h"
 
 using namespace swift;
 using namespace swift::fine_grained_dependencies;
@@ -53,10 +54,9 @@ void UnitTestSourceFileDepGraphFactory::addADefinedDecl(StringRef s,
       parseADefinedDecl(s, kind, DeclAspect::interface);
   if (!key)
     return;
-  StringRef fingerprintString = s.split(fingerprintSeparator).second;
-  const Optional<StringRef> fingerprint = fingerprintString.empty()
-                                              ? Optional<StringRef>()
-                                              : StringRef(fingerprintString);
+  auto fingerprintString = s.split(fingerprintSeparator).second.str();
+  const Optional<Fingerprint> fingerprint =
+    swift::mockFingerprintFromString(fingerprintString);
 
   AbstractSourceFileDepGraphFactory::addADefinedDecl(key.getValue(),
                                                      fingerprint);
@@ -82,12 +82,9 @@ UnitTestSourceFileDepGraphFactory::computeUseKey(StringRef s,
   if (!s.empty())
     return parseADefinedDecl(s, kindOfUse, aspectOfUse).getValue();
   StringRef swiftDepsRef(swiftDeps);
-  return DependencyKey(
-      NodeKind::sourceFileProvide, aspectOfUse,
-      DependencyKey::computeContextForProvidedEntity<
-          NodeKind::sourceFileProvide>(swiftDepsRef),
-      DependencyKey::computeNameForProvidedEntity<NodeKind::sourceFileProvide>(
-          swiftDepsRef));
+  return DependencyKey::Builder(NodeKind::sourceFileProvide, aspectOfUse)
+          .withName(swiftDepsRef)
+          .build();
 }
 
 //==============================================================================
@@ -143,7 +140,6 @@ UnitTestSourceFileDepGraphFactory::singleNameIsContext(const NodeKind kind) {
     return true;
   case NodeKind::topLevel:
   case NodeKind::dynamicLookup:
-  case NodeKind::incrementalExternalDepend:
   case NodeKind::externalDepend:
   case NodeKind::sourceFileProvide:
     return false;

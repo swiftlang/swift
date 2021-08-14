@@ -33,17 +33,6 @@ __all__ = [
 ]
 
 
-_SDK_TARGETS = {
-    'OSX': StdlibDeploymentTarget.OSX.targets,
-    'IOS': StdlibDeploymentTarget.iOS.targets,
-    'IOS_SIMULATOR': StdlibDeploymentTarget.iOSSimulator.targets,
-    'TVOS': StdlibDeploymentTarget.AppleTV.targets,
-    'TVOS_SIMULATOR': StdlibDeploymentTarget.AppleTVSimulator.targets,
-    'WATCHOS': StdlibDeploymentTarget.AppleWatch.targets,
-    'WATCHOS_SIMULATOR': StdlibDeploymentTarget.AppleWatchSimulator.targets,
-}
-
-
 # -----------------------------------------------------------------------------
 
 class UnknownSDKError(Exception):
@@ -70,7 +59,7 @@ def migrate_swift_sdks(args):
         return itertools.chain.from_iterable(iterable)
 
     def _swift_sdk_to_stdlib_targets(sdk):
-        targets = _SDK_TARGETS.get(sdk, None)
+        targets = StdlibDeploymentTarget.get_migrated_targets_for_sdk(sdk)
         if targets is None:
             raise UnknownSDKError(sdk)
 

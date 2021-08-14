@@ -447,7 +447,7 @@ bool SILPerformanceInliner::isProfitableToInline(
           // The access is dynamic and has no nested conflict
           // See if the storage location is considered by
           // access enforcement optimizations
-          AccessedStorage storage = findAccessedStorage(BAI->getSource());
+          auto storage = AccessedStorage::compute(BAI->getSource());
           if (BAI->hasNoNestedConflict() && (storage.isFormalAccessBase())) {
             BlockW.updateBenefit(ExclusivityBenefitWeight,
                                  ExclusivityBenefitBase);
@@ -743,7 +743,7 @@ calculateBBWeights(SILFunction *Caller, DominanceInfo *DT,
     return;
   }
   // Add all blocks to BBToWeightMap without count 0
-  for (auto &block : Caller->getBlocks()) {
+  for (auto &block : *Caller) {
     BBToWeightMap[&block] = 0;
   }
   BBToWeightMap[Caller->getEntryBlock()] = entryCount.getValue();
@@ -987,7 +987,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
   mergeBasicBlocks(Caller);
 
   if (invalidatedStackNesting) {
-    StackNesting().correctStackNesting(Caller);
+    StackNesting::fixNesting(Caller);
   }
 
   // If we were asked to verify our caller after inlining all callees we could

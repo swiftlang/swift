@@ -1,3 +1,6 @@
+# Timing out in CI
+REQUIRES: rdar78483379
+
 RUN: env SWIFT_EXEC=%swiftc_driver_plain not %{python} %utils/swift_build_sdk_interfaces.py %mcp_opt -sdk %S/Inputs/xfails-sdk/ -v -o %t/output | %FileCheck %s
 
 CHECK-DAG: # (FAIL) {{.+}}{{\\|/}}Bad.swiftinterface

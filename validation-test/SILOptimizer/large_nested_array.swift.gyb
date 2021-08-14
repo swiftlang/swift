@@ -1,0 +1,27 @@
+// RUN: %empty-directory(%t)
+// RUN: %gyb %s > %t/main.swift
+
+// The compiler should finish in less than 2 minautes. To give some slack,
+// specify a timeout of 4 minutes.
+// If the compiler needs more than 5 minutes, there is probably a real problem.
+// So please don't just increase the timeout in case this fails.
+
+// RUN: %{python} %S/../../test/Inputs/timeout.py 240 %target-swift-frontend -O -parse-as-library -sil-verify-none -c %t/main.swift -o %t/main.o
+
+// REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
+// REQUIRES: long_test
+// REQUIRES: CPU=arm64 || CPU=x86_64
+
+public struct TestStruct {
+  public static var a: [[Int]] {
+    var a: [[Int]] = Array(repeating: Array(repeating: 0, count: 4), count: 2000)
+
+% for i in range(2000):
+    a[${i}] = [${i * 4}, ${i * 4 + 1}, ${i * 4 + 2}, ${i * 4 + 3}]
+% end
+
+    return a
+  }
+}
+
+

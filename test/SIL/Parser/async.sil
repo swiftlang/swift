@@ -37,15 +37,15 @@ bb0(%fn : $@async () -> ()):
 sil @async_continuation : $@async () -> () {
 // CHECK-NEXT: bb
 entry:
-  // CHECK-NEXT: [[CONT:%.*]] = get_async_continuation $Builtin.Int32
-  %c = get_async_continuation $Builtin.Int32
+  // CHECK-NEXT: [[CONT:%.*]] = get_async_continuation Builtin.Int32
+  %c = get_async_continuation Builtin.Int32
   // CHECK-NEXT: // function_ref
   // CHECK-NEXT: function_ref
   %f = function_ref @not_async_test : $@convention(thin) () -> ()
   // CHECK-NEXT: apply
   apply %f() : $@convention(thin) () -> ()
-  // CHECK-NEXT: await_async_continuation [[CONT]] : $UnsafeContinuation<Builtin.Int32>, resume [[RESUME:bb[0-9]+]]
-  await_async_continuation %c : $UnsafeContinuation<Builtin.Int32>, resume bb1
+  // CHECK-NEXT: await_async_continuation [[CONT]] : $Builtin.RawUnsafeContinuation, resume [[RESUME:bb[0-9]+]]
+  await_async_continuation %c : $Builtin.RawUnsafeContinuation, resume bb1
   // CHECK-NEXT: {{^ *$}}
   // CHECK-NEXT: [[RESUME]]([[RVALUE:%.*]] : $Builtin.Int32):
 bb1(%r : $Builtin.Int32):
@@ -56,15 +56,15 @@ bb1(%r : $Builtin.Int32):
 sil @async_continuation_throws : $@async () -> () {
 // CHECK-NEXT: bb
 entry:
-  // CHECK-NEXT: [[CONT:%.*]] = get_async_continuation [throws] $Builtin.Int32
-  %c = get_async_continuation [throws] $Builtin.Int32
+  // CHECK-NEXT: [[CONT:%.*]] = get_async_continuation [throws] Builtin.Int32
+  %c = get_async_continuation [throws] Builtin.Int32
   // CHECK-NEXT: // function_ref
   // CHECK-NEXT: function_ref
   %f = function_ref @not_async_test : $@convention(thin) () -> ()
   // CHECK-NEXT: apply
   apply %f() : $@convention(thin) () -> ()
-  // CHECK-NEXT: await_async_continuation [[CONT]] : $UnsafeThrowingContinuation<Builtin.Int32>, resume [[RESUME:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
-  await_async_continuation %c : $UnsafeThrowingContinuation<Builtin.Int32>, resume bb1, error bb2
+  // CHECK-NEXT: await_async_continuation [[CONT]] : $Builtin.RawUnsafeContinuation, resume [[RESUME:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
+  await_async_continuation %c : $Builtin.RawUnsafeContinuation, resume bb1, error bb2
   // CHECK-NEXT: {{^ *$}}
   // CHECK-NEXT: [[RESUME]]([[RVALUE:%.*]] : $Builtin.Int32):
 bb1(%r : $Builtin.Int32):
@@ -86,15 +86,15 @@ sil @async_continuation_addr : $@async () -> () {
 entry:
   // CHECK: [[SLOT:%.*]] = alloc_stack
   %a = alloc_stack $Builtin.Int32
-  // CHECK-NEXT: [[CONT:%.*]] = get_async_continuation_addr $Builtin.Int32, [[SLOT]] : $*Builtin.Int32
-  %c = get_async_continuation_addr $Builtin.Int32, %a : $*Builtin.Int32
+  // CHECK-NEXT: [[CONT:%.*]] = get_async_continuation_addr Builtin.Int32, [[SLOT]] : $*Builtin.Int32
+  %c = get_async_continuation_addr Builtin.Int32, %a : $*Builtin.Int32
   // CHECK-NEXT: // function_ref
   // CHECK-NEXT: function_ref
   %f = function_ref @not_async_test : $@convention(thin) () -> ()
   // CHECK-NEXT: apply
   apply %f() : $@convention(thin) () -> ()
-  // CHECK-NEXT: await_async_continuation [[CONT]] : $UnsafeContinuation<Builtin.Int32>, resume [[RESUME:bb[0-9]+]]
-  await_async_continuation %c : $UnsafeContinuation<Builtin.Int32>, resume bb1
+  // CHECK-NEXT: await_async_continuation [[CONT]] : $Builtin.RawUnsafeContinuation, resume [[RESUME:bb[0-9]+]]
+  await_async_continuation %c : $Builtin.RawUnsafeContinuation, resume bb1
   // CHECK-NEXT: {{^ *$}}
   // CHECK-NEXT: [[RESUME]]:
 bb1:
@@ -108,15 +108,15 @@ sil @async_continuation_throws_addr : $@async () -> () {
 entry:
   // CHECK: [[SLOT:%.*]] = alloc_stack
   %a = alloc_stack $Builtin.Int32
-  // CHECK-NEXT: [[CONT:%.*]] = get_async_continuation_addr [throws] $Builtin.Int32, [[SLOT]] : $*Builtin.Int32
-  %c = get_async_continuation_addr [throws] $Builtin.Int32, %a : $*Builtin.Int32
+  // CHECK-NEXT: [[CONT:%.*]] = get_async_continuation_addr [throws] Builtin.Int32, [[SLOT]] : $*Builtin.Int32
+  %c = get_async_continuation_addr [throws] Builtin.Int32, %a : $*Builtin.Int32
   // CHECK-NEXT: // function_ref
   // CHECK-NEXT: function_ref
   %f = function_ref @not_async_test : $@convention(thin) () -> ()
   // CHECK-NEXT: apply
   apply %f() : $@convention(thin) () -> ()
-  // CHECK-NEXT: await_async_continuation [[CONT]] : $UnsafeThrowingContinuation<Builtin.Int32>, resume [[RESUME:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
-  await_async_continuation %c : $UnsafeThrowingContinuation<Builtin.Int32>, resume bb1, error bb2
+  // CHECK-NEXT: await_async_continuation [[CONT]] : $Builtin.RawUnsafeContinuation, resume [[RESUME:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
+  await_async_continuation %c : $Builtin.RawUnsafeContinuation, resume bb1, error bb2
   // CHECK-NEXT: {{^ *$}}
   // CHECK-NEXT: [[RESUME]]:
 bb1:

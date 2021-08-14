@@ -1,4 +1,3 @@
-import OverlaidClangFramework
 import SwiftOnoneSupport
 
 public func fromOverlaidClangFramework()
@@ -21,76 +20,66 @@ public func fromOverlaidClangFrameworkCrossImport()
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 7,
-    key.length: 22
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 30,
-    key.length: 6
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 37,
     key.length: 17
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 56,
+    key.offset: 26,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 63,
+    key.offset: 33,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 68,
+    key.offset: 38,
     key.length: 26
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 97,
+    key.offset: 67,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 104,
+    key.offset: 74,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 109,
+    key.offset: 79,
     key.length: 33
   },
   {
     key.kind: source.lang.swift.syntaxtype.comment,
-    key.offset: 147,
+    key.offset: 117,
     key.length: 39
   },
   {
     key.kind: source.lang.swift.syntaxtype.comment.mark,
-    key.offset: 150,
+    key.offset: 120,
     key.length: 35
   },
   {
     key.kind: source.lang.swift.syntaxtype.comment,
-    key.offset: 188,
+    key.offset: 158,
     key.length: 76
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 264,
+    key.offset: 234,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 271,
+    key.offset: 241,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 276,
+    key.offset: 246,
     key.length: 37
   }
 ]
@@ -98,11 +87,6 @@ public func fromOverlaidClangFrameworkCrossImport()
   {
     key.kind: source.lang.swift.ref.module,
     key.offset: 7,
-    key.length: 22
-  },
-  {
-    key.kind: source.lang.swift.ref.module,
-    key.offset: 37,
     key.length: 17,
     key.is_system: 1
   }
@@ -112,13 +96,13 @@ public func fromOverlaidClangFrameworkCrossImport()
     key.kind: source.lang.swift.decl.function.free,
     key.accessibility: source.lang.swift.accessibility.public,
     key.name: "fromOverlaidClangFramework()",
-    key.offset: 63,
+    key.offset: 33,
     key.length: 33,
-    key.nameoffset: 68,
+    key.nameoffset: 38,
     key.namelength: 28,
     key.attributes: [
       {
-        key.offset: 56,
+        key.offset: 26,
         key.length: 6,
         key.attribute: source.decl.attribute.public
       }
@@ -128,13 +112,13 @@ public func fromOverlaidClangFrameworkCrossImport()
     key.kind: source.lang.swift.decl.function.free,
     key.accessibility: source.lang.swift.accessibility.public,
     key.name: "fromOverlaidClangFrameworkOverlay()",
-    key.offset: 104,
+    key.offset: 74,
     key.length: 40,
-    key.nameoffset: 109,
+    key.nameoffset: 79,
     key.namelength: 35,
     key.attributes: [
       {
-        key.offset: 97,
+        key.offset: 67,
         key.length: 6,
         key.attribute: source.decl.attribute.public
       }
@@ -144,13 +128,13 @@ public func fromOverlaidClangFrameworkCrossImport()
     key.kind: source.lang.swift.decl.function.free,
     key.accessibility: source.lang.swift.accessibility.public,
     key.name: "fromOverlaidClangFrameworkCrossImport()",
-    key.offset: 271,
+    key.offset: 241,
     key.length: 44,
-    key.nameoffset: 276,
+    key.nameoffset: 246,
     key.namelength: 39,
     key.attributes: [
       {
-        key.offset: 264,
+        key.offset: 234,
         key.length: 6,
         key.attribute: source.decl.attribute.public
       }

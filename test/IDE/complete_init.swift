@@ -144,5 +144,5 @@ typealias CAlias = C
 
 var CAliasInstance = CAlias(#^ALIAS_CONSTRUCTOR_0^#
 // rdar://18586415
-// ALIAS_CONSTRUCTOR_0: Decl[Constructor]/CurrNominal:      ['(']{#x: A#}[')'][#CAlias#];
-// ALIAS_CONSTRUCTOR_0: Decl[Constructor]/CurrNominal:      ['(']{#y: A#}[')'][#CAlias#];
+// ALIAS_CONSTRUCTOR_0: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#x: A#}[')'][#CAlias#];
+// ALIAS_CONSTRUCTOR_0: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#y: A#}[')'][#CAlias#];

@@ -123,7 +123,7 @@ bool ArrayAllocation::recursivelyCollectUses(ValueBase *Def) {
   for (auto *Opd : Def->getUses()) {
     auto *User = Opd->getUser();
     // Ignore reference counting and debug instructions.
-    if (isa<RefCountingInst>(User) ||
+    if (isa<RefCountingInst>(User) || isa<DestroyValueInst>(User) ||
         isa<DebugValueInst>(User))
       continue;
 
@@ -195,11 +195,6 @@ public:
 
   void run() override {
     auto &Fn = *getFunction();
-
-    // FIXME: Add ownership support.
-    if (Fn.hasOwnership())
-      return;
-
     bool Changed = false;
     SmallVector<ApplyInst *, 16> DeadArrayCountCalls;
     // Propagate the count of array allocations to array.count users.

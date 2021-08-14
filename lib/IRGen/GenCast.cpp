@@ -478,13 +478,8 @@ llvm::Value *irgen::emitMetatypeToAnyObjectDowncast(IRGenFunction &IGF,
                                                     CheckedCastMode mode) {
   // If ObjC interop is enabled, casting a metatype to AnyObject succeeds
   // if the metatype is for a class.
-
-  auto triviallyFail = [&]() -> llvm::Value* {
-    return llvm::ConstantPointerNull::get(IGF.IGM.ObjCPtrTy);
-  };
-  
   if (!IGF.IGM.ObjCInterop)
-    return triviallyFail();
+    return nullptr;
   
   switch (type->getRepresentation()) {
   case MetatypeRepresentation::ObjC:
@@ -496,7 +491,7 @@ llvm::Value *irgen::emitMetatypeToAnyObjectDowncast(IRGenFunction &IGF,
     // TODO: Final class metatypes could in principle be thin.
     assert(!type.getInstanceType()->mayHaveSuperclass()
            && "classes should not have thin metatypes (yet)");
-    return triviallyFail();
+    return nullptr;
     
   case MetatypeRepresentation::Thick: {
     auto instanceTy = type.getInstanceType();
@@ -508,10 +503,10 @@ llvm::Value *irgen::emitMetatypeToAnyObjectDowncast(IRGenFunction &IGF,
       return IGF.Builder.CreateBitCast(heapMetadata, IGF.IGM.ObjCPtrTy);
     }
     
-    // Is the type obviously not a class?
-    if (!isa<ArchetypeType>(instanceTy)
-        && !isa<ExistentialMetatypeType>(type))
-      return triviallyFail();
+    // If it's not a class, we can't handle it here
+    if (!isa<ArchetypeType>(instanceTy) && !isa<ExistentialMetatypeType>(type)) {
+      return nullptr;
+    }
 
     // Ask the runtime whether this is class metadata.
     llvm::Constant *castFn;
@@ -966,9 +961,42 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
     // Otherwise, this is a metatype-to-object cast.
     assert(targetLoweredType.isAnyClassReferenceType());
 
-    // Convert the metatype value to AnyObject.
+    // Can we convert the metatype value to AnyObject using Obj-C machinery?
     llvm::Value *object =
       emitMetatypeToAnyObjectDowncast(IGF, metatypeVal, sourceMetatype, mode);
+
+    if (object == nullptr) {
+      // Obj-C cast routine failed, use swift_dynamicCast instead
+
+      if (sourceMetatype->getRepresentation() == MetatypeRepresentation::Thin
+          || metatypeVal == nullptr) {
+        // Earlier stages *should* never generate a checked cast with a thin metatype argument.
+        // TODO: Move this assertion up to apply to all checked cast operations.
+        // In assert builds, enforce this by failing here:
+        assert(false && "Invalid SIL: General checked_cast_br cannot have thin argument");
+        // In non-assert builds, stay compatible with previous behavior by emitting a null load.
+        object = llvm::ConstantPointerNull::get(IGF.IGM.ObjCPtrTy);
+      } else {
+        Address src = IGF.createAlloca(metatypeVal->getType(),
+                                       IGF.IGM.getPointerAlignment(),
+                                       "castSrc");
+        IGF.Builder.CreateStore(metatypeVal, src);
+        llvm::PointerType *destPtrType = IGF.IGM.getStoragePointerType(targetLoweredType);
+        Address dest = IGF.createAlloca(destPtrType,
+                                        IGF.IGM.getPointerAlignment(),
+                                        "castDest");
+        IGF.Builder.CreateStore(llvm::ConstantPointerNull::get(destPtrType), dest);
+        llvm::Value *success = emitCheckedCast(IGF,
+                                               src, sourceFormalType,
+                                               dest, targetFormalType,
+                                               CastConsumptionKind::TakeAlways,
+                                               mode);
+        llvm::Value *successResult = IGF.Builder.CreateLoad(dest);
+        llvm::Value *failureResult = llvm::ConstantPointerNull::get(destPtrType);
+        llvm::Value *result = IGF.Builder.CreateSelect(success, successResult, failureResult);
+        object = std::move(result);
+      }
+    }
 
     sourceFormalType = IGF.IGM.Context.getAnyObjectType();
     sourceLoweredType = SILType::getPrimitiveObjectType(sourceFormalType);

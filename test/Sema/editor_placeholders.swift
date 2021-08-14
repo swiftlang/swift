@@ -1,8 +1,8 @@
 // RUN: %target-typecheck-verify-swift
 
-func foo(_ x: Int) -> Int {}
-func foo(_ x: Float) -> Float {}
-func foo<T>(_ t: T) -> T {}
+func foo(_ x: Int) -> Int {} // expected-note {{found this candidate}}
+func foo(_ x: Float) -> Float {} // expected-note {{found this candidate}}
+func foo<T>(_ t: T) -> T {} // expected-note {{found this candidate}}
 
 var v = foo(<#T##x: Float##Float#>) // expected-error {{editor placeholder}}
 v = "" // expected-error {{cannot assign value of type 'String' to type 'Float'}}
@@ -11,7 +11,7 @@ if (true) {
   <#code#> // expected-error {{editor placeholder}}
 }
 
-foo(<#T##x: Undeclared##Undeclared#>) // expected-error {{editor placeholder}} expected-error {{cannot find type 'Undeclared' in scope}}
+foo(<#T##x: Undeclared##Undeclared#>) // expected-error {{editor placeholder}} expected-error {{cannot find type 'Undeclared' in scope}} expected-error {{ambiguous use of 'foo'}}
 
 func f(_ n: Int) {}
 let a1 = <#T#> // expected-error{{editor placeholder in source file}}

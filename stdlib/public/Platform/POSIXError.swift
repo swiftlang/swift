@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+#if (os(macOS) || os(iOS) || os(tvOS) || os(watchOS)) && _runtime(_ObjC)
 
 /// Enumeration describing POSIX error codes.
 @objc

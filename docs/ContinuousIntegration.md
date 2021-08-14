@@ -11,9 +11,12 @@
     - [Linting](#linting)
     - [Source Compatibility Testing](#source-compatibility-testing)
     - [Sourcekit Stress Testing](#sourcekit-stress-testing)
-    - [Specific Preset Testing](#specific-preset-testing)
-    - [Running Non-Executable Device Tests](#running-non-executable-device-tests)
     - [Build Swift Toolchain](#build-swift-toolchain)
+    - [Build and Test Stdlib against Snapshot Toolchain](#build-and-test-stdlib-against-snapshot-toolchain)
+    - [Specific Preset Testing](#specific-preset-testing)
+    - [Specific Preset Testing against a Snapshot Toolchain](#specific-preset-testing-against-a-snapshot-toolchain)
+    - [Running Non-Executable Device Tests using Specific Preset Testing](#running-non-executable-device-tests-using-specific-preset-testing)
+    - [Build and Test the Minimal Freestanding Stdlib using Toolchain Specific Preset Testing](#build-and-test-the-minimal-freestanding-stdlib-using-toolchain-specific-preset-testing)
     - [Testing Compiler Performance](#testing-compiler-performance)
     - [Swift Community Hosted CI Pull Request Testing](#swift-community-hosted-ci-pull-request-testing)
 - [Cross Repository Testing](#cross-repository-testing)
@@ -46,12 +49,12 @@ We describe each in detail below:
 
 Platform     | Comment | Check Status
 ------------ | ------- | ------------
-All supported platforms     | @swift-ci Please smoke test                      | Swift Test Linux Platform (smoke test)<br>Swift Test OS X Platform (smoke test)
-All supported platforms     | @swift-ci Please clean smoke test                | Swift Test Linux Platform (smoke test)<br>Swift Test OS X Platform (smoke test)
-All supported platforms     | @swift-ci Please smoke test and merge            | Swift Test Linux Platform (smoke test)<br>Swift Test OS X Platform (smoke test)
-All supported platforms     | @swift-ci Please clean smoke test and merge      | Swift Test Linux Platform (smoke test)<br>Swift Test OS X Platform (smoke test)
-macOS platform              | @swift-ci Please smoke test OS X platform        | Swift Test OS X Platform (smoke test)
-macOS platform              | @swift-ci Please clean smoke test OS X platform  | Swift Test OS X Platform (smoke test)
+All supported platforms     | @swift-ci Please smoke test                      | Swift Test Linux Platform (smoke test)<br>Swift Test macOS Platform (smoke test)
+All supported platforms     | @swift-ci Please clean smoke test                | Swift Test Linux Platform (smoke test)<br>Swift Test macOS Platform (smoke test)
+All supported platforms     | @swift-ci Please smoke test and merge            | Swift Test Linux Platform (smoke test)<br>Swift Test macOS Platform (smoke test)
+All supported platforms     | @swift-ci Please clean smoke test and merge      | Swift Test Linux Platform (smoke test)<br>Swift Test macOS Platform (smoke test)
+macOS platform              | @swift-ci Please smoke test macOS platform        | Swift Test macOS Platform (smoke test)
+macOS platform              | @swift-ci Please clean smoke test macOS platform  | Swift Test macOS Platform (smoke test)
 Linux platform              | @swift-ci Please smoke test Linux platform       | Swift Test Linux Platform (smoke test)
 Linux platform              | @swift-ci Please clean smoke test Linux platform | Swift Test Linux Platform (smoke test)
 
@@ -81,17 +84,17 @@ A smoke test on Linux does the following:
 
 Platform     | Comment | Check Status
 ------------ | ------- | ------------
-All supported platforms     | @swift-ci Please test                         | Swift Test Linux Platform (smoke test)<br>Swift Test OS X Platform (smoke test)<br>Swift Test Linux Platform<br>Swift Test OS X Platform<br>
-All supported platforms     | @swift-ci Please clean test                   | Swift Test Linux Platform (smoke test)<br>Swift Test OS X Platform (smoke test)<br>Swift Test Linux Platform<br>Swift Test OS X Platform<br>
-All supported platforms     | @swift-ci Please test and merge               | Swift Test Linux Platform (smoke test)<br>Swift Test OS X Platform (smoke test)<br> Swift Test Linux Platform <br>Swift Test OS X Platform
-All supported platforms     | @swift-ci Please clean test and merge               | Swift Test Linux Platform (smoke test)<br>Swift Test OS X Platform (smoke test)<br> Swift Test Linux Platform <br>Swift Test OS X Platform
-macOS platform               | @swift-ci Please test OS X platform           | Swift Test OS X Platform (smoke test)<br>Swift Test OS X Platform
-macOS platform               | @swift-ci Please clean test OS X platform     | Swift Test OS X Platform (smoke test)<br>Swift Test OS X Platform
-macOS platform               | @swift-ci Please benchmark                    | Swift Benchmark on OS X Platform (many runs - rigorous)
-macOS platform               | @swift-ci Please smoke benchmark              | Swift Benchmark on OS X Platform (few runs - sanity)
+All supported platforms     | @swift-ci Please test                         | Swift Test Linux Platform (smoke test)<br>Swift Test macOS Platform (smoke test)<br>Swift Test Linux Platform<br>Swift Test macOS Platform<br>
+All supported platforms     | @swift-ci Please clean test                   | Swift Test Linux Platform (smoke test)<br>Swift Test macOS Platform (smoke test)<br>Swift Test Linux Platform<br>Swift Test macOS Platform<br>
+All supported platforms     | @swift-ci Please test and merge               | Swift Test Linux Platform (smoke test)<br>Swift Test macOS Platform (smoke test)<br> Swift Test Linux Platform <br>Swift Test macOS Platform
+All supported platforms     | @swift-ci Please clean test and merge               | Swift Test Linux Platform (smoke test)<br>Swift Test macOS Platform (smoke test)<br> Swift Test Linux Platform <br>Swift Test macOS Platform
+macOS platform               | @swift-ci Please test macOS platform           | Swift Test macOS Platform (smoke test)<br>Swift Test macOS Platform
+macOS platform               | @swift-ci Please clean test macOS platform     | Swift Test macOS Platform (smoke test)<br>Swift Test macOS Platform
+macOS platform               | @swift-ci Please benchmark                    | Swift Benchmark on macOS Platform (many runs - rigorous)
+macOS platform               | @swift-ci Please smoke benchmark              | Swift Benchmark macOS Platform (few runs - sanity)
 Linux platform               | @swift-ci Please test Linux platform          | Swift Test Linux Platform (smoke test)<br>Swift Test Linux Platform
 Linux platform               | @swift-ci Please clean test Linux platform    | Swift Test Linux Platform (smoke test)<br>Swift Test Linux Platform
-macOS platform               | @swift-ci Please ASAN test                    | Swift ASAN Test OS X Platform
+macOS platform               | @swift-ci Please ASAN test                    | Swift ASAN Test macOS Platform
 Ubuntu 18.04                 | @swift-ci Please test Ubuntu 18.04 platform   | Swift Test Ubuntu 18.04 Platform
 Ubuntu 20.04                 | @swift-ci Please test Ubuntu 20.04 platform   | Swift Test Ubuntu 20.04 Platform
 CentOS 7                     | @swift-ci Please test CentOS 7 platform       | Swift Test CentOS 7 Platform
@@ -113,7 +116,7 @@ With that being said, a validation test on macOS does the following:
 2. Builds the compiler.
 3. Builds the standard library for macOS and the simulators for all platforms.
 4. lldb is /not/ built/tested [[2]](#footnote-2)
-5. The tests, validation-tests are run for all simulators and macOS both with
+5. The tests, validation-tests are run for iOS simulator, watchOS simulator and macOS both with
    and without optimizations enabled.
 
 A validation test on Linux does the following:
@@ -131,8 +134,8 @@ A validation test on Linux does the following:
 
 Platform        | Comment | Check Status
 ------------    | ------- | ------------
-macOS platform  | @swift-ci Please benchmark       | Swift Benchmark on OS X Platform (many runs - rigorous)
-macOS platform  | @swift-ci Please smoke benchmark | Swift Benchmark on OS X Platform (few runs - sanity)
+macOS platform  | @swift-ci Please benchmark       | Swift Benchmark on macOS Platform (many runs - rigorous)
+macOS platform  | @swift-ci Please smoke benchmark | Swift Benchmark on macOS Platform (few runs - sanity)
 
 ### Linting
 
@@ -154,6 +157,21 @@ Platform       | Comment | Check Status
 ------------   | ------- | ------------
 macOS platform | @swift-ci Please Sourcekit Stress test | Swift Sourcekit Stress Tester on macOS Platform
 
+### Build Swift Toolchain
+
+Platform       | Comment | Check Status
+------------   | ------- | ------------
+macOS platform | @swift-ci Please Build Toolchain macOS Platform| Swift Build Toolchain macOS Platform
+Linux platform | @swift-ci Please Build Toolchain Linux Platform| Swift Build Toolchain Linux Platform
+
+### Build and Test Stdlib against Snapshot Toolchain
+
+To test/build the stdlib for a branch that changes only the stdlib using a last known good snapshot toolchain:
+
+Platform       | Comment | Check Status
+------------   | ------- | ------------
+macOS platform | @swift-ci Please test stdlib with toolchain| Swift Test stdlib with toolchain macOS Platform
+
 ### Specific Preset Testing
 
 Platform       | Comment | Check Status
@@ -169,7 +187,23 @@ preset=buildbot_incremental,tools=RA,stdlib=RD,smoketest=macosx,single-thread
 @swift-ci Please test with preset macOS
 ```
 
-### Running Non-Executable Device Tests
+
+### Specific Preset Testing against a Snapshot Toolchain
+
+One can also run an arbitrary preset against a snapshot toolchain 
+
+Platform       | Comment | Check Status
+------------   | ------- | ------------
+macOS platform | preset=<preset> <br> @swift-ci Please test with toolchain and preset| Swift Test stdlib with toolchain macOS Platform (Preset)
+
+For example:
+
+```
+preset=$PRESET_NAME
+@swift-ci Please test with toolchain and preset
+```
+
+### Running Non-Executable Device Tests using Specific Preset Testing
 
 Using the specific preset testing, one can run non-executable device tests by
 telling swift-ci:
@@ -179,12 +213,14 @@ preset=buildbot,tools=RA,stdlib=RD,test=non_executable
 @swift-ci Please test with preset macOS
 ```
 
-### Build Swift Toolchain
+### Build and Test the Minimal Freestanding Stdlib using Toolchain Specific Preset Testing
 
-Platform       | Comment | Check Status
-------------   | ------- | ------------
-macOS platform | @swift-ci Please Build Toolchain macOS Platform| Swift Build Toolchain macOS Platform
-Linux platform | @swift-ci Please Build Toolchain Linux Platform| Swift Build Toolchain Linux Platform
+To test the minimal freestanding stdlib on macho, you can use the support for running a miscellaneous preset against a snapshot toolchain.
+
+```
+preset=stdlib_S_standalone_minimal_macho_x86_64,build,test
+@swift-ci please test with toolchain and preset
+```
 
 ### Testing Compiler Performance
 

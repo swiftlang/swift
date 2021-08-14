@@ -17,6 +17,7 @@
 #ifndef SWIFT_PATTERN_H
 #define SWIFT_PATTERN_H
 
+#include "swift/Basic/AnyValue.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/type_traits.h"
 #include "swift/AST/Decl.h"
@@ -200,6 +201,9 @@ public:
 
   /// Does this binding declare something that requires storage?
   bool hasStorage() const;
+
+  /// Does this pattern have any mutable 'var' bindings?
+  bool hasAnyMutableBindings() const;
 
   static bool classof(const Pattern *P) { return true; }
 

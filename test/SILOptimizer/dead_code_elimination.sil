@@ -32,14 +32,12 @@ bb0:
 
 // CHECK: bb1
 bb1(%3 : $Builtin.Int32, %4 : $Builtin.Int32):
-// CHECK-NEXT: br bb3
+// CHECK-NEXT: br bb2
   %5 = integer_literal $Builtin.Int32, 100
   %7 = builtin "cmp_slt_Int32"(%4 : $Builtin.Int32, %5 : $Builtin.Int32) : $Builtin.Int1
   cond_br %7, bb2, bb3
 
-// CHECK: bb2
 bb2:
-// CHECK-NEXT: br bb1
   %9 = integer_literal $Builtin.Int32, 3
   %11 = integer_literal $Builtin.Int1, -1
   %12 = builtin "sadd_with_overflow_Int32"(%3 : $Builtin.Int32, %9 : $Builtin.Int32, %11 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
@@ -49,7 +47,7 @@ bb2:
   %16 = tuple_extract %15 : $(Builtin.Int32, Builtin.Int1), 0
   br bb1(%13 : $Builtin.Int32, %16 : $Builtin.Int32)
 
-// CHECK: bb3
+// CHECK: bb2
 bb3:
 // CHECK-NEXT: [[RESULT:%[a-zA-Z0-9]+]] = tuple ()
   %18 = tuple ()
@@ -118,7 +116,7 @@ bb4:
   %43 = struct $Bool (%42 : $Builtin.Int1)
   %44 = struct_extract %43 : $Bool, #Bool._value
 // CHECK-NOT: cond_br
-// CHECK: br bb8
+// CHECK: br bb5
   cond_br %44, bb5, bb6(%28 : $Int32)
 
 bb5:
@@ -126,25 +124,20 @@ bb5:
   %47 = struct $Int32 (%46 : $Builtin.Int32)
   br bb6(%47 : $Int32)
 
-// CHECK: bb6{{.*}}):
 bb6(%49 : $Int32):
   %50 = integer_literal $Builtin.Int32, 10
   %52 = struct_extract %29 : $Int32, #Int32._value
   %53 = builtin "cmp_eq_Int32"(%50 : $Builtin.Int32, %52 : $Builtin.Int32) : $Builtin.Int1
   %54 = struct $Bool (%53 : $Builtin.Int1)
   %55 = struct_extract %54 : $Bool, #Bool._value
-// CHECK-NOT: cond_br
-// CHECK: br bb8
   cond_br %55, bb7, bb8(%29 : $Int32)
 
-// CHECK: bb7:
 bb7:
   %57 = integer_literal $Builtin.Int32, 0
   %58 = struct $Int32 (%57 : $Builtin.Int32)
-// CHECK: br bb8
   br bb8(%58 : $Int32)
 
-// CHECK: bb8(%{{[0-9]+}} : $Int32):
+// CHECK: bb5(%{{[0-9]+}} : $Int32):
 bb8(%60 : $Int32):
   %61 = struct_extract %31 : $Int32, #Int32._value
   %62 = integer_literal $Builtin.Int32, 1
@@ -171,7 +164,7 @@ bb8(%60 : $Int32):
 // CHECK: br bb3(undef : $Int32, undef : $Int32,
   br bb3(%49 : $Int32, %60 : $Int32, %78 : $Int32, %69 : $Int32)
 
-// CHECK: bb9:
+// CHECK: bb6:
 bb9:
   %80 = struct_extract %15 : $Int32, #Int32._value
   %81 = integer_literal $Builtin.Int32, 1
@@ -184,7 +177,7 @@ bb9:
 // CHECK: br bb1(undef : $Int32, undef : $Int32,
   br bb1(%28 : $Int32, %29 : $Int32, %88 : $Int32, %30 : $Int32, %31 : $Int32)
 
-// CHECK: bb10:
+// CHECK: bb7:
 bb10:
   %90 = tuple ()
 // CHECK: return

@@ -1,5 +1,4 @@
 target_sources(swiftSILOptimizer PRIVATE
-  CapturePromotion.cpp
   CapturePropagation.cpp
   ClosureSpecializer.cpp
   CrossModuleSerializationSetup.cpp

@@ -38,7 +38,7 @@ void performSyntacticExprDiagnostics(const Expr *E, const DeclContext *DC,
                                      bool isExprStmt);
 
 /// Emit diagnostics for a given statement.
-void performStmtDiagnostics(ASTContext &ctx, const Stmt *S);
+void performStmtDiagnostics(const Stmt *S, DeclContext *DC);
 
 void performAbstractFuncDeclDiagnostics(AbstractFunctionDecl *AFD);
 
@@ -108,6 +108,13 @@ void fixItEncloseTrailingClosure(ASTContext &ctx,
                                  const CallExpr *call,
                                  Identifier closureLabel);
 
+/// Check that we use the async version of a function where available
+///
+/// If a completion-handler function is called from an async context and it has
+/// a '@available' attribute with renamed field pointing to an async function,
+/// we emit a diagnostic suggesting the async call.
+void checkFunctionAsyncUsage(AbstractFunctionDecl *decl);
+void checkPatternBindingDeclAsyncUsage(PatternBindingDecl *decl);
 } // namespace swift
 
 #endif // SWIFT_SEMA_MISC_DIAGNOSTICS_H

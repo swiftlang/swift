@@ -53,8 +53,10 @@ public:
           Impl.SwiftContext.getSwiftDeclForExportedClangDecl(decl))
       return swiftDecl;
 
-    // Otherwise we have no way to find it.
-    return StableSerializationPath();
+    // Allow serialization for non-modular headers as well, with the hope that
+    // we find the same header when doing unqualified lookup during
+    // deserialization.
+    return findImportedPath(named);
   }
 
 private:
@@ -289,7 +291,9 @@ namespace {
     bool IsSerializable = true;
 
     ClangTypeSerializationChecker(ClangImporter::Implementation &impl)
-      : Impl(impl) {}
+      : DataStreamBasicWriter<ClangTypeSerializationChecker>(
+          impl.getClangASTContext()),
+        Impl(impl) {}
 
     void writeUInt64(uint64_t value) {}
     void writeIdentifier(const clang::IdentifierInfo *ident) {}

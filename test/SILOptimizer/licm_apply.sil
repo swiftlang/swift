@@ -47,9 +47,12 @@ bb1:
 
   // This store does _not_ alias with the read in @read_from_param
   store %28 to %1 : $*Int64
-  cond_br undef, bb1, bb2
+  cond_br undef, bb2, bb3
 
 bb2:
+  br bb1
+  
+bb3:
   %15 = tuple ()
   dealloc_stack %2 : $*Int64
   return %15 : $()
@@ -80,9 +83,12 @@ bb1:
 
   // This store does alias with the read in @read_from_param
   store %28 to %2 : $*Int64
-  cond_br undef, bb1, bb2
+  cond_br undef, bb2, bb3
 
 bb2:
+  br bb1
+
+bb3:
   %15 = tuple ()
   dealloc_stack %2 : $*Int64
   return %15 : $()
@@ -114,9 +120,12 @@ bb0(%0 : $Int64, %1 : $*Int64):
 bb1:
   %21 = apply %9() : $@convention(thin) () -> @owned X
   strong_release %21 : $X
-  cond_br undef, bb1, bb2
+  cond_br undef, bb2, bb3
 
 bb2:
+  br bb1
+
+bb3:
   %15 = tuple ()
   return %15 : $()
 }

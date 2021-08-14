@@ -3,14 +3,22 @@
 
 import Swift
 
-#if _runtime(_ObjC)
+#if canImport(Darwin)
   import Darwin
-  import CoreGraphics
+  #if _runtime(_ObjC)
+    import CoreGraphics
+  #else
+    #if arch(x86_64) || arch(arm64)
+      typealias CGFloat = Double
+    #else
+      typealias CGFloat = Float
+    #endif
+  #endif
 #elseif canImport(Glibc)
   import Glibc
   typealias CGFloat = Double
 #elseif os(Windows)
-  import MSVCRT
+  import CRT
   #if arch(x86_64) || arch(arm64)
     typealias CGFloat = Double
   #else

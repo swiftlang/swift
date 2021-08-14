@@ -22,6 +22,7 @@
 #define SWIFT_SIL_PATTERNMATCH_H
 
 #include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILUndef.h"
 namespace swift {
 
@@ -410,9 +411,11 @@ template <typename LTy> struct tupleextractoperation_ty {
              L.match((ValueBase *)TEI->getOperand());
     }
 
-    if (auto *DTR = dyn_cast<DestructureTupleResult>(V)) {
-      return DTR->getIndex() == index &&
-             L.match((ValueBase *)DTR->getParent()->getOperand());
+    if (auto *DTR = dyn_cast<MultipleValueInstructionResult>(V)) {
+      if (auto *DT = dyn_cast<DestructureTupleInst>(DTR->getParent())) {
+        return DTR->getIndex() == index &&
+          L.match((ValueBase *)DT->getOperand());
+      }
     }
 
     return false;
@@ -667,6 +670,16 @@ using BuiltinApplyTy = typename Apply_match<BuiltinValueKind, Tys...>::Ty;
 
 // Define matchers for most of builtin instructions.
 #include "swift/AST/Builtins.def"
+
+#undef BUILTIN_UNARY_OP_MATCH_WITH_ARG_MATCHER
+#undef BUILTIN_BINARY_OP_MATCH_WITH_ARG_MATCHER
+#undef BUILTIN_VARARGS_OP_MATCH_WITH_ARG_MATCHER
+#undef BUILTIN_CAST_OPERATION
+#undef BUILTIN_CAST_OR_BITCAST_OPERATION
+#undef BUILTIN_BINARY_OPERATION_ALL
+#undef BUILTIN_BINARY_PREDICATE
+#undef BUILTIN_MISC_OPERATION
+#undef BUILTIN
 
 //===
 // Convenience compound builtin instructions matchers that succeed

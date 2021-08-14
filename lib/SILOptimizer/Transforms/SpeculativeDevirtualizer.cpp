@@ -85,7 +85,6 @@ static FullApplySite CloneApply(FullApplySite AI, SILValue SelfArg,
                                 SILBuilder &Builder) {
   // Clone the Apply.
   Builder.setCurrentDebugScope(AI.getDebugScope());
-  Builder.addOpenedArchetypeOperands(AI.getInstruction());
   auto Args = AI.getArguments();
   SmallVector<SILValue, 8> Ret(Args.size());
   for (unsigned i = 0, e = Args.size(); i != e; ++i) {
@@ -102,8 +101,7 @@ static FullApplySite CloneApply(FullApplySite AI, SILValue SelfArg,
   case SILInstructionKind::ApplyInst:
     NAI = Builder.createApply(AI.getLoc(), AI.getCallee(),
                               AI.getSubstitutionMap(),
-                              Ret,
-                              cast<ApplyInst>(AI)->isNonThrowing());
+                              Ret, AI.getApplyOptions());
     break;
   case SILInstructionKind::TryApplyInst: {
     auto *TryApplyI = cast<TryApplyInst>(AI.getInstruction());
@@ -111,7 +109,8 @@ static FullApplySite CloneApply(FullApplySite AI, SILValue SelfArg,
     auto ErrorBB = cloneEdge(TryApplyI, TryApplyInst::ErrorIdx);
     NAI = Builder.createTryApply(AI.getLoc(), AI.getCallee(),
                                  AI.getSubstitutionMap(),
-                                 Ret, NormalBB, ErrorBB);
+                                 Ret, NormalBB, ErrorBB,
+                                 AI.getApplyOptions());
     break;
   }
   default:
@@ -151,9 +150,8 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
   SILBasicBlock *Iden = F->createBasicBlock();
   // Virt is the block containing the slow virtual call.
   SILBasicBlock *Virt = F->createBasicBlock();
-  Iden->createPhiArgument(
-      SILType::getPrimitiveObjectType(SubType),
-      ValueOwnershipKind::Owned);
+  Iden->createPhiArgument(SILType::getPrimitiveObjectType(SubType),
+                          OwnershipKind::Owned);
 
   SILBasicBlock *Continue = Entry->split(It);
 
@@ -195,7 +193,7 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
   // Create a PHInode for returning the return value from both apply
   // instructions.
   SILArgument *Arg =
-      Continue->createPhiArgument(AI.getType(), ValueOwnershipKind::Owned);
+      Continue->createPhiArgument(AI.getType(), OwnershipKind::Owned);
   if (!isa<TryApplyInst>(AI)) {
     if (AI.getSubstCalleeType()->isNoReturnFunction(
             F->getModule(), AI.getFunction()->getTypeExpansionContext())) {
@@ -241,14 +239,14 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
   if (auto *TAI = dyn_cast<TryApplyInst>(VirtAI)) {
     auto *ErrorBB = TAI->getFunction()->createBasicBlock();
     ErrorBB->createPhiArgument(TAI->getErrorBB()->getArgument(0)->getType(),
-                               ValueOwnershipKind::Owned);
+                               OwnershipKind::Owned);
     Builder.setInsertionPoint(ErrorBB);
     Builder.createBranch(TAI->getLoc(), TAI->getErrorBB(),
                          {ErrorBB->getArgument(0)});
 
     auto *NormalBB = TAI->getFunction()->createBasicBlock();
     NormalBB->createPhiArgument(TAI->getNormalBB()->getArgument(0)->getType(),
-                                ValueOwnershipKind::Owned);
+                                OwnershipKind::Owned);
     Builder.setInsertionPoint(NormalBB);
     Builder.createBranch(TAI->getLoc(), TAI->getNormalBB(),
                          {NormalBB->getArgument(0)});
@@ -258,9 +256,11 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
     for (auto Arg : VirtAI.getArguments()) {
       Args.push_back(Arg);
     }
-    FullApplySite NewVirtAI = Builder.createTryApply(VirtAI.getLoc(), VirtAI.getCallee(),
+    FullApplySite NewVirtAI = Builder.createTryApply(
+        VirtAI.getLoc(), VirtAI.getCallee(),
         VirtAI.getSubstitutionMap(),
-        Args, NormalBB, ErrorBB);
+        Args, NormalBB, ErrorBB,
+        VirtAI.getApplyOptions());
     VirtAI.getInstruction()->eraseFromParent();
     VirtAI = NewVirtAI;
   }

@@ -64,7 +64,8 @@ ASTScopeImpl::findInnermostEnclosingScope(SourceLoc loc,
 ASTScopeImpl *ASTScopeImpl::findInnermostEnclosingScopeImpl(
     SourceLoc loc, NullablePtr<raw_ostream> os, SourceManager &sourceMgr,
     ScopeCreator &scopeCreator) {
-  expandAndBeCurrentDetectingRecursion(scopeCreator);
+  if (!getWasExpanded())
+    expandAndBeCurrent(scopeCreator);
   auto child = findChildContaining(loc, sourceMgr);
   if (!child)
     return this;
@@ -407,7 +408,7 @@ bool PatternEntryInitializerScope::lookupLocalsOrMembers(
 
 bool CaptureListScope::lookupLocalsOrMembers(DeclConsumer consumer) const {
   for (auto &e : expr->getCaptureList()) {
-    if (consumer.consume({e.Var}))
+    if (consumer.consume({e.getVar()}))
       return true;
   }
   return false;

@@ -60,6 +60,26 @@ static void configureARM64(IRGenModule &IGM, const llvm::Triple &triple,
   // arm64 tops out at 56 effective bits of address space and reserves the high
   // half for the kernel.
   target.SwiftRetainIgnoresNegativeValues = true;
+
+  target.UsableSwiftAsyncContextAddrIntrinsic = true;
+}
+
+/// Configures target-specific information for arm64_32 platforms.
+static void configureARM64_32(IRGenModule &IGM, const llvm::Triple &triple,
+                              SwiftTargetInfo &target) {
+  setToMask(target.PointerSpareBits, 32,
+            SWIFT_ABI_ARM_SWIFT_SPARE_BITS_MASK);
+
+  // arm64_32 has no special objc_msgSend variants, not even stret.
+  target.ObjCUseStret = false;
+
+  // arm64_32 requires marker assembly for objc_retainAutoreleasedReturnValue.
+  target.ObjCRetainAutoreleasedReturnValueMarker =
+    "mov\tfp, fp\t\t// marker for objc_retainAutoreleaseReturnValue";
+
+  setToMask(target.IsObjCPointerBit, 32, SWIFT_ABI_ARM_IS_OBJC_BIT);
+
+  target.ObjCHasOpaqueISAs = true;
 }
 
 /// Configures target-specific information for x86-64 platforms.
@@ -92,6 +112,8 @@ static void configureX86_64(IRGenModule &IGM, const llvm::Triple &triple,
   // x86-64 only has 48 effective bits of address space and reserves the high
   // half for the kernel.
   target.SwiftRetainIgnoresNegativeValues = true;
+
+  target.UsableSwiftAsyncContextAddrIntrinsic = true;
 }
 
 /// Configures target-specific information for 32-bit x86 platforms.
@@ -154,6 +176,13 @@ SwiftTargetInfo::SwiftTargetInfo(
             SWIFT_ABI_DEFAULT_OBJC_RESERVED_BITS_MASK);
   setToMask(FunctionPointerSpareBits, numPointerBits,
             SWIFT_ABI_DEFAULT_FUNCTION_SPARE_BITS_MASK);
+  if (numPointerBits == 64) {
+    ReferencePoisonDebugValue =
+      SWIFT_ABI_DEFAULT_REFERENCE_POISON_DEBUG_VALUE_64;
+  } else {
+    ReferencePoisonDebugValue =
+      SWIFT_ABI_DEFAULT_REFERENCE_POISON_DEBUG_VALUE_32;
+  }
 }
 
 SwiftTargetInfo SwiftTargetInfo::get(IRGenModule &IGM) {
@@ -185,7 +214,11 @@ SwiftTargetInfo SwiftTargetInfo::get(IRGenModule &IGM) {
     break;
 
   case llvm::Triple::aarch64:
-    configureARM64(IGM, triple, target);
+  case llvm::Triple::aarch64_32:
+    if (triple.getArchName() == "arm64_32")
+      configureARM64_32(IGM, triple, target);
+    else
+      configureARM64(IGM, triple, target);
     break;
 
   case llvm::Triple::ppc64:

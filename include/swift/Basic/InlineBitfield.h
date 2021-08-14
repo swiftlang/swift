@@ -81,6 +81,32 @@ namespace swift {
   LLVM_PACKED_END \
   static_assert(sizeof(T##Bitfield) <= 8, "Bitfield overflow")
 
+/// Define a full bitfield for type 'T' that uses all of the remaining bits in
+/// the inline bitfield. We allow for 'T' to have a single generic parameter.
+///
+/// For optimal code gen, place naturally sized fields at the end, with the
+/// largest naturally sized field at the very end. For example:
+///
+/// SWIFT_INLINE_BITFIELD_FULL(Foo, Bar, 1+8+16,
+///   flag : 1,
+///   : NumPadBits, // pad the center, not the end
+///   x : 8,
+///   y : 16
+/// );
+///
+/// NOTE: All instances of Foo will access via the same bitfield entry even if
+/// they differ in the templated value!
+#define SWIFT_INLINE_BITFIELD_FULL_TEMPLATE(T, U, C, ...)                      \
+  LLVM_PACKED_START                                                            \
+  class T##Bitfield {                                                          \
+    template <typename TTy>                                                    \
+    friend class T;                                                            \
+    enum { NumPadBits = 64 - (Num##U##Bits + (C)) };                           \
+    uint64_t : Num##U##Bits, __VA_ARGS__;                                      \
+  } T;                                                                         \
+  LLVM_PACKED_END                                                              \
+  static_assert(sizeof(T##Bitfield) <= 8, "Bitfield overflow")
+
 /// Define an empty bitfield for type 'T'.
 #define SWIFT_INLINE_BITFIELD_EMPTY(T, U) \
   enum { Num##T##Bits = Num##U##Bits }

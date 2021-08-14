@@ -32,55 +32,15 @@ public protocol Differentiable {
   associatedtype TangentVector: Differentiable & AdditiveArithmetic
     where TangentVector.TangentVector == TangentVector
 
-  /// Moves `self` along the given direction. In Riemannian geometry, this is
+  /// Moves `self` by the given offset. In Riemannian geometry, this is
   /// equivalent to exponential map, which moves `self` on the geodesic surface
-  /// along the given tangent vector.
-  mutating func move(along direction: TangentVector)
-
-  /// A closure that produces a zero tangent vector, capturing minimal
-  /// necessary information from `self`.
-  ///
-  /// `move(along: zeroTangentVectorInitializer())` should not modify
-  /// `self`.
-  ///
-  /// In some cases, the zero tangent vector of `self` is equal to
-  /// `TangentVector.zero`. In other cases, the zero tangent vector depends on
-  /// information in `self`, such as shape for an n-dimensional array type.
-  /// For differentiable programming, it is more memory-efficient to define a
-  /// custom `zeroTangentVectorInitializer` property which returns a closure
-  /// that captures and uses only the necessary information to create a zero
-  /// tangent vector. For example:
-  ///
-  ///     struct Vector {
-  ///         var scalars: [Float]
-  ///         var count: Int { scalars.count }
-  ///         init(scalars: [Float]) { ... }
-  ///         init(repeating repeatedElement: Float, count: Int) { ... }
-  ///     }
-  ///
-  ///     extension Vector: AdditiveArithmetic { ... }
-  ///
-  ///     extension Vector: Differentiable {
-  ///         typealias TangentVector = Vector
-  ///
-  ///         @noDerivative
-  ///         var zeroTangentVectorInitializer: () -> TangentVector {
-  ///             let count = self.count
-  ///             return { TangentVector(repeating: 0, count: count) }
-  ///         }
-  ///     }
-  var zeroTangentVectorInitializer: () -> TangentVector { get }
+  /// by the given tangent vector.
+  mutating func move(by offset: TangentVector)
 }
 
 public extension Differentiable where TangentVector == Self {
   @_alwaysEmitIntoClient
-  mutating func move(along direction: TangentVector) {
-    self += direction
+  mutating func move(by offset: TangentVector) {
+    self += offset
   }
-}
-
-public extension Differentiable {
-  /// A tangent vector initialized using `zeroTangentVectorInitializer`.
-  /// `move(along: zeroTangentVector)` should not modify `self`.
-  var zeroTangentVector: TangentVector { zeroTangentVectorInitializer() }
 }

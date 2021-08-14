@@ -5,7 +5,7 @@
 import _Differentiation
 
 // TF-1271: Test `@differentiable` original function in other file.
-@differentiable
+@differentiable(reverse)
 func crossFileDifferentiableAttr<T: Protocol>(
   _ input: T
 ) -> T {
@@ -15,7 +15,7 @@ func crossFileDifferentiableAttr<T: Protocol>(
 // TF-1272: Test original function with registered derivatives in other files.
 // FIXME(TF-1272): Find a way to type-check `@derivative` attributes in other
 // files.
-@differentiable
+@differentiable(reverse)
 func crossFileDerivativeAttr<T: Protocol>(
   _ input: T
 ) -> T {
@@ -27,14 +27,14 @@ func crossFileDerivativeAttr<T: Protocol>(
 // TF-1234: Test `@differentiable` propagation from protocol requirement storage
 // declarations to their accessors in other file.
 
-@differentiable
+@differentiable(reverse)
 func protocolRequirementGetters<T: Protocol>(_ x: T) -> Float {
   x.property + x[]
 }
 
 // TODO(TF-1184): Make `@differentiable` on storage declarations propagate to
 // the setter in addition to the getter.
-@differentiable
+@differentiable(reverse)
 func protocolRequirementSetters<T: Protocol>(_ x: inout T, _ newValue: Float) {
   // expected-error @+2 {{expression is not differentiable}}
   // expected-note @+1 {{member is not differentiable because the corresponding protocol requirement is not '@differentiable'}}
@@ -47,19 +47,19 @@ func protocolRequirementSetters<T: Protocol>(_ x: inout T, _ newValue: Float) {
 // TF-1234: Test `@differentiable` propagation from class member storage
 // declarations to their accessors in other file.
 
-@differentiable
+@differentiable(reverse)
 func classRequirementGetters(_ x: Class) -> Float {
   x.property + x[]
 }
 
-@differentiable
+@differentiable(reverse)
 func classRequirementSetters(_ x: inout Class, _ newValue: Float) {
   x.property = newValue
   x[] = newValue
 }
 
 // Test cross-file lookup of a derivative function with all-concrete derivative generic signature.
-@differentiable
+@differentiable(reverse)
 func allConcreteDerivativeGenericSignature(_ a: [S]) -> Float {
   // No error expected.
   return a.sum()

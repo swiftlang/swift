@@ -1,36 +1,5 @@
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=NO_CONTEXT_0 | %FileCheck %s -check-prefix=NO_CONTEXT_0
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=NIL_0 | %FileCheck %s -check-prefix=NIL_0
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=NIL_1 | %FileCheck %s -check-prefix=NIL_1
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=NIL_2 | %FileCheck %s -check-prefix=NIL_2
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=BOOL_0 | %FileCheck %s -check-prefix=BOOL_0
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=BOOL_1 | %FileCheck %s -check-prefix=BOOL_1
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=BOOL_2 | %FileCheck %s -check-prefix=BOOL_2
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=BOOL_3 | %FileCheck %s -check-prefix=BOOL_3
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=BOOL_4 | %FileCheck %s -check-prefix=BOOL_4
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=INT_0 | %FileCheck %s -check-prefix=INT_0
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=INT_1 | %FileCheck %s -check-prefix=INT_1
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=INT_2 | %FileCheck %s -check-prefix=INT_2
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=DOUBLE_0 | %FileCheck %s -check-prefix=DOUBLE_0
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=STRING_0 | %FileCheck %s -check-prefix=STRING_0
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=STRING_1 | %FileCheck %s -check-prefix=STRING_1
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=STRING_2 | %FileCheck %s -check-prefix=STRING_2
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=STRING_3 | %FileCheck %s -check-prefix=STRING_3
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=STRING_4 | %FileCheck %s -check-prefix=STRING_4
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=STRING_5 | %FileCheck %s -check-prefix=STRING_5
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=ARRAY_0 | %FileCheck %s -check-prefix=ARRAY_0
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=ARRAY_1 | %FileCheck %s -check-prefix=ARRAY_1
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=ARRAY_2 | %FileCheck %s -check-prefix=ARRAY_2
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=DICT_0 | %FileCheck %s -check-prefix=DICT_0
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=DICT_1 | %FileCheck %s -check-prefix=DICT_1
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=DICT_2 | %FileCheck %s -check-prefix=DICT_2
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=TUPLE_0 | %FileCheck %s -check-prefix=TUPLE_0
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=TUPLE_1 | %FileCheck %s -check-prefix=TUPLE_1
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=TUPLE_2 | %FileCheck %s -check-prefix=TUPLE_2
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=COLOR_0 | %FileCheck %s -check-prefix=COLOR_0
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=COLOR_1 | %FileCheck %s -check-prefix=COLOR_1
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=COLOR_2 | %FileCheck %s -check-prefix=COLOR_2
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=IMAGE_0 | %FileCheck %s -check-prefix=IMAGE_0
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=IMAGE_1 | %FileCheck %s -check-prefix=IMAGE_1
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t
 
 func testAll0() {
   // Not type context.

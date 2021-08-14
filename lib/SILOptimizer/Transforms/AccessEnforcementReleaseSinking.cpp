@@ -120,6 +120,7 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::OnFastPath:
     case BuiltinValueKind::ExtractElement:
     case BuiltinValueKind::InsertElement:
+    case BuiltinValueKind::ShuffleVector:
     case BuiltinValueKind::StaticReport:
     case BuiltinValueKind::AssertConf:
     case BuiltinValueKind::StringObjectOr:
@@ -140,6 +141,13 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::GlobalStringTablePointer:
     case BuiltinValueKind::COWBufferForReading:
     case BuiltinValueKind::IntInstrprofIncrement:
+    case BuiltinValueKind::GetCurrentAsyncTask:
+    case BuiltinValueKind::GetCurrentExecutor:
+    case BuiltinValueKind::AutoDiffCreateLinearMapContext:
+    case BuiltinValueKind::EndAsyncLet:
+    case BuiltinValueKind::EndAsyncLetLifetime:
+    case BuiltinValueKind::CreateTaskGroup:
+    case BuiltinValueKind::DestroyTaskGroup:
       return false;
 
     // Handle some rare builtins that may be sensitive to object lifetime
@@ -164,6 +172,24 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::AssignTakeArray:
     case BuiltinValueKind::UnsafeGuaranteed:
     case BuiltinValueKind::UnsafeGuaranteedEnd:
+    case BuiltinValueKind::CancelAsyncTask:
+    case BuiltinValueKind::StartAsyncLet:
+    case BuiltinValueKind::CreateAsyncTask:
+    case BuiltinValueKind::CreateAsyncTaskInGroup:
+    case BuiltinValueKind::StartAsyncLetWithLocalBuffer:
+    case BuiltinValueKind::ConvertTaskToJob:
+    case BuiltinValueKind::InitializeDefaultActor:
+    case BuiltinValueKind::DestroyDefaultActor:
+    case BuiltinValueKind::InitializeDistributedRemoteActor:
+    case BuiltinValueKind::DestroyDistributedActor:
+    case BuiltinValueKind::BuildOrdinarySerialExecutorRef:
+    case BuiltinValueKind::BuildDefaultActorExecutorRef:
+    case BuiltinValueKind::BuildMainActorExecutorRef:
+    case BuiltinValueKind::ResumeNonThrowingContinuationReturning:
+    case BuiltinValueKind::ResumeThrowingContinuationReturning:
+    case BuiltinValueKind::ResumeThrowingContinuationThrowing:
+    case BuiltinValueKind::AutoDiffProjectTopLevelSubcontext:
+    case BuiltinValueKind::AutoDiffAllocateSubcontext:
       return true;
     }
   }

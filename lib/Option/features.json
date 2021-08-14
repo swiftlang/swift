@@ -1,0 +1,13 @@
+{
+  "features": [
+    {
+      "name": "experimental-skip-all-function-bodies"
+    },
+    {
+      "name": "experimental-allow-module-with-compiler-errors"
+    },
+    {
+      "name": "index-unit-output-path"
+    }
+  ]
+}

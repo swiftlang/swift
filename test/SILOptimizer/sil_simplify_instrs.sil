@@ -371,3 +371,16 @@ bb0(%0 : $@thick SpecialEnum.Type):
   %5 = struct $Bool (%4 : $Builtin.Int1)
   return %5 : $Bool
 }
+
+// CHECK-LABEL: sil @dontSimplifyIndirectMetatype : $@convention(thin) () -> @out @thick Int.Type {
+// CHECK:   [[MT:%[0-9]+]] = metatype $@thick Int.Type
+// CHECK:   store [[MT]] to %0
+// CHECK-LABEL: }  // end sil function 'dontSimplifyIndirectMetatype'
+sil @dontSimplifyIndirectMetatype : $@convention(thin) () -> @out @thick Int.Type {
+bb0(%0 : $*@thick Int.Type):
+  %1 = metatype $@thick Int.Type
+  store %1 to %0 : $*@thick Int.Type
+  %3 = tuple ()
+  return %3 : $()
+}
+

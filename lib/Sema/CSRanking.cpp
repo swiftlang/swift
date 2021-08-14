@@ -32,74 +32,95 @@ using namespace constraints;
 #define DEBUG_TYPE "Constraint solver overall"
 STATISTIC(NumDiscardedSolutions, "Number of solutions discarded");
 
+static StringRef getScoreKindName(ScoreKind kind) {
+  switch (kind) {
+  case SK_Hole:
+    return "hole in the constraint system";
+
+  case SK_Unavailable:
+    return "use of an unavailable declaration";
+
+  case SK_AsyncInSyncMismatch:
+    return "async-in-synchronous mismatch";
+
+  case SK_SyncInAsync:
+    return "sync-in-asynchronous";
+
+  case SK_ForwardTrailingClosure:
+    return "forward scan when matching a trailing closure";
+
+  case SK_Fix:
+    return "attempting to fix the source";
+
+  case SK_DisfavoredOverload:
+    return "disfavored overload";
+
+  case SK_UnresolvedMemberViaOptional:
+    return "unwrapping optional at unresolved member base";
+
+  case SK_ForceUnchecked:
+    return "force of an implicitly unwrapped optional";
+
+  case SK_UserConversion:
+    return "user conversion";
+
+  case SK_FunctionConversion:
+    return "function conversion";
+
+  case SK_NonDefaultLiteral:
+    return "non-default literal";
+
+  case SK_CollectionUpcastConversion:
+    return "collection upcast conversion";
+
+  case SK_ValueToOptional:
+    return "value to optional";
+
+  case SK_EmptyExistentialConversion:
+    return "empty-existential conversion";
+
+  case SK_KeyPathSubscript:
+    return "key path subscript";
+
+  case SK_ValueToPointerConversion:
+    return "value-to-pointer conversion";
+
+  case SK_FunctionToAutoClosureConversion:
+    return "function to autoclosure parameter";
+
+  case SK_ImplicitValueConversion:
+    return "value-to-value conversion";
+  }
+}
+
 void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
-  unsigned index = static_cast<unsigned>(kind);
-  CurrentScore.Data[index] += value;
+  if (isForCodeCompletion()) {
+    switch (kind) {
+    case SK_NonDefaultLiteral:
+      // Don't increase score for non-default literals in expressions involving
+      // a code completion. In the below example, members of EnumA and EnumB
+      // should be ranked equally:
+      //   func overloaded(_ x: Float, _ y: EnumA) {}
+      //   func overloaded(_ x: Int, _ y: EnumB) {}
+      //   func overloaded(_ x: Float) -> EnumA {}
+      //   func overloaded(_ x: Int) -> EnumB {}
+      //
+      //   overloaded(1, .<complete>) {}
+      //   overloaded(1).<complete>
+      return;
+    default:
+      break;
+    }
+  }
 
   if (isDebugMode() && value > 0) {
     if (solverState)
       llvm::errs().indent(solverState->depth * 2);
-    llvm::errs() << "(increasing score due to ";
-    switch (kind) {
-    case SK_Hole:
-      llvm::errs() << "hole in the constraint system";
-      break;
-
-    case SK_Unavailable:
-      llvm::errs() << "use of an unavailable declaration";
-      break;
-
-    case SK_AsyncSyncMismatch:
-      llvm::errs() << "async/synchronous mismatch";
-      break;
-
-    case SK_ForwardTrailingClosure:
-      llvm::errs() << "forward scan when matching a trailing closure";
-      break;
-
-    case SK_Fix:
-      llvm::errs() << "attempting to fix the source";
-      break;
-
-    case SK_DisfavoredOverload:
-      llvm::errs() << "disfavored overload";
-      break;
-
-    case SK_ForceUnchecked:
-      llvm::errs() << "force of an implicitly unwrapped optional";
-      break;
-
-    case SK_UserConversion:
-      llvm::errs() << "user conversion";
-      break;
-
-    case SK_FunctionConversion:
-      llvm::errs() << "function conversion";
-      break;
-
-    case SK_NonDefaultLiteral:
-      llvm::errs() << "non-default literal";
-      break;
-        
-    case SK_CollectionUpcastConversion:
-      llvm::errs() << "collection upcast conversion";
-      break;
-        
-    case SK_ValueToOptional:
-      llvm::errs() << "value to optional";
-      break;
-    case SK_EmptyExistentialConversion:
-      llvm::errs() << "empty-existential conversion";
-      break;
-    case SK_KeyPathSubscript:
-      llvm::errs() << "key path subscript";
-      break;
-    case SK_ValueToPointerConversion:
-      llvm::errs() << "value-to-pointer conversion";
-      break;
-    }
-    llvm::errs() << ")\n";
+    llvm::errs() << "(increasing score due to " << getScoreKindName(kind) << ")\n";
   }
+
+  unsigned index = static_cast<unsigned>(kind);
+  CurrentScore.Data[index] += value;
 }
 
 bool ConstraintSystem::worseThanBestSolution() const {
@@ -349,8 +370,8 @@ static bool isProtocolExtensionAsSpecializedAs(DeclContext *dc1,
 
   // Bind the 'Self' type from the first extension to the type parameter from
   // opening 'Self' of the second extension.
-  Type selfType1 = sig1->getGenericParams()[0];
-  Type selfType2 = sig2->getGenericParams()[0];
+  Type selfType1 = sig1.getGenericParams()[0];
+  Type selfType2 = sig2.getGenericParams()[0];
   cs.addConstraint(ConstraintKind::Bind,
                    replacements[cast<GenericTypeParamType>(selfType2->getCanonicalType())],
                    dc1->mapTypeIntoContext(selfType1),
@@ -606,8 +627,8 @@ bool CompareDeclSpecializationRequest::evaluate(
     // If they both have trailing closures, compare those separately.
     bool compareTrailingClosureParamsSeparately = false;
     if (numParams1 > 0 && numParams2 > 0 &&
-        params1.back().getOldType()->is<AnyFunctionType>() &&
-        params2.back().getOldType()->is<AnyFunctionType>()) {
+        params1.back().getParameterType()->is<AnyFunctionType>() &&
+        params2.back().getParameterType()->is<AnyFunctionType>()) {
       compareTrailingClosureParamsSeparately = true;
     }
 
@@ -785,7 +806,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
 
   SmallVector<SolutionDiff::OverloadDiff, 4> overloadDiff(diff.overloads);
   // Single type of keypath dynamic member lookup could refer to different
-  // member overlaods, we have to do a pair-wise comparison in such cases
+  // member overloads, we have to do a pair-wise comparison in such cases
   // otherwise ranking would miss some viable information e.g.
   // `_ = arr[0..<3]` could refer to subscript through writable or read-only
   // key path and each of them could also pick overload which returns `Slice<T>`
@@ -1077,8 +1098,8 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
         auto params = fnTy->getParams();
         assert(params.size() == 2);
 
-        auto param1 = params[0].getOldType();
-        auto param2 = params[1].getOldType()->castTo<AnyFunctionType>();
+        auto param1 = params[0].getParameterType();
+        auto param2 = params[1].getParameterType()->castTo<AnyFunctionType>();
 
         assert(param1->getOptionalObjectType());
         assert(params[1].isAutoClosure());

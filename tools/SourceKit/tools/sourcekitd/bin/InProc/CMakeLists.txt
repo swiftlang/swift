@@ -1,7 +1,13 @@
-set(EXPORTED_SYMBOL_FILE "${SOURCEKITD_SOURCE_DIR}/bin/sourcekitd.exports")
+if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
+  set(EXPORTED_SYMBOL_FILE "${CMAKE_CURRENT_SOURCE_DIR}/sourcekitdInProc-darwin.exports")
+else()
+  set(EXPORTED_SYMBOL_FILE "${CMAKE_CURRENT_SOURCE_DIR}/sourcekitdInProc.exports")
+endif()
 
 option(SOURCEKITD_BUILD_STATIC_INPROC
   "Build sourcekitdInProc as a static library (in addition to a shared one)" OFF)
+
+swift_is_installing_component(sourcekit-inproc SOURCEKIT_INSTALLING_INPROC)
 
 set(sourcekitdInProc_args
   sourcekitdInProc.cpp
@@ -17,6 +23,11 @@ if (SOURCEKIT_INSTALLING_INPROC)
       INSTALL_IN_COMPONENT sourcekit-inproc
     )
     set_property(TARGET sourcekitdInProc APPEND_STRING PROPERTY LINK_FLAGS " -fapplication-extension")
+    if (SOURCEKIT_DEPLOYMENT_OS MATCHES "^macosx")
+      add_definitions(-DSOURCEKIT_VERSIONED_FRAMEWORK_BUNDLE)
+    else()
+      add_definitions(-DSOURCEKIT_UNVERSIONED_FRAMEWORK_BUNDLE)
+    endif()
   else()
     add_sourcekit_library(sourcekitdInProc
       ${sourcekitdInProc_args}

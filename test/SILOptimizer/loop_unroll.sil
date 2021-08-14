@@ -10,11 +10,17 @@ import Builtin
 // CHECK: bb1
 // CHECK:  builtin "sadd_with_overflow_Int64
 // CHECK:  cond_br {{.*}}, bb2, bb3
-// CHECK: bb2:
-// CHECK:  return
+// CHECK: bb2
+// CHECK:  br bb7
 // CHECK: bb3
+// CHECK:  br bb4
+// CHECK: bb4
 // CHECK:  builtin "sadd_with_overflow_Int64
-// CHECK:  br bb2
+// CHECK:  br bb5
+// CHECK: bb5
+// CHECK:  br bb7
+// CHECK: bb7:
+// CHECK:  return
 
 sil @loop_unroll_1 : $@convention(thin) () -> () {
 bb0:
@@ -28,11 +34,14 @@ bb1(%4 : $Builtin.Int64):
   %5 = builtin "sadd_with_overflow_Int64"(%4 : $Builtin.Int64, %1 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
   %6 = tuple_extract %5 : $(Builtin.Int64, Builtin.Int1), 0
   %7 = builtin "cmp_eq_Int64"(%6 : $Builtin.Int64, %2 : $Builtin.Int64) : $Builtin.Int1
-  cond_br %7, bb2, bb1(%6 : $Builtin.Int64)
+  cond_br %7, bb3, bb2
 
 bb2:
- %8 = tuple()
- return %8 : $()
+  br bb1(%6 : $Builtin.Int64)
+
+bb3:
+ %9 = tuple()
+ return %9 : $()
 }
 
 // CHECK-LABEL: sil @loop_unroll_2
@@ -40,14 +49,18 @@ bb2:
 // CHECK:  br bb1
 // CHECK: bb1
 // CHECK:  = builtin "sadd_with_overflow_Int64
-// CHECK:  cond_br {{.*}}, bb3, bb2
+// CHECK:  cond_br {{.*}}, bb2, bb3
 // CHECK: bb2:
-// CHECK:  br bb4
+// CHECK:  br bb7
 // CHECK: bb3:
-// CHECK:  return
+// CHECK:  br bb4
 // CHECK: bb4
 // CHECK:  = builtin "sadd_with_overflow_Int64
-// CHECK:  br bb3
+// CHECK:  br bb5
+// CHECK: bb5:
+// CHECK:  br bb7
+// CHECK: bb7:
+// CHECK:  return
 
 sil @loop_unroll_2 : $@convention(thin) () -> () {
 bb0:
@@ -76,14 +89,18 @@ bb3:
 // CHECK:  br bb1
 // CHECK: bb1
 // CHECK:  = builtin "sadd_with_overflow_Int64
-// CHECK:  cond_br {{.*}}, bb3, bb2
+// CHECK:  cond_br {{.*}}, bb2, bb3
 // CHECK: bb2:
-// CHECK:  br bb4
+// CHECK:  br bb7
 // CHECK: bb3:
-// CHECK:  return
+// CHECK:  br bb4
 // CHECK: bb4
 // CHECK:  = builtin "sadd_with_overflow_Int64
-// CHECK:  br bb3
+// CHECK:  br bb5
+// CHECK: bb5:
+// CHECK:  br bb7
+// CHECK: bb7:
+// CHECK:  return
 
 sil @loop_unroll_3 : $@convention(thin) () -> () {
 bb0:
@@ -112,14 +129,18 @@ bb3:
 // CHECK:  br bb1
 // CHECK: bb1
 // CHECK:  = builtin "sadd_with_overflow_Int64
-// CHECK:  cond_br {{.*}}, bb3, bb2
+// CHECK:  cond_br {{.*}}, bb2, bb3
 // CHECK: bb2:
-// CHECK:  br bb4
+// CHECK:  br bb7
 // CHECK: bb3:
-// CHECK:  return
+// CHECK:  br bb4
 // CHECK: bb4
 // CHECK:  = builtin "sadd_with_overflow_Int64
-// CHECK:  br bb3
+// CHECK:  br bb5
+// CHECK: bb5:
+// CHECK:  br bb7
+// CHECK: bb7:
+// CHECK:  return
 
 sil @loop_unroll_4 : $@convention(thin) () -> () {
 bb0:
@@ -146,7 +167,12 @@ bb3:
 // CHECK-LABEL: sil @loop_unroll_5
 // CHECK:      bb5:
 // CHECK-NEXT:   br bb4
-// CHECK-NEXT: }
+// CHECK: bb6:
+// CHECK-NEXT:  br bb7
+// CHECK: bb7:
+// CHECK-NEXT:  tuple ()
+// CHECK-NEXT:  return
+// CHECK-NEXT: } // end sil function 'loop_unroll_5'
 
 sil @loop_unroll_5 : $@convention(thin) () -> () {
 bb0:
@@ -173,8 +199,12 @@ bb3:
 // CHECK-LABEL: sil @loop_unroll_6
 // CHECK:      bb5:
 // CHECK-NEXT:   br bb4
-// CHECK-NEXT: }
-
+// CHECK: bb6:
+// CHECK-NEXT:  br bb7
+// CHECK: bb7:
+// CHECK-NEXT:  tuple ()
+// CHECK-NEXT:  return
+// CHECK-NEXT: } // end sil function 'loop_unroll_6'
 sil @loop_unroll_6 : $@convention(thin) () -> () {
 bb0:
  %0 = integer_literal $Builtin.Int64, 0
@@ -200,8 +230,12 @@ bb3:
 // CHECK-LABEL: sil @loop_unroll_7
 // CHECK:      bb5:
 // CHECK-NEXT:   br bb4
-// CHECK-NEXT: }
-
+// CHECK: bb6:
+// CHECK-NEXT:  br bb7
+// CHECK: bb7:
+// CHECK-NEXT:  tuple ()
+// CHECK-NEXT:  return
+// CHECK-NEXT: } // end sil function 'loop_unroll_7'
 sil @loop_unroll_7 : $@convention(thin) () -> () {
 bb0:
  %0 = integer_literal $Builtin.Int64, 0
@@ -226,13 +260,19 @@ bb3:
 
 // CHECK-LABEL: sil @unroll_with_exit_block_arg_1
 // CHECK: bb1({{.*}}):
-// CHECK:   cond_br {{.*}}, bb3{{.*}}, bb2({{.*}})
-// CHECK: bb2({{.*}}):
-// CHECK:   return
+// CHECK:   cond_br {{.*}}, bb4, bb2
+// CHECK: bb2:
+// CHECK:   br bb3({{.*}})
 // CHECK: bb3({{.*}}):
-// CHECK:   cond_br {{.*}}, bb4{{.*}}, bb2({{.*}})
-// CHECK: bb4({{.*}}):
-// CHECK:   br bb2({{.*}})
+// CHECK:   br bb11({{.*}})
+// CHECK: bb4:
+// CHECK:   br bb8({{.*}})
+// CHECK: bb8({{.*}}):
+// CHECK:   cond_br {{.*}}, bb9, bb10
+// CHECK: bb10:
+// CHECK:   br bb11({{.*}})
+// CHECK: bb11({{.*}}):
+// CHECK:   return
 // CHECK: }
 sil @unroll_with_exit_block_arg_1 : $@convention(thin) () -> () {
 bb0:
@@ -247,7 +287,10 @@ bb4(%58 : $Builtin.Int64, %59 : $Builtin.Int64):
   %64 = builtin "smul_with_overflow_Int64"(%59 : $Builtin.Int64, %28 : $Builtin.Int64, %56 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
   %65 = tuple_extract %64 : $(Builtin.Int64, Builtin.Int1), 0
   %70 = builtin "cmp_slt_Int64"(%61 : $Builtin.Int64, %28 : $Builtin.Int64) : $Builtin.Int1
-  cond_br %70, bb4(%61 : $Builtin.Int64, %65 : $Builtin.Int64), bb6(%61 : $Builtin.Int64)
+  cond_br %70, bb5, bb6(%61 : $Builtin.Int64)
+
+bb5:
+  br bb4(%61 : $Builtin.Int64, %65 : $Builtin.Int64)
 
 bb6(%72 : $Builtin.Int64):
   %401 = tuple ()
@@ -256,17 +299,19 @@ bb6(%72 : $Builtin.Int64):
 
 // CHECK-LABEL: sil @unroll_with_exit_block_arg_2
 // CHECK: bb1({{.*}}):
-// CHECK:   cond_br {{.*}}, bb2, bb3({{.*}})
+// CHECK:   cond_br {{.*}}, bb4, bb2
 // CHECK: bb2:
-// CHECK:   br bb4{{.*}}
+// CHECK:   br bb3{{.*}}
 // CHECK: bb3({{.*}}):
+// CHECK:   br bb11{{.*}}
+// CHECK: bb4:
+// CHECK:   br bb8{{.*}}
+// CHECK: bb8({{.*}}):
+// CHECK:   cond_br {{.*}}, bb9, bb10
+// CHECK: bb10:
+// CHECK:   br bb11({{.*}})
+// CHECK: bb11({{.*}}):
 // CHECK:   return
-// CHECK: bb4({{.*}}):
-// CHECK:   cond_br {{.*}}, bb5, bb3({{.*}})
-// CHECK: bb5:
-// CHECK:   br bb6{{.*}}
-// CHECK: bb6({{.*}}):
-// CHECK:   br bb3({{.*}})
 // CHECK: }
 sil @unroll_with_exit_block_arg_2 : $@convention(thin) () -> () {
 bb0:

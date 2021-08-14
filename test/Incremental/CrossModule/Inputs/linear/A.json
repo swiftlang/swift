@@ -3,7 +3,7 @@
     "object": "./A.o",
     "swift-dependencies": "./A.swiftdeps",
     "swiftmodule": "./A~partial.swiftmodule",
-    "swiftdoc": "./A.swiftdoc",
+    "swiftdoc": "./A.swiftdoc"
   },
   "": {
     "swift-dependencies": "./A~buildrecord.swiftdeps"

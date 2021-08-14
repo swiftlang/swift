@@ -79,4 +79,4 @@ class D {
   typealias BElement = Int // expected-note{{did you mean 'BElement'?}}
 }
 
-func typoSuperclass2<T : D>(_: T, _: T.Element) { } // expected-error{{'Element' is not a member type of 'T'}}
+func typoSuperclass2<T : D>(_: T, _: T.Element) { } // expected-error{{'Element' is not a member type of type 'T'}}

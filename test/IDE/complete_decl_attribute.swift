@@ -40,6 +40,7 @@ struct MyStruct {}
 // AVAILABILITY1-NEXT: Keyword/None:                       macCatalyst[#Platform#]; name=macCatalyst
 // AVAILABILITY1-NEXT: Keyword/None:                       macCatalystApplicationExtension[#Platform#]; name=macCatalystApplicationExtension
 // AVAILABILITY1-NEXT: Keyword/None:                       OpenBSD[#Platform#]; name=OpenBSD{{$}}
+// AVAILABILITY1-NEXT: Keyword/None:                       Windows[#Platform#]; name=Windows{{$}}
 // AVAILABILITY1-NEXT: End completions
 
 @available(*, #^AVAILABILITY2^#)
@@ -70,6 +71,7 @@ struct MyStruct {}
 // KEYWORD2-NEXT:             Keyword/None:                       derivative[#Func Attribute#]; name=derivative
 // KEYWORD2-NEXT:             Keyword/None:                       transpose[#Func Attribute#]; name=transpose
 // KEYWORD2-NEXT:             Keyword/None:                       noDerivative[#Func Attribute#]; name=noDerivative
+// KEYWORD2-NEXT:             Keyword/None:          Sendable[#Func Attribute#]; name=Sendable
 // KEYWORD2-NOT:              Keyword
 // KEYWORD2:                  Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // KEYWORD2:                  End completions
@@ -89,6 +91,8 @@ struct MyStruct {}
 // KEYWORD3-NEXT:             Keyword/None:                       NSApplicationMain[#Class Attribute#]; name=NSApplicationMain{{$}}
 // KEYWORD3-NEXT:             Keyword/None:                       usableFromInline[#Class Attribute#]; name=usableFromInline
 // KEYWORD3-NEXT:             Keyword/None:                       propertyWrapper[#Class Attribute#]; name=propertyWrapper
+// KEYWORD3-NEXT:             Keyword/None:                       resultBuilder[#Class Attribute#]; name=resultBuilder
+// KEYWORD3-NEXT:             Keyword/None:                       globalActor[#Class Attribute#]; name=globalActor
 // KEYWORD3-NEXT:             End completions
 
 @#^KEYWORD3_2^#IB class C2 {}
@@ -104,6 +108,8 @@ struct MyStruct {}
 // KEYWORD4-NEXT:             Keyword/None:                       usableFromInline[#Enum Attribute#]; name=usableFromInline
 // KEYWORD4-NEXT:             Keyword/None:                       frozen[#Enum Attribute#]; name=frozen
 // KEYWORD4-NEXT:             Keyword/None:                       propertyWrapper[#Enum Attribute#]; name=propertyWrapper
+// KEYWORD4-NEXT:             Keyword/None:                       resultBuilder[#Enum Attribute#]; name=resultBuilder
+// KEYWORD4-NEXT:             Keyword/None:                       globalActor[#Enum Attribute#]; name=globalActor
 // KEYWORD4-NEXT:             End completions
 
 
@@ -116,6 +122,8 @@ struct MyStruct {}
 // KEYWORD5-NEXT:             Keyword/None:                       usableFromInline[#Struct Attribute#]; name=usableFromInline
 // KEYWORD5-NEXT:             Keyword/None:                       frozen[#Struct Attribute#]; name=frozen
 // KEYWORD5-NEXT:             Keyword/None:                       propertyWrapper[#Struct Attribute#]; name=propertyWrapper
+// KEYWORD5-NEXT:             Keyword/None:                       resultBuilder[#Struct Attribute#]; name=resultBuilder
+// KEYWORD5-NEXT:             Keyword/None:                       globalActor[#Struct Attribute#]; name=globalActor
 // KEYWORD5-NEXT:             End completions
 
 @#^ON_GLOBALVAR^# var globalVar
@@ -186,6 +194,7 @@ struct _S {
 // ON_METHOD-DAG: Keyword/None:                       differentiable[#Func Attribute#]; name=differentiable
 // ON_METHOD-DAG: Keyword/None:                       derivative[#Func Attribute#]; name=derivative
 // ON_METHOD-DAG: Keyword/None:                       transpose[#Func Attribute#]; name=transpose
+// ON_METHOD-DAG: Keyword/None:                       Sendable[#Func Attribute#]; name=Sendable
 // ON_METHOD-DAG: Keyword/None:                       noDerivative[#Func Attribute#]; name=noDerivative
 // ON_METHOD-NOT: Keyword
 // ON_METHOD: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
@@ -235,16 +244,19 @@ struct _S {
 // ON_MEMBER_LAST-DAG: Keyword/None:                       inlinable[#Declaration Attribute#]; name=inlinable
 // ON_MEMBER_LAST-DAG: Keyword/None:                       objcMembers[#Declaration Attribute#]; name=objcMembers
 // ON_MEMBER_LAST-DAG: Keyword/None:                       NSApplicationMain[#Declaration Attribute#]; name=NSApplicationMain
+// ON_MEMBER_LAST-DAG: Keyword/None:                       rethrows[#Declaration Attribute#]; name=rethrows
 // ON_MEMBER_LAST-DAG: Keyword/None:                       warn_unqualified_access[#Declaration Attribute#]; name=warn_unqualified_access
 // ON_MEMBER_LAST-DAG: Keyword/None:                       usableFromInline[#Declaration Attribute#]; name=usableFromInline
 // ON_MEMBER_LAST-DAG: Keyword/None:                       discardableResult[#Declaration Attribute#]; name=discardableResult
 // ON_MEMBER_LAST-DAG: Keyword/None:                       GKInspectable[#Declaration Attribute#]; name=GKInspectable
 // ON_MEMBER_LAST-DAG: Keyword/None:                       IBSegueAction[#Declaration Attribute#]; name=IBSegueAction
 // ON_MEMBER_LAST-DAG: Keyword/None:                       propertyWrapper[#Declaration Attribute#]; name=propertyWrapper
+// ON_MEMBER_LAST-DAG: Keyword/None:                       resultBuilder[#Declaration Attribute#]; name=resultBuilder
 // ON_MEMBER_LAST-DAG: Keyword/None:                       differentiable[#Declaration Attribute#]; name=differentiable
 // ON_MEMBER_LAST-DAG: Keyword/None:                       derivative[#Declaration Attribute#]; name=derivative
 // ON_MEMBER_LAST-DAG: Keyword/None:                       transpose[#Declaration Attribute#]; name=transpose
 // ON_MEMBER_LAST-DAG: Keyword/None:                       noDerivative[#Declaration Attribute#]; name=noDerivative
+// ON_MEMBER_LAST-DAG: Keyword/None:                       Sendable[#Declaration Attribute#]; name=Sendable
 // ON_MEMBER_LAST-NOT: Keyword
 // ON_MEMBER_LAST: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // ON_MEMBER_LAST-NOT: Decl[PrecedenceGroup]
@@ -262,36 +274,39 @@ func dummy2() {}
 
 @#^KEYWORD_LAST^#
 
-// KEYWORD_LAST:                  Begin completions
-// KEYWORD_LAST-NEXT:             Keyword/None:                       available[#Declaration Attribute#]; name=available{{$}}
-// KEYWORD_LAST-NEXT:             Keyword/None:                       objc[#Declaration Attribute#]; name=objc{{$}}
-// KEYWORD_LAST-NEXT:             Keyword/None:                       dynamicCallable[#Declaration Attribute#]; name=dynamicCallable
-// KEYWORD_LAST-NEXT:             Keyword/None:                       main[#Declaration Attribute#]; name=main
-// KEYWORD_LAST-NEXT:             Keyword/None:                       dynamicMemberLookup[#Declaration Attribute#]; name=dynamicMemberLookup
-// KEYWORD_LAST-NEXT:             Keyword/None:                       NSCopying[#Declaration Attribute#]; name=NSCopying{{$}}
-// KEYWORD_LAST-NEXT:             Keyword/None:                       IBAction[#Declaration Attribute#]; name=IBAction{{$}}
-// KEYWORD_LAST-NEXT:             Keyword/None:                       IBDesignable[#Declaration Attribute#]; name=IBDesignable{{$}}
-// KEYWORD_LAST-NEXT:             Keyword/None:                       IBInspectable[#Declaration Attribute#]; name=IBInspectable{{$}}
-// KEYWORD_LAST-NEXT:             Keyword/None:                       IBOutlet[#Declaration Attribute#]; name=IBOutlet{{$}}
-// KEYWORD_LAST-NEXT:             Keyword/None:                       NSManaged[#Declaration Attribute#]; name=NSManaged{{$}}
-// KEYWORD_LAST-NEXT:             Keyword/None:                       UIApplicationMain[#Declaration Attribute#]; name=UIApplicationMain{{$}}
-// KEYWORD_LAST-NEXT:             Keyword/None:                       inline[#Declaration Attribute#]; name=inline{{$}}
-// KEYWORD_LAST-NEXT:             Keyword/None:                       requires_stored_property_inits[#Declaration Attribute#]; name=requires_stored_property_inits{{$}}
-// KEYWORD_LAST-NEXT:             Keyword/None:                       nonobjc[#Declaration Attribute#]; name=nonobjc{{$}}
-// KEYWORD_LAST-NEXT:             Keyword/None:                       inlinable[#Declaration Attribute#]; name=inlinable{{$}}
-// KEYWORD_LAST-NEXT:             Keyword/None:                       objcMembers[#Declaration Attribute#]; name=objcMembers{{$}}
-// KEYWORD_LAST-NEXT:             Keyword/None:                       NSApplicationMain[#Declaration Attribute#]; name=NSApplicationMain{{$}}
-// KEYWORD_LAST-NEXT:             Keyword/None:                       warn_unqualified_access[#Declaration Attribute#]; name=warn_unqualified_access
-// KEYWORD_LAST-NEXT:             Keyword/None:                       usableFromInline[#Declaration Attribute#]; name=usableFromInline{{$}}
-// KEYWORD_LAST-NEXT:             Keyword/None:                       discardableResult[#Declaration Attribute#]; name=discardableResult
-// KEYWORD_LAST-NEXT:             Keyword/None:                       GKInspectable[#Declaration Attribute#]; name=GKInspectable{{$}}
-// KEYWORD_LAST-NEXT:             Keyword/None:                       frozen[#Declaration Attribute#]; name=frozen
-// KEYWORD_LAST-NEXT:             Keyword/None:                       propertyWrapper[#Declaration Attribute#]; name=propertyWrapper
-// KEYWORD_LAST-NEXT:             Keyword/None:                       differentiable[#Declaration Attribute#]; name=differentiable
-// KEYWORD_LAST-NEXT:             Keyword/None:                       IBSegueAction[#Declaration Attribute#]; name=IBSegueAction{{$}}
-// KEYWORD_LAST-NEXT:             Keyword/None:                       derivative[#Declaration Attribute#]; name=derivative
-// KEYWORD_LAST-NEXT:             Keyword/None:                       transpose[#Declaration Attribute#]; name=transpose
-// KEYWORD_LAST-NEXT:             Keyword/None:                       noDerivative[#Declaration Attribute#]; name=noDerivative
-// KEYWORD_LAST-NOT:              Keyword
+// KEYWORD_LAST: Begin completions
+// KEYWORD_LAST-DAG: Keyword/None:                       available[#Declaration Attribute#]; name=available{{$}}
+// KEYWORD_LAST-DAG: Keyword/None:                       objc[#Declaration Attribute#]; name=objc{{$}}
+// KEYWORD_LAST-DAG: Keyword/None:                       dynamicCallable[#Declaration Attribute#]; name=dynamicCallable
+// KEYWORD_LAST-DAG: Keyword/None:                       main[#Declaration Attribute#]; name=main
+// KEYWORD_LAST-DAG: Keyword/None:                       dynamicMemberLookup[#Declaration Attribute#]; name=dynamicMemberLookup
+// KEYWORD_LAST-DAG: Keyword/None:                       NSCopying[#Declaration Attribute#]; name=NSCopying{{$}}
+// KEYWORD_LAST-DAG: Keyword/None:                       IBAction[#Declaration Attribute#]; name=IBAction{{$}}
+// KEYWORD_LAST-DAG: Keyword/None:                       IBDesignable[#Declaration Attribute#]; name=IBDesignable{{$}}
+// KEYWORD_LAST-DAG: Keyword/None:                       IBInspectable[#Declaration Attribute#]; name=IBInspectable{{$}}
+// KEYWORD_LAST-DAG: Keyword/None:                       IBOutlet[#Declaration Attribute#]; name=IBOutlet{{$}}
+// KEYWORD_LAST-DAG: Keyword/None:                       NSManaged[#Declaration Attribute#]; name=NSManaged{{$}}
+// KEYWORD_LAST-DAG: Keyword/None:                       UIApplicationMain[#Declaration Attribute#]; name=UIApplicationMain{{$}}
+// KEYWORD_LAST-DAG: Keyword/None:                       inline[#Declaration Attribute#]; name=inline{{$}}
+// KEYWORD_LAST-DAG: Keyword/None:                       requires_stored_property_inits[#Declaration Attribute#]; name=requires_stored_property_inits{{$}}
+// KEYWORD_LAST-DAG: Keyword/None:                       nonobjc[#Declaration Attribute#]; name=nonobjc{{$}}
+// KEYWORD_LAST-DAG: Keyword/None:                       inlinable[#Declaration Attribute#]; name=inlinable{{$}}
+// KEYWORD_LAST-DAG: Keyword/None:                       objcMembers[#Declaration Attribute#]; name=objcMembers{{$}}
+// KEYWORD_LAST-DAG: Keyword/None:                       NSApplicationMain[#Declaration Attribute#]; name=NSApplicationMain{{$}}
+// KEYWORD_LAST-DAG: Keyword/None:                       rethrows[#Declaration Attribute#]; name=rethrows{{$}}
+// KEYWORD_LAST-DAG: Keyword/None:                       warn_unqualified_access[#Declaration Attribute#]; name=warn_unqualified_access
+// KEYWORD_LAST-DAG: Keyword/None:                       usableFromInline[#Declaration Attribute#]; name=usableFromInline{{$}}
+// KEYWORD_LAST-DAG: Keyword/None:                       discardableResult[#Declaration Attribute#]; name=discardableResult
+// KEYWORD_LAST-DAG: Keyword/None:                       GKInspectable[#Declaration Attribute#]; name=GKInspectable{{$}}
+// KEYWORD_LAST-DAG: Keyword/None:                       frozen[#Declaration Attribute#]; name=frozen
+// KEYWORD_LAST-DAG: Keyword/None:                       propertyWrapper[#Declaration Attribute#]; name=propertyWrapper
+// KEYWORD_LAST-DAG: Keyword/None:                       resultBuilder[#Declaration Attribute#]; name=resultBuilder
+// KEYWORD_LAST-DAG: Keyword/None:                       differentiable[#Declaration Attribute#]; name=differentiable
+// KEYWORD_LAST-DAG: Keyword/None:                       IBSegueAction[#Declaration Attribute#]; name=IBSegueAction{{$}}
+// KEYWORD_LAST-DAG: Keyword/None:                       derivative[#Declaration Attribute#]; name=derivative
+// KEYWORD_LAST-DAG: Keyword/None:                       transpose[#Declaration Attribute#]; name=transpose
+// KEYWORD_LAST-DAG: Keyword/None:                       noDerivative[#Declaration Attribute#]; name=noDerivative
+// KEYWORD_LAST-DAG: Keyword/None:                       Sendable[#Declaration Attribute#]; name=Sendable
+// KEYWORD_LAST-NOT: Keyword
 // KEYWORD_LAST: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // KEYWORD_LAST:                  End completions

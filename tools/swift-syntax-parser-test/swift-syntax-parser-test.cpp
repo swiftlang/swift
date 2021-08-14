@@ -58,7 +58,6 @@ NumParses("n", cl::desc("number of invocations"), cl::init(1));
 namespace {
 struct SPNode {
   swiftparse_syntax_kind_t kind;
-  StringRef nodeText;
 
   Optional<swiftparse_token_kind_t> tokKind;
   StringRef leadingTriviaText;
@@ -111,9 +110,9 @@ static swiftparse_client_node_t
 makeNode(const swiftparse_syntax_node_t *raw_node, StringRef source) {
   SPNode *node = new SPNode();
   node->kind = raw_node->kind;
-  auto range = raw_node->range;
-  node->nodeText = source.substr(range.offset, range.length);
   if (raw_node->kind == 0) {
+    auto range = raw_node->token_data.range;
+    auto nodeText = source.substr(range.offset, range.length);
     node->tokKind = raw_node->token_data.kind;
     size_t leadingTriviaLen =
       trivialLen(makeArrayRef(raw_node->token_data.leading_trivia,
@@ -121,11 +120,10 @@ makeNode(const swiftparse_syntax_node_t *raw_node, StringRef source) {
     size_t trailingTriviaLen =
       trivialLen(makeArrayRef(raw_node->token_data.trailing_trivia,
                               raw_node->token_data.trailing_trivia_count));
-    node->leadingTriviaText = node->nodeText.take_front(leadingTriviaLen);
-    node->tokenText =
-      node->nodeText.substr(leadingTriviaLen,
-                            range.length-leadingTriviaLen-trailingTriviaLen);
-    node->trailingTriviaText = node->nodeText.take_back(trailingTriviaLen);
+    node->leadingTriviaText = nodeText.take_front(leadingTriviaLen);
+    node->tokenText = nodeText.substr(
+        leadingTriviaLen, range.length - leadingTriviaLen - trailingTriviaLen);
+    node->trailingTriviaText = nodeText.take_back(trailingTriviaLen);
   } else {
     for (unsigned i = 0, e = raw_node->layout_data.nodes_count; i != e; ++i) {
       auto subnode = convertClientNode(raw_node->layout_data.nodes[i]);
@@ -136,17 +134,18 @@ makeNode(const swiftparse_syntax_node_t *raw_node, StringRef source) {
 }
 
 static swiftparse_client_node_t
-parse(const char *source, swiftparse_node_handler_t node_handler,
+parse(StringRef source, swiftparse_node_handler_t node_handler,
       swiftparse_diagnostic_handler_t diag_handler = nullptr) {
   swiftparse_parser_t parser = swiftparse_parser_create();
   swiftparse_parser_set_node_handler(parser, node_handler);
   swiftparse_parser_set_diagnostic_handler(parser, diag_handler);
-  swiftparse_client_node_t top = swiftparse_parse_string(parser, source);
+  swiftparse_client_node_t top =
+      swiftparse_parse_string(parser, source.data(), source.size());
   swiftparse_parser_dispose(parser);
   return top;
 }
 
-static int dumpTree(const char *source) {
+static int dumpTree(StringRef source) {
   swiftparse_node_handler_t nodeHandler =
     ^swiftparse_client_node_t(const swiftparse_syntax_node_t *raw_node) {
       return makeNode(raw_node, source);
@@ -216,7 +215,7 @@ static void printDiagInfo(const swiftparser_diagnostic_t diag,
   }
 }
 
-static int dumpDiagnostics(const char* source, llvm::SourceMgr &SM,
+static int dumpDiagnostics(StringRef source, llvm::SourceMgr &SM,
                            unsigned BufferId) {
   swiftparse_node_handler_t nodeHandler =
   ^swiftparse_client_node_t(const swiftparse_syntax_node_t *raw_node) {
@@ -255,7 +254,7 @@ static void printTimeRecord(unsigned numInvoks, const TimeRecord &total,
   OS << '\n';
 }
 
-static int timeParsing(const char *source, unsigned numInvoks) {
+static int timeParsing(StringRef source, unsigned numInvoks) {
   swiftparse_node_handler_t nodeHandler =
     ^swiftparse_client_node_t(const swiftparse_syntax_node_t *raw_node) {
       return nullptr;
@@ -288,10 +287,10 @@ int main(int argc, char *argv[]) {
   auto BufferId = SM.AddNewSourceBuffer(std::move(*fileBufOrErr), SMLoc());
   switch (options::Action) {
   case ActionType::DumpTree:
-    return dumpTree(source.data());
+    return dumpTree(source);
   case ActionType::Time:
-    return timeParsing(source.data(), options::NumParses);
+    return timeParsing(source, options::NumParses);
   case ActionType::Diagnostics:
-    return dumpDiagnostics(source.data(), SM, BufferId);
+    return dumpDiagnostics(source, SM, BufferId);
   }
 }

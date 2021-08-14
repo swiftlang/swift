@@ -30,8 +30,9 @@
 // --- Build low level framework.
 // RUN: mkdir -p %t/SDK/Frameworks/LowLevel.framework/Modules/LowLevel.swiftmodule
 // RUN: %target-build-swift-dylib(%t/SDK/Frameworks/LowLevel.framework/LowLevel) -module-name LowLevel -emit-module \
-// RUN:		-emit-module-path %t/SDK/Frameworks/LowLevel.framework/Modules/LowLevel.swiftmodule/%module-target-triple.swiftmodule \
-// RUN:     %S/Inputs/SymbolMove/LowLevel.swift -Xlinker -install_name -Xlinker @rpath/LowLevel.framework/LowLevel -enable-library-evolution
+// RUN:     -emit-module-path %t/SDK/Frameworks/LowLevel.framework/Modules/LowLevel.swiftmodule/%module-target-triple.swiftmodule \
+// RUN:     %S/Inputs/SymbolMove/LowLevel.swift -Xlinker -install_name -Xlinker @rpath/LowLevel.framework/LowLevel -enable-library-evolution \
+// RUN:     -Xfrontend -define-availability -Xfrontend "_iOS13Aligned:macOS 10.10, iOS 8.0"
 
 // --- Build high level framework.
 // RUN: mkdir -p %t/SDK/Frameworks/HighLevel.framework/Modules/HighLevel.swiftmodule
@@ -81,3 +82,7 @@ print("\(bicycle.currentSpeed)")
 
 // BEFORE_MOVE: 15.0
 // AFTER_MOVE: 15.0
+
+funcMacro()
+// BEFORE_MOVE: Macro from HighLevel
+// AFTER_MOVE: Macro from LowLevel

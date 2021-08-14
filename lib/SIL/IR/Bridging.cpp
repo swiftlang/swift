@@ -53,9 +53,7 @@ TypeConverter::getBridgedParam(SILFunctionTypeRepresentation rep,
      llvm::report_fatal_error("unable to set up the ObjC bridge!");
   }
 
-  return AnyFunctionType::Param(bridged->getCanonicalType(),
-                                param.getLabel(),
-                                param.getParameterFlags());
+  return param.withType(bridged->getCanonicalType());
 }
 
 void TypeConverter::

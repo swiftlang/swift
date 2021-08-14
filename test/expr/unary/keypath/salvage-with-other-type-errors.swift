@@ -53,8 +53,9 @@ protocol Bindable: class { }
 
 extension Bindable {
   func test<Value>(to targetKeyPath: ReferenceWritableKeyPath<Self, Value>, change: Value?) {
+    // There is also a note attached to declaration - requirement from conditional conformance of 'Optional<Value>' to 'Equatable'
     if self[keyPath:targetKeyPath] != change {
-      // expected-error@-1 {{binary operator '!=' cannot be applied to operands of type 'Value' and 'Value?'}}
+      // expected-error@-1 {{operator function '!=' requires that 'Value' conform to 'Equatable'}}
       self[keyPath: targetKeyPath] = change!
     }
   }

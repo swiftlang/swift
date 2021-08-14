@@ -79,6 +79,7 @@ struct ValidationInfo {
   StringRef shortVersion = {};
   StringRef miscVersion = {};
   version::Version compatibilityVersion = {};
+  llvm::VersionTuple userModuleVersion;
   size_t bytes = 0;
   Status status = Status::Malformed;
 };
@@ -93,12 +94,15 @@ struct ValidationInfo {
 class ExtendedValidationInfo {
   SmallVector<StringRef, 4> ExtraClangImporterOpts;
   StringRef SDKPath;
+  StringRef ModuleABIName;
   struct {
     unsigned ArePrivateImportsEnabled : 1;
     unsigned IsSIB : 1;
+    unsigned IsStaticLibrary: 1;
     unsigned IsTestable : 1;
     unsigned ResilienceStrategy : 2;
-    unsigned IsImplicitDynamicEnabled: 1;
+    unsigned IsImplicitDynamicEnabled : 1;
+    unsigned IsAllowModuleWithCompilerErrorsEnabled : 1;
   } Bits;
 public:
   ExtendedValidationInfo() : Bits() {}
@@ -128,6 +132,10 @@ public:
   void setImplicitDynamicEnabled(bool val) {
     Bits.IsImplicitDynamicEnabled = val;
   }
+  bool isStaticLibrary() const { return Bits.IsStaticLibrary; }
+  void setIsStaticLibrary(bool val) {
+    Bits.IsStaticLibrary = val;
+  }
   bool isTestable() const { return Bits.IsTestable; }
   void setIsTestable(bool val) {
     Bits.IsTestable = val;
@@ -138,6 +146,15 @@ public:
   void setResilienceStrategy(ResilienceStrategy resilience) {
     Bits.ResilienceStrategy = unsigned(resilience);
   }
+  bool isAllowModuleWithCompilerErrorsEnabled() {
+    return Bits.IsAllowModuleWithCompilerErrorsEnabled;
+  }
+  void setAllowModuleWithCompilerErrorsEnabled(bool val) {
+    Bits.IsAllowModuleWithCompilerErrorsEnabled = val;
+  }
+
+  StringRef getModuleABIName() const { return ModuleABIName; }
+  void setModuleABIName(StringRef name) { ModuleABIName = name; }
 };
 
 /// Returns info about the serialized AST in the given data.

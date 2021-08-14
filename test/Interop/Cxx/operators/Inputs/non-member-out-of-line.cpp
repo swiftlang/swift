@@ -1,5 +1,5 @@
 #include "non-member-out-of-line.h"
 
-IntBox operator+(IntBox lhs, IntBox rhs) {
-  return IntBox{.value = lhs.value + rhs.value};
+LoadableIntWrapper operator+(LoadableIntWrapper lhs, LoadableIntWrapper rhs) {
+  return LoadableIntWrapper{.value = lhs.value + rhs.value};
 }

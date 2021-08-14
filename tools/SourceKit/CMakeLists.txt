@@ -31,9 +31,10 @@ configure_file(
 set(SOURCEKIT_DEPLOYMENT_OS "${SWIFT_HOST_VARIANT}")
 set(SOURCEKIT_DEPLOYMENT_TARGET "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_DEPLOYMENT_VERSION}")
 
-STRING(TOLOWER "${SWIFT_PRIMARY_VARIANT_SDK}" SOURCEKIT_PLATFORM_NAME)
-# Remove '_simulator' from the name if it exists
-STRING(REPLACE "_simulator" "" SOURCEKIT_PLATFORM_NAME "${SOURCEKIT_PLATFORM_NAME}")
+set(SOURCEKIT_TOOLCHAIN_NAME "${SWIFT_DARWIN_XCRUN_TOOLCHAIN}")
+if("${SOURCEKIT_TOOLCHAIN_NAME}" MATCHES "XcodeDefault")
+  set(SOURCEKIT_TOOLCHAIN_NAME "default")
+endif()
 
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin" AND NOT CMAKE_CROSSCOMPILING)
   set(CMAKE_OSX_SYSROOT "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_PATH}")
@@ -62,7 +63,7 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
 
   # Sadly there are two OS naming conventions.
   # xcrun SDK name:   macosx iphoneos iphonesimulator (+ "internal" or version)
-  # -mOS-version-min: macosx ios      ios-simulator
+  # triple name:      macosx ios      ios-simulator
 
   if (SOURCEKIT_DEPLOYMENT_OS MATCHES "^iphoneos")
     set(version_min_os "ios")
@@ -88,10 +89,6 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
     else()
       set(CMAKE_XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET ${SOURCEKIT_DEPLOYMENT_TARGET})
     endif()
-  else()
-    add_compile_options(-m${version_min_os}-version-min=${SOURCEKIT_DEPLOYMENT_TARGET})
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -m${version_min_os}-version-min=${SOURCEKIT_DEPLOYMENT_TARGET}")
-    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -m${version_min_os}-version-min=${SOURCEKIT_DEPLOYMENT_TARGET}")
   endif()
 endif()
 
@@ -103,6 +100,29 @@ include_directories(BEFORE
 
 if(NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
   string(TOUPPER "${CMAKE_SYSTEM_NAME}" SOURCEKIT_DEFAULT_TARGET_SDK)
+endif()
+
+if(SWIFT_BUILD_HOST_DISPATCH)
+  if(SWIFT_HOST_VARIANT_SDK STREQUAL WINDOWS)
+    set(SOURCEKIT_RUNTIME_DIR bin)
+  else()
+    set(SOURCEKIT_RUNTIME_DIR lib)
+  endif()
+  add_dependencies(sourcekit-inproc BlocksRuntime dispatch)
+  if("${SWIFT_HOST_VARIANT_SDK}" MATCHES "OSX|WINDOWS")
+    swift_install_in_component(FILES
+      $<TARGET_FILE:dispatch>
+      $<TARGET_FILE:BlocksRuntime>
+      DESTINATION ${SOURCEKIT_RUNTIME_DIR}
+      COMPONENT sourcekit-inproc)
+  endif()
+  if(SWIFT_HOST_VARIANT_SDK STREQUAL WINDOWS)
+    swift_install_in_component(FILES
+      $<TARGET_LINKER_FILE:dispatch>
+      $<TARGET_LINKER_FILE:BlocksRuntime>
+      DESTINATION lib
+      COMPONENT sourcekit-inproc)
+  endif()
 endif()
 
 add_subdirectory(include)

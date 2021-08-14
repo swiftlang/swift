@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-ir -disable-llvm-optzns -disable-swift-specific-llvm-optzns %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-%target-ptrsize-%target-ptrauth -DINT=i%target-ptrsize
+// UNSUPPORTED: CPU=arm64_32
 
 import Builtin
 import Swift
@@ -52,7 +53,7 @@ entry:
   %1000 = integer_literal $Builtin.Int32, 1000
   apply %marker(%1000) : $@convention(thin) (Builtin.Int32) -> ()
 
-  // CHECK-NEXT:    call swiftcc void @make_big([[BIG]]* noalias nocapture sret [[TEMP]], %swift.type* %C)
+  // CHECK-NEXT:    call swiftcc void @make_big([[BIG]]* noalias nocapture sret({{.*}}) [[TEMP]], %swift.type* %C)
   %make = function_ref @make_big : $@convention(thin) <T: SomeClass> () -> (@owned Big<T>)
   %value = apply %make<C>() : $@convention(thin) <T: SomeClass> () -> (@owned Big<T>)
 

@@ -36,7 +36,8 @@ func testCFToNative(_ cfStr: CFString, cfMutableStr: CFMutableString) {
 
 func testNativeToCF(_ str: String) {
   var cfStr = str as CFString
-  var cfMutableStr = str as CFMutableString // expected-error{{'String' is not convertible to 'CFMutableString'}} {{26-28=as!}}
+  var cfMutableStr = str as CFMutableString // expected-error{{'String' is not convertible to 'CFMutableString'}} 
+  // expected-note@-1{{did you mean to use 'as!' to force downcast?}} {{26-28=as!}}
 }
 
 func testCFToAnyObject(_ cfStr: CFString, cfMutableStr: CFMutableString,
@@ -53,7 +54,8 @@ func testAnyObjectToCF(_ anyObject: AnyObject) {
   var _: CFTree = anyObject as! CFTree
 
   // No implicit conversions.
-  cfStr = anyObject // expected-error{{'AnyObject' is not convertible to 'CFString'; did you mean to use 'as!' to force downcast?}} {{20-20= as! CFString}}
+  cfStr = anyObject // expected-error{{'AnyObject' is not convertible to 'CFString'}} 
+  // expected-note@-1{{did you mean to use 'as!' to force downcast?}} {{20-20= as! CFString}}
   _ = cfStr
 }
 

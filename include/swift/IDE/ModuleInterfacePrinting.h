@@ -42,8 +42,7 @@ enum class ModuleTraversal : unsigned {
 /// Options used to describe the traversal of a module for printing.
 using ModuleTraversalOptions = OptionSet<ModuleTraversal>;
 
-ArrayRef<StringRef> collectModuleGroups(ModuleDecl *M,
-                                        std::vector<StringRef> &Scratch);
+void collectModuleGroups(ModuleDecl *M, SmallVectorImpl<StringRef> &Into);
 
 Optional<StringRef>
 findGroupNameForUSR(ModuleDecl *M, StringRef USR);

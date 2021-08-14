@@ -1,14 +1,27 @@
-// RUN: %target-swift-frontend-verify -typecheck %s -enable-objc-interop -import-objc-header %S/Inputs/objc_direct.h -verify-ignore-unknown
+// RUN: %target-swift-frontend-verify -typecheck %s -enable-objc-interop -import-objc-header %S/../Inputs/objc_direct.h
 
 // REQUIRES: objc_interop
 
-func callThingsOnBar(_ x: Bar) {
-  let _ = x.directProperty  // expected-error {{getter for 'directProperty' is unavailable in Swift}}
-  let _ = x.directProperty2 // expected-error {{getter for 'directProperty2' is unavailable in Swift}}
+var something = Bar() as AnyObject
 
-  x.directMethod() // expected-error {{'directMethod()' is unavailable in Swift}}
-  x.directMethod2() // expected-error {{'directMethod2()' is unavailable in Swift}}
+something.directProperty = 123      // expected-error {{value of type 'AnyObject' has no member 'directProperty'}}
+let _ = something.directProperty    // expected-error {{value of type 'AnyObject' has no member 'directProperty'}}
 
-  Bar.directClassMethod() // expected-error {{'directClassMethod()' is unavailable in Swift}}
-  Bar.directClassMethod2() // expected-error {{'directClassMethod2()' is unavailable in Swift}}
+something.directProperty2 = 456     // expected-error {{value of type 'AnyObject' has no member 'directProperty2'}}
+let _ = something.directProperty2   // expected-error {{value of type 'AnyObject' has no member 'directProperty2'}}
+
+let _ = something.directMethod()    // expected-error {{value of type 'AnyObject' has no member 'directMethod'}}
+
+let _ = something.directMethod2()   // expected-error {{value of type 'AnyObject' has no member 'directMethod2'}}
+
+class Foo {
+    // Test that we can use a method with the same name as some `objc_direct` method.
+    @objc func directProtocolMethod() -> String {
+        "This is not a direct method."
+    }
 }
+
+var otherthing = Foo() as AnyObject
+
+// We expect no error.
+let _ = otherthing.directProtocolMethod()

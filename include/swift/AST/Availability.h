@@ -182,46 +182,19 @@ private:
 
 /// Records the reason a declaration is potentially unavailable.
 class UnavailabilityReason {
-public:
-  enum class Kind {
-    /// The declaration is potentially unavailable because it requires an OS
-    /// version range that is not guaranteed by the minimum deployment
-    /// target.
-    RequiresOSVersionRange,
-
-    /// The declaration is potentially unavailable because it is explicitly
-    /// weakly linked.
-    ExplicitlyWeakLinked
-  };
-
 private:
-  // A value of None indicates the declaration is potentially unavailable
-  // because it is explicitly weak linked.
-  Optional<VersionRange> RequiredDeploymentRange;
+  VersionRange RequiredDeploymentRange;
 
-  UnavailabilityReason(const Optional<VersionRange> &RequiredDeploymentRange)
+  explicit UnavailabilityReason(const VersionRange RequiredDeploymentRange)
       : RequiredDeploymentRange(RequiredDeploymentRange) {}
 
 public:
-  static UnavailabilityReason explicitlyWeaklyLinked() {
-    return UnavailabilityReason(None);
-  }
-
   static UnavailabilityReason requiresVersionRange(const VersionRange Range) {
     return UnavailabilityReason(Range);
   }
 
-  Kind getReasonKind() const {
-    if (RequiredDeploymentRange.hasValue()) {
-      return Kind::RequiresOSVersionRange;
-    } else {
-      return Kind::ExplicitlyWeakLinked;
-    }
-  }
-
   const VersionRange &getRequiredOSVersionRange() const {
-    assert(getReasonKind() == Kind::RequiresOSVersionRange);
-    return RequiredDeploymentRange.getValue();
+    return RequiredDeploymentRange;
   }
 };
 

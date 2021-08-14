@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -disable-availability-checking %S/Inputs/opaque_result_types.swift -module-name External -emit-module -emit-module-path %t/External.swiftmodule
-// RUN: %target-sil-opt -I %t -enable-sil-verify-all %s -generic-specializer -sil-generic-specializer-enable-ownership | %FileCheck %s
+// RUN: %target-sil-opt -I %t -enable-sil-verify-all %s -generic-specializer | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 

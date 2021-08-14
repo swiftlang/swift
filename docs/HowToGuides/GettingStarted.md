@@ -60,15 +60,16 @@ toolchain as a one-off, there are a couple of differences:
 
 1. Create a directory for the whole project:
    ```sh
-   mkdir -p swift-project/swift
-   cd swift-project/swift
+   mkdir swift-project
+   cd swift-project
    ```
 2. Clone the sources:
    - Via SSH (recommended):
      If you plan on contributing regularly, cloning over SSH provides a better
      experience. After you've [uploaded your SSH keys to GitHub][]:
      ```sh
-     git clone git@github.com:apple/swift.git .
+     git clone git@github.com:apple/swift.git swift
+     cd swift
      utils/update-checkout --clone-with-ssh
      ```
    - Via HTTPS:
@@ -76,7 +77,8 @@ toolchain as a one-off, there are a couple of differences:
      or are not familiar with setting up SSH,
      you can use HTTPS instead:
      ```sh
-     git clone https://github.com/apple/swift.git .
+     git clone https://github.com/apple/swift.git swift
+     cd swift
      utils/update-checkout --clone
      ```
    **Note:** If you've already forked the project on GitHub at this stage,
@@ -126,7 +128,9 @@ Double-check that running `pwd` prints a path ending with `swift`.
 
 ### macOS
 
-1. Install [Xcode 12 beta 3][Xcode] or newer:
+⚠️ Since version 0.2.14, `sccache` no longer caches compile commands issued by `build-script` because of [sccache PR 898](https://github.com/mozilla/sccache/pull/898), since `build-script` adds the `-arch x86_64` argument twice. The instructions below may install `sccache` 0.2.14 or newer. You may want to instead download and install an older release from their [Releases page](https://github.com/mozilla/sccache/releases) until this issue is resolved.
+
+1. Install [Xcode 12.3][Xcode] or newer:
    The required version of Xcode changes frequently and is often a beta release.
    Check this document or the host information on <https://ci.swift.org> for the
    current required version.
@@ -147,35 +151,18 @@ Double-check that running `pwd` prints a path ending with `swift`.
 [Homebrew]: https://brew.sh/
 [Homebrew Bundle]: https://github.com/Homebrew/homebrew-bundle
 
-### Ubuntu Linux
+### Linux
 
-1. For Ubuntu 16.04 LTS and 18.04 LTS, run the following:
+1. The latest Linux dependencies are listed in the respective Dockerfiles:
+   * [Ubuntu 20.04](https://github.com/apple/swift-docker/blob/main/swift-ci/master/ubuntu/20.04/Dockerfile)
+   * [CentOS 7](https://github.com/apple/swift-docker/blob/main/swift-ci/master/centos/7/Dockerfile)
+   * [CentOS 8](https://github.com/apple/swift-docker/blob/main/swift-ci/master/centos/8/Dockerfile)
+   * [Amazon Linux 2](https://github.com/apple/swift-docker/blob/main/swift-ci/master/amazon-linux/2/Dockerfile)
 
-   ```sh
-   sudo apt-get install    \
-     clang                 \
-     cmake                 \
-     git                   \
-     icu-devtools          \
-     libcurl4-openssl-dev  \
-     libedit-dev           \
-     libicu-dev            \
-     libncurses5-dev       \
-     libpython3-dev        \
-     libsqlite3-dev        \
-     libxml2-dev           \
-     ninja-build           \
-     pkg-config            \
-     python                \
-     python-six            \
-     rsync                 \
-     swig                  \
-     systemtap-sdt-dev     \
-     tzdata                \
-     uuid-dev
+2. To install sccache (optional):
+   ```
    sudo snap install sccache --candidate --classic
    ```
-
    **Note:** LLDB currently requires at least `swig-1.3.40` but will
    successfully build with version 2 shipped with Ubuntu.
 
@@ -183,7 +170,7 @@ Double-check that running `pwd` prints a path ending with `swift`.
 
 ### Spot check dependencies
 
-* Run `cmake --version`: This should be 3.18.1 or higher for macOS.
+* Run `cmake --version`: This should be 3.19.6 or higher.
 * Run `python3 --version`: Check that this succeeds.
 * Run `ninja --version`: Check that this succeeds.
 * Run `sccache --version`: Check that this succeeds.
@@ -242,23 +229,28 @@ Phew, that's a lot to digest! Now let's proceed to the actual build itself!
    [using both Ninja and Xcode](#using-both-ninja-and-xcode).
 3. Build the toolchain with optimizations, debuginfo, and assertions and run
    the tests.
+   macOS:
    - Via Ninja:
      ```sh
      utils/build-script --skip-build-benchmarks \
-       --skip-ios --skip-watchos --skip-tvos --swift-darwin-supported-archs "x86_64" \
-       --sccache --release-debuginfo --test
+       --skip-ios --skip-watchos --skip-tvos --swift-darwin-supported-archs "$(uname -m)" \
+       --sccache --release-debuginfo --swift-disable-dead-stripping --test
      ```
    - Via Xcode:
      ```sh
      utils/build-script --skip-build-benchmarks \
-       --skip-ios --skip-watchos --skip-tvos --swift-darwin-supported-archs "x86_64" \
-       --sccache --release-debuginfo --test \
+       --skip-ios --skip-watchos --skip-tvos --swift-darwin-supported-archs "$(uname -m)" \
+       --sccache --release-debuginfo --swift-disable-dead-stripping --test \
        --xcode
+     ```
+   Linux (uses Ninja):
+     ```sh
+     utils/build-script --release-debuginfo --test --skip-early-swift-driver
      ```
    This will create a directory
    `swift-project/build/Ninja-RelWithDebInfoAssert`
    (with `Xcode` instead of `Ninja` if you used `--xcode`)
-   containing the build artifacts.
+   containing the Swift compiler and standard library and clang/LLVM build artifacts.
    - If the build succeeds: Once the build is complete, the tests will run.
      - If the tests are passing: Great! We can go to the next step.
      - If some tests are failing:
@@ -267,6 +259,10 @@ Phew, that's a lot to digest! Now let's proceed to the actual build itself!
          handy later when you run the tests after making a change.
    - If the build fails:
      See [Troubleshooting build issues](#troubleshooting-build-issues).
+
+   If you would like to additionally build the Swift corelibs,
+   ie swift-corelibs-libdispatch, swift-corelibs-foundation, and swift-corelibs-xctest,
+   on Linux, add the `--xctest` flag to `build-script`.
 
 In the following sections, for simplicity, we will assume that you are using a
 `Ninja-RelWithDebInfoAssert` build on macOS running on an Intel-based Mac,
@@ -343,14 +339,15 @@ git remote add my-remote https://github.com/username/swift.git
 Finally, create a new branch.
 ```sh
 # Using 'my-branch' as a placeholder name
-git checkout my-branch
+git checkout -b my-branch
 git push --set-upstream my-remote my-branch
 ```
 
 ### First time Xcode setup
 
 If you used `--xcode` earlier, you will see an Xcode project generated under
-`../build/Xcode-RelWithDebInfoAssert/swift-macosx-x86_64`. When you open the
+`../build/Xcode-RelWithDebInfoAssert/swift-macosx-x86_64` (or
+`../build/Xcode-RelWithDebInfoAssert/swift-macosx-arm64` on Apple Silicon Macs). When you open the
 project, Xcode might helpfully suggest "Automatically Create Schemes". Most of
 those schemes are not required in day-to-day work, so you can instead manually
 select the following schemes:
@@ -375,12 +372,12 @@ Now that you have made some changes, you will need to rebuild...
 
 To rebuild the compiler:
 ```sh
-ninja -C ../build/Ninja-RelWithDebInfoAssert/swift-macosx-x86_64 swift-frontend
+ninja -C ../build/Ninja-RelWithDebInfoAssert/swift-macosx-$(uname -m) swift-frontend
 ```
 
 To rebuild everything, including the standard library:
 ```sh
-ninja -C ../build/Ninja-RelWithDebInfoAssert/swift-macosx-x86_64
+ninja -C ../build/Ninja-RelWithDebInfoAssert/swift-macosx-$(uname -m)
 ```
 
 ### Incremental builds with Xcode
@@ -396,7 +393,7 @@ build should be much faster than the from-scratch build at the beginning.
 Now check if the version string has been updated:
 
 ```sh
-../build/Ninja-RelWithDebInfoAssert/swift-macosx-x86_64/bin/swift-frontend --version
+../build/Ninja-RelWithDebInfoAssert/swift-macosx-$(uname -m)/bin/swift-frontend --version
 ```
 
 This should print your updated version string.
@@ -439,22 +436,22 @@ There are two main ways to run tests:
    ```sh
    # Rebuild all test dependencies and run all tests under test/.
    utils/run-test --lit ../llvm-project/llvm/utils/lit/lit.py \
-     ../build/Ninja-RelWithDebInfoAssert/swift-macosx-x86_64/test-macosx-x86_64
+     ../build/Ninja-RelWithDebInfoAssert/swift-macosx-$(uname -m)/test-macosx-$(uname -m)
 
    # Rebuild all test dependencies and run tests containing "MyTest".
    utils/run-test --lit ../llvm-project/llvm/utils/lit/lit.py \
-     ../build/Ninja-RelWithDebInfoAssert/swift-macosx-x86_64/test-macosx-x86_64 \
+     ../build/Ninja-RelWithDebInfoAssert/swift-macosx-$(uname -m)/test-macosx-$(uname -m) \
      --filter="MyTest"
    ```
 2. `lit.py`: lit doesn't know anything about dependencies. It just runs tests.
    ```sh
    # Run all tests under test/.
    ../llvm-project/llvm/utils/lit/lit.py -s -vv \
-     ../build/Ninja-RelWithDebInfoAssert/swift-macosx-x86_64/test-macosx-x86_64
+     ../build/Ninja-RelWithDebInfoAssert/swift-macosx-$(uname -m)/test-macosx-$(uname -m)
 
    # Run tests containing "MyTest"
    ../llvm-project/llvm/utils/lit/lit.py -s -vv \
-     ../build/Ninja-RelWithDebInfoAssert/swift-macosx-x86_64/test-macosx-x86_64 \
+     ../build/Ninja-RelWithDebInfoAssert/swift-macosx-$(uname -m)/test-macosx-$(uname -m) \
      --filter="MyTest"
    ```
    The `-s` and `-vv` flags print a progress bar and the executed commands

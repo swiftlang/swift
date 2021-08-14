@@ -17,9 +17,9 @@
 // CHECK-ADDED: Handled crash.swift
 // CHECK-ADDED-NOT: Handled
 
-// CHECK-RECORD-ADDED-DAG: "./crash.swift": !private [
-// CHECK-RECORD-ADDED-DAG: "./main.swift": [
-// CHECK-RECORD-ADDED-DAG: "./other.swift": [
+// CHECK-RECORD-ADDED-DAG: "{{(./)?}}crash.swift": !private [
+// CHECK-RECORD-ADDED-DAG: "{{(./)?}}main.swift": [
+// CHECK-RECORD-ADDED-DAG: "{{(./)?}}other.swift": [
 
 
 // RUN: %empty-directory(%t)

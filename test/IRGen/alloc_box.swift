@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir -o - | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-disable-pass=SILGenCleanup -primary-file %s -emit-ir -o - | %FileCheck %s
 
 func f() -> Bool? { return nil }
 

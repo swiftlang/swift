@@ -85,7 +85,7 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
         Impl.getClangPreprocessor().getSpelling(tok, SpellingBuffer, &Invalid);
     if (Invalid)
       return nullptr;
-    if (TokSpelling.find('_') != StringRef::npos)
+    if (TokSpelling.contains('_'))
       return nullptr;
   }
 
@@ -322,14 +322,16 @@ static Optional<std::pair<llvm::APSInt, Type>>
   return None;
 }
 
-
 static ValueDecl *importMacro(ClangImporter::Implementation &impl,
-                              DeclContext *DC,
-                              Identifier name,
-                              const clang::MacroInfo *macro,
-                              ClangNode ClangN,
+                              llvm::SmallSet<StringRef, 4> &visitedMacros,
+                              DeclContext *DC, Identifier name,
+                              const clang::MacroInfo *macro, ClangNode ClangN,
                               clang::QualType castType) {
   if (name.empty()) return nullptr;
+
+  assert(visitedMacros.count(name.str()) &&
+         "Add the name of the macro to visitedMacros before calling this "
+         "function.");
 
   auto numTokens = macro->getNumTokens();
   auto tokenI = macro->tokens_begin(), tokenE = macro->tokens_end();
@@ -427,9 +429,15 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
 
         auto macroID = impl.getClangPreprocessor().getMacroInfo(clangID);
         if (macroID && macroID != macro) {
+          // If we've already visited this macro, then bail to prevent an
+          // infinite loop. Otherwise, record that we're going to visit it.
+          if (!visitedMacros.insert(clangID->getName()).second)
+            return nullptr;
+
           // FIXME: This was clearly intended to pass the cast type down, but
           // doing so would be a behavior change.
-          return importMacro(impl, DC, name, macroID, ClangN, /*castType*/{});
+          return importMacro(impl, visitedMacros, DC, name, macroID, ClangN,
+                             /*castType*/ {});
         }
       }
 
@@ -558,38 +566,38 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
     } else if (tokenI[1].is(clang::tok::pipepipe)) {
       bool result  = firstValue.getBoolValue() || secondValue.getBoolValue();
       resultValue  = llvm::APSInt::get(result);
-      resultSwiftType = impl.SwiftContext.getBoolDecl()->getDeclaredInterfaceType();
+      resultSwiftType = impl.SwiftContext.getBoolType();
 
     // Logical AND.
     } else if (tokenI[1].is(clang::tok::ampamp)) {
       bool result  = firstValue.getBoolValue() && secondValue.getBoolValue();
       resultValue  = llvm::APSInt::get(result);
-      resultSwiftType = impl.SwiftContext.getBoolDecl()->getDeclaredInterfaceType();
+      resultSwiftType = impl.SwiftContext.getBoolType();
 
     // Equality.
     } else if (tokenI[1].is(clang::tok::equalequal)) {
       resultValue     = llvm::APSInt::get(firstValue == secondValue);
-      resultSwiftType = impl.SwiftContext.getBoolDecl()->getDeclaredInterfaceType();
+      resultSwiftType = impl.SwiftContext.getBoolType();
 
     // Less than.
     } else if (tokenI[1].is(clang::tok::less)) {
       resultValue     = llvm::APSInt::get(firstValue < secondValue);
-      resultSwiftType = impl.SwiftContext.getBoolDecl()->getDeclaredInterfaceType();
+      resultSwiftType = impl.SwiftContext.getBoolType();
 
     // Less than or equal.
     } else if (tokenI[1].is(clang::tok::lessequal)) {
       resultValue     = llvm::APSInt::get(firstValue <= secondValue);
-      resultSwiftType = impl.SwiftContext.getBoolDecl()->getDeclaredInterfaceType();
+      resultSwiftType = impl.SwiftContext.getBoolType();
 
     // Greater than.
     } else if (tokenI[1].is(clang::tok::greater)) {
       resultValue     = llvm::APSInt::get(firstValue > secondValue);
-      resultSwiftType = impl.SwiftContext.getBoolDecl()->getDeclaredInterfaceType();
+      resultSwiftType = impl.SwiftContext.getBoolType();
 
     // Greater than or equal.
     } else if (tokenI[1].is(clang::tok::greaterequal)) {
       resultValue     = llvm::APSInt::get(firstValue >= secondValue);
-      resultSwiftType = impl.SwiftContext.getBoolDecl()->getDeclaredInterfaceType();
+      resultSwiftType = impl.SwiftContext.getBoolType();
 
     // Unhandled operators.
     } else {
@@ -686,8 +694,11 @@ ValueDecl *ClangImporter::Implementation::importMacro(Identifier name,
     DC = ImportedHeaderUnit;
   }
 
-  auto valueDecl = ::importMacro(*this, DC, name, macro, macroNode,
-                                 /*castType*/{});
+  llvm::SmallSet<StringRef, 4> visitedMacros;
+  visitedMacros.insert(name.str());
+  auto valueDecl =
+      ::importMacro(*this, visitedMacros, DC, name, macro, macroNode,
+                    /*castType*/ {});
 
   // Update the entry for the value we just imported.
   // It's /probably/ the last entry in ImportedMacros[name], but there's an

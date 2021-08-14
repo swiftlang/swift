@@ -244,7 +244,7 @@ bb6:
 // CHECK:   return
 sil @no_forwarding_bad_control_flow : $@convention(thin) (Builtin.Int1) -> () {
 bb0(%0 : $Builtin.Int1):
-  cond_br %0, bb1, bb2
+  cond_br %0, bb9, bb2
 
 bb1:
   %1 = enum $E, #E.A!enumelt
@@ -260,14 +260,26 @@ bb3(%14 : $E):
   switch_enum %14 : $E, case #E.A!enumelt: bb4, case #E.B!enumelt: bb5
 
 bb4:
-  br bb6
+  br bb7
 
 bb5:
-  cond_br undef, bb1, bb6
+  cond_br undef, bb6, bb10
 
 bb6:
+  br bb1
+
+bb7:
+  br bb8
+
+bb8:
   %r = tuple ()
   return %r : $()
+
+bb9:
+  br bb1
+
+bb10:
+  br bb7
 }
 
 // CHECK-LABEL: sil @no_forwarding_multiple_block_args

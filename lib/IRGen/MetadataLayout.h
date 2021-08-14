@@ -188,7 +188,7 @@ public:
 
     Kind getKind() const { return TheKind; }
     
-    Offset getOffsett() const {
+    Offset getOffset() const {
       assert(getKind() == Kind::Offset);
       return TheOffset;
     }

@@ -25,6 +25,10 @@ typedef struct _SwiftContext {
   struct _SwiftContext *parentContext;
 } _SwiftContext;
 
+void exit(int);
+
+#define EXIT_SUCCESS 0
+
 #ifdef __cplusplus
 } // extern "C"
 } // namespace swift

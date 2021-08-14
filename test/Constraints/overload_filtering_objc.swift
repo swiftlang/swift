@@ -19,6 +19,6 @@ import Foundation
 }
 
 func testOptional(obj: P) {
-  // CHECK: disabled disjunction term $T2 bound to decl overload_filtering_objc.(file).P.opt(double:)
+  // CHECK: [disabled] $T2 bound to decl overload_filtering_objc.(file).P.opt(double:)
   _ = obj.opt?(1)
 }

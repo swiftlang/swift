@@ -33,7 +33,7 @@ Note that these branches come not from the "development" branches (above), but t
 | ----------- | -----------------
 | next        | swift/next
 
-`swift/next` is a branch for LLVM that includes all changes necessary to support Swift. Changes from llvm.org's master branch are automatically merged in. Why isn't this just `swift/main`? Well, because LLVM changes *very* rapidly, and that wouldn't be very stable. However, we do want to make sure the Swift stuff keeps working.
+`swift/next` is a branch for LLVM that includes all changes necessary to support Swift. Changes from llvm.org's main branch are automatically merged in. Why isn't this just `swift/main`? Well, because LLVM changes *very* rapidly, and that wouldn't be very stable. However, we do want to make sure the Swift stuff keeps working.
 
 If you are making changes to LLVM to support Swift, you'll probably need to work on them in `swift/main` to test them against Swift itself, but they should be committed to `swift/next`, and cherry-picked to the current release branch (`swift/release/x.y`) if needed. Remember, the release branches are automerged into `swift/main` on a regular basis.
 
@@ -60,9 +60,9 @@ You can use any of the branch names as the argument to `--scheme`, such as `main
 
   1) LLVM Project changes that don't depend on Swift
   
-     - New commits go to `master` in the upstream [llvm-project](https://github.com/llvm/llvm-project).
+     - New commits go to `main` in the upstream [llvm-project](https://github.com/llvm/llvm-project).
 
-     - Then cherry-pick these commits to an appropriate, `swift/main` aligned `apple/stable/*` branch in Apple's fork of [llvm-project](https://github.com/apple/llvm-project). Please see [Apple's branching scheme](https://github.com/apple/llvm-project/blob/apple/master/apple-docs/AppleBranchingScheme.md) document to determine which `apple/stable/*` branch you should cherry-pick to.
+     - Then cherry-pick these commits to an appropriate, `swift/main` aligned `apple/stable/*` branch in Apple's fork of [llvm-project](https://github.com/apple/llvm-project). Please see [Apple's branching scheme](https://github.com/apple/llvm-project/blob/apple/main/apple-docs/AppleBranchingScheme.md) document to determine which `apple/stable/*` branch you should cherry-pick to.
   
      Note that **no new changes should be submitted directly to `apple/main`**. We are actively working on eliminating the differences from upstream LLVM.
 
@@ -84,5 +84,5 @@ Some branches are *automerged* into other branches, to keep them in sync. This i
 
 ### LLVM Project
 - `swift/release/x.y` (the *latest* release branch) is automerged into `swift/main`
-- llvm.org's `master` is automerged into `swift/next`
+- llvm.org's `main` is automerged into `swift/next`
 - llvm.org's release branch *may* be automerged into `swift/release/x.y`, if they are in sync

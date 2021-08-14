@@ -145,6 +145,8 @@ allTests.test("_BridgeStorage") {
         expectTrue(b.unflaggedNativeInstance === c)
         expectFalse(b.isUniquelyReferencedUnflaggedNative())
       }
+      // Keep 'c' alive for the isUniquelyReferenced check above.
+      _fixLifetime(c)
     }
 
   }

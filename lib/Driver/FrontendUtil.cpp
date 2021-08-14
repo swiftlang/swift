@@ -26,6 +26,20 @@
 using namespace swift;
 using namespace swift::driver;
 
+void swift::driver::ExpandResponseFilesWithRetry(llvm::StringSaver &Saver,
+                                llvm::SmallVectorImpl<const char *> &Args) {
+  const unsigned MAX_COUNT = 30;
+  for (unsigned I = 0; I != MAX_COUNT; ++I) {
+    if (llvm::cl::ExpandResponseFiles(Saver,
+        llvm::Triple(llvm::sys::getProcessTriple()).isOSWindows()
+          ? llvm::cl::TokenizeWindowsCommandLine
+          : llvm::cl::TokenizeGNUCommandLine,
+        Args)) {
+      return;
+    }
+  }
+}
+
 bool swift::driver::getSingleFrontendInvocationFromDriverArguments(
     ArrayRef<const char *> Argv, DiagnosticEngine &Diags,
     llvm::function_ref<bool(ArrayRef<const char *> FrontendArgs)> Action,
@@ -52,12 +66,7 @@ bool swift::driver::getSingleFrontendInvocationFromDriverArguments(
   // Expand any file list args.
   llvm::BumpPtrAllocator Allocator;
   llvm::StringSaver Saver(Allocator);
-  llvm::cl::ExpandResponseFiles(
-      Saver,
-      llvm::Triple(llvm::sys::getProcessTriple()).isOSWindows()
-          ? llvm::cl::TokenizeWindowsCommandLine
-          : llvm::cl::TokenizeGNUCommandLine,
-      Args);
+  ExpandResponseFilesWithRetry(Saver, Args);
 
   // Force the driver into batch mode by specifying "swiftc" as the name.
   Driver TheDriver("swiftc", "swiftc", Args, Diags);
@@ -65,6 +74,8 @@ bool swift::driver::getSingleFrontendInvocationFromDriverArguments(
   // Don't check for the existence of input files, since the user of the
   // CompilerInvocation may wish to remap inputs to source buffers.
   TheDriver.setCheckInputFilesExist(false);
+
+  TheDriver.setIsDummyDriverForFrontendInvocation(true);
 
   std::unique_ptr<llvm::opt::InputArgList> ArgList =
     TheDriver.parseArgStrings(ArrayRef<const char *>(Args).slice(1));
@@ -90,7 +101,7 @@ bool swift::driver::getSingleFrontendInvocationFromDriverArguments(
     return true;
 
   std::unique_ptr<Compilation> C =
-      TheDriver.buildCompilation(*TC, std::move(ArgList));
+      TheDriver.buildCompilation(*TC, std::move(ArgList), /*AllowErrors=*/true);
   if (!C || C->getJobs().empty())
     return true; // Don't emit an error; one should already have been emitted
 
@@ -102,7 +113,6 @@ bool swift::driver::getSingleFrontendInvocationFromDriverArguments(
   if (CompileCommands.size() != 1) {
     // TODO: include Jobs in the diagnostic.
     Diags.diagnose(SourceLoc(), diag::error_expected_one_frontend_job);
-    return true;
   }
 
   const Job *Cmd = *CompileCommands.begin();

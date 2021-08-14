@@ -149,6 +149,23 @@ func testDefer() {
   }
 }
 
+func testPropertyWrapper() {
+  @propertyWrapper
+  public struct SR12958 {
+    public var wrappedValue: String
+    init(_ wrappedValue: String) {
+      self.wrappedValue = wrappedValue
+    }
+  }
+
+  public struct MyStruct {
+    @SR12958("something")
+    public static var somevar: String
+    public static var someothervar: Int
+  }
+}
+
+
 // RUN: %target-swift-ide-test -range -pos=8:1 -end-pos 8:32 -source-filename %s | %FileCheck %s -check-prefix=CHECK1
 // RUN: %target-swift-ide-test -range -pos=9:1 -end-pos 9:26 -source-filename %s | %FileCheck %s -check-prefix=CHECK2
 // RUN: %target-swift-ide-test -range -pos=10:1 -end-pos 10:27 -source-filename %s | %FileCheck %s -check-prefix=CHECK3
@@ -187,6 +204,8 @@ func testDefer() {
 // RUN: %target-swift-ide-test -range -pos=133:1 -end-pos=135:65 -source-filename %s | %FileCheck %s -check-prefix=CHECK-NO-PATTERN
 // RUN: %target-swift-ide-test -range -pos=142:12 -end-pos=142:17 -source-filename %s | %FileCheck %s -check-prefix=CHECK-X-Y
 // RUN: %target-swift-ide-test -range -pos=147:1 -end-pos=150:1 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INVALID
+// RUN: %target-swift-ide-test -range -pos=162:5 -end-pos=163:38 -source-filename %s | %FileCheck %s -check-prefix=CHECK-PROPERTY-WRAPPER
+
 
 // CHECK-NO-PATTERN: <Kind>MultiStatement</Kind>
 // CHECK-NO-PATTERN-NEXT: <Content>for key in parameters.keys.sorted(by: <) {
@@ -483,3 +502,11 @@ func testDefer() {
 
 // CHECK-X-Y: <Referenced>x</Referenced><Type>Int</Type>
 // CHECK-X-Y: <Referenced>y</Referenced><Type>Int</Type>
+
+// CHECK-PROPERTY-WRAPPER: <Kind>SingleDecl</Kind>
+// CHECK-PROPERTY-WRAPPER-NEXT: <Content>@SR12958("something")
+// CHECK-PROPERTY-WRAPPER-NEXT:     public static var somevar: String</Content>
+// CHECK-PROPERTY-WRAPPER-NEXT: <Context>swift_ide_test.(file).testPropertyWrapper().MyStruct</Context>
+// CHECK-PROPERTY-WRAPPER-NEXT: <Declared>somevar</Declared><OutscopeReference>false</OutscopeReference>
+// CHECK-PROPERTY-WRAPPER-NEXT: <ASTNodes>1</ASTNodes>
+// CHECK-PROPERTY-WRAPPER-NEXT: <end>

@@ -1,11 +1,11 @@
 // RUN: %target-swift-frontend -typecheck -verify %s
 
 // expected-error @+1 {{'@differentiable' attribute used without importing module '_Differentiation'}}
-let _: @differentiable (Float) -> Float
+let _: @differentiable(reverse) (Float) -> Float
 
 // expected-error @+2 {{'@differentiable' attribute used without importing module '_Differentiation'}}
 // expected-error @+1 {{'@noDerivative' attribute used without importing module '_Differentiation'}}
-let _: @differentiable (Float, @noDerivative Float) -> Float
+let _: @differentiable(reverse) (Float, @noDerivative Float) -> Float
 
 // expected-error @+1 {{'@noDerivative' attribute used without importing module '_Differentiation'}}
 let _: (Float, @noDerivative Float) -> Float

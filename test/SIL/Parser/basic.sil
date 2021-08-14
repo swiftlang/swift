@@ -278,8 +278,8 @@ bb0(%0 : $*T):
   %2 = apply %1<T>(%0) : $@convention(witness_method: Runcible) <Self : Runcible> (@in Self) -> Int
   %3 = metatype $@thick T.Type
   // CHECK: witness_method $T, #Runcible.static_method
-  %4 = witness_method $T, #Runcible.static_method : $@convention(witness_method: Runcible) <Self : Runcible> (@thick T.Type) -> ()
-  %5 = apply %4<T>(%3) : $@convention(witness_method: Runcible) <Self : Runcible> (@thick T.Type) -> ()
+  %4 = witness_method $T, #Runcible.static_method : $@convention(witness_method: Runcible) <Self : Runcible> (@thick Self.Type) -> ()
+  %5 = apply %4<T>(%3) : $@convention(witness_method: Runcible) <Self : Runcible> (@thick Self.Type) -> ()
   %6 = tuple ()
   destroy_addr %0 : $*T
   return %6 : $()
@@ -1267,10 +1267,11 @@ bb0:
 }
 
 // CHECK-LABEL: sil @debug_value
-sil @debug_value : $@convention(thin) (Int, @in P) -> () {
-bb0(%0 : $Int, %1 : $*P):
-  debug_value %0 : $Int        // CHECK: debug_value %0 : $Int
-  debug_value_addr %1 : $*P    // CHECK: debug_value_addr %1 : $*P
+sil @debug_value : $@convention(thin) (Int, @in P, AnyObject) -> () {
+bb0(%0 : $Int, %1 : $*P, %2 : $AnyObject):
+  debug_value %0 : $Int         // CHECK: debug_value %0 : $Int
+  debug_value [poison] %2 : $AnyObject // CHECK: debug_value [poison] %2 : $AnyObject
+  debug_value_addr %1 : $*P     // CHECK: debug_value_addr %1 : $*P
   unreachable
 }
 
@@ -1583,19 +1584,20 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
   return %28 : $()
 }
 
-// CHECK-LABEL: sil @test_end_lifetime : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil [ossa] @test_end_lifetime : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 // CHECK: end_lifetime {{%.*}} : $Builtin.NativeObject
-sil @test_end_lifetime : $@convention(thin) (@owned Builtin.NativeObject) -> () {
-bb0(%0 : $Builtin.NativeObject):
+sil [ossa] @test_end_lifetime : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
   end_lifetime %0 : $Builtin.NativeObject
   return undef : $()
 }
 
-// CHECK-LABEL: sil @test_unchecked_ownership_conversion : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil [ossa] @test_unchecked_ownership_conversion : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
 // CHECK: unchecked_ownership_conversion {{%.*}} : $Builtin.NativeObject, @guaranteed to @owned
-sil @test_unchecked_ownership_conversion : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
-bb0(%0 : $Builtin.NativeObject):
+sil [ossa] @test_unchecked_ownership_conversion : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : @guaranteed $Builtin.NativeObject):
   %1 = unchecked_ownership_conversion %0 : $Builtin.NativeObject, @guaranteed to @owned
+  end_lifetime %1 : $Builtin.NativeObject
   return undef : $()
 }
 

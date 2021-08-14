@@ -19,7 +19,8 @@ class Node(object):
 
     def __init__(self, name, description=None, kind=None, traits=None,
                  children=None, element=None, element_name=None,
-                 element_choices=None, omit_when_empty=False):
+                 element_choices=None, omit_when_empty=False, 
+                 elements_separated_by_newline=False):
         self.syntax_kind = name
         self.swift_syntax_kind = lowercase_first_word(name)
         self.name = kind_to_type(self.syntax_kind)
@@ -47,6 +48,7 @@ class Node(object):
         self.collection_element_name = element_name or self.collection_element
         self.collection_element_type = kind_to_type(self.collection_element)
         self.collection_element_choices = element_choices or []
+        self.elements_separated_by_newline = elements_separated_by_newline
 
     def is_base(self):
         """
@@ -86,3 +88,10 @@ class Node(object):
         has no children.
         """
         return self.omit_when_empty
+
+    def is_token(self):
+        """
+        Returns true if this child has a token kind.
+        """
+        return 'Token' in self.syntax_kind or \
+            'Token' in self.collection_element

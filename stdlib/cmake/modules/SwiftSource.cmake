@@ -1,6 +1,15 @@
 include(macCatalystUtils)
 include(SwiftUtils)
 
+function(_compute_lto_swift_flag option out_var)
+  string(TOLOWER "${option}" lowercase_option)
+  if (lowercase_option STREQUAL "full")
+    set(${out_var} "-lto=llvm-full" PARENT_SCOPE)
+  elseif (lowercase_option STREQUAL "thin")
+    set(${out_var} "-lto=llvm-thin" PARENT_SCOPE)
+  endif()
+endfunction()
+
 # Compute the library subdirectory to use for the given sdk and
 # architecture, placing the result in 'result_var_name'.
 function(compute_library_subdir result_var_name sdk arch)
@@ -42,7 +51,7 @@ function(handle_swift_sources
   cmake_parse_arguments(SWIFTSOURCES
       "IS_MAIN;IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;EMBED_BITCODE;STATIC"
       "SDK;ARCHITECTURE;INSTALL_IN_COMPONENT;MACCATALYST_BUILD_FLAVOR"
-      "DEPENDS;COMPILE_FLAGS;MODULE_NAME"
+      "DEPENDS;COMPILE_FLAGS;MODULE_NAME;ENABLE_LTO"
       ${ARGN})
   translate_flag(${SWIFTSOURCES_IS_MAIN} "IS_MAIN" IS_MAIN_arg)
   translate_flag(${SWIFTSOURCES_IS_STDLIB} "IS_STDLIB" IS_STDLIB_arg)
@@ -107,7 +116,12 @@ function(handle_swift_sources
     if(sdk IN_LIST SWIFT_APPLE_PLATFORMS OR sdk STREQUAL "MACCATALYST")
       list(APPEND swift_compile_flags "-save-optimization-record=bitstream")
     endif()
-
+    if (SWIFTSOURCES_ENABLE_LTO)
+      _compute_lto_swift_flag("${SWIFTSOURCES_ENABLE_LTO}" _lto_flag_out)
+      if (_lto_flag_out)
+        list(APPEND swift_compile_flags "${_lto_flag_out}")
+      endif()
+    endif()
     _compile_swift_files(
         dependency_target
         module_dependency_target
@@ -200,9 +214,7 @@ function(_add_target_variant_swift_compile_flags
     ${ARGN})
 
   # On Windows, we don't set SWIFT_SDK_WINDOWS_PATH_ARCH_{ARCH}_PATH, so don't include it.
-  # On Android the sdk is split to two different paths for includes and libs, so these
-  # need to be set manually.
-  if (NOT "${sdk}" STREQUAL "WINDOWS" AND NOT "${sdk}" STREQUAL "ANDROID")
+  if (NOT "${sdk}" STREQUAL "WINDOWS")
     list(APPEND result "-sdk" "${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH}")
   endif()
 
@@ -219,13 +231,6 @@ function(_add_target_variant_swift_compile_flags
   else()
     list(APPEND result
         "-target" "${SWIFT_SDK_${sdk}_ARCH_${arch}_TRIPLE}")
-  endif()
-
-  if("${sdk}" STREQUAL "ANDROID")
-    swift_android_include_for_arch(${arch} ${arch}_swift_include)
-    foreach(path IN LISTS ${arch}_swift_include)
-      list(APPEND result "\"${CMAKE_INCLUDE_FLAG_C}${path}\"")
-    endforeach()
   endif()
 
   if(NOT BUILD_STANDALONE)
@@ -253,6 +258,14 @@ function(_add_target_variant_swift_compile_flags
 
   if(enable_assertions)
     list(APPEND result "-D" "INTERNAL_CHECKS_ENABLED")
+  endif()
+
+  if(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
+    list(APPEND result "-D" "SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY")
+  endif()
+
+  if(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED)
+    list(APPEND result "-D" "SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED")
   endif()
 
   if(SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS)
@@ -617,7 +630,17 @@ function(_compile_swift_files
   if(CMAKE_HOST_SYSTEM_NAME STREQUAL Windows)
     set(HOST_EXECUTABLE_SUFFIX .exe)
   endif()
-  set(swift_compiler_tool "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swiftc${HOST_EXECUTABLE_SUFFIX}")
+  if(SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER)
+    if(SWIFT_PREBUILT_SWIFT)
+      set(swift_compiler_tool "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swiftc${HOST_EXECUTABLE_SUFFIX}")
+    elseif(CMAKE_Swift_COMPILER)
+      set(swift_compiler_tool "${CMAKE_Swift_COMPILER}")
+    else()
+      message(ERROR "Must pass in prebuilt tools using SWIFT_NATIVE_SWIFT_TOOLS_PATH or set CMAKE_Swift_COMPILER")
+    endif()
+  else()
+    set(swift_compiler_tool "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swiftc${HOST_EXECUTABLE_SUFFIX}")
+  endif()
 
   set(swift_compiler_tool_dep)
   if(SWIFT_INCLUDE_TOOLS)
@@ -664,6 +687,12 @@ function(_compile_swift_files
       math(EXPR old_interface_file_index "${interface_file_index} + 1")
       list(REMOVE_AT maccatalyst_swift_module_flags ${old_interface_file_index})
     endif()
+
+    # We still need to change the main swift flags
+    # so we can use the correct modules
+    # when building for macOS
+    list(APPEND swift_flags
+      "-I" "${SWIFTLIB_DIR}/${library_subdir}")
   elseif(maccatalyst_build_flavor STREQUAL "ios-like")
     compute_library_subdir(maccatalyst_library_subdir
       "MACCATALYST" "${SWIFTFILE_ARCHITECTURE}")
@@ -795,6 +824,7 @@ function(_compile_swift_files
           ${source_files} ${SWIFTFILE_DEPENDS}
           ${swift_ide_test_dependency}
           ${create_dirs_dependency_target}
+          ${copy_legacy_layouts_dep}
         COMMENT "Generating ${module_file}")
 
     if(SWIFTFILE_STATIC)
@@ -851,6 +881,7 @@ function(_compile_swift_files
           ${SWIFTFILE_DEPENDS}
           ${swift_ide_test_dependency}
           ${obj_dirs_dependency_target}
+          ${copy_legacy_layouts_dep}
         COMMENT
           "Generating ${maccatalyst_module_file}")
 
@@ -874,6 +905,7 @@ function(_compile_swift_files
           ${swift_compiler_tool_dep}
           ${source_files} ${SWIFTFILE_DEPENDS}
           ${create_dirs_dependency_target}
+          ${copy_legacy_layouts_dep}
         COMMENT "Generating ${sib_file}"
         EXCLUDE_FROM_ALL)
     set("${dependency_sib_target_out_var_name}" "${sib_dependency_target}" PARENT_SCOPE)
@@ -890,6 +922,7 @@ function(_compile_swift_files
           ${swift_compiler_tool_dep}
           ${source_files} ${SWIFTFILE_DEPENDS}
           ${create_dirs_dependency_target}
+          ${copy_legacy_layouts_dep}
         COMMENT "Generating ${sibopt_file}"
         EXCLUDE_FROM_ALL)
     set("${dependency_sibopt_target_out_var_name}" "${sibopt_dependency_target}" PARENT_SCOPE)
@@ -907,6 +940,7 @@ function(_compile_swift_files
           ${swift_compiler_tool_dep}
           ${source_files} ${SWIFTFILE_DEPENDS}
           ${create_dirs_dependency_target}
+          ${copy_legacy_layouts_dep}
           COMMENT "Generating ${sibgen_file}"
           EXCLUDE_FROM_ALL)
     set("${dependency_sibgen_target_out_var_name}" "${sibgen_dependency_target}" PARENT_SCOPE)

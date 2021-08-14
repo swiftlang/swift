@@ -12,4 +12,4 @@
 public struct MyStruct {}
 
 // CHECK: MyModule.swiftinterface:{{[0-9]+}}:{{[0-9]+}}: error: use of unknown directive '#__debug_emit_invalid_swiftinterface_syntax__'
-// CHECK: MyModule.swiftinterface:{{[0-9]+}}:{{[0-9]+}}: error: failed to verify module interface of 'MyModule'; it may have been damaged or it may have triggered a bug in the Swift compiler when it was produced
+// CHECK: MyModule.swiftinterface:{{[0-9]+}}:{{[0-9]+}}: error: failed to verify module interface of 'MyModule' due to the errors above; the textual interface may be broken by project issues or a compiler bug

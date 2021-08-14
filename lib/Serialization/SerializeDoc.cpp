@@ -247,7 +247,7 @@ public:
     out << data.Brief;
     writer.write<uint32_t>(data.Raw.Comments.size());
     for (auto C : data.Raw.Comments) {
-      writer.write<uint32_t>(C.StartColumn);
+      writer.write<uint32_t>(C.ColumnIndent);
       writer.write<uint32_t>(C.RawText.size());
       out << C.RawText;
     }
@@ -341,12 +341,15 @@ static bool shouldIncludeDecl(Decl *D, bool ExcludeDoubleUnderscore) {
       return false;
   }
 
-  // Skip SPI decls.
-  if (D->isSPI())
+  // Skip SPI decls, unless we're generating a symbol graph with SPI information.
+  if (D->isSPI() && !D->getASTContext().SymbolGraphOpts.IncludeSPISymbols)
     return false;
 
   if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
-    return shouldIncludeDecl(ED->getExtendedNominal(), ExcludeDoubleUnderscore);
+    auto *extended = ED->getExtendedNominal();
+    if (!extended)
+      return false;
+    return shouldIncludeDecl(extended, ExcludeDoubleUnderscore);
   }
   if (ExcludeDoubleUnderscore && hasDoubleUnderscore(D)) {
     return false;
@@ -486,10 +489,14 @@ void DocSerializer::writeDocHeader() {
     control_block::TargetLayout Target(Out);
 
     auto& LangOpts = M->getASTContext().LangOpts;
+    auto verText = version::getSwiftFullVersion(LangOpts.EffectiveLanguageVersion);
     Metadata.emit(ScratchRecord, SWIFTDOC_VERSION_MAJOR, SWIFTDOC_VERSION_MINOR,
                   /*short version string length*/0, /*compatibility length*/0,
-                  version::getSwiftFullVersion(
-                    LangOpts.EffectiveLanguageVersion));
+                  /*user module version major*/0,
+                  /*user module version minor*/0,
+                  /*user module version subminor*/0,
+                  /*user module version build*/0,
+                  verText);
 
     ModuleName.emit(ScratchRecord, M->getName().str());
     Target.emit(ScratchRecord, LangOpts.Target.str());
@@ -520,14 +527,6 @@ void serialization::writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC,
   S.writeToStream(os);
 }
 namespace {
-struct DeclLocationsTableData {
-  uint32_t SourceFileOffset;
-  uint32_t DocRangesOffset;
-  LineColumn Loc;
-  LineColumn StartLoc;
-  LineColumn EndLoc;
-};
-
 class USRTableInfo {
 public:
   using key_type = StringRef;
@@ -615,6 +614,17 @@ public:
   }
 };
 
+static void writeRawLoc(const ExternalSourceLocs::RawLoc &Loc,
+                        endian::Writer &Writer, StringWriter &Strings) {
+  Writer.write<uint32_t>(Loc.Offset);
+  Writer.write<uint32_t>(Loc.Line);
+  Writer.write<uint32_t>(Loc.Column);
+
+  Writer.write<uint32_t>(Loc.Directive.Offset);
+  Writer.write<int32_t>(Loc.Directive.LineOffset);
+  Writer.write<uint32_t>(Loc.Directive.Length);
+  Writer.write<uint32_t>(Strings.getTextOffset(Loc.Directive.Name));
+}
 
 /**
  Records the locations of `SingleRawComment` pieces for a declaration
@@ -623,10 +633,11 @@ public:
  See: \c decl_locs_block::DocRangesLayout
  */
 class DocRangeWriter {
+  StringWriter &Strings;
   llvm::DenseMap<const Decl *, uint32_t> DeclOffsetMap;
   llvm::SmallString<1024> Buffer;
 public:
-  DocRangeWriter() {
+  DocRangeWriter(StringWriter &Strings) : Strings(Strings) {
     /**
      Offset 0 is reserved to mean "no offset", meaning that a declaration
      didn't have a doc comment.
@@ -639,8 +650,9 @@ public:
    twice on the same declaration will not duplicate data but return the
    original offset.
    */
-  uint32_t getDocRangesOffset(const Decl *D,
-      ArrayRef<std::pair<LineColumn, uint32_t>> DocRanges) {
+  uint32_t getDocRangesOffset(
+      const Decl *D,
+      ArrayRef<std::pair<ExternalSourceLocs::RawLoc, uint32_t>> DocRanges) {
     if (DocRanges.empty()) {
       return 0;
     }
@@ -652,13 +664,11 @@ public:
     }
 
     llvm::raw_svector_ostream OS(Buffer);
-
-    endian::write<uint32_t>(OS, DocRanges.size(), little);
-
-    for (const auto &LineColumnAndLength : DocRanges) {
-      endian::write<uint32_t>(OS, LineColumnAndLength.first.Line, little);
-      endian::write<uint32_t>(OS, LineColumnAndLength.first.Column, little);
-      endian::write<uint32_t>(OS, LineColumnAndLength.second, little);
+    endian::Writer Writer(OS, little);
+    Writer.write<uint32_t>(DocRanges.size());
+    for (const auto &DocRange : DocRanges) {
+      writeRawLoc(DocRange.first, Writer, Strings);
+      Writer.write<uint32_t>(DocRange.second);
     }
 
     return StartOffset;
@@ -687,47 +697,12 @@ struct BasicDeclLocsTableWriter : public ASTWalker {
   bool walkToTypeReprPre(TypeRepr *T) override { return false; }
   bool walkToParameterListPre(ParameterList *PL) override { return false; }
 
-  void appendToBuffer(DeclLocationsTableData data) {
-    llvm::raw_svector_ostream out(Buffer);
-    endian::Writer writer(out, little);
-    writer.write<uint32_t>(data.SourceFileOffset);
-    writer.write<uint32_t>(data.DocRangesOffset);
-#define WRITE_LINE_COLUMN(X)                                                  \
-writer.write<uint32_t>(data.X.Line);                                          \
-writer.write<uint32_t>(data.X.Column);
-    WRITE_LINE_COLUMN(Loc)
-    WRITE_LINE_COLUMN(StartLoc);
-    WRITE_LINE_COLUMN(EndLoc);
-#undef WRITE_LINE_COLUMN
-  }
-
   Optional<uint32_t> calculateNewUSRId(Decl *D) {
     llvm::SmallString<512> Buffer;
     llvm::raw_svector_ostream OS(Buffer);
     if (ide::printDeclUSR(D, OS))
       return None;
     return USRWriter.getNewUSRId(OS.str());
-  }
-
-  Optional<DeclLocationsTableData> getLocData(Decl *D) {
-    auto *File = D->getDeclContext()->getModuleScopeContext();
-    auto Locs = cast<FileUnit>(File)->getBasicLocsForDecl(D);
-    if (!Locs.hasValue())
-      return None;
-    DeclLocationsTableData Result;
-    llvm::SmallString<128> AbsolutePath = Locs->SourceFilePath;
-    llvm::sys::fs::make_absolute(AbsolutePath);
-    Result.SourceFileOffset = FWriter.getTextOffset(AbsolutePath.str());
-    Result.DocRangesOffset = DocWriter.getDocRangesOffset(D,
-      llvm::makeArrayRef(Locs->DocRanges));
-#define COPY_LINE_COLUMN(X)                                                   \
-Result.X.Line = Locs->X.Line;                                                 \
-Result.X.Column = Locs->X.Column;
-    COPY_LINE_COLUMN(Loc)
-    COPY_LINE_COLUMN(StartLoc)
-    COPY_LINE_COLUMN(EndLoc)
-#undef COPY_LINE_COLUMN
-    return Result;
   }
 
   bool shouldSerializeSourceLoc(Decl *D) {
@@ -737,11 +712,6 @@ Result.X.Column = Locs->X.Column;
   }
 
   bool walkToDeclPre(Decl *D) override {
-    SWIFT_DEFER {
-      assert(USRWriter.peekNextId() * sizeof(DeclLocationsTableData)
-             == Buffer.size() &&
-            "USR Id has a one-to-one mapping with DeclLocationsTableData");
-    };
     // .swiftdoc doesn't include comments for double underscored symbols, but
     // for .swiftsourceinfo, having the source location for these symbols isn't
     // a concern because these symbols are in .swiftinterface anyway.
@@ -749,15 +719,29 @@ Result.X.Column = Locs->X.Column;
       return false;
     if (!shouldSerializeSourceLoc(D))
       return true;
-    // If we cannot get loc data for D, don't proceed.
-    auto LocData = getLocData(D);
-    if (!LocData.hasValue())
+
+    auto *File = D->getDeclContext()->getModuleScopeContext();
+    auto RawLocs = cast<FileUnit>(File)->getExternalRawLocsForDecl(D);
+    if (!RawLocs.hasValue())
       return true;
-    // If we have handled this USR before, don't proceed.
+
+    // If we have handled this USR before, don't proceed
     auto USR = calculateNewUSRId(D);
     if (!USR.hasValue())
       return true;
-    appendToBuffer(*LocData);
+
+    llvm::SmallString<128> AbsolutePath = RawLocs->SourceFilePath;
+    llvm::sys::fs::make_absolute(AbsolutePath);
+
+    llvm::raw_svector_ostream Out(Buffer);
+    endian::Writer Writer(Out, little);
+    Writer.write<uint32_t>(FWriter.getTextOffset(AbsolutePath.str()));
+    Writer.write<uint32_t>(DocWriter.getDocRangesOffset(
+        D, llvm::makeArrayRef(RawLocs->DocRanges)));
+    writeRawLoc(RawLocs->Loc, Writer, FWriter);
+    writeRawLoc(RawLocs->StartLoc, Writer, FWriter);
+    writeRawLoc(RawLocs->EndLoc, Writer, FWriter);
+
     return true;
   }
 };
@@ -778,6 +762,76 @@ static void emitBasicLocsRecord(llvm::BitstreamWriter &Out,
 
   SmallVector<uint64_t, 8> scratch;
   DeclLocsList.emit(scratch, Writer.Buffer);
+}
+
+static void emitFileListRecord(llvm::BitstreamWriter &Out,
+                               ModuleOrSourceFile MSF, StringWriter &FWriter) {
+  assert(MSF);
+
+  struct SourceFileListWriter {
+    StringWriter &FWriter;
+
+    llvm::SmallString<0> Buffer;
+    llvm::StringSet<> seenFilenames;
+
+    void emitSourceFileInfo(const BasicSourceFileInfo &info) {
+      if (info.getFilePath().empty())
+        return;
+      // Make 'FilePath' absolute for serialization;
+      SmallString<128> absolutePath = info.getFilePath();
+      llvm::sys::fs::make_absolute(absolutePath);
+
+      // Don't emit duplicated files.
+      if (!seenFilenames.insert(absolutePath).second)
+        return;
+
+      auto fileID = FWriter.getTextOffset(absolutePath);
+
+      auto fingerprintStrIncludingTypeMembers =
+        info.getInterfaceHashIncludingTypeMembers().getRawValue();
+      auto fingerprintStrExcludingTypeMembers =
+        info.getInterfaceHashExcludingTypeMembers().getRawValue();
+
+      auto timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                           info.getLastModified().time_since_epoch())
+                           .count();
+
+      llvm::raw_svector_ostream out(Buffer);
+      endian::Writer writer(out, little);
+      // FilePath.
+      writer.write<uint32_t>(fileID);
+
+      // InterfaceHashIncludingTypeMembers (fixed length string).
+      assert(fingerprintStrIncludingTypeMembers.size() == Fingerprint::DIGEST_LENGTH);
+      out << fingerprintStrIncludingTypeMembers;
+
+      // InterfaceHashExcludingTypeMembers (fixed length string).
+      assert(fingerprintStrExcludingTypeMembers.size() == Fingerprint::DIGEST_LENGTH);
+      out << fingerprintStrExcludingTypeMembers;
+
+      // LastModified (nanoseconds since epoch).
+      writer.write<uint64_t>(timestamp);
+      // FileSize (num of bytes).
+      writer.write<uint64_t>(info.getFileSize());
+    }
+
+    SourceFileListWriter(StringWriter &FWriter) : FWriter(FWriter) {
+      Buffer.reserve(1024);
+    }
+  } writer(FWriter);
+
+  if (SourceFile *SF = MSF.dyn_cast<SourceFile *>()) {
+    writer.emitSourceFileInfo(BasicSourceFileInfo(SF));
+  } else {
+    auto *M = MSF.get<ModuleDecl *>();
+    M->collectBasicSourceFileInfo([&](const BasicSourceFileInfo &info) {
+      writer.emitSourceFileInfo(info);
+    });
+  }
+
+  const decl_locs_block::SourceFileListLayout FileList(Out);
+  SmallVector<uint64_t, 8> scratch;
+  FileList.emit(scratch, writer.Buffer);
 }
 
 class SourceInfoSerializer : public SerializerBase {
@@ -804,6 +858,7 @@ public:
     BLOCK_RECORD(control_block, TARGET);
 
     BLOCK(DECL_LOCS_BLOCK);
+    BLOCK_RECORD(decl_locs_block, SOURCE_FILE_LIST);
     BLOCK_RECORD(decl_locs_block, BASIC_DECL_LOCS);
     BLOCK_RECORD(decl_locs_block, DECL_USRS);
     BLOCK_RECORD(decl_locs_block, TEXT_DATA);
@@ -821,10 +876,15 @@ public:
       control_block::TargetLayout Target(Out);
 
       auto& LangOpts = M->getASTContext().LangOpts;
+      auto verText = version::getSwiftFullVersion(LangOpts.EffectiveLanguageVersion);
       Metadata.emit(ScratchRecord, SWIFTSOURCEINFO_VERSION_MAJOR,
                     SWIFTSOURCEINFO_VERSION_MINOR,
                     /*short version string length*/0, /*compatibility length*/0,
-              version::getSwiftFullVersion(LangOpts.EffectiveLanguageVersion));
+                    /*user module version major*/0,
+                    /*user module version minor*/0,
+                    /*user module version sub-minor*/0,
+                    /*user module version build*/0,
+                    verText);
 
       ModuleName.emit(ScratchRecord, M->getName().str());
       Target.emit(ScratchRecord, LangOpts.Target.str());
@@ -845,7 +905,8 @@ void serialization::writeSourceInfoToStream(raw_ostream &os,
       BCBlockRAII restoreBlock(S.Out, DECL_LOCS_BLOCK_ID, 4);
       DeclUSRsTableWriter USRWriter;
       StringWriter FPWriter;
-      DocRangeWriter DocWriter;
+      DocRangeWriter DocWriter(FPWriter);
+      emitFileListRecord(S.Out, DC, FPWriter);
       emitBasicLocsRecord(S.Out, DC, USRWriter, FPWriter, DocWriter);
       // Emit USR table mapping from a USR to USR Id.
       // The basic locs record uses USR Id instead of actual USR, so that we

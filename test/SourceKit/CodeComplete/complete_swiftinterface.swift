@@ -2,7 +2,7 @@
 // RUN: %empty-directory(%t/modulecache)
 
 // 1) Build .swiftinterface files for MyPoint and MyExtensions, using a non-default module cache path
-// RUN: %target-swift-frontend -emit-module-interface-path %t/MyPoint.swiftinterface -module-name MyPoint -emit-module -o /dev/null %S/Inputs/parseable-interface/MyPoint.swift
+// RUN: %target-swift-frontend -emit-module-interface-path %t/MyPointModule.swiftinterface -module-name MyPointModule -emit-module -o /dev/null %S/Inputs/parseable-interface/MyPoint.swift
 // RUN: %target-swift-frontend -emit-module-interface-path %t/MyPointExtensions.swiftinterface -module-name MyPointExtensions -emit-module -o /dev/null -module-cache-path %t/modulecache -I %t %S/Inputs/parseable-interface/MyPointExtensions.swift
 // RUN: %empty-directory(%t/modulecache)
 
@@ -12,7 +12,7 @@
 // 3) Check completion again with a warm module cache
 // RUN: %target-swift-ide-test -code-completion -code-completion-token=MEMBER -source-filename %s -I %t | %FileCheck %s
 
-import MyPoint
+import MyPointModule
 import MyPointExtensions
 
 let x = MyPoint(x: 1, y: 10.5)

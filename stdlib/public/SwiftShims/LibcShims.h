@@ -43,7 +43,7 @@ __swift_size_t _swift_stdlib_fwrite_stdout(const void *ptr, __swift_size_t size,
 // General utilities <stdlib.h>
 // Memory management functions
 static inline void _swift_stdlib_free(void *_Nullable ptr) {
-  extern void free(void *);
+  extern void free(void *_Nullable);
   free(ptr);
 }
 
@@ -70,7 +70,11 @@ static inline __swift_size_t _swift_stdlib_strlen_unsigned(const unsigned char *
 SWIFT_READONLY
 static inline int _swift_stdlib_memcmp(const void *s1, const void *s2,
                                        __swift_size_t n) {
+#if defined(__APPLE__)
+  extern int memcmp(const void * _Nullable, const void * _Nullable, __swift_size_t);
+#else
   extern int memcmp(const void *, const void *, __swift_size_t);
+#endif
   return memcmp(s1, s2, n);
 }
 
@@ -129,7 +133,12 @@ float _stdlib_remainderf(float _self, float _other) {
   
 static inline SWIFT_ALWAYS_INLINE
 float _stdlib_squareRootf(float _self) {
+#if defined(_WIN32) && (defined(_M_IX86) || defined(__i386__))
+  typedef float __m128 __attribute__((__vector_size__(16), __aligned__(16)));
+  return __builtin_ia32_sqrtss(__extension__ (__m128){ _self, 0, 0, 0 })[0];
+#else
   return __builtin_sqrtf(_self);
+#endif
 }
 
 static inline SWIFT_ALWAYS_INLINE

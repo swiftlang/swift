@@ -14,7 +14,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Identifier.h"
+#include "swift/Parse/Lexer.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/ConvertUTF.h"
@@ -226,6 +228,39 @@ ObjCSelector::ObjCSelector(ASTContext &ctx, unsigned numArgs,
 
   assert(numArgs == pieces.size() && "Wrong number of selector pieces");
   Storage = DeclName(ctx, Identifier(), pieces);
+}
+
+llvm::Optional<ObjCSelector>
+ObjCSelector::parse(ASTContext &ctx, StringRef string) {
+  // Find the first colon.
+  auto colonPos = string.find(':');
+
+  // If there is no colon, we have a nullary selector.
+  if (colonPos == StringRef::npos) {
+    if (string.empty() || !Lexer::isIdentifier(string)) return None;
+    return ObjCSelector(ctx, 0, { ctx.getIdentifier(string) });
+  }
+
+  SmallVector<Identifier, 2> pieces;
+  do {
+    // Check whether we have a valid selector piece.
+    auto piece = string.substr(0, colonPos);
+    if (piece.empty()) {
+      pieces.push_back(Identifier());
+    } else {
+      if (!Lexer::isIdentifier(piece)) return None;
+      pieces.push_back(ctx.getIdentifier(piece));
+    }
+
+    // Move to the next piece.
+    string = string.substr(colonPos+1);
+    colonPos = string.find(':');
+  } while (colonPos != StringRef::npos);
+
+  // If anything remains of the string, it's not a selector.
+  if (!string.empty()) return None;
+
+  return ObjCSelector(ctx, pieces.size(), pieces);
 }
 
 ObjCSelectorFamily ObjCSelector::getSelectorFamily() const {

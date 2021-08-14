@@ -12,14 +12,18 @@
 
 #define DEBUG_TYPE "sil-dce"
 #include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
+#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -37,13 +41,22 @@ namespace {
 
 // Without any complex analysis, does this instruction seem like
 // something that we need to keep?
+//
 // FIXME: Reconcile the similarities between this and
 //        isInstructionTriviallyDead.
 static bool seemsUseful(SILInstruction *I) {
-  // begin_access is defined to have side effects, but this is not relevant for
-  // DCE.
-  if (isa<BeginAccessInst>(I))
+  // Even though begin_access/destroy_value/copy_value/end_lifetime have
+  // side-effects, they can be DCE'ed if they do not have useful
+  // dependencies/reverse dependencies
+  if (isa<BeginAccessInst>(I) || isa<CopyValueInst>(I) ||
+      isa<DestroyValueInst>(I) || isa<EndLifetimeInst>(I))
     return false;
+
+  // A load [copy] is okay to be DCE'ed if there are no useful dependencies
+  if (auto *load = dyn_cast<LoadInst>(I)) {
+    if (load->getOwnershipQualifier() == LoadOwnershipQualifier::Copy)
+      return false;
+  }
 
   if (I->mayHaveSideEffects())
     return true;
@@ -60,6 +73,10 @@ static bool seemsUseful(SILInstruction *I) {
     if (TI->isFunctionExiting())
       return true;
   }
+
+  // Is useful if it's associating with a function argument
+  if (isa<DebugValueInst>(I) || isa<DebugValueAddrInst>(I))
+    return isa<SILFunctionArgument>(I->getOperand(0));
 
   return false;
 }
@@ -79,11 +96,13 @@ struct ControllingInfo {
   unsigned MinTreePredLevel;
 };
 
-class DCE : public SILFunctionTransform {
+class DCE {
   typedef llvm::DomTreeNodeBase<SILBasicBlock> PostDomTreeNode;
 
-  llvm::SmallPtrSet<SILNode *, 16> LiveValues;
-  llvm::SmallPtrSet<SILBasicBlock *, 16> LiveBlocks;
+  SILFunction *F;
+  llvm::SmallPtrSet<SILArgument *, 16> LiveArguments;
+  llvm::SmallPtrSet<SILInstruction *, 16> LiveInstructions;
+  BasicBlockSet LiveBlocks;
   llvm::SmallVector<SILInstruction *, 64> Worklist;
   PostDominanceInfo *PDT;
   llvm::DenseMap<SILBasicBlock *, ControllingInfo> ControllingInfoMap;
@@ -94,86 +113,48 @@ class DCE : public SILFunctionTransform {
   // Dependencies which go in the reverse direction. Usually for a pair
   //   %1 = inst_a
   //   inst_b(%1)
-  // the dependency goes from inst_b to inst_a: if inst_b is alive then also
-  // inst_a is alive.
+  // the dependency goes from inst_b to inst_a: if inst_b is alive then
+  // inst_a is also alive.
   // For some instructions the dependency is exactly the other way round, e.g.
   //   %1 = inst_which_can_fail
   //   cond_fail(%1)
   // In this case cond_fail is alive only if inst_which_can_fail is alive.
   // The key of this map is the source of the dependency (inst_a), the
-  // value is the destination (inst_b).
-  llvm::DenseMap<SILInstruction *, SILInstruction *> ReverseDependencies;
+  // value is the set of instructions dependent on it (inst_b).
+  llvm::DenseMap<SILValue, SmallPtrSet<SILInstruction *, 4>>
+      ReverseDependencies;
+
+  // reborrowDependencies tracks the dependency of a reborrowed phiArg with its
+  // renamed base value.
+  // A reborrowed phiArg may have a new base value, if it's original base value
+  // was also passed as a branch operand. The renamed base value should then be
+  // live if the reborrow phiArg was also live.
+  using BaseValueSet = SmallPtrSet<SILValue, 8>;
+  llvm::DenseMap<SILPhiArgument *, BaseValueSet> reborrowDependencies;
 
   /// Tracks if the pass changed branches.
-  bool BranchesChanged;
+  bool BranchesChanged = false;
   /// Tracks if the pass changed ApplyInsts.
-  bool CallsChanged;
+  bool CallsChanged = false;
 
-  /// The entry point to the transformation.
-  void run() override {
-    BranchesChanged = false;
-    CallsChanged = false;
-
-    SILFunction *F = getFunction();
-
-    // FIXME: Support ownership.
-    if (F->hasOwnership())
-      return;
-
-    auto *DA = PM->getAnalysis<PostDominanceAnalysis>();
-    PDT = DA->get(F);
-
-    // If we have a function that consists of nothing but a
-    // structurally infinite loop like:
-    //   while true {}
-    // we'll have an empty post dominator tree.
-    if (!PDT->getRootNode())
-      return;
-
-    LLVM_DEBUG(F->dump());
-    LLVM_DEBUG(PDT->print(llvm::dbgs()));
-
-    assert(Worklist.empty() && LiveValues.empty() && LiveBlocks.empty() &&
-           ControllingInfoMap.empty() && ReverseDependencies.empty() &&
-           "Expected to start with empty data structures!");
-
-    if (!precomputeControlInfo(*F)) {
-      LiveValues.clear();
-      LiveBlocks.clear();
-      ControllingInfoMap.clear();
-      ReverseDependencies.clear();
-      return;
-    }
-
-    markLive(*F);
-    if (removeDead(*F)) {
-      using InvalidationKind = SILAnalysis::InvalidationKind;
-
-      unsigned Inv = InvalidationKind::Instructions;
-      if (CallsChanged)        Inv |= (unsigned) InvalidationKind::Calls;
-      if (BranchesChanged)     Inv |= (unsigned) InvalidationKind::Branches;
-
-      invalidateAnalysis(SILAnalysis::InvalidationKind(Inv));
-    }
-
-    LiveValues.clear();
-    LiveBlocks.clear();
-    ControllingInfoMap.clear();
-    ReverseDependencies.clear();
-  }
-
-  bool precomputeControlInfo(SILFunction &F);
-  void markLive(SILFunction &F);
-  void addReverseDependency(SILInstruction *From, SILInstruction *To);
-  bool removeDead(SILFunction &F);
+  bool precomputeControlInfo();
+  void markLive();
+  /// Record a reverse dependency from \p from to \p to meaning \p to is live
+  /// if \p from is also live.
+  void addReverseDependency(SILValue from, SILInstruction *to);
+  /// Starting from \p borrowInst find all reborrow dependency of its reborrows
+  /// with their renamed base values.
+  void findReborrowDependencies(BeginBorrowInst *borrowInst);
+  bool removeDead();
 
   void computeLevelNumbers(PostDomTreeNode *root);
-  bool hasInfiniteLoops(SILFunction &F);
-  void computePredecessorDependence(SILFunction &F);
+  bool hasInfiniteLoops();
+  void computePredecessorDependence();
   void computeMinPredecessorLevels(PostDomTreeNode *root);
   void insertControllingInfo(SILBasicBlock *Block, unsigned Level);
 
-  void markValueLive(SILNode *V);
+  void markValueLive(SILValue V);
+  void markInstructionLive(SILInstruction *Inst);
   void markTerminatorArgsLive(SILBasicBlock *Pred, SILBasicBlock *Succ,
                               size_t ArgIndex);
   void markControllingTerminatorsLive(SILBasicBlock *Block);
@@ -186,41 +167,59 @@ class DCE : public SILFunctionTransform {
                                 llvm::SmallPtrSetImpl<SILBasicBlock *> &);
   SILBasicBlock *nearestUsefulPostDominator(SILBasicBlock *Block);
   void replaceBranchWithJump(SILInstruction *Inst, SILBasicBlock *Block);
+  /// If \p value is live, insert a lifetime ending operation in ossa.
+  /// destroy_value for @owned value and end_borrow for a @guaranteed value.
+  void endLifetimeOfLiveValue(SILValue value, SILInstruction *insertPt);
 
+public:
+  DCE(SILFunction *F, PostDominanceInfo *PDT) : F(F), LiveBlocks(F), PDT(PDT) {}
+
+  /// The entry point to the transformation.
+  bool run() {
+    if (!precomputeControlInfo())
+      return false;
+
+    markLive();
+    return removeDead();
+  }
+  
+  bool mustInvalidateCalls() const { return CallsChanged; }
+  bool mustInvalidateBranches() const { return BranchesChanged; }
 };
 
 // Keep track of the fact that V is live and add it to our worklist
 // so that we can process the values it depends on.
-void DCE::markValueLive(SILNode *V) {
-  V = V->getRepresentativeSILNodeInObject();
-  if (LiveValues.count(V) || isa<SILUndef>(V))
+void DCE::markValueLive(SILValue V) {
+  if (SILInstruction *inst = V->getDefiningInstruction())
+    return markInstructionLive(inst);
+
+  if (isa<SILUndef>(V))
     return;
 
-  LLVM_DEBUG(llvm::dbgs() << "Marking as live:\n");
-  LLVM_DEBUG(V->dump());
-
-  LiveValues.insert(V);
-
-  if (auto *Def = dyn_cast<SILInstruction>(V)) {
-    markControllingTerminatorsLive(Def->getParent());
-    Worklist.push_back(Def);
-    return;
-  }
-
-  // TODO: MultiValueInstruction
-
-  assert(isa<SILArgument>(V) &&
-         "Only expected instructions and arguments!");
+  LLVM_DEBUG(llvm::dbgs() << "Marking as live: " << *V);
 
   auto *Arg = cast<SILArgument>(V);
+  if (!LiveArguments.insert(Arg).second)
+    return;
+
   markControllingTerminatorsLive(Arg->getParent());
   propagateLiveBlockArgument(Arg);
+}
+
+void DCE::markInstructionLive(SILInstruction *Inst) {
+  if (!LiveInstructions.insert(Inst).second)
+    return;
+
+  LLVM_DEBUG(llvm::dbgs() << "Marking as live: " << *Inst);
+
+  markControllingTerminatorsLive(Inst->getParent());
+  Worklist.push_back(Inst);
 }
 
 /// Gets the producing instruction of a cond_fail condition. Currently these
 /// are overflow builtins but may be extended to other instructions in the
 /// future.
-static SILInstruction *getProducer(CondFailInst *CFI) {
+static BuiltinInst *getProducer(CondFailInst *CFI) {
   // Check for the pattern:
   //   %1 = builtin "some_operation_with_overflow"
   //   %2 = tuple_extract %1
@@ -235,43 +234,76 @@ static SILInstruction *getProducer(CondFailInst *CFI) {
 }
 
 // Determine which instructions from this function we need to keep.
-void DCE::markLive(SILFunction &F) {
-
+void DCE::markLive() {
   // Find the initial set of instructions in this function that appear
   // to be live in the sense that they are not trivially something we
   // can delete by examining only that instruction.
-  for (auto &BB : F) {
+  for (auto &BB : *F) {
     for (auto &I : BB) {
-      if (auto *CFI = dyn_cast<CondFailInst>(&I)) {
-        // A cond_fail is only alive if its (identifiable) producer is alive.
-        if (SILInstruction *Prod = getProducer(CFI)) {
-          addReverseDependency(Prod, CFI);
+      switch (I.getKind()) {
+      case SILInstructionKind::CondFailInst: {
+        if (auto *Prod = getProducer(cast<CondFailInst>(&I))) {
+          addReverseDependency(Prod, &I);
         } else {
-          markValueLive(CFI);
+          markInstructionLive(&I);
         }
-        continue;
+        break;
       }
-      if (auto *FLI = dyn_cast<FixLifetimeInst>(&I)) {
-        // A fix_lifetime (with a non-address type) is only alive if it's
-        // definition is alive.
-        SILValue Op = FLI->getOperand();
-        auto *OpInst = Op->getDefiningInstruction();
-        if (OpInst && !Op->getType().isAddress()) {
-          addReverseDependency(OpInst, FLI);
+      // The side-effects of fix_lifetime effect all references to the same
+      // object. It must be preserved to keep alive any potentially aliasing
+      // references. fix_lifetime can only be removed by proving that its
+      // operand is both a unique and a dead reference, but this makes more
+      // sense in DeadObjectElimination.
+      case SILInstructionKind::FixLifetimeInst: {
+        // If the operand is a trivial scalar value, then it has no aliases or
+        // side-effects. Consider handling this as an instruction
+        // canonicalization instead.
+        SILValue Op = I.getOperand(0);
+        if (!Op->getType().isAddress() && Op->getType().isTrivial(*F)) {
+          addReverseDependency(Op, &I);
         } else {
-          markValueLive(FLI);
+          markInstructionLive(&I);
         }
-        continue;
+        break;
       }
-      if (auto *endAccess = dyn_cast<EndAccessInst>(&I)) {
-        addReverseDependency(endAccess->getBeginAccess(), &I);
-        continue;
+      case SILInstructionKind::EndAccessInst: {
+        // An end_access is live only if it's begin_access is also live.
+        auto *beginAccess = cast<EndAccessInst>(&I)->getBeginAccess();
+        addReverseDependency(beginAccess, &I);
+        break;
       }
-      if (seemsUseful(&I))
-        markValueLive(&I);
+      case SILInstructionKind::DestroyValueInst:
+      case SILInstructionKind::EndBorrowInst:
+      case SILInstructionKind::EndLifetimeInst: {
+        // The instruction is live only if it's operand value is also live
+        addReverseDependency(I.getOperand(0), &I);
+        break;
+      }
+      case SILInstructionKind::BeginBorrowInst: {
+        // Currently we only support borrows of owned values.
+        // Nested borrow handling can be complex in the presence of reborrows.
+        // So it is not handled currently.
+        auto *borrowInst = cast<BeginBorrowInst>(&I);
+        if (borrowInst->getOperand().getOwnershipKind() !=
+            OwnershipKind::Owned) {
+          markInstructionLive(borrowInst);
+          // Visit all end_borrows and mark them live
+          visitTransitiveEndBorrows(BorrowedValue(borrowInst),
+            [&](EndBorrowInst *endBorrow) {
+              markInstructionLive(endBorrow);
+            });
+          continue;
+        }
+        // If not populate reborrowDependencies for this borrow
+        findReborrowDependencies(cast<BeginBorrowInst>(&I));
+        break;
+      }
+      default:
+        if (seemsUseful(&I))
+          markInstructionLive(&I);
+      }
     }
   }
-
   // Now propagate liveness backwards from each instruction in our
   // worklist, adding new instructions to the worklist as we discover
   // more that we need to keep.
@@ -281,17 +313,26 @@ void DCE::markLive(SILFunction &F) {
   }
 }
 
-// Records a reverse dependency. See DCE::ReverseDependencies.
-void DCE::addReverseDependency(SILInstruction *From, SILInstruction *To) {
-  assert(!ReverseDependencies.lookup(To) &&
-         "Target of reverse dependency already in map");
-  SILInstruction *&Target = ReverseDependencies[From];
-  SILInstruction *ExistingTarget = Target;
-  Target = To;
-  if (ExistingTarget) {
-    // Create a single linked chain if From has multiple targets.
-    ReverseDependencies[To] = ExistingTarget;
-  }
+// Records a reverse dependency if needed. See DCE::ReverseDependencies.
+void DCE::addReverseDependency(SILValue from, SILInstruction *to) {
+  LLVM_DEBUG(llvm::dbgs() << "Adding reverse dependency from " << from << " to "
+                          << to);
+  ReverseDependencies[from].insert(to);
+}
+
+void DCE::findReborrowDependencies(BeginBorrowInst *borrowInst) {
+  LLVM_DEBUG(llvm::dbgs() << "Finding reborrow dependencies of " << borrowInst
+                          << "\n");
+  BorrowingOperand initialScopedOperand(&borrowInst->getOperandRef());
+  auto visitReborrowBaseValuePair = [&](SILPhiArgument *phiArg,
+                                        SILValue baseValue) {
+    reborrowDependencies[phiArg].insert(baseValue);
+  };
+  // Find all reborrow dependencies starting from \p borrowInst and populate
+  // them in reborrowDependencies
+  findTransitiveReborrowBaseValuePairs(initialScopedOperand,
+                                       borrowInst->getOperand(),
+                                       visitReborrowBaseValuePair);
 }
 
 // Mark as live the terminator argument at index ArgIndex in Pred that
@@ -303,7 +344,7 @@ void DCE::markTerminatorArgsLive(SILBasicBlock *Pred,
 
   // If the arguments are live, we need to keep the terminator that
   // delivers those arguments.
-  markValueLive(Term);
+  markInstructionLive(Term);
 
   switch (Term->getTermKind()) {
   case TermKind::ReturnInst:
@@ -364,10 +405,18 @@ void DCE::propagateLiveBlockArgument(SILArgument *Arg) {
   // is in reverse direction: Only if its definition (the Arg) is alive, also
   // the debug_value instruction is alive.
   for (Operand *DU : getDebugUses(Arg))
-    markValueLive(DU->getUser());
+    markInstructionLive(DU->getUser());
 
-  if (isa<SILFunctionArgument>(Arg))
-    return;
+  // Mark all reverse dependencies on the Arg live
+  for (auto *depInst : ReverseDependencies.lookup(Arg)) {
+    markInstructionLive(depInst);
+  }
+
+  if (auto *phi = dyn_cast<SILPhiArgument>(Arg)) {
+    for (auto depVal : reborrowDependencies.lookup(phi)) {
+      markValueLive(depVal);
+    }
+  }
 
   auto *Block = Arg->getParent();
   auto ArgIndex = Arg->getIndex();
@@ -388,12 +437,15 @@ void DCE::propagateLiveness(SILInstruction *I) {
     // debug_value instruction is alive.
     for (auto result : I->getResults())
       for (Operand *DU : getDebugUses(result))
-        markValueLive(DU->getUser());
+        markInstructionLive(DU->getUser());
 
-    // Handle all other reverse-dependency instructions, like cond_fail and
-    // fix_lifetime. Only if the definition is alive, the user itself is alive.
-    if (SILInstruction *DepInst = ReverseDependencies.lookup(I)) {
-      markValueLive(DepInst);
+    // Handle all other reverse-dependency instructions, like cond_fail,
+    // fix_lifetime, destroy_value, etc. Only if the definition is alive, the
+    // user itself is alive.
+    for (auto res : I->getResults()) {
+      for (auto *depInst : ReverseDependencies.lookup(res)) {
+        markInstructionLive(depInst);
+      }
     }
     return;
   }
@@ -430,7 +482,11 @@ void DCE::propagateLiveness(SILInstruction *I) {
 SILBasicBlock *DCE::nearestUsefulPostDominator(SILBasicBlock *Block) {
   // Find the nearest post-dominator that has useful instructions.
   auto *PostDomNode = PDT->getNode(Block)->getIDom();
-  while (PostDomNode && !LiveBlocks.count(PostDomNode->getBlock()))
+  while (PostDomNode &&
+         // In case the PostDomNode's block is null, it means it's not contained
+         // in LiveBlocks.
+         (!PostDomNode->getBlock() ||
+          !LiveBlocks.contains(PostDomNode->getBlock())))
     PostDomNode = PostDomNode->getIDom();
 
   if (PostDomNode)
@@ -458,7 +514,7 @@ void DCE::replaceBranchWithJump(SILInstruction *Inst, SILBasicBlock *Block) {
     std::vector<SILValue> Args;
     auto E = Block->args_end();
     for (auto A = Block->args_begin(); A != E; ++A) {
-      assert(!LiveValues.count(*A) && "Unexpected live block argument!");
+      assert(!LiveArguments.count(*A) && "Unexpected live block argument!");
       Args.push_back(SILUndef::get((*A)->getType(), *(*A)->getFunction()));
     }
     Branch =
@@ -471,37 +527,119 @@ void DCE::replaceBranchWithJump(SILInstruction *Inst, SILBasicBlock *Block) {
   (void)Branch;
 }
 
+void DCE::endLifetimeOfLiveValue(SILValue value, SILInstruction *insertPt) {
+  if (SILInstruction *inst = value->getDefiningInstruction()) {
+    if (!LiveInstructions.count(inst))
+      return;
+  } else if (auto *arg = dyn_cast<SILArgument>(value)) {
+    if (!LiveArguments.count(arg))
+      return;
+  }
+  SILBuilderWithScope builder(insertPt);
+  if (value.getOwnershipKind() == OwnershipKind::Owned) {
+    builder.emitDestroyOperation(RegularLocation::getAutoGeneratedLocation(),
+                                 value);
+  }
+  if (value.getOwnershipKind() == OwnershipKind::Guaranteed) {
+    builder.emitEndBorrowOperation(RegularLocation::getAutoGeneratedLocation(),
+                                   value);
+  }
+}
+
 // Remove the instructions that are not potentially useful.
-bool DCE::removeDead(SILFunction &F) {
+bool DCE::removeDead() {
   bool Changed = false;
 
-  for (auto &BB : F) {
-    for (auto I = BB.args_begin(), E = BB.args_end(); I != E;) {
-      auto Inst = *I++;
-      if (LiveValues.count(Inst))
+  for (auto &BB : *F) {
+    for (unsigned i = 0; i < BB.getArguments().size();) {
+      auto *arg = BB.getArgument(i);
+      if (LiveArguments.count(arg)) {
+        i++;
         continue;
+      }
 
       LLVM_DEBUG(llvm::dbgs() << "Removing dead argument:\n");
-      LLVM_DEBUG(Inst->dump());
+      LLVM_DEBUG(arg->dump());
 
-      Inst->replaceAllUsesWithUndef();
+      arg->replaceAllUsesWithUndef();
 
+      if (!F->hasOwnership() || arg->getOwnershipKind() == OwnershipKind::None) {
+        i++;
+        Changed = true;
+        BranchesChanged = true;
+        continue;
+      }
+
+      if (!arg->isPhiArgument()) {
+        // We cannot delete a non phi arg. If it was @owned, insert a
+        // destroy_value, because its consuming user has already been marked
+        // dead and will be deleted.
+        // We do not have to end lifetime of a @guaranteed non phi arg.
+        if (arg->getOwnershipKind() == OwnershipKind::Owned) {
+          auto insertPt = getInsertAfterPoint(arg).getValue();
+          SILBuilderWithScope builder(insertPt);
+          auto *destroy = builder.createDestroyValue(insertPt->getLoc(), arg);
+          LiveInstructions.insert(destroy);
+        }
+        i++;
+        Changed = true;
+        BranchesChanged = true;
+        continue;
+      }
+
+      auto *phiArg = cast<SILPhiArgument>(arg);
+      // In OSSA, we have to delete a dead phi argument and insert destroy or
+      // end_borrow at its predecessors if the incoming values are live.
+      // This is not necessary in non-OSSA, and will infact be incorrect.
+      // Because, passing a value as a phi argument does not imply end of
+      // lifetime in non-OSSA.
+      for (auto *pred : BB.getPredecessorBlocks()) {
+        auto *predTerm = pred->getTerminator();
+        SILInstruction *insertPt = predTerm;
+        if (phiArg->getOwnershipKind() == OwnershipKind::Guaranteed) {
+          // If the phiArg is dead and had reborrow dependencies, its baseValue
+          // may also have been dead and a destroy_value of its baseValue may
+          // have been inserted before the pred's terminator. Make sure to
+          // adjust the insertPt before any destroy_value.
+          for (SILInstruction &predInst : llvm::reverse(*pred)) {
+            if (&predInst == predTerm)
+              continue;
+            if (!isa<DestroyValueInst>(&predInst)) {
+              insertPt = &*std::next(predInst.getIterator());
+              break;
+            }
+          }
+        }
+
+        endLifetimeOfLiveValue(phiArg->getIncomingPhiValue(pred), insertPt);
+      }
+      erasePhiArgument(&BB, i);
       Changed = true;
+      BranchesChanged = true;
     }
 
     for (auto I = BB.begin(), E = BB.end(); I != E; ) {
       auto *Inst = &*I;
       ++I;
-      if (LiveValues.count(Inst) || isa<BranchInst>(Inst))
+      if (LiveInstructions.count(Inst) || isa<BranchInst>(Inst))
         continue;
 
       // We want to replace dead terminators with unconditional branches to
       // the nearest post-dominator that has useful instructions.
-      if (isa<TermInst>(Inst)) {
+      if (auto *termInst = dyn_cast<TermInst>(Inst)) {
         SILBasicBlock *postDom = nearestUsefulPostDominator(Inst->getParent());
         if (!postDom)
           continue;
-  
+
+        for (auto &op : termInst->getAllOperands()) {
+          if (op.isLifetimeEnding()) {
+            endLifetimeOfLiveValue(op.get(), termInst);
+          }
+        }
+        LLVM_DEBUG(llvm::dbgs() << "Replacing branch: ");
+        LLVM_DEBUG(Inst->dump());
+        LLVM_DEBUG(llvm::dbgs() << "with jump to: BB" << postDom->getDebugID());
+
         replaceBranchWithJump(Inst, postDom);
         Inst->eraseFromParent();
         BranchesChanged = true;
@@ -514,6 +652,13 @@ bool DCE::removeDead(SILFunction &F) {
       LLVM_DEBUG(llvm::dbgs() << "Removing dead instruction:\n");
       LLVM_DEBUG(Inst->dump());
 
+      if (F->hasOwnership()) {
+        for (auto &Op : Inst->getAllOperands()) {
+          if (Op.isLifetimeEnding()) {
+            endLifetimeOfLiveValue(Op.get(), Inst);
+          }
+        }
+      }
       Inst->replaceAllUsesOfAllResultsWithUndef();
 
       if (isa<ApplyInst>(Inst))
@@ -547,11 +692,11 @@ bool DCE::removeDead(SILFunction &F) {
 //
 // Returns true upon success, false if nodes that are not present in the
 // post-dominator tree are detected.
-bool DCE::precomputeControlInfo(SILFunction &F) {
+bool DCE::precomputeControlInfo() {
   computeLevelNumbers(PDT->getRootNode());
-  if (hasInfiniteLoops(F))
+  if (hasInfiniteLoops())
     return false;
-  computePredecessorDependence(F);
+  computePredecessorDependence();
   computeMinPredecessorLevels(PDT->getRootNode());
   return true;
 }
@@ -596,8 +741,8 @@ void DCE::computeLevelNumbers(PostDomTreeNode *root) {
 // elimination. Note this will also hit for unreachable code, but
 // presumably we'll run DCE at some point after removing unreachable
 // code.
-bool DCE::hasInfiniteLoops(SILFunction &F) {
-  for (auto &BB : F)
+bool DCE::hasInfiniteLoops() {
+  for (auto &BB : *F)
     if (ControllingInfoMap.find(&BB) == ControllingInfoMap.end())
       return true;
 
@@ -607,8 +752,8 @@ bool DCE::hasInfiniteLoops(SILFunction &F) {
 // For each block, create a list of the direct predecessors that the
 // block is control-dependent on. With each predecessor, also keep the
 // level number of the predecessor in the post-dominator tree.
-void DCE::computePredecessorDependence(SILFunction &F) {
-  for (auto &BB : F) {
+void DCE::computePredecessorDependence() {
+  for (auto &BB : *F) {
     assert(ControllingInfoMap.find(&BB) != ControllingInfoMap.end()
            && "Expected to already have a map entry for block!");
 
@@ -708,7 +853,7 @@ void DCE::collectControllingBlocks(SILBasicBlock *Block,
 }
 
 void DCE::markControllingTerminatorsLive(SILBasicBlock *Block) {
-  if (LiveBlocks.count(Block))
+  if (LiveBlocks.contains(Block))
     return;
 
   LiveBlocks.insert(Block);
@@ -717,11 +862,45 @@ void DCE::markControllingTerminatorsLive(SILBasicBlock *Block) {
   collectControllingBlocks(Block, ControllingBlocks);
 
   for (auto BB : ControllingBlocks)
-    markValueLive(BB->getTerminator());
+    markInstructionLive(BB->getTerminator());
 }
+
+class DCEPass : public SILFunctionTransform {
+public:
+  /// The entry point to the transformation.
+  void run() override {
+    SILFunction *F = getFunction();
+
+    LLVM_DEBUG(llvm::dbgs() << "*** DCE on function: " << F->getName()
+                            << " ***\n");
+
+    auto *DA = PM->getAnalysis<PostDominanceAnalysis>();
+    PostDominanceInfo *PDT = DA->get(F);
+
+    // If we have a function that consists of nothing but a
+    // structurally infinite loop like:
+    //   while true {}
+    // we'll have an empty post dominator tree.
+    if (!PDT->getRootNode())
+      return;
+
+    DCE dce(F, PDT);
+    if (dce.run()) {
+      using InvalidationKind = SILAnalysis::InvalidationKind;
+      unsigned Inv = InvalidationKind::Instructions;
+      if (dce.mustInvalidateCalls())
+        Inv |= (unsigned)InvalidationKind::Calls;
+      if (dce.mustInvalidateBranches()) {
+        removeUnreachableBlocks(*F);
+        Inv |= (unsigned)InvalidationKind::Branches;
+      }
+      invalidateAnalysis(SILAnalysis::InvalidationKind(Inv));
+    }
+  }
+};
 
 } // end anonymous namespace
 
 SILTransform *swift::createDCE() {
-  return new DCE();
+  return new DCEPass();
 }

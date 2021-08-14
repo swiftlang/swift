@@ -19,12 +19,16 @@ struct Outer {
 
 func foo(x : NSUInteger) { // expected-error {{'NSUInteger' is unavailable: use 'Int' instead}}
      let y : NSUInteger = 42 // expected-error {{'NSUInteger' is unavailable: use 'Int' instead}}
+     // expected-error@-1 {{cannot convert value of type 'Int' to specified type 'NSUInteger'}}
 
   let z : MyModule.NSUInteger = 42 // expected-error {{'NSUInteger' is unavailable: use 'Int' instead}}
+  // expected-error@-1 {{cannot convert value of type 'Int' to specified type 'NSUInteger'}}
 
-  let z2 : Outer.NSUInteger = 42 // expected-error {{'NSUInteger' is unavailable: use 'UInt' instead}}  
+  let z2 : Outer.NSUInteger = 42 // expected-error {{'NSUInteger' is unavailable: use 'UInt' instead}}
+  // expected-error@-1 {{cannot convert value of type 'Int' to specified type 'Outer.NSUInteger'}}
 
-  let z3 : MyModule.Outer.NSUInteger = 42 // expected-error {{'NSUInteger' is unavailable: use 'UInt' instead}}  
+  let z3 : MyModule.Outer.NSUInteger = 42 // expected-error {{'NSUInteger' is unavailable: use 'UInt' instead}}
+  // expected-error@-1 {{cannot convert value of type 'Int' to specified type 'Outer.NSUInteger'}}
 }
 
 // Test preventing overrides (but allowing shadowing) of unavailable methods.
@@ -188,6 +192,35 @@ struct VarToFunc {
     // This is nonsense, but someone shouldn't be using 'renamed' for this
     // anyway. Just make sure we don't crash or anything.
     variable = 2 // expected-error {{'variable' has been renamed to 'function()'}} {{5-13=function()}}
+  }
+}
+
+struct DeferBody {
+  func foo() {
+    enum No: Error {
+      case no
+    }
+
+    defer {
+      do {
+        throw No.no
+      } catch No.no {
+      } catch {
+      }
+    }
+    _ = ()
+  }
+
+  func bar() {
+    @available(*, unavailable)
+    enum No: Error { // expected-note 2 {{'No' has been explicitly marked unavailable here}}
+      case no
+    }
+    do {
+      throw No.no
+      // expected-error@-1 {{'No' is unavailable}}
+    } catch No.no {} catch _ {}
+    // expected-error@-1 {{'No' is unavailable}}
   }
 }
 

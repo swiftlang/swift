@@ -87,7 +87,7 @@ bool ARCSequenceDataflowEvaluator::processBBTopDown(ARCBBState &BBState) {
 
     LLVM_DEBUG(llvm::dbgs() << "VISITING:\n    " << I);
 
-    auto Result = DataflowVisitor.visit(&I);
+    auto Result = DataflowVisitor.visit(I.asSILNode());
 
     // If this instruction can have no further effects on another instructions,
     // continue. This happens for instance if we have cleared all of the state
@@ -247,7 +247,7 @@ bool ARCSequenceDataflowEvaluator::processBBBottomUp(
 
     LLVM_DEBUG(llvm::dbgs() << "VISITING:\n    " << I);
 
-    auto Result = DataflowVisitor.visit(&I);
+    auto Result = DataflowVisitor.visit(I.asSILNode());
 
     // If this instruction can have no further effects on another instructions,
     // continue. This happens for instance if we have cleared all of the state

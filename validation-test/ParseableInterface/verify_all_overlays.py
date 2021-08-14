@@ -16,9 +16,7 @@
 
 # Expected failures by platform
 # -----------------------------
-# macosx: XCTest
-# ios: XCTest
-# tvos: XCTest
+# (none)
 
 from __future__ import print_function
 

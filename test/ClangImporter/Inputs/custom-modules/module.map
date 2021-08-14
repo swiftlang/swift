@@ -26,6 +26,11 @@ module ClangModuleWithOverlay {
   link "UnderlyingClangLibrary"
 }
 
+module ConflictingNames {
+  header "ConflictingNames.h"
+  export *
+}
+
 module CoreData {
   header "NSManagedObject.h"
   export *
@@ -105,6 +110,16 @@ module ImportAsMember {
 
   module A {
     header "ImportAsMember.h"
+  }
+}
+
+// FIXME: This probably ought to be in a module_private.map, but that causes
+// hundreds of clang warnings.
+module ImportAsMember_Private {
+  export *
+
+  module A {
+    header "ImportAsMember_Private.h"
   }
 }
 

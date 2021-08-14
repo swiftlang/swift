@@ -6,7 +6,8 @@ import Security
 
 _ = kSecClass as CFString
 _ = kSecClassGenericPassword as CFString
-_ = kSecClassGenericPassword as CFDictionary // expected-error {{'CFString?' is not convertible to 'CFDictionary'}} {{30-32=as!}}
+_ = kSecClassGenericPassword as CFDictionary // expected-error {{'CFString?' is not convertible to 'CFDictionary'}} 
+// expected-note@-1 {{did you mean to use 'as!' to force downcast?}} {{30-32=as!}}
 
 func testIntegration() {
   // Based on code in <rdar://problem/17162475>.

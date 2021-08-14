@@ -39,7 +39,10 @@ namespace swift {
   /// Run all SIL passes for -Onone on module \p M.
   void runSILPassesForOnone(SILModule &M);
 
-  /// Run the SIL ownership eliminator pass on \p M.
+  /// Run the SIL lower hop-to-actor pass on \p M.
+  bool runSILLowerHopToActorPass(SILModule &M);
+
+/// Run the SIL ownership eliminator pass on \p M.
   bool runSILOwnershipEliminatorPass(SILModule &M);
 
   void runSILOptimizationPassesWithFileSpecification(SILModule &Module,
@@ -71,7 +74,11 @@ namespace swift {
   StringRef PassKindID(PassKind Kind);
   StringRef PassKindTag(PassKind Kind);
 
-#define PASS(ID, TAG, NAME) SILTransform *create##ID();
+#define PASS(ID, TAG, NAME) \
+  SILTransform *create##ID();
+#define SWIFT_FUNCTION_PASS_WITH_LEGACY(ID, TAG, NAME) \
+  PASS(ID, TAG, NAME) \
+  SILTransform *createLegacy##ID();
 #define IRGEN_PASS(ID, TAG, NAME)
 #include "Passes.def"
 

@@ -64,8 +64,8 @@ ConditionalValue::ConditionalValue(SILGenFunction &SGF, SGFContext C,
   } else {
     // Otherwise, add a BB arg to the continuation block to receive loadable
     // result.
-    result = contBB->createPhiArgument(tl.getLoweredType(),
-                                       ValueOwnershipKind::Owned);
+    result =
+        contBB->createPhiArgument(tl.getLoweredType(), OwnershipKind::Owned);
   }
 }
 
@@ -77,7 +77,7 @@ SGFContext ConditionalValue::enterBranch(SILBasicBlock *bb) {
   
   assert(!scope.hasValue() && "already have a scope");
   // Start a scope for the current branch.
-  scope.emplace(SGF.Cleanups, CleanupLocation::get(loc));
+  scope.emplace(SGF.Cleanups, CleanupLocation(loc));
 
   // Code emitted in the branch can emit into our buffer for address-only
   // conditionals.

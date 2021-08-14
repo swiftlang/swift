@@ -38,7 +38,7 @@ public enum NoRawValueWithExplicitHashable {
 case a, b, c
 } // CHECK: {{^}$}}
 
-// CHECK-LABEL: extension NoRawValueWithExplicitHashable : Swift.Hashable {
+// CHECK-LABEL: extension synthesized.NoRawValueWithExplicitHashable : Swift.Hashable {
 extension NoRawValueWithExplicitHashable : Hashable {
   // CHECK-NEXT: public func foo()
   public func foo() {}

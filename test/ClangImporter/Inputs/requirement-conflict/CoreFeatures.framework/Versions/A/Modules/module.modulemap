@@ -1,0 +1,11 @@
+framework module CoreFeatures {
+  umbrella header "CoreFeatures.h"
+
+  export *
+  module * { export * }
+}
+
+module CoreFeatures.Swift {
+    header "CoreFeatures-Swift.h"
+    requires objc
+}

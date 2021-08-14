@@ -1,0 +1,93 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift-dylib(%t/%target-library-name(PrintShims)) %S/../../Inputs/print-shims.swift -module-name PrintShims -emit-module -emit-module-path %t/PrintShims.swiftmodule
+// RUN: %target-codesign %t/%target-library-name(PrintShims)
+// RUN: %target-build-swift  -g -parse-sil %s -emit-ir -I %t -L %t -lPrintShim | %FileCheck %s --check-prefix=CHECK-LL
+// RUN: %target-build-swift  -g -parse-sil %s -module-name main -o %t/main -I %t -L %t -lPrintShims %target-rpath(%t)
+// RUN: %target-codesign %t/main
+// RUN: %target-run %t/main %t/%target-library-name(PrintShims) | %FileCheck %s
+
+// REQUIRES: executable_test
+// REQUIRES: swift_test_mode_optimize_none
+// REQUIRES: concurrency
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
+
+import Builtin
+import Swift
+import PrintShims
+import _Concurrency
+
+sil public_external @printGeneric : $@convention(thin) <T> (@in_guaranteed T) -> ()
+sil public_external @printInt64 : $@convention(thin) (Int64) -> ()
+
+// CHECK-LL: @inGenericAndInoutGenericToGenericTu =
+// CHECK-LL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc void @inGenericAndInoutGenericToGeneric(
+// CHECK-LL: define internal swift{{(tail)?}}cc void @"$s017inGenericAndInoutb2ToB0TA"(
+sil @inGenericAndInoutGenericToGeneric : $@async @convention(thin) <T> (@in T, @inout T) -> @out T {
+entry(%out : $*T, %in : $*T, %inout : $*T):
+  %printGeneric = function_ref @printGeneric : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %printGeneric_result1 = apply %printGeneric<T>(%in) : $@convention(thin) <T> (@in_guaranteed T) -> () // CHECK: 876
+  %printGeneric_result2 = apply %printGeneric<T>(%inout) : $@convention(thin) <T> (@in_guaranteed T) -> () // CHECK: 678
+  copy_addr %inout to [initialization] %out : $*T
+  %result = tuple ()
+  return %result : $()
+}
+
+sil @partial_apply_open_generic_capture : $@async @convention(thin) <T> (@inout T) -> @async @callee_owned (@in T) -> @out T {
+entry(%a : $*T):
+  %f = function_ref @inGenericAndInoutGenericToGeneric : $@async @convention(thin) <U> (@in U, @inout U) -> @out U
+  %p = partial_apply %f<T>(%a) : $@async @convention(thin) <U> (@in U, @inout U) -> @out U
+  return %p : $@async @callee_owned (@in T) -> @out T
+}
+
+
+sil @test_case : $@convention(thin) @async () -> () {
+  %in_literal = integer_literal $Builtin.Int64, 876
+  %in = struct $Int64 (%in_literal : $Builtin.Int64)
+  %inout_literal = integer_literal $Builtin.Int64, 678
+  %inout = struct $Int64 (%inout_literal : $Builtin.Int64)
+
+  %in_addr = alloc_stack $Int64
+  store %in to %in_addr : $*Int64
+  %inout_addr = alloc_stack $Int64
+  store %inout to %inout_addr : $*Int64
+  %result_addr = alloc_stack $Int64
+
+  %partial_apply_open_generic_capture = function_ref @partial_apply_open_generic_capture : $@async @convention(thin) <T> (@inout T) -> @async @callee_owned (@in T) -> @out T
+  %partiallyApplied = apply %partial_apply_open_generic_capture<Int64>(%inout_addr) : $@async @convention(thin) <T> (@inout T) -> @async @callee_owned (@in T) -> @out T
+  %ignore = apply %partiallyApplied(%result_addr, %in_addr) : $@async @callee_owned (@in Int64) -> @out Int64
+
+  %result = load %result_addr : $*Int64
+  %printInt64 = function_ref @printInt64 : $@convention(thin) (Int64) -> ()
+  %printInt64_result = apply %printInt64(%result) : $@convention(thin) (Int64) -> () // CHECK: 678
+
+  dealloc_stack %result_addr : $*Int64
+  dealloc_stack %inout_addr : $*Int64
+  dealloc_stack %in_addr : $*Int64
+
+  %void = tuple()
+  return %void : $()
+}
+
+// Defined in _Concurrency
+sil @$ss13_runAsyncMainyyyyYaKcF : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> @error Error) -> ()
+
+sil @no_throw_to_throw_think : $@convention(thin) @async (@guaranteed @async @callee_guaranteed () -> ()) -> @error Error {
+bb0(%0 :$@async @callee_guaranteed () -> ()):
+  %void = apply %0() : $@async @callee_guaranteed () -> ()
+  return %void : $()
+}
+
+// main
+sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+  %test_case_nothrow = function_ref @test_case : $@convention(thin) @async () -> ()
+  %thick_test_case = thin_to_thick_function %test_case_nothrow : $@convention(thin) @async () -> () to $@callee_guaranteed @async () -> ()
+  %thunk = function_ref @no_throw_to_throw_think : $@convention(thin) @async (@guaranteed @async @callee_guaranteed () -> ()) -> @error Error
+  %throwing = partial_apply [callee_guaranteed] %thunk(%thick_test_case) : $@convention(thin) @async (@guaranteed @async @callee_guaranteed () -> ()) -> @error Error
+  %runAsyncMain = function_ref @$ss13_runAsyncMainyyyyYaKcF : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> @error Error) -> ()
+  %result = apply %runAsyncMain(%throwing) : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> @error Error) -> ()
+  %out_literal = integer_literal $Builtin.Int32, 0
+  %out = struct $Int32 (%out_literal : $Builtin.Int32)
+  return %out : $Int32
+}

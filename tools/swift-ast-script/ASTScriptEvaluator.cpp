@@ -63,7 +63,7 @@ public:
       if (!sig->requiresProtocol(paramResultType, ViewProtocol)) continue;
 
       // The parameter must not be a @ViewBuilder parameter.
-      if (param->getFunctionBuilderType()) continue;
+      if (param->getResultBuilderType()) continue;
 
       // Print the function.
       printDecl(fn);
@@ -92,8 +92,11 @@ public:
     if (auto module = dyn_cast<ModuleDecl>(dc)) {
       out << module->getName() << ".";
     } else if (auto extension = dyn_cast<ExtensionDecl>(dc)) {
-      printDecl(out, extension->getExtendedNominal());
-      out << ".";
+      auto *extended = extension->getExtendedNominal();
+      if (extended) {
+        printDecl(out, extended);
+        out << ".";
+      }
     } else if (auto decl = dyn_cast_or_null<ValueDecl>(dc->getAsDecl())) {
       printDecl(out, decl);
       out << ".";

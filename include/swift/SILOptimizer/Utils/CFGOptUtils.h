@@ -25,6 +25,7 @@
 
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 
 namespace llvm {
 template <typename T> class TinyPtrVector;
@@ -35,9 +36,10 @@ namespace swift {
 class DominanceInfo;
 class SILLoop;
 class SILLoopInfo;
+struct InstModCallbacks;
 
 /// Adds a new argument to an edge between a branch and a destination
-/// block.
+/// block. Allows for user injected callbacks via \p callbacks.
 ///
 /// \param branch The terminator to add the argument to.
 /// \param dest The destination block of the edge.
@@ -45,7 +47,7 @@ class SILLoopInfo;
 /// \return The created branch. The old branch is deleted.
 /// The argument is appended at the end of the argument tuple.
 TermInst *addNewEdgeValueToBranch(TermInst *branch, SILBasicBlock *dest,
-                                  SILValue val);
+                                  SILValue val, InstructionDeleter &deleter);
 
 /// Changes the edge value between a branch and destination basic block
 /// at the specified index. Changes all edges from \p Branch to \p Dest to carry
@@ -83,6 +85,11 @@ void replaceBranchTarget(TermInst *t, SILBasicBlock *oldDest,
 /// Check if the edge from the terminator is critical.
 bool isCriticalEdge(TermInst *t, unsigned edgeIdx);
 
+inline bool isNonCriticalEdge(SILBasicBlock *predBB, SILBasicBlock *succBB) {
+  return predBB->getSingleSuccessorBlock() == succBB
+    || succBB->getSinglePredecessorBlock() == predBB;
+}
+
 /// Splits the edge from terminator if it is critical.
 ///
 /// Updates dominance information and loop information if not null.
@@ -117,6 +124,17 @@ bool splitCriticalEdgesTo(SILBasicBlock *toBB, DominanceInfo *domInfo = nullptr,
 void splitEdgesFromTo(SILBasicBlock *from, SILBasicBlock *to,
                       DominanceInfo *domInfo = nullptr,
                       SILLoopInfo *loopInfo = nullptr);
+
+/// Create a basic block to serve as the target of a conditional branch, or
+/// other terminator with multiple successors. This avoids introducing critical
+/// edges when inserting conditional branches.
+///
+/// This is a lightweight helper that assumes no block arguments and does not
+/// update dominators or loops. For more general functionality, just create the
+/// conditional branch then call splitCriticalEdge to fix it up.
+SILBasicBlock *createSplitBranchTarget(SILBasicBlock *targetBlock,
+                                       SILBuilder &builder,
+                                       SILLocation loc);
 
 /// Splits the basic block before the instruction with an unconditional branch
 /// and updates the dominator tree and loop info. Returns the new, branched to

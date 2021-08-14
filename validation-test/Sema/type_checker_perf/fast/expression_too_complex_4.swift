@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 4 -solver-expression-time-threshold=1 -solver-disable-shrink -disable-constraint-solver-performance-hacks -solver-enable-operator-designated-types
+// RUN: %target-typecheck-verify-swift -swift-version 4 -solver-expression-time-threshold=1
 // REQUIRES: tools-release,no_asan
 
 func test(_ i: Int, _ j: Int) -> Int {

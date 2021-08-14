@@ -55,20 +55,6 @@ struct Result : public Item {
     return item->getKind() == ItemKind::Result;
   }
 };
-class ImportDepth {
-  llvm::StringMap<uint8_t> depths;
-
-public:
-  ImportDepth() = default;
-  ImportDepth(ASTContext &context, const CompilerInvocation &invocation);
-
-  Optional<uint8_t> lookup(StringRef module) {
-    auto I = depths.find(module);
-    if (I == depths.end())
-      return None;
-    return I->getValue();
-  }
-};
 } // end anonymous namespace
 
 struct CodeCompletion::Group : public Item {
@@ -86,14 +72,13 @@ struct CodeCompletion::Group : public Item {
 std::vector<Completion *> SourceKit::CodeCompletion::extendCompletions(
     ArrayRef<SwiftResult *> swiftResults, CompletionSink &sink,
     SwiftCompletionInfo &info, const NameToPopularityMap *nameToPopularity,
-    const Options &options, Completion *prefix,
-    Optional<SemanticContextKind> overrideContext,
-    Optional<SemanticContextKind> overrideOperatorContext) {
+    const Options &options, Completion *prefix, bool clearFlair) {
 
   ImportDepth depth;
   if (info.swiftASTContext) {
     // Build import depth map.
-    depth = ImportDepth(*info.swiftASTContext, *info.invocation);
+    depth = ImportDepth(*info.swiftASTContext,
+                        info.invocation->getFrontendOptions());
   }
 
   if (info.completionContext)
@@ -138,10 +123,9 @@ std::vector<Completion *> SourceKit::CodeCompletion::extendCompletions(
       builder.setSemanticContext(prefix->getSemanticContext());
     }
 
-    if (overrideOperatorContext && result->isOperator()) {
-      builder.setSemanticContext(*overrideOperatorContext);
-    } else if (overrideContext) {
-      builder.setSemanticContext(*overrideContext);
+    if (clearFlair) {
+      builder.setFlair(CodeCompletionFlair());
+      builder.setSemanticContext(SemanticContextKind::None);
     }
 
     // If this result is not from the current module, try to get a popularity
@@ -170,7 +154,7 @@ bool SourceKit::CodeCompletion::addCustomCompletions(
         CodeCompletionString::create(sink.allocator, chunk);
     CodeCompletion::SwiftResult swiftResult(
         CodeCompletion::SwiftResult::ResultKind::Pattern,
-        SemanticContextKind::ExpressionSpecific,
+        SemanticContextKind::Local, CodeCompletionFlairBit::ExpressionSpecific,
         /*NumBytesToErase=*/0, completionString,
         CodeCompletionResult::ExpectedTypeRelation::Unknown);
 
@@ -328,75 +312,6 @@ void CodeCompletionOrganizer::groupAndSort(const Options &options) {
 
 CodeCompletionViewRef CodeCompletionOrganizer::takeResultsView() {
   return impl.takeView();
-}
-
-//===----------------------------------------------------------------------===//
-// ImportDepth
-//===----------------------------------------------------------------------===//
-
-ImportDepth::ImportDepth(ASTContext &context,
-                         const CompilerInvocation &invocation) {
-  llvm::DenseSet<ModuleDecl *> seen;
-  std::deque<std::pair<ModuleDecl *, uint8_t>> worklist;
-
-  StringRef mainModule = invocation.getModuleName();
-  auto *main = context.getLoadedModule(context.getIdentifier(mainModule));
-  assert(main && "missing main module");
-  worklist.emplace_back(main, uint8_t(0));
-
-  // Imports from -import-name such as Playground auxiliary sources are treated
-  // specially by applying import depth 0.
-  llvm::StringSet<> auxImports;
-  for (const auto &pair :
-       invocation.getFrontendOptions().getImplicitImportModuleNames())
-    auxImports.insert(pair.first);
-
-  // Private imports from this module.
-  // FIXME: only the private imports from the current source file.
-  // FIXME: ImportFilterKind::ShadowedByCrossImportOverlay?
-  SmallVector<ImportedModule, 16> mainImports;
-  main->getImportedModules(mainImports,
-                           {ModuleDecl::ImportFilterKind::Default,
-                            ModuleDecl::ImportFilterKind::ImplementationOnly});
-  for (auto &import : mainImports) {
-    uint8_t depth = 1;
-    if (auxImports.count(import.importedModule->getName().str()))
-      depth = 0;
-    worklist.emplace_back(import.importedModule, depth);
-  }
-
-  // Fill depths with BFS over module imports.
-  while (!worklist.empty()) {
-    ModuleDecl *module;
-    uint8_t depth;
-    std::tie(module, depth) = worklist.front();
-    worklist.pop_front();
-
-    if (!seen.insert(module).second)
-      continue;
-
-    // Insert new module:depth mapping.
-    const clang::Module *CM = module->findUnderlyingClangModule();
-    if (CM) {
-      depths[CM->getFullModuleName()] = depth;
-    } else {
-      depths[module->getName().str()] = depth;
-    }
-
-    // Add imports to the worklist.
-    SmallVector<ImportedModule, 16> imports;
-    module->getImportedModules(imports);
-    for (auto &import : imports) {
-      uint8_t next = std::max(depth, uint8_t(depth + 1)); // unsigned wrap
-
-      // Implicitly imported sub-modules get the same depth as their parent.
-      if (const clang::Module *CMI =
-              import.importedModule->findUnderlyingClangModule())
-        if (CM && CMI->isSubModuleOf(CM))
-          next = depth;
-      worklist.emplace_back(import.importedModule, next);
-    }
-  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -665,7 +580,6 @@ static double getSemanticContextScore(bool useImportDepth,
                                       Completion *completion) {
   double order = -1.0;
   switch (completion->getSemanticContext()) {
-  case SemanticContextKind::ExpressionSpecific: order = 0; break;
   case SemanticContextKind::Local: order = 1; break;
   case SemanticContextKind::CurrentNominal: order = 2; break;
   case SemanticContextKind::Super: order = 3; break;
@@ -743,10 +657,13 @@ static ResultBucket getResultBucket(Item &item, bool hasRequiredTypes,
   if (completion->isNotRecommended() && !skipMetaGroups)
     return ResultBucket::NotRecommended;
 
-  if (completion->getSemanticContext() ==
-          SemanticContextKind::ExpressionSpecific &&
-      !skipMetaGroups)
-    return ResultBucket::ExpressionSpecific;
+  if (!skipMetaGroups) {
+    auto flair = completion->getFlair();
+    if (flair.contains(CodeCompletionFlairBit::ExpressionSpecific) ||
+        flair.contains(CodeCompletionFlairBit::SuperChain) ||
+        flair.contains(CodeCompletionFlairBit::ArgumentLabels))
+      return ResultBucket::ExpressionSpecific;
+  }
 
   if (completion->isOperator())
     return ResultBucket::Operator;
@@ -1205,6 +1122,7 @@ CompletionBuilder::CompletionBuilder(CompletionSink &sink, SwiftResult &base)
     : sink(sink), current(base) {
   typeRelation = current.getExpectedTypeRelation();
   semanticContext = current.getSemanticContext();
+  flair = current.getFlair();
   completionString =
       const_cast<CodeCompletionString *>(current.getCompletionString());
 
@@ -1249,14 +1167,15 @@ Completion *CompletionBuilder::finish() {
 
     if (current.getKind() == SwiftResult::Declaration) {
       base = SwiftResult(
-          semanticContext, current.getNumBytesToErase(), completionString,
+          semanticContext, flair, current.getNumBytesToErase(), completionString,
           current.getAssociatedDeclKind(), current.isSystem(),
-          current.getModuleName(), current.isNotRecommended(),
-          current.getNotRecommendedReason(), current.getBriefDocComment(),
+          current.getModuleName(), current.getSourceFilePath(),
+          current.getNotRecommendedReason(), current.getDiagnosticSeverity(),
+          current.getDiagnosticMessage(), current.getBriefDocComment(),
           current.getAssociatedUSRs(), current.getDeclKeywords(),
           typeRelation, opKind);
     } else {
-      base = SwiftResult(current.getKind(), semanticContext,
+      base = SwiftResult(current.getKind(), semanticContext, flair,
                          current.getNumBytesToErase(), completionString,
                          typeRelation, opKind);
     }

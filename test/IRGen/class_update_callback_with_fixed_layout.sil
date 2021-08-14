@@ -12,6 +12,7 @@
 
 // REQUIRES: objc_interop
 // REQUIRES: CPU=x86_64
+// UNSUPPORTED: swift_only_stable_abi
 
 sil_stage canonical
 

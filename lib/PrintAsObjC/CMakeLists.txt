@@ -1,4 +1,4 @@
-set_swift_llvm_is_available()
+
 add_swift_host_library(swiftPrintAsObjC STATIC
   DeclAndTypePrinter.cpp
   ModuleContentsWriter.cpp
@@ -9,3 +9,4 @@ target_link_libraries(swiftPrintAsObjC PRIVATE
   swiftFrontend
   swiftIDE)
 
+set_swift_llvm_is_available(swiftPrintAsObjC)

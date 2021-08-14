@@ -25,9 +25,12 @@
 #include "swift/SILOptimizer/Differentiation/PullbackCloner.h"
 #include "swift/SILOptimizer/Differentiation/Thunk.h"
 
+#include "swift/SIL/TerminatorUtils.h"
 #include "swift/SIL/TypeSubstCloner.h"
+#include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/PassManager/PrettyStackTrace.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "swift/SILOptimizer/Utils/DifferentiationMangler.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/DenseMap.h"
 
@@ -63,12 +66,25 @@ class VJPCloner::Implementation final
   /// Info from activity analysis on the original function.
   const DifferentiableActivityInfo &activityInfo;
 
+  /// The loop info.
+  SILLoopInfo *loopInfo;
+
   /// The linear map info.
   LinearMapInfo pullbackInfo;
 
   /// Caches basic blocks whose phi arguments have been remapped (adding a
   /// predecessor enum argument).
   SmallPtrSet<SILBasicBlock *, 4> remappedBasicBlocks;
+
+  /// The `AutoDiffLinearMapContext` object. If null, no explicit context is
+  /// needed (no loops).
+  SILValue pullbackContextValue;
+  /// The unique, borrowed context object. This is valid until the exit block.
+  SILValue borrowedPullbackContextValue;
+
+  /// The generic signature of the `Builtin.autoDiffAllocateSubcontext(_:_:)`
+  /// declaration. It is used for creating a builtin call.
+  GenericSignature builtinAutoDiffAllocateSubcontextGenericSignature;
 
   bool errorOccurred = false;
 
@@ -78,11 +94,11 @@ class VJPCloner::Implementation final
 
   ASTContext &getASTContext() const { return vjp->getASTContext(); }
   SILModule &getModule() const { return vjp->getModule(); }
-  const SILAutoDiffIndices getIndices() const {
-    return witness->getSILAutoDiffIndices();
+  const AutoDiffConfig &getConfig() const {
+    return witness->getConfig();
   }
 
-  Implementation(VJPCloner &parent, ADContext &context, SILFunction *original,
+  Implementation(VJPCloner &parent, ADContext &context,
                  SILDifferentiabilityWitness *witness, SILFunction *vjp,
                  DifferentiationInvoker invoker);
 
@@ -92,6 +108,31 @@ class VJPCloner::Implementation final
   /// Run VJP generation. Returns true on error.
   bool run();
 
+  /// Initializes a context object if needed.
+  void emitLinearMapContextInitializationIfNeeded() {
+    if (!pullbackInfo.hasLoops())
+      return;
+    // Get linear map struct size.
+    auto *returnBB = &*original->findReturnBB();
+    auto pullbackStructType =
+        remapType(pullbackInfo.getLinearMapStructLoweredType(returnBB));
+    Builder.setInsertionPoint(vjp->getEntryBlock());
+    auto topLevelSubcontextSize = emitMemoryLayoutSize(
+        Builder, original->getLocation(), pullbackStructType.getASTType());
+    // Create an context.
+    pullbackContextValue = Builder.createBuiltin(
+        original->getLocation(),
+        getASTContext().getIdentifier(
+            getBuiltinName(BuiltinValueKind::AutoDiffCreateLinearMapContext)),
+        SILType::getNativeObjectType(getASTContext()),
+        SubstitutionMap(), {topLevelSubcontextSize});
+    borrowedPullbackContextValue = Builder.createBeginBorrow(
+        original->getLocation(), pullbackContextValue);
+    LLVM_DEBUG(getADDebugStream()
+               << "Context object initialized because there are loops\n"
+               << *vjp->getEntryBlock() << '\n');
+  }
+
   /// Get the lowered SIL type of the given AST type.
   SILType getLoweredType(Type type) {
     auto vjpGenSig = vjp->getLoweredFunctionType()->getSubstGenericSignature();
@@ -100,11 +141,17 @@ class VJPCloner::Implementation final
     return vjp->getLoweredType(pattern, type);
   }
 
-  /// Get the lowered SIL type of the given nominal type declaration.
-  SILType getNominalDeclLoweredType(NominalTypeDecl *nominal) {
-    auto nominalType =
-        getOpASTType(nominal->getDeclaredInterfaceType()->getCanonicalType());
-    return getLoweredType(nominalType);
+  GenericSignature getBuiltinAutoDiffAllocateSubcontextDecl() {
+    if (builtinAutoDiffAllocateSubcontextGenericSignature)
+      return builtinAutoDiffAllocateSubcontextGenericSignature;
+    auto &ctx = getASTContext();
+    auto *decl = cast<FuncDecl>(getBuiltinValueDecl(
+        ctx, ctx.getIdentifier(
+            getBuiltinName(BuiltinValueKind::AutoDiffAllocateSubcontext))));
+    builtinAutoDiffAllocateSubcontextGenericSignature =
+        decl->getGenericSignature();
+    assert(builtinAutoDiffAllocateSubcontextGenericSignature);
+    return builtinAutoDiffAllocateSubcontextGenericSignature;
   }
 
   // Creates a trampoline block for given original terminator instruction, the
@@ -145,7 +192,7 @@ public:
         getOpASTType(predEnum->getDeclaredInterfaceType()->getCanonicalType());
     auto enumLoweredTy = context.getTypeConverter().getLoweredType(
         enumTy, TypeExpansionContext::minimal());
-    vjpBB->createPhiArgument(enumLoweredTy, ValueOwnershipKind::Owned);
+    vjpBB->createPhiArgument(enumLoweredTy, OwnershipKind::Owned);
     remappedBasicBlocks.insert(bb);
     return vjpBB;
   }
@@ -171,9 +218,8 @@ public:
   }
 
   void visitReturnInst(ReturnInst *ri) {
+    Builder.setCurrentDebugScope(getOpScope(ri->getDebugScope()));
     auto loc = ri->getOperand().getLoc();
-    auto &builder = getBuilder();
-
     // Build pullback struct value for original block.
     auto *origExit = ri->getParent();
     auto *pbStructVal = buildPullbackValueStructValue(ri);
@@ -182,17 +228,35 @@ public:
     auto *origRetInst = cast<ReturnInst>(origExit->getTerminator());
     auto origResult = getOpValue(origRetInst->getOperand());
     SmallVector<SILValue, 8> origResults;
-    extractAllElements(origResult, builder, origResults);
+    extractAllElements(origResult, Builder, origResults);
 
     // Get and partially apply the pullback.
     auto vjpGenericEnv = vjp->getGenericEnvironment();
     auto vjpSubstMap = vjpGenericEnv
                            ? vjpGenericEnv->getForwardingSubstitutionMap()
                            : vjp->getForwardingSubstitutionMap();
-    auto *pullbackRef = builder.createFunctionRef(loc, pullback);
-    auto *pullbackPartialApply =
-        builder.createPartialApply(loc, pullbackRef, vjpSubstMap, {pbStructVal},
-                                   ParameterConvention::Direct_Guaranteed);
+    auto *pullbackRef = Builder.createFunctionRef(loc, pullback);
+
+    // Prepare partial application arguments.
+    SILValue partialApplyArg;
+    if (borrowedPullbackContextValue) {
+      // Initialize the top-level subcontext buffer with the top-level pullback
+      // struct.
+      auto addr = emitProjectTopLevelSubcontext(
+          Builder, loc, borrowedPullbackContextValue, pbStructVal->getType());
+      Builder.createStore(
+          loc, pbStructVal, addr,
+          pbStructVal->getType().isTrivial(*pullback) ?
+              StoreOwnershipQualifier::Trivial : StoreOwnershipQualifier::Init);
+      partialApplyArg = pullbackContextValue;
+      Builder.createEndBorrow(loc, borrowedPullbackContextValue);
+    } else {
+      partialApplyArg = pbStructVal;
+    }
+
+    auto *pullbackPartialApply = Builder.createPartialApply(
+        loc, pullbackRef, vjpSubstMap, {partialApplyArg},
+        ParameterConvention::Direct_Guaranteed);
     auto pullbackType = vjp->getLoweredFunctionType()
                             ->getResults()
                             .back()
@@ -212,7 +276,7 @@ public:
     } else if (pullbackSubstType->isABICompatibleWith(pullbackFnType, *vjp)
                    .isCompatible()) {
       pullbackValue =
-          builder.createConvertFunction(loc, pullbackPartialApply, pullbackType,
+          Builder.createConvertFunction(loc, pullbackPartialApply, pullbackType,
                                         /*withoutActuallyEscaping*/ false);
     } else {
       llvm::report_fatal_error("Pullback value type is not ABI-compatible "
@@ -223,11 +287,12 @@ public:
     SmallVector<SILValue, 8> directResults;
     directResults.append(origResults.begin(), origResults.end());
     directResults.push_back(pullbackValue);
-    builder.createReturn(ri->getLoc(),
-                         joinElements(directResults, builder, loc));
+    Builder.createReturn(ri->getLoc(),
+                         joinElements(directResults, Builder, loc));
   }
 
   void visitBranchInst(BranchInst *bi) {
+    Builder.setCurrentDebugScope(getOpScope(bi->getDebugScope()));
     // Build pullback struct value for original block.
     // Build predecessor enum value for destination block.
     auto *origBB = bi->getParent();
@@ -247,6 +312,7 @@ public:
   }
 
   void visitCondBranchInst(CondBranchInst *cbi) {
+    Builder.setCurrentDebugScope(getOpScope(cbi->getDebugScope()));
     // Build pullback struct value for original block.
     auto *pbStructVal = buildPullbackValueStructValue(cbi);
     // Create a new `cond_br` instruction.
@@ -256,34 +322,33 @@ public:
         createTrampolineBasicBlock(cbi, pbStructVal, cbi->getFalseBB()));
   }
 
-  void visitSwitchEnumInstBase(SwitchEnumInstBase *inst) {
+  void visitSwitchEnumTermInst(SwitchEnumTermInst inst) {
+    Builder.setCurrentDebugScope(getOpScope(inst->getDebugScope()));
     // Build pullback struct value for original block.
-    auto *pbStructVal = buildPullbackValueStructValue(inst);
+    auto *pbStructVal = buildPullbackValueStructValue(*inst);
 
     // Create trampoline successor basic blocks.
     SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 4> caseBBs;
-    for (unsigned i : range(inst->getNumCases())) {
-      auto caseBB = inst->getCase(i);
+    for (unsigned i : range(inst.getNumCases())) {
+      auto caseBB = inst.getCase(i);
       auto *trampolineBB =
           createTrampolineBasicBlock(inst, pbStructVal, caseBB.second);
       caseBBs.push_back({caseBB.first, trampolineBB});
     }
     // Create trampoline default basic block.
     SILBasicBlock *newDefaultBB = nullptr;
-    if (auto *defaultBB = inst->getDefaultBBOrNull().getPtrOrNull())
+    if (auto *defaultBB = inst.getDefaultBBOrNull().getPtrOrNull())
       newDefaultBB = createTrampolineBasicBlock(inst, pbStructVal, defaultBB);
 
     // Create a new `switch_enum` instruction.
     switch (inst->getKind()) {
     case SILInstructionKind::SwitchEnumInst:
-      getBuilder().createSwitchEnum(inst->getLoc(),
-                                    getOpValue(inst->getOperand()),
-                                    newDefaultBB, caseBBs);
+      getBuilder().createSwitchEnum(
+          inst->getLoc(), getOpValue(inst.getOperand()), newDefaultBB, caseBBs);
       break;
     case SILInstructionKind::SwitchEnumAddrInst:
-      getBuilder().createSwitchEnumAddr(inst->getLoc(),
-                                        getOpValue(inst->getOperand()),
-                                        newDefaultBB, caseBBs);
+      getBuilder().createSwitchEnumAddr(
+          inst->getLoc(), getOpValue(inst.getOperand()), newDefaultBB, caseBBs);
       break;
     default:
       llvm_unreachable("Expected `switch_enum` or `switch_enum_addr`");
@@ -291,14 +356,15 @@ public:
   }
 
   void visitSwitchEnumInst(SwitchEnumInst *sei) {
-    visitSwitchEnumInstBase(sei);
+    visitSwitchEnumTermInst(sei);
   }
 
   void visitSwitchEnumAddrInst(SwitchEnumAddrInst *seai) {
-    visitSwitchEnumInstBase(seai);
+    visitSwitchEnumTermInst(seai);
   }
 
   void visitCheckedCastBranchInst(CheckedCastBranchInst *ccbi) {
+    Builder.setCurrentDebugScope(getOpScope(ccbi->getDebugScope()));
     // Build pullback struct value for original block.
     auto *pbStructVal = buildPullbackValueStructValue(ccbi);
     // Create a new `checked_cast_branch` instruction.
@@ -312,6 +378,7 @@ public:
   }
 
   void visitCheckedCastValueBranchInst(CheckedCastValueBranchInst *ccvbi) {
+    Builder.setCurrentDebugScope(getOpScope(ccvbi->getDebugScope()));
     // Build pullback struct value for original block.
     auto *pbStructVal = buildPullbackValueStructValue(ccvbi);
     // Create a new `checked_cast_value_branch` instruction.
@@ -325,6 +392,7 @@ public:
   }
 
   void visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *ccabi) {
+    Builder.setCurrentDebugScope(getOpScope(ccabi->getDebugScope()));
     // Build pullback struct value for original block.
     auto *pbStructVal = buildPullbackValueStructValue(ccabi);
     // Create a new `checked_cast_addr_branch` instruction.
@@ -376,6 +444,7 @@ public:
       return;
     }
 
+    Builder.setCurrentDebugScope(getOpScope(ai->getDebugScope()));
     auto loc = ai->getLoc();
     auto &builder = getBuilder();
     auto origCallee = getOpValue(ai->getCallee());
@@ -388,7 +457,7 @@ public:
     SmallVector<SILValue, 4> allResults;
     SmallVector<unsigned, 8> activeParamIndices;
     SmallVector<unsigned, 8> activeResultIndices;
-    collectMinimalIndicesForFunctionCall(ai, getIndices(), activityInfo,
+    collectMinimalIndicesForFunctionCall(ai, getConfig(), activityInfo,
                                          allResults, activeParamIndices,
                                          activeResultIndices);
     assert(!activeParamIndices.empty() && "Parameter indices cannot be empty");
@@ -406,7 +475,7 @@ public:
     auto numSemanticResults =
         ai->getSubstCalleeType()->getNumResults() +
         ai->getSubstCalleeType()->getNumIndirectMutatingParameters();
-    SILAutoDiffIndices indices(
+    AutoDiffConfig config(
         IndexSubset::get(getASTContext(),
                          ai->getArgumentsWithoutIndirectResults().size(),
                          activeParamIndices),
@@ -418,7 +487,7 @@ public:
     // If functionSource is a `@differentiable` function, just extract it.
     if (originalFnTy->isDifferentiable()) {
       auto paramIndices = originalFnTy->getDifferentiabilityParameterIndices();
-      for (auto i : indices.parameters->getIndices()) {
+      for (auto i : config.parameterIndices->getIndices()) {
         if (!paramIndices->contains(i)) {
           context.emitNondifferentiabilityError(
               origCallee, invoker,
@@ -428,18 +497,22 @@ public:
           return;
         }
       }
-      auto origFnType = origCallee->getType().castTo<SILFunctionType>();
-      auto origFnUnsubstType = origFnType->getUnsubstitutedType(getModule());
-      if (origFnType != origFnUnsubstType) {
-        origCallee = builder.createConvertFunction(
-            loc, origCallee, SILType::getPrimitiveObjectType(origFnUnsubstType),
-            /*withoutActuallyEscaping*/ false);
-      }
-      auto borrowedDiffFunc = builder.emitBeginBorrowOperation(loc, origCallee);
-      vjpValue = builder.createDifferentiableFunctionExtract(
-          loc, NormalDifferentiableFunctionTypeComponent::VJP,
-          borrowedDiffFunc);
-      vjpValue = builder.emitCopyValueOperation(loc, vjpValue);
+      builder.emitScopedBorrowOperation(
+          loc, origCallee, [&](SILValue borrowedDiffFunc) {
+            auto origFnType = origCallee->getType().castTo<SILFunctionType>();
+            auto origFnUnsubstType =
+                origFnType->getUnsubstitutedType(getModule());
+            if (origFnType != origFnUnsubstType) {
+              borrowedDiffFunc = builder.createConvertFunction(
+                  loc, borrowedDiffFunc,
+                  SILType::getPrimitiveObjectType(origFnUnsubstType),
+                  /*withoutActuallyEscaping*/ false);
+            }
+            vjpValue = builder.createDifferentiableFunctionExtract(
+                loc, NormalDifferentiableFunctionTypeComponent::VJP,
+                borrowedDiffFunc);
+            vjpValue = builder.emitCopyValueOperation(loc, vjpValue);
+          });
       auto vjpFnType = vjpValue->getType().castTo<SILFunctionType>();
       auto vjpFnUnsubstType = vjpFnType->getUnsubstitutedType(getModule());
       if (vjpFnType != vjpFnUnsubstType) {
@@ -453,7 +526,7 @@ public:
     auto diagnoseNondifferentiableOriginalFunctionType =
         [&](CanSILFunctionType origFnTy) {
           // Check and diagnose non-differentiable arguments.
-          for (auto paramIndex : indices.parameters->getIndices()) {
+          for (auto paramIndex : config.parameterIndices->getIndices()) {
             if (!originalFnTy->getParameters()[paramIndex]
                      .getSILStorageInterfaceType()
                      .isDifferentiable(getModule())) {
@@ -470,7 +543,7 @@ public:
             }
           }
           // Check and diagnose non-differentiable results.
-          for (auto resultIndex : indices.results->getIndices()) {
+          for (auto resultIndex : config.resultIndices->getIndices()) {
             SILType remappedResultType;
             if (resultIndex >= originalFnTy->getNumResults()) {
               auto inoutArgIdx = resultIndex - originalFnTy->getNumResults();
@@ -536,22 +609,26 @@ public:
       }
 
       auto *diffFuncInst = context.createDifferentiableFunction(
-          getBuilder(), loc, indices.parameters, indices.results, origCallee);
+          getBuilder(), loc, config.parameterIndices, config.resultIndices,
+          origCallee);
 
       // Record the `differentiable_function` instruction.
       context.getDifferentiableFunctionInstWorklist().push_back(diffFuncInst);
 
-      auto borrowedADFunc = builder.emitBeginBorrowOperation(loc, diffFuncInst);
-      auto extractedVJP = getBuilder().createDifferentiableFunctionExtract(
-          loc, NormalDifferentiableFunctionTypeComponent::VJP, borrowedADFunc);
-      vjpValue = builder.emitCopyValueOperation(loc, extractedVJP);
-      builder.emitEndBorrowOperation(loc, borrowedADFunc);
+      builder.emitScopedBorrowOperation(
+          loc, diffFuncInst, [&](SILValue borrowedADFunc) {
+            auto extractedVJP =
+                getBuilder().createDifferentiableFunctionExtract(
+                    loc, NormalDifferentiableFunctionTypeComponent::VJP,
+                    borrowedADFunc);
+            vjpValue = builder.emitCopyValueOperation(loc, extractedVJP);
+          });
       builder.emitDestroyValueOperation(loc, diffFuncInst);
     }
 
     // Record desired/actual VJP indices.
     // Temporarily set original pullback type to `None`.
-    NestedApplyInfo info{indices, /*originalPullbackType*/ None};
+    NestedApplyInfo info{config, /*originalPullbackType*/ None};
     auto insertion = context.getNestedApplyInfo().try_emplace(ai, info);
     auto &nestedApplyInfo = insertion.first->getSecond();
     nestedApplyInfo = info;
@@ -569,7 +646,7 @@ public:
     // Apply the VJP.
     // The VJP should be specialized, so no substitution map is necessary.
     auto *vjpCall = getBuilder().createApply(loc, vjpValue, SubstitutionMap(),
-                                             vjpArgs, ai->isNonThrowing());
+                                             vjpArgs, ai->getApplyOptions());
     LLVM_DEBUG(getADDebugStream() << "Applied vjp function\n" << *vjpCall);
     builder.emitDestroyValueOperation(loc, vjpValue);
 
@@ -629,6 +706,7 @@ public:
   }
 
   void visitTryApplyInst(TryApplyInst *tai) {
+    Builder.setCurrentDebugScope(getOpScope(tai->getDebugScope()));
     // Build pullback struct value for original block.
     auto *pbStructVal = buildPullbackValueStructValue(tai);
     // Create a new `try_apply` instruction.
@@ -637,7 +715,8 @@ public:
         tai->getLoc(), getOpValue(tai->getCallee()),
         getOpSubstitutionMap(tai->getSubstitutionMap()), args,
         createTrampolineBasicBlock(tai, pbStructVal, tai->getNormalBB()),
-        createTrampolineBasicBlock(tai, pbStructVal, tai->getErrorBB()));
+        createTrampolineBasicBlock(tai, pbStructVal, tai->getErrorBB()),
+        tai->getApplyOptions());
   }
 
   void visitDifferentiableFunctionInst(DifferentiableFunctionInst *dfi) {
@@ -678,7 +757,7 @@ static SubstitutionMap getSubstitutionMap(SILFunction *original,
 /// and VJP generic signature.
 static const DifferentiableActivityInfo &
 getActivityInfoHelper(ADContext &context, SILFunction *original,
-                      SILAutoDiffIndices indices, SILFunction *vjp) {
+                      const AutoDiffConfig &config, SILFunction *vjp) {
   // Get activity info of the original function.
   auto &passManager = context.getPassManager();
   auto *activityAnalysis =
@@ -687,32 +766,34 @@ getActivityInfoHelper(ADContext &context, SILFunction *original,
   auto &activityInfo = activityCollection.getActivityInfo(
       vjp->getLoweredFunctionType()->getSubstGenericSignature(),
       AutoDiffDerivativeFunctionKind::VJP);
-  LLVM_DEBUG(activityInfo.dump(indices, getADDebugStream()));
+  LLVM_DEBUG(activityInfo.dump(config, getADDebugStream()));
   return activityInfo;
 }
 
 VJPCloner::Implementation::Implementation(VJPCloner &cloner, ADContext &context,
-                                          SILFunction *original,
                                           SILDifferentiabilityWitness *witness,
                                           SILFunction *vjp,
                                           DifferentiationInvoker invoker)
-    : TypeSubstCloner(*vjp, *original, getSubstitutionMap(original, vjp)),
-      cloner(cloner), context(context), original(original), witness(witness),
+    : TypeSubstCloner(*vjp, *witness->getOriginalFunction(),
+                      getSubstitutionMap(witness->getOriginalFunction(), vjp)),
+      cloner(cloner), context(context),
+      original(witness->getOriginalFunction()), witness(witness),
       vjp(vjp), invoker(invoker),
       activityInfo(getActivityInfoHelper(
-          context, original, witness->getSILAutoDiffIndices(), vjp)),
+          context, original, witness->getConfig(), vjp)),
+      loopInfo(context.getPassManager().getAnalysis<SILLoopAnalysis>()
+                   ->get(original)),
       pullbackInfo(context, AutoDiffLinearMapKind::Pullback, original, vjp,
-                   witness->getSILAutoDiffIndices(), activityInfo) {
+                   witness->getConfig(), activityInfo, loopInfo) {
   // Create empty pullback function.
   pullback = createEmptyPullback();
   context.recordGeneratedFunction(pullback);
 }
 
-VJPCloner::VJPCloner(ADContext &context, SILFunction *original,
+VJPCloner::VJPCloner(ADContext &context,
                      SILDifferentiabilityWitness *witness, SILFunction *vjp,
                      DifferentiationInvoker invoker)
-    : impl(*new Implementation(*this, context, original, witness, vjp,
-                               invoker)) {}
+    : impl(*new Implementation(*this, context, witness, vjp, invoker)) {}
 
 VJPCloner::~VJPCloner() { delete &impl; }
 
@@ -724,11 +805,12 @@ SILFunction &VJPCloner::getPullback() const { return *impl.pullback; }
 SILDifferentiabilityWitness *VJPCloner::getWitness() const {
   return impl.witness;
 }
-const SILAutoDiffIndices VJPCloner::getIndices() const {
-  return impl.getIndices();
+const AutoDiffConfig &VJPCloner::getConfig() const {
+  return impl.getConfig();
 }
 DifferentiationInvoker VJPCloner::getInvoker() const { return impl.invoker; }
 LinearMapInfo &VJPCloner::getPullbackInfo() const { return impl.pullbackInfo; }
+SILLoopInfo *VJPCloner::getLoopInfo() const { return impl.loopInfo; }
 const DifferentiableActivityInfo &VJPCloner::getActivityInfo() const {
   return impl.activityInfo;
 }
@@ -741,9 +823,7 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
   // signature: when witness generic signature has same-type requirements
   // binding all generic parameters to concrete types, VJP function type uses
   // all the concrete types and VJP generic signature is null.
-  CanGenericSignature witnessCanGenSig;
-  if (auto witnessGenSig = witness->getDerivativeGenericSignature())
-    witnessCanGenSig = witnessGenSig->getCanonicalSignature();
+  auto witnessCanGenSig = witness->getDerivativeGenericSignature().getCanonicalSignature();
   auto lookupConformance = LookUpConformanceInModule(module.getSwiftModule());
 
   // Given a type, returns its formal SIL parameter info.
@@ -811,7 +891,7 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
   SmallVector<SILParameterInfo, 8> pbParams;
   SmallVector<SILResultInfo, 8> adjResults;
   auto origParams = origTy->getParameters();
-  auto indices = witness->getSILAutoDiffIndices();
+  auto config = witness->getConfig();
 
   // Add pullback parameters based on original result indices.
   SmallVector<unsigned, 4> inoutParamIndices;
@@ -821,7 +901,7 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
       continue;
     inoutParamIndices.push_back(i);
   }
-  for (auto resultIndex : indices.results->getIndices()) {
+  for (auto resultIndex : config.resultIndices->getIndices()) {
     // Handle formal result.
     if (resultIndex < origTy->getNumResults()) {
       auto origResult = origTy->getResults()[resultIndex];
@@ -853,7 +933,7 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
     auto origResult = inoutParam.getWithInterfaceType(
         inoutParam.getInterfaceType()->getCanonicalType(witnessCanGenSig));
     auto inoutParamTanConvention =
-        indices.isWrtParameter(paramIndex)
+        config.isWrtParameter(paramIndex)
             ? inoutParam.getConvention()
             : ParameterConvention::Indirect_In_Guaranteed;
     SILParameterInfo inoutParamTanParam(
@@ -865,16 +945,24 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
     pbParams.push_back(inoutParamTanParam);
   }
 
-  // Accept a pullback struct in the pullback parameter list. This is the
-  // returned pullback's closure context.
-  auto *origExit = &*original->findReturnBB();
-  auto *pbStruct = pullbackInfo.getLinearMapStruct(origExit);
-  auto pbStructType =
-      pbStruct->getDeclaredInterfaceType()->getCanonicalType(witnessCanGenSig);
-  pbParams.push_back({pbStructType, ParameterConvention::Direct_Owned});
+  if (pullbackInfo.hasLoops()) {
+    // Accept a `AutoDiffLinarMapContext` heap object if there are loops.
+    pbParams.push_back({
+      getASTContext().TheNativeObjectType,
+      ParameterConvention::Direct_Guaranteed
+    });
+  } else {
+    // Accept a pullback struct in the pullback parameter list. This is the
+    // returned pullback's closure context.
+    auto *origExit = &*original->findReturnBB();
+    auto *pbStruct = pullbackInfo.getLinearMapStruct(origExit);
+    auto pbStructType =
+    pbStruct->getDeclaredInterfaceType()->getCanonicalType(witnessCanGenSig);
+    pbParams.push_back({pbStructType, ParameterConvention::Direct_Owned});
+  }
 
   // Add pullback results for the requested wrt parameters.
-  for (auto i : indices.parameters->getIndices()) {
+  for (auto i : config.parameterIndices->getIndices()) {
     auto origParam = origParams[i];
     if (origParam.isIndirectMutating())
       continue;
@@ -888,20 +976,16 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
         origParam.getConvention()));
   }
 
-  Mangle::ASTMangler mangler;
-  auto pbName = original->getASTContext()
-                    .getIdentifier(mangler.mangleAutoDiffLinearMapHelper(
-                        original->getName(), AutoDiffLinearMapKind::Pullback,
-                        witness->getConfig()))
-                    .str();
+  Mangle::DifferentiationMangler mangler;
+  auto pbName = mangler.mangleLinearMap(
+      original->getName(), AutoDiffLinearMapKind::Pullback, config);
   // Set pullback generic signature equal to VJP generic signature.
   // Do not use witness generic signature, which may have same-type requirements
   // binding all generic parameters to concrete types.
   auto pbGenericSig = vjp->getLoweredFunctionType()->getSubstGenericSignature();
-  auto *pbGenericEnv =
-      pbGenericSig ? pbGenericSig->getGenericEnvironment() : nullptr;
+  auto *pbGenericEnv = pbGenericSig.getGenericEnvironment();
   auto pbType = SILFunctionType::get(
-      pbGenericSig, origTy->getExtInfo(), origTy->getCoroutineKind(),
+      pbGenericSig, SILExtInfo::getThin(), origTy->getCoroutineKind(),
       origTy->getCalleeConvention(), pbParams, {}, adjResults, None,
       origTy->getPatternSubstitutions(), origTy->getInvocationSubstitutions(),
       original->getASTContext());
@@ -909,8 +993,9 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
   SILOptFunctionBuilder fb(context.getTransform());
   auto linkage = vjp->isSerialized() ? SILLinkage::Public : SILLinkage::Private;
   auto *pullback = fb.createFunction(
-      linkage, pbName, pbType, pbGenericEnv, original->getLocation(),
-      original->isBare(), IsNotTransparent, vjp->isSerialized(),
+      linkage, context.getASTContext().getIdentifier(pbName).str(), pbType,
+      pbGenericEnv, original->getLocation(), original->isBare(),
+      IsNotTransparent, vjp->isSerialized(),
       original->isDynamicallyReplaceable());
   pullback->setDebugScope(new (module)
                               SILDebugScope(original->getLocation(), pullback));
@@ -930,6 +1015,7 @@ SILBasicBlock *VJPCloner::Implementation::createTrampolineBasicBlock(
   // In the trampoline block, build predecessor enum value for VJP successor
   // block and branch to it.
   SILBuilder trampolineBuilder(trampolineBB);
+  trampolineBuilder.setCurrentDebugScope(getOpScope(termInst->getDebugScope()));
   auto *origBB = termInst->getParent();
   auto *succEnumVal =
       buildPredecessorEnumValue(trampolineBuilder, origBB, succBB, pbStructVal);
@@ -947,14 +1033,13 @@ VJPCloner::Implementation::buildPullbackValueStructValue(TermInst *termInst) {
   auto loc = RegularLocation::getAutoGeneratedLocation();
   auto origBB = termInst->getParent();
   auto *vjpBB = BBMap[origBB];
-  auto *pbStruct = pullbackInfo.getLinearMapStruct(origBB);
-  auto structLoweredTy = getNominalDeclLoweredType(pbStruct);
+  auto structLoweredTy =
+      remapType(pullbackInfo.getLinearMapStructLoweredType(origBB));
   auto bbPullbackValues = pullbackValues[origBB];
   if (!origBB->isEntry()) {
     auto *predEnumArg = vjpBB->getArguments().back();
     bbPullbackValues.insert(bbPullbackValues.begin(), predEnumArg);
   }
-  getBuilder().setCurrentDebugScope(getOpScope(termInst->getDebugScope()));
   return getBuilder().createStruct(loc, structLoweredTy, bbPullbackValues);
 }
 
@@ -962,25 +1047,36 @@ EnumInst *VJPCloner::Implementation::buildPredecessorEnumValue(
     SILBuilder &builder, SILBasicBlock *predBB, SILBasicBlock *succBB,
     SILValue pbStructVal) {
   auto loc = RegularLocation::getAutoGeneratedLocation();
-  auto *succEnum = pullbackInfo.getBranchingTraceDecl(succBB);
-  auto enumLoweredTy = getNominalDeclLoweredType(succEnum);
+  auto enumLoweredTy =
+      remapType(pullbackInfo.getBranchingTraceEnumLoweredType(succBB));
   auto *enumEltDecl =
       pullbackInfo.lookUpBranchingTraceEnumElement(predBB, succBB);
   auto enumEltType = getOpType(enumLoweredTy.getEnumElementType(
       enumEltDecl, getModule(), TypeExpansionContext::minimal()));
-  // If the enum element type does not have a box type (i.e. the enum case is
-  // not indirect), then directly create an enum.
-  auto boxType = dyn_cast<SILBoxType>(enumEltType.getASTType());
-  if (!boxType)
-    return builder.createEnum(loc, pbStructVal, enumEltDecl, enumLoweredTy);
-  // Otherwise, box the pullback struct value and create an enum.
-  auto *newBox = builder.createAllocBox(loc, boxType);
-  builder.emitScopedBorrowOperation(loc, newBox, [&](SILValue borrowedBox) {
-    auto *projectBox = builder.createProjectBox(loc, newBox, /*index*/ 0);
-    builder.emitStoreValueOperation(loc, pbStructVal, projectBox,
-                                    StoreOwnershipQualifier::Init);
-  });
-  return builder.createEnum(loc, newBox, enumEltDecl, enumLoweredTy);
+  // If the predecessor block is in a loop, its predecessor enum payload is a
+  // `Builtin.RawPointer`.
+  if (loopInfo->getLoopFor(predBB)) {
+    auto rawPtrType = SILType::getRawPointerType(getASTContext());
+    assert(enumEltType == rawPtrType);
+    auto pbStructType = pbStructVal->getType();
+    SILValue pbStructSize =
+        emitMemoryLayoutSize(Builder, loc, pbStructType.getASTType());
+    auto rawBufferValue = builder.createBuiltin(
+        loc,
+        getASTContext().getIdentifier(
+            getBuiltinName(BuiltinValueKind::AutoDiffAllocateSubcontext)),
+        rawPtrType, SubstitutionMap(),
+        {borrowedPullbackContextValue, pbStructSize});
+    auto typedBufferValue = builder.createPointerToAddress(
+        loc, rawBufferValue, pbStructType.getAddressType(),
+        /*isStrict*/ true);
+    builder.createStore(
+        loc, pbStructVal, typedBufferValue,
+        pbStructType.isTrivial(*pullback) ?
+            StoreOwnershipQualifier::Trivial : StoreOwnershipQualifier::Init);
+    return builder.createEnum(loc, rawBufferValue, enumEltDecl, enumLoweredTy);
+  }
+  return builder.createEnum(loc, pbStructVal, enumEltDecl, enumLoweredTy);
 }
 
 bool VJPCloner::Implementation::run() {
@@ -991,6 +1087,8 @@ bool VJPCloner::Implementation::run() {
   // Create entry BB and arguments.
   auto *entry = vjp->createBasicBlock();
   createEntryArguments(vjp);
+
+  emitLinearMapContextInitializationIfNeeded();
 
   // Clone.
   SmallVector<SILValue, 4> entryArgs(entry->getArguments().begin(),
@@ -1020,7 +1118,14 @@ bool VJPCloner::Implementation::run() {
   return errorOccurred;
 }
 
-bool VJPCloner::run() { return impl.run(); }
+bool VJPCloner::run() {
+  bool foundError = impl.run();
+#ifndef NDEBUG
+  if (!foundError)
+    getVJP().verify();
+#endif
+  return foundError;
+}
 
 } // end namespace autodiff
 } // end namespace swift

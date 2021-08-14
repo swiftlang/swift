@@ -1,0 +1,336 @@
+% # FIXME(integers): add tests that perform the same checks in generic code.
+% #
+% # cd validation-test/stdlib/FixedPointConversion/
+% #
+% # ../../../utils/gyb --line-directive="" \
+% #   ./Inputs/FixedPointConversion.swift.gyb | ../../../utils/split_file.py
+%
+% from SwiftIntTypes import all_integer_types, int_max
+% from SwiftFloatingPointTypes import all_floating_point_types
+% from decimal import Decimal
+% from itertools import product
+%
+% # Generate a test-suite file for each integer type.
+% for (configuration, bitWidth) in product(['Debug', 'Release'], [32, 64]):
+%   optimizations = '-Onone' if configuration == 'Debug' else '-O'
+%
+%   for selfType in all_integer_types(bitWidth):
+%     SelfName = selfType.stdlib_name
+%     selfMin = selfType.min
+%     selfMax = selfType.max
+%
+%     testSuite = 'FixedPointConversion_{configuration}{bitWidth}_To{SelfName}'\
+%       .format(**locals()) # TODO(python3): use f-string (PEP 498).
+%
+// BEGIN ${testSuite}.swift
+//===----------------------------------------------------------------------===//
+//
+// Automatically Generated From ./Inputs/FixedPointConversion.swift.gyb
+// Do Not Edit Directly!
+//
+//===----------------------------------------------------------------------===//
+//
+// REQUIRES: executable_test
+// REQUIRES: PTRSIZE=${format(bitWidth)}
+// RUN: %target-run-simple-swift(${optimizations})
+// END.
+//
+//===----------------------------------------------------------------------===//
+
+import StdlibUnittest
+
+let ${testSuite} = TestSuite(
+   "${testSuite}"
+)
+
+%     # Test conversion behaviors for all integer types.
+%     for otherType in all_integer_types(bitWidth):
+%       OtherName = otherType.stdlib_name
+%       otherMin = otherType.min
+%       otherMax = otherType.max
+%
+//===----------------------------------------------------------------------===//
+// MARK: ${OtherName}: (${format(otherMin, '+')})...(${format(otherMax, '+')})
+//===----------------------------------------------------------------------===//
+
+%       otherValues = sorted(
+%         set(
+%           filter(
+%             lambda otherValue: (otherMin <= otherValue <= otherMax),
+%             [
+%               selfMin,
+%               selfMax,
+%               selfMin - 1,
+%               selfMax + 1,
+%               otherMin,
+%               otherMax,
+%               0,
+%             ]
+%           )
+%         )
+%       )
+%       otherValues_NeverTraps = otherValues_NeverFails = list(
+%         filter(
+%           lambda otherValue: (selfMin <= otherValue <= selfMax),
+%           otherValues
+%         )
+%       )
+%       otherValues_AlwaysTraps = otherValues_AlwaysFails = list(
+%         filter(
+%           lambda otherValue: not (selfMin <= otherValue <= selfMax),
+%           otherValues
+%         )
+%       )
+%
+%       if len(otherValues_NeverTraps) > 0:
+%
+${testSuite}
+.test("From${OtherName}_NeverTraps")
+.forEach(in: [
+%
+%         for otherValue in otherValues_NeverTraps:
+%           selfLiteral = otherLiteral = format(otherValue, '+')
+%
+  (get${SelfName}(${selfLiteral}), get${OtherName}(${otherLiteral})),
+%
+%         end # for
+]) {
+  expectEqual($0.0, ${SelfName}($0.1))
+}
+
+%       end # if
+%
+%       if len(otherValues_NeverFails) > 0:
+%
+${testSuite}
+.test("From${OtherName}_NeverFails")
+.forEach(in: [
+%
+%         for otherValue in otherValues_NeverFails:
+%           selfLiteral = otherLiteral = format(otherValue, '+')
+%
+  (get${SelfName}(${selfLiteral}), get${OtherName}(${otherLiteral})),
+%
+%         end # for
+]) {
+  expectEqual($0.0, ${SelfName}(exactly: $0.1))
+}
+
+%       end # if
+%
+%       if len(otherValues_AlwaysTraps) > 0:
+%
+${testSuite}
+.test("From${OtherName}_AlwaysTraps")
+.forEach(in: [
+%
+%         for otherValue in otherValues_AlwaysTraps:
+%           otherLiteral = format(otherValue, '+')
+%
+  get${OtherName}(${otherLiteral}),
+%
+%         end # for
+]) {
+  expectCrashLater()
+  _blackHole(${SelfName}($0))
+}
+
+%       end # if
+%
+%       if len(otherValues_AlwaysFails) > 0:
+%
+${testSuite}
+.test("From${OtherName}_AlwaysFails")
+.forEach(in: [
+%
+%         for otherValue in otherValues_AlwaysFails:
+%           otherLiteral = format(otherValue, '+')
+%
+  get${OtherName}(${otherLiteral}),
+%
+%         end # for
+]) {
+  expectNil(${SelfName}(exactly: $0))
+}
+
+%       end # if
+%
+%     end # for otherType in ...
+%
+%     # Test conversion behaviors for all floating-point types.
+%     for otherType in all_floating_point_types():
+%       OtherName = 'Float{}'.format(otherType.bits)
+%       otherMax = int_max(bits=otherType.explicit_significand_bits, signed=False)
+%       otherMin = -otherMax
+%
+//===----------------------------------------------------------------------===//
+// MARK: ${OtherName}: (${format(otherMin, '+')})...(${format(otherMax, '+')})
+//===----------------------------------------------------------------------===//
+
+%       if OtherName == 'Float16':
+%
+#if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
+if #available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
+
+%       elif OtherName == 'Float80':
+%
+#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
+
+%       end # if
+%
+%       otherValues = sorted(
+%         map(
+%           lambda otherLiteral: Decimal(otherLiteral).normalize(),
+%           set(
+%             map(
+%               lambda otherValue: format(otherValue.normalize(), '+'),
+%               filter(
+%                 lambda otherValue: (otherMin <= otherValue <= otherMax),
+%                 [
+%                   Decimal(selfMin),
+%                   Decimal(selfMax),
+%                   Decimal(selfMin - 1),
+%                   Decimal(selfMax + 1),
+%                   Decimal(otherMin),
+%                   Decimal(otherMax),
+%                   Decimal('-0.0'),
+%                   Decimal('+0.0'),
+%                   Decimal('-0.5'),
+%                   Decimal('+0.5'),
+%                   Decimal('-128.5'),
+%                   Decimal('+127.5'),
+%                   Decimal('+255.5'),
+%                   Decimal('-32768.5'),
+%                   Decimal('+32767.5'),
+%                   Decimal('+65535.5'),
+%                 ]
+%               )
+%             )
+%           )
+%         )
+%       )
+%       otherValues_NeverTraps = list(
+%         filter(
+%           lambda otherValue: (selfMin <= int(otherValue) <= selfMax),
+%           otherValues
+%         )
+%       )
+%       otherValues_NeverFails = list(
+%         filter(
+%           lambda otherValue: (otherValue == int(otherValue)) and \
+%                              (selfMin <= int(otherValue) <= selfMax),
+%           otherValues
+%         )
+%       )
+%       otherValues_AlwaysTraps = list(
+%         filter(
+%           lambda otherValue: not (selfMin <= int(otherValue) <= selfMax),
+%           otherValues
+%         )
+%       )
+%       otherValues_AlwaysFails = list(
+%         filter(
+%           lambda otherValue: (otherValue != int(otherValue)) or \
+%                              not (selfMin <= int(otherValue) <= selfMax),
+%           otherValues
+%         )
+%       )
+%       signs = ['-', '+']
+%       nonFinites = ['infinity', 'nan', 'signalingNaN']
+%
+%       if len(otherValues_NeverTraps) > 0:
+%
+${testSuite}
+.test("From${OtherName}_NeverTraps")
+.forEach(in: [
+%
+%         for otherValue in otherValues_NeverTraps:
+%           selfLiteral = format(int(otherValue), '+')
+%           otherLiteral = format(otherValue, '+')
+%
+  (get${SelfName}(${selfLiteral}), get${OtherName}(${otherLiteral})),
+%
+%         end # for
+]) {
+  expectEqual($0.0, ${SelfName}($0.1))
+}
+
+%       end # if
+%
+%       if len(otherValues_NeverFails) > 0:
+%
+${testSuite}
+.test("From${OtherName}_NeverFails")
+.forEach(in: [
+%
+%         for otherValue in otherValues_NeverFails:
+%           selfLiteral = format(int(otherValue), '+')
+%           otherLiteral = format(otherValue, '+')
+%
+  (get${SelfName}(${selfLiteral}), get${OtherName}(${otherLiteral})),
+%
+%         end # for
+]) {
+  expectEqual($0.0, ${SelfName}(exactly: $0.1))
+}
+
+%       end # if
+%
+${testSuite}
+.test("From${OtherName}_AlwaysTraps")
+.forEach(in: [
+%
+%       for otherValue in otherValues_AlwaysTraps:
+%         otherLiteral = format(otherValue, '+')
+%
+  get${OtherName}(${otherLiteral}),
+%
+%       end # for
+%
+%       for (sign, nonFinite) in product(signs, nonFinites):
+%
+  get${OtherName}(${sign}.${nonFinite}),
+%
+%       end # for
+]) {
+  expectCrashLater()
+  _blackHole(${SelfName}($0))
+}
+
+${testSuite}
+.test("From${OtherName}_AlwaysFails")
+.forEach(in: [
+%
+%       for otherValue in otherValues_AlwaysFails:
+%         otherLiteral = format(otherValue, '+')
+%
+  get${OtherName}(${otherLiteral}),
+%
+%       end # for
+%
+%       for (sign, nonFinite) in product(signs, nonFinites):
+%
+  get${OtherName}(${sign}.${nonFinite}),
+%
+%       end # for
+]) {
+  expectNil(${SelfName}(exactly: $0))
+}
+
+%       if OtherName == 'Float16':
+}
+#endif // Float16
+
+%       elif OtherName == 'Float80':
+%
+#endif // Float80
+
+%       end # if
+%
+%     end # for otherType in ...
+%
+runAllTests()
+
+%   end # for selfType in ...
+%
+% end # for (configuration, bitWidth) in ...

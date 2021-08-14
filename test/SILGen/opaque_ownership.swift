@@ -150,13 +150,33 @@ public struct Int64 : ExpressibleByIntegerLiteral, _ExpressibleByBuiltinIntegerL
   }
 }
 
+public struct Int : _ExpressibleByBuiltinIntegerLiteral, ExpressibleByIntegerLiteral, Equatable {
+  var _value: Builtin.Int64
+  public init() {
+    self = 0
+  }
+  public typealias IntegerLiteralType = Int
+  public init(_builtinIntegerLiteral x: _MaxBuiltinIntegerType) {
+    _value = Builtin.s_to_s_checked_trunc_IntLiteral_Int64(x).0
+  }
+
+  public init(integerLiteral value: Int) {
+    self = value
+  }
+
+  public static func ==(_ lhs: Int, rhs: Int) -> Bool {
+    return Bool(Builtin.cmp_eq_Int64(lhs._value, rhs._value))
+  }
+}
+
 // Test ownership of multi-case Enum values in the context of to @in thunks.
 // ---
 // CHECK-LABEL: sil shared [transparent] [serialized] [thunk] [ossa] @$ss17FloatingPointSignOSQsSQ2eeoiySbx_xtFZTW :
 // CHECK: bb0(%0 : $FloatingPointSign, %1 : $FloatingPointSign, %2 : $@thick FloatingPointSign.Type):
-// CHECK:   %3 = function_ref @$ss2eeoiySbx_xtSYRzSQ8RawValueRpzlF : $@convention(thin) <τ_0_0 where τ_0_0 : RawRepresentable, τ_0_0.RawValue : Equatable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0) -> Bool
-// CHECK:   %4 = apply %3<FloatingPointSign>(%0, %1) : $@convention(thin) <τ_0_0 where τ_0_0 : RawRepresentable, τ_0_0.RawValue : Equatable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0) -> Bool
-// CHECK:   return %4 : $Bool
+// CHECK:   %3 = metatype $@thin FloatingPointSign.Type // user: %5
+// CHECK:   %4 = function_ref @$ss17FloatingPointSignO21__derived_enum_equalsySbAB_ABtFZ : $@convention(method) (FloatingPointSign, FloatingPointSign, @thin FloatingPointSign.Type) -> Bool // user: %5
+// CHECK:   %5 = apply %4(%0, %1, %3) : $@convention(method) (FloatingPointSign, FloatingPointSign, @thin FloatingPointSign.Type) -> Bool // user: %6
+// CHECK:   return %5 : $Bool
 // CHECK-LABEL: } // end sil function '$ss17FloatingPointSignOSQsSQ2eeoiySbx_xtFZTW'
 public enum FloatingPointSign: Int64 {
   /// The sign for a positive value.

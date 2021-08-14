@@ -145,7 +145,7 @@ typealias G <TypeInitializerClause>= <FunctionType>(<TupleTypeElement>a x: <Simp
 typealias H <TypeInitializerClause>= <FunctionType>() rethrows -> <TupleType>()</TupleType></FunctionType></TypeInitializerClause></TypealiasDecl><TypealiasDecl>
 typealias I <TypeInitializerClause>= <FunctionType>(<TupleTypeElement><CompositionType><CompositionTypeElement><SimpleTypeIdentifier>A </SimpleTypeIdentifier>& </CompositionTypeElement><CompositionTypeElement><SimpleTypeIdentifier>B<GenericArgumentClause><<GenericArgument><SimpleTypeIdentifier>C</SimpleTypeIdentifier></GenericArgument>></GenericArgumentClause></SimpleTypeIdentifier></CompositionTypeElement></CompositionType></TupleTypeElement>) -> <CompositionType><CompositionTypeElement><SimpleTypeIdentifier>C </SimpleTypeIdentifier>& </CompositionTypeElement><CompositionTypeElement><SimpleTypeIdentifier>D</SimpleTypeIdentifier></CompositionTypeElement></CompositionType></FunctionType></TypeInitializerClause></TypealiasDecl><TypealiasDecl>
 typealias J <TypeInitializerClause>= <AttributedType>inout <Attribute>@autoclosure </Attribute><FunctionType>() -> <SimpleTypeIdentifier>Int</SimpleTypeIdentifier></FunctionType></AttributedType></TypeInitializerClause></TypealiasDecl><TypealiasDecl>
-typealias K <TypeInitializerClause>= <FunctionType>(<TupleTypeElement><Attribute>@invalidAttr </Attribute><SimpleTypeIdentifier>Int</SimpleTypeIdentifier>, </TupleTypeElement><TupleTypeElement><AttributedType>inout <SimpleTypeIdentifier>Int</SimpleTypeIdentifier></AttributedType>, </TupleTypeElement><TupleTypeElement><AttributedType>__shared <SimpleTypeIdentifier>Int</SimpleTypeIdentifier></AttributedType>, </TupleTypeElement><TupleTypeElement><AttributedType>__owned <SimpleTypeIdentifier>Int</SimpleTypeIdentifier></AttributedType></TupleTypeElement>) -> <TupleType>()</TupleType></FunctionType></TypeInitializerClause></TypealiasDecl><TypealiasDecl><Attribute>
+typealias K <TypeInitializerClause>= <FunctionType>(<TupleTypeElement><AttributedType><CustomAttribute>@<SimpleTypeIdentifier>invalidAttr </SimpleTypeIdentifier></CustomAttribute><SimpleTypeIdentifier>Int</SimpleTypeIdentifier></AttributedType>, </TupleTypeElement><TupleTypeElement><AttributedType>inout <SimpleTypeIdentifier>Int</SimpleTypeIdentifier></AttributedType>, </TupleTypeElement><TupleTypeElement><AttributedType>__shared <SimpleTypeIdentifier>Int</SimpleTypeIdentifier></AttributedType>, </TupleTypeElement><TupleTypeElement><AttributedType>__owned <SimpleTypeIdentifier>Int</SimpleTypeIdentifier></AttributedType></TupleTypeElement>) -> <TupleType>()</TupleType></FunctionType></TypeInitializerClause></TypealiasDecl><TypealiasDecl><Attribute>
 
 @objc </Attribute><DeclModifier>private </DeclModifier>typealias T<GenericParameterClause><<GenericParameter>a,</GenericParameter><GenericParameter>b</GenericParameter>> </GenericParameterClause><TypeInitializerClause>= <SimpleTypeIdentifier>Int</SimpleTypeIdentifier></TypeInitializerClause></TypealiasDecl><TypealiasDecl><Attribute>
 @objc </Attribute><DeclModifier>private </DeclModifier>typealias T<GenericParameterClause><<GenericParameter>a,</GenericParameter><GenericParameter>b</GenericParameter>></GenericParameterClause></TypealiasDecl><ClassDecl>
@@ -596,4 +596,25 @@ func foo<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSigna
 #"<StringSegment>abc</StringSegment>"#</StringLiteralExpr><StringLiteralExpr>
 #"<StringSegment>abc </StringSegment><ExpressionSegment>\#(<TupleExprElement><IdentifierExpr>foo</IdentifierExpr></TupleExprElement>)</ExpressionSegment><StringSegment></StringSegment>"#</StringLiteralExpr><StringLiteralExpr>
 ##"<StringSegment>abc</StringSegment>"##</StringLiteralExpr><StringLiteralExpr>
-##"<StringSegment>abc </StringSegment><ExpressionSegment>\##(<TupleExprElement><IdentifierExpr>foo</IdentifierExpr></TupleExprElement>)</ExpressionSegment><StringSegment></StringSegment>"##</StringLiteralExpr>
+##"<StringSegment>abc </StringSegment><ExpressionSegment>\##(<TupleExprElement><IdentifierExpr>foo</IdentifierExpr></TupleExprElement>)</ExpressionSegment><StringSegment></StringSegment>"##</StringLiteralExpr><PostfixIfConfigExpr><FunctionCallExpr><IdentifierExpr>
+
+foo</IdentifierExpr>()</FunctionCallExpr><IfConfigDecl><IfConfigClause>
+#if <IdentifierExpr>COND1</IdentifierExpr><ForcedValueExpr><FunctionCallExpr><OptionalChainingExpr><MemberAccessExpr>
+  .bar</MemberAccessExpr>?</OptionalChainingExpr>()</FunctionCallExpr>!</ForcedValueExpr></IfConfigClause><IfConfigClause>
+#elseif <IdentifierExpr>COND2</IdentifierExpr><MemberAccessExpr><PostfixIfConfigExpr><IfConfigDecl><IfConfigClause>
+  #if <BooleanLiteralExpr>true</BooleanLiteralExpr><FunctionCallExpr><MemberAccessExpr>
+    .call</MemberAccessExpr>()</FunctionCallExpr></IfConfigClause><IfConfigClause>
+  #elseif <BooleanLiteralExpr>true</BooleanLiteralExpr><PostfixIfConfigExpr><IfConfigDecl><IfConfigClause>
+    #if <BooleanLiteralExpr>true</BooleanLiteralExpr><MemberAccessExpr>
+      .other</MemberAccessExpr></IfConfigClause>
+    #endif</IfConfigDecl></PostfixIfConfigExpr></IfConfigClause><IfConfigClause>
+  #else<PostfixIfConfigExpr><FunctionCallExpr><MemberAccessExpr>
+    .before</MemberAccessExpr>()</FunctionCallExpr><IfConfigDecl><IfConfigClause>
+    #if <BooleanLiteralExpr>true</BooleanLiteralExpr><FunctionCallExpr><MemberAccessExpr>
+      .after</MemberAccessExpr>()</FunctionCallExpr></IfConfigClause>
+    #endif</IfConfigDecl></PostfixIfConfigExpr></IfConfigClause>
+  #endif</IfConfigDecl></PostfixIfConfigExpr>
+  .member</MemberAccessExpr></IfConfigClause><IfConfigClause>
+#else<FunctionCallExpr><MemberAccessExpr>
+  .baz</MemberAccessExpr>() <ClosureExpr>{}</ClosureExpr></FunctionCallExpr></IfConfigClause>
+#endif</IfConfigDecl></PostfixIfConfigExpr>

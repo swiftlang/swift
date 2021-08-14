@@ -77,3 +77,141 @@ bb0(%0 : $*SomeClass, %1 : @owned $SomeClass):
   // CHECK: return
   return %9 : $()
 }
+
+@propertyWrapper struct Wrapper<T> {
+  @_hasStorage var wrappedValue: T
+  init(wrappedValue initialValue: T)
+}
+
+struct RefStruct {
+  @_hasStorage var _wrapped: Wrapper<SomeClass>
+}
+
+
+sil @init_closure : $@convention(thin) (@owned SomeClass) -> @owned Wrapper<SomeClass>
+sil @init_closure_indirect : $@convention(thin) (@owned SomeClass) -> @out Wrapper<SomeClass>
+sil @set_closure : $@convention(method) (@owned SomeClass, @inout RefStruct) -> ()
+
+// CHECK-LABEL: sil [ossa] @assign_by_wrapper_initialization_direct
+// CHECK:   [[E:%[0-9]+]] = struct_element_addr
+// CHECK:   [[C:%[0-9]+]] = function_ref @init_closure
+// CHECK:   [[P:%[0-9]+]] = partial_apply [callee_guaranteed] [[C]]()
+// CHECK-NOT: partial_apply
+// CHECK:   [[R:%[0-9]+]] = apply [[P]](%0)
+// CHECK:   store [[R]] to [init] [[E]]
+// CHECK: } // end sil function 'assign_by_wrapper_initialization_direct'
+sil [ossa] @assign_by_wrapper_initialization_direct : $@convention(method) (@owned SomeClass) -> @owned RefStruct {
+bb0(%0 : @owned $SomeClass):
+  %1 = alloc_stack $RefStruct
+  %7 = struct_element_addr %1 : $*RefStruct, #RefStruct._wrapped
+  %8 = function_ref @init_closure : $@convention(thin) (@owned SomeClass) -> @owned Wrapper<SomeClass>
+  %9 = partial_apply [callee_guaranteed] %8() : $@convention(thin) (@owned SomeClass) -> @owned Wrapper<SomeClass>
+  %10 = function_ref @set_closure : $@convention(method) (@owned SomeClass, @inout RefStruct) -> ()
+  %11 = partial_apply [callee_guaranteed] %10(%1) : $@convention(method) (@owned SomeClass, @inout RefStruct) -> ()
+  assign_by_wrapper %0 : $SomeClass to [initialization] %7 : $*Wrapper<SomeClass>, init %9 : $@callee_guaranteed (@owned SomeClass) -> @owned Wrapper<SomeClass>, set %11 : $@callee_guaranteed (@owned SomeClass) -> ()
+  destroy_value %11 : $@callee_guaranteed (@owned SomeClass) -> ()
+  destroy_value %9 : $@callee_guaranteed (@owned SomeClass) -> @owned Wrapper<SomeClass>
+  %16 = load [take] %1 : $*RefStruct
+  dealloc_stack %1 : $*RefStruct
+  return %16 : $RefStruct
+}
+
+// CHECK-LABEL: sil [ossa] @assign_by_wrapper_initialization_indirect
+// CHECK:   [[E:%[0-9]+]] = struct_element_addr
+// CHECK:   [[C:%[0-9]+]] = function_ref @init_closure_indirect
+// CHECK:   [[P:%[0-9]+]] = partial_apply [callee_guaranteed] [[C]]()
+// CHECK-NOT: partial_apply
+// CHECK-NOT: destroy_addr
+// CHECK:   [[R:%[0-9]+]] = apply [[P]]([[E]], %0)
+// CHECK: } // end sil function 'assign_by_wrapper_initialization_indirect'
+sil [ossa] @assign_by_wrapper_initialization_indirect : $@convention(method) (@owned SomeClass) -> @owned RefStruct {
+bb0(%0 : @owned $SomeClass):
+  %1 = alloc_stack $RefStruct
+  %7 = struct_element_addr %1 : $*RefStruct, #RefStruct._wrapped
+  %8 = function_ref @init_closure_indirect : $@convention(thin) (@owned SomeClass) -> @out Wrapper<SomeClass>
+  %9 = partial_apply [callee_guaranteed] %8() : $@convention(thin) (@owned SomeClass) -> @out Wrapper<SomeClass>
+  %10 = function_ref @set_closure : $@convention(method) (@owned SomeClass, @inout RefStruct) -> ()
+  %11 = partial_apply [callee_guaranteed] %10(%1) : $@convention(method) (@owned SomeClass, @inout RefStruct) -> ()
+  assign_by_wrapper %0 : $SomeClass to [initialization] %7 : $*Wrapper<SomeClass>, init %9 : $@callee_guaranteed (@owned SomeClass) -> @out Wrapper<SomeClass>, set %11 : $@callee_guaranteed (@owned SomeClass) -> ()
+  destroy_value %11 : $@callee_guaranteed (@owned SomeClass) -> ()
+  destroy_value %9 : $@callee_guaranteed (@owned SomeClass) -> @out Wrapper<SomeClass>
+  %16 = load [take] %1 : $*RefStruct
+  dealloc_stack %1 : $*RefStruct
+  return %16 : $RefStruct
+}
+
+// CHECK-LABEL: sil [ossa] @assign_by_wrapper_assign_direct
+// CHECK:   [[E:%[0-9]+]] = struct_element_addr
+// CHECK:   [[C:%[0-9]+]] = function_ref @init_closure
+// CHECK:   [[P:%[0-9]+]] = partial_apply [callee_guaranteed] [[C]]()
+// CHECK-NOT: partial_apply
+// CHECK:   [[R:%[0-9]+]] = apply [[P]](%0)
+// CHECK:   store [[R]] to [assign] [[E]]
+// CHECK: } // end sil function 'assign_by_wrapper_assign_direct'
+sil [ossa] @assign_by_wrapper_assign_direct : $@convention(method) (@owned SomeClass, @owned Wrapper<SomeClass>) -> @owned RefStruct {
+bb0(%0 : @owned $SomeClass, %1 : @owned $Wrapper<SomeClass>):
+  %2 = alloc_stack $RefStruct
+  %7 = struct_element_addr %2 : $*RefStruct, #RefStruct._wrapped
+  store %1 to [init] %7 : $*Wrapper<SomeClass>
+  %8 = function_ref @init_closure : $@convention(thin) (@owned SomeClass) -> @owned Wrapper<SomeClass>
+  %9 = partial_apply [callee_guaranteed] %8() : $@convention(thin) (@owned SomeClass) -> @owned Wrapper<SomeClass>
+  %10 = function_ref @set_closure : $@convention(method) (@owned SomeClass, @inout RefStruct) -> ()
+  %11 = partial_apply [callee_guaranteed] %10(%2) : $@convention(method) (@owned SomeClass, @inout RefStruct) -> ()
+  assign_by_wrapper %0 : $SomeClass to [assign] %7 : $*Wrapper<SomeClass>, init %9 : $@callee_guaranteed (@owned SomeClass) -> @owned Wrapper<SomeClass>, set %11 : $@callee_guaranteed (@owned SomeClass) -> ()
+  destroy_value %11 : $@callee_guaranteed (@owned SomeClass) -> ()
+  destroy_value %9 : $@callee_guaranteed (@owned SomeClass) -> @owned Wrapper<SomeClass>
+  %16 = load [take] %2 : $*RefStruct
+  dealloc_stack %2 : $*RefStruct
+  return %16 : $RefStruct
+}
+
+// CHECK-LABEL: sil [ossa] @assign_by_wrapper_assign_indirect
+// CHECK:   [[E:%[0-9]+]] = struct_element_addr
+// CHECK:   [[C:%[0-9]+]] = function_ref @init_closure_indirect
+// CHECK:   [[P:%[0-9]+]] = partial_apply [callee_guaranteed] [[C]]()
+// CHECK-NOT: partial_apply
+// CHECK:   destroy_addr [[E]]
+// CHECK:   [[R:%[0-9]+]] = apply [[P]]([[E]], %0)
+// CHECK: } // end sil function 'assign_by_wrapper_assign_indirect'
+sil [ossa] @assign_by_wrapper_assign_indirect : $@convention(method) (@owned SomeClass, @owned Wrapper<SomeClass>) -> @owned RefStruct {
+bb0(%0 : @owned $SomeClass, %1 : @owned $Wrapper<SomeClass>):
+  %2 = alloc_stack $RefStruct
+  %7 = struct_element_addr %2 : $*RefStruct, #RefStruct._wrapped
+  store %1 to [init] %7 : $*Wrapper<SomeClass>
+  %8 = function_ref @init_closure_indirect : $@convention(thin) (@owned SomeClass) -> @out Wrapper<SomeClass>
+  %9 = partial_apply [callee_guaranteed] %8() : $@convention(thin) (@owned SomeClass) -> @out Wrapper<SomeClass>
+  %10 = function_ref @set_closure : $@convention(method) (@owned SomeClass, @inout RefStruct) -> ()
+  %11 = partial_apply [callee_guaranteed] %10(%2) : $@convention(method) (@owned SomeClass, @inout RefStruct) -> ()
+  assign_by_wrapper %0 : $SomeClass to [assign] %7 : $*Wrapper<SomeClass>, init %9 : $@callee_guaranteed (@owned SomeClass) -> @out Wrapper<SomeClass>, set %11 : $@callee_guaranteed (@owned SomeClass) -> ()
+  destroy_value %11 : $@callee_guaranteed (@owned SomeClass) -> ()
+  destroy_value %9 : $@callee_guaranteed (@owned SomeClass) -> @out Wrapper<SomeClass>
+  %16 = load [take] %2 : $*RefStruct
+  dealloc_stack %2 : $*RefStruct
+  return %16 : $RefStruct
+}
+
+// CHECK-LABEL: sil [ossa] @assign_by_wrapper_assign_wrapped_value
+// CHECK:   [[A:%[0-9]+]] = alloc_stack $RefStruct
+// CHECK:   [[E:%[0-9]+]] = struct_element_addr
+// CHECK-NOT: partial_apply
+// CHECK:   [[C:%[0-9]+]] = function_ref @set_closure
+// CHECK:   [[P:%[0-9]+]] = partial_apply [callee_guaranteed] [[C]]([[A]])
+// CHECK:   apply [[P]](%0)
+// CHECK: } // end sil function 'assign_by_wrapper_assign_wrapped_value'
+sil [ossa] @assign_by_wrapper_assign_wrapped_value : $@convention(method) (@owned SomeClass, @owned RefStruct) -> @owned RefStruct {
+bb0(%0 : @owned $SomeClass, %1 : @owned $RefStruct):
+  %2 = alloc_stack $RefStruct
+  store %1 to [init] %2 : $*RefStruct
+  %7 = struct_element_addr %2 : $*RefStruct, #RefStruct._wrapped
+  %8 = function_ref @init_closure : $@convention(thin) (@owned SomeClass) -> @owned Wrapper<SomeClass>
+  %9 = partial_apply [callee_guaranteed] %8() : $@convention(thin) (@owned SomeClass) -> @owned Wrapper<SomeClass>
+  %10 = function_ref @set_closure : $@convention(method) (@owned SomeClass, @inout RefStruct) -> ()
+  %11 = partial_apply [callee_guaranteed] %10(%2) : $@convention(method) (@owned SomeClass, @inout RefStruct) -> ()
+  assign_by_wrapper %0 : $SomeClass to [assign_wrapped_value] %7 : $*Wrapper<SomeClass>, init %9 : $@callee_guaranteed (@owned SomeClass) -> @owned Wrapper<SomeClass>, set %11 : $@callee_guaranteed (@owned SomeClass) -> ()
+  destroy_value %11 : $@callee_guaranteed (@owned SomeClass) -> ()
+  destroy_value %9 : $@callee_guaranteed (@owned SomeClass) -> @owned Wrapper<SomeClass>
+  %16 = load [take] %2 : $*RefStruct
+  dealloc_stack %2 : $*RefStruct
+  return %16 : $RefStruct
+}
+

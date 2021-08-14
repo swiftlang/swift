@@ -37,9 +37,13 @@ SILValue stripCasts(SILValue V);
 /// mark_dependence) from the current SILValue.
 SILValue stripCastsWithoutMarkDependence(SILValue V);
 
-/// Return the underlying SILValue after stripping off all copy_value and
+/// Return the underlying SILValue after looking through all copy_value and
 /// begin_borrow instructions.
-SILValue stripOwnershipInsts(SILValue v);
+SILValue lookThroughOwnershipInsts(SILValue v);
+
+/// Return the underlying SILValue after looking through all copy_value
+/// instructions.
+SILValue lookThroughCopyValueInsts(SILValue v);
 
 /// Return the underlying SILValue after stripping off all upcasts from the
 /// current SILValue.
@@ -51,7 +55,13 @@ SILValue stripClassCasts(SILValue V);
 
 /// Return the underlying SILValue after stripping off all address projection
 /// instructions.
+///
+/// FIXME: Today address projections are referring to the result of the
+/// projection and doesn't consider the operand. Should we change this?
 SILValue stripAddressProjections(SILValue V);
+
+/// Look through any projections that transform an address -> an address.
+SILValue lookThroughAddressToAddressProjections(SILValue v);
 
 /// Return the underlying SILValue after stripping off all aggregate projection
 /// instructions.

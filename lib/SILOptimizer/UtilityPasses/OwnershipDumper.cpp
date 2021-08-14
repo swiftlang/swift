@@ -34,10 +34,10 @@ static void dumpInstruction(SILInstruction &ii) {
 
   auto ops = ii.getAllOperands();
   if (!ops.empty()) {
-    llvm::outs() << "Operand Ownership Map:\n";
+    llvm::outs() << "Ownership Constraint:\n";
     for (const auto &op : ops) {
       llvm::outs() << "Op #: " << op.getOperandNumber() << "\n"
-                   << "Ownership Map: " << op.getOwnershipKindMap();
+                      "Constraint: " << op.getOwnershipConstraint() << "\n";
     }
   }
 

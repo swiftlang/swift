@@ -6,6 +6,10 @@
 
 // REQUIRES: executable_test,swift_stdlib_no_asserts
 
+// Test needs to be updated for 32bit.
+// rdar://74810823
+// UNSUPPORTED: PTRSIZE=32
+
 #if _runtime(_ObjC)
 import Foundation
 #endif
@@ -16,6 +20,13 @@ struct Outer {
   class InnerClass { }
 
   static let staticString = "static"
+}
+
+class C {
+  @inline(never)
+  func f() -> String {
+    return "\(Self.self)"
+  }
 }
 
 // More types are tested in test/stdlib/TypeName.swift and
@@ -144,6 +155,9 @@ printEmbeeded(testQualifiedLocalType())
 
 // CHECK-OUTPUT: <test.Outer.InnerClass>
 printEmbeeded(testInnerClass())
+
+// CHECK-OUTPUT: <C>
+printEmbeeded(C().f())
 
 #if _runtime(_ObjC)
 

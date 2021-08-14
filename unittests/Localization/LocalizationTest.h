@@ -14,6 +14,7 @@
 #define LOCALIZATION_TEST_H
 
 #include "swift/Localization/LocalizationFormat.h"
+#include "swift/Basic/Compiler.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"

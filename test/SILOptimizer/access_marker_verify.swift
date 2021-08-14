@@ -333,8 +333,9 @@ func testInitGenericEnum<T>(t: T) -> GenericEnum<T>? {
 // CHECK:   copy_addr %1 to [initialization] [[ADR1]] : $*T
 // CHECK:   [[STK:%.*]] = alloc_stack $GenericEnum<T>
 // CHECK:   [[ENUMDATAADDR:%.*]] = init_enum_data_addr [[STK]]
-// CHECK-NOT: begin_access
-// CHECK:   copy_addr [take] [[ADR1]] to [initialization] [[ENUMDATAADDR]] : $*T
+// CHECK:   [[ACCESSENUM:%.*]] = begin_access [modify] [unsafe] [[ENUMDATAADDR]] : $*T
+// CHECK:   copy_addr [take] [[ADR1]] to [initialization] [[ACCESSENUM]] : $*T
+// CHECK:   end_access [[ACCESSENUM]] : $*T
 // CHECK:   inject_enum_addr
 // CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unknown] [[PROJ]]
 // CHECK:   copy_addr [take] %{{.*}} to [[ACCESS]] : $*GenericEnum<T>
@@ -441,8 +442,8 @@ func testEnumPattern(ie: IndirectEnum) -> Bool {
 // CHECK:   switch_enum %{{.*}} : $IndirectEnum, case #IndirectEnum.V!enumelt: [[BBV:bb.*]], default bb
 // CHECK: [[BBV]](%{{.*}} : @owned ${ var Int }):
 // CHECK:   [[PROJ:%.*]] = project_box
-// CHECK-NOT: begin_access
-// CHECK:   load [trivial] [[PROJ]] : $*Int
+// CHECK:   [[ACCESS:%.*]] = begin_access [read] [unsafe] [[PROJ]]
+// CHECK:   load [trivial] [[ACCESS]] : $*Int
 // CHECK-LABEL: } // end sil function '$s20access_marker_verify15testEnumPattern2ieSbAA08IndirectE0O_tF'
 
 // --- enum LValue.

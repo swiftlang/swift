@@ -1,0 +1,4 @@
+module Dummy {
+  header "Dummy.h"
+  export *
+}

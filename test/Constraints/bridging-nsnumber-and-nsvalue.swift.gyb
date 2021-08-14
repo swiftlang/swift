@@ -57,17 +57,17 @@ func bridgeNSNumberBackToSpecificType(object: ${ObjectType},
                                       dictBoth: [${ObjectType}: ${ObjectType}],
                                       set: Set<${ObjectType}>) {
 %   for Type in ValueTypes:
-  _ = object as ${Type} // expected-error{{use 'as!'}}
+  _ = object as ${Type} // expected-error{{is not convertible to}} expected-note {{use 'as!'}}
   _ = object is ${Type}
   _ = object as? ${Type}
   _ = object as! ${Type}
 
-  _ = optional as ${Type}? // expected-error{{use 'as!'}}
+  _ = optional as ${Type}? // expected-error{{is not convertible to}} expected-note {{use 'as!'}}
   _ = optional is ${Type}?
   _ = optional as? ${Type}?
   _ = optional as! ${Type}?
 
-  _ = optional as ${Type} // expected-error{{use 'as!'}}
+  _ = optional as ${Type} // expected-error{{is not convertible to}} expected-note {{use 'as!'}}
   _ = optional is ${Type}
   _ = optional as? ${Type}
   _ = optional as! ${Type}
@@ -82,7 +82,7 @@ func bridgeNSNumberBackToSpecificType(object: ${ObjectType},
   _ = dictKeys as? [${Type}: Any]
   _ = dictKeys as! [${Type}: Any]
 
-  _ = dictKeys as [${Type}: AnyObject] // expected-error{{use 'as!'}}
+  _ = dictKeys as [${Type}: AnyObject] // expected-error{{is not convertible to}} expected-note {{use 'as!'}}
   _ = dictKeys is [${Type}: AnyObject]
   _ = dictKeys as? [${Type}: AnyObject]
   _ = dictKeys as! [${Type}: AnyObject]
@@ -92,7 +92,7 @@ func bridgeNSNumberBackToSpecificType(object: ${ObjectType},
   _ = dictValues as? [AnyHashable: ${Type}]
   _ = dictValues as! [AnyHashable: ${Type}]
 
-  _ = dictValues as [NSObject: ${Type}] // expected-error{{use 'as!'}}
+  _ = dictValues as [NSObject: ${Type}] // expected-error{{is not convertible to}} expected-note {{use 'as!'}}
   _ = dictValues is [NSObject: ${Type}]
   _ = dictValues as? [NSObject: ${Type}]
   _ = dictValues as! [NSObject: ${Type}]
@@ -107,7 +107,7 @@ func bridgeNSNumberBackToSpecificType(object: ${ObjectType},
   _ = dictBoth as? [${Type}: ${ObjectType}]
   _ = dictBoth as! [${Type}: ${ObjectType}]
 
-  _ = dictBoth as [${Type}: ${Type}] // expected-error{{use 'as!'}}
+  _ = dictBoth as [${Type}: ${Type}] // expected-error{{is not convertible to}} expected-note {{use 'as!'}}
   _ = dictBoth is [${Type}: ${Type}]
   _ = dictBoth as? [${Type}: ${Type}]
   _ = dictBoth as! [${Type}: ${Type}]

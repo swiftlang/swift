@@ -3,6 +3,7 @@
 
 // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_if.foo
 func foo(x : Bool) { // CHECK: [[@LINE]]:20 -> {{[0-9]+}}:2 : 0
+           // CHECK: [[@LINE+1]]:6 -> [[@LINE+1]]:9 : 0
   if (x) { // CHECK: [[@LINE]]:10 -> [[@LINE+1]]:4 : 1
   }
 

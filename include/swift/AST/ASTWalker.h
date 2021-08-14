@@ -215,6 +215,10 @@ public:
   /// TapExpr.
   virtual bool shouldWalkIntoTapExpression() { return true; }
 
+  /// This method configures whether the the walker should visit the underlying
+  /// value of a property wrapper placeholder.
+  virtual bool shouldWalkIntoPropertyWrapperPlaceholderValue() { return true; }
+
   /// This method configures whether the walker should visit the capture
   /// initializer expressions within a capture list directly, rather than
   /// walking the declarations.

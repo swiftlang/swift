@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/SILValue.h"
+#include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuiltinVisitor.h"
 #include "swift/SIL/SILInstruction.h"
@@ -80,6 +81,14 @@ SILInstruction *ValueBase::getDefiningInsertionPoint() {
   return nullptr;
 }
 
+SILInstruction *ValueBase::getNextInstruction() {
+  if (auto *inst = getDefiningInstruction())
+    return &*std::next(inst->getIterator());
+  if (auto *arg = dyn_cast<SILArgument>(this))
+    return &*arg->getParentBlock()->begin();
+  return nullptr;
+}
+
 Optional<ValueBase::DefiningInstructionResult>
 ValueBase::getDefiningInstructionResult() {
   if (auto *inst = dyn_cast<SingleValueInstruction>(this))
@@ -90,50 +99,26 @@ ValueBase::getDefiningInstructionResult() {
 }
 
 SILBasicBlock *SILNode::getParentBlock() const {
-  auto *CanonicalNode =
-      const_cast<SILNode *>(this)->getRepresentativeSILNodeInObject();
-  if (auto *Inst = dyn_cast<SILInstruction>(CanonicalNode))
+  if (auto *Inst = dyn_cast<SILInstruction>(this))
     return Inst->getParent();
-  if (auto *Arg = dyn_cast<SILArgument>(CanonicalNode))
+  if (auto *Arg = dyn_cast<SILArgument>(this))
     return Arg->getParent();
+  if (auto *MVR = dyn_cast<MultipleValueInstructionResult>(this)) {
+    return MVR->getParent()->getParent();
+  }
   return nullptr;
 }
 
 SILFunction *SILNode::getFunction() const {
-  auto *CanonicalNode =
-      const_cast<SILNode *>(this)->getRepresentativeSILNodeInObject();
-  if (auto *Inst = dyn_cast<SILInstruction>(CanonicalNode))
-    return Inst->getFunction();
-  if (auto *Arg = dyn_cast<SILArgument>(CanonicalNode))
-    return Arg->getFunction();
+  if (auto *parentBlock = getParentBlock())
+    return parentBlock->getParent();
   return nullptr;
 }
 
 SILModule *SILNode::getModule() const {
-  auto *CanonicalNode =
-      const_cast<SILNode *>(this)->getRepresentativeSILNodeInObject();
-  if (auto *Inst = dyn_cast<SILInstruction>(CanonicalNode))
-    return &Inst->getModule();
-  if (auto *Arg = dyn_cast<SILArgument>(CanonicalNode))
-    return &Arg->getModule();
+  if (SILFunction *func = getFunction())
+    return &func->getModule();
   return nullptr;
-}
-
-const SILNode *SILNode::getRepresentativeSILNodeSlowPath() const {
-  assert(getStorageLoc() != SILNodeStorageLocation::Instruction);
-
-  if (isa<SingleValueInstruction>(this)) {
-    assert(hasMultipleSILNodeBases(getKind()));
-    return &static_cast<const SILInstruction &>(
-        static_cast<const SingleValueInstruction &>(
-            static_cast<const ValueBase &>(*this)));
-  }
-
-  if (auto *MVR = dyn_cast<MultipleValueInstructionResult>(this)) {
-    return MVR->getParent();
-  }
-
-  llvm_unreachable("Invalid value for slow path");
 }
 
 /// Get a location for this value.
@@ -150,64 +135,77 @@ SILLocation SILValue::getLoc() const {
 }
 
 //===----------------------------------------------------------------------===//
+//                               OwnershipKind
+//===----------------------------------------------------------------------===//
+
+llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
+                                     const OwnershipKind &kind) {
+  return os << kind.asString();
+}
+
+StringRef OwnershipKind::asString() const {
+  switch (value) {
+  case OwnershipKind::Any:
+    return "any";
+  case OwnershipKind::Unowned:
+    return "unowned";
+  case OwnershipKind::Owned:
+    return "owned";
+  case OwnershipKind::Guaranteed:
+    return "guaranteed";
+  case OwnershipKind::None:
+    return "none";
+  }
+  llvm_unreachable("covered switch");
+}
+
+//===----------------------------------------------------------------------===//
 //                             ValueOwnershipKind
 //===----------------------------------------------------------------------===//
 
 ValueOwnershipKind::ValueOwnershipKind(const SILFunction &F, SILType Type,
                                        SILArgumentConvention Convention)
-    : Value() {
+    : value(OwnershipKind::Any) {
   auto &M = F.getModule();
 
   // Trivial types can be passed using a variety of conventions. They always
   // have trivial ownership.
   if (Type.isTrivial(F)) {
-    Value = ValueOwnershipKind::None;
+    value = OwnershipKind::None;
     return;
   }
 
   switch (Convention) {
   case SILArgumentConvention::Indirect_In:
   case SILArgumentConvention::Indirect_In_Constant:
-    Value = SILModuleConventions(M).useLoweredAddresses()
-                ? ValueOwnershipKind::None
-                : ValueOwnershipKind::Owned;
+    value = SILModuleConventions(M).useLoweredAddresses()
+                ? OwnershipKind::None
+                : OwnershipKind::Owned;
     break;
   case SILArgumentConvention::Indirect_In_Guaranteed:
-    Value = SILModuleConventions(M).useLoweredAddresses()
-                ? ValueOwnershipKind::None
-                : ValueOwnershipKind::Guaranteed;
+    value = SILModuleConventions(M).useLoweredAddresses()
+                ? OwnershipKind::None
+                : OwnershipKind::Guaranteed;
     break;
   case SILArgumentConvention::Indirect_Inout:
   case SILArgumentConvention::Indirect_InoutAliasable:
   case SILArgumentConvention::Indirect_Out:
-    Value = ValueOwnershipKind::None;
+    value = OwnershipKind::None;
     return;
   case SILArgumentConvention::Direct_Owned:
-    Value = ValueOwnershipKind::Owned;
+    value = OwnershipKind::Owned;
     return;
   case SILArgumentConvention::Direct_Unowned:
-    Value = ValueOwnershipKind::Unowned;
+    value = OwnershipKind::Unowned;
     return;
   case SILArgumentConvention::Direct_Guaranteed:
-    Value = ValueOwnershipKind::Guaranteed;
+    value = OwnershipKind::Guaranteed;
     return;
-  case SILArgumentConvention::Direct_Deallocating:
-    llvm_unreachable("Not handled");
   }
 }
 
 StringRef ValueOwnershipKind::asString() const {
-  switch (Value) {
-  case ValueOwnershipKind::Unowned:
-    return "unowned";
-  case ValueOwnershipKind::Owned:
-    return "owned";
-  case ValueOwnershipKind::Guaranteed:
-    return "guaranteed";
-  case ValueOwnershipKind::None:
-    return "any";
-  }
-  llvm_unreachable("Unhandled ValueOwnershipKind in switch.");
+  return value.asString();
 }
 
 llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
@@ -215,40 +213,24 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
   return os << kind.asString();
 }
 
-Optional<ValueOwnershipKind>
-ValueOwnershipKind::merge(ValueOwnershipKind RHS) const {
-  auto LHSVal = Value;
-  auto RHSVal = RHS.Value;
-
-  // Any merges with anything.
-  if (LHSVal == ValueOwnershipKind::None) {
-    return ValueOwnershipKind(RHSVal);
-  }
-  // Any merges with anything.
-  if (RHSVal == ValueOwnershipKind::None) {
-    return ValueOwnershipKind(LHSVal);
-  }
-
-  return (LHSVal == RHSVal) ? Optional<ValueOwnershipKind>(*this) : llvm::None;
-}
-
-ValueOwnershipKind::ValueOwnershipKind(StringRef S) {
-  auto Result = llvm::StringSwitch<Optional<ValueOwnershipKind::innerty>>(S)
-                    .Case("unowned", ValueOwnershipKind::Unowned)
-                    .Case("owned", ValueOwnershipKind::Owned)
-                    .Case("guaranteed", ValueOwnershipKind::Guaranteed)
-                    .Case("any", ValueOwnershipKind::None)
+ValueOwnershipKind::ValueOwnershipKind(StringRef S)
+    : value(OwnershipKind::Any) {
+  auto Result = llvm::StringSwitch<Optional<OwnershipKind::innerty>>(S)
+                    .Case("unowned", OwnershipKind::Unowned)
+                    .Case("owned", OwnershipKind::Owned)
+                    .Case("guaranteed", OwnershipKind::Guaranteed)
+                    .Case("any", OwnershipKind::None)
                     .Default(None);
   if (!Result.hasValue())
     llvm_unreachable("Invalid string representation of ValueOwnershipKind");
-  Value = Result.getValue();
+  value = Result.getValue();
 }
 
 ValueOwnershipKind
 ValueOwnershipKind::getProjectedOwnershipKind(const SILFunction &F,
                                               SILType Proj) const {
   if (Proj.isTrivial(F))
-    return ValueOwnershipKind::None;
+    return OwnershipKind::None;
   return *this;
 }
 
@@ -292,40 +274,17 @@ StringRef swift::getSILValueName(ValueKind Kind) {
 #endif
 
 //===----------------------------------------------------------------------===//
-//                          OperandOwnershipKindMap
-//===----------------------------------------------------------------------===//
-
-void OperandOwnershipKindMap::print(llvm::raw_ostream &os) const {
-  os << "-- OperandOwnershipKindMap --\n";
-
-  unsigned index = 0;
-  unsigned end = unsigned(ValueOwnershipKind::LastValueOwnershipKind) + 1;
-  while (index != end) {
-    auto kind = ValueOwnershipKind(index);
-    if (canAcceptKind(kind)) {
-      os << kind << ": Yes. Liveness: " << getLifetimeConstraint(kind) << "\n";
-    } else {
-      os << kind << ":  No."
-         << "\n";
-    }
-    ++index;
-  }
-}
-
-void OperandOwnershipKindMap::dump() const { print(llvm::dbgs()); }
-
-//===----------------------------------------------------------------------===//
 //                           UseLifetimeConstraint
 //===----------------------------------------------------------------------===//
 
 llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
                                      UseLifetimeConstraint constraint) {
   switch (constraint) {
-  case UseLifetimeConstraint::MustBeLive:
-    os << "MustBeLive";
+  case UseLifetimeConstraint::NonLifetimeEnding:
+    os << "NonLifetimeEnding";
     break;
-  case UseLifetimeConstraint::MustBeInvalidated:
-    os << "MustBeInvalidated";
+  case UseLifetimeConstraint::LifetimeEnding:
+    os << "LifetimeEnding";
     break;
   }
   return os;
@@ -344,3 +303,123 @@ SILFunction *Operand::getParentFunction() const {
   auto *self = const_cast<Operand *>(this);
   return self->getUser()->getFunction();
 }
+
+bool Operand::canAcceptKind(ValueOwnershipKind kind) const {
+  auto operandOwnership = getOperandOwnership();
+  auto constraint = operandOwnership.getOwnershipConstraint();
+  if (constraint.satisfiesConstraint(kind)) {
+    // Constraints aren't precise enough to enforce Unowned value uses.
+    if (kind == OwnershipKind::Unowned) {
+      return canAcceptUnownedValue(operandOwnership);
+    }
+    return true;
+  }
+
+  return false;
+}
+
+bool Operand::satisfiesConstraints() const {
+  return canAcceptKind(get().getOwnershipKind());
+}
+
+bool Operand::isLifetimeEnding() const {
+  auto constraint = getOwnershipConstraint();
+
+  // If our use lifetime constraint is NonLifetimeEnding, just return false.
+  if (!constraint.isLifetimeEnding())
+    return false;
+
+  // Otherwise, we may have a lifetime ending use. We consider two cases here:
+  // the case where our value has OwnershipKind::None and one where it has some
+  // other OwnershipKind. Note that values with OwnershipKind::None ownership
+  // can not have their lifetime ended since they are outside of the ownership
+  // system. Given such a case, if we have such a value we return
+  // isLifetimeEnding() as false even if the constraint itself has a constraint
+  // that says a value is LifetimeEnding. If we have a value that has a
+  // non-OwnershipKind::None ownership then we just return true as expected.
+  return get().getOwnershipKind() != OwnershipKind::None;
+}
+
+bool Operand::isConsuming() const {
+  if (!getOwnershipConstraint().isConsuming())
+    return false;
+
+  return get().getOwnershipKind() != OwnershipKind::None;
+}
+
+void Operand::dump() const { print(llvm::dbgs()); }
+
+void Operand::print(llvm::raw_ostream &os) const {
+  os << "Operand.\n"
+        "Owner: "
+     << *Owner << "Value: " << get() << "Operand Number: " << getOperandNumber()
+     << '\n'
+     << "Is Type Dependent: " << (isTypeDependent() ? "yes" : "no") << '\n';
+}
+
+//===----------------------------------------------------------------------===//
+//                             OperandConstraint
+//===----------------------------------------------------------------------===//
+
+llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
+                                     OwnershipConstraint constraint) {
+  return os << "<Constraint "
+               "Kind:" << constraint.getPreferredKind()
+            << " LifetimeConstraint:" << constraint.getLifetimeConstraint()
+            << ">";
+}
+
+StringRef OperandOwnership::asString() const {
+  switch (value) {
+  case OperandOwnership::NonUse:
+    return "non-use";
+  case OperandOwnership::TrivialUse:
+    return "trivial-use";
+  case OperandOwnership::InstantaneousUse:
+    return "instantaneous";
+  case OperandOwnership::UnownedInstantaneousUse:
+    return "unowned-instantaneous";
+  case OperandOwnership::ForwardingUnowned:
+    return "forwarding-unowned";
+  case OperandOwnership::PointerEscape:
+    return "pointer-escape";
+  case OperandOwnership::BitwiseEscape:
+    return "bitwise-escape";
+  case OperandOwnership::Borrow:
+    return "borrow";
+  case OperandOwnership::DestroyingConsume:
+    return "destroying-consume";
+  case OperandOwnership::ForwardingConsume:
+    return "forwarding-consume";
+  case OperandOwnership::InteriorPointer:
+    return "interior-pointer";
+  case OperandOwnership::ForwardingBorrow:
+    return "forwarding-borrow";
+  case OperandOwnership::EndBorrow:
+    return "end-borrow";
+  case OperandOwnership::Reborrow:
+    return "reborrow";
+  }
+  llvm_unreachable("covered switch");
+}
+
+llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
+                                     const OperandOwnership &operandOwnership) {
+  return os << operandOwnership.asString();
+}
+
+//===----------------------------------------------------------------------===//
+//                              PlaceholderValue
+//===----------------------------------------------------------------------===//
+
+int PlaceholderValue::numPlaceholderValuesAlive = 0;
+
+PlaceholderValue::PlaceholderValue(SILType type)
+      : ValueBase(ValueKind::PlaceholderValue, type) {
+  numPlaceholderValuesAlive++;
+}
+
+PlaceholderValue::~PlaceholderValue() {
+  numPlaceholderValuesAlive--;
+}
+

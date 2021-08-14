@@ -17,13 +17,14 @@
 #ifndef SWIFT_MODULE_H
 #define SWIFT_MODULE_H
 
+#include "swift/AST/AccessNotes.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Import.h"
 #include "swift/AST/LookupKinds.h"
-#include "swift/AST/RawComment.h"
 #include "swift/AST/Type.h"
+#include "swift/Basic/BasicSourceInfo.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/STLExtras.h"
@@ -55,6 +56,7 @@ namespace swift {
   class FileUnit;
   class FuncDecl;
   class InfixOperatorDecl;
+  enum class LibraryLevel : uint8_t;
   class LinkLibrary;
   class ModuleLoader;
   class NominalTypeDecl;
@@ -165,6 +167,9 @@ class ModuleDecl : public DeclContext, public TypeDecl {
   friend class DirectOperatorLookupRequest;
   friend class DirectPrecedenceGroupLookupRequest;
 
+  /// The ABI name of the module, if it differs from the module name.
+  mutable Identifier ModuleABIName;
+
 public:
   /// Produces the components of a given module's full name in reverse order.
   ///
@@ -249,6 +254,8 @@ private:
   /// \see EntryPointInfoTy
   EntryPointInfoTy EntryPointInfo;
 
+  AccessNotesFile accessNotes;
+
   ModuleDecl(Identifier name, ASTContext &ctx, ImplicitImportInfo importInfo);
 
 public:
@@ -278,6 +285,9 @@ public:
   /// Retrieve a list of modules that each file of this module implicitly
   /// imports.
   ImplicitImportList getImplicitImports() const;
+
+  AccessNotesFile &getAccessNotes() { return accessNotes; }
+  const AccessNotesFile &getAccessNotes() const { return accessNotes; }
 
   ArrayRef<FileUnit *> getFiles() {
     assert(!Files.empty() || failedToLoad());
@@ -337,6 +347,23 @@ public:
   void getDeclaredCrossImportBystanders(
       SmallVectorImpl<Identifier> &bystanderNames);
 
+  /// Retrieve the ABI name of the module, which is used for metadata and
+  /// mangling.
+  Identifier getABIName() const;
+
+  /// Set the ABI name of the module;
+  void setABIName(Identifier name) {
+    ModuleABIName = name;
+  }
+
+  /// User-defined module version number.
+  llvm::VersionTuple UserModuleVersion;
+  void setUserModuleVersion(llvm::VersionTuple UserVer) {
+    UserModuleVersion = UserVer;
+  }
+  llvm::VersionTuple getUserModuleVersion() const {
+    return UserModuleVersion;
+  }
 private:
   /// A cache of this module's underlying module and required bystander if it's
   /// an underscored cross-import overlay.
@@ -397,6 +424,14 @@ public:
     DebugClient = R;
   }
 
+  /// Returns true if this module is compiled as static library.
+  bool isStaticLibrary() const {
+    return Bits.ModuleDecl.StaticLibrary;
+  }
+  void setStaticLibrary(bool isStatic = true) {
+    Bits.ModuleDecl.StaticLibrary = isStatic;
+  }
+
   /// Returns true if this module was or is being compiled for testing.
   bool isTestingEnabled() const {
     return Bits.ModuleDecl.TestingEnabled;
@@ -443,6 +478,9 @@ public:
   void setResilienceStrategy(ResilienceStrategy strategy) {
     Bits.ModuleDecl.RawResilienceStrategy = unsigned(strategy);
   }
+
+  /// Distribution level of the module.
+  LibraryLevel getLibraryLevel() const;
 
   /// Returns true if this module was or is being compiled for testing.
   bool hasIncrementalInfo() const { return Bits.ModuleDecl.HasIncrementalInfo; }
@@ -540,10 +578,15 @@ public:
   ///
   /// \param protocol The protocol to which we are computing conformance.
   ///
+  /// \param allowMissing When \c true, the resulting conformance reference
+  /// might include "missing" conformances, which are synthesized for some
+  /// protocols as an error recovery mechanism.
+  ///
   /// \returns The result of the conformance search, which will be
   /// None if the type does not conform to the protocol or contain a
   /// ProtocolConformanceRef if it does conform.
-  ProtocolConformanceRef lookupConformance(Type type, ProtocolDecl *protocol);
+  ProtocolConformanceRef lookupConformance(Type type, ProtocolDecl *protocol,
+                                           bool allowMissing = false);
 
   /// Look for the conformance of the given existential type to the given
   /// protocol.
@@ -593,8 +636,7 @@ public:
     Default = 1 << 1,
     /// Include imports declared with `@_implementationOnly`.
     ImplementationOnly = 1 << 2,
-    /// Include imports of SPIs declared with `@_spi`. Non-SPI imports are
-    /// included whether or not this flag is specified.
+    /// Include imports of SPIs declared with `@_spi`
     SPIAccessControl = 1 << 3,
     /// Include imports shadowed by a cross-import overlay. Unshadowed imports
     /// are included whether or not this flag is specified.
@@ -605,33 +647,8 @@ public:
 
   /// Looks up which modules are imported by this module.
   ///
-  /// \p filter controls which imports are included in the list.
-  ///
-  /// There are three axes for categorizing imports:
-  /// 1. Privacy: Exported/Private/ImplementationOnly (mutually exclusive).
-  /// 2. SPI/non-SPI: An import of any privacy level may be @_spi("SPIName").
-  /// 3. Shadowed/Non-shadowed: An import of any privacy level may be shadowed
-  ///    by a cross-import overlay.
-  ///
-  /// It is also possible for SPI imports to be shadowed by a cross-import
-  /// overlay.
-  ///
-  /// If \p filter contains multiple privacy levels, modules at all the privacy
-  /// levels are included.
-  ///
-  /// If \p filter contains \c ImportFilterKind::SPIAccessControl, then both
-  /// SPI and non-SPI imports are included. Otherwise, only non-SPI imports are
-  /// included.
-  ///
-  /// If \p filter contains \c ImportFilterKind::ShadowedByCrossImportOverlay,
-  /// both shadowed and non-shadowed imports are included. Otherwise, only
-  /// non-shadowed imports are included.
-  ///
-  /// Clang modules have some additional complexities; see the implementation of
-  /// \c ClangModuleUnit::getImportedModules for details.
-  ///
-  /// \pre \p filter must contain at least one privacy level, i.e. one of
-  ///      \c Exported or \c Private or \c ImplementationOnly.
+  /// \p filter controls whether public, private, or any imports are included
+  /// in this list.
   void getImportedModules(SmallVectorImpl<ImportedModule> &imports,
                           ImportFilter filter = ImportFilterKind::Exported) const;
 
@@ -649,11 +666,17 @@ public:
   /// This assumes that \p module was imported.
   bool isImportedImplementationOnly(const ModuleDecl *module) const;
 
+  /// Returns true if a function, which is using \p nominal, can be serialized
+  /// by cross-module-optimization.
+  bool canBeUsedForCrossModuleOptimization(NominalTypeDecl *nominal) const;
+
   /// Finds all top-level decls of this module.
   ///
   /// This does a simple local lookup, not recursively looking through imports.
   /// The order of the results is not guaranteed to be meaningful.
   void getTopLevelDecls(SmallVectorImpl<Decl*> &Results) const;
+
+  void getExportedPrespecializations(SmallVectorImpl<Decl *> &results) const;
 
   /// Finds top-level decls of this module filtered by their attributes.
   ///
@@ -711,6 +734,9 @@ public:
   /// \returns true if this module is the "swift" standard library module.
   bool isStdlibModule() const;
 
+  /// \returns true if this module has standard substitutions for mangling.
+  bool hasStandardSubstitutions() const;
+
   /// \returns true if this module is the "SwiftShims" module;
   bool isSwiftShimsModule() const;
 
@@ -719,6 +745,9 @@ public:
 
   /// \returns true if this module is the "SwiftOnoneSupport" module;
   bool isOnoneSupportModule() const;
+
+  /// \returns true if this module is the "Foundation" module;
+  bool isFoundationModule() const;
 
   /// \returns true if traversal was aborted, false otherwise.
   bool walk(ASTWalker &Walker);
@@ -745,6 +774,31 @@ public:
   ReverseFullNameIterator getReverseFullModuleName() const {
     return ReverseFullNameIterator(this);
   }
+
+  /// Calls \p callback for each source file of the module.
+  void collectBasicSourceFileInfo(
+      llvm::function_ref<void(const BasicSourceFileInfo &)> callback) const;
+
+  /// Retrieve a fingerprint value that summarizes the contents of this module.
+  ///
+  /// This interface hash a of a module is guaranteed to change if the interface
+  /// hash of any of its (primary) source files changes. For example, when
+  /// building incrementally, the interface hash of this module will change when
+  /// the primaries contributing to its content changes. In contrast, when
+  /// a module is deserialized, the hash of every source file contributes to
+  /// the module's interface hash. It therefore serves as an effective, if
+  /// coarse-grained, way of determining when top-level changes to a module's
+  /// contents have been made.
+  Fingerprint getFingerprint() const;
+
+  /// Returns an approximation of whether the given module could be
+  /// redistributed and consumed by external clients.
+  ///
+  /// FIXME: The scope of this computation should be limited entirely to
+  /// RenamedDeclRequest. Unfortunately, it has been co-opted to support the
+  /// \c SerializeOptionsForDebugging hack. Once this information can be
+  /// transferred from module files to the dSYMs, remove this.
+  bool isExternallyConsumed() const;
 
   SourceRange getSourceRange() const { return SourceRange(); }
 

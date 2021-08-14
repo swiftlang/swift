@@ -252,11 +252,13 @@ func test_coercions_with_overloaded_operator(str: String, optStr: String?, veryO
 
   _ = (str ?? "") as Int // expected-error {{cannot convert value of type 'String' to type 'Int' in coercion}}
   _ = (optStr ?? "") as Int // expected-error {{cannot convert value of type 'String' to type 'Int' in coercion}}
-  _ = (optStr ?? "") as Int? // expected-error {{'String' is not convertible to 'Int?'; did you mean to use 'as!' to force downcast?}}
+  _ = (optStr ?? "") as Int? // expected-error {{'String' is not convertible to 'Int?'}}
+  // expected-note@-1 {{did you mean to use 'as!' to force downcast?}} {{22-24=as!}}
 
   _ = (str ^^^ "") as Int // expected-error {{cannot convert value of type 'String' to type 'Int' in coercion}}
   _ = (optStr ^^^ "") as Int // expected-error {{cannot convert value of type 'String' to type 'Int' in coercion}}
-  _ = (optStr ^^^ "") as Int? // expected-error {{'String' is not convertible to 'Int?'; did you mean to use 'as!' to force downcast?}}
+  _ = (optStr ^^^ "") as Int? // expected-error {{'String' is not convertible to 'Int?'}}
+  // expected-note@-1 {{did you mean to use 'as!' to force downcast?}} {{23-25=as!}}
 
   _ = ([] ?? []) as String // expected-error {{cannot convert value of type '[Any]' to type 'String' in coercion}}
   _ = ([""] ?? []) as [Int: Int] // expected-error {{cannot convert value of type '[String]' to type '[Int : Int]' in coercion}}
@@ -290,7 +292,8 @@ func test_compatibility_coercions(_ arr: [Int], _ optArr: [Int]?, _ dict: [Strin
   // expected-note@-1 {{arguments to generic parameter 'Element' ('Int' and 'String') are expected to be equal}}
   _ = dict as [String: String] // expected-error {{cannot convert value of type '[String : Int]' to type '[String : String]' in coercion}}
   // expected-note@-1 {{arguments to generic parameter 'Value' ('Int' and 'String') are expected to be equal}}
-  _ = dict as [String: String]? // expected-error {{'[String : Int]' is not convertible to '[String : String]?'; did you mean to use 'as!' to force downcast?}}
+  _ = dict as [String: String]? // expected-error {{'[String : Int]' is not convertible to '[String : String]?'}}
+  // expected-note@-1 {{did you mean to use 'as!' to force downcast?}} {{12-14=as!}}
   _ = (dict as [String: Int]?) as [String: Int] // expected-error {{value of optional type '[String : Int]?' must be unwrapped to a value of type '[String : Int]'}}
   // expected-note@-1 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
   // expected-note@-2 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
@@ -466,4 +469,83 @@ func protocol_composition(_ c: ProtocolP & ProtocolQ, _ c1: ProtocolP & Composit
   _ = c1 as? NotConforms // Ok
   _ = c1 as? StructNotComforms // expected-warning {{cast from 'ProtocolP & Composition' (aka 'ProtocolP & ProtocolP1 & ProtocolQ1') to unrelated type 'StructNotComforms' always fails}}
   _ = c1 as? NotConformsFinal // expected-warning {{cast from 'ProtocolP & Composition' (aka 'ProtocolP & ProtocolP1 & ProtocolQ1') to unrelated type 'NotConformsFinal' always fails}}
+}
+
+// SR-13899
+class SR13899_Base {}
+class SR13899_Derived: SR13899_Base {}
+
+protocol SR13899_P {}
+class SR13899_A: SR13899_P {}
+
+typealias DA = SR13899_Derived
+typealias BA = SR13899_Base
+typealias ClosureType = (SR13899_Derived) -> Void
+
+let blockp = { (_: SR13899_A) in }
+let block = { (_: SR13899_Base) in }
+let derived = { (_: SR13899_Derived) in }
+
+let blockalias =  { (_: BA) in  }
+let derivedalias =  { (_: DA) in  }
+
+let _ = block is ClosureType // expected-warning{{runtime conversion from '(SR13899_Base) -> ()' to 'ClosureType' (aka '(SR13899_Derived) -> ()') is not supported; 'is' test always fails}}
+// expected-note@-1 {{consider using 'as' coercion instead}} {{15-17=as}}
+let _ = blockalias is (SR13899_Derived) -> Void // expected-warning{{runtime conversion from '(BA) -> ()' (aka '(SR13899_Base) -> ()') to '(SR13899_Derived) -> Void' is not supported; 'is' test always fails}}
+// expected-note@-1 {{consider using 'as' coercion instead}} {{20-22=as}}
+let _ = block is (SR13899_Derived) -> Void // expected-warning{{runtime conversion from '(SR13899_Base) -> ()' to '(SR13899_Derived) -> Void' is not supported; 'is' test always fails}}
+// expected-note@-1 {{consider using 'as' coercion instead}} {{15-17=as}}
+let _ = block is (SR13899_Derived) -> Void // expected-warning{{runtime conversion from '(SR13899_Base) -> ()' to '(SR13899_Derived) -> Void' is not supported; 'is' test always fails}}
+// expected-note@-1 {{consider using 'as' coercion instead}} {{15-17=as}}
+
+let _ = block as! ClosureType // expected-warning{{runtime conversion from '(SR13899_Base) -> ()' to 'ClosureType' (aka '(SR13899_Derived) -> ()') is not supported; cast always fails}}
+// expected-note@-1 {{consider using 'as' coercion instead}} {{15-18=as}}
+let _ = blockalias as! (SR13899_Derived) -> Void // expected-warning{{runtime conversion from '(BA) -> ()' (aka '(SR13899_Base) -> ()') to '(SR13899_Derived) -> Void' is not supported; cast always fails}}
+// expected-note@-1 {{consider using 'as' coercion instead}} {{20-23=as}}
+let _ = block as! (SR13899_Derived) -> Void // expected-warning{{runtime conversion from '(SR13899_Base) -> ()' to '(SR13899_Derived) -> Void' is not supported; cast always fails}}
+// expected-note@-1 {{consider using 'as' coercion instead}} {{15-18=as}}
+let _ = block as! (SR13899_Derived) -> Void // expected-warning{{runtime conversion from '(SR13899_Base) -> ()' to '(SR13899_Derived) -> Void' is not supported; cast always fails}}
+// expected-note@-1 {{consider using 'as' coercion instead}} {{15-18=as}}
+
+let _ = block as? ClosureType // expected-warning{{runtime conversion from '(SR13899_Base) -> ()' to 'ClosureType' (aka '(SR13899_Derived) -> ()') is not supported; cast always fails}}
+// expected-note@-1 {{consider using 'as' coercion instead}} {{15-18=as}}
+let _ = blockalias as? (SR13899_Derived) -> Void // expected-warning{{runtime conversion from '(BA) -> ()' (aka '(SR13899_Base) -> ()') to '(SR13899_Derived) -> Void' is not supported; cast always fails}}
+// expected-note@-1 {{consider using 'as' coercion instead}} {{20-23=as}}
+let _ = block as? (SR13899_Derived) -> Void // expected-warning{{runtime conversion from '(SR13899_Base) -> ()' to '(SR13899_Derived) -> Void' is not supported; cast always fails}}
+// expected-note@-1 {{consider using 'as' coercion instead}} {{15-18=as}}
+let _ = block as? (SR13899_Derived) -> Void // expected-warning{{runtime conversion from '(SR13899_Base) -> ()' to '(SR13899_Derived) -> Void' is not supported; cast always fails}}
+// expected-note@-1 {{consider using 'as' coercion instead}} {{15-18=as}}
+
+
+let _ = derived is (SR13899_Base) -> Void // expected-warning{{always fails}}
+let _ = blockp is (SR13899_P) -> Void // expected-warning{{always fails}}
+
+// Types are trivially equal.
+let _ = block is (SR13899_Base) -> Void // expected-warning{{'is' test is always true}}
+let _ = block is (SR13899_Base) throws -> Void // expected-warning{{'is' test is always true}}
+let _ = derivedalias is (SR13899_Derived) -> Void // expected-warning{{'is' test is always true}}
+let _ = derivedalias is (SR13899_Derived) throws -> Void // expected-warning{{'is' test is always true}}
+let _ = derived is (SR13899_Derived) -> Void // expected-warning{{'is' test is always true}}
+let _ = derived is (SR13899_Derived) throws -> Void // expected-warning{{'is' test is always true}}
+let _ = blockp is (SR13899_A) -> Void //expected-warning{{'is' test is always true}}
+let _ = blockp is (SR13899_A) throws -> Void //expected-warning{{'is' test is always true}}
+
+protocol PP1 { }
+protocol PP2: PP1 { }
+extension Optional: PP1 where Wrapped == PP2 { }
+
+nil is PP1 // expected-error {{'nil' requires a contextual type}}
+
+// SR-15039
+enum ChangeType<T> {
+  case initial(T)
+  case delta(previous: T, next: T)
+  case unset
+
+  var delta: (previous: T?, next: T)? { nil }
+}
+
+extension ChangeType where T == String? {
+  var foo: String? { return self.delta?.previous as? String } // OK
+  var bar: String? { self.delta?.next }
 }

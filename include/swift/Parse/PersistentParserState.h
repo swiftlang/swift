@@ -19,7 +19,6 @@
 
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Parse/LocalContext.h"
-#include "swift/Parse/Scope.h"
 
 namespace swift {
 
@@ -38,33 +37,27 @@ public:
   CodeCompletionDelayedDeclKind Kind;
   unsigned Flags;
   DeclContext *ParentContext;
-  SavedScope Scope;
   unsigned StartOffset;
   unsigned EndOffset;
   unsigned PrevOffset;
 
-  SavedScope takeScope() { return std::move(Scope); }
-
   CodeCompletionDelayedDeclState(CodeCompletionDelayedDeclKind Kind,
                                  unsigned Flags, DeclContext *ParentContext,
-                                 SavedScope &&Scope, unsigned StartOffset,
-                                 unsigned EndOffset, unsigned PrevOffset)
+                                 unsigned StartOffset, unsigned EndOffset,
+                                 unsigned PrevOffset)
       : Kind(Kind), Flags(Flags), ParentContext(ParentContext),
-        Scope(std::move(Scope)), StartOffset(StartOffset), EndOffset(EndOffset),
+        StartOffset(StartOffset), EndOffset(EndOffset),
         PrevOffset(PrevOffset) {}
 };
 
 /// Parser state persistent across multiple parses.
 class PersistentParserState {
-  swift::ScopeInfo ScopeInfo;
-
   std::unique_ptr<CodeCompletionDelayedDeclState> CodeCompletionDelayedDeclStat;
 
   /// The local context for all top-level code.
   TopLevelContext TopLevelCode;
 
 public:
-  swift::ScopeInfo &getScopeInfo() { return ScopeInfo; }
   PersistentParserState();
   PersistentParserState(ASTContext &ctx) : PersistentParserState() { }
   ~PersistentParserState();

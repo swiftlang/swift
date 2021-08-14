@@ -22,11 +22,14 @@
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/SIL/SILDifferentiabilityWitness.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/Projection.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/Analysis/ArraySemantic.h"
 #include "swift/SILOptimizer/Analysis/DifferentiableActivityAnalysis.h"
+#include "swift/SILOptimizer/Differentiation/ADContext.h"
 #include "swift/SILOptimizer/Differentiation/DifferentiationInvoker.h"
+#include "swift/SILOptimizer/Differentiation/TangentBuilder.h"
 
 namespace swift {
 
@@ -118,7 +121,7 @@ void collectAllActualResultsInTypeOrder(
 /// - The set of minimal parameter and result indices for differentiating the
 ///   `apply` instruction.
 void collectMinimalIndicesForFunctionCall(
-    ApplyInst *ai, SILAutoDiffIndices parentIndices,
+    ApplyInst *ai, const AutoDiffConfig &parentConfig,
     const DifferentiableActivityInfo &activityInfo,
     SmallVectorImpl<SILValue> &results, SmallVectorImpl<unsigned> &paramIndices,
     SmallVectorImpl<unsigned> &resultIndices);
@@ -140,6 +143,9 @@ template <class Inst> Inst *peerThroughFunctionConversions(SILValue value) {
     return peerThroughFunctionConversions<Inst>(pai->getCallee());
   return nullptr;
 }
+
+Optional<std::pair<SILDebugLocation, SILDebugVariable>>
+findDebugLocationAndVariable(SILValue originalValue);
 
 //===----------------------------------------------------------------------===//
 // Diagnostic utilities
@@ -166,8 +172,11 @@ VarDecl *getTangentStoredProperty(ADContext &context, VarDecl *originalField,
 /// Returns the tangent stored property of the original stored property
 /// referenced by the given projection instruction with the given base type.
 /// On error, emits diagnostic and returns nullptr.
+///
+/// NOTE: Asserts if \p projectionInst is not one of: struct_extract,
+/// struct_element_addr, or ref_element_addr.
 VarDecl *getTangentStoredProperty(ADContext &context,
-                                  FieldIndexCacheBase *projectionInst,
+                                  SingleValueInstruction *projectionInst,
                                   CanType baseType,
                                   DifferentiationInvoker invoker);
 
@@ -186,11 +195,15 @@ SILValue joinElements(ArrayRef<SILValue> elements, SILBuilder &builder,
 void extractAllElements(SILValue value, SILBuilder &builder,
                         SmallVectorImpl<SILValue> &results);
 
-/// Emit a zero value into the given buffer access by calling
-/// `AdditiveArithmetic.zero`. The given type must conform to
-/// `AdditiveArithmetic`.
-void emitZeroIntoBuffer(SILBuilder &builder, CanType type,
-                        SILValue bufferAccess, SILLocation loc);
+/// Emit a `Builtin.Word` value that represents the given type's memory layout
+/// size.
+SILValue emitMemoryLayoutSize(
+    SILBuilder &builder, SILLocation loc, CanType type);
+
+/// Emit a projection of the top-level subcontext from the context object.
+SILValue emitProjectTopLevelSubcontext(
+    SILBuilder &builder, SILLocation loc, SILValue context,
+    SILType subcontextType);
 
 //===----------------------------------------------------------------------===//
 // Utilities for looking up derivatives of functions
@@ -236,8 +249,8 @@ findMinimalDerivativeConfiguration(AbstractFunctionDecl *original,
 /// \param parameterIndices must be lowered to SIL.
 /// \param resultIndices must be lowered to SIL.
 SILDifferentiabilityWitness *getOrCreateMinimalASTDifferentiabilityWitness(
-    SILModule &module, SILFunction *original, IndexSubset *parameterIndices,
-    IndexSubset *resultIndices);
+    SILModule &module, SILFunction *original, DifferentiabilityKind kind,
+    IndexSubset *parameterIndices, IndexSubset *resultIndices);
 
 } // end namespace autodiff
 

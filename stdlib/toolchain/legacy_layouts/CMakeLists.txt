@@ -1,7 +1,7 @@
 add_custom_target("copy-legacy-layouts" ALL)
 
 foreach(sdk ${SWIFT_SDKS})
-  foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
+  foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES} ${SWIFT_SDK_${sdk}_MODULE_ARCHITECTURES})
     set(platform "${SWIFT_SDK_${sdk}_LIB_SUBDIR}")
 
     set(input "${SWIFT_SOURCE_DIR}/stdlib/toolchain/legacy_layouts/${platform}/layouts-${arch}.yaml")

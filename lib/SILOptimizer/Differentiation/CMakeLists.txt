@@ -5,5 +5,6 @@ target_sources(swiftSILOptimizer PRIVATE
   JVPCloner.cpp
   LinearMapInfo.cpp
   PullbackCloner.cpp
+  TangentBuilder.cpp
   Thunk.cpp
   VJPCloner.cpp)

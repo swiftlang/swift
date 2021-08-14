@@ -21,16 +21,24 @@
 #ifndef SWIFT_SILOPTIMIZER_PASSMANAGER_SILCOMBINER_H
 #define SWIFT_SILOPTIMIZER_PASSMANAGER_SILCOMBINER_H
 
+#include "swift/Basic/Defer.h"
+#include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILInstructionWorklist.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILVisitor.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SILOptimizer/Analysis/ClassHierarchyAnalysis.h"
+#include "swift/SILOptimizer/Analysis/NonLocalAccessBlockAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ProtocolConformanceAnalysis.h"
+#include "swift/SILOptimizer/OptimizerBridging.h"
 #include "swift/SILOptimizer/Utils/CastOptimizer.h"
 #include "swift/SILOptimizer/Utils/Existential.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
+#include "swift/SILOptimizer/PassManager/PassManager.h"
+
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 
@@ -43,27 +51,43 @@ class AliasAnalysis;
 /// the worklist.
 class SILCombiner :
     public SILInstructionVisitor<SILCombiner, SILInstruction *> {
+  SILFunctionTransform *parentTransform;
 
   AliasAnalysis *AA;
 
   DominanceAnalysis *DA;
 
-  // Determine the set of types a protocol conforms to in whole-module
-  // compilation mode.
+  /// Determine the set of types a protocol conforms to in whole-module
+  /// compilation mode.
   ProtocolConformanceAnalysis *PCA;
 
-  // Class hierarchy analysis needed to confirm no derived classes of a sole
-  // conforming class.
+  /// Class hierarchy analysis needed to confirm no derived classes of a sole
+  /// conforming class.
   ClassHierarchyAnalysis *CHA;
+
+  /// Non local access block analysis that we use when canonicalize object
+  /// lifetimes in OSSA.
+  NonLocalAccessBlockAnalysis *NLABA;
 
   /// Worklist containing all of the instructions primed for simplification.
   SmallSILInstructionWorklist<256> Worklist;
+
+  /// Utility for dead code removal.
+  InstructionDeleter deleter;
+
+  /// A cache of "dead end blocks" through which all paths it is known that the
+  /// program will terminate. This means that we are allowed to leak
+  /// objects.
+  DeadEndBlocks deadEndBlocks;
 
   /// Variable to track if the SILCombiner made any changes.
   bool MadeChange;
 
   /// If set to true then the optimizer is free to erase cond_fail instructions.
   bool RemoveCondFails;
+
+  /// If set to true then copies are canonicalized in OSSA mode.
+  bool enableCopyPropagation;
 
   /// Set to true if some alloc/dealloc_stack instruction are inserted and at
   /// the end of the run stack nesting needs to be corrected.
@@ -78,24 +102,63 @@ class SILCombiner :
   /// Cast optimizer
   CastOptimizer CastOpt;
 
+  /// Dead end blocks cache. SILCombine is already not allowed to mess with CFG
+  /// edges so it is safe to use this here.
+  DeadEndBlocks deBlocks;
+
+  /// External context struct used by \see ownershipRAUWHelper.
+  OwnershipFixupContext ownershipFixupContext;
+  
+  /// For invoking Swift instruction passes in libswift.
+  LibswiftPassInvocation libswiftPassInvocation;
+
 public:
-  SILCombiner(SILOptFunctionBuilder &FuncBuilder, SILBuilder &B,
+  SILCombiner(SILFunctionTransform *parentTransform,
+              SILOptFunctionBuilder &FuncBuilder, SILBuilder &B,
               AliasAnalysis *AA, DominanceAnalysis *DA,
               ProtocolConformanceAnalysis *PCA, ClassHierarchyAnalysis *CHA,
-              bool removeCondFails)
-      : AA(AA), DA(DA), PCA(PCA), CHA(CHA), Worklist("SC"), MadeChange(false),
-        RemoveCondFails(removeCondFails), Iteration(0), Builder(B),
-        CastOpt(FuncBuilder, nullptr /*SILBuilderContext*/,
-                /* ReplaceValueUsesAction */
-                [&](SILValue Original, SILValue Replacement) {
-                  replaceValueUsesWith(Original, Replacement);
-                },
-                /* ReplaceInstUsesAction */
-                [&](SingleValueInstruction *I, ValueBase *V) {
-                  replaceInstUsesWith(*I, V);
-                },
-                /* EraseAction */
-                [&](SILInstruction *I) { eraseInstFromFunction(*I); }) {}
+              NonLocalAccessBlockAnalysis *NLABA, bool removeCondFails,
+              bool enableCopyPropagation)
+      : parentTransform(parentTransform), AA(AA), DA(DA), PCA(PCA), CHA(CHA),
+        NLABA(NLABA), Worklist("SC"),
+        deleter(InstModCallbacks()
+                    .onDelete([&](SILInstruction *instToDelete) {
+                      // We allow for users in SILCombine to perform 2 stage
+                      // deletion, so we need to split the erasing of
+                      // instructions from adding operands to the worklist.
+                      eraseInstFromFunction(*instToDelete,
+                                            false /* don't add operands */);
+                    })
+                    .onNotifyWillBeDeleted(
+                        [&](SILInstruction *instThatWillBeDeleted) {
+                          Worklist.addOperandsToWorklist(
+                            *instThatWillBeDeleted);
+                        })
+                    .onCreateNewInst([&](SILInstruction *newlyCreatedInst) {
+                      Worklist.add(newlyCreatedInst);
+                    })
+                    .onSetUseValue([&](Operand *use, SILValue newValue) {
+                      use->set(newValue);
+                      Worklist.add(use->getUser());
+                    })),
+        deadEndBlocks(&B.getFunction()), MadeChange(false),
+        RemoveCondFails(removeCondFails),
+        enableCopyPropagation(enableCopyPropagation), Iteration(0), Builder(B),
+        CastOpt(
+            FuncBuilder, nullptr /*SILBuilderContext*/,
+            /* ReplaceValueUsesAction */
+            [&](SILValue Original, SILValue Replacement) {
+              replaceValueUsesWith(Original, Replacement);
+            },
+            /* ReplaceInstUsesAction */
+            [&](SingleValueInstruction *I, ValueBase *V) {
+              replaceInstUsesWith(*I, V);
+            },
+            /* EraseAction */
+            [&](SILInstruction *I) { eraseInstFromFunction(*I); }),
+        deBlocks(&B.getFunction()),
+        ownershipFixupContext(getInstModCallbacks(), deBlocks),
+        libswiftPassInvocation(parentTransform->getPassManager(), this) {}
 
   bool runOnFunction(SILFunction &F);
 
@@ -103,6 +166,41 @@ public:
     Iteration = 0;
     Worklist.resetChecked();
     MadeChange = false;
+  }
+
+  /// A "syntactic" high level function that combines our insertPt with the main
+  /// builder's builder context.
+  ///
+  /// Since this is syntactic and we assume that our caller is passing in a
+  /// lambda that if we inline will be eliminated, we mark this function always
+  /// inline.
+  ///
+  /// What is nice about this formulation is it enables one to really concisely
+  /// create a SILBuilder that uses the SILCombiner's builder context but at a
+  /// different use point. Example:
+  ///
+  /// SILBuilderWithScope builder(insertPt);
+  /// builder.createInst1(insertPt->getLoc(), ...);
+  /// builder.createInst2(insertPt->getLoc(), ...);
+  /// builder.createInst3(insertPt->getLoc(), ...);
+  /// auto *finalValue = builder.createInst4(insertPt->getLoc(), ...);
+  ///
+  /// Thats a lot of typing! Instead, using this API, one can write:
+  ///
+  /// auto *finalValue = withBuilder(insertPt, [&](auto &b, auto l) {
+  ///   b.createInst1(l, ...);
+  ///   b.createInst2(l, ...);
+  ///   b.createInst3(l, ...);
+  ///   return b.createInst4(l, ...);
+  /// });
+  ///
+  /// Since this is meant to be just be syntactic, we always inline this method.
+  LLVM_ATTRIBUTE_ALWAYS_INLINE
+  SingleValueInstruction *
+  withBuilder(SILInstruction *insertPt,
+              llvm::function_ref<SingleValueInstruction * (SILBuilder &, SILLocation)> visitor) {
+    SILBuilderWithScope builder(insertPt, Builder);
+    return visitor(builder, insertPt->getLoc());
   }
 
   // Insert the instruction New before instruction Old in Old's parent BB. Add
@@ -118,6 +216,12 @@ public:
   // so that the combiner will know that I was modified.
   void replaceInstUsesWith(SingleValueInstruction &I, ValueBase *V) {
     return Worklist.replaceInstUsesWith(I, V);
+  }
+
+  /// Perform use->set(value) and add use->user to the worklist.
+  void setUseValue(Operand *use, SILValue value) {
+    use->set(value);
+    Worklist.add(use->getUser());
   }
 
   // This method is to be used when a value is found to be dead,
@@ -175,10 +279,16 @@ public:
   SILInstruction *visitBuiltinInst(BuiltinInst *BI);
   SILInstruction *visitCondFailInst(CondFailInst *CFI);
   SILInstruction *visitStrongRetainInst(StrongRetainInst *SRI);
+  SILInstruction *visitCopyValueInst(CopyValueInst *cvi);
+  SILInstruction *visitDestroyValueInst(DestroyValueInst *dvi);
   SILInstruction *visitRefToRawPointerInst(RefToRawPointerInst *RRPI);
   SILInstruction *visitUpcastInst(UpcastInst *UCI);
-  SILInstruction *optimizeLoadFromStringLiteral(LoadInst *LI);
+
+  // NOTE: The load optimized in this method is a load [trivial].
+  SILInstruction *optimizeLoadFromStringLiteral(LoadInst *li);
+
   SILInstruction *visitLoadInst(LoadInst *LI);
+  SILInstruction *visitLoadBorrowInst(LoadBorrowInst *LI);
   SILInstruction *visitIndexAddrInst(IndexAddrInst *IA);
   bool optimizeStackAllocatedEnum(AllocStackInst *AS);
   SILInstruction *visitAllocStackInst(AllocStackInst *AS);
@@ -225,6 +335,14 @@ public:
   SILInstruction *
   visitConvertEscapeToNoEscapeInst(ConvertEscapeToNoEscapeInst *Cvt);
 
+  SILInstruction *legacyVisitGlobalValueInst(GlobalValueInst *globalValue);
+
+#define PASS(ID, TAG, DESCRIPTION)
+#define SWIFT_FUNCTION_PASS(ID, TAG, DESCRIPTION)
+#define SWIFT_INSTRUCTION_PASS(INST, TAG) \
+  SILInstruction *visit##INST(INST *);
+#include "swift/SILOptimizer/PassManager/Passes.def"
+
   /// Instruction visitor helpers.
   SILInstruction *optimizeBuiltinCanBeObjCClass(BuiltinInst *AI);
 
@@ -232,6 +350,8 @@ public:
   SILInstruction *optimizeBuiltinIsConcrete(BuiltinInst *I);
 
   SILInstruction *optimizeBuiltinCOWBufferForReading(BuiltinInst *BI);
+  SILInstruction *optimizeBuiltinCOWBufferForReadingNonOSSA(BuiltinInst *BI);
+  SILInstruction *optimizeBuiltinCOWBufferForReadingOSSA(BuiltinInst *BI);
 
   // Optimize the "trunc_N1_M2" builtin. if N1 is a result of "zext_M1_*" and
   // the following holds true: N1 > M1 and M2>= M1
@@ -255,6 +375,16 @@ public:
   bool tryOptimizeKeypathKVCString(ApplyInst *AI, FuncDecl *calleeFn,
                                   KeyPathInst *kp);
 
+  /// Sinks owned forwarding instructions to their uses if they do not have
+  /// non-debug non-consuming uses. Deletes any debug_values and destroy_values
+  /// when this is done. Returns true if we deleted svi and thus we should not
+  /// try to visit it.
+  bool trySinkOwnedForwardingInst(SingleValueInstruction *svi);
+
+  /// Apply CanonicalizeOSSALifetime to the extended lifetime of any copy
+  /// introduced during SILCombine for an owned value.
+  void canonicalizeOSSALifetimes();
+
   // Optimize concatenation of string literals.
   // Constant-fold concatenation of string literals known at compile-time.
   SILInstruction *optimizeConcatenationOfStringLiterals(ApplyInst *AI);
@@ -263,16 +393,22 @@ public:
   bool optimizeIdentityCastComposition(ApplyInst *FInverse,
                                        StringRef FInverseName, StringRef FName);
 
-private:
-  InstModCallbacks getInstModCallbacks() {
-    return InstModCallbacks(
-        [this](SILInstruction *DeadInst) { eraseInstFromFunction(*DeadInst); },
-        [this](SILInstruction *NewInst) { Worklist.add(NewInst); },
-        [this](SILValue oldValue, SILValue newValue) {
-          replaceValueUsesWith(oldValue, newValue);
-        });
-  }
+  /// Let \p user and \p value be two forwarding single value instructions  with
+  /// the property that \p value is the value that \p user forwards. In this
+  /// case, this helper routine will eliminate \p value if it can rewrite user
+  /// in terms of \p newValue. This is intended to handle cases where we have
+  /// completely different types so we need to actually create a new instruction
+  /// with a different result type.
+  ///
+  /// \param newValueGenerator Generator that produces the new value to
+  /// use. Conditionally called if we can perform the optimization.
+  SILInstruction *tryFoldComposedUnaryForwardingInstChain(
+      SingleValueInstruction *user, SingleValueInstruction *value,
+      function_ref<SILValue()> newValueGenerator);
 
+  InstModCallbacks &getInstModCallbacks() { return deleter.getCallbacks(); }
+
+private:
   // Build concrete existential information using findInitExistential.
   Optional<ConcreteOpenedExistentialInfo>
   buildConcreteOpenedExistentialInfo(Operand &ArgOperand);
@@ -286,11 +422,12 @@ private:
   void buildConcreteOpenedExistentialInfos(
       FullApplySite Apply,
       llvm::SmallDenseMap<unsigned, ConcreteOpenedExistentialInfo> &COEIs,
-      SILBuilderContext &BuilderCtx,
-      SILOpenedArchetypesTracker &OpenedArchetypesTracker);
+      SILBuilderContext &BuilderCtx);
 
   bool canReplaceArg(FullApplySite Apply, const OpenedArchetypeInfo &OAI,
                      const ConcreteExistentialInfo &CEI, unsigned ArgIdx);
+  SILValue canCastArg(FullApplySite Apply, const OpenedArchetypeInfo &OAI,
+                      const ConcreteExistentialInfo &CEI, unsigned ArgIdx);
 
   SILInstruction *createApplyWithConcreteType(
       FullApplySite Apply,
@@ -336,6 +473,14 @@ private:
   /// Returns true if the results of a try_apply are not used.
   static bool isTryApplyResultNotUsed(UserListTy &AcceptedUses,
                                       TryApplyInst *TAI);
+
+  bool hasOwnership() const {
+    return Builder.hasOwnership();
+  }
+  
+  void runSwiftInstructionPass(SILInstruction *inst,
+                               void (*runFunction)(BridgedInstructionPassCtxt));
+
 };
 
 } // end namespace swift

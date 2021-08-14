@@ -22,11 +22,11 @@ using namespace Lowering;
 //===----------------------------------------------------------------------===//
 
 SwitchCaseFullExpr::SwitchCaseFullExpr(SILGenFunction &SGF, CleanupLocation loc)
-    : SGF(SGF), scope(SGF.Cleanups, loc), loc(loc), branchDest() {}
+    : SGF(SGF), scope(SGF, loc), loc(loc), branchDest() {}
 
 SwitchCaseFullExpr::SwitchCaseFullExpr(SILGenFunction &SGF, CleanupLocation loc,
                                        SwitchCaseBranchDest branchDest)
-    : SGF(SGF), scope(SGF.Cleanups, loc), loc(loc), branchDest(branchDest) {}
+    : SGF(SGF), scope(SGF, loc), loc(loc), branchDest(branchDest) {}
 
 void SwitchCaseFullExpr::exitAndBranch(SILLocation loc,
                                        ArrayRef<SILValue> branchArgs) {
@@ -67,43 +67,42 @@ void SwitchCaseFullExpr::unreachableExit() {
 //===----------------------------------------------------------------------===//
 
 void SwitchEnumBuilder::emit() && {
-  bool isAddressOnly = optional.getType().isAddressOnly(builder.getFunction()) &&
-                       getSGF().silConv.useLoweredAddresses();
+  bool isAddressOnly =
+      subjectExprOperand.getType().isAddressOnly(builder.getFunction()) &&
+      getSGF().silConv.useLoweredAddresses();
   using DeclBlockPair = std::pair<EnumElementDecl *, SILBasicBlock *>;
   {
     // TODO: We could store the data in CaseBB form and not have to do this.
     llvm::SmallVector<DeclBlockPair, 8> caseBlocks;
     llvm::SmallVector<ProfileCounter, 8> caseBlockCounts;
-    std::transform(caseDataArray.begin(), caseDataArray.end(),
-                   std::back_inserter(caseBlocks),
-                   [](NormalCaseData &caseData) -> DeclBlockPair {
-                     return {caseData.decl, caseData.block};
-                   });
-    std::transform(caseDataArray.begin(), caseDataArray.end(),
-                   std::back_inserter(caseBlockCounts),
-                   [](NormalCaseData &caseData) -> ProfileCounter {
-                     return caseData.count;
-                   });
+    llvm::transform(caseDataArray, std::back_inserter(caseBlocks),
+                    [](NormalCaseData &caseData) -> DeclBlockPair {
+                      return {caseData.decl, caseData.block};
+                    });
+    llvm::transform(caseDataArray, std::back_inserter(caseBlockCounts),
+                    [](NormalCaseData &caseData) -> ProfileCounter {
+                      return caseData.count;
+                    });
     SILBasicBlock *defaultBlock =
         defaultBlockData ? defaultBlockData->block : nullptr;
     ProfileCounter defaultBlockCount =
         defaultBlockData ? defaultBlockData->count : ProfileCounter();
     ArrayRef<ProfileCounter> caseBlockCountsRef = caseBlockCounts;
     if (isAddressOnly) {
-      builder.createSwitchEnumAddr(loc, optional.getValue(), defaultBlock,
-                                   caseBlocks, caseBlockCountsRef,
+      builder.createSwitchEnumAddr(loc, subjectExprOperand.getValue(),
+                                   defaultBlock, caseBlocks, caseBlockCountsRef,
                                    defaultBlockCount);
     } else {
-      if (optional.getType().isAddress()) {
+      if (subjectExprOperand.getType().isAddress()) {
         // TODO: Refactor this into a maybe load.
-        if (optional.hasCleanup()) {
-          optional = builder.createLoadTake(loc, optional);
+        if (subjectExprOperand.hasCleanup()) {
+          subjectExprOperand = builder.createLoadTake(loc, subjectExprOperand);
         } else {
-          optional = builder.createLoadCopy(loc, optional);
+          subjectExprOperand = builder.createLoadCopy(loc, subjectExprOperand);
         }
       }
-      builder.createSwitchEnum(loc, optional.forward(getSGF()), defaultBlock,
-                               caseBlocks, caseBlockCountsRef,
+      builder.createSwitchEnum(loc, subjectExprOperand.forward(getSGF()),
+                               defaultBlock, caseBlocks, caseBlockCountsRef,
                                defaultBlockCount);
     }
   }
@@ -119,11 +118,11 @@ void SwitchEnumBuilder::emit() && {
 
     // Don't allow cleanups to escape the conditional block.
     SwitchCaseFullExpr presentScope(builder.getSILGenFunction(),
-                                    CleanupLocation::get(loc), branchDest);
+                                    CleanupLocation(loc), branchDest);
     builder.emitBlock(defaultBlock);
-    ManagedValue input = optional;
+    ManagedValue input = subjectExprOperand;
     if (!isAddressOnly) {
-      input = builder.createOwnedPhiArgument(optional.getType());
+      input = builder.createOwnedPhiArgument(subjectExprOperand.getType());
     }
     handler(input, std::move(presentScope));
     builder.clearInsertionPoint();
@@ -137,16 +136,16 @@ void SwitchEnumBuilder::emit() && {
 
     // Don't allow cleanups to escape the conditional block.
     SwitchCaseFullExpr presentScope(builder.getSILGenFunction(),
-                                    CleanupLocation::get(loc), branchDest);
+                                    CleanupLocation(loc), branchDest);
 
     builder.emitBlock(caseBlock);
 
     ManagedValue input;
     if (decl->hasAssociatedValues()) {
       // Pull the payload out if we have one.
-      SILType inputType = optional.getType().getEnumElementType(
+      SILType inputType = subjectExprOperand.getType().getEnumElementType(
           decl, builder.getModule(), builder.getFunction());
-      input = optional;
+      input = subjectExprOperand;
       if (!isAddressOnly) {
         input = builder.createOwnedPhiArgument(inputType);
       }
@@ -165,11 +164,11 @@ void SwitchEnumBuilder::emit() && {
 
     // Don't allow cleanups to escape the conditional block.
     SwitchCaseFullExpr presentScope(builder.getSILGenFunction(),
-                                    CleanupLocation::get(loc), branchDest);
+                                    CleanupLocation(loc), branchDest);
     builder.emitBlock(defaultBlock);
-    ManagedValue input = optional;
+    ManagedValue input = subjectExprOperand;
     if (!isAddressOnly) {
-      input = builder.createOwnedPhiArgument(optional.getType());
+      input = builder.createOwnedPhiArgument(subjectExprOperand.getType());
     }
     handler(input, std::move(presentScope));
     builder.clearInsertionPoint();

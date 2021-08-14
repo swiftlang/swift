@@ -16,6 +16,7 @@
 #include "ModuleFileSharedCore.h"
 #include "DocFormat.h"
 #include "SourceInfoFormat.h"
+#include "swift/AST/RawComment.h"
 #include "llvm/Support/DJB.h"
 
 namespace swift {
@@ -457,7 +458,7 @@ public:
       int32_t nameLength = endian::readNext<int32_t, little, unaligned>(data);
       std::string mangledName(reinterpret_cast<const char *>(data), nameLength);
       data += nameLength;
-      result.push_back({mangledName, genSigId});
+      result.push_back({std::string(mangledName), genSigId});
     }
     return result;
   }
@@ -563,6 +564,49 @@ public:
     using namespace llvm::support;
     assert(length == 4);
     return endian::readNext<uint32_t, little, unaligned>(data);
+  }
+};
+
+/// Serialization for the table mapping module-level declIDs for serialized
+/// iterable decl contexts to their corresponding \c Fingerprint values.
+class ModuleFileSharedCore::DeclFingerprintsTableInfo {
+public:
+  using internal_key_type = uint32_t;
+  using external_key_type = DeclID;
+  using data_type = swift::Fingerprint;
+  using hash_value_type = uint32_t;
+  using offset_type = unsigned;
+
+  internal_key_type GetInternalKey(external_key_type ID) { return ID; }
+
+  hash_value_type ComputeHash(internal_key_type key) {
+    return llvm::hash_value(key);
+  }
+
+  static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
+    return lhs == rhs;
+  }
+
+  static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
+    using namespace llvm::support;
+    const unsigned dataLen = Fingerprint::DIGEST_LENGTH;
+    return {sizeof(uint32_t), dataLen};
+  }
+
+  static internal_key_type ReadKey(const uint8_t *data, unsigned length) {
+    using namespace llvm::support;
+    return endian::readNext<uint32_t, little, unaligned>(data);
+  }
+
+  static data_type ReadData(internal_key_type key, const uint8_t *data,
+                            unsigned length) {
+    using namespace llvm::support;
+    auto str = llvm::StringRef{reinterpret_cast<const char *>(data),
+                               Fingerprint::DIGEST_LENGTH};
+    if (auto fp = Fingerprint::fromString(str))
+      return fp.getValue();
+    llvm::errs() << "Unconvertable fingerprint '" << str << "'\n";
+    abort();
   }
 };
 

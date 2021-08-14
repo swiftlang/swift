@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -generic-specializer -module-name inherit -sil-generic-specializer-enable-ownership %s | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -generic-specializer -module-name inherit %s | %FileCheck %s
 
 import Builtin
 import Swift
