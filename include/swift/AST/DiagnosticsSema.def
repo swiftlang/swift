@@ -5882,6 +5882,12 @@ NOTE(result_builder_missing_build_array, none,
 NOTE(result_builder_missing_build_limited_availability, none,
      "add 'buildLimitedAvailability(_:)' to the result "
      "builder %0 to erase type information for less-available types", (Type))
+ERROR(result_builder_requires_explicit_var_initialization,none,
+      "local variable%select{| '%1'}0 requires explicit initializer to be used with "
+      "result builder %2", (bool, StringRef, DeclName))
+ERROR(cannot_declare_computed_var_in_result_builder,none,
+      "cannot declare local %select{lazy|wrapped|computed|observed}0 variable "
+      "in result builder", (unsigned))
 
 //------------------------------------------------------------------------------
 // MARK: Tuple Shuffle Diagnostics

@@ -1862,6 +1862,13 @@ public:
 
   bool diagnoseAsError() override;
   bool diagnoseAsNote() override;
+
+private:
+  /// Tailored diagnostics for an unsupported variable declaration.
+  bool diagnosePatternBinding(PatternBindingDecl *PB) const;
+
+  /// Tailored diagnostics for lazy/wrapped/computed variable declarations.
+  bool diagnoseStorage(VarDecl *var) const;
 };
 
 /// Diagnose situation when a single "tuple" parameter is given N arguments e.g.
