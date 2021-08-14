@@ -5525,6 +5525,7 @@ internal struct _DictionaryCodingKey: CodingKey {
   }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public protocol CodingKeyRepresentable {
   var codingKey: CodingKey { get }
   init?(codingKey: CodingKey)
