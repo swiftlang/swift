@@ -25,16 +25,6 @@ namespace swift {
 
 namespace rewriting {
 
-/// See the implementation of MutableTerm::checkForOverlap() for a discussion.
-enum class OverlapKind {
-  /// Terms do not overlap.
-  None,
-  /// First kind of overlap (TUV vs U).
-  First,
-  /// Second kind of overlap (TU vs UV).
-  Second
-};
-
 /// A term is a sequence of one or more symbols.
 ///
 /// The Term type is a uniqued, permanently-allocated representation,
@@ -76,10 +66,6 @@ public:
   }
 
   static Term get(const MutableTerm &term, RewriteContext &ctx);
-
-  OverlapKind checkForOverlap(Term other,
-                              MutableTerm &t,
-                              MutableTerm &v) const;
 
   ArrayRef<const ProtocolDecl *> getRootProtocols() const {
     return begin()->getRootProtocols();
@@ -144,6 +130,11 @@ public:
 
   void append(const MutableTerm &other) {
     Symbols.append(other.begin(), other.end());
+  }
+
+  void append(decltype(Symbols)::const_iterator from,
+              decltype(Symbols)::const_iterator to) {
+    Symbols.append(from, to);
   }
 
   int compare(const MutableTerm &other, const ProtocolGraph &protos) const;
