@@ -1,32 +1,20 @@
-<<<#!/usr/bin/env python
-
+# ===-- build_script_invocation.py ---------------------------------------===#
+#
 # This source file is part of the Swift.org open source project
 #
-# Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+# Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
-# See https://swift.org/LICENSE.txt for license information
-# See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+# See https:#swift.org/LICENSE.txt for license information
+# See https:#swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+#
+# ===---------------------------------------------------------------------===#
 
-
-"""
-The ultimate tool for building Swift.
-"""
-
-
-from __future__ import absolute_import, print_function, unicode_literals
-
-import json
 import os
+import pipes
 import platform
-import sys
-import time
 
 from build_swift.build_swift import argparse
-from build_swift.build_swift import defaults
-from build_swift.build_swift import driver_arguments
-from build_swift.build_swift import migration
-from build_swift.build_swift import presets
 from build_swift.build_swift.constants import BUILD_SCRIPT_IMPL_PATH
 from build_swift.build_swift.constants import SWIFT_BUILD_ROOT
 from build_swift.build_swift.constants import SWIFT_REPO_NAME
@@ -34,372 +22,20 @@ from build_swift.build_swift.constants import SWIFT_SOURCE_ROOT
 
 import six
 
-from swift_build_support.swift_build_support import build_script_invocation
+from swift_build_support.swift_build_support import build_graph
+from swift_build_support.swift_build_support import products
 from swift_build_support.swift_build_support import shell
 from swift_build_support.swift_build_support import targets
 from swift_build_support.swift_build_support import workspace
 from swift_build_support.swift_build_support.cmake import CMake
-from swift_build_support.swift_build_support.targets import StdlibDeploymentTarget
-from swift_build_support.swift_build_support.toolchain import host_toolchain
+from swift_build_support.swift_build_support.host_specific_configuration \
+    import HostSpecificConfiguration
+from swift_build_support.swift_build_support.targets \
+    import StdlibDeploymentTarget
 from swift_build_support.swift_build_support.utils \
     import exit_rejecting_arguments
 from swift_build_support.swift_build_support.utils import fatal_error
 
-
-# -----------------------------------------------------------------------------
-# Constants
-
-# These versions are community sourced. At any given time only the Xcode
-# version used by Swift CI is officially supported. See ci.swift.org
-_SUPPORTED_XCODE_BUILDS = [
-    ("12.2 beta 3", "12B5035g"),
-    ("12.2 Release Candidate", "12B5044c"),
-    ("12.2", "12B45b"),
-    ("12.3", "12C33"),
-    ("12.4", "12D4e"),
-    ("12.5 beta 3", "12E5244e"),
-    ("12.5", "12E262"),
-    ("13.0 beta", "13A5154h"),
-    ("13.0 beta 4", "13A5201i")
-]
-
-# -----------------------------------------------------------------------------
-# Helpers
-
-
-def print_note(message, stream=sys.stdout):
-    """Writes a diagnostic message to the given stream. By default this
-    function outputs to stdout.
-    """
-
-    stream.write('[{}] NOTE: {}\n'.format(sys.argv[0], message))
-    stream.flush()
-
-
-def clean_delay():
-    """Provide a short delay so accidentally invoked clean builds can be
-    canceled.
-    """
-
-    sys.stdout.write('Starting clean build in  ')
-    for i in range(3, 0, -1):
-        sys.stdout.write('\b%d' % i)
-        sys.stdout.flush()
-        time.sleep(1)
-    print('\b\b\b\bnow.')
-
-
-def initialize_runtime_environment():
-    """Change the program environment for building.
-    """
-
-    # Set an appropriate default umask.
-    os.umask(0o022)
-
-    # Unset environment variables that might affect how tools behave.
-    for v in [
-            'MAKEFLAGS',
-            'SDKROOT',
-            'MACOSX_DEPLOYMENT_TARGET',
-            'IPHONEOS_DEPLOYMENT_TARGET',
-            'TVOS_DEPLOYMENT_TARGET',
-            'WATCHOS_DEPLOYMENT_TARGET']:
-        os.environ.pop(v, None)
-
-    # Set NINJA_STATUS to format ninja output
-    os.environ['NINJA_STATUS'] = '[%f/%t][%p][%es] '
-
-
-class JSONDumper(json.JSONEncoder):
-    def __init__(self, *args, **kwargs):
-        json.JSONEncoder.__init__(
-            self, indent=2, separators=(',', ': '), sort_keys=True,
-            *args, **kwargs)
-
-    def default(self, o):
-        if hasattr(o, '__dict__'):
-            return vars(o)
-        return six.text_type(o)
-
-
-def print_xcodebuild_versions(file=sys.stdout):
-    """
-    Print the host machine's `xcodebuild` version, as well as version
-    information for all available SDKs.
-    """
-    version = shell.capture(
-        ['xcodebuild', '-version'], dry_run=False, echo=False).rstrip()
-    # Allow non-zero exit codes.  Under certain obscure circumstances
-    # xcodebuild can exit with a non-zero exit code even when the SDK is
-    # usable.
-    sdks = shell.capture(
-        ['xcodebuild', '-version', '-sdk'], dry_run=False, echo=False,
-        allow_non_zero_exit=True).rstrip()
-    fmt = '{version}\n\n--- SDK versions ---\n{sdks}\n'
-
-    print(fmt.format(version=version, sdks=sdks), file=file)
-    file.flush()
-
-
-def validate_xcode_compatibility():
-    if sys.platform != 'darwin':
-        return
-
-    if os.getenv("SKIP_XCODE_VERSION_CHECK"):
-        print("note: skipping Xcode version check")
-        return
-
-    version = shell.capture(
-        ['xcodebuild', '-version'], dry_run=False, echo=False).strip()
-
-    valid_build_numbers = tuple(x[1] for x in _SUPPORTED_XCODE_BUILDS)
-    if not version.endswith(valid_build_numbers):
-        valid_versions_string = "\n".join(
-            "{} ({})".format(*x) for x in _SUPPORTED_XCODE_BUILDS)
-        raise SystemExit(
-            "error: using unsupported Xcode version:\n\n{}\n\n"
-            "Install one of:\n{}\n\n"
-            "Or set 'SKIP_XCODE_VERSION_CHECK=1' in the environment".format(
-                version, valid_versions_string
-            )
-        )
-
-
-def tar(source, destination):
-    """
-    Create a gzip archive of the file at 'source' at the given
-    'destination' path.
-    """
-    # We do not use `tarfile` here because:
-    #  - We wish to support LZMA2 compression while also supporting Python 2.7.
-    #  - We wish to explicitly set the owner and group of the archive.
-    args = ['tar', '-c', '-z', '-f', destination]
-
-    if platform.system() != 'Darwin' and platform.system() != 'Windows':
-        args += ['--owner=0', '--group=0']
-
-    # Discard stderr output such as 'tar: Failed to open ...'. We'll detect
-    # these cases using the exit code, which should cause 'shell.call' to
-    # raise.
-    shell.call(args + [source], stderr=shell.DEVNULL)
-
-
-# -----------------------------------------------------------------------------
-# Argument Validation
-
-def validate_arguments(toolchain, args):
-    if toolchain.cc is None or toolchain.cxx is None:
-        fatal_error(
-            "can't find clang (please install clang-3.5 or a "
-            "later version)")
-
-    if toolchain.cmake is None:
-        fatal_error("can't find CMake (please install CMake)")
-
-    if args.distcc:
-        if toolchain.distcc is None:
-            fatal_error(
-                "can't find distcc (please install distcc)")
-        if toolchain.distcc_pump is None:
-            fatal_error(
-                "can't find distcc-pump (please install distcc-pump)")
-
-    if args.sccache:
-        if toolchain.sccache is None:
-            fatal_error(
-                "can't find sccache (please install sccache)")
-
-    if args.host_target is None or args.stdlib_deployment_targets is None:
-        fatal_error("unknown operating system")
-
-    if args.symbols_package:
-        if not os.path.isabs(args.symbols_package):
-            print(
-                '--symbols-package must be an absolute path '
-                '(was \'{}\')'.format(args.symbols_package))
-            return 1
-        if not args.install_symroot:
-            fatal_error(
-                "--install-symroot is required when specifying "
-                "--symbols-package.")
-
-    if args.android:
-        if args.android_ndk is None or \
-                args.android_api_level is None or \
-                args.android_icu_uc is None or \
-                args.android_icu_uc_include is None or \
-                args.android_icu_i18n is None or \
-                args.android_icu_i18n_include is None or \
-                args.android_icu_data is None:
-            fatal_error(
-                "when building for Android, --android-ndk, "
-                "--android-api-level, --android-icu-uc, "
-                "--android-icu-uc-include, --android-icu-i18n, "
-                "--android-icu-i18n-include, and --android-icu-data "
-                "must be specified")
-
-    targets_needing_toolchain = [
-        'build_indexstoredb',
-        'build_playgroundsupport',
-        'build_sourcekitlsp',
-        'build_toolchainbenchmarks',
-        'build_swift_inspect',
-        'tsan_libdispatch_test',
-    ]
-    has_target_needing_toolchain = \
-        bool(sum(getattr(args, x) for x in targets_needing_toolchain))
-    if args.legacy_impl and has_target_needing_toolchain:
-        fatal_error(
-            "--legacy-impl is incompatible with building packages needing "
-            "a toolchain (%s)" % ", ".join(targets_needing_toolchain))
-
-
-def default_stdlib_deployment_targets(args):
-    """
-    Return targets for the Swift stdlib, based on the build machine.
-    If the build machine is not one of the recognized ones, return None.
-    """
-
-    host_target = StdlibDeploymentTarget.host_target()
-    if host_target is None:
-        return None
-
-    # OS X build machines configure all Darwin platforms by default.
-    # Put iOS native targets last so that we test them last
-    # (it takes a long time).
-    if host_target == StdlibDeploymentTarget.OSX.x86_64:
-        targets = [host_target]
-        if args.build_ios and args.build_ios_simulator:
-            targets.extend(StdlibDeploymentTarget.iOSSimulator.targets)
-        if args.build_ios and args.build_ios_device:
-            targets.extend(StdlibDeploymentTarget.iOS.targets)
-        if args.build_tvos and args.build_tvos_simulator:
-            targets.extend(StdlibDeploymentTarget.AppleTVSimulator.targets)
-        if args.build_tvos and args.build_tvos_device:
-            targets.extend(StdlibDeploymentTarget.AppleTV.targets)
-        if args.build_watchos and args.build_watchos_simulator:
-            targets.extend(StdlibDeploymentTarget
-                           .AppleWatchSimulator.targets)
-        if args.build_watchos and args.build_watchos_device:
-            targets.extend(StdlibDeploymentTarget.AppleWatch.targets)
-        return targets
-    else:
-        # All other machines only configure their host stdlib by default.
-        return [host_target]
-
-
-def apply_default_arguments(toolchain, args):
-    # Infer if ninja is required
-    ninja_required = (
-        args.build_foundation or
-        args.build_indexstoredb or
-        args.build_sourcekitlsp or
-        args.cmake_generator == 'Ninja'
-    )
-    if ninja_required and toolchain.ninja is None:
-        args.build_ninja = True
-
-    # Set the default stdlib-deployment-targets, if none were provided.
-    if args.stdlib_deployment_targets is None:
-        stdlib_targets = default_stdlib_deployment_targets(args)
-        args.stdlib_deployment_targets = [
-            target.name for target in stdlib_targets]
-
-    # SwiftPM and XCTest have a dependency on Foundation.
-    # On OS X, Foundation is built automatically using xcodebuild.
-    # On Linux, we must ensure that it is built manually.
-    if ((args.build_swiftpm or args.build_xctest) and
-            platform.system() != "Darwin"):
-        args.build_foundation = True
-
-    # Foundation has a dependency on libdispatch.
-    # On OS X, libdispatch is provided by the OS.
-    # On Linux, we must ensure that it is built manually.
-    if (args.build_foundation and
-            platform.system() != "Darwin"):
-        args.build_libdispatch = True
-
-    if args.build_subdir is None:
-        args.build_subdir = \
-            workspace.compute_build_subdir(args)
-
-    if args.relocate_xdg_cache_home_under_build_subdir:
-        cache_under_build_subdir = os.path.join(
-            SWIFT_BUILD_ROOT, args.build_subdir, '.cache')
-        if args.verbose_build:
-            print("Relocating XDG_CACHE_HOME to {}".format(cache_under_build_subdir))
-        workspace.relocate_xdg_cache_home_under(cache_under_build_subdir)
-
-    if args.install_destdir is None:
-        args.install_destdir = os.path.join(
-            SWIFT_BUILD_ROOT, args.build_subdir,
-            '{}-{}'.format('toolchain', args.host_target))
-
-    # Add optional stdlib-deployment-targets
-    if args.android:
-        if args.android_arch == "armv7":
-            args.stdlib_deployment_targets.append(
-                StdlibDeploymentTarget.Android.armv7.name)
-        elif args.android_arch == "aarch64":
-            args.stdlib_deployment_targets.append(
-                StdlibDeploymentTarget.Android.aarch64.name)
-        elif args.android_arch == "x86_64":
-            args.stdlib_deployment_targets.append(
-                StdlibDeploymentTarget.Android.x86_64.name)
-
-    # Infer platform flags from manually-specified configure targets.
-    # This doesn't apply to Darwin platforms, as they are
-    # already configured. No building without the platform flag, though.
-
-    android_tgts = [tgt for tgt in args.stdlib_deployment_targets
-                    if StdlibDeploymentTarget.Android.contains(tgt)]
-    if not args.android and len(android_tgts) > 0:
-        # If building natively on an Android host, avoid the NDK
-        # cross-compilation configuration.
-        if not StdlibDeploymentTarget.Android.contains(StdlibDeploymentTarget
-                                                       .host_target().name):
-            args.android = True
-        args.build_android = False
-
-    # Include the Darwin supported architectures in the CMake options.
-    if args.swift_darwin_supported_archs:
-        args.extra_cmake_options.append(
-            '-DSWIFT_DARWIN_SUPPORTED_ARCHS:STRING={}'.format(
-                args.swift_darwin_supported_archs))
-
-        # Remove unsupported Darwin archs from the standard library
-        # deployment targets.
-        supported_archs = args.swift_darwin_supported_archs.split(';')
-        targets = StdlibDeploymentTarget.get_targets_by_name(
-            args.stdlib_deployment_targets)
-
-        args.stdlib_deployment_targets = [
-            target.name
-            for target in targets
-            if (target.platform.is_darwin and
-                target.arch in supported_archs)
-        ]
-
-    # Filter out any macOS stdlib deployment targets that are not supported
-    # by the macOS SDK.
-    targets = StdlibDeploymentTarget.get_targets_by_name(
-        args.stdlib_deployment_targets)
-    args.stdlib_deployment_targets = [
-        target.name
-        for target in targets
-        if (not target.platform.is_darwin or
-            target.platform.sdk_supports_architecture(
-                target.arch, args.darwin_xcrun_toolchain))
-    ]
-
-    # Include the Darwin module-only architectures in the CMake options.
-    if args.swift_darwin_module_archs:
-        args.extra_cmake_options.append(
-            '-DSWIFT_DARWIN_MODULE_ARCHS:STRING={}'.format(
-                args.swift_darwin_module_archs))
-
-# -----------------------------------------------------------------------------
-# Build Script Impl Wrapping
 
 class BuildScriptInvocation(object):
     """Represent a single build script invocation.
@@ -761,6 +397,9 @@ class BuildScriptInvocation(object):
         if args.dry_run:
             impl_args += ["--dry-run"]
 
+        if args.reconfigure:
+            impl_args += ["--reconfigure"]
+
         if args.clang_profile_instr_use:
             impl_args += [
                 "--clang-profile-instr-use=%s" %
@@ -795,6 +434,12 @@ class BuildScriptInvocation(object):
             impl_args += [
                 "--llvm-ninja-targets-for-cross-compile-hosts=%s" %
                 ' '.join(args.llvm_ninja_targets_for_cross_compile_hosts)
+            ]
+
+        if args.darwin_symroot_path_filters:
+            impl_args += [
+                "--darwin_symroot_path_filters=%s" %
+                ' '.join(args.darwin_symroot_path_filters)
             ]
 
         # Compute the set of host-specific variables, which we pass through to
@@ -847,20 +492,31 @@ class BuildScriptInvocation(object):
         return options
 
     def compute_product_classes(self):
-        """compute_product_classes() -> (list, list)
+        """compute_product_classes() -> (list, list, list)
 
-        Compute the list first of all build-script-impl products and then all
-        non-build-script-impl products. It is assumed that concatenating the two
-        lists together will result in a valid dependency graph for the
-        compilation.
-
+        Compute the list first of all pre-build-script-impl products, then all
+        build-script-impl products and then all non-build-script-impl products.
+        It is assumed that concatenating the three lists together will result in a
+        valid dependency graph for the compilation.
         """
+        before_impl_product_classes = []
+        # If --skip-early-swift-driver is passed in, swift will be built
+        # as usual, but relying on its own C++-based (Legacy) driver.
+        # Otherwise, we build an "early" swift-driver using the host
+        # toolchain, which the later-built compiler will forward
+        # `swiftc` invocations to. That is, if we find a Swift compiler
+        # in the host toolchain. If the host toolchain is not equpipped with
+        # a Swift compiler, a warning is emitted. In the future, it may become
+        # mandatory that the host toolchain come with its own `swiftc`.
+        if self.args.build_early_swift_driver:
+            before_impl_product_classes.append(products.EarlySwiftDriver)
+
+        if self.args.build_cmark:
+            before_impl_product_classes.append(products.CMark)
 
         # FIXME: This is a weird division (returning a list of class objects),
         # but it matches the existing structure of the `build-script-impl`.
         impl_product_classes = []
-        if self.args.build_cmark:
-            impl_product_classes.append(products.CMark)
 
         # If --skip-build-llvm is passed in, LLVM cannot be completely disabled, as
         # Swift still needs a few LLVM targets like tblgen to be built for it to be
@@ -926,11 +582,13 @@ class BuildScriptInvocation(object):
         # infer dependencies, infer the dependencies now and then re-split the
         # list.
         if self.args.infer_dependencies:
-            combined = impl_product_classes + product_classes
+            combined_classes = before_impl_product_classes +\
+                impl_product_classes +\
+                product_classes
             if self.args.verbose_build:
                 print("-- Build Graph Inference --")
                 print("Initial Product List:")
-                for p in combined:
+                for p in combined_classes:
                     print("    {}".format(p.product_name()))
 
             # Now that we have produced the schedule, resplit. We require our
@@ -939,25 +597,31 @@ class BuildScriptInvocation(object):
             # non-build-script-impl products. Otherwise, it would be unsafe to
             # re-order build-script-impl products in front of non
             # build-script-impl products.
+            before_impl_product_classes = []
             impl_product_classes = []
             product_classes = []
             is_darwin = platform.system() == 'Darwin'
-            final_schedule = build_graph.produce_scheduled_build(combined)[0]
+            final_schedule =\
+                build_graph.produce_scheduled_build(combined_classes)[0]
             for p in final_schedule:
                 if is_darwin and p.is_nondarwin_only_build_product():
                     continue
-
                 if p.is_build_script_impl_product():
                     impl_product_classes.append(p)
+                elif p.is_before_build_script_impl_product():
+                    before_impl_product_classes.append(p)
                 else:
                     product_classes.append(p)
+
             if self.args.verbose_build:
                 print("Final Build Order:")
+                for p in before_impl_product_classes:
+                    print("    {}".format(p.product_name()))
                 for p in impl_product_classes:
                     print("    {}".format(p.product_name()))
                 for p in product_classes:
                     print("    {}".format(p.product_name()))
-        return (impl_product_classes, product_classes)
+        return (before_impl_product_classes, impl_product_classes, product_classes)
 
     def execute(self):
         """Execute the invocation with the configured arguments."""
@@ -974,7 +638,6 @@ class BuildScriptInvocation(object):
             return
 
         # Otherwise, we compute and execute the individual actions ourselves.
-
         # Compute the list of hosts to operate on.
         all_host_names = [
             self.args.host_target] + self.args.cross_compile_hosts
@@ -985,9 +648,21 @@ class BuildScriptInvocation(object):
         #
         # FIXME: This should really be per-host, but the current structure
         # matches that of `build-script-impl`.
-        (impl_product_classes, product_classes) = self.compute_product_classes()
+        (before_impl_product_classes, impl_product_classes, product_classes) =\
+            self.compute_product_classes()
 
         # Execute each "pass".
+
+        # Pre-build-script-impl products...
+        # Note: currently only supports building for the host.
+        for host_target in all_host_names:
+            for product_class in before_impl_product_classes:
+                if product_class.is_build_script_impl_product():
+                    continue
+                if not product_class.is_before_build_script_impl_product():
+                    continue
+                # Execute clean, build, test, install
+                self.execute_product_build_steps(product_class, host_target)
 
         # Build...
         for host_target in all_hosts:
@@ -1028,33 +703,8 @@ class BuildScriptInvocation(object):
             for product_class in product_classes:
                 if product_class.is_build_script_impl_product():
                     continue
-                product_source = product_class.product_source_name()
-                product_name = product_class.product_name()
-                if product_class.is_swiftpm_unified_build_product():
-                    build_dir = self.workspace.swiftpm_unified_build_dir(
-                        host_target)
-                else:
-                    build_dir = self.workspace.build_dir(
-                        host_target, product_name)
-                product = product_class(
-                    args=self.args,
-                    toolchain=self.toolchain,
-                    source_dir=self.workspace.source_dir(product_source),
-                    build_dir=build_dir)
-                if product.should_clean(host_target):
-                    print("--- Cleaning %s ---" % product_name)
-                    product.clean(host_target)
-                if product.should_build(host_target):
-                    print("--- Building %s ---" % product_name)
-                    product.build(host_target)
-                if product.should_test(host_target):
-                    print("--- Running tests for %s ---" % product_name)
-                    product.test(host_target)
-                    print("--- Finished tests for %s ---" % product_name)
-                if product.should_install(host_target) or \
-                   (self.install_all and product.should_build(host_target)):
-                    print("--- Installing %s ---" % product_name)
-                    product.install(host_target)
+                # Execute clean, build, test, install
+                self.execute_product_build_steps(product_class, host_target)
 
         # Extract symbols...
         for host_target in all_hosts:
@@ -1102,331 +752,37 @@ class BuildScriptInvocation(object):
             ["--only-execute", action_name],
             env=self.impl_env, echo=self.args.verbose_build)
 
-
-# -----------------------------------------------------------------------------
-# Main (preset)
-
-
-def parse_preset_args():
-    parser = argparse.ArgumentParser(
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        description="""Builds Swift using a preset.""")
-    parser.add_argument(
-        "-n", "--dry-run",
-        help="print the commands that would be executed, but do not execute "
-             "them",
-        action="store_true",
-        default=False)
-    parser.add_argument(
-        "--preset-file",
-        help="load presets from the specified file",
-        metavar="PATH",
-        action="append",
-        dest="preset_file_names",
-        default=[])
-    parser.add_argument(
-        "--preset",
-        help="use the specified option preset",
-        metavar="NAME")
-    parser.add_argument(
-        "--show-presets",
-        help="list all presets and exit",
-        action=argparse.actions.StoreTrueAction,
-        nargs=argparse.Nargs.OPTIONAL)
-    parser.add_argument(
-        "--distcc",
-        help="use distcc",
-        action=argparse.actions.StoreTrueAction,
-        nargs=argparse.Nargs.OPTIONAL,
-        default=os.environ.get('USE_DISTCC') == '1')
-    parser.add_argument(
-        "--sccache",
-        help="use sccache",
-        action=argparse.actions.StoreTrueAction,
-        nargs=argparse.Nargs.OPTIONAL,
-        default=os.environ.get('SWIFT_USE_SCCACHE') == '1')
-    parser.add_argument(
-        "--cmake-c-launcher",
-        help="the absolute path to set CMAKE_C_COMPILER_LAUNCHER",
-        metavar="PATH")
-    parser.add_argument(
-        "--cmake-cxx-launcher",
-        help="the absolute path to set CMAKE_CXX_COMPILER_LAUNCHER",
-        metavar="PATH")
-    parser.add_argument(
-        "-j", "--jobs",
-        help="the number of parallel build jobs to use",
-        type=int,
-        dest="build_jobs")
-    parser.add_argument(
-        "preset_substitutions_raw",
-        help="'name=value' pairs that are substituted in the preset",
-        nargs="*",
-        metavar="SUBSTITUTION")
-    parser.add_argument(
-        "--expand-invocation", "--expand-build-script-invocation",
-        help="Print the expanded build-script invocation generated "
-             "by the preset, but do not run the preset",
-        action=argparse.actions.StoreTrueAction,
-        nargs=argparse.Nargs.OPTIONAL)
-    parser.add_argument(
-        "--swiftsyntax-install-prefix",
-        help="specify the directory to where SwiftSyntax should be installed")
-    parser.add_argument(
-        "--build-dir",
-        help="specify the directory where build artifact should be stored")
-    parser.add_argument(
-        "--dump-config",
-        help="instead of building, write JSON to stdout containing "
-             "various values used to build in this configuration",
-        action="store_true",
-        default=False)
-    parser.add_argument(
-        "--reconfigure",
-        help="Reconfigure all projects as we build",
-        action="store_true",
-        default=False)
-
-    return parser.parse_args()
-
-
-def main_preset():
-    args = parse_preset_args()
-
-    if len(args.preset_file_names) == 0:
-        args.preset_file_names = [
-            os.path.join(
-                SWIFT_SOURCE_ROOT, SWIFT_REPO_NAME, "utils",
-                "build-presets.ini")
-        ]
-
-        user_presets_file = os.path.join(os.path.expanduser("~"),
-                                         '.swift-build-presets')
-        if os.path.isfile(user_presets_file):
-            args.preset_file_names.append(user_presets_file)
-
-    preset_parser = presets.PresetParser()
-
-    try:
-        preset_parser.read_files(args.preset_file_names)
-    except presets.PresetError as e:
-        fatal_error(six.text_type(e))
-
-    if args.show_presets:
-        for name in sorted(preset_parser.preset_names,
-                           key=lambda name: name.lower()):
-            print(name)
-        return 0
-
-    if not args.preset:
-        fatal_error("missing --preset option")
-
-    args.preset_substitutions = {}
-    for arg in args.preset_substitutions_raw:
-        name, value = arg.split("=", 1)
-        args.preset_substitutions[name] = value
-
-    try:
-        preset = preset_parser.get_preset(
-            args.preset,
-            vars=args.preset_substitutions)
-    except presets.PresetError as e:
-        fatal_error(six.text_type(e))
-
-    preset_args = migration.migrate_swift_sdks(preset.args)
-
-    if args.distcc and (args.cmake_c_launcher or args.cmake_cxx_launcher):
-        fatal_error(
-            '--distcc can not be used with' +
-            ' --cmake-c-launcher or --cmake-cxx-launcher')
-    if args.sccache and (args.cmake_c_launcher or args.cmake_cxx_launcher):
-        fatal_error(
-            '--sccache can not be used with' +
-            ' --cmake-c-launcher or --cmake-cxx-launcher')
-
-    build_script_args = [sys.argv[0]]
-    if args.dry_run:
-        build_script_args += ["--dry-run"]
-    if args.dump_config:
-        build_script_args += ["--dump-config"]
-
-    build_script_args += preset_args
-    if args.distcc:
-        build_script_args += ["--distcc"]
-    if args.sccache:
-        build_script_args += ["--sccache"]
-    if args.build_jobs:
-        build_script_args += ["--jobs", str(args.build_jobs)]
-    if args.swiftsyntax_install_prefix:
-        build_script_args += ["--install-swiftsyntax",
-                              "--install-destdir",
-                              args.swiftsyntax_install_prefix]
-    if args.build_dir:
-        build_script_args += ["--build-dir", args.build_dir]
-    if args.cmake_c_launcher:
-        build_script_args += ["--cmake-c-launcher", args.cmake_c_launcher]
-    if args.cmake_cxx_launcher:
-        build_script_args += ["--cmake-cxx-launcher", args.cmake_cxx_launcher]
-    printable_command = shell.quote_command(build_script_args)
-    if args.expand_invocation:
-        print(printable_command)
-        return 0
-
-    if args.reconfigure:
-        build_script_args += ["--reconfigure"]
-
-    print_note('using preset "{}", which expands to \n\n{}\n'.format(
-        args.preset, printable_command))
-    shell.call_without_sleeping(build_script_args)
-    return 0
-
-
-# -----------------------------------------------------------------------------
-# Main (normal)
-
-def main_normal():
-    parser = driver_arguments.create_argument_parser()
-
-    args = migration.parse_args(parser, sys.argv[1:])
-
-    if args.build_script_impl_args:
-        # If we received any impl args, check if `build-script-impl` would
-        # accept them or not before any further processing.
-        try:
-            migration.check_impl_args(BUILD_SCRIPT_IMPL_PATH,
-                                      args.build_script_impl_args)
-        except ValueError as e:
-            exit_rejecting_arguments(e, parser)
-
-        if '--check-args-only' in args.build_script_impl_args:
-            return 0
-
-    shell.dry_run = args.dry_run
-
-    # Prepare and validate toolchain
-    if args.darwin_xcrun_toolchain is None:
-        xcrun_toolchain = os.environ.get('TOOLCHAINS',
-                                         defaults.DARWIN_XCRUN_TOOLCHAIN)
-
-        print_note('Using toolchain {}'.format(xcrun_toolchain))
-        args.darwin_xcrun_toolchain = xcrun_toolchain
-
-    toolchain = host_toolchain(xcrun_toolchain=args.darwin_xcrun_toolchain)
-    os.environ['TOOLCHAINS'] = args.darwin_xcrun_toolchain
-
-    if args.host_cc is not None:
-        toolchain.cc = args.host_cc
-    if args.host_cxx is not None:
-        toolchain.cxx = args.host_cxx
-    if args.host_lipo is not None:
-        toolchain.lipo = args.host_lipo
-    if args.host_libtool is not None:
-        toolchain.libtool = args.host_libtool
-    if args.cmake is not None:
-        toolchain.cmake = args.cmake
-    if args.sccache:
-        print("Ensuring the sccache server is running...")
-        # Use --show-stats to ensure the server is started, because using
-        # --start-server will fail if the server is already running.
-        # Capture the output because we don't want to see the stats.
-        shell.capture([toolchain.sccache, "--show-stats"])
-
-    cmake = CMake(args=args, toolchain=toolchain)
-    # Check the CMake version is sufficient on Linux and build from source
-    # if not.
-    cmake_path = cmake.check_cmake_version(SWIFT_SOURCE_ROOT, SWIFT_BUILD_ROOT)
-    if cmake_path is not None:
-        toolchain.cmake = cmake_path
-        args.cmake = cmake_path
-
-    # Preprocess the arguments to apply defaults.
-    apply_default_arguments(toolchain, args)
-
-    # Validate the arguments.
-    validate_arguments(toolchain, args)
-
-    # Create the build script invocation.
-    invocation = build_script_invocation.BuildScriptInvocation(toolchain, args)
-
-    # Sanitize the runtime environment.
-    initialize_runtime_environment()
-
-    # Show SDKs, if requested.
-    if args.show_sdks:
-        print_xcodebuild_versions()
-
-    if args.dump_config:
-        print(JSONDumper().encode(invocation))
-        return 0
-
-    # Clean build directory if requested.
-    if args.clean:
-        clean_delay()
-        shell.rmtree(invocation.workspace.build_root)
-
-    # Create build directory.
-    shell.makedirs(invocation.workspace.build_root)
-
-    # Create .build_script_log
-    if not args.dry_run:
-        build_script_log = os.path.join(invocation.workspace.build_root,
-                                        ".build_script_log")
-        open(build_script_log, 'w').close()
-
-    # Build ninja if required, which will update the toolchain.
-    if args.build_ninja:
-        invocation.build_ninja()
-
-    # Execute the underlying build script implementation.
-    invocation.execute()
-
-    if args.symbols_package:
-        print('--- Creating symbols package ---')
-        print('-- Package file: {} --'.format(args.symbols_package))
-
-        if platform.system() == 'Darwin':
-            prefix = targets.darwin_toolchain_prefix(args.install_prefix)
-            prefix = os.path.join(args.host_target, prefix.lstrip('/'))
+    def execute_product_build_steps(self, product_class, host_target):
+        product_source = product_class.product_source_name()
+        product_name = product_class.product_name()
+        if product_class.is_swiftpm_unified_build_product():
+            build_dir = self.workspace.swiftpm_unified_build_dir(
+                host_target)
         else:
-            prefix = args.install_prefix
-
-        # As a security measure, `tar` normally strips leading '/' from paths
-        # it is archiving. To stay safe, we change working directories, then
-        # run `tar` without the leading '/' (we remove it ourselves to keep
-        # `tar` from emitting a warning).
-        with shell.pushd(args.install_symroot):
-            tar(source=prefix.lstrip('/'),
-                destination=args.symbols_package)
-
-    return 0
-
-
-# -----------------------------------------------------------------------------
-
-def main():
-    if not SWIFT_SOURCE_ROOT:
-        fatal_error(
-            "could not infer source root directory " +
-            "(forgot to set $SWIFT_SOURCE_ROOT environment variable?)")
-
-    if not os.path.isdir(SWIFT_SOURCE_ROOT):
-        fatal_error(
-            "source root directory \'" + SWIFT_SOURCE_ROOT +
-            "\' does not exist " +
-            "(forgot to set $SWIFT_SOURCE_ROOT environment variable?)")
-
-    validate_xcode_compatibility()
-
-    # Determine if we are invoked in the preset mode and dispatch accordingly.
-    if any([(opt.startswith("--preset") or opt == "--show-presets")
-            for opt in sys.argv[1:]]):
-        return main_preset()
-    else:
-        return main_normal()
-
-
-if __name__ == "__main__":
-    try:
-        sys.exit(main())
-    except KeyboardInterrupt:
-        sys.exit(1)
+            build_dir = self.workspace.build_dir(
+                host_target, product_name)
+        product = product_class(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir=self.workspace.source_dir(product_source),
+            build_dir=build_dir)
+        if product.should_clean(host_target):
+            print("--- Cleaning %s ---" % product_name)
+            product.clean(host_target)
+        if product.should_build(host_target):
+            print("--- Building %s ---" % product_name)
+            product.build(host_target)
+        if product.should_test(host_target):
+            print("--- Running tests for %s ---" % product_name)
+            product.test(host_target)
+            print("--- Finished tests for %s ---" % product_name)
+        # Install the product if it should be installed specifically, or
+        # if it should be built and `install_all` is set to True.
+        # The exception is select before_build_script_impl products
+        # which set `is_ignore_install_all_product` to True, ensuring
+        # they are never installed. (e.g. earlySwiftDriver).
+        if product.should_install(host_target) or \
+           (self.install_all and product.should_build(host_target) and
+           not product.is_ignore_install_all_product()):
+            print("--- Installing %s ---" % product_name)
+            product.install(host_target)
