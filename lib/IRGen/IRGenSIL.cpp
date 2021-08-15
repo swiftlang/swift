@@ -1136,6 +1136,9 @@ public:
   void visitAssignByWrapperInst(AssignByWrapperInst *i) {
     llvm_unreachable("assign_by_wrapper is not valid in canonical SIL");
   }
+  void visitMarkDiscardedInst(MarkDiscardedInst *i) {
+    llvm_unreachable("mark_discarded is not valid in canonical SIL");
+  }
   void visitMarkUninitializedInst(MarkUninitializedInst *i) {
     llvm_unreachable("mark_uninitialized is not valid in canonical SIL");
   }

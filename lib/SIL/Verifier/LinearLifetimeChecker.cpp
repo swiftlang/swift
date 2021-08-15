@@ -327,6 +327,7 @@ void State::checkForSameBlockUseAfterFree(Operand *consumingUse,
     // NOTE: We do not exit here since we want to catch /all/ errors that we can
     // find.
     errorBuilder.handleUseOutsideOfLifetime([&] {
+      userBlock->dump();
       llvm::errs() << "Found outside of lifetime use?!\n"
                    << "Value: ";
       if (auto v = value) {

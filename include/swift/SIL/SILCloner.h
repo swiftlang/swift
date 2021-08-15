@@ -1219,6 +1219,16 @@ void SILCloner<ImplClass>::visitAssignByWrapperInst(AssignByWrapperInst *Inst) {
 
 template<typename ImplClass>
 void
+SILCloner<ImplClass>::visitMarkDiscardedInst(MarkDiscardedInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  auto OpLoc = getOpLocation(Inst->getLoc());
+  auto OpValue = getOpValue(Inst->getOperand());
+  recordClonedInstruction(
+    Inst, getBuilder().createMarkDiscarded(OpLoc, OpValue));
+}
+
+template<typename ImplClass>
+void
 SILCloner<ImplClass>::visitMarkUninitializedInst(MarkUninitializedInst *Inst) {
   SILValue OpValue = getOpValue(Inst->getOperand());
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));

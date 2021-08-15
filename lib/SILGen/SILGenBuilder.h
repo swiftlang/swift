@@ -136,6 +136,9 @@ public:
   /// NOTE: Two examples of transforming terminators are switch_enum,
   /// checked_cast_br.
   ManagedValue createGuaranteedTransformingTerminatorArgument(SILType type);
+  
+  using SILBuilder::createMarkDiscarded;
+  ManagedValue createMarkDiscarded(ValueDecl *decl, ManagedValue operand);
 
   using SILBuilder::createMarkUninitialized;
   ManagedValue createMarkUninitialized(ValueDecl *decl, ManagedValue operand,

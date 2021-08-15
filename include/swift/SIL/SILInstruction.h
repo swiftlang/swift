@@ -1818,6 +1818,9 @@ public:
       Optional<SILLocation> DeclLoc = {},
       const SILDebugScope *DeclScope = nullptr,
       llvm::ArrayRef<SILDIExprElement> DIExprElements = {}) const {
+    
+    if (!Bits.RawValue)
+      return None;
 
     if (VD)
       return SILDebugVariable(VD->getName().empty() ? "" : VD->getName().str(),
@@ -4557,6 +4560,17 @@ public:
   void setMode(Mode mode) {
     SILNode::Bits.AssignByWrapperInst.Mode = unsigned(mode);
   }
+};
+
+/// Indicates that a variable has been assigned to a discarded value.
+class MarkDiscardedInst
+    : public UnaryInstructionBase<SILInstructionKind::MarkDiscardedInst,
+                                  NonValueInstruction> {
+  friend SILBuilder;
+
+private:
+  MarkDiscardedInst(SILDebugLocation DebugLoc, SILValue Value)
+      : UnaryInstructionBase(DebugLoc, Value) {}
 };
 
 /// Indicates that a memory location is uninitialized at this point and needs to

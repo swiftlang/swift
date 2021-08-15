@@ -871,6 +871,8 @@ NON_VALUE_INST(AssignInst, assign,
                SILInstruction, MayWrite, DoesNotRelease)
 NON_VALUE_INST(AssignByWrapperInst, assign_by_wrapper,
                SILInstruction, MayWrite, DoesNotRelease)
+BRIDGED_NON_VALUE_INST(MarkDiscardedInst, mark_discarded,
+               SILInstruction, None, DoesNotRelease)
 NON_VALUE_INST(MarkFunctionEscapeInst, mark_function_escape,
                SILInstruction, None, DoesNotRelease)
 BRIDGED_NON_VALUE_INST(DebugValueInst, debug_value,

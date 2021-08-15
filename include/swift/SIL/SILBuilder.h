@@ -894,6 +894,12 @@ public:
 
     createStoreBorrow(loc, src, destAddr);
   }
+  
+  MarkDiscardedInst *
+  createMarkDiscarded(SILLocation Loc, SILValue src) {
+    return insert(new (getModule())
+                  MarkDiscardedInst(getSILDebugLocation(Loc), src));
+  }
 
   MarkUninitializedInst *
   createMarkUninitialized(SILLocation Loc, SILValue src,

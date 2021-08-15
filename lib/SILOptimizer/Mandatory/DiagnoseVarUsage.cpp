@@ -934,6 +934,7 @@ private:
     switch (I->getKind()) {
       case SILInstructionKind::BuiltinInst:
       case SILInstructionKind::CopyValueInst:
+      case SILInstructionKind::MarkDiscardedInst:
       case SILInstructionKind::PointerToAddressInst:
       case SILInstructionKind::ReturnInst:
       case SILInstructionKind::StoreBorrowInst:
