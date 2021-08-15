@@ -383,10 +383,10 @@ func testBuildConfigsTrue() {
 }
 
 func testBuildConfigsFalse() {
-  let abc = 42 // expected-warning {{initialization of immutable value 'abc' was never used; consider replacing with assignment to '_' or removing it}}
-  var mut = 18 // expected-warning {{initialization of variable 'mut' was never used; consider replacing with assignment to '_' or removing it}}
-  var read = 24 // expected-warning {{initialization of variable 'read' was never used; consider replacing with assignment to '_' or removing it}}
-  #if false // false IfConfigs don't appear in SIL, so we can't track this
+  let abc = 42
+  var mut = 18
+  var read = 24
+  #if false
     mut = abc
     read = 1
     markUsed(read)
@@ -402,7 +402,7 @@ func testGuardWithPoundIfTrue(x: Int?) {
 }
 
 func testGuardWithPoundIfFalse(x: Int?) {
-  guard let x = x else { return } // expected-warning {{value 'x' was defined but never used; consider replacing with boolean test}}
+  guard let x = x else { return }
   
   #if false
     markUsed(x)

@@ -374,9 +374,10 @@ protected:
     /// Whether this declaration captures the 'self' param under the same name.
     IsSelfParamCapture : 1,
 
-    /// Whether this is a property used in expressions in the debugger.
-    /// It is up to the debugger to instruct SIL how to access this variable.
-    IsDebuggerVar : 1,
+    /// Whether usage of this is debug variable should be tracked.
+    /// False if the variable appears in inactive if-config clauses, where
+    /// def-use can not be constructed.
+    DiagnoseUsage : 1,
 
     /// Whether this is the backing storage for a lazy property.
     IsLazyStorageProperty : 1,
@@ -5013,6 +5014,14 @@ public:
   void setIntroducer(Introducer value) {
     Bits.VarDecl.Introducer = uint8_t(value);
   }
+  
+  bool shouldDiagnoseUsage() const {
+    return Bits.VarDecl.DiagnoseUsage;
+  }
+  
+  void setDiagnoseUsage(bool V) {
+    Bits.VarDecl.DiagnoseUsage = V;
+  }
 
   CaptureListExpr *getParentCaptureList() const {
     if (!Parent)
@@ -5053,9 +5062,9 @@ public:
   bool isLayoutExposedToClients() const;
 
   /// Is this a special debugger variable?
-  bool isDebuggerVar() const { return Bits.VarDecl.IsDebuggerVar; }
+  bool isDebuggerVar() const { return false; }
   void setDebuggerVar(bool IsDebuggerVar) {
-    Bits.VarDecl.IsDebuggerVar = IsDebuggerVar;
+//    Bits.VarDecl.IsDebuggerVar = IsDebuggerVar;
   }
 
   /// Is this the synthesized storage for a 'lazy' property?

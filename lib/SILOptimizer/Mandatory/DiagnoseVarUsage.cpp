@@ -65,6 +65,10 @@ static bool isSetterParam(SILInstruction *I) {
 static bool shouldTrackVarDecl(SILInstruction *I) {
   if (auto *VD = getVarDecl(I)) {
     
+    if (!VD->shouldDiagnoseUsage()) {
+      return false;
+    }
+    
     if (VD->isCaptureList()) {
       return true;
     }
@@ -140,6 +144,11 @@ static SILValue getDebugVarAddrValue(SILInstruction *I) {
 
 static bool shouldTrackDebugVar(SILInstruction *I) {
   if (auto *DVI = dyn_cast<DebugValueInst>(I)) {
+    
+    // Var declaration may be exempt from usage diagnostics
+    if (!DVI->getVarInfo()->DiagnoseUsage) {
+      return false;
+    }
     
     // Var declaration is setter parameter 'newValue'
     if (isSetterParam(I)) {
@@ -246,35 +255,6 @@ static SILArgument *getFunctionArgInst(SILInstruction *Apply,
 //===----------------------------------------------------------------------===//
 //                          MARK: Def-Use Traversers
 //===----------------------------------------------------------------------===//
-
-/// Traverses through the AST to find an underscore assignment to a VarDecl.
-/// Immutable values assigned to underscores do not appear in SIL.
-/// TODO: Cosider adding diagnostics for discarded assignments that produce
-/// no effects.
-class DiscardResultTraverser : public ASTWalker {
-  
-  VarDecl *VD;
-  
-public:
-  
-  bool DiscardsValue = false;
-  
-  DiscardResultTraverser(VarDecl *VD) : VD(VD) {}
-  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-    if (auto *AE = dyn_cast<AssignExpr>(E)) {
-      auto destExpr = AE->getDest();
-      auto srcExpr = AE->getSrc();
-      if (auto DRE = dyn_cast<DeclRefExpr>(srcExpr)) {
-        if (auto Value = DRE->getDecl()) {
-          DiscardsValue = isa<DiscardAssignmentExpr>(destExpr) &&
-                          Value->getBaseIdentifier() == VD->getName();
-        }
-      }
-    }
-    
-    return { true, E };
-  }
-};
 
 /// Traverses through the def-use of an instruction representing a var
 /// declaration to find mutations of the value.
@@ -1115,15 +1095,6 @@ public:
           }
         }
       }
-    }
-    
-    // As a last resort, check if the value was discarded in an
-    // underscore assignment.
-    if (auto AFD = dyn_cast<AbstractFunctionDecl>(getVarDecl(EntryInst)->
-                                                  getDeclContext())) {
-      DiscardResultTraverser Walker(getVarDecl(EntryInst));
-      AFD->getBody()->walk(Walker);
-      return Walker.DiscardsValue;
     }
     
     return false;

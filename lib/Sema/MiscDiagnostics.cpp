@@ -2399,6 +2399,68 @@ bool swift::computeFixitsForOverridenDeclaration(
 
 namespace {
 
+/// An AST walker that discards diagnostics for variable declarations found
+/// in inactive if-config clauses.
+class InactiveVarDeclUsageChecker : public ASTWalker {
+  DeclContext *DC;
+  
+public:
+  InactiveVarDeclUsageChecker(DeclContext *DC) : DC(DC) {}
+  
+  bool walkToDeclPre(Decl *D) override {
+    if (isa<TypeDecl>(D))
+      return false;
+    
+    // The body of #if clauses are not walked into, we need custom processing
+    // for them.
+    if (auto *ICD = dyn_cast<IfConfigDecl>(D))
+      handleIfConfig(ICD);
+    
+    return true;
+  }
+  
+  /// handle #if directives. All of the active clauses will generate
+  /// diagnostics, but we also want to handle the inactive ones to avoid false
+  /// positives.
+  void handleIfConfig(IfConfigDecl *ICD) {
+    struct ConservativeDeclMarker : public ASTWalker {
+      SourceFile *SF;
+
+      ConservativeDeclMarker(InactiveVarDeclUsageChecker &IVDUC)
+      : SF(IVDUC.DC->getParentSourceFile()) {}
+
+      Expr *walkToExprPost(Expr *E) override {
+        // If we see a bound reference to a decl in an inactive #if block, then
+        // conservatively mark it read and written.  This will silence "variable
+        // unused" and "could be marked let" warnings for it.
+        if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
+          if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
+            VD->setDiagnoseUsage(false);
+          }
+        } else if (auto *declRef = dyn_cast<UnresolvedDeclRefExpr>(E)) {
+          auto name = declRef->getName();
+          auto loc = declRef->getLoc();
+          if (name.isSimpleName() && loc.isValid()) {
+            auto *varDecl = dyn_cast_or_null<VarDecl>(
+              ASTScope::lookupSingleLocalDecl(SF, name.getFullName(), loc));
+            if (varDecl)
+              varDecl->setDiagnoseUsage(false);
+          }
+        }
+        return E;
+      }
+    };
+
+    for (auto &clause : ICD->getClauses()) {
+      // Active clauses are handled by the normal AST walk.
+      if (clause.isActive) continue;
+
+      for (auto elt : clause.Elements)
+        elt.walk(ConservativeDeclMarker(*this));
+    }
+  }
+};
+
 /// An AST walker that determines the underlying type of an opaque return decl
 /// from its associated function body.
 class OpaqueUnderlyingTypeChecker : public ASTWalker {
@@ -2529,6 +2591,13 @@ void swift::performAbstractFuncDeclDiagnostics(AbstractFunctionDecl *AFD) {
   // Don't produce these diagnostics for implicitly generated code.
   if (AFD->getLoc().isInvalid() || AFD->isImplicit() || AFD->isInvalid())
     return;
+  
+  // Check for variables used in if-config clauses, and exempt these from
+  // usage diagnostics.
+  if (!AFD->getDeclContext()->isLocalContext()) {
+    InactiveVarDeclUsageChecker checker(AFD);
+    AFD->walk(checker);
+  }
   
   auto *body = AFD->getBody();
 
