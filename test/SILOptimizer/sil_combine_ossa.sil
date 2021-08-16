@@ -1,5 +1,6 @@
 // RUN: %target-sil-opt -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -sil-combine | %FileCheck %s
 // RUN: %target-sil-opt -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -sil-combine -generic-specializer | %FileCheck %s  --check-prefix=CHECK_FORWARDING_OWNERSHIP_KIND
+// RUN: %target-sil-opt -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -sil-combine -enable-copy-propagation
 
 // Declare this SIL to be canonical because some tests break raw SIL
 // conventions. e.g. address-type block args. -enforce-exclusivity=none is also
@@ -5087,3 +5088,38 @@ bb0(%0 : @guaranteed $Function):
   destroy_value %6 : $Optional<@callee_guaranteed (MyInt) -> Double>
   return %13 : $Double
 }
+
+sil [reabstraction_thunk] @thunk : $@convention(thin) (@guaranteed Klass, @guaranteed Klass) -> ()
+
+// CHECK-LABEL: sil [ossa] @test_partial_apply_apply_opt1 :
+// CHECK-NOT: partial_apply
+// CHECK: } // end sil function 'test_partial_apply_apply_opt1'
+sil [ossa] @test_partial_apply_apply_opt1 : $@convention(thin) (@guaranteed Klass, @guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass, %1 : @guaranteed $Klass):
+  %c1 = copy_value %0 : $Klass
+  %c2 = copy_value %1 : $Klass
+  %f1 = function_ref @thunk : $@convention(thin) (@guaranteed Klass, @guaranteed Klass) -> ()
+  %p1 = partial_apply [callee_guaranteed] %f1(%c1, %c2) : $@convention(thin) (@guaranteed Klass, @guaranteed Klass) -> ()
+  %r = apply %p1() : $@callee_guaranteed () -> ()
+  destroy_value %p1 : $@callee_guaranteed () -> ()
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_partial_apply_apply_opt2 :
+// CHECK-NOT: partial_apply
+// CHECK: } // end sil function 'test_partial_apply_apply_opt2'
+sil [ossa] @test_partial_apply_apply_opt2 : $@convention(thin) (@owned Klass, @owned Klass) -> () {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass):
+  %c1 = copy_value %0 : $Klass
+  %c2 = copy_value %1 : $Klass
+  %f1 = function_ref @thunk : $@convention(thin) (@guaranteed Klass, @guaranteed Klass) -> ()
+  %p1 = partial_apply [callee_guaranteed] %f1(%c1, %c2) : $@convention(thin) (@guaranteed Klass, @guaranteed Klass) -> ()
+  %r = apply %p1() : $@callee_guaranteed () -> ()
+  destroy_value %p1 : $@callee_guaranteed () -> ()
+  destroy_value %0 : $Klass
+  destroy_value %1 : $Klass
+  %7 = tuple ()
+  return %7 : $()
+}
+
