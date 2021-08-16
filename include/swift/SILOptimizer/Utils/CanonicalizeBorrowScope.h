@@ -136,7 +136,7 @@ public:
 
 protected:
   void initBorrow(BorrowedValue borrow) {
-    assert(liveness.empty() && persistentCopies.empty());
+    assert(borrow && liveness.empty() && persistentCopies.empty());
 
     updatedCopies.clear();
     borrowedValue = borrow;

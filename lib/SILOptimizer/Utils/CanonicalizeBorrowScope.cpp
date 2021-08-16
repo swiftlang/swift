@@ -778,9 +778,15 @@ bool CanonicalizeBorrowScope::consolidateBorrowScope() {
 
 bool CanonicalizeBorrowScope::canonicalizeFunctionArgument(
     SILFunctionArgument *arg) {
+  BorrowedValue borrow(arg);
+  if (!borrow)
+    return false;
+
+  initBorrow(borrow);
+
   LLVM_DEBUG(llvm::dbgs() << "*** Canonicalize Borrow: " << borrowedValue);
 
-  initBorrow(BorrowedValue(arg));
+  SWIFT_DEFER { liveness.clear(); };
 
   RewriteInnerBorrowUses innerRewriter(*this);
   beginVisitBorrowScopeUses(); // reset the def/use worklist
