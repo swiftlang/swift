@@ -354,9 +354,6 @@ public:
   /// imported.
   bool shouldImportSwiftConcurrency() const;
 
-  /// Whether the Distributed support library should be implicitly imported.
-  bool shouldImportSwiftDistributed() const;
-
   /// Performs input setup common to these tools:
   /// sil-opt, sil-func-extractor, sil-llvm-gen, and sil-nm.
   /// Return value includes the buffer so caller can keep it alive.
@@ -535,6 +532,10 @@ public:
   /// Whether the Swift Concurrency support library can be imported
   /// i.e. if it can be found.
   bool canImportSwiftConcurrency() const;
+
+  /// Whether the Distributed actors support library can be imported
+  /// i.e. if it can be found.
+  bool canImportSwiftDistributed() const;
 
   /// Gets the SourceFile which is the primary input for this CompilerInstance.
   /// \returns the primary SourceFile, or nullptr if there is no primary input;

@@ -753,6 +753,9 @@ public:
   /// Get the runtime availability of support for concurrency.
   AvailabilityContext getConcurrencyAvailability();
 
+  /// Get the runtime availability of support for distributed actors.
+  AvailabilityContext getDistributedAvailability();
+
   /// Get the runtime availability of support for differentiation.
   AvailabilityContext getDifferentiationAvailability();
 

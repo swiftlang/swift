@@ -330,6 +330,10 @@ AvailabilityContext ASTContext::getConcurrencyAvailability() {
   return getSwift55Availability();
 }
 
+AvailabilityContext ASTContext::getDistributedAvailability() {
+  return getSwift55Availability(); // FIXME(distributed): getSwiftFutureAvailability perhaps? The module is not shipping in any release so far so it does not matter for real though.
+}
+
 AvailabilityContext ASTContext::getDifferentiationAvailability() {
   return getSwiftFutureAvailability();
 }

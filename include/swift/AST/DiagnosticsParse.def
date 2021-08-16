@@ -1839,6 +1839,11 @@ ERROR(attr_requires_concurrency, none,
       "concurrency is enabled",
       (StringRef, bool))
 
+ERROR(attr_requires_distributed, none,
+      "'%0' %select{attribute|modifier}1 is only valid when experimental "
+      "distributed support is enabled",
+      (StringRef, bool))
+
 //------------------------------------------------------------------------------
 // MARK: syntax parsing diagnostics
 //------------------------------------------------------------------------------
