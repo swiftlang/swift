@@ -384,6 +384,16 @@ code for the target that is not the build machine:
 
   Add ``REQUIRES: static_stdlib`` to the test.
 
+* ``%target-rtti-opt``: the ``-frtti`` or ``-fno-rtti`` option required to
+  link with the Swift libraries on the target platform.
+
+* ``%target-cxx-lib``: the argument to add to the command line when using
+  ``swiftc`` and linking in a C++ object file.  Typically ``-lc++`` or
+  ``-lstdc++`` depending on platform.
+
+* ``%target-msvc-runtime-opt``: for Windows, the MSVC runtime option, e.g.
+  ``-MD``, to use when building C/C++ code to link with Swift.
+
 Always use ``%target-*`` substitutions unless you have a good reason.  For
 example, an exception would be a test that checks how the compiler handles
 mixing module files for incompatible platforms (that test would need to compile
