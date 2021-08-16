@@ -256,7 +256,7 @@ func barSync() {
 
 @propertyWrapper
 @OtherGlobalActor
-struct WrapperOnActor<Wrapped> {
+struct WrapperOnActor<Wrapped: Sendable> {
   private var stored: Wrapped
 
   nonisolated init(wrappedValue: Wrapped) {
@@ -286,7 +286,7 @@ public struct WrapperOnMainActor<Wrapped> {
 }
 
 @propertyWrapper
-actor WrapperActor<Wrapped> {
+actor WrapperActor<Wrapped: Sendable> {
   var storage: Wrapped
 
   init(wrappedValue: Wrapped) {
@@ -345,7 +345,7 @@ actor WrapperActorBad1<Wrapped> {
 }
 
 @propertyWrapper
-actor WrapperActorBad2<Wrapped> {
+actor WrapperActorBad2<Wrapped: Sendable> {
   var storage: Wrapped
 
   init(wrappedValue: Wrapped) {
@@ -383,7 +383,7 @@ actor ActorWithWrapper {
 }
 
 @propertyWrapper
-struct WrapperOnSomeGlobalActor<Wrapped> {
+struct WrapperOnSomeGlobalActor<Wrapped: Sendable> {
   private var stored: Wrapped
 
   nonisolated init(wrappedValue: Wrapped) {

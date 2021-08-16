@@ -583,30 +583,26 @@ static bool diagnoseSingleNonSendableType(
 
     if (langOpts.isSwiftVersionAtLeast(6)) {
       // In Swift 6, error when the nominal type comes from a module that
-      // had the concurrency checks consistently applied. Otherwise,
-      // warn only when requested (via -warn-concurrency) and leave a safety
-      // hole otherwise.
-      if (nominalModule->isConcurrencyChecked())
+      // had the concurrency checks consistently applied or from this module.
+      // Otherwise, warn.
+      if (nominalModule->isConcurrencyChecked() || nominalModule == module)
         behavior = DiagnosticBehavior::Unspecified;
-      else if (langOpts.WarnConcurrency)
-        behavior = DiagnosticBehavior::Warning;
       else
-        behavior = DiagnosticBehavior::Ignore;
+        behavior = DiagnosticBehavior::Warning;
     } else {
       // In Swift 5, warn if either the imported or importing model is
-      // checking for concurrency. Otherwise, leave a safety hole.
-      if (nominalModule->isConcurrencyChecked() || langOpts.WarnConcurrency)
+      // checking for concurrency, or if the nominal type comes from this
+      // module. Otherwise, leave a safety hole.
+      if (nominalModule->isConcurrencyChecked() ||
+          nominalModule == module ||
+          langOpts.WarnConcurrency)
         behavior = DiagnosticBehavior::Warning;
       else
         behavior = DiagnosticBehavior::Ignore;
     }
   } else if (!langOpts.isSwiftVersionAtLeast(6)) {
-    // In Swift 5, warn if the current module requested warnings. Otherwise,
-    // leave a safety hole.
-    if (langOpts.WarnConcurrency)
-      behavior = DiagnosticBehavior::Warning;
-    else
-      behavior = DiagnosticBehavior::Ignore;
+    // Always warn in Swift 5.
+    behavior = DiagnosticBehavior::Warning;
   }
 
   bool wasError = diagnose(type, behavior);
@@ -626,6 +622,10 @@ static bool diagnoseSingleNonSendableType(
       fixItLoc = Lexer::getLocForEndOfToken(ctx.SourceMgr, fixItLoc);
       note.fixItInsert(fixItLoc, ", Sendable");
     }
+  } else if (nominal) {
+    nominal->diagnose(
+        diag::non_sendable_nominal, nominal->getDescriptiveKind(),
+        nominal->getName());
   }
 
   return wasError;
@@ -2047,7 +2047,8 @@ namespace {
         if (auto varDecl = dyn_cast<VarDecl>(decl)) {
           if (varDecl->isLet()) {
             auto type = component.getComponentType();
-            if (diagnoseNonSendableTypes(
+            if (shouldDiagnoseExistingDataRaces(getDeclContext()) &&
+                diagnoseNonSendableTypes(
                     type, getParentModule(), component.getLoc(),
                     diag::non_sendable_keypath_access))
               return true;
@@ -2113,6 +2114,7 @@ namespace {
         if (auto indexExpr = component.getIndexExpr()) {
           auto type = indexExpr->getType();
           if (type &&
+              shouldDiagnoseExistingDataRaces(getDeclContext()) &&
               diagnoseNonSendableTypes(
                   type, getParentModule(), component.getLoc(),
                   diag::non_sendable_keypath_capture))

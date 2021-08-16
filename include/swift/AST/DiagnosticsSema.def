@@ -1939,6 +1939,9 @@ NOTE(nonsendable_function_type,none,
 NOTE(nonsendable_tuple_type,none,
      "a tuple type must be composed of 'Sendable' elements to conform to "
      "'Sendable'", ())
+NOTE(non_sendable_nominal,none,
+     "%0 %1 does not conform to the `Sendable` protocol",
+      (DescriptiveDeclKind, DeclName))
 NOTE(add_nominal_sendable_conformance,none,
      "consider making %0 %1 conform to the 'Sendable' protocol",
      (DescriptiveDeclKind, DeclName))
