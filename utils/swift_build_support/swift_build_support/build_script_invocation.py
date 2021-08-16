@@ -526,7 +526,7 @@ class BuildScriptInvocation(object):
         # the build-script code base. The main difference is that these are all
         # build, tested, and installed all at once instead of performing build,
         # test, install like a normal build-script product.
-        builder.begin_impl_pipeline(should_run_epilogue_operations=True)
+        builder.begin_impl_pipeline(should_run_epilogue_operations=False)
 
         # If --skip-build-llvm is passed in, LLVM cannot be completely disabled, as
         # Swift still needs a few LLVM targets like tblgen to be built for it to be
@@ -541,6 +541,11 @@ class BuildScriptInvocation(object):
                                  is_enabled=self.args.build_swift)
         builder.add_impl_product(products.LLDB,
                                  is_enabled=self.args.build_lldb)
+
+        # Begin a new build-script-impl pipeline that builds libraries that we
+        # build as part of build-script-impl but that we should eventually move
+        # onto build-script products.
+        builder.begin_impl_pipeline(should_run_epilogue_operations=True)
         builder.add_impl_product(products.LibDispatch,
                                  is_enabled=self.args.build_libdispatch)
         builder.add_impl_product(products.Foundation,
@@ -617,13 +622,17 @@ class BuildScriptInvocation(object):
 
         # Execute each "product pipeline".
         for index in range(len(product_pipelines)):
+            perform_epilogue_opts = last_impl_index == index
             pipeline = product_pipelines[index]
+
             # Skip empty pipelines.
             if len(pipeline) == 0:
+                if perform_epilogue_opts:
+                    self._execute_merged_host_lipo_core_action()
                 continue
+
             is_impl = pipeline[0].is_build_script_impl_product()
             if is_impl:
-                perform_epilogue_opts = last_impl_index == index
                 self._execute_impl(pipeline, all_hosts, perform_epilogue_opts)
             else:
                 assert(index != last_impl_index)
