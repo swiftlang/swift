@@ -53,15 +53,19 @@ cake: Accessor fixedLayoutStruct2.BecomeFixedBinaryOrder.Modify() is a new API w
 cake: Accessor fixedLayoutStruct2.BecomeFixedBinaryOrder.Set() is a new API without @available attribute
 cake: Class C0 is a new API without @available attribute
 cake: Class C8 is a new API without @available attribute
+cake: Constructor AddingNewDesignatedInit.init(_:) is a new API without @available attribute
 cake: Constructor C1.init(_:) is a new API without @available attribute
 cake: Constructor ClassWithMissingDesignatedInits.init() is a new API without @available attribute
 cake: Constructor SubclassWithMissingDesignatedInits.init() is a new API without @available attribute
 cake: Enum IceKind is now without @frozen
 cake: EnumElement FrozenKind.AddedCase is a new API without @available attribute
+cake: EnumElement FutureKind.FineToAdd is a new API without @available attribute
 cake: Func C1.foo1() is now not static
 cake: Func FinalFuncContainer.NewFinalFunc() is now with final
 cake: Func FinalFuncContainer.NoLongerFinalFunc() is now without final
 cake: Func Float.floatHigher() is a new API without @available attribute
+cake: Func FutureKind.==(_:_:) is a new API without @available attribute
+cake: Func FutureKind.hash(into:) is a new API without @available attribute
 cake: Func HasMutatingMethodClone.foo() has self access kind changing from Mutating to NonMutating
 cake: Func RequiementChanges.addedFunc() is a new API without @available attribute
 cake: Func S1.foo1() has self access kind changing from NonMutating to Mutating
@@ -72,6 +76,7 @@ cake: Protocol P4 is a new API without @available attribute
 cake: Struct C6 is now with @frozen
 cake: Var C1.CIIns1 changes from weak to strong
 cake: Var C1.CIIns2 changes from strong to weak
+cake: Var FutureKind.hashValue is a new API without @available attribute
 cake: Var RequiementChanges.addedVar is a new API without @available attribute
 cake: Var fixedLayoutStruct.$__lazy_storage_$_lazy_d is a new API without @available attribute
 cake: Var fixedLayoutStruct.c is a new API without @available attribute
