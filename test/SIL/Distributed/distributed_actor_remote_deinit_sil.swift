@@ -26,7 +26,7 @@ distributed actor SimpleEmptyDistributedActor {
 // ==== Check that a normal local only actor is left unchanged
 
 // CHECK: // SimpleActor.deinit
-// CHECK: sil hidden [available 12.0] @$s35distributed_actor_remote_deinit_sil11SimpleActorCfd : $@convention(method) (@guaranteed SimpleActor) -> @owned Builtin.NativeObject {
+// CHECK: sil hidden{{.*}} @$s35distributed_actor_remote_deinit_sil11SimpleActorCfd : $@convention(method) (@guaranteed SimpleActor) -> @owned Builtin.NativeObject {
 // CHECK: // %0 "self" // users: %6, %5, %2, %1
 // CHECK: bb0(%0 : $SimpleActor):
 // CHECK:  debug_value %0 : $SimpleActor, let, name "self", argno 1, implicit // id: %1
