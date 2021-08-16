@@ -102,7 +102,6 @@ static void emitDistributedActorStore_transport(
     SILValue actorSelf, AbstractFunctionDecl *func,
     SILArgument *transportArg) {
   auto &B = SGF.B;
-  auto &F = SGF.F;
   auto &SGM = SGF.SGM;
   SILGenFunctionBuilder builder(SGM);
 
@@ -118,7 +117,6 @@ static void emitDistributedActorStore_transport(
   auto *var = dyn_cast<VarDecl>(vars.front());
 
   // ----
-  auto *selfTyDecl = func->getParent()->getSelfNominalTypeDecl();
   auto fieldAddr = B.createRefElementAddr(
       loc, actorSelf, var,
       SGF.getLoweredType(var->getInterfaceType()));
@@ -127,7 +125,7 @@ static void emitDistributedActorStore_transport(
   B.createCopyAddr(loc,
                    /*src*/transportArg,
                    /*dest*/fieldAddr,
-                   IsNotTake, IsInitialization); // TODO(distributed): should it be IsTake?
+                   IsNotTake, IsInitialization);
 }
 
 // TODO(distributed): remove this store impl and reuse Store_transport
@@ -151,7 +149,6 @@ emitDistributedActor_init_transportStore(
   ManagedValue transportArgManaged = ManagedValue::forUnmanaged(transportArgValue);
 
   // ----
-  auto *selfTyDecl = ctor->getParent()->getSelfNominalTypeDecl();
   auto transportFieldAddr = B.createRefElementAddr(
       loc, borrowedSelfArg.getValue(), var,
       SGF.getLoweredType(var->getInterfaceType()));
@@ -197,7 +194,7 @@ static void emitDistributedActorStore_id(
   B.createCopyAddr(loc,
                    /*src*/identityArg,
                    /*dest*/fieldAddr,
-                   IsNotTake, IsInitialization); // TODO(distributed): should it be IsTake?
+                   IsNotTake, IsInitialization);
 }
 
 /// Synthesize the distributed actor's identity (`id`) initialization:
@@ -819,7 +816,7 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
     }
   }
 
-  // TODO: to use a emitAndBranch local function, since these four blocks are so similar
+  // TODO(distributed): to use a emitAndBranch local function, since these four blocks are so similar
 
   {
     B.emitBlock(remoteErrorBB);
