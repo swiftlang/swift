@@ -10,7 +10,7 @@ struct S1 {
   var c: C2
 }
 
-enum E1 { // expected-note{{add conformance of enum 'E1' to the 'Sendable' protocol}}
+enum E1 { // expected-note{{consider making enum 'E1' conform to the 'Sendable' protocol}}{{9-9=: Sendable }}
   case base
   indirect case nested(E1)
 }
@@ -22,7 +22,7 @@ enum E2 {
 
 struct GS1<T> { }
 
-struct GS2<T> {  // expected-note{{add conformance of generic struct 'GS2' to the 'Sendable' protocol}}
+struct GS2<T> {  // expected-note{{consider making generic struct 'GS2' conform to the 'Sendable' protocol}}
   var storage: T
 }
 
@@ -33,7 +33,7 @@ struct Signature { }
 struct Data { }
 struct BlockInfo { }
 
-struct Bitcode { // expected-note{{add conformance of struct 'Bitcode' to the 'Sendable' protocol}}
+struct Bitcode { // expected-note{{consider making struct 'Bitcode' conform to the 'Sendable' protocol}}
   let signature: Signature
   let elements: [BitcodeElement]
   let blockInfo: [UInt64: BlockInfo]
@@ -64,11 +64,11 @@ enum BitcodeElement {
 
 // Public structs and enums do not get implicit Sendable unless they
 // are frozen.
-public struct PublicStruct { // expected-note{{add conformance of struct 'PublicStruct' to the 'Sendable' protocol}}
+public struct PublicStruct { // expected-note{{consider making struct 'PublicStruct' conform to the 'Sendable' protocol}}
   var i: Int
 }
 
-public enum PublicEnum { // expected-note{{add conformance of enum 'PublicEnum' to the 'Sendable' protocol}}
+public enum PublicEnum { // expected-note{{consider making enum 'PublicEnum' conform to the 'Sendable' protocol}}
   case some
 }
 
