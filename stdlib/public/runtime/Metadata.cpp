@@ -3490,17 +3490,13 @@ swift::swift_getExistentialMetatypeMetadata(const Metadata *instanceMetadata) {
 ExistentialMetatypeCacheEntry::ExistentialMetatypeCacheEntry(
                                             const Metadata *instanceMetadata) {
   ExistentialTypeFlags flags;
-  switch (instanceMetadata->getKind()) {
-  case MetadataKind::Existential:
+  if (instanceMetadata->getKind() == MetadataKind::Existential) {
     flags = static_cast<const ExistentialTypeMetadata*>(instanceMetadata)
       ->Flags;
-    break;
-  case MetadataKind::ExistentialMetatype:
+  } else {
+    assert(instanceMetadata->getKind() == MetadataKind::ExistentialMetatype);
     flags = static_cast<const ExistentialMetatypeMetadata*>(instanceMetadata)
       ->Flags;
-    break;
-  default:
-    assert(false && "expected existential metadata");
   }
 
   Data.setKind(MetadataKind::ExistentialMetatype);
