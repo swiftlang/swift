@@ -445,14 +445,6 @@ InitKindRequest::evaluate(Evaluator &evaluator, ConstructorDecl *decl) const {
       }
     }
 
-    // the init(transport:) initializer of a distributed actor is special, as
-    // it ties the actors lifecycle with the transport. As such, it must always
-    // be invoked by any other initializer, just like a designated initializer.
-    if (auto clazz = dyn_cast<ClassDecl>(decl->getDeclContext())) {
-      if (clazz->isDistributedActor() && decl->isDistributedActorLocalInit())
-        return CtorInitializerKind::Designated;
-    }
-
     if (decl->getDeclContext()->getExtendedProtocolDecl()) {
       return CtorInitializerKind::Convenience;
     }
@@ -2166,9 +2158,10 @@ static Type validateParameterType(ParamDecl *decl) {
   }
 
   if (decl->isVariadic()) {
-    Ty = TypeChecker::getArraySliceType(decl->getStartLoc(), Ty);
-    if (Ty->hasError()) {
-      decl->setInvalid();
+    Ty = VariadicSequenceType::get(Ty);
+    if (!ctx.getArrayDecl()) {
+      ctx.Diags.diagnose(decl->getTypeRepr()->getLoc(),
+                         diag::sugar_type_not_found, 0);
       return ErrorType::get(ctx);
     }
 

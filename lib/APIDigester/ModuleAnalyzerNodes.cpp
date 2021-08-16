@@ -1251,7 +1251,7 @@ StringRef SDKContext::getPlatformIntroVersion(Decl *D, PlatformKind Kind) {
       }
     }
   }
-  return getPlatformIntroVersion(D->getDeclContext()->getAsDecl(), Kind);
+  return StringRef();
 }
 
 StringRef SDKContext::getLanguageIntroVersion(Decl *D) {

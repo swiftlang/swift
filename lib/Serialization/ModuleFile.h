@@ -333,7 +333,7 @@ public:
 
   /// Emits one last diagnostic, adds the current module details and errors to
   /// the pretty stack trace, and then aborts.
-  LLVM_ATTRIBUTE_NORETURN void fatal(llvm::Error error) const;
+  [[noreturn]] void fatal(llvm::Error error) const;
   void fatalIfNotSuccess(llvm::Error error) const {
     if (error)
       fatal(std::move(error));
@@ -344,7 +344,7 @@ public:
     fatal(expected.takeError());
   }
 
-  LLVM_ATTRIBUTE_NORETURN void fatal() const {
+  [[noreturn]] void fatal() const {
     fatal(llvm::make_error<llvm::StringError>(
         "(see \"While...\" info below)", llvm::inconvertibleErrorCode()));
   }

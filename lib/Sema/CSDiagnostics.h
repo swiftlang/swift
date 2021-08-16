@@ -903,7 +903,7 @@ private:
                                                   asPG);
   }
 
-  bool exprNeedsParensAfterAddingAs(const Expr *expr, const Expr *rootExpr) {
+  bool exprNeedsParensAfterAddingAs(const Expr *expr) {
     auto *DC = getDC();
     auto asPG = TypeChecker::lookupPrecedenceGroup(
         DC, DC->getASTContext().Id_CastingPrecedence, SourceLoc()).getSingle();
@@ -911,7 +911,8 @@ private:
       return true;
 
     return exprNeedsParensOutsideFollowingOperator(
-        DC, const_cast<Expr *>(expr), const_cast<Expr *>(rootExpr), asPG);
+        DC, const_cast<Expr *>(expr), asPG,
+        [&](auto *E) { return findParentExpr(E); });
   }
 };
 
@@ -1861,6 +1862,13 @@ public:
 
   bool diagnoseAsError() override;
   bool diagnoseAsNote() override;
+
+private:
+  /// Tailored diagnostics for an unsupported variable declaration.
+  bool diagnosePatternBinding(PatternBindingDecl *PB) const;
+
+  /// Tailored diagnostics for lazy/wrapped/computed variable declarations.
+  bool diagnoseStorage(VarDecl *var) const;
 };
 
 /// Diagnose situation when a single "tuple" parameter is given N arguments e.g.

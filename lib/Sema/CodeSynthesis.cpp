@@ -209,10 +209,14 @@ enum class ImplicitConstructorKind {
   /// The default constructor, which default-initializes each
   /// of the instance variables.
   Default,
+  /// The default constructor of a distributed actor.
+  /// Similarly to a Default one it initializes each of the instance variables,
+  /// however it also implicitly gains an ActorTransport parameter.
+  DefaultDistributedActor,
   /// The memberwise constructor, which initializes each of
   /// the instance variables from a parameter of the same type and
   /// name.
-  Memberwise
+  Memberwise,
 };
 
 /// Create an implicit struct or class constructor.
@@ -226,16 +230,6 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
                                                   ImplicitConstructorKind ICK,
                                                   ASTContext &ctx) {
   assert(!decl->hasClangNode());
-
-  // Don't synthesize for distributed actors, they're a bit special.
-  //
-  // They have their special inits, and should not get the usual
-  // default/implicit constructor (i.e. `init()` is illegal for them, as they
-  // always must have an associated transport - via `init(transport:)` or
-  // `init(resolve:using:)`).
-  if (auto clazz = dyn_cast<ClassDecl>(decl))
-    if (clazz->isDistributedActor())
-      return nullptr;
 
   SourceLoc Loc = decl->getLoc();
   auto accessLevel = AccessLevel::Internal;
@@ -319,6 +313,23 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
 
       maybeAddMemberwiseDefaultArg(arg, var, params.size(), ctx);
       
+      params.push_back(arg);
+    }
+  } else if (ICK == ImplicitConstructorKind::DefaultDistributedActor) {
+    assert(isa<ClassDecl>(decl));
+    assert(decl->isDistributedActor() &&
+           "Only 'distributed actor' type can gain implicit distributed actor init");
+
+    if (swift::ensureDistributedModuleLoaded(decl)) {
+      auto transportDecl = ctx.getActorTransportDecl();
+
+      // Create the parameter.
+      auto *arg = new (ctx) ParamDecl(SourceLoc(), Loc, ctx.Id_transport, Loc,
+                                      ctx.Id_transport, transportDecl);
+      arg->setSpecifier(ParamSpecifier::Default);
+      arg->setInterfaceType(transportDecl->getDeclaredInterfaceType());
+      arg->setImplicit();
+
       params.push_back(arg);
     }
   }
@@ -1202,7 +1213,6 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
 
   if (auto *classDecl = dyn_cast<ClassDecl>(decl)) {
     addImplicitInheritedConstructorsToClass(classDecl);
-    addImplicitDistributedActorMembersToClass(classDecl);
   }
 
   // Force the memberwise and default initializers if the type has them.
@@ -1286,17 +1296,19 @@ ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
   }
     break;
   case ImplicitMemberAction::ResolveDistributedActor:
+  case ImplicitMemberAction::ResolveDistributedActorTransport:
   case ImplicitMemberAction::ResolveDistributedActorIdentity: {
     // init(transport:) and init(resolve:using:) may be synthesized as part of
     // derived conformance to the DistributedActor protocol.
     // If the target should conform to the DistributedActor protocol, check the
     // conformance here to attempt synthesis.
-    TypeChecker::addImplicitConstructors(target);
+    // FIXME(distributed): invoke the requirement adding explicitly here
+     TypeChecker::addImplicitConstructors(target);
     auto *distributedActorProto =
         Context.getProtocol(KnownProtocolKind::DistributedActor);
     (void)evaluateTargetConformanceTo(distributedActorProto);
-  }
     break;
+  }
   }
   return std::make_tuple<>();
 }
@@ -1450,24 +1462,6 @@ HasDefaultInitRequest::evaluate(Evaluator &evaluator,
   return areAllStoredPropertiesDefaultInitializable(evaluator, decl);
 }
 
-bool
-HasDistributedActorLocalInitRequest::evaluate(Evaluator &evaluator,
-                                                     NominalTypeDecl *nominal) const {
-  if (auto *decl = dyn_cast<ClassDecl>(nominal)) {
-    if (!decl->isDistributedActor())
-      return false;
-
-    for (auto *member : decl->getMembers())
-      if (auto ctor = dyn_cast<ConstructorDecl>(member))
-        if (ctor->isDistributedActorLocalInit())
-          return true;
-  }
-
-  // areAllStoredPropertiesDefaultInitializable(evaluator, decl);
-
-  return false;
-}
-
 /// Synthesizer callback for a function body consisting of "return".
 static std::pair<BraceStmt *, bool>
 synthesizeSingleReturnFunctionBody(AbstractFunctionDecl *afd, void *) {
@@ -1489,10 +1483,10 @@ SynthesizeDefaultInitRequest::evaluate(Evaluator &evaluator,
                                   decl);
 
   // Create the default constructor.
-  if (auto ctor = createImplicitConstructor(decl,
-                                        ImplicitConstructorKind::Default,
-                                        ctx)) {
-
+  auto ctorKind = decl->isDistributedActor() ?
+      ImplicitConstructorKind::DefaultDistributedActor :
+      ImplicitConstructorKind::Default;
+  if (auto ctor = createImplicitConstructor(decl, ctorKind, ctx)) {
     // Add the constructor.
     decl->addMember(ctor);
 

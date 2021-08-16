@@ -276,8 +276,11 @@ void SourceLookupCache::populateMemberCache(const ModuleDecl &Mod) {
                              "populate-module-class-member-cache");
 
   for (const FileUnit *file : Mod.getFiles()) {
-    auto &SF = *cast<SourceFile>(file);
-    addToMemberCache(SF.getTopLevelDecls());
+    assert(isa<SourceFile>(file) ||
+           isa<SynthesizedFileUnit>(file));
+    SmallVector<Decl *, 8> decls;
+    file->getTopLevelDecls(decls);
+    addToMemberCache(decls);
   }
 
   MemberCachePopulated = true;
@@ -1232,7 +1235,7 @@ LookupConformanceInModuleRequest::evaluate(
 
   // Find the (unspecialized) conformance.
   SmallVector<ProtocolConformance *, 2> conformances;
-  if (!nominal->lookupConformance(mod, protocol, conformances)) {
+  if (!nominal->lookupConformance(protocol, conformances)) {
     if (!protocol->isSpecificProtocol(KnownProtocolKind::Sendable))
       return getInvalidOrMissingConformance(type, protocol);
 

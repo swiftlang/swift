@@ -844,9 +844,8 @@ Type ConstraintSystem::openType(Type type, OpenedTypeMap &replacements) {
     });
 }
 
-Type ConstraintSystem::openOpaqueType(Type type,
+Type ConstraintSystem::openOpaqueType(OpaqueTypeArchetypeType *opaque,
                                       ConstraintLocatorBuilder locator) {
-  auto opaque = type->castTo<OpaqueTypeArchetypeType>();
   auto opaqueLocator = locator.withPathElement(
       LocatorPathElt::OpenedOpaqueArchetype(opaque->getDecl()));
 
@@ -868,16 +867,36 @@ Type ConstraintSystem::openOpaqueType(Type type,
   return underlyingTyVar;
 }
 
-Type ConstraintSystem::openOpaqueTypeRec(Type type,
-                                         ConstraintLocatorBuilder locator) {
+Type ConstraintSystem::openOpaqueType(Type type, ContextualTypePurpose context,
+                                      ConstraintLocatorBuilder locator) {
   // Early return if `type` is `NULL` or if there are no opaque archetypes (in
   // which case there is certainly nothing for us to do).
   if (!type || !type->hasOpaqueArchetype())
     return type;
 
+  auto inReturnContext = [](ContextualTypePurpose context) {
+    return context == CTP_ReturnStmt || context == CTP_ReturnSingleExpr;
+  };
+
+  if (!(context == CTP_Initialization || inReturnContext(context)))
+    return type;
+
+  auto shouldOpen = [&](OpaqueTypeArchetypeType *opaqueType) {
+    if (!inReturnContext(context))
+      return true;
+
+    if (auto *func = dyn_cast<AbstractFunctionDecl>(DC))
+      return opaqueType->getDecl()->isOpaqueReturnTypeOfFunction(func);
+
+    return true;
+  };
+
   return type.transform([&](Type type) -> Type {
-    if (type->is<OpaqueTypeArchetypeType>())
-      return openOpaqueType(type, locator);
+    auto *opaqueType = type->getAs<OpaqueTypeArchetypeType>();
+
+    if (opaqueType && shouldOpen(opaqueType))
+      return openOpaqueType(opaqueType, locator);
+
     return type;
   });
 }
@@ -5268,7 +5287,14 @@ SolutionApplicationTarget::SolutionApplicationTarget(
 void SolutionApplicationTarget::maybeApplyPropertyWrapper() {
   assert(kind == Kind::expression);
   assert(expression.contextualPurpose == CTP_Initialization);
-  auto singleVar = expression.pattern->getSingleVar();
+
+  VarDecl *singleVar;
+  if (auto *pattern = expression.pattern) {
+    singleVar = pattern->getSingleVar();
+  } else {
+    singleVar = expression.propertyWrapper.wrappedVar;
+  }
+
   if (!singleVar)
     return;
 
@@ -5398,6 +5424,23 @@ SolutionApplicationTarget::forUninitializedWrappedVar(VarDecl *wrappedVar) {
   return SolutionApplicationTarget(wrappedVar);
 }
 
+SolutionApplicationTarget
+SolutionApplicationTarget::forPropertyWrapperInitializer(
+    VarDecl *wrappedVar, DeclContext *dc, Expr *initializer) {
+  SolutionApplicationTarget target(
+      initializer, dc, CTP_Initialization, wrappedVar->getType(),
+      /*isDiscarded=*/false);
+  target.expression.propertyWrapper.wrappedVar = wrappedVar;
+  if (auto *patternBinding = wrappedVar->getParentPatternBinding()) {
+    auto index = patternBinding->getPatternEntryIndexForVarDecl(wrappedVar);
+    target.expression.initialization.patternBinding = patternBinding;
+    target.expression.initialization.patternBindingIndex = index;
+    target.expression.pattern = patternBinding->getPattern(index);
+  }
+  target.maybeApplyPropertyWrapper();
+  return target;
+}
+
 ContextualPattern
 SolutionApplicationTarget::getContextualPattern() const {
   assert(kind == Kind::expression);
@@ -5472,6 +5515,14 @@ void ConstraintSystem::diagnoseFailureFor(SolutionApplicationTarget target) {
   SWIFT_DEFER { setPhase(ConstraintSystemPhase::Finalization); };
 
   auto &DE = getASTContext().Diags;
+
+  // If constraint system is in invalid state always produce
+  // a fallback diagnostic that asks to file a bug.
+  if (inInvalidState()) {
+    DE.diagnose(target.getLoc(), diag::failed_to_produce_diagnostic);
+    return;
+  }
+
   if (auto expr = target.getAsExpr()) {
     if (auto *assignment = dyn_cast<AssignExpr>(expr)) {
       if (isa<DiscardAssignmentExpr>(assignment->getDest()))
@@ -5827,7 +5878,6 @@ bool TypeVarBindingProducer::requiresOptionalAdjustment(
     if (auto *nominalBindingDecl = type->getAnyNominal()) {
       SmallVector<ProtocolConformance *, 2> conformances;
       conformsToExprByNilLiteral = nominalBindingDecl->lookupConformance(
-          CS.DC->getParentModule(),
           CS.getASTContext().getProtocol(
               KnownProtocolKind::ExpressibleByNilLiteral),
           conformances);

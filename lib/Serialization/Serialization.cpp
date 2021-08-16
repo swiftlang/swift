@@ -2084,8 +2084,10 @@ void Serializer::writePatternBindingInitializer(PatternBindingDecl *binding,
   StringRef initStr;
   SmallString<128> scratch;
   auto varDecl = binding->getAnchoringVarDecl(bindingIndex);
+  assert((varDecl || allowCompilerErrors()) &&
+         "Serializing PDB without anchoring VarDecl");
   if (binding->hasInitStringRepresentation(bindingIndex) &&
-      varDecl->isInitExposedToClients()) {
+      varDecl && varDecl->isInitExposedToClients()) {
     initStr = binding->getInitStringRepresentation(bindingIndex, scratch);
   }
 
@@ -3957,9 +3959,6 @@ public:
     using namespace decls_block;
     verifyAttrSerializable(dtor);
 
-    if (S.allowCompilerErrors() && dtor->isInvalid())
-      return;
-
     auto contextID = S.addDeclContextRef(dtor->getDeclContext());
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[DestructorLayout::Code];
@@ -4001,11 +4000,33 @@ public:
   }
 };
 
+/// When allowing modules with errors there may be cases where there's little
+/// point in serializing a declaration and doing so would create a maintenance
+/// burden on the deserialization side. Returns \c true if the given declaration
+/// should be skipped and \c false otherwise.
+static bool canSkipWhenInvalid(const Decl *D) {
+  // There's no point writing out the deinit when its context is not a class
+  // as nothing would be able to reference it
+  if (auto *deinit = dyn_cast<DestructorDecl>(D)) {
+    if (!isa<ClassDecl>(D->getDeclContext()))
+      return true;
+  }
+  return false;
+}
+
 void Serializer::writeASTBlockEntity(const Decl *D) {
   using namespace decls_block;
 
   PrettyStackTraceDecl trace("serializing", D);
   assert(DeclsToSerialize.hasRef(D));
+
+  if (D->isInvalid()) {
+    assert(allowCompilerErrors() &&
+           "cannot create a module with an invalid decl");
+
+    if (canSkipWhenInvalid(D))
+      return;
+  }
 
   BitOffset initialOffset = Out.GetCurrentBitNo();
   SWIFT_DEFER {
@@ -4016,8 +4037,6 @@ void Serializer::writeASTBlockEntity(const Decl *D) {
     }
   };
 
-  assert((allowCompilerErrors() || !D->isInvalid()) &&
-         "cannot create a module with an invalid decl");
   if (isDeclXRef(D)) {
     writeCrossReference(D);
     return;
@@ -4544,6 +4563,11 @@ public:
                                      S.addTypeRef(dictTy->getValueType()));
   }
 
+  void visitVariadicSequenceType(const VariadicSequenceType *seqTy) {
+    using namespace decls_block;
+    serializeSimpleWrapper<VariadicSequenceTypeLayout>(seqTy->getBaseType());
+  }
+
   void visitOptionalType(const OptionalType *optionalTy) {
     using namespace decls_block;
     serializeSimpleWrapper<OptionalTypeLayout>(optionalTy->getBaseType());
@@ -4747,6 +4771,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<SILFunctionTypeLayout>();
   registerDeclTypeAbbr<ArraySliceTypeLayout>();
   registerDeclTypeAbbr<DictionaryTypeLayout>();
+  registerDeclTypeAbbr<VariadicSequenceTypeLayout>();
   registerDeclTypeAbbr<ReferenceStorageTypeLayout>();
   registerDeclTypeAbbr<UnboundGenericTypeLayout>();
   registerDeclTypeAbbr<OptionalTypeLayout>();

@@ -276,6 +276,10 @@ def disable_named_lazy_member_loading : Flag<["-"], "disable-named-lazy-member-l
 def debug_requirement_machine : Flag<["-"], "debug-requirement-machine">,
   HelpText<"Enables debugging output from the generics implementation">;
 
+def analyze_requirement_machine : Flag<["-"], "analyze-requirement-machine">,
+  Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Print out requirement machine statistics at the end of the compilation job">;
+
 def requirement_machine_step_limit : Separate<["-"], "requirement-machine-step-limit">,
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
   HelpText<"Set the maximum steps before we give up on confluent completion">;
@@ -427,9 +431,13 @@ def enable_experimental_static_assert :
   Flag<["-"], "enable-experimental-static-assert">,
   HelpText<"Enable experimental #assert">;
 
-def enable_experimental_opaque_return_types :
-  Flag<["-"], "enable-experimental-opaque-return-types">,
-  HelpText<"Enable experimental extensions to opaque return type support">;
+def enable_experimental_named_opaque_types :
+  Flag<["-"], "enable-experimental-named-opaque-types">,
+  HelpText<"Enable experimental support for named opaque result types">;
+
+def enable_experimental_structural_opaque_types :
+  Flag<["-"], "enable-experimental-structural-opaque-types">,
+  HelpText<"Enable experimental support for structural opaque result types">;
 
 def enable_deserialization_recovery :
   Flag<["-"], "enable-deserialization-recovery">,

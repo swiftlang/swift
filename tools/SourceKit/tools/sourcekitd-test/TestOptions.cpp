@@ -382,6 +382,10 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       timeRequest = true;
       break;
 
+    case OPT_measure_instructions:
+      measureInstructions = true;
+      break;
+
     case OPT_repeat_request:
       if (StringRef(InputArg->getValue()).getAsInteger(10, repeatRequest)) {
         llvm::errs() << "error: expected integer for 'cancel-on-subsequent-request'\n";

@@ -100,6 +100,7 @@ bool LowerHopToActor::processHop(HopToExecutorInst *hop) {
     return false;
 
   B.setInsertionPoint(hop);
+  B.setCurrentDebugScope(hop->getDebugScope());
 
   // Get the dominating executor value for this actor, if available,
   // or else emit code to derive it.
@@ -117,6 +118,7 @@ bool LowerHopToActor::processExtract(ExtractExecutorInst *extract) {
   auto executor = extract->getExpectedExecutor();
   if (!isOptionalBuiltinExecutor(executor->getType())) {
     B.setInsertionPoint(extract);
+    B.setCurrentDebugScope(extract->getDebugScope());
     executor = emitGetExecutor(extract->getLoc(), executor, /*optional*/false);
   }
 

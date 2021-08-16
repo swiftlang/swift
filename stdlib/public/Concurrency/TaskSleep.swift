@@ -14,10 +14,7 @@ import Swift
 
 @available(SwiftStdlib 5.5, *)
 extension Task where Success == Never, Failure == Never {
-  /// Suspends the current task for _at least_ the given duration
-  /// in nanoseconds.
-  ///
-  /// This function does _not_ block the underlying thread.
+  @available(*, deprecated, renamed: "Task.sleep(nanoseconds:)")
   public static func sleep(_ duration: UInt64) async {
     return await Builtin.withUnsafeContinuation { (continuation: Builtin.RawUnsafeContinuation) -> Void in
       let job = _taskCreateNullaryContinuationJob(

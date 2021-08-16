@@ -66,13 +66,6 @@ struct TupleMe: Tupled {
   }
 }
 
-struct TupleMeStructural: Tupled {
-  var tuple: (some Any, Int) {
-    "hello"
-    0
-  }
-}
-
 // Witness is separated from the context declaring conformance, so don't infer
 // the result builder.
 struct DoNotTupleMe {

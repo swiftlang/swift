@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-opaque-return-types -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -enable-experimental-named-opaque-types -disable-availability-checking
 
 // Tests for experimental extensions to opaque return type support.
 

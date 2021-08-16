@@ -1817,3 +1817,18 @@ bb0(%0 : @guaranteed $Klass, %1 : $*Int64):
   return %14 : $Builtin.NativeObject
 }
 
+class Bar {
+  func foo()
+}
+
+sil [ossa] @$testEndLifetime : $@convention(method) (@owned Bar, @in Bar) -> () {
+bb0(%0 : @owned $Bar, %1 : $*Bar):
+  %b = begin_access [modify] [dynamic] %1 : $*Bar
+  end_access %b : $*Bar
+  %f = objc_method %0 : $Bar, #Bar.foo!foreign : (Bar) -> () -> (), $@convention(objc_method) (Bar) -> ()
+  %c = apply %f(%0) : $@convention(objc_method) (Bar) -> ()
+  end_lifetime %0 : $Bar
+  destroy_addr %1 : $*Bar
+  %r = tuple ()
+  return %r : $()
+}

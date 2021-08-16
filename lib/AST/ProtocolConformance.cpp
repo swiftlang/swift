@@ -1284,11 +1284,10 @@ void NominalTypeDecl::prepareConformanceTable() const {
 }
 
 bool NominalTypeDecl::lookupConformance(
-       ModuleDecl *module, ProtocolDecl *protocol,
+       ProtocolDecl *protocol,
        SmallVectorImpl<ProtocolConformance *> &conformances) const {
   prepareConformanceTable();
   return ConformanceTable->lookupConformance(
-           module,
            const_cast<NominalTypeDecl *>(this),
            protocol,
            conformances);

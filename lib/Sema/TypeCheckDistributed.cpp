@@ -31,12 +31,34 @@ using namespace swift;
 
 // ==== ------------------------------------------------------------------------
 
+bool swift::ensureDistributedModuleLoaded(Decl *decl) {
+  auto &C = decl->getASTContext();
+  auto moduleAvailable = evaluateOrDefault(
+      C.evaluator, DistributedModuleIsAvailableRequest{decl}, false);
+  return moduleAvailable;
+}
+
+bool
+DistributedModuleIsAvailableRequest::evaluate(Evaluator &evaluator,
+                                              Decl *decl) const {
+  auto &C = decl->getASTContext();
+
+  if (C.getLoadedModule(C.Id_Distributed))
+    return true;
+
+  // seems we're missing the _Distributed module, ask to import it explicitly
+  decl->diagnose(diag::distributed_actor_needs_explicit_distributed_import);
+  return false;
+}
+
+// ==== ------------------------------------------------------------------------
+
 bool IsDistributedActorRequest::evaluate(
     Evaluator &evaluator, NominalTypeDecl *nominal) const {
   // Protocols are actors if they inherit from `DistributedActor`.
   if (auto protocol = dyn_cast<ProtocolDecl>(nominal)) {
     auto &ctx = protocol->getASTContext();
-    auto *distributedActorProtocol = ctx.getProtocol(KnownProtocolKind::DistributedActor);
+    auto *distributedActorProtocol = ctx.getDistributedActorDecl();
     return (protocol == distributedActorProtocol ||
             protocol->inheritsFrom(distributedActorProtocol));
   }
@@ -78,9 +100,9 @@ bool swift::checkDistributedFunction(FuncDecl *func, bool diagnose) {
 
   // --- Check parameters for 'Codable' conformance
   for (auto param : *func->getParameters()) {
-    auto paramType = func->mapTypeIntoContext(param->getInterfaceType());
-    if (TypeChecker::conformsToProtocol(paramType, encodableType, module).isInvalid() ||
-        TypeChecker::conformsToProtocol(paramType, decodableType, module).isInvalid()) {
+    auto paramTy = func->mapTypeIntoContext(param->getInterfaceType());
+    if (TypeChecker::conformsToProtocol(paramTy, encodableType, module).isInvalid() ||
+        TypeChecker::conformsToProtocol(paramTy, decodableType, module).isInvalid()) {
       if (diagnose)
         func->diagnose(
             diag::distributed_actor_func_param_not_codable,
@@ -127,44 +149,93 @@ bool swift::checkDistributedFunction(FuncDecl *func, bool diagnose) {
   return false;
 }
 
-void swift::checkDistributedActorConstructor(ClassDecl *decl, ConstructorDecl *ctor) {
+void swift::checkDistributedActorProperties(const ClassDecl *decl) {
+  auto &C = decl->getASTContext();
+
+  for (auto member : decl->getMembers()) {
+    if (auto prop = dyn_cast<VarDecl>(member)) {
+      auto id = prop->getName();
+      if (id == C.Id_actorTransport ||
+          id == C.Id_id) {
+        prop->diagnose(diag::distributed_actor_user_defined_special_property,
+                      id);
+      }
+    }
+  }
+}
+
+void swift::checkDistributedActorConstructor(const ClassDecl *decl, ConstructorDecl *ctor) {
   // bail out unless distributed actor, only those have special rules to check here
   if (!decl->isDistributedActor())
     return;
 
-  // bail out for synthesized constructors
-  if (ctor->isSynthesized())
+  // Only designated initializers need extra checks
+  if (!ctor->isDesignatedInit())
     return;
 
-  if (ctor->isDistributedActorLocalInit()) {
-    // it is not legal to manually define init(transport:)
-    // TODO: we want to lift this restriction but it is tricky
-    ctor->diagnose(diag::distributed_actor_local_init_explicitly_defined)
-        .fixItRemove(SourceRange(ctor->getStartLoc(), decl->getStartLoc()));
-    // TODO: we should be able to allow this, but then we need to inject
-    //       code or force users to "do the right thing"
+  // === Designated initializers must accept exactly one ActorTransport
+  auto &C = ctor->getASTContext();
+  auto module = ctor->getParentModule();
+
+  SmallVector<ParamDecl*, 2> transportParams;
+  int transportParamsCount = 0;
+  auto protocolDecl = C.getProtocol(KnownProtocolKind::ActorTransport);
+  auto protocolTy = protocolDecl->getDeclaredInterfaceType();
+
+  for (auto param : *ctor->getParameters()) {
+    auto paramTy = ctor->mapTypeIntoContext(param->getInterfaceType());
+    auto conformance = TypeChecker::conformsToProtocol(paramTy, protocolDecl, module);
+
+    if (paramTy->isEqual(protocolTy) || !conformance.isInvalid()) {
+      transportParamsCount += 1;
+      transportParams.push_back(param);
+    }
+  }
+
+  // missing transport parameter
+  if (transportParamsCount == 0) {
+    ctor->diagnose(diag::distributed_actor_designated_ctor_missing_transport_param,
+                   ctor->getName());
+    // TODO(distributed): offer fixit to insert 'transport: ActorTransport'
     return;
   }
 
-  if (ctor->isDistributedActorResolveInit()) {
-    // It is illegal for users to attempt defining a resolve initializer;
-    // Suggest removing it entirely, there is no way users can implement this init.
-    ctor->diagnose(diag::distributed_actor_init_resolve_must_not_be_user_defined)
-        .fixItRemove(SourceRange(ctor->getStartLoc(), decl->getStartLoc()));
+  // ok! We found exactly one transport parameter
+  if (transportParamsCount == 1)
     return;
-  }
 
-  // All user defined initializers on distributed actors must be 'convenience'.
-  //
-  // The only initializer that is allowed to be designated is init(transport:)
-  // which we synthesize on behalf of a distributed actor.
-  //
-  // When checking ctor bodies we'll check
-  if (!ctor->isConvenienceInit()) {
-    ctor->diagnose(diag::distributed_actor_init_user_defined_must_be_convenience,
-                   ctor->getName())
-        .fixItInsert(ctor->getConstructorLoc(), "convenience ");
+  // TODO(distributed): rdar://81824959 report the error on the offending (2nd) matching parameter
+  //                    Or maybe we can issue a note about the other offending params?
+  ctor->diagnose(diag::distributed_actor_designated_ctor_must_have_one_transport_param,
+                 ctor->getName(), transportParamsCount);
+}
+
+// ==== ------------------------------------------------------------------------
+
+void TypeChecker::checkDistributedActor(ClassDecl *decl) {
+  // ==== Ensure the _Distributed module is available,
+  // without it there's no reason to check the decl in more detail anyway.
+  if (!swift::ensureDistributedModuleLoaded(decl))
     return;
-  }
+
+  // ==== Constructors
+  // --- Get the default initializer
+  // If applicable, this will create the default 'init(transport:)' initializer
+  (void)decl->getDefaultInitializer();
+
+  // --- Check all constructors
+  for (auto member : decl->getMembers())
+    if (auto ctor = dyn_cast<ConstructorDecl>(member))
+      checkDistributedActorConstructor(decl, ctor);
+
+  // ==== Properties
+  // --- Check for any illegal re-definitions
+  checkDistributedActorProperties(decl);
+
+  // --- Synthesize properties
+  // TODO: those could technically move to DerivedConformance style
+  swift::addImplicitDistributedActorMembersToClass(decl);
+
+  // ==== Functions
 }
 

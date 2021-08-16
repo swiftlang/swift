@@ -359,16 +359,6 @@ bool TypeResolution::areSameType(Type type1, Type type2) const {
   return areSameType(depMem1->getBase(), depMem2->getBase());
 }
 
-Type TypeChecker::getArraySliceType(SourceLoc loc, Type elementType) {
-  ASTContext &ctx = elementType->getASTContext();
-  if (!ctx.getArrayDecl()) {
-    ctx.Diags.diagnose(loc, diag::sugar_type_not_found, 0);
-    return ErrorType::get(ctx);
-  }
-
-  return ArraySliceType::get(elementType);
-}
-
 Type TypeChecker::getOptionalType(SourceLoc loc, Type elementType) {
   ASTContext &ctx = elementType->getASTContext();
   if (!ctx.getOptionalDecl()) {
@@ -3604,12 +3594,17 @@ NeverNullType TypeResolver::resolveArrayType(ArrayTypeRepr *repr,
     return ErrorType::get(getASTContext());
   }
 
-  auto sliceTy =
-    TypeChecker::getArraySliceType(repr->getBrackets().Start, baseTy);
-  if (sliceTy->hasError())
-    return ErrorType::get(getASTContext());
+  ASTContext &ctx = baseTy->getASTContext();
+  // If the standard library isn't loaded, we ought to let the user know
+  // something has gone terribly wrong, since the rest of the compiler is going
+  // to assume it can canonicalize [T] to Array<T>.
+  if (!ctx.getArrayDecl()) {
+    ctx.Diags.diagnose(repr->getBrackets().Start,
+                       diag::sugar_type_not_found, 0);
+    return ErrorType::get(ctx);
+  }
 
-  return sliceTy;
+  return ArraySliceType::get(baseTy);
 }
 
 NeverNullType

@@ -17,6 +17,7 @@
 #include "TypeChecker.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
+#include "TypeCheckDistributed.h"
 #include "TypeCheckType.h"
 #include "MiscDiagnostics.h"
 #include "swift/Subsystems.h"
@@ -229,8 +230,7 @@ static void tryDiagnoseUnnecessaryCastOverOptionSet(ASTContext &Ctx,
   if (!optionSetType)
     return;
   SmallVector<ProtocolConformance *, 4> conformances;
-  if (!(optionSetType &&
-        NTD->lookupConformance(module, optionSetType, conformances)))
+  if (!(optionSetType && NTD->lookupConformance(optionSetType, conformances)))
     return;
 
   auto *CE = dyn_cast<CallExpr>(E);
@@ -1421,21 +1421,7 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
 
     // Otherwise, complain.  Start with more specific diagnostics.
 
-    // Diagnose unused literals that were translated to implicit
-    // constructor calls during CSApply / ExprRewriter::convertLiteral.
-    if (call->isImplicit()) {
-      Expr *arg = call->getArg();
-      if (auto *TE = dyn_cast<TupleExpr>(arg))
-        if (TE->getNumElements() == 1)
-          arg = TE->getElement(0);
-
-      if (auto *LE = dyn_cast<LiteralExpr>(arg)) {
-        diagnoseIgnoredLiteral(Context, LE);
-        return;
-      }
-    }
-
-    // Other unused constructor calls.
+    // Diagnose unused constructor calls.
     if (callee && isa<ConstructorDecl>(callee) && !call->isImplicit()) {
       DE.diagnose(fn->getLoc(), diag::expression_unused_init_result,
                callee->getDeclContext()->getDeclaredInterfaceType())
@@ -1742,9 +1728,6 @@ static void checkClassConstructorBody(ClassDecl *classDecl,
 
     ctx.Diags.diagnose(initKindAndExpr.initExpr->getLoc(), diag::delegation_here);
   }
-
-  if (classDecl->isActor())
-    checkActorConstructorBody(classDecl, ctor, body);
 
   // An inlinable constructor in a class must always be delegating,
   // unless the class is '@_fixed_layout'.
@@ -2056,7 +2039,6 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
   // Class constructor checking.
   if (auto *ctor = dyn_cast<ConstructorDecl>(AFD)) {
     if (auto classDecl = ctor->getDeclContext()->getSelfClassDecl()) {
-      checkActorConstructor(classDecl, ctor);
       checkClassConstructorBody(classDecl, ctor, body);
     }
   }

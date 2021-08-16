@@ -1706,10 +1706,12 @@ namespace {
 
       auto locator = CS.getConstraintLocator(expr);
       auto contextualType = CS.getContextualType(expr);
+      auto contextualPurpose = CS.getContextualTypePurpose(expr);
 
       auto joinElementTypes = [&](Optional<Type> elementType) {
-        auto openedElementType = elementType.map(
-            [&](Type type) { return CS.openOpaqueTypeRec(type, locator); });
+        auto openedElementType = elementType.map([&](Type type) {
+          return CS.openOpaqueType(type, contextualPurpose, locator);
+        });
 
         const auto elements = expr->getElements();
         unsigned index = 0;
@@ -1829,7 +1831,9 @@ namespace {
 
       auto locator = CS.getConstraintLocator(expr);
       auto contextualType = CS.getContextualType(expr);
-      auto openedType = CS.openOpaqueTypeRec(contextualType, locator);
+      auto contextualPurpose = CS.getContextualTypePurpose(expr);
+      auto openedType =
+          CS.openOpaqueType(contextualType, contextualPurpose, locator);
 
       // If a contextual type exists for this expression and is a dictionary
       // type, apply it directly.
@@ -2241,7 +2245,8 @@ namespace {
         type = type->getReferenceStorageReferent();
 
         Type replacedType = CS.replaceInferableTypesWithTypeVars(type, locator);
-        Type openedType = CS.openOpaqueTypeRec(replacedType, locator);
+        Type openedType =
+            CS.openOpaqueType(replacedType, CTP_Initialization, locator);
         assert(openedType);
 
         auto *subPattern = cast<TypedPattern>(pattern)->getSubPattern();
@@ -2618,14 +2623,13 @@ namespace {
 
       // Try to build the appropriate type for a variadic argument list of
       // the fresh element type.  If that failed, just bail out.
-      auto array = TypeChecker::getArraySliceType(expr->getLoc(), element);
-      if (array->hasError()) return element;
+      auto variadicSeq = VariadicSequenceType::get(element);
 
       // Require the operand to be convertible to the array type.
       CS.addConstraint(ConstraintKind::Conversion,
-                       CS.getType(expr->getSubExpr()), array,
+                       CS.getType(expr->getSubExpr()), variadicSeq,
                        CS.getConstraintLocator(expr));
-      return array;
+      return variadicSeq;
     }
 
     Type visitDynamicTypeExpr(DynamicTypeExpr *expr) {

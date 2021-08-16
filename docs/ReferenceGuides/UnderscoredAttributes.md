@@ -39,6 +39,14 @@ Most notably, default argument expressions are implicitly
 `@_alwaysEmitIntoClient`, which means that adding a default argument to a
 function which did not have one previously does not break ABI.
 
+## `@_assemblyVision`
+
+Forces emission of assembly vision remarks for a function or method, showing
+where various runtime calls and performance impacting hazards are in the code
+at source level after optimization.
+
+Adding this attribute to a type leads to remarks being emitted for all methods.
+
 ## `@_borrowed`
 
 Indicates that the [conservative access pattern](/docs/Lexicon.md#access-pattern)
@@ -95,7 +103,7 @@ extension Text {
 }
 ```
 
-## `@_dynamicReplacement(for:)`
+## `@_dynamicReplacement(for: targetFunc(label:))`
 
 Marks a function as the dynamic replacement for another `dynamic` function.
 This is similar to method swizzling in other languages such as Objective-C,
@@ -103,7 +111,7 @@ except that the replacement happens at program start (or loading a shared
 library), instead of at an arbitrary point in time.
 
 For more details, see the forum post on
-[Dynamic method replacement](https://forums.swift.org/t/dynamic-method-replacement/16619).
+[dynamic method replacement](https://forums.swift.org/t/dynamic-method-replacement/16619).
 
 ## `@_distributedActorIndependent`
 
@@ -124,7 +132,7 @@ already infer from static analysis.
 Changing the implementation in a way that violates the optimizer's assumptions
 about the effects results in undefined behavior.
 
-For more details, see [OptimizerEffects.rst](/docs/Proposals/OptimizerEffects.rst).
+For more details, see [OptimizerEffects.rst](/docs/proposals/OptimizerEffects.rst).
 
 ## `@_exported`
 
@@ -134,7 +142,7 @@ This attribute is most commonly used by overlays.
 
 ```swift
 // module M
-func f() {}
+public func f() {}
 
 // module N
 @_exported import M
@@ -264,16 +272,11 @@ class C {
 
 (Note that it is "inherit", not "inherits", unlike below.)
 
-Marks that a `@Sendable async` closure argument should inherited the actor
+Marks that a `@Sendable async` closure argument should inherit the actor
 context (i.e. what actor it should be run on) based on the declaration site
 of the closure. This is different from the typical behavior, where the closure
 may be runnable anywhere unless its type specifically declares that it will
 run on a specific actor.
-
-This new attribute can be used on parameters of `@Sendable async` type
-to indicate that the closures arguments passed to such parameters
-should inherit the actor context where they are formed, which is not
-the normal behavior for `@Sendable` closures.
 
 ## `@_inheritsConvenienceInitializers`
 
@@ -289,7 +292,6 @@ Indicates that a protocol is a marker protocol. Marker protocols represent some
 meaningful property at compile-time but have no runtime representation.
 
 For more details, see [SE-0302](https://github.com/apple/swift-evolution/blob/main/proposals/0302-concurrent-value-and-concurrent-closures.md#marker-protocols), which introduces marker protocols.
-
 At the moment, the language only has one marker protocol: `Sendable`.
 
 Fun fact: Rust has a very similar concept called

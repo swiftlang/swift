@@ -1845,7 +1845,8 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
 
   // Bind the body result type to the type of the transformed expression.
   addConstraint(bodyResultConstraintKind, transformedType,
-                openOpaqueTypeRec(bodyResultType, locator), locator);
+                openOpaqueType(bodyResultType, CTP_ReturnStmt, locator),
+                locator);
   return getTypeMatchSuccess();
 }
 

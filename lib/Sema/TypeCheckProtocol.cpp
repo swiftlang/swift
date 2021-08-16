@@ -4097,14 +4097,11 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
                        witness->getName(), isSetter, requiredAccess,
                        protoAccessScope.accessLevelForDiagnostics(),
                        proto->getName());
-        if (auto *decl = dyn_cast<AbstractFunctionDecl>(witness)) {
-          auto isMemberwiseInitializer =
-              decl->getBodyKind() ==
-              AbstractFunctionDecl::BodyKind::MemberwiseInitializer;
-          if (isMemberwiseInitializer) {
+
+        if (auto *decl = dyn_cast<AbstractFunctionDecl>(witness))
+          if (decl->isMemberwiseInitializer())
             return;
-          }
-        }
+
         diagnoseWitnessFixAccessLevel(diags, witness, requiredAccess,
                                       isSetter);
       });
@@ -6222,8 +6219,7 @@ swift::findWitnessedObjCRequirements(const ValueDecl *witness,
       // Dig out the conformance.
       if (!conformance.hasValue()) {
         SmallVector<ProtocolConformance *, 2> conformances;
-        nominal->lookupConformance(dc->getParentModule(), proto,
-                                   conformances);
+        nominal->lookupConformance(proto, conformances);
         if (conformances.size() == 1)
           conformance = conformances.front();
         else

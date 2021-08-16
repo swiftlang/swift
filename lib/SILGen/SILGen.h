@@ -184,7 +184,8 @@ public:
   SILFunction *getOrCreateForeignAsyncCompletionHandlerImplFunction(
       CanSILFunctionType blockType, CanType continuationTy,
       AbstractionPattern origFormalType, CanGenericSignature sig,
-      ForeignAsyncConvention convention);
+      ForeignAsyncConvention convention,
+      Optional<ForeignErrorConvention> foreignError);
 
   /// Determine whether the given class has any instance variables that
   /// need to be destroyed.
@@ -317,9 +318,9 @@ public:
   /// Emits the backing initializer for a property with an attached wrapper.
   void emitPropertyWrapperBackingInitializer(VarDecl *var);
 
-  /// Emits default argument generators for the given parameter list.
-  void emitDefaultArgGenerators(SILDeclRef::Loc decl,
-                                ParameterList *paramList);
+  /// Emits argument generators, including default argument generators and
+  /// property wrapper argument generators, for the given parameter list.
+  void emitArgumentGenerators(SILDeclRef::Loc decl, ParameterList *paramList);
   
   /// Emits a thunk from a foreign function to the native Swift convention.
   void emitForeignToNativeThunk(SILDeclRef thunk);

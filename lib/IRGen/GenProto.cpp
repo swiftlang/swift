@@ -3538,7 +3538,7 @@ llvm::Constant *IRGenModule::getAddrOfGenericEnvironment(
         llvm::SmallVector<uint16_t, 4> genericParamCounts;
         unsigned curDepth = 0;
         unsigned genericParamCount = 0;
-        for (const auto gp : signature.getGenericParams()) {
+        for (const auto &gp : signature.getGenericParams()) {
           if (curDepth != gp->getDepth()) {
             genericParamCounts.push_back(genericParamCount);
             curDepth = gp->getDepth();

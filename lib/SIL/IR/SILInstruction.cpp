@@ -1129,6 +1129,7 @@ bool SILInstruction::mayRelease() const {
   default:
     llvm_unreachable("Unhandled releasing instruction!");
 
+  case SILInstructionKind::EndLifetimeInst:
   case SILInstructionKind::GetAsyncContinuationInst:
   case SILInstructionKind::GetAsyncContinuationAddrInst:
   case SILInstructionKind::AwaitAsyncContinuationInst:

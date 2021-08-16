@@ -19,6 +19,17 @@
 using namespace swift;
 using namespace rewriting;
 
+RewriteContext::RewriteContext(ASTContext &ctx)
+    : Context(ctx),
+      Stats(ctx.Stats),
+      SymbolHistogram(Symbol::NumKinds),
+      TermHistogram(4, /*Start=*/1),
+      RuleTrieHistogram(16, /*Start=*/1),
+      RuleTrieRootHistogram(16),
+      PropertyTrieHistogram(16, /*Start=*/1),
+      PropertyTrieRootHistogram(16) {
+}
+
 Term RewriteContext::getTermForType(CanType paramType,
                                     const ProtocolDecl *proto) {
   return Term::get(getMutableTermForType(paramType, proto), *this);
@@ -115,6 +126,79 @@ MutableTerm RewriteContext::getMutableTermForType(CanType paramType,
   return MutableTerm(symbols);
 }
 
+/// Map an associated type symbol to an associated type declaration.
+///
+/// Note that the protocol graph is not part of the caching key; each
+/// protocol graph is a subgraph of the global inheritance graph, so
+/// the specific choice of subgraph does not change the result.
+AssociatedTypeDecl *RewriteContext::getAssociatedTypeForSymbol(
+    Symbol symbol, const ProtocolGraph &protos) {
+  auto found = AssocTypes.find(symbol);
+  if (found != AssocTypes.end())
+    return found->second;
+
+  assert(symbol.getKind() == Symbol::Kind::AssociatedType);
+  auto *proto = symbol.getProtocols()[0];
+  auto name = symbol.getName();
+
+  AssociatedTypeDecl *assocType = nullptr;
+
+  // Special case: handle unknown protocols, since they can appear in the
+  // invalid types that getCanonicalTypeInContext() must handle via
+  // concrete substitution; see the definition of getCanonicalTypeInContext()
+  // below for details.
+  if (!protos.isKnownProtocol(proto)) {
+    assert(symbol.getProtocols().size() == 1 &&
+           "Unknown associated type symbol must have a single protocol");
+    assocType = proto->getAssociatedType(name)->getAssociatedTypeAnchor();
+  } else {
+    // An associated type symbol [P1&P1&...&Pn:A] has one or more protocols
+    // P0...Pn and an identifier 'A'.
+    //
+    // We map it back to a AssociatedTypeDecl as follows:
+    //
+    // - For each protocol Pn, look for associated types A in Pn itself,
+    //   and all protocols that Pn refines.
+    //
+    // - For each candidate associated type An in protocol Qn where
+    //   Pn refines Qn, get the associated type anchor An' defined in
+    //   protocol Qn', where Qn refines Qn'.
+    //
+    // - Out of all the candidiate pairs (Qn', An'), pick the one where
+    //   the protocol Qn' is the lowest element according to the linear
+    //   order defined by TypeDecl::compare().
+    //
+    // The associated type An' is then the canonical associated type
+    // representative of the associated type symbol [P0&...&Pn:A].
+    //
+    for (auto *proto : symbol.getProtocols()) {
+      const auto &info = protos.getProtocolInfo(proto);
+      auto checkOtherAssocType = [&](AssociatedTypeDecl *otherAssocType) {
+        otherAssocType = otherAssocType->getAssociatedTypeAnchor();
+
+        if (otherAssocType->getName() == name &&
+            (assocType == nullptr ||
+             TypeDecl::compare(otherAssocType->getProtocol(),
+                               assocType->getProtocol()) < 0)) {
+          assocType = otherAssocType;
+        }
+      };
+
+      for (auto *otherAssocType : info.AssociatedTypes) {
+        checkOtherAssocType(otherAssocType);
+      }
+
+      for (auto *otherAssocType : info.InheritedAssociatedTypes) {
+        checkOtherAssocType(otherAssocType);
+      }
+    }
+  }
+
+  assert(assocType && "Need to look harder");
+  AssocTypes[symbol] = assocType;
+  return assocType;
+}
+
 /// Compute the interface type for a range of symbols, with an optional
 /// root type.
 ///
@@ -125,7 +209,7 @@ template<typename Iter>
 Type getTypeForSymbolRange(Iter begin, Iter end, Type root,
                            TypeArrayView<GenericTypeParamType> genericParams,
                            const ProtocolGraph &protos,
-                           ASTContext &ctx) {
+                           const RewriteContext &ctx) {
   Type result = root;
 
   auto handleRoot = [&](GenericTypeParamType *genericParam) {
@@ -155,11 +239,11 @@ Type getTypeForSymbolRange(Iter begin, Iter end, Type root,
         continue;
 
       case Symbol::Kind::Protocol:
-        handleRoot(GenericTypeParamType::get(0, 0, ctx));
+        handleRoot(GenericTypeParamType::get(0, 0, ctx.getASTContext()));
         continue;
 
       case Symbol::Kind::AssociatedType:
-        handleRoot(GenericTypeParamType::get(0, 0, ctx));
+        handleRoot(GenericTypeParamType::get(0, 0, ctx.getASTContext()));
 
         // An associated type term at the root means we have a dependent
         // member type rooted at Self; handle the associated type below.
@@ -180,68 +264,9 @@ Type getTypeForSymbolRange(Iter begin, Iter end, Type root,
     }
 
     // We should have a resolved type at this point.
-    assert(symbol.getKind() == Symbol::Kind::AssociatedType);
-    auto *proto = symbol.getProtocols()[0];
-    auto name = symbol.getName();
-
-    AssociatedTypeDecl *assocType = nullptr;
-
-    // Special case: handle unknown protocols, since they can appear in the
-    // invalid types that getCanonicalTypeInContext() must handle via
-    // concrete substitution; see the definition of getCanonicalTypeInContext()
-    // below for details.
-    if (!protos.isKnownProtocol(proto)) {
-      assert(root &&
-             "We only allow unknown protocols in getRelativeTypeForTerm()");
-      assert(symbol.getProtocols().size() == 1 &&
-             "Unknown associated type symbol must have a single protocol");
-      assocType = proto->getAssociatedType(name)->getAssociatedTypeAnchor();
-    } else {
-      // FIXME: Cache this
-      //
-      // An associated type symbol [P1&P1&...&Pn:A] has one or more protocols
-      // P0...Pn and an identifier 'A'.
-      //
-      // We map it back to a AssociatedTypeDecl as follows:
-      //
-      // - For each protocol Pn, look for associated types A in Pn itself,
-      //   and all protocols that Pn refines.
-      //
-      // - For each candidate associated type An in protocol Qn where
-      //   Pn refines Qn, get the associated type anchor An' defined in
-      //   protocol Qn', where Qn refines Qn'.
-      //
-      // - Out of all the candidiate pairs (Qn', An'), pick the one where
-      //   the protocol Qn' is the lowest element according to the linear
-      //   order defined by TypeDecl::compare().
-      //
-      // The associated type An' is then the canonical associated type
-      // representative of the associated type symbol [P0&...&Pn:A].
-      //
-      for (auto *proto : symbol.getProtocols()) {
-        const auto &info = protos.getProtocolInfo(proto);
-        auto checkOtherAssocType = [&](AssociatedTypeDecl *otherAssocType) {
-          otherAssocType = otherAssocType->getAssociatedTypeAnchor();
-
-          if (otherAssocType->getName() == name &&
-              (assocType == nullptr ||
-               TypeDecl::compare(otherAssocType->getProtocol(),
-                                 assocType->getProtocol()) < 0)) {
-            assocType = otherAssocType;
-          }
-        };
-
-        for (auto *otherAssocType : info.AssociatedTypes) {
-          checkOtherAssocType(otherAssocType);
-        }
-
-        for (auto *otherAssocType : info.InheritedAssociatedTypes) {
-          checkOtherAssocType(otherAssocType);
-        }
-      }
-    }
-
-    assert(assocType && "Need to look harder");
+    auto *assocType =
+        const_cast<RewriteContext &>(ctx)
+            .getAssociatedTypeForSymbol(symbol, protos);
     result = DependentMemberType::get(result, assocType);
   }
 
@@ -252,14 +277,14 @@ Type RewriteContext::getTypeForTerm(Term term,
                       TypeArrayView<GenericTypeParamType> genericParams,
                       const ProtocolGraph &protos) const {
   return getTypeForSymbolRange(term.begin(), term.end(), Type(),
-                               genericParams, protos, Context);
+                               genericParams, protos, *this);
 }
 
 Type RewriteContext::getTypeForTerm(const MutableTerm &term,
                       TypeArrayView<GenericTypeParamType> genericParams,
                       const ProtocolGraph &protos) const {
   return getTypeForSymbolRange(term.begin(), term.end(), Type(),
-                               genericParams, protos, Context);
+                               genericParams, protos, *this);
 }
 
 Type RewriteContext::getRelativeTypeForTerm(
@@ -270,5 +295,25 @@ Type RewriteContext::getRelativeTypeForTerm(
   auto genericParam = CanGenericTypeParamType::get(0, 0, Context);
   return getTypeForSymbolRange(
       term.begin() + prefix.size(), term.end(), genericParam,
-      { }, protos, Context);
+      { }, protos, *this);
+}
+
+/// We print stats in the destructor, which should get executed at the end of
+/// a compilation job.
+RewriteContext::~RewriteContext() {
+  if (Context.LangOpts.AnalyzeRequirementMachine) {
+    llvm::dbgs() << "--- Requirement Machine Statistics ---\n";
+    llvm::dbgs() << "\n* Symbol kind:\n";
+    SymbolHistogram.dump(llvm::dbgs(), Symbol::Kinds);
+    llvm::dbgs() << "\n* Term length:\n";
+    TermHistogram.dump(llvm::dbgs());
+    llvm::dbgs() << "\n* Rule trie fanout:\n";
+    RuleTrieHistogram.dump(llvm::dbgs());
+    llvm::dbgs() << "\n* Rule trie root fanout:\n";
+    RuleTrieRootHistogram.dump(llvm::dbgs());
+    llvm::dbgs() << "\n* Property trie fanout:\n";
+    PropertyTrieHistogram.dump(llvm::dbgs());
+    llvm::dbgs() << "\n* Property trie root fanout:\n";
+    PropertyTrieRootHistogram.dump(llvm::dbgs());
+  }
 }

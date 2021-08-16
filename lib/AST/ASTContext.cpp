@@ -394,6 +394,7 @@ struct ASTContext::Implementation {
     llvm::DenseMap<llvm::PointerIntPair<TypeBase*, 3, unsigned>,
                    ExistentialMetatypeType*> ExistentialMetatypeTypes;
     llvm::DenseMap<Type, ArraySliceType*> ArraySliceTypes;
+    llvm::DenseMap<Type, VariadicSequenceType*> VariadicSequenceTypes;
     llvm::DenseMap<std::pair<Type, Type>, DictionaryType *> DictionaryTypes;
     llvm::DenseMap<Type, OptionalType*> OptionalTypes;
     llvm::DenseMap<Type, ParenType*> SimpleParenTypes; // Most are simple
@@ -413,17 +414,6 @@ struct ASTContext::Implementation {
     llvm::FoldingSet<ProtocolCompositionType> ProtocolCompositionTypes;
     llvm::FoldingSet<LayoutConstraintInfo> LayoutConstraints;
     llvm::FoldingSet<OpaqueTypeArchetypeType> OpaqueArchetypes;
-
-    llvm::FoldingSet<GenericSignatureImpl> GenericSignatures;
-
-    /// Stored generic signature builders for canonical generic signatures.
-    llvm::DenseMap<GenericSignature, std::unique_ptr<GenericSignatureBuilder>>
-      GenericSignatureBuilders;
-
-    /// Stored requirement machines for canonical generic signatures.
-    llvm::DenseMap<GenericSignature,
-                   std::unique_ptr<rewriting::RequirementMachine>>
-      RequirementMachines;
 
     /// The set of function types.
     llvm::FoldingSet<FunctionType> FunctionTypes;
@@ -485,6 +475,12 @@ struct ASTContext::Implementation {
   llvm::FoldingSet<AutoDiffDerivativeFunctionIdentifier>
       AutoDiffDerivativeFunctionIdentifiers;
 
+  llvm::FoldingSet<GenericSignatureImpl> GenericSignatures;
+
+  /// Stored generic signature builders for canonical generic signatures.
+  llvm::DenseMap<GenericSignature, std::unique_ptr<GenericSignatureBuilder>>
+    GenericSignatureBuilders;
+
   /// A cache of information about whether particular nominal types
   /// are representable in a foreign language.
   llvm::DenseMap<NominalTypeDecl *, ForeignRepresentationInfo>
@@ -542,6 +538,14 @@ struct ASTContext::Implementation {
 
   /// Memory allocation arena for the term rewriting system.
   std::unique_ptr<rewriting::RewriteContext> TheRewriteContext;
+
+  /// Stored requirement machines for canonical generic signatures.
+  ///
+  /// This should come after TheRewriteContext above, since various destructors
+  /// compile stats in the histograms stored in our RewriteContext.
+  llvm::DenseMap<GenericSignature,
+                 std::unique_ptr<rewriting::RequirementMachine>>
+    RequirementMachines;
 };
 
 ASTContext::Implementation::Implementation()
@@ -1036,6 +1040,8 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
     M = getLoadedModule(Id_Concurrency);
     break;
   case KnownProtocolKind::DistributedActor:
+  case KnownProtocolKind::ActorTransport:
+  case KnownProtocolKind::ActorIdentity:
     M = getLoadedModule(Id_Distributed);
     break;
   default:
@@ -1839,18 +1845,6 @@ void ASTContext::addLoadedModule(ModuleDecl *M) {
   getImpl().LoadedModules[M->getName()] = M;
 }
 
-static AllocationArena getArena(GenericSignature genericSig) {
-  if (!genericSig)
-    return AllocationArena::Permanent;
-
-  if (genericSig.hasTypeVariable()) {
-    assert(false && "Unsubstituted type variable leaked into generic signature");
-    return AllocationArena::ConstraintSolver;
-  }
-
-  return AllocationArena::Permanent;
-}
-
 void ASTContext::registerGenericSignatureBuilder(
                                        GenericSignature sig,
                                        GenericSignatureBuilder &&builder) {
@@ -1858,9 +1852,7 @@ void ASTContext::registerGenericSignatureBuilder(
     return;
 
   auto canSig = sig.getCanonicalSignature();
-  auto arena = getArena(sig);
-  auto &genericSignatureBuilders =
-      getImpl().getArena(arena).GenericSignatureBuilders;
+  auto &genericSignatureBuilders = getImpl().GenericSignatureBuilders;
   auto known = genericSignatureBuilders.find(canSig);
   if (known != genericSignatureBuilders.end()) {
     ++NumRegisteredGenericSignatureBuildersAlready;
@@ -1882,9 +1874,7 @@ GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
 
   // Check whether we already have a generic signature builder for this
   // signature and module.
-  auto arena = getArena(sig);
-  auto &genericSignatureBuilders =
-      getImpl().getArena(arena).GenericSignatureBuilders;
+  auto &genericSignatureBuilders = getImpl().GenericSignatureBuilders;
   auto known = genericSignatureBuilders.find(sig);
   if (known != genericSignatureBuilders.end())
     return known->second.get();
@@ -1962,16 +1952,13 @@ GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
 
 rewriting::RequirementMachine *
 ASTContext::getOrCreateRequirementMachine(CanGenericSignature sig) {
-  assert(!sig.hasTypeVariable());
-
   auto &rewriteCtx = getImpl().TheRewriteContext;
   if (!rewriteCtx)
     rewriteCtx.reset(new rewriting::RewriteContext(*this));
 
   // Check whether we already have a requirement machine for this
   // signature.
-  auto arena = getArena(sig);
-  auto &machines = getImpl().getArena(arena).RequirementMachines;
+  auto &machines = getImpl().RequirementMachines;
 
   auto &machinePtr = machines[sig];
   if (machinePtr) {
@@ -2003,8 +1990,7 @@ bool ASTContext::isRecursivelyConstructingRequirementMachine(
   if (!rewriteCtx)
     return false;
 
-  auto arena = getArena(sig);
-  auto &machines = getImpl().getArena(arena).RequirementMachines;
+  auto &machines = getImpl().RequirementMachines;
 
   auto found = machines.find(sig);
   if (found == machines.end())
@@ -2586,6 +2572,7 @@ size_t ASTContext::Implementation::Arena::getTotalMemory() const {
     llvm::capacity_in_bytes(ArraySliceTypes) +
     llvm::capacity_in_bytes(DictionaryTypes) +
     llvm::capacity_in_bytes(OptionalTypes) +
+    llvm::capacity_in_bytes(VariadicSequenceTypes) +
     llvm::capacity_in_bytes(SimpleParenTypes) +
     llvm::capacity_in_bytes(ParenTypes) +
     llvm::capacity_in_bytes(ReferenceStorageTypes) +
@@ -3469,7 +3456,7 @@ Type AnyFunctionType::Param::getParameterType(bool forCanonical,
     else if (forCanonical)
       type = BoundGenericType::get(arrayDecl, Type(), {type});
     else
-      type = ArraySliceType::get(type);
+      type = VariadicSequenceType::get(type);
   }
   return type;
 }
@@ -4041,6 +4028,18 @@ ArraySliceType *ArraySliceType::get(Type base) {
   return entry = new (C, arena) ArraySliceType(C, base, properties);
 }
 
+VariadicSequenceType *VariadicSequenceType::get(Type base) {
+  auto properties = base->getRecursiveProperties();
+  auto arena = getArena(properties);
+
+  const ASTContext &C = base->getASTContext();
+
+  VariadicSequenceType *&entry = C.getImpl().getArena(arena).VariadicSequenceTypes[base];
+  if (entry) return entry;
+
+  return entry = new (C, arena) VariadicSequenceType(C, base, properties);
+}
+
 DictionaryType *DictionaryType::get(Type keyType, Type valueType) {
   auto properties = keyType->getRecursiveProperties() 
                   | valueType->getRecursiveProperties();
@@ -4489,21 +4488,21 @@ GenericSignature::get(TypeArrayView<GenericTypeParamType> params,
   assert(!params.empty());
 
 #ifndef NDEBUG
-  for (auto req : requirements)
+  for (auto req : requirements) {
     assert(req.getFirstType()->isTypeParameter());
+    assert(!req.getFirstType()->hasTypeVariable());
+    assert(req.getKind() == RequirementKind::Layout ||
+           !req.getSecondType()->hasTypeVariable());
+  }
 #endif
 
   // Check for an existing generic signature.
   llvm::FoldingSetNodeID ID;
   GenericSignatureImpl::Profile(ID, params, requirements);
 
-  auto arena = GenericSignature::hasTypeVariable(requirements)
-                   ? AllocationArena::ConstraintSolver
-                   : AllocationArena::Permanent;
-
   auto &ctx = getASTContext(params, requirements);
   void *insertPos;
-  auto &sigs = ctx.getImpl().getArena(arena).GenericSignatures;
+  auto &sigs = ctx.getImpl().GenericSignatures;
   if (auto *sig = sigs.FindNodeOrInsertPos(ID, insertPos)) {
     if (isKnownCanonical)
       sig->CanonicalSignatureOrASTContext = &ctx;
@@ -4518,7 +4517,7 @@ GenericSignature::get(TypeArrayView<GenericTypeParamType> params,
   void *mem = ctx.Allocate(bytes, alignof(GenericSignatureImpl));
   auto *newSig =
       new (mem) GenericSignatureImpl(params, requirements, isKnownCanonical);
-  ctx.getImpl().getArena(arena).GenericSignatures.InsertNode(newSig, insertPos);
+  ctx.getImpl().GenericSignatures.InsertNode(newSig, insertPos);
   return newSig;
 }
 

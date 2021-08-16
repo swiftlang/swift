@@ -459,6 +459,14 @@ void ASTMangler::beginManglingWithAutoDiffOriginalFunction(
     appendOperator(attr->Name);
     return;
   }
+  // For imported Clang declarations, use the Clang name in order to match how
+  // DifferentiationMangler handles these.
+  auto clangDecl = getClangDeclForMangling(afd);
+  if (clangDecl) {
+    beginManglingWithoutPrefix();
+    appendOperator(clangDecl->getName());
+    return;
+  }
   beginMangling();
   if (auto *cd = dyn_cast<ConstructorDecl>(afd))
     appendConstructorEntity(cd, /*isAllocating*/ !cd->isConvenienceInit());
@@ -1129,6 +1137,12 @@ void ASTMangler::appendType(Type type, const ValueDecl *forDecl) {
     case TypeKind::ArraySlice:
       assert(DWARFMangling && "sugared types are only legal for the debugger");
       appendType(cast<ArraySliceType>(tybase)->getBaseType());
+      appendOperator("XSa");
+      return;
+
+    case TypeKind::VariadicSequence:
+      assert(DWARFMangling && "sugared types are only legal for the debugger");
+      appendType(cast<VariadicSequenceType>(tybase)->getBaseType());
       appendOperator("XSa");
       return;
 
@@ -2138,10 +2152,10 @@ void ASTMangler::appendContext(const DeclContext *ctx, StringRef useModuleName) 
       auto wrapperInit = cast<PropertyWrapperInitializer>(ctx);
       switch (wrapperInit->getKind()) {
       case PropertyWrapperInitializer::Kind::WrappedValue:
-        appendBackingInitializerEntity(wrapperInit->getParam());
+        appendBackingInitializerEntity(wrapperInit->getWrappedVar());
         break;
       case PropertyWrapperInitializer::Kind::ProjectedValue:
-        appendInitFromProjectedValueEntity(wrapperInit->getParam());
+        appendInitFromProjectedValueEntity(wrapperInit->getWrappedVar());
         break;
       }
       return;

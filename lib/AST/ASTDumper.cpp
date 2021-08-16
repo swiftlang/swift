@@ -3840,6 +3840,12 @@ namespace {
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
+    void visitVariadicSequenceType(VariadicSequenceType *T, StringRef label) {
+      printCommon(label, "variadic_sequence_type");
+      printRec(T->getBaseType());
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+    }
+
     void visitProtocolCompositionType(ProtocolCompositionType *T,
                                       StringRef label) {
       printCommon(label, "protocol_composition_type");

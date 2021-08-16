@@ -2306,20 +2306,19 @@ namespace {
     /// name importing options (e.g., if we're importing the Swift 2 version).
     ///
     /// Note: Use this rather than calling Impl.importFullName directly!
-    ImportedName importFullName(const clang::NamedDecl *D,
-                                Optional<ImportedName> &correctSwiftName) {
+    std::pair<ImportedName, Optional<ImportedName>>
+    importFullName(const clang::NamedDecl *D) {
       ImportNameVersion canonicalVersion = getActiveSwiftVersion();
       if (isa<clang::TypeDecl>(D) || isa<clang::ObjCContainerDecl>(D)) {
         canonicalVersion = ImportNameVersion::forTypes();
       }
-      correctSwiftName = None;
 
       // First, import based on the Swift name of the canonical declaration:
       // the latest version for types and the current version for non-type
       // values. If that fails, we won't do anything.
       auto canonicalName = Impl.importFullName(D, canonicalVersion);
       if (!canonicalName)
-        return ImportedName();
+        return {ImportedName(), None};
 
       if (getVersion() == canonicalVersion) {
         // Make sure we don't try to import the same type twice as canonical.
@@ -2329,11 +2328,11 @@ namespace {
               activeName.getDeclName() == canonicalName.getDeclName() &&
               activeName.getEffectiveContext().equalsWithoutResolving(
                   canonicalName.getEffectiveContext())) {
-            return ImportedName();
+            return {ImportedName(), None};
           }
         }
 
-        return canonicalName;
+        return {canonicalName, None};
       }
 
       // Special handling when we import using the alternate Swift name.
@@ -2343,7 +2342,7 @@ namespace {
       // Swift name stub declaration.
       auto alternateName = Impl.importFullName(D, getVersion());
       if (!alternateName)
-        return ImportedName();
+        return {ImportedName(), None};
 
       // Importing for concurrency is special in that the same declaration
       // is imported both with a completion handler parameter and as 'async',
@@ -2352,10 +2351,10 @@ namespace {
         // If the resulting name isn't special for concurrency, it's not
         // different.
         if (!alternateName.getAsyncInfo())
-          return ImportedName();
+          return {ImportedName(), None};
 
         // Otherwise, it's a legitimately different import.
-        return alternateName;
+        return {alternateName, None};
       }
 
       if (alternateName.getDeclName() == canonicalName.getDeclName() &&
@@ -2363,17 +2362,18 @@ namespace {
               canonicalName.getEffectiveContext())) {
         if (getVersion() == getActiveSwiftVersion()) {
           assert(canonicalVersion != getActiveSwiftVersion());
-          return alternateName;
+          return {alternateName, None};
         }
-        return ImportedName();
+        return {ImportedName(), None};
       }
 
       // Always use the active version as the preferred name, even if the
       // canonical name is a different version.
-      correctSwiftName = Impl.importFullName(D, getActiveSwiftVersion());
+      ImportedName correctSwiftName =
+          Impl.importFullName(D, getActiveSwiftVersion());
       assert(correctSwiftName);
 
-      return alternateName;
+      return {alternateName, correctSwiftName};
     }
 
     /// Create a declaration name for anonymous enums, unions and
@@ -2384,21 +2384,22 @@ namespace {
     /// is derived from the name of the field in the outer type. Since the
     /// anonymous type is imported as a nested type of the outer type, this
     /// generated name will most likely be unique.
-    ImportedName getClangDeclName(const clang::TagDecl *decl,
-                                  Optional<ImportedName> &correctSwiftName) {
+    std::pair<ImportedName, Optional<ImportedName>>
+    getClangDeclName(const clang::TagDecl *decl) {
       // If we have a name for this declaration, use it.
-      if (auto name = importFullName(decl, correctSwiftName))
-        return name;
+      auto result = importFullName(decl);
+      if (result.first)
+        return result;
 
       // If that didn't succeed, check whether this is an anonymous tag declaration
       // with a corresponding typedef-name declaration.
       if (decl->getDeclName().isEmpty()) {
         if (auto *typedefForAnon = decl->getTypedefNameForAnonDecl())
-          return importFullName(typedefForAnon, correctSwiftName);
+          return importFullName(typedefForAnon);
       }
 
       if (!decl->isRecord())
-        return ImportedName();
+        return {ImportedName(), None};
 
       // If the type has no name and no structure name, but is not anonymous,
       // generate a name for it. Specifically this is for cases like:
@@ -2407,7 +2408,6 @@ namespace {
       //   }
       // Where the member z is an unnamed struct, but does have a member-name
       // and is accessible as a member of struct a.
-      correctSwiftName = None;
       if (auto recordDecl = dyn_cast<clang::RecordDecl>(
                               decl->getLexicalDeclContext())) {
         for (auto field : recordDecl->fields()) {
@@ -2435,12 +2435,12 @@ namespace {
             ImportedName Result;
             Result.setDeclName(Impl.SwiftContext.getIdentifier(IdStream.str()));
             Result.setEffectiveContext(decl->getDeclContext());
-            return Result;
+            return {Result, None};
           }
         }
       }
       
-      return ImportedName();
+      return {ImportedName(), None};
     }
 
     bool isFactoryInit(ImportedName &name) {
@@ -2510,8 +2510,8 @@ namespace {
       // new enum in the "__ObjC" module.
       if (!enumDecl) {
         // If we don't have a name for this declaration, bail.
-        Optional<ImportedName> correctSwiftName;
-        auto importedName = importFullName(decl, correctSwiftName);
+        ImportedName importedName;
+        std::tie(importedName, std::ignore) = importFullName(decl);
         if (!importedName)
           return nullptr;
 
@@ -2529,8 +2529,8 @@ namespace {
             Impl.ImportedDecls.end())
           continue;
 
-        Optional<ImportedName> correctSwiftName;
-        auto importedName = importFullName(redecl, correctSwiftName);
+        ImportedName importedName;
+        std::tie(importedName, std::ignore) = importFullName(redecl);
         if (!importedName)
           continue;
 
@@ -2616,8 +2616,9 @@ namespace {
     }
 
     Decl *VisitNamespaceAliasDecl(const clang::NamespaceAliasDecl *decl) {
+      ImportedName importedName;
       Optional<ImportedName> correctSwiftName;
-      auto importedName = importFullName(decl, correctSwiftName);
+      std::tie(importedName, correctSwiftName) = importFullName(decl);
       auto name = importedName.getDeclName().getBaseIdentifier();
       if (name.empty())
         return nullptr;
@@ -2757,8 +2758,9 @@ namespace {
                              DeclContext *dc, Identifier name);
 
     Decl *VisitTypedefNameDecl(const clang::TypedefNameDecl *Decl) {
+      ImportedName importedName;
       Optional<ImportedName> correctSwiftName;
-      auto importedName = importFullName(Decl, correctSwiftName);
+      std::tie(importedName, correctSwiftName) = importFullName(Decl);
       auto Name = importedName.getDeclName().getBaseIdentifier();
       if (Name.empty())
         return nullptr;
@@ -2972,8 +2974,9 @@ namespace {
       if (Impl.isOverAligned(decl))
         return nullptr;
 
+      ImportedName importedName;
       Optional<ImportedName> correctSwiftName;
-      auto importedName = getClangDeclName(decl, correctSwiftName);
+      std::tie(importedName, correctSwiftName) = getClangDeclName(decl);
       if (!importedName)
         return nullptr;
 
@@ -3483,8 +3486,9 @@ namespace {
       }
 
       // Import the name.
+      ImportedName importedName;
       Optional<ImportedName> correctSwiftName;
-      auto importedName = getClangDeclName(decl, correctSwiftName);
+      std::tie(importedName, correctSwiftName) = getClangDeclName(decl);
       if (!importedName)
         return nullptr;
 
@@ -3887,8 +3891,9 @@ namespace {
     Decl *VisitEnumConstantDecl(const clang::EnumConstantDecl *decl) {
       auto clangEnum = cast<clang::EnumDecl>(decl->getDeclContext());
 
+      ImportedName importedName;
       Optional<ImportedName> correctSwiftName;
-      auto importedName = importFullName(decl, correctSwiftName);
+      std::tie(importedName, correctSwiftName) = importFullName(decl);
       if (!importedName) return nullptr;
 
       auto name = importedName.getDeclName().getBaseIdentifier();
@@ -3956,8 +3961,9 @@ namespace {
     }
 
     Decl *VisitIndirectFieldDecl(const clang::IndirectFieldDecl *decl) {
+      ImportedName importedName;
       Optional<ImportedName> correctSwiftName;
-      auto importedName = importFullName(decl, correctSwiftName);
+      std::tie(importedName, correctSwiftName) = importFullName(decl);
       if (!importedName) return nullptr;
 
       auto name = importedName.getDeclName().getBaseIdentifier();
@@ -4032,8 +4038,9 @@ namespace {
 
     Decl *VisitFunctionDecl(const clang::FunctionDecl *decl) {
       // Import the name of the function.
+      ImportedName importedName;
       Optional<ImportedName> correctSwiftName;
-      auto importedName = importFullName(decl, correctSwiftName);
+      std::tie(importedName, correctSwiftName) = importFullName(decl);
       if (!importedName)
         return nullptr;
 
@@ -4322,7 +4329,7 @@ namespace {
       ImportedName importedName;
 
       if (!decl->isAnonymousStructOrUnion() && !decl->getDeclName().isEmpty()) {
-        importedName = importFullName(decl, correctSwiftName);
+        std::tie(importedName, correctSwiftName) = importFullName(decl);
         if (!importedName) {
           return nullptr;
         }
@@ -4438,8 +4445,9 @@ namespace {
 
     Decl *VisitVarDecl(const clang::VarDecl *decl) {
       // Variables are imported as... variables.
+      ImportedName importedName;
       Optional<ImportedName> correctSwiftName;
-      auto importedName = importFullName(decl, correctSwiftName);
+      std::tie(importedName, correctSwiftName) = importFullName(decl);
       if (!importedName) return nullptr;
 
       auto name = importedName.getDeclName().getBaseIdentifier();
@@ -4533,9 +4541,10 @@ namespace {
     }
 
     Decl *VisitFunctionTemplateDecl(const clang::FunctionTemplateDecl *decl) {
+      ImportedName importedName;
       Optional<ImportedName> correctSwiftName;
-      auto importedName =
-          importFullName(decl->getAsFunction(), correctSwiftName);
+      std::tie(importedName, correctSwiftName) =
+          importFullName(decl->getAsFunction());
       if (!importedName)
         return nullptr;
       // All template parameters must be template type parameters.
@@ -4558,8 +4567,8 @@ namespace {
         }
       }
 
-      Optional<ImportedName> correctSwiftName;
-      auto importedName = importFullName(decl, correctSwiftName);
+      ImportedName importedName;
+      std::tie(importedName, std::ignore) = importFullName(decl);
       auto name = importedName.getDeclName().getBaseIdentifier();
       if (name.empty())
         return nullptr;
@@ -4594,8 +4603,9 @@ namespace {
       if (!isa<clang::TypeDecl>(decl->getUnderlyingDecl()))
         return nullptr;
         
+      ImportedName importedName;
       Optional<ImportedName> correctSwiftName;
-      auto importedName = importFullName(decl, correctSwiftName);
+      std::tie(importedName, correctSwiftName) = importFullName(decl);
       auto Name = importedName.getDeclName().getBaseIdentifier();
       if (Name.empty())
         return nullptr;
@@ -4676,8 +4686,7 @@ namespace {
         return Known;
 
       ImportedName importedName;
-      Optional<ImportedName> correctSwiftName; // TODO: not sure if we need this.
-      importedName = importFullName(decl, correctSwiftName);
+      std::tie(importedName, std::ignore) = importFullName(decl);
       if (!importedName)
         return nullptr;
 
@@ -4877,7 +4886,7 @@ namespace {
 
       ImportedName importedName;
       Optional<ImportedName> correctSwiftName;
-      importedName = importFullName(decl, correctSwiftName);
+      std::tie(importedName, correctSwiftName) = importFullName(decl);
       if (!importedName)
         return nullptr;
 
@@ -5442,8 +5451,9 @@ namespace {
     }
 
     Decl *VisitObjCProtocolDecl(const clang::ObjCProtocolDecl *decl) {
+      ImportedName importedName;
       Optional<ImportedName> correctSwiftName;
-      auto importedName = importFullName(decl, correctSwiftName);
+      std::tie(importedName, correctSwiftName) = importFullName(decl);
       if (!importedName) return nullptr;
 
       // If we've been asked to produce a compatibility stub, handle it via a
@@ -5560,8 +5570,9 @@ namespace {
       if (auto *definition = decl->getDefinition())
         decl = definition;
 
+      ImportedName importedName;
       Optional<ImportedName> correctSwiftName;
-      auto importedName = importFullName(decl, correctSwiftName);
+      std::tie(importedName, correctSwiftName) = importFullName(decl);
       if (!importedName) return nullptr;
 
       // If we've been asked to produce a compatibility stub, handle it via a
@@ -5760,10 +5771,10 @@ namespace {
                                 DeclContext *dc) {
       assert(dc);
 
+      ImportedName importedName;
       Optional<ImportedName> correctSwiftName;
-      auto name = importFullName(decl, correctSwiftName)
-                      .getDeclName()
-                      .getBaseIdentifier();
+      std::tie(importedName, correctSwiftName) = importFullName(decl);
+      auto name = importedName.getDeclName().getBaseIdentifier();
       if (name.empty())
         return nullptr;
 
@@ -5897,8 +5908,8 @@ namespace {
       auto dc = Impl.importDeclContextOf(decl, effectiveContext);
       if (!dc) return nullptr;
 
-      Optional<ImportedName> correctSwiftName;
-      auto importedName = importFullName(decl, correctSwiftName);
+      ImportedName importedName;
+      std::tie(importedName, std::ignore) = importFullName(decl);
       auto name = importedName.getDeclName().getBaseIdentifier();
 
       if (name.empty()) return nullptr;
@@ -6377,9 +6388,10 @@ Decl *SwiftDeclConverter::importEnumCase(const clang::EnumConstantDecl *decl,
                                          EnumDecl *theEnum,
                                          Decl *correctDecl) {
   auto &context = Impl.SwiftContext;
+  ImportedName importedName;
   Optional<ImportedName> correctSwiftName;
-  auto name =
-      importFullName(decl, correctSwiftName).getDeclName().getBaseIdentifier();
+  std::tie(importedName, correctSwiftName) = importFullName(decl);
+  auto name = importedName.getDeclName().getBaseIdentifier();
   if (name.empty())
     return nullptr;
 
@@ -6433,8 +6445,9 @@ Decl *
 SwiftDeclConverter::importOptionConstant(const clang::EnumConstantDecl *decl,
                                          const clang::EnumDecl *clangEnum,
                                          NominalTypeDecl *theStruct) {
+  ImportedName nameInfo;
   Optional<ImportedName> correctSwiftName;
-  ImportedName nameInfo = importFullName(decl, correctSwiftName);
+  std::tie(nameInfo, correctSwiftName) = importFullName(decl);
   Identifier name = nameInfo.getDeclName().getBaseIdentifier();
   if (name.empty())
     return nullptr;
@@ -6677,7 +6690,7 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
 
     if (!getter) {
       // Find the self index for the getter.
-      getterName = importFullName(function, swift3GetterName);
+      std::tie(getterName, swift3GetterName) = importFullName(function);
       if (!getterName)
         continue;
 
@@ -6687,7 +6700,7 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
 
     if (!setter) {
       // Find the self index for the setter.
-      setterName = importFullName(function, swift3SetterName);
+      std::tie(setterName, swift3SetterName) = importFullName(function);
       if (!setterName)
         continue;
 
@@ -6821,8 +6834,9 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
   if (known != Impl.Constructors.end())
     return known->second;
 
+  ImportedName importedName;
   Optional<ImportedName> correctSwiftName;
-  auto importedName = importFullName(objcMethod, correctSwiftName);
+  std::tie(importedName, correctSwiftName) = importFullName(objcMethod);
   if (!importedName)
     return nullptr;
 
@@ -8321,9 +8335,9 @@ void SwiftDeclConverter::importInheritedConstructors(
     if (objcMethod->isClassMethod()) {
       assert(ctor->getInitKind() == CtorInitializerKind::ConvenienceFactory);
 
+      ImportedName importedName;
       Optional<ImportedName> correctSwiftName;
-      ImportedName importedName =
-          importFullName(objcMethod, correctSwiftName);
+      std::tie(importedName, correctSwiftName) = importFullName(objcMethod);
       assert(
           !correctSwiftName &&
           "Import inherited initializers never references correctSwiftName");

@@ -47,12 +47,12 @@ RequirementMachine::getLocalRequirements(
     return result;
 
   if (props->isConcreteType()) {
-    result.concreteType = props->getConcreteType({}, protos, Context);
+    result.concreteType = props->getConcreteType({}, term, protos, Context);
     return result;
   }
 
   if (props->hasSuperclassBound()) {
-    result.superclass = props->getSuperclassBound({}, protos, Context);
+    result.superclass = props->getSuperclassBound({}, term, protos, Context);
   }
 
   for (const auto *proto : props->getConformsToExcludingSuperclassConformances())
@@ -153,7 +153,7 @@ Type RequirementMachine::getSuperclassBound(Type depType) const {
     return Type();
 
   auto &protos = System.getProtocols();
-  return props->getSuperclassBound({ }, protos, Context);
+  return props->getSuperclassBound({ }, term, protos, Context);
 }
 
 bool RequirementMachine::isConcreteType(Type depType) const {
@@ -183,7 +183,7 @@ Type RequirementMachine::getConcreteType(Type depType) const {
     return Type();
 
   auto &protos = System.getProtocols();
-  return props->getConcreteType({ }, protos, Context);
+  return props->getConcreteType({ }, term, protos, Context);
 }
 
 bool RequirementMachine::areSameTypeParameterInContext(Type depType1,
@@ -346,14 +346,33 @@ Type RequirementMachine::getCanonicalTypeInContext(
       verify(prefix);
 
       auto *props = Map.lookUpProperties(prefix);
-      if (props && props->isConcreteType()) {
-        auto concreteType = props->getConcreteType(genericParams,
-                                                   protos, Context);
-        if (!concreteType->hasTypeParameter())
-          return concreteType;
+      if (props) {
+        if (props->isConcreteType()) {
+          auto concreteType = props->getConcreteType(genericParams,
+                                                     prefix, protos,
+                                                     Context);
+          if (!concreteType->hasTypeParameter())
+            return concreteType;
 
-        // FIXME: Recursion guard is needed here
-        return getCanonicalTypeInContext(concreteType, genericParams);
+          // FIXME: Recursion guard is needed here
+          return getCanonicalTypeInContext(concreteType, genericParams);
+        }
+
+        // Skip this part if the entire input term is valid, because in that
+        // case we don't want to replace the term with its superclass bound;
+        // unlike a fixed concrete type, the superclass bound only comes into
+        // play when looking up a member type.
+        if (props->hasSuperclassBound() &&
+            prefix.size() != term.size()) {
+          auto superclass = props->getSuperclassBound(genericParams,
+                                                      prefix, protos,
+                                                      Context);
+          if (!superclass->hasTypeParameter())
+            return superclass;
+
+          // FIXME: Recursion guard is needed here
+          return getCanonicalTypeInContext(superclass, genericParams);
+        }
       }
 
       return Context.getTypeForTerm(prefix, genericParams, protos);
@@ -554,35 +573,6 @@ RequirementMachine::getConformanceAccessPath(Type type,
       }
     }
   }
-}
-
-/// Compare two associated types.
-static int compareAssociatedTypes(AssociatedTypeDecl *assocType1,
-                                  AssociatedTypeDecl *assocType2) {
-  // - by name.
-  if (int result = assocType1->getName().str().compare(
-                                              assocType2->getName().str()))
-    return result;
-
-  // Prefer an associated type with no overrides (i.e., an anchor) to one
-  // that has overrides.
-  bool hasOverridden1 = !assocType1->getOverriddenDecls().empty();
-  bool hasOverridden2 = !assocType2->getOverriddenDecls().empty();
-  if (hasOverridden1 != hasOverridden2)
-    return hasOverridden1 ? +1 : -1;
-
-  // - by protocol, so t_n_m.`P.T` < t_n_m.`Q.T` (given P < Q)
-  auto proto1 = assocType1->getProtocol();
-  auto proto2 = assocType2->getProtocol();
-  if (int compareProtocols = TypeDecl::compare(proto1, proto2))
-    return compareProtocols;
-
-  // Error case: if we have two associated types with the same name in the
-  // same protocol, just tie-break based on address.
-  if (assocType1 != assocType2)
-    return assocType1 < assocType2 ? -1 : +1;
-
-  return 0;
 }
 
 static void lookupConcreteNestedType(NominalTypeDecl *decl,

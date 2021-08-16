@@ -40,8 +40,10 @@ extern unsigned long long swift_reflection_classIsSwiftMask;
 /// presence of a bug fix or feature that can't be detected from the outside
 /// otherwise. The currently used version numbers are:
 ///
-/// 0 - Indicates that swift_reflection_iterateAsyncTaskAllocations has been
-///     fixed to use the right AsyncTask layout.
+/// 0 - Indicates that swift_reflection_iterateAsyncTaskAllocations has the
+///     first attempted fix to use the right AsyncTask layout.
+/// 1 - Indicates that swift_reflection_iterateAsyncTaskAllocations has been
+///     actually fixed to use the right AsyncTask layout.
 SWIFT_REMOTE_MIRROR_LINKAGE extern uint32_t swift_reflection_libraryVersion;
 
 /// Get the metadata version supported by the Remote Mirror library.

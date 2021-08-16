@@ -14,7 +14,9 @@
 
 
 // Don't change the .priors mod time
-// RUN: touch -t 201401240005 %t/*{swift,swiftdeps,json}
+// RUN: touch -t 201401240005 %t/*swift
+// RUN: touch -t 201401240005 %t/*swiftdeps
+// RUN: touch -t 201401240005 %t/*json
 // RUN: touch -t 201401240006 %t/*.o
 // RUN: touch -t 201401240004 %t/*-external
 // RUN: rm %t/other1-external
@@ -32,7 +34,9 @@
 
 
 // Don't change the .priors mod time
-// RUN: touch -t 201401240005 %t/*{swift,swiftdeps,json}
+// RUN: touch -t 201401240005 %t/*swift
+// RUN: touch -t 201401240005 %t/*swiftdeps
+// RUN: touch -t 201401240005 %t/*json
 // RUN: touch -t 201401240006 %t/*.o
 // RUN: touch -t 201401240004 %t/*-external
 // RUN: rm %t/main1-external

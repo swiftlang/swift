@@ -1557,11 +1557,11 @@ private:
     unsigned numEltTypes = params.size();
 
     bool hasSelf =
-        (extInfoBuilder.hasSelfParam() || Foreign.Self.isImportAsMember());
+        (extInfoBuilder.hasSelfParam() || Foreign.self.isImportAsMember());
     unsigned numNonSelfParams = (hasSelf ? numEltTypes - 1 : numEltTypes);
     TopLevelOrigType = origType;
     // If we have a foreign-self, install handleSelf as the handler.
-    if (Foreign.Self.isInstance()) {
+    if (Foreign.self.isInstance()) {
       assert(hasSelf && numEltTypes > 0);
       ForeignSelf = ForeignSelfInfo{origType.getFunctionParamType(numNonSelfParams),
                                     params[numNonSelfParams]};
@@ -1582,7 +1582,7 @@ private:
 
     // Process the self parameter.  Note that we implicitly drop self
     // if this is a static foreign-self import.
-    if (hasSelf && !Foreign.Self.isImportAsMember()) {
+    if (hasSelf && !Foreign.self.isImportAsMember()) {
       auto selfParam = params[numNonSelfParams];
       auto ty = selfParam.getParameterType();
       auto eltPattern = origType.getFunctionParamType(numNonSelfParams);
@@ -1670,12 +1670,13 @@ private:
   }
   
   bool maybeAddForeignAsyncParameter() {
-    if (!Foreign.Async
-        || NextOrigParamIndex != Foreign.Async->completionHandlerParamIndex())
+    if (!Foreign.async ||
+        NextOrigParamIndex != Foreign.async->completionHandlerParamIndex())
       return false;
-    
-    CanType foreignCHTy = TopLevelOrigType
-      .getObjCMethodAsyncCompletionHandlerForeignType(Foreign.Async.getValue(), TC);
+
+    CanType foreignCHTy =
+        TopLevelOrigType.getObjCMethodAsyncCompletionHandlerForeignType(
+            Foreign.async.getValue(), TC);
     auto completionHandlerOrigTy = TopLevelOrigType.getObjCMethodAsyncCompletionHandlerType(foreignCHTy);
     auto completionHandlerTy = TC.getLoweredType(completionHandlerOrigTy,
                                                  foreignCHTy, expansion)
@@ -1687,17 +1688,12 @@ private:
   }
 
   bool maybeAddForeignErrorParameter() {
-    // A foreign async convention absorbs any error parameter, making it into
-    // an argument to the callback.
-    if (Foreign.Async)
-      return false;
-    
-    if (!Foreign.Error ||
-        NextOrigParamIndex != Foreign.Error->getErrorParameterIndex())
+    if (!Foreign.error ||
+        NextOrigParamIndex != Foreign.error->getErrorParameterIndex())
       return false;
 
     auto foreignErrorTy = TC.getLoweredRValueType(
-        expansion, Foreign.Error->getErrorParameterType());
+        expansion, Foreign.error->getErrorParameterType());
 
     // Assume the error parameter doesn't have interesting lowering.
     Inputs.push_back(SILParameterInfo(foreignErrorTy,
@@ -1707,8 +1703,8 @@ private:
   }
 
   bool maybeAddForeignSelfParameter() {
-    if (!Foreign.Self.isInstance() ||
-        NextOrigParamIndex != Foreign.Self.getSelfIndex())
+    if (!Foreign.self.isInstance() ||
+        NextOrigParamIndex != Foreign.self.getSelfIndex())
       return false;
 
     if (ForeignSelf) {
@@ -1759,27 +1755,27 @@ void updateResultTypeForForeignInfo(
     const ForeignInfo &foreignInfo, CanGenericSignature genericSig,
     AbstractionPattern &origResultType, CanType &substFormalResultType) {
   // If there's no error or async convention, the return type is unchanged.
-  if (!foreignInfo.Async && !foreignInfo.Error) {
+  if (!foreignInfo.async && !foreignInfo.error) {
     return;
   }
-  
-  // A foreign async convention means our lowered return type is Void, since
-  // the imported semantic return and/or error type map to the completion
-  // callback's argument(s).
-  auto &C = substFormalResultType->getASTContext();
-  if (auto async = foreignInfo.Async) {
+
+  // A foreign async convention without an error convention means our lowered
+  // return type is Void, since the imported semantic return map to the
+  // completion callback's argument(s).
+  if (!foreignInfo.error) {
+    auto &C = substFormalResultType->getASTContext();
     substFormalResultType = TupleType::getEmpty(C);
     origResultType = AbstractionPattern(genericSig, substFormalResultType);
     return;
   }
-  
+
   // Otherwise, adjust the return type to match the foreign error convention.
-  auto convention = *foreignInfo.Error;
+  auto convention = *foreignInfo.error;
   switch (convention.getKind()) {
   // These conventions replace the result type.
   case ForeignErrorConvention::ZeroResult:
   case ForeignErrorConvention::NonZeroResult:
-    assert(substFormalResultType->isVoid());
+    assert(substFormalResultType->isVoid() || foreignInfo.async);
     substFormalResultType = convention.getResultType();
     origResultType = AbstractionPattern(genericSig, substFormalResultType);
     return;
@@ -2086,27 +2082,25 @@ static CanSILFunctionType getSILFunctionType(
 
   Optional<SILResultInfo> errorResult;
   assert(
-      (!foreignInfo.Error || substFnInterfaceType->getExtInfo().isThrowing())
-      && "foreignError was set but function type does not throw?");
-  assert(
-      (!foreignInfo.Async || substFnInterfaceType->getExtInfo().isAsync())
-      && "foreignAsync was set but function type is not async?");
+      (!foreignInfo.error || substFnInterfaceType->getExtInfo().isThrowing()) &&
+      "foreignError was set but function type does not throw?");
+  assert((!foreignInfo.async || substFnInterfaceType->getExtInfo().isAsync()) &&
+         "foreignAsync was set but function type is not async?");
 
   // Map '@Sendable' to the appropriate `@Sendable` modifier.
   bool isSendable = substFnInterfaceType->getExtInfo().isSendable();
 
   // Map 'async' to the appropriate `@async` modifier.
   bool isAsync = false;
-  if (substFnInterfaceType->getExtInfo().isAsync() && !foreignInfo.Async) {
+  if (substFnInterfaceType->getExtInfo().isAsync() && !foreignInfo.async) {
     assert(!origType.isForeign()
            && "using native Swift async for foreign type!");
     isAsync = true;
   }
-  
+
   // Map 'throws' to the appropriate error convention.
-  if (substFnInterfaceType->getExtInfo().isThrowing()
-      && !foreignInfo.Error
-      && !foreignInfo.Async) {
+  if (substFnInterfaceType->getExtInfo().isThrowing() && !foreignInfo.error &&
+      !foreignInfo.async) {
     assert(!origType.isForeign()
            && "using native Swift error convention for foreign type!");
     SILType exnType = SILType::getExceptionType(TC.Context);
@@ -2892,10 +2886,8 @@ static CanSILFunctionType getSILFunctionTypeForClangDecl(
     SILExtInfoBuilder extInfoBuilder, const ForeignInfo &foreignInfo,
     Optional<SILDeclRef> constant) {
   if (auto method = dyn_cast<clang::ObjCMethodDecl>(clangDecl)) {
-    auto origPattern =
-      AbstractionPattern::getObjCMethod(origType, method,
-                                        foreignInfo.Error,
-                                        foreignInfo.Async);
+    auto origPattern = AbstractionPattern::getObjCMethod(
+        origType, method, foreignInfo.error, foreignInfo.async);
     return getSILFunctionType(
         TC, TypeExpansionContext::minimal(), origPattern, substInterfaceType,
         extInfoBuilder, ObjCMethodConventions(method), foreignInfo, constant,
@@ -2903,9 +2895,12 @@ static CanSILFunctionType getSILFunctionTypeForClangDecl(
   }
 
   if (auto method = dyn_cast<clang::CXXMethodDecl>(clangDecl)) {
-    AbstractionPattern origPattern = method->isOverloadedOperator() ?
-        AbstractionPattern::getCXXOperatorMethod(origType, method, foreignInfo.Self):
-        AbstractionPattern::getCXXMethod(origType, method, foreignInfo.Self);
+    AbstractionPattern origPattern =
+        method->isOverloadedOperator()
+            ? AbstractionPattern::getCXXOperatorMethod(origType, method,
+                                                       foreignInfo.self)
+            : AbstractionPattern::getCXXMethod(origType, method,
+                                               foreignInfo.self);
     bool isMutating =
         TC.Context.getClangModuleLoader()->isCXXMethodMutating(method);
     auto conventions = CXXMethodConventions(method, isMutating);
@@ -2918,10 +2913,10 @@ static CanSILFunctionType getSILFunctionTypeForClangDecl(
   if (auto func = dyn_cast<clang::FunctionDecl>(clangDecl)) {
     auto clangType = func->getType().getTypePtr();
     AbstractionPattern origPattern =
-      foreignInfo.Self.isImportAsMember()
-        ? AbstractionPattern::getCFunctionAsMethod(origType, clangType,
-                                                   foreignInfo.Self)
-        : AbstractionPattern(origType, clangType);
+        foreignInfo.self.isImportAsMember()
+            ? AbstractionPattern::getCFunctionAsMethod(origType, clangType,
+                                                       foreignInfo.self)
+            : AbstractionPattern(origType, clangType);
     return getSILFunctionType(TC, TypeExpansionContext::minimal(), origPattern,
                               substInterfaceType, extInfoBuilder,
                               CFunctionConventions(func), foreignInfo, constant,
@@ -3214,10 +3209,10 @@ static CanSILFunctionType getUncachedSILFunctionTypeForConstant(
       // import-as-member but do involve the same gymnastics with the
       // formal type.  That's all that SILFunctionType cares about, so
       // pretend that it's import-as-member.
-      if (!foreignInfo.Self.isImportAsMember() &&
+      if (!foreignInfo.self.isImportAsMember() &&
           isImporterGeneratedAccessor(clangDecl, constant)) {
         unsigned selfIndex = cast<AccessorDecl>(decl)->isSetter() ? 1 : 0;
-        foreignInfo.Self.setSelfIndex(selfIndex);
+        foreignInfo.self.setSelfIndex(selfIndex);
       }
 
       return getSILFunctionTypeForClangDecl(

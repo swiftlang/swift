@@ -114,6 +114,8 @@ static void forEachOuterDecl(DeclContext *DC, Fn fn) {
     case DeclContextKind::Initializer:
       if (auto *PBI = dyn_cast<PatternBindingInitializer>(DC))
         fn(PBI->getBinding());
+      else if (auto *I = dyn_cast<PropertyWrapperInitializer>(DC))
+        fn(I->getWrappedVar());
       break;
 
     case DeclContextKind::SubscriptDecl:
@@ -1682,7 +1684,6 @@ static void diagnosePotentialConcurrencyUnavailability(
   fixAvailability(ReferenceRange, ReferenceDC, RequiredRange, Context);
 }
 
-
 void TypeChecker::checkConcurrencyAvailability(SourceRange ReferenceRange,
                                                const DeclContext *ReferenceDC) {
   // Check the availability of concurrency runtime support.
@@ -2182,26 +2183,6 @@ describeRename(ASTContext &ctx, const AvailableAttr *attr, const ValueDecl *D,
 
   // We don't have enough information.
   return ReplacementDeclKind::None;
-}
-
-/// Returns a value that can be used to select between accessor kinds in
-/// diagnostics.
-///
-/// This is correlated with diag::availability_deprecated and others.
-static std::pair<unsigned, DeclName>
-getAccessorKindAndNameForDiagnostics(const ValueDecl *D) {
-  // This should always be one more than the last AccessorKind supported in
-  // the diagnostics. If you need to change it, change the assertion below as
-  // well.
-  static const unsigned NOT_ACCESSOR_INDEX = 2;
-
-  if (auto *accessor = dyn_cast<AccessorDecl>(D)) {
-    DeclName Name = accessor->getStorage()->getName();
-    assert(accessor->isGetterOrSetter());
-    return {static_cast<unsigned>(accessor->getAccessorKind()), Name};
-  }
-
-  return {NOT_ACCESSOR_INDEX, D->getName()};
 }
 
 void TypeChecker::diagnoseIfDeprecated(SourceRange ReferenceRange,

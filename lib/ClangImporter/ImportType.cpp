@@ -589,8 +589,7 @@ namespace {
       auto nominal = element->getAnyNominal();
       auto simdscalar = Impl.SwiftContext.getProtocol(KnownProtocolKind::SIMDScalar);
       SmallVector<ProtocolConformance *, 2> conformances;
-      if (simdscalar && nominal->lookupConformance(nominal->getParentModule(),
-                                                   simdscalar, conformances)) {
+      if (simdscalar && nominal->lookupConformance(simdscalar, conformances)) {
         // Element type conforms to SIMDScalar. Get the SIMDn generic type
         // if it exists.
         SmallString<8> name("SIMD");
@@ -2807,8 +2806,7 @@ bool ClangImporter::Implementation::matchesHashableBound(Type type) {
     auto hashable = SwiftContext.getProtocol(KnownProtocolKind::Hashable);
     SmallVector<ProtocolConformance *, 2> conformances;
     return hashable &&
-      nominal->lookupConformance(nominal->getParentModule(), hashable,
-                                 conformances);
+      nominal->lookupConformance(hashable, conformances);
   }
 
   return false;

@@ -92,6 +92,9 @@ public:
   /// superclass requirement, 'T : C' cannot be satisfied.
   bool canBeSatisfied() const;
 
+  /// Linear order on requirements in a generic signature.
+  int compare(const Requirement &other) const;
+
   SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &out) const;
   void print(raw_ostream &os, const PrintOptions &opts) const;

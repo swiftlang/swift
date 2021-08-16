@@ -1955,24 +1955,6 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Checks whether this type has a distributed actor "local" initializer.
-class HasDistributedActorLocalInitRequest
-    : public SimpleRequest<HasDistributedActorLocalInitRequest, bool(NominalTypeDecl *),
-                           RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  // Evaluation.
-  bool evaluate(Evaluator &evaluator, NominalTypeDecl *decl) const;
-
-public:
-  // Caching.
-  bool isCached() const { return true; }
-};
-
 /// Synthesizes a default initializer for a given type.
 class SynthesizeDefaultInitRequest
     : public SimpleRequest<SynthesizeDefaultInitRequest,
@@ -2065,6 +2047,7 @@ enum class ImplicitMemberAction : uint8_t {
   ResolveDecodable,
   ResolveDistributedActor,
   ResolveDistributedActorIdentity,
+  ResolveDistributedActorTransport,
 };
 
 class ResolveImplicitMemberRequest
@@ -2245,6 +2228,24 @@ public:
   void diagnoseCycle(DiagnosticEngine &diags) const;
   void noteCycleStep(DiagnosticEngine &diags) const;
 
+  // Cached.
+  bool isCached() const { return true; }
+};
+
+/// Checks if the _Distributed module is available.
+class DistributedModuleIsAvailableRequest
+    : public SimpleRequest<DistributedModuleIsAvailableRequest, bool(Decl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  bool evaluate(Evaluator &evaluator, Decl *decl) const;
+
+public:
   // Cached.
   bool isCached() const { return true; }
 };

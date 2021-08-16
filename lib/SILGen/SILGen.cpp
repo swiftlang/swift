@@ -1277,8 +1277,8 @@ emitMarkFunctionEscapeForTopLevelCodeGlobals(SILLocation loc,
 }
 
 void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
-  // Emit any default argument generators.
-  emitDefaultArgGenerators(AFD, AFD->getParameters());
+  // Emit default arguments and property wrapper initializers.
+  emitArgumentGenerators(AFD, AFD->getParameters());
 
   // If this is a function at global scope, it may close over a global variable.
   // If we're emitting top-level code, then emit a "mark_function_escape" that
@@ -1372,6 +1372,9 @@ SILFunction *SILGenModule::emitClosure(AbstractClosureExpr *ce) {
   // initializer of the containing type.
   if (!f->isExternalDeclaration())
     return f;
+
+  // Emit property wrapper argument generators.
+  emitArgumentGenerators(ce, ce->getParameters());
 
   emitFunctionDefinition(constant, f);
   return f;
@@ -1559,13 +1562,17 @@ void SILGenModule::emitGlobalAccessor(VarDecl *global,
   emitOrDelayFunction(*this, accessor);
 }
 
-void SILGenModule::emitDefaultArgGenerators(SILDeclRef::Loc decl,
-                                            ParameterList *paramList) {
+void SILGenModule::emitArgumentGenerators(SILDeclRef::Loc decl,
+                                          ParameterList *paramList) {
   unsigned index = 0;
   for (auto param : *paramList) {
     if (param->isDefaultArgument())
       emitDefaultArgGenerator(SILDeclRef::getDefaultArgGenerator(decl, index),
                               param);
+
+    if (param->hasExternalPropertyWrapper())
+      emitPropertyWrapperBackingInitializer(param);
+
     ++index;
   }
 }
