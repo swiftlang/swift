@@ -2418,11 +2418,9 @@ public:
 
     TypeChecker::checkDeclAttributes(CD);
 
-    if (CD->isActor()) {
+    if (CD->isActor())
       TypeChecker::checkConcurrencyAvailability(CD->getLoc(), CD);
-      if (CD->isDistributedActor())
-        TypeChecker::checkDistributedAvailability(CD->getLoc(), CD);
-    }
+
     for (Decl *Member : CD->getABIMembers())
       visit(Member);
 

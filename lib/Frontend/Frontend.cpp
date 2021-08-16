@@ -819,11 +819,6 @@ bool CompilerInstance::canImportSwiftConcurrency() const {
       {getASTContext().getIdentifier(SWIFT_CONCURRENCY_NAME), SourceLoc()});
 }
 
-bool CompilerInstance::canImportSwiftDistributed() const {
-  return getASTContext().canImportModule(
-      {getASTContext().getIdentifier(SWIFT_DISTRIBUTED_NAME), SourceLoc()});
-}
-
 ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
   auto &frontendOpts = Invocation.getFrontendOptions();
 

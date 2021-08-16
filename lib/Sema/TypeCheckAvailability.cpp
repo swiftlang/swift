@@ -1702,24 +1702,6 @@ void TypeChecker::checkConcurrencyAvailability(SourceRange ReferenceRange,
   }
 }
 
-void TypeChecker::checkDistributedAvailability(SourceRange ReferenceRange,
-                                               const DeclContext *ReferenceDC) {
-  // Check the availability of concurrency runtime support.
-  ASTContext &ctx = ReferenceDC->getASTContext();
-  if (ctx.LangOpts.DisableAvailabilityChecking)
-    return;
-
-  auto runningOS =
-    TypeChecker::overApproximateAvailabilityAtLocation(
-      ReferenceRange.Start, ReferenceDC);
-  auto availability = ctx.getDistributedAvailability();
-  if (!runningOS.isContainedIn(availability)) {
-    diagnosePotentialConcurrencyUnavailability(
-      ReferenceRange, ReferenceDC,
-      UnavailabilityReason::requiresVersionRange(availability.getOSVersion()));
-  }
-}
-
 void TypeChecker::diagnosePotentialUnavailability(
     const ValueDecl *D, SourceRange ReferenceRange,
     const DeclContext *ReferenceDC,

@@ -1026,9 +1026,6 @@ void checkDistributedActor(ClassDecl *decl);
 void checkConcurrencyAvailability(SourceRange ReferenceRange,
                                   const DeclContext *ReferenceDC);
 
-void checkDistributedAvailability(SourceRange ReferenceRange,
-                                  const DeclContext *ReferenceDC);
-
 /// Emits a diagnostic for a reference to a storage accessor that is
 /// potentially unavailable.
 void diagnosePotentialAccessorUnavailability(

@@ -533,10 +533,6 @@ public:
   /// i.e. if it can be found.
   bool canImportSwiftConcurrency() const;
 
-  /// Whether the Distributed actors support library can be imported
-  /// i.e. if it can be found.
-  bool canImportSwiftDistributed() const;
-
   /// Gets the SourceFile which is the primary input for this CompilerInstance.
   /// \returns the primary SourceFile, or nullptr if there is no primary input;
   /// if there are _multiple_ primary inputs, fails with an assertion.
