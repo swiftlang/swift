@@ -3930,6 +3930,10 @@ bool ConstraintSystem::generateConstraints(
       auto contextualPattern = ContextualPattern::forRawPattern(pattern, dc);
       Type patternType = TypeChecker::typeCheckPattern(contextualPattern);
 
+      // Fail early if pattern couldn't be type-checked.
+      if (!patternType || patternType->hasError())
+        return true;
+
       auto init = patternBinding->getInit(index);
       if (!init) {
         llvm_unreachable("Unsupported pattern binding entry");
