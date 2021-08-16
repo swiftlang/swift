@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -primary-file %s -emit-sil -enable-experimental-distributed | %FileCheck %s
+// RUN: %target-swift-frontend -O -primary-file %s -emit-sil -enable-experimental-distributed | %FileCheck %s --dump-input=fail
 
 import _Distributed
 
@@ -38,7 +38,7 @@ distributed actor SimpleEmptyDistributedActor {
 // CHECK: bb3:
 // CHECK:  destroy_addr [[ID_ADDR]] : $*AnyActorIdentity
 // CHECK:  destroy_addr [[TRANSPORT_ADDR]] : $*ActorTransport
-// CHECK:  %16 = builtin "destroyDefaultActor"(%0 : $SimpleEmptyDistributedActor) : $()
-// CHECK:  %17 = unchecked_ref_cast %0 : $SimpleEmptyDistributedActor to $Builtin.NativeObject
-// CHECK:  return %17 : $Builtin.NativeObject
+// CHECK:  [[_:%[0-9]+]] = builtin "destroyDefaultActor"(%0 : $SimpleEmptyDistributedActor) : $()
+// CHECK:  [[SELF:%[0-9]+]] = unchecked_ref_cast %0 : $SimpleEmptyDistributedActor to $Builtin.NativeObject
+// CHECK:  return [[SELF]] : $Builtin.NativeObject
 // CHECK: } // end sil function '$s36distributed_actor_default_deinit_sil27SimpleEmptyDistributedActorCfd'
