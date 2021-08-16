@@ -22,34 +22,34 @@ import Swift
 /// Tasks can start running immediately after creation;
 /// you don't explicitly start or schedule them.
 /// After creating a task, you use the instance to interact with it ---
-/// for example, to wait for it to complete or to cancel in.
+/// for example, to wait for it to complete or to cancel.
 /// It's not a programming error to discard a reference to a task
 /// without waiting for that task to finish or canceling it.
-/// A task runs whether or not you keep a reference to it.
+/// A task runs regardless of whether<!-- EDIT: Don't use "whether or not". --> you keep a reference to it.
 /// However, if you discard the reference to a task,
 /// you give up the ability
-/// to wait for that task's result or cancel the task.
+/// to wait for that task's result or if it's canceled.
 ///
 /// To support operations on the current task,
-/// which can be either a detached task or a child task,
+/// which can be either a detached task or child task,
 /// `Task` also exposes class methods like `yield()`.
 /// Because these methods are asynchronous,
 /// they're always invoked as part of an existing task.
 ///
-/// Only code that's running as part of the task can interact with that task,
+/// Only code that's running as part of the task can interact with that task
 /// by invoking the appropriate context-sensitive static functions which operate
-/// on the current task.
+/// on the current task.<!-- FIXME: Long sentence that could probably be split in two. -->
 ///
 /// A task's execution can be seen as a series of periods where the task ran.
 /// Each such period ends at a suspension point or the
 /// completion of the task.
 ///
-/// These partial periods towards the task's completion are `PartialAsyncTask`.
+/// These partial periods towards<!-- FIXME: The preceding wording is a little awkward; please rewrite. --> the task's completion are `PartialAsyncTask`.
 /// Unless you're implementing a scheduler,
-/// you don't generally interact with partial tasks directly.
+/// you don't directly interact with partial tasks.
 ///
 /// For information about the language-level concurrency model that `Task` is part of,
-/// see [Concurrency][concurrency] in *[The Swift Programming Language][tspl]*.
+/// see [Concurrency][concurrency] in [The Swift Programming Language][tspl].
 ///
 /// [concurrency]: https://docs.swift.org/swift-book/LanguageGuide/Concurrency.html
 /// [tspl]: https://docs.swift.org/swift-book/
@@ -91,9 +91,9 @@ public struct Task<Success, Failure: Error>: Sendable {
 
 @available(SwiftStdlib 5.5, *)
 extension Task {
-  /// Wait for the task to complete, returning its result or throwing an error.
+  /// Wait for the task to complete, then return its result or throw an error.
   ///
-  /// If the task hasn't completed yet,
+  /// If the task hasn't completed,
   /// its priority increases to that of the current task.
   /// Note that this might not be as effective as
   /// creating the task with the correct priority,
@@ -110,9 +110,9 @@ extension Task {
     }
   }
 
-  /// Wait for the task to complete, returning its result or its error.
+  /// Wait for the task to complete, then return its result or error.
   ///
-  /// If the task hasn't completed yet, its priority increases to the
+  /// If the task hasn't completed, its priority increases to the
   /// priority of the current task. Note that this isn't as effective as
   /// creating the task with the correct priority.
   ///
@@ -129,7 +129,7 @@ extension Task {
     }
   }
 
-  /// Indicate that the task should stop.
+  /// Indicate for the task to stop.
   ///
   /// Task cancellation is cooperative:
   /// a task that supports cancellation
@@ -149,7 +149,7 @@ extension Task {
 
 @available(SwiftStdlib 5.5, *)
 extension Task where Failure == Never {
-  /// Wait for the task to complete, returning its result.
+  /// Wait for the task to complete and return its result.
   ///
   /// If the task hasn't completed yet,
   /// its priority increases to that of the current task.
@@ -191,7 +191,7 @@ extension Task: Equatable {
 /// Typically, executors attempt to run tasks with a higher priority
 /// before tasks with a lower priority.
 /// However, the semantics of how priority is treated are left up to each
-/// platform and `Executor` implementation.
+/// platform and `Executor` implementation.<!-- QUERY: Should there be an article before Executor? -->
 ///
 /// Child tasks automatically inherit their parent task's priority.
 /// Detached tasks created by `detach(priority:operation:)` don't inherit task priority
@@ -206,12 +206,12 @@ extension Task: Equatable {
 ///   then the actor's current task is temporarily elevated
 ///   to the priority of the enqueued task.
 ///   This priority elevation allows the new task
-///   to be processed at (effectively) the priority it was enqueued with.
+///   to be processed at the priority it was enqueued with.
 /// - If a a higher-priority task calls the `get()` method,
 ///   then the priority of this task increases until the task completes.
 ///
 /// In both cases, priority elevation helps you prevent a low-priority task
-/// blocking the execution of a high priority task,
+/// that blocks the execution of a high priority task,
 /// which is also known as *priority inversion*.
 @available(SwiftStdlib 5.5, *)
 public struct TaskPriority: RawRepresentable, Sendable {
@@ -284,7 +284,7 @@ extension Task where Success == Never, Failure == Never {
   /// this property's value is `Priority.default`.
   public static var currentPriority: TaskPriority {
     withUnsafeCurrentTask { task in
-      // If we are running on behalf of a task, use that task's priority.
+      // If running on behalf of a task, use that task's priority.
       if let task = task {
         return task.priority
       }
@@ -307,7 +307,7 @@ extension TaskPriority {
 
 /// Flags for schedulable jobs.
 ///
-/// This is a port of the C++ FlagSet.
+/// This is a port of the C++ FlagSet<!-- FIXME: Rewrite so you're not using FlagSet in the abstract. -->.
 @available(SwiftStdlib 5.5, *)
 struct JobFlags {
   /// Kinds of schedulable jobs.
@@ -329,7 +329,7 @@ struct JobFlags {
     }
   }
 
-  /// Whether this is an asynchronous task.
+  /// Whether this is an asynchronous task.<!-- FIXME: All of these "Whether" statements need to be rewritten to be clearer. What does "Whether" tie into? That part of these one-line descriptions doesn't work. Fix here and throughout the remainder of these for this section. Also, should the lines terminate with a colon instead of a period? -->
   var isAsyncTask: Bool { kind == .task }
 
   /// The priority given to the job.
@@ -414,7 +414,7 @@ struct JobFlags {
 
 // ==== Task Creation Flags --------------------------------------------------
 
-/// Form task creation flags for use with the createAsyncTask builtins.
+/// Form task creation flags for use with the `createAsyncTask`<!-- FIXME: If this is an abstract, you'll need to rewrite so you're not including createAsyncTask here. --> built-ins<!-- FIXME: Hyphenate. -->.
 @available(SwiftStdlib 5.5, *)
 @_alwaysEmitIntoClient
 func taskCreateFlags(
@@ -546,7 +546,7 @@ extension Task where Failure == Never {
   /// Runs the given nonthrowing operation asynchronously
   /// as part of a new top-level task.
   ///
-  /// Avoid using a detached task unless it isn't possible
+  /// Don't use a detached task unless it isn't possible
   /// to model the operation using structured concurrency features like child tasks.
   /// Child tasks inherit the parent task's priority and task-local storage,
   /// and canceling a parent task automatically cancels all of its child tasks.
@@ -593,7 +593,7 @@ extension Task where Failure == Error {
   ///
   /// If the operation throws an error, this method propogates that error.
   ///
-  /// Avoid using a detached task unless it isn't possible
+  /// Don't use a detached task unless it isn't possible
   /// to model the operation using structured concurrency features like child tasks.
   /// Child tasks inherit the parent task's priority and task-local storage,
   /// and canceling a parent task automatically cancels all of its child tasks.
@@ -656,7 +656,7 @@ extension Task where Success == Never, Failure == Never {
   /// in the middle of a long-running operation
   /// that doesn't contain any suspension points,
   /// to let other tasks run for a while
-  /// before execution returns back to this task.
+  /// before execution returns to this task.
   ///
   /// If this task is the highest-priority task in the system,
   /// the executor immediately resumes execution of the same task.
@@ -677,15 +677,15 @@ extension Task where Success == Never, Failure == Never {
 /// Calls a closure with an unsafe reference to the current task.
 ///
 /// If you call this function from the body of an asynchronous function,
-/// the unsafe task handle passed to the closure is always non-nil
+/// the unsafe task handle passed to the closure is always non-`nil`
 /// because an asynchronous function always runs in the context of a task.
-/// However if you call this function from the body of a synchronous function,
+/// However, if you call this function from the body of a synchronous function,
 /// and that function isn't executing in the context of any task,
 /// the unsafe task handle is `nil`.
 ///
 /// Don't store an unsafe task reference
 /// for use outside this method's closure.
-/// Storing an unsafe reference doesn't impact the task's actual life cycle,
+/// Storing an unsafe reference doesn't affect the task's actual life cycle,
 /// and the behavior of accessing an unsafe task reference
 /// outside of the `withUnsafeCurrentTask(body:)` method's closure isn't defined.
 /// Instead, use the `task` property of `UnsafeCurrentTask`
@@ -719,7 +719,7 @@ public func withUnsafeCurrentTask<T>(body: (UnsafeCurrentTask?) throws -> T) ret
 /// call the `withUnsafeCurrentTask(body:)` method.
 /// Don't store an unsafe task reference
 /// for use outside that method's closure.
-/// Storing an unsafe reference doesn't impact the task's actual life cycle,
+/// Storing an unsafe reference doesn't affect the task's actual life cycle,
 /// and the behavior of accessing an unsafe task reference
 /// outside of the `withUnsafeCurrentTask(body:)` method's closure isn't defined.
 ///
@@ -731,7 +731,7 @@ public func withUnsafeCurrentTask<T>(body: (UnsafeCurrentTask?) throws -> T) ret
 /// and may lead to crashes or data loss.
 ///
 /// For information about the language-level concurrency model that `UnsafeCurrentTask` is part of,
-/// see [Concurrency][concurrency] in *[The Swift Programming Language][tspl]*.
+/// see [Concurrency][concurrency] in [The Swift Programming Language][tspl].
 ///
 /// [concurrency]: https://docs.swift.org/swift-book/LanguageGuide/Concurrency.html
 /// [tspl]: https://docs.swift.org/swift-book/
@@ -878,8 +878,8 @@ func _getCurrentThreadPriority() -> Int
 
 #if _runtime(_ObjC)
 
-/// Intrinsic used by SILGen to launch a task for bridging a Swift async method
-/// which was called through its ObjC-exported completion-handler-based API.
+/// Intrinsic used by SILGen<!-- FIXME: Should this be in code font? --> to launch a task for bridging a Swift async method
+/// which was called through its ObjC<!-- FIXME: Should this be in code font? -->-exported completion-handler–based API.
 @available(SwiftStdlib 5.5, *)
 @_alwaysEmitIntoClient
 @usableFromInline

@@ -16,11 +16,11 @@ import Swift
 // ==== Task Cancellation ------------------------------------------------------
 
 /// Execute an operation with a cancellation handler that's immediately
-/// invoked if the current task is canceled.
+/// invoked if the current task is canceled<!-- FIXME: Passive; rewrite. -->.
 ///
 /// This differs from the operation cooperatively checking for cancellation
 /// and reacting to it in that the cancellation handler is _always_ and
-/// _immediately_ invoked when the task is canceled. For example, even if the
+/// _immediately_ invoked when the task is canceled<!-- FIXME: Passive; rewrite. -->. For example, even if the
 /// operation is running code that never checks for cancellation, a cancellation
 /// handler still runs and provides a chance to run some cleanup code.
 ///
@@ -34,8 +34,8 @@ public func withTaskCancellationHandler<T>(
 ) async rethrows -> T {
   let task = Builtin.getCurrentAsyncTask()
 
-  // unconditionally add the cancellation record to the task.
-  // if the task was already cancelled, it will be executed right away.
+  // Unconditionally add the cancellation record to the task.
+  // If the task was already canceled, it executes immediately.
   let record = _taskAddCancellationHandler(handler: handler)
   defer { _taskRemoveCancellationHandler(record: record) }
 
@@ -44,7 +44,7 @@ public func withTaskCancellationHandler<T>(
 
 @available(SwiftStdlib 5.5, *)
 extension Task {
-  /// Returns `true` if the task is canceled, and should stop executing.
+  /// Returns `true`<!-- FIXME: If this is an abstract, don't include code font or links. --> if the task is canceled<!-- FIXME: Passive; rewrite. -->, and should stop executing.
   ///
   /// - SeeAlso: `checkCancellation()`
   public var isCancelled: Bool {
@@ -60,10 +60,10 @@ extension Task {
 
 @available(SwiftStdlib 5.5, *)
 extension Task where Success == Never, Failure == Never {
-  /// Returns `true` if the task is canceled, and should stop executing.
+  /// Returns `true` if the task is canceled, and should stop executing.<!-- FIXME: Abstracts need to be unique; this is copy/pasted from what's on line 47, which means it carries the same problems. Rewrite the abstract so that this is different from the one on line 47. What sets it apart? Why would someone use this over the previous? -->
   ///
   /// If no current `Task` is available, returns `false`, as outside of a task
-  /// context no task cancellation may be observed.
+  /// context no task cancellation may be observed<!-- FIXME: Passive; rewrite. -->.
   ///
   /// - SeeAlso: `checkCancellation()`
   public static var isCancelled: Bool {
@@ -75,7 +75,7 @@ extension Task where Success == Never, Failure == Never {
 
 @available(SwiftStdlib 5.5, *)
 extension Task where Success == Never, Failure == Never {
-  /// Check if the task is canceled and throw an `CancellationError` if it was.
+  /// Check if the task is canceled<!-- FIXME: Passive; rewrite. --> and throw an `CancellationError`<!-- FIXME: Don't include symbols in abstracts. --> if it was.
   ///
   /// The error is always an instance of `Task.CancellationError`.
   ///
@@ -87,13 +87,13 @@ extension Task where Success == Never, Failure == Never {
   }
 }
 
-/// The default cancellation thrown when a task is canceled.
+/// The default cancellation thrown when a task is canceled<!-- FIXME: Passive; rewrite. -->.
 ///
 /// This error is also thrown automatically by `Task.checkCancellation()`,
-/// if the current task has been canceled.
+/// if the current task has been canceled<!-- FIXME: Passive; rewrite. -->.
 @available(SwiftStdlib 5.5, *)
 public struct CancellationError: Error {
-  // no extra information, cancellation is intended to be light-weight
+  // No extra information; cancellation is intended to be light-weight.
   public init() {}
 }
 
