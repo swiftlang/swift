@@ -441,9 +441,11 @@ std::pair<int, Node *> Remangler::mangleConstrainedType(Node *node,
     Chain.push_back(node->getChild(1), Factory);
     node = getChildOfType(node->getFirstChild());
   }
-  
+
   if (node->getKind() != Node::Kind::DependentGenericParamType) {
     mangle(node, depth + 1);
+    if (!Chain.size())
+      return {-1, nullptr};
     node = nullptr;
   }
 
