@@ -119,11 +119,13 @@ function(handle_gyb_sources dependency_out_var_name sources_var_name)
   set(gyb_extra_sources
       "${SWIFT_SOURCE_DIR}/utils/GYBUnicodeDataUtils.py"
       "${SWIFT_SOURCE_DIR}/utils/SwiftIntTypes.py"
+      "${SWIFT_SOURCE_DIR}/utils/SwiftFloatingPointTypes.py"
       "${SWIFT_SOURCE_DIR}/utils/UnicodeData/GraphemeBreakProperty.txt"
       "${SWIFT_SOURCE_DIR}/utils/UnicodeData/GraphemeBreakTest.txt"
       "${SWIFT_SOURCE_DIR}/utils/gyb_stdlib_support.py"
       "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/__init__.py"
       "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/Child.py"
+      "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/Classification.py"
       "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/kinds.py"
       "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/Node.py"
       "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/AttributeNodes.py"
