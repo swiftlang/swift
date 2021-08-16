@@ -190,23 +190,24 @@ where SubSequence: MutableCollection
   /// contiguous storage, the method doesn’t call `body` and returns `nil`.
   ///
   /// Often, the optimizer can eliminate bounds- and uniqueness-checks
-  /// within an algorithm, but when that fails, invoking the
-  /// same algorithm on `body`'s argument lets you trade safety for
-  /// speed.
+  /// within an algorithm, but when that fails, invoking the same algorithm on
+  /// `body`'s argument lets you trade safety for speed.
   ///
-  /// Successive calls to this method do not necessarily provide the same
+  /// Successive calls to this method don't necessarily provide the same
   /// pointer every time.
   ///
-  /// This method makes no gurantees about the state of the collection if
+  /// This method makes no guarantees about the state of the collection if
   /// the closure throws an error. Any changes made before the throw may
   /// or may not be reflected in the collection. This is because the closure
   /// could receive direct access to the collection's internal storage, or a
-  /// temporary copy. Therefore, the closure should always provide any necessary
-  /// cleanup.
+  /// temporary copy. Therefore, the closure should always perform any
+  /// necessary cleanup.
   ///
   /// - Parameter body: A closure that receives an in-out
-  /// `UnsafeMutableBufferPointer` to the first element in the collection's
-  /// contiguous storage.
+  /// `UnsafeMutableBufferPointer` to the collection's contiguous storage.
+  /// - Returns: The value returned from `body`, unless the collection doesn't
+  /// support contiguous storage, in which case the method ignores `body` and
+  /// returns `nil`.
   mutating func withContiguousMutableStorageIfAvailable<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R?

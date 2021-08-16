@@ -395,11 +395,14 @@ public protocol Sequence {
   /// must also guarantee that advancing the pointer by the distance to the
   /// slice's `startIndex` generates an equivalent buffer of its `SubSequence`.
   ///
-  /// Successive calls to this method do not necessarily provide the same
+  /// Successive calls to this method don't necessarily provide the same
   /// pointer every time.
   ///
   /// - Parameter body: A closure that receives an `UnsafeBufferPointer` to
-  /// the first element in the sequence's contiguous storage.
+  /// the sequence's contiguous storage.
+  /// - Returns: The value returned from `body`, unless the sequence doesn't
+  /// support contiguous storage, in which case the method ignores `body` and
+  /// returns `nil`.
   func withContiguousStorageIfAvailable<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R?  
