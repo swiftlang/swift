@@ -284,7 +284,7 @@ extension Task where Success == Never, Failure == Never {
   /// this property's value is `Priority.default`.
   public static var currentPriority: TaskPriority {
     withUnsafeCurrentTask { task in
-      // If running on behalf of a task, use that task's priority.
+      // If we are running on behalf of a task, use that task's priority.
       if let task = task {
         return task.priority
       }
@@ -307,7 +307,7 @@ extension TaskPriority {
 
 /// Flags for schedulable jobs.
 ///
-/// This is a port of the C++ FlagSet<!-- FIXME: Rewrite so you're not using FlagSet in the abstract. -->.
+/// This is a port of the C++ FlagSet.
 @available(SwiftStdlib 5.5, *)
 struct JobFlags {
   /// Kinds of schedulable jobs.
@@ -329,7 +329,7 @@ struct JobFlags {
     }
   }
 
-  /// Whether this is an asynchronous task.<!-- FIXME: All of these "Whether" statements need to be rewritten to be clearer. What does "Whether" tie into? That part of these one-line descriptions doesn't work. Fix here and throughout the remainder of these for this section. Also, should the lines terminate with a colon instead of a period? -->
+  /// Whether this is an asynchronous task.
   var isAsyncTask: Bool { kind == .task }
 
   /// The priority given to the job.
@@ -414,7 +414,7 @@ struct JobFlags {
 
 // ==== Task Creation Flags --------------------------------------------------
 
-/// Form task creation flags for use with the `createAsyncTask`<!-- FIXME: If this is an abstract, you'll need to rewrite so you're not including createAsyncTask here. --> built-ins<!-- FIXME: Hyphenate. -->.
+/// Form task creation flags for use with the createAsyncTask builtins.
 @available(SwiftStdlib 5.5, *)
 @_alwaysEmitIntoClient
 func taskCreateFlags(
@@ -878,8 +878,8 @@ func _getCurrentThreadPriority() -> Int
 
 #if _runtime(_ObjC)
 
-/// Intrinsic used by SILGen<!-- FIXME: Should this be in code font? --> to launch a task for bridging a Swift async method
-/// which was called through its ObjC<!-- FIXME: Should this be in code font? -->-exported completion-handler–based API.
+/// Intrinsic used by SILGen to launch a task for bridging a Swift async method
+/// which was called through its ObjC-exported completion-handler-based API.
 @available(SwiftStdlib 5.5, *)
 @_alwaysEmitIntoClient
 @usableFromInline

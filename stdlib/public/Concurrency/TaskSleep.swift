@@ -33,19 +33,19 @@ extension Task where Success == Never, Failure == Never {
 
   /// Describes the state of a sleep() operation.
   private enum SleepState {
-    /// The sleep continuation hasn't begun.
+    /// The sleep continuation has not yet begun.
     case notStarted
 
-    // The sleep continuation has been created<!-- FIXME: Passive; rewrite. --> and is available here.
+    // The sleep continuation has been created and is available here.
     case activeContinuation(SleepContinuation)
 
-    /// The sleep has finished<!-- FIXME: Passive; rewrite. -->.
+    /// The sleep has finished.
     case finished
 
-    /// The sleep was canceled<!-- FIXME: Passive; rewrite. -->.
+    /// The sleep was canceled.
     case cancelled
 
-    /// The sleep was canceled<!-- FIXME: Passive; rewrite. --> before it even started<!-- FIXME: Passive; rewrite. -->.
+    /// The sleep was canceled before it even got started.
     case cancelledBeforeStarted
 
     /// Decode sleep state from the word of storage.
@@ -75,12 +75,12 @@ extension Task where Success == Never, Failure == Never {
       }
     }
 
-    /// Decode the sleep state by loading from the given pointer.
+    /// Decode sleep state by loading from the given pointer
     init(loading wordPtr: UnsafeMutablePointer<Builtin.Word>) {
       self.init(word: Builtin.atomicload_seqcst_Word(wordPtr._rawValue))
     }
 
-    /// Encode the sleep state into a word of storage.
+    /// Encode sleep state into a word of storage.
     var word: UInt {
       switch self {
       case .notStarted:
@@ -102,8 +102,8 @@ extension Task where Success == Never, Failure == Never {
     }
   }
 
-  /// Called when the sleep(nanoseconds:)<!-- FIXME: If this is an abstract, remove the symbol and use an English language equivalent. --> operation woke up without being
-  /// canceled<!-- FIXME: Passive; rewrite. -->.
+  /// Called when the sleep(nanoseconds:) operation woke up without being
+  /// canceled.
   private static func onSleepWake(
       _ wordPtr: UnsafeMutablePointer<Builtin.Word>
   ) {
@@ -114,39 +114,39 @@ extension Task where Success == Never, Failure == Never {
         fatalError("Cannot wake before we even started")
 
       case .activeContinuation(let continuation):
-        // We<!-- FIXME: Correct the use of first person voice here and throughout. Comments, even those that don't get published, should follow Apple Style. --> have an active continuation, so try to transition to the
+        // We have an active continuation, so try to transition to the
         // "finished" state.
         let (_, won) = Builtin.cmpxchg_seqcst_seqcst_Word(
             wordPtr._rawValue,
             state.word._builtinWordValue,
             SleepState.finished.word._builtinWordValue)
         if Bool(_builtinBooleanLiteral: won) {
-          // The sleep finished, so invoke the continuation: we're<!-- FIXME: Fix voice. --> done.
+          // The sleep finished, so invoke the continuation: we're done.
           continuation.resume()
           return
         }
 
-        // Try again.
+        // Try again!
         continue
 
       case .finished:
-        fatalError("Already finished normally, can't do that again.")
+        fatalError("Already finished normally, can't do that again")
 
       case .cancelled:
-        // The task was canceled, which means the continuation was
-        // called by the cancellation handler. We<!-- FIXME: Fix voice. --> need to deallocate the flag
+        // The task was cancelled, which means the continuation was
+        // called by the cancellation handler. We need to deallocate the flag
         // word, because it was left over for this task to complete.
         wordPtr.deallocate()
         return
 
       case .cancelledBeforeStarted:
-        // Nothing to do.
+        // Nothing to do;
         return
       }
     }
   }
 
-  /// Called when the sleep(nanoseconds:)<!-- FIXME: If this is an abstract, remove the symbol and use an English language equivalent. --> operation has been canceled<!-- FIXME: Passive; rewrite. --> before
+  /// Called when the sleep(nanoseconds:) operation has been canceled before
   /// the sleep completed.
   private static func onSleepCancel(
       _ wordPtr: UnsafeMutablePointer<Builtin.Word>
@@ -155,7 +155,7 @@ extension Task where Success == Never, Failure == Never {
       let state = SleepState(loading: wordPtr)
       switch state {
       case .notStarted:
-        // We<!-- FIXME: Fix voice. --> haven't started yet, so try to transition to the cancelled-before
+        // We haven't started yet, so try to transition to the cancelled-before
         // started state.
         let (_, won) = Builtin.cmpxchg_seqcst_seqcst_Word(
             wordPtr._rawValue,
@@ -165,24 +165,24 @@ extension Task where Success == Never, Failure == Never {
           return
         }
 
-        // Try again.
+        // Try again!
         continue
 
       case .activeContinuation(let continuation):
-        // We<!-- FIXME: Fix voice. --> have an active continuation, so try to transition to the
+        // We have an active continuation, so try to transition to the
         // "cancelled" state.
         let (_, won) = Builtin.cmpxchg_seqcst_seqcst_Word(
             wordPtr._rawValue,
             state.word._builtinWordValue,
             SleepState.cancelled.word._builtinWordValue)
         if Bool(_builtinBooleanLiteral: won) {
-          // We<!-- FIXME: Fix voice. --> recorded the task cancellation before the sleep finished, so
+          // We recorded the task cancellation before the sleep finished, so
           // invoke the continuation with the cancellation error.
           continuation.resume(throwing: _Concurrency.CancellationError())
           return
         }
 
-        // Try again.
+        // Try again!
         continue
 
       case .finished, .cancelled, .cancelledBeforeStarted:
@@ -202,7 +202,7 @@ extension Task where Success == Never, Failure == Never {
     let wordPtr = UnsafeMutablePointer<Builtin.Word>.allocate(capacity: 1)
 
     // Initialize the flag word to "not started", which means the continuation
-    // has neither been created nor completed<!-- FIXME: Passive; rewrite. -->.
+    // has neither been created nor completed.
     Builtin.atomicstore_seqcst_Word(
         wordPtr._rawValue, SleepState.notStarted.word._builtinWordValue)
 
@@ -225,13 +225,13 @@ extension Task where Success == Never, Failure == Never {
                   state.word._builtinWordValue,
                   continuationWord._builtinWordValue)
               if !Bool(_builtinBooleanLiteral: won) {
-                // Keep trying.
+                // Keep trying!
                 continue
               }
 
               // Create a task that resumes the continuation normally if it
               // finishes first. Enqueue it directly with the delay, so it fires
-              // when we're<!-- FIXME: Fix voice. --> done sleeping.
+              // when we're done sleeping.
               let sleepTaskFlags = taskCreateFlags(
                 priority: nil, isChildTask: false, copyTaskLocals: false,
                 inheritContext: false, enqueueJob: false,
@@ -244,14 +244,14 @@ extension Task where Success == Never, Failure == Never {
               return
 
             case .activeContinuation, .finished:
-              fatalError("Impossible to have multiple active continuations.")
+              fatalError("Impossible to have multiple active continuations")
 
             case .cancelled:
-              fatalError("Impossible to have canceled before we<!-- FIXME: Fix voice. --> began.")
+              fatalError("Impossible to have cancelled before we began")
 
             case .cancelledBeforeStarted:
-              // Finish the continuation normally. We'll<!-- FIXME: Fix voice. --> throw later, after
-              // we<!-- FIXME: Fix voice. --> clean up.
+              // Finish the continuation normally. We'll throw later, after
+              // we clean up.
               continuation.resume()
               return
           }
@@ -261,11 +261,11 @@ extension Task where Success == Never, Failure == Never {
         onSleepCancel(wordPtr)
       }
 
-      // Determine whether we<!-- FIXME: Fix voice. --> got canceled before we<!-- FIXME: Fix voice. --> even started.
+      // Determine whether we got cancelled before we even started.
       let cancelledBeforeStarted: Bool
       switch SleepState(loading: wordPtr) {
       case .notStarted, .activeContinuation, .cancelled:
-        fatalError("Invalid state for an uncanceled sleep task.")
+        fatalError("Invalid state for non-cancelled sleep task")
 
       case .cancelledBeforeStarted:
         cancelledBeforeStarted = true
@@ -274,17 +274,17 @@ extension Task where Success == Never, Failure == Never {
         cancelledBeforeStarted = false
       }
 
-      // We<!-- FIXME: Fix voice. --> got here without being canceled<!-- FIXME: Passive; rewrite. -->, so deallocate the storage for
+      // We got here without being cancelled, so deallocate the storage for
       // the flag word and continuation.
       wordPtr.deallocate()
 
-      // If we<!-- FIXME: Fix voice. --> got canceled before w<!-- FIXME: Fix voice. -->e even started, through the cancellation
+      // If we got cancelled before we even started, through the cancellation
       // error now.
       if cancelledBeforeStarted {
         throw _Concurrency.CancellationError()
       }
     } catch {
-      // The task was canceled<!-- FIXME: Passive; rewrite. -->; propagate the error. The "on wake" task is
+      // The task was cancelled; propagate the error. The "on wake" task is
       // responsible for deallocating the flag word and continuation, if it's
       // still running.
       throw error

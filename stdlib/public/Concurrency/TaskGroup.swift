@@ -270,7 +270,7 @@ public struct TaskGroup<ChildTaskResult> {
     let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
 
     guard canAdd else {
-      // The group is canceled and isn't accepting any new work.
+      // the group is cancelled and is not accepting any new work
       return false
     }
 
@@ -439,8 +439,8 @@ public struct TaskGroup<ChildTaskResult> {
 @frozen
 public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
 
-  /// The group task into which child tasks offer their results,
-  /// and the `next()`<!-- FIXME: If this is an abstract, don't include anything styled in code font. --> function polls those results from.
+  /// Group task into which child tasks offer their results,
+  /// and the `next()` function polls those results from.
   @usableFromInline
   internal let _group: Builtin.RawPointer
 
@@ -450,7 +450,7 @@ public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
     self._group = group
   }
 
-  /// Await all of the remaining tasks on this group.
+  /// Await all the remaining tasks on this group.
   @usableFromInline
   internal mutating func awaitAllRemainingTasks() async {
     while true {
@@ -522,7 +522,7 @@ public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
     let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
 
     guard canAdd else {
-      // The group is canceled and isn't accepting any new work.
+      // the group is cancelled and is not accepting any new work
       return false
     }
 
@@ -645,7 +645,7 @@ public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
 
       return .success(success)
     } catch {
-      return .failure(error as! Failure) // as!-safe, because we<!-- FIXME: Correct the use of first-person voice here and throughout. --> are only allowed to throw Failure (Error).
+      return .failure(error as! Failure) // as!-safe, because we are only allowed to throw Failure (Error)
     }
   }
 
@@ -734,7 +734,7 @@ extension TaskGroup: AsyncSequence {
     @usableFromInline
     var finished: Bool = false
 
-    // No public constructors.
+    // no public constructors
     init(group: TaskGroup<ChildTaskResult>) {
       self.group = group
     }
@@ -821,7 +821,7 @@ extension ThrowingTaskGroup: AsyncSequence {
     @usableFromInline
     var finished: Bool = false
 
-    // No public constructors.
+    // no public constructors
     init(group: ThrowingTaskGroup<ChildTaskResult, Failure>) {
       self.group = group
     }
@@ -880,8 +880,8 @@ func _taskGroupAddPendingTask(
 @_silgen_name("swift_taskGroup_cancelAll")
 func _taskGroupCancelAll(group: Builtin.RawPointer)
 
-/// Checks only if the group was specifically canceled<!-- FIXME: Passive; rewrite. -->.
-/// The task itself being canceled<!-- FIXME: Passive; rewrite. --> must be checked<!-- FIXME: Passive; rewrite. --> separately.
+/// Checks ONLY if the group was specifically canceled.
+/// The task itself being canceled must be checked separately.
 @available(SwiftStdlib 5.5, *)
 @_silgen_name("swift_taskGroup_isCancelled")
 func _taskGroupIsCancelled(group: Builtin.RawPointer) -> Bool

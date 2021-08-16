@@ -93,7 +93,7 @@ extension Task where Success == Never, Failure == Never {
 /// if the current task has been canceled<!-- FIXME: Passive; rewrite. -->.
 @available(SwiftStdlib 5.5, *)
 public struct CancellationError: Error {
-  // No extra information; cancellation is intended to be light-weight.
+  // no extra information, cancellation is intended to be light-weight
   public init() {}
 }
 
