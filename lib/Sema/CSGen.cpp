@@ -3918,10 +3918,21 @@ bool ConstraintSystem::generateConstraints(
 
     /// Generate constraints for each pattern binding entry
     for (unsigned index : range(patternBinding->getNumPatternEntries())) {
-      // Type check the pattern.
-      auto pattern = patternBinding->getPattern(index);
+      auto *pattern = TypeChecker::resolvePattern(
+          patternBinding->getPattern(index), dc, /*isStmtCondition=*/true);
+
+      if (!pattern)
+        return true;
+
+      // Type check the pattern. Note use of `forRawPattern` here instead
+      // of `forPatternBindingDecl` because resolved `pattern` is not
+      // associated with `patternBinding`.
       auto contextualPattern = ContextualPattern::forRawPattern(pattern, dc);
       Type patternType = TypeChecker::typeCheckPattern(contextualPattern);
+
+      // Fail early if pattern couldn't be type-checked.
+      if (!patternType || patternType->hasError())
+        return true;
 
       auto init = patternBinding->getInit(index);
       if (!init) {
