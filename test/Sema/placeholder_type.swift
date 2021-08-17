@@ -7,7 +7,7 @@ let dict2: [Character: _] = ["h": 0]
 
 let arr = [_](repeating: "hi", count: 3)
 
-func foo(_ arr: [_] = [0]) {} // expected-error {{placeholder type not allowed here}}
+func foo(_ arr: [_] = [0]) {} // expected-error {{type placeholder not allowed here}}
 
 let foo = _.foo // expected-error {{placeholders are not allowed as top-level types}}
 let zero: _ = .zero // expected-error {{placeholders are not allowed as top-level types}}
@@ -75,25 +75,25 @@ where T: ExpressibleByIntegerLiteral, U: ExpressibleByIntegerLiteral {
 }
 
 extension Bar {
-    func frobnicate2() -> Bar<_, _> { // expected-error {{placeholder type not allowed here}}
+    func frobnicate2() -> Bar<_, _> { // expected-error {{type placeholder not allowed here}}
         return Bar(t: 42, u: 42)
     }
     func frobnicate3() -> Bar {
         return Bar<_, _>(t: 42, u: 42)
     }
-    func frobnicate4() -> Bar<_, _> { // expected-error {{placeholder type not allowed here}}
+    func frobnicate4() -> Bar<_, _> { // expected-error {{type placeholder not allowed here}}
         return Bar<_, _>(t: 42, u: 42)
     }
-    func frobnicate5() -> Bar<_, U> { // expected-error {{placeholder type not allowed here}}
+    func frobnicate5() -> Bar<_, U> { // expected-error {{type placeholder not allowed here}}
         return Bar(t: 42, u: 42)
     }
     func frobnicate6() -> Bar {
         return Bar<_, U>(t: 42, u: 42)
     }
-    func frobnicate7() -> Bar<_, _> { // expected-error {{placeholder type not allowed here}}
+    func frobnicate7() -> Bar<_, _> { // expected-error {{type placeholder not allowed here}}
         return Bar<_, U>(t: 42, u: 42)
     }
-    func frobnicate8() -> Bar<_, U> { // expected-error {{placeholder type not allowed here}}
+    func frobnicate8() -> Bar<_, U> { // expected-error {{type placeholder not allowed here}}
         return Bar<_, _>(t: 42, u: 42)
     }
 }
@@ -147,12 +147,12 @@ func f(x: Any, arr: [Int]) {
     let y3 = x as! () -> _ // expected-error {{type of expression is ambiguous without more context}}
 
     switch x {
-    case is _: break // expected-error {{placeholder type not allowed here}}
-    case is [_]: break // expected-error {{placeholder type not allowed here}}
-    case is () -> _: break // expected-error {{placeholder type not allowed here}}
-    case let y as _: break // expected-error {{placeholder type not allowed here}}
-    case let y as [_]: break // expected-error {{placeholder type not allowed here}}
-    case let y as () -> _: break // expected-error {{placeholder type not allowed here}}
+    case is _: break // expected-error {{type placeholder not allowed here}}
+    case is [_]: break // expected-error {{type placeholder not allowed here}}
+    case is () -> _: break // expected-error {{type placeholder not allowed here}}
+    case let y as _: break // expected-error {{type placeholder not allowed here}}
+    case let y as [_]: break // expected-error {{type placeholder not allowed here}}
+    case let y as () -> _: break // expected-error {{type placeholder not allowed here}}
     }
 
     if arr is _ {} // expected-error {{placeholders are not allowed as top-level types}}
@@ -166,12 +166,12 @@ func f(x: Any, arr: [Int]) {
     let y3 = arr as! () -> _ // expected-error {{type of expression is ambiguous without more context}}
 
     switch arr {
-    case is _: break // expected-error {{placeholder type not allowed here}}
-    case is [_]: break // expected-error {{placeholder type not allowed here}}
-    case is () -> _: break // expected-error {{placeholder type not allowed here}}
-    case let y as _: break // expected-error {{placeholder type not allowed here}}
-    case let y as [_]: break // expected-error {{placeholder type not allowed here}}
-    case let y as () -> _: break // expected-error {{placeholder type not allowed here}}
+    case is _: break // expected-error {{type placeholder not allowed here}}
+    case is [_]: break // expected-error {{type placeholder not allowed here}}
+    case is () -> _: break // expected-error {{type placeholder not allowed here}}
+    case let y as _: break // expected-error {{type placeholder not allowed here}}
+    case let y as [_]: break // expected-error {{type placeholder not allowed here}}
+    case let y as () -> _: break // expected-error {{type placeholder not allowed here}}
     }
 }
 

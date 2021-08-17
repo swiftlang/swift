@@ -519,5 +519,5 @@ func takesOpaqueProtocol<T : OpaqueProtocol>(generic: T) {
   _ = generic[0]
 }
 
-func opaquePlaceholderFunc() -> some _ { 1 } // expected-error {{placeholder type not allowed here}}
-var opaquePlaceholderVar: some _ = 1 // expected-error {{placeholder type not allowed here}}
+func opaquePlaceholderFunc() -> some _ { 1 } // expected-error {{type placeholder not allowed here}}
+var opaquePlaceholderVar: some _ = 1 // expected-error {{type placeholder not allowed here}}
