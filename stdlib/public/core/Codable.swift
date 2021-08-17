@@ -5549,9 +5549,9 @@ extension RawRepresentable where Self: CodingKeyRepresentable, RawValue == Int {
   }
   public init?<T: CodingKey>(codingKey: T) {
     if let intValue = codingKey.intValue {
-        self.init(rawValue: intValue)
+      self.init(rawValue: intValue)
     } else {
-        return nil
+      return nil
     }
   }
 }
@@ -5563,9 +5563,9 @@ extension Int: CodingKeyRepresentable {
   }
   public init?<T: CodingKey>(codingKey: T) {
     if let intValue = codingKey.intValue {
-        self = intValue
+      self = intValue
     } else {
-        return nil
+      return nil
     }
   }
 }
