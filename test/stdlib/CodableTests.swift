@@ -76,13 +76,16 @@ func expectRoundTripEquality<T : Codable>(of value: T, encode: (T) throws -> Dat
     expectEqual(value, decoded, "\(#file):\(lineNumber): Decoded \(T.self) <\(debugDescription(decoded))> not equal to original <\(debugDescription(value))>")
 }
 
-func expectRoundTripEqualityThroughJSON<T : Codable>(for value: T, lineNumber: Int, _ expectedJSON: String? = nil) where T : Equatable {
+func expectRoundTripEqualityThroughJSON<T : Codable>(for value: T, _ expectedJSON: String? = nil, lineNumber: Int) where T : Equatable {
     let inf = "INF", negInf = "-INF", nan = "NaN"
     let encode = { (_ value: T) throws -> Data in
         let encoder = JSONEncoder()
         encoder.nonConformingFloatEncodingStrategy = .convertToString(positiveInfinity: inf,
                                                                       negativeInfinity: negInf,
                                                                       nan: nan)
+        if #available(macOS 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *) {
+            encoder.outputFormatting = .sortedKeys
+        }
         let encoded = try encoder.encode(value)
 
         if let expectedJSON = expectedJSON {
@@ -469,41 +472,54 @@ class TestCodable : TestCodableSuper {
     }
 
     func test_Dictionary_JSON() {
-        enum NotCodingKeyRepresentable: String, Codable {
+        enum X: String, Codable { case a, b }
+        enum Y: String, Codable, CodingKeyRepresentable { case a, b }
+        enum Z: String, Codable, CodingKeyRepresentable {
             case a
+            case b
+            init?<T: CodingKey>(codingKey: T) {
+                self.init(rawValue: codingKey.stringValue)
+            }
+            var codingKey: CodingKey {
+                GenericCodingKey(stringValue: self.rawValue)
+            }
         }
 
-        enum CodingKeyRepresentableEnum: String, Codable, CodingKeyRepresentable {
-            case a
+        enum U: Int, Codable { case a = 0, b}
+        enum V: Int, Codable, CodingKeyRepresentable { case a = 0, b }
+        enum W: Int, Codable, CodingKeyRepresentable {
+            case a = 0
+            case b
+            init?<T: CodingKey>(codingKey: T) {
+                self.init(rawValue: codingKey.intValue!)
+            }
+            var codingKey: CodingKey {
+                GenericCodingKey(intValue: self.rawValue)
+            }
         }
 
-        struct GenericStringCodingKey: CodingKey {
+
+        struct GenericCodingKey: CodingKey {
             var stringValue: String
-            var intValue: Int? { nil }
+            var intValue: Int?
 
             init(stringValue: String) {
                 self.stringValue = stringValue
             }
 
-            init?(intValue: Int) {
-                return nil
+            init(intValue: Int) {
+                self.stringValue = "\(intValue)"
+                self.intValue = intValue
             }
         }
 
-        let notCodingKeyRepresentableValues: [Int: [NotCodingKeyRepresentable: Bool]] = [
-          #line : [.a: true]
-        ]
+        expectRoundTripEqualityThroughJSON(for: [X.a: true],             #"["a",true]"#,           lineNumber: #line)
+        expectRoundTripEqualityThroughJSON(for: [Y.a: true, Y.b: false], #"{"a":true,"b":false}"#, lineNumber: #line)
+        expectRoundTripEqualityThroughJSON(for: [Z.a: true, Z.b: false], #"{"a":true,"b":false}"#, lineNumber: #line)
 
-        for (testLine, dictionary) in notCodingKeyRepresentableValues {
-            expectRoundTripEqualityThroughJSON(for: dictionary, lineNumber: testLine, #"["a",true]"#)
-        }
-
-        let codingKeyRepresentableValues: [Int: [CodingKeyRepresentableEnum: Bool]] = [
-            #line : [.a: true]
-        ]
-        for (testLine, dictionary) in codingKeyRepresentableValues {
-            expectRoundTripEqualityThroughJSON(for: dictionary, lineNumber: testLine, #"{"a":true}"#)
-        }
+        expectRoundTripEqualityThroughJSON(for: [U.a: true],             #"[0,true]"#,             lineNumber: #line)
+        expectRoundTripEqualityThroughJSON(for: [V.a: true, V.b: false], #"{"0":true,"1":false}"#, lineNumber: #line)
+        expectRoundTripEqualityThroughJSON(for: [W.a: true, W.b: false], #"{"0":true,"1":false}"#, lineNumber: #line)
     }
 
 
