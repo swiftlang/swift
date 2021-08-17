@@ -5420,11 +5420,6 @@ SolutionApplicationTarget SolutionApplicationTarget::forForEachStmt(
 }
 
 SolutionApplicationTarget
-SolutionApplicationTarget::forUninitializedWrappedVar(VarDecl *wrappedVar) {
-  return SolutionApplicationTarget(wrappedVar);
-}
-
-SolutionApplicationTarget
 SolutionApplicationTarget::forPropertyWrapperInitializer(
     VarDecl *wrappedVar, DeclContext *dc, Expr *initializer) {
   SolutionApplicationTarget target(

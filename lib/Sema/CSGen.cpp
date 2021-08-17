@@ -3955,14 +3955,17 @@ bool ConstraintSystem::generateConstraints(
     return hadError;
   }
 
-  case SolutionApplicationTarget::Kind::uninitializedWrappedVar: {
-    auto *wrappedVar = target.getAsUninitializedWrappedVar();
-    auto propertyType = getVarType(wrappedVar);
-    if (propertyType->hasError())
-      return true;
+  case SolutionApplicationTarget::Kind::uninitializedVar: {
+    if (auto *wrappedVar = target.getAsUninitializedWrappedVar()) {
+      auto propertyType = getVarType(wrappedVar);
+      if (propertyType->hasError())
+        return true;
 
-    return generateWrappedPropertyTypeConstraints(
+      return generateWrappedPropertyTypeConstraints(
         *this, /*initializerType=*/Type(), wrappedVar, propertyType);
+    }
+
+    llvm_unreachable("Unsupported un-initialized variable");
   }
   }
 }

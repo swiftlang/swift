@@ -9086,7 +9086,7 @@ SolutionApplicationTarget SolutionApplicationTarget::walk(ASTWalker &walker) {
   case Kind::patternBinding:
     return *this;
 
-  case Kind::uninitializedWrappedVar:
+  case Kind::uninitializedVar:
     return *this;
   }
 
