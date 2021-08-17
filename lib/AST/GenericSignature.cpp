@@ -458,7 +458,7 @@ GenericSignatureImpl::lookupConformance(CanType type,
   if (type->isTypeParameter())
     return ProtocolConformanceRef(proto);
 
-  return M->lookupConformance(type, proto);
+  return M->lookupConformance(type, proto, /*allowMissing=*/true);
 }
 
 bool GenericSignatureImpl::requiresClass(Type type) const {

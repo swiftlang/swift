@@ -513,6 +513,16 @@ public:
     return Bits.ModuleDecl.IsMainModule;
   }
 
+  /// Whether this module has been compiled with comprehensive checking for
+  /// concurrency, e.g., Sendable checking.
+  bool isConcurrencyChecked() const {
+    return Bits.ModuleDecl.IsConcurrencyChecked;
+  }
+
+  void setIsConcurrencyChecked(bool value = true) {
+    Bits.ModuleDecl.IsConcurrencyChecked = value;
+  }
+
   /// For the main module, retrieves the list of primary source files being
   /// compiled, that is, the files we're generating code for.
   ArrayRef<SourceFile *> getPrimarySourceFiles() const;

@@ -34,7 +34,7 @@ struct S4_P1: P1 {
 }
 
 @MainActor(unsafe)
-protocol P2 {
+protocol P2 { // expected-note{{protocol 'P2' does not conform to the `Sendable` protocol}}
   func f() // expected-note{{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
   nonisolated func g()
 }
@@ -44,6 +44,7 @@ struct S5_P2: P2 {
   func g() { }
 }
 
+// expected-warning@+1{{cannot pass argument of non-sendable type 'P2' across actors}}
 nonisolated func testP2(x: S5_P2, p2: P2) {
   p2.f() // expected-error{{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
   p2.g() // OKAY

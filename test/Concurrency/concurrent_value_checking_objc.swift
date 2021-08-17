@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift  -disable-availability-checking
+// RUN: %target-typecheck-verify-swift  -disable-availability-checking -warn-concurrency
 
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
@@ -13,7 +13,7 @@ final class B: NSObject, Sendable {
   var x: Int = 5 // expected-error{{stored property 'x' of 'Sendable'-conforming class 'B' is mutable}}
 }
 
-class C { }
+class C { } // expected-note{{class 'C' does not conform to the `Sendable` protocol}}
 
 final class D: NSObject, Sendable {
   let c: C = C() // expected-error{{stored property 'c' of 'Sendable'-conforming class 'D' has non-sendable type 'C'}}

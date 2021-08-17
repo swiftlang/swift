@@ -17,8 +17,10 @@
 #ifndef SWIFT_SEMA_TYPECHECKCONCURRENCY_H
 #define SWIFT_SEMA_TYPECHECKCONCURRENCY_H
 
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/Type.h"
 #include <cassert>
 
@@ -238,13 +240,48 @@ bool contextUsesConcurrencyFeatures(const DeclContext *dc);
 /// used to tailor the diagnostic.
 ///
 /// \returns true if an problem was detected, false otherwise.
-bool diagnoseNonConcurrentTypesInReference(
+bool diagnoseNonSendableTypesInReference(
     ConcreteDeclRef declRef, ModuleDecl *module, SourceLoc loc,
-    ConcurrentReferenceKind refKind,
-    DiagnosticBehavior behavior = DiagnosticBehavior::Unspecified);
+    ConcurrentReferenceKind refKind);
 
 /// Produce a diagnostic for a missing conformance to Sendable.
-void diagnoseMissingSendableConformance(SourceLoc loc, Type type);
+void diagnoseMissingSendableConformance(
+    SourceLoc loc, Type type, ModuleDecl *module);
+
+/// Diagnose any non-Sendable types that occur within the given type, using
+/// the given diagnostic.
+///
+/// \param diagnose Emit a diagnostic indicating that the current type
+/// is non-Sendable, with the suggested behavior limitation. Returns \c true
+/// if an error was produced.
+///
+/// \returns \c true if any diagnostics were produced, \c false otherwise.
+bool diagnoseNonSendableTypes(
+    Type type, ModuleDecl *module, SourceLoc loc,
+    llvm::function_ref<bool(Type, DiagnosticBehavior)> diagnose);
+
+namespace detail {
+  template<typename T>
+  struct Identity {
+    typedef T type;
+  };
+}
+/// Diagnose any non-Sendable types that occur within the given type, using
+/// the given diagnostic.
+///
+/// \returns \c true if any errors were produced, \c false otherwise.
+template<typename ...DiagArgs>
+bool diagnoseNonSendableTypes(
+    Type type, ModuleDecl *module, SourceLoc loc, Diag<Type, DiagArgs...> diag,
+    typename detail::Identity<DiagArgs>::type ...diagArgs) {
+  ASTContext &ctx = module->getASTContext();
+  return diagnoseNonSendableTypes(
+      type, module, loc, [&](Type specificType, DiagnosticBehavior behavior) {
+    ctx.Diags.diagnose(loc, diag, type, diagArgs...)
+      .limitBehavior(behavior);
+    return behavior == DiagnosticBehavior::Unspecified;
+  });
+}
 
 /// How the concurrent value check should be performed.
 enum class SendableCheck {

@@ -1611,6 +1611,14 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     DiscardAttribute = true;
   }
 
+  // If this attribute is only permitted when distributed is enabled, reject it.
+  if (DeclAttribute::isDistributedOnly(DK) &&
+      !shouldParseExperimentalDistributed()) {
+    diagnose(Loc, diag::attr_requires_distributed, AttrName,
+             DeclAttribute::isDeclModifier(DK));
+    DiscardAttribute = true;
+  }
+
   if (Context.LangOpts.Target.isOSBinFormatCOFF()) {
     if (DK == DAK_WeakLinked) {
       diagnose(Loc, diag::attr_unsupported_on_target, AttrName,

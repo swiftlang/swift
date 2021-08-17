@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift  -disable-availability-checking -warn-concurrency
 // REQUIRES: concurrency
 
-class NotConcurrent { }
+class NotConcurrent { } // expected-note 17{{class 'NotConcurrent' does not conform to the `Sendable` protocol}}
 
 // ----------------------------------------------------------------------
 // Sendable restriction on actor operations
@@ -77,7 +77,7 @@ struct HasSubscript {
   subscript (i: Int) -> NotConcurrent? { nil }
 }
 
-class ClassWithGlobalActorInits {
+class ClassWithGlobalActorInits { // expected-note 2{{class 'ClassWithGlobalActorInits' does not conform to the `Sendable` protocol}}
   @SomeGlobalActor
   init(_: NotConcurrent) { }
 
@@ -92,6 +92,7 @@ func globalTestMain(nc: NotConcurrent) async {
   await globalAsync(a) // expected-warning{{cannot pass argument of non-sendable type 'NotConcurrent?' across actors}}
   await globalSync(a)  // expected-warning{{cannot pass argument of non-sendable type 'NotConcurrent?' across actors}}
   _ = await ClassWithGlobalActorInits(nc) // expected-warning{{cannot pass argument of non-sendable type 'NotConcurrent' across actors}}
+  // expected-warning@-1{{cannot call function returning non-sendable type 'ClassWithGlobalActorInits' across actors}}
   _ = await ClassWithGlobalActorInits() // expected-warning{{cannot call function returning non-sendable type 'ClassWithGlobalActorInits' across actors}}
 }
 
@@ -143,7 +144,7 @@ func testUnsafeSendableInAsync() async {
 // ----------------------------------------------------------------------
 // Sendable restriction on key paths.
 // ----------------------------------------------------------------------
-class NC: Hashable {
+class NC: Hashable { // expected-note 3{{class 'NC' does not conform to the `Sendable` protocol}}
   func hash(into: inout Hasher) { }
   static func==(_: NC, _: NC) -> Bool { true }
 }

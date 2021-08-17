@@ -2627,7 +2627,6 @@ public:
   void analyzeActorIsolation(const ValueDecl *VD, Type T, bool &implicitlyAsync,
                              Optional<NotRecommendedReason> &NotRecommended) {
     auto isolation = getActorIsolation(const_cast<ValueDecl *>(VD));
-    auto &ctx = VD->getASTContext();
 
     switch (isolation.getKind()) {
     case ActorIsolation::DistributedActorInstance: {
@@ -2646,7 +2645,7 @@ public:
       // if the context has adopted concurrency.
       if (!CanCurrDeclContextHandleAsync &&
           !completionContextUsesConcurrencyFeatures(CurrDeclContext) &&
-          !ctx.LangOpts.WarnConcurrency) {
+          !CurrDeclContext->getParentModule()->isConcurrencyChecked()) {
         return;
       }
       LLVM_FALLTHROUGH;
@@ -2664,7 +2663,8 @@ public:
     }
 
     // If the reference is 'async', all types must be 'Sendable'.
-    if (ctx.LangOpts.WarnConcurrency && implicitlyAsync && T) {
+    if (CurrDeclContext->getParentModule()->isConcurrencyChecked() &&
+        implicitlyAsync && T) {
       auto *M = CurrDeclContext->getParentModule();
       if (isa<VarDecl>(VD)) {
         if (!isSendableType(M, T)) {

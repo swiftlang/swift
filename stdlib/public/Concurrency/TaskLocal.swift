@@ -95,8 +95,7 @@ import Swift
 /// value for lookups in the task local storage.
 @propertyWrapper
 @available(SwiftStdlib 5.5, *)
-// TODO: add Sendable enforcement when we're ready to do so rdar://77441933
-public final class TaskLocal<Value>: UnsafeSendable, CustomStringConvertible {
+public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible {
   let defaultValue: Value
 
   public init(wrappedValue defaultValue: Value) {

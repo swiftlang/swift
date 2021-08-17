@@ -152,6 +152,9 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
     case options_block::MODULE_ABI_NAME:
       extendedInfo.setModuleABIName(blobData);
       break;
+    case options_block::IS_CONCURRENCY_CHECKED:
+      extendedInfo.setIsConcurrencyChecked(true);
+      break;
     default:
       // Unknown options record, possibly for use by a future version of the
       // module format.
@@ -1217,6 +1220,7 @@ ModuleFileSharedCore::ModuleFileSharedCore(
       Bits.IsImplicitDynamicEnabled = extInfo.isImplicitDynamicEnabled();
       Bits.IsAllowModuleWithCompilerErrorsEnabled =
           extInfo.isAllowModuleWithCompilerErrorsEnabled();
+      Bits.IsConcurrencyChecked = extInfo.isConcurrencyChecked();
       MiscVersion = info.miscVersion;
       ModuleABIName = extInfo.getModuleABIName();
 
