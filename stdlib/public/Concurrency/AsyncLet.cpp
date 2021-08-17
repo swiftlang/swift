@@ -245,8 +245,12 @@ static void swift_asyncLet_getImpl(SWIFT_ASYNC_CONTEXT AsyncContext *callerConte
 }
 
 struct AsyncLetContinuationContext: AsyncContext {
-  AsyncLet *alet;  
+  AsyncLet *alet;
+  OpaqueValue *resultBuffer;
 };
+
+static_assert(sizeof(AsyncLetContinuationContext) <= sizeof(TaskFutureWaitAsyncContext),
+              "compiler provides the same amount of context space to each");
 
 SWIFT_CC(swiftasync)
 static void _asyncLet_get_throwing_continuation(
@@ -369,8 +373,7 @@ static void _asyncLet_finish_continuation(
   auto continuationContext
     = reinterpret_cast<AsyncLetContinuationContext*>(callContext);
   auto alet = continuationContext->alet;
-  auto resultBuffer = asImpl(alet)->getFutureContext()
-                                  ->successResultPointer;
+  auto resultBuffer = continuationContext->resultBuffer;
   
   // Destroy the error, or the result that was stored to the buffer.
   if (error) {
@@ -415,6 +418,7 @@ static void swift_asyncLet_finishImpl(SWIFT_ASYNC_CONTEXT AsyncContext *callerCo
   aletContext->Parent = callerContext;
   aletContext->ResumeParent = resumeFunction;
   aletContext->alet = alet;
+  aletContext->resultBuffer = reinterpret_cast<OpaqueValue*>(resultBuffer);
   auto futureContext = asImpl(alet)->getFutureContext();
   
   // TODO: It would be nice if we could await the future without having to
