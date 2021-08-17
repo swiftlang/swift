@@ -136,7 +136,7 @@ static void addImplicitDistributedActorStoredProperties(ClassDecl *decl) {
 
   // ```
   // @_distributedActorIndependent
-  // let id: AnyActorIdentity // TODO: move to `nonisolated var id {}` once we have the new allocation scheme
+  // let id: AnyActorIdentity
   // ```
   {
     auto propertyType = C.getAnyActorIdentityDecl()->getDeclaredInterfaceType();
@@ -151,7 +151,7 @@ static void addImplicitDistributedActorStoredProperties(ClassDecl *decl) {
 
     // mark as @_distributedActorIndependent, allowing access to it from everywhere
     propDecl->getAttrs().add(
-        new (C) DistributedActorIndependentAttr(/*IsImplicit=*/true)); // TODO: remove and move to nonisolated once new constructors land
+        new (C) DistributedActorIndependentAttr(/*IsImplicit=*/true));
 
     decl->addMember(propDecl);
     decl->addMember(pbDecl);
@@ -175,7 +175,7 @@ static void addImplicitDistributedActorStoredProperties(ClassDecl *decl) {
 
     // mark as @_distributedActorIndependent, allowing access to it from everywhere
     propDecl->getAttrs().add(
-        new (C) DistributedActorIndependentAttr(/*IsImplicit=*/true)); // TODO: remove and move to nonisolated once new constructors land
+        new (C) DistributedActorIndependentAttr(/*IsImplicit=*/true));
 
     decl->addMember(propDecl);
     decl->addMember(pbDecl);
