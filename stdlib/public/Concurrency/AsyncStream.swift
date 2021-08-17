@@ -19,7 +19,7 @@ import Swift
 /// create an asynchronous sequence without manually implementing an
 /// asynchronous iterator. In particular, an asynchronous stream is well-suited
 /// to adapt callback- or delegation-based APIs to participate with
-/// `async`/`await`.
+/// `async`-`await`.
 ///
 /// You initialize an `AsyncStream` with a closure that receives an
 /// `AsyncStream.Continuation`. Produce elements in this closure, then provide
@@ -34,11 +34,11 @@ import Swift
 /// consumed by a caller iterating over them. Because of this, `AsyncStream`
 /// defines a buffering behavior, allowing the stream to buffer a specific
 /// number of oldest or newest elements. By default, the buffer limit is
-/// unbounded, that is, `Int.max`.
+/// `Int.max`, which means the value is unbounded.
 ///
 /// ### Adapting Existing Code to Use Streams
 ///
-/// To adapt existing callback code to use `async` / `await`, use the callbacks
+/// To adapt existing callback code to use `async`-`await`, use the callbacks
 /// to provide values to the stream, by using the continuation's `yield(_:)`
 /// method.
 ///
@@ -65,7 +65,7 @@ import Swift
 /// continuation's `yield(_:)` method.
 /// 3. Sets the continuation's `onTermination` property to a closure that
 /// calls `stopMonitoring()` on the monitor.
-/// 4. Finally, calls `startMonitoring` on the `QuakeMonitor`.
+/// 4. Calls `startMonitoring` on the `QuakeMonitor`.
 ///
 ///     extension QuakeMonitor {
 ///
@@ -136,7 +136,7 @@ public struct AsyncStream<Element> {
       /// indicates the number of remaining slots in the buffer at the time of
       /// the `yield` call.
       ///
-      /// - Note: From a thread safety viewpoint, `remaining` is a lower bound
+      /// - Note: From a thread safety point of view, `remaining` is a lower bound
       /// on the number of remaining slots. This is because a subsequent call
       /// that uses the `remaining` value could race on the consumption of
       /// values from the stream.
@@ -144,8 +144,7 @@ public struct AsyncStream<Element> {
       
       /// The stream didn't enqueue the element due to a full buffer.
       ///
-      /// The associated element for this case is the element that the stream
-      /// dropped.
+      /// The associated element for this case is the element dropped by the stream.
       case dropped(Element)
       
       /// The stream didn't enqueue the element because the stream was in a
@@ -181,7 +180,7 @@ public struct AsyncStream<Element> {
     /// nomally from its suspension point with a given element.
     ///
     /// - Parameter value: The value to yield from the continuation.
-    /// - Returns: A `YieldResult` indicating the success or failure of the
+    /// - Returns: A `YieldResult` that indicates the success or failure of the
     ///   yield operation.
     ///
     /// If nothing is awaiting the next value, this method attempts to buffer the
@@ -197,8 +196,8 @@ public struct AsyncStream<Element> {
     /// Resume the task awaiting the next iteration point by having it return
     /// nil, which signifies the end of the iteration.
     ///
-    /// Calling this function more than once has no effect. Once you call
-    /// finish, the stream enters a terminal state and produces no further
+    /// Calling this function more than once has no effect. After calling
+    /// finish, the stream enters a terminal state and doesn't produces any additional
     /// elements.
     public func finish() {
       storage.finish()
@@ -231,20 +230,20 @@ public struct AsyncStream<Element> {
   /// Constructs an asynchronous stream for an element type, using the
   /// specified buffering policy and element-producing closure.
   ///
-  /// - Parameter elementType: The type of element the `AsyncStream`
-  ///   produces.
-  /// - Parameter bufferingPolicy: A `Continuation.BufferingPolicy` value to
-  ///   set the stream's buffering behavior. By default, the stream buffers an
-  ///   unlimited number of elements. You can also set the policy to buffer a
-  ///   specified number of oldest or newest elements.
-  /// - Parameter build: A custom closure that yields values to the
-  ///   `AsyncStream`. This closure receives a `AsyncStream.Continuation`
-  ///   instance that it uses to provide elements to the stream and terminate the
-  ///   stream when finished.
+  /// - Parameters:
+  ///    - elementType: The type of element the `AsyncStream` produces.
+  ///    - bufferingPolicy: A `Continuation.BufferingPolicy` value to
+  ///       set the stream's buffering behavior. By default, the stream buffers an
+  ///       unlimited number of elements. You can also set the policy to buffer a
+  ///       specified number of oldest or newest elements.
+  ///    - build: A custom closure that yields values to the
+  ///       `AsyncStream`. This closure receives a `AsyncStream.Continuation`
+  ///       instance that it uses to provide elements to the stream and terminate the
+  ///       stream when finished.
   ///
   /// The `AsyncStream.Continuation` received by the `build` closure is
-  /// appopriate for use in concurrent contexts. It is thread safe to send and
-  /// finish; all calls are to the continuation are serialized. However, calling
+  /// appropriate for use in concurrent contexts. It is thread safe to send and
+  /// finish; all calls to the continuation are serialized. However, calling
   /// this from multiple concurrent contexts could result in out-of-order
   /// delivery.
   ///
@@ -265,7 +264,7 @@ public struct AsyncStream<Element> {
   ///             }
   ///         }
   ///
-  ///     // call point:
+  ///     // Call point:
   ///     for await random in stream {
   ///         print ("\(random)")
   ///     }
@@ -291,14 +290,14 @@ public struct AsyncStream<Element> {
   /// Use this convenience initializer when you have an asychronous function
   /// that can produce elements for the stream, and don't want to invoke
   /// a continuation manually. This initializer "unfolds" your closure into
-  /// a full-blown asynchronous stream. The created stream handles conformance
+  /// an asynchronous stream. The created stream handles conformance
   /// to the `AsyncSequence` protocol automatically, including termination
   /// (whether by cancellation or by returning `nil` from the closure to finish
   /// iteration).
   ///
   /// The following example shows an `AsyncStream` created with this
   /// initializer that produces random numbers on a one-second interval. This
-  /// example uses Swift's multiple trailing closure syntax, which omits
+  /// example uses the Swift multiple trailing closure syntax, which omits
   /// the `unfolding` parameter label.
   ///
   ///     let stream = AsyncStream<Int> {
@@ -308,7 +307,7 @@ public struct AsyncStream<Element> {
   ///         onCancel: { @Sendable () in print ("Canceled.") }
   ///     )
   ///
-  ///     // call point:
+  ///     // Call point:
   ///     for await random in stream {
   ///         print ("\(random)")
   ///     }
@@ -339,10 +338,10 @@ public struct AsyncStream<Element> {
 extension AsyncStream: AsyncSequence {
   /// The asynchronous iterator for iterating an asynchronous stream.
   ///
-  /// This type specifically doesn't conform to `Sendable`. Do not use it from multiple
+  /// This type doesn't conform to `Sendable`. Don't use it from multiple
   /// concurrent contexts. It is a programmer error to invoke `next()` from a
-  /// concurrent context that contends with another such call, and this will
-  /// result in a call to `fatalError()`.
+  /// concurrent context that contends with another such call, which
+  /// results in a call to `fatalError()`.
   public struct Iterator: AsyncIteratorProtocol {
     let produce: () async -> Element?
 
@@ -352,12 +351,12 @@ extension AsyncStream: AsyncSequence {
     /// `AsyncStream`.
     ///
     /// It is a programmer error to invoke `next()` from a
-    /// concurrent context that contends with another such call, and this will
-    /// result in a call to `fatalError()`.
+    /// concurrent context that contends with another such call, which
+    /// results in a call to `fatalError()`.
     ///
     /// If you cancel the task this iterator is running in while `next()` is
     /// awaiting a value, the `AsyncStream` terminates. In this case, `next()`
-    /// might return `nil` immediately, or might return `nil` on subsequent calls.
+    /// might return `nil` immediately, or return `nil` on subsequent calls.
     public mutating func next() async -> Element? {
       await produce()
     }
@@ -373,10 +372,10 @@ extension AsyncStream: AsyncSequence {
 @available(SwiftStdlib 5.5, *)
 extension AsyncStream.Continuation {
   /// Resume the task awaiting the next iteration point by having it return
-  /// nomally from its suspension point with a given result's success value.
+  /// normally from its suspension point with a given result's success value.
   ///
   /// - Parameter result: A result to yield from the continuation.
-  /// - Returns: A `YieldResult` indicating the success or failure of the
+  /// - Returns: A `YieldResult` that indicates the success or failure of the
   ///   yield operation.
   ///
   /// If nothing is awaiting the next value, the method attempts to buffer the
@@ -395,13 +394,13 @@ extension AsyncStream.Continuation {
   }
 
   /// Resume the task awaiting the next iteration point by having it return
-  /// nomally from its suspension point.
+  /// normally from its suspension point.
   ///
-  /// - Returns: A `YieldResult` indicating the success or failure of the
+  /// - Returns: A `YieldResult` that indicates the success or failure of the
   ///   yield operation.
   ///
   /// Use this method with `AsyncStream` instances whose `Element` type is
-  /// `Void`. In this case, the `yield()` call simply unblocks the awaiting
+  /// `Void`. In this case, the `yield()` call unblocks the awaiting
   /// iteration; there is no value to return.
   ///
   /// If you call this method repeatedly, each call returns immediately, without

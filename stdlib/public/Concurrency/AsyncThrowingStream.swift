@@ -19,7 +19,7 @@ import Swift
 /// way to create an asynchronous sequence without manually implementing an
 /// asynchronous iterator. In particular, an asynchronous stream is well-suited
 /// to adapt callback- or delegation-based APIs to participate with
-/// `async`/`await`.
+/// `async`-`await`.
 ///
 /// In contrast to `AsyncStream`, this type can throw an error from the awaited
 /// `next()`, which terminates the stream with the thrown error.
@@ -39,11 +39,11 @@ import Swift
 /// consumed by a caller iterating over them. Because of this, `AsyncThrowingStream`
 /// defines a buffering behavior, allowing the stream to buffer a specific
 /// number of oldest or newest elements. By default, the buffer limit is
-/// unbounded, that is, `Int.max`.
+/// `Int.max`, which means it's unbounded.
 ///
 /// ### Adapting Existing Code to Use Streams
 ///
-/// To adapt existing callback code to use `async` / `await`, use the callbacks
+/// To adapt existing callback code to use `async`-`await`, use the callbacks
 /// to provide values to the stream, by using the continuation's `yield(_:)`
 /// method.
 ///
@@ -74,10 +74,10 @@ import Swift
 /// 3. Sets the monitor's `errorHandler` property to a closure that receives
 /// any error from the monitor and forwards it to the stream by calling the
 /// continuation's `finish(throwing:)` method. This causes the stream's
-/// iterator to throw the error, terminating the stream.
+/// iterator to throw the error and terminate the stream.
 /// 4. Sets the continuation's `onTermination` property to a closure that
 /// calls `stopMonitoring()` on the monitor.
-/// 5. Finally, calls `startMonitoring` on the `QuakeMonitor`.
+/// 5. Calls `startMonitoring` on the `QuakeMonitor`.
 ///
 ///     extension QuakeMonitor {
 ///
@@ -99,9 +99,8 @@ import Swift
 ///     }
 ///
 ///
-/// Since the stream is an `AsyncSequence`, the call point can use the
-/// `for`-`await`-`in` syntax to process each `Quake` instance as the stream
-/// produces it:
+/// Because the stream is an `AsyncSequence`, the call point uses the
+/// `for`-`await`-`in` syntax to process each `Quake` instance as produced by the stream:
 ///
 ///     do {
 ///         for try await quake in quakeStream {
@@ -177,7 +176,7 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
       ///
       /// This indicates the stream terminated prior to calling `yield`, either
       /// because the stream finished normally or through cancellation, or
-      /// threw an error
+      /// threw an error.
       case terminated
     }
     
@@ -204,7 +203,7 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
     /// nomally from its suspension point with a given element.
     ///
     /// - Parameter value: The value to yield from the continuation.
-    /// - Returns: A `YieldResult` indicating the success or failure of the
+    /// - Returns: A `YieldResult` that indicates the success or failure of the
     ///   yield operation.
     ///
     /// If nothing is awaiting the next value, the method attempts to buffer the
@@ -220,10 +219,10 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
     /// Resume the task awaiting the next iteration point by having it return
     /// nil, which signifies the end of the iteration.
     ///
-    /// - Parameter error: The error to throw, or `nil` to finish normally.
+    /// - Parameter error: The error to throw, or `nil`, to finish normally.
     ///
-    /// Calling this function more than once has no effect. Once you call
-    /// finish, the stream enters a terminal state and produces no further
+    /// Calling this function more than once has no effect. After calling
+    /// finish, the stream enters a terminal state and doesn't produce any additional
     /// elements.
     public func finish(throwing error: __owned Failure? = nil) {
       storage.finish(throwing: error)
@@ -236,11 +235,11 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
     /// terminate iteration of a `AsyncThrowingStream` results in a call to this
     /// callback.
     ///
-    /// Cancelling an active iteration invokes the `onTermination` callback
-    /// first, then resumes by yielding `nil` or throwing an error from the
+    /// Canceling an active iteration invokes the `onTermination` callback
+    /// first, and then resumes by yielding `nil` or throwing an error from the
     /// iterator. This means that you can perform needed cleanup in the
     ///  cancellation handler. After reaching a terminal state, the
-    ///   `AsyncThrowingStream` disposes of the callback.
+    ///  `AsyncThrowingStream` disposes of the callback.
     public var onTermination: (@Sendable (Termination) -> Void)? {
       get {
         return storage.getOnTermination()
@@ -256,13 +255,14 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
   /// Constructs an asynchronous stream for an element type, using the
   /// specified buffering policy and element-producing closure.
   ///
-  /// - Parameter elementType: The type of element the `AsyncThrowingStream`
-  ///   produces
-  /// - Parameter limit: The maximum number of elements to
+  /// - Parameters:
+  ///   - elementType: The type of element the `AsyncThrowingStream`
+  ///   produces.
+  ///   - limit: The maximum number of elements to
   ///   hold in the buffer. By default, this value is unlimited. Use a
   ///   `Continuation.BufferingPolicy` to buffer a specified number of oldest
   ///   or newest elements.
-  /// - Parameter build: A custom closure that yields values to the
+  ///   - build: A custom closure that yields values to the
   ///   `AsyncThrowingStream`. This closure receives an
   ///   `AsyncThrowingStream.Continuation` instance that it uses to provide
   ///   elements to the stream and terminate the stream when finished.
@@ -297,7 +297,7 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
   ///             }
   ///         }
   ///
-  ///     // call point:
+  ///     // Call point:
   ///     do {
   ///         for try await random in stream {
   ///             print ("\(random)")
@@ -344,7 +344,7 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
   ///             return random
   ///         }
   ///
-  ///     // call point:
+  ///     // Call point:
   ///     do {
   ///         for try await random in stream {
   ///             print ("\(random)")
@@ -364,10 +364,10 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
 extension AsyncThrowingStream: AsyncSequence {
   /// The asynchronous iterator for iterating an asynchronous stream.
   ///
-  /// This type is specificially not `Sendable`. Do not use it from multiple
+  /// This type is not `Sendable`. Don't use it from multiple
   /// concurrent contexts. It is a programmer error to invoke `next()` from a
-  /// concurrent context that contends with another such call, and this will
-  /// result in a call to `fatalError()`.
+  /// concurrent context that contends with another such call, which
+  /// results in a call to `fatalError()`.
   public struct Iterator: AsyncIteratorProtocol {
     let produce: () async throws -> Element?
 
@@ -377,7 +377,7 @@ extension AsyncThrowingStream: AsyncSequence {
     /// `AsyncThrowingStream`.
     ///
     /// It is a programmer error to invoke `next()` from a concurrent context
-    /// that contends with another such call, and this will result in a call to
+    /// that contends with another such call, which results in a call to
     ///  `fatalError()`.
     ///
     /// If you cancel the task this iterator is running in while `next()` is
@@ -407,7 +407,7 @@ extension AsyncThrowingStream.Continuation {
   ///   iterator's `next()` method. If the result is the `failure(_:)` case,
   ///   this call terminates the stream with the result's error, by calling
   ///   `finish(throwing:)`.
-  /// - Returns: A `YieldResult` indicating the success or failure of the
+  /// - Returns: A `YieldResult` that indicates the success or failure of the
   ///   yield operation.
   ///
   /// If nothing is awaiting the next value and the result is success, this call
@@ -431,11 +431,11 @@ extension AsyncThrowingStream.Continuation {
   /// Resume the task awaiting the next iteration point by having it return
   /// nomally from its suspension point.
   ///
-  /// - Returns: A `YieldResult` indicating the success or failure of the
+  /// - Returns: A `YieldResult` that indicates the success or failure of the
   ///   yield operation.
   ///
   /// Use this method with `AsyncThrowingStream` instances whose `Element`
-  /// type is `Void`. In this case, the `yield()` call simply unblocks the
+  /// type is `Void`. In this case, the `yield()` call unblocks the
   /// awaiting iteration; there is no value to return.
   ///
   /// If you call this method repeatedly, each call returns immediately,
