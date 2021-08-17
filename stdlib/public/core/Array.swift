@@ -1604,7 +1604,7 @@ extension Array {
     _makeMutableAndUnique()
     let count = _buffer.mutableCount
 
-    // Create an UnsafeBufferPointer over work that we can pass to body
+    // Create an UnsafeBufferPointer that we can pass to body
     let pointer = _buffer.mutableFirstElementAddress
     var inoutBufferPointer = UnsafeMutableBufferPointer(
       start: pointer, count: count)
@@ -1615,6 +1615,7 @@ extension Array {
         inoutBufferPointer.count == count,
         "Array withUnsafeMutableBufferPointer: replacing the buffer is not allowed")
       _endMutation()
+      _fixLifetime(self)
     }
 
     // Invoke the body.
