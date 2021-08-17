@@ -15,17 +15,14 @@ import Swift
 
 // ==== TaskGroup --------------------------------------------------------------
 
-/// Starts a new scope in which a dynamic number of tasks can be created<!-- FIXME: Passive; rewrite. -->.
+/// Starts a new scope that can contain a dynamic number of child tasks.
 ///
-/// When the group returns,
-/// it implicitly waits for all child tasks to complete.
-/// The tasks are canceled<!-- FIXME: Passive; rewrite. --> only if `cancelAll()` was invoked<!-- FIXME: Passive; rewrite. --> before returning,
-/// if the group's task was canceled<!-- FIXME: Passive; rewrite. -->.
+/// A group waits for all of its child tasks
+/// to complete or be canceled before it returns.
+/// After this function returns, the task group is always empty.
 ///
-/// After this method returns, the task group is guaranteed<!-- FIXME: Passive; rewrite. --> to be empty.
-///
-/// To collect the results of tasks that were added<!-- FIXME: Passive; rewrite. --> to the group,
-/// you can use the following pattern:
+/// To collect the results of the group's child tasks,
+/// you can use a `for`-`await`-`in` loop:
 ///
 ///     var sum = 0
 ///     for await result in group {
@@ -33,7 +30,7 @@ import Swift
 ///     }
 ///
 /// If you need more control or only a few results,
-/// you can use a pattern like the following:
+/// you can call `next()` directly:
 ///
 ///     guard let first = await group.next() {
 ///         group.cancelAll()
@@ -46,18 +43,19 @@ import Swift
 /// Task Group Cancellation
 /// =======================
 ///
-/// Canceling the task in which the group is running
-/// also cancels the group and all of its child tasks.
+/// You can cancel a task group and all of its child tasks
+/// by calling the `cancellAll()` method on the task group,
+/// or by canceling the task in which the group is running.
 ///
 /// If you call `async(priority:operation:)` to create a new task in a canceled group,
 /// that task is immediately canceled after creation.
 /// Alternatively, you can call `asyncUnlessCancelled(priority:operation:)`,
-/// which doesn't create the task if the group has already been canceled<!-- FIXME: Passive; rewrite. -->
+/// which doesn't create the task if the group has already been canceled
 /// Choosing between these two functions
 /// lets you control how to react to cancellation within a group:
-/// some child tasks need to run regardless of cancellation
-/// and others are better not even being created<!-- FIXME: Passive; rewrite. Also, "are better not even being created knowing" doesn't make any sense. How can they "know"? You're anthropomorphizing the code. Don't do that. -->
-/// knowing they can't produce useful results.
+/// some child tasks need to run regardless of cancellation,
+/// but other tasks are better not even being created
+/// when you know they can't produce useful results.
 ///
 /// Because the tasks you add to a group with this method are nonthrowing,
 /// those tasks can't respond to cancellation by throwing `CancellationError`.
@@ -90,18 +88,14 @@ public func withTaskGroup<ChildTaskResult, GroupResult>(
   #endif
 }
 
-/// Starts a new scope in which a dynamic number of throwing tasks can be created<!-- FIXME: Passive; rewrite. -->.
+/// Starts a new scope that can contain a dynamic number of throwing child tasks.
 ///
-/// When the group returns,
-/// it implicitly waits for all child tasks to complete.
-/// The tasks are canceled<!-- FIXME: Passive; rewrite. --> only if `cancelAll()` was invoked<!-- FIXME: Passive; rewrite. --> before returning,
-/// if the group's task was canceled<!-- FIXME: Passive; rewrite. -->,
-/// or if the group's body throws an error.
+/// A group waits for all of its child tasks
+/// to complete, throw an error, or be canceled before it returns.
+/// After this function returns, the task group is always empty.
 ///
-/// After this method returns, the task group is guaranteed<!-- FIXME: Passive; rewrite. --> to be empty.
-///
-/// To collect the results of tasks that were added<!-- FIXME: Passive; rewrite. --> to the group,
-/// use the following pattern:
+/// To collect the results of the group's child tasks,
+/// you can use a `for`-`await`-`in` loop:
 ///
 ///     var sum = 0
 ///     for await result in group {
@@ -109,7 +103,7 @@ public func withTaskGroup<ChildTaskResult, GroupResult>(
 ///     }
 ///
 /// If you need more control or only a few results,
-/// you can use the following pattern:
+/// you can call `next()` directly:
 ///
 ///     guard let first = await group.next() {
 ///         group.cancelAll()
@@ -122,26 +116,27 @@ public func withTaskGroup<ChildTaskResult, GroupResult>(
 /// Task Group Cancellation
 /// =======================
 ///
-/// Canceling the task that the group is running in
-/// also cancels the group and all of its child tasks.
+/// You can cancel a task group and all of its child tasks
+/// by calling the `cancellAll()` method on the task group,
+/// or by canceling the task in which the group is running.
 ///
 /// If you call `async(priority:operation:)` to create a new task in a canceled group,
-/// that task is immediately canceled after being created<!-- FIXME: Passive; rewrite. -->.
+/// that task is immediately canceled after creation.
 /// Alternatively, you can call `asyncUnlessCancelled(priority:operation:)`,
-/// which doesn't create the task if the group has already been canceled<!-- FIXME: Passive; rewrite. -->
+/// which doesn't create the task if the group has already been canceled
 /// Choosing between these two functions
 /// lets you control how to react to cancellation within a group:
-/// some child tasks need to run regardless of cancellation
-/// and others are better not even being created
-/// knowing<!-- FIXME: Rewrite for clarity, fix the passive voice, and don't anthropomorphize the code; how can it "know"? --> they can't produce useful results.
+/// some child tasks need to run regardless of cancellation,
+/// but other tasks are better not even being created
+/// when you know they can't produce useful results.
 ///
 /// Throwing an error in one of the tasks of a task group
 /// doesn't immediately cancel the other tasks in that group.
 /// However,
 /// if you call `next()` in the task group and propogate its error,
-/// all other tasks are canceled<!-- FIXME: Passive; rewrite. -->.
+/// all other tasks are canceled.
 /// For example, in the code below,
-/// nothing is canceled<!-- FIXME: Passive; rewrite. --> and the group doesn't throw an error:
+/// nothing is canceled and the group doesn't throw an error:
 ///
 ///     withThrowingTaskGroup { group in
 ///         group.addTask { throw SomeError() }
@@ -157,8 +152,8 @@ public func withTaskGroup<ChildTaskResult, GroupResult>(
 ///
 /// An individual task throws its error
 /// in the corresponding call to `Group.next()`,
-/// which gives you a chance to handle individual error
-/// or to let the error be rethrown<!-- FIXME: Passive; rewrite. --> by the group.
+/// which gives you a chance to handle the individual error
+/// or to let the group rethrow the error.
 @available(SwiftStdlib 5.5, *)
 @inlinable
 public func withThrowingTaskGroup<ChildTaskResult, GroupResult>(
@@ -198,12 +193,12 @@ public func withThrowingTaskGroup<ChildTaskResult, GroupResult>(
 /// To create a task group,
 /// call the `withTaskGroup(of:returning:body:)` method.
 ///
-/// A task group must be used only within the task where it was created<!-- FIXME: Passive; rewrite. -->.
+/// Don't use a task group from outside the task where you created it.
 /// In most cases,
 /// the Swift type system prevents a task group from escaping like that
-/// because adding a child task is a mutating operation,
-/// and mutation operations can't be performed<!-- FIXME: Passive; rewrite. -->
-/// from concurrent execution contexts like child tasks.
+/// because adding a child task to a task group is a mutating operation,
+/// and mutation operations can't be performed
+/// from a concurrent execution context like a child task.
 ///
 /// For information about the language-level concurrency model that `TaskGroup` is part of,
 /// see [Concurrency][concurrency] in [The Swift Programming Language][tspl].
@@ -252,7 +247,7 @@ public struct TaskGroup<ChildTaskResult> {
 #endif
   }
 
-  /// Adds a child task to the group, unless the group has been canceled<!-- FIXME: Passive; rewrite. -->.
+  /// Adds a child task to the group, unless the group has been canceled.
   ///
   /// - Parameters:
   ///   - overridingPriority: The priority of the operation task.
@@ -294,7 +289,7 @@ public struct TaskGroup<ChildTaskResult> {
   ///
   /// The values returned by successive calls to this method
   /// appear in the order that the tasks *completed*,
-  /// not in the order that those tasks were added<!-- FIXME: Passive; rewrite. --> to the task group.
+  /// not in the order that those tasks were added to the task group.
   /// For example:
   ///
   ///     group.addTask { 1 }
@@ -324,17 +319,17 @@ public struct TaskGroup<ChildTaskResult> {
   /// Awaiting on an empty group
   /// immediate returns `nil` without suspending.
   ///
-  /// You can also use `for await` to collect results of a task group:
+  /// You can also use a `for`-`await`-`in` loop to collect results of a task group:
   ///
   ///     for await try value in group {
   ///         collected += value
   ///     }
   ///
   /// Don't call this method from outside the task
-  /// where this task group was created<!-- FIXME: Passive; rewrite. -->.
+  /// where you created this task group.
   /// In most cases, the Swift type system prevents this mistake.
   /// For example, because the `add(priority:operation:)` method is mutating,
-  /// that method can't be called<!-- FIXME: Passive; rewrite. --> from a concurrent execution context like a child task.
+  /// that method can't be called from a concurrent execution context like a child task.
   ///
   /// - Returns: The value returned by the next child task that completes.
   public mutating func next() async -> ChildTaskResult? {
@@ -374,7 +369,7 @@ public struct TaskGroup<ChildTaskResult> {
   /// are silently discarded.
   ///
   /// If you add a task to a group after canceling the group,
-  /// that task is canceled<!-- FIXME: Passive; rewrite. --> immediately after being added<!-- FIXME: Passive; rewrite. --> to the group.
+  /// that task is canceled immediately after being added to the group.
   ///
   /// There are no restrictions on where you can call this method.
   /// Code inside a child task or even another task can cancel a group.
@@ -386,19 +381,21 @@ public struct TaskGroup<ChildTaskResult> {
     _taskGroupCancelAll(group: _group)
   }
 
-  /// A Boolean value that indicates whether the group was canceled<!-- FIXME: Passive; rewrite. -->.
+  /// A Boolean value that indicates whether the group was canceled.
   ///
   /// To cancel a group, call the `TaskGroup.cancelAll()` method.
   ///
-  /// If the task that's currently running this group is canceled<!-- FIXME: Passive; rewrite. -->,
+  /// If the task that's currently running this group is canceled,
   /// the group is also implicitly canceled,
   /// which is also reflected in this property's value.
+  /// ◊TR: Why do we have two implementations of this method?
+  /// ◊TR: What's the difference between them?
   public var isCancelled: Bool {
     return _taskGroupIsCancelled(group: _group)
   }
 }
 
-// Implementation note:<!-- FIXME: I know this doesn't go out as part of the docs, but this text should follow Apple Style and not use first-person voice. -->
+// Implementation note:
 // We are unable to just™ abstract over Failure == Error / Never because of the
 // complicated relationship between `group.spawn` which dictates if `group.next`
 // AND the AsyncSequence conformances would be throwing or not.
@@ -422,12 +419,12 @@ public struct TaskGroup<ChildTaskResult> {
 /// To create a throwing task group,
 /// call the `withThrowingTaskGroup(of:returning:body:)` method.
 ///
-/// Use a throwing task group within the creating task.
+/// Don't use a task group from outside the task where you created it.
 /// In most cases,
 /// the Swift type system prevents a task group from escaping like that
-/// because adding a child task is a mutating operation,
+/// because adding a child task to a task group is a mutating operation,
 /// and mutation operations can't be performed
-/// from concurrent execution contexts likes child tasks.
+/// from concurrent execution contexts like a child task.
 ///
 /// For information about the language-level concurrency model that `ThrowingTaskGroup` is part of,
 /// see [Concurrency][concurrency] in [The Swift Programming Language][tspl].
@@ -501,7 +498,7 @@ public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
 #endif
   }
 
-  /// Adds a child task to the group, unless the group has been canceled<!-- FIXME: Passive; rewrite. -->.
+  /// Adds a child task to the group, unless the group has been canceled.
   ///
   /// This method doesn't throw an error, even if the child task does.
   /// Instead, the corresponding call to `ThrowingTaskGroup.next()` rethrows that error.
@@ -511,7 +508,7 @@ public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
   ///     Omit this parameter or pass `.unspecified`
   ///     to set the child task's priority to the priority of the group.
   ///   - operation: The operation to execute as part of the task group.
-  /// - Returns: `true` if the child task was added<!-- FIXME: Passive; rewrite. --> to the group;
+  /// - Returns: `true` if the child task was added to the group;
   ///   otherwise `false`.
   @_alwaysEmitIntoClient
   public mutating func addTaskUnlessCancelled(
@@ -546,7 +543,7 @@ public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
   ///
   /// The values returned by successive calls to this method
   /// appear in the order that the tasks *completed*,
-  /// not in the order that those tasks were added<!-- FIXME: Passive; rewrite. --> to the task group.
+  /// not in the order that those tasks were added to the task group.
   /// For example:
   ///
   ///     group.addTask { 1 }
@@ -564,7 +561,7 @@ public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
   ///        return first
   ///     }
   ///
-  /// It also lets you write the following code
+  /// It also lets you write code like the following
   /// to wait for all the child tasks to complete,
   /// collecting the values they returned:
   ///
@@ -576,7 +573,7 @@ public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
   /// Awaiting on an empty group
   /// immediate returns `nil` without suspending.
   ///
-  /// You can also use `for await`<!-- QUERY: Should this be `for`-`await`? --> to collect results of a task groups:
+  /// You can also use a `for`-`await`-`in` loop to collect results of a task group:
   ///
   ///     for await try value in group {
   ///         collected += value
@@ -586,13 +583,13 @@ public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
   /// and you propagate that error from this method
   /// out of the body of a call to the
   /// `ThrowingTaskGroup.withThrowingTaskGroup(of:returning:body:)` method,
-  /// then all remaining child tasks in that group are implicitly canceled<!-- FIXME: Passive; rewrite. -->.
+  /// then all remaining child tasks in that group are implicitly canceled.
   ///
   /// Don't call this method from outside the task
   /// where this task group was created.
   /// In most cases, the Swift type system prevents this mistake;
   /// for example, because the `add(priority:operation:)` method is mutating,
-  /// that method can't be called<!-- FIXME: Passive; rewrite. --> from a concurrent execution context like a child task.
+  /// that method can't be called from a concurrent execution context like a child task.
   ///
   /// - Returns: The value returned by the next child task that completes.
   ///
@@ -629,7 +626,7 @@ public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
   /// and you propagate that error from this method
   /// out of the body of a call to the
   /// `ThrowingTaskGroup.withThrowingTaskGroup(of:returning:body:)` method,
-  /// then all remaining child tasks in that group are implicitly canceled<!-- FIXME: Passive; rewrite. -->.
+  /// then all remaining child tasks in that group are implicitly canceled.
   ///
   /// - Returns: A `Result.success` value
   ///   containing the value that the child task returned,
@@ -665,10 +662,10 @@ public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
   ///
   /// After cancellation,
   /// any new results or errors from the tasks in this group
-  /// are silently discarded<!-- FIXME: Passive; rewrite. -->.
+  /// are silently discarded.
   ///
   /// If you add a task to a group after canceling the group,
-  /// that task is canceled<!-- FIXME: Passive; rewrite. --> immediately after being added<!-- FIXME: Passive; rewrite. --> to the group.
+  /// that task is canceled immediately after being added to the group.
   ///
   /// There are no restrictions on where you can call this method.
   /// Code inside a child task or even another task can cancel a group.
@@ -680,13 +677,15 @@ public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
     _taskGroupCancelAll(group: _group)
   }
 
-  /// A Boolean value that indicates whether the group was canceled<!-- FIXME: Passive; rewrite. -->.
+  /// A Boolean value that indicates whether the group was canceled.
   ///
   /// To cancel a group, call the `ThrowingTaskGroup.cancelAll()` method.
   ///
-  /// If the task that's currently running this group is canceled<!-- FIXME: Passive; rewrite. -->,
-  /// the group is also implicitly canceled<!-- FIXME: Passive; rewrite. -->,
-  /// which is also reflected<!-- FIXME: Passive; rewrite. --> in this property's value.
+  /// If the task that's currently running this group is canceled,
+  /// the group is also implicitly canceled,
+  /// which is also reflected in this property's value.
+  /// ◊TR: Why do we have two implementations of this method?
+  /// ◊TR: What's the difference between them?
   public var isCancelled: Bool {
     return _taskGroupIsCancelled(group: _group)
   }
@@ -708,7 +707,7 @@ extension TaskGroup: AsyncSequence {
   ///
   /// The elements returned by this iterator
   /// appear in the order that the tasks *completed*,
-  /// not in the order that those tasks were added<!-- FIXME: Passive; rewrite. --> to the task group.
+  /// not in the order that those tasks were added to the task group.
   ///
   /// This iterator terminates after all tasks have completed.
   /// After iterating over the results of each task,
@@ -782,12 +781,12 @@ extension ThrowingTaskGroup: AsyncSequence {
   ///
   /// The elements returned by this iterator
   /// appear in the order that the tasks *completed*,
-  /// not in the order that those tasks were added<!-- FIXME: Passive; rewrite. --> to the task group.
+  /// not in the order that those tasks were added to the task group.
   ///
-  /// This iterator terminates after all tasks have completed,
+  /// This iterator terminates after all tasks have completed successfully,
   /// or after any task completes by throwing an error.
   /// If a task completes by throwing an error,
-  /// no further task results are returned<!-- FIXME: Passive; rewrite. -->.
+  /// it doesn't return any further task results.
   /// After iterating over the results of each task,
   /// it's valid to make a new iterator for the task group,
   /// which you can use to iterate over the results of new tasks you add to the group.
@@ -830,9 +829,9 @@ extension ThrowingTaskGroup: AsyncSequence {
     ///
     /// The elements returned from this method
     /// appear in the order that the tasks *completed*,
-    /// not in the order that those tasks were added<!-- FIXME: Passive; rewrite. --> to the task group.
+    /// not in the order that those tasks were added to the task group.
     /// After this method returns `nil`,
-    /// this iterater is guaranteed<!-- FIXME: Passive; rewrite. --> to never produce more values.
+    /// this iterater is guaranteed to never produce more values.
     ///
     /// For more information about the iteration order and semantics,
     /// see `ThrowingTaskGroup.next()` 

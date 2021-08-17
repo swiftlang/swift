@@ -22,13 +22,13 @@ import Swift
 /// Tasks can start running immediately after creation;
 /// you don't explicitly start or schedule them.
 /// After creating a task, you use the instance to interact with it ---
-/// for example, to wait for it to complete or to cancel.
+/// for example, to wait for it to complete or to cancel it.
 /// It's not a programming error to discard a reference to a task
 /// without waiting for that task to finish or canceling it.
-/// A task runs regardless of whether<!-- EDIT: Don't use "whether or not". --> you keep a reference to it.
+/// A task runs regardless of whether you keep a reference to it.
 /// However, if you discard the reference to a task,
 /// you give up the ability
-/// to wait for that task's result or if it's canceled.
+/// to wait for that task's result or cancel the task.
 ///
 /// To support operations on the current task,
 /// which can be either a detached task or child task,
@@ -36,16 +36,15 @@ import Swift
 /// Because these methods are asynchronous,
 /// they're always invoked as part of an existing task.
 ///
-/// Only code that's running as part of the task can interact with that task
-/// by invoking the appropriate context-sensitive static functions which operate
-/// on the current task.<!-- FIXME: Long sentence that could probably be split in two. -->
+/// Only code that's running as part of the task can interact with that task.
+/// To interact with the current task,
+/// you call one of the static methods on `Task`.
 ///
 /// A task's execution can be seen as a series of periods where the task ran.
 /// Each such period ends at a suspension point or the
 /// completion of the task.
-///
-/// These partial periods towards<!-- FIXME: The preceding wording is a little awkward; please rewrite. --> the task's completion are `PartialAsyncTask`.
-/// Unless you're implementing a scheduler,
+/// These periods of execution are represented by instances of `PartialAsyncTask`.
+/// Unless you're implementing a custom executor,
 /// you don't directly interact with partial tasks.
 ///
 /// For information about the language-level concurrency model that `Task` is part of,
@@ -91,10 +90,11 @@ public struct Task<Success, Failure: Error>: Sendable {
 
 @available(SwiftStdlib 5.5, *)
 extension Task {
-  /// Wait for the task to complete, then return its result or throw an error.
+  /// The result from a throwing task, after it completes.
   ///
   /// If the task hasn't completed,
-  /// its priority increases to that of the current task.
+  /// accessing this property waits for it to complete
+  /// and its priority increases to that of the current task.
   /// Note that this might not be as effective as
   /// creating the task with the correct priority,
   /// depending on the executor's scheduling details.
@@ -110,11 +110,14 @@ extension Task {
     }
   }
 
-  /// Wait for the task to complete, then return its result or error.
+  /// The result or error from a throwing task, after it completes.
   ///
-  /// If the task hasn't completed, its priority increases to the
-  /// priority of the current task. Note that this isn't as effective as
-  /// creating the task with the correct priority.
+  /// If the task hasn't completed,
+  /// accessing this property waits for it to complete
+  /// and its priority increases to that of the current task.
+  /// Note that this might not be as effective as
+  /// creating the task with the correct priority,
+  /// depending on the executor's scheduling details.
   ///
   /// - Returns: If the task succeeded,
   ///   `.success` with the task's result as the associated value;
@@ -129,7 +132,7 @@ extension Task {
     }
   }
 
-  /// Indicate for the task to stop.
+  /// Indicates that the task should stop running.
   ///
   /// Task cancellation is cooperative:
   /// a task that supports cancellation
@@ -149,10 +152,11 @@ extension Task {
 
 @available(SwiftStdlib 5.5, *)
 extension Task where Failure == Never {
-  /// Wait for the task to complete and return its result.
+  /// The result from a nonthrowing task, after it completes.
   ///
   /// If the task hasn't completed yet,
-  /// its priority increases to that of the current task.
+  /// accessing this property waits for it to complete
+  /// and its priority increases to that of the current task.
   /// Note that this might not be as effective as
   /// creating the task with the correct priority,
   /// depending on the executor's scheduling details.
@@ -191,7 +195,7 @@ extension Task: Equatable {
 /// Typically, executors attempt to run tasks with a higher priority
 /// before tasks with a lower priority.
 /// However, the semantics of how priority is treated are left up to each
-/// platform and `Executor` implementation.<!-- QUERY: Should there be an article before Executor? -->
+/// platform and `Executor` implementation.
 ///
 /// Child tasks automatically inherit their parent task's priority.
 /// Detached tasks created by `detach(priority:operation:)` don't inherit task priority
@@ -211,7 +215,7 @@ extension Task: Equatable {
 ///   then the priority of this task increases until the task completes.
 ///
 /// In both cases, priority elevation helps you prevent a low-priority task
-/// that blocks the execution of a high priority task,
+/// from blocking the execution of a high priority task,
 /// which is also known as *priority inversion*.
 @available(SwiftStdlib 5.5, *)
 public struct TaskPriority: RawRepresentable, Sendable {
@@ -546,7 +550,7 @@ extension Task where Failure == Never {
   /// Runs the given nonthrowing operation asynchronously
   /// as part of a new top-level task.
   ///
-  /// Don't use a detached task unless it isn't possible
+  /// Don't use a detached task if it's possible
   /// to model the operation using structured concurrency features like child tasks.
   /// Child tasks inherit the parent task's priority and task-local storage,
   /// and canceling a parent task automatically cancels all of its child tasks.
@@ -593,7 +597,7 @@ extension Task where Failure == Error {
   ///
   /// If the operation throws an error, this method propogates that error.
   ///
-  /// Don't use a detached task unless it isn't possible
+  /// Don't use a detached task if it's possible
   /// to model the operation using structured concurrency features like child tasks.
   /// Child tasks inherit the parent task's priority and task-local storage,
   /// and canceling a parent task automatically cancels all of its child tasks.
@@ -746,7 +750,7 @@ public struct UnsafeCurrentTask {
 
   /// A Boolean value that indicates whether the current task was canceled.
   ///
-  /// After the value of this property is `true`, it remains `true` indefinitely.
+  /// After the value of this property becomes `true`, it remains `true` indefinitely.
   /// There is no way to uncancel a task.
   ///
   /// - SeeAlso: `checkCancellation()`

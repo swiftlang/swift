@@ -14,10 +14,12 @@ import Swift
 
 @available(SwiftStdlib 5.5, *)
 extension Task where Success == Never, Failure == Never {
-  /// Suspends the current task for at least<!-- NOTE: Don't use italics or any other font styling in an abstract. --> the given duration
+  /// Suspends the current task for at least the given duration
   /// in nanoseconds.
+  /// ◊TR: Why do we have both sleep(_:) and sleep(nanoseconds:) -- what's the difference between them?
+  /// ◊TR: It looks like only sleep(nanoseconds:) throws.
   ///
-  /// This function does not<!-- NOTE: Italics aren't necessary here. --> block the underlying thread.
+  /// This function doesn't block the underlying thread.
   public static func sleep(_ duration: UInt64) async {
     return await Builtin.withUnsafeContinuation { (continuation: Builtin.RawUnsafeContinuation) -> Void in
       let job = _taskCreateNullaryContinuationJob(
@@ -193,10 +195,12 @@ extension Task where Success == Never, Failure == Never {
   }
 
   /// Suspends the current task for at least the given duration
-  /// in nanoseconds, unless the task is canceled<!-- FIXME: Passive; rewrite. -->. If the task is canceled<!-- FIXME: Passive; rewrite. -->,
-  /// throws \c CancellationError without waiting for the duration.<!-- FIXME: If this is an abstract, it shouldn't contain any symbols or additional font styling. Also, an abstract is only a single sentence of 150 chars or less. -->
+  /// in nanoseconds.
   ///
-  /// This function doen't block the underlying thread.
+  /// If the task is canceled before the time ends,
+  /// this function throws `CancellationError`.
+  ///
+  /// This function doesn't block the underlying thread.
   public static func sleep(nanoseconds duration: UInt64) async throws {
     // Allocate storage for the storage word.
     let wordPtr = UnsafeMutablePointer<Builtin.Word>.allocate(capacity: 1)
