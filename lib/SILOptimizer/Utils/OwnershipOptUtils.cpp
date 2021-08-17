@@ -859,7 +859,7 @@ OwnershipRAUWHelper::OwnershipRAUWHelper(OwnershipFixupContext &inputCtx,
   // Otherwise, lets check if we can perform this RAUW operation. If we can't,
   // set ctx to nullptr to invalidate the helper and return.
   if (!canFixUpOwnershipForRAUW(oldValue, newValue, inputCtx)) {
-    ctx = nullptr;
+    invalidate();
     return;
   }
 
@@ -908,16 +908,14 @@ OwnershipRAUWHelper::OwnershipRAUWHelper(OwnershipFixupContext &inputCtx,
     return;
 
   if (!borrowedAddress.interiorPointerOp) {
-    // Invalidate!
-    ctx = nullptr;
+    invalidate();
     return;
   }
 
   ctx->extraAddressFixupInfo.intPtrOp = borrowedAddress.interiorPointerOp;
   auto borrowedValue = borrowedAddress.interiorPointerOp.getSingleBaseValue();
   if (!borrowedValue) {
-    // Invalidate!
-    ctx = nullptr;
+    invalidate();
     return;
   }
 
@@ -929,7 +927,7 @@ OwnershipRAUWHelper::OwnershipRAUWHelper(OwnershipFixupContext &inputCtx,
   // This cloner check must match the later cloner invocation in
   // replaceAddressUses()
   if (!canCloneUseDefChain(newValue, checkBase)) {
-    ctx = nullptr;
+    invalidate();
     return;
   }
 
@@ -937,8 +935,7 @@ OwnershipRAUWHelper::OwnershipRAUWHelper(OwnershipFixupContext &inputCtx,
   auto &oldValueUses = ctx->extraAddressFixupInfo.allAddressUsesFromOldValue;
   if (InteriorPointerOperand::findTransitiveUsesForAddress(oldValue,
                                                            oldValueUses)) {
-    // If we found an error, invalidate and return!
-    ctx = nullptr;
+    invalidate();
     return;
   }
 
@@ -1183,14 +1180,14 @@ OwnershipReplaceSingleUseHelper::OwnershipReplaceSingleUseHelper(
 
   // If we have an address, bail. We don't support this.
   if (newValue->getType().isAddress()) {
-    ctx = nullptr;
+    invalidate();
     return;
   }
 
   // Otherwise, lets check if we can perform this RAUW operation. If we can't,
   // set ctx to nullptr to invalidate the helper and return.
   if (!hasValidRAUWOwnership(use->get(), newValue)) {
-    ctx = nullptr;
+    invalidate();
     return;
   }
 
