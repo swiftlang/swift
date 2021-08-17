@@ -5510,12 +5510,12 @@ internal struct _DictionaryCodingKey: CodingKey {
   internal let stringValue: String
   internal let intValue: Int?
 
-  internal init?(stringValue: String) {
+  internal init(stringValue: String) {
     self.stringValue = stringValue
     self.intValue = Int(stringValue)
   }
 
-  internal init?(intValue: Int) {
+  internal init(intValue: Int) {
     self.stringValue = "\(intValue)"
     self.intValue = intValue
   }
@@ -5529,7 +5529,55 @@ internal struct _DictionaryCodingKey: CodingKey {
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public protocol CodingKeyRepresentable {
   var codingKey: CodingKey { get }
-  init?(codingKey: CodingKey)
+  init?<T: CodingKey>(codingKey: T)
+}
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+extension RawRepresentable where Self: CodingKeyRepresentable, RawValue == String {
+  public var codingKey: CodingKey {
+    _DictionaryCodingKey(stringValue: rawValue)
+  }
+  public init?<T: CodingKey>(codingKey: T) {
+    self.init(rawValue: codingKey.stringValue)
+  }
+}
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+extension RawRepresentable where Self: CodingKeyRepresentable, RawValue == Int {
+  public var codingKey: CodingKey {
+    _DictionaryCodingKey(intValue: rawValue)
+  }
+  public init?<T: CodingKey>(codingKey: T) {
+    if let intValue = codingKey.intValue {
+        self.init(rawValue: intValue)
+    } else {
+        return nil
+    }
+  }
+}
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+extension Int: CodingKeyRepresentable {
+  public var codingKey: CodingKey {
+    _DictionaryCodingKey(intValue: self)
+  }
+  public init?<T: CodingKey>(codingKey: T) {
+    if let intValue = codingKey.intValue {
+        self = intValue
+    } else {
+        return nil
+    }
+  }
+}
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+extension String: CodingKeyRepresentable {
+  public var codingKey: CodingKey {
+    _DictionaryCodingKey(stringValue: self)
+  }
+  public init?<T: CodingKey>(codingKey: T) {
+    self = codingKey.stringValue
+  }
 }
 
 extension Dictionary: Encodable where Key: Encodable, Value: Encodable {
@@ -5548,17 +5596,17 @@ extension Dictionary: Encodable where Key: Encodable, Value: Encodable {
       // Since the keys are already Strings, we can use them as keys directly.
       var container = encoder.container(keyedBy: _DictionaryCodingKey.self)
       for (key, value) in self {
-        let codingKey = _DictionaryCodingKey(stringValue: key as! String)!
+        let codingKey = _DictionaryCodingKey(stringValue: key as! String)
         try container.encode(value, forKey: codingKey)
       }
     } else if Key.self == Int.self {
       // Since the keys are already Ints, we can use them as keys directly.
       var container = encoder.container(keyedBy: _DictionaryCodingKey.self)
       for (key, value) in self {
-        let codingKey = _DictionaryCodingKey(intValue: key as! Int)!
+        let codingKey = _DictionaryCodingKey(intValue: key as! Int)
         try container.encode(value, forKey: codingKey)
       }
-    } else if Key.self is CodingKeyRepresentable.Type {
+    } else if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *), Key.self is CodingKeyRepresentable.Type {
       // Since the keys are CodingKeyRepresentable, we can use the `codingKey`
       // to create `_DictionaryCodingKey` instances.
       var container = encoder.container(keyedBy: _DictionaryCodingKey.self)
@@ -5621,7 +5669,7 @@ extension Dictionary: Decodable where Key: Decodable, Value: Decodable {
         let value = try container.decode(Value.self, forKey: key)
         self[key.intValue! as! Key] = value
       }
-    } else if let codingKeyRepresentableType = Key.self as? CodingKeyRepresentable.Type {
+    } else if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *), let codingKeyRepresentableType = Key.self as? CodingKeyRepresentable.Type {
       // The keys are CodingKeyRepresentable, so we should be able to expect a keyed container.
       let container = try decoder.container(keyedBy: _DictionaryCodingKey.self)
       for dictionaryCodingKey in container.allKeys {
