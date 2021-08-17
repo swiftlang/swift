@@ -8795,7 +8795,10 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
       patternBinding->setPattern(
           index, resultTarget->getInitializationPattern(),
           resultTarget->getDeclContext());
-      patternBinding->setInit(index, resultTarget->getAsExpr());
+
+      if (patternBinding->getInit(index)) {
+        patternBinding->setInit(index, resultTarget->getAsExpr());
+      }
     }
 
     return target;
@@ -8810,6 +8813,21 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
         wrappedVar, backingType->mapTypeOutOfContext());
 
     return target;
+  } else if (auto *pattern = target.getAsUninitializedVar()) {
+    auto contextualPattern = target.getContextualPattern();
+    auto patternType = target.getTypeOfUninitializedVar();
+
+    TypeResolutionOptions options = TypeResolverContext::PatternBindingDecl;
+    options |= TypeResolutionFlags::OverrideType;
+
+    if (auto coercedPattern = TypeChecker::coercePatternToType(
+            contextualPattern, patternType, options)) {
+      auto resultTarget = target;
+      resultTarget.setPattern(coercedPattern);
+      return resultTarget;
+    }
+
+    return None;
   } else {
     auto fn = *target.getAsFunction();
     if (rewriteFunction(fn))

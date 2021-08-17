@@ -3935,14 +3935,13 @@ bool ConstraintSystem::generateConstraints(
         return true;
 
       auto init = patternBinding->getInit(index);
-      if (!init) {
-        llvm_unreachable("Unsupported pattern binding entry");
-      }
 
-      // Generate constraints for the initialization.
-      auto target = SolutionApplicationTarget::forInitialization(
-          init, dc, patternType, pattern,
-          /*bindPatternVarsOneWay=*/true);
+      auto target = init ? SolutionApplicationTarget::forInitialization(
+                               init, dc, patternType, pattern,
+                               /*bindPatternVarsOneWay=*/true)
+                         : SolutionApplicationTarget::forUninitializedVar(
+                               patternBinding, index, pattern, patternType);
+
       if (generateConstraints(target, FreeTypeVariableBinding::Disallow)) {
         hadError = true;
         continue;
@@ -3963,9 +3962,20 @@ bool ConstraintSystem::generateConstraints(
 
       return generateWrappedPropertyTypeConstraints(
         *this, /*initializerType=*/Type(), wrappedVar, propertyType);
-    }
+    } else {
+      auto pattern = target.getAsUninitializedVar();
+      auto locator = getConstraintLocator(
+          pattern, LocatorPathElt::ContextualType(CTP_Initialization));
 
-    llvm_unreachable("Unsupported un-initialized variable");
+      // Generate constraints to bind all of the internal declarations
+      // and verify the pattern.
+      Type patternType = generateConstraints(
+          pattern, locator, /*shouldBindPatternVarsOneWay*/ true,
+          target.getPatternBindingOfUninitializedVar(),
+          target.getIndexOfUninitializedVar());
+
+      return !patternType;
+    }
   }
   }
 }
