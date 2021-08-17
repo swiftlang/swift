@@ -1446,6 +1446,12 @@ public:
   TypeLookupErrorOr<BuiltType> createExistentialMetatypeType(
       BuiltType instance,
       llvm::Optional<Demangle::ImplMetatypeRepresentation> repr = None) const {
+    if (instance->getKind() != MetadataKind::Existential
+        && instance->getKind() != MetadataKind::ExistentialMetatype) {
+      return TYPE_LOOKUP_ERROR_FMT("Tried to build an existential metatype from "
+                                   "a type that was neither an existential nor "
+                                   "an existential metatype");
+    }
     return swift_getExistentialMetatypeMetadata(instance);
   }
 
