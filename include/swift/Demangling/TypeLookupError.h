@@ -207,7 +207,10 @@ template <typename... Args>
 static TypeLookupError TypeLookupErrorImpl(const char *fmt, Args... args) {
   return TypeLookupError([=] {
     char *str;
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wformat-security"
     swift_asprintf(&str, fmt, args...);
+#pragma clang diagnostic pop
     return str;
   });
 }
