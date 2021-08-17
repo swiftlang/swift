@@ -235,7 +235,7 @@ void SILGenFunction::emitClassMemberDestruction(ManagedValue selfValue,
     finishBB = createBasicBlock();
     normalMemberDestroyBB = createBasicBlock();
 
-    emitDistributedActorClassMemberDestruction(selfValue, cd, cleanupLoc,
+    emitDistributedActorClassMemberDestruction(cleanupLoc, selfValue, cd,
                                                normalMemberDestroyBB,
                                                finishBB);
   }

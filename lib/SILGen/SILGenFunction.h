@@ -2018,7 +2018,7 @@ public:
       DestructorDecl *dd, SILValue selfValue, SILBasicBlock *continueBB);
 
   void emitDistributedActorClassMemberDestruction(
-      ManagedValue selfValue, ClassDecl *cd, SILLocation cleanupLoc,
+      SILLocation cleanupLoc, ManagedValue selfValue, ClassDecl *cd,
       SILBasicBlock *normalMemberDestroyBB, SILBasicBlock *finishBB);
 
   //===--------------------------------------------------------------------===//
