@@ -501,6 +501,9 @@ public:
   /// .swiftsourceinfo file (ie. the file exists and has been read).
   bool hasSourceInfo() const { return Core->hasSourceInfo(); }
 
+  /// \c true if this module was built with complete checking for concurrency.
+  bool isConcurrencyChecked() const { return Core->isConcurrencyChecked(); }
+
   /// Associates this module file with the AST node representing it.
   ///
   /// Checks that the file is compatible with the AST module it's being loaded

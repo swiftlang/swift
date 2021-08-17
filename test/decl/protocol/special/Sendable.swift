@@ -2,7 +2,7 @@
 
 func acceptSendable<T: Sendable>(_: T) { }
 
-class NotSendable { }
+class NotSendable { } // expected-note 2{{class 'NotSendable' does not conform to the `Sendable` protocol}}
 
 func testSendableBuiltinConformances(
   i: Int, ns: NotSendable, sf: @escaping @Sendable () -> Void,
@@ -21,8 +21,11 @@ func testSendableBuiltinConformances(
 
   // Complaints about missing Sendable conformances
   acceptSendable((i, ns)) // expected-warning{{type 'NotSendable' does not conform to the 'Sendable' protocol}}
-  acceptSendable(nsf) // expected-warning{{function type '() -> Void' must be marked '@Sendable' to conform to 'Sendable'}}
-  acceptSendable((nsf, i)) // expected-warning{{function type '() -> Void' must be marked '@Sendable' to conform to 'Sendable'}}
-  acceptSendable(funNotSendable) // expected-warning{{function type '() -> Void' must be marked '@Sendable' to conform to 'Sendable'}}
+  acceptSendable(nsf) // expected-warning{{type '() -> Void' does not conform to the 'Sendable' protocol}}
+  // expected-note@-1{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+  acceptSendable((nsf, i)) // expected-warning{{type '() -> Void' does not conform to the 'Sendable' protocol}}
+  // expected-note@-1{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+  acceptSendable(funNotSendable) // expected-warning{{type '() -> Void' does not conform to the 'Sendable' protocol}}
+  // expected-note@-1{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
   acceptSendable((i, ns)) // expected-warning{{type 'NotSendable' does not conform to the 'Sendable' protocol}}
 }

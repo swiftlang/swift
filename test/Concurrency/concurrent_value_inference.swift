@@ -1,7 +1,7 @@
-// RUN: %target-typecheck-verify-swift -enable-library-evolution
+// RUN: %target-typecheck-verify-swift -enable-library-evolution -warn-concurrency
 // REQUIRES: concurrency
 
-class C1 { }
+class C1 { } // expected-note{{class 'C1' does not conform to the `Sendable` protocol}}
 final class C2: Sendable { }
 
 struct S1 {
@@ -10,7 +10,7 @@ struct S1 {
   var c: C2
 }
 
-enum E1 {
+enum E1 { // expected-note{{consider making enum 'E1' conform to the 'Sendable' protocol}}{{9-9=: Sendable }}
   case base
   indirect case nested(E1)
 }
@@ -22,7 +22,7 @@ enum E2 {
 
 struct GS1<T> { }
 
-struct GS2<T> {
+struct GS2<T> {  // expected-note{{consider making generic struct 'GS2' conform to the 'Sendable' protocol}}
   var storage: T
 }
 
@@ -33,7 +33,7 @@ struct Signature { }
 struct Data { }
 struct BlockInfo { }
 
-struct Bitcode {
+struct Bitcode { // expected-note{{consider making struct 'Bitcode' conform to the 'Sendable' protocol}}
   let signature: Signature
   let elements: [BitcodeElement]
   let blockInfo: [UInt64: BlockInfo]
@@ -64,11 +64,11 @@ enum BitcodeElement {
 
 // Public structs and enums do not get implicit Sendable unless they
 // are frozen.
-public struct PublicStruct {
+public struct PublicStruct { // expected-note{{consider making struct 'PublicStruct' conform to the 'Sendable' protocol}}
   var i: Int
 }
 
-public enum PublicEnum {
+public enum PublicEnum { // expected-note{{consider making enum 'PublicEnum' conform to the 'Sendable' protocol}}
   case some
 }
 

@@ -103,6 +103,7 @@ class ExtendedValidationInfo {
     unsigned ResilienceStrategy : 2;
     unsigned IsImplicitDynamicEnabled : 1;
     unsigned IsAllowModuleWithCompilerErrorsEnabled : 1;
+    unsigned IsConcurrencyChecked : 1;
   } Bits;
 public:
   ExtendedValidationInfo() : Bits() {}
@@ -155,6 +156,13 @@ public:
 
   StringRef getModuleABIName() const { return ModuleABIName; }
   void setModuleABIName(StringRef name) { ModuleABIName = name; }
+
+  bool isConcurrencyChecked() const {
+    return Bits.IsConcurrencyChecked;
+  }
+  void setIsConcurrencyChecked(bool val = true) {
+    Bits.IsConcurrencyChecked = val;
+  }
 };
 
 /// Returns info about the serialized AST in the given data.

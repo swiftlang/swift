@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift  -disable-availability-checking -warn-concurrency
 // REQUIRES: concurrency
 
-class Box {
+class Box { // expected-note 3{{class 'Box' does not conform to the `Sendable` protocol}}
     let size : Int = 0
 }
 

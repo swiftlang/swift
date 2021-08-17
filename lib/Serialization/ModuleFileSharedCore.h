@@ -341,8 +341,11 @@ private:
     /// Whether this module is compiled while allowing errors.
     unsigned IsAllowModuleWithCompilerErrorsEnabled: 1;
 
+    /// \c true if this module was built with complete checking for concurrency.
+    unsigned IsConcurrencyChecked: 1;
+
     // Explicitly pad out to the next word boundary.
-    unsigned : 3;
+    unsigned : 5;
   } Bits = {};
   static_assert(sizeof(ModuleBits) <= 8, "The bit set should be small");
 
@@ -534,6 +537,8 @@ public:
   /// Returns \c true if a corresponding .swiftsourceinfo has been found *and
   /// read*.
   bool hasSourceInfo() const;
+
+  bool isConcurrencyChecked() const { return Bits.IsConcurrencyChecked; }
 };
 
 template <typename T, typename RawData>

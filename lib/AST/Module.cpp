@@ -489,6 +489,7 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx,
   Bits.ModuleDecl.IsNonSwiftModule = 0;
   Bits.ModuleDecl.IsMainModule = 0;
   Bits.ModuleDecl.HasIncrementalInfo = 0;
+  Bits.ModuleDecl.IsConcurrencyChecked = 0;
 }
 
 ImplicitImportList ModuleDecl::getImplicitImports() const {
@@ -978,6 +979,21 @@ static bool shouldCreateMissingConformances(ProtocolDecl *proto) {
   return proto->isSpecificProtocol(KnownProtocolKind::Sendable);
 }
 
+ProtocolConformanceRef ProtocolConformanceRef::forMissingOrInvalid(
+    Type type, ProtocolDecl *proto) {
+  // Introduce "missing" conformances when appropriate, so that type checking
+  // (and even code generation) can continue.
+  ASTContext &ctx = proto->getASTContext();
+  if (shouldCreateMissingConformances(proto)) {
+    return ProtocolConformanceRef(
+        ctx.getBuiltinConformance(
+          type, proto, GenericSignature(), { },
+          BuiltinConformanceKind::Missing));
+  }
+
+  return ProtocolConformanceRef::forInvalid();
+}
+
 ProtocolConformanceRef ModuleDecl::lookupConformance(Type type,
                                                      ProtocolDecl *protocol,
                                                      bool allowMissing) {
@@ -1005,23 +1021,6 @@ ProtocolConformanceRef ModuleDecl::lookupConformance(Type type,
     return ProtocolConformanceRef::forInvalid();
 
   return result;
-}
-
-/// Retrieve an invalid or missing conformance, as appropriate, when a
-/// legitimate conformance doesn't exist.
-static ProtocolConformanceRef getInvalidOrMissingConformance(
-    Type type, ProtocolDecl *proto) {
-  // Introduce "missing" conformances when appropriate, so that type checking
-  // (and even code generation) can continue.
-  ASTContext &ctx = proto->getASTContext();
-  if (shouldCreateMissingConformances(proto)) {
-    return ProtocolConformanceRef(
-        ctx.getBuiltinConformance(
-          type, proto, GenericSignature(), { },
-          BuiltinConformanceKind::Missing));
-  }
-
-  return ProtocolConformanceRef::forInvalid();
 }
 
 /// Synthesize a builtin tuple type conformance to the given protocol, if
@@ -1083,7 +1082,7 @@ static ProtocolConformanceRef getBuiltinTupleTypeConformance(
         ctx.getSpecializedConformance(type, genericConformance, subMap));
   }
 
-  return getInvalidOrMissingConformance(type, protocol);
+  return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
 }
 
 /// Whether the given function type conforms to Sendable.
@@ -1116,7 +1115,7 @@ static ProtocolConformanceRef getBuiltinFunctionTypeConformance(
                                   BuiltinConformanceKind::Synthesized));
   }
 
-  return getInvalidOrMissingConformance(type, protocol);
+  return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
 }
 
 /// Synthesize a builtin metatype type conformance to the given protocol, if
@@ -1131,7 +1130,7 @@ static ProtocolConformanceRef getBuiltinMetaTypeTypeConformance(
                                   BuiltinConformanceKind::Synthesized));
   }
 
-  return getInvalidOrMissingConformance(type, protocol);
+  return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
 }
 
 /// Synthesize a builtin type conformance to the given protocol, if
@@ -1146,7 +1145,7 @@ static ProtocolConformanceRef getBuiltinBuiltinTypeConformance(
                                   BuiltinConformanceKind::Synthesized));
   }
 
-  return getInvalidOrMissingConformance(type, protocol);
+  return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
 }
 
 ProtocolConformanceRef
@@ -1184,7 +1183,7 @@ LookupConformanceInModuleRequest::evaluate(
         return ProtocolConformanceRef(protocol);
     }
 
-    return getInvalidOrMissingConformance(type, protocol);
+    return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
   }
 
   // An existential conforms to a protocol if the protocol is listed in the
@@ -1193,7 +1192,7 @@ LookupConformanceInModuleRequest::evaluate(
   if (type->isExistentialType()) {
     auto result = mod->lookupExistentialConformance(type, protocol);
     if (result.isInvalid())
-      return getInvalidOrMissingConformance(type, protocol);
+      return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
     return result;
   }
 
@@ -1231,13 +1230,13 @@ LookupConformanceInModuleRequest::evaluate(
 
   // If we don't have a nominal type, there are no conformances.
   if (!nominal || isa<ProtocolDecl>(nominal))
-    return getInvalidOrMissingConformance(type, protocol);
+    return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
 
   // Find the (unspecialized) conformance.
   SmallVector<ProtocolConformance *, 2> conformances;
   if (!nominal->lookupConformance(protocol, conformances)) {
     if (!protocol->isSpecificProtocol(KnownProtocolKind::Sendable))
-      return getInvalidOrMissingConformance(type, protocol);
+      return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
 
     // Try to infer Sendable conformance.
     GetImplicitSendableRequest cvRequest{nominal};
@@ -1246,7 +1245,7 @@ LookupConformanceInModuleRequest::evaluate(
       conformances.clear();
       conformances.push_back(conformance);
     } else {
-      return getInvalidOrMissingConformance(type, protocol);
+      return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
     }
   }
 
