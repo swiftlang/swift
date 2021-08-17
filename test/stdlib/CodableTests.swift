@@ -849,6 +849,69 @@ class TestCodable : TestCodableSuper {
             expectRoundTripEqualityThroughPlist(for: UUIDCodingWrapper(uuid), lineNumber: testLine)
         }
     }
+
+    func test_Dictionary_JSON() {
+        enum NotCodingKeyRepresentable: String, Codable {
+            case a
+        }
+
+        enum CodingKeyRepresentableEnum: String, Codable, CodingKeyRepresentable {
+            case a
+
+            init?(codingKey: CodingKey) {
+                self.init(rawValue: codingKey.stringValue)
+            }
+            var codingKey: CodingKey { GenericStringCodingKey(stringValue: self.rawValue) }
+        }
+
+        struct GenericStringCodingKey: CodingKey {
+            var stringValue: String
+            var intValue: Int? { nil }
+
+            init(stringValue: String) {
+                self.stringValue = stringValue
+            }
+
+            init?(intValue: Int) {
+                return nil
+            }
+        }
+
+        let notCodingKeyRepresentableValues: [Int: [NotCodingKeyRepresentable: Bool]] = [
+          #line : [.a: true]
+        ]
+
+        for (testLine, dictionary) in notCodingKeyRepresentableValues {
+            expectRoundTripEqualityThroughJSON(for: dictionary, lineNumber: testLine)
+            let encoder = JSONEncoder()
+            let decoder = JSONDecoder()
+            do {
+                let data = try encoder.encode(dictionary)
+                let stringValue = String(decoding: data, as: UTF8.self)
+                expectEqual("[\"a\",true]", stringValue, "\(stringValue)")
+                expectEqual(dictionary, try? decoder.decode([NotCodingKeyRepresentable: Bool].self, from: data), "Expecting dictionary to encode as an array of pairs")
+            } catch {
+                fatalError("\(#file):\(testLine): Unable to encode [NotCodingKeyRepresentable: Bool]: \(error)")
+            }
+        }
+
+        let codingKeyRepresentableValues: [Int: [CodingKeyRepresentableEnum: Bool]] = [
+            #line : [.a: true]
+        ]
+        for (testLine, dictionary) in codingKeyRepresentableValues {
+            expectRoundTripEqualityThroughJSON(for: dictionary, lineNumber: testLine)
+            let encoder = JSONEncoder()
+            let decoder = JSONDecoder()
+            do {
+                let data = try encoder.encode(dictionary)
+                let stringValue = String(decoding: data, as: UTF8.self)
+                expectEqual("{\"a\":true}", stringValue, "\(stringValue)")
+                expectEqual(dictionary, try? decoder.decode([CodingKeyRepresentableEnum: Bool].self, from: data), "Expecting dictionary to encode as a JSON object")
+            } catch {
+                fatalError("\(#file):\(testLine): Unable to encode [CodingKeyRepresentableEnum: Bool]: \(error)")
+            }
+        }
+    }
 }
 
 // MARK: - Helper Types
@@ -869,6 +932,7 @@ struct TopLevelWrapper<T> : Codable, Equatable where T : Codable, T : Equatable 
 
 #if !FOUNDATION_XCTEST
 var tests = [
+   "test_Dictionary_JSON": TestCodable.test_Dictionary_JSON,
     "test_Calendar_JSON" : TestCodable.test_Calendar_JSON,
     "test_Calendar_Plist" : TestCodable.test_Calendar_Plist,
     "test_CharacterSet_JSON" : TestCodable.test_CharacterSet_JSON,
