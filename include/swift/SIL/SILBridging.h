@@ -32,7 +32,7 @@ typedef struct {
 
 enum {
   BridgedOperandSize = 4 * sizeof(uintptr_t),
-  BridgedSuccessorSize = 5 * sizeof(uintptr_t)
+  BridgedSuccessorSize = 4 * sizeof(uintptr_t) + sizeof(uint64_t)
 };
 
 typedef struct {
