@@ -368,7 +368,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   // Create a basic block to jump to for the implicit 'self' return.
   // We won't emit this until after we've emitted the body.
   // The epilog takes a void return because the return of 'self' is implicit.
-  prepareEpilog(false, ctor->hasThrows(), CleanupLocation(ctor));
+  prepareEpilog(None, ctor->hasThrows(), CleanupLocation(ctor));
 
   // If the constructor can fail, set up an alternative epilog for constructor
   // failure.
@@ -790,7 +790,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
 
   // Create a basic block to jump to for the implicit 'self' return.
   // We won't emit the block until after we've emitted the body.
-  prepareEpilog(false, ctor->hasThrows(),
+  prepareEpilog(None, ctor->hasThrows(),
                 CleanupLocation(endOfInitLoc));
 
   auto resultType = ctor->mapTypeIntoContext(ctor->getResultInterfaceType());
@@ -1187,7 +1187,7 @@ void SILGenFunction::emitIVarInitializer(SILDeclRef ivarInitializer) {
   VarLocs[selfDecl] = VarLoc::get(selfArg);
 
   auto cleanupLoc = CleanupLocation(loc);
-  prepareEpilog(false, false, cleanupLoc);
+  prepareEpilog(None, false, cleanupLoc);
 
   // Emit the initializers.
   emitMemberInitializers(cd, selfDecl, cd);
