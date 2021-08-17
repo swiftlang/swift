@@ -439,6 +439,10 @@ option(SWIFT_ENABLE_DISPATCH
   "Enable use of libdispatch"
   TRUE)
 
+option(SWIFT_ENABLE_GLOBAL_ISEL_ARM64
+  "Enable global isel on arm64, arm64e, arm64_32"
+  FALSE)
+
 cmake_dependent_option(SWIFT_BUILD_SYNTAXPARSERLIB
   "Build the Swift Syntax Parser library" TRUE
   "SWIFT_ENABLE_DISPATCH" FALSE)
