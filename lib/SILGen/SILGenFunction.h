@@ -2017,6 +2017,9 @@ public:
   void emitDistributedActor_resignAddress(
       DestructorDecl *dd, SILValue selfValue, SILBasicBlock *continueBB);
 
+  void emitDistributedActorClassMemberDestruction(
+      ManagedValue selfValue, ClassDecl *cd, SILLocation cleanupLoc,
+      SILBasicBlock *normalMemberDestroyBB, SILBasicBlock *finishBB);
 
   //===--------------------------------------------------------------------===//
   // Declarations
@@ -2110,6 +2113,9 @@ public:
 
   /// Destroy and deallocate an initialized local variable.
   void destroyLocalVariable(SILLocation L, VarDecl *D);
+
+  /// Destroy the class member.
+  void destroyClassMember(SILLocation L, ManagedValue selfValue, VarDecl *D);
 
   /// Enter a cleanup to deallocate a stack variable.
   CleanupHandle enterDeallocStackCleanup(SILValue address);

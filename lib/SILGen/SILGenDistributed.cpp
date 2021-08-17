@@ -610,6 +610,75 @@ void SILGenFunction::emitDistributedActor_resignAddress(
   }
 }
 
+
+/******************************************************************************/
+/******************* DISTRIBUTED DEINIT: class memberwise destruction *********/
+/******************************************************************************/
+
+void SILGenFunction::emitDistributedActorClassMemberDestruction(
+    ManagedValue selfValue, ClassDecl *cd, SILLocation cleanupLoc,
+    SILBasicBlock *normalMemberDestroyBB, SILBasicBlock *finishBB) {
+  ASTContext &ctx = getASTContext();
+  auto selfTy = cd->getDeclaredInterfaceType();
+
+  Scope scope(Cleanups, CleanupLocation(loc));
+
+  auto isLocalBB = createBasicBlock();
+  auto remoteMemberDestroyBB = createBasicBlock();
+
+  // TODO(distributed): de-duplicate with the thunk logic in SILGenDistributed
+  // if __isRemoteActor(self) {
+  //   ...
+  // } else {
+  //   ...
+  // }
+  {
+    FuncDecl *isRemoteFn = ctx.getIsRemoteDistributedActor();
+    assert(isRemoteFn && "Could not find 'is remote' function, is the "
+                         "'_Distributed' module available?");
+
+    ManagedValue selfAnyObject =
+        B.createInitExistentialRef(loc, getLoweredType(ctx.getAnyObjectType()),
+                                   CanType(selfTy), selfValue, {});
+    auto result = emitApplyOfLibraryIntrinsic(
+        loc, isRemoteFn, SubstitutionMap(), {selfAnyObject}, SGFContext());
+
+    SILValue isRemoteResult =
+        std::move(result).forwardAsSingleValue(*this, loc);
+    SILValue isRemoteResultUnwrapped =
+        emitUnwrapIntegerResult(loc, isRemoteResult);
+
+    B.createCondBranch(loc, isRemoteResultUnwrapped, remoteMemberDestroyBB, isLocalBB);
+  }
+
+  // // if __isRemoteActor(self)
+  // {
+  //  // destroy only self.id and self.actorTransport
+  // }
+  {
+    B.emitBlock(remoteMemberDestroyBB);
+
+    for (VarDecl *vd : cd->getStoredProperties()) {
+      if (!vd->getAttrs().hasAttribute<DistributedActorIndependentAttr>())
+        continue;
+
+      destroyClassMember(loc, selfValue, vd);
+    }
+
+    B.createBranch(loc, finishBB);
+  }
+
+  // // else (local distributed actor)
+  // {
+  //   <continue normal deinit>
+  // }
+  {
+    B.emitBlock(isLocalBB);
+
+    B.createBranch(loc, normalMemberDestroyBB);
+  }
+}
+
 /******************************************************************************/
 /***************************** DISTRIBUTED THUNKS *****************************/
 /******************************************************************************/
