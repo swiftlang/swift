@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-clang %s -isysroot %sdk -L%swift_obj_root/lib/swift/%target-os-abi -lswiftCore -o %t/objc-getclass
+// RUN: %target-clang %s -isysroot %sdk -L%swift_obj_root/lib/swift/%target-sdk-name -lswiftCore -o %t/objc-getclass
 // RUN: %target-codesign %t/objc-getclass
 // RUN: %target-run %t/objc-getclass %S/Inputs/objc-getclass.txt
 
