@@ -3934,8 +3934,13 @@ bool ConstraintSystem::generateConstraints(
       if (!patternType || patternType->hasError())
         return true;
 
-      auto init = patternBinding->getInit(index);
+      if (!patternBinding->isInitialized(index) &&
+          patternBinding->isDefaultInitializable(index) &&
+          pattern->hasStorage()) {
+        llvm_unreachable("default initialization is unsupported");
+      }
 
+      auto init = patternBinding->getInit(index);
       auto target = init ? SolutionApplicationTarget::forInitialization(
                                init, dc, patternType, pattern,
                                /*bindPatternVarsOneWay=*/true)
