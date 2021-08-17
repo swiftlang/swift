@@ -4404,6 +4404,9 @@ namespace {
     AccessorDecl *tryCreateConstexprAccessor(const clang::VarDecl *clangVar,
                                              VarDecl *swiftVar) {
       assert(clangVar->isConstexpr());
+      auto *Eval = clangVar->ensureEvaluatedStmt();
+      if (cast<clang::Expr>(Eval->Value)->isValueDependent())
+        return nullptr;
       clangVar->evaluateValue();
       auto evaluated = clangVar->getEvaluatedValue();
       if (!evaluated)
