@@ -8,8 +8,6 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
-// REQUIRES: rdar78290608
-
 import _Distributed
 
 @available(SwiftStdlib 5.5, *)
