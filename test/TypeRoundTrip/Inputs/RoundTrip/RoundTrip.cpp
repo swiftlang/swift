@@ -12,12 +12,12 @@ using namespace swift;
 
 static std::string nameForMetadata(const Metadata *md)
 {
-  Demangle::StackAllocatedDemangler<1024> dem;
+  Demangle::__runtime::StackAllocatedDemangler<1024> dem;
   auto nodeTree = _swift_buildDemanglingForMetadata(md, dem);
   if (!nodeTree)
     return "<unknown>";
 
-  std::string result = Demangle::nodeToString(nodeTree);
+  std::string result = Demangle::__runtime::nodeToString(nodeTree);
   return result;
 }
 
@@ -26,11 +26,11 @@ extern "C" SWIFT_CC(swift) void roundTripType(const Metadata *md) {
   const std::string mdName = ::nameForMetadata(md);
 
   // Convert it to a Node tree
-  Demangle::StackAllocatedDemangler<1024> dem;
+  Demangle::__runtime::StackAllocatedDemangler<1024> dem;
   auto nodeTree = _swift_buildDemanglingForMetadata(md, dem);
 
   // Mangle that
-  std::string mangledName = Demangle::mangleNode(nodeTree);
+  std::string mangledName = Demangle::__runtime::mangleNode(nodeTree);
 
   // Look up the result
   auto result = swift_getTypeByMangledName(MetadataState::Abstract,
