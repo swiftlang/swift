@@ -76,14 +76,20 @@ func expectRoundTripEquality<T : Codable>(of value: T, encode: (T) throws -> Dat
     expectEqual(value, decoded, "\(#file):\(lineNumber): Decoded \(T.self) <\(debugDescription(decoded))> not equal to original <\(debugDescription(value))>")
 }
 
-func expectRoundTripEqualityThroughJSON<T : Codable>(for value: T, lineNumber: Int) where T : Equatable {
+func expectRoundTripEqualityThroughJSON<T : Codable>(for value: T, lineNumber: Int, _ expectedJSON: String? = nil) where T : Equatable {
     let inf = "INF", negInf = "-INF", nan = "NaN"
     let encode = { (_ value: T) throws -> Data in
         let encoder = JSONEncoder()
         encoder.nonConformingFloatEncodingStrategy = .convertToString(positiveInfinity: inf,
                                                                       negativeInfinity: negInf,
                                                                       nan: nan)
-        return try encoder.encode(value)
+        let encoded = try encoder.encode(value)
+
+        if let expectedJSON = expectedJSON {
+            let stringValue = String(decoding: encoded, as: UTF8.self)
+            expectEqual(expectedJSON, stringValue, "\(#file):\(lineNumber): Encoded \(T.self) <\(stringValue)> not equal to expected <\(expectedJSON)>")
+        }
+        return encoded
     }
 
     let decode = { (_ type: T.Type, _ data: Data) throws -> T in
@@ -461,6 +467,45 @@ class TestCodable : TestCodableSuper {
             expectRoundTripEqualityThroughPlist(for: decimal, lineNumber: testLine)
         }
     }
+
+    func test_Dictionary_JSON() {
+        enum NotCodingKeyRepresentable: String, Codable {
+            case a
+        }
+
+        enum CodingKeyRepresentableEnum: String, Codable, CodingKeyRepresentable {
+            case a
+        }
+
+        struct GenericStringCodingKey: CodingKey {
+            var stringValue: String
+            var intValue: Int? { nil }
+
+            init(stringValue: String) {
+                self.stringValue = stringValue
+            }
+
+            init?(intValue: Int) {
+                return nil
+            }
+        }
+
+        let notCodingKeyRepresentableValues: [Int: [NotCodingKeyRepresentable: Bool]] = [
+          #line : [.a: true]
+        ]
+
+        for (testLine, dictionary) in notCodingKeyRepresentableValues {
+            expectRoundTripEqualityThroughJSON(for: dictionary, lineNumber: testLine, #"["a",true]"#)
+        }
+
+        let codingKeyRepresentableValues: [Int: [CodingKeyRepresentableEnum: Bool]] = [
+            #line : [.a: true]
+        ]
+        for (testLine, dictionary) in codingKeyRepresentableValues {
+            expectRoundTripEqualityThroughJSON(for: dictionary, lineNumber: testLine, #"{"a":true}"#)
+        }
+    }
+
 
     // MARK: - IndexPath
     lazy var indexPathValues: [Int : IndexPath] = [
@@ -849,69 +894,6 @@ class TestCodable : TestCodableSuper {
             expectRoundTripEqualityThroughPlist(for: UUIDCodingWrapper(uuid), lineNumber: testLine)
         }
     }
-
-    func test_Dictionary_JSON() {
-        enum NotCodingKeyRepresentable: String, Codable {
-            case a
-        }
-
-        enum CodingKeyRepresentableEnum: String, Codable, CodingKeyRepresentable {
-            case a
-
-            init?(codingKey: CodingKey) {
-                self.init(rawValue: codingKey.stringValue)
-            }
-            var codingKey: CodingKey { GenericStringCodingKey(stringValue: self.rawValue) }
-        }
-
-        struct GenericStringCodingKey: CodingKey {
-            var stringValue: String
-            var intValue: Int? { nil }
-
-            init(stringValue: String) {
-                self.stringValue = stringValue
-            }
-
-            init?(intValue: Int) {
-                return nil
-            }
-        }
-
-        let notCodingKeyRepresentableValues: [Int: [NotCodingKeyRepresentable: Bool]] = [
-          #line : [.a: true]
-        ]
-
-        for (testLine, dictionary) in notCodingKeyRepresentableValues {
-            expectRoundTripEqualityThroughJSON(for: dictionary, lineNumber: testLine)
-            let encoder = JSONEncoder()
-            let decoder = JSONDecoder()
-            do {
-                let data = try encoder.encode(dictionary)
-                let stringValue = String(decoding: data, as: UTF8.self)
-                expectEqual("[\"a\",true]", stringValue, "\(stringValue)")
-                expectEqual(dictionary, try? decoder.decode([NotCodingKeyRepresentable: Bool].self, from: data), "Expecting dictionary to encode as an array of pairs")
-            } catch {
-                fatalError("\(#file):\(testLine): Unable to encode [NotCodingKeyRepresentable: Bool]: \(error)")
-            }
-        }
-
-        let codingKeyRepresentableValues: [Int: [CodingKeyRepresentableEnum: Bool]] = [
-            #line : [.a: true]
-        ]
-        for (testLine, dictionary) in codingKeyRepresentableValues {
-            expectRoundTripEqualityThroughJSON(for: dictionary, lineNumber: testLine)
-            let encoder = JSONEncoder()
-            let decoder = JSONDecoder()
-            do {
-                let data = try encoder.encode(dictionary)
-                let stringValue = String(decoding: data, as: UTF8.self)
-                expectEqual("{\"a\":true}", stringValue, "\(stringValue)")
-                expectEqual(dictionary, try? decoder.decode([CodingKeyRepresentableEnum: Bool].self, from: data), "Expecting dictionary to encode as a JSON object")
-            } catch {
-                fatalError("\(#file):\(testLine): Unable to encode [CodingKeyRepresentableEnum: Bool]: \(error)")
-            }
-        }
-    }
 }
 
 // MARK: - Helper Types
@@ -932,7 +914,6 @@ struct TopLevelWrapper<T> : Codable, Equatable where T : Codable, T : Equatable 
 
 #if !FOUNDATION_XCTEST
 var tests = [
-   "test_Dictionary_JSON": TestCodable.test_Dictionary_JSON,
     "test_Calendar_JSON" : TestCodable.test_Calendar_JSON,
     "test_Calendar_Plist" : TestCodable.test_Calendar_Plist,
     "test_CharacterSet_JSON" : TestCodable.test_CharacterSet_JSON,
@@ -955,6 +936,7 @@ var tests = [
     "test_DateComponents_Plist" : TestCodable.test_DateComponents_Plist,
     "test_Decimal_JSON" : TestCodable.test_Decimal_JSON,
     "test_Decimal_Plist" : TestCodable.test_Decimal_Plist,
+    "test_Dictionary_JSON": TestCodable.test_Dictionary_JSON,
     "test_IndexPath_JSON" : TestCodable.test_IndexPath_JSON,
     "test_IndexPath_Plist" : TestCodable.test_IndexPath_Plist,
     "test_IndexSet_JSON" : TestCodable.test_IndexSet_JSON,
