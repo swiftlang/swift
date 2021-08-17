@@ -1,4 +1,3 @@
-// REQUIRES: rdar81128571
 // REQUIRES: objc_interop
 // REQUIRES: concurrency
 
@@ -14,7 +13,7 @@ func optionalBoolWithErr(completion: @escaping (String?, Bool?, Bool, Error?) ->
 
 // All 7 of the below should generate the same refactoring.
 
-// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 -I %S/Inputs -I %t %clang-importer-sdk-nosource | %FileCheck -check-prefix=BOOL-WITH-ERR %s
+// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 -I %S/Inputs -I %t -target %target-triple %clang-importer-sdk-nosource | %FileCheck -check-prefix=BOOL-WITH-ERR %s
 boolWithErr { b, err in
   if !b {
     fatalError("oh no \(err!)")
@@ -22,7 +21,7 @@ boolWithErr { b, err in
   print("not err")
 }
 
-// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 -I %S/Inputs -I %t %clang-importer-sdk-nosource | %FileCheck -check-prefix=BOOL-WITH-ERR %s
+// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 -I %S/Inputs -I %t -target %target-triple %clang-importer-sdk-nosource | %FileCheck -check-prefix=BOOL-WITH-ERR %s
 boolWithErr { b, err in
   if b {
     fatalError("oh no \(err!)")
@@ -30,7 +29,7 @@ boolWithErr { b, err in
   print("not err")
 }
 
-// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 -I %S/Inputs -I %t %clang-importer-sdk-nosource | %FileCheck -check-prefix=BOOL-WITH-ERR %s
+// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 -I %S/Inputs -I %t -target %target-triple %clang-importer-sdk-nosource | %FileCheck -check-prefix=BOOL-WITH-ERR %s
 boolWithErr { b, err in
   if !b && err != nil {
     fatalError("oh no \(err!)")
@@ -38,7 +37,7 @@ boolWithErr { b, err in
   print("not err")
 }
 
-// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 -I %S/Inputs -I %t %clang-importer-sdk-nosource | %FileCheck -check-prefix=BOOL-WITH-ERR %s
+// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 -I %S/Inputs -I %t -target %target-triple %clang-importer-sdk-nosource | %FileCheck -check-prefix=BOOL-WITH-ERR %s
 boolWithErr { b, err in
   if b && err != nil {
     fatalError("oh no \(err!)")
@@ -46,7 +45,7 @@ boolWithErr { b, err in
   print("not err")
 }
 
-// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 -I %S/Inputs -I %t %clang-importer-sdk-nosource | %FileCheck -check-prefix=BOOL-WITH-ERR %s
+// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 -I %S/Inputs -I %t -target %target-triple %clang-importer-sdk-nosource | %FileCheck -check-prefix=BOOL-WITH-ERR %s
 boolWithErr { b, err in
   if err != nil && b == false {
     fatalError("oh no \(err!)")
@@ -54,7 +53,7 @@ boolWithErr { b, err in
   print("not err")
 }
 
-// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 -I %S/Inputs -I %t %clang-importer-sdk-nosource | %FileCheck -check-prefix=BOOL-WITH-ERR %s
+// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 -I %S/Inputs -I %t -target %target-triple %clang-importer-sdk-nosource | %FileCheck -check-prefix=BOOL-WITH-ERR %s
 boolWithErr { b, err in
   if b == true && err == nil {
   } else {
@@ -63,7 +62,7 @@ boolWithErr { b, err in
   print("not err")
 }
 
-// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 -I %S/Inputs -I %t %clang-importer-sdk-nosource | %FileCheck -check-prefix=BOOL-WITH-ERR %s
+// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 -I %S/Inputs -I %t -target %target-triple %clang-importer-sdk-nosource | %FileCheck -check-prefix=BOOL-WITH-ERR %s
 boolWithErr { b, err in
   if !b && err == nil {
   } else {
@@ -81,7 +80,7 @@ boolWithErr { b, err in
 
 // These 3 should both generate the same refactoring.
 
-// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 -I %S/Inputs -I %t %clang-importer-sdk-nosource | %FileCheck -check-prefix=BOOL-WITH-ERR2 %s
+// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 -I %S/Inputs -I %t -target %target-triple %clang-importer-sdk-nosource | %FileCheck -check-prefix=BOOL-WITH-ERR2 %s
 boolWithErr { success, err in
   if success == true && err == nil {
     print("hi")
@@ -91,7 +90,7 @@ boolWithErr { success, err in
   print("not err")
 }
 
-// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 -I %S/Inputs -I %t %clang-importer-sdk-nosource | %FileCheck -check-prefix=BOOL-WITH-ERR2 %s
+// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 -I %S/Inputs -I %t -target %target-triple %clang-importer-sdk-nosource | %FileCheck -check-prefix=BOOL-WITH-ERR2 %s
 boolWithErr { success, err in
   if success && err == nil {
     print("hi")
@@ -101,7 +100,7 @@ boolWithErr { success, err in
   print("not err")
 }
 
-// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 -I %S/Inputs -I %t %clang-importer-sdk-nosource | %FileCheck -check-prefix=BOOL-WITH-ERR2 %s
+// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 -I %S/Inputs -I %t -target %target-triple %clang-importer-sdk-nosource | %FileCheck -check-prefix=BOOL-WITH-ERR2 %s
 boolWithErr { success, err in
   if err == nil {
     print("hi")
@@ -119,7 +118,7 @@ boolWithErr { success, err in
 // BOOL-WITH-ERR2-NEXT:   fatalError("oh no \(err)")
 // BOOL-WITH-ERR2-NEXT: }
 
-// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 -I %S/Inputs -I %t %clang-importer-sdk-nosource | %FileCheck -check-prefix=BOOL-WITH-ERR3 %s
+// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 -I %S/Inputs -I %t -target %target-triple %clang-importer-sdk-nosource | %FileCheck -check-prefix=BOOL-WITH-ERR3 %s
 boolWithErr { failure, err in
   if failure {
     print("a \(err!)")
@@ -142,7 +141,7 @@ boolWithErr { failure, err in
 // BOOL-WITH-ERR3-NEXT: }
 
 // Don't handle the below example as the force unwrap of err takes place under a different condition.
-// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 -I %S/Inputs -I %t %clang-importer-sdk-nosource | %FileCheck -check-prefix=BOOL-DONT-HANDLE %s
+// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 -I %S/Inputs -I %t -target %target-triple %clang-importer-sdk-nosource | %FileCheck -check-prefix=BOOL-DONT-HANDLE %s
 boolWithErr { success, err in
   if !success {
     if err != nil {
@@ -166,7 +165,7 @@ boolWithErr { success, err in
 // BOOL-DONT-HANDLE-NEXT: }
 // BOOL-DONT-HANDLE-NEXT: print("not err")
 
-// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 -I %S/Inputs -I %t %clang-importer-sdk-nosource | %FileCheck -check-prefix=BOOL-DONT-HANDLE2 %s
+// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 -I %S/Inputs -I %t -target %target-triple %clang-importer-sdk-nosource | %FileCheck -check-prefix=BOOL-DONT-HANDLE2 %s
 boolWithErr { success, err in
   if !success {
     func doThings() {
@@ -219,7 +218,7 @@ boolWithErr { success, err in
 // BOOL-DONT-HANDLE2-NEXT: }
 // BOOL-DONT-HANDLE2-NEXT: print("not err")
 
-// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 -I %S/Inputs -I %t %clang-importer-sdk-nosource | %FileCheck -check-prefix=BOOL-DONT-HANDLE3 %s
+// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 -I %S/Inputs -I %t -target %target-triple %clang-importer-sdk-nosource | %FileCheck -check-prefix=BOOL-DONT-HANDLE3 %s
 boolWithErr { success, err in
   if !success {
     fatalError("oh no maybe \(String(describing: err))")
@@ -235,7 +234,7 @@ boolWithErr { success, err in
 // BOOL-DONT-HANDLE3-NEXT: }
 // BOOL-DONT-HANDLE3-NEXT: print("not err")
 
-// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 -I %S/Inputs -I %t %clang-importer-sdk-nosource | %FileCheck -check-prefix=BOOL-DONT-HANDLE4 %s
+// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 -I %S/Inputs -I %t -target %target-triple %clang-importer-sdk-nosource | %FileCheck -check-prefix=BOOL-DONT-HANDLE4 %s
 boolWithErr { failure, err in
   if failure {
     print("a")
@@ -258,7 +257,7 @@ boolWithErr { failure, err in
 // BOOL-DONT-HANDLE4-NEXT:   print("c")
 // BOOL-DONT-HANDLE4-NEXT: }
 
-// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 -I %S/Inputs -I %t %clang-importer-sdk-nosource | %FileCheck -check-prefix=BOOL-WITH-ERR-SILLY %s
+// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 -I %S/Inputs -I %t -target %target-triple %clang-importer-sdk-nosource | %FileCheck -check-prefix=BOOL-WITH-ERR-SILLY %s
 boolWithErr { success, err in
   if success == false && err == nil {
     print("ummm wat \(err!)")
@@ -274,7 +273,7 @@ boolWithErr { success, err in
 // BOOL-WITH-ERR-SILLY-NEXT: }
 // BOOL-WITH-ERR-SILLY-NEXT: print("not err")
 
-// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 -I %S/Inputs -I %t %clang-importer-sdk-nosource | %FileCheck -check-prefix=BOOL-WITH-ERR-SILLY2 %s
+// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 -I %S/Inputs -I %t -target %target-triple %clang-importer-sdk-nosource | %FileCheck -check-prefix=BOOL-WITH-ERR-SILLY2 %s
 boolWithErr { success, err in
   if success {
     print("ummm wat \(err!)")
@@ -292,7 +291,7 @@ boolWithErr { success, err in
 // BOOL-WITH-ERR-SILLY2-NEXT:   print("ummm wat \(<#err#>!)")
 // BOOL-WITH-ERR-SILLY2-NEXT: }
 
-// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 -I %S/Inputs -I %t %clang-importer-sdk-nosource | %FileCheck -check-prefix=MULTI-BOOL-WITH-ERR %s
+// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 -I %S/Inputs -I %t -target %target-triple %clang-importer-sdk-nosource | %FileCheck -check-prefix=MULTI-BOOL-WITH-ERR %s
 multipleBoolWithErr { str, b1, b2, err in
   if !b1 && !b2 {
     print("a \(err!)")
@@ -328,7 +327,7 @@ multipleBoolWithErr { str, b1, b2, err in
 // MULTI-BOOL-WITH-ERR-NEXT:   print("d \(err)")
 // MULTI-BOOL-WITH-ERR-NEXT: }
 
-// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 -I %S/Inputs -I %t %clang-importer-sdk-nosource | %FileCheck -check-prefix=OPT-BOOL-WITH-ERR %s
+// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 -I %S/Inputs -I %t -target %target-triple %clang-importer-sdk-nosource | %FileCheck -check-prefix=OPT-BOOL-WITH-ERR %s
 optionalBoolWithErr { str, optBool, b, err in
   if optBool != nil {
     print("a \(err!)")
@@ -373,7 +372,7 @@ optionalBoolWithErr { str, optBool, b, err in
 // OPT-BOOL-WITH-ERR-NEXT:   print("g \(err)")
 // OPT-BOOL-WITH-ERR-NEXT: }
 
-// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 -I %S/Inputs -I %t %clang-importer-sdk-nosource | %FileCheck -check-prefix=OBJC-BOOL-WITH-ERR %s
+// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 -I %S/Inputs -I %t -target %target-triple %clang-importer-sdk-nosource | %FileCheck -check-prefix=OBJC-BOOL-WITH-ERR %s
 ClassWithHandlerMethods.firstBoolFlagSuccess("") { str, success, unrelated, err in
   if !unrelated {
     print(err!)
@@ -404,7 +403,7 @@ ClassWithHandlerMethods.firstBoolFlagSuccess("") { str, success, unrelated, err 
 // OBJC-BOOL-WITH-ERR-NEXT:   print(err)
 // OBJC-BOOL-WITH-ERR-NEXT: }
 
-// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 -I %S/Inputs -I %t %clang-importer-sdk-nosource | %FileCheck -check-prefix=OBJC-BOOL-WITH-ERR2 %s
+// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 -I %S/Inputs -I %t -target %target-triple %clang-importer-sdk-nosource | %FileCheck -check-prefix=OBJC-BOOL-WITH-ERR2 %s
 ClassWithHandlerMethods.secondBoolFlagFailure("") { str, unrelated, failure, err in
   if unrelated {
     print(err!)
