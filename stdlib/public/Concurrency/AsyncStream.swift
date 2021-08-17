@@ -142,7 +142,7 @@ public struct AsyncStream<Element> {
       /// values from the stream.
       case enqueued(remaining: Int)
       
-      /// The stream didn't enqueue the element due to a full buffer.
+      /// The stream didn't enqueue the element because the buffer was full.
       ///
       /// The associated element for this case is the element dropped by the stream.
       case dropped(Element)

@@ -30,10 +30,10 @@ import Swift
 /// When there are no further elements to produce, call the continuation's
 /// `finish()` method. This causes the sequence iterator to produce a `nil`,
 /// which terminates the sequence. If an error occurs, call the continuation's
-/// `finish(throwing:)` method, which causes the iterator's `next()` to throw
-/// the error to the awaiting call point. The continuation is `Sendable`, which
-/// permits calling it from concurrent contexts external to
-/// the iteration of the `AsyncThrowingStream`.
+/// `finish(throwing:)` method, which causes the iterator's `next()` method to
+/// throw the error to the awaiting call point. The continuation is `Sendable`,
+/// which permits calling it from concurrent contexts external to the iteration
+/// of the `AsyncThrowingStream`.
 ///
 /// An arbitrary source of elements can produce elements faster than they are
 /// consumed by a caller iterating over them. Because of this, `AsyncThrowingStream`
@@ -165,7 +165,7 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
       /// values from the stream.
       case enqueued(remaining: Int)
       
-      /// The stream didn't enqueue the element due to a full buffer.
+      /// The stream didn't enqueue the element because the buffer was full.
       ///
       /// The associated element for this case is the element that the stream
       /// dropped.
@@ -176,7 +176,7 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
       ///
       /// This indicates the stream terminated prior to calling `yield`, either
       /// because the stream finished normally or through cancellation, or
-      /// threw an error.
+      /// it threw an error.
       case terminated
     }
     
