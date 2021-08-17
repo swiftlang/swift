@@ -2869,7 +2869,7 @@ bool ConformanceChecker::checkActorIsolation(
   }
 
   case ActorIsolationRestriction::CrossActorSelf:
-    return diagnoseNonConcurrentTypesInReference(
+    return diagnoseNonSendableTypesInReference(
         witness, DC->getParentModule(), witness->getLoc(),
         ConcurrentReferenceKind::CrossActor);
 
@@ -2940,7 +2940,7 @@ bool ConformanceChecker::checkActorIsolation(
     if (requirement->hasClangNode())
       return false;
 
-    return diagnoseNonConcurrentTypesInReference(
+    return diagnoseNonSendableTypesInReference(
       witness, DC->getParentModule(), witness->getLoc(),
       ConcurrentReferenceKind::CrossActor);
   }
@@ -2975,7 +2975,7 @@ bool ConformanceChecker::checkActorIsolation(
       return false;
 
     if (isCrossActor) {
-      return diagnoseNonConcurrentTypesInReference(
+      return diagnoseNonSendableTypesInReference(
         witness, DC->getParentModule(), witness->getLoc(),
         ConcurrentReferenceKind::CrossActor);
     }
@@ -5927,6 +5927,9 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
     SendableCheck check = SendableCheck::Explicit;
     if (errorConformance || codingKeyConformance)
       check = SendableCheck::ImpliedByStandardProtocol;
+    else if (SendableConformance->getSourceKind() ==
+                 ConformanceEntryKind::Synthesized)
+      check = SendableCheck::Implicit;
     checkSendableConformance(SendableConformance, check);
   }
 

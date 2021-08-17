@@ -1939,6 +1939,12 @@ NOTE(nonsendable_function_type,none,
 NOTE(nonsendable_tuple_type,none,
      "a tuple type must be composed of 'Sendable' elements to conform to "
      "'Sendable'", ())
+NOTE(non_sendable_nominal,none,
+     "%0 %1 does not conform to the `Sendable` protocol",
+      (DescriptiveDeclKind, DeclName))
+NOTE(add_nominal_sendable_conformance,none,
+     "consider making %0 %1 conform to the 'Sendable' protocol",
+     (DescriptiveDeclKind, DeclName))
 
 NOTE(required_by_opaque_return,none,
     "required by opaque return type of %0 %1", (DescriptiveDeclKind, DeclName))
@@ -4492,20 +4498,20 @@ NOTE(protocol_isolated_to_global_actor_here,none,
 ERROR(isolated_parameter_not_actor,none,
       "'isolated' parameter has non-actor type %0", (Type))
       
-WARNING(non_concurrent_param_type,none,
+WARNING(non_sendable_param_type,none,
         "cannot pass argument of non-sendable type %0 across actors",
         (Type))
-WARNING(non_concurrent_result_type,none,
+WARNING(non_sendable_result_type,none,
         "cannot call function returning non-sendable type %0 across "
         "actors", (Type))
-WARNING(non_concurrent_property_type,none,
-        "cannot use %0 %1 with a non-sendable type %2 "
+WARNING(non_sendable_property_type,none,
+        "cannot use %1 %2 with a non-sendable type %0 "
         "%select{across actors|from concurrently-executed code}3",
-        (DescriptiveDeclKind, DeclName, Type, bool))
-WARNING(non_concurrent_keypath_capture,none,
+        (Type, DescriptiveDeclKind, DeclName, bool))
+WARNING(non_sendable_keypath_capture,none,
         "cannot form key path that captures non-sendable type %0",
         (Type))
-WARNING(non_concurrent_keypath_access,none,
+WARNING(non_sendable_keypath_access,none,
         "cannot form key path that accesses non-sendable type %0",
         (Type))
 ERROR(non_concurrent_type_member,none,
@@ -4528,9 +4534,6 @@ ERROR(concurrent_value_inherit,none,
       (bool, DeclName))
 ERROR(non_sendable_type,none,
       "type %0 does not conform to the 'Sendable' protocol", (Type))
-ERROR(non_sendable_function_type,none,
-     "function type %0 must be marked '@Sendable' to conform to 'Sendable'",
-      (Type))
 
 WARNING(unchecked_conformance_not_special,none,
       "@unchecked conformance to %0 has no meaning", (Type))

@@ -445,7 +445,7 @@ NOTE(constexpr_witness_call_with_no_conformance, none,
     "%select{for this call|for a witness-method invoked during this call}0",
     (bool))
 
-NOTE(constexpr_unknown_control_flow_due_to_skip,none, "branch depends on "
+REMARK(constexpr_unknown_control_flow_due_to_skip,none, "branch depends on "
      "non-constant value produced by an unevaluated instructions", ())
 NOTE(constexpr_returned_by_unevaluated_instruction,none,
      "result of an unevaluated instruction is not a constant", ())

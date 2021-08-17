@@ -365,8 +365,10 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
 
   // If the type doesn't conform to this protocol, the result isn't formed
   // from these requirements.
-  if (!genericSig->requiresProtocol(type, proto))
-    return ProtocolConformanceRef::forInvalid();
+  if (!genericSig->requiresProtocol(type, proto)) {
+    Type substType = type.subst(*this);
+    return ProtocolConformanceRef::forMissingOrInvalid(substType, proto);
+  }
 
   auto accessPath =
     genericSig->getConformanceAccessPath(type, proto);

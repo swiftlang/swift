@@ -179,7 +179,7 @@ public func withThrowingTaskGroup<ChildTaskResult, GroupResult>(
 /// It is created by the `withTaskGroup` function.
 @available(SwiftStdlib 5.5, *)
 @frozen
-public struct TaskGroup<ChildTaskResult> {
+public struct TaskGroup<ChildTaskResult: Sendable> {
 
   /// Group task into which child tasks offer their results,
   /// and the `next()` function polls those results from.
@@ -406,7 +406,7 @@ public struct TaskGroup<ChildTaskResult> {
 /// It is created by the `withTaskGroup` function.
 @available(SwiftStdlib 5.5, *)
 @frozen
-public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
+public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
 
   /// Group task into which child tasks offer their results,
   /// and the `next()` function polls those results from.
