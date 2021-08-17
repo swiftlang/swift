@@ -485,6 +485,13 @@ function(add_swift_host_library name)
     message(FATAL_ERROR "One of SHARED/STATIC/OBJECT must be specified")
   endif()
 
+  # Using `support` llvm component ends up adding `-Xlinker /path/to/lib/libLLVMDemangle.a`
+  # to `LINK_FLAGS` but `libLLVMDemangle.a` is not added as an input to the linking ninja statement.
+  # As a workaround, include `demangle` component whenever `support` is mentioned.
+  if("support" IN_LIST ASHL_LLVM_LINK_COMPONENTS)
+    list(APPEND ASHL_LLVM_LINK_COMPONENTS "demangle")
+  endif()
+
   if(XCODE)
     get_filename_component(base_dir ${CMAKE_CURRENT_SOURCE_DIR} NAME)
   
@@ -794,6 +801,12 @@ function(add_swift_host_tool executable)
   precondition(ASHT_SWIFT_COMPONENT
                MESSAGE "Swift Component is required to add a host tool")
 
+  # Using `support` llvm component ends up adding `-Xlinker /path/to/lib/libLLVMDemangle.a`
+  # to `LINK_FLAGS` but `libLLVMDemangle.a` is not added as an input to the linking ninja statement.
+  # As a workaround, include `demangle` component whenever `support` is mentioned.
+  if("support" IN_LIST ASHT_LLVM_LINK_COMPONENTS)
+    list(APPEND ASHT_LLVM_LINK_COMPONENTS "demangle")
+  endif()
 
   add_executable(${executable} ${ASHT_UNPARSED_ARGUMENTS})
   _add_host_variant_c_compile_flags(${executable})
