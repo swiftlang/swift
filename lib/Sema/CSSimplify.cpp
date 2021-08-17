@@ -6600,7 +6600,8 @@ static ConstraintFix *maybeWarnAboutExtraneousCast(
     SmallVector<Type, 4> toOptionals, ConstraintSystem::TypeMatchOptions flags,
     ConstraintLocatorBuilder locator) {
 
-  if (flags.contains(ConstraintSystem::TypeMatchFlags::TMF_ApplyingFix))
+  auto last = locator.last();
+  if (last && last->is<LocatorPathElt::GenericArgument>())
     return nullptr;
 
   // Both types have to be fixed.
@@ -6777,9 +6778,11 @@ ConstraintSystem::simplifyCheckedCastConstraint(
   case CheckedCastKind::ArrayDowncast: {
     auto fromBaseType = *isArrayType(fromType);
     auto toBaseType = *isArrayType(toType);
-
-    auto result = simplifyCheckedCastConstraint(
-        fromBaseType, toBaseType, subflags | TMF_ApplyingFix, locator);
+    
+    auto elementLocator =
+        locator.withPathElement(LocatorPathElt::GenericArgument(0));
+    auto result = simplifyCheckedCastConstraint(fromBaseType, toBaseType,
+                                                subflags, elementLocator);
     attemptRecordCastFixIfSolved(result);
     return result;
   }
@@ -6791,13 +6794,16 @@ ConstraintSystem::simplifyCheckedCastConstraint(
     Type toKeyType, toValueType;
     std::tie(toKeyType, toValueType) = *isDictionaryType(toType);
 
-    if (simplifyCheckedCastConstraint(fromKeyType, toKeyType,
-                                      subflags | TMF_ApplyingFix,
-                                      locator) == SolutionKind::Error)
+    auto keyLocator =
+        locator.withPathElement(LocatorPathElt::GenericArgument(0));
+    if (simplifyCheckedCastConstraint(fromKeyType, toKeyType, subflags,
+                                      keyLocator) == SolutionKind::Error)
       return SolutionKind::Error;
 
-    auto result = simplifyCheckedCastConstraint(
-        fromValueType, toValueType, subflags | TMF_ApplyingFix, locator);
+    auto valueLocator =
+        locator.withPathElement(LocatorPathElt::GenericArgument(1));
+    auto result = simplifyCheckedCastConstraint(fromValueType, toValueType,
+                                                subflags, valueLocator);
     attemptRecordCastFixIfSolved(result);
     return result;
   }
@@ -6805,8 +6811,11 @@ ConstraintSystem::simplifyCheckedCastConstraint(
   case CheckedCastKind::SetDowncast: {
     auto fromBaseType = *isSetType(fromType);
     auto toBaseType = *isSetType(toType);
-    auto result = simplifyCheckedCastConstraint(
-        fromBaseType, toBaseType, subflags | TMF_ApplyingFix, locator);
+    
+    auto elementLocator =
+        locator.withPathElement(LocatorPathElt::GenericArgument(0));
+    auto result = simplifyCheckedCastConstraint(fromBaseType, toBaseType,
+                                                subflags, elementLocator);
     attemptRecordCastFixIfSolved(result);
     return result;
   }
