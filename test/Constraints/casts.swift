@@ -549,3 +549,67 @@ extension ChangeType where T == String? {
   var foo: String? { return self.delta?.previous as? String } // OK
   var bar: String? { self.delta?.next }
 }
+
+// SR-15038
+protocol ExperimentDeserializable {
+  static func deserializeExperiment(_ value: Any) -> Self?
+}
+
+extension String: ExperimentDeserializable {
+  static func deserializeExperiment(_ value: Any) -> String? { value as? String }
+}
+
+extension Int: ExperimentDeserializable {
+  static func deserializeExperiment(_ value: Any) -> Int? { value as? Int }
+}
+
+class Constant<T> {
+  private init(getUnderlyingValue: @escaping () -> T) {
+    print(getUnderlyingValue())
+  }
+}
+
+struct Thing {
+  let storage: [String: Any]
+}
+
+extension Constant where T: Sequence, T.Element: ExperimentDeserializable {
+  static func foo<U>(thing: Thing, defaultValue: T) -> T where T == [U] {
+    guard let array = thing.storage["foo"] as? [Any] else {
+      fatalError()
+    }
+
+    let value = array.map(T.Element.deserializeExperiment) as? [T.Element] ?? defaultValue // OK
+    return value
+  }
+}
+
+// Array
+func decodeStringOrInt<T: FixedWidthInteger>() -> [T] {
+  let stringWrapped = [String]()
+  if let values = stringWrapped.map({ $0.isEmpty ? 0 : T($0) }) as? [T] { // OK
+    return values
+  } else {
+    fatalError()
+  }
+}
+
+// Set 
+func decodeStringOrIntSet<T: FixedWidthInteger>() -> Set<T> {
+  let stringWrapped = [String]()
+  if let values = Set(stringWrapped.map({ $0.isEmpty ? 0 : T($0) })) as? Set<T> { // OK
+    return values
+  } else {
+    fatalError()
+  }
+}
+
+// Dictionary
+func decodeStringOrIntDictionary<T: FixedWidthInteger>() -> [Int: T] {
+  let stringWrapped = [String]()
+  if let values = Dictionary(uniqueKeysWithValues: stringWrapped.map({ $0.isEmpty ? (0, 0) : (0, T($0)) })) as? [Int: T] { // OK
+    return values
+  } else {
+    fatalError()
+  }
+}

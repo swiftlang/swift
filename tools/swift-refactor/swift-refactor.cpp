@@ -135,6 +135,9 @@ static llvm::cl::list<std::string>
     ImportPaths("I",
                 llvm::cl::desc("Add a directory to the import search path"));
 
+static llvm::cl::opt<std::string>
+Triple("target", llvm::cl::desc("target triple"));
+
 enum class DumpType {
   REWRITTEN,
   JSON,
@@ -288,6 +291,8 @@ int main(int argc, char *argv[]) {
 
   Invocation.setSDKPath(options::SDK);
   Invocation.setImportSearchPaths(options::ImportPaths);
+  if (!options::Triple.empty())
+    Invocation.setTargetTriple(options::Triple);
 
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(
       options::SourceFilename);
