@@ -14,6 +14,7 @@
 
 #include "DeclAndTypePrinter.h"
 
+#include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/PrettyStackTrace.h"
@@ -38,6 +39,37 @@ static bool isOSObjectType(const clang::Decl *decl) {
   if (!named)
     return false;
   return !DeclAndTypePrinter::maybeGetOSObjectBaseName(named).empty();
+}
+
+/// Get a DeclName, or create a fake descriptive name. Used defensively in a
+/// diagnostic below where we think we should have a ValueDecl but aren't sure.
+static DeclName getOrInventName(Decl *D) {
+  assert(D && "decl not null");
+
+  if (auto *VD = dyn_cast<ValueDecl>(D))
+    return VD->getName();
+
+  // Generate a fake name that describes the location.
+  SmallString<32> baseName;
+  llvm::raw_svector_ostream baseNameOS(baseName);
+  baseNameOS << "__anonymous_";
+  do {
+    baseNameOS << Decl::getKindName(D->getKind()) <<  "_in_";
+
+    D = D->getDeclContext()->getInnermostDeclarationDeclContext();
+    assert(D && "decl not null");
+  } while (!isa<ValueDecl>(D));     // Will always eventually reach a ModuleDecl
+
+  auto parentName = cast<ValueDecl>(D)->getName();
+  baseNameOS << parentName.getBaseName();
+
+  ASTContext &ctx = D->getASTContext();
+  Identifier baseID = ctx.getIdentifier(baseName);
+
+  if (parentName.isSimpleName())
+    return DeclName(baseID);
+  else
+    return DeclName(ctx, baseID, parentName.getArgumentNames());
 }
 
 namespace {
@@ -510,11 +542,25 @@ public:
         return result;
 
       // Prefer value decls to extensions.
-      assert(!(isa<ValueDecl>(*lhs) && isa<ValueDecl>(*rhs)));
       if (isa<ValueDecl>(*lhs) && !isa<ValueDecl>(*rhs))
         return Descending;
       if (!isa<ValueDecl>(*lhs) && isa<ValueDecl>(*rhs))
         return Ascending;
+
+      if (!isa<ExtensionDecl>(*lhs) || !isa<ExtensionDecl>(*rhs)) {
+        // In theory, only ExtensionDecls should still have a tie by this point.
+        // In practice, we've seen crashes which might be caused by other kinds
+        // of Decls reaching the code below (rdar://81811616) but we don't know
+        // how to reproduce them. Defensively check for this and recover with a
+        // warning or two.
+        (*lhs)->diagnose(diag::objc_printing_unexpected_sort_tie,
+                         (*lhs)->getDescriptiveKind(), getOrInventName(*lhs),
+                         (*rhs)->getDescriptiveKind(), getOrInventName(*rhs));
+        (*rhs)->diagnose(diag::objc_printing_unexpected_sort_tie,
+                         (*rhs)->getDescriptiveKind(), getOrInventName(*rhs),
+                         (*lhs)->getDescriptiveKind(), getOrInventName(*lhs));
+        return Equivalent;
+      }
 
       // Break ties in extensions by putting smaller extensions last (in reverse
       // order).

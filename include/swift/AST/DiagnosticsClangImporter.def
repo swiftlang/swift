@@ -96,5 +96,20 @@ WARNING(import_multiple_mainactor_attr,none,
 
 ERROR(module_map_not_found, none, "module map file '%0' not found", (StringRef))
 
+//------------------------------------------------------------------------------
+// MARK: PrintAsObjC
+//------------------------------------------------------------------------------
+// Included here only because the diagnostic below is hopefully temporary. If
+// PrintAsObjC ever grows its own diagnostics for real, we should put them in
+// their own file.
+
+WARNING(objc_printing_unexpected_sort_tie,none,
+        "generated header file declaration order may change on recompile "
+        "because '@objc' %0 %1 unexpectedly cannot be sorted with respect to "
+        "other %0 %1; non-extensions should always be sortable, so please file "
+        "a bug report (" SWIFT_BUG_REPORT_URL ") containing the build log and, "
+        "if possible, the source code of your project",
+        (DescriptiveDeclKind, DeclName, DescriptiveDeclKind, DeclName))
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
