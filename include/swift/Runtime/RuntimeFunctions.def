@@ -1692,15 +1692,15 @@ FUNCTION(DefaultActorDeallocateResilient,
 // );
 FUNCTION(DistributedActorInitializeRemote,
          swift_distributedActor_remote_initialize, SwiftCC,
-         ConcurrencyAvailability,
+         ConcurrencyAvailability, // TODO(distributed): Introduce DistributedAvailability once shipping somewhere
          RETURNS(OpaquePtrTy),
          ARGS(TypeMetadataPtrTy),
          ATTRS(NoUnwind))
 
-// void swift_distributedActor_destroy(DefaultActor *actor); // TODO: ProxyActor *proxy?
+// void swift_distributedActor_destroy(DefaultActor *actor);
 FUNCTION(DistributedActorDestroy,
          swift_distributedActor_destroy, SwiftCC,
-         ConcurrencyAvailability,
+         ConcurrencyAvailability, // TODO(distributed): Introduce DistributedAvailability once shipping somewhere
          RETURNS(VoidTy),
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind))

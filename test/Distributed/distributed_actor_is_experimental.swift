@@ -7,30 +7,37 @@ actor SomeActor {}
 
 @available(SwiftStdlib 5.5, *)
 distributed actor DA {}
-// expected-error@-1{{'_Distributed' module not imported, required for 'distributed actor'}}
+// expected-error@-1{{'distributed' modifier is only valid when experimental distributed support is enabled}}
 
 @available(SwiftStdlib 5.5, *)
-distributed actor class DAC {} // expected-error{{distributed' can only be applied to 'actor' definitions, and distributed actor-isolated async functions}}
-// expected-error@-1{{keyword 'class' cannot be used as an identifier here}}
+distributed actor class DAC {}
+// expected-error@-1{{'distributed' modifier is only valid when experimental distributed support is enabled}}
+// expected-error@-2{{keyword 'class' cannot be used as an identifier here}}
 
 actor A {
   func normal() async {}
-  distributed func dist() {} // expected-error{{'distributed' function can only be declared within 'distributed actor'}}
-  distributed func distAsync() async {} // expected-error{{'distributed' function can only be declared within 'distributed actor'}}
+  distributed func dist() {}
+  // expected-error@-1{{'distributed' modifier is only valid when experimental distributed support is enabled}}
+  distributed func distAsync() async {}
+  // expected-error@-1{{'distributed' modifier is only valid when experimental distributed support is enabled}}
 
-  distributed var neverOk: String { // expected-error{{'distributed' modifier cannot be applied to this declaration}}
+  distributed var neverOk: String {
+    // expected-error@-1{{'distributed' modifier is only valid when experimental distributed support is enabled}}
     "vars are not allowed to be distributed *ever* anyway"
   }
 }
 
 @available(SwiftStdlib 5.5, *)
 distributed actor DA2 {
-  // expected-error@-1{{'_Distributed' module not imported, required for 'distributed actor'}}
+  // expected-error@-1{{'distributed' modifier is only valid when experimental distributed support is enabled}}
   func normal() async {}
   distributed func dist() {}
+  // expected-error@-1{{'distributed' modifier is only valid when experimental distributed support is enabled}}
   distributed func distAsync() async {}
+  // expected-error@-1{{'distributed' modifier is only valid when experimental distributed support is enabled}}
 
-  distributed var neverOk: String { // expected-error{{'distributed' modifier cannot be applied to this declaration}}
+  distributed var neverOk: String {
+    // expected-error@-1{{'distributed' modifier is only valid when experimental distributed support is enabled}}
     "vars are not allowed to be distributed *ever* anyway"
   }
 }

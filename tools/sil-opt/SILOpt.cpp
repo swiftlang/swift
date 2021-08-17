@@ -415,6 +415,8 @@ int main(int argc, char **argv) {
   }
   Invocation.getLangOptions().EnableExperimentalConcurrency =
     EnableExperimentalConcurrency;
+  Invocation.getLangOptions().EnableExperimentalDistributed =
+    EnableExperimentalDistributed;
 
   Invocation.getLangOptions().EnableObjCInterop =
     EnableObjCInterop ? true :
