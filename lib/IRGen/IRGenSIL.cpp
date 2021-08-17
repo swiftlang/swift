@@ -1024,16 +1024,9 @@ public:
       LTI.initialize(*this, e, Alloca, false /* isOutlined */);
       auto shadow = Alloca.getAddress();
       // Async functions use the value of the artificial address.
-      if (CurSILFn->isAsync() && emitLifetimeExtendingUse(shadow)) {
+      if (CurSILFn->isAsync() && emitLifetimeExtendingUse(shadow))
         if (ValueVariables.insert(shadow).second)
           ValueDomPoints.push_back({shadow, getActiveDominancePoint()});
-        auto inst = cast<llvm::Instruction>(shadow);
-        llvm::IRBuilder<> builder(inst->getNextNode());
-        shadow = builder.CreateLoad(shadow);
-        copy.push_back(shadow);
-        return;
-      }
-
     }
     copy.push_back(Alloca.getAddress());
   }
