@@ -426,15 +426,14 @@ void TBDGenVisitor::addSymbol(SILDeclRef declRef) {
   addSymbol(declRef.mangle(), SymbolSource::forSILDeclRef(declRef));
 }
 
-void TBDGenVisitor::addAsyncFunctionPointerSymbol(AbstractFunctionDecl *AFD) {
-  auto declRef = SILDeclRef(AFD);
+void TBDGenVisitor::addAsyncFunctionPointerSymbol(SILDeclRef declRef) {
   auto silLinkage = effectiveLinkageForClassMember(
     declRef.getLinkage(ForDefinition),
     declRef.getSubclassScope());
   if (Opts.PublicSymbolsOnly && silLinkage != SILLinkage::Public)
     return;
 
-  auto entity = LinkEntity::forAsyncFunctionPointer(AFD);
+  auto entity = LinkEntity::forAsyncFunctionPointer(declRef);
   auto linkage =
       LinkInfo::get(UniversalLinkInfo, SwiftModule, entity, ForDefinition);
   addSymbol(linkage.getName(), SymbolSource::forSILDeclRef(declRef));
@@ -753,7 +752,7 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
   visitDefaultArguments(AFD, AFD->getParameters());
 
   if (AFD->hasAsync()) {
-    addAsyncFunctionPointerSymbol(AFD);
+    addAsyncFunctionPointerSymbol(SILDeclRef(AFD));
   }
 }
 
