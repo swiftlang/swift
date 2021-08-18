@@ -150,6 +150,12 @@ class SILDebugInfoGenerator : public SILModuleTransform {
               I->eraseFromParent();
               continue;
             }
+            if (auto *ASI = dyn_cast<AllocStackInst>(I))
+              // Remove the debug variable scope enclosed
+              // within the SILDebugVariable such that we won't
+              // trigger a verification error.
+              ASI->setDebugVarScope(nullptr);
+
             SILLocation Loc = I->getLoc();
             auto *filePos = SILLocation::FilenameAndLocation::alloc(
                 Ctx.LineNums[I], 1, FileNameBuf, *M);
