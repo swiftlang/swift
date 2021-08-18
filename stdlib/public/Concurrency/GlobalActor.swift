@@ -20,7 +20,7 @@ import Swift
 /// are called global actor types, and can be applied to any declaration to
 /// specify that such types are isolated to that global actor type. When using
 /// such a declaration from another actor (or from nonisolated code),
-/// synchronization is performed through the \c shared actor instance to ensure
+/// synchronization is performed through the shared actor instance to ensure
 /// mutually-exclusive access to the declaration.
 @available(SwiftStdlib 5.5, *)
 public protocol GlobalActor {
