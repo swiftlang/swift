@@ -2069,6 +2069,11 @@ static void rewriteFunction(StructLoweringState &pass,
     pass.applies.append(currentModApplies.begin(), currentModApplies.end());
   } while (repeat);
 
+  while (!pass.modYieldInsts.empty()) {
+    YieldInst *inst = pass.modYieldInsts.pop_back_val();
+    allocateAndSetAll(pass, allocator, inst, inst->getAllOperands());
+  }
+
   for (SILInstruction *instr : pass.instsToMod) {
     for (Operand &operand : instr->getAllOperands()) {
       auto currOperand = operand.get();
@@ -2323,11 +2328,6 @@ static void rewriteFunction(StructLoweringState &pass,
     auto newRetTuple = retBuilder.createTuple(regLoc, emptyTy, {});
     retBuilder.createReturn(newRetTuple->getLoc(), newRetTuple);
     instr->eraseFromParent();
-  }
-
-  while (!pass.modYieldInsts.empty()) {
-    YieldInst *inst = pass.modYieldInsts.pop_back_val();
-    allocateAndSetAll(pass, allocator, inst, inst->getAllOperands());
   }
 }
 
