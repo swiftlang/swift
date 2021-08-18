@@ -999,6 +999,10 @@ void TBDGenVisitor::visitConstructorDecl(ConstructorDecl *CD) {
     // default ValueDecl handling gives the allocating one, so we have to
     // manually include the non-allocating one.
     addSymbol(SILDeclRef(CD, SILDeclRef::Kind::Initializer));
+    if (CD->hasAsync()) {
+      addAsyncFunctionPointerSymbol(
+          SILDeclRef(CD, SILDeclRef::Kind::Initializer));
+    }
     if (auto parentClass = CD->getParent()->getSelfClassDecl()) {
       if (parentClass->isObjC() || CD->isObjC())
         recorder.addObjCMethod(parentClass, SILDeclRef(CD));
