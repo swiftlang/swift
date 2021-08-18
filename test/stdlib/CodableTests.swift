@@ -76,7 +76,7 @@ func expectRoundTripEquality<T : Codable>(of value: T, encode: (T) throws -> Dat
     expectEqual(value, decoded, "\(#file):\(lineNumber): Decoded \(T.self) <\(debugDescription(decoded))> not equal to original <\(debugDescription(value))>")
 }
 
-func expectRoundTripEqualityThroughJSON<T : Codable>(for value: T, _ expectedJSON: String? = nil, lineNumber: Int) where T : Equatable {
+func expectRoundTripEqualityThroughJSON<T : Codable>(for value: T, expectedJSON: String? = nil, lineNumber: Int) where T : Equatable {
     let inf = "INF", negInf = "-INF", nan = "NaN"
     let encode = { (_ value: T) throws -> Data in
         let encoder = JSONEncoder()
@@ -471,30 +471,60 @@ class TestCodable : TestCodableSuper {
         }
     }
 
+    @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
     func test_Dictionary_JSON() {
         enum X: String, Codable { case a, b }
         enum Y: String, Codable, CodingKeyRepresentable { case a, b }
-        enum Z: String, Codable, CodingKeyRepresentable {
+        enum Z: Codable, CodingKeyRepresentable {
             case a
             case b
             init?<T: CodingKey>(codingKey: T) {
-                self.init(rawValue: codingKey.stringValue)
+                switch codingKey.stringValue {
+                case "α":
+                    self = .a
+                case "β":
+                    self = .b
+                default:
+                    return nil
+                }
             }
+
             var codingKey: CodingKey {
-                GenericCodingKey(stringValue: self.rawValue)
+                GenericCodingKey(stringValue: encoded)
+            }
+
+            var encoded: String {
+                switch self {
+                case .a: return "α"
+                case .b: return "β"
+                }
             }
         }
 
         enum U: Int, Codable { case a = 0, b}
         enum V: Int, Codable, CodingKeyRepresentable { case a = 0, b }
-        enum W: Int, Codable, CodingKeyRepresentable {
-            case a = 0
+        enum W: Codable, CodingKeyRepresentable {
+            case a
             case b
             init?<T: CodingKey>(codingKey: T) {
-                self.init(rawValue: codingKey.intValue!)
+                guard let intValue = codingKey.intValue else { return nil }
+                switch intValue {
+                case 42:
+                    self = .a
+                case 64:
+                    self = .b
+                default:
+                    return nil
+                }
             }
             var codingKey: CodingKey {
-                GenericCodingKey(intValue: self.rawValue)
+                GenericCodingKey(intValue: self.encoded)
+            }
+            var encoded: Int {
+                switch self {
+                case .a: return 42
+                case .b: return 64
+                }
             }
         }
 
@@ -513,13 +543,13 @@ class TestCodable : TestCodableSuper {
             }
         }
 
-        expectRoundTripEqualityThroughJSON(for: [X.a: true],             #"["a",true]"#,           lineNumber: #line)
-        expectRoundTripEqualityThroughJSON(for: [Y.a: true, Y.b: false], #"{"a":true,"b":false}"#, lineNumber: #line)
-        expectRoundTripEqualityThroughJSON(for: [Z.a: true, Z.b: false], #"{"a":true,"b":false}"#, lineNumber: #line)
+        expectRoundTripEqualityThroughJSON(for: [X.a: true],             expectedJSON: #"["a",true]"#,              lineNumber: #line)
+        expectRoundTripEqualityThroughJSON(for: [Y.a: true, Y.b: false], expectedJSON: #"{"a":true,"b":false}"#,    lineNumber: #line)
+        expectRoundTripEqualityThroughJSON(for: [Z.a: true, Z.b: false], expectedJSON: #"{"α":true,"β":false}"#,    lineNumber: #line)
 
-        expectRoundTripEqualityThroughJSON(for: [U.a: true],             #"[0,true]"#,             lineNumber: #line)
-        expectRoundTripEqualityThroughJSON(for: [V.a: true, V.b: false], #"{"0":true,"1":false}"#, lineNumber: #line)
-        expectRoundTripEqualityThroughJSON(for: [W.a: true, W.b: false], #"{"0":true,"1":false}"#, lineNumber: #line)
+        expectRoundTripEqualityThroughJSON(for: [U.a: true],             expectedJSON: #"[0,true]"#,                lineNumber: #line)
+        expectRoundTripEqualityThroughJSON(for: [V.a: true, V.b: false], expectedJSON: #"{"0":true,"1":false}"#,    lineNumber: #line)
+        expectRoundTripEqualityThroughJSON(for: [W.a: true, W.b: false], expectedJSON: #"{"42":true,"64":false}"#,  lineNumber: #line)
     }
 
 
@@ -952,7 +982,6 @@ var tests = [
     "test_DateComponents_Plist" : TestCodable.test_DateComponents_Plist,
     "test_Decimal_JSON" : TestCodable.test_Decimal_JSON,
     "test_Decimal_Plist" : TestCodable.test_Decimal_Plist,
-    "test_Dictionary_JSON": TestCodable.test_Dictionary_JSON,
     "test_IndexPath_JSON" : TestCodable.test_IndexPath_JSON,
     "test_IndexPath_Plist" : TestCodable.test_IndexPath_Plist,
     "test_IndexSet_JSON" : TestCodable.test_IndexSet_JSON,
@@ -997,6 +1026,10 @@ if #available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
 if #available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
     tests["test_URLComponents_JSON"] = TestCodable.test_URLComponents_JSON
     tests["test_URLComponents_Plist"] = TestCodable.test_URLComponents_Plist
+}
+
+if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+    tests["test_Dictionary_JSON"] = TestCodable.test_Dictionary_JSON
 }
 
 var CodableTests = TestSuite("TestCodable")
