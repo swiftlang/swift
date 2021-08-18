@@ -33,6 +33,9 @@ def parse_args():
          - swift-refactor
          - temp-dir
          - enable-experimental-concurrency (sent to both)
+         - I (sent to both)
+         - sdk (sent to both)
+         - target (sent to both)
         """)
 
     parser.add_argument(
@@ -71,6 +74,19 @@ def parse_args():
         swift-frontend
         '''
     )
+    parser.add_argument(
+        '-I',
+        action='append',
+        help='Add a directory to the import search path'
+    )
+    parser.add_argument(
+        '-sdk',
+        help='Path to the SDK to build against'
+    )
+    parser.add_argument(
+        '-target',
+        help='The target triple to build for'
+    )
 
     return parser.parse_known_args()
 
@@ -81,10 +97,16 @@ def main():
         args.pos.replace(':', '.')
     temp_file_path = os.path.join(args.temp_dir, temp_file_name)
 
-    extra_frontend_args = []
+    extra_both_args = []
     if args.enable_experimental_concurrency:
-        extra_refactor_args.append('-enable-experimental-concurrency')
-        extra_frontend_args.append('-enable-experimental-concurrency')
+        extra_both_args.append('-enable-experimental-concurrency')
+    if args.I:
+        for path in args.I:
+            extra_both_args += ['-I', path]
+    if args.sdk:
+        extra_both_args += ['-sdk', args.sdk]
+    if args.target:
+        extra_both_args += ['-target', args.target]
 
     dump_text_output = run_cmd([
         args.swift_refactor,
@@ -92,7 +114,7 @@ def main():
         '-source-filename', args.source_filename,
         '-rewritten-output-file', temp_file_path,
         '-pos', args.pos
-    ] + extra_refactor_args, desc='producing edit').decode("utf-8")
+    ] + extra_refactor_args + extra_both_args, desc='producing edit').decode("utf-8")
     sys.stdout.write(dump_text_output)
 
     run_cmd([
@@ -101,7 +123,7 @@ def main():
         temp_file_path,
         '-disable-availability-checking',
         '-warn-on-editor-placeholder'
-    ] + extra_frontend_args, desc='checking that rewritten file compiles')
+    ] + extra_both_args, desc='checking that rewritten file compiles')
 
 
 if __name__ == '__main__':
