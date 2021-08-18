@@ -717,6 +717,12 @@ public:
   void jsonize(json::Output &Out) override;
 };
 
+class SDKNodeDeclImport: public SDKNodeDecl {
+public:
+  SDKNodeDeclImport(SDKNodeInitInfo Info);
+  static bool classof(const SDKNode *N);
+};
+
 // The additional information we need for a type node in the digest.
 // We use type node to represent entities more than types, e.g. parameters, so
 // this struct is necessary to pass down to create a type node.

@@ -72,6 +72,7 @@ NODE_KIND(DeclOperator, OperatorDecl)
 NODE_KIND(DeclType, TypeDecl)
 NODE_KIND(DeclVar, Var)
 NODE_KIND(DeclTypeAlias, TypeAlias)
+NODE_KIND(DeclImport, Import)
 NODE_KIND(DeclAssociatedType, AssociatedType)
 NODE_KIND_RANGE(Decl, DeclFunction, DeclAssociatedType)
 

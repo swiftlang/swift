@@ -46,6 +46,7 @@ struct swift::ide::api::SDKNodeInitInfo {
   SDKNodeInitInfo(SDKContext &Ctx, Decl *D);
   SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD);
   SDKNodeInitInfo(SDKContext &Ctx, OperatorDecl *D);
+  SDKNodeInitInfo(SDKContext &Ctx, ImportDecl *ID);
   SDKNodeInitInfo(SDKContext &Ctx, ProtocolConformance *Conform);
   SDKNodeInitInfo(SDKContext &Ctx, Type Ty, TypeInitInfo Info = TypeInitInfo());
   SDKNode* createSDKNode(SDKNodeKind Kind);
@@ -79,6 +80,9 @@ void SDKContext::addDiagConsumer(DiagnosticConsumer &Consumer) {
 void SDKNodeRoot::registerDescendant(SDKNode *D) {
   // Operator doesn't have usr
   if (isa<SDKNodeDeclOperator>(D))
+    return;
+  // Import doesn't have usr
+  if (isa<SDKNodeDeclImport>(D))
     return;
   if (auto DD = dyn_cast<SDKNodeDecl>(D)) {
     assert(!DD->getUsr().empty());
@@ -165,6 +169,9 @@ SDKNodeDeclConstructor::SDKNodeDeclConstructor(SDKNodeInitInfo Info):
 SDKNodeDeclAccessor::SDKNodeDeclAccessor(SDKNodeInitInfo Info):
   SDKNodeDeclAbstractFunc(Info, SDKNodeKind::DeclAccessor),
   AccKind(Info.AccKind) {}
+
+SDKNodeDeclImport::SDKNodeDeclImport(SDKNodeInitInfo Info):
+  SDKNodeDecl(Info, SDKNodeKind::DeclImport) {}
 
 SDKNodeDeclAssociatedType::SDKNodeDeclAssociatedType(SDKNodeInitInfo Info):
   SDKNodeDecl(Info, SDKNodeKind::DeclAssociatedType) {};
@@ -375,6 +382,7 @@ StringRef SDKNodeType::getTypeRoleDescription() const {
   case SDKNodeKind::DeclType:
   case SDKNodeKind::DeclOperator:
   case SDKNodeKind::Conformance:
+  case SDKNodeKind::DeclImport:
     llvm_unreachable("Type Parent is wrong");
   case SDKNodeKind::DeclFunction:
   case SDKNodeKind::DeclConstructor:
@@ -940,6 +948,7 @@ static bool isSDKNodeEqual(SDKContext &Ctx, const SDKNode &L, const SDKNode &R) 
     }
     case SDKNodeKind::Conformance:
     case SDKNodeKind::TypeWitness:
+    case SDKNodeKind::DeclImport:
     case SDKNodeKind::Root: {
       return L.getPrintedName() == R.getPrintedName() &&
         L.hasSameChildren(R);
@@ -1358,6 +1367,13 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, OperatorDecl *OD):
   PrintedName = OD->getName().str();
 }
 
+SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ImportDecl *ID):
+    SDKNodeInitInfo(Ctx, cast<Decl>(ID)) {
+  std::string content;
+  llvm::raw_string_ostream OS(content);
+  ID->getModulePath().print(OS);
+  Name = PrintedName = Ctx.buffer(content);
+}
 
 SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ProtocolConformance *Conform):
     SDKNodeInitInfo(Ctx, Conform->getProtocol()) {
@@ -1887,6 +1903,10 @@ void SwiftDeclCollector::processDecl(Decl *D) {
   assert(!isa<ValueDecl>(D));
   if (auto *OD = dyn_cast<OperatorDecl>(D)) {
     RootNode->addChild(constructOperatorDeclNode(OD));
+  }
+  if (auto *IM = dyn_cast<ImportDecl>(D)) {
+    RootNode->addChild(SDKNodeInitInfo(Ctx, IM)
+      .createSDKNode(SDKNodeKind::DeclImport));
   }
 }
 
