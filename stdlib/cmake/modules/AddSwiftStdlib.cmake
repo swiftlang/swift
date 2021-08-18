@@ -138,6 +138,14 @@ function(_add_target_variant_c_compile_flags)
 
   set(result ${${CFLAGS_RESULT_VAR_NAME}})
 
+  if ("${CFLAGS_ARCH}" STREQUAL "arm64" OR
+      "${CFLAGS_ARCH}" STREQUAL "arm64e" OR
+      "${CFLAGS_ARCH}" STREQUAL "arm64_32")
+    if (SWIFT_ENABLE_GLOBAL_ISEL_ARM64)
+      list(APPEND result "-fglobal-isel")
+    endif()
+  endif()
+
   _add_target_variant_c_compile_link_flags(
     SDK "${CFLAGS_SDK}"
     ARCH "${CFLAGS_ARCH}"
