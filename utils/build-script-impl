@@ -240,6 +240,7 @@ KNOWN_SETTINGS=(
     skip-merge-lipo-cross-compile-tools           ""                "set to skip running merge-lipo after installing cross-compiled host Swift tools"
     coverage-db                                   ""                "If set, coverage database to use when prioritizing testing"
     skip-local-host-install                       ""                "If we are cross-compiling multiple targets, skip an install pass locally if the hosts match"
+    enable-extract-symbol-dry-run-test            ""                "If we are dry-running, still run the extract symbol phase so that we can test it"
 )
 
 components=(
@@ -3267,7 +3268,10 @@ for host in "${ALL_HOSTS[@]}"; do
 
         # Copy executables and shared libraries from the `host_install_destdir` to
         # INSTALL_SYMROOT and run dsymutil on them.
-        if [[ -z "${DRY_RUN}" ]]; then
+        if [[ -n "${DRY_RUN}" ]] && [[ -z "${ENABLE_EXTRACT_SYMBOL_DRY_RUN_TEST}" ]]; then
+            echo "DRY_RUN! Coping executables and shared libraries from the `host_install_destdir` to
+                  INSTALL_SYMROOT and runing dsymutil on them."
+        else
           (cd "${CURRENT_INSTALL_DIR}" &&
            find ./"${CURRENT_PREFIX}" -perm -0111 -type f -print | \
            filter_paths "${DARWIN_SYMROOT_PATH_FILTERS}" | \
