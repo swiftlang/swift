@@ -580,16 +580,6 @@ def enable_experimental_concise_pound_file : Flag<["-"],
   Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Enable experimental concise '#file' identifier">;
 
-def disable_fuzzy_forward_scan_trailing_closure_matching : Flag<["-"],
-    "disable-fuzzy-forward-scan-trailing-closure-matching">,
-  Flags<[FrontendOption]>,
-  HelpText<"Disable fuzzy forward-scan trailing closure matching">;
-
-def enable_fuzzy_forward_scan_trailing_closure_matching : Flag<["-"],
-    "enable-fuzzy-forward-scan-trailing-closure-matching">,
-  Flags<[FrontendOption]>,
-  HelpText<"Enable fuzzy forward-scan trailing closure matching">;
-
 def enable_experimental_cxx_interop :
   Flag<["-"], "enable-experimental-cxx-interop">,
   HelpText<"Allow importing C++ modules into Swift (experimental feature)">;
