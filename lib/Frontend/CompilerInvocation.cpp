@@ -467,6 +467,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.WarnOnPotentiallyUnavailableEnumCase |=
       Args.hasArg(OPT_warn_on_potentially_unavailable_enum_case);
+  Opts.WarnOnEditorPlaceholder |= Args.hasArg(OPT_warn_on_editor_placeholder);
+
   if (auto A = Args.getLastArg(OPT_enable_access_control,
                                OPT_disable_access_control)) {
     Opts.EnableAccessControl
