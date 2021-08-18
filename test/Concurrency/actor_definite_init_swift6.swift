@@ -330,7 +330,7 @@ struct CardboardBox<T> {
 
 
 @available(SwiftStdlib 5.5, *)
-var globalVar: EscapeArtist?
+var globalVar: EscapeArtist? // expected-note 2 {{var declared here}}
 
 @available(SwiftStdlib 5.5, *)
 actor EscapeArtist {
@@ -340,7 +340,9 @@ actor EscapeArtist {
         self.x = 0
 
         globalVar = self    // expected-error {{this use of actor 'self' can only appear in an async initializer}}
+        // expected-warning@-1{{reference to var 'globalVar' is not concurrency-safe because it involves shared mutable state}}
         Task { await globalVar!.isolatedMethod() }
+        // expected-warning@-1{{reference to var 'globalVar' is not concurrency-safe because it involves shared mutable state}}
 
         if self.x == 0 {
             fatalError("race detected.")
