@@ -500,6 +500,19 @@ class TestCodable : TestCodableSuper {
                 }
             }
         }
+        enum S: Character, Codable, CodingKeyRepresentable {
+            case a = "a"
+            case b = "b"
+
+            init?<T: CodingKey>(codingKey: T) {
+                guard codingKey.stringValue.count == 1 else { return nil }
+                self.init(rawValue: codingKey.stringValue.first!)
+            }
+
+            var codingKey: CodingKey {
+                GenericCodingKey(stringValue: "\(self.rawValue)")
+            }
+        }
 
         enum U: Int, Codable { case a = 0, b}
         enum V: Int, Codable, CodingKeyRepresentable { case a = 0, b }
@@ -528,7 +541,6 @@ class TestCodable : TestCodableSuper {
             }
         }
 
-
         struct GenericCodingKey: CodingKey {
             var stringValue: String
             var intValue: Int?
@@ -546,6 +558,7 @@ class TestCodable : TestCodableSuper {
         expectRoundTripEqualityThroughJSON(for: [X.a: true],             expectedJSON: #"["a",true]"#,              lineNumber: #line)
         expectRoundTripEqualityThroughJSON(for: [Y.a: true, Y.b: false], expectedJSON: #"{"a":true,"b":false}"#,    lineNumber: #line)
         expectRoundTripEqualityThroughJSON(for: [Z.a: true, Z.b: false], expectedJSON: #"{"α":true,"β":false}"#,    lineNumber: #line)
+        expectRoundTripEqualityThroughJSON(for: [S.a: true, S.b: false], expectedJSON: #"{"a":true,"b":false}"#,    lineNumber: #line)
 
         expectRoundTripEqualityThroughJSON(for: [U.a: true],             expectedJSON: #"[0,true]"#,                lineNumber: #line)
         expectRoundTripEqualityThroughJSON(for: [V.a: true, V.b: false], expectedJSON: #"{"0":true,"1":false}"#,    lineNumber: #line)
