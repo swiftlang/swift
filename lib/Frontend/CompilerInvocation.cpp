@@ -657,7 +657,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   }
 
   Opts.EnableConcisePoundFile =
-      Args.hasArg(OPT_enable_experimental_concise_pound_file);
+      Args.hasArg(OPT_enable_experimental_concise_pound_file) ||
+      Opts.EffectiveLanguageVersion.isVersionAtLeast(6);
   Opts.EnableFuzzyForwardScanTrailingClosureMatching =
       Args.hasFlag(OPT_enable_fuzzy_forward_scan_trailing_closure_matching,
                    OPT_disable_fuzzy_forward_scan_trailing_closure_matching,
