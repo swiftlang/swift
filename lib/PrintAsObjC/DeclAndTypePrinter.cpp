@@ -2017,7 +2017,7 @@ auto DeclAndTypePrinter::getImpl() -> Implementation {
 }
 
 bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
-  return isVisibleToObjC(VD, minRequiredAccess) &&
+  return !VD->isInvalid() && isVisibleToObjC(VD, minRequiredAccess) &&
          !VD->getAttrs().hasAttribute<ImplementationOnlyAttr>();
 }
 
