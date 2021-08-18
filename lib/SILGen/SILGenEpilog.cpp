@@ -18,17 +18,16 @@
 using namespace swift;
 using namespace Lowering;
 
-void SILGenFunction::prepareEpilog(Optional<Type> directResultType,
-                                   bool isThrowing,
+void SILGenFunction::prepareEpilog(bool hasDirectResults, bool isThrowing,
                                    CleanupLocation CleanupL) {
   auto *epilogBB = createBasicBlock();
 
   // If we have any direct results, receive them via BB arguments.
-  if (directResultType) {
+  if (hasDirectResults) {
     auto fnConv = F.getConventions();
     // Set NeedsReturn for indirect or direct results. This ensures that SILGen
     // emits unreachable if there is no source level return.
-    NeedsReturn = !(*directResultType)->isEqual(TupleType::getEmpty(getASTContext()));
+    NeedsReturn = (fnConv.funcTy->getNumResults() != 0);
     for (auto directResult : fnConv.getDirectSILResults()) {
       SILType resultType = F.getLoweredType(F.mapTypeIntoContext(
           fnConv.getSILType(directResult, getTypeExpansionContext())));

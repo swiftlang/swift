@@ -252,9 +252,6 @@ public:
   /// code by #function.
   DeclName MagicFunctionName;
   std::string MagicFunctionString;
-  
-  /// The abstraction pattern against which the function is being lowered.
-  Optional<AbstractionPattern> OrigFnType;
 
   ASTContext &getASTContext() const { return SGM.M.getASTContext(); }
 
@@ -615,8 +612,7 @@ public:
   }
 
   std::unique_ptr<Initialization>
-  prepareIndirectResultInit(AbstractionPattern origResultType,
-                            CanType formalResultType,
+  prepareIndirectResultInit(CanType formalResultType,
                             SmallVectorImpl<SILValue> &directResultsBuffer,
                             SmallVectorImpl<CleanupHandle> &cleanups);
 
@@ -908,14 +904,12 @@ public:
   void emitProlog(CaptureInfo captureInfo,
                   ParameterList *paramList, ParamDecl *selfParam,
                   DeclContext *DC, Type resultType,
-                  bool throws, SourceLoc throwsLoc,
-                  Optional<AbstractionPattern> origClosureType = None);
+                  bool throws, SourceLoc throwsLoc);
   /// A simpler version of emitProlog
   /// \returns the number of variables in paramPatterns.
   uint16_t emitBasicProlog(ParameterList *paramList, ParamDecl *selfParam,
                            Type resultType, DeclContext *DC,
-                           bool throws, SourceLoc throwsLoc,
-                           Optional<AbstractionPattern> origClosureType = None);
+                           bool throws, SourceLoc throwsLoc);
 
   /// Create SILArguments in the entry block that bind a single value
   /// of the given parameter suitably for being forwarded.
@@ -930,14 +924,12 @@ public:
   /// Create (but do not emit) the epilog branch, and save the
   /// current cleanups depth as the destination for return statement branches.
   ///
-  /// \param directResultType  If given a value, the epilog block will be
-  ///                    created with arguments for each direct result of this
-  ///                    function, corresponding to the formal return type.
+  /// \param hasDirectResults  If true, the epilog block will be created with
+  ///                    arguments for each direct result of this function.
   /// \param isThrowing  If true, create an error epilog block.
   /// \param L           The SILLocation which should be associated with
   ///                    cleanup instructions.
-  void prepareEpilog(Optional<Type> directResultType,
-                     bool isThrowing, CleanupLocation L);
+  void prepareEpilog(bool hasDirectResults, bool isThrowing, CleanupLocation L);
   void prepareRethrowEpilog(CleanupLocation l);
   void prepareCoroutineUnwindEpilog(CleanupLocation l);
   
@@ -1369,8 +1361,7 @@ public:
   ManagedValue emitClosureValue(SILLocation loc,
                                 SILDeclRef function,
                                 CanType expectedType,
-                                SubstitutionMap subs,
-                                bool alreadyConverted);
+                                SubstitutionMap subs);
 
   PreparedArguments prepareSubscriptIndices(SubscriptDecl *subscript,
                                             SubstitutionMap subs,

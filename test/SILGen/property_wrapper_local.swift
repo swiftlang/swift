@@ -111,7 +111,7 @@ func testLocalLazy() {
   // CHECK-LABEL: sil hidden [ossa] @$s22property_wrapper_local13testLocalLazyyyF : $@convention(thin) () -> () {
 
   @Lazy var value = "hello!"
-  // CHECK: function_ref @$s22property_wrapper_local13testLocalLazyyyFSSycfu_ :
+  // CHECK: function_ref @$s22property_wrapper_local13testLocalLazyyyFSSycfu_ : $@convention(thin) () -> @owned String
   // CHECK: [[I:%.*]] = function_ref @$s22property_wrapper_local4LazyO12wrappedValueACyxGxyXA_tcfC : $@convention(method) <τ_0_0> (@owned @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <τ_0_0>, @thin Lazy<τ_0_0>.Type) -> @out Lazy<τ_0_0>
   //CHECK: apply [[I]]<String>
 

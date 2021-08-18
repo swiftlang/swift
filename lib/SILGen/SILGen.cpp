@@ -1885,7 +1885,7 @@ public:
       sgm.TopLevelSGF = new SILGenFunction(sgm, *toplevel, sf);
       sgm.TopLevelSGF->MagicFunctionName = sgm.SwiftModule->getName();
       auto moduleCleanupLoc = CleanupLocation::getModuleCleanupLocation();
-      sgm.TopLevelSGF->prepareEpilog(None, true, moduleCleanupLoc);
+      sgm.TopLevelSGF->prepareEpilog(false, true, moduleCleanupLoc);
 
       // Create the argc and argv arguments.
       auto prologueLoc = RegularLocation::getModuleLocation();

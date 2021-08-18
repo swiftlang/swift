@@ -34,7 +34,7 @@ void SILGenFunction::emitDestroyingDestructor(DestructorDecl *dd) {
   // Create a basic block to jump to for the implicit destruction behavior
   // of releasing the elements and calling the superclass destructor.
   // We won't actually emit the block until we finish with the destructor body.
-  prepareEpilog(None, false, CleanupLocation(Loc));
+  prepareEpilog(false, false, CleanupLocation(Loc));
 
   emitProfilerIncrement(dd->getTypecheckedBody());
   // Emit the destructor body.
@@ -176,7 +176,7 @@ void SILGenFunction::emitIVarDestroyer(SILDeclRef ivarDestroyer) {
       emitSelfDecl(cd->getDestructor()->getImplicitSelfDecl()));
 
   auto cleanupLoc = CleanupLocation(loc);
-  prepareEpilog(None, false, cleanupLoc);
+  prepareEpilog(false, false, cleanupLoc);
   {
     Scope S(*this, cleanupLoc);
     // Self is effectively guaranteed for the duration of any destructor.  For
@@ -282,7 +282,7 @@ void SILGenFunction::emitObjCDestructor(SILDeclRef dtor) {
   // Create a basic block to jump to for the implicit destruction behavior
   // of releasing the elements and calling the superclass destructor.
   // We won't actually emit the block until we finish with the destructor body.
-  prepareEpilog(None, false, CleanupLocation(loc));
+  prepareEpilog(false, false, CleanupLocation(loc));
 
   emitProfilerIncrement(dd->getTypecheckedBody());
   // Emit the destructor body.

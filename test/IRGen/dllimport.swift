@@ -37,6 +37,7 @@ public func g() {
 }
 
 // CHECK-NO-OPT-DAG: declare dllimport %swift.refcounted* @swift_allocObject(%swift.type*, i32, i32)
+// CHECK-NO-OPT-DAG: declare dllimport void @swift_deallocObject(%swift.refcounted*, i32, i32)
 // CHECK-NO-OPT-DAG: declare dllimport void @swift_release(%swift.refcounted*)
 // CHECK-NO-OPT-DAG: declare dllimport %swift.refcounted* @swift_retain(%swift.refcounted* returned)
 // CHECK-NO-OPT-DAG: @"$s9dllexport1pMp" = external dllimport global %swift.protocol
