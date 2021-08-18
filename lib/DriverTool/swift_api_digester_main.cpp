@@ -1105,6 +1105,7 @@ public:
     case SDKNodeKind::DeclAccessor:
     case SDKNodeKind::DeclConstructor:
     case SDKNodeKind::DeclTypeAlias:
+    case SDKNodeKind::DeclImport:
     case SDKNodeKind::TypeFunc:
     case SDKNodeKind::TypeNominal:
     case SDKNodeKind::TypeAlias: {

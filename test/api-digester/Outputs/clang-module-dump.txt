@@ -4,6 +4,16 @@
   "printedName": "TopLevel",
   "children": [
     {
+      "kind": "Import",
+      "name": "ObjectiveC",
+      "printedName": "ObjectiveC",
+      "declKind": "Import",
+      "moduleName": "Foo",
+      "declAttributes": [
+        "Exported"
+      ]
+    },
+    {
       "kind": "TypeDecl",
       "name": "AnotherObjcProt",
       "printedName": "AnotherObjcProt",
