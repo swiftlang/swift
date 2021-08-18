@@ -89,8 +89,8 @@ func expectRoundTripEqualityThroughJSON<T : Codable>(for value: T, _ expectedJSO
         let encoded = try encoder.encode(value)
 
         if let expectedJSON = expectedJSON {
-            let stringValue = String(decoding: encoded, as: UTF8.self)
-            expectEqual(expectedJSON, stringValue, "\(#file):\(lineNumber): Encoded \(T.self) <\(stringValue)> not equal to expected <\(expectedJSON)>")
+            let actualJSON = String(decoding: encoded, as: UTF8.self)
+            expectEqual(expectedJSON, actualJSON, line: UInt(lineNumber))
         }
         return encoded
     }
