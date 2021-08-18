@@ -5526,6 +5526,15 @@ internal struct _DictionaryCodingKey: CodingKey {
   }
 }
 
+/// A type that can be converted to and from a `CodingKey` value.
+///
+/// With a `CodingKeyRepresentable` type, you can switch back and forth between a
+/// custom type and a `CodingKey` type without losing the value of
+/// the original `CodingKeyRepresentable` type.
+///
+/// Conforming a type to `CodingKeyRepresentable` lets you opt-in to encoding and
+/// decoding `Dictionary` values keyed by the conforming type to and from a keyed
+/// container - rather than an unkeyed container of alternating key-value pairs.
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public protocol CodingKeyRepresentable {
   var codingKey: CodingKey { get }
@@ -5583,9 +5592,9 @@ extension String: CodingKeyRepresentable {
 extension Dictionary: Encodable where Key: Encodable, Value: Encodable {
   /// Encodes the contents of this dictionary into the given encoder.
   ///
-  /// If the dictionary uses `String` or `Int` keys, the contents are encoded
-  /// in a keyed container. Otherwise, the contents are encoded as alternating
-  /// key-value pairs in an unkeyed container.
+  /// If the dictionary uses keys that are `String`, `Int` or a type conforming to
+  /// `CodingKeyRepresentable`, the contents are encoded in a keyed container.
+  /// Otherwise, the contents are encoded as alternating key-value pairs in an unkeyed container.
   ///
   /// This function throws an error if any values are invalid for the given
   /// encoder's format.
