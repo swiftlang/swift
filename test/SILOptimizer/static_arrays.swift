@@ -65,6 +65,9 @@
 // CHECK:         function_ref
 // CHECK:         thin_to_thick_function
 // CHECK:         convert_function
+// CHECK:         function_ref
+// CHECK:         thin_to_thick_function
+// CHECK:         convert_function
 // CHECK:         object {{.*}} ({{[^,]*}}, [tail_elems]
 // CHECK-NEXT:  }
 
