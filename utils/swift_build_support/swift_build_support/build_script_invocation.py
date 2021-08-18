@@ -22,7 +22,6 @@ from build_swift.build_swift.constants import SWIFT_SOURCE_ROOT
 
 import six
 
-from swift_build_support.swift_build_support import build_graph
 from swift_build_support.swift_build_support import products
 from swift_build_support.swift_build_support import shell
 from swift_build_support.swift_build_support import targets
@@ -30,6 +29,8 @@ from swift_build_support.swift_build_support import workspace
 from swift_build_support.swift_build_support.cmake import CMake
 from swift_build_support.swift_build_support.host_specific_configuration \
     import HostSpecificConfiguration
+from swift_build_support.swift_build_support.productpipeline_list_builder \
+    import ProductPipelineListBuilder
 from swift_build_support.swift_build_support.targets \
     import StdlibDeploymentTarget
 from swift_build_support.swift_build_support.utils \
@@ -133,12 +134,12 @@ class BuildScriptInvocation(object):
 
         # Compute any product specific cmake arguments.
         #
-        # NOTE: The sum(list(...)) is b/c compute_product_classes returns a
+        # NOTE: The sum(list(...)) is b/c compute_product_pipelines returns a
         # tuple of lists of which the first is the build-script-impl products
         # and the second is the non-build-script-impl-products. It guarantees
         # that when we concatenate these two lists together we get a valid
         # dependency graph.
-        for product_class in sum(list(self.compute_product_classes()), []):
+        for product_class in sum(list(self.compute_product_pipelines()[0]), []):
             if not product_class.is_build_script_impl_product():
                 continue
 
@@ -491,15 +492,20 @@ class BuildScriptInvocation(object):
 
         return options
 
-    def compute_product_classes(self):
-        """compute_product_classes() -> (list, list, list)
+    def compute_product_pipelines(self):
+        """compute_product_pipelines() -> [[Product]]
 
-        Compute the list first of all pre-build-script-impl products, then all
-        build-script-impl products and then all non-build-script-impl products.
-        It is assumed that concatenating the three lists together will result in a
-        valid dependency graph for the compilation.
+        A list of lists of products.
+
+        Compute lists of product pipelines that we should run. It is guaranteed
+        that all product pipeline lists consist of solely build-script-impl
+        products or build-script products. So one can always check the first
+        element to know if a pipeline returned from the builder is an impl
+        product or not.
         """
-        before_impl_product_classes = []
+        builder = ProductPipelineListBuilder(self.args)
+
+        builder.begin_pipeline()
         # If --skip-early-swift-driver is passed in, swift will be built
         # as usual, but relying on its own C++-based (Legacy) driver.
         # Otherwise, we build an "early" swift-driver using the host
@@ -508,120 +514,79 @@ class BuildScriptInvocation(object):
         # in the host toolchain. If the host toolchain is not equpipped with
         # a Swift compiler, a warning is emitted. In the future, it may become
         # mandatory that the host toolchain come with its own `swiftc`.
-        if self.args.build_early_swift_driver:
-            before_impl_product_classes.append(products.EarlySwiftDriver)
+        builder.add_product(products.EarlySwiftDriver,
+                            is_enabled=self.args.build_early_swift_driver)
 
-        if self.args.build_cmark:
-            before_impl_product_classes.append(products.CMark)
+        builder.add_product(products.CMark,
+                            is_enabled=self.args.build_cmark)
 
-        # FIXME: This is a weird division (returning a list of class objects),
-        # but it matches the existing structure of the `build-script-impl`.
-        impl_product_classes = []
+        # Begin a build-script-impl pipeline for handling the compiler toolchain
+        # and a subset of the tools that we build. We build these in this manner
+        # to preserve current build-script-impl run behavior as we transition
+        # the build-script code base. The main difference is that these are all
+        # build, tested, and installed all at once instead of performing build,
+        # test, install like a normal build-script product.
+        builder.begin_impl_pipeline(should_run_epilogue_operations=True)
 
         # If --skip-build-llvm is passed in, LLVM cannot be completely disabled, as
         # Swift still needs a few LLVM targets like tblgen to be built for it to be
         # configured. Instead, handle this in build-script-impl for now.
-        impl_product_classes.append(products.LLVM)
-        if self.args.build_libcxx:
-            impl_product_classes.append(products.LibCXX)
-        if self.args.build_libicu:
-            impl_product_classes.append(products.LibICU)
-        if self.args.build_swift:
-            impl_product_classes.append(products.Swift)
-        if self.args.build_lldb:
-            impl_product_classes.append(products.LLDB)
-        if self.args.build_libdispatch:
-            impl_product_classes.append(products.LibDispatch)
-        if self.args.build_foundation:
-            impl_product_classes.append(products.Foundation)
-        if self.args.build_xctest:
-            impl_product_classes.append(products.XCTest)
-        if self.args.build_llbuild:
-            impl_product_classes.append(products.LLBuild)
-        # Sanity check that all of our impl classes are actually
-        # build_script_impl products.
-        for prod in impl_product_classes:
-            assert(prod.is_build_script_impl_product())
+        builder.add_impl_product(products.LLVM,
+                                 is_enabled=True)
+        builder.add_impl_product(products.LibCXX,
+                                 is_enabled=self.args.build_libcxx)
+        builder.add_impl_product(products.LibICU,
+                                 is_enabled=self.args.build_libicu)
+        builder.add_impl_product(products.Swift,
+                                 is_enabled=self.args.build_swift)
+        builder.add_impl_product(products.LLDB,
+                                 is_enabled=self.args.build_lldb)
+        builder.add_impl_product(products.LibDispatch,
+                                 is_enabled=self.args.build_libdispatch)
+        builder.add_impl_product(products.Foundation,
+                                 is_enabled=self.args.build_foundation)
+        builder.add_impl_product(products.XCTest,
+                                 is_enabled=self.args.build_xctest)
+        builder.add_impl_product(products.LLBuild,
+                                 is_enabled=self.args.build_llbuild)
 
-        product_classes = []
-        if self.args.build_swiftpm:
-            product_classes.append(products.SwiftPM)
-        if self.args.build_swiftsyntax:
-            product_classes.append(products.SwiftSyntax)
-        if self.args.build_skstresstester:
-            product_classes.append(products.SKStressTester)
-        if self.args.build_swiftformat:
-            product_classes.append(products.SwiftFormat)
-        if self.args.build_swiftevolve:
-            product_classes.append(products.SwiftEvolve)
-        if self.args.build_indexstoredb:
-            product_classes.append(products.IndexStoreDB)
-        if self.args.build_playgroundsupport:
-            product_classes.append(products.PlaygroundSupport)
-        if self.args.build_sourcekitlsp:
-            product_classes.append(products.SourceKitLSP)
-        if self.args.build_toolchainbenchmarks:
-            product_classes.append(products.Benchmarks)
-        if self.args.build_swift_inspect:
-            product_classes.append(products.SwiftInspect)
-        if self.args.tsan_libdispatch_test:
-            product_classes.append(products.TSanLibDispatch)
+        # Begin the post build-script-impl build phase.
+        builder.begin_pipeline()
+
+        builder.add_product(products.SwiftPM,
+                            is_enabled=self.args.build_swiftpm)
+        builder.add_product(products.SwiftSyntax,
+                            is_enabled=self.args.build_swiftsyntax)
+        builder.add_product(products.SKStressTester,
+                            is_enabled=self.args.build_skstresstester)
+        builder.add_product(products.SwiftFormat,
+                            is_enabled=self.args.build_swiftformat)
+        builder.add_product(products.SwiftEvolve,
+                            is_enabled=self.args.build_swiftevolve)
+        builder.add_product(products.IndexStoreDB,
+                            is_enabled=self.args.build_indexstoredb)
+        builder.add_product(products.PlaygroundSupport,
+                            is_enabled=self.args.build_playgroundsupport)
+        builder.add_product(products.SourceKitLSP,
+                            is_enabled=self.args.build_sourcekitlsp)
+        builder.add_product(products.Benchmarks,
+                            is_enabled=self.args.build_toolchainbenchmarks)
+        builder.add_product(products.SwiftInspect,
+                            is_enabled=self.args.build_swift_inspect)
+        builder.add_product(products.TSanLibDispatch,
+                            is_enabled=self.args.tsan_libdispatch_test)
 
         # Keep SwiftDriver at last.
         # swift-driver's integration with the build scripts is not fully
         # supported. Using swift-driver to build these products may hit
         # failures.
-        if self.args.build_swift_driver or self.args.install_swift_driver:
-            product_classes.append(products.SwiftDriver)
-        # Sanity check that all of our non-impl classes are actually
-        # not build_script_impl products.
-        for prod in product_classes:
-            assert(not prod.is_build_script_impl_product())
+        builder.add_product(products.SwiftDriver,
+                            is_enabled=self.args.build_swift_driver
+                            or self.args.install_swift_driver)
 
-        # Now that we have our two lists of product_classes, if we are asked to
-        # infer dependencies, infer the dependencies now and then re-split the
-        # list.
-        if self.args.infer_dependencies:
-            combined_classes = before_impl_product_classes +\
-                impl_product_classes +\
-                product_classes
-            if self.args.verbose_build:
-                print("-- Build Graph Inference --")
-                print("Initial Product List:")
-                for p in combined_classes:
-                    print("    {}".format(p.product_name()))
-
-            # Now that we have produced the schedule, resplit. We require our
-            # dependencies to respect our build-script-impl property. This means
-            # that no build-script-impl products can have dependencies on
-            # non-build-script-impl products. Otherwise, it would be unsafe to
-            # re-order build-script-impl products in front of non
-            # build-script-impl products.
-            before_impl_product_classes = []
-            impl_product_classes = []
-            product_classes = []
-            is_darwin = platform.system() == 'Darwin'
-            final_schedule =\
-                build_graph.produce_scheduled_build(combined_classes)[0]
-            for p in final_schedule:
-                if is_darwin and p.is_nondarwin_only_build_product():
-                    continue
-                if p.is_build_script_impl_product():
-                    impl_product_classes.append(p)
-                elif p.is_before_build_script_impl_product():
-                    before_impl_product_classes.append(p)
-                else:
-                    product_classes.append(p)
-
-            if self.args.verbose_build:
-                print("Final Build Order:")
-                for p in before_impl_product_classes:
-                    print("    {}".format(p.product_name()))
-                for p in impl_product_classes:
-                    print("    {}".format(p.product_name()))
-                for p in product_classes:
-                    print("    {}".format(p.product_name()))
-        return (before_impl_product_classes, impl_product_classes, product_classes)
+        # Now that we have constructed our pass pipelines using our builder, get
+        # the final schedule and finalize the builder.
+        return builder.finalize(shouldInfer=self.args.infer_dependencies)
 
     def execute(self):
         """Execute the invocation with the configured arguments."""
@@ -644,26 +609,40 @@ class BuildScriptInvocation(object):
         all_hosts = [StdlibDeploymentTarget.get_target_for_name(name)
                      for name in all_host_names]
 
-        # Compute the list of product classes to operate on.
+        # Compute the list of lists of product classes to operate on.
         #
         # FIXME: This should really be per-host, but the current structure
         # matches that of `build-script-impl`.
-        (before_impl_product_classes, impl_product_classes, product_classes) =\
-            self.compute_product_classes()
+        (product_pipelines, last_impl_index) = self.compute_product_pipelines()
 
-        # Execute each "pass".
+        # Execute each "product pipeline".
+        for index in range(len(product_pipelines)):
+            pipeline = product_pipelines[index]
+            # Skip empty pipelines.
+            if len(pipeline) == 0:
+                continue
+            is_impl = pipeline[0].is_build_script_impl_product()
+            if is_impl:
+                perform_epilogue_opts = last_impl_index == index
+                self._execute_impl(pipeline, all_hosts, perform_epilogue_opts)
+            else:
+                assert(index != last_impl_index)
+                self._execute(pipeline, all_host_names)
 
-        # Pre-build-script-impl products...
-        # Note: currently only supports building for the host.
-        for host_target in all_host_names:
-            for product_class in before_impl_product_classes:
-                if product_class.is_build_script_impl_product():
-                    continue
-                if not product_class.is_before_build_script_impl_product():
-                    continue
-                # Execute clean, build, test, install
-                self.execute_product_build_steps(product_class, host_target)
+        # And then perform the rest of the non-core epilogue actions.
 
+        # Extract symbols...
+        for host_target in all_hosts:
+            self._execute_extract_symbols_action(host_target)
+
+        # Package...
+        for host_target in all_hosts:
+            self._execute_package_action(host_target)
+
+        # Lipo...
+        self._execute_merged_host_lipo_action()
+
+    def _execute_impl(self, pipeline, all_hosts, should_run_epilogue_operations):
         # Build...
         for host_target in all_hosts:
             # FIXME: We should only compute these once.
@@ -681,41 +660,34 @@ class BuildScriptInvocation(object):
                 print("Running Swift benchmarks for: {}".format(
                     " ".join(config.swift_benchmark_run_targets)))
 
-            for product_class in impl_product_classes:
+            for product_class in pipeline:
                 self._execute_build_action(host_target, product_class)
 
         # Test...
         for host_target in all_hosts:
-            for product_class in impl_product_classes:
+            for product_class in pipeline:
                 self._execute_test_action(host_target, product_class)
 
         # Install...
         for host_target in all_hosts:
-            for product_class in impl_product_classes:
+            for product_class in pipeline:
                 self._execute_install_action(host_target, product_class)
+
+        # And then we may be asked to perform several post-processing operations
+        # on what we have built. If we are not supposed to do so, bail now.
+        if not should_run_epilogue_operations:
+            return
 
         # Core Lipo...
         self._execute_merged_host_lipo_core_action()
 
-        # Non-build-script-impl products...
+    def _execute(self, pipeline, all_host_names):
+        # Pre-build-script-impl products...
         # Note: currently only supports building for the host.
-        for host_target in [self.args.host_target]:
-            for product_class in product_classes:
-                if product_class.is_build_script_impl_product():
-                    continue
+        for host_target in all_host_names:
+            for product_class in pipeline:
                 # Execute clean, build, test, install
                 self.execute_product_build_steps(product_class, host_target)
-
-        # Extract symbols...
-        for host_target in all_hosts:
-            self._execute_extract_symbols_action(host_target)
-
-        # Package...
-        for host_target in all_hosts:
-            self._execute_package_action(host_target)
-
-        # Lipo...
-        self._execute_merged_host_lipo_action()
 
     def _execute_build_action(self, host_target, product_class):
         action_name = "{}-{}-build".format(host_target.name,
