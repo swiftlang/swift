@@ -298,7 +298,7 @@ bb2:
 
 // CHECK: bb3([[ARG:%.*]] : $@callee_owned () -> Int):
 bb3:
-// CHECK-NOT: load [[STACK]]
+// CHECK-NOT: load
   %13 = load %1 : $*@callee_owned () -> Int
 // CHECK: strong_retain [[ARG]]
   strong_retain %13 : $@callee_owned () -> Int
@@ -311,10 +311,10 @@ bb3:
   //       block.
 // CHECK: bb4
 bb4:
-// CHECK-NOT: destroy_addr [[STACK]]
+// CHECK-NOT: destroy_addr
 // CHECK: strong_release [[ARG]]
   destroy_addr %1 : $*@callee_owned () -> Int
-// CHECK-NOT: dealloc_stack [[STACK]]
+// CHECK-NOT: dealloc_stack
   dealloc_stack %1 : $*@callee_owned () -> Int
 // CHECK: return [[RESULT]]
   return %15 : $Int
