@@ -798,7 +798,30 @@ DeclContext *ConformanceLookupTable::getConformingContext(
     // Grab the superclass entry and continue searching for a
     // non-inherited conformance.
     // FIXME: Ambiguity detection and resolution.
-    entry = superclassDecl->ConformanceTable->Conformances[protocol].front();
+    const auto &superclassConformances =
+        superclassDecl->ConformanceTable->Conformances[protocol];
+    if (superclassConformances.empty()) {
+      assert(protocol->isSpecificProtocol(KnownProtocolKind::Sendable));
+
+      // Go dig for a superclass that does conform to Sendable.
+      // FIXME: This is a hack because the inherited conformances aren't
+      // getting updated properly.
+      Type classTy = nominal->getDeclaredInterfaceType();
+      ModuleDecl *module = nominal->getParentModule();
+      do {
+        Type superclassTy = classTy->getSuperclassForDecl(superclassDecl);
+        if (superclassTy->is<ErrorType>())
+          return nullptr;
+        auto inheritedConformance = module->lookupConformance(
+            superclassTy, protocol);
+        if (inheritedConformance)
+          return superclassDecl;
+      } while ((superclassDecl = superclassDecl->getSuperclassDecl()));
+
+      return nullptr;
+    }
+
+    entry = superclassConformances.front();
     nominal = superclassDecl;
   }
 
