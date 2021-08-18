@@ -48,6 +48,9 @@ class RewriteContext final {
   /// Cache for associated type declarations.
   llvm::DenseMap<Symbol, AssociatedTypeDecl *> AssocTypes;
 
+  /// Cache for merged associated type symbols.
+  llvm::DenseMap<std::pair<Symbol, Symbol>, Symbol> MergedAssocTypes;
+
   RewriteContext(const RewriteContext &) = delete;
   RewriteContext(RewriteContext &&) = delete;
   RewriteContext &operator=(const RewriteContext &) = delete;
@@ -90,6 +93,9 @@ public:
 
   AssociatedTypeDecl *getAssociatedTypeForSymbol(Symbol symbol,
                                                  const ProtocolGraph &protos);
+
+  Symbol mergeAssociatedTypes(Symbol lhs, Symbol rhs,
+                              const ProtocolGraph &protos);
 
   ~RewriteContext();
 };

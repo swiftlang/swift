@@ -34,6 +34,7 @@
 #include <deque>
 #include <vector>
 
+#include "RewriteContext.h"
 #include "RewriteSystem.h"
 
 using namespace swift;
@@ -72,12 +73,23 @@ Symbol Symbol::prependPrefixToConcreteSubstitutions(
 /// - If P inherits from Q, this is just [P:T].
 /// - If Q inherits from P, this is just [Q:T].
 /// - If P and Q are unrelated, this is [P&Q:T].
-Symbol RewriteSystem::mergeAssociatedTypes(Symbol lhs, Symbol rhs) const {
+///
+/// Note that the protocol graph is not part of the caching key; each
+/// protocol graph is a subgraph of the global inheritance graph, so
+/// the specific choice of subgraph does not change the result.
+Symbol RewriteContext::mergeAssociatedTypes(Symbol lhs, Symbol rhs,
+                                            const ProtocolGraph &graph) {
+  auto key = std::make_pair(lhs, rhs);
+
+  auto found = MergedAssocTypes.find(key);
+  if (found != MergedAssocTypes.end())
+    return found->second;
+
   // Check preconditions that were established by RewriteSystem::addRule().
   assert(lhs.getKind() == Symbol::Kind::AssociatedType);
   assert(rhs.getKind() == Symbol::Kind::AssociatedType);
   assert(lhs.getName() == rhs.getName());
-  assert(lhs.compare(rhs, Protos) > 0);
+  assert(lhs.compare(rhs, graph) > 0);
 
   auto protos = lhs.getProtocols();
   auto otherProtos = rhs.getProtocols();
@@ -92,7 +104,7 @@ Symbol RewriteSystem::mergeAssociatedTypes(Symbol lhs, Symbol rhs) const {
              std::back_inserter(newProtos),
              [&](const ProtocolDecl *lhs,
                  const ProtocolDecl *rhs) -> int {
-               return Protos.compareProtocols(lhs, rhs) < 0;
+               return graph.compareProtocols(lhs, rhs) < 0;
              });
 
   // Prune duplicates and protocols that are inherited by other
@@ -101,7 +113,7 @@ Symbol RewriteSystem::mergeAssociatedTypes(Symbol lhs, Symbol rhs) const {
   for (const auto *newProto : newProtos) {
     auto inheritsFrom = [&](const ProtocolDecl *thisProto) {
       return (thisProto == newProto ||
-              Protos.inheritsFrom(thisProto, newProto));
+              graph.inheritsFrom(thisProto, newProto));
     };
 
     if (std::find_if(minimalProtos.begin(), minimalProtos.end(),
@@ -120,7 +132,12 @@ Symbol RewriteSystem::mergeAssociatedTypes(Symbol lhs, Symbol rhs) const {
   // of the two sets.
   assert(minimalProtos.size() <= protos.size() + otherProtos.size());
 
-  return Symbol::forAssociatedType(minimalProtos, lhs.getName(), Context);
+  auto result = Symbol::forAssociatedType(minimalProtos, lhs.getName(), *this);
+  auto inserted = MergedAssocTypes.insert(std::make_pair(key, result));
+  assert(inserted.second);
+  (void) inserted;
+
+  return result;
 }
 
 /// Consider the following example:
@@ -207,7 +224,8 @@ void RewriteSystem::processMergedAssociatedTypes() {
       llvm::dbgs() << lhs << " => " << rhs << "\n";
     }
 
-    auto mergedSymbol = mergeAssociatedTypes(lhs.back(), rhs.back());
+    auto mergedSymbol = Context.mergeAssociatedTypes(lhs.back(), rhs.back(),
+                                                     Protos);
     if (DebugMerge) {
       llvm::dbgs() << "### Merged symbol " << mergedSymbol << "\n";
     }

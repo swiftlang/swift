@@ -173,7 +173,6 @@ private:
   computeCriticalPair(ArrayRef<Symbol>::const_iterator from,
                       const Rule &lhs, const Rule &rhs) const;
 
-  Symbol mergeAssociatedTypes(Symbol lhs, Symbol rhs) const;
   void processMergedAssociatedTypes();
 };
 
