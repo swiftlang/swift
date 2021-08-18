@@ -1110,13 +1110,6 @@ void ConvertingInitialization::copyOrInitValueInto(SILGenFunction &SGF,
   if (!isInit) formalValue = formalValue.copy(SGF, loc);
   State = Initialized;
   Value = TheConversion.emit(SGF, loc, formalValue, FinalContext);
-  
-  if (OwnedSubInitialization) {
-    OwnedSubInitialization->copyOrInitValueInto(SGF, loc,
-                                                Value,
-                                                isInit);
-    Value = ManagedValue::forInContext();
-  }
 }
 
 ManagedValue
@@ -1130,14 +1123,6 @@ ConvertingInitialization::emitWithAdjustedConversion(SILGenFunction &SGF,
   setConvertedValue(result);
   finishInitialization(SGF);
   return ManagedValue::forInContext();
-}
-
-Optional<AbstractionPattern>
-ConvertingInitialization::getAbstractionPattern() const {
-  if (TheConversion.isReabstraction()) {
-    return TheConversion.getReabstractionOrigType();
-  }
-  return None;
 }
 
 ManagedValue Conversion::emit(SILGenFunction &SGF, SILLocation loc,
