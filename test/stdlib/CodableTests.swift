@@ -120,11 +120,20 @@ func expectRoundTripEqualityThroughPlist<T : Codable>(for value: T, lineNumber: 
 
 // MARK: - Helper Types
 // A wrapper around a UUID that will allow it to be encoded at the top level of an encoder.
-struct UUIDCodingWrapper : Codable, Equatable {
+struct UUIDCodingWrapper : Codable, Equatable, Hashable, CodingKeyRepresentable {
     let value: UUID
 
     init(_ value: UUID) {
         self.value = value
+    }
+
+    init?<T: CodingKey>(codingKey: T) {
+        guard let uuid = UUID(uuidString: codingKey.stringValue) else { return nil }
+        self.value = uuid
+    }
+
+    var codingKey: CodingKey {
+        GenericCodingKey(stringValue: value.uuidString)
     }
 
     static func ==(_ lhs: UUIDCodingWrapper, _ rhs: UUIDCodingWrapper) -> Bool {
@@ -541,28 +550,18 @@ class TestCodable : TestCodableSuper {
             }
         }
 
-        struct GenericCodingKey: CodingKey {
-            var stringValue: String
-            var intValue: Int?
+        let uuid = UUID(uuidString: "E621E1F8-C36C-495A-93FC-0C247A3E6E5F")!
+        let uuidWrapper = UUIDCodingWrapper(uuid)
 
-            init(stringValue: String) {
-                self.stringValue = stringValue
-            }
-
-            init(intValue: Int) {
-                self.stringValue = "\(intValue)"
-                self.intValue = intValue
-            }
-        }
-
-        expectRoundTripEqualityThroughJSON(for: [X.a: true],             expectedJSON: #"["a",true]"#,              lineNumber: #line)
-        expectRoundTripEqualityThroughJSON(for: [Y.a: true, Y.b: false], expectedJSON: #"{"a":true,"b":false}"#,    lineNumber: #line)
-        expectRoundTripEqualityThroughJSON(for: [Z.a: true, Z.b: false], expectedJSON: #"{"α":true,"β":false}"#,    lineNumber: #line)
-        expectRoundTripEqualityThroughJSON(for: [S.a: true, S.b: false], expectedJSON: #"{"a":true,"b":false}"#,    lineNumber: #line)
-
-        expectRoundTripEqualityThroughJSON(for: [U.a: true],             expectedJSON: #"[0,true]"#,                lineNumber: #line)
-        expectRoundTripEqualityThroughJSON(for: [V.a: true, V.b: false], expectedJSON: #"{"0":true,"1":false}"#,    lineNumber: #line)
-        expectRoundTripEqualityThroughJSON(for: [W.a: true, W.b: false], expectedJSON: #"{"42":true,"64":false}"#,  lineNumber: #line)
+        expectRoundTripEqualityThroughJSON(for: [X.a: true],             expectedJSON: #"["a",true]"#,                                    lineNumber: #line)
+        expectRoundTripEqualityThroughJSON(for: [Y.a: true, Y.b: false], expectedJSON: #"{"a":true,"b":false}"#,                          lineNumber: #line)
+        expectRoundTripEqualityThroughJSON(for: [Z.a: true, Z.b: false], expectedJSON: #"{"α":true,"β":false}"#,                          lineNumber: #line)
+        expectRoundTripEqualityThroughJSON(for: [S.a: true, S.b: false], expectedJSON: #"{"a":true,"b":false}"#,                          lineNumber: #line)
+        expectRoundTripEqualityThroughJSON(for: [uuidWrapper: true],     expectedJSON: #"{"E621E1F8-C36C-495A-93FC-0C247A3E6E5F":true}"#, lineNumber: #line)
+        expectRoundTripEqualityThroughJSON(for: [uuid: true],            expectedJSON: #"["E621E1F8-C36C-495A-93FC-0C247A3E6E5F",true]"#, lineNumber: #line)
+        expectRoundTripEqualityThroughJSON(for: [U.a: true],             expectedJSON: #"[0,true]"#,                                      lineNumber: #line)
+        expectRoundTripEqualityThroughJSON(for: [V.a: true, V.b: false], expectedJSON: #"{"0":true,"1":false}"#,                          lineNumber: #line)
+        expectRoundTripEqualityThroughJSON(for: [W.a: true, W.b: false], expectedJSON: #"{"42":true,"64":false}"#,                        lineNumber: #line)
     }
 
 
@@ -956,6 +955,20 @@ class TestCodable : TestCodableSuper {
 }
 
 // MARK: - Helper Types
+
+struct GenericCodingKey: CodingKey {
+    var stringValue: String
+    var intValue: Int?
+
+    init(stringValue: String) {
+        self.stringValue = stringValue
+    }
+
+    init(intValue: Int) {
+        self.stringValue = "\(intValue)"
+        self.intValue = intValue
+    }
+}
 
 struct TopLevelWrapper<T> : Codable, Equatable where T : Codable, T : Equatable {
     let value: T
