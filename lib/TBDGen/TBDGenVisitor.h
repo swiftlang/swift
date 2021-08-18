@@ -121,7 +121,7 @@ class TBDGenVisitor : public ASTVisitor<TBDGenVisitor> {
                  SymbolKind kind = SymbolKind::GlobalSymbol);
 
   void addSymbol(SILDeclRef declRef);
-  void addAsyncFunctionPointerSymbol(AbstractFunctionDecl *AFD);
+  void addAsyncFunctionPointerSymbol(SILDeclRef declRef);
 
   void addSymbol(LinkEntity entity);
 

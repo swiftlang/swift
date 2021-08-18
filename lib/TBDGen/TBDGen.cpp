@@ -411,15 +411,14 @@ void TBDGenVisitor::addSymbol(SILDeclRef declRef) {
   addSymbol(declRef.mangle(), SymbolSource::forSILDeclRef(declRef));
 }
 
-void TBDGenVisitor::addAsyncFunctionPointerSymbol(AbstractFunctionDecl *AFD) {
-  auto declRef = SILDeclRef(AFD);
+void TBDGenVisitor::addAsyncFunctionPointerSymbol(SILDeclRef declRef) {
   auto silLinkage = effectiveLinkageForClassMember(
     declRef.getLinkage(ForDefinition),
     declRef.getSubclassScope());
   if (Opts.PublicSymbolsOnly && silLinkage != SILLinkage::Public)
     return;
 
-  auto entity = LinkEntity::forAsyncFunctionPointer(AFD);
+  auto entity = LinkEntity::forAsyncFunctionPointer(declRef);
   auto linkage =
       LinkInfo::get(UniversalLinkInfo, SwiftModule, entity, ForDefinition);
   addSymbol(linkage.getName(), SymbolSource::forSILDeclRef(declRef));
@@ -742,7 +741,7 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
   visitDefaultArguments(AFD, AFD->getParameters());
 
   if (AFD->hasAsync()) {
-    addAsyncFunctionPointerSymbol(AFD);
+    addAsyncFunctionPointerSymbol(SILDeclRef(AFD));
   }
 }
 
@@ -989,6 +988,10 @@ void TBDGenVisitor::visitConstructorDecl(ConstructorDecl *CD) {
     // default ValueDecl handling gives the allocating one, so we have to
     // manually include the non-allocating one.
     addSymbol(SILDeclRef(CD, SILDeclRef::Kind::Initializer));
+    if (CD->hasAsync()) {
+      addAsyncFunctionPointerSymbol(
+          SILDeclRef(CD, SILDeclRef::Kind::Initializer));
+    }
     if (auto parentClass = CD->getParent()->getSelfClassDecl()) {
       if (parentClass->isObjC() || CD->isObjC())
         recorder.addObjCMethod(parentClass, SILDeclRef(CD));
