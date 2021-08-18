@@ -107,8 +107,14 @@ bool SILModule::isTypeMetadataAccessible(CanType type) {
   return !type.findIf([&](CanType type) {
     // Note that this function returns true if the type is *illegal* to use.
 
-    // Ignore non-nominal types.
-    auto decl = type.getNominalOrBoundGenericNominal();
+    // Ignore non-nominal types -- except for opaque result types which can be
+    // private and in a different translation unit in which case they can't be
+    // accessed.
+    ValueDecl *decl = type.getNominalOrBoundGenericNominal();
+    if (!decl)
+      decl = isa<OpaqueTypeArchetypeType>(type)
+                 ? cast<OpaqueTypeArchetypeType>(type)->getDecl()
+                 : nullptr;
     if (!decl)
       return false;
 

@@ -468,7 +468,10 @@ std::string LinkEntity::mangleAsString() const {
 
   case Kind::AsyncFunctionPointerAST: {
     std::string Result;
-    Result = SILDeclRef(const_cast<ValueDecl *>(getDecl())).mangle();
+    Result = SILDeclRef(const_cast<ValueDecl *>(getDecl()),
+                        static_cast<SILDeclRef::Kind>(
+                            reinterpret_cast<uintptr_t>(SecondaryPointer)))
+                 .mangle();
     Result.append("Tu");
     return Result;
   }
