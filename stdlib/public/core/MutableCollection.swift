@@ -204,10 +204,13 @@ where SubSequence: MutableCollection
   /// necessary cleanup.
   ///
   /// - Parameter body: A closure that receives an in-out
-  /// `UnsafeMutableBufferPointer` to the collection's contiguous storage.
+  ///   `UnsafeMutableBufferPointer` to the collection's contiguous storage.
+  ///   Use the buffer pointer directly; do not replace it, because this leads
+  ///   to a crash in all implementations of this method within the standard
+  ///   library.
   /// - Returns: The value returned from `body`, unless the collection doesn't
-  /// support contiguous storage, in which case the method ignores `body` and
-  /// returns `nil`.
+  ///   support contiguous storage, in which case the method ignores `body` and
+  ///   returns `nil`.
   mutating func withContiguousMutableStorageIfAvailable<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R?
