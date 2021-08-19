@@ -22,7 +22,11 @@ public func test() {
   roundTripType((x: Int, Float, y: Int.Type).self)
   roundTripType(((@escaping () -> ()) -> ()).self)
   roundTripType(Array<@convention(c) () -> ()>.self)
+
+  // @convention(block) requires Objective-C support
+  #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
   roundTripType(Array<(@escaping @convention(block) () -> (), @convention(block) () -> ()) -> ()>.self)
+  #endif
 
   roundTripType(Int.Type.self)
   roundTripType(((inout String) -> ()).Type.self)
@@ -39,7 +43,11 @@ public func test() {
   roundTripType((x: Int, Float, y: Int.Type).Type.self)
   roundTripType(((@escaping () -> ()) -> ()).Type.self)
   roundTripType(Array<@convention(c) () -> ()>.Type.self)
+
+  // @convention(block) requires Objective-C support
+  #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
   roundTripType(Array<(@escaping @convention(block) () -> (), @convention(block) () -> ()) -> ()>.Type.self)
+  #endif
 
   // rdar://81587763: [SR-15025]: Function type syntax doesn't accept variadics
   // or __owned
