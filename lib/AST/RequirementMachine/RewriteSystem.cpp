@@ -62,6 +62,10 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs) {
   assert(!lhs.empty());
   assert(!rhs.empty());
 
+  if (Debug.contains(DebugFlags::Add)) {
+    llvm::dbgs() << "# Adding rule " << lhs << " == " << rhs << "\n";
+  }
+
   // First, simplify terms appearing inside concrete substitutions before
   // doing anything else.
   if (lhs.back().isSuperclassOrConcreteType())
@@ -89,7 +93,7 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs) {
   assert(lhs.compare(rhs, Protos) > 0);
 
   if (Debug.contains(DebugFlags::Add)) {
-    llvm::dbgs() << "# Adding rule " << lhs << " => " << rhs << "\n";
+    llvm::dbgs() << "## Simplified and oriented rule " << lhs << " => " << rhs << "\n\n";
   }
 
   unsigned i = Rules.size();
