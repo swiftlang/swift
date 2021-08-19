@@ -9502,6 +9502,51 @@ static Type getConstantLiteralType(ClangImporter::Implementation &Impl,
   }
 }
 
+namespace {
+struct ConstantInfo : public ASTAllocated<ConstantInfo> {
+  enum class Kind: int8_t {
+    Expr,
+    String,
+    FloatingPoint,
+    Integer,
+    Bool,
+  };
+
+  Type type;
+  union {
+    StringRef text;
+    Expr *premadeExpr;
+    bool boolValue;
+  };
+  Kind kind;
+  ConstantConvertKind convertKind;
+
+  ConstantInfo(Kind kind, StringRef text, Type type,
+               ConstantConvertKind convertKind)
+    : type(type), text(text), kind(kind), convertKind(convertKind)
+  {
+    assert(kind != Kind::Expr && kind != Kind::Bool);
+  }
+
+  ConstantInfo(Expr *expr, Type type,
+               ConstantConvertKind convertKind)
+    : type(type), premadeExpr(expr), kind(Kind::Expr),
+      convertKind(convertKind) {}
+
+  ConstantInfo(bool boolValue, Type type,
+               ConstantConvertKind convertKind)
+    : type(type), boolValue(boolValue), kind(Kind::Bool),
+      convertKind(convertKind) {}
+
+  Expr *createExpr(ClangImporter::Implementation &impl) const;
+};
+}
+
+static ValueDecl *
+finishCreatingConstant(ClangImporter::Implementation &impl, Identifier name,
+                       DeclContext *dc, ConstantInfo *constantInfo,
+                       bool isStatic, ClangNode N);
+
 ValueDecl *
 ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
                                               Type type,
@@ -9509,10 +9554,11 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
                                               ConstantConvertKind convertKind,
                                               bool isStatic,
                                               ClangNode ClangN) {
-  auto &context = SwiftContext;
-
   // Create the integer literal value.
-  Expr *expr = nullptr;
+  ConstantInfo::Kind contextDataKind;
+  Optional<bool> boolValue = None;
+  llvm::SmallString<16> printedValueBuf;
+
   switch (value.getKind()) {
   case clang::APValue::AddrLabelDiff:
   case clang::APValue::Array:
@@ -9529,86 +9575,46 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
     llvm_unreachable("Unhandled APValue kind");
 
   case clang::APValue::Float:
+    contextDataKind = ConstantInfo::Kind::FloatingPoint;
+    assert(value.getFloat().isFinite() && "can't handle infinities or NaNs");
+    value.getFloat().toString(printedValueBuf);
+    break;
+
   case clang::APValue::Int: {
-    // Print the value.
-    llvm::SmallString<16> printedValueBuf;
-    if (value.getKind() == clang::APValue::Int) {
-      value.getInt().toString(printedValueBuf);
-    } else {
-      assert(value.getFloat().isFinite() && "can't handle infinities or NaNs");
-      value.getFloat().toString(printedValueBuf);
-    }
-    StringRef printedValue = printedValueBuf.str();
+    contextDataKind = ConstantInfo::Kind::Integer;
 
-    // If this was a negative number, record that and strip off the '-'.
-    bool isNegative = printedValue.front() == '-';
-    if (isNegative)
-      printedValue = printedValue.drop_front();
-
-    auto literalType = getConstantLiteralType(*this, type, convertKind);
-
-    // Create the expression node.
-    StringRef printedValueCopy(context.AllocateCopy(printedValue));
-    if (value.getKind() == clang::APValue::Int) {
-      bool isBool = type->getCanonicalType()->isBool();
+    bool isBool = type->getCanonicalType()->isBool();
       // Check if "type" is a C++ enum with an underlying type of "bool".
-      if (!isBool && type->getStructOrBoundGenericStruct() &&
-          type->getStructOrBoundGenericStruct()->getClangDecl()) {
-        if (auto enumDecl = dyn_cast<clang::EnumDecl>(
-                type->getStructOrBoundGenericStruct()->getClangDecl())) {
-          isBool = enumDecl->getIntegerType()->isBooleanType();
-        }
+    if (!isBool && type->getStructOrBoundGenericStruct() &&
+        type->getStructOrBoundGenericStruct()->getClangDecl()) {
+      if (auto enumDecl = dyn_cast<clang::EnumDecl>(
+              type->getStructOrBoundGenericStruct()->getClangDecl())) {
+        isBool = enumDecl->getIntegerType()->isBooleanType();
       }
-      if (isBool) {
-        auto *boolExpr = new (context)
-            BooleanLiteralExpr(value.getInt().getBoolValue(), SourceLoc(),
-                               /*Implicit=*/true);
-
-        boolExpr->setBuiltinInitializer(
-          context.getBoolBuiltinInitDecl());
-        boolExpr->setType(literalType);
-
-        expr = boolExpr;
-      } else {
-        auto *intExpr =
-            new (context) IntegerLiteralExpr(printedValueCopy, SourceLoc(),
-                                             /*Implicit=*/true);
-
-        auto *intDecl = literalType->getAnyNominal();
-        intExpr->setBuiltinInitializer(
-          context.getIntBuiltinInitDecl(intDecl));
-        intExpr->setType(literalType);
-
-        expr = intExpr;
-      }
-    } else {
-      auto *floatExpr =
-          new (context) FloatLiteralExpr(printedValueCopy, SourceLoc(),
-                                         /*Implicit=*/true);
-
-      auto maxFloatTypeDecl = context.get_MaxBuiltinFloatTypeDecl();
-      floatExpr->setBuiltinType(
-          maxFloatTypeDecl->getUnderlyingType());
-
-      auto *floatDecl = literalType->getAnyNominal();
-      floatExpr->setBuiltinInitializer(
-        context.getFloatBuiltinInitDecl(floatDecl));
-      floatExpr->setType(literalType);
-
-      expr = floatExpr;
     }
 
-    if (isNegative)
-      cast<NumberLiteralExpr>(expr)->setNegative(SourceLoc());
-
+    if (isBool)
+      boolValue = value.getInt().getBoolValue();
+    else
+      value.getInt().toString(printedValueBuf);
     break;
   }
   }
 
-  assert(expr);
-  return createConstant(name, dc, type, expr, convertKind, isStatic, ClangN);
-}
+  auto &context = SwiftContext;
+  ConstantInfo *constantInfo;
 
+  if (boolValue) {
+    constantInfo = new (context) ConstantInfo(*boolValue, type, convertKind);
+  } else {
+    StringRef printedValue = context.AllocateCopy(printedValueBuf.str());
+    constantInfo = new (context) ConstantInfo(contextDataKind, printedValue,
+                                              type, convertKind);
+  }
+
+  return finishCreatingConstant(*this, name, dc, constantInfo, isStatic,
+                                ClangN);
+}
 
 ValueDecl *
 ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
@@ -9616,34 +9622,94 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
                                               ConstantConvertKind convertKind,
                                               bool isStatic,
                                               ClangNode ClangN) {
-  auto expr = new (SwiftContext) StringLiteralExpr(value, SourceRange());
+  auto constantInfo = new (SwiftContext)
+      ConstantInfo(ConstantInfo::Kind::String, value, type, convertKind);
 
-  auto literalType = getConstantLiteralType(*this, type, convertKind);
-  auto *stringDecl = literalType->getAnyNominal();
-  expr->setBuiltinInitializer(
-      SwiftContext.getStringBuiltinInitDecl(stringDecl));
-  expr->setType(literalType);
-
-  return createConstant(name, dc, type, expr, convertKind, isStatic, ClangN);
+  return finishCreatingConstant(*this, name, dc, constantInfo, isStatic,
+                                ClangN);
 }
 
-namespace {
-  using ConstantGetterBodyContextData =
-      llvm::PointerIntPair<Expr *, 2, ConstantConvertKind>;
+ValueDecl *
+ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
+                                              Type type, Expr *valueExpr,
+                                              ConstantConvertKind convertKind,
+                                              bool isStatic,
+                                              ClangNode ClangN) {
+  auto constantInfo = new (SwiftContext) ConstantInfo(valueExpr, type,
+                                                      convertKind);
+  return finishCreatingConstant(*this, name, dc, constantInfo, isStatic,
+                                ClangN);
+}
+
+static ValueDecl *
+finishCreatingConstant(ClangImporter::Implementation &impl, Identifier name,
+                       DeclContext *dc, ConstantInfo *constantInfo,
+                       bool isStatic, ClangNode ClangN) {
+  auto &C = impl.SwiftContext;
+
+  VarDecl *var = nullptr;
+  if (ClangN) {
+    var = impl.createDeclWithClangNode<VarDecl>(ClangN, AccessLevel::Public,
+                                               /*IsStatic*/isStatic,
+                                               VarDecl::Introducer::Var,
+                                               SourceLoc(), name, dc);
+  } else {
+    var = new (C) VarDecl(/*IsStatic*/isStatic, VarDecl::Introducer::Var,
+                          SourceLoc(), name, dc);
+  }
+
+  var->setInterfaceType(constantInfo->type);
+  var->setIsObjC(false);
+  var->setIsDynamic(false);
+
+  auto *params = ParameterList::createEmpty(C);
+
+  // Create the getter function declaration.
+  auto func = AccessorDecl::create(C,
+                     /*FuncLoc=*/SourceLoc(),
+                     /*AccessorKeywordLoc=*/SourceLoc(),
+                     AccessorKind::Get,
+                     var,
+                     /*StaticLoc=*/SourceLoc(),
+                     StaticSpellingKind::None,
+                     /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
+                     /*Throws=*/false,
+                     /*ThrowsLoc=*/SourceLoc(),
+                     /*GenericParams=*/nullptr,
+                     params, constantInfo->type, dc);
+  func->setStatic(isStatic);
+  func->setAccess(getOverridableAccessLevel(dc));
+  func->setIsObjC(false);
+  func->setIsDynamic(false);
+
+  func->setBodySynthesizer(
+      ClangImporter::Implementation::synthesizeConstantGetterBody,
+      (void*)constantInfo);
+
+  // Mark the function transparent so that we inline it away completely.
+  func->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
+  auto nonisolatedAttr = new (C) NonisolatedAttr(/*IsImplicit=*/true);
+  var->getAttrs().add(nonisolatedAttr);
+
+  // Set the function up as the getter.
+  makeComputed(var, func, nullptr);
+
+  return var;
 }
 
 /// Synthesizer callback to synthesize the getter for a constant value.
-static std::pair<BraceStmt *, bool>
+std::pair<BraceStmt *, bool> ClangImporter::Implementation::
 synthesizeConstantGetterBody(AbstractFunctionDecl *afd, void *voidContext) {
   ASTContext &ctx = afd->getASTContext();
+  auto &impl = static_cast<ClangImporter *>(ctx.getClangModuleLoader())->Impl;
+
   auto func = cast<AccessorDecl>(afd);
   VarDecl *constantVar = cast<VarDecl>(func->getStorage());
   Type type = func->mapTypeIntoContext(constantVar->getValueInterfaceType());
 
-  auto contextData = ConstantGetterBodyContextData::getFromOpaqueValue(
-      voidContext);
-  Expr *expr = contextData.getPointer();
-  ConstantConvertKind convertKind = contextData.getInt();
+  auto constantInfo = (ConstantInfo *)voidContext;
+  Expr *expr = constantInfo->createExpr(impl);
+  ConstantConvertKind convertKind = constantInfo->convertKind;
 
   // If we need a conversion, add one now.
   switch (convertKind) {
@@ -9707,63 +9773,89 @@ synthesizeConstantGetterBody(AbstractFunctionDecl *afd, void *voidContext) {
            /*isTypeChecked=*/true };
 }
 
-ValueDecl *
-ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
-                                              Type type, Expr *valueExpr,
-                                              ConstantConvertKind convertKind,
-                                              bool isStatic,
-                                              ClangNode ClangN) {
-  auto &C = SwiftContext;
+Expr *ConstantInfo::createExpr(ClangImporter::Implementation &impl) const {
+  ASTContext &context = impl.SwiftContext;
 
-  VarDecl *var = nullptr;
-  if (ClangN) {
-    var = createDeclWithClangNode<VarDecl>(ClangN, AccessLevel::Public,
-                                           /*IsStatic*/isStatic,
-                                           VarDecl::Introducer::Var,
-                                           SourceLoc(), name, dc);
-  } else {
-    var = new (SwiftContext)
-        VarDecl(/*IsStatic*/isStatic, VarDecl::Introducer::Var,
-                SourceLoc(), name, dc);
+  switch (kind) {
+  case Kind::Expr:
+    return premadeExpr;
+
+  case Kind::String: {
+    auto expr = new (context) StringLiteralExpr(text, SourceRange());
+
+    auto literalType = getConstantLiteralType(impl, type, convertKind);
+    auto *stringDecl = literalType->getAnyNominal();
+    expr->setBuiltinInitializer(
+        context.getStringBuiltinInitDecl(stringDecl));
+    expr->setType(literalType);
+
+    return expr;
   }
 
-  var->setInterfaceType(type);
-  var->setIsObjC(false);
-  var->setIsDynamic(false);
+  case Kind::FloatingPoint:
+  case Kind::Integer:
+  case Kind::Bool: {
+    bool isBool = (kind == Kind::Bool);
 
-  auto *params = ParameterList::createEmpty(C);
+    Expr *expr = nullptr;
+    StringRef digits = (isBool ? "" : text);
 
-  // Create the getter function declaration.
-  auto func = AccessorDecl::create(C,
-                     /*FuncLoc=*/SourceLoc(),
-                     /*AccessorKeywordLoc=*/SourceLoc(),
-                     AccessorKind::Get,
-                     var,
-                     /*StaticLoc=*/SourceLoc(),
-                     StaticSpellingKind::None,
-                     /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
-                     /*Throws=*/false,
-                     /*ThrowsLoc=*/SourceLoc(),
-                     /*GenericParams=*/nullptr,
-                     params, type, dc);
-  func->setStatic(isStatic);
-  func->setAccess(getOverridableAccessLevel(dc));
-  func->setIsObjC(false);
-  func->setIsDynamic(false);
+    // If this was a negative number, record that and strip off the '-'.
+    bool isNegative = !digits.empty() && digits.front() == '-';
+    if (isNegative)
+      digits = digits.drop_front();
 
-  func->setBodySynthesizer(synthesizeConstantGetterBody,
-                           ConstantGetterBodyContextData(valueExpr, convertKind)
-                               .getOpaqueValue());
+    auto literalType = getConstantLiteralType(impl, type, convertKind);
 
-  // Mark the function transparent so that we inline it away completely.
-  func->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
-  auto nonisolatedAttr = new (C) NonisolatedAttr(/*IsImplicit=*/true);
-  var->getAttrs().add(nonisolatedAttr);
+    // Create the expression node.
+    if (kind != Kind::FloatingPoint) {
+      if (isBool) {
+        auto *boolExpr = new (context)
+            BooleanLiteralExpr(boolValue, SourceLoc(), /*Implicit=*/true);
 
-  // Set the function up as the getter.
-  makeComputed(var, func, nullptr);
+        boolExpr->setBuiltinInitializer(
+          context.getBoolBuiltinInitDecl());
+        boolExpr->setType(literalType);
 
-  return var;
+        expr = boolExpr;
+      } else {
+        auto *intExpr =
+            new (context) IntegerLiteralExpr(digits, SourceLoc(),
+                                             /*Implicit=*/true);
+
+        auto *intDecl = literalType->getAnyNominal();
+        intExpr->setBuiltinInitializer(
+          context.getIntBuiltinInitDecl(intDecl));
+        intExpr->setType(literalType);
+
+        expr = intExpr;
+      }
+    } else {
+      auto *floatExpr =
+          new (context) FloatLiteralExpr(digits, SourceLoc(),
+                                         /*Implicit=*/true);
+
+      auto maxFloatTypeDecl = context.get_MaxBuiltinFloatTypeDecl();
+      floatExpr->setBuiltinType(
+          maxFloatTypeDecl->getUnderlyingType());
+
+      auto *floatDecl = literalType->getAnyNominal();
+      floatExpr->setBuiltinInitializer(
+        context.getFloatBuiltinInitDecl(floatDecl));
+      floatExpr->setType(literalType);
+
+      expr = floatExpr;
+    }
+
+    if (isNegative)
+      cast<NumberLiteralExpr>(expr)->setNegative(SourceLoc());
+
+    assert(expr);
+    return expr;
+  }
+  }
+
+  llvm_unreachable("unknown ConstantGetterBodyContextData::Kind");
 }
 
 /// Create a decl with error type and an "unavailable" attribute on it
