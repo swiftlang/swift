@@ -11927,6 +11927,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AddSendableAttribute:
   case FixKind::DropThrowsAttribute:
   case FixKind::DropAsyncAttribute:
+  case FixKind::AllowSwiftToCPointerConversion:
     llvm_unreachable("handled elsewhere");
   }
 
