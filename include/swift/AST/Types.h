@@ -18,6 +18,7 @@
 #ifndef SWIFT_TYPES_H
 #define SWIFT_TYPES_H
 
+#include "swift/AST/ASTAllocated.h"
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/ExtInfo.h"
@@ -293,7 +294,8 @@ using TypeMatchOptions = OptionSet<TypeMatchFlags>;
 /// Base class for all types which describe the Swift and SIL ASTs.
 ///
 /// See TypeNodes.def for a succinct description of the full class hierarchy.
-class alignas(1 << TypeAlignInBits) TypeBase {
+class alignas(1 << TypeAlignInBits) TypeBase
+    : public ASTAllocated<std::aligned_storage<8, 8>::type> {
   
   friend class ASTContext;
   TypeBase(const TypeBase&) = delete;
@@ -1232,17 +1234,6 @@ public:
   /// return `None`.
   Optional<TangentSpace>
   getAutoDiffTangentSpace(LookupConformanceFn lookupConformance);
-
-private:
-  // Make vanilla new/delete illegal for Types.
-  void *operator new(size_t Bytes) throw() = delete;
-  void operator delete(void *Data) throw() = delete;
-public:
-  // Only allow allocation of Types using the allocator in ASTContext
-  // or by doing a placement new.
-  void *operator new(size_t bytes, const ASTContext &ctx,
-                     AllocationArena arena, unsigned alignment = 8);
-  void *operator new(size_t Bytes, void *Mem) throw() { return Mem; }
 };
 
 /// AnyGenericType - This abstract class helps types ensure that fields

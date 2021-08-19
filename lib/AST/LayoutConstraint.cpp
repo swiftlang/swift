@@ -140,12 +140,6 @@ bool LayoutConstraintInfo::isNativeRefCounted(LayoutConstraintKind Kind) {
          Kind == LayoutConstraintKind::NativeClass;
 }
 
-void *LayoutConstraintInfo::operator new(size_t bytes, const ASTContext &ctx,
-                                         AllocationArena arena,
-                                         unsigned alignment) {
-  return ctx.Allocate(bytes, alignment, arena);
-}
-
 SourceRange LayoutConstraintLoc::getSourceRange() const { return getLoc(); }
 
 #define MERGE_LOOKUP(lhs, rhs)                                                 \

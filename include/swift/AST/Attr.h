@@ -26,6 +26,7 @@
 #include "swift/Basic/OptimizationMode.h"
 #include "swift/Basic/Version.h"
 #include "swift/Basic/Located.h"
+#include "swift/AST/ASTAllocated.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/AutoDiff.h"
@@ -60,7 +61,8 @@ class PatternBindingInitializer;
 class TrailingWhereClause;
 class TypeExpr;
 
-class alignas(1 << AttrAlignInBits) AttributeBase {
+class alignas(1 << AttrAlignInBits) AttributeBase
+    : public ASTAllocated<AttributeBase> {
 public:
   /// The location of the '@'.
   const SourceLoc AtLoc;
@@ -79,17 +81,6 @@ public:
       return {AtLoc, Range.End};
     return Range;
   }
-
-  // Only allow allocation of attributes using the allocator in ASTContext
-  // or by doing a placement new.
-  void *operator new(size_t Bytes, ASTContext &C,
-                     unsigned Alignment = alignof(AttributeBase));
-
-  void operator delete(void *Data) throw() { }
-  void *operator new(size_t Bytes, void *Mem) throw() { return Mem; }
-
-  // Make vanilla new/delete illegal for attributes.
-  void *operator new(size_t Bytes) throw() = delete;
 
   AttributeBase(const AttributeBase &) = delete;
 

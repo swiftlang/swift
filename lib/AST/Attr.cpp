@@ -68,12 +68,6 @@ static_assert(DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::
               #Name " needs to specify either APIBreakingToRemove or APIStableToRemove");
 #include "swift/AST/Attr.def"
 
-// Only allow allocation of attributes using the allocator in ASTContext.
-void *AttributeBase::operator new(size_t Bytes, ASTContext &C,
-                                  unsigned Alignment) {
-  return C.Allocate(Bytes, Alignment);
-}
-
 StringRef swift::getAccessLevelSpelling(AccessLevel value) {
   switch (value) {
   case AccessLevel::Private: return "private";

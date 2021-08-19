@@ -91,7 +91,8 @@ enum class ProtocolConformanceState {
 ///
 /// ProtocolConformance is an abstract base class, implemented by subclasses
 /// for the various kinds of conformance (normal, specialized, inherited).
-class alignas(1 << DeclAlignInBits) ProtocolConformance {
+class alignas(1 << DeclAlignInBits) ProtocolConformance
+    : public ASTAllocated<ProtocolConformance> {
   /// The kind of protocol conformance.
   ProtocolConformanceKind Kind;
 
@@ -283,20 +284,6 @@ public:
   /// Determine whether the witness for the given requirement
   /// is either the default definition or was otherwise deduced.
   bool usesDefaultDefinition(AssociatedTypeDecl *requirement) const;
-
-  // Make vanilla new/delete illegal for protocol conformances.
-  void *operator new(size_t bytes) = delete;
-  void operator delete(void *data) = delete;
-
-  // Only allow allocation of protocol conformances using the allocator in
-  // ASTContext or by doing a placement new.
-  void *operator new(size_t bytes, ASTContext &context,
-                     AllocationArena arena,
-                     unsigned alignment = alignof(ProtocolConformance));
-  void *operator new(size_t bytes, void *mem) {
-    assert(mem);
-    return mem;
-  }
 
   /// Print a parseable and human-readable description of the identifying
   /// information of the protocol conformance.

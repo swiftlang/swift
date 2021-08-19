@@ -57,12 +57,6 @@ StringRef swift::getFunctionRefKindStr(FunctionRefKind refKind) {
 // Expr methods.
 //===----------------------------------------------------------------------===//
 
-// Only allow allocation of Stmts using the allocator in ASTContext.
-void *Expr::operator new(size_t Bytes, ASTContext &C,
-                         unsigned Alignment) {
-  return C.Allocate(Bytes, Alignment);
-}
-
 StringRef Expr::getKindName(ExprKind K) {
   switch (K) {
 #define EXPR(Id, Parent) case ExprKind::Id: return #Id;

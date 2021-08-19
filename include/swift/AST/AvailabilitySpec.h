@@ -44,7 +44,7 @@ enum class AvailabilitySpecKind {
 
 /// The root class for specifications of API availability in availability
 /// queries.
-class AvailabilitySpec {
+class AvailabilitySpec : public ASTAllocated<AvailabilitySpec> {
   AvailabilitySpecKind Kind;
 
 public:
@@ -53,12 +53,6 @@ public:
   AvailabilitySpecKind getKind() const { return Kind; }
 
   SourceRange getSourceRange() const;
-
-  void *
-  operator new(size_t Bytes, ASTContext &C,
-               unsigned Alignment = alignof(AvailabilitySpec));
-  void *operator new(size_t Bytes) throw() = delete;
-  void operator delete(void *Data) throw() = delete;
 };
 
 /// An availability specification that guards execution based on the
@@ -133,7 +127,8 @@ public:
   void *
   operator new(size_t Bytes, ASTContext &C,
                unsigned Alignment = alignof(PlatformVersionConstraintAvailabilitySpec)){
-    return AvailabilitySpec::operator new(Bytes, C, Alignment);
+    return AvailabilitySpec::operator new(Bytes, C, AllocationArena::Permanent,
+                                          Alignment);
   }
 };
 
@@ -180,7 +175,8 @@ public:
   void *
   operator new(size_t Bytes, ASTContext &C,
                unsigned Alignment = alignof(PlatformAgnosticVersionConstraintAvailabilitySpec)){
-    return AvailabilitySpec::operator new(Bytes, C, Alignment);
+    return AvailabilitySpec::operator new(Bytes, C, AllocationArena::Permanent,
+                                          Alignment);
   }
 };
 
@@ -214,7 +210,8 @@ public:
   void *
   operator new(size_t Bytes, ASTContext &C,
                unsigned Alignment = alignof(OtherPlatformAvailabilitySpec)) {
-    return AvailabilitySpec::operator new(Bytes, C, Alignment);
+    return AvailabilitySpec::operator new(Bytes, C, AllocationArena::Permanent,
+                                          Alignment);
   }
 };
 
