@@ -219,14 +219,14 @@ void RewriteSystem::processMergedAssociatedTypes() {
     // If we have X.[P2:T] => Y.[P1:T], add a new pair of rules:
     // X.[P1:T] => X.[P1&P2:T]
     // X.[P2:T] => X.[P1&P2:T]
-    if (DebugMerge) {
+    if (Debug.contains(DebugFlags::Merge)) {
       llvm::dbgs() << "## Associated type merge candidate ";
       llvm::dbgs() << lhs << " => " << rhs << "\n";
     }
 
     auto mergedSymbol = Context.mergeAssociatedTypes(lhs.back(), rhs.back(),
                                                      Protos);
-    if (DebugMerge) {
+    if (Debug.contains(DebugFlags::Merge)) {
       llvm::dbgs() << "### Merged symbol " << mergedSymbol << "\n";
     }
 
@@ -259,7 +259,7 @@ void RewriteSystem::processMergedAssociatedTypes() {
           // or
           //
           //   [P2:T].[Q] => [P2:T]
-          if (DebugMerge) {
+          if (Debug.contains(DebugFlags::Merge)) {
             llvm::dbgs() << "### Lifting conformance rule " << otherRule << "\n";
           }
 
@@ -431,7 +431,7 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
           // Try to repair the confluence violation by adding a new rule.
           resolvedCriticalPairs.push_back(computeCriticalPair(from, lhs, rhs));
 
-          if (DebugCompletion) {
+          if (Debug.contains(DebugFlags::Completion)) {
             const auto &pair = resolvedCriticalPairs.back();
 
             llvm::dbgs() << "$ Overlapping rules: (#" << i << ") ";

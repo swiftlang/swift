@@ -276,6 +276,9 @@ def disable_named_lazy_member_loading : Flag<["-"], "disable-named-lazy-member-l
 def dump_requirement_machine : Flag<["-"], "dump-requirement-machine">,
   HelpText<"Enables dumping rewrite systems from the generics implementation">;
 
+def debug_requirement_machine : Joined<["-"], "debug-requirement-machine=">,
+  HelpText<"Fine-grained debug output from the generics implementation">;
+
 def analyze_requirement_machine : Flag<["-"], "analyze-requirement-machine">,
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
   HelpText<"Print out requirement machine statistics at the end of the compilation job">;

@@ -465,6 +465,9 @@ namespace swift {
     /// Enables statistics output from the requirement machine.
     bool AnalyzeRequirementMachine = false;
 
+    /// Enables fine-grained debug output from the requirement machine.
+    std::string DebugRequirementMachine;
+
     /// Maximum iteration count for requirement machine confluent completion
     /// algorithm.
     unsigned RequirementMachineStepLimit = 2000;

@@ -19,6 +19,33 @@
 using namespace swift;
 using namespace rewriting;
 
+/// Build a DebugOptions by parsing a comma-separated list of debug flags.
+static DebugOptions parseDebugFlags(StringRef debugFlags) {
+  DebugOptions result;
+
+  SmallVector<StringRef, 2> debug;
+  debugFlags.split(debug, ',');
+  for (auto flagStr : debug) {
+    auto flag = llvm::StringSwitch<Optional<DebugFlags>>(flagStr)
+      .Case("simplify", DebugFlags::Simplify)
+      .Case("add", DebugFlags::Add)
+      .Case("merge", DebugFlags::Merge)
+      .Case("completion", DebugFlags::Completion)
+      .Case("concrete-unification", DebugFlags::ConcreteUnification)
+      .Case("concretize-nested-types", DebugFlags::ConcretizeNestedTypes)
+      .Default(None);
+    if (!flag) {
+      llvm::errs() << "Unknown debug flag in -debug-requirement-machine "
+                   << flagStr << "\n";
+      abort();
+    }
+
+    result |= *flag;
+  }
+
+  return result;
+}
+
 RewriteContext::RewriteContext(ASTContext &ctx)
     : Context(ctx),
       Stats(ctx.Stats),
@@ -28,6 +55,9 @@ RewriteContext::RewriteContext(ASTContext &ctx)
       RuleTrieRootHistogram(16),
       PropertyTrieHistogram(16, /*Start=*/1),
       PropertyTrieRootHistogram(16) {
+  auto debugFlags = StringRef(ctx.LangOpts.DebugRequirementMachine);
+  if (!debugFlags.empty())
+    Debug = parseDebugFlags(debugFlags);
 }
 
 Term RewriteContext::getTermForType(CanType paramType,

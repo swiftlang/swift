@@ -25,6 +25,7 @@
 #include <algorithm>
 #include <vector>
 
+#include "Debug.h"
 #include "ProtocolGraph.h"
 #include "RewriteContext.h"
 #include "RewriteSystem.h"
@@ -145,8 +146,7 @@ class PropertyMap {
   llvm::DenseMap<ConcreteTypeInDomain, Term> ConcreteTypeInDomainMap;
 
   const ProtocolGraph &Protos;
-  unsigned DebugConcreteUnification : 1;
-  unsigned DebugConcretizeNestedTypes : 1;
+  DebugOptions Debug;
 
   PropertyBag *getOrCreateProperties(Term key);
 
@@ -159,8 +159,7 @@ public:
   explicit PropertyMap(RewriteContext &ctx,
                        const ProtocolGraph &protos)
       : Context(ctx), Protos(protos) {
-    DebugConcreteUnification = false;
-    DebugConcretizeNestedTypes = false;
+    Debug = ctx.getDebugOptions();
   }
 
   ~PropertyMap();
