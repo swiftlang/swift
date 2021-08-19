@@ -80,26 +80,6 @@ llvm::ErrorOr<StringRef> ClangModuleDependenciesCacheImpl::getImportHackFile(Str
   return importHackFileCache[moduleName];
 }
 
-namespace {
-  class SingleCommandCompilationDatabase : public CompilationDatabase {
-  public:
-    SingleCommandCompilationDatabase(CompileCommand Cmd)
-        : Command(std::move(Cmd)) {}
-
-    virtual std::vector<CompileCommand>
-    getCompileCommands(StringRef FilePath) const override {
-      return {Command};
-    }
-
-    virtual std::vector<CompileCommand> getAllCompileCommands() const override {
-      return {Command};
-    }
-
-  private:
-    CompileCommand Command;
-  };
-}
-
 // Add search paths.
 // Note: This is handled differently for the Clang importer itself, which
 // adds search paths to Clang's data structures rather than to its
