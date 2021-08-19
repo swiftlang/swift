@@ -14,6 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#define DEBUG_TYPE "ast-types"
+
 #include "swift/AST/Types.h"
 #include "ForeignRepresentationInfo.h"
 #include "swift/AST/ASTContext.h"
@@ -39,6 +41,7 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Compiler.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 #include <functional>
@@ -1829,6 +1832,15 @@ public:
     assert(origType->getAnyNominal() == decl
            && substType->getAnyNominal() == decl);
     
+    LLVM_DEBUG(llvm::dbgs() << "\n---\nTesting bindability of:\n";
+               origType->print(llvm::dbgs());
+               llvm::dbgs() << "\nto subst type:\n";
+               substType->print(llvm::dbgs());
+               if (upperBound) {
+                 llvm::dbgs() << "\nwith upper bound archetype:\n";
+                 upperBound->print(llvm::dbgs());
+               });
+    
     auto *moduleDecl = decl->getParentModule();
     auto origSubMap = origType->getContextSubstitutionMap(
         moduleDecl, decl, decl->getGenericEnvironment());
@@ -1841,7 +1853,125 @@ public:
     llvm::DenseMap<Type, Type> newParamsMap;
     bool didChange = false;
     
-    for (auto gpTy : genericSig.getGenericParams()) {
+    // The upper bounds for the nominal type's arguments may depend on the
+    // upper bounds imposed on the nominal type itself, if conditional
+    // conformances are involved. For instance, if we're looking at:
+    //
+    // protocol P {}
+    // struct A<T: P> {}
+    // struct B<U> {}
+    // extension B: P where U: P {}
+    //
+    // and visiting `A<B<V>>`, then `B<V>` has an upper bound of `_: P` because
+    // of A's generic type constraint. In order to stay within this upper bound,
+    // `V` must also have `_: P` as its upper bound, in order to satisfy the
+    // constraint on `B<V>`. To handle this correctly, ingest requirements
+    // from any extension declarations providing conformances required by the
+    // upper bound.
+    auto upperBoundGenericSig = genericSig;
+    auto upperBoundSubstMap = substSubMap;
+    
+    LLVM_DEBUG(llvm::dbgs() << "\nNominal type generic signature:\n";
+               upperBoundGenericSig.print(llvm::dbgs());
+               upperBoundSubstMap.dump(llvm::dbgs()));
+    
+    if (upperBound && !upperBound->getConformsTo().empty()) {
+      // Start with the set of requirements from the nominal type.
+      SmallVector<Requirement, 4> addedRequirements;
+      
+      llvm::DenseMap<std::pair<CanType, ProtocolDecl*>, ProtocolConformanceRef> addedConformances;
+      
+      for (auto proto : upperBound->getConformsTo()) {
+        // Find the DeclContext providing the conformance for the type.
+        auto nomConformance = moduleDecl->lookupConformance(substType, proto);
+        if (!nomConformance)
+          return CanType();
+        if (nomConformance.isAbstract())
+          continue;
+        auto conformanceContext = nomConformance.getConcrete()->getDeclContext();
+        
+        LLVM_DEBUG(llvm::dbgs() << "\nFound extension conformance for "
+                                << proto->getName()
+                                << " in context:\n";
+                   conformanceContext->printContext(llvm::dbgs()));
+        
+        auto conformanceSig = conformanceContext->getGenericSignatureOfContext();
+        // TODO: Conformance on generalized generic extensions could conceivably
+        // have totally different generic signatures.
+        assert(conformanceSig.getGenericParams().size()
+                 == genericSig.getGenericParams().size()
+               && "generalized generic extension not handled properly");
+        
+        // Collect requirements from the conformance not satisfied by the
+        // original declaration.
+        for (auto reqt : conformanceSig->requirementsNotSatisfiedBy(genericSig)) {
+          LLVM_DEBUG(llvm::dbgs() << "\n- adds requirement\n";
+                     reqt.dump(llvm::dbgs()));
+          
+          addedRequirements.push_back(reqt);
+          
+          // Collect the matching conformance for the substituted type.
+          // TODO: Look this up using the upperBoundSubstConformances
+          if (reqt.getKind() == RequirementKind::Conformance) {
+            auto proto = reqt.getSecondType()->castTo<ProtocolType>()->getDecl();
+            auto substTy = reqt.getFirstType().subst(substSubMap);
+            ProtocolConformanceRef substConformance;
+            if (substTy->isTypeParameter()) {
+              substConformance = ProtocolConformanceRef(proto);
+            } else {
+              substConformance = moduleDecl->lookupConformance(substTy, proto);
+            }
+            
+            LLVM_DEBUG(llvm::dbgs() << "\n` adds conformance for subst type\n";
+                       substTy->print(llvm::dbgs());
+                       substConformance.dump(llvm::dbgs()));
+            
+            auto key = std::make_pair(reqt.getFirstType()->getCanonicalType(),
+                                      proto);
+            
+            addedConformances.insert({key, substConformance});
+          }
+        }
+      }
+      
+      // Build the generic signature with the additional collected requirements.
+      if (!addedRequirements.empty()) {
+        upperBoundGenericSig = evaluateOrDefault(
+                                           decl->getASTContext().evaluator,
+                                           AbstractGenericSignatureRequest{
+                                             upperBoundGenericSig.getPointer(),
+                                             /*genericParams=*/{ },
+                                             std::move(addedRequirements)},
+                                           nullptr);
+        upperBoundSubstMap = SubstitutionMap::get(upperBoundGenericSig,
+          [&](SubstitutableType *t) -> Type {
+            // Type substitutions remain the same as the original substitution
+            // map.
+            return Type(t).subst(substSubMap);
+          },
+          [&](CanType dependentType,
+              Type conformingReplacementType,
+              ProtocolDecl *conformedProtocol) -> ProtocolConformanceRef {
+            // Check whether we added this conformance.
+            auto added = addedConformances.find({dependentType,
+                                                 conformedProtocol});
+            if (added != addedConformances.end()) {
+              return added->second;
+            }
+            // Otherwise, use the conformance from the original map.
+            
+            return substSubMap.lookupConformance(dependentType, conformedProtocol);
+          });
+        
+        LLVM_DEBUG(llvm::dbgs() << "\nGeneric signature with conditional reqts:\n";
+                   upperBoundGenericSig.print(llvm::dbgs());
+                   upperBoundSubstMap.dump(llvm::dbgs()));
+      }
+    }
+    
+    auto upperBoundGenericEnv = upperBoundGenericSig.getGenericEnvironment();
+    
+    for (auto gpTy : upperBoundGenericSig.getGenericParams()) {
       auto gp = gpTy->getCanonicalType();
       
       auto orig = gp.subst(origSubMap)->getCanonicalType();
@@ -1855,13 +1985,14 @@ public:
       // requirements on the type parameters due to conditional conformances.
       // These are currently not considered, leading to invalid generic signatures
       // built during SILGen.
-      auto paramUpperBound = decl->mapTypeIntoContext(gp)
-                                 ->getAs<ArchetypeType>();
+      auto paramUpperBound =
+        GenericEnvironment::mapTypeIntoContext(upperBoundGenericEnv, gp)
+          ->getAs<ArchetypeType>();
       SmallVector<ProtocolConformanceRef, 4> paramSubstConformances;
       if (paramUpperBound) {
         for (auto proto : paramUpperBound->getConformsTo()) {
-          auto conformance = substSubMap.lookupConformance(gp->getCanonicalType(),
-                                                           proto);
+          auto conformance = upperBoundSubstMap.lookupConformance(gp->getCanonicalType(),
+                                                                  proto);
           if (!conformance)
             return CanType();
           paramSubstConformances.push_back(conformance);
