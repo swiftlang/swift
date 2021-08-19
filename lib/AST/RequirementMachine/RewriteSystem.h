@@ -166,9 +166,11 @@ public:
   void dump(llvm::raw_ostream &out) const;
 
 private:
-  std::pair<MutableTerm, MutableTerm>
+  bool
   computeCriticalPair(ArrayRef<Symbol>::const_iterator from,
-                      const Rule &lhs, const Rule &rhs) const;
+                      const Rule &lhs, const Rule &rhs,
+                      std::vector<std::pair<MutableTerm,
+                                            MutableTerm>> &result) const;
 
   void processMergedAssociatedTypes();
 };

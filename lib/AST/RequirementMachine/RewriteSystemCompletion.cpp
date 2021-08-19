@@ -309,6 +309,11 @@ void RewriteSystem::processMergedAssociatedTypes() {
 /// where \p rhs begins at \p from, which must be an iterator pointing
 /// into \p lhs.
 ///
+/// The resulting pair is pushed onto \p result only if it is non-trivial,
+/// that is, the left hand side and right hand side are not equal.
+///
+/// Returns true if the pair was non-trivial, false if it was trivial.
+///
 /// There are two cases:
 ///
 /// 1) lhs == TUV -> X, rhs == U -> Y. The overlapped term is TUV;
@@ -336,9 +341,11 @@ void RewriteSystem::processMergedAssociatedTypes() {
 /// concrete substitution 'X' to get 'A.X'; the new concrete term
 /// is now rooted at the same level as A.B in the rewrite system,
 /// not just B.
-std::pair<MutableTerm, MutableTerm>
+bool
 RewriteSystem::computeCriticalPair(ArrayRef<Symbol>::const_iterator from,
-                                   const Rule &lhs, const Rule &rhs) const {
+                                   const Rule &lhs, const Rule &rhs,
+                                   std::vector<std::pair<MutableTerm,
+                                                         MutableTerm>> &result) const {
   auto end = lhs.getLHS().end();
   if (from + rhs.getLHS().size() < end) {
     // lhs == TUV -> X, rhs == U -> Y.
@@ -352,7 +359,14 @@ RewriteSystem::computeCriticalPair(ArrayRef<Symbol>::const_iterator from,
     MutableTerm t(lhs.getLHS().begin(), from);
     t.append(rhs.getRHS());
     t.append(from + rhs.getLHS().size(), lhs.getLHS().end());
-    return std::make_pair(MutableTerm(lhs.getRHS()), t);
+
+    if (lhs.getRHS().size() == t.size() &&
+        std::equal(lhs.getRHS().begin(), lhs.getRHS().end(),
+                   t.begin())) {
+      return false;
+    }
+
+    result.emplace_back(MutableTerm(lhs.getRHS()), t);
   } else {
     // lhs == TU -> X, rhs == UV -> Y.
 
@@ -372,8 +386,13 @@ RewriteSystem::computeCriticalPair(ArrayRef<Symbol>::const_iterator from,
     // Compute the term TY.
     t.append(rhs.getRHS());
 
-    return std::make_pair(xv, t);
+    if (xv == t)
+      return false;
+
+    result.emplace_back(xv, t);
   }
+
+  return true;
 }
 
 /// Computes the confluent completion using the Knuth-Bendix algorithm.
@@ -439,19 +458,26 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
           }
 
           // Try to repair the confluence violation by adding a new rule.
-          resolvedCriticalPairs.push_back(computeCriticalPair(from, lhs, rhs));
+          if (computeCriticalPair(from, lhs, rhs, resolvedCriticalPairs)) {
+            if (Debug.contains(DebugFlags::Completion)) {
+              const auto &pair = resolvedCriticalPairs.back();
 
-          if (Debug.contains(DebugFlags::Completion)) {
-            const auto &pair = resolvedCriticalPairs.back();
-
-            llvm::dbgs() << "$ Overlapping rules: (#" << i << ") ";
-            llvm::dbgs() << lhs << "\n";
-            llvm::dbgs() << "                -vs- (#" << j << ") ";
-            llvm::dbgs() << rhs << ":\n";
-            llvm::dbgs() << "$$ First term of critical pair is "
-                         << pair.first << "\n";
-            llvm::dbgs() << "$$ Second term of critical pair is "
-                         << pair.second << "\n\n";
+              llvm::dbgs() << "$ Overlapping rules: (#" << i << ") ";
+              llvm::dbgs() << lhs << "\n";
+              llvm::dbgs() << "                -vs- (#" << j << ") ";
+              llvm::dbgs() << rhs << ":\n";
+              llvm::dbgs() << "$$ First term of critical pair is "
+                           << pair.first << "\n";
+              llvm::dbgs() << "$$ Second term of critical pair is "
+                           << pair.second << "\n\n";
+            }
+          } else {
+            if (Debug.contains(DebugFlags::Completion)) {
+              llvm::dbgs() << "$ Trivially overlapping rules: (#" << i << ") ";
+              llvm::dbgs() << lhs << "\n";
+              llvm::dbgs() << "                -vs- (#" << j << ") ";
+              llvm::dbgs() << rhs << ":\n";
+            }
           }
         });
 
