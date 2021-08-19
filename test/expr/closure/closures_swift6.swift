@@ -1,4 +1,5 @@
 // RUN: %target-typecheck-verify-swift -swift-version 6
+// REQUIRES: asserts
 
 func doStuff(_ fn : @escaping () -> Int) {}
 func doVoidStuff(_ fn : @escaping () -> ()) {}
