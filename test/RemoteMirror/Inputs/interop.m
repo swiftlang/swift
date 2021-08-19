@@ -19,12 +19,42 @@
 #import <Foundation/Foundation.h>
 #import <mach/mach.h>
 #import <mach-o/dyld.h>
+#import <libgen.h>
+#import <stdlib.h>
+#import <string.h>
 
 #import "SwiftRemoteMirrorLegacyInterop.h"
 
 
 void *Load(char *path) {
+  const char *libpath = getenv("DYLD_LIBRARY_PATH");
+  char *ourlibpath = NULL;
+  const char *oldlibpath = NULL;
+
+  if (libpath && path[0] == '/') {
+    // If DYLD_LIBRARY_PATH is set, and the path we've been given is absolute,
+    // then prepend the directory part of the path we've been given to it.
+    const char *libdir = dirname(path);
+    size_t pathlen = strlen(libpath);
+    size_t dirlen = strlen(libdir);
+    ourlibpath = (char *)malloc(pathlen + dirlen + 2);
+    memcpy(ourlibpath, libdir, dirlen);
+    ourlibpath[dirlen] = ':';
+    oldlibpath = ourlibpath + dirlen + 1;
+    memcpy(ourlibpath + dirlen + 1, libpath, pathlen + 1);
+
+    setenv("DYLD_LIBRARY_PATH", ourlibpath, 1);
+  }
+
+  // Actually open the dylib
   void *Handle = dlopen(path, RTLD_LOCAL);
+
+  if (ourlibpath) {
+    // Reset DYLD_LIBRARY_PATH, if we changed it
+    setenv("DYLD_LIBRARY_PATH", oldlibpath, 1);
+    free(ourlibpath);
+  }
+
   if (Handle == NULL) {
     fprintf(stderr, "loading %s: %s\n", path, dlerror());
     exit(1);
