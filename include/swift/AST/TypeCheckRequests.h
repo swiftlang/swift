@@ -951,6 +951,24 @@ public:
     bool isCached() const { return true; }
 };
 
+/// Obtain the 'remote' counterpart of a 'distributed func'.
+class GetDistributedRemoteFuncRequest :
+    public SimpleRequest<GetDistributedRemoteFuncRequest,
+        AbstractFunctionDecl *(AbstractFunctionDecl *),
+        RequestFlags::Cached> {
+public:
+    using SimpleRequest::SimpleRequest;
+
+private:
+    friend SimpleRequest;
+
+    AbstractFunctionDecl *evaluate(Evaluator &evaluator, AbstractFunctionDecl *func) const;
+
+public:
+    // Caching
+    bool isCached() const { return true; }
+};
+
 /// Retrieve the static "shared" property within a global actor that provides
 /// the actor instance representing the global actor.
 ///
@@ -2046,8 +2064,6 @@ enum class ImplicitMemberAction : uint8_t {
   ResolveEncodable,
   ResolveDecodable,
   ResolveDistributedActor,
-  ResolveDistributedActorIdentity,
-  ResolveDistributedActorTransport,
 };
 
 class ResolveImplicitMemberRequest

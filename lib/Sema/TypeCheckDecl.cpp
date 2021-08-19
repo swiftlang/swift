@@ -2576,7 +2576,14 @@ static ArrayRef<Decl *> evaluateMembersRequest(
     // We need to add implicit initializers because they
     // affect vtable layout.
     TypeChecker::addImplicitConstructors(nominal);
+
+    auto classDecl = dyn_cast<ClassDecl>(idc);
+    if (classDecl  && classDecl->isDistributedActor()) {
+      // We need to synthesize _remote methods for every distributed method.
+      TypeChecker::addImplicitDistributedActorRemoteFunctions(nominal);
+    }
   }
+
 
   // Force any conformances that may introduce more members.
   for (auto conformance : idc->getLocalConformances()) {
@@ -2609,15 +2616,15 @@ static ArrayRef<Decl *> evaluateMembersRequest(
     TypeChecker::checkConformance(conformance->getRootNormalConformance());
   }
 
-  // If the type conforms to Encodable or Decodable, even via an extension,
-  // the CodingKeys enum is synthesized as a member of the type itself.
-  // Force it into existence.
   if (nominal) {
+    // If the type conforms to Encodable or Decodable, even via an extension,
+    // the CodingKeys enum is synthesized as a member of the type itself.
+    // Force it into existence.
     (void) evaluateOrDefault(
       ctx.evaluator,
-      ResolveImplicitMemberRequest{nominal,
-                 ImplicitMemberAction::ResolveCodingKeys},
-      {});
+        ResolveImplicitMemberRequest{nominal,
+                                     ImplicitMemberAction::ResolveCodingKeys},
+        {});
   }
 
   // If the decl has a @main attribute, we need to force synthesis of the
@@ -2635,6 +2642,10 @@ static ArrayRef<Decl *> evaluateMembersRequest(
         (void) var->getPropertyWrapperAuxiliaryVariables();
         (void) var->getPropertyWrapperInitializerInfo();
       }
+    }
+
+    if (auto *func = dyn_cast<FuncDecl>(member)) {
+      (void) func->getDistributedActorRemoteFuncDecl();
     }
   }
 

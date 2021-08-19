@@ -638,7 +638,6 @@ void SILGenFunction::emitDistributedActor_resignAddress(
 void SILGenFunction::emitDistributedActorClassMemberDestruction(
     SILLocation cleanupLoc, ManagedValue selfValue, ClassDecl *cd,
     SILBasicBlock *normalMemberDestroyBB, SILBasicBlock *finishBB) {
-  ASTContext &ctx = getASTContext();
   auto selfTy = cd->getDeclaredInterfaceType();
 
   Scope scope(Cleanups, CleanupLocation(cleanupLoc));

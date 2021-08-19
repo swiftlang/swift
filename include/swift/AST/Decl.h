@@ -502,7 +502,7 @@ protected:
     IsDebuggerAlias : 1
   );
 
-  SWIFT_INLINE_BITFIELD(NominalTypeDecl, GenericTypeDecl, 1+1+1,
+  SWIFT_INLINE_BITFIELD(NominalTypeDecl, GenericTypeDecl, 1+1+1+1,
     /// Whether we have already added implicitly-defined initializers
     /// to this declaration.
     AddedImplicitInitializers : 1,
@@ -511,7 +511,10 @@ protected:
     HasLazyConformances : 1,
 
     /// Whether this nominal type is having its semantic members resolved.
-    IsComputingSemanticMembers : 1
+    IsComputingSemanticMembers : 1,
+
+    /// Whether we have already added implicitly-defined distributed actor members.
+    AddedImplicitDistributedActorMembers: 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+1+1+1+1+8+16,
@@ -3160,6 +3163,7 @@ protected:
     ExtensionGeneration = 0;
     Bits.NominalTypeDecl.HasLazyConformances = false;
     Bits.NominalTypeDecl.IsComputingSemanticMembers = false;
+    Bits.NominalTypeDecl.AddedImplicitDistributedActorMembers = false;
   }
 
   friend class ProtocolType;
@@ -3194,6 +3198,17 @@ public:
 
   /// Note that we have attempted to add implicit initializers.
   void setAddedImplicitInitializers() {
+    Bits.NominalTypeDecl.AddedImplicitInitializers = true;
+  }
+
+  /// Determine whether we have already attempted to add any
+  /// implicitly-defined distributed actor members to this declaration.
+  bool addedImplicitDistributedActorMembers() const {
+    return Bits.NominalTypeDecl.AddedImplicitInitializers;
+  }
+
+  /// Note that we have attempted to add implicit initializers.
+  void setAddedImplicitDistributedActorMembers() {
     Bits.NominalTypeDecl.AddedImplicitInitializers = true;
   }
 
@@ -5994,6 +6009,10 @@ public:
 
   /// Returns 'true' if the function is distributed.
   bool isDistributed() const;
+
+  /// Get (or synthesize)  the associated remote function for this one.
+  /// For example, for `distributed func hi()` get `func _remote_hi()`.
+  AbstractFunctionDecl *getDistributedActorRemoteFuncDecl() const;
 
   PolymorphicEffectKind getPolymorphicEffectKind(EffectKind kind) const;
 
