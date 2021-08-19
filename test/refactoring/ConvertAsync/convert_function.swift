@@ -269,7 +269,7 @@ func voidResultCompletion(completion: @escaping (Result<Void, Error>) -> Void) {
 // VOID-RESULT-HANDLER-NEXT: }
 
 // rdar://77789360 Make sure we don't print a double return statement.
-// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=RETURN-HANDLING %s
+// RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=RETURN-HANDLING %s
 func testReturnHandling(_ completion: @escaping (String?, Error?) -> Void) {
   return completion("", nil)
 }
@@ -279,6 +279,8 @@ func testReturnHandling(_ completion: @escaping (String?, Error?) -> Void) {
 
 // rdar://77789360 Make sure we don't print a double return statement and don't
 // completely drop completion(a).
+// Note we cannot use refactor-check-compiles here, as the placeholders mean we
+// don't form valid AST.
 // RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=RETURN-HANDLING2 %s
 func testReturnHandling2(completion: @escaping (String) -> ()) {
   simpleErr(arg: "") { x, err in
