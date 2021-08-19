@@ -4404,8 +4404,11 @@ namespace {
     AccessorDecl *tryCreateConstexprAccessor(const clang::VarDecl *clangVar,
                                              VarDecl *swiftVar) {
       assert(clangVar->isConstexpr());
-      auto *Eval = clangVar->ensureEvaluatedStmt();
-      if (cast<clang::Expr>(Eval->Value)->isValueDependent())
+      // Ensure that the value of const expression doesn't rely on template 
+      // parameter. This prevents compiler crash due to assertion failure on the 
+      //clang side.
+      auto *eval = clangVar->ensureEvaluatedStmt();
+      if (cast<clang::Expr>(eval->Value)->isValueDependent())
         return nullptr;
       clangVar->evaluateValue();
       auto evaluated = clangVar->getEvaluatedValue();
