@@ -123,7 +123,7 @@ func testPatterns() async throws {
   // FALLBACK-NEXT: guard let (str1, str2) = strs, str1 == "hi" else { fatalError() }
   // FALLBACK-NEXT: print(str1, str2, err)
 
-  // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=GUARD-AND-UNHANDLED %s
+  // RUN: %refactor-check-compiles -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=GUARD-AND-UNHANDLED %s
   stringTupleParam { strs, err in
     guard let (str1, str2) = strs else { fatalError() }
     print(str1, str2)
@@ -436,6 +436,7 @@ func testNameCollision2(_ completion: @escaping () -> Void) {
 // NAME-COLLISION2-NEXT:   print("b", x, y, z)
 // NAME-COLLISION2-NEXT: }
 
+// Cannot use refactor-check-compiles, as cannot pattern match with placeholders.
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=TEST-UNHANDLED %s
 anyCompletion { val, err in
   if let x = val {
@@ -552,7 +553,7 @@ anyResultCompletion { res in
 
 // Make sure we handle a capture list okay.
 class C {
-  // RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=CAPTURE %s
+  // RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=CAPTURE %s
   func foo() {
     let _ = { [weak self] in
       print(self!)
