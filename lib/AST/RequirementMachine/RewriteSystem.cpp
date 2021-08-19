@@ -123,6 +123,10 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs) {
       lhs.back().getKind() == Symbol::Kind::AssociatedType &&
       rhs.back().getKind() == Symbol::Kind::AssociatedType &&
       lhs.back().getName() == rhs.back().getName()) {
+    if (Debug.contains(DebugFlags::Merge)) {
+      llvm::dbgs() << "## Associated type merge candidate ";
+      llvm::dbgs() << lhs << " => " << rhs << "\n\n";
+    }
     MergedAssociatedTypes.emplace_back(lhs, rhs);
   }
 

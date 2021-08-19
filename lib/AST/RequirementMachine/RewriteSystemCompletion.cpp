@@ -152,25 +152,25 @@ Symbol RewriteContext::mergeAssociatedTypes(Symbol lhs, Symbol rhs,
 ///   [P2].T => [P2:T]
 ///   [P1:T].[P1] => [P1:T]
 ///   [P2:T].[P1] => [P2:T]
-///   <T>.[P1] => <T>
-///   <T>.[P2] => <T>
-///   <T>.T => <T>.[P1:T]
-///   <T>.[P2:T] => <T>.[P1:T]
+///   τ_0_0.[P1] => τ_0_0
+///   τ_0_0.[P2] => τ_0_0
+///   τ_0_0.T => τ_0_0.[P1:T]
+///   τ_0_0.[P2:T] => τ_0_0.[P1:T]
 ///
 /// The completion procedure ends up adding an infinite series of rules of the
 /// form
 ///
-///   <T>.[P1:T].[P2]                 => <T>.[P1:T]
-///   <T>.[P1:T].[P2:T]               => <T>.[P1:T].[P1:T]
+///   τ_0_0.[P1:T].[P2]                 => τ_0_0.[P1:T]
+///   τ_0_0.[P1:T].[P2:T]               => τ_0_0.[P1:T].[P1:T]
 ///
-///   <T>.[P1:T].[P1:T].[P2]          => <T>.[P1:T].[P1:T]
-///   <T>.[P1:T].[P1:T].[P2:T]        => <T>.[P1:T].[P1:T].[P1:T]
+///   τ_0_0.[P1:T].[P1:T].[P2]          => τ_0_0.[P1:T].[P1:T]
+///   τ_0_0.[P1:T].[P1:T].[P2:T]        => τ_0_0.[P1:T].[P1:T].[P1:T]
 ///
-///   <T>.[P1:T].[P1:T].[P1:T].[P2]   => <T>.[P1:T].[P1:T].[P1.T]
-///   <T>.[P1:T].[P1:T].[P1:T].[P2:T] => <T>.[P1:T].[P1:T].[P1:T].[P1.T]
+///   τ_0_0.[P1:T].[P1:T].[P1:T].[P2]   => τ_0_0.[P1:T].[P1:T].[P1.T]
+///   τ_0_0.[P1:T].[P1:T].[P1:T].[P2:T] => τ_0_0.[P1:T].[P1:T].[P1:T].[P1.T]
 ///
 /// The difficulty here stems from the fact that an arbitrary sequence of
-/// [P1:T] following a <T> is known to conform to P2, but P1:T itself
+/// [P1:T] following a τ_0_0 is known to conform to P2, but P1:T itself
 /// does not conform to P2.
 ///
 /// We use a heuristic to compute a completion in this case by using
@@ -178,13 +178,12 @@ Symbol RewriteContext::mergeAssociatedTypes(Symbol lhs, Symbol rhs,
 ///
 /// The key is the following rewrite rule:
 ///
-///   <T>.[P2:T] => <T>.[P1:T]
+///   τ_0_0.[P2:T] => τ_0_0.[P1:T]
 ///
-/// When we add this rule, we introduce a new merged symbol [P1&P2:T] in
-/// a pair of new rules:
+/// When we add this rule, we introduce a new merged symbol [P1&P2:T] and
+/// a new rule:
 ///
-///   <T>.[P1:T] => <T>.[P1&P2:T]
-///   <T>.[P2:T] => <T>.[P1&P2:T]
+///   τ_0_0.[P1:T] => τ_0_0.[P1&P2:T]
 ///
 /// We also look for any existing rules of the form [P1:T].[Q] => [P1:T]
 /// or [P2:T].[Q] => [P2:T], and introduce a new rule:
@@ -194,15 +193,13 @@ Symbol RewriteContext::mergeAssociatedTypes(Symbol lhs, Symbol rhs,
 /// In the above example, we have such a rule for Q == P1 and Q == P2, so
 /// in total we end up adding the following four rules:
 ///
-///   <T>.[P1:T] => <T>.[P1&P2:T]
-///   <T>.[P2:T] => <T>.[P1&P2:T]
+///   τ_0_0.[P1:T] => τ_0_0.[P1&P2:T]
 ///   [P1&P2:T].[P1] => [P1&P2:T]
 ///   [P1&P2:T].[P2] => [P1&P2:T]
 ///
 /// Intuitively, since the conformance requirements on the merged term
-/// are not prefixed by the root <T>, they apply at any level; we've
-/// "tied off" the recursion, and now the rewrite system has a confluent
-/// completion.
+/// are not prefixed by the root τ_0_0, they apply at any level; we've
+/// "tied off" the recursion, and the rewrite system is now convergent.
 void RewriteSystem::processMergedAssociatedTypes() {
   if (MergedAssociatedTypes.empty())
     return;
@@ -220,7 +217,7 @@ void RewriteSystem::processMergedAssociatedTypes() {
     // X.[P1:T] => X.[P1&P2:T]
     // X.[P2:T] => X.[P1&P2:T]
     if (Debug.contains(DebugFlags::Merge)) {
-      llvm::dbgs() << "## Associated type merge candidate ";
+      llvm::dbgs() << "## Processing associated type merge candidate ";
       llvm::dbgs() << lhs << " => " << rhs << "\n";
     }
 
@@ -236,9 +233,6 @@ void RewriteSystem::processMergedAssociatedTypes() {
 
     // Add the rule X.[P1:T] => X.[P1&P2:T].
     addRule(rhs, mergedTerm);
-
-    // Add the rule X.[P2:T] => X.[P1&P2:T].
-    addRule(lhs, mergedTerm);
 
     // Collect new rules here so that we're not adding rules while traversing
     // the trie.
