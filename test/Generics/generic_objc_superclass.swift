@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift %clang-importer-sdk -requirement-machine=verify -debug-requirement-machine 2>&1 | %FileCheck %s
+// RUN: %target-typecheck-verify-swift %clang-importer-sdk -requirement-machine=verify -dump-requirement-machine 2>&1 | %FileCheck %s
 
 // REQUIRES: objc_interop
 
