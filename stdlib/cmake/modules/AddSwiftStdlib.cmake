@@ -1673,6 +1673,10 @@ function(add_swift_target_library name)
                       "-Xfrontend;-disable-implicit-distributed-module-import")
   endif()
 
+  if(SWIFTLIB_IS_STDLIB AND SWIFT_STDLIB_ENABLE_PRESPECIALIZATION)
+    list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-Xfrontend;-prespecialize-generic-metadata")
+  endif()
+
   # If we are building this library for targets, loop through the various
   # SDKs building the variants of this library.
   list_intersect(
