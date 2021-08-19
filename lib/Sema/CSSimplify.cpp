@@ -5889,13 +5889,12 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
               }
             }
 
-            // If both sides are non-optional pointers let's check whether
+            // If both sides are non-optional pointers, let's check whether
             // this argument supports Swift -> C pointer conversions.
             //
             // Do some light verification before recording restriction to
             // avoid allocating constraints for obviously invalid cases.
-            if (type1IsPointer && optionalityMatches &&
-                isArgumentOfImportedDecl(locator)) {
+            if (type1IsPointer && !type1IsOptional && !type2IsOptional) {
               // UnsafeRawPointer -> UnsafePointer<[U]Int8>
               if (type1PointerKind == PTK_UnsafeRawPointer &&
                   pointerKind == PTK_UnsafePointer) {
@@ -11385,6 +11384,12 @@ ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyPointerToCPointerRestriction(
     Type type1, Type type2, TypeMatchOptions flags,
     ConstraintLocatorBuilder locator) {
+  // If this is not an imported function, let's not proceed with this
+  // conversion.
+  if (!isArgumentOfImportedDecl(locator)) {
+    return SolutionKind::Error;
+  }
+
   // Make sure that solutions with implicit pointer conversions
   // are always worse than the ones without them.
   increaseScore(SK_ImplicitValueConversion);

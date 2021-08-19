@@ -5001,11 +5001,29 @@ bool constraints::isArgumentOfReferenceEqualityOperator(
 
 bool ConstraintSystem::isArgumentOfImportedDecl(
     ConstraintLocatorBuilder locator) {
-  auto last = locator.last();
-  if (!(last && last->is<LocatorPathElt::ApplyArgToParam>()))
+  SmallVector<LocatorPathElt, 4> path;
+  auto anchor = locator.getLocatorParts(path);
+
+  if (path.empty())
     return false;
 
-  auto *application = getCalleeLocator(getConstraintLocator(locator));
+  while (!path.empty()) {
+    const auto &last = path.back();
+
+    // Drop all of the `optional payload` or `generic argument`
+    // locator elements at the end of the path, they came from
+    // either value-to-optional promotion or optional-to-optional
+    // conversion.
+    if (last.is<LocatorPathElt::OptionalPayload>() ||
+        last.is<LocatorPathElt::GenericArgument>()) {
+      path.pop_back();
+      continue;
+    }
+
+    break;
+  }
+
+  auto *application = getCalleeLocator(getConstraintLocator(anchor, path));
 
   auto overload = findSelectedOverloadFor(application);
   if (!(overload && overload->choice.isDecl()))
