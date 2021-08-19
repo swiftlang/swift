@@ -70,14 +70,8 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR)
     "${SWIFT_SOURCE_DIR}/lib/Demangling/OldDemangler.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/OldRemangler.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/Punycode.cpp"
-    "${SWIFT_SOURCE_DIR}/lib/Demangling/Remangler.cpp")
-
-  # When we're building with assertions, include the demangle node dumper to aid
-  # in debugging.
-  if(LLVM_ENABLE_ASSERTIONS)
-    list(APPEND swiftDemanglingSources
-      "${SWIFT_SOURCE_DIR}/lib/Demangling/NodeDumper.cpp")
-  endif()
+    "${SWIFT_SOURCE_DIR}/lib/Demangling/Remangler.cpp"
+    "${SWIFT_SOURCE_DIR}/lib/Demangling/NodeDumper.cpp")
 
   add_swift_target_library(swiftDemangling OBJECT_LIBRARY
     ${swiftDemanglingSources}
