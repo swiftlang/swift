@@ -3517,7 +3517,9 @@ public:
     for (auto element : proto->getInherited()) {
       auto elementType = element.getType();
       assert(!elementType || !elementType->hasArchetype());
-      if (elementType && elementType->is<ProtocolType>())
+      if (elementType &&
+          (elementType->is<ProtocolType>() ||
+           elementType->is<ProtocolCompositionType>()))
         dependencyTypes.insert(elementType);
     }
 
