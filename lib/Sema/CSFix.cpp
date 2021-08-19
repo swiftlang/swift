@@ -2003,7 +2003,8 @@ AllowNonOptionalWeak *AllowNonOptionalWeak::create(ConstraintSystem &cs,
 
 bool AllowSwiftToCPointerConversion::diagnose(const Solution &solution,
                                               bool asNote) const {
-  return false;
+  SwiftToCPointerConversionInInvalidContext failure(solution, getLocator());
+  return failure.diagnose(asNote);
 }
 
 AllowSwiftToCPointerConversion *
