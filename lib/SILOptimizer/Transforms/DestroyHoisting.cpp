@@ -765,18 +765,11 @@ public:
     LLVM_DEBUG(llvm::dbgs() << "*** DestroyHoisting on function: "
                             << F->getName() << " ***\n");
 
-    bool EdgeChanged = splitAllCriticalEdges(*F, nullptr, nullptr);
-
     DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
 
     DestroyHoisting CM(F, DA);
     bool InstChanged = CM.hoistDestroys();
 
-    if (EdgeChanged) {
-      // We split critical edges.
-      invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
-      return;
-    }
     if (InstChanged) {
       // We moved instructions.
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
