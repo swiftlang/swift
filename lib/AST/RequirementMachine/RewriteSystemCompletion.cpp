@@ -227,6 +227,22 @@ void RewriteSystem::processMergedAssociatedTypes() {
       llvm::dbgs() << "### Merged symbol " << mergedSymbol << "\n";
     }
 
+    // We must have mergedSymbol <= rhs < lhs, therefore mergedSymbol != lhs.
+    assert(lhs.back() != mergedSymbol &&
+           "Left hand side should not already end with merged symbol?");
+    assert(mergedSymbol.compare(rhs.back(), Protos) <= 0);
+    assert(rhs.back().compare(lhs.back(), Protos) < 0);
+
+    // If the merge didn't actually produce a new symbol, there is nothing else
+    // to do.
+    if (rhs.back() == mergedSymbol) {
+      if (Debug.contains(DebugFlags::Merge)) {
+        llvm::dbgs() << "### Skipping\n";
+      }
+
+      continue;
+    }
+
     // Build the term X.[P1&P2:T].
     MutableTerm mergedTerm = lhs;
     mergedTerm.back() = mergedSymbol;
@@ -469,6 +485,9 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
     // violations.
     processMergedAssociatedTypes();
   } while (again);
+
+  assert(MergedAssociatedTypes.empty() &&
+         "Should have processed all merge candidates");
 
   return std::make_pair(CompletionResult::Success, steps);
 }
