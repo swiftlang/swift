@@ -535,6 +535,18 @@ namespace swift {
     /// until the next major language version.
     InFlightDiagnostic &warnUntilSwiftVersion(unsigned majorVersion);
 
+    /// Conditionally limit the diagnostic behavior to warning until
+    /// the specified version.  If the condition is false, no limit is
+    /// imposed, meaning (presumably) it is treated as an error.
+    ///
+    /// This helps stage in fixes for stricter diagnostics as warnings
+    /// until the next major language version.
+    InFlightDiagnostic &warnUntilSwiftVersionIf(bool shouldLimit,
+                                                unsigned majorVersion) {
+      if (!shouldLimit) return *this;
+      return warnUntilSwiftVersion(majorVersion);
+    }
+
     /// Wraps this diagnostic in another diagnostic. That is, \p wrapper will be
     /// emitted in place of the diagnostic that otherwise would have been
     /// emitted.
