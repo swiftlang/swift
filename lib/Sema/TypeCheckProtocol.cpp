@@ -3963,22 +3963,25 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
   // Determine whether we can derive a witness for this requirement.
   bool canDerive = false;
 
-  // Can a witness for this requirement be derived for this nominal type?
-  if (auto derivable = DerivedConformance::getDerivableRequirement(
-                         nominal,
-                         requirement)) {
-    if (derivable == requirement) {
-      // If it's the same requirement, we can derive it here.
-      canDerive = true;
-    } else {
-      // Otherwise, go satisfy the derivable requirement, which can introduce
-      // a member that could in turn satisfy *this* requirement.
-      auto derivableProto = cast<ProtocolDecl>(derivable->getDeclContext());
-      auto conformance =
-          TypeChecker::conformsToProtocol(Adoptee, derivableProto,
-                                          DC->getParentModule());
-      if (conformance.isConcrete()) {
-        (void)conformance.getConcrete()->getWitnessDecl(derivable);
+  auto *SF = DC->getParentSourceFile();
+  if (!(SF == nullptr || SF->Kind == SourceFileKind::Interface)) {
+    // Can a witness for this requirement be derived for this nominal type?
+    if (auto derivable = DerivedConformance::getDerivableRequirement(
+                           nominal,
+                           requirement)) {
+      if (derivable == requirement) {
+        // If it's the same requirement, we can derive it here.
+        canDerive = true;
+      } else {
+        // Otherwise, go satisfy the derivable requirement, which can introduce
+        // a member that could in turn satisfy *this* requirement.
+        auto derivableProto = cast<ProtocolDecl>(derivable->getDeclContext());
+        auto conformance =
+            TypeChecker::conformsToProtocol(Adoptee, derivableProto,
+                                            DC->getParentModule());
+        if (conformance.isConcrete()) {
+          (void)conformance.getConcrete()->getWitnessDecl(derivable);
+        }
       }
     }
   }
@@ -4287,6 +4290,10 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
 ResolveWitnessResult ConformanceChecker::resolveWitnessViaDerivation(
                        ValueDecl *requirement) {
   assert(!isa<AssociatedTypeDecl>(requirement) && "Use resolveTypeWitnessVia*");
+
+  auto *SF = DC->getParentSourceFile();
+  if (SF != nullptr && SF->Kind == SourceFileKind::Interface)
+    return ResolveWitnessResult::Missing;
 
   // Find the declaration that derives the protocol conformance.
   NominalTypeDecl *derivingTypeDecl = nullptr;
