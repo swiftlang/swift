@@ -99,9 +99,9 @@ extension Task {
   /// creating the task with the correct priority,
   /// depending on the executor's scheduling details.
   ///
-  /// If the task throws an error, this property propogates that error.
+  /// If the task throws an error, this property propagates that error.
   /// Tasks that respond to cancellation by throwing `Task.CancellationError`
-  /// have that error propogated here upon cancellation.
+  /// have that error propagated here upon cancellation.
   ///
   /// - Returns: The task's result.
   public var value: Success {
@@ -595,7 +595,7 @@ extension Task where Failure == Error {
   /// Runs the given throwing operation asynchronously
   /// as part of a new top-level task.
   ///
-  /// If the operation throws an error, this method propogates that error.
+  /// If the operation throws an error, this method propagates that error.
   ///
   /// Don't use a detached task if it's possible
   /// to model the operation using structured concurrency features like child tasks.

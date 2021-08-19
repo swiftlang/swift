@@ -133,7 +133,7 @@ public func withTaskGroup<ChildTaskResult, GroupResult>(
 /// Throwing an error in one of the tasks of a task group
 /// doesn't immediately cancel the other tasks in that group.
 /// However,
-/// if you call `next()` in the task group and propogate its error,
+/// if you call `next()` in the task group and propagate its error,
 /// all other tasks are canceled.
 /// For example, in the code below,
 /// nothing is canceled and the group doesn't throw an error:
@@ -744,7 +744,7 @@ extension TaskGroup: AsyncSequence {
     /// appear in the order that the tasks *completed*,
     /// not in the order that those tasks were added to the task group.
     /// After this method returns `nil`,
-    /// this iterater is guaranteed to never produce more values.
+    /// this iterator is guaranteed to never produce more values.
     ///
     /// For more information about the iteration order and semantics,
     /// see `TaskGroup.next()`.
@@ -831,7 +831,7 @@ extension ThrowingTaskGroup: AsyncSequence {
     /// appear in the order that the tasks *completed*,
     /// not in the order that those tasks were added to the task group.
     /// After this method returns `nil`,
-    /// this iterater is guaranteed to never produce more values.
+    /// this iterator is guaranteed to never produce more values.
     ///
     /// For more information about the iteration order and semantics,
     /// see `ThrowingTaskGroup.next()` 
