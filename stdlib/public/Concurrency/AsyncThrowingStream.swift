@@ -65,7 +65,8 @@ import Swift
 /// To adapt this to use `async`-`await`, extend the `QuakeMonitor` to add a
 /// `quakes` property, of type `AsyncThrowingStream<Quake>`. In the getter for
 /// this property, return an `AsyncThrowingStream`, whose `build` closure --
-/// called at runtime to create the stream -- does the following:
+/// called at runtime to create the stream -- uses the continuation to
+/// perform the following steps:
 ///
 /// 1. Creates a `QuakeMonitor` instance.
 /// 2. Sets the monitor's `quakeHandler` property to a closure that receives
