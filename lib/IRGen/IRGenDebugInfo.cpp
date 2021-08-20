@@ -2457,13 +2457,16 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
             getOrCreateScope(VarInfo.Scope)))
       VarScope = VS;
   }
+  // The llvm.dbg.value(undef) emitted for zero-sized variables get filtered out
+  // by DwarfDebug::collectEntityInfo() otherwise.
+  bool Preserve = true;
   llvm::DILocalVariable *Var =
       (VarInfo.ArgNo > 0)
           ? DBuilder.createParameterVariable(VarScope, VarInfo.Name,
                                              VarInfo.ArgNo, Unit, DVarLine,
-                                             DITy, Optimized, Flags)
+                                             DITy, Preserve, Flags)
           : DBuilder.createAutoVariable(VarScope, VarInfo.Name, Unit, DVarLine,
-                                        DITy, Optimized, Flags);
+                                        DITy, Preserve, Flags);
 
   auto appendDIExpression =
       [&VarInfo, this](llvm::DIExpression *DIExpr) -> llvm::DIExpression * {
