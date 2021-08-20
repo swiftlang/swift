@@ -158,7 +158,8 @@ public:
             [&](SILInstruction *I) { eraseInstFromFunction(*I); }),
         deBlocks(&B.getFunction()),
         ownershipFixupContext(getInstModCallbacks(), deBlocks),
-        libswiftPassInvocation(parentTransform->getPassManager(), this) {}
+        libswiftPassInvocation(parentTransform->getPassManager(),
+                               parentTransform->getFunction(), this) {}
 
   bool runOnFunction(SILFunction &F);
 

@@ -18,21 +18,16 @@ public typealias BridgedFunctionPassCtxt =
 public typealias BridgedInstructionPassCtxt =
   OptimizerBridging.BridgedInstructionPassCtxt
 
-struct FunctionPassContext {
+struct PassContext {
 
   fileprivate let passContext: BridgedPassContext
-  fileprivate let function: Function
   
-  func erase(instruction: Instruction) {
-    PassContext_eraseInstruction(passContext, instruction.bridged)
+  var isSwift51RuntimeAvailable: Bool {
+    PassContext_isSwift51RuntimeAvailable(passContext) != 0
   }
   
-  private func notifyChanges(_ kind: ChangeNotificationKind) {
-    PassContext_notifyChanges(passContext, kind)
-  }
-
   var aliasAnalysis: AliasAnalysis {
-    let bridgedAA = PassContext_getAliasAnalysis(passContext, function.bridged)
+    let bridgedAA = PassContext_getAliasAnalysis(passContext)
     return AliasAnalysis(bridged: bridgedAA)
   }
   
@@ -40,85 +35,79 @@ struct FunctionPassContext {
     let bridgeCA = PassContext_getCalleeAnalysis(passContext)
     return CalleeAnalysis(bridged: bridgeCA)
   }
+
+  func erase(instruction: Instruction) {
+    if instruction is FullApplySite {
+      PassContext_notifyChanges(passContext, callsChanged)
+    }
+    if instruction is TermInst {
+      PassContext_notifyChanges(passContext, branchesChanged)
+    }
+    PassContext_notifyChanges(passContext, instructionsChanged)
+
+    PassContext_eraseInstruction(passContext, instruction.bridged)
+  }
+  
+  func setOperand(of instruction: Instruction, at index : Int, to value: Value) {
+    if instruction is FullApplySite && index == ApplyOperands.calleeOperandIndex {
+      PassContext_notifyChanges(passContext, callsChanged)
+    }
+    PassContext_notifyChanges(passContext, instructionsChanged)
+
+    SILInstruction_setOperand(instruction.bridged, index, value.bridged)
+  }
 }
 
 struct FunctionPass {
 
   let name: String
-  let runFunction: (Function, FunctionPassContext) -> ()
+  let runFunction: (Function, PassContext) -> ()
 
   public init(name: String,
-              _ runFunction: @escaping (Function, FunctionPassContext) -> ()) {
+              _ runFunction: @escaping (Function, PassContext) -> ()) {
     self.name = name
     self.runFunction = runFunction
   }
 
   func run(_ bridgedCtxt: BridgedFunctionPassCtxt) {
     let function = bridgedCtxt.function.function
-    let context = FunctionPassContext(passContext: bridgedCtxt.passContext,
-                                      function: function)
+    let context = PassContext(passContext: bridgedCtxt.passContext)
     runFunction(function, context)
-  }
-}
-
-struct InstructionPassContext {
-  fileprivate let passContext: BridgedPassContext
-
-  func erase(instruction: Instruction) {
-    PassContext_eraseInstruction(passContext, instruction.bridged)
-  }
-
-  private func notifyChanges(_ kind: ChangeNotificationKind) {
-    PassContext_notifyChanges(passContext, kind)
   }
 }
 
 struct InstructionPass<InstType: Instruction> {
 
   let name: String
-  let runFunction: (InstType, InstructionPassContext) -> ()
+  let runFunction: (InstType, PassContext) -> ()
 
-  public init(name: String, _ runFunction: @escaping (InstType, InstructionPassContext) -> ()) {
+  public init(name: String,
+              _ runFunction: @escaping (InstType, PassContext) -> ()) {
     self.name = name
     self.runFunction = runFunction
   }
 
   func run(_ bridgedCtxt: BridgedInstructionPassCtxt) {
     let inst = bridgedCtxt.instruction.getAs(InstType.self)
-    let context = InstructionPassContext(passContext: bridgedCtxt.passContext)
+    let context = PassContext(passContext: bridgedCtxt.passContext)
     runFunction(inst, context)
   }
 }
 
 extension StackList {
-  init(_ context: FunctionPassContext) {
-    self.init(context: context.passContext)
-  }
-  
-  init(_ context: InstructionPassContext) {
+  init(_ context: PassContext) {
     self.init(context: context.passContext)
   }
 }
 
 extension Builder {
   init(at insPnt: Instruction, location: Location,
-       _ context: FunctionPassContext) {
+       _ context: PassContext) {
     self.init(insertionPoint: insPnt, location: location,
               passContext: context.passContext)
   }
 
-  init(at insPnt: Instruction, _ context: FunctionPassContext) {
-    self.init(insertionPoint: insPnt, location: insPnt.location,
-              passContext: context.passContext)
-  }
-
-  init(at insPnt: Instruction, location: Location,
-       _ context: InstructionPassContext) {
-    self.init(insertionPoint: insPnt, location: location,
-              passContext: context.passContext)
-  }
-
-  init(at insPnt: Instruction, _ context: InstructionPassContext) {
+  init(at insPnt: Instruction, _ context: PassContext) {
     self.init(insertionPoint: insPnt, location: insPnt.location,
               passContext: context.passContext)
   }

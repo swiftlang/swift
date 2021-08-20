@@ -14,7 +14,7 @@ import SIL
 
 let simplifyGlobalValuePass = InstructionPass<GlobalValueInst>(
   name: "simplify-global_value", {
-  (globalValue: GlobalValueInst, context: InstructionPassContext) in
+  (globalValue: GlobalValueInst, context: PassContext) in
 
   var users = StackList<Instruction>(context)
   if checkUsers(of: globalValue, users: &users) {
