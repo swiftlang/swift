@@ -2126,7 +2126,9 @@ static Type validateParameterType(ParamDecl *decl) {
     };
     // FIXME: Don't let placeholder types escape type resolution.
     // For now, just return the placeholder type.
-    placeholderHandler = PlaceholderType::get;
+    placeholderHandler = [](auto &ctx, auto *originator) {
+      return Type();
+    };
   } else if (isa<AbstractFunctionDecl>(dc)) {
     options = TypeResolutionOptions(TypeResolverContext::AbstractFunctionDecl);
   } else if (isa<SubscriptDecl>(dc)) {
@@ -2760,7 +2762,9 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
       },
       // FIXME: Don't let placeholder types escape type resolution.
       // For now, just return the placeholder type.
-      PlaceholderType::get);
+      [](auto &ctx, auto *originator) {
+        return Type();
+      });
 
   const auto extendedType = resolution.resolveType(extendedRepr);
 
