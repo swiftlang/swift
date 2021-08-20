@@ -57,7 +57,8 @@ Swift 5.5
     // previously interpreted as a return type of Box<T>, ignoring the <Int> part;
     // now we diagnose an error with a fix-it suggesting replacing `Self` with `Box`
     static func makeBox() -> Self<Int> {...}
-  }```
+  }
+  ```
 
 * [SR-14878][]:
 
