@@ -2576,12 +2576,6 @@ static ArrayRef<Decl *> evaluateMembersRequest(
     // We need to add implicit initializers because they
     // affect vtable layout.
     TypeChecker::addImplicitConstructors(nominal);
-
-    auto classDecl = dyn_cast<ClassDecl>(idc);
-    if (classDecl  && classDecl->isDistributedActor()) {
-      // We need to synthesize _remote methods for every distributed method.
-      TypeChecker::addImplicitDistributedActorRemoteFunctions(nominal);
-    }
   }
 
 
