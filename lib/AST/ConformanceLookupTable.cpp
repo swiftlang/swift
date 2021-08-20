@@ -54,13 +54,6 @@ ProtocolDecl *ConformanceLookupTable::ConformanceEntry::getProtocol() const {
   return Conformance.get<ProtocolConformance *>()->getProtocol();
 }
 
-void *ConformanceLookupTable::ConformanceEntry::operator new(
-        size_t Bytes,
-        ASTContext &C,
-        unsigned Alignment) {
-  return C.Allocate(Bytes, Alignment);
-}
-
 void ConformanceLookupTable::ConformanceEntry::markSupersededBy(
        ConformanceLookupTable &table,
        ConformanceEntry *entry,
@@ -120,12 +113,6 @@ void ConformanceLookupTable::ConformanceEntry::dump(raw_ostream &os,
     os << " superseded_by=@" << static_cast<const void *>(SupersededBy);
 
   os << ")\n";
-}
-
-void *ConformanceLookupTable::operator new(size_t Bytes,
-                                           ASTContext &C,
-                                           unsigned Alignment) {
-  return C.Allocate(Bytes, Alignment);
 }
 
 ConformanceLookupTable::ConformanceLookupTable(ASTContext &ctx) {

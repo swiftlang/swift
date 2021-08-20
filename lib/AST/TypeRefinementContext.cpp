@@ -137,13 +137,6 @@ TypeRefinementContext::createForWhileStmtBody(ASTContext &Ctx, WhileStmt *S,
       Ctx, S, Parent, S->getBody()->getSourceRange(), Info, /* ExplicitInfo */Info);
 }
 
-// Only allow allocation of TypeRefinementContext using the allocator in
-// ASTContext.
-void *TypeRefinementContext::operator new(size_t Bytes, ASTContext &C,
-                                          unsigned Alignment) {
-  return C.Allocate(Bytes, Alignment);
-}
-
 TypeRefinementContext *
 TypeRefinementContext::findMostRefinedSubContext(SourceLoc Loc,
                                                  SourceManager &SM) {

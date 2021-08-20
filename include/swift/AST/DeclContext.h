@@ -19,6 +19,7 @@
 #ifndef SWIFT_DECLCONTEXT_H
 #define SWIFT_DECLCONTEXT_H
 
+#include "swift/AST/ASTAllocated.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/LookupKinds.h"
 #include "swift/AST/ResilienceExpansion.h"
@@ -221,7 +222,8 @@ struct FragileFunctionKind {
 /// and therefore can safely access trailing memory. If you need to create a
 /// macro context, please see GenericContext for how to minimize new entries in
 /// the ASTHierarchy enum below.
-class alignas(1 << DeclContextAlignInBits) DeclContext {
+class alignas(1 << DeclContextAlignInBits) DeclContext
+    : public ASTAllocated<DeclContext> {
   enum class ASTHierarchy : unsigned {
     Decl,
     Expr,
@@ -628,10 +630,6 @@ public:
   SWIFT_DEBUG_DUMPER(dumpContext());
   unsigned printContext(llvm::raw_ostream &OS, unsigned indent = 0,
                         bool onlyAPartialLine = false) const;
-
-  // Only allow allocation of DeclContext using the allocator in ASTContext.
-  void *operator new(size_t Bytes, ASTContext &C,
-                     unsigned Alignment = alignof(DeclContext));
   
   // Some Decls are DeclContexts, but not all. See swift/AST/Decl.h
   static bool classof(const Decl *D);
