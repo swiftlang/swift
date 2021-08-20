@@ -15,6 +15,7 @@
 
 #include "llvm/ADT/DenseSet.h"
 
+#include "Debug.h"
 #include "ProtocolGraph.h"
 #include "Symbol.h"
 #include "Term.h"
@@ -111,11 +112,7 @@ class RewriteSystem final {
   /// Pairs of rules which have already been checked for overlap.
   llvm::DenseSet<std::pair<unsigned, unsigned>> CheckedOverlaps;
 
-  /// Set these to true to enable debugging output.
-  unsigned DebugSimplify : 1;
-  unsigned DebugAdd : 1;
-  unsigned DebugMerge : 1;
-  unsigned DebugCompletion : 1;
+  DebugOptions Debug;
 
 public:
   explicit RewriteSystem(RewriteContext &ctx);
@@ -173,7 +170,6 @@ private:
   computeCriticalPair(ArrayRef<Symbol>::const_iterator from,
                       const Rule &lhs, const Rule &rhs) const;
 
-  Symbol mergeAssociatedTypes(Symbol lhs, Symbol rhs) const;
   void processMergedAssociatedTypes();
 };
 

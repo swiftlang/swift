@@ -34,6 +34,7 @@
 #include <deque>
 #include <vector>
 
+#include "RewriteContext.h"
 #include "RewriteSystem.h"
 
 using namespace swift;
@@ -72,12 +73,23 @@ Symbol Symbol::prependPrefixToConcreteSubstitutions(
 /// - If P inherits from Q, this is just [P:T].
 /// - If Q inherits from P, this is just [Q:T].
 /// - If P and Q are unrelated, this is [P&Q:T].
-Symbol RewriteSystem::mergeAssociatedTypes(Symbol lhs, Symbol rhs) const {
+///
+/// Note that the protocol graph is not part of the caching key; each
+/// protocol graph is a subgraph of the global inheritance graph, so
+/// the specific choice of subgraph does not change the result.
+Symbol RewriteContext::mergeAssociatedTypes(Symbol lhs, Symbol rhs,
+                                            const ProtocolGraph &graph) {
+  auto key = std::make_pair(lhs, rhs);
+
+  auto found = MergedAssocTypes.find(key);
+  if (found != MergedAssocTypes.end())
+    return found->second;
+
   // Check preconditions that were established by RewriteSystem::addRule().
   assert(lhs.getKind() == Symbol::Kind::AssociatedType);
   assert(rhs.getKind() == Symbol::Kind::AssociatedType);
   assert(lhs.getName() == rhs.getName());
-  assert(lhs.compare(rhs, Protos) > 0);
+  assert(lhs.compare(rhs, graph) > 0);
 
   auto protos = lhs.getProtocols();
   auto otherProtos = rhs.getProtocols();
@@ -92,7 +104,7 @@ Symbol RewriteSystem::mergeAssociatedTypes(Symbol lhs, Symbol rhs) const {
              std::back_inserter(newProtos),
              [&](const ProtocolDecl *lhs,
                  const ProtocolDecl *rhs) -> int {
-               return Protos.compareProtocols(lhs, rhs) < 0;
+               return graph.compareProtocols(lhs, rhs) < 0;
              });
 
   // Prune duplicates and protocols that are inherited by other
@@ -101,7 +113,7 @@ Symbol RewriteSystem::mergeAssociatedTypes(Symbol lhs, Symbol rhs) const {
   for (const auto *newProto : newProtos) {
     auto inheritsFrom = [&](const ProtocolDecl *thisProto) {
       return (thisProto == newProto ||
-              Protos.inheritsFrom(thisProto, newProto));
+              graph.inheritsFrom(thisProto, newProto));
     };
 
     if (std::find_if(minimalProtos.begin(), minimalProtos.end(),
@@ -120,7 +132,12 @@ Symbol RewriteSystem::mergeAssociatedTypes(Symbol lhs, Symbol rhs) const {
   // of the two sets.
   assert(minimalProtos.size() <= protos.size() + otherProtos.size());
 
-  return Symbol::forAssociatedType(minimalProtos, lhs.getName(), Context);
+  auto result = Symbol::forAssociatedType(minimalProtos, lhs.getName(), *this);
+  auto inserted = MergedAssocTypes.insert(std::make_pair(key, result));
+  assert(inserted.second);
+  (void) inserted;
+
+  return result;
 }
 
 /// Consider the following example:
@@ -135,25 +152,25 @@ Symbol RewriteSystem::mergeAssociatedTypes(Symbol lhs, Symbol rhs) const {
 ///   [P2].T => [P2:T]
 ///   [P1:T].[P1] => [P1:T]
 ///   [P2:T].[P1] => [P2:T]
-///   <T>.[P1] => <T>
-///   <T>.[P2] => <T>
-///   <T>.T => <T>.[P1:T]
-///   <T>.[P2:T] => <T>.[P1:T]
+///   τ_0_0.[P1] => τ_0_0
+///   τ_0_0.[P2] => τ_0_0
+///   τ_0_0.T => τ_0_0.[P1:T]
+///   τ_0_0.[P2:T] => τ_0_0.[P1:T]
 ///
 /// The completion procedure ends up adding an infinite series of rules of the
 /// form
 ///
-///   <T>.[P1:T].[P2]                 => <T>.[P1:T]
-///   <T>.[P1:T].[P2:T]               => <T>.[P1:T].[P1:T]
+///   τ_0_0.[P1:T].[P2]                 => τ_0_0.[P1:T]
+///   τ_0_0.[P1:T].[P2:T]               => τ_0_0.[P1:T].[P1:T]
 ///
-///   <T>.[P1:T].[P1:T].[P2]          => <T>.[P1:T].[P1:T]
-///   <T>.[P1:T].[P1:T].[P2:T]        => <T>.[P1:T].[P1:T].[P1:T]
+///   τ_0_0.[P1:T].[P1:T].[P2]          => τ_0_0.[P1:T].[P1:T]
+///   τ_0_0.[P1:T].[P1:T].[P2:T]        => τ_0_0.[P1:T].[P1:T].[P1:T]
 ///
-///   <T>.[P1:T].[P1:T].[P1:T].[P2]   => <T>.[P1:T].[P1:T].[P1.T]
-///   <T>.[P1:T].[P1:T].[P1:T].[P2:T] => <T>.[P1:T].[P1:T].[P1:T].[P1.T]
+///   τ_0_0.[P1:T].[P1:T].[P1:T].[P2]   => τ_0_0.[P1:T].[P1:T].[P1.T]
+///   τ_0_0.[P1:T].[P1:T].[P1:T].[P2:T] => τ_0_0.[P1:T].[P1:T].[P1:T].[P1.T]
 ///
 /// The difficulty here stems from the fact that an arbitrary sequence of
-/// [P1:T] following a <T> is known to conform to P2, but P1:T itself
+/// [P1:T] following a τ_0_0 is known to conform to P2, but P1:T itself
 /// does not conform to P2.
 ///
 /// We use a heuristic to compute a completion in this case by using
@@ -161,13 +178,12 @@ Symbol RewriteSystem::mergeAssociatedTypes(Symbol lhs, Symbol rhs) const {
 ///
 /// The key is the following rewrite rule:
 ///
-///   <T>.[P2:T] => <T>.[P1:T]
+///   τ_0_0.[P2:T] => τ_0_0.[P1:T]
 ///
-/// When we add this rule, we introduce a new merged symbol [P1&P2:T] in
-/// a pair of new rules:
+/// When we add this rule, we introduce a new merged symbol [P1&P2:T] and
+/// a new rule:
 ///
-///   <T>.[P1:T] => <T>.[P1&P2:T]
-///   <T>.[P2:T] => <T>.[P1&P2:T]
+///   τ_0_0.[P1:T] => τ_0_0.[P1&P2:T]
 ///
 /// We also look for any existing rules of the form [P1:T].[Q] => [P1:T]
 /// or [P2:T].[Q] => [P2:T], and introduce a new rule:
@@ -177,15 +193,13 @@ Symbol RewriteSystem::mergeAssociatedTypes(Symbol lhs, Symbol rhs) const {
 /// In the above example, we have such a rule for Q == P1 and Q == P2, so
 /// in total we end up adding the following four rules:
 ///
-///   <T>.[P1:T] => <T>.[P1&P2:T]
-///   <T>.[P2:T] => <T>.[P1&P2:T]
+///   τ_0_0.[P1:T] => τ_0_0.[P1&P2:T]
 ///   [P1&P2:T].[P1] => [P1&P2:T]
 ///   [P1&P2:T].[P2] => [P1&P2:T]
 ///
 /// Intuitively, since the conformance requirements on the merged term
-/// are not prefixed by the root <T>, they apply at any level; we've
-/// "tied off" the recursion, and now the rewrite system has a confluent
-/// completion.
+/// are not prefixed by the root τ_0_0, they apply at any level; we've
+/// "tied off" the recursion, and the rewrite system is now convergent.
 void RewriteSystem::processMergedAssociatedTypes() {
   if (MergedAssociatedTypes.empty())
     return;
@@ -202,14 +216,31 @@ void RewriteSystem::processMergedAssociatedTypes() {
     // If we have X.[P2:T] => Y.[P1:T], add a new pair of rules:
     // X.[P1:T] => X.[P1&P2:T]
     // X.[P2:T] => X.[P1&P2:T]
-    if (DebugMerge) {
-      llvm::dbgs() << "## Associated type merge candidate ";
+    if (Debug.contains(DebugFlags::Merge)) {
+      llvm::dbgs() << "## Processing associated type merge candidate ";
       llvm::dbgs() << lhs << " => " << rhs << "\n";
     }
 
-    auto mergedSymbol = mergeAssociatedTypes(lhs.back(), rhs.back());
-    if (DebugMerge) {
+    auto mergedSymbol = Context.mergeAssociatedTypes(lhs.back(), rhs.back(),
+                                                     Protos);
+    if (Debug.contains(DebugFlags::Merge)) {
       llvm::dbgs() << "### Merged symbol " << mergedSymbol << "\n";
+    }
+
+    // We must have mergedSymbol <= rhs < lhs, therefore mergedSymbol != lhs.
+    assert(lhs.back() != mergedSymbol &&
+           "Left hand side should not already end with merged symbol?");
+    assert(mergedSymbol.compare(rhs.back(), Protos) <= 0);
+    assert(rhs.back().compare(lhs.back(), Protos) < 0);
+
+    // If the merge didn't actually produce a new symbol, there is nothing else
+    // to do.
+    if (rhs.back() == mergedSymbol) {
+      if (Debug.contains(DebugFlags::Merge)) {
+        llvm::dbgs() << "### Skipping\n";
+      }
+
+      continue;
     }
 
     // Build the term X.[P1&P2:T].
@@ -218,9 +249,6 @@ void RewriteSystem::processMergedAssociatedTypes() {
 
     // Add the rule X.[P1:T] => X.[P1&P2:T].
     addRule(rhs, mergedTerm);
-
-    // Add the rule X.[P2:T] => X.[P1&P2:T].
-    addRule(lhs, mergedTerm);
 
     // Collect new rules here so that we're not adding rules while traversing
     // the trie.
@@ -241,7 +269,7 @@ void RewriteSystem::processMergedAssociatedTypes() {
           // or
           //
           //   [P2:T].[Q] => [P2:T]
-          if (DebugMerge) {
+          if (Debug.contains(DebugFlags::Merge)) {
             llvm::dbgs() << "### Lifting conformance rule " << otherRule << "\n";
           }
 
@@ -413,7 +441,7 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
           // Try to repair the confluence violation by adding a new rule.
           resolvedCriticalPairs.push_back(computeCriticalPair(from, lhs, rhs));
 
-          if (DebugCompletion) {
+          if (Debug.contains(DebugFlags::Completion)) {
             const auto &pair = resolvedCriticalPairs.back();
 
             llvm::dbgs() << "$ Overlapping rules: (#" << i << ") ";
@@ -457,6 +485,9 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
     // violations.
     processMergedAssociatedTypes();
   } while (again);
+
+  assert(MergedAssociatedTypes.empty() &&
+         "Should have processed all merge candidates");
 
   return std::make_pair(CompletionResult::Success, steps);
 }

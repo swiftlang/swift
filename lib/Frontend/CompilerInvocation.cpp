@@ -829,10 +829,13 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                      A->getAsString(Args), A->getValue());
   }
 
-  Opts.DebugRequirementMachine = Args.hasArg(
-      OPT_debug_requirement_machine);
+  Opts.DumpRequirementMachine = Args.hasArg(
+      OPT_dump_requirement_machine);
   Opts.AnalyzeRequirementMachine = Args.hasArg(
       OPT_analyze_requirement_machine);
+
+  if (const Arg *A = Args.getLastArg(OPT_debug_requirement_machine))
+    Opts.DebugRequirementMachine = A->getValue();
 
   if (const Arg *A = Args.getLastArg(OPT_requirement_machine_step_limit)) {
     unsigned limit;
