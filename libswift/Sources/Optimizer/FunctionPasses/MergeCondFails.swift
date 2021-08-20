@@ -17,8 +17,8 @@ let mergeCondFailsPass = FunctionPass(name: "merge-cond_fails", runMergeCondFail
 /// Return true if the operand of the cond_fail instruction looks like
 /// the overflow bit of an arithmetic instruction.
 private func hasOverflowConditionOperand(_ cfi: CondFailInst) -> Bool {
-  if let tei = cfi.condition as? TupleExtractInst {
-    return tei.tuple is BuiltinInst
+  if let tei = cfi.operand as? TupleExtractInst {
+    return tei.operand is BuiltinInst
   }
   return false
 }
@@ -73,10 +73,10 @@ private func mergeCondFails(_ condFailToMerge: inout StackList<CondFailInst>,
       mergedCond = builder.createBuiltinBinaryFunction(name: "or",
                                         operandType: prevCond.type,
                                         resultType: prevCond.type,
-                                        arguments: [prevCond, cfi.condition])
+                                        arguments: [prevCond, cfi.operand])
       didMerge = true
     } else {
-      mergedCond = cfi.condition
+      mergedCond = cfi.operand
     }
   }
   if !didMerge {
