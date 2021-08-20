@@ -1061,6 +1061,7 @@ public:
       Optional<SpecializeAttr::SpecializationKind> &Kind,
       TrailingWhereClause *&TrailingWhereClause, DeclNameRef &targetFunction,
       SmallVectorImpl<Identifier> &spiGroups,
+      SmallVectorImpl<AvailableAttr *> &availableAttrs,
       llvm::function_ref<bool(Parser &)> parseSILTargetName,
       llvm::function_ref<bool(Parser &)> parseSILSIPModule);
 
@@ -1850,7 +1851,11 @@ public:
   parsePlatformVersionConstraintSpec();
   ParserResult<PlatformAgnosticVersionConstraintAvailabilitySpec>
   parsePlatformAgnosticVersionConstraintSpec();
-
+  bool
+  parseAvailability(bool parseAsPartOfSpecializeAttr, StringRef AttrName,
+                    bool &DiscardAttribute, SourceRange &attrRange,
+                    SourceLoc AtLoc, SourceLoc Loc,
+                    llvm::function_ref<void(AvailableAttr *)> addAttribute);
   //===--------------------------------------------------------------------===//
   // Code completion second pass.
 

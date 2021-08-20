@@ -583,12 +583,14 @@ bool Parser::parseSpecializeAttributeArguments(
     Optional<SpecializeAttr::SpecializationKind> &Kind,
     swift::TrailingWhereClause *&TrailingWhereClause,
     DeclNameRef &targetFunction, SmallVectorImpl<Identifier> &spiGroups,
+    SmallVectorImpl<AvailableAttr *> &availableAttrs,
     llvm::function_ref<bool(Parser &)> parseSILTargetName,
     llvm::function_ref<bool(Parser &)> parseSILSIPModule) {
   SyntaxParsingContext ContentContext(SyntaxContext,
                                       SyntaxKind::SpecializeAttributeSpecList);
   // Parse optional "exported" and "kind" labeled parameters.
   while (!Tok.is(tok::kw_where)) {
+    bool isAvailability = false;
     if (Tok.is(tok::identifier)) {
       auto ParamLabel = Tok.getText();
       SyntaxParsingContext ArgumentContext(
@@ -597,11 +599,11 @@ bool Parser::parseSpecializeAttributeArguments(
                              : SyntaxKind::LabeledSpecializeEntry);
       if (ParamLabel != "exported" && ParamLabel != "kind" &&
           ParamLabel != "target" && ParamLabel != "spi" &&
-          ParamLabel != "spiModule") {
+          ParamLabel != "spiModule" && ParamLabel != "availability") {
         diagnose(Tok.getLoc(), diag::attr_specialize_unknown_parameter_name,
                  ParamLabel);
       }
-      consumeToken();
+      auto AtLoc = consumeToken();
       if (!consumeIf(tok::colon)) {
         diagnose(Tok.getLoc(), diag::attr_specialize_missing_colon, ParamLabel);
         skipUntil(tok::comma, tok::kw_where);
@@ -622,6 +624,17 @@ bool Parser::parseSpecializeAttributeArguments(
           (ParamLabel == "spi" && !spiGroups.empty())) {
         diagnose(Tok.getLoc(), diag::attr_specialize_parameter_already_defined,
                  ParamLabel);
+      }
+      if (ParamLabel == "availability") {
+        SourceRange attrRange;
+        auto Loc = Tok.getLoc();
+        bool shouldDiscardAvailabilityAttr = false;
+        isAvailability = true;
+        if (!parseAvailability(true, ParamLabel, shouldDiscardAvailabilityAttr,
+                               attrRange, AtLoc, Loc, [&](AvailableAttr *attr) {
+                                 availableAttrs.push_back(attr);
+                               }))
+          return false;
       }
       if (ParamLabel == "exported") {
         bool isTrue = consumeIf(tok::kw_true);
@@ -692,7 +705,7 @@ bool Parser::parseSpecializeAttributeArguments(
         spiGroups.push_back(Context.getIdentifier(text));
         consumeToken();
       }
-      if (!consumeIf(tok::comma)) {
+      if (!isAvailability && !consumeIf(tok::comma)) {
         diagnose(Tok.getLoc(), diag::attr_specialize_missing_comma);
         skipUntil(tok::comma, tok::kw_where);
         if (Tok.is(ClosingBrace))
@@ -727,6 +740,139 @@ bool Parser::parseSpecializeAttributeArguments(
   return true;
 }
 
+bool Parser::parseAvailability(
+    bool parseAsPartOfSpecializeAttr, StringRef AttrName,
+    bool &DiscardAttribute, SourceRange &attrRange, SourceLoc AtLoc,
+    SourceLoc Loc, llvm::function_ref<void(AvailableAttr *)> addAttribute) {
+  // platform:
+  //   *
+  //   identifier
+  if (!Tok.is(tok::identifier) &&
+      !(Tok.isAnyOperator() && Tok.getText() == "*")) {
+    if (Tok.is(tok::code_complete) && CodeCompletion) {
+      CodeCompletion->completeDeclAttrParam(DAK_Available, 0);
+      consumeToken(tok::code_complete);
+    }
+    diagnose(Tok.getLoc(), diag::attr_availability_platform, AttrName)
+        .highlight(SourceRange(Tok.getLoc()));
+    consumeIf(tok::r_paren);
+    return false;
+  }
+  // Delay processing of platform until later, after we have
+  // parsed more of the attribute.
+  StringRef Platform = Tok.getText();
+
+  if (Platform != "*" &&
+      (peekToken().isAny(tok::integer_literal, tok::floating_literal) ||
+       peekAvailabilityMacroName())) {
+    // We have the short form of available: @available(iOS 8.0.1, *)
+    SmallVector<AvailabilitySpec *, 5> Specs;
+    ParserStatus Status =
+        parseAvailabilitySpecList(Specs, AvailabilitySpecSource::Available);
+
+    if (Status.isErrorOrHasCompletion())
+      return false;
+
+    auto availTerminator =
+        parseAsPartOfSpecializeAttr ? tok::semi : tok::r_paren;
+    if (!consumeIf(availTerminator)) {
+      auto diagnostic = parseAsPartOfSpecializeAttr
+                            ? diag::attr_expected_semi
+                            : diag::attr_expected_rparen;
+      diagnose(Tok.getLoc(), diagnostic, AttrName, parseAsPartOfSpecializeAttr);
+      return false;
+    }
+
+    attrRange = SourceRange(Loc, PreviousLoc);
+    // For each platform version spec in the spec list, create an
+    // implicit AvailableAttr for the platform with the introduced
+    // version from the spec. For example, if we have
+    //   @available(iOS 8.0, OSX 10.10, *):
+    // we will synthesize:
+    //  @available(iOS, introduced: 8.0)
+    //  @available(OSX, introduced: 10.10)
+    //
+    // Similarly if we have a language version spec or PackageDescription
+    // version in the spec list, create an implicit AvailableAttr
+    // with the specified version as the introduced argument.
+    // For example, if we have
+    //   @available(swift 3.1)
+    // we will synthesize
+    //   @available(swift, introduced: 3.1)
+    // or, if we have
+    //   @available(_PackageDescription 4.2)
+    // we will synthesize
+    //   @available(_PackageDescription, introduced: 4.2)
+
+    for (auto *Spec : Specs) {
+      PlatformKind Platform;
+      llvm::VersionTuple Version;
+      SourceRange VersionRange;
+      PlatformAgnosticAvailabilityKind PlatformAgnostic;
+
+      if (auto *PlatformVersionSpec =
+              dyn_cast<PlatformVersionConstraintAvailabilitySpec>(Spec)) {
+        Platform = PlatformVersionSpec->getPlatform();
+        Version = PlatformVersionSpec->getVersion();
+        VersionRange = PlatformVersionSpec->getVersionSrcRange();
+        PlatformAgnostic = PlatformAgnosticAvailabilityKind::None;
+
+      } else if (auto *PlatformAgnosticVersionSpec = dyn_cast<
+                     PlatformAgnosticVersionConstraintAvailabilitySpec>(Spec)) {
+        Platform = PlatformKind::none;
+        Version = PlatformAgnosticVersionSpec->getVersion();
+        VersionRange = PlatformAgnosticVersionSpec->getVersionSrcRange();
+        PlatformAgnostic =
+            PlatformAgnosticVersionSpec->isLanguageVersionSpecific()
+                ? PlatformAgnosticAvailabilityKind::SwiftVersionSpecific
+                : PlatformAgnosticAvailabilityKind::
+                      PackageDescriptionVersionSpecific;
+
+      } else {
+        continue;
+      }
+
+      Version = canonicalizePlatformVersion(Platform, Version);
+
+      addAttribute(new (Context) AvailableAttr(
+          AtLoc, attrRange, Platform,
+          /*Message=*/StringRef(),
+          /*Rename=*/StringRef(),
+          /*RenameDecl=*/nullptr,
+          /*Introduced=*/Version,
+          /*IntroducedRange=*/VersionRange,
+          /*Deprecated=*/llvm::VersionTuple(),
+          /*DeprecatedRange=*/SourceRange(),
+          /*Obsoleted=*/llvm::VersionTuple(),
+          /*ObsoletedRange=*/SourceRange(), PlatformAgnostic,
+          /*Implicit=*/false));
+    }
+
+    return true;
+  }
+
+  auto AvailabilityAttr =
+      parseExtendedAvailabilitySpecList(AtLoc, Loc, AttrName);
+  DiscardAttribute |= AvailabilityAttr.isParseErrorOrHasCompletion();
+
+  auto availTerminator = parseAsPartOfSpecializeAttr ? tok::semi : tok::r_paren;
+  if (!consumeIf(availTerminator)) {
+    if (!DiscardAttribute) {
+      auto diagnostic = parseAsPartOfSpecializeAttr ? diag::attr_expected_semi
+                                                    : diag::attr_expected_rparen;
+      diagnose(Tok.getLoc(), diagnostic, AttrName, parseAsPartOfSpecializeAttr);
+    }
+    return false;
+  }
+
+  if (!DiscardAttribute) {
+    addAttribute(AvailabilityAttr.get());
+  } else {
+    return false;
+  }
+  return true;
+}
+
 bool Parser::parseSpecializeAttribute(
     swift::tok ClosingBrace, SourceLoc AtLoc, SourceLoc Loc,
     SpecializeAttr *&Attr,
@@ -745,9 +891,11 @@ bool Parser::parseSpecializeAttribute(
 
   DeclNameRef targetFunction;
   SmallVector<Identifier, 4> spiGroups;
+  SmallVector<AvailableAttr *, 4> availableAttrs;
   if (!parseSpecializeAttributeArguments(
           ClosingBrace, DiscardAttribute, exported, kind, trailingWhereClause,
-          targetFunction, spiGroups, parseSILTargetName, parseSILSIPModule)) {
+          targetFunction, spiGroups, availableAttrs, parseSILTargetName,
+          parseSILSIPModule)) {
     return false;
   }
 
@@ -776,7 +924,8 @@ bool Parser::parseSpecializeAttribute(
   // Store the attribute.
   Attr = SpecializeAttr::create(Context, AtLoc, SourceRange(Loc, rParenLoc),
                                 trailingWhereClause, exported.getValue(),
-                                kind.getValue(), targetFunction, spiGroups);
+                                kind.getValue(), targetFunction, spiGroups,
+                                availableAttrs);
   return true;
 }
 
@@ -2211,128 +2360,10 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                DeclAttribute::isDeclModifier(DK));
       return false;
     }
-
-    // platform:
-    //   *
-    //   identifier
-    if (!Tok.is(tok::identifier) &&
-        !(Tok.isAnyOperator() && Tok.getText() == "*")) {
-      if (Tok.is(tok::code_complete) && CodeCompletion) {
-        CodeCompletion->completeDeclAttrParam(DAK_Available, 0);
-        consumeToken(tok::code_complete);
-      }
-      diagnose(Tok.getLoc(), diag::attr_availability_platform, AttrName)
-        .highlight(SourceRange(Tok.getLoc()));
-      consumeIf(tok::r_paren);
+    if (!parseAvailability(false, AttrName, DiscardAttribute, AttrRange, AtLoc,
+                           Loc,
+                           [&](AvailableAttr *attr) { Attributes.add(attr); }))
       return false;
-    }
-
-    // Delay processing of platform until later, after we have
-    // parsed more of the attribute.
-    StringRef Platform = Tok.getText();
-
-    if (Platform != "*" &&
-        (peekToken().isAny(tok::integer_literal, tok::floating_literal) ||
-         peekAvailabilityMacroName())) {
-      // We have the short form of available: @available(iOS 8.0.1, *)
-      SmallVector<AvailabilitySpec *, 5> Specs;
-      ParserStatus Status = parseAvailabilitySpecList(Specs, 
-                                    AvailabilitySpecSource::Available);
-
-      if (Status.isErrorOrHasCompletion())
-        return false;
-
-      if (!consumeIf(tok::r_paren)) {
-        diagnose(Tok.getLoc(), diag::attr_expected_rparen, AttrName,
-                 DeclAttribute::isDeclModifier(DK));
-        return false;
-      }
-
-      AttrRange = SourceRange(Loc, PreviousLoc);
-      // For each platform version spec in the spec list, create an
-      // implicit AvailableAttr for the platform with the introduced
-      // version from the spec. For example, if we have
-      //   @available(iOS 8.0, OSX 10.10, *):
-      // we will synthesize:
-      //  @available(iOS, introduced: 8.0)
-      //  @available(OSX, introduced: 10.10)
-      //
-      // Similarly if we have a language version spec or PackageDescription
-      // version in the spec list, create an implicit AvailableAttr
-      // with the specified version as the introduced argument. 
-      // For example, if we have
-      //   @available(swift 3.1)
-      // we will synthesize
-      //   @available(swift, introduced: 3.1)
-      // or, if we have
-      //   @available(_PackageDescription 4.2)
-      // we will synthesize
-      //   @available(_PackageDescription, introduced: 4.2)
-
-      for (auto *Spec : Specs) {
-        PlatformKind Platform;
-        llvm::VersionTuple Version;
-        SourceRange VersionRange;
-        PlatformAgnosticAvailabilityKind PlatformAgnostic;
-
-        if (auto *PlatformVersionSpec =
-            dyn_cast<PlatformVersionConstraintAvailabilitySpec>(Spec)) {
-          Platform = PlatformVersionSpec->getPlatform();
-          Version = PlatformVersionSpec->getVersion();
-          VersionRange = PlatformVersionSpec->getVersionSrcRange();
-          PlatformAgnostic = PlatformAgnosticAvailabilityKind::None;
-
-        } else if (auto *PlatformAgnosticVersionSpec =
-                   dyn_cast<PlatformAgnosticVersionConstraintAvailabilitySpec>(Spec)) {
-          Platform = PlatformKind::none;
-          Version = PlatformAgnosticVersionSpec->getVersion();
-          VersionRange = PlatformAgnosticVersionSpec->getVersionSrcRange();
-          PlatformAgnostic = PlatformAgnosticVersionSpec->isLanguageVersionSpecific() ?
-                               PlatformAgnosticAvailabilityKind::SwiftVersionSpecific :
-                               PlatformAgnosticAvailabilityKind::PackageDescriptionVersionSpecific;
-
-        } else {
-          continue;
-        }
-
-        Version = canonicalizePlatformVersion(Platform, Version);
-
-        Attributes.add(new (Context)
-                       AvailableAttr(AtLoc, AttrRange,
-                                     Platform,
-                                     /*Message=*/StringRef(),
-                                     /*Rename=*/StringRef(),
-                                     /*RenameDecl=*/nullptr,
-                                     /*Introduced=*/Version,
-                                     /*IntroducedRange=*/VersionRange,
-                                     /*Deprecated=*/llvm::VersionTuple(),
-                                     /*DeprecatedRange=*/SourceRange(),
-                                     /*Obsoleted=*/llvm::VersionTuple(),
-                                     /*ObsoletedRange=*/SourceRange(),
-                                     PlatformAgnostic,
-                                     /*Implicit=*/false));
-      }
-
-      break;
-    }
-
-    auto AvailabilityAttr = parseExtendedAvailabilitySpecList(AtLoc, Loc,
-                                                              AttrName);
-    DiscardAttribute |= AvailabilityAttr.isParseErrorOrHasCompletion();
-
-    if (!consumeIf(tok::r_paren)) {
-      if (!DiscardAttribute) {
-        diagnose(Tok.getLoc(), diag::attr_expected_rparen, AttrName,
-                 DeclAttribute::isDeclModifier(DK));
-      }
-      return false;
-    }
-
-    if (!DiscardAttribute) {
-      Attributes.add(AvailabilityAttr.get());
-    } else {
-      return false;
-    }
     break;
   }
   case DAK_PrivateImport: {
