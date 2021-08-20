@@ -412,13 +412,15 @@ static bool buildModuleFromInterface(CompilerInstance &Instance) {
   StringRef InputPath = FEOpts.InputsAndOutputs.getFilenameOfFirstInput();
   StringRef PrebuiltCachePath = FEOpts.PrebuiltModuleCachePath;
   ModuleInterfaceLoaderOptions LoaderOpts(FEOpts);
+  StringRef ABIPath = Instance.getPrimarySpecificPathsForAtMostOnePrimary()
+    .SupplementaryOutputs.ABIDescriptorOutputPath;
   return ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
       Instance.getSourceMgr(), Instance.getDiags(),
       Invocation.getSearchPathOptions(), Invocation.getLangOptions(),
       Invocation.getClangImporterOptions(),
       Invocation.getClangModuleCachePath(), PrebuiltCachePath,
       FEOpts.BackupModuleInterfaceDir,
-      Invocation.getModuleName(), InputPath, Invocation.getOutputFilename(),
+      Invocation.getModuleName(), InputPath, Invocation.getOutputFilename(), ABIPath,
       FEOpts.SerializeModuleInterfaceDependencyHashes,
       FEOpts.shouldTrackSystemDependencies(), LoaderOpts,
       RequireOSSAModules_t(Invocation.getSILOptions()));

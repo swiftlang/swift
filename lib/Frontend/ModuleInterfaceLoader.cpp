@@ -1007,7 +1007,7 @@ class ModuleInterfaceLoaderImpl {
       ModuleInterfaceBuilder builder(
         ctx.SourceMgr, diagsToUse,
         astDelegate, interfacePath, moduleName, cacheDir,
-        prebuiltCacheDir, backupInterfaceDir,
+        prebuiltCacheDir, backupInterfaceDir, StringRef(),
         Opts.disableInterfaceLock, diagnosticLoc,
         dependencyTracker);
       // If we found an out-of-date .swiftmodule, we still want to add it as
@@ -1039,7 +1039,7 @@ class ModuleInterfaceLoaderImpl {
       // the genericSubInvocation we'll need to use to compute the cache paths.
       ModuleInterfaceBuilder fallbackBuilder(
         ctx.SourceMgr, &ctx.Diags, astDelegate, backupPath, moduleName, cacheDir,
-        prebuiltCacheDir, backupInterfaceDir,
+        prebuiltCacheDir, backupInterfaceDir, StringRef(),
         Opts.disableInterfaceLock, diagnosticLoc,
         dependencyTracker);
       if (rebuildInfo.sawOutOfDateModule(modulePath))
@@ -1208,7 +1208,8 @@ bool ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
     const ClangImporterOptions &ClangOpts, StringRef CacheDir,
     StringRef PrebuiltCacheDir, StringRef BackupInterfaceDir,
     StringRef ModuleName, StringRef InPath,
-    StringRef OutPath, bool SerializeDependencyHashes,
+    StringRef OutPath, StringRef ABIOutputPath,
+    bool SerializeDependencyHashes,
     bool TrackSystemDependencies, ModuleInterfaceLoaderOptions LoaderOpts,
     RequireOSSAModules_t RequireOSSAModules) {
   InterfaceSubContextDelegateImpl astDelegate(
@@ -1218,7 +1219,7 @@ bool ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
       SerializeDependencyHashes, TrackSystemDependencies, RequireOSSAModules);
   ModuleInterfaceBuilder builder(SourceMgr, &Diags, astDelegate, InPath,
                                  ModuleName, CacheDir, PrebuiltCacheDir,
-                                 BackupInterfaceDir,
+                                 BackupInterfaceDir, ABIOutputPath,
                                  LoaderOpts.disableInterfaceLock);
   // FIXME: We really only want to serialize 'important' dependencies here, if
   //        we want to ship the built swiftmodules to another machine.
@@ -1236,7 +1237,7 @@ bool ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
   assert(!backInPath.empty());
   ModuleInterfaceBuilder backupBuilder(SourceMgr, &Diags, astDelegate, backInPath,
                                        ModuleName, CacheDir, PrebuiltCacheDir,
-                                       BackupInterfaceDir,
+                                       BackupInterfaceDir, ABIOutputPath,
                                        LoaderOpts.disableInterfaceLock);
   // Ensure we can rebuild module after user changed the original interface file.
   backupBuilder.addExtraDependency(InPath);
