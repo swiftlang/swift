@@ -12,6 +12,12 @@
 
 import SIL
 
+// Removes all reference counting instructions of a `global_value` instruction
+// if it does not escape.
+//
+// Note that `simplifyStrongRetainPass` and `simplifyStrongReleasePass` can
+// even remove "unbalanced" retains/releases of a `global_value`, but this
+// requires a minimum deployment target.
 let simplifyGlobalValuePass = InstructionPass<GlobalValueInst>(
   name: "simplify-global_value", {
   (globalValue: GlobalValueInst, context: PassContext) in

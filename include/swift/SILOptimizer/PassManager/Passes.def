@@ -422,6 +422,8 @@ PASS(PruneVTables, "prune-vtables",
 PASS_RANGE(AllPasses, AADumper, PruneVTables)
 
 SWIFT_INSTRUCTION_PASS_WITH_LEGACY(GlobalValueInst, "simplify-global_value")
+SWIFT_INSTRUCTION_PASS_WITH_LEGACY(StrongRetainInst, "simplify-strong_retain")
+SWIFT_INSTRUCTION_PASS_WITH_LEGACY(StrongReleaseInst, "simplify-strong_release")
 
 #undef IRGEN_PASS
 #undef SWIFT_FUNCTION_PASS
