@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-clang %s -isysroot %sdk -L%swift_obj_root/lib/swift/%target-sdk-name -lswiftCore -o %t/objc-getclass
+// RUN: %target-clang %s -isysroot %sdk -L%swift_obj_root/lib/swift/%target-sdk-name -lswiftCore -lobjc -o %t/objc-getclass
 // RUN: %target-codesign %t/objc-getclass
 // RUN: %target-run %t/objc-getclass %S/Inputs/objc-getclass.txt
 
@@ -34,8 +34,8 @@ int main(int argc, char **argv) {
     objc_setHook_getClass(dummyHook, &getObjCClassByMangledName);
     objc_setHook_getClass(getObjCClassByMangledName, &dummy);
   } else {
-    fprintf(stderr, "objc-getclass: macOS version is too old\n");
-    return 1;
+    fprintf(stderr, "objc-getclass: OS version is too old\n");
+    return 0;
   }
 
   // Open the input file
