@@ -4706,6 +4706,12 @@ public:
       *getTrailingObjects<const SILDebugScope *>() = NewDS;
   }
 
+  /// Whether the SSA value associated with the current debug_value
+  /// instruction has an address type.
+  bool hasAddrVal() const {
+    return getOperand()->getType().isAddress();
+  }
+
   /// True if all references within this debug value will be overwritten with a
   /// poison sentinel at this point in the program. This is used in debug builds
   /// when shortening non-trivial value lifetimes to ensure the debugger cannot
