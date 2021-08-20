@@ -7,6 +7,10 @@
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
+// rdar://82123254
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
+
 func run() async throws {
   // CHECK: item_id
   // CHECK: file_id
