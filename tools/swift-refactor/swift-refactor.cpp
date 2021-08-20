@@ -404,9 +404,9 @@ int main(int argc, char *argv[]) {
 
   if (options::Action == RefactoringKind::None) {
     llvm::SmallVector<RefactoringKind, 32> Kinds;
-    bool RangeStartMayNeedRename = false;
-    collectAvailableRefactorings(SF, Range, RangeStartMayNeedRename, Kinds,
-                                 {&PrintDiags});
+    bool CollectRangeStartRefactorings = false;
+    collectAvailableRefactorings(SF, Range, CollectRangeStartRefactorings,
+                                 Kinds, {&PrintDiags});
     llvm::outs() << "Action begins\n";
     for (auto Kind : Kinds) {
       llvm::outs() << getDescriptiveRefactoringKindName(Kind) << "\n";
