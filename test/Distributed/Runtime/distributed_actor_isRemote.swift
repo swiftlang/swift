@@ -55,9 +55,9 @@ struct FakeTransport: ActorTransport {
   }
 
   func resolve<Act>(_ identity: AnyActorIdentity, as actorType: Act.Type)
-  throws -> ActorResolved<Act>
+  throws -> Act?
       where Act: DistributedActor {
-    .makeProxy
+    return nil
   }
 
   func assignIdentity<Act>(_ actorType: Act.Type) -> AnyActorIdentity
