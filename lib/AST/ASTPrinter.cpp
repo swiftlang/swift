@@ -5747,10 +5747,9 @@ swift::getInheritedForPrinting(
 
   // Collect synthesized conformances.
   auto &ctx = decl->getASTContext();
+  llvm::SetVector<ProtocolDecl *> protocols;
   for (auto attr : decl->getAttrs().getAttributes<SynthesizedProtocolAttr>()) {
     if (auto *proto = ctx.getProtocol(attr->getProtocolKind())) {
-      if (!options.shouldPrint(proto))
-        continue;
       // The SerialExecutor conformance is only synthesized on the root
       // actor class, so we can just test resilience immediately.
       if (proto->isSpecificProtocol(KnownProtocolKind::SerialExecutor) &&
@@ -5760,9 +5759,28 @@ swift::getInheritedForPrinting(
           isa<EnumDecl>(decl) &&
           cast<EnumDecl>(decl)->hasRawType())
         continue;
-      Results.push_back({TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()),
-                      /*isUnchecked=*/false});
+      protocols.insert(proto);
     }
+  }
+
+  for (size_t i = 0; i < protocols.size(); i++) {
+    auto proto = protocols[i];
+
+    if (!options.shouldPrint(proto)) {
+      // If private stdlib protocols are skipped and this is a private stdlib
+      // protocol, see if any of its inherited protocols are public. Those
+      // protocols can affect the user-visible behavior of the declaration, and
+      // should be printed.
+      if (options.SkipPrivateStdlibDecls &&
+          proto->isPrivateStdlibDecl(!options.SkipUnderscoredStdlibProtocols)) {
+        auto inheritedProtocols = proto->getInheritedProtocols();
+        protocols.insert(inheritedProtocols.begin(), inheritedProtocols.end());
+      }
+      continue;
+    }
+
+    Results.push_back({TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()),
+                       /*isUnchecked=*/false});
   }
 }
 

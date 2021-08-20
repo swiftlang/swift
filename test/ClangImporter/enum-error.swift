@@ -14,6 +14,8 @@
 // RUN: echo '#include "enum-error.h"' > %t.m
 // RUN: %target-swift-ide-test -source-filename %s -print-header -header-to-print %S/Inputs/enum-error.h -import-objc-header %S/Inputs/enum-error.h -print-regular-comments --cc-args %target-cc-options -fsyntax-only %t.m -I %S/Inputs > %t.txt
 // RUN: %FileCheck -check-prefix=HEADER %s < %t.txt
+// RUN: %target-swift-ide-test -source-filename %s -print-header -header-to-print %S/Inputs/enum-error.h -import-objc-header %S/Inputs/enum-error.h -print-regular-comments --skip-private-stdlib-decls -skip-underscored-stdlib-protocols --cc-args %target-cc-options -fsyntax-only %t.m -I %S/Inputs > %t2.txt
+// RUN: %FileCheck -check-prefix=HEADER-NO-PRIVATE %s < %t2.txt
 
 import Foundation
 
@@ -121,12 +123,25 @@ class ObjCTest {
 }
 #endif
 
-// HEADER: enum Code : Int32, _ErrorCodeProtocol {
-// HEADER:   init?(rawValue: Int32)
-// HEADER:   var rawValue: Int32 { get }
-// HEADER:   typealias _ErrorType = TestError
-// HEADER:   case TENone
-// HEADER:   case TEOne
-// HEADER:   case TETwo
+// HEADER: struct TestError : _BridgedStoredNSError {
+// HEADER:   enum Code : Int32, _ErrorCodeProtocol {
+// HEADER:     init?(rawValue: Int32)
+// HEADER:     var rawValue: Int32 { get }
+// HEADER:     typealias _ErrorType = TestError
+// HEADER:     case TENone
+// HEADER:     case TEOne
+// HEADER:     case TETwo
+// HEADER:   }
 // HEADER: }
 // HEADER: func getErr() -> TestError.Code
+
+// HEADER-NO-PRIVATE: struct TestError : CustomNSError, Hashable, Error {
+// HEADER-NO-PRIVATE:   enum Code : Int32, Equatable {
+// HEADER-NO-PRIVATE:     init?(rawValue: Int32)
+// HEADER-NO-PRIVATE:     var rawValue: Int32 { get }
+// HEADER-NO-PRIVATE:     typealias _ErrorType = TestError
+// HEADER-NO-PRIVATE:     case TENone
+// HEADER-NO-PRIVATE:     case TEOne
+// HEADER-NO-PRIVATE:     case TETwo
+// HEADER-NO-PRIVATE:   }
+// HEADER-NO-PRIVATE: }
