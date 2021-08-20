@@ -4,6 +4,30 @@
   "printedName": "TopLevel",
   "children": [
     {
+      "kind": "Import",
+      "name": "SwiftOnoneSupport",
+      "printedName": "SwiftOnoneSupport",
+      "declKind": "Import",
+      "moduleName": "cake"
+    },
+    {
+      "kind": "Import",
+      "name": "_Concurrency",
+      "printedName": "_Concurrency",
+      "declKind": "Import",
+      "moduleName": "cake"
+    },
+    {
+      "kind": "Import",
+      "name": "cake",
+      "printedName": "cake",
+      "declKind": "Import",
+      "moduleName": "cake",
+      "declAttributes": [
+        "Exported"
+      ]
+    },
+    {
       "kind": "TypeDecl",
       "name": "P1",
       "printedName": "P1",
