@@ -1501,6 +1501,8 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
 
     case options::OPT_emit_object:
       OI.CompilerOutputType = file_types::TY_Object;
+      if (OI.LTOVariant != OutputInfo::LTOKind::None)
+        OI.CompilerOutputType = file_types::TY_LLVM_BC;
       break;
 
     case options::OPT_emit_assembly:
