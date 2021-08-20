@@ -281,7 +281,9 @@ public:
 /// \returns the \c null type on failure.
 using OpenUnboundGenericTypeFn = llvm::function_ref<Type(UnboundGenericType *)>;
 
-/// A function reference used to handle a PlaceholderTypeRepr.
+/// A function reference used to handle a \c PlaceholderTypeRepr. If the
+/// function returns a null type, then the unmodified \c PlaceholderType will be
+/// used.
 using HandlePlaceholderTypeReprFn =
     llvm::function_ref<Type(ASTContext &, PlaceholderTypeRepr *)>;
 

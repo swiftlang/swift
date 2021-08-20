@@ -1904,6 +1904,11 @@ TypeVariableBinding::fixForHole(ConstraintSystem &cs) const {
     return std::make_pair(fix, defaultImpact);
   }
 
+  if (srcLocator->isLastElement<LocatorPathElt::PlaceholderType>()) {
+    ConstraintFix *fix = SpecifyTypeForPlaceholder::create(cs, srcLocator);
+    return std::make_pair(fix, defaultImpact);
+  }
+
   if (dstLocator->directlyAt<NilLiteralExpr>()) {
     // This is a dramatic event, it means that there is absolutely
     // no contextual information to resolve type of `nil`.
