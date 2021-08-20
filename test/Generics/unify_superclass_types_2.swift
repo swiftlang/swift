@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -requirement-machine=on -debug-requirement-machine 2>&1 | %FileCheck %s
+// RUN: %target-typecheck-verify-swift -requirement-machine=on -dump-requirement-machine 2>&1 | %FileCheck %s
 
 // Note: The GSB fails this test, because it doesn't implement unification of
 // superclass type constructor arguments.

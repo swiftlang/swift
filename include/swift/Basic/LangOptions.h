@@ -459,11 +459,14 @@ namespace swift {
     RequirementMachineMode EnableRequirementMachine =
         RequirementMachineMode::Disabled;
 
-    /// Enables debugging output from the requirement machine.
-    bool DebugRequirementMachine = false;
+    /// Enables dumping rewrite systems from the requirement machine.
+    bool DumpRequirementMachine = false;
 
     /// Enables statistics output from the requirement machine.
     bool AnalyzeRequirementMachine = false;
+
+    /// Enables fine-grained debug output from the requirement machine.
+    std::string DebugRequirementMachine;
 
     /// Maximum iteration count for requirement machine confluent completion
     /// algorithm.

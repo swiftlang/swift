@@ -24,12 +24,7 @@ using namespace swift;
 using namespace rewriting;
 
 RewriteSystem::RewriteSystem(RewriteContext &ctx)
-    : Context(ctx) {
-  DebugSimplify = false;
-  DebugAdd = false;
-  DebugMerge = false;
-  DebugCompletion = false;
-}
+    : Context(ctx), Debug(ctx.getDebugOptions()) {}
 
 RewriteSystem::~RewriteSystem() {
   Trie.updateHistograms(Context.RuleTrieHistogram,
@@ -67,6 +62,10 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs) {
   assert(!lhs.empty());
   assert(!rhs.empty());
 
+  if (Debug.contains(DebugFlags::Add)) {
+    llvm::dbgs() << "# Adding rule " << lhs << " == " << rhs << "\n";
+  }
+
   // First, simplify terms appearing inside concrete substitutions before
   // doing anything else.
   if (lhs.back().isSuperclassOrConcreteType())
@@ -93,8 +92,8 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs) {
 
   assert(lhs.compare(rhs, Protos) > 0);
 
-  if (DebugAdd) {
-    llvm::dbgs() << "# Adding rule " << lhs << " => " << rhs << "\n";
+  if (Debug.contains(DebugFlags::Add)) {
+    llvm::dbgs() << "## Simplified and oriented rule " << lhs << " => " << rhs << "\n\n";
   }
 
   unsigned i = Rules.size();
@@ -106,7 +105,7 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs) {
     llvm::errs() << "Old rule #" << *oldRuleID << ": ";
     oldRule.dump(llvm::errs());
     llvm::errs() << "\nTrying to replay what happened when I simplified this term:\n";
-    DebugSimplify = true;
+    Debug |= DebugFlags::Simplify;
     MutableTerm term = lhs;
     simplify(lhs);
 
@@ -124,6 +123,10 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs) {
       lhs.back().getKind() == Symbol::Kind::AssociatedType &&
       rhs.back().getKind() == Symbol::Kind::AssociatedType &&
       lhs.back().getName() == rhs.back().getName()) {
+    if (Debug.contains(DebugFlags::Merge)) {
+      llvm::dbgs() << "## Associated type merge candidate ";
+      llvm::dbgs() << lhs << " => " << rhs << "\n\n";
+    }
     MergedAssociatedTypes.emplace_back(lhs, rhs);
   }
 
@@ -135,7 +138,7 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs) {
 bool RewriteSystem::simplify(MutableTerm &term) const {
   bool changed = false;
 
-  if (DebugSimplify) {
+  if (Debug.contains(DebugFlags::Simplify)) {
     llvm::dbgs() << "= Term " << term << "\n";
   }
 
@@ -149,7 +152,7 @@ bool RewriteSystem::simplify(MutableTerm &term) const {
       if (ruleID) {
         const auto &rule = Rules[*ruleID];
         if (!rule.isDeleted()) {
-          if (DebugSimplify) {
+          if (Debug.contains(DebugFlags::Simplify)) {
             llvm::dbgs() << "== Rule #" << *ruleID << ": " << rule << "\n";
           }
 
@@ -158,7 +161,7 @@ bool RewriteSystem::simplify(MutableTerm &term) const {
 
           term.rewriteSubTerm(from, to, rule.getRHS());
 
-          if (DebugSimplify) {
+          if (Debug.contains(DebugFlags::Simplify)) {
             llvm::dbgs() << "=== Result " << term << "\n";
           }
 
@@ -205,7 +208,7 @@ void RewriteSystem::simplifyRewriteSystem() {
         if (Rules[*otherRuleID].isDeleted())
           continue;
 
-        if (DebugCompletion) {
+        if (Debug.contains(DebugFlags::Completion)) {
           const auto &otherRule = Rules[ruleID];
           llvm::dbgs() << "$ Deleting rule " << rule << " because "
                        << "its left hand side contains " << otherRule

@@ -30,7 +30,7 @@ namespace {
 /// transitively-referenced protocols.
 struct RewriteSystemBuilder {
   RewriteContext &Context;
-  bool Debug;
+  bool Dump;
 
   ProtocolGraph Protocols;
   std::vector<std::pair<MutableTerm, MutableTerm>> Rules;
@@ -39,8 +39,8 @@ struct RewriteSystemBuilder {
                                         const ProtocolDecl *proto,
                                         SmallVectorImpl<Term> &result);
 
-  RewriteSystemBuilder(RewriteContext &ctx, bool debug)
-    : Context(ctx), Debug(debug) {}
+  RewriteSystemBuilder(RewriteContext &ctx, bool dump)
+    : Context(ctx), Dump(dump) {}
   void addGenericSignature(CanGenericSignature sig);
   void addAssociatedType(const AssociatedTypeDecl *type,
                          const ProtocolDecl *proto);
@@ -86,7 +86,7 @@ void RewriteSystemBuilder::addGenericSignature(CanGenericSignature sig) {
 
   // Add rewrite rules for each protocol.
   for (auto *proto : Protocols.getProtocols()) {
-    if (Debug) {
+    if (Dump) {
       llvm::dbgs() << "protocol " << proto->getName() << " {\n";
     }
 
@@ -101,7 +101,7 @@ void RewriteSystemBuilder::addGenericSignature(CanGenericSignature sig) {
     for (auto req : info.Requirements)
       addRequirement(req.getCanonical(), proto);
 
-    if (Debug) {
+    if (Dump) {
       llvm::dbgs() << "}\n";
     }
   }
@@ -140,7 +140,7 @@ void RewriteSystemBuilder::addAssociatedType(const AssociatedTypeDecl *type,
 /// protocol symbol.
 void RewriteSystemBuilder::addRequirement(const Requirement &req,
                                           const ProtocolDecl *proto) {
-  if (Debug) {
+  if (Dump) {
     llvm::dbgs() << "+ ";
     req.dump(llvm::dbgs());
     llvm::dbgs() << "\n";
@@ -310,7 +310,7 @@ void RequirementMachine::dump(llvm::raw_ostream &out) const {
 RequirementMachine::RequirementMachine(RewriteContext &ctx)
     : Context(ctx), System(ctx), Map(ctx, System.getProtocols()) {
   auto &langOpts = ctx.getASTContext().LangOpts;
-  Debug = langOpts.DebugRequirementMachine;
+  Dump = langOpts.DumpRequirementMachine;
   RequirementMachineStepLimit = langOpts.RequirementMachineStepLimit;
   RequirementMachineDepthLimit = langOpts.RequirementMachineDepthLimit;
   Stats = ctx.getASTContext().Stats;
@@ -331,14 +331,14 @@ void RequirementMachine::addGenericSignature(CanGenericSignature sig) {
 
   FrontendStatsTracer tracer(Stats, "build-rewrite-system");
 
-  if (Debug) {
+  if (Dump) {
     llvm::dbgs() << "Adding generic signature " << sig << " {\n";
   }
 
 
   // Collect the top-level requirements, and all transtively-referenced
   // protocol requirement signatures.
-  RewriteSystemBuilder builder(Context, Debug);
+  RewriteSystemBuilder builder(Context, Dump);
   builder.addGenericSignature(sig);
 
   // Add the initial set of rewrite rules to the rewrite system, also
@@ -348,7 +348,7 @@ void RequirementMachine::addGenericSignature(CanGenericSignature sig) {
 
   computeCompletion();
 
-  if (Debug) {
+  if (Dump) {
     llvm::dbgs() << "}\n";
   }
 }
@@ -413,7 +413,7 @@ void RequirementMachine::computeCompletion() {
       break;
   }
 
-  if (Debug) {
+  if (Dump) {
     dump(llvm::dbgs());
   }
 

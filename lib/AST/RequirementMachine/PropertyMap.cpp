@@ -736,7 +736,7 @@ void PropertyMap::addProperty(
   assert(property.isProperty());
   auto *props = getOrCreateProperties(key);
   props->addProperty(property, Context,
-                     inducedRules, DebugConcreteUnification);
+                     inducedRules, Debug.contains(DebugFlags::ConcreteUnification));
 }
 
 /// For each fully-concrete type, find the shortest term having that concrete type.
@@ -772,7 +772,7 @@ void PropertyMap::concretizeNestedTypesFromConcreteParents(
     if (props->getConformsTo().empty())
       continue;
 
-    if (DebugConcretizeNestedTypes) {
+    if (Debug.contains(DebugFlags::ConcretizeNestedTypes)) {
       if (props->isConcreteType() ||
           props->hasSuperclassBound()) {
         llvm::dbgs() << "^ Concretizing nested types of ";
@@ -782,7 +782,7 @@ void PropertyMap::concretizeNestedTypesFromConcreteParents(
     }
 
     if (props->isConcreteType()) {
-      if (DebugConcretizeNestedTypes) {
+      if (Debug.contains(DebugFlags::ConcretizeNestedTypes)) {
         llvm::dbgs() << "- via concrete type requirement\n";
       }
 
@@ -797,7 +797,7 @@ void PropertyMap::concretizeNestedTypesFromConcreteParents(
     }
 
     if (props->hasSuperclassBound()) {
-      if (DebugConcretizeNestedTypes) {
+      if (Debug.contains(DebugFlags::ConcretizeNestedTypes)) {
         llvm::dbgs() << "- via superclass requirement\n";
       }
 
@@ -863,7 +863,7 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
                                                  const_cast<ProtocolDecl *>(proto));
     if (conformance.isInvalid()) {
       // FIXME: Diagnose conflict
-      if (DebugConcretizeNestedTypes) {
+      if (Debug.contains(DebugFlags::ConcretizeNestedTypes)) {
         llvm::dbgs() << "^^ " << concreteType << " does not conform to "
                      << proto->getName() << "\n";
       }
@@ -886,7 +886,7 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
       continue;
 
     for (auto *assocType : assocTypes) {
-      if (DebugConcretizeNestedTypes) {
+      if (Debug.contains(DebugFlags::ConcretizeNestedTypes)) {
         llvm::dbgs() << "^^ " << "Looking up type witness for "
                      << proto->getName() << ":" << assocType->getName()
                      << " on " << concreteType << "\n";
@@ -894,7 +894,7 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
 
       auto t = concrete->getTypeWitness(assocType);
       if (!t) {
-        if (DebugConcretizeNestedTypes) {
+        if (Debug.contains(DebugFlags::ConcretizeNestedTypes)) {
           llvm::dbgs() << "^^ " << "Type witness for " << assocType->getName()
                        << " of " << concreteType << " could not be inferred\n";
         }
@@ -904,7 +904,7 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
 
       auto typeWitness = t->getCanonicalType();
 
-      if (DebugConcretizeNestedTypes) {
+      if (Debug.contains(DebugFlags::ConcretizeNestedTypes)) {
         llvm::dbgs() << "^^ " << "Type witness for " << assocType->getName()
                      << " of " << concreteType << " is " << typeWitness << "\n";
       }
@@ -920,7 +920,7 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
         // FIXME: ConcreteTypeInDomainMap should support substitutions so
         // that we can remove this.
 
-        if (DebugConcretizeNestedTypes) {
+        if (Debug.contains(DebugFlags::ConcretizeNestedTypes)) {
           llvm::dbgs() << "^^ Type witness is the same as the concrete type\n";
         }
 
@@ -933,7 +933,7 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
       }
 
       inducedRules.emplace_back(subjectType, constraintType);
-      if (DebugConcretizeNestedTypes) {
+      if (Debug.contains(DebugFlags::ConcretizeNestedTypes)) {
         llvm::dbgs() << "^^ Induced rule " << constraintType
                      << " => " << subjectType << "\n";
       }
@@ -977,7 +977,7 @@ MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
     if (found != ConcreteTypeInDomainMap.end()) {
       MutableTerm result(found->second);
       if (result != subjectType) {
-        if (DebugConcretizeNestedTypes) {
+        if (Debug.contains(DebugFlags::ConcretizeNestedTypes)) {
           llvm::dbgs() << "^^ Type witness can re-use property bag of "
                        << found->second << "\n";
         }

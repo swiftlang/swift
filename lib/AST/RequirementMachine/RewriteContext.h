@@ -19,6 +19,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/Support/Allocator.h"
+#include "Debug.h"
 #include "Histogram.h"
 #include "Symbol.h"
 #include "Term.h"
@@ -48,12 +49,17 @@ class RewriteContext final {
   /// Cache for associated type declarations.
   llvm::DenseMap<Symbol, AssociatedTypeDecl *> AssocTypes;
 
+  /// Cache for merged associated type symbols.
+  llvm::DenseMap<std::pair<Symbol, Symbol>, Symbol> MergedAssocTypes;
+
+  ASTContext &Context;
+
+  DebugOptions Debug;
+
   RewriteContext(const RewriteContext &) = delete;
   RewriteContext(RewriteContext &&) = delete;
   RewriteContext &operator=(const RewriteContext &) = delete;
   RewriteContext &operator=(RewriteContext &&) = delete;
-
-  ASTContext &Context;
 
 public:
   /// Statistics.
@@ -68,6 +74,8 @@ public:
   Histogram PropertyTrieRootHistogram;
 
   explicit RewriteContext(ASTContext &ctx);
+
+  DebugOptions getDebugOptions() const { return Debug; }
 
   Term getTermForType(CanType paramType, const ProtocolDecl *proto);
 
@@ -90,6 +98,9 @@ public:
 
   AssociatedTypeDecl *getAssociatedTypeForSymbol(Symbol symbol,
                                                  const ProtocolGraph &protos);
+
+  Symbol mergeAssociatedTypes(Symbol lhs, Symbol rhs,
+                              const ProtocolGraph &protos);
 
   ~RewriteContext();
 };
