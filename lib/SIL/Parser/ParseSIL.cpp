@@ -1649,7 +1649,10 @@ bool SILParser::parseSILDebugInfoExpression(SILDebugInfoExpression &DIExpr) {
     return true;
 
   // All operators that we currently support
-  static const SILDIExprOperator AllOps[] = {SILDIExprOperator::Fragment};
+  static const SILDIExprOperator AllOps[] = {
+    SILDIExprOperator::Dereference,
+    SILDIExprOperator::Fragment
+  };
 
   do {
     P.consumeToken();
