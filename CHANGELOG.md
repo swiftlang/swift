@@ -9,7 +9,7 @@ Swift 5.6
 
   Type expressions and annotations can now include "type placeholders" which
   directs the compiler to fill in that portion of the type according to the usual
-  type inference rules. Typle placeholders are spelled as an underscore ("`_`") in
+  type inference rules. Type placeholders are spelled as an underscore ("`_`") in
   a type name. For instance:
   
   ```swift
