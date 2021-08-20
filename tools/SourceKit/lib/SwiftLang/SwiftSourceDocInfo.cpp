@@ -1451,24 +1451,24 @@ static void resolveCursor(
         Range.Line = Pair.first;
         Range.Column = Pair.second;
         Range.Length = Length;
-        bool RangeStartMayNeedRename = false;
+        bool CollectRangeStartRefactorings = false;
         collectAvailableRefactorings(&AstUnit->getPrimarySourceFile(), Range,
-                                     RangeStartMayNeedRename, Kinds, {});
+                                     CollectRangeStartRefactorings, Kinds, {});
         for (RefactoringKind Kind : Kinds) {
           Actions.emplace_back(SwiftLangSupport::getUIDForRefactoringKind(Kind),
                                getDescriptiveRefactoringKindName(Kind),
                                /*UnavailableReason*/ StringRef());
         }
-        if (!RangeStartMayNeedRename) {
-          // If Length is given, then the cursor-info request should only about
-          // collecting available refactorings for the range.
+        if (!CollectRangeStartRefactorings) {
+          // If Length is given then this request is only for refactorings,
+          // return straight away unless we need cursor based refactorings as
+          // well.
           CursorInfoData Data;
           Data.AvailableActions = llvm::makeArrayRef(Actions);
           Receiver(RequestResult<CursorInfoData>::fromResult(Data));
           return;
         }
-        // If the range start may need rename, we fall back to a regular cursor
-        // info request to get the available rename kinds.
+        // Fall through to collect cursor based refactorings
       }
 
       auto *File = &AstUnit->getPrimarySourceFile();
@@ -1477,12 +1477,6 @@ static void resolveCursor(
                           CursorInfoRequest{CursorInfoOwner(File, Loc)},
                           ResolvedCursorInfo());
 
-      if (CursorInfo.isInvalid()) {
-        CursorInfoData Info;
-        Info.InternalDiagnostic = "Unable to resolve cursor info.";
-        Receiver(RequestResult<CursorInfoData>::fromResult(Info));
-        return;
-      }
       CompilerInvocation CompInvok;
       ASTInvok->applyTo(CompInvok);
 
@@ -1529,9 +1523,15 @@ static void resolveCursor(
         Receiver(RequestResult<CursorInfoData>::fromResult(Info));
         return;
       }
-      case CursorInfoKind::Invalid: {
-        llvm_unreachable("bad sema token kind");
-      }
+      case CursorInfoKind::Invalid:
+        CursorInfoData Data;
+        if (Actionables) {
+          Data.AvailableActions = llvm::makeArrayRef(Actions);
+        } else {
+          Data.InternalDiagnostic = "Unable to resolve cursor info.";
+        }
+        Receiver(RequestResult<CursorInfoData>::fromResult(Data));
+        return;
       }
     }
 
