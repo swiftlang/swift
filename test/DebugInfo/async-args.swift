@@ -35,6 +35,6 @@ func withGenericArg<T>(_ msg: T) async {
 }
 // CHECK: ![[TAU]] = !DILocalVariable(name: "$\CF\84_0_0",
 // CHECK: ![[MSG]] = !DILocalVariable(name: "msg", arg: 1,
-// CHECK: ![[MSG_R]] = !DILocalVariable(name: "msg", arg: 1,
 // CHECK: ![[TAU_R]] = !DILocalVariable(name: "$\CF\84_0_0",
+// CHECK: ![[MSG_R]] = !DILocalVariable(name: "msg", arg: 1,
 
