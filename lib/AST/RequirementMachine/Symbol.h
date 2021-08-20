@@ -30,6 +30,7 @@ class LayoutConstraint;
 namespace rewriting {
 
 class MutableTerm;
+class ProtocolGraph;
 class RewriteContext;
 class Term;
 

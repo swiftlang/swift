@@ -52,7 +52,7 @@ class RequirementMachine final {
   RewriteSystem System;
   PropertyMap Map;
 
-  bool Debug = false;
+  bool Dump = false;
   bool Complete = false;
   unsigned RequirementMachineStepLimit;
   unsigned RequirementMachineDepthLimit;
