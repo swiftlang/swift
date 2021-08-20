@@ -96,12 +96,6 @@ SourceLoc TypeLoc::getLoc() const {
   return SourceLoc();
 }
 
-// Only allow allocation of Types using the allocator in ASTContext.
-void *TypeBase::operator new(size_t bytes, const ASTContext &ctx,
-                             AllocationArena arena, unsigned alignment) {
-  return ctx.Allocate(bytes, alignment, arena);
-}
-
 NominalTypeDecl *CanType::getAnyNominal() const {
   return dyn_cast_or_null<NominalTypeDecl>(getAnyGeneric());
 }

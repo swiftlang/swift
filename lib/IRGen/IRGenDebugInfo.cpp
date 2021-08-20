@@ -2543,6 +2543,23 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
       !llvm::FindDbgDeclareUses(Storage).empty())
     return;
 
+  // Fragment DIExpression cannot cover the whole variable
+  // or going out-of-bound.
+  if (auto Fragment = Expr->getFragmentInfo())
+    if (auto VarSize = Var->getSizeInBits()) {
+      unsigned FragSize = Fragment->SizeInBits;
+      unsigned FragOffset = Fragment->OffsetInBits;
+      if (FragOffset + FragSize > *VarSize ||
+          FragSize == *VarSize) {
+        // Drop the fragment part
+        assert(Expr->isValid());
+        // Since this expression is valid, DW_OP_LLVM_fragment
+        // and its arguments must be the last 3 elements.
+        auto OrigElements = Expr->getElements();
+        Expr = DBuilder.createExpression(OrigElements.drop_back(3));
+      }
+    }
+
   // A dbg.declare is only meaningful if there is a single alloca for
   // the variable that is live throughout the function.
   if (auto *Alloca = dyn_cast<llvm::AllocaInst>(Storage)) {

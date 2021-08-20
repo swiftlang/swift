@@ -119,7 +119,7 @@ SourceLoc extractNearestSourceLoc(std::tuple<ASTScopeImpl *, ScopeCreator *>);
 /// \code
 /// -dump-scope-maps expanded
 /// \endcode
-class ASTScopeImpl {
+class ASTScopeImpl : public ASTAllocated<ASTScopeImpl> {
   friend class NodeAdder;
   friend class Portion;
   friend class GenericTypeOrExtensionWholePortion;
@@ -159,19 +159,8 @@ public:
   ASTScopeImpl(const ASTScopeImpl &) = delete;
   ASTScopeImpl &operator=(const ASTScopeImpl &) = delete;
 
-  // Make vanilla new illegal for ASTScopes.
-  void *operator new(size_t bytes) = delete;
   // Need this because have virtual destructors
   void operator delete(void *data) {}
-
-  // Only allow allocation of scopes using the allocator of a particular source
-  // file.
-  void *operator new(size_t bytes, const ASTContext &ctx,
-                     unsigned alignment = alignof(ASTScopeImpl));
-  void *operator new(size_t Bytes, void *Mem) {
-    ASTScopeAssert(Mem, "Allocation failed");
-    return Mem;
-  }
 
 #pragma mark - tree declarations
 protected:
@@ -425,25 +414,14 @@ private:
   expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
 };
 
-class Portion {
+class Portion : public ASTAllocated<ASTScopeImpl> {
 public:
   const char *portionName;
   Portion(const char *n) : portionName(n) {}
   virtual ~Portion() {}
 
-  // Make vanilla new illegal for ASTScopes.
-  void *operator new(size_t bytes) = delete;
   // Need this because have virtual destructors
   void operator delete(void *data) {}
-
-  // Only allow allocation of scopes using the allocator of a particular source
-  // file.
-  void *operator new(size_t bytes, const ASTContext &ctx,
-                     unsigned alignment = alignof(ASTScopeImpl));
-  void *operator new(size_t Bytes, void *Mem) {
-    ASTScopeAssert(Mem, "Allocation failed");
-    return Mem;
-  }
 
   /// Return the new insertion point
   virtual ASTScopeImpl *expandScope(GenericTypeOrExtensionScope *,

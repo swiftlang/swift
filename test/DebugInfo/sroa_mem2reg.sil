@@ -2,6 +2,8 @@
 // RUN: %target-sil-opt -enable-sil-verify-all -sil-print-debuginfo -sroa -mem2reg %s -o %t.sil
 // RUN: %FileCheck --check-prefix=CHECK-MEM2REG %s --input-file=%t.sil
 // RUN: %target-swiftc_driver -Xfrontend -disable-debugger-shadow-copies -g -emit-ir %t.sil | %FileCheck --check-prefix=CHECK-IR %s
+// RUN: %target-swiftc_driver -Xfrontend -disable-debugger-shadow-copies -g -c %t.sil -o %t.o
+// RUN: %llvm-dwarfdump --debug-info %t.o | %FileCheck --check-prefix=CHECK-DWARF %s
 sil_stage canonical
 
 import Builtin
@@ -78,3 +80,10 @@ bb0(%0 : $Int64, %1 : $Int64):
 // CHECK-IR-SAME:                            line: 7
 // CHECK-IR: ![[ARG2_MD]] = !DILocalVariable(name: "in_y", arg: 2
 // CHECK-IR-SAME:                            line: 7
+
+// CHECK-DWARF-LABEL:   DW_AT_name    ("foo")
+// CHECK-DWARF:       DW_TAG_variable
+// CHECK-DWARF:         DW_AT_name  ("my_struct")
+// Shouldn't be marked artificial
+// CHECK-DWARF-NOT:     DW_AT_artificial      (true)
+// CHECK-DWARF:       DW_TAG_{{.*}}
