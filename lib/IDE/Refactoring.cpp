@@ -3788,43 +3788,18 @@ bool RefactoringActionTrailingClosure::performChange() {
   return false;
 }
 
-static bool rangeStartMayNeedRename(const ResolvedRangeInfo &Info) {
-  switch(Info.Kind) {
-    case RangeKind::SingleExpression: {
-      Expr *E = Info.ContainedNodes[0].get<Expr*>();
-      // We should show rename for the selection of "foo()"
-      if (auto *CE = dyn_cast<CallExpr>(E)) {
-        if (CE->getFn()->getKind() == ExprKind::DeclRef)
-          return true;
-
-        // When callling an instance method inside another instance method,
-        // we have a dot syntax call whose dot and base are both implicit. We
-        // need to explicitly allow the specific case here.
-        if (auto *DSC = dyn_cast<DotSyntaxCallExpr>(CE->getFn())) {
-          if (DSC->getBase()->isImplicit() &&
-              DSC->getFn()->getStartLoc() == Info.TokensInRange.front().getLoc())
-            return true;
-        }
-      }
-      return false;
-    }
-    case RangeKind::PartOfExpression: {
-      if (auto *CE = dyn_cast<CallExpr>(Info.CommonExprParent)) {
-        if (auto *DSC = dyn_cast<DotSyntaxCallExpr>(CE->getFn())) {
-          if (DSC->getFn()->getStartLoc() == Info.TokensInRange.front().getLoc())
-            return true;
-        }
-      }
-      return false;
-    }
-    case RangeKind::SingleDecl:
-    case RangeKind::MultiTypeMemberDecl:
-    case RangeKind::SingleStatement:
-    case RangeKind::MultiStatement:
-    case RangeKind::Invalid:
-      return false;
+static bool collectRangeStartRefactorings(const ResolvedRangeInfo &Info) {
+  switch (Info.Kind) {
+  case RangeKind::SingleExpression:
+  case RangeKind::SingleStatement:
+  case RangeKind::SingleDecl:
+  case RangeKind::PartOfExpression:
+    return true;
+  case RangeKind::MultiStatement:
+  case RangeKind::MultiTypeMemberDecl:
+  case RangeKind::Invalid:
+    return false;
   }
-  llvm_unreachable("unhandled kind");
 }
     
 bool RefactoringActionConvertToComputedProperty::
@@ -6655,7 +6630,8 @@ private:
     addRange(MidStartLoc, MidEndLoc);
 
     // Third chunk: add in async and throws if necessary
-    OS << " async";
+    if (!FD->hasAsync())
+      OS << " async";
     if (FD->hasThrows() || TopHandler.HasError)
       // TODO: Add throws if converting a function and it has a converted call
       //       without a do/catch
@@ -8292,7 +8268,7 @@ void swift::ide::collectAvailableRefactorings(
 }
 
 void swift::ide::collectAvailableRefactorings(
-    SourceFile *SF, RangeConfig Range, bool &RangeStartMayNeedRename,
+    SourceFile *SF, RangeConfig Range, bool &CollectRangeStartRefactorings,
     SmallVectorImpl<RefactoringKind> &Kinds,
     ArrayRef<DiagnosticConsumer *> DiagConsumers) {
   if (Range.Length == 0) {
@@ -8321,7 +8297,7 @@ void swift::ide::collectAvailableRefactorings(
     RANGE_REFACTORING(KIND, NAME, ID)
 #include "swift/IDE/RefactoringKinds.def"
 
-  RangeStartMayNeedRename = rangeStartMayNeedRename(Result);
+  CollectRangeStartRefactorings = collectRangeStartRefactorings(Result);
 }
 
 bool swift::ide::
