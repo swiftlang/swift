@@ -6655,7 +6655,8 @@ private:
     addRange(MidStartLoc, MidEndLoc);
 
     // Third chunk: add in async and throws if necessary
-    OS << " async";
+    if (!FD->hasAsync())
+      OS << " async";
     if (FD->hasThrows() || TopHandler.HasError)
       // TODO: Add throws if converting a function and it has a converted call
       //       without a do/catch

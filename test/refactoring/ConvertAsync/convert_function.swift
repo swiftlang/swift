@@ -21,6 +21,17 @@ func simpleErr(arg: String) async throws -> String { }
 func simpleRes(arg: String, _ completion: @escaping (Result<String, Error>) -> Void) { }
 func simpleRes(arg: String) async throws -> String { }
 
+// RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=ALREADY-ASYNC %s
+func alreadyAsync() async {
+  simple {
+    print($0)
+  }
+}
+// ALREADY-ASYNC: func alreadyAsync() async {
+// ALREADY-ASYNC-NEXT: let val0 = await simple()
+// ALREADY-ASYNC-NEXT: print(val0)
+// ALREADY-ASYNC-NEXT: }
+
 // RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=NESTED %s
 func nested() {
   simple {
