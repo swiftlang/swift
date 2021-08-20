@@ -409,9 +409,8 @@ private func _getCocoaStringPointer(
   if let ascii = stableCocoaASCIIPointer(cfImmutableValue) {
     return .ascii(ascii)
   }
-  if let utf16Ptr = _stdlib_binary_CFStringGetCharactersPtr(cfImmutableValue) {
-    return .utf16(utf16Ptr)
-  }
+  // We could ask for UTF16 here via _stdlib_binary_CFStringGetCharactersPtr,
+  // but we currently have no use for it
   return .none
 }
 
