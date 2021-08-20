@@ -1853,7 +1853,7 @@ bool ModuleDecl::isExternallyConsumed() const {
 
 namespace swift {
 /// Represents a file containing information about cross-module overlays.
-class OverlayFile {
+class OverlayFile : public ASTAllocated<OverlayFile> {
   friend class ModuleDecl;
   /// The file that data should be loaded from.
   StringRef filePath;
@@ -1876,13 +1876,6 @@ class OverlayFile {
                               StringRef bystandingModule,
                               SourceLoc diagLoc);
 public:
-  // Only allocate in ASTContexts.
-  void *operator new(size_t bytes) = delete;
-  void *operator new(size_t bytes, const ASTContext &ctx,
-                     unsigned alignment = alignof(OverlayFile)) {
-    return ctx.Allocate(bytes, alignment);
-  }
-
   OverlayFile(StringRef filePath)
       : filePath(filePath) {
     assert(!filePath.empty());
@@ -3014,10 +3007,6 @@ void SynthesizedFileUnit::getTopLevelDecls(
 //===----------------------------------------------------------------------===//
 
 void FileUnit::anchor() {}
-void *FileUnit::operator new(size_t Bytes, ASTContext &C, unsigned Alignment) {
-  return C.Allocate(Bytes, Alignment);
-}
-
 void FileUnit::getTopLevelDeclsWhereAttributesMatch(
             SmallVectorImpl<Decl*> &Results,
             llvm::function_ref<bool(DeclAttributes)> matchAttributes) const {

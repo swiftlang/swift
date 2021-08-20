@@ -1023,7 +1023,7 @@ void LazyConformanceLoader::anchor() {}
 
 /// Lookup table used to store members of a nominal type (and its extensions)
 /// for fast retrieval.
-class swift::MemberLookupTable {
+class swift::MemberLookupTable : public ASTAllocated<swift::MemberLookupTable> {
   /// The last extension that was included within the member lookup table's
   /// results.
   ExtensionDecl *LastExtensionIncluded = nullptr;
@@ -1107,17 +1107,6 @@ public:
   SWIFT_DEBUG_DUMP {
     dump(llvm::errs());
   }
-
-  // Only allow allocation of member lookup tables using the allocator in
-  // ASTContext or by doing a placement new.
-  void *operator new(size_t Bytes, ASTContext &C,
-                     unsigned Alignment = alignof(MemberLookupTable)) {
-    return C.Allocate(Bytes, Alignment);
-  }
-  void *operator new(size_t Bytes, void *Mem) {
-    assert(Mem);
-    return Mem;
-  }
 };
 
 namespace {
@@ -1136,20 +1125,9 @@ namespace {
 /// table for lookup based on Objective-C selector.
 class ClassDecl::ObjCMethodLookupTable
         : public llvm::DenseMap<std::pair<ObjCSelector, char>,
-                                StoredObjCMethods>
-{
-public:
-  // Only allow allocation of member lookup tables using the allocator in
-  // ASTContext or by doing a placement new.
-  void *operator new(size_t Bytes, ASTContext &C,
-                     unsigned Alignment = alignof(MemberLookupTable)) {
-    return C.Allocate(Bytes, Alignment);
-  }
-  void *operator new(size_t Bytes, void *Mem) {
-    assert(Mem);
-    return Mem;
-  }
-};
+                                StoredObjCMethods>,
+          public ASTAllocated<ClassDecl::ObjCMethodLookupTable>
+{};
 
 MemberLookupTable::MemberLookupTable(ASTContext &ctx) {
   // Register a cleanup with the ASTContext to call the lookup table

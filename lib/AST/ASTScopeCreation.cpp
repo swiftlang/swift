@@ -44,7 +44,7 @@ namespace ast_scope {
 
 #pragma mark ScopeCreator
 
-class ScopeCreator final {
+class ScopeCreator final : public ASTAllocated<ScopeCreator> {
   friend class ASTSourceFileScope;
   /// For allocating scopes.
   ASTContext &ctx;
@@ -180,18 +180,6 @@ public:
 
   void print(raw_ostream &out) const {
     out << "(swift::ASTSourceFileScope*) " << sourceFileScope << "\n";
-  }
-
-  // Make vanilla new illegal.
-  void *operator new(size_t bytes) = delete;
-
-  // Only allow allocation of scopes using the allocator of a particular source
-  // file.
-  void *operator new(size_t bytes, const ASTContext &ctx,
-                     unsigned alignment = alignof(ScopeCreator));
-  void *operator new(size_t Bytes, void *Mem) {
-    ASTScopeAssert(Mem, "Allocation failed");
-    return Mem;
   }
 };
 } // ast_scope
@@ -1163,25 +1151,6 @@ AbstractPatternEntryScope::AbstractPatternEntryScope(
     : decl(declBeingScoped), patternEntryIndex(entryIndex) {
   ASTScopeAssert(entryIndex < declBeingScoped->getPatternList().size(),
                  "out of bounds");
-}
-
-#pragma mark new operators
-void *ASTScopeImpl::operator new(size_t bytes, const ASTContext &ctx,
-                                 unsigned alignment) {
-  return ctx.Allocate(bytes, alignment);
-}
-
-void *Portion::operator new(size_t bytes, const ASTContext &ctx,
-                             unsigned alignment) {
-  return ctx.Allocate(bytes, alignment);
-}
-void *ASTScope::operator new(size_t bytes, const ASTContext &ctx,
-                             unsigned alignment) {
-  return ctx.Allocate(bytes, alignment);
-}
-void *ScopeCreator::operator new(size_t bytes, const ASTContext &ctx,
-                                 unsigned alignment) {
-  return ctx.Allocate(bytes, alignment);
 }
 
 #pragma mark - expandBody

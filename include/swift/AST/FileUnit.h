@@ -18,8 +18,6 @@
 #include "swift/Basic/BasicSourceInfo.h"
 
 namespace swift {
-static inline unsigned alignOfFileUnit();
-
 /// A container for module-scope declarations that itself provides a scope; the
 /// smallest unit of code organization.
 ///
@@ -28,7 +26,7 @@ static inline unsigned alignOfFileUnit();
 /// file. A module can contain several file-units.
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wnon-virtual-dtor"
-class FileUnit : public DeclContext {
+class FileUnit : public DeclContext, public ASTAllocated<FileUnit> {
 #pragma clang diagnostic pop
   virtual void anchor();
 
@@ -313,22 +311,9 @@ public:
     return DC->getContextKind() == DeclContextKind::FileUnit;
   }
 
-private:
-  // Make placement new and vanilla new/delete illegal for FileUnits.
-  void *operator new(size_t Bytes) throw() = delete;
-  void *operator new(size_t Bytes, void *Mem) throw() = delete;
-  void operator delete(void *Data) throw() = delete;
-
-public:
-  // Only allow allocation of FileUnits using the allocator in ASTContext
-  // or by doing a placement new.
-  void *operator new(size_t Bytes, ASTContext &C,
-                     unsigned Alignment = alignOfFileUnit());
+  using ASTAllocated<FileUnit>::operator new;
+  using ASTAllocated<FileUnit>::operator delete;
 };
-
-static inline unsigned alignOfFileUnit() {
-  return alignof(FileUnit&);
-}
 
 /// This represents the compiler's implicitly generated declarations in the
 /// Builtin module.

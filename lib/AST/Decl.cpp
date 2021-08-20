@@ -134,18 +134,6 @@ void ClangNode::dump() const {
     llvm::errs() << "ClangNode contains nullptr\n";
 }
 
-// Only allow allocation of Decls using the allocator in ASTContext.
-void *Decl::operator new(size_t Bytes, const ASTContext &C,
-                         unsigned Alignment) {
-  return C.Allocate(Bytes, Alignment);
-}
-
-// Only allow allocation of Modules using the allocator in ASTContext.
-void *ModuleDecl::operator new(size_t Bytes, const ASTContext &C,
-                           unsigned Alignment) {
-  return C.Allocate(Bytes, Alignment);
-}
-
 StringRef Decl::getKindName(DeclKind K) {
   switch (K) {
 #define DECL(Id, Parent) case DeclKind::Id: return #Id;
@@ -7633,14 +7621,8 @@ StringRef AbstractFunctionDecl::getInlinableBodyText(
 
 /// A uniqued list of derivative function configurations.
 struct AbstractFunctionDecl::DerivativeFunctionConfigurationList
-    : public llvm::SetVector<AutoDiffConfig> {
-  // Necessary for `ASTContext` allocation.
-  void *operator new(
-      size_t bytes, ASTContext &ctx,
-      unsigned alignment = alignof(DerivativeFunctionConfigurationList)) {
-    return ctx.Allocate(bytes, alignment);
-  }
-};
+    : public ASTAllocated<DerivativeFunctionConfigurationList>,
+      public llvm::SetVector<AutoDiffConfig> {};
 
 void AbstractFunctionDecl::prepareDerivativeFunctionConfigurations() {
   if (DerivativeFunctionConfigs)

@@ -684,6 +684,11 @@ llvm::BumpPtrAllocator &ASTContext::getAllocator(AllocationArena arena) const {
   llvm_unreachable("bad AllocationArena");
 }
 
+void *detail::allocateInASTContext(size_t bytes, const ASTContext &ctx,
+                                   AllocationArena arena, unsigned alignment) {
+  return ctx.Allocate(bytes, alignment, arena);
+}
+
 ImportPath::Raw
 swift::detail::ImportPathBuilder_copyToImpl(ASTContext &ctx,
                                             ImportPath::Raw raw) {

@@ -696,7 +696,7 @@ public:
 } // end namespace namelookup
 
 /// The interface into the ASTScope subsystem
-class ASTScope {
+class ASTScope : public ASTAllocated<ASTScope> {
   friend class ast_scope::ASTScopeImpl;
   ast_scope::ASTSourceFileScope *const impl;
 
@@ -754,20 +754,6 @@ public:
   SWIFT_DEBUG_DUMP;
   void print(llvm::raw_ostream &) const;
   void dumpOneScopeMapLocation(std::pair<unsigned, unsigned>);
-
-  // Make vanilla new illegal for ASTScopes.
-  void *operator new(size_t bytes) = delete;
-  // Need this because have virtual destructors
-  void operator delete(void *data) {}
-
-  // Only allow allocation of scopes using the allocator of a particular source
-  // file.
-  void *operator new(size_t bytes, const ASTContext &ctx,
-                     unsigned alignment = alignof(ASTScope));
-  void *operator new(size_t Bytes, void *Mem) {
-    assert(Mem);
-    return Mem;
-  }
 
 private:
   static ast_scope::ASTSourceFileScope *createScopeTree(SourceFile *);

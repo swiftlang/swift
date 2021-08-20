@@ -163,7 +163,8 @@ class OverlayFile;
 /// output binary and logical module (such as a single library or executable).
 ///
 /// \sa FileUnit
-class ModuleDecl : public DeclContext, public TypeDecl {
+class ModuleDecl
+    : public DeclContext, public TypeDecl, public ASTAllocated<ModuleDecl> {
   friend class DirectOperatorLookupRequest;
   friend class DirectPrecedenceGroupLookupRequest;
 
@@ -822,16 +823,8 @@ public:
     return D->getKind() == DeclKind::Module;
   }
 
-private:
-  // Make placement new and vanilla new/delete illegal for Modules.
-  void *operator new(size_t Bytes) throw() = delete;
-  void operator delete(void *Data) throw() = delete;
-  void *operator new(size_t Bytes, void *Mem) throw() = delete;
-public:
-  // Only allow allocation of Modules using the allocator in ASTContext
-  // or by doing a placement new.
-  void *operator new(size_t Bytes, const ASTContext &C,
-                     unsigned Alignment = alignof(ModuleDecl));
+  using ASTAllocated<ModuleDecl>::operator new;
+  using ASTAllocated<ModuleDecl>::operator delete;
 };
 
 /// Wraps either a swift module or a clang one.
