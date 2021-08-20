@@ -23,6 +23,7 @@
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Sema.h"
 #include "llvm/ADT/TinyPtrVector.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/FileSystem.h"
@@ -787,6 +788,8 @@ public:
   void lookupVisibleDecls(ArrayRef<ModuleDecl *> Modules);
 };
 
+void detectRename(SDKNode *L, SDKNode *R);
+
 int dumpSwiftModules(const CompilerInvocation &InitInvok,
                      const llvm::StringSet<> &ModuleNames,
                      StringRef OutputDir,
@@ -804,6 +807,8 @@ void dumpSDKRoot(SDKNodeRoot *Root, StringRef OutputFile);
 int dumpSDKContent(const CompilerInvocation &InitInvok,
                    const llvm::StringSet<> &ModuleNames,
                    StringRef OutputFile, CheckerOptions Opts);
+
+void dumpModuleContent(ModuleDecl *MD, StringRef OutputFile, bool ABI);
 
 /// Mostly for testing purposes, this function de-serializes the SDK dump in
 /// dumpPath and re-serialize them to OutputPath. If the tool performs correctly,
