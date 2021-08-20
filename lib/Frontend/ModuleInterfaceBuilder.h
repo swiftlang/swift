@@ -41,6 +41,7 @@ class ModuleInterfaceBuilder {
   const StringRef moduleName;
   const StringRef moduleCachePath;
   const StringRef prebuiltCachePath;
+  const StringRef ABIDescriptorPath;
   const bool disableInterfaceFileLock;
   const SourceLoc diagnosticLoc;
   DependencyTracker *const dependencyTracker;
@@ -94,6 +95,7 @@ public:
                             StringRef moduleName,
                             StringRef moduleCachePath,
                             StringRef prebuiltCachePath,
+                            StringRef ABIDescriptorPath,
                             bool disableInterfaceFileLock = false,
                             SourceLoc diagnosticLoc = SourceLoc(),
                             DependencyTracker *tracker = nullptr)
@@ -101,6 +103,7 @@ public:
       subASTDelegate(subASTDelegate),
       interfacePath(interfacePath), moduleName(moduleName),
       moduleCachePath(moduleCachePath), prebuiltCachePath(prebuiltCachePath),
+      ABIDescriptorPath(ABIDescriptorPath),
       disableInterfaceFileLock(disableInterfaceFileLock),
       diagnosticLoc(diagnosticLoc), dependencyTracker(tracker) {}
 

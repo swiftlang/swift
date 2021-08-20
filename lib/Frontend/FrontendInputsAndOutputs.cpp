@@ -503,6 +503,12 @@ bool FrontendInputsAndOutputs::hasPrivateModuleInterfaceOutputPath() const {
         return outs.PrivateModuleInterfaceOutputPath;
       });
 }
+bool FrontendInputsAndOutputs::hasABIDescriptorOutputPath() const {
+  return hasSupplementaryOutputPath(
+      [](const SupplementaryOutputPaths &outs) -> const std::string & {
+        return outs.ABIDescriptorOutputPath;
+      });
+}
 bool FrontendInputsAndOutputs::hasModuleSummaryOutputPath() const {
   return hasSupplementaryOutputPath(
       [](const SupplementaryOutputPaths &outs) -> const std::string & {

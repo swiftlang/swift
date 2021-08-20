@@ -129,6 +129,8 @@ ERROR(error_mode_cannot_emit_module_summary,none,
       "this mode does not support emitting module summary files", ())
 ERROR(error_mode_cannot_emit_symbol_graph,none,
       "this mode does not support emitting symbol graph files", ())
+ERROR(error_mode_cannot_emit_abi_descriptor,none,
+      "this mode does not support emitting ABI descriptor", ())
 ERROR(cannot_emit_ir_skipping_function_bodies,none,
       "the -experimental-skip-*-function-bodies* flags do not support "
       "emitting IR", ())
