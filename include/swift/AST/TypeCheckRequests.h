@@ -933,24 +933,6 @@ public:
     bool isCached() const { return true; }
 };
 
-/// Determine whether the given func is distributed.
-class IsDistributedFuncRequest :
-    public SimpleRequest<IsDistributedFuncRequest,
-        bool(FuncDecl *),
-        RequestFlags::Cached> {
-public:
-    using SimpleRequest::SimpleRequest;
-
-private:
-    friend SimpleRequest;
-
-    bool evaluate(Evaluator &evaluator, FuncDecl *func) const;
-
-public:
-    // Caching
-    bool isCached() const { return true; }
-};
-
 /// Obtain the 'remote' counterpart of a 'distributed func'.
 class GetDistributedRemoteFuncRequest :
     public SimpleRequest<GetDistributedRemoteFuncRequest,

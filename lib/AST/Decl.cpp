@@ -7221,11 +7221,6 @@ bool AbstractFunctionDecl::isSendable() const {
 
 bool AbstractFunctionDecl::isDistributed() const {
   return this->getAttrs().hasAttribute<DistributedActorAttr>();
-
-//  auto mutableFunc = const_cast<FuncDecl *>(func);
-//  return evaluateOrDefault(getASTContext().evaluator,
-//                           IsDistributedFuncRequest{mutableFunc},
-//                           false);
 }
 
 AbstractFunctionDecl*

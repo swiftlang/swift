@@ -71,12 +71,6 @@ bool IsDistributedActorRequest::evaluate(
   return classDecl->isExplicitDistributedActor();
 }
 
-bool IsDistributedFuncRequest::evaluate(
-    Evaluator &evaluator, FuncDecl *func) const {
-  // Check whether the attribute was explicitly specified.
-  return func->getAttrs().hasAttribute<DistributedActorAttr>();
-}
-
 AbstractFunctionDecl *GetDistributedRemoteFuncRequest::evaluate(
     Evaluator &evaluator, AbstractFunctionDecl *func) const {
   if (!func->isDistributed())
