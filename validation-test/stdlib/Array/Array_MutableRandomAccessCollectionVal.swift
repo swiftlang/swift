@@ -3,7 +3,7 @@
 // Do Not Edit Directly!
 //===----------------------------------------------------------------------===//
 
-// RUN: %target-run-simple-swift
+// RUN: %enable-cow-checking %target-run-simple-swift
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 
