@@ -1637,7 +1637,7 @@ void LoweredValue::getExplosion(IRGenFunction &IGF, SILType type,
   case Kind::DynamicallyEnforcedAddress:
   case Kind::CoroutineState:
     llvm_unreachable("not a value");
-      
+
   case Kind::ExplosionVector:
     ex.add(Storage.get<ExplosionVector>(kind));
     return;
@@ -4713,7 +4713,11 @@ static bool InCoroContext(SILFunction &f, SILInstruction &i) {
 }
 
 void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
+  auto SILVal = i->getOperand();
+  bool IsAddrVal = SILVal->getType().isAddress();
   if (i->poisonRefs()) {
+    assert(!IsAddrVal &&
+           "SIL values with address type should not have poison");
     emitPoisonDebugValueInst(i);
     return;
   }
@@ -4722,16 +4726,17 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
 
   auto VarInfo = i->getVarInfo();
   assert(VarInfo && "debug_value without debug info");
-  auto SILVal = i->getOperand();
   if (isa<SILUndef>(SILVal)) {
     // We cannot track the location of inlined error arguments because it has no
     // representation in SIL.
-    if (!i->getDebugScope()->InlinedCallSite && VarInfo->Name == "$error") {
+    if (!IsAddrVal &&
+        !i->getDebugScope()->InlinedCallSite && VarInfo->Name == "$error") {
       auto funcTy = CurSILFn->getLoweredFunctionType();
       emitErrorResultVar(funcTy, funcTy->getErrorResult(), i);
     }
     return;
   }
+  bool IsInCoro = InCoroContext(*CurSILFn, *i);
 
   bool IsAnonymous = false;
   VarInfo->Name = getVarName(i, IsAnonymous);
@@ -4742,26 +4747,49 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
     SILTy = *MaybeSILTy;
   else
     SILTy = SILVal->getType();
+
   auto RealTy = SILTy.getASTType();
+  if (IsAddrVal && IsInCoro)
+    if (auto *PBI = dyn_cast<ProjectBoxInst>(i->getOperand())) {
+      // Usually debug info only ever describes the *result* of a projectBox
+      // call. To allow the debugger to display a boxed parameter of an async
+      // continuation object, however, the debug info can only describe the box
+      // itself and thus also needs to emit a box type for it so the debugger
+      // knows to call into Remote Mirrors to unbox the value.
+      RealTy = PBI->getOperand()->getType().getASTType();
+      assert(isa<SILBoxType>(RealTy));
+    }
+
+  // Figure out the debug variable type
   if (VarDecl *Decl = i->getDecl()) {
     DbgTy = DebugTypeInfo::getLocalVariable(
         Decl, RealTy, getTypeInfo(SILVal->getType()));
   } else if (!SILTy.hasArchetype() && !VarInfo->Name.empty()) {
-    // Preliminary support for .sil debug information.
+    // Handle the cases that read from a SIL file
     DbgTy = DebugTypeInfo::getFromTypeInfo(RealTy, getTypeInfo(SILTy));
   } else
     return;
 
+  // Calculate the indirection
+  IndirectionKind Indirection = DirectValue;
+  if (IsInCoro)
+    Indirection = IsAddrVal ? CoroIndirectValue : CoroDirectValue;
+  else if (IsAddrVal && !isa<AllocStackInst>(SILVal))
+    Indirection = IndirectValue;
+
   // Put the value into a stack slot at -Onone.
   llvm::SmallVector<llvm::Value *, 8> Copy;
-  emitShadowCopyIfNeeded(SILVal, i->getDebugScope(), *VarInfo, IsAnonymous,
-                         Copy);
+  if (IsAddrVal)
+    Copy.emplace_back(
+      emitShadowCopyIfNeeded(getLoweredAddress(SILVal).getAddress(),
+                             i->getDebugScope(), *VarInfo, IsAnonymous));
+  else
+    emitShadowCopyIfNeeded(SILVal, i->getDebugScope(), *VarInfo, IsAnonymous,
+                           Copy);
+
   bindArchetypes(DbgTy.getType());
   if (!IGM.DebugInfo)
     return;
-
-  IndirectionKind Indirection =
-    InCoroContext(*CurSILFn, *i) ? CoroDirectValue : DirectValue;
 
   emitDebugVariableDeclaration(Copy, DbgTy, SILTy, i->getDebugScope(),
                                i->getLoc(), *VarInfo, Indirection);
