@@ -466,3 +466,20 @@ internal struct InternalStruct { // expected-note 3 {{add @available attribute}}
   var fInternal: AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in}}
 }
 
+// Top-level code, if somehow present in a resilient module, is treated like
+// a non-inlinable function.
+defer {
+  _ = AtDeploymentTarget()
+  _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
+}
+_ = NoAvailable()
+_ = BeforeInliningTarget()
+_ = AtInliningTarget()
+_ = BetweenTargets()
+_ = AtDeploymentTarget()
+_ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
+
+if #available(macOS 11, iOS 14, tvOS 14, watchOS 7, *) {
+  _ = AfterDeploymentTarget()
+}
+
