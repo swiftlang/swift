@@ -1130,7 +1130,7 @@ RValue RValueEmitter::visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C) {
   // FIXME: Much of this was copied from visitOptionalEvaluationExpr.
 
   // Prior to Swift 5, an optional try's subexpression is always wrapped in an additional optional
-  bool shouldWrapInOptional = !(SGF.getASTContext().LangOpts.isSwiftVersionAtLeast(5));
+  bool shouldWrapInOptional = false; // TODO: delete code relying on this, etc.
   
   auto &optTL = SGF.getTypeLowering(E->getType());
 

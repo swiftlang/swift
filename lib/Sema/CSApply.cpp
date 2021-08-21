@@ -3438,11 +3438,6 @@ namespace {
       //
       // The result is that in Swift 5, 'try?' avoids producing nested optionals.
       
-      if (!cs.getASTContext().LangOpts.isSwiftVersionAtLeast(5)) {
-        // Nothing to do for Swift 4 and earlier!
-        return simplifyExprType(expr);
-      }
-      
       Type exprType = simplifyType(cs.getType(expr));
 
       auto subExpr = coerceToType(expr->getSubExpr(), exprType,

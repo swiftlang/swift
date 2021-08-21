@@ -1620,23 +1620,29 @@ namespace {
     }
 
     Type visitOptionalTryExpr(OptionalTryExpr *expr) {
+      auto innerExpr = expr->getSubExpr();
       auto valueTy = CS.createTypeVariable(CS.getConstraintLocator(expr),
                                            TVO_PrefersSubtypeBinding |
                                            TVO_CanBindToNoEscape);
 
-      Type optTy = getOptionalType(expr->getSubExpr()->getLoc(), valueTy);
+      Type optTy = getOptionalType(innerExpr->getLoc(), valueTy);
       if (!optTy)
         return Type();
 
-      // Prior to Swift 5, 'try?' always adds an additional layer of optionality,
-      // even if the sub-expression was already optional.
+      // In Swift 5 and later, if we have the expression `try? (E : T)`
+      // then the type of that entire expression is:
+      //   - Optional<T>    if T is not Optional<...>
+      //   - T              if T is already Optional<...>
       if (CS.getASTContext().LangOpts.isSwiftVersionAtLeast(5)) {
         CS.addConstraint(ConstraintKind::Conversion,
-                         CS.getType(expr->getSubExpr()), optTy,
+                         CS.getType(innerExpr), optTy,
                          CS.getConstraintLocator(expr));
       } else {
+        // In Swift 4 and earlier, if we have `try? (E : T)`
+        // then the type of the entire expression is Optional<T>,
+        // even if T is already Optional<...>.
         CS.addConstraint(ConstraintKind::OptionalObject,
-                         optTy, CS.getType(expr->getSubExpr()),
+                         optTy, CS.getType(innerExpr),
                          CS.getConstraintLocator(expr));
       }
       return optTy;

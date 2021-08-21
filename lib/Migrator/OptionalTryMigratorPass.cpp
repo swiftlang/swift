@@ -66,19 +66,29 @@ namespace {
         // There's already an explicit cast here; we don't need to add anything
         return;
       }
-      
-      if (!optTryExpr->getSubExpr()->getType()->getOptionalObjectType()) {
-        // This 'try?' doesn't wrap an optional, so its behavior does not
-        // change from Swift 4 to Swift 5
-        return;
+
+      // After Sema runs in Swift 4 mode, the AST is in a form that works
+      // for the expected Swift 5+ code generation later in the compiler.
+      // So, we look for an additional wrapper added by Sema. For example:
+      //
+      //     (optional_try_expr type='(Int?)?'
+      //       (inject_into_optional implicit type='(Int?)?' <-- optional wrap
+      //         (paren_expr type='(Int?)'    <-- of an optional expr.
+      //
+      auto subExpr = optTryExpr->getSubExpr();
+      if (auto wrapper = dyn_cast<InjectIntoOptionalExpr>(subExpr)) {
+        assert(wrapper->isImplicit());
+        if (wrapper->getSubExpr()->getType()->getOptionalObjectType()) {
+          // This 'try?' wraps an optional, so its behavior will
+          // change from Swift 4 to Swift 5
+          Type typeToPreserve = optTryExpr->getType();
+          auto typeName = typeToPreserve->getStringAsComponent();
+
+          auto range = optTryExpr->getSourceRange();
+          auto charRange = Lexer::getCharSourceRangeFromSourceRange(SM, range);
+          Editor.insertWrap("((", charRange, (Twine(") as ") + typeName + ")").str());
+        }
       }
-      
-      Type typeToPreserve = optTryExpr->getType();
-      auto typeName = typeToPreserve->getStringAsComponent();
-      
-      auto range = optTryExpr->getSourceRange();
-      auto charRange = Lexer::getCharSourceRangeFromSourceRange(SM, range);
-      Editor.insertWrap("((", charRange, (Twine(") as ") + typeName + ")").str());
     }
     
   public:
