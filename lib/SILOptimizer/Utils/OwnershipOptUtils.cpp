@@ -1632,5 +1632,9 @@ createExtendedNestedBorrowScope(SILPhiArgument *newPhi) {
 // assumes that this API will eventually be called for all such new phis until
 // OSSA is fully valid.
 bool swift::createBorrowScopeForPhiOperands(SILPhiArgument *newPhi) {
+  if (newPhi->getOwnershipKind() != OwnershipKind::Guaranteed
+      && newPhi->getOwnershipKind() != OwnershipKind::None) {
+      return false;
+  }
   return GuaranteedPhiBorrowFixup().createExtendedNestedBorrowScope(newPhi);
 }
