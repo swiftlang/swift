@@ -541,8 +541,9 @@ computeDesignatedInitOverrideSignature(ASTContext &ctx,
       auto lookupConformanceFn =
           [&](CanType depTy, Type substTy,
               ProtocolDecl *proto) -> ProtocolConformanceRef {
-        if (auto conf = subMap.lookupConformance(depTy, proto))
-          return conf;
+        if (depTy->getRootGenericParam()->getDepth() < superclassDepth)
+          if (auto conf = subMap.lookupConformance(depTy, proto))
+            return conf;
 
         return ProtocolConformanceRef(proto);
       };
@@ -1125,9 +1126,7 @@ static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
           continue;
 
         auto type = swift::getMemberTypeForComparison(ctor, nullptr);
-        auto parentType = swift::getMemberTypeForComparison(superclassCtor, ctor);
-
-        if (isOverrideBasedOnType(ctor, type, superclassCtor, parentType)) {
+        if (isOverrideBasedOnType(ctor, type, superclassCtor)) {
           alreadyDeclared = true;
           break;
         }

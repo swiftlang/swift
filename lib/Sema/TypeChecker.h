@@ -1261,7 +1261,7 @@ Type getMemberTypeForComparison(const ValueDecl *member,
 /// Determine whether the given declaration is an override by comparing type
 /// information.
 bool isOverrideBasedOnType(const ValueDecl *decl, Type declTy,
-                           const ValueDecl *parentDecl, Type parentDeclTy);
+                           const ValueDecl *parentDecl);
 
 /// Determine whether the given declaration is an operator defined in a
 /// protocol. If \p type is not null, check specifically whether \p decl

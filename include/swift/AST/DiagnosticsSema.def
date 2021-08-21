@@ -2708,10 +2708,6 @@ WARNING(override_swift3_objc_inference,Deprecation,
         "override of %0 %1 from extension of %2 depends on deprecated "
         "inference of '@objc'",
         (DescriptiveDeclKind, DeclName, Identifier))
-ERROR(override_method_different_generic_sig,none,
-      "overridden method %0 has generic signature %1 which is incompatible with "
-      "base method's generic signature %2; expected generic signature to be %3",
-      (DeclBaseName, StringRef, StringRef, StringRef))
 
 // Inheritance
 ERROR(duplicate_inheritance,none,
