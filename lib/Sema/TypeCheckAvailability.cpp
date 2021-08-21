@@ -569,12 +569,19 @@ private:
     if (auto afd = dyn_cast<AbstractFunctionDecl>(D))
       return bodyIsResilienceBoundary(afd);
 
-    return false;
+    // The only other case we care about is top-level code.
+    return isa<TopLevelCodeDecl>(D);
   }
 
   TypeRefinementContext *buildBodyRefinementContext(Decl *D) {
-    auto afd = cast<AbstractFunctionDecl>(D);
-    SourceRange range = afd->getBodySourceRange();
+    SourceRange range;
+    if (auto tlcd = dyn_cast<TopLevelCodeDecl>(D)) {
+      range = tlcd->getSourceRange();
+    } else if (auto afd = dyn_cast<AbstractFunctionDecl>(D)) {
+      range = afd->getBodySourceRange();
+    } else {
+      llvm_unreachable("unknown decl");
+    }
 
     AvailabilityContext DeploymentTargetInfo =
         AvailabilityContext::forDeploymentTarget(Context);
