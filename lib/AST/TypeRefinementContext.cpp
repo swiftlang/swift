@@ -312,6 +312,10 @@ void TypeRefinementContext::print(raw_ostream &OS, SourceManager &SrcMgr,
     R.print(OS, SrcMgr, /*PrintText=*/false);
   }
 
+  if (!ExplicitAvailabilityInfo.isAlwaysAvailable())
+    OS << " explicit_versions="
+       << ExplicitAvailabilityInfo.getOSVersion().getAsString();
+
   for (TypeRefinementContext *Child : Children) {
     OS << '\n';
     Child->print(OS, SrcMgr, Indent + 2);
