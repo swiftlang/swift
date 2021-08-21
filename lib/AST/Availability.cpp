@@ -30,6 +30,11 @@ AvailabilityContext AvailabilityContext::forDeploymentTarget(ASTContext &Ctx) {
       VersionRange::allGTE(Ctx.LangOpts.getMinPlatformVersion()));
 }
 
+AvailabilityContext AvailabilityContext::forInliningTarget(ASTContext &Ctx) {
+  return AvailabilityContext(
+      VersionRange::allGTE(Ctx.LangOpts.MinimumInliningTargetVersion));
+}
+
 namespace {
 
 /// The inferred availability required to access a group of declarations

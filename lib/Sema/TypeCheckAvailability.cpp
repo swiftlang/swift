@@ -181,7 +181,7 @@ ExportContext ExportContext::forDeclSignature(Decl *D) {
   auto runningOSVersion =
       (Ctx.LangOpts.DisableAvailabilityChecking
        ? AvailabilityContext::alwaysAvailable()
-       : TypeChecker::overApproximateAvailabilityAtLocation(D->getEndLoc(), DC));
+       : TypeChecker::overApproximateAvailabilityAtLocation(D->getLoc(), DC));
   bool spi = Ctx.LangOpts.LibraryLevel == LibraryLevel::SPI;
   bool implicit = false;
   bool deprecated = false;
@@ -288,6 +288,27 @@ static bool hasActiveAvailableAttribute(Decl *D,
   return getActiveAvailableAttribute(D, AC);
 }
 
+static bool bodyIsResilienceBoundary(Decl *D) {
+  // The declaration contains code...
+  if (auto afd = dyn_cast<AbstractFunctionDecl>(D)) {
+    // And it has a location so we can check it...
+    if (!afd->isImplicit() && afd->getBodySourceRange().isValid()) {
+      // And the code is within our resilience domain, so it should be
+      // compiled with the minimum deployment target, not the minimum inlining
+      // target.
+      return afd->getResilienceExpansion() != ResilienceExpansion::Minimal;
+    }
+  }
+
+  return false;
+}
+
+static bool computeContainedByDeploymentTarget(TypeRefinementContext *TRC,
+                                               ASTContext &ctx) {
+  return TRC->getAvailabilityInfo()
+                  .isContainedIn(AvailabilityContext::forDeploymentTarget(ctx));
+}
+
 namespace {
 
 /// A class to walk the AST to build the type refinement context hierarchy.
@@ -302,6 +323,8 @@ class TypeRefinementContextBuilder : private ASTWalker {
     /// indicating that custom logic elsewhere will handle removing
     /// the context when needed.
     ParentTy ScopeNode;
+
+    bool ContainedByDeploymentTarget;
   };
 
   std::vector<ContextInfo> ContextStack;
@@ -318,10 +341,24 @@ class TypeRefinementContextBuilder : private ASTWalker {
     return ContextStack.back().TRC;
   }
 
+  bool isCurrentTRCContainedByDeploymentTarget() {
+    return ContextStack.back().ContainedByDeploymentTarget;
+  }
+
   void pushContext(TypeRefinementContext *TRC, ParentTy PopAfterNode) {
     ContextInfo Info;
     Info.TRC = TRC;
     Info.ScopeNode = PopAfterNode;
+
+    if (!ContextStack.empty() && isCurrentTRCContainedByDeploymentTarget()) {
+      assert(computeContainedByDeploymentTarget(TRC, Context) &&
+             "incorrectly skipping computeContainedByDeploymentTarget()");
+      Info.ContainedByDeploymentTarget = true;
+    } else {
+      Info.ContainedByDeploymentTarget =
+          computeContainedByDeploymentTarget(TRC, Context);
+    }
+
     ContextStack.push_back(Info);
   }
 
@@ -367,11 +404,16 @@ private:
       pushContext(DeclTRC, D);
     }
 
+    // Adds in a TRC that covers only the body of the declaration.
+    if (auto BodyTRC = getNewContextForBodyOfDecl(D)) {
+      pushContext(BodyTRC, D);
+    }
+
     return true;
   }
 
   bool walkToDeclPost(Decl *D) override {
-    // As seen above, we could have up to two TRCs in the stack for a single
+    // As seen above, we could have up to three TRCs in the stack for a single
     // declaration.
     while (ContextStack.back().ScopeNode.getAsDecl() == D) {
       ContextStack.pop_back();
@@ -508,6 +550,39 @@ private:
     }
     
     return D->getSourceRange();
+  }
+
+  TypeRefinementContext *getNewContextForBodyOfDecl(Decl *D) {
+    if (bodyIntroducesNewContext(D))
+      return buildBodyRefinementContext(D);
+
+    return nullptr;
+  }
+
+  bool bodyIntroducesNewContext(Decl *D) {
+    // Are we already effectively in a resilience boundary? If not, adding one
+    // wouldn't change availability.
+    if (isCurrentTRCContainedByDeploymentTarget())
+      return false;
+
+    // If we're in a function, is its body a resilience boundary?
+    if (auto afd = dyn_cast<AbstractFunctionDecl>(D))
+      return bodyIsResilienceBoundary(afd);
+
+    return false;
+  }
+
+  TypeRefinementContext *buildBodyRefinementContext(Decl *D) {
+    auto afd = cast<AbstractFunctionDecl>(D);
+    SourceRange range = afd->getBodySourceRange();
+
+    AvailabilityContext DeploymentTargetInfo =
+        AvailabilityContext::forDeploymentTarget(Context);
+    DeploymentTargetInfo.intersectWith(getCurrentTRC()->getAvailabilityInfo());
+
+    return TypeRefinementContext::createForResilienceBoundary(
+                                           Context, D, getCurrentTRC(),
+                                           DeploymentTargetInfo, range);
   }
 
   std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
@@ -927,8 +1002,8 @@ void TypeChecker::buildTypeRefinementContextHierarchy(SourceFile &SF) {
   if (!RootTRC) {
     // The root type refinement context reflects the fact that all parts of
     // the source file are guaranteed to be executing on at least the minimum
-    // platform version.
-    auto MinPlatformReq = AvailabilityContext::forDeploymentTarget(Context);
+    // platform version for inlining.
+    auto MinPlatformReq = AvailabilityContext::forInliningTarget(Context);
     RootTRC = TypeRefinementContext::createRoot(&SF, MinPlatformReq);
     SF.setTypeRefinementContext(RootTRC);
   }
@@ -993,9 +1068,8 @@ TypeChecker::overApproximateAvailabilityAtLocation(SourceLoc loc,
   // refined. For now, this is fine -- but if we ever synthesize #available(),
   // this will be a real problem.
 
-  // We can assume we are running on at least the minimum deployment target.
-  auto OverApproximateContext =
-    AvailabilityContext::forDeploymentTarget(Context);
+  // We can assume we are running on at least the minimum inlining target.
+  auto OverApproximateContext = AvailabilityContext::forInliningTarget(Context);
   auto isInvalidLoc = [SF](SourceLoc loc) {
     return SF ? loc.isInvalid() : true;
   };
