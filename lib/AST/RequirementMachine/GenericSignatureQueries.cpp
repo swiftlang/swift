@@ -517,7 +517,14 @@ RequirementMachine::getConformanceAccessPath(Type type,
       return found->second;
     }
 
-    assert(CurrentConformanceAccessPaths.size() > 0);
+    if (CurrentConformanceAccessPaths.empty()) {
+      llvm::errs() << "Failed to find conformance access path for ";
+      llvm::errs() << type << " " << protocol->getName() << "\n:";
+      type.dump(llvm::errs());
+      llvm::errs() << "\n";
+      dump(llvm::errs());
+      abort();
+    }
 
     // The buffer consists of all conformance access paths of length N.
     // Swap it out with an empty buffer, and fill it with all paths of
