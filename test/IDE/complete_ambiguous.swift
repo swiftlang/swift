@@ -383,6 +383,10 @@ _ = testing([Point(4, 89)]) { arg in
 
 struct Thing {
     init(_ block: (Point) -> Void) {}
+
+    enum ThingEnum { case first, second }
+    func doStuff(_ x: ThingEnum, _ y: Int) -> Thing { return self }
+    func takesRef(_ ref: () -> ()) -> Thing { return self }
 }
 @resultBuilder
 struct ThingBuilder {
@@ -429,6 +433,20 @@ CreateThings {
     Thing. // ErrorExpr
 }
 
+struct TestFuncBodyBuilder {
+  func someFunc() {}
+
+  @ThingBuilder func foo() -> [Thing] {
+    Thing()
+      .doStuff(.#^FUNCBUILDER_FUNCBODY^#, 3)
+      .takesRef(someFunc)
+  }
+}
+// FUNCBUILDER_FUNCBODY: Begin completions, 3 items
+// FUNCBUILDER_FUNCBODY-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: first[#Thing.ThingEnum#];
+// FUNCBUILDER_FUNCBODY-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: second[#Thing.ThingEnum#];
+// FUNCBUILDER_FUNCBODY-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): Thing.ThingEnum#})[#(into: inout Hasher) -> Void#];
+// FUNCBUILDER_FUNCBODY: End completions
 
 func takesClosureOfPoint(_: (Point)->()) {}
 func overloadedWithDefaulted(_: ()->()) {}

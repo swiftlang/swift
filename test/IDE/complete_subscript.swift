@@ -17,6 +17,7 @@
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LABELED_SUBSCRIPT | %FileCheck %s -check-prefix=LABELED_SUBSCRIPT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TUPLE | %FileCheck %s -check-prefix=TUPLE
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SETTABLE_SUBSCRIPT | %FileCheck %s -check-prefix=SETTABLE_SUBSCRIPT
 
 struct MyStruct<T> {
   static subscript(x: Int, static defValue: T) -> MyStruct<T> {
@@ -159,3 +160,20 @@ func testSubcscriptTuple(val: (x: Int, String)) {
 // TUPLE-DAG: Pattern/CurrNominal/Flair[ArgLabels]:                 ['[']{#keyPath: KeyPath<(x: Int, String), Value>#}[']'][#Value#];
 // TUPLE: End completions
 }
+
+struct HasSettableSub {
+    subscript(a: String) -> Any {
+        get { return 1 }
+        set { }
+    }
+}
+
+func testSettableSub(x: inout HasSettableSub) {
+    let local = "some string"
+    x[#^SETTABLE_SUBSCRIPT^#] = 32
+}
+// SETTABLE_SUBSCRIPT: Begin completions
+// SETTABLE_SUBSCRIPT-DAG: Pattern/CurrNominal/Flair[ArgLabels]: ['[']{#keyPath: KeyPath<HasSettableSub, Value>#}[']'][#Value#];
+// SETTABLE_SUBSCRIPT-DAG: Decl[Subscript]/CurrNominal/Flair[ArgLabels]: ['[']{#(a): String#}[']'][#@lvalue Any#];
+// SETTABLE_SUBSCRIPT-DAG: Decl[LocalVar]/Local/TypeRelation[Identical]: local[#String#]; name=local
+// SETTABLE_SUBSCRIPT: End completions

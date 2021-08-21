@@ -5709,8 +5709,13 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     if (!type1->is<LValueType>() &&
         type2->isExistentialType()) {
 
-      // Penalize conversions to Any.
-      if (kind >= ConstraintKind::Conversion && type2->isAny())
+      // Penalize conversions to Any, unless we're solving for code completion.
+      // Code completion should offer completions both from solutions with
+      // overloads involving Any and those with more specific types because the
+      // completion the user then choses can force the Any overload to be
+      // picked.
+      if (kind >= ConstraintKind::Conversion && type2->isAny() &&
+          !isForCodeCompletion())
         increaseScore(ScoreKind::SK_EmptyExistentialConversion);
 
       conversionsOrFixes.push_back(ConversionRestrictionKind::Existential);
