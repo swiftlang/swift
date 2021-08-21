@@ -355,9 +355,15 @@ public:
 
 private:
   bool walkToDeclPre(Decl *D) override {
-    TypeRefinementContext *DeclTRC = getNewContextForWalkOfDecl(D);
+    // Adds in a parent TRC for decls which are syntatically nested but are not
+    // represented that way in the AST. (Particularly, AbstractStorageDecl
+    // parents for AccessorDecl children.)
+    if (auto ParentTRC = getEffectiveParentContextForDecl(D)) {
+      pushContext(ParentTRC, D);
+    }
 
-    if (DeclTRC) {
+    // Adds in a TRC that covers the entire declaration.
+    if (auto DeclTRC = getNewContextForSignatureOfDecl(D)) {
       pushContext(DeclTRC, D);
     }
 
@@ -365,24 +371,45 @@ private:
   }
 
   bool walkToDeclPost(Decl *D) override {
-    if (ContextStack.back().ScopeNode.getAsDecl() == D) {
+    // As seen above, we could have up to two TRCs in the stack for a single
+    // declaration.
+    while (ContextStack.back().ScopeNode.getAsDecl() == D) {
       ContextStack.pop_back();
     }
     return true;
   }
 
-  /// Returns a new context to be introduced for the declaration, or nullptr
-  /// if no new context should be introduced.
-  TypeRefinementContext *getNewContextForWalkOfDecl(Decl *D) {
+  TypeRefinementContext *getEffectiveParentContextForDecl(Decl *D) {
     if (auto accessor = dyn_cast<AccessorDecl>(D)) {
       // Use TRC of the storage rather the current TRC when walking this
       // function.
+      // FIXME: Can we assert that we won't process storage later that should
+      //        have been returned now?
       auto it = StorageContexts.find(accessor->getStorage());
       if (it != StorageContexts.end()) {
         return it->second;
       }
     }
-    
+    return nullptr;
+  }
+
+  /// If necessary, records a TRC so it can be returned by subsequent calls to
+  /// `getEffectiveParentContextForDecl()`.
+  void recordEffectiveParentContext(Decl *D, TypeRefinementContext *NewTRC) {
+    // Record the TRC for this storage declaration so that
+    // when we process the accessor, we can use this TRC as the
+    // parent in `getEffectiveParentContextForDecl()`.
+    if (auto *StorageDecl = dyn_cast<AbstractStorageDecl>(D)) {
+      if (StorageDecl->hasParsedAccessors()) {
+        // FIXME: Can we assert that we've never queried for this storage?
+        StorageContexts[StorageDecl] = NewTRC;
+      }
+    }
+  }
+
+  /// Returns a new context to be introduced for the declaration, or nullptr
+  /// if no new context should be introduced.
+  TypeRefinementContext *getNewContextForSignatureOfDecl(Decl *D) {
     if (declarationIntroducesNewContext(D)) {
       return buildDeclarationRefinementContext(D);
     }
@@ -414,15 +441,10 @@ private:
                                              ExplicitDeclInfo,
                                              refinementSourceRangeForDecl(D));
     
-    // Record the TRC for this storage declaration so that
-    // when we process the accessor, we can use this TRC as the
-    // parent.
-    if (auto *StorageDecl = dyn_cast<AbstractStorageDecl>(D)) {
-      if (StorageDecl->hasParsedAccessors()) {
-        StorageContexts[StorageDecl] = NewTRC;
-      }
-    }
-    
+
+    // Possibly use this as an effective parent context later.
+    recordEffectiveParentContext(D, NewTRC);
+
     return NewTRC;
   }
   
@@ -460,6 +482,16 @@ private:
       // Use the declaration's availability for the context when checking
       // the bodies of its accessors.
 
+      Decl *locDecl = D;
+      // For a variable declaration (without accessors) we use the range of the
+      // containing pattern binding declaration to make sure that we include
+      // any type annotation in the type refinement context range.
+      if (auto varDecl = dyn_cast<VarDecl>(storageDecl)) {
+        auto *PBD = varDecl->getParentPatternBinding();
+        if (PBD)
+          locDecl = PBD;
+      }
+
       // HACK: For synthesized trivial accessors we may have not a valid
       // location for the end of the braces, so in that case we will fall back
       // to using the range for the storage declaration. The right fix here is
@@ -468,18 +500,11 @@ private:
       // locations.
       SourceLoc BracesEnd = storageDecl->getBracesRange().End;
       if (storageDecl->hasParsedAccessors() && BracesEnd.isValid()) {
-        return SourceRange(storageDecl->getStartLoc(),
+        return SourceRange(locDecl->getStartLoc(),
                            BracesEnd);
       }
       
-      // For a variable declaration (without accessors) we use the range of the
-      // containing pattern binding declaration to make sure that we include
-      // any type annotation in the type refinement context range.
-      if (auto varDecl = dyn_cast<VarDecl>(storageDecl)) {
-        auto *PBD = varDecl->getParentPatternBinding();
-        if (PBD)
-          return PBD->getSourceRange();
-      }
+      return locDecl->getSourceRange();
     }
     
     return D->getSourceRange();
