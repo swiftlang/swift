@@ -1150,9 +1150,7 @@ function(_add_swift_target_library_single target name)
     set(analyze_code_coverage "${SWIFT_ANALYZE_CODE_COVERAGE}")
   endif()
 
-  if (NOT SWIFTLIB_SINGLE_TARGET_LIBRARY)
-    set(lto_type "${SWIFT_STDLIB_ENABLE_LTO}")
-  endif()
+  set(lto_type "${SWIFT_STDLIB_ENABLE_LTO}")
 
   _add_target_variant_c_compile_flags(
     SDK "${SWIFTLIB_SINGLE_SDK}"
@@ -2068,7 +2066,8 @@ function(add_swift_target_library name)
         endif()
       endif()
 
-      if(sdk IN_LIST SWIFT_APPLE_PLATFORMS)
+      if((sdk IN_LIST SWIFT_APPLE_PLATFORMS)
+        OR (sdk STREQUAL "FREESTANDING"))
         # In the past, we relied on unsetting globally
         # CMAKE_OSX_ARCHITECTURES to ensure that CMake would
         # not add the -arch flag
@@ -2076,6 +2075,9 @@ function(add_swift_target_library name)
         # when CMake will enforce a default (see
         # https://gitlab.kitware.com/cmake/cmake/-/merge_requests/5291)
         set_property(TARGET ${VARIANT_NAME} PROPERTY OSX_ARCHITECTURES "${arch}")
+        if (SWIFTLIB_IS_STDLIB AND SWIFTLIB_STATIC)
+          set_property(TARGET ${VARIANT_NAME}-static PROPERTY OSX_ARCHITECTURES "${arch}")
+        endif()
       endif()
     endforeach()
 
@@ -2514,7 +2516,8 @@ function(add_swift_target_executable name)
           EXCLUDE_FROM_ALL TRUE)
       endif()
 
-      if(${sdk} IN_LIST SWIFT_APPLE_PLATFORMS)
+      if((${sdk} IN_LIST SWIFT_APPLE_PLATFORMS)
+        OR (sdk STREQUAL "FREESTANDING"))
         # In the past, we relied on unsetting globally
         # CMAKE_OSX_ARCHITECTURES to ensure that CMake would
         # not add the -arch flag
