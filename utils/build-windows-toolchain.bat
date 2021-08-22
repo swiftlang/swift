@@ -666,6 +666,16 @@ msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\installer.wixproj
 :: TODO(compnerd) actually perform the code-signing
 :: signtool sign /f Apple_CodeSign.pfx /p Apple_CodeSign_Password /tr http://timestamp.digicert.com /fd sha256 %PackageRoot%\installer\installer.exe
 
+:: Stage Artifacts
+md %BuildRoot%\artifacts
+:: FIXME(compnerd) should we provide SDKs as standalone artifact?
+move %PackageRoot%\sdk.msi %BuildRoot%\artifacts || (exit /b)
+:: Redistributable libraries for developers
+move %PackageRoot%\runtime.msi %BuildRoot%\artifacts || (exit /b)
+move %PackageRoot%\icu.msi %BuildRoot%\artifacts || (exit /b)
+:: Installer
+move %PackageRoot%\installer\installer.exe %BuildRoot%\artifacts || (exit /b)
+
 :: TODO(compnerd) test LLVM
 
 :: Test Swift
