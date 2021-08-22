@@ -121,12 +121,14 @@ public protocol ActorIdentity: Sendable, Hashable, Codable {}
 
 @available(SwiftStdlib 5.5, *)
 public struct AnyActorIdentity: ActorIdentity, @unchecked Sendable, CustomStringConvertible {
+  @usableFromInline public let underlying: Any    
   @usableFromInline let _hashInto: (inout Hasher) -> ()
   @usableFromInline let _equalTo: (Any) -> Bool
   @usableFromInline let _encodeTo: (Encoder) throws -> ()
   @usableFromInline let _description: () -> String
 
   public init<ID>(_ identity: ID) where ID: ActorIdentity {
+    underlying = identity
     _hashInto = { hasher in identity
         .hash(into: &hasher)
     }
