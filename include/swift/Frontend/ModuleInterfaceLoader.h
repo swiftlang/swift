@@ -430,7 +430,8 @@ public:
       const ClangImporterOptions &ClangOpts, StringRef CacheDir,
       StringRef PrebuiltCacheDir, StringRef BackupInterfaceDir,
       StringRef ModuleName, StringRef InPath,
-      StringRef OutPath, bool SerializeDependencyHashes,
+      StringRef OutPath, StringRef ABIOutputPath,
+      bool SerializeDependencyHashes,
       bool TrackSystemDependencies, ModuleInterfaceLoaderOptions Opts,
       RequireOSSAModules_t RequireOSSAModules);
 };
