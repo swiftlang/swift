@@ -143,6 +143,9 @@ struct SupplementaryOutputPaths {
   /// The path to which we should emit module summary file.
   std::string ModuleSummaryOutputPath;
 
+  /// The output path to generate ABI baseline.
+  std::string ABIDescriptorOutputPath;
+
   SupplementaryOutputPaths() = default;
   SupplementaryOutputPaths(const SupplementaryOutputPaths &) = default;
 
@@ -174,6 +177,8 @@ struct SupplementaryOutputPaths {
       fn(PrivateModuleInterfaceOutputPath); 
     if (!ModuleSummaryOutputPath.empty())
       fn(ModuleSummaryOutputPath);
+    if (!ABIDescriptorOutputPath.empty())
+      fn(ABIDescriptorOutputPath);
   }
 
   bool empty() const {
@@ -182,7 +187,7 @@ struct SupplementaryOutputPaths {
            ReferenceDependenciesFilePath.empty() &&
            SerializedDiagnosticsPath.empty() && LoadedModuleTracePath.empty() &&
            TBDPath.empty() && ModuleInterfaceOutputPath.empty() &&
-           ModuleSourceInfoOutputPath.empty();
+           ModuleSourceInfoOutputPath.empty() && ABIDescriptorOutputPath.empty();
   }
 };
 } // namespace swift

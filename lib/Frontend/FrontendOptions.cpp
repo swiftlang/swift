@@ -524,7 +524,47 @@ bool FrontendOptions::canActionEmitLoadedModuleTrace(ActionType action) {
   }
   llvm_unreachable("unhandled action");
 }
-
+bool FrontendOptions::canActionEmitABIDescriptor(ActionType action) {
+  switch (action) {
+  case ActionType::CompileModuleFromInterface:
+    return true;
+  case ActionType::NoneAction:
+  case ActionType::Parse:
+  case ActionType::ResolveImports:
+  case ActionType::Typecheck:
+  case ActionType::DumpParse:
+  case ActionType::DumpInterfaceHash:
+  case ActionType::DumpAST:
+  case ActionType::EmitSyntax:
+  case ActionType::PrintAST:
+  case ActionType::EmitPCH:
+  case ActionType::DumpScopeMaps:
+  case ActionType::DumpTypeRefinementContexts:
+  case ActionType::DumpTypeInfo:
+  case ActionType::EmitSILGen:
+  case ActionType::TypecheckModuleFromInterface:
+  case ActionType::Immediate:
+  case ActionType::REPL:
+  case ActionType::EmitPCM:
+  case ActionType::DumpPCM:
+  case ActionType::ScanDependencies:
+  case ActionType::PrintVersion:
+  case ActionType::PrintFeature:
+  case ActionType::MergeModules:
+  case ActionType::EmitModuleOnly:
+  case ActionType::EmitSIL:
+  case ActionType::EmitSIBGen:
+  case ActionType::EmitSIB:
+  case ActionType::EmitIRGen:
+  case ActionType::EmitIR:
+  case ActionType::EmitBC:
+  case ActionType::EmitAssembly:
+  case ActionType::EmitObject:
+  case ActionType::EmitImportedModules:
+    return false;
+  }
+  llvm_unreachable("unhandled action");
+}
 bool FrontendOptions::canActionEmitModule(ActionType action) {
   switch (action) {
   case ActionType::NoneAction:
