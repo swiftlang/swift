@@ -795,6 +795,15 @@ void AttributeChecker::visitAccessControlAttr(AccessControlAttr *attr) {
           .fixItRemove(attr->getRange());
       }
     }
+
+    if (auto VD = dyn_cast<ValueDecl>(D)) {
+      if (!VD->isObjC() && attr->getAccess() == AccessLevel::Open) {
+        diagnose(attr->getLocation(), diag::access_control_non_objc_open_func,
+                 isa<FuncDecl>(VD))
+            .fixItReplace(attr->getRange(), "public");
+        attr->setInvalid();
+      }
+    }
   }
 
   if (attr->getAccess() == AccessLevel::Open) {

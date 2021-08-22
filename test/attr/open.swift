@@ -134,3 +134,21 @@ open class OpenSubClass : OpenSuperClass {
   open override subscript(index: MarkerForNonOpenSubscripts) -> Int { return 0 }
   
 }
+
+open class InvalidOpenExtension {
+  open func openMethod() { } // No error
+}
+extension InvalidOpenExtension {
+  open func nonObjcOpenMethod() { } // expected-error {{non-@objc methods in extensions cannot be overriden; use 'public' instead}} {{3-7=public}}
+  open var nonObjcOpenVar: Int { 3 }  // expected-error {{non-@objc properties in extensions cannot be overriden; use 'public' instead}} {{3-7=public}}
+  @objc open func objcOpenMethod() { } // No error
+  @objc open var objcOpenVar: Int { 3 } // No error
+}
+
+@objcMembers
+open class ValidOpenExtension { }
+extension ValidOpenExtension {
+    open func objcOpenMethod() { } // No error
+    open var objcOpenVar: Int { 3 } // No error
+}
+
