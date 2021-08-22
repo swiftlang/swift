@@ -427,6 +427,7 @@ private:
   static bool canActionEmitModuleDoc(ActionType);
   static bool canActionEmitModuleSummary(ActionType);
   static bool canActionEmitInterface(ActionType);
+  static bool canActionEmitABIDescriptor(ActionType);
 
 public:
   static bool doesActionGenerateSIL(ActionType);

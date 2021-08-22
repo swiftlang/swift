@@ -284,6 +284,9 @@ bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
     if (SubInstance.getDiags().hadAnyError()) {
       return std::make_error_code(std::errc::not_supported);
     }
+    if (!ABIDescriptorPath.empty()) {
+      swift::ide::api::dumpModuleContent(Mod, ABIDescriptorPath, true);
+    }
     return std::error_code();
     });
   }, ThreadStackSize);
