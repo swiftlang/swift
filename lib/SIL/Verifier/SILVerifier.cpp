@@ -1186,8 +1186,46 @@ public:
       }
     }
 
-    if (OwnershipForwardingMixin::isa(I)) {
+    if (I->getFunction()->hasOwnership() && OwnershipForwardingMixin::isa(I)) {
       checkOwnershipForwardingInst(I);
+    }
+  }
+
+  // Verify the result of any forwarding terminator, including switch_enum.
+  void checkForwardedTermResult(OwnershipForwardingTermInst *term,
+                                SILBasicBlock *destBB) {
+    require(destBB->getNumArguments() == 1,
+            "OwnershipForwardingTermInst needs a single result");
+    auto *arg = destBB->getArgument(0);
+    auto argKind = arg->getOwnershipKind();
+    // A terminator may cast a nontrivial to a trivial type. e.g. a trivial
+    // payload in a nontrivial enum. If the result is trivial, it no longer
+    // requires ownership.
+    if (arg->getType().isTrivial(F) && argKind == OwnershipKind::None)
+      return;
+
+    require(argKind == term->getForwardingOwnershipKind(),
+            "OwnershipForwardingTermInst nontrivial result "
+            "must have the same ownership");
+  }
+
+  /// A terminator result is forwarded from the terminator's operand. Forwarding
+  /// a nontrivial value to another nontrivial value can never gain or lose
+  /// ownership information. If the terminator's operand has ownership and the
+  /// result is nontrivial, then the result must have identical ownership.
+  ///
+  /// The terminator result can only "lose" ownership if the operand is
+  /// nontrivial but the result is trivial. It is still valid for the trivial
+  /// result to retain the operand's ownership, but unnecessary and produces
+  /// less efficient SIL.
+  void checkOwnershipForwardingTermInst(OwnershipForwardingTermInst *term) {
+    // Verifying switch_enum ownership requires evaluating the payload
+    // types. These are fully verified by checkSwitchEnumInst.
+    if (isa<SwitchEnumInst>(term))
+      return;
+
+    for (auto &succ : term->getSuccessors()) {
+      checkForwardedTermResult(term, succ.getBB());
     }
   }
 
@@ -1208,6 +1246,10 @@ public:
       require(kind.isCompatibleWith(o->getForwardingOwnershipKind()),
               "GuaranteedFirstArgForwardingSingleValueInst's ownership kind "
               "must be compatible with guaranteed");
+    }
+
+    if (auto *term = dyn_cast<OwnershipForwardingTermInst>(i)) {
+      checkOwnershipForwardingTermInst(term);
     }
   }
 
@@ -4503,104 +4545,96 @@ public:
     checkSelectValueCases(SVI);
   }
 
-  void checkSwitchEnumInst(SwitchEnumInst *SOI) {
-    require(SOI->getOperand()->getType().isObject(),
+  void checkSwitchEnumInst(SwitchEnumInst *switchEnum) {
+    require(switchEnum->getOperand()->getType().isObject(),
             "switch_enum operand must be an object");
 
-    SILType uTy = SOI->getOperand()->getType();
+    SILType uTy = switchEnum->getOperand()->getType();
     EnumDecl *uDecl = uTy.getEnumOrBoundGenericEnum();
     require(uDecl, "switch_enum operand is not an enum");
 
     // Find the set of enum elements for the type so we can verify
     // exhaustiveness.
     llvm::DenseSet<EnumElementDecl*> unswitchedElts;
-    uDecl->getAllElements(unswitchedElts);
 
-    // Verify the set of enum cases we dispatch on.
-    for (unsigned i = 0, e = SOI->getNumCases(); i < e; ++i) {
-      EnumElementDecl *elt;
-      SILBasicBlock *dest;
-      std::tie(elt, dest) = SOI->getCase(i);
-
+    auto checkSwitchCase = [&](EnumElementDecl *elt, SILBasicBlock *dest) {
       require(elt->getDeclContext() == uDecl,
               "switch_enum dispatches on enum element that is not part of "
               "its type");
-      require(unswitchedElts.count(elt),
+      require(unswitchedElts.insert(elt).second,
               "switch_enum dispatches on same enum element more than once");
-      unswitchedElts.erase(elt);
 
-      // The destination BB can take the argument payload, if any, as a BB
-      // arguments, or it can ignore it and take no arguments.
-      if (elt->hasAssociatedValues()) {
-        if (isSILOwnershipEnabled() && F.hasOwnership()) {
-          require(dest->getArguments().size() == 1,
-                  "switch_enum destination for case w/ args must take 1 "
-                  "argument");
-          if (!dest->getArgument(0)->getType().isTrivial(*SOI->getFunction())) {
-            require(
-                dest->getArgument(0)->getOwnershipKind().isCompatibleWith(
-                    SOI->getForwardingOwnershipKind()),
-                "Switch enum non-trivial destination arg must have ownership "
-                "kind that is compatible with the switch_enum's operand");
-          }
-        } else {
-          require(dest->getArguments().empty() ||
-                      dest->getArguments().size() == 1,
-                  "switch_enum destination for case w/ args must take 0 or 1 "
-                  "arguments");
-        }
-
-        if (dest->getArguments().size() == 1) {
-          SILType eltArgTy = uTy.getEnumElementType(elt, F.getModule(),
-                                                    F.getTypeExpansionContext());
-          SILType bbArgTy = dest->getArguments()[0]->getType();
-          if (F.getModule().getStage() != SILStage::Lowered) {
-            // During the lowered stage, a function type might have different
-            // signature
-            require(eltArgTy == bbArgTy,
-                    "switch_enum destination bbarg must match case arg type");
-          }
-          require(!dest->getArguments()[0]->getType().isAddress(),
-                  "switch_enum destination bbarg type must not be an address");
-        }
-
-      } else {
+      if (!elt->hasAssociatedValues()) {
         require(dest->getArguments().empty(),
                 "switch_enum destination for no-argument case must take no "
                 "arguments");
+        return;
       }
+      // Check for a valid switch result type.
+      if (dest->getArguments().size() == 1) {
+        SILType eltArgTy = uTy.getEnumElementType(elt, F.getModule(),
+                                                  F.getTypeExpansionContext());
+        SILType bbArgTy = dest->getArguments()[0]->getType();
+        if (F.getModule().getStage() != SILStage::Lowered) {
+          // During the lowered stage, a function type might have different
+          // signature
+          require(eltArgTy == bbArgTy,
+                  "switch_enum destination bbarg must match case arg type");
+        }
+        require(!dest->getArguments()[0]->getType().isAddress(),
+                "switch_enum destination bbarg type must not be an address");
+      }
+      if (!isSILOwnershipEnabled() || !F.hasOwnership()) {
+        // In non-OSSA, the destBB can optionally ignore the payload.
+        require(dest->getArguments().empty()
+                    || dest->getArguments().size() == 1,
+                "switch_enum destination for case w/ args must take 0 or 1 "
+                "arguments");
+        return;
+      }
+      checkForwardedTermResult(switchEnum, dest);
+    };
+    // Verify the set of enum cases we dispatch on.
+    for (unsigned i = 0, e = switchEnum->getNumCases(); i < e; ++i) {
+      EnumElementDecl *elt;
+      SILBasicBlock *dest;
+      std::tie(elt, dest) = switchEnum->getCase(i);
+      checkSwitchCase(elt, dest);
     }
-
     // If the switch is non-exhaustive, we require a default.
-    bool isExhaustive =
-        uDecl->isEffectivelyExhaustive(F.getModule().getSwiftModule(),
-                                       F.getResilienceExpansion());
-    require((isExhaustive && unswitchedElts.empty()) || SOI->hasDefault(),
-            "nonexhaustive switch_enum must have a default destination");
-    if (SOI->hasDefault()) {
-      // When SIL ownership is enabled, we require all default branches to take
-      // an @owned original version of the enum.
-      //
-      // When SIL ownership is disabled, we no longer support this.
-      if (isSILOwnershipEnabled() && F.hasOwnership()) {
-        require(SOI->getDefaultBB()->getNumArguments() == 1,
-                "Switch enum default block should have one argument");
-        requireSameType(
-            SOI->getDefaultBB()->getArgument(0)->getType(),
-            SOI->getOperand()->getType(),
-            "Switch enum default block should have one argument that is "
-            "the same as the input type");
-        auto defaultKind =
-            SOI->getDefaultBB()->getArgument(0)->getOwnershipKind();
-        require(
-            defaultKind.isCompatibleWith(SOI->getOperand().getOwnershipKind()),
-            "Switch enum default block arg must have same ownership kind "
-            "as operand");
-      } else if (!F.hasOwnership()) {
-        require(SOI->getDefaultBB()->args_empty(),
-                "switch_enum default destination must take no arguments");
-      }
+    if (!switchEnum->hasDefault()) {
+      bool isExhaustive = uDecl->isEffectivelyExhaustive(
+          F.getModule().getSwiftModule(), F.getResilienceExpansion());
+      require(isExhaustive
+                  && (unswitchedElts.size() == uDecl->getNumElements()),
+              "nonexhaustive switch_enum must have a default destination");
+      return;
     }
+    auto *defaultBB = switchEnum->getDefaultBB();
+    if (!isSILOwnershipEnabled() || !F.hasOwnership()) {
+      require(switchEnum->getDefaultBB()->args_empty(),
+              "switch_enum default destination must take no arguments");
+      return;
+    }
+    // When the switch has a unique default case, the OSSA result has the same
+    // requirements as a matched result.
+    if (NullablePtr<EnumElementDecl> uniqueCase =
+            switchEnum->getUniqueCaseForDefault()) {
+      checkSwitchCase(uniqueCase.get(), defaultBB);
+      return;
+    }
+    // With no unique case, the switch_enum operand is simply forwarded.
+    require(defaultBB->getNumArguments() == 1,
+            "Switch enum default block should have one argument");
+    requireSameType(
+        defaultBB->getArgument(0)->getType(),
+        switchEnum->getOperand()->getType(),
+        "Switch enum default block should have one argument that is "
+        "the same as the input type");
+    require(defaultBB->getArgument(0)->getOwnershipKind()
+                == switchEnum->getForwardingOwnershipKind(),
+            "switch_enum non-trivial destination arg must have the same "
+            "ownership as switch_enum's operand");
   }
 
   void checkSwitchEnumAddrInst(SwitchEnumAddrInst *SOI) {
