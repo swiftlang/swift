@@ -205,8 +205,7 @@ synthesizeRemoteFuncStubBody(AbstractFunctionDecl *func, void *context) {
   auto uintInit = ctx.getIntBuiltinInitDecl(uintDecl);
 
   auto missingTransportDecl = ctx.getMissingDistributedActorTransport();
-  assert(missingTransportDecl &&
-         "Could not locate '_missingDistributedActorTransport' function");
+  assert(missingTransportDecl && "Could not locate '_missingDistributedActorTransport' function");
 
   // Create a call to _Distributed._missingDistributedActorTransport
   auto loc = func->getLoc();
@@ -244,10 +243,16 @@ synthesizeRemoteFuncStubBody(AbstractFunctionDecl *func, void *context) {
   file->setBuiltinInitializer(staticStringInit);
 
   auto startLineAndCol = SM.getPresumedLineAndColumnForLoc(distributedFunc->getStartLoc());
+//  auto *line = new (ctx) MagicIdentifierLiteralExpr(
+//      MagicIdentifierLiteralExpr::Line, loc, /*Implicit=*/true);
+//  auto *line = new (ctx) IntegerLiteralExpr(startLineAndCol.first, loc,
+//                                            /*implicit*/ true);
   auto *line = IntegerLiteralExpr::createFromUnsigned(ctx, startLineAndCol.first);
   line->setType(uintType);
   line->setBuiltinInitializer(uintInit);
 
+//  auto *column = new (ctx) MagicIdentifierLiteralExpr(
+//      MagicIdentifierLiteralExpr::Column, loc, /*Implicit=*/true);
   auto *column = IntegerLiteralExpr::createFromUnsigned(ctx, startLineAndCol.second);
   column->setType(uintType);
   column->setBuiltinInitializer(uintInit);
@@ -259,6 +264,7 @@ synthesizeRemoteFuncStubBody(AbstractFunctionDecl *func, void *context) {
 
   SmallVector<ASTNode, 2> stmts;
   stmts.push_back(call); // something() -> Never
+  // stmts.push_back(new (ctx) ReturnStmt(SourceLoc(), /*Result=*/nullptr)); // FIXME: this causes 'different types for return type: String vs. ()'
   auto body = BraceStmt::create(ctx, SourceLoc(), stmts, SourceLoc(),
                                 /*implicit=*/true);
   return { body, /*isTypeChecked=*/true };
@@ -284,8 +290,7 @@ static Identifier makeRemoteFuncIdentifier(FuncDecl* func) {
 ///
 /// and is intended to be replaced by a transport library by providing an
 /// appropriate @_dynamicReplacement function.
-static FuncDecl*
-addImplicitRemoteFunction(ClassDecl *decl, FuncDecl *func) {
+static void addImplicitRemoteActorFunction(ClassDecl *decl, FuncDecl *func) {
   auto &C = decl->getASTContext();
   auto parentDC = decl;
 
@@ -310,10 +315,6 @@ addImplicitRemoteFunction(ClassDecl *decl, FuncDecl *func) {
   remoteFuncDecl->getAttrs().add(
       new (C) DistributedActorIndependentAttr(/*IsImplicit=*/true));
 
-  // nonisolated
-  remoteFuncDecl->getAttrs().add(
-      new (C) NonisolatedAttr(/*IsImplicit=*/true));
-
   // users should never have to access this function directly;
   // it is only invoked from our distributed function thunk if the actor is remote.
   remoteFuncDecl->setUserAccessible(false);
@@ -325,16 +326,16 @@ addImplicitRemoteFunction(ClassDecl *decl, FuncDecl *func) {
   remoteFuncDecl->copyFormalAccessFrom(func, /*sourceIsParentContext=*/false);
 
   decl->addMember(remoteFuncDecl);
-  return remoteFuncDecl;
 }
 
 /// Synthesize dynamic _remote stub functions for each encountered distributed function.
-static void addImplicitRemoteFunctions(ClassDecl *decl) {
+static void addImplicitRemoteActorFunctions(ClassDecl *decl) {
   assert(decl->isDistributedActor());
+
   for (auto member : decl->getMembers()) {
-    auto func = dyn_cast<AbstractFunctionDecl>(member);
+    auto func = dyn_cast<FuncDecl>(member);
     if (func && func->isDistributed()) {
-      (void) func->getDistributedActorRemoteFuncDecl();
+      addImplicitRemoteActorFunction(decl, func);
     }
   }
 }
@@ -343,33 +344,8 @@ static void addImplicitRemoteFunctions(ClassDecl *decl) {
 /************************ SYNTHESIS ENTRY POINT *******************************/
 /******************************************************************************/
 
-AbstractFunctionDecl *TypeChecker::addImplicitDistributedActorRemoteFunction(
-    ClassDecl *decl, AbstractFunctionDecl *AFD) {
-  if (!decl->isDistributedActor())
-    return nullptr;
-
-  if (auto func = dyn_cast<FuncDecl>(AFD))
-    return addImplicitRemoteFunction(decl, func);
-
-  return nullptr;
-}
-
-void TypeChecker::addImplicitDistributedActorRemoteFunctions(NominalTypeDecl *decl) {
-  // Bail out if not a distributed actor definition.
-  if (!decl->isDistributedActor())
-    return;
-
-  // If the _Distributed module is missing we cannot synthesize anything.
-  if (!swift::ensureDistributedModuleLoaded(decl))
-    return;
-
-  if (auto clazz = dyn_cast<ClassDecl>(decl))
-    addImplicitRemoteFunctions(clazz);
-}
-
 /// Entry point for adding all computed members to a distributed actor decl.
-// TODO(distributed): move the synthesis of protocol requirements to DerivedConformance style
-void swift::addImplicitDistributedActorMembers(ClassDecl *decl) {
+void swift::addImplicitDistributedActorMembersToClass(ClassDecl *decl) {
   // Bail out if not a distributed actor definition.
   if (!decl->isDistributedActor())
     return;
@@ -380,4 +356,5 @@ void swift::addImplicitDistributedActorMembers(ClassDecl *decl) {
 
   addFactoryResolveFunction(decl);
   addImplicitDistributedActorStoredProperties(decl);
+  addImplicitRemoteActorFunctions(decl);
 }

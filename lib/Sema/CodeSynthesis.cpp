@@ -1255,10 +1255,9 @@ ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
 
   auto &Context = target->getASTContext();
   switch (action) {
-  case ImplicitMemberAction::ResolveImplicitInit: {
+  case ImplicitMemberAction::ResolveImplicitInit:
     TypeChecker::addImplicitConstructors(target);
     break;
-  }
   case ImplicitMemberAction::ResolveCodingKeys: {
     // CodingKeys is a special type which may be synthesized as part of
     // Encodable/Decodable conformance. If the target conforms to either
@@ -1275,8 +1274,8 @@ ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
     if (!evaluateTargetConformanceTo(decodableProto)) {
       (void)evaluateTargetConformanceTo(encodableProto);
     }
-    break;
   }
+    break;
   case ImplicitMemberAction::ResolveEncodable: {
     // encode(to:) may be synthesized as part of derived conformance to the
     // Encodable protocol.
@@ -1284,8 +1283,8 @@ ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
     // conformance here to attempt synthesis.
     auto *encodableProto = Context.getProtocol(KnownProtocolKind::Encodable);
     (void)evaluateTargetConformanceTo(encodableProto);
-    break;
   }
+    break;
   case ImplicitMemberAction::ResolveDecodable: {
     // init(from:) may be synthesized as part of derived conformance to the
     // Decodable protocol.
@@ -1294,11 +1293,17 @@ ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
     TypeChecker::addImplicitConstructors(target);
     auto *decodableProto = Context.getProtocol(KnownProtocolKind::Decodable);
     (void)evaluateTargetConformanceTo(decodableProto);
-    break;
   }
-case ImplicitMemberAction::ResolveDistributedActor: {
-    if (auto classDecl = dyn_cast<ClassDecl>(target))
-      swift::addImplicitDistributedActorMembers(classDecl);
+    break;
+  case ImplicitMemberAction::ResolveDistributedActor:
+  case ImplicitMemberAction::ResolveDistributedActorTransport:
+  case ImplicitMemberAction::ResolveDistributedActorIdentity: {
+    // init(transport:) and init(resolve:using:) may be synthesized as part of
+    // derived conformance to the DistributedActor protocol.
+    // If the target should conform to the DistributedActor protocol, check the
+    // conformance here to attempt synthesis.
+    // FIXME(distributed): invoke the requirement adding explicitly here
+     TypeChecker::addImplicitConstructors(target);
     auto *distributedActorProto =
         Context.getProtocol(KnownProtocolKind::DistributedActor);
     (void)evaluateTargetConformanceTo(distributedActorProto);
