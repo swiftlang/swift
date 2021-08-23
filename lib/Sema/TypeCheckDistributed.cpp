@@ -71,33 +71,14 @@ bool IsDistributedActorRequest::evaluate(
   return classDecl->isExplicitDistributedActor();
 }
 
-AbstractFunctionDecl *GetDistributedRemoteFuncRequest::evaluate(
-    Evaluator &evaluator, AbstractFunctionDecl *func) const {
-  if (!func->isDistributed())
-    return nullptr;
-
-  auto &C = func->getASTContext();
-  DeclContext *DC = func->getDeclContext();
-
-  // not via `ensureDistributedModuleLoaded` to avoid generating a warning,
-  // we won't be emitting the offending decl after all.
-  if (!C.getLoadedModule(C.Id_Distributed))
-    return nullptr;
-
-  // Locate the actor decl that the member must be synthesized to.
-  // TODO(distributed): should this just be added to the extension instead when we're in one?
-  ClassDecl *decl = dyn_cast<ClassDecl>(DC);
-  if (!decl) {
-    if (auto ED = dyn_cast<ExtensionDecl>(DC)) {
-      decl = dyn_cast<ClassDecl>(ED->getExtendedNominal());
-    }
+bool IsDistributedFuncRequest::evaluate(
+    Evaluator &evaluator, FuncDecl *func) const {
+  // Check whether the attribute was explicitly specified.
+  if (auto attr = func->getAttrs().getAttribute<DistributedActorAttr>()) {
+    return true;
+  } else {
+    return false;
   }
-
-  /// A distributed func cannot be added to a non-distributed actor;
-  /// If the 'decl' was not a distributed actor we must have declared and
-  /// requested it from a illegal context, let's just ignore the synthesis.
-  assert(decl && "Can't find actor detect to add implicit _remote function to");
-  return TypeChecker::addImplicitDistributedActorRemoteFunction(decl, func);
 }
 
 // ==== ------------------------------------------------------------------------
@@ -150,9 +131,6 @@ bool swift::checkDistributedFunction(FuncDecl *func, bool diagnose) {
 
   // === Check _remote functions
   ClassDecl *actorDecl = dyn_cast<ClassDecl>(func->getParent());
-  if (actorDecl == nullptr)
-    if (auto ED = dyn_cast<ExtensionDecl>(func->getParent()))
-      actorDecl = dyn_cast<ClassDecl>(ED->getExtendedNominal());
   assert(actorDecl && actorDecl->isDistributedActor());
 
   // _remote function for a distributed function must not be implemented by end-users,
@@ -256,7 +234,7 @@ void TypeChecker::checkDistributedActor(ClassDecl *decl) {
 
   // --- Synthesize properties
   // TODO: those could technically move to DerivedConformance style
-  swift::addImplicitDistributedActorMembers(decl);
+  swift::addImplicitDistributedActorMembersToClass(decl);
 
   // ==== Functions
 }
