@@ -200,6 +200,18 @@ func subscriptMutableCollectionIgnored() {
   ds[3..<5] = goodSlice
 }
 
+// expected-error@+2 {{type 'IncompleteRangeReplaceableCollection' does not conform to protocol 'RangeReplaceableCollection'}}
+// expected-error@+1 {{unavailable instance method 'replaceSubrange(_:with:)' was used to satisfy a requirement of protocol 'RangeReplaceableCollection'}}
+struct IncompleteRangeReplaceableCollection: RangeReplaceableCollection {
+  var startIndex: Int
+  var endIndex: Int
+
+  func index(after i: Int) -> Int { i+1 }
+  subscript(position: Int) -> Int { position }
+
+  init() { startIndex = 0; endIndex = 0 }
+ }
+
 // FIXME: Remove -verify-ignore-unknown.
 // <unknown>:0: error: unexpected note produced: possibly intended match
 // <unknown>:0: error: unexpected note produced: possibly intended match
