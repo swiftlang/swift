@@ -46,8 +46,8 @@ endif()
 
 # Build any target libdispatch if needed.
 foreach(sdk ${SWIFT_SDKS})
-  # Apple targets have libdispatch available, do not build it.
-  if(NOT "${sdk}" IN_LIST SWIFT_APPLE_PLATFORMS)
+  # Darwin targets have libdispatch available, do not build it.
+  if(NOT "${sdk}" IN_LIST SWIFT_DARWIN_PLATFORMS)
     list(APPEND DISPATCH_SDKS "${sdk}")
   endif()
 endforeach()
