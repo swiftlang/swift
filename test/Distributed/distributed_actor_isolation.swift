@@ -1,4 +1,5 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-distributed -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -enable-experimental-distributed -disable-availability-checking -verify-ignore-unknown
+// TODO(distributed): remove the -verify-ignore-unknown, we're causing Sendable warnings in <unknown> locs right now
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
@@ -67,24 +68,26 @@ distributed actor DistributedActor_1 {
     fatalError()
   }
 
-  distributed func distReturnGeneric<T: Codable>(item: T) async throws -> T { // ok
+  distributed func distReturnGeneric<T: Sendable & Codable>(item: T) async throws -> T { // ok
     item
   }
-  distributed func distReturnGenericWhere<T>(item: Int) async throws -> T where T: Codable { // ok
+  distributed func distReturnGenericWhere<T>(item: Int) async throws -> T
+      where T: Sendable, T: Codable { // ok
     fatalError()
   }
-  distributed func distBadReturnGeneric<T>(int: Int) async throws -> T {
+  distributed func distBadReturnGeneric<T: Sendable>(int: Int) async throws -> T {
     // expected-error@-1 {{distributed function result type 'T' does not conform to 'Codable'}}
     fatalError()
   }
 
-  distributed func distGenericParam<T: Codable>(value: T) async throws { // ok
+  distributed func distGenericParam<T: Sendable & Codable>(value: T) async throws { // ok
     fatalError()
   }
-  distributed func distGenericParamWhere<T>(value: T) async throws -> T where T: Codable { // ok
+  distributed func distGenericParamWhere<T>(value: T) async throws -> T
+      where T: Sendable, T: Codable { // ok
     value
   }
-  distributed func distBadGenericParam<T>(int: T) async throws {
+  distributed func distBadGenericParam<T>(int: T) async throws where T: Sendable {
     // expected-error@-1 {{distributed function parameter 'int' of type 'T' does not conform to 'Codable'}}
     fatalError()
   }

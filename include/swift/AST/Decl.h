@@ -5986,6 +5986,10 @@ public:
   /// Returns 'true' if the function is distributed.
   bool isDistributed() const;
 
+  /// Get (or synthesize)  the associated remote function for this one.
+  /// For example, for `distributed func hi()` get `func _remote_hi()`.
+  AbstractFunctionDecl *getDistributedActorRemoteFuncDecl() const;
+
   PolymorphicEffectKind getPolymorphicEffectKind(EffectKind kind) const;
 
   // FIXME: Hack that provides names with keyword arguments for accessors.
