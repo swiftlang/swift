@@ -12,3 +12,6 @@ public struct PrivateStr {
   }
 }
 
+public func privateFunc() -> Int {
+  return 40
+}

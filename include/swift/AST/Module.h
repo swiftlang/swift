@@ -677,9 +677,10 @@ public:
   /// This assumes that \p module was imported.
   bool isImportedImplementationOnly(const ModuleDecl *module) const;
 
-  /// Returns true if a function, which is using \p nominal, can be serialized
-  /// by cross-module-optimization.
-  bool canBeUsedForCrossModuleOptimization(NominalTypeDecl *nominal) const;
+  /// Returns true if decl context or its content can be serialized by
+  /// cross-module-optimization.
+  /// The \p ctxt can e.g. be a NominalType or the context of a function.
+  bool canBeUsedForCrossModuleOptimization(DeclContext *ctxt) const;
 
   /// Finds all top-level decls of this module.
   ///
