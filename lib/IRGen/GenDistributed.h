@@ -43,7 +43,6 @@ class IRGenFunction;
 /// Emit the '_distributedActorRemoteInitialize' call.
 llvm::Value *emitDistributedActorInitializeRemote(
     IRGenFunction &IGF,
-    SILType selfType,
     llvm::Value *actorMetatype,
     Explosion &out);
 
