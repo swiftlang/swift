@@ -5,6 +5,18 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 
 Swift 5.6
 ---------
+* [SE-0315][]:
+
+  Type expressions and annotations can now include "type placeholders" which
+  directs the compiler to fill in that portion of the type according to the usual
+  type inference rules. Type placeholders are spelled as an underscore ("`_`") in
+  a type name. For instance:
+  
+  ```swift
+  // This is OK--the compiler can infer the key type as `Int`.
+  let dict: [_: String] = [0: "zero", 1: "one", 2: "two"]
+  ```
+
 * [SE-0290][]:
 
   It is now possible to write inverted availability conditions by using the new `#unavailable` keyword:
@@ -8680,6 +8692,7 @@ Swift 1.0
 [SE-0310]: <https://github.com/apple/swift-evolution/blob/main/proposals/0310-effectful-readonly-properties.md>
 [SE-0311]: <https://github.com/apple/swift-evolution/blob/main/proposals/0311-task-locals.md>
 [SE-0313]: <https://github.com/apple/swift-evolution/blob/main/proposals/0313-actor-isolation-control.md>
+[SE-0315]: <https://github.com/apple/swift-evolution/blob/main/proposals/0315-placeholder-types.md>
 [SE-0316]: <https://github.com/apple/swift-evolution/blob/main/proposals/0316-global-actors.md>
 
 [SR-75]: <https://bugs.swift.org/browse/SR-75>
