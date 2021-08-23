@@ -12,6 +12,8 @@
 
 // REQUIRES: executable_test
 // REQUIRES: shell
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 // CHECK-NOT: FAIL
 
