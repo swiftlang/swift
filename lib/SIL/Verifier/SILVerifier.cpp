@@ -545,6 +545,13 @@ struct ImmutableAddressUseVerifier {
       case SILInstructionKind::SwitchEnumAddrInst:
       case SILInstructionKind::SelectEnumAddrInst:
         break;
+      case SILInstructionKind::DebugValueInst:
+        if (cast<DebugValueInst>(inst)->hasAddrVal())
+          break;
+        else {
+          llvm::errs() << "Unhandled, unexpected instruction: " << *inst;
+          llvm_unreachable("invoking standard assertion failure");
+        }
       case SILInstructionKind::AddressToPointerInst:
         // We assume that the user is attempting to do something unsafe since we
         // are converting to a raw pointer. So just ignore this use.

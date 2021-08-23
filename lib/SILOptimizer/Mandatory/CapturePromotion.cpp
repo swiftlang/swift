@@ -313,6 +313,7 @@ private:
 
   SILValue getProjectBoxMappedVal(SILValue operandValue);
 
+  void visitDebugValueInst(DebugValueInst *inst);
   void visitDebugValueAddrInst(DebugValueAddrInst *inst);
   void visitDestroyValueInst(DestroyValueInst *inst);
   void visitStructElementAddrInst(StructElementAddrInst *inst);
@@ -580,6 +581,17 @@ void ClosureCloner::visitDebugValueAddrInst(DebugValueAddrInst *inst) {
     return;
   }
   SILCloner<ClosureCloner>::visitDebugValueAddrInst(inst);
+}
+/// Doing the same thing as ClosureCloner::visitDebugValueAddrInst. Only used
+/// when transitioning away from debug_value_addr.
+void ClosureCloner::visitDebugValueInst(DebugValueInst *inst) {
+  if (inst->hasAddrVal())
+    if (SILValue value = getProjectBoxMappedVal(inst->getOperand())) {
+      getBuilder().setCurrentDebugScope(getOpScope(inst->getDebugScope()));
+      getBuilder().createDebugValue(inst->getLoc(), value, *inst->getVarInfo());
+      return;
+    }
+  SILCloner<ClosureCloner>::visitDebugValueInst(inst);
 }
 
 /// Handle a destroy_value instruction during cloning of a closure; if it is a
@@ -855,6 +867,7 @@ getPartialApplyArgMutationsAndEscapes(PartialApplyInst *pai,
     }
 
     if (isa<DebugValueAddrInst>(addrUser) ||
+        DebugValueInst::hasAddrVal(addrUser) ||
         isa<MarkFunctionEscapeInst>(addrUser) || isa<EndAccessInst>(addrUser)) {
       return false;
     }

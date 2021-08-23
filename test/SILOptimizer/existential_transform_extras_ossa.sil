@@ -80,7 +80,7 @@ bb0:
 
 // CHECK-LABEL: sil public_external [serialized] [ossa] @$s7dealloc20wrap_foo_ncp_another1aSiAA1P_pz_tF : $@convention(thin) (@inout P) -> Int32 {
 // CHECK: bb0(%0 : $*P):
-// CHECK:  debug_value_addr
+// CHECK:  debug_value {{.*}} expr op_deref
 // CHECK:  alloc_stack
 // CHECK:  copy_addr
 // CHECK:  open_existential_addr
@@ -114,7 +114,7 @@ sil_global hidden [let] @$global_var : $P
 
 // CHECK-LABEL: sil hidden [noinline] [ossa] @$helper : $@convention(thin) (@in P) -> Int32 {
 // CHECK: bb0(%0 : $*P):
-// CHECK:   debug_value_addr
+// CHECK:   debug_value {{.*}} expr op_deref
 // CHECK:   alloc_stack
 // CHECK:   copy_addr
 // CHECK:   destroy_addr

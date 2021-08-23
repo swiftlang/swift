@@ -144,10 +144,10 @@ public class CC<R> {
 sil @useAny : $@convention(thin) <V> (@in_guaranteed V) -> ()
 
 // CHECK-LABEL: sil @testDebugValue : $@convention(method) <R><S> (@in_guaranteed S, @guaranteed CC<R>, Bool) -> () {
-// CHECK: debug_value_addr %0 : $*S, let, name "u"
+// CHECK: debug_value %0 : $*S, let, name "u", expr op_deref
 // CHECK: apply %{{.*}}<S>(%0) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
 // CHECK: [[FIELD:%.*]] = ref_element_addr %1 : $CC<R>, #CC.r
-// CHECK: debug_value_addr [[FIELD]] : $*R, let, name "u"
+// CHECK: debug_value [[FIELD]] : $*R, let, name "u", expr op_deref
 // CHECK: apply %{{.*}}<R>([[FIELD]]) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
 // CHECK-LABEL: } // end sil function 'testDebugValue'
 sil @testDebugValue : $@convention(method) <R><S> (@in_guaranteed S, @guaranteed CC<R>, Bool) -> () {

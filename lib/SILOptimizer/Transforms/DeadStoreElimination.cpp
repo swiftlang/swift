@@ -1045,7 +1045,9 @@ void DSEContext::processStoreInst(SILInstruction *I, DSEKind Kind) {
 
 void DSEContext::processDebugValueAddrInstForGenKillSet(SILInstruction *I) {
   BlockState *S = getBlockState(I);
-  SILValue Mem = cast<DebugValueAddrInst>(I)->getOperand();
+  SILValue Mem = isa<DebugValueAddrInst>(I)?
+    cast<DebugValueAddrInst>(I)->getOperand() :
+    cast<DebugValueInst>(I)->getOperand();
   for (unsigned i = 0; i < S->LocationNum; ++i) {
     if (!S->BBMaxStoreSet.test(i))
       continue;
@@ -1058,7 +1060,9 @@ void DSEContext::processDebugValueAddrInstForGenKillSet(SILInstruction *I) {
 
 void DSEContext::processDebugValueAddrInstForDSE(SILInstruction *I) {
   BlockState *S = getBlockState(I);
-  SILValue Mem = cast<DebugValueAddrInst>(I)->getOperand();
+  SILValue Mem = isa<DebugValueAddrInst>(I)?
+    cast<DebugValueAddrInst>(I)->getOperand() :
+    cast<DebugValueInst>(I)->getOperand();
   for (unsigned i = 0; i < S->LocationNum; ++i) {
     if (!S->isTrackingLocation(S->BBWriteSetMid, i))
       continue;
@@ -1140,7 +1144,7 @@ void DSEContext::processInstruction(SILInstruction *I, DSEKind Kind) {
     processLoadInst(I, Kind);
   } else if (isa<StoreInst>(I)) {
     processStoreInst(I, Kind);
-  } else if (isa<DebugValueAddrInst>(I)) {
+  } else if (isa<DebugValueAddrInst>(I) || DebugValueInst::hasAddrVal(I)) {
     processDebugValueAddrInst(I, Kind);
   } else if (I->mayReadFromMemory()) {
     processUnknownReadInst(I, Kind);

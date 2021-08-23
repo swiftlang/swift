@@ -416,13 +416,13 @@ enum IntTEnum<T> {
 // CHECK: Storage: Argument %0 = argument of bb0 : $*IntTEnum<T>
 // CHECK: Path: ()
 // CHECK: Exact Uses {
-// CHECK-NEXT:  debug_value_addr %0 : $*IntTEnum<T>, let, name "self", argno 1
+// CHECK-NEXT:  debug_value %0 : $*IntTEnum<T>, let, name "self", argno 1, expr op_deref
 // CHECK-NEXT:  Path: ()
 // CHECK-NEXT:  copy_addr %0 to [initialization] %2 : $*IntTEnum<T>
 // CHECK-NEXT:  Path: ()
 // CHECK-NEXT: }
 // CHECK: Overlapping Uses {
-// CHECK-NEXT:  debug_value_addr %0 : $*IntTEnum<T>, let, name "self", argno 1
+// CHECK-NEXT:  debug_value %0 : $*IntTEnum<T>, let, name "self", argno 1, expr op_deref
 // CHECK-NEXT:  Path: ()
 // CHECK-NEXT:  copy_addr %0 to [initialization] %2 : $*IntTEnum<T>
 // CHECK-NEXT:  Path: ()

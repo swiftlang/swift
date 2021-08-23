@@ -759,6 +759,12 @@ getConcreteValueOfExistentialBoxAddr(SILValue addr, SILInstruction *ignoreUser) 
     case SILInstructionKind::DebugValueAddrInst:
     case SILInstructionKind::LoadInst:
       break;
+    case SILInstructionKind::DebugValueInst:
+      if (!DebugValueInst::hasAddrVal(stackUser)) {
+        if (stackUser != ignoreUser)
+          return SILValue();
+      }
+      break;
     case SILInstructionKind::StoreInst: {
       auto *store = cast<StoreInst>(stackUser);
       assert(store->getSrc() != stackLoc && "cannot store an address");

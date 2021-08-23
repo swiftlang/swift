@@ -4770,14 +4770,11 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   } else
     return;
 
-  // Calculate the indirection
-  IndirectionKind Indirection = DirectValue;
-  if (IsInCoro)
-    Indirection = IsAddrVal ? CoroIndirectValue : CoroDirectValue;
-  else if (IsAddrVal && !isa<AllocStackInst>(SILVal))
-    Indirection = IndirectValue;
+  // Since debug_value is expressing indirection explicitly via op_deref,
+  // we're not using either IndirectValue or CoroIndirectValue here.
+  IndirectionKind Indirection = IsInCoro? CoroDirectValue : DirectValue;
 
-  // Put the value into a stack slot at -Onone.
+  // Put the value into a shadow-copy stack slot at -Onone.
   llvm::SmallVector<llvm::Value *, 8> Copy;
   if (IsAddrVal)
     Copy.emplace_back(

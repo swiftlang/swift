@@ -4672,6 +4672,8 @@ class DebugValueInst final
   static DebugValueInst *create(SILDebugLocation DebugLoc, SILValue Operand,
                                 SILModule &M, SILDebugVariable Var,
                                 bool poisonRefs);
+  static DebugValueInst *createAddr(SILDebugLocation DebugLoc, SILValue Operand,
+                                    SILModule &M, SILDebugVariable Var);
 
   SIL_DEBUG_VAR_SUPPLEMENT_TRAILING_OBJS_IMPL()
 
@@ -4711,6 +4713,17 @@ public:
   bool hasAddrVal() const {
     return getOperand()->getType().isAddress();
   }
+
+  /// An utility to check if \p I is DebugValueInst and
+  /// whether it's associated with address type SSA value.
+  static DebugValueInst *hasAddrVal(SILInstruction *I) {
+    auto *DVI = dyn_cast_or_null<DebugValueInst>(I);
+    return DVI && DVI->hasAddrVal()? DVI : nullptr;
+  }
+
+  /// Whether the attached di-expression (if there is any) starts
+  /// with `op_deref`.
+  bool exprStartsWithDeref() const;
 
   /// True if all references within this debug value will be overwritten with a
   /// poison sentinel at this point in the program. This is used in debug builds

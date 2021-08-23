@@ -357,6 +357,29 @@ DebugValueInst *DebugValueInst::create(SILDebugLocation DebugLoc,
   return ::new (buf) DebugValueInst(DebugLoc, Operand, Var, poisonRefs);
 }
 
+DebugValueInst *DebugValueInst::createAddr(SILDebugLocation DebugLoc,
+                                           SILValue Operand, SILModule &M,
+                                           SILDebugVariable Var) {
+  // For alloc_stack, debug_value is used to annotate the associated
+  // memory location, so we shouldn't attach op_deref.
+  if (!isa<AllocStackInst>(Operand))
+    Var.DIExpr.prependElements(
+      {SILDIExprElement::createOperator(SILDIExprOperator::Dereference)});
+  void *buf = allocateDebugVarCarryingInst<DebugValueInst>(M, Var);
+  return ::new (buf) DebugValueInst(DebugLoc, Operand, Var,
+                                    /*poisonRefs=*/false);
+}
+
+bool DebugValueInst::exprStartsWithDeref() const {
+  if (!NumDIExprOperands)
+    return false;
+
+  llvm::ArrayRef<SILDIExprElement> DIExprElements(
+      getTrailingObjects<SILDIExprElement>(), NumDIExprOperands);
+  return DIExprElements.front().getAsOperator()
+          == SILDIExprOperator::Dereference;
+}
+
 DebugValueAddrInst::DebugValueAddrInst(SILDebugLocation DebugLoc,
                                        SILValue Operand, SILDebugVariable Var)
     : UnaryInstructionBase(DebugLoc, Operand),

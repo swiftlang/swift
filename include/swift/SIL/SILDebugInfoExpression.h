@@ -162,6 +162,15 @@ public:
     appendElements(Tail.Elements);
   }
 
+  void prependElements(llvm::ArrayRef<SILDIExprElement> NewElements) {
+    Elements.insert(Elements.begin(),
+                    NewElements.begin(), NewElements.end());
+  }
+
+  void eraseElement(const_iterator It) {
+    Elements.erase(It);
+  }
+
   /// The iterator for SILDIExprOperand
   class op_iterator {
     friend class SILDebugInfoExpression;

@@ -44,7 +44,7 @@ public class C<R> {
   // IR-LABEL: define {{.*}} @"$s1A1CC1fyyqd__lF"
 #sourceLocation(file: "f.swift", line: 1)
   public func f<S>(_ s: S) {
-    // SIL: debug_value_addr %0 : $*S, let, name "s", argno 1,{{.*}} scope [[F]]
+    // SIL: debug_value %0 : $*S, let, name "s", argno 1, expr op_deref, {{.*}} scope [[F]]
     // SIL: function_ref {{.*}}yes{{.*}} scope [[F1G1]]
     // SIL: function_ref {{.*}}use{{.*}} scope [[F1G3H]]
     // IR: dbg.value(metadata %swift.type* %S, metadata ![[MD_1_0:[0-9]+]]

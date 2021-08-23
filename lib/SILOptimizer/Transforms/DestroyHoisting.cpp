@@ -390,6 +390,7 @@ void DestroyHoisting::getUsedLocationsOfInst(Bits &bits, SILInstruction *I) {
       getUsedLocationsOfOperands(bits, I);
       break;
     case SILInstructionKind::DebugValueAddrInst:
+    case SILInstructionKind::DebugValueInst:
     case SILInstructionKind::DestroyAddrInst:
       // destroy_addr and debug_value_addr are handled specially.
       break;
@@ -488,6 +489,13 @@ void DestroyHoisting::moveDestroysInBlock(
       auto *dvaLoc = locations.getLocation(DVA->getOperand());
       if (dvaLoc && locationOverlaps(dvaLoc, activeDestroys))
         toRemove.push_back(DVA);
+    } else if (auto *DV = DebugValueInst::hasAddrVal(&I)) {
+      // debug_value w/ address value does not count as real use of a location.
+      // If we are moving a destroy_addr above a debug_value, just delete that
+      // debug_value.
+      auto *dvaLoc = locations.getLocation(DV->getOperand());
+      if (dvaLoc && locationOverlaps(dvaLoc, activeDestroys))
+        toRemove.push_back(DV);
     } else if (I.mayHaveSideEffects()) {
       // Delete all destroy_addr and debug_value_addr which are scheduled for
       // removal.
@@ -526,6 +534,12 @@ void DestroyHoisting::insertDestroys(Bits &toInsert, Bits &activeDestroys,
         // Also keep debug_value_addr instructions, located before a
         // destroy_addr which we won't move.
         auto *dvaLoc = locations.getLocation(DVA->getOperand());
+        if (dvaLoc && dvaLoc->selfAndParents.anyCommon(keepDestroyedLocs))
+          return true;
+      } else if (auto *DV = DebugValueInst::hasAddrVal(I)) {
+        // Also keep debug_value_addr instructions, located before a
+        // destroy_addr which we won't move.
+        auto *dvaLoc = locations.getLocation(DV->getOperand());
         if (dvaLoc && dvaLoc->selfAndParents.anyCommon(keepDestroyedLocs))
           return true;
       }

@@ -564,7 +564,7 @@ bb3:
 
 // CHECK-LABEL: sil [ossa] @mem2reg_debug_value_addr :
 // CHECK-NOT: alloc_stack
-// CHECK-NOT: debug_value_addr
+// CHECK-NOT: debug_value {{.*}} expr op_deref
 // CHECK: debug_value %0
 // CHECK-LABEL: } // end sil function 'mem2reg_debug_value_addr'
 sil [ossa] @mem2reg_debug_value_addr : $@convention(thin) (@owned Klass) -> @owned Klass {
@@ -682,7 +682,7 @@ bb0:
   %0 = alloc_stack $Klass
   %local = alloc_ref $Klass
   store %local to [init] %0 : $*Klass
-  // CHECK-NOT: debug_value_addr
+  // CHECK-NOT: debug_value {{.*}} expr op_deref
   debug_value_addr %0 : $*Klass
   destroy_addr %0 : $*Klass
   // CHECK-NOT: dealloc_stack

@@ -180,7 +180,7 @@ bb0(%0 : $*()):
 
 // CHECK-LABEL: sil @mem2reg_debug_value_addr
 // CHECK-NOT: alloc_stack
-// CHECK-NOT: debug_value_addr
+// CHECK-NOT: debug_value {{.*}} expr op_deref
 // CHECK: debug_value %0
 // CHECK: return
 sil @mem2reg_debug_value_addr : $@convention(thin) (Int) -> Int {
@@ -327,7 +327,7 @@ sil @no_real_uses : $@convention(thin) () -> () {
 bb0:
   // CHECK-NOT: alloc_stack
   %0 = alloc_stack $Builtin.Int32
-  // CHECK-NOT: debug_value_addr
+  // CHECK-NOT: debug_value {{.*}} expr op_deref
   debug_value_addr %0 : $*Builtin.Int32, let, name "x", argno 1
   // CHECK-NOT: dealloc_stack
   dealloc_stack %0 : $*Builtin.Int32
