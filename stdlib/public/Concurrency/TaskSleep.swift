@@ -16,8 +16,6 @@ import Swift
 extension Task where Success == Never, Failure == Never {
   /// Suspends the current task for at least the given duration
   /// in nanoseconds.
-  /// ◊TR: Why do we have both sleep(_:) and sleep(nanoseconds:) -- what's the difference between them?
-  /// ◊TR: It looks like only sleep(nanoseconds:) throws.
   ///
   /// This function doesn't block the underlying thread.
   public static func sleep(_ duration: UInt64) async {

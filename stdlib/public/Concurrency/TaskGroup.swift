@@ -373,7 +373,6 @@ public struct TaskGroup<ChildTaskResult> {
   ///
   /// There are no restrictions on where you can call this method.
   /// Code inside a child task or even another task can cancel a group.
-  /// ◊TR: Is this rewrite too strong?
   ///
   /// - SeeAlso: `Task.isCancelled`
   /// - SeeAlso: `TaskGroup.isCancelled`
@@ -388,8 +387,6 @@ public struct TaskGroup<ChildTaskResult> {
   /// If the task that's currently running this group is canceled,
   /// the group is also implicitly canceled,
   /// which is also reflected in this property's value.
-  /// ◊TR: Why do we have two implementations of this method?
-  /// ◊TR: What's the difference between them?
   public var isCancelled: Bool {
     return _taskGroupIsCancelled(group: _group)
   }
@@ -669,7 +666,6 @@ public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
   ///
   /// There are no restrictions on where you can call this method.
   /// Code inside a child task or even another task can cancel a group.
-  /// ◊TR: Is this rewrite too strong?
   ///
   /// - SeeAlso: `Task.isCancelled`
   /// - SeeAlso: `ThrowingTaskGroup.isCancelled`
@@ -684,8 +680,6 @@ public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
   /// If the task that's currently running this group is canceled,
   /// the group is also implicitly canceled,
   /// which is also reflected in this property's value.
-  /// ◊TR: Why do we have two implementations of this method?
-  /// ◊TR: What's the difference between them?
   public var isCancelled: Bool {
     return _taskGroupIsCancelled(group: _group)
   }
