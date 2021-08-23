@@ -172,11 +172,8 @@ public:
   }
 };
 
-// Return the minimum Swift runtime version that supports demangling a given
-// type.
-static llvm::VersionTuple
-getRuntimeVersionThatSupportsDemanglingType(IRGenModule &IGM,
-                                            CanType type) {
+Optional<llvm::VersionTuple>
+swift::irgen::getRuntimeVersionThatSupportsDemanglingType(CanType type) {
   // Associated types of opaque types weren't mangled in a usable form by the
   // Swift 5.1 runtime, so we needed to add a new mangling in 5.2.
   if (type->hasOpaqueArchetype()) {
@@ -194,8 +191,7 @@ getRuntimeVersionThatSupportsDemanglingType(IRGenModule &IGM,
     // guards, so we don't need to limit availability of mangled names
     // involving them.
   }
-  
-  return llvm::VersionTuple(5, 0);
+  return None;
 }
 
 // Produce a fallback mangled type name that uses an open-coded callback
@@ -289,9 +285,11 @@ getTypeRefImpl(IRGenModule &IGM,
     // symbolic reference with a callback function.
     if (auto runtimeCompatVersion = getSwiftRuntimeCompatibilityVersionForTarget
                                       (IGM.Context.LangOpts.Target)) {
-      if (*runtimeCompatVersion <
-            getRuntimeVersionThatSupportsDemanglingType(IGM, type)) {
-        return getTypeRefByFunction(IGM, sig, type);
+      if (auto minimumSupportedRuntimeVersion =
+              getRuntimeVersionThatSupportsDemanglingType(type)) {
+        if (*runtimeCompatVersion < *minimumSupportedRuntimeVersion) {
+          return getTypeRefByFunction(IGM, sig, type);
+        }
       }
     }
       
