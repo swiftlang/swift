@@ -48,7 +48,7 @@ public protocol ActorTransport: Sendable {
   ///
   /// Detecting liveness of such remote actors shall be offered / by transport libraries
   /// by other means, such as "watching an actor for termination" or similar.
-  func resolve<Act>(_ identity: AnyActorIdentity, as actorType: Act.Type) throws -> ActorResolved<Act> // TODO(distributed): make just optional
+  func resolve<Act>(_ identity: AnyActorIdentity, as actorType: Act.Type) throws -> Act? // TODO(distributed): make just optional
       where Act: DistributedActor
 
   // ==== ---------------------------------------------------------------------
@@ -72,10 +72,4 @@ public protocol ActorTransport: Sendable {
   /// Called during actor deinit/destroy.
   func resignIdentity(_ id: AnyActorIdentity)
 
-}
-
-@available(SwiftStdlib 5.5, *)
-public enum ActorResolved<Act: DistributedActor> {
-  case resolved(Act)
-  case makeProxy
 }
