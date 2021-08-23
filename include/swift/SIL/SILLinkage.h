@@ -15,9 +15,6 @@
 
 #include "llvm/Support/ErrorHandling.h"
 
-// FIXME: Remove after fixmeWitnessHasLinkageThatNeedsToBePublic is removed.
-#include "swift/SIL/SILDeclRef.h"
-
 namespace swift {
 
 class ValueDecl;
