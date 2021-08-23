@@ -1,6 +1,10 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
+// rdar://82240971 – Temporarily disable this test on non-macOS platforms until
+// the CI is fixed to not produce 'Invalid device: iPhone 8'.
+// REQUIRES: OS=macosx
+
 import _Differentiation
 
 // Test `Differentiable` protocol conformances for stdlib types.
