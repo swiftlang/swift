@@ -1,18 +1,19 @@
 // First test: functional correctness
 
 // RUN: %empty-directory(%t) 
-// RUN: %target-build-swift -O -wmo -parse-as-library -cross-module-optimization -emit-module -emit-module-path=%t/Submodule.swiftmodule -module-name=Submodule %S/Inputs/cross-submodule.swift -c -o %t/submodule.o
-// RUN: %target-build-swift -O -wmo -parse-as-library -cross-module-optimization -emit-module -emit-module-path=%t/PrivateSubmodule.swiftmodule -module-name=PrivateSubmodule %S/Inputs/cross-private-submodule.swift -c -o %t/privatesubmodule.o
-// RUN: %target-build-swift -O -wmo -parse-as-library -cross-module-optimization -emit-module -emit-module-path=%t/Test.swiftmodule -module-name=Test -I%t %S/Inputs/cross-module.swift -c -o %t/test.o
+// RUN: %target-build-swift -O -wmo -parse-as-library -cross-module-optimization -emit-module -emit-module-path=%t/Submodule.swiftmodule -module-name=Submodule %S/Inputs/cross-module/cross-submodule.swift -c -o %t/submodule.o
+// RUN: %target-build-swift -O -wmo -parse-as-library -cross-module-optimization -emit-module -emit-module-path=%t/PrivateSubmodule.swiftmodule -module-name=PrivateSubmodule %S/Inputs/cross-module/cross-private-submodule.swift -c -o %t/privatesubmodule.o
+// RUN: %target-clang -c --language=c %S/Inputs/cross-module/c-module.c -o %t/c-module.o
+// RUN: %target-build-swift -O -wmo -parse-as-library -cross-module-optimization -emit-module -emit-module-path=%t/Test.swiftmodule -module-name=Test -I%t -I%S/Inputs/cross-module %S/Inputs/cross-module/cross-module.swift -c -o %t/test.o
 // RUN: %target-build-swift -O -wmo -module-name=Main -I%t %s -c -o %t/main.o
-// RUN: %target-swiftc_driver %t/main.o %t/test.o %t/submodule.o %t/privatesubmodule.o -o %t/a.out
+// RUN: %target-swiftc_driver %t/main.o %t/test.o %t/submodule.o %t/privatesubmodule.o %t/c-module.o -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s -check-prefix=CHECK-OUTPUT
 
 // Check if it also works if the main module is compiled with -Onone:
 
 // RUN: %target-build-swift -Onone -wmo -module-name=Main -I%t %s -c -o %t/main-onone.o
-// RUN: %target-swiftc_driver %t/main-onone.o %t/test.o %t/submodule.o %t/privatesubmodule.o -o %t/a.out
+// RUN: %target-swiftc_driver %t/main-onone.o %t/test.o %t/submodule.o %t/privatesubmodule.o %t/c-module.o -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s -check-prefix=CHECK-OUTPUT
 
@@ -146,8 +147,14 @@ func testGlobal() {
 @inline(never)
 func testImplementationOnly() {
   // CHECK-OUTPUT: 27
-  // CHECK-SIL2: function_ref @$s4Test22callImplementationOnlyyxxlF
-  print(callImplementationOnly(27))
+  // CHECK-SIL2: function_ref @$s4Test26callImplementationOnlyTypeyxxlF
+  print(callImplementationOnlyType(27))
+  // CHECK-OUTPUT: 40
+  // CHECK-SIL2: function_ref @$s4Test26callImplementationOnlyFuncySixlF
+  print(callImplementationOnlyFunc(0))
+  // CHECK-OUTPUT: 123
+  // CHECK-SIL2: function_ref @$s4Test23callCImplementationOnlyySixlF
+  print(callCImplementationOnly(0))
   // CHECK-SIL2: } // end sil function '$s4Main22testImplementationOnlyyyF'
 }
 

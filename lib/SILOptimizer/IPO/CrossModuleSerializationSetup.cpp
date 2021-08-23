@@ -386,6 +386,11 @@ bool CrossModuleSerializationSetup::canUseFromInline(SILFunction *func,
   if (!func)
     return false;
 
+  if (DeclContext *funcCtxt = func->getDeclContext()) {
+    if (!M.getSwiftModule()->canBeUsedForCrossModuleOptimization(funcCtxt))
+      return false;
+  }
+
   switch (func->getLinkage()) {
   case SILLinkage::PublicNonABI:
     return func->isSerialized() != IsNotSerialized;

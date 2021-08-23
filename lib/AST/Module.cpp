@@ -2346,14 +2346,15 @@ bool ModuleDecl::isImportedImplementationOnly(const ModuleDecl *module) const {
 }
 
 bool ModuleDecl::
-canBeUsedForCrossModuleOptimization(NominalTypeDecl *nominal) const {
-  ModuleDecl *moduleOfNominal = nominal->getParentModule();
+canBeUsedForCrossModuleOptimization(DeclContext *ctxt) const {
+  ModuleDecl *moduleOfCtxt = ctxt->getParentModule();
 
-  // If the nominal is defined in the same module, it's fine.
-  if (moduleOfNominal == this)
+  // If the context defined in the same module - or is the same module, it's
+  // fine.
+  if (moduleOfCtxt == this)
     return true;
 
-  // See if nominal is imported in a "regular" way, i.e. not with
+  // See if context is imported in a "regular" way, i.e. not with
   // @_implementationOnly or @_spi.
   ModuleDecl::ImportFilter filter = {
     ModuleDecl::ImportFilterKind::Exported,
@@ -2363,7 +2364,7 @@ canBeUsedForCrossModuleOptimization(NominalTypeDecl *nominal) const {
 
   auto &imports = getASTContext().getImportCache();
   for (auto &desc : results) {
-    if (imports.isImportedBy(moduleOfNominal, desc.importedModule))
+    if (imports.isImportedBy(moduleOfCtxt, desc.importedModule))
       return true;
   }
   return false;
