@@ -5420,11 +5420,6 @@ SolutionApplicationTarget SolutionApplicationTarget::forForEachStmt(
 }
 
 SolutionApplicationTarget
-SolutionApplicationTarget::forUninitializedWrappedVar(VarDecl *wrappedVar) {
-  return SolutionApplicationTarget(wrappedVar);
-}
-
-SolutionApplicationTarget
 SolutionApplicationTarget::forPropertyWrapperInitializer(
     VarDecl *wrappedVar, DeclContext *dc, Expr *initializer) {
   SolutionApplicationTarget target(
@@ -5443,6 +5438,12 @@ SolutionApplicationTarget::forPropertyWrapperInitializer(
 
 ContextualPattern
 SolutionApplicationTarget::getContextualPattern() const {
+  if (kind == Kind::uninitializedVar) {
+    assert(patternBinding);
+    return ContextualPattern::forPatternBindingDecl(patternBinding,
+                                                    uninitializedVar.index);
+  }
+
   assert(kind == Kind::expression);
   assert(expression.contextualPurpose == CTP_Initialization ||
          expression.contextualPurpose == CTP_ForEachStmt);
@@ -5558,6 +5559,8 @@ void ConstraintSystem::diagnoseFailureFor(SolutionApplicationTarget target) {
       nominal->diagnose(diag::property_wrapper_declared_here,
                         nominal->getName());
     }
+  } else if (auto *var = target.getAsUninitializedVar()) {
+    DE.diagnose(target.getLoc(), diag::failed_to_produce_diagnostic);
   } else {
     // Emit a poor fallback message.
     DE.diagnose(target.getAsFunction()->getLoc(),

@@ -295,7 +295,7 @@ void constraints::performSyntacticDiagnosticsForTarget(
   case SolutionApplicationTarget::Kind::stmtCondition:
   case SolutionApplicationTarget::Kind::caseLabelItem:
   case SolutionApplicationTarget::Kind::patternBinding:
-  case SolutionApplicationTarget::Kind::uninitializedWrappedVar:
+  case SolutionApplicationTarget::Kind::uninitializedVar:
     // Nothing to do for these.
     return;
   }

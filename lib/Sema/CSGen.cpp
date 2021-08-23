@@ -3936,15 +3936,19 @@ bool ConstraintSystem::generateConstraints(
       if (!patternType || patternType->hasError())
         return true;
 
-      auto init = patternBinding->getInit(index);
-      if (!init) {
-        llvm_unreachable("Unsupported pattern binding entry");
+      if (!patternBinding->isInitialized(index) &&
+          patternBinding->isDefaultInitializable(index) &&
+          pattern->hasStorage()) {
+        llvm_unreachable("default initialization is unsupported");
       }
 
-      // Generate constraints for the initialization.
-      auto target = SolutionApplicationTarget::forInitialization(
-          init, dc, patternType, pattern,
-          /*bindPatternVarsOneWay=*/true);
+      auto init = patternBinding->getInit(index);
+      auto target = init ? SolutionApplicationTarget::forInitialization(
+                               init, dc, patternType, pattern,
+                               /*bindPatternVarsOneWay=*/true)
+                         : SolutionApplicationTarget::forUninitializedVar(
+                               patternBinding, index, pattern, patternType);
+
       if (generateConstraints(target, FreeTypeVariableBinding::Disallow)) {
         hadError = true;
         continue;
@@ -3957,14 +3961,28 @@ bool ConstraintSystem::generateConstraints(
     return hadError;
   }
 
-  case SolutionApplicationTarget::Kind::uninitializedWrappedVar: {
-    auto *wrappedVar = target.getAsUninitializedWrappedVar();
-    auto propertyType = getVarType(wrappedVar);
-    if (propertyType->hasError())
-      return true;
+  case SolutionApplicationTarget::Kind::uninitializedVar: {
+    if (auto *wrappedVar = target.getAsUninitializedWrappedVar()) {
+      auto propertyType = getVarType(wrappedVar);
+      if (propertyType->hasError())
+        return true;
 
-    return generateWrappedPropertyTypeConstraints(
+      return generateWrappedPropertyTypeConstraints(
         *this, /*initializerType=*/Type(), wrappedVar, propertyType);
+    } else {
+      auto pattern = target.getAsUninitializedVar();
+      auto locator = getConstraintLocator(
+          pattern, LocatorPathElt::ContextualType(CTP_Initialization));
+
+      // Generate constraints to bind all of the internal declarations
+      // and verify the pattern.
+      Type patternType = generateConstraints(
+          pattern, locator, /*shouldBindPatternVarsOneWay*/ true,
+          target.getPatternBindingOfUninitializedVar(),
+          target.getIndexOfUninitializedVar());
+
+      return !patternType;
+    }
   }
   }
 }

@@ -1559,7 +1559,7 @@ public:
     stmtCondition,
     caseLabelItem,
     patternBinding,
-    uninitializedWrappedVar,
+    uninitializedVar,
   } kind;
 
 private:
@@ -1631,9 +1631,15 @@ private:
       DeclContext *dc;
     } caseLabelItem;
 
-    PatternBindingDecl *patternBinding;
+    struct {
+      /// Index into pattern binding declaration (if any).
+      unsigned index;
+      PointerUnion<VarDecl *, Pattern *> declaration;
+      /// Type associated with the declaration.
+      Type type;
+    } uninitializedVar;
 
-    VarDecl *uninitializedWrappedVar;
+    PatternBindingDecl *patternBinding;
   };
 
   // If the pattern contains a single variable that has an attached
@@ -1679,9 +1685,29 @@ public:
     this->patternBinding = patternBinding;
   }
 
-  SolutionApplicationTarget(VarDecl *wrappedVar) {
-    kind = Kind::uninitializedWrappedVar;
-    this->uninitializedWrappedVar= wrappedVar;
+  SolutionApplicationTarget(VarDecl *uninitializedWrappedVar)
+      : kind(Kind::uninitializedVar) {
+    if (auto *PDB = uninitializedWrappedVar->getParentPatternBinding()) {
+      patternBinding = PDB;
+      uninitializedVar.index =
+          PDB->getPatternEntryIndexForVarDecl(uninitializedWrappedVar);
+    } else {
+      uninitializedVar.index = 0;
+    }
+
+    uninitializedVar.declaration = uninitializedWrappedVar;
+    uninitializedVar.type = Type();
+  }
+
+  SolutionApplicationTarget(PatternBindingDecl *binding, unsigned index,
+                            Pattern *var, Type patternTy)
+      : kind(Kind::uninitializedVar) {
+    assert(patternBinding);
+
+    patternBinding = binding;
+    uninitializedVar.index = index;
+    uninitializedVar.declaration = var;
+    uninitializedVar.type = patternTy;
   }
 
   /// Form a target for the initialization of a pattern from an expression.
@@ -1703,8 +1729,16 @@ public:
 
   /// Form a target for a property with an attached property wrapper that is
   /// initialized out-of-line.
-  static SolutionApplicationTarget forUninitializedWrappedVar(
-      VarDecl *wrappedVar);
+  static SolutionApplicationTarget
+  forUninitializedWrappedVar(VarDecl *wrappedVar) {
+    return {wrappedVar};
+  }
+
+  static SolutionApplicationTarget
+  forUninitializedVar(PatternBindingDecl *binding, unsigned index, Pattern *var,
+                      Type patternTy) {
+    return {binding, index, var, patternTy};
+  }
 
   /// Form a target for a synthesized property wrapper initializer.
   static SolutionApplicationTarget forPropertyWrapperInitializer(
@@ -1719,7 +1753,7 @@ public:
     case Kind::stmtCondition:
     case Kind::caseLabelItem:
     case Kind::patternBinding:
-    case Kind::uninitializedWrappedVar:
+    case Kind::uninitializedVar:
       return nullptr;
     }
     llvm_unreachable("invalid expression type");
@@ -1742,8 +1776,13 @@ public:
     case Kind::patternBinding:
       return patternBinding->getDeclContext();
 
-    case Kind::uninitializedWrappedVar:
-      return uninitializedWrappedVar->getDeclContext();
+    case Kind::uninitializedVar: {
+      if (auto *wrappedVar =
+              uninitializedVar.declaration.dyn_cast<VarDecl *>())
+        return wrappedVar->getDeclContext();
+
+      return patternBinding->getInitContext(uninitializedVar.index);
+    }
     }
     llvm_unreachable("invalid decl context type");
   }
@@ -1799,6 +1838,9 @@ public:
 
   /// For a pattern initialization target, retrieve the pattern.
   Pattern *getInitializationPattern() const {
+    if (kind == Kind::uninitializedVar)
+      return uninitializedVar.declaration.get<Pattern *>();
+
     assert(kind == Kind::expression);
     assert(expression.contextualPurpose == CTP_Initialization);
     return expression.pattern;
@@ -1903,6 +1945,12 @@ public:
   }
 
   void setPattern(Pattern *pattern) {
+    if (kind == Kind::uninitializedVar) {
+      assert(uninitializedVar.declaration.is<Pattern *>());
+      uninitializedVar.declaration = pattern;
+      return;
+    }
+
     assert(kind == Kind::expression);
     assert(expression.contextualPurpose == CTP_Initialization ||
            expression.contextualPurpose == CTP_ForEachStmt);
@@ -1915,7 +1963,7 @@ public:
     case Kind::stmtCondition:
     case Kind::caseLabelItem:
     case Kind::patternBinding:
-    case Kind::uninitializedWrappedVar:
+    case Kind::uninitializedVar:
       return None;
 
     case Kind::function:
@@ -1930,7 +1978,7 @@ public:
     case Kind::function:
     case Kind::caseLabelItem:
     case Kind::patternBinding:
-    case Kind::uninitializedWrappedVar:
+    case Kind::uninitializedVar:
       return None;
 
     case Kind::stmtCondition:
@@ -1945,7 +1993,7 @@ public:
     case Kind::function:
     case Kind::stmtCondition:
     case Kind::patternBinding:
-    case Kind::uninitializedWrappedVar:
+    case Kind::uninitializedVar:
       return None;
 
     case Kind::caseLabelItem:
@@ -1960,7 +2008,7 @@ public:
     case Kind::function:
     case Kind::stmtCondition:
     case Kind::caseLabelItem:
-    case Kind::uninitializedWrappedVar:
+    case Kind::uninitializedVar:
       return nullptr;
 
     case Kind::patternBinding:
@@ -1978,8 +2026,68 @@ public:
     case Kind::patternBinding:
       return nullptr;
 
-    case Kind::uninitializedWrappedVar:
-      return uninitializedWrappedVar;
+    case Kind::uninitializedVar:
+      return uninitializedVar.declaration.dyn_cast<VarDecl *>();
+    }
+    llvm_unreachable("invalid case label type");
+  }
+
+  Pattern *getAsUninitializedVar() const {
+    switch (kind) {
+    case Kind::expression:
+    case Kind::function:
+    case Kind::stmtCondition:
+    case Kind::caseLabelItem:
+    case Kind::patternBinding:
+      return nullptr;
+
+    case Kind::uninitializedVar:
+      return uninitializedVar.declaration.dyn_cast<Pattern *>();
+    }
+    llvm_unreachable("invalid case label type");
+  }
+
+  Type getTypeOfUninitializedVar() const {
+    switch (kind) {
+    case Kind::expression:
+    case Kind::function:
+    case Kind::stmtCondition:
+    case Kind::caseLabelItem:
+    case Kind::patternBinding:
+      return nullptr;
+
+    case Kind::uninitializedVar:
+      return uninitializedVar.type;
+    }
+    llvm_unreachable("invalid case label type");
+  }
+
+  PatternBindingDecl *getPatternBindingOfUninitializedVar() const {
+    switch (kind) {
+    case Kind::expression:
+    case Kind::function:
+    case Kind::stmtCondition:
+    case Kind::caseLabelItem:
+    case Kind::patternBinding:
+      return nullptr;
+
+    case Kind::uninitializedVar:
+      return patternBinding;
+    }
+    llvm_unreachable("invalid case label type");
+  }
+
+  unsigned getIndexOfUninitializedVar() const {
+    switch (kind) {
+    case Kind::expression:
+    case Kind::function:
+    case Kind::stmtCondition:
+    case Kind::caseLabelItem:
+    case Kind::patternBinding:
+      return 0;
+
+    case Kind::uninitializedVar:
+      return uninitializedVar.index;
     }
     llvm_unreachable("invalid case label type");
   }
@@ -2013,8 +2121,13 @@ public:
     case Kind::patternBinding:
       return patternBinding->getSourceRange();
 
-    case Kind::uninitializedWrappedVar:
-      return uninitializedWrappedVar->getSourceRange();
+    case Kind::uninitializedVar: {
+      if (auto *wrappedVar =
+              uninitializedVar.declaration.dyn_cast<VarDecl *>()) {
+        return wrappedVar->getSourceRange();
+      }
+      return uninitializedVar.declaration.get<Pattern *>()->getSourceRange();
+    }
     }
     llvm_unreachable("invalid target type");
   }
@@ -2037,8 +2150,13 @@ public:
     case Kind::patternBinding:
       return patternBinding->getLoc();
 
-    case Kind::uninitializedWrappedVar:
-      return uninitializedWrappedVar->getLoc();
+    case Kind::uninitializedVar: {
+      if (auto *wrappedVar =
+          uninitializedVar.declaration.dyn_cast<VarDecl *>()) {
+        return wrappedVar->getLoc();
+      }
+      return uninitializedVar.declaration.get<Pattern *>()->getLoc();
+    }
     }
     llvm_unreachable("invalid target type");
   }
