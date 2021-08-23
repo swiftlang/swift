@@ -13,8 +13,7 @@
 extern "C" {
 
 void initializeLibSwift();
-
-}
-
+  
 void initializeLibSwift() {}
+}
 
