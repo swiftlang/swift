@@ -497,11 +497,11 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   ABSTRACT_SINGLE_VALUE_INST(ConversionInst, SingleValueInstruction)
     BRIDGED_SINGLE_VALUE_INST(UpcastInst, upcast,
                       ConversionInst, None, DoesNotRelease)
-    SINGLE_VALUE_INST(AddressToPointerInst, address_to_pointer,
+    BRIDGED_SINGLE_VALUE_INST(AddressToPointerInst, address_to_pointer,
                       ConversionInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(PointerToAddressInst, pointer_to_address,
                       ConversionInst, None, DoesNotRelease)
-    SINGLE_VALUE_INST(UncheckedRefCastInst, unchecked_ref_cast,
+    BRIDGED_SINGLE_VALUE_INST(UncheckedRefCastInst, unchecked_ref_cast,
                       ConversionInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(UncheckedAddrCastInst, unchecked_addr_cast,
                       ConversionInst, None, DoesNotRelease)
@@ -513,7 +513,7 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                       ConversionInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(RefToRawPointerInst, ref_to_raw_pointer,
                       ConversionInst, None, DoesNotRelease)
-    SINGLE_VALUE_INST(RawPointerToRefInst, raw_pointer_to_ref,
+    BRIDGED_SINGLE_VALUE_INST(RawPointerToRefInst, raw_pointer_to_ref,
                       ConversionInst, None, DoesNotRelease)
 #define LOADABLE_REF_STORAGE(Name, name, ...) \
     SINGLE_VALUE_INST(RefTo##Name##Inst, ref_to_##name, \
@@ -521,7 +521,7 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
     SINGLE_VALUE_INST(Name##ToRefInst, name##_to_ref, \
                       ConversionInst, None, DoesNotRelease)
 #include "swift/AST/ReferenceStorage.def"
-    SINGLE_VALUE_INST(ConvertFunctionInst, convert_function,
+    BRIDGED_SINGLE_VALUE_INST(ConvertFunctionInst, convert_function,
                       ConversionInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(ConvertEscapeToNoEscapeInst, convert_escape_to_noescape,
                       ConversionInst, None, DoesNotRelease)
@@ -535,15 +535,15 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                       ConversionInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(BridgeObjectToWordInst, bridge_object_to_word,
                       ConversionInst, None, DoesNotRelease)
-    SINGLE_VALUE_INST(ThinToThickFunctionInst, thin_to_thick_function,
+    BRIDGED_SINGLE_VALUE_INST(ThinToThickFunctionInst, thin_to_thick_function,
                       ConversionInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(ThickToObjCMetatypeInst, thick_to_objc_metatype,
                       ConversionInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(ObjCToThickMetatypeInst, objc_to_thick_metatype,
                       ConversionInst, None, DoesNotRelease)
-    SINGLE_VALUE_INST(ObjCMetatypeToObjectInst, objc_metatype_to_object,
+    BRIDGED_SINGLE_VALUE_INST(ObjCMetatypeToObjectInst, objc_metatype_to_object,
                       ConversionInst, None, DoesNotRelease)
-    SINGLE_VALUE_INST(ObjCExistentialMetatypeToObjectInst, objc_existential_metatype_to_object,
+    BRIDGED_SINGLE_VALUE_INST(ObjCExistentialMetatypeToObjectInst, objc_existential_metatype_to_object,
                       ConversionInst, None, DoesNotRelease)
     // unconditional_checked_cast_value reads the source value and produces
     // a new value with a potentially different representation.
@@ -566,7 +566,7 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
 
   BRIDGED_SINGLE_VALUE_INST(ClassifyBridgeObjectInst, classify_bridge_object,
                     SingleValueInstruction, None, DoesNotRelease)
-  SINGLE_VALUE_INST(ValueToBridgeObjectInst, value_to_bridge_object,
+  BRIDGED_SINGLE_VALUE_INST(ValueToBridgeObjectInst, value_to_bridge_object,
                     SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(MarkDependenceInst, mark_dependence,
                     SingleValueInstruction, None, DoesNotRelease)

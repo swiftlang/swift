@@ -357,6 +357,11 @@ BridgedArrayRef SILInstruction_getOperands(BridgedInstruction inst) {
   return {(const unsigned char *)operands.data(), operands.size()};
 }
 
+void SILInstruction_setOperand(BridgedInstruction inst, SwiftInt index,
+                               BridgedValue value) {
+  castToInst(inst)->setOperand((unsigned)index, castToSILValue(value));
+}
+
 BridgedLocation SILInstruction_getLocation(BridgedInstruction inst) {
   SILDebugLocation loc = castToInst(inst)->getDebugLocation();
   return *reinterpret_cast<BridgedLocation *>(&loc);

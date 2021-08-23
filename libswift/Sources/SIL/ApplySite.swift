@@ -10,24 +10,28 @@
 //
 //===----------------------------------------------------------------------===//
 
+public struct ApplyOperands {
+  public static let calleeOperandIndex: Int = 0
+  public static let firstArgumentIndex = 1
+}
+
 public protocol ApplySite : AnyObject {
   var operands: OperandArray { get }
   var numArguments: Int { get }
 }
 
-private let firstArgumentIndex = 1
-
 extension ApplySite {
-  public var callee: Value { operands[0].value }
+  public var callee: Value { operands[ApplyOperands.calleeOperandIndex].value }
 
   public func argumentIndex(of operand: Operand) -> Int? {
     let opIdx = operand.index
-    if opIdx >= firstArgumentIndex &&
-       opIdx <= firstArgumentIndex + numArguments {
-      return opIdx - firstArgumentIndex
+    if opIdx >= ApplyOperands.firstArgumentIndex &&
+       opIdx <= ApplyOperands.firstArgumentIndex + numArguments {
+      return opIdx - ApplyOperands.firstArgumentIndex
     }
     return nil
   }
+
 }
 
 public protocol FullApplySite : ApplySite {

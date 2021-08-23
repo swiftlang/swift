@@ -99,6 +99,13 @@ public struct UseList : Sequence, CustomReflectable {
     self.firstOpPtr = firstOpPtr.op
   }
 
+  public var isSingleUse: Bool {
+    if let opPtr = firstOpPtr {
+      return Operand_nextUse(BridgedOperand(op: opPtr)).op == nil
+    }
+    return false
+  }
+
   public func makeIterator() -> Iterator {
     return Iterator(currentOpPtr: firstOpPtr)
   }
