@@ -2365,7 +2365,7 @@ void AttributeChecker::visitDiscardableResultAttr(DiscardableResultAttr *attr) {
   }
 }
 
-/// Lookup the replaced decl in the replacments scope.
+/// Lookup the replaced decl in the replacements scope.
 static void lookupReplacedDecl(DeclNameRef replacedDeclName,
                                const DeclAttribute  *attr,
                                const ValueDecl *replacement,
@@ -2400,9 +2400,10 @@ static void lookupReplacedDecl(DeclNameRef replacedDeclName,
   if (declCtxt->isInSpecializeExtensionContext())
     options |= NL_IncludeUsableFromInline;
 
-  if (typeCtx)
+  if (typeCtx) {
     moduleScopeCtxt->lookupQualified({typeCtx}, replacedDeclName, options,
                                      results);
+  }
 }
 
 /// Remove any argument labels from the interface type of the given value that
@@ -3497,6 +3498,19 @@ DynamicallyReplacedDeclRequest::evaluate(Evaluator &evaluator,
   // If the attribute is invalid, bail.
   if (attr->isInvalid())
     return nullptr;
+
+  auto *clazz = VD->getDeclContext()->getSelfClassDecl();
+  if (clazz && clazz->isDistributedActor()) {
+    // Since distributed actors synthesize their `_remote`
+    // counterparts to any `distributed func` declared on them, and such remote
+    // function is a popular target for dynamic function replacement - we must
+    // force the synthesis has happened here already, such that we can lookup
+    // the func for the replacement we're handling right now.
+    //
+    // This request is cached, so it won't cause wasted/duplicate work.
+    TypeChecker::addImplicitDistributedActorRemoteFunctions(clazz);
+  }
+
 
   // If we can lazily resolve the function, do so now.
   if (auto *LazyResolver = attr->Resolver) {
