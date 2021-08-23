@@ -1124,7 +1124,7 @@ ForwardingOperand::ForwardingOperand(Operand *use) {
   this->use = use;
 }
 
-ValueOwnershipKind ForwardingOperand::getOwnershipKind() const {
+ValueOwnershipKind ForwardingOperand::getForwardingOwnershipKind() const {
   auto *user = use->getUser();
 
   // NOTE: This if chain is meant to be a covered switch, so make sure to return
@@ -1156,7 +1156,8 @@ ValueOwnershipKind ForwardingOperand::getOwnershipKind() const {
   llvm_unreachable("Unhandled forwarding inst?!");
 }
 
-void ForwardingOperand::setOwnershipKind(ValueOwnershipKind newKind) const {
+void ForwardingOperand::setForwardingOwnershipKind(
+    ValueOwnershipKind newKind) const {
   auto *user = use->getUser();
   // NOTE: This if chain is meant to be a covered switch, so make sure to return
   // in each if itself since we have an unreachable at the bottom to ensure if a

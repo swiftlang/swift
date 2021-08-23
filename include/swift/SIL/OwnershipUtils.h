@@ -172,8 +172,8 @@ public:
     return use->getOwnershipConstraint();
   }
 
-  ValueOwnershipKind getOwnershipKind() const;
-  void setOwnershipKind(ValueOwnershipKind newKind) const;
+  ValueOwnershipKind getForwardingOwnershipKind() const;
+  void setForwardingOwnershipKind(ValueOwnershipKind newKind) const;
   void replaceOwnershipKind(ValueOwnershipKind oldKind,
                             ValueOwnershipKind newKind) const;
 
