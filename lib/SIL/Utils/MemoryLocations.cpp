@@ -362,6 +362,10 @@ bool MemoryLocations::analyzeLocationUsesRecursively(SILValue V, unsigned locIdx
         if (!cast<LoadBorrowInst>(user)->getUsersOfType<BranchInst>().empty())
           return false;
         break;
+      case SILInstructionKind::DebugValueInst:
+        if (cast<DebugValueInst>(user)->hasAddrVal())
+          break;
+        return false;
       case SILInstructionKind::InjectEnumAddrInst:
       case SILInstructionKind::SelectEnumAddrInst:
       case SILInstructionKind::ExistentialMetatypeInst:

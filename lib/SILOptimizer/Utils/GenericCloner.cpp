@@ -124,6 +124,18 @@ void GenericCloner::populateCloned() {
                                             *DVAI->getVarInfo());
               getBuilder().setCurrentDebugScope(oldScope);
               break;
+            } else if (auto *DVI = DebugValueInst::hasAddrVal(ArgUse->getUser())) {
+              auto *oldScope = getBuilder().getCurrentDebugScope();
+              getBuilder().setCurrentDebugScope(
+                  remapScope(DVI->getDebugScope()));
+              auto VarInfo = DVI->getVarInfo();
+              assert(VarInfo && VarInfo->DIExpr &&
+                     "No DebugVarInfo or no DIExpr operand?");
+              // Drop the op_deref
+              VarInfo->DIExpr.eraseElement(VarInfo->DIExpr.element_begin());
+              getBuilder().createDebugValue(DVI->getLoc(), NewArg, *VarInfo);
+              getBuilder().setCurrentDebugScope(oldScope);
+              break;
             }
           }
 

@@ -501,7 +501,7 @@ bb0(%0 : @guaranteed $@callee_guaranteed () -> @out U):
 sil [ossa] @callWithAutoclosure : $@convention(thin) <T where T : P> (@in T) -> () {
 // CHECK: bb0
 bb0(%0 : $*T):
-  // CHECK: debug_value_addr
+  // CHECK: debug_value {{.*}} expr op_deref
   debug_value_addr %0 : $*T
   // CHECK: function_ref @mightApply
   %2 = function_ref @mightApply : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@owned @callee_owned () -> @out τ_0_0) -> ()
@@ -528,7 +528,7 @@ bb0(%0 : $*T):
 sil [ossa] @callWithAutoclosure_2 : $@convention(thin) <T where T : P> (@in T) -> () {
 // CHECK: bb0
 bb0(%0 : $*T):
-  // CHECK: debug_value_addr
+  // CHECK: debug_value {{.*}} expr op_deref
   debug_value_addr %0 : $*T
   // CHECK: function_ref @mightApply
   %2 = function_ref @mightApply : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@owned @callee_owned () -> @out τ_0_0) -> ()

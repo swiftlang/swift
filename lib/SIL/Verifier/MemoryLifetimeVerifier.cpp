@@ -613,6 +613,11 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
       case SILInstructionKind::DebugValueAddrInst:
         requireBitsSet(bits, I.getOperand(0), &I);
         break;
+      case SILInstructionKind::DebugValueInst:
+        if (cast<DebugValueInst>(&I)->hasAddrVal() &&
+            cast<DebugValueInst>(&I)->exprStartsWithDeref())
+          requireBitsSet(bits, I.getOperand(0), &I);
+        break;
       case SILInstructionKind::UncheckedTakeEnumDataAddrInst: {
         // Note that despite the name, unchecked_take_enum_data_addr does _not_
         // "take" the payload of the Swift.Optional enum. This is a terrible

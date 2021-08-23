@@ -154,9 +154,9 @@ bb0(%0 : $T):
 // CHECK:   %[[PREV1:.*]] = alloc_stack $T
 // CHECK:   %[[ARG2:.*]] = alloc_stack $T
 // CHECK:   %[[PREV2:.*]] = alloc_stack $T
-// CHECK:   debug_value_addr %0 : $*T, var, name "t", argno 1
-// CHECK:   debug_value_addr %1 : $*T, var, name "u", argno 2
-// CHECK:   debug_value_addr %2 : $*T
+// CHECK:   debug_value %0 : $*T, var, name "t", argno 1, expr op_deref
+// CHECK:   debug_value %1 : $*T, var, name "u", argno 2, expr op_deref
+// CHECK:   debug_value %2 : $*T, {{.*}} expr op_deref
 // CHECK:   copy_addr %2 to [initialization] %[[ARG1]] : $*T
 // CHECK:   copy_addr [take] %0 to [initialization] %[[PREV1]] : $*T
 // CHECK:   copy_addr [take] %[[ARG1]] to [initialization] %0 : $*T

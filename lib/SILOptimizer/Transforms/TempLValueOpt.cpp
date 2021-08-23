@@ -273,7 +273,7 @@ void TempLValueOptPass::combineCopyAndDestroy(CopyAddrInst *copyInst) {
 
   // Check if the destroy_addr is after the copy_addr and if there are no
   // memory accesses between them.
-  SmallVector<DebugValueAddrInst *, 4> debugInsts;
+  SmallVector<SILInstruction *, 4> debugInsts;
   for (auto iter = std::next(copyInst->getIterator());
        iter != block->end(); ++iter) {
     SILInstruction *inst = &*iter;
@@ -288,6 +288,9 @@ void TempLValueOptPass::combineCopyAndDestroy(CopyAddrInst *copyInst) {
       return;
     }
     if (auto *debugInst = dyn_cast<DebugValueAddrInst>(inst)) {
+      if (debugInst->getOperand() == copyInst->getSrc())
+        debugInsts.push_back(debugInst);
+    } else if(auto *debugInst = DebugValueInst::hasAddrVal(inst)) {
       if (debugInst->getOperand() == copyInst->getSrc())
         debugInsts.push_back(debugInst);
     }

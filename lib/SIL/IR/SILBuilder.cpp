@@ -569,7 +569,6 @@ void SILBuilder::emitDestructureValueOperation(
 DebugValueInst *SILBuilder::createDebugValue(SILLocation Loc, SILValue src,
                                              SILDebugVariable Var,
                                              bool poisonRefs) {
-  assert(isLoadableOrOpaque(src->getType()));
   // Debug location overrides cannot apply to debug value instructions.
   DebugLocOverrideRAII LocOverride{*this, None};
   return insert(
@@ -577,12 +576,12 @@ DebugValueInst *SILBuilder::createDebugValue(SILLocation Loc, SILValue src,
                            poisonRefs));
 }
 
-DebugValueAddrInst *SILBuilder::createDebugValueAddr(SILLocation Loc,
-                                                     SILValue src,
-                                                     SILDebugVariable Var) {
+DebugValueInst *SILBuilder::createDebugValueAddr(SILLocation Loc,
+                                                 SILValue src,
+                                                 SILDebugVariable Var) {
   // Debug location overrides cannot apply to debug addr instructions.
   DebugLocOverrideRAII LocOverride{*this, None};
-  return insert(DebugValueAddrInst::create(getSILDebugLocation(Loc), src,
+  return insert(DebugValueInst::createAddr(getSILDebugLocation(Loc), src,
                                            getModule(), Var));
 }
 

@@ -254,7 +254,7 @@ func test_weird_property(_ v : WeirdPropertyTest, i : Int) -> Int {
 
 // CHECK-LABEL: sil hidden [ossa] @{{.*}}generic_identity
 // CHECK: bb0(%0 : $*T, %1 : $*T):
-// CHECK-NEXT: debug_value_addr %1 : $*T
+// CHECK-NEXT: debug_value %1 : $*T, {{.*}} expr op_deref
 // CHECK-NEXT: copy_addr %1 to [initialization] %0 : $*T
 // CHECK-NOT: destroy_addr %1
 // CHECK: } // end sil function '{{.*}}generic_identity{{.*}}'
@@ -286,7 +286,7 @@ protocol SimpleProtocol {
 // CHECK-LABEL: sil hidden [ossa] @{{.*}}testLetProtocolBases
 // CHECK: bb0(%0 : $*SimpleProtocol):
 func testLetProtocolBases(_ p : SimpleProtocol) {
-  // CHECK-NEXT: debug_value_addr
+  // CHECK-NEXT: debug_value {{.*}} expr op_deref
   // CHECK-NEXT: open_existential_addr
   // CHECK-NEXT: witness_method
   // CHECK-NEXT: apply
@@ -305,7 +305,7 @@ func testLetProtocolBases(_ p : SimpleProtocol) {
 // CHECK-LABEL: sil hidden [ossa] @{{.*}}testLetArchetypeBases
 // CHECK: bb0(%0 : $*T):
 func testLetArchetypeBases<T : SimpleProtocol>(_ p : T) {
-  // CHECK-NEXT: debug_value_addr
+  // CHECK-NEXT: debug_value {{.*}} expr op_deref
   // CHECK-NEXT: witness_method $T
   // CHECK-NEXT: apply
   p.doSomethingGreat()
@@ -321,7 +321,7 @@ func testLetArchetypeBases<T : SimpleProtocol>(_ p : T) {
 // CHECK-LABEL: sil hidden [ossa] @{{.*}}testDebugValue
 // CHECK: bb0(%0 : $Int, %1 : $*SimpleProtocol):
 // CHECK-NEXT: debug_value %0 : $Int, let, name "a"
-// CHECK-NEXT: debug_value_addr %1 : $*SimpleProtocol, let, name "b"
+// CHECK-NEXT: debug_value %1 : $*SimpleProtocol, let, name "b", {{.*}} expr op_deref
 func testDebugValue(_ a : Int, b : SimpleProtocol) -> Int {
 
   // CHECK-NEXT: debug_value %0 : $Int, let, name "x"
@@ -439,7 +439,7 @@ struct GenericStruct<T> {
   }
   // CHECK-LABEL: sil hidden [ossa] @{{.*}}GenericStructV4getA{{.*}} : $@convention(method) <T> (@in_guaranteed GenericStruct<T>) -> @out T
   // CHECK: bb0(%0 : $*T, %1 : $*GenericStruct<T>):
-  // CHECK-NEXT: debug_value_addr %1 : $*GenericStruct<T>, let, name "self"
+  // CHECK-NEXT: debug_value %1 : $*GenericStruct<T>, let, name "self", {{.*}} expr op_deref
   // CHECK-NEXT: %3 = struct_element_addr %1 : $*GenericStruct<T>, #GenericStruct.a
   // CHECK-NEXT: copy_addr %3 to [initialization] %0 : $*T
   // CHECK-NEXT: %5 = tuple ()
@@ -451,7 +451,7 @@ struct GenericStruct<T> {
   
   // CHECK-LABEL: sil hidden [ossa] @{{.*}}GenericStructV4getB{{.*}} : $@convention(method) <T> (@in_guaranteed GenericStruct<T>) -> Int
   // CHECK: bb0([[SELF_ADDR:%.*]] : $*GenericStruct<T>):
-  // CHECK-NEXT: debug_value_addr [[SELF_ADDR]] : $*GenericStruct<T>, let, name "self"
+  // CHECK-NEXT: debug_value [[SELF_ADDR]] : $*GenericStruct<T>, let, name "self", {{.*}} expr op_deref
   // CHECK-NEXT: [[PROJ_ADDR:%.*]] = struct_element_addr [[SELF_ADDR]] : $*GenericStruct<T>, #GenericStruct.b
   // CHECK-NEXT: [[PROJ_VAL:%.*]] = load [trivial] [[PROJ_ADDR]] : $*Int
   // CHECK-NOT: destroy_addr [[SELF]] : $*GenericStruct<T>

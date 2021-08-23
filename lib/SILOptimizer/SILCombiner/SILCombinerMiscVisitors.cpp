@@ -514,6 +514,10 @@ bool SILCombiner::optimizeStackAllocatedEnum(AllocStackInst *AS) {
       case SILInstructionKind::InjectEnumAddrInst:
         // We'll check init_enum_addr below.
         break;
+      case SILInstructionKind::DebugValueInst:
+        if (DebugValueInst::hasAddrVal(user))
+          break;
+        return false;
       case SILInstructionKind::InitEnumDataAddrInst: {
         auto *ieda = cast<InitEnumDataAddrInst>(user);
         auto *el = ieda->getElement();
@@ -599,6 +603,12 @@ bool SILCombiner::optimizeStackAllocatedEnum(AllocStackInst *AS) {
         eraseInstFromFunction(*svi);
         break;
       }
+      case SILInstructionKind::DebugValueInst:
+        if (DebugValueInst::hasAddrVal(user)) {
+          eraseInstFromFunction(*user);
+          break;
+        }
+        LLVM_FALLTHROUGH;
       default:
         llvm_unreachable("unexpected alloc_stack user");
     }
