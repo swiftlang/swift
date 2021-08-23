@@ -738,6 +738,9 @@ public:
   /// Get the runtime availability of support for concurrency.
   AvailabilityContext getConcurrencyAvailability();
 
+  /// Get the back-deployed availability for concurrency.
+  AvailabilityContext getBackDeployedConcurrencyAvailability();
+
   /// Get the runtime availability of support for differentiation.
   AvailabilityContext getDifferentiationAvailability();
 
