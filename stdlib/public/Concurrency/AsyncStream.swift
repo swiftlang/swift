@@ -131,7 +131,7 @@ public struct AsyncStream<Element> {
       
       /// The stream successfully enqueued the element.
       ///
-      /// This value reprsents the successful enqueueing of an element, whether
+      /// This value represents the successful enqueueing of an element, whether
       /// the stream buffers the element or delivers it immediately to a pending
       /// call to `next()`. The associated value `remaining` is a hint that
       /// indicates the number of remaining slots in the buffer at the time of
@@ -208,7 +208,7 @@ public struct AsyncStream<Element> {
     /// stream.
     ///
     /// If an `onTermination` callback is set, using task cancellation to
-    /// terminate iteration of a `AsyncStream` results in a call to this
+    /// terminate iteration of an `AsyncStream` results in a call to this
     /// callback.
     ///
     /// Canceling an active iteration invokes the `onTermination` callback
@@ -238,7 +238,7 @@ public struct AsyncStream<Element> {
   ///       unlimited number of elements. You can also set the policy to buffer a
   ///       specified number of oldest or newest elements.
   ///    - build: A custom closure that yields values to the
-  ///       `AsyncStream`. This closure receives a `AsyncStream.Continuation`
+  ///       `AsyncStream`. This closure receives an `AsyncStream.Continuation`
   ///       instance that it uses to provide elements to the stream and terminate the
   ///       stream when finished.
   ///
@@ -286,14 +286,14 @@ public struct AsyncStream<Element> {
   /// - Parameters:
   ///   - produce: A closure that asynchronously produces elements for the
   ///     stream.
-  ///   - onCancel: A closure to execute when cancelling the stream's task.
+  ///   - onCancel: A closure to execute when canceling the stream's task.
   ///
   /// Use this convenience initializer when you have an asychronous function
   /// that can produce elements for the stream, and don't want to invoke
   /// a continuation manually. This initializer "unfolds" your closure into
   /// an asynchronous stream. The created stream handles conformance
   /// to the `AsyncSequence` protocol automatically, including termination
-  /// (whether by cancellation or by returning `nil` from the closure to finish
+  /// (either by cancellation or by returning `nil` from the closure to finish
   /// iteration).
   ///
   /// The following example shows an `AsyncStream` created with this

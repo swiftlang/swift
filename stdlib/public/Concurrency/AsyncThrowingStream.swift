@@ -154,13 +154,13 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
       
       /// The stream successfully enqueued the element.
       ///
-      /// This value reprsents the successful enqueueing of an element, whether
+      /// This value represents the successful enqueueing of an element, whether
       /// the stream buffers the element or delivers it immediately to a pending
       /// call to `next()`. The associated value `remaining` is a hint that
       /// indicates the number of remaining slots in the buffer at the time of
       /// the `yield` call.
       ///
-      /// - Note: From a thread safety viewpoint, `remaining` is a lower bound
+      /// - Note: From a thread safety perspective, `remaining` is a lower bound
       /// on the number of remaining slots. This is because a subsequent call
       /// that uses the `remaining` value could race on the consumption of
       /// values from the stream.
@@ -233,7 +233,7 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
     /// stream.
     ///
     /// If an `onTermination` callback is set, using task cancellation to
-    /// terminate iteration of a `AsyncThrowingStream` results in a call to this
+    /// terminate iteration of an `AsyncThrowingStream` results in a call to this
     /// callback.
     ///
     /// Canceling an active iteration invokes the `onTermination` callback
