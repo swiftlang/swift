@@ -1035,6 +1035,12 @@ void swift::simple_display(llvm::raw_ostream &out,
   case ImplicitMemberAction::ResolveDistributedActor:
     out << "resolve DistributedActor";
     break;
+  case ImplicitMemberAction::ResolveDistributedActorIdentity:
+    out << "resolve DistributedActor.id";
+    break;
+  case ImplicitMemberAction::ResolveDistributedActorTransport:
+    out << "resolve DistributedActor.actorTransport";
+    break;
   }
 }
 
