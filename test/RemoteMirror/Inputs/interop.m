@@ -25,6 +25,18 @@
 
 #import "SwiftRemoteMirrorLegacyInterop.h"
 
+// dirname() is *not* safe - it may modify the input string; so instead just
+// copy anything up to the last slash.
+char *safe_dirname(const char *path) {
+  const char *slash = strrchr(path, '/');
+  if (!slash)
+    return strdup(".");
+  size_t len = slash - path;
+  char *result = (char *)malloc(len + 1);
+  memcpy(result, path, len);
+  result[len] = '\0';
+  return result;
+}
 
 void *Load(char *path) {
   const char *libpath = getenv("DYLD_LIBRARY_PATH");
@@ -34,14 +46,15 @@ void *Load(char *path) {
   if (libpath && path[0] == '/') {
     // If DYLD_LIBRARY_PATH is set, and the path we've been given is absolute,
     // then prepend the directory part of the path we've been given to it.
-    const char *libdir = dirname(path);
-    size_t pathlen = strlen(libpath);
+    char *libdir = safe_dirname(path);
     size_t dirlen = strlen(libdir);
-    ourlibpath = (char *)malloc(pathlen + dirlen + 2);
-    memcpy(ourlibpath, libdir, dirlen);
-    ourlibpath[dirlen] = ':';
+    if (asprintf(&ourlibpath, "%s:%s", libdir, oldlibpath) < 0) {
+      fprintf(stderr, "Unable to form new DYLD_LIBRARY_PATH!\n");
+      exit(1);
+    }
+    free(libdir);
+
     oldlibpath = ourlibpath + dirlen + 1;
-    memcpy(ourlibpath + dirlen + 1, libpath, pathlen + 1);
 
     setenv("DYLD_LIBRARY_PATH", ourlibpath, 1);
   }
