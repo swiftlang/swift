@@ -1,5 +1,9 @@
 // RUN: %target-run-simple-swift(-Xfrontend -requirement-machine=off)
 
+// rdar://82240971 – Temporarily disable this test on non-macOS platforms until
+// the CI is fixed to not produce 'Invalid device: iPhone 8'.
+// REQUIRES: OS=macosx
+
 // REQUIRES: executable_test
 
 // SR-14240: Error: symbol 'powTJfSSpSr' (powTJfSSpSr) is in generated IR file,
