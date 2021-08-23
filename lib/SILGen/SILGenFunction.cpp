@@ -514,18 +514,17 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
   emitProfilerIncrement(fd->getTypecheckedBody());
   emitProlog(captureInfo, fd->getParameters(), fd->getImplicitSelfDecl(), fd,
              fd->getResultInterfaceType(), fd->hasThrows(), fd->getThrowsLoc());
+  prepareEpilog(true, fd->hasThrows(), CleanupLocation(fd));
 
   if (fd->isDistributedActorFactory()) {
     // Synthesize the factory function body
     emitDistributedActorFactory(fd);
   } else {
-    prepareEpilog(true, fd->hasThrows(), CleanupLocation(fd));
-    
     // Emit the actual function body as usual
     emitStmt(fd->getTypecheckedBody());
-
-    emitEpilog(fd);
   }
+
+  emitEpilog(fd);
 
   mergeCleanupBlocks();
 }
