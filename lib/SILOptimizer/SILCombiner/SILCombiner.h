@@ -158,7 +158,8 @@ public:
             [&](SILInstruction *I) { eraseInstFromFunction(*I); }),
         deBlocks(&B.getFunction()),
         ownershipFixupContext(getInstModCallbacks(), deBlocks),
-        libswiftPassInvocation(parentTransform->getPassManager(), this) {}
+        libswiftPassInvocation(parentTransform->getPassManager(),
+                               parentTransform->getFunction(), this) {}
 
   bool runOnFunction(SILFunction &F);
 
@@ -278,7 +279,7 @@ public:
   SILInstruction *optimizeStringObject(BuiltinInst *BI);
   SILInstruction *visitBuiltinInst(BuiltinInst *BI);
   SILInstruction *visitCondFailInst(CondFailInst *CFI);
-  SILInstruction *visitStrongRetainInst(StrongRetainInst *SRI);
+  SILInstruction *legacyVisitStrongRetainInst(StrongRetainInst *SRI);
   SILInstruction *visitCopyValueInst(CopyValueInst *cvi);
   SILInstruction *visitDestroyValueInst(DestroyValueInst *dvi);
   SILInstruction *visitRefToRawPointerInst(RefToRawPointerInst *RRPI);
@@ -308,7 +309,7 @@ public:
   SILInstruction *visitRawPointerToRefInst(RawPointerToRefInst *RPTR);
   SILInstruction *
   visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *TEDAI);
-  SILInstruction *visitStrongReleaseInst(StrongReleaseInst *SRI);
+  SILInstruction *legacyVisitStrongReleaseInst(StrongReleaseInst *SRI);
   SILInstruction *visitCondBranchInst(CondBranchInst *CBI);
   SILInstruction *
   visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *UTBCI);
