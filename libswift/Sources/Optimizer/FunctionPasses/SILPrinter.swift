@@ -14,7 +14,7 @@ import SIL
 
 let silPrinterPass = FunctionPass(name: "sil-printer", runSILPrinter)
 
-func runSILPrinter(function: Function, context: FunctionPassContext) {
+func runSILPrinter(function: Function, context: PassContext) {
   print("run SILPrinter on function: \(function.name)")
 
   for (bbIdx, block) in function.blocks.enumerated() {

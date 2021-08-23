@@ -322,7 +322,7 @@ void swift::executePassPipelinePlan(SILModule *SM,
 SILPassManager::SILPassManager(SILModule *M, bool isMandatory,
                                irgen::IRGenModule *IRMod)
     : Mod(M), IRMod(IRMod),
-      libswiftPassInvocation(this, /*SILCombiner*/ nullptr),
+      libswiftPassInvocation(this),
       isMandatory(isMandatory), deserializationNotificationHandler(nullptr) {
 #define ANALYSIS(NAME) \
   Analyses.push_back(create##NAME##Analysis(Mod));
@@ -469,7 +469,9 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
   
   assert(changeNotifications == SILAnalysis::InvalidationKind::Nothing
          && "change notifications not cleared");
-  
+
+  libswiftPassInvocation.startPassRun(F);
+
   // Run it!
   SFT->run();
 
@@ -1100,8 +1102,14 @@ FixedSizeSlab *LibswiftPassInvocation::freeSlab(FixedSizeSlab *slab) {
   return prev;
 }
 
+void LibswiftPassInvocation::startPassRun(SILFunction *function) {
+  assert(!this->function && "a pass is already running");
+  this->function = function;
+}
+
 void LibswiftPassInvocation::finishedPassRun() {
   assert(allocatedSlabs.empty() && "StackList is leaking slabs");
+  function = nullptr;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1166,10 +1174,17 @@ void PassContext_eraseInstruction(BridgedPassContext passContext,
   castToPassInvocation(passContext)->eraseInstruction(castToInst(inst));
 }
 
-BridgedAliasAnalysis PassContext_getAliasAnalysis(BridgedPassContext context,
-                                                  BridgedFunction function) {
+SwiftInt PassContext_isSwift51RuntimeAvailable(BridgedPassContext context) {
   SILPassManager *pm = castToPassInvocation(context)->getPassManager();
-  return {pm->getAnalysis<AliasAnalysis>(castToFunction(function))};
+  ASTContext &ctxt = pm->getModule()->getASTContext();
+  return AvailabilityContext::forDeploymentTarget(ctxt).
+           isContainedIn(ctxt.getSwift51Availability());
+}
+
+BridgedAliasAnalysis PassContext_getAliasAnalysis(BridgedPassContext context) {
+  LibswiftPassInvocation *invocation = castToPassInvocation(context);
+  SILPassManager *pm = invocation->getPassManager();
+  return {pm->getAnalysis<AliasAnalysis>(invocation->getFunction())};
 }
 
 BridgedCalleeAnalysis PassContext_getCalleeAnalysis(BridgedPassContext context) {

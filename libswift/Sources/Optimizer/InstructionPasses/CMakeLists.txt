@@ -7,4 +7,5 @@
 # See http://swift.org/CONTRIBUTORS.txt for Swift project authors
 
 libswift_sources(Optimizer
-  SimplifyGlobalValue.swift)
+  SimplifyGlobalValue.swift
+  SimplifyStrongRetainRelease.swift)

@@ -1213,7 +1213,7 @@ SILInstruction *SILCombiner::visitDestroyValueInst(DestroyValueInst *dvi) {
   return nullptr;
 }
 
-SILInstruction *SILCombiner::visitStrongRetainInst(StrongRetainInst *SRI) {
+SILInstruction *SILCombiner::legacyVisitStrongRetainInst(StrongRetainInst *SRI) {
   assert(!SRI->getFunction()->hasOwnership());
 
   // Retain of ThinToThickFunction is a no-op.
@@ -1821,7 +1821,7 @@ SILInstruction *SILCombiner::visitUncheckedTakeEnumDataAddrInst(
   return eraseInstFromFunction(*tedai);
 }
 
-SILInstruction *SILCombiner::visitStrongReleaseInst(StrongReleaseInst *SRI) {
+SILInstruction *SILCombiner::legacyVisitStrongReleaseInst(StrongReleaseInst *SRI) {
   assert(!SRI->getFunction()->hasOwnership());
 
   // Release of ThinToThickFunction is a no-op.
