@@ -280,8 +280,12 @@ namespace swift {
     /// Enable experimental concurrency model.
     bool EnableExperimentalConcurrency = false;
 
+
     /// Enable experimental asyncHandler support.
     bool EnableExperimentalAsyncHandler = false;
+
+    /// Enable experimental back-deployment of the concurrency model.
+    bool EnableExperimentalBackDeployConcurrency = false;
 
     /// Enable experimental flow-sensitive concurrent captures.
     bool EnableExperimentalFlowSensitiveConcurrentCaptures = false;

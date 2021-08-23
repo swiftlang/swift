@@ -330,6 +330,10 @@ AvailabilityContext ASTContext::getConcurrencyAvailability() {
   return getSwift55Availability();
 }
 
+AvailabilityContext ASTContext::getBackDeployedConcurrencyAvailability() {
+  return getSwift51Availability();
+}
+
 AvailabilityContext ASTContext::getDifferentiationAvailability() {
   return getSwiftFutureAvailability();
 }
