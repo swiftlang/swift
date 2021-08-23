@@ -933,10 +933,10 @@ public:
     bool isCached() const { return true; }
 };
 
-/// Obtain the 'remote' counterpart of a 'distributed func'.
-class GetDistributedRemoteFuncRequest :
-    public SimpleRequest<GetDistributedRemoteFuncRequest,
-        AbstractFunctionDecl *(AbstractFunctionDecl *),
+/// Determine whether the given func is distributed.
+class IsDistributedFuncRequest :
+    public SimpleRequest<IsDistributedFuncRequest,
+        bool(FuncDecl *),
         RequestFlags::Cached> {
 public:
     using SimpleRequest::SimpleRequest;
@@ -944,7 +944,7 @@ public:
 private:
     friend SimpleRequest;
 
-    AbstractFunctionDecl *evaluate(Evaluator &evaluator, AbstractFunctionDecl *func) const;
+    bool evaluate(Evaluator &evaluator, FuncDecl *func) const;
 
 public:
     // Caching
@@ -2046,6 +2046,8 @@ enum class ImplicitMemberAction : uint8_t {
   ResolveEncodable,
   ResolveDecodable,
   ResolveDistributedActor,
+  ResolveDistributedActorIdentity,
+  ResolveDistributedActorTransport,
 };
 
 class ResolveImplicitMemberRequest
