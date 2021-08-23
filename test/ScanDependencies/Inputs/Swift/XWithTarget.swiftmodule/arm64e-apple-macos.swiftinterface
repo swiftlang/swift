@@ -1,0 +1,5 @@
+// swift-interface-format-version: 1.0
+// swift-module-flags: -module-name XWithTarget -target arm64e-apple-macosx10.9
+import Swift
+@_exported import X
+public func overlayFuncX() { }

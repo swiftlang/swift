@@ -40,7 +40,7 @@ public func run_DifferentiationIdentity(N: Int) {
     x
   }
   for _ in 0..<1000*N {
-    blackHole(valueWithGradient(at: 1, in: f))
+    blackHole(valueWithGradient(at: 1, of: f))
   }
 }
 
@@ -50,7 +50,7 @@ public func run_DifferentiationSquare(N: Int) {
     x * x
   }
   for _ in 0..<1000*N {
-    blackHole(valueWithGradient(at: 1, in: f))
+    blackHole(valueWithGradient(at: 1, of: f))
   }
 }
 
@@ -66,7 +66,7 @@ public func run_DifferentiationArraySum(N: Int) {
     return result
   }
   for _ in 0..<N {
-    blackHole(valueWithGradient(at: onesArray, in: sum))
+    blackHole(valueWithGradient(at: onesArray, of: sum))
   }
 }
 

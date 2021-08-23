@@ -4,7 +4,7 @@ class C {
   // Erroneous typealias decl.
   typealias Inner: Foo = Int
 
-  // Implict accessor with attribute at the top of its body.
+  // Implicit accessor with attribute at the top of its body.
   var x: Int {
     @objc
     func f() {}

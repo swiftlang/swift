@@ -17,14 +17,17 @@
 #ifndef SWIFT_SEMA_TYPE_CHECK_OBJC_H
 #define SWIFT_SEMA_TYPE_CHECK_OBJC_H
 
+#include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "llvm/ADT/Optional.h"
+#include "llvm/ADT/PointerUnion.h"
 
 namespace swift {
 
 class AbstractFunctionDecl;
 class ASTContext;
+class ObjCAttr;
 class SubscriptDecl;
 class ValueDecl;
 class VarDecl;
@@ -68,6 +71,9 @@ public:
     ExplicitlyGKInspectable,
     /// Is it a member of an @objc extension of a class.
     MemberOfObjCExtension,
+    /// Has an explicit '@objc' attribute added by an access note, rather than
+    /// written in source code.
+    ExplicitlyObjCByAccessNote,
 
     // These kinds do not appear in diagnostics.
 
@@ -85,14 +91,49 @@ private:
   Kind kind;
 
   /// When the kind is \c WitnessToObjC, the requirement being witnessed.
-  ValueDecl * decl = nullptr;
+  llvm::PointerUnion<ValueDecl *, DeclAttribute *> declOrAttr =
+      static_cast<DeclAttribute *>(nullptr);
 
-  ObjCReason(Kind kind, ValueDecl *decl) : kind(kind), decl(decl) { }
+  ObjCReason(Kind kind, ValueDecl *decl) : kind(kind), declOrAttr(decl) { }
+
+  static bool requiresAttr(Kind kind) {
+    switch (kind) {
+    case ExplicitlyCDecl:
+    case ExplicitlyDynamic:
+    case ExplicitlyObjC:
+    case ExplicitlyIBOutlet:
+    case ExplicitlyIBAction:
+    case ExplicitlyIBSegueAction:
+    case ExplicitlyNSManaged:
+    case ExplicitlyIBInspectable:
+    case ExplicitlyGKInspectable:
+    case ExplicitlyObjCByAccessNote:
+      return true;
+
+    case MemberOfObjCProtocol:
+    case ImplicitlyObjC:
+    case OverridesObjC:
+    case WitnessToObjC:
+    case MemberOfObjCExtension:
+    case MemberOfObjCMembersClass:
+    case MemberOfObjCSubclass:
+    case ElementOfObjCEnum:
+    case Accessor:
+      return false;
+    }
+  }
 
 public:
   /// Implicit conversion from the trivial reason kinds.
   ObjCReason(Kind kind) : kind(kind) {
     assert(kind != WitnessToObjC && "Use ObjCReason::witnessToObjC()");
+    assert(!requiresAttr(kind) && "Use ObjCReason(Kind, DeclAttribute*)");
+  }
+
+  ObjCReason(Kind kind, const DeclAttribute *attr)
+      : kind(kind), declOrAttr(const_cast<DeclAttribute *>(attr)) {
+    // const_cast above because it's difficult to get a non-const DeclAttribute.
+    assert(requiresAttr(kind) && "Use ObjCReason(Kind)");
   }
 
   /// Retrieve the kind of requirement.
@@ -108,13 +149,29 @@ public:
   /// requirement, retrieve the requirement.
   ValueDecl *getObjCRequirement() const {
     assert(kind == WitnessToObjC);
-    return decl;
+    return declOrAttr.get<ValueDecl *>();
   }
+
+  DeclAttribute *getAttr() const {
+    if (!requiresAttr(kind))
+      return nullptr;
+    return declOrAttr.get<DeclAttribute *>();
+  }
+
+  void setAttrInvalid() const;
+
+  /// Emit an additional diagnostic describing why we are applying @objc to the
+  /// decl, if this is not obvious from the decl itself.
+  void describe(const Decl *VD) const;
 };
 
-/// Determine whether we should diagnose conflicts due to inferring @objc
-/// with this particular reason.
-bool shouldDiagnoseObjCReason(ObjCReason reason, ASTContext &ctx);
+/// Determine how to diagnose conflicts due to inferring @objc with this
+/// particular reason.
+DiagnosticBehavior
+behaviorLimitForObjCReason(ObjCReason reason, ASTContext &ctx);
+
+/// Returns the ObjCReason for this ObjCAttr to be attached to the declaration.
+ObjCReason objCReasonForObjCAttr(const ObjCAttr *attr);
 
 /// Return the %select discriminator for the OBJC_ATTR_SELECT macro used to
 /// complain about the correct attribute during @objc inference.

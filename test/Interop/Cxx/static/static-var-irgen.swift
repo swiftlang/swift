@@ -8,13 +8,16 @@ public func initStaticVars() -> CInt {
     + staticConstexprNonTrivial.val
 }
 
+// Constexpr vars should be inlined and removed.
+// CHECK-NOT: ?staticConstexpr
+// CHECK-NOT: _ZL15staticConstexpr
+
 // CHECK: @{{_ZL9staticVar|staticVar}} = internal global i32 2, align 4
 // CHECK: @{{_ZL13staticVarInit|staticVarInit}} = internal global i32 0, align 4
 // CHECK: @{{_ZL19staticVarInlineInit|staticVarInlineInit}} = internal global i32 0, align 4
 // CHECK: @{{_ZL11staticConst|staticConst}} = internal constant i32 4, align 4
 // CHECK: @{{_ZL15staticConstInit|staticConstInit}} = internal global i32 0, align 4
 // CHECK: @{{_ZL21staticConstInlineInit|staticConstInlineInit}} = internal global i32 0, align 4
-// CHECK: @{{_ZL15staticConstexpr|staticConstexpr}} = internal constant i32 32, align 4
 // CHECK: @{{_ZL16staticNonTrivial|staticNonTrivial}} = internal global %class.NonTrivial zeroinitializer, align 4
 // CHECK: @{{_ZL21staticConstNonTrivial|staticConstNonTrivial}} = internal global %class.NonTrivial zeroinitializer, align 4
 // CHECK: @{{_ZL25staticConstexprNonTrivial|staticConstexprNonTrivial}} = internal constant %class.NonTrivial { i32 8192 }, align 4
@@ -46,10 +49,10 @@ public func initStaticVars() -> CInt {
 // CHECK: ret i32 16
 
 // CHECK: define internal void @{{__cxx_global_var_init.4|"\?\?__EstaticNonTrivial@@YAXXZ"}}()
-// CHECK: call {{void|%class.NonTrivial\*}} {{@_ZN10NonTrivialC[12]Ei\(%class.NonTrivial\* @_ZL16staticNonTrivial, i32 1024\)|@"\?\?0NonTrivial@@QEAA@H@Z"\(%class.NonTrivial\* @staticNonTrivial, i32 1024\)}}
+// CHECK: call {{void|%class.NonTrivial\*}} {{@_ZN10NonTrivialC[12]Ei\(%class.NonTrivial\* nonnull dereferenceable\(4\) @_ZL16staticNonTrivial, i32 1024\)|@"\?\?0NonTrivial@@QEAA@H@Z"\(%class.NonTrivial\* nonnull dereferenceable\(4\) @staticNonTrivial, i32 1024\)}}
 
 // CHECK: define internal void @{{__cxx_global_var_init.5|"\?\?__EstaticConstNonTrivial@@YAXXZ"}}()
-// CHECK: call {{void|%class.NonTrivial\*}} {{@_ZN10NonTrivialC[12]Ei\(%class.NonTrivial\* @_ZL21staticConstNonTrivial, i32 2048\)|@"\?\?0NonTrivial@@QEAA@H@Z"\(%class.NonTrivial\* @staticConstNonTrivial, i32 2048\)}}
+// CHECK: call {{void|%class.NonTrivial\*}} {{@_ZN10NonTrivialC[12]Ei\(%class.NonTrivial\* nonnull dereferenceable\(4\) @_ZL21staticConstNonTrivial, i32 2048\)|@"\?\?0NonTrivial@@QEAA@H@Z"\(%class.NonTrivial\* nonnull dereferenceable\(4\) @staticConstNonTrivial, i32 2048\)}}
 
 public func readStaticVar() -> CInt {
   return staticVar

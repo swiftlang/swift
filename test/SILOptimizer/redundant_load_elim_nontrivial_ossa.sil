@@ -1,0 +1,1080 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -redundant-load-elim | %FileCheck %s
+// TODO : Add a version with semantic-arc-opts when #34971 is landed or DCE is enabled on OSSA
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+///////////////////////
+// Type Declarations //
+///////////////////////
+
+class Klass {
+}
+
+struct NonTrivialStruct {
+  var val : Klass
+}
+
+class AX {
+  final var current: Klass
+  init()
+}
+
+struct A {
+  var i : Klass
+}
+
+struct Agg2 {
+  var t : (Klass, Klass)
+}
+
+struct Agg1 {
+  var a : Agg2
+}
+
+class AB {
+  var value: Klass
+  var value2: Klass
+  init(value: Klass)
+   deinit
+}
+
+enum XYZ {
+  case A
+  case B((Klass, Klass))
+  case C(Klass)
+}
+
+struct TwoField {
+  var a: Klass
+  var b: Klass
+  init(a: Klass, b: Int)
+  init()
+}
+
+class C1 {}
+
+class C2  {
+ var current: Klass
+ init()
+}
+
+class C3 : C2 {
+ override init()
+}
+
+class NewRangeGenerator1 {
+  final var current: NonTrivialStruct
+  final let end: NonTrivialStruct
+  init(start: NonTrivialStruct, end: NonTrivialStruct)
+}
+
+final class NewHalfOpenRangeGenerator : NewRangeGenerator1 {
+  override init(start: NonTrivialStruct, end: NonTrivialStruct)
+}
+
+sil_global @total_klass : $Klass
+sil_global @total_nontrivialstruct : $NonTrivialStruct
+
+sil @use_Klass : $@convention(thin) (@owned Klass) -> ()
+sil @use_nontrivialstruct : $@convention(thin) (@owned NonTrivialStruct) -> ()
+sil @use_a : $@convention(thin) (@owned A) -> ()
+sil @use_twofield : $@convention(thin) (@owned TwoField) -> ()
+sil @init_twofield : $@convention(thin) (@thin TwoField.Type) -> @owned TwoField
+
+// We have a bug in the old projection code which this test case exposes.
+// Make sure its handled properly in the new projection.
+//
+// Make sure the store to the different fields does not affect the load
+//
+// CHECK-LABEL: sil hidden [ossa] @load_forward_across_store_to_different_field :
+// CHECK: = load
+// CHECK-NOT: = load
+// CHECK-LABEL: } // end sil function 'load_forward_across_store_to_different_field'
+sil hidden [ossa] @load_forward_across_store_to_different_field : $@convention(thin) (@owned AB) -> @owned Klass {
+bb0(%0 : @owned $AB):
+  %borrow0 = begin_borrow %0 : $AB
+  %2 = ref_element_addr %borrow0 : $AB, #AB.value
+  %3 = load [copy] %2 : $*Klass
+  %copy3 = copy_value %3 : $Klass
+  %222 = ref_element_addr %borrow0 : $AB, #AB.value2
+  store %3 to [init] %222 : $*Klass
+  %4 = ref_element_addr %borrow0 : $AB, #AB.value
+  %5 = load [copy] %4 : $*Klass
+  %copy5 = copy_value %5 : $Klass
+  end_borrow %borrow0 : $AB
+  destroy_value %0 : $AB
+  %22 = function_ref @use_Klass : $@convention(thin) (@owned Klass) -> ()
+  apply %22(%copy3) : $@convention(thin) (@owned Klass) -> ()
+  apply %22(%5) : $@convention(thin) (@owned Klass) -> ()
+  return %copy5 : $Klass
+}
+
+// CHECK-LABEL: sil hidden [ossa] @load_forward_across_end_cow_mutation :
+// CHECK-NOT: = load
+// CHECK-LABEL: } // end sil function 'load_forward_across_end_cow_mutation'
+sil hidden [ossa] @load_forward_across_end_cow_mutation : $@convention(thin) (@owned AB, @owned Klass) -> @owned Klass {
+bb0(%0 : @owned $AB, %1 : @owned $Klass):
+  %borrow0 = begin_borrow %0 : $AB
+  %2 = ref_element_addr %borrow0 : $AB, #AB.value
+  store %1 to [init] %2 : $*Klass
+  end_borrow %borrow0 : $AB
+  %4 = end_cow_mutation %0 : $AB
+  %borrow4 = begin_borrow %4 : $AB
+  %5 = ref_element_addr %borrow4 : $AB, #AB.value
+  %6 = load [copy] %5 : $*Klass
+  end_borrow %borrow4 : $AB
+  destroy_value %4 : $AB
+  return %6 : $Klass
+}
+
+// CHECK-LABEL: sil hidden [ossa] @redundant_load_across_fixlifetime_inst :
+// CHECK: = load
+// CHECK-NOT: = load
+// CHECK-LABEL: } // end sil function 'redundant_load_across_fixlifetime_inst'
+sil hidden [ossa] @redundant_load_across_fixlifetime_inst : $@convention(thin) (@owned AB) -> @owned Klass {
+bb0(%0 : @owned $AB):
+  %borrow0 = begin_borrow %0 : $AB
+  %2 = ref_element_addr %borrow0 : $AB, #AB.value
+  %3 = load [copy] %2 : $*Klass
+  %4 = ref_element_addr %borrow0 : $AB, #AB.value
+  fix_lifetime %0 : $AB
+  %5 = load [copy] %4 : $*Klass
+  %copy5 = copy_value %5 : $Klass
+  end_borrow %borrow0 : $AB
+  destroy_value %0 : $AB
+  %22 = function_ref @use_Klass : $@convention(thin) (@owned Klass) -> ()
+  apply %22(%3) : $@convention(thin) (@owned Klass) -> ()
+  apply %22(%5) : $@convention(thin) (@owned Klass) -> ()
+  return %copy5 : $Klass
+}
+
+// Check that we don't crash if the address is an unchecked_addr_cast.
+// CHECK-LABEL: sil [ossa] @test_unchecked_addr_cast :
+// CHECK-NOT: = load
+// CHECK-LABEL: } // end sil function 'test_unchecked_addr_cast'
+sil [ossa] @test_unchecked_addr_cast : $@convention(thin) (@inout A, @owned A) -> @owned A {
+bb0(%0 : $*A, %1 : @owned $A):
+  %2 = unchecked_addr_cast %0 : $*A to $*A
+  store %1 to [init] %2 : $*A
+  %l1 = load [take] %2 : $*A
+  return %l1 : $A
+}
+
+// Multi-BB version of the previous test.
+// CHECK-LABEL: sil [ossa] @test_forwarding_ignoring_unchecked_addr_cast2 :
+// CHECK-NOT: = load
+// CHECK-LABEL: } // end sil function 'test_forwarding_ignoring_unchecked_addr_cast2'
+sil [ossa] @test_forwarding_ignoring_unchecked_addr_cast2 : $@convention(thin) (@inout A, @owned A, @owned A) -> () {
+bb0(%0 : $*A, %1 : @owned $A, %2 : @owned $A):
+  %3 = unchecked_addr_cast %0 : $*A to $*A
+  store %1 to [init] %3 : $*A
+  br bb1
+
+bb1:
+  %5 = load [copy] %3 : $*A
+  %6 = load [take] %3 : $*A
+  %copy2 = copy_value %2 : $A
+  destroy_value %5 : $A
+  destroy_value %6 : $A
+  store %copy2 to [assign] %3 : $*A
+  cond_br undef, bb3, bb2
+
+bb3:
+  br bb1
+
+bb2:
+  destroy_value %2 : $A
+  %res = tuple ()
+  return %res : $() 
+}
+
+// CHECK-LABEL: sil [ossa] @test_read_dependence_allows_forwarding_multi_bb_1 :
+// CHECK: bb0
+// CHECK: store
+// CHECK: bb1
+// CHECK: store
+// CHECK-NOT: = load
+// CHECK: cond_br
+// CHECK-LABEL: } // end sil function 'test_read_dependence_allows_forwarding_multi_bb_1'
+sil [ossa] @test_read_dependence_allows_forwarding_multi_bb_1 : $@convention(thin) (@inout A, @owned A) -> () {
+bb0(%0 : $*A, %1 : @owned $A):
+  %copy1 = copy_value %1 : $A
+  store %1 to [init] %0 : $*A
+  %2 = unchecked_addr_cast %0 : $*A to $*A
+  %3 = unchecked_addr_cast %2 : $*A to $*A
+  br bb1
+
+bb1:
+  // This means that the first store is not dead.
+  %4 = load [copy] %3 : $*A
+  // But we still should be able to forward this load.
+  %5 = load [copy] %0 : $*A
+  // We need to dedup this store to trigger the self loop
+  // forwarding. Once we do the full optimistic data flow this will no
+  // longer be needed.
+  %6 = load [take] %0 : $*A
+  %copy1a = copy_value %copy1 : $A
+  store %copy1a to [assign] %0 : $*A
+  destroy_value %4 : $A
+  destroy_value %5 : $A
+  destroy_value %6 : $A
+  cond_br undef, bb1a, bb2
+
+bb1a:
+  br bb1
+
+bb2:
+  destroy_value %copy1 : $A
+  %res = tuple ()
+  return %res : $() 
+}
+
+// DISABLE this test for now. it seems DCE is not getting rid of the load in bb8 after the RLE happens.
+//
+// Make sure the switch does not affect the forwarding of the load.
+// switch_enum cannot have BBArgument, but the %17 = load %2 : $*Int32 is not produced in the
+// switch basic block.
+// DISABLE_CHECK-LABEL: load_elimination_disregard_switch_enum
+// DISABLE_CHECK: bb8
+// DISABLE_CHECK-NOT: = load
+// DISABLE_CHECK-LABEL: } // end sil function 'load_elimination_disregard_switch_enum'
+sil [ossa] @load_elimination_disregard_switch_enum : $@convention(thin) (@owned Klass, @owned Klass, @inout Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass, %2 : $*Klass):
+  cond_br undef, bb7, bb1
+
+bb1:
+  %4 = tuple (%0 : $Klass, %1 : $Klass)
+  %5 = enum $XYZ, #XYZ.B!enumelt, %4 : $(Klass, Klass)
+  switch_enum %5 : $XYZ, case #XYZ.A!enumelt: bb2, case #XYZ.B!enumelt: bb4, case #XYZ.C!enumelt: bb6
+
+bb2:
+  br bb3
+
+bb3:
+  br bb5
+
+bb4(%11 : $(Klass, Klass)):
+  %12 = tuple_extract %11 : $(Klass, Klass), 0
+  br bb5
+
+bb5:
+  br bb5
+
+bb6(%15 : $Klass):
+  br bb5
+
+bb7:
+  destroy_value %0 : $Klass
+  destroy_value %1 : $Klass
+  %17 = load [copy] %2 : $*Klass
+  br bb8
+
+bb8:
+  %19 = load [copy] %2 : $*Klass
+  destroy_value %17 : $Klass
+  return %19 : $Klass
+}
+
+// CHECK-LABEL: sil [ossa] @load_store_forwarding_from_aggregate_to_field :
+// CHECK-NOT: load
+// CHECK-LABEL: } // end sil function 'load_store_forwarding_from_aggregate_to_field'
+sil [ossa] @load_store_forwarding_from_aggregate_to_field : $@convention(thin) (@owned Agg1) -> @owned Klass {
+bb0(%0 : @owned $Agg1):
+  %1 = alloc_stack $Agg1
+  store %0 to [init] %1 : $*Agg1
+  %2 = struct_element_addr %1 : $*Agg1, #Agg1.a
+  %3 = struct_element_addr %2 : $*Agg2, #Agg2.t
+  %4 = tuple_element_addr %3 : $*(Klass, Klass), 1
+  %5 = load [copy] %4 : $*Klass
+  destroy_addr %1 : $*Agg1
+  dealloc_stack %1 : $*Agg1
+  return %5 : $Klass
+}
+
+// CHECK-LABEL: sil [ossa] @store_promotion :
+// CHECK: store
+// CHECK-NEXT: destroy_addr
+// CHECK-NEXT: destroy_value
+// CHECK-NEXT: destroy_value
+// CHECK-LABEL: } // end sil function 'store_promotion'
+sil [ossa] @store_promotion : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <Klass>
+  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <Klass>, 0
+  store %0 to [init] %1a : $*Klass
+  %3 = load [copy] %1a : $*Klass
+  %4 = load [take] %1a : $*Klass
+  destroy_value %4 : $Klass
+  destroy_value %3 : $Klass
+  destroy_value %1 : $<τ_0_0> { var τ_0_0 } <Klass>
+  %7 = tuple()
+  return %7 : $()
+}
+
+// CHECK-LABEL: promote_partial_load :
+// CHECK: alloc_stack
+// CHECK-NOT: = load
+// CHECK: [[RESULT:%[0-9]+]] = struct_extract
+// CHECK-LABEL: } // end sil function 'promote_partial_load'
+sil [ossa] @promote_partial_load : $@convention(thin) (@owned Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass):
+  %1 = alloc_stack $NonTrivialStruct
+  %2 = struct $NonTrivialStruct (%0 : $Klass)
+  store %2 to [init] %1 : $*NonTrivialStruct
+  %3 = struct_element_addr %1 : $*NonTrivialStruct, #NonTrivialStruct.val
+  %4 = load [take] %3 : $*Klass
+  dealloc_stack %1 : $*NonTrivialStruct
+  return %4 : $Klass
+}
+
+// TODO: HANDLE THIS, THIS IS SAME VALUE STORES.
+//
+// CHECK-LABEL: sil [ossa] @store_loaded_value :
+// CHECK-LABEL: } // end sil function 'store_loaded_value'
+sil [ossa]  @store_loaded_value : $@convention(thin) (@inout Agg2, @inout Agg1) -> () {
+bb0(%0 : $*Agg2, %1 : $*Agg1):
+  %2 = load [take] %1 : $*Agg1
+  %3 = load [take] %0 : $*Agg2
+  store %2 to [init]  %1 : $*Agg1
+  store %3 to [init] %0 : $*Agg2
+  %6 = tuple()
+  return %6 : $()
+}
+
+// Make sure we RLE the second load.
+//
+// CHECK-LABEL: test_simple_rle_in_class :
+// CHECK: = load
+// CHECK-NOT: = load
+// CHECK-LABEL: } // end sil function 'test_simple_rle_in_class'
+sil [ossa] @test_simple_rle_in_class : $@convention(thin)(@owned AB) -> () {
+bb0(%0 : @owned $AB):
+  %borrow0 = begin_borrow %0 : $AB
+  %2 = ref_element_addr %borrow0 : $AB, #AB.value
+  %3 = load [copy] %2 : $*Klass
+  %4 = ref_element_addr %borrow0 : $AB, #AB.value
+  %5 = load [copy] %4 : $*Klass
+  end_borrow %borrow0 : $AB
+  destroy_value %3 : $Klass
+  destroy_value %5 : $Klass
+  destroy_value %0 : $AB
+  %6 = tuple()
+  return %6 : $()
+}
+
+// Make sure we RLE the load in BB2.
+//
+// CHECK-LABEL: test_silargument_rle :
+// CHECK: bb2
+// CHECK-NOT: = load
+// CHECK: cond_br
+// CHECK-LABEL: } // end sil function 'test_silargument_rle'
+sil [ossa] @test_silargument_rle : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %copy0 = copy_value %0 : $Klass
+  %g = global_addr @total_klass : $*Klass
+  store %0 to [assign] %g : $*Klass
+  %6 = alloc_ref $AX
+  %borrow6 = begin_borrow %6 : $AX
+  %8 = ref_element_addr %borrow6 : $AX, #AX.current
+  store %copy0 to [assign] %8 : $*Klass
+  end_borrow %borrow6 : $AX
+  cond_br undef, bb0a, bb0b
+
+bb0a:
+  br bb2
+
+bb0b:
+  br bb3
+
+bb2:
+  %9 = load [copy] %g : $*Klass
+  store %9 to [assign] %g : $*Klass
+  cond_br undef, bb2b, bb2a
+
+bb2a:
+  br bb2
+
+bb2b:
+  br bb3
+
+bb3:
+  destroy_value %6 : $AX
+  %44 = tuple ()
+  return %44 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @load_to_load_forwarding_diamonds : $@convention(thin) (@inout Builtin.Int32) -> Builtin.Int32 {
+// CHECK: = load
+// CHECK-NOT: = load
+// CHECK-LABEL: } // end sil function 'load_to_load_forwarding_diamonds'
+sil [ossa] @load_to_load_forwarding_diamonds : $@convention(thin) (@inout Builtin.Int32) -> Builtin.Int32 {
+bb0(%0 : $*Builtin.Int32):
+  %1 = load [trivial] %0 : $*Builtin.Int32
+  // Simple diamond.
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  // Triangle
+  cond_br undef, bb4, bb5
+
+bb4:
+  br bb6
+
+bb5:
+  br bb6 
+
+bb6:
+  %2 = load [trivial] %0 : $*Builtin.Int32
+  return %2 : $Builtin.Int32
+}
+
+// Forward store %1 and store %2 such that load %3 becomes an identity trivial cast.
+// Both loads from %0 will be eliminated.
+// CHECK-LABEL: sil [ossa] @test_read_dependence_allows_forwarding_multi_bb_2 : 
+// CHECK: bb1
+// CHECK: = load
+// CHECK-NOT: = load
+// CHECK: bb2
+// CHECK-LABEL: } // end sil function 'test_read_dependence_allows_forwarding_multi_bb_2'
+sil [ossa] @test_read_dependence_allows_forwarding_multi_bb_2 : $@convention(thin) (@inout A, @owned A, @owned A) -> () {
+bb0(%0 : $*A, %1 : @owned $A, %2 : @owned $A):
+  store %1 to [init] %0 : $*A
+  %3 = unchecked_addr_cast %0 : $*A to $*A
+  %4 = unchecked_addr_cast %3 : $*A to $*A
+  br bb1
+
+bb1:
+  // This means that the first store is not dead.
+  %2c = copy_value %2 : $A
+  %6 = load [copy] %3 : $*A
+  %7 = load [copy] %0 : $*A
+  %8 = load [take] %0 : $*A
+  %22 = function_ref @use_a : $@convention(thin) (@owned A) -> ()
+  %123 = apply %22(%6) : $@convention(thin) (@owned A) -> ()
+  %223 = apply %22(%7) : $@convention(thin) (@owned A) -> ()
+  %323 = apply %22(%8) : $@convention(thin) (@owned A) -> ()
+  store %2c to [init] %0 : $*A
+  cond_br undef, bb1a, bb2
+
+bb1a:
+  br bb1
+
+bb2:
+  destroy_value %2 : $A
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @load_to_load_loop :
+// CHECK: bb1([[BBARG:%[0-9]+]]
+// CHECK-NOT: load
+// CHECK: bb2:
+// CHECK-NOT: load
+// CHECK-LABEL: } // end sil function 'load_to_load_loop'
+sil [ossa] @load_to_load_loop : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %101 = alloc_stack $NonTrivialStruct
+  %102 = alloc_stack $NonTrivialStruct
+  %0ele = struct_element_addr %101 : $*NonTrivialStruct, #NonTrivialStruct.val
+  %1ele = struct_element_addr %102 : $*NonTrivialStruct, #NonTrivialStruct.val
+  %copy1 = copy_value %0 : $Klass
+  %copy2 = copy_value %0 : $Klass
+  store %copy1 to [init] %0ele : $*Klass
+  store %copy2 to [init] %1ele : $*Klass
+  %2 = load [copy] %0ele : $*Klass
+  %99 = load [copy] %1ele : $*Klass
+  %125 = function_ref @use_Klass : $@convention(thin) (@owned Klass) -> ()
+  %126 = apply %125(%2) : $@convention(thin) (@owned Klass) -> ()
+  %127 = apply %125(%99) : $@convention(thin) (@owned Klass) -> ()
+  br bb1
+
+bb1:
+  %4 = load [take] %0ele : $*Klass
+  %1125 = function_ref @use_Klass : $@convention(thin) (@owned Klass) -> ()
+  %1126 = apply %1125(%4) : $@convention(thin) (@owned Klass) -> ()
+  %copy0 = copy_value %0 : $Klass
+  store %copy0 to [init] %0ele : $*Klass
+  %6 = load [copy] %0ele : $*Klass
+  %11125 = function_ref @use_Klass : $@convention(thin) (@owned Klass) -> ()
+  %11126 = apply %11125(%6) : $@convention(thin) (@owned Klass) -> ()
+  cond_br undef, bb1a, bb2
+
+bb1a:
+  br bb1  
+
+bb2:
+  %7 = load [take] %0ele : $*Klass
+  %111125 = function_ref @use_Klass : $@convention(thin) (@owned Klass) -> ()
+  %111126 = apply %111125(%7) : $@convention(thin) (@owned Klass) -> ()
+  destroy_value %0 : $Klass
+  destroy_addr %1ele : $*Klass
+  dealloc_stack %102 : $*NonTrivialStruct
+  dealloc_stack %101 : $*NonTrivialStruct
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: agg_and_field_store_branches_diamond :
+// CHECK: bb3
+// CHECK-NOT: = load
+// CHECK-LABEL: } // end sil function 'agg_and_field_store_branches_diamond'
+sil hidden [ossa] @agg_and_field_store_branches_diamond : $@convention(thin) (@owned Klass, @owned Klass) -> () {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass):
+  %stk = alloc_stack $TwoField, var, name "x"
+  cond_br undef, bb1, bb2
+
+bb1:
+  %11 = struct_element_addr %stk : $*TwoField, #TwoField.a
+  store %0 to [init] %11 : $*Klass
+  %16 = struct_element_addr %stk : $*TwoField, #TwoField.b
+  store %1 to [init] %16 : $*Klass
+  br bb3
+
+bb2:
+  %3 = function_ref @init_twofield : $@convention(thin) (@thin TwoField.Type) -> @owned TwoField
+  %4 = metatype $@thin TwoField.Type
+  %5 = apply %3(%4) : $@convention(thin) (@thin TwoField.Type) -> @owned TwoField
+  destroy_value %0 : $Klass
+  destroy_value %1 : $Klass 
+  store %5 to [init] %stk : $*TwoField
+  br bb3
+
+bb3:
+  %99 = load [take] %stk : $*TwoField
+  %991 = function_ref @use_twofield : $@convention(thin) (@owned TwoField) -> ()
+  %55 = apply %991(%99) : $@convention(thin) (@owned TwoField) -> ()
+  dealloc_stack %stk : $*TwoField
+  %23 = tuple ()
+  return %23 : $()
+}
+
+// CHECK-LABEL: agg_and_field_store_with_the_same_value :
+// CHECK: bb2
+// CHECK-NOT: = load
+// CHECK-LABEL: } // end sil function 'agg_and_field_store_with_the_same_value'
+sil hidden [ossa] @agg_and_field_store_with_the_same_value : $@convention(thin) (@owned Klass, @owned Klass) -> () {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass):
+  %stk = alloc_stack $TwoField, var, name "x"
+  br bb1
+
+bb1:
+  %11 = struct_element_addr %stk : $*TwoField, #TwoField.a
+  store %0 to [init] %11 : $*Klass
+  %16 = struct_element_addr %stk : $*TwoField, #TwoField.b
+  store %1 to [init] %16 : $*Klass
+  br bb2
+
+bb2:
+  %99 = load [take] %stk : $*TwoField
+  %991 = function_ref @use_twofield : $@convention(thin) (@owned TwoField) -> ()
+  %55 = apply %991(%99) : $@convention(thin) (@owned TwoField) -> ()
+  dealloc_stack %stk : $*TwoField
+  %23 = tuple ()
+  return %23 : $()
+}
+
+// Make sure we form a single SILArgument.
+//
+// CHECK-LABEL: single_silargument_agg_in_one_block :
+// CHECK: bb3([[ARG:%.*]] : @owned $TwoField):
+// CHECK-NOT: = load
+// CHECK-LABEL: } // end sil function 'single_silargument_agg_in_one_block'
+sil hidden [ossa] @single_silargument_agg_in_one_block : $@convention(thin) (@owned Klass, @owned Klass) -> () {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass):
+  %stk = alloc_stack $TwoField, var, name "x"
+  cond_br undef, bb1, bb2
+
+bb1:
+  %5 = struct_element_addr %stk : $*TwoField, #TwoField.a
+  store %0 to [init] %5 : $*Klass
+  %7 = struct_element_addr %stk : $*TwoField, #TwoField.b
+  store %1 to [init] %7 : $*Klass
+  br bb3
+
+bb2:
+  %12 = struct $TwoField (%0 : $Klass, %1 : $Klass)
+  store %12 to [init] %stk : $*TwoField
+  br bb3
+
+bb3:
+  %15 = load [take] %stk : $*TwoField
+  // function_ref use_twofield
+  %16 = function_ref @use_twofield : $@convention(thin) (@owned TwoField) -> ()
+  %17 = apply %16(%15) : $@convention(thin) (@owned TwoField) -> ()
+  dealloc_stack %stk : $*TwoField
+  %18 = tuple ()
+  return %18 : $()
+}
+
+// CHECK-LABEL: large_diamond_silargument_forwarding :
+// CHECK: bb9
+// CHECK-NOT: = load
+// CHECK-LABEL: } // end sil function 'large_diamond_silargument_forwarding'
+sil hidden [ossa] @large_diamond_silargument_forwarding : $@convention(thin) (@owned Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass):
+  %1 = alloc_stack $TwoField, var, name "x"
+  cond_br undef, bb1, bb2
+
+bb1:
+  cond_br undef, bb3, bb4
+
+bb2:
+  cond_br undef, bb5, bb6
+
+bb3:
+  %7 = struct_element_addr %1 : $*TwoField, #TwoField.a
+  store %0 to [init] %7 : $*Klass
+  br bb7
+
+bb4:
+  %10 = struct_element_addr %1 : $*TwoField, #TwoField.a
+  store %0 to [init] %10 : $*Klass
+  br bb7
+
+bb5:
+  %13 = struct_element_addr %1 : $*TwoField, #TwoField.a
+  store %0 to [init] %13 : $*Klass
+  br bb8
+
+bb6:
+  %16 = struct_element_addr %1 : $*TwoField, #TwoField.a
+  store %0 to [init] %16 : $*Klass
+  br bb8
+
+bb7:
+  br bb9
+
+bb8:
+  br bb9
+
+bb9:
+  %21 = struct_element_addr %1 : $*TwoField, #TwoField.a
+  %22 = load [take] %21 : $*Klass
+  dealloc_stack %1 : $*TwoField
+  return %22 : $Klass
+}
+
+// CHECK-LABEL: sil [ossa] @test_project_box :
+// CHECK: [[PB:%[0-9]*]] = project_box %0
+// CHECK: [[LD:%[0-9]*]] = load [copy] [[PB]]
+// CHECK: [[COPY:%[0-9]*]] = copy_value [[LD]]
+// CHECK: [[TP:%[0-9]*]] = tuple ([[LD]] : $Klass, [[COPY]] : $Klass)
+// CHECK-LABEL: } // end sil function 'test_project_box'
+sil [ossa] @test_project_box : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Klass>) -> @owned (Klass, Klass) {
+bb0(%0 : @owned $<τ_0_0> { var τ_0_0 } <Klass>):
+  %2 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Klass>, 0
+  %3 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Klass>, 0
+  %4 = load [copy] %2 : $*Klass
+  %5 = load [copy] %3 : $*Klass
+  %r = tuple(%4 : $Klass, %5 : $Klass)
+  destroy_value %0 : $<τ_0_0> { var τ_0_0 } <Klass>
+  return %r : $(Klass, Klass)
+}
+
+// Make sure we can forward loads to class members from the same class through
+// upcast.
+//
+// CHECK-LABEL: sil [ossa] @load_forward_same_upcasted_base :
+// CHECK: bb0
+// CHECK: = loa
+// CHECK-NOT: = load
+// CHECK-LABEL: } // end sil function 'load_forward_same_upcasted_base'
+sil [ossa] @load_forward_same_upcasted_base : $@convention(thin)(@owned C3) -> () {
+bb0(%0 : @owned $C3):
+  %borrow0 = begin_borrow %0 : $C3
+  %1 = upcast %borrow0 : $C3 to $C2
+  %2 = ref_element_addr %1 : $C2, #C2.current
+  %3 = load [copy] %2 : $*Klass
+  %4 = upcast %borrow0 : $C3 to $C2
+  %5 = ref_element_addr %4 : $C2, #C2.current
+  %6 = load [take] %5 : $*Klass
+  end_borrow %borrow0 : $C3
+  destroy_value %3 : $Klass
+  destroy_value %6 : $Klass
+  destroy_value %0 : $C3
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// Make sure we can forward loads to class members from the same class through
+// downcast.
+//
+// CHECK-LABEL: sil [ossa] @load_forward_same_downcasted_base :
+// CHECK: bb0
+// CHECK: = load
+// CHECK-NOT: = load
+// CHECK-LABEL: } // end sil function 'load_forward_same_downcasted_base'
+sil [ossa] @load_forward_same_downcasted_base : $@convention(thin)(@owned C1) -> () {
+bb0(%0 : @owned $C1):
+  %borrow0 = begin_borrow %0 : $C1
+  %1 = unchecked_ref_cast %borrow0 : $C1 to $C2
+  %2 = ref_element_addr %1 : $C2, #C2.current
+  %3 = load [copy] %2 : $*Klass
+  %4 = unchecked_ref_cast %borrow0 : $C1 to $C2
+  %5 = ref_element_addr %4 : $C2, #C2.current
+  %6 = load [take] %5 : $*Klass
+  end_borrow %borrow0 : $C1
+  destroy_value %3 : $Klass
+  destroy_value %6 : $Klass
+  destroy_value %0 : $C1
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// Make sure the first load in bb1 is not eliminated as we have
+// this unreachable block which will have a liveout of nil.
+// we make this in the context of a loop, because we want to run an
+// optimistic data flow.
+//
+// CHECK-LABEL: sil [ossa] @load_to_load_loop_with_unreachable_block :
+// CHECK: bb1:
+// CHECK: = load
+// CHECK: cond_br
+// CHECK-LABEL: } // end sil function 'load_to_load_loop_with_unreachable_block'
+sil [ossa] @load_to_load_loop_with_unreachable_block : $@convention(thin) (@owned NonTrivialStruct, @owned NonTrivialStruct) -> () {
+bb0(%0 : @owned $NonTrivialStruct, %1 : @owned $NonTrivialStruct):
+  %101 = alloc_stack $NonTrivialStruct
+  %102 = alloc_stack $NonTrivialStruct
+  store %0 to [init] %101 : $*NonTrivialStruct
+  store %1 to [init] %102 : $*NonTrivialStruct
+  %0ele = struct_element_addr %101 : $*NonTrivialStruct, #NonTrivialStruct.val
+  %1ele = struct_element_addr %102 : $*NonTrivialStruct, #NonTrivialStruct.val
+  %2 = load [copy] %0ele : $*Klass
+  %99 = load [take] %1ele : $*Klass
+  %125 = function_ref @use_Klass : $@convention(thin) (@owned Klass) -> ()
+  %126 = apply %125(%2) : $@convention(thin) (@owned Klass) -> ()
+  %127 = apply %125(%99) : $@convention(thin) (@owned Klass) -> ()
+  br bb1
+
+bb20:
+  br bb1
+
+bb1:
+  %4 = load [copy] %0ele : $*Klass
+  %5 = copy_value %4 : $Klass 
+  %1125 = function_ref @use_Klass : $@convention(thin) (@owned Klass) -> ()
+  %1126 = apply %1125(%4) : $@convention(thin) (@owned Klass) -> ()
+  store %5 to [assign] %0ele : $*Klass
+  %6 = load [copy] %0ele : $*Klass
+  %11125 = function_ref @use_Klass : $@convention(thin) (@owned Klass) -> ()
+  %11126 = apply %11125(%6) : $@convention(thin) (@owned Klass) -> ()
+  cond_br undef, bb1a, bb2
+
+bb1a:
+  br bb1
+
+bb2:
+  %7 = load [take] %0ele : $*Klass
+  %111125 = function_ref @use_Klass : $@convention(thin) (@owned Klass) -> ()
+  %111126 = apply %111125(%7) : $@convention(thin) (@owned Klass) -> ()
+  dealloc_stack %102 : $*NonTrivialStruct
+  dealloc_stack %101 : $*NonTrivialStruct
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil hidden [ossa] @redundant_load_over_intermediate_release_with_epilogue_release :
+// CHECK: [[AD:%.*]] = ref_element_addr
+// CHECK: [[AD2:%.*]] = load [copy] [[AD]]
+// CHECK-NOT: [[AD3:%.*]] = load [take] [[AD]]
+// CHECK: destroy_value
+// CHECK-LABEL: } // end sil function 'redundant_load_over_intermediate_release_with_epilogue_release'
+sil hidden [ossa] @redundant_load_over_intermediate_release_with_epilogue_release : $@convention(thin) (@owned AB) -> () {
+bb0(%0 : @owned $AB):
+  %borrow0 = begin_borrow %0 : $AB
+  %1 = ref_element_addr %borrow0 : $AB, #AB.value
+  %2 = load [copy] %1 : $*Klass
+  %3 = load [take] %1 : $*Klass
+  end_borrow %borrow0 : $AB
+  destroy_value %2 : $Klass
+  destroy_value %3 : $Klass
+  destroy_value %0 : $AB
+  %4 = tuple ()
+  return %4 : $()
+}
+
+// Make sure we have a deterministic forward ordering and also both loads are forwarded.
+//
+// CHECK-LABEL: sil [ossa] @load_store_deterministic_forwarding :
+// CHECK: bb0
+// CHECK: store
+// CHECK-NEXT: copy_value
+// CHECK-NEXT: store
+// CHECK-NOT: load
+// CHECK-LABEL: } // end sil function 'load_store_deterministic_forwarding'
+sil [ossa] @load_store_deterministic_forwarding : $@convention(thin) (@inout Klass, @inout Klass, @owned Klass) -> @owned Klass {
+bb0(%0 : $*Klass, %1 : $*Klass, %2 : @owned $Klass):
+  store %2 to [assign] %0 : $*Klass
+  %3 = load [copy] %0 : $*Klass
+  store %3 to [assign] %1: $*Klass
+  %4 = load [copy] %1 : $*Klass
+  return %4 : $Klass
+}
+
+// CHECK-LABEL: sil [ossa] @redundant_load_mark_dependence :
+// CHECK: load
+// CHECK-NOT: load
+// CHECK-LABEL: } // end sil function 'redundant_load_mark_dependence'
+sil [ossa] @redundant_load_mark_dependence : $@convention(thin) (@inout Klass, @guaranteed Builtin.NativeObject) -> @owned (Klass, Klass) {
+bb0(%0 : $*Klass, %1 : @guaranteed $Builtin.NativeObject):
+  %2 = mark_dependence %0 : $*Klass on %1 : $Builtin.NativeObject
+  %4 = load [copy] %2 : $*Klass
+  %5 = load [take] %2 : $*Klass
+  %6 = tuple(%4 : $Klass, %5 : $Klass)
+  return %6 : $(Klass, Klass)
+}
+
+// CHECK-LABEL: sil [ossa] @dont_crash_on_index_addr_projection :
+// CHECK-LABEL: } // end sil function 'dont_crash_on_index_addr_projection'
+sil [ossa] @dont_crash_on_index_addr_projection : $@convention(thin) (Builtin.RawPointer) -> @owned (Klass, Klass, Klass, Klass) {
+bb0(%0 : $Builtin.RawPointer):
+  // Negative (valid constant index)
+  %3 = integer_literal $Builtin.Word, 4294967295 // '0xffffffff'
+  %4 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*Klass
+  %5 = index_addr %4 : $*Klass, %3 : $Builtin.Word
+  %6 = load [copy] %5 : $*Klass
+  // TailIndex (invalid constant index)
+  %7 = integer_literal $Builtin.Word, 2147483647 // '0x7fffffff'
+  %8 = index_addr %4 : $*Klass, %7 : $Builtin.Word
+  %9 = load [copy] %8 : $*Klass
+  // UnknownOffset (valid index)
+  %10 = integer_literal $Builtin.Word, 3221225472 // '0xC0000000'
+  %11 = index_addr %4 : $*Klass, %10 : $Builtin.Word
+  %12 = load [copy] %11 : $*Klass
+  // Root (unused/invalid index))
+  %13 = integer_literal $Builtin.Word, 2147483648 // '0x80000000'
+  %14 = index_addr %4 : $*Klass, %13 : $Builtin.Word
+  %15 = load [copy] %14 : $*Klass
+  %99 = tuple (%6 : $Klass, %9 : $Klass, %12 : $Klass, %15 : $Klass)
+  return %99 : $(Klass, Klass, Klass, Klass)
+}
+
+sil [ossa] @overwrite_int : $@convention(thin) (@inout Int, Int) -> ()
+
+// Make sure that the store is forwarded to the load, ie. the load is
+// eliminated. That's correct as the stored value can't be changed by the
+// callee as it's passed with @in_guaranteed.
+sil @test_rle_in_guaranteed_sink : $@convention(thin) (Klass) -> ()
+sil @test_rle_in_guaranteed_callee : $@convention(thin) (@in_guaranteed Klass) -> ()
+
+// CHECK-LABEL: sil [ossa] @test_rle_in_guaranteed_entry :
+// CHECK-NOT: load
+// CHECK-LABEL: } // end sil function 'test_rle_in_guaranteed_entry'
+sil [ossa] @test_rle_in_guaranteed_entry : $@convention(thin) (@in Klass, @owned Klass) -> () {
+bb0(%0 : $*Klass, %1 : @owned $Klass):
+  store %1 to [assign] %0 : $*Klass
+  %f_callee = function_ref @test_rle_in_guaranteed_callee : $@convention(thin) (@in_guaranteed Klass) -> ()
+  %r1 = apply %f_callee(%0) : $@convention(thin) (@in_guaranteed Klass) -> ()
+  %value_again = load [take] %0 : $*Klass
+  %f_sink = function_ref @test_rle_in_guaranteed_sink : $@convention(thin) (Klass) -> ()
+  %r2 = apply %f_sink(%value_again) : $@convention(thin) (Klass) -> ()
+  destroy_value %value_again : $Klass
+  %3 = tuple()
+  return %3 : $()
+}
+
+// Check that set_deallocating, and dealloc_ref don't prevent optimization.
+// CHECK-LABEL: ignore_read_write :
+// CHECK: bb0
+// CHECK-NOT: load
+// CHECK-LABEL: end sil function 'ignore_read_write'
+sil [ossa] @ignore_read_write : $@convention(thin) (@owned Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass):
+  %1 = alloc_ref [stack] $AX
+  %borrow1 = begin_borrow %1 : $AX
+  %4 = ref_element_addr %borrow1 : $AX, #AX.current
+  store %0 to [init] %4 : $*Klass
+  %5 = load [copy] %4 : $*Klass
+  end_borrow %borrow1 : $AX
+  set_deallocating %1 : $AX
+  dealloc_ref [stack] %1 : $AX
+  return %5 : $Klass
+}
+
+public enum FakeOptional {
+  case some1(UInt)
+  case some2(Klass)
+}
+
+struct StructWithEnum {
+  var val:FakeOptional
+}
+
+// Check that set_deallocating, and dealloc_ref don't prevent optimization.
+// CHECK-LABEL: @rle_copy_does_not_need_cfgsplitting :
+// CHECK: load 
+// CHECK-NOT: load
+// CHECK-LABEL: end sil function 'rle_copy_does_not_need_cfgsplitting'
+sil [ossa] @rle_copy_does_not_need_cfgsplitting : $@convention(thin) (@in StructWithEnum) -> () {
+bb0(%0 : $*StructWithEnum):
+  %val1 = load [copy] %0 : $*StructWithEnum
+  %borrow1 = begin_borrow %val1 : $StructWithEnum
+  %1 = struct_extract %borrow1 : $StructWithEnum, #StructWithEnum.val
+  %copy1 = copy_value %1 : $FakeOptional
+  switch_enum %1 : $FakeOptional, case #FakeOptional.some1!enumelt:bb1, case #FakeOptional.some2!enumelt:bb2
+
+bb1(%arg1 : $UInt):
+  br bb3(%arg1 : $UInt)
+
+bb2(%arg2 : @guaranteed $Klass):
+  %3 = unchecked_trivial_bit_cast %arg2 : $Klass to $UInt
+  br bb3(%3 : $UInt)
+
+bb3(%arg3 : $UInt):
+  br bb4
+
+bb4:
+  %val2 = load [take] %0 : $*StructWithEnum
+  %borrow2 = begin_borrow %val2 : $StructWithEnum
+  %2 = struct_extract %borrow2 : $StructWithEnum, #StructWithEnum.val
+  %copy2 = copy_value %2 : $FakeOptional
+  switch_enum %2 : $FakeOptional, case #FakeOptional.some1!enumelt:bb5, case #FakeOptional.some2!enumelt:bb6
+
+bb5(%arg4 : $UInt):
+  br bb7(%arg4 : $UInt)
+
+bb6(%arg5 : @guaranteed $Klass):
+  %4 = unchecked_trivial_bit_cast %arg5 : $Klass to $UInt
+  br bb7(%4 : $UInt)
+
+bb7(%arg6 : $UInt):
+  destroy_value %copy2 : $FakeOptional
+  br bb8
+
+bb8:
+  end_borrow %borrow2 : $StructWithEnum
+  end_borrow %borrow1 : $StructWithEnum
+  destroy_value %val2 : $StructWithEnum
+  destroy_value %val1 : $StructWithEnum
+  destroy_value %copy1 : $FakeOptional
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: @ignore_unreachable_simple :
+// CHECK:        [[V:%[0-9]+]] = load [copy]
+// CHECK:        [[C:%[0-9]+]] = copy_value [[V]]
+// CHECK:      bb1:
+// CHECK-NEXT:   destroy_value [[C]]
+// CHECK:      bb2:
+// CHECK-NEXT:   unreachable
+// CHECK: } // end sil function 'ignore_unreachable_simple'
+sil [ossa] @ignore_unreachable_simple : $@convention(thin) (@in_guaranteed NonTrivialStruct) -> () {
+bb0(%0 : $*NonTrivialStruct):
+  %ele = struct_element_addr %0 : $*NonTrivialStruct, #NonTrivialStruct.val
+  %val1 = load [copy] %ele : $*Klass
+  destroy_value %val1 : $Klass
+  cond_br undef, bb1, bb2
+
+bb1:
+  %val2 = load [copy] %ele : $*Klass
+  destroy_value %val2 : $Klass
+  br bb3
+
+bb2:
+  unreachable
+
+bb3:
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: @ignore_unreachable_complex :
+// CHECK:        [[V:%[0-9]+]] = load [copy]
+// CHECK:        copy_value [[V]]
+// CHECK:        copy_value [[V]]
+// CHECK:      bb1:
+// CHECK-NEXT:   destroy_value
+// CHECK-NEXT:   cond_br
+// CHECK:      bb2:
+// CHECK-NEXT:   destroy_value
+// CHECK-NEXT:   cond_br
+// CHECK:      bb3:
+// CHECK-NEXT:   destroy_value
+// CHECK-NEXT:   br bb5
+// CHECK:      bb4:
+// CHECK-NEXT:   destroy_value
+// CHECK-NEXT:   br bb5
+// CHECK:      bb5:
+// CHECK-NEXT:   tuple
+// CHECK:      bb6:
+// CHECK-NEXT:   br bb8
+// CHECK:      bb7:
+// CHECK-NEXT:   br bb8
+// CHECK:      bb8:
+// CHECK-NEXT:   unreachable
+// CHECK: } // end sil function 'ignore_unreachable_complex'
+sil [ossa] @ignore_unreachable_complex : $@convention(thin) (@in_guaranteed NonTrivialStruct) -> () {
+bb0(%0 : $*NonTrivialStruct):
+  %ele = struct_element_addr %0 : $*NonTrivialStruct, #NonTrivialStruct.val
+  %val1 = load [copy] %ele : $*Klass
+  destroy_value %val1 : $Klass
+  cond_br undef, bb1, bb2
+
+bb1:
+  cond_br undef, bb3, bb6
+
+bb2:
+  cond_br undef, bb4, bb7
+
+bb3:
+  %val2 = load [copy] %ele : $*Klass
+  destroy_value %val2 : $Klass
+  br bb5
+
+bb4:
+  %val3 = load [copy] %ele : $*Klass
+  destroy_value %val3 : $Klass
+  br bb5
+
+bb5:
+  %res = tuple ()
+  return %res : $()
+
+bb6:
+  br bb8
+
+bb7:
+  br bb8
+
+bb8:
+  unreachable
+}
+
+
+// CHECK-LABEL: @infinite_loop_and_unreachable :
+// CHECK:   [[V:%[0-9]+]] = load [copy]
+// CHECK:   [[C1:%[0-9]+]] = copy_value [[V]]
+// CHECK: bb1:
+// CHECK:   [[C2:%[0-9]+]] = copy_value [[C1]]
+// CHECK:   destroy_value [[C2]]
+// CHECK: } // end sil function 'infinite_loop_and_unreachable'
+sil [ossa] @infinite_loop_and_unreachable : $@convention(thin) (@in_guaranteed NonTrivialStruct) -> () {
+bb0(%0 : $*NonTrivialStruct):
+  %ele = struct_element_addr %0 : $*NonTrivialStruct, #NonTrivialStruct.val
+  %val1 = load [copy] %ele : $*Klass
+  destroy_value %val1 : $Klass
+  br bb1
+
+bb1:
+  %val2 = load [copy] %ele : $*Klass
+  destroy_value %val2 : $Klass
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  unreachable
+}
+

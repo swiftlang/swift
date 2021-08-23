@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -target x86_64-apple-macosx10.14 -target-sdk-version 10.15.4 -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend %s -target %target-cpu-apple-macosx10.14 -target-sdk-version 10.15.4 -emit-ir | %FileCheck %s
 
 // REQUIRES: OS=macosx
 

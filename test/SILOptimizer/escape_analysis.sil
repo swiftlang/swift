@@ -8,7 +8,7 @@ import Builtin
 import Swift
 import SwiftShims
 
-protocol ClassP : class {
+protocol ClassP : AnyObject {
   func foo()
 }
 
@@ -1774,7 +1774,7 @@ class IntWrapper {
 
 // CHECK-LABEL: CG of testInteriorCycle
 // CHECK-NEXT:   Arg [ref] %0 Esc: A, Succ: (%2)
-// CHECK-NEXT:   Con [int] %2 Esc: G, Succ: (%2)
+// CHECK-NEXT:   Con [int] %2 Esc: A, Succ: (%2)
 // CHECK-NEXT:   Val %6 Esc: , Succ: %0, %2
 // CHECK-NEXT:   Ret return Esc: , Succ: %6
 // CHECK-LABEL: End
@@ -1960,5 +1960,24 @@ bb0(%0 : $Z):
 sil hidden [noinline] @$noreturncallee : $@convention(thin)  (@guaranteed Z) -> @owned Z {
 bb0(%0 : $Z):
   unreachable
+}
+
+// CHECK-LABEL: CG of test_destroy_value
+// CHECK:   Arg %0 Esc: A, Succ: (%1)
+// CHECK:   Con [ref] %1 Esc: A, Succ: (%1.1)
+// CHECK:   Con [int] %1.1 Esc: G, Succ: (%1.2)
+// CHECK:   Con [ref] %1.2 Esc: G, Succ:
+// CHECK-LABEL: End
+// CHECK: NoEscape: %0 = argument of bb0 : $*X
+// CHECK:  to   destroy_value %1 : $X
+// CHECK: MayEscape:   %1 = load [copy] %0 : $*X
+// CHECK:  to   destroy_value %1 : $X
+sil [ossa] @test_destroy_value : $@convention(thin) (@in X) -> () {
+bb0 (%0 : $*X):
+  %1 = load [copy] %0 : $*X
+  destroy_value %1 : $X
+  destroy_addr %0 : $*X
+  %2 = tuple()
+  return %2 : $()
 }
 

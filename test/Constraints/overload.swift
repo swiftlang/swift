@@ -3,9 +3,9 @@
 func markUsed<T>(_ t: T) {}
 
 func f0(_: Float) -> Float {}
-// expected-note@-1 {{candidate expects value of type 'Float' for parameter #1}}
+// expected-note@-1 {{candidate expects value of type 'Float' for parameter #1 (got 'X')}}
 func f0(_: Int) -> Int {}
-// expected-note@-1 {{candidate expects value of type 'Int' for parameter #1}}
+// expected-note@-1 {{candidate expects value of type 'Int' for parameter #1 (got 'X')}}
 
 func f1(_: Int) {}
 
@@ -245,4 +245,15 @@ func test_no_hole_propagation() {
   func test(withArguments arguments: [String]) -> String {
     return arguments.reduce(0, +) // expected-error {{cannot convert value of type 'Int' to expected argument type 'String'}}
   }
+}
+
+// rdar://79672230 - crash due to unsatisfied `: AnyObject` requirement
+func rdar79672230() {
+  struct MyType {}
+
+  func test(_ representation: MyType) -> Bool {} // expected-note {{found candidate with type 'MyType'}}
+  func test<T>(_ object: inout T) -> Bool where T : AnyObject {} // expected-note {{candidate requires that 'MyType' conform to 'AnyObject' (requirement specified as 'T' : 'AnyObject')}}
+
+  var t: MyType = MyType()
+  test(&t) // expected-error {{no exact matches in call to local function 'test'}}
 }

@@ -1,0 +1,15 @@
+// RUN: not --crash %target-sil-opt -enable-sil-verify-all=true -sil-verify-all=true %s
+// RUN: %target-sil-opt -enable-sil-verify-all=false -sil-verify-all=false %s
+
+// We only run this test without asserts.
+
+// UNSUPPORTED: asserts
+
+class Klass {}
+
+sil [ossa] @leaky_code : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $Klass
+  %9999 = tuple()
+  return %9999 : $()
+}

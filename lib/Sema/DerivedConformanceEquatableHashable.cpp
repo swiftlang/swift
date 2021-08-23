@@ -79,8 +79,8 @@ deriveBodyEquatable_enum_uninhabited_eq(AbstractFunctionDecl *eqDecl, void *) {
                                   SourceLoc(), /*HasTrailingClosure*/ false,
                                   /*implicit*/ true,
                                   TupleType::get(abTupleElts, C));
-  auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), abExpr,
-                                       SourceLoc(), cases, SourceLoc(), C);
+  auto switchStmt =
+      SwitchStmt::createImplicit(LabeledStmtInfo(), abExpr, cases, C);
   statements.push_back(switchStmt);
 
   auto body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
@@ -123,7 +123,8 @@ deriveBodyEquatable_enum_noAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
                                     AccessSemantics::Ordinary, fnType);
 
     fnType = fnType->getResult()->castTo<FunctionType>();
-    auto *callExpr = new (C) DotSyntaxCallExpr(ref, SourceLoc(), base, fnType);
+    auto *callExpr =
+        DotSyntaxCallExpr::create(C, ref, SourceLoc(), base, fnType);
     callExpr->setImplicit();
     callExpr->setThrows(false);
     cmpFuncExpr = callExpr;
@@ -134,16 +135,9 @@ deriveBodyEquatable_enum_noAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
                                       fnType);
   }
 
-  TupleTypeElt abTupleElts[2] = { aIndex->getType(), bIndex->getType() };
-  TupleExpr *abTuple = TupleExpr::create(C, SourceLoc(), { aIndex, bIndex },
-                                         { }, { }, SourceLoc(),
-                                         /*HasTrailingClosure*/ false,
-                                         /*Implicit*/ true,
-                                         TupleType::get(abTupleElts, C));
-
-  auto *cmpExpr = new (C) BinaryExpr(
-      cmpFuncExpr, abTuple, /*implicit*/ true,
-      fnType->castTo<FunctionType>()->getResult());
+  auto *cmpExpr =
+      BinaryExpr::create(C, aIndex, cmpFuncExpr, bIndex, /*implicit*/ true,
+                         fnType->castTo<FunctionType>()->getResult());
   cmpExpr->setThrows(false);
   statements.push_back(new (C) ReturnStmt(SourceLoc(), cmpExpr));
 
@@ -276,8 +270,8 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
   auto abExpr = TupleExpr::create(C, SourceLoc(), { aRef, bRef }, {}, {},
                                   SourceLoc(), /*HasTrailingClosure*/ false,
                                   /*implicit*/ true);
-  auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), abExpr,
-                                       SourceLoc(), cases, SourceLoc(), C);
+  auto switchStmt =
+      SwitchStmt::createImplicit(LabeledStmtInfo(), abExpr, cases, C);
   statements.push_back(switchStmt);
 
   auto body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
@@ -387,6 +381,7 @@ deriveEquatable_eq(
                                     C.getIdentifier(s), parentDC);
     param->setSpecifier(ParamSpecifier::Default);
     param->setInterfaceType(selfIfaceTy);
+    param->setImplicit();
     return param;
   };
 
@@ -395,7 +390,7 @@ deriveEquatable_eq(
     getParamDecl("b")
   });
 
-  auto boolTy = C.getBoolDecl()->getDeclaredInterfaceType();
+  auto boolTy = C.getBoolType();
 
   Identifier generatedIdentifier;
   if (parentDC->getParentModule()->isResilient()) {
@@ -537,6 +532,7 @@ deriveHashable_hashInto(
                                             C.Id_hasher, parentDC);
   hasherParamDecl->setSpecifier(ParamSpecifier::InOut);
   hasherParamDecl->setInterfaceType(hasherType);
+  hasherParamDecl->setImplicit();
 
   ParameterList *params = ParameterList::createWithoutLoc(hasherParamDecl);
 
@@ -554,6 +550,12 @@ deriveHashable_hashInto(
 
   hashDecl->copyFormalAccessFrom(derived.Nominal,
                                  /*sourceIsParentContext=*/true);
+
+  // The derived hash(into:) for an actor must be non-isolated.
+  if (derived.Nominal->isActor() ||
+      getActorIsolation(derived.Nominal) == ActorIsolation::GlobalActor) {
+    hashDecl->getAttrs().add(new (C) NonisolatedAttr(/*IsImplicit*/true));
+  }
 
   derived.addMembersToConformanceContext({hashDecl});
 
@@ -748,8 +750,8 @@ deriveBodyHashable_enum_hasAssociatedValues_hashInto(
   // generate: switch enumVar { }
   auto enumRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(),
                                      /*implicit*/true);
-  auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), enumRef,
-                                       SourceLoc(), cases, SourceLoc(), C);
+  auto switchStmt =
+      SwitchStmt::createImplicit(LabeledStmtInfo(), enumRef, cases, C);
 
   auto body = BraceStmt::create(C, SourceLoc(), {ASTNode(switchStmt)},
                                 SourceLoc());
@@ -858,21 +860,20 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   ASTContext &C = derived.Context;
 
   auto parentDC = derived.getConformanceContext();
-  Type intType = C.getIntDecl()->getDeclaredInterfaceType();
+  Type intType = C.getIntType();
 
   // We can't form a Hashable conformance if Int isn't Hashable or
   // ExpressibleByIntegerLiteral.
-  if (TypeChecker::conformsToProtocol(
-          intType, C.getProtocol(KnownProtocolKind::Hashable), parentDC)
-          .isInvalid()) {
+  if (!TypeChecker::conformsToKnownProtocol(
+          intType, KnownProtocolKind::Hashable,
+          derived.getParentModule())) {
     derived.ConformanceDecl->diagnose(diag::broken_int_hashable_conformance);
     return nullptr;
   }
 
-  ProtocolDecl *intLiteralProto =
-      C.getProtocol(KnownProtocolKind::ExpressibleByIntegerLiteral);
-  if (TypeChecker::conformsToProtocol(intType, intLiteralProto, parentDC)
-          .isInvalid()) {
+  if (!TypeChecker::conformsToKnownProtocol(
+          intType, KnownProtocolKind::ExpressibleByIntegerLiteral,
+          derived.getParentModule())) {
     derived.ConformanceDecl->diagnose(
       diag::broken_int_integer_literal_convertible_conformance);
     return nullptr;
@@ -882,6 +883,7 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
     new (C) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Var,
                     SourceLoc(), C.Id_hashValue, parentDC);
   hashValueDecl->setInterfaceType(intType);
+  hashValueDecl->setSynthesized();
 
   ParameterList *params = ParameterList::createEmpty(C);
 
@@ -889,11 +891,13 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
       /*FuncLoc=*/SourceLoc(), /*AccessorKeywordLoc=*/SourceLoc(),
       AccessorKind::Get, hashValueDecl,
       /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
+      /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
       /*GenericParams=*/nullptr, params,
       intType, parentDC);
   getterDecl->setImplicit();
   getterDecl->setBodySynthesizer(&deriveBodyHashable_hashValue);
+  getterDecl->setSynthesized();
   getterDecl->setIsTransparent(false);
 
   getterDecl->copyFormalAccessFrom(derived.Nominal,
@@ -906,6 +910,12 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   hashValueDecl->setAccessors(SourceLoc(), {getterDecl}, SourceLoc());
   hashValueDecl->copyFormalAccessFrom(derived.Nominal,
                                       /*sourceIsParentContext*/ true);
+
+  // The derived hashValue of an actor must be nonisolated.
+  if (derived.Nominal->isActor() ||
+      getActorIsolation(derived.Nominal) == ActorIsolation::GlobalActor) {
+    hashValueDecl->getAttrs().add(new (C) NonisolatedAttr(/*IsImplicit*/true));
+  }
 
   Pattern *hashValuePat = NamedPattern::createImplicit(C, hashValueDecl);
   hashValuePat->setType(intType);
@@ -938,7 +948,8 @@ getHashableConformance(const Decl *parentDecl) {
   ASTContext &C = parentDecl->getASTContext();
   const auto IDC = cast<IterableDeclContext>(parentDecl);
   auto hashableProto = C.getProtocol(KnownProtocolKind::Hashable);
-  for (auto conformance: IDC->getLocalConformances()) {
+  for (auto conformance: IDC->getLocalConformances(
+           ConformanceLookupKind::NonStructural)) {
     if (conformance->getProtocol() == hashableProto) {
       return conformance;
     }

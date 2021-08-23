@@ -1,9 +1,9 @@
 // RUN: %empty-directory(%t)
-// RUN: %swift -emit-module -o %t/test_module.swiftmodule %S/Inputs/test_module.swift
+// RUN: %swift -emit-module -o %t/test_module.swiftmodule %S/Inputs/test_module.swift -disable-implicit-concurrency-module-import
 
-// RUN: %sourcekitd-test -req=index %s -- %s -I %t | %FileCheck %s
+// RUN: %sourcekitd-test -req=index %s -- %s -I %t -Xfrontend -disable-implicit-concurrency-module-import | %FileCheck %s
 
-// RUN: %sourcekitd-test -req=index %t/test_module.swiftmodule | %sed_clean > %t.response
+// RUN: %sourcekitd-test -req=index %t/test_module.swiftmodule -- -Xfrontend -disable-implicit-concurrency-module-import | %sed_clean > %t.response
 // RUN: %diff -u %S/Inputs/test_module.index.response %t.response
 
 import test_module

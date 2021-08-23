@@ -20,4 +20,4 @@ struct TemplatedMagicWrapper {
 
 typedef TemplatedMagicWrapper<MagicWrapper> TemplatedWrappedMagicInt;
 typedef MagicWrapper<IntWrapper> WrappedMagicInt;
-#endif  // TEST_INTEROP_CXX_TEMPLATES_INPUTS_CLASS_TEMPLATE_TEMPLATE_PARAMETER_H
+#endif // TEST_INTEROP_CXX_TEMPLATES_INPUTS_CLASS_TEMPLATE_TEMPLATE_PARAMETER_H

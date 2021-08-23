@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-clang -c %S/Inputs/static-local-var.cpp -I %S/Inputs -o %t/static-local-var.o
+// RUN: %target-clangxx -c %S/Inputs/static-local-var.cpp -I %S/Inputs -o %t/static-local-var.o
 // RUN: %target-build-swift %s -I %S/Inputs -o %t/statics %t/static-local-var.o -Xfrontend -enable-cxx-interop
 // RUN: %target-codesign %t/statics
 // RUN: %target-run %t/statics

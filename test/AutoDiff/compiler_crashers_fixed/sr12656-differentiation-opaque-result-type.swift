@@ -1,5 +1,4 @@
 // RUN: not %target-swift-frontend -disable-availability-checking -emit-sil -verify %s
-// REQUIRES: asserts
 
 // SR-12656: Differentiation transform crashes for original function with opaque
 // result type.
@@ -8,7 +7,7 @@
 
 import _Differentiation
 
-@differentiable
+@differentiable(reverse)
 func opaqueResult(_ x: Float) -> some Differentiable { x }
 
 // swift: swift/lib/SILOptimizer/Differentiation/PullbackEmitter.cpp:244: void swift::autodiff::PullbackEmitter::addAdjointValue(swift::SILBasicBlock *, swift::SILValue, swift::autodiff::AdjointValue, swift::SILLocation): Assertion `newAdjointValue.getType() == getRemappedTangentType(originalValue->getType())' failed.
@@ -18,7 +17,7 @@ func opaqueResult(_ x: Float) -> some Differentiable { x }
 // 2.      While evaluating request ExecuteSILPipelineRequest(Run pipelines { Guaranteed Passes } on SIL for main.main)
 // 3.      While running pass #15 SILModuleTransform "Differentiation".
 // 4.      While processing // differentiability witness for opaqueResult(_:)
-// sil_differentiability_witness hidden [parameters 0] [results 0] @$s4main12opaqueResultyQrSfF : $@convention(thin) (Float) -> @out @_opaqueReturnTypeOf("$s4main12opaqueResultyQrSfF", 0) 🦸 {
+// sil_differentiability_witness hidden [reverse] [parameters 0] [results 0] @$s4main12opaqueResultyQrSfF : $@convention(thin) (Float) -> @out @_opaqueReturnTypeOf("$s4main12opaqueResultyQrSfF", 0) __ {
 // }
 //  on SIL function "@$s4main12opaqueResultyQrSfF".
 //  for 'opaqueResult(_:)' (at swift/test/AutoDiff/compiler_crashers/sr12656-differentiation-opaque-result-type.swift:13:1)

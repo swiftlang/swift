@@ -58,13 +58,13 @@ struct WrapperAcceptingAutoclosure<T> {
 
 @propertyWrapper
 struct MissingValue<T> { }
-// expected-error@-1{{property wrapper type 'MissingValue' does not contain a non-static property named 'wrappedValue'}} {{educational-notes=property-wrapper-requirements}}
+// expected-error@-1{{property wrapper type 'MissingValue' does not contain a non-static property named 'wrappedValue'}} {{educational-notes=property-wrapper-requirements}}{{25-25=var wrappedValue: <#Value#>}}
 
 @propertyWrapper
 struct StaticValue {
   static var wrappedValue: Int = 17
 }
-// expected-error@-3{{property wrapper type 'StaticValue' does not contain a non-static property named 'wrappedValue'}}
+// expected-error@-3{{property wrapper type 'StaticValue' does not contain a non-static property named 'wrappedValue'}}{{21-21=var wrappedValue: <#Value#>}}
 
 
 // expected-error@+1{{'@propertyWrapper' attribute cannot be applied to this declaration}}
@@ -1096,16 +1096,18 @@ struct TestComposition {
   @WrapperD<WrapperE, Int, String> @WrapperE var p3: Int?
   @WrapperD<WrapperC, Int, String> @WrapperC var p4: Int?
   @WrapperD<WrapperC, Int, String> @WrapperE var p5: Int // expected-error{{generic parameter 'Value' could not be inferred}}
-  // expected-note@-1 {{explicitly specify the generic arguments to fix this issue}}
-  // expected-error@-2 {{composed wrapper type 'WrapperE<Int>' does not match former 'wrappedValue' type 'WrapperC<Value>'}}
+    // expected-note@-1 {{explicitly specify the generic arguments to fix this issue}}
+    // expected-error@-2 {{composed wrapper type 'WrapperE<Int>' does not match type of 'WrapperD<WrapperC<Value>, Int, String>.wrappedValue', which is 'WrapperC<Value>'}}
+
+  @Wrapper<String> @Wrapper var value: Int // expected-error{{composed wrapper type 'Wrapper<Int>' does not match type of 'Wrapper<String>.wrappedValue', which is 'String'}}
 
 	func triggerErrors(d: Double) { // expected-note 6 {{mark method 'mutating' to make 'self' mutable}} {{2-2=mutating }}
-		p1 = d // expected-error{{cannot assign value of type 'Double' to type 'Int'}} {{8-8=Int(}} {{9-9=)}}
+		p1 = d // expected-error{{cannot assign value of type 'Double' to type 'Int?'}} {{8-8=Int(}} {{9-9=)}}
     // expected-error@-1 {{cannot assign to property: 'self' is immutable}}
-		p2 = d // expected-error{{cannot assign value of type 'Double' to type 'String'}}
+		p2 = d // expected-error{{cannot assign value of type 'Double' to type 'String?'}}
     // expected-error@-1 {{cannot assign to property: 'self' is immutable}}
     // TODO(diagnostics): Looks like source range for 'd' here is reported as starting at 10, but it should be 8
-    p3 = d // expected-error{{cannot assign value of type 'Double' to type 'Int'}} {{10-10=Int(}} {{11-11=)}}
+    p3 = d // expected-error{{cannot assign value of type 'Double' to type 'Int?'}} {{10-10=Int(}} {{11-11=)}}
     // expected-error@-1 {{cannot assign to property: 'self' is immutable}}
 
 		_p1 = d // expected-error{{cannot assign value of type 'Double' to type 'WrapperA<WrapperB<WrapperC<Int>>>'}}
@@ -2075,4 +2077,21 @@ struct OptionalWrapper<T> {
 
 struct UseOptionalWrapper {
   @OptionalWrapper var p: Int?? // Okay
+}
+
+@propertyWrapper
+struct WrapperWithFailableInit<Value> {
+  var wrappedValue: Value
+
+  init(_ base: WrapperWithFailableInit<Value>) { fatalError() }
+
+  init?(_ base: WrapperWithFailableInit<Value?>) { fatalError() }
+}
+
+struct TestInitError {
+  // FIXME: bad diagnostics when a wrapper does not support init from wrapped value
+
+  // expected-error@+2 {{extraneous argument label 'wrappedValue:' in call}}
+  // expected-error@+1 {{cannot convert value of type 'Int' to specified type 'WrapperWithFailableInit<Int>'}}
+  @WrapperWithFailableInit var value: Int = 10
 }

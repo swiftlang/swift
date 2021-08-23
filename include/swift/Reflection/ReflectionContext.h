@@ -23,6 +23,7 @@
 #include "llvm/BinaryFormat/ELF.h"
 #include "llvm/Object/COFF.h"
 #include "llvm/Support/Memory.h"
+#include "llvm/ADT/STLExtras.h"
 
 #include "swift/ABI/Enum.h"
 #include "swift/ABI/ObjectFile.h"
@@ -92,7 +93,7 @@ class ReflectionContext
   using super = remote::MetadataReader<Runtime, TypeRefBuilder>;
   using super::readMetadata;
   using super::readObjCClassName;
-
+  using super::readResolvedPointerValue;
   std::unordered_map<typename super::StoredPointer, const TypeInfo *> Cache;
 
   /// All buffers we need to keep around long term. This will automatically free them
@@ -113,6 +114,22 @@ public:
   using typename super::StoredPointer;
   using typename super::StoredSignedPointer;
   using typename super::StoredSize;
+
+  struct AsyncTaskAllocationChunk {
+    enum class ChunkKind {
+      Unknown,
+      NonPointer,
+      RawPointer,
+      StrongReference,
+      UnownedReference,
+      WeakReference,
+      UnmanagedReference
+    };
+
+    StoredPointer Start;
+    unsigned Length;
+    ChunkKind Kind;
+  };
 
   explicit ReflectionContext(std::shared_ptr<MemoryReader> reader)
     : super(std::move(reader), *this)
@@ -153,6 +170,8 @@ public:
       auto CmdBuf = this->getReader().readBytes(
           RemoteAddress(CmdStartAddress.getAddressData() + Offset),
           SegmentCmdHdrSize);
+      if (!CmdBuf)
+        return false;
       auto CmdHdr = reinterpret_cast<typename T::SegmentCmd *>(CmdBuf.get());
       if (strncmp(CmdHdr->segname, "__TEXT", sizeof(CmdHdr->segname)) == 0) {
         Command = CmdHdr;
@@ -173,6 +192,8 @@ public:
     auto LoadCmdAddress = reinterpret_cast<const char *>(loadCmdOffset);
     auto LoadCmdBuf = this->getReader().readBytes(
         RemoteAddress(LoadCmdAddress), sizeof(typename T::SegmentCmd));
+    if (!LoadCmdBuf)
+      return false;
     auto LoadCmd = reinterpret_cast<typename T::SegmentCmd *>(LoadCmdBuf.get());
 
     // The sections start immediately after the load command.
@@ -181,36 +202,11 @@ public:
                        sizeof(typename T::SegmentCmd);
     auto Sections = this->getReader().readBytes(
         RemoteAddress(SectAddress), NumSect * sizeof(typename T::Section));
-
-    auto Slide = ImageStart.getAddressData() - Command->vmaddr;
-    std::string Prefix = "__swift5";
-    uint64_t RangeStart = UINT64_MAX;
-    uint64_t RangeEnd = UINT64_MAX;
-    auto SectionsBuf = reinterpret_cast<const char *>(Sections.get());
-    for (unsigned I = 0; I < NumSect; ++I) {
-      auto S = reinterpret_cast<typename T::Section *>(
-          SectionsBuf + (I * sizeof(typename T::Section)));
-      if (strncmp(S->sectname, Prefix.c_str(), strlen(Prefix.c_str())) != 0)
-        continue;
-      if (RangeStart == UINT64_MAX && RangeEnd == UINT64_MAX) {
-        RangeStart = S->addr + Slide;
-        RangeEnd = S->addr + S->size + Slide;
-        continue;
-      }
-      RangeStart = std::min(RangeStart, (uint64_t)S->addr + Slide);
-      RangeEnd = std::max(RangeEnd, (uint64_t)(S->addr + S->size + Slide));
-      // Keep the range rounded to 8 byte alignment on both ends so we don't
-      // introduce misaligned pointers mapping between local and remote
-      // address space.
-      RangeStart = RangeStart & ~7;
-      RangeEnd = RangeEnd + 7 & ~7;      
-    }
- 
-    if (RangeStart == UINT64_MAX && RangeEnd == UINT64_MAX)
+    if (!Sections)
       return false;
 
-    auto SectBuf = this->getReader().readBytes(RemoteAddress(RangeStart),
-                                               RangeEnd - RangeStart);
+    auto Slide = ImageStart.getAddressData() - Command->vmaddr;
+    auto SectionsBuf = reinterpret_cast<const char *>(Sections.get());
 
     auto findMachOSectionByName = [&](llvm::StringRef Name)
         -> std::pair<RemoteRef<void>, uint64_t> {
@@ -220,11 +216,13 @@ public:
         if (strncmp(S->sectname, Name.data(), strlen(Name.data())) != 0)
           continue;
         auto RemoteSecStart = S->addr + Slide;
-        auto SectBufData = reinterpret_cast<const char *>(SectBuf.get());
-        auto LocalSectStart =
-            reinterpret_cast<const char *>(SectBufData + RemoteSecStart - RangeStart);
-        
-        auto StartRef = RemoteRef<void>(RemoteSecStart, LocalSectStart);
+        auto LocalSectBuf =
+            this->getReader().readBytes(RemoteAddress(RemoteSecStart), S->size);
+        if (!LocalSectBuf)
+          return {nullptr, 0};
+
+        auto StartRef = RemoteRef<void>(RemoteSecStart, LocalSectBuf.get());
+        savedBuffers.push_back(std::move(LocalSectBuf));
         return {StartRef, S->size};
       }
       return {nullptr, 0};
@@ -267,6 +265,8 @@ public:
       auto CmdBuf = this->getReader().readBytes(
           RemoteAddress(CmdStartAddress.getAddressData() + Offset),
           SegmentCmdHdrSize);
+      if (!CmdBuf)
+        return false;
       auto CmdHdr = reinterpret_cast<typename T::SegmentCmd *>(CmdBuf.get());
       if (strncmp(CmdHdr->segname, "__DATA", sizeof(CmdHdr->segname)) == 0) {
         auto DataSegmentEnd =
@@ -281,7 +281,6 @@ public:
     }
 
     savedBuffers.push_back(std::move(Buf));
-    savedBuffers.push_back(std::move(SectBuf));
     savedBuffers.push_back(std::move(Sections));
     return true;
   }
@@ -289,6 +288,8 @@ public:
   bool readPECOFFSections(RemoteAddress ImageStart) {
     auto DOSHdrBuf = this->getReader().readBytes(
         ImageStart, sizeof(llvm::object::dos_header));
+    if (!DOSHdrBuf)
+      return false;
     auto DOSHdr =
         reinterpret_cast<const llvm::object::dos_header *>(DOSHdrBuf.get());
     auto COFFFileHdrAddr = ImageStart.getAddressData() +
@@ -297,6 +298,8 @@ public:
 
     auto COFFFileHdrBuf = this->getReader().readBytes(
         RemoteAddress(COFFFileHdrAddr), sizeof(llvm::object::coff_file_header));
+    if (!COFFFileHdrBuf)
+      return false;
     auto COFFFileHdr = reinterpret_cast<const llvm::object::coff_file_header *>(
         COFFFileHdrBuf.get());
 
@@ -306,9 +309,11 @@ public:
     auto SectionTableBuf = this->getReader().readBytes(
         RemoteAddress(SectionTableAddr),
         sizeof(llvm::object::coff_section) * COFFFileHdr->NumberOfSections);
+    if (!SectionTableBuf)
+      return false;
 
-    auto findCOFFSectionByName = [&](llvm::StringRef Name)
-        -> std::pair<RemoteRef<void>, uint64_t> {
+    auto findCOFFSectionByName =
+        [&](llvm::StringRef Name) -> std::pair<RemoteRef<void>, uint64_t> {
       for (size_t i = 0; i < COFFFileHdr->NumberOfSections; ++i) {
         const llvm::object::coff_section *COFFSec =
             reinterpret_cast<const llvm::object::coff_section *>(
@@ -323,6 +328,8 @@ public:
         auto Addr = ImageStart.getAddressData() + COFFSec->VirtualAddress;
         auto Buf = this->getReader().readBytes(RemoteAddress(Addr),
                                                COFFSec->VirtualSize);
+        if (!Buf)
+          return {nullptr, 0};
         auto BufStart = Buf.get();
         savedBuffers.push_back(std::move(Buf));
 
@@ -508,6 +515,8 @@ public:
             } else {
               SecBuf = this->getReader().readBytes(SecStart, SecSize);
             }
+            if (!SecBuf)
+              return {nullptr, 0};
             auto SecContents =
                 RemoteRef<void>(SecStart.getAddressData(), SecBuf.get());
             savedBuffers.push_back(std::move(SecBuf));
@@ -576,6 +585,8 @@ public:
   bool readELF(RemoteAddress ImageStart, llvm::Optional<llvm::sys::MemoryBlock> FileBuffer) {
     auto Buf =
         this->getReader().readBytes(ImageStart, sizeof(llvm::ELF::Elf64_Ehdr));
+    if (!Buf)
+      return false;
 
     // Read the header.
     auto Hdr = reinterpret_cast<const llvm::ELF::Elf64_Ehdr *>(Buf.get());
@@ -634,6 +645,47 @@ public:
     return false;
   }
 
+  /// Adds an image using the FindSection closure to find the swift metadata
+  /// sections. \param FindSection
+  ///     Closure that finds sections by name. ReflectionContext is in charge
+  ///     of freeing the memory buffer in the RemoteRef return value.
+  ///     process.
+  /// \return
+  ///     \b True if any of the reflection sections were registered,
+  ///     \b false otherwise.
+  bool addImage(llvm::function_ref<
+                std::pair<RemoteRef<void>, uint64_t>(ReflectionSectionKind)>
+                    FindSection) {
+    auto Sections = {
+        ReflectionSectionKind::fieldmd, ReflectionSectionKind::assocty,
+        ReflectionSectionKind::builtin, ReflectionSectionKind::capture,
+        ReflectionSectionKind::typeref, ReflectionSectionKind::reflstr};
+
+    llvm::SmallVector<std::pair<RemoteRef<void>, uint64_t>, 6> Pairs;
+    for (auto Section : Sections) {
+      Pairs.push_back(FindSection(Section));
+      auto LatestRemoteRef = std::get<RemoteRef<void>>(Pairs.back());
+      if (LatestRemoteRef) {
+        MemoryReader::ReadBytesResult Buffer(
+            LatestRemoteRef.getLocalBuffer(),
+            [](const void *Ptr) { free(const_cast<void *>(Ptr)); });
+
+        savedBuffers.push_back(std::move(Buffer));
+      }
+    }
+
+    // If we didn't find any sections, return.
+    if (llvm::all_of(Pairs, [](const auto &Pair) { return !Pair.first; }))
+      return false;
+
+    ReflectionInfo Info = {
+        {Pairs[0].first, Pairs[0].second}, {Pairs[1].first, Pairs[1].second},
+        {Pairs[2].first, Pairs[2].second}, {Pairs[3].first, Pairs[3].second},
+        {Pairs[4].first, Pairs[4].second}, {Pairs[5].first, Pairs[5].second}};
+    this->addReflectionInfo(Info);
+    return true;
+  }
+
   void addReflectionInfo(ReflectionInfo I) {
     getBuilder().addReflectionInfo(I);
   }
@@ -677,7 +729,16 @@ public:
 
     return false;
   }
-  
+
+  /// Returns the address of the nominal type descriptor given a metadata
+  /// address.
+  StoredPointer nominalTypeDescriptorFromMetadata(StoredPointer MetadataAddress) {
+    auto Metadata = readMetadata(MetadataAddress);
+    if (!Metadata)
+      return 0;
+    return super::readAddressOfNominalTypeDescriptor(Metadata, true);
+  }
+
   /// Return a description of the layout of a class instance with the given
   /// metadata as its isa pointer.
   const TypeInfo *
@@ -779,6 +840,52 @@ public:
     }
   }
 
+  llvm::Optional<std::pair<const TypeRef *, RemoteAddress>>
+  getDynamicTypeAndAddressClassExistential(RemoteAddress ExistentialAddress) {
+    auto PointerValue =
+        readResolvedPointerValue(ExistentialAddress.getAddressData());
+    if (!PointerValue)
+      return {};
+    auto Result = readMetadataFromInstance(*PointerValue);
+    if (!Result)
+      return {};
+    auto TypeResult = readTypeFromMetadata(Result.getValue());
+    if (!TypeResult)
+      return {};
+    return {{std::move(TypeResult), RemoteAddress(*PointerValue)}};
+  }
+
+  llvm::Optional<std::pair<const TypeRef *, RemoteAddress>>
+  getDynamicTypeAndAddressErrorExistential(RemoteAddress ExistentialAddress,
+                                           bool *IsBridgedError = nullptr) {
+    auto Result = readMetadataAndValueErrorExistential(ExistentialAddress);
+    if (!Result)
+      return {};
+
+    auto TypeResult =
+        readTypeFromMetadata(Result->MetadataAddress.getAddressData());
+    if (!TypeResult)
+      return {};
+
+    if (IsBridgedError)
+      *IsBridgedError = Result->IsBridgedError;
+
+    return {{TypeResult, Result->PayloadAddress}};
+  }
+
+  llvm::Optional<std::pair<const TypeRef *, RemoteAddress>>
+  getDynamicTypeAndAddressOpaqueExistential(RemoteAddress ExistentialAddress) {
+    auto Result = readMetadataAndValueOpaqueExistential(ExistentialAddress);
+    if (!Result)
+      return {};
+
+    auto TypeResult =
+        readTypeFromMetadata(Result->MetadataAddress.getAddressData());
+    if (!TypeResult)
+      return {};
+    return {{std::move(TypeResult), Result->PayloadAddress}};
+  }
+
   bool projectExistential(RemoteAddress ExistentialAddress,
                           const TypeRef *ExistentialTR,
                           const TypeRef **OutInstanceTR,
@@ -840,6 +947,75 @@ public:
       return false;
     }
   }
+  /// A version of `projectExistential` tailored for LLDB.
+  /// This version dereferences the resulting TypeRef if it wraps
+  /// a class type, it also dereferences the input `ExistentialAddress` before
+  /// attempting to find its dynamic type and address when dealing with error
+  /// existentials.
+  llvm::Optional<std::pair<const TypeRef *, RemoteAddress>>
+  projectExistentialAndUnwrapClass(RemoteAddress ExistentialAddress,
+                                   const TypeRef &ExistentialTR) {
+    auto IsClass = [](const TypeRef *TypeResult) {
+      // When the existential wraps a class type, LLDB expects that the
+      // address returned is the class instance itself and not the address
+      // of the reference.
+      bool IsClass = TypeResult->getKind() == TypeRefKind::ForeignClass ||
+                     TypeResult->getKind() == TypeRefKind::ObjCClass;
+      if (auto *nominal = llvm::dyn_cast<NominalTypeRef>(TypeResult))
+        IsClass = nominal->isClass();
+      else if (auto *boundGeneric =
+                   llvm::dyn_cast<BoundGenericTypeRef>(TypeResult))
+        IsClass = boundGeneric->isClass();
+      return IsClass;
+    };
+
+    auto DereferenceAndSet = [&](RemoteAddress &Address) {
+      auto PointerValue = readResolvedPointerValue(Address.getAddressData());
+      if (!PointerValue)
+        return false;
+      Address = RemoteAddress(*PointerValue);
+      return true;
+    };
+
+    auto ExistentialRecordTI = getRecordTypeInfo(&ExistentialTR, nullptr);
+    if (!ExistentialRecordTI)
+      return {};
+
+    switch (ExistentialRecordTI->getRecordKind()) {
+    case RecordKind::ClassExistential:
+      return getDynamicTypeAndAddressClassExistential(ExistentialAddress);
+    case RecordKind::ErrorExistential: {
+      // LLDB stores the address of the error pointer.
+      if (!DereferenceAndSet(ExistentialAddress))
+        return {};
+
+      bool IsBridgedError = false;
+      auto Pair = getDynamicTypeAndAddressErrorExistential(ExistentialAddress,
+                                                           &IsBridgedError);
+      if (!Pair)
+        return {};
+
+      if (!IsBridgedError && IsClass(std::get<const TypeRef *>(*Pair)))
+        if (!DereferenceAndSet(std::get<RemoteAddress>(*Pair)))
+          return {};
+
+      return Pair;
+    }
+    case RecordKind::OpaqueExistential: {
+      auto Pair = getDynamicTypeAndAddressOpaqueExistential(ExistentialAddress);
+      if (!Pair)
+        return {};
+
+      if (IsClass(std::get<const TypeRef *>(*Pair)))
+        if (!DereferenceAndSet(std::get<RemoteAddress>(*Pair)))
+          return {};
+
+      return Pair;
+    }
+    default:
+      return {};
+    }
+  }
 
   /// Projects the value of an enum.
   ///
@@ -879,6 +1055,12 @@ public:
     }
   }
 
+  const RecordTypeInfo *getRecordTypeInfo(const TypeRef *TR,
+                              remote::TypeInfoProvider *ExternalTypeInfo) {
+    auto *TypeInfo = getTypeInfo(TR, ExternalTypeInfo);
+    return dyn_cast_or_null<const RecordTypeInfo>(TypeInfo);
+  }
+
   /// Iterate the protocol conformance cache tree rooted at NodePtr, calling
   /// Call with the type and protocol in each node.
   void iterateConformanceTree(StoredPointer NodePtr,
@@ -887,10 +1069,10 @@ public:
       return;
     auto NodeBytes = getReader().readBytes(RemoteAddress(NodePtr),
                                            sizeof(ConformanceNode<Runtime>));
+    if (!NodeBytes)
+      return;
     auto NodeData =
       reinterpret_cast<const ConformanceNode<Runtime> *>(NodeBytes.get());
-    if (!NodeData)
-      return;
     Call(NodeData->Type, NodeData->Proto);
     iterateConformanceTree(NodeData->Left, Call);
     iterateConformanceTree(NodeData->Right, Call);
@@ -901,21 +1083,21 @@ public:
       std::function<void(StoredPointer Type, StoredPointer Proto)> Call) {
     auto MapBytes = getReader().readBytes(RemoteAddress(ConformancesPtr),
                                           sizeof(ConcurrentHashMap<Runtime>));
+    if (!MapBytes)
+      return;
     auto MapData =
         reinterpret_cast<const ConcurrentHashMap<Runtime> *>(MapBytes.get());
-    if (!MapData)
-      return;
 
     auto Count = MapData->ElementCount;
     auto Size = Count * sizeof(ConformanceCacheEntry<Runtime>);
 
     auto ElementsBytes =
         getReader().readBytes(RemoteAddress(MapData->Elements), Size);
+    if (!ElementsBytes)
+      return;
     auto ElementsData =
         reinterpret_cast<const ConformanceCacheEntry<Runtime> *>(
             ElementsBytes.get());
-    if (!ElementsData)
-      return;
 
     for (StoredSize i = 0; i < Count; i++) {
       auto &Element = ElementsData[i];
@@ -983,10 +1165,10 @@ public:
         auto AllocationBytes =
           getReader().readBytes(RemoteAddress(Allocation.Ptr),
                                               Allocation.Size);
+        if (!AllocationBytes)
+          return 0;
         auto Entry = reinterpret_cast<const GenericMetadataCacheEntry *>(
           AllocationBytes.get());
-        if (!Entry)
-          return 0;
         return Entry->Value;
     }
     return 0;
@@ -1023,10 +1205,10 @@ public:
     case GenericWitnessTableCacheTag: {
       auto NodeBytes = getReader().readBytes(
           RemoteAddress(Allocation.Ptr), sizeof(MetadataCacheNode<Runtime>));
+      if (!NodeBytes)
+        return llvm::None;
       auto Node =
           reinterpret_cast<const MetadataCacheNode<Runtime> *>(NodeBytes.get());
-      if (!Node)
-        return llvm::None;
       return *Node;
     }
     default:
@@ -1079,23 +1261,23 @@ public:
 
     auto PoolBytes = getReader()
       .readBytes(AllocationPoolAddr->getResolvedAddress(), sizeof(PoolRange));
-    auto Pool = reinterpret_cast<const PoolRange *>(PoolBytes.get());
-    if (!Pool)
+    if (!PoolBytes)
       return std::string("failure reading allocation pool contents");
+    auto Pool = reinterpret_cast<const PoolRange *>(PoolBytes.get());
 
     auto TrailerPtr = Pool->Begin + Pool->Remaining;
     while (TrailerPtr) {
       auto TrailerBytes = getReader()
         .readBytes(RemoteAddress(TrailerPtr), sizeof(PoolTrailer));
-      auto Trailer = reinterpret_cast<const PoolTrailer *>(TrailerBytes.get());
-      if (!Trailer)
+      if (!TrailerBytes)
         break;
+      auto Trailer = reinterpret_cast<const PoolTrailer *>(TrailerBytes.get());
       auto PoolStart = TrailerPtr - Trailer->PoolSize;
       auto PoolBytes = getReader()
         .readBytes(RemoteAddress(PoolStart), Trailer->PoolSize);
-      auto PoolPtr = (const char *)PoolBytes.get();
-      if (!PoolPtr)
+      if (!PoolBytes)
         break;
+      auto PoolPtr = (const char *)PoolBytes.get();
 
       uintptr_t Offset = 0;
       while (Offset < Trailer->PoolSize) {
@@ -1137,10 +1319,7 @@ public:
       auto HeaderBytes = getReader().readBytes(
           RemoteAddress(BacktraceListNext),
           sizeof(MetadataAllocationBacktraceHeader<Runtime>));
-      auto HeaderPtr =
-          reinterpret_cast<const MetadataAllocationBacktraceHeader<Runtime> *>(
-              HeaderBytes.get());
-      if (HeaderPtr == nullptr) {
+      if (!HeaderBytes) {
         // FIXME: std::stringstream would be better, but LLVM's standard library
         // introduces a vtable and we don't want that.
         char result[128];
@@ -1149,6 +1328,9 @@ public:
             BacktraceListNext.getAddressData());
         return std::string(result);
       }
+      auto HeaderPtr =
+          reinterpret_cast<const MetadataAllocationBacktraceHeader<Runtime> *>(
+              HeaderBytes.get());
       auto BacktraceAddrPtr =
           BacktraceListNext +
           sizeof(MetadataAllocationBacktraceHeader<Runtime>);
@@ -1162,6 +1344,46 @@ public:
 
       BacktraceListNext = RemoteAddress(HeaderPtr->Next);
     }
+    return llvm::None;
+  }
+
+  llvm::Optional<std::string> iterateAsyncTaskAllocations(
+      StoredPointer AsyncTaskPtr,
+      std::function<void(StoredPointer, unsigned, AsyncTaskAllocationChunk[])>
+          Call) {
+    using AsyncTask = AsyncTask<Runtime>;
+    using StackAllocator = StackAllocator<Runtime>;
+
+    auto AsyncTaskBytes =
+        getReader().readBytes(RemoteAddress(AsyncTaskPtr), sizeof(AsyncTask));
+    auto *AsyncTaskObj =
+        reinterpret_cast<const AsyncTask *>(AsyncTaskBytes.get());
+    if (!AsyncTaskObj)
+      return std::string("failure reading async task");
+
+    StoredPointer SlabPtr = AsyncTaskObj->PrivateStorage.Allocator.FirstSlab;
+    while (SlabPtr) {
+      auto SlabBytes = getReader().readBytes(
+          RemoteAddress(SlabPtr), sizeof(typename StackAllocator::Slab));
+      auto Slab = reinterpret_cast<const typename StackAllocator::Slab *>(
+          SlabBytes.get());
+      if (!Slab)
+        return std::string("failure reading slab");
+
+      // For now, we won't try to walk the allocations in the slab, we'll just
+      // provide the whole thing as one big chunk.
+      size_t HeaderSize =
+          llvm::alignTo(sizeof(*Slab), llvm::Align(alignof(std::max_align_t)));
+      AsyncTaskAllocationChunk Chunk;
+
+      Chunk.Start = SlabPtr + HeaderSize;
+      Chunk.Length = Slab->CurrentOffset;
+      Chunk.Kind = AsyncTaskAllocationChunk::ChunkKind::Unknown;
+      Call(SlabPtr, 1, &Chunk);
+
+      SlabPtr = Slab->Next;
+    }
+
     return llvm::None;
   }
 

@@ -4,32 +4,30 @@ func foo(value: MyStruct) {
 
 // REQUIRES: shell
 
-// RUN: DEPCHECK_INTERVAL=2
-// RUN: SLEEP_TIME=3
-
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/VFS)
 // RUN: cp %S/Inputs/checkdeps/MyProject/LibraryExt.swift %t/VFS/
 
 // RUN: %sourcekitd-test \
-// RUN:   -req=global-config -req-opts=completion_check_dependency_interval=${DEPCHECK_INTERVAL} == \
+// RUN:   -req=global-config -req-opts=completion_check_dependency_interval=100 == \
 
 // RUN:   -shell -- echo "### Initial" == \
 // RUN:   -req=complete -pos=2:9 -pass-as-sourcetext -vfs-files=%t/VFS/Main.swift=@%s,%t/VFS/Library.swift=@%S/Inputs/checkdeps/MyProject/Library.swift %t/VFS/Main.swift -- -target %target-triple %t/VFS/Main.swift %t/VFS/LibraryExt.swift %t/VFS/Library.swift == \
 
 // RUN:   -shell -- echo "### Modify" == \
-// RUN:   -shell -- sleep ${SLEEP_TIME} == \
+// RUN:   -req=global-config -req-opts=completion_check_dependency_interval=0 == \
 // RUN:   -req=complete -pos=2:9 -pass-as-sourcetext -vfs-files=%t/VFS/Main.swift=@%s,%t/VFS/Library.swift=@%S/Inputs/checkdeps/MyProject_mod/Library.swift %t/VFS/Main.swift -- -target %target-triple %t/VFS/Main.swift %t/VFS/LibraryExt.swift %t/VFS/Library.swift == \
 
 // RUN:   -shell -- echo "### Keep" == \
-// RUN:   -shell -- sleep ${SLEEP_TIME} == \
+// RUN:   -req=global-config -req-opts=completion_check_dependency_interval=0 == \
 // RUN:   -req=complete -pos=2:9 -pass-as-sourcetext -vfs-files=%t/VFS/Main.swift=@%s,%t/VFS/Library.swift=@%S/Inputs/checkdeps/MyProject_mod/Library.swift %t/VFS/Main.swift -- -target %target-triple %t/VFS/Main.swift %t/VFS/LibraryExt.swift %t/VFS/Library.swift == \
 
-// RUN:   -shell -- echo "### Rollback without sleep" == \
+// RUN:   -shell -- echo "### Rollback without check" == \
+// RUN:   -req=global-config -req-opts=completion_check_dependency_interval=100 == \
 // RUN:   -req=complete -pos=2:9 -pass-as-sourcetext -vfs-files=%t/VFS/Main.swift=@%s,%t/VFS/Library.swift=@%S/Inputs/checkdeps/MyProject/Library.swift %t/VFS/Main.swift -- -target %target-triple %t/VFS/Main.swift %t/VFS/LibraryExt.swift %t/VFS/Library.swift == \
 
-// RUN:   -shell -- echo "### After sleep" == \
-// RUN:   -shell -- sleep ${SLEEP_TIME} == \
+// RUN:   -shell -- echo "### Check" == \
+// RUN:   -req=global-config -req-opts=completion_check_dependency_interval=0 == \
 // RUN:   -req=complete -pos=2:9 -pass-as-sourcetext -vfs-files=%t/VFS/Main.swift=@%s,%t/VFS/Library.swift=@%S/Inputs/checkdeps/MyProject/Library.swift %t/VFS/Main.swift -- -target %target-triple %t/VFS/Main.swift %t/VFS/LibraryExt.swift %t/VFS/Library.swift \
 
 // RUN:   |  %FileCheck %s
@@ -58,7 +56,7 @@ func foo(value: MyStruct) {
 // CHECK: ]
 // CHECK: key.reusingastcontext: 1
 
-// CHECK-LABEL: ### Rollback without sleep
+// CHECK-LABEL: ### Rollback without check
 // CHECK: key.results: [
 // CHECK-DAG: key.description: "myStructMethod_mod()"
 // CHECK-DAG: key.description: "extensionMethod()"
@@ -66,7 +64,7 @@ func foo(value: MyStruct) {
 // CHECK: ]
 // CHECK: key.reusingastcontext: 1
 
-// CHECK-LABEL: ### After sleep
+// CHECK-LABEL: ### Check
 // CHECK: key.results: [
 // CHECK-DAG: key.description: "myStructMethod()"
 // CHECK-DAG: key.description: "extensionMethod()"

@@ -58,7 +58,7 @@ extern "C" void _objc_setClassCopyFixupHandler(void (* _Nonnull newFixupHandler)
 #endif
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Hashing.h"
-#include "CompatibilityOverride.h"
+#include "../CompatibilityOverride/CompatibilityOverride.h"
 #include "ErrorObject.h"
 #include "ExistentialMetadataImpl.h"
 #include "swift/Runtime/Debug.h"
@@ -385,12 +385,17 @@ static GenericMetadataCache &getCache(
 }
 
 #if SWIFT_PTRAUTH && SWIFT_OBJC_INTEROP
+// See [NOTE: Dynamic-subclass-KVO]
 static void swift_objc_classCopyFixupHandler(Class oldClass, Class newClass) {
   auto oldClassMetadata = reinterpret_cast<const ClassMetadata *>(oldClass);
 
   // Bail out if this isn't a Swift.
   if (!oldClassMetadata->isTypeMetadata())
    return;
+
+  // Copy the value witness table pointer for pointer authentication.
+  auto newClassMetadata = reinterpret_cast<ClassMetadata *>(newClass);
+  newClassMetadata->setValueWitnesses(oldClassMetadata->getValueWitnesses());
 
  // Otherwise, re-sign v-table entries using the extra discriminators stored
  // in the v-table descriptor.
@@ -408,9 +413,11 @@ static void swift_objc_classCopyFixupHandler(Class oldClass, Class newClass) {
       auto src = srcWords + vtable->getVTableOffset(description);
       auto dest = dstWords + vtable->getVTableOffset(description);
       for (size_t i = 0, e = vtable->VTableSize; i != e; ++i) {
-        swift_ptrauth_copy(reinterpret_cast<void **>(&dest[i]),
-                           reinterpret_cast<void *const *>(&src[i]),
-                           descriptors[i].Flags.getExtraDiscriminator());
+        swift_ptrauth_copy_code_or_data(
+            reinterpret_cast<void **>(&dest[i]),
+            reinterpret_cast<void *const *>(&src[i]),
+            descriptors[i].Flags.getExtraDiscriminator(),
+            !descriptors[i].Flags.isAsync());
       }
     }
 
@@ -1023,6 +1030,11 @@ swift::swift_getObjCClassMetadata(const ClassMetadata *theClass) {
 
 const ClassMetadata *
 swift::swift_getObjCClassFromMetadata(const Metadata *theMetadata) {
+  // We're not supposed to accept NULL, but older runtimes somehow did as a
+  // side effect of UB in dyn_cast, so we'll keep that going.
+  if (!theMetadata)
+    return nullptr;
+
   // Unwrap ObjC class wrappers.
   if (auto wrapper = dyn_cast<ObjCClassWrapperMetadata>(theMetadata)) {
     return wrapper->Class;
@@ -1036,6 +1048,11 @@ swift::swift_getObjCClassFromMetadata(const Metadata *theMetadata) {
 
 const ClassMetadata *
 swift::swift_getObjCClassFromMetadataConditional(const Metadata *theMetadata) {
+  // We're not supposed to accept NULL, but older runtimes somehow did as a
+  // side effect of UB in dyn_cast, so we'll keep that going.
+  if (!theMetadata)
+    return nullptr;
+
   // If it's an ordinary class, return it.
   if (auto theClass = dyn_cast<ClassMetadata>(theMetadata)) {
     return theClass;
@@ -1064,12 +1081,18 @@ public:
 
   struct Key {
     const FunctionTypeFlags Flags;
-
+    const FunctionMetadataDifferentiabilityKind DifferentiabilityKind;
     const Metadata *const *Parameters;
     const uint32_t *ParameterFlags;
     const Metadata *Result;
+    const Metadata *GlobalActor;
 
     FunctionTypeFlags getFlags() const { return Flags; }
+
+    FunctionMetadataDifferentiabilityKind getDifferentiabilityKind() const {
+      return DifferentiabilityKind;
+    }
+
     const Metadata *getParameter(unsigned index) const {
       assert(index < Flags.getNumParameters());
       return Parameters[index];
@@ -1086,8 +1109,13 @@ public:
       return ParameterFlags::fromIntValue(flags);
     }
 
+    const Metadata *getGlobalActor() const { return GlobalActor; }
+
     friend llvm::hash_code hash_value(const Key &key) {
-      auto hash = llvm::hash_combine(key.Flags.getIntValue(), key.Result);
+      auto hash = llvm::hash_combine(
+          key.Flags.getIntValue(),
+          key.DifferentiabilityKind.getIntValue(),
+          key.Result, key.GlobalActor);
       for (unsigned i = 0, e = key.getFlags().getNumParameters(); i != e; ++i) {
         hash = llvm::hash_combine(hash, key.getParameter(i));
         hash = llvm::hash_combine(hash, key.getParameterFlags(i).getIntValue());
@@ -1105,7 +1133,12 @@ public:
   bool matchesKey(const Key &key) const {
     if (key.getFlags().getIntValue() != Data.Flags.getIntValue())
       return false;
+    if (key.getDifferentiabilityKind().Value !=
+        Data.getDifferentiabilityKind().Value)
+      return false;
     if (key.getResult() != Data.ResultType)
+      return false;
+    if (key.getGlobalActor() != Data.getGlobalActor())
       return false;
     for (unsigned i = 0, e = key.getFlags().getNumParameters(); i != e; ++i) {
       if (key.getParameter(i) != Data.getParameter(i))
@@ -1118,8 +1151,9 @@ public:
   }
 
   friend llvm::hash_code hash_value(const FunctionCacheEntry &value) {
-    Key key = {value.Data.Flags, value.Data.getParameters(),
-               value.Data.getParameterFlags(), value.Data.ResultType};
+    Key key = {value.Data.Flags, value.Data.getDifferentiabilityKind(),
+               value.Data.getParameters(), value.Data.getParameterFlags(),
+               value.Data.ResultType, value.Data.getGlobalActor()};
     return hash_value(key);
   }
 
@@ -1136,6 +1170,11 @@ public:
     auto size = numParams * sizeof(FunctionTypeMetadata::Parameter);
     if (flags.hasParameterFlags())
       size += numParams * sizeof(uint32_t);
+    if (flags.isDifferentiable())
+      size = roundUpToAlignment(size, sizeof(void *)) +
+          sizeof(FunctionMetadataDifferentiabilityKind);
+    if (flags.hasGlobalActor())
+      size = roundUpToAlignment(size, sizeof(void *)) + sizeof(Metadata *);
     return roundUpToAlignment(size, sizeof(void *));
   }
 };
@@ -1191,7 +1230,44 @@ swift::swift_getFunctionTypeMetadata(FunctionTypeFlags flags,
                                      const Metadata *const *parameters,
                                      const uint32_t *parameterFlags,
                                      const Metadata *result) {
-  FunctionCacheEntry::Key key = { flags, parameters, parameterFlags, result };
+  assert(!flags.isDifferentiable()
+         && "Differentiable function type metadata should be obtained using "
+            "'swift_getFunctionTypeMetadataDifferentiable'");
+  assert(!flags.hasGlobalActor()
+         && "Global actor function type metadata should be obtained using "
+            "'swift_getFunctionTypeMetadataGlobalActor'");
+  FunctionCacheEntry::Key key = {
+    flags, FunctionMetadataDifferentiabilityKind::NonDifferentiable, parameters,
+    parameterFlags, result, nullptr
+  };
+  return &FunctionTypes.getOrInsert(key).first->Data;
+}
+
+const FunctionTypeMetadata *
+swift::swift_getFunctionTypeMetadataDifferentiable(
+    FunctionTypeFlags flags, FunctionMetadataDifferentiabilityKind diffKind,
+    const Metadata *const *parameters, const uint32_t *parameterFlags,
+    const Metadata *result) {
+  assert(!flags.hasGlobalActor()
+         && "Global actor function type metadata should be obtained using "
+            "'swift_getFunctionTypeMetadataGlobalActor'");
+  assert(flags.isDifferentiable());
+  assert(diffKind.isDifferentiable());
+  FunctionCacheEntry::Key key = {
+    flags, diffKind, parameters, parameterFlags, result, nullptr
+  };
+  return &FunctionTypes.getOrInsert(key).first->Data;
+}
+
+const FunctionTypeMetadata *
+swift::swift_getFunctionTypeMetadataGlobalActor(
+    FunctionTypeFlags flags, FunctionMetadataDifferentiabilityKind diffKind,
+    const Metadata *const *parameters, const uint32_t *parameterFlags,
+    const Metadata *result, const Metadata *globalActor) {
+  assert(flags.hasGlobalActor());
+  FunctionCacheEntry::Key key = {
+    flags, diffKind, parameters, parameterFlags, result, globalActor
+  };
   return &FunctionTypes.getOrInsert(key).first->Data;
 }
 
@@ -1231,6 +1307,10 @@ FunctionCacheEntry::FunctionCacheEntry(const Key &key) {
   Data.setKind(MetadataKind::Function);
   Data.Flags = flags;
   Data.ResultType = key.getResult();
+  if (flags.hasGlobalActor())
+    *Data.getGlobalActorAddr() = key.getGlobalActor();
+  if (flags.isDifferentiable())
+    *Data.getDifferentiabilityKindAddress() = key.getDifferentiabilityKind();
 
   for (unsigned i = 0; i < numParameters; ++i) {
     Data.getParameters()[i] = key.getParameter(i);
@@ -2500,14 +2580,6 @@ static void initGenericClassObjCName(ClassMetadata *theClass) {
 }
 
 static bool installLazyClassNameHook() {
-#if !OBJC_SETHOOK_LAZYCLASSNAMER_DEFINED
-  using objc_hook_lazyClassNamer =
-    const char * _Nullable (*)(_Nonnull Class cls);
-  auto objc_setHook_lazyClassNamer =
-    (void (*)(objc_hook_lazyClassNamer, objc_hook_lazyClassNamer *))
-    dlsym(RTLD_NEXT, "objc_setHook_lazyClassNamer");  
-#endif
-
   static objc_hook_lazyClassNamer oldHook;
   auto myHook = [](Class theClass) -> const char * {
     ClassMetadata *metadata = (ClassMetadata *)theClass;
@@ -2516,14 +2588,12 @@ static bool installLazyClassNameHook() {
     return oldHook(theClass);
   };
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunguarded-availability"
-  if (objc_setHook_lazyClassNamer == nullptr)
-    return false;
-  objc_setHook_lazyClassNamer(myHook, &oldHook);
-#pragma clang diagnostic pop
+  if (SWIFT_RUNTIME_WEAK_CHECK(objc_setHook_lazyClassNamer)) {
+    SWIFT_RUNTIME_WEAK_USE(objc_setHook_lazyClassNamer(myHook, &oldHook));
+    return true;
+  }
 
-  return true;
+  return false;
 }
 
 __attribute__((constructor)) SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE static bool
@@ -2581,9 +2651,11 @@ static void copySuperclassMetadataToSubclass(ClassMetadata *theClass,
 #if SWIFT_PTRAUTH
       auto descriptors = description->getMethodDescriptors();
       for (size_t i = 0, e = vtable->VTableSize; i != e; ++i) {
-        swift_ptrauth_copy(reinterpret_cast<void**>(&dest[i]),
-                           reinterpret_cast<void*const*>(&src[i]),
-                           descriptors[i].Flags.getExtraDiscriminator());
+        swift_ptrauth_copy_code_or_data(
+            reinterpret_cast<void **>(&dest[i]),
+            reinterpret_cast<void *const *>(&src[i]),
+            descriptors[i].Flags.getExtraDiscriminator(),
+            !descriptors[i].Flags.isAsync());
       }
 #else
       memcpy(dest, src, vtable->VTableSize * sizeof(uintptr_t));
@@ -2628,9 +2700,10 @@ static void initClassVTable(ClassMetadata *self) {
     auto descriptors = description->getMethodDescriptors();
     for (unsigned i = 0, e = vtable->VTableSize; i < e; ++i) {
       auto &methodDescription = descriptors[i];
-      swift_ptrauth_init(&classWords[vtableOffset + i],
-                         methodDescription.Impl.get(),
-                         methodDescription.Flags.getExtraDiscriminator());
+      swift_ptrauth_init_code_or_data(
+          &classWords[vtableOffset + i], methodDescription.Impl.get(),
+          methodDescription.Flags.getExtraDiscriminator(),
+          !methodDescription.Flags.isAsync());
     }
   }
 
@@ -2669,9 +2742,10 @@ static void initClassVTable(ClassMetadata *self) {
       auto offset = (baseVTable->getVTableOffset(baseClass) +
                      (baseMethod - baseClassMethods.data()));
 
-      swift_ptrauth_init(&classWords[offset],
-                         descriptor.Impl.get(),
-                         baseMethod->Flags.getExtraDiscriminator());
+      swift_ptrauth_init_code_or_data(&classWords[offset],
+                                      descriptor.Impl.get(),
+                                      baseMethod->Flags.getExtraDiscriminator(),
+                                      !baseMethod->Flags.isAsync());
     }
   }
 }
@@ -2993,11 +3067,6 @@ getSuperclassMetadata(ClassMetadata *self, bool allowDependency) {
   return {MetadataDependency(), second};
 }
 
-// Suppress diagnostic about the availability of _objc_realizeClassFromSwift.
-// We test availability with a nullptr check, but the compiler doesn't see that.
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunguarded-availability-new"
-
 static SWIFT_CC(swift) MetadataDependency
 _swift_initClassMetadataImpl(ClassMetadata *self,
                              ClassLayoutFlags layoutFlags,
@@ -3024,18 +3093,6 @@ _swift_initClassMetadataImpl(ClassMetadata *self,
     (void)unused;
     setUpObjCRuntimeGetImageNameFromClass();
   }, nullptr);
-
-#ifndef OBJC_REALIZECLASSFROMSWIFT_DEFINED
-  // Temporary workaround until _objc_realizeClassFromSwift is in the SDK.
-  static auto _objc_realizeClassFromSwift =
-    (Class (*)(Class _Nullable, void *_Nullable))
-    dlsym(RTLD_NEXT, "_objc_realizeClassFromSwift");
-#endif
-
-  // Temporary workaround until objc_loadClassref is in the SDK.
-  static auto objc_loadClassref =
-    (Class (*)(void *))
-    dlsym(RTLD_NEXT, "objc_loadClassref");
 #endif
 
   // Copy field offsets, generic arguments and (if necessary) vtable entries
@@ -3072,10 +3129,8 @@ _swift_initClassMetadataImpl(ClassMetadata *self,
     // The compiler enforces that @objc methods in extensions of classes
     // with resilient ancestry have the correct availability, so it should
     // be safe to ignore the stub in this case.
-    if (stub != nullptr &&
-        objc_loadClassref != nullptr &&
-        _objc_realizeClassFromSwift != nullptr) {
-      _objc_realizeClassFromSwift((Class) self, const_cast<void *>(stub));
+    if (stub != nullptr && SWIFT_RUNTIME_WEAK_CHECK(_objc_realizeClassFromSwift)) {
+      SWIFT_RUNTIME_WEAK_USE(_objc_realizeClassFromSwift((Class) self, const_cast<void *>(stub)));
     } else {
       swift_instantiateObjCClass(self);
     }
@@ -3086,8 +3141,6 @@ _swift_initClassMetadataImpl(ClassMetadata *self,
 
   return MetadataDependency();
 }
-
-#pragma clang diagnostic pop
 
 void swift::swift_initClassMetadata(ClassMetadata *self,
                                     ClassLayoutFlags layoutFlags,
@@ -3112,12 +3165,6 @@ swift::swift_initClassMetadata2(ClassMetadata *self,
 
 #if SWIFT_OBJC_INTEROP
 
-// Suppress diagnostic about the availability of _objc_realizeClassFromSwift.
-// We test availability with a nullptr check, but the compiler doesn't see that.
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunguarded-availability-new"
-
-
 static SWIFT_CC(swift) MetadataDependency
 _swift_updateClassMetadataImpl(ClassMetadata *self,
                                ClassLayoutFlags layoutFlags,
@@ -3125,14 +3172,7 @@ _swift_updateClassMetadataImpl(ClassMetadata *self,
                                const TypeLayout * const *fieldTypes,
                                size_t *fieldOffsets,
                                bool allowDependency) {
-#ifndef OBJC_REALIZECLASSFROMSWIFT_DEFINED
-  // Temporary workaround until _objc_realizeClassFromSwift is in the SDK.
-  static auto _objc_realizeClassFromSwift =
-    (Class (*)(Class _Nullable, void *_Nullable))
-    dlsym(RTLD_NEXT, "_objc_realizeClassFromSwift");
-#endif
-
-  bool requiresUpdate = (_objc_realizeClassFromSwift != nullptr);
+  bool requiresUpdate = SWIFT_RUNTIME_WEAK_CHECK(_objc_realizeClassFromSwift);
 
   // If we're on a newer runtime, we're going to be initializing the
   // field offset vector. Realize the superclass metadata first, even
@@ -3180,7 +3220,7 @@ _swift_updateClassMetadataImpl(ClassMetadata *self,
     initObjCClass(self, numFields, fieldTypes, fieldOffsets);
 
     // See remark above about how this slides field offset globals.
-    _objc_realizeClassFromSwift((Class)self, (Class)self);
+    SWIFT_RUNTIME_WEAK_USE(_objc_realizeClassFromSwift((Class)self, (Class)self));
   }
 
   return MetadataDependency();
@@ -3207,7 +3247,6 @@ swift::swift_updateClassMetadata2(ClassMetadata *self,
                                         /*allowDependency*/ true);
 }
 
-#pragma clang diagnostic pop
 #endif
 
 #ifndef NDEBUG
@@ -3246,11 +3285,17 @@ swift::swift_lookUpClassMethod(const ClassMetadata *metadata,
 #if SWIFT_PTRAUTH
   // Re-sign the return value without the address.
   unsigned extra = method->Flags.getExtraDiscriminator();
-  return ptrauth_auth_and_resign(*methodPtr,
-                                 ptrauth_key_function_pointer,
-                                 ptrauth_blend_discriminator(methodPtr, extra),
-                                 ptrauth_key_function_pointer,
-                                 extra);
+  if (method->Flags.isAsync()) {
+    return ptrauth_auth_and_resign(
+        *methodPtr, ptrauth_key_process_independent_data,
+        ptrauth_blend_discriminator(methodPtr, extra),
+        ptrauth_key_process_independent_data, extra);
+  } else {
+    return ptrauth_auth_and_resign(
+        *methodPtr, ptrauth_key_function_pointer,
+        ptrauth_blend_discriminator(methodPtr, extra),
+        ptrauth_key_function_pointer, extra);
+  }
 #else
   return *methodPtr;
 #endif
@@ -3445,13 +3490,17 @@ swift::swift_getExistentialMetatypeMetadata(const Metadata *instanceMetadata) {
 ExistentialMetatypeCacheEntry::ExistentialMetatypeCacheEntry(
                                             const Metadata *instanceMetadata) {
   ExistentialTypeFlags flags;
-  if (instanceMetadata->getKind() == MetadataKind::Existential) {
+  switch (instanceMetadata->getKind()) {
+  case MetadataKind::Existential:
     flags = static_cast<const ExistentialTypeMetadata*>(instanceMetadata)
       ->Flags;
-  } else {
-    assert(instanceMetadata->getKind() == MetadataKind::ExistentialMetatype);
+    break;
+  case MetadataKind::ExistentialMetatype:
     flags = static_cast<const ExistentialMetatypeMetadata*>(instanceMetadata)
       ->Flags;
+    break;
+  default:
+    assert(false && "expected existential metadata");
   }
 
   Data.setKind(MetadataKind::ExistentialMetatype);
@@ -4618,7 +4667,9 @@ static void initProtocolWitness(void **slot, void *witness,
   case ProtocolRequirementFlags::Kind::Setter:
   case ProtocolRequirementFlags::Kind::ReadCoroutine:
   case ProtocolRequirementFlags::Kind::ModifyCoroutine:
-    swift_ptrauth_init(slot, witness, reqt.Flags.getExtraDiscriminator());
+    swift_ptrauth_init_code_or_data(slot, witness,
+                                    reqt.Flags.getExtraDiscriminator(),
+                                    !reqt.Flags.isAsync());
     return;
 
   case ProtocolRequirementFlags::Kind::AssociatedConformanceAccessFunction:
@@ -4657,7 +4708,9 @@ static void copyProtocolWitness(void **dest, void * const *src,
   case ProtocolRequirementFlags::Kind::Setter:
   case ProtocolRequirementFlags::Kind::ReadCoroutine:
   case ProtocolRequirementFlags::Kind::ModifyCoroutine:
-    swift_ptrauth_copy(dest, src, reqt.Flags.getExtraDiscriminator());
+    swift_ptrauth_copy_code_or_data(dest, src,
+                                    reqt.Flags.getExtraDiscriminator(),
+                                    !reqt.Flags.isAsync());
     return;
 
   // FIXME: these should both use ptrauth_key_process_independent_data now.
@@ -5006,7 +5059,7 @@ swift_getAssociatedTypeWitnessSlowImpl(
     Demangle::makeSymbolicMangledNameStringRef(mangledNameBase);
 
   // Demangle the associated type.
-  TypeLookupErrorOr<TypeInfo> result = TypeInfo();
+  TypeLookupErrorOr<TypeInfo> result;
   if (inProtocolContext) {
     // The protocol's Self is the only generic parameter that can occur in the
     // type.
@@ -6068,7 +6121,7 @@ const HeapObject *swift_getKeyPathImpl(const void *pattern,
 
 #define OVERRIDE_KEYPATH COMPATIBILITY_OVERRIDE
 #define OVERRIDE_WITNESSTABLE COMPATIBILITY_OVERRIDE
-#include "CompatibilityOverride.def"
+#include COMPATIBILITY_OVERRIDE_INCLUDE_PATH
 
 #if defined(_WIN32) && defined(_M_ARM64)
 namespace std {

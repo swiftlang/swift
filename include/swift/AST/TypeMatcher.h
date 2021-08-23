@@ -102,14 +102,10 @@ class TypeMatcher {
 
     TRIVIAL_CASE(ErrorType)
     TRIVIAL_CASE(BuiltinIntegerType)
-    TRIVIAL_CASE(BuiltinIntegerLiteralType)
     TRIVIAL_CASE(BuiltinFloatType)
-    TRIVIAL_CASE(BuiltinRawPointerType)
-    TRIVIAL_CASE(BuiltinNativeObjectType)
-    TRIVIAL_CASE(BuiltinBridgeObjectType)
-    TRIVIAL_CASE(BuiltinUnsafeValueBufferType)
     TRIVIAL_CASE(BuiltinVectorType)
-    TRIVIAL_CASE(SILTokenType)
+#define SINGLETON_TYPE(SHORT_ID, ID) TRIVIAL_CASE(ID##Type)
+#include "swift/AST/TypeNodes.def"
 
     bool visitUnresolvedType(CanUnresolvedType firstType, Type secondType,
                              Type sugaredFirstType) {
@@ -199,8 +195,32 @@ class TypeMatcher {
     TRIVIAL_CASE(ModuleType)
     TRIVIAL_CASE(DynamicSelfType)
     TRIVIAL_CASE(ArchetypeType)
-    TRIVIAL_CASE(GenericTypeParamType)
-    TRIVIAL_CASE(DependentMemberType)
+
+    bool visitDependentMemberType(CanDependentMemberType firstType,
+                                   Type secondType,
+                                   Type sugaredFirstType) {
+      /* If the types match, continue. */
+      if (!Matcher.asDerived().alwaysMismatchTypeParameters() &&
+          firstType->isEqual(secondType))
+        return true;
+
+      /* Otherwise, let the derived class deal with the mismatch. */
+      return mismatch(firstType.getPointer(), secondType,
+                      sugaredFirstType);
+    }
+
+    bool visitGenericTypeParamType(CanGenericTypeParamType firstType,
+                                   Type secondType,
+                                   Type sugaredFirstType) {
+      /* If the types match, continue. */
+      if (!Matcher.asDerived().alwaysMismatchTypeParameters() &&
+          firstType->isEqual(secondType))
+        return true;
+
+      /* Otherwise, let the derived class deal with the mismatch. */
+      return mismatch(firstType.getPointer(), secondType,
+                      sugaredFirstType);
+    }
 
     /// FIXME: Split this out into cases?
     bool visitAnyFunctionType(CanAnyFunctionType firstFunc, Type secondType,
@@ -210,6 +230,9 @@ class TypeMatcher {
         // to mismatch on (!firstFunc->throws() && secondFunc->throws()), but
         // embedding that non-commutativity in this general matcher is icky.
         if (firstFunc->isNoEscape() != secondFunc->isNoEscape())
+          return mismatch(firstFunc.getPointer(), secondFunc, sugaredFirstType);
+
+        if (firstFunc->isSendable() != secondFunc->isSendable())
           return mismatch(firstFunc.getPointer(), secondFunc, sugaredFirstType);
 
         auto sugaredFirstFunc = sugaredFirstType->castTo<AnyFunctionType>();
@@ -300,6 +323,8 @@ class TypeMatcher {
 
 #undef TRIVIAL_CASE
   };
+
+  bool alwaysMismatchTypeParameters() const { return false; }
 
   ImplClass &asDerived() { return static_cast<ImplClass &>(*this); }
 

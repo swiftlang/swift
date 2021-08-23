@@ -132,7 +132,8 @@ SILDifferentiabilityWitness *
 SerializedSILLoader::lookupDifferentiabilityWitness(
     SILDifferentiabilityWitnessKey key) {
   Mangle::ASTMangler mangler;
-  std::string mangledKey = mangler.mangleSILDifferentiabilityWitnessKey(key);
+  auto mangledKey = mangler.mangleSILDifferentiabilityWitness(
+     key.originalFunctionName, key.kind, key.config);
   // It is possible that one module has a declaration of a
   // SILDifferentiabilityWitness, while another has the full definition.
   SILDifferentiabilityWitness *dw = nullptr;
@@ -144,14 +145,58 @@ SerializedSILLoader::lookupDifferentiabilityWitness(
   return dw;
 }
 
-void SerializedSILLoader::invalidateCaches() {
-  for (auto &Des : LoadedSILSections)
-    Des->invalidateFunctionCache();
+void SerializedSILLoader::invalidateAllCaches() {
+  for (auto &des : LoadedSILSections)
+    des->invalidateAllCaches();
 }
 
-bool SerializedSILLoader::invalidateFunction(SILFunction *F) {
-  for (auto &Des : LoadedSILSections)
-    if (Des->invalidateFunction(F))
+bool SerializedSILLoader::invalidateFunction(SILFunction *fn) {
+  for (auto &des : LoadedSILSections)
+    if (des->invalidateFunction(fn))
+      return true;
+  return false;
+}
+
+bool SerializedSILLoader::invalidateGlobalVariable(SILGlobalVariable *gv) {
+  for (auto &des : LoadedSILSections)
+    if (des->invalidateGlobalVariable(gv))
+      return true;
+  return false;
+}
+
+bool SerializedSILLoader::invalidateVTable(SILVTable *vt) {
+  for (auto &des : LoadedSILSections)
+    if (des->invalidateVTable(vt))
+      return true;
+  return false;
+}
+
+bool SerializedSILLoader::invalidateWitnessTable(SILWitnessTable *wt) {
+  for (auto &des : LoadedSILSections)
+    if (des->invalidateWitnessTable(wt))
+      return true;
+  return false;
+}
+
+bool SerializedSILLoader::invalidateDefaultWitnessTable(
+    SILDefaultWitnessTable *wt) {
+  for (auto &des : LoadedSILSections)
+    if (des->invalidateDefaultWitnessTable(wt))
+      return true;
+  return false;
+}
+
+bool SerializedSILLoader::invalidateProperty(SILProperty *p) {
+  for (auto &des : LoadedSILSections)
+    if (des->invalidateProperty(p))
+      return true;
+  return false;
+}
+
+bool SerializedSILLoader::invalidateDifferentiabilityWitness(
+    SILDifferentiabilityWitness *w) {
+  for (auto &des : LoadedSILSections)
+    if (des->invalidateDifferentiabilityWitness(w))
       return true;
   return false;
 }

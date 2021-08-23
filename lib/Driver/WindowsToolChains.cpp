@@ -172,16 +172,10 @@ toolchains::Windows::constructInvocation(const DynamicLinkJobAction &job,
   }
 
   if (context.Args.hasArg(options::OPT_profile_generate)) {
-    SmallString<128> LibProfile(SharedResourceDirPath);
-    llvm::sys::path::remove_filename(LibProfile); // remove platform name
-    llvm::sys::path::append(LibProfile, "clang", "lib");
-
-    llvm::sys::path::append(LibProfile, getTriple().getOSName(),
-                            Twine("clang_rt.profile-") +
-                                getTriple().getArchName() + ".lib");
-    Arguments.push_back(context.Args.MakeArgString(LibProfile));
+    Arguments.push_back(context.Args.MakeArgString("-Xlinker"));
     Arguments.push_back(context.Args.MakeArgString(
-        Twine("-u", llvm::getInstrProfRuntimeHookVarName())));
+        Twine({"-include:", llvm::getInstrProfRuntimeHookVarName()})));
+    Arguments.push_back(context.Args.MakeArgString("-lclang_rt.profile"));
   }
 
   context.Args.AddAllArgs(Arguments, options::OPT_Xlinker);

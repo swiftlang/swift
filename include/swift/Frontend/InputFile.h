@@ -105,6 +105,12 @@ public:
   /// stream, the result is "-".
   std::string outputFilename() const { return PSPs.OutputFilename; }
 
+  std::string indexUnitOutputFilename() const {
+    if (!PSPs.IndexUnitOutputFilename.empty())
+      return PSPs.IndexUnitOutputFilename;
+    return outputFilename();
+  }
+
   /// If there are explicit primary inputs (i.e. designated with -primary-input
   /// or -primary-filelist), the paths specific to those inputs (other than the
   /// input file path itself) are kept here. If there are no explicit primary

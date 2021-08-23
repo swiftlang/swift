@@ -28,6 +28,8 @@
 #include "Explosion.h"
 #include "GenCall.h"
 #include "GenCast.h"
+#include "GenConcurrency.h"
+#include "GenDistributed.h"
 #include "GenPointerAuth.h"
 #include "GenIntegerLiteral.h"
 #include "IRGenFunction.h"
@@ -120,6 +122,7 @@ getLoweredTypeAndTypeInfo(IRGenModule &IGM, Type unloweredType) {
 /// emitBuiltinCall - Emit a call to a builtin function.
 void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
                             Identifier FnId, SILType resultType,
+                            ArrayRef<SILType> argTypes,
                             Explosion &args, Explosion &out,
                             SubstitutionMap substitutions) {
   if (Builtin.ID == BuiltinValueKind::COWBufferForReading) {
@@ -218,6 +221,77 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
+  // emitGetCurrentExecutor has no arguments.
+  if (Builtin.ID == BuiltinValueKind::GetCurrentExecutor) {
+    emitGetCurrentExecutor(IGF, out);
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::StartAsyncLet) {
+    auto taskOptions = args.claimNext();
+    auto taskFunction = args.claimNext();
+    auto taskContext = args.claimNext();
+
+    auto asyncLet = emitBuiltinStartAsyncLet(
+        IGF,
+        taskOptions,
+        taskFunction,
+        taskContext,
+        nullptr,
+        substitutions
+        );
+
+    out.add(asyncLet);
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::StartAsyncLetWithLocalBuffer) {
+    auto taskOptions = args.claimNext();
+    auto taskFunction = args.claimNext();
+    auto taskContext = args.claimNext();
+    auto localBuffer = args.claimNext();
+
+    auto asyncLet = emitBuiltinStartAsyncLet(
+        IGF,
+        taskOptions,
+        taskFunction,
+        taskContext,
+        localBuffer,
+        substitutions
+        );
+
+    out.add(asyncLet);
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::EndAsyncLet) {
+    emitEndAsyncLet(IGF, args.claimNext());
+    // Ignore a second operand which is inserted by ClosureLifetimeFixup and
+    // only used for dependency tracking.
+    (void)args.claimAll();
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::EndAsyncLetLifetime) {
+    IGF.Builder.CreateLifetimeEnd(args.claimNext());
+    // Ignore a second operand which is inserted by ClosureLifetimeFixup and
+    // only used for dependency tracking.
+    (void)args.claimAll();
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::CreateTaskGroup) {
+    // Claim metadata pointer.
+    (void)args.claimAll();
+    out.add(emitCreateTaskGroup(IGF, substitutions));
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::DestroyTaskGroup) {
+    emitDestroyTaskGroup(IGF, args.claimNext());
+    return;
+  }
+
   // Everything else cares about the (rvalue) argument.
 
   if (Builtin.ID == BuiltinValueKind::CancelAsyncTask) {
@@ -226,23 +300,23 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   }
 
   if (Builtin.ID == BuiltinValueKind::CreateAsyncTask ||
-      Builtin.ID == BuiltinValueKind::CreateAsyncTaskFuture) {
+      Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroup) {
+
     auto flags = args.claimNext();
-    auto parentTask = args.claimNext();
-    auto futureResultType =
-        (Builtin.ID == BuiltinValueKind::CreateAsyncTaskFuture)
-          ? args.claimNext()
-          : nullptr;
+    auto taskGroup =
+        (Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroup)
+        ? args.claimNext()
+        : nullptr;
+    auto futureResultType = args.claimNext();
     auto taskFunction = args.claimNext();
     auto taskContext = args.claimNext();
 
-    // FIXME: SIL treats the function/context parameter as "guaranteed", but
-    // the runtime entry point assumes it is owned. Introduce an extra retain
-    // of the context to balance things out.
-    IGF.emitNativeStrongRetain(taskContext, IGF.getDefaultAtomicity());
-
     auto newTaskAndContext = emitTaskCreate(
-        IGF, flags, parentTask, futureResultType, taskFunction, taskContext,
+        IGF,
+        flags,
+        taskGroup,
+        futureResultType,
+        taskFunction, taskContext,
         substitutions);
 
     // Cast back to NativeObject/RawPointer.
@@ -255,6 +329,76 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
+  if (Builtin.ID == BuiltinValueKind::ConvertTaskToJob) {
+    auto task = args.claimNext();
+    // The job object starts at the beginning of the task.
+    auto job = IGF.Builder.CreateBitCast(task, IGF.IGM.SwiftJobPtrTy);
+    out.add(job);
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::InitializeDefaultActor ||
+      Builtin.ID == BuiltinValueKind::DestroyDefaultActor) {
+    auto fn = Builtin.ID == BuiltinValueKind::InitializeDefaultActor
+                ? IGF.IGM.getDefaultActorInitializeFn()
+                : IGF.IGM.getDefaultActorDestroyFn();
+    auto actor = args.claimNext();
+    actor = IGF.Builder.CreateBitCast(actor, IGF.IGM.RefCountedPtrTy);
+    auto call = IGF.Builder.CreateCall(fn, {actor});
+    call->setCallingConv(IGF.IGM.SwiftCC);
+    call->setDoesNotThrow();
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::ResumeThrowingContinuationReturning ||
+      Builtin.ID == BuiltinValueKind::ResumeNonThrowingContinuationReturning) {
+    auto continuation = args.claimNext();
+    auto valueTy = argTypes[1];
+    auto valuePtr = args.claimNext();
+    bool throwing =
+      (Builtin.ID == BuiltinValueKind::ResumeThrowingContinuationReturning);
+    IGF.emitResumeAsyncContinuationReturning(continuation, valuePtr, valueTy,
+                                             throwing);
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::ResumeThrowingContinuationThrowing) {
+    auto continuation = args.claimNext();
+    auto error = args.claimNext();
+    IGF.emitResumeAsyncContinuationThrowing(continuation, error);
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::BuildMainActorExecutorRef) {
+    emitBuildMainActorExecutorRef(IGF, out);
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::BuildDefaultActorExecutorRef) {
+    auto actor = args.claimNext();
+    emitBuildDefaultActorExecutorRef(IGF, actor, out);
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::BuildOrdinarySerialExecutorRef) {
+    auto actor = args.claimNext();
+    auto type = substitutions.getReplacementTypes()[0]->getCanonicalType();
+    auto conf = substitutions.getConformances()[0];
+    emitBuildOrdinarySerialExecutorRef(IGF, actor, type, conf, out);
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::InitializeDistributedRemoteActor) {
+    auto actorMetatype = args.claimNext();
+    emitDistributedActorInitializeRemote(IGF, actorMetatype, out);
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::DestroyDistributedActor) {
+    auto actor = args.claimNext();
+    emitDistributedActorDestroy(IGF, actor);
+    return;
+  }
 
   // If this is an LLVM IR intrinsic, lower it to an intrinsic call.
   const IntrinsicInfo &IInfo = IGF.getSILModule().getIntrinsicInfo(FnId);
@@ -777,6 +921,16 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     out.add(IGF.Builder.CreateInsertElement(vector, newValue, index));
     return;
   }
+  
+  if (Builtin.ID == BuiltinValueKind::ShuffleVector) {
+    using namespace llvm;
+
+    auto dict0 = args.claimNext();
+    auto dict1 = args.claimNext();
+    auto index = args.claimNext();
+    out.add(IGF.Builder.CreateShuffleVector(dict0, dict1, index));
+    return;
+  }
 
   if (Builtin.ID == BuiltinValueKind::SToSCheckedTrunc ||
       Builtin.ID == BuiltinValueKind::UToUCheckedTrunc ||
@@ -1048,7 +1202,18 @@ if (Builtin.ID == BuiltinValueKind::id) { \
 
   if (Builtin.ID == BuiltinValueKind::TSanInoutAccess) {
     auto address = args.claimNext();
-    IGF.emitTSanInoutAccessCall(address);
+
+    // The tsanInoutAccess builtin takes a single argument, the address
+    // of the accessed storage
+    SILType accessedType = argTypes[0];
+
+    // Empty types (such as structs without stored properties) have a
+    // meaningless value for their address. We not should call into the
+    // TSan runtime to check for data races on accesses on such addresses.
+    if (!IGF.IGM.getTypeInfo(accessedType)
+        .isKnownEmpty(ResilienceExpansion::Maximal)) {
+      IGF.emitTSanInoutAccessCall(address);
+    }
     return;
   }
 

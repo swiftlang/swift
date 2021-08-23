@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend  -primary-file %s -O -sil-verify-all -Xllvm -sil-disable-pass=FunctionSignatureOpts -module-name=test -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend  -primary-file %s -O -sil-verify-all -Xllvm -sil-disable-pass=FunctionSignatureOpts -module-name=test -emit-ir | %FileCheck %s -check-prefix=CHECK-LLVM
 
 // Also do an end-to-end test to check all components, including IRGen.
 // RUN: %empty-directory(%t) 
@@ -8,6 +9,11 @@
 // REQUIRES: CPU=arm64 || CPU=x86_64
 
 // Check if the optimizer is able to convert array literals to statically initialized arrays.
+
+// CHECK-LABEL: sil_global @$s4test4FStrV10globalFuncyS2icvpZ : $@callee_guaranteed (Int) -> Int = {
+// CHECK:         %0 = function_ref @$s4test3fooyS2iF : $@convention(thin) (Int) -> Int
+// CHECK-NEXT:    %initval = thin_to_thick_function %0
+// CHECK-NEXT:  }
 
 // CHECK-LABEL: outlined variable #0 of arrayLookup(_:)
 // CHECK-NEXT:  sil_global private @{{.*}}arrayLookup{{.*}} = {
@@ -51,6 +57,20 @@
 // CHECK:         object {{.*}} ({{[^,]*}}, [tail_elems] {{[^,]*}}, {{[^,]*}})
 // CHECK-NEXT:  }
 
+// CHECK-LABEL: outlined variable #0 of functionArray()
+// CHECK-NEXT:  sil_global private @{{.*functionArray.*}} = {
+// CHECK:         function_ref
+// CHECK:         thin_to_thick_function
+// CHECK:         convert_function
+// CHECK:         function_ref
+// CHECK:         thin_to_thick_function
+// CHECK:         convert_function
+// CHECK:         function_ref
+// CHECK:         thin_to_thick_function
+// CHECK:         convert_function
+// CHECK:         object {{.*}} ({{[^,]*}}, [tail_elems]
+// CHECK-NEXT:  }
+
 // CHECK-LABEL: outlined variable #0 of returnDictionary()
 // CHECK-NEXT:  sil_global private @{{.*}}returnDictionary{{.*}} = {
 // CHECK-DAG:     integer_literal $Builtin.Int{{[0-9]+}}, 5
@@ -79,9 +99,18 @@
 // CHECK:   return
 public let globalVariable = [ 100, 101, 102 ]
 
-// CHECK-LABEL: sil {{.*}}arrayLookup{{.*}} : $@convention(thin) (Int) -> Int {
-// CHECK:   global_value @{{.*}}arrayLookup{{.*}}
-// CHECK:   return
+// CHECK-LABEL: sil [noinline] @$s4test11arrayLookupyS2iF
+// CHECK:   global_value @$s4test11arrayLookupyS2iFTv_
+// CHECK-NOT: retain
+// CHECK-NOT: release
+// CHECK:   } // end sil function '$s4test11arrayLookupyS2iF'
+
+// CHECK-LLVM-LABEL: define {{.*}} @"$s4test11arrayLookupyS2iF"
+// CHECK-LLVM-NOT:  call
+// CHECK-LLVM:      [[E:%[0-9]+]] = getelementptr {{.*}} @"$s4test11arrayLookupyS2iFTv_"
+// CHECK-LLVM-NEXT: [[L:%[0-9]+]] = load {{.*}} [[E]]
+// CHECK-LLVM-NEXT: ret {{.*}} [[L]]
+// CHECK-LLVM:   }
 @inline(never)
 public func arrayLookup(_ i: Int) -> Int {
   let lookupTable = [10, 11, 12]
@@ -154,6 +183,22 @@ public func returnStringDictionary() -> [String:String] {
   return ["1":"2", "3":"4", "5":"6"]
 }
 
+func foo(_ i: Int) -> Int { return i }
+
+// CHECK-LABEL: sil {{.*functionArray.*}} : $@convention(thin) () -> @owned Array<(Int) -> Int> {
+// CHECK:   global_value @{{.*functionArray.*}}
+// CHECK: } // end sil function '{{.*functionArray.*}}'
+@inline(never)
+func functionArray() -> [(Int) -> Int] {
+  func bar(_ i: Int) -> Int { return i + 1 }
+  return [foo, bar, { $0 + 10 }]
+}
+
+public struct FStr {
+  // Not an array, but also tested here.
+  public static var globalFunc = foo
+}
+
 // CHECK-OUTPUT:      [100, 101, 102]
 print(globalVariable)
 // CHECK-OUTPUT-NEXT: 11
@@ -168,6 +213,10 @@ print(gg!)
 storeArray()
 // CHECK-OUTPUT-NEXT: [227, 228]
 print(gg!)
+// CHECK-OUTPUT-NEXT: 311
+print(functionArray()[0](100) + functionArray()[1](100) + functionArray()[2](100))
+// CHECK-OUTPUT-NEXT: 27
+print(FStr.globalFunc(27))
 
 let dict = returnDictionary()
 // CHECK-OUTPUT-NEXT: dict 3: 2, 4, 6

@@ -120,7 +120,6 @@ struct CodeCompletionInfo {
   struct DescriptionStructure {
     IndexRange baseName;
     IndexRange parameterRange;
-    IndexRange throwsRange;
   };
 
   Optional<DescriptionStructure> descriptionStructure;
@@ -136,6 +135,27 @@ struct ExpressionType {
 
 struct ExpressionTypesInFile {
   std::vector<ExpressionType> Results;
+  StringRef TypeBuffer;
+};
+
+struct VariableType {
+  /// The variable identifier's offset in the file.
+  unsigned VarOffset;
+  /// The variable identifier's length.
+  unsigned VarLength;
+  /// The offset of the type's string representation inside
+  /// `VariableTypesInFile.TypeBuffer`.
+  unsigned TypeOffset;
+  /// Whether the variable declaration has an explicit type annotation.
+  bool HasExplicitType;
+};
+
+struct VariableTypesInFile {
+  /// The typed variable declarations in the file.
+  std::vector<VariableType> Results;
+  /// A String containing the printed representation of all types in
+  /// `Results`. Entries in `Results` refer to their types by using
+  /// an offset into this string.
   StringRef TypeBuffer;
 };
 
@@ -194,6 +214,11 @@ enum class DiagnosticSeverityKind {
   Error
 };
 
+enum class DiagnosticCategory {
+  Deprecation,
+  NoUsage
+};
+
 struct DiagnosticEntryInfoBase {
   struct Fixit {
     unsigned Offset;
@@ -201,11 +226,13 @@ struct DiagnosticEntryInfoBase {
     std::string Text;
   };
 
+  std::string ID;
   std::string Description;
   unsigned Offset = 0;
   unsigned Line = 0;
   unsigned Column = 0;
   std::string Filename;
+  SmallVector<DiagnosticCategory, 1> Categories;
   SmallVector<std::pair<unsigned, unsigned>, 2> Ranges;
   SmallVector<Fixit, 2> Fixits;
   SmallVector<std::string, 1> EducationalNotePaths;
@@ -226,13 +253,9 @@ struct SourceFileRange {
 enum class SyntaxTreeTransferMode {
   /// Don't transfer the syntax tree
   Off,
-  /// Transfer the syntax tree incrementally
-  Incremental,
-  /// Always transfer the entire syntax tree
+  /// Transfer the entire syntax tree
   Full
 };
-
-enum class SyntaxTreeSerializationFormat { JSON, ByteTree };
 
 class EditorConsumer {
   virtual void anchor();
@@ -279,6 +302,8 @@ public:
 
   virtual void recordFormattedText(StringRef Text) = 0;
 
+  virtual bool diagnosticsEnabled() = 0;
+
   virtual void setDiagnosticStage(UIdent DiagStage) = 0;
   virtual void handleDiagnostic(const DiagnosticEntryInfo &Info,
                                 UIdent DiagStage) = 0;
@@ -286,8 +311,7 @@ public:
   virtual void handleSourceText(StringRef Text) = 0;
 
   virtual void
-  handleSyntaxTree(const swift::syntax::SourceFileSyntax &SyntaxTree,
-                   std::unordered_set<unsigned> &ReusedNodeIds) = 0;
+  handleSyntaxTree(const swift::syntax::SourceFileSyntax &SyntaxTree) = 0;
   virtual bool syntaxTreeEnabled() {
     return syntaxTreeTransferMode() != SyntaxTreeTransferMode::Off;
   }
@@ -377,22 +401,55 @@ struct RefactoringInfo {
   UIdent Kind;
   StringRef KindName;
   StringRef UnavailableReason;
+
+  RefactoringInfo(UIdent Kind, StringRef KindName, StringRef UnavailableReason)
+      : Kind(Kind), KindName(KindName), UnavailableReason(UnavailableReason) {}
 };
 
-struct CursorInfoData {
-  // If nonempty, a proper Info could not be resolved (and the rest of the Info
-  // will be empty). Clients can potentially use this to show a diagnostic
-  // message to the user in lieu of using the empty response.
-  StringRef InternalDiagnostic;
+struct ParentInfo {
+  StringRef Title;
+  StringRef KindName;
+  StringRef USR;
 
+  ParentInfo(StringRef Title, StringRef KindName, StringRef USR)
+      : Title(Title), KindName(KindName), USR(USR) {}
+};
+
+struct ReferencedDeclInfo {
+  StringRef USR;
+  UIdent DeclarationLang;
+  StringRef AccessLevel;
+  StringRef FilePath;
+  StringRef ModuleName;
+  bool IsSystem;
+  bool IsSPI;
+  ArrayRef<ParentInfo> ParentContexts;
+
+  ReferencedDeclInfo(StringRef USR, UIdent DeclLang, StringRef AccessLevel,
+                     StringRef FilePath, StringRef ModuleName, bool System,
+                     bool SPI, ArrayRef<ParentInfo> Parents)
+      : USR(USR), DeclarationLang(DeclLang), AccessLevel(AccessLevel),
+        FilePath(FilePath), ModuleName(ModuleName), IsSystem(System),
+        IsSPI(SPI), ParentContexts(Parents) {}
+};
+
+struct LocationInfo {
+  StringRef Filename;
+  unsigned Offset = 0;
+  unsigned Length = 0;
+  unsigned Line = 0;
+  unsigned Column = 0;
+};
+
+struct CursorSymbolInfo {
   UIdent Kind;
+  UIdent DeclarationLang;
   StringRef Name;
   StringRef USR;
   StringRef TypeName;
   StringRef TypeUSR;
   StringRef ContainerTypeUSR;
   StringRef DocComment;
-  StringRef TypeInterface;
   StringRef GroupName;
   /// A key for documentation comment localization, if it exists in the doc
   /// comment for the declaration.
@@ -402,26 +459,44 @@ struct CursorInfoData {
   /// Fully annotated XML pretty printed declaration.
   /// FIXME: this should eventually replace \c AnnotatedDeclaration.
   StringRef FullyAnnotatedDeclaration;
+  /// The SymbolGraph JSON for this declaration.
+  StringRef SymbolGraph;
   /// Non-empty if the symbol was imported from a clang module.
   StringRef ModuleName;
   /// Non-empty if a generated interface editor document has previously been
   /// opened for the module the symbol came from.
   StringRef ModuleInterfaceName;
-  /// This is an (offset,length) pair.
-  /// It is set only if the declaration has a source location.
-  llvm::Optional<std::pair<unsigned, unsigned>> DeclarationLoc = None;
-  /// Set only if the declaration has a source location.
-  StringRef Filename;
+  /// Filename is non-empty if there's a source location.
+  LocationInfo Location;
   /// For methods this lists the USRs of the overrides in the class hierarchy.
   ArrayRef<StringRef> OverrideUSRs;
   /// Related declarations, overloaded functions etc., in annotated XML form.
   ArrayRef<StringRef> AnnotatedRelatedDeclarations;
   /// All groups of the module name under cursor.
   ArrayRef<StringRef> ModuleGroupArray;
-  /// All available actions on the code under cursor.
-  ArrayRef<RefactoringInfo> AvailableActions;
+  /// Stores the Symbol Graph title, kind, and USR of the parent contexts of the
+  /// symbol under the cursor.
+  ArrayRef<ParentInfo> ParentContexts;
+  /// The set of decls referenced in the symbol graph declaration fragments.
+  ArrayRef<ReferencedDeclInfo> ReferencedSymbols;
+  /// For calls this lists the USRs of the receiver types (multiple only in the
+  /// case that the base is a protocol composition).
+  ArrayRef<StringRef> ReceiverUSRs;
+
   bool IsSystem = false;
+  bool IsDynamic = false;
+
   llvm::Optional<unsigned> ParentNameOffset;
+};
+
+struct CursorInfoData {
+  // If nonempty, a proper Info could not be resolved (and the rest of the Info
+  // will be empty). Clients can potentially use this to show a diagnostic
+  // message to the user in lieu of using the empty response.
+  StringRef InternalDiagnostic;
+  llvm::ArrayRef<CursorSymbolInfo> Symbols;
+  /// All available actions on the code under cursor.
+  llvm::ArrayRef<RefactoringInfo> AvailableActions;
 };
 
 struct RangeInfo {
@@ -496,6 +571,7 @@ struct DocEntityInfo {
   bool IsUnavailable = false;
   bool IsDeprecated = false;
   bool IsOptional = false;
+  bool IsAsync = false;
   swift::Type Ty;
 };
 
@@ -659,6 +735,8 @@ public:
 
   virtual void globalConfigurationUpdated(std::shared_ptr<GlobalConfig> Config) {};
 
+  virtual void dependencyUpdated() {}
+
   virtual void indexSource(StringRef Filename,
                            IndexingConsumer &Consumer,
                            ArrayRef<const char *> Args) = 0;
@@ -745,8 +823,9 @@ public:
 
   virtual void
   getCursorInfo(StringRef Filename, unsigned Offset, unsigned Length,
-                bool Actionables, bool CancelOnSubsequentRequest,
-                ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions,
+                bool Actionables, bool SymbolGraph,
+                bool CancelOnSubsequentRequest, ArrayRef<const char *> Args,
+                Optional<VFSOptions> vfsOptions,
        std::function<void(const RequestResult<CursorInfoData> &)> Receiver) = 0;
 
   virtual void getNameInfo(StringRef Filename, unsigned Offset,
@@ -805,6 +884,15 @@ public:
                                       bool CanonicalType,
                                       std::function<void(const
                                           RequestResult<ExpressionTypesInFile> &)> Receiver) = 0;
+
+  /// Collects variable types for a range defined by `Offset` and `Length` in
+  /// the source file. If `Offset` or `Length` are empty, variable types for
+  /// the entire document are collected.
+  virtual void collectVariableTypes(
+      StringRef FileName, ArrayRef<const char *> Args,
+      Optional<unsigned> Offset, Optional<unsigned> Length,
+      std::function<void(const RequestResult<VariableTypesInFile> &)>
+          Receiver) = 0;
 
   virtual void getDocInfo(llvm::MemoryBuffer *InputBuf,
                           StringRef ModuleName,

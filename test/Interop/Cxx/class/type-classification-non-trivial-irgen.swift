@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-cxx-interop -I %S/Inputs %s -emit-ir | %FileCheck %s
+// RUN: %target-swiftxx-frontend -I %S/Inputs %s -emit-ir | %FileCheck %s
 
 // Verify that non-trival/address-only C++ classes are constructed and accessed
 // correctly. Make sure that we correctly IRGen functions that construct
@@ -50,8 +50,11 @@ public func testStructWithSubobjectCopyConstructorAndValue() -> Bool {
 // CHECK: [[MEMBER_STRUCT:%.*]] = bitcast %TSo33StructWithCopyConstructorAndValueV* [[MEMBER]] to %struct.StructWithCopyConstructorAndValue*
 // CHECK: call {{.*}}@{{_ZN33StructWithCopyConstructorAndValueC(1|2)Ei|"\?\?0StructWithCopyConstructorAndValue@@QEAA@H@Z"}}(%struct.StructWithCopyConstructorAndValue* {{(noalias )?}}[[MEMBER_STRUCT]], i32 42)
 // CHECK: [[TEMP_AS_STRUCT:%.*]] = bitcast %TSo33StructWithCopyConstructorAndValueV* [[TEMP]] to %struct.StructWithCopyConstructorAndValue*
-// CHECK: [[OBJ_AS_STRUCT:%.*]] = bitcast %TSo037StructWithCopyConstructorAndSubobjectcdE5ValueV* [[OBJ]] to %struct.StructWithCopyConstructorAndSubobjectCopyConstructorAndValue*
-// CHECK: call {{.*}}@{{_ZN60StructWithCopyConstructorAndSubobjectCopyConstructorAndValueC(1|2)E33StructWithCopyConstructorAndValue|"\?\?0StructWithCopyConstructorAndSubobjectCopyConstructorAndValue@@QEAA@UStructWithCopyConstructorAndValue@@@Z"}}(%struct.StructWithCopyConstructorAndSubobjectCopyConstructorAndValue* {{(noalias )?}}[[OBJ_AS_STRUCT]], %struct.StructWithCopyConstructorAndValue* [[TEMP_AS_STRUCT]])
+// CHECK: [[MEMBER_AS_STRUCT:%.*]] = bitcast %TSo33StructWithCopyConstructorAndValueV* [[MEMBER]] to %struct.StructWithCopyConstructorAndValue*
+// CHECK: call {{.*}}@{{_ZN33StructWithCopyConstructorAndValueC(1|2)ERKS_|"\?\?0StructWithCopyConstructorAndValue@@QEAA@AEBU0@@Z"}}(%struct.StructWithCopyConstructorAndValue* [[TEMP_AS_STRUCT]], %struct.StructWithCopyConstructorAndValue* [[MEMBER_AS_STRUCT]])
+// CHECK: [[TEMP_AS_STRUCT_2:%.*]] = bitcast %TSo33StructWithCopyConstructorAndValueV* [[TEMP]] to %struct.StructWithCopyConstructorAndValue*
+// CHECK: [[OBJ_AS_STRUCT_2:%.*]] = bitcast %TSo037StructWithCopyConstructorAndSubobjectcdE5ValueV* [[OBJ]] to %struct.StructWithCopyConstructorAndSubobjectCopyConstructorAndValue*
+// CHECK: call {{.*}}@{{_ZN60StructWithCopyConstructorAndSubobjectCopyConstructorAndValueC(1|2)E33StructWithCopyConstructorAndValue|"\?\?0StructWithCopyConstructorAndSubobjectCopyConstructorAndValue@@QEAA@UStructWithCopyConstructorAndValue@@@Z"}}(%struct.StructWithCopyConstructorAndSubobjectCopyConstructorAndValue* {{(noalias )?}}[[OBJ_AS_STRUCT_2]], %struct.StructWithCopyConstructorAndValue* [[TEMP_AS_STRUCT_2]])
 // CHECK: [[TEMP_MEMBER:%.*]] = getelementptr inbounds %TSo33StructWithCopyConstructorAndValueV, %TSo33StructWithCopyConstructorAndValueV* [[TEMP2]], i32 0, i32 0
 // CHECK: [[TEMP_MEMBER_VAL:%.*]] = getelementptr inbounds %Ts5Int32V, %Ts5Int32V* [[TEMP_MEMBER]], i32 0, i32 0
 // CHECK: [[LHS:%.*]] = load i32, i32* [[TEMP_MEMBER_VAL]]

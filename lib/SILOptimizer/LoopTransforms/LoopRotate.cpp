@@ -39,6 +39,8 @@ using namespace swift;
 /// loops in the swift benchmarks).
 static llvm::cl::opt<int> LoopRotateSizeLimit("looprotate-size-limit",
                                               llvm::cl::init(20));
+static llvm::cl::opt<bool> RotateSingleBlockLoop("looprotate-single-block-loop",
+                                                 llvm::cl::init(false));
 
 /// Check whether all operands are loop invariant.
 static bool
@@ -123,7 +125,9 @@ static void mapOperands(SILInstruction *inst,
 static void updateSSAForUseOfValue(
     SILSSAUpdater &updater, SmallVectorImpl<SILPhiArgument *> &insertedPhis,
     const llvm::DenseMap<ValueBase *, SILValue> &valueMap,
-    SILBasicBlock *Header, SILBasicBlock *EntryCheckBlock, SILValue Res) {
+    SILBasicBlock *Header, SILBasicBlock *EntryCheckBlock, SILValue Res,
+    SmallVectorImpl<std::pair<SILBasicBlock *, unsigned>>
+        &accumulatedAddressPhis) {
   // Find the mapped instruction.
   assert(valueMap.count(Res) && "Expected to find value in map!");
   SILValue MappedValue = valueMap.find(Res)->second;
@@ -131,7 +135,7 @@ static void updateSSAForUseOfValue(
   assert(Res->getType() == MappedValue->getType() && "The types must match");
 
   insertedPhis.clear();
-  updater.initialize(Res->getType());
+  updater.initialize(Res->getType(), Res.getOwnershipKind());
   updater.addAvailableValue(Header, Res);
   updater.addAvailableValue(EntryCheckBlock, MappedValue);
 
@@ -157,39 +161,52 @@ static void updateSSAForUseOfValue(
            && "The entry check block should dominate the header");
     updater.rewriteUse(*use);
   }
-  // Canonicalize inserted phis to avoid extra BB Args.
+
+  // Canonicalize inserted phis to avoid extra BB Args and if we find an address
+  // phi, stash it so we can handle it after we are done rewriting.
+  bool hasOwnership = Header->getParent()->hasOwnership();
   for (SILPhiArgument *arg : insertedPhis) {
     if (SILValue inst = replaceBBArgWithCast(arg)) {
       arg->replaceAllUsesWith(inst);
       // DCE+SimplifyCFG runs as a post-pass cleanup.
       // DCE replaces dead arg values with undef.
       // SimplifyCFG deletes the dead BB arg.
+      continue;
     }
+
+    // If we didn't simplify and have an address phi, stash the value so we can
+    // fix it up.
+    if (hasOwnership && arg->getType().isAddress())
+      accumulatedAddressPhis.emplace_back(arg->getParent(), arg->getIndex());
   }
 }
 
-static void
-updateSSAForUseOfInst(SILSSAUpdater &updater,
-                      SmallVectorImpl<SILPhiArgument *> &insertedPhis,
-                      const llvm::DenseMap<ValueBase *, SILValue> &valueMap,
-                      SILBasicBlock *header, SILBasicBlock *entryCheckBlock,
-                      SILInstruction *inst) {
+static void updateSSAForUseOfInst(
+    SILSSAUpdater &updater, SmallVectorImpl<SILPhiArgument *> &insertedPhis,
+    const llvm::DenseMap<ValueBase *, SILValue> &valueMap,
+    SILBasicBlock *header, SILBasicBlock *entryCheckBlock, SILInstruction *inst,
+    SmallVectorImpl<std::pair<SILBasicBlock *, unsigned>>
+        &accumulatedAddressPhis) {
   for (auto result : inst->getResults())
     updateSSAForUseOfValue(updater, insertedPhis, valueMap, header,
-                           entryCheckBlock, result);
+                           entryCheckBlock, result, accumulatedAddressPhis);
 }
 
 /// Rewrite the code we just created in the preheader and update SSA form.
 static void rewriteNewLoopEntryCheckBlock(
     SILBasicBlock *header, SILBasicBlock *entryCheckBlock,
     const llvm::DenseMap<ValueBase *, SILValue> &valueMap) {
-  SmallVector<SILPhiArgument *, 4> insertedPhis;
+  SmallVector<std::pair<SILBasicBlock *, unsigned>, 8> accumulatedAddressPhis;
+  SmallVector<SILPhiArgument *, 8> insertedPhis;
   SILSSAUpdater updater(&insertedPhis);
 
-  // Fix PHIs (incoming arguments).
-  for (auto *arg : header->getArguments())
+  // Fix PHIs (incoming arguments). We iterate by index in case we replace the
+  // phi argument so we do not invalidate iterators.
+  for (unsigned i : range(header->getNumArguments())) {
+    auto *arg = header->getArguments()[i];
     updateSSAForUseOfValue(updater, insertedPhis, valueMap, header,
-                           entryCheckBlock, arg);
+                           entryCheckBlock, arg, accumulatedAddressPhis);
+  }
 
   auto instIter = header->begin();
 
@@ -197,8 +214,42 @@ static void rewriteNewLoopEntryCheckBlock(
   while (instIter != header->end()) {
     auto &inst = *instIter;
     updateSSAForUseOfInst(updater, insertedPhis, valueMap, header,
-                          entryCheckBlock, &inst);
+                          entryCheckBlock, &inst, accumulatedAddressPhis);
     ++instIter;
+  }
+
+  // Then see if any of our phis were address phis. In such a case, rewrite the
+  // address to be a smuggled through raw pointer. We do this late to
+  // conservatively not interfere with the previous code's invariants.
+  //
+  // We also translate the phis into a BasicBlock, Index form so we are careful
+  // with invalidation issues around branches/args.
+  auto rawPointerTy =
+      SILType::getRawPointerType(header->getParent()->getASTContext());
+  auto rawPointerUndef = SILUndef::get(rawPointerTy, header->getModule());
+  auto loc = RegularLocation::getAutoGeneratedLocation();
+  while (!accumulatedAddressPhis.empty()) {
+    SILBasicBlock *block;
+    unsigned argIndex;
+    std::tie(block, argIndex) = accumulatedAddressPhis.pop_back_val();
+    auto *arg = cast<SILPhiArgument>(block->getArgument(argIndex));
+    assert(arg->getType().isAddress() && "Not an address phi?!");
+    for (auto *predBlock : block->getPredecessorBlocks()) {
+      Operand *predUse = arg->getIncomingPhiOperand(predBlock);
+      SILBuilderWithScope builder(predUse->getUser());
+      auto *newIncomingValue =
+          builder.createAddressToPointer(loc, predUse->get(), rawPointerTy);
+      predUse->set(newIncomingValue);
+    }
+    SILBuilderWithScope builder(arg->getNextInstruction());
+    SILType oldArgType = arg->getType();
+    auto *phiShim = builder.createPointerToAddress(
+        loc, rawPointerUndef, oldArgType, true /*isStrict*/,
+        false /*is invariant*/);
+    arg->replaceAllUsesWith(phiShim);
+    SILArgument *newArg = block->replacePhiArgument(
+        argIndex, rawPointerTy, OwnershipKind::None, nullptr);
+    phiShim->setOperand(newArg);
   }
 }
 
@@ -228,9 +279,9 @@ static bool rotateLoopAtMostUpToLatch(SILLoop *loop, DominanceInfo *domInfo,
     return false;
   }
 
-  bool didRotate =
-      rotateLoop(loop, domInfo, loopInfo, false /* rotateSingleBlockLoops */,
-                 latch, ShouldVerify);
+  bool didRotate = rotateLoop(
+      loop, domInfo, loopInfo,
+      RotateSingleBlockLoop /* rotateSingleBlockLoops */, latch, ShouldVerify);
 
   // Keep rotating at most until we hit the original latch.
   if (didRotate)
@@ -406,7 +457,7 @@ bool swift::rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
 
   // Beautify the IR. Move the old header to after the old latch as it is now
   // the latch.
-  header->moveAfter(latch);
+  header->getParent()->moveBlockAfter(header, latch);
 
   // Merge the old latch with the old header if possible.
   if (mergeBasicBlockWithSuccessor(latch, domInfo, loopInfo))
@@ -440,9 +491,6 @@ class LoopRotation : public SILFunctionTransform {
 
     SILFunction *f = getFunction();
     assert(f);
-    // FIXME: Add ownership support.
-    if (f->hasOwnership())
-      return;
 
     SILLoopInfo *loopInfo = loopAnalysis->get(f);
     assert(loopInfo);

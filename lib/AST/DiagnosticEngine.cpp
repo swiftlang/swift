@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
@@ -52,19 +53,37 @@ enum class DiagnosticOptions {
 
   /// After a fatal error subsequent diagnostics are suppressed.
   Fatal,
+
+  /// An API or ABI breakage diagnostic emitted by the API digester.
+  APIDigesterBreakage,
+
+  /// A deprecation warning or error.
+  Deprecation,
+
+  /// A diagnostic warning about an unused element.
+  NoUsage,
 };
 struct StoredDiagnosticInfo {
   DiagnosticKind kind : 2;
   bool pointsToFirstBadToken : 1;
   bool isFatal : 1;
+  bool isAPIDigesterBreakage : 1;
+  bool isDeprecation : 1;
+  bool isNoUsage : 1;
 
   constexpr StoredDiagnosticInfo(DiagnosticKind k, bool firstBadToken,
-                                 bool fatal)
-      : kind(k), pointsToFirstBadToken(firstBadToken), isFatal(fatal) {}
+                                 bool fatal, bool isAPIDigesterBreakage,
+                                 bool deprecation, bool noUsage)
+      : kind(k), pointsToFirstBadToken(firstBadToken), isFatal(fatal),
+        isAPIDigesterBreakage(isAPIDigesterBreakage), isDeprecation(deprecation),
+        isNoUsage(noUsage) {}
   constexpr StoredDiagnosticInfo(DiagnosticKind k, DiagnosticOptions opts)
       : StoredDiagnosticInfo(k,
                              opts == DiagnosticOptions::PointsToFirstBadToken,
-                             opts == DiagnosticOptions::Fatal) {}
+                             opts == DiagnosticOptions::Fatal,
+                             opts == DiagnosticOptions::APIDigesterBreakage,
+                             opts == DiagnosticOptions::Deprecation,
+                             opts == DiagnosticOptions::NoUsage) {}
 };
 
 // Reproduce the DiagIDs, as we want both the size and access to the raw ids
@@ -104,6 +123,12 @@ static constexpr const char *const debugDiagnosticStrings[] = {
     "<not a diagnostic>",
 };
 
+static constexpr const char *const diagnosticIDStrings[] = {
+#define DIAG(KIND, ID, Options, Text, Signature) #ID,
+#include "swift/AST/DiagnosticsAll.def"
+    "<not a diagnostic>",
+};
+
 static constexpr const char *const fixItStrings[] = {
 #define DIAG(KIND, ID, Options, Text, Signature)
 #define FIXIT(ID, Text, Signature) Text,
@@ -136,8 +161,8 @@ static constexpr EducationalNotes<LocalDiagID::NumDiags> _EducationalNotes = Edu
 static constexpr auto educationalNotes = _EducationalNotes.value;
 
 DiagnosticState::DiagnosticState() {
-  // Initialize our per-diagnostic state to default
-  perDiagnosticBehavior.resize(LocalDiagID::NumDiags, Behavior::Unspecified);
+  // Initialize our ignored diagnostics to default
+  ignoredDiagnostics.resize(LocalDiagID::NumDiags);
 }
 
 static CharSourceRange toCharSourceRange(SourceManager &SM, SourceRange SR) {
@@ -289,6 +314,54 @@ InFlightDiagnostic &InFlightDiagnostic::fixItExchange(SourceRange R1,
   return *this;
 }
 
+InFlightDiagnostic &
+InFlightDiagnostic::limitBehavior(DiagnosticBehavior limit) {
+  Engine->getActiveDiagnostic().setBehaviorLimit(limit);
+  return *this;
+}
+
+InFlightDiagnostic &
+InFlightDiagnostic::warnUntilSwiftVersion(unsigned majorVersion) {
+  if (!Engine->languageVersion.isVersionAtLeast(majorVersion)) {
+    limitBehavior(DiagnosticBehavior::Warning)
+      .wrapIn(diag::error_in_future_swift_version, majorVersion);
+  }
+
+  return *this;
+}
+
+InFlightDiagnostic &
+InFlightDiagnostic::wrapIn(const Diagnostic &wrapper) {
+  // Save current active diagnostic into WrappedDiagnostics, ignoring state
+  // so we don't get a None return or influence future diagnostics.
+  DiagnosticState tempState;
+  Engine->state.swap(tempState);
+  llvm::SaveAndRestore<DiagnosticBehavior>
+      limit(Engine->getActiveDiagnostic().BehaviorLimit,
+            DiagnosticBehavior::Unspecified);
+
+  Engine->WrappedDiagnostics.push_back(
+       *Engine->diagnosticInfoForDiagnostic(Engine->getActiveDiagnostic()));
+
+  Engine->state.swap(tempState);
+
+  auto &wrapped = Engine->WrappedDiagnostics.back();
+
+  // Copy and update its arg list.
+  Engine->WrappedDiagnosticArgs.emplace_back(wrapped.FormatArgs);
+  wrapped.FormatArgs = Engine->WrappedDiagnosticArgs.back();
+
+  // Overwrite the ID and argument with those from the wrapper.
+  Engine->getActiveDiagnostic().ID = wrapper.ID;
+  Engine->getActiveDiagnostic().Args = wrapper.Args;
+
+  // Set the argument to the diagnostic being wrapped.
+  assert(wrapper.getArgs().front().getKind() == DiagnosticArgumentKind::Diagnostic);
+  Engine->getActiveDiagnostic().Args.front() = &wrapped;
+
+  return *this;
+}
+
 void InFlightDiagnostic::flush() {
   if (!IsActive)
     return;
@@ -308,6 +381,18 @@ void Diagnostic::addChildNote(Diagnostic &&D) {
 
 bool DiagnosticEngine::isDiagnosticPointsToFirstBadToken(DiagID ID) const {
   return storedDiagnosticInfos[(unsigned) ID].pointsToFirstBadToken;
+}
+
+bool DiagnosticEngine::isAPIDigesterBreakageDiagnostic(DiagID ID) const {
+  return storedDiagnosticInfos[(unsigned)ID].isAPIDigesterBreakage;
+}
+
+bool DiagnosticEngine::isDeprecationDiagnostic(DiagID ID) const {
+  return storedDiagnosticInfos[(unsigned)ID].isDeprecation;
+}
+
+bool DiagnosticEngine::isNoUsageDiagnostic(DiagID ID) const {
+  return storedDiagnosticInfos[(unsigned)ID].isNoUsage;
 }
 
 bool DiagnosticEngine::finishProcessing() {
@@ -393,7 +478,7 @@ static bool isInterestingTypealias(Type type) {
   else
     return false;
 
-  if (aliasDecl == type->getASTContext().getVoidDecl())
+  if (aliasDecl->getUnderlyingType()->isVoid())
     return false;
 
   // The 'Swift.AnyObject' typealias is not 'interesting'.
@@ -417,15 +502,24 @@ static bool isInterestingTypealias(Type type) {
   return true;
 }
 
+/// Walks the type recursivelly desugaring  types to display, but skipping
+/// `GenericTypeParamType` because we would lose association with its original
+/// declaration and end up presenting the parameter in τ_0_0 format on
+/// diagnostic.
+static Type getAkaTypeForDisplay(Type type) {
+  return type.transform([](Type visitTy) -> Type {
+    if (isa<SugarType>(visitTy.getPointer()) &&
+        !isa<GenericTypeParamType>(visitTy.getPointer()))
+      return getAkaTypeForDisplay(visitTy->getDesugaredType());
+    return visitTy;
+  });
+}
+
 /// Decide whether to show the desugared type or not.  We filter out some
 /// cases to avoid too much noise.
 static bool shouldShowAKA(Type type, StringRef typeName) {
   // Canonical types are already desugared.
   if (type->isCanonical())
-    return false;
-
-  // Don't show generic type parameters.
-  if (type->getCanonicalType()->hasTypeParameter())
     return false;
 
   // Only show 'aka' if there's a typealias involved; other kinds of sugar
@@ -436,7 +530,7 @@ static bool shouldShowAKA(Type type, StringRef typeName) {
   // If they are textually the same, don't show them.  This can happen when
   // they are actually different types, because they exist in different scopes
   // (e.g. everyone names their type parameters 'T').
-  if (typeName == type->getCanonicalType()->getString())
+  if (typeName == getAkaTypeForDisplay(type).getString())
     return false;
 
   return true;
@@ -446,12 +540,13 @@ static bool shouldShowAKA(Type type, StringRef typeName) {
 /// with the same string representation, it should be qualified during
 /// formatting.
 static bool typeSpellingIsAmbiguous(Type type,
-                                    ArrayRef<DiagnosticArgument> Args) {
+                                    ArrayRef<DiagnosticArgument> Args,
+                                    PrintOptions &PO) {
   for (auto arg : Args) {
     if (arg.getKind() == DiagnosticArgumentKind::Type) {
       auto argType = arg.getAsType();
-      if (argType && !argType->isEqual(type) &&
-          argType->getWithoutParens().getString() == type.getString()) {
+      if (argType && argType->getWithoutParens().getPointer() != type.getPointer() &&
+          argType->getWithoutParens().getString(PO) == type.getString(PO)) {
         return true;
       }
     }
@@ -459,9 +554,21 @@ static bool typeSpellingIsAmbiguous(Type type,
   return false;
 }
 
+/// Determine whether this is the main actor type.
+static bool isMainActor(Type type) {
+  if (auto nominal = type->getAnyNominal()) {
+    if (nominal->getName().is("MainActor") &&
+        nominal->getParentModule()->getName() ==
+          nominal->getASTContext().Id_Concurrency)
+      return true;
+  }
+
+  return false;
+}
+
 /// Format a single diagnostic argument and write it to the given
 /// stream.
-static void formatDiagnosticArgument(StringRef Modifier, 
+static void formatDiagnosticArgument(StringRef Modifier,
                                      StringRef ModifierArguments,
                                      ArrayRef<DiagnosticArgument> Args,
                                      unsigned ArgIndex,
@@ -534,12 +641,36 @@ static void formatDiagnosticArgument(StringRef Modifier,
     Type type;
     bool needsQualification = false;
 
+    // TODO: We should use PrintOptions::printForDiagnostic here, or we should
+    // rename that method.
+    PrintOptions printOptions{};
+
     if (Arg.getKind() == DiagnosticArgumentKind::Type) {
       type = Arg.getAsType()->getWithoutParens();
-      needsQualification = typeSpellingIsAmbiguous(type, Args);
+      if (type.isNull()) {
+        // FIXME: We should never receive a nullptr here, but this is causing
+        // crashes (rdar://75740683). Remove once ParenType never contains
+        // nullptr as the underlying type.
+        Out << "<null>";
+        break;
+      }
+      if (type->getASTContext().TypeCheckerOpts.PrintFullConvention)
+        printOptions.PrintFunctionRepresentationAttrs =
+            PrintOptions::FunctionRepresentationMode::Full;
+      needsQualification = typeSpellingIsAmbiguous(type, Args, printOptions);
     } else {
       assert(Arg.getKind() == DiagnosticArgumentKind::FullyQualifiedType);
       type = Arg.getAsFullyQualifiedType().getType()->getWithoutParens();
+      if (type.isNull()) {
+        // FIXME: We should never receive a nullptr here, but this is causing
+        // crashes (rdar://75740683). Remove once ParenType never contains
+        // nullptr as the underlying type.
+        Out << "<null>";
+        break;
+      }
+      if (type->getASTContext().TypeCheckerOpts.PrintFullConvention)
+        printOptions.PrintFunctionRepresentationAttrs =
+            PrintOptions::FunctionRepresentationMode::Full;
       needsQualification = true;
     }
 
@@ -565,19 +696,19 @@ static void formatDiagnosticArgument(StringRef Modifier,
       auto descriptiveKind = opaqueTypeDecl->getDescriptiveKind();
 
       Out << llvm::format(FormatOpts.OpaqueResultFormatString.c_str(),
-                          type->getString().c_str(),
+                          type->getString(printOptions).c_str(),
                           Decl::getDescriptiveKindName(descriptiveKind).data(),
                           NamingDeclText.c_str());
 
     } else {
-      auto printOptions = PrintOptions();
       printOptions.FullyQualifiedTypes = needsQualification;
       std::string typeName = type->getString(printOptions);
 
       if (shouldShowAKA(type, typeName)) {
         llvm::SmallString<256> AkaText;
         llvm::raw_svector_ostream OutAka(AkaText);
-        OutAka << type->getCanonicalType();
+
+        OutAka << getAkaTypeForDisplay(type);
         Out << llvm::format(FormatOpts.AKAFormatString.c_str(),
                             typeName.c_str(), AkaText.c_str());
       } else {
@@ -664,29 +795,43 @@ static void formatDiagnosticArgument(StringRef Modifier,
         << FormatOpts.ClosingQuotationMark;
     break;
   case DiagnosticArgumentKind::ActorIsolation:
+    assert(Modifier.empty() && "Improper modifier for ActorIsolation argument");
     switch (auto isolation = Arg.getAsActorIsolation()) {
     case ActorIsolation::ActorInstance:
       Out << "actor-isolated";
       break;
 
+    case ActorIsolation::DistributedActorInstance:
+      Out << "distributed actor-isolated";
+      break;
+
     case ActorIsolation::GlobalActor:
-      Out << "global actor " << FormatOpts.OpeningQuotationMark
-        << isolation.getGlobalActor().getString()
-        << FormatOpts.ClosingQuotationMark << "-isolated";
-      break;
-
-    case ActorIsolation::Independent:
-      Out << "actor-independent";
-      break;
-
-    case ActorIsolation::IndependentUnsafe:
-      Out << "actor-independent-unsafe";
-      break;
-
-    case ActorIsolation::Unspecified:
-      Out << "non-actor-isolated";
+    case ActorIsolation::GlobalActorUnsafe: {
+      Type globalActor = isolation.getGlobalActor();
+      if (isMainActor(globalActor)) {
+        Out << "main actor-isolated";
+      } else {
+        Out << "global actor " << FormatOpts.OpeningQuotationMark
+          << globalActor.getString()
+          << FormatOpts.ClosingQuotationMark << "-isolated";
+      }
       break;
     }
+
+    case ActorIsolation::Independent:
+    case ActorIsolation::Unspecified:
+      Out << "nonisolated";
+      break;
+    }
+    break;
+
+  case DiagnosticArgumentKind::Diagnostic: {
+    assert(Modifier.empty() && "Improper modifier for Diagnostic argument");
+    auto diagArg = Arg.getAsDiagnostic();
+    DiagnosticEngine::formatDiagnosticText(Out, diagArg->FormatString,
+                                           diagArg->FormatArgs);
+    break;
+  }
   }
 }
 
@@ -758,23 +903,38 @@ void DiagnosticEngine::formatDiagnosticText(
   }
 }
 
-static DiagnosticKind toDiagnosticKind(DiagnosticState::Behavior behavior) {
+static DiagnosticKind toDiagnosticKind(DiagnosticBehavior behavior) {
   switch (behavior) {
-  case DiagnosticState::Behavior::Unspecified:
+  case DiagnosticBehavior::Unspecified:
     llvm_unreachable("unspecified behavior");
-  case DiagnosticState::Behavior::Ignore:
+  case DiagnosticBehavior::Ignore:
     llvm_unreachable("trying to map an ignored diagnostic");
-  case DiagnosticState::Behavior::Error:
-  case DiagnosticState::Behavior::Fatal:
+  case DiagnosticBehavior::Error:
+  case DiagnosticBehavior::Fatal:
     return DiagnosticKind::Error;
-  case DiagnosticState::Behavior::Note:
+  case DiagnosticBehavior::Note:
     return DiagnosticKind::Note;
-  case DiagnosticState::Behavior::Warning:
+  case DiagnosticBehavior::Warning:
     return DiagnosticKind::Warning;
-  case DiagnosticState::Behavior::Remark:
+  case DiagnosticBehavior::Remark:
     return DiagnosticKind::Remark;
   }
 
+  llvm_unreachable("Unhandled DiagnosticKind in switch.");
+}
+
+static
+DiagnosticBehavior toDiagnosticBehavior(DiagnosticKind kind, bool isFatal) {
+  switch (kind) {
+  case DiagnosticKind::Note:
+    return DiagnosticBehavior::Note;
+  case DiagnosticKind::Error:
+    return isFatal ? DiagnosticBehavior::Fatal : DiagnosticBehavior::Error;
+  case DiagnosticKind::Warning:
+    return DiagnosticBehavior::Warning;
+  case DiagnosticKind::Remark:
+    return DiagnosticBehavior::Remark;
+  }
   llvm_unreachable("Unhandled DiagnosticKind in switch.");
 }
 
@@ -787,78 +947,71 @@ llvm::cl::opt<bool> AssertOnError("swift-diagnostics-assert-on-error",
 llvm::cl::opt<bool> AssertOnWarning("swift-diagnostics-assert-on-warning",
                                     llvm::cl::init(false));
 
-DiagnosticState::Behavior DiagnosticState::determineBehavior(DiagID id) {
-  auto set = [this](DiagnosticState::Behavior lvl) {
-    if (lvl == Behavior::Fatal) {
-      fatalErrorOccurred = true;
-      anyErrorOccurred = true;
-    } else if (lvl == Behavior::Error) {
-      anyErrorOccurred = true;
-    }
-
-    assert((!AssertOnError || !anyErrorOccurred) && "We emitted an error?!");
-    assert((!AssertOnWarning || (lvl != Behavior::Warning)) &&
-           "We emitted a warning?!");
-    previousBehavior = lvl;
-    return lvl;
-  };
-
+DiagnosticBehavior DiagnosticState::determineBehavior(const Diagnostic &diag) {
   // We determine how to handle a diagnostic based on the following rules
-  //   1) If current state dictates a certain behavior, follow that
-  //   2) If the user provided a behavior for this specific diagnostic, follow
-  //      that
-  //   3) If the user provided a behavior for this diagnostic's kind, follow
-  //      that
-  //   4) Otherwise remap the diagnostic kind
+  //   1) Map the diagnostic to its "intended" behavior, applying the behavior
+  //      limit for this particular emission
+  //   2) If current state dictates a certain behavior, follow that
+  //   3) If the user ignored this specific diagnostic, follow that
+  //   4) If the user substituted a different behavior for this behavior, apply
+  //      that change
+  //   5) Update current state for use during the next diagnostic
 
-  auto diagInfo = storedDiagnosticInfos[(unsigned)id];
-  bool isNote = diagInfo.kind == DiagnosticKind::Note;
+  //   1) Map the diagnostic to its "intended" behavior, applying the behavior
+  //      limit for this particular emission
+  auto diagInfo = storedDiagnosticInfos[(unsigned)diag.getID()];
+  DiagnosticBehavior lvl =
+      std::max(toDiagnosticBehavior(diagInfo.kind, diagInfo.isFatal),
+               diag.getBehaviorLimit());
+  assert(lvl != DiagnosticBehavior::Unspecified);
 
-  //   1) If current state dictates a certain behavior, follow that
+  //   2) If current state dictates a certain behavior, follow that
 
   // Notes relating to ignored diagnostics should also be ignored
-  if (previousBehavior == Behavior::Ignore && isNote)
-    return set(Behavior::Ignore);
+  if (previousBehavior == DiagnosticBehavior::Ignore
+      && lvl == DiagnosticBehavior::Note)
+    lvl = DiagnosticBehavior::Ignore;
 
   // Suppress diagnostics when in a fatal state, except for follow-on notes
   if (fatalErrorOccurred)
-    if (!showDiagnosticsAfterFatalError && !isNote)
-      return set(Behavior::Ignore);
+    if (!showDiagnosticsAfterFatalError && lvl != DiagnosticBehavior::Note)
+      lvl = DiagnosticBehavior::Ignore;
 
-  //   2) If the user provided a behavior for this specific diagnostic, follow
-  //      that
+  //   3) If the user ignored this specific diagnostic, follow that
+  if (ignoredDiagnostics[(unsigned)diag.getID()])
+    lvl = DiagnosticBehavior::Ignore;
 
-  if (perDiagnosticBehavior[(unsigned)id] != Behavior::Unspecified)
-    return set(perDiagnosticBehavior[(unsigned)id]);
-
-  //   3) If the user provided a behavior for this diagnostic's kind, follow
-  //      that
-  if (diagInfo.kind == DiagnosticKind::Warning) {
-    if (suppressWarnings)
-      return set(Behavior::Ignore);
+  //   4) If the user substituted a different behavior for this behavior, apply
+  //      that change
+  if (lvl == DiagnosticBehavior::Warning) {
     if (warningsAsErrors)
-      return set(Behavior::Error);
+      lvl = DiagnosticBehavior::Error;
+    if (suppressWarnings)
+      lvl = DiagnosticBehavior::Ignore;
   }
 
-  //   4) Otherwise remap the diagnostic kind
-  switch (diagInfo.kind) {
-  case DiagnosticKind::Note:
-    return set(Behavior::Note);
-  case DiagnosticKind::Error:
-    return set(diagInfo.isFatal ? Behavior::Fatal : Behavior::Error);
-  case DiagnosticKind::Warning:
-    return set(Behavior::Warning);
-  case DiagnosticKind::Remark:
-    return set(Behavior::Remark);
+  //   5) Update current state for use during the next diagnostic
+  if (lvl == DiagnosticBehavior::Fatal) {
+    fatalErrorOccurred = true;
+    anyErrorOccurred = true;
+  } else if (lvl == DiagnosticBehavior::Error) {
+    anyErrorOccurred = true;
   }
 
-  llvm_unreachable("Unhandled DiagnosticKind in switch.");
+  assert((!AssertOnError || !anyErrorOccurred) && "We emitted an error?!");
+  assert((!AssertOnWarning || (lvl != DiagnosticBehavior::Warning)) &&
+         "We emitted a warning?!");
+
+  previousBehavior = lvl;
+  return lvl;
 }
 
 void DiagnosticEngine::flushActiveDiagnostic() {
   assert(ActiveDiagnostic && "No active diagnostic to flush");
   if (TransactionCount == 0) {
     emitDiagnostic(*ActiveDiagnostic);
+    WrappedDiagnostics.clear();
+    WrappedDiagnosticArgs.clear();
   } else {
     onTentativeDiagnosticFlush(*ActiveDiagnostic);
     TentativeDiagnostics.emplace_back(std::move(*ActiveDiagnostic));
@@ -871,6 +1024,8 @@ void DiagnosticEngine::emitTentativeDiagnostics() {
     emitDiagnostic(diag);
   }
   TentativeDiagnostics.clear();
+  WrappedDiagnostics.clear();
+  WrappedDiagnosticArgs.clear();
 }
 
 /// Returns the access level of the least accessible PrettyPrintedDeclarations
@@ -889,8 +1044,8 @@ static AccessLevel getBufferAccessLevel(const Decl *decl) {
 
 Optional<DiagnosticInfo>
 DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic) {
-  auto behavior = state.determineBehavior(diagnostic.getID());
-  if (behavior == DiagnosticState::Behavior::Ignore)
+  auto behavior = state.determineBehavior(diagnostic);
+  if (behavior == DiagnosticBehavior::Ignore)
     return None;
 
   // Figure out the source location.
@@ -1006,8 +1161,13 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic) {
           // Pretty-print the declaration we've picked.
           llvm::raw_svector_ostream out(buffer);
           TrackingPrinter printer(entries, out, bufferAccessLevel);
-          ppDecl->print(printer,
-                        PrintOptions::printForDiagnostics(bufferAccessLevel));
+          llvm::SaveAndRestore<bool> isPrettyPrinting(
+              IsPrettyPrintingDecl, true);
+          ppDecl->print(
+              printer,
+              PrintOptions::printForDiagnostics(
+                  bufferAccessLevel,
+                  decl->getASTContext().TypeCheckerOpts.PrintFullConvention));
         }
 
         // Build a buffer with the pretty-printed declaration.
@@ -1029,28 +1189,40 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic) {
     }
   }
 
+  StringRef Category;
+  if (isAPIDigesterBreakageDiagnostic(diagnostic.getID()))
+    Category = "api-digester-breaking-change";
+  else if (isDeprecationDiagnostic(diagnostic.getID()))
+    Category = "deprecation";
+  else if (isNoUsageDiagnostic(diagnostic.getID()))
+    Category = "no-usage";
+
   return DiagnosticInfo(
       diagnostic.getID(), loc, toDiagnosticKind(behavior),
       diagnosticStringFor(diagnostic.getID(), getPrintDiagnosticNames()),
-      diagnostic.getArgs(), getDefaultDiagnosticLoc(), /*child note info*/ {},
-      diagnostic.getRanges(), diagnostic.getFixIts(), diagnostic.isChildNote());
+      diagnostic.getArgs(), Category, getDefaultDiagnosticLoc(),
+      /*child note info*/ {}, diagnostic.getRanges(), diagnostic.getFixIts(),
+      diagnostic.isChildNote());
 }
 
 void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
   if (auto info = diagnosticInfoForDiagnostic(diagnostic)) {
     SmallVector<DiagnosticInfo, 1> childInfo;
-    TinyPtrVector<DiagnosticInfo *> childInfoPtrs;
     auto childNotes = diagnostic.getChildNotes();
-    for (unsigned idx = 0; idx < childNotes.size(); ++idx) {
-      if (auto child = diagnosticInfoForDiagnostic(childNotes[idx])) {
-        childInfo.push_back(*child);
-        childInfoPtrs.push_back(&childInfo[idx]);
-      }
+    for (unsigned i : indices(childNotes)) {
+      auto child = diagnosticInfoForDiagnostic(childNotes[i]);
+      assert(child);
+      assert(child->Kind == DiagnosticKind::Note &&
+             "Expected child diagnostics to all be notes?!");
+      childInfo.push_back(*child);
+    }
+    TinyPtrVector<DiagnosticInfo *> childInfoPtrs;
+    for (unsigned i : indices(childInfo)) {
+      childInfoPtrs.push_back(&childInfo[i]);
     }
     info->ChildDiagnosticInfo = childInfoPtrs;
-    
-    SmallVector<std::string, 1> educationalNotePaths;
 
+    SmallVector<std::string, 1> educationalNotePaths;
     auto associatedNotes = educationalNotes[(uint32_t)diagnostic.getID()];
     while (associatedNotes && *associatedNotes) {
       SmallString<128> notePath(getDiagnosticDocumentationPath());
@@ -1072,20 +1244,27 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
     emitDiagnostic(childNote);
 }
 
+DiagnosticKind DiagnosticEngine::declaredDiagnosticKindFor(const DiagID id) {
+  return storedDiagnosticInfos[(unsigned)id].kind;
+}
+
 llvm::StringRef
 DiagnosticEngine::diagnosticStringFor(const DiagID id,
-                                      bool printDiagnosticName) {
-  // TODO: Print diagnostic names from `localization`.
-  if (printDiagnosticName) {
-    return debugDiagnosticStrings[(unsigned)id];
-  }
-  auto defaultMessage = diagnosticStrings[(unsigned)id];
-  if (localization) {
-    auto localizedMessage =
-        localization.get()->getMessageOr(id, defaultMessage);
+                                      bool printDiagnosticNames) {
+  auto defaultMessage = printDiagnosticNames
+                            ? debugDiagnosticStrings[(unsigned)id]
+                            : diagnosticStrings[(unsigned)id];
+
+  if (auto producer = localization.get()) {
+    auto localizedMessage = producer->getMessageOr(id, defaultMessage);
     return localizedMessage;
   }
   return defaultMessage;
+}
+
+llvm::StringRef
+DiagnosticEngine::diagnosticIDStringFor(const DiagID id) {
+  return diagnosticIDStrings[(unsigned)id];
 }
 
 const char *InFlightDiagnostic::fixItStringFor(const FixItID id) {
@@ -1146,4 +1325,25 @@ void DiagnosticEngine::onTentativeDiagnosticFlush(Diagnostic &diagnostic) {
     auto I = TransactionStrings.insert(content).first;
     argument = DiagnosticArgument(StringRef(I->getKeyData()));
   }
+}
+
+EncodedDiagnosticMessage::EncodedDiagnosticMessage(StringRef S)
+    : Message(Lexer::getEncodedStringSegment(S, Buf, /*IsFirstSegment=*/true,
+                                             /*IsLastSegment=*/true,
+                                             /*IndentToStrip=*/~0U)) {}
+
+std::pair<unsigned, DeclName>
+swift::getAccessorKindAndNameForDiagnostics(const ValueDecl *D) {
+  // This should always be one more than the last AccessorKind supported in
+  // the diagnostics. If you need to change it, change the assertion below as
+  // well.
+  static const unsigned NOT_ACCESSOR_INDEX = 2;
+
+  if (auto *accessor = dyn_cast<AccessorDecl>(D)) {
+    DeclName Name = accessor->getStorage()->getName();
+    assert(accessor->isGetterOrSetter());
+    return {static_cast<unsigned>(accessor->getAccessorKind()), Name};
+  }
+
+  return {NOT_ACCESSOR_INDEX, D->getName()};
 }

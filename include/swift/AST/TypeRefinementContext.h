@@ -46,7 +46,7 @@ namespace swift {
 /// These refinement contexts form a lexical tree parallel to the AST but much
 /// more sparse: we only introduce refinement contexts when there is something
 /// to refine.
-class TypeRefinementContext {
+class TypeRefinementContext : public ASTAllocated<TypeRefinementContext> {
 
 public:
   /// Describes the reason a type refinement context was introduced.
@@ -154,13 +154,21 @@ private:
 
   SourceRange SrcRange;
 
+  /// A canonical availiability info for this context, computed top-down from the root
+  /// context (compilation deployment target).
   AvailabilityContext AvailabilityInfo;
+
+  /// If this context was annotated with an availability attribute, this property captures that.
+  /// It differs from the above `AvailabilityInfo` by being independent of the deployment target,
+  /// and is used for providing availability attribute redundancy warning diagnostics.
+  AvailabilityContext ExplicitAvailabilityInfo;
 
   std::vector<TypeRefinementContext *> Children;
 
   TypeRefinementContext(ASTContext &Ctx, IntroNode Node,
                         TypeRefinementContext *Parent, SourceRange SrcRange,
-                        const AvailabilityContext &Info);
+                        const AvailabilityContext &Info,
+                        const AvailabilityContext &ExplicitInfo);
 
 public:
   
@@ -172,6 +180,7 @@ public:
   static TypeRefinementContext *createForDecl(ASTContext &Ctx, Decl *D,
                                               TypeRefinementContext *Parent,
                                               const AvailabilityContext &Info,
+                                              const AvailabilityContext &ExplicitInfo,
                                               SourceRange SrcRange);
   
   /// Create a refinement context for the Then branch of the given IfStmt.
@@ -245,6 +254,12 @@ public:
     return AvailabilityInfo;
   }
 
+  /// Returns the information on what availability was specified by the programmer
+  /// on this context (if any).
+  const AvailabilityContext &getExplicitAvailabilityInfo() const {
+    return ExplicitAvailabilityInfo;
+  }
+
   /// Adds a child refinement context.
   void addChild(TypeRefinementContext *Child) {
     assert(Child->getSourceRange().isValid());
@@ -261,11 +276,6 @@ public:
   void print(raw_ostream &OS, SourceManager &SrcMgr, unsigned Indent = 0) const;
   
   static StringRef getReasonName(Reason R);
-  
-  // Only allow allocation of TypeRefinementContext using the allocator in
-  // ASTContext.
-  void *operator new(size_t Bytes, ASTContext &C,
-                     unsigned Alignment = alignof(TypeRefinementContext));
 };
 
 } // end namespace swift

@@ -17,8 +17,10 @@
 #ifndef SWIFT_PATTERN_H
 #define SWIFT_PATTERN_H
 
+#include "swift/Basic/AnyValue.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/type_traits.h"
+#include "swift/AST/ASTAllocated.h"
 #include "swift/AST/Decl.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
@@ -49,7 +51,7 @@ enum : unsigned { NumPatternKindBits =
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, PatternKind kind);
 
 /// Pattern - Base class for all patterns in Swift.
-class alignas(8) Pattern {
+class alignas(8) Pattern : public ASTAllocated<Pattern> {
 protected:
   union { uint64_t OpaqueBits;
 
@@ -201,16 +203,12 @@ public:
   /// Does this binding declare something that requires storage?
   bool hasStorage() const;
 
+  /// Does this pattern have any mutable 'var' bindings?
+  bool hasAnyMutableBindings() const;
+
   static bool classof(const Pattern *P) { return true; }
 
   //*** Allocation Routines ************************************************/
-
-  void *operator new(size_t bytes, const ASTContext &C);
-
-  // Make placement new and vanilla new/delete illegal for Patterns.
-  void *operator new(size_t bytes) = delete;
-  void operator delete(void *data) = delete;
-  void *operator new(size_t bytes, void *data) = delete;
 
   void print(llvm::raw_ostream &OS,
              const PrintOptions &Options = PrintOptions()) const;

@@ -284,7 +284,7 @@ func test_r18400194() {
 //   Don't add capture arguments to local default argument generators.
 func localFunctionWithDefaultArg() {
   var z = 5
-  func bar(_ x: Int? = nil) {
+  func bar(_ x: Int? = (nil)) {
     z += 1
   }
   bar()
@@ -432,6 +432,23 @@ func testCallableWithDefault(_ x: CallableWithDefault) {
   // CHECK: [[CALL_AS_FN:%[0-9]+]] = function_ref @$s17default_arguments19CallableWithDefaultV14callAsFunction1y1zySi_SStF : $@convention(method) (Int, @guaranteed String, CallableWithDefault) -> ()
   // CHECK: apply [[CALL_AS_FN]]([[I]], [[STR]], {{%[0-9]+}})
   x(y: 5)
+}
+
+enum E {
+  // CHECK-LABEL: sil hidden [ossa] @$s17default_arguments1EO6ResultV4name9platformsAESS_SaySiGtcfcfA0_ : $@convention(thin) () -> @owned Array<Int>
+  struct Result {
+    var name: String
+    var platforms: [Int] = []
+  }
+
+  // CHECK-LABEL: sil hidden [ossa] @$s17default_arguments1EO4testyyFZ : $@convention(method) (@thin E.Type) -> ()
+  static func test() {
+    // CHECK: function_ref @$s17default_arguments1EO6ResultV4name9platformsAESS_SaySiGtcfcfA0_ : $@convention(thin) () -> @owned Array<Int>
+    // CHECK: function_ref @$s17default_arguments1EO4testyyFZAC6ResultVSS_SaySiGtcfu_ : $@convention(thin) (@guaranteed String, @guaranteed Array<Int>) -> @owned E.Result
+
+    // CHECK-LABEL: sil private [ossa] @$s17default_arguments1EO4testyyFZAC6ResultVSS_SaySiGtcfu_ : $@convention(thin) (@guaranteed String, @guaranteed Array<Int>) -> @owned E.Result
+    var result = Self.Result(name: "")
+  }
 }
 
 // FIXME: Arguably we shouldn't allow calling a constructor like this, as

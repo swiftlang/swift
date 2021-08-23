@@ -32,6 +32,7 @@ var x: Int
 // CHECK1:      source.lang.swift.ref.struct ()
 // CHECK1-NEXT: Int
 // CHECK1-NEXT: s:Si
+// CHECK1-NEXT: source.lang.swift
 // CHECK1-NEXT: Int.Type
 // CHECK1-NEXT: $s
 // CHECK1-NEXT: Swift{{$}}

@@ -12,11 +12,13 @@
 
 #define DEBUG_TYPE "closure-lifetime-fixup"
 
+#include "swift/Basic/Defer.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
@@ -101,22 +103,16 @@ static SILInstruction *getDeinitSafeClosureDestructionPoint(SILBasicBlock *bb) {
 
 static void findReachableExitBlocks(SILInstruction *i,
                                     SmallVectorImpl<SILBasicBlock *> &result) {
-  SmallVector<SILBasicBlock *, 32> worklist;
-  SmallPtrSet<SILBasicBlock *, 8> visitedBlocks;
+  BasicBlockWorklist worklist(i->getParent());
 
-  visitedBlocks.insert(i->getParent());
-  worklist.push_back(i->getParent());
-
-  while (!worklist.empty()) {
-    auto *bb = worklist.pop_back_val();
+  while (SILBasicBlock *bb = worklist.pop()) {
     if (bb->getTerminator()->isFunctionExiting()) {
       result.push_back(bb);
       continue;
     }
-    llvm::copy_if(bb->getSuccessorBlocks(), std::back_inserter(worklist),
-                  [&](SILBasicBlock *bb) {
-      return visitedBlocks.insert(bb).second;
-    });
+    for (SILBasicBlock *succ : bb->getSuccessors()) {
+      worklist.pushIfNotVisited(succ);
+    }
   }
 }
 
@@ -212,7 +208,8 @@ cleanupDeadTrivialPhiArgs(SILValue initialValue,
 /// that case where we have to consider that destroy_value, we have a simpler
 /// time here.
 static void extendLifetimeToEndOfFunction(SILFunction &fn,
-                                          ConvertEscapeToNoEscapeInst *cvt) {
+                                          ConvertEscapeToNoEscapeInst *cvt,
+                                          SILSSAUpdater &updater) {
   auto escapingClosure = cvt->getOperand();
   auto escapingClosureTy = escapingClosure->getType();
   auto optionalEscapingClosureTy = SILType::getOptionalType(escapingClosureTy);
@@ -243,8 +240,10 @@ static void extendLifetimeToEndOfFunction(SILFunction &fn,
   // use SILSSAUpdater::GetValueInMiddleOfBlock() to extend the object's
   // lifetime respecting loops.
   SmallVector<SILPhiArgument *, 8> insertedPhis;
-  SILSSAUpdater updater(&insertedPhis);
-  updater.initialize(optionalEscapingClosureTy);
+  updater.setInsertedPhis(&insertedPhis);
+  updater.initialize(optionalEscapingClosureTy, fn.hasOwnership()
+                                                    ? OwnershipKind::Owned
+                                                    : OwnershipKind::None);
 
   // Create an Optional<() -> ()>.none in the entry block of the function and
   // add it as an available value to the SSAUpdater.
@@ -365,6 +364,62 @@ static SILValue insertMarkDependenceForCapturedArguments(PartialApplyInst *pai,
   return curr;
 }
 
+/// Returns the (single) "endAsyncLetLifetime" builtin if \p startAsyncLet is a
+/// "startAsyncLetWithLocalBuffer" builtin.
+static BuiltinInst *getEndAsyncLet(BuiltinInst *startAsyncLet) {
+  if (startAsyncLet->getBuiltinKind() != BuiltinValueKind::StartAsyncLetWithLocalBuffer)
+    return nullptr;
+
+  BuiltinInst *endAsyncLet = nullptr;
+  for (Operand *op : startAsyncLet->getUses()) {
+    auto *endBI = dyn_cast<BuiltinInst>(op->getUser());
+    if (endBI && endBI->getBuiltinKind() == BuiltinValueKind::EndAsyncLetLifetime) {
+      // At this stage of the pipeline, it's always the case that a
+      // startAsyncLet has an endAsyncLet: that's how SILGen generates it.
+      // Just to be on the safe side, do this check.
+      if (endAsyncLet)
+        return nullptr;
+      endAsyncLet = endBI;
+    }
+  }
+  return endAsyncLet;
+}
+
+/// Call the \p insertFn with a builder at all insertion points after
+/// a closure is used by \p closureUser.
+static void insertAfterClosureUser(SILInstruction *closureUser,
+                                   function_ref<void(SILBuilder &)> insertFn) {
+  // Don't insert any destroy or deallocation right before an unreachable.
+  // It's not needed an will only add up to code size.
+  auto insertAtNonUnreachable = [&](SILBuilder &builder) {
+    if (isa<UnreachableInst>(builder.getInsertionPoint()))
+      return;
+    insertFn(builder);
+  };
+
+  if (auto *startAsyncLet = dyn_cast<BuiltinInst>(closureUser)) {
+    BuiltinInst *endAsyncLet = getEndAsyncLet(startAsyncLet);
+    if (!endAsyncLet)
+      return;
+    SILBuilderWithScope builder(std::next(endAsyncLet->getIterator()));
+    insertAtNonUnreachable(builder);
+    return;
+  }
+  FullApplySite fas = FullApplySite::isa(closureUser);
+  assert(fas);
+  fas.insertAfterFullEvaluation(insertAtNonUnreachable);
+}
+
+static SILValue skipConvert(SILValue v) {
+  auto *cvt = dyn_cast<ConvertFunctionInst>(v);
+  if (!cvt)
+    return v;
+  auto *pa = dyn_cast<PartialApplyInst>(cvt->getOperand());
+  if (!pa || !pa->hasOneUse())
+    return v;
+  return pa;
+}
+
 /// Rewrite a partial_apply convert_escape_to_noescape sequence with a single
 /// apply/try_apply user to a partial_apply [stack] terminated with a
 /// dealloc_stack placed after the apply.
@@ -388,12 +443,15 @@ static SILValue insertMarkDependenceForCapturedArguments(PartialApplyInst *pai,
 /// dealloc_stack still needs to be balanced with other dealloc_stacks i.e the
 /// caller needs to use the StackNesting utility to update the dealloc_stack
 /// nesting.
-static bool tryRewriteToPartialApplyStack(
-    SILLocation &loc, PartialApplyInst *origPA,
-    ConvertEscapeToNoEscapeInst *cvt, SILInstruction *singleApplyUser,
-    SILBasicBlock::iterator &advanceIfDelete,
+static SILValue tryRewriteToPartialApplyStack(
+    ConvertEscapeToNoEscapeInst *cvt,
+    SILInstruction *closureUser, InstructionDeleter &deleter,
     llvm::DenseMap<SILInstruction *, SILInstruction *> &memoized) {
-  
+
+  auto *origPA = dyn_cast<PartialApplyInst>(skipConvert(cvt->getOperand()));
+  if (!origPA)
+    return SILValue();
+
   auto *convertOrPartialApply = cast<SingleValueInstruction>(origPA);
   if (cvt->getOperand() != origPA)
     convertOrPartialApply = cast<ConvertFunctionInst>(cvt->getOperand());
@@ -401,10 +459,8 @@ static bool tryRewriteToPartialApplyStack(
   // Whenever we delete an instruction advance the iterator and remove the
   // instruction from the memoized map.
   auto saveDeleteInst = [&](SILInstruction *i) {
-    if (&*advanceIfDelete == i)
-      ++advanceIfDelete;
     memoized.erase(i);
-    i->eraseFromParent();
+    deleter.forceDelete(i);
   };
 
   // Look for a single non ref count user of the partial_apply.
@@ -417,7 +473,7 @@ static bool tryRewriteToPartialApplyStack(
       continue;
     }
     if (singleNonDebugNonRefCountUser)
-      return false;
+      return SILValue();
     singleNonDebugNonRefCountUser = user;
   }
   
@@ -478,94 +534,77 @@ static bool tryRewriteToPartialApplyStack(
       SmallVector<Operand*, 16> Uses(arg.get()->getUses());
       for (auto use : Uses)
         if (auto *deallocInst = dyn_cast<DeallocStackInst>(use->getUser()))
-          deallocInst->eraseFromParent();
+          deleter.forceDelete(deallocInst);
     }
   }
 
-  // Insert destroys of arguments after the apply and the dealloc_stack.
-  if (auto *apply = dyn_cast<ApplyInst>(singleApplyUser)) {
-    auto insertPt = std::next(SILBasicBlock::iterator(apply));
-    // Don't insert dealloc_stacks at unreachable.
-    if (isa<UnreachableInst>(*insertPt))
-      return true;
-    SILBuilderWithScope b3(insertPt);
-    b3.createDeallocStack(loc, newPA);
-    insertDestroyOfCapturedArguments(newPA, b3);
+  // Insert destroys of arguments after the closure user and the dealloc_stack.
+  insertAfterClosureUser(closureUser, [newPA](SILBuilder &builder) {
+    auto loc = RegularLocation(builder.getInsertionPointLoc());
+    builder.createDeallocStack(loc, newPA);
+    insertDestroyOfCapturedArguments(newPA, builder);
     // dealloc_stack of the in_guaranteed capture is inserted
-    insertDeallocOfCapturedArguments(newPA, b3);
-  } else if (auto *tai = dyn_cast<TryApplyInst>(singleApplyUser)) {
-    for (auto *succBB : tai->getSuccessorBlocks()) {
-      SILBuilderWithScope b3(succBB->begin());
-      b3.createDeallocStack(loc, newPA);
-      insertDestroyOfCapturedArguments(newPA, b3);
-      // dealloc_stack of the in_guaranteed capture is inserted
-      insertDeallocOfCapturedArguments(newPA, b3);
-    }
-  } else {
-    llvm_unreachable("Unknown FullApplySite instruction kind");
-  }
-  return true;
-}
-
-static SILValue skipConvert(SILValue v) {
-  auto *cvt = dyn_cast<ConvertFunctionInst>(v);
-  if (!cvt)
-    return v;
-  auto *pa = dyn_cast<PartialApplyInst>(cvt->getOperand());
-  if (!pa || !pa->hasOneUse())
-    return v;
-  return pa;
+    insertDeallocOfCapturedArguments(newPA, builder);
+  });
+  return closure;
 }
 
 static bool tryExtendLifetimeToLastUse(
     ConvertEscapeToNoEscapeInst *cvt,
     llvm::DenseMap<SILInstruction *, SILInstruction *> &memoized,
-    SILBasicBlock::iterator &advanceIfDelete) {
+    InstructionDeleter &deleter) {
   // If there is a single user that is an apply this is simple: extend the
   // lifetime of the operand until after the apply.
   auto *singleUser = lookThroughRebastractionUsers(cvt, memoized);
   if (!singleUser)
     return false;
 
-  // Handle an apply.
-  if (auto singleApplyUser = FullApplySite::isa(singleUser)) {
-    // FIXME: Don't know how-to handle begin_apply/end_apply yet.
-    if (isa<BeginApplyInst>(singleApplyUser.getInstruction())) {
+  // Handle apply instructions and startAsyncLet.
+  BuiltinInst *endAsyncLet = nullptr;
+  if (FullApplySite::isa(singleUser)) {
+    // TODO: Enable begin_apply/end_apply. It should work, but is not tested yet.
+    if (isa<BeginApplyInst>(singleUser))
       return false;
-    }
+  } else if (auto *bi = dyn_cast<BuiltinInst>(singleUser)) {
+    endAsyncLet = getEndAsyncLet(bi);
+    if (!endAsyncLet)
+      return false;
+  } else {
+    return false;
+  }
 
-    auto loc = RegularLocation::getAutoGeneratedLocation();
-    auto origPA = dyn_cast<PartialApplyInst>(skipConvert(cvt->getOperand()));
-    if (origPA && tryRewriteToPartialApplyStack(
-                      loc, origPA, cvt, singleApplyUser.getInstruction(),
-                      advanceIfDelete, memoized))
-      return true;
-
-    // Insert a copy at the convert_escape_to_noescape [not_guaranteed] and
-    // change the instruction to the guaranteed form.
-    auto escapingClosure = cvt->getOperand();
-    auto *closureCopy =
-        SILBuilderWithScope(cvt).createCopyValue(loc, escapingClosure);
-    cvt->setLifetimeGuaranteed();
-    cvt->setOperand(closureCopy);
-
-    // Insert a destroy after the apply.
-    if (auto *apply = dyn_cast<ApplyInst>(singleApplyUser.getInstruction())) {
-      auto insertPt = std::next(SILBasicBlock::iterator(apply));
-      SILBuilderWithScope(insertPt).createDestroyValue(loc, closureCopy);
-
-    } else if (auto *tai =
-                   dyn_cast<TryApplyInst>(singleApplyUser.getInstruction())) {
-      for (auto *succBB : tai->getSuccessorBlocks()) {
-        SILBuilderWithScope(succBB->begin())
-            .createDestroyValue(loc, closureCopy);
-      }
-    } else {
-      llvm_unreachable("Unknown FullApplySite instruction kind");
+  if (SILValue closure = tryRewriteToPartialApplyStack(cvt, singleUser,
+                                                       deleter, memoized)) {
+    if (auto *cfi = dyn_cast<ConvertFunctionInst>(closure))
+      closure = cfi->getOperand();
+    if (endAsyncLet && isa<MarkDependenceInst>(closure)) {
+      // Add the top-level mark_dependence (which keeps the closure arguments
+      // alive) as a second operand to the endAsyncLet builtin.
+      // This ensures that the closure arguments are kept alive until the
+      // endAsyncLet builtin.
+      assert(endAsyncLet->getNumOperands() == 1);
+      SILBuilderWithScope builder(endAsyncLet);
+      builder.createBuiltin(endAsyncLet->getLoc(), endAsyncLet->getName(),
+        endAsyncLet->getType(), endAsyncLet->getSubstitutions(),
+        {endAsyncLet->getOperand(0), closure});
+      deleter.forceDelete(endAsyncLet);
     }
     return true;
   }
-  return false;
+
+  // Insert a copy at the convert_escape_to_noescape [not_guaranteed] and
+  // change the instruction to the guaranteed form.
+  auto escapingClosure = cvt->getOperand();
+  auto *closureCopy =
+      SILBuilderWithScope(cvt).createCopyValue(cvt->getLoc(), escapingClosure);
+  cvt->setLifetimeGuaranteed();
+  cvt->setOperand(closureCopy);
+
+  insertAfterClosureUser(singleUser, [closureCopy](SILBuilder &builder) {
+    auto loc = RegularLocation(builder.getInsertionPointLoc());
+    builder.createDestroyValue(loc, closureCopy);
+  });
+  return true;
 }
 
 /// Ensure the lifetime of the closure across a two step optional conversion
@@ -758,6 +797,7 @@ static SILInstruction *getOnlyDestroy(CopyBlockWithoutEscapingInst *cb) {
 ///      cond_fail %e
 ///      destroy_value %closure
 static bool fixupCopyBlockWithoutEscaping(CopyBlockWithoutEscapingInst *cb,
+                                          InstructionDeleter &deleter,
                                           bool &modifiedCFG) {
   // Find the end of the lifetime of the copy_block_without_escaping
   // instruction.
@@ -798,7 +838,7 @@ static bool fixupCopyBlockWithoutEscaping(CopyBlockWithoutEscapingInst *cb,
   SILBuilderWithScope b(cb);
   auto *newCB = b.createCopyBlock(loc, cb->getBlock());
   cb->replaceAllUsesWith(newCB);
-  cb->eraseFromParent();
+  deleter.forceDelete(cb);
 
   auto autoGenLoc = RegularLocation::getAutoGeneratedLocation();
 
@@ -849,7 +889,9 @@ static bool fixupCopyBlockWithoutEscaping(CopyBlockWithoutEscapingInst *cb,
 
   SmallVector<SILPhiArgument *, 8> insertedPhis;
   SILSSAUpdater updater(&insertedPhis);
-  updater.initialize(optionalEscapingClosureTy);
+  updater.initialize(optionalEscapingClosureTy, fn.hasOwnership()
+                                                    ? OwnershipKind::Owned
+                                                    : OwnershipKind::None);
 
   // Create the Optional.none as the beginning available value.
   SILValue entryBlockOptionalNone;
@@ -936,14 +978,12 @@ static bool fixupClosureLifetimes(SILFunction &fn, bool &checkStackNesting,
   llvm::DenseMap<SILInstruction *, SILInstruction *> memoizedQueries;
 
   for (auto &block : fn) {
-    auto i = block.begin();
-    while (i != block.end()) {
-      SILInstruction *inst = &*i;
-      ++i;
+    SILSSAUpdater updater;
+    for (SILInstruction *inst : updater.getDeleter().updatingRange(&block)) {
 
       // Handle, copy_block_without_escaping instructions.
       if (auto *cb = dyn_cast<CopyBlockWithoutEscapingInst>(inst)) {
-        if (fixupCopyBlockWithoutEscaping(cb, modifiedCFG)) {
+        if (fixupCopyBlockWithoutEscaping(cb, updater.getDeleter(), modifiedCFG)) {
           changed = true;
         }
         continue;
@@ -963,7 +1003,7 @@ static bool fixupClosureLifetimes(SILFunction &fn, bool &checkStackNesting,
         }
       }
 
-      if (tryExtendLifetimeToLastUse(cvt, memoizedQueries, i)) {
+      if (tryExtendLifetimeToLastUse(cvt, memoizedQueries, updater.getDeleter())) {
         changed = true;
         checkStackNesting = true;
         continue;
@@ -971,7 +1011,7 @@ static bool fixupClosureLifetimes(SILFunction &fn, bool &checkStackNesting,
 
       // Otherwise, extend the lifetime of the operand to the end of the
       // function.
-      extendLifetimeToEndOfFunction(fn, cvt);
+      extendLifetimeToEndOfFunction(fn, cvt, updater);
       changed = true;
     }
   }
@@ -1002,9 +1042,8 @@ class ClosureLifetimeFixup : public SILFunctionTransform {
 
     if (fixupClosureLifetimes(*getFunction(), checkStackNesting, modifiedCFG)) {
       if (checkStackNesting){
-        StackNesting sn;
         modifiedCFG |=
-            sn.correctStackNesting(getFunction()) == StackNesting::Changes::CFG;
+          StackNesting::fixNesting(getFunction()) == StackNesting::Changes::CFG;
       }
       if (modifiedCFG)
         invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);

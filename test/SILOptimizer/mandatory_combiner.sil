@@ -75,6 +75,12 @@ sil @myint_from_myint_and_proto : $@convention(thin) (MyInt, @guaranteed { var P
 
 sil @myint_from_proto_and_myint : $@convention(thin) (@guaranteed { var Proto }, MyInt) -> MyInt
 
+// Optional support
+enum FakeOptional<T> {
+case none
+case some(T)
+}
+
 ///////////
 // Tests //
 ///////////

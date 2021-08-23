@@ -42,13 +42,8 @@ extension ${Self}: Differentiable {
   public typealias TangentVector = ${Self}
 
   ${Availability(bits)}
-  public mutating func move(along direction: TangentVector) {
-    self += direction
-  }
-
-  @inlinable
-  public var zeroTangentVectorInitializer: () -> TangentVector {
-    { 0 }
+  public mutating func move(by offset: TangentVector) {
+    self += offset
   }
 }
 
@@ -281,5 +276,23 @@ where
   func _vjpSquareRoot() -> (value: Self, pullback: (Self) -> Self) {
     let y = squareRoot()
     return (y, { v in v / (2 * y) })
+  }
+
+  @inlinable
+  @derivative(of: minimum)
+  static func _vjpMinimum(_ x: Self, _ y: Self) -> (
+    value: Self, pullback: (TangentVector) -> (TangentVector, TangentVector)
+  ) {
+    if x <= y || y.isNaN { return (x, { v in (v, .zero) }) }
+    return (y, { v in (.zero, v) })
+  }
+
+  @inlinable
+  @derivative(of: maximum)
+  static func _vjpMaximum(_ x: Self, _ y: Self) -> (
+    value: Self, pullback: (TangentVector) -> (TangentVector, TangentVector)
+  ) {
+    if x > y || y.isNaN { return (x, { v in (v, .zero) }) }
+    return (y, { v in (.zero, v) })
   }
 }

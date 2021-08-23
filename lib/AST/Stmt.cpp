@@ -33,12 +33,6 @@ using namespace swift;
 // Stmt methods.
 //===----------------------------------------------------------------------===//
 
-// Only allow allocation of Stmts using the allocator in ASTContext.
-void *Stmt::operator new(size_t Bytes, ASTContext &C,
-                         unsigned Alignment) {
-  return C.Allocate(Bytes, Alignment);
-}
-
 StringRef Stmt::getKindName(StmtKind K) {
   switch (K) {
 #define STMT(Id, Parent) case StmtKind::Id: return #Id;
@@ -155,21 +149,6 @@ BraceStmt *BraceStmt::create(ASTContext &ctx, SourceLoc lbloc,
   assert(std::none_of(elts.begin(), elts.end(),
                       [](ASTNode node) -> bool { return node.isNull(); }) &&
          "null element in BraceStmt");
-  // Uncomment the following after rdar://53254395 is done:
-  //  if (
-  //    !std::is_sorted(
-  //      elts.begin(), elts.end(),
-  //      [&](ASTNode n1, ASTNode n2) {
-  //        return !ctx.SourceMgr.isBeforeInBuffer(n2.getEndLoc(),
-  //                                              n1.getEndLoc());
-  //      })) {
-  //    llvm::errs() << "Brace statement elements out of order: \n";
-  //    for (auto n: elts) {
-  //      llvm::errs() << n.getOpaqueValue() << ": ";
-  //      n.dump(llvm::errs());
-  //    }
-  //    llvm_unreachable("brace elements out of order")
-  //  }
 
   void *Buffer = ctx.Allocate(totalSizeToAlloc<ASTNode>(elts.size()),
                               alignof(BraceStmt));
@@ -296,15 +275,15 @@ void LabeledConditionalStmt::setCond(StmtCondition e) {
   Cond = e;
 }
 
-PoundAvailableInfo *PoundAvailableInfo::create(ASTContext &ctx,
-                                               SourceLoc PoundLoc,
-                                               SourceLoc LParenLoc,
-                                       ArrayRef<AvailabilitySpec *> queries,
-                                                     SourceLoc RParenLoc) {
+PoundAvailableInfo *
+PoundAvailableInfo::create(ASTContext &ctx, SourceLoc PoundLoc,
+                           SourceLoc LParenLoc,
+                           ArrayRef<AvailabilitySpec *> queries,
+                           SourceLoc RParenLoc, bool isUnavailability) {
   unsigned size = totalSizeToAlloc<AvailabilitySpec *>(queries.size());
   void *Buffer = ctx.Allocate(size, alignof(PoundAvailableInfo));
   return ::new (Buffer) PoundAvailableInfo(PoundLoc, LParenLoc, queries,
-                                           RParenLoc);
+                                           RParenLoc, isUnavailability);
 }
 
 SourceLoc PoundAvailableInfo::getEndLoc() const {
@@ -497,6 +476,7 @@ SwitchStmt *SwitchStmt::create(LabeledStmtInfo LabelInfo, SourceLoc SwitchLoc,
                                SourceLoc LBraceLoc,
                                ArrayRef<ASTNode> Cases,
                                SourceLoc RBraceLoc,
+                               SourceLoc EndLoc,
                                ASTContext &C) {
 #ifndef NDEBUG
   for (auto N : Cases)
@@ -509,7 +489,8 @@ SwitchStmt *SwitchStmt::create(LabeledStmtInfo LabelInfo, SourceLoc SwitchLoc,
                        alignof(SwitchStmt));
   SwitchStmt *theSwitch = ::new (p) SwitchStmt(LabelInfo, SwitchLoc,
                                                SubjectExpr, LBraceLoc,
-                                               Cases.size(), RBraceLoc);
+                                               Cases.size(), RBraceLoc,
+                                               EndLoc);
 
   std::uninitialized_copy(Cases.begin(), Cases.end(),
                           theSwitch->getTrailingObjects<ASTNode>());

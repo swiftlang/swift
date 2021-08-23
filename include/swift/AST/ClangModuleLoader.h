@@ -177,6 +177,16 @@ public:
                       StringRef relatedEntityKind,
                       llvm::function_ref<void(TypeDecl *)> receiver) = 0;
 
+  /// Instantiate and import class template using given arguments.
+  ///
+  /// This method will find the clang::ClassTemplateSpecialization decl if
+  /// it already exists, or it will create one. Then it will import this
+  /// decl the same way as we import typedeffed class templates - using
+  /// the hidden struct prefixed with `__CxxTemplateInst`.
+  virtual StructDecl *
+  instantiateCXXClassTemplate(clang::ClassTemplateDecl *decl,
+                      ArrayRef<clang::TemplateArgument> arguments) = 0;
+
   /// Try to parse the string as a Clang function type.
   ///
   /// Returns null if there was a parsing failure.
@@ -226,9 +236,11 @@ public:
   instantiateCXXFunctionTemplate(ASTContext &ctx,
                                  clang::FunctionTemplateDecl *func,
                                  SubstitutionMap subst) = 0;
+
+  virtual bool isCXXMethodMutating(const clang::CXXMethodDecl *method) = 0;
 };
 
-/// Used to describe a template instantiation error.
+/// Describes a C++ template instantiation error.
 struct TemplateInstantiationError {
   /// Generic types that could not be converted to QualTypes using the
   /// ClangTypeConverter.

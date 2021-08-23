@@ -1,14 +1,14 @@
-////===--- _EitherSequence.swift - A sequence type-erasing two sequences -----===//
-////
-//// This source file is part of the Swift.org open source project
-////
-//// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
-//// Licensed under Apache License v2.0 with Runtime Library Exception
-////
-//// See https://swift.org/LICENSE.txt for license information
-//// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
-////
-////===----------------------------------------------------------------------===//
+//===--- _EitherSequence.swift - A sequence type-erasing two sequences -----===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
 
 // Not public stdlib API, currently used in Mirror.children implementation.
 
@@ -42,6 +42,9 @@ extension _Either: Comparable where Left: Comparable, Right: Comparable {
     }
   }
 }
+
+extension _Either: Sendable
+  where Left: Sendable, Right: Sendable { }
 
 /// A sequence that type erases two sequences. A lighter-weight alternative to
 /// AnySequence when more can be statically known, and which is more easily
@@ -107,7 +110,7 @@ extension _EitherCollection: Collection {
     switch (self,position) {
     case let (.left(s),.left(i)): return s[i]
     case let (.right(s),.right(i)): return s[i]
-    default: fatalError("_EitherCollecton: Sequence used with other index type")
+    default: fatalError("_EitherCollection: Sequence used with other index type")
     }
   }
 
@@ -115,7 +118,7 @@ extension _EitherCollection: Collection {
     switch (self,i) {
     case let (.left(s),.left(i)): return .left(s.index(after: i))
     case let (.right(s),.right(i)): return .right(s.index(after: i))
-    default: fatalError("_EitherCollecton: wrong type of index used")
+    default: fatalError("_EitherCollection: wrong type of index used")
     }
   }
 
@@ -129,7 +132,7 @@ extension _EitherCollection: Collection {
       return s.index(i, offsetBy: distance, limitedBy: limit).map { .left($0) }
     case let (.right(s),.right(i),.right(limit)):
       return s.index(i, offsetBy: distance, limitedBy: limit).map { .right($0) }
-    default: fatalError("_EitherCollecton: wrong type of index used")
+    default: fatalError("_EitherCollection: wrong type of index used")
     }
   }
 
@@ -137,7 +140,7 @@ extension _EitherCollection: Collection {
     switch (self,i) {
     case let (.left(s),.left(i)): return .left(s.index(i, offsetBy: distance))
     case let (.right(s),.right(i)): return .right(s.index(i, offsetBy: distance))
-    default: fatalError("_EitherCollecton: wrong type of index used")
+    default: fatalError("_EitherCollection: wrong type of index used")
     }
   }
 
@@ -147,7 +150,7 @@ extension _EitherCollection: Collection {
       return s.distance(from: i, to: j)
     case let (.right(s),.right(i),.right(j)):
       return s.distance(from: i, to: j)
-    default: fatalError("_EitherCollecton: wrong type of index used")
+    default: fatalError("_EitherCollection: wrong type of index used")
     }
   }
 }
@@ -161,7 +164,7 @@ extension _EitherBidirectionalCollection: BidirectionalCollection {
     switch (self,i) {
     case let (.left(s),.left(i)): return .left(s.index(before: i))
     case let (.right(s),.right(i)): return .right(s.index(before: i))
-    default: fatalError("_EitherCollecton: wrong type of index used")
+    default: fatalError("_EitherCollection: wrong type of index used")
     }
   }
 }

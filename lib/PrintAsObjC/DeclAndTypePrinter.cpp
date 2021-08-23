@@ -23,6 +23,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SwiftNameTranslation.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/IDE/CommentConversion.h"
 #include "swift/Parse/Lexer.h"
@@ -44,11 +45,8 @@ static bool isNSObjectOrAnyHashable(ASTContext &ctx, Type type) {
              == ctx.getSwiftId(KnownFoundationEntity::NSObject) &&
            classDecl->getModuleContext()->getName() == ctx.Id_ObjectiveC;
   }
-  if (auto nomDecl = type->getAnyNominal()) {
-    return nomDecl == ctx.getAnyHashableDecl();
-  }
 
-  return false;
+  return type->isAnyHashable();
 }
 
 static bool isAnyObjectOrAny(Type type) {
@@ -71,7 +69,7 @@ static bool isClangKeyword(Identifier name) {
 
   if (name.empty())
     return false;
-  return keywords.find(name.str()) != keywords.end();
+  return keywords.contains(name.str());
 }
 
 
@@ -594,7 +592,7 @@ private:
       if (asyncConvention &&
           i == asyncConvention->completionHandlerParamIndex()) {
         os << piece << ":(";
-        print(asyncConvention->completionHandlerType(), None);
+        print(asyncConvention->completionHandlerType(), OTK_None);
         os << ")completionHandler";
         continue;
       }
@@ -930,96 +928,15 @@ private:
     return hasPrintedAnything;
   }
 
-  const ValueDecl *getRenameDecl(const ValueDecl *D,
-                                 const ParsedDeclName renamedParsedDeclName) {
-    auto declContext = D->getDeclContext();
-    ASTContext &astContext = D->getASTContext();
-    auto renamedDeclName = renamedParsedDeclName.formDeclNameRef(astContext);
-
-    if (isa<ClassDecl>(D) || isa<ProtocolDecl>(D)) {
-      if (!renamedParsedDeclName.ContextName.empty()) {
-        return nullptr;
-      }
-      SmallVector<ValueDecl *, 1> decls;
-      declContext->lookupQualified(declContext->getParentModule(),
-                                   renamedDeclName.withoutArgumentLabels(),
-                                   NL_OnlyTypes,
-                                   decls);
-      if (decls.size() == 1)
-        return decls[0];
-      return nullptr;
-    }
-
-    TypeDecl *typeDecl = declContext->getSelfNominalTypeDecl();
-
-    const ValueDecl *renamedDecl = nullptr;
-    SmallVector<ValueDecl *, 4> lookupResults;
-    declContext->lookupQualified(typeDecl->getDeclaredInterfaceType(),
-                                 renamedDeclName, NL_QualifiedDefault,
-                                 lookupResults);
-
-    if (lookupResults.size() == 1) {
-      auto candidate = lookupResults[0];
-      if (!shouldInclude(candidate))
-        return nullptr;
-      if (candidate->getKind() != D->getKind() ||
-          (candidate->isInstanceMember() !=
-           cast<ValueDecl>(D)->isInstanceMember()))
-        return nullptr;
-
-      renamedDecl = candidate;
-    } else {
-      for (auto candidate : lookupResults) {
-        if (!shouldInclude(candidate))
-          continue;
-
-        if (candidate->getKind() != D->getKind() ||
-            (candidate->isInstanceMember() !=
-             cast<ValueDecl>(D)->isInstanceMember()))
-          continue;
-
-        if (isa<AbstractFunctionDecl>(candidate)) {
-          auto cParams = cast<AbstractFunctionDecl>(candidate)->getParameters();
-          auto dParams = cast<AbstractFunctionDecl>(D)->getParameters();
-
-          if (cParams->size() != dParams->size())
-            continue;
-
-          bool hasSameParameterTypes = true;
-          for (auto index : indices(*cParams)) {
-            auto cParamsType = cParams->get(index)->getType();
-            auto dParamsType = dParams->get(index)->getType();
-            if (!cParamsType->matchesParameter(dParamsType,
-                                               TypeMatchOptions())) {
-              hasSameParameterTypes = false;
-              break;
-            }
-          }
-
-          if (!hasSameParameterTypes) {
-            continue;
-          }
-        }
-
-        if (renamedDecl) {
-          // If we found a duplicated candidate then we would silently fail.
-          renamedDecl = nullptr;
-          break;
-        }
-        renamedDecl = candidate;
-      }
-    }
-    return renamedDecl;
-  }
-
   void printRenameForDecl(const AvailableAttr *AvAttr, const ValueDecl *D,
                           bool includeQuotes) {
     assert(!AvAttr->Rename.empty());
 
-    const ValueDecl *renamedDecl =
-        getRenameDecl(D, parseDeclName(AvAttr->Rename));
-
+    auto *renamedDecl = evaluateOrDefault(
+        getASTContext().evaluator, RenamedDeclRequest{D, AvAttr}, nullptr);
     if (renamedDecl) {
+      assert(shouldInclude(renamedDecl) &&
+             "ObjC printer logic mismatch with renamed decl");
       SmallString<128> scratch;
       auto renamedObjCRuntimeName =
           renamedDecl->getObjCRuntimeName()->getString(scratch);
@@ -1075,7 +992,7 @@ private:
       ty = unwrapped;
 
     auto genericTy = ty->getAs<BoundGenericStructType>();
-    if (!genericTy || genericTy->getDecl() != getASTContext().getArrayDecl())
+    if (!genericTy || !genericTy->isArray())
       return false;
 
     assert(genericTy->getGenericArgs().size() == 1);
@@ -1182,14 +1099,14 @@ private:
 
       auto nominal = copyTy->getNominalOrBoundGenericNominal();
       if (nominal && isa<StructDecl>(nominal)) {
-        if (nominal == ctx.getArrayDecl() ||
-            nominal == ctx.getDictionaryDecl() ||
-            nominal == ctx.getSetDecl() ||
-            nominal == ctx.getStringDecl() ||
-            (!getKnownTypeInfo(nominal) && getObjCBridgedClass(nominal))) {
+        if (copyTy->isArray() ||
+            copyTy->isDictionary() ||
+            copyTy->isSet() ||
+            copyTy->isString() ||
+            getObjCBridgedClass(nominal)) {
           // We fast-path the most common cases in the condition above.
           os << ", copy";
-        } else if (nominal == ctx.getUnmanagedDecl()) {
+        } else if (copyTy->isUnmanaged()) {
           os << ", unsafe_unretained";
           // Don't print unsafe_unretained twice.
           if (auto boundTy = copyTy->getAs<BoundGenericType>()) {
@@ -1374,10 +1291,15 @@ private:
 
 public:
   /// If \p nominal is bridged to an Objective-C class (via a conformance to
-  /// _ObjectiveCBridgeable), return that class.
+  /// _ObjectiveCBridgeable) and is not an imported Clang type or a known type,
+  /// return that class.
   ///
   /// Otherwise returns null.
   const ClassDecl *getObjCBridgedClass(const NominalTypeDecl *nominal) {
+    // Print known types as their unbridged type.
+    if (getKnownTypeInfo(nominal))
+      return nullptr;
+
     // Print imported bridgeable decls as their unbridged type.
     if (nominal->hasClangNode())
       return nullptr;
@@ -1390,7 +1312,7 @@ public:
 
     // Determine whether this nominal type is _ObjectiveCBridgeable.
     SmallVector<ProtocolConformance *, 2> conformances;
-    if (!nominal->lookupConformance(&owningPrinter.M, proto, conformances))
+    if (!nominal->lookupConformance(proto, conformances))
       return nullptr;
 
     // Dig out the Objective-C type.
@@ -1597,6 +1519,10 @@ private:
     os << " */";
   }
 
+  void visitErrorType(ErrorType *Ty, Optional<OptionalTypeKind> optionalKind) {
+    os << "/* error */id";
+  }
+
   bool isClangPointerType(const clang::TypeDecl *clangTypeDecl) const {
     ASTContext &ctx = getASTContext();
     auto &clangASTContext = ctx.getClangModuleLoader()->getClangASTContext();
@@ -1709,7 +1635,7 @@ private:
       auto *clangDecl = SD->getClangDecl();
       if (!clangDecl)
         return false;
-      return clangDecl->hasAttr<clang::SwiftNewtypeAttr>();
+      return clangDecl->hasAttr<clang::SwiftNewTypeAttr>();
     };
 
     // Use the type as bridged to Objective-C unless the element type is itself
@@ -1717,10 +1643,7 @@ private:
     const StructDecl *SD = ty->getStructOrBoundGenericStruct();
     if (ty->isAny()) {
       ty = ctx.getAnyObjectType();
-    } else if (SD != ctx.getArrayDecl() &&
-        SD != ctx.getDictionaryDecl() &&
-        SD != ctx.getSetDecl() &&
-        !isSwiftNewtype(SD)) {
+    } else if (!ty->isKnownStdlibCollectionType() && !isSwiftNewtype(SD)) {
       ty = ctx.getBridgedToObjC(&owningPrinter.M, ty);
     }
 
@@ -1733,13 +1656,9 @@ private:
   /// it out.
   bool printIfKnownGenericStruct(const BoundGenericStructType *BGT,
                                  Optional<OptionalTypeKind> optionalKind) {
-    StructDecl *SD = BGT->getDecl();
-    if (!SD->getModuleContext()->isStdlibModule())
-      return false;
+    auto bgsTy = Type(const_cast<BoundGenericStructType *>(BGT));
 
-    ASTContext &ctx = getASTContext();
-
-    if (SD == ctx.getUnmanagedDecl()) {
+    if (bgsTy->isUnmanaged()) {
       auto args = BGT->getGenericArgs();
       assert(args.size() == 1);
       visitPart(args.front(), optionalKind);
@@ -1749,10 +1668,10 @@ private:
 
     // Everything from here on is some kind of pointer type.
     bool isConst;
-    if (SD == ctx.getUnsafePointerDecl()) {
+    if (bgsTy->isUnsafePointer()) {
       isConst = true;
-    } else if (SD == ctx.getAutoreleasingUnsafeMutablePointerDecl() ||
-               SD == ctx.getUnsafeMutablePointerDecl()) {
+    } else if (bgsTy->isAutoreleasingUnsafeMutablePointer() ||
+               bgsTy->isUnsafeMutablePointer()) {
       isConst = false;
     } else {
       // Not a pointer.
@@ -2098,7 +2017,7 @@ auto DeclAndTypePrinter::getImpl() -> Implementation {
 }
 
 bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
-  return isVisibleToObjC(VD, minRequiredAccess) &&
+  return !VD->isInvalid() && isVisibleToObjC(VD, minRequiredAccess) &&
          !VD->getAttrs().hasAttribute<ImplementationOnlyAttr>();
 }
 

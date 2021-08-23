@@ -25,8 +25,27 @@
 #include "llvm/Support/YAMLTraits.h"
 #include <forward_list>
 
+namespace swift {
+namespace json {
+
+/// Input to the llvm::yaml / json parser that deserialises to a \c RawSyntax
+/// tree. Contains a \c SyntaxArena in which the tree shall be created.
+class SyntaxInput : public llvm::yaml::Input {
+public:
+  RC<SyntaxArena> Arena;
+
+  SyntaxInput(llvm::StringRef InputContent, const RC<SyntaxArena> &Arena)
+      : llvm::yaml::Input(InputContent), Arena(Arena) {}
+  SyntaxInput(llvm::MemoryBufferRef buffer, const RC<SyntaxArena> &Arena)
+      : llvm::yaml::Input(buffer), Arena(Arena) {}
+};
+} // end namespace json
+} // end namespace swift
+
 namespace llvm {
 namespace yaml {
+
+using swift::json::SyntaxInput;
 
 /// Deserialization traits for SourcePresence.
 template <> struct ScalarEnumerationTraits<swift::SourcePresence> {
@@ -73,16 +92,16 @@ template <> struct SequenceTraits<std::vector<swift::TriviaPiece>> {
 };
 
 /// Deserialization traits for RawSyntax list.
-template <> struct SequenceTraits<std::vector<swift::RC<swift::RawSyntax>>> {
-  static size_t size(IO &in, std::vector<swift::RC<swift::RawSyntax>> &seq) {
+template <> struct SequenceTraits<std::vector<const swift::RawSyntax *>> {
+  static size_t size(IO &in, std::vector<const swift::RawSyntax *> &seq) {
     return seq.size();
   }
-  static swift::RC<swift::RawSyntax> &
-  element(IO &in, std::vector<swift::RC<swift::RawSyntax>> &seq, size_t index) {
+  static const swift::RawSyntax *&
+  element(IO &in, std::vector<const swift::RawSyntax *> &seq, size_t index) {
     if (seq.size() <= index) {
       seq.resize(index + 1);
     }
-    return const_cast<swift::RC<swift::RawSyntax> &>(seq[index]);
+    return const_cast<const swift::RawSyntax *&>(seq[index]);
   }
 };
 
@@ -117,7 +136,7 @@ template <> struct MappingTraits<TokenDescription> {
   }
 };
 
-/// Deserialization traits for RC<RawSyntax>.
+/// Deserialization traits for RawSyntax *.
 /// First it will check whether the node is null.
 /// Then this will be different depending if the raw syntax node is a Token or
 /// not. Token nodes will always have this structure:
@@ -138,10 +157,12 @@ template <> struct MappingTraits<TokenDescription> {
 /// }
 /// ```
 
-template <> struct MappingTraits<swift::RC<swift::RawSyntax>> {
-  static void mapping(IO &in, swift::RC<swift::RawSyntax> &value) {
+template <> struct MappingTraits<const swift::RawSyntax *> {
+  static void mapping(IO &in, const swift::RawSyntax *&value) {
     TokenDescription description;
-    auto input = static_cast<Input *>(&in);
+    // RawSyntax trees must always be generated from a SyntaxInput. Otherwise
+    // we don't have an arena to create the nodes in.
+    auto input = static_cast<SyntaxInput *>(&in);
     /// Check whether this is null
     if (input->getCurrentNode()->getType() != Node::NodeKind::NK_Mapping) {
       return;
@@ -150,36 +171,24 @@ template <> struct MappingTraits<swift::RC<swift::RawSyntax>> {
     if (description.hasValue) {
       swift::tok tokenKind = description.Kind;
       StringRef text = description.Text;
-      std::vector<swift::TriviaPiece> leadingTrivia;
+      StringRef leadingTrivia;
       in.mapRequired("leadingTrivia", leadingTrivia);
-      std::vector<swift::TriviaPiece> trailingTrivia;
+      StringRef trailingTrivia;
       in.mapRequired("trailingTrivia", trailingTrivia);
       swift::SourcePresence presence;
       in.mapRequired("presence", presence);
-      /// FIXME: This is a workaround for existing bug from llvm yaml parser
-      /// which would raise error when deserializing number with trailing
-      /// character like "1\n". See https://bugs.llvm.org/show_bug.cgi?id=15505
-      StringRef nodeIdString;
-      in.mapRequired("id", nodeIdString);
-      unsigned nodeId = std::atoi(nodeIdString.data());
-      value = swift::RawSyntax::make(
-          tokenKind, swift::OwnedString::makeRefCounted(text), leadingTrivia,
-          trailingTrivia, presence, /*Arena=*/nullptr, nodeId);
+      value = swift::RawSyntax::makeAndCalcLength(
+          tokenKind, text, leadingTrivia, trailingTrivia, presence,
+          input->Arena);
     } else {
       swift::SyntaxKind kind;
       in.mapRequired("kind", kind);
-      std::vector<swift::RC<swift::RawSyntax>> layout;
+      std::vector<const swift::RawSyntax *> layout;
       in.mapRequired("layout", layout);
       swift::SourcePresence presence;
       in.mapRequired("presence", presence);
-      /// FIXME: This is a workaround for existing bug from llvm yaml parser
-      /// which would raise error when deserializing number with trailing
-      /// character like "1\n". See https://bugs.llvm.org/show_bug.cgi?id=15505
-      StringRef nodeIdString;
-      in.mapRequired("id", nodeIdString);
-      unsigned nodeId = std::atoi(nodeIdString.data());
-      value = swift::RawSyntax::make(kind, layout, presence, /*Arena=*/nullptr,
-                                     nodeId);
+      value =
+          swift::RawSyntax::make(kind, layout, presence, input->Arena);
     }
   }
 };
@@ -190,15 +199,19 @@ template <> struct MappingTraits<swift::RC<swift::RawSyntax>> {
 namespace swift {
 namespace json {
 class SyntaxDeserializer {
-  llvm::yaml::Input Input;
+  SyntaxInput Input;
 
 public:
-  SyntaxDeserializer(llvm::StringRef InputContent) : Input(InputContent) {}
-  SyntaxDeserializer(llvm::MemoryBufferRef buffer) : Input(buffer) {}
+  SyntaxDeserializer(llvm::StringRef InputContent,
+                     RC<SyntaxArena> Arena = SyntaxArena::make())
+      : Input(InputContent, Arena) {}
+  SyntaxDeserializer(llvm::MemoryBufferRef buffer,
+                     RC<SyntaxArena> Arena = SyntaxArena::make())
+      : Input(buffer, Arena) {}
   llvm::Optional<swift::SourceFileSyntax> getSourceFileSyntax() {
-    swift::RC<swift::RawSyntax> raw;
+    const swift::RawSyntax *raw;
     Input >> raw;
-    return swift::make<swift::SourceFileSyntax>(raw);
+    return swift::makeRoot<swift::SourceFileSyntax>(raw);
   }
 };
 } // namespace json

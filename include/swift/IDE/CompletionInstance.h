@@ -49,6 +49,7 @@ class CompletionInstance {
   llvm::sys::TimePoint<> DependencyCheckedTimestamp;
   llvm::StringMap<llvm::hash_code> InMemoryDependencyHash;
   unsigned CachedReuseCount = 0;
+  std::atomic<bool> CachedCIShouldBeInvalidated;
 
   void cacheCompilerInstance(std::unique_ptr<CompilerInstance> CI,
                              llvm::hash_code ArgsHash);
@@ -80,8 +81,13 @@ class CompletionInstance {
       llvm::function_ref<void(CompilerInstance &, bool)> Callback);
 
 public:
-  CompletionInstance() {}
+  CompletionInstance() : CachedCIShouldBeInvalidated(false) {}
 
+  // Mark the cached compiler instance "should be invalidated". In the next
+  // completion, new compiler instance will be used. (Thread safe.)
+  void markCachedCompilerInstanceShouldBeInvalidated();
+
+  // Update options with \c NewOpts. (Thread safe.)
   void setOptions(Options NewOpts);
 
   /// Calls \p Callback with a \c CompilerInstance which is prepared for the

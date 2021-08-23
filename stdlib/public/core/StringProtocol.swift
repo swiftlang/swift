@@ -43,7 +43,7 @@ public protocol StringProtocol
   var unicodeScalars: UnicodeScalarView { get }
 
   func hasPrefix(_ prefix: String) -> Bool
-  func hasSuffix(_ prefix: String) -> Bool
+  func hasSuffix(_ suffix: String) -> Bool
 
   func lowercased() -> String
   func uppercased() -> String
@@ -153,7 +153,7 @@ extension StringProtocol {
       let end = endIndex
       _internalInvariant(
         start.transcodedOffset == 0 && end.transcodedOffset == 0)
-      return Range(uncheckedBounds: (start._encodedOffset, end._encodedOffset))
+      return Range(_uncheckedBounds: (start._encodedOffset, end._encodedOffset))
     }
   }
 

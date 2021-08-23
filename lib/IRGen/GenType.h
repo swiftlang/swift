@@ -27,6 +27,12 @@
 #include "IRGenFunction.h"
 #include "LegacyLayoutFormat.h"
 
+namespace llvm {
+  namespace vfs {
+    class FileSystem;
+  }
+}
+
 namespace swift {
   class GenericSignatureBuilder;
   class ArchetypeType;
@@ -103,11 +109,13 @@ private:
   const LoadableTypeInfo *UnknownObjectTI = nullptr;
   const LoadableTypeInfo *BridgeObjectTI = nullptr;
   const LoadableTypeInfo *RawPointerTI = nullptr;
+  const LoadableTypeInfo *RawUnsafeContinuationTI = nullptr;
+  const LoadableTypeInfo *JobTI = nullptr;
+  const LoadableTypeInfo *ExecutorTI = nullptr;
   const LoadableTypeInfo *WitnessTablePtrTI = nullptr;
   const TypeInfo *TypeMetadataPtrTI = nullptr;
   const TypeInfo *SwiftContextPtrTI = nullptr;
   const TypeInfo *TaskContinuationFunctionPtrTI = nullptr;
-  const TypeInfo *SwiftExecutorPtrTI = nullptr;
   const TypeInfo *ObjCClassPtrTI = nullptr;
   const LoadableTypeInfo *EmptyTI = nullptr;
   const LoadableTypeInfo *IntegerLiteralTI = nullptr;
@@ -133,9 +141,6 @@ private:
 
   const LoadableTypeInfo *createPrimitive(llvm::Type *T,
                                           Size size, Alignment align);
-  const LoadableTypeInfo *createPrimitiveForAlignedPointer(llvm::PointerType *T,
-                                                   Size size, Alignment align,
-                                                   Alignment pointerAlignment);
   const FixedTypeInfo *createImmovable(llvm::Type *T,
                                        Size size, Alignment align);
 
@@ -183,10 +188,12 @@ public:
   const LoadableTypeInfo &getUnknownObjectTypeInfo();
   const LoadableTypeInfo &getBridgeObjectTypeInfo();
   const LoadableTypeInfo &getRawPointerTypeInfo();
+  const LoadableTypeInfo &getRawUnsafeContinuationTypeInfo();
+  const LoadableTypeInfo &getJobTypeInfo();
+  const LoadableTypeInfo &getExecutorTypeInfo();
   const TypeInfo &getTypeMetadataPtrTypeInfo();
   const TypeInfo &getSwiftContextPtrTypeInfo();
   const TypeInfo &getTaskContinuationFunctionPtrTypeInfo();
-  const TypeInfo &getSwiftExecutorPtrTypeInfo();
   const TypeInfo &getObjCClassPtrTypeInfo();
   const LoadableTypeInfo &getWitnessTablePtrTypeInfo();
   const LoadableTypeInfo &getEmptyTypeInfo();

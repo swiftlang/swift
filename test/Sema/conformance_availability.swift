@@ -16,7 +16,7 @@ public struct HasUnavailableConformance1 {}
 
 @available(*, unavailable)
 extension HasUnavailableConformance1 : Horse {}
-// expected-note@-1 7{{conformance of 'HasUnavailableConformance1' to 'Horse' has been explicitly marked unavailable here}}
+// expected-note@-1 4{{conformance of 'HasUnavailableConformance1' to 'Horse' has been explicitly marked unavailable here}}
 
 func passUnavailableConformance1(x: HasUnavailableConformance1) {
   takesHorse(x) // expected-error {{conformance of 'HasUnavailableConformance1' to 'Horse' is unavailable}}
@@ -26,9 +26,9 @@ func passUnavailableConformance1(x: HasUnavailableConformance1) {
 
 @available(*, unavailable)
 func passUnavailableConformance1a(x: HasUnavailableConformance1) {
-  takesHorse(x) // expected-error {{conformance of 'HasUnavailableConformance1' to 'Horse' is unavailable}}
-  x.giddyUp() // expected-error {{conformance of 'HasUnavailableConformance1' to 'Horse' is unavailable}}
-  _ = UsesHorse<HasUnavailableConformance1>.self // expected-error {{conformance of 'HasUnavailableConformance1' to 'Horse' is unavailable}}
+  takesHorse(x)
+  x.giddyUp()
+  _ = UsesHorse<HasUnavailableConformance1>.self
 }
 
 // Platform unavailability
@@ -322,3 +322,44 @@ func usesUnavailableHashable(_ c: UnavailableHashable) {
   // expected-error@-1 2 {{conformance of 'UnavailableHashable' to 'Hashable' is only available in macOS 100 or newer}}
   // expected-note@-2 2 {{add 'if #available' version check}}
 }
+
+// Actually make sure we check witness availability correctly.
+protocol Vehicle {
+  func move() // expected-note {{protocol requirement here}}
+}
+
+@available(macOS 100, *)
+struct Pony : Vehicle {
+  func move() {}
+}
+
+struct Bike {}
+
+@available(macOS 100, *)
+extension Bike : Vehicle {
+  func move() {}
+}
+
+class Car {}
+class ClownCar : Car {}
+
+@available(macOS 200, *)
+extension Car {
+  func move() {} // expected-note {{'move()' declared here}}
+}
+
+@available(macOS 100, *)
+extension ClownCar : Vehicle {}
+// expected-error@-1 {{protocol 'Vehicle' requires 'move()' to be available in macOS 100 and newer}}
+
+// rdar://problem/75430966 - Allow using unavailable conformances from unavailable contexts.
+@available(*, unavailable)
+public enum UnavailableEnum {
+  case horse
+}
+
+@available(*, unavailable)
+extension UnavailableEnum : Swift.Equatable {}
+
+@available(*, unavailable)
+extension UnavailableEnum : Swift.Hashable {}

@@ -26,6 +26,14 @@ class LibICU(product.Product):
         return True
 
     @classmethod
+    def is_before_build_script_impl_product(cls):
+        """is_before_build_script_impl_product -> bool
+
+        Whether this product is build before any build-script-impl products.
+        """
+        return False
+
+    @classmethod
     def product_source_name(cls):
         """product_source_name() -> str
 

@@ -161,6 +161,10 @@ public:
     return visit(T->getBase());
   }
 
+  FoundResult visitIsolatedTypeRepr(IsolatedTypeRepr *T) {
+    return visit(T->getBase());
+  }
+
   FoundResult visitArrayTypeRepr(ArrayTypeRepr *T) {
     return handleParent(T, T->getBase());
   }
@@ -568,7 +572,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
       }
       return false;
     };
-    if (auto *VD = getReferencedDecl(Call).second.getDecl())
+    if (auto *VD = getReferencedDecl(Call, /*semantic=*/false).second.getDecl())
       if (handleDecl(VD, Call->getSourceRange()))
         return true;
 
@@ -1358,8 +1362,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     llvm::raw_svector_ostream OS(Buffer);
     if (swift::ide::printValueDeclUSR(OD, OS))
       return SourceLoc();
-    return OverridingRemoveNames.find(OS.str()) == OverridingRemoveNames.end() ?
-      SourceLoc() : OverrideLoc;
+    return OverridingRemoveNames.contains(OS.str()) ? OverrideLoc : SourceLoc();
   }
 
   struct SuperRemoval: public ASTWalker {
@@ -1380,7 +1383,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
           auto *RD = DSC->getFn()->getReferencedDecl().getDecl();
           if (swift::ide::printValueDeclUSR(RD, OS))
             return false;
-          return USRs.find(OS.str()) != USRs.end();
+          return USRs.contains(OS.str());
         }
       }
       // We should handle try super.foo() too.

@@ -13,6 +13,8 @@
 #ifndef SWIFT_SERIALIZATION_DESERIALIZATIONERRORS_H
 #define SWIFT_SERIALIZATION_DESERIALIZATIONERRORS_H
 
+#include "ModuleFile.h"
+#include "ModuleFileSharedCore.h"
 #include "ModuleFormat.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Module.h"
@@ -20,12 +22,6 @@
 #include "llvm/Support/PrettyStackTrace.h"
 
 namespace swift {
-class ModuleFile;
-class ModuleFileSharedCore;
-
-StringRef getNameOfModule(const ModuleFile *);
-StringRef getNameOfModule(const ModuleFileSharedCore *);
-
 namespace serialization {
 
 class XRefTracePath {
@@ -276,16 +272,25 @@ class XRefError : public llvm::ErrorInfo<XRefError, DeclDeserializationError> {
 
   XRefTracePath path;
   const char *message;
+  SmallVector<std::string, 2> notes;
 public:
   template <size_t N>
-  XRefError(const char (&message)[N], XRefTracePath path, DeclName name)
-      : path(path), message(message) {
+  XRefError(const char (&message)[N], XRefTracePath path, DeclName name,
+            SmallVector<std::string, 2> notes = {})
+      : path(path), message(message), notes(notes) {
     this->name = name;
   }
 
   void log(raw_ostream &OS) const override {
     OS << message << "\n";
     path.print(OS);
+
+    if (!notes.empty()) {
+      OS << "Notes:\n";
+      for (auto &line : notes) {
+        OS << "* " << line << "\n";
+      }
+    }
   }
 
   std::error_code convertToErrorCode() const override {
@@ -360,9 +365,9 @@ public:
   }
 
   void log(raw_ostream &OS) const override {
-    OS << "could not deserialize type for '" << name << "'";
+    OS << "Could not deserialize type for '" << name << "'";
     if (underlyingReason) {
-      OS << ": ";
+      OS << "\nCaused by: ";
       underlyingReason->log(OS);
     }
   }
@@ -461,7 +466,9 @@ public:
       : PrettyStackTraceModuleFile("While reading from", module) {}
 
   void print(raw_ostream &os) const override {
-    os << Action << " \'" << getNameOfModule(&MF) << "'\n";
+    os << Action << " ";
+    MF.outputDiagnosticInfo(os);
+    os << "\n";
   }
 };
 
@@ -472,7 +479,9 @@ public:
       : MF(module) {}
 
   void print(raw_ostream &os) const override {
-    os << "While reading from \'" << getNameOfModule(&MF) << "'\n";
+    os << "While reading from ";
+    MF.outputDiagnosticInfo(os);
+    os << "\n";
   }
 };
 

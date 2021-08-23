@@ -26,13 +26,6 @@
 
 #include <stdlib.h>
 
-/// Major version changes when there are ABI or source incompatible changes.
-#define SWIFT_REFLECTION_VERSION_MAJOR 3
-
-/// Minor version changes when new APIs are added in ABI- and source-compatible
-/// way.
-#define SWIFT_REFLECTION_VERSION_MINOR 0
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -42,6 +35,16 @@ SWIFT_REMOTE_MIRROR_LINKAGE
 __attribute__((__weak_import__))
 #endif
 extern unsigned long long swift_reflection_classIsSwiftMask;
+
+/// An arbitrary version number for this library. Incremented to indicate the
+/// presence of a bug fix or feature that can't be detected from the outside
+/// otherwise. The currently used version numbers are:
+///
+/// 0 - Indicates that swift_reflection_iterateAsyncTaskAllocations has the
+///     first attempted fix to use the right AsyncTask layout.
+/// 1 - Indicates that swift_reflection_iterateAsyncTaskAllocations has been
+///     actually fixed to use the right AsyncTask layout.
+SWIFT_REMOTE_MIRROR_LINKAGE extern uint32_t swift_reflection_libraryVersion;
 
 /// Get the metadata version supported by the Remote Mirror library.
 SWIFT_REMOTE_MIRROR_LINKAGE
@@ -135,6 +138,13 @@ SWIFT_REMOTE_MIRROR_LINKAGE
 uintptr_t
 swift_reflection_metadataForObject(SwiftReflectionContextRef ContextRef,
                                    uintptr_t Object);
+
+/// Returns the nominal type descriptor given the metadata
+SWIFT_REMOTE_MIRROR_LINKAGE
+swift_reflection_ptr_t
+swift_reflection_metadataNominalTypeDescriptor(SwiftReflectionContextRef ContextRef,
+																							 swift_reflection_ptr_t Metadata);
+
 
 /// Returns an opaque type reference for a class or closure context
 /// instance pointer, or NULL if one can't be constructed.
@@ -246,6 +256,19 @@ int swift_reflection_projectExistential(SwiftReflectionContextRef ContextRef,
                                         swift_typeref_t ExistentialTypeRef,
                                         swift_typeref_t *OutInstanceTypeRef,
                                         swift_addr_t *OutStartOfInstanceData);
+
+/// Like swift_reflection_projectExistential, with 2 differences:
+///
+/// - When dealing with an error existential, this version will dereference 
+///   the ExistentialAddress before proceeding.
+/// - After setting OutInstanceTypeRef and OutStartOfInstanceData this version
+///   may derefence and set OutStartOfInstanceData if OutInstanceTypeRef is a 
+///   class TypeRef.
+SWIFT_REMOTE_MIRROR_LINKAGE
+int swift_reflection_projectExistentialAndUnwrapClass(
+    SwiftReflectionContextRef ContextRef, swift_addr_t ExistentialAddress,
+    swift_typeref_t ExistentialTypeRef, swift_typeref_t *OutInstanceTypeRef,
+    swift_addr_t *OutStartOfInstanceData);
 
 /// Projects the value of an enum.
 ///
@@ -371,6 +394,34 @@ SWIFT_REMOTE_MIRROR_LINKAGE
 const char *swift_reflection_iterateMetadataAllocationBacktraces(
     SwiftReflectionContextRef ContextRef,
     swift_metadataAllocationBacktraceIterator Call, void *ContextPtr);
+
+/// Allocation iterator passed to swift_reflection_iterateAsyncTaskAllocations
+typedef void (*swift_asyncTaskAllocationIterator)(
+    swift_reflection_ptr_t AllocationPtr, unsigned Count,
+    swift_async_task_allocation_chunk_t Chunks[], void *ContextPtr);
+
+/// Iterate over the allocations associated with the given async task object.
+/// This object must have an isa value equal to
+/// _swift_concurrency_debug_asyncTaskMetadata.
+///
+/// Calls the passed in Call function for each allocation associated with the
+/// async task object. The function is passed the allocation pointer and an
+/// array of chunks. Each chunk consists of a start, length, and kind for that
+/// chunk of the allocated memory. Any regions of the allocation that are not
+/// covered by a chunk are unallocated or garbage. The chunk array is valid only
+/// for the duration of the call.
+///
+/// An async task may have more than one allocation associated with it, so the
+/// function may be called more than once. It may also have no allocations, in
+/// which case the function is not called.
+///
+/// Returns NULL on success. On error, returns a pointer to a C string
+/// describing the error. This pointer remains valid until the next
+/// swift_reflection call on the given context.
+SWIFT_REMOTE_MIRROR_LINKAGE
+const char *swift_reflection_iterateAsyncTaskAllocations(
+    SwiftReflectionContextRef ContextRef, swift_reflection_ptr_t AsyncTaskPtr,
+    swift_asyncTaskAllocationIterator Call, void *ContextPtr);
 
 #ifdef __cplusplus
 } // extern "C"

@@ -5,6 +5,9 @@
     },
     {
       "name": "experimental-allow-module-with-compiler-errors"
+    },
+    {
+      "name": "index-unit-output-path"
     }
   ]
 }

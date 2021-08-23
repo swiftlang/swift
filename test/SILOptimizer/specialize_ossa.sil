@@ -702,7 +702,10 @@ bb1:
   %val = integer_literal $Builtin.Int64, 4
   store %val to [trivial] %val_storage : $*Builtin.Int64
   %fn = function_ref @selfReferringGenericClosure : $@convention(thin) <U, V> (@in_guaranteed U, @in_guaranteed V, Builtin.Int64) -> () 
-  %7 = partial_apply %fn<R, Builtin.Int64>(%0, %val_storage, %4) : $@convention(thin) <U, V> (@in_guaranteed U, @in_guaranteed V, Builtin.Int64) -> ()
+  %s = alloc_stack $R
+  copy_addr %0 to [initialization] %s : $*R
+  %7 = partial_apply %fn<R, Builtin.Int64>(%s, %val_storage, %4) : $@convention(thin) <U, V> (@in_guaranteed U, @in_guaranteed V, Builtin.Int64) -> ()
+  dealloc_stack %s : $*R
   dealloc_stack %val_storage : $*Builtin.Int64
   destroy_value %7 : $@callee_owned () -> ()
   br bb3
@@ -725,7 +728,10 @@ bb1:
   %val2 = copy_value %2 : $Builtin.NativeObject
   store %val to [init] %val_storage : $*Builtin.NativeObject
   %fn = function_ref @selfReferringGenericClosure_nontrivial_guaranteed : $@convention(thin) <U, V> (@in_guaranteed U, @in_guaranteed V, @guaranteed Builtin.NativeObject) -> () 
-  %7 = partial_apply %fn<R, Builtin.NativeObject>(%0, %val_storage, %val2) : $@convention(thin) <U, V> (@in_guaranteed U, @in_guaranteed V, @guaranteed Builtin.NativeObject) -> ()
+  %s = alloc_stack $R
+  copy_addr %0 to [initialization] %s : $*R
+  %7 = partial_apply %fn<R, Builtin.NativeObject>(%s, %val_storage, %val2) : $@convention(thin) <U, V> (@in_guaranteed U, @in_guaranteed V, @guaranteed Builtin.NativeObject) -> ()
+  dealloc_stack %s : $*R
   dealloc_stack %val_storage : $*Builtin.NativeObject
   destroy_value %7 : $@callee_owned () -> ()
   br bb3
@@ -748,7 +754,10 @@ bb1:
   %val2 = copy_value %2 : $Builtin.NativeObject
   store %val to [init] %val_storage : $*Builtin.NativeObject
   %fn = function_ref @selfReferringGenericClosure_nontrivial_guaranteed_applied : $@convention(thin) <U, V> (@in_guaranteed U, @in_guaranteed V, @guaranteed Builtin.NativeObject) -> () 
-  %7 = partial_apply %fn<R, Builtin.NativeObject>(%0, %val_storage, %val2) : $@convention(thin) <U, V> (@in_guaranteed U, @in_guaranteed V, @guaranteed Builtin.NativeObject) -> ()
+  %s = alloc_stack $R
+  copy_addr %0 to [initialization] %s : $*R
+  %7 = partial_apply %fn<R, Builtin.NativeObject>(%s, %val_storage, %val2) : $@convention(thin) <U, V> (@in_guaranteed U, @in_guaranteed V, @guaranteed Builtin.NativeObject) -> ()
+  dealloc_stack %s : $*R
   apply %7() :$@callee_owned () -> ()
   dealloc_stack %val_storage : $*Builtin.NativeObject
   br bb3

@@ -4,7 +4,7 @@ public class C {
   public func f() {}
 }
 
-//CHECK-LABEL: sil [serialized] @$s32devirtualize_inlinable_mandatory1gyyAA1CCF : $@convention(thin) (@guaranteed C) -> () {
+//CHECK-LABEL: sil @$s32devirtualize_inlinable_mandatory1gyyAA1CCF : $@convention(thin) (@guaranteed C) -> () {
 //CHECK: class_method %0 : $C, #C.f : (C) -> () -> (), $@convention(method) (@guaranteed C) -> ()
 //CHECK-NOT: function_ref
 //CHECK: return 

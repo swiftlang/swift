@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # utils/run-test - test runner for Swift -*- python -*-
 #
 # This source file is part of the Swift.org open source project
@@ -37,6 +37,7 @@ TEST_SUBSETS = [
     'only_validation',
     'only_long',
     'only_stress',
+    'only_early_swiftdriver'
 ]
 
 SWIFT_SOURCE_DIR = os.path.join(SWIFT_SOURCE_ROOT, 'swift')

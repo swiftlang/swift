@@ -36,13 +36,13 @@ namespace {
 
 /// A TypeInfo implementation for Builtin.IntegerLiteral.
 class IntegerLiteralTypeInfo :
-  public ScalarPairTypeInfo<IntegerLiteralTypeInfo, LoadableTypeInfo> {
+  public TrivialScalarPairTypeInfo<IntegerLiteralTypeInfo, LoadableTypeInfo> {
 
 public:
   IntegerLiteralTypeInfo(llvm::StructType *storageType,
                          Size size, Alignment align, SpareBitVector &&spareBits)
-      : ScalarPairTypeInfo(storageType, size, std::move(spareBits), align,
-                           IsPOD, IsFixedSize) {}
+      : TrivialScalarPairTypeInfo(storageType, size, std::move(spareBits), align,
+                                  IsPOD, IsFixedSize) {}
 
   static Size getFirstElementSize(IRGenModule &IGM) {
     return IGM.getPointerSize();
@@ -50,22 +50,10 @@ public:
   static StringRef getFirstElementLabel() {
     return ".data";
   }
-  static bool isFirstElementTrivial() {
-    return true;
-  }
 
   TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
                                         SILType T) const override {
     return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
-  }
-
-  void emitRetainFirstElement(IRGenFunction &IGF, llvm::Value *fn,
-                              Optional<Atomicity> atomicity = None) const {}
-  void emitReleaseFirstElement(IRGenFunction &IGF, llvm::Value *fn,
-                               Optional<Atomicity> atomicity = None) const {}
-  void emitAssignFirstElement(IRGenFunction &IGF, llvm::Value *fn,
-                              Address fnAddr) const {
-    IGF.Builder.CreateStore(fn, fnAddr);
   }
 
   static Size getSecondElementOffset(IRGenModule &IGM) {
@@ -76,17 +64,6 @@ public:
   }
   static StringRef getSecondElementLabel() {
     return ".flags";
-  }
-  bool isSecondElementTrivial() const {
-    return true;
-  }
-  void emitRetainSecondElement(IRGenFunction &IGF, llvm::Value *data,
-                               Optional<Atomicity> atomicity = None) const {}
-  void emitReleaseSecondElement(IRGenFunction &IGF, llvm::Value *data,
-                                Optional<Atomicity> atomicity = None) const {}
-  void emitAssignSecondElement(IRGenFunction &IGF, llvm::Value *context,
-                               Address dataAddr) const {
-    IGF.Builder.CreateStore(context, dataAddr);
   }
 
   // The data pointer isn't a heap object, but it is an aligned pointer.

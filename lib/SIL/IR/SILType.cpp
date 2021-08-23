@@ -26,6 +26,24 @@
 using namespace swift;
 using namespace swift::Lowering;
 
+/// Find an opened archetype represented by this type.
+/// It is assumed by this method that the type contains
+/// at most one opened archetype.
+/// Typically, it would be called from a type visitor.
+/// It checks only the type itself, but does not try to
+/// recursively check any children of this type, because
+/// this is the task of the type visitor invoking it.
+/// \returns The found archetype or empty type otherwise.
+CanArchetypeType swift::getOpenedArchetypeOf(CanType Ty) {
+  if (!Ty)
+    return CanArchetypeType();
+  while (auto MetaTy = dyn_cast<AnyMetatypeType>(Ty))
+    Ty = MetaTy.getInstanceType();
+  if (Ty->isOpenedExistential())
+    return cast<ArchetypeType>(Ty);
+  return CanArchetypeType();
+}
+
 SILType SILType::getExceptionType(const ASTContext &C) {
   return SILType::getPrimitiveObjectType(C.getExceptionType());
 }
@@ -147,7 +165,7 @@ SILType SILType::getFieldType(VarDecl *field, TypeConverter &TC,
     substFieldTy = origFieldTy.getType();
   } else {
     substFieldTy =
-      getASTType()->getTypeOfMember(&TC.M, field, nullptr)->getCanonicalType();
+      getASTType()->getTypeOfMember(&TC.M, field)->getCanonicalType();
   }
 
   auto loweredTy =
@@ -193,6 +211,12 @@ SILType SILType::getEnumElementType(EnumElementDecl *elt, TypeConverter &TC,
 SILType SILType::getEnumElementType(EnumElementDecl *elt, SILModule &M,
                                     TypeExpansionContext context) const {
   return getEnumElementType(elt, M.Types, context);
+}
+
+SILType SILType::getEnumElementType(EnumElementDecl *elt,
+                                    SILFunction *fn) const {
+  return getEnumElementType(elt, fn->getModule(),
+                            fn->getTypeExpansionContext());
 }
 
 bool SILType::isLoadableOrOpaque(const SILFunction &F) const {
@@ -631,8 +655,8 @@ bool SILType::isDifferentiable(SILModule &M) const {
 
 Type
 TypeBase::replaceSubstitutedSILFunctionTypesWithUnsubstituted(SILModule &M) const {
-  return Type(const_cast<TypeBase*>(this)).transform([&](Type t) -> Type {
-    if (auto f = t->getAs<SILFunctionType>()) {
+  return Type(const_cast<TypeBase *>(this)).transform([&](Type t) -> Type {
+    if (auto *f = t->getAs<SILFunctionType>()) {
       auto sft = f->getUnsubstitutedType(M);
       
       // Also eliminate substituted function types in the arguments, yields,
@@ -692,4 +716,12 @@ bool SILType::isEffectivelyExhaustiveEnumType(SILFunction *f) {
   assert(decl && "Called for a non enum type");
   return decl->isEffectivelyExhaustive(f->getModule().getSwiftModule(),
                                        f->getResilienceExpansion());
+}
+
+SILType SILType::getSILBoxFieldType(const SILFunction *f, unsigned field) {
+  auto *boxTy = getASTType()->getAs<SILBoxType>();
+  if (!boxTy)
+    return SILType();
+  return ::getSILBoxFieldType(f->getTypeExpansionContext(), boxTy,
+                              f->getModule().Types, field);
 }

@@ -17,6 +17,8 @@
 extern "C" {
 SWIFT_REMOTE_MIRROR_LINKAGE
 unsigned long long swift_reflection_classIsSwiftMask = 2;
+
+SWIFT_REMOTE_MIRROR_LINKAGE uint32_t swift_reflection_libraryVersion = 1;
 }
 
 #include "swift/Demangling/Demangler.h"
@@ -282,6 +284,13 @@ swift_reflection_metadataForObject(SwiftReflectionContextRef ContextRef,
   return *MetadataAddress;
 }
 
+swift_reflection_ptr_t
+swift_reflection_metadataNominalTypeDescriptor(SwiftReflectionContextRef ContextRef,
+                                               swift_reflection_ptr_t MetadataAddress) {
+  auto Context = ContextRef->nativeContext;
+  return Context->nominalTypeDescriptorFromMetadata(MetadataAddress);
+}
+
 swift_typeref_t
 swift_reflection_typeRefForInstance(SwiftReflectionContextRef ContextRef,
                                     uintptr_t Object) {
@@ -463,6 +472,30 @@ static swift_childinfo_t convertChild(const TypeInfo *TI, unsigned Index) {
   };
 }
 
+static swift_layout_kind_t convertAllocationChunkKind(
+    NativeReflectionContext::AsyncTaskAllocationChunk::ChunkKind Kind) {
+  switch (Kind) {
+  case NativeReflectionContext::AsyncTaskAllocationChunk::ChunkKind::Unknown:
+    return SWIFT_UNKNOWN;
+  case NativeReflectionContext::AsyncTaskAllocationChunk::ChunkKind::NonPointer:
+    return SWIFT_BUILTIN;
+  case NativeReflectionContext::AsyncTaskAllocationChunk::ChunkKind::RawPointer:
+    return SWIFT_RAW_POINTER;
+  case NativeReflectionContext::AsyncTaskAllocationChunk::ChunkKind::
+      StrongReference:
+    return SWIFT_STRONG_REFERENCE;
+  case NativeReflectionContext::AsyncTaskAllocationChunk::ChunkKind::
+      UnownedReference:
+    return SWIFT_UNOWNED_REFERENCE;
+  case NativeReflectionContext::AsyncTaskAllocationChunk::ChunkKind::
+      WeakReference:
+    return SWIFT_WEAK_REFERENCE;
+  case NativeReflectionContext::AsyncTaskAllocationChunk::ChunkKind::
+      UnmanagedReference:
+    return SWIFT_UNMANAGED_REFERENCE;
+  }
+}
+
 static const char *returnableCString(SwiftReflectionContextRef ContextRef,
                                       llvm::Optional<std::string> String) {
   if (String) {
@@ -547,6 +580,23 @@ int swift_reflection_projectExistential(SwiftReflectionContextRef ContextRef,
   return Success;
 }
 
+int swift_reflection_projectExistentialAndUnwrapClass(SwiftReflectionContextRef ContextRef,
+                                        swift_addr_t ExistentialAddress,
+                                        swift_typeref_t ExistentialTypeRef,
+                                        swift_typeref_t *InstanceTypeRef,
+                                        swift_addr_t *StartOfInstanceData) {
+  auto Context = ContextRef->nativeContext;
+  auto ExistentialTR = reinterpret_cast<const TypeRef *>(ExistentialTypeRef);
+  auto RemoteExistentialAddress = RemoteAddress(ExistentialAddress);
+  auto Pair = Context->projectExistentialAndUnwrapClass(
+      RemoteExistentialAddress, *ExistentialTR);
+  if (!Pair.hasValue())
+    return false;
+  *InstanceTypeRef = reinterpret_cast<swift_typeref_t>(std::get<const TypeRef *>(*Pair));
+  *StartOfInstanceData = std::get<RemoteAddress>(*Pair).getAddressData();
+
+  return true;
+}
 int swift_reflection_projectEnumValue(SwiftReflectionContextRef ContextRef,
                                       swift_addr_t EnumAddress,
                                       swift_typeref_t EnumTypeRef,
@@ -715,6 +765,26 @@ const char *swift_reflection_iterateMetadataAllocationBacktraces(
         std::vector<swift_reflection_ptr_t> ConvertedPtrs{&Ptrs[0],
                                                           &Ptrs[Count]};
         Call(AllocationPtr, Count, ConvertedPtrs.data(), ContextPtr);
+      });
+  return returnableCString(ContextRef, Error);
+}
+
+const char *swift_reflection_iterateAsyncTaskAllocations(
+    SwiftReflectionContextRef ContextRef, swift_reflection_ptr_t AsyncTaskPtr,
+    swift_asyncTaskAllocationIterator Call, void *ContextPtr) {
+  auto Context = ContextRef->nativeContext;
+  auto Error = Context->iterateAsyncTaskAllocations(
+      AsyncTaskPtr, [&](auto AllocationPtr, auto Count, auto Chunks) {
+        std::vector<swift_async_task_allocation_chunk_t> ConvertedChunks;
+        ConvertedChunks.reserve(Count);
+        for (unsigned i = 0; i < Count; i++) {
+          swift_async_task_allocation_chunk_t Chunk;
+          Chunk.Start = Chunks[i].Start;
+          Chunk.Length = Chunks[i].Length;
+          Chunk.Kind = convertAllocationChunkKind(Chunks[i].Kind);
+          ConvertedChunks.push_back(Chunk);
+        }
+        Call(AllocationPtr, Count, ConvertedChunks.data(), ContextPtr);
       });
   return returnableCString(ContextRef, Error);
 }

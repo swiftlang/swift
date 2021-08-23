@@ -30,10 +30,10 @@ internal func _abstract(
 // The two must coexist, so it was renamed. The old name must not be
 // used in the new runtime. _TtCs11_AnyKeyPath is the mangled name for
 // Swift._AnyKeyPath.
-@_objcRuntimeName(_TtCs11_AnyKeyPath)
 
 /// A type-erased key path, from any root type to any resulting value
 /// type.
+@_objcRuntimeName(_TtCs11_AnyKeyPath)
 public class AnyKeyPath: Hashable, _AppendKeyPath {
   /// The root type for this key path.
   @inlinable
@@ -748,7 +748,7 @@ internal enum KeyPathComponent: Hashable {
 internal final class ClassHolder<ProjectionType> {
 
   /// The type of the scratch record passed to the runtime to record
-  /// accesses to guarantee exlcusive access.
+  /// accesses to guarantee exclusive access.
   internal typealias AccessRecord = Builtin.UnsafeValueBuffer
 
   internal var previous: AnyObject?
@@ -1932,6 +1932,11 @@ func _modifyAtWritableKeyPath_impl<Root, Value>(
   root: inout Root,
   keyPath: WritableKeyPath<Root, Value>
 ) -> (UnsafeMutablePointer<Value>, AnyObject?) {
+  if type(of: keyPath).kind == .reference {
+    return _modifyAtReferenceWritableKeyPath_impl(root: root,
+      keyPath: _unsafeUncheckedDowncast(keyPath,
+        to: ReferenceWritableKeyPath<Root, Value>.self))
+  }
   return keyPath._projectMutableAddress(from: &root)
 }
 
@@ -3677,3 +3682,4 @@ internal func _instantiateKeyPathBuffer(
       as: RawKeyPathComponent.Header.self)
   }
 }
+

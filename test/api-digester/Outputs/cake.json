@@ -4,6 +4,30 @@
   "printedName": "TopLevel",
   "children": [
     {
+      "kind": "Import",
+      "name": "SwiftOnoneSupport",
+      "printedName": "SwiftOnoneSupport",
+      "declKind": "Import",
+      "moduleName": "cake"
+    },
+    {
+      "kind": "Import",
+      "name": "_Concurrency",
+      "printedName": "_Concurrency",
+      "declKind": "Import",
+      "moduleName": "cake"
+    },
+    {
+      "kind": "Import",
+      "name": "cake",
+      "printedName": "cake",
+      "declKind": "Import",
+      "moduleName": "cake",
+      "declAttributes": [
+        "Exported"
+      ]
+    },
+    {
       "kind": "TypeDecl",
       "name": "P1",
       "printedName": "P1",
@@ -149,6 +173,12 @@
           "name": "P1",
           "printedName": "P1",
           "usr": "s:4cake2P1P"
+        },
+        {
+          "kind": "Conformance",
+          "name": "Sendable",
+          "printedName": "Sendable",
+          "usr": "s:s8SendableP"
         },
         {
           "kind": "Conformance",
@@ -539,21 +569,35 @@
           "moduleName": "cake"
         },
         {
-          "kind": "TypeAlias",
-          "name": "RawValue",
-          "printedName": "RawValue",
+          "kind": "Function",
+          "name": "__derived_enum_equals",
+          "printedName": "__derived_enum_equals(_:_:)",
           "children": [
             {
               "kind": "TypeNominal",
-              "name": "Int",
-              "printedName": "Swift.Int",
-              "usr": "s:Si"
+              "name": "Bool",
+              "printedName": "Swift.Bool",
+              "usr": "s:Sb"
+            },
+            {
+              "kind": "TypeNominal",
+              "name": "Number",
+              "printedName": "cake.Number",
+              "usr": "s:4cake6NumberO"
+            },
+            {
+              "kind": "TypeNominal",
+              "name": "Number",
+              "printedName": "cake.Number",
+              "usr": "s:4cake6NumberO"
             }
           ],
-          "declKind": "TypeAlias",
-          "usr": "s:4cake6NumberO8RawValuea",
+          "declKind": "Func",
+          "usr": "s:4cake6NumberO21__derived_enum_equalsySbAC_ACtFZ",
           "moduleName": "cake",
-          "implicit": true
+          "static": true,
+          "implicit": true,
+          "funcSelfKind": "NonMutating"
         },
         {
           "kind": "Constructor",
@@ -589,6 +633,23 @@
             "Inlinable"
           ],
           "init_kind": "Designated"
+        },
+        {
+          "kind": "TypeAlias",
+          "name": "RawValue",
+          "printedName": "RawValue",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Int",
+              "printedName": "Swift.Int",
+              "usr": "s:Si"
+            }
+          ],
+          "declKind": "TypeAlias",
+          "usr": "s:4cake6NumberO8RawValuea",
+          "moduleName": "cake",
+          "implicit": true
         },
         {
           "kind": "Var",
@@ -789,6 +850,14 @@
       "moduleName": "cake",
       "declAttributes": [
         "Frozen"
+      ],
+      "conformances": [
+        {
+          "kind": "Conformance",
+          "name": "Sendable",
+          "printedName": "Sendable",
+          "usr": "s:s8SendableP"
+        }
       ]
     },
     {
@@ -1090,10 +1159,6 @@
           "usr": "s:4cake6PSuperPAAE9futureFooyyF",
           "moduleName": "cake",
           "genericSig": "<Self where Self : cake.PSuper>",
-          "intro_Macosx": "10.15",
-          "intro_iOS": "13",
-          "intro_tvOS": "13",
-          "intro_watchOS": "6",
           "funcSelfKind": "NonMutating"
         }
       ],
@@ -1592,6 +1657,12 @@
           "name": "Equatable",
           "printedName": "Equatable",
           "usr": "s:SQ"
+        },
+        {
+          "kind": "Conformance",
+          "name": "Sendable",
+          "printedName": "Sendable",
+          "usr": "s:s8SendableP"
         },
         {
           "kind": "Conformance",

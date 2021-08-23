@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-clang -c %S/Inputs/static-member-var.cpp -I %S/Inputs -o %t/static-member-var.o -std=c++11
-// RUN: %target-build-swift %s -I %S/Inputs -o %t/statics %t/static-member-var.o -Xfrontend -enable-cxx-interop -Xcc -std=c++11
+// RUN: %target-clangxx -c %S/Inputs/static-member-var.cpp -I %S/Inputs -o %t/static-member-var.o
+// RUN: %target-build-swift %s -I %S/Inputs -o %t/statics %t/static-member-var.o -Xfrontend -enable-cxx-interop
 // RUN: %target-codesign %t/statics
 // RUN: %target-run %t/statics
 //
@@ -88,6 +88,11 @@ StaticMemberVarTestSuite.test("const-static-member") {
 StaticMemberVarTestSuite.test("no-collisions") {
   expectEqual(144, ClassA.notUniqueName)
   expectEqual(169, ClassB.notUniqueName)
+}
+
+StaticMemberVarTestSuite.test("init-struct-with-static-member") {
+  let obj = WithStaticAndInstanceMember(myInstance: 123)
+  expectEqual(123, obj.myInstance)
 }
 
 runAllTests()

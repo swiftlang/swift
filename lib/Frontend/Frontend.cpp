@@ -20,7 +20,6 @@
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/FileSystem.h"
-#include "swift/AST/IncrementalRanges.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/FileTypes.h"
@@ -41,6 +40,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Error.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Process.h"
@@ -105,16 +105,6 @@ std::string CompilerInvocation::getReferenceDependenciesFilePathForPrimary(
       .SupplementaryOutputs.ReferenceDependenciesFilePath;
 }
 std::string
-CompilerInvocation::getSwiftRangesFilePathForPrimary(StringRef filename) const {
-  return getPrimarySpecificPathsForPrimary(filename)
-      .SupplementaryOutputs.SwiftRangesFilePath;
-}
-std::string CompilerInvocation::getCompiledSourceFilePathForPrimary(
-    StringRef filename) const {
-  return getPrimarySpecificPathsForPrimary(filename)
-      .SupplementaryOutputs.CompiledSourceFilePath;
-}
-std::string
 CompilerInvocation::getSerializedDiagnosticsPathForAtMostOnePrimary() const {
   return getPrimarySpecificPathsForAtMostOnePrimary()
       .SupplementaryOutputs.SerializedDiagnosticsPath;
@@ -124,14 +114,6 @@ std::string CompilerInvocation::getTBDPathForWholeModule() const {
          "TBDPath only makes sense when the whole module can be seen");
   return getPrimarySpecificPathsForAtMostOnePrimary()
       .SupplementaryOutputs.TBDPath;
-}
-
-std::string
-CompilerInvocation::getLdAddCFileOutputPathForWholeModule() const {
-  assert(getFrontendOptions().InputsAndOutputs.isWholeModule() &&
-         "LdAdd cfile only makes sense when the whole module can be seen");
-  return getPrimarySpecificPathsForAtMostOnePrimary()
-    .SupplementaryOutputs.LdAddCFilePath;
 }
 
 std::string
@@ -164,7 +146,24 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
   if (opts.SerializeBridgingHeader && !outs.ModuleOutputPath.empty())
     serializationOpts.ImportedHeader = opts.ImplicitObjCHeaderPath;
   serializationOpts.ModuleLinkName = opts.ModuleLinkName;
+  serializationOpts.UserModuleVersion = opts.UserModuleVersion;
   serializationOpts.ExtraClangOptions = getClangImporterOptions().ExtraArgs;
+  serializationOpts.PublicDependentLibraries =
+      getIRGenOptions().PublicLinkLibraries;
+
+  if (opts.EmitSymbolGraph) {
+    if (!opts.SymbolGraphOutputDir.empty()) {
+      serializationOpts.SymbolGraphOutputDir = opts.SymbolGraphOutputDir;
+    } else {
+      serializationOpts.SymbolGraphOutputDir = serializationOpts.OutputPath;
+    }
+    SmallString<256> OutputDir(serializationOpts.SymbolGraphOutputDir);
+    llvm::sys::fs::make_absolute(OutputDir);
+    serializationOpts.SymbolGraphOutputDir = OutputDir.str().str();
+  }
+  serializationOpts.SkipSymbolGraphInheritedDocs = opts.SkipInheritedDocs;
+  serializationOpts.IncludeSPISymbolsInSymbolGraph = opts.IncludeSPISymbolsInSymbolGraph;
+  
   if (!getIRGenOptions().ForceLoadSymbolName.empty())
     serializationOpts.AutolinkForceLoad = true;
 
@@ -173,10 +172,12 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
   // the public.
   serializationOpts.SerializeOptionsForDebugging =
       opts.SerializeOptionsForDebugging.getValueOr(
-          !isModuleExternallyConsumed(module));
+          !module->isExternallyConsumed());
 
-  serializationOpts.ExperimentalCrossModuleIncrementalInfo =
-      opts.EnableExperimentalCrossModuleIncrementalBuild;
+  serializationOpts.DisableCrossModuleIncrementalInfo =
+      opts.DisableCrossModuleIncrementalBuild;
+
+  serializationOpts.StaticLibrary = opts.Static;
 
   return serializationOpts;
 }
@@ -205,10 +206,16 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
     return false;
   }
 
+  // For the time being, we only need to record dependencies in batch mode
+  // and single file builds.
+  Invocation.getLangOptions().RecordRequestReferences
+    = !isWholeModuleCompilation();
+
   Context.reset(ASTContext::get(
       Invocation.getLangOptions(), Invocation.getTypeCheckerOptions(),
       Invocation.getSearchPathOptions(),
       Invocation.getClangImporterOptions(),
+      Invocation.getSymbolGraphOptions(),
       SourceMgr, Diagnostics));
   registerParseRequestFunctions(Context->evaluator);
   registerTypeCheckerRequestFunctions(Context->evaluator);
@@ -285,15 +292,32 @@ void CompilerInstance::setupStatsReporter() {
   Stats = std::move(Reporter);
 }
 
-void CompilerInstance::setupDiagnosticVerifierIfNeeded() {
+bool CompilerInstance::setupDiagnosticVerifierIfNeeded() {
   auto &diagOpts = Invocation.getDiagnosticOptions();
+  bool hadError = false;
+
   if (diagOpts.VerifyMode != DiagnosticOptions::NoVerify) {
     DiagVerifier = std::make_unique<DiagnosticVerifier>(
         SourceMgr, InputSourceCodeBufferIDs,
         diagOpts.VerifyMode == DiagnosticOptions::VerifyAndApplyFixes,
         diagOpts.VerifyIgnoreUnknown);
+    for (const auto &filename : diagOpts.AdditionalVerifierFiles) {
+      auto result = getFileSystem().getBufferForFile(filename);
+      if (!result) {
+        Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file,
+                             filename, result.getError().message());
+        hadError |= true;
+        continue;
+      }
+
+      auto bufferID = SourceMgr.addNewSourceBuffer(std::move(result.get()));
+      DiagVerifier->appendAdditionalBufferID(bufferID);
+    }
+
     addDiagnosticConsumer(DiagVerifier.get());
   }
+
+  return hadError;
 }
 
 void CompilerInstance::setupDependencyTrackerIfNeeded() {
@@ -321,21 +345,10 @@ void CompilerInstance::setupDependencyTrackerIfNeeded() {
   DepTracker = std::make_unique<DependencyTracker>(*collectionMode);
 }
 
-void CompilerInstance::setUpModuleDependencyCacheIfNeeded() {
-  const auto &Invocation = getInvocation();
-  const auto &opts = Invocation.getFrontendOptions();
-  if (opts.RequestedAction == FrontendOptions::ActionType::ScanDependencies ||
-      opts.RequestedAction == FrontendOptions::ActionType::ScanClangDependencies) {
-    ModDepCache = std::make_unique<ModuleDependenciesCache>();
-  }
-}
-
 bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   Invocation = Invok;
 
   setupDependencyTrackerIfNeeded();
-
-  setUpModuleDependencyCacheIfNeeded();
 
   // If initializing the overlay file system fails there's no sense in
   // continuing because the compiler will read the wrong files.
@@ -353,7 +366,9 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
     return true;
 
   setupStatsReporter();
-  setupDiagnosticVerifierIfNeeded();
+
+  if (setupDiagnosticVerifierIfNeeded())
+    return true;
 
   return false;
 }
@@ -376,7 +391,7 @@ static bool loadAndValidateVFSOverlay(
     Diag.diagnose(SourceLoc(), diag::invalid_vfs_overlay_file, File);
     return true;
   }
-  OverlayFS->pushOverlay(VFS);
+  OverlayFS->pushOverlay(std::move(VFS));
   return false;
 }
 
@@ -429,6 +444,8 @@ void CompilerInstance::setUpDiagnosticOptions() {
   }
   Diagnostics.setDiagnosticDocumentationPath(
       Invocation.getDiagnosticOptions().DiagnosticDocumentationPath);
+  Diagnostics.setLanguageVersion(
+      Invocation.getLangOptions().EffectiveLanguageVersion);
   if (!Invocation.getDiagnosticOptions().LocalizationCode.empty()) {
     Diagnostics.setLocalization(
         Invocation.getDiagnosticOptions().LocalizationCode,
@@ -510,8 +527,10 @@ bool CompilerInstance::setUpModuleLoaders() {
   auto &FEOpts = Invocation.getFrontendOptions();
   ModuleInterfaceLoaderOptions LoaderOpts(FEOpts);
   Context->addModuleInterfaceChecker(
-    std::make_unique<ModuleInterfaceCheckerImpl>(*Context, ModuleCachePath,
-      FEOpts.PrebuiltModuleCachePath, LoaderOpts));
+      std::make_unique<ModuleInterfaceCheckerImpl>(
+          *Context, ModuleCachePath, FEOpts.PrebuiltModuleCachePath,
+          FEOpts.BackupModuleInterfaceDir, LoaderOpts,
+          RequireOSSAModules_t(Invocation.getSILOptions())));
   // If implicit modules are disabled, we need to install an explicit module
   // loader.
   bool ExplicitModuleBuild = Invocation.getFrontendOptions().DisableImplicitModules;
@@ -519,7 +538,6 @@ bool CompilerInstance::setUpModuleLoaders() {
     auto ESML = ExplicitSwiftModuleLoader::create(
         *Context,
         getDependencyTracker(), MLM,
-        Invocation.getSearchPathOptions().ExplicitSwiftModules,
         Invocation.getSearchPathOptions().ExplicitSwiftModuleMap,
         IgnoreSourceInfoFile);
     this->DefaultSerializedLoader = ESML.get();
@@ -550,15 +568,15 @@ bool CompilerInstance::setUpModuleLoaders() {
                                                        ->getClangModuleLoader()->getClangInstance());
     auto &FEOpts = Invocation.getFrontendOptions();
     ModuleInterfaceLoaderOptions LoaderOpts(FEOpts);
-    InterfaceSubContextDelegateImpl ASTDelegate(Context->SourceMgr, Context->Diags,
-                                                Context->SearchPathOpts, Context->LangOpts,
-                                                Context->ClangImporterOpts,
-                                                LoaderOpts,
-                                                /*buildModuleCacheDirIfAbsent*/false,
-                                                ModuleCachePath,
-                                                FEOpts.PrebuiltModuleCachePath,
-                                                FEOpts.SerializeModuleInterfaceDependencyHashes,
-                                                FEOpts.shouldTrackSystemDependencies());
+    InterfaceSubContextDelegateImpl ASTDelegate(
+        Context->SourceMgr, &Context->Diags, Context->SearchPathOpts,
+        Context->LangOpts, Context->ClangImporterOpts, LoaderOpts,
+        /*buildModuleCacheDirIfAbsent*/ false, ModuleCachePath,
+        FEOpts.PrebuiltModuleCachePath,
+        FEOpts.BackupModuleInterfaceDir,
+        FEOpts.SerializeModuleInterfaceDependencyHashes,
+        FEOpts.shouldTrackSystemDependencies(),
+        RequireOSSAModules_t(Invocation.getSILOptions()));
     auto mainModuleName = Context->getIdentifier(FEOpts.ModuleName);
     std::unique_ptr<PlaceholderSwiftModuleScanner> PSMS =
       std::make_unique<PlaceholderSwiftModuleScanner>(*Context,
@@ -599,17 +617,23 @@ bool CompilerInstance::setUpInputs() {
 
   const auto &Inputs =
       Invocation.getFrontendOptions().InputsAndOutputs.getAllInputs();
+  const bool shouldRecover = Invocation.getFrontendOptions()
+                                 .InputsAndOutputs.shouldRecoverMissingInputs();
+
+  bool hasFailed = false;
   for (const InputFile &input : Inputs) {
     bool failed = false;
-    Optional<unsigned> bufferID = getRecordedBufferID(input, failed);
-    if (failed)
-      return true;
+    Optional<unsigned> bufferID =
+        getRecordedBufferID(input, shouldRecover, failed);
+    hasFailed |= failed;
 
     if (!bufferID.hasValue() || !input.isPrimary())
       continue;
 
     recordPrimaryInputBuffer(*bufferID);
   }
+  if (hasFailed)
+    return true;
 
   // Set the primary file to the code-completion point if one exists.
   if (codeCompletionBufferID.hasValue() &&
@@ -621,8 +645,9 @@ bool CompilerInstance::setUpInputs() {
   return false;
 }
 
-Optional<unsigned> CompilerInstance::getRecordedBufferID(const InputFile &input,
-                                                         bool &failed) {
+Optional<unsigned>
+CompilerInstance::getRecordedBufferID(const InputFile &input,
+                                      const bool shouldRecover, bool &failed) {
   if (!input.getBuffer()) {
     if (Optional<unsigned> existingBufferID =
             SourceMgr.getIDForBufferIdentifier(input.getFileName())) {
@@ -630,6 +655,13 @@ Optional<unsigned> CompilerInstance::getRecordedBufferID(const InputFile &input,
     }
   }
   auto buffers = getInputBuffersIfPresent(input);
+
+  // Recover by dummy buffer if requested.
+  if (!buffers.hasValue() && shouldRecover &&
+      input.getType() == file_types::TY_Swift) {
+    buffers = ModuleBuffers(llvm::MemoryBuffer::getMemBuffer(
+        "// missing file\n", input.getFileName()));
+  }
 
   if (!buffers.hasValue()) {
     failed = true;
@@ -660,8 +692,13 @@ Optional<ModuleBuffers> CompilerInstance::getInputBuffersIfPresent(
   // FIXME: Working with filenames is fragile, maybe use the real path
   // or have some kind of FileManager.
   using FileOrError = llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>;
-  FileOrError inputFileOrErr = swift::vfs::getFileOrSTDIN(getFileSystem(),
-                                                          input.getFileName());
+  FileOrError inputFileOrErr =
+    swift::vfs::getFileOrSTDIN(getFileSystem(), input.getFileName(),
+                              /*FileSize*/-1,
+                              /*RequiresNullTerminator*/true,
+                              /*IsVolatile*/false,
+      /*Bad File Descriptor Retry*/getInvocation().getFrontendOptions()
+                               .BadFileDescriptorRetryCount);
   if (!inputFileOrErr) {
     Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file,
                          input.getFileName(),
@@ -718,9 +755,26 @@ CompilerInstance::openModuleDoc(const InputFile &input) {
   return None;
 }
 
+/// Enable Swift concurrency on a per-target basis
+static bool shouldImportConcurrencyByDefault(const llvm::Triple &target) {
+  if (target.isOSDarwin())
+    return true;
+  if (target.isOSWindows())
+    return true;
+  if (target.isOSLinux())
+    return true;
+#if SWIFT_IMPLICIT_CONCURRENCY_IMPORT
+  if (target.isOSWASI())
+    return true;
+  if (target.isOSOpenBSD())
+    return true;
+#endif
+  return false;
+}
+
 bool CompilerInvocation::shouldImportSwiftConcurrency() const {
-  return getLangOptions().EnableExperimentalConcurrency
-      && !getLangOptions().DisableImplicitConcurrencyModuleImport &&
+  return shouldImportConcurrencyByDefault(getLangOptions().Target) &&
+      !getLangOptions().DisableImplicitConcurrencyModuleImport &&
       getFrontendOptions().InputMode !=
         FrontendOptions::ParseInputMode::SwiftModuleInterface;
 }
@@ -752,6 +806,19 @@ bool CompilerInvocation::shouldImportSwiftONoneSupport() const {
          FrontendOptions::doesActionGenerateSIL(options.RequestedAction);
 }
 
+void CompilerInstance::verifyImplicitConcurrencyImport() {
+  if (Invocation.shouldImportSwiftConcurrency() &&
+      !canImportSwiftConcurrency()) {
+    Diagnostics.diagnose(SourceLoc(),
+                         diag::warn_implicit_concurrency_import_failed);
+  }
+}
+
+bool CompilerInstance::canImportSwiftConcurrency() const {
+  return getASTContext().canImportModule(
+      {getASTContext().getIdentifier(SWIFT_CONCURRENCY_NAME), SourceLoc()});
+}
+
 ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
   auto &frontendOpts = Invocation.getFrontendOptions();
 
@@ -776,6 +843,9 @@ ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
     pushImport(SWIFT_ONONE_SUPPORT);
   }
 
+  // FIXME: The canImport check is required for compatibility
+  // with older SDKs. Longer term solution is to have the driver make
+  // the decision on the implicit import: rdar://76996377
   if (Invocation.shouldImportSwiftConcurrency()) {
     switch (imports.StdlibKind) {
     case ImplicitStdlibKind::Builtin:
@@ -783,7 +853,8 @@ ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
       break;
 
     case ImplicitStdlibKind::Stdlib:
-      pushImport(SWIFT_CONCURRENCY_NAME);
+      if (canImportSwiftConcurrency())
+        pushImport(SWIFT_CONCURRENCY_NAME);
       break;
     }
   }
@@ -892,9 +963,15 @@ ModuleDecl *CompilerInstance::getMainModule() const {
       MainModule->setPrivateImportsEnabled();
     if (Invocation.getFrontendOptions().EnableImplicitDynamic)
       MainModule->setImplicitDynamicEnabled();
-
+    if (!Invocation.getFrontendOptions().ModuleABIName.empty()) {
+      MainModule->setABIName(getASTContext().getIdentifier(
+          Invocation.getFrontendOptions().ModuleABIName));
+    }
     if (Invocation.getFrontendOptions().EnableLibraryEvolution)
       MainModule->setResilienceStrategy(ResilienceStrategy::Resilient);
+    if (Invocation.getLangOptions().WarnConcurrency ||
+        Invocation.getLangOptions().isSwiftVersionAtLeast(6))
+      MainModule->setIsConcurrencyChecked(true);
 
     // Register the main module with the AST context.
     Context->addLoadedModule(MainModule);
@@ -925,8 +1002,30 @@ void CompilerInstance::setMainModule(ModuleDecl *newMod) {
 bool CompilerInstance::performParseAndResolveImportsOnly() {
   FrontendStatsTracer tracer(getStatsReporter(), "parse-and-resolve-imports");
 
-  // Resolve imports for all the source files.
   auto *mainModule = getMainModule();
+
+  // Load access notes.
+  if (!Invocation.getFrontendOptions().AccessNotesPath.empty()) {
+    auto accessNotesPath = Invocation.getFrontendOptions().AccessNotesPath;
+
+    auto bufferOrError =
+        swift::vfs::getFileOrSTDIN(getFileSystem(), accessNotesPath);
+    if (bufferOrError) {
+      int sourceID =
+          SourceMgr.addNewSourceBuffer(std::move(bufferOrError.get()));
+      auto buffer =
+          SourceMgr.getLLVMSourceMgr().getMemoryBuffer(sourceID);
+
+      if (auto accessNotesFile = AccessNotesFile::load(*Context, buffer))
+        mainModule->getAccessNotes() = *accessNotesFile;
+    }
+    else {
+      Diagnostics.diagnose(SourceLoc(), diag::access_notes_file_io_error,
+                           accessNotesPath, bufferOrError.getError().message());
+    }
+  }
+
+  // Resolve imports for all the source files.
   for (auto *file : mainModule->getFiles()) {
     if (auto *SF = dyn_cast<SourceFile>(file))
       performImportResolution(*SF);
@@ -969,6 +1068,8 @@ bool CompilerInstance::loadStdlibIfNeeded() {
                          Invocation.getTargetTriple());
     return true;
   }
+
+  verifyImplicitConcurrencyImport();
 
   // If we failed to load, we should have already diagnosed.
   if (M->failedToLoad()) {
@@ -1052,10 +1153,10 @@ CompilerInstance::getSourceFileParsingOptions(bool forPrimary) const {
       opts |= SourceFile::ParsingFlags::DisableDelayedBodies;
   }
 
+  auto typeOpts = getASTContext().TypeCheckerOpts;
   if (forPrimary || isWholeModuleCompilation()) {
     // Disable delayed body parsing for primaries and in WMO, unless
     // forcefully skipping function bodies
-    auto typeOpts = getASTContext().TypeCheckerOpts;
     if (typeOpts.SkipFunctionBodies == FunctionBodySkipping::None)
       opts |= SourceFile::ParsingFlags::DisableDelayedBodies;
   } else {
@@ -1064,9 +1165,10 @@ CompilerInstance::getSourceFileParsingOptions(bool forPrimary) const {
     opts |= SourceFile::ParsingFlags::SuppressWarnings;
   }
 
-  // Enable interface hash computation for primaries, but not in WMO, as it's
-  // only currently needed for incremental mode.
-  if (forPrimary) {
+  // Enable interface hash computation for primaries or emit-module-separately,
+  // but not in WMO, as it's only currently needed for incremental mode.
+  if (forPrimary ||
+      typeOpts.SkipFunctionBodies == FunctionBodySkipping::NonInlinableWithoutTypes) {
     opts |= SourceFile::ParsingFlags::EnableInterfaceHash;
   }
   return opts;
@@ -1196,21 +1298,4 @@ const PrimarySpecificPaths &
 CompilerInstance::getPrimarySpecificPathsForSourceFile(
     const SourceFile &SF) const {
   return Invocation.getPrimarySpecificPathsForSourceFile(SF);
-}
-
-bool CompilerInstance::emitSwiftRanges(DiagnosticEngine &diags,
-                                       SourceFile *primaryFile,
-                                       StringRef outputPath) const {
-  return incremental_ranges::SwiftRangesEmitter(outputPath, primaryFile,
-                                                SourceMgr, diags)
-      .emit();
-  return false;
-}
-
-bool CompilerInstance::emitCompiledSource(DiagnosticEngine &diags,
-                                          const SourceFile *primaryFile,
-                                          StringRef outputPath) const {
-  return incremental_ranges::CompiledSourceEmitter(outputPath, primaryFile,
-                                                   SourceMgr, diags)
-      .emit();
 }

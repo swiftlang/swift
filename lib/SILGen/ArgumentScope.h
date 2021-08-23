@@ -33,7 +33,7 @@ class ArgumentScope {
 
 public:
   ArgumentScope(SILGenFunction &SGF, SILLocation loc)
-      : normalScope(SGF.Cleanups, CleanupLocation::get(loc)),
+      : normalScope(SGF.Cleanups, CleanupLocation(loc)),
         formalEvalScope(SGF), loc(loc) {}
 
   ~ArgumentScope() {

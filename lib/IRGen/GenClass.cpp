@@ -88,7 +88,7 @@ static bool classHasIncompleteLayout(IRGenModule &IGM,
 namespace {
   class ClassLayoutBuilder : public StructLayoutBuilder {
     SmallVector<ElementLayout, 8> Elements;
-    SmallVector<VarDecl*, 8> AllStoredProperties;
+    SmallVector<Field, 8> AllStoredProperties;
     SmallVector<FieldAccess, 8> AllFieldAccesses;
 
     // If we're building a layout with tail-allocated elements, we do
@@ -220,7 +220,9 @@ namespace {
         return;
       }
 
-      if (theClass->hasSuperclass()) {
+      if (theClass->isNativeNSObjectSubclass()) {
+        // For layout purposes, we don't have ObjC ancestry.
+      } else if (theClass->hasSuperclass()) {
         SILType superclassType = classType.getSuperclass();
         auto superclassDecl = superclassType.getClassOrBoundGenericClass();
         assert(superclassType && superclassDecl);
@@ -275,11 +277,22 @@ namespace {
     void addDirectFieldsFromClass(ClassDecl *rootClass, SILType rootClassType,
                                   ClassDecl *theClass, SILType classType,
                                   bool superclass) {
-      for (VarDecl *var : theClass->getStoredProperties()) {
-        SILType type = classType.getFieldType(var, IGM.getSILModule(),
-                                              TypeExpansionContext::minimal());
+      bool collectStoredProperties =
+        !superclass ||
+        (rootClass->isGenericContext() && !rootClassType.getASTType()
+                                               ->getRecursiveProperties()
+                                               .hasUnboundGeneric());
+
+      forEachField(IGM, theClass, [&](Field field) {
+        // Ignore missing properties here; we should have flagged these
+        // with the classHasIncompleteLayout call above.
+        if (!field.isConcrete()) {
+          assert(Options & ClassMetadataFlags::ClassHasMissingMembers);
+          return;
+        }
 
         // Lower the field type.
+        SILType type = field.getType(IGM, classType);
         auto *eltType = &IGM.getTypeInfo(type);
         if (CompletelyFragileLayout && !eltType->isFixedSize()) {
           LoweringModeScope scope(IGM, TypeConverter::Mode::Legacy);
@@ -296,21 +309,16 @@ namespace {
         auto element = ElementLayout::getIncomplete(*eltType);
         bool isKnownEmpty = !addField(element, LayoutStrategy::Universal);
 
-        bool isSpecializedGeneric =
-            (rootClass->isGenericContext() && !rootClassType.getASTType()
-                                                   ->getRecursiveProperties()
-                                                   .hasUnboundGeneric());
-
         // The 'Elements' list only contains superclass fields when we're
         // building a layout for tail allocation.
-        if (!superclass || TailTypes || isSpecializedGeneric)
+        if (collectStoredProperties || TailTypes)
           Elements.push_back(element);
 
-        if (!superclass || isSpecializedGeneric) {
-          AllStoredProperties.push_back(var);
+        if (collectStoredProperties) {
+          AllStoredProperties.push_back(field);
           AllFieldAccesses.push_back(getFieldAccess(isKnownEmpty));
         }
-      }
+      });
 
       if (!superclass) {
         // If we're calculating the layout of a specialized generic class type,
@@ -333,9 +341,9 @@ namespace {
 
           for (unsigned index : indices(AllFieldAccesses)) {
             auto &access = AllFieldAccesses[index];
-            auto *var = AllStoredProperties[index];
+            auto field = AllStoredProperties[index];
             if (access == FieldAccess::NonConstantDirect)
-              access = abstractLayout->getFieldAccessAndElement(var).first;
+              access = abstractLayout->getFieldAccessAndElement(field).first;
           }
         }
 
@@ -868,15 +876,47 @@ static void getInstanceSizeAndAlignMask(IRGenFunction &IGF,
     = emitClassResilientInstanceSizeAndAlignMask(IGF, selfClass, metadata);
 }
 
+static llvm::Value *emitCastToHeapObject(IRGenFunction &IGF,
+                                         llvm::Value *value) {
+  return IGF.Builder.CreateBitCast(value, IGF.IGM.RefCountedPtrTy);
+}
+
 void irgen::emitClassDeallocation(IRGenFunction &IGF, SILType selfType,
                                   llvm::Value *selfValue) {
   auto *theClass = selfType.getClassOrBoundGenericClass();
+
+  // We want to deallocate default actors or potential default
+  // actors differently.  We assume that being a default actor
+  // is purely a property of the root actor class, so just go to
+  // that class.
+  if (auto rootActorClass = theClass->getRootActorClass()) {
+    // If it's a default actor, use swift_deallocDefaultActor.
+    if (rootActorClass->isDefaultActor(IGF.IGM.getSwiftModule(),
+                                       ResilienceExpansion::Maximal)) {
+      selfValue = emitCastToHeapObject(IGF, selfValue);
+      IGF.Builder.CreateCall(IGF.IGM.getDefaultActorDeallocateFn(),
+                             {selfValue});
+      return;
+    }
+
+    // If it's possibly a default actor, use a resilient pattern.
+    if (!rootActorClass->isForeign() &&
+        rootActorClass->isResilient(IGF.IGM.getSwiftModule(),
+                                    ResilienceExpansion::Maximal)) {
+      selfValue = emitCastToHeapObject(IGF, selfValue);
+      IGF.Builder.CreateCall(IGF.IGM.getDefaultActorDeallocateResilientFn(),
+                             {selfValue});
+      return;
+    }
+
+    // Otherwise use the normal path.
+  }
 
   llvm::Value *size, *alignMask;
   getInstanceSizeAndAlignMask(IGF, selfType, theClass, selfValue,
                               size, alignMask);
 
-  selfValue = IGF.Builder.CreateBitCast(selfValue, IGF.IGM.RefCountedPtrTy);
+  selfValue = emitCastToHeapObject(IGF, selfValue);
   emitDeallocateClassInstance(IGF, selfValue, size, alignMask);
 }
 
@@ -1029,7 +1069,7 @@ namespace {
     };
 
     llvm::SmallString<16> CategoryName;
-    SmallVector<VarDecl*, 8> Ivars;
+    SmallVector<Field, 8> Ivars;
     SmallVector<MethodDescriptor, 16> InstanceMethods;
     SmallVector<MethodDescriptor, 16> ClassMethods;
     SmallVector<MethodDescriptor, 16> OptInstanceMethods;
@@ -1068,6 +1108,9 @@ namespace {
         : IGM(IGM), TheEntity(theUnion), TheExtension(nullptr),
           FieldLayout(&fieldLayout) {
       visitConformances(getClass());
+
+      if (getClass()->isRootDefaultActor())
+        Ivars.push_back(Field::DefaultActorStorage);
       visitMembers(getClass());
 
       if (Lowering::usesObjCAllocator(getClass())) {
@@ -1110,8 +1153,19 @@ namespace {
         Protocols.push_back(proto);
       }
 
-      for (Decl *member : theProtocol->getMembers())
+      for (Decl *member : theProtocol->getMembers()) {
+        // Async methods coming from ObjC protocols shouldn't be recorded twice.
+        // At the moment, the language doesn't allow suppressing the
+        // completionHandler-based variant, so this is sufficient.
+        if (theProtocol->hasClangNode() && theProtocol->isObjC()) {
+          if (auto funcOrAccessor = dyn_cast<AbstractFunctionDecl>(member)) {
+            if (funcOrAccessor->isAsyncContext()) {
+              continue;
+            }
+          }
+        }
         visit(member);
+      }
     }
 
     /// Gather protocol records for all of the explicitly-specified Objective-C
@@ -1159,15 +1213,15 @@ namespace {
     void buildMetaclassStub() {
       assert(FieldLayout && "can't build a metaclass from a category");
 
-      auto specializedGenericType = getSpecializedGenericType().map(
-          [](auto canType) { return (Type)canType; });
+      Optional<CanType> specializedGenericType = getSpecializedGenericType();
 
       // The isa is the metaclass pointer for the root class.
       auto rootClass = getRootClassForMetaclass(IGM, getClass());
       Type rootType;
       if (specializedGenericType && rootClass->isGenericContext()) {
         rootType =
-            (*specializedGenericType)->getRootClass(/*useArchetypes=*/false);
+            (*specializedGenericType)->getRootClass(
+               /*useArchetypes=*/false);
       } else {
         rootType = Type();
       }
@@ -1180,11 +1234,11 @@ namespace {
       // If this class has no formal superclass, then its actual
       // superclass is SwiftObject, i.e. the root class.
       llvm::Constant *superPtr;
-      if (getClass()->hasSuperclass()) {
-        auto base = getClass()->getSuperclassDecl();
+      if (auto base = getSuperclassDeclForMetadata(IGM, getClass())) {
         if (specializedGenericType && base->isGenericContext()) {
           superPtr = getMetaclassRefOrNull(
-              (*specializedGenericType)->getSuperclass(/*useArchetypes=*/false),
+              getSuperclassForMetadata(IGM, *specializedGenericType,
+                                       /*useArchetypes=*/false),
               base);
         } else {
           superPtr = getMetaclassRefOrNull(Type(), base);
@@ -1207,10 +1261,10 @@ namespace {
       auto init = llvm::ConstantStruct::get(IGM.ObjCClassStructTy,
                                             makeArrayRef(fields));
       llvm::Constant *uncastMetaclass;
-      if (auto theType = getSpecializedGenericType()) {
+      if (specializedGenericType) {
         uncastMetaclass =
             IGM.getAddrOfCanonicalSpecializedGenericMetaclassObject(
-                *theType, ForDefinition);
+                *specializedGenericType, ForDefinition);
       } else {
         uncastMetaclass =
             IGM.getAddrOfMetaclassObject(getClass(), ForDefinition);
@@ -1440,7 +1494,12 @@ namespace {
       emitRODataFields(fields, forMeta, hasUpdater);
       
       auto dataSuffix = forMeta ? "_METACLASS_DATA_" : "_DATA_";
-      return buildGlobalVariable(fields, dataSuffix, /*const*/ true);
+      
+      // The rodata is constant if the object layout is known entirely
+      // statically. Otherwise, the ObjC runtime may slide the InstanceSize
+      // based on changing base class layout.
+      return buildGlobalVariable(fields, dataSuffix,
+                               /*const*/ forMeta || FieldLayout->isFixedSize());
     }
 
   private:
@@ -1800,20 +1859,26 @@ namespace {
     ///   uint32_t alignment;    // actually the log2 of the alignment
     ///   uint32_t size;
     /// };
-    void buildIvar(ConstantArrayBuilder &ivars, VarDecl *ivar) {
+    void buildIvar(ConstantArrayBuilder &ivars, Field field) {
       assert(FieldLayout && "can't build ivar for category");
-
-      auto fields = ivars.beginStruct();
 
       // For now, we never try to emit specialized versions of the
       // metadata statically, so compute the field layout using the
       // originally-declared type.
-      auto pair = FieldLayout->getFieldAccessAndElement(ivar);
+      auto pair = FieldLayout->getFieldAccessAndElement(field);
 
       llvm::Constant *offsetPtr;
       switch (pair.first) {
       case FieldAccess::ConstantDirect:
       case FieldAccess::NonConstantDirect: {
+        // Default actor storage doesn't get an ivar access variable.
+        if (field.getKind() == Field::DefaultActorStorage) {
+          offsetPtr = nullptr;
+          break;
+        }
+
+        // Otherwise, we should have a normal stored property.
+        auto ivar = field.getVarDecl();
         // If the field offset is fixed relative to the start of the superclass,
         // reference the global from the ivar metadata so that the Objective-C
         // runtime will slide it down.
@@ -1824,22 +1889,28 @@ namespace {
       case FieldAccess::ConstantIndirect:
         // Otherwise, swift_initClassMetadata() will point the Objective-C
         // runtime into the field offset vector of the instantiated metadata.
-        offsetPtr
-          = llvm::ConstantPointerNull::get(IGM.IntPtrTy->getPointerTo());
+        offsetPtr = nullptr;
         break;
       }
 
-      fields.add(offsetPtr);
+      StringRef name = field.getName();
+      const TypeInfo &storageTI = pair.second.getType();
+      auto fields = ivars.beginStruct();
+
+      if (offsetPtr)
+        fields.add(offsetPtr);
+      else
+        fields.addNullPointer(IGM.IntPtrTy->getPointerTo());
 
       // TODO: clang puts this in __TEXT,__objc_methname,cstring_literals
-      fields.add(IGM.getAddrOfGlobalString(ivar->getName().str()));
+      fields.add(IGM.getAddrOfGlobalString(name));
 
       // TODO: clang puts this in __TEXT,__objc_methtype,cstring_literals
       fields.add(IGM.getAddrOfGlobalString(""));
 
       Size size;
       Alignment alignment;
-      if (auto fixedTI = dyn_cast<FixedTypeInfo>(&pair.second.getType())) {
+      if (auto fixedTI = dyn_cast<FixedTypeInfo>(&storageTI)) {
         size = fixedTI->getFixedSize();
         alignment = fixedTI->getFixedAlignment();
       } else {
@@ -1850,7 +1921,7 @@ namespace {
       // If the size is larger than we can represent in 32-bits,
       // complain about the unimplementable ivar.
       if (uint32_t(size.getValue()) != size.getValue()) {
-        IGM.error(ivar->getLoc(),
+        IGM.error(field.getVarDecl()->getLoc(),
                   "ivar size (" + Twine(size.getValue()) +
                   " bytes) overflows Objective-C ivar layout");
         size = Size(0);
@@ -1873,8 +1944,8 @@ namespace {
       return buildOptionalList(Ivars, eltSize, "_IVARS_",
                                /*constant*/ true,
                                [&](ConstantArrayBuilder &descriptors,
-                                   VarDecl *ivar) {
-        buildIvar(descriptors, ivar);
+                                   Field field) {
+        buildIvar(descriptors, field);
       });
     }
 
@@ -2071,6 +2142,15 @@ namespace {
     /// Get the name of the class or protocol to mangle into the ObjC symbol
     /// name.
     StringRef getEntityName(llvm::SmallVectorImpl<char> &buffer) const {
+      if (auto prespecialization = getSpecializedGenericType()) {
+        buffer.clear();
+        llvm::raw_svector_ostream os(buffer);
+        os << LinkEntity::forTypeMetadata(*prespecialization,
+                                          TypeMetadataAddress::FullMetadata)
+                  .mangleAsString();
+        return os.str();
+      }
+
       if (auto theClass = getClass()) {
         return theClass->getObjCRuntimeName(buffer);
       }
@@ -2111,6 +2191,7 @@ namespace {
       case llvm::Triple::Wasm:
         var->setSection(".data");
         break;
+      case llvm::Triple::GOFF:
       case llvm::Triple::UnknownObjectFormat:
         llvm_unreachable("Don't know how to emit private global constants for "
                          "the selected object format.");
@@ -2380,9 +2461,10 @@ ClassDecl *IRGenModule::getObjCRuntimeBaseClass(Identifier name,
 
   // Make a really fake-looking class.
   auto SwiftRootClass = new (Context) ClassDecl(SourceLoc(), name, SourceLoc(),
-                                           ArrayRef<TypeLoc>(),
+                                           ArrayRef<InheritedEntry>(),
                                            /*generics*/ nullptr,
-                                           Context.TheBuiltinModule);
+                                           Context.TheBuiltinModule,
+                                           /*isActor*/false);
   SwiftRootClass->setIsObjC(Context.LangOpts.EnableObjCInterop);
   SwiftRootClass->getAttrs().add(ObjCAttr::createNullary(Context, objcName,
     /*isNameImplicit=*/true));
@@ -2410,6 +2492,13 @@ IRGenModule::getObjCRuntimeBaseForSwiftRootClass(ClassDecl *theClass) {
   return getObjCRuntimeBaseClass(name, name);
 }
 
+/// Lazily declare the base class for a Swift class that inherits from
+/// NSObject but uses native reference-counting.
+ClassDecl *IRGenModule::getSwiftNativeNSObjectDecl() {
+  Identifier name = Context.Id_SwiftNativeNSObject;
+  return getObjCRuntimeBaseClass(name, name);
+}
+
 ClassDecl *irgen::getRootClassForMetaclass(IRGenModule &IGM, ClassDecl *C) {
   while (auto superclass = C->getSuperclassDecl())
     C = superclass;
@@ -2434,6 +2523,33 @@ ClassDecl *irgen::getRootClassForMetaclass(IRGenModule &IGM, ClassDecl *C) {
 
   return IGM.getObjCRuntimeBaseClass(IGM.Context.Id_SwiftObject,
                                      IGM.Context.Id_SwiftObject);
+}
+
+ClassDecl *
+irgen::getSuperclassDeclForMetadata(IRGenModule &IGM, ClassDecl *C) {
+  if (C->isNativeNSObjectSubclass())
+    return IGM.getSwiftNativeNSObjectDecl();
+  return C->getSuperclassDecl();
+}
+
+CanType irgen::getSuperclassForMetadata(IRGenModule &IGM, ClassDecl *C) {
+  if (C->isNativeNSObjectSubclass())
+    return IGM.getSwiftNativeNSObjectDecl()->getDeclaredInterfaceType()
+                                           ->getCanonicalType();
+  if (auto superclass = C->getSuperclass())
+    return superclass->getCanonicalType();
+  return CanType();
+}
+
+CanType irgen::getSuperclassForMetadata(IRGenModule &IGM, CanType type,
+                                        bool useArchetypes) {
+  auto cls = type->getClassOrBoundGenericClass();
+  if (cls->isNativeNSObjectSubclass())
+    return IGM.getSwiftNativeNSObjectDecl()->getDeclaredInterfaceType()
+                                           ->getCanonicalType();
+  if (auto superclass = type->getSuperclass(useArchetypes))
+    return superclass->getCanonicalType();
+  return CanType();
 }
 
 ClassMetadataStrategy
@@ -2515,6 +2631,13 @@ bool irgen::hasKnownSwiftMetadata(IRGenModule &IGM, CanType type) {
 
 /// Is the given class known to have Swift-compatible metadata?
 bool irgen::hasKnownSwiftMetadata(IRGenModule &IGM, ClassDecl *theClass) {
+  // Make sure that the fake declarations we make in getObjcRuntimeBaseClass
+  // are treated this way.
+  if (theClass->getModuleContext()->isBuiltinModule()) {
+    assert(IGM.ObjCInterop);
+    return false;
+  }
+
   // For now, the fact that a declaration was not implemented in Swift
   // is enough to conclusively force us into a slower path.
   // Eventually we might have an attribute here or something based on
@@ -2568,7 +2691,9 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
                                         signature.getType()->getPointerTo(),
                                         IGF.IGM.getPointerAlignment());
     auto fnPtr = IGF.emitInvariantLoad(slot);
-    auto &schema = IGF.getOptions().PointerAuth.SwiftClassMethods;
+    auto &schema = methodType->isAsync()
+                       ? IGF.getOptions().PointerAuth.AsyncSwiftClassMethods
+                       : IGF.getOptions().PointerAuth.SwiftClassMethods;
     auto authInfo =
       PointerAuthInfo::emit(IGF, schema, slot.getAddress(), method);
     return FunctionPointer(methodType, fnPtr, authInfo, signature);
@@ -2576,10 +2701,18 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
   case ClassMetadataLayout::MethodInfo::Kind::DirectImpl: {
     auto fnPtr = llvm::ConstantExpr::getBitCast(methodInfo.getDirectImpl(),
                                            signature.getType()->getPointerTo());
-    return FunctionPointer::forDirect(methodType, fnPtr, signature);
+    llvm::Constant *secondaryValue = nullptr;
+    if (cast<AbstractFunctionDecl>(method.getDecl())->hasAsync()) {
+      auto *silFn = IGF.IGM.getSILFunctionForAsyncFunctionPointer(
+          methodInfo.getDirectImpl());
+      secondaryValue = cast<llvm::Constant>(
+          IGF.IGM.getAddrOfSILFunction(silFn, NotForDefinition));
+    }
+    return FunctionPointer::forDirect(methodType, fnPtr, secondaryValue,
+                                      signature);
   }
   }
-  
+  llvm_unreachable("covered switch");
 }
 
 FunctionPointer

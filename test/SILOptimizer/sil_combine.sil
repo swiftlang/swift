@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -sil-combine | %FileCheck %s
+// RUN: %target-sil-opt -enable-objc-interop -enable-sil-verify-all %s -sil-combine | %FileCheck %s
 
 // Declare this SIL to be canonical because some tests break raw SIL
 // conventions. e.g. address-type block args. -enforce-exclusivity=none is also
@@ -544,21 +544,6 @@ bb0(%0 : $@thin U.Type, %1 : $C):
   return %6 : $(U, U, U)
 }
 
-// RefToRawPointer pointer consumption.
-//
-// (ref_to_raw_pointer (unchecked_ref_cast x))
-//    -> (ref_to_raw_pointer x)
-// CHECK-LABEL: sil @ref_to_raw_pointer_unchecked_ref_cast_composition : $@convention(thin) (C) -> Builtin.RawPointer
-// CHECK: bb0
-// CHECK-NEXT: ref_to_raw_pointer
-// CHECK-NEXT: return
-sil @ref_to_raw_pointer_unchecked_ref_cast_composition : $@convention(thin) (C) -> Builtin.RawPointer {
-bb0(%0 : $C):
-  %1 = unchecked_ref_cast %0 : $C to $Builtin.NativeObject
-  %2 = ref_to_raw_pointer %1 : $Builtin.NativeObject to $Builtin.RawPointer
-  return %2 : $Builtin.RawPointer
-}
-
 // CHECK-LABEL: sil @downcast_upcast_roundtrip
 // CHECK: bb0
 // CHECK-NEXT: return
@@ -567,6 +552,23 @@ bb0(%0 : $HeapBufferStorage<T_0_0, T_0_1>):
   %2 = upcast %0 : $HeapBufferStorage<T_0_0, T_0_1> to $RawBuffer // user: %3
   %3 = unconditional_checked_cast %2 : $RawBuffer to HeapBufferStorage<T_0_0, T_0_1>
   return %3 : $HeapBufferStorage<T_0_0, T_0_1>
+}
+
+class Derived : C {}
+
+// CHECK-LABEL: sil @dead_unconditional_checked_cast :
+// CHECK-NOT:   unconditional_checked_cast
+// CHECK:     bb1:
+// CHECK:       strong_release %0
+// CHECK:     } // end sil function 'dead_unconditional_checked_cast'
+sil @dead_unconditional_checked_cast : $@convention(thin) (@owned C) -> () {
+bb0(%0 : $C):
+  %1 = unconditional_checked_cast %0 : $C to Derived
+  br bb1
+bb1:
+  strong_release %1 : $Derived
+  %r = tuple ()
+  return %r : $()
 }
 
 // CHECK-LABEL: sil @cond_fail_applied_to_zero_removal
@@ -834,6 +836,20 @@ bb0(%0 : $C1):
   strong_retain %1 : $C2
   strong_release %0 : $C1
   return %0 : $C1
+}
+
+// strong_retain/strong_release don't accept an Optional<reference>.
+//
+// CHECK-LABEL: sil @dontOptimizeRefCastOfOptional
+// CHECK:   %1 = unchecked_ref_cast %0
+// CHECK:   strong_retain %1
+// CHECK: } // end sil function 'dontOptimizeRefCastOfOptional'
+sil @dontOptimizeRefCastOfOptional : $@convention(thin) (@guaranteed Optional<C1>) -> () {
+bb0(%0 : $Optional<C1>):
+  %1 = unchecked_ref_cast %0 : $Optional<C1> to $C1
+  strong_retain %1 : $C1
+  %3 = tuple ()
+  return %3 : $()
 }
 
 // CHECK-LABEL: sil @dead_end_cow_mutation
@@ -2342,30 +2358,11 @@ bb0(%0: $MyClass):
   return %3 : $Builtin.NativeObject
 }
 
-// CHECK-LABEL: sil @collapse_existential_pack_unpack_ref_to_raw_pointer
-// CHECK:       bb0([[Ref:%.*]]: $MyClass):
-// CHECK-NOT:     init_existential_ref
-// CHECK-NOT:     open_existential_ref
-// CHECK:         ref_to_raw_pointer [[Ref]]
-
-sil @collapse_existential_pack_unpack_ref_to_raw_pointer : $@convention(thin) (MyClass) -> () {
-bb0(%0: $MyClass):
-  %1 = init_existential_ref %0 : $MyClass : $MyClass, $AnyObject
-  %2 = open_existential_ref %1 : $AnyObject to $@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject
-  %3 = ref_to_raw_pointer %2 : $@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject to $Builtin.RawPointer
-  %4 = pointer_to_address %3 : $Builtin.RawPointer to [strict] $*Builtin.Word
-  %5 = integer_literal $Builtin.Word, 5
-  store %5 to %4: $*Builtin.Word
-  %6 = tuple ()
-  return %6 : $()
-}
-
 // CHECK-LABEL: sil @load_fixlifetime_address
 // CHECK:          [[Stck:%.*]] = alloc_stack
 // CHECK-NOT:                     fix_lifetime [[Stck]]#1
 // CHECK:       [[StckVal:%.*]] = load [[Stck]]
 // CHECK:                         fix_lifetime [[StckVal]]
-
 sil @load_fixlifetime_address : $@convention(thin) (Builtin.NativeObject) -> () {
 bb0(%0: $Builtin.NativeObject):
   %1 = alloc_stack $Builtin.NativeObject
@@ -2376,20 +2373,6 @@ bb0(%0: $Builtin.NativeObject):
   return %6 : $()
 }
 
-// CHECK-LABEL:     sil @collapse_to_unchecked_trivial_bit_cast
-// CHECK:           bb0([[Ref:%.*]]: $Optional<MyClass>):
-// CHECK:             unchecked_trivial_bit_cast [[Ref]]
-// CHECK-NOT:         unchecked_ref_cast
-// CHECK-NOT:         ref_to_raw_pointer
-// CHECK:             return
-// (ref_to_raw_pointer (unchecked_ref_cast x)) -> (unchecked_trivial_bit_cast x)
-sil @collapse_to_unchecked_trivial_bit_cast : $@convention(thin) (Optional<MyClass>) -> (Builtin.RawPointer) {
-bb0(%0 : $Optional<MyClass>):
-  %1 = unchecked_ref_cast %0 : $Optional<MyClass> to $Builtin.NativeObject
-  %2 = ref_to_raw_pointer %1 : $Builtin.NativeObject to $Builtin.RawPointer
-  return %2 : $Builtin.RawPointer
-}
-
 struct GenContainer<T> {
 }
 
@@ -2398,12 +2381,11 @@ bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $*GenContai
   unreachable
 }
 
-
-// CHECK-LABEL:   sil @remove_dead_code_after_cond_fail
+// CHECK-LABEL:   sil @remove_dead_code_after_cond_fail :
 // CHECK:           [[Ref:%.*]] = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT:      cond_fail [[Ref]]
 // CHECK-NEXT:      unreachable
-
+// CHECK: } // end sil function 'remove_dead_code_after_cond_fail'
 sil @remove_dead_code_after_cond_fail : $@convention(thin) () -> (Int32) {
 bb0:
   %0 = integer_literal $Builtin.Int32, -2
@@ -2991,13 +2973,17 @@ struct OtherError: Error {
   var payload: AnyObject
 }
 
-// CHECK-LABEL: sil @unconditional_existential_box_cast
+// CHECK-LABEL: sil @unconditional_existential_box_cast :
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK:      retain_value %0
+// CHECK-NOT: unconditional_checked_cast_addr
 // CHECK:      [[E:%[0-9]+]] = alloc_stack $Error
+// CHECK-NOT: unconditional_checked_cast_addr
 // CHECK:      [[T:%[0-9]+]] = alloc_stack $TestError
-// CHECK-NEXT: retain_value %0
 // CHECK-NEXT: destroy_addr [[E]]
 // CHECK-NEXT: store %0 to [[T]]
 // CHECK-NEXT: struct_element_addr
+// CHECK-NOT: unconditional_checked_cast_addr
 // CHECK:   } // end sil function 'unconditional_existential_box_cast'
 sil @unconditional_existential_box_cast : $@convention(thin) (@guaranteed TestError) -> @owned AnyObject {
 bb0(%0 : $TestError):
@@ -3163,13 +3149,14 @@ bb0(%0 : $TestError):
   return %11 : $AnyObject
 }
 
-// CHECK-LABEL: sil @unconditional_existential_box_cast_not_dominating
+// CHECK-LABEL: sil @unconditional_existential_box_cast_not_dominating :
+// CHECK:      retain_value %0
 // CHECK:      [[E:%[0-9]+]] = alloc_stack $Error
 // CHECK:      [[T:%[0-9]+]] = alloc_stack $TestError
-// CHECK-NEXT: retain_value %0
 // CHECK-NEXT: destroy_addr [[E]]
 // CHECK-NEXT: store %0 to [[T]]
 // CHECK-NEXT: struct_element_addr
+// CHECK-NOT: unconditional_checked_cast_addr
 // CHECK:   } // end sil function 'unconditional_existential_box_cast_not_dominating'
 sil @unconditional_existential_box_cast_not_dominating : $@convention(thin) (@guaranteed TestError) -> @owned AnyObject {
 bb0(%0 : $TestError):
@@ -3201,12 +3188,13 @@ bb4:
 }
 
 // CHECK-LABEL: sil @conditional_existential_box_cast
+// CHECK:      retain_value %0
 // CHECK:      [[E:%[0-9]+]] = alloc_stack $Error
 // CHECK:      [[T:%[0-9]+]] = alloc_stack $TestError
-// CHECK-NEXT: retain_value %0
 // CHECK-NEXT: store %0 to [[T]]
 // CHECK-NEXT: [[I:%[0-9]+]] = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: cond_br [[I]], bb1, bb2
+// CHECK-NOT: checked_cast_addr_br
 // CHECK:   } // end sil function 'conditional_existential_box_cast'
 sil @conditional_existential_box_cast : $@convention(thin) (@guaranteed TestError) -> @owned AnyObject {
 bb0(%0 : $TestError):
@@ -3235,13 +3223,14 @@ bb2:
 }
 
 // CHECK-LABEL: sil @taking_conditional_existential_box_cast
+// CHECK:      retain_value %0
 // CHECK:      [[E:%[0-9]+]] = alloc_stack $Error
 // CHECK:      [[T:%[0-9]+]] = alloc_stack $TestError
-// CHECK-NEXT: retain_value %0
 // CHECK-NEXT: destroy_addr [[E]]
 // CHECK-NEXT: store %0 to [[T]]
 // CHECK-NEXT: [[I:%[0-9]+]] = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: cond_br [[I]], bb1, bb2
+// CHECK-NOT: checked_cast_addr_br
 // CHECK:   } // end sil function 'taking_conditional_existential_box_cast'
 sil @taking_conditional_existential_box_cast : $@convention(thin) (@guaranteed TestError) -> @owned AnyObject {
 bb0(%0 : $TestError):
@@ -3867,6 +3856,79 @@ bb0(%0 : $Builtin.Int64):
   return %2 : $Builtin.BridgeObject
 }
 
+struct MyStringObj {
+  @_hasStorage var a: UInt64
+  @_hasStorage var b: Builtin.BridgeObject
+}
+
+struct MyStringGuts {
+  @_hasStorage var o: MyStringObj
+}
+
+struct MyString {
+  @_hasStorage var g: MyStringGuts
+}
+
+// CHECK-LABEL: sil @optimize_arc_with_value_to_bridge_object2
+// CHECK:      bb0(%0 : $UInt64):
+// CHECK-NEXT:   tuple
+// CHECK-NEXT:   return
+// CHECK:      } // end sil function 'optimize_arc_with_value_to_bridge_object2'
+sil @optimize_arc_with_value_to_bridge_object2 : $@convention(thin) (UInt64) -> () {
+bb0(%0 : $UInt64):
+  %1 = integer_literal $Builtin.Int64, -1945555039024054272
+  %2 = value_to_bridge_object %1 : $Builtin.Int64
+  %3 = struct $MyStringObj (%0 : $UInt64, %2 : $Builtin.BridgeObject)
+  %4 = struct $MyStringGuts (%3 : $MyStringObj)
+  %5 = struct $MyString (%4 : $MyStringGuts)
+  release_value %5 : $MyString
+  %7 = tuple ()
+  return %7 : $()
+}
+
+enum EnumWithPayload {
+  case A(UInt64)
+  case B(AnyObject)
+  case C
+}
+
+// CHECK-LABEL: sil @optimize_arc_with_trivial_payload_enum
+// CHECK:       bb0(%0 : $UInt64):
+// CHECK-NEXT:    tuple
+// CHECK-NEXT:    return
+// CHECK:       } // end sil function 'optimize_arc_with_trivial_payload_enum'
+sil @optimize_arc_with_trivial_payload_enum : $@convention(thin) (UInt64) -> () {
+bb0(%0 : $UInt64):
+  %1 = enum $EnumWithPayload, #EnumWithPayload.A!enumelt, %0 : $UInt64
+  release_value %1 : $EnumWithPayload
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil @optimize_arc_with_trivial_enum
+// CHECK:       bb0:
+// CHECK-NEXT:    tuple
+// CHECK-NEXT:    return
+// CHECK:       } // end sil function 'optimize_arc_with_trivial_enum'
+sil @optimize_arc_with_trivial_enum : $@convention(thin) () -> () {
+bb0:
+  %1 = enum $EnumWithPayload, #EnumWithPayload.C!enumelt
+  release_value %1 : $EnumWithPayload
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil @dont_remove_release_of_nontrivial_enum
+// CHECK:         strong_release %0
+// CHECK:       } // end sil function 'dont_remove_release_of_nontrivial_enum'
+sil @dont_remove_release_of_nontrivial_enum : $@convention(thin) (@guaranteed AnyObject) -> () {
+bb0(%0 : $AnyObject):
+  %1 = enum $EnumWithPayload, #EnumWithPayload.B!enumelt, %0 : $AnyObject
+  release_value %1 : $EnumWithPayload
+  %7 = tuple ()
+  return %7 : $()
+}
+
 // CHECK-LABEL: sil @optimize_stringObject_bit_operations
 // CHECK:      bb0:
 // CHECK-NEXT:   %0 = integer_literal $Builtin.Int64, 4611686018427387904
@@ -4118,15 +4180,88 @@ bb0:
   return %1 : $Int64
 }
 
-// Check for disabled optimization of unchecked_bitwise_cast to unchecked_ref_cast in ossa
-// This test can be optimized when ossa is supported in the SILCombine for unchecked_bitwise_cast
-// CHECK-LABEL: sil [ossa] @refcast :
-// CHECK: unchecked_bitwise_cast
-// CHECK-LABEL: } // end sil function 'refcast'
-sil [ossa] @refcast : $@convention(thin) (@owned Klass) -> @owned Optional<Klass> {
-bb0(%0 : @owned $Klass):
-  %1 = unchecked_bitwise_cast %0 : $Klass to $Optional<Klass>
-  %2 = copy_value %1 : $Optional<Klass>
-  destroy_value %0 : $Klass
-  return %2 : $Optional<Klass>
+sil @convert_raw_pointer_to_nativeobject : $@convention(thin) (Builtin.RawPointer) -> @owned Builtin.NativeObject
+
+// To eliminate the convert_function below we need to convert the try_apply to
+// an apply. We do not delete edges like this in SILCombine with ownership and
+// are trying to reduce it without ownership. So make sure we don't optimize
+// this. This should be done in a different pass that handles CFG issues.
+//
+// CHECK-LABEL: sil @do_not_eliminate_error_adding_convert_function_used_by_try_apply_nonownership : $@convention(thin) (Builtin.RawPointer) -> @owned Builtin.NativeObject {
+// CHECK: convert_function
+// CHECK: try_apply
+// CHECK: } // end sil function 'do_not_eliminate_error_adding_convert_function_used_by_try_apply_nonownership'
+sil @do_not_eliminate_error_adding_convert_function_used_by_try_apply_nonownership : $@convention(thin) (Builtin.RawPointer) -> @owned Builtin.NativeObject {
+bb0(%0 : $Builtin.RawPointer):
+  %f = function_ref @convert_raw_pointer_to_nativeobject : $@convention(thin) (Builtin.RawPointer) -> @owned Builtin.NativeObject
+  %t = thin_to_thick_function %f : $@convention(thin) (Builtin.RawPointer) -> @owned Builtin.NativeObject to $@noescape @callee_guaranteed (Builtin.RawPointer) -> @owned Builtin.NativeObject
+  %c = convert_function %t : $@noescape @callee_guaranteed (Builtin.RawPointer) -> @owned Builtin.NativeObject to $@noescape @callee_guaranteed (Builtin.RawPointer) -> (@owned Builtin.NativeObject, @error Error)
+  try_apply %c(%0) : $@noescape @callee_guaranteed (Builtin.RawPointer) -> (@owned Builtin.NativeObject, @error Error), normal bb1, error bb2
+
+bb1(%result : $Builtin.NativeObject):
+  return %result : $Builtin.NativeObject
+
+bb2(%error : $Error):
+  unreachable
 }
+
+sil_global private @outlined_global : $_ContiguousArrayStorage<Int>
+
+// CHECK-LABEL: sil @test_global_value
+// CHECK-NOT:   retain
+// CHECK-NOT:   release
+// CHECK-NOT:   debug_value
+// CHECK:     } // end sil function 'test_global_value'
+sil @test_global_value : $@convention(thin) () -> Int {
+bb0:
+  %0 = global_value @outlined_global : $_ContiguousArrayStorage<Int>
+  strong_retain %0 : $_ContiguousArrayStorage<Int>
+  debug_value %0 : $_ContiguousArrayStorage<Int>, let, name "x"
+  %2 = upcast %0 : $_ContiguousArrayStorage<Int> to $__ContiguousArrayStorageBase
+  strong_retain %2 : $__ContiguousArrayStorageBase
+  %13 = ref_tail_addr [immutable] %2 : $__ContiguousArrayStorageBase, $Int
+  %16 = load %13 : $*Int
+  strong_release %2 : $__ContiguousArrayStorageBase
+  strong_release %0 : $_ContiguousArrayStorage<Int>
+  return %16 : $Int
+} // end sil function 'test_global_value'
+
+final class Kp1 {
+  @_hasStorage @_hasInitialValue final var b: Kp2? { get set }
+  @objc deinit
+  init()
+}
+
+class Kp2 {
+  @_hasStorage @_hasInitialValue var s: String { get set }
+  @objc deinit
+  init()
+}
+
+sil @kpgetter : $@convention(thin) (@in_guaranteed Kp2) -> @out String
+sil @kpsetter : $@convention(thin) (@in_guaranteed String, @in_guaranteed Kp2) -> ()
+sil @swift_getAtKeyPath : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @guaranteed KeyPath<τ_0_0, τ_0_1>) -> @out τ_0_1
+
+// Test keypath optimization for optional chaining with accesses scopes.
+// E.g.   \.a?.b   (on a class)
+//
+// CHECK-LABEL: sil @test_optional_chaining_keypath
+// CHECK:    [[BA:%[0-9]+]] = begin_access
+// CHECK:    switch_enum {{.*}} case #Optional.none!enumelt: bb2, case #Optional.some!enumelt: bb1
+// CHECK:  bb1:
+// CHECK:    apply
+// CHECK:    end_access [[BA]]
+// CHECK:  bb2:
+// CHECK:    end_access [[BA]]
+// CHECK:  bb3:
+// CHECK:     } // end sil function 'test_optional_chaining_keypath'
+sil @test_optional_chaining_keypath : $@convention(thin) (@in_guaranteed Kp1) -> @out Optional<String> {
+bb0(%0 : $*Optional<String>, %1 : $*Kp1):
+  %kp = keypath $KeyPath<Kp1, Optional<String>>, (root $Kp1; stored_property #Kp1.b : $Optional<Kp2>; optional_chain : $Kp2; settable_property $String,  id #Kp2.s!getter : (Kp2) -> () -> String, getter @kpgetter : $@convention(thin) (@in_guaranteed Kp2) -> @out String, setter @kpsetter : $@convention(thin) (@in_guaranteed String, @in_guaranteed Kp2) -> (); optional_wrap : $Optional<String>)
+  %f = function_ref @swift_getAtKeyPath : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @guaranteed KeyPath<τ_0_0, τ_0_1>) -> @out τ_0_1
+  %a = apply %f<Kp1, Optional<String>>(%0, %1, %kp) : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @guaranteed KeyPath<τ_0_0, τ_0_1>) -> @out τ_0_1
+  strong_release %kp : $KeyPath<Kp1, Optional<String>>
+  %r = tuple ()
+  return %r : $()
+}
+

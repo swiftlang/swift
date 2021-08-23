@@ -48,8 +48,12 @@ public:
   /// An Objective-C header to import and make implicitly visible.
   std::string ImplicitObjCHeaderPath;
 
-  /// The name of the module which the frontend is building.
+  /// The name of the module that the frontend is building.
   std::string ModuleName;
+
+  /// The ABI name of the module that the frontend is building, to be used in
+  /// mangling and metadata.
+  std::string ModuleABIName;
 
   /// The name of the library to link against when using this module.
   std::string ModuleLinkName;
@@ -70,12 +74,22 @@ public:
   /// The path to which we should store indexing data, if any.
   std::string IndexStorePath;
 
+  /// The path to load access notes from.
+  std::string AccessNotesPath;
+
   /// The path to look in when loading a module interface file, to see if a
   /// binary module has already been built for use by the compiler.
   std::string PrebuiltModuleCachePath;
 
+  /// The path to look in to find backup .swiftinterface files if those found
+  /// from SDKs are failing.
+  std::string BackupModuleInterfaceDir;
+
   /// For these modules, we should prefer using Swift interface when importing them.
   std::vector<std::string> PreferInterfaceForModules;
+
+  /// User-defined module version number.
+  llvm::VersionTuple UserModuleVersion;
 
   /// Emit index data for imported serialized swift system modules.
   bool IndexSystemModules = false;
@@ -86,6 +100,9 @@ public:
   /// The module for which we should verify all of the generic signatures.
   std::string VerifyGenericSignaturesInModule;
 
+  /// Number of retry opening an input file if the previous opening returns
+  /// bad file descriptor error.
+  unsigned BadFileDescriptorRetryCount = 0;
   enum class ActionType {
     NoneAction,        ///< No specific action
     Parse,             ///< Parse only
@@ -124,7 +141,8 @@ public:
     REPL,      ///< REPL mode
 
     EmitAssembly, ///< Emit assembly
-    EmitIR,       ///< Emit LLVM IR
+    EmitIRGen,    ///< Emit LLVM IR before LLVM optimizations
+    EmitIR,       ///< Emit LLVM IR after LLVM optimizations
     EmitBC,       ///< Emit LLVM BC
     EmitObject,   ///< Emit object file
 
@@ -134,7 +152,6 @@ public:
     DumpPCM, ///< Dump information about a precompiled Clang module
 
     ScanDependencies,        ///< Scan dependencies of Swift source files
-    ScanClangDependencies,   ///< Scan dependencies of a Clang module
     PrintVersion,       ///< Print version information.
     PrintFeature,       ///< Print supported feature of this compiler
   };
@@ -165,12 +182,6 @@ public:
   /// the module.
   bool CheckOnoneSupportCompleteness = false;
 
-  /// If set, dumps wall time taken to check each function body to llvm::errs().
-  bool DebugTimeFunctionBodies = false;
-
-  /// If set, dumps wall time taken to check each expression.
-  bool DebugTimeExpressionTypeChecking = false;
-
   /// The path to which we should output statistics files.
   std::string StatsOutputDir;
 
@@ -183,6 +194,11 @@ public:
   /// Profile changes to stats to files in StatsOutputDir, grouped by source
   /// entity.
   bool ProfileEntities = false;
+
+  /// Emit parseable-output directly from the frontend, instead of relying
+  /// the driver to emit it. This is used in context where frontend jobs are executed by
+  /// clients other than the driver.
+  bool FrontendParseableOutput = false;
 
   /// Indicates whether or not an import statement can pick up a Swift source
   /// file (as opposed to a module file).
@@ -282,19 +298,34 @@ public:
   /// of the main Swift module's source files.
   bool ImportPrescan = false;
 
+  /// After performing a dependency scanning action, serialize the scanner's internal state.
+  bool SerializeDependencyScannerCache = false;
+
+  /// Load and re-use a prior serialized dependency scanner cache.
+  bool ReuseDependencyScannerCache = false;
+
+  /// The path at which to either serialize or deserialize the dependency scanner cache.
+  std::string SerializedDependencyScannerCachePath;
+
+  /// Emit remarks indicating use of the serialized module dependency scanning cache
+  bool EmitDependencyScannerCacheRemarks = false;
+
   /// When performing an incremental build, ensure that cross-module incremental
   /// build metadata is available in any swift modules emitted by this frontend
   /// job.
   ///
   /// This flag is currently only propagated from the driver to
   /// any merge-modules jobs.
-  bool EnableExperimentalCrossModuleIncrementalBuild = false;
+  bool DisableCrossModuleIncrementalBuild = false;
 
   /// Best effort to output a .swiftmodule regardless of any compilation
   /// errors. SIL generation and serialization is skipped entirely when there
   /// are errors. The resulting serialized AST may include errors types and
   /// skip nodes entirely, depending on the errors involved.
   bool AllowModuleWithCompilerErrors = false;
+
+  /// True if the "-static" option is set.
+  bool Static = false;
 
   /// The different modes for validating TBD against the LLVM IR.
   enum class TBDValidationMode {
@@ -366,18 +397,37 @@ public:
 
   /// Whether we're configured to track system intermodule dependencies.
   bool shouldTrackSystemDependencies() const;
+  
+  /// Whether to emit symbol graphs for the output module.
+  bool EmitSymbolGraph = false;
+
+  /// The directory to which we should emit a symbol graph JSON files.
+  /// It is valid whenever there are any inputs.
+  ///
+  /// These are JSON file that describes the public interface of a module for
+  /// curating documentation, separated into files for each module this module
+  /// extends.
+  ///
+  /// \sa SymbolGraphASTWalker
+  std::string SymbolGraphOutputDir;
+  
+  /// Whether to emit doc comment information in symbol graphs for symbols
+  /// which are inherited through classes or default implementations.
+  bool SkipInheritedDocs = false;
+
+  /// Whether to include symbols with SPI information in the symbol graph.
+  bool IncludeSPISymbolsInSymbolGraph = false;
 
 private:
   static bool canActionEmitDependencies(ActionType);
   static bool canActionEmitReferenceDependencies(ActionType);
-  static bool canActionEmitSwiftRanges(ActionType);
-  static bool canActionEmitCompiledSource(ActionType);
   static bool canActionEmitObjCHeader(ActionType);
   static bool canActionEmitLoadedModuleTrace(ActionType);
   static bool canActionEmitModule(ActionType);
   static bool canActionEmitModuleDoc(ActionType);
   static bool canActionEmitModuleSummary(ActionType);
   static bool canActionEmitInterface(ActionType);
+  static bool canActionEmitABIDescriptor(ActionType);
 
 public:
   static bool doesActionGenerateSIL(ActionType);

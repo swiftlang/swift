@@ -51,6 +51,10 @@ public:
     return ObjCHasOpaqueISAs;
   }
 
+  bool canUseSwiftAsyncContextAddrIntrinsic() const {
+    return UsableSwiftAsyncContextAddrIntrinsic;
+  }
+
   /// The target's object format type.
   llvm::Triple::ObjectFormatType OutputObjectFormat;
   
@@ -84,6 +88,11 @@ public:
   /// Changes to this must be kept in sync with swift/Runtime/Metadata.h.
   uint64_t LeastValidPointerValue;
 
+  /// Poison sentinel value recognized by LLDB as a former reference to a
+  /// potentially deinitialized object. It uses no spare bits and cannot point
+  /// to readable memory.
+  uint64_t ReferencePoisonDebugValue;
+
   /// The maximum number of scalars that we allow to be returned directly.
   unsigned MaxScalarsForDirectResult = 3;
 
@@ -104,6 +113,8 @@ public:
   /// True if `swift_retain` and `swift_release` are no-ops when passed
   /// "negative" pointer values.
   bool SwiftRetainIgnoresNegativeValues = false;
+
+  bool UsableSwiftAsyncContextAddrIntrinsic = false;
 };
 
 }

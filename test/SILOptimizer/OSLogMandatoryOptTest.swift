@@ -623,3 +623,17 @@ func testWrappingWithinClosures(x: Int) {
       // CHECK-LABEL: end sil function '${{.*}}testWrappingWithinClosures1xySi_tFyyXEfU_
   }
 }
+
+func testAnimationSignpost(cond: Bool, x: Int, y: Float) {
+  _osSignpostAnimationBeginTestHelper("animation begins here %d", Int.min)
+  _osSignpostAnimationBeginTestHelper("a message without arguments")
+  _osSignpostAnimationBeginTestHelper("animation begins here %ld", x)
+  _osSignpostAnimationBeginTestHelper("animation begins here %ld", cond ? x : y)
+  _osSignpostAnimationBeginTestHelper("animation begins here %ld %f", x, y)
+  // CHECK-LABEL: @${{.*}}testAnimationSignpost4cond1x1yySb_SiSftF
+  // CHECK: string_literal utf8 "animation begins here %d isAnimation=YES"
+  // CHECK: string_literal utf8 "a message without arguments isAnimation=YES"
+  // CHECK: string_literal utf8 "animation begins here %ld isAnimation=YES"
+  // CHECK: string_literal utf8 "animation begins here %ld isAnimation=YES"
+  // CHECK: string_literal utf8 "animation begins here %ld %f isAnimation=YES"
+}

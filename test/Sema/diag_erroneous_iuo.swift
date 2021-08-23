@@ -201,7 +201,7 @@ let y1: Int = (x as Int!)! // expected-error {{using '!' is not allowed here; pe
 let z0: Int = x as! Int! // expected-error {{using '!' is not allowed here; perhaps '?' was intended?}}{{24-25=?}}
 // expected-warning@-1 {{forced cast from 'Int?' to 'Int' only unwraps optionals; did you mean to use '!'?}}
 let z1: Int = (x as! Int!)! // expected-error {{using '!' is not allowed here; perhaps '?' was intended?}}{{25-26=?}}
-// expected-warning@-1 {{forced cast of 'Int?' to same type has no effect}}
+// expected-warning@-1 {{forced cast from 'Int?' to 'Int' only unwraps optionals; did you mean to use '!'?}}
 let w0: Int = (x as? Int!)! // expected-warning {{conditional cast from 'Int?' to 'Int?' always succeeds}}
 // expected-error@-1 {{using '!' is not allowed here; perhaps '?' was intended?}}{{25-26=?}}
 let w1: Int = (x as? Int!)!! // expected-warning {{conditional cast from 'Int?' to 'Int?' always succeeds}}
@@ -211,6 +211,7 @@ func overloadedByOptionality(_ a: inout Int!) {}
 // expected-note@-1 {{'overloadedByOptionality' previously declared here}}
 func overloadedByOptionality(_ a: inout Int?) {}
 // expected-error@-1 {{invalid redeclaration of 'overloadedByOptionality'}}
+// expected-note@-2 {{optional parameter is of same type as implicitly unwrapped optional parameter}}
 
 struct T {
   let i: Int!

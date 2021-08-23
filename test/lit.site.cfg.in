@@ -34,6 +34,7 @@ config.swift_test_results_dir = \
 config.coverage_mode = "@SWIFT_ANALYZE_CODE_COVERAGE@"
 config.lldb_build_root = "@LLDB_BUILD_DIR@"
 config.libdispatch_build_path = "@SWIFT_PATH_TO_LIBDISPATCH_BUILD@"
+config.libdispatch_static_build_path = "@SWIFT_PATH_TO_LIBDISPATCH_STATIC_BUILD@"
 config.swift_driver_test_options = "@SWIFT_DRIVER_TEST_OPTIONS@"
 config.swift_frontend_test_options = "@SWIFT_FRONTEND_TEST_OPTIONS@"
 
@@ -43,6 +44,7 @@ config.darwin_xcrun_toolchain = "@SWIFT_DARWIN_XCRUN_TOOLCHAIN@"
 # --- android ---
 config.android_ndk_path = "@SWIFT_ANDROID_NDK_PATH@"
 config.android_ndk_gcc_version = "@SWIFT_ANDROID_NDK_GCC_VERSION@"
+config.android_api_level = "@SWIFT_ANDROID_API_LEVEL@"
 
 # --- Windows ---
 msvc_runtime_flags = {
@@ -57,6 +59,12 @@ config.swift_stdlib_msvc_runtime = \
 config.darwin_enable_maccatalyst = "@SWIFT_ENABLE_MACCATALYST@" == "TRUE"
 config.darwin_maccatalyst_build_flavor = "@BUILD_FLAVOR@"
 config.darwin_osx_variant_suffix = "@DEFAULT_OSX_VARIANT_SUFFIX@"
+
+# If we are not testing against the host compiler, we are testing against the
+# just built compiler. Add that as a feature so we can conditionally mark tests
+# as requiring a just_built_compiler.
+config.testing_against_host_compiler = \
+    "@SWIFT_RUN_TESTS_WITH_HOST_COMPILER@" == "TRUE"
 
 # Please remember to handle empty strings and/or unset variables correctly.
 
@@ -82,9 +90,6 @@ if "@SWIFT_STDLIB_ASSERTIONS@" == "TRUE":
     config.available_features.add('swift_stdlib_asserts')
 else:
     config.available_features.add('swift_stdlib_no_asserts')
-
-if "@SWIFT_AST_VERIFIER@" == "TRUE":
-    config.available_features.add('swift_ast_verifier')
 
 if "@SWIFT_OPTIMIZED@" == "TRUE":
     config.available_features.add("optimized_stdlib")
@@ -129,6 +134,8 @@ if "@SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING@" == "TRUE":
     config.available_features.add('differentiable_programming')
 if "@SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY@" == "TRUE":
     config.available_features.add('concurrency')
+if "@SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED@" == "TRUE":
+    config.available_features.add('distributed')
 
 # Let the main config do the real work.
 if config.test_exec_root is None:

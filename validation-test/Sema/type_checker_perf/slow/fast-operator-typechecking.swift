@@ -19,5 +19,4 @@ func f(tail: UInt64, byteCount: UInt64) {
 func size(count: Int) {
   // Size of the buffer we need to allocate
   let _ = count * MemoryLayout<Float>.size * (4 + 3 + 3 + 2 + 4)
-  // expected-error@-1 {{the compiler is unable to type-check this expression in reasonable time}}
 }

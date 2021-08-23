@@ -2,7 +2,7 @@
 
 // Also do an end-to-end test to check if the generated code is correct.
 // RUN: %empty-directory(%t) 
-// RUN: %target-build-swift -O -Xllvm -module-name=test %s -o %t/a.out
+// RUN: %target-build-swift -O -module-name=test %s -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s -check-prefix=CHECK-OUTPUT
 // REQUIRES: executable_test

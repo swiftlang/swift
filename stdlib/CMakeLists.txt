@@ -44,6 +44,14 @@ else()
   set(SWIFT_BUILD_TEST_SUPPORT_MODULES_default FALSE)
 endif()
 
+if("${SWIFT_HOST_VARIANT_SDK}" MATCHES "(OSX|IOS*|TVOS*|WATCHOS*)")
+  set(SWIFT_STDLIB_ENABLE_PRESPECIALIZATION_default TRUE)
+elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
+  set(SWIFT_STDLIB_ENABLE_PRESPECIALIZATION_default TRUE)
+else()
+  set(SWIFT_STDLIB_ENABLE_PRESPECIALIZATION_default FALSE)
+endif()
+
 #
 # User-configurable options for the standard library.
 #
@@ -79,6 +87,17 @@ option(SWIFT_BUILD_TEST_SUPPORT_MODULES
        "Whether to build StdlibUnittest and other test support modules. Defaults to On when SWIFT_BUILD_SDK_OVERLAY is On, or when SWIFT_INCLUDE_TESTS is On."
        "${SWIFT_BUILD_TEST_SUPPORT_MODULES_default}")
 
+option(SWIFT_FREESTANDING_FLAVOR
+       "When building the FREESTANDING stdlib, which build style to use (options: apple, linux)")
+
+option(SWIFT_STDLIB_ENABLE_PRESPECIALIZATION
+       "Should stdlib be built with generic metadata prespecialization enabled. Defaults to On on Darwin and on "
+       "${SWIFT_STDLIB_ENABLE_PRESPECIALIZATION_default}")
+
+set(SWIFT_STDLIB_ENABLE_LTO OFF CACHE STRING "Build Swift stdlib with LTO. One
+    must specify the form of LTO by setting this to one of: 'full', 'thin'. This
+    option only affects the standard library and runtime, not tools.")
+
 #
 # End of user-configurable options.
 #
@@ -112,11 +131,11 @@ else()
   # If we use Clang-cl or MSVC, CMake provides default compiler and linker flags that are incompatible
   # with the frontend of Clang or Clang++.
   if(SWIFT_COMPILER_IS_MSVC_LIKE)
-    set(CMAKE_CXX_COMPILER "${SWIFT_NATIVE_LLVM_TOOLS_PATH}/clang-cl")
-    set(CMAKE_C_COMPILER "${SWIFT_NATIVE_LLVM_TOOLS_PATH}/clang-cl")
+    set(CMAKE_CXX_COMPILER "${SWIFT_NATIVE_CLANG_TOOLS_PATH}/clang-cl")
+    set(CMAKE_C_COMPILER "${SWIFT_NATIVE_CLANG_TOOLS_PATH}/clang-cl")
   else()
-    set(CMAKE_CXX_COMPILER "${SWIFT_NATIVE_LLVM_TOOLS_PATH}/clang++")
-    set(CMAKE_C_COMPILER "${SWIFT_NATIVE_LLVM_TOOLS_PATH}/clang")
+    set(CMAKE_CXX_COMPILER "${SWIFT_NATIVE_CLANG_TOOLS_PATH}/clang++")
+    set(CMAKE_C_COMPILER "${SWIFT_NATIVE_CLANG_TOOLS_PATH}/clang")
   endif()
 
   if(CMAKE_C_COMPILER_LAUNCHER MATCHES ".*distcc")
@@ -140,7 +159,6 @@ endif()
 # built and cause link failures for mismatches. Without linking that library,
 # we get link failures regardless, so instead, this just disables the checks.
 add_compile_definitions($<$<OR:$<COMPILE_LANGUAGE:C>,$<COMPILE_LANGUAGE:CXX>>:LLVM_DISABLE_ABI_BREAKING_CHECKS_ENFORCING=1>)
-include_directories(BEFORE ${CMAKE_PROJECT_SOURCE_DIR}/include)
 
 set(SWIFT_STDLIB_LIBRARY_BUILD_TYPES)
 if(SWIFT_BUILD_DYNAMIC_STDLIB)
@@ -192,13 +210,23 @@ function(swift_create_stdlib_targets name variant define_all_alias)
   if(NOT define_all_alias)
     set(ALL_keyword ALL)
   endif()
-  add_custom_target(${name}${variant}
-    ${ALL_keyword}
-    DEPENDS
-    ${name}${SWIFT_PRIMARY_VARIANT_SUFFIX}${variant})
-  set_target_properties(${name}${variant}
-    PROPERTIES
-    FOLDER "Swift libraries/Aggregate")
+
+  # When cross-compiling host tools for multiple architectures, targeting a
+  # different SDK, the primary variant is not one of the variants being built,
+  # so it can't be added as a target here. build-script will invoke the
+  # more-specific target, so just skip creating this target and warn in case
+  # someone is using the CMake more directly.
+  if(SWIFT_PRIMARY_VARIANT_SDK IN_LIST SWIFT_SDKS)
+    add_custom_target(${name}${variant}
+      ${ALL_keyword}
+      DEPENDS
+      ${name}${SWIFT_PRIMARY_VARIANT_SUFFIX}${variant})
+    set_target_properties(${name}${variant}
+      PROPERTIES
+      FOLDER "Swift libraries/Aggregate")
+  else()
+    message(WARNING "Primary variant ${SWIFT_PRIMARY_VARIANT_SDK} is not being built, not creating ${name}${variant} alias target for it.")
+  endif()
 endfunction()
 
 swift_create_stdlib_targets("swift-stdlib" "" TRUE)

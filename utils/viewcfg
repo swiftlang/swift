@@ -59,14 +59,15 @@ class Block(object):
         if self.content is None:
             self.content = ""
         escaped_text = re.sub(r'([\\<>{}"|])', r'\\\1', text[0:80]).rstrip()
-        self.content += escaped_text + '\\l'
-        self.last_line = text
+        if len(escaped_text) > 0:
+            self.content += escaped_text + '\\l'
+            self.last_line = text
 
     def get_succs(self):
         if self.succs is None:
             self.succs = []
             if self.last_line is not None:
-                for match in re.finditer(r'\bbb[0-9]+\b', self.last_line):
+                for match in re.finditer(r'\bbb[0-9]+\w*\b', self.last_line):
                     self.succs.append(match.group())
 
                 it = re.finditer(r'\blabel %"?([^\s"]+)\b', self.last_line)
@@ -139,7 +140,7 @@ def main():
             if adj_name not in block_map:
                 new_blocks[adj_name] = Block(adj_name, None)
 
-    block_map = dict(block_map.items() + new_blocks.items())
+    block_map.update(new_blocks.items())
 
     # Add missing edges if we didn't see a successor in the terminator
     # but the block is mentioned in the pred list of the successor.

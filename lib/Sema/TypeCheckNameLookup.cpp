@@ -151,12 +151,12 @@ namespace {
       auto conformance = DC->getParentModule()->lookupConformance(
           conformingType, foundProto);
       if (conformance.isInvalid()) {
-        // If there's no conformance, we have an existential
-        // and we found a member from one of the protocols, and
-        // not a class constraint if any.
-        assert(foundInType->isExistentialType() || foundInType->hasError());
-        if (foundInType->isExistentialType())
+        if (foundInType->isExistentialType()) {
+          // If there's no conformance, we have an existential
+          // and we found a member from one of the protocols, and
+          // not a class constraint if any.
           addResult(found);
+        }
         return;
       }
 
@@ -273,6 +273,32 @@ LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclNameRef name,
   return result;
 }
 
+// An unfortunate hack to kick the decl checker into adding semantic members to
+// the current type before we attempt a semantic lookup. The places this method
+// looks needs to be in sync with \c extractDirectlyReferencedNominalTypes.
+// See the note in \c synthesizeSemanticMembersIfNeeded about a better, more
+// just, and peaceful world.
+static void installSemanticMembersIfNeeded(Type type, DeclNameRef name) {
+  // Look-through class-bound archetypes to ensure we synthesize e.g.
+  // inherited constructors.
+  if (auto archetypeTy = type->getAs<ArchetypeType>()) {
+    if (auto super = archetypeTy->getSuperclass()) {
+      type = super;
+    }
+  }
+
+  if (type->isExistentialType()) {
+    auto layout = type->getExistentialLayout();
+    if (auto super = layout.explicitSuperclass) {
+      type = super;
+    }
+  }
+
+  if (auto *current = type->getAnyNominal()) {
+    current->synthesizeSemanticMembersIfNeeded(name.getFullName());
+  }
+}
+
 LookupResult
 TypeChecker::lookupUnqualifiedType(DeclContext *dc, DeclNameRef name,
                                    SourceLoc loc,
@@ -320,9 +346,7 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
   subOptions &= ~NL_RemoveNonVisible;
 
   // Make sure we've resolved implicit members, if we need them.
-  if (auto *current = type->getAnyNominal()) {
-    current->synthesizeSemanticMembersIfNeeded(name.getFullName());
-  }
+  installSemanticMembersIfNeeded(type, name);
 
   LookupResultBuilder builder(result, dc, options);
   SmallVector<ValueDecl *, 4> lookupResults;
@@ -334,8 +358,25 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
   return result;
 }
 
+static bool doesTypeAliasFullyConstrainAllOuterGenericParams(
+    TypeAliasDecl *aliasDecl) {
+  auto parentSig = aliasDecl->getDeclContext()->getGenericSignatureOfContext();
+  auto genericSig = aliasDecl->getGenericSignature();
+
+  if (!parentSig || !genericSig)
+    return false;
+
+  for (auto *paramType : parentSig.getGenericParams()) {
+    if (!genericSig->isConcreteType(paramType))
+      return false;
+  }
+
+  return true;
+}
+
 TypeChecker::UnsupportedMemberTypeAccessKind
-TypeChecker::isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl) {
+TypeChecker::isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl,
+                                           bool hasUnboundOpener) {
   // We don't allow lookups of a non-generic typealias of an unbound
   // generic type, because we have no way to model such a type in the
   // AST.
@@ -352,13 +393,18 @@ TypeChecker::isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl) {
     // underlying type is not dependent.
     if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
       if (!aliasDecl->isGeneric() &&
-          aliasDecl->getUnderlyingType()->hasTypeParameter()) {
+          aliasDecl->getUnderlyingType()->hasTypeParameter() &&
+          !doesTypeAliasFullyConstrainAllOuterGenericParams(aliasDecl)) {
         return UnsupportedMemberTypeAccessKind::TypeAliasOfUnboundGeneric;
       }
     }
 
     if (isa<AssociatedTypeDecl>(typeDecl))
       return UnsupportedMemberTypeAccessKind::AssociatedTypeOfUnboundGeneric;
+
+    if (isa<NominalTypeDecl>(typeDecl))
+      if (!hasUnboundOpener)
+        return UnsupportedMemberTypeAccessKind::NominalTypeOfUnboundGeneric;
   }
 
   if (type->isExistentialType() &&
@@ -392,9 +438,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
     subOptions |= NL_IncludeUsableFromInline;
 
   // Make sure we've resolved implicit members, if we need them.
-  if (auto *current = type->getAnyNominal()) {
-    current->synthesizeSemanticMembersIfNeeded(name.getFullName());
-  }
+  installSemanticMembersIfNeeded(type, name);
 
   if (!dc->lookupQualified(type, name, subOptions, decls))
     return result;
@@ -411,7 +455,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
       continue;
     }
 
-    if (isUnsupportedMemberTypeAccess(type, typeDecl)
+    if (isUnsupportedMemberTypeAccess(type, typeDecl, true)
           != TypeChecker::UnsupportedMemberTypeAccessKind::None) {
       auto memberType = typeDecl->getDeclaredInterfaceType();
 
@@ -551,7 +595,7 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
                                         Type baseTypeOrNull,
                                         NameLookupOptions lookupOptions,
                                         TypoCorrectionResults &corrections,
-                                        GenericSignatureBuilder *gsb,
+                                        GenericSignature genericSig,
                                         unsigned maxResults) {
   // Disable typo-correction if we won't show the diagnostic anyway or if
   // we've hit our typo correction limit.
@@ -592,7 +636,8 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
     lookupVisibleMemberDecls(consumer, baseTypeOrNull, DC,
                              /*includeInstanceMembers*/true,
                              /*includeDerivedRequirements*/false,
-                             /*includeProtocolExtensionMembers*/true, gsb);
+                             /*includeProtocolExtensionMembers*/true,
+                             genericSig);
   } else {
     lookupVisibleDecls(consumer, DC, /*top level*/ true,
                        corrections.Loc.getBaseNameLoc());

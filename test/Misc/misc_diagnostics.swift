@@ -17,9 +17,10 @@ if let realRoomName = roomName as! NSString { // expected-warning{{forced cast f
 
 var pi = 3.14159265358979
 var d: CGFloat = 2.0
-var dpi:CGFloat = d*pi // expected-error@:21{{cannot convert value of type 'Double' to expected argument type 'CGFloat'}}
+var dpi:CGFloat = d*pi // Ok (implicit conversion Double -> CGFloat)
 
 let ff: CGFloat = floorf(20.0) // expected-error{{cannot convert value of type 'Float' to specified type 'CGFloat'}}
+let _: CGFloat = floor(20.0) // Ok (Double -> CGFloat) conversion
 
 let total = 15.0
 let count = 7
@@ -171,4 +172,66 @@ func tuple_splat2(_ q : (a : Int, b : Int)) {
 // SR-1612: Type comparison of foreign types is always true.
 func is_foreign(a: AnyObject) -> Bool {
   return a is CGColor // expected-warning {{'is' test is always true because 'CGColor' is a Core Foundation type}}
+}
+
+func test_implicit_cgfloat_conversion() {
+  func test_to(_: CGFloat) {}
+  func test_from(_: Double) {}
+
+  let d: Double    = 0.0
+  let f: Float     = 0.0
+  let cgf: CGFloat = 0.0
+
+  test_to(d) // Ok (Double -> CGFloat)
+  test_to(f) // expected-error {{cannot convert value of type 'Float' to expected argument type 'CGFloat'}}
+  test_to(d + d) // Ok (Double -> CGFloat for both arguments)
+  test_to(d + cgf) // Ok
+  test_to(d + cgf - d) // Ok (prefer CGFloat -> Double for `cgf`), it's a better solution than trying to convert `d`s to `CGFloat`
+  test_to(d + cgf - cgf) // Ok (only one choice here to conver `d` to CGFloat)
+
+  test_from(cgf) // Ok (CGFloat -> Double)
+  test_from(f) // expected-error {{cannot convert value of type 'Float' to expected argument type 'Double'}}
+  test_from(cgf + cgf) // Ok (CGFloat -> Double for both arguments)
+  test_from(d + cgf) // Ok
+  test_from(cgf + d - cgf) // (prefer Double -> CGFloat for `d`), it's a better solution than trying to convert `cgf`s to `Double`
+  test_from(cgf + d - d) // Ok (only one choice here to conver `cgf` to Double)
+
+  func test_returns_double(_: CGFloat) -> Double {
+    42.0
+  }
+
+  func test_returns_cgfloat(_: Double) -> CGFloat {
+    42.0
+  }
+
+  test_to(test_returns_double(d)) // Ok (two implicit conversions here `d` -> CGFloat & result of `test_returns_double` to CGFloat)
+  test_from(test_returns_cgfloat(cgf)) // Ok (same as above by in other direction)
+
+  let _: CGFloat = d // Ok
+  let _: CGFloat = f // expected-error {{cannot convert value of type 'Float' to specified type 'CGFloat'}}
+  let _: Double  = cgf // Ok
+  let _: Float   = cgf // expected-error {{cannot convert value of type 'CGFloat' to specified type 'Float'}}
+
+  // Let's make sure that implicit conversion doesn't interfere with optionality
+  func test(a: CGFloat?) {
+    let b = a ?? 0 // Produces non-optional binding of CGFloat type
+    test_to(b) // Ok
+    test_from(b) // Ok
+
+    let c: Double = (a ?? 0) as CGFloat // Ok with implicit conversion
+  }
+
+  func test_loading_tuple_elements(values: inout (CGFloat, CGFloat)) {
+    struct S {
+      init(x: Double, y: Double) {}
+      init(x: CGFloat, y: CGFloat) {}
+    }
+    _ = S(x: 0.0, y: values.0) // Ok
+  }
+
+  func allow_optional_promotion_double(_: Double??) {}
+  func allow_optional_promotion_cgfloat(_: CGFloat??) {}
+
+  allow_optional_promotion_double(cgf) // Ok -> CGFloat -> Double -> Double??
+  allow_optional_promotion_cgfloat(d) // Ok -> Double -> CGFloat -> CFloat??
 }

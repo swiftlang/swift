@@ -229,6 +229,7 @@ public class Derived3 : Base3 {
   @inlinable
   public init(_: Int) {}
   // expected-error@-1 {{initializer 'init()' is internal and cannot be referenced from an '@inlinable' function}}
+  // expected-note@-2 {{call to unavailable initializer 'init()' from superclass 'Base3' occurs implicitly at the end of this initializer}}
 }
 
 @_fixed_layout
@@ -245,6 +246,7 @@ class Derived4 : Middle4 {
   @inlinable
   public init(_: Int) {}
   // expected-error@-1 {{initializer 'init()' is internal and cannot be referenced from an '@inlinable' function}}
+  // expected-note@-2 {{call to unavailable initializer 'init()' from superclass 'Middle4' occurs implicitly at the end of this initializer}}
 }
 
 
@@ -356,4 +358,13 @@ public struct PrivateInlinableCrash {
     // expected-error@-1 2{{struct 'PrivateStruct' is private and cannot be referenced from an '@inlinable' function}}
     // expected-error@-2 {{initializer 'init()' is private and cannot be referenced from an '@inlinable' function}}
   }
+}
+
+// Just make sure we don't crash.
+private func deferBodyTestCall() {} // expected-note {{global function 'deferBodyTestCall()' is not '@usableFromInline' or public}}
+@inlinable public func deferBodyTest() {
+  defer {
+    deferBodyTestCall() // expected-error {{global function 'deferBodyTestCall()' is private and cannot be referenced from an '@inlinable' function}}
+  }
+  _ = ()
 }

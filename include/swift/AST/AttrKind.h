@@ -80,16 +80,6 @@ enum : unsigned { NumInlineKindBits =
   countBitsUsed(static_cast<unsigned>(InlineKind::Last_InlineKind)) };
 
 
-/// Indicates whether an actorIndependent decl is unsafe or not
-enum class ActorIndependentKind : uint8_t {
-  Safe = 0,
-  Unsafe = 1,
-  Last_InlineKind = Unsafe
-};
-
-enum : unsigned { NumActorIndependentKindBits =
-  countBitsUsed(static_cast<unsigned>(ActorIndependentKind::Last_InlineKind)) };
-
 /// This enum represents the possible values of the @_effects attribute.
 /// These values are ordered from the strongest guarantee to the weakest,
 /// so please do not reorder existing values.

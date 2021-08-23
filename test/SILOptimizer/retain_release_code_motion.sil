@@ -31,7 +31,7 @@ struct A {
 
 class fuzz { }
 
-protocol P : class { }
+protocol P : AnyObject { }
 
 enum Boo {
   case one
@@ -884,4 +884,164 @@ bb2:
 
 bb3(%24 : $Optional<P>):
   return %24 : $Optional<P>
+}
+
+// -----------------------------------------------------------------------------
+// Test EscapeAnalysis::mayReleaseContent
+// -----------------------------------------------------------------------------
+
+class Node {
+  var node: Node
+}
+struct Queue {
+  var node: Node
+}
+
+sil @getNode : $@convention(thin) () -> @owned Node
+
+// testInoutRelease helper.
+//
+// To test a corner case in canApplyDecrementRefCount, this function
+// cannot have "mayReadRC" or "global mayRelease" side effects.
+sil [ossa] @setNode : $@convention(thin) (@owned Node, @inout Queue) -> () {
+bb0(%0 : @owned $Node, %1 : $*Queue):
+  %new = struct $Queue(%0 : $Node)
+  store %new to [assign] %1 : $*Queue
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// When analyzing this function for retain code motion,
+// AliasAnalysis::canApplyDecrementRefCount will query
+// EscapeAnalysis::mayReleaseContent, passing it an inout pointer for
+// the "released reference".
+//
+// rdar://74360041 (Assertion failed:
+// (!releasedReference->getType().isAddress() && "an address is never
+// a reference"), function mayReleaseContent
+//
+// CHECK-LABEL: sil @testInoutRelease : $@convention(thin) (@inout Queue) -> () {
+// CHECK: strong_retain
+// CHECK: apply {{.*}} : $@convention(thin) (@owned Node, @inout Queue) -> ()
+// CHECK-LABEL: } // end sil function 'testInoutRelease'
+sil @testInoutRelease : $@convention(thin) (@inout Queue) -> () {
+bb0(%0 : $*Queue):
+  %get = function_ref @getNode : $@convention(thin) () -> @owned Node
+  %node = apply %get() : $@convention(thin) () -> @owned Node
+  %set = function_ref @setNode : $@convention(thin) (@owned Node, @inout Queue) -> ()
+  strong_retain %node : $Node
+  %call = apply %set(%node, %0) : $@convention(thin) (@owned Node, @inout Queue) -> ()
+  %12 = tuple ()
+  return %12 : $()
+}
+
+// Still cannot sink the retain because %extraNode is not unique.
+//
+// CHECK-LABEL: sil @testMayReleaseNoSink : $@convention(thin) (@inout Queue) -> () {
+// CHECK: strong_retain
+// CHECK: apply {{.*}} : $@convention(thin) (@owned Node, @inout Queue) -> ()
+// CHECK-LABEL: } // end sil function 'testMayReleaseNoSink'
+sil @testMayReleaseNoSink : $@convention(thin) (@inout Queue) -> () {
+bb0(%0 : $*Queue):
+  %get = function_ref @getNode : $@convention(thin) () -> @owned Node
+  %node = apply %get() : $@convention(thin) () -> @owned Node
+  %extraNode = apply %get() : $@convention(thin) () -> @owned Node
+  %set = function_ref @setNode : $@convention(thin) (@owned Node, @inout Queue) -> ()
+  strong_retain %extraNode : $Node
+  %call = apply %set(%node, %0) : $@convention(thin) (@owned Node, @inout Queue) -> ()
+  %12 = tuple ()
+  return %12 : $()
+}
+
+// The retain of extraNode can sink here because is unique within this
+// function and not released by setNode.
+//
+// CHECK-LABEL: sil @testMayReleaseSink : $@convention(thin) (@inout Queue) -> () {
+// CHECK: apply {{.*}} : $@convention(thin) (@owned Node, @inout Queue) -> ()
+// CHECK: strong_retain
+// CHECK-LABEL: } // end sil function 'testMayReleaseSink'
+sil @testMayReleaseSink : $@convention(thin) (@inout Queue) -> () {
+bb0(%0 : $*Queue):
+  %get = function_ref @getNode : $@convention(thin) () -> @owned Node
+  %node = apply %get() : $@convention(thin) () -> @owned Node
+  %extraNode = alloc_ref $Node
+  %set = function_ref @setNode : $@convention(thin) (@owned Node, @inout Queue) -> ()
+  strong_retain %extraNode : $Node
+  %call = apply %set(%node, %0) : $@convention(thin) (@owned Node, @inout Queue) -> ()
+  %12 = tuple ()
+  return %12 : $()
+}
+
+// Both the queue and node are unique and non-escaping, but we still
+// can't sink because the queue may point to the node.
+//
+// CHECK-LABEL: sil @testMayReleaseUniqNoSink : $@convention(thin) () -> () {
+// CHECK: strong_retain
+// CHECK: apply {{.*}} : $@convention(thin) (@owned Node, @inout Queue) -> ()
+// CHECK-LABEL: } // end sil function 'testMayReleaseUniqNoSink'
+sil @testMayReleaseUniqNoSink : $@convention(thin) () -> () {
+bb0:
+  %queue = alloc_stack $Queue
+  %extraNode = alloc_ref $Node
+  %set = function_ref @setNode : $@convention(thin) (@owned Node, @inout Queue) -> ()
+  strong_retain %extraNode : $Node
+  %call = apply %set(%extraNode, %queue) : $@convention(thin) (@owned Node, @inout Queue) -> ()
+  dealloc_stack %queue : $*Queue
+  %12 = tuple ()
+  return %12 : $()
+}
+
+// %queue is unique, but %extraNode is not. We can still sink because
+// there's no connection.
+//
+// CHECK-LABEL: sil @testMayReleaseUniqSink : $@convention(thin) () -> () {
+// CHECK: apply {{.*}} : $@convention(thin) (@owned Node, @inout Queue) -> ()
+// CHECK: strong_retain
+// CHECK-LABEL: } // end sil function 'testMayReleaseUniqSink'
+sil @testMayReleaseUniqSink : $@convention(thin) () -> () {
+bb0:
+  %queue = alloc_stack $Queue
+  %get = function_ref @getNode : $@convention(thin) () -> @owned Node
+  %extraNode = apply %get() : $@convention(thin) () -> @owned Node
+  %node = alloc_ref $Node
+  %set = function_ref @setNode : $@convention(thin) (@owned Node, @inout Queue) -> ()
+  strong_retain %extraNode : $Node
+  %call = apply %set(%node, %queue) : $@convention(thin) (@owned Node, @inout Queue) -> ()
+  dealloc_stack %queue : $*Queue
+  %12 = tuple ()
+  return %12 : $()
+}
+
+// CG: %queue -> %node1 -> %node2
+//
+// If the retain of %node2 sink below the call to @setNode, then when
+// @inout %queue is overwritten by setNode, both node1 and node2 are
+// freed. The subsequent retain of %node2 will crash.
+//
+// This used to be allowed because we reasoned that a local reference
+// to %node2 should have "its own retain". This is true, but it's
+// still important not to sink that retain for that local reference
+// below a call where that object may be indirectly released via
+// another destroyed object.
+//
+// CHECK-LABEL: sil @testMayReleaseIndirectSink : $@convention(thin) () -> () {
+// CHECK: strong_retain
+// CHECK: apply {{.*}} : $@convention(thin) (@owned Node, @inout Queue) -> ()
+// CHECK-LABEL: } // end sil function 'testMayReleaseIndirectSink'
+sil @testMayReleaseIndirectSink : $@convention(thin) () -> () {
+bb0:
+  %set = function_ref @setNode : $@convention(thin) (@owned Node, @inout Queue) -> ()
+  %queue = alloc_stack $Queue
+  %node1 = alloc_ref $Node
+  %node2 = alloc_ref $Node
+  %addr = ref_element_addr %node1 : $Node, #Node.node
+  store %node2 to %addr : $*Node
+  %call1 = apply %set(%node1, %queue) : $@convention(thin) (@owned Node, @inout Queue) -> ()
+  %extraNode = alloc_ref $Node
+  strong_retain %node2 : $Node
+  // This call destroys %node1 which releases %node2.
+  %call2 = apply %set(%extraNode, %queue) : $@convention(thin) (@owned Node, @inout Queue) -> ()
+  dealloc_stack %queue : $*Queue
+  %12 = tuple ()
+  return %12 : $()
 }

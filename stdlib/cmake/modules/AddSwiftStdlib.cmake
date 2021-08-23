@@ -70,6 +70,10 @@ function(_add_target_variant_c_compile_link_flags)
     endif()
   endif()
 
+  if("${CFLAGS_SDK}" STREQUAL "ANDROID")
+    set(DEPLOYMENT_VERSION ${SWIFT_ANDROID_API_LEVEL})
+  endif()
+
   # MSVC, clang-cl, gcc don't understand -target.
   if(CMAKE_C_COMPILER_ID MATCHES "^Clang|AppleClang$" AND
       NOT SWIFT_COMPILER_IS_MSVC_LIKE)
@@ -105,20 +109,6 @@ function(_add_target_variant_c_compile_link_flags)
     list(APPEND result
       "-arch" "${CFLAGS_ARCH}"
       "-F${SWIFT_SDK_${CFLAGS_SDK}_PATH}/../../../Developer/Library/Frameworks")
-
-    set(add_explicit_version TRUE)
-
-    # iOS-like and zippered libraries get their deployment version from the
-    # target triple
-    if(maccatalyst_build_flavor STREQUAL "ios-like" OR
-        maccatalyst_build_flavor STREQUAL "zippered")
-      set(add_explicit_version FALSE)
-    endif()
-
-    if(add_explicit_version)
-      list(APPEND result
-        "-m${SWIFT_SDK_${CFLAGS_SDK}_VERSION_MIN_NAME}-version-min=${DEPLOYMENT_VERSION}")
-     endif()
   endif()
 
   if(CFLAGS_ANALYZE_CODE_COVERAGE)
@@ -147,6 +137,14 @@ function(_add_target_variant_c_compile_flags)
     ${ARGN})
 
   set(result ${${CFLAGS_RESULT_VAR_NAME}})
+
+  if ("${CFLAGS_ARCH}" STREQUAL "arm64" OR
+      "${CFLAGS_ARCH}" STREQUAL "arm64e" OR
+      "${CFLAGS_ARCH}" STREQUAL "arm64_32")
+    if (SWIFT_ENABLE_GLOBAL_ISEL_ARM64)
+      list(APPEND result "-fglobal-isel")
+    endif()
+  endif()
 
   _add_target_variant_c_compile_link_flags(
     SDK "${CFLAGS_SDK}"
@@ -261,18 +259,15 @@ function(_add_target_variant_c_compile_flags)
     endif()
   endif()
 
-  if(${CFLAGS_SDK} STREQUAL ANDROID)
-    if(${CFLAGS_ARCH} STREQUAL x86_64)
-      # NOTE(compnerd) Android NDK 21 or lower will generate library calls to
-      # `__sync_val_compare_and_swap_16` rather than lowering to the CPU's
-      # `cmpxchg16b` instruction as the `cx16` feature is disabled due to a bug
-      # in Clang.  This is being fixed in the current master Clang and will
-      # hopefully make it into Clang 9.0.  In the mean time, workaround this in
-      # the build.
-      if(CMAKE_C_COMPILER_ID MATCHES Clang AND CMAKE_C_COMPILER_VERSION
-          VERSION_LESS 9.0.0)
-        list(APPEND result -mcx16)
-      endif()
+  # The concurrency library uses double-word atomics.  MSVC's std::atomic
+  # uses a spin lock for this, so to get reasonable behavior we have to
+  # implement it ourselves using _InterlockedCompareExchange128.
+  # clang-cl requires us to enable the `cx16` feature to use this intrinsic.
+  if(CFLAGS_ARCH STREQUAL x86_64)
+    if(SWIFT_COMPILER_IS_MSVC_LIKE)
+      list(APPEND result /clang:-mcx16)
+    else()
+      list(APPEND result -mcx16)
     endif()
   endif()
 
@@ -294,16 +289,6 @@ function(_add_target_variant_c_compile_flags)
   if((CFLAGS_ARCH STREQUAL "armv7" OR CFLAGS_ARCH STREQUAL "aarch64") AND
      (CFLAGS_SDK STREQUAL "LINUX" OR CFLAGS_SDK STREQUAL "ANDROID"))
      list(APPEND result -funwind-tables)
-  endif()
-
-  if("${CFLAGS_SDK}" STREQUAL "ANDROID")
-    list(APPEND result -nostdinc++)
-    swift_android_libcxx_include_paths(CFLAGS_CXX_INCLUDES)
-    swift_android_include_for_arch("${CFLAGS_ARCH}" "${CFLAGS_ARCH}_INCLUDE")
-    foreach(path IN LISTS CFLAGS_CXX_INCLUDES ${CFLAGS_ARCH}_INCLUDE)
-      list(APPEND result "SHELL:${CMAKE_INCLUDE_SYSTEM_FLAG_C}${path}")
-    endforeach()
-    list(APPEND result "-D__ANDROID_API__=${SWIFT_ANDROID_API_LEVEL}")
   endif()
 
   if("${CFLAGS_SDK}" STREQUAL "LINUX")
@@ -381,6 +366,9 @@ function(_add_target_variant_link_flags)
     MACCATALYST_BUILD_FLAVOR  "${LFLAGS_MACCATALYST_BUILD_FLAVOR}")
   if("${LFLAGS_SDK}" STREQUAL "LINUX")
     list(APPEND link_libraries "pthread" "dl")
+    if("${SWIFT_HOST_VARIANT_ARCH}" MATCHES "armv6|armv7|i686")
+      list(APPEND link_libraries PRIVATE "atomic")
+    endif()
   elseif("${LFLAGS_SDK}" STREQUAL "FREEBSD")
     list(APPEND link_libraries "pthread")
   elseif("${LFLAGS_SDK}" STREQUAL "OPENBSD")
@@ -418,7 +406,7 @@ function(_add_target_variant_link_flags)
       ${SWIFT_ANDROID_${LFLAGS_ARCH}_ICU_I18N}
       ${SWIFT_ANDROID_${LFLAGS_ARCH}_ICU_UC})
 
-    swift_android_lib_for_arch(${LFLAGS_ARCH} ${LFLAGS_ARCH}_LIB)
+    swift_android_libgcc_for_arch_cross_compile(${LFLAGS_ARCH} ${LFLAGS_ARCH}_LIB)
     foreach(path IN LISTS ${LFLAGS_ARCH}_LIB)
       list(APPEND library_search_directories ${path})
     endforeach()
@@ -646,7 +634,8 @@ function(_add_swift_target_library_single target name)
         DARWIN_INSTALL_NAME_DIR
         SDK
         DEPLOYMENT_VERSION_MACCATALYST
-        MACCATALYST_BUILD_FLAVOR)
+        MACCATALYST_BUILD_FLAVOR
+        ENABLE_LTO)
   set(SWIFTLIB_SINGLE_multiple_parameter_options
         C_COMPILE_FLAGS
         DEPENDS
@@ -748,7 +737,7 @@ function(_add_swift_target_library_single target name)
     handle_gyb_sources(
         gyb_dependency_targets
         SWIFTLIB_SINGLE_GYB_SOURCES
-        "${SWIFTLIB_SINGLE_ARCHITECTURE}")
+        ARCH "${SWIFTLIB_SINGLE_ARCHITECTURE}")
     set(SWIFTLIB_SINGLE_SOURCES ${SWIFTLIB_SINGLE_SOURCES}
       ${SWIFTLIB_SINGLE_GYB_SOURCES})
   endif()
@@ -801,6 +790,7 @@ function(_add_swift_target_library_single target name)
       ${SWIFTLIB_SINGLE_IS_SDK_OVERLAY_keyword}
       ${embed_bitcode_arg}
       ${SWIFTLIB_SINGLE_STATIC_keyword}
+      ENABLE_LTO "${SWIFTLIB_SINGLE_ENABLE_LTO}"
       INSTALL_IN_COMPONENT "${SWIFTLIB_SINGLE_INSTALL_IN_COMPONENT}"
       MACCATALYST_BUILD_FLAVOR "${SWIFTLIB_SINGLE_MACCATALYST_BUILD_FLAVOR}")
   add_swift_source_group("${SWIFTLIB_SINGLE_EXTERNAL_SOURCES}")
@@ -983,11 +973,6 @@ function(_add_swift_target_library_single target name)
       endif()
     endif()
 
-    # Always use @rpath for XCTest
-    if(module_name STREQUAL "XCTest")
-      set(install_name_dir "@rpath")
-    endif()
-
     if(SWIFTLIB_SINGLE_DARWIN_INSTALL_NAME_DIR)
       set(install_name_dir "${SWIFTLIB_SINGLE_DARWIN_INSTALL_NAME_DIR}")
     endif()
@@ -1018,6 +1003,10 @@ function(_add_swift_target_library_single target name)
         PROPERTIES
         INSTALL_RPATH "$ORIGIN")
     endif()
+  elseif("${SWIFTLIB_SINGLE_SDK}" STREQUAL "OPENBSD")
+    set_target_properties("${target}"
+      PROPERTIES
+      INSTALL_RPATH "$ORIGIN")
   endif()
 
   set_target_properties("${target}" PROPERTIES BUILD_WITH_INSTALL_RPATH YES)
@@ -1161,9 +1150,7 @@ function(_add_swift_target_library_single target name)
     set(analyze_code_coverage "${SWIFT_ANALYZE_CODE_COVERAGE}")
   endif()
 
-  if (NOT SWIFTLIB_SINGLE_TARGET_LIBRARY)
-    set(lto_type "${SWIFT_TOOLS_ENABLE_LTO}")
-  endif()
+  set(lto_type "${SWIFT_STDLIB_ENABLE_LTO}")
 
   _add_target_variant_c_compile_flags(
     SDK "${SWIFTLIB_SINGLE_SDK}"
@@ -1366,6 +1353,16 @@ function(_add_swift_target_library_single target name)
       ${library_search_directories})
     target_link_libraries("${target_static}" PRIVATE
         ${SWIFTLIB_SINGLE_PRIVATE_LINK_LIBRARIES})
+
+    # Force executables linker language to be CXX so that we do not link using the
+    # host toolchain swiftc.
+    if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "ANDROID")
+      set_property(TARGET "${target_static}" PROPERTY
+        LINKER_LANGUAGE "C")
+    else()
+      set_property(TARGET "${target_static}" PROPERTY
+        LINKER_LANGUAGE "CXX")
+    endif()
   endif()
 
   # Do not add code here.
@@ -1657,7 +1654,8 @@ function(add_swift_target_library name)
     list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-warn-implicit-overrides")
   endif()
 
-  if(NOT SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER AND NOT BUILD_STANDALONE)
+  if(NOT SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER AND NOT BUILD_STANDALONE AND
+     NOT SWIFT_PREBUILT_CLANG)
     list(APPEND SWIFTLIB_DEPENDS clang)
   endif()
 
@@ -1665,6 +1663,16 @@ function(add_swift_target_library name)
   if(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
     list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS 
                       "-Xfrontend;-disable-implicit-concurrency-module-import")
+  endif()
+
+  # Turn off implicit import of _Distributed when building libraries
+  if(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED)
+    list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS
+                      "-Xfrontend;-disable-implicit-distributed-module-import")
+  endif()
+
+  if(SWIFTLIB_IS_STDLIB AND SWIFT_STDLIB_ENABLE_PRESPECIALIZATION)
+    list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-Xfrontend;-prespecialize-generic-metadata")
   endif()
 
   # If we are building this library for targets, loop through the various
@@ -1931,9 +1939,7 @@ function(add_swift_target_library name)
       # These paths must come before their normal counterparts so that when compiling
       # macCatalyst-only or unzippered-twin overlays the macCatalyst version
       # of a framework is found and not the Mac version.
-      if(maccatalyst_build_flavor STREQUAL "ios-like"
-          OR (name STREQUAL "swiftXCTest"
-            AND maccatalyst_build_flavor STREQUAL "zippered"))
+      if(maccatalyst_build_flavor STREQUAL "ios-like")
 
         # The path to find iOS-only frameworks (such as UIKit) under macCatalyst.
         set(ios_support_frameworks_path "${SWIFT_SDK_${sdk}_PATH}/System/iOSSupport/System/Library/Frameworks/")
@@ -2010,7 +2016,7 @@ function(add_swift_target_library name)
         DEPLOYMENT_VERSION_TVOS "${SWIFTLIB_DEPLOYMENT_VERSION_TVOS}"
         DEPLOYMENT_VERSION_WATCHOS "${SWIFTLIB_DEPLOYMENT_VERSION_WATCHOS}"
         MACCATALYST_BUILD_FLAVOR "${maccatalyst_build_flavor}"
-
+        ENABLE_LTO "${SWIFT_STDLIB_ENABLE_LTO}"
         GYB_SOURCES ${SWIFTLIB_GYB_SOURCES}
       )
     if(NOT SWIFT_BUILT_STANDALONE AND NOT "${CMAKE_C_COMPILER_ID}" MATCHES "Clang")
@@ -2034,7 +2040,9 @@ function(add_swift_target_library name)
       if(NOT SWIFTLIB_OBJECT_LIBRARY)
         # Add dependencies on the (not-yet-created) custom lipo target.
         foreach(DEP ${SWIFTLIB_LINK_LIBRARIES})
-          if (NOT "${DEP}" STREQUAL "icucore")
+          if (NOT "${DEP}" STREQUAL "icucore" AND
+              NOT "${DEP}" STREQUAL "dispatch" AND
+              NOT "${DEP}" STREQUAL "BlocksRuntime")
             add_dependencies(${VARIANT_NAME}
               "${DEP}-${SWIFT_SDK_${sdk}_LIB_SUBDIR}")
           endif()
@@ -2043,7 +2051,9 @@ function(add_swift_target_library name)
         if (SWIFTLIB_IS_STDLIB AND SWIFTLIB_STATIC)
           # Add dependencies on the (not-yet-created) custom lipo target.
           foreach(DEP ${SWIFTLIB_LINK_LIBRARIES})
-            if (NOT "${DEP}" STREQUAL "icucore")
+            if (NOT "${DEP}" STREQUAL "icucore" AND
+                NOT "${DEP}" STREQUAL "dispatch" AND
+                NOT "${DEP}" STREQUAL "BlocksRuntime")
               add_dependencies("${VARIANT_NAME}-static"
                 "${DEP}-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-static")
             endif()
@@ -2053,6 +2063,20 @@ function(add_swift_target_library name)
         if(arch IN_LIST SWIFT_SDK_${sdk}_ARCHITECTURES)
           # Note this thin library.
           list(APPEND THIN_INPUT_TARGETS ${VARIANT_NAME})
+        endif()
+      endif()
+
+      if((sdk IN_LIST SWIFT_APPLE_PLATFORMS)
+        OR (sdk STREQUAL "FREESTANDING"))
+        # In the past, we relied on unsetting globally
+        # CMAKE_OSX_ARCHITECTURES to ensure that CMake would
+        # not add the -arch flag
+        # This is no longer the case when running on Apple Silicon,
+        # when CMake will enforce a default (see
+        # https://gitlab.kitware.com/cmake/cmake/-/merge_requests/5291)
+        set_property(TARGET ${VARIANT_NAME} PROPERTY OSX_ARCHITECTURES "${arch}")
+        if (SWIFTLIB_IS_STDLIB AND SWIFTLIB_STATIC)
+          set_property(TARGET ${VARIANT_NAME}-static PROPERTY OSX_ARCHITECTURES "${arch}")
         endif()
       endif()
     endforeach()
@@ -2340,7 +2364,7 @@ function(_add_swift_target_executable_single name)
     ARCH "${SWIFTEXE_SINGLE_ARCHITECTURE}"
     BUILD_TYPE "${CMAKE_BUILD_TYPE}"
     ENABLE_ASSERTIONS "${LLVM_ENABLE_ASSERTIONS}"
-    ENABLE_LTO "${SWIFT_TOOLS_ENABLE_LTO}"
+    ENABLE_LTO "${SWIFT_STDLIB_ENABLE_LTO}"
     ANALYZE_CODE_COVERAGE "${SWIFT_ANALYZE_CODE_COVERAGE}"
     RESULT_VAR_NAME c_compile_flags)
   _add_target_variant_link_flags(
@@ -2348,7 +2372,7 @@ function(_add_swift_target_executable_single name)
     ARCH "${SWIFTEXE_SINGLE_ARCHITECTURE}"
     BUILD_TYPE "${CMAKE_BUILD_TYPE}"
     ENABLE_ASSERTIONS "${LLVM_ENABLE_ASSERTIONS}"
-    ENABLE_LTO "${SWIFT_TOOLS_ENABLE_LTO}"
+    ENABLE_LTO "${SWIFT_STDLIB_ENABLE_LTO}"
     LTO_OBJECT_NAME "${name}-${SWIFTEXE_SINGLE_SDK}-${SWIFTEXE_SINGLE_ARCHITECTURE}"
     ANALYZE_CODE_COVERAGE "${SWIFT_ANALYZE_CODE_COVERAGE}"
     RESULT_VAR_NAME link_flags
@@ -2368,6 +2392,7 @@ function(_add_swift_target_executable_single name)
       SDK ${SWIFTEXE_SINGLE_SDK}
       ARCHITECTURE ${SWIFTEXE_SINGLE_ARCHITECTURE}
       COMPILE_FLAGS ${SWIFTEXE_SINGLE_COMPILE_FLAGS}
+      ENABLE_LTO "${SWIFT_STDLIB_ENABLE_LTO}"
       IS_MAIN)
   add_swift_source_group("${SWIFTEXE_SINGLE_EXTERNAL_SOURCES}")
 
@@ -2491,7 +2516,16 @@ function(add_swift_target_executable name)
           EXCLUDE_FROM_ALL TRUE)
       endif()
 
-      if(${sdk} IN_LIST SWIFT_APPLE_PLATFORMS)
+      if((${sdk} IN_LIST SWIFT_APPLE_PLATFORMS)
+        OR (sdk STREQUAL "FREESTANDING"))
+        # In the past, we relied on unsetting globally
+        # CMAKE_OSX_ARCHITECTURES to ensure that CMake would
+        # not add the -arch flag
+        # This is no longer the case when running on Apple Silicon,
+        # when CMake will enforce a default (see
+        # https://gitlab.kitware.com/cmake/cmake/-/merge_requests/5291)
+        set_property(TARGET ${VARIANT_NAME} PROPERTY OSX_ARCHITECTURES "${arch}")
+
         add_custom_command_target(unused_var2
          COMMAND "codesign" "-f" "-s" "-" "${SWIFT_RUNTIME_OUTPUT_INTDIR}/${VARIANT_NAME}"
          CUSTOM_TARGET_NAME "${VARIANT_NAME}_signed"

@@ -112,8 +112,8 @@ public enum Result<Success, Failure: Error> {
   ///
   /// - Parameter transform: A closure that takes the success value of the
   ///   instance.
-  /// - Returns: A `Result` instance with the result of evaluating `transform`
-  ///   as the new failure value if this instance represents a failure.
+  /// - Returns: A `Result` instance, either from the closure or the previous
+  ///   `.failure`.
   @inlinable
   public func flatMap<NewSuccess>(
     _ transform: (Success) -> Result<NewSuccess, Failure>
@@ -190,3 +190,5 @@ extension Result where Failure == Swift.Error {
 extension Result: Equatable where Success: Equatable, Failure: Equatable { }
 
 extension Result: Hashable where Success: Hashable, Failure: Hashable { }
+
+extension Result: Sendable where Success: Sendable, Failure: Sendable { }

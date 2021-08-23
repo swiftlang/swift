@@ -167,84 +167,6 @@ static locale_t getCLocale() {
 }
 #endif
 
-#if !SWIFT_DTOA_FLOAT80_SUPPORT
-#if defined(__APPLE__)
-#define swift_snprintf_l snprintf_l
-#elif defined(__CYGWIN__) || defined(_WIN32) || defined(__HAIKU__)
-// swift_snprintf_l() is not used.
-#else
-static int swift_snprintf_l(char *Str, size_t StrSize, locale_t Locale,
-                            const char *Format, ...) {
-  if (Locale == nullptr) {
-    Locale = getCLocale();
-  }
-  locale_t OldLocale = uselocale(Locale);
-
-  va_list Args;
-  va_start(Args, Format);
-  int Result = std::vsnprintf(Str, StrSize, Format, Args);
-  va_end(Args);
-
-  uselocale(OldLocale);
-
-  return Result;
-}
-#endif
-
-template <typename T>
-static uint64_t swift_floatingPointToString(char *Buffer, size_t BufferLength,
-                                            T Value, const char *Format, 
-                                            bool Debug) {
-  if (BufferLength < 32)
-    swift::crash("swift_floatingPointToString: insufficient buffer size");
-
-  int Precision = std::numeric_limits<T>::digits10;
-  if (Debug) {
-    Precision = std::numeric_limits<T>::max_digits10;
-  }
-
-#if defined(__CYGWIN__) || defined(_WIN32) || defined(__HAIKU__)
-  // Cygwin does not support uselocale(), but we can use the locale feature 
-  // in stringstream object.
-  std::ostringstream ValueStream;
-  ValueStream.width(0);
-  ValueStream.precision(Precision);
-  ValueStream.imbue(std::locale::classic());
-  ValueStream << Value;
-  std::string ValueString(ValueStream.str());
-  size_t i = ValueString.length();
-
-  if (i < BufferLength) {
-    std::copy(ValueString.begin(), ValueString.end(), Buffer);
-    Buffer[i] = '\0';
-  } else {
-    swift::crash("swift_floatingPointToString: insufficient buffer size");
-  }
-#else
-  // Pass a null locale to use the C locale.
-  int i = swift_snprintf_l(Buffer, BufferLength, /*Locale=*/nullptr, Format,
-                           Precision, Value);
-
-  if (i < 0)
-    swift::crash(
-        "swift_floatingPointToString: unexpected return value from sprintf");
-  if (size_t(i) >= BufferLength)
-    swift::crash("swift_floatingPointToString: insufficient buffer size");
-#endif
-
-  // Add ".0" to a float that (a) is not in scientific notation, (b) does not
-  // already have a fractional part, (c) is not infinite, and (d) is not a NaN
-  // value.
-  if (strchr(Buffer, 'e') == nullptr && strchr(Buffer, '.') == nullptr &&
-      strchr(Buffer, 'n') == nullptr) {
-    Buffer[i++] = '.';
-    Buffer[i++] = '0';
-  }
-
-  return i;
-}
-#endif
-
 // TODO: replace this with a float16 implementation instead of calling _float.
 // Argument type will have to stay float, though; only the formatting changes.
 // Note, return type is __swift_ssize_t, not uint64_t as with the other
@@ -254,33 +176,31 @@ SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 __swift_ssize_t swift_float16ToString(char *Buffer, size_t BufferLength,
                                       float Value, bool Debug) {
   __fp16 v = Value;
-  return swift_format_float16(&v, Buffer, BufferLength);
+  return swift_dtoa_optimal_binary16_p(&v, Buffer, BufferLength);
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 uint64_t swift_float32ToString(char *Buffer, size_t BufferLength,
                                float Value, bool Debug) {
-  return swift_format_float(Value, Buffer, BufferLength);
+  return swift_dtoa_optimal_float(Value, Buffer, BufferLength);
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 uint64_t swift_float64ToString(char *Buffer, size_t BufferLength,
                                double Value, bool Debug) {
-  return swift_format_double(Value, Buffer, BufferLength);
+  return swift_dtoa_optimal_double(Value, Buffer, BufferLength);
 }
 
+// We only support float80 on platforms that use that exact format for 'long double'
+// This should match the conditionals in Runtime.swift
+#if !defined(_WIN32) && !defined(__ANDROID__) && (defined(__i386__) || defined(__i686__) || defined(__x86_64__))
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 uint64_t swift_float80ToString(char *Buffer, size_t BufferLength,
                                long double Value, bool Debug) {
-#if SWIFT_DTOA_FLOAT80_SUPPORT
-  return swift_format_float80(Value, Buffer, BufferLength);
-#else
-  // Use this when 'long double' is not true Float80
-  return swift_floatingPointToString<long double>(Buffer, BufferLength, Value,
-                                                  "%0.*Lg", Debug);
-#endif
-
+  // SwiftDtoa.cpp automatically enables float80 on platforms that use it for 'long double'
+  return swift_dtoa_optimal_float80_p(&Value, Buffer, BufferLength);
 }
+#endif
 
 /// \param[out] LinePtr Replaced with the pointer to the malloc()-allocated
 /// line.  Can be NULL if no characters were read. This buffer should be

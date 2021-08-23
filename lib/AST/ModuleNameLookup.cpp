@@ -230,7 +230,7 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
       if (import.importedModule == headerImportModule)
         continue;
 
-      visitImport(import, nullptr);
+      visitImport(import, moduleScopeContext);
     }
   }
 

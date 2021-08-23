@@ -77,7 +77,7 @@ SGFContext ConditionalValue::enterBranch(SILBasicBlock *bb) {
   
   assert(!scope.hasValue() && "already have a scope");
   // Start a scope for the current branch.
-  scope.emplace(SGF.Cleanups, CleanupLocation::get(loc));
+  scope.emplace(SGF.Cleanups, CleanupLocation(loc));
 
   // Code emitted in the branch can emit into our buffer for address-only
   // conditionals.

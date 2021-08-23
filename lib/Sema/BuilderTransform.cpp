@@ -205,9 +205,8 @@ class BuilderClosureVisitor
   }
 
 public:
-  BuilderClosureVisitor(ASTContext &ctx, ConstraintSystem *cs,
-                        DeclContext *dc, Type builderType,
-                        Type bodyResultType)
+  BuilderClosureVisitor(ASTContext &ctx, ConstraintSystem *cs, DeclContext *dc,
+                        Type builderType, Type bodyResultType)
       : cs(cs), dc(dc), ctx(ctx), builderType(builderType) {
     builder = builderType->getAnyNominal();
     applied.builderType = builderType;
@@ -238,9 +237,8 @@ public:
           { applied.returnExpr }, { Identifier() });
     }
 
-    applied.returnExpr = cs->buildTypeErasedExpr(applied.returnExpr,
-                                                 dc, applied.bodyResultType,
-                                                 CTP_ReturnStmt);
+    applied.returnExpr = cs->buildTypeErasedExpr(
+        applied.returnExpr, dc, applied.bodyResultType, CTP_ReturnStmt);
 
     applied.returnExpr = cs->generateConstraints(applied.returnExpr, dc);
     if (!applied.returnExpr) {
@@ -268,14 +266,30 @@ protected:
   }
 
   void visitPatternBindingDecl(PatternBindingDecl *patternBinding) {
-    // If any of the entries lacks an initializer, don't handle this node.
-    if (!llvm::all_of(range(patternBinding->getNumPatternEntries()),
-                      [&](unsigned index) {
-            return patternBinding->isExplicitlyInitialized(index);
-        })) {
-      if (!unhandledNode)
-        unhandledNode = patternBinding;
-      return;
+    // Enforce some restrictions on local variables inside a result builder.
+    for (unsigned i : range(patternBinding->getNumPatternEntries())) {
+      // The pattern binding must have an initial value expression.
+      if (!patternBinding->isExplicitlyInitialized(i)) {
+        if (!unhandledNode)
+          unhandledNode = patternBinding;
+        return;
+      }
+
+      // Each variable bound by the pattern must be stored, and cannot
+      // have observers.
+      SmallVector<VarDecl *, 8> variables;
+      patternBinding->getPattern(i)->collectVariables(variables);
+
+      for (auto *var : variables) {
+        if (!var->getImplInfo().isSimpleStored()) {
+          if (!unhandledNode)
+            unhandledNode = patternBinding;
+          return;
+        }
+
+        // Also check for invalid attributes.
+        TypeChecker::checkDeclAttributes(var);
+      }
     }
 
     // If there is a constraint system, generate constraints for the pattern
@@ -486,15 +500,19 @@ protected:
     if (!cs || !thenVar || (elseChainVar && !*elseChainVar))
       return nullptr;
 
-    // If there is a #available in the condition, the 'then' will need to
-    // be wrapped in a call to buildLimitedAvailability(_:), if available.
     Expr *thenVarRefExpr = buildVarRef(
         thenVar, ifStmt->getThenStmt()->getEndLoc());
-    if (findAvailabilityCondition(ifStmt->getCond()) &&
-        builderSupports(ctx.Id_buildLimitedAvailability)) {
-      thenVarRefExpr = buildCallIfWanted(
-          ifStmt->getThenStmt()->getEndLoc(), ctx.Id_buildLimitedAvailability,
-          { thenVarRefExpr }, { Identifier() });
+
+    // If there is a #available in the condition, wrap the 'then' in a call to
+    // buildLimitedAvailability(_:).
+    auto availabilityCond = findAvailabilityCondition(ifStmt->getCond());
+    bool supportsAvailability =
+        availabilityCond && builderSupports(ctx.Id_buildLimitedAvailability);
+    if (supportsAvailability &&
+        !availabilityCond->getAvailability()->isUnavailability()) {
+      thenVarRefExpr = buildCallIfWanted(ifStmt->getThenStmt()->getEndLoc(),
+                                         ctx.Id_buildLimitedAvailability,
+                                         {thenVarRefExpr}, {Identifier()});
     }
 
     // Prepare the `then` operand by wrapping it to produce a chain result.
@@ -517,12 +535,22 @@ protected:
       elseExpr = buildVarRef(*elseChainVar, ifStmt->getEndLoc());
       elseLoc = ifStmt->getElseLoc();
 
-    // - Otherwise, wrap it to produce a chain result.
+      // - Otherwise, wrap it to produce a chain result.
     } else {
+      Expr *elseVarRefExpr = buildVarRef(*elseChainVar, ifStmt->getEndLoc());
+
+      // If there is a #unavailable in the condition, wrap the 'else' in a call
+      // to buildLimitedAvailability(_:).
+      if (supportsAvailability &&
+          availabilityCond->getAvailability()->isUnavailability()) {
+        elseVarRefExpr = buildCallIfWanted(ifStmt->getEndLoc(),
+                                           ctx.Id_buildLimitedAvailability,
+                                           {elseVarRefExpr}, {Identifier()});
+      }
+
+      elseExpr = buildWrappedChainPayload(elseVarRefExpr, payloadIndex + 1,
+                                          numPayloads, isOptional);
       elseLoc = ifStmt->getElseLoc();
-      elseExpr = buildWrappedChainPayload(
-          buildVarRef(*elseChainVar, ifStmt->getEndLoc()),
-          payloadIndex + 1, numPayloads, isOptional);
     }
 
     // The operand should have optional type if we had optional results,
@@ -738,15 +766,20 @@ protected:
     // statements by excluding invalid cases.
     if (auto *BS = dyn_cast<BraceStmt>(body)) {
       if (BS->getNumElements() == 0) {
-        hadError = true;
-        return nullptr;
+        // HACK: still allow empty bodies if typechecking for code
+        // completion. Code completion ignores diagnostics
+        // and won't get any types if we fail.
+        if (!ctx.SourceMgr.hasCodeCompletionBuffer()) {
+          hadError = true;
+          return nullptr;
+        }
       }
     }
 
     // If needed, generate constraints for everything in the case statement.
     if (cs) {
       auto locator = cs->getConstraintLocator(
-          subjectExpr, LocatorPathElt::ContextualType());
+          subjectExpr, LocatorPathElt::ContextualType(CTP_Initialization));
       Type subjectType = cs->getType(subjectExpr);
 
       if (cs->generateConstraints(caseStmt, dc, subjectType, locator)) {
@@ -774,7 +807,8 @@ protected:
     // take care of this.
     auto sequenceProto = TypeChecker::getProtocol(
         dc->getASTContext(), forEachStmt->getForLoc(),
-        KnownProtocolKind::Sequence);
+        forEachStmt->getAwaitLoc().isValid() ? 
+          KnownProtocolKind::AsyncSequence : KnownProtocolKind::Sequence);
     if (!sequenceProto) {
       if (!unhandledNode)
         unhandledNode = forEachStmt;
@@ -829,7 +863,7 @@ protected:
     cs->addConstraint(
         ConstraintKind::Equal, cs->getType(arrayInitExpr), arrayType,
         cs->getConstraintLocator(
-          arrayInitExpr, LocatorPathElt::ContextualType()));
+            arrayInitExpr, LocatorPathElt::ContextualType(CTP_Initialization)));
 
     // Form a call to Array.append(_:) to add the result of executing each
     // iteration of the loop body to the array formed above.
@@ -941,7 +975,8 @@ struct ResultBuilderTarget {
 /// Handles the rewrite of the body of a closure to which a result builder
 /// has been applied.
 class BuilderClosureRewriter
-    : public StmtVisitor<BuilderClosureRewriter, Stmt *, ResultBuilderTarget> {
+    : public StmtVisitor<BuilderClosureRewriter, NullablePtr<Stmt>,
+                         ResultBuilderTarget> {
   ASTContext &ctx;
   const Solution &solution;
   DeclContext *dc;
@@ -1008,12 +1043,12 @@ private:
     switch (target.kind) {
     case ResultBuilderTarget::ReturnValue: {
       // Return the expression.
-      Type bodyResultType =
+      Type bodyResultInterfaceType =
           solution.simplifyType(builderTransform.bodyResultType);
 
-      SolutionApplicationTarget returnTarget(
-          capturedExpr, dc, CTP_ReturnStmt, bodyResultType,
-          /*isDiscarded=*/false);
+      SolutionApplicationTarget returnTarget(capturedExpr, dc, CTP_ReturnStmt,
+                                             bodyResultInterfaceType,
+                                             /*isDiscarded=*/false);
       Expr *resultExpr = nullptr;
       if (auto resultTarget = rewriteTarget(returnTarget))
         resultExpr = resultTarget->getAsExpr();
@@ -1102,8 +1137,9 @@ public:
         solution(solution), dc(dc), builderTransform(builderTransform),
         rewriteTarget(rewriteTarget) { }
 
-  Stmt *visitBraceStmt(BraceStmt *braceStmt, ResultBuilderTarget target,
-                       Optional<ResultBuilderTarget> innerTarget = None) {
+  NullablePtr<Stmt>
+  visitBraceStmt(BraceStmt *braceStmt, ResultBuilderTarget target,
+                 Optional<ResultBuilderTarget> innerTarget = None) {
     std::vector<ASTNode> newElements;
 
     // If there is an "inner" target corresponding to this brace, declare
@@ -1143,7 +1179,7 @@ public:
         // "throw" statements produce no value. Transform them directly.
         if (auto throwStmt = dyn_cast<ThrowStmt>(stmt)) {
           if (auto newStmt = visitThrowStmt(throwStmt)) {
-            newElements.push_back(stmt);
+            newElements.push_back(newStmt.get());
           }
           continue;
         }
@@ -1154,7 +1190,7 @@ public:
 
         declareTemporaryVariable(captured.first, newElements);
 
-        Stmt *finalStmt = visit(
+        auto finalStmt = visit(
             stmt,
             ResultBuilderTarget{ResultBuilderTarget::TemporaryVar,
                                   std::move(captured)});
@@ -1164,7 +1200,7 @@ public:
         if (!finalStmt)
           return nullptr;
 
-        newElements.push_back(finalStmt);
+        newElements.push_back(finalStmt.get());
         continue;
       }
 
@@ -1214,7 +1250,7 @@ public:
                              braceStmt->getRBraceLoc());
   }
 
-  Stmt *visitIfStmt(IfStmt *ifStmt, ResultBuilderTarget target) {
+  NullablePtr<Stmt> visitIfStmt(IfStmt *ifStmt, ResultBuilderTarget target) {
     // Rewrite the condition.
     if (auto condition = rewriteTarget(
             SolutionApplicationTarget(ifStmt->getCond(), dc)))
@@ -1230,7 +1266,10 @@ public:
             temporaryVar, {target.captured.second[0]}),
           ResultBuilderTarget::forAssign(
             capturedThen.first, {capturedThen.second.front()}));
-    ifStmt->setThenStmt(newThen);
+    if (!newThen)
+      return nullptr;
+
+    ifStmt->setThenStmt(newThen.get());
 
     // Look for a #available condition. If there is one, we need to check
     // that the resulting type of the "then" doesn't refer to any types that
@@ -1243,9 +1282,18 @@ public:
     // this warning to an error.
     if (auto availabilityCond = findAvailabilityCondition(ifStmt->getCond())) {
       SourceLoc loc = availabilityCond->getStartLoc();
-      Type thenBodyType = solution.simplifyType(
+      Type bodyType;
+      if (availabilityCond->getAvailability()->isUnavailability()) {
+        // For #unavailable, we need to check the "else".
+        Type elseBodyType = solution.simplifyType(
+          solution.getType(target.captured.second[1]));
+        bodyType = elseBodyType;
+      } else {
+        Type thenBodyType = solution.simplifyType(
           solution.getType(target.captured.second[0]));
-      thenBodyType.findIf([&](Type type) {
+        bodyType = thenBodyType;
+      }
+      bodyType.findIf([&](Type type) {
         auto nominal = type->getAnyNominal();
         if (!nominal)
           return false;
@@ -1293,23 +1341,28 @@ public:
             dyn_cast_or_null<BraceStmt>(ifStmt->getElseStmt())) {
       // Translate the "else" branch when it's a stmt-brace.
       auto capturedElse = takeCapturedStmt(elseBraceStmt);
-      Stmt *newElse = visitBraceStmt(
+      auto newElse = visitBraceStmt(
           elseBraceStmt,
           ResultBuilderTarget::forAssign(
             temporaryVar, {target.captured.second[1]}),
           ResultBuilderTarget::forAssign(
             capturedElse.first, {capturedElse.second.front()}));
-      ifStmt->setElseStmt(newElse);
+      if (!newElse)
+        return nullptr;
+
+      ifStmt->setElseStmt(newElse.get());
     } else if (auto elseIfStmt = cast_or_null<IfStmt>(ifStmt->getElseStmt())){
       // Translate the "else" branch when it's an else-if.
       auto capturedElse = takeCapturedStmt(elseIfStmt);
       std::vector<ASTNode> newElseElements;
       declareTemporaryVariable(capturedElse.first, newElseElements);
-      newElseElements.push_back(
-          visitIfStmt(
-            elseIfStmt,
-            ResultBuilderTarget::forAssign(
-              capturedElse.first, capturedElse.second)));
+      auto newElseElt =
+          visitIfStmt(elseIfStmt, ResultBuilderTarget::forAssign(
+                                      capturedElse.first, capturedElse.second));
+      if (!newElseElt)
+        return nullptr;
+
+      newElseElements.push_back(newElseElt.get());
       newElseElements.push_back(
           initializeTarget(
             ResultBuilderTarget::forAssign(
@@ -1333,23 +1386,25 @@ public:
     return ifStmt;
   }
 
-  Stmt *visitDoStmt(DoStmt *doStmt, ResultBuilderTarget target) {
+  NullablePtr<Stmt> visitDoStmt(DoStmt *doStmt, ResultBuilderTarget target) {
     // Each statement turns into a (potential) temporary variable
     // binding followed by the statement itself.
     auto body = cast<BraceStmt>(doStmt->getBody());
     auto captured = takeCapturedStmt(body);
 
-    auto newInnerBody = cast<BraceStmt>(
-        visitBraceStmt(
-          body,
-          target,
-          ResultBuilderTarget::forAssign(
-            captured.first, {captured.second.front()})));
-    doStmt->setBody(newInnerBody);
+    auto newInnerBody =
+        visitBraceStmt(body, target,
+                       ResultBuilderTarget::forAssign(
+                           captured.first, {captured.second.front()}));
+    if (!newInnerBody)
+      return nullptr;
+
+    doStmt->setBody(cast<BraceStmt>(newInnerBody.get()));
     return doStmt;
   }
 
-  Stmt *visitSwitchStmt(SwitchStmt *switchStmt, ResultBuilderTarget target) {
+  NullablePtr<Stmt> visitSwitchStmt(SwitchStmt *switchStmt,
+                                    ResultBuilderTarget target) {
     // Translate the subject expression.
     ConstraintSystem &cs = solution.getConstraintSystem();
     auto subjectTarget =
@@ -1394,7 +1449,8 @@ public:
     return switchStmt;
   }
 
-  Stmt *visitCaseStmt(CaseStmt *caseStmt, ResultBuilderTarget target) {
+  NullablePtr<Stmt> visitCaseStmt(CaseStmt *caseStmt,
+                                  ResultBuilderTarget target) {
     // Translate the patterns and guard expressions for each case label item.
     for (auto &caseLabelItem : caseStmt->getMutableCaseLabelItems()) {
       SolutionApplicationTarget caseLabelTarget(&caseLabelItem, dc);
@@ -1405,19 +1461,19 @@ public:
     // Transform the body of the case.
     auto body = cast<BraceStmt>(caseStmt->getBody());
     auto captured = takeCapturedStmt(body);
-    auto newInnerBody = cast<BraceStmt>(
-        visitBraceStmt(
-          body,
-          target,
-          ResultBuilderTarget::forAssign(
-            captured.first, {captured.second.front()})));
-    caseStmt->setBody(newInnerBody);
+    auto newInnerBody =
+        visitBraceStmt(body, target,
+                       ResultBuilderTarget::forAssign(
+                           captured.first, {captured.second.front()}));
+    if (!newInnerBody)
+      return nullptr;
 
+    caseStmt->setBody(cast<BraceStmt>(newInnerBody.get()));
     return caseStmt;
   }
 
-  Stmt *visitForEachStmt(
-      ForEachStmt *forEachStmt, ResultBuilderTarget target) {
+  NullablePtr<Stmt> visitForEachStmt(ForEachStmt *forEachStmt,
+                                     ResultBuilderTarget target) {
     // Translate the for-each loop header.
     ConstraintSystem &cs = solution.getConstraintSystem();
     auto forEachTarget =
@@ -1447,13 +1503,14 @@ public:
     // will append the result of executing the loop body to the array.
     auto body = forEachStmt->getBody();
     auto capturedBody = takeCapturedStmt(body);
-    auto newBody = cast<BraceStmt>(
-        visitBraceStmt(
-          body,
-          ResultBuilderTarget::forExpression(arrayAppendCall),
-          ResultBuilderTarget::forAssign(
-            capturedBody.first, {capturedBody.second.front()})));
-    forEachStmt->setBody(newBody);
+    auto newBody = visitBraceStmt(
+        body, ResultBuilderTarget::forExpression(arrayAppendCall),
+        ResultBuilderTarget::forAssign(capturedBody.first,
+                                       {capturedBody.second.front()}));
+    if (!newBody)
+      return nullptr;
+
+    forEachStmt->setBody(cast<BraceStmt>(newBody.get()));
     outerBodySteps.push_back(forEachStmt);
 
     // Step 3. Perform the buildArray() call to turn the array of results
@@ -1465,11 +1522,11 @@ public:
 
     // Form a brace statement to put together the three main steps for the
     // for-each loop translation outlined above.
-    return BraceStmt::create(
-        ctx, forEachStmt->getStartLoc(), outerBodySteps, newBody->getEndLoc());
+    return BraceStmt::create(ctx, forEachStmt->getStartLoc(), outerBodySteps,
+                             newBody.get()->getEndLoc());
   }
 
-  Stmt *visitThrowStmt(ThrowStmt *throwStmt) {
+  NullablePtr<Stmt> visitThrowStmt(ThrowStmt *throwStmt) {
     // Rewrite the error.
     auto target = *solution.getConstraintSystem()
         .getSolutionApplicationTarget(throwStmt);
@@ -1481,12 +1538,14 @@ public:
     return throwStmt;
   }
 
-  Stmt *visitThrowStmt(ThrowStmt *throwStmt, ResultBuilderTarget target) {
+  NullablePtr<Stmt> visitThrowStmt(ThrowStmt *throwStmt,
+                                   ResultBuilderTarget target) {
     llvm_unreachable("Throw statements produce no value");
   }
 
 #define UNHANDLED_RESULT_BUILDER_STMT(STMT) \
-  Stmt *visit##STMT##Stmt(STMT##Stmt *stmt, ResultBuilderTarget target) { \
+  NullablePtr<Stmt> \
+  visit##STMT##Stmt(STMT##Stmt *stmt, ResultBuilderTarget target) { \
     llvm_unreachable("Function builders do not allow statement of kind " \
                      #STMT); \
   }
@@ -1518,12 +1577,12 @@ BraceStmt *swift::applyResultBuilderTransform(
           rewriteTarget) {
   BuilderClosureRewriter rewriter(solution, dc, applied, rewriteTarget);
   auto captured = rewriter.takeCapturedStmt(body);
-  return cast_or_null<BraceStmt>(
-    rewriter.visitBraceStmt(
-      body,
-      ResultBuilderTarget::forReturn(applied.returnExpr),
-      ResultBuilderTarget::forAssign(
-        captured.first, captured.second)));
+  auto result = rewriter.visitBraceStmt(
+      body, ResultBuilderTarget::forReturn(applied.returnExpr),
+      ResultBuilderTarget::forAssign(captured.first, captured.second));
+  if (!result)
+    return nullptr;
+  return cast<BraceStmt>(result.get());
 }
 
 Optional<BraceStmt *> TypeChecker::applyResultBuilderBodyTransform(
@@ -1554,7 +1613,7 @@ Optional<BraceStmt *> TypeChecker::applyResultBuilderBodyTransform(
 
     ctx.Diags.diagnose(
         returnStmts.front()->getReturnLoc(),
-        diag::result_builder_disabled_by_return, builderType);
+        diag::result_builder_disabled_by_return_warn, builderType);
 
     // Note that one can remove the result builder attribute.
     auto attr = func->getAttachedResultBuilder();
@@ -1565,10 +1624,7 @@ Optional<BraceStmt *> TypeChecker::applyResultBuilderBodyTransform(
     }
 
     if (attr) {
-      ctx.Diags.diagnose(
-          attr->getLocation(), diag::result_builder_remove_attr)
-        .fixItRemove(attr->getRangeWithAt());
-      attr->setInvalid();
+      diagnoseAndRemoveAttr(func, attr, diag::result_builder_remove_attr);
     }
 
     // Note that one can remove all of the return statements.
@@ -1594,7 +1650,7 @@ Optional<BraceStmt *> TypeChecker::applyResultBuilderBodyTransform(
   ConstraintKind resultConstraintKind = ConstraintKind::Conversion;
   if (auto opaque = resultContextType->getAs<OpaqueTypeArchetypeType>()) {
     if (opaque->getDecl()->isOpaqueReturnTypeOfFunction(func)) {
-      resultConstraintKind = ConstraintKind::OpaqueUnderlyingType;
+      resultConstraintKind = ConstraintKind::Equal;
     }
   }
 
@@ -1660,25 +1716,24 @@ Optional<BraceStmt *> TypeChecker::applyResultBuilderBodyTransform(
 }
 
 Optional<ConstraintSystem::TypeMatchResult>
-ConstraintSystem::matchResultBuilder(
-    AnyFunctionRef fn, Type builderType, Type bodyResultType,
-    ConstraintKind bodyResultConstraintKind,
-    ConstraintLocatorBuilder locator) {
+ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
+                                     Type bodyResultType,
+                                     ConstraintKind bodyResultConstraintKind,
+                                     ConstraintLocatorBuilder locator) {
   auto builder = builderType->getAnyNominal();
   assert(builder && "Bad result builder type");
   assert(builder->getAttrs().hasAttribute<ResultBuilderAttr>());
 
   if (InvalidResultBuilderBodies.count(fn)) {
-    (void)recordFix(
-        IgnoreInvalidResultBuilderBody::duringConstraintGeneration(
-            *this, getConstraintLocator(fn.getBody())));
+    (void)recordFix(IgnoreInvalidResultBuilderBody::create(
+        *this, getConstraintLocator(fn.getAbstractClosureExpr())));
     return getTypeMatchSuccess();
   }
 
   // Pre-check the body: pre-check any expressions in it and look
   // for return statements.
   auto request =
-      PreCheckResultBuilderRequest{{fn, /*SuppressDiagnostics=*/true}};
+      PreCheckResultBuilderRequest{{fn, /*SuppressDiagnostics=*/false}};
   switch (evaluateOrDefault(getASTContext().evaluator, request,
                             ResultBuilderBodyPreCheck::Error)) {
   case ResultBuilderBodyPreCheck::Okay:
@@ -1686,17 +1741,31 @@ ConstraintSystem::matchResultBuilder(
     break;
 
   case ResultBuilderBodyPreCheck::Error: {
+    InvalidResultBuilderBodies.insert(fn);
+
     if (!shouldAttemptFixes())
       return getTypeMatchFailure(locator);
 
-    if (recordFix(IgnoreInvalidResultBuilderBody::duringPreCheck(
-            *this, getConstraintLocator(fn.getBody()))))
+    if (recordFix(IgnoreInvalidResultBuilderBody::create(
+            *this, getConstraintLocator(fn.getAbstractClosureExpr()))))
       return getTypeMatchFailure(locator);
 
     return getTypeMatchSuccess();
   }
 
   case ResultBuilderBodyPreCheck::HasReturnStmt:
+    // Diagnostic mode means that solver couldn't reach any viable
+    // solution, so let's diagnose presence of a `return` statement
+    // in the closure body.
+    if (shouldAttemptFixes()) {
+      if (recordFix(IgnoreResultBuilderWithReturnStmts::create(
+              *this, builderType,
+              getConstraintLocator(fn.getAbstractClosureExpr()))))
+        return getTypeMatchFailure(locator);
+
+      return getTypeMatchSuccess();
+    }
+
     // If the body has a return statement, suppress the transform but
     // continue solving the constraint system.
     return None;
@@ -1742,9 +1811,8 @@ ConstraintSystem::matchResultBuilder(
     if (transaction.hasErrors()) {
       InvalidResultBuilderBodies.insert(fn);
 
-      if (recordFix(
-              IgnoreInvalidResultBuilderBody::duringConstraintGeneration(
-                  *this, getConstraintLocator(fn.getBody()))))
+      if (recordFix(IgnoreInvalidResultBuilderBody::create(
+              *this, getConstraintLocator(fn.getAbstractClosureExpr()))))
         return getTypeMatchFailure(locator);
 
       return getTypeMatchSuccess();
@@ -1776,7 +1844,8 @@ ConstraintSystem::matchResultBuilder(
   }
 
   // Bind the body result type to the type of the transformed expression.
-  addConstraint(bodyResultConstraintKind, transformedType, bodyResultType,
+  addConstraint(bodyResultConstraintKind, transformedType,
+                openOpaqueType(bodyResultType, CTP_ReturnStmt, locator),
                 locator);
   return getTypeMatchSuccess();
 }
@@ -1835,8 +1904,11 @@ public:
       DiagnosticTransaction transaction(diagEngine);
 
       HasError |= ConstraintSystem::preCheckExpression(
-          E, DC, /*replaceInvalidRefsWithErrors=*/false);
+          E, DC, /*replaceInvalidRefsWithErrors=*/true);
       HasError |= transaction.hasErrors();
+
+      if (!HasError)
+        HasError |= containsErrorExpr(E);
 
       if (SuppressDiagnostics)
         transaction.abort();
@@ -1858,6 +1930,29 @@ public:
     return std::make_pair(true, S);
   }
 
+  /// Check whether given expression (including single-statement
+  /// closures) contains `ErrorExpr` as one of its sub-expressions.
+  bool containsErrorExpr(Expr *expr) {
+    bool hasError = false;
+
+    expr->forEachChildExpr([&](Expr *expr) -> Expr * {
+      hasError |= isa<ErrorExpr>(expr);
+      if (hasError)
+        return nullptr;
+
+      if (auto *closure = dyn_cast<ClosureExpr>(expr)) {
+        if (shouldTypeCheckInEnclosingExpression(closure)) {
+          hasError |= containsErrorExpr(closure->getSingleExpressionBody());
+          return hasError ? nullptr : expr;
+        }
+      }
+
+      return expr;
+    });
+
+    return hasError;
+  }
+
   /// Ignore patterns.
   std::pair<bool, Pattern*> walkToPatternPre(Pattern *pat) override {
     return { false, pat };
@@ -1868,13 +1963,6 @@ public:
 
 ResultBuilderBodyPreCheck PreCheckResultBuilderRequest::evaluate(
     Evaluator &evaluator, PreCheckResultBuilderDescriptor owner) const {
-  // We don't want to do the precheck if it will already have happened in
-  // the enclosing expression.
-  bool skipPrecheck = false;
-  if (auto closure = dyn_cast_or_null<ClosureExpr>(
-          owner.Fn.getAbstractClosureExpr()))
-    skipPrecheck = shouldTypeCheckInEnclosingExpression(closure);
-
   return PreCheckResultBuilderApplication(
              owner.Fn, /*skipPrecheck=*/false,
              /*suppressDiagnostics=*/owner.SuppressDiagnostics)

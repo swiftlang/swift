@@ -1,0 +1,99 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -existential-specializer | %FileCheck %s
+
+import Builtin
+import Swift
+import SwiftShims
+
+// -----------------------------------------------------------------------------
+// Test respecialization after the original thunk has been dead-code-eliminated.
+//
+// Consider the pipeline:
+//  - GenericSpecializer
+//  - ExistentialSpecializer
+//  - Inliner
+//  - DeadFunctionElimination
+//  - GenericSpecializer
+//  - ExistentialSpecializer
+//
+// This test models the pipeline just before the final invocation of
+// ExistentialSpecializer. The SIL now contains a function "wrapFoo"
+// that has already been specialized (with the suffix
+// "Tf4ee_n"). However, the thunk for that specialization does not
+// exist (it would have been inlined and dead-code eliminated by the
+// pipeline above). This allows the ExistentialSpecializer to kick in
+// again on a call to the same function.
+//
+// Here we reinvoke ExistentialSpecializer to ensure that it reuses
+// the existing specialization of wrapFoo (with the suffix "Tf4ee_n").
+// "callPrespecializedWrapFoo" is what drives the optimization this
+// time around by calling into the original, unspecialized wrapFoo.
+
+internal protocol SomeProtocol : AnyObject {
+  func foo() -> Int
+}
+
+@_hasMissingDesignatedInitializers public class SomeClass : SomeProtocol {
+  @_hasStorage @_hasInitialValue var x: Int { get set }
+  init()
+  @inline(never) func foo() -> Int
+}
+
+// SomeClass.foo()
+sil [noinline] @$s1t9SomeClassC3fooSiyF : $@convention(method) (@guaranteed SomeClass) -> Int
+
+// The original "wrapFoo" function prior to existential specialization.
+//
+// This will be replaced with a thunk by existential specialization.
+// CHECK-LABEL: sil hidden [signature_optimized_thunk] [always_inline] @$s1t7wrapFoo1a1bSi_SitAA12SomeProtocol_p_AaE_ptF : $@convention(thin) (@guaranteed SomeProtocol, @guaranteed SomeProtocol) -> (Int, Int) {
+sil hidden [noinline] @$s1t7wrapFoo1a1bSi_SitAA12SomeProtocol_p_AaE_ptF : $@convention(thin) (@guaranteed SomeProtocol, @guaranteed SomeProtocol) -> (Int, Int) {
+bb0(%0 : $SomeProtocol, %1 : $SomeProtocol):
+  debug_value %0 : $SomeProtocol, let, name "a", argno 1
+  debug_value %1 : $SomeProtocol, let, name "b", argno 2
+  %4 = open_existential_ref %0 : $SomeProtocol to $@opened("15146E00-3B09-11EB-9A47-D0817AD9F6DD") SomeProtocol
+  %5 = unchecked_ref_cast %4 : $@opened("15146E00-3B09-11EB-9A47-D0817AD9F6DD") SomeProtocol to $SomeClass
+  // function_ref SomeClass.foo()
+  %6 = function_ref @$s1t9SomeClassC3fooSiyF : $@convention(method) (@guaranteed SomeClass) -> Int
+  %7 = apply %6(%5) : $@convention(method) (@guaranteed SomeClass) -> Int
+  %8 = open_existential_ref %1 : $SomeProtocol to $@opened("15147238-3B09-11EB-9A47-D0817AD9F6DD") SomeProtocol
+  %9 = unchecked_ref_cast %8 : $@opened("15147238-3B09-11EB-9A47-D0817AD9F6DD") SomeProtocol to $SomeClass
+  %10 = apply %6(%9) : $@convention(method) (@guaranteed SomeClass) -> Int
+  %11 = tuple (%7 : $Int, %10 : $Int)
+  return %11 : $(Int, Int)
+}
+
+// CHECK-LABEL: sil @callPrespecializedWrapFoo : $@convention(thin) (@guaranteed SomeClass) -> (Int, Int) {
+sil @callPrespecializedWrapFoo : $@convention(thin) (@guaranteed SomeClass) -> (Int, Int) {
+bb0(%0 : $SomeClass):
+  debug_value %0 : $SomeClass, let, name "a", argno 1
+  %2 = init_existential_ref %0 : $SomeClass : $SomeClass, $SomeProtocol
+  %3 = init_existential_ref %0 : $SomeClass : $SomeClass, $SomeProtocol
+  // function_ref wrapFoo(a:b:)
+  %4 = function_ref @$s1t7wrapFoo1a1bSi_SitAA12SomeProtocol_p_AaE_ptF : $@convention(thin) (@guaranteed SomeProtocol, @guaranteed SomeProtocol) -> (Int, Int)
+  %5 = apply %4(%2, %3) : $@convention(thin) (@guaranteed SomeProtocol, @guaranteed SomeProtocol) -> (Int, Int)
+  %6 = tuple_extract %5 : $(Int, Int), 0
+  %7 = tuple_extract %5 : $(Int, Int), 1
+  %8 = tuple (%6 : $Int, %7 : $Int)
+  return %8 : $(Int, Int)
+}
+
+// wrapFoo after existential specialization AND thunk inlining.
+// After thunk inlining, the original thunk may be dead, but the specialized function may still be called.
+//
+// CHECK-LABEL: sil shared [noinline] @$s1t7wrapFoo1a1bSi_SitAA12SomeProtocol_p_AaE_ptFTf4ee_n : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : SomeProtocol, τ_0_1 : SomeProtocol> (@guaranteed τ_0_0, @guaranteed τ_0_1) -> (Int, Int) {
+sil shared [noinline] @$s1t7wrapFoo1a1bSi_SitAA12SomeProtocol_p_AaE_ptFTf4ee_n : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : SomeProtocol, τ_0_1 : SomeProtocol> (@guaranteed τ_0_0, @guaranteed τ_0_1) -> (Int, Int) {
+bb0(%0 : $τ_0_0, %1 : $τ_0_1):
+  %2 = init_existential_ref %0 : $τ_0_0 : $τ_0_0, $SomeProtocol
+  %3 = init_existential_ref %1 : $τ_0_1 : $τ_0_1, $SomeProtocol
+  debug_value %2 : $SomeProtocol, let, name "a", argno 1
+  debug_value %3 : $SomeProtocol, let, name "b", argno 2
+  %6 = open_existential_ref %2 : $SomeProtocol to $@opened("47F4DDE6-3B09-11EB-9A47-D0817AD9F6DD") SomeProtocol
+  %7 = unchecked_ref_cast %6 : $@opened("47F4DDE6-3B09-11EB-9A47-D0817AD9F6DD") SomeProtocol to $SomeClass
+  // function_ref SomeClass.foo()
+  %8 = function_ref @$s1t9SomeClassC3fooSiyF : $@convention(method) (@guaranteed SomeClass) -> Int
+  %9 = apply %8(%7) : $@convention(method) (@guaranteed SomeClass) -> Int
+  %10 = open_existential_ref %3 : $SomeProtocol to $@opened("47F4E1A6-3B09-11EB-9A47-D0817AD9F6DD") SomeProtocol
+  %11 = unchecked_ref_cast %10 : $@opened("47F4E1A6-3B09-11EB-9A47-D0817AD9F6DD") SomeProtocol to $SomeClass
+  %12 = apply %8(%11) : $@convention(method) (@guaranteed SomeClass) -> Int
+  %13 = tuple (%9 : $Int, %12 : $Int)
+  return %13 : $(Int, Int)
+}

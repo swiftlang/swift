@@ -48,7 +48,8 @@ enum : unsigned { NumTypeReprKindBits =
   countBitsUsed(static_cast<unsigned>(TypeReprKind::Last_TypeRepr)) };
 
 /// Representation of a type as written in source.
-class alignas(1 << TypeReprAlignInBits) TypeRepr {
+class alignas(1 << TypeReprAlignInBits) TypeRepr
+    : public ASTAllocated<TypeRepr> {
   TypeRepr(const TypeRepr&) = delete;
   void operator=(const TypeRepr&) = delete;
 
@@ -135,6 +136,10 @@ public:
   SourceLoc getEndLoc() const;
   SourceRange getSourceRange() const;
 
+  /// Find an @unchecked attribute and return its source location, or return
+  /// an invalid source location if there is no such attribute.
+  SourceLoc findUncheckedAttrLoc() const;
+
   /// Is this type grammatically a type-simple?
   inline bool isSimple() const; // bottom of this file
 
@@ -146,19 +151,21 @@ public:
     return walk(walker);
   }
 
+  /// Look through the given type and its children to find a type for
+  /// which the given predicate returns true.
+  ///
+  /// \param pred A predicate function object. It should return true if the
+  /// given type node satisfies the criteria.
+  ///
+  /// \returns true if the predicate returns true for the given type or any of
+  /// its children.
+  bool findIf(llvm::function_ref<bool(TypeRepr *)> pred);
+
+  /// Check recursively whether this type repr or any of its decendants are
+  /// opaque return type reprs.
+  bool hasOpaque();
+
   //*** Allocation Routines ************************************************/
-
-  void *operator new(size_t bytes, const ASTContext &C,
-                     unsigned Alignment = alignof(TypeRepr));
-
-  void *operator new(size_t bytes, void *data) {
-    assert(data);
-    return data;
-  }
-
-  // Make placement new and vanilla new/delete illegal for TypeReprs.
-  void *operator new(size_t bytes) = delete;
-  void operator delete(void *data) = delete;
 
   void print(raw_ostream &OS, const PrintOptions &Opts = PrintOptions()) const;
   void print(ASTPrinter &Printer, const PrintOptions &Opts) const;
@@ -939,7 +946,8 @@ public:
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::InOut ||
            T->getKind() == TypeReprKind::Shared ||
-           T->getKind() == TypeReprKind::Owned;
+           T->getKind() == TypeReprKind::Owned ||
+           T->getKind() == TypeReprKind::Isolated;
   }
   static bool classof(const SpecifierTypeRepr *T) { return true; }
   
@@ -995,6 +1003,21 @@ public:
   static bool classof(const OwnedTypeRepr *T) { return true; }
 };
 
+/// An 'isolated' type.
+/// \code
+///   x : isolated Actor
+/// \endcode
+class IsolatedTypeRepr : public SpecifierTypeRepr {
+public:
+  IsolatedTypeRepr(TypeRepr *Base, SourceLoc InOutLoc)
+    : SpecifierTypeRepr(TypeReprKind::Isolated, Base, InOutLoc) {}
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::Isolated;
+  }
+  static bool classof(const IsolatedTypeRepr *T) { return true; }
+};
+
 /// A TypeRepr for a known, fixed type.
 ///
 /// Fixed type representations should be used sparingly, in places
@@ -1045,13 +1068,13 @@ public:
   TypeRepr *getFieldType() const { return FieldTypeAndMutable.getPointer(); }
   bool isMutable() const { return FieldTypeAndMutable.getInt(); }
 };
-  
-/// TypeRepr for opaque return types.
+
+/// A TypeRepr for anonymous opaque return types.
 ///
-/// This can occur in the return position of a function declaration, or the
-/// top-level type of a property, to specify that the concrete return type
-/// should be abstracted from callers, given a set of generic constraints that
-/// the concrete return type satisfies:
+/// This can occur in the return type of a function declaration, or the type of
+/// a property, to specify that the concrete return type should be abstracted
+/// from callers, given a set of generic constraints that the concrete return
+/// type satisfies:
 ///
 /// func foo() -> some Collection { return [1,2,3] }
 /// var bar: some SignedInteger = 1
@@ -1083,6 +1106,69 @@ private:
   SourceLoc getLocImpl() const { return OpaqueLoc; }
   void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
   friend class TypeRepr;
+};
+
+/// A TypeRepr for a type with a generic parameter list of named opaque return
+/// types.
+///
+/// This can occur only as the return type of a function declaration, or the
+/// type of a property, to specify types which should be abstracted from
+/// callers, given a set of generic constraints that the concrete types satisfy:
+///
+/// func foo() -> <T: Collection> T { return [1] }
+class NamedOpaqueReturnTypeRepr : public TypeRepr {
+  TypeRepr *Base;
+  GenericParamList *GenericParams;
+
+public:
+  NamedOpaqueReturnTypeRepr(TypeRepr *Base, GenericParamList *GenericParams)
+      : TypeRepr(TypeReprKind::NamedOpaqueReturn), Base(Base),
+        GenericParams(GenericParams) {
+    assert(Base && GenericParams);
+  }
+
+  TypeRepr *getBase() const { return Base; }
+  GenericParamList *getGenericParams() const { return GenericParams; }
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::NamedOpaqueReturn;
+  }
+  static bool classof(const NamedOpaqueReturnTypeRepr *T) { return true; }
+
+private:
+  SourceLoc getStartLocImpl() const;
+  SourceLoc getEndLocImpl() const;
+  SourceLoc getLocImpl() const;
+  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  friend class TypeRepr;
+};
+
+/// TypeRepr for a user-specified placeholder (essentially, a user-facing
+/// representation of an anonymous type variable.
+///
+/// Can occur anywhere a normal type would occur, though usually expected to be
+/// used in structural positions like \c Generic<Int,_>.
+class PlaceholderTypeRepr: public TypeRepr {
+  SourceLoc UnderscoreLoc;
+
+public:
+  PlaceholderTypeRepr(SourceLoc loc)
+    : TypeRepr(TypeReprKind::Placeholder), UnderscoreLoc(loc)
+  {}
+
+    SourceLoc getUnderscoreLoc() const { return UnderscoreLoc; }
+
+    static bool classof(const TypeRepr *T) {
+      return T->getKind() == TypeReprKind::Placeholder;
+    }
+    static bool classof(const PlaceholderTypeRepr *T) { return true; }
+
+  private:
+    SourceLoc getStartLocImpl() const { return UnderscoreLoc; }
+    SourceLoc getEndLocImpl() const { return UnderscoreLoc; }
+    SourceLoc getLocImpl() const { return UnderscoreLoc; }
+    void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+    friend class TypeRepr;
 };
 
 /// SIL-only TypeRepr for box types.
@@ -1183,6 +1269,7 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::InOut:
   case TypeReprKind::Composition:
   case TypeReprKind::OpaqueReturn:
+  case TypeReprKind::NamedOpaqueReturn:
     return false;
   case TypeReprKind::SimpleIdent:
   case TypeReprKind::GenericIdent:
@@ -1198,6 +1285,8 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::SILBox:
   case TypeReprKind::Shared:
   case TypeReprKind::Owned:
+  case TypeReprKind::Isolated:
+  case TypeReprKind::Placeholder:
     return true;
   }
   llvm_unreachable("bad TypeRepr kind");

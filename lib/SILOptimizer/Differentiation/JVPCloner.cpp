@@ -30,6 +30,7 @@
 #include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/PassManager/PrettyStackTrace.h"
+#include "swift/SILOptimizer/Utils/DifferentiationMangler.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/DenseMap.h"
 
@@ -75,7 +76,7 @@ private:
   //--------------------------------------------------------------------------//
 
   /// The builder for the differential function.
-  SILBuilder differentialBuilder;
+  TangentBuilder differentialBuilder;
 
   /// Mapping from original basic blocks to corresponding differential basic
   /// blocks.
@@ -99,7 +100,7 @@ private:
   llvm::DenseMap<VarDecl *, SILValue> differentialStructElements;
 
   /// An auxiliary differential local allocation builder.
-  SILBuilder diffLocalAllocBuilder;
+  TangentBuilder diffLocalAllocBuilder;
 
   /// Stack buffers allocated for storing local tangent values.
   SmallVector<SILValue, 8> differentialLocalAllocations;
@@ -114,10 +115,8 @@ private:
 
   ASTContext &getASTContext() const { return jvp->getASTContext(); }
   SILModule &getModule() const { return jvp->getModule(); }
-  const SILAutoDiffIndices getIndices() const {
-    return witness->getSILAutoDiffIndices();
-  }
-  SILBuilder &getDifferentialBuilder() { return differentialBuilder; }
+  const AutoDiffConfig getConfig() const { return witness->getConfig(); }
+  TangentBuilder &getDifferentialBuilder() { return differentialBuilder; }
   SILFunction &getDifferential() { return differentialBuilder.getFunction(); }
   SILArgument *getDifferentialStructArgument(SILBasicBlock *origBB) {
 #ifndef NDEBUG
@@ -194,19 +193,19 @@ private:
   // Tangent materialization
   //--------------------------------------------------------------------------//
 
-  void emitZeroIndirect(CanType type, SILValue bufferAccess, SILLocation loc) {
+  void emitZeroIndirect(CanType type, SILValue buffer, SILLocation loc) {
     auto builder = getDifferentialBuilder();
     auto tangentSpace = getTangentSpace(type);
     assert(tangentSpace && "No tangent space for this type");
     switch (tangentSpace->getKind()) {
     case TangentSpace::Kind::TangentVector:
-      emitZeroIntoBuffer(builder, type, bufferAccess, loc);
+      builder.emitZeroIntoBuffer(loc, buffer, IsInitialization);
       return;
     case TangentSpace::Kind::Tuple: {
       auto tupleType = tangentSpace->getTuple();
       SmallVector<SILValue, 8> zeroElements;
       for (unsigned i : range(tupleType->getNumElements())) {
-        auto eltAddr = builder.createTupleElementAddr(loc, bufferAccess, i);
+        auto eltAddr = builder.createTupleElementAddr(loc, buffer, i);
         emitZeroIndirect(tupleType->getElementType(i)->getCanonicalType(),
                          eltAddr, loc);
       }
@@ -376,7 +375,7 @@ private:
   void prepareForDifferentialGeneration();
 
 public:
-  explicit Implementation(ADContext &context, SILFunction *original,
+  explicit Implementation(ADContext &context,
                           SILDifferentiabilityWitness *witness,
                           SILFunction *jvp, DifferentiationInvoker invoker);
 
@@ -453,7 +452,7 @@ public:
     // tangent buffers of the active indirect results.
     if (!shouldDifferentiate) {
       for (auto indResult : ai->getIndirectSILResults())
-        if (activityInfo.isActive(indResult, getIndices())) {
+        if (activityInfo.isActive(indResult, getConfig())) {
           auto &tanBuf = getTangentBuffer(ai->getParent(), indResult);
           emitZeroIndirect(tanBuf->getType().getASTType(), tanBuf,
                            tanBuf.getLoc());
@@ -480,7 +479,7 @@ public:
     SmallVector<SILValue, 4> allResults;
     SmallVector<unsigned, 8> activeParamIndices;
     SmallVector<unsigned, 8> activeResultIndices;
-    collectMinimalIndicesForFunctionCall(ai, getIndices(), activityInfo,
+    collectMinimalIndicesForFunctionCall(ai, getConfig(), activityInfo,
                                          allResults, activeParamIndices,
                                          activeResultIndices);
     assert(!activeParamIndices.empty() && "Parameter indices cannot be empty");
@@ -498,7 +497,7 @@ public:
     auto numResults =
         ai->getSubstCalleeType()->getNumResults() +
         ai->getSubstCalleeType()->getNumIndirectMutatingParameters();
-    SILAutoDiffIndices indices(
+    AutoDiffConfig config(
         IndexSubset::get(getASTContext(),
                          ai->getArgumentsWithoutIndirectResults().size(),
                          activeParamIndices),
@@ -509,7 +508,7 @@ public:
     // If functionSource is a `@differentiable` function, just extract it.
     if (originalFnTy->isDifferentiable()) {
       auto paramIndices = originalFnTy->getDifferentiabilityParameterIndices();
-      for (auto i : indices.parameters->getIndices()) {
+      for (auto i : config.parameterIndices->getIndices()) {
         if (!paramIndices->contains(i)) {
           context.emitNondifferentiabilityError(
               origCallee, invoker,
@@ -564,7 +563,7 @@ public:
       auto diagnoseNondifferentiableOriginalFunctionType =
           [&](CanSILFunctionType origFnTy) {
             // Check and diagnose non-differentiable arguments.
-            for (auto paramIndex : indices.parameters->getIndices()) {
+            for (auto paramIndex : config.parameterIndices->getIndices()) {
               if (!originalFnTy->getParameters()[paramIndex]
                        .getSILStorageInterfaceType()
                        .isDifferentiable(getModule())) {
@@ -581,7 +580,7 @@ public:
               }
             }
             // Check and diagnose non-differentiable results.
-            for (auto resultIndex : indices.results->getIndices()) {
+            for (auto resultIndex : config.resultIndices->getIndices()) {
               SILType remappedResultType;
               if (resultIndex >= originalFnTy->getNumResults()) {
                 auto inoutArgIdx = resultIndex - originalFnTy->getNumResults();
@@ -611,7 +610,8 @@ public:
         return;
 
       auto *diffFuncInst = context.createDifferentiableFunction(
-          builder, loc, indices.parameters, indices.results, origCallee);
+          builder, loc, config.parameterIndices, config.resultIndices,
+          origCallee);
 
       // Record the `differentiable_function` instruction.
       context.getDifferentiableFunctionInstWorklist().push_back(diffFuncInst);
@@ -639,7 +639,7 @@ public:
     // Apply the JVP.
     // The JVP should be specialized, so no substitution map is necessary.
     auto *jvpCall = getBuilder().createApply(loc, jvpValue, SubstitutionMap(),
-                                             jvpArgs, ai->isNonThrowing());
+                                             jvpArgs, ai->getApplyOptions());
     LLVM_DEBUG(getADDebugStream() << "Applied jvp function\n" << *jvpCall);
 
     // Release the differentiable function.
@@ -686,7 +686,7 @@ public:
     differentialValues[ai->getParent()].push_back(differential);
 
     // Differential emission.
-    emitTangentForApplyInst(ai, indices, originalDifferentialType);
+    emitTangentForApplyInst(ai, config, originalDifferentialType);
   }
 
   void visitReturnInst(ReturnInst *ri) {
@@ -828,7 +828,7 @@ public:
     if (!differentialInfo.shouldDifferentiateInstruction(li)) {
       auto isTake =
           (li->getOwnershipQualifier() == LoadOwnershipQualifier::Take);
-      if (isTake && activityInfo.isActive(li->getOperand(), getIndices())) {
+      if (isTake && activityInfo.isActive(li->getOperand(), getConfig())) {
         auto &tanBuf = getTangentBuffer(li->getParent(), li->getOperand());
         getDifferentialBuilder().emitDestroyOperation(tanBuf.getLoc(), tanBuf);
       }
@@ -864,7 +864,7 @@ public:
     // If a non-active value is stored into an active buffer, zero-initialize
     // the active buffer's tangent buffer.
     if (!differentialInfo.shouldDifferentiateInstruction(si)) {
-      if (activityInfo.isActive(si->getDest(), getIndices())) {
+      if (activityInfo.isActive(si->getDest(), getConfig())) {
         auto &tanBufDest = getTangentBuffer(si->getParent(), si->getDest());
         emitZeroIndirect(tanBufDest->getType().getASTType(), tanBufDest,
                          tanBufDest.getLoc());
@@ -888,7 +888,7 @@ public:
     // If a non-active value is stored into an active buffer, zero-initialize
     // the active buffer's tangent buffer.
     if (!differentialInfo.shouldDifferentiateInstruction(sbi)) {
-      if (activityInfo.isActive(sbi->getDest(), getIndices())) {
+      if (activityInfo.isActive(sbi->getDest(), getConfig())) {
         auto &tanBufDest = getTangentBuffer(sbi->getParent(), sbi->getDest());
         emitZeroIndirect(tanBufDest->getType().getASTType(), tanBufDest,
                          tanBufDest.getLoc());
@@ -913,13 +913,13 @@ public:
     // If an active buffer is copied with take into a non-active buffer, destroy
     // the source buffer's tangent buffer.
     if (!differentialInfo.shouldDifferentiateInstruction(cai)) {
-      if (activityInfo.isActive(cai->getDest(), getIndices())) {
+      if (activityInfo.isActive(cai->getDest(), getConfig())) {
         auto &tanBufDest = getTangentBuffer(cai->getParent(), cai->getDest());
         emitZeroIndirect(tanBufDest->getType().getASTType(), tanBufDest,
                          tanBufDest.getLoc());
       }
       if (cai->isTakeOfSrc() &&
-          activityInfo.isActive(cai->getSrc(), getIndices())) {
+          activityInfo.isActive(cai->getSrc(), getConfig())) {
         auto &tanBufSrc = getTangentBuffer(cai->getParent(), cai->getSrc());
         getDifferentialBuilder().emitDestroyOperation(tanBufSrc.getLoc(),
                                                       tanBufSrc);
@@ -1183,7 +1183,7 @@ public:
   CLONE_AND_EMIT_TANGENT(DestructureTuple, dti) {
     assert(llvm::any_of(dti->getResults(),
                         [&](SILValue elt) {
-                          return activityInfo.isActive(elt, getIndices());
+                          return activityInfo.isActive(elt, getConfig());
                         }) &&
            "`destructure_tuple` should have at least one active result");
 
@@ -1216,7 +1216,7 @@ public:
   ///
   ///   Original: y = apply f(x0, x1, ...)
   ///    Tangent: tan[y] = apply diff_f(tan[x0], tan[x1], ...)
-  void emitTangentForApplyInst(ApplyInst *ai, SILAutoDiffIndices applyIndices,
+  void emitTangentForApplyInst(ApplyInst *ai, const AutoDiffConfig &applyConfig,
                                CanSILFunctionType originalDifferentialType) {
     assert(differentialInfo.shouldDifferentiateApplySite(ai));
     auto *bb = ai->getParent();
@@ -1243,7 +1243,7 @@ public:
       // If the argument is not active:
       // - Skip the element, if it is not differentiable.
       // - Otherwise, add a zero value to that location.
-      if (!activityInfo.isActive(origArg, getIndices())) {
+      if (!activityInfo.isActive(origArg, getConfig())) {
         auto origCalleeType = ai->getSubstCalleeType();
         if (!origCalleeType->isDifferentiable())
           continue;
@@ -1292,8 +1292,7 @@ public:
 
     // Call the differential.
     auto *differentialCall =
-        diffBuilder.createApply(loc, differential, SubstitutionMap(), diffArgs,
-                                /*isNonThrowing*/ false);
+        diffBuilder.createApply(loc, differential, SubstitutionMap(), diffArgs);
     diffBuilder.emitDestroyValueOperation(loc, differential);
 
     // Get the original `apply` results.
@@ -1315,12 +1314,12 @@ public:
       origAllResults.push_back(inoutArg);
     for (auto inoutArg : differentialCall->getInoutArguments())
       differentialAllResults.push_back(inoutArg);
-    assert(applyIndices.results->getNumIndices() ==
+    assert(applyConfig.resultIndices->getNumIndices() ==
            differentialAllResults.size());
 
     // Set tangent values for original `apply` results.
     unsigned differentialResultIndex = 0;
-    for (auto resultIndex : applyIndices.results->getIndices()) {
+    for (auto resultIndex : applyConfig.resultIndices->getIndices()) {
       auto origResult = origAllResults[resultIndex];
       auto differentialResult =
           differentialAllResults[differentialResultIndex++];
@@ -1331,7 +1330,7 @@ public:
         } else if (auto *dti = getSingleDestructureTupleUser(ai)) {
           bool notSetValue = true;
           for (auto result : dti->getResults()) {
-            if (activityInfo.isActive(result, getIndices())) {
+            if (activityInfo.isActive(result, getConfig())) {
               assert(notSetValue &&
                      "This was incorrectly set, should only have one active "
                      "result from the tuple.");
@@ -1358,7 +1357,7 @@ public:
     SmallVector<SILValue, 8> retElts;
     for (auto i : range(originalResults.size())) {
       auto origResult = originalResults[i];
-      if (!getIndices().results->contains(i))
+      if (!getConfig().resultIndices->contains(i))
         continue;
       auto tanVal = materializeTangent(getTangentValue(origResult), diffLoc);
       retElts.push_back(tanVal);
@@ -1394,7 +1393,7 @@ static SubstitutionMap getSubstitutionMap(SILFunction *original,
 /// and JVP generic signature.
 static const DifferentiableActivityInfo &
 getActivityInfo(ADContext &context, SILFunction *original,
-                SILAutoDiffIndices indices, SILFunction *jvp) {
+                const AutoDiffConfig &config, SILFunction *jvp) {
   // Get activity info of the original function.
   auto &passManager = context.getPassManager();
   auto *activityAnalysis =
@@ -1403,36 +1402,35 @@ getActivityInfo(ADContext &context, SILFunction *original,
   auto &activityInfo = activityCollection.getActivityInfo(
       jvp->getLoweredFunctionType()->getSubstGenericSignature(),
       AutoDiffDerivativeFunctionKind::JVP);
-  LLVM_DEBUG(activityInfo.dump(indices, getADDebugStream()));
+  LLVM_DEBUG(activityInfo.dump(config, getADDebugStream()));
   return activityInfo;
 }
 
 JVPCloner::Implementation::Implementation(ADContext &context,
-                                          SILFunction *original,
                                           SILDifferentiabilityWitness *witness,
                                           SILFunction *jvp,
                                           DifferentiationInvoker invoker)
-    : TypeSubstCloner(*jvp, *original, getSubstitutionMap(original, jvp)),
-      context(context), original(original), witness(witness), jvp(jvp),
-      invoker(invoker),
-      activityInfo(getActivityInfo(context, original,
-                                   witness->getSILAutoDiffIndices(), jvp)),
+    : TypeSubstCloner(*jvp, *witness->getOriginalFunction(),
+                      getSubstitutionMap(witness->getOriginalFunction(), jvp)),
+      context(context), original(witness->getOriginalFunction()),
+      witness(witness), jvp(jvp), invoker(invoker),
+      activityInfo(
+          getActivityInfo(context, original, witness->getConfig(), jvp)),
       loopInfo(context.getPassManager().getAnalysis<SILLoopAnalysis>()
                    ->get(original)),
       differentialInfo(context, AutoDiffLinearMapKind::Differential, original,
-                       jvp, witness->getSILAutoDiffIndices(), activityInfo,
-                       loopInfo),
-      differentialBuilder(SILBuilder(
-          *createEmptyDifferential(context, witness, &differentialInfo))),
-      diffLocalAllocBuilder(getDifferential()) {
+                       jvp, witness->getConfig(), activityInfo, loopInfo),
+      differentialBuilder(TangentBuilder(
+          *createEmptyDifferential(context, witness, &differentialInfo),
+          context)),
+      diffLocalAllocBuilder(getDifferential(), context) {
   // Create empty differential function.
   context.recordGeneratedFunction(&getDifferential());
 }
 
-JVPCloner::JVPCloner(ADContext &context, SILFunction *original,
-                     SILDifferentiabilityWitness *witness, SILFunction *jvp,
-                     DifferentiationInvoker invoker)
-    : impl(*new Implementation(context, original, witness, jvp, invoker)) {}
+JVPCloner::JVPCloner(ADContext &context, SILDifferentiabilityWitness *witness,
+                     SILFunction *jvp, DifferentiationInvoker invoker)
+    : impl(*new Implementation(context, witness, jvp, invoker)) {}
 
 JVPCloner::~JVPCloner() { delete &impl; }
 
@@ -1516,7 +1514,7 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
   auto diffParamArgs =
       differential.getArgumentsWithoutIndirectResults().drop_back();
   assert(diffParamArgs.size() ==
-         witness->getSILAutoDiffIndices().parameters->getNumIndices());
+         witness->getConfig().parameterIndices->getNumIndices());
   auto origParamArgs = original->getArgumentsWithoutIndirectResults();
 
   // TODO(TF-788): Re-enable non-varied result warning.
@@ -1525,11 +1523,11 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
   SmallVector<SILValue, 8> origFormalResults;
   collectAllFormalResultsInTypeOrder(*original, origFormalResults);
    std::get<0>(pair);
-  for (auto resultIndex : getIndices().results->getIndices()) {
+  for (auto resultIndex : getConfig().results->getIndices()) {
     auto origResult = origFormalResults[resultIndex];
     // Emit warning if original result is not varied, because it will always
     // have a zero derivative.
-    if (!activityInfo.isVaried(origResult, getIndices().parameters)) {
+    if (!activityInfo.isVaried(origResult, getConfig().parameters)) {
       // Emit fixit if original result has a valid source location.
       auto startLoc = origResult.getLoc().getStartSourceLoc();
       auto endLoc = origResult.getLoc().getEndSourceLoc();
@@ -1543,7 +1541,7 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
   */
 
   // Initialize tangent mapping for parameters.
-  auto diffParamsIt = getIndices().parameters->begin();
+  auto diffParamsIt = getConfig().parameterIndices->begin();
   for (auto index : range(diffParamArgs.size())) {
     auto *diffArg = diffParamArgs[index];
     auto *origArg = origParamArgs[*diffParamsIt];
@@ -1570,7 +1568,7 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
   differentialBuilder.setInsertionPoint(differential.getEntryBlock());
   auto diffIndResults = differential.getIndirectResults();
   unsigned differentialIndirectResultIndex = 0;
-  for (auto resultIndex : getIndices().results->getIndices()) {
+  for (auto resultIndex : getConfig().resultIndices->getIndices()) {
     auto origResult = originalResults[resultIndex];
     // Handle original formal indirect result.
     if (resultIndex < origFnTy->getNumResults()) {
@@ -1581,7 +1579,7 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
       setTangentBuffer(origEntry, origResult, diffIndResult);
       // If original indirect result is non-varied, zero-initialize its tangent
       // buffer.
-      if (!activityInfo.isVaried(origResult, getIndices().parameters))
+      if (!activityInfo.isVaried(origResult, getConfig().parameterIndices))
         emitZeroIndirect(diffIndResult->getType().getASTType(), diffIndResult,
                          diffLoc);
       continue;
@@ -1594,7 +1592,7 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
         origFnTy->getIndirectMutatingParameters().begin(), inoutParamIndex);
     auto paramIndex =
         std::distance(origFnTy->getParameters().begin(), &*inoutParamIt);
-    if (getIndices().parameters->contains(paramIndex))
+    if (getConfig().parameterIndices->contains(paramIndex))
       continue;
     auto diffIndResult = diffIndResults[differentialIndirectResultIndex++];
     setTangentBuffer(origEntry, origResult, diffIndResult);
@@ -1617,9 +1615,7 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
   // signature: when witness generic signature has same-type requirements
   // binding all generic parameters to concrete types, JVP function type uses
   // all the concrete types and JVP generic signature is null.
-  CanGenericSignature witnessCanGenSig;
-  if (auto witnessGenSig = witness->getDerivativeGenericSignature())
-    witnessCanGenSig = witnessGenSig->getCanonicalSignature();
+  auto witnessCanGenSig = witness->getDerivativeGenericSignature().getCanonicalSignature();
   auto lookupConformance = LookUpConformanceInModule(module.getSwiftModule());
 
   // Parameters of the differential are:
@@ -1630,9 +1626,9 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
   SmallVector<SILParameterInfo, 8> dfParams;
   SmallVector<SILResultInfo, 8> dfResults;
   auto origParams = origTy->getParameters();
-  auto indices = witness->getSILAutoDiffIndices();
+  auto config = witness->getConfig();
 
-  for (auto resultIndex : indices.results->getIndices()) {
+  for (auto resultIndex : config.resultIndices->getIndices()) {
     if (resultIndex < origTy->getNumResults()) {
       // Handle formal original result.
       auto origResult = origTy->getResults()[resultIndex];
@@ -1654,7 +1650,7 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
       // If the original `inout` parameter is a differentiability parameter,
       // then it already has a corresponding differential parameter. Do not add
       // a corresponding differential result.
-      if (indices.parameters->contains(paramIndex))
+      if (config.parameterIndices->contains(paramIndex))
         continue;
       auto inoutParam = origTy->getParameters()[paramIndex];
       auto paramTan = inoutParam.getInterfaceType()->getAutoDiffTangentSpace(
@@ -1666,7 +1662,7 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
   }
 
   // Add differential parameters for the requested wrt parameters.
-  for (auto i : indices.parameters->getIndices()) {
+  for (auto i : config.parameterIndices->getIndices()) {
     auto origParam = origParams[i];
     origParam = origParam.getWithInterfaceType(
         origParam.getInterfaceType()->getCanonicalType(witnessCanGenSig));
@@ -1686,31 +1682,28 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
       dfStruct->getDeclaredInterfaceType()->getCanonicalType(witnessCanGenSig);
   dfParams.push_back({dfStructType, ParameterConvention::Direct_Owned});
 
-  Mangle::ASTMangler mangler;
-  auto diffName =
-      original->getASTContext()
-          .getIdentifier(mangler.mangleAutoDiffLinearMapHelper(
-              original->getName(), AutoDiffLinearMapKind::Differential,
-              witness->getConfig()))
-          .str();
+  Mangle::DifferentiationMangler mangler;
+  auto diffName = mangler.mangleLinearMap(
+      witness->getOriginalFunction()->getName(),
+      AutoDiffLinearMapKind::Differential, witness->getConfig());
   // Set differential generic signature equal to JVP generic signature.
   // Do not use witness generic signature, which may have same-type requirements
   // binding all generic parameters to concrete types.
   auto diffGenericSig =
       jvp->getLoweredFunctionType()->getSubstGenericSignature();
-  auto *diffGenericEnv =
-      diffGenericSig ? diffGenericSig->getGenericEnvironment() : nullptr;
+  auto *diffGenericEnv = diffGenericSig.getGenericEnvironment();
   auto diffType = SILFunctionType::get(
-      diffGenericSig, origTy->getExtInfo(), origTy->getCoroutineKind(),
+      diffGenericSig, SILExtInfo::getThin(), origTy->getCoroutineKind(),
       origTy->getCalleeConvention(), dfParams, {}, dfResults, None,
       origTy->getPatternSubstitutions(), origTy->getInvocationSubstitutions(),
       original->getASTContext());
 
   SILOptFunctionBuilder fb(context.getTransform());
-  auto linkage = jvp->isSerialized() ? SILLinkage::Public : SILLinkage::Hidden;
+  auto linkage = jvp->isSerialized() ? SILLinkage::Public : SILLinkage::Private;
   auto *differential = fb.createFunction(
-      linkage, diffName, diffType, diffGenericEnv, original->getLocation(),
-      original->isBare(), IsNotTransparent, jvp->isSerialized(),
+      linkage, context.getASTContext().getIdentifier(diffName).str(), diffType,
+      diffGenericEnv, original->getLocation(), original->isBare(),
+      IsNotTransparent, jvp->isSerialized(),
       original->isDynamicallyReplaceable());
   differential->setDebugScope(
       new (module) SILDebugScope(original->getLocation(), differential));

@@ -35,6 +35,7 @@
 
 #include "swift/Basic/BlotSetVector.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/DenseMap.h"
@@ -65,12 +66,19 @@ template <typename VectorT = std::vector<SILInstruction *>,
 class SILInstructionWorklist : SILInstructionWorklistBase {
   BlotSetVector<SILInstruction *, VectorT, MapT> worklist;
 
+  /// For invoking Swift instruction passes in libswift.
+  LibswiftPassInvocation *libswiftPassInvocation = nullptr;
+
   void operator=(const SILInstructionWorklist &rhs) = delete;
   SILInstructionWorklist(const SILInstructionWorklist &worklist) = delete;
 
 public:
   SILInstructionWorklist(const char *loggingName = "InstructionWorklist")
       : SILInstructionWorklistBase(loggingName) {}
+
+  void setLibswiftPassInvocation(LibswiftPassInvocation *invocation) {
+    libswiftPassInvocation = invocation;
+  }
 
   /// Returns true if the worklist is empty.
   bool isEmpty() const { return worklist.empty(); }
@@ -125,6 +133,32 @@ public:
   void addUsersToWorklist(SILValue value) {
     for (auto *use : value->getUses()) {
       add(use->getUser());
+    }
+  }
+
+  /// Add operands of \p instruction to the worklist. Meant to be used once it
+  /// is certain that \p instruction will be deleted but may have operands that
+  /// are still alive. With fewer uses, the operand definition may be
+  /// optimizable.
+  ///
+  /// \p instruction may still have uses because this is called before
+  /// InstructionDeleter begins deleting it and some instructions are deleted at
+  /// the same time as their uses.
+  void addOperandsToWorklist(SILInstruction &instruction) {
+    // Make sure that we reprocess all operands now that we reduced their
+    // use counts.
+    if (instruction.getNumOperands() < 8) {
+      for (auto &operand : instruction.getAllOperands()) {
+        if (auto *operandInstruction =
+                operand.get()->getDefiningInstruction()) {
+          withDebugStream([&](llvm::raw_ostream &stream,
+                              StringRef loggingName) {
+            stream << loggingName << ": add op " << *operandInstruction << '\n'
+                   << " from erased inst to worklist\n";
+          });
+          add(operandInstruction);
+        }
+      }
     }
   }
 
@@ -215,7 +249,7 @@ public:
     return newInstruction;
   }
 
-  // This method is to be used when an instruction is found to be dead,
+  // This method is to be used when an instruction is found to be dead or
   // replaceable with another preexisting expression. Here we add all uses of
   // instruction to the worklist, and replace all uses of instruction with the
   // new value.
@@ -296,29 +330,15 @@ public:
   }
 
   void eraseSingleInstFromFunction(SILInstruction &instruction,
-                                   bool addOperandsToWorklist) {
+                                   bool shouldAddOperandsToWorklist) {
     withDebugStream([&](llvm::raw_ostream &stream, StringRef loggingName) {
       stream << loggingName << ": ERASE " << instruction << '\n';
     });
 
-    assert(!instruction.hasUsesOfAnyResult() &&
-           "Cannot erase instruction that is used!");
+    // If we are asked to add operands to the worklist, do so now.
+    if (shouldAddOperandsToWorklist)
+      addOperandsToWorklist(instruction);
 
-    // Make sure that we reprocess all operands now that we reduced their
-    // use counts.
-    if (instruction.getNumOperands() < 8 && addOperandsToWorklist) {
-      for (auto &operand : instruction.getAllOperands()) {
-        if (auto *operandInstruction =
-                operand.get()->getDefiningInstruction()) {
-          withDebugStream([&](llvm::raw_ostream &stream,
-                              StringRef loggingName) {
-            stream << loggingName << ": add op " << *operandInstruction << '\n'
-                   << " from erased inst to worklist\n";
-          });
-          add(operandInstruction);
-        }
-      }
-    }
     erase(&instruction);
     instruction.eraseFromParent();
   }

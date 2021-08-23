@@ -226,7 +226,8 @@ private:
     // Create the closure.
     auto *Params = ParameterList::createEmpty(Ctx);
     auto *Closure = new (Ctx)
-        ClosureExpr(SourceRange(), nullptr, Params, SourceLoc(), SourceLoc(),
+        ClosureExpr(DeclAttributes(), SourceRange(), nullptr, Params,
+                    SourceLoc(), SourceLoc(),
                     SourceLoc(), SourceLoc(), nullptr,
                     DF.getNextDiscriminator(), getCurrentDeclContext());
     Closure->setImplicit(true);
@@ -238,7 +239,7 @@ private:
     Closure->setBody(ClosureBody, /*isSingleExpression=*/false);
 
     // Call the closure.
-    auto *ClosureCall = CallExpr::createImplicit(Ctx, Closure, {}, {});
+    auto *ClosureCall = CallExpr::createImplicitEmpty(Ctx, Closure);
     ClosureCall->setThrows(false);
 
     // TODO: typeCheckExpression() seems to assign types to everything here,

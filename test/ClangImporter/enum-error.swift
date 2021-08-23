@@ -14,6 +14,8 @@
 // RUN: echo '#include "enum-error.h"' > %t.m
 // RUN: %target-swift-ide-test -source-filename %s -print-header -header-to-print %S/Inputs/enum-error.h -import-objc-header %S/Inputs/enum-error.h -print-regular-comments --cc-args %target-cc-options -fsyntax-only %t.m -I %S/Inputs > %t.txt
 // RUN: %FileCheck -check-prefix=HEADER %s < %t.txt
+// RUN: %target-swift-ide-test -source-filename %s -print-header -header-to-print %S/Inputs/enum-error.h -import-objc-header %S/Inputs/enum-error.h -print-regular-comments --skip-private-stdlib-decls -skip-underscored-stdlib-protocols --cc-args %target-cc-options -fsyntax-only %t.m -I %S/Inputs > %t2.txt
+// RUN: %FileCheck -check-prefix=HEADER-NO-PRIVATE %s < %t2.txt
 
 import Foundation
 
@@ -45,15 +47,15 @@ func testError() {
   } catch {}
 
 #elseif ASQEXPR
-// ASQEXPR: sil_witness_table shared [serialized] TestError: _BridgedStoredNSError module __ObjC
+// ASQEXPR: sil_witness_table shared TestError: _BridgedStoredNSError module __ObjC
   let wasTestError = testErrorNSError as? TestError; wasTestError
 
 #elseif ASBANGEXPR
-// ASBANGEXPR: sil_witness_table shared [serialized] TestError: _BridgedStoredNSError module __ObjC
+// ASBANGEXPR: sil_witness_table shared TestError: _BridgedStoredNSError module __ObjC
   let terr2 = testErrorNSError as! TestError; terr2
 
 #elseif ISEXPR
-// ISEXPR: sil_witness_table shared [serialized] TestError: _BridgedStoredNSError module __ObjC
+// ISEXPR: sil_witness_table shared TestError: _BridgedStoredNSError module __ObjC
   if (testErrorNSError is TestError) {
     print("true")
   } else {
@@ -61,14 +63,14 @@ func testError() {
   }
 
 #elseif CATCHIS
-// CATCHIS: sil_witness_table shared [serialized] TestError: _BridgedStoredNSError module __ObjC
+// CATCHIS: sil_witness_table shared TestError: _BridgedStoredNSError module __ObjC
   do {
     throw TestError(.TETwo)
   } catch is TestError {
   } catch {}
 
 #elseif CATCHAS
-// CATCHAS: sil_witness_table shared [serialized] TestError: _BridgedStoredNSError module __ObjC
+// CATCHAS: sil_witness_table shared TestError: _BridgedStoredNSError module __ObjC
   do {
     throw TestError(.TETwo)
   } catch let err as TestError {
@@ -83,8 +85,8 @@ func testError() {
   let _ : TestError = dyncast(testErrorNSError)
 
 #elseif EXHAUSTIVE
-// CHECK: sil_witness_table shared [serialized] TestError: _BridgedStoredNSError module __ObjC
-// CHECK: sil_witness_table shared [serialized] ExhaustiveError: _BridgedStoredNSError module __ObjC
+// CHECK: sil_witness_table shared TestError: _BridgedStoredNSError module __ObjC
+// CHECK: sil_witness_table shared ExhaustiveError: _BridgedStoredNSError module __ObjC
   let terr = getErr()
   switch (terr) { case .TENone, .TEOne, .TETwo: break }
   // EXHAUSTIVE: [[@LINE-1]]:{{.+}}: warning: switch covers known cases, but 'TestError.Code' may have additional unknown values
@@ -121,12 +123,25 @@ class ObjCTest {
 }
 #endif
 
-// HEADER: enum Code : Int32, _ErrorCodeProtocol {
-// HEADER:   init?(rawValue: Int32)
-// HEADER:   var rawValue: Int32 { get }
-// HEADER:   typealias _ErrorType = TestError
-// HEADER:   case TENone
-// HEADER:   case TEOne
-// HEADER:   case TETwo
+// HEADER: struct TestError : _BridgedStoredNSError {
+// HEADER:   enum Code : Int32, _ErrorCodeProtocol {
+// HEADER:     init?(rawValue: Int32)
+// HEADER:     var rawValue: Int32 { get }
+// HEADER:     typealias _ErrorType = TestError
+// HEADER:     case TENone
+// HEADER:     case TEOne
+// HEADER:     case TETwo
+// HEADER:   }
 // HEADER: }
 // HEADER: func getErr() -> TestError.Code
+
+// HEADER-NO-PRIVATE: struct TestError : CustomNSError, Hashable, Error {
+// HEADER-NO-PRIVATE:   enum Code : Int32, Equatable {
+// HEADER-NO-PRIVATE:     init?(rawValue: Int32)
+// HEADER-NO-PRIVATE:     var rawValue: Int32 { get }
+// HEADER-NO-PRIVATE:     typealias _ErrorType = TestError
+// HEADER-NO-PRIVATE:     case TENone
+// HEADER-NO-PRIVATE:     case TEOne
+// HEADER-NO-PRIVATE:     case TETwo
+// HEADER-NO-PRIVATE:   }
+// HEADER-NO-PRIVATE: }

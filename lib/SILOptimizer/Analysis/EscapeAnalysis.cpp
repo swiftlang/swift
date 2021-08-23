@@ -101,6 +101,54 @@ EscapeAnalysis::findRecursivePointerKind(SILType Ty,
   return NoPointer;
 }
 
+// Return the PointerKind that summarizes a class's stored properties.
+//
+// If a class only holds fields of non-pointer types, then it is guaranteed not
+// to point to any other objects.
+EscapeAnalysis::PointerKind
+EscapeAnalysis::findClassPropertiesPointerKind(SILType Ty,
+                                               const SILFunction &F) const {
+  if (Ty.isAddress())
+    return AnyPointer;
+
+  auto *classDecl = Ty.getClassOrBoundGenericClass();
+  if (!classDecl)
+    return AnyPointer;
+
+  auto &M = F.getModule();
+  auto expansion = F.getTypeExpansionContext();
+
+  // Start with the most precise pointer kind
+  PointerKind propertiesKind = NoPointer;
+  auto meetAggregateKind = [&](PointerKind otherKind) {
+    if (otherKind > propertiesKind)
+      propertiesKind = otherKind;
+  };
+  for (Type classTy = Ty.getASTType(); classTy;
+       classTy = classTy->getSuperclass()) {
+    classDecl = classTy->getClassOrBoundGenericClass();
+    assert(classDecl && "superclass must be a class");
+
+    // Return AnyPointer unless we have guaranteed visibility into all class and
+    // superclass properties. Use Minimal resilience expansion because the cache
+    // is not per-function.
+    if (classDecl->isResilient())
+      return AnyPointer;
+
+    // For each field in the class, get the pointer kind for that field. For
+    // reference-type properties, this will be ReferenceOnly. For aggregates, it
+    // will be the meet over all aggregate fields.
+    SILType objTy =
+      SILType::getPrimitiveObjectType(classTy->getCanonicalType());
+    for (VarDecl *property : classDecl->getStoredProperties()) {
+      SILType fieldTy =
+          objTy.getFieldType(property, M, expansion).getObjectType();
+      meetAggregateKind(findCachedPointerKind(fieldTy, F));
+    }
+  }
+  return propertiesKind;
+}
+
 // Returns the kind of pointer that \p Ty recursively contains.
 EscapeAnalysis::PointerKind
 EscapeAnalysis::findCachedPointerKind(SILType Ty, const SILFunction &F) const {
@@ -110,6 +158,19 @@ EscapeAnalysis::findCachedPointerKind(SILType Ty, const SILFunction &F) const {
 
   PointerKind pointerKind = findRecursivePointerKind(Ty, F);
   const_cast<EscapeAnalysis *>(this)->pointerKindCache[Ty] = pointerKind;
+  return pointerKind;
+}
+
+EscapeAnalysis::PointerKind
+EscapeAnalysis::findCachedClassPropertiesKind(SILType Ty,
+                                              const SILFunction &F) const {
+  auto iter = classPropertiesKindCache.find(Ty);
+  if (iter != classPropertiesKindCache.end())
+    return iter->second;
+
+  PointerKind pointerKind = findClassPropertiesPointerKind(Ty, F);
+  const_cast<EscapeAnalysis *>(this)
+    ->classPropertiesKindCache[Ty] = pointerKind;
   return pointerKind;
 }
 
@@ -207,20 +268,20 @@ SILValue EscapeAnalysis::getPointerRoot(SILValue value) {
   return value;
 }
 
-static bool isNonWritableMemoryAddress(SILNode *V) {
+static bool isNonWritableMemoryAddress(SILValue V) {
   switch (V->getKind()) {
-  case SILNodeKind::FunctionRefInst:
-  case SILNodeKind::DynamicFunctionRefInst:
-  case SILNodeKind::PreviousDynamicFunctionRefInst:
-  case SILNodeKind::WitnessMethodInst:
-  case SILNodeKind::ClassMethodInst:
-  case SILNodeKind::SuperMethodInst:
-  case SILNodeKind::ObjCMethodInst:
-  case SILNodeKind::ObjCSuperMethodInst:
-  case SILNodeKind::StringLiteralInst:
-  case SILNodeKind::ThinToThickFunctionInst:
-  case SILNodeKind::ThinFunctionToPointerInst:
-  case SILNodeKind::PointerToThinFunctionInst:
+  case ValueKind::FunctionRefInst:
+  case ValueKind::DynamicFunctionRefInst:
+  case ValueKind::PreviousDynamicFunctionRefInst:
+  case ValueKind::WitnessMethodInst:
+  case ValueKind::ClassMethodInst:
+  case ValueKind::SuperMethodInst:
+  case ValueKind::ObjCMethodInst:
+  case ValueKind::ObjCSuperMethodInst:
+  case ValueKind::StringLiteralInst:
+  case ValueKind::ThinToThickFunctionInst:
+  case ValueKind::ThinFunctionToPointerInst:
+  case ValueKind::PointerToThinFunctionInst:
     // These instructions return pointers to memory which can't be a
     // destination of a store.
     return true;
@@ -870,6 +931,7 @@ void EscapeAnalysis::ConnectionGraph::computeUsePoints() {
 #include "swift/AST/ReferenceStorage.def"
         case SILInstructionKind::StrongReleaseInst:
         case SILInstructionKind::ReleaseValueInst:
+        case SILInstructionKind::DestroyValueInst:
         case SILInstructionKind::ApplyInst:
         case SILInstructionKind::TryApplyInst: {
           /// Actually we only add instructions which may release a reference.
@@ -1209,15 +1271,6 @@ bool EscapeAnalysis::ConnectionGraph::forwardTraverseDefer(
   return true;
 }
 
-void EscapeAnalysis::ConnectionGraph::removeFromGraph(ValueBase *V) {
-  CGNode *node = Values2Nodes.lookup(V);
-  if (!node)
-    return;
-  Values2Nodes.erase(V);
-  if (node->mappedValue == V)
-    node->mappedValue = nullptr;
-}
-
 //===----------------------------------------------------------------------===//
 //                      Dumping, Viewing and Verification
 //===----------------------------------------------------------------------===//
@@ -1552,8 +1605,8 @@ void EscapeAnalysis::ConnectionGraph::print(llvm::raw_ostream &OS) const {
         const char *Separator = "";
         for (unsigned VIdx = Nd->UsePoints.find_first(); VIdx != -1u;
              VIdx = Nd->UsePoints.find_next(VIdx)) {
-          auto node = UsePointTable[VIdx];
-          OS << Separator << '%' << InstToIDMap[node];
+          SILInstruction *inst = UsePointTable[VIdx];
+          OS << Separator << '%' << InstToIDMap[inst->asSILNode()];
           Separator = ",";
         }
         break;
@@ -1618,11 +1671,13 @@ void EscapeAnalysis::ConnectionGraph::verify() const {
   // Verify that all pointer nodes are still mapped, otherwise the process of
   // merging nodes may have lost information. Only visit reachable blocks,
   // because the graph builder only mapped values from reachable blocks.
-  ReachableBlocks reachable;
-  reachable.visit(F, [this](SILBasicBlock *bb) {
+  ReachableBlocks reachable(F);
+  reachable.visit([this](SILBasicBlock *bb) {
     for (auto &i : *bb) {
-      if (isNonWritableMemoryAddress(&i))
-        continue;
+      if (auto *svi = dyn_cast<SingleValueInstruction>(&i)) {
+        if (isNonWritableMemoryAddress(svi))
+          continue;
+      }
 
       if (auto ai = dyn_cast<ApplyInst>(&i)) {
         if (EA->canOptimizeArrayUninitializedCall(ai).isValid())
@@ -1747,8 +1802,8 @@ void EscapeAnalysis::buildConnectionGraph(FunctionInfo *FInfo,
   assert(ConGraph->isEmpty());
 
   // Visit the blocks in dominance order.
-  ReachableBlocks reachable;
-  reachable.visit(ConGraph->F, [&](SILBasicBlock *bb) {
+  ReachableBlocks reachable(ConGraph->F);
+  reachable.visit([&](SILBasicBlock *bb) {
     // Create edges for the instructions.
     for (auto &i : *bb) {
       analyzeInstruction(&i, FInfo, BottomUpOrder, RecursionDepth);
@@ -2059,15 +2114,15 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
   if (auto *SVI = dyn_cast<SingleValueInstruction>(I)) {
     if (getPointerBase(SVI))
       return;
+
+    // Instructions which return the address of non-writable memory cannot have
+    // an effect on escaping.
+    if (isNonWritableMemoryAddress(SVI))
+      return;
   }
 
   // Incidental uses produce no values and have no effect on their operands.
   if (isIncidentalUse(I))
-    return;
-
-  // Instructions which return the address of non-writable memory cannot have
-  // an effect on escaping.
-  if (isNonWritableMemoryAddress(I))
     return;
 
   switch (I->getKind()) {
@@ -2121,11 +2176,18 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
       if (!fieldNode) {
         // In the unexpected case that the object has no field content, create
         // escaping unknown content.
+        //
+        // TODO: Why does this need to be "escaping"? The fields can't escape
+        // during deinitialization.
         ConGraph->getOrCreateUnknownContent(objNode)->markEscaping();
         return;
       }
       if (!deinitIsKnownToNotCapture(OpV)) {
-        ConGraph->getOrCreateUnknownContent(fieldNode)->markEscaping();
+        // Find out if the object's fields may have any references or pointers.
+        PointerKind propertiesKind =
+            findCachedClassPropertiesKind(OpV->getType(), *OpV->getFunction());
+        if (propertiesKind != EscapeAnalysis::NoPointer)
+          ConGraph->getOrCreateUnknownContent(fieldNode)->markEscaping();
         return;
       }
       // This deinit is known to not directly capture it's own field content;
@@ -2589,8 +2651,9 @@ bool EscapeAnalysis::canEscapeToUsePoint(SILValue value,
                                          SILInstruction *usePoint,
                                          ConnectionGraph *conGraph) {
 
-  assert((FullApplySite::isa(usePoint) || isa<RefCountingInst>(usePoint))
-         && "use points are only created for calls and refcount instructions");
+  assert((FullApplySite::isa(usePoint) || isa<RefCountingInst>(usePoint) ||
+          isa<DestroyValueInst>(usePoint)) &&
+         "use points are only created for calls and refcount instructions");
 
   CGNode *node = conGraph->getValueContent(value);
   if (!node)
@@ -2647,6 +2710,14 @@ bool EscapeAnalysis::canEscapeTo(SILValue V, RefCountingInst *RI) {
     return true;
   auto *ConGraph = getConnectionGraph(RI->getFunction());
   return canEscapeToUsePoint(V, RI, ConGraph);
+}
+
+bool EscapeAnalysis::canEscapeTo(SILValue V, DestroyValueInst *DVI) {
+  // If it's not uniquely identified we don't know anything about the value.
+  if (!isUniquelyIdentified(V))
+    return true;
+  auto *ConGraph = getConnectionGraph(DVI->getFunction());
+  return canEscapeToUsePoint(V, DVI, ConGraph);
 }
 
 /// Utility to get the function which contains both values \p V1 and \p V2.
@@ -2715,95 +2786,115 @@ bool EscapeAnalysis::canPointToSameMemory(SILValue V1, SILValue V2) {
   return true;
 }
 
-// Return true if deinitialization of \p releasedReference may release memory
-// directly pointed to by \p accessAddress.
+// Returns true if deinitialization of \p releasedPtr may release memory
+// directly pointed to by \p livePtr.
 //
-// Note that \p accessedAddress could be a reference itself, an address of a
+// The implementation is common between mayReleaseReferenceContent and
+// mayReleaseAddressContent, but the semantics are different. For references,
+// this models the release of the reference itself. For addresses, this models
+// the release of any reference pointed to by the address. The caller should
+// explicitly ask for the right one so they aren't surprised. Here we simply
+// switch behavior based on whether \p releasedPtr is an address type.
+//
+// Note that \p livePtr could be a reference itself, an address of a
 // local/argument that contains a reference, or even a pointer to the middle of
-// an object (even if it is an exclusive argument).
+// an object. (Even an exclusive argument may point to the middle of an object).
 //
-// This is almost the same as asking "is the content node for accessedAddress
-// reachable via releasedReference", with three subtle differences:
+// This is similar to asking "is the content of livePtr reachable via
+// releasedPtr". There are two interesting cases in which a connection graph
+// query can determine that the accessed memory cannot be released:
 //
-// (1) A locally referenced object can only be freed when deinitializing
-// releasedReference if it is the same object. Indirect references will be kept
-// alive by their distinct local references--ARC can't remove those without
-// inserting a mark_dependence/end_dependence scope.
-//
-// (2) the content of exclusive arguments may be indirectly reachable via
-// releasedReference, but the exclusive argument must have it's own reference
-// count, so cannot be freed via the locally released reference.
-//
-// (3) Objects may contain raw pointers into themselves or into other
-// objects. Any access to the raw pointer is not considered a use of the object
-// because that access must be "guarded" by a fix_lifetime or
-// mark_dependence/end_dependence that acts as a placeholder.
-//
-// There are two interesting cases in which a connection graph query can
-// determine that the accessed memory cannot be released:
-//
-// Case #1: accessedAddress points to a uniquely identified object that does not
+// Case #1: \p livePtr points to a uniquely identified object that does not
 // escape within this function.
 //
-// Note: A "uniquely identified object" is either a locally allocated object,
-// which is obviously not reachable outside this function, or an exclusive
-// address argument, which *is* reachable outside this function, but must
-// have its own reference count so cannot be released locally.
+// In this case, it is sufficient to ensure that no connection graph path exists
+// from the content of \p livePtr to the content of \p releasedPtr.
+//
+// Note: A "uniquely identified object" is either locally allocated, which is
+// obviously not reachable outside this function, or an exclusive address, which
+// *is* reachable outside this function, but must have its own reference count
+// so cannot be released in this function or its callees.
 //
 // Case #2: The released reference points to a local object and no connection
 // graph path exists from the referenced object to a global-escaping or
-// argument-escaping node without traversing a non-interior edge.
+// argument-escaping node.
 //
-// In both cases, the connection graph is sufficient to determine if the
-// accessed content may be released. To prove that the accessed memory is
-// distinct from any released memory it is now sufficient to check that no
-// connection graph path exists from the released object's node to the accessed
-// content node without traversing a non-interior edge.
-bool EscapeAnalysis::mayReleaseContent(SILValue releasedReference,
-                                       SILValue accessedAddress) {
-  assert(!releasedReference->getType().isAddress()
-         && "an address is never a reference");
-
-  SILFunction *f = getCommonFunction(releasedReference, accessedAddress);
+// TODO: This API is inneffective for release hoisting, because the release
+// itself is often the only place that an object's contents may escape. We can't
+// currently determine that since the contents cannot escape prior to \p
+// releasePtr, then livePtr cannot possible point to the same memory!
+//
+// TODO: In the future, we may have an AliasAnalysis query that distinguishes
+// between retain-sinking vs. release-hoisting. With SemanticARC, we may not
+// need to do this, but it is possible to be much more aggressive with
+// release-hoisting. This is becase, for a retain/release pair, it's always ok
+// to release earlier as long as there are no subsequent aliasing uses. If the
+// caller is only concerned with release hoisting and knows there are no
+// subsequent aliasing uses protected by a local release, then the connection
+// graph reachability check here only needs to search within the current object
+// (it can stop at a non-interior edge). This would assume that any indirectly
+// released reference needs to be kept alive by some distinct local
+// references--ARC can't remove those without inserting a
+// mark_dependence/end_dependence scope. It would also ignore the fact that
+// objects may contain raw pointers into themselves or into other objects. Any
+// access to the raw pointer is not considered a use of the object because that
+// access must be "guarded" by a fix_lifetime or mark_dependence/end_dependence
+// that acts as a placeholder.
+bool EscapeAnalysis::mayReleaseContent(SILValue releasedPtr, SILValue livePtr) {
+  SILFunction *f = getCommonFunction(releasedPtr, livePtr);
   if (!f)
     return true;
 
   auto *conGraph = getConnectionGraph(f);
 
-  CGNode *addrContentNode = conGraph->getValueContent(accessedAddress);
-  if (!addrContentNode)
+  CGNode *liveContentNode = conGraph->getValueContent(livePtr);
+  if (!liveContentNode)
     return true;
 
-  // Case #1: Unique accessedAddress whose content does not escape.
-  bool isAccessUniq =
-      isUniquelyIdentified(accessedAddress)
-      && !addrContentNode->valueEscapesInsideFunction(accessedAddress);
+  // Case #1: Unique livePtr whose content does not escape.
+  //
+  // If \p livePtr is an exclusive function argument, it may be indirectly
+  // reachable via releasedPtr, but the exclusive argument must have it's own
+  // reference count retained by the called. We consider \p livePtr unique since
+  // it so cannot be freed via a release of \p releasedPtr within this function
+  // or its callees.
+  bool isLiveAddressUnique =
+      isUniquelyIdentified(livePtr)
+      && !liveContentNode->valueEscapesInsideFunction(livePtr);
 
-  // Case #2: releasedReference points to a local object.
-  if (!isAccessUniq && !pointsToLocalObject(releasedReference))
+  // Case #2: releasedPtr points to a local object.
+  if (!isLiveAddressUnique && !pointsToLocalObject(releasedPtr))
     return true;
 
-  CGNode *releasedObjNode = conGraph->getValueContent(releasedReference);
+  // If \p releasedPtr is an address, then its released content is at least two
+  // levels away: the address points to a reference, which points to an object.
+  // CGNode *releasedObjNode = nullptr;
+  CGNode *releasedObjNode = nullptr;
+  if (releasedPtr->getType().isAddress()) {
+    CGNode *addrContentObjNode = conGraph->getValueContent(releasedPtr);
+    if (!addrContentObjNode)
+      return true;
+    releasedObjNode = conGraph->getOrCreateUnknownContent(addrContentObjNode);
+  } else {
+    releasedObjNode = conGraph->getValueContent(releasedPtr);
+  }
   // Make sure we have at least one value CGNode for releasedReference.
   if (!releasedObjNode)
     return true;
 
-  // Check for reachability from releasedObjNode to addrContentNode.
+  // Check for reachability from releasedObjNode to liveContentNode.
   // A pointsTo cycle is equivalent to a null pointsTo.
   CGNodeWorklist worklist(conGraph);
   for (CGNode *releasedNode = releasedObjNode;
        releasedNode && worklist.tryPush(releasedNode);
        releasedNode = releasedNode->getContentNodeOrNull()) {
     // A path exists from released content to accessed content.
-    if (releasedNode == addrContentNode)
+    if (releasedNode == liveContentNode)
       return true;
 
     // A path exists to an escaping node.
-    if (!isAccessUniq && releasedNode->escapesInsideFunction())
+    if (!isLiveAddressUnique && releasedNode->escapesInsideFunction())
       return true;
-
-    if (!releasedNode->isInterior())
-      break;
   }
   return false; // no path to escaping memory that may be freed.
 }
@@ -2819,21 +2910,6 @@ void EscapeAnalysis::invalidate(SILFunction *F, InvalidationKind K) {
     LLVM_DEBUG(llvm::dbgs() << "  invalidate "
                             << FInfo->Graph.F->getName() << '\n');
     invalidateIncludingAllCallers(FInfo);
-  }
-}
-
-void EscapeAnalysis::handleDeleteNotification(SILNode *node) {
-  auto value = dyn_cast<ValueBase>(node);
-  if (!value) return;
-
-  if (SILBasicBlock *Parent = node->getParentBlock()) {
-    SILFunction *F = Parent->getParent();
-    if (FunctionInfo *FInfo = Function2Info.lookup(F)) {
-      if (FInfo->isValid()) {
-        FInfo->Graph.removeFromGraph(value);
-        FInfo->SummaryGraph.removeFromGraph(value);
-      }
-    }
   }
 }
 

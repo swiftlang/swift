@@ -54,8 +54,7 @@ public protocol P {}
 // STRUCT-NEXT:   },
 // STRUCT-NEXT:   {
 // STRUCT-NEXT:     "kind": "typeIdentifier",
-// STRUCT-NEXT:     "spelling": "T",
-// STRUCT-NEXT:     "preciseIdentifier": "s:12NominalTypes1SV1Txmfp"
+// STRUCT-NEXT:     "spelling": "T"
 // STRUCT-NEXT:   }
 // STRUCT-NEXT:   {
 // STRUCT-NEXT:     "kind": "text",
@@ -106,8 +105,7 @@ public class C<T> where T: Sequence {}
 // CLASS-NEXT:   },
 // CLASS-NEXT:   {
 // CLASS-NEXT:     "kind": "typeIdentifier",
-// CLASS-NEXT:     "spelling": "T",
-// CLASS-NEXT:     "preciseIdentifier": "s:12NominalTypes1CC1Txmfp"
+// CLASS-NEXT:     "spelling": "T"
 // CLASS-NEXT:   }
 // CLASS-NEXT:   {
 // CLASS-NEXT:     "kind": "text",
@@ -158,8 +156,7 @@ public enum E<T> where T: Sequence {}
 // ENUM-NEXT:   },
 // ENUM-NEXT:   {
 // ENUM-NEXT:     "kind": "typeIdentifier",
-// ENUM-NEXT:     "spelling": "T",
-// ENUM-NEXT:     "preciseIdentifier": "s:12NominalTypes1EO1Txmfp"
+// ENUM-NEXT:     "spelling": "T"
 // ENUM-NEXT:   }
 // ENUM-NEXT:   {
 // ENUM-NEXT:     "kind": "text",
@@ -211,8 +208,7 @@ public typealias TA<T> = S<T> where T: Sequence
 // TYPEALIAS-NEXT:   },
 // TYPEALIAS-NEXT:   {
 // TYPEALIAS-NEXT:     "kind": "typeIdentifier",
-// TYPEALIAS-NEXT:     "spelling": "T",
-// TYPEALIAS-NEXT:     "preciseIdentifier": "s:12NominalTypes2TAa1Txmfp"
+// TYPEALIAS-NEXT:     "spelling": "T"
 // TYPEALIAS-NEXT:   }
 // TYPEALIAS-NEXT:   {
 // TYPEALIAS-NEXT:     "kind": "text",
@@ -228,8 +224,7 @@ public typealias TA<T> = S<T> where T: Sequence
 // TYPEALIAS-NEXT:   },
 // TYPEALIAS-NEXT:   {
 // TYPEALIAS-NEXT:     "kind": "typeIdentifier",
-// TYPEALIAS-NEXT:     "spelling": "T",
-// TYPEALIAS-NEXT:     "preciseIdentifier": "s:12NominalTypes2TAa1Txmfp"
+// TYPEALIAS-NEXT:     "spelling": "T"
 // TYPEALIAS-NEXT:   }
 // TYPEALIAS-NEXT:   {
 // TYPEALIAS-NEXT:     "kind": "text",

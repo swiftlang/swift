@@ -128,25 +128,17 @@ internal func _getClassPlaygroundQuickLook(
 #endif
 
 extension Mirror {
-  internal struct ReflectedChildren: RandomAccessCollection {
-    let subject: Any
-    let subjectType: Any.Type
-    var startIndex: Int { 0 }
-    var endIndex: Int { _getChildCount(subject, type: subjectType) }
-    subscript(index: Int) -> Child {
-      getChild(of: subject, type: subjectType, index: index)
-    }
-  }
-
-  internal init(
-    internalReflecting subject: Any,
-    subjectType: Any.Type? = nil,
-    customAncestor: Mirror? = nil
-  ) {
+  internal init(internalReflecting subject: Any,
+              subjectType: Any.Type? = nil,
+              customAncestor: Mirror? = nil)
+  {
     let subjectType = subjectType ?? _getNormalizedType(subject, type: type(of: subject))
     
-    self._children = _Children(
-      ReflectedChildren(subject: subject, subjectType: subjectType))
+    let childCount = _getChildCount(subject, type: subjectType)
+    let children = (0 ..< childCount).lazy.map({
+      getChild(of: subject, type: subjectType, index: $0)
+    })
+    self.children = Children(children)
     
     self._makeSuperclassMirror = {
       guard let subjectClass = subjectType as? AnyClass,
@@ -308,7 +300,7 @@ public func _forEachField(
 ///     and the `_MetadataKind` of the field's type.
 /// - Returns: `true` if every invocation of `body` returns `true`; otherwise,
 ///   `false`.
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 11.3, iOS 14.5, tvOS 14.5, watchOS 7.4, *)
 @discardableResult
 @_spi(Reflection)
 public func _forEachFieldWithKeyPath<Root>(

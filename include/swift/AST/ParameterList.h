@@ -27,14 +27,10 @@ namespace swift {
 /// This describes a list of parameters.  Each parameter descriptor is tail
 /// allocated onto this list.
 class alignas(ParamDecl *) ParameterList final :
+    // FIXME: Do we really just want to allocate these pointer-aligned?
+    public ASTAllocated<std::aligned_storage<8, 8>::type>,
     private llvm::TrailingObjects<ParameterList, ParamDecl *> {
   friend TrailingObjects;
-
-  void *operator new(size_t Bytes) throw() = delete;
-  void operator delete(void *Data) throw() = delete;
-  void *operator new(size_t Bytes, void *Mem) throw() = delete;
-  void *operator new(size_t Bytes, ASTContext &C,
-                     unsigned Alignment = 8);
 
   SourceLoc LParenLoc, RParenLoc;
   size_t numParameters;
@@ -67,6 +63,14 @@ public:
     return create(decl->getASTContext(), decl);
   }
 
+  static ParameterList *clone(const ASTContext &Ctx, ParameterList *PL) {
+    SmallVector<ParamDecl*, 4> params;
+    params.reserve(PL->size());
+    for (auto p : *PL)
+      params.push_back(ParamDecl::clone(Ctx, p));
+    return ParameterList::create(Ctx, params);
+  }
+
   SourceLoc getLParenLoc() const { return LParenLoc; }
   SourceLoc getRParenLoc() const { return RParenLoc; }
   
@@ -76,7 +80,10 @@ public:
   iterator end() { return getArray().end(); }
   const_iterator begin() const { return getArray().begin(); }
   const_iterator end() const { return getArray().end(); }
-  
+
+  ParamDecl *front() const { return getArray().front(); }
+  ParamDecl *back() const { return getArray().back(); }
+
   MutableArrayRef<ParamDecl*> getArray() {
     return {getTrailingObjects<ParamDecl*>(), numParameters};
   }

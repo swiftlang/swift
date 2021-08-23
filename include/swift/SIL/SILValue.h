@@ -37,11 +37,13 @@ class PostOrderFunctionInfo;
 class ReversePostOrderInfo;
 class Operand;
 class SILInstruction;
+class SILArgument;
 class SILLocation;
 class DeadEndBlocks;
 class ValueBaseUseIterator;
 class ConsumingUseIterator;
 class NonConsumingUseIterator;
+class NonTypeDependentUseIterator;
 class SILValue;
 
 /// An enumeration which contains values for all the concrete ValueBase
@@ -116,10 +118,18 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
 ///   statically. Thus we treat Any as representing an invalid
 ///   value. ValueOwnershipKinds can only perform a meet operation to determine
 ///   if two ownership kinds are compatible with a merge of Any showing the
-///   merge is impossible since values can not have any ownership.
+///   merge is impossible since values can not have any ownership. Values with
+///   ownership None are statically proven to be trivial values, often because
+///   they are trivially typed, but sometimes because of path-sensitive
+///   information like knowledge of an enum case. Trivial values have no
+///   ownership semantics.
 ///
-/// * OperandConstraint: This represents a constraint on the values that can be
-///   used by a specific operand. Here Any is valid.
+/// * OwnershipConstraint: This represents a constraint on the values that can
+///   be used by a specific operand. Here Any is valid and is used for operands
+///   that don't care about the ownership kind (lack ownership constraints). In
+///   contrast, a constraint of None is the most restrictive. It requires a
+///   trivial value. An Unowned, Owned, or Guaranteed constraint requires either
+///   a value with the named ownership, or a trivial value.
 struct OwnershipKind {
   enum innerty : uint8_t {
     /// An ownership kind that models an ownership that is unknown statically at
@@ -159,10 +169,12 @@ struct OwnershipKind {
     Guaranteed,
 
     /// A SILValue with None ownership kind is an independent value outside of
-    /// the ownership system. It is used to model trivially typed values as well
+    /// the ownership system. It is used to model values that are statically
+    /// determined to be trivial. This includes trivially typed values as well
     /// as trivial cases of non-trivial enums. Naturally None can be merged with
     /// any ValueOwnershipKind allowing us to naturally model merge and branch
-    /// points in the SSA graph.
+    /// points in the SSA graph, where more information about the value is
+    /// statically available on some control flow paths.
     None,
 
     LastValueOwnershipKind = None,
@@ -226,6 +238,8 @@ struct OwnershipKind {
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const OwnershipKind &kind);
 
+struct OperandOwnership;
+
 /// A value representing the specific ownership semantics that a SILValue may
 /// have.
 struct ValueOwnershipKind {
@@ -286,6 +300,11 @@ struct ValueOwnershipKind {
     llvm_unreachable("covered switch");
   }
 
+  /// Return the OperandOwnership for a forwarded operand when the forwarded
+  /// result has this ValueOwnershipKind. \p allowUnowned is true for a subset
+  /// of forwarding operations that are allowed to propagate Unowned values.
+  OperandOwnership getForwardingOperandOwnership(bool allowUnowned) const;
+
   /// Returns true if \p Other can be merged successfully with this, implying
   /// that the two ownership kinds are "compatibile".
   ///
@@ -329,10 +348,8 @@ class ValueBase : public SILNode, public SILAllocated<ValueBase> {
   ValueBase &operator=(const ValueBase &) = delete;
 
 protected:
-  ValueBase(ValueKind kind, SILType type, IsRepresentative isRepresentative)
-      : SILNode(SILNodeKind(kind), SILNodeStorageLocation::Value,
-                isRepresentative),
-        Type(type) {}
+  ValueBase(ValueKind kind, SILType type)
+      : SILNode(SILNodeKind(kind)), Type(type) {}
 
 public:
   ~ValueBase() {
@@ -371,6 +388,9 @@ public:
   using consuming_use_range = iterator_range<consuming_use_iterator>;
   using non_consuming_use_iterator = NonConsumingUseIterator;
   using non_consuming_use_range = iterator_range<non_consuming_use_iterator>;
+  using non_typedependent_use_iterator = NonTypeDependentUseIterator;
+  using non_typedependent_use_range =
+      iterator_range<non_typedependent_use_iterator>;
 
   inline use_iterator use_begin() const;
   inline use_iterator use_end() const;
@@ -380,6 +400,9 @@ public:
 
   inline non_consuming_use_iterator non_consuming_use_begin() const;
   inline non_consuming_use_iterator non_consuming_use_end() const;
+
+  inline non_typedependent_use_iterator non_typedependent_use_begin() const;
+  inline non_typedependent_use_iterator non_typedependent_use_end() const;
 
   /// Returns a range of all uses, which is useful for iterating over all uses.
   /// To ignore debug-info instructions use swift::getNonDebugUses instead
@@ -404,6 +427,10 @@ public:
 
   /// Returns a range of all non consuming uses
   inline non_consuming_use_range getNonConsumingUses() const;
+
+  /// Returns a range of uses that are not classified as a type dependent
+  /// operand of the user.
+  inline non_typedependent_use_range getNonTypeDependentUses() const;
 
   template <class T>
   inline T *getSingleUserOfType() const;
@@ -451,11 +478,47 @@ public:
   /// For instruction results, this returns getDefiningInstruction(). For
   /// arguments, this returns SILBasicBlock::begin() for the argument's parent
   /// block. Returns nullptr for SILUndef.
+  ///
+  /// FIXME: remove this redundant API from SILValue.
+  SILInstruction *getDefiningInsertionPoint();
+
+  // Const version of \see getDefiningInsertionPoint.
   const SILInstruction *getDefiningInsertionPoint() const {
     return const_cast<ValueBase *>(this)->getDefiningInsertionPoint();
   }
 
-  SILInstruction *getDefiningInsertionPoint();
+  /// Return the next SIL instruction to execute /after/ this value is
+  /// available.
+  ///
+  /// Operationally this means that:
+  ///
+  /// * For SILArguments, this returns the first instruction in the block.
+  ///
+  /// * For SILInstructions, this returns std::next. This is the main divergence
+  ///   from getDefiningInsertionPoint() (see discussion below).
+  ///
+  /// * For SILUndef, this returns nullptr.
+  ///
+  /// DISCUSSION: The reason that this exists is that when one wants a "next"
+  /// instruction pointer, one often times wants to write:
+  ///
+  ///   if (auto *insertPt = value->getDefiningInsertionPoint())
+  ///     return std::next(insertPt);
+  ///
+  /// This is incorrect for SILArguments since after processing a SILArgument,
+  /// we need to process the actual first instruction in the block. With this
+  /// API, one can simply do:
+  ///
+  ///   if (auto *inst = value->getNextInstruction())
+  ///     return inst;
+  ///
+  /// And get the correct answer every time.
+  SILInstruction *getNextInstruction();
+
+  // Const version of \see getDefiningInsertionPoint.
+  const SILInstruction *getNextInstruction() const {
+    return const_cast<ValueBase *>(this)->getNextInstruction();
+  }
 
   struct DefiningInstructionResult {
     SILInstruction *Instruction;
@@ -466,9 +529,19 @@ public:
   /// result index, or None if it is not defined by an instruction.
   Optional<DefiningInstructionResult> getDefiningInstructionResult();
 
-  static bool classof(const SILNode *N) {
-    return N->getKind() >= SILNodeKind::First_ValueBase &&
-           N->getKind() <= SILNodeKind::Last_ValueBase;
+  /// Returns the ValueOwnershipKind that describes this SILValue's ownership
+  /// semantics if the SILValue has ownership semantics. Returns is a value
+  /// without any Ownership Semantics.
+  ///
+  /// An example of a SILValue without ownership semantics is a
+  /// struct_element_addr.
+  ///
+  /// NOTE: This is implemented in ValueOwnership.cpp not SILValue.cpp.
+  ValueOwnershipKind getOwnershipKind() const;
+
+  static bool classof(SILNodePointer node) {
+    return node->getKind() >= SILNodeKind::First_ValueBase &&
+           node->getKind() <= SILNodeKind::Last_ValueBase;
   }
   static bool classof(const ValueBase *V) { return true; }
 
@@ -561,16 +634,34 @@ public:
   /// struct_element_addr.
   ///
   /// NOTE: This is implemented in ValueOwnership.cpp not SILValue.cpp.
-  ValueOwnershipKind getOwnershipKind() const;
+  ///
+  /// FIXME: remove this redundant API from SILValue.
+  ValueOwnershipKind getOwnershipKind() const {
+    return Value->getOwnershipKind();
+  }
 
   /// Verify that this SILValue and its uses respects ownership invariants.
-  void verifyOwnership(DeadEndBlocks *DEBlocks = nullptr) const;
+  void verifyOwnership(DeadEndBlocks *DEBlocks) const;
 };
+
+inline SILNodePointer::SILNodePointer(SILValue value) : node(value) { }
 
 inline bool ValueOwnershipKind::isCompatibleWith(SILValue other) const {
   return isCompatibleWith(other.getOwnershipKind());
 }
 
+/// Constraints on the ownership of an operand value.
+///
+/// The ownershipKind component constrains the operand's value ownership to be
+/// the same or "above" the constraint in the lattice, such that
+/// join(constraint, valueOwnership) == valueOwnership. In other words, applying
+/// the constraint does not change the value's ownership. For example, a value
+/// with None ownership is accepted by any OwnershipConstraint, and an
+/// OwnershipConstraint with 'Any' ownership kind can accept any value. Note
+/// that operands commonly allow either Owned or Guaranteed operands. These
+/// operands have an Any ownership constraint to allow either. However,
+/// enforcement of Unowned value is more strict. This requires separate logic in
+/// canAcceptUnownedValue() to avoid complicating the OwnershipKind lattice.
 class OwnershipConstraint {
   OwnershipKind ownershipKind;
   UseLifetimeConstraint lifetimeConstraint;
@@ -597,10 +688,9 @@ public:
     return lifetimeConstraint;
   }
 
-  /// Return a constraint that is appropriate for an operand that can accept a
-  /// value with any ownership kind without ending said value's lifetime.
-  static OwnershipConstraint any() {
-    return {OwnershipKind::Any, UseLifetimeConstraint::NonLifetimeEnding};
+  bool isConsuming() const {
+    return ownershipKind == OwnershipKind::Owned
+      && lifetimeConstraint == UseLifetimeConstraint::LifetimeEnding;
   }
 
   bool satisfiedBy(const Operand *use) const;
@@ -617,6 +707,249 @@ public:
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               OwnershipConstraint constraint);
+
+/// Categorize all uses in terms of their ownership effect.
+///
+/// Used to verify completeness of the ownership use model and exhaustively
+/// switch over any category of ownership use. Implies ownership constraints and
+/// lifetime constraints.
+///
+/// OperandOwnership may be statically determined by the user's opcode alone, or
+/// by the opcode and operand type. Or it may be dynamically determined by an
+/// ownership kind variable in the user's state. However, it may never be
+/// inferred from the ownership of the incoming value. This way, the logic for
+/// determining which ValueOwnershipKind an operand may accept is reliable.
+///
+/// Any use that takes an Owned or Guaranteed value may also take a trivial
+/// value (ownership None), because the ownership semantics are irrelevant.
+struct OperandOwnership {
+  enum innerty : uint8_t {
+    /// Operands that do not use the value. They only represent a dependence
+    /// on a dominating definition and do not require liveness.
+    /// (type-dependent operands)
+    NonUse,
+
+    /// Uses that can only handle trivial values. The operand value must have
+    /// None ownership. These uses require liveness but are otherwise
+    /// unverified.
+    TrivialUse,
+
+    /// Use the value only for the duration of the operation, which may have
+    /// side effects. Requires an owned or guaranteed value.
+    /// (single-instruction apply with @guaranteed argument)
+    InstantaneousUse,
+
+    /// MARK: Uses of Any ownership values:
+
+    /// Use a value without requiring or propagating ownership. The operation
+    /// may not have side-effects that could affect ownership. This is limited
+    /// to a small number of operations that are allowed to take Unowned values.
+    /// (copy_value, single-instruction apply with @unowned argument))
+    UnownedInstantaneousUse,
+
+    /// Forwarding instruction with an Unowned result. Its operands may have any
+    /// ownership.
+    ForwardingUnowned,
+
+    // Escape a pointer into a value which cannot be tracked or verified.
+    //
+    // TODO: Eliminate the PointerEscape category. All pointer escapes should be
+    // InteriorPointer, guarded by a borrow scope, and verified.
+    PointerEscape,
+
+    /// Bitwise escape. Escapes the nontrivial contents of the value.
+    /// OSSA does not enforce the lifetime of the escaping bits.
+    /// The programmer must explicitly force lifetime extension.
+    /// (ref_to_unowned, unchecked_trivial_bitcast)
+    BitwiseEscape,
+
+    /// Borrow. Propagates the owned or guaranteed value within a scope, without
+    /// ending its lifetime.
+    /// (begin_borrow, begin_apply with @guaranteed argument)
+    Borrow,
+
+    /// MARK: Uses of Owned (or None) values:
+
+    /// Destroying Consume. Destroys the owned value immediately.
+    /// (store, destroy, @owned destructure).
+    DestroyingConsume,
+    /// Forwarding Consume. Consumes the owned value indirectly via a move.
+    /// (br, destructure, tuple, struct, cast, switch).
+    ForwardingConsume,
+
+    /// MARK: Uses of Guaranteed (or None) values:
+
+    /// Interior Pointer. Propagates a trivial value (e.g. address, pointer, or
+    /// no-escape closure) that depends on the guaranteed value within the
+    /// base's borrow scope. The verifier checks that all uses of the trivial
+    /// value are in scope.
+    /// (ref_element_addr, open_existential_box)
+    InteriorPointer,
+    /// Forwarded Borrow. Propagates the guaranteed value within the base's
+    /// borrow scope.
+    /// (tuple_extract, struct_extract, cast, switch)
+    ForwardingBorrow,
+    /// End Borrow. End the borrow scope opened directly by the operand.
+    /// The operand must be a begin_borrow, begin_apply, or function argument.
+    /// (end_borrow, end_apply)
+    EndBorrow,
+    // Reborrow. Ends the borrow scope opened directly by the operand and begins
+    // one or multiple disjoint borrow scopes. If a forwarded value is
+    // reborrowed, then its base must also be reborrowed at the same point.
+    // (br, FIXME: should also include destructure, tuple, struct)
+    Reborrow
+  } value;
+
+  OperandOwnership(innerty newValue) : value(newValue) {}
+  OperandOwnership(const OperandOwnership &other): value(other.value) {}
+
+  OperandOwnership &operator=(const OperandOwnership &other) {
+    value = other.value;
+    return *this;
+  }
+
+  OperandOwnership &operator=(OperandOwnership::innerty other) {
+    value = other;
+    return *this;
+  }
+
+  operator innerty() const { return value; }
+
+  StringRef asString() const;
+
+  /// Return the OwnershipConstraint corresponding to this OperandOwnership.
+  OwnershipConstraint getOwnershipConstraint();
+};
+
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                              const OperandOwnership &operandOwnership);
+
+/// Map OperandOwnership to the OwnershipConstraint used in OSSA validation.
+///
+/// Each OperandOwnership kind maps directly to a fixed OwnershipConstraint. Any
+/// value that can be legally passed to this operand must have an ownership kind
+/// permitted by this constraint. A constraint permits an ownership kind if,
+/// when it is applied to that ownership kind via a lattice join, it returns the
+/// same ownership kind, indicating that no restriction exists.
+///
+/// Consequently, OperandOwnership kinds that are allowed to take either Owned
+/// or Guaranteed values map to an OwnershipKind::Any constraint.
+///
+/// Unowned values are more restricted than Owned or Guaranteed values in
+/// terms of their valid uses, which helps limit the situations where the
+/// implementation needs to consider this special case. This additional
+/// restriction is validated by `canAcceptUnownedValue`.
+///
+/// Forwarding instructions that produce Owned or Guaranteed values always
+/// forward an operand of the same ownership kind. Each case has a distinct
+/// OperandOwnership (ForwardingConsume and ForwardingBorrow), which enforces a
+/// specific constraint on the operand's ownership. Forwarding instructions that
+/// produce an Unowned value, however, may forward an operand of any
+/// ownership. Therefore, ForwardingUnowned is mapped to OwnershipKind::Any.
+///
+/// This design yields the following advantages:
+///
+/// 1. Keeping the verification of Unowned in a separate utility avoids
+///    the need to add an extra OwnedOrGuaranteed state to the OwnershipKind
+///    lattice. That state would be meaningless as a representation of value
+///    ownership, would serve no purpose as a data flow state, and would make
+///    the basic definition of ownership less approachable to developers.
+///
+/// 2. Owned or Guaranteed values can be passed to instructions that want to
+///    produce an unowned result from a parent operand. This simplifies the IR
+///    and makes RAUWing Unowned values with Owned or Guaranteed values much
+///    easier since it does not need to introduce operations that convert those
+///    values to Unowned. This significantly simplifies the implementation of
+///    OSSA utilities.
+///
+/// Defined inline so the switch is eliminated for constant OperandOwnership.
+inline OwnershipConstraint OperandOwnership::getOwnershipConstraint() {
+  switch (value) {
+  case OperandOwnership::TrivialUse:
+    return {OwnershipKind::None, UseLifetimeConstraint::NonLifetimeEnding};
+  case OperandOwnership::NonUse:
+  case OperandOwnership::InstantaneousUse:
+  case OperandOwnership::UnownedInstantaneousUse:
+  case OperandOwnership::ForwardingUnowned:
+  case OperandOwnership::PointerEscape:
+  case OperandOwnership::BitwiseEscape:
+  case OperandOwnership::Borrow:
+    return {OwnershipKind::Any, UseLifetimeConstraint::NonLifetimeEnding};
+  case OperandOwnership::DestroyingConsume:
+  case OperandOwnership::ForwardingConsume:
+    return {OwnershipKind::Owned, UseLifetimeConstraint::LifetimeEnding};
+  case OperandOwnership::InteriorPointer:
+  case OperandOwnership::ForwardingBorrow:
+    return {OwnershipKind::Guaranteed,
+            UseLifetimeConstraint::NonLifetimeEnding};
+  case OperandOwnership::EndBorrow:
+  case OperandOwnership::Reborrow:
+    return {OwnershipKind::Guaranteed, UseLifetimeConstraint::LifetimeEnding};
+  }
+  llvm_unreachable("covered switch");
+}
+
+/// Return true if this use can accept Unowned values.
+///
+/// This extra restriction is applied on top of the OwnershipConstraint to limit
+/// the spread of Unowned values.
+inline bool canAcceptUnownedValue(OperandOwnership operandOwnership) {
+  switch (operandOwnership) {
+  case OperandOwnership::NonUse:
+  case OperandOwnership::UnownedInstantaneousUse:
+  case OperandOwnership::ForwardingUnowned:
+  case OperandOwnership::PointerEscape:
+  case OperandOwnership::BitwiseEscape:
+    return true;
+  case OperandOwnership::TrivialUse:
+  case OperandOwnership::InstantaneousUse:
+  case OperandOwnership::Borrow:
+  case OperandOwnership::DestroyingConsume:
+  case OperandOwnership::ForwardingConsume:
+  case OperandOwnership::InteriorPointer:
+  case OperandOwnership::ForwardingBorrow:
+  case OperandOwnership::EndBorrow:
+  case OperandOwnership::Reborrow:
+    return false;
+  }
+  llvm_unreachable("covered switch");
+}
+
+/// Return true if all OperandOwnership invariants hold.
+bool checkOperandOwnershipInvariants(const Operand *operand);
+
+/// Return the OperandOwnership for a forwarded operand when the forwarding
+/// operation has this "forwarding ownership" (as returned by
+/// getForwardingOwnershipKind()). \p allowUnowned is true for a subset of
+/// forwarding operations that are allowed to propagate Unowned values.
+///
+/// Forwarding ownership is determined by the forwarding instruction's constant
+/// ownership attribute. If forwarding ownership is owned, then the instruction
+/// moves owned operand to its result, ending its lifetime. If forwarding
+/// ownership is guaranteed, then the instruction propagates the lifetime of its
+/// borrows operand through its result.
+///
+/// The resulting forwarded value typically has forwarding ownership, but may
+/// differ when the result is trivial type. e.g. an owned or guaranteed value
+/// can be cast to a trivial type using owned or guaranteed forwarding.
+inline OperandOwnership
+ValueOwnershipKind::getForwardingOperandOwnership(bool allowUnowned) const {
+  switch (value) {
+  case OwnershipKind::Any:
+    llvm_unreachable("invalid value ownership");
+  case OwnershipKind::Unowned:
+    if (allowUnowned) {
+      return OperandOwnership::ForwardingUnowned;
+    }
+    llvm_unreachable("invalid value ownership");
+  case OwnershipKind::None:
+    return OperandOwnership::TrivialUse;
+  case OwnershipKind::Guaranteed:
+    return OperandOwnership::ForwardingBorrow;
+  case OwnershipKind::Owned:
+    return OperandOwnership::ForwardingConsume;
+  }
+}
 
 /// A formal SIL reference to a value, suitable for use as a stored
 /// operand.
@@ -687,6 +1020,8 @@ public:
   SILInstruction *getUser() { return Owner; }
   const SILInstruction *getUser() const { return Owner; }
 
+  Operand *getNextUse() const { return NextUse; }
+
   /// Return true if this operand is a type dependent operand.
   ///
   /// Implemented in SILInstruction.h
@@ -695,40 +1030,56 @@ public:
   /// Return which operand this is in the operand list of the using instruction.
   unsigned getOperandNumber() const;
 
-  /// Return the ownership constraint that restricts what types of values this
-  /// Operand can contain. Returns none if the operand is a type dependent
-  /// operand.
+  /// Return the use ownership of this operand.
   ///
   /// NOTE: This is implemented in OperandOwnership.cpp.
-  Optional<OwnershipConstraint> getOwnershipConstraint() const;
+  OperandOwnership getOperandOwnership() const;
+
+  /// Return the ownership constraint that restricts what types of values this
+  /// Operand can contain.
+  OwnershipConstraint getOwnershipConstraint() const {
+    return getOperandOwnership().getOwnershipConstraint();
+  }
 
   /// Returns true if changing the operand to use a value with the given
-  /// ownership kind would not cause the operand to violate the operand's
-  /// ownership constraints. Returns false otherwise.
+  /// ownership kind, without rewriting the instruction, would not cause the
+  /// operand to violate the operand's ownership constraints.
   bool canAcceptKind(ValueOwnershipKind kind) const;
 
   /// Returns true if this operand and its value satisfy the operand's
   /// operand constraint.
   bool satisfiesConstraints() const;
 
-  /// Returns true if this operand acts as a use that consumes its associated
-  /// value.
+  /// Returns true if this operand acts as a use that ends the lifetime its
+  /// associated value, either by consuming the owned value or ending the
+  /// guaranteed scope.
   bool isLifetimeEnding() const;
+
+  /// Returns true if this ends the lifetime of an owned operand.
+  bool isConsuming() const;
 
   SILBasicBlock *getParentBlock() const;
   SILFunction *getParentFunction() const;
 
+  LLVM_ATTRIBUTE_DEPRECATED(
+      void dump() const LLVM_ATTRIBUTE_USED,
+      "Dump the operand's state. Only for use in the debugger!");
+  void print(llvm::raw_ostream &os) const;
+
 private:
   void removeFromCurrent() {
-    if (!Back) return;
+    if (!Back)
+      return;
     *Back = NextUse;
-    if (NextUse) NextUse->Back = Back;
+    if (NextUse)
+      NextUse->Back = Back;
   }
 
   void insertIntoCurrent() {
     Back = &TheValue->FirstUse;
     NextUse = TheValue->FirstUse;
-    if (NextUse) NextUse->Back = &NextUse;
+    if (NextUse)
+      NextUse->Back = &NextUse;
     TheValue->FirstUse = this;
   }
 
@@ -736,6 +1087,7 @@ private:
   friend class ValueBaseUseIterator;
   friend class ConsumingUseIterator;
   friend class NonConsumingUseIterator;
+  friend class NonTypeDependentUseIterator;
   template <unsigned N> friend class FixedOperandList;
   friend class TrailingOperandsList;
 };
@@ -862,6 +1214,41 @@ ValueBase::non_consuming_use_end() const {
   return ValueBase::non_consuming_use_iterator(nullptr);
 }
 
+class NonTypeDependentUseIterator : public ValueBaseUseIterator {
+public:
+  explicit NonTypeDependentUseIterator(Operand *cur)
+      : ValueBaseUseIterator(cur) {}
+  NonTypeDependentUseIterator &operator++() {
+    assert(Cur && "incrementing past end()!");
+    assert(!Cur->isTypeDependent());
+    while ((Cur = Cur->NextUse)) {
+      if (!Cur->isTypeDependent())
+        break;
+    }
+    return *this;
+  }
+
+  NonTypeDependentUseIterator operator++(int unused) {
+    NonTypeDependentUseIterator copy = *this;
+    ++*this;
+    return copy;
+  }
+};
+
+inline ValueBase::non_typedependent_use_iterator
+ValueBase::non_typedependent_use_begin() const {
+  auto cur = FirstUse;
+  while (cur && cur->isTypeDependent()) {
+    cur = cur->NextUse;
+  }
+  return ValueBase::non_typedependent_use_iterator(cur);
+}
+
+inline ValueBase::non_typedependent_use_iterator
+ValueBase::non_typedependent_use_end() const {
+  return ValueBase::non_typedependent_use_iterator(nullptr);
+}
+
 inline bool ValueBase::hasOneUse() const {
   auto I = use_begin(), E = use_end();
   if (I == E) return false;
@@ -905,6 +1292,11 @@ inline ValueBase::consuming_use_range ValueBase::getConsumingUses() const {
 inline ValueBase::non_consuming_use_range
 ValueBase::getNonConsumingUses() const {
   return {non_consuming_use_begin(), non_consuming_use_end()};
+}
+
+inline ValueBase::non_typedependent_use_range
+ValueBase::getNonTypeDependentUses() const {
+  return {non_typedependent_use_begin(), non_typedependent_use_end()};
 }
 
 inline bool ValueBase::hasTwoUses() const {
@@ -1028,6 +1420,25 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SILValue V) {
   V->print(OS);
   return OS;
 }
+
+/// Used internally in e.g. the SIL parser and deserializer to handle forward-
+/// referenced values.
+/// A PlaceholderValue must not appear in valid SIL.
+class PlaceholderValue : public ValueBase {
+  static int numPlaceholderValuesAlive;
+
+public:
+  PlaceholderValue(SILType type);
+  ~PlaceholderValue();
+
+  static int getNumPlaceholderValuesAlive() { return numPlaceholderValuesAlive; }
+
+  static bool classof(const SILArgument *) = delete;
+  static bool classof(const SILInstruction *) = delete;
+  static bool classof(SILNodePointer node) {
+    return node->getKind() == SILNodeKind::PlaceholderValue;
+  }
+};
 
 } // end namespace swift
 

@@ -19,6 +19,17 @@ class MyType<T> {
 	}
 }
 
+// rdar://76750555
+public protocol IP {
+    init(networkBytes: Int)
+}
+
+public struct HostRecord<IPType: IP> {
+    func foo() {
+        let ipType = IPType(networkBytes: 42)
+    }
+}
+
 // RUN: %sourcekitd-test -req=cursor -pos=1:10 %s -- %s | %FileCheck -check-prefix=CHECK1 %s
 // CHECK1: <Declaration>func testGenerics&lt;T&gt;(x: <Type usr="s:15cursor_generics12testGenerics1xyx_tlF1TL_xmfp">T</Type>)</Declaration>
 
@@ -37,3 +48,7 @@ class MyType<T> {
 // RUN: %sourcekitd-test -req=cursor -pos=18:14 %s -- %s | %FileCheck -check-prefix=CHECK5 %s
 // CHECK5: source.lang.swift.ref.var.instance
 // CHECK5: <Declaration>let items: [<Type usr="s:Si">Int</Type>]</Declaration>
+
+// RUN: %sourcekitd-test -req=cursor -pos=29:22 %s -- %s | %FileCheck -check-prefix=CHECK_IP_TYPE %s
+// CHECK_IP_TYPE: source.lang.swift.ref.generic_type_param
+// CHECK_IP_TYPE: <Declaration>IPType : <Type usr="s:15cursor_generics2IPP">IP</Type></Declaration>

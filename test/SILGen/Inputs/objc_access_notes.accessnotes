@@ -1,0 +1,56 @@
+---
+Reason: fancy test suite
+Notes:
+
+# These two should not match anything, but could accidentally match Hoozit.typical(_:y:)
+- Name: 'typical(_:y:)'
+  ObjC: true
+  ObjCName: 'pickedNoteWithNameThatWasTooShallow_typical:y:'
+- Name: 'Hoozit.Hoozit.typical(_:y:)'
+  ObjC: true
+  ObjCName: 'pickedNoteWithNameThatWasTooDeep_typical:y:'
+
+# These entries should actually match things.
+- Name: 'Hoozit.typical(_:y:)'
+  ObjC: true
+- Name: 'Hoozit.copyFoo()'
+  ObjC: true
+- Name: 'Hoozit.mutableCopyFoo()'
+  ObjC: true
+- Name: 'Hoozit.copy8()'
+  ObjC: true
+- Name: 'Hoozit.makeDuplicate()'
+  ObjC: true
+  ObjCName: 'copyDuplicate'
+- Name: 'Hoozit.mutableCopyFoo()'
+  ObjC: true
+- Name: 'Hoozit.initFoo()'
+  ObjC: true
+- Name: 'Hoozit.typicalProperty'
+  ObjC: true
+- Name: 'Hoozit.copyProperty'
+  ObjC: true
+- Name: 'Hoozit.propComputed'
+  ObjC: true
+- Name: 'getter:Hoozit.propComputed()'
+  ObjCName: 'initPropComputedGetter'
+- Name: 'setter:Hoozit.propComputed(_:)'
+  ObjCName: 'initPropComputedSetter:'
+- Name: 'Hoozit.roProperty'
+  ObjC: true
+- Name: 'Hoozit.rwProperty'
+  ObjC: true
+- Name: 'Hoozit.copyRWProperty'
+  ObjC: true
+- Name: 'Hoozit.initProperty'
+  ObjC: true
+- Name: 'Hoozit.subscript(_:)'
+  ObjC: true
+- Name: 'Hoozit.init(int:)'
+  ObjC: true
+  Dynamic: true
+- Name: 'Hoozit.foof()'
+  ObjC: true
+- Name: 'Wotsit.plain()'
+  ObjC: true
+  ObjCName: 'fancy'

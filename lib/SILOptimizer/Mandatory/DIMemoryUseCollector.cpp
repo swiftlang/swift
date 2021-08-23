@@ -93,13 +93,8 @@ static unsigned getElementCountRec(TypeExpansionContext context,
 }
 
 static std::pair<SILType, bool>
-computeMemorySILType(MarkUninitializedInst *MemoryInst) {
+computeMemorySILType(MarkUninitializedInst *MUI, SILValue Address) {
   // Compute the type of the memory object.
-  auto *MUI = MemoryInst;
-  SILValue Address = MUI;
-  if (auto *PBI = Address->getSingleUserOfType<ProjectBoxInst>()) {
-    Address = PBI;
-  }
   SILType MemorySILType = Address->getType().getObjectType();
 
   // If this is a let variable we're initializing, remember this so we don't
@@ -118,7 +113,13 @@ DIMemoryObjectInfo::DIMemoryObjectInfo(MarkUninitializedInst *MI)
     : MemoryInst(MI) {
   auto &Module = MI->getModule();
 
-  std::tie(MemorySILType, IsLet) = computeMemorySILType(MemoryInst);
+  SILValue Address = MemoryInst;
+  if (auto PBI = MemoryInst->getSingleUserOfType<ProjectBoxInst>()) {
+    IsBox = true;
+    Address = PBI;
+  }
+
+  std::tie(MemorySILType, IsLet) = computeMemorySILType(MI, Address);
 
   // Compute the number of elements to track in this memory object.
   // If this is a 'self' in a delegating initializer, we only track one bit:
@@ -431,6 +432,23 @@ bool DIMemoryObjectInfo::isElementLetProperty(unsigned Element) const {
   return false;
 }
 
+ConstructorDecl *DIMemoryObjectInfo::getActorInitSelf() const {
+  // is it 'self'?
+  if (!MemoryInst->isVar())
+    if (auto decl =
+        dyn_cast_or_null<ClassDecl>(getASTType()->getAnyNominal()))
+      // is it for an actor?
+      if (decl->isActor() && !decl->isDistributedActor()) // FIXME(78484431) skip distributed actors for now, until their initializers are fixed!
+        if (auto *silFn = MemoryInst->getFunction())
+          // is it a designated initializer?
+          if (auto *ctor = dyn_cast_or_null<ConstructorDecl>(
+                            silFn->getDeclContext()->getAsDecl()))
+            if (ctor->isDesignatedInit())
+              return ctor;
+
+  return nullptr;
+}
+
 //===----------------------------------------------------------------------===//
 //                        DIMemoryUse Implementation
 //===----------------------------------------------------------------------===//
@@ -475,9 +493,14 @@ namespace {
 /// Gathers information about a specific address and its uses to determine
 /// definite initialization.
 class ElementUseCollector {
+public:
+  typedef SmallPtrSet<SILFunction *, 8> FunctionSet;
+
+private:
   SILModule &Module;
   const DIMemoryObjectInfo &TheMemory;
   DIElementUseInfo &UseInfo;
+  FunctionSet &VisitedClosures;
 
   /// IsSelfOfNonDelegatingInitializer - This is true if we're looking at the
   /// top level of a 'self' variable in a non-delegating init method.
@@ -494,12 +517,15 @@ class ElementUseCollector {
 
 public:
   ElementUseCollector(const DIMemoryObjectInfo &TheMemory,
-                      DIElementUseInfo &UseInfo)
-      : Module(TheMemory.getModule()), TheMemory(TheMemory), UseInfo(UseInfo) {}
+                      DIElementUseInfo &UseInfo,
+                      FunctionSet &visitedClosures)
+      : Module(TheMemory.getModule()), TheMemory(TheMemory), UseInfo(UseInfo),
+        VisitedClosures(visitedClosures)
+  {}
 
   /// This is the main entry point for the use walker.  It collects uses from
   /// the address and the refcount result of the allocation.
-  void collectFrom() {
+  void collectFrom(SILValue V, bool collectDestroysOfContainer) {
     IsSelfOfNonDelegatingInitializer = TheMemory.isNonDelegatingInit();
 
     // If this is a delegating initializer, collect uses specially.
@@ -508,12 +534,16 @@ public:
       assert(!TheMemory.isDerivedClassSelfOnly() &&
              "Should have been handled outside of here");
       // If this is a class pointer, we need to look through ref_element_addrs.
-      collectClassSelfUses();
+      collectClassSelfUses(V);
       return;
     }
 
-    collectUses(TheMemory.getUninitializedValue(), 0);
-    gatherDestroysOfContainer(TheMemory, UseInfo);
+    collectUses(V, 0);
+    if (collectDestroysOfContainer) {
+      assert(V == TheMemory.getUninitializedValue() &&
+             "can only gather destroys of root value");
+      gatherDestroysOfContainer(TheMemory, UseInfo);
+    }
   }
 
   void trackUse(DIMemoryUse Use) { UseInfo.trackUse(Use); }
@@ -525,7 +555,9 @@ public:
 
 private:
   void collectUses(SILValue Pointer, unsigned BaseEltNo);
-  void collectClassSelfUses();
+  bool addClosureElementUses(PartialApplyInst *pai, Operand *argUse);
+
+  void collectClassSelfUses(SILValue ClassPointer);
   void collectClassSelfUses(SILValue ClassPointer, SILType MemorySILType,
                             llvm::SmallDenseMap<VarDecl *, unsigned> &EN);
 
@@ -911,8 +943,14 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       continue;
     }
 
+    if (User->isDebugInstruction())
+      continue;
+
     if (auto *PAI = dyn_cast<PartialApplyInst>(User)) {
       if (onlyUsedByAssignByWrapper(PAI))
+        continue;
+        
+      if (BaseEltNo == 0 && addClosureElementUses(PAI, Op))
         continue;
     }
 
@@ -926,9 +964,85 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
   }
 }
 
+/// Add all used elements of an implicit closure, which is capturing 'self'.
+///
+/// We want to correctly handle implicit closures in initializers, e.g. with
+/// boolean operators:
+/// \code
+///   init() {
+///     bool_member1 = false
+///     bool_member2 = false || bool_member1 // implicit closure
+///   }
+/// \endcode
+///
+/// The implicit closure ('bool_member1' at the RHS of the || operator) captures
+/// the whole self, but only uses 'bool_member1'.
+/// If we would add the whole captured 'self' as use, we would get a
+/// "'self.bool_member2' not initialized" error at the partial_apply.
+/// Therefore we look into the body of the closure and only add the actually
+/// used members.
+bool ElementUseCollector::addClosureElementUses(PartialApplyInst *pai,
+                                                Operand *argUse) {
+  SILFunction *callee = pai->getReferencedFunctionOrNull();
+  if (!callee)
+    return false;
+
+  // Implicit closures are "transparent", which means they are always inlined.
+  // It would probably also work to handle non-transparent closures (e.g.
+  // explicit closures). But if the closure is not inlined we could end up
+  // passing a partially initialized self to the closure function. Although it
+  // would probably not cause any real problems, an `@in_guaranteed` argument
+  // (the captured 'self') is assumed to be fully initialized in SIL.
+  if (!callee->isTransparent())
+    return false;
+
+  // Implicit closures are only partial-applied once and there cannot be a
+  // recursive cycle of implicit closures.
+  // Nevertheless such a scenario is theoretically possible in SIL. To be on the
+  // safe side, check for cycles.
+  if (!VisitedClosures.insert(callee).second)
+    return false;
+
+  unsigned argIndex = ApplySite(pai).getCalleeArgIndex(*argUse);
+  SILArgument *arg = callee->getArgument(argIndex);
+  
+  // Bail if arg is not the original 'self' object, but e.g. a projected member.
+  assert(TheMemory.getType().isObject());
+  if (arg->getType().getObjectType() != TheMemory.getType())
+    return false;
+
+  DIElementUseInfo ArgUseInfo;
+  ElementUseCollector collector(TheMemory, ArgUseInfo, VisitedClosures);
+  collector.collectFrom(arg, /*collectDestroysOfContainer*/ false);
+
+  if (!ArgUseInfo.Releases.empty() || !ArgUseInfo.StoresToSelf.empty())
+    return false;
+    
+  for (const DIMemoryUse &use : ArgUseInfo.Uses) {
+    // Only handle loads and escapes. Implicit closures will not have stores or
+    // store-like uses, anyway.
+    // Also, as we don't do a flow-sensitive analysis of the callee, we cannot
+    // handle stores, because we don't know if they are unconditional or not.
+    switch (use.Kind) {
+      case DIUseKind::Load:
+      case DIUseKind::Escape:
+      case DIUseKind::InOutArgument:
+        break;
+      default:
+        return false;
+    }
+  }
+
+  // Track all uses of the closure.
+  for (const DIMemoryUse &use : ArgUseInfo.Uses) {
+    trackUse(DIMemoryUse(pai, use.Kind, use.FirstElement, use.NumElements));
+  }
+  return true;
+}
+
 /// collectClassSelfUses - Collect all the uses of a 'self' pointer in a class
 /// constructor.  The memory object has class type.
-void ElementUseCollector::collectClassSelfUses() {
+void ElementUseCollector::collectClassSelfUses(SILValue ClassPointer) {
   assert(IsSelfOfNonDelegatingInitializer &&
          TheMemory.getASTType()->getClassOrBoundGenericClass() != nullptr);
 
@@ -951,9 +1065,12 @@ void ElementUseCollector::collectClassSelfUses() {
 
   // If we are looking at the init method for a root class, just walk the
   // MUI use-def chain directly to find our uses.
-  if (TheMemory.isRootSelf()) {
-    collectClassSelfUses(TheMemory.getUninitializedValue(), TheMemory.getType(),
-                         EltNumbering);
+  if (TheMemory.isRootSelf() ||
+  
+      // Also, just visit all users if ClassPointer is a closure argument,
+      // i.e. collectClassSelfUses is called from addClosureElementUses.
+      isa<SILFunctionArgument>(ClassPointer)) {
+    collectClassSelfUses(ClassPointer, TheMemory.getType(), EltNumbering);
     return;
   }
 
@@ -1307,11 +1424,18 @@ void ElementUseCollector::collectClassSelfUses(
     if (isUninitializedMetatypeInst(User))
       continue;
 
+    if (User->isDebugInstruction())
+      continue;
+ 
     // If this is a partial application of self, then this is an escape point
     // for it.
     if (auto *PAI = dyn_cast<PartialApplyInst>(User)) {
       if (onlyUsedByAssignByWrapper(PAI))
         continue;
+
+      if (addClosureElementUses(PAI, Op))
+        continue;
+
       Kind = DIUseKind::Escape;
     }
 
@@ -1709,5 +1833,8 @@ void swift::ownership::collectDIElementUsesFrom(
     return;
   }
 
-  ElementUseCollector(MemoryInfo, UseInfo).collectFrom();
+  ElementUseCollector::FunctionSet VisitedClosures;
+  ElementUseCollector collector(MemoryInfo, UseInfo, VisitedClosures);
+  collector.collectFrom(MemoryInfo.getUninitializedValue(),
+                        /*collectDestroysOfContainer*/ true);
 }

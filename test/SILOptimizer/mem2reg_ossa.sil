@@ -130,8 +130,8 @@ bb2:
   br bb3(%14 : $Int64)
 
 bb3(%18 : $Int64):
-  dealloc_stack %1 : $*Int64
   %20 = load [trivial] %1 : $*Int64
+  dealloc_stack %1 : $*Int64
   return %18 : $Int64
 }
 
@@ -326,7 +326,7 @@ sil [ossa] @no_real_uses : $@convention(thin) () -> () {
 // CHECK: bb0
 bb0:
   // CHECK-NOT: alloc_stack
-  %0 = alloc_stack $Builtin.Int32
+  %0 = alloc_stack [dynamic_lifetime] $Builtin.Int32
   // CHECK-NOT: debug_value_addr
   debug_value_addr %0 : $*Builtin.Int32, let, name "x", argno 1
   // CHECK-NOT: dealloc_stack
@@ -478,7 +478,8 @@ bb3(%20 : $((), ())):
 
 // CHECK-LABEL: sil [ossa] @load_tuple_of_void :
 // CHECK-NOT: alloc_stack
-// CHECK:   return undef : $((), ())
+// CHECK:   [[T:%[0-9]+]] = tuple (%{{[0-9]+}} : $(), %{{[0-9]+}} : $())
+// CHECK:   return [[T]] : $((), ())
 // CHECK: } // end sil function 'load_tuple_of_void'
 sil [ossa] @load_tuple_of_void : $@convention(thin) () -> ((), ()) {
 bb0:

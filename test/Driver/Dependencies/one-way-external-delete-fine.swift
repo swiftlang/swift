@@ -13,7 +13,10 @@
 // CHECK-SECOND-NOT: Handled
 
 
-// RUN: touch -t 201401240005 %t/*
+// Don't change the .priors mod time
+// RUN: touch -t 201401240005 %t/*swift
+// RUN: touch -t 201401240005 %t/*swiftdeps
+// RUN: touch -t 201401240005 %t/*json
 // RUN: touch -t 201401240006 %t/*.o
 // RUN: touch -t 201401240004 %t/*-external
 // RUN: rm %t/other1-external
@@ -30,7 +33,10 @@
 // RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path "%{python.unquoted};%S/Inputs/update-dependencies.py;%swift-dependency-tool" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents  ./main.swift ./other.swift -module-name main -j1 -v 2>&1 | %FileCheck -check-prefix=CHECK-FIRST %s
 
 
-// RUN: touch -t 201401240005 %t/*
+// Don't change the .priors mod time
+// RUN: touch -t 201401240005 %t/*swift
+// RUN: touch -t 201401240005 %t/*swiftdeps
+// RUN: touch -t 201401240005 %t/*json
 // RUN: touch -t 201401240006 %t/*.o
 // RUN: touch -t 201401240004 %t/*-external
 // RUN: rm %t/main1-external

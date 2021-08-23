@@ -47,6 +47,11 @@ llvm::SanitizerCoverageOptions parseSanitizerCoverageArgValue(
         DiagnosticEngine &Diag,
         OptionSet<SanitizerKind> sanitizers);
 
+/// Parse -sanitize-address-use-odr-indicator's value.
+bool parseSanitizerAddressUseODRIndicator(
+    const llvm::opt::Arg *A, const OptionSet<SanitizerKind> &enabledSanitizers,
+    DiagnosticEngine &Diags);
+
 /// Returns the active sanitizers as a comma-separated list.
 std::string getSanitizerList(const OptionSet<SanitizerKind> &Set);
 }

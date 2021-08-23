@@ -183,6 +183,7 @@ def _apply_default_arguments(args):
         args.test_tvos = False
         args.test_watchos = False
         args.test_android = False
+        args.test_cmark = False
         args.test_swiftpm = False
         args.test_swift_driver = False
         args.test_swiftsyntax = False
@@ -192,6 +193,12 @@ def _apply_default_arguments(args):
         args.test_swiftformat = False
         args.test_swiftevolve = False
         args.test_toolchainbenchmarks = False
+
+    # --test implies --test-early-swift-driver
+    # (unless explicitly skipped with `--skip-test-early-swift-driver`)
+    if args.test and (args.build_early_swift_driver and
+                      args.test_early_swift_driver is None):
+        args.test_early_swift_driver = True
 
     # --skip-test-ios is merely a shorthand for host and simulator tests.
     if not args.test_ios:
@@ -282,6 +289,9 @@ def create_argument_parser():
            help='instead of building, write JSON to stdout containing '
                 'various values used to build in this configuration')
 
+    option(['--reconfigure'], store_true,
+           help="Reconfigure all projects as we build")
+
     option('--legacy-impl', store_true('legacy_impl'),
            help='use legacy implementation')
 
@@ -335,10 +345,19 @@ def create_argument_parser():
            help='enable code coverage analysis in Swift (false, not-merged, '
                 'merged).')
 
+    option('--swift-disable-dead-stripping', toggle_true, 
+           help="Turn off Darwin-specific dead stripping for Swift host tools")
+
     option('--build-subdir', store,
            metavar='PATH',
            help='name of the directory under $SWIFT_BUILD_ROOT where the '
                 'build products will be placed')
+    option('--relocate-xdg-cache-home-under-build-subdir',
+           store_true,
+           help='relocate $XDG_CACHE_HOME to the same location '
+                'where build products will be placed; '
+                'this supports having multiple runs for different branches '
+                'in CI bots for Linux')
     option('--install-prefix', store_path,
            default=targets.install_prefix(),
            help='The installation prefix. This is where built Swift products '
@@ -374,6 +393,15 @@ def create_argument_parser():
     option('--host-cxx', store_path(executable=True),
            help='the absolute path to CXX, the "clang++" compiler for the '
                 'host platform. Default is auto detected.')
+    option('--native-swift-tools-path', store_path,
+           help='the path to a directory that contains prebuilt Swift tools '
+                'that are executable on the host platform')
+    option('--native-clang-tools-path', store_path,
+           help='the path to a directory that contains prebuilt Clang tools '
+                'that are executable on the host platform')
+    option('--native-llvm-tools-path', store_path,
+           help='the path to a directory that contains prebuilt LLVM tools '
+                'that are executable on the host platform')
     option('--cmake-c-launcher', store_path(executable=True),
            default=os.environ.get('C_COMPILER_LAUNCHER', None),
            help='the absolute path to set CMAKE_C_COMPILER_LAUNCHER')
@@ -592,6 +620,9 @@ def create_argument_parser():
     option(['--swift-driver'], toggle_true('build_swift_driver'),
            help='build swift-driver')
 
+    option(['--skip-early-swift-driver'], toggle_false('build_early_swift_driver'),
+           help='skip building the early swift-driver')
+
     option(['--indexstore-db'], toggle_true('build_indexstoredb'),
            help='build IndexStoreDB')
     option('--test-indexstore-db-sanitize-all',
@@ -666,6 +697,12 @@ def create_argument_parser():
     option('--symbols-package', store_path,
            help='if provided, an archive of the symbols directory will be '
                 'generated at this path')
+    option('--darwin-symroot-path-filters', append,
+           type=argparse.ShellSplitType(),
+           help='Space separated list of patterns used to match '
+                'a subset of files to generate symbols for. '
+                'Only supported on Darwin. Can be called multiple times '
+                'to add multiple such options.')
 
     # -------------------------------------------------------------------------
     in_group('Build variant')
@@ -980,7 +1017,12 @@ def create_argument_parser():
            help='skip testing iOS simulator targets')
     option('--skip-test-ios-32bit-simulator',
            toggle_false('test_ios_32bit_simulator'),
+           default=False,
            help='skip testing iOS 32 bit simulator targets')
+    option('--skip-test-watchos-32bit-simulator',
+           toggle_false('test_watchos_32bit_simulator'),
+           default=True,
+           help='skip testing watchOS 32 bit simulator targets')
     option('--skip-test-ios-host',
            toggle_false('test_ios_host'),
            help='skip testing iOS device targets on the host machine (the '
@@ -1017,11 +1059,19 @@ def create_argument_parser():
            toggle_false('test_android_host'),
            help='skip testing Android device targets on the host machine (the '
                 'phone itself)')
-
+    option('--skip-clean-llbuild', toggle_false('clean_llbuild'),
+           help='skip cleaning up llbuild')
+    option('--clean-early-swift-driver', toggle_true('clean_early_swift_driver'),
+           help='Clean up the early SwiftDriver')
+    option('--skip-test-early-swift-driver',
+           store('test_early_swift_driver', const=False),
+           help='Test the early SwiftDriver against the host toolchain')
     option('--skip-clean-swiftpm', toggle_false('clean_swiftpm'),
            help='skip cleaning up swiftpm')
     option('--skip-clean-swift-driver', toggle_false('clean_swift_driver'),
            help='skip cleaning up Swift driver')
+    option('--skip-test-cmark', toggle_false('test_cmark'),
+           help='skip testing cmark')
     option('--skip-test-swiftpm', toggle_false('test_swiftpm'),
            help='skip testing swiftpm')
     option('--skip-test-swift-driver', toggle_false('test_swift_driver'),
@@ -1054,6 +1104,21 @@ def create_argument_parser():
     option('--llvm-targets-to-build', store,
            default='X86;ARM;AArch64;PowerPC;SystemZ;Mips',
            help='LLVM target generators to build')
+
+    option('--llvm-ninja-targets', append,
+           type=argparse.ShellSplitType(),
+           help='Space separated list of ninja targets to build for LLVM '
+                'instead of the default ones. Only supported when using '
+                'ninja to build. Can be called multiple times '
+                'to add multiple such options.')
+
+    option('--llvm-ninja-targets-for-cross-compile-hosts', append,
+           type=argparse.ShellSplitType(),
+           help='Space separated list of ninja targets to build for LLVM '
+                'in cross compile hosts instead of the ones specified in '
+                'llvm-ninja-targets (or the default ones). '
+                'Can be called multiple times '
+                'to add multiple such options.')
 
     # -------------------------------------------------------------------------
     in_group('Build settings for Android')
@@ -1111,6 +1176,10 @@ def create_argument_parser():
     option('--enable-experimental-concurrency', toggle_true,
            default=True,
            help='Enable experimental Swift concurrency model.')
+
+    option('--enable-experimental-distributed', toggle_true,
+           default=True,
+           help='Enable experimental Swift distributed actors.')
 
     # -------------------------------------------------------------------------
     in_group('Unsupported options')

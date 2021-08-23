@@ -24,6 +24,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include <utility>
@@ -467,11 +468,17 @@ public:
     auto *repr = IdentTypeRepr::create(Context, components);
 
     // See if the repr resolves to a type.
-    const auto resolution =
-        TypeResolution::forContextual(DC, options, [](auto unboundTy) {
+    const auto resolution = TypeResolution::forContextual(
+        DC, options,
+        [](auto unboundTy) {
           // FIXME: Don't let unbound generic types escape type resolution.
           // For now, just return the unbound generic type.
           return unboundTy;
+        },
+        // FIXME: Don't let placeholder types escape type resolution.
+        // For now, just return the placeholder type.
+        [](auto &ctx, auto *originator) {
+          return Type();
         });
     const auto ty = resolution.resolveType(repr);
     auto *enumDecl = dyn_cast_or_null<EnumDecl>(ty->getAnyNominal());
@@ -585,11 +592,19 @@ public:
 
       // See first if the entire repr resolves to a type.
       const Type enumTy =
-          TypeResolution::forContextual(DC, options, [](auto unboundTy) {
-            // FIXME: Don't let unbound generic types escape type resolution.
-            // For now, just return the unbound generic type.
-            return unboundTy;
-          }).resolveType(prefixRepr);
+          TypeResolution::forContextual(
+              DC, options,
+              [](auto unboundTy) {
+                // FIXME: Don't let unbound generic types escape type
+                // resolution. For now, just return the unbound generic type.
+                return unboundTy;
+              },
+              // FIXME: Don't let placeholder types escape type resolution.
+              // For now, just return the placeholder type.
+              [](auto &ctx, auto *originator) {
+                return Type();
+              })
+              .resolveType(prefixRepr);
       auto *enumDecl = dyn_cast_or_null<EnumDecl>(enumTy->getAnyNominal());
       if (!enumDecl)
         return nullptr;
@@ -696,7 +711,7 @@ static Type validateTypedPattern(TypedPattern *TP, TypeResolution resolution) {
   // property definition.
   auto &Context = resolution.getASTContext();
   auto *Repr = TP->getTypeRepr();
-  if (Repr && isa<OpaqueReturnTypeRepr>(Repr)) {
+  if (Repr && Repr->hasOpaque()) {
     auto named = dyn_cast<NamedPattern>(
                            TP->getSubPattern()->getSemanticsProvidingPattern());
     if (!named) {
@@ -732,8 +747,12 @@ static Type validateTypedPattern(TypedPattern *TP, TypeResolution resolution) {
 Type TypeChecker::typeCheckPattern(ContextualPattern pattern) {
   DeclContext *dc = pattern.getDeclContext();
   ASTContext &ctx = dc->getASTContext();
-  return evaluateOrDefault(
-      ctx.evaluator, PatternTypeRequest{pattern}, ErrorType::get(ctx));
+  if (auto type = evaluateOrDefault(ctx.evaluator, PatternTypeRequest{pattern},
+                                    Type())) {
+    return type;
+  }
+
+  return ErrorType::get(ctx);
 }
 
 /// Apply the contextual pattern's context to the type resolution options.
@@ -785,16 +804,23 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
   // that type.
   case PatternKind::Typed: {
     OpenUnboundGenericTypeFn unboundTyOpener = nullptr;
+    HandlePlaceholderTypeReprFn placeholderHandler = nullptr;
     if (pattern.allowsInference()) {
       unboundTyOpener = [](auto unboundTy) {
         // FIXME: Don't let unbound generic types escape type resolution.
         // For now, just return the unbound generic type.
         return unboundTy;
       };
+      // FIXME: Don't let placeholder types escape type resolution.
+      // For now, just return the placeholder type.
+      placeholderHandler = [](auto &ctx, auto *originator) {
+        return Type();
+      };
     }
     return validateTypedPattern(
         cast<TypedPattern>(P),
-        TypeResolution::forContextual(dc, options, unboundTyOpener));
+        TypeResolution::forContextual(dc, options, unboundTyOpener,
+                                      placeholderHandler));
   }
 
   // A wildcard or name pattern cannot appear by itself in a context
@@ -848,16 +874,23 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
     auto somePat = cast<OptionalSomePattern>(P);
     if (somePat->isImplicit() && isa<TypedPattern>(somePat->getSubPattern())) {
       OpenUnboundGenericTypeFn unboundTyOpener = nullptr;
+      HandlePlaceholderTypeReprFn placeholderHandler = nullptr;
       if (pattern.allowsInference()) {
         unboundTyOpener = [](auto unboundTy) {
           // FIXME: Don't let unbound generic types escape type resolution.
           // For now, just return the unbound generic type.
           return unboundTy;
         };
+        // FIXME: Don't let placeholder types escape type resolution.
+        // For now, just return the placeholder type.
+        placeholderHandler = [](auto &ctx, auto *originator) {
+          return Type();
+        };
       }
       TypedPattern *TP = cast<TypedPattern>(somePat->getSubPattern());
       const auto type = validateTypedPattern(
-          TP, TypeResolution::forContextual(dc, options, unboundTyOpener));
+          TP, TypeResolution::forContextual(dc, options, unboundTyOpener,
+                                            placeholderHandler));
       if (type && !type->hasError()) {
         return OptionalType::get(type);
       }
@@ -1042,6 +1075,12 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
       if (!type->isEqual(patternType) && !type->hasError()) {
         if (options & TypeResolutionFlags::OverrideType) {
           TP->setType(type);
+          // If the pattern type has a placeholder, we need to resolve it here.
+          if (patternType->hasPlaceholder()) {
+            validateTypedPattern(
+                cast<TypedPattern>(TP),
+                TypeResolution::forContextual(dc, options, nullptr, nullptr));
+          }
         } else {
           diags.diagnose(P->getLoc(), diag::pattern_type_mismatch_context,
                          type);
@@ -1114,8 +1153,8 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
           "unknown structurally uninhabited type");
       }
     } else if (auto *BST = diagTy->getAs<BoundGenericStructType>()) {
-      if (BST->getDecl() == Context.getArrayDecl())
-          shouldRequireType = BST->getGenericArgs()[0]->isEqual(Context.TheEmptyTupleType);
+      if (BST->isArray())
+        shouldRequireType = BST->getGenericArgs()[0]->isVoid();
     }
     
     if (shouldRequireType &&
@@ -1224,7 +1263,7 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
   case PatternKind::Expr: {
     assert(cast<ExprPattern>(P)->isResolved()
            && "coercing unresolved expr pattern!");
-    if (type->getAnyNominal() == Context.getBoolDecl()) {
+    if (type->isBool()) {
       // The type is Bool.
       // Check if the pattern is a Bool literal
       auto EP = cast<ExprPattern>(P);
@@ -1264,8 +1303,10 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
     const auto castType =
         TypeResolution::forContextual(dc, TypeResolverContext::InExpression,
                                       // FIXME: Should we really unconditionally
-                                      // complain about unbound generics here?
-                                      /*unboundTyOpener*/ nullptr)
+                                      // complain about unbound generics and
+                                      // placeholders here?
+                                      /*unboundTyOpener*/ nullptr,
+                                      /*placeholderHandler*/ nullptr)
             .resolveType(IP->getCastTypeRepr());
     if (castType->hasError())
       return nullptr;
@@ -1285,7 +1326,7 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
       auto extraOpts =
           llvm::drop_begin(inputTypeOptionals, castTypeOptionals.size());
       for (auto extraOptTy : llvm::reverse(extraOpts)) {
-        auto some = Context.getOptionalDecl()->getUniqueElement(/*hasVal*/true);
+        auto some = Context.getOptionalSomeDecl();
         auto *base = TypeExpr::createImplicit(extraOptTy, Context);
         sub = new (Context) EnumElementPattern(
             base, IP->getStartLoc(), DeclNameLoc(IP->getEndLoc()),
@@ -1622,7 +1663,7 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
 
 /// Coerce the specified parameter list of a ClosureExpr to the specified
 /// contextual type.
-void TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
+void TypeChecker::coerceParameterListToType(ParameterList *P,
                                             AnyFunctionType *FN) {
 
   // Local function to check if the given type is valid e.g. doesn't have

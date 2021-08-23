@@ -314,3 +314,37 @@ bb1:
   %75 = tuple ()
   return %75 : $()
 }
+
+sil [ossa] @closure_inout : $@convention(thin) (@inout X) -> () 
+sil [ossa] @closure_inout_aliasable : $@convention(thin) (@inout_aliasable X) -> () 
+
+// CHECK-LABEL: sil [ossa] @test_closure_inout :
+// CHECK:         partial_apply
+// CHECK-NEXT:    = apply
+// CHECK-NEXT:    destroy_addr %0
+// CHECK:       } // end sil function 'test_closure_inout'
+sil [ossa] @test_closure_inout : $@convention(thin) (@in X) -> () {
+bb0(%0 :  $*X):
+  %func = function_ref @closure_inout : $@convention(thin) (@inout X) -> ()
+  %pa = partial_apply %func(%0) : $@convention(thin) (@inout X) -> ()
+  apply %pa() : $@callee_owned () -> ()
+  destroy_addr %0 : $*X
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_closure_inout_aliasable :
+// CHECK:         partial_apply
+// CHECK-NEXT:    = apply
+// CHECK-NEXT:    destroy_addr %0
+// CHECK:       } // end sil function 'test_closure_inout_aliasable'
+sil [ossa] @test_closure_inout_aliasable : $@convention(thin) (@in X) -> () {
+bb0(%0 :  $*X):
+  %func = function_ref @closure_inout_aliasable : $@convention(thin) (@inout_aliasable X) -> ()
+  %pa = partial_apply %func(%0) : $@convention(thin) (@inout_aliasable X) -> ()
+  apply %pa() : $@callee_owned () -> ()
+  destroy_addr %0 : $*X
+  %res = tuple ()
+  return %res : $()
+}
+

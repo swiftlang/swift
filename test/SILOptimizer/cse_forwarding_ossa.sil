@@ -1,0 +1,223 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -cse | %FileCheck %s
+sil_stage canonical
+
+import Builtin
+
+class SuperKlass {}
+
+class Klass : SuperKlass {}
+
+struct NonTrivialStruct {
+  var val : Klass
+}
+
+// CHECK-LABEL: sil [ossa] @cse_copy_upcast1 :
+// CHECK: upcast
+// CHECK-NOT: upcast 
+// CHECK-LABEL: } // end sil function 'cse_copy_upcast1'
+sil [ossa] @cse_copy_upcast1 : $@convention(thin) (@owned Klass) -> @owned (SuperKlass, SuperKlass) {
+bb0(%0 : @owned $Klass):
+  %copy0 = copy_value %0 : $Klass
+  %1 = upcast %0 : $Klass to $SuperKlass
+  %2 = upcast %copy0 : $Klass to $SuperKlass
+  %res = tuple (%1: $SuperKlass, %2: $SuperKlass)
+  return %res : $(SuperKlass, SuperKlass)
+}
+
+// CHECK-LABEL: sil [ossa] @cse_copy_upcast2 :
+// CHECK: upcast
+// CHECK-NOT: upcast 
+// CHECK-LABEL: } // end sil function 'cse_copy_upcast2'
+sil [ossa] @cse_copy_upcast2 : $@convention(thin) (@owned Klass) -> @owned (SuperKlass, SuperKlass) {
+bb0(%0 : @owned $Klass):
+  %copy0 = copy_value %0 : $Klass
+  %1 = upcast %copy0 : $Klass to $SuperKlass
+  %2 = upcast %0 : $Klass to $SuperKlass
+  %res = tuple (%1: $SuperKlass, %2: $SuperKlass)
+  return %res : $(SuperKlass, SuperKlass)
+}
+
+// CHECK-LABEL: sil [ossa] @cse_copy_upcast3 :
+// CHECK: upcast
+// CHECK-NOT: upcast 
+// CHECK-LABEL: } // end sil function 'cse_copy_upcast3'
+sil [ossa] @cse_copy_upcast3 : $@convention(thin) (@owned Klass) -> @owned (SuperKlass, SuperKlass) {
+bb0(%0 : @owned $Klass):
+  %copy0 = copy_value %0 : $Klass
+  %copy1 = copy_value %0 : $Klass
+  %1 = upcast %copy0 : $Klass to $SuperKlass
+  %2 = upcast %copy1 : $Klass to $SuperKlass
+  destroy_value %0 : $Klass
+  %res = tuple (%1: $SuperKlass, %2: $SuperKlass)
+  return %res : $(SuperKlass, SuperKlass)
+}
+
+// CHECK-LABEL: sil [ossa] @cse_copy_upcast4 :
+// CHECK: upcast
+// CHECK-NOT: upcast 
+// CHECK-LABEL: } // end sil function 'cse_copy_upcast4'
+sil [ossa] @cse_copy_upcast4 : $@convention(thin) (@guaranteed Klass) -> @owned SuperKlass {
+bb0(%0 : @guaranteed $Klass):
+  %copy0 = copy_value %0 : $Klass
+  %1 = upcast %0 : $Klass to $SuperKlass
+  %2 = upcast %copy0 : $Klass to $SuperKlass
+  destroy_value %2 : $SuperKlass
+  %copy1 = copy_value %1 : $SuperKlass
+  return %copy1 : $SuperKlass
+}
+
+// CHECK-LABEL: sil [ossa] @cse_copy_upcast5 :
+// CHECK: upcast
+// CHECK-NOT: upcast 
+// CHECK-LABEL: } // end sil function 'cse_copy_upcast5'
+sil [ossa] @cse_copy_upcast5 : $@convention(thin) (@guaranteed Klass) -> @owned SuperKlass {
+bb0(%0 : @guaranteed $Klass):
+  %copy0 = copy_value %0 : $Klass
+  %1 = upcast %copy0 : $Klass to $SuperKlass
+  %2 = upcast %0 : $Klass to $SuperKlass
+  destroy_value %1 : $SuperKlass
+  %copy2 = copy_value %2 : $SuperKlass
+  return %copy2 : $SuperKlass
+}
+
+sil [ossa] @useSuperKlass1 : $@convention(thin) (@guaranteed SuperKlass) -> ()
+sil [ossa] @useSuperKlass2 : $@convention(thin) (@owned SuperKlass) -> ()
+
+// CHECK-LABEL: sil [ossa] @cse_copy_upcast6 :
+// CHECK: upcast
+// CHECK-NOT: upcast 
+// CHECK-LABEL: } // end sil function 'cse_copy_upcast6'
+sil [ossa] @cse_copy_upcast6 : $@convention(thin) (@guaranteed Klass) -> @owned SuperKlass {
+bb0(%0 : @guaranteed $Klass):
+  %1 = upcast %0 : $Klass to $SuperKlass
+  %func = function_ref @useSuperKlass1 : $@convention(thin) (@guaranteed SuperKlass) -> ()
+  apply %func(%1) : $@convention(thin) (@guaranteed SuperKlass) -> ()
+  %2 = upcast %0 : $Klass to $SuperKlass
+  %copy2 = copy_value %2 : $SuperKlass
+  return %copy2 : $SuperKlass
+}
+
+// CHECK-LABEL: sil [ossa] @cse_copy_upcast7 :
+// CHECK: upcast
+// CHECK-NOT: upcast 
+// CHECK-LABEL: } // end sil function 'cse_copy_upcast7'
+sil [ossa] @cse_copy_upcast7 : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %copy0 = copy_value %0 : $Klass
+  %1 = upcast %copy0 : $Klass to $SuperKlass
+  %2 = upcast %0 : $Klass to $SuperKlass
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  %copy2 = copy_value %2 : $SuperKlass
+  %func = function_ref @useSuperKlass2 : $@convention(thin) (@owned SuperKlass) -> ()
+  apply %func(%copy2) : $@convention(thin) (@owned SuperKlass) -> ()
+  br bb3
+ 
+bb3:
+  destroy_value %1 : $SuperKlass
+  %res = tuple()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @cse_copy_upcast8 :
+// CHECK: upcast
+// CHECK-NOT: upcast 
+// CHECK-LABEL: } // end sil function 'cse_copy_upcast8'
+sil [ossa] @cse_copy_upcast8 : $@convention(thin) (@guaranteed Klass) -> @owned SuperKlass {
+bb0(%0 : @guaranteed $Klass):
+  %copy0 = copy_value %0 : $Klass
+  %borrow0 = begin_borrow %copy0 : $Klass
+  %1 = upcast %borrow0 : $Klass to $SuperKlass
+  end_borrow %borrow0 : $Klass
+  destroy_value %copy0 : $Klass
+  %2 = upcast %0 : $Klass to $SuperKlass
+  %copy2 = copy_value %2 : $SuperKlass
+  return %copy2 : $SuperKlass
+}
+
+// CHECK-LABEL: sil [ossa] @cse_copy_unchecked_ref_cast : 
+// CHECK: unchecked_ref_cast
+// CHECK-NOT: unchecked_ref_cast 
+// CHECK-LABEL: } // end sil function 'cse_copy_unchecked_ref_cast'
+sil [ossa] @cse_copy_unchecked_ref_cast : $@convention(thin) (@owned Klass) -> @owned (SuperKlass, SuperKlass) {
+bb0(%0 : @owned $Klass):
+  %copy0 = copy_value %0 : $Klass
+  %1 = unchecked_ref_cast %0 : $Klass to $SuperKlass
+  %2 = unchecked_ref_cast %copy0 : $Klass to $SuperKlass
+  %res = tuple (%1: $SuperKlass, %2: $SuperKlass)
+  return %res : $(SuperKlass, SuperKlass)
+}
+
+// CHECK-LABEL: sil [ossa] @cse_copy_upcast_destroy_before_common_expr : 
+// CHECK: upcast
+// CHECK-NOT: upcast 
+// CHECK-LABEL: } // end sil function 'cse_copy_upcast_destroy_before_common_expr'
+sil [ossa] @cse_copy_upcast_destroy_before_common_expr : $@convention(thin) (@owned Klass) -> @owned SuperKlass {
+bb0(%0 : @owned $Klass):
+  %copy0 = copy_value %0 : $Klass
+  %1 = upcast %0 : $Klass to $SuperKlass
+  destroy_value %1 : $SuperKlass
+  %2 = upcast %copy0 : $Klass to $SuperKlass
+  return %2 : $SuperKlass
+}
+
+// CHECK-LABEL: sil [ossa] @cse_copy_upcast_need_destroys : 
+// CHECK-NOT: upcast 
+// CHECK-LABEL: } // end sil function 'cse_copy_upcast_need_destroys'
+sil [ossa] @cse_copy_upcast_need_destroys : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %copy0 = copy_value %0 : $Klass
+  %1 = upcast %0 : $Klass to $SuperKlass
+  destroy_value %1 : $SuperKlass
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = upcast %copy0 : $Klass to $SuperKlass
+  destroy_value %2 : $SuperKlass
+  br bb3
+
+bb2:
+  destroy_value %copy0 : $Klass
+  br bb3
+
+bb3:
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @cse_copy_upcast_multiple_identity : 
+// CHECK: upcast
+// CHECK-NOT: upcast 
+// CHECK-LABEL: } // end sil function 'cse_copy_upcast_multiple_identity'
+sil [ossa] @cse_copy_upcast_multiple_identity : $@convention(thin) (@owned Klass) -> @owned SuperKlass {
+bb0(%0 : @owned $Klass):
+  %copy0 = copy_value %0 : $Klass
+  %copy00 = copy_value %copy0 : $Klass
+  %1 = upcast %0 : $Klass to $SuperKlass
+  destroy_value %1 : $SuperKlass
+  %2 = upcast %copy00 : $Klass to $SuperKlass
+  destroy_value %copy0 : $Klass
+  return %2 : $SuperKlass
+}
+
+// CHECK-LABEL: sil [ossa] @cse_borrow_upcast : 
+// CHECK: upcast
+// CHECK-NOT: upcast 
+// CHECK-LABEL: } // end sil function 'cse_borrow_upcast'
+sil [ossa] @cse_borrow_upcast : $@convention(thin) (@owned Klass) -> @owned (SuperKlass, SuperKlass) {
+bb0(%0 : @owned $Klass):
+  %borrow = begin_borrow %0 : $Klass
+  %copy0_1 = copy_value %borrow : $Klass
+  %copy0_2 = copy_value %borrow : $Klass
+  %1 = upcast %copy0_1 : $Klass to $SuperKlass
+  %2 = upcast %copy0_2 : $Klass to $SuperKlass
+  end_borrow %borrow : $Klass
+  destroy_value %0 : $Klass
+  %res = tuple (%1: $SuperKlass, %2: $SuperKlass)
+  return %res : $(SuperKlass, SuperKlass)
+}
+

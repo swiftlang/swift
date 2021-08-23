@@ -6,14 +6,14 @@
 // UNSUPPORTED: CPU=armv7s && OS=ios
 
 // CHECK: @"$s4main9NamespaceC5ValueVySS_SiSdGWV" = linkonce_odr hidden constant %swift.vwtable {
-// CHECK-SAME:    i8* bitcast ({{(%swift.opaque\* \(\[[0-9]+ x i8\]\*, \[[0-9]+ x i8\]\*, %swift.type\*\)\* @"\$[a-zA-Z0-9_]+" to i8\*|[^@]+@__swift_memcpy[^[:space:]]+ to i8\*)}}),
-// CHECK-SAME:    i8* bitcast ({{[^@]*}}@__swift_noop_void_return{{[^[:space:]]* to i8\*}}),
-// CHECK-SAME:    i8* bitcast ({{[^@]+}}@__swift_memcpy{{[^[:space:]]+ to i8\*}}),
-// CHECK-SAME:    i8* bitcast ({{[^@]+}}@__swift_memcpy{{[^[:space:]]+ to i8\*}}),
-// CHECK-SAME:    i8* bitcast ({{[^@]+}}@__swift_memcpy{{[^[:space:]]+ to i8\*}}),
-// CHECK-SAME:    i8* bitcast ({{[^@]+}}@__swift_memcpy{{[^[:space:]]+ to i8\*}}),
-// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main9NamespaceC5ValueVySS_SiSdGwet{{[^@]+}} to i8*),
-// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main9NamespaceC5ValueVySS_SiSdGwst{{[^@]+}} to i8*),
+// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main9NamespaceC5ValueVwCP{{[^)]*}} to i8*)
+// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main9NamespaceC5ValueVwxx{{[^)]*}} to i8*)
+// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main9NamespaceC5ValueVwcp{{[^)]*}} to i8*)
+// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main9NamespaceC5ValueVwca{{[^)]*}} to i8*)
+// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main9NamespaceC5ValueVwtk{{[^)]*}} to i8*)
+// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main9NamespaceC5ValueVwta{{[^)]*}} to i8*)
+// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main9NamespaceC5ValueVwet{{[^)]*}} to i8*)
+// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main9NamespaceC5ValueVwst{{[^)]*}} to i8*)
 // CHECK-SAME:    [[INT]] {{[0-9]+}},
 // CHECK-SAME:    [[INT]] {{[0-9]+}},
 // CHECK-SAME:    i32 {{[0-9]+}},

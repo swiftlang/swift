@@ -81,6 +81,14 @@ SILInstruction *ValueBase::getDefiningInsertionPoint() {
   return nullptr;
 }
 
+SILInstruction *ValueBase::getNextInstruction() {
+  if (auto *inst = getDefiningInstruction())
+    return &*std::next(inst->getIterator());
+  if (auto *arg = dyn_cast<SILArgument>(this))
+    return &*arg->getParentBlock()->begin();
+  return nullptr;
+}
+
 Optional<ValueBase::DefiningInstructionResult>
 ValueBase::getDefiningInstructionResult() {
   if (auto *inst = dyn_cast<SingleValueInstruction>(this))
@@ -91,50 +99,26 @@ ValueBase::getDefiningInstructionResult() {
 }
 
 SILBasicBlock *SILNode::getParentBlock() const {
-  auto *CanonicalNode =
-      const_cast<SILNode *>(this)->getRepresentativeSILNodeInObject();
-  if (auto *Inst = dyn_cast<SILInstruction>(CanonicalNode))
+  if (auto *Inst = dyn_cast<SILInstruction>(this))
     return Inst->getParent();
-  if (auto *Arg = dyn_cast<SILArgument>(CanonicalNode))
+  if (auto *Arg = dyn_cast<SILArgument>(this))
     return Arg->getParent();
+  if (auto *MVR = dyn_cast<MultipleValueInstructionResult>(this)) {
+    return MVR->getParent()->getParent();
+  }
   return nullptr;
 }
 
 SILFunction *SILNode::getFunction() const {
-  auto *CanonicalNode =
-      const_cast<SILNode *>(this)->getRepresentativeSILNodeInObject();
-  if (auto *Inst = dyn_cast<SILInstruction>(CanonicalNode))
-    return Inst->getFunction();
-  if (auto *Arg = dyn_cast<SILArgument>(CanonicalNode))
-    return Arg->getFunction();
+  if (auto *parentBlock = getParentBlock())
+    return parentBlock->getParent();
   return nullptr;
 }
 
 SILModule *SILNode::getModule() const {
-  auto *CanonicalNode =
-      const_cast<SILNode *>(this)->getRepresentativeSILNodeInObject();
-  if (auto *Inst = dyn_cast<SILInstruction>(CanonicalNode))
-    return &Inst->getModule();
-  if (auto *Arg = dyn_cast<SILArgument>(CanonicalNode))
-    return &Arg->getModule();
+  if (SILFunction *func = getFunction())
+    return &func->getModule();
   return nullptr;
-}
-
-const SILNode *SILNode::getRepresentativeSILNodeSlowPath() const {
-  assert(getStorageLoc() != SILNodeStorageLocation::Instruction);
-
-  if (isa<SingleValueInstruction>(this)) {
-    assert(hasMultipleSILNodeBases(getKind()));
-    return &static_cast<const SILInstruction &>(
-        static_cast<const SingleValueInstruction &>(
-            static_cast<const ValueBase &>(*this)));
-  }
-
-  if (auto *MVR = dyn_cast<MultipleValueInstructionResult>(this)) {
-    return MVR->getParent();
-  }
-
-  llvm_unreachable("Invalid value for slow path");
 }
 
 /// Get a location for this value.
@@ -172,6 +156,7 @@ StringRef OwnershipKind::asString() const {
   case OwnershipKind::None:
     return "none";
   }
+  llvm_unreachable("covered switch");
 }
 
 //===----------------------------------------------------------------------===//
@@ -216,8 +201,6 @@ ValueOwnershipKind::ValueOwnershipKind(const SILFunction &F, SILType Type,
   case SILArgumentConvention::Direct_Guaranteed:
     value = OwnershipKind::Guaranteed;
     return;
-  case SILArgumentConvention::Direct_Deallocating:
-    llvm_unreachable("Not handled");
   }
 }
 
@@ -322,24 +305,14 @@ SILFunction *Operand::getParentFunction() const {
 }
 
 bool Operand::canAcceptKind(ValueOwnershipKind kind) const {
-  auto constraint = getOwnershipConstraint();
-  if (!constraint)
-    return false;
-
-  if (constraint->satisfiesConstraint(kind))
+  auto operandOwnership = getOperandOwnership();
+  auto constraint = operandOwnership.getOwnershipConstraint();
+  if (constraint.satisfiesConstraint(kind)) {
+    // Constraints aren't precise enough to enforce Unowned value uses.
+    if (kind == OwnershipKind::Unowned) {
+      return canAcceptUnownedValue(operandOwnership);
+    }
     return true;
-
-  // Then see if our preferred ownership constraint was not guaranteed or our
-  // use lifetime constraint was LifetimeEnding. If it wasn't, then we fail
-  // since we do not allow for implicit borrows in such situations.
-  if (kind == OwnershipKind::Owned && !isLifetimeEnding()) {
-    // Otherwise, we now know that our constraint is non lifetime ending
-    // and guaranteed and our value had owned ownership. If our user
-    // allows for implicit borrows and thus can accept owned values,
-    // return true.
-    if (auto borrowingOperand = BorrowingOperand::get(this))
-      if (borrowingOperand->canAcceptOwnedValues())
-        return true;
   }
 
   return false;
@@ -352,13 +325,8 @@ bool Operand::satisfiesConstraints() const {
 bool Operand::isLifetimeEnding() const {
   auto constraint = getOwnershipConstraint();
 
-  // If we got back Optional::None, then our operand is for a type dependent
-  // operand. So return false.
-  if (!constraint)
-    return false;
-
   // If our use lifetime constraint is NonLifetimeEnding, just return false.
-  if (!constraint->isLifetimeEnding())
+  if (!constraint.isLifetimeEnding())
     return false;
 
   // Otherwise, we may have a lifetime ending use. We consider two cases here:
@@ -372,6 +340,23 @@ bool Operand::isLifetimeEnding() const {
   return get().getOwnershipKind() != OwnershipKind::None;
 }
 
+bool Operand::isConsuming() const {
+  if (!getOwnershipConstraint().isConsuming())
+    return false;
+
+  return get().getOwnershipKind() != OwnershipKind::None;
+}
+
+void Operand::dump() const { print(llvm::dbgs()); }
+
+void Operand::print(llvm::raw_ostream &os) const {
+  os << "Operand.\n"
+        "Owner: "
+     << *Owner << "Value: " << get() << "Operand Number: " << getOperandNumber()
+     << '\n'
+     << "Is Type Dependent: " << (isTypeDependent() ? "yes" : "no") << '\n';
+}
+
 //===----------------------------------------------------------------------===//
 //                             OperandConstraint
 //===----------------------------------------------------------------------===//
@@ -383,3 +368,58 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
             << " LifetimeConstraint:" << constraint.getLifetimeConstraint()
             << ">";
 }
+
+StringRef OperandOwnership::asString() const {
+  switch (value) {
+  case OperandOwnership::NonUse:
+    return "non-use";
+  case OperandOwnership::TrivialUse:
+    return "trivial-use";
+  case OperandOwnership::InstantaneousUse:
+    return "instantaneous";
+  case OperandOwnership::UnownedInstantaneousUse:
+    return "unowned-instantaneous";
+  case OperandOwnership::ForwardingUnowned:
+    return "forwarding-unowned";
+  case OperandOwnership::PointerEscape:
+    return "pointer-escape";
+  case OperandOwnership::BitwiseEscape:
+    return "bitwise-escape";
+  case OperandOwnership::Borrow:
+    return "borrow";
+  case OperandOwnership::DestroyingConsume:
+    return "destroying-consume";
+  case OperandOwnership::ForwardingConsume:
+    return "forwarding-consume";
+  case OperandOwnership::InteriorPointer:
+    return "interior-pointer";
+  case OperandOwnership::ForwardingBorrow:
+    return "forwarding-borrow";
+  case OperandOwnership::EndBorrow:
+    return "end-borrow";
+  case OperandOwnership::Reborrow:
+    return "reborrow";
+  }
+  llvm_unreachable("covered switch");
+}
+
+llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
+                                     const OperandOwnership &operandOwnership) {
+  return os << operandOwnership.asString();
+}
+
+//===----------------------------------------------------------------------===//
+//                              PlaceholderValue
+//===----------------------------------------------------------------------===//
+
+int PlaceholderValue::numPlaceholderValuesAlive = 0;
+
+PlaceholderValue::PlaceholderValue(SILType type)
+      : ValueBase(ValueKind::PlaceholderValue, type) {
+  numPlaceholderValuesAlive++;
+}
+
+PlaceholderValue::~PlaceholderValue() {
+  numPlaceholderValuesAlive--;
+}
+

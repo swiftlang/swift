@@ -1,0 +1,24 @@
+# REQUIRES: standalone_build
+# REQUIRES: OS=macosx
+
+# As a result of incremental changes,
+# in dry-run mode the symbol extraction
+# still runs some real commands against the installation
+# and symbol directories (e.g. find and cpio)
+# This test explictly checks that such commands
+# do not cause build-script to fail when run
+# against empty directories (which is the typical
+# scenario in dry-run)
+# RUN: %empty-directory(%t)
+# RUN: mkdir -p %t
+# RUN: mkdir -p %t/destdir
+# RUN: mkdir -p %t/symroot/macosx-%target-cpu
+# RUN: SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script-impl --dry-run --build-dir=%t/build --workspace=%swift_src_root/.. --cmake %cmake --only-execute macosx-%target-cpu-extractsymbols --host-cc /usr/bin/true --darwin-install-extract-symbols=1 --host-target=macosx-%target-cpu --install-symroot=%t/symroot --install-destdir=%t/destdir --build-jobs=1 2>&1 | %FileCheck %s
+
+# CHECK: --- Extracting symbols ---
+
+# CHECK-NOT: {{^}}echo dsymutil
+
+# CHECK-NOT: {{^[^\+].*}}strip
+
+# CHECK-NOT: {{^[^\+].*}}codesign

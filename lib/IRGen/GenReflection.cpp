@@ -28,10 +28,12 @@
 
 #include "ConstantBuilder.h"
 #include "Explosion.h"
+#include "Field.h"
 #include "GenClass.h"
 #include "GenDecl.h"
 #include "GenEnum.h"
 #include "GenHeap.h"
+#include "GenMeta.h"
 #include "GenProto.h"
 #include "GenType.h"
 #include "IRGenDebugInfo.h"
@@ -170,11 +172,8 @@ public:
   }
 };
 
-// Return the minimum Swift runtime version that supports demangling a given
-// type.
-static llvm::VersionTuple
-getRuntimeVersionThatSupportsDemanglingType(IRGenModule &IGM,
-                                            CanType type) {
+Optional<llvm::VersionTuple>
+swift::irgen::getRuntimeVersionThatSupportsDemanglingType(CanType type) {
   // Associated types of opaque types weren't mangled in a usable form by the
   // Swift 5.1 runtime, so we needed to add a new mangling in 5.2.
   if (type->hasOpaqueArchetype()) {
@@ -192,8 +191,7 @@ getRuntimeVersionThatSupportsDemanglingType(IRGenModule &IGM,
     // guards, so we don't need to limit availability of mangled names
     // involving them.
   }
-  
-  return llvm::VersionTuple(5, 0);
+  return None;
 }
 
 // Produce a fallback mangled type name that uses an open-coded callback
@@ -227,13 +225,10 @@ getTypeRefByFunction(IRGenModule &IGM,
       accessor->setAttributes(IGM.constructInitialAttributes());
       
       SmallVector<GenericRequirement, 4> requirements;
-      GenericEnvironment *genericEnv = nullptr;
-      if (sig) {
-        enumerateGenericSignatureRequirements(sig,
-                [&](GenericRequirement reqt) { requirements.push_back(reqt); });
-        genericEnv = sig->getGenericEnvironment();
-      }
-      
+      auto *genericEnv = sig.getGenericEnvironment();
+      enumerateGenericSignatureRequirements(sig,
+              [&](GenericRequirement reqt) { requirements.push_back(reqt); });
+
       {
         IRGenFunction IGF(IGM, accessor);
         if (IGM.DebugInfo)
@@ -290,9 +285,11 @@ getTypeRefImpl(IRGenModule &IGM,
     // symbolic reference with a callback function.
     if (auto runtimeCompatVersion = getSwiftRuntimeCompatibilityVersionForTarget
                                       (IGM.Context.LangOpts.Target)) {
-      if (*runtimeCompatVersion <
-            getRuntimeVersionThatSupportsDemanglingType(IGM, type)) {
-        return getTypeRefByFunction(IGM, sig, type);
+      if (auto minimumSupportedRuntimeVersion =
+              getRuntimeVersionThatSupportsDemanglingType(type)) {
+        if (*runtimeCompatVersion < *minimumSupportedRuntimeVersion) {
+          return getTypeRefByFunction(IGM, sig, type);
+        }
       }
     }
       
@@ -306,7 +303,7 @@ getTypeRefImpl(IRGenModule &IGM,
   }
 
   IRGenMangler Mangler;
-  auto SymbolicName = Mangler.mangleTypeForReflection(IGM, type);
+  auto SymbolicName = Mangler.mangleTypeForReflection(IGM, sig, type);
   return {IGM.getAddrOfStringForTypeRef(SymbolicName, role),
           SymbolicName.runtimeSizeInBytes()};
 }
@@ -353,16 +350,12 @@ IRGenModule::emitWitnessTableRefString(CanType type,
     = substOpaqueTypesWithUnderlyingTypes(type, conformance);
   
   auto origType = type;
-  CanGenericSignature genericSig;
-  SmallVector<GenericRequirement, 4> requirements;
-  GenericEnvironment *genericEnv = nullptr;
+  auto genericSig = origGenericSig.getCanonicalSignature();
 
-  if (origGenericSig) {
-    genericSig = origGenericSig.getCanonicalSignature();
-    enumerateGenericSignatureRequirements(genericSig,
-                [&](GenericRequirement reqt) { requirements.push_back(reqt); });
-    genericEnv = genericSig->getGenericEnvironment();
-  }
+  SmallVector<GenericRequirement, 4> requirements;
+  enumerateGenericSignatureRequirements(genericSig,
+              [&](GenericRequirement reqt) { requirements.push_back(reqt); });
+  auto *genericEnv = genericSig.getGenericEnvironment();
 
   IRGenMangler mangler;
   std::string symbolName =
@@ -626,25 +619,21 @@ class AssociatedTypeMetadataBuilder : public ReflectionMetadataBuilder {
   ArrayRef<std::pair<StringRef, CanType>> AssociatedTypes;
 
   void layout() override {
-    // If the conforming type is generic, we just want to emit the
-    // unbound generic type here.
-    auto *Nominal = Conformance->getType()->getAnyNominal();
-    assert(Nominal && "Structural conformance?");
+    PrettyStackTraceConformance DebugStack("emitting associated type metadata",
+                                           Conformance);
 
-    PrettyStackTraceDecl DebugStack("emitting associated type metadata",
-                                    Nominal);
-
-    addNominalRef(Nominal);
+    auto *DC = Conformance->getDeclContext();
+    addNominalRef(DC->getSelfNominalTypeDecl());
     addNominalRef(Conformance->getProtocol());
 
     B.addInt32(AssociatedTypes.size());
     B.addInt32(AssociatedTypeRecordSize);
 
+    auto genericSig = DC->getGenericSignatureOfContext().getCanonicalSignature();
     for (auto AssocTy : AssociatedTypes) {
       auto NameGlobal = IGM.getAddrOfFieldName(AssocTy.first);
       B.addRelativeAddress(NameGlobal);
-      addTypeRef(AssocTy.second,
-                 Nominal->getGenericSignature().getCanonicalSignature());
+      addTypeRef(AssocTy.second, genericSig);
     }
   }
 
@@ -672,13 +661,8 @@ public:
 private:
   const NominalTypeDecl *NTD;
 
-  void addFieldDecl(const ValueDecl *value, Type type,
-                    bool indirect=false) {
-    reflection::FieldRecordFlags flags;
-    flags.setIsIndirectCase(indirect);
-    if (auto var = dyn_cast<VarDecl>(value))
-      flags.setIsVar(!var->isLet());
-
+  void addField(reflection::FieldRecordFlags flags,
+                Type type, StringRef name) {
     B.addInt32(flags.getRawValue());
 
     if (!type) {
@@ -693,12 +677,32 @@ private:
     }
 
     if (IGM.IRGen.Opts.EnableReflectionNames) {
-      auto name = value->getBaseIdentifier().str();
       auto fieldName = IGM.getAddrOfFieldName(name);
       B.addRelativeAddress(fieldName);
     } else {
       B.addInt32(0);
     }
+  }
+
+  void addField(Field field) {
+    reflection::FieldRecordFlags flags;
+    bool isLet = false;
+
+    switch (field.getKind()) {
+    case Field::Var: {
+      auto var = field.getVarDecl();
+      isLet = var->isLet();
+      break;
+    }
+    case Field::MissingMember:
+      llvm_unreachable("emitting reflection for type with missing member");
+    case Field::DefaultActorStorage:
+      flags.setIsArtificial();
+      break;
+    }
+    flags.setIsVar(!isLet);
+
+    addField(flags, field.getInterfaceType(IGM), field.getName());
   }
 
   void layoutRecord() {
@@ -716,10 +720,20 @@ private:
     B.addInt16(uint16_t(kind));
     B.addInt16(FieldRecordSize);
 
-    auto properties = NTD->getStoredProperties();
-    B.addInt32(properties.size());
-    for (auto property : properties)
-      addFieldDecl(property, property->getInterfaceType());
+    B.addInt32(getNumFields(NTD));
+    forEachField(IGM, NTD, [&](Field field) {
+      addField(field);
+    });
+  }
+
+  void addField(const EnumDecl *enumDecl, const EnumElementDecl *decl,
+                bool hasPayload) {
+    reflection::FieldRecordFlags flags;
+    if (hasPayload && (decl->isIndirect() || enumDecl->isIndirect()))
+      flags.setIsIndirectCase();
+
+    addField(flags, decl->getArgumentInterfaceType(),
+             decl->getBaseIdentifier().str());
   }
 
   void layoutEnum() {
@@ -741,14 +755,11 @@ private:
                + strategy.getElementsWithNoPayload().size());
 
     for (auto enumCase : strategy.getElementsWithPayload()) {
-      bool indirect = (enumCase.decl->isIndirect() ||
-                       enumDecl->isIndirect());
-      addFieldDecl(enumCase.decl, enumCase.decl->getArgumentInterfaceType(),
-                   indirect);
+      addField(enumDecl, enumCase.decl, /*has payload*/ true);
     }
 
     for (auto enumCase : strategy.getElementsWithNoPayload()) {
-      addFieldDecl(enumCase.decl, enumCase.decl->getArgumentInterfaceType());
+      addField(enumDecl, enumCase.decl, /*has payload*/ false);
     }
   }
 
@@ -779,7 +790,8 @@ private:
     auto *CD = dyn_cast<ClassDecl>(NTD);
     auto *PD = dyn_cast<ProtocolDecl>(NTD);
     if (CD && CD->getSuperclass()) {
-      addTypeRef(CD->getSuperclass(), CD->getGenericSignature());
+      addTypeRef(CD->getSuperclass(),
+                 CD->getGenericSignature());
     } else if (PD && PD->getDeclaredInterfaceType()->getSuperclass()) {
       addTypeRef(PD->getDeclaredInterfaceType()->getSuperclass(),
                  PD->getGenericSignature());
@@ -1097,6 +1109,10 @@ public:
       case irgen::MetadataSource::Kind::Metadata:
         Root = SourceBuilder.createMetadataCapture(Source.getParamIndex());
         break;
+
+      case irgen::MetadataSource::Kind::ErasedTypeMetadata:
+        // Fixed in the function body
+        break;
       }
 
       // The metadata might be reached via a non-trivial path (eg,
@@ -1186,6 +1202,7 @@ static std::string getReflectionSectionName(IRGenModule &IGM,
   SmallString<50> SectionName;
   llvm::raw_svector_ostream OS(SectionName);
   switch (IGM.TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::GOFF:
   case llvm::Triple::UnknownObjectFormat:
     llvm_unreachable("unknown object format");
   case llvm::Triple::XCOFF:
@@ -1415,7 +1432,7 @@ void IRGenModule::emitFieldDescriptor(const NominalTypeDecl *D) {
 
   if (needsFieldDescriptor) {
     FieldTypeMetadataBuilder builder(*this, D);
-    FieldDescriptors.push_back(builder.emit());
+    builder.emit();
   }
 }
 

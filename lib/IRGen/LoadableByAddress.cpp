@@ -26,6 +26,7 @@
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILUndef.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/MapVector.h"
@@ -37,8 +38,7 @@ using namespace swift;
 using namespace swift::irgen;
 
 static GenericEnvironment *getSubstGenericEnvironment(CanSILFunctionType fnTy) {
-  auto sig = fnTy->getSubstGenericSignature();
-  return sig ? sig->getGenericEnvironment() : nullptr;
+  return fnTy->getSubstGenericSignature().getGenericEnvironment();
 }
 
 static GenericEnvironment *getSubstGenericEnvironment(SILFunction *F) {
@@ -2068,6 +2068,11 @@ static void rewriteFunction(StructLoweringState &pass,
     pass.applies.append(currentModApplies.begin(), currentModApplies.end());
   } while (repeat);
 
+  while (!pass.modYieldInsts.empty()) {
+    YieldInst *inst = pass.modYieldInsts.pop_back_val();
+    allocateAndSetAll(pass, allocator, inst, inst->getAllOperands());
+  }
+
   for (SILInstruction *instr : pass.instsToMod) {
     for (Operand &operand : instr->getAllOperands()) {
       auto currOperand = operand.get();
@@ -2287,7 +2292,7 @@ static void rewriteFunction(StructLoweringState &pass,
   while (!pass.modReturnInsts.empty()) {
     auto *instr = pass.modReturnInsts.pop_back_val();
     auto loc = instr->getLoc(); // SILLocation::RegularKind
-    auto regLoc = RegularLocation(loc.getSourceLoc());
+    auto regLoc = RegularLocation(loc);
     SILBuilderWithScope retBuilder(instr);
     assert(modNonFuncTypeResultType(pass.F, pass.Mod) &&
            "Expected a regular type");
@@ -2322,11 +2327,6 @@ static void rewriteFunction(StructLoweringState &pass,
     auto newRetTuple = retBuilder.createTuple(regLoc, emptyTy, {});
     retBuilder.createReturn(newRetTuple->getLoc(), newRetTuple);
     instr->eraseFromParent();
-  }
-
-  while (!pass.modYieldInsts.empty()) {
-    YieldInst *inst = pass.modYieldInsts.pop_back_val();
-    allocateAndSetAll(pass, allocator, inst, inst->getAllOperands());
   }
 }
 
@@ -2530,7 +2530,8 @@ void LoadableByAddress::recreateSingleApply(
     SILValue newApply =
       applyBuilder.createApply(castedApply->getLoc(), callee,
                                applySite.getSubstitutionMap(),
-                               callArgs, castedApply->isNonThrowing());
+                               callArgs,
+                               castedApply->getApplyOptions());
     castedApply->replaceAllUsesWith(newApply);
     break;
   }
@@ -2539,7 +2540,8 @@ void LoadableByAddress::recreateSingleApply(
     applyBuilder.createTryApply(
         castedApply->getLoc(), callee,
         applySite.getSubstitutionMap(), callArgs,
-        castedApply->getNormalBB(), castedApply->getErrorBB());
+        castedApply->getNormalBB(), castedApply->getErrorBB(),
+        castedApply->getApplyOptions());
     break;
   }
   case SILInstructionKind::BeginApplyInst: {
@@ -2547,7 +2549,7 @@ void LoadableByAddress::recreateSingleApply(
     auto newApply =
       applyBuilder.createBeginApply(oldApply->getLoc(), callee,
                                     applySite.getSubstitutionMap(), callArgs,
-                                    oldApply->isNonThrowing());
+                                    oldApply->getApplyOptions());
 
     // Use the new token result.
     oldApply->getTokenResult()->replaceAllUsesWith(newApply->getTokenResult());
@@ -2726,9 +2728,7 @@ bool LoadableByAddress::recreateDifferentiabilityWitnessFunction(
   auto *currIRMod = getIRGenModule()->IRGen.getGenModule(instr->getFunction());
   auto resultFnTy = instr->getType().castTo<SILFunctionType>();
   auto genSig = resultFnTy->getSubstGenericSignature();
-  GenericEnvironment *genEnv = nullptr;
-  if (genSig)
-    genEnv = genSig->getGenericEnvironment();
+  auto *genEnv = genSig.getGenericEnvironment();
   auto newResultFnTy =
       MapperCache.getNewSILFunctionType(genEnv, resultFnTy, *currIRMod);
   if (resultFnTy == newResultFnTy)
@@ -2765,7 +2765,8 @@ bool LoadableByAddress::recreateTupleInstr(
   for (auto elem : tupleInstr->getElements()) {
     elems.push_back(elem);
   }
-  auto *newTuple = tupleBuilder.createTuple(tupleInstr->getLoc(), elems);
+  auto *newTuple = tupleBuilder.createTuple(tupleInstr->getLoc(), newResultTy,
+                                            elems);
   tupleInstr->replaceAllUsesWith(newTuple);
   Delete.push_back(tupleInstr);
   return true;
@@ -2795,9 +2796,9 @@ bool LoadableByAddress::recreateConvInstr(SILInstruction &I,
   if (convInstr->getKind() == SILInstructionKind::DifferentiableFunctionInst ||
       convInstr->getKind() == SILInstructionKind::DifferentiableFunctionExtractInst ||
       convInstr->getKind() == SILInstructionKind::LinearFunctionInst ||
-      convInstr->getKind() == SILInstructionKind::LinearFunctionExtractInst)
-    if (auto genSig = currSILFunctionType->getSubstGenericSignature())
-      genEnv = genSig->getGenericEnvironment();
+      convInstr->getKind() == SILInstructionKind::LinearFunctionExtractInst) {
+    genEnv = currSILFunctionType->getSubstGenericSignature().getGenericEnvironment();
+  }
   CanSILFunctionType newFnType = MapperCache.getNewSILFunctionType(
       genEnv, currSILFunctionType, *currIRMod);
   SILType newType = SILType::getPrimitiveObjectType(newFnType);

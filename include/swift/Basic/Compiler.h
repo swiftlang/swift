@@ -103,4 +103,63 @@
 #define SWIFT_CRASH_BUG_REPORT_MESSAGE \
   "Please " SWIFT_BUG_REPORT_MESSAGE_BASE " and the crash backtrace."
 
+// Conditionally exclude declarations or statements that are only needed for
+// assertions from release builds (NDEBUG) without cluttering the surrounding
+// code by #ifdefs.
+//
+// struct DoThings  {
+//   SWIFT_ASSERT_ONLY_DECL(unsigned verifyCount = 0);
+//   DoThings() {
+//     SWIFT_ASSERT_ONLY(verifyCount = getNumberOfThingsToDo());
+//   }
+//   void doThings() {
+//     do {
+//       // ... do each thing
+//       SWIFT_ASSERT_ONLY(--verifyCount);
+//     } while (!done());
+//     assert(verifyCount == 0 && "did not do everything");
+//   }
+// };
+#ifdef NDEBUG
+#define SWIFT_ASSERT_ONLY_DECL(...)
+#define SWIFT_ASSERT_ONLY(...) do { } while (false)
+#else
+#define SWIFT_ASSERT_ONLY_DECL(...) __VA_ARGS__
+#define SWIFT_ASSERT_ONLY(...) do { __VA_ARGS__; } while (false)
+#endif
+
+#if defined(__LP64__) || defined(_WIN64)
+#define SWIFT_POINTER_IS_8_BYTES 1
+#define SWIFT_POINTER_IS_4_BYTES 0
+#else
+// TODO: consider supporting 16-bit targets
+#define SWIFT_POINTER_IS_8_BYTES 0
+#define SWIFT_POINTER_IS_4_BYTES 1
+#endif
+
+// Produce a string literal for the raw argument tokens.
+#define SWIFT_STRINGIZE_RAW(TOK) #TOK
+
+// Produce a string literal for the macro-expanded argument tokens.
+#define SWIFT_STRINGIZE_EXPANDED(TOK) SWIFT_STRINGIZE_RAW(TOK)
+
+#if defined(__USER_LABEL_PREFIX__)
+#define SWIFT_SYMBOL_PREFIX_STRING \
+  SWIFT_STRINGIZE_EXPANDED(__USER_LABEL_PREFIX__)
+#else
+// Clang and GCC always define __USER_LABEL_PREFIX__, so this should
+// only come up with MSVC, and Windows doesn't use a prefix.
+#define SWIFT_SYMBOL_PREFIX_STRING ""
+#endif
+
+// An attribute to override the symbol name of a declaration.
+// This does not compensate for platform symbol prefixes; for that,
+// use SWIFT_ASM_LABEL_WITH_PREFIX.
+//
+// This only actually works on Clang or GCC; MSVC does not provide
+// an attribute to change the asm label.
+#define SWIFT_ASM_LABEL_RAW(STRING) __asm__(STRING)
+#define SWIFT_ASM_LABEL_WITH_PREFIX(STRING) \
+  SWIFT_ASM_LABEL_RAW(SWIFT_SYMBOL_PREFIX_STRING STRING)
+
 #endif // SWIFT_BASIC_COMPILER_H

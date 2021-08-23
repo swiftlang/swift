@@ -32,7 +32,7 @@ func variadic() {
   // FIXME: Problem here is related to multi-statement closure body not being type-checked together with
   // enclosing context. We could have inferred `$0` to be `[Int]` if `let` was a part of constraint system.
   takesVariadicGeneric({let _: [Int] = $0})
-  // expected-error@-1 {{unable to infer type of a closure parameter $0 in the current context}}
+  // expected-error@-1 {{unable to infer type of a closure parameter '$0' in the current context}}
 
   takesVariadicIntInt({_ = $0; takesIntArray($1)})
   takesVariadicIntInt({_ = $0; let _: [Int] = $1})

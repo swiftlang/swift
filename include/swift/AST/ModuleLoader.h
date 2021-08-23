@@ -19,12 +19,15 @@
 
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Import.h"
+#include "swift/AST/ModuleDependencies.h"
+#include "swift/Basic/ArrayRefView.h"
+#include "swift/Basic/Fingerprint.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Located.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/TinyPtrVector.h"
-#include "swift/AST/ModuleDependencies.h"
+#include "llvm/Support/VersionTuple.h"
 #include <system_error>
 
 namespace llvm {
@@ -74,8 +77,25 @@ enum class IntermoduleDepTrackingMode {
 /// Records dependencies on files outside of the current module;
 /// implemented in terms of a wrapped clang::DependencyCollector.
 class DependencyTracker {
+public:
+  /// A representation of a first-class incremental dependency known to the
+  /// Swift compiler.
+  struct IncrementalDependency {
+    std::string path;
+    Fingerprint fingerprint;
+
+    IncrementalDependency(std::string Path, Fingerprint FP)
+        : path(std::move(Path)), fingerprint(std::move(FP)) {}
+  };
+
+  inline static std::string getPath(const IncrementalDependency &id) {
+    return id.path;
+  }
+  typedef ArrayRefView<IncrementalDependency, std::string, getPath>
+      DependencyPathArrayRef;
+
   std::shared_ptr<clang::DependencyCollector> clangCollector;
-  SmallVector<std::string, 8> incrementalDeps;
+  SmallVector<IncrementalDependency, 8> incrementalDeps;
   llvm::StringSet<> incrementalDepsUniquer;
 
 public:
@@ -94,14 +114,20 @@ public:
   ///
   /// No additional canonicalization or adulteration of the file path in
   /// \p File is performed.
-  void addIncrementalDependency(StringRef File);
+  void addIncrementalDependency(StringRef File, Fingerprint FP);
 
   /// Fetches the list of dependencies.
   ArrayRef<std::string> getDependencies() const;
 
   /// Fetches the list of dependencies that are known to have incremental swift
   /// dependency information embedded inside of them.
-  ArrayRef<std::string> getIncrementalDependencies() const;
+  ArrayRef<IncrementalDependency> getIncrementalDependencies() const;
+
+  /// A view of the paths of the dependencies known to have incremental swift
+  /// dependency information embedded inside of them.
+  DependencyPathArrayRef getIncrementalDependencyPaths() const {
+    return DependencyPathArrayRef(getIncrementalDependencies());
+  }
 
   /// Return the underlying clang::DependencyCollector that this
   /// class wraps.
@@ -174,7 +200,9 @@ public:
   ///
   /// Note that even if this check succeeds, errors may still occur if the
   /// module is loaded in full.
-  virtual bool canImportModule(ImportPath::Element named) = 0;
+  virtual bool canImportModule(ImportPath::Element named,
+                               llvm::VersionTuple version,
+                               bool underlyingVersion) = 0;
 
   /// Import a module with the given module path.
   ///

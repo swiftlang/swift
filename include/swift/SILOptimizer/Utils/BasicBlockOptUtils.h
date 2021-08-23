@@ -23,6 +23,7 @@
 #define SWIFT_SILOPTIMIZER_UTILS_BASICBLOCKOPTUTILS_H
 
 #include "swift/SIL/SILBasicBlock.h"
+#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
@@ -35,9 +36,11 @@ class SILLoopInfo;
 
 /// Compute the set of reachable blocks.
 class ReachableBlocks {
-  SmallPtrSet<SILBasicBlock *, 32> visited;
+  BasicBlockSet visited;
 
 public:
+  ReachableBlocks(SILFunction *function) : visited(function) {}
+
   /// Invoke \p visitor for each reachable block in \p f in worklist order (at
   /// least one predecessor has been visited--defs are always visited before
   /// uses except for phi-type block args). The \p visitor takes a block
@@ -45,10 +48,10 @@ public:
   /// continue visiting blocks.
   ///
   /// Returns true if all reachable blocks were visited.
-  bool visit(SILFunction *f, function_ref<bool(SILBasicBlock *)> visitor);
+  bool visit(function_ref<bool(SILBasicBlock *)> visitor);
 
   /// Return true if \p bb has been visited.
-  bool isVisited(SILBasicBlock *bb) const { return visited.count(bb); }
+  bool isVisited(SILBasicBlock *bb) const { return visited.contains(bb); }
 };
 
 /// Remove all instructions in the body of \p bb in safe manner by using
@@ -79,6 +82,19 @@ inline bool isUsedOutsideOfBlock(SILValue v) {
 bool rotateLoop(SILLoop *loop, DominanceInfo *domInfo, SILLoopInfo *loopInfo,
                 bool rotateSingleBlockLoops, SILBasicBlock *upToBB,
                 bool shouldVerify);
+
+//===----------------------------------------------------------------------===//
+//                             BasicBlock Cloning
+//===----------------------------------------------------------------------===//
+
+/// Return true if the \p termInst can be cloned. If termInst produces a
+/// guaranteed result, then it must be possible to create a nested borrow scope
+/// for that result when the cloner generates a guaranteed phi.
+///
+/// Note: if all the terminators uses will also be cloned, then a guaranteed phi
+/// won't be necessary. This is one of the reasons that cloning a region is much
+/// better than cloning a single block at a time.
+bool canCloneTerminator(TermInst *termInst);
 
 /// Sink address projections to their out-of-block uses. This is
 /// required after cloning a block and before calling
@@ -154,6 +170,9 @@ protected:
   /// state is reset each time analyzeAddressProjections is called.
   SinkAddressProjections sinkProj;
 
+  // If available, the current DeadEndBlocks for incremental update.
+  DeadEndBlocks *deBlocks;
+
 public:
   /// An ordered list of old to new available value pairs.
   ///
@@ -162,14 +181,15 @@ public:
   SmallVector<std::pair<SILValue, SILValue>, 16> availVals;
 
   // Clone blocks starting at `origBB`, within the same function.
-  BasicBlockCloner(SILBasicBlock *origBB)
-      : SILCloner(*origBB->getParent()), origBB(origBB) {}
+  BasicBlockCloner(SILBasicBlock *origBB, DeadEndBlocks *deBlocks = nullptr)
+      : SILCloner(*origBB->getParent()), origBB(origBB), deBlocks(deBlocks) {}
 
   bool canCloneBlock() {
     for (auto &inst : *origBB) {
       if (!canCloneInstruction(&inst))
         return false;
     }
+    canCloneTerminator(origBB->getTerminator());
     return true;
   }
 
@@ -201,6 +221,12 @@ public:
     successorBBs.reserve(origBB->getSuccessors().size());
     llvm::copy(origBB->getSuccessors(), std::back_inserter(successorBBs));
     cloneReachableBlocks(origBB, successorBBs, insertAfterBB);
+
+    if (deBlocks) {
+      for (auto *succBB : successorBBs) {
+        deBlocks->updateForReachableBlock(succBB);
+      }
+    }
   }
 
   /// Clone the given branch instruction's destination block, splitting
@@ -218,6 +244,19 @@ public:
     bi->eraseFromParent();
   }
 
+  /// Create phis and maintain OSSA invariants.
+  ///
+  /// Note: This must be called after calling cloneBlock or cloneBranchTarget,
+  /// before using any OSSA utilities.
+  ///
+  /// The client may perform arbitrary branch fixups and dead block removal
+  /// after cloning and before calling this.
+  ///
+  /// WARNING: If client converts terminator results to phis (e.g. replaces a
+  /// switch_enum with a branch), then it must call this before performing that
+  /// transformation, or fix the OSSA representation of that value itself.
+  void updateOSSAAfterCloning();
+
   /// Get the newly cloned block corresponding to `origBB`.
   SILBasicBlock *getNewBB() {
     return remapBasicBlock(origBB);
@@ -225,10 +264,14 @@ public:
 
   bool wasCloned() { return isBlockCloned(origBB); }
 
-  /// Helper function to perform SSA updates after calling cloneBranchTarget.
-  void updateSSAAfterCloning();
-
 protected:
+  /// Helper function to perform SSA updates used by updateOSSAAfterCloning.
+  void updateSSAAfterCloning(SmallVectorImpl<SILPhiArgument *> &newPhis);
+
+  /// Given a terminator result, either from the original or the cloned block,
+  /// update OSSA for any phis created for the result during edge splitting.
+  void updateOSSATerminatorResult(SILPhiArgument *termResult);
+
   // MARK: CRTP overrides.
 
   /// Override getMappedValue to allow values defined outside the block to be
@@ -317,7 +360,9 @@ public:
   /// Add \p InitVal and all its operands (transitively) for cloning.
   ///
   /// Note: all init values must are added, before calling clone().
-  void add(SILInstruction *initVal);
+  /// Returns false if cloning is not possible, e.g. if we would end up cloning
+  /// a reference to a private function into a function which is serialized.
+  bool add(SILInstruction *initVal);
 
   /// Clone \p InitVal and all its operands into the initializer of the
   /// SILGlobalVariable.
@@ -329,7 +374,9 @@ public:
   static void appendToInitializer(SILGlobalVariable *gVar,
                                   SingleValueInstruction *initVal) {
     StaticInitCloner cloner(gVar);
-    cloner.add(initVal);
+    bool success = cloner.add(initVal);
+    (void)success;
+    assert(success && "adding initVal cannot fail for a global variable");
     cloner.clone(initVal);
   }
 

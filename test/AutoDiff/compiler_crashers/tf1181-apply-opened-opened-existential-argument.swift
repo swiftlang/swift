@@ -1,5 +1,4 @@
 // RUN: not --crash %target-swift-frontend -disable-availability-checking -emit-sil -verify %s
-// REQUIRES: asserts
 
 // TF-1181: Differentiation transform crash for `apply` with opened existential arguments.
 
@@ -21,7 +20,7 @@ public final class Platform {
   public static var service: PlatformAPI = CpuService()
 }
 
-@differentiable(where T: DifferentiableTensorView)
+@differentiable(reverse where T: DifferentiableTensorView)
 public func abs<T: DifferentiableTensorView>(_ x: T) -> T where T.Element: Numeric {
   Platform.service.abs(x)
 }
@@ -34,7 +33,7 @@ public func abs<T: DifferentiableTensorView>(_ x: T) -> T where T.Element: Numer
 // 2.      While evaluating request ExecuteSILPipelineRequest(Run pipelines { Guaranteed Passes } on SIL for main.main)
 // 3.      While running pass #105 SILModuleTransform "Differentiation".
 // 4.      While processing // differentiability witness for abs<A>(_:)
-// sil_differentiability_witness [serialized] [parameters 0] [results 0] <T where T : DifferentiableTensorView, T.Element : Numeric> @$s4main3absyxxAA24DifferentiableTensorViewRzSj7ElementAA0dE0PRpzlF : $@convention(thin) <T where T : DifferentiableTensorView, T.Element : Numeric> (@in_guaranteed T) -> @out T {
+// sil_differentiability_witness [serialized] [reverse] [parameters 0] [results 0] <T where T : DifferentiableTensorView, T.Element : Numeric> @$s4main3absyxxAA24DifferentiableTensorViewRzSj7ElementAA0dE0PRpzlF : $@convention(thin) <T where T : DifferentiableTensorView, T.Element : Numeric> (@in_guaranteed T) -> @out T {
 // }
 //  on SIL function "@$s4main3absyxxAA24DifferentiableTensorViewRzSj7ElementAA0dE0PRpzlF".
 //  for 'abs(_:)' (at swift/test/AutoDiff/compiler_crashers/tf1181-apply-opened-opened-existential-argument.swift:27:8)

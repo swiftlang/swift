@@ -92,6 +92,11 @@ final class IntClass {
      }
      wrapped = 27
   }
+
+  convenience init(withConvenienceInit x: Int) {
+    self.init()
+    self.wrapped = x
+  }
 }
 
 struct RefStruct {
@@ -210,6 +215,13 @@ func testIntClass() {
   let t5 = IntClass(dynamic: true)
   // CHECK-NEXT: 27
   print(t5.wrapped)
+
+  // CHECK-NEXT:   .. init 42
+  // CHECK-NEXT:   .. set 27
+  // CHECK-NEXT:   .. set 123
+  let t6 = IntClass(withConvenienceInit: 123)
+  // CHECK-NEXT: 123
+  print(t6.wrapped)
 }
 
 func testRefStruct() {
@@ -537,30 +549,74 @@ func testSR_12341() {
 
 @propertyWrapper
 struct NonMutatingSetterWrapper<Value> {
-    var value: Value
-    init(wrappedValue: Value) {
-        value = wrappedValue
+  var value: Value
+  init(wrappedValue: Value) {
+    print("  .. init \(wrappedValue)")
+    value = wrappedValue
+  }
+  var wrappedValue: Value {
+    get { value }
+    nonmutating set {
+      print("  .. nonmutatingSet \(newValue)")
     }
-    var wrappedValue: Value {
-        get { value }
-        nonmutating set {
-            print("  .. nonmutatingSet \(newValue)")
-        }
-    }
+  }
 }
 
 struct NonMutatingWrapperTestStruct {
-    @NonMutatingSetterWrapper var SomeProp: Int
-    init(val: Int) {
-        SomeProp = val
-    }
+  @NonMutatingSetterWrapper var SomeProp: Int
+  init(val: Int) {
+    SomeProp = val
+    SomeProp = val + 1
+  }
+}
+
+// Check if a non-trivial value passes the memory lifetime verifier.
+struct NonMutatingWrapperTestStructString {
+  @NonMutatingSetterWrapper var SomeProp: String
+  init(val: String) {
+    SomeProp = val
+  }
 }
 
 func testNonMutatingSetterStruct() {
   // CHECK: ## NonMutatingSetterWrapper
   print("\n## NonMutatingSetterWrapper")
   let A = NonMutatingWrapperTestStruct(val: 11)
-  // CHECK-NEXT:  .. nonmutatingSet 11
+  // CHECK-NEXT:  .. init 11
+  // CHECK-NEXT:  .. nonmutatingSet 12
+}
+
+@propertyWrapper
+final class ClassWrapper<T> {
+  private var _wrappedValue: T
+  var wrappedValue: T {
+    get { _wrappedValue }
+    set {
+      print(" .. set \(newValue)")
+      _wrappedValue = newValue
+    }
+  }
+
+  init(wrappedValue: T) {
+    print(" .. init \(wrappedValue)")
+    self._wrappedValue = wrappedValue
+  }
+}
+
+struct StructWithClassWrapper<T> {
+   @ClassWrapper private var _storage: T?
+
+   init(value: T?) {
+      _storage = value
+   }
+}
+
+func testStructWithClassWrapper() {
+  // CHECK: ## StructWithClassWrapper
+  print("\n## StructWithClassWrapper")
+  let _ = StructWithClassWrapper<Int>(value: 10)
+  // CHECK-NEXT:  .. init nil
+  // CHECK-NEXT:  .. set Optional(10)
 }
 
 testIntStruct()
@@ -574,3 +630,4 @@ testComposed()
 testWrapperInitWithDefaultArg()
 testSR_12341()
 testNonMutatingSetterStruct()
+testStructWithClassWrapper()

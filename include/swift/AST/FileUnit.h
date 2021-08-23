@@ -14,10 +14,10 @@
 #define SWIFT_AST_FILEUNIT_H
 
 #include "swift/AST/Module.h"
+#include "swift/AST/RawComment.h"
+#include "swift/Basic/BasicSourceInfo.h"
 
 namespace swift {
-static inline unsigned alignOfFileUnit();
-
 /// A container for module-scope declarations that itself provides a scope; the
 /// smallest unit of code organization.
 ///
@@ -26,7 +26,7 @@ static inline unsigned alignOfFileUnit();
 /// file. A module can contain several file-units.
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wnon-virtual-dtor"
-class FileUnit : public DeclContext {
+class FileUnit : public DeclContext, public ASTAllocated<FileUnit> {
 #pragma clang diagnostic pop
   virtual void anchor();
 
@@ -162,11 +162,12 @@ public:
     return None;
   }
 
-  virtual Optional<BasicDeclLocs> getBasicLocsForDecl(const Decl *D) const {
+  virtual Optional<ExternalSourceLocs::RawLocs>
+  getExternalRawLocsForDecl(const Decl *D) const {
     return None;
   }
 
-  virtual void collectAllGroups(std::vector<StringRef> &Names) const {}
+  virtual void collectAllGroups(SmallVectorImpl<StringRef> &Names) const {}
 
   /// Returns an implementation-defined "discriminator" for \p D, which
   /// distinguishes \p D from other declarations in the same module with the
@@ -182,6 +183,9 @@ public:
   /// This does a simple local lookup, not recursively looking through imports.
   /// The order of the results is not guaranteed to be meaningful.
   virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {}
+
+  virtual void
+  getExportedPrespecializations(SmallVectorImpl<Decl *> &results) const {}
 
   /// Finds top-level decls in this file filtered by their attributes.
   ///
@@ -267,7 +271,7 @@ public:
     return dyn_cast_or_null<ClassDecl>(getMainDecl());
   }
   bool hasMainDecl() const { return getMainDecl(); }
-  virtual Decl *getMainDecl() const { return nullptr; }
+  virtual ValueDecl *getMainDecl() const { return nullptr; }
   FuncDecl *getMainFunc() const {
     return dyn_cast_or_null<FuncDecl>(getMainDecl());
   }
@@ -307,22 +311,9 @@ public:
     return DC->getContextKind() == DeclContextKind::FileUnit;
   }
 
-private:
-  // Make placement new and vanilla new/delete illegal for FileUnits.
-  void *operator new(size_t Bytes) throw() = delete;
-  void *operator new(size_t Bytes, void *Mem) throw() = delete;
-  void operator delete(void *Data) throw() = delete;
-
-public:
-  // Only allow allocation of FileUnits using the allocator in ASTContext
-  // or by doing a placement new.
-  void *operator new(size_t Bytes, ASTContext &C,
-                     unsigned Alignment = alignOfFileUnit());
+  using ASTAllocated<FileUnit>::operator new;
+  using ASTAllocated<FileUnit>::operator delete;
 };
-
-static inline unsigned alignOfFileUnit() {
-  return alignof(FileUnit&);
-}
 
 /// This represents the compiler's implicitly generated declarations in the
 /// Builtin module.
@@ -398,6 +389,9 @@ public:
                  SmallVectorImpl<GenericSignature> &genericSignatures) {
     return false;
   }
+
+  virtual void collectBasicSourceFileInfo(
+      llvm::function_ref<void(const BasicSourceFileInfo &)> callback) const {}
 
   static bool classof(const FileUnit *file) {
     return file->getKind() == FileUnitKind::SerializedAST ||

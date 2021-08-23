@@ -56,7 +56,7 @@
 //              :         }*, 
 //              :         i8*, 
 //              :         i8* 
-//              :       }* @_DATA__TtC4mainP33_496329636AC05466637A72F247DC6ABC9Ancestor1 to i64
+//              :       }* @"_DATA_$s4main9Ancestor1[[UNIQUE_ID_1]]CySiGMf to i64
 //              :     ), 
 //              :     i64 2
 //              :   ), 
@@ -184,7 +184,7 @@
 //   CHECK-apple-SAME:         }*, 
 //   CHECK-apple-SAME:         i8*, 
 //   CHECK-apple-SAME:         i8* 
-//   CHECK-apple-SAME:       }* @_DATA__TtC4mainP33_496329636AC05466637A72F247DC6ABC5Value to [[INT]]
+//   CHECK-apple-SAME:       }* @"_DATA_$s4main5Value[[UNIQUE_ID_1]]CySiGMf" to [[INT]]
 //   CHECK-apple-SAME:     ), 
 //   CHECK-apple-SAME:     [[INT]] 2
 //   CHECK-apple-SAME:   ), 

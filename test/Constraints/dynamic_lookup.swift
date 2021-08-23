@@ -5,9 +5,6 @@
 
 // REQUIRES: objc_interop
 
-// FIXME(rdar://64425653): We should re-enable this test for other platforms.
-// REQUIRES: OS=macosx
-
 import Foundation
 import PrivateObjC
 
@@ -215,6 +212,7 @@ type(of: obj).foo!(obj)(5) // expected-error{{instance member 'foo' cannot be us
 // Checked casts to AnyObject
 var p: P = Y()
 var obj3 : AnyObject = (p as! AnyObject)! // expected-error{{cannot force unwrap value of non-optional type 'AnyObject'}} {{41-42=}}
+// expected-warning@-1{{forced cast from 'P' to 'AnyObject' always succeeds; did you mean to use 'as'?}} {{27-30=as}}
 
 // Implicit force of an implicitly unwrapped optional
 let uopt : AnyObject! = nil
@@ -341,8 +339,10 @@ func testOverloadedWithUnavailable(ao: AnyObject) {
 }
 
 func dynamicInitCrash(ao: AnyObject.Type) {
+  // This is going to produce difference results on macOS/iOS due to
+  // different availability of `init(...)` overloads attached to `AnyObject`
   let sdk = ao.init(blahblah: ())
-  // expected-error@-1 {{no exact matches in call to initializer}}
+  // expected-error@-1 {{}}
 }
 
 // Test that we correctly diagnose ambiguity for different typed members available
@@ -432,4 +432,21 @@ class ClassWithObjcCallAsFunction {
 func testCallAsFunctionAnyObject(_ x: AnyObject) {
   x() // expected-error {{cannot call value of non-function type 'AnyObject'}}
   x.callAsFunction() // Okay.
+}
+
+// Note: In Swift >= 6 mode this would become an error.
+func test_dynamic_subscript_accepts_type_name_argument() {
+  @objc class A {
+    @objc subscript(a: A.Type) -> Int { get { 42 } }
+  }
+
+  func test(a: AnyObject, optA: AnyObject?) {
+    let _ = a[A] // expected-warning {{expected member name or constructor call after type name}}
+    // expected-note@-1 {{add arguments after the type to construct a value of the type}} {{16-16=()}}
+    // expected-note@-2 {{use '.self' to reference the type object}} {{16-16=.self}}
+
+    let _ = optA?[A] // expected-warning {{expected member name or constructor call after type name}}
+    // expected-note@-1 {{add arguments after the type to construct a value of the type}} {{20-20=()}}
+    // expected-note@-2 {{use '.self' to reference the type object}} {{20-20=.self}}
+  }
 }

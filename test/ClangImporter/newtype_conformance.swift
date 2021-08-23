@@ -22,6 +22,7 @@ func testNewTypeWrapper(x: NSNotification.Name, y: NSNotification.Name) {
   acceptEquatable(x)
   acceptHashable(x)
   acceptComparable(x) // expected-error {{global function 'acceptComparable' requires that 'NSNotification.Name' conform to 'Comparable'}}
+  // expected-note@-1 {{did you mean to use '.rawValue'?}} {{19-19=.rawValue}}
 
   _ = x == y
   _ = x != y

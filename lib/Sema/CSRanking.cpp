@@ -40,8 +40,11 @@ static StringRef getScoreKindName(ScoreKind kind) {
   case SK_Unavailable:
     return "use of an unavailable declaration";
 
-  case SK_AsyncSyncMismatch:
-    return "async/synchronous mismatch";
+  case SK_AsyncInSyncMismatch:
+    return "async-in-synchronous mismatch";
+
+  case SK_SyncInAsync:
+    return "sync-in-asynchronous";
 
   case SK_ForwardTrailingClosure:
     return "forward scan when matching a trailing closure";
@@ -51,6 +54,9 @@ static StringRef getScoreKindName(ScoreKind kind) {
 
   case SK_DisfavoredOverload:
     return "disfavored overload";
+
+  case SK_UnresolvedMemberViaOptional:
+    return "unwrapping optional at unresolved member base";
 
   case SK_ForceUnchecked:
     return "force of an implicitly unwrapped optional";
@@ -78,6 +84,12 @@ static StringRef getScoreKindName(ScoreKind kind) {
 
   case SK_ValueToPointerConversion:
     return "value-to-pointer conversion";
+
+  case SK_FunctionToAutoClosureConversion:
+    return "function to autoclosure parameter";
+
+  case SK_ImplicitValueConversion:
+    return "value-to-value conversion";
   }
 }
 
@@ -358,8 +370,8 @@ static bool isProtocolExtensionAsSpecializedAs(DeclContext *dc1,
 
   // Bind the 'Self' type from the first extension to the type parameter from
   // opening 'Self' of the second extension.
-  Type selfType1 = sig1->getGenericParams()[0];
-  Type selfType2 = sig2->getGenericParams()[0];
+  Type selfType1 = sig1.getGenericParams()[0];
+  Type selfType2 = sig2.getGenericParams()[0];
   cs.addConstraint(ConstraintKind::Bind,
                    replacements[cast<GenericTypeParamType>(selfType2->getCanonicalType())],
                    dc1->mapTypeIntoContext(selfType1),
@@ -615,8 +627,8 @@ bool CompareDeclSpecializationRequest::evaluate(
     // If they both have trailing closures, compare those separately.
     bool compareTrailingClosureParamsSeparately = false;
     if (numParams1 > 0 && numParams2 > 0 &&
-        params1.back().getOldType()->is<AnyFunctionType>() &&
-        params2.back().getOldType()->is<AnyFunctionType>()) {
+        params1.back().getParameterType()->is<AnyFunctionType>() &&
+        params2.back().getParameterType()->is<AnyFunctionType>()) {
       compareTrailingClosureParamsSeparately = true;
     }
 
@@ -794,7 +806,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
 
   SmallVector<SolutionDiff::OverloadDiff, 4> overloadDiff(diff.overloads);
   // Single type of keypath dynamic member lookup could refer to different
-  // member overlaods, we have to do a pair-wise comparison in such cases
+  // member overloads, we have to do a pair-wise comparison in such cases
   // otherwise ranking would miss some viable information e.g.
   // `_ = arr[0..<3]` could refer to subscript through writable or read-only
   // key path and each of them could also pick overload which returns `Slice<T>`
@@ -1086,8 +1098,8 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
         auto params = fnTy->getParams();
         assert(params.size() == 2);
 
-        auto param1 = params[0].getOldType();
-        auto param2 = params[1].getOldType()->castTo<AnyFunctionType>();
+        auto param1 = params[0].getParameterType();
+        auto param2 = params[1].getParameterType()->castTo<AnyFunctionType>();
 
         assert(param1->getOptionalObjectType());
         assert(params[1].isAutoClosure());

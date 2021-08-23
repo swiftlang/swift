@@ -5,6 +5,7 @@ add_swift_host_library(swiftImmediate STATIC
     linker
     mcjit
     orcjit
+    orctargetprocess
     jitlink
     transformutils)
 target_link_libraries(swiftImmediate PRIVATE

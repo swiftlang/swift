@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -parse-stdlib -module-name keypaths %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -disable-availability-checking -parse-stdlib -module-name keypaths %s | %FileCheck %s
 
 import Swift
 
@@ -586,4 +586,46 @@ func tuples_generic<T, U, V>(_: T, _: U, _: V) {
   let _: ReferenceWritableKeyPath<TUC, V> = \TUC.2.x
   // CHECK: keypath $KeyPath<(T, U, C<V>), String>, <τ_0_0, τ_0_1, τ_0_2> (root $(τ_0_0, τ_0_1, C<τ_0_2>); tuple_element #2 : $C<τ_0_2>; stored_property #C.y : $String) <T, U, V>
   let _: KeyPath<TUC, String> = \TUC.2.y
+}
+
+protocol DefineSomeType {
+  associatedtype SomeType
+  func defineSome() -> SomeType
+}
+
+protocol A {}
+extension Int : A {}
+
+struct TestKeyPathWithSomeType : DefineSomeType {
+  func defineSome() -> some A {
+    return 0
+  }
+
+  func testKeyPathWithSome() {
+    _ = \S<SomeType>.y
+    _ = \S<SomeType>.z.x
+    _ = \C<SomeType>.x
+    _ = \C<SomeType>.y
+    _ = \C<SomeType>.z.x
+    _ = \C<SomeType>.z.z.y
+    _ = \C<SomeType>.nonfinal
+    _ = \C<SomeType>.computed
+    _ = \C<SomeType>.observed
+    _ = \C<SomeType>.nonfinal.x
+    _ = \C<SomeType>.computed.x
+    _ = \C<SomeType>.observed.x
+    _ = \C<SomeType>.z.computed
+    _ = \C<SomeType>.z.observed
+    _ = \C<SomeType>.observed.x
+    _ = \C<SomeType>.reabstracted
+    _ = \S<SomeType>.computed
+    _ = \S<SomeType>.observed
+    _ = \S<SomeType>.z.nonfinal
+    _ = \S<SomeType>.z.computed
+    _ = \S<SomeType>.z.observed
+    _ = \S<SomeType>.computed.x
+    _ = \S<SomeType>.computed.y
+    _ = \S<SomeType>.reabstracted
+
+  }
 }

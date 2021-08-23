@@ -467,10 +467,16 @@ OmissionTypeName importer::getClangTypeNameForOmission(clang::ASTContext &ctx,
     case clang::BuiltinType::OMPIterator:
       return OmissionTypeName();
 
-    // SVE builtin types that don't have Swift equivalents.
+    // ARM SVE builtin types that don't have Swift equivalents.
 #define SVE_TYPE(Name, Id, ...) \
     case clang::BuiltinType::Id:
 #include "clang/Basic/AArch64SVEACLETypes.def"
+      return OmissionTypeName();
+
+    // PPC MMA builtin types that don't have Swift equivalents.
+#define PPC_VECTOR_TYPE(Name, Id, Size) \
+    case clang::BuiltinType::Id:
+#include "clang/Basic/PPCTypes.def"
       return OmissionTypeName();
     }
   }
@@ -494,10 +500,10 @@ OmissionTypeName importer::getClangTypeNameForOmission(clang::ASTContext &ctx,
   return StringRef();
 }
 
-static clang::SwiftNewtypeAttr *
+static clang::SwiftNewTypeAttr *
 retrieveNewTypeAttr(const clang::TypedefNameDecl *decl) {
   // Retrieve the attribute.
-  auto attr = decl->getAttr<clang::SwiftNewtypeAttr>();
+  auto attr = decl->getAttr<clang::SwiftNewTypeAttr>();
   if (!attr)
     return nullptr;
 
@@ -510,7 +516,7 @@ retrieveNewTypeAttr(const clang::TypedefNameDecl *decl) {
   return attr;
 }
 
-clang::SwiftNewtypeAttr *
+clang::SwiftNewTypeAttr *
 importer::getSwiftNewtypeAttr(const clang::TypedefNameDecl *decl,
                               ImportNameVersion version) {
   // Newtype was introduced in Swift 3
@@ -607,12 +613,18 @@ bool importer::hasNativeSwiftDecl(const clang::Decl *decl) {
 
 /// Translate the "nullability" notion from API notes into an optional type
 /// kind.
-OptionalTypeKind importer::translateNullability(clang::NullabilityKind kind) {
+OptionalTypeKind importer::translateNullability(
+    clang::NullabilityKind kind, bool stripNonResultOptionality) {
+  if (stripNonResultOptionality &&
+      kind != clang::NullabilityKind::NullableResult)
+    return OptionalTypeKind::OTK_None;
+
   switch (kind) {
   case clang::NullabilityKind::NonNull:
     return OptionalTypeKind::OTK_None;
 
   case clang::NullabilityKind::Nullable:
+  case clang::NullabilityKind::NullableResult:
     return OptionalTypeKind::OTK_Optional;
 
   case clang::NullabilityKind::Unspecified:
@@ -620,6 +632,7 @@ OptionalTypeKind importer::translateNullability(clang::NullabilityKind kind) {
   }
 
   llvm_unreachable("Invalid NullabilityKind.");
+  return OptionalTypeKind::OTK_Optional;
 }
 
 bool importer::isRequiredInitializer(const clang::ObjCMethodDecl *method) {
@@ -716,7 +729,8 @@ bool importer::isUnavailableInSwift(
     llvm::VersionTuple version = attr->getDeprecated();
     if (version.empty())
       continue;
-    if (platformAvailability.treatDeprecatedAsUnavailable(decl, version)) {
+    if (platformAvailability.treatDeprecatedAsUnavailable(
+            decl, version, /*isAsync=*/false)) {
       return true;
     }
   }

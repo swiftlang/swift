@@ -85,6 +85,11 @@ namespace irgen {
 
   ClassDecl *getRootClassForMetaclass(IRGenModule &IGM, ClassDecl *theClass);
 
+  ClassDecl *getSuperclassDeclForMetadata(IRGenModule &IGM, ClassDecl *theClass);
+  CanType getSuperclassForMetadata(IRGenModule &IGM, ClassDecl *theClass);
+  CanType getSuperclassForMetadata(IRGenModule &IGM, CanType theClass,
+                                   bool useArchetypes = true);
+
   enum class ClassMetadataStrategy {
     /// Does the given class have resilient ancestry, or is the class itself
     /// generic?

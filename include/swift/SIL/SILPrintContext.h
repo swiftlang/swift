@@ -78,7 +78,8 @@ public:
 
   /// Constructor based on SILOptions.
   ///
-  /// DebugInfo will be set according to the -sil-print-debuginfo option.
+  /// DebugInfo will be set according to SILOptions::PrintDebugInfo or
+  /// the -sil-print-debuginfo option.
   SILPrintContext(llvm::raw_ostream &OS, const SILOptions &Opts);
 
   SILPrintContext(llvm::raw_ostream &OS, bool Verbose, bool SortedSIL,
@@ -108,7 +109,7 @@ public:
 
   SILPrintContext::ID getID(const SILBasicBlock *Block);
 
-  SILPrintContext::ID getID(const SILNode *node);
+  SILPrintContext::ID getID(SILNodePointer node);
 
   /// Returns true if the \p Scope has and ID assigned.
   bool hasScopeID(const SILDebugScope *Scope) const {

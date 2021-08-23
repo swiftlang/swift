@@ -94,6 +94,7 @@ public:
     case Kind::AsyncFunction:
       return RequirementsVector[i];
     }
+    llvm_unreachable("covered switch");
   }
 
   ProtocolConformanceRef
@@ -129,10 +130,11 @@ public:
     case Kind::AsyncFunction:
       return RequirementsVector;
     }
+    llvm_unreachable("unhandled case");
   }
 
-  bool forPartialApply() { return kind == Kind::PartialApply; }
-  bool forAsyncFunction() { return kind == Kind::AsyncFunction; }
+  bool forPartialApply() const { return kind == Kind::PartialApply; }
+  bool forAsyncFunction() const { return kind == Kind::AsyncFunction; }
 
 private:
   static NecessaryBindings computeBindings(IRGenModule &IGM,

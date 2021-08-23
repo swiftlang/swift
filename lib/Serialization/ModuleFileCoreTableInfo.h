@@ -16,6 +16,7 @@
 #include "ModuleFileSharedCore.h"
 #include "DocFormat.h"
 #include "SourceInfoFormat.h"
+#include "swift/AST/RawComment.h"
 #include "llvm/Support/DJB.h"
 
 namespace swift {
@@ -457,7 +458,7 @@ public:
       int32_t nameLength = endian::readNext<int32_t, little, unaligned>(data);
       std::string mangledName(reinterpret_cast<const char *>(data), nameLength);
       data += nameLength;
-      result.push_back({mangledName, genSigId});
+      result.push_back({std::string(mangledName), genSigId});
     }
     return result;
   }
@@ -600,9 +601,12 @@ public:
   static data_type ReadData(internal_key_type key, const uint8_t *data,
                             unsigned length) {
     using namespace llvm::support;
-    auto str = std::string{reinterpret_cast<const char *>(data),
-                           Fingerprint::DIGEST_LENGTH};
-    return Fingerprint{str};
+    auto str = llvm::StringRef{reinterpret_cast<const char *>(data),
+                               Fingerprint::DIGEST_LENGTH};
+    if (auto fp = Fingerprint::fromString(str))
+      return fp.getValue();
+    llvm::errs() << "Unconvertable fingerprint '" << str << "'\n";
+    abort();
   }
 };
 

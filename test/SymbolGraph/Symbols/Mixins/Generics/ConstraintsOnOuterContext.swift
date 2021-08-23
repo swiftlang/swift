@@ -18,10 +18,12 @@ public struct MyStruct<S: Sequence> {
 // CHECK:          "kind": "conformance"
 // CHECK-NEXT:     "lhs": "S"
 // CHECK-NEXT:     "rhs": "Sequence"
-//               },
+// CHECK-NEXT:     "rhsPrecise": "s:ST"
+// CHECK-NEXT:   },
 //               {
 // CHECK:          "kind": "sameType"
 // CHECK-NEXT:     "lhs": "S.Element"
 // CHECK-NEXT:     "rhs": "Int"
+// CHECK-NEXT:     "rhsPrecise": "s:Si"
 // CHECK-NEXT:   }
 // CHECK-NEXT: ]

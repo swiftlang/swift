@@ -44,40 +44,16 @@ extension Optional: Differentiable where Wrapped: Differentiable {
       }
     }
 
-    public mutating func move(along direction: TangentVector) {
-      if let value = direction.value {
-        self.value?.move(along: value)
-      }
-    }
-
-    @noDerivative
-    public var zeroTangentVectorInitializer: () -> TangentVector {
-      switch value {
-      case nil:
-        return { Self(nil) }
-      case let x?:
-        return { [zeroTanInit = x.zeroTangentVectorInitializer] in
-          Self(zeroTanInit())
-        }
+    public mutating func move(by offset: TangentVector) {
+      if let value = offset.value {
+        self.value?.move(by: value)
       }
     }
   }
 
-  public mutating func move(along direction: TangentVector) {
-    if let value = direction.value {
-      self?.move(along: value)
-    }
-  }
-
-  @noDerivative
-  public var zeroTangentVectorInitializer: () -> TangentVector {
-    switch self {
-    case nil:
-      return { TangentVector(nil) }
-    case let x?:
-      return { [zeroTanInit = x.zeroTangentVectorInitializer] in
-        TangentVector(zeroTanInit())
-      }
+  public mutating func move(by offset: TangentVector) {
+    if let value = offset.value {
+      self?.move(by: value)
     }
   }
 }

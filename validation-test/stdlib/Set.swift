@@ -284,7 +284,7 @@ SetTestSuite.test("AssociatedTypes") {
 
 SetTestSuite.test("sizeof") {
   var s = Set(["Hello", "world"])
-#if arch(i386) || arch(arm)
+#if arch(i386) || arch(arm) || arch(arm64_32)
   expectEqual(4, MemoryLayout.size(ofValue: s))
 #else
   expectEqual(8, MemoryLayout.size(ofValue: s))
@@ -3242,6 +3242,11 @@ SetTestSuite.test("formSymmetricDifference")
 
   // Removing all elements should cause an identity change
   expectNotEqual(identity1, s1._rawIdentifier())
+
+  // Without a fixLifetime here, the (non-ObjC) optimizer destroys
+  // 's1' after its last uses and recycles the storage so the identity
+  // check above fails.
+  _fixLifetime(s1_copy)
 }
 
 SetTestSuite.test("removeFirst") {

@@ -78,7 +78,7 @@
 // COMPLEX-DAG: -F /path/to/frameworks -Fsystem /path/to/systemframeworks -F /path/to/more/frameworks
 // COMPLEX-DAG: -I /path/to/headers -I path/to/more/headers
 // COMPLEX-DAG: -module-cache-path /tmp/modules
-// COMPLEX-DAG: -emit-reference-dependencies-path {{(.*(/|\\))?driver-compile[^ /]+}}.swiftdeps
+// COMPLEX-DAG: -emit-reference-dependencies-path {{(.*(/|\\))?driver-compile[^ /]*}}.swiftdeps
 // COMPLEX: -o {{.+}}.o
 
 

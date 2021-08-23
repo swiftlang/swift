@@ -36,7 +36,9 @@ func test1a() -> unionSearchFlags {
 
 func test1b(_ b : Bool) {
   _ = 123
-  _ = .description == 1 // expected-error {{cannot infer contextual base in reference to member 'description'}}
+  _ = .description == 1
+  // expected-error@-1 {{instance member 'description' cannot be used on type 'Int'}}
+  // expected-error@-2 {{member 'description' in 'Int' produces result of type 'String', but context expects 'Int'}}
 }
 
 enum MaybeInt {
@@ -76,10 +78,10 @@ func test3(_ a: ZeroOneTwoThree) {
      ZeroOneTwoThree.Zero // expected-error {{cannot convert value of type 'ZeroOneTwoThree' to specified type 'Int'}}
 
   // expected-warning @+1 {{unused}}
-  test3 ZeroOneTwoThree.Zero // expected-error {{expression resolves to an unused function}} expected-error{{consecutive statements}} {{8-8=;}}
+  test3 ZeroOneTwoThree.Zero // expected-error {{function is unused}} expected-error{{consecutive statements}} {{8-8=;}}
   test3 (ZeroOneTwoThree.Zero)
   test3(ZeroOneTwoThree.Zero)
-  test3 // expected-error {{expression resolves to an unused function}}
+  test3 // expected-error {{function is unused}}
   // expected-warning @+1 {{unused}}
   (ZeroOneTwoThree.Zero)
   
@@ -101,9 +103,9 @@ func test3a(_ a: ZeroOneTwoThree) {
   
   var i = 0 > 3 ? .none : .some(3) // expected-error {{cannot infer contextual base in reference to member 'none'}}
 
-  test3a;  // expected-error {{unused function}}
+  test3a;  // expected-error {{function is unused}}
   .Zero   // expected-error {{reference to member 'Zero' cannot be resolved without a contextual type}}
-  test3a   // expected-error {{unused function}}
+  test3a   // expected-error {{function is unused}}
   (.Zero) // expected-error {{reference to member 'Zero' cannot be resolved without a contextual type}}
   test3a(.Zero)
 }
@@ -510,7 +512,24 @@ let _: GenericEnumWithStaticNone<Int>? = .none // expected-warning {{assuming yo
 // expected-note@-1 {{explicitly specify 'Optional' to silence this warning}}{{42-42=Optional}}
 // expected-note@-2 {{use 'GenericEnumWithStaticNone<Int>.none' instead}}{{42-42=GenericEnumWithStaticNone<Int>}}
 let _: GenericEnumWithStaticNone<String>? = .none // Okay
-let _: GenericEnumWithStaticNone? = .none // FIXME(SR-11535): This should be diagnosed
+
+let _: GenericEnumWithStaticNone? = .none // expected-warning {{assuming you mean 'GenericEnumWithStaticNone<Int>.none'; did you mean 'Optional<GenericEnumWithStaticNone<Int>>.none' instead?}}
+// expected-note@-1 {{use 'Optional<GenericEnumWithStaticNone<Int>>.none' instead}} {{37-37=Optional<GenericEnumWithStaticNone<Int>>}} 
+// expected-note@-2 {{use 'GenericEnumWithStaticNone<Int>.none' instead}} {{37-37=GenericEnumWithStaticNone<Int>}} 
+
+enum GenericStructWithStaticNone<T> {
+  init() {}
+  static var none: GenericStructWithStaticNone<Int> { GenericStructWithStaticNone<Int>() }
+}
+
+let _: GenericStructWithStaticNone<Int>? = .none // expected-warning {{assuming you mean 'Optional<GenericStructWithStaticNone<Int>>.none'; did you mean 'GenericStructWithStaticNone<Int>.none' instead?}}
+// expected-note@-1 {{explicitly specify 'Optional' to silence this warning}}{{44-44=Optional}}
+// expected-note@-2 {{use 'GenericStructWithStaticNone<Int>.none' instead}}{{44-44=GenericStructWithStaticNone<Int>}}
+let _: GenericStructWithStaticNone<String>? = .none // Okay
+
+let _: GenericStructWithStaticNone? = .none // expected-warning {{assuming you mean 'GenericStructWithStaticNone<Int>.none'; did you mean 'Optional<GenericStructWithStaticNone<Int>>.none' instead?}}
+// expected-note@-1 {{use 'Optional<GenericStructWithStaticNone<Int>>.none' instead}} {{39-39=Optional<GenericStructWithStaticNone<Int>>}} 
+// expected-note@-2 {{use 'GenericStructWithStaticNone<Int>.none' instead}} {{39-39=GenericStructWithStaticNone<Int>}} 
 
 enum GenericEnumWithoutNone<T> {
   case a

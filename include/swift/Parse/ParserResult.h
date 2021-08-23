@@ -183,6 +183,10 @@ public:
     IsError = true;
   }
 
+  void setHasCodeCompletion() {
+    IsCodeCompletion = true;
+  }
+
   void clearIsError() {
     IsError = false;
   }

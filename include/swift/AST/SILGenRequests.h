@@ -20,16 +20,15 @@
 #include "swift/AST/ASTTypeIDs.h"
 #include "swift/AST/EvaluatorDependencies.h"
 #include "swift/AST/SimpleRequest.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/SIL/SILDeclRef.h"
 
 namespace swift {
 
-class FileUnit;
 class LangOptions;
 class ModuleDecl;
 class SILModule;
 class SILOptions;
-class SourceFile;
 
 namespace Lowering {
   class TypeConverter;

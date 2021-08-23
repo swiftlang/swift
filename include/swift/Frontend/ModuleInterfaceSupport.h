@@ -20,6 +20,7 @@
 #define SWIFT_INTERFACE_FORMAT_VERSION_KEY "swift-interface-format-version"
 #define SWIFT_COMPILER_VERSION_KEY "swift-compiler-version"
 #define SWIFT_MODULE_FLAGS_KEY "swift-module-flags"
+#define SWIFT_MODULE_FLAGS_IGNORABLE_KEY "swift-module-flags-ignorable"
 
 namespace swift {
 
@@ -41,6 +42,10 @@ struct ModuleInterfaceOptions {
   /// back .swiftinterface and reconstructing .swiftmodule.
   std::string Flags;
 
+  /// Flags that should be emitted to the .swiftinterface file but are OK to be
+  /// ignored by the earlier version of the compiler.
+  std::string IgnorableFlags;
+
   /// Print SPI decls and attributes.
   bool PrintSPIs = false;
 
@@ -57,7 +62,6 @@ std::string getSwiftInterfaceCompilerVersionForCurrentCompiler(ASTContext &ctx);
 
 llvm::Regex getSwiftInterfaceFormatVersionRegex();
 llvm::Regex getSwiftInterfaceCompilerVersionRegex();
-llvm::Regex getSwiftInterfaceModuleFlagsRegex();
 
 /// Emit a stable module interface for \p M, which can be used by a client
 /// source file to import this module, subject to options given by \p Opts.

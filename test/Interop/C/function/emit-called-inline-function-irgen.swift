@@ -6,7 +6,7 @@
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -I %S/Inputs -Xcc -std=c99 -emit-ir -o - | %FileCheck %s -check-prefix C99 --implicit-check-not notCalled
-// RUN: %target-swift-frontend %s -I %S/Inputs -enable-cxx-interop -emit-ir -o - | %FileCheck %s -check-prefix CXX --implicit-check-not notCalled
+// RUN: %target-swiftxx-frontend %s -I %S/Inputs -emit-ir -o - | %FileCheck %s -check-prefix CXX --implicit-check-not notCalled
 
 import EmitCalledInlineFunction
 
@@ -15,7 +15,7 @@ import EmitCalledInlineFunction
 
 // CXX-DAG: define linkonce_odr{{( dso_local)?}} i32 @{{_Z15calledFromSwiftv|"\?calledFromSwift@@YAHXZ"}}()
 // CXX-DAG: define linkonce_odr{{( dso_local)?}} i32 @{{_Z18calledTransitivelyv|"\?calledTransitively@@YAHXZ"}}()
-// CXX-DAG: define linkonce_odr{{( dso_local)?}} i32 @{{_ZN1C32memberFunctionCalledTransitivelyEv|"\?memberFunctionCalledTransitively@C@@QEAAHXZ"}}(%class.C* %this)
+// CXX-DAG: define linkonce_odr{{( dso_local)?}} i32 @{{_ZN1C32memberFunctionCalledTransitivelyEv|"\?memberFunctionCalledTransitively@C@@QEAAHXZ"}}(%class.C* nonnull dereferenceable(1) %this)
 // CXX-DAG: define linkonce_odr{{( dso_local)?}} i32 @{{_Z29calledTransitivelyFromVarInitv|"\?calledTransitivelyFromVarInit@@YAHXZ"}}()
 
 calledFromSwift()

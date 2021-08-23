@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -verify %s
+// RUN: %target-swift-frontend -emit-sil -verify %s -requirement-machine=off
 
 // SR-12744: Pullback generation crash for unhandled indirect result.
 // May be due to inconsistent derivative function type calculation logic in
@@ -7,8 +7,8 @@
 import _Differentiation
 
 class Class: Differentiable {
-  @differentiable(wrt: (self, x))
-  @differentiable(wrt: x)
+  @differentiable(reverse, wrt: (self, x))
+  @differentiable(reverse, wrt: x)
   func f(_ x: Float) -> Float { x }
 }
 

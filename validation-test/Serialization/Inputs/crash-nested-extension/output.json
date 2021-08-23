@@ -1,0 +1,13 @@
+{
+  "./f1.swift": {
+    "swift-dependencies": "./f1.swiftdeps",
+    "swiftmodule": "./f1~partial.swiftmodule"
+  },
+  "./f2.swift": {
+    "swift-dependencies": "./f2.swiftdeps",
+    "swiftmodule": "./f2~partial.swiftmodule"
+  },
+  "": {
+    "swift-dependencies": "./main~buildrecord.swiftdeps"
+  }
+}

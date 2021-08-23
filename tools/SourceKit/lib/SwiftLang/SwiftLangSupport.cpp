@@ -303,6 +303,16 @@ void SwiftLangSupport::globalConfigurationUpdated(
   configureCompletionInstance(CompletionInst, Config);
 }
 
+void SwiftLangSupport::dependencyUpdated() {
+  CompletionInst->markCachedCompilerInstanceShouldBeInvalidated();
+}
+
+UIdent SwiftLangSupport::getUIDForDeclLanguage(const swift::Decl *D) {
+  if (D->hasClangNode())
+    return KindObjC;
+  return KindSwift;
+}
+
 UIdent SwiftLangSupport::getUIDForDecl(const Decl *D, bool IsRef) {
   return UIdentVisitor(IsRef).visit(const_cast<Decl*>(D));
 }

@@ -45,6 +45,7 @@ set(SWIFTLIB_ESSENTIAL
   CollectionAlgorithms.swift
   Comparable.swift
   CompilerProtocols.swift
+  Sendable.swift
   ContiguousArray.swift
   ContiguouslyStored.swift
   ClosedRange.swift
@@ -60,7 +61,6 @@ set(SWIFTLIB_ESSENTIAL
   DictionaryVariant.swift
   DropWhile.swift
   Dump.swift
-  EitherSequence.swift
   EmptyCollection.swift
   Equatable.swift
   ErrorType.swift
@@ -209,14 +209,11 @@ set(SWIFTLIB_SOURCES
   Availability.swift
   CollectionDifference.swift
   CollectionOfOne.swift
-  DiscontiguousSlice.swift
   Diffing.swift
   FloatingPointRandom.swift
   Mirror.swift
   PlaygroundDisplay.swift
   CommandLine.swift
-  RangeSet.swift
-  RangeSetStorage.swift
   SliceBuffer.swift
   SIMDVector.swift
   UnfoldSequence.swift
@@ -227,6 +224,7 @@ set(SWIFTLIB_SOURCES
 
 set(SWIFTLIB_GYB_SOURCES
   ${SWIFTLIB_ESSENTIAL_GYB_SOURCES}
+  SIMDConcreteOperations.swift.gyb
   SIMDVectorTypes.swift.gyb
   Tuple.swift.gyb
   )
@@ -288,6 +286,7 @@ endif()
 
 # STAGING: Temporarily avoids having to write #fileID in Swift.swiftinterface.
 list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-enable-experimental-concise-pound-file")
+list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-enable-ossa-modules")
 
 if(SWIFT_CHECK_ESSENTIAL_STDLIB)
   add_swift_target_library(swift_stdlib_essential ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IS_STDLIB_CORE

@@ -4,26 +4,24 @@ func foo(value: MyStruct) {
 
 // REQUIRES: shell
 
-// RUN: DEPCHECK_INTERVAL=1
-// RUN: SLEEP_TIME=2
-
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/VFS)
 // RUN: cp %S/Inputs/checkdeps/MyProject/LibraryExt.swift %t/VFS/
 
 // RUN: %sourcekitd-test \
-// RUN:   -req=global-config -req-opts=completion_check_dependency_interval=${DEPCHECK_INTERVAL} == \
+// RUN:   -req=global-config -req-opts=completion_check_dependency_interval=100 == \
 
 // RUN:   -shell -- echo "### Initial" == \
 // RUN:   -req=complete.open -pos=2:9 -pass-as-sourcetext -vfs-files=%t/VFS/Main.swift=@%s,%t/VFS/Library.swift=@%S/Inputs/checkdeps/MyProject/Library.swift %t/VFS/Main.swift -- -target %target-triple %t/VFS/Main.swift %t/VFS/LibraryExt.swift %t/VFS/Library.swift == \
 // RUN:   -req=complete.close -pos=2:9 -name %t/VFS/Main.swift %s == \
 
 // RUN:   -shell -- echo "### Modify" == \
-// RUN:   -shell -- sleep ${SLEEP_TIME} == \
+// RUN:   -req=global-config -req-opts=completion_check_dependency_interval=0 == \
 // RUN:   -req=complete.open -pos=2:9 -pass-as-sourcetext -vfs-files=%t/VFS/Main.swift=@%s,%t/VFS/Library.swift=@%S/Inputs/checkdeps/MyProject_mod/Library.swift %t/VFS/Main.swift -- -target %target-triple %t/VFS/Main.swift %t/VFS/LibraryExt.swift %t/VFS/Library.swift == \
 // RUN:   -req=complete.close -pos=2:9 -name %t/VFS/Main.swift %s == \
 
 // RUN:   -shell -- echo "### Keep" == \
+// RUN:   -req=global-config -req-opts=completion_check_dependency_interval=100 == \
 // RUN:   -req=complete.open -pos=2:9 -pass-as-sourcetext -vfs-files=%t/VFS/Main.swift=@%s,%t/VFS/Library.swift=@%S/Inputs/checkdeps/MyProject_mod/Library.swift %t/VFS/Main.swift -- -target %target-triple %t/VFS/Main.swift %t/VFS/LibraryExt.swift %t/VFS/Library.swift == \
 // RUN:   -req=complete.close -pos=2:9 -name %t/VFS/Main.swift %s \
 

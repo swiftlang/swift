@@ -43,6 +43,7 @@ class NativeCCEntryPointArgumentEmission
     : public virtual EntryPointArgumentEmission {
 
 public:
+  virtual void mapAsyncParameters() = 0;
   virtual llvm::Value *getCallerErrorResultArgument() = 0;
   virtual llvm::Value *getContext() = 0;
   virtual Explosion getArgumentExplosion(unsigned index, unsigned size) = 0;

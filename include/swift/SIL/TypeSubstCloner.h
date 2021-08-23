@@ -54,6 +54,7 @@ class TypeSubstCloner : public SILClonerWithScopes<ImplClass> {
     SubstitutionMap Subs;
     SmallVector<SILValue, 8> Args;
     SubstitutionMap RecursiveSubs;
+    ApplyOptions ApplyOpts;
 
   public:
     ApplySiteCloningHelper(ApplySite AI, TypeSubstCloner &Cloner)
@@ -67,9 +68,17 @@ class TypeSubstCloner : public SILClonerWithScopes<ImplClass> {
       // Remap substitutions.
       Subs = Cloner.getOpSubstitutionMap(AI.getSubstitutionMap());
 
+      // If we're inlining a [noasync] function, make sure any calls inside it
+      // are marked as [noasync] as appropriate.
+      ApplyOpts = AI.getApplyOptions();
+      if (!Builder.getFunction().isAsync() &&
+          SubstCalleeSILType.castTo<SILFunctionType>()->isAsync()) {
+        ApplyOpts |= ApplyFlags::DoesNotAwait;
+      }
+
       if (!Cloner.Inlining) {
         FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(AI.getCallee());
-        if (FRI && FRI->getInitiallyReferencedFunction() == AI.getFunction() &&
+        if (FRI && FRI->getReferencedFunction() == AI.getFunction() &&
             Subs == Cloner.SubsMap) {
           // Handle recursions by replacing the apply to the callee with an
           // apply to the newly specialized function, but only if substitutions
@@ -123,6 +132,10 @@ class TypeSubstCloner : public SILClonerWithScopes<ImplClass> {
     SubstitutionMap getSubstitutions() const {
       return Subs;
     }
+
+    ApplyOptions getApplyOptions() const {
+      return ApplyOpts;
+    }
   };
 
 public:
@@ -137,27 +150,13 @@ public:
   using SILClonerWithScopes<ImplClass>::getOpBasicBlock;
   using SILClonerWithScopes<ImplClass>::recordClonedInstruction;
   using SILClonerWithScopes<ImplClass>::recordFoldedValue;
-  using SILClonerWithScopes<ImplClass>::addBlockWithUnreachable;
-  using SILClonerWithScopes<ImplClass>::OpenedArchetypesTracker;
 
   TypeSubstCloner(SILFunction &To,
                   SILFunction &From,
                   SubstitutionMap ApplySubs,
-                  SILOpenedArchetypesTracker &OpenedArchetypesTracker,
                   DominanceInfo *DT = nullptr,
                   bool Inlining = false)
-    : SILClonerWithScopes<ImplClass>(To, OpenedArchetypesTracker, DT, Inlining),
-      SwiftMod(From.getModule().getSwiftModule()),
-      SubsMap(ApplySubs),
-      Original(From),
-      Inlining(Inlining) {
-  }
-
-  TypeSubstCloner(SILFunction &To,
-                  SILFunction &From,
-                  SubstitutionMap ApplySubs,
-                  bool Inlining = false)
-    : SILClonerWithScopes<ImplClass>(To, Inlining),
+    : SILClonerWithScopes<ImplClass>(To, DT, Inlining),
       SwiftMod(From.getModule().getSwiftModule()),
       SubsMap(ApplySubs),
       Original(From),
@@ -214,7 +213,8 @@ protected:
     ApplyInst *N =
         getBuilder().createApply(getOpLocation(Inst->getLoc()),
                                  Helper.getCallee(), Helper.getSubstitutions(),
-                                 Helper.getArguments(), Inst->isNonThrowing(),
+                                 Helper.getArguments(),
+                                 Helper.getApplyOptions(),
                                  GenericSpecializationInformation::create(
                                    Inst, getBuilder()));
     // Specialization can return noreturn applies that were not identified as
@@ -234,6 +234,7 @@ protected:
         Helper.getSubstitutions(), Helper.getArguments(),
         getOpBasicBlock(Inst->getNormalBB()),
         getOpBasicBlock(Inst->getErrorBB()),
+        Helper.getApplyOptions(),
         GenericSpecializationInformation::create(
           Inst, getBuilder()));
     recordClonedInstruction(Inst, N);
@@ -428,9 +429,10 @@ protected:
       return ParentFunction;
 
     // Clone the function with the substituted type for the debug info.
-    Mangle::GenericSpecializationMangler Mangler(
-        ParentFunction, SubsMap, IsNotSerialized, false, ForInlining);
-    std::string MangledName = Mangler.mangle(RemappedSig);
+    Mangle::GenericSpecializationMangler Mangler(ParentFunction,
+                                                 IsNotSerialized);
+    std::string MangledName =
+      Mangler.mangleForDebugInfo(RemappedSig, SubsMap, ForInlining);
 
     if (ParentFunction->getName() == MangledName)
       return ParentFunction;

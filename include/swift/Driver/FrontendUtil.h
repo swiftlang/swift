@@ -15,6 +15,7 @@
 
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/StringSaver.h"
 
 #include <memory>
 
@@ -23,6 +24,11 @@ namespace swift {
 class DiagnosticEngine;
 
 namespace driver {
+/// Expand response files in the argument list with retrying.
+/// This function is a wrapper of lvm::cl::ExpandResponseFiles. It will
+/// retry calling the function if the previous expansion failed.
+void ExpandResponseFilesWithRetry(llvm::StringSaver &Saver,
+                                  llvm::SmallVectorImpl<const char *> &Args);
 
 /// Generates the list of arguments that would be passed to the compiler
 /// frontend from the given driver arguments.

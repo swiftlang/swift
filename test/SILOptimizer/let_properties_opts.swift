@@ -2,6 +2,7 @@
 // RUN: %target-swift-frontend -module-name let_properties_opts -primary-file %s -O -emit-sil | %FileCheck %s
 
 // REQUIRES: optimized_stdlib
+// REQUIRES: tmpdisable
 
 // Test propagation of non-static let properties with compile-time constant values.
 

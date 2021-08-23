@@ -308,7 +308,7 @@ func badTypeConformance6<T>(_: T) where [T] : Collection { }
 // expected-error@-1{{type '[T]' in conformance requirement does not refer to a generic parameter or associated type}}
 
 func badTypeConformance7<T, U>(_: T, _: U) where T? : U { }
-// expected-error@-1{{type 'T?' constrained to non-protocol, non-class type 'U'}}
+// expected-error@-1{{type 'T?' in conformance requirement does not refer to a generic parameter or associated type}}
 
 func badSameType<T, U : GeneratesAnElement, V>(_ : T, _ : U)
   where T == U.Element, U.Element == V {} // expected-error{{same-type requirement makes generic parameters 'T' and 'V' equivalent}}

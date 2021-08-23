@@ -14,12 +14,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "CompatibilityOverride.h"
+#include "../CompatibilityOverride/CompatibilityOverride.h"
 #include "ErrorObject.h"
 #include "Private.h"
 #include "SwiftHashableSupport.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/Basic/Lazy.h"
+#include "swift/Runtime/Bincompat.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/ExistentialContainer.h"
@@ -110,6 +111,11 @@ extern "C" const StructDescriptor NOMINAL_TYPE_DESCR_SYM(Sh);
 /// Nominal type descriptor for Swift.String.
 extern "C" const StructDescriptor NOMINAL_TYPE_DESCR_SYM(SS);
 
+/// This issues a fatal error or warning if the srcValue contains a null object
+/// reference.  It is used when the srcType is a non-nullable reference type, in
+/// which case it is dangerous to continue with a null reference.  The null
+/// reference is returned if we're operating in backwards-compatibility mode, so
+/// callers still have to check for null.
 static HeapObject * getNonNullSrcObject(OpaqueValue *srcValue,
                                         const Metadata *srcType,
                                         const Metadata *destType) {
@@ -120,12 +126,27 @@ static HeapObject * getNonNullSrcObject(OpaqueValue *srcValue,
 
   std::string srcTypeName = nameForMetadata(srcType);
   std::string destTypeName = nameForMetadata(destType);
-  swift::fatalError(/* flags = */ 0,
-                    "Found unexpected null pointer value"
+  const char *msg = "Found unexpected null pointer value"
                     " while trying to cast value of type '%s' (%p)"
-                    " to '%s' (%p)\n",
-                    srcTypeName.c_str(), srcType,
-                    destTypeName.c_str(), destType);
+                    " to '%s' (%p)%s\n";
+  if (runtime::bincompat::unexpectedObjCNullWhileCastingIsFatal()) {
+    // By default, Swift 5.4 and later issue a fatal error.
+    swift::fatalError(/* flags = */ 0, msg,
+                      srcTypeName.c_str(), srcType,
+                      destTypeName.c_str(), destType,
+                      "");
+  } else {
+    // In backwards compatibility mode, this code will warn and return the null
+    // reference anyway: If you examine the calls to the function, you'll see
+    // that most callers fail the cast in that case, but a few casts (e.g., with
+    // Obj-C or CF destination type) sill succeed in that case.  This is
+    // dangerous, but necessary for compatibility.
+    swift::warning(/* flags = */ 0, msg,
+                   srcTypeName.c_str(), srcType,
+                   destTypeName.c_str(), destType,
+                   ": Continuing with null object, but expect problems later.");
+  }
+  return object;
 }
 
 /******************************************************************************/
@@ -310,7 +331,9 @@ tryCastFromClassToObjCBridgeable(
       _getBridgedObjectiveCType(MetadataState::Complete, destType,
                                 destBridgeWitness).Value;
   void *srcObject = getNonNullSrcObject(srcValue, srcType, destType);
-  if (nullptr == swift_dynamicCastUnknownClass(srcObject, targetBridgedClass)) {
+  // Note: srcObject can be null here in compatibility mode
+  if (nullptr == srcObject
+      || nullptr == swift_dynamicCastUnknownClass(srcObject, targetBridgedClass)) {
     destFailureType = targetBridgedClass;
     return DynamicCastResult::Failure;
   }
@@ -422,8 +445,12 @@ tryCastToSwiftClass(
   switch (srcType->getKind()) {
   case MetadataKind::Class: // Swift class => Swift class
   case MetadataKind::ObjCClassWrapper: { // Obj-C class => Swift class
-    void *object = getNonNullSrcObject(srcValue, srcType, destType);
-    if (auto t = swift_dynamicCastClass(object, destClassType)) {
+    void *srcObject = getNonNullSrcObject(srcValue, srcType, destType);
+    // Note: srcObject can be null in compatibility mode.
+    if (srcObject == nullptr) {
+      return DynamicCastResult::Failure;
+    }
+    if (auto t = swift_dynamicCastClass(srcObject, destClassType)) {
       auto castObject = const_cast<void *>(t);
       *(reinterpret_cast<void **>(destLocation)) = castObject;
       if (takeOnSuccess) {
@@ -465,6 +492,17 @@ tryCastToObjectiveCClass(
   case MetadataKind::ObjCClassWrapper: // Obj-C class => Obj-C class
   case MetadataKind::ForeignClass: { // CF class => Obj-C class
     auto srcObject = getNonNullSrcObject(srcValue, srcType, destType);
+    // If object is null, then we're in the compatibility mode.
+    // Earlier cast logic always succeeded `as!` casts of nil
+    // class references but failed `as?` and `is`
+    if (srcObject == nullptr) {
+      if (mayDeferChecks) {
+        *reinterpret_cast<const void **>(destLocation) = nullptr;
+        return DynamicCastResult::SuccessViaCopy;
+      } else {
+        return DynamicCastResult::Failure;
+      }
+    }
     auto destObjCClass = destObjCType->Class;
     if (auto resultObject
         = swift_dynamicCastObjCClass(srcObject, destObjCClass)) {
@@ -504,6 +542,19 @@ tryCastToForeignClass(
   case MetadataKind::ObjCClassWrapper: // Obj-C class => CF class
   case MetadataKind::ForeignClass: { // CF class => CF class
     auto srcObject = getNonNullSrcObject(srcValue, srcType, destType);
+    // If srcObject is null, then we're in compatibility mode.
+    // Earlier cast logic always succeeded `as!` casts of nil
+    // class references.  Yes, this is very dangerous, which
+    // is why we no longer permit it.
+    if (srcObject == nullptr) {
+      if (mayDeferChecks) {
+        *reinterpret_cast<const void **>(destLocation) = nullptr;
+        return DynamicCastResult::SuccessViaCopy;
+      } else {
+        // `as?` and `is` checks always fail on nil sources
+        return DynamicCastResult::Failure;
+      }
+    }
     if (auto resultObject
         = swift_dynamicCastForeignClass(srcObject, destClassType)) {
       *reinterpret_cast<const void **>(destLocation) = resultObject;
@@ -679,6 +730,10 @@ struct ObjCBridgeMemo {
       // Use the dynamic ISA type of the object always (Note that this
       // also implicitly gives us the ObjC type for a CF object.)
       void *srcObject = getNonNullSrcObject(srcValue, srcType, destType);
+      // If srcObject is null, then we're in backwards compatibility mode.
+      if (srcObject == nullptr) {
+        return DynamicCastResult::Failure;
+      }
       Class srcObjCType = object_getClass((id)srcObject);
       // Fail if the ObjC object is not a subclass of the bridge class.
       while (srcObjCType != targetBridgedObjCClass) {
@@ -709,8 +764,49 @@ tryCastToAnyHashable(
   assert(cast<StructMetadata>(destType)->Description
          == &STRUCT_TYPE_DESCR_SYM(s11AnyHashable));
 
+  switch (srcType->getKind()) {
+  case MetadataKind::ForeignClass: // CF -> String
+  case MetadataKind::ObjCClassWrapper: { // Obj-C -> String
+#if SWIFT_OBJC_INTEROP
+    // TODO: Implement a fast path for NSString->AnyHashable casts.
+    // These are incredibly common because an NSDictionary with
+    // NSString keys is bridged by default to [AnyHashable:Any].
+    // Until this is implemented, fall through to the general case
+    break;
+#else
+    // If no Obj-C interop, just fall through to the general case.
+    break;
+#endif
+  }
+  case MetadataKind::Optional: {
+    // Until SR-9047 fixes the interactions between AnyHashable and Optional, we
+    // avoid directly injecting Optionals.  In particular, this allows
+    // casts from [String?:String] to [AnyHashable:Any] to work the way people
+    // expect. Otherwise, without SR-9047, the resulting dictionary can only be
+    // indexed with an explicit Optional<String>, not a plain String.
+    // After SR-9047, we can consider dropping this special case entirely.
+
+    // !!!!  This breaks compatibility with compiler-optimized casts
+    // (which just inject) and violates the Casting Spec.  It just preserves
+    // the behavior of the older casting code until we can clean things up.
+    auto srcInnerType = cast<EnumMetadata>(srcType)->getGenericArgs()[0];
+    unsigned sourceEnumCase = srcInnerType->vw_getEnumTagSinglePayload(
+      srcValue, /*emptyCases=*/1);
+    auto nonNil = (sourceEnumCase == 0);
+    if (nonNil) {
+      return DynamicCastResult::Failure;  // Our caller will unwrap the optional and try again
+    }
+    // Else Optional is nil -- the general case below will inject it
+    break;
+  }
+  default:
+    break;
+  }
+
+
+  // General case: If it conforms to Hashable, we cast it
   auto hashableConformance = reinterpret_cast<const HashableWitnessTable *>(
-      swift_conformsToProtocol(srcType, &HashableProtocolDescriptor));
+    swift_conformsToProtocol(srcType, &HashableProtocolDescriptor));
   if (hashableConformance) {
     _swift_convertToAnyHashableIndirect(srcValue, destLocation,
                                         srcType, hashableConformance);
@@ -943,7 +1039,7 @@ initializeToNilAtDepth(OpaqueValue *destLocation, const Metadata *destType, int 
 }
 
 static void
-copyNil(OpaqueValue *destLocation, const Metadata *destType, const Metadata *srcType)
+copyNilPreservingDepth(OpaqueValue *destLocation, const Metadata *destType, const Metadata *srcType)
 {
   assert(srcType->getKind() == MetadataKind::Optional);
   assert(destType->getKind() == MetadataKind::Optional);
@@ -986,7 +1082,13 @@ tryCastUnwrappingOptionalBoth(
     srcValue, /*emptyCases=*/1);
   auto sourceIsNil = (sourceEnumCase != 0);
   if (sourceIsNil) {
-    copyNil(destLocation, destType, srcType);
+    if (runtime::bincompat::useLegacyOptionalNilInjection()) {
+      auto destInnerType = cast<EnumMetadata>(destType)->getGenericArgs()[0];
+      // Set .none at the outer level
+      destInnerType->vw_storeEnumTagSinglePayload(destLocation, 1, 1);
+    } else {
+      copyNilPreservingDepth(destLocation, destType, srcType);
+    }
     return DynamicCastResult::SuccessViaCopy; // nil was essentially copied to dest
   } else {
     auto destEnumType = cast<EnumMetadata>(destType);
@@ -1361,15 +1463,26 @@ tryCastToClassExistential(
   case MetadataKind::ObjCClassWrapper:
   case MetadataKind::Class:
   case MetadataKind::ForeignClass: {
-    auto object = getNonNullSrcObject(srcValue, srcType, destType);
+    auto srcObject = getNonNullSrcObject(srcValue, srcType, destType);
+    // If srcObject is null, then we're in compatibility mode.
+    // Earlier cast logic always succeeded `as!` casts of nil
+    // class references:
+    if (srcObject == nullptr) {
+      if (mayDeferChecks) {
+        *reinterpret_cast<const void **>(destLocation) = nullptr;
+        return DynamicCastResult::SuccessViaCopy;
+      } else {
+        return DynamicCastResult::Failure;
+      }
+    }
     if (_conformsToProtocols(srcValue, srcType,
                              destExistentialType,
                              destExistentialLocation->getWitnessTables())) {
-      destExistentialLocation->Value = object;
+      destExistentialLocation->Value = srcObject;
       if (takeOnSuccess) {
         return DynamicCastResult::SuccessViaTake;
       } else {
-        swift_unknownObjectRetain(object);
+        swift_unknownObjectRetain(srcObject);
         return DynamicCastResult::SuccessViaCopy;
       }
     }
@@ -1401,41 +1514,62 @@ tryCastToClassExistentialViaSwiftValue(
   auto destExistentialLocation
     = reinterpret_cast<ClassExistentialContainer *>(destLocation);
 
-  // Fail if the target has constraints that make it unsuitable for
-  // a __SwiftValue box.
-  // FIXME: We should not have different checks here for
-  // Obj-C vs non-Obj-C.  The _SwiftValue boxes should conform
-  // to the exact same protocols on both platforms.
-  bool destIsConstrained = destExistentialType->NumProtocols != 0;
-  if (destIsConstrained) {
-#if SWIFT_OBJC_INTEROP // __SwiftValue is an Obj-C class
-    if (!findSwiftValueConformances(
-          destExistentialType, destExistentialLocation->getWitnessTables())) {
+  switch (srcType->getKind()) {
+  case MetadataKind::Class:
+  case MetadataKind::ObjCClassWrapper:
+  case MetadataKind::ForeignClass:
+    // Class references always go directly into
+    // class existentials; it makes no sense to wrap them.
+    return DynamicCastResult::Failure;
+
+  case MetadataKind::Metatype: {
+#if SWIFT_OBJC_INTEROP
+    auto metatypePtr = reinterpret_cast<const Metadata **>(srcValue);
+    auto metatype = *metatypePtr;
+    switch (metatype->getKind()) {
+    case MetadataKind::Class:
+    case MetadataKind::ObjCClassWrapper:
+    case MetadataKind::ForeignClass:
+      // Exclude class metatypes on Darwin, since those are object types and can
+      // be stored directly.
       return DynamicCastResult::Failure;
-    }
-#else // __SwiftValue is a native class
-    if (!swift_swiftValueConformsTo(destType, destType)) {
-      return DynamicCastResult::Failure;
+    default:
+      break;
     }
 #endif
+    // Non-class metatypes are never objects, and
+    // metatypes on non-Darwin are never objects, so
+    // fall through to box those.
+    SWIFT_FALLTHROUGH;
   }
 
+  default: {
+    if (destExistentialType->NumProtocols != 0) {
+      // The destination is a class-constrained protocol type
+      // and the source is not a class, so....
+      return DynamicCastResult::Failure;
+    } else {
+      // This is a simple (unconstrained) `AnyObject` so we can populate
+      // it by stuffing a non-class instance into a __SwiftValue box
 #if SWIFT_OBJC_INTEROP
-  auto object = bridgeAnythingToSwiftValueObject(
-    srcValue, srcType, takeOnSuccess);
-  destExistentialLocation->Value = object;
-  if (takeOnSuccess) {
-    return DynamicCastResult::SuccessViaTake;
-  } else {
-    return DynamicCastResult::SuccessViaCopy;
-  }
+      auto object = bridgeAnythingToSwiftValueObject(
+        srcValue, srcType, takeOnSuccess);
+      destExistentialLocation->Value = object;
+      if (takeOnSuccess) {
+        return DynamicCastResult::SuccessViaTake;
+      } else {
+        return DynamicCastResult::SuccessViaCopy;
+      }
 # else
-  // Note: Code below works correctly on both Obj-C and non-Obj-C platforms,
-  // but the code above is slightly faster on Obj-C platforms.
-  auto object = _bridgeAnythingToObjectiveC(srcValue, srcType);
-  destExistentialLocation->Value = object;
-  return DynamicCastResult::SuccessViaCopy;
+      // Note: Code below works correctly on both Obj-C and non-Obj-C platforms,
+      // but the code above is slightly faster on Obj-C platforms.
+      auto object = _bridgeAnythingToObjectiveC(srcValue, srcType);
+      destExistentialLocation->Value = object;
+      return DynamicCastResult::SuccessViaCopy;
 #endif
+    }
+  }
+  }
 }
 
 static DynamicCastResult
@@ -1631,8 +1765,14 @@ tryCastToMetatype(
   case MetadataKind::ObjCClassWrapper: {
 #if SWIFT_OBJC_INTEROP
     // Some classes are actually metatypes
-    void *object = getNonNullSrcObject(srcValue, srcType, destType);
-    if (auto metatype = _getUnknownClassAsMetatype(object)) {
+    void *srcObject = getNonNullSrcObject(srcValue, srcType, destType);
+    // If object is null, then we're in compatibility mode.
+    // Continuing here at all is dangerous, but that's what the
+    // pre-Swift-5.4 casting logic did.
+    if (srcObject == nullptr) {
+      return DynamicCastResult::Failure;
+    }
+    if (auto metatype = _getUnknownClassAsMetatype(srcObject)) {
       auto srcInnerValue = reinterpret_cast<OpaqueValue *>(&metatype);
       auto srcInnerType = swift_getMetatypeMetadata(metatype);
       return tryCast(destLocation, destType, srcInnerValue, srcInnerType,
@@ -1742,6 +1882,12 @@ tryCastToExistentialMetatype(
     // Some Obj-C classes are actually metatypes
 #if SWIFT_OBJC_INTEROP
     void *srcObject = getNonNullSrcObject(srcValue, srcType, destType);
+    // If srcObject is null, we're in compatibility mode.
+    // Continuing here at al is dangerous, but that's what the
+    // pre-Swift-5.4 casting logic did.
+    if (srcObject == nullptr) {
+      return DynamicCastResult::Failure;
+    }
     if (auto metatype = _getUnknownClassAsMetatype(srcObject)) {
       return _dynamicCastMetatypeToExistentialMetatype(
         destLocation,
@@ -1906,14 +2052,19 @@ tryCast(
       || srcKind == MetadataKind::ObjCClassWrapper
       || srcKind == MetadataKind::ForeignClass) {
     auto srcObject = getNonNullSrcObject(srcValue, srcType, destType);
-    auto srcDynamicType = swift_getObjectType(srcObject);
-    if (srcDynamicType != srcType) {
-      srcFailureType = srcDynamicType;
-      auto castResult = tryCastToDestType(
-        destLocation, destType, srcValue, srcDynamicType,
-        destFailureType, srcFailureType, takeOnSuccess, mayDeferChecks);
-      if (isSuccess(castResult)) {
-        return castResult;
+    // If srcObject is null, we're in compability mode.
+    // But we can't lookup dynamic type for a null class reference, so
+    // just skip this in that case.
+    if (srcObject != nullptr) {
+      auto srcDynamicType = swift_getObjectType(srcObject);
+      if (srcDynamicType != srcType) {
+        srcFailureType = srcDynamicType;
+        auto castResult = tryCastToDestType(
+          destLocation, destType, srcValue, srcDynamicType,
+          destFailureType, srcFailureType, takeOnSuccess, mayDeferChecks);
+        if (isSuccess(castResult)) {
+          return castResult;
+        }
       }
     }
   }
@@ -2152,17 +2303,6 @@ tryCast(
 /****************************** Main Entrypoint *******************************/
 /******************************************************************************/
 
-// XXX REMOVE ME XXX TODO XXX
-// Declare the old entrypoint
-SWIFT_RUNTIME_EXPORT
-bool
-swift_dynamicCast_OLD(OpaqueValue *destLocation,
-                      OpaqueValue *srcValue,
-                      const Metadata *srcType,
-                      const Metadata *destType,
-                      DynamicCastFlags flags);
-// XXX REMOVE ME XXX TODO XXX
-
 /// ABI: Perform a dynamic cast to an arbitrary type.
 static bool
 swift_dynamicCastImpl(OpaqueValue *destLocation,
@@ -2209,4 +2349,4 @@ swift_dynamicCastImpl(OpaqueValue *destLocation,
 }
 
 #define OVERRIDE_DYNAMICCASTING COMPATIBILITY_OVERRIDE
-#include "CompatibilityOverride.def"
+#include COMPATIBILITY_OVERRIDE_INCLUDE_PATH

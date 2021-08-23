@@ -32,13 +32,13 @@ Compilation times for the compiler and the standard library can be agonizing, es
 
 ```
 $ brew install sccache
-$ sccache --start-server
 $ ./swift/utils/build-script MY_ARGS --sccache
 ```
 
-If you want to always use sccache, you can `export SWIFT_USE_SCCACHE=1` and the build script will pick it up.
+If you want to always use sccache, you can `export SWIFT_USE_SCCACHE=1` and omit the `--sccache` flag from the `build-script` invocation.
 
-Given the size of artifacts generated, you might also want to bump the cache size from the default 10GB to something larger, say by putting `export SCCACHE_CACHE_SIZE="50G"` in your dotfile(s).
+Given the size of artifacts generated, you might also want to bump the cache size from the default 10GB to something larger, say by putting `export SCCACHE_CACHE_SIZE="50G"` in your dotfile(s).  You'll need to restart the `sccache` server after changing that environment variable
+(`sccache --stop-server && sccache --start-server`).
 
 You can run some compiles to see if it is actually doing something by running `sccache --show-stats`. Depending on the exact compilation task you're running, you might see very different cache hit rates. For example, `sccache` is particularly effective if you're rebuilding LLVM, which doesn't change so frequently from the Swift compiler's perspective. On the other hand, if you're changing the compiler's AST, the cache hit rate is likely to be much lower.
 

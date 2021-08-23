@@ -18,5 +18,6 @@ public func foo<T>(x: T) where T: Sequence {}
 // CHECK:          "kind": "conformance"
 // CHECK-NEXT:     "lhs": "T"
 // CHECK-NEXT:     "rhs": "Sequence"
+// CHECK-NEXT:     "rhsPrecise": "s:ST"
 // CHECK-NEXT:   }
 // CHECK-NEXT: ]

@@ -33,15 +33,13 @@ class ClosureConstraintGenerator
 
   ConstraintSystem &cs;
   ClosureExpr *closure;
-  Type closureResultType;
 
 public:
   /// Whether an error was encountered while generating constraints.
   bool hadError = false;
 
-  ClosureConstraintGenerator(ConstraintSystem &cs, ClosureExpr *closure,
-                             Type closureResultType)
-    : cs(cs), closure(closure), closureResultType(closureResultType) { }
+  ClosureConstraintGenerator(ConstraintSystem &cs, ClosureExpr *closure)
+      : cs(cs), closure(closure) {}
 
 private:
   void visitDecl(Decl *decl) {
@@ -95,11 +93,10 @@ private:
 
     // FIXME: Locator should point at the return statement?
     bool hasReturn = hasExplicitResult(closure);
-    cs.addConstraint(
-        ConstraintKind::Conversion, cs.getType(expr),
-        closureResultType,
-        cs.getConstraintLocator(
-           closure, LocatorPathElt::ClosureBody(hasReturn)));
+    cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
+                     cs.getClosureType(closure)->getResult(),
+                     cs.getConstraintLocator(
+                         closure, LocatorPathElt::ClosureBody(hasReturn)));
   }
 
 #define UNSUPPORTED_STMT(STMT) void visit##STMT##Stmt(STMT##Stmt *) { \
@@ -127,9 +124,8 @@ private:
 
 }
 
-bool ConstraintSystem::generateConstraints(
-    ClosureExpr *closure, Type resultType) {
-  ClosureConstraintGenerator generator(*this, closure, resultType);
+bool ConstraintSystem::generateConstraints(ClosureExpr *closure) {
+  ClosureConstraintGenerator generator(*this, closure);
   generator.visit(closure->getBody());
   return generator.hadError;
 }
@@ -185,7 +181,7 @@ private:
       if (auto expr = node.dyn_cast<Expr *>()) {
         // Rewrite the expression.
         if (auto rewrittenExpr = rewriteExpr(expr))
-          node = expr;
+          node = rewrittenExpr;
         else
           hadError = true;
       } else if (auto stmt = node.dyn_cast<Stmt *>()) {
@@ -305,7 +301,7 @@ SolutionApplicationToFunctionResult ConstraintSystem::applySolution(
     // Coerce the parameter types.
     closureFnType = closureType->castTo<FunctionType>();
     auto *params = closure->getParameters();
-    TypeChecker::coerceParameterListToType(params, closure, closureFnType);
+    TypeChecker::coerceParameterListToType(params, closureFnType);
 
     // Coerce the result type, if it was written explicitly.
     if (closure->hasExplicitResultType()) {

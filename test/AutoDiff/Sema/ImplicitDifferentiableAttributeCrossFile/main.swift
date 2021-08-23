@@ -44,7 +44,7 @@ public final class ConformingStructWithSupersetAttr: Protocol2 {}
 // Note that public witnesses are required to explicitly specify `@differentiable` attributes except
 // those w.r.t. parameters that have already been covered by an existing `@differentiable` attribute.
 extension ConformingStructWithSupersetAttr {
-  // @differentiable(wrt: self) // Omitting this is okay.
-  @differentiable
+  // @differentiable(reverse, wrt: self) // Omitting this is okay.
+  @differentiable(reverse)
   public func internalMethod4(_ x: Float) -> Float { x }
 }

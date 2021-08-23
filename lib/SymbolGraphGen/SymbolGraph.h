@@ -42,6 +42,16 @@ struct SymbolGraph {
    The module whose types were extended in `M`.
    */
   Optional<ModuleDecl *> ExtendedModule;
+  
+  /**
+   The module declaring `M`, if `M` is a cross-import overlay.
+   */
+  Optional<ModuleDecl *> DeclaringModule;
+  
+  /**
+   The modules that must be imported alongside `DeclaringModule` for `M` to be imported, if `M` is a cross-import overlay.
+   */
+  SmallVector<Identifier, 1> BystanderModules;
 
   /**
    A context for allocations.
@@ -64,11 +74,17 @@ struct SymbolGraph {
    */
   llvm::DenseSet<Edge> Edges;
 
+  /**
+   True if this graph is for a single symbol, rather than an entire module.
+   */
+  bool IsForSingleNode;
+
   SymbolGraph(SymbolGraphASTWalker &Walker,
               ModuleDecl &M,
               Optional<ModuleDecl *> ExtendedModule,
               markup::MarkupContext &Ctx,
-              Optional<llvm::VersionTuple> ModuleVersion = None);
+              Optional<llvm::VersionTuple> ModuleVersion = None,
+              bool IsForSingleNode = false);
 
   // MARK: - Utilities
 
@@ -128,15 +144,6 @@ struct SymbolGraph {
    and show unique documentation for it.
    */
   void recordConformanceSynthesizedMemberRelationships(Symbol S);
-
-  /**
-   If a declaration has members by subclassing, record a symbol with a
-   "synthesized" USR to disambiguate from the superclass's real implementation.
-
-   This makes it more convenient
-   to curate symbols on a subclass's documentation.
-   */
-  void recordSuperclassSynthesizedMemberRelationships(Symbol S);
 
   /**
    Record InheritsFrom relationships for every class from which the
@@ -207,7 +214,7 @@ struct SymbolGraph {
 
   /// Get the overall declaration for a symbol.
   void
-  serializeDeclarationFragments(StringRef Key, Type T,
+  serializeDeclarationFragments(StringRef Key, Type T, Type BaseTy,
                                 llvm::json::OStream &OS);
 
   /// Returns `true` if the declaration has a name that makes it

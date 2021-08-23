@@ -62,7 +62,7 @@
 /// [clusters]: http://www.unicode.org/glossary/#extended_grapheme_cluster
 /// [scalars]: http://www.unicode.org/glossary/#unicode_scalar_value
 @frozen
-public struct Character {
+public struct Character: Sendable {
   @usableFromInline
   internal var _str: String
 
@@ -145,7 +145,7 @@ extension Character :
 
   /// Creates a character with the specified value.
   ///
-  /// Do not call this initalizer directly. It is used by the compiler when
+  /// Do not call this initializer directly. It is used by the compiler when
   /// you use a string literal to initialize a `Character` instance. For
   /// example:
   ///

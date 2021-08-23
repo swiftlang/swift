@@ -71,14 +71,14 @@ Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
     // Parse the name of the parameter.
     Identifier Name;
     SourceLoc NameLoc;
-    if (parseIdentifier(Name, NameLoc,
+    if (parseIdentifier(Name, NameLoc, /*diagnoseDollarPrefix=*/true,
                         diag::expected_generics_parameter_name)) {
       Result.setIsParseError();
       break;
     }
 
     // Parse the ':' followed by a type.
-    SmallVector<TypeLoc, 1> Inherited;
+    SmallVector<InheritedEntry, 1> Inherited;
     if (Tok.is(tok::colon)) {
       (void)consumeToken();
       ParserResult<TypeRepr> Ty;
@@ -101,7 +101,7 @@ Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
         return makeParserCodeCompletionStatus();
 
       if (Ty.isNonNull())
-        Inherited.push_back(Ty.get());
+        Inherited.push_back({Ty.get()});
     }
 
     // We always create generic type parameters with an invalid depth.
@@ -307,7 +307,8 @@ ParserStatus Parser::parseGenericWhereClause(
               ->isKnownLayout()) {
         // Parse a layout constraint.
         Identifier LayoutName;
-        auto LayoutLoc = consumeIdentifier(&LayoutName);
+        auto LayoutLoc = consumeIdentifier(LayoutName,
+                                           /*diagnoseDollarPrefix=*/false);
         auto LayoutInfo = parseLayoutConstraint(LayoutName);
         if (!LayoutInfo->isKnownLayout()) {
           // There was a bug in the layout constraint.

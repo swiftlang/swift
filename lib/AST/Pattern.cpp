@@ -291,6 +291,15 @@ bool Pattern::hasStorage() const {
   return HasStorage;
 }
 
+bool Pattern::hasAnyMutableBindings() const {
+  auto HasMutable = false;
+  forEachVariable([&](VarDecl *VD) {
+    if (!VD->isLet())
+      HasMutable = true;
+  });
+  return HasMutable;
+}
+
 /// Return true if this is a non-resolved ExprPattern which is syntactically
 /// irrefutable.
 static bool isIrrefutableExprPattern(const ExprPattern *EP) {
@@ -343,11 +352,6 @@ case PatternKind::ID: foundRefutablePattern = true; break;
   });
     
   return foundRefutablePattern;
-}
-
-/// Standard allocator for Patterns.
-void *Pattern::operator new(size_t numBytes, const ASTContext &C) {
-  return C.Allocate(numBytes, alignof(Pattern));
 }
 
 /// Find the name directly bound by this pattern.  When used as a

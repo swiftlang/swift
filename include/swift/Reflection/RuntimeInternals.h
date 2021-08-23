@@ -21,6 +21,8 @@
 #ifndef SWIFT_REFLECTION_RUNTIME_INTERNALS_H
 #define SWIFT_REFLECTION_RUNTIME_INTERNALS_H
 
+#include <stdint.h>
+
 namespace swift {
 
 namespace reflection {
@@ -58,6 +60,58 @@ template <typename Runtime> struct ConformanceCacheEntry {
   typename Runtime::StoredPointer Type;
   typename Runtime::StoredPointer Proto;
   typename Runtime::StoredPointer Witness;
+};
+
+template <typename Runtime>
+struct HeapObject {
+  typename Runtime::StoredPointer Metadata;
+  typename Runtime::StoredSize RefCounts;
+};
+
+template <typename Runtime>
+struct Job {
+  HeapObject<Runtime> HeapObject;
+  typename Runtime::StoredPointer SchedulerPrivate[2];
+  uint32_t Flags;
+  uint32_t Id;
+  typename Runtime::StoredPointer Reserved[2];
+  typename Runtime::StoredPointer RunJob;
+};
+
+template <typename Runtime>
+struct StackAllocator {
+  typename Runtime::StoredPointer LastAllocation;
+  typename Runtime::StoredPointer FirstSlab;
+  int32_t NumAllocatedSlabs;
+  bool FirstSlabIsPreallocated;
+
+  struct Slab {
+    typename Runtime::StoredPointer Next;
+    uint32_t Capacity;
+    uint32_t CurrentOffset;
+  };
+};
+
+template <typename Runtime>
+struct ActiveTaskStatus {
+  typename Runtime::StoredPointer Record;
+  typename Runtime::StoredSize Flags;
+};
+
+template <typename Runtime>
+struct AsyncTaskPrivateStorage {
+  ActiveTaskStatus<Runtime> Status;
+  StackAllocator<Runtime> Allocator;
+  typename Runtime::StoredPointer Local;
+};
+
+template <typename Runtime>
+struct AsyncTask: Job<Runtime> {
+  // On 64-bit, there's a Reserved64 after ResumeContext.  
+  typename Runtime::StoredPointer ResumeContextAndReserved[
+    sizeof(typename Runtime::StoredPointer) == 8 ? 2 : 1];
+
+  AsyncTaskPrivateStorage<Runtime> PrivateStorage;
 };
 
 } // end namespace reflection

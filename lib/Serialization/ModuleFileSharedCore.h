@@ -66,12 +66,18 @@ class ModuleFileSharedCore {
   /// The Swift compatibility version in use when this module was built.
   version::Version CompatibilityVersion;
 
+  /// User-defined module version number.
+  llvm::VersionTuple UserModuleVersion;
+
   /// The data blob containing all of the module's identifiers.
   StringRef IdentifierData;
 
   /// Full blob from the misc. version field of the metadata block. This should
   /// include the version string of the compiler that built the module.
   StringRef MiscVersion;
+
+  /// The module ABI name.
+  StringRef ModuleABIName;
 
   /// \c true if this module has incremental dependency information.
   bool HasIncrementalInfo = false;
@@ -263,6 +269,7 @@ private:
   std::unique_ptr<SerializedObjCMethodTable> ObjCMethods;
 
   ArrayRef<serialization::DeclID> OrderedTopLevelDecls;
+  ArrayRef<serialization::DeclID> ExportedPrespecializationDecls;
 
   class DeclCommentTableInfo;
   using SerializedDeclCommentTable =
@@ -287,6 +294,9 @@ private:
 
   /// A blob of 0 terminated string segments referenced in \c SourceLocsTextData
   StringRef SourceLocsTextData;
+
+  /// A blob of source file list.
+  StringRef SourceFileListData;
 
   /// An array of fixed size source location data for each USR appearing in
   /// \c DeclUSRsTable.
@@ -316,6 +326,9 @@ private:
     /// Whether this module file is actually a .sib file.
     unsigned IsSIB: 1;
 
+    /// Whether this module is compiled as static library.
+    unsigned IsStaticLibrary: 1;
+
     /// Whether this module file is compiled with '-enable-testing'.
     unsigned IsTestable : 1;
 
@@ -328,8 +341,11 @@ private:
     /// Whether this module is compiled while allowing errors.
     unsigned IsAllowModuleWithCompilerErrorsEnabled: 1;
 
+    /// \c true if this module was built with complete checking for concurrency.
+    unsigned IsConcurrencyChecked: 1;
+
     // Explicitly pad out to the next word boundary.
-    unsigned : 3;
+    unsigned : 5;
   } Bits = {};
   static_assert(sizeof(ModuleBits) <= 8, "The bit set should be small");
 
@@ -358,12 +374,12 @@ private:
 
   /// Emits one last diagnostic, logs the error, and then aborts for the stack
   /// trace.
-  LLVM_ATTRIBUTE_NORETURN static void fatal(llvm::Error error);
-  void fatalIfNotSuccess(llvm::Error error) {
+  [[noreturn]] void fatal(llvm::Error error) const;
+  void fatalIfNotSuccess(llvm::Error error) const {
     if (error)
       fatal(std::move(error));
   }
-  template <typename T> T fatalIfUnexpected(llvm::Expected<T> expected) {
+  template <typename T> T fatalIfUnexpected(llvm::Expected<T> expected) const {
     if (expected)
       return std::move(expected.get());
     fatal(expected.takeError());
@@ -495,6 +511,9 @@ public:
     return info;
   }
 
+  /// Outputs information useful for diagnostics to \p out
+  void outputDiagnosticInfo(llvm::raw_ostream &os) const;
+  
   // Out of line to avoid instantiation OnDiskChainedHashTable here.
   ~ModuleFileSharedCore();
 
@@ -511,6 +530,15 @@ public:
   /// Returns \c true if this module file contains a section with incremental
   /// information.
   bool hasIncrementalInfo() const { return HasIncrementalInfo; }
+
+  /// Returns \c true if a corresponding .swiftsourceinfo has been found.
+  bool hasSourceInfoFile() const { return !!ModuleSourceInfoInputBuffer; }
+
+  /// Returns \c true if a corresponding .swiftsourceinfo has been found *and
+  /// read*.
+  bool hasSourceInfo() const;
+
+  bool isConcurrencyChecked() const { return Bits.IsConcurrencyChecked; }
 };
 
 template <typename T, typename RawData>

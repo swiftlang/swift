@@ -4,6 +4,7 @@ set(SWIFT_RUNTIME_CXX_FLAGS)
 set(SWIFT_RUNTIME_LINK_FLAGS)
 set(SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS)
 set(SWIFT_RUNTIME_SWIFT_LINK_FLAGS)
+set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_LINK_FLAGS)
 
 if(SWIFT_RUNTIME_USE_SANITIZERS)
   # TODO: Refactor this
@@ -18,7 +19,7 @@ endif()
 list(APPEND  SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS "-Xfrontend" "-verify-syntax-tree")
 
 if(SWIFT_STDLIB_SIL_DEBUGGING)
-  list(APPEND SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS "-Xfrontend" "-gsil")
+  list(APPEND SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS "-Xfrontend" "-sil-based-debuginfo")
 endif()
 
 # Build the runtime with -Wall to catch, e.g., uninitialized variables
@@ -40,16 +41,18 @@ endif()
 
 # C++ code in the runtime and standard library should generally avoid
 # introducing static constructors or destructors.
-check_cxx_compiler_flag("-Werror -Wglobal-constructors" CXX_SUPPORTS_GLOBAL_CONSTRUCTORS_WARNING)
+check_cxx_compiler_flag("-Wglobal-constructors -Werror=global-constructors" CXX_SUPPORTS_GLOBAL_CONSTRUCTORS_WARNING)
 if(CXX_SUPPORTS_GLOBAL_CONSTRUCTORS_WARNING)
-  list(APPEND SWIFT_RUNTIME_CORE_CXX_FLAGS "-Wglobal-constructors")
+  list(APPEND SWIFT_RUNTIME_CORE_CXX_FLAGS "-Wglobal-constructors"
+    "-Werror=global-constructors")
 endif()
 
 # C++ code in the runtime and standard library should generally avoid
 # introducing static constructors or destructors.
-check_cxx_compiler_flag("-Wexit-time-destructors" CXX_SUPPORTS_EXIT_TIME_DESTRUCTORS_WARNING)
+check_cxx_compiler_flag("-Wexit-time-destructors -Werror=exit-time-destructors" CXX_SUPPORTS_EXIT_TIME_DESTRUCTORS_WARNING)
 if(CXX_SUPPORTS_EXIT_TIME_DESTRUCTORS_WARNING)
-  list(APPEND SWIFT_RUNTIME_CORE_CXX_FLAGS "-Wexit-time-destructors")
+  list(APPEND SWIFT_RUNTIME_CORE_CXX_FLAGS "-Wexit-time-destructors"
+    "-Werror=exit-time-destructors")
 endif()
 
 add_subdirectory(SwiftShims)
@@ -67,14 +70,8 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR)
     "${SWIFT_SOURCE_DIR}/lib/Demangling/OldDemangler.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/OldRemangler.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/Punycode.cpp"
-    "${SWIFT_SOURCE_DIR}/lib/Demangling/Remangler.cpp")
-
-  # When we're building with assertions, include the demangle node dumper to aid
-  # in debugging.
-  if(LLVM_ENABLE_ASSERTIONS)
-    list(APPEND swiftDemanglingSources
-      "${SWIFT_SOURCE_DIR}/lib/Demangling/NodeDumper.cpp")
-  endif()
+    "${SWIFT_SOURCE_DIR}/lib/Demangling/Remangler.cpp"
+    "${SWIFT_SOURCE_DIR}/lib/Demangling/NodeDumper.cpp")
 
   add_swift_target_library(swiftDemangling OBJECT_LIBRARY
     ${swiftDemanglingSources}
@@ -97,6 +94,10 @@ if(SWIFT_BUILD_STDLIB)
   if(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
     add_subdirectory(Concurrency)
   endif()
+
+  if(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED)
+    add_subdirectory(Distributed)
+  endif()
 endif()
 
 if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR)
@@ -109,13 +110,17 @@ if(SWIFT_BUILD_SDK_OVERLAY OR SWIFT_BUILD_TEST_SUPPORT_MODULES)
 endif()
 
 if(SWIFT_BUILD_SDK_OVERLAY)
-  list_intersect("${SWIFT_APPLE_PLATFORMS}" "${SWIFT_SDKS}" building_darwin_sdks)
-  if(building_darwin_sdks)
-    add_subdirectory(Darwin)
-  endif()
+  # On Apple platforms, we aren't building any overlays (other than Darwin in
+  # Platform above). Instead, we're picking them up from the SDK.
 
   if(WINDOWS IN_LIST SWIFT_SDKS)
     add_subdirectory(Windows)
   endif()
 endif()
 
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_LINK_FLAGS
+    "-Wl,-reexported_symbols_list,${CMAKE_CURRENT_SOURCE_DIR}/Concurrency/ReexportedSymbols")
+endif()
+
+list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}")

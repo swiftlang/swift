@@ -72,21 +72,18 @@ where Element: Differentiable {
   public typealias TangentVector =
     Array<Element.TangentVector>.DifferentiableView
 
-  public mutating func move(along direction: TangentVector) {
+  public mutating func move(by offset: TangentVector) {
+    if offset.base.isEmpty {
+      return
+    }
     precondition(
-      base.count == direction.base.count, """
-        Count mismatch: \(base.count) ('self') and \(direction.base.count) \
+      base.count == offset.base.count, """
+        Count mismatch: \(base.count) ('self') and \(offset.base.count) \
         ('direction')
         """)
-    for i in base.indices {
-      base[i].move(along: direction.base[i])
+    for i in offset.base.indices {
+      base[i].move(by: offset.base[i])
     }
-  }
-
-  /// A closure that produces a `TangentVector` of zeros with the same
-  /// `count` as `self`.
-  public var zeroTangentVectorInitializer: () -> TangentVector {
-    return base.zeroTangentVectorInitializer
   }
 }
 
@@ -178,18 +175,10 @@ extension Array: Differentiable where Element: Differentiable {
   public typealias TangentVector =
     Array<Element.TangentVector>.DifferentiableView
 
-  public mutating func move(along direction: TangentVector) {
+  public mutating func move(by offset: TangentVector) {
     var view = DifferentiableView(self)
-    view.move(along: direction)
+    view.move(by: offset)
     self = view.base
-  }
-
-  /// A closure that produces a `TangentVector` of zeros with the same
-  /// `count` as `self`.
-  public var zeroTangentVectorInitializer: () -> TangentVector {
-    { [zeroInits = map(\.zeroTangentVectorInitializer)] in
-      TangentVector(zeroInits.map { $0() })
-    }
   }
 }
 
@@ -231,10 +220,13 @@ extension Array where Element: Differentiable {
     pullback: (TangentVector) -> (TangentVector, TangentVector)
   ) {
     func pullback(_ v: TangentVector) -> (TangentVector, TangentVector) {
+      if v.base.isEmpty {
+        return (.zero, .zero)
+      }
       precondition(
         v.base.count == lhs.count + rhs.count, """
-          Tangent vector with invalid count; expected to equal the sum of \
-          operand counts \(lhs.count) and \(rhs.count)
+          Tangent vector with invalid count \(v.base.count); expected to \
+          equal the sum of operand counts \(lhs.count) and \(rhs.count)
           """)
       return (
         TangentVector([Element.TangentVector](v.base[0..<lhs.count])),
@@ -347,9 +339,9 @@ extension Array where Element: Differentiable {
 
 extension Array where Element: Differentiable {
   @inlinable
-  @differentiable(wrt: self)
+  @differentiable(reverse, wrt: self)
   public func differentiableMap<Result: Differentiable>(
-    _ body: @differentiable (Element) -> Result
+    _ body: @differentiable(reverse) (Element) -> Result
   ) -> [Result] {
     map(body)
   }
@@ -357,7 +349,7 @@ extension Array where Element: Differentiable {
   @inlinable
   @derivative(of: differentiableMap)
   internal func _vjpDifferentiableMap<Result: Differentiable>(
-    _ body: @differentiable (Element) -> Result
+    _ body: @differentiable(reverse) (Element) -> Result
   ) -> (
     value: [Result],
     pullback: (Array<Result>.TangentVector) -> Array.TangentVector
@@ -365,7 +357,7 @@ extension Array where Element: Differentiable {
     var values: [Result] = []
     var pullbacks: [(Result.TangentVector) -> Element.TangentVector] = []
     for x in self {
-      let (y, pb) = valueWithPullback(at: x, in: body)
+      let (y, pb) = valueWithPullback(at: x, of: body)
       values.append(y)
       pullbacks.append(pb)
     }
@@ -378,7 +370,7 @@ extension Array where Element: Differentiable {
   @inlinable
   @derivative(of: differentiableMap)
   internal func _jvpDifferentiableMap<Result: Differentiable>(
-    _ body: @differentiable (Element) -> Result
+    _ body: @differentiable(reverse) (Element) -> Result
   ) -> (
     value: [Result],
     differential: (Array.TangentVector) -> Array<Result>.TangentVector
@@ -386,7 +378,7 @@ extension Array where Element: Differentiable {
     var values: [Result] = []
     var differentials: [(Element.TangentVector) -> Result.TangentVector] = []
     for x in self {
-      let (y, df) = valueWithDifferential(at: x, in: body)
+      let (y, df) = valueWithDifferential(at: x, of: body)
       values.append(y)
       differentials.append(df)
     }
@@ -399,10 +391,10 @@ extension Array where Element: Differentiable {
 
 extension Array where Element: Differentiable {
   @inlinable
-  @differentiable(wrt: (self, initialResult))
+  @differentiable(reverse, wrt: (self, initialResult))
   public func differentiableReduce<Result: Differentiable>(
     _ initialResult: Result,
-    _ nextPartialResult: @differentiable (Result, Element) -> Result
+    _ nextPartialResult: @differentiable(reverse) (Result, Element) -> Result
   ) -> Result {
     reduce(initialResult, nextPartialResult)
   }
@@ -411,7 +403,7 @@ extension Array where Element: Differentiable {
   @derivative(of: differentiableReduce)
   internal func _vjpDifferentiableReduce<Result: Differentiable>(
     _ initialResult: Result,
-    _ nextPartialResult: @differentiable (Result, Element) -> Result
+    _ nextPartialResult: @differentiable(reverse) (Result, Element) -> Result
   ) -> (
     value: Result,
     pullback: (Result.TangentVector)
@@ -425,7 +417,7 @@ extension Array where Element: Differentiable {
     var result = initialResult
     for element in self {
       let (y, pb) =
-        valueWithPullback(at: result, element, in: nextPartialResult)
+        valueWithPullback(at: result, element, of: nextPartialResult)
       result = y
       pullbacks.append(pb)
     }
@@ -449,7 +441,7 @@ extension Array where Element: Differentiable {
   @derivative(of: differentiableReduce, wrt: (self, initialResult))
   func _jvpDifferentiableReduce<Result: Differentiable>(
     _ initialResult: Result,
-    _ nextPartialResult: @differentiable (Result, Element) -> Result
+    _ nextPartialResult: @differentiable(reverse) (Result, Element) -> Result
   ) -> (value: Result,
         differential: (Array.TangentVector, Result.TangentVector)
           -> Result.TangentVector) {
@@ -461,7 +453,7 @@ extension Array where Element: Differentiable {
     var result = initialResult
     for element in self {
       let (y, df) =
-        valueWithDifferential(at: result, element, in: nextPartialResult)
+        valueWithDifferential(at: result, element, of: nextPartialResult)
       result = y
       differentials.append(df)
     }

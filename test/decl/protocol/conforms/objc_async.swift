@@ -1,8 +1,9 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %S/Inputs/custom-modules -enable-experimental-concurrency %s -verify -verify-ignore-unknown
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %S/Inputs/custom-modules  -disable-availability-checking %s -verify -verify-ignore-unknown
 
 // REQUIRES: objc_interop
 // REQUIRES: concurrency
 import Foundation
+import ObjectiveC
 import ObjCConcurrency
 
 // Conform via async method
@@ -50,4 +51,23 @@ extension C5: ConcurrentProtocol {
   func askUser(toJumpThroughHoop hoop: String, completionHandler: ((String) -> Void)?) {
     completionHandler?("hello")
   }
+}
+
+// Global actors.
+actor SomeActor { }
+
+@globalActor
+struct SomeGlobalActor {
+  static let shared = SomeActor()
+}
+
+class C6: ConcurrentProtocol {
+  @SomeGlobalActor
+  func askUser(toSolvePuzzle puzzle: String) async throws -> String { "" }
+
+  func askUser(toJumpThroughHoop hoop: String) async -> String { "hello" }
+}
+
+class C7: NSObject {
+  @SomeGlobalActor override var description: String { "on an actor" }
 }

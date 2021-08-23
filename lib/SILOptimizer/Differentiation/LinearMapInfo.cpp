@@ -37,7 +37,7 @@ static GenericParamList *cloneGenericParameters(ASTContext &ctx,
                                                 DeclContext *dc,
                                                 CanGenericSignature sig) {
   SmallVector<GenericTypeParamDecl *, 2> clonedParams;
-  for (auto paramType : sig->getGenericParams()) {
+  for (auto paramType : sig.getGenericParams()) {
     auto clonedParam = new (ctx)
         GenericTypeParamDecl(dc, paramType->getName(), SourceLoc(),
                              paramType->getDepth(), paramType->getIndex());
@@ -54,11 +54,11 @@ static GenericParamList *cloneGenericParameters(ASTContext &ctx,
 
 LinearMapInfo::LinearMapInfo(ADContext &context, AutoDiffLinearMapKind kind,
                              SILFunction *original, SILFunction *derivative,
-                             SILAutoDiffIndices indices,
+                             const AutoDiffConfig &config,
                              const DifferentiableActivityInfo &activityInfo,
                              SILLoopInfo *loopInfo)
     : kind(kind), original(original), derivative(derivative),
-      activityInfo(activityInfo), loopInfo(loopInfo), indices(indices),
+      activityInfo(activityInfo), loopInfo(loopInfo), config(config),
       synthesizedFile(context.getOrCreateSynthesizedFile(original)),
       typeConverter(context.getTypeConverter()) {
   generateDifferentiationDataStructures(context, derivative);
@@ -77,7 +77,7 @@ VarDecl *LinearMapInfo::addVarDecl(NominalTypeDecl *nominal, StringRef name,
   auto *varDecl = new (astCtx) VarDecl(
       /*IsStatic*/ false, VarDecl::Introducer::Var,
       SourceLoc(), id, nominal);
-  varDecl->setAccess(nominal->getEffectiveAccess());
+  varDecl->setAccess(AccessLevel::Private);
   if (type->hasArchetype())
     varDecl->setInterfaceType(type->mapTypeOutOfContext());
   else
@@ -123,7 +123,7 @@ LinearMapInfo::createBranchingTraceDecl(SILBasicBlock *originalBB,
   auto &file = getSynthesizedFile();
   // Create a branching trace enum.
   Mangle::ASTMangler mangler;
-  AutoDiffConfig config(indices.parameters, indices.results, genericSig);
+  auto config = this->config.withGenericSignature(genericSig);
   auto enumName = mangler.mangleAutoDiffGeneratedDeclaration(
       AutoDiffGeneratedDeclarationKind::BranchingTraceEnum,
       original->getName().str(), originalBB->getDebugID(), kind, config);
@@ -194,7 +194,7 @@ LinearMapInfo::createLinearMapStruct(SILBasicBlock *originalBB,
   auto &file = getSynthesizedFile();
   // Create a linear map struct.
   Mangle::ASTMangler mangler;
-  AutoDiffConfig config(indices.parameters, indices.results, genericSig);
+  auto config = this->config.withGenericSignature(genericSig);
   auto structName = mangler.mangleAutoDiffGeneratedDeclaration(
       AutoDiffGeneratedDeclarationKind::LinearMapStruct,
       original->getName().str(), originalBB->getDebugID(), kind, config);
@@ -230,13 +230,19 @@ VarDecl *LinearMapInfo::addLinearMapDecl(ApplyInst *ai, SILType linearMapType) {
     params.push_back(
         AnyFunctionType::Param(param.getInterfaceType(), Identifier(), flags));
   }
+
   AnyFunctionType *astFnTy;
-  if (auto genSig = silFnTy->getSubstGenericSignature())
+  if (auto genSig = silFnTy->getSubstGenericSignature()) {
+    // FIXME: Verify ExtInfo state is correct, not working by accident.
+    GenericFunctionType::ExtInfo info;
     astFnTy = GenericFunctionType::get(
-        genSig, params, silFnTy->getAllResultsInterfaceType().getASTType());
-  else
+        genSig, params, silFnTy->getAllResultsInterfaceType().getASTType(),
+        info);
+  } else {
+    FunctionType::ExtInfo info;
     astFnTy = FunctionType::get(
-        params, silFnTy->getAllResultsInterfaceType().getASTType());
+        params, silFnTy->getAllResultsInterfaceType().getASTType(), info);
+  }
 
   auto *origBB = ai->getParent();
   auto *linMapStruct = getLinearMapStruct(origBB);
@@ -258,20 +264,20 @@ void LinearMapInfo::addLinearMapToStruct(ADContext &context, ApplyInst *ai) {
   SmallVector<SILValue, 4> allResults;
   SmallVector<unsigned, 8> activeParamIndices;
   SmallVector<unsigned, 8> activeResultIndices;
-  collectMinimalIndicesForFunctionCall(ai, indices, activityInfo, allResults,
+  collectMinimalIndicesForFunctionCall(ai, config, activityInfo, allResults,
                                        activeParamIndices, activeResultIndices);
 
   // Check if there are any active results or arguments. If not, skip
   // this instruction.
   auto hasActiveResults = llvm::any_of(allResults, [&](SILValue res) {
-    return activityInfo.isActive(res, indices);
+    return activityInfo.isActive(res, config);
   });
   bool hasActiveInoutArgument = false;
   bool hasActiveArguments = false;
   auto numIndirectResults = ai->getNumIndirectResults();
   for (auto argIdx : range(ai->getSubstCalleeConv().getNumParameters())) {
     auto arg = ai->getArgumentsWithoutIndirectResults()[argIdx];
-    if (activityInfo.isActive(arg, indices)) {
+    if (activityInfo.isActive(arg, config)) {
       hasActiveArguments = true;
       auto paramInfo = ai->getSubstCalleeConv().getParamInfoForSILArg(
           numIndirectResults + argIdx);
@@ -307,20 +313,20 @@ void LinearMapInfo::addLinearMapToStruct(ADContext &context, ApplyInst *ai) {
   auto *results = IndexSubset::get(original->getASTContext(), numResults,
                                    activeResultIndices);
   // Create autodiff indices for the `apply` instruction.
-  SILAutoDiffIndices applyIndices(parameters, results);
+  AutoDiffConfig applyConfig(parameters, results);
 
   // Check for non-differentiable original function type.
   auto checkNondifferentiableOriginalFunctionType = [&](CanSILFunctionType
                                                             origFnTy) {
     // Check non-differentiable arguments.
-    for (auto paramIndex : applyIndices.parameters->getIndices()) {
+    for (auto paramIndex : applyConfig.parameterIndices->getIndices()) {
       auto remappedParamType =
           origFnTy->getParameters()[paramIndex].getSILStorageInterfaceType();
       if (!remappedParamType.isDifferentiable(derivative->getModule()))
         return true;
     }
     // Check non-differentiable results.
-    for (auto resultIndex : applyIndices.results->getIndices()) {
+    for (auto resultIndex : applyConfig.resultIndices->getIndices()) {
       SILType remappedResultType;
       if (resultIndex >= origFnTy->getNumResults()) {
         auto inoutArgIdx = resultIndex - origFnTy->getNumResults();
@@ -368,7 +374,7 @@ void LinearMapInfo::generateDifferentiationDataStructures(
   CanGenericSignature derivativeFnGenSig = nullptr;
   if (auto *derivativeFnGenEnv = derivativeFn->getGenericEnvironment())
     derivativeFnGenSig =
-        derivativeFnGenEnv->getGenericSignature()->getCanonicalSignature();
+        derivativeFnGenEnv->getGenericSignature().getCanonicalSignature();
 
   // Create linear map struct for each original block.
   for (auto &origBB : *original) {
@@ -464,16 +470,16 @@ bool LinearMapInfo::shouldDifferentiateApplySite(FullApplySite applySite) {
   // Function applications with an active inout argument should be
   // differentiated.
   for (auto inoutArg : applySite.getInoutArguments())
-    if (activityInfo.isActive(inoutArg, indices))
+    if (activityInfo.isActive(inoutArg, config))
       return true;
 
   bool hasActiveDirectResults = false;
   forEachApplyDirectResult(applySite, [&](SILValue directResult) {
-    hasActiveDirectResults |= activityInfo.isActive(directResult, indices);
+    hasActiveDirectResults |= activityInfo.isActive(directResult, config);
   });
   bool hasActiveIndirectResults =
       llvm::any_of(applySite.getIndirectSILResults(), [&](SILValue result) {
-        return activityInfo.isActive(result, indices);
+        return activityInfo.isActive(result, config);
       });
   bool hasActiveResults = hasActiveDirectResults || hasActiveIndirectResults;
 
@@ -486,7 +492,7 @@ bool LinearMapInfo::shouldDifferentiateApplySite(FullApplySite applySite) {
 
   auto arguments = applySite.getArgumentsWithoutIndirectResults();
   bool hasActiveArguments = llvm::any_of(arguments, [&](SILValue arg) {
-    return activityInfo.isActive(arg, indices);
+    return activityInfo.isActive(arg, config);
   });
   return hasActiveResults && hasActiveArguments;
 }
@@ -512,10 +518,10 @@ bool LinearMapInfo::shouldDifferentiateInstruction(SILInstruction *inst) {
   // differentiated.
   auto hasActiveOperands =
       llvm::any_of(inst->getAllOperands(), [&](Operand &op) {
-        return activityInfo.isActive(op.get(), indices);
+        return activityInfo.isActive(op.get(), config);
       });
   auto hasActiveResults = llvm::any_of(inst->getResults(), [&](SILValue val) {
-    return activityInfo.isActive(val, indices);
+    return activityInfo.isActive(val, config);
   });
   if (hasActiveOperands && hasActiveResults)
     return true;
@@ -527,7 +533,7 @@ bool LinearMapInfo::shouldDifferentiateInstruction(SILInstruction *inst) {
     // intrinsic application (representing the semantic destination) is active.
 #define CHECK_INST_TYPE_ACTIVE_DEST(INST)                                      \
   if (auto *castInst = dyn_cast<INST##Inst>(inst))                             \
-    return activityInfo.isActive(castInst->getDest(), indices);
+    return activityInfo.isActive(castInst->getDest(), config);
   CHECK_INST_TYPE_ACTIVE_DEST(Store)
   CHECK_INST_TYPE_ACTIVE_DEST(StoreBorrow)
   CHECK_INST_TYPE_ACTIVE_DEST(CopyAddr)

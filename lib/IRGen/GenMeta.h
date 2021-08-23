@@ -47,6 +47,7 @@ namespace irgen {
   class Size;
   class StructLayout;
   class ClassLayout;
+  class LinkEntity;
 
   bool requiresForeignTypeMetadata(CanType type);
   bool requiresForeignTypeMetadata(NominalTypeDecl *decl);
@@ -183,7 +184,9 @@ namespace irgen {
                                           ArrayRef<Requirement> requirements);
 
   llvm::GlobalValue *emitAsyncFunctionPointer(IRGenModule &IGM,
-                                              SILFunction *function, Size size);
+                                              llvm::Function *function,
+                                              LinkEntity entity,
+                                              Size size);
 } // end namespace irgen
 } // end namespace swift
 

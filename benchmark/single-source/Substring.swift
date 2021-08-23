@@ -29,6 +29,7 @@ public let SubstringTest = [
   BenchmarkInfo(name: "SubstringEquatable", runFunction: run_SubstringEquatable, tags: [.validation, .api, .String]),
   BenchmarkInfo(name: "SubstringFromLongString", runFunction: run_SubstringFromLongString, tags: [.validation, .api, .String]),
   BenchmarkInfo(name: "SubstringFromLongStringGeneric", runFunction: run_SubstringFromLongStringGeneric, tags: [.validation, .api, .String]),
+  BenchmarkInfo(name: "SubstringTrimmingASCIIWhitespace", runFunction: run_SubstringTrimmingASCIIWhitespace, tags: [.validation, .api, .String]),
 ]
 
 // A string that doesn't fit in small string storage and doesn't fit in Latin-1
@@ -265,6 +266,38 @@ public func run_SubstringComparable(_ N: Int) {
 		}
 	}
   CheckResults(count == N*500)
+}
+
+extension Character {
+  fileprivate var isASCIIWhitespace: Bool {
+    return self == " " || self == "\t" || self == "\r" || self == "\n" || self == "\r\n"
+  }
+}
+
+extension Substring {
+  fileprivate func trimWhitespace() -> Substring {
+    var me = self
+    while me.first?.isASCIIWhitespace == .some(true) {
+      me = me.dropFirst()
+    }
+    while me.last?.isASCIIWhitespace == .some(true) {
+      me = me.dropLast()
+    }
+    return me
+  }
+}
+
+let _trimmableSubstrings = "pineapple,🍍,  pineapple\t,\r\n\r\n\r\n, 🍍 ,".split(separator: ",")
+
+@inline(never)
+public func run_SubstringTrimmingASCIIWhitespace(_ N: Int) {
+  let substrings = _trimmableSubstrings // bringing this alias from above
+  var count = 0
+  for _ in 1...N*100 {
+    for substring in substrings {
+      blackHole(substring.trimWhitespace())
+    }
+  }
 }
 
 /*

@@ -137,7 +137,7 @@ llvm::AtomicOrdering decodeLLVMAtomicOrdering(StringRef O);
 bool canBuiltinBeOverloadedForType(BuiltinValueKind ID, Type Ty);
 
 /// Retrieve the AST-level AsyncTaskAndContext type, used for the
-/// createAsyncTask builtin.
+/// createAsyncTask* builtins.
 Type getAsyncTaskAndContextType(ASTContext &ctx);
 
 }

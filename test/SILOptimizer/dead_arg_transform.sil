@@ -1,0 +1,35 @@
+// RUN: %target-sil-opt -sil-inline-generics -enable-sil-verify-all -inline -function-signature-opts -sil-fso-optimize-if-not-called %s | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+public protocol View {
+}
+
+class DynamicStorage {
+}
+
+final class ItemStorage<V> : DynamicStorage where V : View {
+}
+
+extension View {
+  func dynamicStorage() -> DynamicStorage
+}
+
+sil @ItemStorage_init : $@convention(method) <V where V : View> (@in V, @owned ItemStorage<V>) -> @owned ItemStorage<V>
+
+// Test to check we don't attempt to specialize when we have only dead type args
+// Tests there is no crash in DeadArgTransform trying to erase a type arg with debug uses
+
+// CHECK-LABEL: sil @ItemStorage_alloc_init : 
+// CHECK-LABEL: } // end sil function 'ItemStorage_alloc_init'
+sil @ItemStorage_alloc_init : $@convention(method) <V where V : View> (@in V, @thick ItemStorage<V>.Type, @thick ItemStorage<V>.Type) -> @owned ItemStorage<V> {
+bb0(%0 : $*V, %1 : $@thick ItemStorage<V>.Type, %2 : $@thick ItemStorage<V>.Type):
+  %4 = alloc_ref $ItemStorage<V>
+  %5 = function_ref @ItemStorage_init : $@convention(method) <τ_0_0 where τ_0_0 : View> (@in τ_0_0, @owned ItemStorage<τ_0_0>) -> @owned ItemStorage<τ_0_0>
+  %6 = apply %5<V>(%0, %4) : $@convention(method) <τ_0_0 where τ_0_0 : View> (@in τ_0_0, @owned ItemStorage<τ_0_0>) -> @owned ItemStorage<τ_0_0>
+  return %6 : $ItemStorage<V>
+}
+

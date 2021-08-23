@@ -47,6 +47,7 @@ class ArgsToFrontendInputsConverter {
 
   llvm::opt::Arg const *const FilelistPathArg;
   llvm::opt::Arg const *const PrimaryFilelistPathArg;
+  llvm::opt::Arg const *const BadFileDescriptorRetryCountArg;
 
   /// A place to keep alive any buffers that are loaded as part of setting up
   /// the frontend inputs.

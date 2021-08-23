@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -I %S/Inputs -enable-cxx-interop -emit-silgen %s | %FileCheck %s
+// RUN: %target-swiftxx-frontend -I %S/Inputs -emit-silgen %s | %FileCheck %s
 
 import TypeClassification
 

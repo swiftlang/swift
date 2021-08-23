@@ -867,7 +867,7 @@ extension ArraySlice: RangeReplaceableCollection {
   internal mutating func _reserveCapacityAssumingUniqueBuffer(oldCount: Int) {
     // Due to make_mutable hoisting the situation can arise where we hoist
     // _makeMutableAndUnique out of loop and use it to replace
-    // _makeUniqueAndReserveCapacityIfNotUnique that preceeds this call. If the
+    // _makeUniqueAndReserveCapacityIfNotUnique that precedes this call. If the
     // array was empty _makeMutableAndUnique does not replace the empty array
     // buffer by a unique buffer (it just replaces it by the empty array
     // singleton).
@@ -1079,6 +1079,7 @@ extension ArraySlice: RangeReplaceableCollection {
   //===--- algorithms -----------------------------------------------------===//
 
   @inlinable
+  @available(*, deprecated, renamed: "withContiguousMutableStorageIfAvailable")
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
@@ -1238,32 +1239,18 @@ extension ArraySlice {
     // Ensure unique storage
     _makeMutableAndUnique()
 
-    // Ensure that body can't invalidate the storage or its bounds by
-    // moving self into a temporary working array.
-    // NOTE: The stack promotion optimization that keys of the
-    // "array.withUnsafeMutableBufferPointer" semantics annotation relies on the
-    // array buffer not being able to escape in the closure. It can do this
-    // because we swap the array buffer in self with an empty buffer here. Any
-    // escape via the address of self in the closure will therefore escape the
-    // empty array.
-
-    var work = ArraySlice()
-    (work, self) = (self, work)
-
-    // Create an UnsafeBufferPointer over work that we can pass to body
-    let pointer = work._buffer.firstElementAddress
+    // Create an UnsafeBufferPointer that we can pass to body
+    let pointer = _buffer.firstElementAddress
     var inoutBufferPointer = UnsafeMutableBufferPointer(
       start: pointer, count: count)
 
-    // Put the working array back before returning.
     defer {
       _precondition(
         inoutBufferPointer.baseAddress == pointer &&
         inoutBufferPointer.count == count,
         "ArraySlice withUnsafeMutableBufferPointer: replacing the buffer is not allowed")
-
-      (work, self) = (self, work)
       _endMutation()
+      _fixLifetime(self)
     }
 
     // Invoke the body.
@@ -1516,3 +1503,22 @@ extension ArraySlice {
         shiftedToStartIndex: _startIndex))
   }
 }
+
+extension ArraySlice: Sendable, UnsafeSendable
+  where Element: Sendable { }
+
+#if INTERNAL_CHECKS_ENABLED
+extension ArraySlice {
+  // This allows us to test the `_copyContents` implementation in
+  // `_SliceBuffer`. (It's like `_copyToContiguousArray` but it always makes a
+  // copy.)
+  @_alwaysEmitIntoClient
+  public func _copyToNewArray() -> [Element] {
+    Array(unsafeUninitializedCapacity: self.count) { buffer, count in
+      var (it, c) = self._buffer._copyContents(initializing: buffer)
+      _precondition(it.next() == nil)
+      count = c
+    }
+  }
+}
+#endif

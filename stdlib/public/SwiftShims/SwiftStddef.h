@@ -17,15 +17,22 @@
 // result, using stddef.h here would pull in Darwin module (which includes
 // libc). This creates a dependency cycle, so we can't use stddef.h in
 // SwiftShims.
+//
 // On Linux, the story is different. We get the error message
 // "/usr/include/x86_64-linux-gnu/sys/types.h:146:10: error: 'stddef.h' file not
 // found"
 // This is a known Clang/Ubuntu bug.
-#if !defined(__APPLE__) && !defined(__linux__)
+//
+// On Windows, the complicated setup between clang and MSVC causes a cicular
+// dependency between `ucrt` and `SwiftShims`, preventing a successful build of
+// the module.
+//
+// Opt to use teh compiler vended type whenever possible.
+#if defined(__clang__)
+typedef __SIZE_TYPE__ __swift_size_t;
+#else
 #include <stddef.h>
 typedef size_t __swift_size_t;
-#else
-typedef __SIZE_TYPE__ __swift_size_t;
 #endif
 
 // This selects the signed equivalent of the unsigned type chosen for size_t.

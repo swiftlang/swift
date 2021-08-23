@@ -7,7 +7,7 @@
 // derived class generic signature.
 
 class Puppy<T, U> {
-  init(t: T? = nil, u: U? = nil) {}
+  init(t: T? = (nil), u: U? = (nil)) {}
 }
 
 class Chipmunk : Puppy<Int, String> {}

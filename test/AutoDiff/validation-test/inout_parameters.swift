@@ -1,5 +1,9 @@
-// RUN: %target-run-simple-swift
+// RUN: %target-run-simple-swift(-Xfrontend -requirement-machine=off)
 // REQUIRES: executable_test
+
+// Would fail due to unavailability of swift_autoDiffCreateLinearMapContext.
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 // `inout` parameter differentiation tests.
 
@@ -18,8 +22,8 @@ InoutParameterAutoDiffTests.test("Float.+=") {
     result += y
     return result
   }
-  expectEqual((1, 1), gradient(at: 4, 5, in: mutatingAddWrapper))
-  expectEqual((10, 10), pullback(at: 4, 5, in: mutatingAddWrapper)(10))
+  expectEqual((1, 1), gradient(at: 4, 5, of: mutatingAddWrapper))
+  expectEqual((10, 10), pullback(at: 4, 5, of: mutatingAddWrapper)(10))
 }
 
 InoutParameterAutoDiffTests.test("Float.-=") {
@@ -28,8 +32,8 @@ InoutParameterAutoDiffTests.test("Float.-=") {
     result += y
     return result
   }
-  expectEqual((1, 1), gradient(at: 4, 5, in: mutatingSubtractWrapper))
-  expectEqual((10, 10), pullback(at: 4, 5, in: mutatingSubtractWrapper)(10))
+  expectEqual((1, 1), gradient(at: 4, 5, of: mutatingSubtractWrapper))
+  expectEqual((10, 10), pullback(at: 4, 5, of: mutatingSubtractWrapper)(10))
 }
 
 InoutParameterAutoDiffTests.test("Float.*=") {
@@ -38,8 +42,8 @@ InoutParameterAutoDiffTests.test("Float.*=") {
     result += y
     return result
   }
-  expectEqual((1, 1), gradient(at: 4, 5, in: mutatingMultiplyWrapper))
-  expectEqual((10, 10), pullback(at: 4, 5, in: mutatingMultiplyWrapper)(10))
+  expectEqual((1, 1), gradient(at: 4, 5, of: mutatingMultiplyWrapper))
+  expectEqual((10, 10), pullback(at: 4, 5, of: mutatingMultiplyWrapper)(10))
 }
 
 InoutParameterAutoDiffTests.test("Float./=") {
@@ -48,8 +52,8 @@ InoutParameterAutoDiffTests.test("Float./=") {
     result += y
     return result
   }
-  expectEqual((1, 1), gradient(at: 4, 5, in: mutatingDivideWrapper))
-  expectEqual((10, 10), pullback(at: 4, 5, in: mutatingDivideWrapper)(10))
+  expectEqual((1, 1), gradient(at: 4, 5, of: mutatingDivideWrapper))
+  expectEqual((10, 10), pullback(at: 4, 5, of: mutatingDivideWrapper)(10))
 }
 
 // Simplest possible `inout` parameter differentiation.
@@ -63,15 +67,15 @@ InoutParameterAutoDiffTests.test("InoutIdentity") {
     inoutIdentity(&result)
     return result
   }
-  expectEqual(1, gradient(at: 10, in: identity))
-  expectEqual(10, pullback(at: 10, in: identity)(10))
+  expectEqual(1, gradient(at: 10, of: identity))
+  expectEqual(10, pullback(at: 10, of: identity)(10))
 }
 
 extension Float {
   // Custom version of `Float.*=`, implemented using `Float.*` and mutation.
   // Verify that its generated derivative has the same behavior as the
   // registered derivative for `Float.*=`.
-  @differentiable
+  @differentiable(reverse)
   static func multiplyAssign(_ lhs: inout Float, _ rhs: Float) {
     lhs = lhs * rhs
   }
@@ -85,7 +89,7 @@ InoutParameterAutoDiffTests.test("ControlFlow") {
     }
     return result
   }
-  expectEqual([1, 1, 1], gradient(at: [1, 2, 3], in: sum))
+  expectEqual([1, 1, 1], gradient(at: [1, 2, 3], of: sum))
 
   func product(_ array: [Float]) -> Float {
     var result: Float = 1
@@ -94,7 +98,7 @@ InoutParameterAutoDiffTests.test("ControlFlow") {
     }
     return result
   }
-  expectEqual([20, 15, 12], gradient(at: [3, 4, 5], in: product))
+  expectEqual([20, 15, 12], gradient(at: [3, 4, 5], of: product))
 
   func productCustom(_ array: [Float]) -> Float {
     var result: Float = 1
@@ -103,7 +107,7 @@ InoutParameterAutoDiffTests.test("ControlFlow") {
     }
     return result
   }
-  expectEqual([20, 15, 12], gradient(at: [3, 4, 5], in: productCustom))
+  expectEqual([20, 15, 12], gradient(at: [3, 4, 5], of: productCustom))
 }
 
 InoutParameterAutoDiffTests.test("SetAccessor") {
@@ -114,6 +118,15 @@ InoutParameterAutoDiffTests.test("SetAccessor") {
       get { x }
       set { x = newValue }
     }
+
+    // Computed property with explicit `@differentiable` accessors.
+    var doubled: Float {
+      @differentiable(reverse)
+      get { x + x }
+
+      @differentiable(reverse)
+      set { x = newValue / 2 }
+    }
   }
 
   // `squared` implemented using a `set` accessor.
@@ -123,14 +136,25 @@ InoutParameterAutoDiffTests.test("SetAccessor") {
     s.computed *= x
     return s.x
   }
-  expectEqual(6, gradient(at: 3, in: squared))
-  expectEqual(8, gradient(at: 4, in: squared))
+  expectEqual((9, 6), valueWithGradient(at: 3, of: squared))
+  expectEqual((16, 8), valueWithGradient(at: 4, of: squared))
+
+  // `quadrupled` implemented using a `set` accessor.
+  func quadrupled(_ x: Float) -> Float {
+    var s = S(x: 1)
+    s.doubled *= 4 * x
+    return s.x
+  }
+  print(valueWithGradient(at: 3, of: quadrupled))
+  print(valueWithGradient(at: 4, of: quadrupled))
+  expectEqual((12, 4), valueWithGradient(at: 3, of: quadrupled))
+  expectEqual((16, 4), valueWithGradient(at: 4, of: quadrupled))
 }
 
 // Test differentiation wrt `inout` parameters that have a class type.
 InoutParameterAutoDiffTests.test("InoutClassParameter") {
   class Class: Differentiable {
-    @differentiable
+    @differentiable(reverse)
     var x: Float
 
     init(_ x: Float) {
@@ -147,8 +171,8 @@ InoutParameterAutoDiffTests.test("InoutClassParameter") {
       squaredViaMutation(&c)
       return c.x
     }
-    expectEqual((100, 20), valueWithGradient(at: 10, in: squared))
-    expectEqual(200, pullback(at: 10, in: squared)(10))
+    expectEqual((100, 20), valueWithGradient(at: 10, of: squared))
+    expectEqual(200, pullback(at: 10, of: squared)(10))
   }
 
   do {
@@ -162,10 +186,10 @@ InoutParameterAutoDiffTests.test("InoutClassParameter") {
       return c.x
     }
     // FIXME(TF-1080): Fix incorrect class property `modify` accessor derivative values.
-    // expectEqual((100, 20), valueWithGradient(at: 10, in: squared))
-    // expectEqual(200, pullback(at: 10, in: squared)(10))
-    expectEqual((100, 1), valueWithGradient(at: 10, in: squared))
-    expectEqual(10, pullback(at: 10, in: squared)(10))
+    // expectEqual((100, 20), valueWithGradient(at: 10, of: squared))
+    // expectEqual(200, pullback(at: 10, of: squared)(10))
+    expectEqual((100, 1), valueWithGradient(at: 10, of: squared))
+    expectEqual(10, pullback(at: 10, of: squared)(10))
   }
 }
 
@@ -173,34 +197,34 @@ InoutParameterAutoDiffTests.test("InoutClassParameter") {
 // treated as a differentiability result.
 
 protocol SR_13305_Protocol {
-  @differentiable(wrt: x)
+  @differentiable(reverse, wrt: x)
   func method(_ x: Float, _ y: inout Float)
 
-  @differentiable(wrt: x)
+  @differentiable(reverse, wrt: x)
   func genericMethod<T: Differentiable>(_ x: T, _ y: inout T)
 }
 
 InoutParameterAutoDiffTests.test("non-wrt inout parameter") {
   struct SR_13305_Struct: SR_13305_Protocol {
-    @differentiable(wrt: x)
+    @differentiable(reverse, wrt: x)
     func method(_ x: Float, _ y: inout Float) {
       y = y * x
     }
 
-    @differentiable(wrt: x)
+    @differentiable(reverse, wrt: x)
     func genericMethod<T: Differentiable>(_ x: T, _ y: inout T) {
       y = x
     }
   }
 
-  @differentiable(wrt: x)
+  @differentiable(reverse, wrt: x)
   func foo(_ s: SR_13305_Struct, _ x: Float, _ y: Float) -> Float {
     var y = y
     s.method(x, &y)
     return y
   }
 
-  @differentiable(wrt: x)
+  @differentiable(reverse, wrt: x)
   func fooGeneric<T: SR_13305_Protocol>(_ s: T, _ x: Float, _ y: Float) -> Float {
     var y = y
     s.method(x, &y)
@@ -210,18 +234,18 @@ InoutParameterAutoDiffTests.test("non-wrt inout parameter") {
   let s = SR_13305_Struct()
 
   do {
-    let (value, (dx, dy)) = valueWithGradient(at: 2, 3, in: { foo(s, $0, $1) })
+    let (value, (dx, dy)) = valueWithGradient(at: 2, 3, of: { foo(s, $0, $1) })
     expectEqual(6, value)
     expectEqual((3, 2), (dx, dy))
   }
-  expectEqual((value: 6, gradient: 3), valueWithGradient(at: 2, in: { foo(s, $0, 3) }))
+  expectEqual((value: 6, gradient: 3), valueWithGradient(at: 2, of: { foo(s, $0, 3) }))
 
   do {
-    let (value, (dx, dy)) = valueWithGradient(at: 2, 3, in: { fooGeneric(s, $0, $1) })
+    let (value, (dx, dy)) = valueWithGradient(at: 2, 3, of: { fooGeneric(s, $0, $1) })
     expectEqual(2, value)
     expectEqual((1, 0), (dx, dy))
   }
-  expectEqual((value: 2, gradient: 1), valueWithGradient(at: 2, in: { fooGeneric(s, $0, 3) }))
+  expectEqual((value: 2, gradient: 1), valueWithGradient(at: 2, of: { fooGeneric(s, $0, 3) }))
 }
 
 runAllTests()

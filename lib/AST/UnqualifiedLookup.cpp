@@ -23,6 +23,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/PropertyWrappers.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
@@ -272,12 +273,12 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
                                   "performUnqualifedLookup",
                                   DC->getParentSourceFile());
 
-  if (Loc.isValid()) {
+  if (Loc.isValid() && DC->getParentSourceFile()) {
     // Operator lookup is always global, for the time being.
     if (!Name.isOperator())
       lookInASTScopes();
   } else {
-    assert(DC->isModuleScopeContext() &&
+    assert((DC->isModuleScopeContext() || !DC->getParentSourceFile()) &&
            "Unqualified lookup without a source location must start from "
            "a module-scope context");
 
@@ -788,16 +789,18 @@ public:
   bool consume(ArrayRef<ValueDecl *> values,
                NullablePtr<DeclContext> baseDC) override {
     for (auto *value: values) {
+      bool foundMatch = false;
       if (auto *varDecl = dyn_cast<VarDecl>(value)) {
         // Check if the name matches any auxiliary decls not in the AST
         varDecl->visitAuxiliaryDecls([&](VarDecl *auxiliaryVar) {
           if (name.isSimpleName(auxiliaryVar->getName())) {
             results.push_back(auxiliaryVar);
+            foundMatch = true;
           }
         });
       }
 
-      if (value->getName().matchesRef(name))
+      if (!foundMatch && value->getName().matchesRef(name))
         results.push_back(value);
     }
 

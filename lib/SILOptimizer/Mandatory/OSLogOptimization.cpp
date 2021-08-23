@@ -1,4 +1,4 @@
-//===--- OSLogOptimizer.cpp - Optimizes calls to OS Log ===//
+//===--- OSLogOptimizer.cpp - Optimizes calls to OS Log -------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -68,6 +68,8 @@
 /// 'substituteConstants' and 'emitCodeForSymbolicValue'. The remaining
 /// functions in the file implement the subtasks and utilities needed by the
 /// above functions.
+///
+//===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticEngine.h"
@@ -91,6 +93,7 @@
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeLowering.h"
+#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
@@ -242,18 +245,6 @@ static bool isIntegerOrBoolType(SILType silType, ASTContext &astContext) {
   return nominalDecl && isStdlibIntegerOrBoolDecl(nominalDecl, astContext);
 }
 
-/// Return true if and only if the given SIL type represents a String type.
-static bool isStringType(SILType silType, ASTContext &astContext) {
-  NominalTypeDecl *nominalDecl = silType.getNominalOrBoundGenericNominal();
-  return nominalDecl && nominalDecl == astContext.getStringDecl();
-}
-
-/// Return true if and only if the given SIL type represents an Array type.
-static bool isArrayType(SILType silType, ASTContext &astContext) {
-  NominalTypeDecl *nominalDecl = silType.getNominalOrBoundGenericNominal();
-  return nominalDecl && nominalDecl == astContext.getArrayDecl();
-}
-
 /// Decide if the given instruction (which could possibly be a call) should
 /// be constant evaluated.
 ///
@@ -296,7 +287,7 @@ static bool isFoldableIntOrBool(SILValue value, ASTContext &astContext) {
 /// Return true iff the given value is a string and is not an initialization
 /// of an string from a string literal.
 static bool isFoldableString(SILValue value, ASTContext &astContext) {
-  return isStringType(value->getType(), astContext) &&
+  return value->getType().getASTType()->isString() &&
          (!isa<ApplyInst>(value) ||
           !getStringMakeUTF8Init(cast<ApplyInst>(value)));
 }
@@ -304,7 +295,7 @@ static bool isFoldableString(SILValue value, ASTContext &astContext) {
 /// Return true iff the given value is an array and is not an initialization
 /// of an array from an array literal.
 static bool isFoldableArray(SILValue value, ASTContext &astContext) {
-  if (!isArrayType(value->getType(), astContext))
+  if (!value->getType().getASTType()->isArray())
     return false;
   // If value is an initialization of an array from a literal or an empty array
   // initializer, it need not be folded. Arrays constructed from literals use a
@@ -322,8 +313,9 @@ static bool isFoldableArray(SILValue value, ASTContext &astContext) {
     return true;
   SILFunction *callee = cast<ApplyInst>(constructorInst)->getCalleeFunction();
   return !callee ||
-         (!callee->hasSemanticsAttr("array.init.empty") &&
-          !callee->hasSemanticsAttr("array.uninitialized_intrinsic"));
+         (!callee->hasSemanticsAttr(semantics::ARRAY_INIT_EMPTY) &&
+          !callee->hasSemanticsAttr(semantics::ARRAY_UNINITIALIZED_INTRINSIC) &&
+          !callee->hasSemanticsAttr(semantics::ARRAY_FINALIZE_INTRINSIC));
 }
 
 /// Return true iff the given value is a closure but is not a creation of a
@@ -521,8 +513,7 @@ static SILValue emitCodeForConstantArray(ArrayRef<SILValue> elements,
                                          CanType arrayType, SILBuilder &builder,
                                          SILLocation loc) {
   ASTContext &astContext = builder.getASTContext();
-  assert(astContext.getArrayDecl() ==
-         arrayType->getNominalOrBoundGenericNominal());
+  assert(arrayType->isArray());
   SILModule &module = builder.getModule();
 
   // Create a SILValue for the number of elements.
@@ -560,7 +551,7 @@ static SILValue emitCodeForConstantArray(ArrayRef<SILValue> elements,
   FunctionRefInst *arrayAllocateRef =
       builder.createFunctionRef(loc, arrayAllocateFun);
   ApplyInst *applyInst = builder.createApply(
-      loc, arrayAllocateRef, subMap, ArrayRef<SILValue>(numElementsSIL), false);
+      loc, arrayAllocateRef, subMap, ArrayRef<SILValue>(numElementsSIL));
 
   // Extract the elements of the tuple returned by the call to the allocator.
   DestructureTupleInst *destructureInst =
@@ -670,8 +661,7 @@ static SILValue emitCodeForSymbolicValue(SymbolicValue symVal,
 
   switch (symVal.getKind()) {
   case SymbolicValue::String: {
-    assert(astContext.getStringDecl() ==
-           expectedType->getNominalOrBoundGenericNominal());
+    assert(expectedType->isString());
 
     StringRef stringVal = symVal.getStringValue();
     StringLiteralInst *stringLitInst = builder.createStringLiteral(
@@ -696,7 +686,7 @@ static SILValue emitCodeForSymbolicValue(SymbolicValue symVal,
     FunctionRefInst *stringInitRef =
         builder.createFunctionRef(loc, stringInfo.getStringInitIntrinsic());
     ApplyInst *applyInst = builder.createApply(
-        loc, stringInitRef, SubstitutionMap(), ArrayRef<SILValue>(args), false);
+        loc, stringInitRef, SubstitutionMap(), ArrayRef<SILValue>(args));
     return applyInst;
   }
   case SymbolicValue::Integer: { // Builtin integer types.
@@ -881,8 +871,7 @@ getEndPointsOfDataDependentChain(SILValue value, SILFunction *fun,
   SILInstruction *valueDefinition = value->getDefiningInstruction();
   SILInstruction *def =
       valueDefinition ? valueDefinition : &(value->getParentBlock()->front());
-  ValueLifetimeAnalysis lifetimeAnalysis =
-      ValueLifetimeAnalysis(def, transitiveUsers);
+  ValueLifetimeAnalysis lifetimeAnalysis(def, transitiveUsers);
   ValueLifetimeAnalysis::Frontier frontier;
   bool hasCriticlEdges = lifetimeAnalysis.computeFrontier(
       frontier, ValueLifetimeAnalysis::DontModifyCFG);
@@ -997,6 +986,14 @@ static void substituteConstants(FoldState &foldState) {
   for (SILValue constantSILValue : foldState.getConstantSILValues()) {
     SymbolicValue constantSymbolicVal =
         evaluator.lookupConstValue(constantSILValue).getValue();
+    // Make sure that the symbolic value tracked in the foldState is a constant.
+    // In the case of ArraySymbolicValue, the array storage could be a non-constant
+    // if some instruction in the array initialization sequence was not evaluated
+    // and skipped.
+    if (!constantSymbolicVal.containsOnlyConstants()) {
+      assert(constantSymbolicVal.getKind() != SymbolicValue::String && "encountered non-constant string symbolic value");
+      continue;
+    }
 
     SILInstruction *definingInst = constantSILValue->getDefiningInstruction();
     assert(definingInst);
@@ -1113,8 +1110,6 @@ static bool checkOSLogMessageIsConstant(SingleValueInstruction *osLogMessage,
   return errorDetected;
 }
 
-using CallbackTy = llvm::function_ref<void(SILInstruction *)>;
-
 /// Return true iff the given address-valued instruction has only stores into
 /// it. This function tests for the conditions under which a call, that was
 /// constant evaluated, that writes into the address-valued instruction can be
@@ -1189,8 +1184,7 @@ static bool hasOnlyStoreUses(SingleValueInstruction *addressInst) {
 /// of begin_apply. This will also fix the lifetimes of the deleted instructions
 /// whenever possible.
 static void forceDeleteAllocStack(SingleValueInstruction *inst,
-                                  InstructionDeleter &deleter,
-                                  CallbackTy callback) {
+                                  InstructionDeleter &deleter) {
   SmallVector<SILInstruction *, 8> users;
   for (Operand *use : inst->getUses())
     users.push_back(use->getUser());
@@ -1199,30 +1193,33 @@ static void forceDeleteAllocStack(SingleValueInstruction *inst,
     if (isIncidentalUse(user))
       continue;
     if (isa<DestroyAddrInst>(user)) {
-      deleter.forceDelete(user, callback);
+      deleter.forceDelete(user);
       continue;
     }
     if (isa<BeginAccessInst>(user)) {
-      forceDeleteAllocStack(cast<BeginAccessInst>(user), deleter, callback);
+      forceDeleteAllocStack(cast<BeginAccessInst>(user), deleter);
       continue;
     }
-    deleter.forceDeleteAndFixLifetimes(user, callback);
+    // Notify the deletion worklist in case user's other operands become dead.
+    deleter.getCallbacks().notifyWillBeDeleted(user);
+    deleter.forceDeleteAndFixLifetimes(user);
   }
-  deleter.forceDelete(inst, callback);
+  deleter.forceDelete(inst);
 }
 
 /// Delete \c inst , if it is dead, along with its dead users and invoke the
 /// callback whever an instruction is deleted.
-static void deleteInstructionWithUsersAndFixLifetimes(
-    SILInstruction *inst, InstructionDeleter &deleter, CallbackTy callback) {
+static void
+deleteInstructionWithUsersAndFixLifetimes(SILInstruction *inst,
+                                          InstructionDeleter &deleter) {
   // If this is an alloc_stack, it can be eliminated as long as it is only
   // stored into or destroyed.
   if (AllocStackInst *allocStack = dyn_cast<AllocStackInst>(inst)) {
     if (hasOnlyStoreUses(allocStack))
-      forceDeleteAllocStack(allocStack, deleter, callback);
+      forceDeleteAllocStack(allocStack, deleter);
     return;
   }
-  deleter.recursivelyDeleteUsersIfDead(inst, callback);
+  deleter.recursivelyDeleteUsersIfDead(inst);
 }
 
 /// Try to dead-code eliminate the OSLogMessage instance \c oslogMessage passed
@@ -1231,31 +1228,38 @@ static void deleteInstructionWithUsersAndFixLifetimes(
 /// \returns true if elimination is successful and false if it is not successful
 /// and diagnostics is emitted.
 static bool tryEliminateOSLogMessage(SingleValueInstruction *oslogMessage) {
-  InstructionDeleter deleter;
   // List of instructions that are possibly dead.
   SmallVector<SILInstruction *, 4> worklist = {oslogMessage};
   // Set of all deleted instructions.
   SmallPtrSet<SILInstruction *, 4> deletedInstructions;
+
+  auto callbacks =
+      InstModCallbacks().onNotifyWillBeDeleted([&](SILInstruction *deadInst) {
+        // Add operands of all deleted instructions to the worklist so that
+        // they can be recursively deleted if possible.
+        for (Operand &operand : deadInst->getAllOperands()) {
+          if (SILInstruction *definingInstruction =
+                  operand.get()->getDefiningInstruction()) {
+            if (!deletedInstructions.count(definingInstruction))
+              worklist.push_back(definingInstruction);
+          }
+        }
+        (void)deletedInstructions.insert(deadInst);
+      });
+  InstructionDeleter deleter(callbacks);
+
   unsigned startIndex = 0;
   while (startIndex < worklist.size()) {
     SILInstruction *inst = worklist[startIndex++];
     if (deletedInstructions.count(inst))
       continue;
-    deleteInstructionWithUsersAndFixLifetimes(
-        inst, deleter, [&](SILInstruction *deadInst) {
-          // Add operands of all deleted instructions to the worklist so that
-          // they can be recursively deleted if possible.
-          for (Operand &operand : deadInst->getAllOperands()) {
-            if (SILInstruction *definingInstruction =
-                    operand.get()->getDefiningInstruction()) {
-              if (!deletedInstructions.count(definingInstruction))
-                worklist.push_back(definingInstruction);
-            }
-          }
-          (void)deletedInstructions.insert(deadInst);
-        });
+    deleteInstructionWithUsersAndFixLifetimes(inst, deleter);
+    // Call cleanupDeadInstructions incrementally because it may expose a dead
+    // alloc_stack, which will only be deleted by this pass via
+    // deleteInstructionWithUsersAndFixLifetimes().
+    deleter.cleanupDeadInstructions();
   }
-  deleter.cleanUpDeadInstructions();
+
   // If the OSLogMessage instance is not deleted, either we couldn't see the
   // body of the log call or there is a bug in the library implementation.
   // Assuming that the library implementation is correct, it means that either
@@ -1403,19 +1407,23 @@ static SILInstruction *beginOfInterpolation(ApplyInst *oslogInit) {
   // formatting and privacy options are literals, all candidate instructions
   // must be in the same basic block. But, this code doesn't rely on that
   // assumption.
-  SmallPtrSet<SILBasicBlock *, 4> candidateBBs;
+  BasicBlockSet candidateBBs(oslogInit->getFunction());
+  SILBasicBlock *candidateBB = nullptr;
+  unsigned numCandidateBBsFound = 0;
   for (auto *candidate: candidateStartInstructions) {
-    SILBasicBlock *candidateBB = candidate->getParent();
-    candidateBBs.insert(candidateBB);
+    candidateBB = candidate->getParent();
+    if (candidateBBs.insert(candidateBB))
+      ++numCandidateBBsFound;
   }
 
   SILBasicBlock *firstBB = nullptr;
-  if (candidateBBs.size() == 1) {
-    firstBB = *candidateBBs.begin();
+  if (numCandidateBBsFound == 1) {
+    assert(candidateBB);
+    firstBB = candidateBB;
   } else {
     SILBasicBlock *entryBB = oslogInit->getFunction()->getEntryBlock();
     for (SILBasicBlock *bb : llvm::breadth_first<SILBasicBlock *>(entryBB)) {
-      if (candidateBBs.count(bb)) {
+      if (candidateBBs.contains(bb)) {
         firstBB = bb;
         break;
       }
@@ -1475,7 +1483,7 @@ suppressGlobalStringTablePointerError(SingleValueInstruction *oslogMessage) {
     // many instructions, do the cleanup at the end.
     deleter.trackIfDead(bi);
   }
-  deleter.cleanUpDeadInstructions();
+  deleter.cleanupDeadInstructions();
 }
 
 /// If the SILInstruction is an initialization of OSLogMessage, return the

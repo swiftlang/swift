@@ -17,13 +17,14 @@
 #ifndef SWIFT_MODULE_H
 #define SWIFT_MODULE_H
 
+#include "swift/AST/AccessNotes.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Import.h"
 #include "swift/AST/LookupKinds.h"
-#include "swift/AST/RawComment.h"
 #include "swift/AST/Type.h"
+#include "swift/Basic/BasicSourceInfo.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/STLExtras.h"
@@ -55,6 +56,7 @@ namespace swift {
   class FileUnit;
   class FuncDecl;
   class InfixOperatorDecl;
+  enum class LibraryLevel : uint8_t;
   class LinkLibrary;
   class ModuleLoader;
   class NominalTypeDecl;
@@ -161,9 +163,13 @@ class OverlayFile;
 /// output binary and logical module (such as a single library or executable).
 ///
 /// \sa FileUnit
-class ModuleDecl : public DeclContext, public TypeDecl {
+class ModuleDecl
+    : public DeclContext, public TypeDecl, public ASTAllocated<ModuleDecl> {
   friend class DirectOperatorLookupRequest;
   friend class DirectPrecedenceGroupLookupRequest;
+
+  /// The ABI name of the module, if it differs from the module name.
+  mutable Identifier ModuleABIName;
 
 public:
   /// Produces the components of a given module's full name in reverse order.
@@ -249,6 +255,8 @@ private:
   /// \see EntryPointInfoTy
   EntryPointInfoTy EntryPointInfo;
 
+  AccessNotesFile accessNotes;
+
   ModuleDecl(Identifier name, ASTContext &ctx, ImplicitImportInfo importInfo);
 
 public:
@@ -278,6 +286,9 @@ public:
   /// Retrieve a list of modules that each file of this module implicitly
   /// imports.
   ImplicitImportList getImplicitImports() const;
+
+  AccessNotesFile &getAccessNotes() { return accessNotes; }
+  const AccessNotesFile &getAccessNotes() const { return accessNotes; }
 
   ArrayRef<FileUnit *> getFiles() {
     assert(!Files.empty() || failedToLoad());
@@ -337,6 +348,23 @@ public:
   void getDeclaredCrossImportBystanders(
       SmallVectorImpl<Identifier> &bystanderNames);
 
+  /// Retrieve the ABI name of the module, which is used for metadata and
+  /// mangling.
+  Identifier getABIName() const;
+
+  /// Set the ABI name of the module;
+  void setABIName(Identifier name) {
+    ModuleABIName = name;
+  }
+
+  /// User-defined module version number.
+  llvm::VersionTuple UserModuleVersion;
+  void setUserModuleVersion(llvm::VersionTuple UserVer) {
+    UserModuleVersion = UserVer;
+  }
+  llvm::VersionTuple getUserModuleVersion() const {
+    return UserModuleVersion;
+  }
 private:
   /// A cache of this module's underlying module and required bystander if it's
   /// an underscored cross-import overlay.
@@ -397,6 +425,14 @@ public:
     DebugClient = R;
   }
 
+  /// Returns true if this module is compiled as static library.
+  bool isStaticLibrary() const {
+    return Bits.ModuleDecl.StaticLibrary;
+  }
+  void setStaticLibrary(bool isStatic = true) {
+    Bits.ModuleDecl.StaticLibrary = isStatic;
+  }
+
   /// Returns true if this module was or is being compiled for testing.
   bool isTestingEnabled() const {
     return Bits.ModuleDecl.TestingEnabled;
@@ -444,6 +480,9 @@ public:
     Bits.ModuleDecl.RawResilienceStrategy = unsigned(strategy);
   }
 
+  /// Distribution level of the module.
+  LibraryLevel getLibraryLevel() const;
+
   /// Returns true if this module was or is being compiled for testing.
   bool hasIncrementalInfo() const { return Bits.ModuleDecl.HasIncrementalInfo; }
   void setHasIncrementalInfo(bool enabled = true) {
@@ -473,6 +512,16 @@ public:
 
   bool isMainModule() const {
     return Bits.ModuleDecl.IsMainModule;
+  }
+
+  /// Whether this module has been compiled with comprehensive checking for
+  /// concurrency, e.g., Sendable checking.
+  bool isConcurrencyChecked() const {
+    return Bits.ModuleDecl.IsConcurrencyChecked;
+  }
+
+  void setIsConcurrencyChecked(bool value = true) {
+    Bits.ModuleDecl.IsConcurrencyChecked = value;
   }
 
   /// For the main module, retrieves the list of primary source files being
@@ -540,10 +589,15 @@ public:
   ///
   /// \param protocol The protocol to which we are computing conformance.
   ///
+  /// \param allowMissing When \c true, the resulting conformance reference
+  /// might include "missing" conformances, which are synthesized for some
+  /// protocols as an error recovery mechanism.
+  ///
   /// \returns The result of the conformance search, which will be
   /// None if the type does not conform to the protocol or contain a
   /// ProtocolConformanceRef if it does conform.
-  ProtocolConformanceRef lookupConformance(Type type, ProtocolDecl *protocol);
+  ProtocolConformanceRef lookupConformance(Type type, ProtocolDecl *protocol,
+                                           bool allowMissing = false);
 
   /// Look for the conformance of the given existential type to the given
   /// protocol.
@@ -571,9 +625,6 @@ public:
   void lookupObjCMethods(
          ObjCSelector selector,
          SmallVectorImpl<AbstractFunctionDecl *> &results) const;
-
-  Optional<Fingerprint>
-  loadFingerprint(const IterableDeclContext *IDC) const;
 
   /// Find all SPI names imported from \p importedModule by this module,
   /// collecting the identifiers in \p spiGroups.
@@ -626,11 +677,18 @@ public:
   /// This assumes that \p module was imported.
   bool isImportedImplementationOnly(const ModuleDecl *module) const;
 
+  /// Returns true if decl context or its content can be serialized by
+  /// cross-module-optimization.
+  /// The \p ctxt can e.g. be a NominalType or the context of a function.
+  bool canBeUsedForCrossModuleOptimization(DeclContext *ctxt) const;
+
   /// Finds all top-level decls of this module.
   ///
   /// This does a simple local lookup, not recursively looking through imports.
   /// The order of the results is not guaranteed to be meaningful.
   void getTopLevelDecls(SmallVectorImpl<Decl*> &Results) const;
+
+  void getExportedPrespecializations(SmallVectorImpl<Decl *> &results) const;
 
   /// Finds top-level decls of this module filtered by their attributes.
   ///
@@ -688,6 +746,9 @@ public:
   /// \returns true if this module is the "swift" standard library module.
   bool isStdlibModule() const;
 
+  /// \returns true if this module has standard substitutions for mangling.
+  bool hasStandardSubstitutions() const;
+
   /// \returns true if this module is the "SwiftShims" module;
   bool isSwiftShimsModule() const;
 
@@ -726,6 +787,31 @@ public:
     return ReverseFullNameIterator(this);
   }
 
+  /// Calls \p callback for each source file of the module.
+  void collectBasicSourceFileInfo(
+      llvm::function_ref<void(const BasicSourceFileInfo &)> callback) const;
+
+  /// Retrieve a fingerprint value that summarizes the contents of this module.
+  ///
+  /// This interface hash a of a module is guaranteed to change if the interface
+  /// hash of any of its (primary) source files changes. For example, when
+  /// building incrementally, the interface hash of this module will change when
+  /// the primaries contributing to its content changes. In contrast, when
+  /// a module is deserialized, the hash of every source file contributes to
+  /// the module's interface hash. It therefore serves as an effective, if
+  /// coarse-grained, way of determining when top-level changes to a module's
+  /// contents have been made.
+  Fingerprint getFingerprint() const;
+
+  /// Returns an approximation of whether the given module could be
+  /// redistributed and consumed by external clients.
+  ///
+  /// FIXME: The scope of this computation should be limited entirely to
+  /// RenamedDeclRequest. Unfortunately, it has been co-opted to support the
+  /// \c SerializeOptionsForDebugging hack. Once this information can be
+  /// transferred from module files to the dSYMs, remove this.
+  bool isExternallyConsumed() const;
+
   SourceRange getSourceRange() const { return SourceRange(); }
 
   static bool classof(const DeclContext *DC) {
@@ -738,16 +824,8 @@ public:
     return D->getKind() == DeclKind::Module;
   }
 
-private:
-  // Make placement new and vanilla new/delete illegal for Modules.
-  void *operator new(size_t Bytes) throw() = delete;
-  void operator delete(void *Data) throw() = delete;
-  void *operator new(size_t Bytes, void *Mem) throw() = delete;
-public:
-  // Only allow allocation of Modules using the allocator in ASTContext
-  // or by doing a placement new.
-  void *operator new(size_t Bytes, const ASTContext &C,
-                     unsigned Alignment = alignof(ModuleDecl));
+  using ASTAllocated<ModuleDecl>::operator new;
+  using ASTAllocated<ModuleDecl>::operator delete;
 };
 
 /// Wraps either a swift module or a clang one.

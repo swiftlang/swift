@@ -69,31 +69,36 @@ protected:
 // The mangler for specialized generic functions.
 class GenericSpecializationMangler : public SpecializationMangler {
 
-  SubstitutionMap SubMap;
-  bool isReAbstracted;
-  bool isInlined;
-  bool isPrespecializaton;
+  GenericSpecializationMangler(std::string origFuncName)
+      : SpecializationMangler(SpecializationPass::GenericSpecializer,
+                              IsNotSerialized, origFuncName) {}
+
+  GenericSignature getGenericSignature() {
+    assert(Function && "Need a SIL function to get a generic signature");
+    return Function->getLoweredFunctionType()->getInvocationGenericSignature();
+  }
+
+  void appendSubstitutions(GenericSignature sig, SubstitutionMap subs);
+
+  std::string manglePrespecialized(GenericSignature sig,
+                                      SubstitutionMap subs);
 
 public:
-  GenericSpecializationMangler(SILFunction *F, SubstitutionMap SubMap,
-                               IsSerialized_t Serialized, bool isReAbstracted,
-                               bool isInlined = false,
-                               bool isPrespecializaton = false)
+  GenericSpecializationMangler(SILFunction *F, IsSerialized_t Serialized)
       : SpecializationMangler(SpecializationPass::GenericSpecializer,
-                              Serialized, F),
-        SubMap(SubMap), isReAbstracted(isReAbstracted), isInlined(isInlined),
-        isPrespecializaton(isPrespecializaton) {}
+                              Serialized, F) {}
 
-  GenericSpecializationMangler(std::string origFuncName, SubstitutionMap SubMap)
-      : SpecializationMangler(SpecializationPass::GenericSpecializer,
-                              IsNotSerialized, origFuncName),
-        SubMap(SubMap), isReAbstracted(true), isInlined(false),
-        isPrespecializaton(true) {}
+  std::string mangleNotReabstracted(SubstitutionMap subs);
 
-  std::string mangle(GenericSignature Sig = GenericSignature());
+  std::string mangleReabstracted(SubstitutionMap subs, bool alternativeMangling);
 
-  // TODO: This utility should move from the libswiftSILOptimizer to
-  // libswiftSIL.
+  std::string mangleForDebugInfo(GenericSignature sig, SubstitutionMap subs,
+                                 bool forInlining);
+
+  std::string manglePrespecialized(SubstitutionMap subs) {
+    return manglePrespecialized(getGenericSignature(), subs);
+  }
+                                    
   static std::string manglePrespecialization(std::string unspecializedName,
                                              GenericSignature genericSig,
                                              GenericSignature specializedSig);

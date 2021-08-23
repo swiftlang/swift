@@ -1,59 +1,40 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency %import-libdispatch)
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking  %import-libdispatch -parse-as-library)
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
-// XFAIL: CPU=arm64e
+
+// rdar://76038845
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 import Dispatch
-
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#endif
-
-extension DispatchQueue {
-  func async<R>(execute: @escaping () async throws -> R) -> Task.Handle<R> {
-    let handle = Task.runDetached(operation: execute)
-
-    // Run the task
-    _ = { self.async { handle.run() } }()
-
-    return handle
-  }
-}
 
 enum HomeworkError: Error, Equatable {
   case dogAteIt(String)
 }
 
+@available(SwiftStdlib 5.5, *)
 func formGreeting(name: String) async -> String {
   return "Hello \(name) from async world"
 }
 
+@available(SwiftStdlib 5.5, *)
 func testSimple(
   name: String, dogName: String, shouldThrow: Bool, doSuspend: Bool
-) {
+) async {
   print("Testing name: \(name), dog: \(dogName), shouldThrow: \(shouldThrow) doSuspend: \(doSuspend)")
 
-  let queue = DispatchQueue(label: "concurrent", attributes: .concurrent)
-  let group = DispatchGroup()
   var completed = false
 
-  group.enter()
-  let taskHandle = queue.async { () async throws -> String in
-    defer {
-      group.leave()
-    }
-
+  let taskHandle: Task.Handle<String, Error> = detach {
     let greeting = await formGreeting(name: name)
 
     // If the intent is to test suspending, wait a bit so the second task
     // can complete.
     if doSuspend {
       print("- Future sleeping")
-      sleep(1)
+      await Task.sleep(1_000_000_000)
     }
 
     if (shouldThrow) {
@@ -65,42 +46,40 @@ func testSimple(
     return greeting + "!"
   }
 
-  group.enter()
-  _ = queue.async { () async in
-    defer {
-      group.leave()
-    }
-
-    // If the intent is not to test suspending, wait a bit so the first task
-    // can complete.
-    if !doSuspend {
-      print("+ Reader sleeping")
-      sleep(1)
-    }
-
-    do {
-      print("+ Reader waiting for the result")
-      let result = await try taskHandle.get()
-      completed = true
-      print("+ Normal return: \(result)")
-      assert(result == "Hello \(name) from async world!")
-    } catch HomeworkError.dogAteIt(let badDog) {
-      completed = true
-      print("+ Error return: HomeworkError.dogAteIt(\(badDog))")
-      assert(badDog == dogName + " the dog")
-    } catch {
-      fatalError("Caught a different exception?")
-    }
+  // If the intent is not to test suspending, wait a bit so the first task
+  // can complete.
+  if !doSuspend {
+    print("+ Reader sleeping")
+    await Task.sleep(1_000_000_000)
   }
 
-  group.wait()
+  do {
+    print("+ Reader waiting for the result")
+    let result = try await taskHandle.get()
+    completed = true
+    print("+ Normal return: \(result)")
+    assert(result == "Hello \(name) from async world!")
+  } catch HomeworkError.dogAteIt(let badDog) {
+    completed = true
+    print("+ Error return: HomeworkError.dogAteIt(\(badDog))")
+    assert(badDog == dogName + " the dog")
+  } catch {
+    fatalError("Caught a different exception?")
+  }
+
   assert(completed)
   print("Finished test")
 }
 
-testSimple(name: "Ted", dogName: "Hazel", shouldThrow: false, doSuspend: false)
-testSimple(name: "Ted", dogName: "Hazel", shouldThrow: true, doSuspend: false)
-testSimple(name: "Ted", dogName: "Hazel", shouldThrow: false, doSuspend: true)
-testSimple(name: "Ted", dogName: "Hazel", shouldThrow: true, doSuspend: true)
 
-print("Done")
+@available(SwiftStdlib 5.5, *)
+@main struct Main {
+  static func main() async {
+    await testSimple(name: "Ted", dogName: "Hazel", shouldThrow: false, doSuspend: false)
+    await testSimple(name: "Ted", dogName: "Hazel", shouldThrow: true, doSuspend: false)
+    await testSimple(name: "Ted", dogName: "Hazel", shouldThrow: false, doSuspend: true)
+    await testSimple(name: "Ted", dogName: "Hazel", shouldThrow: true, doSuspend: true)
+
+    print("Done")
+  }
+}

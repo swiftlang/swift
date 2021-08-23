@@ -251,6 +251,8 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'MultipleTrailingClosureElement': 246,
     'PoundFileIDExpr': 247,
     'TargetFunctionEntry': 248,
+    'PostfixIfConfigExpr': 250,
+    'UnavailabilityCondition': 251,
 }
 
 

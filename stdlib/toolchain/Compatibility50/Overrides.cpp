@@ -86,18 +86,13 @@ using mach_header_platform = mach_header;
 
 __attribute__((constructor))
 static void installGetClassHook_untrusted() {
+  extern char __dso_handle[];
+  
   // swiftCompatibility* might be linked into multiple dynamic libraries because
   // of build system reasons, but the copy in the main executable is the only
   // one that should count. Bail early unless we're running out of the main
   // executable.
-  //
-  // Newer versions of dyld add additional API that can determine this more
-  // efficiently, but we have to support back to OS X 10.9/iOS 7, so dladdr
-  // is the only API that reaches back that far.
-  Dl_info dlinfo;
-  if (dladdr((const void*)(uintptr_t)installGetClassHook_untrusted, &dlinfo) == 0)
-    return;
-  auto machHeader = (const mach_header_platform *)dlinfo.dli_fbase;
+  auto machHeader = (const mach_header_platform *)__dso_handle;
   if (machHeader->filetype != MH_EXECUTE)
     return;
   

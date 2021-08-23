@@ -328,10 +328,10 @@ def main():
 
     # Determine the set of extra arguments we'll use.
     extra_args = ['-skip-imports']
-    if args.enable_infer_import_as_member:
-        extra_args = extra_args + ['-enable-infer-import-as-member']
     if args.enable_experimental_concurrency:
         extra_args = extra_args + ['-enable-experimental-concurrency']
+    if args.enable_experimental_distributed:
+        extra_args = extra_args + ['-enable-experimental-distributed']
     if args.swift_version:
         extra_args = extra_args + ['-swift-version', '%s' % args.swift_version]
 

@@ -39,9 +39,8 @@ public:
   ///
   /// The parent JVP cloner stores the original function and an empty
   /// to-be-generated pullback function.
-  explicit JVPCloner(ADContext &context, SILFunction *original,
-                     SILDifferentiabilityWitness *witness, SILFunction *jvp,
-                     DifferentiationInvoker invoker);
+  explicit JVPCloner(ADContext &context, SILDifferentiabilityWitness *witness,
+                     SILFunction *jvp, DifferentiationInvoker invoker);
   ~JVPCloner();
 
   /// Performs JVP generation on the empty JVP function. Returns true if any

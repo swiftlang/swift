@@ -31,45 +31,27 @@ class ReborrowVerifier {
   /// A cache of dead-end basic blocks that we use to determine if we can
   /// ignore "leaks".
   DeadEndBlocks &deadEndBlocks;
-  /// A cache map of borrow lifetime ending operands and their base value
-  llvm::SmallDenseMap<Operand *, SILValue> visitedOps;
-  /// A cache map of guaranteed phi args and their base value
-  llvm::SmallDenseMap<SILPhiArgument *, SILValue> visitedPhiArgs;
   /// The builder that the checker uses to emit error messages, crash if asked
   /// for, or supply back interesting info to the caller.
   LinearLifetimeChecker::ErrorBuilder errorBuilder;
+  /// A map of reborrow phi arg to its base values.
+  /// Note that a reborrow phi arg can have different base values based on
+  /// different control flow paths.
+  llvm::DenseMap<SILPhiArgument *, SmallPtrSet<SILValue, 8>>
+      reborrowToBaseValuesMap;
 
 public:
   ReborrowVerifier(const SILFunction *func, DeadEndBlocks &deadEndBlocks,
                    LinearLifetimeChecker::ErrorBuilder errorBuilder)
       : deadEndBlocks(deadEndBlocks), errorBuilder(errorBuilder) {}
 
+  /// Find all the reborrows of \p initialScopedOperand and verify their
+  /// lifetime.
   void verifyReborrows(BorrowingOperand initialScopedOperand, SILValue value);
 
 private:
   /// Verifies whether the reborrow's lifetime lies within its base value
   bool verifyReborrowLifetime(SILPhiArgument *phiArg, SILValue baseVal);
-
-  /// Check if the operand is visited
-  bool isVisitedOp(Operand *op, SILValue baseVal) {
-    return visitedOps.find(op) != visitedOps.end();
-  }
-
-  /// Check if the phi arg and base value are visited
-  bool isVisitedPhiArg(SILPhiArgument *phiArg, SILValue baseVal) {
-    auto itPhiArg = visitedPhiArgs.find(phiArg);
-    return itPhiArg != visitedPhiArgs.end() && (*itPhiArg).second == baseVal;
-  }
-
-  /// Mark operand as visited
-  void addVisitedOp(Operand *op, SILValue baseVal) {
-    visitedOps.insert({op, baseVal});
-  }
-
-  /// Mark guaranteed phi arg as visited
-  void addVisitedPhiArg(SILPhiArgument *phiArg, SILValue baseVal) {
-    visitedPhiArgs.insert({phiArg, baseVal});
-  }
 };
 
 } // namespace swift

@@ -73,6 +73,7 @@ bb0(%0 : @owned $AnyObject):
   inject_enum_addr %1 : $*Optional<AnyObject>, #Optional.some!enumelt
   %5 = load_borrow %1 : $*Optional<AnyObject>
   end_borrow %5 : $Optional<AnyObject>
+  destroy_addr %1 : $*Optional<AnyObject>
   dealloc_stack %1 : $*Optional<AnyObject>
   %99 = tuple ()
   return %99 : $()
@@ -97,3 +98,58 @@ bb0(%0 : @guaranteed $ObjectWrapper):
   end_borrow %2 : $AnyObject
   return %3 : $ObjectWrapper
 }
+
+final class B { }
+
+final class K {
+  @_hasStorage public var x: B { get }
+  init()
+}
+
+sil [ossa] @test_dealloc_ref : $@convention(thin) (@owned K) -> () {
+bb0(%0 : @owned $K):
+  %1 = begin_borrow %0 : $K
+  %2 = ref_element_addr %1 : $K, #K.x
+  %3 = begin_access [read] [dynamic] %2 : $*B
+  %4 = load_borrow %3 : $*B
+  end_borrow %4 : $B
+  end_access %3 : $*B
+  end_borrow %1 : $K
+  dealloc_ref %0 : $K
+  %r = tuple ()
+  return %r : $()
+}
+
+sil [ossa] @test_dealloc_partial_ref : $@convention(thin) (@owned K) -> () {
+bb0(%0 : @owned $K):
+  %1 = begin_borrow %0 : $K
+  %2 = ref_element_addr %1 : $K, #K.x
+  %3 = begin_access [read] [dynamic] %2 : $*B
+  %4 = load_borrow %3 : $*B
+  end_borrow %4 : $B
+  end_access %3 : $*B
+  end_borrow %1 : $K
+  %8 = metatype $@thick K.Type
+  dealloc_partial_ref %0 : $K, %8 : $@thick K.Type
+  %r = tuple ()
+  return %r : $()
+}
+
+sil [ossa] @test_end_lifetime : $@convention(thin) (@owned K) -> () {
+bb0(%0 : @owned $K):
+  %1 = begin_borrow %0 : $K
+  %2 = ref_element_addr %1 : $K, #K.x
+  %3 = begin_access [read] [dynamic] %2 : $*B
+  %4 = load_borrow %3 : $*B
+  end_borrow %4 : $B
+  end_access %3 : $*B
+  %cast = unchecked_ref_cast %1 : $K to $Builtin.NativeObject
+  %conv1 = unchecked_ownership_conversion %cast : $Builtin.NativeObject, @guaranteed to @owned
+  end_borrow %1 : $K
+  end_lifetime %0 : $K
+  %conv2 = unchecked_ref_cast %conv1 : $Builtin.NativeObject to $K
+  dealloc_ref %conv2 : $K
+  %r = tuple ()
+  return %r : $()
+}
+

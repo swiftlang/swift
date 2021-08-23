@@ -144,3 +144,6 @@ extension Collection where Indices == DefaultIndices<Self> {
       endIndex: self.endIndex)
   }
 }
+
+extension DefaultIndices: Sendable
+  where Elements: Sendable, Elements.Index: Sendable { }

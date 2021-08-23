@@ -17,7 +17,7 @@
 
 #include "swift/Runtime/Casting.h"
 #include "../SwiftShims/RuntimeShims.h"
-#include "CompatibilityOverride.h"
+#include "../CompatibilityOverride/CompatibilityOverride.h"
 #include "ErrorObject.h"
 #include "ExistentialMetadataImpl.h"
 #include "Private.h"
@@ -885,7 +885,7 @@ swift_dynamicCastMetatypeUnconditionalImpl(const Metadata *sourceType,
 /******************************** Existentials ********************************/
 /******************************************************************************/
 
-
+#if SWIFT_OBJC_INTEROP
 static void unwrapExistential(OpaqueValue *src,
                               const ExistentialTypeMetadata *srcType,
                               OpaqueValue *&srcValue,
@@ -932,6 +932,7 @@ static void unwrapExistential(OpaqueValue *src,
     }
   }
 }
+#endif
 
 /******************************************************************************/
 /****************************** Main Entrypoint *******************************/
@@ -1477,5 +1478,5 @@ HeapObject *_swift_bridgeToObjectiveCUsingProtocolIfPossible(
 #endif
 
 #define OVERRIDE_CASTING COMPATIBILITY_OVERRIDE
-#include "CompatibilityOverride.def"
+#include COMPATIBILITY_OVERRIDE_INCLUDE_PATH
 

@@ -243,6 +243,9 @@ namespace {
     IMPL(BuiltinIntegerLiteral, Trivial)
     IMPL(BuiltinFloat, Trivial)
     IMPL(BuiltinRawPointer, Trivial)
+    IMPL(BuiltinRawUnsafeContinuation, Trivial)
+    IMPL(BuiltinJob, Trivial)
+    IMPL(BuiltinExecutor, Trivial)
     IMPL(BuiltinNativeObject, Reference)
     IMPL(BuiltinBridgeObject, Reference)
     IMPL(BuiltinVector, Trivial)
@@ -256,6 +259,15 @@ namespace {
 
     RetTy visitBuiltinUnsafeValueBufferType(
                                          CanBuiltinUnsafeValueBufferType type,
+                                         AbstractionPattern origType,
+                                         IsTypeExpansionSensitive_t isSensitive) {
+      return asImpl().handleAddressOnly(type, {IsNotTrivial, IsFixedABI,
+                                               IsAddressOnly, IsNotResilient,
+                                               isSensitive});
+    }
+
+    RetTy visitBuiltinDefaultActorStorageType(
+                                         CanBuiltinDefaultActorStorageType type,
                                          AbstractionPattern origType,
                                          IsTypeExpansionSensitive_t isSensitive) {
       return asImpl().handleAddressOnly(type, {IsNotTrivial, IsFixedABI,
@@ -282,9 +294,12 @@ namespace {
     RetTy visitSILFunctionType(CanSILFunctionType type,
                                AbstractionPattern origType,
                                IsTypeExpansionSensitive_t isSensitive) {
-      // Handle `@differentiable` and `@differentiable(linear)` functions.
+      // Handle `@differentiable` and `@differentiable(_linear)` functions.
       switch (type->getDifferentiabilityKind()) {
+      // TODO: Ban `Normal` and `Forward` cases.
       case DifferentiabilityKind::Normal:
+      case DifferentiabilityKind::Forward:
+      case DifferentiabilityKind::Reverse:
         return asImpl().visitNormalDifferentiableSILFunctionType(
             type, mergeIsTypeExpansionSensitive(
                       isSensitive,
@@ -294,7 +309,7 @@ namespace {
         return asImpl().visitLinearDifferentiableSILFunctionType(
             type, mergeIsTypeExpansionSensitive(
                       isSensitive,
-                      getLinearDifferentiableSILFunctionTypeRecursiveProperties(
+                      getNormalDifferentiableSILFunctionTypeRecursiveProperties(
                           type, origType)));
       case DifferentiabilityKind::NonDifferentiable:
         break;
@@ -412,8 +427,15 @@ namespace {
       return visitAbstractTypeParamType(type, origType, isSensitive);
     }
 
-    Type getConcreteReferenceStorageReferent(Type type) {
+    Type getConcreteReferenceStorageReferent(Type type,
+                                             AbstractionPattern origType) {
       if (type->isTypeParameter()) {
+        auto genericSig = origType.getGenericSignature();
+        if (auto concreteType = genericSig->getConcreteType(type))
+          return concreteType;
+        if (auto superclassType = genericSig->getSuperclassBound(type))
+          return superclassType;
+        assert(genericSig->requiresClass(type));
         return TC.Context.getAnyObjectType();
       }
 
@@ -458,7 +480,7 @@ namespace {
                                    IsTypeExpansionSensitive_t isSensitive) { \
       auto referentType = \
         type->getReferentType()->lookThroughSingleOptionalType(); \
-      auto concreteType = getConcreteReferenceStorageReferent(referentType); \
+      auto concreteType = getConcreteReferenceStorageReferent(referentType, origType); \
       if (Name##StorageType::get(concreteType, TC.Context) \
             ->isLoadable(Expansion.getResilienceExpansion())) { \
         return asImpl().visitLoadable##Name##StorageType(type, origType, \
@@ -1323,7 +1345,7 @@ namespace {
     }
   };
 
-  /// A type lowering for `@differentiable(linear)` function types.
+  /// A type lowering for `@differentiable(_linear)` function types.
   class LinearDifferentiableSILFunctionTypeLowering final
       : public LoadableAggTypeLowering<
                    LinearDifferentiableSILFunctionTypeLowering,
@@ -1746,7 +1768,10 @@ namespace {
         // field type against the declaration's interface type as we normally
         // would, we use the substituted field type in order to accurately
         // preserve the properties of the aggregate.
-        auto origFieldType = origType.unsafeGetSubstFieldType(field);
+        auto sig = field->getDeclContext()->getGenericSignatureOfContext();
+        auto interfaceTy = field->getInterfaceType()->getCanonicalType(sig);
+        auto origFieldType = origType.unsafeGetSubstFieldType(field,
+                                                              interfaceTy);
         
         properties.addSubobject(classifyType(origFieldType, substFieldType,
                                              TC, Expansion));
@@ -2343,7 +2368,9 @@ getCanonicalSignatureOrNull(GenericSignature sig) {
 /// Get the type of a global variable accessor function, () -> RawPointer.
 static CanAnyFunctionType getGlobalAccessorType(CanType varType) {
   ASTContext &C = varType->getASTContext();
-  return CanFunctionType::get({}, C.TheRawPointerType);
+  // FIXME: Verify ExtInfo state is correct, not working by accident.
+  CanFunctionType::ExtInfo info;
+  return CanFunctionType::get({}, C.TheRawPointerType, info);
 }
 
 /// Removes @noescape from the given type if it's a function type. Otherwise,
@@ -2359,6 +2386,7 @@ static CanType removeNoEscape(CanType resultType) {
 
 /// Get the type of a default argument generator, () -> T.
 static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
+                                                     TypeConverter &TC,
                                                      SILDeclRef c) {
   auto *vd = c.getDecl();
   auto resultTy = getParameterAt(vd,
@@ -2376,17 +2404,12 @@ static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
   canResultTy = removeNoEscape(canResultTy);
 
   // Get the generic signature from the surrounding context.
-  auto sig = vd->getInnermostDeclContext()->getGenericSignatureOfContext();
-  if (auto *afd = dyn_cast<AbstractFunctionDecl>(vd)) {
-    auto *param = getParameterAt(afd, c.defaultArgIndex);
-    if (param->hasDefaultExpr()) {
-      auto captureInfo = param->getDefaultArgumentCaptureInfo();
-      sig = getEffectiveGenericSignature(afd, captureInfo);
-    }
-  }
+  auto sig = TC.getConstantGenericSignature(c);
 
-  return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig),
-                                 {}, canResultTy);
+  // FIXME: Verify ExtInfo state is correct, not working by accident.
+  CanAnyFunctionType::ExtInfo info;
+  return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig), {},
+                                 canResultTy, info);
 }
 
 /// Get the type of a stored property initializer, () -> T.
@@ -2411,30 +2434,40 @@ static CanAnyFunctionType getStoredPropertyInitializerInterfaceType(
 
   auto sig = DC->getGenericSignatureOfContext();
 
-  return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig),
-                                 {}, resultTy);
+  // FIXME: Verify ExtInfo state is correct, not working by accident.
+  CanAnyFunctionType::ExtInfo info;
+  return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig), {}, resultTy,
+                                 info);
 }
 
 /// Get the type of a property wrapper backing initializer,
 /// (property-type) -> backing-type.
 static CanAnyFunctionType getPropertyWrapperBackingInitializerInterfaceType(
                                                      TypeConverter &TC,
-                                                     VarDecl *VD) {
+                                                     SILDeclRef c) {
+  auto *VD = cast<VarDecl>(c.getDecl());
   CanType resultType =
       VD->getPropertyWrapperBackingPropertyType()->getCanonicalType();
 
-  auto *DC = VD->getInnermostDeclContext();
-  CanType inputType =
-    VD->getPropertyWrapperInitValueInterfaceType()->getCanonicalType();
+  CanType inputType;
+  if (c.kind == SILDeclRef::Kind::PropertyWrapperBackingInitializer) {
+    inputType = VD->getPropertyWrapperInitValueInterfaceType()->getCanonicalType();
+  } else {
+    Type interfaceType = VD->getPropertyWrapperProjectionVar()->getInterfaceType();
+    inputType = interfaceType->getCanonicalType();
+  }
 
-  auto sig = DC->getGenericSignatureOfContext();
+  GenericSignature sig = TC.getConstantGenericSignature(c);
 
   AnyFunctionType::Param param(
       inputType, Identifier(),
       ParameterTypeFlags().withValueOwnership(ValueOwnership::Owned));
+  // FIXME: Verify ExtInfo state is correct, not working by accident.
+  CanAnyFunctionType::ExtInfo info;
   return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig), {param},
-                                 resultType);
+                                 resultType, info);
 }
+
 /// Get the type of a destructor function.
 static CanAnyFunctionType getDestructorInterfaceType(DestructorDecl *dd,
                                                      bool isDeallocating,
@@ -2459,7 +2492,9 @@ static CanAnyFunctionType getDestructorInterfaceType(DestructorDecl *dd,
   CanType resultTy = (isDeallocating
                       ? TupleType::getEmpty(C)
                       : C.TheNativeObjectType);
-  CanType methodTy = CanFunctionType::get({}, resultTy);
+  // FIXME: Verify ExtInfo state is correct, not working by accident.
+  CanFunctionType::ExtInfo info;
+  CanType methodTy = CanFunctionType::get({}, resultTy, info);
 
   auto sig = dd->getGenericSignatureOfContext();
   FunctionType::Param args[] = {FunctionType::Param(classType)};
@@ -2511,6 +2546,7 @@ getFunctionInterfaceTypeWithCaptures(TypeConverter &TC,
   auto innerExtInfo =
       AnyFunctionType::ExtInfoBuilder(FunctionType::Representation::Thin,
                                       funcType->isThrowing())
+          .withConcurrent(funcType->isSendable())
           .withAsync(funcType->isAsync())
           .build();
 
@@ -2518,6 +2554,45 @@ getFunctionInterfaceTypeWithCaptures(TypeConverter &TC,
       getCanonicalSignatureOrNull(genericSig),
       funcType.getParams(), funcType.getResult(),
       innerExtInfo);
+}
+
+static CanAnyFunctionType getEntryPointInterfaceType(ASTContext &C) {
+  // Use standard library types if we have them; otherwise, fall back to
+  // builtins.
+  CanType Int32Ty;
+  if (auto Int32Decl = C.getInt32Decl()) {
+    Int32Ty = Int32Decl->getDeclaredInterfaceType()->getCanonicalType();
+  } else {
+    Int32Ty = CanType(BuiltinIntegerType::get(32, C));
+  }
+
+  CanType PtrPtrInt8Ty = C.TheRawPointerType;
+  if (auto PointerDecl = C.getUnsafeMutablePointerDecl()) {
+    if (auto Int8Decl = C.getInt8Decl()) {
+      Type Int8Ty = Int8Decl->getDeclaredInterfaceType();
+      Type PointerInt8Ty = BoundGenericType::get(PointerDecl,
+                                                 nullptr,
+                                                 Int8Ty);
+      Type OptPointerInt8Ty = OptionalType::get(PointerInt8Ty);
+      PtrPtrInt8Ty = BoundGenericType::get(PointerDecl,
+                                           nullptr,
+                                           OptPointerInt8Ty)
+        ->getCanonicalType();
+    }
+  }
+
+  using Param = FunctionType::Param;
+  Param params[] = {Param(Int32Ty), Param(PtrPtrInt8Ty)};
+
+  auto rep = FunctionTypeRepresentation::CFunctionPointer;
+  auto *clangTy = C.getClangFunctionType(params, Int32Ty, rep);
+  auto extInfo = FunctionType::ExtInfoBuilder()
+                     .withRepresentation(rep)
+                     .withClangFunctionType(clangTy)
+                     .build();
+
+  return CanAnyFunctionType::get(/*genericSig*/ nullptr,
+                                 llvm::makeArrayRef(params), Int32Ty, extInfo);
 }
 
 CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
@@ -2582,18 +2657,20 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
     return getGlobalAccessorType(var->getInterfaceType()->getCanonicalType());
   }
   case SILDeclRef::Kind::DefaultArgGenerator:
-    return getDefaultArgGeneratorInterfaceType(c);
+    return getDefaultArgGeneratorInterfaceType(*this, c);
   case SILDeclRef::Kind::StoredPropertyInitializer:
     return getStoredPropertyInitializerInterfaceType(cast<VarDecl>(vd));
   case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
-    return getPropertyWrapperBackingInitializerInterfaceType(*this,
-                                                             cast<VarDecl>(vd));
+  case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
+    return getPropertyWrapperBackingInitializerInterfaceType(*this, c);
   case SILDeclRef::Kind::IVarInitializer:
     return getIVarInitDestroyerInterfaceType(cast<ClassDecl>(vd),
                                              c.isForeign, false);
   case SILDeclRef::Kind::IVarDestroyer:
     return getIVarInitDestroyerInterfaceType(cast<ClassDecl>(vd),
                                              c.isForeign, true);
+  case SILDeclRef::Kind::EntryPoint:
+    return getEntryPointInterfaceType(Context);
   }
 
   llvm_unreachable("Unhandled SILDeclRefKind in switch.");
@@ -2623,11 +2700,30 @@ TypeConverter::getConstantGenericSignature(SILDeclRef c) {
     return getEffectiveGenericSignature(
       vd->getInnermostDeclContext(), captureInfo);
   }
+  case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
+  case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue: {
+    // FIXME: It might be better to compute lowered local captures of
+    // the property wrapper generator directly and collapse this into the
+    // above case. For now, take the generic signature of the enclosing
+    // context.
+    auto *dc = vd->getDeclContext();
+    if (dc->isLocalContext()) {
+      SILDeclRef enclosingDecl;
+      if (auto *closure = dyn_cast<AbstractClosureExpr>(dc)) {
+        enclosingDecl = SILDeclRef(closure);
+      } else {
+        enclosingDecl = SILDeclRef(cast<AbstractFunctionDecl>(dc));
+      }
+      return getConstantGenericSignature(enclosingDecl);
+    }
+    return dc->getGenericSignatureOfContext();
+  }
   case SILDeclRef::Kind::EnumElement:
   case SILDeclRef::Kind::GlobalAccessor:
   case SILDeclRef::Kind::StoredPropertyInitializer:
-  case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
     return vd->getDeclContext()->getGenericSignatureOfContext();
+  case SILDeclRef::Kind::EntryPoint:
+    llvm_unreachable("Doesn't have generic signature");
   }
 
   llvm_unreachable("Unhandled SILDeclRefKind in switch.");
@@ -2635,9 +2731,7 @@ TypeConverter::getConstantGenericSignature(SILDeclRef c) {
 
 GenericEnvironment *
 TypeConverter::getConstantGenericEnvironment(SILDeclRef c) {
-  if (auto sig = getConstantGenericSignature(c))
-    return sig->getGenericEnvironment();
-  return nullptr;
+  return getConstantGenericSignature(c).getGenericEnvironment();
 }
 
 SILType TypeConverter::getSubstitutedStorageType(TypeExpansionContext context,
@@ -2709,6 +2803,7 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
   switch (fn.kind) {
   case SILDeclRef::Kind::StoredPropertyInitializer:
   case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
+  case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
     return CaptureInfo::empty();
 
   default:
@@ -2767,9 +2862,24 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
       // of its accessors.
       if (auto capturedVar = dyn_cast<VarDecl>(capture.getDecl())) {
         auto collectAccessorCaptures = [&](AccessorKind kind) {
-          if (auto *accessor = capturedVar->getParsedAccessor(kind))
+          if (auto *accessor = capturedVar->getParsedAccessor(kind)) {
             collectFunctionCaptures(accessor);
+          } else if (capturedVar->hasAttachedPropertyWrapper() ||
+                     capturedVar->getOriginalWrappedProperty(
+                         PropertyWrapperSynthesizedPropertyKind::Projection)) {
+            // Wrapped properties have synthesized accessors.
+            if (auto *accessor = capturedVar->getSynthesizedAccessor(kind))
+              collectFunctionCaptures(accessor);
+          }
         };
+
+        // 'Lazy' properties don't fit into the below categorization,
+        // and they have a synthesized getter, not a parsed one.
+        if (capturedVar->getAttrs().hasAttribute<LazyAttr>()) {
+          if (auto *getter = capturedVar->getSynthesizedAccessor(
+                AccessorKind::Get))
+            collectFunctionCaptures(getter);
+        }
 
         if (!capture.isDirect()) {
           auto impl = capturedVar->getImplInfo();
@@ -3014,6 +3124,15 @@ TypeConverter::checkForABIDifferences(SILModule &M,
   // trivial.
   if (auto fnTy1 = type1.getAs<SILFunctionType>()) {
     if (auto fnTy2 = type2.getAs<SILFunctionType>()) {
+      // Async/synchronous conversions always need a thunk.
+      if (fnTy1->isAsync() != fnTy2->isAsync())
+        return ABIDifference::NeedsThunk;
+      // Usin an async function without an error result in place of an async
+      // function that needs an error result is not ABI compatible.
+      if (fnTy2->isAsync() && !fnTy1->hasErrorResult() &&
+          fnTy2->hasErrorResult())
+        return ABIDifference::NeedsThunk;
+
       // @convention(block) is a single retainable pointer so optionality
       // change is allowed.
       if (optionalityChange)
@@ -3142,8 +3261,7 @@ TypeConverter::checkFunctionForABIDifferences(SILModule &M,
   // We might still want to conditionalize this behavior even after we commit
   // substituted function types, to avoid bloating
   // IR for platforms that don't differentiate function type representations.
-  bool DifferentFunctionTypesHaveDifferentRepresentation
-    = Context.LangOpts.EnableSubstSILFunctionTypesForFunctionValues;
+  bool DifferentFunctionTypesHaveDifferentRepresentation = true;
   
   // TODO: For C language types we should consider the attached Clang types.
   if (fnTy1->getLanguage() == SILFunctionLanguage::C)
@@ -3295,7 +3413,7 @@ TypeConverter::getInterfaceBoxTypeForCapture(ValueDecl *captured,
   auto loweredContextType = loweredInterfaceType;
   auto contextBoxTy = boxTy;
   if (signature) {
-    auto env = signature->getGenericEnvironment();
+    auto env = signature.getGenericEnvironment();
     loweredContextType = env->mapTypeIntoContext(loweredContextType)
                             ->getCanonicalType();
     contextBoxTy = cast<SILBoxType>(

@@ -182,12 +182,12 @@ FunctionSignatureSpecializationMangler::mangleClosureProp(SILInstruction *Inst) 
   // restriction is removed, the assert here will fire.
   if (auto *TTTFI = dyn_cast<ThinToThickFunctionInst>(Inst)) {
     auto *FRI = cast<FunctionRefInst>(TTTFI->getCallee());
-    appendIdentifier(FRI->getInitiallyReferencedFunction()->getName());
+    appendIdentifier(FRI->getReferencedFunction()->getName());
     return;
   }
   auto *PAI = cast<PartialApplyInst>(Inst);
   auto *FRI = cast<FunctionRefInst>(PAI->getCallee());
-  appendIdentifier(FRI->getInitiallyReferencedFunction()->getName());
+  appendIdentifier(FRI->getReferencedFunction()->getName());
 
   // Then we mangle the types of the arguments that the partial apply is
   // specializing.

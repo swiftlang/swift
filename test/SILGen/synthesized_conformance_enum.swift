@@ -15,8 +15,8 @@ enum NoValues {
 // CHECK:   case a, b
 // CHECK-FRAGILE:   @_implements(Equatable, ==(_:_:)) static func __derived_enum_equals(_ a: NoValues, _ b: NoValues) -> Bool
 // CHECK-RESILIENT: static func == (a: NoValues, b: NoValues) -> Bool
-// CHECK:   var hashValue: Int { get }
 // CHECK:   func hash(into hasher: inout Hasher)
+// CHECK:   var hashValue: Int { get }
 // CHECK: }
 
 // CHECK-LABEL: extension Enum : Equatable where T : Equatable {
@@ -24,8 +24,8 @@ enum NoValues {
 // CHECK-RESILIENT: static func == (a: Enum<T>, b: Enum<T>) -> Bool
 // CHECK: }
 // CHECK-LABEL: extension Enum : Hashable where T : Hashable {
-// CHECK:   var hashValue: Int { get }
 // CHECK:   func hash(into hasher: inout Hasher)
+// CHECK:   var hashValue: Int { get }
 // CHECK: }
 
 // CHECK-LABEL: extension NoValues : CaseIterable {
@@ -41,16 +41,29 @@ extension Enum: Equatable where T: Equatable {}
 // CHECK-RESILIENT-NEXT: sil hidden [ossa] @$s28synthesized_conformance_enum4EnumOAASQRzlE2eeoiySbACyxG_AEtFZ : $@convention(method) <T where T : Equatable> (@in_guaranteed Enum<T>, @in_guaranteed Enum<T>, @thin Enum<T>.Type) -> Bool {
 
 extension Enum: Hashable where T: Hashable {}
+// CHECK-LABEL: // Enum<A>.hash(into:)
+// CHECK-NEXT: sil hidden [ossa] @$s28synthesized_conformance_enum4EnumOAASHRzlE4hash4intoys6HasherVz_tF : $@convention(method) <T where T : Hashable> (@inout Hasher, @in_guaranteed Enum<T>) -> () {
+
 // CHECK-LABEL: // Enum<A>.hashValue.getter
 // CHECK-NEXT: sil hidden [ossa] @$s28synthesized_conformance_enum4EnumOAASHRzlE9hashValueSivg : $@convention(method) <T where T : Hashable> (@in_guaranteed Enum<T>) -> Int {
 
-// CHECK-LABEL: // Enum<A>.hash(into:)
-// CHECK-NEXT: sil hidden [ossa] @$s28synthesized_conformance_enum4EnumOAASHRzlE4hash4intoys6HasherVz_tF : $@convention(method) <T where T : Hashable> (@inout Hasher, @in_guaranteed Enum<T>) -> () {
+extension Enum: Codable where T: Codable {}
+// CHECK-LABEL: // Enum<A>.encode(to:)
+// CHECK-NEXT: sil hidden [ossa] @$s28synthesized_conformance_enum4EnumOAASeRzSERzlE6encode2toys7Encoder_p_tKF : $@convention(method) <T where T : Decodable, T : Encodable> (@in_guaranteed Encoder, @in_guaranteed Enum<T>) -> @error Error {
+
+// CHECK-LABEL: // Enum<A>.init(from:)
+// CHECK-NEXT: sil hidden [ossa] @$s28synthesized_conformance_enum4EnumOAASeRzSERzlE4fromACyxGs7Decoder_p_tKcfC : $@convention(method) <T where T : Decodable, T : Encodable> (@in Decoder, @thin Enum<T>.Type) -> (@out Enum<T>, @error Error)
 
 extension NoValues: CaseIterable {}
 // CHECK-LABEL: // static NoValues.allCases.getter
 // CHECK-NEXT: sil hidden [ossa] @$s28synthesized_conformance_enum8NoValuesO8allCasesSayACGvgZ : $@convention(method) (@thin NoValues.Type) -> @owned Array<NoValues> {
 
+extension NoValues: Codable {}
+// CHECK-LABEL: // NoValues.encode(to:)
+// CHECK-NEXT: sil hidden [ossa] @$s28synthesized_conformance_enum8NoValuesO6encode2toys7Encoder_p_tKF : $@convention(method) (@in_guaranteed Encoder, NoValues) -> @error Error {
+
+// CHECK-LABEL: // NoValues.init(from:)
+// CHECK-NEXT: sil hidden [ossa] @$s28synthesized_conformance_enum8NoValuesO4fromACs7Decoder_p_tKcfC : $@convention(method) (@in Decoder, @thin NoValues.Type) -> (NoValues, @error Error)
 
 // Witness tables for Enum
 
@@ -67,6 +80,18 @@ extension NoValues: CaseIterable {}
 // CHECK-DAG:   conditional_conformance (T: Hashable): dependent
 // CHECK: }
 
+// CHECK-LABEL: sil_witness_table hidden <T where T : Decodable, T : Encodable> Enum<T>: Decodable module synthesized_conformance_enum {
+// CHECK-NEXT:   method #Decodable.init!allocator: <Self where Self : Decodable> (Self.Type) -> (Decoder) throws -> Self : @$s28synthesized_conformance_enum4EnumOyxGSeAASeRzSERzlSe4fromxs7Decoder_p_tKcfCTW	// protocol witness for Decodable.init(from:) in conformance <A> Enum<A>
+// CHECK-NEXT:   conditional_conformance (T: Decodable): dependent
+// CHECK-NEXT:   conditional_conformance (T: Encodable): dependent
+// CHECK-NEXT: }
+
+// CHECK-LABEL: sil_witness_table hidden <T where T : Decodable, T : Encodable> Enum<T>: Encodable module synthesized_conformance_enum {
+// CHECK-NEXT:   method #Encodable.encode: <Self where Self : Encodable> (Self) -> (Encoder) throws -> () : @$s28synthesized_conformance_enum4EnumOyxGSEAASeRzSERzlSE6encode2toys7Encoder_p_tKFTW	// protocol witness for Encodable.encode(to:) in conformance <A> Enum<A>
+// CHECK-NEXT:   conditional_conformance (T: Decodable): dependent
+// CHECK-NEXT:   conditional_conformance (T: Encodable): dependent
+// CHECK-NEXT: }
+
 // Witness tables for NoValues
 
 // CHECK-LABEL: sil_witness_table hidden NoValues: CaseIterable module synthesized_conformance_enum {
@@ -75,4 +100,10 @@ extension NoValues: CaseIterable {}
 // CHECK-NEXT:   method #CaseIterable.allCases!getter: <Self where Self : CaseIterable> (Self.Type) -> () -> Self.AllCases : @$s28synthesized_conformance_enum8NoValuesOs12CaseIterableAAsADP8allCases03AllI0QzvgZTW // protocol witness for static CaseIterable.allCases.getter in conformance NoValues
 // CHECK-NEXT: }
 
+// CHECK-LABEL: sil_witness_table hidden NoValues: Decodable module synthesized_conformance_enum {
+// CHECK-NEXT:   method #Decodable.init!allocator: <Self where Self : Decodable> (Self.Type) -> (Decoder) throws -> Self : @$s28synthesized_conformance_enum8NoValuesOSeAASe4fromxs7Decoder_p_tKcfCTW // protocol witness for Decodable.init(from:) in conformance NoValues
+// CHECK-NEXT: }
 
+// CHECK-LABEL: sil_witness_table hidden NoValues: Encodable module synthesized_conformance_enum {
+// CHECK-NEXT:   method #Encodable.encode: <Self where Self : Encodable> (Self) -> (Encoder) throws -> () : @$s28synthesized_conformance_enum8NoValuesOSEAASE6encode2toys7Encoder_p_tKFTW // protocol witness for Encodable.encode(to:) in conformance NoValues
+// CHECK-NEXT: }

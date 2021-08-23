@@ -116,13 +116,13 @@ protocol InternalProtocol {
 // CHECK-SAME: i32 3,
 
 // -- type metadata for associated type
-// CHECK-SAME: @"{{got.|__imp_}}$s1T18resilient_protocol24ProtocolWithRequirementsPTl"
+// CHECK-SAME: @"{{got.|\\01__imp__?}}$s1T18resilient_protocol24ProtocolWithRequirementsPTl"
 // CHECK-SAME: @"symbolic Si"
 
-// CHECK-SAME: @"{{got.|__imp_}}$s18resilient_protocol24ProtocolWithRequirementsP5firstyyFTq"
+// CHECK-SAME: @"{{got.|\\01__imp__?}}$s18resilient_protocol24ProtocolWithRequirementsP5firstyyFTq"
 // CHECK-SAME: @firstWitness
 
-// CHECK-SAME: @"{{got.|__imp_}}$s18resilient_protocol24ProtocolWithRequirementsP6secondyyFTq"
+// CHECK-SAME: @"{{got.|\\01__imp__?}}$s18resilient_protocol24ProtocolWithRequirementsP6secondyyFTq"
 // CHECK-SAME: @secondWitness
 
 // -- number of witness table entries

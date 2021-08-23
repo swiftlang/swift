@@ -64,6 +64,9 @@ public:
     }
   }
 
+  operator const Operand *() const { return op; }
+  operator Operand *() { return op; }
+
   Operand *getOperand() const { return op; }
   SILValue getValue() const { return op->get(); }
   SILType getType() const { return op->get()->getType(); }

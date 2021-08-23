@@ -11,19 +11,19 @@
 
 // Note: RUN lines copied from test/Syntax/round_trip_parse_gen.swift.
 
-@differentiable
+@differentiable(reverse)
 func bar(_ x: Float, _: Float) -> Float { return 1 }
 
-@differentiable(where T : FloatingPoint)
+@differentiable(reverse where T : FloatingPoint)
 func bar<T : Numeric>(_ x: T, _: T) -> T { return 1 }
 
-@differentiable(wrt: x)
+@differentiable(reverse, wrt: x)
 func bar(_ x: Float, _: Float) -> Float { return 1 }
 
-@differentiable(wrt: (self, x, y))
+@differentiable(reverse, wrt: (self, x, y))
 func bar(_ x: Float, y: Float) -> Float { return 1 }
 
-@differentiable(wrt: (self, x, y) where T : FloatingPoint)
+@differentiable(reverse, wrt: (self, x, y) where T : FloatingPoint)
 func bar<T : Numeric>(_ x: T, y: T) -> T { return 1 }
 
 @derivative(of: -)

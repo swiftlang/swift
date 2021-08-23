@@ -1,0 +1,10 @@
+#ifndef TEST_INTEROP_CXX_NAMESPACE_INPUTS_FREE_FUNCTIONS_SECOND_HEADER_H
+#define TEST_INTEROP_CXX_NAMESPACE_INPUTS_FREE_FUNCTIONS_SECOND_HEADER_H
+
+#include "free-functions.h"
+
+inline const char *FunctionsNS1::definedInDefs() {
+  return "FunctionsNS1::definedInDefs";
+}
+
+#endif // TEST_INTEROP_CXX_NAMESPACE_INPUTS_FREE_FUNCTIONS_SECOND_HEADER_H

@@ -179,6 +179,43 @@ public:
   }
 };
 
+template <class Derived, class Base>
+class TrivialScalarPairTypeInfo : public ScalarPairTypeInfo<Derived, Base> {
+  using super = ScalarPairTypeInfo<Derived, Base>;
+protected:
+  template <class... T> TrivialScalarPairTypeInfo(T &&...args)
+    : super(::std::forward<T>(args)...) {}
+
+  const Derived &asDerived() const {
+    return static_cast<const Derived &>(*this);
+  }
+
+public:
+  static bool isFirstElementTrivial() {
+    return true;
+  }
+  void emitRetainFirstElement(IRGenFunction &IGF, llvm::Value *value,
+                              Optional<Atomicity> atomicity = None) const {}
+  void emitReleaseFirstElement(IRGenFunction &IGF, llvm::Value *value,
+                               Optional<Atomicity> atomicity = None) const {}
+  void emitAssignFirstElement(IRGenFunction &IGF, llvm::Value *value,
+                              Address valueAddr) const {
+    IGF.Builder.CreateStore(value, valueAddr);
+  }
+
+  static bool isSecondElementTrivial() {
+    return true;
+  }
+  void emitRetainSecondElement(IRGenFunction &IGF, llvm::Value *value,
+                               Optional<Atomicity> atomicity = None) const {}
+  void emitReleaseSecondElement(IRGenFunction &IGF, llvm::Value *value,
+                                Optional<Atomicity> atomicity = None) const {}
+  void emitAssignSecondElement(IRGenFunction &IGF, llvm::Value *value,
+                              Address valueAddr) const {
+    IGF.Builder.CreateStore(value, valueAddr);
+  }
+};
+
 }
 }
 

@@ -218,8 +218,8 @@ class Discard {
   }
 
   func baz() {
-    self.bar // expected-error {{expression resolves to an unused function}}
-    bar // expected-error {{expression resolves to an unused function}}
+    self.bar // expected-error {{function is unused}}
+    bar // expected-error {{function is unused}}
   }
 }
 
@@ -240,5 +240,5 @@ struct SR_12271_S {
 SR_12271_S().bar1() // Okay
 SR_12271_S.bar2() // Okay
 
-SR_12271_S().bar1 // expected-error {{expression resolves to an unused function}}
-SR_12271_S.bar2 // expected-error {{expression resolves to an unused function}}
+SR_12271_S().bar1 // expected-error {{function is unused}}
+SR_12271_S.bar2 // expected-error {{function is unused}}

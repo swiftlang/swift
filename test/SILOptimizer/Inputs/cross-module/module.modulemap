@@ -1,0 +1,3 @@
+module PrivateCModule {
+  header "c-module.h"
+}

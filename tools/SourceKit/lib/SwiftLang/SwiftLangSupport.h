@@ -106,9 +106,9 @@ public:
 
   ImmutableTextSnapshotRef getLatestSnapshot() const;
 
-  void parse(ImmutableTextSnapshotRef Snapshot, SwiftLangSupport &Lang,
-             bool BuildSyntaxTree,
-             swift::SyntaxParsingCache *SyntaxCache = nullptr);
+  void resetSyntaxInfo(ImmutableTextSnapshotRef Snapshot,
+                       SwiftLangSupport &Lang, bool BuildSyntaxTree,
+                       swift::SyntaxParsingCache *SyntaxCache = nullptr);
   void readSyntaxInfo(EditorConsumer &consumer, bool ReportDiags);
   void readSemanticInfo(ImmutableTextSnapshotRef Snapshot,
                         EditorConsumer& Consumer);
@@ -128,7 +128,7 @@ public:
 
   /// Whether or not the AST stored for this document is up-to-date or just an
   /// artifact of incremental syntax parsing
-  bool hasUpToDateAST() const;
+  bool isIncrementalParsingEnabled() const;
 
   /// Returns the virtual filesystem associated with this document.
   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> getFileSystem() const;
@@ -364,6 +364,7 @@ public:
   getFileSystem(const Optional<VFSOptions> &vfsOptions,
                 Optional<StringRef> primaryFile, std::string &error);
 
+  static SourceKit::UIdent getUIDForDeclLanguage(const swift::Decl *D);
   static SourceKit::UIdent getUIDForDecl(const swift::Decl *D,
                                          bool IsRef = false);
   static SourceKit::UIdent getUIDForExtensionOfDecl(const swift::Decl *D);
@@ -474,6 +475,8 @@ public:
 
   void globalConfigurationUpdated(std::shared_ptr<GlobalConfig> Config) override;
 
+  void dependencyUpdated() override;
+
   void indexSource(StringRef Filename, IndexingConsumer &Consumer,
                    ArrayRef<const char *> Args) override;
 
@@ -557,8 +560,9 @@ public:
 
   void
   getCursorInfo(StringRef Filename, unsigned Offset, unsigned Length,
-                bool Actionables, bool CancelOnSubsequentRequest,
-                ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions,
+                bool Actionables, bool SymbolGraph,
+                bool CancelOnSubsequentRequest, ArrayRef<const char *> Args,
+                Optional<VFSOptions> vfsOptions,
                 std::function<void(const RequestResult<CursorInfoData> &)> Receiver) override;
 
   void getNameInfo(StringRef Filename, unsigned Offset,
@@ -598,6 +602,12 @@ public:
                               ArrayRef<const char *> ExpectedProtocols,
                               bool CanonicalType,
                               std::function<void(const RequestResult<ExpressionTypesInFile> &)> Receiver) override;
+
+  void collectVariableTypes(
+      StringRef FileName, ArrayRef<const char *> Args,
+      Optional<unsigned> Offset, Optional<unsigned> Length,
+      std::function<void(const RequestResult<VariableTypesInFile> &)> Receiver)
+      override;
 
   void semanticRefactoring(StringRef Filename, SemanticRefactoringInfo Info,
                            ArrayRef<const char*> Args,

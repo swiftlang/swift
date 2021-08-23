@@ -88,8 +88,7 @@ public:
     SmallVector<Operand *, 8> endScopeUses;
     transform(access->getEndAccesses(), std::back_inserter(endScopeUses),
               [](EndAccessInst *eai) { return &eai->getAllOperands()[0]; });
-    SmallPtrSet<SILBasicBlock *, 4> visitedBlocks;
-    LinearLifetimeChecker checker(visitedBlocks, ctx.getDeadEndBlocks());
+    LinearLifetimeChecker checker(ctx.getDeadEndBlocks());
     if (!checker.validateLifetime(access, endScopeUses,
                                   liveRange.getAllConsumingUses())) {
       // If we fail the linear lifetime check, then just recur:
@@ -137,9 +136,8 @@ public:
 
       // Ok, we have some writes. See if any of them are within our live
       // range. If any are, we definitely can not promote to load_borrow.
-      SmallPtrSet<SILBasicBlock *, 4> visitedBlocks;
       SmallVector<BeginAccessInst *, 16> foundBeginAccess;
-      LinearLifetimeChecker checker(visitedBlocks, ctx.getDeadEndBlocks());
+      LinearLifetimeChecker checker(ctx.getDeadEndBlocks());
       SILValue introducerValue = liveRange.getIntroducer().value;
       if (!checker.usesNotContainedWithinLifetime(introducerValue,
                                                   liveRange.getDestroyingUses(),
@@ -161,7 +159,6 @@ public:
             bai->getUsersOfType<EndAccessInst>(),
             std::back_inserter(endAccessList),
             [](EndAccessInst *eai) { return &eai->getAllOperands()[0]; });
-        visitedBlocks.clear();
 
         // We know that our live range is based on a load [copy], so we know
         // that our value must have a defining inst.
@@ -221,8 +218,8 @@ public:
     // know statically that our let can not be written to in the current
     // function. To be conservative, assume that all other non-local scopes
     // write to memory.
-    if (!value->isLocalScope()) {
-      if (value->kind == BorrowedValueKind::SILFunctionArgument) {
+    if (!value.isLocalScope()) {
+      if (value.kind == BorrowedValueKind::SILFunctionArgument) {
         return answer(false);
       }
 
@@ -233,7 +230,7 @@ public:
 
     // TODO: This is disabled temporarily for guaranteed phi args just for
     // staging purposes. Thus be conservative and assume true in these cases.
-    if (value->kind == BorrowedValueKind::Phi) {
+    if (value.kind == BorrowedValueKind::Phi) {
       return answer(true);
     }
 
@@ -243,11 +240,10 @@ public:
     // to check whether the copied value is dominated by the lifetime of the
     // borrow it's based on.
     SmallVector<Operand *, 4> endScopeInsts;
-    value->visitLocalScopeEndingUses(
-        [&](Operand *use) { endScopeInsts.push_back(use); });
+    value.visitLocalScopeEndingUses(
+      [&](Operand *use) { endScopeInsts.push_back(use); return true; });
 
-    SmallPtrSet<SILBasicBlock *, 4> visitedBlocks;
-    LinearLifetimeChecker checker(visitedBlocks, ctx.getDeadEndBlocks());
+    LinearLifetimeChecker checker(ctx.getDeadEndBlocks());
 
     // Returns true on success. So we invert.
     bool foundError = !checker.validateLifetime(
@@ -285,18 +281,19 @@ public:
   /// See if we have an alloc_stack that is only written to once by an
   /// initializing instruction.
   void visitStackAccess(AllocStackInst *stack) {
-    SmallVector<Operand *, 8> destroyAddrOperands;
-    bool initialAnswer = isSingleInitAllocStack(stack, destroyAddrOperands);
+    // These will contain all of the address destroying operands that form the
+    // lifetime of the object. They may not be destroy_addr!
+    SmallVector<Operand *, 8> addrDestroyingOperands;
+    bool initialAnswer = isSingleInitAllocStack(stack, addrDestroyingOperands);
     if (!initialAnswer)
       return answer(true);
 
     // Then make sure that all of our load [copy] uses are within the
     // destroy_addr.
-    SmallPtrSet<SILBasicBlock *, 4> visitedBlocks;
-    LinearLifetimeChecker checker(visitedBlocks, ctx.getDeadEndBlocks());
+    LinearLifetimeChecker checker(ctx.getDeadEndBlocks());
     // Returns true on success. So we invert.
     bool foundError = !checker.validateLifetime(
-        stack, destroyAddrOperands /*consuming users*/,
+        stack, addrDestroyingOperands /*consuming users*/,
         liveRange.getAllConsumingUses() /*non consuming users*/);
     return answer(foundError);
   }
@@ -326,7 +323,7 @@ static bool isWrittenTo(Context &ctx, LoadInst *load,
 bool SemanticARCOptVisitor::visitLoadInst(LoadInst *li) {
   // This optimization can use more complex analysis. We should do some
   // experiments before enabling this by default as a guaranteed optimization.
-  if (ctx.onlyGuaranteedOpts)
+  if (ctx.onlyMandatoryOpts)
     return false;
 
   // If we are not supposed to perform this transform, bail.

@@ -21,9 +21,7 @@ template <class T> struct ValueContext;
 
 template <class T>
 using InvokeFunctionRef =
-  llvm::function_ref<void(AsyncTask *task,
-                          ExecutorRef executor,
-                          ValueContext<T> *context)>;
+  llvm::function_ref<void(ValueContext<T> *context)>;
 using BodyFunctionRef =
   llvm::function_ref<void(AsyncTask *task)>;
 
@@ -38,11 +36,11 @@ using undeduced =
   typename std::enable_if<std::is_same<T, T>::value, T>::type;
 
 template <class T>
-SWIFT_CC(swift)
-static void simpleTaskInvokeFunction(AsyncTask *task, ExecutorRef executor,
-                                     AsyncContext *context) {
+SWIFT_CC(swiftasync)
+static void simpleTaskInvokeFunction(SWIFT_ASYNC_CONTEXT AsyncContext *context,
+                                     SWIFT_CONTEXT HeapObject *) {
   auto valueContext = static_cast<ValueContext<T>*>(context);
-  valueContext->StoredInvokeFn(task, executor, valueContext);
+  valueContext->StoredInvokeFn(valueContext);
 
   // Destroy the stored value.
   valueContext->Value.T::~T();
@@ -50,17 +48,21 @@ static void simpleTaskInvokeFunction(AsyncTask *task, ExecutorRef executor,
   // Return to finish off the task.
   // In a normal situation we'd need to free the context, but here
   // we know we're at the top level.
-  valueContext->ResumeParent(task, executor, valueContext->Parent);
+  return valueContext->ResumeParent(valueContext);
 }
 
 template <class T>
-static void withSimpleTask(JobFlags flags, T &&value,
+static void withSimpleTask(TaskCreateFlags flags, T &&value,
                            undeduced<InvokeFunctionRef<T>> invokeFn,
                            BodyFunctionRef body) {
   auto taskAndContext =
-    swift_task_create_f(flags, /*parent*/ nullptr,
-                        &simpleTaskInvokeFunction<T>,
-                        sizeof(ValueContext<T>));
+      swift_task_create_common(flags.getOpaqueValue(),
+                               nullptr,
+                               nullptr,
+                               reinterpret_cast<TaskContinuationFunction *>(
+                                 &simpleTaskInvokeFunction<T>),
+                               nullptr,
+                               sizeof(ValueContext<T>));
 
   auto valueContext =
     static_cast<ValueContext<T>*>(taskAndContext.InitialContext);
@@ -76,11 +78,11 @@ template <class T>
 static void withSimpleTask(T &&value,
                            undeduced<InvokeFunctionRef<T>> invokeFn,
                            BodyFunctionRef bodyFn) {
-  withSimpleTask(JobKind::Task, std::forward<T>(value), invokeFn, bodyFn);
+  withSimpleTask(TaskCreateFlags(), std::forward<T>(value), invokeFn, bodyFn);
 }
 
 static ExecutorRef createFakeExecutor(uintptr_t value) {
-  return {reinterpret_cast<Executor*>(value)};
+  return ExecutorRef::forDefaultActor(reinterpret_cast<DefaultActor*>(value));
 }
 
 } // end anonymous namespace
@@ -92,13 +94,12 @@ TEST(TaskStatusTest, basicTasks) {
 
   struct Storage { int value; };
   withSimpleTask(Storage{47},
-    [&](AsyncTask *task, ExecutorRef executor,
-        ValueContext<Storage> *context) {
+    [&](ValueContext<Storage> *context) {
     // The task passed in should be the task we created.
-    EXPECT_EQ(createdTask, task);
+    EXPECT_EQ(createdTask, swift_task_getCurrent());
 
     // The executor passed in should be the executor we created.
-    EXPECT_EQ(createdExecutor, executor);
+    //EXPECT_EQ(createdExecutor, executor);
 
     // We shouldn't have run yet.
     EXPECT_FALSE(hasRun);
@@ -112,7 +113,7 @@ TEST(TaskStatusTest, basicTasks) {
     createdTask = task;
 
     EXPECT_FALSE(hasRun);
-    createdTask->run(createdExecutor);
+    swift_job_run(task, createdExecutor);
     EXPECT_TRUE(hasRun);
 
     createdTask = nullptr;
@@ -125,15 +126,15 @@ TEST(TaskStatusTest, basicTasks) {
 TEST(TaskStatusTest, cancellation_simple) {
   struct Storage { int value; };
   withSimpleTask(Storage{47},
-    [&](AsyncTask *task, ExecutorRef executor,
-        ValueContext<Storage> *context) {
-    EXPECT_FALSE(task->isCancelled());
+    [&](ValueContext<Storage> *context) {
+    auto task = swift_task_getCurrent();
+    EXPECT_FALSE(swift_task_isCancelled(task));
     swift_task_cancel(task);
-    EXPECT_TRUE(task->isCancelled());
+    EXPECT_TRUE(swift_task_isCancelled(task));
     swift_task_cancel(task);
-    EXPECT_TRUE(task->isCancelled());
+    EXPECT_TRUE(swift_task_isCancelled(task));
   }, [&](AsyncTask *task) {
-    task->run(createFakeExecutor(1234));
+    swift_job_run(task, createFakeExecutor(1234));
   });
 }
 
@@ -143,9 +144,9 @@ TEST(TaskStatusTest, cancellation_simple) {
 TEST(TaskStatusTest, deadline) {
   struct Storage { int value; };
   withSimpleTask(Storage{47},
-    [&](AsyncTask *task, ExecutorRef executor,
-        ValueContext<Storage> *context) {
-    EXPECT_FALSE(task->isCancelled());
+    [&](ValueContext<Storage> *context) {
+    auto task = swift_task_getCurrent();
+    EXPECT_FALSE(swift_task_isCancelled(task));
 
     TaskDeadline deadlineOne = { 1234 };
     TaskDeadline deadlineTwo = { 2345 };
@@ -157,7 +158,7 @@ TEST(TaskStatusTest, deadline) {
     EXPECT_EQ(NearestTaskDeadline::None, nearest.ValueKind);
 
     // Add deadline 1.  Check that we haven't been cancelled yet.
-    result = swift_task_addStatusRecord(task, &recordOne);
+    result = swift_task_addStatusRecord(&recordOne);
     EXPECT_TRUE(result);
 
     // There should now be an active deadline.
@@ -166,7 +167,7 @@ TEST(TaskStatusTest, deadline) {
     EXPECT_EQ(deadlineOne, nearest.Value);
 
     // Remove deadline 1.  Check that we haven't been cancelled yet.
-    result = swift_task_removeStatusRecord(task, &recordOne);
+    result = swift_task_removeStatusRecord(&recordOne);
     EXPECT_TRUE(result);
 
     // There shouldn't be an active deadline anymore.
@@ -174,9 +175,9 @@ TEST(TaskStatusTest, deadline) {
     EXPECT_EQ(NearestTaskDeadline::None, nearest.ValueKind);
 
     // Add deadline 1, then 2.
-    result = swift_task_addStatusRecord(task, &recordOne);
+    result = swift_task_addStatusRecord(&recordOne);
     EXPECT_TRUE(result);
-    result = swift_task_addStatusRecord(task, &recordTwo);
+    result = swift_task_addStatusRecord(&recordTwo);
     EXPECT_TRUE(result);
 
     // The nearest deadline should be deadline 1.
@@ -185,13 +186,13 @@ TEST(TaskStatusTest, deadline) {
     EXPECT_EQ(deadlineOne, nearest.Value);
 
     // Remove the deadlines.
-    result = swift_task_removeStatusRecord(task, &recordTwo);
+    result = swift_task_removeStatusRecord(&recordTwo);
     EXPECT_TRUE(result);
-    result = swift_task_removeStatusRecord(task, &recordOne);
+    result = swift_task_removeStatusRecord(&recordOne);
     EXPECT_TRUE(result);
 
     // Add deadline 2, then 1s.
-    result = swift_task_addStatusRecord(task, &recordTwo);
+    result = swift_task_addStatusRecord(&recordTwo);
     EXPECT_TRUE(result);
 
     // In the middle, the nearest deadline should be deadline 2.
@@ -199,7 +200,7 @@ TEST(TaskStatusTest, deadline) {
     EXPECT_EQ(NearestTaskDeadline::Active, nearest.ValueKind);
     EXPECT_EQ(deadlineTwo, nearest.Value);
 
-    result = swift_task_addStatusRecord(task, &recordOne);
+    result = swift_task_addStatusRecord(&recordOne);
     EXPECT_TRUE(result);
 
     // The nearest deadline should be deadline 1.
@@ -208,41 +209,41 @@ TEST(TaskStatusTest, deadline) {
     EXPECT_EQ(deadlineOne, nearest.Value);
 
     // Remove the deadlines.
-    result = swift_task_removeStatusRecord(task, &recordOne);
+    result = swift_task_removeStatusRecord(&recordOne);
     EXPECT_TRUE(result);
-    result = swift_task_removeStatusRecord(task, &recordTwo);
+    result = swift_task_removeStatusRecord(&recordTwo);
     EXPECT_TRUE(result);
 
     // Do the same thing with tryAddStatus.
-    result = swift_task_tryAddStatusRecord(task, &recordTwo);
+    result = swift_task_tryAddStatusRecord(&recordTwo);
     EXPECT_TRUE(result);
-    result = swift_task_tryAddStatusRecord(task, &recordOne);
+    result = swift_task_tryAddStatusRecord(&recordOne);
     EXPECT_TRUE(result);
     // The nearest deadline should be deadline 1.
     nearest = swift_task_getNearestDeadline(task);
     EXPECT_EQ(NearestTaskDeadline::Active, nearest.ValueKind);
     EXPECT_EQ(deadlineOne, nearest.Value);
-    result = swift_task_removeStatusRecord(task, &recordOne);
+    result = swift_task_removeStatusRecord(&recordOne);
     EXPECT_TRUE(result);
-    result = swift_task_removeStatusRecord(task, &recordTwo);
+    result = swift_task_removeStatusRecord(&recordTwo);
     EXPECT_TRUE(result);
 
     // Remove out of order.
-    result = swift_task_addStatusRecord(task, &recordTwo);
+    result = swift_task_addStatusRecord(&recordTwo);
     EXPECT_TRUE(result);
-    result = swift_task_addStatusRecord(task, &recordOne);
+    result = swift_task_addStatusRecord(&recordOne);
     EXPECT_TRUE(result);
     // The nearest deadline should be deadline 1.
     nearest = swift_task_getNearestDeadline(task);
     EXPECT_EQ(NearestTaskDeadline::Active, nearest.ValueKind);
     EXPECT_EQ(deadlineOne, nearest.Value);
-    result = swift_task_removeStatusRecord(task, &recordTwo);
+    result = swift_task_removeStatusRecord(&recordTwo);
     EXPECT_TRUE(result);
-    result = swift_task_removeStatusRecord(task, &recordOne);
+    result = swift_task_removeStatusRecord(&recordOne);
     EXPECT_TRUE(result);
 
     // Add deadline 2, then cancel.
-    result = swift_task_addStatusRecord(task, &recordTwo);
+    result = swift_task_addStatusRecord(&recordTwo);
     EXPECT_TRUE(result);
 
     // The nearest deadline should be deadline 2.
@@ -252,33 +253,33 @@ TEST(TaskStatusTest, deadline) {
 
     // Cancel.
     swift_task_cancel(task);
-    EXPECT_TRUE(task->isCancelled());
+    EXPECT_TRUE(swift_task_isCancelled(task));
 
     // We should report already cancelled now.
     nearest = swift_task_getNearestDeadline(task);
     EXPECT_EQ(NearestTaskDeadline::AlreadyCancelled, nearest.ValueKind);
 
     // Add deadline 1.
-    result = swift_task_addStatusRecord(task, &recordOne);
+    result = swift_task_addStatusRecord(&recordOne);
     EXPECT_FALSE(result);
 
     nearest = swift_task_getNearestDeadline(task);
     EXPECT_EQ(NearestTaskDeadline::AlreadyCancelled, nearest.ValueKind);
 
-    result = swift_task_removeStatusRecord(task, &recordOne);
+    result = swift_task_removeStatusRecord(&recordOne);
     EXPECT_FALSE(result);
 
-    result = swift_task_tryAddStatusRecord(task, &recordOne);
+    result = swift_task_tryAddStatusRecord(&recordOne);
     EXPECT_FALSE(result);
 
-    result = swift_task_removeStatusRecord(task, &recordTwo);
+    result = swift_task_removeStatusRecord(&recordTwo);
     EXPECT_FALSE(result);
 
     nearest = swift_task_getNearestDeadline(task);
     EXPECT_EQ(NearestTaskDeadline::AlreadyCancelled, nearest.ValueKind);
 
-    EXPECT_TRUE(task->isCancelled());
+    EXPECT_TRUE(swift_task_isCancelled(task));
   }, [&](AsyncTask *task) {
-    task->run(createFakeExecutor(1234));
+    swift_job_run(task, createFakeExecutor(1234));
   });
 }

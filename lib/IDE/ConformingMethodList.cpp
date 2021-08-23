@@ -90,6 +90,11 @@ void ConformingMethodListCallbacks::doneParsing() {
   if (T->hasArchetype())
     T = T->mapTypeOutOfContext();
 
+  // If there are no (instance) members for this type, bail.
+  if (!T->mayHaveMembers() || T->is<ModuleType>()) {
+    return;
+  }
+
   llvm::SmallPtrSet<ProtocolDecl*, 8> expectedProtocols;
   for (auto Name: ExpectedTypeNames) {
     if (auto *PD = resolveProtocolName(CurDeclContext, Name)) {
@@ -107,8 +112,7 @@ void ConformingMethodListCallbacks::doneParsing() {
 void ConformingMethodListCallbacks::getMatchingMethods(
     Type T, llvm::SmallPtrSetImpl<ProtocolDecl*> &expectedTypes,
     SmallVectorImpl<ValueDecl *> &result) {
-  if (!T->mayHaveMembers())
-    return;
+  assert(T->mayHaveMembers() && !T->is<ModuleType>());
 
   class LocalConsumer : public VisibleDeclConsumer {
     ModuleDecl *CurModule;
@@ -125,22 +129,20 @@ void ConformingMethodListCallbacks::getMatchingMethods(
     /// Returns true if \p VD is a instance method whose return type conforms
     /// to the requested protocols.
     bool isMatchingMethod(ValueDecl *VD) {
-      if (!isa<FuncDecl>(VD))
+      auto *FD = dyn_cast<FuncDecl>(VD);
+      if (!FD)
         return false;
-      if (VD->isStatic() || VD->isOperator())
-        return false;
-
-      auto declTy = T->getTypeOfMember(CurModule, VD);
-      if (declTy->is<ErrorType>())
+      if (FD->isStatic() || FD->isOperator())
         return false;
 
-      // Strip '(Self.Type) ->' and parameters.
-      declTy = declTy->castTo<AnyFunctionType>()->getResult();
-      declTy = declTy->castTo<AnyFunctionType>()->getResult();
+      auto resultTy = T->getTypeOfMember(CurModule, FD,
+                                         FD->getResultInterfaceType());
+      if (resultTy->is<ErrorType>())
+        return false;
 
       // The return type conforms to any of the requested protocols.
       for (auto Proto : ExpectedTypes) {
-        if (CurModule->conformsToProtocol(declTy, Proto))
+        if (CurModule->conformsToProtocol(resultTy, Proto))
           return true;
       }
 

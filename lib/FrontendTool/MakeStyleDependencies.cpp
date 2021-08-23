@@ -75,8 +75,9 @@ swift::frontend::utils::escapeForMake(StringRef raw,
 /// should appear in roughly the same order relative to other paths. Ultimately,
 /// this makes it easier to test the contents of the emitted files with tools
 /// like FileCheck.
+template <typename Container>
 static std::vector<std::string>
-reversePathSortedFilenames(const ArrayRef<std::string> elts) {
+reversePathSortedFilenames(const Container &elts) {
   std::vector<std::string> tmp(elts.begin(), elts.end());
   std::sort(tmp.begin(), tmp.end(),
             [](const std::string &a, const std::string &b) -> bool {
@@ -127,7 +128,7 @@ bool swift::emitMakeDependenciesIfNeeded(DiagnosticEngine &diags,
     dependencyString.append(frontend::utils::escapeForMake(path, buffer).str());
   }
   auto incrementalDependencyPaths =
-      reversePathSortedFilenames(depTracker->getIncrementalDependencies());
+      reversePathSortedFilenames(depTracker->getIncrementalDependencyPaths());
   for (auto const &path : incrementalDependencyPaths) {
     dependencyString.push_back(' ');
     dependencyString.append(frontend::utils::escapeForMake(path, buffer).str());

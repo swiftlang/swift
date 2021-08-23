@@ -1,7 +1,7 @@
 // Test the -require-explicit-availability flag
 // REQUIRES: OS=macosx
 
-// RUN: %swiftc_driver -typecheck -parse-as-library -target x86_64-apple-macosx10.10 -Xfrontend -verify -require-explicit-availability -require-explicit-availability-target "macOS 10.10"  %s
+// RUN: %swiftc_driver -typecheck -parse-as-library -target %target-cpu-apple-macosx10.10 -Xfrontend -verify -require-explicit-availability -require-explicit-availability-target "macOS 10.10"  %s
 
 public struct S { // expected-warning {{public declarations should have an availability attribute when building with -require-explicit-availability}}
   public func method() { }

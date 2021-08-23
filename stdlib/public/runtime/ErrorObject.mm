@@ -542,6 +542,26 @@ swift::_swift_stdlib_bridgeErrorToNSError(SwiftError *errorObject) {
 
 extern "C" const ProtocolDescriptor PROTOCOL_DESCR_SYM(s5Error);
 
+static IMP
+getNSProxyLookupMethod() {
+  Class NSProxyClass = objc_lookUpClass("NSProxy");
+  return class_getMethodImplementation(NSProxyClass, @selector(methodSignatureForSelector:));
+}
+
+// A safer alternative to calling `isKindOfClass:` directly.
+static bool
+isKindOfClass(HeapObject *object, Class cls) {
+  IMP NSProxyLookupMethod = SWIFT_LAZY_CONSTANT(getNSProxyLookupMethod());
+  // People sometimes fail to override `methodSignatureForSelector:` in their
+  // NSProxy subclasses, which causes `isKindOfClass:` to crash.  Avoid that...
+  Class objectClass = object_getClass((id)object);
+  IMP objectLookupMethod = class_getMethodImplementation(objectClass, @selector(methodSignatureForSelector:));
+  if (objectLookupMethod == NSProxyLookupMethod) {
+    return false;
+  }
+  return [reinterpret_cast<id>(object) isKindOfClass: cls];
+}
+
 bool
 swift::tryDynamicCastNSErrorObjectToValue(HeapObject *object,
                                           OpaqueValue *dest,
@@ -550,8 +570,7 @@ swift::tryDynamicCastNSErrorObjectToValue(HeapObject *object,
   Class NSErrorClass = getNSErrorClass();
 
   // The object must be an NSError subclass.
-  if (isObjCTaggedPointerOrNull(object) ||
-      ![reinterpret_cast<id>(object) isKindOfClass: NSErrorClass])
+  if (isObjCTaggedPointerOrNull(object) || !isKindOfClass(object, NSErrorClass))
     return false;
 
   id srcInstance = reinterpret_cast<id>(object);

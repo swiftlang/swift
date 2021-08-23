@@ -239,27 +239,6 @@ public:
   void didDeserialize(ModuleDecl *mod,
                       SILDefaultWitnessTable *wtable) override;
 };
-
-/// A protocol (or interface) for handling value deletion notifications.
-///
-/// This class is used as a base class for any class that need to accept
-/// instruction deletion notification messages. This is used by passes and
-/// analysis that need to invalidate data structures that contain pointers.
-/// This is similar to LLVM's ValueHandle.
-struct DeleteNotificationHandler {
-  DeleteNotificationHandler() { }
-  virtual ~DeleteNotificationHandler() {}
-
-  /// Handle the invalidation message for the value \p Value.
-  virtual void handleDeleteNotification(SILNode *value) { }
-
-  /// Returns True if the pass, analysis or other entity wants to receive
-  /// notifications. This callback is called once when the class is being
-  /// registered, and not once per notification. Entities that implement
-  /// this callback should always return a constant answer (true/false).
-  virtual bool needsNotifications() { return false; }
-};
-
 } // namespace swift
 
 #endif

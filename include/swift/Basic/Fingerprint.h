@@ -13,10 +13,10 @@
 #ifndef SWIFT_BASIC_FINGERPRINT_H
 #define SWIFT_BASIC_FINGERPRINT_H
 
+#include "swift/Basic/StableHasher.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/Support/MD5.h"
 
 #include <string>
 
@@ -52,70 +52,60 @@ namespace swift {
 /// iterable decl contexts to detect when the tokens in their bodies have
 /// changed. This makes them a coarse - yet safe - overapproximation for when a
 /// decl has changed semantically.
-///
-/// \c Fingerprints are currently implemented as a thin wrapper around an MD5
-/// hash. MD5 is known to be neither the fastest nor the most
-/// cryptographically capable algorithm, but it does afford us the avalanche
-/// effect we desire. We should revisit the modeling decision here.
 class Fingerprint final {
 public:
   /// The size (in bytes) of the raw value of all fingerprints.
-  ///
-  /// This constant's value is justified by a static assertion in the
-  /// corresponding cpp file.
   constexpr static size_t DIGEST_LENGTH = 32;
 
+  using Core = std::pair<uint64_t, uint64_t>;
 private:
-  std::string Core;
+  Core core;
+
+  friend struct StableHasher::Combiner<swift::Fingerprint>;
 
 public:
+  /// Creates a fingerprint value from a pair of 64-bit integers.
+  explicit Fingerprint(Fingerprint::Core value) : core(value) {}
+
   /// Creates a fingerprint value from the given input string that is known to
-  /// be a 32-byte hash value.
+  /// be a 32-byte hash value, i.e. that represent a valid 32-bit hex integer.
   ///
-  /// In +asserts builds, strings that violate this invariant will crash. If a
-  /// fingerprint value is needed to represent an "invalid" state, use a
-  /// vocabulary type like \c Optional<Fingerprint> instead.
-  explicit Fingerprint(std::string value) : Core(std::move(value)) {
-    assert(Core.size() == Fingerprint::DIGEST_LENGTH &&
-           "Only supports 32-byte hash values!");
-  }
+  /// Strings that violate this invariant will return a null optional.
+  static llvm::Optional<Fingerprint> fromString(llvm::StringRef value);
 
-  /// Creates a fingerprint value from the given input string literal.
-  template <std::size_t N>
-  explicit Fingerprint(const char (&literal)[N])
-    : Core{literal, N-1} {
-      static_assert(N == Fingerprint::DIGEST_LENGTH + 1,
-                    "String literal must be 32 bytes in length!");
-    }
-
-  /// Creates a fingerprint value by consuming the given \c MD5Result from LLVM.
-  explicit Fingerprint(llvm::MD5::MD5Result &&MD5Value)
-      : Core{MD5Value.digest().str()} {}
+  /// Creates a fingerprint value by consuming the given \c StableHasher.
+  explicit Fingerprint(StableHasher &&stableHasher)
+      : core{std::move(stableHasher).finalize()} {}
 
 public:
   /// Retrieve the raw underlying bytes of this fingerprint.
-  llvm::StringRef getRawValue() const { return Core; }
+  llvm::SmallString<Fingerprint::DIGEST_LENGTH> getRawValue() const;
 
 public:
   friend bool operator==(const Fingerprint &lhs, const Fingerprint &rhs) {
-    return lhs.Core == rhs.Core;
+    return lhs.core == rhs.core;
   }
 
   friend bool operator!=(const Fingerprint &lhs, const Fingerprint &rhs) {
-    return lhs.Core != rhs.Core;
+    return lhs.core != rhs.core;
   }
 
   friend llvm::hash_code hash_value(const Fingerprint &fp) {
-    return llvm::hash_value(fp.Core);
+    return llvm::hash_value(fp.core);
+  }
+
+public:
+  bool operator<(const Fingerprint &other) const {
+    return core < other.core;
   }
 
 public:
   /// The fingerprint value consisting of 32 bytes of zeroes.
   ///
-  /// This fingerprint is a perfectly fine value for an MD5 hash, but it is
+  /// This fingerprint is a perfectly fine value for a hash, but it is
   /// completely arbitrary.
   static Fingerprint ZERO() {
-    return Fingerprint("00000000000000000000000000000000");
+    return Fingerprint(Fingerprint::Core{0, 0});
   }
 
 private:
@@ -124,10 +114,26 @@ private:
   ///
   /// Very well, LLVM. A default value you shall have.
   friend class llvm::yaml::IO;
-  Fingerprint() : Core(DIGEST_LENGTH, '0') {}
+  Fingerprint() : core{Fingerprint::Core{0, 0}} {}
 };
 
 void simple_display(llvm::raw_ostream &out, const Fingerprint &fp);
+}; // namespace swift
+
+namespace swift {
+
+template <> struct StableHasher::Combiner<Fingerprint> {
+  static void combine(StableHasher &hasher, const Fingerprint &Val) {
+    // Our underlying buffer is already byte-swapped. Combine the
+    // raw bytes from the core by hand.
+    uint8_t buffer[8];
+    memcpy(buffer, &Val.core.first, sizeof(buffer));
+    hasher.combine<sizeof(buffer)>(buffer);
+    memcpy(buffer, &Val.core.second, sizeof(buffer));
+    hasher.combine<sizeof(buffer)>(buffer);
+  }
+};
+
 }; // namespace swift
 
 namespace llvm {

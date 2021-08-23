@@ -16,8 +16,8 @@ class TopLevelObjectTyWithoutDestructor {
 var topLevelObject2:TopLevelObjectTyWithoutDestructor
 
 // CHECK-LABEL: sil [ossa] @main
-// CHECK: integer_literal ${{.*}}, 0, {{.*}} top_level
-// CHECK: return    {{.*}} top_level
+// CHECK: integer_literal ${{.*}}, 0, {{.*}} auto_gen
+// CHECK: return    {{.*}} auto_gen
 
 // Check allocating initializer
 // CHECK-LABEL: sil_locations_top_level.TopLevelObjectTy.__allocating_init

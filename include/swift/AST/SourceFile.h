@@ -99,15 +99,16 @@ private:
 
   /// Either the class marked \@NS/UIApplicationMain or the synthesized FuncDecl
   /// that calls main on the type marked @main.
-  Decl *MainDecl = nullptr;
+  ValueDecl *MainDecl = nullptr;
 
   /// The source location of the main type.
   SourceLoc MainDeclDiagLoc;
 
   /// A hash of all interface-contributing tokens that have been lexed for
-  /// this source file so far.
+  /// this source file.
+  ///
   /// We only collect interface hash for primary input files.
-  llvm::Optional<llvm::MD5> InterfaceHash;
+  llvm::Optional<StableHasher> InterfaceHasher;
 
   /// The ID for the memory buffer containing this file's source.
   ///
@@ -216,9 +217,6 @@ public:
   /// The list of local type declarations in the source file.
   llvm::SetVector<TypeDecl *> LocalTypeDecls;
 
-  /// A set of synthesized declarations that need to be type checked.
-  llvm::SmallVector<Decl *, 8> SynthesizedDecls;
-
   /// The list of functions defined in this file whose bodies have yet to be
   /// typechecked. They must be held in this list instead of eagerly validated
   /// because their bodies may force us to perform semantic checks of arbitrary
@@ -226,11 +224,6 @@ public:
   /// we cannot, in general, perform witness matching on singular requirements
   /// unless the entire conformance has been evaluated.
   std::vector<AbstractFunctionDecl *> DelayedFunctions;
-
-  /// We might perform type checking on the same source file more than once,
-  /// if its the main file or a REPL instance, so keep track of the last
-  /// checked synthesized declaration to avoid duplicating work.
-  unsigned LastCheckedSynthesizedDecl = 0;
 
   /// A mapping from Objective-C selectors to the methods that have
   /// those selectors.
@@ -248,10 +241,17 @@ public:
   /// unsatisfied, which might conflict with other Objective-C methods.
   std::vector<ObjCUnsatisfiedOptReq> ObjCUnsatisfiedOptReqs;
 
+  /// A selector that is used by two different declarations in the same class.
+  /// Fields: classDecl, selector, isInstanceMethod.
   using ObjCMethodConflict = std::tuple<ClassDecl *, ObjCSelector, bool>;
 
   /// List of Objective-C member conflicts we have found during type checking.
   std::vector<ObjCMethodConflict> ObjCMethodConflicts;
+
+  /// List of attributes added by access notes, used to emit remarks for valid
+  /// ones.
+  llvm::DenseMap<ValueDecl *, std::vector<DeclAttribute *>>
+      AttrsAddedByAccessNotes;
 
   /// Describes what kind of file this is, which can affect some type checking
   /// and other behavior.
@@ -406,7 +406,8 @@ public:
 
   Identifier getDiscriminatorForPrivateValue(const ValueDecl *D) const override;
   Identifier getPrivateDiscriminator() const { return PrivateDiscriminator; }
-  Optional<BasicDeclLocs> getBasicLocsForDecl(const Decl *D) const override;
+  Optional<ExternalSourceLocs::RawLocs>
+  getExternalRawLocsForDecl(const Decl *D) const override;
 
   /// Returns the synthesized file for this source file, if it exists.
   SynthesizedFileUnit *getSynthesizedFile() const { return SynthesizedFile; };
@@ -486,7 +487,7 @@ public:
     llvm_unreachable("bad SourceFileKind");
   }
 
-  Decl *getMainDecl() const override { return MainDecl; }
+  ValueDecl *getMainDecl() const override { return MainDecl; }
   SourceLoc getMainDeclDiagLoc() const {
     assert(hasMainDecl());
     return MainDeclDiagLoc;
@@ -500,7 +501,7 @@ public:
   /// one.
   ///
   /// Should only be called during type-checking.
-  bool registerMainDecl(Decl *mainDecl, SourceLoc diagLoc);
+  bool registerMainDecl(ValueDecl *mainDecl, SourceLoc diagLoc);
 
   /// True if this source file has an application entry point.
   ///
@@ -519,17 +520,32 @@ public:
   /// Set the root refinement context for the file.
   void setTypeRefinementContext(TypeRefinementContext *TRC);
 
-  /// Whether this file has an interface hash available.
+  /// Whether this file can compute an interface hash.
   bool hasInterfaceHash() const {
     return ParsingOpts.contains(ParsingFlags::EnableInterfaceHash);
   }
 
-  /// Output this file's interface hash into the provided string buffer.
+  /// Retrieve a fingerprint value that summarizes the declarations in this
+  /// source file.
+  ///
+  /// Note that the interface hash merely summarizes the top-level declarations
+  /// in this file. Type body fingerprints are currently implemented such that
+  /// they divert tokens away from the hasher used for fingerprints. That is,
+  /// changes to the bodies of types and extensions will not result in a change
+  /// to the interface hash.
+  ///
+  /// In order for the interface hash to be enabled, this source file must be a
+  /// primary and the compiler must be set in incremental mode. If this is not
+  /// the case, this function will try to signal with an assert. It is useful
+  /// to guard requests for the interface hash with \c hasInterfaceHash().
   Fingerprint getInterfaceHash() const;
 
   void dumpInterfaceHash(llvm::raw_ostream &out) {
     out << getInterfaceHash() << '\n';
   }
+
+  /// Get this file's interface hash including the type members in the file.
+  Fingerprint getInterfaceHashIncludingTypeMembers() const;
 
   /// If this source file has been told to collect its parsed tokens, retrieve
   /// those tokens.

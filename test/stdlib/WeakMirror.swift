@@ -115,6 +115,8 @@ mirrors.test("class/NativeSwiftClassHasNativeWeakReferenceNoLeak") {
     let extractedChild = children[0].1 as! NativeSwiftClass
     expectNotNil(extractedChild)
     expectNotNil(verifier)
+    // If child is destroyed, the above cast and checks will fail.
+    _fixLifetime(child)
   }
   expectNil(verifier)
 }

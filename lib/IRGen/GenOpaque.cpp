@@ -321,7 +321,7 @@ llvm::Value *irgen::emitInvariantLoadOfOpaqueWitness(IRGenFunction &IGF,
   llvm::Value *slot = table;
   if (index.getValue() != 0)
     slot = IGF.Builder.CreateConstInBoundsGEP1_32(
-        /*Ty=*/nullptr, table, index.getValue());
+       table->getType()->getPointerElementType(), table, index.getValue());
 
   if (slotPtr) *slotPtr = slot;
 
@@ -431,7 +431,7 @@ static FunctionPointer emitLoadOfValueWitnessFunction(IRGenFunction &IGF,
                                     IGF.getOptions().PointerAuth.ValueWitnesses,
                                         slot, index);
 
-  return FunctionPointer(FunctionPointer::KindTy::Function, witness, authInfo,
+  return FunctionPointer(FunctionPointer::Kind::Function, witness, authInfo,
                          signature);
 }
 
@@ -478,13 +478,13 @@ IRGenFunction::emitValueWitnessFunctionRef(SILType type,
       assert(discriminator && "no saved discriminator for value witness fn!");
       authInfo = PointerAuthInfo(schema.getKey(), discriminator);
     }
-    return FunctionPointer(FunctionPointer::KindTy::Function, witness, authInfo,
+    return FunctionPointer(FunctionPointer::Kind::Function, witness, authInfo,
                            signature);
   }
   
   auto vwtable = emitValueWitnessTableRef(type, &metadataSlot);
   auto witness = emitLoadOfValueWitnessFunction(*this, vwtable, index);
-  setScopedLocalTypeDataForLayout(type, key, witness.getPointer(*this));
+  setScopedLocalTypeDataForLayout(type, key, witness.getRawPointer());
   if (auto &authInfo = witness.getAuthInfo()) {
     setScopedLocalTypeDataForLayout(type,
                         LocalTypeDataKind::forValueWitnessDiscriminator(index),

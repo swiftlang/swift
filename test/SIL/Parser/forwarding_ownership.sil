@@ -1,0 +1,37 @@
+// RUN: %target-sil-opt %s | %FileCheck %s
+sil_stage canonical
+
+import Builtin
+import Swift
+
+class Klass {
+}
+
+struct NonTrivialStruct {
+  var id:Klass
+}
+
+// CHECK-LABEL: sil [ossa] @unchecked_ref_cast_test :
+sil [ossa] @unchecked_ref_cast_test : $@convention(thin) <T> (@in T, @owned Klass) -> () {
+bb0(%0 : $*T, %1 : @owned $Klass):
+  destroy_addr %0 : $*T
+// CHECK: unchecked_ref_cast %1 : $Klass to $Optional<Klass>, forwarding: @unowned
+  %3 = unchecked_ref_cast %1 : $Klass to $Optional<Klass>, forwarding: @unowned
+  %4 = copy_value %3 : $Optional<Klass>
+  destroy_value %1 : $Klass
+  destroy_value %4 : $Optional<Klass>
+  %8 = tuple ()
+  return %8 : $()
+}
+// CHECK-LABEL: } // end sil function 'unchecked_ref_cast_test'
+
+// CHECK-LABEL: sil [ossa] @struct_test :
+sil [ossa] @struct_test : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+// CHECK-NOT: forwarding:
+  %3 = struct $NonTrivialStruct (%0 : $Klass), forwarding: @owned
+  destroy_value %3 : $NonTrivialStruct
+  %8 = tuple ()
+  return %8 : $()
+}
+// CHECK-LABEL: } // end sil function 'struct_test'

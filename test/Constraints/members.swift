@@ -615,15 +615,13 @@ func rdar50679161() {
 
 
 func rdar_50467583_and_50909555() {
-  if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+  if #available(macOS 11.3, iOS 14.5, tvOS 14.5, watchOS 7.4, *) {
     // rdar://problem/50467583
     let _: Set = [Int][] // expected-error {{no 'subscript' candidates produce the expected contextual result type 'Set'}}
     // expected-error@-1 {{no exact matches in call to subscript}}
     // expected-note@-2 {{found candidate with type '(Int) -> Int'}}
     // expected-note@-3 {{found candidate with type '(Range<Int>) -> ArraySlice<Int>'}}
     // expected-note@-4 {{found candidate with type '((UnboundedRange_) -> ()) -> ArraySlice<Int>'}}
-    // expected-note@-5 {{found candidate with type '(RangeSet<Array<Int>.Index>) -> DiscontiguousSlice<[Int]>' (aka '(RangeSet<Int>) -> DiscontiguousSlice<Array<Int>>')}}
-    // expected-note@-6 {{found candidate with type '(Range<Array<Int>.Index>) -> Slice<[Int]>' (aka '(Range<Int>) -> Slice<Array<Int>>')}}
   }
   
   // rdar://problem/50909555
@@ -725,4 +723,25 @@ func rdar66891544() {
   func foo<U>(_: U, defaultU: U? = nil) {}
 
   foo(.bar) // expected-error {{cannot infer contextual base in reference to member 'bar'}}
+}
+
+// rdar://55369704 - extraneous diagnostics produced in combination with missing/misspelled members
+func rdar55369704() {
+  struct S {
+  }
+
+  func test(x: Int, s: S) {
+    _ = x - Int(s.value) // expected-error {{value of type 'S' has no member 'value'}}
+  }
+}
+
+// SR-14533
+struct SR14533 {
+  var xs: [Int] 
+}
+
+func fSR14533(_ s: SR14533) {
+  for (x1, x2) in zip(s.xs, s.ys) {
+    // expected-error@-1{{value of type 'SR14533' has no member 'ys'}}
+  }
 }

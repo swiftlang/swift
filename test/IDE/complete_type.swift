@@ -43,6 +43,15 @@ typealias FooTypealias = Int
 // WITH_GLOBAL_TYPES-DAG: Decl[TypeAlias]/CurrModule: FooTypealias[#Int#]{{; name=.+$}}
 // WITH_GLOBAL_TYPES: End completions
 
+// WITH_GLOBAL_TYPES_EXPR: Begin completions
+// Global completions at expression position
+// WITH_GLOBAL_TYPES_EXPR-DAG: Decl[Struct]/CurrModule:    FooStruct[#FooStruct#]{{; name=.+$}}
+// WITH_GLOBAL_TYPES_EXPR-DAG: Decl[Enum]/CurrModule:      FooEnum[#FooEnum#]{{; name=.+$}}
+// WITH_GLOBAL_TYPES_EXPR-DAG: Decl[Class]/CurrModule:     FooClass[#FooClass#]{{; name=.+$}}
+// WITH_GLOBAL_TYPES_EXPR-DAG: Decl[Protocol]/CurrModule/Flair[RareType]: FooProtocol[#FooProtocol#]{{; name=.+$}}
+// WITH_GLOBAL_TYPES_EXPR-DAG: Decl[TypeAlias]/CurrModule: FooTypealias[#Int#]{{; name=.+$}}
+// WITH_GLOBAL_TYPES_EXPR: End completions
+
 // GLOBAL_NEGATIVE-NOT: fooObject
 // GLOBAL_NEGATIVE-NOT: fooFunc
 
@@ -337,7 +346,8 @@ struct TypeInStructInheritance2 : , #^TYPE_IN_STRUCT_INHERITANCE_2?check=WITH_GL
 
 struct TypeInStructInheritance3 : FooProtocol, #^TYPE_IN_STRUCT_INHERITANCE_3?check=WITH_GLOBAL_TYPES;check=GLOBAL_NEGATIVE^#
 
-struct TypeInStructInheritance4 : FooProtocol., #^TYPE_IN_STRUCT_INHERITANCE_4?check=WITH_GLOBAL_TYPES^#
+// FIXME: 'check' shold be 'WITH_GLOBAL_TYPES'
+struct TypeInStructInheritance4 : FooProtocol., #^TYPE_IN_STRUCT_INHERITANCE_4?check=WITH_GLOBAL_TYPES_EXPR^#
 
 struct TypeInStructInheritance5 : #^TYPE_IN_STRUCT_INHERITANCE_5?check=WITH_GLOBAL_TYPES;check=GLOBAL_NEGATIVE^# {
 }
@@ -348,7 +358,8 @@ struct TypeInStructInheritance6 : , #^TYPE_IN_STRUCT_INHERITANCE_6?check=WITH_GL
 struct TypeInStructInheritance7 : FooProtocol, #^TYPE_IN_STRUCT_INHERITANCE_7?check=WITH_GLOBAL_TYPES;check=GLOBAL_NEGATIVE^# {
 }
 
-struct TypeInStructInheritance8 : FooProtocol., #^TYPE_IN_STRUCT_INHERITANCE_8?check=WITH_GLOBAL_TYPES^# {
+// FIXME: 'check' shold be 'WITH_GLOBAL_TYPES'
+struct TypeInStructInheritance8 : FooProtocol., #^TYPE_IN_STRUCT_INHERITANCE_8?check=WITH_GLOBAL_TYPES_EXPR^# {
 }
 
 //===---
@@ -779,3 +790,24 @@ struct ContainExtension {
 // EXTENSION_INHERITANCE-DAG: Decl[TypeAlias]/CurrNominal:        ProtoAlias[#FooProtocol#];
 // EXTENSION_INHERITANCE-DAG: Keyword/None:                       Type[#HasProtoAlias.Type#];
 // EXTENSION_INHERITANCE: End completions
+
+var _: (() -> #^IN_POSTFIX_BASE_1?check=WITH_GLOBAL_TYPES^#)?
+var _: (() -> #^IN_POSTFIX_BASE_2?check=WITH_GLOBAL_TYPES^#)!
+var _: (() -> #^IN_POSTFIX_BASE_3?check=WITH_GLOBAL_TYPES^#)[1]
+var _: (() -> #^IN_POSTFIX_BASE_4?check=WITH_GLOBAL_TYPES^#).Protocol
+var _: (() -> #^IN_POSTFIX_BASE_5?check=WITH_GLOBAL_TYPES^#).Type
+
+struct HaveNested {
+    struct Nested {}
+}
+
+var _: HaveNested.#^IN_POSTFIX_BASE_MEMBER_1?check=POSTFIX_BASE_MEMBER^#?
+var _: HaveNested.#^IN_POSTFIX_BASE_MEMBER_2?check=POSTFIX_BASE_MEMBER^#!
+var _: HaveNested.#^IN_POSTFIX_BASE_MEMBER_3?check=POSTFIX_BASE_MEMBER^#[1]
+var _: HaveNested.#^IN_POSTFIX_BASE_MEMBER_4?check=POSTFIX_BASE_MEMBER^#.Protocol
+var _: HaveNested.#^IN_POSTFIX_BASE_MEMBER_5?check=POSTFIX_BASE_MEMBER^#.Type
+
+// POSTFIX_BASE_MEMBER: Begin completions, 2 items
+// POSTFIX_BASE_MEMBER-DAG: Decl[Struct]/CurrNominal:           Nested[#HaveNested.Nested#];
+// POSTFIX_BASE_MEMBER-DAG: Keyword/None:                       Type[#HaveNested.Type#];
+// POSTFIX_BASE_MEMBER: End completions

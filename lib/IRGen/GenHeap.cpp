@@ -1343,21 +1343,34 @@ llvm::Value *IRGenFunction::emitLoadRefcountedPtr(Address addr,
 llvm::Value *IRGenFunction::
 emitIsUniqueCall(llvm::Value *value, SourceLoc loc, bool isNonNull) {
   llvm::Constant *fn;
+  bool nonObjC = !IGM.getAvailabilityContext().isContainedIn(
+      IGM.Context.getObjCIsUniquelyReferencedAvailability());
+
   if (value->getType() == IGM.RefCountedPtrTy) {
     if (isNonNull)
       fn = IGM.getIsUniquelyReferenced_nonNull_nativeFn();
     else
       fn = IGM.getIsUniquelyReferenced_nativeFn();
   } else if (value->getType() == IGM.UnknownRefCountedPtrTy) {
-    if (isNonNull)
-      fn = IGM.getIsUniquelyReferencedNonObjC_nonNullFn();
-    else
-      fn = IGM.getIsUniquelyReferencedNonObjCFn();
+    if (nonObjC) {
+      if (isNonNull)
+        fn = IGM.getIsUniquelyReferencedNonObjC_nonNullFn();
+      else
+        fn = IGM.getIsUniquelyReferencedNonObjCFn();
+    } else {
+      if (isNonNull)
+        fn = IGM.getIsUniquelyReferenced_nonNullFn();
+      else
+        fn = IGM.getIsUniquelyReferencedFn();
+    }
   } else if (value->getType() == IGM.BridgeObjectPtrTy) {
     if (!isNonNull)
       unimplemented(loc, "optional bridge ref");
 
-    fn = IGM.getIsUniquelyReferencedNonObjC_nonNull_bridgeObjectFn();
+    if (nonObjC)
+      fn = IGM.getIsUniquelyReferencedNonObjC_nonNull_bridgeObjectFn();
+    else
+      fn = IGM.getIsUniquelyReferenced_nonNull_bridgeObjectFn();
   } else {
     llvm_unreachable("Unexpected LLVM type for a refcounted pointer.");
   }
@@ -1369,16 +1382,16 @@ emitIsUniqueCall(llvm::Value *value, SourceLoc loc, bool isNonNull) {
 llvm::Value *IRGenFunction::emitIsEscapingClosureCall(
     llvm::Value *value, SourceLoc sourceLoc, unsigned verificationType) {
   auto loc = SILLocation::decode(sourceLoc, IGM.Context.SourceMgr);
-  auto line = llvm::ConstantInt::get(IGM.Int32Ty, loc.Line);
-  auto col = llvm::ConstantInt::get(IGM.Int32Ty, loc.Column);
+  auto line = llvm::ConstantInt::get(IGM.Int32Ty, loc.line);
+  auto col = llvm::ConstantInt::get(IGM.Int32Ty, loc.column);
 
   // Only output the filepath in debug mode. It is going to leak into the
   // executable. This is the same behavior as asserts.
   auto filename = IGM.IRGen.Opts.shouldOptimize()
                       ? IGM.getAddrOfGlobalString("")
-                      : IGM.getAddrOfGlobalString(loc.Filename);
+                      : IGM.getAddrOfGlobalString(loc.filename);
   auto filenameLength =
-      llvm::ConstantInt::get(IGM.Int32Ty, loc.Filename.size());
+      llvm::ConstantInt::get(IGM.Int32Ty, loc.filename.size());
   auto type = llvm::ConstantInt::get(IGM.Int32Ty, verificationType);
   llvm::CallInst *call =
       Builder.CreateCall(IGM.getIsEscapingClosureAtFileLocationFn(),

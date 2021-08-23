@@ -24,6 +24,7 @@
 
 #include <assert.h>
 #include <errno.h>
+#include <inttypes.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -70,7 +71,6 @@ static void errnoAndExit(const char *message) {
 }
 
 #if 0
-#include <inttypes.h>
 #define DEBUG_LOG(fmt, ...) fprintf(stderr, "%s: " fmt "\n",\
                                     __func__, __VA_ARGS__)
 #else
@@ -238,6 +238,17 @@ PipeMemoryReader_receiveInstanceKind(const PipeMemoryReader *Reader) {
   return KindValue;
 }
 
+static uint8_t PipeMemoryReader_receiveShouldUnwrapExistential(
+    const PipeMemoryReader *Reader) {
+  int WriteFD = PipeMemoryReader_getParentWriteFD(Reader);
+  write(WriteFD, REQUEST_SHOULD_UNWRAP_CLASS_EXISTENTIAL, 2);
+  uint8_t ShouldUnwrap = 0;
+  PipeMemoryReader_collectBytesFromPipe(Reader, &ShouldUnwrap,
+                                        sizeof(ShouldUnwrap));
+  DEBUG_LOG("Requested if should unwrap class existential is", KindValue);
+  return ShouldUnwrap;
+}
+
 static uintptr_t
 PipeMemoryReader_receiveInstanceAddress(const PipeMemoryReader *Reader) {
   int WriteFD = PipeMemoryReader_getParentWriteFD(Reader);
@@ -281,7 +292,7 @@ PipeMemoryReader_receiveImages(SwiftReflectionContextRef RC,
   size_t NumReflectionInfos;
   PipeMemoryReader_collectBytesFromPipe(Reader, &NumReflectionInfos,
                                         sizeof(NumReflectionInfos));
-  DEBUG_LOG("Receiving %z images from child", NumReflectionInfos);
+  DEBUG_LOG("Receiving %zu images from child", NumReflectionInfos);
 
   if (NumReflectionInfos == 0)
     return;
@@ -310,7 +321,7 @@ makeLocalSection(const void *Buffer,
   }
 
   swift_reflection_section_t LS = {(void *)Buffer,
-                                   (void *)(Buffer + Section.Size)};
+                                   (void *)((uint8_t *)Buffer + Section.Size)};
   return LS;
 }
 
@@ -445,24 +456,25 @@ int reflectHeapObject(SwiftReflectionContextRef RC,
   return 1;
 }
 
-int reflectExistential(SwiftReflectionContextRef RC,
-                       const PipeMemoryReader Pipe,
-                       swift_typeref_t MockExistentialTR) {
+int reflectExistentialImpl(
+    SwiftReflectionContextRef RC, const PipeMemoryReader Pipe,
+    swift_typeref_t MockExistentialTR,
+    int (*ProjectExistentialFn)(SwiftReflectionContextRef, swift_addr_t,
+                                swift_typeref_t, swift_typeref_t *,
+                                swift_addr_t *)) {
   uintptr_t instance = PipeMemoryReader_receiveInstanceAddress(&Pipe);
   if (instance == 0) {
     // Child has no more instances to examine
     PipeMemoryReader_sendDoneMessage(&Pipe);
     return 0;
   }
-  printf("Instance pointer in child address space: 0x%lx\n",
-         instance);
+  printf("Instance pointer in child address space: 0x%lx\n", instance);
 
   swift_typeref_t InstanceTypeRef;
   swift_addr_t StartOfInstanceData = 0;
 
-  if (!swift_reflection_projectExistential(RC, instance, MockExistentialTR,
-                                           &InstanceTypeRef,
-                                           &StartOfInstanceData)) {
+  if (!ProjectExistentialFn(RC, instance, MockExistentialTR, &InstanceTypeRef,
+                            &StartOfInstanceData)) {
     printf("swift_reflection_projectExistential failed.\n");
     PipeMemoryReader_sendDoneMessage(&Pipe);
     return 0;
@@ -476,8 +488,26 @@ int reflectExistential(SwiftReflectionContextRef RC,
   swift_reflection_dumpInfoForTypeRef(RC, InstanceTypeRef);
   printf("\n");
 
+  printf("Start of instance data: 0x%" PRIx64 "\n", StartOfInstanceData);
+  printf("\n");
+
   PipeMemoryReader_sendDoneMessage(&Pipe);
   return 1;
+}
+
+int reflectExistential(SwiftReflectionContextRef RC,
+                       const PipeMemoryReader Pipe,
+                       swift_typeref_t MockExistentialTR) {
+  return reflectExistentialImpl(RC, Pipe, MockExistentialTR,
+                                swift_reflection_projectExistential);
+}
+
+int reflectExistentialAndUnwrapClass(SwiftReflectionContextRef RC,
+                                     const PipeMemoryReader Pipe,
+                                     swift_typeref_t MockExistentialTR) {
+  return reflectExistentialImpl(
+      RC, Pipe, MockExistentialTR,
+      swift_reflection_projectExistentialAndUnwrapClass);
 }
 
 int reflectEnum(SwiftReflectionContextRef RC,
@@ -628,6 +658,29 @@ int reflectEnumValue(SwiftReflectionContextRef RC,
 
 }
 
+static void
+asyncTaskIterationCallback(swift_reflection_ptr_t AllocationPtr, unsigned Count,
+                           swift_async_task_allocation_chunk_t Chunks[],
+                           void *ContextPtr) {
+  printf("  Allocation block %#" PRIx64 "\n", (uint64_t)AllocationPtr);
+  for (unsigned i = 0; i < Count; i++)
+    printf("    Chunk at %#" PRIx64 " length %u kind %u\n",
+           (uint64_t)Chunks[i].Start, Chunks[i].Length, Chunks[i].Kind);
+}
+
+int reflectAsyncTask(SwiftReflectionContextRef RC,
+                     const PipeMemoryReader Pipe) {
+  uintptr_t AsyncTaskInstance = PipeMemoryReader_receiveInstanceAddress(&Pipe);
+  printf("Async task %#" PRIx64 "\n", (uint64_t)AsyncTaskInstance);
+  swift_reflection_iterateAsyncTaskAllocations(
+      RC, AsyncTaskInstance, asyncTaskIterationCallback, NULL);
+
+  printf("\n\n");
+  PipeMemoryReader_sendDoneMessage(&Pipe);
+  fflush(stdout);
+  return 1;
+}
+
 
 int doDumpHeapInstance(const char *BinaryFilename) {
   PipeMemoryReader Pipe = createPipeMemoryReader();
@@ -643,8 +696,15 @@ int doDumpHeapInstance(const char *BinaryFilename) {
       close(PipeMemoryReader_getParentReadFD(&Pipe));
       dup2(PipeMemoryReader_getChildReadFD(&Pipe), STDIN_FILENO);
       dup2(PipeMemoryReader_getChildWriteFD(&Pipe), STDOUT_FILENO);
-      _execv(BinaryFilename, NULL);
-      exit(EXIT_SUCCESS);
+
+      char *const argv[] = {strdup(BinaryFilename), NULL};
+      int r = _execv(BinaryFilename, argv);
+      int status = EXIT_SUCCESS;
+      if (r == -1) {
+        perror("child process");
+        status = EXIT_FAILURE;
+      }
+      exit(status);
     }
     default: { // Parent
       close(PipeMemoryReader_getChildReadFD(&Pipe));
@@ -676,23 +736,38 @@ int doDumpHeapInstance(const char *BinaryFilename) {
           break;
         case Existential: {
           static const char Name[] = MANGLING_PREFIX_STR "ypD";
-          swift_typeref_t AnyTR
-            = swift_reflection_typeRefForMangledTypeName(RC,
-              Name, sizeof(Name)-1);
+          swift_typeref_t AnyTR = swift_reflection_typeRefForMangledTypeName(
+              RC, Name, sizeof(Name) - 1);
+          uint8_t ShouldUnwrap =
+              PipeMemoryReader_receiveShouldUnwrapExistential(&Pipe);
 
-          printf("Reflecting an existential.\n");
-          if (!reflectExistential(RC, Pipe, AnyTR))
-            return EXIT_SUCCESS;
+          if (ShouldUnwrap) {
+            printf("Reflecting an existential and unwrapping class.\n");
+            if (!reflectExistentialAndUnwrapClass(RC, Pipe, AnyTR))
+              return EXIT_SUCCESS;
+          } else {
+            printf("Reflecting an existential.\n");
+            if (!reflectExistential(RC, Pipe, AnyTR))
+              return EXIT_SUCCESS;
+          }
           break;
         }
         case ErrorExistential: {
           static const char ErrorName[] = MANGLING_PREFIX_STR "s5Error_pD";
-          swift_typeref_t ErrorTR
-            = swift_reflection_typeRefForMangledTypeName(RC,
-              ErrorName, sizeof(ErrorName)-1);
-          printf("Reflecting an error existential.\n");
-          if (!reflectExistential(RC, Pipe, ErrorTR))
-            return EXIT_SUCCESS;
+          swift_typeref_t ErrorTR = swift_reflection_typeRefForMangledTypeName(
+              RC, ErrorName, sizeof(ErrorName) - 1);
+          uint8_t ShouldUnwrap =
+              PipeMemoryReader_receiveShouldUnwrapExistential(&Pipe);
+
+          if (ShouldUnwrap) {
+            printf("Reflecting an error existential and unwrapping class.\n");
+            if (!reflectExistentialAndUnwrapClass(RC, Pipe, ErrorTR))
+              return EXIT_SUCCESS;
+          } else {
+            printf("Reflecting an error existential.\n");
+            if (!reflectExistential(RC, Pipe, ErrorTR))
+              return EXIT_SUCCESS;
+          }
           break;
         }
         case Closure:
@@ -709,6 +784,12 @@ int doDumpHeapInstance(const char *BinaryFilename) {
         case EnumValue: {
           printf("Reflecting an enum value.\n");
           if (!reflectEnumValue(RC, Pipe))
+            return EXIT_SUCCESS;
+          break;
+        }
+        case AsyncTask: {
+          printf("Reflecting an async task.\n");
+          if (!reflectAsyncTask(RC, Pipe))
             return EXIT_SUCCESS;
           break;
         }

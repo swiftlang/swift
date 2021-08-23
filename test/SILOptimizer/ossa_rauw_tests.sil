@@ -1,0 +1,1028 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -optimized-mandatory-combine -sil-mandatory-combine-enable-canon-and-simple-dce -semantic-arc-opts %s | %FileCheck %s
+
+// Make sure that we can perform all of these RAUW without producing ARC traffic
+// that semantic arc opts can't eliminate.
+
+sil_stage canonical
+
+import Builtin
+
+// Trivial declarations
+
+struct MyInt {
+  var value: Builtin.Int64
+}
+
+// Generic declarations
+
+protocol Addable {
+  static var an: Self { get }
+}
+
+// Class declarations
+
+struct NativeObjectWrapper {
+  var obj: Builtin.NativeObject
+}
+
+sil @inguaranteed_nativeobject_user : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
+
+class Klass {
+  init()
+  deinit
+
+  var field: Klass
+  var structField: NativeObjectWrapper
+}
+
+class SubKlass : Klass {}
+
+sil @use_klass_unowned : $@convention(thin) (Klass) -> ()
+
+// Existential declarations
+
+protocol Proto {
+  static var an: Proto { get }
+}
+
+// Trivial support
+
+sil @first_of_three_ints : $@convention(thin) (MyInt, MyInt, MyInt) -> MyInt
+
+sil @constant_zero : $@convention(thin) () -> MyInt 
+
+sil @identity_int : $@convention(thin) (MyInt) -> MyInt 
+
+// Generic support
+
+sil @first_of_three_addables : $@convention(thin) <A where A : Addable> (@in_guaranteed A, @guaranteed <τ_0_0 where τ_0_0 : Addable> { var τ_0_0 } <A>, @guaranteed <τ_0_0 where τ_0_0 : Addable> { var τ_0_0 } <A>) -> @
+out A
+
+// Class support
+
+sil [exact_self_class] @klass_alloc_init : $@convention(method) (@thick Klass.Type) -> @owned Klass
+
+// Klass.init()
+sil @klass_init : $@convention(method) (@owned Klass) -> @owned Klass
+// Klass.deinit
+sil @klass_deinit : $@convention(method) (@guaranteed Klass) -> @owned Builtin.NativeObject
+
+// Klass.__deallocating_deinit
+sil @klass_dealloc_deinit : $@convention(method) (@owned Klass) -> ()
+
+sil_vtable Klass {
+  #Klass.init!allocator: (Klass.Type) -> () -> Klass : @klass_alloc_init
+  #Klass.deinit!deallocator: @klass_dealloc_deinit
+}
+
+sil @first_of_three_klasses : $@convention(thin) (@guaranteed Klass, @guaranteed Klass, @guaranteed Klass) -> @owned Klass
+
+sil @use_klass_guaranteed : $@convention(thin) (@guaranteed Klass) -> ()
+
+// Existential support
+
+sil @first_of_three_protos : $@convention(thin) (@in_guaranteed Proto, @guaranteed { var Proto }, @guaranteed { var Proto }) -> @out Proto
+
+sil @get_proto : $@convention(thin) () -> @out Proto
+
+// Mixed support
+
+sil @proto_from_proto_and_myint : $@convention(thin) (@in_guaranteed Proto, MyInt) -> @out Proto
+
+sil @myint_from_myint_and_proto : $@convention(thin) (MyInt, @guaranteed { var Proto }) -> MyInt
+
+sil @myint_from_proto_and_myint : $@convention(thin) (@guaranteed { var Proto }, MyInt) -> MyInt
+
+// Enum support
+
+enum FakeOptional<T> {
+case none
+case some(T)
+}
+
+sil @use_fakeoptional_klass_guaranteed : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> ()
+
+///////////
+// Tests //
+///////////
+
+//===---
+// None Tests
+//
+
+// CHECK-LABEL: sil [ossa] @none_to_none_rauw : $@convention(thin) (MyInt) -> MyInt {
+// CHECK: bb0
+// CHECK: return %0
+// CHECK: } // end sil function 'none_to_none_rauw'
+sil [ossa] @none_to_none_rauw : $@convention(thin) (MyInt) -> MyInt {
+bb0(%0 : $MyInt):
+  %1 = unchecked_bitwise_cast %0 : $MyInt to $Builtin.Int64
+  %2 = unchecked_bitwise_cast %1 : $Builtin.Int64 to $MyInt
+  return %2 : $MyInt
+}
+
+// We do not support replacing .none with non-trivial ownerships. This can only
+// occur with enum cases without payloads or with trivial payload. That requires
+// more infrastructure than we have currently.
+
+//===---
+// Owned Tests
+//
+
+// CHECK-LABEL: sil [ossa] @owned_to_owned_rauw : $@convention(thin) (@owned Klass) -> @owned Klass {
+// CHECK: bb0(
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'owned_to_owned_rauw'
+sil [ossa] @owned_to_owned_rauw : $@convention(thin) (@owned Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass):
+  %1 = unchecked_ref_cast %0 : $Klass to $SubKlass
+  %2 = upcast %1 : $SubKlass to $Klass
+  return %2 : $Klass
+}
+
+// We get ARC traffic here today since we do not get rid of PhiArguments kept
+// alive only by destroys/end_borrows. We will eventually though.
+//
+// CHECK-LABEL: sil [ossa] @owned_to_owned_consuming : $@convention(thin) (@owned FakeOptional<Klass>) -> () {
+// CHECK: copy_value
+// CHECK-NOT: enum $FakeOptional<Klass>, #FakeOptional.some!enumelt
+// CHECK: } // end sil function 'owned_to_owned_consuming'
+sil [ossa] @owned_to_owned_consuming : $@convention(thin) (@owned FakeOptional<Klass>) -> () {
+bb0(%0 : @owned $FakeOptional<Klass>):
+  switch_enum %0 : $FakeOptional<Klass>, case #FakeOptional.some: bb1, case #FakeOptional.none: bb2
+
+bb1(%0a : @owned $Klass):
+  %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %0a : $Klass
+  br bb3(%1 : $FakeOptional<Klass>)
+
+bb2:
+  %3 = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  br bb3(%3 : $FakeOptional<Klass>)
+
+bb3(%4 : @owned $FakeOptional<Klass>):
+  destroy_value %4 : $FakeOptional<Klass>
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+//===---
+// Unowned Tests
+//
+
+// CHECK-LABEL: sil [ossa] @unowned_to_owned_rauw : $@convention(thin) (@owned Klass) -> @owned Klass {
+// CHECK: bb0(
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'unowned_to_owned_rauw'
+sil [ossa] @unowned_to_owned_rauw : $@convention(thin) (@owned Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass):
+  %1 = unchecked_bitwise_cast %0 : $Klass to $SubKlass
+  %2 = unchecked_bitwise_cast %1 : $SubKlass to $Klass
+  %3 = copy_value %2 : $Klass
+  destroy_value %0 : $Klass
+  return %3 : $Klass
+}
+
+// CHECK-LABEL: sil [ossa] @unowned_to_owned_rauw_loop : $@convention(thin) (@owned Klass) -> @owned FakeOptional<Klass> {
+// CHECK: bb0([[ARG:%.*]] : @owned $Klass):
+// CHECK-NOT: unchecked_bitwise_cast
+// CHECK-NOT: copy_value
+// CHECK-NOT: destroy_value
+//
+// CHECK: bb2:
+// CHECK-NEXT: [[COPY:%.*]] = copy_value [[ARG]]
+// CHECK-NEXT: cond_br undef, bb3, bb4
+//
+// CHECK: bb3:
+// CHECK-NEXT: destroy_value [[COPY]]
+// CHECK-NEXT: br bb2
+//
+// CHECK: bb4:
+// CHECK-NEXT: [[ENUM_SOME_RESULT:%.*]] = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, [[COPY]]
+// CHECK-NEXT: br bb6([[ENUM_SOME_RESULT]] : $FakeOptional<Klass>)
+//
+// CHECK: bb5:
+// CHECK-NEXT: [[ENUM_NONE_RESULT:%.*]] = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+// CHECK-NEXT: br bb6([[ENUM_NONE_RESULT]] :
+//
+// CHECK: bb6([[RESULT:%.*]] : @owned $FakeOptional<Klass>):
+// CHECK-NEXT: destroy_value [[ARG]]
+// CHECK-NEXT: return [[RESULT]]
+// CHECK: } // end sil function 'unowned_to_owned_rauw_loop'
+sil [ossa] @unowned_to_owned_rauw_loop : $@convention(thin) (@owned Klass) -> @owned FakeOptional<Klass> {
+bb0(%0 : @owned $Klass):
+  cond_br undef, bbLoopPreHeader, bbEarlyExit
+
+bbLoopPreHeader:
+  br bbLoopHeader
+
+bbLoopHeader:
+  %1 = unchecked_bitwise_cast %0 : $Klass to $SubKlass
+  %2 = unchecked_bitwise_cast %1 : $SubKlass to $Klass
+  %3 = copy_value %2 : $Klass
+  cond_br undef, bbBackEdge, bbExitingBlock
+
+bbBackEdge:
+  destroy_value %3 : $Klass
+  br bbLoopHeader
+
+bbExitingBlock:
+  %4 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %3 : $Klass
+  br bbExitBlock(%4 : $FakeOptional<Klass>)
+
+bbEarlyExit:
+  %5 = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  br bbExitBlock(%5 : $FakeOptional<Klass>)
+
+bbExitBlock(%result : @owned $FakeOptional<Klass>):
+  destroy_value %0 : $Klass
+  return %result : $FakeOptional<Klass>
+}
+
+// CHECK-LABEL: sil [ossa] @unowned_to_guaranteed_rauw : $@convention(thin) (@guaranteed Klass) -> @owned Klass {
+// CHECK: bb0(
+// CHECK-NEXT: copy_value
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'unowned_to_guaranteed_rauw'
+sil [ossa] @unowned_to_guaranteed_rauw : $@convention(thin) (@guaranteed Klass) -> @owned Klass {
+bb0(%0 : @guaranteed $Klass):
+  %1 = unchecked_bitwise_cast %0 : $Klass to $SubKlass
+  %2 = unchecked_bitwise_cast %1 : $SubKlass to $Klass
+  %3 = copy_value %2 : $Klass
+  return %3 : $Klass
+}
+
+// CHECK-LABEL: sil [ossa] @unowned_to_guaranteed_rauw_loop : $@convention(thin) (@guaranteed Klass) -> @owned FakeOptional<Klass> {
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $Klass):
+// CHECK-NOT: unchecked_bitwise_cast
+// CHECK-NOT: copy_value
+// CHECK-NOT: destroy_value
+//
+// CHECK: bb2:
+// CHECK-NEXT: [[COPY:%.*]] = copy_value [[ARG]]
+// CHECK-NEXT: cond_br undef, bb3, bb4
+//
+// CHECK: bb3:
+// CHECK-NEXT: destroy_value [[COPY]]
+// CHECK-NEXT: br bb2
+//
+// CHECK: bb4:
+// CHECK-NEXT: [[ENUM_SOME_RESULT:%.*]] = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, [[COPY]]
+// CHECK-NEXT: br bb6([[ENUM_SOME_RESULT]] : $FakeOptional<Klass>)
+//
+// CHECK: bb5:
+// CHECK-NEXT: [[ENUM_NONE_RESULT:%.*]] = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt // user: %10
+// CHECK-NEXT: br bb6([[ENUM_NONE_RESULT]] :
+//
+// CHECK: bb6([[RESULT:%.*]] : @owned $FakeOptional<Klass>):
+// CHECK-NEXT: return [[RESULT]]
+// CHECK: } // end sil function 'unowned_to_guaranteed_rauw_loop'
+sil [ossa] @unowned_to_guaranteed_rauw_loop : $@convention(thin) (@guaranteed Klass) -> @owned FakeOptional<Klass> {
+bb0(%0 : @guaranteed $Klass):
+  cond_br undef, bbLoopPreHeader, bbEarlyExit
+
+bbLoopPreHeader:
+  br bbLoopHeader
+
+bbLoopHeader:
+  %1 = unchecked_bitwise_cast %0 : $Klass to $SubKlass
+  %2 = unchecked_bitwise_cast %1 : $SubKlass to $Klass
+  %3 = copy_value %2 : $Klass
+  cond_br undef, bbBackEdge, bbExitingBlock
+
+bbBackEdge:
+  destroy_value %3 : $Klass
+  br bbLoopHeader
+
+bbExitingBlock:
+  %4 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %3 : $Klass
+  br bbExitBlock(%4 : $FakeOptional<Klass>)
+
+bbEarlyExit:
+  %5 = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  br bbExitBlock(%5 : $FakeOptional<Klass>)
+
+bbExitBlock(%result : @owned $FakeOptional<Klass>):
+  return %result : $FakeOptional<Klass>
+}
+
+// CHECK-LABEL: sil [ossa] @unowned_to_guaranteed_rauw_2 : $@convention(thin) (@guaranteed Klass) -> (Klass, Klass) {
+// CHECK: bb0(
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'unowned_to_guaranteed_rauw_2'
+sil [ossa] @unowned_to_guaranteed_rauw_2 : $@convention(thin) (@guaranteed Klass) -> (Klass, Klass) {
+bb0(%0 : @guaranteed $Klass):
+  %1 = unchecked_bitwise_cast %0 : $Klass to $SubKlass
+  %2 = unchecked_bitwise_cast %1 : $SubKlass to $Klass
+  %3 = tuple(%2 : $Klass, %2 : $Klass)
+  return %3 : $(Klass, Klass)
+}
+
+// CHECK-LABEL: sil [ossa] @unowned_to_guaranteed_rauw_2a : $@convention(thin) (@guaranteed Builtin.NativeObject) -> (Klass, Klass) {
+// CHECK: bb0(
+// CHECK-NEXT: unchecked_ref_cast
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'unowned_to_guaranteed_rauw_2a'
+sil [ossa] @unowned_to_guaranteed_rauw_2a : $@convention(thin) (@guaranteed Builtin.NativeObject) -> (Klass, Klass) {
+bb0(%0 : @guaranteed $Builtin.NativeObject):
+  %0a = unchecked_ref_cast %0 : $Builtin.NativeObject to $Klass
+  %1 = unchecked_bitwise_cast %0a : $Klass to $SubKlass
+  %2 = unchecked_bitwise_cast %1 : $SubKlass to $Klass
+  %3 = tuple(%2 : $Klass, %2 : $Klass)
+  return %3 : $(Klass, Klass)
+}
+
+// We need the unchecked_ownership_conversion since our base value is
+// guaranteed, not a function argument, and our user is a function exiting
+// terminator.
+//
+// CHECK-LABEL: sil [ossa] @unowned_to_guaranteed_rauw_2b : $@convention(thin) (@guaranteed Builtin.NativeObject) -> Klass {
+// CHECK: bb0(
+// CHECK-NEXT: unchecked_ref_cast
+// CHECK-NEXT: unchecked_ownership_conversion
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'unowned_to_guaranteed_rauw_2b'
+sil [ossa] @unowned_to_guaranteed_rauw_2b : $@convention(thin) (@guaranteed Builtin.NativeObject) -> Klass {
+bb0(%0 : @guaranteed $Builtin.NativeObject):
+  %0a = unchecked_ref_cast %0 : $Builtin.NativeObject to $Klass
+  %1 = unchecked_bitwise_cast %0a : $Klass to $SubKlass
+  %2 = unchecked_bitwise_cast %1 : $SubKlass to $Klass
+  return %2 : $Klass
+}
+
+
+// CHECK-LABEL: sil [ossa] @unowned_to_guaranteed_rauw_2_loop : $@convention(thin) (@guaranteed Klass) -> @owned FakeOptional<(Klass, Klass)> {
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $Klass):
+// CHECK-NOT: unchecked_bitwise_cast
+// CHECK-NOT: copy_value
+// CHECK-NOT: destroy_value
+//
+// CHECK: bb2:
+// CHECK-NEXT: [[TUP:%.*]] = tuple ([[ARG]] : $Klass, [[ARG]] : $Klass)
+// CHECK-NEXT: [[COPY:%.*]] = copy_value [[TUP]]
+// CHECK-NEXT: cond_br undef, bb3, bb4
+//
+// CHECK: bb3:
+// CHECK-NEXT: destroy_value [[COPY]]
+// CHECK-NEXT: br bb2
+//
+// CHECK: bb4:
+// CHECK-NEXT: [[ENUM_SOME_RESULT:%.*]] = enum $FakeOptional<{{.*}}>, #FakeOptional.some!enumelt, [[COPY]]
+// CHECK-NEXT: br bb6([[ENUM_SOME_RESULT]] : $FakeOptional<{{.*}}>)
+//
+// CHECK: bb5:
+// CHECK-NEXT: [[ENUM_NONE_RESULT:%.*]] = enum $FakeOptional<{{.*}}>, #FakeOptional.none!enumelt
+// CHECK-NEXT: br bb6([[ENUM_NONE_RESULT]] :
+//
+// CHECK: bb6([[RESULT:%.*]] : @owned $FakeOptional<{{.*}}>):
+// CHECK-NEXT: return [[RESULT]]
+// CHECK: } // end sil function 'unowned_to_guaranteed_rauw_2_loop'
+sil [ossa] @unowned_to_guaranteed_rauw_2_loop : $@convention(thin) (@guaranteed Klass) -> @owned FakeOptional<(Klass, Klass)> {
+bb0(%0 : @guaranteed $Klass):
+  cond_br undef, bbLoopPreHeader, bbEarlyExit
+
+bbLoopPreHeader:
+  br bbLoopHeader
+
+bbLoopHeader:
+  %1 = unchecked_bitwise_cast %0 : $Klass to $SubKlass
+  %2 = unchecked_bitwise_cast %1 : $SubKlass to $Klass
+  %3 = tuple(%2 : $Klass, %2 : $Klass)
+  %4 = copy_value %3 : $(Klass, Klass)
+  cond_br undef, bbBackEdge, bbExitingBlock
+
+bbBackEdge:
+  destroy_value %4 : $(Klass, Klass)
+  br bbLoopHeader
+
+bbExitingBlock:
+  %5 = enum $FakeOptional<(Klass, Klass)>, #FakeOptional.some!enumelt, %4 : $(Klass, Klass)
+  br bbExitBlock(%5 : $FakeOptional<(Klass, Klass)>)
+
+bbEarlyExit:
+  %6 = enum $FakeOptional<(Klass, Klass)>, #FakeOptional.none!enumelt
+  br bbExitBlock(%6 : $FakeOptional<(Klass, Klass)>)
+
+bbExitBlock(%result : @owned $FakeOptional<(Klass, Klass)>):
+  return %result : $FakeOptional<(Klass, Klass)>
+}
+
+// CHECK-LABEL: sil [ossa] @unowned_to_guaranteed_rauw_3 : $@convention(thin) (@guaranteed Klass) -> Klass {
+// CHECK: bb0(
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'unowned_to_guaranteed_rauw_3'
+sil [ossa] @unowned_to_guaranteed_rauw_3 : $@convention(thin) (@guaranteed Klass) -> Klass {
+bb0(%0 : @guaranteed $Klass):
+  %1 = unchecked_bitwise_cast %0 : $Klass to $SubKlass
+  %2 = unchecked_bitwise_cast %1 : $SubKlass to $Klass
+  return %2 : $Klass
+}
+
+//===---
+// Guaranteed Tests
+//
+
+// CHECK-LABEL: sil [ossa] @guaranteed_to_guaranteed : $@convention(thin) (@guaranteed Klass) -> () {
+// CHECK-NOT: unchecked_ref_cast
+// CHECK: } // end sil function 'guaranteed_to_guaranteed'
+sil [ossa] @guaranteed_to_guaranteed : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %1 = unchecked_ref_cast %0 : $Klass to $SubKlass
+  %2 = unchecked_ref_cast %1 : $SubKlass to $Klass
+  %f = function_ref @use_klass_guaranteed : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %f(%2) : $@convention(thin) (@guaranteed Klass) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We should have no ARC traffic despite having a loop here.
+//
+// CHECK-LABEL: sil [ossa] @guaranteed_to_guaranteed_loop : $@convention(thin) (@guaranteed Klass) -> () {
+// CHECK-NOT: unchecked_ref_cast
+// CHECK-NOT: copy_value
+// CHECK: } // end sil function 'guaranteed_to_guaranteed_loop'
+sil [ossa] @guaranteed_to_guaranteed_loop : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  cond_br undef, bb1, bbSkipLoop
+
+bb1:
+  br bb1a
+
+bb1a:
+  br bb2
+
+bb2:
+  %1 = unchecked_ref_cast %0 : $Klass to $SubKlass
+  %2 = unchecked_ref_cast %1 : $SubKlass to $Klass
+  %f = function_ref @use_klass_guaranteed : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %f(%2) : $@convention(thin) (@guaranteed Klass) -> ()
+  cond_br undef, bbBackEdge, bbExitingBlock
+
+bbBackEdge:
+  br bb1a
+
+bbSkipLoop:
+  br bbExit
+
+bbExitingBlock:
+  br bbExit
+
+bbExit:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @guaranteed_to_unowned : $@convention(thin) (@guaranteed Klass) -> () {
+// CHECK-NOT: unchecked_ref_cast
+// CHECK: } // end sil function 'guaranteed_to_unowned'
+sil [ossa] @guaranteed_to_unowned : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %1 = unchecked_ref_cast %0 : $Klass to $SubKlass
+  %2 = unchecked_ref_cast %1 : $SubKlass to $Klass
+  %f = function_ref @use_klass_unowned : $@convention(thin) (Klass) -> ()
+  apply %f(%2) : $@convention(thin) (Klass) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @guaranteed_to_unowned_loop : $@convention(thin) (@guaranteed Klass) -> () {
+// CHECK-NOT: unchecked_ref_cast
+// CHECK-NOT: copy_value
+// CHECK: } // end sil function 'guaranteed_to_unowned_loop'
+sil [ossa] @guaranteed_to_unowned_loop : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  cond_br undef, bb1, bbSkipLoop
+
+bb1:
+  br bb1a
+
+bb1a:
+  br bb2
+
+bb2:
+  %1 = unchecked_ref_cast %0 : $Klass to $SubKlass
+  %2 = unchecked_ref_cast %1 : $SubKlass to $Klass
+  %f = function_ref @use_klass_unowned : $@convention(thin) (Klass) -> ()
+  apply %f(%2) : $@convention(thin) (Klass) -> ()
+  cond_br undef, bbBackEdge, bbExitingBlock
+
+bbBackEdge:
+  br bb1a
+
+bbSkipLoop:
+  br bbExit
+
+bbExitingBlock:
+  br bbExit
+
+bbExit:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Lifetime extend borrow to %3 and insert a copy.
+//
+// We should have no copies in this function when we are done.
+//
+// Just make sure we eliminated the FakeOptional.some.
+//
+// CHECK-LABEL: sil [ossa] @guaranteed_to_owned_consuming : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> () {
+// CHECK-NOT: enum $FakeOptional<Klass>, #FakeOptional.some!enumelt
+// CHECK-NOT: copy_value
+// CHECK-NOT: destroy_value
+// CHECK: } // end sil function 'guaranteed_to_owned_consuming'
+sil [ossa] @guaranteed_to_owned_consuming : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> () {
+bb0(%0 : @guaranteed $FakeOptional<Klass>):
+  switch_enum %0 : $FakeOptional<Klass>, case #FakeOptional.some: bb1, case #FakeOptional.none: bb2
+
+bb1(%0a : @guaranteed $Klass):
+  %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %0a : $Klass
+  %2 = copy_value %1 : $FakeOptional<Klass>
+  br bb3(%2 : $FakeOptional<Klass>)
+
+bb2:
+  %3 = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  br bb3(%3 : $FakeOptional<Klass>)
+
+bb3(%4 : @owned $FakeOptional<Klass>):
+  destroy_value %4 : $FakeOptional<Klass>
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @guaranteed_to_owned_consuming_loop : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> () {
+// CHECK-NOT: enum $FakeOptional<Klass>, #FakeOptional.some!enumelt
+// CHECK-NOT: copy_value
+// CHECK-NOT: destroy_value
+// CHECK: } // end sil function 'guaranteed_to_owned_consuming_loop'
+sil [ossa] @guaranteed_to_owned_consuming_loop : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> () {
+bb0(%0 : @guaranteed $FakeOptional<Klass>):
+  cond_br undef, bbPreLoopHeader, bbEarlyExit
+
+bbPreLoopHeader:
+  br bbLoopHeader
+
+bbLoopHeader:
+  switch_enum %0 : $FakeOptional<Klass>, case #FakeOptional.some: bb1, case #FakeOptional.none: bb2
+
+bb1(%0a : @guaranteed $Klass):
+  %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %0a : $Klass
+  %2 = copy_value %1 : $FakeOptional<Klass>
+  br bb3(%2 : $FakeOptional<Klass>)
+
+bb2:
+  %3 = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  br bb3(%3 : $FakeOptional<Klass>)
+
+bb3(%4 : @owned $FakeOptional<Klass>):
+  destroy_value %4 : $FakeOptional<Klass>
+  cond_br undef, bbBackEdge, bbLoopExitingBlock
+
+bbBackEdge:
+  br bbLoopHeader
+
+bbLoopExitingBlock:
+  br bbExit
+
+bbEarlyExit:
+  br bbExit
+
+bbExit:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// For the normal check, make sure we performed the optimization. In this case
+// it means eliminating the enum instruction in bb1.
+//
+// Then after cleaning up show that we do not have any copy_value or
+// begin_borrows left.
+//
+// CHECK-LABEL: sil [ossa] @guaranteed_to_guaranteed_consuming : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> () {
+// CHECK-NOT: copy_value
+// CHECK: begin_borrow
+// CHECK-NOT: enum $FakeOptional<Klass>, #FakeOptional.some!enumelt
+// CHECK: } // end sil function 'guaranteed_to_guaranteed_consuming'
+//
+// We eliminate all begin borrows from this example with semantic-arc.
+sil [ossa] @guaranteed_to_guaranteed_consuming : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> () {
+bb0(%0 : @guaranteed $FakeOptional<Klass>):
+  switch_enum %0 : $FakeOptional<Klass>, case #FakeOptional.some: bb1, case #FakeOptional.none: bb2
+
+bb1(%0a : @guaranteed $Klass):
+  %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %0a : $Klass
+  %2 = begin_borrow %1 : $FakeOptional<Klass>
+  br bb3(%2 : $FakeOptional<Klass>)
+
+bb2:
+  %3 = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  br bb3(%3 : $FakeOptional<Klass>)
+
+bb3(%4 : @guaranteed $FakeOptional<Klass>):
+  end_borrow %4 : $FakeOptional<Klass>
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Make sure we performed the optimization.
+//
+// CHECK-LABEL: sil [ossa] @guaranteed_to_guaranteed_non_consuming_deadend : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> () {
+// CHECK-NOT: copy_value
+// CHECK-NOT: begin_borrow
+// CHECK-NOT: enum $FakeOptional<Klass>, #FakeOptional.some!enumelt
+// CHECK: } // end sil function 'guaranteed_to_guaranteed_non_consuming_deadend'
+sil [ossa] @guaranteed_to_guaranteed_non_consuming_deadend : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> () {
+bb0(%0 : @guaranteed $FakeOptional<Klass>):
+  switch_enum %0 : $FakeOptional<Klass>, case #FakeOptional.some: bb1, case #FakeOptional.none: bb2
+
+bb1(%0a : @guaranteed $Klass):
+  // We are going to replace %1 with %0.
+  %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %0a : $Klass
+  %f2 = function_ref @use_fakeoptional_klass_guaranteed : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> ()
+  apply %f2(%1) : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> ()
+  unreachable
+
+bb2:
+  %3 = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  %f = function_ref @use_fakeoptional_klass_guaranteed : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> ()
+  apply %f(%3) : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> ()
+  unreachable
+}
+
+// In this example we are replacing %1 with %0 inserting fix up copies. Make
+// sure that we do not end up with any arc traffic!
+//
+// Make sure we actually eliminated the FakeOptional.some in bb1. We are
+// replacing it with %0.
+//
+// CHECK-LABEL: sil [ossa] @guaranteed_to_guaranteed_nonconsuming_2 : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> () {
+// CHECK-NOT: copy_value
+// CHECK-NOT: enum $FakeOptional<Klass>, #FakeOptional.some!enumelt
+// CHECK-NOT: begin_borrow
+// CHECK: } // end sil function 'guaranteed_to_guaranteed_nonconsuming_2'
+sil [ossa] @guaranteed_to_guaranteed_nonconsuming_2 : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> () {
+bb0(%0 : @guaranteed $FakeOptional<Klass>):
+  switch_enum %0 : $FakeOptional<Klass>, case #FakeOptional.some: bb1, case #FakeOptional.none: bb2
+
+bb1(%0a : @guaranteed $Klass):
+  %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %0a : $Klass
+  %f2 = function_ref @use_fakeoptional_klass_guaranteed : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> ()
+  apply %f2(%1) : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> ()
+  br bb3
+
+bb2:
+  %3 = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  %f = function_ref @use_fakeoptional_klass_guaranteed : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> ()
+  apply %f(%3) : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> ()
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We do eliminate the copy_value here, but we do not eliminate the begin_borrow
+// since we do not in semantic arc opts eliminate args kept alive just by
+// borrows.
+//
+// CHECK-LABEL: sil [ossa] @guaranteed_copy_rauw_owned : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> () {
+// CHECK-NOT: copy_value
+// CHECK: begin_borrow
+// CHECK-NOT: copy_value
+// CHECK: } // end sil function 'guaranteed_copy_rauw_owned'
+sil [ossa] @guaranteed_copy_rauw_owned : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> () {
+bb0(%0 : @guaranteed $FakeOptional<Klass>):
+  %0c = copy_value %0 : $FakeOptional<Klass>
+  switch_enum %0c : $FakeOptional<Klass>, case #FakeOptional.some: bb1, case #FakeOptional.none: bb2
+
+bb1(%0a : @owned $Klass):
+  %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %0a : $Klass
+  br bb3(%1 : $FakeOptional<Klass>)
+
+bb2:
+  %3 = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  br bb3(%3 : $FakeOptional<Klass>)
+
+bb3(%4 : @owned $FakeOptional<Klass>):
+  destroy_value %4 : $FakeOptional<Klass>
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @interior_pointer_lifetime_extension_arg_not_int_ptr : $@convention(thin) (@in_guaranteed Klass) -> @owned Klass {
+// CHECK-NOT: address_to_pointer
+// CHECK-NOT: pointer_to_address
+// CHECK: } // end sil function 'interior_pointer_lifetime_extension_arg_not_int_ptr'
+sil [ossa] @interior_pointer_lifetime_extension_arg_not_int_ptr : $@convention(thin) (@in_guaranteed Klass) -> @owned Klass {
+bb0(%0 : $*Klass):
+  %1 = address_to_pointer %0 : $*Klass to $Builtin.RawPointer
+  %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Klass
+  %3 = load [copy] %2 : $*Klass
+  return %3 : $Klass
+}
+
+// CHECK-LABEL: sil [ossa] @interior_pointer_lifetime_extension_int_ptr_no_lifetime_ext_needed : $@convention(thin) (@owned Klass) -> @owned Klass {
+// CHECK-NOT: address_to_pointer
+// CHECK-NOT: pointer_to_address
+// CHECK: } // end sil function 'interior_pointer_lifetime_extension_int_ptr_no_lifetime_ext_needed'
+sil [ossa] @interior_pointer_lifetime_extension_int_ptr_no_lifetime_ext_needed : $@convention(thin) (@owned Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass):
+  %0a = begin_borrow %0 : $Klass
+  %0b = ref_element_addr %0a : $Klass, #Klass.field
+  %1 = address_to_pointer %0b : $*Klass to $Builtin.RawPointer
+  %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Klass
+  %3 = load [copy] %2 : $*Klass
+  end_borrow %0a : $Klass
+  destroy_value %0 : $Klass
+  return %3 : $Klass
+}
+
+// In this case, we need to perform the interior pointer lifetime extension.
+//
+// CHECK-LABEL: sil [ossa] @interior_pointer_lifetime_extension_int_ptr_need_lifetime_ext : $@convention(thin) (@owned Klass) -> @owned Klass {
+// CHECK-NOT: address_to_pointer
+// CHECK-NOT: pointer_to_address
+// CHECK: } // end sil function 'interior_pointer_lifetime_extension_int_ptr_need_lifetime_ext'
+sil [ossa] @interior_pointer_lifetime_extension_int_ptr_need_lifetime_ext : $@convention(thin) (@owned Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass):
+  %0a = begin_borrow %0 : $Klass
+  %0b = ref_element_addr %0a : $Klass, #Klass.field
+  %1 = address_to_pointer %0b : $*Klass to $Builtin.RawPointer
+  %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Klass
+  end_borrow %0a : $Klass
+  %3 = load [copy] %2 : $*Klass
+  destroy_value %0 : $Klass
+  return %3 : $Klass
+}
+
+// CHECK-LABEL: sil [ossa] @interior_pointer_lifetime_extension_int_ptr_need_lifetime_ext_with_proj : $@convention(thin) (@owned Klass) -> @owned Builtin.NativeObject {
+// CHECK-NOT: address_to_pointer
+// CHECK-NOT: pointer_to_address
+// CHECK: } // end sil function 'interior_pointer_lifetime_extension_int_ptr_need_lifetime_ext_with_proj'
+sil [ossa] @interior_pointer_lifetime_extension_int_ptr_need_lifetime_ext_with_proj : $@convention(thin) (@owned Klass) -> @owned Builtin.NativeObject {
+bb0(%0 : @owned $Klass):
+  %0a = begin_borrow %0 : $Klass
+  %0b = ref_element_addr %0a : $Klass, #Klass.structField
+  %0c = struct_element_addr %0b : $*NativeObjectWrapper, #NativeObjectWrapper.obj
+  %1 = address_to_pointer %0c : $*Builtin.NativeObject to $Builtin.RawPointer
+  %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Builtin.NativeObject
+  end_borrow %0a : $Klass
+  %3 = load [copy] %2 : $*Builtin.NativeObject
+  destroy_value %0 : $Klass
+  return %3 : $Builtin.NativeObject
+}
+
+// Make sure we inserted everything in the right places rather than using the
+// ownership verifier.
+//
+// CHECK-LABEL: sil [ossa] @interior_pointer_lifetime_extension_int_ptr_need_lifetime_ext_with_proj_2 : $@convention(thin) (@owned Klass) -> @owned Builtin.NativeObject {
+// CHECK: bb0([[ARG:%.*]] : @owned
+// CHECK-NEXT: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK-NEXT: [[NEW_INT_PTR:%.*]] = ref_element_addr [[BORROWED_ARG]]
+// CHECK-NEXT: br bb1
+//
+// CHECK: bb1:
+// CHECK-NEXT: br bb2
+//
+// CHECK: bb2:
+// CHECK-NEXT: [[NEW_GEP:%.*]] = struct_element_addr [[NEW_INT_PTR]]
+// CHECK-NEXT: br bb3
+//
+// CHECK: bb3:
+// CHECK-NEXT: br bb4
+//
+// CHECK: bb4:
+// CHECK-NEXT: [[RESULT:%.*]] = load [copy] [[NEW_GEP]] :
+// CHECK-NEXT: end_borrow [[BORROWED_ARG]]
+// CHECK-NEXT: destroy_value [[ARG]]
+// CHECK-NEXT: return [[RESULT]]
+// CHECK-NEXT: } // end sil function 'interior_pointer_lifetime_extension_int_ptr_need_lifetime_ext_with_proj_2'
+sil [ossa] @interior_pointer_lifetime_extension_int_ptr_need_lifetime_ext_with_proj_2 : $@convention(thin) (@owned Klass) -> @owned Builtin.NativeObject {
+bb0(%0 : @owned $Klass):
+  %0a = begin_borrow %0 : $Klass
+  br bb1
+
+bb1:
+  %0b = ref_element_addr %0a : $Klass, #Klass.structField
+  %0c = struct_element_addr %0b : $*NativeObjectWrapper, #NativeObjectWrapper.obj
+  br bb2
+
+bb2:
+  %1 = address_to_pointer %0c : $*Builtin.NativeObject to $Builtin.RawPointer
+  %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Builtin.NativeObject
+  br bb3
+
+bb3:
+  end_borrow %0a : $Klass
+  br bb4
+
+bb4:
+  %3 = load [copy] %2 : $*Builtin.NativeObject
+  destroy_value %0 : $Klass
+  return %3 : $Builtin.NativeObject
+}
+
+// Make sure we inserted everything in the right places rather than using the
+// ownership verifier given we can't eliminate the underlying RAUW.
+//
+// CHECK-LABEL: sil [ossa] @interior_pointer_lifetime_extension_int_ptr_need_lifetime_ext_with_proj_3 : $@convention(thin) (@owned Klass) -> @owned Builtin.NativeObject {
+// CHECK: bb0([[ARG:%.*]] : @owned
+// CHECK-NEXT: [[ORIGINAL_BORROW:%.*]] = begin_borrow [[ARG]]
+// CHECK-NEXT: [[COPIED_ARG:%.*]] = copy_value [[ORIGINAL_BORROW]]
+// CHECK-NEXT: [[BORROWED_COPIED_ARG:%.*]] = begin_borrow [[COPIED_ARG]]
+// CHECK-NEXT: [[NEW_INT_PTR:%.*]] = ref_element_addr [[BORROWED_COPIED_ARG]]
+// CHECK-NEXT: br bb1
+//
+// CHECK: bb1:
+// CHECK-NEXT: [[OLD_INT_PTR:%.*]] = ref_element_addr
+// CHECK-NEXT: [[OLD_GEP:%.*]] = struct_element_addr [[OLD_INT_PTR]]
+// CHECK-NEXT: br bb2
+//
+// CHECK: bb2:
+// CHECK-NEXT: // function_ref
+// CHECK-NEXT: [[USER:%.*]] = function_ref @
+// CHECK-NEXT: apply [[USER]]([[OLD_GEP]])
+// CHECK-NEXT: [[NEW_GEP:%.*]] = struct_element_addr [[NEW_INT_PTR]]
+// CHECK-NEXT: br bb3
+//
+// CHECK: bb3:
+// CHECK-NEXT: end_borrow [[ORIGINAL_BORROW]]
+// CHECK-NEXT: br bb4
+//
+// CHECK: bb4:
+// CHECK-NEXT: [[RESULT:%.*]] = load [copy] [[NEW_GEP]]
+// CHECK-NEXT: end_borrow [[BORROWED_COPIED_ARG]]
+// CHECK-NEXT: destroy_value [[COPIED_ARG]]
+// CHECK-NEXT: destroy_value [[ARG]]
+// CHECK-NEXT: return [[RESULT]]
+// CHECK-NEXT: } // end sil function 'interior_pointer_lifetime_extension_int_ptr_need_lifetime_ext_with_proj_3'
+sil [ossa] @interior_pointer_lifetime_extension_int_ptr_need_lifetime_ext_with_proj_3 : $@convention(thin) (@owned Klass) -> @owned Builtin.NativeObject {
+bb0(%0 : @owned $Klass):
+  %0a = begin_borrow %0 : $Klass
+  br bb1
+
+bb1:
+  %0b = ref_element_addr %0a : $Klass, #Klass.structField
+  %0c = struct_element_addr %0b : $*NativeObjectWrapper, #NativeObjectWrapper.obj
+  br bb2
+
+bb2:
+  %f = function_ref @inguaranteed_nativeobject_user : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
+  apply %f(%0c) : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
+  %1 = address_to_pointer %0c : $*Builtin.NativeObject to $Builtin.RawPointer
+  %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Builtin.NativeObject
+  br bb3
+
+bb3:
+  end_borrow %0a : $Klass
+  br bb4
+
+bb4:
+  %3 = load [copy] %2 : $*Builtin.NativeObject
+  destroy_value %0 : $Klass
+  return %3 : $Builtin.NativeObject
+}
+
+// CHECK-LABEL: sil [ossa] @interior_pointer_lifetime_extension_int_ptr_need_lifetime_ext_loop_1 : $@convention(thin) (@owned Klass) -> @owned Builtin.NativeObject {
+// CHECK-NOT: address_to_pointer
+// CHECK-NOT: pointer_to_address
+// CHECK: } // end sil function 'interior_pointer_lifetime_extension_int_ptr_need_lifetime_ext_loop_1'
+sil [ossa] @interior_pointer_lifetime_extension_int_ptr_need_lifetime_ext_loop_1 : $@convention(thin) (@owned Klass) -> @owned Builtin.NativeObject {
+bb0(%0 : @owned $Klass):
+  %0a = begin_borrow %0 : $Klass
+  br bb1
+
+bb1:
+  %0b = ref_element_addr %0a : $Klass, #Klass.structField
+  %0c = struct_element_addr %0b : $*NativeObjectWrapper, #NativeObjectWrapper.obj
+  br bb2
+
+bb2:
+  br bbLoop
+
+bbLoop:
+  %f = function_ref @inguaranteed_nativeobject_user : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
+  apply %f(%0c) : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
+  %1 = address_to_pointer %0c : $*Builtin.NativeObject to $Builtin.RawPointer
+  %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Builtin.NativeObject
+  cond_br undef, bbBackEdge, bb3
+
+bbBackEdge:
+  br bbLoop
+
+bb3:
+  end_borrow %0a : $Klass
+  br bb4
+
+bb4:
+  %3 = load [copy] %2 : $*Builtin.NativeObject
+  destroy_value %0 : $Klass
+  return %3 : $Builtin.NativeObject
+}
+
+// CHECK-LABEL: sil [ossa] @interior_pointer_lifetime_extension_int_ptr_need_lifetime_ext_loop_2 : $@convention(thin) (@owned Klass) -> @owned Builtin.NativeObject {
+// CHECK-NOT: address_to_pointer
+// CHECK-NOT: pointer_to_address
+// CHECK: } // end sil function 'interior_pointer_lifetime_extension_int_ptr_need_lifetime_ext_loop_2'
+sil [ossa] @interior_pointer_lifetime_extension_int_ptr_need_lifetime_ext_loop_2 : $@convention(thin) (@owned Klass) -> @owned Builtin.NativeObject {
+bb0(%0 : @owned $Klass):
+  %0a = begin_borrow %0 : $Klass
+  br bb1
+
+bb1:
+  %0b = ref_element_addr %0a : $Klass, #Klass.structField
+  %0c = struct_element_addr %0b : $*NativeObjectWrapper, #NativeObjectWrapper.obj
+  br bb2
+
+bb2:
+  br bbLoop
+
+bbLoop:
+  %f = function_ref @inguaranteed_nativeobject_user : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
+  apply %f(%0c) : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
+  %1 = address_to_pointer %0c : $*Builtin.NativeObject to $Builtin.RawPointer
+  %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Builtin.NativeObject
+  br bbLoop2
+
+bbLoop2:
+  %3 = load [copy] %2 : $*Builtin.NativeObject
+  cond_br undef, bbBackEdge, bb3
+
+bbBackEdge:
+  destroy_value %3 : $Builtin.NativeObject
+  br bbLoop
+
+bb3:
+  end_borrow %0a : $Klass
+  br bb4
+
+bb4:
+  destroy_value %0 : $Klass
+  return %3 : $Builtin.NativeObject
+}
+
+// CHECK-LABEL: sil [ossa] @interior_pointer_lifetime_extension_int_ptr_need_lifetime_ext_loop_3 : $@convention(thin) (@owned Klass) -> @owned Builtin.NativeObject {
+// CHECK-NOT: address_to_pointer
+// CHECK-NOT: pointer_to_address
+// CHECK: } // end sil function 'interior_pointer_lifetime_extension_int_ptr_need_lifetime_ext_loop_3'
+sil [ossa] @interior_pointer_lifetime_extension_int_ptr_need_lifetime_ext_loop_3 : $@convention(thin) (@owned Klass) -> @owned Builtin.NativeObject {
+bb0(%0 : @owned $Klass):
+  %0a = begin_borrow %0 : $Klass
+  br bb1
+
+bb1:
+  br bb2
+
+bb2:
+  br bbLoop(%0a : $Klass, undef : $Klass)
+
+bbLoop(%arg : @guaranteed $Klass, %base : @owned $Klass):
+  %0b = ref_element_addr %arg : $Klass, #Klass.structField
+  %0c = struct_element_addr %0b : $*NativeObjectWrapper, #NativeObjectWrapper.obj
+  br bbLoop2
+
+bbLoop2:
+  %f = function_ref @inguaranteed_nativeobject_user : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
+  apply %f(%0c) : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
+  %1 = address_to_pointer %0c : $*Builtin.NativeObject to $Builtin.RawPointer
+  %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Builtin.NativeObject
+  br bbLoop3
+
+bbLoop3:
+  end_borrow %arg : $Klass
+  destroy_value %base : $Klass
+  %3 = load [copy] %2 : $*Builtin.NativeObject
+  cond_br undef, bbBackEdge, bb3
+
+bbBackEdge:
+  destroy_value %3 : $Builtin.NativeObject
+  br bbLoop(undef : $Klass, undef : $Klass)
+
+bb3:
+  br bb4
+
+bb4:
+  destroy_value %0 : $Klass
+  return %3 : $Builtin.NativeObject
+}
+
+// Make sure that we always RAUW if our new value address is from a
+// pointer_to_address since we don't track interior pointers that escape through
+// address_to_pointer.
+//
+// CHECK-LABEL: sil [ossa] @interior_pointer_no_base_new_value : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> @owned Builtin.NativeObject {
+// CHECK: pointer_to_address
+// CHECK-NOT: address_to_pointer
+// CHECK-NOT: pointer_to_address
+// CHECK: } // end sil function 'interior_pointer_no_base_new_value'
+sil [ossa] @interior_pointer_no_base_new_value : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> @owned Builtin.NativeObject {
+bb0(%0 : $Builtin.RawPointer, %count : $Builtin.Word):
+  %0a = index_raw_pointer %0 : $Builtin.RawPointer, %count : $Builtin.Word
+  %2 = pointer_to_address %0a : $Builtin.RawPointer to [strict] $*Builtin.NativeObject
+  %3 = index_addr %2 : $*Builtin.NativeObject, %count : $Builtin.Word
+  %4 = address_to_pointer %3 : $*Builtin.NativeObject to $Builtin.RawPointer
+  %5 = pointer_to_address %4 : $Builtin.RawPointer to [strict] $*Builtin.NativeObject
+  %6 = load [copy] %5 : $*Builtin.NativeObject
+  return %6 : $Builtin.NativeObject
+}

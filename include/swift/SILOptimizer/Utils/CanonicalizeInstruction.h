@@ -26,8 +26,10 @@
 #ifndef SWIFT_SILOPTIMIZER_UTILS_CANONICALIZEINSTRUCTION_H
 #define SWIFT_SILOPTIMIZER_UTILS_CANONICALIZEINSTRUCTION_H
 
+#include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/Support/Debug.h"
 
 namespace swift {
@@ -38,15 +40,33 @@ struct CanonicalizeInstruction {
   // May be overriden by passes.
   static constexpr const char *defaultDebugType = "sil-canonicalize";
   const char *debugType = defaultDebugType;
+  DeadEndBlocks &deadEndBlocks;
+  InstModCallbacks callbacks;
 
-  CanonicalizeInstruction(const char *passDebugType) {
+  CanonicalizeInstruction(const char *passDebugType,
+                          DeadEndBlocks &deadEndBlocks)
+      : deadEndBlocks(deadEndBlocks),
+        callbacks() {
 #ifndef NDEBUG
     if (llvm::DebugFlag && !llvm::isCurrentDebugType(debugType))
       debugType = passDebugType;
 #endif
+    callbacks = InstModCallbacks()
+      .onDelete([&](SILInstruction *toDelete) {
+        killInstruction(toDelete);
+      })
+      .onCreateNewInst([&](SILInstruction *newInst) {
+        notifyNewInstruction(newInst);
+      })
+      .onSetUseValue([&](Operand *use, SILValue newValue) {
+        use->set(newValue);
+        notifyHasNewUsers(newValue);
+      });
   }
 
   virtual ~CanonicalizeInstruction();
+
+  const SILFunction *getFunction() const { return deadEndBlocks.getFunction(); }
 
   /// Rewrite this instruction, based on its operands and uses, into a more
   /// canonical representation.

@@ -20,6 +20,7 @@
 #include "swift/AST/EvaluatorDependencies.h"
 #include "swift/AST/SimpleRequest.h"
 #include "swift/Basic/Fingerprint.h"
+#include "swift/Parse/Token.h"
 #include "swift/Syntax/SyntaxNodes.h"
 
 namespace swift {
@@ -86,7 +87,7 @@ public:
 struct SourceFileParsingResult {
   ArrayRef<Decl *> TopLevelDecls;
   Optional<ArrayRef<Token>> CollectedTokens;
-  Optional<llvm::MD5> InterfaceHash;
+  Optional<StableHasher> InterfaceHasher;
   Optional<syntax::SourceFileSyntax> SyntaxRoot;
 };
 

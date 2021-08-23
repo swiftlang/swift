@@ -1,10 +1,10 @@
 // RUN: not %target-swift-frontend -typecheck %s -swift-version 4 2> %t.4.txt
 // RUN: %FileCheck -check-prefix=CHECK -check-prefix=CHECK-4 %s < %t.4.txt
-// RUN: %FileCheck -check-prefix=NEGATIVE -check-prefix=NEGATIVE-4 %s < %t.4.txt
+// RUN: %FileCheck -check-prefix=NEGATIVE %s < %t.4.txt
 
 // RUN: not %target-swift-frontend -typecheck %s -swift-version 5 2> %t.5.txt
 // RUN: %FileCheck -check-prefix=CHECK -check-prefix=CHECK-5 %s < %t.5.txt
-// RUN: %FileCheck -check-prefix=NEGATIVE -check-prefix=NEGATIVE-5 %s < %t.5.txt
+// RUN: %FileCheck -check-prefix=NEGATIVE %s < %t.5.txt
 
 
 class NonOptToOpt {

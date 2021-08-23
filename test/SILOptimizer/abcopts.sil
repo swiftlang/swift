@@ -789,7 +789,13 @@ bb0(%0 : $ArraySlice<Int>):
   %t1 = apply %f1(%0) : $@convention(method) (@owned ArraySlice<Int>) -> Int32
   %c1 = struct_extract %t1 : $Int32, #Int32._value
   %t2 = builtin "cmp_eq_Int32"(%z0 : $Builtin.Int32, %c1 : $Builtin.Int32) : $Builtin.Int1
-  cond_br %t2, bb2, bb1(%z0 : $Builtin.Int32)
+  cond_br %t2, bb0a, bb0b
+
+bb0a:
+  br bb2
+
+bb0b:
+ br bb1(%z0 : $Builtin.Int32)
 
 bb1(%i0 : $Builtin.Int32):
   %f2 = function_ref @checkbounds3 : $@convention(method) (Int32, Bool, @owned ArraySlice<Int>) -> _DependenceToken
@@ -805,7 +811,13 @@ bb1(%i0 : $Builtin.Int32):
   %t6 = builtin "sadd_with_overflow_Int32"(%i0 : $Builtin.Int32, %i2 : $Builtin.Int32, %t5 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
   %t7 = tuple_extract %t6 : $(Builtin.Int32, Builtin.Int1), 0
   %8 = builtin "cmp_eq_Int32"(%t7 : $Builtin.Int32, %c1 : $Builtin.Int32) : $Builtin.Int1
-  cond_br %8, bb2, bb1(%t7 : $Builtin.Int32)
+  cond_br %8, bb1a, bb1b
+
+bb1a:
+  br bb2
+
+bb1b:
+  br bb1(%t7 : $Builtin.Int32)
 
 bb2:
   %r1 = tuple ()

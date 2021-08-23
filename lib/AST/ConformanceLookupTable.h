@@ -39,7 +39,7 @@ class ModuleDecl;
 /// This table is a lower-level detail that clients should generally not
 /// access directly. Rather, one should use the protocol- and
 /// conformance-centric entry points in \c NominalTypeDecl and \c DeclContext.
-class ConformanceLookupTable {
+class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
   /// Describes the stage at which a particular nominal type or
   /// extension's conformances has been processed.
   enum class ConformanceStage : uint8_t {
@@ -85,6 +85,9 @@ class ConformanceLookupTable {
   class ConformanceSource {
     llvm::PointerIntPair<void *, 2, ConformanceEntryKind> Storage;
 
+    /// The location of the "unchecked" attribute, if there is one.
+    SourceLoc uncheckedLoc;
+
     ConformanceSource(void *ptr, ConformanceEntryKind kind) 
       : Storage(ptr, kind) { }
 
@@ -123,6 +126,14 @@ class ConformanceLookupTable {
       return ConformanceSource(typeDecl, ConformanceEntryKind::Synthesized);
     }
 
+    /// Return a new conformance source with the given location of "@unchecked".
+    ConformanceSource withUncheckedLoc(SourceLoc uncheckedLoc) {
+      ConformanceSource result(*this);
+      if (uncheckedLoc.isValid())
+        result.uncheckedLoc = uncheckedLoc;
+      return result;
+    }
+
     /// Retrieve the kind of conformance formed from this source.
     ConformanceEntryKind getKind() const { return Storage.getInt(); }
 
@@ -147,6 +158,11 @@ class ConformanceLookupTable {
       }
 
       llvm_unreachable("Unhandled ConformanceEntryKind in switch.");
+    }
+
+    /// The location of the @unchecked attribute, if any.
+    SourceLoc getUncheckedLoc() const {
+      return uncheckedLoc;
     }
 
     /// For an inherited conformance, retrieve the class declaration
@@ -183,7 +199,7 @@ class ConformanceLookupTable {
   };
 
   /// An entry in the conformance table.
-  struct ConformanceEntry {
+  struct ConformanceEntry : public ASTAllocated<ConformanceEntry> {
     /// The source location within the current context where the
     /// protocol conformance was specified.
     SourceLoc Loc;
@@ -283,11 +299,6 @@ class ConformanceLookupTable {
 
       return Loc;
     }
-
-    // Only allow allocation of conformance entries using the
-    // allocator in ASTContext.
-    void *operator new(size_t Bytes, ASTContext &C,
-                       unsigned Alignment = alignof(ConformanceEntry));
 
     SWIFT_DEBUG_DUMP;
     void dump(raw_ostream &os, unsigned indent = 0) const;
@@ -429,17 +440,14 @@ public:
   /// conformances found for this protocol and nominal type.
   ///
   /// \returns true if any conformances were found. 
-  bool lookupConformance(ModuleDecl *module,
-                         NominalTypeDecl *nominal,
+  bool lookupConformance(NominalTypeDecl *nominal,
                          ProtocolDecl *protocol, 
                          SmallVectorImpl<ProtocolConformance *> &conformances);
 
   /// Look for all of the conformances within the given declaration context.
   void lookupConformances(NominalTypeDecl *nominal,
                           DeclContext *dc,
-                          ConformanceLookupKind lookupKind,
-                          SmallVectorImpl<ProtocolDecl *> *protocols,
-                          SmallVectorImpl<ProtocolConformance *> *conformances,
+                          std::vector<ProtocolConformance *> *conformances,
                           SmallVectorImpl<ConformanceDiagnostic> *diagnostics);
 
   /// Retrieve the complete set of protocols to which this nominal
@@ -465,16 +473,6 @@ public:
   getSatisfiedProtocolRequirementsForMember(const ValueDecl *member,
                                             NominalTypeDecl *nominal,
                                             bool sorted);
-
-  // Only allow allocation of conformance lookup tables using the
-  // allocator in ASTContext or by doing a placement new.
-  void *operator new(size_t Bytes, ASTContext &C,
-                     unsigned Alignment = alignof(ConformanceLookupTable));
-
-  void *operator new(size_t Bytes, void *Mem) {
-    assert(Mem);
-    return Mem;
-  }
 
   SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &os) const;

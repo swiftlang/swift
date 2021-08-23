@@ -4,7 +4,7 @@ import Builtin
 
 sil_stage canonical
 
-// CHECK: define hidden swiftcc void @f010_irgen_identity(%swift.opaque* noalias nocapture sret %0, %swift.opaque* noalias nocapture %1, %swift.type* %T)
+// CHECK: define hidden swiftcc void @f010_irgen_identity(%swift.opaque* noalias nocapture sret({{.*}}) %0, %swift.opaque* noalias nocapture %1, %swift.type* %T)
 // CHECK: entry:
 // CHECK-NOT: call
 // CHECK-arm64e: call i64 @llvm.ptrauth.blend.i64

@@ -26,6 +26,7 @@
 #include "llvm/Support/EndianStream.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/OnDiskHashTable.h"
+#include "llvm/Support/StringSaver.h"
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/YAMLTraits.h"
 #include "llvm/Support/raw_ostream.h"
@@ -42,6 +43,12 @@ enum class DiagID : uint32_t;
 namespace diag {
 
 using namespace llvm::support;
+
+enum LocalizationProducerState : uint8_t {
+  NotInitialized,
+  Initialized,
+  FailedInitialization
+};
 
 class DefToYAMLConverter {
   llvm::ArrayRef<const char *> IDs;
@@ -154,18 +161,44 @@ public:
 };
 
 class LocalizationProducer {
+  /// This allocator will retain localized diagnostic strings containing the
+  /// diagnostic's message and identifier as `message [id]` for the duration of
+  /// compiler invocation. This will be used when the frontend flag
+  /// `-debug-diagnostic-names` is used.
+  llvm::BumpPtrAllocator localizationAllocator;
+  llvm::StringSaver localizationSaver;
+  bool printDiagnosticNames;
+  LocalizationProducerState state = NotInitialized;
+
 public:
+  LocalizationProducer(bool printDiagnosticNames = false)
+      : localizationSaver(localizationAllocator),
+        printDiagnosticNames(printDiagnosticNames) {}
+
   /// If the  message isn't available/localized in current context
   /// return the fallback default message.
   virtual llvm::StringRef getMessageOr(swift::DiagID id,
-                                       llvm::StringRef defaultMessage) const {
-    auto message = getMessage(id);
-    return message.empty() ? defaultMessage : message;
-  }
+                                       llvm::StringRef defaultMessage);
+
+  /// \returns a `SerializedLocalizationProducer` pointer if the serialized
+  /// diagnostics file available, otherwise returns a `YAMLLocalizationProducer`
+  /// if the `YAML` file is available. If both files aren't available returns a
+  /// `nullptr`.
+  static std::unique_ptr<LocalizationProducer>
+  producerFor(llvm::StringRef locale, llvm::StringRef path,
+              bool printDiagnosticNames);
 
   virtual ~LocalizationProducer() {}
 
 protected:
+  LocalizationProducerState getState() const;
+
+  /// Used to lazily initialize `LocalizationProducer`s.
+  /// \returns true if the producer is successfully initialized, false
+  /// otherwise.
+  virtual bool initializeImpl() = 0;
+  virtual void initializeIfNeeded() final;
+
   /// Retrieve a message for the given diagnostic id.
   /// \returns empty string if message couldn't be found.
   virtual llvm::StringRef getMessage(swift::DiagID id) const = 0;
@@ -173,19 +206,22 @@ protected:
 
 class YAMLLocalizationProducer final : public LocalizationProducer {
   std::vector<std::string> diagnostics;
+  std::string filePath;
 
 public:
   /// The diagnostics IDs that are no longer available in `.def`
   std::vector<std::string> unknownIDs;
-  explicit YAMLLocalizationProducer(llvm::StringRef filePath);
+  explicit YAMLLocalizationProducer(llvm::StringRef filePath,
+                                    bool printDiagnosticNames = false);
 
   /// Iterate over all of the available (non-empty) translations
   /// maintained by this producer, callback gets each translation
   /// with its unique identifier.
   void forEachAvailable(
-      llvm::function_ref<void(swift::DiagID, llvm::StringRef)> callback) const;
+      llvm::function_ref<void(swift::DiagID, llvm::StringRef)> callback);
 
 protected:
+  bool initializeImpl() override;
   llvm::StringRef getMessage(swift::DiagID id) const override;
 };
 
@@ -198,9 +234,11 @@ class SerializedLocalizationProducer final : public LocalizationProducer {
 
 public:
   explicit SerializedLocalizationProducer(
-      std::unique_ptr<llvm::MemoryBuffer> buffer);
+      std::unique_ptr<llvm::MemoryBuffer> buffer,
+      bool printDiagnosticNames = false);
 
 protected:
+  bool initializeImpl() override;
   llvm::StringRef getMessage(swift::DiagID id) const override;
 };
 

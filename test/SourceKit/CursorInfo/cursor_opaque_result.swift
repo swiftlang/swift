@@ -19,6 +19,7 @@ func test(value: MyStruct) {
 
 // OPAQUE: foo()
 // OPAQUE-NEXT: s:8MyModule0A6StructV3fooQryF
+// OPAQUE-NEXT: source.lang.swift
 // OPAQUE-NEXT: (MyStruct) -> () -> some Comparable
 // OPAQUE-NEXT: $sQrycD
 // OPAQUE-NEXT: <Container>$s8MyModule0A6StructVD</Container>
@@ -28,6 +29,7 @@ func test(value: MyStruct) {
 
 // ASSOC: bar()
 // ASSOC-NEXT: s:8MyModule1PPAAE3bar5AssocQzyF
+// ASSOC-NEXT: source.lang.swift
 // ASSOC-NEXT: <Self where Self : P> (Self) -> () -> Self.Assoc
 // ASSOC-NEXT: $s5AssocQzycD
 // ASSOC-NEXT: <Container>$s8MyModule0A6StructVD</Container>

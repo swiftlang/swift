@@ -45,12 +45,16 @@ Type InheritedTypeRequest::evaluate(
   switch (stage) {
   case TypeResolutionStage::Structural:
     resolution =
-        TypeResolution::forStructural(dc, None, /*unboundTyOpener*/ nullptr);
+        TypeResolution::forStructural(dc, TypeResolverContext::Inherited,
+                                      /*unboundTyOpener*/ nullptr,
+                                      /*placeholderHandler*/ nullptr);
     break;
 
   case TypeResolutionStage::Interface:
     resolution =
-        TypeResolution::forInterface(dc, None, /*unboundTyOpener*/ nullptr);
+        TypeResolution::forInterface(dc, TypeResolverContext::Inherited,
+                                     /*unboundTyOpener*/ nullptr,
+                                     /*placeholderHandler*/ nullptr);
     break;
 
   case TypeResolutionStage::Contextual: {
@@ -272,9 +276,8 @@ static Type inferResultBuilderType(ValueDecl *decl)  {
   auto addConformanceMatches = [&matches](ValueDecl *lookupDecl) {
     DeclContext *dc = lookupDecl->getDeclContext();
     auto idc = cast<IterableDeclContext>(dc->getAsDecl());
-    auto conformances = evaluateOrDefault(
-        dc->getASTContext().evaluator,
-        LookupAllConformancesInContextRequest{idc}, { });
+    auto conformances = idc->getLocalConformances(
+        ConformanceLookupKind::NonStructural);
 
     for (auto conformance : conformances) {
       auto protocol = conformance->getProtocol();

@@ -60,5 +60,11 @@ extension DummyClass {
   @objc func nsstringProperty2() -> Int { return 0 } // expected-error{{method 'nsstringProperty2()' with Objective-C selector 'nsstringProperty2' conflicts with getter for 'nsstringProperty2' with the same Objective-C selector}}
 }
 
+open class MyObject: NSObject {} // expected-note{{implicit initializer 'init()' declared here}}
+
+extension MyObject {
+    public override convenience init() {} // expected-error{{initializer 'init()' with Objective-C selector 'init' conflicts with implicit initializer 'init()' with the same Objective-C selector}}
+}
+
 // FIXME: Remove -verify-ignore-unknown.
 // <unknown>:0: error: unexpected note produced: 'nsstringProperty2' previously declared here

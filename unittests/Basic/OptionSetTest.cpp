@@ -12,7 +12,6 @@
 
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/Range.h"
-#include "swift/Basic/ValueEnumerator.h"
 #include "gtest/gtest.h"
 
 using namespace swift;

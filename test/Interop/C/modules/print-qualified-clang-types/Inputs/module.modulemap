@@ -1,13 +1,7 @@
 module ForeignA {
-  // Nest the header in a sub-module to make sure these are handled correctly.
-  module Sub {
-    header "foreign-a.h"
-  }
+  header "foreign-a.h"
 }
 
 module ForeignB {
-  // Nest the header in a sub-module to make sure these are handled correctly.
-  module Sub {
-    header "foreign-b.h"
-  }
+  header "foreign-b.h"
 }

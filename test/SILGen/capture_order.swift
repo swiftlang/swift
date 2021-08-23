@@ -119,25 +119,6 @@ func captureInClosure() {
 
 /// Regression tests
 
-func sr3210_crash() {
-  defer { // expected-error {{'defer' block captures 'b' before it is declared}}
-    print("\(b)") // expected-note {{captured here}}
-  }
-
-  return
-
-  let b = 2 // expected-note {{captured value declared here}}
-  // expected-warning@-1 {{code after 'return' will never be executed}}
-}
-
-func sr3210() {
-  defer {
-    print("\(b)")
-  }
-
-  let b = 2
-}
-
 class SR4812 {
   public func foo() {
     let bar = { [weak self] in
@@ -183,4 +164,24 @@ class rdar40600800 {
       }
     }
   }
+}
+
+// Make sure we can't capture an uninitialized 'var' box, either.
+func SR14747() {
+  func g() -> Int { // expected-error {{closure captures 'r' before it is declared}}
+    _ = r // expected-note {{captured here}}
+    return 5
+  }
+  var r = g() // expected-note {{captured value declared here}}
+  // expected-warning@-1 {{variable 'r' was never mutated; consider changing to 'let' constant}}
+}
+
+class class77933460 {}
+
+func func77933460() {
+  var obj: class77933460 = { obj }()
+  // expected-error@-1 {{closure captures 'obj' before it is declared}}
+  // expected-note@-2 {{captured here}}
+  // expected-note@-3 {{captured value declared here}}
+  // expected-warning@-4 {{variable 'obj' was never mutated; consider changing to 'let' constant}}
 }

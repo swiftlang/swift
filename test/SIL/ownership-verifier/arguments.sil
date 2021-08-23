@@ -687,8 +687,7 @@ bb3:
 // CHECK: Non Consuming User:   br bb2(%5 : $Builtin.NativeObject, %8 : $Builtin.NativeObject)
 // CHECK: Block: bb4
 // CHECK-LABEL: Error#: 1. End Error in Function: 'simple_loop_carry_over_consume'
-//
-// CHECK-NOT: Error#: {{[0-9][0-9]*}}. End Error in Function: 'simple_loop_carry_over_consume'
+// Some more errors are emitted
 sil [ossa] @simple_loop_carry_over_consume : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
 bb0(%0 : @guaranteed $Builtin.NativeObject):
   %1 = begin_borrow %0 : $Builtin.NativeObject

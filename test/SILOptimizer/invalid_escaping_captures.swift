@@ -256,3 +256,22 @@ func badNoEscapeCaptureThroughVar(_ fn: () -> ()) {
     myFunc()
   }
 }
+
+@inline(never)
+func takeNoEscapeReturnGetter(f: ()->()->Int64) -> ()->Int64 { return f() }
+
+// Test that invalid escaping capture diagnostics are run on nested
+// closures before exclusivity diagnostics are run. Exclusivity
+// diagnostics need to inspect all referenced closures that capture
+// inouts. Also ensure that exclusivity diagnostics does not crash
+// when verifying that a closure that captures inout does not escape
+// as long as a previous diagnostic error is present.
+struct TestInoutEscapeInClosure {
+  var someValue: Int64 = 0
+  mutating func testInoutEscapeInClosure() -> () -> Int64 {
+    return takeNoEscapeReturnGetter {
+      return { return someValue } // expected-error {{escaping closure captures mutating 'self' parameter}}
+      // expected-note@-1 {{captured here}}
+    }
+  }
+}

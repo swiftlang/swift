@@ -41,16 +41,16 @@
 }
 
 // LITERAL4:         Begin completions
-// LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal/IsSystem: withCString({#(body): (UnsafePointer<Int8>) throws -> Result##(UnsafePointer<Int8>) throws -> Result#})[' rethrows'][#Result#]; name=withCString(body: (UnsafePointer<Int8>) throws -> Result) rethrows{{$}}
+// LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal/IsSystem: withCString({#(body): (UnsafePointer<Int8>) throws -> Result##(UnsafePointer<Int8>) throws -> Result#})[' rethrows'][#Result#]; name=withCString(:){{$}}
 
 // FIXME: we should show the qualified String.Index type.
 // rdar://problem/20788802
 // LITERAL4-DAG:     Decl[InstanceVar]/CurrNominal/IsSystem:    startIndex[#String.Index#]; name=startIndex{{$}}
 // LITERAL4-DAG:     Decl[InstanceVar]/CurrNominal/IsSystem:    endIndex[#String.Index#]; name=endIndex{{$}}
-// LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal/IsSystem: append({#(c): Character#})[#Void#]; name=append(c: Character){{$}}
-// LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal/IsSystem: append({#contentsOf: Sequence#})[#Void#]; name=append(contentsOf: Sequence){{$}}
-// LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal/IsSystem: insert({#contentsOf: Collection#}, {#at: String.Index#})[#Void#]; name=insert(contentsOf: Collection, at: String.Index){{$}}
-// LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal/IsSystem: remove({#at: String.Index#})[#Character#]; name=remove(at: String.Index){{$}}
+// LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal/IsSystem: append({#(c): Character#})[#Void#]; name=append(:){{$}}
+// LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal/IsSystem: append({#contentsOf: Sequence#})[#Void#]; name=append(contentsOf:){{$}}
+// LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal/IsSystem: insert({#contentsOf: Collection#}, {#at: String.Index#})[#Void#]; name=insert(contentsOf:at:){{$}}
+// LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal/IsSystem: remove({#at: String.Index#})[#Character#]; name=remove(at:){{$}}
 // LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal/IsSystem: lowercased()[#String#]; name=lowercased(){{$}}
 
 func giveMeAString() -> Int {

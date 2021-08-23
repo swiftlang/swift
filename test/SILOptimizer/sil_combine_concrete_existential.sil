@@ -427,10 +427,10 @@ bb0:
   %c1 = apply %f1(%a0) :  $@convention(thin) (@in_guaranteed AnyP) -> ()
   %a1 = alloc_stack $AnyP
   copy_addr %a0 to [initialization] %a1 : $*AnyP
-  %o0 = open_existential_addr immutable_access %a1 : $*AnyP to $*@opened("7C4DAF8E-D722-11E8-920A-D0817AD9F6DD") AnyP
+  %o0 = open_existential_addr immutable_access %a1 : $*AnyP to $*@opened("8C4DAF8E-D722-11E8-920A-D0817AD9F6DD") AnyP
   %a2 = alloc_stack $StructOfAnyP
-  %w0 = witness_method $@opened("7C4DAF8E-D722-11E8-920A-D0817AD9F6DD") AnyP, #AnyP.returnsSelf : <Self where Self : AnyP> (Self) -> () -> Self, %o0 : $*@opened("7C4DAF8E-D722-11E8-920A-D0817AD9F6DD") AnyP : $@convention(witness_method: AnyP) <τ_0_0 where τ_0_0 : AnyP> (@in_guaranteed τ_0_0) -> @out StructOfAnyP
-  %c0 = apply %w0<@opened("7C4DAF8E-D722-11E8-920A-D0817AD9F6DD") AnyP>(%a2, %o0) : $@convention(witness_method: AnyP) <τ_0_0 where τ_0_0 : AnyP> (@in_guaranteed τ_0_0) -> @out StructOfAnyP
+  %w0 = witness_method $@opened("8C4DAF8E-D722-11E8-920A-D0817AD9F6DD") AnyP, #AnyP.returnsSelf : <Self where Self : AnyP> (Self) -> () -> Self, %o0 : $*@opened("8C4DAF8E-D722-11E8-920A-D0817AD9F6DD") AnyP : $@convention(witness_method: AnyP) <τ_0_0 where τ_0_0 : AnyP> (@in_guaranteed τ_0_0) -> @out StructOfAnyP
+  %c0 = apply %w0<@opened("8C4DAF8E-D722-11E8-920A-D0817AD9F6DD") AnyP>(%a2, %o0) : $@convention(witness_method: AnyP) <τ_0_0 where τ_0_0 : AnyP> (@in_guaranteed τ_0_0) -> @out StructOfAnyP
   dealloc_stack %a2 : $*StructOfAnyP
   dealloc_stack %a1 : $*AnyP
   dealloc_stack %a0 : $*AnyP

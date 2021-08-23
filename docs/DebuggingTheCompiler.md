@@ -25,7 +25,7 @@ benefit of all Swift developers.
         - [Getting CommandLine for swift stdlib from Ninja to enable dumping stdlib SIL](#getting-commandline-for-swift-stdlib-from-ninja-to-enable-dumping-stdlib-sil)
         - [Dumping the SIL and other Data in LLDB](#dumping-the-sil-and-other-data-in-lldb)
     - [Debugging and Profiling on SIL level](#debugging-and-profiling-on-sil-level)
-        - [SIL source level profiling using -gsil](#sil-source-level-profiling-using--gsil)
+        - [SIL source level profiling using -sil-based-debuginfo](#sil-source-level-profiling)
         - [ViewCFG: Regex based CFG Printer for SIL/LLVM-IR](#viewcfg-regex-based-cfg-printer-for-silllvm-ir)
         - [Debugging the Compiler using advanced LLDB Breakpoints](#debugging-the-compiler-using-advanced-lldb-breakpoints)
         - [Debugging the Compiler using LLDB Scripts](#debugging-the-compiler-using-lldb-scripts)
@@ -36,6 +36,14 @@ benefit of all Swift developers.
         - [Bisecting on SIL optimizer pass counts to identify optimizer bugs](#bisecting-on-sil-optimizer-pass-counts-to-identify-optimizer-bugs)
         - [Using git-bisect in the presence of branch forwarding/feature branches](#using-git-bisect-in-the-presence-of-branch-forwardingfeature-branches)
         - [Reducing SIL test cases using bug_reducer](#reducing-sil-test-cases-using-bug_reducer)
+- [Debugging the Compiler Build](#debugging-the-compiler-build)
+    - [Build Dry Run](#build-dry-run)
+- [Debugging the Compiler Driver](#debugging-the-compiler-driver-build)
+    - [Swift Compiler Driver F.A.Q](#swift-compiler-driver-f.a.q.)
+    - [Building the compiler without using the standalone driver](#building-the-compiler-without-the-standalone-driver)
+    - [Invoking the compiler without forwarding to the standalone driver](#invoking-the-compiler-without-forwarding-to-the-standalone-driver)
+    - [Reproducing the Compiler Driver build steps](#reproducing-the-compiler-driver-build-steps)
+    - [Installing the Compiler Driver](#installing-the-compiler-driver)
 - [Debugging Swift Executables](#debugging-swift-executables)
     - [Determining the mangled name of a function in LLDB](#determining-the-mangled-name-of-a-function-in-lldb)
     - [Manually symbolication using LLDB](#manually-symbolication-using-lldb)
@@ -91,6 +99,12 @@ swiftc -emit-sil -Onone file.swift
 
 ```sh
 swiftc -emit-sil -O file.swift
+```
+
+* **Debug info in SIL** To print debug info from `file.swift` in SIL:
+
+```sh
+swiftc -g -emit-sil -O file.swift
 ```
 
 * **IRGen** To print the LLVM IR after IR generation:
@@ -212,47 +226,31 @@ Often it is not sufficient to dump the SIL at the beginning or end of
 the optimization pipeline. The SILPassManager supports useful options
 to dump the SIL also between pass runs.
 
-The SILPassManager's SIL dumping options vary along two orthogonal
-functional axes:
+A short (non-exhaustive) list of SIL printing options:
 
-1. Options that control if functions/modules are printed.
-2. Options that filter what is printed at those points.
+* `-Xllvm '-sil-print-function=SWIFT_MANGLED_NAME'`: Print the specified
+  function after each pass which modifies the function. Note that for module
+  passes, the function is printed if the pass changed _any_ function (the
+  pass manager doesn't know which functions a module pass has changed).
+  Multiple functions can be specified as a comma separated list.
 
-One generally always specifies an option of type 1 and optionally adds
-an option of type 2 to filter the output.
+* `-Xllvm '-sil-print-functions=NAME'`: Like `-sil-print-function`, except that
+  functions are selected if NAME is _contained_ in their mangled names.
 
-A short (non-exhaustive) list of type 1 options:
+* `-Xllvm -sil-print-all`: Print all functions when ever a function pass
+  modifies a function and print the entire module if a module pass modifies
+  the SILModule.
 
-* `-Xllvm -sil-print-all`: Print functions/modules when ever a
-  function pass modifies a function and Print the entire module
-  (modulo filtering) if a module pass modifies a SILModule.
+* `-Xllvm -sil-print-around=$PASS_NAME`: Print the SIL before and after a pass
+  with name `$PASS_NAME` runs on a function or module.
+  By default it prints the whole module. To print only specific functions, add
+  `-sil-print-function` and/or `-sil-print-functions`.
 
-A short (non-exhaustive) list of type 2 options:
+* `-Xllvm -sil-print-before=$PASS_NAME`: Like `-sil-print-around`, but prints
+  the SIL only _before_ the specified pass runs.
 
-* `-Xllvm -sil-print-around=$PASS_NAME`: Print a function/module
-  before and after a function pass with name `$PASS_NAME` runs on a
-  function/module or dump a module before a module pass with name
-  `$PASS_NAME` runs on a module.
-
-* `-Xllvm -sil-print-before=$PASS_NAME`: Print a function/module
-  before a function pass with name `$PASS_NAME` runs on a
-  function/module or dump a module before a module pass with name
-  `$PASS_NAME` runs on a module. NOTE: This happens even without
-  sil-print-all set!
-
-* `-Xllvm -sil-print-after=$PASS_NAME`: Print a function/module
-  after a function pass with name `$PASS_NAME` runs on a
-  function/module or dump a module before a module pass with name
-  `$PASS_NAME` runs on a module.
-
-* `-Xllvm '-sil-print-only-function=SWIFT_MANGLED_NAME'`: When ever
-  one would print a function/module, only print the given function.
-
-These options together allow one to visualize how a
-SILFunction/SILModule is optimized by the optimizer as each
-optimization pass runs easily via formulations like:
-
-    swiftc -Xllvm '-sil-print-only-function=$myMainFunction' -Xllvm -sil-print-all
+* `-Xllvm -sil-print-after=$PASS_NAME`: Like `-sil-print-around`, but prints
+  the SIL only _after_ the specified pass did run.
 
 NOTE: This may emit a lot of text to stderr, so be sure to pipe the
 output to a file.
@@ -307,12 +305,13 @@ has a `dump()` method you can call.
 
 ## Debugging and Profiling on SIL level
 
-### SIL source level profiling using -gsil
+### SIL source level profiling
 
 The compiler provides a way to debug and profile on SIL level. To enable SIL
-debugging add the front-end option -gsil together with -g. Example:
+debugging add the front-end option -sil-based-debuginfo together with -g.
+Example:
 
-    swiftc -g -Xfrontend -gsil -O test.swift -o a.out
+    swiftc -g -Xfrontend -sil-based-debuginfo -O test.swift -o a.out
 
 This writes the SIL after optimizations into a file and generates debug info
 for it. In the debugger and profiler you can then see the SIL code instead of
@@ -553,6 +552,157 @@ the pipeline. Here is a quick summary of the various options:
   When printing IR for functions for print-[before|after]-all options, Only
   print the IR for functions whose name is in this comma separated list.
 
+## Debugging assembly and object code
+
+Understanding layout of compiler-generated metadata
+can sometimes involve looking at assembly and object code.
+
+### Working with a single file
+
+Here's how to generate assembly or object code:
+
+```
+# Emit assembly in Intel syntax (AT&T syntax is the default)
+swiftc tmp.swift -emit-assembly -Xllvm -x86-asm-syntax=intel -o tmp.S
+
+# Emit object code
+swiftc tmp.swift -emit-object -o tmp.o
+```
+
+Understanding mangled names can be hard though: `swift demangle` to the rescue!
+
+```
+swiftc tmp.swift -emit-assembly -Xllvm -x86-asm-syntax=intel -o - \
+  | swift demangle > tmp-demangled.S
+
+swiftc tmp.swift -emit-object -o tmp.o
+
+# Look at where different symbols are located, sorting by address (-n)
+# and displaying section names (-m)
+nm -n -m tmp.o | swift demangle > tmp.txt
+
+# Inspect disassembly of an existing dylib (AT&T syntax is the default)
+objdump -d -macho --x86-asm-syntax=intel /path/to/libcake.dylib \
+  | swift demangle > libcake.S
+```
+
+### Working with multiple files
+
+Some bugs only manifest in WMO, and may involve complicated Xcode projects.
+Moreover, Xcode may be passing arguments via `-filelist`
+and expecting outputs via `-output-filelist`, and those file lists
+may be in temporary directories.
+
+If you want to inspect assembly or object code for individual files when
+compiling under WMO, you can mimic this by doing the following:
+
+```
+# Assuming all .swift files from the MyProject/Sources directory
+# need to be included
+find MyProject/Sources -name '*.swift' -type f > input-files.txt
+
+# In some cases, projects may use multiple files with the same
+# name but in different directories (for different schemes),
+# which can be a problem. Having a file list makes working around
+# this convenient as you can manually manually edit out the files
+# that are not of interest at this stage.
+
+mkdir Output
+
+# 1. -output-filelist doesn't recreate a subdirectory structure,
+#    so first strip out directories
+# 2. map .swift files to assembly files
+sed -e 's|.*/|Output/|;s|\.swift|.S|' input-files.txt > output-files.txt
+
+# Save command-line arguments from Xcode's 'CompileSwiftSources' phase in
+# the build log to a file for convenience, say args.txt.
+#
+# -sdk /path/to/sdk <... other args ...>
+
+xcrun swift-frontend @args.txt \
+  -filelist input-files.txt \
+  -output-filelist output-files.txt \
+  -O -whole-module-optimization \
+  -emit-assembly
+```
+
+If you are manually calling `swift-frontend` without an Xcode invocation to
+use as a template, you will need to at least add
+`-sdk "$(xcrun --show-sdk-path macosx)"` (if compiling for macOS),
+and `-I /path/to/includedir` to include necessary swift modules and interfaces.
+
+### Working with multi-architecture binaries
+
+On macOS, one might be interested in debugging multi-architecture binaries
+such as [universal binaries][]. By default `nm` will show symbols from all
+architectures, so a universal binary might look funny due to two copies of
+everything. Use `nm -arch` to look at a specific architecture:
+
+```
+nm -n -m -arch x86_64 path/to/libcake.dylib | swift demangle
+```
+
+[universal binaries]: https://en.wikipedia.org/wiki/Universal_binary
+
+### Other helpful tools
+
+TODO: This section should mention information about non-macOS platforms:
+maybe we can have a table with rows for use cases and columns for
+platforms (macOS, Linux, Windows), and the cells would be tool names.
+We could also mention platforms next to the tool names.
+
+In the previous sub-sections, we've seen how using different tools can
+make working with assembly and object code much nicer. Here is a short
+listing of commonly used tools on macOS, along with some example use cases:
+
+- Miscellaneous:
+ - `strings`: Find printable strings in a binary file.
+  - Potential use cases: If you're building a binary in multiple configurations,
+    and forgot which binary corresponds to which configuration, you can look
+    through the output of `strings` to identify differences.
+- `c++filt`: The C++ equivalent of `swift-demangle`.
+  - Potential use cases: Looking at the generated code for the
+    Swift runtime, investigating C++ interop issues.
+
+- Linking:
+  - `libtool`: A tool to create static and dynamic libraries. Generally, it's
+    easier to instead ask `swiftc` to link files, but potentially handy as
+    a higher-level alternative to `ld`, `ar` and `lipo`.
+
+- Debug info:
+  - `dwarfdump`: Extract debug info in human-readable form.
+    - Potential use cases: If you want to quickly check if two binaries
+      are identical, you can compare their UUIDs. For on-disk binaries,
+      you can obtain the UUID using `dwarfdump --uuid` For binaries
+      loaded by a running application, you can obtain the UUID using
+      `image list` in LLDB.
+- `objdump`: Dump object files.
+   Some examples of using `objdump` are documented in the previous subsection.
+   If you have a Swift compiler build, you can use `llvm-objdump` from
+   `$LLVM_BUILD_DIR/bin` instead of using the system `objdump`.
+
+   Compared to other tools on this list, `objdump` packs a LOT of
+   functionality; it can show information about sections, relocations
+   and more. It also supports many flags to format and filter the output.
+
+- Linker information (symbol table, sections, binding):
+  - `nm`: Display symbol tables.
+    Some examples of using `nm` are documented in the previous subsection.
+  - `size`: Get high-level information about sections in a binary,
+    such as the sizes of sections and where they are located.
+  - `dyldinfo`: Display information used by dyld, such as which dylibs
+    an image depends on.
+  - `install_name_tool`: Change the name for a dynamic shared library,
+    and query or modify the runpath search paths (aka 'rpaths') it uses.
+
+- Multi-architecture binaries:
+  - `lipo`: A tool that can be used to create, inspect and dissect
+     [universal binaries][universal binaries].
+     - Potential use cases: If you have a universal binary on an
+       Apple Silicon Mac, but want to quickly test if the issue would reproduce
+       on `x86_64`, you can extract the `x86_64` slice by using `lipo`.
+       The `x86_64` binary will automatically run under Rosetta 2.
+
 ## Bisecting Compiler Errors
 
 ### Bisecting on SIL optimizer pass counts to identify optimizer bugs
@@ -586,11 +736,11 @@ it's quite easy to do this manually:
 
 2. Get the SIL before and after the bad optimization.
 
-  a. Add the compiler options
-     `-Xllvm -sil-print-all -Xllvm -sil-print-only-function='<function>'`
+  a. Add the compiler option
+     `-Xllvm -sil-print-function='<function>'`
      where `<function>` is the function name (including the preceding `$`).
      For example:
-     `-Xllvm -sil-print-all -Xllvm -sil-print-only-function='$s4test6testityS2iF'`.
+     `-Xllvm -sil-print-function='$s4test6testityS2iF'`.
      Again, the output can be large, so it's best to redirect stderr to a file.
   b. From the output, copy the SIL of the function *before* the bad
      run into a separate file and the SIL *after* the bad run into a file.
@@ -607,11 +757,11 @@ missing important content from the downstream branch. As an example,
 consider a situation where one has the following straw man commit flow
 graph:
 
-    github/master -> github/tensorflow
+    github/main -> github/tensorflow
 
 In this case if one attempts to use `git-bisect` on
 github/tensorflow, `git-bisect` will sometimes choose commits from
-github/master resulting in one being unable to compile/test specific
+github/main resulting in one being unable to compile/test specific
 tensorflow code that has not been upstreamed yet. Even worse, what if
 we are trying to bisect in between two that were branched from
 github/tensorflow and have had subsequent commits cherry-picked on
@@ -619,7 +769,7 @@ top. Without any loss of generality, lets call those two tags
 `tag-tensorflow-bad` and `tag-tensorflow-good`. Since both of
 these tags have had commits cherry-picked on top, they are technically
 not even on the github/tensorflow branch, but rather in a certain
-sense are a tag of a feature branch from master/tensorflow. So,
+sense are a tag of a feature branch from main/tensorflow. So,
 `git-bisect` doesn't even have a clear history to bisect on in
 multiple ways.
 
@@ -634,14 +784,14 @@ commits. We can compute this as so:
 
 Given that both tags were taken from the feature branch, the reader
 can prove to themselves that this commit is guaranteed to be on
-`github/tensorflow` and not `github/master` since all commits from
-`github/master` are forwarded using git merges.
+`github/tensorflow` and not `github/main` since all commits from
+`github/main` are forwarded using git merges.
 
 Then lets assume that we checked out `$TAG_MERGE_BASE` and then ran
 `test.sh` and did not hit any error. Ok, we can not bisect. Sadly,
 as mentioned above if we run git-bisect in between `$TAG_MERGE_BASE`
 and `tags/tag-tensorflow-bad`, `git-bisect` will sometimes choose
-commits from `github/master` which would cause `test.sh` to fail
+commits from `github/main` which would cause `test.sh` to fail
 if we are testing tensorflow specific code! To work around this
 problem, we need to start our bisect and then tell `git-bisect` to
 ignore those commits by using the skip sub command:
@@ -671,6 +821,131 @@ reducing SIL test cases by:
 
 For more information and a high level example, see:
 ./swift/utils/bug_reducer/README.md.
+
+# Debugging the Compiler Build
+
+## Build Dry Run
+
+A "dry-run" invocation of the `build-script` (using the `--dry-run` flag) will
+print the commands that would be executed in a given build, without executing
+them. A dry-run script invocation output can be used to inspect the build stages
+of a given `build-script` configuration, or create script corresponding to one
+such configuration.
+
+# Debugging the Compiler Driver
+
+The Swift compiler uses a standalone compiler-driver application written in
+Swift: [swift-driver](https://github.com/apple/swift-driver). When building the
+compiler using `build-script`, by default, the standalone driver will be built
+first, using the host toolchain, if the host toolchain contains a Swift
+compiler. If the host toolchain does not contain Swift, a warning is emitted and
+the legacy compiler-driver (integrated in the C++ code-base) will be used. In
+the future, a host toolchain containing a Swift compiler may become mandatory.
+Once the compiler is built, the compiler build directory (`swift-<OS>-<ARCH>`)
+is updated with a symlink to the standalone driver, ensuring calls to the build
+directory's `swift` and `swiftc` always forward to the standalone driver.
+
+For more information about the driver, see:
+[github.com/apple/swift-driver/blob/main/README.md](https://github.com/apple/swift-driver/blob/main/README.md)
+
+## Swift Compiler Driver F.A.Q.
+> What's the difference between invoking 'swiftc' vs. 'swift-driver' at the top
+  level?
+
+Today, `swift` and `swiftc` are symbolic links to the compiler binary
+(`swift-frontend`). Invoking `swiftc` causes the executable to detects that it
+is a compiler-driver invocation, and not a direct compiler-frontend invocation,
+by examining the invoked program's name. The compiler frontend can be invoked
+directly by invoking the `swift-frontend` executable, or passing in the
+`-frontend` option to `swiftc`.
+
+The standalone [Compiler Driver](https://github.com/apple/swift-driver) is
+installed as a separate `swift-driver` executable in the Swift toolchain's `bin`
+directory. When a user launches the compiler by invoking `swiftc`, the C++ based
+compiler executable forwards the invocation to the `swift-driver` executable if
+one is found alongside it. This forwarding mechanism is in-place temporarily, to
+allow for an easy fallback to the legacy driver via one of the two escape
+hatches:
+
+- `-disallow-use-new-driver` command line flag
+- `SWIFT_USE_OLD_DRIVER` environment variable
+
+If the user is to directly invoke the `swift-driver` executable, the behaviour
+should be the same as invoking the `swiftc` executable, but without the option
+for a legacy driver fallback.
+
+Once the legacy driver is deprecated, `swift` and `swiftc` executables will
+become symbolic links to the `swift-driver` executable directly.
+
+
+> Will 'swiftc ... -###' always print the same set of commands for the old/new
+  driver? Do they call 'swift-frontend' the same way?
+
+The standalone [Compiler Driver](https://github.com/apple/swift-driver) is meant
+to be a direct drop-in replacement for the C++-based legacy driver. It has the
+exact same command-line interface. The expectation is that its behaviour closely
+matches the legacy driver; however, during, and after the transition to the new
+driver being the default its behaviour may start to diverge from the legacy
+driver as par for the course of its evolution and gaining new features, etc.
+Today, broadly-speaking, sets of `swift-frontend` invocations generated by the
+two drivers are expected to be very similar.
+
+## Building the compiler without the standalone driver
+One can build the compiler that does not rely on the standalone driver and
+instead uses the legacy, built-in driver using the `build-script` option: 
+`--skip-early-swift-driver`.
+
+## Invoking the compiler without forwarding to the standalone driver
+The Swift compiler can currently be invoked in an execution mode that will use
+the legacy C++-based compiler driver using one of the following two options:
+- Passing `-disallow-use-new-driver` argument to the `swiftc` invocation
+- Setting the `SWIFT_USE_OLD_DRIVER` environment variable 
+
+## Reproducing the Compiler Driver build steps
+A "[dry-run](#build-dry-run)" invocation of the `build-script` can be used to
+examine the SwiftDriver build stage and commands, without executing it. For
+example:
+```
+$ utils/build-script --release-debuginfo --dry-run
++ mkdir -p /SwiftWorkspace/build/Ninja-RelWithDebInfoAssert
+--- Building earlyswiftdriver ---
++ /SwiftWorkspace/swift-driver/Utilities/build-script-helper.py build --package-path /SwiftWorkspace/swift-driver --build-path /SwiftWorkspace/build/Ninja-RelWithDebInfoAssert/earlyswiftdriver-macosx-x86_64 --configuration release --toolchain /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr --ninja-bin /Applications/Xcode.app/Contents/Developer/usr/local/bin/ninja --cmake-bin /Applications/Xcode.app/Contents/Developer/usr/local/bin/cmake --local_compiler_build
+Building the standard library for: swift-test-stdlib-macosx-x86_64
+...
+```
+One of the first steps is an invocation of the driver's
+`build-script-helper.py` script which specifies that the driver us to be built
+(`build`) using the host toolchain (`--toolchain`) to a specified location
+(`--build-path`). 
+
+## Installing the Compiler Driver
+In order to create a Swift compiler installation (`--install-swift`), the
+standalone driver must be built as a separate build product using the
+*just-built* Swift compiler and toolchain (the ones built in the same
+`build-script` invocation, preceding the SwiftDriver build product). The
+additional build product is added to the build by specifying the
+`--swift-driver` option of the `build-script`. The driver product is istalled
+into the resulting toolchain installation by specifying the
+`--install-swift-driver` option of the `build-script`.
+
+Note, a "dry-run" `build-script` invocation when installing the standalone
+driver will demonstrate the commands required to build and install the driver as
+a standalone build product:
+```
+$ utils/build-script --release-debuginfo --dry-run --swift-driver --install-swift-driver
+...
+--- Cleaning swiftdriver ---
++ /SwiftWorkspace/swift-driver/Utilities/build-script-helper.py clean --package-path /SwiftWorkspace/swift-driver --build-path /SwiftWorkspace/build/Ninja-RelWithDebInfoAssert/swiftdriver-macosx-x86_64 --configuration release --toolchain /SwiftWorkspace/build/Ninja-RelWithDebInfoAssert/toolchain-macosx-x86_64/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr --ninja-bin /Applications/Xcode.app/Contents/Developer/usr/local/bin/ninja --cmake-bin /Applications/Xcode.app/Contents/Developer/usr/local/bin/cmake
+--- Building swiftdriver ---
++ /SwiftWorkspace/swift-driver/Utilities/build-script-helper.py build --package-path /SwiftWorkspace/swift-driver --build-path /SwiftWorkspace/build/Ninja-RelWithDebInfoAssert/swiftdriver-macosx-x86_64 --configuration release --toolchain /SwiftWorkspace/build/Ninja-RelWithDebInfoAssert/toolchain-macosx-x86_64/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr --ninja-bin /Applications/Xcode.app/Contents/Developer/usr/local/bin/ninja --cmake-bin /Applications/Xcode.app/Contents/Developer/usr/local/bin/cmake
+--- Installing swiftdriver ---
++ /SwiftWorkspace/swift-driver/Utilities/build-script-helper.py install --package-path /SwiftWorkspace/swift-driver --build-path /SwiftWorkspace/build/Ninja-RelWithDebInfoAssert/swiftdriver-macosx-x
+86_64 --configuration release --toolchain /SwiftWorkspace/build/Ninja-RelWithDebInfoAssert/toolchain-macosx-x86_64/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr --ninja-bin /Applications/Xcode.app/Contents/Developer/usr/local/bin/ninja --cmake-bin /Applications/Xcode.app/Contents/Developer/usr/local/bin/cmake
+```
+These invocations of the driver's `build-script-helper.py` script specify the
+individual build actions (`clean`, `build`, `install`), the product build path
+(`--build-path`), and the *just-built* toolchain which should be used
+(`--toolchain`).
 
 # Debugging Swift Executables
 
@@ -875,14 +1150,14 @@ well as cleanups/modernizations on a code-base. Swift's cmake invocation by
 default creates one of these json databases at the root path of the swift host
 build, for example on macOS:
 
-    $PATH_TO_BUILD/swift-macosx-x86_64/compile_commands.json
+    $PATH_TO_BUILD/swift-macosx-$(uname -m)/compile_commands.json
 
 Using this file, one invokes `clang-tidy` on a specific file in the codebase
 as follows:
 
-    clang-tidy -p=$PATH_TO_BUILD/swift-macosx-x86_64/compile_commands.json $FULL_PATH_TO_FILE
+    clang-tidy -p=$PATH_TO_BUILD/swift-macosx-$(uname -m)/compile_commands.json $FULL_PATH_TO_FILE
 
 One can also use shell regex to visit multiple files in the same directory. Example:
 
-    clang-tidy -p=$PATH_TO_BUILD/swift-macosx-x86_64/compile_commands.json $FULL_PATH_TO_DIR/*.cpp
+    clang-tidy -p=$PATH_TO_BUILD/swift-macosx-$(uname -m)/compile_commands.json $FULL_PATH_TO_DIR/*.cpp
 

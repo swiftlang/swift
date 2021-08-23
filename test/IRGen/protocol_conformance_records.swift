@@ -57,7 +57,7 @@ public struct NativeGenericType<T>: Runcible {
 // -- protocol descriptor
 // CHECK-SAME:           [[RUNCIBLE]]
 // -- type metadata
-// CHECK-SAME:           @"{{got.|__imp_}}$sSiMn"
+// CHECK-SAME:           @"{{got.|\\01__imp__?}}$sSiMn"
 // -- witness table
 // CHECK-SAME:           @"$sSi28protocol_conformance_records8RuncibleAAWP"
 // -- reserved
@@ -73,7 +73,7 @@ extension Int: Runcible {
 // -- protocol descriptor
 // CHECK-SAME:           [[RUNCIBLE]]
 // -- nominal type descriptor
-// CHECK-SAME:           @"{{got.|__imp_}}$s16resilient_struct4SizeVMn"
+// CHECK-SAME:           @"{{got.|\\01__imp__?}}$s16resilient_struct4SizeVMn"
 // -- witness table
 // CHECK-SAME:           @"$s16resilient_struct4SizeV28protocol_conformance_records8RuncibleADWP"
 // -- reserved
@@ -132,9 +132,9 @@ extension NativeGenericType : Spoon where T: Spoon {
 // Retroactive conformance
 // CHECK-LABEL: @"$sSi18resilient_protocol22OtherResilientProtocol0B20_conformance_recordsMc" ={{ dllexport | protected | }}constant
 // -- protocol descriptor
-// CHECK-SAME:           @"{{got.|__imp_}}$s18resilient_protocol22OtherResilientProtocolMp"
+// CHECK-SAME:           @"{{got.|\\01__imp__?}}$s18resilient_protocol22OtherResilientProtocolMp"
 // -- nominal type descriptor
-// CHECK-SAME:           @"{{got.|__imp_}}$sSiMn"
+// CHECK-SAME:           @"{{got.|\\01__imp__?}}$sSiMn"
 // -- witness table pattern
 // CHECK-SAME:           i32 0,
 // -- flags

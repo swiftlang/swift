@@ -11,6 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/BasicBlockUtils.h"
+#include "swift/Basic/Defer.h"
+#include "swift/Basic/STLExtras.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/LoopInfo.h"
 #include "swift/SIL/SILArgument.h"
@@ -18,6 +20,7 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/TerminatorUtils.h"
+#include "llvm/ADT/STLExtras.h"
 
 using namespace swift;
 
@@ -171,7 +174,8 @@ void swift::getEdgeArgs(TermInst *T, unsigned edgeIdx, SILBasicBlock *newEdgeBB,
     if (!succBB->getNumArguments())
       return;
     args.push_back(newEdgeBB->createPhiArgument(
-        succBB->getArgument(0)->getType(), OwnershipKind::Owned));
+        succBB->getArgument(0)->getType(),
+        succBB->getArgument(0)->getOwnershipKind()));
     return;
   }
 
@@ -183,7 +187,8 @@ void swift::getEdgeArgs(TermInst *T, unsigned edgeIdx, SILBasicBlock *newEdgeBB,
     if (!succBB->getNumArguments())
       return;
     args.push_back(newEdgeBB->createPhiArgument(
-        succBB->getArgument(0)->getType(), OwnershipKind::Owned));
+        succBB->getArgument(0)->getType(),
+        succBB->getArgument(0)->getOwnershipKind()));
     return;
   }
 
@@ -194,7 +199,8 @@ void swift::getEdgeArgs(TermInst *T, unsigned edgeIdx, SILBasicBlock *newEdgeBB,
     if (!succBB->getNumArguments())
       return;
     args.push_back(newEdgeBB->createPhiArgument(
-        succBB->getArgument(0)->getType(), OwnershipKind::Owned));
+        succBB->getArgument(0)->getType(),
+        succBB->getArgument(0)->getOwnershipKind()));
     return;
   }
   case SILInstructionKind::CheckedCastAddrBranchInst: {
@@ -203,7 +209,8 @@ void swift::getEdgeArgs(TermInst *T, unsigned edgeIdx, SILBasicBlock *newEdgeBB,
     if (!succBB->getNumArguments())
       return;
     args.push_back(newEdgeBB->createPhiArgument(
-        succBB->getArgument(0)->getType(), OwnershipKind::Owned));
+        succBB->getArgument(0)->getType(),
+        succBB->getArgument(0)->getOwnershipKind()));
     return;
   }
   case SILInstructionKind::CheckedCastValueBranchInst: {
@@ -212,7 +219,8 @@ void swift::getEdgeArgs(TermInst *T, unsigned edgeIdx, SILBasicBlock *newEdgeBB,
     if (!succBB->getNumArguments())
       return;
     args.push_back(newEdgeBB->createPhiArgument(
-        succBB->getArgument(0)->getType(), OwnershipKind::Owned));
+        succBB->getArgument(0)->getType(),
+        succBB->getArgument(0)->getOwnershipKind()));
     return;
   }
 
@@ -222,7 +230,8 @@ void swift::getEdgeArgs(TermInst *T, unsigned edgeIdx, SILBasicBlock *newEdgeBB,
     if (!succBB->getNumArguments())
       return;
     args.push_back(newEdgeBB->createPhiArgument(
-        succBB->getArgument(0)->getType(), OwnershipKind::Owned));
+        succBB->getArgument(0)->getType(),
+        succBB->getArgument(0)->getOwnershipKind()));
     return;
   }
 
@@ -359,22 +368,156 @@ void swift::mergeBasicBlockWithSingleSuccessor(SILBasicBlock *BB,
 //                              DeadEndBlocks
 //===----------------------------------------------------------------------===//
 
+// Propagate the reachability up the control flow graph.
+void DeadEndBlocks::propagateNewlyReachableBlocks(unsigned startIdx) {
+  for (unsigned idx = startIdx; idx < reachableBlocks.size(); ++idx) {
+    const SILBasicBlock *bb = reachableBlocks[idx];
+    for (SILBasicBlock *predBB : bb->getPredecessorBlocks())
+      reachableBlocks.insert(predBB);
+  }
+}
+
 void DeadEndBlocks::compute() {
-  assert(ReachableBlocks.empty() && "Computed twice");
+  assert(reachableBlocks.empty() && "Computed twice");
 
   // First step: find blocks which end up in a no-return block (terminated by
   // an unreachable instruction).
   // Search for function-exiting blocks, i.e. return and throw.
-  for (const SILBasicBlock &BB : *F) {
+  for (const SILBasicBlock &BB : *f) {
     const TermInst *TI = BB.getTerminator();
     if (TI->isFunctionExiting())
-      ReachableBlocks.insert(&BB);
+      reachableBlocks.insert(&BB);
   }
-  // Propagate the reachability up the control flow graph.
-  unsigned Idx = 0;
-  while (Idx < ReachableBlocks.size()) {
-    const SILBasicBlock *BB = ReachableBlocks[Idx++];
-    for (SILBasicBlock *Pred : BB->getPredecessorBlocks())
-      ReachableBlocks.insert(Pred);
+  propagateNewlyReachableBlocks(0);
+}
+
+void DeadEndBlocks::updateForReachableBlock(SILBasicBlock *reachableBB) {
+  if (!didComputeValue)
+    return;
+
+  assert(reachableBlocks.count(reachableBB));
+  unsigned numReachable = reachableBlocks.size();
+  for (SILBasicBlock *predBB : reachableBB->getPredecessorBlocks()) {
+    reachableBlocks.insert(predBB);
+  }
+  propagateNewlyReachableBlocks(numReachable);
+}
+
+bool DeadEndBlocks::triviallyEndsInUnreachable(SILBasicBlock *block) {
+  // Handle the case where a single "unreachable" block (e.g. containing a call
+  // to fatalError()), is jumped to from multiple source blocks.
+  if (SILBasicBlock *singleSucc = block->getSingleSuccessorBlock())
+    block = singleSucc;
+  return isa<UnreachableInst>(block->getTerminator());
+}
+
+//===----------------------------------------------------------------------===//
+//                  Post Dominance Set Completion Utilities
+//===----------------------------------------------------------------------===//
+
+void swift::findJointPostDominatingSet(
+    SILBasicBlock *dominatingBlock, ArrayRef<SILBasicBlock *> dominatedBlockSet,
+    function_ref<void(SILBasicBlock *)> inputBlocksFoundDuringWalk,
+    function_ref<void(SILBasicBlock *)> foundJointPostDomSetCompletionBlocks,
+    function_ref<void(SILBasicBlock *)> inputBlocksInJointPostDomSet) {
+  // If our reachable block set is empty, assert. This is most likely programmer
+  // error.
+  assert(dominatedBlockSet.size() != 0);
+
+  // If we have a reachable block set with a single block and that block is
+  // dominatingBlock, then we return success since a block post-doms its self so
+  // it is already complete.
+  //
+  // NOTE: We do not consider this a visited
+  if (dominatedBlockSet.size() == 1 && dominatingBlock == dominatedBlockSet[0]) {
+    if (inputBlocksInJointPostDomSet)
+      inputBlocksInJointPostDomSet(dominatingBlock);
+    return;
+  }
+
+  /// The worklist that drives the algorithm.
+  SmallVector<SILBasicBlock *, 32> worklist;
+
+  /// All blocks visited during the backwards walk of the CFG, but not including
+  /// the initial blocks in `dominatedBlockSet`.
+  BasicBlockSet visitedBlocks(dominatingBlock->getParent());
+
+  /// All blocks in `dominatedBlockSet` (= blocks where we begin our walk).
+  BasicBlockSet initialBlocks(visitedBlocks.getFunction());
+
+  // Compute our joint post dominating set. We do this by performing a backwards
+  // walk up the CFG tracking back liveness until we find our dominating block.
+  for (auto *block : dominatedBlockSet) {
+    // We require dominatedBlockSet to be a set and thus assert if we hit it to
+    // flag user error to our caller.
+    assert(!initialBlocks.contains(block) &&
+           "dominatedBlockSet must not contain duplicate elements");
+    initialBlocks.insert(block);
+    worklist.push_back(block);
+  }
+
+  // Then until we run out of blocks...
+  while (!worklist.empty()) {
+    auto *block = worklist.pop_back_val();
+
+    // If we are the dominating block, we are done.
+    if (dominatingBlock == block)
+      continue;
+
+    for (auto *predBlock : block->getPredecessorBlocks()) {
+      if (visitedBlocks.insert(predBlock))
+        worklist.push_back(predBlock);
+    }
+  }
+
+  // Do the same walk over all visited blocks again to find the "leaking"
+  // blocks. These leaking blocks are the completion of the post dom set.
+  //
+  // Note that we could also keep all visited blocks in a SmallVector in the
+  // first run. But the worklist algorithm is fast and we don't want
+  // to risk that the small vector overflows (the set of visited blocks can be
+  // much larger than the maximum worklist size).
+  BasicBlockSet visitedBlocksInSecondRun(visitedBlocks.getFunction());
+  assert(worklist.empty());
+  worklist.append(dominatedBlockSet.begin(), dominatedBlockSet.end());
+  while (!worklist.empty()) {
+    auto *block = worklist.pop_back_val();
+    if (dominatingBlock == block)
+      continue;
+
+    for (auto *predBlock : block->getPredecessorBlocks()) {
+      assert(visitedBlocks.contains(predBlock));
+      if (visitedBlocksInSecondRun.insert(predBlock)) {
+        worklist.push_back(predBlock);
+        
+        for (auto *succBlock : predBlock->getSuccessorBlocks()) {
+          // All not-visited successors of a visited block are "leaking" blocks.
+          if (!visitedBlocks.contains(succBlock) &&
+              // For this purpose also the initial blocks count as "visited",
+              // although they are not added to the visitedBlocks set.
+              !initialBlocks.contains(succBlock) &&
+              // Ignore blocks which end in an unreachable. This is a very
+              // simple check, but covers most of the cases, e.g. block which
+              // calls fatalError().
+              !DeadEndBlocks::triviallyEndsInUnreachable(succBlock)) {
+            assert(succBlock->getSinglePredecessorBlock() == predBlock &&
+                   "CFG must not contain critical edge");
+            // Note that since there are no critical edges in the CFG, we are
+            // not calling the closure for a leaking successor block twice.
+            foundJointPostDomSetCompletionBlocks(succBlock);
+          }
+        }
+      }
+    }
+  }
+
+  // Pass back the reachable input blocks that were not reachable from other
+  // input blocks to.
+  for (auto *block : dominatedBlockSet) {
+    if (visitedBlocks.contains(block)) {
+      inputBlocksFoundDuringWalk(block);
+    } else if (inputBlocksInJointPostDomSet) {
+      inputBlocksInJointPostDomSet(block);
+    }
   }
 }

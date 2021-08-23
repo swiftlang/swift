@@ -24,8 +24,8 @@ TEST(TypeLookupError, ConstantString) {
 }
 
 TEST(TypeLookupError, FormatString) {
-  auto error = TypeLookupError("%d %d %d %d %d %d %d %d %d %d", 0, 1, 2, 3, 4,
-                               5, 6, 7, 8, 9, 10);
+  auto error = TYPE_LOOKUP_ERROR_FMT("%d %d %d %d %d %d %d %d %d %d", 0, 1, 2,
+                                     3, 4, 5, 6, 7, 8, 9);
   char *str = error.copyErrorString();
   ASSERT_STREQ(str, "0 1 2 3 4 5 6 7 8 9");
   error.freeErrorString(str);
@@ -35,8 +35,8 @@ TEST(TypeLookupError, Copying) {
   std::vector<TypeLookupError> vec;
 
   {
-    auto originalError = TypeLookupError("%d %d %d %d %d %d %d %d %d %d", 0, 1,
-                                         2, 3, 4, 5, 6, 7, 8, 9, 10);
+    auto originalError = TYPE_LOOKUP_ERROR_FMT("%d %d %d %d %d %d %d %d %d %d",
+                                               0, 1, 2, 3, 4, 5, 6, 7, 8, 9);
     for (int i = 0; i < 5; i++)
       vec.push_back(originalError);
   }

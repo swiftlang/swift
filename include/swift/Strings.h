@@ -24,6 +24,8 @@ constexpr static const StringLiteral STDLIB_NAME = "Swift";
 constexpr static const StringLiteral SWIFT_ONONE_SUPPORT = "SwiftOnoneSupport";
 /// The name of the Concurrency module, which supports that extension.
 constexpr static const StringLiteral SWIFT_CONCURRENCY_NAME = "_Concurrency";
+/// The name of the Distributed module, which supports that extension.
+constexpr static const StringLiteral SWIFT_DISTRIBUTED_NAME = "_Distributed";
 /// The name of the SwiftShims module, which contains private stdlib decls.
 constexpr static const StringLiteral SWIFT_SHIMS_NAME = "SwiftShims";
 /// The name of the Builtin module, which contains Builtin functions.
@@ -46,6 +48,12 @@ constexpr static const StringLiteral CXX_TEMPLATE_INST_PREFIX =
 
 constexpr static const StringLiteral SEMANTICS_PROGRAMTERMINATION_POINT =
     "programtermination_point";
+
+constexpr static const StringLiteral SEMANTICS_DEFAULT_ACTOR =
+    "defaultActor";
+
+constexpr static const StringLiteral DEFAULT_ACTOR_STORAGE_FIELD_NAME =
+    "$defaultActor";
 
 /// The name of the Builtin type prefix
 constexpr static const StringLiteral BUILTIN_TYPE_NAME_PREFIX = "Builtin.";
@@ -110,9 +118,21 @@ constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_BRIDGEOBJECT = {
 /// The name of the Builtin type for RawPointer
 constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_RAWPOINTER = {
     "Builtin.RawPointer"};
+/// The name of the Builtin type for RawUnsafeContinuation
+constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_RAWUNSAFECONTINUATION = {
+    "Builtin.RawUnsafeContinuation"};
 /// The name of the Builtin type for UnsafeValueBuffer
 constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_UNSAFEVALUEBUFFER =
     {"Builtin.UnsafeValueBuffer"};
+/// The name of the Builtin type for Job
+constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_JOB = {
+    "Builtin.Job"};
+/// The name of the Builtin type for ExecutorRef
+constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_EXECUTOR = {
+    "Builtin.Executor"};
+/// The name of the Builtin type for DefaultActorStorage
+constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_DEFAULTACTORSTORAGE = {
+    "Builtin.DefaultActorStorage"};
 /// The name of the Builtin type for UnknownObject
 ///
 /// This no longer exists as an AST-accessible type, but it's still used for

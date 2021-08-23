@@ -13,6 +13,7 @@
 #ifndef SWIFT_AST_FINE_GRAINED_DEPENDENCIES_H
 #define SWIFT_AST_FINE_GRAINED_DEPENDENCIES_H
 
+#include "swift/AST/EvaluatorDependencies.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/Fingerprint.h"
 #include "swift/Basic/LLVM.h"
@@ -57,11 +58,14 @@
 //==============================================================================
 
 namespace swift {
+class Decl;
 class DependencyTracker;
 class DiagnosticEngine;
 class FrontendOptions;
 class ModuleDecl;
 class SourceFile;
+class NominalTypeDecl;
+class ValueDecl;
 
 /// Use a new namespace to help keep the experimental code from clashing.
 namespace fine_grained_dependencies {
@@ -417,6 +421,57 @@ class DependencyKey {
   // For import/export
   friend ::llvm::yaml::MappingTraits<DependencyKey>;
 
+public:
+  class Builder {
+  private:
+    const NodeKind kind;
+    const DeclAspect aspect;
+    const DeclContext *context;
+    StringRef name;
+
+  private:
+    // A private copy constructor so our clients are forced to use the
+    // move-only builder interface.
+    explicit Builder(NodeKind kind, DeclAspect aspect,
+                     const DeclContext *context, StringRef name)
+        : kind(kind), aspect(aspect), context(context), name(name) {}
+
+  public:
+    /// Creates a DependencyKey::Builder from the given \p kind and \p aspect
+    /// with a \c null context and empty name.
+    explicit Builder(NodeKind kind, DeclAspect aspect)
+        : kind(kind), aspect(aspect), context(nullptr), name("") {}
+
+  public:
+    /// Consumes this builder and returns a dependency key created from its
+    /// data.
+    DependencyKey build() &&;
+
+  public:
+    /// Extracts the data from the given \p ref into a this builder.
+    Builder fromReference(const evaluator::DependencyCollector::Reference &ref);
+
+  public:
+    /// Extracts the context data from the given declaration, if any.
+    Builder withContext(const Decl *D) &&;
+    /// Extracts the context data from the given decl-member pair, if any.
+    Builder withContext(std::pair<const NominalTypeDecl *, const ValueDecl *>
+                            holderAndMember) &&;
+
+  public:
+    /// Copies the name data for the given swiftdeps file into this builder.
+    Builder withName(StringRef swiftDeps) &&;
+    /// Copies the name of the given declaration into this builder, if any.
+    Builder withName(const Decl *decl) &&;
+    /// Extracts the name from the given decl-member pair, if any.
+    Builder withName(std::pair<const NominalTypeDecl *, const ValueDecl *>
+                         holderAndMember) &&;
+
+  private:
+    static StringRef getTopLevelName(const Decl *decl);
+  };
+
+private:
   NodeKind kind;
   DeclAspect aspect;
   /// The mangled context type name of the holder for \ref potentialMember, \ref
@@ -480,15 +535,6 @@ public:
   }
   bool isInterface() const { return getAspect() == DeclAspect::interface; }
 
-  /// Create just the interface half of the keys for a provided Decl or Decl
-  /// pair
-  template <NodeKind kind, typename Entity>
-  static DependencyKey createForProvidedEntityInterface(Entity);
-
-  /// Given some type of provided entity compute the context field of the key.
-  template <NodeKind kind, typename Entity>
-  static std::string computeContextForProvidedEntity(Entity);
-
   DependencyKey correspondingImplementation() const {
     return withAspect(DeclAspect::implementation);
   }
@@ -496,10 +542,6 @@ public:
   DependencyKey withAspect(DeclAspect aspect) const {
     return DependencyKey(kind, aspect, context, name);
   }
-
-  /// Given some type of provided entity compute the name field of the key.
-  template <NodeKind kind, typename Entity>
-  static std::string computeNameForProvidedEntity(Entity);
 
   static DependencyKey createKeyForWholeSourceFile(DeclAspect,
                                                    StringRef swiftDeps);
@@ -832,8 +874,10 @@ public:
   }
 
   /// Read a swiftdeps file at \p path and return a SourceFileDepGraph if
-  /// successful.
-  Optional<SourceFileDepGraph> static loadFromPath(StringRef);
+  /// successful. If \p allowSwiftModule is true, try to load the information
+  /// from a swiftmodule file if appropriate.
+  Optional<SourceFileDepGraph> static loadFromPath(
+      StringRef, bool allowSwiftModule = false);
 
   /// Read a swiftdeps file from \p buffer and return a SourceFileDepGraph if
   /// successful.

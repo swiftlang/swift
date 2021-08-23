@@ -17,5 +17,8 @@
 
 @end
 
+@protocol MyAsyncProtocol
+-(void)myAsyncMethod:(void (^ _Nullable)(NSError * _Nullable, NSString * _Nullable))completionHandler;
+@end
 
 #endif

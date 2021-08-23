@@ -156,25 +156,6 @@ std::vector<const Job *> ModuleDepGraph::findJobsToRecompileWhenWholeJobChanges(
   return findJobsToRecompileWhenNodesChange(allNodesInJob);
 }
 
-template <typename Nodes>
-std::vector<const Job *>
-ModuleDepGraph::findJobsToRecompileWhenNodesChange(const Nodes &nodes) {
-  std::vector<ModuleDepGraphNode *> foundDependents;
-  for (ModuleDepGraphNode *n : nodes)
-    findPreviouslyUntracedDependents(foundDependents, n);
-  return jobsContaining(foundDependents);
-}
-
-template std::vector<const Job *>
-ModuleDepGraph::findJobsToRecompileWhenNodesChange<
-    std::unordered_set<ModuleDepGraphNode *>>(
-    const std::unordered_set<ModuleDepGraphNode *> &);
-
-template std::vector<const Job *>
-ModuleDepGraph::findJobsToRecompileWhenNodesChange<
-    std::vector<ModuleDepGraphNode *>>(
-    const std::vector<ModuleDepGraphNode *> &);
-
 std::vector<std::string> ModuleDepGraph::computeSwiftDepsFromNodes(
     ArrayRef<const ModuleDepGraphNode *> nodes) const {
   llvm::StringSet<> swiftDepsOfNodes;
@@ -216,12 +197,6 @@ std::vector<StringRef> ModuleDepGraph::getExternalDependencies() const {
                                 externalDependencies.end());
 }
 
-std::vector<StringRef>
-ModuleDepGraph::getIncrementalExternalDependencies() const {
-  return std::vector<StringRef>(incrementalExternalDependencies.begin(),
-                                incrementalExternalDependencies.end());
-}
-
 // Add every (swiftdeps) use of the external dependency to foundJobs.
 // Can return duplicates, but it doesn't break anything, and they will be
 // canonicalized later.
@@ -231,26 +206,6 @@ std::vector<const Job *> ModuleDepGraph::findExternallyDependentUntracedJobs(
       stats, "fine-grained-dependencies-findExternallyDependentUntracedJobs");
   std::vector<const Job *> foundJobs;
   forEachUntracedJobDirectlyDependentOnExternalSwiftDeps(
-      externalDependency, [&](const Job *job) {
-        foundJobs.push_back(job);
-        for (const Job *marked : findJobsToRecompileWhenWholeJobChanges(job)) {
-          // findJobsToRecompileWhenWholeJobChanges is reflexive
-          // Don't return job twice.
-          if (marked != job)
-            foundJobs.push_back(marked);
-        }
-      });
-  return foundJobs;
-}
-
-std::vector<const Job *>
-ModuleDepGraph::findIncrementalExternallyDependentUntracedJobs(
-    StringRef externalDependency) {
-  FrontendStatsTracer tracer(stats,
-                             "fine-grained-dependencies-"
-                             "findIncrementalExternallyDependentUntracedJobs");
-  std::vector<const Job *> foundJobs;
-  forEachUntracedJobDirectlyDependentOnExternalIncrementalSwiftDeps(
       externalDependency, [&](const Job *job) {
         foundJobs.push_back(job);
         for (const Job *marked : findJobsToRecompileWhenWholeJobChanges(job)) {
@@ -275,19 +230,6 @@ void ModuleDepGraph::forEachUntracedJobDirectlyDependentOnExternalSwiftDeps(
   }
 }
 
-void ModuleDepGraph::
-    forEachUntracedJobDirectlyDependentOnExternalIncrementalSwiftDeps(
-        StringRef externalSwiftDeps, function_ref<void(const Job *)> fn) {
-  // TODO move nameForDep into key
-  // These nodes will depend on the *interface* of the external Decl.
-  DependencyKey key(NodeKind::incrementalExternalDepend, DeclAspect::interface,
-                    "", externalSwiftDeps.str());
-  for (const ModuleDepGraphNode *useNode : usesByDef[key]) {
-    if (!useNode->getHasBeenTraced())
-      fn(getJob(useNode->getSwiftDepsOfProvides()));
-  }
-}
-
 //==============================================================================
 // MARK: Integrating SourceFileDepGraph into ModuleDepGraph
 //==============================================================================
@@ -306,7 +248,6 @@ ModuleDepGraph::Changes ModuleDepGraph::integrate(const SourceFileDepGraph &g,
 
   g.forEachNode([&](const SourceFileDepGraphNode *integrand) {
     const auto &key = integrand->getKey();
-
     auto preexistingMatch = findPreexistingMatch(swiftDepsOfJob, integrand);
     if (preexistingMatch.hasValue() &&
         preexistingMatch.getValue().first == LocationOfPreexistingNode::here)
@@ -446,9 +387,6 @@ bool ModuleDepGraph::recordWhatUseDependsUpon(
           if (def->getKey().getKind() == NodeKind::externalDepend) {
             externalDependencies.insert(externalSwiftDeps.str());
             useHasNewExternalDependency = true;
-          } else if (def->getKey().getKind() ==
-                     NodeKind::incrementalExternalDepend) {
-            incrementalExternalDependencies.insert(externalSwiftDeps.str());
           }
         }
       });
@@ -700,9 +638,6 @@ void ModuleDepGraph::verifyExternalDependencyUniqueness(
   assert((key.getKind() != NodeKind::externalDepend ||
           externalDependencies.count(key.getName().str()) == 1) &&
          "Ensure each external dependency is tracked exactly once");
-  assert((key.getKind() != NodeKind::incrementalExternalDepend ||
-          incrementalExternalDependencies.count(key.getName().str()) == 1) &&
-         "Ensure each incremental external dependency is tracked exactly once");
 }
 
 void ModuleDepGraph::verifyCanFindEachJob() const {
@@ -791,10 +726,6 @@ void ModuleDepGraph::printOneNodeOfPath(raw_ostream &out,
   case NodeKind::externalDepend:
     out << filename << " depends on " << key.aspectName() << " of module '"
         << key.humanReadableName() << "'";
-    break;
-  case NodeKind::incrementalExternalDepend:
-    out << filename << " depends on " << key.aspectName()
-        << " of incremental module '" << key.humanReadableName() << "'";
     break;
   case NodeKind::sourceFileProvide:
     out << key.aspectName() << " of source file " << key.humanReadableName();

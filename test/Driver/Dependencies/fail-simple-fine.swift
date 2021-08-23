@@ -19,9 +19,9 @@
 // CHECK-SECOND-NOT: Handled main.swift
 // CHECK-SECOND-NOT: Handled other.swift
 
-// CHECK-RECORD-DAG: "./bad.swift": !private [
-// CHECK-RECORD-DAG: "./main.swift": !private [
-// CHECK-RECORD-DAG: "./other.swift": !private [
+// CHECK-RECORD-DAG: "{{(./)?}}bad.swift": !private [
+// CHECK-RECORD-DAG: "{{(./)?}}main.swift": !private [
+// CHECK-RECORD-DAG: "{{(./)?}}other.swift": !private [
 
 // RUN: cd %t &&  %swiftc_driver -c -driver-use-frontend-path "%{python.unquoted};%S/Inputs/update-dependencies.py;%swift-dependency-tool" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./bad.swift ./main.swift ./other.swift -module-name main -j1 -v 2>&1 | %FileCheck -check-prefix=CHECK-THIRD %s
 

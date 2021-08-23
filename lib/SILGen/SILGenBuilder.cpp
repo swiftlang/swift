@@ -447,7 +447,6 @@ static ManagedValue createInputFunctionArgument(SILGenBuilder &B, SILType type,
     return ManagedValue::forLValue(arg);
   case SILArgumentConvention::Indirect_In_Constant:
     llvm_unreachable("Convention not produced by SILGen");
-  case SILArgumentConvention::Direct_Deallocating:
   case SILArgumentConvention::Indirect_Out:
     llvm_unreachable("unsupported convention for API");
   }

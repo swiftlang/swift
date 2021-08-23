@@ -170,7 +170,6 @@ class ModuleDepGraph {
 
   // Supports requests from the driver to getExternalDependencies.
   std::unordered_set<std::string> externalDependencies;
-  std::unordered_set<std::string> incrementalExternalDependencies;
 
   /// Keyed by swiftdeps filename, so we can get back to Jobs.
   std::unordered_map<std::string, const driver::Job *> jobsBySwiftDeps;
@@ -188,8 +187,8 @@ class ModuleDepGraph {
   std::unordered_map<std::string, unsigned> dotFileSequenceNumber;
 
 public:
-  const bool verifyFineGrainedDependencyGraphAfterEveryImport;
-  const bool emitFineGrainedDependencyDotFileAfterEveryImport;
+  bool verifyFineGrainedDependencyGraphAfterEveryImport;
+  bool emitFineGrainedDependencyDotFileAfterEveryImport;
 
 private:
   /// If tracing dependencies, holds a vector used to hold the current path
@@ -203,7 +202,7 @@ private:
       dependencyPathsToJobs;
 
   /// For helping with performance tuning, may be null:
-  UnifiedStatsReporter *const stats;
+  UnifiedStatsReporter *stats;
 
   //==============================================================================
   // MARK: ModuleDepGraph - mutating dependencies
@@ -493,7 +492,12 @@ public:
 
   template <typename Nodes>
   std::vector<const driver::Job *>
-  findJobsToRecompileWhenNodesChange(const Nodes &);
+  findJobsToRecompileWhenNodesChange(const Nodes &nodes) {
+    std::vector<ModuleDepGraphNode *> foundDependents;
+    for (ModuleDepGraphNode *n : nodes)
+      findPreviouslyUntracedDependents(foundDependents, n);
+    return jobsContaining(foundDependents);
+  }
 
 private:
   std::vector<const driver::Job *>
@@ -510,22 +514,12 @@ public:
   std::vector<const driver::Job *>
   findExternallyDependentUntracedJobs(StringRef externalDependency);
 
-  /// Find jobs that were previously not known to need compilation but that
-  /// depend on \c incrementalExternalDependency.
-  ///
-  /// This code path should only act as a fallback to the status-quo behavior.
-  /// Otherwise it acts to pessimize the behavior of cross-module incremental
-  /// builds.
-  std::vector<const driver::Job *>
-  findIncrementalExternallyDependentUntracedJobs(StringRef externalDependency);
-
   //============================================================================
   // MARK: ModuleDepGraph - External dependencies
   //============================================================================
 
 public:
   std::vector<StringRef> getExternalDependencies() const;
-  std::vector<StringRef> getIncrementalExternalDependencies() const;
 
   void forEachUntracedJobDirectlyDependentOnExternalSwiftDeps(
       StringRef externalDependency, function_ref<void(const driver::Job *)> fn);

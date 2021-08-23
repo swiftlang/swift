@@ -1958,6 +1958,14 @@ void irgen::emitMetatypeOfMetatype(IRGenFunction &IGF, Explosion &value,
   out.add(tablesAndValue.first);
 }
 
+Address
+irgen::emitClassExistentialValueAddress(IRGenFunction &IGF, Address existential,
+                                        SILType baseTy) {
+  assert(baseTy.isClassExistentialType());
+  auto &baseTI = IGF.getTypeInfo(baseTy).as<ClassExistentialTypeInfo>();
+  return baseTI.projectValue(IGF, existential);
+}
+
 /// Extract the instance pointer from a class existential value.
 llvm::Value *
 irgen::emitClassExistentialProjection(IRGenFunction &IGF,

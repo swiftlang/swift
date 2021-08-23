@@ -76,9 +76,9 @@ DECL_NODES = [
     Node('FunctionSignature', kind='Syntax',
          children=[
              Child('Input', kind='ParameterClause'),
-             Child('AsyncKeyword', kind='IdentifierToken',
+             Child('AsyncOrReasyncKeyword', kind='IdentifierToken',
                    classification='Keyword',
-                   text_choices=['async'], is_optional=True),
+                   text_choices=['async', 'reasync'], is_optional=True),
              Child('ThrowsOrRethrowsKeyword', kind='Token',
                    is_optional=True,
                    token_choices=[
@@ -106,6 +106,7 @@ DECL_NODES = [
                        Child('Statements', kind='CodeBlockItemList'),
                        Child('SwitchCases', kind='SwitchCaseList'),
                        Child('Decls', kind='MemberDeclList'),
+                       Child('PostfixExpression', kind='Expr'),
                    ]),
          ]),
 
@@ -171,7 +172,7 @@ DECL_NODES = [
                        'required', 'static', 'unowned', 'weak', 'private',
                        'fileprivate', 'internal', 'public', 'open',
                        'mutating', 'nonmutating', 'indirect', '__consuming',
-                       'actor', 'async'
+                       'actor', 'async', 'distributed'
                    ]),
              Child('DetailLeftParen', kind='LeftParenToken', is_optional=True),
              Child('Detail', kind='IdentifierToken', is_optional=True),
@@ -197,7 +198,7 @@ DECL_NODES = [
          ]),
 
     # class-declaration -> attributes? access-level-modifier?
-    #                      'class' class-name
+    #                      ('class' | 'actor') class-name
     #                      generic-parameter-clause?
     #                      type-inheritance-clause?
     #                      generic-where-clause?
@@ -210,7 +211,8 @@ DECL_NODES = [
                    collection_element_name='Attribute', is_optional=True),
              Child('Modifiers', kind='ModifierList',
                    collection_element_name='Modifier', is_optional=True),
-             Child('ClassKeyword', kind='ClassToken'),
+             Child('ClassOrActorKeyword', kind='Token',
+                    token_choices=['ClassToken', 'ContextualKeywordToken']),
              Child('Identifier', kind='IdentifierToken'),
              Child('GenericParameterClause', kind='GenericParameterClause',
                    is_optional=True),
@@ -287,13 +289,14 @@ DECL_NODES = [
          children=[
              Child('LeftBrace', kind='LeftBraceToken'),
              Child('Members', kind='MemberDeclList',
-                   collection_element_name='Member'),
-             Child('RightBrace', kind='RightBraceToken'),
+                   collection_element_name='Member', is_indented=True),
+             Child('RightBrace', kind='RightBraceToken', 
+                   requires_leading_newline=True),
          ]),
 
     # member-decl-list = member-decl member-decl-list?
     Node('MemberDeclList', kind='SyntaxCollection',
-         element='MemberDeclListItem'),
+         element='MemberDeclListItem', elements_separated_by_newline=True),
 
     # member-decl = decl ';'?
     Node('MemberDeclListItem', kind='Syntax', omit_when_empty=True,
@@ -532,6 +535,15 @@ DECL_NODES = [
                       '_read', '_modify'
                    ]),
              Child('Parameter', kind='AccessorParameter', is_optional=True),
+             Child('AsyncKeyword', kind='IdentifierToken',
+                   classification='Keyword',
+                   text_choices=['async'], is_optional=True),
+             Child('ThrowsKeyword', kind='Token',
+                   is_optional=True,
+                   token_choices=[
+                       'ThrowsToken',
+                       'RethrowsToken',
+                   ]),
              Child('Body', kind='CodeBlock', is_optional=True),
          ]),
 

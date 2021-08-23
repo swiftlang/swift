@@ -618,7 +618,8 @@ protected:
   bool forwardDeadTempCopy(CopyAddrInst *destCopy);
   bool forwardPropagateCopy();
   bool backwardPropagateCopy();
-  bool hoistDestroy(SILInstruction *DestroyPoint, SILLocation DestroyLoc);
+  bool hoistDestroy(SILInstruction *DestroyPoint, SILLocation DestroyLoc,
+                    SmallVectorImpl<DebugValueAddrInst *> &debugInstsToDelete);
 
   bool isSourceDeadAtCopy();
 
@@ -1224,8 +1225,11 @@ bool CopyForwarding::backwardPropagateCopy() {
 ///
 /// Return true if a destroy was inserted, forwarded from a copy, or the
 /// block was marked dead-in.
-bool CopyForwarding::hoistDestroy(SILInstruction *DestroyPoint,
-                                  SILLocation DestroyLoc) {
+/// \p debugInstsToDelete will contain the debug_value_addr users of copy src
+/// that need to be deleted if the hoist is successful
+bool CopyForwarding::hoistDestroy(
+    SILInstruction *DestroyPoint, SILLocation DestroyLoc,
+    SmallVectorImpl<DebugValueAddrInst *> &debugInstsToDelete) {
   if (!EnableDestroyHoisting)
     return false;
 
@@ -1265,6 +1269,14 @@ bool CopyForwarding::hoistDestroy(SILInstruction *DestroyPoint,
         LLVM_DEBUG(llvm::dbgs() << "  Cannot hoist above stored value use:"
                                 << *Inst);
         return tryToInsertHoistedDestroyAfter(Inst);
+      }
+      if (auto *debugAddr = dyn_cast<DebugValueAddrInst>(Inst)) {
+        // Collect debug_value_addr uses of copy src. If the hoist is
+        // successful, these instructions will have consumed operand and need to
+        // be erased.
+        if (SrcDebugValueInsts.contains(debugAddr)) {
+          debugInstsToDelete.push_back(debugAddr);
+        }
       }
       if (!ShouldHoist && isa<ApplyInst>(Inst))
         ShouldHoist = true;
@@ -1316,10 +1328,11 @@ void CopyForwarding::forwardCopiesOf(SILValue Def, SILFunction *F) {
   bool HoistedDestroyFound = false;
   SILLocation HoistedDestroyLoc = F->getLocation();
   const SILDebugScope *HoistedDebugScope = nullptr;
+  SmallVector<DebugValueAddrInst *, 2> debugInstsToDelete;
 
   for (auto *Destroy : DestroyPoints) {
     // If hoistDestroy returns false, it was not worth hoisting.
-    if (hoistDestroy(Destroy, Destroy->getLoc())) {
+    if (hoistDestroy(Destroy, Destroy->getLoc(), debugInstsToDelete)) {
       // Propagate DestroyLoc for any destroy hoisted above a block.
       if (DeadInBlocks.count(Destroy->getParent())) {
         HoistedDestroyLoc = Destroy->getLoc();
@@ -1331,7 +1344,12 @@ void CopyForwarding::forwardCopiesOf(SILValue Def, SILFunction *F) {
       // original Destroy.
       Destroy->eraseFromParent();
       assert(HasChanged || !DeadInBlocks.empty() && "HasChanged should be set");
+      // Since the hoist was successful, delete all dead debug_value_addr
+      for (auto *deadDebugUser : debugInstsToDelete) {
+        deadDebugUser->eraseFromParent();
+      }
     }
+    debugInstsToDelete.clear();
   }
   // Any blocks containing a DestroyPoints where hoistDestroy did not find a use
   // are now marked in DeadInBlocks.
@@ -1358,9 +1376,14 @@ void CopyForwarding::forwardCopiesOf(SILValue Def, SILFunction *F) {
     if (DeadInSuccs.size() == Succs.size() &&
         !SrcUserInsts.count(BB->getTerminator())) {
       // All successors are dead, so continue hoisting.
-      bool WasHoisted = hoistDestroy(BB->getTerminator(), HoistedDestroyLoc);
+      bool WasHoisted = hoistDestroy(BB->getTerminator(), HoistedDestroyLoc,
+                                     debugInstsToDelete);
       (void)WasHoisted;
       assert(WasHoisted && "should always hoist above a terminator");
+      for (auto *deadDebugUser : debugInstsToDelete) {
+        deadDebugUser->eraseFromParent();
+      }
+      debugInstsToDelete.clear();
       continue;
     }
     // Emit a destroy on each CFG edge leading to a dead-in block. This requires

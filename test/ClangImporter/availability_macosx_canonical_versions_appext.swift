@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -I %S/Inputs/custom-modules -target x86_64-apple-macosx10.15 -application-extension %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -I %S/Inputs/custom-modules -target %target-cpu-apple-macosx10.15 -application-extension %s
 
 // REQUIRES: OS=macosx
 

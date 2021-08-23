@@ -1318,3 +1318,82 @@ bb3:
   %outer = tuple (%extract0 : $Int64, %inner: $(Int64, Int64))
   return %outer : $(Int64, (Int64, Int64))
 }
+
+class C {}
+
+// This won't be hoisted because we can't find a base to check if it is invariant
+// CHECK-LABEL: sil @testLoopInvariantStoreNoBase1 :
+// CHECK: bb6:
+// CHECK-NOT:   store
+// CHECK-LABEL: } // end sil function 'testLoopInvariantStoreNoBase1'
+sil @testLoopInvariantStoreNoBase1 : $@convention(thin) (Builtin.BridgeObject, Double) -> () {
+bb0(%0 : $Builtin.BridgeObject, %1 : $Double):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = unchecked_ref_cast %0 : $Builtin.BridgeObject to $C
+  %3 = ref_tail_addr [immutable] %2 : $C, $Double
+  %4 = address_to_pointer %3 : $*Double to $Builtin.RawPointer
+  br bb3(%4 : $Builtin.RawPointer)
+
+bb2:
+  %6 = unchecked_ref_cast %0 : $Builtin.BridgeObject to $C
+  %7 = ref_tail_addr [immutable] %6 : $C, $Double
+  %8 = address_to_pointer %7 : $*Double to $Builtin.RawPointer
+  br bb3(%8 : $Builtin.RawPointer)
+
+bb3(%9 : $Builtin.RawPointer):
+  br bb4
+
+bb4:
+  %11 = pointer_to_address %9 : $Builtin.RawPointer to [strict] $*Double
+  store %1 to %11 : $*Double
+  cond_br undef, bb5, bb6
+
+bb5:
+  br bb4
+
+bb6:
+  %15 = tuple ()
+  return %15 : $()
+}
+
+// This won't be hoisted because we can't find a base to check if it is invariant
+// CHECK-LABEL: sil @testLoopInvariantStoreNoBase2 :
+// CHECK: bb6:
+// CHECK-NOT:   store
+// CHECK-LABEL: } // end sil function 'testLoopInvariantStoreNoBase2'
+sil @testLoopInvariantStoreNoBase2 : $@convention(thin) (Builtin.BridgeObject, Double) -> () {
+bb0(%0 : $Builtin.BridgeObject, %1 : $Double):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = unchecked_ref_cast %0 : $Builtin.BridgeObject to $C
+  %3 = ref_tail_addr [immutable] %2 : $C, $Double
+  %4 = address_to_pointer %3 : $*Double to $Builtin.RawPointer
+  br bb3(%4 : $Builtin.RawPointer)
+
+bb2:
+  %6 = unchecked_ref_cast %0 : $Builtin.BridgeObject to $C
+  %7 = ref_tail_addr [immutable] %6 : $C, $Double
+  %8 = address_to_pointer %7 : $*Double to $Builtin.RawPointer
+  br bb3(%8 : $Builtin.RawPointer)
+
+bb3(%9 : $Builtin.RawPointer):
+  br bb4
+
+bb4:
+  %11 = pointer_to_address %9 : $Builtin.RawPointer to [strict] $*Double
+  %12 = integer_literal $Builtin.Word, 1
+  %13 = index_addr %11 : $*Double, %12 : $Builtin.Word
+  store %1 to %13 : $*Double
+  cond_br undef, bb5, bb6
+
+bb5:
+  br bb4
+
+bb6:
+  %15 = tuple ()
+  return %15 : $()
+}
+

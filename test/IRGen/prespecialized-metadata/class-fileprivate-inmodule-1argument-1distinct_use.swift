@@ -51,7 +51,7 @@
 //   CHECK-apple-SAME:         { i32, i32, [1 x { [[INT]]*, i8*, i8*, i32, i32 }] }*, 
 //   CHECK-apple-SAME:         i8*, 
 //   CHECK-apple-SAME:         i8* 
-//   CHECK-apple-SAME:       }* @_DATA__TtC4mainP[[UNIQUE_ID_2:[0-9A-Z_]+]]5Value to [[INT]]
+//   CHECK-apple-SAME:       }* @"_DATA_$s4main5Value[[UNIQUE_ID_1]]CySiGMf" to [[INT]]
 //   CHECK-apple-SAME:     ), 
 //   CHECK-apple-SAME:     [[INT]] 2
 //   CHECK-apple-SAME:   ), 

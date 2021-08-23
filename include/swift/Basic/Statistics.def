@@ -144,20 +144,11 @@ FRONTEND_STATISTIC(AST, NumModuleLookupValue)
 /// AnyObject lookup.
 FRONTEND_STATISTIC(AST, NumModuleLookupClassMember)
 
-/// Number of body scopes for iterable types
-FRONTEND_STATISTIC(AST, NumIterableTypeBodyASTScopes)
-
-/// Number of expansions of body scopes for iterable types
-FRONTEND_STATISTIC(AST, NumIterableTypeBodyASTScopeExpansions)
-
-/// Number of brace statment scopes for iterable types
-FRONTEND_STATISTIC(AST, NumBraceStmtASTScopes)
-
-/// Number of expansions of brace statement scopes for iterable types
-FRONTEND_STATISTIC(AST, NumBraceStmtASTScopeExpansions)
-
 /// Number of ASTScope lookups
 FRONTEND_STATISTIC(AST, NumASTScopeLookups)
+
+/// Number of ASTScope expansions
+FRONTEND_STATISTIC(AST, NumASTScopeExpansions)
 
 /// Number of lookups of the cached import graph for a module or
 /// source file.
@@ -229,9 +220,26 @@ FRONTEND_STATISTIC(Sema, NumAccessorsSynthesized)
 /// Number of synthesized accessor bodies.
 FRONTEND_STATISTIC(Sema, NumAccessorBodiesSynthesized)
 
+/// Number of requirement machines constructed. Rough proxy for
+/// amount of work the requirement machine does analyzing type signatures.
+FRONTEND_STATISTIC(Sema, NumRequirementMachines)
+
+/// Number of new rules added by Knuth-Bendix completion procedure.
+FRONTEND_STATISTIC(Sema, NumRequirementMachineCompletionSteps)
+
+/// Number of new rules added by concrete term unification.
+FRONTEND_STATISTIC(Sema, NumRequirementMachineUnifiedConcreteTerms)
+
 /// Number of generic signature builders constructed. Rough proxy for
 /// amount of work the GSB does analyzing type signatures.
 FRONTEND_STATISTIC(Sema, NumGenericSignatureBuilders)
+
+/// Number of steps in the GSB's redundant requirements algorithm, which is in
+/// the worst-case exponential.
+FRONTEND_STATISTIC(Sema, NumRedundantRequirementSteps)
+
+/// Number of conformance access paths we had to compute.
+FRONTEND_STATISTIC(Sema, NumConformanceAccessPathsRecorded)
 
 /// Number of lazy requirement signatures registered.
 FRONTEND_STATISTIC(Sema, NumLazyRequirementSignatures)

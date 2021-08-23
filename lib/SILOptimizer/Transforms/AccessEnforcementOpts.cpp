@@ -17,6 +17,8 @@
 /// - Should run immediately before the AccessEnforcementWMO to share
 ///   AccessedStorageAnalysis results.
 ///
+/// - Benefits from running after AccessEnforcementReleaseSinking.
+///
 /// This pass optimizes access enforcement as follows:
 ///
 /// **Access marker folding**
@@ -426,7 +428,7 @@ BeginAccessInst *AccessConflictAndMergeAnalysis::findMergeableOutOfScopeAccess(
   auto identicalStorageIter = llvm::find_if(
       state.outOfScopeConflictFreeAccesses, [&](BeginAccessInst *bai) {
         auto storageInfo = result.getAccessInfo(bai);
-        return storageInfo.hasIdenticalBase(currStorageInfo);
+        return storageInfo.hasIdenticalStorage(currStorageInfo);
       });
   if (identicalStorageIter == state.outOfScopeConflictFreeAccesses.end())
     return nullptr;
@@ -482,7 +484,7 @@ void AccessConflictAndMergeAnalysis::insertOutOfScopeAccess(
   auto identicalStorageIter = llvm::find_if(
       state.outOfScopeConflictFreeAccesses, [&](BeginAccessInst *bai) {
         auto storageInfo = result.getAccessInfo(bai);
-        return storageInfo.hasIdenticalBase(currStorageInfo);
+        return storageInfo.hasIdenticalStorage(currStorageInfo);
       });
   if (identicalStorageIter == state.outOfScopeConflictFreeAccesses.end())
     state.outOfScopeConflictFreeAccesses.insert(beginAccess);
@@ -727,7 +729,7 @@ void AccessConflictAndMergeAnalysis::visitFullApply(FullApplySite fullApply,
   ASA->getCallSiteEffects(callSiteAccesses, fullApply);
 
   LLVM_DEBUG(llvm::dbgs() << "Visiting: " << *fullApply.getInstruction()
-                          << "  call site accesses: ";
+                          << "  call site accesses:\n";
              callSiteAccesses.dump());
   recordConflicts(state, callSiteAccesses.getResult());
 }
@@ -1092,10 +1094,6 @@ struct AccessEnforcementOpts : public SILFunctionTransform {
   void run() override {
     SILFunction *F = getFunction();
     if (F->empty())
-      return;
-
-    // FIXME: Support ownership.
-    if (F->hasOwnership())
       return;
 
     LLVM_DEBUG(llvm::dbgs() << "Running local AccessEnforcementOpts on "

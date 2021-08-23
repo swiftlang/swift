@@ -158,12 +158,41 @@ func cast_test(_ ptr: inout Builtin.RawPointer, i8: inout Builtin.Int8,
   d = Builtin.bitcast_Int64_FPIEEE64(i64)   // CHECK: bitcast
 }
 
-func intrinsic_test(_ i32: inout Builtin.Int32, i16: inout Builtin.Int16) {
+func vector_bitcast_test(_ src: Builtin.Vec16xInt8) -> Builtin.Int16 {
+  // CHECK: vector_bitcast_test
+  // This is the idiom for pmovmskb on x86 targets:
+  let zero: Builtin.Vec16xInt8 = Builtin.zeroInitializer()
+  let mask = Builtin.cmp_slt_Vec16xInt8(src, zero)
+  return Builtin.bitcast_Vec16xInt1_Int16(mask) // CHECK: bitcast
+}
+
+func vector_bitcast_test_ii(_ src: Builtin.Int16) -> Builtin.Vec16xInt8 {
+  // CHECK: vector_bitcast_test_ii
+  let v16x1 = Builtin.bitcast_Int16_Vec16xInt1(src) // CHECK: bitcast
+  return Builtin.sext_Vec16xInt1_Vec16xInt8(v16x1)   // CHECK: sext
+}
+
+func shufflevector_test(_ src: Builtin.FPIEEE32) -> Builtin.Vec4xFPIEEE32 {
+  // CHECK: insertelement <4 x float> zeroinitializer
+  // CHECK: shufflevector <4 x float>
+  let vec = Builtin.insertelement_Vec4xFPIEEE32_FPIEEE32_Int32(
+    Builtin.zeroInitializer(), src, Builtin.zeroInitializer()
+  )
+  return Builtin.shufflevector_Vec4xFPIEEE32_Vec4xInt32(
+    vec, vec, Builtin.zeroInitializer()
+  )
+}
+
+func intrinsic_test(_ i32: inout Builtin.Int32, i16: inout Builtin.Int16,
+                    _ v8i16: Builtin.Vec8xInt16) {
+  // CHECK: intrinsic_test
   i32 = Builtin.int_bswap_Int32(i32) // CHECK: llvm.bswap.i32(
 
   i16 = Builtin.int_bswap_Int16(i16) // CHECK: llvm.bswap.i16(
   
   var x = Builtin.int_sadd_with_overflow_Int16(i16, i16) // CHECK: call { i16, i1 } @llvm.sadd.with.overflow.i16(
+  
+  i16 = Builtin.int_vector_reduce_smin_Vec8xInt16(v8i16) // CHECK: llvm.vector.reduce.smin.v8i16(
   
   Builtin.int_trap() // CHECK: llvm.trap()
 }
@@ -633,7 +662,7 @@ func acceptsAnyObject(_ ref: inout Builtin.AnyObject?) {}
 // CHECK-NEXT: [[ADDR:%.+]] = getelementptr inbounds [[OPTIONAL_ANYOBJECT_TY]], [[OPTIONAL_ANYOBJECT_TY]]* %0, i32 0, i32 0
 // CHECK-NEXT: [[CASTED:%.+]] = bitcast {{.+}}* [[ADDR]] to [[UNKNOWN_OBJECT:%objc_object|%swift\.refcounted]]**
 // CHECK-NEXT: [[REF:%.+]] = load [[UNKNOWN_OBJECT]]*, [[UNKNOWN_OBJECT]]** [[CASTED]]
-// CHECK-objc-NEXT: [[RESULT:%.+]] = call i1 @swift_isUniquelyReferencedNonObjC([[UNKNOWN_OBJECT]]* [[REF]])
+// CHECK-objc-NEXT: [[RESULT:%.+]] = call i1 @swift_isUniquelyReferenced{{(NonObjC)?}}([[UNKNOWN_OBJECT]]* [[REF]])
 // CHECK-native-NEXT: [[RESULT:%.+]] = call i1 @swift_isUniquelyReferenced_native([[UNKNOWN_OBJECT]]* [[REF]])
 // CHECK-NEXT: ret i1 [[RESULT]]
 func isUnique(_ ref: inout Builtin.AnyObject?) -> Bool {
@@ -646,7 +675,7 @@ func isUnique(_ ref: inout Builtin.AnyObject?) -> Bool {
 // CHECK-NEXT: entry:
 // CHECK-NEXT: [[ADDR:%.+]] = getelementptr inbounds %AnyObject, %AnyObject* %0, i32 0, i32 0
 // CHECK-NEXT: [[REF:%.+]] = load [[UNKNOWN_OBJECT]]*, [[UNKNOWN_OBJECT]]** [[ADDR]]
-// CHECK-objc-NEXT: [[RESULT:%.+]] = call i1 @swift_isUniquelyReferencedNonObjC_nonNull([[UNKNOWN_OBJECT]]* [[REF]])
+// CHECK-objc-NEXT: [[RESULT:%.+]] = call i1 @swift_isUniquelyReferenced{{(NonObjC)?}}_nonNull([[UNKNOWN_OBJECT]]* [[REF]])
 // CHECK-native-NEXT: [[RESULT:%.+]] = call i1 @swift_isUniquelyReferenced_nonNull_native([[UNKNOWN_OBJECT]]* [[REF]])
 // CHECK-NEXT: ret i1 [[RESULT]]
 func isUnique(_ ref: inout Builtin.AnyObject) -> Bool {
@@ -657,7 +686,7 @@ func isUnique(_ ref: inout Builtin.AnyObject) -> Bool {
 // CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_BbzF"(%swift.bridge** nocapture dereferenceable({{.*}}) %0) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK-NEXT: load %swift.bridge*, %swift.bridge** %0
-// CHECK-NEXT: call i1 @swift_isUniquelyReferencedNonObjC_nonNull_bridgeObject(%swift.bridge* %1)
+// CHECK-NEXT: call i1 @swift_isUniquelyReferenced{{(NonObjC)?}}_nonNull_bridgeObject(%swift.bridge* %1)
 // CHECK-NEXT: ret i1 %2
 func isUnique(_ ref: inout Builtin.BridgeObject) -> Bool {
   return Builtin.isUnique(&ref)
@@ -838,6 +867,14 @@ func globalStringTablePointerUse(_ str: String) -> Builtin.RawPointer {
   return Builtin.globalStringTablePointer(str);
 }
 
+
+// CHECK-LABEL: define {{.*}}convertTaskToJob
+// CHECK:      call %swift.refcounted* @swift_retain(%swift.refcounted* returned %0)
+// CHECK-NEXT: [[T0:%.*]] = bitcast %swift.refcounted* %0 to %swift.job*
+// CHECK-NEXT: ret %swift.job* [[T0]]
+func convertTaskToJob(_ task: Builtin.NativeObject) -> Builtin.Job {
+  return Builtin.convertTaskToJob(task)
+}
 
 
 // CHECK: ![[R]] = !{i64 0, i64 9223372036854775807}

@@ -31,10 +31,10 @@ func test() {
 // CHECK: source.lang.swift.ref.function.free ()
 // CHECK-NEXT: someFunc()
 // CHECK-NEXT: s:10SomeModule8someFuncyyF
+// CHECK-NEXT: source.lang.swift
 // CHECK-NEXT: () -> ()
 // CHECK-NEXT: $syycD
 // CHECK-NEXT: SomeModule
 // CHECK-NEXT: SYSTEM
 // CHECK-NEXT: <Declaration>func someFunc()</Declaration>
 // CHECK-NEXT: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>someFunc</decl.name>()</decl.function.free>
-// CHECK-NEXT: </LocalizationKey>

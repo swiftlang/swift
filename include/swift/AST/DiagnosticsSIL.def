@@ -43,6 +43,10 @@ ERROR(bridging_objcbridgeable_broken,none,
       "broken definition of '_ObjectiveCBridgeable' protocol: missing %0",
       (DeclName))
 
+ERROR(sil_function_redefinition,none,
+      "multiple definitions of symbol '%0'",
+      (StringRef))
+
 ERROR(invalid_sil_builtin,none,
       "INTERNAL ERROR: invalid use of builtin: %0",
       (StringRef))
@@ -103,8 +107,6 @@ ERROR(objc_selector_malformed,none,"the type ObjectiveC.Selector is malformed",
 // Capture before declaration diagnostics.
 ERROR(capture_before_declaration,none,
       "closure captures %0 before it is declared", (Identifier))
-ERROR(capture_before_declaration_defer,none,
-      "'defer' block captures %0 before it is declared", (Identifier))
 NOTE(captured_value_declared_here,none,
      "captured value declared here", ())
 
@@ -165,6 +167,22 @@ ERROR(variable_defer_use_uninit,none,
       " initialized", (StringRef, bool))
 ERROR(self_closure_use_uninit,none,
       "'self' captured by a closure before all members were initialized", ())
+
+/// false == sync; true == global-actor isolated
+ERROR(self_use_actor_init,none,
+      "this use of actor 'self' %select{can only|cannot}0 appear in "
+      "%select{an async|a global-actor isolated}0 initializer",
+      (bool))
+ERROR(self_disallowed_actor_init,none,
+      "actor 'self' %select{can only|cannot}0 %1 from "
+      "%select{an async|a global-actor isolated}0 initializer",
+      (bool, StringRef))
+NOTE(actor_convenience_init,none,
+     "convenience initializers allow non-isolated use of 'self' once "
+     "initialized",
+     ())
+
+
 
 
 ERROR(variable_addrtaken_before_initialized,none,
@@ -248,17 +266,25 @@ NOTE(designated_init_c_struct_fix,none,
 
 
 // Control flow diagnostics.
-ERROR(missing_return,none,
-      "missing return in a %select{function|closure}1 expected to return %0",
-      (Type, unsigned))
-ERROR(missing_return_last_expr,none,
-      "missing return in a %select{function|closure}1 expected to return %0; "
-      "did you mean to return the last expression?",
-      (Type, unsigned))
-ERROR(missing_never_call,none,
-      "%select{function|closure}1 with uninhabited return type %0 is missing "
+ERROR(missing_return_closure,none,
+      "missing return in closure expected to return %0",
+      (Type))
+ERROR(missing_never_call_closure,none,
+      "closure with uninhabited return type %0 is missing "
       "call to another never-returning function on all paths",
-      (Type, unsigned))
+      (Type))
+
+ERROR(missing_return_decl,none,
+      "missing return in %1 expected to return %0",
+      (Type, DescriptiveDeclKind))
+ERROR(missing_never_call_decl,none,
+      "%1 with uninhabited return type %0 is missing "
+      "call to another never-returning function on all paths",
+      (Type, DescriptiveDeclKind))
+
+NOTE(missing_return_last_expr_note,none,
+    "did you mean to return the last expression?", ())
+
 ERROR(guard_body_must_not_fallthrough,none,
       "'guard' body must not fall through, consider using a 'return' or 'throw'"
       " to exit the scope", ())
@@ -277,8 +303,11 @@ WARNING(unreachable_case,none,
 WARNING(switch_on_a_constant,none,
         "switch condition evaluates to a constant", ())
 NOTE(unreachable_code_note,none, "will never be executed", ())
-WARNING(warn_infinite_recursive_function,none,
-        "all paths through this function will call itself", ())
+WARNING(warn_infinite_recursive_call,none,
+        "function call causes an infinite recursion", ())
+WARNING(warn_dead_weak_store,none,
+        "weak reference will always be nil because the referenced object is "
+        "deallocated here", ())
 
 // 'transparent' diagnostics
 ERROR(circular_transparent,none,
@@ -416,7 +445,7 @@ NOTE(constexpr_witness_call_with_no_conformance, none,
     "%select{for this call|for a witness-method invoked during this call}0",
     (bool))
 
-NOTE(constexpr_unknown_control_flow_due_to_skip,none, "branch depends on "
+REMARK(constexpr_unknown_control_flow_due_to_skip,none, "branch depends on "
      "non-constant value produced by an unevaluated instructions", ())
 NOTE(constexpr_returned_by_unevaluated_instruction,none,
      "result of an unevaluated instruction is not a constant", ())
@@ -435,7 +464,7 @@ ERROR(autodiff_differentiation_module_not_imported,none,
       "Automatic differentiation requires the '_Differentiation' module to be "
       "imported", ())
 ERROR(autodiff_conversion_to_linear_function_not_supported,none,
-      "conversion to '@differentiable(linear)' function type is not yet "
+      "conversion to '@differentiable(_linear)' function type is not yet "
       "supported", ())
 ERROR(autodiff_function_not_differentiable_error,none,
       "function is not differentiable", ())
@@ -644,6 +673,16 @@ NOTE(box_to_stack_cannot_promote_box_to_stack_due_to_escape_location, none,
      "value escapes here", ())
 
 WARNING(semantic_function_improper_nesting, none, "'@_semantics' function calls non-'@_semantics' function with nested '@_semantics' calls", ())
+
+// Capture promotion diagnostics
+WARNING(capturepromotion_concurrentcapture_mutation, none,
+        "'%0' mutated after capture by concurrent closure", (StringRef))
+NOTE(capturepromotion_concurrentcapture_closure_here, none,
+     "variable captured by concurrent closure", ())
+NOTE(capturepromotion_concurrentcapture_capturinguse_here, none,
+     "capturing use", ())
+NOTE(capturepromotion_variable_defined_here,none,
+     "variable defined here", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

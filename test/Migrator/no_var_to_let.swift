@@ -1,8 +1,8 @@
-// RUN: %target-swift-frontend -typecheck %s -swift-version 4
-// RUN: %empty-directory(%t) && %target-swift-frontend -c -update-code -primary-file %s -emit-migrated-file-path %t/no_var_to_let.swift.result -swift-version 4 -o /dev/null
-// RUN: %empty-directory(%t) && %target-swift-frontend -c -update-code -primary-file %s -emit-migrated-file-path %t/no_var_to_let.swift.result -swift-version 4 -o /dev/null
+// RUN: %target-swift-frontend -typecheck %s -swift-version 4 %api_diff_data_dir
+// RUN: %empty-directory(%t) && %target-swift-frontend -c -update-code -primary-file %s -emit-migrated-file-path %t/no_var_to_let.swift.result -swift-version 4 -o /dev/null %api_diff_data_dir
+// RUN: %empty-directory(%t) && %target-swift-frontend -c -update-code -primary-file %s -emit-migrated-file-path %t/no_var_to_let.swift.result -swift-version 4 -o /dev/null %api_diff_data_dir
 // RUN: %diff -u %s %t/no_var_to_let.swift.result
-// RUN: %target-swift-frontend -typecheck %s -swift-version 5
+// RUN: %target-swift-frontend -typecheck %s -swift-version 5 %api_diff_data_dir
 
 // Note that the diff run line indicates that there should be no change.
 

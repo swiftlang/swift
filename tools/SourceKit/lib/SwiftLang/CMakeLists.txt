@@ -42,6 +42,7 @@ target_link_libraries(SourceKitSwiftLang PRIVATE
   swiftSerialization
   swiftSyntax
   swiftOption
+  swiftSymbolGraphGen
   libcmark_static
   # Clang dependencies.
   clangIndex

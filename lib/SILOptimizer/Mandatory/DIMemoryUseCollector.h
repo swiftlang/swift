@@ -72,6 +72,9 @@ class DIMemoryObjectInfo {
   /// non-empty.
   bool HasDummyElement = false;
 
+  /// True if this object has a single user of type ProjectBoxInst.
+  bool IsBox = false;
+
 public:
   DIMemoryObjectInfo(MarkUninitializedInst *MemoryInst);
 
@@ -98,10 +101,11 @@ public:
   /// instruction. For alloc_box though it returns the project_box associated
   /// with the memory info.
   SingleValueInstruction *getUninitializedValue() const {
-    if (auto *mui = dyn_cast<MarkUninitializedInst>(MemoryInst)) {
-      if (auto *pbi = mui->getSingleUserOfType<ProjectBoxInst>()) {
-        return pbi;
-      }
+    if (IsBox) {
+      // TODO: consider just storing the ProjectBoxInst in this case.
+      auto *pbi = MemoryInst->getSingleUserOfType<ProjectBoxInst>();
+      assert(pbi);
+      return pbi;
     }
     return MemoryInst;
   }
@@ -159,6 +163,10 @@ public:
     }
     return false;
   }
+
+  /// Returns the initializer if the memory use is 'self' and appears in an
+  /// actor's designated initializer. Otherwise, returns nullptr.
+  ConstructorDecl *getActorInitSelf() const;
 
   /// True if this memory object is the 'self' of a derived class initializer.
   bool isDerivedClassSelf() const { return MemoryInst->isDerivedClassSelf(); }
@@ -298,12 +306,10 @@ struct DIMemoryUse {
 
   /// For memory objects of (potentially recursive) tuple type, this keeps
   /// track of which tuple elements are affected.
-  unsigned short FirstElement, NumElements;
+  unsigned FirstElement, NumElements;
 
   DIMemoryUse(SILInstruction *Inst, DIUseKind Kind, unsigned FE, unsigned NE)
       : Inst(Inst), Kind(Kind), FirstElement(FE), NumElements(NE) {
-    assert(FE == FirstElement && NumElements == NE &&
-           "more than 64K elements not supported yet");
   }
 
   DIMemoryUse() : Inst(nullptr) {}

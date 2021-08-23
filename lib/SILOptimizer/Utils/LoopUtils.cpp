@@ -194,7 +194,7 @@ bool swift::canonicalizeAllLoops(DominanceInfo *DT, SILLoopInfo *LI) {
   bool MadeChange = false;
   llvm::SmallVector<std::pair<SILLoop *, bool>, 16> Worklist;
   for (auto *L : LI->getTopLevelLoops())
-    Worklist.push_back({L, L->empty()});
+    Worklist.push_back({L, L->isInnermost()});
 
   while (Worklist.size()) {
     SILLoop *L;
@@ -204,7 +204,7 @@ bool swift::canonicalizeAllLoops(DominanceInfo *DT, SILLoopInfo *LI) {
     if (!VisitedAlready) {
       Worklist.push_back({L, true});
       for (auto *Subloop : L->getSubLoopRange()) {
-        Worklist.push_back({Subloop, Subloop->empty()});
+        Worklist.push_back({Subloop, Subloop->isInnermost()});
       }
       continue;
     }
@@ -225,7 +225,7 @@ void SILLoopVisitor::run() {
   // worklist.
   llvm::SmallVector<std::pair<SILLoop *, bool>, 32> Worklist;
   for (auto *L : LI->getTopLevelLoops()) {
-    Worklist.push_back({L, L->empty()});
+    Worklist.push_back({L, L->isInnermost()});
   }
 
   while (Worklist.size()) {
@@ -236,7 +236,7 @@ void SILLoopVisitor::run() {
     if (!Visited) {
       Worklist.push_back({L, true});
       for (auto *SubLoop : L->getSubLoops()) {
-        Worklist.push_back({SubLoop, SubLoop->empty()});
+        Worklist.push_back({SubLoop, SubLoop->isInnermost()});
       }
       continue;
     }

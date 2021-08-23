@@ -58,7 +58,7 @@
 // --       field offset vector offset:
 // CHECK-SAME:   i32 0,
 // -- superclass:
-// CHECK-SAME:   @"{{got.|__imp_}}$s15resilient_class22ResilientOutsideParentCMn"
+// CHECK-SAME:   @"{{got.|\\01__imp__?}}$s15resilient_class22ResilientOutsideParentCMn"
 // --       singleton metadata initialization cache:
 // CHECK-SAME:   @"$s16class_resilience14ResilientChildCMl"
 // --       resilient pattern:
@@ -69,17 +69,17 @@
 // CHECK-SAME:   i32 2,
 // CHECK-SAME:   %swift.method_override_descriptor {
 // --       base class:
-// CHECK-SAME:   @"{{got.|__imp_}}$s15resilient_class22ResilientOutsideParentCMn"
+// CHECK-SAME:   @"{{got.|\\01__imp__?}}$s15resilient_class22ResilientOutsideParentCMn"
 // --       base method:
-// CHECK-SAME:   @"{{got.|__imp_}}$s15resilient_class22ResilientOutsideParentC8getValueSiyFTq"
+// CHECK-SAME:   @"{{got.|\\01__imp__?}}$s15resilient_class22ResilientOutsideParentC8getValueSiyFTq"
 // --       implementation:
 // CHECK-SAME:   @"$s16class_resilience14ResilientChildC8getValueSiyF"
 // CHECK-SAME:   }
 // CHECK-SAME:   %swift.method_override_descriptor {
 // --       base class:
-// CHECK-SAME:   @"{{got.|__imp_}}$s15resilient_class22ResilientOutsideParentCMn"
+// CHECK-SAME:   @"{{got.|\\01__imp__?}}$s15resilient_class22ResilientOutsideParentCMn"
 // --       base method:
-// CHECK-SAME:   @"{{got.|__imp_}}$s15resilient_class22ResilientOutsideParentCACycfCTq"
+// CHECK-SAME:   @"{{got.|\\01__imp__?}}$s15resilient_class22ResilientOutsideParentCACycfCTq"
 // --       implementation:
 // CHECK-SAME:   @"$s16class_resilience14ResilientChildCACycfC"
 // CHECK-SAME:   }

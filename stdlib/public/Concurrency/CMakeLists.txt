@@ -10,22 +10,75 @@
 #
 #===----------------------------------------------------------------------===#
 
+set(LLVM_OPTIONAL_SOURCES
+  ${swift_concurrency_objc_sources})
+
+set(swift_concurrency_link_libraries
+  swiftCore)
+
+if(SWIFT_CONCURRENCY_USES_DISPATCH)
+  if(NOT CMAKE_SYSTEM_NAME STREQUAL Darwin)
+    include_directories(AFTER
+                          ${SWIFT_PATH_TO_LIBDISPATCH_SOURCE})
+
+    # FIXME: we can't rely on libdispatch having been built for the
+    # target at this point in the process.  Currently, we're relying
+    # on soft-linking.
+    list(APPEND swift_concurrency_link_libraries
+      dispatch)
+  endif()
+endif()
+
 add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
+  ../CompatibilityOverride/CompatibilityOverride.cpp
+  Actor.cpp
   Actor.swift
+  AsyncLet.cpp
+  AsyncLet.swift
+  CheckedContinuation.swift
+  GlobalExecutor.cpp
+  Errors.swift
+  Error.cpp
+  Executor.swift
+  AsyncCompactMapSequence.swift
+  AsyncDropFirstSequence.swift
+  AsyncDropWhileSequence.swift
+  AsyncFilterSequence.swift
+  AsyncFlatMapSequence.swift
+  AsyncIteratorProtocol.swift
+  AsyncMapSequence.swift
+  AsyncPrefixSequence.swift
+  AsyncPrefixWhileSequence.swift
+  AsyncSequence.swift
+  AsyncThrowingCompactMapSequence.swift
+  AsyncThrowingDropWhileSequence.swift
+  AsyncThrowingFilterSequence.swift
+  AsyncThrowingFlatMapSequence.swift
+  AsyncThrowingMapSequence.swift
+  AsyncThrowingPrefixWhileSequence.swift
+  GlobalActor.swift
+  MainActor.swift
   PartialAsyncTask.swift
+  SourceCompatibilityShims.swift
   Task.cpp
   Task.swift
   TaskCancellation.swift
-  _TimeTypes.swift
   TaskAlloc.cpp
   TaskStatus.cpp
+  TaskGroup.cpp
   TaskGroup.swift
+  TaskLocal.cpp
+  TaskLocal.swift
+  TaskSleep.swift
+  ThreadSanitizer.cpp
   Mutex.cpp
+  AsyncStreamBuffer.swift
+  AsyncStream.swift
+  AsyncThrowingStream.swift
+  AsyncStream.cpp
+  Deque.swift
+  ${swift_concurrency_objc_sources}
 
-  SWIFT_MODULE_DEPENDS_OSX Darwin
-  SWIFT_MODULE_DEPENDS_IOS Darwin
-  SWIFT_MODULE_DEPENDS_TVOS Darwin
-  SWIFT_MODULE_DEPENDS_WATCHOS Darwin
   SWIFT_MODULE_DEPENDS_LINUX Glibc
   SWIFT_MODULE_DEPENDS_FREEBSD Glibc
   SWIFT_MODULE_DEPENDS_OPENBSD Glibc
@@ -33,7 +86,7 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   SWIFT_MODULE_DEPENDS_HAIKU Glibc
   SWIFT_MODULE_DEPENDS_WINDOWS CRT
 
-  LINK_LIBRARIES swiftCore
+  LINK_LIBRARIES ${swift_concurrency_link_libraries}
 
   C_COMPILE_FLAGS
     -Dswift_Concurrency_EXPORTS
@@ -41,6 +94,8 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
     -parse-stdlib
     -Xfrontend -enable-experimental-concurrency
-  LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
+    -Xfrontend -define-availability
+    -Xfrontend \"SwiftStdlib 5.5:macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0\"
+  LINK_FLAGS "${SWIFT_RUNTIME_CONCURRENCY_SWIFT_LINK_FLAGS}"
   INSTALL_IN_COMPONENT stdlib
 )

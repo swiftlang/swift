@@ -15,12 +15,19 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "../CompatibilityOverride/CompatibilityOverride.h"
 #include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/Mutex.h"
 #include "swift/ABI/TaskStatus.h"
+#include "TaskPrivate.h"
 #include <atomic>
 
 using namespace swift;
+
+inline TaskStatusRecord *
+ActiveTaskStatus::getStatusRecordParent(TaskStatusRecord *ptr) {
+  return ptr->getParent();
+}
 
 /**************************************************************************/
 /************************* RECORD LOCK MANAGEMENT *************************/
@@ -166,7 +173,7 @@ static void waitForStatusRecordUnlock(AsyncTask *task,
 
   while (true) {
     // Check that oldStatus is still correct.
-    oldStatus = task->Status.load(std::memory_order_acquire);
+    oldStatus = task->_private().Status.load(std::memory_order_acquire);
     if (!oldStatus.isLocked())
       return;
 
@@ -178,6 +185,19 @@ static void waitForStatusRecordUnlock(AsyncTask *task,
   }
 }
 
+enum class LockContext {
+  /// The lock is being acquired from within the running task.
+  OnTask,
+
+  /// The lock is being acquired asynchronously in order to cancel the
+  /// task.
+  Cancellation,
+
+  /// The lock is being acquired asynchronously in order to read the
+  /// status records for some other reason.
+  OtherAsynchronous
+};
+
 /// Acquire a task's status record lock and return the
 /// previous value of its status record state.
 ///
@@ -188,17 +208,18 @@ static void waitForStatusRecordUnlock(AsyncTask *task,
 static ActiveTaskStatus
 acquireStatusRecordLock(AsyncTask *task,
                         Optional<StatusRecordLockRecord> &recordLockRecord,
-                        bool forCancellation) {
-  auto loadOrdering = forCancellation
+                        LockContext lockContext) {
+  auto loadOrdering = lockContext != LockContext::OnTask
                         ? std::memory_order_acquire
                         : std::memory_order_relaxed;
+  bool forCancellation = lockContext == LockContext::Cancellation;
 
   // Load the current state.  We can use relaxed loads if this isn't
   // for cancellation because (1) this operation should be synchronous
   // with the task, so the only thing that can modify it asynchronously
   // is a cancelling thread, and (2) we'll reload with acquire ordering
   // if a cancelling thread forces us to wait for an unlock.
-  auto oldStatus = task->Status.load(loadOrdering);
+  auto oldStatus = task->_private().Status.load(loadOrdering);
 
   while (true) {
     // Cancellation should be idempotent: if the task has already
@@ -217,10 +238,8 @@ acquireStatusRecordLock(AsyncTask *task,
     // try to just set the cancelled bit and return.
     auto oldRecord = oldStatus.getInnermostRecord();
     if (!oldRecord && forCancellation) {
-      ActiveTaskStatus newStatus(nullptr,
-                                 /*cancelled*/ true,
-                                 /*locked*/ false);
-      if (task->Status.compare_exchange_weak(oldStatus, newStatus,
+      ActiveTaskStatus newStatus = oldStatus.withCancelled();
+      if (task->_private().Status.compare_exchange_weak(oldStatus, newStatus,
             /*success*/ std::memory_order_relaxed,
             /*failure*/ loadOrdering))
         return newStatus;
@@ -238,11 +257,11 @@ acquireStatusRecordLock(AsyncTask *task,
 
     // Install the lock record as the active cancellation info, or
     // restart if that fails.
-    bool newIsCancelled = forCancellation || oldStatus.isCancelled();
-    ActiveTaskStatus newStatus(&*recordLockRecord,
-                               /*cancelled*/ newIsCancelled,
-                               /*locked*/ true);
-    if (task->Status.compare_exchange_weak(oldStatus, newStatus,
+    ActiveTaskStatus newStatus =
+      oldStatus.withLockingRecord(&*recordLockRecord);
+    if (forCancellation)
+      newStatus = newStatus.withCancelled();
+    if (task->_private().Status.compare_exchange_weak(oldStatus, newStatus,
            /*success*/ std::memory_order_release,
            /*failure*/ loadOrdering))
       return oldStatus;
@@ -260,7 +279,7 @@ static void releaseStatusRecordLock(AsyncTask *task,
   // the state while we've locked it.  The task shouldn't depend
   // on memory-ordering with anything we've done, so we can use a
   // relaxed store.
-  task->Status.store(newStatus, std::memory_order_relaxed);
+  task->_private().Status.store(newStatus, std::memory_order_relaxed);
 
   // Unlock the record lock.
   recordLockRecord->unlock();
@@ -270,11 +289,13 @@ static void releaseStatusRecordLock(AsyncTask *task,
 /*************************** RECORD MANAGEMENT ****************************/
 /**************************************************************************/
 
-bool swift::swift_task_addStatusRecord(AsyncTask *task,
-                                       TaskStatusRecord *newRecord) {
+SWIFT_CC(swift)
+static bool swift_task_addStatusRecordImpl(TaskStatusRecord *newRecord) {
+  auto task = swift_task_getCurrent();
+
   // Load the current state.  We can use a relaxed load because we're
   // synchronous with the task.
-  auto oldStatus = task->Status.load(std::memory_order_relaxed);
+  auto oldStatus = task->_private().Status.load(std::memory_order_relaxed);
 
   while (true) {
     // Wait for any active lock to be released.
@@ -287,21 +308,21 @@ bool swift::swift_task_addStatusRecord(AsyncTask *task,
     // Set the record as the new innermost record.
     // We have to use a release on success to make the initialization of
     // the new record visible to the cancelling thread.
-    ActiveTaskStatus newStatus(newRecord,
-                               oldStatus.isCancelled(),
-                               /*locked*/ false);
-    if (task->Status.compare_exchange_weak(oldStatus, newStatus,
+    ActiveTaskStatus newStatus = oldStatus.withInnermostRecord(newRecord);
+    if (task->_private().Status.compare_exchange_weak(oldStatus, newStatus,
            /*success*/ std::memory_order_release,
            /*failure*/ std::memory_order_relaxed))
       return !oldStatus.isCancelled();
   }
 }
 
-bool swift::swift_task_tryAddStatusRecord(AsyncTask *task,
-                                          TaskStatusRecord *newRecord) {
+SWIFT_CC(swift)
+static bool swift_task_tryAddStatusRecordImpl(TaskStatusRecord *newRecord) {
+  auto task = swift_task_getCurrent();
+
   // Load the current state.  We can use a relaxed load because we're
   // synchronous with the task.
-  auto oldStatus = task->Status.load(std::memory_order_relaxed);
+  auto oldStatus = task->_private().Status.load(std::memory_order_relaxed);
 
   while (true) {
     // If the old info is already cancelled, do nothing.
@@ -322,20 +343,21 @@ bool swift::swift_task_tryAddStatusRecord(AsyncTask *task,
     // Set the record as the new innermost record.
     // We have to use a release on success to make the initialization of
     // the new record visible to the cancelling thread.
-    ActiveTaskStatus newStatus(newRecord,
-                               /*cancelled*/ false,
-                               /*locked*/ false);
-    if (task->Status.compare_exchange_weak(oldStatus, newStatus,
+    ActiveTaskStatus newStatus = oldStatus.withInnermostRecord(newRecord);
+    if (task->_private().Status.compare_exchange_weak(oldStatus, newStatus,
            /*success*/ std::memory_order_release,
            /*failure*/ std::memory_order_relaxed))
       return true;
   }
 }
 
-bool swift::swift_task_removeStatusRecord(AsyncTask *task,
-                                          TaskStatusRecord *record) {
+SWIFT_CC(swift)
+static bool swift_task_removeStatusRecordImpl(TaskStatusRecord *record) {
+  auto task = swift_task_getCurrent();
+
   // Load the current state.
-  auto oldStatus = task->Status.load(std::memory_order_relaxed);
+  auto &status = task->_private().Status;
+  auto oldStatus = status.load(std::memory_order_relaxed);
 
   while (true) {
     // Wait for any active lock to be released.
@@ -344,13 +366,13 @@ bool swift::swift_task_removeStatusRecord(AsyncTask *task,
 
     // If the record is the innermost record, try to just pop it off.
     if (oldStatus.getInnermostRecord() == record) {
-      ActiveTaskStatus newStatus(record->getParent(),
-                                 oldStatus.isCancelled(),
-                                 /*locked*/ false);
-      if (task->Status.compare_exchange_weak(oldStatus, newStatus,
+      ActiveTaskStatus newStatus =
+        oldStatus.withInnermostRecord(record->getParent());
+      if (status.compare_exchange_weak(oldStatus, newStatus,
              /*success*/ std::memory_order_release,
-             /*failure*/ std::memory_order_relaxed))
+             /*failure*/ std::memory_order_relaxed)) {
         return !oldStatus.isCancelled();
+      }
 
       // Otherwise, restart.
       continue;
@@ -365,7 +387,7 @@ bool swift::swift_task_removeStatusRecord(AsyncTask *task,
   // Acquire the status record lock.
   Optional<StatusRecordLockRecord> recordLockRecord;
   oldStatus = acquireStatusRecordLock(task, recordLockRecord,
-                                      /*forCancellation*/ false);
+                                      LockContext::OnTask);
   assert(!oldStatus.isLocked());
 
   // We can't observe the record to be the innermost record here because
@@ -392,7 +414,56 @@ bool swift::swift_task_removeStatusRecord(AsyncTask *task,
   return !oldStatus.isCancelled();
 }
 
+SWIFT_CC(swift)
+static bool swift_task_hasTaskGroupStatusRecordImpl() {
+  auto task = swift_task_getCurrent();
+
+  // a group must be in a task, so if we're not in a task...
+  // then, we certainly are not in a group either!
+  if (!task)
+    return false;
+
+  Optional<StatusRecordLockRecord> recordLockRecord;
+
+  // Acquire the status record lock.
+  auto oldStatus = acquireStatusRecordLock(task, recordLockRecord,
+                                           LockContext::OnTask);
+  assert(!oldStatus.isLocked());
+
+  // Scan for the task group record within all the active records.
+  auto foundTaskGroupRecord = false;
+  for (auto record: oldStatus.records()) {
+    if (record->getKind() == TaskStatusRecordKind::TaskGroup) {
+      foundTaskGroupRecord = true;
+      break; // out of the for loop
+    }
+  }
+
+  releaseStatusRecordLock(task, oldStatus, recordLockRecord);
+
+  return foundTaskGroupRecord;
+}
+
 /**************************************************************************/
+/************************** CHILD TASK MANAGEMENT *************************/
+/**************************************************************************/
+
+// ==== Child tasks ------------------------------------------------------------
+SWIFT_CC(swift)
+static ChildTaskStatusRecord*
+swift_task_attachChildImpl(AsyncTask *child) {
+  void *allocation = malloc(sizeof(swift::ChildTaskStatusRecord));
+  auto record = new (allocation) swift::ChildTaskStatusRecord(child);
+  swift_task_addStatusRecord(record);
+  return record;
+}
+
+SWIFT_CC(swift)
+static void
+swift_task_detachChildImpl(ChildTaskStatusRecord *record) {
+  swift_task_removeStatusRecord(record);
+}
+
 /****************************** CANCELLATION ******************************/
 /**************************************************************************/
 
@@ -406,6 +477,13 @@ static void performCancellationAction(TaskStatusRecord *record) {
   // Child tasks need to be recursively cancelled.
   case TaskStatusRecordKind::ChildTask: {
     auto childRecord = cast<ChildTaskStatusRecord>(record);
+    for (AsyncTask *child: childRecord->children())
+      swift_task_cancel(child);
+    return;
+  }
+
+  case TaskStatusRecordKind::TaskGroup: {
+    auto childRecord = cast<TaskGroupTaskStatusRecord>(record);
     for (AsyncTask *child: childRecord->children())
       swift_task_cancel(child);
     return;
@@ -433,18 +511,56 @@ static void performCancellationAction(TaskStatusRecord *record) {
   // FIXME: allow dynamic extension/correction?
 }
 
-void swift::swift_task_cancel(AsyncTask *task) {
+/// Perform any cancellation actions required by the given record.
+static void performGroupCancellationAction(TaskStatusRecord *record) {
+  switch (record->getKind()) {
+  // We only need to cancel specific GroupChildTasks, not arbitrary child tasks.
+  // A task may be parent to many tasks which are not part of a group after all.
+  case TaskStatusRecordKind::ChildTask:
+    return;
+
+  case TaskStatusRecordKind::TaskGroup: {
+    auto groupChildRecord = cast<TaskGroupTaskStatusRecord>(record);
+    // Since a task can only be running a single task group at the same time,
+    // we can always assume that the group record which we found is the one
+    // we're intended to cancel child tasks for.
+    //
+    // A group enforces that tasks can not "escape" it, and as such once the group
+    // returns, all its task have been completed.
+    for (AsyncTask *child: groupChildRecord->children()) {
+      swift_task_cancel(child);
+    }
+    return;
+  }
+
+  // All other kinds of records we handle the same way as in a normal cancellation
+  case TaskStatusRecordKind::Deadline:
+  case TaskStatusRecordKind::CancellationNotification:
+  case TaskStatusRecordKind::EscalationNotification:
+  case TaskStatusRecordKind::Private_RecordLock:
+    performCancellationAction(record);
+    return;
+}
+
+  // Other cases can fall through here and be ignored.
+  // FIXME: allow dynamic extension/correction?
+}
+
+SWIFT_CC(swift)
+static void swift_task_cancelImpl(AsyncTask *task) {
   Optional<StatusRecordLockRecord> recordLockRecord;
 
   // Acquire the status record lock.
   auto oldStatus = acquireStatusRecordLock(task, recordLockRecord,
-                                           /*forCancellation*/ true);
+                                           LockContext::Cancellation);
   assert(!oldStatus.isLocked());
 
-  // If we were already cancelled or were able to cancel without acquiring
-  // the lock, there's nothing else to do.
-  if (oldStatus.isCancelled())
+  // Lock acquisition will fail for LockContext::Cancellation if
+  // the task is already cancelled.  In this case, we have nothing
+  // to do, not even releasing the lock.
+  if (oldStatus.isCancelled()) {
     return;
+  }
 
   // Otherwise, we've installed the lock record and are now the
   // locking thread.
@@ -457,10 +573,30 @@ void swift::swift_task_cancel(AsyncTask *task) {
 
   // Release the status record lock, being sure to flag that
   // the task is now cancelled.
-  ActiveTaskStatus cancelledStatus(oldStatus.getInnermostRecord(),
-                                   /*cancelled*/ true,
-                                   /*locked*/ false);
+  ActiveTaskStatus cancelledStatus = oldStatus.withCancelled();
   releaseStatusRecordLock(task, cancelledStatus, recordLockRecord);
+}
+
+SWIFT_CC(swift)
+static void swift_task_cancel_group_child_tasksImpl(TaskGroup *group) {
+  Optional<StatusRecordLockRecord> recordLockRecord;
+
+  // Acquire the status record lock.
+  //
+  // We purposefully DO NOT make this a cancellation by itself.
+  // We are cancelling the task group, and all tasks it contains.
+  // We are NOT cancelling the entire parent task though.
+  auto task = swift_task_getCurrent();
+  auto oldStatus = acquireStatusRecordLock(task, recordLockRecord,
+                                           LockContext::OnTask);
+  // Carry out the cancellation operations associated with all
+  // the active records.
+  for (auto cur: oldStatus.records()) {
+    performGroupCancellationAction(cur);
+  }
+
+  // Release the status record lock, restoring exactly the old status.
+  releaseStatusRecordLock(task, oldStatus, recordLockRecord);
 }
 
 /**************************************************************************/
@@ -478,6 +614,12 @@ static void performEscalationAction(TaskStatusRecord *record,
   // Child tasks need to be recursively escalated.
   case TaskStatusRecordKind::ChildTask: {
     auto childRecord = cast<ChildTaskStatusRecord>(record);
+    for (AsyncTask *child: childRecord->children())
+      swift_task_escalate(child, newPriority);
+    return;
+  }
+  case TaskStatusRecordKind::TaskGroup: {
+    auto childRecord = cast<TaskGroupTaskStatusRecord>(record);
     for (AsyncTask *child: childRecord->children())
       swift_task_escalate(child, newPriority);
     return;
@@ -505,30 +647,28 @@ static void performEscalationAction(TaskStatusRecord *record,
   // FIXME: allow dynamic extension/correction?
 }
 
+SWIFT_CC(swift)
 JobPriority
-swift::swift_task_escalate(AsyncTask *task, JobPriority newPriority) {
+static swift_task_escalateImpl(AsyncTask *task, JobPriority newPriority) {
   Optional<StatusRecordLockRecord> recordLockRecord;
 
-  // Fast path: check that the task's priority is not already at least
-  // as high as the target.  The task's priority can only be modified
-  // under the status record lock; it's possible that the priority could
-  // be getting simultaneously escalated, but it's okay for us to return
-  // before that's complete.
-  if (task->Flags.getPriority() >= newPriority)
-    return task->Flags.getPriority();
+  // Fast path: check that the stored priority is already at least
+  // as high as the desired priority.
+  auto oldStatus = task->_private().Status.load(std::memory_order_relaxed);
+  if (oldStatus.getStoredPriority() >= newPriority)
+    return oldStatus.getStoredPriority();
 
-  // Acquire the status record lock.
-  auto oldStatus = acquireStatusRecordLock(task, recordLockRecord,
-                                           /*forCancellation*/ false);
+  // Acquire the status record lock.  This has to do a load-acquire
+  // because we need to read the status records.
+  oldStatus = acquireStatusRecordLock(task, recordLockRecord,
+                                      LockContext::OtherAsynchronous);
   assert(!oldStatus.isLocked());
 
   // Now that we have the task's status lock, check again that the
   // priority is still too low.
-  auto priorityToReturn = task->Flags.getPriority();
-  if (priorityToReturn < newPriority) {
-    // Change the priority.
-    task->Flags.setPriority(newPriority);
-    priorityToReturn = newPriority;
+  auto newStatus = oldStatus;
+  if (oldStatus.getStoredPriority() < newPriority) {
+    newStatus = oldStatus.withEscalatedPriority(newPriority);
 
     // TODO: attempt to escalate the thread running the task, if it's
     // currently running.  This probably requires the task to be enqueued
@@ -541,22 +681,57 @@ swift::swift_task_escalate(AsyncTask *task, JobPriority newPriority) {
   }
 
   // Release the status record lock, restoring the old status.
-  releaseStatusRecordLock(task, oldStatus, recordLockRecord);
+  releaseStatusRecordLock(task, newStatus, recordLockRecord);
 
-  return priorityToReturn;
+  return newStatus.getStoredPriority();
+}
+
+void AsyncTask::flagAsRunning_slow() {
+  Optional<StatusRecordLockRecord> recordLockRecord;
+
+  auto oldStatus = acquireStatusRecordLock(this, recordLockRecord,
+                                           LockContext::OnTask);
+  assert(!oldStatus.isLocked());
+  assert(!oldStatus.isRunning());
+
+  auto newStatus = oldStatus.withRunning(true);
+  if (newStatus.isStoredPriorityEscalated()) {
+    newStatus = newStatus.withoutStoredPriorityEscalation();
+    Flags.setPriority(oldStatus.getStoredPriority());
+  }
+
+  releaseStatusRecordLock(this, newStatus, recordLockRecord);
+}
+
+void AsyncTask::flagAsSuspended_slow() {
+  Optional<StatusRecordLockRecord> recordLockRecord;
+
+  auto oldStatus = acquireStatusRecordLock(this, recordLockRecord,
+                                           LockContext::OnTask);
+  assert(!oldStatus.isLocked());
+  assert(oldStatus.isRunning());
+
+  auto newStatus = oldStatus.withRunning(false);
+  if (newStatus.isStoredPriorityEscalated()) {
+    newStatus = newStatus.withoutStoredPriorityEscalation();
+    Flags.setPriority(oldStatus.getStoredPriority());
+  }
+
+  releaseStatusRecordLock(this, newStatus, recordLockRecord);
 }
 
 /**************************************************************************/
 /******************************** DEADLINE ********************************/
 /**************************************************************************/
-
-NearestTaskDeadline swift::swift_task_getNearestDeadline(AsyncTask *task) {
+SWIFT_CC(swift)
+static NearestTaskDeadline swift_task_getNearestDeadlineImpl(AsyncTask *task) {
   // We don't have to worry about the deadline records being
   // concurrently modified, so we can just walk the record chain,
   // ignoring the possibility of a concurrent cancelling task.
 
   // Load the current state.
-  auto oldStatus = task->Status.load(std::memory_order_relaxed);
+  auto &status = task->_private().Status;
+  auto oldStatus = status.load(std::memory_order_relaxed);
 
   NearestTaskDeadline result;
 
@@ -591,3 +766,6 @@ NearestTaskDeadline swift::swift_task_getNearestDeadline(AsyncTask *task) {
   }
   return result;
 }
+
+#define OVERRIDE_TASK_STATUS COMPATIBILITY_OVERRIDE
+#include COMPATIBILITY_OVERRIDE_INCLUDE_PATH

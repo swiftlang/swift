@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COVARIANT_RETURN_CONV | %FileCheck %s --check-prefix=COVARIANT_RETURN_CONV
+// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t
 
 class BaseClass {
   func returnSelf() -> Self {}
@@ -7,14 +7,22 @@ class BaseClass {
 class DerivedClass: BaseClass {
   var value: Int
   func foo() {}
+
+  func testWithStaticSelf() {
+    self.returnSelf().#^COVARIANT_SELF_RETURN_STATIC?check=COVARIANT_SELF_RETURN^#
+  }
+
+  func testWithDynamicSelf() -> Self {
+    self.returnSelf().#^COVARIANT_SELF_RETURN_DYNAMIC?check=COVARIANT_SELF_RETURN^#
+    return self
+  }
 }
 
-func test(value: DerivedClass) {
-  value.returnSelf().#^COVARIANT_RETURN_CONV^#
-// COVARIANT_RETURN_CONV: Begin completions, 4 items
-// COVARIANT_RETURN_CONV-DAG: Keyword[self]/CurrNominal:          self[#DerivedClass#];
-// COVARIANT_RETURN_CONV-DAG: Decl[InstanceVar]/CurrNominal:      value[#Int#];
-// COVARIANT_RETURN_CONV-DAG: Decl[InstanceMethod]/CurrNominal:   foo()[#Void#];
-// COVARIANT_RETURN_CONV-DAG: Decl[InstanceMethod]/Super:         returnSelf()[#Self#];
-// COVARIANT_RETURN_CONV: End completions
-}
+// COVARIANT_SELF_RETURN: Begin completions, 6 items
+// COVARIANT_SELF_RETURN-DAG: Keyword[self]/CurrNominal:          self[#{{Self|DerivedClass}}#];
+// COVARIANT_SELF_RETURN-DAG: Decl[InstanceVar]/CurrNominal:      value[#Int#];
+// COVARIANT_SELF_RETURN-DAG: Decl[InstanceMethod]/CurrNominal:   foo()[#Void#];
+// COVARIANT_SELF_RETURN-DAG: Decl[InstanceMethod]/Super:         returnSelf()[#Self#];
+// COVARIANT_SELF_RETURN-DAG: Decl[InstanceMethod]/CurrNominal:   testWithStaticSelf()[#Void#];
+// COVARIANT_SELF_RETURN-DAG: Decl[InstanceMethod]/CurrNominal:   testWithDynamicSelf()[#Self#];
+// COVARIANT_SELF_RETURN: End completions

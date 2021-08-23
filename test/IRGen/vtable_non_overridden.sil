@@ -25,8 +25,8 @@ sil_vtable InternalA {
 }
 
 // -- we should still generate method descriptors for the elided methods
-// CHECK-LABEL: @"$s21vtable_non_overridden9InternalAC3fooyyFTq" =
-// CHECK-LABEL: @"$s21vtable_non_overridden9InternalAC3basyyFTq" =
+// CHECK-LABEL: @"$s21vtable_non_overridden9InternalAC3fooyyFTq" = hidden constant %swift.method_descriptor {{.*}} section "{{(__TEXT,__const|\.rodata|\.rdata)}}"
+// CHECK-LABEL: @"$s21vtable_non_overridden9InternalAC3basyyFTq" = hidden constant %swift.method_descriptor {{.*}} section "{{(__TEXT,__const|\.rodata|\.rdata)}}"
 
 // -- only overridden entries in internal method descriptor table
 // CHECK-LABEL: @"$s21vtable_non_overridden9InternalACMn" =

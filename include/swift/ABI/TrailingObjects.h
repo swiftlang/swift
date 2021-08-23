@@ -56,7 +56,6 @@
 #define SWIFT_ABI_TRAILINGOBJECTS_H
 
 #include "llvm/Support/Alignment.h"
-#include "llvm/Support/AlignOf.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/type_traits.h"

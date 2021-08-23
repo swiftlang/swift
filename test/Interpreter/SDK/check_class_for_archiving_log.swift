@@ -13,7 +13,7 @@
 import Foundation
 
 // A tricky way to make the FileCheck tests conditional on the OS version.
-if #available(iOS 13, macOS 10.15, tvOS 13, watchOS 6, *) {
+if #available(macOS 12, iOS 15, watchOS 8, tvOS 15, *) {
   print("-check-prefix=CHECK")
 } else {
   // Disable the checks for older OSes because of rdar://problem/50504765

@@ -18,8 +18,10 @@
 #ifndef SWIFT_REFLECTION_TYPEREF_H
 #define SWIFT_REFLECTION_TYPEREF_H
 
+#include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/Casting.h"
+#include "llvm/Support/Compiler.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/Remote/MetadataReader.h"
 #include "swift/Basic/Unreachable.h"
@@ -137,7 +139,34 @@ class TypeRefBuilder;
 using DepthAndIndex = std::pair<unsigned, unsigned>;
 using GenericArgumentMap = llvm::DenseMap<DepthAndIndex, const TypeRef *>;
 
-class alignas(void *) TypeRef {
+/// FIXME: Implement me!
+struct TypeRefLayoutConstraint {
+  friend llvm::hash_code hash_value(const TypeRefLayoutConstraint &layout) {
+    return llvm::hash_value(0);
+  }
+  operator bool() const { return true; }
+  bool operator==(TypeRefLayoutConstraint rhs) const {
+    return true;
+  }
+};
+
+class TypeRefRequirement
+    : public RequirementBase<
+          const TypeRef *,
+          llvm::PointerIntPair<const TypeRef *, 3, RequirementKind>,
+          TypeRefLayoutConstraint> {
+public:
+  TypeRefRequirement(RequirementKind kind, const TypeRef *first,
+                     const TypeRef *second)
+      : RequirementBase(kind, first, second) {}
+  TypeRefRequirement(RequirementKind kind, const TypeRef *first,
+                     TypeRefLayoutConstraint second)
+      : RequirementBase(kind, first, second) {}
+};
+
+// On 32-bit systems this needs more than just pointer alignment to fit the
+// extra bits needed by TypeRefRequirement.
+class alignas(8) TypeRef {
   TypeRefKind Kind;
 
 public:
@@ -432,9 +461,13 @@ class FunctionTypeRef final : public TypeRef {
   std::vector<Param> Parameters;
   const TypeRef *Result;
   FunctionTypeFlags Flags;
+  FunctionMetadataDifferentiabilityKind DifferentiabilityKind;
+  const TypeRef *GlobalActor;
 
   static TypeRefID Profile(const std::vector<Param> &Parameters,
-                           const TypeRef *Result, FunctionTypeFlags Flags) {
+                           const TypeRef *Result, FunctionTypeFlags Flags,
+                           FunctionMetadataDifferentiabilityKind DiffKind,
+                           const TypeRef *GlobalActor) {
     TypeRefID ID;
     for (const auto &Param : Parameters) {
       ID.addString(Param.getLabel().str());
@@ -443,20 +476,28 @@ class FunctionTypeRef final : public TypeRef {
     }
     ID.addPointer(Result);
     ID.addInteger(static_cast<uint64_t>(Flags.getIntValue()));
+    ID.addInteger(static_cast<uint64_t>(DiffKind.getIntValue()));
+    ID.addPointer(GlobalActor);
+
     return ID;
   }
 
 public:
   FunctionTypeRef(std::vector<Param> Params, const TypeRef *Result,
-                  FunctionTypeFlags Flags)
+                  FunctionTypeFlags Flags,
+                  FunctionMetadataDifferentiabilityKind DiffKind,
+                  const TypeRef *GlobalActor)
       : TypeRef(TypeRefKind::Function), Parameters(Params), Result(Result),
-        Flags(Flags) {}
+        Flags(Flags), DifferentiabilityKind(DiffKind),
+        GlobalActor(GlobalActor) {}
 
   template <typename Allocator>
-  static const FunctionTypeRef *create(Allocator &A, std::vector<Param> Params,
-                                       const TypeRef *Result,
-                                       FunctionTypeFlags Flags) {
-    FIND_OR_CREATE_TYPEREF(A, FunctionTypeRef, Params, Result, Flags);
+  static const FunctionTypeRef *create(
+      Allocator &A, std::vector<Param> Params, const TypeRef *Result,
+      FunctionTypeFlags Flags, FunctionMetadataDifferentiabilityKind DiffKind,
+      const TypeRef *GlobalActor) {
+    FIND_OR_CREATE_TYPEREF(
+        A, FunctionTypeRef, Params, Result, Flags, DiffKind, GlobalActor);
   }
 
   const std::vector<Param> &getParameters() const { return Parameters; };
@@ -467,6 +508,14 @@ public:
 
   FunctionTypeFlags getFlags() const {
     return Flags;
+  }
+
+  FunctionMetadataDifferentiabilityKind getDifferentiabilityKind() const {
+    return DifferentiabilityKind;
+  }
+
+  const TypeRef *getGlobalActor() const {
+    return GlobalActor;
   }
 
   static bool classof(const TypeRef *TR) {
@@ -839,6 +888,67 @@ public:
 
   static bool classof(const TypeRef *TR) {
     return TR->getKind() == TypeRefKind::SILBox;
+  }
+};
+
+class SILBoxTypeWithLayoutTypeRef final : public TypeRef {
+public:
+  struct Field : public llvm::PointerIntPair<const TypeRef *, 1> {
+    Field(const TypeRef *Type, bool Mutable)
+        : llvm::PointerIntPair<const TypeRef *, 1>(Type, (unsigned)Mutable) {}
+    const TypeRef *getType() const { return getPointer(); }
+    bool isMutable() const { return getInt() == 1; }
+  };
+  using Substitution = std::pair<const TypeRef *, const TypeRef *>;
+
+  const std::vector<Field> &getFields() const { return Fields; }
+  const std::vector<Substitution> &getSubstitutions() const {
+    return Substitutions;
+  }
+  const std::vector<TypeRefRequirement> &getRequirements() const {
+    return Requirements;
+  }
+protected:
+  std::vector<Field> Fields;
+  std::vector<Substitution> Substitutions;
+  std::vector<TypeRefRequirement> Requirements;
+
+  static TypeRefID
+  Profile(const std::vector<Field> &Fields,
+          const std::vector<Substitution> &Substitutions,
+          const std::vector<TypeRefRequirement> &Requirements) {
+    TypeRefID ID;
+    for (auto &f : Fields)
+      ID.addPointer(f.getOpaqueValue());
+    for (auto &s : Substitutions) {
+      ID.addPointer(s.first);
+      ID.addPointer(s.second);
+    }
+    for (auto &r : Requirements)
+      ID.addInteger((uint64_t)(size_t)hash_value(hash_value(r)));
+    return ID;
+  }
+
+public:
+  SILBoxTypeWithLayoutTypeRef(llvm::ArrayRef<Field> Fields,
+                              llvm::ArrayRef<Substitution> Substitutions,
+                              llvm::ArrayRef<TypeRefRequirement> Requirements)
+      : TypeRef(TypeRefKind::SILBoxTypeWithLayout),
+        Fields(Fields.begin(), Fields.end()),
+        Substitutions(Substitutions.begin(), Substitutions.end()),
+        Requirements(Requirements.begin(), Requirements.end()) {}
+
+  template <typename Allocator>
+  static const SILBoxTypeWithLayoutTypeRef *
+  create(Allocator &A, llvm::ArrayRef<Field> Fields,
+         llvm::ArrayRef<Substitution> Substitutions,
+         llvm::ArrayRef<TypeRefRequirement> Requirements) {
+    FIND_OR_CREATE_TYPEREF(A, SILBoxTypeWithLayoutTypeRef, Fields,
+                           Substitutions, Requirements);
+  }
+
+  static bool classof(const TypeRef *TR) {
+    return TR->getKind() == TypeRefKind::SILBoxTypeWithLayout;
   }
 };
 

@@ -1,8 +1,11 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
+// RUN: %target-typecheck-verify-swift  -disable-availability-checking
 
 // REQUIRES: concurrency
 
-async let x = 1 // okay
+func test() async {
+  async let x = 1 // okay
+  _ = await x
+}
 
 struct X {
   async let x = 1 // expected-error{{'async let' can only be used on local declarations}}
@@ -31,7 +34,12 @@ func chopVegetables() async throws -> [String] { [] }
 func marinateMeat() async -> String { "MEAT" }
 
 func cook() async throws {
-  async let veggies = await try chopVegetables(), meat = await marinateMeat()
-  _ = await try veggies
+  async let veggies = try await chopVegetables(), meat = await marinateMeat()
+  _ = try await veggies
   _ = await meat
+}
+
+func testInterpolation() async {
+  async let y = "\(12345)"
+  _ = await y
 }

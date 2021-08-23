@@ -168,7 +168,7 @@ open class User {
 
 // This is mostly to check when changes are necessary for the CHECK-IR lines
 // above.
-// CHECK-VTABLE-LABEL: sil_vtable [serialized] User {
+// CHECK-VTABLE-LABEL: sil_vtable User {
 // (10 words of normal class metadata on 64-bit platforms, 13 on 32-bit)
 // 10 CHECK-VTABLE-NEXT: #User.unwrappedProp!getter:
 // 11 CHECK-VTABLE-NEXT: #User.unwrappedProp!setter:

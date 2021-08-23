@@ -285,7 +285,7 @@ TEST_F(LexerTest, BOMNoCommentNoTrivia) {
           TriviaRetentionMode::WithoutTrivia);
   
   Token Tok;
-  ParsedTrivia LeadingTrivia, TrailingTrivia;
+  StringRef LeadingTrivia, TrailingTrivia;
   
   L.lex(Tok, LeadingTrivia, TrailingTrivia);
   ASSERT_EQ(tok::identifier, Tok.getKind());
@@ -293,16 +293,16 @@ TEST_F(LexerTest, BOMNoCommentNoTrivia) {
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 14), Tok.getLoc());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 14), Tok.getCommentRange().getStart());
   ASSERT_EQ(0u, Tok.getCommentRange().getByteLength());
-  ASSERT_EQ((ParsedTrivia{{}}), LeadingTrivia);
-  ASSERT_EQ((ParsedTrivia{{}}), TrailingTrivia);
+  ASSERT_EQ(StringRef(), LeadingTrivia);
+  ASSERT_EQ(StringRef(), TrailingTrivia);
   
   L.lex(Tok, LeadingTrivia, TrailingTrivia);
   ASSERT_EQ(tok::eof, Tok.getKind());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 31), Tok.getLoc());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 31), Tok.getCommentRange().getStart());
   ASSERT_EQ(0u, Tok.getCommentRange().getByteLength());
-  ASSERT_EQ((ParsedTrivia{{}}), LeadingTrivia);
-  ASSERT_EQ((ParsedTrivia{{}}), TrailingTrivia);
+  ASSERT_EQ(StringRef(), LeadingTrivia);
+  ASSERT_EQ(StringRef(), TrailingTrivia);
 }
 
 TEST_F(LexerTest, BOMTokenCommentNoTrivia) {
@@ -317,7 +317,7 @@ TEST_F(LexerTest, BOMTokenCommentNoTrivia) {
           TriviaRetentionMode::WithoutTrivia);
   
   Token Tok;
-  ParsedTrivia LeadingTrivia, TrailingTrivia;
+  StringRef LeadingTrivia, TrailingTrivia;
   
   L.lex(Tok, LeadingTrivia, TrailingTrivia);
   ASSERT_EQ(tok::comment, Tok.getKind());
@@ -325,8 +325,8 @@ TEST_F(LexerTest, BOMTokenCommentNoTrivia) {
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 3), Tok.getLoc());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 3), Tok.getCommentRange().getStart());
   ASSERT_EQ(0u, Tok.getCommentRange().getByteLength());
-  ASSERT_EQ((ParsedTrivia{{}}), LeadingTrivia);
-  ASSERT_EQ((ParsedTrivia{{}}), TrailingTrivia);
+  ASSERT_EQ(StringRef(), LeadingTrivia);
+  ASSERT_EQ(StringRef(), TrailingTrivia);
   
   L.lex(Tok, LeadingTrivia, TrailingTrivia);
   ASSERT_EQ(tok::identifier, Tok.getKind());
@@ -334,8 +334,8 @@ TEST_F(LexerTest, BOMTokenCommentNoTrivia) {
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 14), Tok.getLoc());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 14), Tok.getCommentRange().getStart());
   ASSERT_EQ(0u, Tok.getCommentRange().getByteLength());
-  ASSERT_EQ((ParsedTrivia{{}}), LeadingTrivia);
-  ASSERT_EQ((ParsedTrivia{{}}), TrailingTrivia);
+  ASSERT_EQ(StringRef(), LeadingTrivia);
+  ASSERT_EQ(StringRef(), TrailingTrivia);
   
   L.lex(Tok, LeadingTrivia, TrailingTrivia);
   ASSERT_EQ(tok::comment, Tok.getKind());
@@ -343,8 +343,8 @@ TEST_F(LexerTest, BOMTokenCommentNoTrivia) {
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 18), Tok.getLoc());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 18), Tok.getCommentRange().getStart());
   ASSERT_EQ(0u, Tok.getCommentRange().getByteLength());
-  ASSERT_EQ((ParsedTrivia{{}}), LeadingTrivia);
-  ASSERT_EQ((ParsedTrivia{{}}), TrailingTrivia);
+  ASSERT_EQ(StringRef(), LeadingTrivia);
+  ASSERT_EQ(StringRef(), TrailingTrivia);
   
   L.lex(Tok, LeadingTrivia, TrailingTrivia);
   ASSERT_EQ(tok::comment, Tok.getKind());
@@ -352,16 +352,16 @@ TEST_F(LexerTest, BOMTokenCommentNoTrivia) {
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 24), Tok.getLoc());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 24), Tok.getCommentRange().getStart());
   ASSERT_EQ(0u, Tok.getCommentRange().getByteLength());
-  ASSERT_EQ((ParsedTrivia{{}}), LeadingTrivia);
-  ASSERT_EQ((ParsedTrivia{{}}), TrailingTrivia);
+  ASSERT_EQ(StringRef(), LeadingTrivia);
+  ASSERT_EQ(StringRef(), TrailingTrivia);
   
   L.lex(Tok, LeadingTrivia, TrailingTrivia);
   ASSERT_EQ(tok::eof, Tok.getKind());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 31), Tok.getLoc());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 31), Tok.getCommentRange().getStart());
   ASSERT_EQ(0u, Tok.getCommentRange().getByteLength());
-  ASSERT_EQ((ParsedTrivia{{}}), LeadingTrivia);
-  ASSERT_EQ((ParsedTrivia{{}}), TrailingTrivia);
+  ASSERT_EQ(StringRef(), LeadingTrivia);
+  ASSERT_EQ(StringRef(), TrailingTrivia);
 }
 
 TEST_F(LexerTest, BOMAttachCommentNoTrivia) {
@@ -376,7 +376,7 @@ TEST_F(LexerTest, BOMAttachCommentNoTrivia) {
           TriviaRetentionMode::WithoutTrivia);
   
   Token Tok;
-  ParsedTrivia LeadingTrivia, TrailingTrivia;
+  StringRef LeadingTrivia, TrailingTrivia;
   
   L.lex(Tok, LeadingTrivia, TrailingTrivia);
   ASSERT_EQ(tok::identifier, Tok.getKind());
@@ -384,16 +384,16 @@ TEST_F(LexerTest, BOMAttachCommentNoTrivia) {
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 14), Tok.getLoc());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 3), Tok.getCommentRange().getStart());
   ASSERT_EQ(10u, Tok.getCommentRange().getByteLength());
-  ASSERT_EQ((ParsedTrivia{{}}), LeadingTrivia);
-  ASSERT_EQ((ParsedTrivia{{}}), TrailingTrivia);
+  ASSERT_EQ(StringRef(), LeadingTrivia);
+  ASSERT_EQ(StringRef(), TrailingTrivia);
   
   L.lex(Tok, LeadingTrivia, TrailingTrivia);
   ASSERT_EQ(tok::eof, Tok.getKind());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 31), Tok.getLoc());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 18), Tok.getCommentRange().getStart());
   ASSERT_EQ(13u, Tok.getCommentRange().getByteLength());
-  ASSERT_EQ((ParsedTrivia{{}}), LeadingTrivia);
-  ASSERT_EQ((ParsedTrivia{{}}), TrailingTrivia);
+  ASSERT_EQ(StringRef(), LeadingTrivia);
+  ASSERT_EQ(StringRef(), TrailingTrivia);
 }
 
 TEST_F(LexerTest, BOMNoCommentTrivia) {
@@ -408,7 +408,7 @@ TEST_F(LexerTest, BOMNoCommentTrivia) {
           TriviaRetentionMode::WithTrivia);
   
   Token Tok;
-  ParsedTrivia LeadingTrivia, TrailingTrivia;
+  StringRef LeadingTrivia, TrailingTrivia;
   
   L.lex(Tok, LeadingTrivia, TrailingTrivia);
   ASSERT_EQ(tok::identifier, Tok.getKind());
@@ -416,26 +416,34 @@ TEST_F(LexerTest, BOMNoCommentTrivia) {
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 14), Tok.getLoc());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 14), Tok.getCommentRange().getStart());
   ASSERT_EQ(0u, Tok.getCommentRange().getByteLength());
+  ASSERT_EQ("\xEF\xBB\xBF" "// comment" "\n", LeadingTrivia);
+  ASSERT_EQ(" ", TrailingTrivia);
+
+  ParsedTrivia LeadingTriviaPieces = TriviaLexer::lexTrivia(LeadingTrivia);
+  ParsedTrivia TrailingTriviaPieces = TriviaLexer::lexTrivia(TrailingTrivia);
   ASSERT_EQ((ParsedTrivia{{
     ParsedTriviaPiece(TriviaKind::GarbageText, strlen("\xEF\xBB\xBF")),
     ParsedTriviaPiece(TriviaKind::LineComment, strlen("// comment")),
     ParsedTriviaPiece(TriviaKind::Newline, 1)
-  }}), LeadingTrivia);
+  }}), LeadingTriviaPieces);
   ASSERT_EQ((ParsedTrivia{{
     ParsedTriviaPiece(TriviaKind::Space, 1)
-  }}), TrailingTrivia);
+  }}), TrailingTriviaPieces);
   
   L.lex(Tok, LeadingTrivia, TrailingTrivia);
   ASSERT_EQ(tok::eof, Tok.getKind());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 31), Tok.getLoc());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 31), Tok.getCommentRange().getStart());
   ASSERT_EQ(0u, Tok.getCommentRange().getByteLength());
+  ASSERT_EQ("//xx \n/* x */", LeadingTrivia);
+  ASSERT_EQ(StringRef(), TrailingTrivia);
+
+  LeadingTriviaPieces = TriviaLexer::lexTrivia(LeadingTrivia);
   ASSERT_EQ((ParsedTrivia{{
     ParsedTriviaPiece(TriviaKind::LineComment, strlen("//xx ")),
     ParsedTriviaPiece(TriviaKind::Newline, 1),
     ParsedTriviaPiece(TriviaKind::BlockComment, strlen("/* x */"))
-  }}), LeadingTrivia);
-  ASSERT_EQ((ParsedTrivia{{}}), TrailingTrivia);
+  }}), LeadingTriviaPieces);
 }
 
 TEST_F(LexerTest, BOMAttachCommentTrivia) {
@@ -450,7 +458,7 @@ TEST_F(LexerTest, BOMAttachCommentTrivia) {
           TriviaRetentionMode::WithTrivia);
   
   Token Tok;
-  ParsedTrivia LeadingTrivia, TrailingTrivia;
+  StringRef LeadingTrivia, TrailingTrivia;
   
   L.lex(Tok, LeadingTrivia, TrailingTrivia);
   ASSERT_EQ(tok::identifier, Tok.getKind());
@@ -458,26 +466,34 @@ TEST_F(LexerTest, BOMAttachCommentTrivia) {
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 14), Tok.getLoc());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 3), Tok.getCommentRange().getStart());
   ASSERT_EQ(10u, Tok.getCommentRange().getByteLength());
+  ASSERT_EQ("\xEF\xBB\xBF" "// comment" "\n", LeadingTrivia);
+  ASSERT_EQ(" ", TrailingTrivia);
+
+  ParsedTrivia LeadingTriviaPieces = TriviaLexer::lexTrivia(LeadingTrivia);
+  ParsedTrivia TrailingTriviaPieces = TriviaLexer::lexTrivia(TrailingTrivia);
   ASSERT_EQ((ParsedTrivia{{
     ParsedTriviaPiece(TriviaKind::GarbageText, strlen("\xEF\xBB\xBF")),
     ParsedTriviaPiece(TriviaKind::LineComment, strlen("// comment")),
     ParsedTriviaPiece(TriviaKind::Newline, 1)
-  }}), LeadingTrivia);
+  }}), LeadingTriviaPieces);
   ASSERT_EQ((ParsedTrivia{{
     ParsedTriviaPiece(TriviaKind::Space, 1)
-  }}), TrailingTrivia);
+  }}), TrailingTriviaPieces);
   
   L.lex(Tok, LeadingTrivia, TrailingTrivia);
   ASSERT_EQ(tok::eof, Tok.getKind());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 31), Tok.getLoc());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 18), Tok.getCommentRange().getStart());
   ASSERT_EQ(13u, Tok.getCommentRange().getByteLength());
+  ASSERT_EQ("//xx \n/* x */", LeadingTrivia);
+  ASSERT_EQ(StringRef(), TrailingTrivia);
+
+  LeadingTriviaPieces = TriviaLexer::lexTrivia(LeadingTrivia);
   ASSERT_EQ((ParsedTrivia{{
     ParsedTriviaPiece(TriviaKind::LineComment, strlen("//xx ")),
     ParsedTriviaPiece(TriviaKind::Newline, 1),
     ParsedTriviaPiece(TriviaKind::BlockComment, strlen("/* x */"))
-  }}), LeadingTrivia);
-  ASSERT_EQ((ParsedTrivia{{}}), TrailingTrivia);
+  }}), LeadingTriviaPieces);
 }
 
 TEST_F(LexerTest, RestoreBasic) {

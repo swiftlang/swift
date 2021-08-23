@@ -110,6 +110,17 @@ DisableASTDump("sil-disable-ast-dump", llvm::cl::Hidden,
                llvm::cl::init(false),
                llvm::cl::desc("Do not dump AST."));
 
+static llvm::cl::opt<bool> EnableOSSAModules(
+    "enable-ossa-modules",
+    llvm::cl::desc("Do we always serialize SIL in OSSA form? If "
+                   "this is disabled we do not serialize in OSSA "
+                   "form when optimizing."));
+
+static llvm::cl::opt<llvm::cl::boolOrDefault> EnableObjCInterop(
+    "enable-objc-interop",
+    llvm::cl::desc("Whether the Objective-C interop should be enabled. "
+                   "The value is `true` by default on Darwin platforms."));
+
 // This function isn't referenced outside its translation unit, but it
 // can't use the "static" keyword because its address is used for
 // getMainExecutable (since some platforms don't support taking the
@@ -206,7 +217,7 @@ void removeUnwantedFunctions(SILModule *M, ArrayRef<std::string> MangledNames,
   // Now mark all of these functions as public and remove their bodies.
   for (auto &F : DeadFunctions) {
     F->setLinkage(SILLinkage::PublicExternal);
-    F->getBlocks().clear();
+    F->clear();
   }
 
   // Remove dead functions.
@@ -244,9 +255,18 @@ int main(int argc, char **argv) {
   Invocation.getLangOptions().EnableAccessControl = false;
   Invocation.getLangOptions().EnableObjCAttrRequiresFoundation = false;
 
+  if (EnableObjCInterop == llvm::cl::BOU_UNSET) {
+    Invocation.getLangOptions().EnableObjCInterop =
+        Invocation.getLangOptions().Target.isOSDarwin();
+  } else {
+    Invocation.getLangOptions().EnableObjCInterop =
+        EnableObjCInterop == llvm::cl::BOU_TRUE;
+  }
+
   SILOptions &Opts = Invocation.getSILOptions();
   Opts.EmitVerboseSIL = EmitVerboseSIL;
   Opts.EmitSortedSIL = EmitSortedSIL;
+  Opts.EnableOSSAModules = EnableOSSAModules;
 
   serialization::ExtendedValidationInfo extendedInfo;
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =

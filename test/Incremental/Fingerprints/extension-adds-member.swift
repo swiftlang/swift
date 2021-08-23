@@ -1,8 +1,5 @@
-// Test per-type-body fingerprints using simple extensions
-//
-// If the parser is allowed to use a body fingerprint for an extension
-// this test will fail because usesA.swift won't be recompiled for the
-// last step.
+// Test that adding an overloaded member to an extension causes the users
+// depending on that extension to rebuild.
 
 // Establish status quo
 

@@ -119,7 +119,7 @@ SourceLoc extractNearestSourceLoc(std::tuple<ASTScopeImpl *, ScopeCreator *>);
 /// \code
 /// -dump-scope-maps expanded
 /// \endcode
-class ASTScopeImpl {
+class ASTScopeImpl : public ASTAllocated<ASTScopeImpl> {
   friend class NodeAdder;
   friend class Portion;
   friend class GenericTypeOrExtensionWholePortion;
@@ -136,17 +136,15 @@ protected:
   /// storage declaration or is directly descended from it.
 
 private:
-  /// Always set by the constructor, so that when creating a child
-  /// the parent chain is available.
-  ASTScopeImpl *parent = nullptr; // null at the root
+  /// The pointer:
+  /// - Always set by the constructor, so that when creating a child
+  ///   the parent chain is available. Null at the root.
+  /// The int:
+  /// - A flag indicating if the scope has been expanded yet or not.
+  llvm::PointerIntPair<ASTScopeImpl *, 1> parentAndWasExpanded;
 
   /// Child scopes, sorted by source range.
   Children storedChildren;
-
-  bool wasExpanded = false;
-
-  /// Can clear storedChildren, so must remember this
-  bool haveAddedCleanup = false;
 
   mutable Optional<CharSourceRange> cachedCharSourceRange;
 
@@ -161,24 +159,17 @@ public:
   ASTScopeImpl(const ASTScopeImpl &) = delete;
   ASTScopeImpl &operator=(const ASTScopeImpl &) = delete;
 
-  // Make vanilla new illegal for ASTScopes.
-  void *operator new(size_t bytes) = delete;
   // Need this because have virtual destructors
   void operator delete(void *data) {}
 
-  // Only allow allocation of scopes using the allocator of a particular source
-  // file.
-  void *operator new(size_t bytes, const ASTContext &ctx,
-                     unsigned alignment = alignof(ASTScopeImpl));
-  void *operator new(size_t Bytes, void *Mem) {
-    ASTScopeAssert(Mem, "Allocation failed");
-    return Mem;
-  }
-
 #pragma mark - tree declarations
 protected:
-  NullablePtr<ASTScopeImpl> getParent() { return parent; }
-  NullablePtr<const ASTScopeImpl> getParent() const { return parent; }
+  NullablePtr<ASTScopeImpl> getParent() {
+    return parentAndWasExpanded.getPointer();
+  }
+  NullablePtr<const ASTScopeImpl> getParent() const {
+    return parentAndWasExpanded.getPointer();
+  }
 
   const Children &getChildren() const { return storedChildren; }
 
@@ -247,19 +238,13 @@ private:
 
 #pragma mark - Scope tree creation
 public:
-  /// expandScope me, sending deferred nodes to my descendants.
-  /// Return the scope into which to place subsequent decls
-  ASTScopeImpl *expandAndBeCurrentDetectingRecursion(ScopeCreator &);
-
-  /// Expand or reexpand the scope if unexpanded or if not current.
-  /// There are several places in the compiler that mutate the AST after the
-  /// fact, above and beyond adding Decls to the SourceFile.
+  /// Expand the scope if unexpanded.
   ASTScopeImpl *expandAndBeCurrent(ScopeCreator &);
 
-  bool getWasExpanded() const { return wasExpanded; }
+  bool getWasExpanded() const { return parentAndWasExpanded.getInt(); }
 
 protected:
-  void setWasExpanded() { wasExpanded = true; }
+  void setWasExpanded() { parentAndWasExpanded.setInt(1); }
   virtual ASTScopeImpl *expandSpecifically(ScopeCreator &) = 0;
 
 public:
@@ -360,7 +345,7 @@ public:
   /// what obtaines for scoping. However, guards are different. The scope after
   /// the guard else must hop into the innermoset scope of the guard condition.
   virtual NullablePtr<const ASTScopeImpl> getLookupParent() const {
-    return parent;
+    return getParent();
   }
 
 #pragma mark - - lookup- local bindings
@@ -429,25 +414,14 @@ private:
   expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
 };
 
-class Portion {
+class Portion : public ASTAllocated<ASTScopeImpl> {
 public:
   const char *portionName;
   Portion(const char *n) : portionName(n) {}
   virtual ~Portion() {}
 
-  // Make vanilla new illegal for ASTScopes.
-  void *operator new(size_t bytes) = delete;
   // Need this because have virtual destructors
   void operator delete(void *data) {}
-
-  // Only allow allocation of scopes using the allocator of a particular source
-  // file.
-  void *operator new(size_t bytes, const ASTContext &ctx,
-                     unsigned alignment = alignof(ASTScopeImpl));
-  void *operator new(size_t Bytes, void *Mem) {
-    ASTScopeAssert(Mem, "Allocation failed");
-    return Mem;
-  }
 
   /// Return the new insertion point
   virtual ASTScopeImpl *expandScope(GenericTypeOrExtensionScope *,
@@ -629,8 +603,6 @@ public:
 
 public:
   NullablePtr<ASTScopeImpl> insertionPointForDeferredExpansion() override;
-
-  void countBodies(ScopeCreator &) const;
 };
 
 class NominalTypeScope final : public IterableTypeScope {
@@ -709,7 +681,7 @@ public:
   Decl *getDecl() const override { return decl; }
 };
 
-/// Since each generic parameter can "see" the preceeding ones,
+/// Since each generic parameter can "see" the preceding ones,
 /// (e.g. <A, B: A>) -- it's not legal but that's how lookup behaves --
 /// Each GenericParamScope scopes just ONE parameter, and we next
 /// each one within the previous one.
@@ -963,7 +935,9 @@ class PatternEntryInitializerScope final : public AbstractPatternEntryScope {
 public:
   PatternEntryInitializerScope(PatternBindingDecl *pbDecl, unsigned entryIndex)
       : AbstractPatternEntryScope(pbDecl, entryIndex),
-        initAsWrittenWhenCreated(pbDecl->getOriginalInit(entryIndex)) {}
+        initAsWrittenWhenCreated(pbDecl->isDebuggerBinding() ?
+                                 pbDecl->getInit(entryIndex) :
+                                 pbDecl->getOriginalInit(entryIndex)) {}
   virtual ~PatternEntryInitializerScope() {}
 
 protected:

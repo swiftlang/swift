@@ -32,7 +32,7 @@ namespace semanticarc {
 struct LLVM_LIBRARY_VISIBILITY Context {
   SILFunction &fn;
   ARCTransformKind transformKind = ARCTransformKind::All;
-  Optional<DeadEndBlocks> deadEndBlocks;
+  DeadEndBlocks &deadEndBlocks;
   ValueLifetimeAnalysis::Frontier lifetimeFrontier;
   SmallMultiMapCache<SILValue, Operand *> addressToExhaustiveWriteListCache;
 
@@ -64,7 +64,44 @@ struct LLVM_LIBRARY_VISIBILITY Context {
   /// our LiveRange can not see through joined live ranges, we know that we
   /// should only be able to have a single owned value introducer for each
   /// consumed operand.
-  FrozenMultiMap<SILValue, Operand *> joinedOwnedIntroducerToConsumedOperands;
+  ///
+  /// NOTE: To work around potential invalidation of our consuming operands when
+  /// adding values to edges on the CFG, we store our Operands as a
+  /// SILBasicBlock and an operand number. We only add values to edges and never
+  /// remove/modify edges so the operand number should be safe.
+  struct ConsumingOperandState {
+    PointerUnion<SILBasicBlock *, SILInstruction *> parent;
+    unsigned operandNumber;
+
+    ConsumingOperandState() : parent(nullptr), operandNumber(UINT_MAX) {}
+
+    ConsumingOperandState(Operand *op)
+        : parent(), operandNumber(op->getOperandNumber()) {
+      if (auto *ti = dyn_cast<TermInst>(op->getUser())) {
+        parent = ti->getParent();
+      } else {
+        parent = op->getUser();
+      }
+    }
+
+    ConsumingOperandState(const ConsumingOperandState &other) :
+        parent(other.parent), operandNumber(other.operandNumber) {}
+
+    ConsumingOperandState &operator=(const ConsumingOperandState &other) {
+      parent = other.parent;
+      operandNumber = other.operandNumber;
+      return *this;
+    }
+
+    ~ConsumingOperandState() = default;
+
+    operator bool() const {
+      return bool(parent) && operandNumber != UINT_MAX;
+    }
+  };
+
+  FrozenMultiMap<SILValue, ConsumingOperandState>
+      joinedOwnedIntroducerToConsumedOperands;
 
   /// If set to true, then we should only run cheap optimizations that do not
   /// build up data structures or analyze code in depth.
@@ -72,7 +109,7 @@ struct LLVM_LIBRARY_VISIBILITY Context {
   /// As an example, we do not do load [copy] optimizations here since they
   /// generally involve more complex analysis, but simple peepholes of
   /// copy_values we /do/ allow.
-  bool onlyGuaranteedOpts;
+  bool onlyMandatoryOpts;
 
   /// Callbacks that we must use to remove or RAUW values.
   InstModCallbacks instModCallbacks;
@@ -80,16 +117,13 @@ struct LLVM_LIBRARY_VISIBILITY Context {
   using FrozenMultiMapRange =
       decltype(joinedOwnedIntroducerToConsumedOperands)::PairToSecondEltRange;
 
-  DeadEndBlocks &getDeadEndBlocks() {
-    if (!deadEndBlocks)
-      deadEndBlocks.emplace(&fn);
-    return *deadEndBlocks;
-  }
+  DeadEndBlocks &getDeadEndBlocks() { return deadEndBlocks; }
 
-  Context(SILFunction &fn, bool onlyGuaranteedOpts, InstModCallbacks callbacks)
-      : fn(fn), deadEndBlocks(), lifetimeFrontier(),
+  Context(SILFunction &fn, DeadEndBlocks &deBlocks, bool onlyMandatoryOpts,
+          InstModCallbacks callbacks)
+      : fn(fn), deadEndBlocks(deBlocks), lifetimeFrontier(),
         addressToExhaustiveWriteListCache(constructCacheValue),
-        onlyGuaranteedOpts(onlyGuaranteedOpts), instModCallbacks(callbacks) {}
+        onlyMandatoryOpts(onlyMandatoryOpts), instModCallbacks(callbacks) {}
 
   void verify() const;
 

@@ -20,10 +20,10 @@
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/Module.h"
-#include "swift/AST/RawComment.h"
 #include "swift/AST/SILLayout.h"
-#include "swift/Serialization/Validation.h"
+#include "swift/Basic/BasicSourceInfo.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Serialization/Validation.h"
 #include "clang/AST/Type.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
@@ -74,11 +74,6 @@ class ModuleFile
   llvm::BitstreamCursor SILCursor;
   llvm::BitstreamCursor SILIndexCursor;
   llvm::BitstreamCursor DeclMemberTablesCursor;
-
-  friend StringRef getNameOfModule(const ModuleFile *);
-
-  /// A callback to be invoked every time a type was deserialized.
-  std::function<void(Type)> DeserializedTypeCallback;
 
 public:
   static std::unique_ptr<llvm::MemoryBuffer> getModuleName(ASTContext &Ctx,
@@ -336,23 +331,26 @@ public:
     return issue;
   }
 
-  /// Emits one last diagnostic, logs the error, and then aborts for the stack
-  /// trace.
-  LLVM_ATTRIBUTE_NORETURN void fatal(llvm::Error error);
-  void fatalIfNotSuccess(llvm::Error error) {
+  /// Emits one last diagnostic, adds the current module details and errors to
+  /// the pretty stack trace, and then aborts.
+  [[noreturn]] void fatal(llvm::Error error) const;
+  void fatalIfNotSuccess(llvm::Error error) const {
     if (error)
       fatal(std::move(error));
   }
-  template <typename T> T fatalIfUnexpected(llvm::Expected<T> expected) {
+  template <typename T> T fatalIfUnexpected(llvm::Expected<T> expected) const {
     if (expected)
       return std::move(expected.get());
     fatal(expected.takeError());
   }
 
-  LLVM_ATTRIBUTE_NORETURN void fatal() {
+  [[noreturn]] void fatal() const {
     fatal(llvm::make_error<llvm::StringError>(
         "(see \"While...\" info below)", llvm::inconvertibleErrorCode()));
   }
+
+  /// Outputs information useful for diagnostics to \p out
+  void outputDiagnosticInfo(llvm::raw_ostream &os) const;
 
   ASTContext &getContext() const {
     assert(FileContext && "no associated context yet");
@@ -390,6 +388,10 @@ private:
   llvm::Error
   readGenericRequirementsChecked(SmallVectorImpl<Requirement> &requirements,
                                  llvm::BitstreamCursor &Cursor);
+
+  /// Read a list of associated type declarations in a protocol.
+  void readAssociatedTypes(SmallVectorImpl<AssociatedTypeDecl *> &assocTypes,
+                           llvm::BitstreamCursor &Cursor);
 
   /// Populates the protocol's default witness table.
   ///
@@ -433,6 +435,15 @@ public:
     return Core->Name;
   }
 
+  /// The ABI name of the module.
+  StringRef getModuleABIName() const {
+    return Core->ModuleABIName;
+  }
+
+  llvm::VersionTuple getUserModuleVersion() const {
+    return Core->UserModuleVersion;
+  }
+
   /// The Swift compatibility version in use when this module was built.
   const version::Version &getCompatibilityVersion() const {
     return Core->CompatibilityVersion;
@@ -455,6 +466,11 @@ public:
     return Core->Bits.IsTestable;
   }
 
+  /// Whether this module is compiled as static library.
+  bool isStaticLibrary() const {
+    return Core->Bits.IsStaticLibrary;
+  }
+
   /// Whether the module is resilient. ('-enable-library-evolution')
   ResilienceStrategy getResilienceStrategy() const {
     return ResilienceStrategy(Core->Bits.ResilienceStrategy);
@@ -467,12 +483,26 @@ public:
 
   /// Whether this module is compiled while allowing errors
   /// ('-experimental-allow-module-with-compiler-errors').
-  bool isAllowModuleWithCompilerErrorsEnabled() const {
+  bool compiledAllowingCompilerErrors() const {
     return Core->Bits.IsAllowModuleWithCompilerErrorsEnabled;
   }
 
+  /// Whether currently allowing modules with compiler errors (ie.
+  /// '-experimental-allow-module-with-compiler-errors' is currently enabled).
+  bool allowCompilerErrors() const;
+
   /// \c true if this module has incremental dependency information.
   bool hasIncrementalInfo() const { return Core->hasIncrementalInfo(); }
+
+  /// \c true if this module has a corresponding .swiftsourceinfo file.
+  bool hasSourceInfoFile() const { return Core->hasSourceInfoFile(); }
+
+  /// \c true if this module has information from a corresponding
+  /// .swiftsourceinfo file (ie. the file exists and has been read).
+  bool hasSourceInfo() const { return Core->hasSourceInfo(); }
+
+  /// \c true if this module was built with complete checking for concurrency.
+  bool isConcurrencyChecked() const { return Core->isConcurrencyChecked(); }
 
   /// Associates this module file with the AST node representing it.
   ///
@@ -486,10 +516,14 @@ public:
   /// This does not include diagnostics about \e this file failing to load,
   /// but rather other things that might be imported as part of bringing the
   /// file into the AST.
+  /// \param recoverFromIncompatibility Whether to associate the file
+  /// regardless of the compatibility with the AST module. Still returns the
+  /// underlying error for diagnostic purposes but does not set the error bit.
   ///
   /// \returns any error that occurred during association, such as being
   /// compiled for a different OS.
-  Status associateWithFileContext(FileUnit *file, SourceLoc diagLoc);
+  Status associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
+                                  bool recoverFromIncompatibility);
 
   /// Returns `true` if there is a buffer that might contain source code where
   /// other parts of the compiler could have emitted diagnostics, to indicate
@@ -611,6 +645,8 @@ public:
          SmallVectorImpl<Decl*> &Results,
          llvm::function_ref<bool(DeclAttributes)> matchAttributes = nullptr);
 
+  void getExportedPrespecializations(SmallVectorImpl<Decl *> &results);
+
   /// Adds all operators to the given vector.
   void getOperatorDecls(SmallVectorImpl<OperatorDecl *> &Results);
 
@@ -680,18 +716,25 @@ public:
   loadRequirementSignature(const ProtocolDecl *proto, uint64_t contextData,
                            SmallVectorImpl<Requirement> &requirements) override;
 
+  void
+  loadAssociatedTypes(const ProtocolDecl *proto, uint64_t contextData,
+                      SmallVectorImpl<AssociatedTypeDecl *> &assocTypes) override;
+
   Optional<StringRef> getGroupNameById(unsigned Id) const;
   Optional<StringRef> getSourceFileNameById(unsigned Id) const;
   Optional<StringRef> getGroupNameForDecl(const Decl *D) const;
   Optional<StringRef> getSourceFileNameForDecl(const Decl *D) const;
   Optional<unsigned> getSourceOrderForDecl(const Decl *D) const;
-  void collectAllGroups(std::vector<StringRef> &Names) const;
+  void collectAllGroups(SmallVectorImpl<StringRef> &Names) const;
   Optional<CommentInfo> getCommentForDecl(const Decl *D) const;
   Optional<CommentInfo> getCommentForDeclByUSR(StringRef USR) const;
   Optional<StringRef> getGroupNameByUSR(StringRef USR) const;
-  Optional<BasicDeclLocs> getBasicDeclLocsForDecl(const Decl *D) const;
+  Optional<ExternalSourceLocs::RawLocs>
+  getExternalRawLocsForDecl(const Decl *D) const;
   Identifier getDiscriminatorForPrivateValue(const ValueDecl *D);
   Optional<Fingerprint> loadFingerprint(const IterableDeclContext *IDC) const;
+  void collectBasicSourceFileInfo(
+      llvm::function_ref<void(const BasicSourceFileInfo &)> callback) const;
 
 
   // MARK: Deserialization interface
@@ -801,8 +844,11 @@ public:
   llvm::Expected<NormalProtocolConformance *>
   readNormalConformanceChecked(serialization::NormalConformanceID id);
 
-  /// Reads a foreign error conformance from \c DeclTypeCursor, if present.
+  /// Reads a foreign error convention from \c DeclTypeCursor, if present.
   Optional<ForeignErrorConvention> maybeReadForeignErrorConvention();
+
+  /// Reads a foreign async convention from \c DeclTypeCursor, if present.
+  Optional<ForeignAsyncConvention> maybeReadForeignAsyncConvention();
 
   /// Reads inlinable body text from \c DeclTypeCursor, if present.
   Optional<StringRef> maybeReadInlinableBodyText();

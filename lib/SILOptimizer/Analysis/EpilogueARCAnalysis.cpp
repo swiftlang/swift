@@ -40,15 +40,17 @@ void EpilogueARCContext::initializeDataflow() {
     SILValue CArg = ToProcess.pop_back_val();
     if (!CArg)
       continue;
-    if (Processed.find(CArg) != Processed.end())
-       continue;
+    if (Processed.contains(CArg))
+      continue;
     Processed.insert(CArg);
     if (auto *A = dyn_cast<SILPhiArgument>(CArg)) {
       // Find predecessor and break the SILArgument to predecessors.
       for (auto *X : A->getParent()->getPredecessorBlocks()) {
         // Try to find the predecessor edge-value.
         SILValue IA = A->getIncomingPhiValue(X);
-        getState(X).LocalArg = IA;
+        auto state = getState(X);
+        if (state.hasValue())
+          state.getValue()->LocalArg = IA;
 
         // Maybe the edge value is another SILArgument.
         ToProcess.push_back(IA);
@@ -64,15 +66,19 @@ bool EpilogueARCContext::convergeDataflow() {
     Changed = false;
     // Iterate until the data flow converges.
     for (SILBasicBlock *B : PO->getPostOrder()) {
-      auto &BS = getState(B);
+      // Since the basic block is in PO, it is reachable and will always have a
+      // state
+      auto *BS = getState(B).getValue();
       // Merge in all the successors.
       bool BBSetOut = false;
       if (!B->succ_empty()) {
         auto Iter = B->succ_begin();
-        BBSetOut = getState(*Iter).BBSetIn;
+        // Since the basic block is reachable, its successors are reachable, and
+        // will always have a state.
+        BBSetOut = getState(*Iter).getValue()->BBSetIn;
         Iter = std::next(Iter);
         for (auto E = B->succ_end(); Iter != E; ++Iter) {
-          BBSetOut &= getState(*Iter).BBSetIn;
+          BBSetOut &= getState(*Iter).getValue()->BBSetIn;
         }
       } else if (isExitBlock(B)) {
         // We set the BBSetOut for exit blocks.
@@ -100,8 +106,8 @@ bool EpilogueARCContext::convergeDataflow() {
       }
 
       // Update BBSetIn.
-      Changed |= (BS.BBSetIn != BBSetOut);
-      BS.BBSetIn = BBSetOut;
+      Changed |= (BS->BBSetIn != BBSetOut);
+      BS->BBSetIn = BBSetOut;
     }
   } while (Changed);
   return true;
@@ -122,10 +128,12 @@ bool EpilogueARCContext::computeEpilogueARC() {
       // not have an epilogue ARC instruction, which means the data flow has 
       // failed.
       auto Iter = B->succ_begin();
-      auto Base = getState(*Iter).BBSetIn;
+      // Since basic block B is in PO, its successors will be reachable and will
+      // always have a state
+      auto Base = getState(*Iter).getValue()->BBSetIn;
       Iter = std::next(Iter);
       for (auto E = B->succ_end(); Iter != E; ++Iter) {
-        if (getState(*Iter).BBSetIn != Base)
+        if (getState(*Iter).getValue()->BBSetIn != Base)
           return false;
       }
       BBSetOut = Base;
@@ -164,9 +172,15 @@ bool EpilogueARCContext::computeEpilogueARC() {
 //===----------------------------------------------------------------------===//
 
 void EpilogueARCAnalysis::initialize(SILPassManager *PM) {
-  AA = PM->getAnalysis<AliasAnalysis>();
+  passManager = PM;
   PO = PM->getAnalysis<PostOrderAnalysis>();
   RC = PM->getAnalysis<RCIdentityAnalysis>();
+}
+
+std::unique_ptr<EpilogueARCFunctionInfo>
+EpilogueARCAnalysis::newFunctionAnalysis(SILFunction *F) {
+  return std::make_unique<EpilogueARCFunctionInfo>(F, PO,
+    passManager->getAnalysis<AliasAnalysis>(F), RC);
 }
 
 SILAnalysis *swift::createEpilogueARCAnalysis(SILModule *M) {

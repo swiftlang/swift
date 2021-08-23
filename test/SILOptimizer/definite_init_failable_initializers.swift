@@ -1,4 +1,8 @@
-// RUN: %target-swift-frontend -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -disable-copy-propagation %s | %FileCheck %s
+
+// Using -disable-copy-propagation to pattern match against older SIL
+// output. At least until -enable-copy-propagation has been around
+// long enough in the same form to be worth rewriting CHECK lines.
 
 // High-level tests that DI handles early returns from failable and throwing
 // initializers properly. The main complication is conditional release of self
@@ -86,10 +90,10 @@ struct FailableStruct {
     return nil
   }
 
-// CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers14FailableStructV46failAfterWholeObjectInitializationByAssignmentACSgyt_tcfC
+// CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers14FailableStructV46failAfterWholeObjectInitializationByAssignmentACSgyt_tcfC :
 // CHECK:       bb0
 // CHECK:         [[SELF_BOX:%.*]] = alloc_stack $FailableStruct
-// CHECK:         [[CANARY]] = apply
+// CHECK:         [[CANARY:%.*]] = apply
 // CHECK-NEXT:    [[WRITE:%.*]] = begin_access [modify] [static] [[SELF_BOX]] : $*FailableStruct
 // CHECK-NEXT:    store [[CANARY]] to [[WRITE]]
 // CHECK-NEXT:    end_access [[WRITE]] : $*FailableStruct
@@ -566,12 +570,11 @@ struct ThrowStruct {
     self = ThrowStruct(noFail: ())
   }
 
-// CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers11ThrowStructV25failDuringSelfReplacementACSi_tKcfC
+// CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers11ThrowStructV25failDuringSelfReplacementACSi_tKcfC :
 // CHECK:       bb0(%0 : $Int, %1 : $@thin ThrowStruct.Type):
 // CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack $ThrowStruct
-// CHECK:         [[SELF_TYPE:%.*]] = metatype $@thin ThrowStruct.Type
 // CHECK:         [[INIT_FN:%.*]] = function_ref @$s35definite_init_failable_initializers11ThrowStructV4failACyt_tKcfC
-// CHECK-NEXT:    try_apply [[INIT_FN]]([[SELF_TYPE]])
+// CHECK-NEXT:    try_apply [[INIT_FN]](%1)
 // CHECK:       bb1([[NEW_SELF:%.*]] : $ThrowStruct):
 // CHECK-NEXT:    [[WRITE:%.*]] = begin_access [modify] [static] [[SELF_BOX]] : $*ThrowStruct
 // CHECK-NEXT:    retain_value [[NEW_SELF]]
@@ -590,9 +593,8 @@ struct ThrowStruct {
 // CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers11ThrowStructV24failAfterSelfReplacementACSi_tKcfC
 // CHECK:       bb0(%0 : $Int, %1 : $@thin ThrowStruct.Type):
 // CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack $ThrowStruct
-// CHECK:         [[SELF_TYPE:%.*]] = metatype $@thin ThrowStruct.Type
 // CHECK:         [[INIT_FN:%.*]] = function_ref @$s35definite_init_failable_initializers11ThrowStructV6noFailACyt_tcfC
-// CHECK-NEXT:    [[NEW_SELF:%.*]] = apply [[INIT_FN]]([[SELF_TYPE]])
+// CHECK-NEXT:    [[NEW_SELF:%.*]] = apply [[INIT_FN]](%1)
 // CHECK-NEXT:    [[WRITE:%.*]] = begin_access [modify] [static] [[SELF_BOX]] : $*ThrowStruct
 // CHECK-NEXT:    retain_value [[NEW_SELF]]
 // CHECK-NEXT:    store [[NEW_SELF]] to [[WRITE]]

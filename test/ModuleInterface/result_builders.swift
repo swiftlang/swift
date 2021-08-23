@@ -63,4 +63,7 @@ public protocol ProtocolWithBuilderProperty {
 
   // CHECK: @ResultBuilders.TupleBuilder var myVar: Self.Assoc { get }
   @TupleBuilder var myVar: Assoc { get }
+
+  // CHECK: @ResultBuilders.TupleBuilder func myFunc<T1, T2>(_ t1: T1, _ t2: T2) -> (T1, T2)
+  @TupleBuilder func myFunc<T1, T2>(_ t1: T1, _ t2: T2) -> (T1, T2)
 }

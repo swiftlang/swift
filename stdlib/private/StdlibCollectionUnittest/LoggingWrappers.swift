@@ -404,7 +404,7 @@ extension LoggingMutableCollection: MutableCollection {
     MutableCollectionLog.withContiguousMutableStorageIfAvailable[selfType] += 1
     let result = try base.withContiguousMutableStorageIfAvailable(body)
     if result != nil {
-      Log.withContiguousMutableStorageIfAvailable[selfType] += 1
+      Log.withContiguousMutableStorageIfAvailableNonNilReturns[selfType] += 1
     }
     return result
   }
@@ -618,7 +618,7 @@ extension BufferAccessLoggingMutableCollection: MutableCollection {
     Log.withContiguousMutableStorageIfAvailable[selfType] += 1
     let result = try base.withContiguousMutableStorageIfAvailable(body)
     if result != nil {
-      Log.withContiguousMutableStorageIfAvailable[selfType] += 1
+      Log.withContiguousMutableStorageIfAvailableNonNilReturns[selfType] += 1
     }
     return result
   }

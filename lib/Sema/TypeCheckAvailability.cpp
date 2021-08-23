@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeCheckAvailability.h"
+#include "TypeCheckConcurrency.h"
 #include "TypeChecker.h"
 #include "TypeCheckObjC.h"
 #include "MiscDiagnostics.h"
@@ -113,6 +114,8 @@ static void forEachOuterDecl(DeclContext *DC, Fn fn) {
     case DeclContextKind::Initializer:
       if (auto *PBI = dyn_cast<PatternBindingInitializer>(DC))
         fn(PBI->getBinding());
+      else if (auto *I = dyn_cast<PropertyWrapperInitializer>(DC))
+        fn(I->getWrappedVar());
       break;
 
     case DeclContextKind::SubscriptDecl:
@@ -147,7 +150,11 @@ static void computeExportContextBits(ASTContext &Ctx, Decl *D,
   if (D->isSPI())
     *spi = true;
 
-  if (D->isImplicit())
+  // Defer bodies are desugared to an implicit closure expression. We need to
+  // dilute the meaning of "implicit" to make sure we're still checking
+  // availability inside of defer statements.
+  const auto isDeferBody = isa<FuncDecl>(D) && cast<FuncDecl>(D)->isDeferBody();
+  if (D->isImplicit() && !isDeferBody)
     *implicit = true;
 
   if (D->getAttrs().getDeprecated(Ctx))
@@ -175,7 +182,7 @@ ExportContext ExportContext::forDeclSignature(Decl *D) {
       (Ctx.LangOpts.DisableAvailabilityChecking
        ? AvailabilityContext::alwaysAvailable()
        : TypeChecker::overApproximateAvailabilityAtLocation(D->getEndLoc(), DC));
-  bool spi = false;
+  bool spi = Ctx.LangOpts.LibraryLevel == LibraryLevel::SPI;
   bool implicit = false;
   bool deprecated = false;
   Optional<PlatformKind> unavailablePlatformKind;
@@ -204,7 +211,7 @@ ExportContext ExportContext::forFunctionBody(DeclContext *DC, SourceLoc loc) {
        ? AvailabilityContext::alwaysAvailable()
        : TypeChecker::overApproximateAvailabilityAtLocation(loc, DC));
 
-  bool spi = false;
+  bool spi = Ctx.LangOpts.LibraryLevel == LibraryLevel::SPI;
   bool implicit = false;
   bool deprecated = false;
   Optional<PlatformKind> unavailablePlatformKind;
@@ -396,13 +403,15 @@ private:
     // The potential versions in the declaration are constrained by both
     // the declared availability of the declaration and the potential versions
     // of its lexical context.
-    AvailabilityContext DeclInfo =
+    AvailabilityContext ExplicitDeclInfo =
         swift::AvailabilityInference::availableRange(D, Context);
+    AvailabilityContext DeclInfo = ExplicitDeclInfo;
     DeclInfo.intersectWith(getCurrentTRC()->getAvailabilityInfo());
 
     TypeRefinementContext *NewTRC =
         TypeRefinementContext::createForDecl(Context, D, getCurrentTRC(),
                                              DeclInfo,
+                                             ExplicitDeclInfo,
                                              refinementSourceRangeForDecl(D));
     
     // Record the TRC for this storage declaration so that
@@ -639,9 +648,14 @@ private:
 
     TypeRefinementContext *StartingTRC = getCurrentTRC();
 
+    // Tracks if we're refining for availability or unavailability.
+    Optional<bool> isUnavailability = None;
+
     for (StmtConditionElement Element : Cond) {
       TypeRefinementContext *CurrentTRC = getCurrentTRC();
       AvailabilityContext CurrentInfo = CurrentTRC->getAvailabilityInfo();
+      AvailabilityContext CurrentExplicitInfo =
+        CurrentTRC->getExplicitAvailabilityInfo();
 
       // If the element is not a condition, walk it in the current TRC.
       if (Element.getKind() != StmtConditionElement::CK_Availability) {
@@ -660,10 +674,25 @@ private:
       // condition elements following it.
       auto *Query = Element.getAvailability();
 
+      if (isUnavailability == None) {
+        isUnavailability = Query->isUnavailability();
+      } else if (isUnavailability != Query->isUnavailability()) {
+        // Mixing availability with unavailability in the same statement will
+        // cause the false flow's version range to be ambiguous. Report it.
+        //
+        // Technically we can support this by not refining ambiguous flows,
+        // but there are currently no legitimate cases where one would have
+        // to mix availability with unavailability.
+        Context.Diags.diagnose(Query->getLoc(),
+                               diag::availability_cannot_be_mixed);
+        break;
+      }
+
       // If this query expression has no queries, we will not introduce a new
       // refinement context. We do not diagnose here: a diagnostic will already
       // have been emitted by the parser.
-      if (Query->getQueries().empty())
+      // For #unavailable, empty queries are valid as wildcards are implied.
+      if (!Query->isUnavailability() && Query->getQueries().empty())
         continue;
 
       AvailabilitySpec *Spec = bestActiveSpecForQuery(Query);
@@ -672,10 +701,9 @@ private:
         // so rather than refining, emit a diagnostic and just use the current
         // TRC.
         Context.Diags.diagnose(
-            Query->getLoc(),
-            diag::availability_query_required_for_platform,
+            Query->getLoc(), diag::availability_query_required_for_platform,
             platformString(targetPlatform(Context.LangOpts)));
-        
+
         continue;
       }
 
@@ -704,24 +732,23 @@ private:
         continue;
       }
 
-
-      // If the version range for the current TRC is completely contained in
-      // the range for the spec, then a version query can never be false, so the
-      // spec is useless. If so, report this.
-      if (CurrentInfo.isContainedIn(NewConstraint)) {
+      // If the explicitly-specified (via #availability) version range for the
+      // current TRC is completely contained in the range for the spec, then
+      // a version query can never be false, so the spec is useless.
+      // If so, report this.
+      if (CurrentExplicitInfo.isContainedIn(NewConstraint)) {
+        // Unavailability refinements are always "useless" from a symbol
+        // availability point of view, so only useless availability specs are
+        // reported.
+        if (isUnavailability.getValue()) {
+          continue;
+        }
         DiagnosticEngine &Diags = Context.Diags;
-        // Some availability checks will always pass because the minimum
-        // deployment target guarantees they will never be false. We don't
-        // diagnose these checks as useless because the source file may
-        // be shared with other projects/targets having older deployment
-        // targets. We don't currently have a mechanism for the user to
-        // suppress these warnings (for example, by indicating when the
-        // required compatibility version is different than the deployment
-        // target).
         if (CurrentTRC->getReason() != TypeRefinementContext::Reason::Root) {
           PlatformKind BestPlatform = targetPlatform(Context.LangOpts);
           auto *PlatformSpec =
               dyn_cast<PlatformVersionConstraintAvailabilitySpec>(Spec);
+
           // If possible, try to report the diagnostic in terms for the
           // platform the user uttered in the '#available()'. For a platform
           // that inherits availability from another platform it may be
@@ -734,7 +761,9 @@ private:
           Diags.diagnose(CurrentTRC->getIntroductionLoc(),
                          diag::availability_query_useless_enclosing_scope_here);
         }
+      }
 
+      if (CurrentInfo.isContainedIn(NewConstraint)) {
         // No need to actually create the refinement context if we know it is
         // useless.
         continue;
@@ -769,8 +798,18 @@ private:
       FalseRefinement = FalseFlow;
     }
 
+    auto makeResult =
+        [isUnavailability](Optional<AvailabilityContext> TrueRefinement,
+                           Optional<AvailabilityContext> FalseRefinement) {
+          if (isUnavailability.hasValue() && isUnavailability.getValue()) {
+            // If this is an unavailability check, invert the result.
+            return std::make_pair(FalseRefinement, TrueRefinement);
+          }
+          return std::make_pair(TrueRefinement, FalseRefinement);
+        };
+
     if (NestedCount == 0)
-      return std::make_pair(None, FalseRefinement);
+      return makeResult(None, FalseRefinement);
 
     TypeRefinementContext *NestedTRC = getCurrentTRC();
     while (NestedCount-- > 0)
@@ -778,7 +817,7 @@ private:
 
     assert(getCurrentTRC() == StartingTRC);
 
-    return std::make_pair(NestedTRC->getAvailabilityInfo(), FalseRefinement);
+    return makeResult(NestedTRC->getAvailabilityInfo(), FalseRefinement);
   }
 
   /// Return the best active spec for the target platform or nullptr if no
@@ -794,7 +833,8 @@ private:
         continue;
       }
 
-      auto *VersionSpec = dyn_cast<PlatformVersionConstraintAvailabilitySpec>(Spec);
+      auto *VersionSpec =
+          dyn_cast<PlatformVersionConstraintAvailabilitySpec>(Spec);
       if (!VersionSpec)
         continue;
 
@@ -817,7 +857,15 @@ private:
 
     // If we have reached this point, we found no spec for our target, so
     // we return the other spec ('*'), if we found it, or nullptr, if not.
-    return FoundOtherSpec;
+    if (FoundOtherSpec) {
+      return FoundOtherSpec;
+    } else if (available->isUnavailability()) {
+      // For #unavailable, imply the presence of a wildcard.
+      SourceLoc Loc = available->getRParenLoc();
+      return new (Context) OtherPlatformAvailabilitySpec(Loc);
+    } else {
+      return nullptr;
+    }
   }
 
   /// Return the availability context for the given spec.
@@ -936,37 +984,51 @@ TypeChecker::overApproximateAvailabilityAtLocation(SourceLoc loc,
   return OverApproximateContext;
 }
 
-Optional<UnavailabilityReason>
-TypeChecker::checkDeclarationAvailability(const Decl *D,
-                                          const ExportContext &where) {
-  auto *referenceDC = where.getDeclContext();
+bool TypeChecker::isDeclarationUnavailable(
+    const Decl *D, const DeclContext *referenceDC,
+    llvm::function_ref<AvailabilityContext()> getAvailabilityContext) {
   ASTContext &Context = referenceDC->getASTContext();
   if (Context.LangOpts.DisableAvailabilityChecking) {
-    return None;
+    return false;
   }
 
   if (!referenceDC->getParentSourceFile()) {
     // We only check availability if this reference is in a source file; we do
     // not check in other kinds of FileUnits.
-    return None;
+    return false;
   }
-
-  AvailabilityContext runningOSOverApprox =
-      where.getAvailabilityContext();
 
   AvailabilityContext safeRangeUnderApprox{
       AvailabilityInference::availableRange(D, Context)};
+
+  if (safeRangeUnderApprox.isAlwaysAvailable())
+    return false;
+
+  AvailabilityContext runningOSOverApprox = getAvailabilityContext();
 
   // The reference is safe if an over-approximation of the running OS
   // versions is fully contained within an under-approximation
   // of the versions on which the declaration is available. If this
   // containment cannot be guaranteed, we say the reference is
   // not available.
-  if (runningOSOverApprox.isContainedIn(safeRangeUnderApprox))
-    return None;
+  return !runningOSOverApprox.isContainedIn(safeRangeUnderApprox);
+}
 
-  VersionRange version = safeRangeUnderApprox.getOSVersion();
-  return UnavailabilityReason::requiresVersionRange(version);
+Optional<UnavailabilityReason>
+TypeChecker::checkDeclarationAvailability(const Decl *D,
+                                          const ExportContext &Where) {
+  if (isDeclarationUnavailable(D, Where.getDeclContext(), [&Where] {
+        return Where.getAvailabilityContext();
+      })) {
+    auto &Context = Where.getDeclContext()->getASTContext();
+    AvailabilityContext safeRangeUnderApprox{
+        AvailabilityInference::availableRange(D, Context)};
+
+    VersionRange version = safeRangeUnderApprox.getOSVersion();
+    return UnavailabilityReason::requiresVersionRange(version);
+  }
+
+  return None;
 }
 
 Optional<UnavailabilityReason>
@@ -1599,6 +1661,47 @@ void TypeChecker::diagnosePotentialOpaqueTypeUnavailability(
   fixAvailability(ReferenceRange, ReferenceDC, RequiredRange, Context);
 }
 
+static void diagnosePotentialConcurrencyUnavailability(
+    SourceRange ReferenceRange, const DeclContext *ReferenceDC,
+    const UnavailabilityReason &Reason) {
+  ASTContext &Context = ReferenceDC->getASTContext();
+
+  auto RequiredRange = Reason.getRequiredOSVersionRange();
+  {
+    auto Err =
+      Context.Diags.diagnose(
+          ReferenceRange.Start,
+          diag::availability_concurrency_only_version_newer,
+          prettyPlatformString(targetPlatform(Context.LangOpts)),
+          Reason.getRequiredOSVersionRange().getLowerEndpoint());
+
+    // Direct a fixit to the error if an existing guard is nearly-correct
+    if (fixAvailabilityByNarrowingNearbyVersionCheck(ReferenceRange,
+                                                     ReferenceDC,
+                                                     RequiredRange, Context, Err))
+      return;
+  }
+  fixAvailability(ReferenceRange, ReferenceDC, RequiredRange, Context);
+}
+
+void TypeChecker::checkConcurrencyAvailability(SourceRange ReferenceRange,
+                                               const DeclContext *ReferenceDC) {
+  // Check the availability of concurrency runtime support.
+  ASTContext &ctx = ReferenceDC->getASTContext();
+  if (ctx.LangOpts.DisableAvailabilityChecking)
+    return;
+  
+  auto runningOS =
+    TypeChecker::overApproximateAvailabilityAtLocation(
+      ReferenceRange.Start, ReferenceDC);
+  auto availability = ctx.getConcurrencyAvailability();
+  if (!runningOS.isContainedIn(availability)) {
+    diagnosePotentialConcurrencyUnavailability(
+      ReferenceRange, ReferenceDC,
+      UnavailabilityReason::requiresVersionRange(availability.getOSVersion()));
+  }
+}
+
 void TypeChecker::diagnosePotentialUnavailability(
     const ValueDecl *D, SourceRange ReferenceRange,
     const DeclContext *ReferenceDC,
@@ -1719,7 +1822,8 @@ static bool isInsideCompatibleUnavailableDeclaration(
   // but allow the use of types.
   PlatformKind platform = attr->Platform;
   if (platform == PlatformKind::none &&
-      !isa<TypeDecl>(D)) {
+      !isa<TypeDecl>(D) &&
+      !isa<ExtensionDecl>(D)) {
     return false;
   }
 
@@ -1770,7 +1874,7 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
     auto argList = getOriginalArgumentList(argExpr);
 
     size_t numElementsWithinParens = argList.args.size();
-    numElementsWithinParens -= argList.hasTrailingClosure;
+    numElementsWithinParens -= argList.getNumTrailingClosures();
     if (selfIndex >= numElementsWithinParens)
       return;
 
@@ -1947,11 +2051,11 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
     return;
 
   SmallVector<Identifier, 4> argumentLabelIDs;
-  std::transform(parsed.ArgumentLabels.begin(), parsed.ArgumentLabels.end(),
-                 std::back_inserter(argumentLabelIDs),
-                 [&ctx](StringRef labelStr) -> Identifier {
-    return labelStr.empty() ? Identifier() : ctx.getIdentifier(labelStr);
-  });
+  llvm::transform(parsed.ArgumentLabels, std::back_inserter(argumentLabelIDs),
+                  [&ctx](StringRef labelStr) -> Identifier {
+                    return labelStr.empty() ? Identifier()
+                                            : ctx.getIdentifier(labelStr);
+                  });
 
   // Coerce the `argumentLabelIDs` to the user supplied arguments.
   // e.g:
@@ -2018,18 +2122,16 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
     return;
   }
 
-  auto argumentLabelsToCheck = llvm::makeArrayRef(argumentLabelIDs);
-  // The argument label for a trailing closure is ignored.
-  if (argList.hasTrailingClosure)
-    argumentLabelsToCheck = argumentLabelsToCheck.drop_back();
-
-  if (std::equal(argumentLabelsToCheck.begin(), argumentLabelsToCheck.end(),
-                 argList.labels.begin())) {
-    // Already matching.
-    return;
+  // If any of the argument labels are mismatched, perform label correction.
+  for (auto i : indices(argList.args)) {
+    // The argument label of an unlabeled trailing closure is ignored.
+    if (argList.isUnlabeledTrailingClosureIdx(i))
+      continue;
+    if (argumentLabelIDs[i] != argList.labels[i]) {
+      diagnoseArgumentLabelError(ctx, argExpr, argumentLabelIDs, false, &diag);
+      return;
+    }
   }
-
-  diagnoseArgumentLabelError(ctx, argExpr, argumentLabelIDs, false, &diag);
 }
 
 // Must be kept in sync with diag::availability_decl_unavailable_rename and
@@ -2081,26 +2183,6 @@ describeRename(ASTContext &ctx, const AvailableAttr *attr, const ValueDecl *D,
 
   // We don't have enough information.
   return ReplacementDeclKind::None;
-}
-
-/// Returns a value that can be used to select between accessor kinds in
-/// diagnostics.
-///
-/// This is correlated with diag::availability_deprecated and others.
-static std::pair<unsigned, DeclName>
-getAccessorKindAndNameForDiagnostics(const ValueDecl *D) {
-  // This should always be one more than the last AccessorKind supported in
-  // the diagnostics. If you need to change it, change the assertion below as
-  // well.
-  static const unsigned NOT_ACCESSOR_INDEX = 2;
-
-  if (auto *accessor = dyn_cast<AccessorDecl>(D)) {
-    DeclName Name = accessor->getStorage()->getName();
-    assert(accessor->isGetterOrSetter());
-    return {static_cast<unsigned>(accessor->getAccessorKind()), Name};
-  }
-
-  return {NOT_ACCESSOR_INDEX, D->getName()};
 }
 
 void TypeChecker::diagnoseIfDeprecated(SourceRange ReferenceRange,
@@ -2444,19 +2526,18 @@ bool isSubscriptReturningString(const ValueDecl *D, ASTContext &Context) {
 
   // The subscripts taking T<Int> do not return Substring, and our
   // special fixit does not help here.
-  auto intDecl = Context.getIntDecl();
   auto nominalTypeParam = genericArgs[0]->getAs<NominalType>();
   if (!nominalTypeParam)
     return false;
 
-  if (nominalTypeParam->getDecl() == intDecl)
+  if (nominalTypeParam->isInt())
     return false;
 
   auto resultTy = fnTy->getResult()->getAs<NominalType>();
   if (!resultTy)
     return false;
 
-  return resultTy->getDecl() == stringDecl;
+  return resultTy->isString();
 }
 
 bool swift::diagnoseExplicitUnavailability(
@@ -2822,6 +2903,7 @@ private:
       case KeyPathExpr::Component::Kind::OptionalForce:
       case KeyPathExpr::Component::Kind::Identity:
       case KeyPathExpr::Component::Kind::DictionaryKey:
+      case KeyPathExpr::Component::Kind::CodeCompletion:
         break;
       }
     }
@@ -2998,16 +3080,11 @@ swift::diagnoseDeclAvailability(const ValueDecl *D,
 
 /// Return true if the specified type looks like an integer of floating point
 /// type.
-static bool isIntegerOrFloatingPointType(Type ty, DeclContext *DC,
-                                         ASTContext &Context) {
-  auto integerType =
-    Context.getProtocol(KnownProtocolKind::ExpressibleByIntegerLiteral);
-  auto floatingType =
-    Context.getProtocol(KnownProtocolKind::ExpressibleByFloatLiteral);
-  if (!integerType || !floatingType) return false;
-
-  return TypeChecker::conformsToProtocol(ty, integerType, DC) ||
-         TypeChecker::conformsToProtocol(ty, floatingType, DC);
+static bool isIntegerOrFloatingPointType(Type ty, ModuleDecl *M) {
+  return (TypeChecker::conformsToKnownProtocol(
+            ty, KnownProtocolKind::ExpressibleByIntegerLiteral, M) ||
+          TypeChecker::conformsToKnownProtocol(
+            ty, KnownProtocolKind::ExpressibleByFloatLiteral, M));
 }
 
 
@@ -3037,7 +3114,7 @@ ExprAvailabilityWalker::diagnoseIncDecRemoval(const ValueDecl *D, SourceRange R,
   // to "lvalue += 1".
   auto *DC = Where.getDeclContext();
   std::string replacement;
-  if (isIntegerOrFloatingPointType(call->getType(), DC, Context))
+  if (isIntegerOrFloatingPointType(call->getType(), DC->getParentModule()))
     replacement = isInc ? " += 1" : " -= 1";
   else {
     // Otherwise, it must be an index type.  Rewrite to:
@@ -3383,6 +3460,12 @@ void swift::diagnoseTypeAvailability(const TypeRepr *TR, Type T, SourceLoc loc,
   diagnoseTypeAvailability(T, loc, where, flags);
 }
 
+static void diagnoseMissingConformance(
+    SourceLoc loc, Type type, ProtocolDecl *proto, ModuleDecl *module) {
+  assert(proto->isSpecificProtocol(KnownProtocolKind::Sendable));
+  diagnoseMissingSendableConformance(loc, type, module);
+}
+
 bool
 swift::diagnoseConformanceAvailability(SourceLoc loc,
                                        ProtocolConformanceRef conformance,
@@ -3395,6 +3478,16 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
 
   const ProtocolConformance *concreteConf = conformance.getConcrete();
   const RootProtocolConformance *rootConf = concreteConf->getRootConformance();
+
+  // Diagnose "missing" conformances where we needed a conformance but
+  // didn't have one.
+  if (auto builtinConformance = dyn_cast<BuiltinProtocolConformance>(rootConf)){
+    if (builtinConformance->isMissing()) {
+      diagnoseMissingConformance(loc, builtinConformance->getType(),
+                                 builtinConformance->getProtocol(),
+                                 where.getDeclContext()->getParentModule());
+    }
+  }
 
   auto *DC = where.getDeclContext();
 

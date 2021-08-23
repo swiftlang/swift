@@ -48,6 +48,7 @@ func testAcceptColorTagged(i: Int, s: String) {
 // ATTR_NAME: source.lang.swift.ref.struct (19:8-19:21)
 // ATTR_NAME-NEXT: TaggedBuilder
 // ATTR_NAME-NEXT: s:11BuilderTest06TaggedA0V
+// ATTR_NAME-NEXT: source.lang.swift
 // ATTR_NAME-NEXT: TaggedBuilder<Tag>.Type
 // ATTR_NAME-NEXT: $s11BuilderTest06TaggedA0VyxGmD
 // ATTR_NAME-NEXT: <Declaration>@resultBuilder struct TaggedBuilder&lt;Tag&gt;</Declaration>
@@ -58,6 +59,7 @@ func testAcceptColorTagged(i: Int, s: String) {
 // ATTR_GENERICARG: source.lang.swift.ref.enum (31:6-31:11)
 // ATTR_GENERICARG-NEXT: Color
 // ATTR_GENERICARG-NEXT: s:11BuilderTest5ColorO
+// ATTR_GENERICARG-NEXT: source.lang.swift
 // ATTR_GENERICARG-NEXT: Color.Type
 // ATTR_GENERICARG-NEXT: $s11BuilderTest5ColorOmD
 // ATTR_GENERICARG-NEXT: <Declaration>enum Color</Declaration>
@@ -68,6 +70,7 @@ func testAcceptColorTagged(i: Int, s: String) {
 // CALL_BUILDERFUNC: source.lang.swift.ref.function.free (35:6-35:78)
 // CALL_BUILDERFUNC-NEXT: acceptColorTagged(body:)
 // CALL_BUILDERFUNC-NEXT: s:11BuilderTest17acceptColorTagged4bodyyxAA0D0OXE_tlF
+// CALL_BUILDERFUNC-NEXT: source.lang.swift
 // CALL_BUILDERFUNC-NEXT: <Result> (body: (Color) -> Result) -> ()
 // CALL_BUILDERFUNC-NEXT: $s4bodyyx11BuilderTest5ColorOXE_tcluD
 // CALL_BUILDERFUNC-NEXT: <Declaration>func acceptColorTagged&lt;Result&gt;(@<Type usr="s:11BuilderTest06TaggedA0V">TaggedBuilder</Type>&lt;<Type usr="s:11BuilderTest5ColorO">Color</Type>&gt; body: (<Type usr="s:11BuilderTest5ColorO">Color</Type>) -&gt; <Type usr="s:11BuilderTest17acceptColorTagged4bodyyxAA0D0OXE_tlF6ResultL_xmfp">Result</Type>)</Declaration>
@@ -78,6 +81,7 @@ func testAcceptColorTagged(i: Int, s: String) {
 // CLOSUREPARAM_DECL: source.lang.swift.decl.var.parameter (40:23-40:28)
 // CLOSUREPARAM_DECL-NEXT: color
 // CLOSUREPARAM_DECL-NEXT: s:11BuilderTest21testAcceptColorTagged1i1sySi_SStFAA0F0VyAA0E0OSiG_AFyAHSSGtAHXEfU_5colorL_AHvp
+// CLOSUREPARAM_DECL-NEXT: source.lang.swift
 // CLOSUREPARAM_DECL-NEXT: Color
 // CLOSUREPARAM_DECL-NEXT: $s11BuilderTest5ColorOD
 // CLOSUREPARAM_DECL-NEXT: <Declaration>let color: <Type usr="s:11BuilderTest5ColorO">Color</Type></Declaration>
@@ -88,6 +92,7 @@ func testAcceptColorTagged(i: Int, s: String) {
 // CLOSUREPARAM_USER: source.lang.swift.ref.var.local (40:23-40:28)
 // CLOSUREPARAM_USER-NEXT: color
 // CLOSUREPARAM_USER-NEXT: s:11BuilderTest21testAcceptColorTagged1i1sySi_SStFAA0F0VyAA0E0OSiG_AFyAHSSGtAHXEfU_5colorL_AHvp
+// CLOSUREPARAM_USER-NEXT: source.lang.swift
 // CLOSUREPARAM_USER-NEXT: Color
 // CLOSUREPARAM_USER-NEXT: $s11BuilderTest5ColorOD
 // CLOSUREPARAM_USER-NEXT: <Declaration>let color: <Type usr="s:11BuilderTest5ColorO">Color</Type></Declaration>
@@ -98,6 +103,7 @@ func testAcceptColorTagged(i: Int, s: String) {
 // CAPTURED_VALUE: source.lang.swift.ref.var.local (39:28-39:29)
 // CAPTURED_VALUE-NEXT: i
 // CAPTURED_VALUE-NEXT: s:11BuilderTest21testAcceptColorTagged1i1sySi_SStFACL_Sivp
+// CAPTURED_VALUE-NEXT: source.lang.swift
 // CAPTURED_VALUE-NEXT: Int
 // CAPTURED_VALUE-NEXT: $sSiD
 // CAPTURED_VALUE-NEXT: <Declaration>let i: <Type usr="s:Si">Int</Type></Declaration>
@@ -108,6 +114,7 @@ func testAcceptColorTagged(i: Int, s: String) {
 // CAPTURED_VALUE_METHOD: source.lang.swift.ref.function.method.instance (10:8-10:28)
 // CAPTURED_VALUE_METHOD: tag(_:)
 // CAPTURED_VALUE_METHOD: s:11BuilderTest8TaggablePAAE3tagyAA6TaggedVyqd__xGqd__lF
+// CAPTURED_VALUE_METHOD: source.lang.swift
 // CAPTURED_VALUE_METHOD: <Self, Tag where Self : Taggable> (Self) -> (Tag) -> Tagged<Tag, Self>
 // CAPTURED_VALUE_METHOD: $sy11BuilderTest6TaggedVyqd__xGqd__cluD
 // CAPTURED_VALUE_METHOD: <Container>$sSiD</Container>

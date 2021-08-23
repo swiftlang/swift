@@ -20,6 +20,39 @@
 #include "swift/Basic/Compiler.h"
 #include "swift/Runtime/CMakeConfig.h"
 
+/// SWIFT_RUNTIME_WEAK_IMPORT - Marks a symbol for weak import.
+#if (__has_attribute(weak_import))
+#define SWIFT_RUNTIME_WEAK_IMPORT __attribute__((weak_import))
+#else
+#define SWIFT_RUNTIME_WEAK_IMPORT
+#endif
+
+/// SWIFT_RUNTIME_WEAK_CHECK - Tests if a potentially weakly linked function
+/// is linked into the runtime.  This is useful on Apple platforms where it is
+/// possible that system functions are only available on newer versions.
+#ifdef __clang__
+#define SWIFT_RUNTIME_WEAK_CHECK(x)                                     \
+  _Pragma("clang diagnostic push")                                      \
+  _Pragma("clang diagnostic ignored \"-Wunguarded-availability\"")      \
+  _Pragma("clang diagnostic ignored \"-Wunguarded-availability-new\"")  \
+  (&x)                                                                  \
+  _Pragma("clang diagnostic pop")
+#else
+#define SWIFT_RUNTIME_WEAK_CHECK(x) &x
+#endif
+
+/// SWIFT_RUNTIME_WEAK_USE - Use a potentially weakly imported symbol.
+#ifdef __clang__
+#define SWIFT_RUNTIME_WEAK_USE(x)                                       \
+  _Pragma("clang diagnostic push")                                      \
+  _Pragma("clang diagnostic ignored \"-Wunguarded-availability\"")      \
+  _Pragma("clang diagnostic ignored \"-Wunguarded-availability-new\"")  \
+  (x)                                                                   \
+  _Pragma("clang diagnostic pop")
+#else
+#define SWIFT_RUNTIME_WEAK_USE(x) x
+#endif
+
 /// SWIFT_RUNTIME_LIBRARY_VISIBILITY - If a class marked with this attribute is
 /// linked into a shared library, then the class should be private to the
 /// library and not accessible from outside it.  Can also be used to mark
@@ -100,34 +133,21 @@
 /// from ObjC classes?
 #ifndef SWIFT_CLASS_IS_SWIFT_MASK
 
-// Non-Apple platforms always use 1.
-# if !defined(__APPLE__)
-#  define SWIFT_CLASS_IS_SWIFT_MASK 1ULL
-
-// Builds for Swift-in-the-OS always use 2.
-# elif SWIFT_BNI_OS_BUILD
-#  define SWIFT_CLASS_IS_SWIFT_MASK 2ULL
-
-// Builds for Xcode always use 1.
-# elif SWIFT_BNI_XCODE_BUILD
-#  define SWIFT_CLASS_IS_SWIFT_MASK 1ULL
-
 // Compatibility hook libraries cannot rely on the "is swift" bit being either
 // value, since they must work with both OS and Xcode versions of the libraries.
 // Generate a reference to a nonexistent symbol so that we get obvious linker
 // errors if we try.
-# elif SWIFT_COMPATIBILITY_LIBRARY
+# if SWIFT_COMPATIBILITY_LIBRARY
 extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTLY__;
 #  define SWIFT_CLASS_IS_SWIFT_MASK __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTLY__
 
-// Other builds (such as local builds on developers' computers)
-// dynamically choose the bit at runtime based on the current OS
-// version.
+// Apple platforms always use 2
+# elif defined(__APPLE__)
+#  define SWIFT_CLASS_IS_SWIFT_MASK 2ULL
+
+// Non-Apple platforms always use 1.
 # else
-#  define SWIFT_CLASS_IS_SWIFT_MASK _swift_classIsSwiftMask
-#  define SWIFT_CLASS_IS_SWIFT_MASK_GLOBAL_VARIABLE 1
-#  define SWIFT_BUILD_HAS_BACK_DEPLOYMENT 1
-#  include "BackDeployment.h"
+#  define SWIFT_CLASS_IS_SWIFT_MASK 1ULL
 
 # endif
 #endif
@@ -174,6 +194,20 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #define SWIFT_CONTEXT
 #define SWIFT_ERROR_RESULT
 #define SWIFT_INDIRECT_RESULT
+#endif
+
+#if __has_attribute(swift_async_context)
+#define SWIFT_ASYNC_CONTEXT __attribute__((swift_async_context))
+#else
+#define SWIFT_ASYNC_CONTEXT
+#endif
+
+// SWIFT_CC(swiftasync) is the Swift async calling convention.
+// We assume that it supports mandatory tail call elimination.
+#if __has_feature(swiftasynccc) && __has_attribute(swiftasynccall)
+#define SWIFT_CC_swiftasync __attribute__((swiftasynccall))
+#else
+#define SWIFT_CC_swiftasync SWIFT_CC_swift
 #endif
 
 // SWIFT_CC(PreserveMost) is used in the runtime implementation to prevent
@@ -233,6 +267,12 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #define __ptrauth_swift_escalation_notification_function                       \
   __ptrauth(ptrauth_key_function_pointer, 1,                                   \
             SpecialPointerAuthDiscriminators::EscalationNotificationFunction)
+#define __ptrauth_swift_dispatch_invoke_function                               \
+  __ptrauth(ptrauth_key_process_independent_code, 1,                           \
+            SpecialPointerAuthDiscriminators::DispatchInvokeFunction)
+#define __ptrauth_swift_objc_superclass                                        \
+  __ptrauth(ptrauth_key_process_independent_data, 1,                           \
+            swift::SpecialPointerAuthDiscriminators::ObjCSuperclass)
 #define swift_ptrauth_sign_opaque_read_resume_function(__fn, __buffer)         \
   ptrauth_auth_and_resign(__fn, ptrauth_key_function_pointer, 0,               \
                           ptrauth_key_process_independent_code,                \
@@ -258,6 +298,8 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #define __ptrauth_swift_async_context_yield
 #define __ptrauth_swift_cancellation_notification_function
 #define __ptrauth_swift_escalation_notification_function
+#define __ptrauth_swift_dispatch_invoke_function
+#define __ptrauth_swift_objc_superclass
 #define __ptrauth_swift_runtime_function_entry
 #define __ptrauth_swift_runtime_function_entry_with_key(__key)
 #define __ptrauth_swift_runtime_function_entry_strip(__fn) (__fn)
@@ -285,9 +327,39 @@ static inline void swift_ptrauth_copy(T *dest, const T *src, unsigned extra) {
 #endif
 }
 
-/// Initialize the destination with an address-discriminated signed pointer.
-/// This does not authenticate the source value, so be careful about how
-/// you construct it.
+/// Copy an address-discriminated signed data pointer from the source
+/// to the destination.
+template <class T>
+SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE
+static inline void swift_ptrauth_copy_data(T *dest, const T *src,
+                                           unsigned extra) {
+#if SWIFT_PTRAUTH
+  *dest = ptrauth_auth_and_resign(*src,
+                                  ptrauth_key_process_independent_data,
+                                  ptrauth_blend_discriminator(src, extra),
+                                  ptrauth_key_process_independent_data,
+                                  ptrauth_blend_discriminator(dest, extra));
+#else
+  *dest = *src;
+#endif
+}
+
+/// Copy an address-discriminated signed pointer from the source
+/// to the destination.
+template <class T>
+SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE static inline void
+swift_ptrauth_copy_code_or_data(T *dest, const T *src, unsigned extra,
+                                bool isCode) {
+  if (isCode) {
+    return swift_ptrauth_copy(dest, src, extra);
+  } else {
+    return swift_ptrauth_copy_data(dest, src, extra);
+  }
+}
+
+/// Initialize the destination with an address-discriminated signed
+/// function pointer.  This does not authenticate the source value, so be
+/// careful about how you construct it.
 template <class T>
 SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE
 static inline void swift_ptrauth_init(T *dest, T value, unsigned extra) {
@@ -301,6 +373,35 @@ static inline void swift_ptrauth_init(T *dest, T value, unsigned extra) {
 #endif
 }
 
+/// Initialize the destination with an address-discriminated signed
+/// data pointer.  This does not authenticate the source value, so be
+/// careful about how you construct it.
+template <class T>
+SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE
+static inline void swift_ptrauth_init_data(T *dest, T value, unsigned extra) {
+  // FIXME: assert that T is not a function-pointer type?
+#if SWIFT_PTRAUTH
+  *dest = ptrauth_sign_unauthenticated(value,
+                                  ptrauth_key_process_independent_data,
+                                  ptrauth_blend_discriminator(dest, extra));
+#else
+  *dest = value;
+#endif
+}
+
+/// Initialize the destination with an address-discriminated signed
+/// pointer.  This does not authenticate the source value, so be
+/// careful about how you construct it.
+template <class T>
+SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE static inline void
+swift_ptrauth_init_code_or_data(T *dest, T value, unsigned extra, bool isCode) {
+  if (isCode) {
+    return swift_ptrauth_init(dest, value, extra);
+  } else {
+    return swift_ptrauth_init_data(dest, value, extra);
+  }
+}
+
 template <typename T>
 SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE
 static inline T swift_auth_data_non_address(T value, unsigned extra) {
@@ -308,6 +409,17 @@ static inline T swift_auth_data_non_address(T value, unsigned extra) {
   return (T)ptrauth_auth_data((void *)value,
                                ptrauth_key_process_independent_data,
                                extra);
+#else
+  return value;
+#endif
+}
+
+template <typename T>
+SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE static inline T
+swift_auth_code(T value, unsigned extra) {
+#if SWIFT_PTRAUTH
+  return (T)ptrauth_auth_function((void *)value,
+                                  ptrauth_key_process_independent_code, extra);
 #else
   return value;
 #endif

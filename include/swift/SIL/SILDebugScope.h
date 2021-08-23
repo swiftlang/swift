@@ -95,7 +95,7 @@ public:
 };
 
 /// Determine whether an instruction may not have a SILDebugScope.
-bool maybeScopeless(SILInstruction &I);
+bool maybeScopeless(const SILInstruction &inst);
 
 /// Knows how to make a deep copy of a debug scope.
 class ScopeCloner {

@@ -273,12 +273,21 @@ swift::vfs::getFileOrSTDIN(llvm::vfs::FileSystem &FS,
                            const llvm::Twine &Filename,
                            int64_t FileSize,
                            bool RequiresNullTerminator,
-                           bool IsVolatile) {
+                           bool IsVolatile,
+                           unsigned BADFRetry) {
   llvm::SmallString<256> NameBuf;
   llvm::StringRef NameRef = Filename.toStringRef(NameBuf);
 
   if (NameRef == "-")
     return llvm::MemoryBuffer::getSTDIN();
-  return FS.getBufferForFile(Filename, FileSize,
-                             RequiresNullTerminator, IsVolatile);
+  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> inputFileOrErr = nullptr;
+  for (unsigned I = 0; I != BADFRetry + 1; ++ I) {
+    inputFileOrErr = FS.getBufferForFile(Filename, FileSize,
+                                         RequiresNullTerminator, IsVolatile);
+    if (inputFileOrErr)
+      return inputFileOrErr;
+    if (inputFileOrErr.getError().value() != EBADF)
+      return inputFileOrErr;
+  }
+  return inputFileOrErr;
 }

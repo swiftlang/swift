@@ -18,6 +18,9 @@
 #ifndef SWIFT_SIL_CONSUMPTION_H
 #define SWIFT_SIL_CONSUMPTION_H
 
+#include "llvm/Support/ErrorHandling.h"
+#include <cstdint>
+
 namespace swift {
 
 /// Is an operation a "take"?  A take consumes the original value,

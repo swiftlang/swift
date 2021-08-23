@@ -89,7 +89,10 @@ public:
 
   friend class Scope;
 
-//--- Function prologue and epilogue -------------------------------------------
+  Address createErrorResultSlot(SILType errorType, bool isAsync);
+
+  //--- Function prologue and epilogue
+  //-------------------------------------------
 public:
   Explosion collectParameters();
   void emitScalarReturn(SILType returnResultType, SILType funcResultType,
@@ -100,12 +103,16 @@ public:
   void emitBBForReturn();
   bool emitBranchToReturnBB();
 
+  void emitAllExtractValues(llvm::Value *aggValue, llvm::StructType *type,
+                            Explosion &out);
+
   /// Return the error result slot to be passed to the callee, given an error
   /// type.  There's always only one error type.
   ///
   /// For async functions, this is different from the caller result slot because
   /// that is a gep into the %swift.context.
   Address getCalleeErrorResultSlot(SILType errorType);
+  Address getAsyncCalleeErrorResultSlot(SILType errorType);
 
   /// Return the error result slot provided by the caller.
   Address getCallerErrorResultSlot();
@@ -129,29 +136,47 @@ public:
   }
 
   llvm::Value *getAsyncTask();
-  llvm::Value *getAsyncExecutor();
   llvm::Value *getAsyncContext();
+  void storeCurrentAsyncContext(llvm::Value *context);
 
-  llvm::CallInst *emitSuspendAsyncCall(ArrayRef<llvm::Value *> args);
+  llvm::CallInst *emitSuspendAsyncCall(unsigned swiftAsyncContextIndex,
+                                       llvm::StructType *resultTy,
+                                       ArrayRef<llvm::Value *> args,
+                                       bool restoreCurrentContext = true);
 
-  llvm::Function *getOrCreateResumePrjFn();
+  llvm::Value *emitAsyncResumeProjectContext(llvm::Value *callerContextAddr);
+  llvm::Function *getOrCreateResumePrjFn(bool forPrologue = false);
   llvm::Function *createAsyncDispatchFn(const FunctionPointer &fnPtr,
                                         ArrayRef<llvm::Value *> args);
   llvm::Function *createAsyncDispatchFn(const FunctionPointer &fnPtr,
                                         ArrayRef<llvm::Type *> argTypes);
 
-  void emitGetAsyncContinuation(SILType silTy, StackAddress optionalResultAddr,
-                                Explosion &out);
+  void emitGetAsyncContinuation(SILType resumeTy,
+                                StackAddress optionalResultAddr,
+                                Explosion &out,
+                                bool canThrow);
 
-  void emitAwaitAsyncContinuation(SILType unsafeContinuationTy,
+  void emitAwaitAsyncContinuation(SILType resumeTy,
                                   bool isIndirectResult,
                                   Explosion &outDirectResult,
                                   llvm::BasicBlock *&normalBB,
                                   llvm::PHINode *&optionalErrorPhi,
                                   llvm::BasicBlock *&optionalErrorBB);
 
+  void emitResumeAsyncContinuationReturning(llvm::Value *continuation,
+                                            llvm::Value *srcPtr,
+                                            SILType valueTy,
+                                            bool throwing);
+
+  void emitResumeAsyncContinuationThrowing(llvm::Value *continuation,
+                                           llvm::Value *error);
+
   FunctionPointer
   getFunctionPointerForResumeIntrinsic(llvm::Value *resumeIntrinsic);
+
+  void emitSuspensionPoint(Explosion &executor, llvm::Value *asyncResume);
+  llvm::Function *getOrCreateResumeFromSuspensionFn();
+  llvm::Function *createAsyncSuspendFn();
 
 private:
   void emitPrologue();
@@ -160,13 +185,12 @@ private:
   Address ReturnSlot;
   llvm::BasicBlock *ReturnBB;
   llvm::Value *CalleeErrorResultSlot = nullptr;
+  llvm::Value *AsyncCalleeErrorResultSlot = nullptr;
   llvm::Value *CallerErrorResultSlot = nullptr;
   llvm::Value *CoroutineHandle = nullptr;
   llvm::Value *AsyncCoroutineCurrentResume = nullptr;
   llvm::Value *AsyncCoroutineCurrentContinuationContext = nullptr;
 
-  Address asyncTaskLocation;
-  Address asyncExecutorLocation;
   Address asyncContextLocation;
 
   /// The unique block that calls @llvm.coro.end.
@@ -187,8 +211,8 @@ public:
     return getEffectiveOptimizationMode() == OptimizationMode::ForSize;
   }
 
-  void setupAsync();
-  bool isAsync() const { return asyncTaskLocation.isValid(); }
+  void setupAsync(unsigned asyncContextIndex);
+  bool isAsync() const { return asyncContextLocation.isValid(); }
 
   Address createAlloca(llvm::Type *ty, Alignment align,
                        const llvm::Twine &name = "");
@@ -340,8 +364,20 @@ public:
 private:
   llvm::Instruction *AllocaIP;
   const SILDebugScope *DbgScope;
+  /// The insertion point where we should but instructions we would normally put
+  /// at the beginning of the function. LLVM's coroutine lowering really does
+  /// not like it if we put instructions with side-effectrs before the
+  /// coro.begin.
+  llvm::Instruction *EarliestIP;
 
-//--- Reference-counting methods -----------------------------------------------
+public:
+  void setEarliestInsertionPoint(llvm::Instruction *inst) { EarliestIP = inst; }
+  /// Returns the first insertion point before which we should insert
+  /// instructions which have side-effects.
+  llvm::Instruction *getEarliestInsertionPoint() const { return EarliestIP; }
+
+  //--- Reference-counting methods
+  //-----------------------------------------------
 public:
   // Returns the default atomicity of the module.
   Atomicity getDefaultAtomicity();

@@ -16,6 +16,8 @@
 
 #define DEBUG_TYPE "silgen-cleanup"
 
+#include "swift/Basic/Defer.h"
+#include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeInstruction.h"
@@ -28,7 +30,8 @@ struct SILGenCanonicalize final : CanonicalizeInstruction {
   bool changed = false;
   llvm::SmallPtrSet<SILInstruction *, 16> deadOperands;
 
-  SILGenCanonicalize() : CanonicalizeInstruction(DEBUG_TYPE) {}
+  SILGenCanonicalize(DeadEndBlocks &deadEndBlocks)
+      : CanonicalizeInstruction(DEBUG_TYPE, deadEndBlocks) {}
 
   void notifyNewInstruction(SILInstruction *) override { changed = true; }
 
@@ -46,18 +49,33 @@ struct SILGenCanonicalize final : CanonicalizeInstruction {
 
   void notifyHasNewUsers(SILValue) override { changed = true; }
 
-  SILBasicBlock::iterator deleteDeadOperands(SILBasicBlock::iterator nextII) {
-    // Delete trivially dead instructions in non-determistic order.
+  /// Delete trivially dead instructions in non-determistic order.
+  ///
+  /// We either have that nextII is endII or if nextII is not endII then endII
+  /// is nextII->getParent()->end().
+  SILBasicBlock::iterator deleteDeadOperands(SILBasicBlock::iterator nextII,
+                                             SILBasicBlock::iterator endII) {
+    auto callbacks = InstModCallbacks().onDelete([&](SILInstruction *deadInst) {
+      LLVM_DEBUG(llvm::dbgs() << "Trivially dead: " << *deadInst);
+
+      // If nextII is the instruction we are going to delete, move nextII past
+      // it.
+      if (deadInst->getIterator() == nextII)
+        ++nextII;
+
+      // Then remove the instruction from the set and delete it.
+      deadOperands.erase(deadInst);
+      deadInst->eraseFromParent();
+    });
+
     while (!deadOperands.empty()) {
       SILInstruction *deadOperInst = *deadOperands.begin();
+
       // Make sure at least the first instruction is removed from the set.
       deadOperands.erase(deadOperInst);
-      eliminateDeadInstruction(deadOperInst, [&](SILInstruction *deadInst) {
-        LLVM_DEBUG(llvm::dbgs() << "Trivially dead: " << *deadInst);
-        if (nextII == deadInst->getIterator())
-          ++nextII;
-        deadOperands.erase(deadInst);
-      });
+
+      // Then delete this instruction/everything else that we can.
+      eliminateDeadInstruction(deadOperInst, callbacks);
     }
     return nextII;
   }
@@ -86,7 +104,8 @@ void SILGenCleanup::run() {
     LLVM_DEBUG(llvm::dbgs()
                << "\nRunning SILGenCleanup on " << function.getName() << "\n");
 
-    SILGenCanonicalize sgCanonicalize;
+    DeadEndBlocks deadEndBlocks(&function);
+    SILGenCanonicalize sgCanonicalize(deadEndBlocks);
 
     // Iterate over all blocks even if they aren't reachable. No phi-less
     // dataflow cycles should have been created yet, and these transformations
@@ -94,7 +113,7 @@ void SILGenCleanup::run() {
     for (auto &bb : function) {
       for (auto ii = bb.begin(), ie = bb.end(); ii != ie;) {
         ii = sgCanonicalize.canonicalize(&*ii);
-        ii = sgCanonicalize.deleteDeadOperands(ii);
+        ii = sgCanonicalize.deleteDeadOperands(ii, ie);
       }
     }
     if (sgCanonicalize.changed) {

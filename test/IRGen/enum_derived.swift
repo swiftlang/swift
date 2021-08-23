@@ -22,15 +22,6 @@ enum E {
 // CHECK: %2 = icmp eq i8 %0, %1
 // CHECK: ret i1 %2
 
-// Check for the presence of the hashValue getter, calling Hasher.init() and
-// Hasher.finalize().
-
-// CHECK-NORMAL-LABEL:define hidden swiftcc i{{.*}} @"$s12enum_derived1EO9hashValueSivg"(i8 %0)
-// CHECK-TESTABLE-LABEL:define{{( dllexport)?}}{{( protected)?}} swiftcc i{{.*}} @"$s12enum_derived1EO9hashValueSivg"(i8 %0)
-// CHECK: call swiftcc void @"$ss6HasherV5_seedABSi_tcfC"(%Ts6HasherV* {{.*}})
-// CHECK: call swiftcc i{{[0-9]+}} @"$ss6HasherV9_finalizeSiyF"(%Ts6HasherV* {{.*}})
-// CHECK: ret i{{[0-9]+}} %{{[0-9]+}}
-
 // Check if the hash(into:) method can be compiled to a simple zext instruction
 // followed by a call to Hasher._combine(_:).
 
@@ -39,6 +30,15 @@ enum E {
 // CHECK: [[V:%.*]] = zext i8 %1 to i{{.*}}
 // CHECK: tail call swiftcc void @"$ss6HasherV8_combineyySuF"(i{{.*}} [[V]], %Ts6HasherV*
 // CHECK: ret void
+
+// Check for the presence of the hashValue getter, calling Hasher.init() and
+// Hasher.finalize().
+
+// CHECK-NORMAL-LABEL:define hidden swiftcc i{{.*}} @"$s12enum_derived1EO9hashValueSivg"(i8 %0)
+// CHECK-TESTABLE-LABEL:define{{( dllexport)?}}{{( protected)?}} swiftcc i{{.*}} @"$s12enum_derived1EO9hashValueSivg"(i8 %0)
+// CHECK: call swiftcc void @"$ss6HasherV5_seedABSi_tcfC"(%Ts6HasherV* {{.*}})
+// CHECK: call swiftcc i{{[0-9]+}} @"$ss6HasherV9_finalizeSiyF"(%Ts6HasherV* {{.*}})
+// CHECK: ret i{{[0-9]+}} %{{[0-9]+}}
 
 // Derived conformances from extensions
 // The actual enums are in Inputs/def_enum.swift

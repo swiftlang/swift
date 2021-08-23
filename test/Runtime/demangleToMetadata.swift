@@ -1,13 +1,15 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-stdlib %s -module-name main -o %t/a.out
+// RUN: %target-build-swift -Xfrontend -disable-availability-checking -parse-stdlib %s -module-name main -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 import Swift
 import StdlibUnittest
+import _Concurrency
 
 let DemangleToMetadataTests = TestSuite("DemangleToMetadata")
 
@@ -45,12 +47,21 @@ func f1_variadic(x: ()...) { }
 func f1_inout(x: inout ()) { }
 func f1_shared(x: __shared AnyObject) { }
 func f1_owned(x: __owned AnyObject) { }
-
+func f1_takes_concurrent(_: @Sendable () -> Void) { }
 func f2_variadic_inout(x: ()..., y: inout ()) { }
 
 func f1_escaping(_: @escaping (Int) -> Float) { }
 func f1_autoclosure(_: @autoclosure () -> Float) { }
 func f1_escaping_autoclosure(_: @autoclosure @escaping () -> Float) { }
+func f1_mainactor(_: @MainActor () -> Float) { }
+
+func globalActorMetatypeFn<T>(_: T.Type) -> Any.Type {
+  typealias Fn = @MainActor () -> T
+  return Fn.self
+}
+
+@available(SwiftStdlib 5.5, *)
+func f1_actor(_: (isolated Actor) -> Void) { }
 
 DemangleToMetadataTests.test("function types") {
   // Conventions
@@ -62,7 +73,7 @@ DemangleToMetadataTests.test("function types") {
 #endif
 
   // Async functions
-  expectEqual(type(of: f0_async), _typeByName("yyYc")!)
+  expectEqual(type(of: f0_async), _typeByName("yyYac")!)
 
   // Throwing functions
   expectEqual(type(of: f0_throws), _typeByName("yyKc")!)
@@ -81,6 +92,9 @@ DemangleToMetadataTests.test("function types") {
   expectEqual(type(of: f1_shared), _typeByName("yyyXlhc")!)
   expectEqual(type(of: f1_owned), _typeByName("yyyXlnc")!)
 
+  // Concurrent function types.
+  expectEqual(type(of: f1_takes_concurrent), _typeByName("yyyyYbXEc")!)
+
   // Mix-and-match.
   expectEqual(type(of: f2_variadic_inout), _typeByName("yyytd_ytztc")!)
 
@@ -94,6 +108,22 @@ DemangleToMetadataTests.test("function types") {
   // Autoclosure
   expectEqual(type(of: f1_autoclosure), _typeByName("ySfyXKc")!)
   expectEqual(type(of: f1_escaping_autoclosure), _typeByName("ySfyXAc")!)
+
+  // MainActor
+  expectEqual(type(of: f1_mainactor), _typeByName("ySfyScMYcXEc")!)
+  expectEqual(
+    "(@MainActor () -> Float) -> ()",
+    String(describing: _typeByName("ySfyScMYcXEc")!))
+  typealias MainActorFn = @MainActor () -> Float
+  expectEqual(MainActorFn.self, _typeByName("SfyScMYcc")!)
+  expectEqual(MainActorFn.self, globalActorMetatypeFn(Float.self))
+
+  // isolated parameters
+  if #available(SwiftStdlib 5.5, *) {
+    expectEqual(type(of: f1_actor), _typeByName("yyScA_pYiXEc")!)
+    typealias IsolatedFn = ((isolated Actor) -> Void) -> Void
+    expectEqual(IsolatedFn.self, type(of: f1_actor))
+  }
 }
 
 DemangleToMetadataTests.test("metatype types") {
@@ -241,6 +271,11 @@ DemangleToMetadataTests.test("demangle built-in types") {
   expectEqual(Builtin.FPIEEE64.self, _typeByName("Bf64_")!)
 
   expectEqual(Builtin.Vec4xFPIEEE32.self, _typeByName("Bf32_Bv4_")!)
+
+  expectEqual(Builtin.RawUnsafeContinuation.self, _typeByName("Bc")!)
+  expectEqual(Builtin.Executor.self, _typeByName("Be")!)
+  expectNotNil(_typeByName("BD"))
+  expectEqual(Builtin.Job.self, _typeByName("Bj")!)
 }
 
 class CG4<T: P1, U: P2> {
@@ -480,6 +515,11 @@ if #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
   }
 }
 
+if #available(SwiftStdlib 5.5, *) {
+  DemangleToMetadataTests.test("Concurrency standard substitutions") {
+    expectEqual(TaskGroup<Int>.self, _typeByName("ScGySiG")!)
+  }
+}
 
 runAllTests()
 

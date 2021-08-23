@@ -267,6 +267,8 @@ ClassMetadataLayout::ClassMetadataLayout(IRGenModule &IGM, ClassDecl *decl)
 
     ClassMetadataLayout &Layout;
 
+    bool IsInTargetFields = false;
+
     Scanner(IRGenModule &IGM, ClassDecl *decl, ClassMetadataLayout &layout)
       : super(IGM, decl), Layout(layout) {}
 
@@ -347,17 +349,35 @@ ClassMetadataLayout::ClassMetadataLayout(IRGenModule &IGM, ClassDecl *decl)
     }
 
     void noteStartOfFieldOffsets(ClassDecl *forClass) {
-      if (forClass == Target)
+      if (forClass == Target) {
+        assert(!IsInTargetFields);
+        IsInTargetFields = true;
         Layout.FieldOffsetVector = getNextOffset();
+      }
       super::noteStartOfFieldOffsets(forClass);
     }
 
+    void noteEndOfFieldOffsets(ClassDecl *forClass) {
+      assert(IsInTargetFields == (forClass == Target));
+      if (IsInTargetFields)
+        IsInTargetFields = false;
+      super::noteEndOfFieldOffsets(forClass);
+    }
+
     void addFieldOffset(VarDecl *field) {
-      if (field->getDeclContext() == Target) {
+      assert(IsInTargetFields == (field->getDeclContext() == Target));
+      if (IsInTargetFields) {
         ++Layout.NumImmediateMembers;
         Layout.FieldOffsets.try_emplace(field, getNextOffset());
       }
       super::addFieldOffset(field);
+    }
+
+    void addDefaultActorStorageFieldOffset() {
+      if (IsInTargetFields) {
+        ++Layout.NumImmediateMembers;
+      }
+      super::addDefaultActorStorageFieldOffset();
     }
 
     void addFieldOffsetPlaceholders(MissingMemberDecl *placeholder) {

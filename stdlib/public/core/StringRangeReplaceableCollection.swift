@@ -31,7 +31,7 @@ extension String: RangeReplaceableCollection {
     self.init(repeating: repeatedValue._str, count: count)
   }
 
-  // This initializer disambiguates between the following intitializers, now
+  // This initializer disambiguates between the following initializers, now
   // that String conforms to Collection:
   // - init<T>(_ value: T) where T: LosslessStringConvertible
   // - init<S>(_ characters: S) where S: Sequence, S.Element == Character

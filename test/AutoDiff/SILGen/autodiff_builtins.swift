@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-stdlib -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -parse-stdlib -emit-silgen %s -requirement-machine=off | %FileCheck %s
 
 import _Differentiation
 import Swift
@@ -83,75 +83,6 @@ func applyDerivative_f1_vjp<T: AdditiveArithmetic & Differentiable>(t0: T) -> (T
 // CHECK: [[PULLBACK:%.*]] = load [take] [[D_RESULT_BUFFER_1_FOR_LOAD]]
 // CHECK: copy_addr [take] [[D_RESULT_BUFFER_0_FOR_LOAD]] to [initialization] [[ORIG_RESULT_OUT_PARAM]]
 // CHECK: return [[PULLBACK]]
-
-// MARK: - applyTranspose
-
-@_silgen_name("applyTranspose_f_direct_arity1")
-func applyTranspose_f_direct_arity1(_ x: Float) -> Float {
-  return Builtin.applyTranspose_arity1(f_direct_arity1, x)
-}
-// CHECK-LABEL: sil{{.*}}@applyTranspose_f_direct_arity1
-// CHECK: bb0([[X:%.*]] : $Float):
-// CHECK:   [[ORIG:%.*]] = function_ref @f_direct_arity1 : $@convention(thin) (Float) -> Float
-// CHECK:   [[THICK_ORIG:%.*]] = thin_to_thick_function [[ORIG]] : $@convention(thin) (Float) -> Float to $@callee_guaranteed (Float) -> Float
-// CHECK:   [[LINEAR:%.*]] = linear_function [parameters 0] [[THICK_ORIG]] : $@callee_guaranteed (Float) -> Float
-// CHECK:   [[NOESC_LINEAR:%.*]] = convert_escape_to_noescape [not_guaranteed] [[LINEAR]] : $@differentiable(linear) @callee_guaranteed (Float) -> Float to $@differentiable(linear) @noescape @callee_guaranteed (Float) -> Float
-// CHECK:   [[TRANS:%.*]] = linear_function_extract [transpose] [[NOESC_LINEAR]] : $@differentiable(linear) @noescape @callee_guaranteed (Float) -> Float
-// CHECK:   [[RESULT:%.*]] = apply [[TRANS]]([[X]]) : $@noescape @callee_guaranteed (Float) -> Float
-// CHECK:   return [[RESULT]] : $Float
-// CHECK: } // end sil function 'applyTranspose_f_direct_arity1'
-
-@_silgen_name("applyTranspose_f_direct_arity2")
-func applyTranspose_f_direct_arity2(_ x: Float) -> (Float, Float) {
-  return Builtin.applyTranspose_arity2(f_direct_arity2, x)
-}
-
-// CHECK-LABEL: sil{{.*}}@applyTranspose_f_direct_arity2 :
-// CHECK: bb0([[X:%.*]] : $Float)
-// CHECK:   [[ORIG:%.*]] = function_ref @f_direct_arity2 : $@convention(thin) (Float, Float) -> Float
-// CHECK:   [[THICK_ORIG:%.*]] = thin_to_thick_function [[ORIG]] : $@convention(thin) (Float, Float) -> Float to $@callee_guaranteed (Float, Float) -> Float
-// CHECK:   [[LINEAR:%.*]] = linear_function [parameters 0 1] [[THICK_ORIG]] : $@callee_guaranteed (Float, Float) -> Float
-// CHECK:   [[NOESC_LINEAR:%.*]] = convert_escape_to_noescape [not_guaranteed] [[LINEAR]] : $@differentiable(linear) @callee_guaranteed (Float, Float) -> Float to $@differentiable(linear) @noescape @callee_guaranteed (Float, Float) -> Float
-// CHECK:   [[TRANS:%.*]] = linear_function_extract [transpose] [[NOESC_LINEAR]] : $@differentiable(linear) @noescape @callee_guaranteed (Float, Float) -> Float
-// CHECK:   [[RESULT:%.*]] = apply [[TRANS]]([[X]]) : $@noescape @callee_guaranteed (Float) -> (Float, Float)
-// CHECK:   ([[RES1:%.*]], [[RES2:%.*]]) = destructure_tuple [[RESULT]] : $(Float, Float)
-// CHECK:   [[RESULT:%.*]] = tuple ([[RES1]] : $Float, [[RES2]] : $Float)
-// CHECK:   return [[RESULT]] : $(Float, Float)
-// CHECK: } // end sil function 'applyTranspose_f_direct_arity2'
-
-@_silgen_name("applyTranspose_f_indirect_arity1")
-func applyTranspose_f_indirect_arity1<T: AdditiveArithmetic & Differentiable>(_ x: T) -> T {
-  return Builtin.applyTranspose_arity1(f_indirect_arity1, x)
-}
-// CHECK-LABEL: sil{{.*}}@applyTranspose_f_indirect_arity1
-// CHECK: bb0([[OUT_PARAM:%.*]] : $*T, [[X:%.*]] : $*T):
-// CHECK: [[RESULT:%.*]] = apply [[TRANSPOSE:%.*]]([[OUT_PARAM]], [[X]])
-
-// MARK: - differentiableFunction
-
-@_silgen_name("differentiableFunction_f_direct_arity1")
-func differentiableFunction_f_direct_arity1() -> @differentiable (Float) -> Float {
-  return Builtin.differentiableFunction_arity1(f_direct_arity1, f_direct_arity1_jvp, f_direct_arity1_vjp)
-}
-// CHECK-LABEL: sil{{.*}}@differentiableFunction_f_direct_arity1
-// CHECK: [[DIFF_FN:%.*]] = differentiable_function
-// CHECK: return [[DIFF_FN]]
-
-// MARK: - linearFunction
-// TODO(TF-1142): Add linear_funcion to this test when it exists.
-
-@_silgen_name("linearFunction_f_direct_arity1")
-func linearFunction_f_direct_arity1() -> @differentiable(linear) (Float) -> Float {
-  return Builtin.linearFunction_arity1(f_direct_arity1, f_direct_arity1)
-}
-// CHECK-LABEL: sil{{.*}}@linearFunction_f_direct_arity1
-// CHECK: bb0:
-// CHECK:   [[ORIG1:%.*]] = function_ref @f_direct_arity1 : $@convention(thin) (Float) -> Float
-// CHECK:   [[THICK_ORIG1:%.*]] = thin_to_thick_function [[ORIG1]] : $@convention(thin) (Float) -> Float to $@callee_guaranteed (Float) -> Float
-// CHECK:   [[ORIG2:%.*]] = function_ref @f_direct_arity1 : $@convention(thin) (Float) -> Float
-// CHECK:   [[THICK_ORIG2:%.*]] = thin_to_thick_function [[ORIG2]] : $@convention(thin) (Float) -> Float to $@callee_guaranteed (Float) -> Float
-// CHECK:   [[LINEAR:%.*]] = linear_function [parameters 0] [[THICK_ORIG1]] : $@callee_guaranteed (Float) -> Float with_transpose [[THICK_ORIG2]] : $@callee_guaranteed (Float) -> Float
-// CHECK:   return [[LINEAR]] : $@differentiable(linear) @callee_guaranteed (Float) -> Float
 
 struct ExamplePullbackStruct<T: Differentiable> {
   var pb0: (T.TangentVector) -> T.TangentVector

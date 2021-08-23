@@ -73,22 +73,6 @@ bool syntax::isCommentTriviaKind(TriviaKind Kind) {
   llvm_unreachable("unknown kind");
 }
 
-void TriviaPiece::accumulateAbsolutePosition(AbsolutePosition &Pos) const {
-  switch (Kind) {
-% for trivia in TRIVIAS:
-  case TriviaKind::${trivia.name}:
-% if not trivia.is_collection():
-    Pos.addText(Text.str());
-% elif trivia.is_new_line:
-    Pos.addNewlines(Count, ${trivia.characters_len()});
-% else:
-    Pos.addColumns(Count);
-% end
-  break;
-% end
-  }
-}
-
 bool TriviaPiece::trySquash(const TriviaPiece &Next) {
   if (Kind != Next.Kind) { return false; }
   switch (Kind) {

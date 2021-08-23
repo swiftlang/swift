@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "sil-aa"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
+#include "swift/SIL/SILBridgingUtils.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
@@ -27,14 +28,9 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
+#include "swift/SILOptimizer/OptimizerBridging.h"
 
 using namespace swift;
-
-
-// The AliasAnalysis Cache must not grow beyond this size.
-// We limit the size of the AA cache to 2**14 because we want to limit the
-// memory usage of this cache.
-static const int AliasAnalysisMaxCacheSize = 16384;
 
 
 //===----------------------------------------------------------------------===//
@@ -546,21 +542,13 @@ bool AliasAnalysis::typesMayAlias(SILType T1, SILType T2,
 /// to disambiguate the two values.
 AliasResult AliasAnalysis::alias(SILValue V1, SILValue V2,
                                  SILType TBAAType1, SILType TBAAType2) {
-  AliasKeyTy Key = toAliasKey(V1, V2, TBAAType1, TBAAType2);
+  AliasCacheKey Key = {V1, V2, TBAAType1.getOpaqueValue(),
+                       TBAAType2.getOpaqueValue()};
 
   // Check if we've already computed this result.
   auto It = AliasCache.find(Key);
   if (It != AliasCache.end()) {
     return It->second;
-  }
-
-  // Flush the cache if the size of the cache is too large.
-  if (AliasCache.size() > AliasAnalysisMaxCacheSize) {
-    AliasCache.clear();
-    AliasValueBaseToIndex.clear();
-
-    // Key is no longer valid as we cleared the AliasValueBaseToIndex.
-    Key = toAliasKey(V1, V2, TBAAType1, TBAAType2);
   }
 
   // Calculate the aliasing result and store it in the cache.
@@ -706,8 +694,18 @@ bool AliasAnalysis::canApplyDecrementRefCount(FullApplySite FAS, SILValue Ptr) {
     if (ArgEffect.mayRelease()) {
       // The function may release this argument, so check if the pointer can
       // escape to it.
-      if (EA->mayReleaseContent(FAS.getArgument(Idx), Ptr))
-        return true;
+      auto arg = FAS.getArgument(Idx);
+      if (arg->getType().isAddress()) {
+        // Handle indirect argument as if they are a release to any references
+        // pointed to by the argument's address.
+        if (EA->mayReleaseAddressContent(arg, Ptr))
+          return true;
+      } else {
+        // Handle direct arguments as if they are a direct release of the
+        // reference (just like a destroy_value).
+        if (EA->mayReleaseReferenceContent(arg, Ptr))
+          return true;
+      }
     }
   }
   return false;
@@ -723,12 +721,18 @@ bool AliasAnalysis::canBuiltinDecrementRefCount(BuiltinInst *BI, SILValue Ptr) {
       continue;
 
     // A builtin can only release an object if it can escape to one of the
-    // builtin's arguments. 'EscapeAnalysis::mayReleaseContent()' expects 'Arg'
-    // to be an owned reference and disallows addresses. Conservatively handle
-    // address type arguments as and conservatively treat all other values
-    // potential owned references.
-    if (Arg->getType().isAddress() || EA->mayReleaseContent(Arg, Ptr))
-      return true;
+    // builtin's arguments.
+    if (Arg->getType().isAddress()) {
+      // Handle indirect argument as if they are a release to any references
+      // pointed to by the argument's address.
+      if (EA->mayReleaseAddressContent(Arg, Ptr))
+        return true;
+    } else {
+      // Handle direct arguments as if they are a direct release of the
+      // reference (just like a destroy_value).
+      if (EA->mayReleaseReferenceContent(Arg, Ptr))
+        return true;
+    }
   }
   return false;
 }
@@ -771,27 +775,54 @@ bool AliasAnalysis::mayValueReleaseInterfereWithInstruction(
   // accessedPointer. Access to any objects beyond the first released refcounted
   // object are irrelevant--they must already have sufficient refcount that they
   // won't be released when releasing Ptr.
-  return EA->mayReleaseContent(releasedReference, accessedPointer);
+  return EA->mayReleaseReferenceContent(releasedReference, accessedPointer);
 }
 
-void AliasAnalysis::initialize(SILPassManager *PM) {
-  SEA = PM->getAnalysis<SideEffectAnalysis>();
-  EA = PM->getAnalysis<EscapeAnalysis>();
-}
+namespace {
+
+class AliasAnalysisContainer : public FunctionAnalysisBase<AliasAnalysis> {
+  SideEffectAnalysis *SEA = nullptr;
+  EscapeAnalysis *EA = nullptr;
+
+public:
+  AliasAnalysisContainer() : FunctionAnalysisBase(SILAnalysisKind::Alias) {}
+
+  virtual bool shouldInvalidate(SILAnalysis::InvalidationKind K) override {
+    return K & InvalidationKind::Instructions;
+  }
+
+  // Computes loop information for the given function using dominance
+  // information.
+  virtual std::unique_ptr<AliasAnalysis>
+  newFunctionAnalysis(SILFunction *F) override {
+    assert(EA && SEA && "dependent analysis not initialized");
+    return std::make_unique<AliasAnalysis>(SEA, EA);
+  }
+
+  virtual void initialize(SILPassManager *PM) override {
+    SEA = PM->getAnalysis<SideEffectAnalysis>();
+    EA = PM->getAnalysis<EscapeAnalysis>();
+  }
+};
+
+} // end anonymous namespace
 
 SILAnalysis *swift::createAliasAnalysis(SILModule *M) {
-  return new AliasAnalysis(M);
+  return new AliasAnalysisContainer();
 }
 
-AliasKeyTy AliasAnalysis::toAliasKey(SILValue V1, SILValue V2,
-                                     SILType Type1, SILType Type2) {
-  size_t idx1 = AliasValueBaseToIndex.getIndex(V1);
-  assert(idx1 != std::numeric_limits<size_t>::max() &&
-         "~0 index reserved for empty/tombstone keys");
-  size_t idx2 = AliasValueBaseToIndex.getIndex(V2);
-  assert(idx2 != std::numeric_limits<size_t>::max() &&
-         "~0 index reserved for empty/tombstone keys");
-  void *t1 = Type1.getOpaqueValue();
-  void *t2 = Type2.getOpaqueValue();
-  return {idx1, idx2, t1, t2};
+//===----------------------------------------------------------------------===//
+//                            Swift Bridging
+//===----------------------------------------------------------------------===//
+
+inline AliasAnalysis *castToAliasAnalysis(BridgedAliasAnalysis aa) {
+  return  const_cast<AliasAnalysis *>(
+    static_cast<const AliasAnalysis *>(aa.aliasAnalysis));
+}
+
+BridgedMemoryBehavior AliasAnalysis_getMemBehavior(BridgedAliasAnalysis aa,
+                                                   BridgedInstruction inst,
+                                                   BridgedValue addr) {
+  return (BridgedMemoryBehavior)castToAliasAnalysis(aa)->
+    computeMemoryBehavior(castToInst(inst), castToSILValue(addr));
 }

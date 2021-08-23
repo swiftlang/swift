@@ -5,6 +5,7 @@ sil_stage raw
 import Builtin
 
 sil @use_native_object : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+sil @use_native_object_inguaranteed : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
 sil @use_int32 : $@convention(thin) (Builtin.Int32) -> ()
 
 enum Either<T, R> {
@@ -357,4 +358,24 @@ sil [ossa] @lower_unchecked_value_cast_to_unchecked_bitwise_cast : $@convention(
 bb0(%0a : $PairOfInt):
   %0b = unchecked_value_cast %0a : $PairOfInt to $Builtin.Int64
   return %0b : $Builtin.Int64
+}
+
+// Make sure we RAUW the store_borrow's result with its dest while lowering.
+//
+// CHECK-LABEL: sil @lower_store_borrow_result_correctly : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK:   [[STACK:%.*]] = alloc_stack
+// CHECK:   store [[ARG]] to [[STACK]]
+// CHECK:   apply {{%.*}}([[STACK]])
+// CHECK: } // end sil function 'lower_store_borrow_result_correctly'
+sil [ossa] @lower_store_borrow_result_correctly : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : @guaranteed $Builtin.NativeObject):
+  // This is materializing %0 into memory to be passed as an in_guaranteed arg.
+  %1 = alloc_stack $Builtin.NativeObject
+  %result = store_borrow %0 to %1 : $*Builtin.NativeObject
+  %f = function_ref @use_native_object_inguaranteed : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
+  apply %f(%result) : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
+  dealloc_stack %1 : $*Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
 }

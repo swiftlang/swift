@@ -139,10 +139,17 @@ module WinSDK [system] {
     }
   }
 
+  module ActiveX {
+    header "OCIdl.h"
+    export *
+  }
+
   module Controls {
     module CommCtrl {
       header "CommCtrl.h"
       export *
+
+      link "ComCtl32.Lib"
     }
 
     module CommDlg {
@@ -151,6 +158,67 @@ module WinSDK [system] {
 
       link "ComDlg32.Lib"
     }
+  }
+
+  explicit module DirectX {
+    module Direct3D11 {
+      header "d3d11.h"
+      header "d3d11_1.h"
+      header "d3d11_2.h"
+      header "d3d11_3.h"
+      header "d3d11_4.h"
+      export *
+
+      link "d3d11.lib"
+      link "dxgi.lib"
+    }
+
+    module Direct3D12 {
+      header "d3d12.h"
+      export *
+
+      link "d3d12.lib"
+      link "dxgi.lib"
+    }
+
+    // FIXME(compnerd) DXGI is part of the Direct3D interfaces currently; we
+    // should split it out, but because it is part of the D3D11 interfaces, this
+    // separate module is meant to augment the uncovered portions only.
+    module _DXGI {
+      header "../shared/dxgi1_6.h"
+      header "dxgidebug.h"
+      export *
+
+      link "dxgi.lib"
+    }
+
+    module D3DCompiler {
+      header "d3dcompiler.h"
+      export *
+
+      link "d3dcompiler.lib"
+    }
+
+    module XAudio29 {
+      header "xaudio2.h"
+      header "xaudio2fx.h"
+      export *
+
+      link "xaudio2.lib"
+
+      requires cplusplus
+    }
+
+    // XInput 1.4 (Windows 10, XBox) is newer than the XInput 9.1.0 which was
+    // part of Vista.
+    module XInput14 {
+      header "Xinput.h"
+      export *
+
+      link "xinput.lib"
+    }
+
+    link "dxguid.lib"
   }
 
   // FIXME(compnerd) this is a hack for the HWND typedef for DbgHelp
@@ -343,9 +411,19 @@ module WinSDK [system] {
     link "sensorsapi.lib"
   }
 
+  module UI {
+    module XAML {
+      module Hosting {
+        header "windows.ui.xaml.hosting.desktopwindowxamlsource.h"
+        export *
+      }
+    }
+  }
+
   module User {
     header "WinUser.h"
     export *
+    link "User32.Lib"
   }
 
   module WIC {
@@ -399,6 +477,20 @@ module WinSDK [system] {
     export *
 
     link "AdvAPI32.Lib"
+  }
+
+  module WinSafer {
+    header "winsafer.h"
+    export *
+
+    link "AdvAPI32.Lib"
+  }
+  
+  module WinUSB {
+    header "winusb.h"
+    export *
+    
+    link "winusb.lib"
   }
 
   // TODO(compnerd) does it make sense to implicitly export this API surface?

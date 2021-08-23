@@ -19,6 +19,7 @@
 #ifndef SWIFT_DECLCONTEXT_H
 #define SWIFT_DECLCONTEXT_H
 
+#include "swift/AST/ASTAllocated.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/LookupKinds.h"
 #include "swift/AST/ResilienceExpansion.h"
@@ -159,6 +160,9 @@ enum class ConformanceLookupKind : unsigned {
   OnlyExplicit,
   /// All conformances except for inherited ones.
   NonInherited,
+  /// All conformances except structurally-derived conformances, of which
+  /// Sendable is the only one.
+  NonStructural,
 };
 
 /// Describes a diagnostic for a conflict between two protocol
@@ -218,7 +222,8 @@ struct FragileFunctionKind {
 /// and therefore can safely access trailing memory. If you need to create a
 /// macro context, please see GenericContext for how to minimize new entries in
 /// the ASTHierarchy enum below.
-class alignas(1 << DeclContextAlignInBits) DeclContext {
+class alignas(1 << DeclContextAlignInBits) DeclContext
+    : public ASTAllocated<DeclContext> {
   enum class ASTHierarchy : unsigned {
     Decl,
     Expr,
@@ -615,16 +620,16 @@ public:
   /// is also included.
   unsigned getSemanticDepth() const;
 
+  /// Returns if this extension is always available on the current deployment
+  /// target. Used for conformance lookup disambiguation.
+  bool isAlwaysAvailableConformanceContext() const;
+
   /// \returns true if traversal was aborted, false otherwise.
   bool walkContext(ASTWalker &Walker);
 
   SWIFT_DEBUG_DUMPER(dumpContext());
   unsigned printContext(llvm::raw_ostream &OS, unsigned indent = 0,
                         bool onlyAPartialLine = false) const;
-
-  // Only allow allocation of DeclContext using the allocator in ASTContext.
-  void *operator new(size_t Bytes, ASTContext &C,
-                     unsigned Alignment = alignof(DeclContext));
   
   // Some Decls are DeclContexts, but not all. See swift/AST/Decl.h
   static bool classof(const Decl *D);
@@ -734,6 +739,8 @@ class IterableDeclContext {
 
   static IterableDeclContext *castDeclToIterableDeclContext(const Decl *D);
 
+  friend class LookupAllConformancesInContextRequest;
+
   /// Retrieve the \c ASTContext in which this iterable context occurs.
   ASTContext &getASTContext() const;
 
@@ -778,10 +785,17 @@ public:
   /// the implementation.
   ArrayRef<Decl *> getParsedMembers() const;
 
-  /// Get all the members that are semantically within this context,
-  /// including any implicitly-synthesized members.
+  /// Get all of the members within this context that can affect ABI, including
+  /// any implicitly-synthesized members.
+  ///
   /// The resulting list of members will be stable across translation units.
-  ArrayRef<Decl *> getSemanticMembers() const;
+  ArrayRef<Decl *> getABIMembers() const;
+
+  /// Get all of the members within this context, including any
+  /// implicitly-synthesized members.
+  ///
+  /// The resulting list of members will be stable across translation units.
+  ArrayRef<Decl *> getAllMembers() const;
 
   /// Retrieve the set of members in this context without loading any from the
   /// associated lazy loader; this should only be used as part of implementing

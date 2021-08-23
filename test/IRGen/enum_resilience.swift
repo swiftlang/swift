@@ -88,7 +88,7 @@ enum InternalEither {
   case Right(ReferenceFast)
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s15enum_resilience25functionWithResilientEnumy010resilient_A06MediumOAEF"(%swift.opaque* noalias nocapture sret %0, %swift.opaque* noalias nocapture %1)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s15enum_resilience25functionWithResilientEnumy010resilient_A06MediumOAEF"(%swift.opaque* noalias nocapture sret({{.*}}) %0, %swift.opaque* noalias nocapture %1)
 public func functionWithResilientEnum(_ m: Medium) -> Medium {
 
 // CHECK:      [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s14resilient_enum6MediumOMa"([[INT]] 0)
@@ -108,7 +108,7 @@ public func functionWithResilientEnum(_ m: Medium) -> Medium {
   return m
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s15enum_resilience33functionWithIndirectResilientEnumy010resilient_A00E8ApproachOAEF"(%swift.opaque* noalias nocapture sret %0, %swift.opaque* noalias nocapture %1)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s15enum_resilience33functionWithIndirectResilientEnumy010resilient_A00E8ApproachOAEF"(%swift.opaque* noalias nocapture sret({{.*}}) %0, %swift.opaque* noalias nocapture %1)
 public func functionWithIndirectResilientEnum(_ ia: IndirectApproach) -> IndirectApproach {
 
 // CHECK:      [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s14resilient_enum16IndirectApproachOMa"([[INT]] 0)
@@ -286,7 +286,7 @@ public func resilientEnumPartialApply(_ f: (Medium) -> Int) {
 // CHECK:     ret void
 }
 
-// CHECK-LABEL: define internal swiftcc void @"$s14resilient_enum6MediumOSiIgnd_ACSiIegnr_TRTA"(%TSi* noalias nocapture sret %0, %swift.opaque* noalias nocapture %1, %swift.refcounted* swiftself %2)
+// CHECK-LABEL: define internal swiftcc void @"$s14resilient_enum6MediumOSiIgnd_ACSiIegnr_TRTA"(%TSi* noalias nocapture sret({{.*}}) %0, %swift.opaque* noalias nocapture %1, %swift.refcounted* swiftself %2)
 
 
 // Enums with resilient payloads from a different resilience domain
@@ -341,8 +341,9 @@ extension ResilientMultiPayloadGenericEnum {
   }
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s15enum_resilience39constructExhaustiveWithResilientMembers010resilient_A011SimpleShapeOyF"(%T14resilient_enum11SimpleShapeO* noalias nocapture sret %0)
-// CHECK: [[BUFFER:%.*]] = bitcast %T14resilient_enum11SimpleShapeO* %0 to %swift.opaque*
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s15enum_resilience39constructExhaustiveWithResilientMembers010resilient_A011SimpleShapeOyF"(%swift.opaque* noalias nocapture sret({{.*}}) %0)
+// CHECK: [[ARG:%.*]] = bitcast %swift.opaque* %0 to %T14resilient_enum11SimpleShapeO*
+// CHECK: [[BUFFER:%.*]] = bitcast %T14resilient_enum11SimpleShapeO* [[ARG]] to %swift.opaque*
 // CHECK: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s16resilient_struct4SizeVMa"([[INT]] 0)
 // CHECK-NEXT: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK: [[STORE_TAG:%.*]] = bitcast i8* {{%.+}} to void (%swift.opaque*, i32, i32, %swift.type*)* 

@@ -264,3 +264,10 @@ func sr_13654_valid_interpolation() throws {
   _ = try "\(sr_13654_func())"
   _ = "\(try sr_13654_func())"
 }
+
+// rdar://problem/72748150
+func takesClosure(_: (() -> ())) throws -> Int {}
+
+func passesClosure() {
+    _ = try takesClosure { } // expected-error {{errors thrown from here are not handled}}
+}

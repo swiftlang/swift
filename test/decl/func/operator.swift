@@ -422,3 +422,11 @@ func testPostfixOperatorOnTuple<A, B>(a: A, b: B) {
   (§)((a, (b, b), a))
   _ = (a, ((), (b, (a, a), b)§), a)§
 }
+
+func testNonexistentPowerOperatorWithPowFunctionOutOfScope() {
+  func a(_ value: Double) { }
+  let x: Double = 3.0
+  let y: Double = 3.0
+  let z: Double = x**y // expected-error {{cannot find operator '**' in scope}}
+  let w: Double = a(x**2.0) // expected-error {{cannot find operator '**' in scope}}
+}

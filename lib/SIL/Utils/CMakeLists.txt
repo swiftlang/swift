@@ -1,5 +1,6 @@
 target_sources(swiftSIL PRIVATE
   BasicBlockUtils.cpp
+  BitDataflow.cpp
   DebugUtils.cpp
   Dominance.cpp
   DynamicCasts.cpp
@@ -7,11 +8,12 @@ target_sources(swiftSIL PRIVATE
   InstructionUtils.cpp
   LoopInfo.cpp
   MemAccessUtils.cpp
+  MemoryLocations.cpp
   OptimizationRemark.cpp
   OwnershipUtils.cpp
   PrettyStackTrace.cpp
   Projection.cpp
+  SILBridging.cpp
   SILInstructionWorklist.cpp
-  SILOpenedArchetypesTracker.cpp
   SILRemarkStreamer.cpp
   ValueUtils.cpp)

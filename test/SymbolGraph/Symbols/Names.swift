@@ -5,6 +5,8 @@
 // RUN: %FileCheck %s --input-file %t/Names.symbols.json --check-prefix=FUNC
 // RUN: %FileCheck %s --input-file %t/Names.symbols.json --check-prefix=INNERTYPE
 // RUN: %FileCheck %s --input-file %t/Names.symbols.json --check-prefix=INNERTYPEALIAS
+// RUN: %FileCheck %s --input-file %t/Names.symbols.json --check-prefix=INNERENUM
+// RUN: %FileCheck %s --input-file %t/Names.symbols.json --check-prefix=INNERCASE
 
 public struct MyStruct {
   public struct InnerStruct {}
@@ -12,6 +14,10 @@ public struct MyStruct {
   public typealias InnerTypeAlias = InnerStruct
 
   public func foo() {}
+
+  public enum InnerEnum {
+      case InnerCase
+  }
 }
 
 // CHECK-LABEL: "precise": "s:5Names8MyStructV"
@@ -29,3 +35,11 @@ public struct MyStruct {
 // INNERTYPEALIAS-LABEL: "precise": "s:5Names8MyStructV14InnerTypeAliasa"
 // INNERTYPEALIAS: names
 // INNERTYPEALIAS-NEXT: "title": "MyStruct.InnerTypeAlias"
+
+// INNERENUM-LABEL: "precise": "s:5Names8MyStructV9InnerEnumO",
+// INNERENUM: names
+// INNERENUM-NEXT: "title": "MyStruct.InnerEnum"
+
+// INNERCASE-LABEL: "precise": "s:5Names8MyStructV9InnerEnumO0D4CaseyA2EmF",
+// INNERCASE: names
+// INNERCASE-NEXT: "title": "MyStruct.InnerEnum.InnerCase",

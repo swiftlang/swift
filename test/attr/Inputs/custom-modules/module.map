@@ -1,2 +1,3 @@
 module AttrObjc_FooClangModule { header "attr_objc_foo_clang_module.h" }
 module Testable_ClangModule { header "testable_clang.h" }
+module ObjcAsync { header "objc_async.h" }

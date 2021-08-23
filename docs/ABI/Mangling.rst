@@ -147,6 +147,8 @@ Globals
   // TODO check this::
   global ::= mangled-name 'TA'                     // partial application forwarder
   global ::= mangled-name 'Ta'                     // ObjC partial application forwarder
+  global ::= mangled-name 'TQ' index               // Async await continuation partial function
+  global ::= mangled-name 'TY' index               // Async suspend continuation partial function
 
   global ::= type 'w' VALUE-WITNESS-KIND // value witness
 
@@ -166,6 +168,8 @@ Globals
   global ::= protocol-conformance assoc-type-list protocol 'WT' // associated type witness table accessor
   global ::= protocol-conformance protocol 'Wb' // base protocol witness table accessor
   global ::= type protocol-conformance 'Wl' // lazy protocol witness table accessor
+
+  global ::= global generic-signature? 'WJ' DIFFERENTIABILITY-KIND INDEX-SUBSET 'p' INDEX-SUBSET 'r' // differentiability witness
 
   global ::= type 'WV'                   // value witness table
   global ::= entity 'Wvd'                // field offset
@@ -207,6 +211,7 @@ types where the metadata itself has unknown layout.)
   global ::= global 'TD'                 // dynamic dispatch thunk
   global ::= global 'Td'                 // direct method reference thunk
   global ::= global 'TI'                 // implementation of a dynamic_replaceable function
+  global ::= global 'Tu'                 // async function pointer of a function
   global ::= global 'TX'                 // function pointer of a dynamic_replaceable function
   global ::= entity entity 'TV'          // vtable override thunk, derived followed by base
   global ::= type label-list? 'D'        // type mangling for the debugger with label list for function types.
@@ -219,15 +224,22 @@ types where the metadata itself has unknown layout.)
   global ::= global 'Tm'                 // merged function
   global ::= entity                      // some identifiable thing
   global ::= from-type to-type generic-signature? 'TR'  // reabstraction thunk
+  global ::= impl-function-type type 'Tz' index? // objc-to-swift-async completion handler block implementation
+  global ::= impl-function-type type 'TZ' index? // objc-to-swift-async completion handler block implementation (predefined by runtime)
   global ::= from-type to-type generic-signature? 'TR'  // reabstraction thunk
-  global ::= impl-function-type type 'Tz'     // objc-to-swift-async completion handler block implementation
-  global ::= impl-function-type type 'TZ'     // objc-to-swift-async completion handler block implementation (predefined by runtime)
+  global ::= impl-function-type type generic-signature? 'Tz'     // objc-to-swift-async completion handler block implementation
+  global ::= impl-function-type type generic-signature? 'TZ'     // objc-to-swift-async completion handler block implementation (predefined by runtime)
   global ::= from-type to-type self-type generic-signature? 'Ty'  // reabstraction thunk with dynamic 'Self' capture
   global ::= from-type to-type generic-signature? 'Tr'  // obsolete mangling for reabstraction thunk
   global ::= entity generic-signature? type type* 'TK' // key path getter
   global ::= entity generic-signature? type type* 'Tk' // key path setter
   global ::= type generic-signature 'TH' // key path equality
   global ::= type generic-signature 'Th' // key path hasher
+  global ::= global generic-signature? 'TJ' AUTODIFF-FUNCTION-KIND INDEX-SUBSET 'p' INDEX-SUBSET 'r' // autodiff function
+  global ::= global generic-signature? 'TJV' AUTODIFF-FUNCTION-KIND INDEX-SUBSET 'p' INDEX-SUBSET 'r' // autodiff derivative vtable thunk
+  global ::= from-type to-type 'TJO' AUTODIFF-FUNCTION-KIND // autodiff self-reordering reabstraction thunk
+  global ::= from-type 'TJS' AUTODIFF-FUNCTION-KIND INDEX-SUBSET 'p' INDEX-SUBSET 'r' INDEX-SUBSET 'P' // autodiff linear map subset parameters thunk
+  global ::= global to-type 'TJS' AUTODIFF-FUNCTION-KIND INDEX-SUBSET 'p' INDEX-SUBSET 'r' INDEX-SUBSET 'P' // autodiff derivative function subset parameters thunk
 
   global ::= protocol 'TL'               // protocol requirements base descriptor
   global ::= assoc-type-name 'Tl'        // associated type descriptor
@@ -238,6 +250,8 @@ types where the metadata itself has unknown layout.)
 
   REABSTRACT-THUNK-TYPE ::= 'R'          // reabstraction thunk
   REABSTRACT-THUNK-TYPE ::= 'r'          // reabstraction thunk (obsolete)
+
+  global ::= reabstraction-thunk type 'TU' // reabstraction thunk with global actor constraint
 
 The `from-type` and `to-type` in a reabstraction thunk helper function
 are always non-polymorphic ``<impl-function-type>`` types.
@@ -269,6 +283,16 @@ are always non-polymorphic ``<impl-function-type>`` types.
 
 ``<VALUE-WITNESS-KIND>`` differentiates the kinds of value
 witness functions for a type.
+
+::
+
+  AUTODIFF-FUNCTION-KIND ::= 'f'        // JVP (forward-mode derivative)
+  AUTODIFF-FUNCTION-KIND ::= 'r'        // VJP (reverse-mode derivative)
+  AUTODIFF-FUNCTION-KIND ::= 'd'        // differential
+  AUTODIFF-FUNCTION-KIND ::= 'p'        // pullback
+
+``<AUTODIFF-FUNCTION-KIND>`` differentiates the kinds of functions assocaited
+with a differentiable function used for differentiable programming.
 
 ::
 
@@ -305,6 +329,7 @@ Entities
   entity-spec ::= 'fA' INDEX                 // default argument N+1 generator
   entity-spec ::= 'fi'                       // non-local variable initializer
   entity-spec ::= 'fP'                       // property wrapper backing initializer
+  entity-spec ::= 'fW'                       // property wrapper init from projected value
   entity-spec ::= 'fD'                       // deallocating destructor; untyped
   entity-spec ::= 'fd'                       // non-deallocating destructor; untyped
   entity-spec ::= 'fE'                       // ivar destroyer; untyped
@@ -441,7 +466,7 @@ Types
   KNOWN-TYPE-KIND ::= 'a'                    // Swift.Array
   KNOWN-TYPE-KIND ::= 'B'                    // Swift.BinaryFloatingPoint
   KNOWN-TYPE-KIND ::= 'b'                    // Swift.Bool
-  KNOWN-TYPE-KIND ::= 'c'                    // Swift.UnicodeScalar
+  KNOWN-TYPE-KIND ::= 'c' KNOWN-TYPE-KIND-2  // Second set of standard types
   KNOWN-TYPE-KIND ::= 'D'                    // Swift.Dictionary
   KNOWN-TYPE-KIND ::= 'd'                    // Swift.Float64
   KNOWN-TYPE-KIND ::= 'E'                    // Swift.Encodable
@@ -487,14 +512,41 @@ Types
   KNOWN-TYPE-KIND ::= 'Z'                    // Swift.SignedInteger
   KNOWN-TYPE-KIND ::= 'z'                    // Swift.BinaryInteger
 
+  KNOWN-TYPE-KIND-2 ::= 'A'        // Swift.Actor
+  KNOWN-TYPE-KIND-2 ::= 'C'        // Swift.CheckedContinuation
+  KNOWN-TYPE-KIND-2 ::= 'c'        // Swift.UnsafeContinuation
+  KNOWN-TYPE-KIND-2 ::= 'E'        // Swift.CancellationError
+  KNOWN-TYPE-KIND-2 ::= 'e'        // Swift.UnownedSerialExecutor
+  KNOWN-TYPE-KIND-2 ::= 'F'        // Swift.Executor
+  KNOWN-TYPE-KIND-2 ::= 'f'        // Swift.SerialExecutor
+  KNOWN-TYPE-KIND-2 ::= 'G'        // Swift.TaskGroup
+  KNOWN-TYPE-KIND-2 ::= 'g'        // Swift.ThrowingTaskGroup
+  KNOWN-TYPE-KIND-2 ::= 'I'        // Swift.AsyncIteratorProtocol
+  KNOWN-TYPE-KIND-2 ::= 'i'        // Swift.AsyncSequence
+  KNOWN-TYPE-KIND-2 ::= 'J'        // Swift.UnownedJob
+  KNOWN-TYPE-KIND-2 ::= 'M'        // Swift.MainActor
+  KNOWN-TYPE-KIND-2 ::= 'P'        // Swift.TaskPriority
+  KNOWN-TYPE-KIND-2 ::= 'S'        // Swift.AsyncStream
+  KNOWN-TYPE-KIND-2 ::= 's'        // Swift.AsyncThrowingStream
+  KNOWN-TYPE-KIND-2 ::= 'T'        // Swift.Task
+  KNOWN-TYPE-KIND-2 ::= 't'        // Swift.UnsafeCurrentTask
+
   protocol ::= context decl-name
   protocol ::= standard-substitutions
 
   type ::= 'Bb'                              // Builtin.BridgeObject
   type ::= 'BB'                              // Builtin.UnsafeValueBuffer
+  #if SWIFT_RUNTIME_VERSION >= 5.5
+    type ::= 'Bc'                              // Builtin.RawUnsafeContinuation
+    type ::= 'BD'                              // Builtin.DefaultActorStorage
+    type ::= 'Be'                              // Builtin.Executor
+  #endif
   type ::= 'Bf' NATURAL '_'                  // Builtin.Float<n>
   type ::= 'Bi' NATURAL '_'                  // Builtin.Int<n>
   type ::= 'BI'                              // Builtin.IntLiteral
+  #if SWIFT_RUNTIME_VERSION >= 5.5
+    type ::= 'Bj'                              // Builtin.Job
+  #endif
   type ::= 'BO'                              // Builtin.UnknownObject (no longer a distinct type, but still used for AnyObject)
   type ::= 'Bo'                              // Builtin.NativeObject
   type ::= 'Bp'                              // Builtin.RawPointer
@@ -533,29 +585,33 @@ Types
   FUNCTION-KIND ::= 'zC' C-TYPE              // C function pointer type with with non-canonical C type
   FUNCTION-KIND ::= 'A'                      // @auto_closure function type (escaping)
   FUNCTION-KIND ::= 'E'                      // function type (noescape)
-  FUNCTION-KIND ::= 'F'                      // @differentiable function type
-  FUNCTION-KIND ::= 'G'                      // @differentiable function type (escaping)
-  FUNCTION-KIND ::= 'H'                      // @differentiable(linear) function type
-  FUNCTION-KIND ::= 'I'                      // @differentiable(linear) function type (escaping)
 
   C-TYPE is mangled according to the Itanium ABI, and prefixed with the length.
   Non-ASCII identifiers are preserved as-is; we do not use Punycode.
 
-  function-signature ::= params-type params-type async? throws? // results and parameters
+  function-signature ::= params-type params-type async? sendable? throws? differentiable? global-actor? // results and parameters
 
-  params-type ::= type 'z'? 'h'?              // tuple in case of multiple parameters or a single parameter with a single tuple type
+  params-type ::= type 'z'? 'h'?             // tuple in case of multiple parameters or a single parameter with a single tuple type
                                              // with optional inout convention, shared convention. parameters don't have labels,
                                              // they are mangled separately as part of the entity.
-  params-type ::= empty-list                  // shortcut for no parameters
+  params-type ::= empty-list                 // shortcut for no parameters
 
-  async ::= 'Y'                              // 'async' annotation on function types
+  #if SWIFT_RUNTIME_VERSION >= 5.5
+    async ::= 'Ya'                             // 'async' annotation on function types
+    sendable ::= 'Yb'                          // @Sendable on function types
+    global-actor :: = type 'Yc'                // Global actor on function type
+  #endif
   throws ::= 'K'                             // 'throws' annotation on function types
+  differentiable ::= 'Yjf'                   // @differentiable(_forward) on function type
+  differentiable ::= 'Yjr'                   // @differentiable(reverse) on function type
+  differentiable ::= 'Yjd'                   // @differentiable on function type
+  differentiable ::= 'Yjl'                   // @differentiable(_linear) on function type
 
   type-list ::= list-type '_' list-type*     // list of types
   type-list ::= empty-list
 
                                                   // FIXME: Consider replacing 'h' with a two-char code
-  list-type ::= type identifier? 'z'? 'h'? 'n'? 'd'?   // type with optional label, inout convention, shared convention, owned convention, and variadic specifier
+  list-type ::= type identifier? 'Yk'? 'z'? 'h'? 'n'? 'Yi'? 'd'?  // type with optional label, '@noDerivative', inout convention, shared convention, owned convention, actor 'isolated', and variadic specifier
 
   METATYPE-REPR ::= 't'                      // Thin metatype representation
   METATYPE-REPR ::= 'T'                      // Thick metatype representation
@@ -609,7 +665,7 @@ mangled in to disambiguate.
   impl-function-type ::= type* 'I' FUNC-ATTRIBUTES '_'
   impl-function-type ::= type* generic-signature 'I' FUNC-ATTRIBUTES '_'
 
-  FUNC-ATTRIBUTES ::= PATTERN-SUBS? INVOCATION-SUBS? PSEUDO-GENERIC? CALLEE-ESCAPE? DIFFERENTIABILITY-KIND? CALLEE-CONVENTION FUNC-REPRESENTATION? COROUTINE-KIND? ASYNC? (PARAM-CONVENTION PARAM-DIFFERENTIABILITY?)* RESULT-CONVENTION* ('Y' PARAM-CONVENTION)* ('z' RESULT-CONVENTION RESULT-DIFFERENTIABILITY?)?
+  FUNC-ATTRIBUTES ::= PATTERN-SUBS? INVOCATION-SUBS? PSEUDO-GENERIC? CALLEE-ESCAPE? DIFFERENTIABILITY-KIND? CALLEE-CONVENTION FUNC-REPRESENTATION? COROUTINE-KIND? SENDABLE? ASYNC? (PARAM-CONVENTION PARAM-DIFFERENTIABILITY?)* RESULT-CONVENTION* ('Y' PARAM-CONVENTION)* ('z' RESULT-CONVENTION RESULT-DIFFERENTIABILITY?)?
 
   PATTERN-SUBS ::= 's'                       // has pattern substitutions
   INVOCATION-SUB ::= 'I'                     // has invocation substitutions
@@ -617,9 +673,10 @@ mangled in to disambiguate.
 
   CALLEE-ESCAPE ::= 'e'                      // @escaping (inverse of SIL @noescape)
 
-  DIFFERENTIABILITY-KIND ::= DIFFERENTIABLE | LINEAR
-  DIFFERENTIABLE ::= 'd'                     // @differentiable
-  LINEAR ::= 'l'                             // @differentiable(linear)
+  DIFFERENTIABILITY-KIND ::= 'd'             // @differentiable
+  DIFFERENTIABILITY-KIND ::= 'l'             // @differentiable(_linear)
+  DIFFERENTIABILITY-KIND ::= 'f'             // @differentiable(_forward)
+  DIFFERENTIABILITY-KIND ::= 'r'             // @differentiable(reverse)
 
   CALLEE-CONVENTION ::= 'y'                  // @callee_unowned
   CALLEE-CONVENTION ::= 'g'                  // @callee_guaranteed
@@ -638,7 +695,10 @@ mangled in to disambiguate.
   COROUTINE-KIND ::= 'A'                     // yield-once coroutine
   COROUTINE-KIND ::= 'G'                     // yield-many coroutine
 
-  ASYNC ::= 'H'                              // @async
+  #if SWIFT_RUNTIME_VERSION >= 5.5
+    SENDABLE ::= 'h'                           // @Sendable
+    ASYNC ::= 'H'                              // @async
+  #endif
 
   PARAM-CONVENTION ::= 'i'                   // indirect in
   PARAM-CONVENTION ::= 'c'                   // indirect in constant
@@ -1000,12 +1060,21 @@ Numbers and Indexes
 ``<INDEX>`` is a production for encoding numbers in contexts that can't
 end in a digit; it's optimized for encoding smaller numbers.
 
+::
+
+  INDEX-SUBSET ::= ('S' | 'U')+
+
+``<INDEX-SUBSET>`` is encoded like a bit vector and is optimized for encoding
+indices with a small upper bound.
+
 Function Specializations
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 ::
 
   specialization ::= type '_' type* 'Tg' SPEC-INFO     // Generic re-abstracted specialization
+  specialization ::= type '_' type* 'TB' SPEC-INFO     // Alternative mangling for generic re-abstracted specializations,
+                                                       // used for functions with re-abstracted resilient parameter types.
   specialization ::= type '_' type* 'Ts' SPEC-INFO     // Generic re-abstracted prespecialization
   specialization ::= type '_' type* 'TG' SPEC-INFO     // Generic not re-abstracted specialization
   specialization ::= type '_' type* 'Ti' SPEC-INFO     // Inlined function with generic substitutions.

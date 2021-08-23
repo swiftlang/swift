@@ -1,19 +1,19 @@
-// RUN: %target-swift-frontend -parse-as-library -O -module-name=test %s -enable-library-evolution -emit-sil | %FileCheck %s
+// RUN: %empty-directory(%t) 
+// RUN: %target-build-swift -wmo -O -enable-library-evolution %S/Inputs/specialization_and_resilience_module.swift -DMODULE -parse-as-library -emit-module -emit-module-path=%t/Test.swiftmodule -module-name=Test -c -o %t/module.o
+// RUN: %target-build-swift -wmo -O %s -I%t -module-name=Main -c -o %t/main.o
+// RUN: %target-build-swift %t/main.o %t/module.o -o %t/a.out
+// RUN: %target-codesign %t/a.out
+// RUN: %target-run %t/a.out | %FileCheck %s
 
-public enum En {
-  case A
-  case B
-}
+// REQUIRES: executable_test
 
-@inlinable
-@inline(never)
-func genfunc<T>(_ t: T) -> T {
-  return t
-}
+import Test
 
-// CHECK-LABEL: sil @$s4test11callGenFuncyyF : $@convention(thin) () -> () {
-// CHECK:  = function_ref @$s4test7genfuncyxxlFAA2EnO_Tg5 : $@convention(thin) (En) -> @out En
-// CHECK: } // end sil function '$s4test11callGenFuncyyF'
-public func callGenFunc() {
-  _ = genfunc(En.A)
-}
+// CHECK: Mystruct(x: 100)
+testParam(Mystruct(100))
+// CHECK: Mystruct(x: 101)
+print(testReturn([Mystruct(101)]))
+// CHECK: Mystruct(x: 27)
+// CHECK: Mystruct(x: 28)
+otherFunc()
+

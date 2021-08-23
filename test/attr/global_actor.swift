@@ -1,7 +1,7 @@
-// RUN: %target-swift-frontend -typecheck -verify %s -enable-experimental-concurrency
+// RUN: %target-swift-frontend -typecheck -verify %s  -disable-availability-checking
 // REQUIRES: concurrency
 
-actor class SomeActor { }
+actor SomeActor { }
 
 // -----------------------------------------------------------------------
 // @globalActor attribute itself.
@@ -20,35 +20,37 @@ struct GenericGlobalActor<T> {
 
 // Ill-formed global actors.
 @globalActor
-open class GA2 { // expected-error{{global actor 'GA2' requires a static property 'shared' that produces an actor instance}}{{17-17=\n    public static let shared = <#actor instance#>}}
+final class GA2 { // expected-error{{type 'GA2' does not conform to protocol 'GlobalActor'}}
 }
 
 @globalActor
-struct GA3 { // expected-error{{global actor 'GA3' requires a static property 'shared' that produces an actor instance}}
-  let shared = SomeActor() // expected-note{{'shared' property in global actor is not 'static'}}{{3-3=static }}
+struct GA3 { // expected-error{{type 'GA3' does not conform to protocol 'GlobalActor'}}
+  let shared = SomeActor()
 }
 
 @globalActor
-struct GA4 { // expected-error{{global actor 'GA4' requires a static property 'shared' that produces an actor instance}}
-  private static let shared = SomeActor() // expected-note{{'shared' property has more restrictive access (private) than its global actor (internal)}}{{3-11=}}
+struct GA4 {
+  private static let shared = SomeActor() // expected-error{{property 'shared' must be as accessible as its enclosing type because it matches a requirement in protocol 'GlobalActor'}}
+  // expected-note@-1{{mark the static property as 'internal' to satisfy the requirement}}
 }
 
 @globalActor
-open class GA5 { // expected-error{{global actor 'GA5' requires a static property 'shared' that produces an actor instance}}
-  static let shared = SomeActor() // expected-note{{'shared' property has more restrictive access (internal) than its global actor (public)}}{{3-3=public}}
+open class GA5 { // expected-error{{non-final class 'GA5' cannot be a global actor}}
+  static let shared = SomeActor() // expected-error{{property 'shared' must be declared public because it matches a requirement in public protocol 'GlobalActor'}}
+  // expected-note@-1{{mark the static property as 'public' to satisfy the requirement}}
 }
 
 @globalActor
-struct GA6<T> { // expected-error{{global actor 'GA6' requires a static property 'shared' that produces an actor instance}}
+struct GA6<T> { // expected-error{{type 'GA6<T>' does not conform to protocol 'GlobalActor'}}
 }
 
 extension GA6 where T: Equatable {
-  static var shared: SomeActor { SomeActor() } // expected-note{{'shared' property in global actor cannot be in a constrained extension}}
+  static var shared: SomeActor { SomeActor() }
 }
 
 @globalActor
-class GA7 { // expected-error{{global actor 'GA7' requires a static property 'shared' that produces an actor instance}}
-  static let shared = 5 // expected-note{{'shared' property type 'Int' does not conform to the 'Actor' protocol}}
+final class GA7 { // expected-error{{type 'GA7' does not conform to protocol 'GlobalActor'}}
+  static let shared = 5 // expected-note{{candidate would match and infer 'ActorType' = 'Int' if 'Int' conformed to 'Actor'}}
 }
 
 // -----------------------------------------------------------------------
@@ -65,7 +67,7 @@ struct OtherGlobalActor {
 }
 
 @GA1 struct X {
-  @GA1 var member: Int // expected-error{{stored property 'member' of a struct cannot have a global actor}}
+  @GA1 var member: Int
 }
 
 struct Y {
@@ -83,7 +85,7 @@ class SomeClass {
 
 @GA1 typealias Integer = Int // expected-error{{type alias cannot have a global actor}}
 
-@GA1 actor class ActorInTooManyPlaces { } // expected-error{{actor class 'ActorInTooManyPlaces' cannot have a global actor}}
+@GA1 actor ActorInTooManyPlaces { } // expected-error{{actor 'ActorInTooManyPlaces' cannot have a global actor}}
 
 @GA1 @OtherGlobalActor func twoGlobalActors() { } // expected-error{{declaration can not have multiple global actor attributes ('OtherGlobalActor' and 'GA1')}}
 
@@ -96,5 +98,5 @@ struct Container {
 // Redundant attributes
 // -----------------------------------------------------------------------
 extension SomeActor {
-  @GA1 @actorIndependent func conflict1() { } // expected-error{{instance method 'conflict1()' has multiple actor-isolation attributes ('actorIndependent' and 'GA1')}}
+  @GA1 nonisolated func conflict1() { } // expected-error 3{{instance method 'conflict1()' has multiple actor-isolation attributes ('nonisolated' and 'GA1')}}
 }

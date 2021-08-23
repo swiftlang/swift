@@ -62,7 +62,9 @@ void SourceLoader::collectVisibleTopLevelModuleNames(
   // TODO: Implement?
 }
 
-bool SourceLoader::canImportModule(ImportPath::Element ID) {
+bool SourceLoader::canImportModule(ImportPath::Element ID,
+                                   llvm::VersionTuple version,
+                                   bool underlyingVersion) {
   // Search the memory buffers to see if we can find this file on disk.
   FileOrError inputFileOrError = findModule(Ctx, ID.Item.str(),
                                             ID.Loc);

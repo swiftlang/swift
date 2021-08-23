@@ -35,14 +35,3 @@ function(get_swift_test_versioned_target_triple variant_triple_out_var sdk arch 
 
   set(${variant_triple_out_var} "${variant_triple}" PARENT_SCOPE)
 endfunction()
-
-# Get the default OSX variant suffix for test targets
-function(get_swift_test_default_osx_variant_suffix suffix_out_var original_variant_suffix build_flavor)
-  set(suffix "")
-  if(build_flavor STREQUAL "ios-like")
-    set(suffix "${variant_suffix}")
-  endif()
-
-  set(${suffix_out_var} "${suffix}" PARENT_SCOPE)
-endfunction()
-

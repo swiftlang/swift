@@ -145,6 +145,26 @@ extension Unsafe${Mutable}RawBufferPointer: Sequence {
   public func makeIterator() -> Iterator {
     return Iterator(_position: _position, _end: _end)
   }
+
+  /// Copies the elements of `self` to the memory at `destination.baseAddress`,
+  /// stopping when either `self` or `destination` is exhausted.
+  ///
+  /// - Returns: an iterator over any remaining elements of `self` and the
+  ///   number of elements copied.
+  @inlinable // unsafe-performance
+  @_alwaysEmitIntoClient
+  public func _copyContents(
+    initializing destination: UnsafeMutableBufferPointer<UInt8>
+  ) -> (Iterator, UnsafeMutableBufferPointer<UInt8>.Index) {
+    guard let s = _position, let e = _end, e > s, !destination.isEmpty else {
+      return (makeIterator(), 0)
+    }
+    let destinationAddress = destination.baseAddress._unsafelyUnwrappedUnchecked
+    let d = UnsafeMutableRawPointer(destinationAddress)
+    let n = Swift.min(destination.count, self.count)
+    d.copyMemory(from: s, byteCount: n)
+    return (Iterator(_position: s.advanced(by: n), _end: e), n)
+  }
 }
 
 extension Unsafe${Mutable}RawBufferPointer: ${Mutable}Collection {
@@ -253,7 +273,7 @@ extension Unsafe${Mutable}RawBufferPointer: ${Mutable}Collection {
   @inlinable
   public var count: Int {
     if let pos = _position {
-      return _end! - pos
+      return _assumeNonNegative(_end! - pos)
     }
     return 0
   }
@@ -263,15 +283,21 @@ extension Unsafe${Mutable}RawBufferPointer: RandomAccessCollection { }
 
 extension Unsafe${Mutable}RawBufferPointer {
 %  if mutable:
-  /// Returns a newly allocated buffer with the given size, in bytes.
+  /// Allocates uninitialized memory with the specified size and alignment.
   ///
-  /// The memory referenced by the new buffer is allocated, but not
-  /// initialized.
+  /// You are in charge of managing the allocated memory. Be sure to deallocate
+  /// any memory that you manually allocate.
+  ///
+  /// The allocated memory is not bound to any specific type and must be bound
+  /// before performing any typed operations. If you are using the memory for
+  /// a specific type, allocate memory using the
+  /// `UnsafeMutablePointerBuffer.allocate(capacity:)` static method instead.
   ///
   /// - Parameters:
-  ///   - byteCount: The number of bytes to allocate.
+  ///   - byteCount: The number of bytes to allocate. `byteCount` must not be
+  ///     negative.
   ///   - alignment: The alignment of the new region of allocated memory, in
-  ///     bytes.
+  ///     bytes. `alignment` must be a whole power of 2.
   /// - Returns: A buffer pointer to a newly allocated region of memory aligned 
   ///     to `alignment`.
   @inlinable
@@ -412,6 +438,16 @@ extension Unsafe${Mutable}RawBufferPointer {
     guard let position = _position else {
       return
     }
+    
+    if source.withContiguousStorageIfAvailable({
+      (buffer: UnsafeBufferPointer<C.Element>) -> Void in
+      if let base = buffer.baseAddress {
+        position.copyMemory(from: base, byteCount: buffer.count)
+      }
+    }) != nil {
+      return
+    }
+
     for (index, byteValue) in source.enumerated() {
       position.storeBytes(
         of: byteValue, toByteOffset: index, as: UInt8.self)
@@ -432,11 +468,11 @@ extension Unsafe${Mutable}RawBufferPointer {
   public init(
     @_nonEphemeral start: Unsafe${Mutable}RawPointer?, count: Int
   ) {
-    _precondition(count >= 0, "${Self} with negative count")
-    _precondition(count == 0 || start != nil,
+    _debugPrecondition(count >= 0, "${Self} with negative count")
+    _debugPrecondition(count == 0 || start != nil,
       "${Self} has a nil start and nonzero count")
     _position = start
-    _end = start.map { $0 + count }
+    _end = start.map { $0 + _assumeNonNegative(count) }
   }
 
   /// Creates a new buffer over the same memory as the given buffer.
@@ -511,6 +547,17 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// - Parameter slice: The raw buffer slice to rebase.
   @inlinable
   public init(rebasing slice: Slice<UnsafeRawBufferPointer>) {
+    // NOTE: `Slice` does not guarantee that its start/end indices are valid
+    // in `base` -- it merely ensures that `startIndex <= endIndex`.
+    // We need manually check that we aren't given an invalid slice,
+    // or the resulting collection would allow access that was
+    // out-of-bounds with respect to the original base buffer.
+    // We only do this in debug builds to prevent a measurable performance
+    // degradation wrt passing around pointers not wrapped in a BufferPointer
+    // construct.
+    _debugPrecondition(
+      slice.startIndex >= 0 && slice.endIndex <= slice.base.count,
+      "Invalid slice")
     let base = slice.base.baseAddress?.advanced(by: slice.startIndex)
     let count = slice.endIndex &- slice.startIndex
     self.init(start: base, count: count)
@@ -808,6 +855,11 @@ public func withUnsafeBytes<T, Result>(
   let buffer = UnsafeRawBufferPointer(start: addr, count: MemoryLayout<T>.size)
   return try body(buffer)
 }
+
+extension UnsafeRawBufferPointer: Sendable { }
+extension UnsafeRawBufferPointer.Iterator: Sendable { }
+extension UnsafeMutableRawBufferPointer: Sendable { }
+
 
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)

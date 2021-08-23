@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/SILOptimizer/Analysis/ArraySemantic.h"
+#include "swift/SILOptimizer/Analysis/SideEffectAnalysis.h"
 #include "swift/SILOptimizer/Utils/PerformanceInlinerUtils.h"
 #include "swift/AST/Module.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
@@ -614,6 +616,7 @@ SemanticFunctionLevel swift::getSemanticFunctionLevel(SILFunction *function) {
     return SemanticFunctionLevel::Transient;
 
   } // end switch
+  llvm_unreachable("covered switch");
 }
 
 /// Return true if \p apply calls into an optimizable semantic function from
@@ -790,8 +793,8 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
     return nullptr;
   }
 
-  if (!SILInlineNeverFuns.empty()
-      && Callee->getName().find(SILInlineNeverFuns, 0) != StringRef::npos)
+  if (!SILInlineNeverFuns.empty() &&
+      Callee->getName().contains(SILInlineNeverFuns))
     return nullptr;
 
   if (!SILInlineNeverFun.empty() &&

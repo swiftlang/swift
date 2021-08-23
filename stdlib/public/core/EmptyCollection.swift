@@ -172,3 +172,6 @@ extension EmptyCollection: Equatable {
     return true
   }
 }
+
+extension EmptyCollection: Sendable { }
+extension EmptyCollection.Iterator: Sendable { }

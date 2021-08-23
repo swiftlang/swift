@@ -577,7 +577,11 @@ static void computeSwiftModuleTraceInfo(
     path::replace_extension(modPath, swiftInterfaceExt);
   };
 
-  for (auto &depPath : depTracker.getDependencies()) {
+  auto deps = depTracker.getDependencies();
+  SmallVector<std::string, 16> dependencies{deps.begin(), deps.end()};
+  auto incrDeps = depTracker.getIncrementalDependencyPaths();
+  dependencies.append(incrDeps.begin(), incrDeps.end());
+  for (const auto &depPath : dependencies) {
 
     // Decide if this is a swiftmodule based on the extension of the raw
     // dependency path, as the true file may have a different one.

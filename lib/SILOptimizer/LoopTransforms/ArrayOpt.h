@@ -31,7 +31,7 @@ namespace swift {
 /// Projections over the aggregate that do not access the struct are ignored.
 ///
 /// StructLoads records loads of the struct value.
-/// StructAddressUsers records other uses of the struct address.
+/// StructAddressUsers records all uses of the struct address.
 /// StructValueUsers records direct uses of the loaded struct.
 ///
 /// Projections of the struct over its elements are all similarly recorded in
@@ -125,6 +125,9 @@ public:
     if (!ElementAddressUsers.empty())
       return false;
     for (SILInstruction *user : StructAddressUsers) {
+      // ignore load users
+      if (isa<LoadInst>(user))
+        continue;
       if (user != use1 && user != use2)
         return false;
     }
@@ -184,6 +187,7 @@ protected:
         // Found a use of the struct at the given access path.
         if (auto *LoadI = dyn_cast<LoadInst>(UseInst)) {
           StructLoads.push_back(LoadI);
+          StructAddressUsers.push_back(LoadI);
           continue;
         }
 

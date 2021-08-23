@@ -26,6 +26,10 @@
 using namespace swift;
 using namespace reflection;
 
+TypeRefBuilder::BuiltType TypeRefBuilder::decodeMangledType(Node *node) {
+  return swift::Demangle::decodeMangledType(*this, node).getType();
+}
+
 RemoteRef<char> TypeRefBuilder::readTypeRef(uint64_t remoteAddr) {
   // The remote address should point into one of the TypeRef or
   // ReflectionString references we already read out of the images.
@@ -80,11 +84,22 @@ valid_type_ref:
 }
 
 /// Load and normalize a mangled name so it can be matched with string equality.
-std::string
+llvm::Optional<std::string>
 TypeRefBuilder::normalizeReflectionName(RemoteRef<char> reflectionName) {
   // Remangle the reflection name to resolve symbolic references.
-  if (auto node = demangleTypeRef(reflectionName)) {
-    return mangleNode(node);
+  if (auto node = demangleTypeRef(reflectionName,
+                                  /*useOpaqueTypeSymbolicReferences*/ false)) {
+    switch (node->getKind()) {
+    case Node::Kind::TypeSymbolicReference:
+    case Node::Kind::ProtocolSymbolicReference:
+    case Node::Kind::OpaqueTypeDescriptorSymbolicReference:
+      // Symbolic references cannot be mangled, return a failure.
+      return {};
+    default:
+      auto result = mangleNode(node);
+      clearNodeFactory();
+      return result;
+    }
   }
 
   // Fall back to the raw string.
@@ -96,7 +111,9 @@ bool
 TypeRefBuilder::reflectionNameMatches(RemoteRef<char> reflectionName,
                                       StringRef searchName) {
   auto normalized = normalizeReflectionName(reflectionName);
-  return searchName.equals(normalized);
+  if (!normalized)
+    return false;
+  return searchName.equals(*normalized);
 }
 
 const TypeRef * TypeRefBuilder::
@@ -135,8 +152,8 @@ lookupTypeWitness(const std::string &MangledTypeName,
         auto SubstitutedTypeName = readTypeRef(AssocTy,
                                                AssocTy->SubstitutedTypeName);
         auto Demangled = demangleTypeRef(SubstitutedTypeName);
-        auto *TypeWitness =
-            swift::Demangle::decodeMangledType(*this, Demangled).getType();
+        auto *TypeWitness = decodeMangledType(Demangled);
+        clearNodeFactory();
 
         AssociatedTypeCache.insert(std::make_pair(key, TypeWitness));
         return TypeWitness;
@@ -155,8 +172,8 @@ const TypeRef *TypeRefBuilder::lookupSuperclass(const TypeRef *TR) {
     return nullptr;
 
   auto Demangled = demangleTypeRef(readTypeRef(FD, FD->Superclass));
-  auto Unsubstituted =
-      swift::Demangle::decodeMangledType(*this, Demangled).getType();
+  auto Unsubstituted = decodeMangledType(Demangled);
+  clearNodeFactory();
   if (!Unsubstituted)
     return nullptr;
 
@@ -188,9 +205,8 @@ TypeRefBuilder::getFieldTypeInfo(const TypeRef *TR) {
       if (!FD->hasMangledTypeName())
         continue;
       auto CandidateMangledName = readTypeRef(FD, FD->MangledTypeName);
-      auto NormalizedName = normalizeReflectionName(CandidateMangledName);
-      FieldTypeInfoCache[NormalizedName] = FD;
-      Dem.clear();
+      if (auto NormalizedName = normalizeReflectionName(CandidateMangledName))
+        FieldTypeInfoCache[*NormalizedName] = FD;
     }
   }
 
@@ -227,8 +243,8 @@ bool TypeRefBuilder::getFieldTypeRefs(
     }
 
     auto Demangled = demangleTypeRef(readTypeRef(Field,Field->MangledTypeName));
-    auto Unsubstituted =
-        swift::Demangle::decodeMangledType(*this, Demangled).getType();
+    auto Unsubstituted = decodeMangledType(Demangled);
+    clearNodeFactory();
     if (!Unsubstituted)
       return false;
 
@@ -306,7 +322,8 @@ TypeRefBuilder::getClosureContextInfo(RemoteRef<CaptureDescriptor> CD) {
     if (CR->hasMangledTypeName()) {
       auto MangledName = readTypeRef(CR, CR->MangledTypeName);
       auto DemangleTree = demangleTypeRef(MangledName);
-      TR = swift::Demangle::decodeMangledType(*this, DemangleTree).getType();
+      TR = decodeMangledType(DemangleTree);
+      clearNodeFactory();
     }
     Info.CaptureTypes.push_back(TR);
   }
@@ -318,7 +335,8 @@ TypeRefBuilder::getClosureContextInfo(RemoteRef<CaptureDescriptor> CD) {
     if (MSR->hasMangledTypeName()) {
       auto MangledName = readTypeRef(MSR, MSR->MangledTypeName);
       auto DemangleTree = demangleTypeRef(MangledName);
-      TR = swift::Demangle::decodeMangledType(*this, DemangleTree).getType();
+      TR = decodeMangledType(DemangleTree);
+      clearNodeFactory();
     }
 
     const MetadataSource *MS = nullptr;
@@ -347,6 +365,7 @@ TypeRefBuilder::dumpTypeRef(RemoteRef<char> MangledName,
   auto TypeName = nodeToString(DemangleTree);
   fprintf(file, "%s\n", TypeName.c_str());
   auto Result = swift::Demangle::decodeMangledType(*this, DemangleTree);
+  clearNodeFactory();
   if (Result.isError()) {
     auto *Error = Result.getError();
     char *ErrorStr = Error->copyErrorString();
@@ -367,6 +386,7 @@ void TypeRefBuilder::dumpFieldSection(FILE *file) {
       auto TypeDemangling =
         demangleTypeRef(readTypeRef(descriptor, descriptor->MangledTypeName));
       auto TypeName = nodeToString(TypeDemangling);
+      clearNodeFactory();
       fprintf(file, "%s\n", TypeName.c_str());
       for (size_t i = 0; i < TypeName.size(); ++i)
         fprintf(file, "-");
@@ -395,6 +415,7 @@ void TypeRefBuilder::dumpAssociatedTypeSection(FILE *file) {
       auto protocolNode = demangleTypeRef(
                          readTypeRef(descriptor, descriptor->ProtocolTypeName));
       auto protocolName = nodeToString(protocolNode);
+      clearNodeFactory();
 
       fprintf(file, "- %s : %s", conformingTypeName.c_str(), protocolName.c_str());
       fprintf(file, "\n");
@@ -419,6 +440,7 @@ void TypeRefBuilder::dumpBuiltinTypeSection(FILE *file) {
       auto typeNode = demangleTypeRef(readTypeRef(descriptor,
                                                   descriptor->TypeName));
       auto typeName = nodeToString(typeNode);
+      clearNodeFactory();
       
       fprintf(file, "\n- %s:\n", typeName.c_str());
       fprintf(file, "Size: %u\n", descriptor->Size);

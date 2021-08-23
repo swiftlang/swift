@@ -40,7 +40,7 @@ class Clazz<T> {
 
 func doit() {
   assertIsPrespecialized(Clazz<Int>.self, is: true)
-  assertIsPrespecialized(clazzArgument: Int.self, is: true) // Clazz<Int> is prespecialized by the preceeding call
+  assertIsPrespecialized(clazzArgument: Int.self, is: true) // Clazz<Int> is prespecialized by the preceding call
 
   assertIsPrespecialized(clazzArgument: Double.self, is: false) // Clazz<Double> is not prespecialized
 }

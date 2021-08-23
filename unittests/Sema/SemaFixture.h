@@ -20,6 +20,7 @@
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Sema/ConstraintSystem.h"
+#include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Host.h"
@@ -28,6 +29,7 @@
 #include <string>
 
 using namespace swift::constraints;
+using namespace swift::constraints::inference;
 
 namespace swift {
 namespace unittest {
@@ -38,6 +40,7 @@ public:
   TypeCheckerOptions TypeCheckerOpts;
   SearchPathOptions SearchPathOpts;
   ClangImporterOptions ClangImporterOpts;
+  symbolgraphgen::SymbolGraphOptions SymbolGraphOpts;
   SourceManager SourceMgr;
   DiagnosticEngine Diags;
 
@@ -67,11 +70,16 @@ public:
 protected:
   Type getStdlibType(StringRef name) const;
 
+  NominalTypeDecl *getStdlibNominalTypeDecl(StringRef name) const;
+
+  VarDecl *addExtensionVarMember(NominalTypeDecl *decl, StringRef name,
+                                 Type type) const;
+
   ProtocolType *createProtocol(llvm::StringRef protocolName,
                                Type parent = Type());
 
-  static ConstraintSystem::PotentialBindings
-  inferBindings(ConstraintSystem &cs, TypeVariableType *typeVar);
+  static BindingSet inferBindings(ConstraintSystem &cs,
+                                  TypeVariableType *typeVar);
 };
 
 } // end namespace unittest

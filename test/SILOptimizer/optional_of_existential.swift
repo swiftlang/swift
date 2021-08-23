@@ -17,10 +17,11 @@ struct X : Q {
 
 // CHECK-LABEL: sil hidden @$s4test1XV0A2MeSiSgvg : $@convention(method) (X) -> Optional<Int> {
 // CHECK:      bb0(%0 : $X):
+// CHECK-NEXT:   debug_value
 // CHECK-NEXT:   integer_literal ${{.*}}, 0
 // CHECK-NEXT:   struct $Int
-// CHECK-NEXT:   enum $Optional<Int>, #Optional.some!enumelt
-// CHECK-NEXT:   return %3 : $Optional<Int>
+// CHECK-NEXT:   %[[ENUM:[0-9]+]] = enum $Optional<Int>, #Optional.some!enumelt
+// CHECK-NEXT:   return %[[ENUM]] : $Optional<Int>
 // CHECK-NEXT: } // end sil function '$s4test1XV0A2MeSiSgvg'
   var testMe: Int? { z }
 }

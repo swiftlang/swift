@@ -113,7 +113,7 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
     break;
   case IRGenDebugInfoLevel::ASTTypes:
   case IRGenDebugInfoLevel::DwarfTypes:
-    CGO.DebugTypeExtRefs = true;
+    CGO.DebugTypeExtRefs = !Opts.DisableClangModuleSkeletonCUs;
     CGO.setDebugInfo(clang::codegenoptions::DebugInfoKind::FullDebugInfo);
     break;
   }
@@ -548,6 +548,17 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   DefaultCC = SWIFT_DEFAULT_LLVM_CC;
   SwiftCC = llvm::CallingConv::Swift;
 
+  bool isAsyncCCSupported =
+    clangASTContext.getTargetInfo().checkCallingConvention(clang::CC_SwiftAsync)
+    == clang::TargetInfo::CCCR_OK;
+  if (isAsyncCCSupported) {
+    SwiftAsyncCC = llvm::CallingConv::SwiftTail;
+    AsyncTailCallKind = llvm::CallInst::TCK_MustTail;
+  } else {
+    SwiftAsyncCC = SwiftCC;
+    AsyncTailCallKind = llvm::CallInst::TCK_Tail;
+  }
+
   if (opts.DebugInfoLevel > IRGenDebugInfoLevel::None)
     DebugInfo = IRGenDebugInfo::createIRGenDebugInfo(IRGen.Opts, *CI, *this,
                                                      Module,
@@ -592,37 +603,76 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
 
   AsyncFunctionPointerTy = createStructType(*this, "swift.async_func_pointer",
                                             {RelativeAddressTy, Int32Ty}, true);
-  SwiftContextTy = createStructType(*this, "swift.context", {});
-  auto *ContextPtrTy = llvm::PointerType::getUnqual(SwiftContextTy);
-  SwiftTaskTy = createStructType(*this, "swift.task", {
-    Int8PtrTy, Int8PtrTy, // Job.SchedulerPrivate
-    Int64Ty,              // Job.Flags
-    FunctionPtrTy,        // Job.RunJob/Job.ResumeTask
-    ContextPtrTy,         // Task.ResumeContext
-    Int64Ty               // Task.Status
-  });
-  SwiftExecutorTy = createStructType(*this, "swift.executor", {});
-  AsyncFunctionPointerPtrTy = AsyncFunctionPointerTy->getPointerTo(DefaultAS);
+  SwiftContextTy = llvm::StructType::create(getLLVMContext(), "swift.context");
   SwiftContextPtrTy = SwiftContextTy->getPointerTo(DefaultAS);
+
+  // This must match the definition of class AsyncTask in swift/ABI/Task.h.
+  SwiftTaskTy = createStructType(*this, "swift.task", {
+    RefCountedStructTy,   // object header
+    Int8PtrTy, Int8PtrTy, // Job.SchedulerPrivate
+    Int32Ty,              // Job.Flags
+    Int32Ty,              // Job.ID
+    Int8PtrTy, Int8PtrTy, // Reserved
+    FunctionPtrTy,        // Job.RunJob/Job.ResumeTask
+    SwiftContextPtrTy,    // Task.ResumeContext
+    IntPtrTy              // Task.Status
+  });
+
+  AsyncFunctionPointerPtrTy = AsyncFunctionPointerTy->getPointerTo(DefaultAS);
   SwiftTaskPtrTy = SwiftTaskTy->getPointerTo(DefaultAS);
-  SwiftExecutorPtrTy = SwiftExecutorTy->getPointerTo(DefaultAS);
+  SwiftAsyncLetPtrTy = Int8PtrTy; // we pass it opaquely (AsyncLet*)
+  SwiftTaskOptionRecordPtrTy = SizeTy; // Builtin.RawPointer? that we get as (TaskOptionRecord*)
+  SwiftTaskGroupPtrTy = Int8PtrTy; // we pass it opaquely (TaskGroup*)
+  SwiftTaskOptionRecordTy = createStructType(*this, "swift.task_option", {
+    SizeTy,                     // Flags
+    SwiftTaskOptionRecordPtrTy, // Parent
+  });
+  SwiftTaskGroupTaskOptionRecordTy = createStructType(
+      *this, "swift.task_group_task_option", {
+    SwiftTaskOptionRecordTy,    // Base option record
+    SwiftTaskGroupPtrTy,        // Task group
+  });
+  ExecutorFirstTy = SizeTy;
+  ExecutorSecondTy = SizeTy;
+  SwiftExecutorTy = createStructType(*this, "swift.executor", {
+    ExecutorFirstTy,      // identity
+    ExecutorSecondTy,     // implementation
+  });
+  SwiftJobTy = createStructType(*this, "swift.job", {
+    RefCountedStructTy,   // object header
+    Int8PtrTy, Int8PtrTy, // SchedulerPrivate
+    Int32Ty,              // flags
+    Int32Ty,              // ID
+    Int8PtrTy, Int8PtrTy, // Reserved
+    FunctionPtrTy,        // RunJob/ResumeTask
+  });
+  SwiftJobPtrTy = SwiftJobTy->getPointerTo(DefaultAS);
 
   // using TaskContinuationFunction =
-  //   SWIFT_CC(swift)
-  //   void (AsyncTask *, ExecutorRef, AsyncContext *);
+  //   SWIFT_CC(swift) void (SWIFT_ASYNC_CONTEXT AsyncContext *);
   TaskContinuationFunctionTy = llvm::FunctionType::get(
-      VoidTy, {SwiftTaskPtrTy, SwiftExecutorPtrTy, SwiftContextPtrTy},
-      /*isVarArg*/ false);
+      VoidTy, {SwiftContextPtrTy}, /*isVarArg*/ false);
   TaskContinuationFunctionPtrTy = TaskContinuationFunctionTy->getPointerTo();
+
+  SwiftContextTy->setBody({
+    SwiftContextPtrTy,    // Parent
+    TaskContinuationFunctionPtrTy, // ResumeParent,
+    SizeTy,               // Flags
+  });
 
   AsyncTaskAndContextTy = createStructType(
       *this, "swift.async_task_and_context",
       { SwiftTaskPtrTy, SwiftContextPtrTy });
 
-  AsyncContinuationContextTy = createStructType(
-      *this, "swift.async_continuation_context",
-      {SwiftContextPtrTy, SizeTy, ErrorPtrTy, OpaquePtrTy, SwiftExecutorPtrTy});
-  AsyncContinuationContextPtrTy = AsyncContinuationContextTy->getPointerTo();
+  ContinuationAsyncContextTy = createStructType(
+      *this, "swift.continuation_context",
+      {SwiftContextTy,       // AsyncContext header
+       SizeTy,               // await synchronization
+       ErrorPtrTy,           // error result pointer
+       OpaquePtrTy,          // normal result address
+       SwiftExecutorTy});    // resume to executor
+  ContinuationAsyncContextPtrTy =
+    ContinuationAsyncContextTy->getPointerTo(DefaultAS);
 
   DifferentiabilityWitnessTy = createStructType(
       *this, "swift.differentiability_witness", {Int8PtrTy, Int8PtrTy});
@@ -743,6 +793,26 @@ namespace RuntimeConstants {
     }
     return RuntimeAvailability::AlwaysAvailable;
   }
+
+  RuntimeAvailability
+  MultiPayloadEnumTagSinglePayloadAvailability(ASTContext &context) {
+    auto featureAvailability = context.getMultiPayloadEnumTagSinglePayload();
+    if (!isDeploymentAvailabilityContainedIn(context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
+  RuntimeAvailability
+  ObjCIsUniquelyReferencedAvailability(ASTContext &context) {
+    auto featureAvailability =
+        context.getObjCIsUniquelyReferencedAvailability();
+    if (!isDeploymentAvailabilityContainedIn(context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
 } // namespace RuntimeConstants
 
 // We don't use enough attributes to justify generalizing the
@@ -865,6 +935,11 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
   }
 
   return cache;
+}
+
+llvm::Constant *IRGenModule::getDeletedAsyncMethodErrorAsyncFunctionPointer() {
+  return getAddrOfLLVMVariableOrGOTEquivalent(
+      LinkEntity::forKnownAsyncFunctionPointer("swift_deletedAsyncMethodError")).getValue();
 }
 
 #define QUOTE(...) __VA_ARGS__
@@ -1154,7 +1229,7 @@ llvm::SmallString<32> getTargetDependentLibraryOption(const llvm::Triple &T,
   llvm::SmallString<32> buffer;
 
   if (T.isWindowsMSVCEnvironment() || T.isWindowsItaniumEnvironment()) {
-    bool quote = library.find(' ') != StringRef::npos;
+    bool quote = library.contains(' ');
 
     buffer += "/DEFAULTLIB:";
     if (quote)
@@ -1165,7 +1240,7 @@ llvm::SmallString<32> getTargetDependentLibraryOption(const llvm::Triple &T,
     if (quote)
       buffer += '"';
   } else if (T.isPS4()) {
-    bool quote = library.find(' ') != StringRef::npos;
+    bool quote = library.contains(' ');
 
     buffer += "\01";
     if (quote)
@@ -1255,18 +1330,6 @@ static bool replaceModuleFlagsEntry(llvm::LLVMContext &Ctx,
     }
   }
   llvm_unreachable("Could not replace old linker options entry?");
-}
-
-/// Returns true if the object file generated by \p IGM will be the "first"
-/// object file in the module. This lets us determine where to put a symbol
-/// that must be unique.
-static bool isFirstObjectFileInModule(IRGenModule &IGM) {
-  if (IGM.getSILModule().isWholeModule())
-    return IGM.IRGen.getPrimaryIGM() == &IGM;
-
-  auto *file = cast<FileUnit>(IGM.getSILModule().getAssociatedContext());
-  auto *containingModule = file->getParentModule();
-  return containingModule->getFiles().front() == file;
 }
 
 static bool
@@ -1443,6 +1506,47 @@ AutolinkKind AutolinkKind::create(const SwiftTargetInfo &TargetInfo,
   return AutolinkKind::LLVMLinkerOptions;
 }
 
+static llvm::GlobalObject *createForceImportThunk(IRGenModule &IGM) {
+  llvm::SmallString<64> buf;
+  encodeForceLoadSymbolName(buf, IGM.IRGen.Opts.ForceLoadSymbolName);
+  if (IGM.Triple.isOSBinFormatMachO()) {
+    // On Mach-O targets, emit a common force-load symbol that resolves to
+    // a global variable so it will be coalesced at static link time into a
+    // single external symbol.
+    //
+    // Looks like C's tentative definitions are good for something after all.
+    auto ForceImportThunk =
+        new llvm::GlobalVariable(IGM.Module,
+                                 IGM.Int1Ty,
+                                 /*isConstant=*/false,
+                                 llvm::GlobalValue::CommonLinkage,
+                                 llvm::Constant::getNullValue(IGM.Int1Ty),
+                                 buf.str());
+    ApplyIRLinkage(IRLinkage::ExternalCommon).to(ForceImportThunk);
+    IGM.addUsedGlobal(ForceImportThunk);
+    return ForceImportThunk;
+  } else {
+    // On all other targets, emit an external symbol that resolves to a
+    // function definition. On Windows, linkonce_odr is basically a no-op and
+    // the COMDAT we set by applying linkage gives us the desired coalescing
+    // behavior.
+    auto ForceImportThunk =
+        llvm::Function::Create(llvm::FunctionType::get(IGM.VoidTy, false),
+                               llvm::GlobalValue::LinkOnceODRLinkage, buf,
+                               &IGM.Module);
+    ForceImportThunk->setAttributes(IGM.constructInitialAttributes());
+    ApplyIRLinkage(IRLinkage::ExternalExport).to(ForceImportThunk);
+    if (IGM.Triple.supportsCOMDAT())
+      if (auto *GO = cast<llvm::GlobalObject>(ForceImportThunk))
+        GO->setComdat(IGM.Module.getOrInsertComdat(ForceImportThunk->getName()));
+
+    auto BB = llvm::BasicBlock::Create(IGM.getLLVMContext(), "", ForceImportThunk);
+    llvm::IRBuilder<> IRB(BB);
+    IRB.CreateRetVoid();
+    return ForceImportThunk;
+  }
+}
+
 void IRGenModule::emitAutolinkInfo() {
   auto Autolink =
       AutolinkKind::create(TargetInfo, Triple, IRGen.Opts.LLVMLTOKind);
@@ -1461,23 +1565,8 @@ void IRGenModule::emitAutolinkInfo() {
 
   Autolink.writeEntries(Entries, Metadata, *this);
 
-  if (!IRGen.Opts.ForceLoadSymbolName.empty() &&
-      (Triple.supportsCOMDAT() || isFirstObjectFileInModule(*this))) {
-    llvm::SmallString<64> buf;
-    encodeForceLoadSymbolName(buf, IRGen.Opts.ForceLoadSymbolName);
-    auto ForceImportThunk =
-        llvm::Function::Create(llvm::FunctionType::get(VoidTy, false),
-                               llvm::GlobalValue::ExternalLinkage, buf,
-                               &Module);
-    ForceImportThunk->setAttributes(constructInitialAttributes());
-    ApplyIRLinkage(IRLinkage::ExternalExport).to(ForceImportThunk);
-    if (Triple.supportsCOMDAT())
-      if (auto *GO = cast<llvm::GlobalObject>(ForceImportThunk))
-        GO->setComdat(Module.getOrInsertComdat(ForceImportThunk->getName()));
-
-    auto BB = llvm::BasicBlock::Create(getLLVMContext(), "", ForceImportThunk);
-    llvm::IRBuilder<> IRB(BB);
-    IRB.CreateRetVoid();
+  if (!IRGen.Opts.ForceLoadSymbolName.empty()) {
+    (void) createForceImportThunk(*this);
   }
 }
 
@@ -1561,6 +1650,16 @@ bool IRGenModule::finalize() {
     DebugInfo->finalize();
   cleanupClangCodeGenMetadata();
 
+  // Clean up DSOLocal & DLLImport attributes, they cannot be applied together.
+  // The imported declarations are marked as DSO local by default.
+  for (auto &GV : Module.globals())
+    if (GV.hasDLLImportStorageClass())
+      GV.setDSOLocal(false);
+
+  for (auto &F : Module.functions())
+    if (F.hasDLLImportStorageClass())
+      F.setDSOLocal(false);
+
   return true;
 }
 
@@ -1600,9 +1699,10 @@ bool IRGenModule::useDllStorage() { return ::useDllStorage(Triple); }
 
 bool IRGenModule::shouldPrespecializeGenericMetadata() {
   auto canPrespecializeTarget =
-      (Triple.isOSDarwin() || Triple.isTvOS() || Triple.isOSLinux());
+      (Triple.isOSDarwin() ||
+       (Triple.isOSLinux() && !(Triple.isARM() && Triple.isArch32Bit())));
   if (canPrespecializeTarget && isStandardLibrary()) {
-    return true;
+    return IRGen.Opts.PrespecializeGenericMetadata;
   }
   auto &context = getSwiftModule()->getASTContext();
   auto deploymentAvailability =

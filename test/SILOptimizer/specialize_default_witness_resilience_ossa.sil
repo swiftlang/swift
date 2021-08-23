@@ -25,25 +25,25 @@ public struct ConformingNonTrivialStruct : ResilientProtocol {
   public func defaultB()
 }
 
-// CHECK-LABEL: sil shared [ossa] @$s8defaultA4main16ConformingStructV_Tg5
+// CHECK-LABEL: sil shared [ossa] @$s8defaultA4main16ConformingStructV_TB5
 // CHECK:       bb0(%0 : $ConformingStruct):
 // CHECK-NEXT:    [[TMP:%.*]] = alloc_stack $ConformingStruct
 // CHECK-NEXT:    store %0 to [trivial] [[TMP]] : $*ConformingStruct
-// CHECK:         [[FN:%.*]] = function_ref @$s8defaultB4main16ConformingStructV_Tg5
+// CHECK:         [[FN:%.*]] = function_ref @$s8defaultB4main16ConformingStructV_TB5
 // CHECK-NEXT:    [[LOAD:%.*]] = load [trivial] [[TMP]] : $*ConformingStruct
 // CHECK-NEXT:    [[RESULT:%.*]] = apply [[FN]]([[LOAD]])
 // CHECK-NEXT:    dealloc_stack [[TMP]] : $*ConformingStruct
-// CHECK } // end sil function 's8defaultA4main16ConformingStructV_Tg5'
+// CHECK } // end sil function 's8defaultA4main16ConformingStructV_TB5'
 
-// CHECK-LABEL: sil shared [ossa] @$s8defaultA4main26ConformingNonTrivialStructV_Tg5
+// CHECK-LABEL: sil shared [ossa] @$s8defaultA4main26ConformingNonTrivialStructV_TB5
 // CHECK:       bb0(%0 : @guaranteed $ConformingNonTrivialStruct):
 // CHECK-NEXT:    [[TMP:%.*]] = alloc_stack $ConformingNonTrivialStruct
 // CHECK-NEXT:    store_borrow %0 to [[TMP]] : $*ConformingNonTrivialStruct
-// CHECK:         [[FN:%.*]] = function_ref @$s8defaultB4main26ConformingNonTrivialStructV_Tg5
+// CHECK:         [[FN:%.*]] = function_ref @$s8defaultB4main26ConformingNonTrivialStructV_TB5
 // CHECK-NEXT:    [[LOAD:%.*]] = load_borrow [[TMP]] : $*ConformingNonTrivialStruct
 // CHECK-NEXT:    [[RESULT:%.*]] = apply [[FN]]([[LOAD]])
 // CHECK:         dealloc_stack [[TMP]] : $*ConformingNonTrivialStruct
-// CHECK } // end sil function 's8defaultA4main16ConformingNonTrivialStructV_Tg5'
+// CHECK } // end sil function 's8defaultA4main16ConformingNonTrivialStructV_TB5'
 
 sil [ossa] @defaultA : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> () {
 bb0(%0 : $*Self):
@@ -52,19 +52,19 @@ bb0(%0 : $*Self):
   return %result : $()
 }
 
-// CHECK-LABEL: sil shared [ossa] @$s8defaultB4main16ConformingStructV_Tg5 :
+// CHECK-LABEL: sil shared [ossa] @$s8defaultB4main16ConformingStructV_TB5 :
 // CHECK:       bb0(%0 : $ConformingStruct):
 // CHECK-NEXT:    [[TMP:%.*]] = alloc_stack $ConformingStruct
 // CHECK-NEXT:    store %0 to [trivial] [[TMP]] : $*ConformingStruct
 // CHECK:    dealloc_stack [[TMP]] : $*ConformingStruct
-// CHECK: } // end sil function '$s8defaultB4main16ConformingStructV_Tg5'
+// CHECK: } // end sil function '$s8defaultB4main16ConformingStructV_TB5'
 
-// CHECK-LABEL: sil shared [ossa] @$s8defaultB4main26ConformingNonTrivialStructV_Tg5 :
+// CHECK-LABEL: sil shared [ossa] @$s8defaultB4main26ConformingNonTrivialStructV_TB5 :
 // CHECK:       bb0(%0 : @guaranteed $ConformingNonTrivialStruct):
 // CHECK-NEXT:    [[TMP:%.*]] = alloc_stack $ConformingNonTrivialStruct
 // CHECK-NEXT:    store_borrow %0 to [[TMP]] : $*ConformingNonTrivialStruct
 // CHECK:    dealloc_stack [[TMP]] : $*ConformingNonTrivialStruct
-// CHECK: } // end sil function '$s8defaultB4main26ConformingNonTrivialStructV_Tg5'
+// CHECK: } // end sil function '$s8defaultB4main26ConformingNonTrivialStructV_TB5'
 
 sil [ossa] @defaultB : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> () {
 bb0(%0 : $*Self):
@@ -74,7 +74,7 @@ bb0(%0 : $*Self):
 
 // CHECK-LABEL: sil hidden [ossa] @test_specialize_default_witness_method
 // CHECK:       bb0(%0 : $*ConformingStruct):
-// CHECK:         [[FN:%.*]] = function_ref @$s8defaultA4main16ConformingStructV_Tg5
+// CHECK:         [[FN:%.*]] = function_ref @$s8defaultA4main16ConformingStructV_TB5
 // CHECK-NEXT:    [[VALUE:%.*]] = load [trivial] %0 : $*ConformingStruct
 // CHECK-NEXT:    [[RESULT:%.*]] = apply [[FN]]([[VALUE]])
 // CHECK-NEXT:    return [[RESULT]]
@@ -88,7 +88,7 @@ bb0(%0 : $*ConformingStruct):
 
 // CHECK-LABEL: sil hidden [ossa] @test_specialize_default_witness_method_nontrivial
 // CHECK:       bb0(%0 : $*ConformingNonTrivialStruct):
-// CHECK:         [[FN:%.*]] = function_ref @$s8defaultA4main26ConformingNonTrivialStructV_Tg5
+// CHECK:         [[FN:%.*]] = function_ref @$s8defaultA4main26ConformingNonTrivialStructV_TB5
 // CHECK-NEXT:    [[VALUE:%.*]] = load_borrow %0 : $*ConformingNonTrivialStruct
 // CHECK-NEXT:    [[RESULT:%.*]] = apply [[FN]]([[VALUE]])
 // CHECK: } // end sil function 'test_specialize_default_witness_method_nontrivial'

@@ -169,7 +169,7 @@
 ///       let numberPointer = UnsafeRawPointer(&number)
 ///       // Accessing 'numberPointer' is undefined behavior.
 @frozen
-public struct UnsafeRawPointer: _Pointer {
+public struct UnsafeRawPointer: _Pointer, Sendable {
   
   public typealias Pointee = UInt8
   
@@ -521,7 +521,7 @@ extension UnsafeRawPointer: Strideable {
 ///       let numberPointer = UnsafeMutableRawPointer(&number)
 ///       // Accessing 'numberPointer' is undefined behavior.
 @frozen
-public struct UnsafeMutableRawPointer: _Pointer {
+public struct UnsafeMutableRawPointer: _Pointer, Sendable {
   
   public typealias Pointee = UInt8
   
@@ -600,7 +600,7 @@ public struct UnsafeMutableRawPointer: _Pointer {
   /// - Parameters:
   ///   - byteCount: The number of bytes to allocate. `byteCount` must not be negative.
   ///   - alignment: The alignment of the new region of allocated memory, in
-  ///     bytes.
+  ///     bytes. `alignment` must be a whole power of 2.
   /// - Returns: A pointer to a newly allocated region of memory. The memory is
   ///   allocated, but not initialized.
   @inlinable

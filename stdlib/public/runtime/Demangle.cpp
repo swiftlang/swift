@@ -482,6 +482,9 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
         parent->addChild(input, Dem);
         input = parent;
       };
+      if (flags.isNoDerivative()) {
+        wrapInput(Node::Kind::NoDerivative);
+      }
       switch (flags.getValueOwnership()) {
       case ValueOwnership::Default:
         /* nothing */
@@ -495,6 +498,9 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
       case ValueOwnership::Owned:
         wrapInput(Node::Kind::Owned);
         break;
+      }
+      if (flags.isIsolated()) {
+        wrapInput(Node::Kind::Isolated);
       }
 
       inputs.push_back({input, flags.isVariadic()});
@@ -561,10 +567,47 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
     result->addChild(resultTy, Dem);
     
     auto funcNode = Dem.createNode(kind);
+    if (func->hasGlobalActor()) {
+      auto globalActorTypeNode =
+          _swift_buildDemanglingForMetadata(func->getGlobalActor(), Dem);
+      NodePointer globalActorNode =
+          Dem.createNode(Node::Kind::GlobalActorFunctionType);
+      globalActorNode->addChild(globalActorTypeNode, Dem);
+      funcNode->addChild(globalActorNode, Dem);
+    }
+    switch (func->getDifferentiabilityKind().Value) {
+    case FunctionMetadataDifferentiabilityKind::NonDifferentiable:
+      break;
+    case FunctionMetadataDifferentiabilityKind::Forward:
+      funcNode->addChild(Dem.createNode(
+          Node::Kind::DifferentiableFunctionType,
+          (Node::IndexType)MangledDifferentiabilityKind::Forward), Dem);
+      break;
+    case FunctionMetadataDifferentiabilityKind::Reverse:
+      funcNode->addChild(Dem.createNode(
+          Node::Kind::DifferentiableFunctionType,
+          (Node::IndexType)MangledDifferentiabilityKind::Reverse), Dem);
+      break;
+    case FunctionMetadataDifferentiabilityKind::Normal:
+      funcNode->addChild(Dem.createNode(
+          Node::Kind::DifferentiableFunctionType,
+          (Node::IndexType)MangledDifferentiabilityKind::Normal), Dem);
+      break;
+    case FunctionMetadataDifferentiabilityKind::Linear:
+      funcNode->addChild(Dem.createNode(
+          Node::Kind::DifferentiableFunctionType,
+          (Node::IndexType)MangledDifferentiabilityKind::Linear), Dem);
+      break;
+    }
     if (func->isThrowing())
       funcNode->addChild(Dem.createNode(Node::Kind::ThrowsAnnotation), Dem);
+    if (func->isSendable()) {
+      funcNode->addChild(
+          Dem.createNode(Node::Kind::ConcurrentFunctionType), Dem);
+    }
     if (func->isAsync())
       funcNode->addChild(Dem.createNode(Node::Kind::AsyncAnnotation), Dem);
+
     funcNode->addChild(parameters, Dem);
     funcNode->addChild(result, Dem);
     return funcNode;

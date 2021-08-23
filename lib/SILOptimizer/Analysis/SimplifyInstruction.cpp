@@ -20,12 +20,15 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-simplify"
+
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
+#include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILOptimizer/Analysis/ValueTracking.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 
 using namespace swift;
 using namespace swift::PatternMatch;
@@ -67,6 +70,7 @@ namespace {
     SILValue visitPointerToThinFunctionInst(PointerToThinFunctionInst *PTTFI);
     SILValue visitBeginAccessInst(BeginAccessInst *BAI);
     SILValue visitMetatypeInst(MetatypeInst *MTI);
+    SILValue visitConvertFunctionInst(ConvertFunctionInst *cfi);
 
     SILValue simplifyOverflowBuiltin(BuiltinInst *BI);
   };
@@ -142,39 +146,43 @@ SILValue InstSimplifier::visitTupleInst(TupleInst *TI) {
   return SILValue();
 }
 
-SILValue InstSimplifier::visitTupleExtractInst(TupleExtractInst *TEI) {
+SILValue InstSimplifier::visitTupleExtractInst(TupleExtractInst *tei) {
+  auto op = lookThroughOwnershipInsts(tei->getOperand());
+
   // tuple_extract(tuple(x, y), 0) -> x
-  if (auto *TheTuple = dyn_cast<TupleInst>(TEI->getOperand()))
-    return TheTuple->getElement(TEI->getFieldIndex());
+  if (auto *tupleInst = dyn_cast<TupleInst>(op))
+    return tupleInst->getElement(tei->getFieldIndex());
 
   // tuple_extract(apply([add|sub|...]overflow(x,y)),  0) -> x
   // tuple_extract(apply(checked_trunc(ext(x))), 0) -> x
-  if (TEI->getFieldIndex() == 0)
-    if (auto *BI = dyn_cast<BuiltinInst>(TEI->getOperand()))
-      return simplifyOverflowBuiltin(BI);
+  if (tei->getFieldIndex() == 0)
+    if (auto *bi = dyn_cast<BuiltinInst>(tei->getOperand()))
+      return simplifyOverflowBuiltin(bi);
 
   return SILValue();
 }
 
-SILValue InstSimplifier::visitStructExtractInst(StructExtractInst *SEI) {
+SILValue InstSimplifier::visitStructExtractInst(StructExtractInst *sei) {
+  auto op = lookThroughOwnershipInsts(sei->getOperand());
+
   // struct_extract(struct(x, y), x) -> x
-  if (auto *Struct = dyn_cast<StructInst>(SEI->getOperand()))
-    return Struct->getFieldValue(SEI->getField());
+  if (auto *si = dyn_cast<StructInst>(op))
+    return si->getFieldValue(sei->getField());
 
   return SILValue();
 }
 
 SILValue
-InstSimplifier::
-visitUncheckedEnumDataInst(UncheckedEnumDataInst *UEDI) {
+InstSimplifier::visitUncheckedEnumDataInst(UncheckedEnumDataInst *uedi) {
   // (unchecked_enum_data (enum payload)) -> payload
-  if (auto *EI = dyn_cast<EnumInst>(UEDI->getOperand())) {
-    if (EI->getElement() != UEDI->getElement())
+  auto opt = lookThroughOwnershipInsts(uedi->getOperand());
+  if (auto *ei = dyn_cast<EnumInst>(opt)) {
+    if (ei->getElement() != uedi->getElement())
       return SILValue();
 
-    assert(EI->hasOperand() &&
+    assert(ei->hasOperand() &&
            "Should only get data from an enum with payload.");
-    return EI->getOperand();
+    return lookThroughOwnershipInsts(ei->getOperand());
   }
 
   return SILValue();
@@ -297,7 +305,6 @@ SILValue InstSimplifier::visitAddressToPointerInst(AddressToPointerInst *ATPI) {
 }
 
 SILValue InstSimplifier::visitPointerToAddressInst(PointerToAddressInst *PTAI) {
-  // (pointer_to_address strict (address_to_pointer x)) -> x
   // If this address is not strict, then it cannot be replaced by an address
   // that may be strict.
   if (auto *ATPI = dyn_cast<AddressToPointerInst>(PTAI->getOperand()))
@@ -319,6 +326,29 @@ SILValue InstSimplifier::visitRefToRawPointerInst(RefToRawPointerInst *RefToRaw)
   return SILValue();
 }
 
+/// If the only use of a cast is a destroy, just destroy the cast operand.
+static SILValue simplifyDeadCast(SingleValueInstruction *Cast) {
+  if (!Cast->hasUsesOfAnyResult())
+    return SILValue();
+
+  for (Operand *op : Cast->getUses()) {
+    switch (op->getUser()->getKind()) {
+      case SILInstructionKind::DestroyValueInst:
+        break;
+      case SILInstructionKind::StrongReleaseInst:
+      case SILInstructionKind::StrongRetainInst:
+        // ref-casts can cast from an Optional<Classtype>. But strong_retain/
+        // strong_release don't accept an optional.
+        if (!Cast->getOperand(0)->getType().isReferenceCounted(Cast->getModule()))
+          return SILValue();
+        break;
+      default:
+        return SILValue();
+    }
+  }
+  return Cast->getOperand(0);
+}
+
 SILValue
 InstSimplifier::
 visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI) {
@@ -327,22 +357,7 @@ visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI) {
     if (UCCI->getType() == upcast->getOperand()->getType())
       return upcast->getOperand();
 
-  return SILValue();
-}
-
-/// If the only use of a cast is a destroy, just destroy the cast operand.
-static SILValue simplifyDeadCast(SingleValueInstruction *Cast) {
-  for (Operand *op : Cast->getUses()) {
-    switch (op->getUser()->getKind()) {
-      case SILInstructionKind::DestroyValueInst:
-      case SILInstructionKind::StrongReleaseInst:
-      case SILInstructionKind::StrongRetainInst:
-        break;
-      default:
-        return SILValue();
-    }
-  }
-  return Cast->getOperand(0);
+  return simplifyDeadCast(UCCI);
 }
 
 SILValue
@@ -474,6 +489,19 @@ SILValue InstSimplifier::visitBeginAccessInst(BeginAccessInst *BAI) {
       })) {
     return BAI->getOperand();
   }
+  return SILValue();
+}
+
+SILValue InstSimplifier::visitConvertFunctionInst(ConvertFunctionInst *cfi) {
+  // Eliminate round trip convert_function. Non round-trip is performed in
+  // SILCombine.
+  //
+  // (convert_function Y->X (convert_function x X->Y)) -> x
+  SILValue convertedValue = lookThroughOwnershipInsts(cfi->getConverted());
+  if (auto *subCFI = dyn_cast<ConvertFunctionInst>(convertedValue))
+    if (subCFI->getConverted()->getType() == cfi->getType())
+      return lookThroughOwnershipInsts(subCFI->getConverted());
+
   return SILValue();
 }
 
@@ -718,14 +746,9 @@ case BuiltinValueKind::id:
   return SILValue();
 }
 
-/// Try to simplify the specified instruction, performing local
-/// analysis of the operands of the instruction, without looking at its uses
-/// (e.g. constant folding).  If a simpler result can be found, it is
-/// returned, otherwise a null SILValue is returned.
-///
-SILValue swift::simplifyInstruction(SILInstruction *I) {
-  return InstSimplifier().visit(I);
-}
+//===----------------------------------------------------------------------===//
+//                           Top Level Entrypoints
+//===----------------------------------------------------------------------===//
 
 /// Replace an instruction with a simplified result, including any debug uses,
 /// and erase the instruction. If the instruction initiates a scope, do not
@@ -733,37 +756,23 @@ SILValue swift::simplifyInstruction(SILInstruction *I) {
 ///
 /// This is a simple transform based on the above analysis.
 ///
+/// We assume that when ownership is enabled that the IR is in valid OSSA form
+/// before this is called. It will perform fixups as necessary to preserve OSSA.
+///
 /// Return an iterator to the next (nondeleted) instruction.
-SILBasicBlock::iterator swift::replaceAllSimplifiedUsesAndErase(
-    SILInstruction *I, SILValue result,
-    std::function<void(SILInstruction *)> eraseHandler) {
+SILBasicBlock::iterator
+swift::replaceAllSimplifiedUsesAndErase(SILInstruction *i, SILValue result,
+                                        InstModCallbacks &callbacks,
+                                        DeadEndBlocks *deadEndBlocks) {
+  auto *svi = cast<SingleValueInstruction>(i);
+  assert(svi != result && "Cannot RAUW a value with itself");
 
-  auto *SVI = cast<SingleValueInstruction>(I);
-  assert(SVI != result && "Cannot RAUW a value with itself");
-  SILBasicBlock::iterator nextii = std::next(I->getIterator());
-
-  // Only SingleValueInstructions are currently simplified.
-  while (!SVI->use_empty()) {
-    Operand *use = *SVI->use_begin();
-    SILInstruction *user = use->getUser();
-    // Erase the end of scope marker.
-    if (isEndOfScopeMarker(user)) {
-      if (&*nextii == user)
-        ++nextii;
-      if (eraseHandler)
-        eraseHandler(user);
-      else
-        user->eraseFromParent();
-      continue;
-    }
-    use->set(result);
+  if (svi->getFunction()->hasOwnership()) {
+    OwnershipFixupContext ctx{callbacks, *deadEndBlocks};
+    OwnershipRAUWHelper helper(ctx, svi, result);
+    return helper.perform();
   }
-  if (eraseHandler)
-    eraseHandler(I);
-  else
-    I->eraseFromParent();
-
-  return nextii;
+  return replaceAllUsesAndErase(svi, result, callbacks);
 }
 
 /// Simplify invocations of builtin operations that may overflow.
@@ -776,4 +785,47 @@ SILBasicBlock::iterator swift::replaceAllSimplifiedUsesAndErase(
 /// In case when a simplification is not possible, a null SILValue is returned.
 SILValue swift::simplifyOverflowBuiltinInstruction(BuiltinInst *BI) {
   return InstSimplifier().simplifyOverflowBuiltin(BI);
+}
+
+/// Try to simplify the specified instruction, performing local
+/// analysis of the operands of the instruction, without looking at its uses
+/// (e.g. constant folding).  If a simpler result can be found, it is
+/// returned, otherwise a null SILValue is returned.
+///
+/// NOTE: We assume that the insertion point associated with the SILValue must
+/// dominate \p i.
+static SILValue simplifyInstruction(SILInstruction *i) {
+  return InstSimplifier().visit(i);
+}
+
+SILBasicBlock::iterator swift::simplifyAndReplaceAllSimplifiedUsesAndErase(
+    SILInstruction *i, InstModCallbacks &callbacks,
+    DeadEndBlocks *deadEndBlocks) {
+  auto next = std::next(i->getIterator());
+  auto *svi = dyn_cast<SingleValueInstruction>(i);
+  if (!svi)
+    return next;
+  SILValue result = simplifyInstruction(i);
+
+  // If we fail to simplify or the simplified value returned is our passed in
+  // value, just return std::next since we can't simplify.
+  if (!result || svi == result)
+    return next;
+
+  if (!svi->getFunction()->hasOwnership())
+    return replaceAllUsesAndErase(svi, result, callbacks);
+
+  // If we weren't passed a dead end blocks, we can't optimize without ownership
+  // enabled.
+  if (!deadEndBlocks)
+    return next;
+
+  OwnershipFixupContext ctx{callbacks, *deadEndBlocks};
+  OwnershipRAUWHelper helper(ctx, svi, result);
+
+  // If our RAUW helper is invalid, we do not support RAUWing this case, so
+  // just return next.
+  if (!helper.isValid())
+    return next;
+  return helper.perform();
 }

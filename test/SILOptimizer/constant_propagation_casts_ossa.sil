@@ -1,0 +1,96 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -diagnostic-constant-propagation | %FileCheck %s
+sil_stage canonical
+
+//import Swift
+
+class Klass {
+}
+
+class SubKlass : Klass {
+}
+
+class NoSubKlass {
+}
+
+sil [noinline] @blackhole1 : $@convention(thin) (@guaranteed SubKlass) -> ()
+sil [noinline] @blackhole2 : $@convention(thin) (@guaranteed NoSubKlass) -> ()
+
+// CHECK-LABEL: sil [ossa] @test_guaranteed_cast_opt1 :
+// CHECK-NOT: checked_cast_br
+// CHECK: upcast 
+// CHECK-LABEL: } // end sil function 'test_guaranteed_cast_opt1'
+sil [ossa] @test_guaranteed_cast_opt1 : $@convention(thin) (@owned SubKlass) -> () {
+bb0(%0 : @owned $SubKlass):
+  %borrow = begin_borrow %0 : $SubKlass
+  checked_cast_br %borrow : $SubKlass to Klass, bb1, bb2
+
+bb1(%val1 : @guaranteed $Klass):
+  %copy = copy_value %val1: $Klass
+  end_borrow %borrow : $SubKlass
+  destroy_value %copy : $Klass
+  br bb3
+
+bb2(%val2 : @guaranteed $SubKlass):
+  end_borrow %borrow : $SubKlass
+  br bb3
+
+bb3:
+  destroy_value %0 : $SubKlass
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_guaranteed_cast_opt2 :
+// CHECK-NOT: checked_cast_br
+// CHECK: upcast 
+// CHECK-LABEL: } // end sil function 'test_guaranteed_cast_opt2'
+sil [ossa] @test_guaranteed_cast_opt2 : $@convention(thin) (@owned SubKlass) -> () {
+bb0(%0 : @owned $SubKlass):
+  %borrow = begin_borrow %0 : $SubKlass
+  checked_cast_br %borrow : $SubKlass to Klass, bb1, bb2
+
+bb1(%val1 : @guaranteed $Klass):
+  %copy = copy_value %val1: $Klass
+  end_borrow %borrow : $SubKlass
+  destroy_value %copy : $Klass
+  br bb3
+
+bb2(%val2 : @guaranteed $SubKlass):
+  %func = function_ref @blackhole1 : $@convention(thin) (@guaranteed SubKlass) -> ()
+  apply %func(%val2) : $@convention(thin) (@guaranteed SubKlass) -> ()
+  end_borrow %borrow : $SubKlass
+  br bb3
+
+bb3:
+  destroy_value %0 : $SubKlass
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_guaranteed_cast_opt3 :
+// CHECK-NOT: checked_cast_br
+// CHECK: br bb2
+// CHECK-LABEL: } // end sil function 'test_guaranteed_cast_opt3'
+sil [ossa] @test_guaranteed_cast_opt3 : $@convention(thin) (@owned NoSubKlass) -> () {
+bb0(%0 : @owned $NoSubKlass):
+  %borrow = begin_borrow %0 : $NoSubKlass
+  checked_cast_br %borrow : $NoSubKlass to Klass, bb1, bb2
+
+bb1(%val1 : @guaranteed $Klass):
+  %copy = copy_value %val1: $Klass
+  end_borrow %borrow : $NoSubKlass
+  destroy_value %copy : $Klass
+  br bb3
+
+bb2(%val2 : @guaranteed $NoSubKlass):
+  %func = function_ref @blackhole2 : $@convention(thin) (@guaranteed NoSubKlass) -> ()
+  apply %func(%val2) : $@convention(thin) (@guaranteed NoSubKlass) -> ()
+  end_borrow %borrow : $NoSubKlass
+  br bb3
+
+bb3:
+  destroy_value %0 : $NoSubKlass
+  %r = tuple ()
+  return %r : $()
+}
+

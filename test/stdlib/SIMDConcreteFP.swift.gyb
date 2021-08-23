@@ -1,0 +1,87 @@
+//===--- SIMDConcreteFP.swift.gyb -----------------------------*- swift -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2021 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+// RUN: %empty-directory(%t)
+// RUN: %gyb -DCMAKE_SIZEOF_VOID_P=%target-ptrsize %s -o %t/SIMDConcreteFP.swift
+// RUN: %line-directive %t/SIMDConcreteFP.swift -- %target-build-swift %t/SIMDConcreteFP.swift -o %t/a.out
+// RUN: %target-codesign %t/a.out
+// RUN: %line-directive %t/SIMDConcreteFP.swift -- %target-run %t/a.out
+// REQUIRES: executable_test
+// REQUIRES: rdar76545659
+
+import StdlibUnittest
+
+func genericComparisons<T>(
+  _ a: T, _ b: T
+) -> (
+  eq: SIMDMask<T.MaskStorage>,
+  ne: SIMDMask<T.MaskStorage>,
+  lt: SIMDMask<T.MaskStorage>,
+  le: SIMDMask<T.MaskStorage>,
+  gt: SIMDMask<T.MaskStorage>,
+  ge: SIMDMask<T.MaskStorage>
+) where T: SIMD, T.Scalar: Comparable {(
+  eq: a .== b,
+  ne: a .!= b,
+  lt: a .<  b,
+  le: a .<= b,
+  gt: a .>  b,
+  ge: a .>= b
+)}
+
+%for (Scalar, bits) in [('Float16',16), ('Float',32), ('Double',64)]:
+% for n in [2,3,4,8,16,32,64]:
+%  Vector = "SIMD" + str(n) + "<" + Scalar + ">"
+%  storageN = 4 if n == 3 else n
+%  Builtin = "Vec" + str(storageN) + "xFPIEEE" + str(bits)
+var ${Scalar}x${n}_TestSuite = TestSuite("${Scalar}x${n}")
+
+%  if bits == 16:
+#if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
+%  end
+${Scalar}x${n}_TestSuite.test("comparisons") {
+%  if bits == 16:
+  if #available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
+%  end
+  let a = ${Vector}.random(in: -1 ..< 1)
+  let ap1 = a + ${Vector}(repeating: 1)
+  expectTrue(all(a .== a))
+  expectFalse(any(a .!= a))
+  expectFalse(any(a .== ap1))
+  expectTrue(all(a .!= ap1))
+  expectTrue(all(a .< ap1))
+  expectTrue(all(a .<= ap1))
+  expectFalse(any(a .> ap1))
+  expectFalse(any(a .>= ap1))
+  
+  let b = a.replacing(
+    with: ${Vector}.random(in: -1 ..< 1),
+    where: .random()
+  )
+  let (eq,ne,lt,le,gt,ge) = genericComparisons(a, b)
+  expectEqual(eq, a .== b)
+  expectEqual(ne, a .!= b)
+  expectEqual(lt, a .<  b)
+  expectEqual(le, a .<= b)
+  expectEqual(gt, a .>  b)
+  expectEqual(ge, a .>= b)
+%  if bits == 16:
+  }
+%  end
+}
+%  if bits == 16:
+  #endif
+%  end
+
+% end
+%end
+
+runAllTests()

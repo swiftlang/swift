@@ -1,0 +1,4 @@
+framework module NativeDep [extern_c] {
+  umbrella header "NativeDep.h"
+  export *
+}

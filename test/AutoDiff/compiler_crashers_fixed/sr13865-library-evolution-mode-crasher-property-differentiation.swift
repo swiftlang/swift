@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend -c -enable-library-evolution %s
-// REQUIRES: asserts
 
 // SR-13865: AutoDiff crasher on property derivatives in library evolution mode.
 
@@ -9,17 +8,17 @@ public struct Struct: Differentiable {
   var stored: Float
 
   // Test property.
-  @differentiable
+  @differentiable(reverse)
   public var property: Float {
     stored
   }
 
-  @differentiable
+  @differentiable(reverse)
   public var property2: Float {
     stored + stored
   }
 
-  @differentiable
+  @differentiable(reverse)
   public var property3: Float {
     stored.squareRoot()
   }
@@ -34,7 +33,7 @@ public struct Struct: Differentiable {
 // 2.	While evaluating request ExecuteSILPipelineRequest(Run pipelines { Mandatory Diagnostic Passes + Enabling Optimization Passes } on SIL for test2.test2)
 // 3.	While running pass #157 SILModuleTransform "Differentiation".
 // 4.	While processing // differentiability witness for Struct.property.getter
-// sil_differentiability_witness [serialized] [parameters 0] [results 0] @$s5test26StructV8propertySfvg : $@convention(method) (@in_guaranteed Struct) -> Float {
+// sil_differentiability_witness [serialized] [reverse] [parameters 0] [results 0] @$s5test26StructV8propertySfvg : $@convention(method) (@in_guaranteed Struct) -> Float {
 // }
 // 
 //  on SIL function "@$s5test26StructV8propertySfvg".

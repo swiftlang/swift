@@ -90,29 +90,34 @@ public:
 
   SILModule &getModule() const { return Inst->getModule(); }
 
-  static ApplySite isa(SILNode *node) {
-    auto *i = dyn_cast<SILInstruction>(node);
-    if (!i)
-      return ApplySite();
-
-    auto kind = ApplySiteKind::fromNodeKind(i->getKind());
+  static ApplySite isa(SILInstruction *inst) {
+    auto kind = ApplySiteKind::fromNodeKind(inst->getKind());
     if (!kind)
       return ApplySite();
 
     switch (kind.getValue()) {
     case ApplySiteKind::ApplyInst:
-      return ApplySite(cast<ApplyInst>(node));
+      return ApplySite(cast<ApplyInst>(inst));
     case ApplySiteKind::BeginApplyInst:
-      return ApplySite(cast<BeginApplyInst>(node));
+      return ApplySite(cast<BeginApplyInst>(inst));
     case ApplySiteKind::TryApplyInst:
-      return ApplySite(cast<TryApplyInst>(node));
+      return ApplySite(cast<TryApplyInst>(inst));
     case ApplySiteKind::PartialApplyInst:
-      return ApplySite(cast<PartialApplyInst>(node));
+      return ApplySite(cast<PartialApplyInst>(inst));
     }
     llvm_unreachable("covered switch");
   }
 
+  static ApplySite isa(SILValue value) {
+    if (auto *inst = value->getDefiningInstruction())
+      return ApplySite::isa(inst);
+    return ApplySite();
+  }
+
   ApplySiteKind getKind() const { return ApplySiteKind(Inst->getKind()); }
+
+  SILInstruction *operator*() const { return Inst; }
+  SILInstruction *operator->() const { return Inst; }
 
   explicit operator bool() const { return Inst != nullptr; }
 
@@ -181,8 +186,8 @@ public:
   /// Calls to (previous_)dynamic_function_ref have a dynamic target function so
   /// we should not optimize them.
   bool canOptimize() const {
-    return !DynamicFunctionRefInst::classof(getCallee()) &&
-      !PreviousDynamicFunctionRefInst::classof(getCallee());
+    return !swift::isa<DynamicFunctionRefInst>(getCallee()) &&
+      !swift::isa<PreviousDynamicFunctionRefInst>(getCallee());
   }
 
   /// Return the type.
@@ -337,10 +342,42 @@ public:
   }
 
   /// Return the SILArgumentConvention for the given applied argument operand.
-  SILArgumentConvention getArgumentConvention(Operand &oper) const {
+  SILArgumentConvention getArgumentConvention(const Operand &oper) const {
     unsigned calleeArgIdx =
         getCalleeArgIndexOfFirstAppliedArg() + getAppliedArgIndex(oper);
     return getSubstCalleeConv().getSILArgumentConvention(calleeArgIdx);
+  }
+
+  /// Return the SILArgumentConvention for the given applied argument operand at
+  /// the apply instruction.
+  ///
+  /// For full applies, this is equivalent to `getArgumentConvention`. But for
+  /// a partial_apply, the argument ownership convention at the partial_apply
+  /// instruction itself is different from the argument convention of the callee.
+  /// For details see the partial_apply documentation in SIL.rst.
+  SILArgumentConvention getArgumentOperandConvention(const Operand &oper) const {
+    SILArgumentConvention conv = getArgumentConvention(oper);
+    auto *pai = dyn_cast<PartialApplyInst>(Inst);
+    if (!pai)
+      return conv;
+    switch (conv) {
+    case SILArgumentConvention::Indirect_Inout:
+    case SILArgumentConvention::Indirect_InoutAliasable:
+      return conv;
+    case SILArgumentConvention::Direct_Owned:
+    case SILArgumentConvention::Direct_Unowned:
+    case SILArgumentConvention::Direct_Guaranteed:
+      return pai->isOnStack() ? SILArgumentConvention::Direct_Guaranteed
+                              : SILArgumentConvention::Direct_Owned;
+    case SILArgumentConvention::Indirect_In:
+    case SILArgumentConvention::Indirect_In_Constant:
+    case SILArgumentConvention::Indirect_In_Guaranteed:
+      return pai->isOnStack() ? SILArgumentConvention::Indirect_In_Guaranteed
+                              : SILArgumentConvention::Indirect_In;
+    case SILArgumentConvention::Indirect_Out:
+      llvm_unreachable("partial_apply cannot have an @out operand");
+    }
+    llvm_unreachable("covered switch");
   }
 
   /// Return true if 'self' is an applied argument.
@@ -407,19 +444,30 @@ public:
   /// result argument to the apply site.
   bool isIndirectResultOperand(const Operand &op) const;
 
+  ApplyOptions getApplyOptions() const {
+    switch (ApplySiteKind(getInstruction()->getKind())) {
+    case ApplySiteKind::ApplyInst:
+      return cast<ApplyInst>(Inst)->getApplyOptions();
+    case ApplySiteKind::BeginApplyInst:
+      return cast<BeginApplyInst>(Inst)->getApplyOptions();
+    case ApplySiteKind::TryApplyInst:
+      return cast<TryApplyInst>(Inst)->getApplyOptions();
+    case ApplySiteKind::PartialApplyInst:
+      return ApplyOptions();
+    }
+    llvm_unreachable("covered switch");
+  }
+
   /// Return whether the given apply is of a formally-throwing function
   /// which is statically known not to throw.
   bool isNonThrowing() const {
-    switch (ApplySiteKind(getInstruction()->getKind())) {
-    case ApplySiteKind::ApplyInst:
-      return cast<ApplyInst>(Inst)->isNonThrowing();
-    case ApplySiteKind::BeginApplyInst:
-      return cast<BeginApplyInst>(Inst)->isNonThrowing();
-    case ApplySiteKind::TryApplyInst:
-      return false;
-    case ApplySiteKind::PartialApplyInst:
-      llvm_unreachable("Unhandled case");
-    }
+    return getApplyOptions().contains(ApplyFlags::DoesNotThrow);
+  }
+
+  /// Return whether the given apply is of a formally-async function
+  /// which is statically known not to await.
+  bool isNonAsync() const {
+    return getApplyOptions().contains(ApplyFlags::DoesNotAwait);
   }
 
   static ApplySite getFromOpaqueValue(void *p) { return ApplySite(p); }
@@ -493,22 +541,25 @@ public:
   FullApplySite(BeginApplyInst *inst) : ApplySite(inst) {}
   FullApplySite(TryApplyInst *inst) : ApplySite(inst) {}
 
-  static FullApplySite isa(SILNode *node) {
-    auto *i = dyn_cast<SILInstruction>(node);
-    if (!i)
-      return FullApplySite();
-    auto kind = FullApplySiteKind::fromNodeKind(i->getKind());
+  static FullApplySite isa(SILInstruction *inst) {
+    auto kind = FullApplySiteKind::fromNodeKind(inst->getKind());
     if (!kind)
       return FullApplySite();
     switch (kind.getValue()) {
     case FullApplySiteKind::ApplyInst:
-      return FullApplySite(cast<ApplyInst>(node));
+      return FullApplySite(cast<ApplyInst>(inst));
     case FullApplySiteKind::BeginApplyInst:
-      return FullApplySite(cast<BeginApplyInst>(node));
+      return FullApplySite(cast<BeginApplyInst>(inst));
     case FullApplySiteKind::TryApplyInst:
-      return FullApplySite(cast<TryApplyInst>(node));
+      return FullApplySite(cast<TryApplyInst>(inst));
     }
     llvm_unreachable("covered switch");
+  }
+
+  static FullApplySite isa(SILValue value) {
+    if (auto *inst = value->getDefiningInstruction())
+      return FullApplySite::isa(inst);
+    return FullApplySite();
   }
 
   FullApplySiteKind getKind() const {
@@ -615,7 +666,8 @@ public:
   /// Returns true if \p op is an operand that passes an indirect
   /// result argument to the apply site.
   bool isIndirectResultOperand(const Operand &op) const {
-    return getCalleeArgIndex(op) < getNumIndirectSILResults();
+    return isArgumentOperand(op)
+      && (getCalleeArgIndex(op) < getNumIndirectSILResults());
   }
 
   static FullApplySite getFromOpaqueValue(void *p) { return FullApplySite(p); }

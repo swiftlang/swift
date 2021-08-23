@@ -157,7 +157,8 @@ public:
 
   /// Associate a new \p PrimaryOutputFile (of type \c getPrimaryOutputType())
   /// with the provided \p Input pair of Base and Primary inputs.
-  void addPrimaryOutput(CommandInputPair Input, StringRef PrimaryOutputFile);
+  void addPrimaryOutput(CommandInputPair Input, StringRef PrimaryOutputFile,
+                        StringRef IndexUnitOutputPath);
 
   /// Return true iff the set of additional output types in \c this is
   /// identical to the set of additional output types in \p other.
@@ -183,6 +184,13 @@ public:
   /// contexts with absent primary outputs another way -- but this is currently
   /// assumed at several call sites.
   SmallVector<StringRef, 16> getPrimaryOutputFilenames() const;
+
+
+  /// Returns the output file path to record in the index data for each input.
+  /// The return value will contain one \c StringRef per primary input if any
+  /// input had an output filename for the index data that was different to its
+  /// primary output filename, and be empty otherwise.
+  SmallVector<StringRef, 16> getIndexUnitOutputFilenames() const;
 
   /// Assuming (and asserting) that there are one or more input pairs, associate
   /// an additional output named \p OutputFilename of type \p type with the

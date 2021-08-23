@@ -290,7 +290,7 @@ static void initDocGenericParams(const Decl *D, DocEntityInfo &Info,
 
   // FIXME: Not right for extensions of nested generic types
   if (GC->isGeneric()) {
-    for (auto *GP : GenericSig->getInnermostGenericParams()) {
+    for (auto *GP : GenericSig.getInnermostGenericParams()) {
       if (GP->getDecl()->isImplicit())
         continue;
       Type TypeToPrint = GP;
@@ -314,11 +314,11 @@ static void initDocGenericParams(const Decl *D, DocEntityInfo &Info,
   if (auto *typeDC = GC->getInnermostTypeContext())
     Proto = typeDC->getSelfProtocolDecl();
 
-  for (auto Req: GenericSig->getRequirements()) {
+  for (auto Req: GenericSig.getRequirements()) {
     if (Proto &&
         Req.getKind() == RequirementKind::Conformance &&
         Req.getFirstType()->isEqual(Proto->getSelfInterfaceType()) &&
-        Req.getSecondType()->getAnyNominal() == Proto)
+        Req.getProtocolDecl() == Proto)
       continue;
 
     auto First = Req.getFirstType();
@@ -426,6 +426,12 @@ static bool initDocEntityInfo(const Decl *D,
   Info.IsUnavailable = AvailableAttr::isUnavailable(D);
   Info.IsDeprecated = D->getAttrs().getDeprecated(D->getASTContext()) != nullptr;
   Info.IsOptional = D->getAttrs().hasAttribute<OptionalAttr>();
+  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
+    Info.IsAsync = AFD->hasAsync();
+  } else if (auto *Storage = dyn_cast<AbstractStorageDecl>(D)) {
+    if (auto *Getter = Storage->getAccessor(AccessorKind::Get))
+      Info.IsAsync = Getter->hasAsync();
+  }
 
   if (!IsRef) {
     llvm::raw_svector_ostream OS(Info.DocComment);
@@ -465,11 +471,9 @@ static bool initDocEntityInfo(const Decl *D,
       SmallVector<Identifier, 1> Bystanders;
       if (MD->getRequiredBystandersIfCrossImportOverlay(
           DeclaringModForCrossImport, Bystanders)) {
-        std::transform(Bystanders.begin(), Bystanders.end(),
-                       std::back_inserter(Info.RequiredBystanders),
-                       [](Identifier Bystander){
-          return Bystander.str().str();
-        });
+        llvm::transform(
+            Bystanders, std::back_inserter(Info.RequiredBystanders),
+            [](Identifier Bystander) { return Bystander.str().str(); });
       } else {
         llvm_unreachable("DeclaringModForCrossImport not correct?");
       }
@@ -537,7 +541,7 @@ static void passConforms(const ValueDecl *D, DocInfoConsumer &Consumer) {
     return;
   Consumer.handleConformsToEntity(EntInfo);
 }
-static void passInherits(ArrayRef<TypeLoc> InheritedTypes,
+static void passInherits(ArrayRef<InheritedEntry> InheritedTypes,
                          DocInfoConsumer &Consumer) {
   for (auto Inherited : InheritedTypes) {
     if (!Inherited.getType())
@@ -551,7 +555,7 @@ static void passInherits(ArrayRef<TypeLoc> InheritedTypes,
     if (auto ProtoComposition
                = Inherited.getType()->getAs<ProtocolCompositionType>()) {
       for (auto T : ProtoComposition->getMembers())
-        passInherits(TypeLoc::withoutLoc(T), Consumer);
+        passInherits(InheritedEntry(TypeLoc::withoutLoc(T)), Consumer);
       continue;
     }
 
@@ -614,9 +618,9 @@ static void reportRelated(ASTContext &Ctx, const Decl *D,
     // Otherwise, report the inheritance of the type alias itself.
     passInheritsAndConformancesForValueDecl(TAD, Consumer);
   } else if (const auto *TD = dyn_cast<TypeDecl>(D)) {
-    llvm::SmallVector<TypeLoc, 4> AllInherits;
-    getInheritedForPrinting(TD, PrintOptions(), AllInherits);
-    passInherits(AllInherits, Consumer);
+    llvm::SmallVector<InheritedEntry, 4> AllInheritsForPrinting;
+    getInheritedForPrinting(TD, PrintOptions(), AllInheritsForPrinting);
+    passInherits(AllInheritsForPrinting, Consumer);
     passConforms(TD->getSatisfiedProtocolRequirements(/*Sorted=*/true),
                  Consumer);
   } else if (auto *VD = dyn_cast<ValueDecl>(D)) {
@@ -1229,18 +1233,15 @@ public:
   void accept(SourceManager &SM, RegionType RegionType,
               ArrayRef<Replacement> Replacements) {
     unsigned Start = AllEdits.size();
-    std::transform(
-        Replacements.begin(), Replacements.end(), std::back_inserter(AllEdits),
+    llvm::transform(
+        Replacements, std::back_inserter(AllEdits),
         [&](const Replacement &R) -> Edit {
-          std::pair<unsigned, unsigned> Start =
-                                            SM.getPresumedLineAndColumnForLoc(
-                                                R.Range.getStart()),
-                                        End = SM.getPresumedLineAndColumnForLoc(
-                                            R.Range.getEnd());
+          auto Start = SM.getLineAndColumnInBuffer(R.Range.getStart());
+          auto End = SM.getLineAndColumnInBuffer(R.Range.getEnd());
           SmallVector<NoteRegion, 4> SubRanges;
           auto RawRanges = R.RegionsWorthNote;
-          std::transform(
-              RawRanges.begin(), RawRanges.end(), std::back_inserter(SubRanges),
+          llvm::transform(
+              RawRanges, std::back_inserter(SubRanges),
               [](swift::ide::NoteRegion R) -> SourceKit::NoteRegion {
                 return {SwiftLangSupport::getUIDForRefactoringRangeKind(R.Kind),
                         R.StartLine,
@@ -1304,9 +1305,9 @@ public:
     for (const auto &R : Ranges) {
       SourceKit::RenameRangeDetail Result;
       std::tie(Result.StartLine, Result.StartColumn) =
-          SM.getPresumedLineAndColumnForLoc(R.Range.getStart());
+          SM.getLineAndColumnInBuffer(R.Range.getStart());
       std::tie(Result.EndLine, Result.EndColumn) =
-          SM.getPresumedLineAndColumnForLoc(R.Range.getEnd());
+          SM.getLineAndColumnInBuffer(R.Range.getEnd());
       Result.ArgIndex = R.Index;
       Result.Kind =
           SwiftLangSupport::getUIDForRefactoringRangeKind(R.RangeKind);
@@ -1523,7 +1524,6 @@ findModuleGroups(StringRef ModuleName, ArrayRef<const char *> Args,
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
-  std::vector<StringRef> Groups;
   std::string Error;
   if (getASTManager()->initCompilerInvocationNoInputs(Invocation, Args,
                                                      CI.getDiags(), Error)) {
@@ -1550,7 +1550,8 @@ findModuleGroups(StringRef ModuleName, ArrayRef<const char *> Args,
     Receiver(RequestResult<ArrayRef<StringRef>>::fromError(Error));
     return;
   }
-  std::vector<StringRef> Scratch;
-  Receiver(RequestResult<ArrayRef<StringRef>>::fromResult(
-      collectModuleGroups(M, Scratch)));
+
+  llvm::SmallVector<StringRef, 0> Groups;
+  collectModuleGroups(M, Groups);
+  Receiver(RequestResult<ArrayRef<StringRef>>::fromResult(Groups));
 }

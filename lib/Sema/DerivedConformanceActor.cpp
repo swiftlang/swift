@@ -1,8 +1,8 @@
-//===--- DerivedConformanceActor.cpp - Derived Actor Conformance ----------===//
+//===--- DerivedConformanceActor.cpp --------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2018 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,284 +10,171 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  This file implements implicit derivation of the Actor protocol.
+// This file implements explicit derivation of the Actor protocol
+// for actor types.
+//
+// Swift Evolution pitch thread:
+// https://forums.swift.org/t/support-custom-executors-in-swift-concurrency/44425
 //
 //===----------------------------------------------------------------------===//
-#include "DerivedConformances.h"
+
+#include "CodeSynthesis.h"
 #include "TypeChecker.h"
-#include "TypeCheckConcurrency.h"
-#include "swift/AST/NameLookupRequests.h"
+#include "swift/Strings.h"
+#include "swift/AST/Decl.h"
+#include "swift/AST/Expr.h"
+#include "swift/AST/GenericSignature.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/Pattern.h"
+#include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/Stmt.h"
+#include "swift/AST/Types.h"
+#include "DerivedConformances.h"
 
 using namespace swift;
 
-bool DerivedConformance::canDeriveActor(
-    NominalTypeDecl *nominal, DeclContext *dc) {
+bool DerivedConformance::canDeriveActor(DeclContext *dc,
+                                        NominalTypeDecl *nominal) {
   auto classDecl = dyn_cast<ClassDecl>(nominal);
-  return classDecl && classDecl->isActor() && dc == nominal;
+  return classDecl && classDecl->isActor() && dc == nominal &&
+        !classDecl->getUnownedExecutorProperty();
 }
 
-static DeclName getEnqueuePartialTaskName(ASTContext &ctx) {
-  return DeclName(ctx, ctx.Id_enqueue, { ctx.Id_partialTask });
-}
+/// Turn a Builtin.Executor value into an UnownedSerialExecutor.
+static Expr *constructUnownedSerialExecutor(ASTContext &ctx,
+                                            Expr *arg) {
+  auto executorDecl = ctx.getUnownedSerialExecutorDecl();
+  if (!executorDecl) return nullptr;
 
-static Type getPartialAsyncTaskType(ASTContext &ctx) {
-  auto concurrencyModule = ctx.getLoadedModule(ctx.Id_Concurrency);
-  if (!concurrencyModule)
-    return Type();
+  for (auto member: executorDecl->getAllMembers()) {
+    auto ctor = dyn_cast<ConstructorDecl>(member);
+    if (!ctor) continue;
+    auto params = ctor->getParameters();
+    if (params->size() != 1 ||
+        !params->get(0)->getInterfaceType()->is<BuiltinExecutorType>())
+      continue;
 
-  SmallVector<ValueDecl *, 2> decls;
-  concurrencyModule->lookupQualified(
-      concurrencyModule, DeclNameRef(ctx.Id_PartialAsyncTask),
-      NL_QualifiedDefault, decls);
-  for (auto decl : decls) {
-    if (auto typeDecl = dyn_cast<TypeDecl>(decl))
-      return typeDecl->getDeclaredInterfaceType();
-  }
+    Type executorType = executorDecl->getDeclaredInterfaceType();
 
-  return Type();
-}
+    Type ctorType = ctor->getInterfaceType();
 
-/// Look for the default actor queue type.
-static Type getDefaultActorQueueType(DeclContext *dc, SourceLoc loc) {
-  ASTContext &ctx = dc->getASTContext();
-  UnqualifiedLookupOptions options;
-  options |= UnqualifiedLookupFlags::TypeLookup;
-  auto desc = UnqualifiedLookupDescriptor(
-      DeclNameRef(ctx.getIdentifier("_DefaultActorQueue")), dc, loc, options);
-  auto lookup =
-      evaluateOrDefault(ctx.evaluator, UnqualifiedLookupRequest{desc}, {});
-  for (const auto &result : lookup) {
-    if (auto typeDecl = dyn_cast<TypeDecl>(result.getValueDecl()))
-      return typeDecl->getDeclaredInterfaceType();
-  }
+    // We have the right initializer. Build a reference to it of type:
+    //   (UnownedSerialExecutor.Type)
+    //      -> (Builtin.Executor) -> UnownedSerialExecutor
+    auto initRef = new (ctx) DeclRefExpr(ctor, DeclNameLoc(), /*implicit*/true,
+                                         AccessSemantics::Ordinary,
+                                         ctorType);
 
-  return Type();
-}
+    // Apply the initializer to the metatype, building an expression of type:
+    //   (Builtin.Executor) -> UnownedSerialExecutor
+    auto metatypeRef = TypeExpr::createImplicit(executorType, ctx);
+    Type ctorAppliedType = ctorType->getAs<FunctionType>()->getResult();
+    auto selfApply = ConstructorRefCallExpr::create(ctx, initRef, metatypeRef,
+                                                    ctorAppliedType);
+    selfApply->setImplicit(true);
+    selfApply->setThrows(false);
 
-/// Look for the initialization function for the default actor storage.
-static FuncDecl *getDefaultActorQueueCreate(DeclContext *dc, SourceLoc loc) {
-  ASTContext &ctx = dc->getASTContext();
-  auto desc = UnqualifiedLookupDescriptor(
-      DeclNameRef(ctx.getIdentifier("_defaultActorQueueCreate")), dc, loc,
-      UnqualifiedLookupOptions());
-  auto lookup =
-      evaluateOrDefault(ctx.evaluator, UnqualifiedLookupRequest{desc}, {});
-  for (const auto &result : lookup) {
-    // FIXME: Validate this further, because we're assuming the exact type.
-    if (auto func = dyn_cast<FuncDecl>(result.getValueDecl()))
-      return func;
-  }
-
-  return nullptr;
-}
-
-/// Look for the default enqueue operation.
-static FuncDecl *getDefaultActorQueueEnqueue(DeclContext *dc, SourceLoc loc) {
-  ASTContext &ctx = dc->getASTContext();
-  auto desc = UnqualifiedLookupDescriptor(
-      DeclNameRef(ctx.getIdentifier("_defaultActorQueueEnqueuePartialTask")),
-      dc, loc, UnqualifiedLookupOptions());
-  auto lookup =
-      evaluateOrDefault(ctx.evaluator, UnqualifiedLookupRequest{desc}, {});
-  for (const auto &result : lookup) {
-    // FIXME: Validate this further, because we're assuming the exact type.
-    if (auto func = dyn_cast<FuncDecl>(result.getValueDecl()))
-      return func;
+    // Call the constructor, building an expression of type
+    // UnownedSerialExecutor.
+    auto call = CallExpr::createImplicit(ctx, selfApply, arg, /*labels*/ {});
+    call->setType(executorType);
+    call->setThrows(false);
+    return call;
   }
 
   return nullptr;
 }
 
 static std::pair<BraceStmt *, bool>
-deriveBodyActor_enqueuePartialTask(
-  AbstractFunctionDecl *enqueuePartialTask, void *) {
-  // func enqueue(partialTask: PartialAsyncTask) {
-  //   _defaultActorQueueEnqueuePartialTask(
-  //     actor: self, queue: &self.$__actor_storage, partialTask: partialTask)
+deriveBodyActor_unownedExecutor(AbstractFunctionDecl *getter, void *) {
+  // var unownedExecutor: UnownedSerialExecutor {
+  //   get {
+  //     return Builtin.buildDefaultActorExecutorRef(self)
+  //   }
   // }
-  ASTContext &ctx = enqueuePartialTask->getASTContext();
-
-  // Dig out the $__actor_storage property.
-  auto classDecl = enqueuePartialTask->getDeclContext()->getSelfClassDecl();
-  VarDecl *storageVar = nullptr;
-  for (auto decl : classDecl->lookupDirect(ctx.Id_actorStorage)) {
-    storageVar = dyn_cast<VarDecl>(decl);
-    if (storageVar)
-      break;
-  }
+  ASTContext &ctx = getter->getASTContext();
 
   // Produce an empty brace statement on failure.
   auto failure = [&]() -> std::pair<BraceStmt *, bool> {
     auto body = BraceStmt::create(
-        ctx, SourceLoc(), { }, SourceLoc(), /*implicit=*/true);
+      ctx, SourceLoc(), { }, SourceLoc(), /*implicit=*/true);
     return { body, /*isTypeChecked=*/true };
   };
 
-  if (!storageVar) {
-    classDecl->diagnose(
-        diag::concurrency_lib_missing, ctx.Id_actorStorage.str());
-    return failure();
-  }
+  // Build a reference to self.
+  Type selfType = getter->getImplicitSelfDecl()->getType();
+  Expr *selfArg = DerivedConformance::createSelfDeclRef(getter);
+  selfArg->setType(selfType);
 
-  // Call into the runtime to enqueue the task.
-  auto fn = getDefaultActorQueueEnqueue(classDecl, classDecl->getLoc());
-  if (!fn) {
-    classDecl->diagnose(
-        diag::concurrency_lib_missing, "_defaultActorQueueEnqueuePartialTask");
-    return failure();
-  }
+  // The builtin call gives us a Builtin.Executor.
+  auto builtinCall =
+    DerivedConformance::createBuiltinCall(ctx,
+                        BuiltinValueKind::BuildDefaultActorExecutorRef,
+                                          {selfType}, {}, {selfArg});
 
-  // Reference to _defaultActorQueueEnqueuePartialTask.
-  auto fnRef = new (ctx) DeclRefExpr(fn, DeclNameLoc(), /*Implicit=*/true);
-  fnRef->setType(fn->getInterfaceType());
+  // Turn that into an UnownedSerialExecutor.
+  auto initCall = constructUnownedSerialExecutor(ctx, builtinCall);
+  if (!initCall) return failure();
 
-  // self argument to the function.
-  auto selfDecl = enqueuePartialTask->getImplicitSelfDecl();
-  Type selfType = enqueuePartialTask->mapTypeIntoContext(
-      selfDecl->getValueInterfaceType());
-  Expr *selfArg = new (ctx) DeclRefExpr(
-      selfDecl, DeclNameLoc(), /*Implicit=*/true, AccessSemantics::Ordinary,
-      selfType);
-  selfArg = ErasureExpr::create(ctx, selfArg, ctx.getAnyObjectType(), { });
-  selfArg->setImplicit();
-
-  // Address of the actor storage.
-  auto module = classDecl->getModuleContext();
-  Expr *selfBase = new (ctx) DeclRefExpr(
-      selfDecl, DeclNameLoc(), /*Implicit=*/true, AccessSemantics::Ordinary,
-      selfType);
-  SubstitutionMap storageVarSubs = classDecl->getDeclaredTypeInContext()
-      ->getMemberSubstitutionMap(module, storageVar);
-  ConcreteDeclRef storageVarDeclRef(storageVar, storageVarSubs);
-  Type storageVarType = classDecl->mapTypeIntoContext(
-      storageVar->getValueInterfaceType());
-  Type storageVarRefType = LValueType::get(storageVarType);
-  Expr *storageVarRefExpr = new (ctx) MemberRefExpr(
-      selfBase, SourceLoc(), storageVarDeclRef, DeclNameLoc(),
-      /*Implicit=*/true);
-  storageVarRefExpr->setType(storageVarRefType);
-  storageVarRefExpr = new (ctx) InOutExpr(
-      SourceLoc(), storageVarRefExpr, storageVarType, /*isImplicit=*/true);
-
-  // The partial asynchronous task.
-  auto partialTaskParam = enqueuePartialTask->getParameters()->get(0);
-  Expr *partialTask = new (ctx) DeclRefExpr(
-      partialTaskParam, DeclNameLoc(), /*Implicit=*/true,
-      AccessSemantics::Ordinary,
-      enqueuePartialTask->mapTypeIntoContext(
-        partialTaskParam->getValueInterfaceType()));
-
-  // Form the call itself.
-  auto call = CallExpr::createImplicit(
-      ctx, fnRef, { selfArg, storageVarRefExpr, partialTask },
-      { ctx.getIdentifier("actor"), ctx.getIdentifier("queue"),
-        ctx.Id_partialTask });
-  call->setType(fn->getResultInterfaceType());
-  call->setThrows(false);
+  auto ret = new (ctx) ReturnStmt(SourceLoc(), initCall, /*implicit*/ true);
 
   auto body = BraceStmt::create(
-      ctx, SourceLoc(), { call }, SourceLoc(), /*implicit=*/true);
+    ctx, SourceLoc(), { ret }, SourceLoc(), /*implicit=*/true);
   return { body, /*isTypeChecked=*/true };
 }
 
-/// Derive the declaration of Actor's enqueue(partialTask:).
-static ValueDecl *deriveActor_enqueuePartialTask(DerivedConformance &derived) {
+/// Derive the declaration of Actor's unownedExecutor property.
+static ValueDecl *deriveActor_unownedExecutor(DerivedConformance &derived) {
   ASTContext &ctx = derived.Context;
 
   // Retrieve the types and declarations we'll need to form this operation.
-  Type partialTaskType = getPartialAsyncTaskType(ctx);
-  if (!partialTaskType) {
+  auto executorDecl = ctx.getUnownedSerialExecutorDecl();
+  if (!executorDecl) {
     derived.Nominal->diagnose(
-        diag::concurrency_lib_missing, ctx.Id_PartialAsyncTask.str());
+      diag::concurrency_lib_missing, "UnownedSerialExecutor");
     return nullptr;
   }
+  Type executorType = executorDecl->getDeclaredInterfaceType();
 
-  auto parentDC = derived.getConformanceContext();
-  Type defaultActorQueueType = getDefaultActorQueueType(
-      parentDC, derived.ConformanceDecl->getLoc());
-  if (!defaultActorQueueType) {
-    derived.Nominal->diagnose(
-        diag::concurrency_lib_missing, "_DefaultActorQueue");
-    return nullptr;
-  }
+  auto propertyPair =
+    derived.declareDerivedProperty(ctx.Id_unownedExecutor,
+                                   executorType, executorType,
+                                   /*static*/ false, /*final*/ false);
+  auto property = propertyPair.first;
+  property->setSynthesized(true);
+  property->getAttrs().add(new (ctx) SemanticsAttr(SEMANTICS_DEFAULT_ACTOR,
+                                                   SourceLoc(), SourceRange(),
+                                                   /*implicit*/ true));
+  property->getAttrs().add(new (ctx) NonisolatedAttr(/*IsImplicit=*/true));
 
-  auto actorStorageCreateFn = getDefaultActorQueueCreate(
-      parentDC, derived.ConformanceDecl->getLoc());
-  if (!actorStorageCreateFn) {
-    derived.Nominal->diagnose(
-        diag::concurrency_lib_missing, "_defaultActorQueueCreate");
-    return nullptr;
-  }
+  // Make the property implicitly final.
+  property->getAttrs().add(new (ctx) FinalAttr(/*IsImplicit=*/true));
+  if (property->getFormalAccess() == AccessLevel::Open)
+    property->overwriteAccess(AccessLevel::Public);
 
-  // Partial task parameter to enqueue(partialTask:).
-  auto partialTaskParamDecl = new (ctx) ParamDecl(
-      SourceLoc(), SourceLoc(), ctx.Id_partialTask,
-      SourceLoc(), ctx.Id_partialTask, parentDC);
-  partialTaskParamDecl->setInterfaceType(partialTaskType);
-  partialTaskParamDecl->setSpecifier(ParamSpecifier::Default);
+  // Clone any @available attributes from UnownedSerialExecutor.
+  // Really, though, the whole actor probably needs to be marked as
+  // unavailable.
+  for (auto attr: executorDecl->getAttrs().getAttributes<AvailableAttr>())
+    property->getAttrs().add(attr->clone(ctx, /*implicit*/true));
 
-  // enqueue(partialTask:) method.
-  ParameterList *params = ParameterList::createWithoutLoc(partialTaskParamDecl);
-  auto func = FuncDecl::createImplicit(
-      ctx, StaticSpellingKind::None, getEnqueuePartialTaskName(ctx),
-      SourceLoc(), /*Async=*/false, /*Throws=*/false, /*GenericParams=*/nullptr,
-      params, TupleType::getEmpty(ctx), parentDC);
-  func->copyFormalAccessFrom(derived.Nominal);
-  func->setBodySynthesizer(deriveBodyActor_enqueuePartialTask);
-  func->setSynthesized();
-  // mark as @actorIndependent(unsafe)
-  func->getAttrs().add(new (ctx) ActorIndependentAttr(
-                            ActorIndependentKind::Unsafe, /*IsImplicit=*/true));
-
-  // Actor storage property and its initialization.
-  auto actorStorage = new (ctx) VarDecl(
-      /*isStatic=*/false, VarDecl::Introducer::Var, SourceLoc(),
-      ctx.Id_actorStorage, parentDC);
-  actorStorage->setInterfaceType(defaultActorQueueType);
-  actorStorage->setImplicit();
-  actorStorage->setAccess(AccessLevel::Private);
-  actorStorage->getAttrs().add(new (ctx) FinalAttr(/*Implicit=*/true));
-
-  // Pattern binding to initialize the actor storage.
-  Pattern *actorStoragePattern = NamedPattern::createImplicit(
-      ctx, actorStorage);
-  actorStoragePattern = TypedPattern::createImplicit(
-      ctx, actorStoragePattern, defaultActorQueueType);
-
-  // Initialization expression.
-  // FIXME: We want the equivalent of type(of: self) here, but we cannot refer
-  // to self, so for now we use the static type instead.
-  Type nominalType = derived.Nominal->getDeclaredTypeInContext();
-  Expr *metatypeArg = TypeExpr::createImplicit(nominalType, ctx);
-  Type anyObjectMetatype = ExistentialMetatypeType::get(ctx.getAnyObjectType());
-  metatypeArg = ErasureExpr::create(ctx, metatypeArg, anyObjectMetatype, { });
-  Expr *actorStorageCreateFnRef = new (ctx) DeclRefExpr(
-      actorStorageCreateFn, DeclNameLoc(), /*Implicit=*/true);
-  actorStorageCreateFnRef->setType(actorStorageCreateFn->getInterfaceType());
-
-  auto actorStorageInit = CallExpr::createImplicit(
-      ctx, actorStorageCreateFnRef, { metatypeArg}, { Identifier() });
-  actorStorageInit->setType(actorStorageCreateFn->getResultInterfaceType());
-  actorStorageInit->setThrows(false);
-
-  auto actorStoragePatternBinding = PatternBindingDecl::createImplicit(
-      ctx, StaticSpellingKind::None, actorStoragePattern, actorStorageInit,
-      parentDC);
-  actorStoragePatternBinding->setInitializerChecked(0);
+  auto getter =
+    derived.addGetterToReadOnlyDerivedProperty(property, executorType);
+  getter->setBodySynthesizer(deriveBodyActor_unownedExecutor);
 
   derived.addMembersToConformanceContext(
-      { func, actorStorage, actorStoragePatternBinding });
-  return func;
+    { property, propertyPair.second, });
+  return property;
 }
 
 ValueDecl *DerivedConformance::deriveActor(ValueDecl *requirement) {
-  auto func = dyn_cast<FuncDecl>(requirement);
-  if (!func)
+  auto var = dyn_cast<VarDecl>(requirement);
+  if (!var)
     return nullptr;
 
-  if (FuncDecl::isEnqueuePartialTaskName(Context, func->getName()))
-    return deriveActor_enqueuePartialTask(*this);
+  if (var->getName() == Context.Id_unownedExecutor)
+    return deriveActor_unownedExecutor(*this);
 
   return nullptr;
 }

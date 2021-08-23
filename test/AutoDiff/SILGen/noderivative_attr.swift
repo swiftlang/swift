@@ -67,7 +67,7 @@ struct Bar: Differentiable {
 
 // Test TF-152: derived conformances "no interface type set" crasher.
 struct TF_152: Differentiable {
-  @differentiable(wrt: bar)
+  @differentiable(reverse, wrt: bar)
   func applied(to input: Float, bar: TF_152_Bar) -> Float {
     return input
   }

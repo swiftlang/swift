@@ -407,6 +407,18 @@ UnsafeRawBufferPointerTestSuite.test("subscript.range.wide") {
   buffer[0..<2] = buffer[0..<3]
 }
 
+UnsafeRawBufferPointerTestSuite.test("_copyContents") {
+  let a = Array<UInt8>(0..<20)
+  let b = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: 10*a.count)
+  defer { b.deallocate() }
+  var (unwritten, written) = a.withUnsafeBytes {
+    bytes in
+    bytes._copyContents(initializing: b)
+  }
+  expectNil(unwritten.next())
+  expectEqual(written, a.count)
+}
+
 UnsafeRawBufferPointerTestSuite.test("copyMemory.overflow") {
   var buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 3, alignment: MemoryLayout<UInt>.alignment)
   defer { buffer.deallocate() }
@@ -419,6 +431,19 @@ UnsafeRawBufferPointerTestSuite.test("copyMemory.overflow") {
   // Performs a valid byte-wise copy but triggers a debug range size check.
   UnsafeMutableRawBufferPointer(rebasing: bytes).copyMemory(
       from: UnsafeRawBufferPointer(buffer))
+}
+
+// Use copyBytes without contiguous storage
+UnsafeRawBufferPointerTestSuite.test("copyBytes.withoutContiguouseStorage") {
+  let ranges: [Range<UInt8>] = [0..<2, 1..<3, 2..<4, 3..<5]
+  var array = [UInt8](repeating: 0, count: 2)
+  for range in ranges {
+    array.withUnsafeMutableBytes { byte in
+        byte.copyBytes(from: range)
+    }
+    expectEqual(array.count, range.count)
+    expectEqual(array, Array(range))
+  }
 }
 
 UnsafeRawBufferPointerTestSuite.test("copyBytes.sequence.overflow") {

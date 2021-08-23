@@ -6,14 +6,14 @@
 // UNSUPPORTED: CPU=armv7s && OS=ios
 
 // CHECK: @"$s4main5ValueVys5UInt8VSSGWV" = linkonce_odr hidden constant %swift.vwtable {
-// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main5ValueVys5UInt8VSSGwCP{{[^@]+}} to i8*),
-// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main5ValueVys5UInt8VSSGwxx{{[^@]+}} to i8*),
-// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main5ValueVys5UInt8VSSGwcp{{[^@]+}} to i8*),
-// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main5ValueVys5UInt8VSSGwca{{[^@]+}} to i8*),
-// CHECK-SAME:    i8* bitcast ({{[^@]+}}@__swift_memcpy{{[^[:space:]]* to i8\*}}),
-// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main5ValueVys5UInt8VSSGwta{{[^@]+}} to i8*),
-// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main5ValueVys5UInt8VSSGwet{{[^@]+}} to i8*),
-// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main5ValueVys5UInt8VSSGwst{{[^@]+}} to i8*),
+// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main5ValueVwCP{{[^)]*}} to i8*)
+// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main5ValueVwxx{{[^)]*}} to i8*)
+// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main5ValueVwcp{{[^)]*}} to i8*)
+// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main5ValueVwca{{[^)]*}} to i8*)
+// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main5ValueVwtk{{[^)]*}} to i8*)
+// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main5ValueVwta{{[^)]*}} to i8*)
+// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main5ValueVwet{{[^)]*}} to i8*)
+// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main5ValueVwst{{[^)]*}} to i8*)
 // CHECK-SAME:    [[INT]] {{[0-9]+}},
 // CHECK-SAME:    [[INT]] {{[0-9]+}},
 // CHECK-SAME:    i32 {{[0-9]+}},
@@ -25,14 +25,14 @@
 // CHECK: @"$s4main5ValueVys5UInt8VSSGMf" = linkonce_odr hidden constant {{.+}}$s4main5ValueVMn{{.+}} to %swift.type_descriptor*), %swift.type* @"$ss5UInt8VN", %swift.type* @"$sSSN", i32 0, i32 [[ALIGNMENT]], i64 3 }>, align [[ALIGNMENT]]
 
 // CHECK: @"$s4main5ValueVySSSdGWV" = linkonce_odr hidden constant %swift.vwtable {
-// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main5ValueVySSSdGwCP{{[^@]+}} to i8*),
-// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main5ValueVySSSdGwxx{{[^@]+}} to i8*),
-// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main5ValueVySSSdGwcp{{[^@]+}} to i8*),
-// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main5ValueVySSSdGwca{{[^@]+}} to i8*),
-// CHECK-SAME:    i8* bitcast ({{[^@]+}}@__swift_memcpy{{[^[:space:]]* to i8\*}}),
-// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main5ValueVySSSdGwta{{[^@]+}} to i8*),
-// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main5ValueVySSSdGwet{{[^@]+}} to i8*),
-// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main5ValueVySSSdGwst{{[^@]+}} to i8*),
+// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main5ValueVwCP{{[^)]*}} to i8*)
+// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main5ValueVwxx{{[^)]*}} to i8*)
+// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main5ValueVwcp{{[^)]*}} to i8*)
+// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main5ValueVwca{{[^)]*}} to i8*)
+// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main5ValueVwtk{{[^)]*}} to i8*)
+// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main5ValueVwta{{[^)]*}} to i8*)
+// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main5ValueVwet{{[^)]*}} to i8*)
+// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main5ValueVwst{{[^)]*}} to i8*)
 // CHECK-SAME:    [[INT]] {{[0-9]+}},
 // CHECK-SAME:    [[INT]] {{[0-9]+}},
 // CHECK-SAME:    i32 {{[0-9]+}},
@@ -44,14 +44,14 @@
 // CHECK: @"$s4main5ValueVySSSdGMf" = linkonce_odr hidden constant {{.+}}$s4main5ValueVMn{{.+}} to %swift.type_descriptor*), %swift.type* @"$sSSN", %swift.type* @"$sSdN", i32 0, i32 16, i64 3 }>, align [[ALIGNMENT]]
 
 // CHECK: @"$s4main5ValueVySdSiGWV" = linkonce_odr hidden constant %swift.vwtable {
-// CHECK-SAME:    i8* bitcast ({{(%swift.opaque\* \(\[[0-9]+ x i8\]\*, \[[0-9]+ x i8\]\*, %swift.type\*\)\* @"\$[a-zA-Z0-9_]+" to i8\*|[^@]+@__swift_memcpy[^[:space:]]* to i8\*)}}),
-// CHECK-SAME:    i8* bitcast ({{[^@]*}}@__swift_noop_void_return{{[^[:space:]]* to i8\*}}),
-// CHECK-SAME:    i8* bitcast ({{[^@]+}}@__swift_memcpy{{[^[:space:]]* to i8\*}}),
-// CHECK-SAME:    i8* bitcast ({{[^@]+}}@__swift_memcpy{{[^[:space:]]* to i8\*}}),
-// CHECK-SAME:    i8* bitcast ({{[^@]+}}@__swift_memcpy{{[^[:space:]]* to i8\*}}),
-// CHECK-SAME:    i8* bitcast ({{[^@]+}}@__swift_memcpy{{[^[:space:]]* to i8\*}}),
-// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main5ValueVySdSiGwet{{[^@]+}} to i8*),
-// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main5ValueVySdSiGwst{{[^@]+}} to i8*),
+// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main5ValueVwCP{{[^)]*}} to i8*)
+// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main5ValueVwxx{{[^)]*}} to i8*)
+// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main5ValueVwcp{{[^)]*}} to i8*)
+// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main5ValueVwca{{[^)]*}} to i8*)
+// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main5ValueVwtk{{[^)]*}} to i8*)
+// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main5ValueVwta{{[^)]*}} to i8*)
+// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main5ValueVwet{{[^)]*}} to i8*)
+// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main5ValueVwst{{[^)]*}} to i8*)
 // CHECK-SAME:    [[INT]] {{[0-9]+}},
 // CHECK-SAME:    [[INT]] {{[0-9]+}},
 // CHECK-SAME:    i32 {{[0-9]+}},
@@ -63,14 +63,14 @@
 // CHECK: @"$s4main5ValueVySdSiGMf" = linkonce_odr hidden constant {{.+}}$s4main5ValueVMn{{.+}} to %swift.type_descriptor*), %swift.type* @"$sSdN", %swift.type* @"$sSiN", i32 0, i32 8, i64 3 }>, align [[ALIGNMENT]]
 
 // CHECK: @"$s4main5ValueVyS2iGWV" = linkonce_odr hidden constant %swift.vwtable {
-// CHECK-SAME:    i8* bitcast ({{(%swift.opaque\* \(\[[0-9]+ x i8\]\*, \[[0-9]+ x i8\]\*, %swift.type\*\)\* @"\$[a-zA-Z0-9_]+" to i8\*|[^@]+@__swift_memcpy[^[:space:]]* to i8\*)}}),
-// CHECK-SAME:    i8* bitcast ({{[^@]*}}@__swift_noop_void_return{{[^[:space:]]* to i8\*}}),
-// CHECK-SAME:    i8* bitcast ({{[^@]+}}@__swift_memcpy{{[^[:space:]]* to i8\*}}),
-// CHECK-SAME:    i8* bitcast ({{[^@]+}}@__swift_memcpy{{[^[:space:]]* to i8\*}}),
-// CHECK-SAME:    i8* bitcast ({{[^@]+}}@__swift_memcpy{{[^[:space:]]* to i8\*}}),
-// CHECK-SAME:    i8* bitcast ({{[^@]+}}@__swift_memcpy{{[^[:space:]]* to i8\*}}),
-// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main5ValueVyS2iGwet{{[^@]+}} to i8*),
-// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main5ValueVyS2iGwst{{[^@]+}} to i8*),
+// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main5ValueVwCP{{[^)]*}} to i8*)
+// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main5ValueVwxx{{[^)]*}} to i8*)
+// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main5ValueVwcp{{[^)]*}} to i8*)
+// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main5ValueVwca{{[^)]*}} to i8*)
+// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main5ValueVwtk{{[^)]*}} to i8*)
+// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main5ValueVwta{{[^)]*}} to i8*)
+// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main5ValueVwet{{[^)]*}} to i8*)
+// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main5ValueVwst{{[^)]*}} to i8*)
 // CHECK-SAME:    [[INT]] {{[0-9]+}},
 // CHECK-SAME:    [[INT]] {{[0-9]+}},
 // CHECK-SAME:    i32 {{[0-9]+}},

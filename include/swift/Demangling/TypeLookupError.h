@@ -110,7 +110,7 @@ public:
 
     Fn(Context, Command::DestroyContext, nullptr);
     Fn = other.Fn;
-    Context = Fn(Context, Command::CopyContext, nullptr);
+    Context = Fn(other.Context, Command::CopyContext, nullptr);
 
     return *this;
   }
@@ -124,18 +124,6 @@ public:
       return context;
     };
   }
-
-  /// Construct a TypeLookupError that creates a string using asprintf. The passed-in
-  /// format string and arguments are passed directly to swift_asprintf when
-  /// the string is requested. The arguments are captured and the string is only
-  /// formatted when needed.
-  template <typename... Args>
-  TypeLookupError(const char *fmt, Args... args)
-      : TypeLookupError([=] {
-          char *str;
-          swift_asprintf(&str, fmt, args...);
-          return str;
-        }) {}
 
   /// Construct a TypeLookupError that wraps a function returning a string. The
   /// passed-in function can return either a `std::string` or `char *`. If it
@@ -181,6 +169,8 @@ template <typename T> class TypeLookupErrorOr {
   TaggedUnion<T, TypeLookupError> Value;
 
 public:
+  TypeLookupErrorOr() : Value(TypeLookupError("freshly constructed error")) {}
+
   TypeLookupErrorOr(const T &t) : Value(t) {
     if (!t)
       Value = TypeLookupError("unknown error");
@@ -200,6 +190,30 @@ public:
 
   bool isError() { return getError() != nullptr; }
 };
+
+/// Construct a TypeLookupError that creates a string using asprintf. The
+/// passed-in format string and arguments are passed directly to swift_asprintf
+/// when the string is requested. The arguments are captured and the string is
+/// only formatted when needed.
+///
+/// The crazy sizeof(swift_asprintf(... construct gives us compile-time type
+/// checking of the format string and arguments, while still letting us use the
+/// variadic template to safely capture the arguments in the lambda.
+#define TYPE_LOOKUP_ERROR_FMT(...)                                             \
+  (sizeof(swift_asprintf(NULL, __VA_ARGS__)), TypeLookupErrorImpl(__VA_ARGS__))
+
+// Implementation for TYPE_LOOKUP_ERROR_FMT. Don't call directly.
+template <typename... Args>
+static TypeLookupError TypeLookupErrorImpl(const char *fmt, Args... args) {
+  return TypeLookupError([=] {
+    char *str;
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wformat-security"
+    swift_asprintf(&str, fmt, args...);
+#pragma clang diagnostic pop
+    return str;
+  });
+}
 
 } // namespace swift
 

@@ -2,6 +2,7 @@
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
+// UNSUPPORTED: OS=watchos && CPU=arm64_32
 
 import CoreFoundation
 // Can't import StdlibUnittest; that brings in Foundation.

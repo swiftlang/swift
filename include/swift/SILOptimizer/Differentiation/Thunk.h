@@ -38,6 +38,8 @@ class ArchetypeType;
 
 namespace autodiff {
 
+class ADContext;
+
 //===----------------------------------------------------------------------===//
 // Thunk helpers
 //===----------------------------------------------------------------------===//
@@ -106,8 +108,8 @@ SILValue reabstractFunction(
 std::pair<SILFunction *, SubstitutionMap>
 getOrCreateSubsetParametersThunkForDerivativeFunction(
     SILOptFunctionBuilder &fb, SILValue origFnOperand, SILValue derivativeFn,
-    AutoDiffDerivativeFunctionKind kind, SILAutoDiffIndices desiredIndices,
-    SILAutoDiffIndices actualIndices);
+    AutoDiffDerivativeFunctionKind kind, const AutoDiffConfig &desiredConfig,
+    const AutoDiffConfig &actualConfig, ADContext &adContext);
 
 /// Get or create a derivative function parameter index subset thunk from
 /// `actualIndices` to `desiredIndices` for the given associated function
@@ -119,7 +121,8 @@ getOrCreateSubsetParametersThunkForLinearMap(
     SILOptFunctionBuilder &fb, SILFunction *assocFn,
     CanSILFunctionType origFnType, CanSILFunctionType linearMapType,
     CanSILFunctionType targetType, AutoDiffDerivativeFunctionKind kind,
-    SILAutoDiffIndices desiredIndices, SILAutoDiffIndices actualIndices);
+    const AutoDiffConfig &desiredConfig, const AutoDiffConfig &actualConfig,
+    ADContext &adContext);
 
 } // end namespace autodiff
 

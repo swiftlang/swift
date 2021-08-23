@@ -104,6 +104,19 @@ _ = Memberwise1.init(x: 2)
 _ = Memberwise2.init(m: 2, n: Memberwise1(x: 34))
 #endif
 
+@propertyWrapper
+struct Bar<T> {
+  let wrappedValue: T
+  init(wrappedValue: T, other: Int) {
+    self.wrappedValue = wrappedValue
+  }
+}
+
+struct Foo {
+  @Bar(other: Foo.test)
+  static var test: Int = 10
+}
+
 // RUN: %empty-directory(%t.result)
 // RUN: %sourcekitd-test -req=syntactic-rename -rename-spec %S/syntactic-rename/x.in.json %s >> %t.result/x.expected
 // RUN: %diff -u %S/syntactic-rename/x.expected %t.result/x.expected

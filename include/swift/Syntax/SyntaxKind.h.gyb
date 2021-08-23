@@ -25,14 +25,13 @@
 #define SWIFT_SYNTAX_KIND_H
 
 #include "swift/Basic/InlineBitfield.h"
-#include "swift/Basic/ByteTreeSerialization.h"
 #include "swift/Basic/JSONSerialization.h"
 #include "llvm/Support/YAMLTraits.h"
 
 namespace swift {
 namespace syntax {
 
-enum class SyntaxKind {
+enum class SyntaxKind : uint16_t {
   Token,
 % for name, nodes in grouped_nodes.items():
 %   for node in nodes:
@@ -48,9 +47,6 @@ enum class SyntaxKind {
 
   // NOTE: Unknown must be the last kind.
   Unknown,
-};
-enum : unsigned {
-  NumSyntaxKindBits = countBitsUsed(static_cast<unsigned>(SyntaxKind::Unknown))
 };
 
 void dumpSyntaxKind(llvm::raw_ostream &os, const SyntaxKind kind);
@@ -76,36 +72,6 @@ SyntaxKind getUnknownKind(SyntaxKind Kind);
 } // end namespace syntax
 
 bool parserShallOmitWhenNoChildren(syntax::SyntaxKind Kind);
-
-namespace byteTree {
-
-template <>
-struct WrapperTypeTraits<syntax::SyntaxKind> {
-  // Explicitly spell out all SyntaxKinds to keep the serialized value stable
-  // even if its members get reordered or members get removed
-  static uint16_t numericValue(const syntax::SyntaxKind &Kind) {
-    switch (Kind) {
-    case syntax::SyntaxKind::Token:
-      return 0;
-    case syntax::SyntaxKind::Unknown:
-      return 1;
-% for name, nodes in grouped_nodes.items():
-%   for node in nodes:
-    case syntax::SyntaxKind::${node.syntax_kind}: 
-      return ${SYNTAX_NODE_SERIALIZATION_CODES[node.syntax_kind]};
-%   end
-% end
-    }
-    llvm_unreachable("unhandled kind");
-  }
-
-  static void write(ByteTreeWriter &Writer, const syntax::SyntaxKind &Kind,
-                    unsigned Index) {
-    Writer.write(numericValue(Kind), Index);
-  }
-};
-
-} // end namespace byteTree
 
 namespace json {
 

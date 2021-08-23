@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
@@ -50,11 +51,11 @@ Action(llvm::cl::desc("kind:"), llvm::cl::init(RefactoringKind::None),
            clEnumValN(RefactoringKind::ConvertStringsConcatenationToInterpolation,
                       "strings-concatenation-to-interpolation", "Perform strings concatenation to interpolation refactoring"),
            clEnumValN(RefactoringKind::ExpandTernaryExpr,
-                     "expand-ternary-expr", "Perform expand ternary expression"),
+                      "expand-ternary-expr", "Perform expand ternary expression"),
            clEnumValN(RefactoringKind::ConvertToTernaryExpr,
                       "convert-to-ternary-expr", "Perform convert to ternary expression"),
-		   clEnumValN(RefactoringKind::ConvertIfLetExprToGuardExpr,
-					   "convert-to-guard", "Perform convert to guard expression"),
+		       clEnumValN(RefactoringKind::ConvertIfLetExprToGuardExpr,
+                      "convert-to-guard", "Perform convert to guard expression"),
            clEnumValN(RefactoringKind::ConvertGuardExprToIfLetExpr,
                       "convert-to-iflet", "Perform convert to iflet expression"),
            clEnumValN(RefactoringKind::ExtractFunction,
@@ -74,8 +75,16 @@ Action(llvm::cl::desc("kind:"), llvm::cl::init(RefactoringKind::None),
            clEnumValN(RefactoringKind::MemberwiseInitLocalRefactoring, "memberwise-init", "Generate member wise initializer"),
            clEnumValN(RefactoringKind::AddEquatableConformance, "add-equatable-conformance", "Add Equatable conformance"),
            clEnumValN(RefactoringKind::ConvertToComputedProperty,
-                   "convert-to-computed-property", "Convert from field initialization to computed property"),
-           clEnumValN(RefactoringKind::ConvertToSwitchStmt, "convert-to-switch-stmt", "Perform convert to switch statement")));
+                      "convert-to-computed-property", "Convert from field initialization to computed property"),
+           clEnumValN(RefactoringKind::ConvertToSwitchStmt, "convert-to-switch-stmt", "Perform convert to switch statement"),
+           clEnumValN(RefactoringKind::ConvertCallToAsyncAlternative,
+                      "convert-call-to-async-alternative", "Convert call to use its async alternative (if any)"),
+           clEnumValN(RefactoringKind::ConvertToAsync,
+                      "convert-to-async", "Convert the entire function to async"),
+           clEnumValN(RefactoringKind::AddAsyncAlternative,
+                      "add-async-alternative", "Add an async alternative of a function taking a callback"),
+           clEnumValN(RefactoringKind::AddAsyncWrapper,
+                      "add-async-wrapper", "Add an async alternative that forwards onto the function taking a callback")));
 
 
 static llvm::cl::opt<std::string>
@@ -88,6 +97,10 @@ SourceFilename("source-filename", llvm::cl::desc("Name of the source file"));
 static llvm::cl::list<std::string>
 InputFilenames(llvm::cl::Positional, llvm::cl::desc("[input files...]"),
                llvm::cl::ZeroOrMore);
+
+static llvm::cl::opt<std::string>
+    RewrittenOutputFile("rewritten-output-file",
+                        llvm::cl::desc("Name of the rewritten output file"));
 
 static llvm::cl::opt<std::string>
 LineColumnPair("pos", llvm::cl::desc("Line:Column pair or /*label*/"));
@@ -111,10 +124,35 @@ static llvm::cl::opt<bool>
 IsNonProtocolType("is-non-protocol-type",
                   llvm::cl::desc("The symbol being renamed is a type and not a protocol"));
 
-static llvm::cl::opt<bool>
-DumpInJason("dump-json",
-            llvm::cl::desc("Whether to dump refactoring edits in Json"),
-            llvm::cl::init(false));
+static llvm::cl::opt<bool> EnableExperimentalConcurrency(
+    "enable-experimental-concurrency",
+    llvm::cl::desc("Whether to enable experimental concurrency or not"));
+
+static llvm::cl::opt<std::string>
+    SDK("sdk", llvm::cl::desc("Path to the SDK to build against"));
+
+static llvm::cl::list<std::string>
+    ImportPaths("I",
+                llvm::cl::desc("Add a directory to the import search path"));
+
+static llvm::cl::opt<std::string>
+Triple("target", llvm::cl::desc("target triple"));
+
+enum class DumpType {
+  REWRITTEN,
+  JSON,
+  TEXT
+};
+static llvm::cl::opt<DumpType> DumpIn(
+    llvm::cl::desc("Dump edits to stdout as:"),
+    llvm::cl::init(DumpType::REWRITTEN),
+    llvm::cl::values(
+        clEnumValN(DumpType::REWRITTEN, "dump-rewritten",
+                   "rewritten file"),
+        clEnumValN(DumpType::JSON, "dump-json",
+                   "JSON"),
+        clEnumValN(DumpType::TEXT, "dump-text",
+                   "text")));
 
 static llvm::cl::opt<bool>
 AvailableActions("actions",
@@ -203,10 +241,11 @@ std::vector<RenameLoc> getRenameLocs(unsigned BufferID, SourceManager &SM,
                                      bool IsFunctionLike,
                                      bool IsNonProtocolType) {
   std::vector<RenameLoc> Renames;
-  std::transform(Locs.begin(), Locs.end(), std::back_inserter(Renames), [&](const RefactorLoc &Loc) -> RenameLoc {
-    return {Loc.Line, Loc.Column, Loc.Usage, OldName, NewName, IsFunctionLike,
-      IsNonProtocolType};
-  });
+  llvm::transform(Locs, std::back_inserter(Renames),
+                  [&](const RefactorLoc &Loc) -> RenameLoc {
+                    return {Loc.Line, Loc.Column,     Loc.Usage,        OldName,
+                            NewName,  IsFunctionLike, IsNonProtocolType};
+                  });
   return Renames;
 }
 
@@ -249,11 +288,21 @@ int main(int argc, char *argv[]) {
   Invocation.setMainExecutablePath(
     llvm::sys::fs::getMainExecutable(argv[0],
     reinterpret_cast<void *>(&anchorForGetMainExecutable)));
+
+  Invocation.setSDKPath(options::SDK);
+  Invocation.setImportSearchPaths(options::ImportPaths);
+  if (!options::Triple.empty())
+    Invocation.setTargetTriple(options::Triple);
+
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(
       options::SourceFilename);
   Invocation.getLangOptions().AttachCommentsToDecls = true;
   Invocation.getLangOptions().CollectParsedToken = true;
   Invocation.getLangOptions().BuildSyntaxTree = true;
+  Invocation.getLangOptions().DisableAvailabilityChecking = true;
+
+  if (options::EnableExperimentalConcurrency)
+    Invocation.getLangOptions().EnableExperimentalConcurrency = true;
 
   for (auto FileName : options::InputFilenames)
     Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(FileName);
@@ -354,13 +403,12 @@ int main(int argc, char *argv[]) {
   RangeConfig Range = getRange(BufferID, SM, StartLoc, EndLoc);
 
   if (options::Action == RefactoringKind::None) {
-    std::vector<RefactoringKind> Scratch;
-    ArrayRef<RefactoringKind> AllKinds;
-    bool RangeStartMayNeedRename = false;
-    AllKinds = collectAvailableRefactorings(SF, Range,RangeStartMayNeedRename,
-                                            Scratch, {&PrintDiags});
+    llvm::SmallVector<RefactoringKind, 32> Kinds;
+    bool CollectRangeStartRefactorings = false;
+    collectAvailableRefactorings(SF, Range, CollectRangeStartRefactorings,
+                                 Kinds, {&PrintDiags});
     llvm::outs() << "Action begins\n";
-    for (auto Kind : AllKinds) {
+    for (auto Kind : Kinds) {
       llvm::outs() << getDescriptiveRefactoringKindName(Kind) << "\n";
     }
     llvm::outs() << "Action ends\n";
@@ -371,14 +419,36 @@ int main(int argc, char *argv[]) {
   RefactoringConfig.Range = Range;
   RefactoringConfig.PreferredName = options::NewName;
   std::string Error;
-  std::unique_ptr<SourceEditConsumer> pConsumer;
-  if (options::DumpInJason)
-    pConsumer.reset(new SourceEditJsonConsumer(llvm::outs()));
-  else
-    pConsumer.reset(new SourceEditOutputConsumer(SF->getASTContext().SourceMgr,
-                                                      BufferID,
-                                                      llvm::outs()));
 
-  return refactorSwiftModule(CI.getMainModule(), RefactoringConfig, *pConsumer,
-                             PrintDiags);
+  StringRef RewrittenOutputFile = options::RewrittenOutputFile;
+  if (RewrittenOutputFile.empty())
+    RewrittenOutputFile = "-";
+  std::error_code EC;
+  llvm::raw_fd_ostream RewriteStream(RewrittenOutputFile, EC);
+  if (RewriteStream.has_error()) {
+    llvm::errs() << "Could not open rewritten output file";
+    return 1;
+  }
+
+  SmallVector<std::unique_ptr<SourceEditConsumer>> Consumers;
+  if (!options::RewrittenOutputFile.empty() ||
+      options::DumpIn == options::DumpType::REWRITTEN) {
+    Consumers.emplace_back(new SourceEditOutputConsumer(
+        SF->getASTContext().SourceMgr, BufferID, RewriteStream));
+  }
+  switch (options::DumpIn) {
+  case options::DumpType::REWRITTEN:
+    // Already added
+    break;
+  case options::DumpType::JSON:
+    Consumers.emplace_back(new SourceEditJsonConsumer(llvm::outs()));
+    break;
+  case options::DumpType::TEXT:
+    Consumers.emplace_back(new SourceEditTextConsumer(llvm::outs()));
+    break;
+  }
+
+  BroadcastingSourceEditConsumer BroadcastConsumer(Consumers);
+  return refactorSwiftModule(CI.getMainModule(), RefactoringConfig,
+                             BroadcastConsumer, PrintDiags);
 }

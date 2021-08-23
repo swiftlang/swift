@@ -16,6 +16,9 @@
 #include "SemanticARCOptVisitor.h"
 #include "Transforms.h"
 
+#include "swift/Basic/Defer.h"
+#include "swift/SILOptimizer/Analysis/Analysis.h"
+#include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 
 #include "llvm/Support/CommandLine.h"
@@ -40,6 +43,10 @@ static llvm::cl::list<ARCTransformKind> TransformsToPerform(
         clEnumValN(ARCTransformKind::LifetimeJoiningPeephole,
                    "sil-semantic-arc-peepholes-lifetime-joining",
                    "Perform the join lifetimes peephole"),
+        clEnumValN(ARCTransformKind::OwnershipConversionElimPeephole,
+                   "sil-semantic-arc-peepholes-ownership-conversion-elim",
+                   "Eliminate unchecked_ownership_conversion insts that are "
+                   "not needed"),
         clEnumValN(ARCTransformKind::OwnedToGuaranteedPhi,
                    "sil-semantic-arc-owned-to-guaranteed-phi",
                    "Perform Owned To Guaranteed Phi. NOTE: Seeded by peephole "
@@ -59,10 +66,10 @@ namespace {
 // case DiagnosticConstantPropagation exposed anything new in this assert
 // configuration.
 struct SemanticARCOpts : SILFunctionTransform {
-  bool guaranteedOptsOnly;
+  bool mandatoryOptsOnly;
 
-  SemanticARCOpts(bool guaranteedOptsOnly)
-      : guaranteedOptsOnly(guaranteedOptsOnly) {}
+  SemanticARCOpts(bool mandatoryOptsOnly)
+      : mandatoryOptsOnly(mandatoryOptsOnly) {}
 
 #ifndef NDEBUG
   void performCommandlineSpecifiedTransforms(SemanticARCOptVisitor &visitor) {
@@ -78,6 +85,7 @@ struct SemanticARCOpts : SILFunctionTransform {
       case ARCTransformKind::RedundantBorrowScopeElimPeephole:
       case ARCTransformKind::LoadCopyToLoadBorrowPeephole:
       case ARCTransformKind::AllPeepholes:
+      case ARCTransformKind::OwnershipConversionElimPeephole:
         // We never assume we are at fixed point when running these transforms.
         if (performPeepholesWithoutFixedPoint(visitor)) {
           invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
@@ -143,7 +151,9 @@ struct SemanticARCOpts : SILFunctionTransform {
            "Can not perform semantic arc optimization unless ownership "
            "verification is enabled");
 
-    SemanticARCOptVisitor visitor(f, guaranteedOptsOnly);
+    auto *deBlocksAnalysis = getAnalysis<DeadEndBlocksAnalysis>();
+    SemanticARCOptVisitor visitor(f, *deBlocksAnalysis->get(&f),
+                                  mandatoryOptsOnly);
 
 #ifndef NDEBUG
     // If we are being asked for testing purposes to run a series of transforms
@@ -175,9 +185,9 @@ struct SemanticARCOpts : SILFunctionTransform {
 } // end anonymous namespace
 
 SILTransform *swift::createSemanticARCOpts() {
-  return new SemanticARCOpts(false /*guaranteed*/);
+  return new SemanticARCOpts(false /*mandatory*/);
 }
 
-SILTransform *swift::createGuaranteedARCOpts() {
-  return new SemanticARCOpts(true /*guaranteed*/);
+SILTransform *swift::createMandatoryARCOpts() {
+  return new SemanticARCOpts(true /*mandatory*/);
 }

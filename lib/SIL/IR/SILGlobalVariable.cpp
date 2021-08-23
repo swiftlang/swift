@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/SIL/SILBridging.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILGlobalVariable.h"
 #include "swift/SIL/SILInstruction.h"
@@ -18,6 +19,8 @@
 
 using namespace swift;
 
+SwiftMetatype SILGlobalVariable::registeredMetatype;
+    
 SILGlobalVariable *SILGlobalVariable::create(SILModule &M, SILLinkage linkage,
                                              IsSerialized_t isSerialized,
                                              StringRef name,
@@ -44,7 +47,8 @@ SILGlobalVariable::SILGlobalVariable(SILModule &Module, SILLinkage Linkage,
                                      IsSerialized_t isSerialized,
                                      StringRef Name, SILType LoweredType,
                                      Optional<SILLocation> Loc, VarDecl *Decl)
-  : Module(Module),
+  : SwiftObjectHeader(registeredMetatype),
+    Module(Module),
     Name(Name),
     LoweredType(LoweredType),
     Location(Loc.getValueOr(SILLocation::invalid())),
@@ -58,8 +62,12 @@ SILGlobalVariable::SILGlobalVariable(SILModule &Module, SILLinkage Linkage,
 }
 
 SILGlobalVariable::~SILGlobalVariable() {
-  StaticInitializerBlock.dropAllReferences();
-  StaticInitializerBlock.clearStaticInitializerBlock(Module);
+  clear();
+}
+
+bool SILGlobalVariable::isPossiblyUsedExternally() const {
+  SILLinkage linkage = getLinkage();
+  return swift::isPossiblyUsedExternally(linkage, getModule().isWholeModule());
 }
 
 /// Get this global variable's fragile attribute.
@@ -106,6 +114,11 @@ BuiltinInst *SILGlobalVariable::getOffsetSubtract(const TupleExtractInst *TE,
 
 bool SILGlobalVariable::isValidStaticInitializerInst(const SILInstruction *I,
                                                      SILModule &M) {
+  for (const Operand &op : I->getAllOperands()) {
+    // Rule out SILUndef and SILArgument.
+    if (!isa<SingleValueInstruction>(op.get()))
+      return false;
+  }
   switch (I->getKind()) {
     case SILInstructionKind::BuiltinInst: {
       auto *bi = cast<BuiltinInst>(I);
@@ -165,12 +178,19 @@ bool SILGlobalVariable::isValidStaticInitializerInst(const SILInstruction *I,
           return false;
       }
       return false;
+    case SILInstructionKind::FunctionRefInst:
+      // TODO: support async function pointers in static globals.
+      if (cast<FunctionRefInst>(I)->getReferencedFunction()->isAsync())
+        return false;
+      return true;
     case SILInstructionKind::StructInst:
     case SILInstructionKind::TupleInst:
     case SILInstructionKind::IntegerLiteralInst:
     case SILInstructionKind::FloatLiteralInst:
     case SILInstructionKind::ObjectInst:
     case SILInstructionKind::ValueToBridgeObjectInst:
+    case SILInstructionKind::ConvertFunctionInst:
+    case SILInstructionKind::ThinToThickFunctionInst:
       return true;
     default:
       return false;
@@ -241,7 +261,7 @@ SILFunction *swift::getCalleeOfOnceCall(BuiltinInst *BI) {
          "Expected C function representation!");
 
   if (auto *FR = dyn_cast<FunctionRefInst>(Callee))
-    return FR->getReferencedFunctionOrNull();
+    return FR->getReferencedFunction();
 
   return nullptr;
 }
@@ -305,13 +325,7 @@ swift::getVariableOfStaticInitializer(SILFunction *InitFunc,
       if (HasStore || SI->getDest() != SGA)
         return nullptr;
       HasStore = true;
-      SILValue value = SI->getSrc();
-
-      // We only handle StructInst and TupleInst being stored to a
-      // global variable for now.
-      if (!isa<StructInst>(value) && !isa<TupleInst>(value))
-        return nullptr;
-      InitVal = cast<SingleValueInstruction>(value);
+      InitVal = cast<SingleValueInstruction>(SI->getSrc());
     } else if (!SILGlobalVariable::isValidStaticInitializerInst(&I,
                                                              I.getModule())) {
       return nullptr;

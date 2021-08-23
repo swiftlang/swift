@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend %s -emit-ir -enable-experimental-concurrency -parse-sil
 
+// REQUIRES: concurrency
+
 import Swift
 
 struct Pack {

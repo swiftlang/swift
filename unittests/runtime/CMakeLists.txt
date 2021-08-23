@@ -1,8 +1,16 @@
+# We can't currently build the runtime tests under ASAN
+# The problem is that we want to use the just-build compiler (just like the
+# runtime) but ASAN will complain if we link against libgtest and LLVMSupport
+# libraries because they were compiled with the host compiler.
 if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
-   ("${SWIFT_HOST_VARIANT_ARCH}" STREQUAL "${SWIFT_PRIMARY_VARIANT_ARCH}"))
+  ("${SWIFT_HOST_VARIANT_ARCH}" STREQUAL "${SWIFT_PRIMARY_VARIANT_ARCH}") AND
+  (NOT (LLVM_USE_SANITIZER STREQUAL "Address")))
 
   if("${CMAKE_C_COMPILER_ID}" MATCHES "Clang")
-    # Do nothing
+    if(NOT SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER)
+      set(CMAKE_CXX_COMPILER "${SWIFT_NATIVE_CLANG_TOOLS_PATH}/clang++")
+      set(CMAKE_C_COMPILER "${SWIFT_NATIVE_CLANG_TOOLS_PATH}/clang")
+    endif()
   elseif(SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER)
     if(NOT "${CMAKE_C_COMPILER_ID}" MATCHES "Clang")
       message(FATAL_ERROR "Building the swift runtime is not supported with ${CMAKE_C_COMPILER_ID}. Use the just-built clang instead.")
@@ -13,11 +21,11 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     # If we use Clang-cl or MSVC, CMake provides default compiler and linker flags that are incompatible
     # with the frontend of Clang or Clang++.
     if(SWIFT_COMPILER_IS_MSVC_LIKE)
-      set(CMAKE_CXX_COMPILER "${SWIFT_NATIVE_LLVM_TOOLS_PATH}/clang-cl")
-      set(CMAKE_C_COMPILER "${SWIFT_NATIVE_LLVM_TOOLS_PATH}/clang-cl")
+      set(CMAKE_CXX_COMPILER "${SWIFT_NATIVE_CLANG_TOOLS_PATH}/clang-cl")
+      set(CMAKE_C_COMPILER "${SWIFT_NATIVE_CLANG_TOOLS_PATH}/clang-cl")
     else()
-      set(CMAKE_CXX_COMPILER "${SWIFT_NATIVE_LLVM_TOOLS_PATH}/clang++")
-      set(CMAKE_C_COMPILER "${SWIFT_NATIVE_LLVM_TOOLS_PATH}/clang")
+      set(CMAKE_CXX_COMPILER "${SWIFT_NATIVE_CLANG_TOOLS_PATH}/clang++")
+      set(CMAKE_C_COMPILER "${SWIFT_NATIVE_CLANG_TOOLS_PATH}/clang")
     endif()
 
     if(CMAKE_C_COMPILER_LAUNCHER MATCHES ".*distcc")
@@ -42,8 +50,14 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     # some stdlib hooks to implement SwiftObject.
     list(APPEND PLATFORM_TARGET_LINK_LIBRARIES
       ${FOUNDATION_LIBRARY}
+      swift_Concurrency${SWIFT_PRIMARY_VARIANT_SUFFIX}
       swiftStdlibUnittest${SWIFT_PRIMARY_VARIANT_SUFFIX}
       )
+  elseif(SWIFT_HOST_VARIANT STREQUAL "Linux")
+    if(SWIFT_HOST_VARIANT_ARCH MATCHES "armv6|armv7|i686")
+      list(APPEND PLATFORM_TARGET_LINK_LIBRARIES
+        "atomic")
+    endif()
   elseif(SWIFT_HOST_VARIANT STREQUAL "freebsd")
     find_library(EXECINFO_LIBRARY execinfo)
     list(APPEND PLATFORM_TARGET_LINK_LIBRARIES
@@ -55,10 +69,27 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
 
   if(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
     list(APPEND PLATFORM_SOURCES
+      Actor.cpp
       TaskStatus.cpp
       )
     list(APPEND PLATFORM_TARGET_LINK_LIBRARIES
       swift_Concurrency${SWIFT_PRIMARY_VARIANT_SUFFIX}
+      )
+
+    if(NOT "${SWIFT_PRIMARY_VARIANT_SDK}" IN_LIST SWIFT_APPLE_PLATFORMS)
+      list(APPEND PLATFORM_TARGET_LINK_LIBRARIES
+        dispatch${SWIFT_PRIMARY_VARIANT_SUFFIX}
+        BlocksRuntime${SWIFT_PRIMARY_VARIANT_SUFFIX}
+        )
+    endif()
+  endif()
+
+  if(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED)
+#    list(APPEND PLATFORM_SOURCES
+#      DistributedActor.cpp
+#      )
+    list(APPEND PLATFORM_TARGET_LINK_LIBRARIES
+      swift_Distributed${SWIFT_PRIMARY_VARIANT_SUFFIX}
       )
   endif()
 
@@ -66,17 +97,20 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
   set(LLVM_OPTIONAL_SOURCES
     weak.mm
     Refcounting.mm
+    Actor.cpp
     TaskStatus.cpp)
 
   add_swift_unittest(SwiftRuntimeTests
     Array.cpp
-    CompatibilityOverride.cpp
+    CompatibilityOverrideRuntime.cpp
+    CompatibilityOverrideConcurrency.cpp
     Concurrent.cpp
     Metadata.cpp
     Mutex.cpp
     Enum.cpp
     Refcounting.cpp
     Stdlib.cpp
+    StackAllocator.cpp
     ${PLATFORM_SOURCES}
 
     # The runtime tests link to internal runtime symbols, which aren't exported
@@ -105,4 +139,3 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     ${PLATFORM_TARGET_LINK_LIBRARIES}
     )
 endif()
-

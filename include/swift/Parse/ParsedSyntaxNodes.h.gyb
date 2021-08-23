@@ -53,7 +53,7 @@ class Parsed${node.name} ${qualifier} : public Parsed${node.base_type} {
 %     end
 
 public:
-  explicit Parsed${node.name}(ParsedRawSyntaxNode rawNode)
+  explicit Parsed${node.name}(ParsedRawSyntaxNode &&rawNode)
     : Parsed${node.base_type}(std::move(rawNode)) {
   }
 
@@ -62,9 +62,13 @@ public:
   /// ${line}
 %       end
 %       if child.is_optional:
-  llvm::Optional<Parsed${child.type_name}> getDeferred${child.name}();
+  llvm::Optional<Parsed${child.type_name}> getDeferred${child.name}(
+      const SyntaxParsingContext *SyntaxContext
+  );
 %       else:
-  Parsed${child.type_name} getDeferred${child.name}();
+  Parsed${child.type_name} getDeferred${child.name}(
+      const SyntaxParsingContext *SyntaxContext
+  );
 %       end
 %     end
 

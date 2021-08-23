@@ -18,6 +18,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Basic/SourceManager.h"
@@ -28,6 +29,7 @@
 #include "swift/Parse/PersistentParserState.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Subsystems.h"
+#include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "clang/AST/ASTContext.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -198,7 +200,7 @@ forEachDependencyUntilTrue(CompilerInstance &CI, unsigned excludeBufferID,
     if (callback(dep))
       return true;
   }
-  for (auto &dep : CI.getDependencyTracker()->getIncrementalDependencies()) {
+  for (auto dep : CI.getDependencyTracker()->getIncrementalDependencyPaths()) {
     if (callback(dep))
       return true;
   }
@@ -276,49 +278,6 @@ static bool areAnyDependentFilesInvalidated(
       });
 }
 
-/// Get interface hash of \p SF including the type members in the file.
-///
-/// See if the inteface of the function and types visible from a function body
-/// has changed since the last completion. If they haven't changed, completion
-/// can reuse the existing AST of the source file. \c SF->getInterfaceHash() is
-/// not enough because it doesn't take the interface of the type members into
-/// account. For example:
-///
-///   struct S {
-///     func foo() {}
-///   }
-///   func main(val: S) {
-///     val.<HERE>
-///   }
-///
-/// In this case, we need to ensure that the interface of \c S hasn't changed.
-/// Note that we don't care about local types (i.e. type declarations inside
-/// function bodies, closures, or top level statement bodies) because they are
-/// not visible from other functions where the completion is happening.
-static Fingerprint getInterfaceHashIncludingTypeMembers(const SourceFile *SF) {
-  /// FIXME: Gross. Hashing multiple "hash" values.
-  llvm::MD5 hash;
-  hash.update(SF->getInterfaceHash().getRawValue());
-
-  std::function<void(IterableDeclContext *)> hashTypeBodyFingerprints =
-      [&](IterableDeclContext *IDC) {
-        if (auto fp = IDC->getBodyFingerprint())
-          hash.update(fp->getRawValue());
-        for (auto *member : IDC->getParsedMembers())
-          if (auto *childIDC = dyn_cast<IterableDeclContext>(member))
-            hashTypeBodyFingerprints(childIDC);
-      };
-
-  for (auto *D : SF->getTopLevelDecls()) {
-    if (auto IDC = dyn_cast<IterableDeclContext>(D))
-      hashTypeBodyFingerprints(IDC);
-  }
-
-  llvm::MD5::MD5Result result;
-  hash.final(result);
-  return Fingerprint{std::move(result)};
-}
-
 } // namespace
 
 bool CompletionInstance::performCachedOperationIfPossible(
@@ -330,6 +289,10 @@ bool CompletionInstance::performCachedOperationIfPossible(
   llvm::PrettyStackTraceString trace(
       "While performing cached completion if possible");
 
+  // Check the invalidation first. Otherwise, in case no 'CacheCI' exists yet,
+  // the flag will remain 'true' even after 'CachedCI' is populated.
+  if (CachedCIShouldBeInvalidated.exchange(false))
+    return false;
   if (!CachedCI)
     return false;
   if (CachedReuseCount >= Opts.MaxASTReuseCount)
@@ -368,9 +331,10 @@ bool CompletionInstance::performCachedOperationIfPossible(
   SearchPathOptions searchPathOpts = CI.getASTContext().SearchPathOpts;
   DiagnosticEngine tmpDiags(tmpSM);
   ClangImporterOptions clangOpts;
+  symbolgraphgen::SymbolGraphOptions symbolOpts;
   std::unique_ptr<ASTContext> tmpCtx(
-      ASTContext::get(langOpts, typeckOpts, searchPathOpts, clangOpts, tmpSM,
-                      tmpDiags));
+      ASTContext::get(langOpts, typeckOpts, searchPathOpts, clangOpts,
+                      symbolOpts, tmpSM, tmpDiags));
   registerParseRequestFunctions(tmpCtx->evaluator);
   registerIDERequestFunctions(tmpCtx->evaluator);
   registerTypeCheckerRequestFunctions(tmpCtx->evaluator);
@@ -395,8 +359,26 @@ bool CompletionInstance::performCachedOperationIfPossible(
   switch (newInfo.Kind) {
   case CodeCompletionDelayedDeclKind::FunctionBody: {
     // If the interface has changed, AST must be refreshed.
-    const auto oldInterfaceHash = getInterfaceHashIncludingTypeMembers(oldSF);
-    const auto newInterfaceHash = getInterfaceHashIncludingTypeMembers(tmpSF);
+    // See if the inteface of the function and types visible from a function
+    // body has changed since the last completion. If they haven't changed,
+    // completion can reuse the existing AST of the source file.
+    // \c getInterfaceHash() is not enough because it doesn't take the interface
+    // of the type members into account. For example:
+    //
+    //   struct S {
+    //     func foo() {}
+    //   }
+    //   func main(val: S) {
+    //     val.<HERE>
+    //   }
+    //
+    // In this case, we need to ensure that the interface of \c S hasn't
+    // changed. Note that we don't care about local types (i.e. type
+    // declarations inside function bodies, closures, or top level statement
+    // bodies) because they are not visible from other functions where the
+    // completion is happening.
+    const auto oldInterfaceHash = oldSF->getInterfaceHashIncludingTypeMembers();
+    const auto newInterfaceHash = tmpSF->getInterfaceHashIncludingTypeMembers();
     if (oldInterfaceHash != newInterfaceHash)
       return false;
 
@@ -484,6 +466,7 @@ bool CompletionInstance::performCachedOperationIfPossible(
     auto &Ctx = oldM->getASTContext();
     auto *newM = ModuleDecl::createMainModule(Ctx, oldM->getName(),
                                               oldM->getImplicitImportInfo());
+    newM->setABIName(oldM->getABIName());
     auto *newSF = new (Ctx) SourceFile(*newM, SourceFileKind::Main, newBufferID,
                                        oldSF->getParsingOptions());
     newM->addFile(*newSF);
@@ -511,6 +494,10 @@ bool CompletionInstance::performCachedOperationIfPossible(
 
   {
     PrettyStackTraceDeclContext trace("performing cached completion", traceDC);
+
+    // The diagnostic engine is keeping track of state which might modify
+    // parsing and type checking behaviour. Clear the flags.
+    CI.getDiags().resetHadAnyError();
 
     if (DiagC)
       CI.addDiagnosticConsumer(DiagC);
@@ -607,7 +594,11 @@ bool CompletionInstance::shouldCheckDependencies() const {
   auto now = system_clock::now();
   auto threshold = DependencyCheckedTimestamp +
                    seconds(Opts.DependencyCheckIntervalSecond);
-  return threshold < now;
+  return threshold <= now;
+}
+
+void CompletionInstance::markCachedCompilerInstanceShouldBeInvalidated() {
+  CachedCIShouldBeInvalidated = true;
 }
 
 void CompletionInstance::setOptions(CompletionInstance::Options NewOpts) {
@@ -621,10 +612,6 @@ bool swift::ide::CompletionInstance::performOperation(
     llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
     std::string &Error, DiagnosticConsumer *DiagC,
     llvm::function_ref<void(CompilerInstance &, bool)> Callback) {
-
-  // Always disable source location resolutions from .swiftsourceinfo file
-  // because they're somewhat heavy operations and aren't needed for completion.
-  Invocation.getFrontendOptions().IgnoreSwiftSourceInfo = true;
 
   // Disable to build syntax tree because code-completion skips some portion of
   // source text. That breaks an invariant of syntax tree building.

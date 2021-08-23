@@ -51,6 +51,7 @@ Clang also has a kind of diagnostic called a "remark", which represents informat
   - "...to silence this warning"
   - "...here" (for a purely locational note)
 
+- If possible, it is best to include the name of the type or function that has the error, e.g. "non-actor type 'Nope' cannot ..." is better than "non-actor type cannot ...". It helps developers relate the error message to the specific type the error is about, even if the error would highlight the appropriate line / function in other ways. 
 
 ### Locations and Highlights ###
 

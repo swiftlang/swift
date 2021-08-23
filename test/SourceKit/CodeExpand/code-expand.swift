@@ -242,3 +242,9 @@ func inactiveWithTrailing() {
   // CHECK-NEXT: <#code#>
 }
 #endif
+
+expandClosureWithInternalParameterNames {
+  withtrail(<#T##callback: (Int, Int) -> Bool##(_ a: Int, _ b: Int) -> Bool#>)
+// CHECK: withtrail { a, b in
+// CHECK-NEXT: <#code#>
+}

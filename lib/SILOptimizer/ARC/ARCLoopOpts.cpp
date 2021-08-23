@@ -66,7 +66,7 @@ class ARCLoopOpts : public SILFunctionTransform {
     }
 
     // Get all of the analyses that we need.
-    auto *AA = getAnalysis<AliasAnalysis>();
+    auto *AA = getAnalysis<AliasAnalysis>(F);
     auto *RCFI = getAnalysis<RCIdentityAnalysis>()->get(F);
     auto *EAFI = getAnalysis<EpilogueARCAnalysis>()->get(F);
     auto *LRFI = getAnalysis<LoopRegionAnalysis>()->get(F);

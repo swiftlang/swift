@@ -98,6 +98,8 @@ public:
       return {getTrailingObjects<ImportedModule>(),
               NumTopLevelImports + NumTransitiveImports};
   }
+
+  SWIFT_DEBUG_DUMP;
 };
 
 class alignas(ImportedModule) ImportCache {

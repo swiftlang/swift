@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -Osize -import-objc-header %S/Inputs/Outliner.h %s -emit-sil -enforce-exclusivity=unchecked | %FileCheck %s
-// RUN: %target-swift-frontend -Osize -g -import-objc-header %S/Inputs/Outliner.h %s -emit-sil -enforce-exclusivity=unchecked | %FileCheck %s
+// RUN: %target-swift-frontend -Osize -import-objc-header %S/Inputs/Outliner.h %s -emit-sil -enforce-exclusivity=unchecked -enable-copy-propagation | %FileCheck %s
+// RUN: %target-swift-frontend -Osize -g -import-objc-header %S/Inputs/Outliner.h %s -emit-sil -enforce-exclusivity=unchecked -enable-copy-propagation | %FileCheck %s
 
 // REQUIRES: objc_interop
 // REQUIRES: optimized_stdlib
@@ -40,7 +40,8 @@ public class MyGizmo {
 // CHECK:  apply [[FUN]]({{.*}}) : $@convention(thin) (@owned String, Int, Optional<AnyObject>, Gizmo) -> @owned Optional<String>
 // CHECK:  [[FUN:%.*]] = function_ref @$sSo5GizmoC11doSomethingyypSgSaySSGSgFToTembgnn_
 // CHECK:  apply [[FUN]]({{.*}}) : $@convention(thin) (@guaranteed Array<String>, Gizmo) -> @owned Optional<AnyObject>
-// CHECK:  apply [[FUN]]({{.*}}) : $@convention(thin) (@guaranteed Array<String>, Gizmo) -> @owned Optional<AnyObject>
+// CHECK:  [[FUN:%.*]] = function_ref @$sSo5GizmoC11doSomethingyypSgSaySSGSgFToTembnn_
+// CHECK:  apply [[FUN]]({{.*}}) : $@convention(thin) (@owned Array<String>, Gizmo) -> @owned Optional<AnyObject>
 // CHECK: return
 // CHECK: } // end sil function '$s8outliner13testOutliningyyF'
 public func testOutlining() {
@@ -135,7 +136,7 @@ public func testOutlining() {
 // CHECK:   %15 = function_ref @$sSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ : $@convention(method) (@guaranteed Optional<NSString>, @thin String.Type) -> @owned String
 // CHECK:   %16 = metatype $@thin String.Type
 // CHECK:   %17 = apply %15(%9, %16) : $@convention(method) (@guaranteed Optional<NSString>, @thin String.Type) -> @owned String
-// CHECK:   release_value %9 : $Optional<NSString>          // id: %18
+// CHECK:   release_value %9 : $Optional<NSString>
 // CHECK:   %19 = enum $Optional<String>, #Optional.some!enumelt, %17 : $String
 // CHECK:   br bb3(%19 : $Optional<String>)
 //

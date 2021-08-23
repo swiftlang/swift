@@ -18,7 +18,7 @@
 #ifndef SWIFT_SERIALIZATION_SOURCEINFOFORMAT_H
 #define SWIFT_SERIALIZATION_SOURCEINFOFORMAT_H
 
-#include "llvm/Bitcode/RecordLayout.h"
+#include "llvm/Bitcode/BitcodeConvenience.h"
 
 namespace swift {
 namespace serialization {
@@ -41,7 +41,7 @@ const unsigned char SWIFTSOURCEINFO_SIGNATURE[] = { 0xF0, 0x9F, 0x8F, 0x8E };
 ///
 /// See docs/StableBitcode.md for information on how to make
 /// backwards-compatible changes using the LLVM bitcode format.
-const uint16_t SWIFTSOURCEINFO_VERSION_MAJOR = 2;
+const uint16_t SWIFTSOURCEINFO_VERSION_MAJOR = 3;
 
 /// Serialized swiftsourceinfo format minor version number.
 ///
@@ -49,7 +49,7 @@ const uint16_t SWIFTSOURCEINFO_VERSION_MAJOR = 2;
 /// interesting to test for. A backwards-compatible change is one where an \e
 /// old compiler can read the new format without any problems (usually by
 /// ignoring new information).
-const uint16_t SWIFTSOURCEINFO_VERSION_MINOR = 0; // Last change: add doc comment ranges
+const uint16_t SWIFTSOURCEINFO_VERSION_MINOR = 0; // add location offset
 
 /// The hash seed used for the string hashes(llvm::djbHash) in a .swiftsourceinfo file.
 const uint32_t SWIFTSOURCEINFO_HASH_SEED = 5387;
@@ -72,7 +72,13 @@ namespace decl_locs_block {
     DECL_USRS,
     TEXT_DATA,
     DOC_RANGES,
+    SOURCE_FILE_LIST,
   };
+
+  using SourceFileListLayout = BCRecordLayout<
+    SOURCE_FILE_LIST, // record ID
+    BCBlob            // An array of fixed size 'BasicSourceFileInfo' data.
+  >;
 
   using BasicDeclLocsLayout = BCRecordLayout<
     BASIC_DECL_LOCS, // record ID

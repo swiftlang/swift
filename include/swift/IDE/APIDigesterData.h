@@ -162,8 +162,7 @@ public:
 
   bool rightCommentUnderscored() const {
     DeclNameViewer Viewer(RightComment);
-    auto HasUnderScore =
-      [](StringRef S) { return S.find('_') != StringRef::npos; };
+    auto HasUnderScore = [](StringRef S) { return S.contains('_'); };
     auto Args = Viewer.args();
     return HasUnderScore(Viewer.base()) ||
         std::any_of(Args.begin(), Args.end(), HasUnderScore);

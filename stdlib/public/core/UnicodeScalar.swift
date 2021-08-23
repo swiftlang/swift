@@ -33,7 +33,7 @@ extension Unicode {
   ///     print(airplane)
   ///     // Prints "✈︎"
   @frozen
-  public struct Scalar {
+  public struct Scalar: Sendable {
     @inlinable
     internal init(_value: UInt32) {
       self._value = _value
@@ -337,8 +337,8 @@ extension Unicode.Scalar {
   ///     }
   @inlinable
   public init?(_ v: Int) {
-    if let us = Unicode.Scalar(UInt32(v)) {
-      self = us
+    if let exact = UInt32(exactly: v) {
+      self.init(exact)
     } else {
       return nil
     }
@@ -387,7 +387,7 @@ extension Unicode.Scalar: Comparable {
 
 extension Unicode.Scalar {
   @frozen
-  public struct UTF16View {
+  public struct UTF16View: Sendable {
     @inlinable
     internal init(value: Unicode.Scalar) {
       self.value = value
@@ -437,7 +437,7 @@ extension Unicode.Scalar.UTF16View: RandomAccessCollection {
 extension Unicode.Scalar {
   @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
   @frozen
-  public struct UTF8View {
+  public struct UTF8View: Sendable {
     @inlinable
     internal init(value: Unicode.Scalar) {
       self.value = value

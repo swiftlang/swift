@@ -16,6 +16,7 @@
 #include "sourcekitd/DocSupportAnnotationArray.h"
 #include "sourcekitd/TokenAnnotationsArray.h"
 #include "sourcekitd/ExpressionTypeArray.h"
+#include "sourcekitd/VariableTypeArray.h"
 #include "sourcekitd/RawData.h"
 #include "sourcekitd/RequestResponsePrinterBase.h"
 #include "SourceKit/Support/UIdent.h"
@@ -232,6 +233,16 @@ void ResponseBuilder::Dictionary::set(SourceKit::UIdent Key,
   xpc_object_t arr = xpc_array_create(nullptr, 0);
   for (auto Str : Strs) {
     xpc_array_set_string(arr, XPC_ARRAY_APPEND, Str.c_str());
+  }
+  xpc_dictionary_set_value(Impl, Key.c_str(), arr);
+  xpc_release(arr);
+}
+
+void ResponseBuilder::Dictionary::set(SourceKit::UIdent Key,
+                                      ArrayRef<SourceKit::UIdent> UIDs) {
+  xpc_object_t arr = xpc_array_create(nullptr, 0);
+  for (auto UID : UIDs) {
+    xpc_array_set_uint64(arr, XPC_ARRAY_APPEND, uintptr_t(SKDUIDFromUIdent(UID)));
   }
   xpc_dictionary_set_value(Impl, Key.c_str(), arr);
   xpc_release(arr);
@@ -614,6 +625,7 @@ static sourcekitd_variant_type_t XPCVar_get_type(sourcekitd_variant_t var) {
     case CustomBufferKind::DocStructureElementArray:
     case CustomBufferKind::AttributesArray:
     case CustomBufferKind::ExpressionTypeArray:
+    case CustomBufferKind::VariableTypeArray:
       return SOURCEKITD_VARIANT_TYPE_ARRAY;
     case CustomBufferKind::RawData:
       return SOURCEKITD_VARIANT_TYPE_DATA;
@@ -776,6 +788,9 @@ static sourcekitd_variant_t variantFromXPCObject(xpc_object_t obj) {
                 (uintptr_t)CUSTOM_BUF_START(obj), 0 }};
     case CustomBufferKind::ExpressionTypeArray:
       return {{ (uintptr_t)getVariantFunctionsForExpressionTypeArray(),
+                (uintptr_t)CUSTOM_BUF_START(obj), 0 }};
+    case CustomBufferKind::VariableTypeArray:
+      return {{ (uintptr_t)getVariantFunctionsForVariableTypeArray(),
                 (uintptr_t)CUSTOM_BUF_START(obj), 0 }};
     case sourcekitd::CustomBufferKind::RawData:
       return {{ (uintptr_t)getVariantFunctionsForRawData(),

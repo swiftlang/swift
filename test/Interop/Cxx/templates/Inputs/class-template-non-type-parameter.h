@@ -1,11 +1,12 @@
 #ifndef TEST_INTEROP_CXX_TEMPLATES_INPUTS_CLASS_TEMPLATE_NON_TYPE_PARAMETER_H
 #define TEST_INTEROP_CXX_TEMPLATES_INPUTS_CLASS_TEMPLATE_NON_TYPE_PARAMETER_H
 
-template<class T, auto Size>
-struct MagicArray {
-    T t[Size];
-};
+#if defined(__clang__)
+using size_t = __SIZE_TYPE__;
+#endif
+
+template <class T, size_t Size> struct MagicArray { T t[Size]; };
 
 typedef MagicArray<int, 2> MagicIntPair;
 
-#endif  // TEST_INTEROP_CXX_TEMPLATES_INPUTS_CLASS_TEMPLATE_NON_TYPE_PARAMETER_H
+#endif // TEST_INTEROP_CXX_TEMPLATES_INPUTS_CLASS_TEMPLATE_NON_TYPE_PARAMETER_H

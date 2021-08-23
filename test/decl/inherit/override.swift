@@ -46,8 +46,8 @@ extension B {
   override func f3D() { }
   override func f4D() -> ObjCClassB { }
 
-  func f5() { }  // expected-error{{overridi}}
-  func f6() -> A { }  // expected-error{{overriding declarations in extensions is not supported}}
+  func f5() { }  // expected-error{{overri}}
+  func f6() -> A { }  // expected-error{{instance method 'f6()' is declared in extension of 'A' and cannot be overridden}}
 
   @objc override func f7() { }
   @objc override func f8() -> ObjCClassA { }

@@ -16,13 +16,13 @@
 // CHECK-FIRST: Handled f.swift
 // CHECK-FIRST: Handled bad.swift
 
-// CHECK-RECORD-CLEAN-DAG: "./a.swift": [
-// CHECK-RECORD-CLEAN-DAG: "./b.swift": [
-// CHECK-RECORD-CLEAN-DAG: "./c.swift": [
-// CHECK-RECORD-CLEAN-DAG: "./d.swift": [
-// CHECK-RECORD-CLEAN-DAG: "./e.swift": [
-// CHECK-RECORD-CLEAN-DAG: "./f.swift": [
-// CHECK-RECORD-CLEAN-DAG: "./bad.swift": [
+// CHECK-RECORD-CLEAN-DAG: "{{(./)?}}a.swift": [
+// CHECK-RECORD-CLEAN-DAG: "{{(./)?}}b.swift": [
+// CHECK-RECORD-CLEAN-DAG: "{{(./)?}}c.swift": [
+// CHECK-RECORD-CLEAN-DAG: "{{(./)?}}d.swift": [
+// CHECK-RECORD-CLEAN-DAG: "{{(./)?}}e.swift": [
+// CHECK-RECORD-CLEAN-DAG: "{{(./)?}}f.swift": [
+// CHECK-RECORD-CLEAN-DAG: "{{(./)?}}bad.swift": [
 
 
 // RUN: touch -t 201401240006 %t/a.swift
@@ -39,13 +39,13 @@
 // NEGATIVE-A-NOT: Handled e.swift
 // NEGATIVE-A-NOT: Handled f.swift
 
-// CHECK-RECORD-A-DAG: "./a.swift": [
-// CHECK-RECORD-A-DAG: "./b.swift": [
-// CHECK-RECORD-A-DAG: "./c.swift": !private [
-// CHECK-RECORD-A-DAG: "./d.swift": !private [
-// CHECK-RECORD-A-DAG: "./e.swift": !private [
-// CHECK-RECORD-A-DAG: "./f.swift": [
-// CHECK-RECORD-A-DAG: "./bad.swift": !private [
+// CHECK-RECORD-A-DAG: "{{(./)?}}a.swift": [
+// CHECK-RECORD-A-DAG: "{{(./)?}}b.swift": [
+// CHECK-RECORD-A-DAG: "{{(./)?}}c.swift": !private [
+// CHECK-RECORD-A-DAG: "{{(./)?}}d.swift": !private [
+// CHECK-RECORD-A-DAG: "{{(./)?}}e.swift": !private [
+// CHECK-RECORD-A-DAG: "{{(./)?}}f.swift": [
+// CHECK-RECORD-A-DAG: "{{(./)?}}bad.swift": !private [
 
 // RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path "%{python.unquoted};%S/Inputs/update-dependencies.py;%swift-dependency-tool" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./a.swift ./b.swift ./c.swift ./d.swift ./e.swift ./f.swift ./bad.swift -module-name main -j1 -v > %t/a2.txt 2>&1
 // RUN: %FileCheck -check-prefix=CHECK-A2 %s < %t/a2.txt
@@ -81,13 +81,13 @@
 // NEGATIVE-B-NOT: Handled e.swift
 // NEGATIVE-B-NOT: Handled f.swift
 
-// CHECK-RECORD-B-DAG: "./a.swift": [
-// CHECK-RECORD-B-DAG: "./b.swift": [
-// CHECK-RECORD-B-DAG: "./c.swift": [
-// CHECK-RECORD-B-DAG: "./d.swift": [
-// CHECK-RECORD-B-DAG: "./e.swift": [
-// CHECK-RECORD-B-DAG: "./f.swift": [
-// CHECK-RECORD-B-DAG: "./bad.swift": !private [
+// CHECK-RECORD-B-DAG: "{{(./)?}}a.swift": [
+// CHECK-RECORD-B-DAG: "{{(./)?}}b.swift": [
+// CHECK-RECORD-B-DAG: "{{(./)?}}c.swift": [
+// CHECK-RECORD-B-DAG: "{{(./)?}}d.swift": [
+// CHECK-RECORD-B-DAG: "{{(./)?}}e.swift": [
+// CHECK-RECORD-B-DAG: "{{(./)?}}f.swift": [
+// CHECK-RECORD-B-DAG: "{{(./)?}}bad.swift": !private [
 
 // RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path "%{python.unquoted};%S/Inputs/update-dependencies.py;%swift-dependency-tool" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./a.swift ./b.swift ./c.swift ./d.swift ./e.swift ./f.swift ./bad.swift -module-name main -j1 -v > %t/b2.txt 2>&1
 // RUN: %FileCheck -check-prefix=CHECK-B2 %s < %t/b2.txt

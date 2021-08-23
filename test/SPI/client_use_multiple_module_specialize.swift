@@ -1,22 +1,22 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -enable-experimental-prespecialization -emit-module -DLIB_A %s -module-name A -emit-module-path %t/A.swiftmodule
-// RUN: %target-swift-frontend -enable-experimental-prespecialization -emit-module -DLIB_B %s -module-name B -emit-module-path %t/B.swiftmodule -I %t
-// RUN: %target-swift-frontend -enable-experimental-prespecialization -module-name C -emit-sil -O -DLIB_C %s -I %t | %FileCheck  %s
-// RUN: %target-swift-frontend -enable-experimental-prespecialization -module-name C -emit-sil -O -DLIB_C_NO_SPI %s -I %t | %FileCheck  %s --check-prefix=NOSPI
+// RUN: %target-swift-frontend -emit-module -DLIB_A %s -module-name A -emit-module-path %t/A.swiftmodule
+// RUN: %target-swift-frontend -emit-module -DLIB_B %s -module-name B -emit-module-path %t/B.swiftmodule -I %t
+// RUN: %target-swift-frontend -module-name C -emit-sil -O -DLIB_C %s -I %t | %FileCheck  %s
+// RUN: %target-swift-frontend -module-name C -emit-sil -O -DLIB_C_NO_SPI %s -I %t | %FileCheck  %s --check-prefix=NOSPI
 
 // Test using the public swiftinterface
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -enable-experimental-prespecialization -swift-version 5 -enable-library-evolution -emit-module -DLIB_A %s -module-name A -emit-module-path %t/A.swiftmodule -emit-module-interface-path %t/A.swiftinterface
-// RUN: %target-swift-frontend -enable-experimental-prespecialization -swift-version 5 -enable-library-evolution -emit-module -DLIB_B %s -module-name B -emit-module-path %t/B.swiftmodule -I %t -emit-module-interface-path %t/B.swiftinterface
+// RUN: %target-swift-frontend -swift-version 5 -enable-library-evolution -emit-module -DLIB_A %s -module-name A -emit-module-path %t/A.swiftmodule -emit-module-interface-path %t/A.swiftinterface
+// RUN: %target-swift-frontend -swift-version 5 -enable-library-evolution -emit-module -DLIB_B %s -module-name B -emit-module-path %t/B.swiftmodule -I %t -emit-module-interface-path %t/B.swiftinterface
 // RUN: rm %t/A.swiftmodule %t/B.swiftmodule
-// RUN: %target-swift-frontend -enable-experimental-prespecialization -module-name C -emit-sil -O -DLIB_C %s -I %t | %FileCheck  %s --check-prefix=PUBLIC
+// RUN: %target-swift-frontend -module-name C -emit-sil -O -DLIB_C %s -I %t | %FileCheck  %s --check-prefix=PUBLIC
 
 // Test using the private swiftinterface
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -enable-experimental-prespecialization -swift-version 5 -enable-library-evolution -emit-module -DLIB_A %s -module-name A -emit-module-path %t/A.swiftmodule -emit-module-interface-path %t/A.swiftinterface -emit-private-module-interface-path %t/A.private.swiftinterface
-// RUN: %target-swift-frontend -enable-experimental-prespecialization -swift-version 5 -enable-library-evolution -emit-module -DLIB_B %s -module-name B -emit-module-path %t/B.swiftmodule -I %t -emit-module-interface-path %t/B.swiftinterface -emit-private-module-interface-path %t/B.private.swiftinterface
+// RUN: %target-swift-frontend -swift-version 5 -enable-library-evolution -emit-module -DLIB_A %s -module-name A -emit-module-path %t/A.swiftmodule -emit-module-interface-path %t/A.swiftinterface -emit-private-module-interface-path %t/A.private.swiftinterface
+// RUN: %target-swift-frontend -swift-version 5 -enable-library-evolution -emit-module -DLIB_B %s -module-name B -emit-module-path %t/B.swiftmodule -I %t -emit-module-interface-path %t/B.swiftinterface -emit-private-module-interface-path %t/B.private.swiftinterface
 // RUN: rm %t/A.swiftmodule %t/B.swiftmodule
-// RUN: %target-swift-frontend -enable-experimental-prespecialization -module-name C -emit-sil -O -DLIB_C %s -I %t | %FileCheck  %s
+// RUN: %target-swift-frontend -module-name C -emit-sil -O -DLIB_C %s -I %t | %FileCheck  %s
 
 #if LIB_A
 

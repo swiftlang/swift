@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-build-swift -emit-executable %s -g -o %t/concurrency -emit-module -Xfrontend -enable-experimental-concurrency
+// RUN: %target-build-swift -emit-executable %s -g -o %t/concurrency -emit-module 
 
 // RUN: sed -ne '/\/\/ *DEMANGLE-TYPE: /s/\/\/ *DEMANGLE-TYPE: *//p' < %s > %t/input
 // RUN: %lldb-moduleimport-test-with-sdk %t/concurrency -type-from-mangled=%t/input | %FileCheck %s --check-prefix=CHECK-TYPE
@@ -20,10 +20,10 @@ func foo() {
   }
 }
 
-// DEMANGLE-TYPE: $sSayySiYcG
+// DEMANGLE-TYPE: $sSayySiYacG
 // CHECK-TYPE: Array<(Int) async -> ()>
 
-// DEMANGLE-TYPE: $sSayySiYKcG
+// DEMANGLE-TYPE: $sSayySiYaKcG
 // CHECK-TYPE: Array<(Int) async throws -> ()>
 
 // DEMANGLE-TYPE: $sIegH_D

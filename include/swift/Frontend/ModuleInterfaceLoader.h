@@ -150,7 +150,8 @@ class ExplicitSwiftModuleLoader: public SerializedModuleLoaderBase {
                   std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
                   bool IsFramework) override;
 
-  bool canImportModule(ImportPath::Element mID) override;
+  bool canImportModule(ImportPath::Element mID, llvm::VersionTuple version,
+                       bool underlyingVersion) override;
 
   bool isCached(StringRef DepPath) override { return false; };
 
@@ -160,7 +161,6 @@ public:
   static std::unique_ptr<ExplicitSwiftModuleLoader>
   create(ASTContext &ctx,
          DependencyTracker *tracker, ModuleLoadingMode loadMode,
-         ArrayRef<std::string> ExplicitModulePaths,
          StringRef ExplicitSwiftModuleMap,
          bool IgnoreSwiftSourceInfoFile);
 
@@ -179,10 +179,11 @@ struct ExplicitModuleInfo {
   std::string moduleDocPath;
   // Path of the .swiftsourceinfo file.
   std::string moduleSourceInfoPath;
-  // Opened buffer for the .swiftmodule file.
-  std::unique_ptr<llvm::MemoryBuffer> moduleBuffer;
   // A flag that indicates whether this module is a framework
   bool isFramework;
+  // A flag that indicates whether this module is a system module
+  // Set the default to be false.
+  bool isSystem = false;
 };
 
 /// Parser of explicit module maps passed into the compiler.
@@ -241,7 +242,18 @@ private:
     SmallString<32> Buffer;
     return Saver.save(cast<llvm::yaml::ScalarNode>(N)->getValue(Buffer));
   }
-  
+
+  static bool parseBoolValue(StringRef val) {
+    auto valStr = val.str();
+    valStr.erase(std::remove(valStr.begin(), valStr.end(), '\n'), valStr.end());
+    if (valStr.compare("true") == 0)
+      return true;
+    else if (valStr.compare("false") == 0)
+      return false;
+    else
+      llvm_unreachable("Unexpected JSON value for isFramework");
+  }
+
   bool parseSingleModuleEntry(llvm::yaml::Node &node,
                               llvm::StringMap<ExplicitModuleInfo> &moduleMap) {
     using namespace llvm::yaml;
@@ -262,14 +274,9 @@ private:
       } else if (key == "sourceInfoPath") {
         result.moduleSourceInfoPath = val.str();
       } else if (key == "isFramework") {
-        auto valStr = val.str();
-        valStr.erase(std::remove(valStr.begin(), valStr.end(), '\n'), valStr.end());
-        if (valStr.compare("true") == 0)
-          result.isFramework = true;
-        else if (valStr.compare("false") == 0)
-          result.isFramework = false;
-        else
-          llvm_unreachable("Unexpected JSON value for isFramework");
+        result.isFramework = parseBoolValue(val);
+      } else if (key == "isSystem") {
+        result.isSystem = parseBoolValue(val);
       } else {
         // Being forgiving for future fields.
         continue;
@@ -311,21 +318,49 @@ struct ModuleInterfaceLoaderOptions {
   ModuleInterfaceLoaderOptions() = default;
 };
 
+/// Strongly typed enum that represents if we require all SILModules to have
+/// OSSA modules emitted. This is implemented by incorporating this bit into the
+/// module cache hash.
+struct RequireOSSAModules_t {
+  enum ValueTy {
+    No = 0,
+    Yes = 1,
+  };
+
+  ValueTy value;
+
+  RequireOSSAModules_t(const SILOptions &opts)
+      : value(opts.EnableOSSAModules ? RequireOSSAModules_t::Yes
+                                     : RequireOSSAModules_t::No) {}
+
+  operator ValueTy() const { return value; }
+  explicit operator bool() const { return bool(value); }
+};
+
 class ModuleInterfaceCheckerImpl: public ModuleInterfaceChecker {
   friend class ModuleInterfaceLoader;
   ASTContext &Ctx;
   std::string CacheDir;
   std::string PrebuiltCacheDir;
+  std::string BackupInterfaceDir;
   ModuleInterfaceLoaderOptions Opts;
+  RequireOSSAModules_t RequiresOSSAModules;
 
 public:
-  explicit ModuleInterfaceCheckerImpl(ASTContext &Ctx,
-                                      StringRef cacheDir,
+  explicit ModuleInterfaceCheckerImpl(ASTContext &Ctx, StringRef cacheDir,
                                       StringRef prebuiltCacheDir,
-                                      ModuleInterfaceLoaderOptions Opts)
-  : Ctx(Ctx), CacheDir(cacheDir), PrebuiltCacheDir(prebuiltCacheDir),
-    Opts(Opts) {}
-
+                                      StringRef BackupInterfaceDir,
+                                      ModuleInterfaceLoaderOptions opts,
+                                      RequireOSSAModules_t requiresOSSAModules)
+      : Ctx(Ctx), CacheDir(cacheDir), PrebuiltCacheDir(prebuiltCacheDir),
+        BackupInterfaceDir(BackupInterfaceDir),
+        Opts(opts), RequiresOSSAModules(requiresOSSAModules) {}
+  explicit ModuleInterfaceCheckerImpl(ASTContext &Ctx, StringRef cacheDir,
+                                      StringRef prebuiltCacheDir,
+                                      ModuleInterfaceLoaderOptions opts,
+                                      RequireOSSAModules_t requiresOSSAModules):
+    ModuleInterfaceCheckerImpl(Ctx, cacheDir, prebuiltCacheDir, StringRef(),
+                               opts, requiresOSSAModules) {}
   std::vector<std::string>
   getCompiledModuleCandidatesForInterface(StringRef moduleName,
                                           StringRef interfacePath) override;
@@ -390,19 +425,23 @@ public:
   ///
   /// A simplified version of the core logic in #openModuleFiles.
   static bool buildSwiftModuleFromSwiftInterface(
-    SourceManager &SourceMgr, DiagnosticEngine &Diags,
-    const SearchPathOptions &SearchPathOpts, const LangOptions &LangOpts,
-    const ClangImporterOptions &ClangOpts,
-    StringRef CacheDir, StringRef PrebuiltCacheDir,
-    StringRef ModuleName, StringRef InPath, StringRef OutPath,
-    bool SerializeDependencyHashes, bool TrackSystemDependencies,
-    ModuleInterfaceLoaderOptions Opts);
+      SourceManager &SourceMgr, DiagnosticEngine &Diags,
+      const SearchPathOptions &SearchPathOpts, const LangOptions &LangOpts,
+      const ClangImporterOptions &ClangOpts, StringRef CacheDir,
+      StringRef PrebuiltCacheDir, StringRef BackupInterfaceDir,
+      StringRef ModuleName, StringRef InPath,
+      StringRef OutPath, StringRef ABIOutputPath,
+      bool SerializeDependencyHashes,
+      bool TrackSystemDependencies, ModuleInterfaceLoaderOptions Opts,
+      RequireOSSAModules_t RequireOSSAModules);
 };
 
 struct InterfaceSubContextDelegateImpl: InterfaceSubContextDelegate {
 private:
   SourceManager &SM;
-  DiagnosticEngine &Diags;
+public:
+  DiagnosticEngine *Diags;
+private:
   llvm::BumpPtrAllocator Allocator;
   llvm::StringSaver ArgSaver;
   std::vector<StringRef> GenericArgs;
@@ -418,27 +457,27 @@ private:
       // Diagnose this inside the interface file, if possible.
       loc = SM.getLocFromExternalSource(interfacePath, 1, 1);
     }
-    return Diags.diagnose(loc, ID, std::move(Args)...);
+    return Diags->diagnose(loc, ID, std::move(Args)...);
   }
-  void inheritOptionsForBuildingInterface(const SearchPathOptions &SearchPathOpts,
-                                          const LangOptions &LangOpts);
+  void
+  inheritOptionsForBuildingInterface(const SearchPathOptions &SearchPathOpts,
+                                     const LangOptions &LangOpts,
+                                     RequireOSSAModules_t requireOSSAModules);
   bool extractSwiftInterfaceVersionAndArgs(CompilerInvocation &subInvocation,
                                            SmallVectorImpl<const char *> &SubArgs,
                                            std::string &CompilerVersion,
                                            StringRef interfacePath,
                                            SourceLoc diagnosticLoc);
 public:
-  InterfaceSubContextDelegateImpl(SourceManager &SM,
-                                  DiagnosticEngine &Diags,
-                                  const SearchPathOptions &searchPathOpts,
-                                  const LangOptions &langOpts,
-                                  const ClangImporterOptions &clangImporterOpts,
-                                  ModuleInterfaceLoaderOptions LoaderOpts,
-                                  bool buildModuleCacheDirIfAbsent,
-                                  StringRef moduleCachePath,
-                                  StringRef prebuiltCachePath,
-                                  bool serializeDependencyHashes,
-                                  bool trackSystemDependencies);
+  InterfaceSubContextDelegateImpl(
+      SourceManager &SM, DiagnosticEngine *Diags,
+      const SearchPathOptions &searchPathOpts, const LangOptions &langOpts,
+      const ClangImporterOptions &clangImporterOpts,
+      ModuleInterfaceLoaderOptions LoaderOpts, bool buildModuleCacheDirIfAbsent,
+      StringRef moduleCachePath, StringRef prebuiltCachePath,
+      StringRef backupModuleInterfaceDir,
+      bool serializeDependencyHashes, bool trackSystemDependencies,
+      RequireOSSAModules_t requireOSSAModules);
   std::error_code runInSubContext(StringRef moduleName,
                                   StringRef interfacePath,
                                   StringRef outputPath,

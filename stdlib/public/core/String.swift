@@ -383,6 +383,8 @@ public struct String {
   public init() { self.init(_StringGuts()) }
 }
 
+extension String: Sendable { }
+
 extension String {
   #if !INTERNAL_CHECKS_ENABLED
   @inlinable @inline(__always) internal func _invariantCheck() {}
@@ -458,6 +460,7 @@ extension String {
       contigBytes._providesContiguousBytesNoCopy
     {
       self = contigBytes.withUnsafeBytes { rawBufPtr in
+        Builtin.onFastPath() // encourage SIL Optimizer to inline this closure
         return String._fromUTF8Repairing(
           UnsafeBufferPointer(
             start: rawBufPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
@@ -539,7 +542,7 @@ extension String {
       if _fastPath(smol.isASCII) {
         self = String(_StringGuts(smol))
       } else {
-        //We succeeded in making a _SmallString, but may need to repair UTF8
+        // We succeeded in making a _SmallString, but may need to repair UTF8
         self = smol.withUTF8 { String._fromUTF8Repairing($0).result }
       }
       return

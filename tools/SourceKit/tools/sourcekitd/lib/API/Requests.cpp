@@ -16,6 +16,7 @@
 #include "sourcekitd/DocSupportAnnotationArray.h"
 #include "sourcekitd/TokenAnnotationsArray.h"
 #include "sourcekitd/ExpressionTypeArray.h"
+#include "sourcekitd/VariableTypeArray.h"
 
 #include "SourceKit/Core/Context.h"
 #include "SourceKit/Core/LangSupport.h"
@@ -29,6 +30,7 @@
 
 #include "swift/Basic/ExponentialGrowthAppendingBinaryByteStream.h"
 #include "swift/Basic/Mangler.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Basic/Version.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/ManglingMacros.h"
@@ -83,8 +85,6 @@ struct SKEditorConsumerOptions {
   bool EnableStructure = false;
   bool EnableDiagnostics = false;
   SyntaxTreeTransferMode SyntaxTransferMode = SyntaxTreeTransferMode::Off;
-  SyntaxTreeSerializationFormat SyntaxSerializationFormat =
-      SyntaxTreeSerializationFormat::JSON;
   bool SyntacticOnly = false;
 };
 
@@ -194,6 +194,10 @@ static void reportCursorInfo(const RequestResult<CursorInfoData> &Result, Respon
 
 static void reportExpressionTypeInfo(const RequestResult<ExpressionTypesInFile> &Result,
                                      ResponseReceiver Rec);
+
+static void
+reportVariableTypeInfo(const RequestResult<VariableTypesInFile> &Result,
+                       ResponseReceiver Rec);
 
 static void reportRangeInfo(const RequestResult<RangeInfo> &Result, ResponseReceiver Rec);
 
@@ -324,26 +328,10 @@ static SyntaxTreeTransferMode syntaxTransferModeFromUID(sourcekitd_uid_t UID) {
     return SyntaxTreeTransferMode::Off;
   } else if (UID == KindSyntaxTreeOff) {
     return SyntaxTreeTransferMode::Off;
-  } else if (UID == KindSyntaxTreeIncremental) {
-    return SyntaxTreeTransferMode::Incremental;
   } else if (UID == KindSyntaxTreeFull) {
     return SyntaxTreeTransferMode::Full;
   } else {
     llvm_unreachable("Unexpected syntax tree transfer mode");
-  }
-}
-
-static llvm::Optional<SyntaxTreeSerializationFormat>
-syntaxSerializationFormatFromUID(sourcekitd_uid_t UID) {
-  if (UID == nullptr) {
-    // Default is JSON
-    return SyntaxTreeSerializationFormat::JSON;
-  } else if (UID == KindSyntaxTreeSerializationJSON) {
-    return SyntaxTreeSerializationFormat::JSON;
-  } else if (UID == KindSyntaxTreeSerializationByteTree) {
-    return SyntaxTreeSerializationFormat::ByteTree;
-  } else {
-    return llvm::None;
   }
 }
 
@@ -480,9 +468,6 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     ResponseBuilder RB;
     auto dict = RB.getDictionary();
 
-    Optional<bool> OptimizeForIDE =
-        Req.getOptionalInt64(KeyOptimizeForIDE)
-            .map([](int64_t v) -> bool { return v; });
     Optional<unsigned> CompletionMaxASTContextReuseCount =
         Req.getOptionalInt64(KeyCompletionMaxASTContextReuseCount)
             .map([](int64_t v) -> unsigned { return v; });
@@ -491,12 +476,11 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
             .map([](int64_t v) -> unsigned { return v; });
 
     GlobalConfig::Settings UpdatedConfig =
-        Config->update(OptimizeForIDE, CompletionMaxASTContextReuseCount,
+        Config->update(CompletionMaxASTContextReuseCount,
                        CompletionCheckDependencyInterval);
 
     getGlobalContext().getSwiftLangSupport().globalConfigurationUpdated(Config);
 
-    dict.set(KeyOptimizeForIDE, UpdatedConfig.OptimizeForIDE);
     dict.set(KeyCompletionMaxASTContextReuseCount,
              UpdatedConfig.CompletionOpts.MaxASTContextReuseCount);
     dict.set(KeyCompletionCheckDependencyInterval,
@@ -590,6 +574,11 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     return Rec(ResponseBuilder().createResponse());
   }
 
+  if (ReqUID == RequestDependencyUpdated) {
+    getGlobalContext().getSwiftLangSupport().dependencyUpdated();
+    return Rec(ResponseBuilder().createResponse());
+  }
+
   Optional<StringRef> SourceFile = Req.getString(KeySourceFile);
   Optional<StringRef> SourceText = Req.getString(KeySourceText);
 
@@ -640,7 +629,6 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     int64_t EnableDiagnostics = true;
     Req.getInt64(KeyEnableDiagnostics, EnableDiagnostics, /*isOptional=*/true);
     auto TransferModeUID = Req.getUID(KeySyntaxTreeTransferMode);
-    auto SerializationFormatUID = Req.getUID(KeySyntaxTreeSerializationFormat);
     int64_t SyntacticOnly = false;
     Req.getInt64(KeySyntacticOnly, SyntacticOnly, /*isOptional=*/true);
 
@@ -649,11 +637,6 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     Opts.EnableStructure = EnableStructure;
     Opts.EnableDiagnostics = EnableDiagnostics;
     Opts.SyntaxTransferMode = syntaxTransferModeFromUID(TransferModeUID);
-    auto SyntaxSerializationFormat =
-        syntaxSerializationFormatFromUID(SerializationFormatUID);
-    if (!SyntaxSerializationFormat)
-      return Rec(createErrorRequestFailed("Invalid serialization format"));
-    Opts.SyntaxSerializationFormat = SyntaxSerializationFormat.getValue();
     Opts.SyntacticOnly = SyntacticOnly;
     return Rec(editorOpen(*Name, InputBuf.get(), Opts, Args, std::move(vfsOptions)));
   }
@@ -688,18 +671,12 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     int64_t SyntacticOnly = false;
     Req.getInt64(KeySyntacticOnly, SyntacticOnly, /*isOptional=*/true);
     auto TransferModeUID = Req.getUID(KeySyntaxTreeTransferMode);
-    auto SerializationFormatUID = Req.getUID(KeySyntaxTreeSerializationFormat);
 
     SKEditorConsumerOptions Opts;
     Opts.EnableSyntaxMap = EnableSyntaxMap;
     Opts.EnableStructure = EnableStructure;
     Opts.EnableDiagnostics = EnableDiagnostics;
     Opts.SyntaxTransferMode = syntaxTransferModeFromUID(TransferModeUID);
-    auto SyntaxSerializationFormat =
-        syntaxSerializationFormatFromUID(SerializationFormatUID);
-    if (!SyntaxSerializationFormat)
-      return Rec(createErrorRequestFailed("Invalid serialization format"));
-    Opts.SyntaxSerializationFormat = SyntaxSerializationFormat.getValue();
     Opts.SyntacticOnly = SyntacticOnly;
 
     return Rec(editorReplaceText(*Name, InputBuf.get(), Offset, Length, Opts));
@@ -947,6 +924,11 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
         dict.set(KeyValue, stat->value);
       };
 
+      Statistic instructionCount(
+          UIdentFromSKDUID(KindStatInstructionCount),
+          "# of instructions executed since the SourceKit process was started");
+      instructionCount.value.store(swift::getInstructionsExecuted());
+      addStat(&instructionCount);
       addStat(&numRequests);
       addStat(&numSemaRequests);
       std::for_each(stats.begin(), stats.end(), addStat);
@@ -1083,9 +1065,11 @@ static void handleSemanticRequest(
       Req.getInt64(KeyLength, Length, /*isOptional=*/true);
       int64_t Actionables = false;
       Req.getInt64(KeyRetrieveRefactorActions, Actionables, /*isOptional=*/true);
+      int64_t SymbolGraph = false;
+      Req.getInt64(KeyRetrieveSymbolGraph, SymbolGraph, /*isOptional=*/true);
       return Lang.getCursorInfo(
-          *SourceFile, Offset, Length, Actionables, CancelOnSubsequentRequest,
-          Args, std::move(vfsOptions),
+          *SourceFile, Offset, Length, Actionables, SymbolGraph,
+          CancelOnSubsequentRequest, Args, std::move(vfsOptions),
           [Rec](const RequestResult<CursorInfoData> &Result) {
             reportCursorInfo(Result, Rec);
           });
@@ -1165,7 +1149,7 @@ static void handleSemanticRequest(
 
     SmallVector<const char *, 8> ExpectedProtocols;
     if (Req.getStringArray(KeyExpectedTypes, ExpectedProtocols, true))
-      return Rec(createErrorRequestInvalid("invalid 'key.interested_protocols'"));
+      return Rec(createErrorRequestInvalid("invalid 'key.expectedtypes'"));
     int64_t CanonicalTy = false;
     Req.getInt64(KeyCanonicalizeType, CanonicalTy, /*isOptional=*/true);
     return Lang.collectExpressionTypes(*SourceFile, Args, ExpectedProtocols,
@@ -1173,6 +1157,19 @@ static void handleSemanticRequest(
       [Rec](const RequestResult<ExpressionTypesInFile> &Result) {
         reportExpressionTypeInfo(Result, Rec);
       });
+  }
+
+  if (ReqUID == RequestCollectVariableType) {
+    LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
+    Optional<unsigned> Offset = Req.getOptionalInt64(KeyOffset).map(
+        [](int64_t v) -> unsigned { return v; });
+    Optional<unsigned> Length = Req.getOptionalInt64(KeyLength).map(
+        [](int64_t v) -> unsigned { return v; });
+    return Lang.collectVariableTypes(
+        *SourceFile, Args, Offset, Length,
+        [Rec](const RequestResult<VariableTypesInFile> &Result) {
+          reportVariableTypeInfo(Result, Rec);
+        });
   }
 
   if (ReqUID == RequestFindLocalRenameRanges) {
@@ -1227,12 +1224,10 @@ static void handleSemanticRequest(
       return Rec(createErrorRequestInvalid("cannot specify 'key.selectorpieces' "
                                            "and 'key.argnames' at the same time"));
     }
-    std::transform(ArgParts.begin(), ArgParts.end(),
-                   std::back_inserter(Input.ArgNames),
-                   [](const char *C) { return StringRef(C).trim('`'); });
-    std::transform(Selectors.begin(), Selectors.end(),
-                   std::back_inserter(Input.ArgNames),
-                   [](const char *C) { return StringRef(C); });
+    llvm::transform(ArgParts, std::back_inserter(Input.ArgNames),
+                    [](const char *C) { return StringRef(C).trim('`'); });
+    llvm::transform(Selectors, std::back_inserter(Input.ArgNames),
+                    [](const char *C) { return StringRef(C); });
     return Lang.getNameInfo(*SourceFile, Offset, Input, Args,
       [Rec](const RequestResult<NameTranslatingInfo> &Result) {
         reportNameInfo(Result, Rec);
@@ -1617,6 +1612,8 @@ void SKDocConsumer::addDocEntityInfoToDict(const DocEntityInfo &Info,
     Elem.set(KeyIsDeprecated, Info.IsDeprecated);
   if (Info.IsOptional)
     Elem.set(KeyIsOptional, Info.IsOptional);
+  if (Info.IsAsync)
+    Elem.set(KeyIsAsync, Info.IsAsync);
   if (!Info.DocComment.empty())
     Elem.set(KeyDocFullAsXML, Info.DocComment);
   if (!Info.FullyAnnotatedDecl.empty())
@@ -1757,6 +1754,117 @@ bool SKDocConsumer::handleDiagnostic(const DiagnosticEntryInfo &Info) {
 // ReportCursorInfo
 //===----------------------------------------------------------------------===//
 
+static void addCursorSymbolInfo(const CursorSymbolInfo &Symbol,
+                                ResponseBuilder::Dictionary &Elem) {
+  Elem.set(KeyKind, Symbol.Kind);
+  if (Symbol.DeclarationLang.isValid())
+    Elem.set(KeyDeclarationLang, Symbol.DeclarationLang);
+  Elem.set(KeyName, Symbol.Name);
+  if (!Symbol.USR.empty())
+    Elem.set(KeyUSR, Symbol.USR);
+  if (!Symbol.TypeName.empty())
+    Elem.set(KeyTypeName, Symbol.TypeName);
+  if (!Symbol.TypeUSR.empty())
+    Elem.set(KeyTypeUsr, Symbol.TypeUSR);
+  if (!Symbol.ContainerTypeUSR.empty())
+    Elem.set(KeyContainerTypeUsr, Symbol.ContainerTypeUSR);
+  if (!Symbol.DocComment.empty())
+    Elem.set(KeyDocFullAsXML, Symbol.DocComment);
+  if (!Symbol.GroupName.empty())
+    Elem.set(KeyGroupName, Symbol.GroupName);
+  if (!Symbol.LocalizationKey.empty())
+    Elem.set(KeyLocalizationKey, Symbol.LocalizationKey);
+  if (!Symbol.AnnotatedDeclaration.empty())
+    Elem.set(KeyAnnotatedDecl, Symbol.AnnotatedDeclaration);
+  if (!Symbol.FullyAnnotatedDeclaration.empty())
+    Elem.set(KeyFullyAnnotatedDecl, Symbol.FullyAnnotatedDeclaration);
+  if (!Symbol.SymbolGraph.empty())
+    Elem.set(KeySymbolGraph, Symbol.SymbolGraph);
+  if (!Symbol.ModuleName.empty())
+    Elem.set(KeyModuleName, Symbol.ModuleName);
+  if (!Symbol.ModuleInterfaceName.empty())
+    Elem.set(KeyModuleInterfaceName, Symbol.ModuleInterfaceName);
+  if (!Symbol.Location.Filename.empty()) {
+    Elem.set(KeyFilePath, Symbol.Location.Filename);
+    Elem.set(KeyOffset, Symbol.Location.Offset);
+    Elem.set(KeyLength, Symbol.Location.Length);
+    Elem.set(KeyLine, Symbol.Location.Line);
+    Elem.set(KeyColumn, Symbol.Location.Column);
+  }
+
+  if (!Symbol.OverrideUSRs.empty()) {
+    auto Overrides = Elem.setArray(KeyOverrides);
+    for (auto USR : Symbol.OverrideUSRs) {
+      auto Override = Overrides.appendDictionary();
+      Override.set(KeyUSR, USR);
+    }
+  }
+
+  if (!Symbol.AnnotatedRelatedDeclarations.empty()) {
+    auto RelDecls = Elem.setArray(KeyRelatedDecls);
+    for (auto AnnotDecl : Symbol.AnnotatedRelatedDeclarations) {
+      auto RelDecl = RelDecls.appendDictionary();
+      RelDecl.set(KeyAnnotatedDecl, AnnotDecl);
+    }
+  }
+
+  if (!Symbol.ModuleGroupArray.empty()) {
+    auto Groups = Elem.setArray(KeyModuleGroups);
+    for (auto Name : Symbol.ModuleGroupArray) {
+      auto Entry = Groups.appendDictionary();
+      Entry.set(KeyGroupName, Name);
+    }
+  }
+
+  if (!Symbol.ParentContexts.empty()) {
+    auto Parents = Elem.setArray(KeyParentContexts);
+    for (const auto &ParentTy : Symbol.ParentContexts) {
+      auto Parent = Parents.appendDictionary();
+      Parent.set(KeyName, ParentTy.Title);
+      Parent.set(KeyKind, ParentTy.KindName);
+      Parent.set(KeyUSR, ParentTy.USR);
+    }
+  }
+
+  if (!Symbol.ReferencedSymbols.empty()) {
+    auto Refs = Elem.setArray(KeyReferencedSymbols);
+    for (const auto &Ref: Symbol.ReferencedSymbols) {
+      auto Symbol = Refs.appendDictionary();
+      Symbol.set(KeyUSR, Ref.USR);
+      Symbol.set(KeyAccessLevel, Ref.AccessLevel);
+      Symbol.set(KeyFilePath, Ref.FilePath);
+      Symbol.set(KeyModuleName, Ref.ModuleName);
+      Symbol.set(KeyDeclarationLang, Ref.DeclarationLang);
+      Symbol.setBool(KeyIsSystem, Ref.IsSystem);
+      Symbol.setBool(KeyIsSPI, Ref.IsSPI);
+
+      auto Parents = Symbol.setArray(KeyParentContexts);
+      for (const auto &ParentTy : Ref.ParentContexts) {
+        auto Parent = Parents.appendDictionary();
+        Parent.set(KeyName, ParentTy.Title);
+        Parent.set(KeyKind, ParentTy.KindName);
+        Parent.set(KeyUSR, ParentTy.USR);
+      }
+    }
+  }
+
+  if (!Symbol.ReceiverUSRs.empty()) {
+    auto Receivers = Elem.setArray(KeyReceivers);
+    for (auto USR : Symbol.ReceiverUSRs) {
+      auto Receiver = Receivers.appendDictionary();
+      Receiver.set(KeyUSR, USR);
+    }
+  }
+
+  if (Symbol.IsSystem)
+    Elem.setBool(KeyIsSystem, true);
+  if (Symbol.IsDynamic)
+    Elem.setBool(KeyIsDynamic, true);
+
+  if (Symbol.ParentNameOffset)
+    Elem.set(KeyParentLoc, Symbol.ParentNameOffset.getValue());
+}
+
 static void reportCursorInfo(const RequestResult<CursorInfoData> &Result,
                              ResponseReceiver Rec) {
   if (Result.isCancelled())
@@ -1767,56 +1875,29 @@ static void reportCursorInfo(const RequestResult<CursorInfoData> &Result,
   const CursorInfoData &Info = Result.value();
 
   ResponseBuilder RespBuilder;
+  auto Elem = RespBuilder.getDictionary();
   if (!Info.InternalDiagnostic.empty()) {
-    auto Elem = RespBuilder.getDictionary();
     Elem.set(KeyInternalDiagnostic, Info.InternalDiagnostic);
     return Rec(RespBuilder.createResponse());
   }
-  if (Info.Kind.isInvalid())
-    return Rec(RespBuilder.createResponse());
 
-  auto Elem = RespBuilder.getDictionary();
-  Elem.set(KeyKind, Info.Kind);
-  Elem.set(KeyName, Info.Name);
-  if (!Info.USR.empty())
-    Elem.set(KeyUSR, Info.USR);
-  if (!Info.TypeName.empty())
-    Elem.set(KeyTypeName, Info.TypeName);
-  if (!Info.DocComment.empty())
-    Elem.set(KeyDocFullAsXML, Info.DocComment);
-  if (!Info.AnnotatedDeclaration.empty())
-    Elem.set(KeyAnnotatedDecl, Info.AnnotatedDeclaration);
-  if (!Info.FullyAnnotatedDeclaration.empty())
-    Elem.set(KeyFullyAnnotatedDecl, Info.FullyAnnotatedDeclaration);
-  if (!Info.ModuleName.empty())
-    Elem.set(KeyModuleName, Info.ModuleName);
-  if (!Info.GroupName.empty())
-    Elem.set(KeyGroupName, Info.GroupName);
-  if (!Info.LocalizationKey.empty())
-    Elem.set(KeyLocalizationKey, Info.LocalizationKey);
-  if (!Info.ModuleInterfaceName.empty())
-    Elem.set(KeyModuleInterfaceName, Info.ModuleInterfaceName);
-  if (Info.DeclarationLoc.hasValue()) {
-    Elem.set(KeyOffset, Info.DeclarationLoc.getValue().first);
-    Elem.set(KeyLength, Info.DeclarationLoc.getValue().second);
-    if (!Info.Filename.empty())
-      Elem.set(KeyFilePath, Info.Filename);
-  }
-  if (!Info.OverrideUSRs.empty()) {
-    auto Overrides = Elem.setArray(KeyOverrides);
-    for (auto USR : Info.OverrideUSRs) {
-      auto Override = Overrides.appendDictionary();
-      Override.set(KeyUSR, USR);
+  if (!Info.Symbols.empty()) {
+    addCursorSymbolInfo(Info.Symbols[0], Elem);
+    if (Info.Symbols.size() > 1) {
+      auto SecondarySymbols = Elem.setArray(KeySecondarySymbols);
+      for (auto Secondary : makeArrayRef(Info.Symbols).drop_front()) {
+        auto SecondaryElem = SecondarySymbols.appendDictionary();
+        addCursorSymbolInfo(Secondary, SecondaryElem);
+      }
     }
   }
-  if (!Info.ModuleGroupArray.empty()) {
-    auto Groups = Elem.setArray(KeyModuleGroups);
-    for (auto Name : Info.ModuleGroupArray) {
-      auto Entry = Groups.appendDictionary();
-      Entry.set(KeyGroupName, Name);
-    }
-  }
+
   if (!Info.AvailableActions.empty()) {
+    // Clients rely on a kind being set to determine whether the cursor
+    // has any results or not. Add one if there's no symbols, ie. only actions
+    // were requested (even though it's meaningless).
+    if (Info.Symbols.empty())
+      Elem.set(KeyKind, KindRefModule);
     auto Actions = Elem.setArray(KeyRefactorActions);
     for (auto Info : Info.AvailableActions) {
       auto Entry = Actions.appendDictionary();
@@ -1826,24 +1907,6 @@ static void reportCursorInfo(const RequestResult<CursorInfoData> &Result,
         Entry.set(KeyActionUnavailableReason, Info.UnavailableReason);
     }
   }
-  if (Info.ParentNameOffset) {
-    Elem.set(KeyParentLoc, Info.ParentNameOffset.getValue());
-  }
-  if (!Info.AnnotatedRelatedDeclarations.empty()) {
-    auto RelDecls = Elem.setArray(KeyRelatedDecls);
-    for (auto AnnotDecl : Info.AnnotatedRelatedDeclarations) {
-      auto RelDecl = RelDecls.appendDictionary();
-      RelDecl.set(KeyAnnotatedDecl, AnnotDecl);
-    }
-  }
-  if (Info.IsSystem)
-    Elem.setBool(KeyIsSystem, true);
-  if (!Info.TypeInterface.empty())
-    Elem.set(KeyTypeInterface, Info.TypeInterface);
-  if (!Info.TypeUSR.empty())
-    Elem.set(KeyTypeUsr, Info.TypeUSR);
-  if (!Info.ContainerTypeUSR.empty())
-    Elem.set(KeyContainerTypeUsr, Info.ContainerTypeUSR);
 
   return Rec(RespBuilder.createResponse());
 }
@@ -1933,6 +1996,30 @@ static void reportExpressionTypeInfo(const RequestResult<ExpressionTypesInFile> 
     ArrBuilder.add(R);
   }
   Dict.setCustomBuffer(KeyExpressionTypeList, ArrBuilder.createBuffer());
+  Rec(Builder.createResponse());
+}
+
+//===----------------------------------------------------------------------===//
+// ReportVariableTypeInfo
+//===----------------------------------------------------------------------===//
+
+static void
+reportVariableTypeInfo(const RequestResult<VariableTypesInFile> &Result,
+                       ResponseReceiver Rec) {
+  if (Result.isCancelled())
+    return Rec(createErrorRequestCancelled());
+  if (Result.isError())
+    return Rec(createErrorRequestFailed(Result.getError()));
+
+  const VariableTypesInFile &Info = Result.value();
+
+  ResponseBuilder Builder;
+  auto Dict = Builder.getDictionary();
+  VariableTypeArrayBuilder ArrBuilder(Info.TypeBuffer);
+  for (auto &R : Info.Results) {
+    ArrBuilder.add(R);
+  }
+  Dict.setCustomBuffer(KeyVariableTypeList, ArrBuilder.createBuffer());
   Rec(Builder.createResponse());
 }
 
@@ -2259,8 +2346,6 @@ bool SKGroupedCodeCompletionConsumer::handleResult(const CodeCompletionInfo &R) 
              R.descriptionStructure->baseName);
     addRange(structure, KeyBodyOffset, KeyBodyLength,
              R.descriptionStructure->parameterRange);
-    addRange(structure, KeyThrowOffset, KeyThrowLength,
-             R.descriptionStructure->throwsRange);
 
     if (R.parametersStructure) {
       auto params = structure.setArray(KeySubStructure);
@@ -2508,14 +2593,15 @@ public:
 
   void recordFormattedText(StringRef Text) override;
 
+  bool diagnosticsEnabled() override { return Opts.EnableDiagnostics; }
+
   void setDiagnosticStage(UIdent DiagStage) override;
   void handleDiagnostic(const DiagnosticEntryInfo &Info,
                         UIdent DiagStage) override;
 
   void handleSourceText(StringRef Text) override;
 
-  void handleSyntaxTree(const swift::syntax::SourceFileSyntax &SyntaxTree,
-                        std::unordered_set<unsigned> &ReusedNodeIds) override;
+  void handleSyntaxTree(const swift::syntax::SourceFileSyntax &SyntaxTree) override;
 
   SyntaxTreeTransferMode syntaxTreeTransferMode() override {
     return Opts.SyntaxTransferMode;
@@ -2786,6 +2872,28 @@ static void fillDictionaryForDiagnosticInfo(
 static void fillDictionaryForDiagnosticInfoBase(
     ResponseBuilder::Dictionary Elem, const DiagnosticEntryInfoBase &Info) {
 
+  if (!Info.ID.empty())
+    Elem.set(KeyID, Info.ID);
+
+  if (!Info.Categories.empty()) {
+    SmallVector<SourceKit::UIdent, 1> CategoryUIDs;
+
+    static UIdent UIDKindDiagDeprecation(KindDiagDeprecation.str());
+    static UIdent UIDKindDiagNoUsage(KindDiagNoUsage.str());
+
+    for (auto C : Info.Categories) {
+      switch (C) {
+      case DiagnosticCategory::Deprecation:
+        CategoryUIDs.push_back(UIDKindDiagDeprecation);
+        break;
+      case DiagnosticCategory::NoUsage:
+        CategoryUIDs.push_back(UIDKindDiagNoUsage);
+        break;
+      }
+    }
+    Elem.set(KeyCategories, CategoryUIDs);
+  }
+
   Elem.set(KeyDescription, Info.Description);
   if (Info.Line != 0) {
     Elem.set(KeyLine, Info.Line);
@@ -2841,42 +2949,8 @@ void SKEditorConsumer::handleSourceText(StringRef Text) {
   Dict.set(KeySourceText, Text);
 }
 
-void serializeSyntaxTreeAsByteTree(
-    const swift::syntax::SourceFileSyntax &SyntaxTree,
-    std::unordered_set<unsigned> &ReusedNodeIds,
-    ResponseBuilder::Dictionary &Dict) {
-  auto StartClock = clock();
-  // Serialize the syntax tree as a ByteTree
-  auto Stream = swift::ExponentialGrowthAppendingBinaryByteStream();
-  Stream.reserve(32 * 1024);
-  std::map<void *, void *> UserInfo;
-  UserInfo[swift::byteTree::UserInfoKeyReusedNodeIds] = &ReusedNodeIds;
-  swift::byteTree::ByteTreeWriter::write(Stream,
-                                         swift::byteTree::SYNTAX_TREE_VERSION,
-                                         *SyntaxTree.getRaw(), UserInfo);
-
-  std::unique_ptr<llvm::WritableMemoryBuffer> Buf =
-      llvm::WritableMemoryBuffer::getNewUninitMemBuffer(sizeof(uint64_t) + Stream.data().size());
-  *reinterpret_cast<uint64_t*>(Buf->getBufferStart()) =
-      (uint64_t)CustomBufferKind::RawData;
-  memcpy(Buf->getBufferStart() + sizeof(uint64_t),
-         Stream.data().data(), Stream.data().size());
-
-  Dict.setCustomBuffer(KeySerializedSyntaxTree, std::move(Buf));
-
-  auto EndClock = clock();
-  LOG_SECTION("incrParse Performance", InfoLowPrio) {
-    Log->getOS() << "Serialized " << Stream.data().size()
-                 << " bytes as ByteTree in ";
-    auto Seconds = (double)(EndClock - StartClock) * 1000 / CLOCKS_PER_SEC;
-    llvm::write_double(Log->getOS(), Seconds, llvm::FloatStyle::Fixed, 2);
-    Log->getOS() << "ms";
-  }
-}
-
 void serializeSyntaxTreeAsJson(
     const swift::syntax::SourceFileSyntax &SyntaxTree,
-    std::unordered_set<unsigned> ReusedNodeIds,
     ResponseBuilder::Dictionary &Dict) {
   auto StartClock = clock();
   // 4096 is a heuristic buffer size that appears to usually be able to fit an
@@ -2888,7 +2962,6 @@ void serializeSyntaxTreeAsJson(
     llvm::raw_string_ostream SyntaxTreeStream(SyntaxTreeString);
     SyntaxTreeStream.SetBufferSize(ReserveBufferSize);
     swift::json::Output::UserInfoMap JsonUserInfo;
-    JsonUserInfo[swift::json::OmitNodesUserInfoKey] = &ReusedNodeIds;
     swift::json::Output SyntaxTreeOutput(SyntaxTreeStream, JsonUserInfo,
                                          /*PrettyPrint=*/false);
     SyntaxTreeOutput << *SyntaxTree.getRaw();
@@ -2906,32 +2979,8 @@ void serializeSyntaxTreeAsJson(
 }
 
 void SKEditorConsumer::handleSyntaxTree(
-    const swift::syntax::SourceFileSyntax &SyntaxTree,
-    std::unordered_set<unsigned> &ReusedNodeIds) {
-
-  std::unordered_set<unsigned> OmitNodes;
-  switch (Opts.SyntaxTransferMode) {
-  case SourceKit::SyntaxTreeTransferMode::Off:
-    // Don't serialize the tree at all
-    return;
-  case SourceKit::SyntaxTreeTransferMode::Full:
-    // Serialize the tree without omitting any nodes
-    OmitNodes = {};
-    break;
-  case SourceKit::SyntaxTreeTransferMode::Incremental:
-    // Serialize the tree and omit all nodes that have been reused
-    OmitNodes = ReusedNodeIds;
-    break;
-  }
-
-  switch (Opts.SyntaxSerializationFormat) {
-  case SourceKit::SyntaxTreeSerializationFormat::JSON:
-    serializeSyntaxTreeAsJson(SyntaxTree, OmitNodes, Dict);
-    break;
-  case SourceKit::SyntaxTreeSerializationFormat::ByteTree:
-    serializeSyntaxTreeAsByteTree(SyntaxTree, OmitNodes, Dict);
-    break;
-  }
+    const swift::syntax::SourceFileSyntax &SyntaxTree) {
+  serializeSyntaxTreeAsJson(SyntaxTree, Dict);
 }
 
 static sourcekitd_response_t

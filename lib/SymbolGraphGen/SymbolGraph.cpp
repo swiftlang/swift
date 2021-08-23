@@ -17,9 +17,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/Version.h"
-#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Sema/IDETypeChecking.h"
-#include "swift/Serialization/SerializedModuleLoader.h"
 
 #include "DeclarationFragmentPrinter.h"
 #include "FormatVersion.h"
@@ -34,12 +32,22 @@ SymbolGraph::SymbolGraph(SymbolGraphASTWalker &Walker,
                          ModuleDecl &M,
                          Optional<ModuleDecl *> ExtendedModule,
                          markup::MarkupContext &Ctx,
-                         Optional<llvm::VersionTuple> ModuleVersion)
+                         Optional<llvm::VersionTuple> ModuleVersion,
+                         bool IsForSingleNode)
 : Walker(Walker),
   M(M),
   ExtendedModule(ExtendedModule),
   Ctx(Ctx),
-  ModuleVersion(ModuleVersion) {}
+  ModuleVersion(ModuleVersion),
+  IsForSingleNode(IsForSingleNode) {
+    if (auto *DM = M.getDeclaringModuleIfCrossImportOverlay()) {
+      DeclaringModule = DM;
+      SmallVector<Identifier, 1> Bystanders;
+      if (M.getRequiredBystandersIfCrossImportOverlay(DM, Bystanders)) {
+        BystanderModules = Bystanders;
+      }
+    }
+  }
 
 // MARK: - Utilities
 
@@ -62,6 +70,7 @@ PrintOptions SymbolGraph::getDeclarationFragmentsPrintOptions() const {
   Opts.SkipUnderscoredStdlibProtocols = true;
   Opts.PrintGenericRequirements = true;
   Opts.PrintInherited = false;
+  Opts.ExplodeEnumCaseDecls = true;
 
   Opts.ExclusiveAttrList.clear();
 
@@ -187,7 +196,6 @@ void SymbolGraph::recordNode(Symbol S) {
   // with this declaration.
   recordMemberRelationship(S);
   recordConformanceSynthesizedMemberRelationships(S);
-  recordSuperclassSynthesizedMemberRelationships(S);
   recordConformanceRelationships(S);
   recordInheritanceRelationships(S);
   recordDefaultImplementationRelationships(S);
@@ -229,6 +237,12 @@ void SymbolGraph::recordMemberRelationship(Symbol S) {
       if (isRequirementOrDefaultImplementation(S.getSymbolDecl())) {
         return;
       }
+      if (DC->getSelfNominalTypeDecl() == nullptr) {
+        // If we couldn't look up the type the member is declared on (e.g.
+        // because the member is declared in an extension whose extended type
+        // doesn't exist), don't record a memberOf relationship.
+        return;
+      }
       return recordEdge(S,
                         Symbol(this, DC->getSelfNominalTypeDecl(), nullptr),
                         RelationshipKind::MemberOf());
@@ -241,45 +255,6 @@ void SymbolGraph::recordMemberRelationship(Symbol S) {
     case swift::DeclContextKind::Module:
     case swift::DeclContextKind::FileUnit:
       break;
-  }
-}
-
-void SymbolGraph::recordSuperclassSynthesizedMemberRelationships(Symbol S) {
-  if (!Walker.Options.EmitSynthesizedMembers) {
-    return;
-  }
-  // Via class inheritance...
-  if (const auto *C = dyn_cast<ClassDecl>(S.getSymbolDecl())) {
-    // Collect all superclass members up the inheritance chain.
-    SmallPtrSet<const ValueDecl *, 32> SuperClassMembers;
-    const auto *Super = C->getSuperclassDecl();
-    while (Super) {
-      for (const auto *SuperMember : Super->getMembers()) {
-        if (const auto *SuperMemberVD = dyn_cast<ValueDecl>(SuperMember)) {
-          SuperClassMembers.insert(SuperMemberVD);
-        }
-      }
-      Super = Super->getSuperclassDecl();
-    }
-    // Remove any that are overridden by this class.
-    for (const auto *DerivedMember : C->getMembers()) {
-      if (const auto *DerivedMemberVD = dyn_cast<ValueDecl>(DerivedMember)) {
-        if (const auto *Overridden = DerivedMemberVD->getOverriddenDecl()) {
-          SuperClassMembers.erase(Overridden);
-        }
-      }
-    }
-    // What remains in SuperClassMembers are inherited members that
-    // haven't been overridden by the class.
-    // Add a synthesized relationship.
-    for (const auto *InheritedMember : SuperClassMembers) {
-      if (canIncludeDeclAsNode(InheritedMember)) {
-        Symbol Source(this, InheritedMember, C);
-        Symbol Target(this, C, nullptr);
-        Nodes.insert(Source);
-        recordEdge(Source, Target, RelationshipKind::MemberOf());
-      }
-    }
   }
 }
 
@@ -328,9 +303,10 @@ void SymbolGraph::recordConformanceSynthesizedMemberRelationships(Symbol S) {
     return;
   }
 
-  SynthesizedExtensionAnalyzer
-  ExtensionAnalyzer(const_cast<NominalTypeDecl*>(OwningNominal),
-      PrintOptions::printModuleInterface());
+  SynthesizedExtensionAnalyzer ExtensionAnalyzer(
+      const_cast<NominalTypeDecl *>(OwningNominal),
+      PrintOptions::printModuleInterface(
+          OwningNominal->getASTContext().TypeCheckerOpts.PrintFullConvention));
   auto MergeGroupKind = SynthesizedExtensionAnalyzer::MergeGroupKind::All;
   ExtensionAnalyzer.forEachExtensionMergeGroup(MergeGroupKind,
       [&](ArrayRef<ExtensionInfo> ExtensionInfos){
@@ -414,6 +390,17 @@ void SymbolGraph::recordDefaultImplementationRelationships(Symbol S) {
           recordEdge(Symbol(this, VD, nullptr),
                      Symbol(this, MemberVD, nullptr),
                      RelationshipKind::DefaultImplementationOf());
+
+          // If P is from a different module, and it's being added to a type
+          // from the current module, add a `memberOf` relation to the extended
+          // protocol.
+          if (MemberVD->getModuleContext()->getNameStr() != M.getNameStr() && VD->getDeclContext()) {
+            if (auto *ExP = VD->getDeclContext()->getSelfNominalTypeDecl()) {
+              recordEdge(Symbol(this, VD, nullptr),
+                         Symbol(this, ExP, nullptr),
+                         RelationshipKind::MemberOf());
+            }
+          }
         }
       }
     }
@@ -499,40 +486,20 @@ void SymbolGraph::serialize(llvm::json::OStream &OS) {
     }); // end metadata:
 
     OS.attributeObject("module", [&](){
-      OS.attribute("name", M.getNameStr());
+      if (DeclaringModule) {
+        // A cross-import overlay can be considered part of its declaring module
+        OS.attribute("name", (*DeclaringModule)->getNameStr());
+        std::vector<StringRef> B;
+        for (auto BModule : BystanderModules) {
+          B.push_back(BModule.str());
+        }
+        OS.attribute("bystanders", B);
+      } else {
+        OS.attribute("name", M.getNameStr());
+      }
       AttributeRAII Platform("platform", OS);
 
-      auto *MainFile = M.getFiles().front();
-      switch (MainFile->getKind()) {
-          case FileUnitKind::Builtin:
-            llvm_unreachable("Unexpected module kind: Builtin");
-          case FileUnitKind::DWARFModule:
-            llvm_unreachable("Unexpected module kind: DWARFModule");
-          case FileUnitKind::Source:
-            llvm_unreachable("Unexpected module kind: Source");
-          case FileUnitKind::Synthesized:
-            llvm_unreachable("Unexpected module kind: Synthesized");
-            break;
-          case FileUnitKind::SerializedAST: {
-            auto SerializedAST = cast<SerializedASTFile>(MainFile);
-            auto Target = llvm::Triple(SerializedAST->getTargetTriple());
-            symbolgraphgen::serialize(Target, OS);
-            break;
-          }
-          case FileUnitKind::ClangModule: {
-            auto ClangModule = cast<ClangModuleUnit>(MainFile);
-            if (const auto *Overlay = ClangModule->getOverlayModule()) {
-              auto &OverlayMainFile =
-                  Overlay->getMainFile(FileUnitKind::SerializedAST);
-              auto SerializedAST = cast<SerializedASTFile>(OverlayMainFile);
-              auto Target = llvm::Triple(SerializedAST.getTargetTriple());
-              symbolgraphgen::serialize(Target, OS);
-            } else {
-              symbolgraphgen::serialize(Walker.Options.Target, OS);
-            }
-            break;
-        }
-      }
+      symbolgraphgen::serialize(M, OS, Walker.Options.Target);
     });
 
     if (ModuleVersion) {
@@ -560,8 +527,9 @@ SymbolGraph::serializeDeclarationFragments(StringRef Key,
                                            llvm::json::OStream &OS) {
   DeclarationFragmentPrinter Printer(this, OS, Key);
   auto Options = getDeclarationFragmentsPrintOptions();
-  if (S.getSynthesizedBaseType()) {
-    Options.setBaseType(S.getSynthesizedBaseType());
+  if (S.getBaseType()) {
+    Options.setBaseType(S.getBaseType());
+    Options.PrintAsMember = true;
   }
   S.getSymbolDecl()->print(Printer, Options);
 }
@@ -570,16 +538,9 @@ void
 SymbolGraph::serializeNavigatorDeclarationFragments(StringRef Key,
                                                     const Symbol &S,
                                                     llvm::json::OStream &OS) {
-  DeclarationFragmentPrinter Printer(this, OS, Key);
-
   if (const auto *TD = dyn_cast<GenericTypeDecl>(S.getSymbolDecl())) {
+    DeclarationFragmentPrinter Printer(this, OS, Key);
     Printer.printAbridgedType(TD, /*PrintKeyword=*/false);
-  } else {
-    auto Options = getSubHeadingDeclarationFragmentsPrintOptions();
-    if (S.getSynthesizedBaseType()) {
-      Options.setBaseType(S.getSynthesizedBaseType());
-    }
-    S.getSymbolDecl()->print(Printer, Options);
   }
 }
 
@@ -593,8 +554,9 @@ SymbolGraph::serializeSubheadingDeclarationFragments(StringRef Key,
     Printer.printAbridgedType(TD, /*PrintKeyword=*/true);
   } else {
     auto Options = getSubHeadingDeclarationFragmentsPrintOptions();
-    if (S.getSynthesizedBaseType()) {
-      Options.setBaseType(S.getSynthesizedBaseType());
+    if (S.getBaseType()) {
+      Options.setBaseType(S.getBaseType());
+      Options.PrintAsMember = true;
     }
     S.getSymbolDecl()->print(Printer, Options);
   }
@@ -602,9 +564,15 @@ SymbolGraph::serializeSubheadingDeclarationFragments(StringRef Key,
 
 void
 SymbolGraph::serializeDeclarationFragments(StringRef Key, Type T,
-                                            llvm::json::OStream &OS) {
+                                           Type BaseType,
+                                           llvm::json::OStream &OS) {
   DeclarationFragmentPrinter Printer(this, OS, Key);
-  T->print(Printer, getDeclarationFragmentsPrintOptions());
+  auto Options = getDeclarationFragmentsPrintOptions();
+  if (BaseType) {
+    Options.setBaseType(BaseType);
+    Options.PrintAsMember = true;
+  }
+  T->print(Printer, Options);
 }
 
 bool SymbolGraph::isImplicitlyPrivate(const Decl *D,
@@ -622,7 +590,7 @@ bool SymbolGraph::isImplicitlyPrivate(const Decl *D,
 
   // Don't include declarations with the @_spi attribute unless the
   // access control filter is internal or below.
-  if (D->isSPI()) {
+  if (D->isSPI() && !Walker.Options.IncludeSPISymbols) {
     return Walker.Options.MinimumAccessLevel > AccessLevel::Internal;
   }
 

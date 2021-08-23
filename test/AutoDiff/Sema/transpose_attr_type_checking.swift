@@ -402,7 +402,7 @@ struct level1 {
     static func + (_: Self, _: Self) -> Self { Self() }
     static func - (_: Self, _: Self) -> Self { Self() }
     typealias TangentVector = Self
-    mutating func move(along: TangentVector) {}
+    mutating func move(by: TangentVector) {}
     func foo(x: Float) -> Float {
       return x
     }
@@ -474,7 +474,6 @@ extension Float {
 
 // Test non-`func` original declarations.
 
-// expected-note @+1 {{candidate initializer does not have type equal to or less constrained than '<T where T : Differentiable, T == T.TangentVector> (Struct<T>) -> (Float) -> Struct<T>'}}
 struct Struct<T> {}
 extension Struct: Equatable where T: Equatable {}
 extension Struct: Differentiable & AdditiveArithmetic
@@ -483,7 +482,7 @@ where T: Differentiable & AdditiveArithmetic {
   static func + (_: Self, _: Self) -> Self { Self() }
   static func - (_: Self, _: Self) -> Self { Self() }
   typealias TangentVector = Self
-  mutating func move(along: TangentVector) {}
+  mutating func move(by: TangentVector) {}
 }
 
 // Test computed properties.
@@ -499,9 +498,8 @@ extension Struct where T: Differentiable & AdditiveArithmetic {
 
 // Test initializers.
 extension Struct {
-  // expected-note @+1 {{candidate initializer does not have type equal to or less constrained than '<T where T : Differentiable, T == T.TangentVector> (Struct<T>) -> (Float) -> Struct<T>'}}
+  // expected-note @+1 {{original function 'init(_:)' is a 'static' method}}
   init(_ x: Float) {}
-  // expected-note @+1 {{candidate initializer does not have type equal to or less constrained than '<T where T : Differentiable, T == T.TangentVector> (Struct<T>) -> (Float) -> Struct<T>'}}
   init(_ x: T, y: Float) {}
 }
 
@@ -517,9 +515,9 @@ extension Struct where T: Differentiable, T == T.TangentVector {
   }
 
   // Test instance transpose for static original initializer.
-  // TODO(TF-1015): Add improved instance/static member mismatch error.
-  // expected-error @+1 {{referenced declaration 'init' could not be resolved}}
+  // expected-error @+1 {{unexpected transpose function declaration; 'init(_:)' requires the transpose function 'vjpInitStaticMismatch' to be a 'static' method}}
   @transpose(of: init, wrt: 0)
+  // expected-note @+1 {{make transpose function 'vjpInitStaticMismatch' a 'static' method}}{{3-3=static }}
   func vjpInitStaticMismatch(_ x: Self) -> Float {
     fatalError()
   }

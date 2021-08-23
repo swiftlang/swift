@@ -87,8 +87,8 @@ public:
     assert(!first->hasTypeVariable() && !second->hasTypeVariable() &&
            "Cannot compute join of types involving type variables");
 
-    assert(!first->hasHole() && !second->hasHole() &&
-           "Cannot compute join of types involving type holes");
+    assert(!first->hasPlaceholder() && !second->hasPlaceholder() &&
+           "Cannot compute join of types involving type placeholders");
 
     assert(first->getWithoutSpecifierType()->isEqual(first) &&
            "Expected simple type!");

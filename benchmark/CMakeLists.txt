@@ -1,6 +1,6 @@
 # -*- mode: cmake -*-
 
-cmake_minimum_required(VERSION 2.8.12)
+cmake_minimum_required(VERSION 3.19.6)
 
 # Add path for custom CMake modules.
 list(APPEND CMAKE_MODULE_PATH
@@ -44,6 +44,7 @@ set(SWIFT_BENCH_MODULES
     single-source/BitCount
     single-source/Breadcrumbs
     single-source/BucketSort
+    single-source/BufferFill
     single-source/ByteSwap
     single-source/COWTree
     single-source/COWArrayGuaranteedParameterOverhead
@@ -158,6 +159,8 @@ set(SWIFT_BENCH_MODULES
     single-source/RemoveWhere
     single-source/ReversedCollections
     single-source/RomanNumbers
+    single-source/SIMDRandomMask
+    single-source/SIMDReduceInteger
     single-source/SequenceAlgos
     single-source/SetTests
     single-source/SevenBoom
@@ -179,6 +182,8 @@ set(SWIFT_BENCH_MODULES
     single-source/StringMatch
     single-source/StringRemoveDupes
     single-source/StringReplaceSubrange
+    single-source/StringSplitting
+    single-source/StringSwitch
     single-source/StringTests
     single-source/StringWalk
     single-source/Substring

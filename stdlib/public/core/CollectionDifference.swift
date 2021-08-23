@@ -419,3 +419,10 @@ extension CollectionDifference.Change: Codable where ChangeElement: Codable {
 
 @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
 extension CollectionDifference: Codable where ChangeElement: Codable {}
+
+@available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
+extension CollectionDifference: Sendable where ChangeElement: Sendable { }
+@available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
+extension CollectionDifference.Change: Sendable where ChangeElement: Sendable { }
+@available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
+extension CollectionDifference.Index: Sendable where ChangeElement: Sendable { }

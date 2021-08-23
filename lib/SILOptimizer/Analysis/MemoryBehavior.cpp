@@ -15,6 +15,8 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/SILVisitor.h"
+#include "swift/SIL/OwnershipUtils.h"
+#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/EscapeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/SideEffectAnalysis.h"
@@ -22,11 +24,6 @@
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
-
-// The MemoryBehavior Cache must not grow beyond this size.
-// We limit the size of the MB cache to 2**14 because we want to limit the
-// memory usage of this cache.
-static const int MemoryBehaviorAnalysisMaxCacheSize = 16384;
 
 //===----------------------------------------------------------------------===//
 //                       Memory Behavior Implementation
@@ -136,37 +133,38 @@ public:
   }
 
   MemBehavior visitBeginAccessInst(BeginAccessInst *beginAccess) {
+    if (!mayAlias(beginAccess->getSource()))
+      return MemBehavior::None;
+
+    // begin_access does not physically read or write memory. But we model it
+    // as a memory read and/or write to prevent optimizations to move other
+    // aliased loads/stores across begin_access into the access scope.
     switch (beginAccess->getAccessKind()) {
     case SILAccessKind::Deinit:
-      // A [deinit] only directly reads from the object. The fact that it frees
-      // memory is modeled more precisely by the release operations within the
-      // deinit scope. Therefore, handle it like a [read] here...
-      LLVM_FALLTHROUGH;
+      // For the same reason we treat a ``load [take]`` or a ``destroy_addr``
+      // as a memory write, we do that for a ``begin_access [deinit]`` as well.
+      // See SILInstruction::MemoryBehavior.
+      return MemBehavior::MayReadWrite;
     case SILAccessKind::Read:
-      if (!mayAlias(beginAccess->getSource()))
-        return MemBehavior::None;
-
       return MemBehavior::MayRead;
-
     case SILAccessKind::Modify:
       if (isLetValue()) {
         assert(getAccessBase(beginAccess) != getValueAddress()
                && "let modification not allowed");
         return MemBehavior::None;
       }
-      // [modify] has a special case for ignoring 'let's, but otherwise is
-      // identical to an [init]...
-      LLVM_FALLTHROUGH;
+      return MemBehavior::MayReadWrite;
     case SILAccessKind::Init:
-      if (!mayAlias(beginAccess->getSource()))
-        return MemBehavior::None;
-
       return MemBehavior::MayWrite;
     }
     llvm_unreachable("invalid access kind");
   }
 
   MemBehavior visitEndAccessInst(EndAccessInst *endAccess) {
+    // end_access does not physically read or write memory. But, similar to
+    // begin_access, we model it as a memory read and/or write to prevent
+    // optimizations to move other aliased loads/stores across end_access into
+    // the access scope.
     return visitBeginAccessInst(endAccess->getBeginAccess());
   }
 
@@ -182,6 +180,7 @@ public:
   MemBehavior visitBuiltinInst(BuiltinInst *BI);
   MemBehavior visitStrongReleaseInst(StrongReleaseInst *BI);
   MemBehavior visitReleaseValueInst(ReleaseValueInst *BI);
+  MemBehavior visitDestroyValueInst(DestroyValueInst *DVI);
   MemBehavior visitSetDeallocatingInst(SetDeallocatingInst *BI);
   MemBehavior visitBeginCOWMutationInst(BeginCOWMutationInst *BCMI);
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
@@ -225,6 +224,7 @@ public:
   }
   REFCOUNTINC_MEMBEHAVIOR_INST(StrongRetainInst)
   REFCOUNTINC_MEMBEHAVIOR_INST(RetainValueInst)
+  REFCOUNTINC_MEMBEHAVIOR_INST(CopyValueInst)
 #define UNCHECKED_REF_STORAGE(Name, ...)                                       \
   REFCOUNTINC_MEMBEHAVIOR_INST(Name##RetainValueInst)                          \
   REFCOUNTINC_MEMBEHAVIOR_INST(StrongCopy##Name##ValueInst)
@@ -490,6 +490,13 @@ MemBehavior MemoryBehaviorVisitor::visitReleaseValueInst(ReleaseValueInst *SI) {
   return MemBehavior::MayHaveSideEffects;
 }
 
+MemBehavior
+MemoryBehaviorVisitor::visitDestroyValueInst(DestroyValueInst *DVI) {
+  if (!EA->canEscapeTo(V, DVI))
+    return MemBehavior::None;
+  return MemBehavior::MayHaveSideEffects;
+}
+
 MemBehavior MemoryBehaviorVisitor::visitSetDeallocatingInst(SetDeallocatingInst *SDI) {
   return MemBehavior::None;
 }
@@ -508,20 +515,11 @@ visitBeginCOWMutationInst(BeginCOWMutationInst *BCMI) {
 
 MemBehavior
 AliasAnalysis::computeMemoryBehavior(SILInstruction *Inst, SILValue V) {
-  MemBehaviorKeyTy Key = toMemoryBehaviorKey(Inst, V);
+  MemBehaviorCacheKey Key = {V, Inst};
   // Check if we've already computed this result.
   auto It = MemoryBehaviorCache.find(Key);
   if (It != MemoryBehaviorCache.end()) {
     return It->second;
-  }
-
-  // Flush the cache if the size of the cache is too large.
-  if (MemoryBehaviorCache.size() > MemoryBehaviorAnalysisMaxCacheSize) {
-    MemoryBehaviorCache.clear();
-    MemoryBehaviorNodeToIndex.clear();
-
-    // Key is no longer valid as we cleared the MemoryBehaviorNodeToIndex.
-    Key = toMemoryBehaviorKey(Inst, V);
   }
 
   // Calculate the aliasing result and store it in the cache.
@@ -530,23 +528,149 @@ AliasAnalysis::computeMemoryBehavior(SILInstruction *Inst, SILValue V) {
   return Result;
 }
 
+/// If \p V is an address of an immutable memory, return the begin of the
+/// scope where the memory can be considered to be immutable.
+///
+/// This is either a ``begin_access [read]`` in case V is the result of the
+/// begin_access or a projection of it.
+/// Or it is the begin of a borrow scope (begin_borrow, load_borrow, a
+/// guaranteed function argument) of an immutable copy-on-write buffer.
+/// For example:
+///   %b = begin_borrow %array_buffer
+///   %V = ref_element_addr [immutable] %b : $BufferType, #BufferType.someField
+///
+static SILValue getBeginScopeInst(SILValue V) {
+  SILValue accessScope = getAccessScope(V);
+  if (auto *access = dyn_cast<BeginAccessInst>(accessScope)) {
+    if (access->getAccessKind() == SILAccessKind::Read &&
+        access->getEnforcement() != SILAccessEnforcement::Unsafe)
+      return access;
+    return SILValue();
+  }
+  SILValue accessBase = getAccessBase(V);
+  SILValue object;
+  if (auto *elementAddr = dyn_cast<RefElementAddrInst>(accessBase)) {
+    if (!elementAddr->isImmutable())
+      return SILValue();
+    object = elementAddr->getOperand();
+  } else if (auto *tailAddr = dyn_cast<RefTailAddrInst>(accessBase)) {
+    if (!tailAddr->isImmutable())
+      return SILValue();
+    object = tailAddr->getOperand();
+  } else {
+    return SILValue();
+  }
+  if (BorrowedValue borrowedObj = getSingleBorrowIntroducingValue(object)) {
+    return borrowedObj.value;
+  }
+  return SILValue();
+}
+
+/// Collect all instructions which are inside an immutable scope.
+///
+/// The \p beginScopeInst is either a ``begin_access [read]`` or the begin of a
+/// borrow scope (begin_borrow, load_borrow) of an immutable copy-on-write
+/// buffer.
+void AliasAnalysis::computeImmutableScope(SingleValueInstruction *beginScopeInst) {
+  BasicBlockSet visitedBlocks(beginScopeInst->getFunction());
+  llvm::SmallVector<std::pair<SILInstruction *, SILBasicBlock *>, 16> workList;
+  
+  auto addEndScopeInst = [&](SILInstruction *endScope) {
+    workList.push_back({endScope, endScope->getParent()});
+    bool isNew = visitedBlocks.insert(endScope->getParent());
+    (void)isNew;
+    assert(isNew);
+  };
+  
+  // First step: add all scope-ending instructions to the worklist.
+  if (auto *beginAccess = dyn_cast<BeginAccessInst>(beginScopeInst)) {
+    for (EndAccessInst *endAccess : beginAccess->getEndAccesses()) {
+      addEndScopeInst(endAccess);
+    }
+  } else {
+    visitTransitiveEndBorrows(BorrowedValue(beginScopeInst), addEndScopeInst);
+  }
+
+  // Second step: walk up the control flow until the beginScopeInst and add
+  // all (potentially) memory writing instructions to instsInImmutableScopes.
+  while (!workList.empty()) {
+    auto instAndBlock = workList.pop_back_val();
+    SILBasicBlock *block = instAndBlock.second;
+    // If the worklist entry doesn't have an instruction, start at the end of
+    // the block.
+    auto iter = instAndBlock.first ? instAndBlock.first->getIterator()
+                                   : block->end();
+    // Walk up the instruction list - either to the begin of the block or until
+    // we hit the beginScopeInst.
+    while (true) {
+      if (iter == block->begin()) {
+        assert(block != block->getParent()->getEntryBlock() &&
+               "didn't find the beginScopeInst when walking up the CFG");
+        // Add all predecessor blocks to the worklist.
+        for (SILBasicBlock *pred : block->getPredecessorBlocks()) {
+          if (visitedBlocks.insert(pred))
+            workList.push_back({nullptr, pred});
+        }
+        break;
+      }
+      --iter;
+      SILInstruction *inst = &*iter;
+      if (inst == beginScopeInst) {
+        // When we are at the beginScopeInst we terminate the CFG walk.
+        break;
+      }
+      if (inst->mayWriteToMemory()) {
+        instsInImmutableScopes.insert({beginScopeInst, inst});
+      }
+    }
+  }
+}
+
+/// Returns true if \p inst is in an immutable scope of V.
+///
+/// That means that even if we don't know anything about inst, we can be sure
+/// that inst cannot write to V.
+/// An immutable scope is for example a read-only begin_access/end_access scope.
+/// Another example is a borrow scope of an immutable copy-on-write buffer.
+bool AliasAnalysis::isInImmutableScope(SILInstruction *inst, SILValue V) {
+  if (!V->getType().isAddress())
+    return false;
+    
+  SILValue beginScope = getBeginScopeInst(V);
+  if (!beginScope)
+    return false;
+
+  if (auto *funcArg = dyn_cast<SILFunctionArgument>(beginScope)) {
+    // The immutable scope (= an guaranteed argument) spans over the whole
+    // function. We don't need to do any scope computation in this case.
+    assert(funcArg->getArgumentConvention().isGuaranteedConvention());
+    return true;
+  }
+
+  auto *beginScopeInst = dyn_cast<SingleValueInstruction>(beginScope);
+  if (!beginScopeInst)
+    return false;
+
+  // Recompute the scope if not done yet.
+  if (immutableScopeComputed.insert(beginScopeInst).second) {
+    computeImmutableScope(beginScopeInst);
+  }
+  return instsInImmutableScopes.contains({beginScopeInst, inst});
+}
+
 MemBehavior
 AliasAnalysis::computeMemoryBehaviorInner(SILInstruction *Inst, SILValue V) {
   LLVM_DEBUG(llvm::dbgs() << "GET MEMORY BEHAVIOR FOR:\n    " << *Inst << "    "
                           << *V);
   assert(SEA && "SideEffectsAnalysis must be initialized!");
-  return MemoryBehaviorVisitor(this, SEA, EA, V).visit(Inst);
-}
-
-MemBehaviorKeyTy AliasAnalysis::toMemoryBehaviorKey(SILInstruction *V1,
-                                                    SILValue V2) {
-  size_t idx1 =
-    MemoryBehaviorNodeToIndex.getIndex(V1->getRepresentativeSILNodeInObject());
-  assert(idx1 != std::numeric_limits<size_t>::max() &&
-         "~0 index reserved for empty/tombstone keys");
-  size_t idx2 = MemoryBehaviorNodeToIndex.getIndex(
-      V2->getRepresentativeSILNodeInObject());
-  assert(idx2 != std::numeric_limits<size_t>::max() &&
-         "~0 index reserved for empty/tombstone keys");
-  return {idx1, idx2};
+  
+  MemBehavior result = MemoryBehaviorVisitor(this, SEA, EA, V).visit(Inst);
+  
+  // If the "regular" alias analysis thinks that Inst may modify V, check if
+  // Inst is in an immutable scope of V.
+  if (result > MemBehavior::MayRead && isInImmutableScope(Inst, V)) {
+    return (result == MemBehavior::MayWrite) ? MemBehavior::None
+                                             : MemBehavior::MayRead;
+  }
+  return result;
 }

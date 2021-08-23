@@ -4,6 +4,30 @@
   "printedName": "TopLevel",
   "children": [
     {
+      "kind": "Import",
+      "name": "SwiftOnoneSupport",
+      "printedName": "SwiftOnoneSupport",
+      "declKind": "Import",
+      "moduleName": "cake"
+    },
+    {
+      "kind": "Import",
+      "name": "_Concurrency",
+      "printedName": "_Concurrency",
+      "declKind": "Import",
+      "moduleName": "cake"
+    },
+    {
+      "kind": "Import",
+      "name": "cake",
+      "printedName": "cake",
+      "declKind": "Import",
+      "moduleName": "cake",
+      "declAttributes": [
+        "Exported"
+      ]
+    },
+    {
       "kind": "TypeDecl",
       "name": "P1",
       "printedName": "P1",
@@ -144,6 +168,12 @@
           "name": "P1",
           "printedName": "P1",
           "usr": "s:4cake2P1P"
+        },
+        {
+          "kind": "Conformance",
+          "name": "Sendable",
+          "printedName": "Sendable",
+          "usr": "s:s8SendableP"
         },
         {
           "kind": "Conformance",
@@ -536,6 +566,37 @@
           "fixedbinaryorder": 0
         },
         {
+          "kind": "Function",
+          "name": "__derived_enum_equals",
+          "printedName": "__derived_enum_equals(_:_:)",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Bool",
+              "printedName": "Swift.Bool",
+              "usr": "s:Sb"
+            },
+            {
+              "kind": "TypeNominal",
+              "name": "Number",
+              "printedName": "cake.Number",
+              "usr": "s:4cake6NumberO"
+            },
+            {
+              "kind": "TypeNominal",
+              "name": "Number",
+              "printedName": "cake.Number",
+              "usr": "s:4cake6NumberO"
+            }
+          ],
+          "declKind": "Func",
+          "usr": "s:4cake6NumberO21__derived_enum_equalsySbAC_ACtFZ",
+          "moduleName": "cake",
+          "static": true,
+          "implicit": true,
+          "funcSelfKind": "NonMutating"
+        },
+        {
           "kind": "Constructor",
           "name": "init",
           "printedName": "init(rawValue:)",
@@ -883,6 +944,14 @@
       "moduleName": "cake",
       "declAttributes": [
         "Frozen"
+      ],
+      "conformances": [
+        {
+          "kind": "Conformance",
+          "name": "Sendable",
+          "printedName": "Sendable",
+          "usr": "s:s8SendableP"
+        }
       ]
     },
     {
@@ -1203,10 +1272,6 @@
           "moduleName": "cake",
           "genericSig": "<τ_0_0 where τ_0_0 : cake.PSuper>",
           "sugared_genericSig": "<Self where Self : cake.PSuper>",
-          "intro_Macosx": "10.15",
-          "intro_iOS": "13",
-          "intro_tvOS": "13",
-          "intro_watchOS": "6",
           "funcSelfKind": "NonMutating"
         }
       ],
@@ -1730,6 +1795,12 @@
           "name": "_HasCustomAnyHashableRepresentation",
           "printedName": "_HasCustomAnyHashableRepresentation",
           "usr": "s:s35_HasCustomAnyHashableRepresentationP"
+        },
+        {
+          "kind": "Conformance",
+          "name": "Sendable",
+          "printedName": "Sendable",
+          "usr": "s:s8SendableP"
         },
         {
           "kind": "Conformance",

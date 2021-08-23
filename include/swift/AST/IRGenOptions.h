@@ -23,6 +23,7 @@
 #include "swift/Basic/Sanitizers.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/OptimizationMode.h"
+#include "swift/Config.h"
 #include "clang/Basic/PointerAuthOptions.h"
 // FIXME: This include is just for llvm::SanitizerCoverageOptions. We should
 // split the header upstream so we don't include so much.
@@ -39,7 +40,10 @@ enum class IRGenOutputKind : unsigned {
   Module,
 
   /// Generate an LLVM module and write it out as LLVM assembly.
-  LLVMAssembly,
+  LLVMAssemblyBeforeOptimization,
+
+  /// Generate an LLVM module and write it out as LLVM assembly.
+  LLVMAssemblyAfterOptimization,
 
   /// Generate an LLVM module and write it out as LLVM bitcode.
   LLVMBitcode,
@@ -138,8 +142,40 @@ struct PointerAuthOptions : clang::PointerAuthOptions {
   /// Resilient class stub initializer callbacks.
   PointerAuthSchema ResilientClassStubInitCallbacks;
 
+  /// Like SwiftFunctionPointers but for use with AsyncFunctionPointer values.
+  PointerAuthSchema AsyncSwiftFunctionPointers;
+
+  /// Like SwiftClassMethods but for use with AsyncFunctionPointer values.
+  PointerAuthSchema AsyncSwiftClassMethods;
+
+  /// Like ProtocolWitnesses but for use with AsyncFunctionPointer values.
+  PointerAuthSchema AsyncProtocolWitnesses;
+
+  /// Like SwiftClassMethodPointers but for use with AsyncFunctionPointer
+  /// values.
+  PointerAuthSchema AsyncSwiftClassMethodPointers;
+
+  /// Like SwiftDynamicReplacements but for use with AsyncFunctionPointer
+  /// values.
+  PointerAuthSchema AsyncSwiftDynamicReplacements;
+
+  /// Like PartialApplyCapture but for use with AsyncFunctionPointer values.
+  PointerAuthSchema AsyncPartialApplyCapture;
+
   /// The parent async context stored within a child async context.
   PointerAuthSchema AsyncContextParent;
+
+  /// The function to call to resume running in the parent context.
+  PointerAuthSchema AsyncContextResume;
+
+  /// The resume function stored in AsyncTask.
+  PointerAuthSchema TaskResumeFunction;
+
+  /// The async context stored in AsyncTask.
+  PointerAuthSchema TaskResumeContext;
+
+  /// The swift async context entry in the extended frame info.
+  PointerAuthSchema AsyncContextExtendedFrameEntry;
 };
 
 enum class JITDebugArtifact : unsigned {
@@ -168,6 +204,9 @@ public:
   /// The libraries and frameworks specified on the command line.
   SmallVector<LinkLibrary, 4> LinkLibraries;
 
+  /// The public dependent libraries specified on the command line.
+  std::vector<std::string> PublicLinkLibraries;
+
   /// If non-empty, the (unmangled) name of a dummy symbol to emit that can be
   /// used to force-load this module.
   std::string ForceLoadSymbolName;
@@ -186,6 +225,9 @@ public:
 
   /// Which sanitizer(s) have recovery instrumentation enabled.
   OptionSet<SanitizerKind> SanitizersWithRecoveryInstrumentation;
+
+  /// Whether to enable ODR indicators when building with ASan.
+  unsigned SanitizeAddressUseODRIndicator : 1;
 
   /// Path prefixes that should be rewritten in debug info.
   PathRemapper DebugPrefixMap;
@@ -210,9 +252,6 @@ public:
 
   /// Whether we should run swift specific LLVM optimizations after IRGen.
   unsigned DisableSwiftSpecificLLVMOptzns : 1;
-
-  /// Whether we should run LLVM SLP vectorizer.
-  unsigned DisableLLVMSLPVectorizer : 1;
 
   /// Special codegen for playgrounds.
   unsigned Playground : 1;
@@ -284,9 +323,6 @@ public:
   /// measurements on a non-clean build directory.
   unsigned UseIncrementalLLVMCodeGen : 1;
 
-  /// Enable use of the swiftcall calling convention.
-  unsigned UseSwiftCall : 1;
-
   /// Enable the use of type layouts for value witness functions and use
   /// vw functions instead of outlined copy/destroy functions.
   unsigned UseTypeLayoutValueHandling : 1;
@@ -306,6 +342,8 @@ public:
   
   /// Whether to disable using mangled names for accessing concrete type metadata.
   unsigned DisableConcreteTypeMetadataMangledNameAccessors : 1;
+
+  unsigned EnableGlobalISel : 1;
 
   /// The number of threads for multi-threaded code generation.
   unsigned NumThreads = 0;
@@ -338,15 +376,17 @@ public:
   JITDebugArtifact DumpJIT = JITDebugArtifact::None;
 
   IRGenOptions()
-      : DWARFVersion(2), OutputKind(IRGenOutputKind::LLVMAssembly),
+      : DWARFVersion(2),
+        OutputKind(IRGenOutputKind::LLVMAssemblyAfterOptimization),
         Verify(true), OptMode(OptimizationMode::NotSet),
         Sanitizers(OptionSet<SanitizerKind>()),
         SanitizersWithRecoveryInstrumentation(OptionSet<SanitizerKind>()),
+        SanitizeAddressUseODRIndicator(false),
         DebugInfoLevel(IRGenDebugInfoLevel::None),
         DebugInfoFormat(IRGenDebugInfoFormat::None),
         DisableClangModuleSkeletonCUs(false), UseJIT(false),
         DisableLLVMOptzns(false), DisableSwiftSpecificLLVMOptzns(false),
-        DisableLLVMSLPVectorizer(false), Playground(false),
+        Playground(false),
         EmitStackPromotionChecks(false), FunctionSections(false),
         PrintInlineTree(false), EmbedMode(IRGenEmbedMode::None),
         LLVMLTOKind(IRGenLLVMLTOKind::None), HasValueNamesSetting(false),
@@ -355,10 +395,11 @@ public:
         ForcePublicLinkage(false), LazyInitializeClassMetadata(false),
         LazyInitializeProtocolConformances(false), DisableLegacyTypeInfo(false),
         PrespecializeGenericMetadata(false), UseIncrementalLLVMCodeGen(true),
-        UseSwiftCall(false), UseTypeLayoutValueHandling(true),
+        UseTypeLayoutValueHandling(true),
         GenerateProfile(false), EnableDynamicReplacementChaining(false),
         DisableRoundTripDebugTypes(false), DisableDebuggerShadowCopies(false),
-        DisableConcreteTypeMetadataMangledNameAccessors(false), CmdArgs(),
+        DisableConcreteTypeMetadataMangledNameAccessors(false),
+        EnableGlobalISel(false), CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All) {}
 
@@ -384,7 +425,8 @@ public:
     if (HasValueNamesSetting) {
       return ValueNames;
     } else {
-      return OutputKind == IRGenOutputKind::LLVMAssembly;
+      return OutputKind == IRGenOutputKind::LLVMAssemblyBeforeOptimization ||
+             OutputKind == IRGenOutputKind::LLVMAssemblyAfterOptimization;
     }
   }
 

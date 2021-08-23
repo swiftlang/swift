@@ -19,12 +19,19 @@
 #include "Context.h"
 #include "OwnershipPhiOperand.h"
 #include "Transforms.h"
+#include "swift/Basic/Defer.h"
+#include "swift/Basic/STLExtras.h"
 
 using namespace swift;
 using namespace swift::semanticarc;
 
+namespace {
+using ConsumingOperandState = Context::ConsumingOperandState;
+} // anonymous namespace
+
+template <typename OperandRangeTy>
 static bool canEliminatePhi(
-    Context::FrozenMultiMapRange optimizableIntroducerRange,
+    OperandRangeTy optimizableIntroducerRange,
     ArrayRef<OwnershipPhiOperand> incomingValueOperandList,
     SmallVectorImpl<OwnedValueIntroducer> &ownedValueIntroducerAccumulator) {
   for (auto incomingValueOperand : incomingValueOperandList) {
@@ -54,19 +61,19 @@ static bool canEliminatePhi(
     // to eliminate. Since we do not look through joined live ranges, we must
     // only have a single introducer. So look for that one and if not, bail.
     auto singleIntroducer = getSingleOwnedValueIntroducer(incomingValue);
-    if (!singleIntroducer.hasValue()) {
+    if (!singleIntroducer) {
       return false;
     }
 
     // Then make sure that our owned value introducer is able to be converted to
     // guaranteed and that we found it to have a LiveRange that we could have
     // eliminated /if/ we were to get rid of this phi.
-    if (!singleIntroducer->isConvertableToGuaranteed()) {
+    if (!singleIntroducer.isConvertableToGuaranteed()) {
       return false;
     }
 
     // Otherwise, add the introducer to our result array.
-    ownedValueIntroducerAccumulator.push_back(*singleIntroducer);
+    ownedValueIntroducerAccumulator.push_back(singleIntroducer);
   }
 
 #ifndef NDEBUG
@@ -161,9 +168,19 @@ bool swift::semanticarc::tryConvertOwnedPhisToGuaranteedPhis(Context &ctx) {
     // eliminated if it was not for the given phi. If all of them are, we can
     // optimize!
     {
-      auto rawFoundOptimizableIntroducerArray = pair.second;
-      if (!canEliminatePhi(rawFoundOptimizableIntroducerArray,
-                           incomingValueOperandList, ownedValueIntroducers)) {
+      std::function<Operand *(const Context::ConsumingOperandState)> lambda =
+        [&](const Context::ConsumingOperandState &state) -> Operand * {
+            unsigned opNum = state.operandNumber;
+            if (state.parent.is<SILBasicBlock *>()) {
+              SILBasicBlock *block = state.parent.get<SILBasicBlock *>();
+              return &block->getTerminator()->getAllOperands()[opNum];
+            }
+            SILInstruction *inst = state.parent.get<SILInstruction *>();
+            return &inst->getAllOperands()[opNum];
+        };
+      auto operandsTransformed = makeTransformRange(pair.second, lambda);
+      if (!canEliminatePhi(operandsTransformed, incomingValueOperandList,
+                           ownedValueIntroducers)) {
         continue;
       }
     }

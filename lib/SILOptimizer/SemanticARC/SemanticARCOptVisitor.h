@@ -36,7 +36,7 @@ namespace semanticarc {
 /// visitors do, we maintain a visitedSinceLastMutation list to ensure that we
 /// revisit all interesting instructions in between mutations.
 struct LLVM_LIBRARY_VISIBILITY SemanticARCOptVisitor
-    : SILInstructionVisitor<SemanticARCOptVisitor, bool> {
+    : SILValueVisitor<SemanticARCOptVisitor, bool> {
   /// Our main worklist. We use this after an initial run through.
   SmallBlotSetVector<SILValue, 32> worklist;
 
@@ -49,13 +49,15 @@ struct LLVM_LIBRARY_VISIBILITY SemanticARCOptVisitor
 
   Context ctx;
 
-  explicit SemanticARCOptVisitor(SILFunction &fn, bool onlyGuaranteedOpts)
-      : ctx(fn, onlyGuaranteedOpts,
-            InstModCallbacks(
-                [this](SILInstruction *inst) { eraseInstruction(inst); },
-                [](SILInstruction *) {}, [](SILValue, SILValue) {},
-                [this](SingleValueInstruction *i, SILValue value) {
-                  eraseAndRAUWSingleValueInstruction(i, value);
+  explicit SemanticARCOptVisitor(SILFunction &fn, DeadEndBlocks &deBlocks,
+                                 bool onlyMandatoryOpts)
+      : ctx(fn, deBlocks, onlyMandatoryOpts,
+            InstModCallbacks()
+                .onDelete(
+                    [this](SILInstruction *inst) { eraseInstruction(inst); })
+                .onSetUseValue([this](Operand *use, SILValue newValue) {
+                  use->set(newValue);
+                  worklist.insert(newValue);
                 })) {}
 
   void reset() {
@@ -118,18 +120,21 @@ struct LLVM_LIBRARY_VISIBILITY SemanticARCOptVisitor
     drainVisitedSinceLastMutationIntoWorklist();
   }
 
-  InstModCallbacks getCallbacks() {
-    return InstModCallbacks(
-        [this](SILInstruction *inst) { eraseInstruction(inst); },
-        [](SILInstruction *) {}, [](SILValue, SILValue) {},
-        [this](SingleValueInstruction *i, SILValue value) {
-          eraseAndRAUWSingleValueInstruction(i, value);
-        });
+  InstModCallbacks &getCallbacks() { return ctx.instModCallbacks; }
+
+  bool visitSILInstruction(SILInstruction *i) {
+    assert((isa<OwnershipForwardingTermInst>(i) ||
+            !OwnershipForwardingMixin::isa(i)) &&
+           "Should have forwarding visitor for all ownership forwarding "
+           "non-term instructions");
+    return false;
   }
 
   /// The default visitor.
-  bool visitSILInstruction(SILInstruction *i) {
-    assert(!isa<OwnershipForwardingInst>(i) &&
+  bool visitValueBase(ValueBase *v) {
+    auto *inst = v->getDefiningInstruction();
+    (void)inst;
+    assert((!inst || !OwnershipForwardingMixin::isa(inst)) &&
            "Should have forwarding visitor for all ownership forwarding "
            "instructions");
     return false;
@@ -138,6 +143,9 @@ struct LLVM_LIBRARY_VISIBILITY SemanticARCOptVisitor
   bool visitCopyValueInst(CopyValueInst *cvi);
   bool visitBeginBorrowInst(BeginBorrowInst *bbi);
   bool visitLoadInst(LoadInst *li);
+  bool
+  visitUncheckedOwnershipConversionInst(UncheckedOwnershipConversionInst *uoci);
+
   static bool shouldVisitInst(SILInstruction *i) {
     switch (i->getKind()) {
     default:
@@ -145,6 +153,7 @@ struct LLVM_LIBRARY_VISIBILITY SemanticARCOptVisitor
     case SILInstructionKind::CopyValueInst:
     case SILInstructionKind::BeginBorrowInst:
     case SILInstructionKind::LoadInst:
+    case SILInstructionKind::UncheckedOwnershipConversionInst:
       return true;
     }
   }
@@ -186,20 +195,6 @@ struct LLVM_LIBRARY_VISIBILITY SemanticARCOptVisitor
   FORWARDING_INST(DifferentiableFunctionExtract)
   FORWARDING_INST(LinearFunctionExtract)
 #undef FORWARDING_INST
-
-#define FORWARDING_TERM(NAME)                                                  \
-  bool visit##NAME##Inst(NAME##Inst *cls) {                                    \
-    for (auto succValues : cls->getSuccessorBlockArgumentLists()) {            \
-      for (SILValue v : succValues) {                                          \
-        worklist.insert(v);                                                    \
-      }                                                                        \
-    }                                                                          \
-    return false;                                                              \
-  }
-  FORWARDING_TERM(SwitchEnum)
-  FORWARDING_TERM(CheckedCastBranch)
-  FORWARDING_TERM(Branch)
-#undef FORWARDING_TERM
 
   bool processWorklist();
   bool optimize();

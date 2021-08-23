@@ -6,7 +6,7 @@ public func == (lhs: CGPoint, rhs: CGPoint) -> Bool {
 }
 
 public struct CGFloat {
-#if arch(i386) || arch(arm)
+#if arch(i386) || arch(arm) || arch(arm64_32)
   public typealias UnderlyingType = Float
 #elseif arch(x86_64) || arch(arm64) || arch(powerpc64le) || arch(s390x)
   public typealias UnderlyingType = Double

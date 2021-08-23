@@ -143,9 +143,21 @@ void AccessSummaryAnalysis::processArgument(FunctionInfo *info,
 /// used by directly calling it or passing it as argument, but not using it as a
 /// partial_apply callee.
 ///
-/// FIXME: This needs to be checked in the SILVerifier.
+/// An error found in DiagnoseInvalidEscapingCaptures can indicate invalid SIL
+/// that is detected here but not in normal SIL verification. When the
+/// source-level closure captures an inout argument, it appears in SIL to be a
+/// non-escaping closure. The following verification then fails because the
+/// "nonescaping" closure actually escapes.
+///
+/// FIXME: This should be checked in the SILVerifier, with consideration for the
+/// caveat above where an inout has been captured be an escaping closure.
 static bool hasExpectedUsesOfNoEscapePartialApply(Operand *partialApplyUse) {
   SILInstruction *user = partialApplyUse->getUser();
+
+  // Bypass this verification when a diagnostic error is present. See comments
+  // on DiagnoseInvalidEscapingCaptures above.
+  if (user->getModule().getASTContext().hadError())
+    return true;
 
   // It is fine to call the partial apply
   switch (user->getKind()) {
@@ -187,32 +199,15 @@ static bool hasExpectedUsesOfNoEscapePartialApply(Operand *partialApplyUse) {
     return partialApplyUse->getOperandNumber() ==
            CopyBlockWithoutEscapingInst::Closure;
 
-  // A copy_value that is only used by the store to a block storage is fine.
-  // It is part of the pattern we emit for verifying that a noescape closure
-  // passed to objc has not escaped.
-  //  %4 = convert_escape_to_noescape [not_guaranteed] %3 :
-  //    $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
-  //  %5 = function_ref @withoutEscapingThunk
-  //  %6 = partial_apply [callee_guaranteed] %5(%4) :
-  //    $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
-  //  %7 = mark_dependence %6 : $@callee_guaranteed () -> () on %4 :
-  //    $@noescape @callee_guaranteed () -> ()
-  //  %8 = copy_value %7 : $@callee_guaranteed () -> ()
-  //  %9 = alloc_stack $@block_storage @callee_guaranteed () -> ()
-  //  %10 = project_block_storage %9 :
-  //    $*@block_storage @callee_guaranteed () -> ()
-  //  store %8 to [init] %10 : $*@callee_guaranteed () -> ()
-  //  %13 = init_block_storage_header %9 :
-  //    $*@block_storage @callee_guaranteed () -> (),
-  //    invoke %12
-  //  %14 = copy_block_without_escaping %13 : $() -> () withoutEscaping %7
   case SILInstructionKind::CopyValueInst:
-    return isa<StoreInst>(getSingleNonDebugUser(cast<CopyValueInst>(user)));
+    return llvm::all_of(cast<CopyValueInst>(user)->getUses(),
+                        hasExpectedUsesOfNoEscapePartialApply);
 
   // End borrow is always ok.
   case SILInstructionKind::EndBorrowInst:
     return true;
 
+  case SILInstructionKind::IsEscapingClosureInst:
   case SILInstructionKind::StoreInst:
   case SILInstructionKind::DestroyValueInst:
     // @block_storage is passed by storing it to the stack. We know this is

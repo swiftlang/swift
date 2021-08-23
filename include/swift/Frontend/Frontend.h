@@ -41,6 +41,7 @@
 #include "swift/Serialization/Validation.h"
 #include "swift/Subsystems.h"
 #include "swift/TBDGen/TBDGen.h"
+#include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Option/ArgList.h"
@@ -86,6 +87,7 @@ class CompilerInvocation {
   TypeCheckerOptions TypeCheckerOpts;
   FrontendOptions FrontendOpts;
   ClangImporterOptions ClangImporterOpts;
+  symbolgraphgen::SymbolGraphOptions SymbolGraphOpts;
   SearchPathOptions SearchPathOpts;
   DiagnosticOptions DiagnosticOpts;
   MigratorOptions MigratorOpts;
@@ -204,6 +206,12 @@ public:
 
   void setRuntimeResourcePath(StringRef Path);
 
+  /// Compute the default prebuilt module cache path for a given resource path
+  /// and SDK version. This function is also used by LLDB.
+  static std::string
+  computePrebuiltCachePath(StringRef RuntimeResourcePath, llvm::Triple target,
+                           Optional<llvm::VersionTuple> sdkVer);
+
   /// If we haven't explicitly passed -prebuilt-module-cache-path, set it to
   /// the default value of <resource-dir>/<platform>/prebuilt-modules.
   /// @note This should be called once, after search path options and frontend
@@ -249,6 +257,11 @@ public:
   ClangImporterOptions &getClangImporterOptions() { return ClangImporterOpts; }
   const ClangImporterOptions &getClangImporterOptions() const {
     return ClangImporterOpts;
+  }
+
+  symbolgraphgen::SymbolGraphOptions &getSymbolGraphOptions() { return SymbolGraphOpts; }
+  const symbolgraphgen::SymbolGraphOptions &getSymbolGraphOptions() const {
+    return SymbolGraphOpts;
   }
 
   SearchPathOptions &getSearchPathOptions() { return SearchPathOpts; }
@@ -362,8 +375,6 @@ public:
   std::string getModuleOutputPathForAtMostOnePrimary() const;
   std::string
   getReferenceDependenciesFilePathForPrimary(StringRef filename) const;
-  std::string getSwiftRangesFilePathForPrimary(StringRef filename) const;
-  std::string getCompiledSourceFilePathForPrimary(StringRef filename) const;
   std::string getSerializedDiagnosticsPathForAtMostOnePrimary() const;
 
   /// TBDPath only makes sense in whole module compilation mode,
@@ -377,8 +388,6 @@ public:
   std::string getModuleInterfaceOutputPathForWholeModule() const;
   std::string getPrivateModuleInterfaceOutputPathForWholeModule() const;
 
-  std::string getLdAddCFileOutputPathForWholeModule() const;
-
 public:
   /// Given the current configuration of this frontend invocation, a set of
   /// supplementary output paths, and a module, compute the appropriate set of
@@ -389,15 +398,6 @@ public:
   SerializationOptions
   computeSerializationOptions(const SupplementaryOutputPaths &outs,
                               const ModuleDecl *module) const;
-
-  /// Returns an approximation of whether the given module could be
-  /// redistributed and consumed by external clients.
-  ///
-  /// FIXME: The scope of this computation should be limited entirely to
-  /// PrintAsObjC. Unfortunately, it has been co-opted to support the
-  /// \c SerializeOptionsForDebugging hack. Once this information can be
-  /// transferred from module files to the dSYMs, remove this.
-  bool isModuleExternallyConsumed(const ModuleDecl *mod) const;
 };
 
 /// A class which manages the state and execution of the compiler.
@@ -469,7 +469,9 @@ public:
   DiagnosticEngine &getDiags() { return Diagnostics; }
   const DiagnosticEngine &getDiags() const { return Diagnostics; }
 
-  llvm::vfs::FileSystem &getFileSystem() { return *SourceMgr.getFileSystem(); }
+  llvm::vfs::FileSystem &getFileSystem() const {
+    return *SourceMgr.getFileSystem();
+  }
 
   ASTContext &getASTContext() { return *Context; }
   const ASTContext &getASTContext() const { return *Context; }
@@ -490,8 +492,6 @@ public:
 
   DependencyTracker *getDependencyTracker() { return DepTracker.get(); }
   const DependencyTracker *getDependencyTracker() const { return DepTracker.get(); }
-
-  ModuleDependenciesCache *getModuleDependencyCache() { return ModDepCache.get(); }
 
   UnifiedStatsReporter *getStatsReporter() const { return Stats.get(); }
 
@@ -524,6 +524,14 @@ public:
   ArrayRef<SourceFile *> getPrimarySourceFiles() const {
     return getMainModule()->getPrimarySourceFiles();
   }
+
+  /// Verify that if an implicit import of the `Concurrency` module if expected,
+  /// it can actually be imported. Emit a warning, otherwise.
+  void verifyImplicitConcurrencyImport();
+
+  /// Whether the Swift Concurrency support library can be imported
+  /// i.e. if it can be found.
+  bool canImportSwiftConcurrency() const;
 
   /// Gets the SourceFile which is the primary input for this CompilerInstance.
   /// \returns the primary SourceFile, or nullptr if there is no primary input;
@@ -558,13 +566,15 @@ private:
   bool setUpVirtualFileSystemOverlays();
   void setUpLLVMArguments();
   void setUpDiagnosticOptions();
-  void setUpModuleDependencyCacheIfNeeded();
   bool setUpModuleLoaders();
   bool setUpInputs();
   bool setUpASTContextIfNeeded();
   void setupStatsReporter();
-  void setupDiagnosticVerifierIfNeeded();
   void setupDependencyTrackerIfNeeded();
+
+  /// \return false if successsful, true on error.
+  bool setupDiagnosticVerifierIfNeeded();
+
   Optional<unsigned> setUpCodeCompletionBuffer();
 
   /// Find a buffer for a given input file and ensure it is recorded in
@@ -572,7 +582,9 @@ private:
   /// Return the buffer ID if it is not already compiled, or None if so.
   /// Set failed on failure.
 
-  Optional<unsigned> getRecordedBufferID(const InputFile &input, bool &failed);
+  Optional<unsigned> getRecordedBufferID(const InputFile &input,
+                                         const bool shouldRecover,
+                                         bool &failed);
 
   /// Given an input file, return a buffer to use for its contents,
   /// and a buffer for the corresponding module doc file if one exists.
@@ -652,16 +664,6 @@ public:
   getPrimarySpecificPathsForAtMostOnePrimary() const;
   const PrimarySpecificPaths &
   getPrimarySpecificPathsForSourceFile(const SourceFile &SF) const;
-
-  /// Write out the unparsed (delayed) source ranges
-  /// Return true for error
-  bool emitSwiftRanges(DiagnosticEngine &diags, SourceFile *primaryFile,
-                       StringRef outputPath) const;
-
-  /// Return true for error
-  bool emitCompiledSource(DiagnosticEngine &diags,
-                          const SourceFile *primaryFile,
-                          StringRef outputPath) const;
 };
 
 } // namespace swift

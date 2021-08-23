@@ -3,7 +3,7 @@
 // RUN: %empty-directory(%t)
 
 /// Compile the lib with SPI decls
-// RUN: %target-build-swift-dylib(%t/%target-library-name(SPIHelper)) -Xfrontend -enable-experimental-prespecialization %S/Inputs/spi_helper.swift -emit-module -emit-module-path %t/SPIHelper.swiftmodule -module-name SPIHelper -enable-library-evolution
+// RUN: %target-build-swift-dylib(%t/%target-library-name(SPIHelper)) %S/Inputs/spi_helper.swift -emit-module -emit-module-path %t/SPIHelper.swiftmodule -module-name SPIHelper -enable-library-evolution
 // RUN: %target-codesign %t/%target-library-name(SPIHelper)
 
 /// Client with SPI access

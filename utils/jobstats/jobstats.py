@@ -328,11 +328,12 @@ def load_stats_dir(path, select_module=[], select_stat=[],
             for (k, v) in j.items():
                 if sre.search(k) is None:
                     continue
+                if k.startswith('time.'):
+                    v = int(1000000.0 * float(v))
                 if k.startswith('time.') and exclude_timers:
                     continue
                 tm = match_timerpat(k)
                 if tm:
-                    v = int(1000000.0 * float(v))
                     if tm['jobkind'] == jobkind and \
                        tm['timerkind'] == 'wall':
                         dur_usec = v

@@ -19,6 +19,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SILOptimizer/Analysis/AccessedStorageAnalysis.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
@@ -938,7 +939,8 @@ void LoopTreeOptimization::analyzeCurrentLoop(
     // how to rematerialize global_addr, then we don't need this base.
     auto access = AccessPathWithBase::compute(SI->getDest());
     auto accessPath = access.accessPath;
-    if (accessPath.isValid() && isLoopInvariant(access.base, Loop)) {
+    if (accessPath.isValid() &&
+        (access.base && isLoopInvariant(access.base, Loop))) {
       if (isOnlyLoadedAndStored(AA, sideEffects, Loads, Stores, SI->getDest(),
                                 accessPath)) {
         if (!LoadAndStoreAddrs.count(accessPath)) {
@@ -1195,7 +1197,7 @@ static bool
 storesCommonlyDominateLoopExits(AccessPath accessPath,
                                 SILLoop *loop,
                                 ArrayRef<SILBasicBlock *> exitingBlocks) {
-  SmallPtrSet<SILBasicBlock *, 16> stores;
+  BasicBlockSet stores(loop->getHeader()->getParent());
   SmallVector<Operand *, 8> uses;
   // Collect as many recognizable stores as possible. It's ok if not all stores
   // are collected.
@@ -1208,7 +1210,7 @@ storesCommonlyDominateLoopExits(AccessPath accessPath,
   SILBasicBlock *header = loop->getHeader();
   // If a store is in the loop header, we already know that it's dominating all
   // loop exits.
-  if (stores.count(header) != 0)
+  if (stores.contains(header))
     return true;
 
   // Also a store in the pre-header dominates all exists. Although the situation
@@ -1243,21 +1245,21 @@ storesCommonlyDominateLoopExits(AccessPath accessPath,
   //   exit:
   //     store %phi to %addr
   //
-  if (stores.count(loop->getLoopPreheader()) != 0)
+  if (stores.contains(loop->getLoopPreheader()))
     return true;
 
   // Propagate the store-is-not-alive flag through the control flow in the loop,
   // starting at the header.
-  SmallPtrSet<SILBasicBlock *, 16> storesNotAlive;
+  BasicBlockSet storesNotAlive(loop->getHeader()->getParent());
   storesNotAlive.insert(header);
   bool changed = false;
   do {
     changed = false;
     for (SILBasicBlock *block : loop->blocks()) {
-      bool storeAlive = (storesNotAlive.count(block) == 0);
-      if (storeAlive && stores.count(block) == 0 &&
+      bool storeAlive = !storesNotAlive.contains(block);
+      if (storeAlive && !stores.contains(block) &&
           std::any_of(block->pred_begin(), block->pred_end(),
-            [&](SILBasicBlock *b) { return storesNotAlive.count(b) != 0; })) {
+            [&](SILBasicBlock *b) { return storesNotAlive.contains(b); })) {
         storesNotAlive.insert(block);
         changed = true;
       }
@@ -1272,7 +1274,7 @@ storesCommonlyDominateLoopExits(AccessPath accessPath,
   for (SILBasicBlock *eb : exitingBlocks) {
     // Ignore loop exits to blocks which end in an unreachable.
     if (!std::any_of(eb->succ_begin(), eb->succ_end(), isUnreachableBlock) &&
-        storesNotAlive.count(eb) != 0) {
+        storesNotAlive.contains(eb)) {
       return false;
     }
   }
@@ -1326,7 +1328,8 @@ hoistLoadsAndStores(AccessPath accessPath, SILLoop *loop) {
 
       if (!storeAddr) {
         storeAddr = SI->getDest();
-        ssaUpdater.initialize(storeAddr->getType().getObjectType());
+        ssaUpdater.initialize(storeAddr->getType().getObjectType(),
+                              storeAddr.getOwnershipKind());
       } else if (SI->getDest()->getType() != storeAddr->getType()) {
         // This transformation assumes that the values of all stores in the loop
         // must be interchangeable. It won't work if stores different types
@@ -1338,11 +1341,21 @@ hoistLoadsAndStores(AccessPath accessPath, SILLoop *loop) {
     }
   }
   assert(storeAddr && "hoistLoadsAndStores requires a store in the loop");
-  SILValue initialAddr = cloneUseDefChain(
-      storeAddr, preheader->getTerminator(), [&](SILValue srcAddr) {
-        // Clone projections until the address dominates preheader.
-        return !DomTree->dominates(srcAddr->getParentBlock(), preheader);
-      });
+  auto checkBase = [&](SILValue srcAddr) {
+    // Clone projections until the address dominates preheader.
+    if (DomTree->dominates(srcAddr->getParentBlock(), preheader))
+      return srcAddr;
+
+    // return an invalid SILValue to continue cloning.
+    return SILValue();
+  };
+  SILValue initialAddr =
+      cloneUseDefChain(storeAddr, preheader->getTerminator(), checkBase);
+  // cloneUseDefChain may currently fail if a begin_borrow or mark_dependence is
+  // in the chain.
+  if (!initialAddr)
+    return;
+
   LoadInst *initialLoad =
       B.createLoad(preheader->getTerminator()->getLoc(), initialAddr,
                    LoadOwnershipQualifier::Unqualified);
@@ -1455,7 +1468,7 @@ public:
 
     DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
     PostDominanceAnalysis *PDA = PM->getAnalysis<PostDominanceAnalysis>();
-    AliasAnalysis *AA = PM->getAnalysis<AliasAnalysis>();
+    AliasAnalysis *AA = PM->getAnalysis<AliasAnalysis>(F);
     SideEffectAnalysis *SEA = PM->getAnalysis<SideEffectAnalysis>();
     AccessedStorageAnalysis *ASA = getAnalysis<AccessedStorageAnalysis>();
     DominanceInfo *DomTree = nullptr;
