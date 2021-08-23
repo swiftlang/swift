@@ -48,7 +48,7 @@ public protocol ActorTransport: Sendable {
   ///
   /// Detecting liveness of such remote actors shall be offered / by transport libraries
   /// by other means, such as "watching an actor for termination" or similar.
-  func resolve<Act>(_ identity: AnyActorIdentity, as actorType: Act.Type) throws -> Act? // TODO(distributed): make just optional
+  func resolve<Act>(_ identity: AnyActorIdentity, as actorType: Act.Type) throws -> Act?
       where Act: DistributedActor
 
   // ==== ---------------------------------------------------------------------
