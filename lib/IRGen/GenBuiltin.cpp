@@ -390,7 +390,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
 
   if (Builtin.ID == BuiltinValueKind::InitializeDistributedRemoteActor) {
     auto actorMetatype = args.claimNext();
-    emitDistributedActorInitializeRemote(IGF, actorMetatype, out);
+    emitDistributedActorInitializeRemote(IGF, resultType, actorMetatype, out);
     return;
   }
 
