@@ -88,6 +88,8 @@ ERROR(not_inheriting_convenience_inits,APIDigesterBreakage,"%0 no longer inherit
 
 ERROR(enum_case_added,APIDigesterBreakage,"%0 has been added as a new enum case", (StringRef))
 
+ERROR(demangled_name_changed,APIDigesterBreakage,"%0 has mangled name changing from '%1' to '%2'", (StringRef, StringRef, StringRef))
+
 WARNING(cannot_read_allowlist,none,"cannot read breakage allowlist at '%0'", (StringRef))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
