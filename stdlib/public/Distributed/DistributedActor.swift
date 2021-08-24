@@ -93,16 +93,21 @@ extension DistributedActor {
 // ==== Codable conformance ----------------------------------------------------
 
 extension CodingUserInfoKey {
-    @available(SwiftStdlib 5.5, *)
-    static let actorTransportKey = CodingUserInfoKey(rawValue: "$dist_act_transport")!
+  @available(SwiftStdlib 5.5, *)
+  public static let actorTransportKey = CodingUserInfoKey(rawValue: "$dist_act_transport")!
 }
 
 @available(SwiftStdlib 5.5, *)
 extension DistributedActor {
   nonisolated public init(from decoder: Decoder) throws {
-//    let id = try AnyActorIdentity(from: decoder)
-//    self = try Self.resolve(id, using: transport) // FIXME: This is going to be solved by the init() work!!!!
-    fatalError("\(#function) is not implemented yet for distributed actors'")
+    guard let transport = decoder.userInfo[.actorTransportKey] as? ActorTransport else {
+      throw DistributedActorCodingError(message:
+        "Missing ActorTransport (for key .actorTransportKey) " +
+        "in Decoder.userInfo, while decoding \(Self.self).")
+    }
+
+    let id: AnyActorIdentity = try transport.decodeIdentity(from: decoder)
+    self = try Self.resolve(id, using: transport)
   }
 
   nonisolated public func encode(to encoder: Encoder) throws {
@@ -121,12 +126,14 @@ public protocol ActorIdentity: Sendable, Hashable, Codable {}
 
 @available(SwiftStdlib 5.5, *)
 public struct AnyActorIdentity: ActorIdentity, @unchecked Sendable, CustomStringConvertible {
+  public let underlying: Any
   @usableFromInline let _hashInto: (inout Hasher) -> ()
   @usableFromInline let _equalTo: (Any) -> Bool
   @usableFromInline let _encodeTo: (Encoder) throws -> ()
   @usableFromInline let _description: () -> String
 
   public init<ID>(_ identity: ID) where ID: ActorIdentity {
+    self.underlying = identity
     _hashInto = { hasher in identity
         .hash(into: &hasher)
     }
