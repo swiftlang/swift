@@ -21,6 +21,8 @@
 
 #include "swift/Basic/LLVM.h"
 
+#include <string>
+
 namespace swift {
 class Decl;
 class AbstractStorageDecl;
