@@ -628,7 +628,6 @@ function(_add_swift_target_library_single target name)
         OBJECT_LIBRARY
         SHARED
         STATIC
-        TARGET_LIBRARY
         INSTALL_WITH_SHARED)
   set(SWIFTLIB_SINGLE_single_parameter_options
         ARCHITECTURE
@@ -856,7 +855,7 @@ function(_add_swift_target_library_single target name)
   endforeach()
 
   set(SWIFTLIB_SINGLE_XCODE_WORKAROUND_SOURCES)
-  if(XCODE AND SWIFTLIB_SINGLE_TARGET_LIBRARY)
+  if(XCODE)
     set(SWIFTLIB_SINGLE_XCODE_WORKAROUND_SOURCES
         # Note: the dummy.cpp source file provides no definitions. However,
         # it forces Xcode to properly link the static library.
@@ -879,8 +878,7 @@ function(_add_swift_target_library_single target name)
   target_include_directories(${target} BEFORE PRIVATE
     ${SWIFT_SOURCE_DIR}/stdlib/include)
   if(("${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "ELF" OR
-      "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "COFF") AND
-     SWIFTLIB_SINGLE_TARGET_LIBRARY)
+      "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "COFF"))
     if("${libkind}" STREQUAL "SHARED" AND NOT SWIFTLIB_SINGLE_NOSWIFTRT)
       # TODO(compnerd) switch to the generator expression when cmake is upgraded
       # to a version which supports it.
@@ -943,27 +941,25 @@ function(_add_swift_target_library_single target name)
         SUFFIX ${LLVM_PLUGIN_EXT})
   endif()
 
-  if(SWIFTLIB_SINGLE_TARGET_LIBRARY)
-    # Install runtime libraries to lib/swift instead of lib. This works around
-    # the fact that -isysroot prevents linking to libraries in the system
-    # /usr/lib if Swift is installed in /usr.
-    set_target_properties("${target}" PROPERTIES
-      LIBRARY_OUTPUT_DIRECTORY ${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}
-      ARCHIVE_OUTPUT_DIRECTORY ${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR})
-    if(SWIFTLIB_SINGLE_SDK STREQUAL WINDOWS AND SWIFTLIB_SINGLE_IS_STDLIB_CORE
-        AND libkind STREQUAL SHARED)
-      add_custom_command(TARGET ${target} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:${target}> ${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR})
-    endif()
-
-    foreach(config ${CMAKE_CONFIGURATION_TYPES})
-      string(TOUPPER ${config} config_upper)
-      escape_path_for_xcode("${config}" "${SWIFTLIB_DIR}" config_lib_dir)
-      set_target_properties(${target} PROPERTIES
-        LIBRARY_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${SWIFTLIB_SINGLE_SUBDIR}
-        ARCHIVE_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${SWIFTLIB_SINGLE_SUBDIR})
-    endforeach()
+  # Install runtime libraries to lib/swift instead of lib. This works around
+  # the fact that -isysroot prevents linking to libraries in the system
+  # /usr/lib if Swift is installed in /usr.
+  set_target_properties("${target}" PROPERTIES
+    LIBRARY_OUTPUT_DIRECTORY ${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}
+    ARCHIVE_OUTPUT_DIRECTORY ${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR})
+  if(SWIFTLIB_SINGLE_SDK STREQUAL WINDOWS AND SWIFTLIB_SINGLE_IS_STDLIB_CORE
+      AND libkind STREQUAL SHARED)
+    add_custom_command(TARGET ${target} POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:${target}> ${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR})
   endif()
+
+  foreach(config ${CMAKE_CONFIGURATION_TYPES})
+    string(TOUPPER ${config} config_upper)
+    escape_path_for_xcode("${config}" "${SWIFTLIB_DIR}" config_lib_dir)
+    set_target_properties(${target} PROPERTIES
+      LIBRARY_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${SWIFTLIB_SINGLE_SUBDIR}
+      ARCHIVE_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${SWIFTLIB_SINGLE_SUBDIR})
+  endforeach()
 
   if(SWIFTLIB_SINGLE_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
     set(install_name_dir "@rpath")
@@ -999,9 +995,7 @@ function(_add_swift_target_library_single target name)
     # for an Android cross-build from a macOS host. Construct the proper linker
     # flags manually in add_swift_target_library instead, see there with
     # variable `swiftlib_link_flags_all`.
-    if(SWIFTLIB_SINGLE_TARGET_LIBRARY)
-      set_target_properties("${target}" PROPERTIES NO_SONAME TRUE)
-    endif()
+    set_target_properties("${target}" PROPERTIES NO_SONAME TRUE)
     # Only set the install RPATH if the toolchain and stdlib will be in Termux
     # or some other native sysroot on Android.
     if(NOT "${SWIFT_ANDROID_NATIVE_SYSROOT}" STREQUAL "")
@@ -1068,11 +1062,9 @@ function(_add_swift_target_library_single target name)
 
   # Don't build standard libraries by default.  We will enable building
   # standard libraries that the user requested; the rest can be built on-demand.
-  if(SWIFTLIB_SINGLE_TARGET_LIBRARY)
-    foreach(t "${target}" ${target_static})
-      set_target_properties(${t} PROPERTIES EXCLUDE_FROM_ALL TRUE)
-    endforeach()
-  endif()
+  foreach(t "${target}" ${target_static})
+    set_target_properties(${t} PROPERTIES EXCLUDE_FROM_ALL TRUE)
+  endforeach()
 
   # Handle linking and dependencies.
   add_dependencies_multiple_targets(
@@ -1147,15 +1139,8 @@ function(_add_swift_target_library_single target name)
   list(APPEND library_search_directories "${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH}/usr/lib/swift")
 
   # Add variant-specific flags.
-  if(SWIFTLIB_SINGLE_TARGET_LIBRARY)
-    set(build_type "${SWIFT_STDLIB_BUILD_TYPE}")
-    set(enable_assertions "${SWIFT_STDLIB_ASSERTIONS}")
-  else()
-    set(build_type "${CMAKE_BUILD_TYPE}")
-    set(enable_assertions "${LLVM_ENABLE_ASSERTIONS}")
-    set(analyze_code_coverage "${SWIFT_ANALYZE_CODE_COVERAGE}")
-  endif()
-
+  set(build_type "${SWIFT_STDLIB_BUILD_TYPE}")
+  set(enable_assertions "${SWIFT_STDLIB_ASSERTIONS}")
   set(lto_type "${SWIFT_STDLIB_ENABLE_LTO}")
 
   _add_target_variant_c_compile_flags(
@@ -1994,7 +1979,6 @@ function(add_swift_target_library name)
         ${SWIFTLIB_OBJECT_LIBRARY_keyword}
         ${SWIFTLIB_INSTALL_WITH_SHARED_keyword}
         ${SWIFTLIB_SOURCES}
-        TARGET_LIBRARY
         MODULE_TARGETS ${module_variant_names}
         SDK ${sdk}
         ARCHITECTURE ${arch}
