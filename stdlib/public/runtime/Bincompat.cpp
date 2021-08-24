@@ -18,7 +18,7 @@
 #include <stdint.h>
 
 // If this is an Apple OS, use the Apple binary compatibility rules
-#if __has_include(<mach-o/dyld_priv.h>)
+#if __has_include(<mach-o/dyld_priv.h>) && defined(SWIFT_RUNTIME_OS_VERSIONING)
   #include <mach-o/dyld_priv.h>
   #ifndef BINARY_COMPATIBILITY_APPLE
     #define BINARY_COMPATIBILITY_APPLE 1
