@@ -845,6 +845,14 @@ Additionally, non-protocol extensions allow a few additional changes:
     protocol extensions that do *not* satisfy protocol requirements are not
     overridable, even when the conforming type is a class.
 
+.. note::
+    
+    It is an ABI incompatible change to move a member to an extension with 
+    different constraints. Similarly, it is an ABI incompatible change to move a member
+    from a constrained extension back to its base type. Note that this is the case 
+    even if the constraints from the extension are restated as constraints in the 
+    where clause of e.g. a function or subscript member.
+     
 
 Operators and Precedence Groups
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
