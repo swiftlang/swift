@@ -14,7 +14,7 @@ foreach(SDK ${SWIFT_SDKS})
       _add_swift_target_library_single(
         BlocksRuntimeStub${VARIANT_SUFFIX}
         BlocksRuntimeStub
-        SHARED
+        SHARED NOSWIFTRT
         ARCHITECTURE ${ARCH}
         SDK ${SDK}
         INSTALL_IN_COMPONENT dev
