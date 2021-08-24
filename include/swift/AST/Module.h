@@ -257,6 +257,9 @@ private:
 
   AccessNotesFile accessNotes;
 
+  /// Used by the debugger to bypass resilient access to fields.
+  bool BypassResilience = false;
+
   ModuleDecl(Identifier name, ASTContext &ctx, ImplicitImportInfo importInfo);
 
 public:
@@ -289,6 +292,12 @@ public:
 
   AccessNotesFile &getAccessNotes() { return accessNotes; }
   const AccessNotesFile &getAccessNotes() const { return accessNotes; }
+
+  /// Return whether the module was imported with resilience disabled. The
+  /// debugger does this to access private fields.
+  bool getBypassResilience() const { return BypassResilience; }
+  /// Only to be called by MemoryBufferSerializedModuleLoader.
+  void setBypassResilience() { BypassResilience = true; }
 
   ArrayRef<FileUnit *> getFiles() {
     assert(!Files.empty() || failedToLoad());

@@ -104,6 +104,15 @@ static bool isArchetypeValidInFunction(ArchetypeType *A, const SILFunction *F) {
 
 namespace {
 
+/// When resilience is bypassed, direct access is legal, but the decls are still
+/// resilient.
+template <typename DeclType>
+bool checkResilience(DeclType *D, ModuleDecl *M,
+                     ResilienceExpansion expansion) {
+  return !D->getModuleContext()->getBypassResilience() &&
+         D->isResilient(M, expansion);
+}
+
 /// Metaprogramming-friendly base class.
 template <class Impl>
 class SILVerifierBase : public SILInstructionVisitor<Impl> {
@@ -234,7 +243,7 @@ void verifyKeyPathComponent(SILModule &M,
             "property decl should be a member of the base with the same type "
             "as the component");
     require(property->hasStorage(), "property must be stored");
-    require(!property->isResilient(M.getSwiftModule(), expansion),
+    require(!checkResilience(property, M.getSwiftModule(), expansion),
             "cannot access storage of resilient property");
     auto propertyTy =
         loweredBaseTy.getFieldType(property, M, typeExpansionContext);
@@ -2045,7 +2054,7 @@ public:
   void checkAllocGlobalInst(AllocGlobalInst *AGI) {
     SILGlobalVariable *RefG = AGI->getReferencedGlobal();
     if (auto *VD = RefG->getDecl()) {
-      require(!VD->isResilient(F.getModule().getSwiftModule(),
+      require(!checkResilience(VD, F.getModule().getSwiftModule(),
                                F.getResilienceExpansion()),
               "cannot access storage of resilient global");
     }
@@ -2064,7 +2073,7 @@ public:
         RefG->getLoweredTypeInContext(F.getTypeExpansionContext()),
         "global_addr/value must be the type of the variable it references");
     if (auto *VD = RefG->getDecl()) {
-      require(!VD->isResilient(F.getModule().getSwiftModule(),
+      require(!checkResilience(VD, F.getModule().getSwiftModule(),
                                F.getResilienceExpansion()),
               "cannot access storage of resilient global");
     }
@@ -2752,8 +2761,8 @@ public:
     require(!structDecl->hasUnreferenceableStorage(),
             "Cannot build a struct with unreferenceable storage from elements "
             "using StructInst");
-    require(!structDecl->isResilient(F.getModule().getSwiftModule(),
-                                     F.getResilienceExpansion()),
+    require(!checkResilience(structDecl, F.getModule().getSwiftModule(),
+                             F.getResilienceExpansion()),
             "cannot access storage of resilient struct");
     require(SI->getType().isObject(),
             "StructInst must produce an object");
@@ -2954,8 +2963,8 @@ public:
     require(cd, "Operand of dealloc_ref must be of class type");
 
     if (!DI->canAllocOnStack()) {
-      require(!cd->isResilient(F.getModule().getSwiftModule(),
-                              F.getResilienceExpansion()),
+      require(!checkResilience(cd, F.getModule().getSwiftModule(),
+                               F.getResilienceExpansion()),
               "cannot directly deallocate resilient class");
     }
   }
@@ -3071,7 +3080,7 @@ public:
             "result of struct_extract cannot be address");
     StructDecl *sd = operandTy.getStructOrBoundGenericStruct();
     require(sd, "must struct_extract from struct");
-    require(!sd->isResilient(F.getModule().getSwiftModule(),
+    require(!checkResilience(sd, F.getModule().getSwiftModule(),
                              F.getResilienceExpansion()),
             "cannot access storage of resilient struct");
     require(!EI->getField()->isStatic(),
@@ -3120,7 +3129,7 @@ public:
             "must derive struct_element_addr from address");
     StructDecl *sd = operandTy.getStructOrBoundGenericStruct();
     require(sd, "struct_element_addr operand must be struct address");
-    require(!sd->isResilient(F.getModule().getSwiftModule(),
+    require(!checkResilience(sd, F.getModule().getSwiftModule(),
                              F.getResilienceExpansion()),
             "cannot access storage of resilient struct");
     require(EI->getType().isAddress(),
@@ -3153,7 +3162,7 @@ public:
     SILType operandTy = EI->getOperand()->getType();
     ClassDecl *cd = operandTy.getClassOrBoundGenericClass();
     require(cd, "ref_element_addr operand must be a class instance");
-    require(!cd->isResilient(F.getModule().getSwiftModule(),
+    require(!checkResilience(cd, F.getModule().getSwiftModule(),
                              F.getResilienceExpansion()),
             "cannot access storage of resilient class");
 
@@ -3177,7 +3186,7 @@ public:
     SILType operandTy = RTAI->getOperand()->getType();
     ClassDecl *cd = operandTy.getClassOrBoundGenericClass();
     require(cd, "ref_tail_addr operand must be a class instance");
-    require(!cd->isResilient(F.getModule().getSwiftModule(),
+    require(!checkResilience(cd, F.getModule().getSwiftModule(),
                              F.getResilienceExpansion()),
             "cannot access storage of resilient class");
     require(cd, "ref_tail_addr operand must be a class instance");
@@ -3187,7 +3196,7 @@ public:
     SILType operandTy = DSI->getOperand()->getType();
     StructDecl *sd = operandTy.getStructOrBoundGenericStruct();
     require(sd, "must struct_extract from struct");
-    require(!sd->isResilient(F.getModule().getSwiftModule(),
+    require(!checkResilience(sd, F.getModule().getSwiftModule(),
                              F.getResilienceExpansion()),
             "cannot access storage of resilient struct");
     if (F.hasOwnership()) {

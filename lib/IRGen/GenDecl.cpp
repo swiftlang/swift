@@ -4993,7 +4993,10 @@ llvm::Constant *IRGenModule::getAddrOfGlobalUTF16String(StringRef utf8) {
 /// - For enums, new cases can be added
 /// - For classes, the superclass might change the size or number
 ///   of stored properties
-bool IRGenModule::isResilient(NominalTypeDecl *D, ResilienceExpansion expansion) {
+bool IRGenModule::isResilient(NominalTypeDecl *D,
+                              ResilienceExpansion expansion) {
+  if (D->getModuleContext()->getBypassResilience())
+    return false;
   if (expansion == ResilienceExpansion::Maximal &&
       Types.getLoweringMode() == TypeConverter::Mode::CompletelyFragile) {
     return false;
