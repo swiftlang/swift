@@ -113,7 +113,7 @@ function(handle_swift_sources
     # FIXME: We shouldn't /have/ to build things in a single process.
     # <rdar://problem/15972329>
     list(APPEND swift_compile_flags "-whole-module-optimization")
-    if(sdk IN_LIST SWIFT_APPLE_PLATFORMS OR sdk STREQUAL "MACCATALYST")
+    if(sdk IN_LIST SWIFT_DARWIN_PLATFORMS OR sdk STREQUAL "MACCATALYST")
       list(APPEND swift_compile_flags "-save-optimization-record=bitstream")
     endif()
     if (SWIFTSOURCES_ENABLE_LTO)
@@ -218,7 +218,7 @@ function(_add_target_variant_swift_compile_flags
     list(APPEND result "-sdk" "${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH}")
   endif()
 
-  if("${sdk}" IN_LIST SWIFT_APPLE_PLATFORMS)
+  if("${sdk}" IN_LIST SWIFT_DARWIN_PLATFORMS)
     set(sdk_deployment_version "${SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION}")
     get_target_triple(target target_variant "${sdk}" "${arch}"
     MACCATALYST_BUILD_FLAVOR "${VARIANT_MACCATALYST_BUILD_FLAVOR}"
@@ -237,7 +237,7 @@ function(_add_target_variant_swift_compile_flags
     list(APPEND result "-resource-dir" "${SWIFTLIB_DIR}")
   endif()
 
-  if("${sdk}" IN_LIST SWIFT_APPLE_PLATFORMS)
+  if("${sdk}" IN_LIST SWIFT_DARWIN_PLATFORMS)
     # We collate -F with the framework path to avoid unwanted deduplication
     # of options by target_compile_options -- this way no undesired
     # side effects are introduced should a new search path be added.
@@ -543,7 +543,7 @@ function(_compile_swift_files
     endif()
 
     set(optional_arg)
-    if(SWIFTFILE_SDK IN_LIST SWIFT_APPLE_PLATFORMS OR
+    if(SWIFTFILE_SDK IN_LIST SWIFT_DARWIN_PLATFORMS OR
        SWIFTFILE_SDK STREQUAL "MACCATALYST")
       # Allow installation of stdlib without building all variants on Darwin.
       set(optional_arg "OPTIONAL")
