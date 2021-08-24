@@ -146,13 +146,11 @@ areAccessorsOverrideCompatible(const AbstractStorageDecl *storage,
 }
 
 bool swift::isOverrideBasedOnType(const ValueDecl *decl, Type declTy,
-                                  const ValueDecl *parentDecl,
-                                  Type parentDeclTy) {
+                                  const ValueDecl *parentDecl) {
   auto genericSig =
       decl->getInnermostDeclContext()->getGenericSignatureOfContext();
 
   auto canDeclTy = declTy->getCanonicalType(genericSig);
-  auto canParentDeclTy = parentDeclTy->getCanonicalType(genericSig);
 
   auto declIUOAttr = decl->isImplicitlyUnwrappedOptional();
   auto parentDeclIUOAttr = parentDecl->isImplicitlyUnwrappedOptional();
@@ -167,17 +165,32 @@ bool swift::isOverrideBasedOnType(const ValueDecl *decl, Type declTy,
   // We can still succeed with a subtype match later in
   // OverrideMatcher::match().
   if (decl->getDeclContext()->getSelfClassDecl()) {
-    if (auto declGenericCtx = decl->getAsGenericContext()) {
+    if (auto declCtx = decl->getAsGenericContext()) {
+      auto *parentCtx = parentDecl->getAsGenericContext();
+
+      if (declCtx->isGeneric() != parentCtx->isGeneric())
+        return false;
+
+      if (declCtx->isGeneric() &&
+          (declCtx->getGenericParams()->size() !=
+           parentCtx->getGenericParams()->size()))
+        return false;
+
       auto &ctx = decl->getASTContext();
       auto sig = ctx.getOverrideGenericSignature(parentDecl, decl);
-
       if (sig &&
-          declGenericCtx->getGenericSignature().getCanonicalSignature() !=
+          declCtx->getGenericSignature().getCanonicalSignature() !=
               sig.getCanonicalSignature()) {
         return false;
       }
     }
   }
+
+  auto parentDeclTy = getMemberTypeForComparison(parentDecl, decl);
+  if (parentDeclTy->hasError())
+    return false;
+
+  auto canParentDeclTy = parentDeclTy->getCanonicalType(genericSig);
 
   // If this is a constructor, let's compare only parameter types.
   if (isa<ConstructorDecl>(decl)) {
@@ -284,6 +297,11 @@ static bool areOverrideCompatibleSimple(ValueDecl *decl,
   if (auto genDecl = decl->getAsGenericContext()) {
     auto genParentDecl = parentDecl->getAsGenericContext();
     if (genDecl->isGeneric() != genParentDecl->isGeneric())
+      return false;
+
+    if (genDecl->isGeneric() &&
+        (genDecl->getGenericParams()->size() !=
+         genParentDecl->getGenericParams()->size()))
       return false;
   }
 
@@ -908,13 +926,22 @@ SmallVector<OverrideMatch, 2> OverrideMatcher::match(
     (void)parentMethod;
     (void)parentStorage;
 
-    // Check whether the types are identical.
-    auto parentDeclTy = getMemberTypeForComparison(parentDecl, decl);
-    if (parentDeclTy->hasError())
-      continue;
+    // If the generic requirements don't match, don't try anything else below,
+    // because it will compute an invalid interface type by applying malformed
+    // substitutions.
+    if (isClassOverride()) {
+      using Direction = ASTContext::OverrideGenericSignatureReqCheck;
+      if (decl->getAsGenericContext()) {
+        if (!ctx.overrideGenericSignatureReqsSatisfied(
+                parentDecl, decl, Direction::DerivedReqSatisfiedByBase)) {
+          continue;
+        }
+      }
+    }
 
+    // Check whether the types are identical.
     Type declTy = getDeclComparisonType();
-    if (isOverrideBasedOnType(decl, declTy, parentDecl, parentDeclTy)) {
+    if (isOverrideBasedOnType(decl, declTy, parentDecl)) {
       matches.push_back({parentDecl, true});
       continue;
     }
@@ -944,6 +971,7 @@ SmallVector<OverrideMatch, 2> OverrideMatcher::match(
     }
 
     auto declFnTy = getDeclComparisonType()->getAs<AnyFunctionType>();
+    auto parentDeclTy = getMemberTypeForComparison(parentDecl, decl);
     auto parentDeclFnTy = parentDeclTy->getAs<AnyFunctionType>();
     if (declFnTy && parentDeclFnTy) {
       auto paramsAndResultMatch = [=]() -> bool {
@@ -1100,26 +1128,6 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
                                baseDecl->getName());
     fixDeclarationName(diag, decl, baseDecl->getName());
     emittedMatchError = true;
-  }
-
-  if (isClassOverride()) {
-    auto baseGenericCtx = baseDecl->getAsGenericContext();
-    auto derivedGenericCtx = decl->getAsGenericContext();
-
-    using Direction = ASTContext::OverrideGenericSignatureReqCheck;
-    if (baseGenericCtx && derivedGenericCtx) {
-      if (!ctx.overrideGenericSignatureReqsSatisfied(
-              baseDecl, decl, Direction::DerivedReqSatisfiedByBase)) {
-        auto newSig = ctx.getOverrideGenericSignature(baseDecl, decl);
-        diags.diagnose(decl, diag::override_method_different_generic_sig,
-                       decl->getBaseName(),
-                       derivedGenericCtx->getGenericSignature()->getAsString(),
-                       baseGenericCtx->getGenericSignature()->getAsString(),
-                       newSig->getAsString());
-        diags.diagnose(baseDecl, diag::overridden_here);
-        emittedMatchError = true;
-      }
-    }
   }
 
   // If we have an explicit ownership modifier and our parent doesn't,
