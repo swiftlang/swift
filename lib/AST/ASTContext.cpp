@@ -5173,11 +5173,22 @@ ASTContext::getOverrideGenericSignature(const ValueDecl *base,
 bool ASTContext::overrideGenericSignatureReqsSatisfied(
     const ValueDecl *base, const ValueDecl *derived,
     const OverrideGenericSignatureReqCheck direction) {
+  auto *baseCtx = base->getAsGenericContext();
+  auto *derivedCtx = derived->getAsGenericContext();
+
+  if (baseCtx->isGeneric() != derivedCtx->isGeneric())
+    return false;
+
+  if (baseCtx->isGeneric() &&
+      (baseCtx->getGenericParams()->size() !=
+       derivedCtx->getGenericParams()->size()))
+    return false;
+
   auto sig = getOverrideGenericSignature(base, derived);
   if (!sig)
     return true;
 
-  auto derivedSig = derived->getAsGenericContext()->getGenericSignature();
+  auto derivedSig = derivedCtx->getGenericSignature();
 
   switch (direction) {
   case OverrideGenericSignatureReqCheck::BaseReqSatisfiedByDerived:
