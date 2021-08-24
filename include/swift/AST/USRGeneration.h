@@ -20,6 +20,7 @@
 #define SWIFT_AST_USRGENERATION_H
 
 #include "swift/Basic/LLVM.h"
+#include <string>
 
 namespace swift {
 class Decl;
