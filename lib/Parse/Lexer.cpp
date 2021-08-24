@@ -2145,9 +2145,10 @@ void Lexer::tryLexEditorPlaceholder() {
     if (Ptr[0] == '<' && Ptr[1] == '#')
       break;
     if (Ptr[0] == '#' && Ptr[1] == '>') {
-      // Found it. Flag it as error (or warning, if in playground mode) for the
-      // rest of the compiler pipeline and lex it as an identifier.
-      if (LangOpts.Playground) {
+      // Found it. Flag it as error (or warning, if in playground mode or we've
+      // been asked to warn) for the rest of the compiler pipeline and lex it
+      // as an identifier.
+      if (LangOpts.Playground || LangOpts.WarnOnEditorPlaceholder) {
         diagnose(TokStart, diag::lex_editor_placeholder_in_playground);
       } else {
         diagnose(TokStart, diag::lex_editor_placeholder);

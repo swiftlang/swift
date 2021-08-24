@@ -128,6 +128,9 @@ namespace swift {
     /// Should potential unavailability on enum cases be downgraded to a warning?
     bool WarnOnPotentiallyUnavailableEnumCase = false;
 
+    /// Should the editor placeholder error be downgraded to a warning?
+    bool WarnOnEditorPlaceholder = false;
+
     /// Maximum number of typo corrections we are allowed to perform.
     /// This is disabled by default until we can get typo-correction working within acceptable performance bounds.
     unsigned TypoCorrectionLimit = 0;
