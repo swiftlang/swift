@@ -138,7 +138,10 @@ public struct AnyActorIdentity: ActorIdentity, @unchecked Sendable, CustomString
         .hash(into: &hasher)
     }
     _equalTo = { other in
-      guard let rhs = other as? ID else {
+      guard let otherAnyIdentity = other as? AnyActorIdentity else {
+        return false
+      }
+      guard let rhs = otherAnyIdentity.underlying as? ID else {
         return false
       }
       return identity == rhs
