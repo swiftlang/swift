@@ -23,7 +23,8 @@ def parse_args():
         A drop-in replacement for a 'swift-refactor -dump-text' call that
         1. Checks that the file still compiles after the refactoring by doing
            'swift-refactor -dump-rewritten' and feeding the result to
-           'swift-frontend -typecheck'
+           'swift-frontend -typecheck -disable-availability-checking
+            -warn-on-editor-placeholder'
         2. Outputting the result of the 'swift-refactor -dump-text' call
 
         All arguments other than the following will be forwarded to
@@ -107,7 +108,8 @@ def main():
         args.swift_frontend,
         '-typecheck',
         temp_file_path,
-        '-disable-availability-checking'
+        '-disable-availability-checking',
+        '-warn-on-editor-placeholder'
     ] + extra_frontend_args, desc='checking that rewritten file compiles')
     sys.stdout.write(dump_text_output)
 
