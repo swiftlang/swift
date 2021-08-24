@@ -4909,6 +4909,8 @@ Optional<Identifier> constraints::getOperatorName(Expr *expr) {
     choice = ODRE->getDecls().front();
   } else if (auto *DRE = dyn_cast_or_null<DeclRefExpr>(expr)) {
     choice = DRE->getDecl();
+  } else if (auto *declRef = dyn_cast_or_null<UnresolvedDeclRefExpr>(expr)) {
+    return declRef->getName().getBaseIdentifier();
   } else {
     return None;
   }

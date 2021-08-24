@@ -1895,10 +1895,10 @@ assessRequirementFailureImpact(ConstraintSystem &cs, Type requirementType,
 
   // If this requirement is associated with an overload choice let's
   // tie impact to how many times this requirement type is mentioned.
-  if (auto *ODRE = getAsExpr<OverloadedDeclRefExpr>(anchor)) {
+  if (isExpr<OverloadedDeclRefExpr>(anchor) || isExpr<UnresolvedDeclRefExpr>(anchor)) {
     if (auto *typeVar = requirementType->getAs<TypeVariableType>()) {
       unsigned choiceImpact = 0;
-      if (auto choice = cs.findSelectedOverloadFor(ODRE)) {
+      if (auto choice = cs.findSelectedOverloadFor(getAsExpr(anchor))) {
         choice->openedType.visit([&](Type type) {
           if (type->isEqual(typeVar))
             ++choiceImpact;

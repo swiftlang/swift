@@ -592,11 +592,11 @@ bool MissingConformanceFailure::diagnoseTypeCannotConform(
 
 bool MissingConformanceFailure::diagnoseAsAmbiguousOperatorRef() {
   auto anchor = getRawAnchor();
-  auto *ODRE = getAsExpr<OverloadedDeclRefExpr>(anchor);
-  if (!ODRE)
+  auto *declRef = getAsExpr<UnresolvedDeclRefExpr>(anchor);
+  if (!declRef)
     return false;
 
-  auto name = ODRE->getDecls().front()->getBaseName();
+  auto name = declRef->getName().getBaseName();
   if (!(name.isOperator() && getLHS()->isStdlibType() && getRHS()->isStdlibType()))
     return false;
 
@@ -2701,8 +2701,8 @@ bool ContextualFailure::diagnoseConversionToBool() const {
   if (auto *parent = findParentExpr(anchor)) {
     if (auto *parentOpCall = dyn_cast<PrefixUnaryExpr>(parent)) {
       auto &ctx = getASTContext();
-      auto opRef = dyn_cast<DeclRefExpr>(parentOpCall->getFn());
-      if (opRef && opRef->getDecl()->getBaseName() == ctx.Id_NegationOperator)
+      auto opRef = dyn_cast<UnresolvedDeclRefExpr>(parentOpCall->getFn());
+      if (opRef && opRef->getName().getBaseName() == ctx.Id_NegationOperator)
         notOperatorLoc = opRef->getLoc();
     }
   }

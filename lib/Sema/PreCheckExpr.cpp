@@ -424,6 +424,12 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
   DeclNameRef Name = UDRE->getName();
   SourceLoc Loc = UDRE->getLoc();
 
+  // Delay resolving operator references. These will be resolved in
+  // the solver.
+  if (Name.isOperator()) {
+    return UDRE;
+  }
+
   DeclNameRef LookupName = Name;
   if (Name.isCompoundName()) {
     auto &context = DC->getASTContext();

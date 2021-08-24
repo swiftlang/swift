@@ -1379,12 +1379,16 @@ namespace {
     }
 
     Type visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *expr) {
-      // This is an error case, where we're trying to use type inference
-      // to help us determine which declaration the user meant to refer to.
-      // FIXME: Do we need to note that we're doing some kind of recovery?
-      return CS.createTypeVariable(CS.getConstraintLocator(expr),
-                                   TVO_CanBindToLValue |
-                                   TVO_CanBindToNoEscape);
+      auto *typeVar = CS.createTypeVariable(CS.getConstraintLocator(expr),
+                                            TVO_CanBindToLValue |
+                                            TVO_CanBindToNoEscape);
+
+      if (expr->getName().isOperator()) {
+        auto locator = CS.getConstraintLocator(expr);
+        CS.addGlobalOperatorConstraint(typeVar, locator);
+      }
+
+      return typeVar;
     }
     
     Type visitMemberRefExpr(MemberRefExpr *expr) {
