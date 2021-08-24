@@ -851,6 +851,8 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
     if (prevFailed)
       return failConjunction();
 
+    // There could be a local ambiguity related to
+    // the current element, let's try to resolve it.
     if (Solutions.size() > 1) {
       filterSolutions(Solutions, /*minimize=*/true);
 
@@ -918,7 +920,7 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
 
       // Now that all of the information from the conjunction has
       // been applied, let's attempt to solve the outer scope.
-      return suspend(std::make_unique<SplitterStep>(CS, Solutions));
+      return suspend(std::make_unique<SplitterStep>(CS, OuterSolutions));
     }
   }
 

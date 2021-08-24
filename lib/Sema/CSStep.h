@@ -858,12 +858,25 @@ class ConjunctionStep : public BindingStep<ConjunctionElementProducer> {
   /// system step before conjunction step.
   Optional<SolverSnapshot> Snapshot;
 
+  /// A set of previously deduced solutions. This is used upon
+  /// successful solution of an isolated conjunction to introduce
+  /// all of the inferred information back into the outer context.
+  SmallVectorImpl<Solution> &OuterSolutions;
+
+  /// Solutions produced while attempting elements of an isolated conjunction.
+  ///
+  /// Note that this is what `BindingStep` is initialized with
+  /// in isolated mode.
+  SmallVector<Solution, 4> IsolatedSolutions;
+
 public:
   ConjunctionStep(ConstraintSystem &cs, Constraint *conjunction,
                   SmallVectorImpl<Solution> &solutions)
-      : BindingStep(cs, {cs, conjunction}, solutions),
+      : BindingStep(cs, {cs, conjunction},
+                    conjunction->isIsolated() ? IsolatedSolutions : solutions),
         BestScore(getBestScore()), CurrentScore(getCurrentScore()),
-        Conjunction(conjunction), AfterConjunction(erase(conjunction)) {
+        Conjunction(conjunction), AfterConjunction(erase(conjunction)),
+        OuterSolutions(solutions) {
     assert(conjunction->getKind() == ConstraintKind::Conjunction);
 
     // Make a snapshot of the constraint system state before conjunction.
