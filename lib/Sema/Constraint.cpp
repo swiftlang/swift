@@ -90,6 +90,10 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
     assert(!Second.isNull());
     break;
 
+  case ConstraintKind::GlobalOperator:
+    assert(!First.isNull());
+    break;
+
   case ConstraintKind::BindOverload:
     llvm_unreachable("Wrong constructor for overload binding constraint");
 
@@ -146,6 +150,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, Type Third,
   case ConstraintKind::DefaultClosureType:
   case ConstraintKind::UnresolvedMemberChainBase:
   case ConstraintKind::PropertyWrapper:
+  case ConstraintKind::GlobalOperator:
     llvm_unreachable("Wrong constructor");
 
   case ConstraintKind::KeyPath:
@@ -277,6 +282,7 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
   case ConstraintKind::DefaultClosureType:
   case ConstraintKind::UnresolvedMemberChainBase:
   case ConstraintKind::PropertyWrapper:
+  case ConstraintKind::GlobalOperator:
     return create(cs, getKind(), getFirstType(), getSecondType(), getLocator());
 
   case ConstraintKind::ApplicableFunction:
@@ -379,6 +385,10 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
     break;
   case ConstraintKind::PropertyWrapper:
     Out << " property wrapper with wrapped value of ";
+    break;
+  case ConstraintKind::GlobalOperator:
+    Out << " global operator";
+    skipSecond = true;
     break;
   case ConstraintKind::KeyPath:
       Out << " key path from ";
@@ -576,6 +586,10 @@ gatherReferencedTypeVars(Constraint *constraint,
       gatherReferencedTypeVars(nested, typeVars);
     return;
 
+  case ConstraintKind::GlobalOperator:
+    constraint->getFirstType()->getTypeVariables(typeVars);
+    break;
+
   case ConstraintKind::KeyPath:
   case ConstraintKind::KeyPathApplication:
     constraint->getThirdType()->getTypeVariables(typeVars);
@@ -764,7 +778,7 @@ Constraint *Constraint::createBindOverload(ConstraintSystem &cs, Type type,
   return createFixedChoice(cs, type, choice, useDC, /*fix=*/nullptr, locator);
 }
 
-Constraint *Constraint::createRestricted(ConstraintSystem &cs, 
+Constraint *Constraint::createRestricted(ConstraintSystem &cs,
                                          ConstraintKind kind, 
                                          ConversionRestrictionKind restriction,
                                          Type first, Type second, 

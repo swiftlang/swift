@@ -3560,6 +3560,11 @@ public:
                                Type first, Type second,
                                ConstraintLocatorBuilder locator);
 
+  /// Add a new constraint to resolve the given operator type via
+  /// unqualified lookup.
+  void addGlobalOperatorConstraint(Type operatorType,
+                                   ConstraintLocatorBuilder locator);
+
   /// Add a constraint that binds an overload set to a specific choice.
   void addBindOverloadConstraint(Type boundTy, OverloadChoice choice,
                                  ConstraintLocator *locator,
@@ -4828,6 +4833,11 @@ private:
       ArrayRef<TypeVariableType *> componentTypeVars,
       TypeMatchOptions flags,
       ConstraintLocatorBuilder locator);
+
+  /// Attempt to simplify the given GlobalOperator constraint.
+  SolutionKind simplifyGlobalOperatorConstraint(Type type,
+                                                TypeMatchOptions flags,
+                                                ConstraintLocatorBuilder locator);
 
   /// Attempt to simplify the given defaultable constraint.
   SolutionKind simplifyDefaultableConstraint(Type first, Type second,

@@ -1644,6 +1644,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::DefaultClosureType:
   case ConstraintKind::UnresolvedMemberChainBase:
   case ConstraintKind::PropertyWrapper:
+  case ConstraintKind::GlobalOperator:
     llvm_unreachable("Not a conversion");
   }
 
@@ -1783,6 +1784,7 @@ static bool matchFunctionRepresentations(FunctionType::ExtInfo einfo1,
   case ConstraintKind::DefaultClosureType:
   case ConstraintKind::UnresolvedMemberChainBase:
   case ConstraintKind::PropertyWrapper:
+  case ConstraintKind::GlobalOperator:
     return true;
   }
 
@@ -2186,6 +2188,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::DefaultClosureType:
   case ConstraintKind::UnresolvedMemberChainBase:
   case ConstraintKind::PropertyWrapper:
+  case ConstraintKind::GlobalOperator:
     llvm_unreachable("Not a relational constraint");
   }
 
@@ -5253,6 +5256,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::DefaultClosureType:
     case ConstraintKind::UnresolvedMemberChainBase:
     case ConstraintKind::PropertyWrapper:
+    case ConstraintKind::GlobalOperator:
       llvm_unreachable("Not a relational constraint");
     }
   }
@@ -9917,6 +9921,86 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
   return unsolved();
 }
 
+void ConstraintSystem::addGlobalOperatorConstraint(
+    Type operatorType, ConstraintLocatorBuilder locator) {
+  (void)simplifyGlobalOperatorConstraint(operatorType,
+                                         TMF_GenerateConstraints,
+                                         locator);
+}
+
+ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyGlobalOperatorConstraint(
+    Type type, TypeMatchOptions flags, ConstraintLocatorBuilder locator) {
+  auto *typeVar = type->getAs<TypeVariableType>();
+  if (!typeVar)
+    return SolutionKind::Error;
+
+  // FIXME: Consider using a dedicated OperatorRefExpr AST node here.
+  auto *declRef = getAsExpr<UnresolvedDeclRefExpr>(locator.getAnchor());
+  auto *declContext = DC;
+  if (declRef->getLoc().isInvalid())
+    declContext = DC->getModuleScopeContext();
+
+  auto lookup = TypeChecker::lookupUnqualified(declContext, declRef->getName(),
+                                               declRef->getLoc());
+
+  llvm::SmallVector<OverloadChoice, 4> candidates;
+  for (auto entry : lookup) {
+    auto *decl = entry.getValueDecl();
+    switch (declRef->getRefKind()) {
+    case DeclRefKind::Ordinary:
+    case DeclRefKind::BinaryOperator:
+      break;
+
+    case DeclRefKind::PrefixOperator:
+      if (decl->getAttrs().hasAttribute<PrefixAttr>())
+        break;
+
+      continue;
+
+    case DeclRefKind::PostfixOperator:
+      if (decl->getAttrs().hasAttribute<PostfixAttr>())
+        break;
+
+      continue;
+    }
+
+    OverloadChoice choice =
+         OverloadChoice(Type(), entry.getValueDecl(), declRef->getFunctionRefKind());
+    candidates.push_back(choice);
+  }
+
+  if (!candidates.empty()) {
+    // For operators, sort the results so that non-generic operations come first.
+    // Note: this is part of a performance hack to prefer non-generic operators
+    // to generic operators, because the former is far more efficient to check.
+    std::stable_sort(candidates.begin(), candidates.end(),
+                     [&](OverloadChoice choiceX, OverloadChoice choiceY) -> bool {
+      auto *declX = choiceX.getDecl();
+      auto *declY = choiceY.getDecl();
+      auto xGeneric = declX->getInterfaceType()->getAs<GenericFunctionType>();
+      auto yGeneric = declY->getInterfaceType()->getAs<GenericFunctionType>();
+      if (static_cast<bool>(xGeneric) != static_cast<bool>(yGeneric)) {
+        return xGeneric? false : true;
+      }
+
+      if (!xGeneric)
+        return false;
+
+      unsigned xDepth = xGeneric->getGenericParams().back()->getDepth();
+      unsigned yDepth = yGeneric->getGenericParams().back()->getDepth();
+      return xDepth < yDepth;
+    });
+
+    auto *loc = getConstraintLocator(locator);
+    addOverloadSet(typeVar, candidates, DC, loc);
+    return SolutionKind::Solved;
+  }
+
+  // TODO: apply fixes for failed operator lookup.
+  return SolutionKind::Error;
+}
+
 bool ConstraintSystem::simplifyAppliedOverloadsImpl(
     Constraint *disjunction, TypeVariableType *fnTypeVar,
     FunctionType *argFnType, unsigned numOptionalUnwraps,
@@ -11879,6 +11963,9 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
   case ConstraintKind::PropertyWrapper:
     return simplifyPropertyWrapperConstraint(first, second, subflags, locator);
 
+  case ConstraintKind::GlobalOperator:
+    return simplifyGlobalOperatorConstraint(first, subflags, locator);
+
   case ConstraintKind::FunctionInput:
   case ConstraintKind::FunctionResult:
     return simplifyFunctionComponentConstraint(kind, first, second,
@@ -12403,6 +12490,11 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
                                              constraint.getSecondType(),
                                              /*flags*/ None,
                                              constraint.getLocator());
+
+  case ConstraintKind::GlobalOperator:
+    return simplifyGlobalOperatorConstraint(constraint.getFirstType(),
+                                            /*flags=*/None,
+                                            constraint.getLocator());
 
   case ConstraintKind::FunctionInput:
   case ConstraintKind::FunctionResult:
