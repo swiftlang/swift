@@ -38,6 +38,8 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS, PatternKind kind) {
     return OS << "parenthesized pattern";
   case PatternKind::Tuple:
     return OS << "tuple pattern";
+  case PatternKind::Mapping:
+    return OS << "property extracting pattern";
   case PatternKind::Named:
     return OS << "pattern variable binding";
   case PatternKind::Any:
@@ -221,6 +223,10 @@ void Pattern::forEachVariable(llvm::function_ref<void(VarDecl *)> fn) const {
       elt.getPattern()->forEachVariable(fn);
     return;
 
+  case PatternKind::Mapping:
+    cast<MappingPattern>(this)->getSubPattern()->forEachVariable(fn);
+    return;
+
   case PatternKind::EnumElement:
     if (auto SP = cast<EnumElementPattern>(this)->getSubPattern())
       SP->forEachVariable(fn);
@@ -268,6 +274,9 @@ void Pattern::forEachNode(llvm::function_ref<void(Pattern*)> f) {
     for (auto elt : cast<TuplePattern>(this)->getElements())
       elt.getPattern()->forEachNode(f);
     return;
+
+  case PatternKind::Mapping:
+    return cast<MappingPattern>(this)->getSubPattern()->forEachNode(f);
 
   case PatternKind::EnumElement: {
     auto *OP = cast<EnumElementPattern>(this);

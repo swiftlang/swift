@@ -93,7 +93,7 @@ enum Voluntary<T> : Equatable {
     case .Mere,
          .Mere(), // expected-error{{tuple pattern cannot match values of the non-tuple type 'T'}}
          .Mere(_),
-         .Mere(_, _): // expected-error{{tuple pattern cannot match values of the non-tuple type 'T'}}
+         .Mere(_, _): // expected-error{{tuple pattern cannot match values of the non-tuple type 'T'}} expected-note {{label elements with property names to destructure by property}} {{16-16=<#property name#>: }} {{19-19=<#property name#>: }}
       ()
 
     case .Twain(), // expected-error{{tuple pattern has the wrong length for tuple type '(T, T)'}}
@@ -134,7 +134,7 @@ case Voluntary<Int>.Naught,
   ()
 case Voluntary<Int>.Mere,
      Voluntary<Int>.Mere(_),
-     Voluntary<Int>.Mere(_, _), // expected-error{{tuple pattern cannot match values of the non-tuple type 'Int'}}
+     Voluntary<Int>.Mere(_, _), // expected-error{{tuple pattern cannot match values of the non-tuple type 'Int'}} expected-note {{label elements with property names to destructure by property}} {{26-26=<#property name#>: }} {{29-29=<#property name#>: }}
      Voluntary.Mere,
      Voluntary.Mere(_),
      .Mere,
@@ -304,6 +304,59 @@ case is [Derived]: // expected-error{{collection downcast in cast pattern is not
 default:
   ()
 }
+
+
+
+// Property destructuring.
+struct Alignment {
+  enum Lawfulness { case lawful, neutral, chaotic }
+  enum Goodness { case good, neutral, evil }
+  var lawfulness: Lawfulness
+  var goodness: Goodness    // expected-note {{'goodness' declared here}}
+}
+
+var alignment = Alignment(lawfulness: .chaotic, goodness: .good)
+
+switch alignment {
+case ():    // expected-error {{tuple pattern cannot match values of the non-tuple type 'Alignment'}}
+  break
+}
+
+switch alignment {
+case (_):    // no-error; degrades to ParenPattern
+  break
+}
+
+switch alignment {
+case (lawfulness: _):    // no-error
+  break
+}
+
+switch alignment {
+case (lawfulness: _, goodness: _):    // no-error
+  break
+default: // FIXME: Shouldn't be needed
+  break
+}
+
+switch alignment {
+case (goodness: _, lawfulness: _):    // no-error
+  break
+default: // FIXME: Shouldn't be needed
+  break
+}
+
+switch alignment {
+case (hotness: _):    // expected-error {{value of type 'Alignment' has no member 'hotness'}}
+  break
+}
+
+switch alignment {
+case (goodness: _, _):    // expected-error {{tuple pattern cannot match values of the non-tuple type 'Alignment'}} expected-note {{label elements with property names to destructure by property}}
+  break
+}
+
+// TODO: Exhuastiveness checker tests.
 
 
 // Optional patterns.

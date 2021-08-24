@@ -1567,6 +1567,8 @@ namespace {
         return Space::forConstructor(item->getType(), Identifier(),
                                      conArgSpace);
       }
+      case PatternKind::Mapping:
+        return projectPattern(cast<MappingPattern>(item)->getSubPattern());
       }
       llvm_unreachable("unhandled kind");
     }

@@ -5945,6 +5945,9 @@ ManagedValue SILGenFunction::emitReadAsyncLetBinding(SILLocation loc,
     void visitParenPattern(ParenPattern *P) {
       return visit(P->getSubPattern());
     }
+    void visitMappingPattern(MappingPattern *P) {
+      return visit(P->getSubPattern());
+    }
     void visitTypedPattern(TypedPattern *P) {
       return visit(P->getSubPattern());
     }

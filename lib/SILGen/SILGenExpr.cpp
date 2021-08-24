@@ -4593,6 +4593,10 @@ namespace {
     }
 #include "swift/AST/PatternNodes.def"
 
+    Type visitMappingPattern(MappingPattern *pattern) {
+      llvm::report_fatal_error("unimplemented");
+    }
+
     Type visitTuplePattern(TuplePattern *pattern) {
       SmallVector<TupleTypeElt, 4> tupleElts;
       for (auto &element : pattern->getElements()) {

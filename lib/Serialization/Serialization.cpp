@@ -2923,6 +2923,8 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       }
       break;
     }
+    case PatternKind::Mapping:
+      llvm::report_fatal_error("unimplemented");
     case PatternKind::Named: {
       auto named = cast<NamedPattern>(pattern);
 

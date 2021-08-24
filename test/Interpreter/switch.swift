@@ -282,4 +282,56 @@ SwitchTestSuite.test("Enum Initialization Leaks") {
   }
 }
 
+SwitchTestSuite.test("Property Destructuring") {
+  struct Alignment {
+    enum Lawfulness { case lawful, neutral, chaotic }
+    enum Goodness { case good, neutral, evil }
+    var lawfulness: Lawfulness
+    var goodness: Goodness
+
+    var descriptionPrefix: String {
+      switch self {
+      case (lawfulness: .lawful):
+        return "lawful"
+      case (lawfulness: .neutral):
+        return "neutral"
+      case (lawfulness: .chaotic):
+        return "chaotic"
+      default: // FIXME: should not be necessary
+        fatalError()
+      }
+    }
+
+    var descriptionSuffix: String {
+      switch self {
+      case (goodness: .good):
+        return "good"
+      case (goodness: .neutral):
+        return "neutral"
+      case (goodness: .evil):
+        return "evil"
+      default: // FIXME: should not be necessary
+        fatalError()
+      }
+    }
+
+    var description: String {
+      switch self {
+      case (lawfulness: .neutral, goodness: .neutral):
+        return "true netural"
+      default:
+        return "\(descriptionPrefix) \(descriptionSuffix)"
+      }
+    }
+  }
+
+  func desc(_ lawfulness: Alignment.Lawfulness, _ goodness: Alignment.Goodness) -> String {
+    return Alignment(lawfulness: lawfulness, goodness: goodness).description
+  }
+
+  expectEqual(desc(.lawful, .good), "lawful good")
+  expectEqual(desc(.neutral, .evil), "neutral evil")
+  expectEqual(desc(.neutral, .neutral), "true neutral")
+}
+
 runAllTests()
