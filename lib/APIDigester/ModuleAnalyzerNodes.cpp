@@ -944,6 +944,8 @@ static bool isSDKNodeEqual(SDKContext &Ctx, const SDKNode &L, const SDKNode &R) 
         if (Left->getFixedBinaryOrder() != Right->getFixedBinaryOrder())
           return false;
       }
+      if (Left->getUsr() != Right->getUsr())
+        return false;
       LLVM_FALLTHROUGH;
     }
     case SDKNodeKind::Conformance:
@@ -2550,6 +2552,13 @@ void swift::ide::api::SDKNodeDecl::diagnose(SDKNode *Right) {
         getFixedBinaryOrder() != RD->getFixedBinaryOrder()) {
       emitDiag(Loc, diag::decl_reorder, getFixedBinaryOrder(),
                RD->getFixedBinaryOrder());
+    }
+    if (getUsr() != RD->getUsr()) {
+      auto left = demangleUSR(getUsr());
+      auto right = demangleUSR(RD->getUsr());
+      if (left != right) {
+        emitDiag(Loc, diag::demangled_name_changed, left, right);
+      }
     }
   }
 }
