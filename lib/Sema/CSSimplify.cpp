@@ -5894,7 +5894,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
             //
             // Do some light verification before recording restriction to
             // avoid allocating constraints for obviously invalid cases.
-            if (type1IsPointer && !type1IsOptional && !type2IsOptional) {
+            if (type1IsPointer && !type1IsOptional && !type2IsOptional &&
+                (shouldAttemptFixes() || isArgumentOfImportedDecl(locator))) {
               // UnsafeRawPointer -> UnsafePointer<[U]Int8>
               if (type1PointerKind == PTK_UnsafeRawPointer &&
                   pointerKind == PTK_UnsafePointer) {
@@ -11384,26 +11385,43 @@ ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyPointerToCPointerRestriction(
     Type type1, Type type2, TypeMatchOptions flags,
     ConstraintLocatorBuilder locator) {
-  // If this is not an imported function, let's not proceed with this
-  // conversion.
-  if (!isArgumentOfImportedDecl(locator)) {
-    return SolutionKind::Error;
-  }
+  bool inCorrectPosition = isArgumentOfImportedDecl(locator);
 
-  // Make sure that solutions with implicit pointer conversions
-  // are always worse than the ones without them.
-  increaseScore(SK_ImplicitValueConversion);
+  if (inCorrectPosition) {
+    // Make sure that solutions with implicit pointer conversions
+    // are always worse than the ones without them.
+    increaseScore(SK_ImplicitValueConversion);
+  } else {
+    // If this is not an imported function, let's not proceed with
+    // the conversion, unless in diagnostic mode.
+    if (!shouldAttemptFixes())
+      return SolutionKind::Error;
+
+    // Let's attempt to convert the types and record a tailored
+    // fix if that succeeds.
+  }
 
   auto &ctx = getASTContext();
 
   PointerTypeKind swiftPtrKind, cPtrKind;
 
-  auto swiftPtr =
-      type1->lookThroughAllOptionalTypes()->getAnyPointerElementType(
-          swiftPtrKind);
+  auto swiftPtr = type1->getAnyPointerElementType(swiftPtrKind);
+  auto cPtr = type2->getAnyPointerElementType(cPtrKind);
 
-  auto cPtr =
-      type2->lookThroughAllOptionalTypes()->getAnyPointerElementType(cPtrKind);
+  assert(swiftPtr);
+  assert(cPtr);
+
+  auto markSupported = [&]() -> SolutionKind {
+    if (inCorrectPosition)
+      return SolutionKind::Solved;
+
+    // If conversion cannot be allowed on account of declaration,
+    // let's add a tailored fix.
+    auto *fix = AllowSwiftToCPointerConversion::create(
+        *this, getConstraintLocator(locator));
+
+    return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+  };
 
   // Unsafe[Mutable]RawPointer -> Unsafe[Mutable]Pointer<[U]Int8>
   if (swiftPtrKind == PTK_UnsafeRawPointer ||
@@ -11411,7 +11429,7 @@ ConstraintSystem::simplifyPointerToCPointerRestriction(
     // Since it's a C pointer on parameter side it would always
     // be fully resolved.
     if (cPtr->isInt8() || cPtr->isUInt8())
-      return SolutionKind::Solved;
+      return markSupported();
   } else {
     // Unsafe[Mutable]Pointer<T> -> Unsafe[Mutable]Pointer<[U]Int8>
     if (cPtr->isInt8() || cPtr->isUInt8()) {
@@ -11419,7 +11437,7 @@ ConstraintSystem::simplifyPointerToCPointerRestriction(
       addConstraint(
           ConstraintKind::Defaultable, swiftPtr, cPtr,
           locator.withPathElement(LocatorPathElt::GenericArgument(0)));
-      return SolutionKind::Solved;
+      return markSupported();
     }
 
     auto elementLoc =
@@ -11432,7 +11450,7 @@ ConstraintSystem::simplifyPointerToCPointerRestriction(
       addConstraint(ConstraintKind::Equal, cPtr,
                     swiftPtr->isUInt() ? ctx.getIntType() : ctx.getUIntType(),
                     elementLoc);
-      return SolutionKind::Solved;
+      return markSupported();
     }
 
     if (swiftPtr->isInt8() || swiftPtr->isUInt8()) {
@@ -11440,7 +11458,7 @@ ConstraintSystem::simplifyPointerToCPointerRestriction(
                     swiftPtr->isUInt8() ? ctx.getInt8Type()
                                         : ctx.getUInt8Type(),
                     elementLoc);
-      return SolutionKind::Solved;
+      return markSupported();
     }
 
     if (swiftPtr->isInt16() || swiftPtr->isUInt16()) {
@@ -11448,7 +11466,7 @@ ConstraintSystem::simplifyPointerToCPointerRestriction(
                     swiftPtr->isUInt16() ? ctx.getInt16Type()
                                          : ctx.getUInt16Type(),
                     elementLoc);
-      return SolutionKind::Solved;
+      return markSupported();
     }
 
     if (swiftPtr->isInt32() || swiftPtr->isUInt32()) {
@@ -11456,7 +11474,7 @@ ConstraintSystem::simplifyPointerToCPointerRestriction(
                     swiftPtr->isUInt32() ? ctx.getInt32Type()
                                          : ctx.getUInt32Type(),
                     elementLoc);
-      return SolutionKind::Solved;
+      return markSupported();
     }
 
     if (swiftPtr->isInt64() || swiftPtr->isUInt64()) {
@@ -11464,8 +11482,16 @@ ConstraintSystem::simplifyPointerToCPointerRestriction(
                     swiftPtr->isUInt64() ? ctx.getInt64Type()
                                          : ctx.getUInt64Type(),
                     elementLoc);
-      return SolutionKind::Solved;
+      return markSupported();
     }
+  }
+
+  // If the conversion is unsupported, let's record a generic argument mismatch.
+  if (shouldAttemptFixes() && !inCorrectPosition) {
+    auto *fix = AllowArgumentMismatch::create(*this, type1, type2,
+                                              getConstraintLocator(locator));
+    return recordFix(fix, /*impact=*/2) ? SolutionKind::Error
+                                        : SolutionKind::Solved;
   }
 
   return SolutionKind::Error;

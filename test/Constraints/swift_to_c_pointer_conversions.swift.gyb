@@ -243,3 +243,29 @@ func test_overloaded_ref_is_not_ambiguous() {
   const_char_ptr_func(overloaded_func()) // Ok
   const_opt_char_ptr_func(overloaded_func()) // Ok
 }
+
+func test_tailored_diagnostic(ptr: UnsafeRawPointer, tptr: UnsafePointer<Int8>) {
+  func swift_uint8_func(_: UnsafePointer<UInt8>) {}
+  func swift_int8_func(_: UnsafePointer<Int8>) {}
+  func opt_arg_func(_: UnsafePointer<Int8>?) {}
+
+  swift_uint8_func(ptr)
+  // expected-error@-1 {{cannot convert value of type 'UnsafeRawPointer' to expected argument type 'UnsafePointer<UInt8>' because local function 'swift_uint8_func' was not imported from C header}}
+  swift_uint8_func(tptr)
+  // expected-error@-1 {{cannot convert value of type 'UnsafePointer<Int8>' to expected argument type 'UnsafePointer<UInt8>' because local function 'swift_uint8_func' was not imported from C header}}
+
+  swift_int8_func(ptr)
+  // expected-error@-1 {{cannot convert value of type 'UnsafeRawPointer' to expected argument type 'UnsafePointer<Int8>' because local function 'swift_int8_func' was not imported from C header}}
+  swift_int8_func(tptr) // Ok
+
+  opt_arg_func(ptr)
+  // expected-error@-1 {{cannot convert value of type 'UnsafeRawPointer' to expected argument type 'UnsafePointer<Int8>?' because local function 'opt_arg_func' was not imported from C header}}
+  opt_arg_func(tptr) // Ok
+
+  let optrS8: UnsafePointer<Int8>? = nil
+  let optrU8: UnsafePointer<UInt8>? = nil
+
+  opt_arg_func(optrS8) // Ok
+  opt_arg_func(optrU8)
+  // expected-error@-1 {{cannot convert value of type 'UnsafePointer<UInt8>?' to expected argument type 'UnsafePointer<Int8>?' because local function 'opt_arg_func' was not imported from C header}}
+}
