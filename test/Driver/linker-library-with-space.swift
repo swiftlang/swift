@@ -15,4 +15,4 @@
 // LINUX-lib-flag-space-DAG: -L baz
 // LINUX-lib-flag-space-DAG: -lboo
 // LINUX-lib-flag-space-DAG: -Xlinker -undefined
-// LINUX-lib-flag-space: -o linker
+// LINUX-lib-flag-space: -o main
