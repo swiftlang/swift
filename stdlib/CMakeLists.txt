@@ -75,6 +75,10 @@ option(SWIFT_RUNTIME_MACHO_NO_DYLD
        "Build stdlib assuming the runtime environment uses Mach-O but does not support dynamic modules."
        FALSE)
 
+option(SWIFT_STDLIB_HAS_DARWIN_LIBMALLOC
+  "Build stdlib assuming the Darwin build of stdlib can use extended libmalloc APIs"
+  )
+
 option(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
        "Build the standard libraries assuming that they will be used in an environment with only a single thread."
        FALSE)
@@ -165,7 +169,7 @@ if(SWIFT_BUILD_DYNAMIC_STDLIB)
   list(APPEND SWIFT_STDLIB_LIBRARY_BUILD_TYPES SHARED)
 endif()
 if(SWIFT_BUILD_STATIC_STDLIB)
-  list_intersect("${SWIFT_APPLE_PLATFORMS}" "${SWIFT_SDKS}" building_darwin_sdks)
+  list_intersect("${SWIFT_DARWIN_PLATFORMS}" "${SWIFT_SDKS}" building_darwin_sdks)
   if(building_darwin_sdks)
     message(SEND_ERROR "cannot build static standard library for Darwin SDKs")
   else()
