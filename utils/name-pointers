@@ -1,0 +1,76 @@
+#!/usr/bin/env python3
+
+# Utility to assign names to hex-formatted integer values.
+#
+# This is handy for examining the output of SWIFT_TASK_PRINTF_DEBUG, as staring
+# at pointer values and comparing them is more tedious than comparing words.
+#
+# Input is read from stdin and re-formatted text is emitted to stdout.
+# Example usage:
+#
+# cat async-output.log | utils/name-pointers
+#
+# TODO: phausler suggested we could emit colorful output.
+
+import sys
+import re
+
+size_adjectives = [
+    "", "Miniscule", "Huge", "Tiny",
+    "Large", "Small", "Chonky", "Microscopic",
+    "Gigantic", "Petite", "Gargantuan", "Little",
+    "Massive", "Miniature", "Puny", "Big"
+]
+
+color_adjectives = [
+    "", "Violet", "Indigo", "Blue",
+    "Green", "Yellow", "Orange", "Red",
+    "Cyan", "Magenta", "Pink", "Black",
+    "White", "Brown", "Beige", "Purple"
+]
+
+nouns = [
+    "Tomato", "Onion", "Carrot", "Potato",
+    "Lettuce", "Garlic", "Kale", "Cabbage",
+    "Pumpkin", "Broccoli", "Cauliflower", "Spinach",
+    "Cucumber", "Beetroot", "Radish", "Pea",
+    "Cat", "Dog", "Chicken", "Horse",
+    "Monkey", "Lion", "Tiger", "Hippo",
+    "Eagle", "Lizard", "Cheetah", "Bear",
+    "Crab", "Ostrich", "Snake", "Penguin"
+]
+
+counter = 0
+max_counter = len(nouns) * len(color_adjectives) * len(size_adjectives)
+cache = {}
+
+input_lines = sys.stdin.read()
+start = 0
+for match in re.finditer('0x[0-9a-fA-F]+', input_lines):
+    end = match.start()
+    sys.stdout.write(input_lines[start:end])
+    start = match.end()
+    matchstr = input_lines[match.start():match.end()]
+    intval = int(matchstr, 16)
+    if counter > max_counter:
+        sys.stdout.write(input_lines[match.start():])
+        break
+    if intval == 0:
+        sys.stdout.write("NULL ({})".format(matchstr))
+        continue
+    try:
+        name = cache[intval]
+    except KeyError:
+        size_idx = counter // len(color_adjectives) // len(nouns)
+        color_idx = (counter // len(nouns)) % len(color_adjectives)
+        noun_idx = counter % len(nouns)
+        name = "{}{}{} ({})".format(
+            size_adjectives[size_idx],
+            color_adjectives[color_idx],
+            nouns[noun_idx],
+            matchstr)
+        cache[intval] = name
+        counter += 1
+    sys.stdout.write(name)
+
+sys.stdout.flush()
