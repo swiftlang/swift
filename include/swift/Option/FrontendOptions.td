@@ -436,6 +436,10 @@ def warn_on_potentially_unavailable_enum_case : Flag<["-"],
   "warn-on-potentially-unavailable-enum-case">,
   HelpText<"Downgrade potential unavailability of enum case to a warning">;
 
+def warn_on_editor_placeholder : Flag<["-"],
+  "warn-on-editor-placeholder">,
+  HelpText<"Downgrade the editor placeholder error to a warning">;
+
 def report_errors_to_debugger : Flag<["-"], "report-errors-to-debugger">,
   HelpText<"Deprecated, will be removed in future versions.">;
 
