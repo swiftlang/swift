@@ -7214,7 +7214,7 @@ private:
                                   /*Success=*/true);
 
     addAwaitCall(CE, ArgList.ref(), Blocks.SuccessBlock, SuccessParams,
-                 InlinePatterns, HandlerDesc, /*AddDeclarations*/ true);
+                 InlinePatterns, HandlerDesc, /*AddDeclarations=*/true);
     printOutOfLineBindingPatterns(Blocks.SuccessBlock, InlinePatterns);
     convertNodes(Blocks.SuccessBlock.nodesToPrint());
     clearNames(SuccessParams);
@@ -7225,7 +7225,8 @@ private:
 
       // Always use the ErrParam name if none is bound.
       prepareNames(Blocks.ErrorBlock, llvm::makeArrayRef(ErrParam),
-                   ErrInlinePatterns, HandlerDesc.Type != HandlerType::RESULT);
+                   ErrInlinePatterns,
+                   /*AddIfMissing=*/HandlerDesc.Type != HandlerType::RESULT);
       preparePlaceholdersAndUnwraps(HandlerDesc, SuccessParams, ErrParam,
                                     /*Success=*/false);
 
@@ -7506,7 +7507,7 @@ private:
   void addCatch(const ParamDecl *ErrParam) {
     OS << "\n" << tok::r_brace << " " << tok::kw_catch << " ";
     auto ErrName = newNameFor(ErrParam, false);
-    if (!ErrName.empty()) {
+    if (!ErrName.empty() && ErrName != "_") {
       OS << tok::kw_let << " " << ErrName << " ";
     }
     OS << tok::l_brace;
@@ -7590,6 +7591,8 @@ private:
   /// other names in the current scope.
   Identifier createUniqueName(StringRef Name) {
     Identifier Ident = getASTContext().getIdentifier(Name);
+    if (Name == "_")
+      return Ident;
 
     auto &CurrentNames = Scopes.back().Names;
     if (CurrentNames.count(Ident)) {

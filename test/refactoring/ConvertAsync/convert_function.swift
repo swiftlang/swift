@@ -635,3 +635,46 @@ func twoCompletionHandlerCalls(completion: @escaping (String?, Error?) -> Void) 
 // TWO-COMPLETION-HANDLER-CALLS-NEXT:   return res
 // TWO-COMPLETION-HANDLER-CALLS-NEXT:   return res
 // TWO-COMPLETION-HANDLER-CALLS-NEXT: }
+
+// RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=NESTED-IGNORED %s
+func nestedIgnored() throws {
+  simple { _ in
+    print("done")
+    simple { _ in
+      print("done")
+    }
+  }
+}
+// NESTED-IGNORED:      func nestedIgnored() async throws {
+// NESTED-IGNORED-NEXT:   let _ = await simple()
+// NESTED-IGNORED-NEXT:   print("done")
+// NESTED-IGNORED-NEXT:   let _ = await simple()
+// NESTED-IGNORED-NEXT:   print("done")
+// NESTED-IGNORED-NEXT: }
+
+// RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=IGNORED-ERR %s
+func nestedIgnoredErr() throws {
+  simpleErr(arg: "") { str, _ in
+    if str == nil {
+      print("error")
+    }
+
+    simpleErr(arg: "") { str, _ in
+      if str == nil {
+        print("error")
+      }
+    }
+  }
+}
+// IGNORED-ERR:      func nestedIgnoredErr() async throws {
+// IGNORED-ERR-NEXT:   do {
+// IGNORED-ERR-NEXT:     let str = try await simpleErr(arg: "")
+// IGNORED-ERR-NEXT:     do {
+// IGNORED-ERR-NEXT:       let str1 = try await simpleErr(arg: "")
+// IGNORED-ERR-NEXT:     } catch {
+// IGNORED-ERR-NEXT:       print("error")
+// IGNORED-ERR-NEXT:     }
+// IGNORED-ERR-NEXT:   } catch {
+// IGNORED-ERR-NEXT:     print("error")
+// IGNORED-ERR-NEXT:   }
+// IGNORED-ERR-NEXT: }
