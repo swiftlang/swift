@@ -11,6 +11,11 @@ if(NOT BUILD_STANDALONE)
   list(APPEND darwin_depends copy_apinotes)
 endif()
 
+set(swift_platform_compile_flags)
+if(SWIFT_ENABLE_REFLECTION)
+  list(APPEND swift_platform_compile_flags "-DSWIFT_ENABLE_REFLECTION")
+endif()
+
 set(swiftDarwin_target_sdks ALL_APPLE_PLATFORMS)
 if(SWIFT_FREESTANDING_FLAVOR STREQUAL "apple")
   set(swiftDarwin_target_sdks ALL_APPLE_PLATFORMS FREESTANDING)
@@ -30,6 +35,7 @@ add_swift_target_library(swiftDarwin ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_
       ${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}
       ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
       -Xfrontend -disable-objc-attr-requires-foundation-module
+      ${swift_platform_compile_flags}
     LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
     TARGET_SDKS "${swiftDarwin_target_sdks}"
     INSTALL_IN_COMPONENT sdk-overlay
@@ -51,6 +57,7 @@ add_swift_target_library(swiftGlibc ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_O
     SWIFT_COMPILE_FLAGS
       ${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}
       ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
+      ${swift_platform_compile_flags}
     LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
     TARGET_SDKS "${swiftGlibc_target_sdks}"
     INSTALL_IN_COMPONENT sdk-overlay
@@ -68,6 +75,7 @@ add_swift_target_library(swiftCRT ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVE
       ${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}
       ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
       -Xcc -D_USE_MATH_DEFINES
+      ${swift_platform_compile_flags}
     LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
     TARGET_SDKS WINDOWS
     INSTALL_IN_COMPONENT sdk-overlay)

@@ -10,6 +10,10 @@ if (NOT IS_BUILD_TYPE_OPTIMIZED)
   list(APPEND swift_stdlib_unittest_compile_flags "-DSWIFT_STDLIB_DEBUG")
 endif()
 
+if(SWIFT_ENABLE_REFLECTION)
+  list(APPEND swift_stdlib_unittest_compile_flags "-DSWIFT_ENABLE_REFLECTION")
+endif()
+
 set(swift_stdlib_unittest_link_libraries "")
 set(swift_stdlib_unittest_modules "")
 if (SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
