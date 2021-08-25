@@ -266,6 +266,5 @@ void swift::addImplicitDistributedActorMembersToClass(ClassDecl *decl) {
     return;
 
   addFactoryResolveFunction(decl);
-//  addImplicitDistributedActorStoredProperties(decl);
   addImplicitRemoteActorFunctions(decl);
 }
