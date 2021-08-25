@@ -41,8 +41,14 @@
 
 namespace swift {
 
-// Uncomment to enable helpful debug spew to stderr
-//#define SWIFT_TASK_PRINTF_DEBUG 1
+// Set to 1 to enable helpful debug spew to stderr
+#if 0
+#define SWIFT_TASK_DEBUG_LOG(fmt, ...)                                         \
+  fprintf(stderr, "[%lu] " fmt "\n", (unsigned long)_swift_get_thread_id(),    \
+          __VA_ARGS__)
+#else
+#define SWIFT_TASK_DEBUG_LOG(fmt, ...) (void)0
+#endif
 
 #if defined(_WIN32)
 using ThreadID = decltype(GetCurrentThreadId());
@@ -405,10 +411,7 @@ inline void AsyncTask::flagAsSuspended() {
 // that can be used when debugging locally to instrument when a task actually is
 // dealloced.
 inline void AsyncTask::flagAsCompleted() {
-#if SWIFT_TASK_PRINTF_DEBUG
-  fprintf(stderr, "[%lu] task completed %p\n",
-          _swift_get_thread_id(), this);
-#endif
+  SWIFT_TASK_DEBUG_LOG("task completed %p", this);
 }
 
 inline void AsyncTask::localValuePush(const HeapObject *key,
