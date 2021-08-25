@@ -247,6 +247,10 @@ def enable_experimental_concurrency :
   Flag<["-"], "enable-experimental-concurrency">,
   HelpText<"Enable experimental concurrency model">;
 
+def enable_experimental_back_deploy_concurrency :
+  Flag<["-"], "enable-experimental-back-deploy-concurrency">,
+  HelpText<"Enable experimental back-deployment of the concurrency model">;
+
 def enable_experimental_distributed :
   Flag<["-"], "enable-experimental-distributed">,
   HelpText<"Enable experimental 'distributed' actors and functions">;
