@@ -28,7 +28,6 @@
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Mutex.h"
 #include "swift/Runtime/HeapObject.h"
-#include "AsyncCall.h"
 #include "Debug.h"
 #include "bitset"
 #include "string"
