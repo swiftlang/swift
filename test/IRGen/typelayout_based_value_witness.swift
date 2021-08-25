@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend -enable-type-layout -primary-file %s -emit-ir | %FileCheck %s --check-prefix=CHECK
 // RUN: %target-swift-frontend -enable-type-layout -primary-file %s -O -emit-ir | %FileCheck %s --check-prefix=OPT --check-prefix=OPT-%target-ptrsize
+// RUN: %target-swift-frontend -enable-type-layout -force-struct-type-layouts -primary-file %s -O -emit-ir | %FileCheck %s --check-prefix=FORCE-OPT --check-prefix=FORCE-OPT-%target-ptrsize
 // RUN: %target-swift-frontend -primary-file %s -emit-ir | %FileCheck %s --check-prefix=NOTL
 
 public struct B<T> {
@@ -10,6 +11,21 @@ public struct B<T> {
 public struct A<T> {
   var a : B<T>
   var b:  B<T>
+}
+
+public class C<T> {
+  init(a: B<T>, b: B<T>) {
+    self.a = a
+    self.b = b
+  }
+  var a : B<T>
+  var b:  B<T>
+}
+
+public struct Fixed<T> {
+  var a : Int8
+  var b : Int16
+  var c : C<T>
 }
 
 // NOTL-LABEL: define{{.*}} %swift.opaque* @"$s30typelayout_based_value_witness1AVwCP"(
@@ -87,6 +103,18 @@ public struct A<T> {
 // OPT:   tail call void [[DESTROY]](%swift.opaque* noalias [[ADDR_T4]], %swift.type* [[T]])
 // OPT:   ret void
 // CHECK: }
+
+// FORCE-OPT: define{{.*}} void @"$s30typelayout_based_value_witness5FixedVwxx"(%swift.opaque* noalias nocapture readonly %object, %swift.type* nocapture readnone %"Fixed<T>")
+// For fixed types, we should expect a direct gep to the address instead of a
+// manual alignment computation only if we force creating aligned groups for structs
+// FORCE-OPT:  [[T_PARAM:%.*]] = bitcast %swift.opaque* %object to i8*
+// FORCE-OPT:  [[OFFSET:%.*]] = getelementptr inbounds i8, i8* [[T_PARAM]], i64 8
+// FORCE-OPT:  [[CASTED:%.*]] = bitcast i8* [[OFFSET]] to %T30typelayout_based_value_witness1CC**
+// FORCE-OPT:  %toDestroy = load %T30typelayout_based_value_witness1CC*, %T30typelayout_based_value_witness1CC** [[CASTED]], align 8
+// FORCE-OPT:  [[FIELD:%.*]] = getelementptr %T30typelayout_based_value_witness1CC, %T30typelayout_based_value_witness1CC* %toDestroy, i64 0, i32 0
+// FORCE-OPT:  tail call void @swift_release(%swift.refcounted* [[FIELD]]) #6
+// FORCE-OPT:  ret void
+// FORCE-OPT:}
 
 // Let's not crash on the following example.
 public protocol P {}
