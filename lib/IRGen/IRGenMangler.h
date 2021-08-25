@@ -311,6 +311,7 @@ public:
     bool isAssocTypeAtDepth = false;
     (void)appendAssocType(
         assocType->getDeclaredInterfaceType()->castTo<DependentMemberType>(),
+        nullptr,
         isAssocTypeAtDepth);
     appendOperator("Tl");
     return finalize();
@@ -323,7 +324,7 @@ public:
     beginMangling();
     appendAnyGenericType(proto);
     if (isa<GenericTypeParamType>(subject)) {
-      appendType(subject);
+      appendType(subject, nullptr);
     } else {
       bool isFirstAssociatedTypeIdentifier = true;
       appendAssociatedTypePath(subject, isFirstAssociatedTypeIdentifier);
@@ -427,10 +428,6 @@ public:
     beginMangling();
     appendProtocolConformance(Conformance);
 
-    // appendProtocolConformance() sets CurGenericSignature; clear it out
-    // before calling appendAssociatedTypePath().
-    CurGenericSignature = nullptr;
-
     bool isFirstAssociatedTypeIdentifier = true;
     appendAssociatedTypePath(AssociatedType, isFirstAssociatedTypeIdentifier);
     appendAnyGenericType(Proto);
@@ -449,13 +446,9 @@ public:
   }
 
   void appendAssociatedTypePath(CanType associatedType, bool &isFirst) {
-    // In the mangling format, the "short associated type" optimization is
-    // not performed when mangling an associated type path.
-    assert(!CurGenericSignature && "Caller needs to explicitly clear the signature");
-
     if (auto memberType = dyn_cast<DependentMemberType>(associatedType)) {
       appendAssociatedTypePath(memberType.getBase(), isFirst);
-      appendAssociatedTypeName(memberType);
+      appendAssociatedTypeName(memberType, nullptr);
       appendListSeparator(isFirst);
     } else {
       assert(isa<GenericTypeParamType>(associatedType));
@@ -492,8 +485,7 @@ public:
   std::string mangleOutlinedCopyFunction(CanType ty,
                                          CanGenericSignature sig) {
     beginMangling();
-    bindGenericParameters(sig);
-    appendType(ty);
+    appendType(ty, sig);
     if (sig)
       appendGenericSignature(sig);
     appendOperator("WOy");
@@ -502,8 +494,7 @@ public:
   std::string mangleOutlinedConsumeFunction(CanType ty,
                                             CanGenericSignature sig) {
     beginMangling();
-    bindGenericParameters(sig);
-    appendType(ty);
+    appendType(ty, sig);
     if (sig)
       appendGenericSignature(sig);
     appendOperator("WOe");
@@ -513,8 +504,7 @@ public:
   std::string mangleOutlinedRetainFunction(CanType t,
                                            CanGenericSignature sig) {
     beginMangling();
-    bindGenericParameters(sig);
-    appendType(t);
+    appendType(t, sig);
     if (sig)
       appendGenericSignature(sig);
     appendOperator("WOr");
@@ -523,8 +513,7 @@ public:
   std::string mangleOutlinedReleaseFunction(CanType t,
                                             CanGenericSignature sig) {
     beginMangling();
-    bindGenericParameters(sig);
-    appendType(t);
+    appendType(t, sig);
     if (sig)
       appendGenericSignature(sig);
     appendOperator("WOs");
@@ -534,8 +523,7 @@ public:
   std::string mangleOutlinedInitializeWithTakeFunction(CanType t,
                                                        CanGenericSignature sig) {
     beginMangling();
-    bindGenericParameters(sig);
-    appendType(t);
+    appendType(t, sig);
     if (sig)
       appendGenericSignature(sig);
     appendOperator("WOb");
@@ -544,8 +532,7 @@ public:
   std::string mangleOutlinedInitializeWithCopyFunction(CanType t,
                                                        CanGenericSignature sig) {
     beginMangling();
-    bindGenericParameters(sig);
-    appendType(t);
+    appendType(t, sig);
     if (sig)
       appendGenericSignature(sig);
     appendOperator("WOc");
@@ -554,8 +541,7 @@ public:
   std::string mangleOutlinedAssignWithTakeFunction(CanType t,
                                                    CanGenericSignature sig) {
     beginMangling();
-    bindGenericParameters(sig);
-    appendType(t);
+    appendType(t, sig);
     if (sig)
       appendGenericSignature(sig);
     appendOperator("WOd");
@@ -564,8 +550,7 @@ public:
   std::string mangleOutlinedAssignWithCopyFunction(CanType t,
                                                    CanGenericSignature sig) {
     beginMangling();
-    bindGenericParameters(sig);
-    appendType(t);
+    appendType(t, sig);
     if (sig)
       appendGenericSignature(sig);
     appendOperator("WOf");
@@ -574,8 +559,7 @@ public:
   std::string mangleOutlinedDestroyFunction(CanType t,
                                             CanGenericSignature sig) {
     beginMangling();
-    bindGenericParameters(sig);
-    appendType(t);
+    appendType(t, sig);
     if (sig)
       appendGenericSignature(sig);
     appendOperator("WOh");
@@ -625,7 +609,7 @@ protected:
 
   std::string mangleTypeSymbol(Type type, const char *Op) {
     beginMangling();
-    appendType(type);
+    appendType(type, nullptr);
     appendOperator(Op);
     return finalize();
   }
@@ -643,7 +627,7 @@ protected:
                                       const char *Op) {
     beginMangling();
     if (type)
-      appendType(type);
+      appendType(type, nullptr);
     appendProtocolConformance(Conformance);
     appendOperator(Op);
     return finalize();
