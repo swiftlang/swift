@@ -1441,9 +1441,6 @@ TypeConverter::~TypeConverter() {
 }
 
 void TypeConverter::setGenericContext(CanGenericSignature signature) {
-  if (!signature)
-    return;
-  
   CurGenericSignature = signature;
 
   // Clear the dependent type info cache since we have a new active signature

@@ -21,6 +21,7 @@
 #include "GenType.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
@@ -825,9 +826,29 @@ private:
       return MetadataTypeDeclCache.find(DbgTy.getDecl()->getName().str())
           ->getKey();
 
+    // This is a bit of a hack. We need a generic signature to use for mangling.
+    // If we started with an interface type, just use IGM.getCurGenericContext(),
+    // since callers that use interface types typically push a signature that way.
+    //
+    // Otherwise, if we have a contextual type, find an archetype and ask it for
+    // it's generic signature. The context generic signature from the IRGenModule
+    // is unlikely to be useful here.
+    GenericSignature Sig;
     Type Ty = DbgTy.getType();
-    if (Ty->hasArchetype())
+    if (Ty->hasArchetype()) {
+      Ty.findIf([&](Type t) -> bool {
+        if (auto *archetypeTy = t->getAs<PrimaryArchetypeType>()) {
+          Sig = archetypeTy->getGenericEnvironment()->getGenericSignature();
+          return true;
+        }
+
+        return false;
+      });
+
       Ty = Ty->mapTypeOutOfContext();
+    } else {
+      Sig = IGM.getCurGenericContext();
+    }
 
     // Strip off top level of type sugar (except for type aliases).
     // We don't want Optional<T> and T? to get different debug types.
@@ -852,7 +873,6 @@ private:
         IGM.getSILModule());
 
     Mangle::ASTMangler Mangler;
-    GenericSignature Sig = IGM.getCurGenericContext();
     std::string Result = Mangler.mangleTypeForDebugger(Ty, Sig);
 
     if (!Opts.DisableRoundTripDebugTypes) {

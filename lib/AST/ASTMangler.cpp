@@ -1116,7 +1116,9 @@ void ASTMangler::appendType(Type type, const ValueDecl *forDecl) {
         if (tryMangleTypeSubstitution(tybase))
           return;
 
+        auto outerGenericSig = CurGenericSignature;
         appendAnyGenericType(decl);
+        CurGenericSignature = outerGenericSig;
         bool isFirstArgList = true;
         appendBoundGenericArgs(type, isFirstArgList);
         appendRetroactiveConformances(type);
@@ -1249,7 +1251,9 @@ void ASTMangler::appendType(Type type, const ValueDecl *forDecl) {
           appendType(GenArgs[0], forDecl);
           appendOperator("Sg");
         } else {
+          auto outerGenericSig = CurGenericSignature;
           appendAnyGenericType(Decl);
+          CurGenericSignature = outerGenericSig;
           bool isFirstArgList = true;
           appendBoundGenericArgs(type, isFirstArgList);
           appendRetroactiveConformances(type);
@@ -3223,17 +3227,6 @@ void ASTMangler::appendAnyProtocolConformance(
 void ASTMangler::appendConcreteProtocolConformance(
                                       const ProtocolConformance *conformance) {
   auto module = conformance->getDeclContext()->getParentModule();
-
-  // It's possible that we might not have a generic signature here to get
-  // the conformance access path (for example, when mangling types for
-  // debugger). In that case, we can use the generic signature of the
-  // conformance (if it's present).
-  auto conformanceSig = conformance->getGenericSignature();
-  auto shouldUseConformanceSig = !CurGenericSignature && conformanceSig;
-  llvm::SaveAndRestore<CanGenericSignature> savedSignature(
-      CurGenericSignature, shouldUseConformanceSig
-                               ? conformanceSig.getCanonicalSignature()
-                               : CurGenericSignature);
 
   // Conforming type.
   Type conformingType = conformance->getType();
