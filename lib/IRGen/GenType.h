@@ -277,8 +277,6 @@ public:
   {}
   
   ~GenericContextScope() {
-    if (!newSig)
-      return;
     assert(TC.CurGenericSignature == newSig);
     TC.setGenericContext(oldSig);
   }
