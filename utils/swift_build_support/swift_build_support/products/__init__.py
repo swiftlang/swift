@@ -10,6 +10,7 @@
 #
 # ----------------------------------------------------------------------------
 
+from .backdeployconcurrency import BackDeployConcurrency
 from .benchmarks import Benchmarks
 from .cmark import CMark
 from .foundation import Foundation
@@ -35,6 +36,7 @@ from .tsan_libdispatch import TSanLibDispatch
 from .xctest import XCTest
 
 __all__ = [
+    'BackDeployConcurrency',
     'CMark',
     'Ninja',
     'Foundation',

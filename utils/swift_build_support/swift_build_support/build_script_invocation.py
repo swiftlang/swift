@@ -544,6 +544,8 @@ class BuildScriptInvocation(object):
             assert(prod.is_build_script_impl_product())
 
         product_classes = []
+        if self.args.build_backdeployconcurrency:
+            product_classes.append(products.BackDeployConcurrency)
         if self.args.build_swiftpm:
             product_classes.append(products.SwiftPM)
         if self.args.build_swiftsyntax:

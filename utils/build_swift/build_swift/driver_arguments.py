@@ -589,6 +589,9 @@ def create_argument_parser():
     option(['-b', '--llbuild'], toggle_true('build_llbuild'),
            help='build llbuild')
 
+    option(['--back-deploy-concurrency'], toggle_true('build_backdeployconcurrency'),
+           help='build the concurrency back-deployment libraries')
+
     option(['--libcxx'], toggle_true('build_libcxx'),
            help='build libcxx')
 
