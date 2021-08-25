@@ -553,6 +553,8 @@ class BuildScriptInvocation(object):
         # Begin the post build-script-impl build phase.
         builder.begin_pipeline()
 
+        builder.add_product(products.BackDeployConcurrency,
+                            is_enabled=self.args.build_backdeployconcurrency)
         builder.add_product(products.SwiftPM,
                             is_enabled=self.args.build_swiftpm)
         builder.add_product(products.SwiftSyntax,

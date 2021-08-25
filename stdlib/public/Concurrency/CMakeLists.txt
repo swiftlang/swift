@@ -13,8 +13,13 @@
 set(LLVM_OPTIONAL_SOURCES
   ${swift_concurrency_objc_sources})
 
-set(swift_concurrency_link_libraries
-  swiftCore)
+if(NOT swift_concurrency_availability)
+  set(swift_concurrency_availability "macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0")
+endif()
+
+if(NOT swift_concurrency_install_component)
+  set(swift_concurrency_install_component stdlib)
+endif()
 
 if(SWIFT_CONCURRENCY_USES_DISPATCH)
   if(NOT CMAKE_SYSTEM_NAME STREQUAL Darwin)
@@ -92,10 +97,12 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
     -Dswift_Concurrency_EXPORTS
   SWIFT_COMPILE_FLAGS
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
+    ${swift_concurrency_swift_flags}
     -parse-stdlib
     -Xfrontend -enable-experimental-concurrency
     -Xfrontend -define-availability
-    -Xfrontend \"SwiftStdlib 5.5:macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0\"
+    -Xfrontend "SwiftStdlib 5.5:${swift_concurrency_availability}"
   LINK_FLAGS "${SWIFT_RUNTIME_CONCURRENCY_SWIFT_LINK_FLAGS}"
-  INSTALL_IN_COMPONENT stdlib
+  ${swift_concurrency_options}
+  INSTALL_IN_COMPONENT ${swift_concurrency_install_component}
 )
