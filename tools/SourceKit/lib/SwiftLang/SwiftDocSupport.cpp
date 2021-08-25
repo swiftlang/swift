@@ -269,7 +269,9 @@ static void initDocGenericParams(const Decl *D, DocEntityInfo &Info,
   // synthesized extention itself rather than a member, into its extended
   // nominal (the extension's own requirements shouldn't be considered in the
   // substitution).
+  unsigned TypeContextDepth = 0;
   SubstitutionMap SubMap;
+  ModuleDecl *M = nullptr;
   Type BaseType;
   if (SynthesizedTarget) {
     BaseType = SynthesizedTarget.getBaseNominal()->getDeclaredInterfaceType();
@@ -279,13 +281,29 @@ static void initDocGenericParams(const Decl *D, DocEntityInfo &Info,
         DC = cast<ExtensionDecl>(D)->getExtendedNominal();
       else
         DC = D->getInnermostDeclContext()->getInnermostTypeContext();
-      auto *M = DC->getParentModule();
+      M = DC->getParentModule();
       SubMap = BaseType->getContextSubstitutionMap(M, DC);
+      if (!SubMap.empty()) {
+        TypeContextDepth = SubMap.getGenericSignature()
+            .getGenericParams().back()->getDepth() + 1;
+      }
     }
   }
 
   auto SubstTypes = [&](Type Ty) {
-    return Ty.subst(SubMap, SubstFlags::DesugarMemberTypes);
+    if (SubMap.empty())
+      return Ty;
+
+    return Ty.subst(
+      [&](SubstitutableType *type) -> Type {
+        if (cast<GenericTypeParamType>(type)->getDepth() < TypeContextDepth)
+          return Type(type).subst(SubMap);
+        return type;
+      },
+      [&](CanType depType, Type substType, ProtocolDecl *proto) {
+        return M->lookupConformance(substType, proto);
+      },
+      SubstFlags::DesugarMemberTypes);
   };
 
   // FIXME: Not right for extensions of nested generic types

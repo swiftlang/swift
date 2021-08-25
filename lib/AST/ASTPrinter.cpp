@@ -1588,17 +1588,34 @@ void PrintAST::printSingleDepthOfGenericSignature(
   bool swapSelfAndDependentMemberType =
     (flags & SwapSelfAndDependentMemberType);
 
+  unsigned typeContextDepth = 0;
   SubstitutionMap subMap;
+  ModuleDecl *M = nullptr;
   if (CurrentType && Current) {
     if (!CurrentType->isExistentialType()) {
       auto *DC = Current->getInnermostDeclContext()->getInnermostTypeContext();
-      auto *M = DC->getParentModule();
+      M = DC->getParentModule();
       subMap = CurrentType->getContextSubstitutionMap(M, DC);
+      if (!subMap.empty()) {
+        typeContextDepth = subMap.getGenericSignature()
+            .getGenericParams().back()->getDepth() + 1;
+      }
     }
   }
 
   auto substParam = [&](Type param) -> Type {
-    return param.subst(subMap);
+    if (subMap.empty())
+      return param;
+
+    return param.subst(
+      [&](SubstitutableType *type) -> Type {
+        if (cast<GenericTypeParamType>(type)->getDepth() < typeContextDepth)
+          return Type(type).subst(subMap);
+        return type;
+      },
+      [&](CanType depType, Type substType, ProtocolDecl *proto) {
+        return M->lookupConformance(substType, proto);
+      });
   };
 
   if (printParams) {
@@ -1608,10 +1625,7 @@ void PrintAST::printSingleDepthOfGenericSignature(
         genericParams,
         [&](GenericTypeParamType *param) {
           if (!subMap.empty()) {
-            if (auto argTy = substParam(param))
-              printType(argTy);
-            else
-              printType(param);
+            printType(substParam(param));
           } else if (auto *GP = param->getDecl()) {
             Printer.callPrintStructurePre(PrintStructureKind::GenericParameter,
                                           GP);
