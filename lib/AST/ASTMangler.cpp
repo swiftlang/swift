@@ -3153,6 +3153,7 @@ void ASTMangler::appendDependentProtocolConformance(
     // are.
     SWIFT_DEFER {
       currentProtocol = entry.second;
+      sig = currentProtocol->getGenericSignature();
     };
 
     // The first entry is the "root". Find this requirement in the generic
