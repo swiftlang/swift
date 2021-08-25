@@ -84,20 +84,16 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask,
     switch (queueHead.getStatus()) {
     case Status::Error:
     case Status::Success:
-#if SWIFT_TASK_PRINTF_DEBUG
-      fprintf(stderr, "[%lu] task %p waiting on task %p, completed immediately\n",
-              _swift_get_thread_id(), waitingTask, this);
-#endif
+      SWIFT_TASK_DEBUG_LOG("task %p waiting on task %p, completed immediately",
+                           waitingTask, this);
       _swift_tsan_acquire(static_cast<Job *>(this));
       if (contextIntialized) waitingTask->flagAsRunning();
       // The task is done; we don't need to wait.
       return queueHead.getStatus();
 
     case Status::Executing:
-#if SWIFT_TASK_PRINTF_DEBUG
-      fprintf(stderr, "[%lu] task %p waiting on task %p, going to sleep\n",
-              _swift_get_thread_id(), waitingTask, this);
-#endif
+      SWIFT_TASK_DEBUG_LOG("task %p waiting on task %p, going to sleep",
+                           waitingTask, this);
       _swift_tsan_release(static_cast<Job *>(waitingTask));
       // Task is not complete. We'll need to add ourselves to the queue.
       break;
@@ -183,21 +179,16 @@ void AsyncTask::completeFuture(AsyncContext *context) {
   // Schedule every waiting task on the executor.
   auto waitingTask = queueHead.getTask();
 
-#if SWIFT_TASK_PRINTF_DEBUG
   if (!waitingTask)
-    fprintf(stderr, "[%lu] task %p had no waiting tasks\n",
-            _swift_get_thread_id(), this);
-#endif
+    SWIFT_TASK_DEBUG_LOG("task %p had no waiting tasks", this);
 
   while (waitingTask) {
     // Find the next waiting task before we invalidate it by resuming
     // the task.
     auto nextWaitingTask = waitingTask->getNextWaitingTask();
 
-#if SWIFT_TASK_PRINTF_DEBUG
-    fprintf(stderr, "[%lu] waking task %p from future of task %p\n",
-            _swift_get_thread_id(), waitingTask, this);
-#endif
+    SWIFT_TASK_DEBUG_LOG("waking task %p from future of task %p", waitingTask,
+                         this);
 
     // Fill in the return context.
     auto waitingContext =
@@ -247,9 +238,7 @@ static void destroyTask(SWIFT_CONTEXT HeapObject *obj) {
   // the task-local allocator.  There's actually nothing else to clean up
   // here.
 
-#if SWIFT_TASK_PRINTF_DEBUG
-  fprintf(stderr, "[%lu] destroy task %p\n", _swift_get_thread_id(), task);
-#endif
+  SWIFT_TASK_DEBUG_LOG("destroy task %p", task);
   free(task);
 }
 
@@ -322,9 +311,7 @@ static void completeTaskImpl(AsyncTask *task,
 
   task->Private.complete(task);
 
-#if SWIFT_TASK_PRINTF_DEBUG
-  fprintf(stderr, "[%lu] task %p completed\n", _swift_get_thread_id(), task);
-#endif
+  SWIFT_TASK_DEBUG_LOG("task %p completed", task);
 
   // Complete the future.
   // Warning: This deallocates the task in case it's an async let task.
@@ -562,10 +549,8 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   } else {
     allocation = malloc(amountToAllocate);
   }
-#if SWIFT_TASK_PRINTF_DEBUG
-  fprintf(stderr, "[%lu] allocate task %p, parent = %p, slab %u\n",
-          _swift_get_thread_id(), allocation, parent, initialSlabSize);
-#endif
+  SWIFT_TASK_DEBUG_LOG("allocate task %p, parent = %p, slab %u", allocation,
+                       parent, initialSlabSize);
 
   AsyncContext *initialContext =
     reinterpret_cast<AsyncContext*>(
@@ -640,10 +625,7 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
     futureAsyncContextPrefix->indirectResult = futureFragment->getStoragePtr();
   }
 
-#if SWIFT_TASK_PRINTF_DEBUG
-  fprintf(stderr, "[%lu] creating task %p with parent %p\n",
-          _swift_get_thread_id(), task, parent);
-#endif
+  SWIFT_TASK_DEBUG_LOG("creating task %p with parent %p", task, parent);
 
   // Initialize the task-local allocator.
   initialContext->ResumeParent = reinterpret_cast<TaskContinuationFunction *>(
