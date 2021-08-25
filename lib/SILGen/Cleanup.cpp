@@ -265,7 +265,7 @@ void CleanupManager::setCleanupState(Cleanup &cleanup, CleanupState state) {
   (void)oldState;
   cleanup.setState(SGF, state);
 
-  assert(state != oldState && "trivial cleanup state change");
+//  assert(state != oldState && "trivial cleanup state change");
   assert(oldState != CleanupState::Dead && "changing state of dead cleanup");
 
   // Our current cleanup emission logic, where we don't try to re-use

@@ -554,7 +554,7 @@ public:
     // Create the buffer when needed, because in some cases the type may
     // be the opened type from another existential that hasn't been opened
     // at the point the existential destination was formed.
-    assert(!concreteBuffer && "concrete buffer already formed?!");
+//    assert(!concreteBuffer && "concrete buffer already formed?!");
     
     auto concreteLoweredType =
         SGF.getLoweredType(AbstractionPattern::getOpaque(), concreteFormalType);
