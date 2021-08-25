@@ -8251,6 +8251,13 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       if (instanceTy->isAny() || instanceTy->isAnyObject())
         impact += 5;
 
+      // Increasing the impact for missing member in any argument position so it
+      // doesn't affect situations where there are another fixes involved.
+      auto *anchorExpr = getAsExpr(locator->getAnchor());
+      if (anchorExpr && isArgumentExpr(anchorExpr)) {
+        impact += 5;
+      }
+
       if (recordFix(fix, impact))
         return SolutionKind::Error;
 
@@ -8301,7 +8308,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
                               functionRefKind, locator,
                               /*includeInaccessibleMembers*/ true);
 
-      // If uwrapped type still couldn't find anything for a given name,
+      // If unwrapped type still couldn't find anything for a given name,
       // let's fallback to a "not such member" fix.
       if (result.ViableCandidates.empty() && result.UnviableCandidates.empty())
         return fixMissingMember(origBaseTy, memberTy, locator);
