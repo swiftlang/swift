@@ -996,7 +996,7 @@ public:
 
   SolutionApplicationTargetsKey(
       const PatternBindingDecl *patternBinding, unsigned index) {
-    kind = Kind::stmt;
+    kind = Kind::patternBindingEntry;
     storage.patternBindingEntry.patternBinding = patternBinding;
     storage.patternBindingEntry.index = index;
   }
