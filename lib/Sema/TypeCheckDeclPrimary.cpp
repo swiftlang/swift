@@ -2930,6 +2930,11 @@ public:
 
     TypeChecker::checkDeclAttributes(ED);
 
+    if (nominal->isDistributedActor()) {
+      auto decl = dyn_cast<ClassDecl>(nominal);
+      TypeChecker::checkDistributedActor(decl);
+    }
+
     for (Decl *Member : ED->getMembers())
       visit(Member);
 

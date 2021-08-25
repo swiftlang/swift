@@ -94,95 +94,6 @@ static void addFactoryResolveFunction(ClassDecl *decl) {
 }
 
 /******************************************************************************/
-/******************************** PROPERTIES **********************************/
-/******************************************************************************/
-
-// TODO: deduplicate with 'declareDerivedProperty' from DerivedConformance...
-std::pair<VarDecl *, PatternBindingDecl *>
-createStoredProperty(ClassDecl *classDecl, ASTContext &ctx,
-                     VarDecl::Introducer introducer, Identifier name,
-                     Type propertyInterfaceType, Type propertyContextType,
-                     bool isStatic, bool isFinal) {
-  auto parentDC = classDecl;
-
-  VarDecl *propDecl = new (ctx)
-      VarDecl(/*IsStatic*/ isStatic, introducer,
-                           SourceLoc(), name, parentDC);
-  propDecl->setImplicit();
-  propDecl->setSynthesized();
-  propDecl->copyFormalAccessFrom(classDecl, /*sourceIsParentContext*/ true);
-  propDecl->setInterfaceType(propertyInterfaceType);
-
-  Pattern *propPat = NamedPattern::createImplicit(ctx, propDecl);
-  propPat->setType(propertyContextType);
-
-  propPat = TypedPattern::createImplicit(ctx, propPat, propertyContextType);
-  propPat->setType(propertyContextType);
-
-  auto *pbDecl = PatternBindingDecl::createImplicit(
-      ctx, StaticSpellingKind::None, propPat, /*InitExpr*/ nullptr,
-      parentDC);
-  return {propDecl, pbDecl};
-}
-
-/// Adds the following, fairly special, properties to each distributed actor:
-/// - actorTransport
-/// - id
-// TODO(distributed): move this synthesis to DerivedConformance style
-static void addImplicitDistributedActorStoredProperties(ClassDecl *decl) {
-  assert(decl->isDistributedActor());
-
-  auto &C = decl->getASTContext();
-
-  // ```
-  // @_distributedActorIndependent
-  // let id: AnyActorIdentity
-  // ```
-  {
-    auto propertyType = C.getAnyActorIdentityDecl()->getDeclaredInterfaceType();
-
-    VarDecl *propDecl;
-    PatternBindingDecl *pbDecl;
-    std::tie(propDecl, pbDecl) = createStoredProperty(
-        decl, C,
-        VarDecl::Introducer::Let, C.Id_id,
-        propertyType, propertyType,
-        /*isStatic=*/false, /*isFinal=*/true);
-
-    // mark as @_distributedActorIndependent, allowing access to it from everywhere
-    propDecl->getAttrs().add(
-        new (C) DistributedActorIndependentAttr(/*IsImplicit=*/true));
-
-    decl->addMember(propDecl);
-    decl->addMember(pbDecl);
-  }
-
-  // ```
-  // @_distributedActorIndependent
-  // let actorTransport: ActorTransport
-  // ```
-  // (no need for @actorIndependent because it is an immutable let)
-  {
-    auto propertyType = C.getActorTransportDecl()->getDeclaredInterfaceType();
-
-    VarDecl *propDecl;
-    PatternBindingDecl *pbDecl;
-    std::tie(propDecl, pbDecl) = createStoredProperty(
-        decl, C,
-        VarDecl::Introducer::Let, C.Id_actorTransport,
-        propertyType, propertyType,
-        /*isStatic=*/false, /*isFinal=*/true);
-
-    // mark as @_distributedActorIndependent, allowing access to it from everywhere
-    propDecl->getAttrs().add(
-        new (C) DistributedActorIndependentAttr(/*IsImplicit=*/true));
-
-    decl->addMember(propDecl);
-    decl->addMember(pbDecl);
-  }
-}
-
-/******************************************************************************/
 /*************************** _REMOTE_ FUNCTIONS *******************************/
 /******************************************************************************/
 
@@ -355,6 +266,6 @@ void swift::addImplicitDistributedActorMembersToClass(ClassDecl *decl) {
     return;
 
   addFactoryResolveFunction(decl);
-  addImplicitDistributedActorStoredProperties(decl);
+//  addImplicitDistributedActorStoredProperties(decl);
   addImplicitRemoteActorFunctions(decl);
 }

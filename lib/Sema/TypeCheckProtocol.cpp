@@ -6412,6 +6412,7 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
     return derived.deriveDifferentiable(Requirement);
 
   case KnownDerivableProtocolKind::DistributedActor:
+    fprintf(stderr, "[%s:%d] (%s) DERIVE DistributedActor \n", __FILE__, __LINE__, __FUNCTION__);
     return derived.deriveDistributedActor(Requirement);
 
   case KnownDerivableProtocolKind::OptionSet:
