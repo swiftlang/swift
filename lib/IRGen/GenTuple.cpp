@@ -329,9 +329,8 @@ namespace {
         return fields[0];
       }
 
-      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, 1, false);
+      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, 1);
     }
-
 
     llvm::Value *getEnumTagSinglePayload(IRGenFunction &IGF,
                                          llvm::Value *numEmptyCases,

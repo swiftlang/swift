@@ -708,7 +708,7 @@ namespace {
         return fields[0];
       }
 
-      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, 1, false);
+      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, 1);
     }
 
     // We have an indirect schema.
