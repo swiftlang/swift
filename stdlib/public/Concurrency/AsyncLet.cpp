@@ -24,7 +24,6 @@
 #include "swift/Runtime/HeapObject.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "TaskPrivate.h"
-#include "AsyncCall.h"
 #include "Debug.h"
 
 #if !defined(_WIN32)
