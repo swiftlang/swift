@@ -3200,7 +3200,7 @@ extension FixedWidthInteger {
   ///     // y == -35 (after overflow)
   ///
   /// For more about arithmetic with overflow operators, see [Overflow
-  /// Operators][overflow] in *[The Swift Programming Language][tspl]*.
+  /// Operators][overflow] in [The Swift Programming Language][tspl].
   ///
   /// [overflow]: https://docs.swift.org/swift-book/LanguageGuide/AdvancedOperators.html#ID37
   /// [tspl]: https://docs.swift.org/swift-book/
@@ -3230,7 +3230,7 @@ extension FixedWidthInteger {
   ///     // y == -35 (after overflow)
   ///
   /// For more about arithmetic with overflow operators, see [Overflow
-  /// Operators][overflow] in *[The Swift Programming Language][tspl]*.
+  /// Operators][overflow] in [The Swift Programming Language][tspl].
   ///
   /// [overflow]: https://docs.swift.org/swift-book/LanguageGuide/AdvancedOperators.html#ID37
   /// [tspl]: https://docs.swift.org/swift-book/
@@ -3258,7 +3258,7 @@ extension FixedWidthInteger {
   ///     // y == 245 (after overflow)
   ///
   /// For more about arithmetic with overflow operators, see [Overflow
-  /// Operators][overflow] in *[The Swift Programming Language][tspl]*.
+  /// Operators][overflow] in [The Swift Programming Language][tspl].
   ///
   /// [overflow]: https://docs.swift.org/swift-book/LanguageGuide/AdvancedOperators.html#ID37
   /// [tspl]: https://docs.swift.org/swift-book/
@@ -3288,7 +3288,7 @@ extension FixedWidthInteger {
   ///     // y == 245 (after overflow)
   ///
   /// For more about arithmetic with overflow operators, see [Overflow
-  /// Operators][overflow] in *[The Swift Programming Language][tspl]*.
+  /// Operators][overflow] in [The Swift Programming Language][tspl].
   ///
   /// [overflow]: https://docs.swift.org/swift-book/LanguageGuide/AdvancedOperators.html#ID37
   /// [tspl]: https://docs.swift.org/swift-book/
@@ -3316,7 +3316,7 @@ extension FixedWidthInteger {
   ///     // y == -12 (after overflow)
   ///
   /// For more about arithmetic with overflow operators, see [Overflow
-  /// Operators][overflow] in *[The Swift Programming Language][tspl]*.
+  /// Operators][overflow] in [The Swift Programming Language][tspl].
   ///
   /// [overflow]: https://docs.swift.org/swift-book/LanguageGuide/AdvancedOperators.html#ID37
   /// [tspl]: https://docs.swift.org/swift-book/
@@ -3346,7 +3346,7 @@ extension FixedWidthInteger {
   ///     // y == -12 (after overflow)
   ///
   /// For more about arithmetic with overflow operators, see [Overflow
-  /// Operators][overflow] in *[The Swift Programming Language][tspl]*.
+  /// Operators][overflow] in [The Swift Programming Language][tspl].
   ///
   /// [overflow]: https://docs.swift.org/swift-book/LanguageGuide/AdvancedOperators.html#ID37
   /// [tspl]: https://docs.swift.org/swift-book/
