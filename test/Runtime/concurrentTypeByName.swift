@@ -1,6 +1,8 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
+// REQUIRES: radar82364236
+
 import StdlibUnittest
 import SwiftPrivateThreadExtras
 
