@@ -8670,11 +8670,13 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
       if (!resultTarget)
         return None;
 
-      patternBinding->setPattern(
-          index, resultTarget->getInitializationPattern(),
-          resultTarget->getDeclContext());
+      auto *pattern = resultTarget->getInitializationPattern();
+      patternBinding->setPattern(index, pattern,
+                                 resultTarget->getDeclContext());
 
-      if (patternBinding->getInit(index)) {
+      if (patternBinding->isExplicitlyInitialized(index) ||
+          (patternBinding->isDefaultInitializable(index) &&
+           pattern->hasStorage())) {
         patternBinding->setInit(index, resultTarget->getAsExpr());
         patternBinding->setInitializerChecked(index);
       }
