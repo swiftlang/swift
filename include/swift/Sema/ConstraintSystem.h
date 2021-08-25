@@ -996,7 +996,7 @@ public:
 
   SolutionApplicationTargetsKey(
       const PatternBindingDecl *patternBinding, unsigned index) {
-    kind = Kind::stmt;
+    kind = Kind::patternBindingEntry;
     storage.patternBindingEntry.patternBinding = patternBinding;
     storage.patternBindingEntry.index = index;
   }
@@ -1632,6 +1632,7 @@ private:
     } caseLabelItem;
 
     struct {
+      PatternBindingDecl *binding;
       /// Index into pattern binding declaration (if any).
       unsigned index;
       PointerUnion<VarDecl *, Pattern *> declaration;
@@ -1688,10 +1689,11 @@ public:
   SolutionApplicationTarget(VarDecl *uninitializedWrappedVar)
       : kind(Kind::uninitializedVar) {
     if (auto *PDB = uninitializedWrappedVar->getParentPatternBinding()) {
-      patternBinding = PDB;
+      uninitializedVar.binding = PDB;
       uninitializedVar.index =
           PDB->getPatternEntryIndexForVarDecl(uninitializedWrappedVar);
     } else {
+      uninitializedVar.binding = nullptr;
       uninitializedVar.index = 0;
     }
 
@@ -1702,9 +1704,7 @@ public:
   SolutionApplicationTarget(PatternBindingDecl *binding, unsigned index,
                             Pattern *var, Type patternTy)
       : kind(Kind::uninitializedVar) {
-    assert(patternBinding);
-
-    patternBinding = binding;
+    uninitializedVar.binding = binding;
     uninitializedVar.index = index;
     uninitializedVar.declaration = var;
     uninitializedVar.type = patternTy;
@@ -1781,7 +1781,7 @@ public:
               uninitializedVar.declaration.dyn_cast<VarDecl *>())
         return wrappedVar->getDeclContext();
 
-      return patternBinding->getInitContext(uninitializedVar.index);
+      return uninitializedVar.binding->getInitContext(uninitializedVar.index);
     }
     }
     llvm_unreachable("invalid decl context type");
@@ -2072,7 +2072,7 @@ public:
       return nullptr;
 
     case Kind::uninitializedVar:
-      return patternBinding;
+      return uninitializedVar.binding;
     }
     llvm_unreachable("invalid case label type");
   }

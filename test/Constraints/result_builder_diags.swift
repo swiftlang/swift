@@ -111,6 +111,13 @@ func testDiags() {
     y + 25
   }
 
+  tuplify(true) { _ in
+    0
+    let x: Int = 0, y: String = "" // Multiple initialized pattern bindings are okay
+    x + 1
+    y
+  }
+
   // Statements unsupported by the particular builder.
   tuplifyWithoutIf(true) {
     if $0 {    // expected-error{{closure containing control flow statement cannot be used with result builder 'TupleBuilderWithoutIf'}}
