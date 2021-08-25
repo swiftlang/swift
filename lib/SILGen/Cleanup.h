@@ -272,7 +272,8 @@ public:
   bool hasAnyActiveCleanups(CleanupsDepth from);
 
   /// Dump the output of each cleanup on this stack.
-  void dump() const;
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
+                            "Only for use in the debugger");
 
   /// Dump the given cleanup handle if it is on the current stack.
   void dump(CleanupHandle handle) const;
