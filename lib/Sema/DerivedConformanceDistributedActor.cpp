@@ -60,7 +60,6 @@ createStoredProperty(ClassDecl *classDecl, ASTContext &ctx,
 
 static ValueDecl *deriveDistributedActor_id(DerivedConformance &derived) {
   assert(derived.Nominal->isDistributedActor());
-  auto decl = dyn_cast<ClassDecl>(derived.Nominal);
   auto &C = derived.Context;
 
   // ```
@@ -71,9 +70,8 @@ static ValueDecl *deriveDistributedActor_id(DerivedConformance &derived) {
 
   VarDecl *propDecl;
   PatternBindingDecl *pbDecl;
-  std::tie(propDecl, pbDecl) = createStoredProperty(
-      decl, C,
-      VarDecl::Introducer::Let, C.Id_id,
+  std::tie(propDecl, pbDecl) = derived.declareDerivedProperty(
+      C.Id_id,
       propertyType, propertyType,
       /*isStatic=*/false, /*isFinal=*/true);
 
@@ -88,7 +86,6 @@ static ValueDecl *deriveDistributedActor_id(DerivedConformance &derived) {
 static ValueDecl *deriveDistributedActor_actorTransport(
     DerivedConformance &derived) {
   assert(derived.Nominal->isDistributedActor());
-  auto decl = dyn_cast<ClassDecl>(derived.Nominal);
   auto &C = derived.Context;
 
   // ```
@@ -100,9 +97,8 @@ static ValueDecl *deriveDistributedActor_actorTransport(
 
   VarDecl *propDecl;
   PatternBindingDecl *pbDecl;
-  std::tie(propDecl, pbDecl) = createStoredProperty(
-      decl, C,
-      VarDecl::Introducer::Let, C.Id_actorTransport,
+  std::tie(propDecl, pbDecl) = derived.declareDerivedProperty(
+      C.Id_actorTransport,
       propertyType, propertyType,
       /*isStatic=*/false, /*isFinal=*/true);
 
