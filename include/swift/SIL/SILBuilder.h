@@ -713,10 +713,11 @@ public:
                       LoadBorrowInst(getSILDebugLocation(Loc), LV));
   }
 
-  BeginBorrowInst *createBeginBorrow(SILLocation Loc, SILValue LV) {
+  BeginBorrowInst *createBeginBorrow(SILLocation Loc, SILValue LV,
+                                     bool defined = false) {
     assert(!LV->getType().isAddress());
     return insert(new (getModule())
-                      BeginBorrowInst(getSILDebugLocation(Loc), LV));
+                      BeginBorrowInst(getSILDebugLocation(Loc), LV, defined));
   }
 
   /// Convenience function for creating a load_borrow on non-trivial values and
