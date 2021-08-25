@@ -82,6 +82,7 @@ def parse_args():
     Simple regex based transform of SIL and LLVM-IR into graphviz form.
     """)
     parser.add_argument("output_suffix", nargs='?')
+    parser.add_argument("--disable_inst_dump", action='store_true')
     parser.add_argument("--input_file", type=argparse.FileType('r'),
                         default=sys.stdin)
     parser.add_argument("--renderer", choices=["Graphviz", "dot"],
@@ -159,15 +160,15 @@ def main():
                           node [fontname = "{font}"];
                           edge [fontname = "{font}"];""".format(font=fontname))
         for block in block_list:
-            if block.content is not None:
-                out_file.write(
-                    "\tNode" + str(block.index) +
-                    " [shape=record,label=\"{" + block.content + "}\"];\n")
-            else:
+            if block.content is None or args.disable_inst_dump:
                 out_file.write(
                     "\tNode" + str(block.index) +
                     " [shape=record,color=gray,fontcolor=gray,label=\"{" +
                     block.name + "}\"];\n")
+            else:
+                out_file.write(
+                    "\tNode" + str(block.index) +
+                    " [shape=record,label=\"{" + block.content + "}\"];\n")
 
             for succ_name in block.get_succs():
                 succ_block = block_map[succ_name]
