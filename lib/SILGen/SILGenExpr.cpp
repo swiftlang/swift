@@ -1127,95 +1127,127 @@ RValue RValueEmitter::visitForceTryExpr(ForceTryExpr *E, SGFContext C) {
 }
 
 RValue RValueEmitter::visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C) {
-  // FIXME: Much of this was copied from visitOptionalEvaluationExpr.
-
-  // Prior to Swift 5, an optional try's subexpression is always wrapped in an additional optional
-  bool shouldWrapInOptional = false; // TODO: delete code relying on this, etc.
-  
-  auto &optTL = SGF.getTypeLowering(E->getType());
+  // NOTE: much of this implementation is based on emitOptionalEvaluation
+  auto optType = E->getType();
+  SILLocation loc = E;
+  auto &optTL = SGF.getTypeLowering(optType);
 
   Initialization *optInit = C.getEmitInto();
-  bool usingProvidedContext =
-    optInit && optInit->canPerformInPlaceInitialization();
+  const bool usingProvidedContext =
+      optInit && optInit->canPerformInPlaceInitialization();
 
   // Form the optional using address operations if the type is address-only or
   // if we already have an address to use.
-  bool isByAddress = usingProvidedContext || optTL.isAddressOnly();
+  const bool isByAddress = ((usingProvidedContext || optTL.isAddressOnly()) &&
+      SGF.silConv.useLoweredAddresses());
 
   std::unique_ptr<TemporaryInitialization> optTemp;
-  if (!usingProvidedContext && isByAddress) {
-    // Allocate the temporary for the Optional<T> if we didn't get one from the
-    // context.
-    optTemp = SGF.emitTemporary(E, optTL);
-    optInit = optTemp.get();
-  } else if (!usingProvidedContext) {
-    // If the caller produced a context for us, but we can't use it, then don't.
+  if (!isByAddress) {
+    // If the caller produced a context for us, but we're not going
+    // to use it, make sure we don't.
     optInit = nullptr;
+  } else if (!usingProvidedContext) {
+    // Allocate the temporary for the Optional<T> if we didn't get one from the
+    // context.  This needs to happen outside of the cleanups scope we're about
+    // to push.
+    optTemp = SGF.emitTemporary(loc, optTL);
+    optInit = optTemp.get();
   }
+  assert(isByAddress == (optInit != nullptr));
 
-  FullExpr localCleanups(SGF.Cleanups, E);
+  // Acquire the address to emit into outside of the cleanups scope.
+  SILValue optAddr;
+  if (isByAddress)
+    optAddr = optInit->getAddressForInPlaceInitialization(SGF, loc);
+
+  // Enter a cleanups scope.
+  FullExpr scope(SGF.Cleanups, CleanupLocation(loc));
 
   // Set up a "catch" block for when an error occurs.
   SILBasicBlock *catchBB = SGF.createBasicBlock(FunctionSection::Postmatter);
   llvm::SaveAndRestore<JumpDest> throwDest{
     SGF.ThrowDest,
-    JumpDest(catchBB, SGF.Cleanups.getCleanupsDepth(), E)};
+    JumpDest(catchBB, SGF.Cleanups.getCleanupsDepth(), CleanupLocation(loc))};
 
-  SILValue branchArg;
-  if (shouldWrapInOptional) {
-    if (isByAddress) {
-      assert(optInit);
-      SILValue optAddr = optInit->getAddressForInPlaceInitialization(SGF, E);
-      SGF.emitInjectOptionalValueInto(E, E->getSubExpr(), optAddr, optTL);
-    } else {
-      ManagedValue subExprValue = SGF.emitRValueAsSingleValue(E->getSubExpr());
-      ManagedValue wrapped = SGF.getOptionalSomeValue(E, subExprValue, optTL);
-      branchArg = wrapped.forward(SGF);
-    }
+  // Inside of the cleanups scope, create a new initialization to
+  // emit into optAddr.
+  std::unique_ptr<TemporaryInitialization> normalInit;
+  if (isByAddress) {
+    normalInit = SGF.useBufferAsTemporary(optAddr, optTL);
   }
-  else {
-    if (isByAddress) {
-      assert(optInit);
-      SGF.emitExprInto(E->getSubExpr(), optInit);
-    } else {
-      ManagedValue subExprValue = SGF.emitRValueAsSingleValue(E->getSubExpr());
-      branchArg = subExprValue.forward(SGF);
-    }
-  }
-  
-  localCleanups.pop();
 
-  // If it turns out there are no uses of the catch block, just drop it.
+  // Get the result of the sub-expression.
+  ManagedValue result = SGF.emitRValueAsSingleValue(E->getSubExpr(),
+                                                  SGFContext(normalInit.get()));
+
+  // If we're emitting into the context, make sure the normal value is there.
+  if (isByAddress) {
+    normalInit->copyOrInitValueInto(SGF, loc, result, /*init*/ true);
+    normalInit->finishInitialization(SGF);
+    result = ManagedValue::forInContext();
+  }
+
+  // We fell out of the normal result, which generated a T? as either
+  // a scalar in normalArgument or directly into normalInit.
+
+  // If we're using by-address initialization, we must've emitted into
+  // normalInit.  Forward its cleanup before popping the scope.
+  if (isByAddress) {
+    normalInit->getManagedAddress().forward(SGF);
+    normalInit.reset(); // Make sure we don't use this anymore.
+  } else {
+    assert(!result.isInContext());
+    result.forward(SGF);
+  }
+
+  // This concludes the conditional scope.
+  scope.pop();
+
+  // In the usual case, the code will have emitted one or more branches to the
+  // catch block.  However, if the body is simple enough, we can end up with
+  // no branches to the catchBB.  Detect this and simplify the generated code
+  // if so.
   if (catchBB->pred_empty()) {
-    // Remove the dead failureBB.
+    // Remove the dead catchBB.
     SGF.eraseBasicBlock(catchBB);
 
-    // The value we provide is the one we've already got.
-    if (!isByAddress)
-      return RValue(SGF, E,
-                    SGF.emitManagedRValueWithCleanup(branchArg, optTL));
-    
-    if (shouldWrapInOptional) {
+    // Just re-manage the main result if we're not using address-based IRGen.
+    if (!isByAddress) {
+      result = SGF.emitManagedRValueWithCleanup(result.getValue(), optTL);
+    } else {
+      // Otherwise, we must have emitted into normalInit, which means that,
+      // now that we're out of the cleanups scope, we need to finish optInit.
+      assert(result.isInContext());
       optInit->finishInitialization(SGF);
+
+      // If optInit came from the SGFContext, then we've already
+      // successfully emitted into that. Otherwise, if we're not using
+      // the context, then must have emitted into optTemp, so we need
+      // to get that managed address.
+      if (!usingProvidedContext) {
+        assert(optTemp);
+        result = optTemp->getManagedAddress();
+      }
     }
 
-    // If we emitted into the provided context, we're done.
-    if (usingProvidedContext)
-      return RValue::forInContext();
-
-    return RValue(SGF, E, optTemp->getManagedAddress());
+    return RValue(SGF, E, result);
   }
+
+  ///////
+  // Okay, we do have uses of the failure block, so we'll need to merge
+  // control paths.
 
   SILBasicBlock *contBB = SGF.createBasicBlock();
 
   // Branch to the continuation block.
-  if (isByAddress)
-    SGF.B.createBranch(E, contBB);
+  if (!isByAddress)
+    SGF.B.createBranch(loc, contBB, result.getValue());
   else
-    SGF.B.createBranch(E, contBB, branchArg);
+    SGF.B.createBranch(loc, contBB);
 
-  // If control branched to the failure block, inject .None into the
-  // result type.
+  // In the catch block, inject nil into the result.
+  // A catch block will receive the error as an argument,
+  // so we need to toss the error away.
   SGF.B.emitBlock(catchBB);
   FullExpr catchCleanups(SGF.Cleanups, E);
   auto *errorArg = catchBB->createPhiArgument(
@@ -1223,36 +1255,41 @@ RValue RValueEmitter::visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C) {
   (void) SGF.emitManagedRValueWithCleanup(errorArg);
   catchCleanups.pop();
 
+  // Note that none of the code here introduces any cleanups.
+  // If it did, we'd need to push a scope.
   if (isByAddress) {
-    SGF.emitInjectOptionalNothingInto(E,
-                    optInit->getAddressForInPlaceInitialization(SGF, E), optTL);
-    SGF.B.createBranch(E, contBB);
+    SGF.emitInjectOptionalNothingInto(loc, optAddr, optTL);
+    SGF.B.createBranch(loc, contBB);
   } else {
-    auto branchArg = SGF.getOptionalNoneValue(E, optTL);
-    SGF.B.createBranch(E, contBB, branchArg);
+    auto bbArg = SGF.getOptionalNoneValue(loc, optTL);
+    SGF.B.createBranch(loc, contBB, bbArg);
   }
 
   // Emit the continuation block.
   SGF.B.emitBlock(contBB);
 
-  // If this was done in SSA registers, then the value is provided as an
-  // argument to the block.
-  if (!isByAddress) {
+  // Create a PHI for the optional result if desired.
+  if (isByAddress) {
+    assert(result.isInContext());
+  } else {
     auto arg =
         contBB->createPhiArgument(optTL.getLoweredType(), OwnershipKind::Owned);
-    return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(arg, optTL));
+    result = SGF.emitManagedRValueWithCleanup(arg, optTL);
   }
 
-  if (shouldWrapInOptional) {
-    optInit->finishInitialization(SGF);
-  }
-  
-  // If we emitted into the provided context, we're done.
-  if (usingProvidedContext)
-    return RValue::forInContext();
+  // We may need to manage the value in optInit.
+  if (!isByAddress) return RValue(SGF, E, result);
+
+  assert(result.isInContext());
+  optInit->finishInitialization(SGF);
+
+  // If we didn't emit into the provided context, the primary result
+  // is really a temporary.
+  if (usingProvidedContext) return RValue::forInContext();
 
   assert(optTemp);
-  return RValue(SGF, E, optTemp->getManagedAddress());
+  result = optTemp->getManagedAddress();
+  return RValue(SGF, E, result);
 }
 
 static bool inExclusiveBorrowSelfSection(
@@ -4929,7 +4966,7 @@ void SILGenFunction::emitOptionalEvaluation(SILLocation loc, Type optType,
   // if so.
   if (failureBB->pred_empty()) {
     // Remove the dead failureBB.
-    failureBB->eraseFromParent();
+    eraseBasicBlock(failureBB);
 
     // Just re-manage all the secondary results.
     for (auto &result : MutableArrayRef<ManagedValue>(results).slice(1)) {
