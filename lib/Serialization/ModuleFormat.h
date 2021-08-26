@@ -1257,7 +1257,6 @@ namespace decls_block {
     BCFixed<1>,             // implicit flag
     BCFixed<1>,             // class-bounded?
     BCFixed<1>,             // objc?
-    BCFixed<1>,             // existential-type-supported?
     AccessLevelField,       // access level
     BCVBR<4>,               // number of inherited types
     BCArray<TypeIDField>    // inherited types, followed by dependency types

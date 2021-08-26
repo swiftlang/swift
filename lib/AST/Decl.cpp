@@ -5008,24 +5008,31 @@ findProtocolSelfReferences(const ProtocolDecl *proto, Type type,
     return findProtocolSelfReferences(proto, selfType->getSelfType(), position);
   }
 
-  // Most bound generic types are invariant.
-  if (auto *const bgt = type->getAs<BoundGenericType>()) {
+  if (auto *const nominal = type->getAs<NominalOrBoundGenericNominalType>()) {
     auto info = SelfReferenceInfo();
 
-    if (bgt->isArray()) {
-      // Swift.Array preserves variance in its Value type.
-      info |= findProtocolSelfReferences(proto, bgt->getGenericArgs().front(),
-                                         position);
-    } else if (bgt->isDictionary()) {
-      // Swift.Dictionary preserves variance in its Element type.
-      info |= findProtocolSelfReferences(proto, bgt->getGenericArgs().front(),
-                                         SelfReferencePosition::Invariant);
-      info |= findProtocolSelfReferences(proto, bgt->getGenericArgs().back(),
-                                         position);
-    } else {
-      for (auto paramType : bgt->getGenericArgs()) {
-        info |= findProtocolSelfReferences(proto, paramType,
+    // Don't forget to look in the parent.
+    if (const auto parent = nominal->getParent()) {
+      info |= findProtocolSelfReferences(proto, parent, position);
+    }
+
+    // Most bound generic types are invariant.
+    if (auto *const bgt = type->getAs<BoundGenericType>()) {
+      if (bgt->isArray()) {
+        // Swift.Array preserves variance in its Value type.
+        info |= findProtocolSelfReferences(proto, bgt->getGenericArgs().front(),
+                                           position);
+      } else if (bgt->isDictionary()) {
+        // Swift.Dictionary preserves variance in its Element type.
+        info |= findProtocolSelfReferences(proto, bgt->getGenericArgs().front(),
                                            SelfReferencePosition::Invariant);
+        info |= findProtocolSelfReferences(proto, bgt->getGenericArgs().back(),
+                                           position);
+      } else {
+        for (auto paramType : bgt->getGenericArgs()) {
+          info |= findProtocolSelfReferences(proto, paramType,
+                                             SelfReferencePosition::Invariant);
+        }
       }
     }
 
@@ -5036,6 +5043,16 @@ findProtocolSelfReferences(const ProtocolDecl *proto, Type type,
   // reference to 'Self'.
   if (type->is<OpaqueTypeArchetypeType>())
     return SelfReferenceInfo::forSelfRef(SelfReferencePosition::Invariant);
+
+  // Protocol compositions preserve variance.
+  if (auto *comp = type->getAs<ProtocolCompositionType>()) {
+    // 'Self' may be referenced only in a superclass component.
+    if (const auto superclass = comp->getSuperclass()) {
+      return findProtocolSelfReferences(proto, superclass, position);
+    }
+
+    return SelfReferenceInfo();
+  }
 
   // A direct reference to 'Self'.
   if (proto->getSelfInterfaceType()->isEqual(type))
@@ -5134,11 +5151,6 @@ bool ProtocolDecl::isAvailableInExistential(const ValueDecl *decl) const {
   }
 
   return true;
-}
-
-bool ProtocolDecl::existentialTypeSupported() const {
-  return evaluateOrDefault(getASTContext().evaluator,
-    ExistentialTypeSupportedRequest{const_cast<ProtocolDecl *>(this)}, true);
 }
 
 StringRef ProtocolDecl::getObjCRuntimeName(
