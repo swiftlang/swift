@@ -1457,6 +1457,9 @@ public:
   }
 
   void visitBeginBorrowInst(BeginBorrowInst *LBI) {
+    if (LBI->isDefined()) {
+      *this << "[defined] ";
+    }
     *this << getIDAndType(LBI->getOperand());
   }
 

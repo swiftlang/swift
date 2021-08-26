@@ -1852,7 +1852,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   UNARY_INSTRUCTION(EndLifetime)
   UNARY_INSTRUCTION(CopyBlock)
   UNARY_INSTRUCTION(LoadBorrow)
-  UNARY_INSTRUCTION(BeginBorrow)
   REFCOUNTING_INSTRUCTION(StrongRetain)
   REFCOUNTING_INSTRUCTION(StrongRelease)
   UNARY_INSTRUCTION(IsUnique)
@@ -1861,6 +1860,17 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   UNARY_INSTRUCTION(ExtractExecutor)
 #undef UNARY_INSTRUCTION
 #undef REFCOUNTING_INSTRUCTION
+
+  case SILInstructionKind::BeginBorrowInst: {
+    assert(RecordKind == SIL_ONE_OPERAND && "Layout should be OneOperand.");
+    unsigned defined = Attr;
+    ResultInst = Builder.createBeginBorrow(
+        Loc,
+        getLocalValue(ValID, getSILType(MF->getType(TyID),
+                                        (SILValueCategory)TyCategory, Fn)),
+        defined == 1);
+    break;
+  }
 
   case SILInstructionKind::IsEscapingClosureInst: {
     assert(RecordKind == SIL_ONE_OPERAND && "Layout should be OneOperand.");

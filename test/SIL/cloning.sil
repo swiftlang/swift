@@ -28,3 +28,20 @@ bb0:
   return %2 : $()
 }
 
+sil [ossa] [always_inline] @callee_begin_borrow_defined : $@convention(thin) () -> () {
+  %instance = alloc_ref $X
+  %guaranteed_c = begin_borrow [defined] %instance : $X
+  end_borrow %guaranteed_c : $X
+  destroy_value %instance : $X
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @caller_begin_borrow_defined
+// CHECK: begin_borrow [defined]
+// CHECK-LABEL: } // end sil function 'caller_begin_borrow_defined'
+sil [ossa] @caller_begin_borrow_defined : $@convention(thin) () -> () {
+  %callee_begin_borrow_defined = function_ref @callee_begin_borrow_defined : $@convention(thin) () -> ()
+  %res = apply %callee_begin_borrow_defined() : $@convention(thin) () -> ()
+  return %res : $()
+}
