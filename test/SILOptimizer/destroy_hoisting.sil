@@ -348,3 +348,104 @@ bb0(%0 :  $*X):
   return %res : $()
 }
 
+// CHECK-LABEL: sil [ossa] @test_switch_enum_addr :
+// CHECK-NOT:     destroy_addr
+// CHECK:         switch_enum_addr
+// CHECK:       } // end sil function 'test_switch_enum_addr'
+sil [ossa] @test_switch_enum_addr : $@convention(thin) (@in TwoCases) -> () {
+bb0(%0 : $*TwoCases):
+  %2 = alloc_stack $TwoCases
+  copy_addr %0 to [initialization] %2 : $*TwoCases
+  switch_enum_addr %2 : $*TwoCases, case #TwoCases.A!enumelt: bb1, case #TwoCases.B!enumelt: bb2
+
+bb1:
+  destroy_addr %2 : $*TwoCases
+  dealloc_stack %2 : $*TwoCases
+  br bb3
+
+bb2:
+  destroy_addr %2 : $*TwoCases
+  dealloc_stack %2 : $*TwoCases
+  br bb3
+
+bb3:
+  destroy_addr %0 : $*TwoCases
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_load_borrow1 :
+// CHECK-NOT:         destroy_addr
+// CHECK:             load_borrow
+// CHECK-LABEL: } // end sil function 'test_load_borrow1'
+sil [ossa] @test_load_borrow1 : $@convention(thin) (@in TwoCases) -> () {
+bb0(%0 : $*TwoCases):
+  %2 = alloc_stack $TwoCases
+  copy_addr %0 to [initialization] %2 : $*TwoCases
+  %ld = load_borrow %2 : $*TwoCases
+  br bb1(%ld : $TwoCases)
+
+bb1(%newld : @guaranteed $TwoCases):
+  end_borrow %newld : $TwoCases
+  br bb2
+
+bb2:
+  destroy_addr %2 : $*TwoCases
+  dealloc_stack %2 : $*TwoCases
+  br bb3
+
+bb3:
+  destroy_addr %0 : $*TwoCases
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_load_borrow2 :
+// CHECK-NOT:         destroy_addr
+// CHECK:             load_borrow
+// CHECK-LABEL: } // end sil function 'test_load_borrow2'
+sil [ossa] @test_load_borrow2 : $@convention(thin) (@in TwoCases) -> () {
+bb0(%0 : $*TwoCases):
+  %2 = alloc_stack $TwoCases
+  copy_addr %0 to [initialization] %2 : $*TwoCases
+  %ld = load_borrow %2 : $*TwoCases
+  cond_br undef, bb1, bb2
+
+bb1:
+  end_borrow %ld : $TwoCases
+  br bb3
+
+bb2:
+  br bb2a(%ld : $TwoCases)
+
+bb2a(%newld : @guaranteed $TwoCases):
+  end_borrow %newld : $TwoCases
+  br bb3
+
+bb3:
+  destroy_addr %2 : $*TwoCases
+  dealloc_stack %2 : $*TwoCases
+  br bb3
+
+bb4:
+  destroy_addr %0 : $*TwoCases
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_begin_access :
+// CHECK-NOT:         destroy_addr
+// CHECK:             begin_access
+// CHECK-LABEL: } // end sil function 'test_begin_access'
+sil [ossa] @test_begin_access : $@convention(thin) (@in X) -> () {
+bb0(%0 : $*X):
+  %a = begin_access [read] [dynamic] %0 : $*X
+  br bb1
+
+bb1:
+  end_access %a : $*X
+  destroy_addr %0 : $*X
+  %r = tuple ()
+  return %r : $()
+}
+
