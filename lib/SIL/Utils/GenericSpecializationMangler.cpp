@@ -79,7 +79,7 @@ appendSubstitutions(GenericSignature sig, SubstitutionMap subs) {
   bool First = true;
   sig->forEachParam([&](GenericTypeParamType *ParamType, bool Canonical) {
     if (Canonical) {
-      appendType(Type(ParamType).subst(subs)->getCanonicalType());
+      appendType(Type(ParamType).subst(subs)->getCanonicalType(), nullptr);
       appendListSeparator(First);
     }
   });

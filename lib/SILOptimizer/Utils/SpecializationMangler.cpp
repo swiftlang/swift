@@ -26,7 +26,7 @@ using namespace Mangle;
 
 std::string PartialSpecializationMangler::mangle() {
   beginMangling();
-  appendType(SpecializedFnTy);
+  appendType(SpecializedFnTy, nullptr);
   appendSpecializationOperator(isReAbstracted ? "Tp" : "TP");
   return finalize();
 }
@@ -193,7 +193,7 @@ FunctionSignatureSpecializationMangler::mangleClosureProp(SILInstruction *Inst) 
   // specializing.
   for (auto &Op : PAI->getArgumentOperands()) {
     SILType Ty = Op.get()->getType();
-    appendType(Ty.getASTType());
+    appendType(Ty.getASTType(), nullptr);
   }
 }
 
