@@ -13,22 +13,13 @@
 import os
 import platform
 
-from build_swift.build_swift.constants import MULTIROOT_DATA_FILE_PATH
-
 from . import cmake_product
 from . import cmark
-from . import foundation
 from . import libcxx
-from . import libdispatch
 from . import libicu
-from . import llbuild
 from . import llvm
-from . import product
 from . import swift
-from . import swiftpm
-from . import swiftsyntax
-from . import xctest
-from .. import shell
+
 
 class BackDeployConcurrency(cmake_product.CMakeProduct):
     @classmethod
@@ -65,18 +56,22 @@ class BackDeployConcurrency(cmake_product.CMakeProduct):
         self.cmake_options.define(
             'TOOLCHAIN_DIR:PATH',
             self.install_toolchain_path(host_target))
-        self.cmake_options.define('SWIFT_NATIVE_SWIFT_TOOLS_PATH:PATH',
-                                  os.path.join(self.install_toolchain_path(host_target), 'bin'))
+        self.cmake_options.define(
+            'SWIFT_NATIVE_SWIFT_TOOLS_PATH:PATH',
+            os.path.join(self.install_toolchain_path(host_target), 'bin'))
 
         self.cmake_options.define('SWIFT_EMBED_BITCODE_SECTION:BOOL', True)
         self.cmake_options.define('SWIFT_ENABLE_MACCATALYST:BOOL', True)
         self.cmake_options.define('CMAKE_CROSSCOMPILING:BOOL', True)
 
         # Only build the back-deployment concurrency library, nothing else
-        self.cmake_options.define('BUILD_SWIFT_CONCURRENCY_BACK_DEPLOYMENT_LIBRARIES:BOOL', True)
+        self.cmake_options.define(
+            'BUILD_SWIFT_CONCURRENCY_BACK_DEPLOYMENT_LIBRARIES:BOOL', True)
         self.cmake_options.define('SWIFT_INCLUDE_TOOLS:BOOL', False)
-        self.cmake_options.define('SWIFT_BUILD_STDLIB_EXTRA_TOOLCHAIN_CONTENT:BOOL', False)
-        self.cmake_options.define('SWIFT_BUILD_TEST_SUPPORT_MODULES:BOOL', False)
+        self.cmake_options.define(
+            'SWIFT_BUILD_STDLIB_EXTRA_TOOLCHAIN_CONTENT:BOOL', False)
+        self.cmake_options.define(
+            'SWIFT_BUILD_TEST_SUPPORT_MODULES:BOOL', False)
         self.cmake_options.define('SWIFT_BUILD_STDLIB:BOOL', False)
         self.cmake_options.define('SWIFT_BUILD_DYNAMIC_STDLIB:BOOL', False)
         self.cmake_options.define('SWIFT_BUILD_STATIC_STDLIB:BOOL', False)
@@ -93,8 +88,9 @@ class BackDeployConcurrency(cmake_product.CMakeProduct):
         self.cmake_options.define('SWIFT_INSTALL_COMPONENTS:STRING', 'back-deployment')
 
         # Figure out the SDKs to build.
-        # NOTE: This normally happens down in build-script-impl, so we have to re-implement the logic here.
-        sdks_to_build=['OSX']
+        # NOTE: This normally happens down in build-script-impl, so we have
+        # to re-implement the logic here.
+        sdks_to_build = ['OSX']
         if self.args.build_ios_device:
             sdks_to_build.append('IOS')
         if self.args.build_ios_simulator:
@@ -121,11 +117,16 @@ class BackDeployConcurrency(cmake_product.CMakeProduct):
         self.cmake_options.define('CMAKE_INSTALL_PREFIX', "")
 
         # Configure back-deployment targets
-        self.cmake_options.define('SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX:STRING', '10.15')
-        self.cmake_options.define('SWIFT_DARWIN_DEPLOYMENT_VERSION_IOS:STRING', '13.0')
-        self.cmake_options.define('SWIFT_DARWIN_DEPLOYMENT_VERSION_MACCATALYST:STRING', '13.0')
-        self.cmake_options.define('SWIFT_DARWIN_DEPLOYMENT_VERSION_TVOS:STRING', '13.0')
-        self.cmake_options.define('SWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS:STRING', '6.0')
+        self.cmake_options.define(
+            'SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX:STRING', '10.15')
+        self.cmake_options.define(
+            'SWIFT_DARWIN_DEPLOYMENT_VERSION_IOS:STRING', '13.0')
+        self.cmake_options.define(
+            'SWIFT_DARWIN_DEPLOYMENT_VERSION_MACCATALYST:STRING', '13.0')
+        self.cmake_options.define(
+            'SWIFT_DARWIN_DEPLOYMENT_VERSION_TVOS:STRING', '13.0')
+        self.cmake_options.define(
+            'SWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS:STRING', '6.0')
 
         self.build_with_cmake(["back-deployment"], build_variant, [])
 
