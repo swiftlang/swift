@@ -488,6 +488,7 @@ ERROR(referenced_value_no_accessor,none,
       "referenced declaration has no %select{getter|setter}0", (unsigned))
 ERROR(expected_sil_value_ownership_kind,none,
       "expected value ownership kind in SIL code", ())
+ERROR(unrecognized_sil_qualifier,none, "unrecognized SIL qualifier", ())
 ERROR(silfunc_and_silarg_have_incompatible_sil_value_ownership,none,
       "SILFunction and SILArgument have mismatching ValueOwnershipKinds. "
       "Function type specifies: '@%0'. SIL argument specifies: '@%1'.",
