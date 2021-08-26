@@ -243,6 +243,11 @@ namespace {
       return parseSILIdentifier(Result, L, Diagnostic(ID, Args...));
     }
 
+    template <typename T>
+    bool
+    parseSILQualifier(Optional<T> &result,
+                      llvm::function_ref<Optional<T>(StringRef)> parseName);
+
     bool parseVerbatim(StringRef identifier);
 
     template <typename T>
@@ -815,6 +820,38 @@ static bool parseSILOptional(bool &Result, SILParser &SP, StringRef Expected) {
     if (Optional != Expected)
       return true;
     Result = true;
+  }
+  return false;
+}
+
+// If the qualifier string is unrecognized, then diagnose and fail.
+//
+// If the qualifier is absent, then succeed and set the result to None.
+// The caller can decide how to proceed with an absent qualifier.
+//
+// Usage:
+// auto parseQualifierName = [](StringRef Str) {
+//   return llvm::StringSwitch<Optional<SomeQualifier>>(Str)
+//       .Case("one", SomeQualifier::One)
+//       .Case("two", SomeQualifier::Two)
+//       .Default(None);
+// };
+// if (parseSILQualifier<SomeQualifier>(Qualifier, parseQualifierName))
+//   return true;
+template <typename T>
+bool SILParser::parseSILQualifier(
+    Optional<T> &result, llvm::function_ref<Optional<T>(StringRef)> parseName) {
+  auto loc = P.Tok.getLoc();
+  StringRef Str;
+  // If we do not parse '[' ... ']',
+  if (!parseSILOptional(Str, *this)) {
+    result = None;
+    return false;
+  }
+  result = parseName(Str);
+  if (!result) {
+    P.diagnose(loc, Diagnostic(diag::unrecognized_sil_qualifier));
+    return true;
   }
   return false;
 }
@@ -2010,84 +2047,6 @@ bool SILParser::parseSILDebugLocation(SILLocation &L, SILBuilder &B,
   return false;
 }
 
-static bool parseLoadOwnershipQualifier(LoadOwnershipQualifier &Result,
-                                        SILParser &P) {
-  StringRef Str;
-  // If we do not parse '[' ... ']', we have unqualified. Set value and return.
-  if (!parseSILOptional(Str, P)) {
-    Result = LoadOwnershipQualifier::Unqualified;
-    return false;
-  }
-
-  // Then try to parse one of our other qualifiers. We do not support parsing
-  // unqualified here so we use that as our fail value.
-  auto Tmp = llvm::StringSwitch<LoadOwnershipQualifier>(Str)
-                 .Case("take", LoadOwnershipQualifier::Take)
-                 .Case("copy", LoadOwnershipQualifier::Copy)
-                 .Case("trivial", LoadOwnershipQualifier::Trivial)
-                 .Default(LoadOwnershipQualifier::Unqualified);
-
-  // Thus return true (following the conventions in this file) if we fail.
-  if (Tmp == LoadOwnershipQualifier::Unqualified)
-    return true;
-
-  // Otherwise, assign Result and return false.
-  Result = Tmp;
-  return false;
-}
-
-static bool parseStoreOwnershipQualifier(StoreOwnershipQualifier &Result,
-                                         SILParser &P) {
-  StringRef Str;
-  // If we do not parse '[' ... ']', we have unqualified. Set value and return.
-  if (!parseSILOptional(Str, P)) {
-    Result = StoreOwnershipQualifier::Unqualified;
-    return false;
-  }
-
-  // Then try to parse one of our other qualifiers. We do not support parsing
-  // unqualified here so we use that as our fail value.
-  auto Tmp = llvm::StringSwitch<StoreOwnershipQualifier>(Str)
-                 .Case("init", StoreOwnershipQualifier::Init)
-                 .Case("assign", StoreOwnershipQualifier::Assign)
-                 .Case("trivial", StoreOwnershipQualifier::Trivial)
-                 .Default(StoreOwnershipQualifier::Unqualified);
-
-  // Thus return true (following the conventions in this file) if we fail.
-  if (Tmp == StoreOwnershipQualifier::Unqualified)
-    return true;
-
-  // Otherwise, assign Result and return false.
-  Result = Tmp;
-  return false;
-}
-
-static bool parseAssignOwnershipQualifier(AssignOwnershipQualifier &Result,
-                                          SILParser &P) {
-  StringRef Str;
-  // If we do not parse '[' ... ']', we have unknown. Set value and return.
-  if (!parseSILOptional(Str, P)) {
-    Result = AssignOwnershipQualifier::Unknown;
-    return false;
-  }
-
-  // Then try to parse one of our other initialization kinds. We do not support
-  // parsing unknown here so we use that as our fail value.
-  auto Tmp = llvm::StringSwitch<AssignOwnershipQualifier>(Str)
-                 .Case("reassign", AssignOwnershipQualifier::Reassign)
-                 .Case("reinit", AssignOwnershipQualifier::Reinit)
-                 .Case("init", AssignOwnershipQualifier::Init)
-                 .Default(AssignOwnershipQualifier::Unknown);
-
-  // Thus return true (following the conventions in this file) if we fail.
-  if (Tmp == AssignOwnershipQualifier::Unknown)
-    return true;
-
-  // Otherwise, assign Result and return false.
-  Result = Tmp;
-  return false;
-}
-
 static bool parseAssignByWrapperMode(AssignByWrapperInst::Mode &Result,
                                           SILParser &P) {
   StringRef Str;
@@ -3252,15 +3211,23 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
   }
 
   case SILInstructionKind::LoadInst: {
-    LoadOwnershipQualifier Qualifier;
+    Optional<LoadOwnershipQualifier> Qualifier;
     SourceLoc AddrLoc;
-
-    if (parseLoadOwnershipQualifier(Qualifier, *this) ||
-        parseTypedValueRef(Val, AddrLoc, B) ||
-        parseSILDebugLocation(InstLoc, B))
+    auto parseLoadOwnership = [](StringRef Str) {
+      return llvm::StringSwitch<Optional<LoadOwnershipQualifier>>(Str)
+          .Case("take", LoadOwnershipQualifier::Take)
+          .Case("copy", LoadOwnershipQualifier::Copy)
+          .Case("trivial", LoadOwnershipQualifier::Trivial)
+          .Default(None);
+    };
+    if (parseSILQualifier<LoadOwnershipQualifier>(Qualifier, parseLoadOwnership)
+        || parseTypedValueRef(Val, AddrLoc, B)
+        || parseSILDebugLocation(InstLoc, B)) {
       return true;
-
-    ResultVal = B.createLoad(InstLoc, Val, Qualifier);
+    }
+    if (!Qualifier)
+      Qualifier = LoadOwnershipQualifier::Unqualified;
+    ResultVal = B.createLoad(InstLoc, Val, Qualifier.getValue());
     break;
   }
 
@@ -3838,8 +3805,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     SourceLoc ToLoc, AddrLoc;
     Identifier ToToken;
     SILValue AddrVal;
-    StoreOwnershipQualifier StoreQualifier;
-    AssignOwnershipQualifier AssignQualifier;
+    Optional<StoreOwnershipQualifier> StoreQualifier;
+    Optional<AssignOwnershipQualifier> AssignQualifier;
     bool IsStore = Opcode == SILInstructionKind::StoreInst;
     bool IsAssign = Opcode == SILInstructionKind::AssignInst;
     if (parseValueName(From) ||
@@ -3847,10 +3814,28 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
                            "to"))
       return true;
 
-    if (IsStore && parseStoreOwnershipQualifier(StoreQualifier, *this))
+    auto parseStoreOwnership = [](StringRef Str) {
+      return llvm::StringSwitch<Optional<StoreOwnershipQualifier>>(Str)
+          .Case("init", StoreOwnershipQualifier::Init)
+          .Case("assign", StoreOwnershipQualifier::Assign)
+          .Case("trivial", StoreOwnershipQualifier::Trivial)
+          .Default(None);
+    };
+    if (IsStore
+        && parseSILQualifier<StoreOwnershipQualifier>(StoreQualifier,
+                                                      parseStoreOwnership))
       return true;
 
-    if (IsAssign && parseAssignOwnershipQualifier(AssignQualifier, *this))
+    auto parseAssignOwnership = [](StringRef Str) {
+      return llvm::StringSwitch<Optional<AssignOwnershipQualifier>>(Str)
+          .Case("reassign", AssignOwnershipQualifier::Reassign)
+          .Case("reinit", AssignOwnershipQualifier::Reinit)
+          .Case("init", AssignOwnershipQualifier::Init)
+          .Default(None);
+    };
+    if (IsAssign
+        && parseSILQualifier<AssignOwnershipQualifier>(AssignQualifier,
+                                                       parseAssignOwnership))
       return true;
 
     if (parseTypedValueRef(AddrVal, AddrLoc, B) ||
@@ -3871,15 +3856,19 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     SILType ValType = AddrVal->getType().getObjectType();
 
     if (IsStore) {
+      if (!StoreQualifier)
+        StoreQualifier = StoreOwnershipQualifier::Unqualified;
       ResultVal =
           B.createStore(InstLoc, getLocalValue(From, ValType, InstLoc, B),
-                        AddrVal, StoreQualifier);
+                        AddrVal, StoreQualifier.getValue());
     } else {
       assert(IsAssign);
+      if (!AssignQualifier)
+        AssignQualifier = AssignOwnershipQualifier::Unknown;
 
       ResultVal =
           B.createAssign(InstLoc, getLocalValue(From, ValType, InstLoc, B),
-                         AddrVal, AssignQualifier);
+                         AddrVal, AssignQualifier.getValue());
     }
 
     break;
