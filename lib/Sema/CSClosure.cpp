@@ -105,10 +105,14 @@ static void createConjunction(ConstraintSystem &cs,
 
   if (locator->directlyAt<ClosureExpr>()) {
     auto *closure = castToExpr<ClosureExpr>(locator->getAnchor());
-
-    // If this is a top level closure, it has to be isolated.
-    isIsolated = !isa<AbstractClosureExpr>(closure->getParent());
+    // Conjunction associated with the body of the closure has to
+    // reference a type variable representing closure type,
+    // otherwise it would get disconnected from its contextual type.
     referencedVars.push_back(cs.getType(closure)->castTo<TypeVariableType>());
+    // Body of the closure is always isolated from its context, only
+    // its individual elements are allowed access to type information
+    // from the ouside e.g. parameters/result type.
+    isIsolated = true;
   }
 
   for (const auto &entry : elements) {
