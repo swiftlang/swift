@@ -333,16 +333,21 @@ void DestroyHoisting::getUsedLocationsOfOperands(Bits &bits, SILInstruction *I) 
   }
 }
 
-// Set all bits of locations which instruction \p I is using. It's including
-// parent and sub-locations (see comment in getUsedLocationsOfAddr).
+// NOTE: All instructions handled in
+// MemoryLocations::analyzeLocationUsesRecursively should also be handled
+// explicitly here.
+// Set all bits of locations which instruction \p I is using.
+// It's including parent and sub-locations (see comment in
+// getUsedLocationsOfAddr).
 void DestroyHoisting::getUsedLocationsOfInst(Bits &bits, SILInstruction *I) {
   switch (I->getKind()) {
-    case SILInstructionKind::EndBorrowInst:
-      if (auto *LBI = dyn_cast<LoadBorrowInst>(
-                                        cast<EndBorrowInst>(I)->getOperand())) {
+    case SILInstructionKind::EndBorrowInst: {
+      auto op = cast<EndBorrowInst>(I)->getOperand();
+      if (auto *LBI = dyn_cast<LoadBorrowInst>(op)) {
         getUsedLocationsOfAddr(bits, LBI->getOperand());
       }
       break;
+    }
     case SILInstructionKind::EndApplyInst:
       // Operands passed to begin_apply are alive throughout an end_apply ...
       getUsedLocationsOfOperands(bits, cast<EndApplyInst>(I)->getBeginApply());
@@ -351,6 +356,19 @@ void DestroyHoisting::getUsedLocationsOfInst(Bits &bits, SILInstruction *I) {
       // ... or abort_apply.
       getUsedLocationsOfOperands(bits, cast<AbortApplyInst>(I)->getBeginApply());
       break;
+    case SILInstructionKind::EndAccessInst:
+      getUsedLocationsOfOperands(bits,
+                                 cast<EndAccessInst>(I)->getBeginAccess());
+      break;
+    // These instructions do not access the memory location for read/write
+    case SILInstructionKind::StructElementAddrInst:
+    case SILInstructionKind::TupleElementAddrInst:
+    case SILInstructionKind::WitnessMethodInst:
+    case SILInstructionKind::OpenExistentialAddrInst:
+      break;
+    case SILInstructionKind::InitExistentialAddrInst:
+    case SILInstructionKind::InitEnumDataAddrInst:
+    case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
     case SILInstructionKind::SelectEnumAddrInst:
     case SILInstructionKind::ExistentialMetatypeInst:
     case SILInstructionKind::ValueMetatypeInst:
@@ -368,6 +386,7 @@ void DestroyHoisting::getUsedLocationsOfInst(Bits &bits, SILInstruction *I) {
     case SILInstructionKind::ApplyInst:
     case SILInstructionKind::TryApplyInst:
     case SILInstructionKind::YieldInst:
+    case SILInstructionKind::SwitchEnumAddrInst:
       getUsedLocationsOfOperands(bits, I);
       break;
     case SILInstructionKind::DebugValueAddrInst:
@@ -765,18 +784,11 @@ public:
     LLVM_DEBUG(llvm::dbgs() << "*** DestroyHoisting on function: "
                             << F->getName() << " ***\n");
 
-    bool EdgeChanged = splitAllCriticalEdges(*F, nullptr, nullptr);
-
     DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
 
     DestroyHoisting CM(F, DA);
     bool InstChanged = CM.hoistDestroys();
 
-    if (EdgeChanged) {
-      // We split critical edges.
-      invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
-      return;
-    }
     if (InstChanged) {
       // We moved instructions.
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
