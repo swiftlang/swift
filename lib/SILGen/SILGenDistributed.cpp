@@ -70,32 +70,11 @@ static void emitDistributedIfRemoteBranch(SILGenFunction &SGF,
   B.createCondBranch(Loc, isRemoteResultUnwrapped, isRemoteBB, isLocalBB);
 }
 
-static AbstractFunctionDecl *lookupActorTransportResolveFunc(ASTContext &C) {
-  auto transportDecl = C.getActorTransportDecl();
-
-  for (auto decl : transportDecl->lookupDirect(DeclName(C.Id_resolve)))
-    if (auto funcDecl = dyn_cast<AbstractFunctionDecl>(decl))
-      return funcDecl;
-
-  llvm_unreachable("Missing ActorTransport.resolve function");
-}
-
 static VarDecl *lookupActorTransportProperty(ASTContext &C, ClassDecl *cd,
                                              SILValue selfValue) {
   auto transportVarDeclRefs = cd->lookupDirect(C.Id_actorTransport);
   assert(transportVarDeclRefs.size() == 1);
   return dyn_cast<VarDecl>(transportVarDeclRefs.front());
-}
-
-static EnumElementDecl *lookupEnumCase(ASTContext &C, EnumDecl *target,
-                                       Identifier identifier) {
-  auto elementDecls = target->lookupDirect(DeclName(identifier));
-  if (elementDecls.empty())
-    return nullptr;
-
-  auto *elementDecl = elementDecls.front();
-
-  return dyn_cast<EnumElementDecl>(elementDecl);
 }
 
 /******************************************************************************/
@@ -814,7 +793,6 @@ void SILGenFunction::emitDistributedActor_resignAddress(
 void SILGenFunction::emitDistributedActorClassMemberDestruction(
     SILLocation cleanupLoc, ManagedValue selfValue, ClassDecl *cd,
     SILBasicBlock *normalMemberDestroyBB, SILBasicBlock *finishBB) {
-  ASTContext &ctx = getASTContext();
   auto selfTy = cd->getDeclaredInterfaceType();
 
   Scope scope(Cleanups, CleanupLocation(cleanupLoc));
