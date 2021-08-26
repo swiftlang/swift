@@ -13,7 +13,9 @@
 set(LLVM_OPTIONAL_SOURCES
   ${swift_concurrency_objc_sources})
 
-if(NOT swift_concurrency_availability)
+if (SWIFT_ALLOW_BACK_DEPLOY_CONCURRENCY OR BUILD_SWIFT_CONCURRENCY_BACK_DEPLOYMENT_LIBRARIES)
+  set(swift_concurrency_availability "macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0")
+else()
   set(swift_concurrency_availability "macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0")
 endif()
 
