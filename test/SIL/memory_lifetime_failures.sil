@@ -538,3 +538,32 @@ bb0(%0 : $Bool):
   %10 = tuple ()
   return %10 : $()
 }
+
+// MemoryLifetimeVerifier does not detect an error here due to reborrows
+sil [ossa] @test_load_borrow1 : $@convention(thin) (@in Optional<T>) -> () {
+bb0(%0 : $*Optional<T>):
+  destroy_addr %0 : $*Optional<T>
+  %1 = load_borrow %0 : $*Optional<T>
+  br bb1(%1 : $Optional<T>)
+
+bb1(%3 : @guaranteed $Optional<T>):
+  end_borrow %3 : $Optional<T>
+  br bb2
+
+bb2:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK: SIL memory lifetime failure in @test_load_borrow2: memory is not initialized, but should
+sil [ossa] @test_load_borrow2 : $@convention(thin) (@in Optional<T>) -> () {
+bb0(%0 : $*Optional<T>):
+  destroy_addr %0 : $*Optional<T>
+  %1 = load_borrow %0 : $*Optional<T>
+  end_borrow %1 : $Optional<T>
+  br bb1
+
+bb1:
+  %r = tuple ()
+  return %r : $()
+}
