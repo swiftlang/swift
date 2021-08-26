@@ -32,7 +32,6 @@ namespace Mangle {
 /// The mangler for AST declarations.
 class ASTMangler : public Mangler {
 protected:
-  CanGenericSignature CurGenericSignature;
   ModuleDecl *Mod = nullptr;
 
   /// Optimize out protocol names if a type only conforms to one protocol.
@@ -94,12 +93,12 @@ public:
   ASTMangler(bool DWARFMangling = false)
     : DWARFMangling(DWARFMangling) {}
 
-  void addTypeSubstitution(Type type) {
-    type = dropProtocolsFromAssociatedTypes(type);
+  void addTypeSubstitution(Type type, GenericSignature sig) {
+    type = dropProtocolsFromAssociatedTypes(type, sig);
     addSubstitution(type.getPointer());
   }
-  bool tryMangleTypeSubstitution(Type type) {
-    type = dropProtocolsFromAssociatedTypes(type);
+  bool tryMangleTypeSubstitution(Type type, GenericSignature sig) {
+    type = dropProtocolsFromAssociatedTypes(type, sig);
     return tryMangleSubstitution(type.getPointer());
   }
 
@@ -255,7 +254,7 @@ public:
   std::string mangleObjCRuntimeName(const NominalTypeDecl *Nominal);
 
   std::string mangleTypeWithoutPrefix(Type type) {
-    appendType(type);
+    appendType(type, nullptr);
     return finalize();
   }
 
@@ -293,17 +292,17 @@ protected:
 
   void appendSymbolKind(SymbolKind SKind);
 
-  void appendType(Type type, const ValueDecl *forDecl = nullptr);
+  void appendType(Type type, GenericSignature sig,
+                  const ValueDecl *forDecl = nullptr);
   
   void appendDeclName(const ValueDecl *decl);
 
   GenericTypeParamType *appendAssocType(DependentMemberType *DepTy,
+                                        GenericSignature sig,
                                         bool &isAssocTypeAtDepth);
 
   void appendOpWithGenericParamIndex(StringRef,
                                      const GenericTypeParamType *paramTy);
-
-  void bindGenericParameters(GenericSignature sig);
 
   /// Mangles a sugared type iff we are mangling for the debugger.
   template <class T> void appendSugaredType(Type type,
@@ -314,7 +313,8 @@ protected:
     appendType(BlandTy, forDecl);
   }
 
-  void appendBoundGenericArgs(Type type, bool &isFirstArgList);
+  void appendBoundGenericArgs(Type type, GenericSignature sig,
+                              bool &isFirstArgList);
 
   /// Append the bound generics arguments for the given declaration context
   /// based on a complete substitution map.
@@ -322,17 +322,20 @@ protected:
   /// \returns the number of generic parameters that were emitted
   /// thus far.
   unsigned appendBoundGenericArgs(DeclContext *dc,
+                                  GenericSignature sig,
                                   SubstitutionMap subs,
                                   bool &isFirstArgList);
   
   /// Append the bound generic arguments as a flat list, disregarding depth.
-  void appendFlatGenericArgs(SubstitutionMap subs);
+  void appendFlatGenericArgs(SubstitutionMap subs,
+                             GenericSignature sig);
 
   /// Append any retroactive conformances.
-  void appendRetroactiveConformances(Type type);
+  void appendRetroactiveConformances(Type type, GenericSignature sig);
   void appendRetroactiveConformances(SubstitutionMap subMap,
+                                     GenericSignature sig,
                                      ModuleDecl *fromModule);
-  void appendImplFunctionType(SILFunctionType *fn);
+  void appendImplFunctionType(SILFunctionType *fn, GenericSignature sig);
 
   void appendContextOf(const ValueDecl *decl);
 
@@ -350,27 +353,33 @@ protected:
     FunctionMangling,
   };
 
-  void appendFunction(AnyFunctionType *fn,
+  void appendFunction(AnyFunctionType *fn, GenericSignature sig,
                     FunctionManglingKind functionMangling = NoFunctionMangling,
                     const ValueDecl *forDecl = nullptr);
-  void appendFunctionType(AnyFunctionType *fn, bool isAutoClosure = false,
+  void appendFunctionType(AnyFunctionType *fn, GenericSignature sig,
+                          bool isAutoClosure = false,
                           const ValueDecl *forDecl = nullptr);
   void appendClangType(AnyFunctionType *fn);
   template <typename FnType>
   void appendClangType(FnType *fn, llvm::raw_svector_ostream &os);
 
   void appendFunctionSignature(AnyFunctionType *fn,
+                               GenericSignature sig,
                                const ValueDecl *forDecl,
                                FunctionManglingKind functionMangling);
 
   void appendFunctionInputType(ArrayRef<AnyFunctionType::Param> params,
+                               GenericSignature sig,
                                const ValueDecl *forDecl = nullptr);
   void appendFunctionResultType(Type resultType,
+                                GenericSignature sig,
                                 const ValueDecl *forDecl = nullptr);
 
-  void appendTypeList(Type listTy, const ValueDecl *forDecl = nullptr);
+  void appendTypeList(Type listTy, GenericSignature sig,
+                      const ValueDecl *forDecl = nullptr);
   void appendTypeListElement(Identifier name, Type elementType,
                              ParameterTypeFlags flags,
+                             GenericSignature sig,
                              const ValueDecl *forDecl = nullptr);
 
   /// Append a generic signature to the mangling.
@@ -385,16 +394,21 @@ protected:
   bool appendGenericSignature(GenericSignature sig,
                               GenericSignature contextSig = nullptr);
 
-  void appendRequirement(const Requirement &reqt);
+  void appendRequirement(const Requirement &reqt,
+                         GenericSignature sig);
 
-  void appendGenericSignatureParts(ArrayRef<CanTypeWrapper<GenericTypeParamType>> params,
+  void appendGenericSignatureParts(GenericSignature sig,
+                                   ArrayRef<CanTypeWrapper<GenericTypeParamType>> params,
                                    unsigned initialParamDepth,
                                    ArrayRef<Requirement> requirements);
 
-  DependentMemberType *dropProtocolFromAssociatedType(DependentMemberType *dmt);
-  Type dropProtocolsFromAssociatedTypes(Type type);
+  DependentMemberType *dropProtocolFromAssociatedType(DependentMemberType *dmt,
+                                                      GenericSignature sig);
+  Type dropProtocolsFromAssociatedTypes(Type type,
+                                        GenericSignature sig);
 
-  void appendAssociatedTypeName(DependentMemberType *dmt);
+  void appendAssociatedTypeName(DependentMemberType *dmt,
+                                GenericSignature sig);
 
   void appendClosureEntity(const SerializedAbstractClosureExpr *closure);
   
@@ -437,12 +451,14 @@ protected:
 
   void appendProtocolConformance(const ProtocolConformance *conformance);
   void appendProtocolConformanceRef(const RootProtocolConformance *conformance);
-  void appendAnyProtocolConformance(CanGenericSignature genericSig,
+  void appendAnyProtocolConformance(GenericSignature genericSig,
                                     CanType conformingType,
                                     ProtocolConformanceRef conformance);
   void appendConcreteProtocolConformance(
-                                        const ProtocolConformance *conformance);
-  void appendDependentProtocolConformance(const ConformanceAccessPath &path);
+                                        const ProtocolConformance *conformance,
+                                        GenericSignature sig);
+  void appendDependentProtocolConformance(const ConformanceAccessPath &path,
+                                          GenericSignature sig);
   void appendOpParamForLayoutConstraint(LayoutConstraint Layout);
   
   void appendSymbolicReference(SymbolicReferent referent);
