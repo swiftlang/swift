@@ -11,13 +11,15 @@
 // REQUIRES: concurrency
 
 // CHECK: public actor SomeActor
-@available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
+
+@available(SwiftStdlib 5.5, *)
 public actor SomeActor {
   nonisolated func maine() { }
 }
 
 // CHECK: @globalActor public struct SomeGlobalActor
-@available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
+
+@available(SwiftStdlib 5.5, *)
 @globalActor
 public struct SomeGlobalActor {
   public static let shared = SomeActor()
@@ -25,7 +27,8 @@ public struct SomeGlobalActor {
 
 // CHECK: @{{(Test.)?}}SomeGlobalActor public protocol P1
 // CHECK-NEXT: @{{(Test.)?}}SomeGlobalActor func method()
-@available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
+
+@available(SwiftStdlib 5.5, *)
 @SomeGlobalActor
 public protocol P1 {
   func method()
@@ -33,48 +36,59 @@ public protocol P1 {
 
 // CHECK: class C1
 // CHECK-NEXT: @{{(Test.)?}}SomeGlobalActor public func method()
-@available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
+
+@available(SwiftStdlib 5.5, *)
 public class C1: P1 {
   public func method() { }
 }
 
-@available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
+
+@available(SwiftStdlib 5.5, *)
 @SomeGlobalActor
 public class C2 { }
 
 // CHECK: @{{(Test.)?}}SomeGlobalActor public class C2
-@available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
+
+@available(SwiftStdlib 5.5, *)
 public class C3: C2 { }
 
 // CHECK: public class C4 : Swift.UnsafeSendable
-@available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
+
+@available(SwiftStdlib 5.5, *)
 public class C4: UnsafeSendable { }
 
 // CHECK: public class C5 : @unchecked Swift.Sendable
-@available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
+
+@available(SwiftStdlib 5.5, *)
 public class C5: @unchecked Sendable { }
 
-@available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
+
+@available(SwiftStdlib 5.5, *)
 public class C6 { }
 
 // CHECK: extension {{(Test.)?}}C6 : @unchecked Swift.Sendable
-@available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
+
+@available(SwiftStdlib 5.5, *)
 extension C6: @unchecked Sendable { }
 
-@available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
+
+@available(SwiftStdlib 5.5, *)
 public class C7 { }
 
 // CHECK: extension {{(Test.)?}}C7 : Swift.UnsafeSendable
-@available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
+
+@available(SwiftStdlib 5.5, *)
 extension C7: UnsafeSendable { }
 
-@available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
+
+@available(SwiftStdlib 5.5, *)
 public protocol P2 {
   @SomeGlobalActor func method()
 }
 
-@available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
+
 // CHECK: class {{(Test.)?}}C8 : {{(Test.)?}}P2 {
+@available(SwiftStdlib 5.5, *)
 public class C8 : P2 {
   // CHECK: @{{(Test.)?}}SomeGlobalActor public func method()
   public func method() {}
