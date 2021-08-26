@@ -56,6 +56,7 @@ EXPECTED_DEFAULTS = {
     'benchmark_num_onone_iterations': 3,
     'build_android': False,
     'build_args': [],
+    'build_backdeployconcurrency': False,
     'build_benchmarks': True,
     'build_clang_tools_extra': True,
     'build_cygwin': True,
@@ -466,6 +467,7 @@ EXPECTED_OPTIONS = [
     SetOption('--skip-tvos', dest='tvos', value=False),
     SetOption('--skip-watchos', dest='watchos', value=False),
 
+    SetTrueOption('--back-deploy-concurrency', dest='build_backdeployconcurrency'),
     SetTrueOption('--benchmark'),
     SetTrueOption('--clean'),
     SetTrueOption('--dry-run'),
