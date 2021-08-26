@@ -167,13 +167,13 @@ class B : A {
 }
 
 func testB(_ b: B) {
-  var _: P1 = b // expected-error{{has Self or associated type requirements}}
-  var _: P4 = b // expected-error{{has Self or associated type requirements}}
+  var _: P1 = b
+  var _: P4 = b
   var _: P5 = b
   var _: P6 = b
-  var _: P7 = b // expected-error{{has Self or associated type requirements}}
-  var _: P8 = b // okay
-  var _: P9 = b // expected-error{{has Self or associated type requirements}}
+  var _: P7 = b
+  var _: P8 = b
+  var _: P9 = b
 }
 
 // Class A5 conforms to P5 in an inheritable manner.
