@@ -12,6 +12,7 @@ func test() {
   _ = swiftFunc()
 }
 
+// REQUIRES: radar82364901
 // UNSUPPORTED: OS=windows-msvc
 
 // -----------------------------------------------------------------------------
