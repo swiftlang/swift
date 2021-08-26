@@ -15,6 +15,6 @@ import Foundation
 // CHECK-LABEL: @objc @_inheritsConvenienceInitializers
 // CHECK: public actor SomeActor : ObjectiveC.NSObject {
 // CHECK: @objc override public init()
-@available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
+@available(SwiftStdlib 5.5, *)
 public actor SomeActor: NSObject {
 }

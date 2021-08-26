@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-stdlib -target x86_64-apple-macosx10.15 -typecheck -verify %s
+// RUN: %target-swift-frontend -parse-stdlib -target x86_64-apple-macosx10.14 -typecheck -verify %s
 // RUN: %target-swift-frontend -parse-stdlib -target x86_64-apple-macosx12 -typecheck %s
 // REQUIRES: OS=macosx
 

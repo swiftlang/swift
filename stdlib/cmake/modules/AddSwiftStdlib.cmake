@@ -640,6 +640,7 @@ function(_add_swift_target_library_single target name)
         SDK
         DEPLOYMENT_VERSION_MACCATALYST
         MACCATALYST_BUILD_FLAVOR
+        BACK_DEPLOYMENT_LIBRARY
         ENABLE_LTO)
   set(SWIFTLIB_SINGLE_multiple_parameter_options
         C_COMPILE_FLAGS
@@ -771,6 +772,13 @@ function(_add_swift_target_library_single target name)
       -libc;${SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY})
   endif()
 
+  # Don't install the Swift module content for back-deployment libraries.
+  if (SWIFTLIB_SINGLE_BACK_DEPLOYMENT_LIBRARY)
+    set(install_in_component "never_install")
+  else()
+    set(install_in_component "${SWIFTLIB_SINGLE_INSTALL_IN_COMPONENT}")
+  endif()
+
   # FIXME: don't actually depend on the libraries in SWIFTLIB_SINGLE_LINK_LIBRARIES,
   # just any swiftmodule files that are associated with them.
   handle_swift_sources(
@@ -796,7 +804,7 @@ function(_add_swift_target_library_single target name)
       ${embed_bitcode_arg}
       ${SWIFTLIB_SINGLE_STATIC_keyword}
       ENABLE_LTO "${SWIFTLIB_SINGLE_ENABLE_LTO}"
-      INSTALL_IN_COMPONENT "${SWIFTLIB_SINGLE_INSTALL_IN_COMPONENT}"
+      INSTALL_IN_COMPONENT "${install_in_component}"
       MACCATALYST_BUILD_FLAVOR "${SWIFTLIB_SINGLE_MACCATALYST_BUILD_FLAVOR}")
   add_swift_source_group("${SWIFTLIB_SINGLE_EXTERNAL_SOURCES}")
 
@@ -941,21 +949,28 @@ function(_add_swift_target_library_single target name)
         SUFFIX ${LLVM_PLUGIN_EXT})
   endif()
 
+  # For back-deployed libraries, install into lib/swift-<version>.
+  if (SWIFTLIB_SINGLE_BACK_DEPLOYMENT_LIBRARY)
+    set(swiftlib_prefix "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib/swift-${SWIFTLIB_SINGLE_BACK_DEPLOYMENT_LIBRARY}")
+  else()
+    set(swiftlib_prefix ${SWIFTLIB_DIR})
+  endif()
+
   # Install runtime libraries to lib/swift instead of lib. This works around
   # the fact that -isysroot prevents linking to libraries in the system
   # /usr/lib if Swift is installed in /usr.
   set_target_properties("${target}" PROPERTIES
-    LIBRARY_OUTPUT_DIRECTORY ${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}
-    ARCHIVE_OUTPUT_DIRECTORY ${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR})
+    LIBRARY_OUTPUT_DIRECTORY ${swiftlib_prefix}/${SWIFTLIB_SINGLE_SUBDIR}
+    ARCHIVE_OUTPUT_DIRECTORY ${swiftlib_prefix}/${SWIFTLIB_SINGLE_SUBDIR})
   if(SWIFTLIB_SINGLE_SDK STREQUAL WINDOWS AND SWIFTLIB_SINGLE_IS_STDLIB_CORE
       AND libkind STREQUAL SHARED)
     add_custom_command(TARGET ${target} POST_BUILD
-      COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:${target}> ${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR})
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:${target}> ${swiftlib_prefix}/${SWIFTLIB_SINGLE_SUBDIR})
   endif()
 
   foreach(config ${CMAKE_CONFIGURATION_TYPES})
     string(TOUPPER ${config} config_upper)
-    escape_path_for_xcode("${config}" "${SWIFTLIB_DIR}" config_lib_dir)
+    escape_path_for_xcode("${config}" "${swiftlib_prefix}" config_lib_dir)
     set_target_properties(${target} PROPERTIES
       LIBRARY_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${SWIFTLIB_SINGLE_SUBDIR}
       ARCHIVE_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${SWIFTLIB_SINGLE_SUBDIR})
@@ -1390,6 +1405,7 @@ endfunction()
 #     DEPLOYMENT_VERSION_TVOS version
 #     DEPLOYMENT_VERSION_WATCHOS version
 #     MACCATALYST_BUILD_FLAVOR flavor
+#     BACK_DEPLOYMENT_LIBRARY version
 #     source1 [source2 source3 ...])
 #
 # name
@@ -1485,6 +1501,9 @@ endfunction()
 # IS_SDK_OVERLAY
 #   Treat the library as a part of the Swift SDK overlay.
 #
+# BACK_DEPLOYMENT_LIBRARY
+#   Treat this as a back-deployment library to the given Swift version
+#
 # INSTALL_IN_COMPONENT comp
 #   The Swift installation component that this library belongs to.
 #
@@ -1533,7 +1552,8 @@ function(add_swift_target_library name)
         INSTALL_IN_COMPONENT
         DARWIN_INSTALL_NAME_DIR
         DEPLOYMENT_VERSION_MACCATALYST
-        MACCATALYST_BUILD_FLAVOR)
+        MACCATALYST_BUILD_FLAVOR
+        BACK_DEPLOYMENT_LIBRARY)
   set(SWIFTLIB_multiple_parameter_options
         C_COMPILE_FLAGS
         DEPENDS
@@ -1970,6 +1990,12 @@ function(add_swift_target_library name)
         list(APPEND swiftlib_link_flags_all "-Wl,-soname,lib${name}.so")
       endif()
 
+      if (SWIFTLIB_BACK_DEPLOYMENT_LIBRARY)
+        set(back_deployment_library_option BACK_DEPLOYMENT_LIBRARY ${SWIFTLIB_BACK_DEPLOYMENT_LIBRARY})
+      else()
+        set(back_deployment_library_option)
+      endif()
+
       # Add this library variant.
       _add_swift_target_library_single(
         ${variant_name}
@@ -2006,6 +2032,7 @@ function(add_swift_target_library name)
         DEPLOYMENT_VERSION_TVOS "${SWIFTLIB_DEPLOYMENT_VERSION_TVOS}"
         DEPLOYMENT_VERSION_WATCHOS "${SWIFTLIB_DEPLOYMENT_VERSION_WATCHOS}"
         MACCATALYST_BUILD_FLAVOR "${maccatalyst_build_flavor}"
+        ${back_deployment_library_option}
         ENABLE_LTO "${SWIFT_STDLIB_ENABLE_LTO}"
         GYB_SOURCES ${SWIFTLIB_GYB_SOURCES}
       )
@@ -2106,6 +2133,9 @@ function(add_swift_target_library name)
         if("${sdk}" STREQUAL "WINDOWS")
           set(UNIVERSAL_LIBRARY_NAME
             "${SWIFTLIB_DIR}/${library_subdir}/${name}.dll")
+        elseif(SWIFTLIB_BACK_DEPLOYMENT_LIBRARY)
+          set(UNIVERSAL_LIBRARY_NAME
+            "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib/swift-${SWIFTLIB_BACK_DEPLOYMENT_LIBRARY}/${library_subdir}/${CMAKE_SHARED_LIBRARY_PREFIX}${name}${CMAKE_SHARED_LIBRARY_SUFFIX}")
         else()
           set(UNIVERSAL_LIBRARY_NAME
             "${SWIFTLIB_DIR}/${library_subdir}/${CMAKE_SHARED_LIBRARY_PREFIX}${name}${CMAKE_SHARED_LIBRARY_SUFFIX}")
@@ -2185,8 +2215,16 @@ function(add_swift_target_library name)
         # NOTE: ${UNIVERSAL_LIBRARY_NAME} is the output associated with the target
         # ${lipo_target}
         add_dependencies(${SWIFTLIB_INSTALL_IN_COMPONENT} ${lipo_target})
+
+        if (SWIFTLIB_BACK_DEPLOYMENT_LIBRARY)
+          # Back-deployment libraries get installed into a versioned directory.
+          set(install_dest "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}-${SWIFTLIB_BACK_DEPLOYMENT_LIBRARY}/${resource_dir_sdk_subdir}")
+        else()
+          set(install_dest "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}")
+        endif()
+
         swift_install_in_component(FILES "${UNIVERSAL_LIBRARY_NAME}"
-                                   DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}"
+                                   DESTINATION ${install_dest}
                                    COMPONENT "${SWIFTLIB_INSTALL_IN_COMPONENT}"
                                    PERMISSIONS ${file_permissions}
                                    "${optional_arg}")

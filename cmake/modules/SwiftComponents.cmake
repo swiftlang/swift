@@ -46,6 +46,7 @@
 # The set of "defined" swift components are as follows:
 #
 # * autolink-driver -- the Swift driver support tools
+# * back-deployment -- Swift back-deployment libraries
 # * compiler -- the Swift compiler and (on supported platforms) the REPL.
 # * clang-builtin-headers -- install a copy of Clang builtin headers under
 #   'lib/swift/clang'.  This is useful when Swift compiler is installed in
@@ -66,7 +67,7 @@
 # * toolchain-dev-tools -- install development tools useful in a shared toolchain
 # * dev -- headers and libraries required to use Swift compiler as a library.
 set(_SWIFT_DEFINED_COMPONENTS
-  "autolink-driver;compiler;clang-builtin-headers;clang-resource-dir-symlink;clang-builtin-headers-in-clang-resource-dir;stdlib;stdlib-experimental;sdk-overlay;parser-lib;editor-integration;tools;testsuite-tools;toolchain-tools;toolchain-dev-tools;dev;license;sourcekit-xpc-service;sourcekit-inproc;swift-remote-mirror;swift-remote-mirror-headers")
+  "autolink-driver;back-deployment;compiler;clang-builtin-headers;clang-resource-dir-symlink;clang-builtin-headers-in-clang-resource-dir;stdlib;stdlib-experimental;sdk-overlay;parser-lib;editor-integration;tools;testsuite-tools;toolchain-tools;toolchain-dev-tools;dev;license;sourcekit-xpc-service;sourcekit-inproc;swift-remote-mirror;swift-remote-mirror-headers")
 
 # The default install components include all of the defined components, except
 # for the following exceptions.
@@ -85,6 +86,8 @@ else()
   list(REMOVE_ITEM _SWIFT_DEFAULT_COMPONENTS "sourcekit-xpc-service")
 endif()
 list(REMOVE_ITEM _SWIFT_DEFAULT_COMPONENTS "stdlib-experimental")
+# back-deployment libraries are opt-in
+list(REMOVE_ITEM _SWIFT_DEFAULT_COMPONENTS "back-deployment")
 
 macro(swift_configure_components)
   # Set the SWIFT_INSTALL_COMPONENTS variable to the default value if it is not passed in via -D
