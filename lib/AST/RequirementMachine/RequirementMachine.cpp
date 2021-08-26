@@ -238,6 +238,21 @@ void RewriteSystemBuilder::addRequirement(const Requirement &req,
 
 void RequirementMachine::verify(const MutableTerm &term) const {
 #ifndef NDEBUG
+  // If the term is in the generic parameter domain, ensure we have a valid
+  // generic parameter.
+  if (term.begin()->getKind() == Symbol::Kind::GenericParam) {
+    auto *genericParam = term.begin()->getGenericParam();
+    auto genericParams = Sig.getGenericParams();
+    auto found = std::find(genericParams.begin(),
+                           genericParams.end(),
+                           genericParam);
+    if (found == genericParams.end()) {
+      llvm::errs() << "Bad generic parameter in " << term << "\n";
+      dump(llvm::errs());
+      abort();
+    }
+  }
+
   MutableTerm erased;
 
   // First, "erase" resolved associated types from the term, and try
@@ -305,6 +320,14 @@ void RequirementMachine::dump(llvm::raw_ostream &out) const {
   out << "Requirement machine for " << Sig << "\n";
   System.dump(out);
   Map.dump(out);
+
+  out << "\nConformance access paths:\n";
+  for (auto pair : ConformanceAccessPaths) {
+    out << "- " << pair.first.first << " : ";
+    out << pair.first.second->getName() << " => ";
+    pair.second.print(out);
+    out << "\n";
+  }
 }
 
 RequirementMachine::RequirementMachine(RewriteContext &ctx)
