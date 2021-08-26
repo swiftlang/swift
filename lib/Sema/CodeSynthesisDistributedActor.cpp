@@ -31,69 +31,6 @@
 using namespace swift;
 
 /******************************************************************************/
-/******************************* RESOLVE FUNCTION *****************************/
-/******************************************************************************/
-
-/// Synthesizes the
-///
-/// \verbatim
-/// static resolve(_ address: ActorAddress,
-///                using transport: ActorTransport) throws -> Self {
-///   <filled in by SILGenDistributed>
-/// }
-/// \endverbatim
-///
-/// factory function in the AST, with an empty body. Its body is
-/// expected to be filled-in during SILGen.
-// TODO(distributed): move this synthesis to DerivedConformance style
-static void addFactoryResolveFunction(ClassDecl *decl) {
-  assert(decl->isDistributedActor());
-  auto &C = decl->getASTContext();
-
-  auto mkParam = [&](Identifier argName, Identifier paramName, Type ty) -> ParamDecl* {
-    auto *param = new (C) ParamDecl(SourceLoc(),
-                                    SourceLoc(), argName,
-                                    SourceLoc(), paramName, decl);
-    param->setImplicit();
-    param->setSpecifier(ParamSpecifier::Default);
-    param->setInterfaceType(ty);
-    return param;
-  };
-
-  auto addressType = C.getAnyActorIdentityDecl()->getDeclaredInterfaceType();
-  auto transportType = C.getActorTransportDecl()->getDeclaredInterfaceType();
-
-  // (_ identity: AnyActorIdentity, using transport: ActorTransport)
-  auto *params = ParameterList::create(
-      C,
-      /*LParenLoc=*/SourceLoc(),
-      /*params=*/{  mkParam(Identifier(), C.Id_identity, addressType),
-                    mkParam(C.Id_using, C.Id_transport, transportType)
-                  },
-      /*RParenLoc=*/SourceLoc()
-      );
-
-  // Func name: resolve(_:using:)
-  DeclName name(C, C.Id_resolve, params);
-
-  // Expected type: (Self) -> (AnyActorIdentity, ActorTransport) throws -> (Self)
-  auto *factoryDecl =
-      FuncDecl::createImplicit(C, StaticSpellingKind::KeywordStatic,
-                               name, SourceLoc(),
-                               /*async=*/false,
-                               /*throws=*/true,
-                               /*genericParams=*/nullptr,
-                               params,
-                               /*returnType*/decl->getDeclaredInterfaceType(),
-                               decl);
-
-  factoryDecl->setDistributedActorFactory(); // TODO(distributed): should we mark this specifically as the resolve factory?
-  factoryDecl->copyFormalAccessFrom(decl, /*sourceIsParentContext=*/true);
-
-  decl->addMember(factoryDecl);
-}
-
-/******************************************************************************/
 /*************************** _REMOTE_ FUNCTIONS *******************************/
 /******************************************************************************/
 
@@ -265,6 +202,5 @@ void swift::addImplicitDistributedActorMembersToClass(ClassDecl *decl) {
   if (!swift::ensureDistributedModuleLoaded(decl))
     return;
 
-  addFactoryResolveFunction(decl);
   addImplicitRemoteActorFunctions(decl);
 }

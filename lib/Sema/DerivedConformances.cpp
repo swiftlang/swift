@@ -359,6 +359,17 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
         return getRequirement(KnownProtocolKind::Hashable);
     }
 
+    // static DistributedActor.resolve(_:using:)
+    if (name.isCompoundName() && name.getBaseName() == ctx.Id_resolve &&
+        func->isStatic()) {
+      auto argumentNames = name.getArgumentNames();
+      if (argumentNames.size() == 2 &&
+          argumentNames[0] == Identifier() &&
+          argumentNames[1] == ctx.Id_using) {
+        return getRequirement(KnownProtocolKind::DistributedActor);
+      }
+    }
+
     return nullptr;
   }
 

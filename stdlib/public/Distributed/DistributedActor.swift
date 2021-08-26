@@ -34,8 +34,7 @@ public protocol AnyActor: Sendable, AnyObject {}
 /// distributed actor.
 @available(SwiftStdlib 5.5, *)
 public protocol DistributedActor:
-    AnyActor,
-    Identifiable, Hashable, Codable {
+    AnyActor, Identifiable, Hashable, Codable {
     /// Resolves the passed in `identity` against the `transport`, returning
     /// either a local or remote actor reference.
     ///

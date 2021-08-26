@@ -135,11 +135,9 @@ func test() {
   // a remote actor should not resign it's address, it was never "assigned" it
   print("before")
   _ = try! DA_userDefined2.resolve(.init(address), using: transport)
-  print("done")
   // CHECK: before
   // CHECK-NEXT: resolve type:DA_userDefined2, address:AnyActorIdentity(ActorAddress(address: "xxx"))
   // CHECK-NEXT: Deinitializing
-  // CHECK-NEXT: done
 }
 
 @available(SwiftStdlib 5.5, *)

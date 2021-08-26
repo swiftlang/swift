@@ -215,6 +215,9 @@ void swift::checkDistributedActorConstructor(const ClassDecl *decl, ConstructorD
 // ==== ------------------------------------------------------------------------
 
 void TypeChecker::checkDistributedActor(ClassDecl *decl) {
+  if (!decl)
+    return;
+
   // ==== Ensure the _Distributed module is available,
   // without it there's no reason to check the decl in more detail anyway.
   if (!swift::ensureDistributedModuleLoaded(decl))

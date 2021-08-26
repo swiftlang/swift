@@ -28,35 +28,77 @@ bool DerivedConformance::canDeriveDistributedActor(
   auto classDecl = dyn_cast<ClassDecl>(nominal);
   return classDecl && classDecl->isDistributedActor() && dc == nominal;
 }
+
 // ==== ------------------------------------------------------------------------
 
-// TODO: deduplicate with 'declareDerivedProperty' from DerivedConformance...
-std::pair<VarDecl *, PatternBindingDecl *>
-createStoredProperty(ClassDecl *classDecl, ASTContext &ctx,
-                     VarDecl::Introducer introducer, Identifier name,
-                     Type propertyInterfaceType, Type propertyContextType,
-                     bool isStatic, bool isFinal) {
-  auto parentDC = classDecl;
+/******************************************************************************/
+/******************************* RESOLVE FUNCTION *****************************/
+/******************************************************************************/
 
-  VarDecl *propDecl = new (ctx)
-      VarDecl(/*IsStatic*/ isStatic, introducer,
-                           SourceLoc(), name, parentDC);
-  propDecl->setImplicit();
-  propDecl->setSynthesized();
-  propDecl->copyFormalAccessFrom(classDecl, /*sourceIsParentContext*/ true);
-  propDecl->setInterfaceType(propertyInterfaceType);
+/// Synthesizes the
+///
+/// \verbatim
+/// static resolve(_ address: ActorAddress,
+///                using transport: ActorTransport) throws -> Self {
+///   <filled in by SILGenDistributed>
+/// }
+/// \endverbatim
+///
+/// factory function in the AST, with an empty body. Its body is
+/// expected to be filled-in during SILGen.
+// TODO(distributed): move this synthesis to DerivedConformance style
+static FuncDecl *deriveDistributedActor_resolve(DerivedConformance &derived) {
+  auto decl = dyn_cast<ClassDecl>(derived.Nominal);
+  assert(decl->isDistributedActor());
+  auto &C = decl->getASTContext();
 
-  Pattern *propPat = NamedPattern::createImplicit(ctx, propDecl);
-  propPat->setType(propertyContextType);
+  auto mkParam = [&](Identifier argName, Identifier paramName, Type ty) -> ParamDecl* {
+    auto *param = new (C) ParamDecl(SourceLoc(),
+                                    SourceLoc(), argName,
+                                    SourceLoc(), paramName, decl);
+    param->setImplicit();
+    param->setSpecifier(ParamSpecifier::Default);
+    param->setInterfaceType(ty);
+    return param;
+  };
 
-  propPat = TypedPattern::createImplicit(ctx, propPat, propertyContextType);
-  propPat->setType(propertyContextType);
+  auto addressType = C.getAnyActorIdentityDecl()->getDeclaredInterfaceType();
+  auto transportType = C.getActorTransportDecl()->getDeclaredInterfaceType();
 
-  auto *pbDecl = PatternBindingDecl::createImplicit(
-      ctx, StaticSpellingKind::None, propPat, /*InitExpr*/ nullptr,
-      parentDC);
-  return {propDecl, pbDecl};
+  // (_ identity: AnyActorIdentity, using transport: ActorTransport)
+  auto *params = ParameterList::create(
+      C,
+      /*LParenLoc=*/SourceLoc(),
+      /*params=*/{  mkParam(Identifier(), C.Id_identity, addressType),
+                  mkParam(C.Id_using, C.Id_transport, transportType)
+      },
+      /*RParenLoc=*/SourceLoc()
+  );
+
+  // Func name: resolve(_:using:)
+  DeclName name(C, C.Id_resolve, params);
+
+  // Expected type: (Self) -> (AnyActorIdentity, ActorTransport) throws -> (Self)
+  auto *factoryDecl =
+      FuncDecl::createImplicit(C, StaticSpellingKind::KeywordStatic,
+                               name, SourceLoc(),
+                               /*async=*/false,
+                               /*throws=*/true,
+                               /*genericParams=*/nullptr,
+                               params,
+                               /*returnType*/decl->getDeclaredInterfaceType(),
+                               decl);
+
+  factoryDecl->setDistributedActorFactory(); // TODO(distributed): should we mark this specifically as the resolve factory?
+  factoryDecl->copyFormalAccessFrom(decl, /*sourceIsParentContext=*/true);
+
+  derived.addMembersToConformanceContext({factoryDecl});
+  return factoryDecl;
 }
+
+/******************************************************************************/
+/******************************* PROPERTIES ***********************************/
+/******************************************************************************/
 
 static ValueDecl *deriveDistributedActor_id(DerivedConformance &derived) {
   assert(derived.Nominal->isDistributedActor());
@@ -114,7 +156,6 @@ static ValueDecl *deriveDistributedActor_actorTransport(
   return propDecl;
 }
 
-
 // ==== ------------------------------------------------------------------------
 
 ValueDecl *DerivedConformance::deriveDistributedActor(ValueDecl *requirement) {
@@ -124,6 +165,13 @@ ValueDecl *DerivedConformance::deriveDistributedActor(ValueDecl *requirement) {
 
     if (var->getName() == Context.Id_actorTransport)
       return deriveDistributedActor_actorTransport(*this);
+  }
+
+  if (auto func = dyn_cast<FuncDecl>(requirement)) {
+    // just a simple name check is enough here,
+    // if we are invoked here we know for sure it is for the "right" function
+    if (func->getName().getBaseName() == Context.Id_resolve)
+      return deriveDistributedActor_resolve(*this);
   }
 
   return nullptr;
