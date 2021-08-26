@@ -4934,6 +4934,15 @@ ConstraintSystem::isArgumentExpr(Expr *expr) {
     return None;
   }
 
+  // Specifically for unresolved member expr getParentExpr returns a chain
+  // result expr as its immediate parent, so let's look one level up on AST.
+  if (auto *URMCR = getAsExpr<UnresolvedMemberChainResultExpr>(argList)) {
+    argList = getParentExpr(URMCR);
+    if (!argList) {
+      return None;
+    }
+  }
+
   if (isa<ParenExpr>(argList)) {
     for (;;) {
       auto *parent = getParentExpr(argList);
