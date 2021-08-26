@@ -664,7 +664,6 @@ extension Unsafe${Mutable}RawBufferPointer {
   public func initializeMemory<S: Sequence>(
     as type: S.Element.Type, from source: S
   ) -> (unwritten: S.Iterator, initialized: UnsafeMutableBufferPointer<S.Element>) {
-    // TODO: Optimize where `C` is a `ContiguousArrayBuffer`.
 
     var unwritten = source.makeIterator()
     let elementStride = MemoryLayout<S.Element>.stride
@@ -694,6 +693,43 @@ extension Unsafe${Mutable}RawBufferPointer {
 
     let start = base.assumingMemoryBound(to: S.Element.self)
     let buffer = UnsafeMutableBufferPointer(start: start, count: written)
+    return (unwritten, buffer)
+  }
+
+  /// Initializes the buffer's memory with the given elements, binding the
+  /// initialized memory to the elements' type.
+  ///
+  /// When calling the `initializeMemory(as:from:)` method on a buffer `b`,
+  /// the memory referenced by `b` must be uninitialized or initialized to a
+  /// trivial type, and must be properly aligned for accessing `C.Element`.
+  /// The buffer must contain sufficient memory to accommodate
+  /// `source.count`.
+  ///
+  /// This method initializes the buffer with elements from `source` until
+  /// `source` is exhausted. After calling `initializeMemory(as:from:)`,
+  /// the memory referenced by the returned `UnsafeMutableBufferPointer`
+  /// instance is bound and initialized to type `C.Element`.
+  ///
+  /// - Parameters:
+  ///   - type: The type of the elements to bind the buffer's memory to.
+  ///   - source: A collection of elements with which to initialize the buffer.
+  /// - Returns: An iterator to any elements of `source` that didn't fit in the
+  ///   buffer, and a typed buffer of the written elements. The returned
+  ///   buffer references memory starting at the same base address as this
+  ///   buffer.
+  @_alwaysEmitIntoClient
+  public func initializeMemory<C: Collection>(
+    as type: C.Element.Type, from source: C
+  ) -> (unwritten: C.Iterator, initialized: UnsafeMutableBufferPointer<C.Element>) {
+
+    let offered = source.count
+    _precondition(offered <= count / MemoryLayout<C.Element>.stride,
+      "insufficient space to accommodate source.count elements")
+
+    let start = baseAddress?.bindMemory(to: C.Element.self, capacity: offered)
+    let buffer = UnsafeMutableBufferPointer(start: start, count: offered)
+    let (unwritten, written) = source._copyContents(initializing: buffer)
+    _internalInvariant(written == offered)
     return (unwritten, buffer)
   }
   %  end # mutable
