@@ -543,7 +543,7 @@ extension AsyncThrowingStream {
 }
 
 // this is used to store closures; which are two words
-final class _AsyncStreamCriticalStorage<Contents> {
+final class _AsyncStreamCriticalStorage<Contents>: UnsafeSendable {
   var _value: Contents
   private init(_doNotCallMe: ()) {
     fatalError("_AsyncStreamCriticalStorage must be initialized by create")
