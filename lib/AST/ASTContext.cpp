@@ -2951,7 +2951,7 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
         auto ext = dyn_cast<ExtensionDecl>(AFD->getDeclContext());
         auto distProto =
             Ctx.getProtocol(KnownProtocolKind::DistributedActor);
-        if (ext && ext->getExtendedNominal() &&
+        if (distProto && ext && ext->getExtendedNominal() &&
             ext->getExtendedNominal()->getInterfaceType()
                 ->isEqual(distProto->getInterfaceType())) {
           auto name = CD->getName();
