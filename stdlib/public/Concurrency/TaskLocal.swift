@@ -188,6 +188,7 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   // the type-checker that this property-wrapper never wants to have an enclosing
   // instance (it is impossible to declare a property wrapper inside the `Never`
   // type).
+  @available(*, unavailable, message: "property wrappers cannot be instance members")
   public static subscript(
     _enclosingInstance object: Never,
     wrapped wrappedKeyPath: ReferenceWritableKeyPath<Never, Value>,
