@@ -3652,7 +3652,7 @@ begin_borrow
 
 ::
 
-   sil-instruction ::= 'begin_borrow' sil-operand
+   sil-instruction ::= 'begin_borrow' '[defined]'? sil-operand
 
    %1 = begin_borrow %0 : $T
 
@@ -3664,6 +3664,10 @@ in `Dead End Blocks`_. This `begin_borrow`_ and the lifetime ending uses of
 region in between this borrow and its lifetime ending use, ``%0`` must be
 live. This makes sense semantically since ``%1`` is modeling a new value with a
 dependent lifetime on ``%0``.
+
+The optional ``defined`` attribute specifies that the operand corresponds to a
+local variable in the Swift source, so special care must be taken when moving
+the end_borrow.
 
 This instruction is only valid in functions in Ownership SSA form.
 

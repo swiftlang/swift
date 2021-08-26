@@ -29,3 +29,17 @@ bb0(%0 : $*Builtin.NativeObject, %1 : @guaranteed $Builtin.NativeObject):
   %4 = tuple()
   return %4 : $()
 }
+
+class C {}
+
+// CHECK-LABEL: sil [ossa] @defined_borrow_test
+// CHECK: begin_borrow [defined] {{%[^,]+}}
+// CHECK-LABEL: } // end sil function 'defined_borrow_test'
+sil [ossa] @defined_borrow_test : $@convention(thin) () -> () {
+  %instance = alloc_ref $C
+  %guaranteed_c = begin_borrow [defined] %instance : $C
+  end_borrow %guaranteed_c : $C
+  destroy_value %instance : $C
+  %res = tuple ()
+  return %res : $()
+}

@@ -3278,11 +3278,21 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
   case SILInstructionKind::BeginBorrowInst: {
     SourceLoc AddrLoc;
 
+    bool defined = false;
+    StringRef attributeName;
+
+    if (parseSILOptional(attributeName, *this)) {
+      if (attributeName.equals("defined"))
+        defined = true;
+      else
+        return true;
+    }
+
     if (parseTypedValueRef(Val, AddrLoc, B) ||
         parseSILDebugLocation(InstLoc, B))
       return true;
 
-    ResultVal = B.createBeginBorrow(InstLoc, Val);
+    ResultVal = B.createBeginBorrow(InstLoc, Val, defined);
     break;
   }
 
