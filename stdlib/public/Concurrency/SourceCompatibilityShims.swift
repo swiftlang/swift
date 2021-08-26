@@ -155,11 +155,11 @@ public func async<T>(
 @available(SwiftStdlib 5.5, *)
 extension Task where Success == Never, Failure == Never {
   @available(*, deprecated, message: "`Task.Group` was replaced by `ThrowingTaskGroup` and `TaskGroup` and will be removed shortly.")
-  public typealias Group<TaskResult> = ThrowingTaskGroup<TaskResult, Error>
+  public typealias Group<TaskResult: Sendable> = ThrowingTaskGroup<TaskResult, Error>
 
   @available(*, deprecated, message: "`Task.withGroup` was replaced by `withThrowingTaskGroup` and `withTaskGroup` and will be removed shortly.")
   @_alwaysEmitIntoClient
-  public static func withGroup<TaskResult, BodyResult>(
+  public static func withGroup<TaskResult: Sendable, BodyResult>(
       resultType: TaskResult.Type,
       returning returnType: BodyResult.Type = BodyResult.self,
       body: (inout Task.Group<TaskResult>) async throws -> BodyResult

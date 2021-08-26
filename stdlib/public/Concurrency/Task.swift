@@ -756,7 +756,7 @@ func _enqueueJobGlobalWithDelay(_ delay: UInt64, _ task: Builtin.Job)
 public func _asyncMainDrainQueue() -> Never
 
 @available(SwiftStdlib 5.5, *)
-public func _runAsyncMain(_ asyncFun: @escaping () async throws -> ()) {
+public func _runAsyncMain(@_unsafeSendable _ asyncFun: @escaping () async throws -> ()) {
   Task.detached {
     do {
 #if !os(Windows)
