@@ -28,16 +28,15 @@ distributed actor D3 {
 @available(SwiftStdlib 5.5, *)
 distributed actor D4 {
   // expected-error@-1{{actor 'D4' has no initializers}}
-  // expected-error@-2{{type 'D4' does not conform to protocol 'DistributedActor'}}
   let actorTransport: String
-  // expected-error@-1{{invalid redeclaration of synthesized property 'actorTransport'}}
+  // expected-error@-1{{invalid redeclaration of synthesized implementation for protocol requirement 'actorTransport'}}
   // expected-error@-2{{property 'actorTransport' cannot be defined explicitly, as it conflicts with distributed actor synthesized stored property}}
   // expected-note@-3{{stored property 'actorTransport' without initial value prevents synthesized initializers}}
   let id: AnyActorIdentity
-  // expected-error@-1{{invalid redeclaration of synthesized property 'id'}}
+  // expected-error@-1{{actor-isolated property 'id' cannot be used to satisfy a protocol requirement}}
   // expected-error@-2{{property 'id' cannot be defined explicitly, as it conflicts with distributed actor synthesized stored property}}
-  // expected-note@-3{{stored property 'id' without initial value prevents synthesized initializers}}
-  // expected-note@-4{{candidate exactly matches}}
+  // expected-error@-3{{actor-isolated property 'id' cannot be used to satisfy a protocol requirement}}
+  // expected-note@-4{{stored property 'id' without initial value prevents synthesized initializers}}
 }
 
 // ==== Tests ------------------------------------------------------------------

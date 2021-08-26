@@ -7,24 +7,33 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
-// REQUIRES: rdar78290608
-
 import _Distributed
 
 @available(SwiftStdlib 5.5, *)
-actor A {}
+    actor A {}
 
 @available(SwiftStdlib 5.5, *)
 distributed actor DA {
+  init(transport: ActorTransport) {
+    defer { transport.actorReady(self) }
+  }
 }
 
 @available(SwiftStdlib 5.5, *)
 distributed actor DA_userDefined {
+  init(transport: ActorTransport) {
+    defer { transport.actorReady(self) }
+  }
+
   deinit {}
 }
 
 @available(SwiftStdlib 5.5, *)
 distributed actor DA_userDefined2 {
+  init(transport: ActorTransport) {
+    defer { transport.actorReady(self) }
+  }
+
   deinit {
     print("Deinitializing \(self.id)")
     return
@@ -35,6 +44,10 @@ distributed actor DA_userDefined2 {
 distributed actor DA_state {
   var name = "Hello"
   var age = 42
+
+  init(transport: ActorTransport) {
+    defer { transport.actorReady(self) }
+  }
 
   deinit {
     print("Deinitializing \(self.id)")
@@ -59,7 +72,7 @@ struct FakeTransport: ActorTransport {
     fatalError("not implemented \(#function)")
   }
 
-  func resolve<Act>(_ identity: Act.ID, as actorType: Act.Type) throws -> Act?
+  func resolve<Act>(_ identity: AnyActorIdentity, as actorType: Act.Type) throws -> Act?
       where Act: DistributedActor {
     print("resolve type:\(actorType), address:\(identity)")
     return nil
@@ -121,11 +134,10 @@ func test() {
 
   // a remote actor should not resign it's address, it was never "assigned" it
   print("before")
-  _ = try! DA_userDefined2(resolve: .init(address), using: transport)
-  print("done")
+  _ = try! DA_userDefined2.resolve(.init(address), using: transport)
   // CHECK: before
+  // CHECK-NEXT: resolve type:DA_userDefined2, address:AnyActorIdentity(ActorAddress(address: "xxx"))
   // CHECK-NEXT: Deinitializing
-  // CHECK-NEXT: done
 }
 
 @available(SwiftStdlib 5.5, *)
