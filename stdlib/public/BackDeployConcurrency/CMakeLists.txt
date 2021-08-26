@@ -41,6 +41,5 @@ add_compile_definitions(SWIFT_CONCURRENCY_BACK_DEPLOYMENT)
 set(swift_concurrency_swift_flags -Xfrontend -enable-experimental-back-deploy-concurrency)
 set(swift_concurrency_install_component back-deployment)
 set(swift_concurrency_options BACK_DEPLOYMENT_LIBRARY 5.5)
-set(swift_concurrency_availability "macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0")
 
 add_subdirectory(../Concurrency stdlib/public/BackDeployConcurrency)
