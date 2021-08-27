@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -O -primary-file %s -emit-sil -enable-experimental-distributed | %FileCheck %s --dump-input=fail
+// REQUIRES: concurrency
 
 import _Distributed
 
