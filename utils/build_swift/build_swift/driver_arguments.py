@@ -592,7 +592,8 @@ def create_argument_parser():
     option(['--back-deploy-concurrency'], toggle_true('build_backdeployconcurrency'),
            help='build back-deployment support for concurrency')
 
-    option(['--install-back-deploy-concurrency'], toggle_true('install_backdeployconcurrency'),
+    option(['--install-back-deploy-concurrency'],
+           toggle_true('install_backdeployconcurrency'),
            help='install back-deployment support libraries for concurrency')
 
     option(['--libcxx'], toggle_true('build_libcxx'),
