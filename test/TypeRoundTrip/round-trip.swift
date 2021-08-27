@@ -6,7 +6,7 @@
 // RUN: echo "func runAllTests() throws {" >> %t/all-tests.swift
 // RUN: for module in %S/Inputs/testcases/*.swift; do modname=$(basename $module .swift); %target-build-swift -g -static -emit-module-path %t/$modname.swiftmodule -emit-module -emit-library -module-name $modname -o %t/%target-static-library-name($modname) -I%t -L%t $module -lRoundTrip; echo "  print(\"--- $modname\")" >> %t/all-tests.swift; echo "  $modname.test()" >> %t/all-tests.swift; echo "  print(\"\")" >> %t/all-tests.swift; echo "-l$modname" >> %t/link.txt; done
 // RUN: echo "}" >> %t/all-tests.swift
-// RUN: %target-build-swift -g -I%t -o %t/round-trip %s %t/all-tests.swift -L%t %target-cxx-lib $(cat %t/link.txt) -lRoundTrip -lswiftReflection
+// RUN: %target-build-swift -g -I%t -o %t/round-trip %s %t/all-tests.swift -L%t %target-cxx-lib $(cat %t/link.txt) -lm -lRoundTrip -lswiftReflection
 // RUN: %target-codesign %t/round-trip
 // RUN: %target-run %t/round-trip | %FileCheck %s
 
