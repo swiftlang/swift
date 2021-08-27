@@ -26,6 +26,7 @@
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/raw_ostream.h"
 #include <memory>
 
@@ -772,6 +773,8 @@ class ConjunctionStep : public BindingStep<ConjunctionElementProducer> {
   class SolverSnapshot {
     ConstraintSystem &CS;
 
+    Optional<llvm::SaveAndRestore<DeclContext *>> DC = None;
+
     llvm::SetVector<TypeVariableType *> TypeVars;
     ConstraintList Constraints;
 
@@ -782,8 +785,15 @@ class ConjunctionStep : public BindingStep<ConjunctionElementProducer> {
     std::unique_ptr<Scope> IsolationScope = nullptr;
 
   public:
-    SolverSnapshot(ConstraintSystem &cs)
+    SolverSnapshot(ConstraintSystem &cs, Constraint *conjunction)
         : CS(cs), TypeVars(std::move(cs.TypeVariables)) {
+      auto *locator = conjunction->getLocator();
+      // If this conjunction represents a closure, we need to
+      // switch declaration context over to it.
+      if (locator->directlyAt<ClosureExpr>()) {
+        DC.emplace(CS.DC, castToExpr<ClosureExpr>(locator->getAnchor()));
+      }
+
       auto &CG = CS.getConstraintGraph();
       // Remove all of the current inactive constraints.
       Constraints.splice(Constraints.end(), CS.InactiveConstraints);
@@ -827,6 +837,7 @@ class ConjunctionStep : public BindingStep<ConjunctionElementProducer> {
 
   private:
     void restore() {
+      DC.reset();
       CS.TypeVariables = std::move(TypeVars);
       CS.InactiveConstraints.splice(CS.InactiveConstraints.end(), Constraints);
     }
@@ -881,7 +892,7 @@ public:
 
     // Make a snapshot of the constraint system state before conjunction.
     if (conjunction->isIsolated())
-      Snapshot.emplace(cs);
+      Snapshot.emplace(cs, conjunction);
   }
 
   ~ConjunctionStep() override {
