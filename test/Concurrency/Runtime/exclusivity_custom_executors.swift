@@ -9,6 +9,7 @@
 
 // Disabled until test hang can be looked at.
 // UNSUPPORTED: OS=windows-msvc
+// UNSUPPORTED: OS=wasi
 
 // This test makes sure that we properly save/restore access when we
 // synchronously launch a task from a serial executor. The access from the task
