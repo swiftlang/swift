@@ -468,6 +468,7 @@ EXPECTED_OPTIONS = [
     SetOption('--skip-watchos', dest='watchos', value=False),
 
     SetTrueOption('--back-deploy-concurrency', dest='build_backdeployconcurrency'),
+    SetTrueOption('--install-back-deploy-concurrency', dest='install_backdeployconcurrency'),
     SetTrueOption('--benchmark'),
     SetTrueOption('--clean'),
     SetTrueOption('--dry-run'),

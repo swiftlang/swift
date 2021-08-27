@@ -137,7 +137,7 @@ class BackDeployConcurrency(cmake_product.CMakeProduct):
         raise RuntimeError("Testing not implemented")
 
     def should_install(self, host_target):
-        return False
+        return self.args.install_backdeployconcurrency
 
     def install(self, host_target):
         destdir = self.host_install_destdir(host_target) + self.args.install_prefix
