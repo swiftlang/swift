@@ -8671,8 +8671,11 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
         return None;
 
       auto *pattern = resultTarget->getInitializationPattern();
-      patternBinding->setPattern(index, pattern,
-                                 resultTarget->getDeclContext());
+      // Record that the pattern has been fully validated,
+      // this is important for subsequent call to typeCheckDecl
+      // because otherwise it would try to re-typecheck pattern.
+      patternBinding->setPattern(index, pattern, resultTarget->getDeclContext(),
+                                 /*isFullyValidated=*/true);
 
       if (patternBinding->isExplicitlyInitialized(index) ||
           (patternBinding->isDefaultInitializable(index) &&
