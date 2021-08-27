@@ -194,7 +194,17 @@ getRuntimeVersionThatSupportsDemanglingType(IRGenModule &IGM,
     // guards, so we don't need to limit availability of mangled names
     // involving them.
   }
-  
+
+  bool needsConcurrency = type.findIf([](CanType t) -> bool {
+    if (auto fn = dyn_cast<AnyFunctionType>(t)) {
+      return fn->isAsync() || fn->isSendable() || fn->hasGlobalActor();
+    }
+    return false;
+  });
+  if (needsConcurrency) {
+    return llvm::VersionTuple(5, 5);
+  }
+
   return llvm::VersionTuple(5, 0);
 }
 
