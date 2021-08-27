@@ -179,7 +179,9 @@ toolchains::Windows::constructInvocation(const DynamicLinkJobAction &job,
   }
 
   context.Args.AddAllArgs(Arguments, options::OPT_Xlinker);
-  context.Args.AddAllArgs(Arguments, options::OPT_linker_option_Group);
+  context.Args.AddAllArgsExcept(Arguments, {options::OPT_linker_option_Group},
+                                {options::OPT_l});
+  ToolChain::addLinkedLibArgs(context.Args, Arguments);
   context.Args.AddAllArgValues(Arguments, options::OPT_Xclang_linker);
 
   // Run clang in verbose mode if "-v" is set
