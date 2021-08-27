@@ -894,10 +894,14 @@ private:
     // Generate constraints for pattern binding declarations.
     if (auto patternBinding = dyn_cast<PatternBindingDecl>(decl)) {
       SolutionApplicationTarget target(patternBinding);
-      if (!rewriteTarget(target))
+      if (!rewriteTarget(target)) {
         hadError = true;
+        return;
+      }
 
-      return;
+      // Allow `typeCheckDecl` to be called after solution is applied
+      // to a pattern binding. That would materialize required
+      // information e.g. accessors and do access/availability checks.
     }
 
     TypeChecker::typeCheckDecl(decl);
