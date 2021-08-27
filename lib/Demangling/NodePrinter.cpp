@@ -772,7 +772,7 @@ private:
   }
 
   void printFunctionType(NodePointer LabelList, NodePointer node) {
-    if (node->getNumChildren() < 2 || node->getNumChildren() > 6) {
+    if (node->getNumChildren() < 2) {
       setInvalid();
       return;
     }
@@ -811,9 +811,14 @@ private:
       assert(false && "Unhandled function type in printFunctionType!");
     }
 
+    unsigned argIndex = node->getNumChildren() - 2;
     unsigned startIndex = 0;
     bool isSendable = false, isAsync = false, isThrows = false;
     auto diffKind = MangledDifferentiabilityKind::NonDifferentiable;
+    if (node->getChild(startIndex)->getKind() == Node::Kind::ClangType) {
+      // handled earlier
+      ++startIndex;
+    }
     if (node->getChild(startIndex)->getKind() ==
           Node::Kind::GlobalActorFunctionType) {
       print(node->getChild(startIndex));
@@ -823,10 +828,6 @@ private:
         Node::Kind::DifferentiableFunctionType) {
       diffKind =
           (MangledDifferentiabilityKind)node->getChild(startIndex)->getIndex();
-      ++startIndex;
-    }
-    if (node->getChild(startIndex)->getKind() == Node::Kind::ClangType) {
-      // handled earlier
       ++startIndex;
     }
     if (node->getChild(startIndex)->getKind() == Node::Kind::ThrowsAnnotation) {
@@ -863,7 +864,7 @@ private:
     if (isSendable)
       Printer << "@Sendable ";
 
-    printFunctionParameters(LabelList, node->getChild(startIndex),
+    printFunctionParameters(LabelList, node->getChild(argIndex),
                             Options.ShowFunctionArgumentTypes);
 
     if (!Options.ShowFunctionArgumentTypes)
@@ -875,7 +876,7 @@ private:
     if (isThrows)
       Printer << " throws";
 
-    print(node->getChild(startIndex + 1));
+    print(node->getChild(argIndex + 1));
   }
 
   void printImplFunctionType(NodePointer fn) {
