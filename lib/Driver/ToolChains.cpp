@@ -142,6 +142,7 @@ static void addLTOArgs(const OutputInfo &OI, ArgStringList &arguments) {
   }
 }
 
+
 void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
                                       const CommandOutput &output,
                                       const ArgList &inputArgs,
@@ -838,7 +839,8 @@ ToolChain::constructInvocation(const InterpretJobAction &job,
   Arguments.push_back("-module-name");
   Arguments.push_back(context.Args.MakeArgString(context.OI.ModuleName));
 
-  context.Args.AddAllArgs(Arguments, options::OPT_l, options::OPT_framework);
+  context.Args.AddAllArgs(Arguments, options::OPT_framework);
+  ToolChain::addLinkedLibArgs(context.Args, Arguments);
 
   // The immediate arguments must be last.
   context.Args.AddLastArg(Arguments, options::OPT__DASH_DASH);
@@ -1186,8 +1188,8 @@ ToolChain::constructInvocation(const REPLJobAction &job,
   addRuntimeLibraryFlags(context.OI, FrontendArgs);
 
   context.Args.AddLastArg(FrontendArgs, options::OPT_import_objc_header);
-  context.Args.AddAllArgs(FrontendArgs, options::OPT_l, options::OPT_framework,
-                          options::OPT_L);
+  context.Args.AddAllArgs(FrontendArgs, options::OPT_framework, options::OPT_L);
+  ToolChain::addLinkedLibArgs(context.Args, FrontendArgs);
 
   if (!useLLDB) {
     FrontendArgs.insert(FrontendArgs.begin(), {"-frontend", "-repl"});
