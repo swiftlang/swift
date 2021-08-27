@@ -902,13 +902,6 @@ namespace {
     /// insert RebindSelfInConstructorExpr nodes.
     llvm::SmallVector<Expr *, 8> ExprStack;
 
-    /// A stack, corresponding to \c ExprStack above, that indicates at each
-    /// level whether the enclosing context is plausibly something that will
-    /// be folded into a \c TypeExpr after \c simplifyTypeExpr is called.
-    /// This helps us determine whether '_' should become a placeholder type or
-    /// not, which lets us produce better diagnostics during type checking.
-    llvm::SmallVector<bool, 8> PossibleTypeContextStack;
-
     /// The 'self' variable to use when rebinding 'self' in a constructor.
     VarDecl *UnresolvedCtorSelf = nullptr;
 
@@ -942,12 +935,12 @@ namespace {
     /// the type conforms to the expected literal protocol.
     Expr *simplifyTypeConstructionWithLiteralArg(Expr *E);
 
-    /// Whether we are in a context that might turn out to be a \c TypeExpr
-    /// after \c simplifyTypeExpr is called up the tree. This function allows
-    /// us to make better guesses about whether invalid uses of '_' were
-    /// "supposed" to be \c DiscardAssignmentExprs or patterns, which results
-    /// in better diagnostics after type checking.
-    bool possiblyInTypeContext();
+    /// Whether the current expression \p E is in a context that might turn out
+    /// to be a \c TypeExpr after \c simplifyTypeExpr is called up the tree.
+    /// This function allows us to make better guesses about whether invalid
+    /// uses of '_' were "supposed" to be \c DiscardAssignmentExprs or patterns,
+    /// which results in better diagnostics after type checking.
+    bool possiblyInTypeContext(Expr *E);
 
     /// Whether we can simplify the given discard assignment expr. Not possible
     /// if it's been marked "valid" or if the current state of the AST disallows
@@ -1170,17 +1163,7 @@ namespace {
         if (recursive) {
           if (isa<SequenceExpr>(expr))
             SequenceExprDepth++;
-
-          // The next level is considered a type context if either:
-          // - The expression is a valid parent for a TypeExpr, or
-          // - The current level is a type context and the expression "looks
-          //   like" a type (and is not a call arg).
-          bool shouldEnterTypeContext = expr->isValidTypeExprParent();
-          bool shouldContinueTypeContext = possiblyInTypeContext() &&
-              exprLooksLikeAType(expr) && !CallArgs.count(expr);
           ExprStack.push_back(expr);
-          PossibleTypeContextStack.push_back(shouldEnterTypeContext ||
-                                             shouldContinueTypeContext);
         }
 
         return std::make_pair(recursive, expr);
@@ -1302,7 +1285,6 @@ namespace {
       // Remove this expression from the stack.
       assert(ExprStack.back() == expr);
       ExprStack.pop_back();
-      PossibleTypeContextStack.pop_back();
 
       // Mark the direct callee as being a callee.
       if (auto *call = dyn_cast<ApplyExpr>(expr))
@@ -1591,17 +1573,30 @@ TypeExpr *PreCheckExpression::simplifyUnresolvedSpecializeExpr(
   return nullptr;
 }
 
-bool PreCheckExpression::possiblyInTypeContext() {
-  return !PossibleTypeContextStack.empty() && PossibleTypeContextStack.back();
+bool PreCheckExpression::possiblyInTypeContext(Expr *E) {
+  // Walk back up the stack of parents looking for a valid type context.
+  for (auto *ParentExpr : llvm::reverse(ExprStack)) {
+    // We're considered to be in a type context if either:
+    // - We have a valid parent for a TypeExpr, or
+    // - The parent "looks like" a type (and is not a call arg), and we can
+    //   reach a valid parent for a TypeExpr if we continue walking.
+    if (ParentExpr->isValidParentOfTypeExpr(E))
+      return true;
+
+    if (!exprLooksLikeAType(ParentExpr) || CallArgs.count(ParentExpr))
+      return false;
+
+    E = ParentExpr;
+  }
+  return false;
 }
 
 /// Only allow simplification of a DiscardAssignmentExpr if it hasn't already
 /// been explicitly marked as correct, and the current AST state allows it.
 bool PreCheckExpression::canSimplifyDiscardAssignmentExpr(
     DiscardAssignmentExpr *DAE) {
-  return !CorrectDiscardAssignmentExprs.count(DAE) &&
-      possiblyInTypeContext() &&
-      SequenceExprDepth == 0;
+  return !CorrectDiscardAssignmentExprs.count(DAE) && SequenceExprDepth == 0 &&
+         possiblyInTypeContext(DAE);
 }
 
 /// Simplify expressions which are type sugar productions that got parsed
