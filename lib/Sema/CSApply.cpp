@@ -8811,6 +8811,7 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
 
       if (patternBinding->getInit(index)) {
         patternBinding->setInit(index, resultTarget->getAsExpr());
+        patternBinding->setInitializerChecked(index);
       }
     }
 
