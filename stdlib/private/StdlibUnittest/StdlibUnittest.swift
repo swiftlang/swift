@@ -35,6 +35,12 @@ import WinSDK
 import ObjectiveC
 #endif
 
+#if os(WASI)
+let platformSupportSpawnChild = false
+#else
+let platformSupportSpawnChild = true
+#endif
+
 extension String {
   /// Returns the lines in `self`.
   public var _lines : [String] {
@@ -1690,12 +1696,7 @@ public func runAllTests() {
   if _isChildProcess {
     _childProcess()
   } else {
-    #if os(WASI)
-    // WASI doesn't support child process
-    var runTestsInProcess: Bool = true
-    #else
-    var runTestsInProcess: Bool = false
-    #endif
+    var runTestsInProcess: Bool = !platformSupportSpawnChild
     var filter: String?
     var args = [String]()
     var i = 0
@@ -1765,7 +1766,7 @@ public func runAllTestsAsync() async {
   if _isChildProcess {
     await _childProcessAsync()
   } else {
-    var runTestsInProcess: Bool = false
+    var runTestsInProcess: Bool = !platformSupportSpawnChild
     var filter: String?
     var args = [String]()
     var i = 0
