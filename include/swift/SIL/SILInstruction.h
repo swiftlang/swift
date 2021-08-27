@@ -734,8 +734,7 @@ public:
   /// Returns true if the instruction is only relevant for debug
   /// informations and has no other impact on program semantics.
   bool isDebugInstruction() const {
-    return getKind() == SILInstructionKind::DebugValueInst ||
-           getKind() == SILInstructionKind::DebugValueAddrInst;
+    return getKind() == SILInstructionKind::DebugValueInst;
   }
 
   /// Returns true if the instruction is a meta instruction which is
@@ -1720,8 +1719,8 @@ public:
 };
 
 /// Holds common debug information about local variables and function
-/// arguments that are needed by DebugValueInst, DebugValueAddrInst,
-/// AllocStackInst, and AllocBoxInst.
+/// arguments that are needed by DebugValueInst, AllocStackInst,
+/// and AllocBoxInst.
 struct SILDebugVariable {
   StringRef Name;
   unsigned ArgNo : 16;
@@ -4738,58 +4737,6 @@ public:
 
   void setPoisonRefs(bool poisonRefs = true) {
     SILNode::Bits.DebugValueInst.PoisonRefs = poisonRefs;
-  }
-};
-
-/// Define the start or update to a symbolic variable value (for address-only
-/// types) .
-class DebugValueAddrInst final
-    : public UnaryInstructionBase<SILInstructionKind::DebugValueAddrInst,
-                                  NonValueInstruction>,
-      private SILDebugVariableSupplement,
-      private llvm::TrailingObjects<DebugValueAddrInst, SILType, SILLocation,
-                                    const SILDebugScope *, SILDIExprElement,
-                                    char> {
-  friend TrailingObjects;
-  friend SILBuilder;
-
-  TailAllocatedDebugVariable VarInfo;
-
-  DebugValueAddrInst(SILDebugLocation DebugLoc, SILValue Operand,
-                     SILDebugVariable Var);
-  static DebugValueAddrInst *create(SILDebugLocation DebugLoc,
-                                    SILValue Operand, SILModule &M,
-                                    SILDebugVariable Var);
-
-  SIL_DEBUG_VAR_SUPPLEMENT_TRAILING_OBJS_IMPL()
-
-public:
-  /// Return the underlying variable declaration that this denotes,
-  /// or null if we don't have one.
-  VarDecl *getDecl() const;
-  /// Return the debug variable information attached to this instruction.
-  Optional<SILDebugVariable> getVarInfo() const {
-    Optional<SILType> AuxVarType;
-    Optional<SILLocation> VarDeclLoc;
-    const SILDebugScope *VarDeclScope = nullptr;
-    if (HasAuxDebugVariableType)
-      AuxVarType = *getTrailingObjects<SILType>();
-
-    if (hasAuxDebugLocation())
-      VarDeclLoc = *getTrailingObjects<SILLocation>();
-    if (hasAuxDebugScope())
-      VarDeclScope = *getTrailingObjects<const SILDebugScope *>();
-
-    llvm::ArrayRef<SILDIExprElement> DIExprElements(
-        getTrailingObjects<SILDIExprElement>(), NumDIExprOperands);
-
-    return VarInfo.get(getDecl(), getTrailingObjects<char>(), AuxVarType,
-                       VarDeclLoc, VarDeclScope, DIExprElements);
-  }
-
-  void setDebugVarScope(const SILDebugScope *NewDS) {
-    if (hasAuxDebugScope())
-      *getTrailingObjects<const SILDebugScope *>() = NewDS;
   }
 };
 

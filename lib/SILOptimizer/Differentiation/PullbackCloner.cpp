@@ -1676,7 +1676,6 @@ public:
 
   // Debugging/reference counting instructions.
   NO_ADJOINT(DebugValue)
-  NO_ADJOINT(DebugValueAddr)
   NO_ADJOINT(RetainValue)
   NO_ADJOINT(RetainValueAddr)
   NO_ADJOINT(ReleaseValue)

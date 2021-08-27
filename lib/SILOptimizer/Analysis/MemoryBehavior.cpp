@@ -364,7 +364,6 @@ static bool hasEscapingUses(SILValue address, int &numChecks) {
       return true;
 
     switch (user->getKind()) {
-      case SILInstructionKind::DebugValueAddrInst:
       case SILInstructionKind::FixLifetimeInst:
       case SILInstructionKind::LoadInst:
       case SILInstructionKind::StoreInst:

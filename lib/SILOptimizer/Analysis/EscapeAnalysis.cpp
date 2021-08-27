@@ -2143,7 +2143,6 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
     case SILInstructionKind::CondBranchInst:
     case SILInstructionKind::SwitchEnumInst:
     case SILInstructionKind::DebugValueInst:
-    case SILInstructionKind::DebugValueAddrInst:
     case SILInstructionKind::ValueMetatypeInst:
     case SILInstructionKind::InitExistentialMetatypeInst:
     case SILInstructionKind::OpenExistentialMetatypeInst:

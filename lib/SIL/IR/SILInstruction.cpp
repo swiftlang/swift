@@ -1367,7 +1367,6 @@ bool SILInstruction::isMetaInstruction() const {
   case SILInstructionKind::AllocBoxInst:
   case SILInstructionKind::AllocStackInst:
   case SILInstructionKind::DebugValueInst:
-  case SILInstructionKind::DebugValueAddrInst:
     return true;
   default:
     return false;

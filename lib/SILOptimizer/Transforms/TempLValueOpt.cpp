@@ -280,17 +280,14 @@ void TempLValueOptPass::combineCopyAndDestroy(CopyAddrInst *copyInst) {
     if (inst == destroy) {
       copyInst->setIsTakeOfSrc(IsTake);
       destroy->eraseFromParent();
-      // Cleanup all debug_value_addr of the copy src btw the copy and destroy
+      // Cleanup all debug_value of the copy src btw the copy and destroy
       for (auto debugInst : debugInsts) {
         debugInst->eraseFromParent();
       }
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
       return;
     }
-    if (auto *debugInst = dyn_cast<DebugValueAddrInst>(inst)) {
-      if (debugInst->getOperand() == copyInst->getSrc())
-        debugInsts.push_back(debugInst);
-    } else if(auto *debugInst = DebugValueInst::hasAddrVal(inst)) {
+    if(auto *debugInst = DebugValueInst::hasAddrVal(inst)) {
       if (debugInst->getOperand() == copyInst->getSrc())
         debugInsts.push_back(debugInst);
     }

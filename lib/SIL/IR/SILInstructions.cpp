@@ -380,31 +380,7 @@ bool DebugValueInst::exprStartsWithDeref() const {
           == SILDIExprOperator::Dereference;
 }
 
-DebugValueAddrInst::DebugValueAddrInst(SILDebugLocation DebugLoc,
-                                       SILValue Operand, SILDebugVariable Var)
-    : UnaryInstructionBase(DebugLoc, Operand),
-      SILDebugVariableSupplement(Var.DIExpr.getNumElements(),
-                                 Var.Type.hasValue(), Var.Loc.hasValue(),
-                                 Var.Scope),
-      VarInfo(Var, getTrailingObjects<char>(), getTrailingObjects<SILType>(),
-              getTrailingObjects<SILLocation>(),
-              getTrailingObjects<const SILDebugScope *>(),
-              getTrailingObjects<SILDIExprElement>()) {
-  if (auto *VD = DebugLoc.getLocation().getAsASTNode<VarDecl>())
-    VarInfo.setImplicit(VD->isImplicit() || VarInfo.isImplicit());
-}
-
-DebugValueAddrInst *DebugValueAddrInst::create(SILDebugLocation DebugLoc,
-                                               SILValue Operand, SILModule &M,
-                                               SILDebugVariable Var) {
-  void *buf = allocateDebugVarCarryingInst<DebugValueAddrInst>(M, Var);
-  return ::new (buf) DebugValueAddrInst(DebugLoc, Operand, Var);
-}
-
 VarDecl *DebugValueInst::getDecl() const {
-  return getLoc().getAsASTNode<VarDecl>();
-}
-VarDecl *DebugValueAddrInst::getDecl() const {
   return getLoc().getAsASTNode<VarDecl>();
 }
 

@@ -1146,7 +1146,6 @@ public:
     llvm_unreachable("unimplemented");
   }
   void visitDebugValueInst(DebugValueInst *i);
-  void visitDebugValueAddrInst(DebugValueAddrInst *i);
   void visitRetainValueInst(RetainValueInst *i);
   void visitRetainValueAddrInst(RetainValueAddrInst *i);
   void visitCopyValueInst(CopyValueInst *i);
@@ -4790,64 +4789,6 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
 
   emitDebugVariableDeclaration(Copy, DbgTy, SILTy, i->getDebugScope(),
                                i->getLoc(), *VarInfo, Indirection);
-}
-
-void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
-  if (i->getDebugScope()->getInlinedFunction()->isTransparent())
-    return;
-
-  auto SILVal = i->getOperand();
-  if (isa<SILUndef>(SILVal))
-    return;
-
-  auto VarInfo = i->getVarInfo();
-  assert(VarInfo && "debug_value_addr without debug info");
-  bool IsAnonymous = false;
-  bool IsLoadablyByAddress = isa<AllocStackInst>(SILVal);
-  IndirectionKind Indirection =
-      (IsLoadablyByAddress) ? DirectValue : IndirectValue;
-  VarInfo->Name = getVarName(i, IsAnonymous);
-  auto *Addr = getLoweredAddress(SILVal).getAddress();
-  SILType SILTy;
-  if (auto MaybeSILTy = VarInfo->Type)
-    // If there is auxiliary type info, use it
-    SILTy = *MaybeSILTy;
-  else
-    SILTy = SILVal->getType();
-  auto RealType = SILTy.getASTType();
-  if (CurSILFn->isAsync() && !i->getDebugScope()->InlinedCallSite) {
-    Indirection = CoroIndirectValue;
-    if (auto *PBI = dyn_cast<ProjectBoxInst>(i->getOperand())) {
-      // Usually debug info only ever describes the *result* of a projectBox
-      // call. To allow the debugger to display a boxed parameter of an async
-      // continuation object, however, the debug info can only describe the box
-      // itself and thus also needs to emit a box type for it so the debugger
-      // knows to call into Remote Mirrors to unbox the value.
-      RealType = PBI->getOperand()->getType().getASTType();
-      assert(isa<SILBoxType>(RealType));
-    }
-  }
-
-  DebugTypeInfo DbgTy;
-  if (VarDecl *Decl = i->getDecl())
-    DbgTy = DebugTypeInfo::getLocalVariable(Decl, RealType,
-                                            getTypeInfo(SILVal->getType()));
-  else if (i->getFunction()->isBare() && !SILTy.hasArchetype() &&
-           !VarInfo->Name.empty())
-    // Handle the cases that read from a SIL file
-    DbgTy = DebugTypeInfo::getFromTypeInfo(RealType, getTypeInfo(SILTy));
-  else
-    return;
-
-  bindArchetypes(DbgTy.getType());
-  if (!IGM.DebugInfo)
-    return;
-
-  // Put the value's address into a stack slot at -Onone and emit a debug
-  // intrinsic.
-  emitDebugVariableDeclaration(
-      emitShadowCopyIfNeeded(Addr, i->getDebugScope(), *VarInfo, IsAnonymous),
-      DbgTy, SILType(), i->getDebugScope(), i->getLoc(), *VarInfo, Indirection);
 }
 
 void IRGenSILFunction::visitFixLifetimeInst(swift::FixLifetimeInst *i) {

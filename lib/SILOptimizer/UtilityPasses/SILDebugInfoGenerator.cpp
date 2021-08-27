@@ -144,8 +144,8 @@ class SILDebugInfoGenerator : public SILModuleTransform {
           for (auto iter = BB.begin(), end = BB.end(); iter != end;) {
             SILInstruction *I = &*iter;
             ++iter;
-            if (isa<DebugValueInst>(I) || isa<DebugValueAddrInst>(I)) {
-              // debug_value and debug_value_addr are not needed anymore.
+            if (isa<DebugValueInst>(I)) {
+              // debug_value instructions are not needed anymore.
               // Also, keeping them might trigger a verifier error.
               I->eraseFromParent();
               continue;

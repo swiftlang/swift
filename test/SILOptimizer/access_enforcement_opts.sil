@@ -564,7 +564,7 @@ sil private @$s17enforce_with_opts24testInoutWriteEscapeReadyyFyycfU_ : $@conven
 // %0
 bb0(%0 : ${ var Int64 }):
   %1 = project_box %0 : ${ var Int64 }, 0
-  debug_value_addr %1 : $*Int64, var, name "x", argno 1
+  debug_value %1 : $*Int64, var, name "x", argno 1, expr op_deref
   %3 = begin_access [read] [dynamic] %1 : $*Int64
   %4 = load %3 : $*Int64
   end_access %3 : $*Int64
@@ -641,7 +641,7 @@ sil private @$s17enforce_with_opts020testInoutWriteEscapeF0yyFyycfU_ : $@convent
 // %0
 bb0(%0 : ${ var Int64 }):
   %1 = project_box %0 : ${ var Int64 }, 0
-  debug_value_addr %1 : $*Int64, var, name "x", argno 1
+  debug_value %1 : $*Int64, var, name "x", argno 1, expr op_deref
   %3 = integer_literal $Builtin.Int64, 42
   %4 = struct $Int64 (%3 : $Builtin.Int64)
   %5 = begin_access [modify] [dynamic] %1 : $*Int64
@@ -696,7 +696,7 @@ sil private @$s23enforce_with_opts_nob2s021testInoutReadNoescapeG0yyFyycfU_ : $@
 // %0
 bb0(%0 : ${ var Int64 }):
   %1 = project_box %0 : ${ var Int64 }, 0
-  debug_value_addr %1 : $*Int64, var, name "x", argno 1
+  debug_value %1 : $*Int64, var, name "x", argno 1, expr op_deref
   %3 = begin_access [read] [dynamic] %1 : $*Int64
   %4 = load %3 : $*Int64
   end_access %3 : $*Int64
@@ -716,7 +716,7 @@ sil private @$s23enforce_with_opts_nob2s021testInoutReadNoescapeG0yyFyyXEfU0_ : 
 // %0
 // %1
 bb0(%0 : $*Int64, %1 : $@callee_guaranteed () -> ()):
-  debug_value_addr %0 : $*Int64, var, name "x", argno 1
+  debug_value %0 : $*Int64, var, name "x", argno 1, expr op_deref
   debug_value %1 : $@callee_guaranteed () -> (), let, name "c", argno 2
   %4 = begin_access [read] [dynamic] %0 : $*Int64
   %5 = tuple ()
@@ -772,7 +772,7 @@ sil private @$s23enforce_with_opts_nob2s26testInoutReadNoescapeWriteyyFyycfU_ : 
 // %0
 bb0(%0 : ${ var Int64 }):
   %1 = project_box %0 : ${ var Int64 }, 0
-  debug_value_addr %1 : $*Int64, var, name "x", argno 1
+  debug_value %1 : $*Int64, var, name "x", argno 1, expr op_deref
   %3 = integer_literal $Builtin.Int64, 7
   %4 = struct $Int64 (%3 : $Builtin.Int64)
   %5 = begin_access [modify] [dynamic] %1 : $*Int64
@@ -788,7 +788,7 @@ bb0(%0 : ${ var Int64 }):
 // CHECK-LABEL: } // end sil function '$s23enforce_with_opts_nob2s26testInoutReadNoescapeWriteyyFyyXEfU0_'
 sil private @$s23enforce_with_opts_nob2s26testInoutReadNoescapeWriteyyFyyXEfU0_ : $@convention(thin) (@inout_aliasable Int64, @guaranteed @callee_guaranteed () -> ()) -> () {
 bb0(%0 : $*Int64, %1 : $@callee_guaranteed () -> ()):
-  debug_value_addr %0 : $*Int64, var, name "x", argno 1
+  debug_value %0 : $*Int64, var, name "x", argno 1, expr op_deref
   debug_value %1 : $@callee_guaranteed () -> (), let, name "c", argno 2
   %4 = begin_access [read] [dynamic] %0 : $*Int64
   %5 = tuple ()
@@ -844,7 +844,7 @@ sil private @$s23enforce_with_opts_nob2s33testInoutWriteNoescapeReadClosureyyFyy
 // %0
 bb0(%0 : ${ var Int64 }):
   %1 = project_box %0 : ${ var Int64 }, 0
-  debug_value_addr %1 : $*Int64, var, name "x", argno 1
+  debug_value %1 : $*Int64, var, name "x", argno 1, expr op_deref
   %3 = begin_access [read] [dynamic] %1 : $*Int64
   %4 = load %3 : $*Int64
   end_access %3 : $*Int64
@@ -864,7 +864,7 @@ sil private @$s23enforce_with_opts_nob2s33testInoutWriteNoescapeReadClosureyyFyy
 // %0
 // %1
 bb0(%0 : $*Int64, %1 : $@callee_guaranteed () -> ()):
-  debug_value_addr %0 : $*Int64, var, name "x", argno 1
+  debug_value %0 : $*Int64, var, name "x", argno 1, expr op_deref
   debug_value %1 : $@callee_guaranteed () -> (), let, name "c", argno 2
   %4 = begin_access [modify] [dynamic] %0 : $*Int64
   %5 = tuple ()
@@ -918,7 +918,7 @@ sil private @$s23enforce_with_opts_nob2s022testInoutWriteNoescapeG7ClosureyyFyyc
 // %0
 bb0(%0 : ${ var Int64 }):
   %1 = project_box %0 : ${ var Int64 }, 0
-  debug_value_addr %1 : $*Int64, var, name "x", argno 1
+  debug_value %1 : $*Int64, var, name "x", argno 1, expr op_deref
   %3 = integer_literal $Builtin.Int64, 7
   %4 = struct $Int64 (%3 : $Builtin.Int64)
   %5 = begin_access [modify] [dynamic] %1 : $*Int64
@@ -934,7 +934,7 @@ bb0(%0 : ${ var Int64 }):
 // CHECK-LABEL: } // end sil function '$s23enforce_with_opts_nob2s022testInoutWriteNoescapeG7ClosureyyFyyXEfU0_'
 sil private @$s23enforce_with_opts_nob2s022testInoutWriteNoescapeG7ClosureyyFyyXEfU0_ : $@convention(thin) (@inout_aliasable Int64, @guaranteed @callee_guaranteed () -> ()) -> () {
 bb0(%0 : $*Int64, %1 : $@callee_guaranteed () -> ()):
-  debug_value_addr %0 : $*Int64, var, name "x", argno 1
+  debug_value %0 : $*Int64, var, name "x", argno 1, expr op_deref
   debug_value %1 : $@callee_guaranteed () -> (), let, name "c", argno 2
   %4 = begin_access [modify] [dynamic] %0 : $*Int64
   %5 = tuple ()
