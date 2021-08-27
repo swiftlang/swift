@@ -154,9 +154,11 @@ void swift::checkDistributedActorProperties(const ClassDecl *decl) {
 
   for (auto member : decl->getMembers()) {
     if (auto prop = dyn_cast<VarDecl>(member)) {
+      if (prop->isSynthesized())
+        continue;
+
       auto id = prop->getName();
-      if (id == C.Id_actorTransport ||
-          id == C.Id_id) {
+      if (id == C.Id_actorTransport || id == C.Id_id) {
         prop->diagnose(diag::distributed_actor_user_defined_special_property,
                       id);
       }
@@ -213,6 +215,9 @@ void swift::checkDistributedActorConstructor(const ClassDecl *decl, ConstructorD
 // ==== ------------------------------------------------------------------------
 
 void TypeChecker::checkDistributedActor(ClassDecl *decl) {
+  if (!decl)
+    return;
+
   // ==== Ensure the _Distributed module is available,
   // without it there's no reason to check the decl in more detail anyway.
   if (!swift::ensureDistributedModuleLoaded(decl))
@@ -235,7 +240,5 @@ void TypeChecker::checkDistributedActor(ClassDecl *decl) {
   // --- Synthesize properties
   // TODO: those could technically move to DerivedConformance style
   swift::addImplicitDistributedActorMembersToClass(decl);
-
-  // ==== Functions
 }
 
