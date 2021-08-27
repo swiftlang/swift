@@ -46,7 +46,22 @@ namespace {
 void forEachTargetModuleBasename(const ASTContext &Ctx,
                                  llvm::function_ref<void(StringRef)> body) {
   auto normalizedTarget = getTargetSpecificModuleTriple(Ctx.LangOpts.Target);
+
+  // An arm64 module can import an arm64e module.
+  Optional<llvm::Triple> normalizedAltTarget;
+  if ((normalizedTarget.getArch() == llvm::Triple::ArchType::aarch64) &&
+      (normalizedTarget.getSubArch() !=
+       llvm::Triple::SubArchType::AArch64SubArch_arm64e)) {
+    auto altTarget = normalizedTarget;
+    altTarget.setArchName("arm64e");
+    normalizedAltTarget = getTargetSpecificModuleTriple(altTarget);
+  }
+
   body(normalizedTarget.str());
+
+  if (normalizedAltTarget) {
+    body(normalizedAltTarget->str());
+  }
 
   // We used the un-normalized architecture as a target-specific
   // module name. Fall back to that behavior.
@@ -60,6 +75,10 @@ void forEachTargetModuleBasename(const ASTContext &Ctx,
   // new names.
   if (Ctx.LangOpts.Target.getArch() == llvm::Triple::ArchType::arm) {
     body("arm");
+  }
+
+  if (normalizedAltTarget) {
+    body(normalizedAltTarget->getArchName());
   }
 }
 
