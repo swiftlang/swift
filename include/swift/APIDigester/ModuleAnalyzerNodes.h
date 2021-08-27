@@ -23,6 +23,7 @@
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Sema.h"
 #include "llvm/ADT/TinyPtrVector.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/FileSystem.h"
@@ -717,6 +718,12 @@ public:
   void jsonize(json::Output &Out) override;
 };
 
+class SDKNodeDeclImport: public SDKNodeDecl {
+public:
+  SDKNodeDeclImport(SDKNodeInitInfo Info);
+  static bool classof(const SDKNode *N);
+};
+
 // The additional information we need for a type node in the digest.
 // We use type node to represent entities more than types, e.g. parameters, so
 // this struct is necessary to pass down to create a type node.
@@ -781,6 +788,8 @@ public:
   void lookupVisibleDecls(ArrayRef<ModuleDecl *> Modules);
 };
 
+void detectRename(SDKNode *L, SDKNode *R);
+
 int dumpSwiftModules(const CompilerInvocation &InitInvok,
                      const llvm::StringSet<> &ModuleNames,
                      StringRef OutputDir,
@@ -798,6 +807,8 @@ void dumpSDKRoot(SDKNodeRoot *Root, StringRef OutputFile);
 int dumpSDKContent(const CompilerInvocation &InitInvok,
                    const llvm::StringSet<> &ModuleNames,
                    StringRef OutputFile, CheckerOptions Opts);
+
+void dumpModuleContent(ModuleDecl *MD, StringRef OutputFile, bool ABI);
 
 /// Mostly for testing purposes, this function de-serializes the SDK dump in
 /// dumpPath and re-serialize them to OutputPath. If the tool performs correctly,

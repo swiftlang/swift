@@ -341,11 +341,14 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
       options::OPT_emit_ldadd_cfile_path);
   auto moduleSummaryOutput = getSupplementaryFilenamesFromArguments(
       options::OPT_emit_module_summary_path);
+  auto abiDescriptorOutput = getSupplementaryFilenamesFromArguments(
+      options::OPT_emit_abi_descriptor_path);
   if (!objCHeaderOutput || !moduleOutput || !moduleDocOutput ||
       !dependenciesFile || !referenceDependenciesFile ||
       !serializedDiagnostics || !fixItsOutput || !loadedModuleTrace || !TBD ||
       !moduleInterfaceOutput || !privateModuleInterfaceOutput ||
-      !moduleSourceInfoOutput || !ldAddCFileOutput || !moduleSummaryOutput) {
+      !moduleSourceInfoOutput || !ldAddCFileOutput || !moduleSummaryOutput ||
+      !abiDescriptorOutput) {
     return None;
   }
   std::vector<SupplementaryOutputPaths> result;
@@ -368,6 +371,7 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
     sop.ModuleSourceInfoOutputPath = (*moduleSourceInfoOutput)[i];
     sop.LdAddCFilePath = (*ldAddCFileOutput)[i];
     sop.ModuleSummaryOutputPath = (*moduleSummaryOutput)[i];
+    sop.ABIDescriptorOutputPath = (*abiDescriptorOutput)[i];
     result.push_back(sop);
   }
   return result;
@@ -466,6 +470,8 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
   auto PrivateModuleInterfaceOutputPath =
       pathsFromArguments.PrivateModuleInterfaceOutputPath;
 
+  // There is no non-path form of -emit-abi-descriptor-path
+  auto ABIDescriptorOutputPath = pathsFromArguments.ABIDescriptorOutputPath;
   ID emitModuleOption;
   std::string moduleExtension;
   std::string mainOutputIfUsableForModule;
@@ -492,6 +498,7 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
   sop.ModuleSourceInfoOutputPath = moduleSourceInfoOutputPath;
   sop.LdAddCFilePath = pathsFromArguments.LdAddCFilePath;
   sop.ModuleSummaryOutputPath = moduleSummaryOutputPath;
+  sop.ABIDescriptorOutputPath = ABIDescriptorOutputPath;
   return sop;
 }
 

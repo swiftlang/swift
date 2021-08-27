@@ -27,5 +27,6 @@ target_link_libraries(swiftFrontend PRIVATE
   swiftLocalization
   swiftSema
   swiftSerialization
-  swiftTBDGen)
+  swiftTBDGen
+  swiftAPIDigester)
 
