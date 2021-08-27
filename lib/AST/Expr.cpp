@@ -736,7 +736,7 @@ llvm::DenseMap<Expr *, Expr *> Expr::getParentMap() {
   return parentMap;
 }
 
-bool Expr::isValidTypeExprParent() const {
+bool Expr::isValidParentOfTypeExpr(Expr *typeExpr) const {
   // Allow references to types as a part of:
   // - member references T.foo, T.Type, T.self, etc.
   // - constructor calls T()
@@ -746,7 +746,6 @@ bool Expr::isValidTypeExprParent() const {
   switch (getKind()) {
   case ExprKind::Error:
   case ExprKind::DotSelf:
-  case ExprKind::Call:
   case ExprKind::MemberRef:
   case ExprKind::UnresolvedMember:
   case ExprKind::DotSyntaxCall:
@@ -755,8 +754,14 @@ bool Expr::isValidTypeExprParent() const {
   case ExprKind::DotSyntaxBaseIgnored:
   case ExprKind::UnresolvedSpecialize:
   case ExprKind::OpenExistential:
-  case ExprKind::Subscript:
     return true;
+
+  // For these cases we need to ensure the type expr is the function or base.
+  // We do not permit e.g 'foo(T)'.
+  case ExprKind::Call:
+    return cast<CallExpr>(this)->getFn() == typeExpr;
+  case ExprKind::Subscript:
+    return cast<SubscriptExpr>(this)->getBase() == typeExpr;
 
   case ExprKind::NilLiteral:
   case ExprKind::BooleanLiteral:
