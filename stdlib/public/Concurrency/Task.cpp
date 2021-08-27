@@ -244,12 +244,16 @@ static void destroyTask(SWIFT_CONTEXT HeapObject *obj) {
 }
 
 static ExecutorRef executorForEnqueuedJob(Job *job) {
+#if SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
+  return ExecutorRef::generic();
+#else
   void *jobQueue = job->SchedulerPrivate[Job::DispatchQueueIndex];
   if (jobQueue == DISPATCH_QUEUE_GLOBAL_EXECUTOR)
     return ExecutorRef::generic();
   else
     return ExecutorRef::forOrdinary(reinterpret_cast<HeapObject*>(jobQueue),
                     _swift_task_getDispatchQueueSerialExecutorWitnessTable());
+#endif
 }
 
 static void jobInvoke(void *obj, void *unused, uint32_t flags) {
