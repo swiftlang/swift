@@ -476,6 +476,7 @@ EXPECTED_OPTIONS = [
               dest='test_early_swift_driver', value=False),
 
     SetTrueOption('--back-deploy-concurrency', dest='build_backdeployconcurrency'),
+    SetTrueOption('--install-back-deploy-concurrency', dest='install_backdeployconcurrency'),
     SetTrueOption('--benchmark'),
     SetTrueOption('--clean'),
     SetTrueOption('--dry-run'),
