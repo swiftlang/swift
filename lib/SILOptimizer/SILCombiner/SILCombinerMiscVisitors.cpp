@@ -508,7 +508,6 @@ bool SILCombiner::optimizeStackAllocatedEnum(AllocStackInst *AS) {
   for (auto *use : AS->getUses()) {
     SILInstruction *user = use->getUser();
     switch (user->getKind()) {
-      case SILInstructionKind::DebugValueAddrInst:
       case SILInstructionKind::DestroyAddrInst:
       case SILInstructionKind::DeallocStackInst:
       case SILInstructionKind::InjectEnumAddrInst:
@@ -573,7 +572,6 @@ bool SILCombiner::optimizeStackAllocatedEnum(AllocStackInst *AS) {
     SILInstruction *user = use->getUser();
     switch (user->getKind()) {
       case SILInstructionKind::InjectEnumAddrInst:
-      case SILInstructionKind::DebugValueAddrInst:
         eraseInstFromFunction(*user);
         break;
       case SILInstructionKind::DestroyAddrInst:

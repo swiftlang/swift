@@ -152,7 +152,7 @@ bb0(%arg : @owned $T, %addr : $*T):
   debug_value %copy : $T
   store %copy to [assign] %addr : $*T
   debug_value %arg : $T
-  debug_value_addr %addr : $*T
+  debug_value %addr : $*T, expr op_deref
   destroy_value %arg : $T
   %v = tuple ()
   return %v : $()

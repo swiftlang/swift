@@ -194,7 +194,6 @@ public:
   virtual bool visitNormalUse(SILInstruction *user) = 0;
   virtual bool visitTake(CopyAddrInst *copy) = 0;
   virtual bool visitDestroy(DestroyAddrInst *destroy) = 0;
-  virtual bool visitDebugValue(DebugValueAddrInst *debugValue) = 0;
   virtual bool visitDebugValue(DebugValueInst *debugValue) = 0;
 };
 } // namespace
@@ -265,10 +264,6 @@ static bool visitAddressUsers(SILValue address, SILInstruction *ignoredUser,
     case SILInstructionKind::InjectEnumAddrInst:
     case SILInstructionKind::StoreInst:
       if (!visitor.visitNormalUse(UserInst))
-        return false;
-      break;
-    case SILInstructionKind::DebugValueAddrInst:
-      if (!visitor.visitDebugValue(cast<DebugValueAddrInst>(UserInst)))
         return false;
       break;
     case SILInstructionKind::DebugValueInst:
@@ -394,10 +389,6 @@ public:
     Oper = &UserInst->getOperandRef();
     return false;
   }
-  bool visitDebugValueAddrInst(DebugValueAddrInst *UserInst) {
-    Oper = &UserInst->getOperandRef();
-    return false;
-  }
   bool visitDebugValueInst(DebugValueInst *UserInst) {
     if (UserInst->hasAddrVal()) {
       Oper = &UserInst->getOperandRef();
@@ -505,10 +496,6 @@ public:
     }
     return true;
   }
-  bool visitDebugValueAddrInst(DebugValueAddrInst *UserInst) {
-    Oper = &UserInst->getOperandRef();
-    return false;
-  }
   bool visitDebugValueInst(DebugValueInst *UserInst) {
     if (UserInst->hasAddrVal()) {
       Oper = &UserInst->getOperandRef();
@@ -582,9 +569,6 @@ class CopyForwarding {
     virtual bool visitDestroy(DestroyAddrInst *destroy) override {
       CPF.DestroyPoints.push_back(destroy);
       return true;
-    }
-    virtual bool visitDebugValue(DebugValueAddrInst *debugValue) override {
-      return CPF.SrcDebugValueInsts.insert(debugValue).second;
     }
     virtual bool visitDebugValue(DebugValueInst *debugValue) override {
       return CPF.SrcDebugValueInsts.insert(debugValue).second;
@@ -671,9 +655,6 @@ public:
   }
   virtual bool visitDestroy(DestroyAddrInst *destroy) override {
     return DestUsers.insert(destroy).second;
-  }
-  virtual bool visitDebugValue(DebugValueAddrInst *debugValue) override {
-    return DestUsers.insert(debugValue).second;
   }
   virtual bool visitDebugValue(DebugValueInst *debugValue) override {
     return DestUsers.insert(debugValue).second;
@@ -786,10 +767,10 @@ CopyAddrInst *CopyForwarding::findCopyIntoDeadTemp(
     if (SrcUserInsts.count(UserInst))
       return nullptr;
 
-    // Collect all debug_value_addr instructions between temp to dest copy and
-    // src to temp copy. On success, these debug_value_addr instructions should
-    // be deleted.
-    if (isa<DebugValueAddrInst>(UserInst) || isa<DebugValueInst>(UserInst)) {
+    // Collect all debug_value w/ address value instructions between temp to
+    // dest copy and src to temp copy.
+    // On success, these debug_value instructions should be deleted.
+    if (isa<DebugValueInst>(UserInst)) {
       // 'SrcDebugValueInsts' consists of all the debug users of 'temp'
       if (SrcDebugValueInsts.count(UserInst))
         debugInstsToDelete.push_back(UserInst);
@@ -846,7 +827,7 @@ forwardDeadTempCopy(CopyAddrInst *destCopy) {
       .createDestroyAddr(srcCopy->getLoc(), srcCopy->getDest());
   }
 
-  // Delete all dead debug_value_addr instructions
+  // Delete all dead debug_value instructions
   for (auto *deadDebugUser : debugInstsToDelete) {
     deadDebugUser->eraseFromParent();
   }
@@ -1185,8 +1166,7 @@ bool CopyForwarding::backwardPropagateCopy() {
     if (UserInst == CopyDestRoot->getDefiningInstruction()
         || DestUserInsts.count(UserInst)
         || RootUserInsts.count(UserInst)) {
-      if (isa<DebugValueAddrInst>(UserInst) ||
-          DebugValueInst::hasAddrVal(UserInst)) {
+      if (DebugValueInst::hasAddrVal(UserInst)) {
         DebugValueInstsToDelete.push_back(UserInst);
         continue;
       }
@@ -1196,8 +1176,7 @@ bool CopyForwarding::backwardPropagateCopy() {
     }
     // Early check to avoid scanning unrelated instructions.
     if (!SrcUserInsts.count(UserInst)
-        && !((isa<DebugValueAddrInst>(UserInst) ||
-              isa<DebugValueInst>(UserInst))
+        && !(isa<DebugValueInst>(UserInst)
              && SrcDebugValueInsts.count(UserInst)))
       continue;
 
@@ -1256,7 +1235,7 @@ bool CopyForwarding::backwardPropagateCopy() {
 ///
 /// Return true if a destroy was inserted, forwarded from a copy, or the
 /// block was marked dead-in.
-/// \p debugInstsToDelete will contain the debug_value_addr users of copy src
+/// \p debugInstsToDelete will contain the debug_value users of copy src
 /// that need to be deleted if the hoist is successful
 bool CopyForwarding::hoistDestroy(
     SILInstruction *DestroyPoint, SILLocation DestroyLoc,
@@ -1301,8 +1280,8 @@ bool CopyForwarding::hoistDestroy(
                                 << *Inst);
         return tryToInsertHoistedDestroyAfter(Inst);
       }
-      if (isa<DebugValueAddrInst>(Inst) || isa<DebugValueInst>(Inst)) {
-        // Collect debug_value_addr uses of copy src. If the hoist is
+      if (isa<DebugValueInst>(Inst)) {
+        // Collect debug_value uses of copy src. If the hoist is
         // successful, these instructions will have consumed operand and need to
         // be erased.
         if (SrcDebugValueInsts.contains(Inst)) {
@@ -1375,7 +1354,7 @@ void CopyForwarding::forwardCopiesOf(SILValue Def, SILFunction *F) {
       // original Destroy.
       Destroy->eraseFromParent();
       assert(HasChanged || !DeadInBlocks.empty() && "HasChanged should be set");
-      // Since the hoist was successful, delete all dead debug_value_addr
+      // Since the hoist was successful, delete all dead debug_value
       for (auto *deadDebugUser : debugInstsToDelete) {
         deadDebugUser->eraseFromParent();
       }

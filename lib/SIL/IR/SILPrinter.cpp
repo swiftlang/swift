@@ -1586,12 +1586,6 @@ public:
                   &DVI->getModule().getASTContext().SourceMgr);
   }
 
-  void visitDebugValueAddrInst(DebugValueAddrInst *DVAI) {
-    *this << getIDAndType(DVAI->getOperand());
-    printDebugVar(DVAI->getVarInfo(),
-                  &DVAI->getModule().getASTContext().SourceMgr);
-  }
-
 #define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   void visitLoad##Name##Inst(Load##Name##Inst *LI) { \
     if (LI->isTake()) \

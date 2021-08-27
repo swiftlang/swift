@@ -87,9 +87,8 @@ static void replaceDestroy(DestroyAddrInst *dai, SILValue newValue,
   deleter.forceDelete(dai);
 }
 
-/// Promote a DebugValueAddr to a DebugValue of the given value.
-template <class DebugInstTy>
-static void promoteDebugValueAddr(DebugInstTy *dvai, SILValue value,
+/// Promote a DebugValue w/ address value to a DebugValue of non-address value.
+static void promoteDebugValueAddr(DebugValueInst *dvai, SILValue value,
                                   SILBuilderContext &ctx,
                                   InstructionDeleter &deleter) {
   assert(dvai->getOperand()->getType().isLoadable(*dvai->getFunction()) &&
@@ -431,14 +430,10 @@ StoreInst *StackAllocationPromoter::promoteAllocationInBlock(
       continue;
     }
 
-    // Replace debug_value_addr with debug_value of the promoted value
+    // Replace debug_value w/ address value with debug_value of
+    // the promoted value.
     // if we have a valid value to use at this point. Otherwise we'll
     // promote this when we deal with hooking up phis.
-    if (auto *dvai = dyn_cast<DebugValueAddrInst>(inst)) {
-      if (dvai->getOperand() == asi && runningVal)
-        promoteDebugValueAddr(dvai, runningVal, ctx, deleter);
-      continue;
-    }
     if (auto *dvi = DebugValueInst::hasAddrVal(inst)) {
       if (dvi->getOperand() == asi && runningVal)
         promoteDebugValueAddr(dvi, runningVal, ctx, deleter);
@@ -641,13 +636,7 @@ void StackAllocationPromoter::fixBranchesAndUses(BlockSetVector &phiBlocks) {
     // on.
     SILBasicBlock *userBlock = user->getParent();
 
-    if (auto *dvai = dyn_cast<DebugValueAddrInst>(user)) {
-      // Replace DebugValueAddr with DebugValue.
-      SILValue def = getLiveInValue(phiBlocks, userBlock);
-      promoteDebugValueAddr(dvai, def, ctx, deleter);
-      ++NumInstRemoved;
-      continue;
-    } else if (auto *dvi = DebugValueInst::hasAddrVal(user)) {
+    if (auto *dvi = DebugValueInst::hasAddrVal(user)) {
       // Replace debug_value w/ address-type value with
       // a new debug_value w/ promoted value.
       SILValue def = getLiveInValue(phiBlocks, userBlock);
@@ -998,10 +987,9 @@ static bool isCaptured(AllocStackInst *asi, bool &inSingleBlock) {
       if (si->getDest() == asi)
         continue;
 
-    // Deallocation is also okay, as are DebugValueAddr. We will turn
-    // the latter into DebugValue.
-    if (isa<DeallocStackInst>(user) || isa<DebugValueAddrInst>(user) ||
-        DebugValueInst::hasAddrVal(user))
+    // Deallocation is also okay, as are DebugValue w/ address value. We will
+    // promote the latter into normal DebugValue.
+    if (isa<DeallocStackInst>(user) || DebugValueInst::hasAddrVal(user))
       continue;
 
     // Destroys of loadable types can be rewritten as releases, so
@@ -1036,9 +1024,8 @@ bool MemoryToRegisters::isWriteOnlyAllocation(AllocStackInst *asi) {
       continue;
 
     // If we haven't already promoted the AllocStack, we may see
-    // DebugValueAddr uses.
-    if (isa<DebugValueAddrInst>(user) ||
-        DebugValueInst::hasAddrVal(user))
+    // DebugValue uses.
+    if (DebugValueInst::hasAddrVal(user))
       continue;
 
     if (isDeadAddrProjection(user))
@@ -1095,20 +1082,9 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
       }
     }
 
-    // Replace debug_value_addr with debug_value of the promoted value.
-    if (auto *dvai = dyn_cast<DebugValueAddrInst>(inst)) {
-      if (dvai->getOperand() == asi) {
-        if (runningVal) {
-          promoteDebugValueAddr(dvai, runningVal, ctx, deleter);
-        } else {
-          // Drop debug_value_addr of uninitialized void values.
-          assert(asi->getElementType().isVoid() &&
-                 "Expected initialization of non-void type!");
-          deleter.forceDelete(dvai);
-        }
-      }
-      continue;
-    } else if (auto *dvi = DebugValueInst::hasAddrVal(inst)) {
+    // Replace debug_value w/ address value with debug_value of
+    // the promoted value.
+    if (auto *dvi = DebugValueInst::hasAddrVal(inst)) {
       if (dvi->getOperand() == asi) {
         if (runningVal) {
           promoteDebugValueAddr(dvi, runningVal, ctx, deleter);

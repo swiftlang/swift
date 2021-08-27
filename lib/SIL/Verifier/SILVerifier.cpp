@@ -537,7 +537,6 @@ struct ImmutableAddressUseVerifier {
       }
       case SILInstructionKind::MarkDependenceInst:
       case SILInstructionKind::LoadBorrowInst:
-      case SILInstructionKind::DebugValueAddrInst:
       case SILInstructionKind::ExistentialMetatypeInst:
       case SILInstructionKind::ValueMetatypeInst:
       case SILInstructionKind::FixLifetimeInst:
@@ -1219,8 +1218,6 @@ public:
     else if (auto *di = dyn_cast<AllocBoxInst>(inst))
       varInfo = di->getVarInfo();
     else if (auto *di = dyn_cast<DebugValueInst>(inst))
-      varInfo = di->getVarInfo();
-    else if (auto *di = dyn_cast<DebugValueAddrInst>(inst))
       varInfo = di->getVarInfo();
 
     if (!varInfo)

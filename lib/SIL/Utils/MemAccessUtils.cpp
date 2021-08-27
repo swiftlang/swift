@@ -1635,7 +1635,6 @@ swift::getSingleInitAllocStackUse(AllocStackInst *asi,
       break;
     case SILInstructionKind::DeallocStackInst:
     case SILInstructionKind::LoadBorrowInst:
-    case SILInstructionKind::DebugValueAddrInst:
       continue;
     }
 

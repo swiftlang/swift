@@ -610,10 +610,14 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
       case SILInstructionKind::ValueMetatypeInst:
       case SILInstructionKind::IsUniqueInst:
       case SILInstructionKind::FixLifetimeInst:
-      case SILInstructionKind::DebugValueAddrInst:
         requireBitsSet(bits, I.getOperand(0), &I);
         break;
       case SILInstructionKind::DebugValueInst:
+        // We don't want to check `debug_value` instructions that
+        // are used to mark variable declarations (e.g. its SSA value is
+        // an alloc_stack), which don't have any `op_deref` in its
+        // di-expression, because that memory does't need to be initialized
+        // when `debug_value` is referencing it.
         if (cast<DebugValueInst>(&I)->hasAddrVal() &&
             cast<DebugValueInst>(&I)->exprStartsWithDeref())
           requireBitsSet(bits, I.getOperand(0), &I);

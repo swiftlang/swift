@@ -217,8 +217,6 @@ final public class FixLifetimeInst : Instruction, UnaryInstruction {}
 
 final public class DebugValueInst : Instruction, UnaryInstruction {}
 
-final public class DebugValueAddrInst : Instruction, UnaryInstruction {}
-
 final public class UnconditionalCheckedCastAddrInst : Instruction {
   public override var mayTrap: Bool { true }
 }

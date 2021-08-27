@@ -116,7 +116,6 @@ void AccessSummaryAnalysis::processArgument(FunctionInfo *info,
       worklist.append(inst->use_begin(), inst->use_end());
       break;
     }
-    case SILInstructionKind::DebugValueAddrInst:
     case SILInstructionKind::AddressToPointerInst:
       // Ignore these uses, they don't affect formal accesses.
       break;
