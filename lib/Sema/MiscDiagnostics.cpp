@@ -621,7 +621,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       DiagnosticBehavior behavior = DiagnosticBehavior::Error;
 
       if (auto *ParentExpr = Parent.getAsExpr()) {
-        if (ParentExpr->isValidTypeExprParent())
+        if (ParentExpr->isValidParentOfTypeExpr(E))
           return;
 
         if (!Ctx.LangOpts.isSwiftVersionAtLeast(6)) {
