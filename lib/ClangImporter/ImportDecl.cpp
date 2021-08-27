@@ -1343,8 +1343,7 @@ synthesizeValueConstructorBody(AbstractFunctionDecl *afd, void *context) {
     for (unsigned i = 0, e = members.size(); i < e; ++i) {
       auto var = members[i];
 
-      if (var->hasClangNode() &&
-          isa<clang::IndirectFieldDecl>(var->getClangDecl()))
+      if (isa_and_nonnull<clang::IndirectFieldDecl>(var->getClangDecl()))
         continue;
 
       if (var->hasStorage() == (pass != 0)) {

@@ -1690,8 +1690,7 @@ private:
   static bool canMangle(TypeBase *Ty) {
     // TODO: C++ types are not yet supported (SR-13223).
     if (Ty->getStructOrBoundGenericStruct() &&
-        Ty->getStructOrBoundGenericStruct()->getClangDecl() &&
-        isa<clang::CXXRecordDecl>(
+        isa_and_nonnull<clang::CXXRecordDecl>(
             Ty->getStructOrBoundGenericStruct()->getClangDecl()))
       return false;
 
@@ -2445,7 +2444,7 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
     while (isa<llvm::DILexicalBlock>(Scope))
       Scope = cast<llvm::DILexicalBlock>(Scope)->getScope();
   }
-  assert(Scope && isa<llvm::DIScope>(Scope) && "variable has no scope");
+  assert(isa_and_nonnull<llvm::DIScope>(Scope) && "variable has no scope");
   llvm::DIFile *Unit = getFile(Scope);
   llvm::DIType *DITy = getOrCreateType(DbgTy);
   assert(DITy && "could not determine debug type of variable");
@@ -2636,8 +2635,7 @@ void IRGenDebugInfoImpl::emitGlobalVariableDeclaration(
     if (MetatypeType *metaTy = dyn_cast<MetatypeType>(ty))
       ty = metaTy->getInstanceType().getPointer();
     if (ty->getStructOrBoundGenericStruct() &&
-        ty->getStructOrBoundGenericStruct()->getClangDecl() &&
-        isa<clang::CXXRecordDecl>(
+        isa_and_nonnull<clang::CXXRecordDecl>(
             ty->getStructOrBoundGenericStruct()->getClangDecl()))
       return;
   }
