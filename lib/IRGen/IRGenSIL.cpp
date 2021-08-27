@@ -1065,8 +1065,7 @@ public:
       if (MetatypeType *metaTy = dyn_cast<MetatypeType>(ty))
         ty = metaTy->getRootClass().getPointer();
       if (ty->getStructOrBoundGenericStruct() &&
-          ty->getStructOrBoundGenericStruct()->getClangDecl() &&
-          isa<clang::CXXRecordDecl>(
+          isa_and_nonnull<clang::CXXRecordDecl>(
               ty->getStructOrBoundGenericStruct()->getClangDecl()))
         return;
     }
@@ -1709,7 +1708,7 @@ IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM, SILFunction *f)
     CurFn->addFnAttr(llvm::Attribute::SanitizeAddress);
   if (IGM.IRGen.Opts.Sanitizers & SanitizerKind::Thread) {
     auto declContext = f->getDeclContext();
-    if (declContext && isa<DestructorDecl>(declContext)) {
+    if (isa_and_nonnull<DestructorDecl>(declContext)) {
       // Do not report races in deinit and anything called from it
       // because TSan does not observe synchronization between retain
       // count dropping to '0' and the object deinitialization.

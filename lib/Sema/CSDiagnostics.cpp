@@ -3162,7 +3162,7 @@ void ContextualFailure::tryComputedPropertyFixIts() const {
       auto *initExpr = PBD->getInit(i);
       if (!VD->isStatic() &&
           !VD->getAttrs().getAttribute<DynamicReplacementAttr>() &&
-          initExpr && isa<ClosureExpr>(initExpr)) {
+          isa_and_nonnull<ClosureExpr>(initExpr)) {
         auto diag = emitDiagnostic(diag::extension_stored_property_fixit,
                                    VD->getName());
         diag.fixItRemove(PBD->getEqualLoc(i));
@@ -3956,7 +3956,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
         if (!argExpr)
           return false;
         auto possibleApplyExpr = findParentExpr(expr);
-        return possibleApplyExpr && isa<ApplyExpr>(possibleApplyExpr);
+        return isa_and_nonnull<ApplyExpr>(possibleApplyExpr);
       };
 
       auto *initCall = findParentExpr(findParentExpr(ctorRef));
@@ -6924,14 +6924,14 @@ bool MissingContextualBaseInMemberRefFailure::diagnoseAsError() {
   auto *parentExpr = findParentExpr(anchor);
 
   // Look through immediate call of unresolved member (e.g., `.foo(0)`).
-  if (parentExpr && isa<CallExpr>(parentExpr))
+  if (isa_and_nonnull<CallExpr>(parentExpr))
     parentExpr = findParentExpr(parentExpr);
 
   // FIXME: We should probably look through the entire member chain so that
   // something like `let _ = .foo().bar` gets the "no contextual type" error
   // rather than the "Cannot infer contextual base" error.
   UnresolvedMemberChainResultExpr *resultExpr = nullptr;
-  if (parentExpr && isa<UnresolvedMemberChainResultExpr>(parentExpr)) {
+  if (isa_and_nonnull<UnresolvedMemberChainResultExpr>(parentExpr)) {
     resultExpr = cast<UnresolvedMemberChainResultExpr>(parentExpr);
     parentExpr = findParentExpr(parentExpr);
   }
@@ -7469,12 +7469,12 @@ bool MissingContextualTypeForNil::diagnoseAsError() {
   // attempt any types for it.
   auto *parentExpr = findParentExpr(expr);
 
-  while (parentExpr && isa<IdentityExpr>(parentExpr))
+  while (isa_and_nonnull<IdentityExpr>(parentExpr))
     parentExpr = findParentExpr(parentExpr);
 
   // In cases like `_ = nil?` AST would have `nil`
   // wrapped in `BindOptionalExpr`.
-  if (parentExpr && isa<BindOptionalExpr>(parentExpr))
+  if (isa_and_nonnull<BindOptionalExpr>(parentExpr))
     parentExpr = findParentExpr(parentExpr);
 
   if (parentExpr) {
