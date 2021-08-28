@@ -2930,21 +2930,6 @@ public:
 
     TypeChecker::checkDeclAttributes(ED);
 
-    fprintf(stderr, "[%s:%d] (%s) VISIT EXTENSION\n", __FILE__, __LINE__, __FUNCTION__);
-    if (nominal->isDistributedActor()) {
-      auto decl = dyn_cast<ClassDecl>(nominal);
-      TypeChecker::checkDistributedActor(decl);
-
-      fprintf(stderr, "[%s:%d] (%s) VISIT DIST ACTOR MEMBERS FROM EXTENSION\n", __FILE__, __LINE__, __FUNCTION__);
-      for (Decl *Member : ED->getMembers()) {
-        if (auto var = dyn_cast<VarDecl>(Member))
-          fprintf(stderr, "[%s:%d] (%s) VISIT MEMBER: [%s]\n", __FILE__, __LINE__, __FUNCTION__, var->getName().str().str().c_str());
-        if (auto func = dyn_cast<FuncDecl>(Member))
-          fprintf(stderr, "[%s:%d] (%s) VISIT MEMBER: [%s]\n", __FILE__, __LINE__, __FUNCTION__, func->getName().getBaseName().getIdentifier().str().str().c_str());
-      }
-
-    }
-
     for (Decl *Member : ED->getMembers())
       visit(Member);
 
@@ -2955,6 +2940,11 @@ public:
     checkAccessControl(ED);
 
     checkExplicitAvailability(ED);
+
+    if (nominal->isDistributedActor()) {
+      auto decl = dyn_cast<ClassDecl>(nominal);
+      TypeChecker::checkDistributedActor(decl);
+    }
   }
 
   void visitTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
