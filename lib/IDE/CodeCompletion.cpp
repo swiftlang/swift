@@ -6366,7 +6366,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
     if (ParsedDecl && ParsedDecl == CurDeclContext->getAsDecl())
       DC = ParsedDecl->getDeclContext();
     if (!isa<ProtocolDecl>(DC))
-      if (DC->isTypeContext() || (ParsedDecl && isa<FuncDecl>(ParsedDecl)))
+      if (DC->isTypeContext() || isa_and_nonnull<FuncDecl>(ParsedDecl))
         addOpaqueTypeKeyword(Sink);
 
     LLVM_FALLTHROUGH;
@@ -7012,7 +7012,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   }
   if (auto *DRE = dyn_cast_or_null<DeclRefExpr>(ParsedExpr)) {
     Lookup.setIsSelfRefExpr(DRE->getDecl()->getName() == Context.Id_self);
-  } else if (ParsedExpr && isa<SuperRefExpr>(ParsedExpr)) {
+  } else if (isa_and_nonnull<SuperRefExpr>(ParsedExpr)) {
     Lookup.setIsSuperRefExpr();
   }
 
@@ -7205,7 +7205,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       Lookup.setHaveLParen(true);
       for (auto &typeAndDecl : ContextInfo.getPossibleCallees()) {
         auto apply = ContextInfo.getAnalyzedExpr();
-        if (apply && isa<SubscriptExpr>(apply)) {
+        if (isa_and_nonnull<SubscriptExpr>(apply)) {
           Lookup.addSubscriptCallPattern(
               typeAndDecl.Type,
               dyn_cast_or_null<SubscriptDecl>(typeAndDecl.Decl),

@@ -202,8 +202,7 @@ Solution::resolveConcreteDeclRef(ValueDecl *decl,
 
   // If this is a C++ function template, get it's specialization for the given
   // substitution map and update the decl accordingly.
-  if (decl->getClangDecl() &&
-      isa<clang::FunctionTemplateDecl>(decl->getClangDecl())) {
+  if (isa_and_nonnull<clang::FunctionTemplateDecl>(decl->getClangDecl())) {
     auto *newFn =
         decl->getASTContext()
             .getClangModuleLoader()

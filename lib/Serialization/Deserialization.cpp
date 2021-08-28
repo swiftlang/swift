@@ -6495,8 +6495,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     } else {
       fatal(thirdOrError.takeError());
     }
-    if (third &&
-        isa<TypeAliasDecl>(third) &&
+    if (isa_and_nonnull<TypeAliasDecl>(third) &&
         third->getModuleContext() != getAssociatedModule() &&
         !third->getDeclaredInterfaceType()->isEqual(second)) {
       // Conservatively drop references to typealiases in other modules

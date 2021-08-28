@@ -2318,7 +2318,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
 
     if (shouldAttemptFixes()) {
       auto *anchor = locator.trySimplifyToExpr();
-      if (anchor && isa<ClosureExpr>(anchor) &&
+      if (isa_and_nonnull<ClosureExpr>(anchor) &&
           isSingleTupleParam(ctx, func2Params) &&
           canImplodeParams(func1Params)) {
         auto *fix = AllowClosureParamDestructuring::create(

@@ -4309,8 +4309,8 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
 
   // If this is a C++ constructor, don't add the metatype "self" parameter
   // because we'll never use it and it will cause problems in IRGen.
-  if (constant.getDecl()->getClangDecl() &&
-      isa<clang::CXXConstructorDecl>(constant.getDecl()->getClangDecl())) {
+  if (isa_and_nonnull<clang::CXXConstructorDecl>(
+          constant.getDecl()->getClangDecl())) {
     // But, make sure it is actually a metatype that we're not adding. If
     // changes to the self parameter are made in the future, this logic may
     // need to be updated.
