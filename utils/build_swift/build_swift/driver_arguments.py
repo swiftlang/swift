@@ -587,6 +587,9 @@ def create_argument_parser():
     # -------------------------------------------------------------------------
     in_group('Options to select projects')
 
+    option('--no-infer', toggle_false('infer_dependencies'),
+           help='Do not infer any downstream dependencies from enabled projects')
+
     option('--infer', toggle_true('infer_dependencies'),
            help='Infer any downstream dependencies from enabled projects')
 
