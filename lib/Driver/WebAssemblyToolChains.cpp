@@ -224,8 +224,8 @@ void validateLinkerArguments(DiagnosticEngine &diags,
                              ArgStringList linkerArgs) {
   for (auto arg : linkerArgs) {
     if (StringRef(arg).startswith("--global-base=")) {
-      diags.diagnose(SourceLoc(), diag::error_option_not_supported, arg,
-                     "wasm32");
+      diags.diagnose(SourceLoc(), diag::error_conflicting_options, arg,
+                     "wasm32 target");
     }
   }
 }
