@@ -321,6 +321,9 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
            "Only 'distributed actor' type can gain implicit distributed actor init");
 
     if (swift::ensureDistributedModuleLoaded(decl)) {
+      // copy access level of distributed actor init from the nominal decl
+      accessLevel = decl->getEffectiveAccess();
+
       auto transportDecl = ctx.getActorTransportDecl();
 
       // Create the parameter.

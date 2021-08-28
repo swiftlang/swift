@@ -14,7 +14,7 @@ import _Distributed
 import def_distributed
 
 func testDoSomethingDistributed(transport: ActorTransport) {
-  let da = DA(transport: transport)
+  let _: DA = DA(transport: transport)
 }
 
 extension DA {
