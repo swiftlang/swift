@@ -642,6 +642,7 @@ private:
   
   /// The DWARF importer delegate, if installed.
   DWARFImporterDelegate *DWARFImporter = nullptr;
+
 public:
   /// Only used for testing.
   void setDWARFImporterDelegate(DWARFImporterDelegate &delegate);
