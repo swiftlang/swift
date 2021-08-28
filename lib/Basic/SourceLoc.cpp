@@ -165,9 +165,14 @@ SourceManager::getVirtualFile(SourceLoc Loc) const {
   if (CachedVFile.first == p)
     return CachedVFile.second;
 
-  // Returns the first element that is >p.
-  auto VFileIt = VirtualFiles.upper_bound(p);
-  if (VFileIt != VirtualFiles.end() && VFileIt->second.Range.contains(Loc)) {
+  // Returns the first element that is >=p.
+  auto VFileIt = VirtualFiles.lower_bound(p);
+  if (VFileIt == VirtualFiles.end())
+    return nullptr;
+
+  // Consider the end as within the range in order to handle EOF locations
+  const CharSourceRange &Range = VFileIt->second.Range;
+  if (Loc == Range.getEnd() || VFileIt->second.Range.contains(Loc)) {
     CachedVFile = { p, &VFileIt->second };
     return CachedVFile.second;
   }

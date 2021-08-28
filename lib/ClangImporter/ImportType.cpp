@@ -2599,12 +2599,7 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
   }
 
   if (importedName.hasCustomName() && argNames.size() != swiftParams.size()) {
-    // Note carefully: we're emitting a warning in the /Clang/ buffer.
-    auto &srcMgr = getClangASTContext().getSourceManager();
-    ClangSourceBufferImporter &bufferImporter =
-        getBufferImporterForDiagnostics();
-    SourceLoc methodLoc =
-        bufferImporter.resolveSourceLocation(srcMgr, clangDecl->getLocation());
+    SourceLoc methodLoc = importSourceLoc(clangDecl->getLocation());
     if (methodLoc.isValid()) {
       diagnose(methodLoc, diag::invalid_swift_name_method,
                                   swiftParams.size() < argNames.size(),

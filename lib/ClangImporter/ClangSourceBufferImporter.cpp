@@ -13,6 +13,7 @@
 #include "ClangSourceBufferImporter.h"
 #include "swift/Basic/SourceManager.h"
 #include "clang/Basic/SourceManager.h"
+#include "clang/Basic/SourceManagerInternals.h"
 #include "llvm/Support/MemoryBuffer.h"
 
 using namespace swift;
@@ -29,69 +30,105 @@ static SourceLoc findEndOfLine(SourceManager &SM, SourceLoc loc,
   return loc.getAdvancedLoc(newlineOffset);
 }
 
-SourceLoc ClangSourceBufferImporter::resolveSourceLocation(
-    const clang::SourceManager &clangSrcMgr,
-    clang::SourceLocation clangLoc) {
-  SourceLoc loc;
+SourceLoc ClangSourceBufferImporter::importSourceLoc(
+    const clang::SourceManager &clangSourceManager,
+    clang::SourceLocation clangLoc, bool forDiagnostics) {
+  // Map the location to one in an actual file (as opposed to within a macro)
+  clangLoc = clangSourceManager.getFileLoc(clangLoc);
 
-  clangLoc = clangSrcMgr.getFileLoc(clangLoc);
-  auto decomposedLoc = clangSrcMgr.getDecomposedLoc(clangLoc);
-  if (decomposedLoc.first.isInvalid())
-    return loc;
+  clang::FileID clangFileID;
+  unsigned offset;
+  std::tie(clangFileID, offset) =
+      clangSourceManager.getDecomposedLoc(clangLoc);
+  if (clangFileID.isInvalid())
+    return SourceLoc();
 
-  auto clangFileID = decomposedLoc.first;
-  auto buffer = clangSrcMgr.getBufferOrFake(clangFileID);
+  llvm::Optional<llvm::MemoryBufferRef> buffer =
+      clangSourceManager.getBufferOrNone(clangFileID);
+  if (!buffer)
+    return SourceLoc();
+
+  // Grab the already mapped buffer or add a new one (without copying) if it
+  // hasn't been added before
   unsigned mirrorID;
-
-  auto mirrorIter = mirroredBuffers.find(buffer.getBufferStart());
+  auto mirrorIter = mirroredBuffers.find(buffer->getBufferStart());
+  bool allDirectives = false;
   if (mirrorIter != mirroredBuffers.end()) {
-    mirrorID = mirrorIter->second;
+    mirrorID = mirrorIter->second.FileID;
+    allDirectives = mirrorIter->second.Complete;
   } else {
     std::unique_ptr<llvm::MemoryBuffer> mirrorBuffer{
-      llvm::MemoryBuffer::getMemBuffer(buffer.getBuffer(),
-                                       buffer.getBufferIdentifier(),
+      llvm::MemoryBuffer::getMemBuffer(buffer->getBuffer(),
+                                       buffer->getBufferIdentifier(),
                                        /*RequiresNullTerminator=*/true)
     };
     mirrorID = swiftSourceManager.addNewSourceBuffer(std::move(mirrorBuffer));
-    mirroredBuffers[buffer.getBufferStart()] = mirrorID;
-  }
-  loc = swiftSourceManager.getLocForOffset(mirrorID, decomposedLoc.second);
+    mirroredBuffers[buffer->getBufferStart()] = { mirrorID, !forDiagnostics };
 
-  auto presumedLoc = clangSrcMgr.getPresumedLoc(clangLoc);
-  if (!presumedLoc.getFilename())
-    return loc;
-  if (presumedLoc.getLine() == 0)
-    return SourceLoc();
-
-  unsigned bufferLineNumber =
-    clangSrcMgr.getLineNumber(decomposedLoc.first, decomposedLoc.second);
-
-  StringRef presumedFile = presumedLoc.getFilename();
-  SourceLoc startOfLine = loc.getAdvancedLoc(-presumedLoc.getColumn() + 1);
-
-  // FIXME: Virtual files can't actually model the EOF position correctly, so
-  // if this virtual file would start at EOF, just hope the physical location
-  // will do.
-  if (startOfLine != swiftSourceManager.getRangeForBuffer(mirrorID).getEnd()) {
-    bool isNewVirtualFile = swiftSourceManager.openVirtualFile(
-        startOfLine, presumedFile, presumedLoc.getLine() - bufferLineNumber);
-    if (isNewVirtualFile) {
-      SourceLoc endOfLine = findEndOfLine(swiftSourceManager, loc, mirrorID);
-      swiftSourceManager.closeVirtualFile(endOfLine);
+    // Make sure to keep a reference to the underlying manager
+    if (clangSourceManagers.insert(&clangSourceManager).second) {
+      clangSourceManagerRefs.emplace_back(&clangSourceManager);
     }
   }
 
-  using SourceManagerRef = llvm::IntrusiveRefCntPtr<const clang::SourceManager>;
-  auto iter = std::lower_bound(sourceManagersWithDiagnostics.begin(),
-                               sourceManagersWithDiagnostics.end(),
-                               &clangSrcMgr,
-                               [](const SourceManagerRef &inArray,
-                                  const clang::SourceManager *toInsert) {
-    return std::less<const clang::SourceManager *>()(inArray.get(), toInsert);
-  });
-  if (iter == sourceManagersWithDiagnostics.end() ||
-      iter->get() != &clangSrcMgr) {
-    sourceManagersWithDiagnostics.insert(iter, &clangSrcMgr);
+  SourceLoc loc = swiftSourceManager.getLocForOffset(mirrorID, offset);
+  if (allDirectives)
+    return swiftSourceManager.getLocForOffset(mirrorID, offset);
+
+  // Now add any line directives, if any. Note that the line table will be
+  // incomplete if a module is broken and diagnostics are output, but otherwise
+  // we'll be reading from the serialized module and hence have the full line
+  // table.
+  //
+  // Always add the enclosing line directive if importing a source location for
+  // a diagnostic, but otherwise assume we have the full line table and add
+  // all directives at once to avoid adding a virtual file for every location.
+
+  bool Invalid = false;
+  const clang::SrcMgr::SLocEntry &Entry =
+      clangSourceManager.getSLocEntry(clangFileID, &Invalid);
+  if (Invalid || !Entry.isFile())
+    return loc;
+
+  // TODO: The LineTable is obstensibly part of the "internals", should we be
+  //       relying on it here?
+  if (!clangSourceManager.hasLineTable() ||
+      !Entry.getFile().hasLineDirectives())
+    return loc;
+
+  clang::LineTableInfo &lineTable =
+      *clangSourceManager.getCurrentLineTable();
+
+  ArrayRef<clang::LineEntry> lineEntries;
+  if (!forDiagnostics) {
+    mirroredBuffers[buffer->getBufferStart()].Complete = true;
+
+    lineEntries = lineTable.entries(clangFileID);
+    if (lineEntries.empty())
+      return loc;
+  } else {
+    const clang::LineEntry *entry =
+        lineTable.FindNearestLineEntry(clangFileID, offset);
+    if (!entry)
+      return loc;
+    lineEntries = llvm::makeArrayRef(*entry);
+  }
+
+  for (const clang::LineEntry &entry : lineEntries) {
+    SourceLoc fileLoc =
+        swiftSourceManager.getLocForOffset(mirrorID, entry.FileOffset);
+    const SourceManager::VirtualFile *file = swiftSourceManager.getVirtualFile(fileLoc);
+    if (file) {
+      if (file->Range.getStart() == fileLoc)
+        continue;
+      swiftSourceManager.closeVirtualFile(fileLoc);
+    }
+
+    StringRef fileName = lineTable.getFilename(entry.FilenameID);
+    unsigned line =
+        swiftSourceManager.getLineAndColumnInBuffer(fileLoc).first;
+    swiftSourceManager.openVirtualFile(fileLoc, fileName,
+                                       entry.LineNo - line - 1);
   }
 
   return loc;

@@ -839,42 +839,6 @@ static ArrayRef<T> copyAndClearArray(llvm::BumpPtrAllocator &Allocator,
   return Ref;
 }
 
-static void setLocationInfoForClangNode(ClangNode ClangNode,
-                                        ClangImporter *Importer,
-                                        LocationInfo &Location) {
-  clang::ASTContext &ClangCtx = Importer->getClangASTContext();
-  clang::SourceManager &ClangSM = ClangCtx.getSourceManager();
-
-  clang::SourceRange SR = ClangNode.getLocation();
-  if (auto MD =
-          dyn_cast_or_null<clang::ObjCMethodDecl>(ClangNode.getAsDecl())) {
-    SR = clang::SourceRange(MD->getSelectorStartLoc(),
-                            MD->getDeclaratorEndLoc());
-  }
-
-  clang::CharSourceRange CharRange =
-      clang::Lexer::makeFileCharRange(clang::CharSourceRange::getTokenRange(SR),
-                                      ClangSM, ClangCtx.getLangOpts());
-  if (CharRange.isInvalid())
-    return;
-
-  std::pair<clang::FileID, unsigned> Decomp =
-      ClangSM.getDecomposedLoc(CharRange.getBegin());
-  if (!Decomp.first.isInvalid()) {
-    if (auto FE = ClangSM.getFileEntryForID(Decomp.first)) {
-      Location.Filename = FE->getName();
-
-      std::pair<clang::FileID, unsigned> EndDecomp =
-          ClangSM.getDecomposedLoc(CharRange.getEnd());
-
-      Location.Offset = Decomp.second;
-      Location.Length = EndDecomp.second - Decomp.second;
-      Location.Line = ClangSM.getLineNumber(Decomp.first, Decomp.second);
-      Location.Column = ClangSM.getColumnNumber(Decomp.first, Decomp.second);
-    }
-  }
-}
-
 static unsigned getCharLength(SourceManager &SM, SourceRange TokenRange) {
   SourceLoc CharEndLoc = Lexer::getLocForEndOfToken(SM, TokenRange.End);
   return SM.getByteDistance(TokenRange.Start, CharEndLoc);
@@ -882,41 +846,36 @@ static unsigned getCharLength(SourceManager &SM, SourceRange TokenRange) {
 
 static void setLocationInfo(const ValueDecl *VD,
                             LocationInfo &Location) {
-  ASTContext &Ctx = VD->getASTContext();
-  SourceManager &SM = Ctx.SourceMgr;
-
-  auto ClangNode = VD->getClangNode();
-
   auto Loc = VD->getLoc(/*SerializedOK=*/true);
-  if (Loc.isValid()) {
-    auto getSignatureRange = [&](const ValueDecl *VD) -> Optional<unsigned> {
-      if (auto FD = dyn_cast<AbstractFunctionDecl>(VD)) {
-        SourceRange R = FD->getSignatureSourceRange();
-        if (R.isValid())
-          return getCharLength(SM, R);
-      }
-      return None;
-    };
-    unsigned NameLen;
-    if (auto SigLen = getSignatureRange(VD)) {
-      NameLen = SigLen.getValue();
-    } else if (VD->hasName()) {
-      NameLen = VD->getBaseName().userFacingName().size();
-    } else {
-      NameLen = getCharLength(SM, Loc);
-    }
+  if (!Loc.isValid())
+    return;
 
-    unsigned DeclBufID = SM.findBufferContainingLoc(Loc);
-    Location.Filename = SM.getIdentifierForBuffer(DeclBufID);
-    Location.Offset = SM.getLocOffsetInBuffer(Loc, DeclBufID);
-    Location.Length = NameLen;
-    std::tie(Location.Line, Location.Column) = SM.getLineAndColumnInBuffer(
-        Loc, DeclBufID);
-  } else if (ClangNode) {
-    ClangImporter *Importer =
-        static_cast<ClangImporter*>(Ctx.getClangModuleLoader());
-    setLocationInfoForClangNode(ClangNode, Importer, Location);
+  SourceManager &SM = VD->getASTContext().SourceMgr;
+
+  auto getSignatureRange = [&](const ValueDecl *VD) -> Optional<unsigned> {
+    if (auto FD = dyn_cast<AbstractFunctionDecl>(VD)) {
+      SourceRange R = FD->getSignatureSourceRange();
+      if (R.isValid())
+        return getCharLength(SM, R);
+    }
+    return None;
+  };
+
+  unsigned NameLen;
+  if (auto SigLen = getSignatureRange(VD)) {
+    NameLen = SigLen.getValue();
+  } else if (VD->hasName()) {
+    NameLen = VD->getBaseName().userFacingName().size();
+  } else {
+    NameLen = getCharLength(SM, Loc);
   }
+
+  unsigned DeclBufID = SM.findBufferContainingLoc(Loc);
+  Location.Filename = SM.getIdentifierForBuffer(DeclBufID);
+  Location.Offset = SM.getLocOffsetInBuffer(Loc, DeclBufID);
+  Location.Length = NameLen;
+  std::tie(Location.Line, Location.Column) = SM.getLineAndColumnInBuffer(
+      Loc, DeclBufID);
 }
 
 static llvm::Error

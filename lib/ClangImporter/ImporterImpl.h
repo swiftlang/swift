@@ -361,11 +361,11 @@ private:
   LookupTableMap LookupTables;
 
   /// A helper class used to bring Clang buffers into Swift's SourceManager
-  /// for the purpose of emitting diagnostics.
+  /// for the purpose of importing locations.
   ///
   /// Listed early so that it gets torn down after the underlying Clang
   /// instances that also use these buffers.
-  importer::ClangSourceBufferImporter BuffersForDiagnostics;
+  importer::ClangSourceBufferImporter BufferImporter;
 
   /// The fake buffer used to import modules.
   ///
@@ -717,8 +717,8 @@ public:
     return Instance->getCodeGenOpts();
   }
 
-  importer::ClangSourceBufferImporter &getBufferImporterForDiagnostics() {
-    return BuffersForDiagnostics;
+  importer::ClangSourceBufferImporter &getBufferImporter() {
+    return BufferImporter;
   }
 
   /// Imports the given header contents into the Clang context.
@@ -817,7 +817,7 @@ public:
   SourceLoc importSourceLoc(clang::SourceLocation loc);
 
   /// Import the given Clang source range into Swift.
-  SourceRange importSourceRange(clang::SourceRange loc);
+  SourceRange importSourceRange(clang::SourceRange range);
 
   /// Import the given Clang preprocessor macro as a Swift value decl.
   ///
@@ -1604,18 +1604,18 @@ class SwiftNameLookupExtension : public clang::ModuleFileExtension {
   std::unique_ptr<SwiftLookupTable> &pchLookupTable;
   LookupTableMap &lookupTables;
   ASTContext &swiftCtx;
-  ClangSourceBufferImporter &buffersForDiagnostics;
+  ClangSourceBufferImporter &bufferImporter;
   const PlatformAvailability &availability;
 
 public:
   SwiftNameLookupExtension(std::unique_ptr<SwiftLookupTable> &pchLookupTable,
                            LookupTableMap &tables, ASTContext &ctx,
-                           ClangSourceBufferImporter &buffersForDiagnostics,
+                           ClangSourceBufferImporter &bufferImporter,
                            const PlatformAvailability &avail)
       : // Update in response to D97702 landing.
         clang::ModuleFileExtension(),
         pchLookupTable(pchLookupTable), lookupTables(tables), swiftCtx(ctx),
-        buffersForDiagnostics(buffersForDiagnostics), availability(avail) {}
+        bufferImporter(bufferImporter), availability(avail) {}
 
   clang::ModuleFileExtensionMetadata getExtensionMetadata() const override;
   llvm::hash_code hashExtension(llvm::hash_code code) const override;

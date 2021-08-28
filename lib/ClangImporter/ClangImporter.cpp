@@ -1106,7 +1106,7 @@ ClangImporter::create(ASTContext &ctx,
       std::make_shared<SwiftNameLookupExtension>(
           importer->Impl.BridgingHeaderLookupTable,
           importer->Impl.LookupTables, importer->Impl.SwiftContext,
-          importer->Impl.getBufferImporterForDiagnostics(),
+          importer->Impl.getBufferImporter(),
           importer->Impl.platformAvailability));
 
   // Create a compiler instance.
@@ -1446,7 +1446,7 @@ bool ClangImporter::Implementation::importHeader(
 
   // Finalize the lookup table, which may fail.
   finalizeLookupTable(*BridgingHeaderLookupTable, getNameImporter(),
-                      getBufferImporterForDiagnostics());
+                      getBufferImporter());
 
   // FIXME: What do we do if there was already an error?
   if (!hadError && clangDiags.hasErrorOccurred()) {
@@ -2205,7 +2205,7 @@ ClangImporter::Implementation::Implementation(
       IsReadingBridgingPCH(false),
       CurrentVersion(ImportNameVersion::fromOptions(ctx.LangOpts)),
       BridgingHeaderLookupTable(new SwiftLookupTable(nullptr)),
-      BuffersForDiagnostics(ctx.SourceMgr),
+      BufferImporter(ctx.SourceMgr),
       platformAvailability(ctx.LangOpts), nameImporter(),
       DisableSourceImport(ctx.ClangImporterOpts.DisableSourceImport),
       DWARFImporter(dwarfImporterDelegate) {}
@@ -2263,14 +2263,14 @@ ClangImporter::Implementation::exportSourceLoc(SourceLoc loc) {
 
 SourceLoc
 ClangImporter::Implementation::importSourceLoc(clang::SourceLocation loc) {
-  // FIXME: Implement!
-  return SourceLoc();
+  return BufferImporter.importSourceLoc(
+      getClangASTContext().getSourceManager(), loc);
 }
 
 SourceRange
-ClangImporter::Implementation::importSourceRange(clang::SourceRange loc) {
-  // FIXME: Implement!
-  return SourceRange();
+ClangImporter::Implementation::importSourceRange(clang::SourceRange range) {
+  return SourceRange(importSourceLoc(range.getBegin()),
+                     importSourceLoc(range.getEnd()));
 }
 
 #pragma mark Importing names

@@ -123,14 +123,15 @@ void ClangDiagnosticConsumer::HandleDiagnostic(
 
   const ASTContext &ctx = ImporterImpl.SwiftContext;
   ClangSourceBufferImporter &bufferImporter =
-      ImporterImpl.getBufferImporterForDiagnostics();
+      ImporterImpl.getBufferImporter();
 
   if (clangDiag.getID() == clang::diag::err_module_not_built &&
       CurrentImport && clangDiag.getArgStdStr(0) == CurrentImport->getName()) {
     SourceLoc loc = DiagLoc;
     if (clangDiag.getLocation().isValid()) {
-      loc = bufferImporter.resolveSourceLocation(clangDiag.getSourceManager(),
-                                                 clangDiag.getLocation());
+      loc = bufferImporter.importSourceLoc(clangDiag.getSourceManager(),
+                                           clangDiag.getLocation(),
+                                           /*forDiagnostics=*/true);
     }
 
     ctx.Diags.diagnose(loc, diag::clang_cannot_build_module,
@@ -172,8 +173,9 @@ void ClangDiagnosticConsumer::HandleDiagnostic(
 
     SourceLoc noteLoc;
     if (clangNoteLoc.isValid())
-      noteLoc = bufferImporter.resolveSourceLocation(clangNoteLoc.getManager(),
-                                                     clangNoteLoc);
+      noteLoc = bufferImporter.importSourceLoc(clangNoteLoc.getManager(),
+                                               clangNoteLoc,
+                                               /*forDiagnostics=*/true);
     ctx.Diags.diagnose(noteLoc, diagKind, message);
   };
 

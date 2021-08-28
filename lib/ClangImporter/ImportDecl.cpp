@@ -4244,7 +4244,6 @@ namespace {
       if (funcTemplate)
         clangNode = funcTemplate;
 
-      // FIXME: Poor location info.
       auto nameLoc = Impl.importSourceLoc(decl->getLocation());
 
       AbstractFunctionDecl *result = nullptr;
@@ -4257,7 +4256,7 @@ namespace {
         DeclName ctorName(Impl.SwiftContext, DeclBaseName::createConstructor(),
                           bodyParams);
         result = Impl.createDeclWithClangNode<ConstructorDecl>(
-            clangNode, AccessLevel::Public, ctorName, loc, 
+            clangNode, AccessLevel::Public, ctorName, nameLoc,
             /*failable=*/false, /*FailabilityLoc=*/SourceLoc(),
             /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
             /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), 
@@ -4266,10 +4265,10 @@ namespace {
         auto resultTy = importedType.getType();
 
         FuncDecl *func =
-            createFuncOrAccessor(Impl.SwiftContext, loc, accessorInfo, name,
-                                 nameLoc, genericParams, bodyParams, resultTy,
-                                 /*async=*/false, /*throws=*/false, dc,
-                                 clangNode);
+            createFuncOrAccessor(Impl.SwiftContext, /*funcLoc=*/SourceLoc(),
+                                 accessorInfo, name, nameLoc, genericParams,
+                                 bodyParams, resultTy, /*async=*/false,
+                                 /*throws=*/false, dc, clangNode);
         result = func;
 
         if (!dc->isModuleScopeContext()) {
@@ -5088,10 +5087,10 @@ namespace {
         }
       }
 
+      auto nameLoc = Impl.importSourceLoc(decl->getSelectorStartLoc());
       auto result = createFuncOrAccessor(Impl.SwiftContext,
                                          /*funcLoc*/ SourceLoc(), accessorInfo,
-                                         importedName.getDeclName(),
-                                         /*nameLoc*/ SourceLoc(),
+                                         importedName.getDeclName(), nameLoc,
                                          /*genericParams=*/nullptr, bodyParams,
                                          resultTy, async, throws, dc, decl);
 
@@ -7122,8 +7121,9 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
   assert(!importedName.getAsyncInfo());
   auto result = Impl.createDeclWithClangNode<ConstructorDecl>(
       objcMethod, AccessLevel::Public, importedName.getDeclName(),
-      /*NameLoc=*/SourceLoc(), failability, /*FailabilityLoc=*/SourceLoc(),
-      /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
+      Impl.importSourceLoc(objcMethod->getLocation()),
+      failability, /*FailabilityLoc=*/SourceLoc(), /*Async=*/false,
+      /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/importedName.getErrorInfo().hasValue(),
       /*ThrowsLoc=*/SourceLoc(), bodyParams,
       /*GenericParams=*/nullptr, const_cast<DeclContext *>(dc));
@@ -8783,12 +8783,7 @@ void ClangImporter::Implementation::importAttributes(
         if (SeenMainActorAttr) {
           // Cannot add main actor annotation twice. We'll keep the first
           // one and raise a warning about the duplicate.
-          auto &clangSrcMgr = getClangASTContext().getSourceManager();
-          ClangSourceBufferImporter &bufferImporter =
-              getBufferImporterForDiagnostics();
-          SourceLoc attrLoc = bufferImporter.resolveSourceLocation(
-              clangSrcMgr, swiftAttr->getLocation());
-
+          SourceLoc attrLoc = importSourceLoc(swiftAttr->getLocation());
           diagnose(attrLoc, diag::import_multiple_mainactor_attr,
                    swiftAttr->getAttribute(),
                    SeenMainActorAttr.getValue()->getAttribute());
@@ -8844,11 +8839,7 @@ void ClangImporter::Implementation::importAttributes(
 
       if (hadError) {
         // Complain about the unhandled attribute or modifier.
-        auto &clangSrcMgr = getClangASTContext().getSourceManager();
-        ClangSourceBufferImporter &bufferImporter =
-          getBufferImporterForDiagnostics();
-        SourceLoc attrLoc = bufferImporter.resolveSourceLocation(
-          clangSrcMgr, swiftAttr->getLocation());
+        SourceLoc attrLoc = importSourceLoc(swiftAttr->getLocation());
         diagnose(attrLoc, diag::clang_swift_attr_unhandled,
                  swiftAttr->getAttribute());
       }
@@ -9413,19 +9404,13 @@ ClangImporter::Implementation::importDeclForDeclContext(
   if (!contextDeclsWarnedAbout.insert(contextDecl).second)
     return nullptr;
 
-  auto convertLoc = [&](clang::SourceLocation clangLoc) {
-    return getBufferImporterForDiagnostics()
-      .resolveSourceLocation(getClangASTContext().getSourceManager(),
-                             clangLoc);
-  };
-
   auto getDeclName = [](const clang::Decl *D) -> StringRef {
     if (auto ND = dyn_cast<clang::NamedDecl>(D))
       return ND->getName();
     return "<anonymous>";
   };
 
-  SourceLoc loc = convertLoc(importingDecl->getLocation());
+  SourceLoc loc = importSourceLoc(importingDecl->getLocation());
   diagnose(loc, diag::swift_name_circular_context_import,
            writtenName, getDeclName(importingDecl));
 
@@ -9433,7 +9418,7 @@ ClangImporter::Implementation::importDeclForDeclContext(
   for (auto entry : make_range(contextDeclsBeingImported.rbegin(), iter)) {
     auto otherDecl = std::get<0>(entry);
     auto otherWrittenName = std::get<1>(entry);
-    diagnose(convertLoc(otherDecl->getLocation()),
+    diagnose(importSourceLoc(otherDecl->getLocation()),
              diag::swift_name_circular_context_import_other,
              otherWrittenName, getDeclName(otherDecl));
   }

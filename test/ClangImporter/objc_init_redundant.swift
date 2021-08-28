@@ -10,12 +10,12 @@ import Foundation
 extension NSObject {
   @objc convenience init() { self.init() } // expected-error{{initializer 'init()' with Objective-C selector 'init' conflicts with previous declaration with the same Objective-C selector}}
 // CHECK: objc_init_redundant.swift:[[@LINE-1]]:21: error: initializer 'init()' with Objective-C selector 'init' conflicts
-// CHECK: ObjectiveC.NSObject:{{.*}}note: 'init' previously declared here
+// CHECK: NSObject.h:18:1:{{.*}}note: 'init' previously declared here
 }
 
 extension NSObject {
   @objc(class) func foo() { } // expected-error{{method 'foo()' with Objective-C selector 'class' conflicts with method 'class()' with the same Objective-C selector}}
 // CHECK: objc_init_redundant.swift:[[@LINE-1]]:21: error: method 'foo()' with Objective-C selector 'class' conflicts
-// CHECK: ObjectiveC.NSObjectProtocol:{{.*}}note: method 'class()' declared here
+// CHECK: NSObject.h:11:10:{{.*}}note: method 'class()' declared here
 }
 

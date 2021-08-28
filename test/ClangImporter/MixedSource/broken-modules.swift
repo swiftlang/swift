@@ -29,7 +29,7 @@ import BrokenClangModule
 // CLANG-CHECK: a-fake-file.h:42:5: note: previous definition is here
 // CLANG-CHECK: a-fake-file.h:46:5: error: expected identifier or '('
 // CLANG-CHECK: a-fake-file.h:45:11: note: expanded from macro 'I'
-// CLANG-CHECK: {{.+}}{{/|\\}}Inputs{{/|\\}}broken-modules{{/|\\}}BrokenClangModule.h:11:35: error: expected ';' after top level declarator
+// CLANG-CHECK: a-fake-file.h:50:35: error: expected ';' after top level declarator
 
 // CHECK: broken-modules.swift:[[@LINE-9]]:8: error: could not build Objective-C module 'BrokenClangModule'
 // CHECK: error: no such module 'BrokenClangModule'

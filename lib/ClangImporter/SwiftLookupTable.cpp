@@ -71,17 +71,17 @@ class SwiftLookupTableWriter : public clang::ModuleFileExtensionWriter {
   clang::ASTWriter &Writer;
 
   ASTContext &swiftCtx;
-  importer::ClangSourceBufferImporter &buffersForDiagnostics;
+  importer::ClangSourceBufferImporter &bufferImporter;
   const PlatformAvailability &availability;
 
 public:
   SwiftLookupTableWriter(
       clang::ModuleFileExtension *extension, clang::ASTWriter &writer,
       ASTContext &ctx,
-      importer::ClangSourceBufferImporter &buffersForDiagnostics,
+      importer::ClangSourceBufferImporter &bufferImporter,
       const PlatformAvailability &avail)
     : ModuleFileExtensionWriter(extension), Writer(writer), swiftCtx(ctx),
-      buffersForDiagnostics(buffersForDiagnostics), availability(avail) {}
+      bufferImporter(bufferImporter), availability(avail) {}
 
   void writeExtensionContents(clang::Sema &sema,
                               llvm::BitstreamWriter &stream) override;
@@ -2027,7 +2027,7 @@ void importer::addMacrosToLookupTable(SwiftLookupTable &table,
 
 void importer::finalizeLookupTable(
     SwiftLookupTable &table, NameImporter &nameImporter,
-    ClangSourceBufferImporter &buffersForDiagnostics) {
+    ClangSourceBufferImporter &bufferImporter) {
   // Resolve any unresolved entries.
   SmallVector<SwiftLookupTable::SingleEntry, 4> unresolved;
   if (table.resolveUnresolvedEntries(unresolved)) {
@@ -2045,7 +2045,7 @@ void importer::finalizeLookupTable(
         clang::SourceLocation diagLoc = swiftName->getLocation();
         if (!diagLoc.isValid())
           diagLoc = decl->getLocation();
-        SourceLoc swiftSourceLoc = buffersForDiagnostics.resolveSourceLocation(
+        SourceLoc swiftSourceLoc = bufferImporter.importSourceLoc(
             nameImporter.getClangContext().getSourceManager(), diagLoc);
 
         DiagnosticEngine &swiftDiags = nameImporter.getContext().Diags;
@@ -2111,13 +2111,13 @@ void SwiftLookupTableWriter::populateTable(SwiftLookupTable &table,
   addMacrosToLookupTable(table, nameImporter);
 
   // Finalize the lookup table, which may fail.
-  finalizeLookupTable(table, nameImporter, buffersForDiagnostics);
+  finalizeLookupTable(table, nameImporter, bufferImporter);
 };
 
 std::unique_ptr<clang::ModuleFileExtensionWriter>
 SwiftNameLookupExtension::createExtensionWriter(clang::ASTWriter &writer) {
   return std::make_unique<SwiftLookupTableWriter>(this, writer, swiftCtx,
-                                                  buffersForDiagnostics,
+                                                  bufferImporter,
                                                   availability);
 }
 

@@ -18,6 +18,7 @@
 #include "clang/Basic/SourceLocation.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 
 namespace llvm {
@@ -33,29 +34,34 @@ class SourceManager;
 
 namespace importer {
 
-/// A helper class used to keep alive the Clang source managers where
-/// diagnostics have been reported.
+/// A helper class used to import clang::SourceLocation to swift::SourceLoc,
+/// for eg. attaching to declarations or for diagnostics.
 ///
-/// This is a bit of a hack, but LLVM's source manager (and by extension
-/// Swift's) does not support buffers going away, so if we want to report
-/// diagnostics in them we have to do it this way.
+/// Rather than copying the underlying MemoryBuffer, instead keep any
+/// clang::SourceManager with imported locations alive and reference its
+/// underlying buffer directly.
 class ClangSourceBufferImporter {
-  // This is not using SmallPtrSet or similar because we need the
-  // IntrusiveRefCntPtr to stay a ref-counting pointer.
+  struct MirrorEntry {
+    unsigned FileID;
+    bool Complete;
+  };
+
+  llvm::SmallPtrSet<const clang::SourceManager *, 4> clangSourceManagers;
   SmallVector<llvm::IntrusiveRefCntPtr<const clang::SourceManager>, 4>
-    sourceManagersWithDiagnostics;
-  llvm::DenseMap<const char *, unsigned> mirroredBuffers;
+    clangSourceManagerRefs;
+  llvm::DenseMap<const char *, MirrorEntry> mirroredBuffers;
   SourceManager &swiftSourceManager;
 
 public:
   explicit ClangSourceBufferImporter(SourceManager &sourceMgr)
-    : swiftSourceManager(sourceMgr) {}
+      : swiftSourceManager(sourceMgr) {}
 
   /// Returns a Swift source location that points into a Clang buffer.
   ///
   /// This will keep the Clang buffer alive as long as this object.
-  SourceLoc resolveSourceLocation(const clang::SourceManager &clangSrcMgr,
-                                  clang::SourceLocation clangLoc);
+  SourceLoc importSourceLoc(
+      const clang::SourceManager &clangSourceManager,
+      clang::SourceLocation clangLoc, bool forDiagnostics=false);
 };
 
 } // end namespace importer

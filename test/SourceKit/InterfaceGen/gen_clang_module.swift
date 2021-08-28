@@ -50,7 +50,7 @@ var x: FooClassBase
 // RUN:      == -req=cursor -pos=231:20 | %FileCheck -check-prefix=CHECK2 %s
 // The cursor points inside the interface, see 'gen_clang_module.swift.response'
 
-// CHECK2: source.lang.swift.decl.function.method.instance ({{.*}}Foo.framework/Headers/Foo.h:170:10-170:27)
+// CHECK2: source.lang.swift.decl.function.method.instance ({{.*}}Foo.framework/Headers/Foo.h:170:10-170:26)
 // CHECK2: fooInstanceFunc0
 // CHECK2: c:objc(cs)FooClassDerived(im)fooInstanceFunc0
 // CHECK2: Foo{{$}}

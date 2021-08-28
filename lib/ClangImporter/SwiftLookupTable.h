@@ -584,7 +584,7 @@ void addMacrosToLookupTable(SwiftLookupTable &table, NameImporter &);
 /// Finalize a lookup table, handling any as-yet-unresolved entries
 /// and emitting diagnostics if necessary.
 void finalizeLookupTable(SwiftLookupTable &table, NameImporter &,
-                         ClangSourceBufferImporter &buffersForDiagnostics);
+                         ClangSourceBufferImporter &bufferImporter);
 }
 }
 
