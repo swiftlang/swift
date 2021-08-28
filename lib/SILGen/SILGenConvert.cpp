@@ -594,7 +594,7 @@ public:
   }
 
   bool isInPlaceInitializationOfGlobal() const override {
-    return existential && isa<GlobalAddrInst>(existential);
+    return isa_and_nonnull<GlobalAddrInst>(existential);
   }
 
   void finishInitialization(SILGenFunction &SGF) override {

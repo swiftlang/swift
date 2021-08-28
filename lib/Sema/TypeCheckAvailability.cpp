@@ -1997,8 +1997,7 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
 
     // Continue on to diagnose any argument label renames.
 
-  } else if (parsed.BaseName == "init" &&
-             call && isa<CallExpr>(call)) {
+  } else if (parsed.BaseName == "init" && isa_and_nonnull<CallExpr>(call)) {
     // For initializers, replace with a "call" of the context type...but only
     // if we know we're doing a call (rather than a first-class reference).
     if (parsed.isMember()) {

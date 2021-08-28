@@ -3762,7 +3762,7 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
     if (ty->hasError()) return ty;
 
     auto nominalDecl = ty->getAnyNominal();
-    if (nominalDecl && isa<ClassDecl>(nominalDecl)) {
+    if (isa_and_nonnull<ClassDecl>(nominalDecl)) {
       if (checkSuperclass(tyR->getStartLoc(), ty))
         continue;
 

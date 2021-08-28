@@ -555,8 +555,8 @@ public:
     };
 
     // Remove the metatype "self" parameter by making this a static member.
-    if (constant->getDecl()->getClangDecl() &&
-        isa<clang::CXXConstructorDecl>(constant->getDecl()->getClangDecl()))
+    if (isa_and_nonnull<clang::CXXConstructorDecl>(
+            constant->getDecl()->getClangDecl()))
       result.foreign.self.setStatic();
 
     return result;

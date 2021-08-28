@@ -1422,7 +1422,7 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
     // Otherwise, complain.  Start with more specific diagnostics.
 
     // Diagnose unused constructor calls.
-    if (callee && isa<ConstructorDecl>(callee) && !call->isImplicit()) {
+    if (isa_and_nonnull<ConstructorDecl>(callee) && !call->isImplicit()) {
       DE.diagnose(fn->getLoc(), diag::expression_unused_init_result,
                callee->getDeclContext()->getDeclaredInterfaceType())
         .highlight(call->getArg()->getSourceRange());

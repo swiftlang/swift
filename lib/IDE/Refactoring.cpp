@@ -4505,7 +4505,7 @@ struct AsyncHandlerParamDesc : public AsyncHandlerDesc {
   }
 
   bool alternativeIsAccessor() const {
-    return Alternative && isa<AccessorDecl>(Alternative);
+    return isa_and_nonnull<AccessorDecl>(Alternative);
   }
 };
 
@@ -6828,7 +6828,7 @@ private:
       // for the completion handler call, e.g 'return completion(args...)'. In
       // that case, be sure not to add another return.
       auto *parent = getWalker().Parent.getAsStmt();
-      if (parent && isa<ReturnStmt>(parent) &&
+      if (isa_and_nonnull<ReturnStmt>(parent) &&
           !cast<ReturnStmt>(parent)->isImplicit()) {
         // The statement already has a return keyword. Don't add another one.
         AddedReturnOrThrow = false;
