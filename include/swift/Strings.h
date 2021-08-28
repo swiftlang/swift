@@ -58,6 +58,10 @@ constexpr static const StringLiteral DEFAULT_ACTOR_STORAGE_FIELD_NAME =
 /// The name of the Builtin type prefix
 constexpr static const StringLiteral BUILTIN_TYPE_NAME_PREFIX = "Builtin.";
 
+/// The default SPI group name to associate with Clang SPIs.
+constexpr static const StringLiteral CLANG_MODULE_DEFUALT_SPI_GROUP_NAME =
+  "OBJC_DEFAULT_SPI_GROUP";
+
 /// A composition class containing a StringLiteral for the names of
 /// Swift builtins. The reason we use this is to ensure that we when
 /// necessary slice off the "Builtin." prefix from these names in a
