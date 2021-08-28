@@ -1,3 +1,8 @@
+# FIXME(katei): Platform/WASI is not recognized as a platform in LLVM, so it reports
+# "Unable to determine platform" while handling LLVM options.
+# Set WASI as a UNIX platform to spoof LLVM
+set(UNIX 1)
+
 set(SWIFT_PRIMARY_VARIANT_SDK WASI CACHE STRING "")
 set(SWIFT_PRIMARY_VARIANT_ARCH wasm32 CACHE STRING "")
 set(SWIFT_HOST_VARIANT_SDK NONE CACHE STRING "")

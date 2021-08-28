@@ -78,7 +78,7 @@ build_host_toolchain() {
 
 build_target_toolchain() {
 
-  COMPILER_RT_BUILD_DIR="$TARGET_BUILD_ROOT/compiler-rt-wasi-wasm32"
+  local COMPILER_RT_BUILD_DIR="$TARGET_BUILD_ROOT/compiler-rt-wasi-wasm32"
   cmake -B "$COMPILER_RT_BUILD_DIR" \
     -D CMAKE_TOOLCHAIN_FILE="$SOURCE_PATH/swift/utils/webassembly/compiler-rt-cache.cmake" \
     -D CMAKE_BUILD_TYPE=Release \
@@ -95,18 +95,25 @@ build_target_toolchain() {
 
   ninja install -C "$COMPILER_RT_BUILD_DIR"
 
-  SWIFT_STDLIB_BUILD_DIR="$TARGET_BUILD_ROOT/swift-stdlib-wasi-wasm32"
-  cmake -B "$TARGET_BUILD_ROOT/swift-stdlib-wasi-wasm32" \
-    -C "$SOURCE_PATH/swift/cmake/caches/Runtime-WASI-wasm32.cmake" \
+  # Only configure LLVM to use CMake functionalities in LLVM
+  local LLVM_TARGET_BUILD_DIR="$TARGET_BUILD_ROOT/llvm-wasi-wasm32"
+  cmake -B "$LLVM_TARGET_BUILD_DIR" \
     -D CMAKE_BUILD_TYPE=Release \
-    -D CMAKE_C_COMPILER="$HOST_BUILD_DIR/llvm-$HOST_SUFFIX/bin/clang" \
-    -D CMAKE_CXX_COMPILER="$HOST_BUILD_DIR/llvm-$HOST_SUFFIX/bin/clang++" \
-    -D CMAKE_RANLIB="$HOST_BUILD_DIR/llvm-$HOST_SUFFIX/bin/llvm-ranlib" \
-    -D CMAKE_AR="$HOST_BUILD_DIR/llvm-$HOST_SUFFIX/bin/llvm-ar" \
+    -D LLVM_ENABLE_ZLIB=NO \
+    -D LLVM_ENABLE_LIBXML2=NO \
+    -G Ninja \
+    -S "$SOURCE_PATH/llvm-project/llvm"
+
+  local SWIFT_STDLIB_BUILD_DIR="$TARGET_BUILD_ROOT/swift-stdlib-wasi-wasm32"
+  cmake -B "$SWIFT_STDLIB_BUILD_DIR" \
+    -C "$SOURCE_PATH/swift/cmake/caches/Runtime-WASI-wasm32.cmake" \
+    -D CMAKE_TOOLCHAIN_FILE="$SOURCE_PATH/swift/utils/webassembly/toolchain-wasi.cmake" \
+    -D CMAKE_BUILD_TYPE=Release \
     -D CMAKE_C_COMPILER_LAUNCHER="$(which sccache)" \
     -D CMAKE_CXX_COMPILER_LAUNCHER="$(which sccache)" \
     -D CMAKE_INSTALL_PREFIX="$DIST_TOOLCHAIN_SDK/usr" \
-    -D LLVM_DIR="$HOST_BUILD_DIR/llvm-$HOST_SUFFIX/lib/cmake/llvm/" \
+    -D LLVM_BIN="$HOST_BUILD_DIR/llvm-$HOST_SUFFIX/bin" \
+    -D LLVM_DIR="$LLVM_TARGET_BUILD_DIR/lib/cmake/llvm/" \
     -D SWIFT_NATIVE_SWIFT_TOOLS_PATH="$HOST_BUILD_DIR/swift-$HOST_SUFFIX/bin" \
     -D SWIFT_WASI_SYSROOT_PATH="$WASI_SYSROOT_PATH" \
     -D SWIFT_WASI_wasm32_ICU_UC_INCLUDE="$BUILD_SDK_PATH/icu/include" \
