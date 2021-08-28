@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -56,7 +56,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 613; // isStaticLibrary option
+const uint16_t SWIFTMODULE_VERSION_MINOR = 625; // is concurrency checked?
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -765,6 +765,8 @@ namespace control_block {
     BCVBR<8>, // length of "short compatibility version string" in the blob
     BCVBR<17>, // User module format major version
     BCVBR<17>, // User module format minor version
+    BCVBR<17>, // User module format sub-minor version
+    BCVBR<17>, // User module format build version
     BCBlob // misc. version information
   >;
 
@@ -795,6 +797,7 @@ namespace options_block {
     IS_IMPLICIT_DYNAMIC_ENABLED,
     IS_ALLOW_MODULE_WITH_COMPILER_ERRORS_ENABLED,
     MODULE_ABI_NAME,
+    IS_CONCURRENCY_CHECKED,
   };
 
   using SDKPathLayout = BCRecordLayout<
@@ -840,6 +843,10 @@ namespace options_block {
   using ModuleABINameLayout = BCRecordLayout<
     MODULE_ABI_NAME,
     BCBlob
+  >;
+
+  using IsConcurrencyCheckedLayout = BCRecordLayout<
+    IS_CONCURRENCY_CHECKED
   >;
 }
 
@@ -1020,6 +1027,7 @@ namespace decls_block {
     BCFixed<1>,          // autoclosure?
     BCFixed<1>,          // non-ephemeral?
     ValueOwnershipField, // inout, shared or owned?
+    BCFixed<1>,          // isolated
     BCFixed<1>           // noDerivative?
   >;
 
@@ -1142,6 +1150,7 @@ namespace decls_block {
 
   using ArraySliceTypeLayout = SyntaxSugarTypeLayout<ARRAY_SLICE_TYPE>;
   using OptionalTypeLayout = SyntaxSugarTypeLayout<OPTIONAL_TYPE>;
+  using VariadicSequenceTypeLayout = SyntaxSugarTypeLayout<VARIADIC_SEQUENCE_TYPE>;
 
   using DictionaryTypeLayout = BCRecordLayout<
     DICTIONARY_TYPE,
@@ -1424,8 +1433,7 @@ namespace decls_block {
   using UnaryOperatorLayout = BCRecordLayout<
     Code, // ID field
     IdentifierIDField,  // name
-    DeclContextIDField, // context decl
-    BCArray<DeclIDField> // designated types
+    DeclContextIDField  // context decl
   >;
 
   using PrefixOperatorLayout = UnaryOperatorLayout<PREFIX_OPERATOR_DECL>;
@@ -1435,8 +1443,7 @@ namespace decls_block {
     INFIX_OPERATOR_DECL,
     IdentifierIDField, // name
     DeclContextIDField,// context decl
-    DeclIDField,       // precedence group
-    BCArray<DeclIDField> // designated types
+    DeclIDField        // precedence group
   >;
 
   using PrecedenceGroupLayout = BCRecordLayout<
@@ -1609,6 +1616,11 @@ namespace decls_block {
     BCVBR<8>                     // alignment
   >;
 
+  using AssociatedTypeLayout = BCRecordLayout<
+    ASSOCIATED_TYPE,
+    DeclIDField                  // associated type decl
+  >;
+
   /// Specifies the private discriminator string for a private declaration. This
   /// identifies the declaration's original source file in some opaque way.
   using PrivateDiscriminatorLayout = BCRecordLayout<
@@ -1644,6 +1656,7 @@ namespace decls_block {
     BCVBR<5>, // type mapping count
     BCVBR<5>, // value mapping count
     BCVBR<5>, // requirement signature conformance count
+    BCFixed<1>, // unchecked
     BCArray<DeclIDField>
     // The array contains type witnesses, then value witnesses.
     // Requirement signature conformances follow, then the substitution records
@@ -1665,6 +1678,15 @@ namespace decls_block {
   using InheritedProtocolConformanceLayout = BCRecordLayout<
     INHERITED_PROTOCOL_CONFORMANCE,
     TypeIDField // the conforming type
+  >;
+
+  using BuiltinProtocolConformanceLayout = BCRecordLayout<
+    BUILTIN_PROTOCOL_CONFORMANCE,
+    TypeIDField, // the conforming type
+    DeclIDField, // the protocol
+    GenericSignatureIDField, // the generic signature
+    BCFixed<2> // the builtin conformance kind
+    // the (optional) conditional requirements follow
   >;
 
   // Refers to a normal protocol conformance in the given module via its id.
@@ -1855,11 +1877,6 @@ namespace decls_block {
     BCFixed<2>  // inline value
   >;
 
-  using ActorIndependentDeclAttrLayout = BCRecordLayout<
-    ActorIndependent_DECL_ATTR,
-    BCFixed<1>  // unsafe flag
-  >;
-
   using OptimizeDeclAttrLayout = BCRecordLayout<
     Optimize_DECL_ATTR,
     BCFixed<2>  // optimize value
@@ -1874,10 +1891,11 @@ namespace decls_block {
     BC_AVAIL_TUPLE, // Introduced
     BC_AVAIL_TUPLE, // Deprecated
     BC_AVAIL_TUPLE, // Obsoleted
-    BCVBR<5>,   // platform
-    BCVBR<5>,   // number of bytes in message string
-    BCVBR<5>,   // number of bytes in rename string
-    BCBlob      // platform, followed by message
+    BCVBR<5>,    // platform
+    DeclIDField, // rename declaration (if any)
+    BCVBR<5>,    // number of bytes in message string
+    BCVBR<5>,    // number of bytes in rename string
+    BCBlob       // message, followed by rename
   >;
 
   using OriginallyDefinedInDeclAttrLayout = BCRecordLayout<
@@ -1933,13 +1951,6 @@ namespace decls_block {
     IdentifierIDField, // Original name.
     DeclIDField, // Original function declaration.
     BCArray<BCFixed<1>> // Transposed parameter indices' bitvector.
-  >;
-
-  using CompletionHandlerAsyncDeclAttrLayout = BCRecordLayout<
-    CompletionHandlerAsync_DECL_ATTR,
-    BCFixed<1>,                 // Implicit flag.
-    BCVBR<5>,                   // Completion handler index
-    DeclIDField                 // Mapped async function decl
   >;
 
 #define SIMPLE_DECL_ATTR(X, CLASS, ...)         \

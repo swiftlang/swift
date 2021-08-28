@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s -enable-experimental-concurrency | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s  -disable-availability-checking | %FileCheck %s
 // REQUIRES: concurrency
 
 class BaseClass<T> {

@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-irgen-test-overlays
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -enable-experimental-concurrency %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t)  -disable-availability-checking %s -emit-ir | %FileCheck %s
 
 // REQUIRES: OS=macosx
 // REQUIRES: concurrency

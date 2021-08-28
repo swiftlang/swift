@@ -1,8 +1,8 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - -parse-as-library \
-// RUN:    -module-name M -enable-experimental-concurrency | %FileCheck %s --dump-input always
+// RUN:    -module-name M  -disable-availability-checking | %FileCheck %s --dump-input always
 // REQUIRES: concurrency
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 extension Collection where Element: Sendable {
   public func f() async throws {
     return try await withThrowingTaskGroup(of: Element.self) { group in

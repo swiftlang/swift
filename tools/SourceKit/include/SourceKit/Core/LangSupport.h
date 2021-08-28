@@ -138,6 +138,27 @@ struct ExpressionTypesInFile {
   StringRef TypeBuffer;
 };
 
+struct VariableType {
+  /// The variable identifier's offset in the file.
+  unsigned VarOffset;
+  /// The variable identifier's length.
+  unsigned VarLength;
+  /// The offset of the type's string representation inside
+  /// `VariableTypesInFile.TypeBuffer`.
+  unsigned TypeOffset;
+  /// Whether the variable declaration has an explicit type annotation.
+  bool HasExplicitType;
+};
+
+struct VariableTypesInFile {
+  /// The typed variable declarations in the file.
+  std::vector<VariableType> Results;
+  /// A String containing the printed representation of all types in
+  /// `Results`. Entries in `Results` refer to their types by using
+  /// an offset into this string.
+  StringRef TypeBuffer;
+};
+
 class CodeCompletionConsumer {
   virtual void anchor();
 
@@ -193,6 +214,11 @@ enum class DiagnosticSeverityKind {
   Error
 };
 
+enum class DiagnosticCategory {
+  Deprecation,
+  NoUsage
+};
+
 struct DiagnosticEntryInfoBase {
   struct Fixit {
     unsigned Offset;
@@ -200,11 +226,13 @@ struct DiagnosticEntryInfoBase {
     std::string Text;
   };
 
+  std::string ID;
   std::string Description;
   unsigned Offset = 0;
   unsigned Line = 0;
   unsigned Column = 0;
   std::string Filename;
+  SmallVector<DiagnosticCategory, 1> Categories;
   SmallVector<std::pair<unsigned, unsigned>, 2> Ranges;
   SmallVector<Fixit, 2> Fixits;
   SmallVector<std::string, 1> EducationalNotePaths;
@@ -856,6 +884,15 @@ public:
                                       bool CanonicalType,
                                       std::function<void(const
                                           RequestResult<ExpressionTypesInFile> &)> Receiver) = 0;
+
+  /// Collects variable types for a range defined by `Offset` and `Length` in
+  /// the source file. If `Offset` or `Length` are empty, variable types for
+  /// the entire document are collected.
+  virtual void collectVariableTypes(
+      StringRef FileName, ArrayRef<const char *> Args,
+      Optional<unsigned> Offset, Optional<unsigned> Length,
+      std::function<void(const RequestResult<VariableTypesInFile> &)>
+          Receiver) = 0;
 
   virtual void getDocInfo(llvm::MemoryBuffer *InputBuf,
                           StringRef ModuleName,

@@ -702,13 +702,9 @@ static void recordShadowedDecls(ArrayRef<ValueDecl *> decls,
     if (decl->isRecursiveValidation())
       continue;
 
-    CanGenericSignature signature;
-
-    auto *dc = decl->getInnermostDeclContext();
-    if (auto genericSig = dc->getGenericSignatureOfContext())
-      signature = genericSig->getCanonicalSignature();
-
     // Record this declaration based on its signature.
+    auto *dc = decl->getInnermostDeclContext();
+    auto signature = dc->getGenericSignatureOfContext().getCanonicalSignature();
     auto &known = collisions[signature.getPointer()];
     if (known.size() == 1) {
       collisionSignatures.push_back(signature.getPointer());
@@ -1027,7 +1023,7 @@ void LazyConformanceLoader::anchor() {}
 
 /// Lookup table used to store members of a nominal type (and its extensions)
 /// for fast retrieval.
-class swift::MemberLookupTable {
+class swift::MemberLookupTable : public ASTAllocated<swift::MemberLookupTable> {
   /// The last extension that was included within the member lookup table's
   /// results.
   ExtensionDecl *LastExtensionIncluded = nullptr;
@@ -1111,17 +1107,6 @@ public:
   SWIFT_DEBUG_DUMP {
     dump(llvm::errs());
   }
-
-  // Only allow allocation of member lookup tables using the allocator in
-  // ASTContext or by doing a placement new.
-  void *operator new(size_t Bytes, ASTContext &C,
-                     unsigned Alignment = alignof(MemberLookupTable)) {
-    return C.Allocate(Bytes, Alignment);
-  }
-  void *operator new(size_t Bytes, void *Mem) {
-    assert(Mem);
-    return Mem;
-  }
 };
 
 namespace {
@@ -1140,20 +1125,9 @@ namespace {
 /// table for lookup based on Objective-C selector.
 class ClassDecl::ObjCMethodLookupTable
         : public llvm::DenseMap<std::pair<ObjCSelector, char>,
-                                StoredObjCMethods>
-{
-public:
-  // Only allow allocation of member lookup tables using the allocator in
-  // ASTContext or by doing a placement new.
-  void *operator new(size_t Bytes, ASTContext &C,
-                     unsigned Alignment = alignof(MemberLookupTable)) {
-    return C.Allocate(Bytes, Alignment);
-  }
-  void *operator new(size_t Bytes, void *Mem) {
-    assert(Mem);
-    return Mem;
-  }
-};
+                                StoredObjCMethods>,
+          public ASTAllocated<ClassDecl::ObjCMethodLookupTable>
+{};
 
 MemberLookupTable::MemberLookupTable(ASTContext &ctx) {
   // Register a cleanup with the ASTContext to call the lookup table
@@ -1401,6 +1375,31 @@ NominalTypeDecl::lookupDirect(DeclName name,
                            DirectLookupRequest({this, name, flags}), {});
 }
 
+AbstractFunctionDecl*
+NominalTypeDecl::lookupDirectRemoteFunc(AbstractFunctionDecl *func) {
+  auto &C = func->getASTContext();
+  auto *selfTyDecl = func->getParent()->getSelfNominalTypeDecl();
+
+  // _remote functions only exist as counterparts to a distributed function.
+  if (!func->isDistributed())
+    return nullptr;
+
+  auto localFuncName = func->getBaseIdentifier().str().str();
+  auto remoteFuncId = C.getIdentifier("_remote_" + localFuncName);
+
+  auto remoteFuncDecls = selfTyDecl->lookupDirect(DeclName(remoteFuncId));
+
+  if (remoteFuncDecls.empty())
+    return nullptr;
+
+  if (auto remoteDecl = dyn_cast<AbstractFunctionDecl>(remoteFuncDecls.front())) {
+    // TODO: implement more checks here, it has to be the exact right signature.
+    return remoteDecl;
+  }
+
+  return nullptr;
+}
+
 TinyPtrVector<ValueDecl *>
 DirectLookupRequest::evaluate(Evaluator &evaluator,
                               DirectLookupDescriptor desc) const {
@@ -1413,8 +1412,6 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
   ASTContext &ctx = decl->getASTContext();
   const bool useNamedLazyMemberLoading = (ctx.LangOpts.NamedLazyMemberLoading &&
                                           decl->hasLazyMembers());
-  const bool disableAdditionalExtensionLoading =
-      flags.contains(NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions);
   const bool includeAttrImplements =
       flags.contains(NominalTypeDecl::LookupDirectFlags::IncludeAttrImplements);
 
@@ -1430,8 +1427,7 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
   // If we're allowed to load extensions, call prepareExtensions to ensure we
   // properly invalidate the lazily-complete cache for any extensions brought in
   // by modules loaded after-the-fact. This can happen with the LLDB REPL.
-  if (!disableAdditionalExtensionLoading)
-    decl->prepareExtensions();
+  decl->prepareExtensions();
 
   auto &Table = *decl->LookupTable;
   if (!useNamedLazyMemberLoading) {
@@ -1439,12 +1435,10 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
     // all extensions).
     (void)decl->getMembers();
 
-    if (!disableAdditionalExtensionLoading) {
-      for (auto E : decl->getExtensions())
-        (void)E->getMembers();
+    for (auto E : decl->getExtensions())
+      (void)E->getMembers();
 
-      Table.updateLookupTable(decl);
-    }
+    Table.updateLookupTable(decl);
   } else if (!Table.isLazilyComplete(name.getBaseName())) {
     // The lookup table believes it doesn't have a complete accounting of this
     // name - either because we're never seen it before, or another extension
@@ -1452,13 +1446,8 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
     // us a hand.
     DeclBaseName baseName(name.getBaseName());
     populateLookupTableEntryFromLazyIDCLoader(ctx, Table, baseName, decl);
+    populateLookupTableEntryFromExtensions(ctx, Table, baseName, decl);
 
-    if (!disableAdditionalExtensionLoading) {
-      populateLookupTableEntryFromExtensions(ctx, Table, baseName, decl);
-    }
-
-    // FIXME: If disableAdditionalExtensionLoading is true, we should
-    // not mark the entry as complete.
     Table.markLazilyComplete(baseName);
   }
 
@@ -2229,6 +2218,7 @@ directReferencesForTypeRepr(Evaluator &evaluator,
   case TypeReprKind::Error:
   case TypeReprKind::Function:
   case TypeReprKind::InOut:
+  case TypeReprKind::Isolated:
   case TypeReprKind::Metatype:
   case TypeReprKind::Owned:
   case TypeReprKind::Protocol:
@@ -2236,8 +2226,9 @@ directReferencesForTypeRepr(Evaluator &evaluator,
   case TypeReprKind::SILBox:
   case TypeReprKind::Placeholder:
     return { };
-      
+
   case TypeReprKind::OpaqueReturn:
+  case TypeReprKind::NamedOpaqueReturn:
     return { };
 
   case TypeReprKind::Fixed:
@@ -2485,7 +2476,8 @@ GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) c
     // is implemented.
     if (auto *proto = ext->getExtendedProtocolDecl()) {
       auto protoType = proto->getDeclaredInterfaceType();
-      TypeLoc selfInherited[1] = { TypeLoc::withoutLoc(protoType) };
+      InheritedEntry selfInherited[1] = {
+        InheritedEntry(TypeLoc::withoutLoc(protoType)) };
       genericParams->getParams().front()->setInherited(
         ctx.AllocateCopy(selfInherited));
     }
@@ -2505,7 +2497,8 @@ GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) c
     auto selfDecl = new (ctx) GenericTypeParamDecl(
         proto, selfId, SourceLoc(), /*depth=*/0, /*index=*/0);
     auto protoType = proto->getDeclaredInterfaceType();
-    TypeLoc selfInherited[1] = { TypeLoc::withoutLoc(protoType) };
+    InheritedEntry selfInherited[1] = {
+      InheritedEntry(TypeLoc::withoutLoc(protoType)) };
     selfDecl->setInherited(ctx.AllocateCopy(selfInherited));
     selfDecl->setImplicit();
 
@@ -2635,7 +2628,7 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
 
 void swift::getDirectlyInheritedNominalTypeDecls(
     llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
-    unsigned i, llvm::SmallVectorImpl<Located<NominalTypeDecl *>> &result,
+    unsigned i, llvm::SmallVectorImpl<InheritedNominalEntry> &result,
     bool &anyObject) {
   auto typeDecl = decl.dyn_cast<const TypeDecl *>();
   auto extDecl = decl.dyn_cast<const ExtensionDecl *>();
@@ -2657,18 +2650,20 @@ void swift::getDirectlyInheritedNominalTypeDecls(
   // FIXME: This is a hack. We need cooperation from
   // InheritedDeclsReferencedRequest to make this work.
   SourceLoc loc;
+  SourceLoc uncheckedLoc;
   if (TypeRepr *typeRepr = typeDecl ? typeDecl->getInherited()[i].getTypeRepr()
                                     : extDecl->getInherited()[i].getTypeRepr()){
     loc = typeRepr->getLoc();
+    uncheckedLoc = typeRepr->findUncheckedAttrLoc();
   }
 
   // Form the result.
   for (auto nominal : nominalTypes) {
-    result.push_back({nominal, loc});
+    result.push_back({nominal, loc, uncheckedLoc});
   }
 }
 
-SmallVector<Located<NominalTypeDecl *>, 4>
+SmallVector<InheritedNominalEntry, 4>
 swift::getDirectlyInheritedNominalTypeDecls(
     llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
     bool &anyObject) {
@@ -2678,7 +2673,7 @@ swift::getDirectlyInheritedNominalTypeDecls(
   // Gather results from all of the inherited types.
   unsigned numInherited = typeDecl ? typeDecl->getInherited().size()
                                    : extDecl->getInherited().size();
-  SmallVector<Located<NominalTypeDecl *>, 4> result;
+  SmallVector<InheritedNominalEntry, 4> result;
   for (unsigned i : range(numInherited)) {
     getDirectlyInheritedNominalTypeDecls(decl, i, result, anyObject);
   }
@@ -2704,7 +2699,7 @@ swift::getDirectlyInheritedNominalTypeDecls(
       if (!req.getFirstType()->isEqual(protoSelfTy))
         continue;
 
-      result.emplace_back(req.getProtocolDecl(), loc);
+      result.emplace_back(req.getProtocolDecl(), loc, SourceLoc());
     }
     return result;
   }
@@ -2714,7 +2709,7 @@ swift::getDirectlyInheritedNominalTypeDecls(
   anyObject |= selfBounds.anyObject;
 
   for (auto inheritedNominal : selfBounds.decls)
-    result.emplace_back(inheritedNominal, loc);
+    result.emplace_back(inheritedNominal, loc, SourceLoc());
 
   return result;
 }

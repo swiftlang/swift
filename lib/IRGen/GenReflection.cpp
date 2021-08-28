@@ -172,11 +172,8 @@ public:
   }
 };
 
-// Return the minimum Swift runtime version that supports demangling a given
-// type.
-static llvm::VersionTuple
-getRuntimeVersionThatSupportsDemanglingType(IRGenModule &IGM,
-                                            CanType type) {
+Optional<llvm::VersionTuple>
+swift::irgen::getRuntimeVersionThatSupportsDemanglingType(CanType type) {
   // Associated types of opaque types weren't mangled in a usable form by the
   // Swift 5.1 runtime, so we needed to add a new mangling in 5.2.
   if (type->hasOpaqueArchetype()) {
@@ -194,8 +191,7 @@ getRuntimeVersionThatSupportsDemanglingType(IRGenModule &IGM,
     // guards, so we don't need to limit availability of mangled names
     // involving them.
   }
-  
-  return llvm::VersionTuple(5, 0);
+  return None;
 }
 
 // Produce a fallback mangled type name that uses an open-coded callback
@@ -229,13 +225,10 @@ getTypeRefByFunction(IRGenModule &IGM,
       accessor->setAttributes(IGM.constructInitialAttributes());
       
       SmallVector<GenericRequirement, 4> requirements;
-      GenericEnvironment *genericEnv = nullptr;
-      if (sig) {
-        enumerateGenericSignatureRequirements(sig,
-                [&](GenericRequirement reqt) { requirements.push_back(reqt); });
-        genericEnv = sig->getGenericEnvironment();
-      }
-      
+      auto *genericEnv = sig.getGenericEnvironment();
+      enumerateGenericSignatureRequirements(sig,
+              [&](GenericRequirement reqt) { requirements.push_back(reqt); });
+
       {
         IRGenFunction IGF(IGM, accessor);
         if (IGM.DebugInfo)
@@ -292,9 +285,11 @@ getTypeRefImpl(IRGenModule &IGM,
     // symbolic reference with a callback function.
     if (auto runtimeCompatVersion = getSwiftRuntimeCompatibilityVersionForTarget
                                       (IGM.Context.LangOpts.Target)) {
-      if (*runtimeCompatVersion <
-            getRuntimeVersionThatSupportsDemanglingType(IGM, type)) {
-        return getTypeRefByFunction(IGM, sig, type);
+      if (auto minimumSupportedRuntimeVersion =
+              getRuntimeVersionThatSupportsDemanglingType(type)) {
+        if (*runtimeCompatVersion < *minimumSupportedRuntimeVersion) {
+          return getTypeRefByFunction(IGM, sig, type);
+        }
       }
     }
       
@@ -355,16 +350,12 @@ IRGenModule::emitWitnessTableRefString(CanType type,
     = substOpaqueTypesWithUnderlyingTypes(type, conformance);
   
   auto origType = type;
-  CanGenericSignature genericSig;
-  SmallVector<GenericRequirement, 4> requirements;
-  GenericEnvironment *genericEnv = nullptr;
+  auto genericSig = origGenericSig.getCanonicalSignature();
 
-  if (origGenericSig) {
-    genericSig = origGenericSig.getCanonicalSignature();
-    enumerateGenericSignatureRequirements(genericSig,
-                [&](GenericRequirement reqt) { requirements.push_back(reqt); });
-    genericEnv = genericSig->getGenericEnvironment();
-  }
+  SmallVector<GenericRequirement, 4> requirements;
+  enumerateGenericSignatureRequirements(genericSig,
+              [&](GenericRequirement reqt) { requirements.push_back(reqt); });
+  auto *genericEnv = genericSig.getGenericEnvironment();
 
   IRGenMangler mangler;
   std::string symbolName =
@@ -1118,6 +1109,10 @@ public:
       case irgen::MetadataSource::Kind::Metadata:
         Root = SourceBuilder.createMetadataCapture(Source.getParamIndex());
         break;
+
+      case irgen::MetadataSource::Kind::ErasedTypeMetadata:
+        // Fixed in the function body
+        break;
       }
 
       // The metadata might be reached via a non-trivial path (eg,
@@ -1437,7 +1432,7 @@ void IRGenModule::emitFieldDescriptor(const NominalTypeDecl *D) {
 
   if (needsFieldDescriptor) {
     FieldTypeMetadataBuilder builder(*this, D);
-    FieldDescriptors.push_back(builder.emit());
+    builder.emit();
   }
 }
 

@@ -283,6 +283,7 @@ static SILValue convertIntroducerToGuaranteed(OwnedValueIntroducer introducer) {
   case OwnedValueIntroducerKind::AllocRefInit:
     return SILValue();
   }
+  llvm_unreachable("covered switch");
 }
 
 void OwnershipLiveRange::convertJoinedLiveRangePhiToGuaranteed(

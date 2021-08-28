@@ -129,6 +129,8 @@ ERROR(error_mode_cannot_emit_module_summary,none,
       "this mode does not support emitting module summary files", ())
 ERROR(error_mode_cannot_emit_symbol_graph,none,
       "this mode does not support emitting symbol graph files", ())
+ERROR(error_mode_cannot_emit_abi_descriptor,none,
+      "this mode does not support emitting ABI descriptor", ())
 ERROR(cannot_emit_ir_skipping_function_bodies,none,
       "the -experimental-skip-*-function-bodies* flags do not support "
       "emitting IR", ())
@@ -251,11 +253,6 @@ ERROR(tbd_not_supported_with_cmo,none,
         "Test-Based InstallAPI (TBD) is not support with cross-module-optimization",
         ())
 
-WARNING(linker_directives_choice_confusion,none,
-        "only one of -emit-ldadd-cfile-path and -module-installname-map-file can be specified;"
-        "the c file won't be generated",
-        ())
-
 ERROR(previous_installname_map_missing,none,
       "cannot open previous install name map from %0",
       (StringRef))
@@ -287,12 +284,6 @@ ERROR(batch_scan_input_file_missing,none,
 ERROR(batch_scan_input_file_corrupted,none,
       "batch dependencies scan input file from %0 is malformed",
       (StringRef))
-
-REMARK(default_previous_install_name, none,
-      "default previous install name for %0 is %1", (StringRef, StringRef))
-
-REMARK(platform_previous_install_name, none,
-       "previous install name for %0 in %1 is %2", (StringRef, StringRef, StringRef))
 
 ERROR(unknown_platform_name, none,
       "unkown platform name %0", (StringRef))
@@ -371,6 +362,11 @@ WARNING(warning_module_shadowing_may_break_module_interface,none,
         /*shadowedModule=*/ModuleDecl *, /*interfaceModule*/ModuleDecl *))
 REMARK(rebuilding_module_from_interface,none,
        "rebuilding module '%0' from interface '%1'", (StringRef, StringRef))
+REMARK(rebuilding_stdlib_from_interface,none,
+       "did not find a prebuilt standard library for target '%0' compatible "
+       "with this Swift compiler; building it may take a few minutes, but it "
+       "should only happen once for this combination of compiler and target",
+       (StringRef))
 NOTE(sdk_version_pbm_version,none,
      "SDK build version is '%0'; prebuilt modules were "
      "built using SDK build version: '%1'", (StringRef, StringRef))
@@ -405,6 +401,8 @@ ERROR(error_option_required,none, "option '%0' is required", (StringRef))
 ERROR(error_nonexistent_output_dir,none,
       "'-output-dir' argument '%0' does not exist or is not a directory", (StringRef))
 
+REMARK(interface_file_backup_used,none,
+      "building module from '%0' failed; retrying building module from '%1'", (StringRef, StringRef))
 
 // Dependency Verifier Diagnostics
 ERROR(missing_member_dependency,none,

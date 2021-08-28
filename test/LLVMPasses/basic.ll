@@ -369,6 +369,59 @@ bb1:
   ret void
 }
 
+; CHECK-LABEL: @releasemotion_forwarding
+; CHECK-NOT: swift_retain
+; CHECK-NOT: swift_release
+; CHECK: call void @user(%swift.refcounted* %P)
+; CHECK: ret
+define void @releasemotion_forwarding(%swift.refcounted* %P, i8* %O, %swift.bridge* %B) {
+entry:
+  %res = tail call %swift.refcounted* @swift_retain(%swift.refcounted* %P)
+  tail call void @swift_release(%swift.refcounted* %res) nounwind
+  call void @user(%swift.refcounted* %res) nounwind
+  ret void
+}
+
+; CHECK-LABEL: @retainmotion_forwarding
+; CHECK: store %swift.refcounted* %P, %swift.refcounted** %R, align 4
+; CHECK-NOT: swift_retain
+; CHECK-NOT: swift_release
+; CHECK: ret
+define void @retainmotion_forwarding(%swift.refcounted* %P, %swift.refcounted** %R, %swift.bridge* %B) {
+entry:
+  %res = tail call %swift.refcounted* @swift_retain(%swift.refcounted* %P)
+  store %swift.refcounted* %res, %swift.refcounted** %R, align 4
+  call void @swift_bridgeObjectRelease(%swift.bridge* %B)
+  tail call void @swift_release(%swift.refcounted* %res) nounwind
+  ret void
+}
+
+; CHECK-LABEL: @unknownreleasemotion_forwarding
+; CHECK-NOT: swift_unknownObjectRetain
+; CHECK-NOT: swift_unknownObjectRelease
+; CHECK: call void @user(%swift.refcounted* %P)
+; CHECK: ret
+define void @unknownreleasemotion_forwarding(%swift.refcounted* %P, i8* %O, %swift.bridge* %B) {
+entry:
+  %res = tail call %swift.refcounted* @swift_unknownObjectRetain(%swift.refcounted* %P)
+  tail call void @swift_unknownObjectRelease(%swift.refcounted* %res) nounwind
+  call void @user(%swift.refcounted* %res) nounwind
+  ret void
+}
+
+; CHECK-LABEL: @unknownretainmotion_forwarding
+; CHECK: store %swift.refcounted* %P, %swift.refcounted** %R, align 4
+; CHECK-NOT: swift_unknownObjectRetain
+; CHECK-NOT: swift_unknownObjectRelease
+; CHECK: ret
+define void @unknownretainmotion_forwarding(%swift.refcounted* %P, %swift.refcounted** %R, %swift.bridge* %B) {
+entry:
+  %res = tail call %swift.refcounted* @swift_unknownObjectRetain(%swift.refcounted* %P)
+  store %swift.refcounted* %res, %swift.refcounted** %R, align 4
+  call void @swift_bridgeObjectRelease(%swift.bridge* %B)
+  tail call void @swift_unknownObjectRelease(%swift.refcounted* %res) nounwind
+  ret void
+}
 
 !llvm.dbg.cu = !{!1}
 !llvm.module.flags = !{!4}

@@ -63,7 +63,7 @@ static bool cleanFunction(SILFunction &fn) {
           deleter.forceDelete(bi);
           // StaticReport only takes trivial operands, and therefore doesn't
           // require fixing the lifetime of its operands.
-          deleter.cleanUpDeadInstructions();
+          deleter.cleanupDeadInstructions();
           madeChange = true;
           break;
         }

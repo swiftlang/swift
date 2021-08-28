@@ -236,6 +236,8 @@ public:
   instantiateCXXFunctionTemplate(ASTContext &ctx,
                                  clang::FunctionTemplateDecl *func,
                                  SubstitutionMap subst) = 0;
+
+  virtual bool isCXXMethodMutating(const clang::CXXMethodDecl *method) = 0;
 };
 
 /// Describes a C++ template instantiation error.

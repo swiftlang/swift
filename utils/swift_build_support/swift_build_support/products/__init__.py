@@ -10,8 +10,10 @@
 #
 # ----------------------------------------------------------------------------
 
+from .backdeployconcurrency import BackDeployConcurrency
 from .benchmarks import Benchmarks
 from .cmark import CMark
+from .earlyswiftdriver import EarlySwiftDriver
 from .foundation import Foundation
 from .indexstoredb import IndexStoreDB
 from .libcxx import LibCXX
@@ -35,6 +37,7 @@ from .tsan_libdispatch import TSanLibDispatch
 from .xctest import XCTest
 
 __all__ = [
+    'BackDeployConcurrency',
     'CMark',
     'Ninja',
     'Foundation',
@@ -51,6 +54,7 @@ __all__ = [
     'SwiftInspect',
     'SwiftPM',
     'SwiftDriver',
+    'EarlySwiftDriver',
     'XCTest',
     'SwiftSyntax',
     'SKStressTester',

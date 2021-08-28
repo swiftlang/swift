@@ -156,6 +156,7 @@ StringRef OwnershipKind::asString() const {
   case OwnershipKind::None:
     return "none";
   }
+  llvm_unreachable("covered switch");
 }
 
 //===----------------------------------------------------------------------===//
@@ -339,6 +340,23 @@ bool Operand::isLifetimeEnding() const {
   return get().getOwnershipKind() != OwnershipKind::None;
 }
 
+bool Operand::isConsuming() const {
+  if (!getOwnershipConstraint().isConsuming())
+    return false;
+
+  return get().getOwnershipKind() != OwnershipKind::None;
+}
+
+void Operand::dump() const { print(llvm::dbgs()); }
+
+void Operand::print(llvm::raw_ostream &os) const {
+  os << "Operand.\n"
+        "Owner: "
+     << *Owner << "Value: " << get() << "Operand Number: " << getOperandNumber()
+     << '\n'
+     << "Is Type Dependent: " << (isTypeDependent() ? "yes" : "no") << '\n';
+}
+
 //===----------------------------------------------------------------------===//
 //                             OperandConstraint
 //===----------------------------------------------------------------------===//
@@ -382,6 +400,7 @@ StringRef OperandOwnership::asString() const {
   case OperandOwnership::Reborrow:
     return "reborrow";
   }
+  llvm_unreachable("covered switch");
 }
 
 llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,

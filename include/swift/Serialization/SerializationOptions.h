@@ -33,6 +33,7 @@ namespace swift {
     const char *SourceInfoOutputPath = nullptr;
     std::string SymbolGraphOutputDir;
     bool SkipSymbolGraphInheritedDocs = true;
+    bool IncludeSPISymbolsInSymbolGraph = false;
     llvm::VersionTuple UserModuleVersion;
 
     StringRef GroupInfoPath;
@@ -130,6 +131,7 @@ namespace swift {
       uint64_t getSize() const { return Size; }
     };
     ArrayRef<FileDependency> Dependencies;
+    ArrayRef<std::string> PublicDependentLibraries;
 
     bool AutolinkForceLoad = false;
     bool SerializeAllSIL = false;

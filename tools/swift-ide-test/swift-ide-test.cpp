@@ -266,6 +266,12 @@ static llvm::cl::list<std::string>
 BuildConfigs("D", llvm::cl::desc("Conditional compilation flags"),
              llvm::cl::cat(Category));
 
+static llvm::cl::opt<bool>
+ParseAsLibrary("parse-as-library",
+               llvm::cl::desc("Parse '-source-filename' as a library source file"),
+               llvm::cl::cat(Category),
+               llvm::cl::init(false));
+
 static llvm::cl::opt<std::string>
 SDK("sdk", llvm::cl::desc("path to the SDK to build against"),
     llvm::cl::cat(Category));
@@ -458,6 +464,12 @@ CodeCOmpletionAnnotateResults("code-completion-annotate-results",
                               llvm::cl::desc("annotate completion results with XML"),
                               llvm::cl::cat(Category),
                               llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
+CodeCompletionSourceFileInfo("code-completion-sourcefileinfo",
+                             llvm::cl::desc("print module source file information"),
+                             llvm::cl::cat(Category),
+                             llvm::cl::init(false));
 
 static llvm::cl::opt<std::string>
 DebugClientDiscriminator("debug-client-discriminator",
@@ -751,15 +763,34 @@ static llvm::cl::opt<bool>
 EnableExperimentalConcurrency("enable-experimental-concurrency",
                               llvm::cl::desc("Enable experimental concurrency model"),
                               llvm::cl::init(false));
+static llvm::cl::opt<bool>
+WarnConcurrency("warn-concurrency",
+                llvm::cl::desc("Additional concurrency warnings"),
+                llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
 DisableImplicitConcurrencyImport("disable-implicit-concurrency-module-import",
                                  llvm::cl::desc("Disable implicit import of _Concurrency module"),
                                  llvm::cl::init(false));
 
+static llvm::cl::opt<bool> EnableExperimentalNamedOpaqueTypes(
+    "enable-experimental-named-opaque-types",
+    llvm::cl::desc("Enable experimental support for named opaque result types"),
+    llvm::cl::Hidden, llvm::cl::cat(Category), llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
+EnableExperimentalDistributed("enable-experimental-distributed",
+                              llvm::cl::desc("Enable experimental distributed actors and functions"),
+                              llvm::cl::init(false));
+
 static llvm::cl::list<std::string>
 AccessNotesPath("access-notes-path", llvm::cl::desc("Path to access notes file"),
                 llvm::cl::cat(Category));
+
+static llvm::cl::opt<bool>
+AllowCompilerErrors("allow-compiler-errors",
+                    llvm::cl::desc("Whether to attempt to continue despite compiler errors"),
+                    llvm::cl::init(false));
 
 } // namespace options
 
@@ -888,7 +919,8 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
                             bool CodeCompletionDiagnostics,
                             bool CodeCompletionKeywords,
                             bool CodeCompletionComments,
-                            bool CodeCompletionAnnotateResults) {
+                            bool CodeCompletionAnnotateResults,
+                            bool CodeCompletionSourceFileInfo) {
   std::unique_ptr<ide::OnDiskCodeCompletionCache> OnDiskCache;
   if (!options::CompletionCachePath.empty()) {
     OnDiskCache = std::make_unique<ide::OnDiskCodeCompletionCache>(
@@ -897,6 +929,7 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
   ide::CodeCompletionCache CompletionCache(OnDiskCache.get());
   ide::CodeCompletionContext CompletionContext(CompletionCache);
   CompletionContext.setAnnotateResult(CodeCompletionAnnotateResults);
+  CompletionContext.setRequiresSourceFileInfo(CodeCompletionSourceFileInfo);
 
   // Create a CodeCompletionConsumer.
   std::unique_ptr<ide::CodeCompletionConsumer> Consumer(
@@ -1091,7 +1124,9 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
                                  StringRef SourceFilename,
                                  bool CodeCompletionDiagnostics,
                                  bool CodeCompletionKeywords,
-                                 bool CodeCompletionComments) {
+                                 bool CodeCompletionComments,
+                                 bool CodeCompletionAnnotateResults,
+                                 bool CodeCompletionSourceFileInfo) {
   auto FileBufOrErr = llvm::MemoryBuffer::getFile(SourceFilename);
   if (!FileBufOrErr) {
     llvm::errs() << "error opening input file: "
@@ -1222,11 +1257,14 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
           // Create a CodeCompletionConsumer.
           std::unique_ptr<ide::CodeCompletionConsumer> Consumer(
               new ide::PrintingCodeCompletionConsumer(OS, IncludeKeywords,
-                                                      IncludeComments));
+                                                      IncludeComments,
+                                                      CodeCompletionAnnotateResults));
 
           // Create a factory for code completion callbacks that will feed the
           // Consumer.
           ide::CodeCompletionContext CompletionContext(CompletionCache);
+          CompletionContext.setAnnotateResult(CodeCompletionAnnotateResults);
+          CompletionContext.setRequiresSourceFileInfo(CodeCompletionSourceFileInfo);
           std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
               ide::makeCodeCompletionCallbacksFactory(CompletionContext,
                                                       *Consumer));
@@ -3843,8 +3881,21 @@ int main(int argc, char *argv[]) {
   if (options::EnableExperimentalConcurrency) {
     InitInvok.getLangOptions().EnableExperimentalConcurrency = true;
   }
+  if (options::WarnConcurrency) {
+    InitInvok.getLangOptions().WarnConcurrency = true;
+  }
   if (options::DisableImplicitConcurrencyImport) {
     InitInvok.getLangOptions().DisableImplicitConcurrencyModuleImport = true;
+  }
+  if (options::EnableExperimentalNamedOpaqueTypes) {
+    InitInvok.getLangOptions().EnableExperimentalNamedOpaqueTypes = true;
+  }
+
+  if (options::EnableExperimentalDistributed) {
+    // distributed implies concurrency features:
+    InitInvok.getLangOptions().EnableExperimentalConcurrency = true;
+    // enable 'distributed' parsing and features
+    InitInvok.getLangOptions().EnableExperimentalDistributed = true;
   }
 
   if (!options::Triple.empty())
@@ -3868,6 +3919,10 @@ int main(int argc, char *argv[]) {
   if (!options::AccessNotesPath.empty()) {
     InitInvok.getFrontendOptions().AccessNotesPath =
         options::AccessNotesPath[options::AccessNotesPath.size()-1];
+  }
+  if (options::ParseAsLibrary) {
+    InitInvok.getFrontendOptions().InputMode =
+        swift::FrontendOptions::ParseInputMode::SwiftLibrary;
   }
   InitInvok.getClangImporterOptions().PrecompiledHeaderOutputDir =
     options::PCHOutputDir;
@@ -3917,6 +3972,12 @@ int main(int argc, char *argv[]) {
       options::ExplicitSwiftModuleMap;
     InitInvok.getFrontendOptions().DisableImplicitModules = true;
   }
+
+  if (options::AllowCompilerErrors) {
+    InitInvok.getFrontendOptions().AllowModuleWithCompilerErrors = true;
+    InitInvok.getLangOptions().AllowModuleWithCompilerErrors = true;
+  }
+
   // Process the clang arguments last and allow them to override previously
   // set options.
   if (!CCArgs.empty()) {
@@ -3992,7 +4053,9 @@ int main(int argc, char *argv[]) {
                                      options::SourceFilename,
                                      options::CodeCompletionDiagnostics,
                                      options::CodeCompletionKeywords,
-                                     options::CodeCompletionComments);
+                                     options::CodeCompletionComments,
+                                     options::CodeCOmpletionAnnotateResults,
+                                     options::CodeCompletionSourceFileInfo);
     break;
 
   case ActionType::CodeCompletion:
@@ -4007,7 +4070,8 @@ int main(int argc, char *argv[]) {
                                 options::CodeCompletionDiagnostics,
                                 options::CodeCompletionKeywords,
                                 options::CodeCompletionComments,
-                                options::CodeCOmpletionAnnotateResults);
+                                options::CodeCOmpletionAnnotateResults,
+                                options::CodeCompletionSourceFileInfo);
     break;
 
   case ActionType::REPLCodeCompletion:

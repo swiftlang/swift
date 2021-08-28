@@ -14,6 +14,13 @@
 
 @end
 
+@implementation MutableButt: Butt
+@end
+
+@implementation MutableButt_2Fast2Furious: MutableButt
+@end
+
+
 @implementation Farm
 
 -(void)getDogWithCompletion:(void (^ _Nonnull)(NSInteger))completionHandler {
@@ -30,7 +37,7 @@
 
 void scheduleButt(Butt *b, NSString *s) {
   [b butt: 1738 completionHandler: ^(NSInteger i) {
-    printf("butt %p named %s occurred at %zd", b, [s UTF8String], (ssize_t)i);
+    printf("butt %p named %s occurred at %zd\n", b, [s UTF8String], (ssize_t)i);
     fflush(stdout);
   }];
 }

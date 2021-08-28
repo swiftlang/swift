@@ -1514,15 +1514,23 @@ ${assignmentOperatorComment(x.operator, True)}
 % end
 
 %   dbits = bits*2
-%   if bits <= word_bits:
+%   if bits == 64:
+  #if !(arch(arm) || arch(i386) || arch(wasm32))
+  //  On 32b architectures we fall back on the generic implementation,
+  //  because LLVM doesn't know how to codegen the 128b multiply we use.
+  //
+  //  Note that arm64_32 is a 64b architecture for the purposes of this
+  //  check, because we have a 64x64 -> 128 multiply there (the actual
+  //  ISA is AArch64).
+%   end
   /// Returns a tuple containing the high and low parts of the result of
   /// multiplying this value by the given value.
   ///
   /// Use this method to calculate the full result of a product that would
   /// otherwise overflow. Unlike traditional truncating multiplication, the
-  /// `multipliedFullWidth(by:)` method returns a tuple
-  /// containing both the `high` and `low` parts of the product of this value and
-  /// `other`. The following example uses this method to multiply two `UInt8`
+  /// `multipliedFullWidth(by:)` method returns a tuple containing both the
+  /// `high` and `low` parts of the product of this value and `other`.
+  /// The following example uses this method to multiply two `UInt8`
   /// values that normally overflow when multiplied:
   ///
   ///     let x: UInt8 = 100
@@ -1557,6 +1565,8 @@ ${assignmentOperatorComment(x.operator, True)}
     let high = ${Self}(Builtin.truncOrBitCast_Int${dbits}_Int${bits}(shifted))
     return (high: high, low: low)
   }
+%   if bits == 64:
+  #endif
 %   end
 
   /// Returns a tuple containing the quotient and remainder of dividing the

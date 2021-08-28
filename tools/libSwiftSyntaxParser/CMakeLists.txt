@@ -9,7 +9,8 @@ set(LLVM_EXPORTED_SYMBOL_FILE
 
 add_swift_host_library(libSwiftSyntaxParser SHARED
   c-include-check.c
-  libSwiftSyntaxParser.cpp)
+  libSwiftSyntaxParser.cpp
+  LLVM_LINK_COMPONENTS support)
 if(NOT SWIFT_BUILT_STANDALONE AND NOT CMAKE_C_COMPILER_ID MATCHES Clang)
   add_dependencies(libSwiftSyntaxParser clang)
 endif()

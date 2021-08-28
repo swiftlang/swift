@@ -21,6 +21,7 @@
 #include "swift/AST/Availability.h"
 #include "swift/AST/ResilienceExpansion.h"
 #include "swift/Basic/ProfileCounter.h"
+#include "swift/SIL/SwiftObjectHeader.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILDeclRef.h"
@@ -129,7 +130,11 @@ private:
 /// zero or more SIL SILBasicBlock objects that contain the SILInstruction
 /// objects making up the function.
 class SILFunction
-  : public llvm::ilist_node<SILFunction>, public SILAllocated<SILFunction> {
+  : public llvm::ilist_node<SILFunction>, public SILAllocated<SILFunction>,
+    public SwiftObjectHeader {
+    
+  static SwiftMetatype registeredMetatype;
+    
 public:
   using BlockListType = llvm::iplist<SILBasicBlock>;
 
@@ -315,6 +320,9 @@ private:
   /// The function's effects attribute.
   unsigned EffectsKindAttr : NumEffectsKindBits;
 
+  /// The function is in a statically linked module.
+  unsigned IsStaticallyLinked : 1;
+
   static void
   validateSubclassScope(SubclassScope scope, IsThunk_t isThunk,
                         const GenericSpecializationInformation *genericInfo) {
@@ -385,6 +393,10 @@ private:
   void setHasOwnership(bool newValue) { HasOwnership = newValue; }
 
 public:
+  static void registerBridgedMetatype(SwiftMetatype metatype) {
+    registeredMetatype = metatype;
+  }
+
   ~SILFunction();
 
   SILModule &getModule() const { return Module; }
@@ -532,6 +544,12 @@ public:
 
   void setWasDeserializedCanonical(bool val = true) {
     WasDeserializedCanonical = val;
+  }
+
+  bool isStaticallyLinked() const { return IsStaticallyLinked; }
+
+  void setIsStaticallyLinked(bool value) {
+    IsStaticallyLinked = value;
   }
 
   /// Returns true if this is a reabstraction thunk of escaping function type
@@ -820,7 +838,8 @@ public:
     DeclCtxt = (DS ? DebugScope->Loc.getAsDeclContext() : nullptr);
   }
 
-  /// Initialize the debug scope for debug info on SIL level (-gsil).
+  /// Initialize the debug scope for debug info on SIL level
+  /// (-sil-based-debuginfo).
   void setSILDebugScope(const SILDebugScope *DS) {
     DebugScope = DS;
   }
@@ -980,6 +999,10 @@ public:
   }
 
   void clear();
+
+  /// Like `clear`, but does not call `dropAllReferences`, which is the
+  /// responsibility of the caller.
+  void eraseAllBlocks();
 
   /// Return the identity substitutions necessary to forward this call if it is
   /// generic.

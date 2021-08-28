@@ -356,6 +356,10 @@ public:
   /// Determine whether this type variable represents a closure result type.
   bool isClosureResultType() const;
 
+  /// Determine whether this type variable represents
+  /// a type of a key path expression.
+  bool isKeyPathType() const;
+
   /// Retrieve the representative of the equivalence class to which this
   /// type variable belongs.
   ///
@@ -788,7 +792,7 @@ struct AppliedBuilderTransform {
   Type builderType;
 
   /// The result type of the body, to which the returned expression will be
-  /// converted.
+  /// converted. Opaque types should be unopened.
   Type bodyResultType;
 
   /// An expression whose value has been recorded for later use.
@@ -992,7 +996,7 @@ public:
 
   SolutionApplicationTargetsKey(
       const PatternBindingDecl *patternBinding, unsigned index) {
-    kind = Kind::stmt;
+    kind = Kind::patternBindingEntry;
     storage.patternBindingEntry.patternBinding = patternBinding;
     storage.patternBindingEntry.index = index;
   }
@@ -1181,6 +1185,10 @@ public:
   /// The node -> type mappings introduced by this solution.
   llvm::DenseMap<ASTNode, Type> nodeTypes;
 
+  /// The key path component types introduced by this solution.
+  llvm::DenseMap<std::pair<const KeyPathExpr *, unsigned>, Type>
+      keyPathComponentTypes;
+
   /// Contextual types introduced by this solution.
   std::vector<std::pair<ASTNode, ContextualTypeInfo>> contextualTypes;
 
@@ -1289,8 +1297,15 @@ public:
 
   bool hasType(ASTNode node) const;
 
+  /// Returns \c true if the \p ComponentIndex-th component in \p KP has a type
+  /// associated with it.
+  bool hasType(const KeyPathExpr *KP, unsigned ComponentIndex) const;
+
   /// Retrieve the type of the given node, as recorded in this solution.
   Type getType(ASTNode node) const;
+
+  /// Retrieve the type of the \p ComponentIndex-th component in \p KP.
+  Type getType(const KeyPathExpr *KP, unsigned ComponentIndex) const;
 
   /// Retrieve the type of the given node as recorded in this solution
   /// and resolve all of the type variables in contains to form a fully
@@ -1379,11 +1394,11 @@ enum class ConstraintSystemFlags {
 
   /// If set, verbose output is enabled for this constraint system.
   ///
-  /// Note that this flag is automatically applied to all constraint systems
+  /// Note that this flag is automatically applied to all constraint systems,
   /// when \c DebugConstraintSolver is set in \c TypeCheckerOptions. It can be
   /// automatically enabled for select constraint solving attempts by setting
-  /// \c DebugConstraintSolverAttempt. Finally, it be automatically enabled
-  /// for a pre-configured set of expressions on line numbers by setting
+  /// \c DebugConstraintSolverAttempt. Finally, it can also be automatically 
+  /// enabled for a pre-configured set of expressions on line numbers by setting
   /// \c DebugConstraintSolverOnLines.
   DebugConstraints = 0x10,
 
@@ -1544,7 +1559,7 @@ public:
     stmtCondition,
     caseLabelItem,
     patternBinding,
-    uninitializedWrappedVar,
+    uninitializedVar,
   } kind;
 
 private:
@@ -1616,9 +1631,16 @@ private:
       DeclContext *dc;
     } caseLabelItem;
 
-    PatternBindingDecl *patternBinding;
+    struct {
+      PatternBindingDecl *binding;
+      /// Index into pattern binding declaration (if any).
+      unsigned index;
+      PointerUnion<VarDecl *, Pattern *> declaration;
+      /// Type associated with the declaration.
+      Type type;
+    } uninitializedVar;
 
-    VarDecl *uninitializedWrappedVar;
+    PatternBindingDecl *patternBinding;
   };
 
   // If the pattern contains a single variable that has an attached
@@ -1664,9 +1686,28 @@ public:
     this->patternBinding = patternBinding;
   }
 
-  SolutionApplicationTarget(VarDecl *wrappedVar) {
-    kind = Kind::uninitializedWrappedVar;
-    this->uninitializedWrappedVar= wrappedVar;
+  SolutionApplicationTarget(VarDecl *uninitializedWrappedVar)
+      : kind(Kind::uninitializedVar) {
+    if (auto *PDB = uninitializedWrappedVar->getParentPatternBinding()) {
+      uninitializedVar.binding = PDB;
+      uninitializedVar.index =
+          PDB->getPatternEntryIndexForVarDecl(uninitializedWrappedVar);
+    } else {
+      uninitializedVar.binding = nullptr;
+      uninitializedVar.index = 0;
+    }
+
+    uninitializedVar.declaration = uninitializedWrappedVar;
+    uninitializedVar.type = Type();
+  }
+
+  SolutionApplicationTarget(PatternBindingDecl *binding, unsigned index,
+                            Pattern *var, Type patternTy)
+      : kind(Kind::uninitializedVar) {
+    uninitializedVar.binding = binding;
+    uninitializedVar.index = index;
+    uninitializedVar.declaration = var;
+    uninitializedVar.type = patternTy;
   }
 
   /// Form a target for the initialization of a pattern from an expression.
@@ -1688,8 +1729,20 @@ public:
 
   /// Form a target for a property with an attached property wrapper that is
   /// initialized out-of-line.
-  static SolutionApplicationTarget forUninitializedWrappedVar(
-      VarDecl *wrappedVar);
+  static SolutionApplicationTarget
+  forUninitializedWrappedVar(VarDecl *wrappedVar) {
+    return {wrappedVar};
+  }
+
+  static SolutionApplicationTarget
+  forUninitializedVar(PatternBindingDecl *binding, unsigned index, Pattern *var,
+                      Type patternTy) {
+    return {binding, index, var, patternTy};
+  }
+
+  /// Form a target for a synthesized property wrapper initializer.
+  static SolutionApplicationTarget forPropertyWrapperInitializer(
+      VarDecl *wrappedVar, DeclContext *dc, Expr *initializer);
 
   Expr *getAsExpr() const {
     switch (kind) {
@@ -1700,7 +1753,7 @@ public:
     case Kind::stmtCondition:
     case Kind::caseLabelItem:
     case Kind::patternBinding:
-    case Kind::uninitializedWrappedVar:
+    case Kind::uninitializedVar:
       return nullptr;
     }
     llvm_unreachable("invalid expression type");
@@ -1723,8 +1776,13 @@ public:
     case Kind::patternBinding:
       return patternBinding->getDeclContext();
 
-    case Kind::uninitializedWrappedVar:
-      return uninitializedWrappedVar->getDeclContext();
+    case Kind::uninitializedVar: {
+      if (auto *wrappedVar =
+              uninitializedVar.declaration.dyn_cast<VarDecl *>())
+        return wrappedVar->getDeclContext();
+
+      return uninitializedVar.binding->getInitContext(uninitializedVar.index);
+    }
     }
     llvm_unreachable("invalid decl context type");
   }
@@ -1780,6 +1838,9 @@ public:
 
   /// For a pattern initialization target, retrieve the pattern.
   Pattern *getInitializationPattern() const {
+    if (kind == Kind::uninitializedVar)
+      return uninitializedVar.declaration.get<Pattern *>();
+
     assert(kind == Kind::expression);
     assert(expression.contextualPurpose == CTP_Initialization);
     return expression.pattern;
@@ -1798,7 +1859,7 @@ public:
   bool isOptionalSomePatternInit() const {
     return kind == Kind::expression &&
         expression.contextualPurpose == CTP_Initialization &&
-        isa<OptionalSomePattern>(expression.pattern) &&
+        dyn_cast_or_null<OptionalSomePattern>(expression.pattern) &&
         !expression.pattern->isImplicit();
   }
 
@@ -1822,7 +1883,9 @@ public:
 
     // Don't create property wrapper generator functions for static variables and
     // local variables with initializers.
-    if (wrappedVar->isStatic() || wrappedVar->getDeclContext()->isLocalContext())
+    bool hasInit = expression.propertyWrapper.hasInitialWrappedValue;
+    if (wrappedVar->isStatic() ||
+        (hasInit && wrappedVar->getDeclContext()->isLocalContext()))
       return false;
 
     return expression.propertyWrapper.innermostWrappedValueInit == apply;
@@ -1882,6 +1945,12 @@ public:
   }
 
   void setPattern(Pattern *pattern) {
+    if (kind == Kind::uninitializedVar) {
+      assert(uninitializedVar.declaration.is<Pattern *>());
+      uninitializedVar.declaration = pattern;
+      return;
+    }
+
     assert(kind == Kind::expression);
     assert(expression.contextualPurpose == CTP_Initialization ||
            expression.contextualPurpose == CTP_ForEachStmt);
@@ -1894,7 +1963,7 @@ public:
     case Kind::stmtCondition:
     case Kind::caseLabelItem:
     case Kind::patternBinding:
-    case Kind::uninitializedWrappedVar:
+    case Kind::uninitializedVar:
       return None;
 
     case Kind::function:
@@ -1909,7 +1978,7 @@ public:
     case Kind::function:
     case Kind::caseLabelItem:
     case Kind::patternBinding:
-    case Kind::uninitializedWrappedVar:
+    case Kind::uninitializedVar:
       return None;
 
     case Kind::stmtCondition:
@@ -1924,7 +1993,7 @@ public:
     case Kind::function:
     case Kind::stmtCondition:
     case Kind::patternBinding:
-    case Kind::uninitializedWrappedVar:
+    case Kind::uninitializedVar:
       return None;
 
     case Kind::caseLabelItem:
@@ -1939,7 +2008,7 @@ public:
     case Kind::function:
     case Kind::stmtCondition:
     case Kind::caseLabelItem:
-    case Kind::uninitializedWrappedVar:
+    case Kind::uninitializedVar:
       return nullptr;
 
     case Kind::patternBinding:
@@ -1957,8 +2026,68 @@ public:
     case Kind::patternBinding:
       return nullptr;
 
-    case Kind::uninitializedWrappedVar:
-      return uninitializedWrappedVar;
+    case Kind::uninitializedVar:
+      return uninitializedVar.declaration.dyn_cast<VarDecl *>();
+    }
+    llvm_unreachable("invalid case label type");
+  }
+
+  Pattern *getAsUninitializedVar() const {
+    switch (kind) {
+    case Kind::expression:
+    case Kind::function:
+    case Kind::stmtCondition:
+    case Kind::caseLabelItem:
+    case Kind::patternBinding:
+      return nullptr;
+
+    case Kind::uninitializedVar:
+      return uninitializedVar.declaration.dyn_cast<Pattern *>();
+    }
+    llvm_unreachable("invalid case label type");
+  }
+
+  Type getTypeOfUninitializedVar() const {
+    switch (kind) {
+    case Kind::expression:
+    case Kind::function:
+    case Kind::stmtCondition:
+    case Kind::caseLabelItem:
+    case Kind::patternBinding:
+      return nullptr;
+
+    case Kind::uninitializedVar:
+      return uninitializedVar.type;
+    }
+    llvm_unreachable("invalid case label type");
+  }
+
+  PatternBindingDecl *getPatternBindingOfUninitializedVar() const {
+    switch (kind) {
+    case Kind::expression:
+    case Kind::function:
+    case Kind::stmtCondition:
+    case Kind::caseLabelItem:
+    case Kind::patternBinding:
+      return nullptr;
+
+    case Kind::uninitializedVar:
+      return uninitializedVar.binding;
+    }
+    llvm_unreachable("invalid case label type");
+  }
+
+  unsigned getIndexOfUninitializedVar() const {
+    switch (kind) {
+    case Kind::expression:
+    case Kind::function:
+    case Kind::stmtCondition:
+    case Kind::caseLabelItem:
+    case Kind::patternBinding:
+      return 0;
+
+    case Kind::uninitializedVar:
+      return uninitializedVar.index;
     }
     llvm_unreachable("invalid case label type");
   }
@@ -1992,8 +2121,13 @@ public:
     case Kind::patternBinding:
       return patternBinding->getSourceRange();
 
-    case Kind::uninitializedWrappedVar:
-      return uninitializedWrappedVar->getSourceRange();
+    case Kind::uninitializedVar: {
+      if (auto *wrappedVar =
+              uninitializedVar.declaration.dyn_cast<VarDecl *>()) {
+        return wrappedVar->getSourceRange();
+      }
+      return uninitializedVar.declaration.get<Pattern *>()->getSourceRange();
+    }
     }
     llvm_unreachable("invalid target type");
   }
@@ -2016,8 +2150,13 @@ public:
     case Kind::patternBinding:
       return patternBinding->getLoc();
 
-    case Kind::uninitializedWrappedVar:
-      return uninitializedWrappedVar->getLoc();
+    case Kind::uninitializedVar: {
+      if (auto *wrappedVar =
+          uninitializedVar.declaration.dyn_cast<VarDecl *>()) {
+        return wrappedVar->getLoc();
+      }
+      return uninitializedVar.declaration.get<Pattern *>()->getLoc();
+    }
     }
     llvm_unreachable("invalid target type");
   }
@@ -2126,6 +2265,11 @@ private:
   /// explored.
   size_t MaxMemory = 0;
 
+  /// Flag to indicate to the solver that the system is in invalid
+  /// state and it shouldn't proceed but instead produce a fallback
+  /// diagnostic.
+  bool InvalidState = false;
+
   /// Cached member lookups.
   llvm::DenseMap<std::pair<Type, DeclNameRef>, Optional<LookupResult>>
     MemberLookups;
@@ -2168,8 +2312,22 @@ private:
   /// run through various diagnostics passes without actually mutating
   /// the types on the nodes.
   llvm::MapVector<ASTNode, Type> NodeTypes;
-  llvm::DenseMap<std::pair<const KeyPathExpr *, unsigned>, TypeBase *>
+
+  /// The nodes for which we have produced types, along with the prior type
+  /// each node had before introducing this type.
+  llvm::SmallVector<std::pair<ASTNode, Type>, 8> addedNodeTypes;
+
+  /// Maps components in a key path expression to their type. Needed because
+  /// KeyPathExpr + Index isn't an \c ASTNode and thus can't be stored in \c
+  /// NodeTypes.
+  llvm::DenseMap<std::pair<const KeyPathExpr *, /*component index=*/unsigned>,
+                 Type>
       KeyPathComponentTypes;
+
+  /// Same as \c addedNodeTypes for \c KeyPathComponentTypes.
+  llvm::SmallVector<
+      std::tuple<const KeyPathExpr *, /*component index=*/unsigned, Type>>
+      addedKeyPathComponentTypes;
 
   /// Maps AST entries to their solution application targets.
   llvm::MapVector<SolutionApplicationTargetsKey, SolutionApplicationTarget>
@@ -2250,10 +2408,6 @@ private:
   /// used for the 'self' of an existential type.
   SmallVector<std::pair<ConstraintLocator *, OpenedArchetypeType *>, 4>
     OpenedExistentialTypes;
-
-  /// The nodes for which we have produced types, along with the prior type
-  /// each node had before introducing this type.
-  llvm::SmallVector<std::pair<ASTNode, Type>, 8> addedNodeTypes;
 
   /// The set of functions that have been transformed by a result builder.
   std::vector<std::pair<AnyFunctionRef, AppliedBuilderTransform>>
@@ -2370,7 +2524,7 @@ private:
      /// The best solution computed so far.
     Optional<Score> BestScore;
 
-    /// The number of the solution attempt we're looking at.
+    /// The number of the solution attempts we're looking at.
     unsigned SolutionAttempt;
 
     /// Refers to the innermost partial solution scope.
@@ -2517,8 +2671,8 @@ private:
 
   private:
     /// The list of constraints that have been retired along the
-    /// current path, this list is used in LIFO fashion when constraints
-    /// are added back to the circulation.
+    /// current path, this list is used in LIFO fashion when
+    /// constraints are added back to the circulation.
     ConstraintList retiredConstraints;
 
     /// The set of constraints which were active at the time of this state
@@ -2614,6 +2768,11 @@ public:
 
     Phase = newPhase;
   }
+
+  /// Check whether constraint system is in valid state e.g.
+  /// has left-over active/inactive constraints which should
+  /// have been simplified.
+  bool inInvalidState() const { return InvalidState; }
 
   /// Cache the types of the given expression and all subexpressions.
   void cacheExprTypes(Expr *expr) {
@@ -2724,6 +2883,8 @@ public:
 
     unsigned numAddedNodeTypes;
 
+    unsigned numAddedKeyPathComponentTypes;
+
     unsigned numDisabledConstraints;
 
     unsigned numFavoredConstraints;
@@ -2817,8 +2978,8 @@ private:
   /// able to emit an error message, or false if none of the fixits worked out.
   bool applySolutionFixes(const Solution &solution);
 
-  /// If there is more than one viable solution,
-  /// attempt to pick the best solution and remove all of the rest.
+  /// If there is more than one viable solution, attempt 
+  /// to pick the best solution and remove all of the rest.
   ///
   /// \param solutions The set of solutions to filter.
   ///
@@ -2861,7 +3022,7 @@ private:
   void addKeyPathApplicationRootConstraint(Type root, ConstraintLocatorBuilder locator);
 
 public:
-  /// Lookup for a member with the given name in the given base type.
+  /// Lookup for a member with the given name which is in the given base type.
   ///
   /// This routine caches the results of member lookups in the top constraint
   /// system, to avoid.
@@ -2939,10 +3100,15 @@ public:
   /// map is used throughout the expression type checker in order to
   /// avoid mutating expressions until we know we have successfully
   /// type-checked them.
-  void setType(KeyPathExpr *KP, unsigned I, Type T) {
+  void setType(const KeyPathExpr *KP, unsigned I, Type T) {
     assert(KP && "Expected non-null key path parameter!");
     assert(T && "Expected non-null type!");
-    KeyPathComponentTypes[std::make_pair(KP, I)] = T.getPointer();
+
+    Type &entry = KeyPathComponentTypes[{KP, I}];
+    Type oldType = entry;
+    entry = T;
+
+    addedKeyPathComponentTypes.push_back(std::make_tuple(KP, I, oldType));
   }
 
   /// Check to see if we have a type for a node.
@@ -3286,9 +3452,8 @@ public:
                      bool isFavored = false);
 
   /// Add the appropriate constraint for a contextual conversion.
-  void addContextualConversionConstraint(
-      Expr *expr, Type conversionType, ContextualTypePurpose purpose,
-      bool isOpaqueReturnType);
+  void addContextualConversionConstraint(Expr *expr, Type conversionType,
+                                         ContextualTypePurpose purpose);
 
   /// Convenience function to pass an \c ArrayRef to \c addJoinConstraint
   Type addJoinConstraint(ConstraintLocator *locator,
@@ -3824,6 +3989,16 @@ public:
   /// \returns The opened type, or \c type if there are no archetypes in it.
   Type openType(Type type, OpenedTypeMap &replacements);
 
+private:
+  /// "Open" an opaque archetype type, similar to \c openType.
+  Type openOpaqueType(OpaqueTypeArchetypeType *type,
+                      ConstraintLocatorBuilder locator);
+
+public:
+  /// Recurse over the given type and open any opaque archetype types.
+  Type openOpaqueType(Type type, ContextualTypePurpose context,
+                      ConstraintLocatorBuilder locator);
+
   /// "Open" the given function type.
   ///
   /// If the function type is non-generic, this is equivalent to calling
@@ -3951,7 +4126,7 @@ public:
   }
 
 private:
-  /// Adjust the constraint system to accomodate the given selected overload, and
+  /// Adjust the constraint system to accommodate the given selected overload, and
   /// recompute the type of the referenced declaration.
   ///
   /// \returns a pair containing the adjusted opened type of a reference to
@@ -4088,10 +4263,9 @@ public:
   /// Generate constraints for the body of the given closure.
   ///
   /// \param closure the closure expression
-  /// \param resultType the closure's result type
   ///
   /// \returns \c true if constraint generation failed, \c false otherwise
-  bool generateConstraints(ClosureExpr *closure, Type resultType);
+  bool generateConstraints(ClosureExpr *closure);
 
   /// Generate constraints for the given (unchecked) expression.
   ///
@@ -4429,9 +4603,25 @@ public:
 
   /// Build implicit autoclosure expression wrapping a given expression.
   /// Given expression represents computed result of the closure.
+  ///
+  /// The \p ClosureDC must be the deepest possible context that
+  /// contains this autoclosure expression. For example,
+  ///
+  /// func foo() {
+  ///   _ = { $0 || $1 || $2 }
+  /// }
+  ///
+  /// Even though the decl context of $1 (after solution application) is
+  /// `||`'s autoclosure parameter, we cannot know this until solution
+  /// application has finished because autoclosure expressions are expanded in
+  /// depth-first order then \c ContextualizeClosures comes around to clean up.
+  /// All that is required is that the explicit closure be the context since it
+  /// is the innermost context that can introduce potential new capturable
+  /// declarations.
   Expr *buildAutoClosureExpr(Expr *expr, FunctionType *closureType,
+                             DeclContext *ClosureDC,
                              bool isDefaultWrappedValue = false,
-                             bool isSpawnLetWrapper = false);
+                             bool isAsyncLetWrapper = false);
 
   /// Builds a type-erased return expression that can be used in dynamic
   /// replacement.
@@ -4546,12 +4736,6 @@ private:
                                           TypeMatchOptions flags,
                                           ConstraintLocatorBuilder locator);
 
-  /// Attempt to simplify an OpaqueUnderlyingType constraint.
-  SolutionKind simplifyOpaqueUnderlyingTypeConstraint(Type type1,
-                                              Type type2,
-                                              TypeMatchOptions flags,
-                                              ConstraintLocatorBuilder locator);
-  
   /// Attempt to simplify the BridgingConversion constraint.
   SolutionKind simplifyBridgingConstraint(Type type1,
                                          Type type2,
@@ -4682,10 +4866,10 @@ public:
   ///
   /// \returns \c None when the result builder cannot be applied at all,
   /// otherwise the result of applying the result builder.
-  Optional<TypeMatchResult> matchResultBuilder(
-      AnyFunctionRef fn, Type builderType, Type bodyResultType,
-      ConstraintKind bodyResultConstraintKind,
-      ConstraintLocatorBuilder locator);
+  Optional<TypeMatchResult>
+  matchResultBuilder(AnyFunctionRef fn, Type builderType, Type bodyResultType,
+                     ConstraintKind bodyResultConstraintKind,
+                     ConstraintLocatorBuilder locator);
 
   /// Matches a wrapped or projected value parameter type to its backing
   /// property wrapper type by applying the property wrapper.
@@ -5269,17 +5453,9 @@ bool hasAppliedSelf(ConstraintSystem &cs, const OverloadChoice &choice);
 bool hasAppliedSelf(const OverloadChoice &choice,
                     llvm::function_ref<Type(Type)> getFixedType);
 
-/// Check whether type conforms to a given known protocol.
-bool conformsToKnownProtocol(DeclContext *dc, Type type,
-                             KnownProtocolKind protocol);
-
-/// Check whether given type conforms to `RawPepresentable` protocol
+/// Check whether given type conforms to `RawRepresentable` protocol
 /// and return witness type.
 Type isRawRepresentable(ConstraintSystem &cs, Type type);
-/// Check whether given type conforms to a specific known kind
-/// `RawPepresentable` protocol and return witness type.
-Type isRawRepresentable(ConstraintSystem &cs, Type type,
-                        KnownProtocolKind rawRepresentableProtocol);
 
 /// Compute the type that shall stand in for dynamic 'Self' in a member
 /// reference with a base of the given object type.
@@ -5373,6 +5549,9 @@ public:
   TypeVariableBinding(TypeVariableType *typeVar, PotentialBinding &binding)
       : TypeVar(typeVar), Binding(binding) {}
 
+  TypeVariableType *getTypeVariable() const { return TypeVar; }
+  Type getType() const { return Binding.BindingType; }
+
   bool isDefaultable() const { return Binding.isDefaultableBinding(); }
 
   bool hasDefaultedProtocol() const {
@@ -5415,7 +5594,9 @@ public:
   /// This is useful to be able to exhaustively attempt bindings
   /// for type variables found at one level, before proceeding to
   /// supertypes or literal defaults etc.
-  virtual bool needsToComputeNext() const { return false; }
+  virtual bool needsToComputeNext() const = 0;
+
+  virtual bool isExhausted() const = 0;
 };
 
 class TypeVarBindingProducer : public BindingProducer<TypeVariableBinding> {
@@ -5442,6 +5623,8 @@ class TypeVarBindingProducer : public BindingProducer<TypeVariableBinding> {
   /// to that protocol or be wrapped in an optional.
   bool CanBeNil;
 
+  bool IsExhausted = false;
+
 public:
   using Element = TypeVariableBinding;
 
@@ -5451,16 +5634,39 @@ public:
   ArrayRef<Binding> getCurrentBindings() const { return Bindings; }
 
   Optional<Element> operator()() override {
+    if (isExhausted())
+      return None;
+
     // Once we reach the end of the current bindings
     // let's try to compute new ones, e.g. supertypes,
     // literal defaults, if that fails, we are done.
-    if (needsToComputeNext() && !computeNext())
+    if (needsToComputeNext() && !computeNext()) {
+      IsExhausted = true;
       return None;
+    }
 
-    return TypeVariableBinding(TypeVar, Bindings[Index++]);
+    auto &binding = Bindings[Index++];
+
+    // Record produced type as bound/explored early, otherwise
+    // it could be possible to re-discover it during `computeNext()`,
+    // which leads to duplicate bindings e.g. inferring fallback
+    // `Void` for a closure result type when `Void` was already
+    // inferred as a direct/transitive binding.
+    {
+      auto type = binding.BindingType;
+
+      BoundTypes.insert(type.getPointer());
+      ExploredTypes.insert(type->getCanonicalType());
+    }
+
+    return TypeVariableBinding(TypeVar, binding);
   }
 
-  bool needsToComputeNext() const override { return Index >= Bindings.size(); }
+  bool needsToComputeNext() const override {
+    return isExhausted() ? false : Index >= Bindings.size();
+  }
+
+  bool isExhausted() const override { return IsExhausted; }
 
 private:
   /// Compute next batch of bindings if possible, this could
@@ -5533,10 +5739,10 @@ public:
   }
 
   Optional<Element> operator()() override {
-    unsigned currIndex = Index;
-    if (currIndex >= Choices.size())
+    if (isExhausted())
       return None;
 
+    unsigned currIndex = Index;
     bool isBeginningOfPartition = PartitionIndex < PartitionBeginning.size() &&
                                   PartitionBeginning[PartitionIndex] == Index;
     if (isBeginningOfPartition)
@@ -5559,6 +5765,10 @@ public:
     return DisjunctionChoice(CS, currIndex, Choices[Ordering[currIndex]],
                              IsExplicitConversion, isBeginningOfPartition);
   }
+
+  bool needsToComputeNext() const override { return false; }
+
+  bool isExhausted() const override { return Index >= Choices.size(); }
 
 private:
   // Partition the choices in the disjunction into groups that we will
@@ -5701,9 +5911,9 @@ bool exprNeedsParensBeforeAddingNilCoalescing(DeclContext *DC,
 // Return true if, when replacing "<expr>" with "<expr> as T", parentheses need
 // to be added around the new expression in order to maintain the correct
 // precedence.
-bool exprNeedsParensAfterAddingNilCoalescing(DeclContext *DC,
-                                             Expr *expr,
-                                             Expr *rootExpr);
+bool exprNeedsParensAfterAddingNilCoalescing(
+    DeclContext *DC, Expr *expr,
+    llvm::function_ref<Expr *(const Expr *)> getParent);
 
 /// Return true if, when replacing "<expr>" with "<expr> op <something>",
 /// parentheses must be added around "<expr>" to allow the new operator
@@ -5712,13 +5922,12 @@ bool exprNeedsParensInsideFollowingOperator(DeclContext *DC,
                                             Expr *expr,
                                             PrecedenceGroupDecl *followingPG);
 
-/// Return true if, when replacing "<expr>" with "<expr> op <something>"
-/// within the given root expression, parentheses must be added around
-/// the new operator to prevent it from binding incorrectly in the
-/// surrounding context.
+/// Return true if, when replacing "<expr>" with "<expr> op <something>",
+/// parentheses must be added around the new operator to prevent it from binding
+/// incorrectly in the surrounding context.
 bool exprNeedsParensOutsideFollowingOperator(
-    DeclContext *DC, Expr *expr, Expr *rootExpr,
-    PrecedenceGroupDecl *followingPG);
+    DeclContext *DC, Expr *expr, PrecedenceGroupDecl *followingPG,
+    llvm::function_ref<Expr *(const Expr *)> getParent);
 
 /// Determine whether this is a SIMD operator.
 bool isSIMDOperator(ValueDecl *value);

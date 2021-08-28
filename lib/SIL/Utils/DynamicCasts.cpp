@@ -603,12 +603,12 @@ swift::classifyDynamicCast(ModuleDecl *M,
     if (targetClass) {
       // Imported Objective-C generics don't check the generic parameters, which
       // are lost at runtime.
-      if (sourceClass->usesObjCGenericsModel()) {
+      if (sourceClass->isTypeErasedGenericClass()) {
       
         if (sourceClass == targetClass)
           return DynamicCastFeasibility::WillSucceed;
         
-        if (targetClass->usesObjCGenericsModel()) {
+        if (targetClass->isTypeErasedGenericClass()) {
           // If both classes are ObjC generics, the cast may succeed if the
           // classes are related, irrespective of their generic parameters.
 

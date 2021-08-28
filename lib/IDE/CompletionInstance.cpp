@@ -29,6 +29,7 @@
 #include "swift/Parse/PersistentParserState.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Subsystems.h"
+#include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "clang/AST/ASTContext.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -330,9 +331,10 @@ bool CompletionInstance::performCachedOperationIfPossible(
   SearchPathOptions searchPathOpts = CI.getASTContext().SearchPathOpts;
   DiagnosticEngine tmpDiags(tmpSM);
   ClangImporterOptions clangOpts;
+  symbolgraphgen::SymbolGraphOptions symbolOpts;
   std::unique_ptr<ASTContext> tmpCtx(
-      ASTContext::get(langOpts, typeckOpts, searchPathOpts, clangOpts, tmpSM,
-                      tmpDiags));
+      ASTContext::get(langOpts, typeckOpts, searchPathOpts, clangOpts,
+                      symbolOpts, tmpSM, tmpDiags));
   registerParseRequestFunctions(tmpCtx->evaluator);
   registerIDERequestFunctions(tmpCtx->evaluator);
   registerTypeCheckerRequestFunctions(tmpCtx->evaluator);
@@ -610,10 +612,6 @@ bool swift::ide::CompletionInstance::performOperation(
     llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
     std::string &Error, DiagnosticConsumer *DiagC,
     llvm::function_ref<void(CompilerInstance &, bool)> Callback) {
-
-  // Always disable source location resolutions from .swiftsourceinfo file
-  // because they're somewhat heavy operations and aren't needed for completion.
-  Invocation.getFrontendOptions().IgnoreSwiftSourceInfo = true;
 
   // Disable to build syntax tree because code-completion skips some portion of
   // source text. That breaks an invariant of syntax tree building.

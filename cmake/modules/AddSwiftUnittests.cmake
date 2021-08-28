@@ -21,28 +21,12 @@ function(add_swift_unittest test_dirname)
     set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY LINK_FLAGS " ${_lto_flag_out} ")
   endif()
 
-  if(SWIFT_BUILT_STANDALONE AND NOT "${CMAKE_CFG_INTDIR}" STREQUAL ".")
-    # Replace target references with full paths, so that we use LLVM's
-    # build configuration rather than Swift's.
-    get_target_property(libnames ${test_dirname} LINK_LIBRARIES)
-
-    set(new_libnames)
-    foreach(dep ${libnames})
-      if("${dep}" MATCHES "^(LLVM|Clang|gtest)" AND NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
-        list(APPEND new_libnames "${LLVM_LIBRARY_OUTPUT_INTDIR}/lib${dep}.a")
-      else()
-        list(APPEND new_libnames "${dep}")
-      endif()
-    endforeach()
-
-    set_property(TARGET ${test_dirname} PROPERTY LINK_LIBRARIES ${new_libnames})
-    swift_common_llvm_config(${test_dirname} support)
-  endif()
-
   if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
-    # Add an @rpath to the swift library directory.
+    # Add an @rpath to the swift library directory
+    # and one to the OS dylibs we require but
+    # are not building ourselves (e.g Foundation overlay)
     set_target_properties(${test_dirname} PROPERTIES
-      BUILD_RPATH ${SWIFT_LIBRARY_OUTPUT_INTDIR}/swift/macosx)
+      BUILD_RPATH "${SWIFT_LIBRARY_OUTPUT_INTDIR}/swift/macosx;${SWIFT_DARWIN_STDLIB_INSTALL_NAME_DIR}")
     # Force all the swift libraries to be found via rpath.
     add_custom_command(TARGET "${test_dirname}" POST_BUILD
       COMMAND "${SWIFT_SOURCE_DIR}/utils/swift-rpathize.py"
@@ -86,5 +70,4 @@ function(add_swift_unittest test_dirname)
     endif()
   endif()
 endfunction()
-
 

@@ -1,4 +1,4 @@
-set_swift_llvm_is_available()
+
 
 set(swiftDriver_sources
   Action.cpp
@@ -26,3 +26,5 @@ target_link_libraries(swiftDriver PRIVATE
   swiftAST
   swiftBasic
   swiftOption)
+
+set_swift_llvm_is_available(swiftDriver)

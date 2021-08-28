@@ -475,7 +475,7 @@ public:
       case AbstractFunctionDecl::BodyKind::None:
       case AbstractFunctionDecl::BodyKind::TypeChecked:
       case AbstractFunctionDecl::BodyKind::Skipped:
-      case AbstractFunctionDecl::BodyKind::MemberwiseInitializer:
+      case AbstractFunctionDecl::BodyKind::SILSynthesize:
       case AbstractFunctionDecl::BodyKind::Deserialized:
         return true;
 
@@ -1758,6 +1758,26 @@ public:
       }
     }
 
+    /// A version of AnyFunctionType::equalParams() that ignores "isolated"
+    /// parameters, which aren't represented in the type system.
+    static bool equalParamsIgnoringIsolation(
+        ArrayRef<AnyFunctionType::Param> a,
+        ArrayRef<AnyFunctionType::Param> b) {
+      auto withoutIsolation = [](AnyFunctionType::Param param) {
+        return param.withFlags(param.getParameterFlags().withIsolated(false));
+      };
+
+      if (a.size() != b.size())
+        return false;
+
+      for (unsigned i = 0, n = a.size(); i != n; ++i) {
+        if (withoutIsolation(a[i]) != withoutIsolation(b[i]))
+          return false;
+      }
+
+      return true;
+    }
+
     void verifyChecked(ApplyExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verifying ApplyExpr", E);
 
@@ -1780,9 +1800,9 @@ public:
 
       SmallVector<AnyFunctionType::Param, 8> Args;
       Type InputExprTy = E->getArg()->getType();
-      AnyFunctionType::decomposeInput(InputExprTy, Args);
+      AnyFunctionType::decomposeTuple(InputExprTy, Args);
       auto Params = FT->getParams();
-      if (!AnyFunctionType::equalParams(Args, Params)) {
+      if (!equalParamsIgnoringIsolation(Args, Params)) {
         Out << "Argument type does not match parameter type in ApplyExpr:"
                "\nArgument type: ";
         InputExprTy.print(Out);
@@ -1799,7 +1819,7 @@ public:
         E->dump(Out);
         Out << "\n";
         abort();
-      } else if (E->throws() && !FT->isThrowing()) {
+      } else if (E->throws() && !FT->isThrowing() && !E->implicitlyThrows()) {
         PolymorphicEffectKind rethrowingKind = PolymorphicEffectKind::Invalid;
         if (auto DRE = dyn_cast<DeclRefExpr>(E->getFn())) {
           if (auto fnDecl = dyn_cast<AbstractFunctionDecl>(DRE->getDecl())) {
@@ -1985,6 +2005,15 @@ public:
         abort();
       }
 
+      verifyCheckedBase(E);
+    }
+
+    void verifyChecked(ParenExpr *E) {
+      PrettyStackTraceExpr debugStack(Ctx, "verifying ParenExpr", E);
+      if (!isa<ParenType>(E->getType().getPointer())) {
+        Out << "ParenExpr not of ParenType\n";
+        abort();
+      }
       verifyCheckedBase(E);
     }
 

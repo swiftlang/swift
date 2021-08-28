@@ -282,7 +282,19 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
   const unsigned ThrowStmtType    = 3;
   const unsigned UnknownStmtType  = 4;
   unsigned StmtType = UnknownStmtType;
-  
+
+  // Emit local auxiliary declarations.
+  if (!SGF.LocalAuxiliaryDecls.empty()) {
+    for (auto *var : SGF.LocalAuxiliaryDecls) {
+      if (auto *patternBinding = var->getParentPatternBinding())
+        SGF.visit(patternBinding);
+
+      SGF.visit(var);
+    }
+
+    SGF.LocalAuxiliaryDecls.clear();
+  }
+
   for (auto &ESD : S->getElements()) {
     
     if (auto D = ESD.dyn_cast<Decl*>())
@@ -330,9 +342,10 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
           continue;
         }
       } else if (auto D = ESD.dyn_cast<Decl*>()) {
-        // Local type declarations are not unreachable because they can appear
-        // after the declared type has already been used.
-        if (isa<TypeDecl>(D))
+        // Local declarations aren't unreachable - only their usages can be. To
+        // that end, we only care about pattern bindings since their
+        // initializer expressions can be unreachable.
+        if (!isa<PatternBindingDecl>(D))
           continue;
       }
       

@@ -33,11 +33,11 @@ class Child(object):
         self.is_indented = is_indented
         self.requires_leading_newline = requires_leading_newline
 
-        # If the child has "token" anywhere in the kind, it's considered
+        # If the child ends with "token" in the kind, it's considered
         # a token node. Grab the existing reference to that token from the
         # global list.
         self.token_kind = \
-            self.syntax_kind if "Token" in self.syntax_kind else None
+            self.syntax_kind if self.syntax_kind.endswith("Token") else None
         self.token = SYNTAX_TOKEN_MAP.get(self.token_kind)
 
         self.is_optional = is_optional

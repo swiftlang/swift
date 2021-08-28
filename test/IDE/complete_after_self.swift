@@ -139,8 +139,8 @@ class ThisDerived1 : ThisBase1 {
     self.#^CONVENIENCE_SELF_DOT_1?check=CONVENIENCE_SELF_DOT_1;check=COMMON_SELF_DOT_1^#
 // CONVENIENCE_SELF_DOT_1: Begin completions, 20 items
 // CONVENIENCE_SELF_DOT_1-DAG: Decl[Constructor]/CurrNominal: init()[#ThisDerived1#]; name=init()
-// CONVENIENCE_SELF_DOT_1-DAG: Decl[Constructor]/CurrNominal: init({#a: Int#})[#ThisDerived1#]; name=init(a: Int)
-// CONVENIENCE_SELF_DOT_1-DAG: Decl[Constructor]/CurrNominal: init({#conv: Int#})[#ThisDerived1#]; name=init(conv: Int)
+// CONVENIENCE_SELF_DOT_1-DAG: Decl[Constructor]/CurrNominal: init({#a: Int#})[#ThisDerived1#]; name=init(a:)
+// CONVENIENCE_SELF_DOT_1-DAG: Decl[Constructor]/CurrNominal: init({#conv: Int#})[#ThisDerived1#]; name=init(conv:)
 // CONVENIENCE_SELF_DOT_1: End completions
   }
 
@@ -273,8 +273,8 @@ extension ThisDerived1 {
     self.#^EXTENSION_CONSTRUCTOR_SELF_DOT_1?check=COMMON_SELF_DOT_1;check=EXTENSION_CONSTRUCTOR_SELF_DOT_1^#
 // EXTENSION_CONSTRUCTOR_SELF_DOT_1: Begin completions, 20 items
 // EXTENSION_CONSTRUCTOR_SELF_DOT_1: Decl[Constructor]/CurrNominal:      init()[#ThisDerived1#]; name=init()
-// EXTENSION_CONSTRUCTOR_SELF_DOT_1: Decl[Constructor]/CurrNominal:      init({#a: Int#})[#ThisDerived1#]; name=init(a: Int)
-// EXTENSION_CONSTRUCTOR_SELF_DOT_1: Decl[Constructor]/CurrNominal:      init({#someExtensionArg: Int#})[#ThisDerived1#]; name=init(someExtensionArg: Int)
+// EXTENSION_CONSTRUCTOR_SELF_DOT_1: Decl[Constructor]/CurrNominal:      init({#a: Int#})[#ThisDerived1#]; name=init(a:)
+// EXTENSION_CONSTRUCTOR_SELF_DOT_1: Decl[Constructor]/CurrNominal:      init({#someExtensionArg: Int#})[#ThisDerived1#]; name=init(someExtensionArg:)
 // EXTENSION_CONSTRUCTOR_SELF_DOT_1: End completions
 
   }
@@ -287,7 +287,7 @@ struct S1 {
 // STRUCT_CONSTRUCTOR_SELF_DOT_1: Begin completions, 4 items
 // STRUCT_CONSTRUCTOR_SELF_DOT_1-DAG: Keyword[self]/CurrNominal: self[#S1#]; name=self
 // STRUCT_CONSTRUCTOR_SELF_DOT_1-DAG: Decl[Constructor]/CurrNominal: init()[#S1#]; name=init()
-// STRUCT_CONSTRUCTOR_SELF_DOT_1-DAG: Decl[Constructor]/CurrNominal: init({#x: Int#})[#S1#]; name=init(x: Int)
+// STRUCT_CONSTRUCTOR_SELF_DOT_1-DAG: Decl[Constructor]/CurrNominal: init({#x: Int#})[#S1#]; name=init(x:)
 // STRUCT_CONSTRUCTOR_SELF_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal: f()[#Void#]; name=f()
 // STRUCT_CONSTRUCTOR_SELF_DOT_1: End completions
     let s: S1

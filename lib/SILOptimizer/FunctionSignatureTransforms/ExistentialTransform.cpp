@@ -292,7 +292,7 @@ void ExistentialTransform::convertExistentialArgTypesToGenericArgTypes(
   /// Determine the existing generic parameter depth.
   int Depth = 0;
   if (OrigGenericSig != nullptr) {
-    Depth = OrigGenericSig->getGenericParams().back()->getDepth() + 1;
+    Depth = OrigGenericSig.getGenericParams().back()->getDepth() + 1;
   }
 
   /// Index of the Generic Parameter.
@@ -526,7 +526,7 @@ void ExistentialTransform::populateThunkBody() {
 
   unsigned int OrigDepth = 0;
   if (F->getLoweredFunctionType()->isPolymorphic()) {
-    OrigDepth = OrigCalleeGenericSig->getGenericParams().back()->getDepth() + 1;
+    OrigDepth = OrigCalleeGenericSig.getGenericParams().back()->getDepth() + 1;
   }
   SubstitutionMap OrigSubMap = F->getForwardingSubstitutionMap();
 
@@ -628,7 +628,7 @@ void ExistentialTransform::createExistentialSpecializedFunction() {
     NewF = CachedFn;
   } else {
     auto NewFGenericSig = NewFTy->getInvocationGenericSignature();
-    auto NewFGenericEnv = NewFGenericSig->getGenericEnvironment();
+    auto NewFGenericEnv = NewFGenericSig.getGenericEnvironment();
     SILLinkage linkage = getSpecializedLinkage(F, F->getLinkage());
 
     NewF = FunctionBuilder.createFunction(

@@ -17,6 +17,7 @@
 #ifndef SWIFT_AST_STMT_H
 #define SWIFT_AST_STMT_H
 
+#include "swift/AST/ASTAllocated.h"
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/Availability.h"
 #include "swift/AST/AvailabilitySpec.h"
@@ -53,7 +54,7 @@ enum : unsigned { NumStmtKindBits =
   countBitsUsed(static_cast<unsigned>(StmtKind::Last_Stmt)) };
 
 /// Stmt - Base class for all statements in swift.
-class alignas(8) Stmt {
+class alignas(8) Stmt : public ASTAllocated<Stmt> {
   Stmt(const Stmt&) = delete;
   Stmt& operator=(const Stmt&) = delete;
 
@@ -138,16 +139,6 @@ public:
 
   SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &OS, const ASTContext *Ctx = nullptr, unsigned Indent = 0) const;
-
-  // Only allow allocation of Exprs using the allocator in ASTContext
-  // or by doing a placement new.
-  void *operator new(size_t Bytes, ASTContext &C,
-                     unsigned Alignment = alignof(Stmt));
-  
-  // Make vanilla new/delete illegal for Stmts.
-  void *operator new(size_t Bytes) throw() = delete;
-  void operator delete(void *Data) throw() = delete;
-  void *operator new(size_t Bytes, void *Mem) throw() = delete;
 };
 
 /// BraceStmt - A brace enclosed sequence of expressions, stmts, or decls, like
@@ -341,11 +332,17 @@ class alignas(8) PoundAvailableInfo final :
   /// This is filled in by Sema.
   VersionRange VariantAvailableRange;
 
+  /// Indicates that the expression is checking if a version range 
+  /// is **not** available.
+  bool _isUnavailability;
+
   PoundAvailableInfo(SourceLoc PoundLoc, SourceLoc LParenLoc,
-                     ArrayRef<AvailabilitySpec *> queries, SourceLoc RParenLoc)
+                     ArrayRef<AvailabilitySpec *> queries, SourceLoc RParenLoc,
+                     bool isUnavailability)
    : PoundLoc(PoundLoc), LParenLoc(LParenLoc), RParenLoc(RParenLoc),
      NumQueries(queries.size()), AvailableRange(VersionRange::empty()),
-     VariantAvailableRange(VersionRange::empty()) {
+     VariantAvailableRange(VersionRange::empty()), 
+     _isUnavailability(isUnavailability) {
     std::uninitialized_copy(queries.begin(), queries.end(),
                             getTrailingObjects<AvailabilitySpec *>());
   }
@@ -354,7 +351,8 @@ public:
   static PoundAvailableInfo *create(ASTContext &ctx, SourceLoc PoundLoc,
                                     SourceLoc LParenLoc,
                                     ArrayRef<AvailabilitySpec *> queries,
-                                    SourceLoc RParenLoc);
+                                    SourceLoc RParenLoc,
+                                    bool isUnavailability);
   
   ArrayRef<AvailabilitySpec *> getQueries() const {
     return llvm::makeArrayRef(getTrailingObjects<AvailabilitySpec *>(),
@@ -379,6 +377,8 @@ public:
   void setVariantAvailableRange(const VersionRange &Range) {
     VariantAvailableRange = Range;
   }
+
+  bool isUnavailability() const { return _isUnavailability; }
 };
 
 

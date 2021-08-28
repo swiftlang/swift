@@ -12,6 +12,7 @@
     key.column: 16,
     key.filepath: real.swift,
     key.severity: source.diagnostic.severity.error,
+    key.id: "cannot_find_in_scope",
     key.description: "cannot find 'goo' in scope",
     key.diagnostic_stage: source.diagnostic.stage.swift.sema,
     key.ranges: [

@@ -1,5 +1,4 @@
 // RUN: %target-sil-opt -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -jumpthread-simplify-cfg | %FileCheck %s
-// FIXME: Update for select_enum change.
 
 // Declare this SIL to be canonical because some tests break raw SIL
 // conventions. e.g. address-type block args. -enforce-exclusivity=none is also

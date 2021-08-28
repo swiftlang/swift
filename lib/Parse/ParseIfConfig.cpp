@@ -98,12 +98,17 @@ static llvm::VersionTuple getCanImportVersion(TupleExpr *te,
     }
     return result;
   }
+  StringRef verText;
   if (auto *nle = dyn_cast<NumberLiteralExpr>(subE)) {
-    auto digits = nle->getDigitsText();
-    if (result.tryParse(digits)) {
-      if (D) {
-        D->diagnose(nle->getLoc(), diag::canimport_version, digits);
-      }
+    verText = nle->getDigitsText();
+  } else if (auto *sle= dyn_cast<StringLiteralExpr>(subE)) {
+    verText = sle->getValue();
+  }
+  if (verText.empty())
+    return result;
+  if (result.tryParse(verText)) {
+    if (D) {
+      D->diagnose(subE->getLoc(), diag::canimport_version, verText);
     }
   }
   return result;
@@ -199,11 +204,7 @@ class ValidateIfConfigCondition :
 
       // Apply the operator with left-associativity by folding the first two
       // operands.
-      TupleExpr *Arg = TupleExpr::create(Ctx, SourceLoc(), { LHS, RHS },
-                                         { }, { }, SourceLoc(),
-                                         /*HasTrailingClosure=*/false,
-                                         /*Implicit=*/true);
-      LHS = new (Ctx) BinaryExpr(Op, Arg, /*implicit*/false);
+      LHS = BinaryExpr::create(Ctx, LHS, Op, RHS, /*implicit*/ false);
 
       // If we don't have the next operator, we're done.
       if (IsEnd)
@@ -522,9 +523,8 @@ public:
 
   bool visitBinaryExpr(BinaryExpr *E) {
     auto OpName = getDeclRefStr(E->getFn());
-    auto Args = E->getArg()->getElements();
-    if (OpName == "||") return visit(Args[0]) || visit(Args[1]);
-    if (OpName == "&&") return visit(Args[0]) && visit(Args[1]);
+    if (OpName == "||") return visit(E->getLHS()) || visit(E->getRHS());
+    if (OpName == "&&") return visit(E->getLHS()) && visit(E->getRHS());
     llvm_unreachable("unsupported binary operator");
   }
 
@@ -552,9 +552,8 @@ public:
 
   bool visitBinaryExpr(BinaryExpr *E) {
     auto OpName = getDeclRefStr(E->getFn());
-    auto Args = E->getArg()->getElements();
-    if (OpName == "||") return visit(Args[0]) && visit(Args[1]);
-    if (OpName == "&&") return visit(Args[0]) || visit(Args[1]);
+    if (OpName == "||") return visit(E->getLHS()) && visit(E->getRHS());
+    if (OpName == "&&") return visit(E->getLHS()) || visit(E->getRHS());
     llvm_unreachable("unsupported binary operator");
   }
 
@@ -587,9 +586,8 @@ static bool isPlatformConditionDisjunction(Expr *E, PlatformConditionKind Kind,
                                            ArrayRef<StringRef> Vals) {
   if (auto *Or = dyn_cast<BinaryExpr>(E)) {
     if (getDeclRefStr(Or->getFn()) == "||") {
-      auto Args = Or->getArg()->getElements();
-      return (isPlatformConditionDisjunction(Args[0], Kind, Vals) &&
-              isPlatformConditionDisjunction(Args[1], Kind, Vals));
+      return (isPlatformConditionDisjunction(Or->getLHS(), Kind, Vals) &&
+              isPlatformConditionDisjunction(Or->getRHS(), Kind, Vals));
     }
   } else if (auto *P = dyn_cast<ParenExpr>(E)) {
     return isPlatformConditionDisjunction(P->getSubExpr(), Kind, Vals);
@@ -650,11 +648,10 @@ static Expr *findAnyLikelySimulatorEnvironmentTest(Expr *Condition) {
 
   if (auto *And = dyn_cast<BinaryExpr>(Condition)) {
     if (getDeclRefStr(And->getFn()) == "&&") {
-      auto Args = And->getArg()->getElements();
-      if ((isSimulatorPlatformOSTest(Args[0]) &&
-           isSimulatorPlatformArchTest(Args[1])) ||
-          (isSimulatorPlatformOSTest(Args[1]) &&
-           isSimulatorPlatformArchTest(Args[0]))) {
+      if ((isSimulatorPlatformOSTest(And->getLHS()) &&
+           isSimulatorPlatformArchTest(And->getRHS())) ||
+          (isSimulatorPlatformOSTest(And->getRHS()) &&
+           isSimulatorPlatformArchTest(And->getLHS()))) {
         return And;
       }
     }

@@ -17,6 +17,7 @@
 //===----------------------------------------------------------------------===//
 
 let RequestInstanceKind = "k"
+let RequestShouldUnwrapClassExistential = "u"
 let RequestInstanceAddress = "i"
 let RequestReflectionInfos = "r"
 let RequestImages = "m"
@@ -346,11 +347,15 @@ internal func sendPointerSize() {
 /// The parent sends a Done message to indicate that it's done
 /// looking at this instance. It will continue to ask for instances,
 /// so call doneReflecting() when you don't have any more instances.
-internal func reflect(instanceAddress: UInt, kind: InstanceKind) {
+internal func reflect(instanceAddress: UInt, 
+                      kind: InstanceKind, 
+                      shouldUnwrapClassExistential: Bool = false) {
   while let command = readLine(strippingNewline: true) {
     switch command {
     case String(validatingUTF8: RequestInstanceKind)!:
       sendValue(kind.rawValue)
+    case String(validatingUTF8: RequestShouldUnwrapClassExistential)!:
+      sendValue(shouldUnwrapClassExistential)
     case String(validatingUTF8: RequestInstanceAddress)!:
       sendValue(instanceAddress)
     case String(validatingUTF8: RequestReflectionInfos)!:
@@ -437,12 +442,18 @@ public func reflect(object: AnyObject) {
 /// The test doesn't care about the witness tables - we only care
 /// about what's in the buffer, so we always put these values into
 /// an Any existential.
-public func reflect<T>(any: T, kind: InstanceKind = .Existential) {
+///
+/// If shouldUnwrapClassExistential is set to true, this exercises 
+/// projectExistentialAndUnwrapClass instead of projectExistential.
+public func reflect<T>(any: T, kind: InstanceKind = .Existential, 
+    shouldUnwrapClassExistential: Bool = false) {
   let any: Any = any
   let anyPointer = UnsafeMutablePointer<Any>.allocate(capacity: MemoryLayout<Any>.size)
   anyPointer.initialize(to: any)
   let anyPointerValue = UInt(bitPattern: anyPointer)
-  reflect(instanceAddress: anyPointerValue, kind: kind)
+  reflect(instanceAddress: anyPointerValue, 
+          kind: kind, 
+          shouldUnwrapClassExistential: shouldUnwrapClassExistential)
   anyPointer.deallocate()
 }
 
@@ -472,6 +483,21 @@ public func reflect<T: Error>(error: T) {
   let error: Error = error
   let errorPointerValue = unsafeBitCast(error, to: UInt.self)
   reflect(instanceAddress: errorPointerValue, kind: .ErrorExistential)
+}
+
+// Like reflect<T: Error>(error: T), but calls projectExistentialAndUnwrapClass 
+// instead of projectExistential and adds an extra level of indirection, which is
+// what projectExistentialAndUnwrapClass expects.
+public func reflectUnwrappingClassExistential<T: Error>(error: T) {
+  let error: Error = error
+  let errorPointerValue = unsafeBitCast(error, to: UInt.self)
+  let anyPointer = UnsafeMutablePointer<Any>.allocate(capacity: MemoryLayout<Any>.size)
+  anyPointer.initialize(to: errorPointerValue)
+  let anyPointerValue = UInt(bitPattern: anyPointer)
+  reflect(instanceAddress: anyPointerValue, 
+          kind: .ErrorExistential, 
+          shouldUnwrapClassExistential: true)
+  anyPointer.deallocate()
 }
 
 // Reflect an `Enum`

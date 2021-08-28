@@ -90,4 +90,9 @@ StaticMemberVarTestSuite.test("no-collisions") {
   expectEqual(169, ClassB.notUniqueName)
 }
 
+StaticMemberVarTestSuite.test("init-struct-with-static-member") {
+  let obj = WithStaticAndInstanceMember(myInstance: 123)
+  expectEqual(123, obj.myInstance)
+}
+
 runAllTests()

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-stdlib -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -parse-stdlib -emit-silgen %s -requirement-machine=off | %FileCheck %s
 
 import _Differentiation
 import Swift

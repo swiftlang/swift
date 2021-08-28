@@ -93,7 +93,7 @@ BraceStmt *ParseAbstractFunctionBodyRequest::evaluate(
 
   switch (afd->getBodyKind()) {
   case BodyKind::Deserialized:
-  case BodyKind::MemberwiseInitializer:
+  case BodyKind::SILSynthesize:
   case BodyKind::None:
   case BodyKind::Skipped:
     return nullptr;

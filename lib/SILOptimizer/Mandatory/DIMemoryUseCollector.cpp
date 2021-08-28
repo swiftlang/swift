@@ -93,13 +93,8 @@ static unsigned getElementCountRec(TypeExpansionContext context,
 }
 
 static std::pair<SILType, bool>
-computeMemorySILType(MarkUninitializedInst *MemoryInst) {
+computeMemorySILType(MarkUninitializedInst *MUI, SILValue Address) {
   // Compute the type of the memory object.
-  auto *MUI = MemoryInst;
-  SILValue Address = MUI;
-  if (auto *PBI = Address->getSingleUserOfType<ProjectBoxInst>()) {
-    Address = PBI;
-  }
   SILType MemorySILType = Address->getType().getObjectType();
 
   // If this is a let variable we're initializing, remember this so we don't
@@ -118,7 +113,13 @@ DIMemoryObjectInfo::DIMemoryObjectInfo(MarkUninitializedInst *MI)
     : MemoryInst(MI) {
   auto &Module = MI->getModule();
 
-  std::tie(MemorySILType, IsLet) = computeMemorySILType(MemoryInst);
+  SILValue Address = MemoryInst;
+  if (auto PBI = MemoryInst->getSingleUserOfType<ProjectBoxInst>()) {
+    IsBox = true;
+    Address = PBI;
+  }
+
+  std::tie(MemorySILType, IsLet) = computeMemorySILType(MI, Address);
 
   // Compute the number of elements to track in this memory object.
   // If this is a 'self' in a delegating initializer, we only track one bit:
@@ -429,6 +430,23 @@ bool DIMemoryObjectInfo::isElementLetProperty(unsigned Element) const {
   // Otherwise, we miscounted elements?
   assert(Element == 0 && "Element count problem");
   return false;
+}
+
+ConstructorDecl *DIMemoryObjectInfo::getActorInitSelf() const {
+  // is it 'self'?
+  if (!MemoryInst->isVar())
+    if (auto decl =
+        dyn_cast_or_null<ClassDecl>(getASTType()->getAnyNominal()))
+      // is it for an actor?
+      if (decl->isActor() && !decl->isDistributedActor()) // FIXME(78484431) skip distributed actors for now, until their initializers are fixed!
+        if (auto *silFn = MemoryInst->getFunction())
+          // is it a designated initializer?
+          if (auto *ctor = dyn_cast_or_null<ConstructorDecl>(
+                            silFn->getDeclContext()->getAsDecl()))
+            if (ctor->isDesignatedInit())
+              return ctor;
+
+  return nullptr;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1047,7 +1065,11 @@ void ElementUseCollector::collectClassSelfUses(SILValue ClassPointer) {
 
   // If we are looking at the init method for a root class, just walk the
   // MUI use-def chain directly to find our uses.
-  if (TheMemory.isRootSelf()) {
+  if (TheMemory.isRootSelf() ||
+  
+      // Also, just visit all users if ClassPointer is a closure argument,
+      // i.e. collectClassSelfUses is called from addClosureElementUses.
+      isa<SILFunctionArgument>(ClassPointer)) {
     collectClassSelfUses(ClassPointer, TheMemory.getType(), EltNumbering);
     return;
   }

@@ -393,7 +393,7 @@ extension C : P8 {}
 public class F<T : D> {}
 extension F : P8 {}
 
-// CHECK16:      <synthesized>extension <ref:Class>F</ref> where <ref:GenericTypeParam>T</ref> : <ref:Class>D</ref> {
+// CHECK16:      <decl:Class>public class <loc>F<<decl:GenericTypeParam>T</decl>></loc> where <ref:GenericTypeParam>T</ref> : <ref:module>print_synthesized_extensions</ref>.<ref:Class>D</ref> {</decl>
 // CHECK16-NEXT:   <decl:Func>public func <loc>bar()</loc></decl>
 // CHECK16-NEXT: }</synthesized>
 

@@ -884,6 +884,7 @@ func _childProcess() {
 }
 
 #if SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
+@available(SwiftStdlib 5.5, *)
 @inline(never)
 func _childProcessAsync() async {
 #if !os(WASI)
@@ -1380,6 +1381,7 @@ class _ParentProcess {
   }
 
 #if SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
+  @available(SwiftStdlib 5.5, *)
   internal func runOneTestAsync(
     fullTestName: String,
     testSuite: TestSuite,
@@ -1546,6 +1548,7 @@ class _ParentProcess {
   }
 
 #if SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
+  @available(SwiftStdlib 5.5, *)
   func runAsync() async {
     if let filter = _filter {
       print("StdlibUnittest: using filter: \(filter)")
@@ -1568,7 +1571,7 @@ class _ParentProcess {
             continue
           }
 
-          switch runOneTest(
+          switch await runOneTestAsync(
             fullTestName: fullTestName,
             testSuite: testSuite,
             test: t,
@@ -1735,6 +1738,7 @@ public func runAllTests() {
 }
 
 #if SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
+@available(SwiftStdlib 5.5, *)
 public func runAllTestsAsync() async {
   if PersistentState.runNoTestsWasCalled {
     print("runAllTests() called after runNoTests(). Aborting.")
@@ -1922,6 +1926,7 @@ public final class TestSuite {
   }
 
 #if SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
+  @available(SwiftStdlib 5.5, *)
   func _runTestAsync(name testName: String, parameter: Int?) async {
     PersistentState.ranSomething = true
     for r in _allResettables {

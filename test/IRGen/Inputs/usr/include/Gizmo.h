@@ -166,3 +166,6 @@ __attribute__((swift_name("OuterType.InnerType")))
 
 @interface ObjcGenericClass<__covariant SectionType>
 @end
+
+@interface FungingArray <Element: id<NSFunging>> : NSObject
+@end

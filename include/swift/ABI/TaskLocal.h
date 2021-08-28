@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Swift ABI describing tasks.
+// Swift ABI describing task locals.
 //
 //===----------------------------------------------------------------------===//
 
@@ -69,6 +69,15 @@ public:
     // Trailing storage for the value itself. The storage will be
     // uninitialized or contain an instance of \c valueType.
 
+    /// Returns true if this item is a 'parent pointer'.
+    ///
+    /// A parent pointer is special kind of `Item` is created when pointing at
+    /// the parent storage, forming a chain of task local items spanning multiple
+    /// tasks.
+    bool isParentPointer() const {
+      return !valueType;
+    }
+
   protected:
     explicit Item()
       : next(0),
@@ -117,6 +126,8 @@ public:
       return reinterpret_cast<OpaqueValue *>(
         reinterpret_cast<char *>(this) + storageOffset(valueType));
     }
+
+    void copyTo(AsyncTask *task);
 
     /// Compute the offset of the storage from the base of the item.
     static size_t storageOffset(const Metadata *valueType) {
@@ -172,7 +183,7 @@ public:
     /// returns, as such, any child tasks potentially accessing the value stack
     /// are guaranteed to be completed by the time we pop values off the stack
     /// (after the body has completed).
-    TaskLocal::Item *head;
+    TaskLocal::Item *head = nullptr;
 
   public:
 
@@ -184,7 +195,22 @@ public:
 
     OpaqueValue* getValue(AsyncTask *task, const HeapObject *key);
 
-    void popValue(AsyncTask *task);
+    /// Returns `true` of more bindings remain in this storage,
+    /// and `false` if the just popped value was the last one and the storage
+    /// can be safely disposed of.
+    bool popValue(AsyncTask *task);
+
+    /// Copy all task-local bindings to the target task.
+    ///
+    /// The new bindings allocate their own items and can out-live the current task.
+    ///
+    /// ### Optimizations
+    /// Only the most recent binding of a value is copied over, i.e. given
+    /// a key bound to `A` and then `B`, only the `B` binding will be copied.
+    /// This is safe and correct because the new task would never have a chance
+    /// to observe the `A` value, because it semantically will never observe a
+    /// "pop" of the `B` value - it was spawned from a scope where only B was observable.
+    void copyTo(AsyncTask *target);
 
     /// Destroy and deallocate all items stored by this specific task.
     ///

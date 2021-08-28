@@ -21,6 +21,7 @@
 #include "ExtraInhabitants.h"
 #include "GenProto.h"
 #include "GenType.h"
+#include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "LoadableTypeInfo.h"
@@ -127,7 +128,12 @@ const LoadableTypeInfo &TypeConverter::getExecutorTypeInfo() {
 
 void irgen::emitBuildMainActorExecutorRef(IRGenFunction &IGF,
                                           Explosion &out) {
-  // FIXME
+  auto call = IGF.Builder.CreateCall(IGF.IGM.getTaskGetMainExecutorFn(),
+                                     {});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
+
+  IGF.emitAllExtractValues(call, IGF.IGM.SwiftExecutorTy, out);
 }
 
 void irgen::emitBuildDefaultActorExecutorRef(IRGenFunction &IGF,
@@ -169,8 +175,10 @@ void irgen::emitGetCurrentExecutor(IRGenFunction &IGF, Explosion &out) {
 }
 
 llvm::Value *irgen::emitBuiltinStartAsyncLet(IRGenFunction &IGF,
+                                             llvm::Value *taskOptions,
                                              llvm::Value *taskFunction,
                                              llvm::Value *localContextInfo,
+                                             llvm::Value *localResultBuffer,
                                              SubstitutionMap subs) {
   // stack allocate AsyncLet, and begin lifetime for it (until EndAsyncLet)
   auto ty = llvm::ArrayType::get(IGF.IGM.Int8PtrTy, NumWords_AsyncLet);
@@ -184,13 +192,27 @@ llvm::Value *irgen::emitBuiltinStartAsyncLet(IRGenFunction &IGF,
   auto futureResultType = subs.getReplacementTypes()[0]->getCanonicalType();
   auto futureResultTypeMetadata = IGF.emitAbstractTypeMetadataRef(futureResultType);
 
-  // This is @_silgen_name("swift_asyncLet_start")
-  auto *call = IGF.Builder.CreateCall(IGF.IGM.getAsyncLetStartFn(),
+  llvm::CallInst *call;
+  if (localResultBuffer) {
+    // This is @_silgen_name("swift_asyncLet_begin")
+    call = IGF.Builder.CreateCall(IGF.IGM.getAsyncLetBeginFn(),
                                       {alet,
+                                       taskOptions,
+                                       futureResultTypeMetadata,
+                                       taskFunction,
+                                       localContextInfo,
+                                       localResultBuffer
+                                      });
+  } else {
+    // This is @_silgen_name("swift_asyncLet_start")
+    call = IGF.Builder.CreateCall(IGF.IGM.getAsyncLetStartFn(),
+                                      {alet,
+                                       taskOptions,
                                        futureResultTypeMetadata,
                                        taskFunction,
                                        localContextInfo
                                       });
+  }
   call->setDoesNotThrow();
   call->setCallingConv(IGF.IGM.SwiftCC);
 
@@ -206,15 +228,20 @@ void irgen::emitEndAsyncLet(IRGenFunction &IGF, llvm::Value *alet) {
   IGF.Builder.CreateLifetimeEnd(alet);
 }
 
-llvm::Value *irgen::emitCreateTaskGroup(IRGenFunction &IGF) {
+llvm::Value *irgen::emitCreateTaskGroup(IRGenFunction &IGF,
+                                        SubstitutionMap subs) {
   auto ty = llvm::ArrayType::get(IGF.IGM.Int8PtrTy, NumWords_TaskGroup);
   auto address = IGF.createAlloca(ty, Alignment(Alignment_TaskGroup));
   auto group = IGF.Builder.CreateBitCast(address.getAddress(),
                                          IGF.IGM.Int8PtrTy);
   IGF.Builder.CreateLifetimeStart(group);
+  assert(subs.getReplacementTypes().size() == 1 &&
+         "createTaskGroup should have a type substitution");
+  auto resultType = subs.getReplacementTypes()[0]->getCanonicalType();
+  auto resultTypeMetadata = IGF.emitAbstractTypeMetadataRef(resultType);
 
   auto *call = IGF.Builder.CreateCall(IGF.IGM.getTaskGroupInitializeFn(),
-                                      {group});
+                                      {group, resultTypeMetadata});
   call->setDoesNotThrow();
   call->setCallingConv(IGF.IGM.SwiftCC);
 
@@ -228,4 +255,35 @@ void irgen::emitDestroyTaskGroup(IRGenFunction &IGF, llvm::Value *group) {
   call->setCallingConv(IGF.IGM.SwiftCC);
 
   IGF.Builder.CreateLifetimeEnd(group);
+}
+
+llvm::Function *IRGenModule::getAwaitAsyncContinuationFn() {
+  StringRef name = "__swift_continuation_await_point";
+  if (llvm::GlobalValue *F = Module.getNamedValue(name))
+    return cast<llvm::Function>(F);
+
+  // The parameters here match the extra arguments passed to
+  // @llvm.coro.suspend.async by emitAwaitAsyncContinuation.
+  llvm::Type *argTys[] = { ContinuationAsyncContextPtrTy };
+  auto *suspendFnTy =
+    llvm::FunctionType::get(VoidTy, argTys, false /*vaargs*/);
+
+  llvm::Function *suspendFn =
+      llvm::Function::Create(suspendFnTy, llvm::Function::InternalLinkage,
+                             name, &Module);
+  suspendFn->setCallingConv(SwiftAsyncCC);
+  suspendFn->setDoesNotThrow();
+  IRGenFunction suspendIGF(*this, suspendFn);
+  if (DebugInfo)
+    DebugInfo->emitArtificialFunction(suspendIGF, suspendFn);
+  auto &Builder = suspendIGF.Builder;
+
+  llvm::Value *context = suspendFn->getArg(0);
+  auto *call = Builder.CreateCall(getContinuationAwaitFn(), { context });
+  call->setDoesNotThrow();
+  call->setCallingConv(SwiftAsyncCC);
+  call->setTailCallKind(AsyncTailCallKind);
+
+  Builder.CreateRetVoid();
+  return suspendFn;
 }

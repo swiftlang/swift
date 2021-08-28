@@ -49,7 +49,7 @@ function(_add_target_variant_c_compile_link_flags)
 
   set(result ${${CFLAGS_RESULT_VAR_NAME}})
 
-  if("${CFLAGS_SDK}" IN_LIST SWIFT_APPLE_PLATFORMS)
+  if("${CFLAGS_SDK}" IN_LIST SWIFT_DARWIN_PLATFORMS)
     # Check if there's a specific OS deployment version needed for this invocation
     if("${CFLAGS_SDK}" STREQUAL "OSX")
       if(DEFINED maccatalyst_build_flavor)
@@ -102,7 +102,7 @@ function(_add_target_variant_c_compile_link_flags)
     endif()
   endif()
 
-  if("${CFLAGS_SDK}" IN_LIST SWIFT_APPLE_PLATFORMS)
+  if("${CFLAGS_SDK}" IN_LIST SWIFT_DARWIN_PLATFORMS)
     # We collate -F with the framework path to avoid unwanted deduplication
     # of options by target_compile_options -- this way no undesired
     # side effects are introduced should a new search path be added.
@@ -137,6 +137,14 @@ function(_add_target_variant_c_compile_flags)
     ${ARGN})
 
   set(result ${${CFLAGS_RESULT_VAR_NAME}})
+
+  if ("${CFLAGS_ARCH}" STREQUAL "arm64" OR
+      "${CFLAGS_ARCH}" STREQUAL "arm64e" OR
+      "${CFLAGS_ARCH}" STREQUAL "arm64_32")
+    if (SWIFT_ENABLE_GLOBAL_ISEL_ARM64)
+      list(APPEND result "-fglobal-isel")
+    endif()
+  endif()
 
   _add_target_variant_c_compile_link_flags(
     SDK "${CFLAGS_SDK}"
@@ -314,6 +322,12 @@ function(_add_target_variant_c_compile_flags)
 
   if(SWIFT_RUNTIME_MACHO_NO_DYLD)
     list(APPEND result "-DSWIFT_RUNTIME_MACHO_NO_DYLD")
+  endif()
+
+  if(SWIFT_STDLIB_HAS_DARWIN_LIBMALLOC)
+    list(APPEND result "-DSWIFT_STDLIB_HAS_DARWIN_LIBMALLOC=1")
+  else()
+    list(APPEND result "-DSWIFT_STDLIB_HAS_DARWIN_LIBMALLOC=0")
   endif()
 
   if(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
@@ -618,7 +632,6 @@ function(_add_swift_target_library_single target name)
         OBJECT_LIBRARY
         SHARED
         STATIC
-        TARGET_LIBRARY
         INSTALL_WITH_SHARED)
   set(SWIFTLIB_SINGLE_single_parameter_options
         ARCHITECTURE
@@ -631,6 +644,7 @@ function(_add_swift_target_library_single target name)
         SDK
         DEPLOYMENT_VERSION_MACCATALYST
         MACCATALYST_BUILD_FLAVOR
+        BACK_DEPLOYMENT_LIBRARY
         ENABLE_LTO)
   set(SWIFTLIB_SINGLE_multiple_parameter_options
         C_COMPILE_FLAGS
@@ -733,7 +747,7 @@ function(_add_swift_target_library_single target name)
     handle_gyb_sources(
         gyb_dependency_targets
         SWIFTLIB_SINGLE_GYB_SOURCES
-        "${SWIFTLIB_SINGLE_ARCHITECTURE}")
+        ARCH "${SWIFTLIB_SINGLE_ARCHITECTURE}")
     set(SWIFTLIB_SINGLE_SOURCES ${SWIFTLIB_SINGLE_SOURCES}
       ${SWIFTLIB_SINGLE_GYB_SOURCES})
   endif()
@@ -762,6 +776,13 @@ function(_add_swift_target_library_single target name)
       -libc;${SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY})
   endif()
 
+  # Don't install the Swift module content for back-deployment libraries.
+  if (SWIFTLIB_SINGLE_BACK_DEPLOYMENT_LIBRARY)
+    set(install_in_component "never_install")
+  else()
+    set(install_in_component "${SWIFTLIB_SINGLE_INSTALL_IN_COMPONENT}")
+  endif()
+
   # FIXME: don't actually depend on the libraries in SWIFTLIB_SINGLE_LINK_LIBRARIES,
   # just any swiftmodule files that are associated with them.
   handle_swift_sources(
@@ -787,7 +808,7 @@ function(_add_swift_target_library_single target name)
       ${embed_bitcode_arg}
       ${SWIFTLIB_SINGLE_STATIC_keyword}
       ENABLE_LTO "${SWIFTLIB_SINGLE_ENABLE_LTO}"
-      INSTALL_IN_COMPONENT "${SWIFTLIB_SINGLE_INSTALL_IN_COMPONENT}"
+      INSTALL_IN_COMPONENT "${install_in_component}"
       MACCATALYST_BUILD_FLAVOR "${SWIFTLIB_SINGLE_MACCATALYST_BUILD_FLAVOR}")
   add_swift_source_group("${SWIFTLIB_SINGLE_EXTERNAL_SOURCES}")
 
@@ -823,7 +844,7 @@ function(_add_swift_target_library_single target name)
   endif()
 
   # Only build the modules for any arch listed in the *_MODULE_ARCHITECTURES.
-  if(SWIFTLIB_SINGLE_SDK IN_LIST SWIFT_APPLE_PLATFORMS
+  if(SWIFTLIB_SINGLE_SDK IN_LIST SWIFT_DARWIN_PLATFORMS
       AND SWIFTLIB_SINGLE_ARCHITECTURE IN_LIST SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_MODULE_ARCHITECTURES)
     # Create dummy target to hook up the module target dependency.
     add_custom_target("${target}"
@@ -846,7 +867,7 @@ function(_add_swift_target_library_single target name)
   endforeach()
 
   set(SWIFTLIB_SINGLE_XCODE_WORKAROUND_SOURCES)
-  if(XCODE AND SWIFTLIB_SINGLE_TARGET_LIBRARY)
+  if(XCODE)
     set(SWIFTLIB_SINGLE_XCODE_WORKAROUND_SOURCES
         # Note: the dummy.cpp source file provides no definitions. However,
         # it forces Xcode to properly link the static library.
@@ -869,8 +890,7 @@ function(_add_swift_target_library_single target name)
   target_include_directories(${target} BEFORE PRIVATE
     ${SWIFT_SOURCE_DIR}/stdlib/include)
   if(("${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "ELF" OR
-      "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "COFF") AND
-     SWIFTLIB_SINGLE_TARGET_LIBRARY)
+      "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "COFF"))
     if("${libkind}" STREQUAL "SHARED" AND NOT SWIFTLIB_SINGLE_NOSWIFTRT)
       # TODO(compnerd) switch to the generator expression when cmake is upgraded
       # to a version which supports it.
@@ -933,29 +953,34 @@ function(_add_swift_target_library_single target name)
         SUFFIX ${LLVM_PLUGIN_EXT})
   endif()
 
-  if(SWIFTLIB_SINGLE_TARGET_LIBRARY)
-    # Install runtime libraries to lib/swift instead of lib. This works around
-    # the fact that -isysroot prevents linking to libraries in the system
-    # /usr/lib if Swift is installed in /usr.
-    set_target_properties("${target}" PROPERTIES
-      LIBRARY_OUTPUT_DIRECTORY ${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}
-      ARCHIVE_OUTPUT_DIRECTORY ${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR})
-    if(SWIFTLIB_SINGLE_SDK STREQUAL WINDOWS AND SWIFTLIB_SINGLE_IS_STDLIB_CORE
-        AND libkind STREQUAL SHARED)
-      add_custom_command(TARGET ${target} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:${target}> ${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR})
-    endif()
-
-    foreach(config ${CMAKE_CONFIGURATION_TYPES})
-      string(TOUPPER ${config} config_upper)
-      escape_path_for_xcode("${config}" "${SWIFTLIB_DIR}" config_lib_dir)
-      set_target_properties(${target} PROPERTIES
-        LIBRARY_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${SWIFTLIB_SINGLE_SUBDIR}
-        ARCHIVE_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${SWIFTLIB_SINGLE_SUBDIR})
-    endforeach()
+  # For back-deployed libraries, install into lib/swift-<version>.
+  if (SWIFTLIB_SINGLE_BACK_DEPLOYMENT_LIBRARY)
+    set(swiftlib_prefix "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib/swift-${SWIFTLIB_SINGLE_BACK_DEPLOYMENT_LIBRARY}")
+  else()
+    set(swiftlib_prefix ${SWIFTLIB_DIR})
   endif()
 
-  if(SWIFTLIB_SINGLE_SDK IN_LIST SWIFT_APPLE_PLATFORMS)
+  # Install runtime libraries to lib/swift instead of lib. This works around
+  # the fact that -isysroot prevents linking to libraries in the system
+  # /usr/lib if Swift is installed in /usr.
+  set_target_properties("${target}" PROPERTIES
+    LIBRARY_OUTPUT_DIRECTORY ${swiftlib_prefix}/${SWIFTLIB_SINGLE_SUBDIR}
+    ARCHIVE_OUTPUT_DIRECTORY ${swiftlib_prefix}/${SWIFTLIB_SINGLE_SUBDIR})
+  if(SWIFTLIB_SINGLE_SDK STREQUAL WINDOWS AND SWIFTLIB_SINGLE_IS_STDLIB_CORE
+      AND libkind STREQUAL SHARED)
+    add_custom_command(TARGET ${target} POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:${target}> ${swiftlib_prefix}/${SWIFTLIB_SINGLE_SUBDIR})
+  endif()
+
+  foreach(config ${CMAKE_CONFIGURATION_TYPES})
+    string(TOUPPER ${config} config_upper)
+    escape_path_for_xcode("${config}" "${swiftlib_prefix}" config_lib_dir)
+    set_target_properties(${target} PROPERTIES
+      LIBRARY_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${SWIFTLIB_SINGLE_SUBDIR}
+      ARCHIVE_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${SWIFTLIB_SINGLE_SUBDIR})
+  endforeach()
+
+  if(SWIFTLIB_SINGLE_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
     set(install_name_dir "@rpath")
 
     if(SWIFTLIB_SINGLE_IS_STDLIB)
@@ -967,11 +992,6 @@ function(_add_swift_target_library_single target name)
           AND DEFINED SWIFT_DARWIN_MACCATALYST_STDLIB_INSTALL_NAME_DIR)
         set(install_name_dir "${SWIFT_DARWIN_MACCATALYST_STDLIB_INSTALL_NAME_DIR}")
       endif()
-    endif()
-
-    # Always use @rpath for XCTest
-    if(module_name STREQUAL "XCTest")
-      set(install_name_dir "@rpath")
     endif()
 
     if(SWIFTLIB_SINGLE_DARWIN_INSTALL_NAME_DIR)
@@ -994,9 +1014,7 @@ function(_add_swift_target_library_single target name)
     # for an Android cross-build from a macOS host. Construct the proper linker
     # flags manually in add_swift_target_library instead, see there with
     # variable `swiftlib_link_flags_all`.
-    if(SWIFTLIB_SINGLE_TARGET_LIBRARY)
-      set_target_properties("${target}" PROPERTIES NO_SONAME TRUE)
-    endif()
+    set_target_properties("${target}" PROPERTIES NO_SONAME TRUE)
     # Only set the install RPATH if the toolchain and stdlib will be in Termux
     # or some other native sysroot on Android.
     if(NOT "${SWIFT_ANDROID_NATIVE_SYSROOT}" STREQUAL "")
@@ -1004,6 +1022,10 @@ function(_add_swift_target_library_single target name)
         PROPERTIES
         INSTALL_RPATH "$ORIGIN")
     endif()
+  elseif("${SWIFTLIB_SINGLE_SDK}" STREQUAL "OPENBSD")
+    set_target_properties("${target}"
+      PROPERTIES
+      INSTALL_RPATH "$ORIGIN")
   endif()
 
   set_target_properties("${target}" PROPERTIES BUILD_WITH_INSTALL_RPATH YES)
@@ -1059,11 +1081,9 @@ function(_add_swift_target_library_single target name)
 
   # Don't build standard libraries by default.  We will enable building
   # standard libraries that the user requested; the rest can be built on-demand.
-  if(SWIFTLIB_SINGLE_TARGET_LIBRARY)
-    foreach(t "${target}" ${target_static})
-      set_target_properties(${t} PROPERTIES EXCLUDE_FROM_ALL TRUE)
-    endforeach()
-  endif()
+  foreach(t "${target}" ${target_static})
+    set_target_properties(${t} PROPERTIES EXCLUDE_FROM_ALL TRUE)
+  endforeach()
 
   # Handle linking and dependencies.
   add_dependencies_multiple_targets(
@@ -1138,18 +1158,9 @@ function(_add_swift_target_library_single target name)
   list(APPEND library_search_directories "${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH}/usr/lib/swift")
 
   # Add variant-specific flags.
-  if(SWIFTLIB_SINGLE_TARGET_LIBRARY)
-    set(build_type "${SWIFT_STDLIB_BUILD_TYPE}")
-    set(enable_assertions "${SWIFT_STDLIB_ASSERTIONS}")
-  else()
-    set(build_type "${CMAKE_BUILD_TYPE}")
-    set(enable_assertions "${LLVM_ENABLE_ASSERTIONS}")
-    set(analyze_code_coverage "${SWIFT_ANALYZE_CODE_COVERAGE}")
-  endif()
-
-  if (NOT SWIFTLIB_SINGLE_TARGET_LIBRARY)
-    set(lto_type "${SWIFT_STDLIB_ENABLE_LTO}")
-  endif()
+  set(build_type "${SWIFT_STDLIB_BUILD_TYPE}")
+  set(enable_assertions "${SWIFT_STDLIB_ASSERTIONS}")
+  set(lto_type "${SWIFT_STDLIB_ENABLE_LTO}")
 
   _add_target_variant_c_compile_flags(
     SDK "${SWIFTLIB_SINGLE_SDK}"
@@ -1193,7 +1204,7 @@ function(_add_swift_target_library_single target name)
 
   # Configure plist creation for OS X.
   set(PLIST_INFO_PLIST "Info.plist" CACHE STRING "Plist name")
-  if("${SWIFTLIB_SINGLE_SDK}" IN_LIST SWIFT_APPLE_PLATFORMS AND SWIFTLIB_SINGLE_IS_STDLIB)
+  if("${SWIFTLIB_SINGLE_SDK}" IN_LIST SWIFT_DARWIN_PLATFORMS AND SWIFTLIB_SINGLE_IS_STDLIB)
     set(PLIST_INFO_NAME ${name})
     set(PLIST_INFO_UTI "com.apple.dt.runtime.${name}")
     set(PLIST_INFO_VERSION "${SWIFT_VERSION}")
@@ -1250,7 +1261,7 @@ function(_add_swift_target_library_single target name)
     ${c_compile_flags})
   target_link_options(${target} PRIVATE
     ${link_flags})
-  if(${SWIFTLIB_SINGLE_SDK} IN_LIST SWIFT_APPLE_PLATFORMS)
+  if(${SWIFTLIB_SINGLE_SDK} IN_LIST SWIFT_DARWIN_PLATFORMS)
     target_link_options(${target} PRIVATE
       "LINKER:-compatibility_version,1")
     if(SWIFT_COMPILER_VERSION)
@@ -1352,6 +1363,16 @@ function(_add_swift_target_library_single target name)
       ${library_search_directories})
     target_link_libraries("${target_static}" PRIVATE
         ${SWIFTLIB_SINGLE_PRIVATE_LINK_LIBRARIES})
+
+    # Force executables linker language to be CXX so that we do not link using the
+    # host toolchain swiftc.
+    if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "ANDROID")
+      set_property(TARGET "${target_static}" PROPERTY
+        LINKER_LANGUAGE "C")
+    else()
+      set_property(TARGET "${target_static}" PROPERTY
+        LINKER_LANGUAGE "CXX")
+    endif()
   endif()
 
   # Do not add code here.
@@ -1388,6 +1409,7 @@ endfunction()
 #     DEPLOYMENT_VERSION_TVOS version
 #     DEPLOYMENT_VERSION_WATCHOS version
 #     MACCATALYST_BUILD_FLAVOR flavor
+#     BACK_DEPLOYMENT_LIBRARY version
 #     source1 [source2 source3 ...])
 #
 # name
@@ -1483,6 +1505,9 @@ endfunction()
 # IS_SDK_OVERLAY
 #   Treat the library as a part of the Swift SDK overlay.
 #
+# BACK_DEPLOYMENT_LIBRARY
+#   Treat this as a back-deployment library to the given Swift version
+#
 # INSTALL_IN_COMPONENT comp
 #   The Swift installation component that this library belongs to.
 #
@@ -1531,7 +1556,8 @@ function(add_swift_target_library name)
         INSTALL_IN_COMPONENT
         DARWIN_INSTALL_NAME_DIR
         DEPLOYMENT_VERSION_MACCATALYST
-        MACCATALYST_BUILD_FLAVOR)
+        MACCATALYST_BUILD_FLAVOR
+        BACK_DEPLOYMENT_LIBRARY)
   set(SWIFTLIB_multiple_parameter_options
         C_COMPILE_FLAGS
         DEPENDS
@@ -1603,7 +1629,7 @@ function(add_swift_target_library name)
   if("${SWIFTLIB_TARGET_SDKS}" STREQUAL "")
     set(SWIFTLIB_TARGET_SDKS ${SWIFT_SDKS})
   endif()
-  list_replace(SWIFTLIB_TARGET_SDKS ALL_APPLE_PLATFORMS "${SWIFT_APPLE_PLATFORMS}")
+  list_replace(SWIFTLIB_TARGET_SDKS ALL_APPLE_PLATFORMS "${SWIFT_DARWIN_PLATFORMS}")
 
   # All Swift code depends on the standard library, except for the standard
   # library itself.
@@ -1652,6 +1678,16 @@ function(add_swift_target_library name)
   if(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
     list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS 
                       "-Xfrontend;-disable-implicit-concurrency-module-import")
+  endif()
+
+  # Turn off implicit import of _Distributed when building libraries
+  if(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED)
+    list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS
+                      "-Xfrontend;-disable-implicit-distributed-module-import")
+  endif()
+
+  if(SWIFTLIB_IS_STDLIB AND SWIFT_STDLIB_ENABLE_PRESPECIALIZATION)
+    list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-Xfrontend;-prespecialize-generic-metadata")
   endif()
 
   # If we are building this library for targets, loop through the various
@@ -1811,7 +1847,7 @@ function(add_swift_target_library name)
       list(APPEND swiftlib_link_flags_all "-Wl,-z,defs")
     endif()
     # Setting back linker flags which are not supported when making Android build on macOS cross-compile host.
-    if(SWIFTLIB_SHARED AND sdk IN_LIST SWIFT_APPLE_PLATFORMS)
+    if(SWIFTLIB_SHARED AND sdk IN_LIST SWIFT_DARWIN_PLATFORMS)
       list(APPEND swiftlib_link_flags_all "-dynamiclib -Wl,-headerpad_max_install_names")
     endif()
 
@@ -1918,9 +1954,7 @@ function(add_swift_target_library name)
       # These paths must come before their normal counterparts so that when compiling
       # macCatalyst-only or unzippered-twin overlays the macCatalyst version
       # of a framework is found and not the Mac version.
-      if(maccatalyst_build_flavor STREQUAL "ios-like"
-          OR (name STREQUAL "swiftXCTest"
-            AND maccatalyst_build_flavor STREQUAL "zippered"))
+      if(maccatalyst_build_flavor STREQUAL "ios-like")
 
         # The path to find iOS-only frameworks (such as UIKit) under macCatalyst.
         set(ios_support_frameworks_path "${SWIFT_SDK_${sdk}_PATH}/System/iOSSupport/System/Library/Frameworks/")
@@ -1933,7 +1967,7 @@ function(add_swift_target_library name)
         list(APPEND swiftlib_link_flags_all "-F${ios_support_frameworks_path}")
       endif()
 
-      if(sdk IN_LIST SWIFT_APPLE_PLATFORMS AND SWIFTLIB_IS_SDK_OVERLAY)
+      if(sdk IN_LIST SWIFT_DARWIN_PLATFORMS AND SWIFTLIB_IS_SDK_OVERLAY)
         set(swiftlib_swift_compile_private_frameworks_flag "-Fsystem" "${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH}/System/Library/PrivateFrameworks/")
         foreach(tbd_lib ${SWIFTLIB_SWIFT_MODULE_DEPENDS_FROM_SDK})
           list(APPEND swiftlib_link_flags_all "${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH}/usr/lib/swift/libswift${tbd_lib}.tbd")
@@ -1960,6 +1994,12 @@ function(add_swift_target_library name)
         list(APPEND swiftlib_link_flags_all "-Wl,-soname,lib${name}.so")
       endif()
 
+      if (SWIFTLIB_BACK_DEPLOYMENT_LIBRARY)
+        set(back_deployment_library_option BACK_DEPLOYMENT_LIBRARY ${SWIFTLIB_BACK_DEPLOYMENT_LIBRARY})
+      else()
+        set(back_deployment_library_option)
+      endif()
+
       # Add this library variant.
       _add_swift_target_library_single(
         ${variant_name}
@@ -1969,7 +2009,6 @@ function(add_swift_target_library name)
         ${SWIFTLIB_OBJECT_LIBRARY_keyword}
         ${SWIFTLIB_INSTALL_WITH_SHARED_keyword}
         ${SWIFTLIB_SOURCES}
-        TARGET_LIBRARY
         MODULE_TARGETS ${module_variant_names}
         SDK ${sdk}
         ARCHITECTURE ${arch}
@@ -1997,6 +2036,7 @@ function(add_swift_target_library name)
         DEPLOYMENT_VERSION_TVOS "${SWIFTLIB_DEPLOYMENT_VERSION_TVOS}"
         DEPLOYMENT_VERSION_WATCHOS "${SWIFTLIB_DEPLOYMENT_VERSION_WATCHOS}"
         MACCATALYST_BUILD_FLAVOR "${maccatalyst_build_flavor}"
+        ${back_deployment_library_option}
         ENABLE_LTO "${SWIFT_STDLIB_ENABLE_LTO}"
         GYB_SOURCES ${SWIFTLIB_GYB_SOURCES}
       )
@@ -2046,6 +2086,19 @@ function(add_swift_target_library name)
           list(APPEND THIN_INPUT_TARGETS ${VARIANT_NAME})
         endif()
       endif()
+
+      if(sdk IN_LIST SWIFT_APPLE_PLATFORMS)
+        # In the past, we relied on unsetting globally
+        # CMAKE_OSX_ARCHITECTURES to ensure that CMake would
+        # not add the -arch flag
+        # This is no longer the case when running on Apple Silicon,
+        # when CMake will enforce a default (see
+        # https://gitlab.kitware.com/cmake/cmake/-/merge_requests/5291)
+        set_property(TARGET ${VARIANT_NAME} PROPERTY OSX_ARCHITECTURES "${arch}")
+        if (SWIFTLIB_IS_STDLIB AND SWIFTLIB_STATIC)
+          set_property(TARGET ${VARIANT_NAME}-static PROPERTY OSX_ARCHITECTURES "${arch}")
+        endif()
+      endif()
     endforeach()
 
     # Configure module-only targets
@@ -2084,6 +2137,9 @@ function(add_swift_target_library name)
         if("${sdk}" STREQUAL "WINDOWS")
           set(UNIVERSAL_LIBRARY_NAME
             "${SWIFTLIB_DIR}/${library_subdir}/${name}.dll")
+        elseif(SWIFTLIB_BACK_DEPLOYMENT_LIBRARY)
+          set(UNIVERSAL_LIBRARY_NAME
+            "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib/swift-${SWIFTLIB_BACK_DEPLOYMENT_LIBRARY}/${library_subdir}/${CMAKE_SHARED_LIBRARY_PREFIX}${name}${CMAKE_SHARED_LIBRARY_SUFFIX}")
         else()
           set(UNIVERSAL_LIBRARY_NAME
             "${SWIFTLIB_DIR}/${library_subdir}/${CMAKE_SHARED_LIBRARY_PREFIX}${name}${CMAKE_SHARED_LIBRARY_SUFFIX}")
@@ -2141,7 +2197,7 @@ function(add_swift_target_library name)
       endif()
 
       set(optional_arg)
-      if(sdk IN_LIST SWIFT_APPLE_PLATFORMS)
+      if(sdk IN_LIST SWIFT_DARWIN_PLATFORMS)
         # Allow installation of stdlib without building all variants on Darwin.
         set(optional_arg "OPTIONAL")
       endif()
@@ -2163,8 +2219,16 @@ function(add_swift_target_library name)
         # NOTE: ${UNIVERSAL_LIBRARY_NAME} is the output associated with the target
         # ${lipo_target}
         add_dependencies(${SWIFTLIB_INSTALL_IN_COMPONENT} ${lipo_target})
+
+        if (SWIFTLIB_BACK_DEPLOYMENT_LIBRARY)
+          # Back-deployment libraries get installed into a versioned directory.
+          set(install_dest "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}-${SWIFTLIB_BACK_DEPLOYMENT_LIBRARY}/${resource_dir_sdk_subdir}")
+        else()
+          set(install_dest "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}")
+        endif()
+
         swift_install_in_component(FILES "${UNIVERSAL_LIBRARY_NAME}"
-                                   DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}"
+                                   DESTINATION ${install_dest}
                                    COMPONENT "${SWIFTLIB_INSTALL_IN_COMPONENT}"
                                    PERMISSIONS ${file_permissions}
                                    "${optional_arg}")
@@ -2401,7 +2465,7 @@ function(_add_swift_target_executable_single name)
   if (SWIFT_PARALLEL_LINK_JOBS)
     set_property(TARGET ${name} PROPERTY JOB_POOL_LINK swift_link_job_pool)
   endif()
-  if(${SWIFTEXE_SINGLE_SDK} IN_LIST SWIFT_APPLE_PLATFORMS)
+  if(${SWIFTEXE_SINGLE_SDK} IN_LIST SWIFT_DARWIN_PLATFORMS)
     set_target_properties(${name} PROPERTIES
       BUILD_WITH_INSTALL_RPATH YES
       INSTALL_RPATH "@executable_path/../lib/swift/${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}")
@@ -2484,6 +2548,14 @@ function(add_swift_target_executable name)
       endif()
 
       if(${sdk} IN_LIST SWIFT_APPLE_PLATFORMS)
+        # In the past, we relied on unsetting globally
+        # CMAKE_OSX_ARCHITECTURES to ensure that CMake would
+        # not add the -arch flag
+        # This is no longer the case when running on Apple Silicon,
+        # when CMake will enforce a default (see
+        # https://gitlab.kitware.com/cmake/cmake/-/merge_requests/5291)
+        set_property(TARGET ${VARIANT_NAME} PROPERTY OSX_ARCHITECTURES "${arch}")
+
         add_custom_command_target(unused_var2
          COMMAND "codesign" "-f" "-s" "-" "${SWIFT_RUNTIME_OUTPUT_INTDIR}/${VARIANT_NAME}"
          CUSTOM_TARGET_NAME "${VARIANT_NAME}_signed"

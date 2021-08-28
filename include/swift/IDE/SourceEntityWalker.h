@@ -14,9 +14,11 @@
 #define SWIFT_IDE_SOURCE_ENTITY_WALKER_H
 
 #include "swift/AST/ASTWalker.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/Support/SaveAndRestore.h"
 
 namespace clang {
   class Module;
@@ -71,6 +73,9 @@ public:
   /// Walks the provided Expr.
   /// \returns true if traversal was aborted, false otherwise.
   bool walk(Expr *E);
+  /// Walks the provided Pattern.
+  /// \returns true if traversal was aborted, false otherwise.
+  bool walk(Pattern *P);
   /// Walks the provided ASTNode.
   /// \returns true if traversal was aborted, false otherwise.
   bool walk(ASTNode N);
@@ -98,6 +103,14 @@ public:
   /// This method is called after visiting the children of an expression. If it
   /// returns false, the remaining traversal is terminated and returns failure.
   virtual bool walkToExprPost(Expr *E) { return true; }
+
+  /// This method is called when first visiting a pattern, before walking
+  /// into its children. If it returns false, the subtree is skipped.
+  virtual bool walkToPatternPre(Pattern *P) { return true; }
+
+  /// This method is called after visiting the children of a pattern. If it
+  /// returns false, the remaining traversal is terminated and returns failure.
+  virtual bool walkToPatternPost(Pattern *P) { return true; }
 
   /// This method is called when a ValueDecl is referenced in source. If it
   /// returns false, the remaining traversal is terminated and returns failure.
@@ -176,6 +189,21 @@ protected:
   virtual ~SourceEntityWalker() {}
 
   virtual void anchor();
+
+  /// Retrieve the current ASTWalker being used to traverse the AST.
+  const ASTWalker &getWalker() const {
+    assert(Walker && "Not walking!");
+    return *Walker;
+  }
+
+private:
+  ASTWalker *Walker = nullptr;
+
+  /// Utility that lets us keep track of an ASTWalker when walking.
+  bool performWalk(ASTWalker &W, llvm::function_ref<bool(void)> DoWalk) {
+    llvm::SaveAndRestore<ASTWalker *> SV(Walker, &W);
+    return DoWalk();
+  }
 };
 
 } // namespace swift

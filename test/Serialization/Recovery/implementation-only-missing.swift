@@ -12,8 +12,9 @@
 //// The client app should build OK without the private module. Removing the
 //// private module is superfluous but makes sure that it's not somehow loaded.
 // RUN: rm %t/private_lib.swiftmodule
-// RUN: %target-swift-frontend -typecheck -DCLIENT_APP -primary-file %s -I %t -index-system-modules -index-store-path %t
-// RUN: %target-swift-frontend -emit-sil -DCLIENT_APP -primary-file %s -I %t -module-name client
+// RUN: %target-swift-frontend -typecheck -DCLIENT_APP %s -I %t -index-system-modules -index-store-path %t
+// RUN: %target-swift-frontend -typecheck -DCLIENT_APP %s -I %t -D FAIL_TYPECHECK -verify
+// RUN: %target-swift-frontend -emit-sil -DCLIENT_APP %s -I %t -module-name client
 
 //// Printing the public module should not crash when checking for overrides of
 //// methods from the private module.
@@ -42,9 +43,13 @@ public protocol HiddenProtocol {
   associatedtype Value
 }
 
+public protocol HiddenProtocol2 {}
+
 public protocol HiddenProtocolWithOverride {
   func hiddenOverride()
 }
+
+public class HiddenClass {}
 
 #elseif PUBLIC_LIB
 
@@ -91,6 +96,19 @@ public struct PublicStructConformsToHiddenProtocol: RefinesHiddenProtocol {
   public init() { }
 }
 
+public class SomeClass {
+    func funcUsingIoiType(_ a: HiddenClass) {}
+}
+
+// Check that we recover from a reference to an implementation-only
+// imported type in a protocol composition. rdar://78631465
+protocol CompositionMemberInheriting : HiddenProtocol2 {}
+protocol CompositionMemberSimple {}
+protocol InheritingFromComposition : CompositionMemberInheriting & CompositionMemberSimple {}
+struct StructInheritingFromComposition : CompositionMemberInheriting & CompositionMemberSimple {}
+class ClassInheritingFromComposition : CompositionMemberInheriting & CompositionMemberSimple {}
+protocol InheritingFromCompositionDirect : CompositionMemberSimple & HiddenProtocol2 {}
+
 #elseif CLIENT_APP
 
 import public_lib
@@ -100,5 +118,13 @@ print(s.nonWrappedVar)
 
 var p = PublicStructConformsToHiddenProtocol()
 print(p)
+
+#if FAIL_TYPECHECK
+    // Access to a missing member on an AnyObject triggers a typo correction
+    // that looks at *all* class members. rdar://79427805
+    class ClassUnrelatedToSomeClass {}
+    var something = ClassUnrelatedToSomeClass() as AnyObject
+    something.triggerTypoCorrection = 123 // expected-error {{value of type 'AnyObject' has no member 'triggerTypoCorrection'}}
+#endif
 
 #endif

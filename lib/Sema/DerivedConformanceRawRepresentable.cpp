@@ -207,7 +207,8 @@ struct RuntimeVersionCheck {
 
     // availableInfo = "#available(\(platformSpec), \(otherSpec))"
     auto availableInfo = PoundAvailableInfo::create(
-        C, SourceLoc(), SourceLoc(), { platformSpec, otherSpec }, SourceLoc());
+        C, SourceLoc(), SourceLoc(), { platformSpec, otherSpec }, SourceLoc(),
+        false);
 
     // This won't be filled in by TypeCheckAvailability because we have
     // invalid SourceLocs in this area of the AST.
@@ -403,12 +404,9 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
 
 
   assert([&]() -> bool {
-    auto equatableProto = TypeChecker::getProtocol(C, enumDecl->getLoc(),
-                                                   KnownProtocolKind::Equatable);
-    if (!equatableProto) {
-      return false;
-    }
-    return !TypeChecker::conformsToProtocol(rawType, equatableProto, enumDecl).isInvalid();
+    return TypeChecker::conformsToKnownProtocol(
+        rawType, KnownProtocolKind::Equatable,
+        derived.getParentModule());
   }());
 
   auto *rawDecl = new (C)
@@ -464,14 +462,8 @@ bool DerivedConformance::canDeriveRawRepresentable(DeclContext *DC,
 
   // The raw type must be Equatable, so that we have a suitable ~= for
   // synthesized switch statements.
-  auto equatableProto =
-      TypeChecker::getProtocol(enumDecl->getASTContext(), enumDecl->getLoc(),
-                               KnownProtocolKind::Equatable);
-  if (!equatableProto)
-    return false;
-
-  if (TypeChecker::conformsToProtocol(rawType, equatableProto, DC)
-          .isInvalid())
+  if (!TypeChecker::conformsToKnownProtocol(rawType, KnownProtocolKind::Equatable,
+                                            DC->getParentModule()))
     return false;
 
   auto &C = type->getASTContext();

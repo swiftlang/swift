@@ -1196,9 +1196,12 @@ public:
     return entity;
   }
 
-  static LinkEntity forAsyncFunctionPointer(AbstractFunctionDecl *decl) {
+  static LinkEntity forAsyncFunctionPointer(SILDeclRef declRef) {
     LinkEntity entity;
-    entity.setForDecl(Kind::AsyncFunctionPointerAST, decl);
+    entity.setForDecl(Kind::AsyncFunctionPointerAST,
+                      declRef.getAbstractFunctionDecl());
+    entity.SecondaryPointer =
+        reinterpret_cast<void *>(static_cast<uintptr_t>(declRef.kind));
     return entity;
   }
 
@@ -1417,6 +1420,7 @@ struct IRLinkage {
   static const IRLinkage InternalWeakODR;
   static const IRLinkage Internal;
 
+  static const IRLinkage ExternalCommon;
   static const IRLinkage ExternalImport;
   static const IRLinkage ExternalWeakImport;
   static const IRLinkage ExternalExport;

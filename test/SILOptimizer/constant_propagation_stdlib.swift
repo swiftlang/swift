@@ -12,7 +12,7 @@ public struct MyInt {
 // CHECK-ONONE:       } // end sil function '$s27constant_propagation_stdlib15isConcrete_trueyBi1_AA5MyIntVF'
 // CHECK-O-LABEL:     sil @$s27constant_propagation_stdlib15isConcrete_trueyBi1_AA5MyIntVF : $@convention(thin) (MyInt) -> Builtin.Int1 {
 // CHECK-O:           bb0(
-// CHECK-O-NEXT:        [[RESULT:%.*]] = integer_literal $Builtin.Int1, -1
+// CHECK-O:             [[RESULT:%.*]] = integer_literal $Builtin.Int1, -1
 // CHECK-O-NEXT:        return [[RESULT]]
 // CHECK-O-NEXT:      } // end sil function '$s27constant_propagation_stdlib15isConcrete_trueyBi1_AA5MyIntVF'
 public func isConcrete_true(_ x: MyInt) -> Builtin.Int1 {
@@ -85,8 +85,8 @@ public func isConcrete_concrete_caller(_ x: MyInt) -> Builtin.Int1 {
 // CHECK-ONONE:       } // end sil function '$s27constant_propagation_stdlib4main1xBi1__Bi1_Bi1_tAA5MyIntV_tF'
 // CHECK-O-LABEL:     sil @$s27constant_propagation_stdlib4main1xBi1__Bi1_Bi1_tAA5MyIntV_tF : $@convention(thin) (MyInt) -> (Builtin.Int1, Builtin.Int1, Builtin.Int1) {
 // CHECK-O:           bb0(
-// CHECK-O-NEXT:        [[VALUE:%.*]] = integer_literal $Builtin.Int1, -1
-// CHECK-O-NEXT:        [[RESULT:%.*]] = tuple ([[VALUE]] : $Builtin.Int1, [[VALUE]] : $Builtin.Int1, [[VALUE]] : $Builtin.Int1)
+// CHECK-O:             [[VALUE:%.*]] = integer_literal $Builtin.Int1, -1
+// CHECK-O:             [[RESULT:%.*]] = tuple ([[VALUE]] : $Builtin.Int1, [[VALUE]] : $Builtin.Int1, [[VALUE]] : $Builtin.Int1)
 // CHECK-O-NEXT:        return [[RESULT]]
 // CHECK-O-NEXT:      } // end sil function '$s27constant_propagation_stdlib4main1xBi1__Bi1_Bi1_tAA5MyIntV_tF'
 public func main(x: MyInt) -> (Builtin.Int1, Builtin.Int1, Builtin.Int1) {

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-experimental-concurrency -import-objc-header %S/Inputs/Delegate.h %s -emit-ir -o - | %FileCheck %s -DALIGNMENT=%target-alignment
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk)  -disable-availability-checking -import-objc-header %S/Inputs/Delegate.h %s -emit-ir -o - | %FileCheck %s -DALIGNMENT=%target-alignment
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
 

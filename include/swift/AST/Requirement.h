@@ -76,6 +76,25 @@ public:
 
   ProtocolDecl *getProtocolDecl() const;
 
+  /// Determines if this substituted requirement is satisfied.
+  ///
+  /// \param conditionalRequirements An out parameter initialized to an
+  /// array of requirements that the caller must check to ensure this
+  /// requirement is completely satisfied.
+  bool isSatisfied(ArrayRef<Requirement> &conditionalRequirements,
+                   bool allowMissing = false) const;
+
+  /// Determines if this substituted requirement can ever be satisfied,
+  /// possibly with additional substitutions.
+  ///
+  /// For example, if 'T' is unconstrained, then a superclass requirement
+  /// 'T : C' can be satisfied; however, if 'T' already has an unrelated
+  /// superclass requirement, 'T : C' cannot be satisfied.
+  bool canBeSatisfied() const;
+
+  /// Linear order on requirements in a generic signature.
+  int compare(const Requirement &other) const;
+
   SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &out) const;
   void print(raw_ostream &os, const PrintOptions &opts) const;

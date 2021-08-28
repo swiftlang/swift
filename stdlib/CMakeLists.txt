@@ -44,6 +44,14 @@ else()
   set(SWIFT_BUILD_TEST_SUPPORT_MODULES_default FALSE)
 endif()
 
+if("${SWIFT_HOST_VARIANT_SDK}" MATCHES "(OSX|IOS*|TVOS*|WATCHOS*)")
+  set(SWIFT_STDLIB_ENABLE_PRESPECIALIZATION_default TRUE)
+elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
+  set(SWIFT_STDLIB_ENABLE_PRESPECIALIZATION_default TRUE)
+else()
+  set(SWIFT_STDLIB_ENABLE_PRESPECIALIZATION_default FALSE)
+endif()
+
 #
 # User-configurable options for the standard library.
 #
@@ -67,6 +75,10 @@ option(SWIFT_RUNTIME_MACHO_NO_DYLD
        "Build stdlib assuming the runtime environment uses Mach-O but does not support dynamic modules."
        FALSE)
 
+option(SWIFT_STDLIB_HAS_DARWIN_LIBMALLOC
+  "Build stdlib assuming the Darwin build of stdlib can use extended libmalloc APIs"
+  )
+
 option(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
        "Build the standard libraries assuming that they will be used in an environment with only a single thread."
        FALSE)
@@ -78,6 +90,13 @@ option(SWIFT_STDLIB_OS_VERSIONING
 option(SWIFT_BUILD_TEST_SUPPORT_MODULES
        "Whether to build StdlibUnittest and other test support modules. Defaults to On when SWIFT_BUILD_SDK_OVERLAY is On, or when SWIFT_INCLUDE_TESTS is On."
        "${SWIFT_BUILD_TEST_SUPPORT_MODULES_default}")
+
+option(SWIFT_FREESTANDING_FLAVOR
+       "When building the FREESTANDING stdlib, which build style to use (options: apple, linux)")
+
+option(SWIFT_STDLIB_ENABLE_PRESPECIALIZATION
+       "Should stdlib be built with generic metadata prespecialization enabled. Defaults to On on Darwin and on "
+       "${SWIFT_STDLIB_ENABLE_PRESPECIALIZATION_default}")
 
 set(SWIFT_STDLIB_ENABLE_LTO OFF CACHE STRING "Build Swift stdlib with LTO. One
     must specify the form of LTO by setting this to one of: 'full', 'thin'. This
@@ -144,14 +163,13 @@ endif()
 # built and cause link failures for mismatches. Without linking that library,
 # we get link failures regardless, so instead, this just disables the checks.
 add_compile_definitions($<$<OR:$<COMPILE_LANGUAGE:C>,$<COMPILE_LANGUAGE:CXX>>:LLVM_DISABLE_ABI_BREAKING_CHECKS_ENFORCING=1>)
-include_directories(BEFORE ${CMAKE_PROJECT_SOURCE_DIR}/include)
 
 set(SWIFT_STDLIB_LIBRARY_BUILD_TYPES)
 if(SWIFT_BUILD_DYNAMIC_STDLIB)
   list(APPEND SWIFT_STDLIB_LIBRARY_BUILD_TYPES SHARED)
 endif()
 if(SWIFT_BUILD_STATIC_STDLIB)
-  list_intersect("${SWIFT_APPLE_PLATFORMS}" "${SWIFT_SDKS}" building_darwin_sdks)
+  list_intersect("${SWIFT_DARWIN_PLATFORMS}" "${SWIFT_SDKS}" building_darwin_sdks)
   if(building_darwin_sdks)
     message(SEND_ERROR "cannot build static standard library for Darwin SDKs")
   else()

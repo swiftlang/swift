@@ -1,5 +1,5 @@
-// RUN: %target-swift-emit-silgen -emit-sorted-sil -enable-objc-interop -disable-objc-attr-requires-foundation-module %s | %FileCheck %s
-// RUN: %target-swift-emit-silgen -emit-sorted-sil -enable-objc-interop -disable-objc-attr-requires-foundation-module -enable-library-evolution %s | %FileCheck -check-prefix=CHECK-RESILIENT %s
+// RUN: %target-swift-emit-silgen -emit-sorted-sil %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -emit-sorted-sil -enable-library-evolution %s | %FileCheck -check-prefix=CHECK-RESILIENT %s
 
 #if os(Windows) && arch(x86_64)
 @objc public enum CLike: Int32 {

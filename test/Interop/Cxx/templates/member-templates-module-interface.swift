@@ -6,8 +6,8 @@
 // CHECK:   mutating func addAll<T, U>(_ a: Int32, _ b: T, _ c: U) -> Int32
 // CHECK:   mutating func passThrough<T>(_ val: T) -> T
 // CHECK:   mutating func passThroughConst<T>(_ val: T) -> T
-// CHECK:   mutating func passThroughOnConst<T>(_ val: T) -> T
-// CHECK:   mutating func passThroughConstOnConst<T>(_ val: T) -> T
+// CHECK:   func passThroughOnConst<T>(_ val: T) -> T
+// CHECK:   func passThroughConstOnConst<T>(_ val: T) -> T
 // CHECK:   mutating func doNothingConstRef<T>(_ val: UnsafePointer<T>)
 // CHECK:   mutating func make42Ref<T>(_ val: UnsafeMutablePointer<T>)
 // CHECK: }

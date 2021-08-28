@@ -255,6 +255,9 @@ struct BorrowedValue;
 /// borrowed and thus the incoming value must implicitly be borrowed until the
 /// user's corresponding end scope instruction.
 ///
+/// Invariant: For a given operand, BorrowingOperand is valid iff
+/// it has OperandOwnership::Borrow or OperandOwnership::Reborrow.
+///
 /// NOTE: We do not require that the guaranteed scope be represented by a
 /// guaranteed value in the same function: see begin_apply. In such cases, we
 /// require instead an end_* instruction to mark the end of the scope's region.
@@ -263,7 +266,16 @@ struct BorrowingOperand {
   BorrowingOperandKind kind;
 
   BorrowingOperand(Operand *op)
-      : op(op), kind(BorrowingOperandKind::get(op->getUser()->getKind())) {}
+      : op(op), kind(BorrowingOperandKind::get(op->getUser()->getKind())) {
+    auto ownership = op->getOperandOwnership();
+    if (ownership != OperandOwnership::Borrow
+        && ownership != OperandOwnership::Reborrow) {
+      // consuming applies and branch arguments are not borrowing operands.
+      kind = BorrowingOperandKind::Invalid;
+      return;
+    }
+    assert(kind != BorrowingOperandKind::Invalid && "missing case");
+  }
   BorrowingOperand(const BorrowingOperand &other)
       : op(other.op), kind(other.kind) {}
   BorrowingOperand &operator=(const BorrowingOperand &other) {
@@ -279,23 +291,7 @@ struct BorrowingOperand {
   const Operand *operator->() const { return op; }
   Operand *operator->() { return op; }
 
-  operator bool() const { return kind != BorrowingOperandKind::Invalid && op; }
-
-  /// If \p op is a borrow introducing operand return it after doing some
-  /// checks.
-  static BorrowingOperand get(Operand *op) {
-    auto *user = op->getUser();
-    auto kind = BorrowingOperandKind::get(user->getKind());
-    if (!kind)
-      return {nullptr, kind};
-    return {op, kind};
-  }
-
-  /// If \p op is a borrow introducing operand return it after doing some
-  /// checks.
-  static BorrowingOperand get(const Operand *op) {
-    return get(const_cast<Operand *>(op));
-  }
+  operator bool() const { return kind != BorrowingOperandKind::Invalid; }
 
   /// If this borrowing operand results in the underlying value being borrowed
   /// over a region of code instead of just for a single instruction, visit
@@ -337,8 +333,14 @@ struct BorrowingOperand {
     llvm_unreachable("Covered switch isn't covered?!");
   }
 
-  /// Return true if the user instruction introduces a borrow scope? This is
-  /// true for both reborrows and nested borrows.
+  /// Return true if the user instruction defines a borrowed value that
+  /// introduces a borrow scope and therefore may be reborrowed. This is true
+  /// for both reborrows and nested borrows.
+  ///
+  /// Note that begin_apply does create a borrow scope, and may define
+  /// guaranteed value within that scope. The difference is that those yielded
+  /// values do not themselves introduce a borrow scope. In other words, they
+  /// cannot be reborrowed.
   ///
   /// If true, the visitBorrowIntroducingUserResults() can be called to acquire
   /// each BorrowedValue that introduces a new borrow scopes.
@@ -589,7 +591,7 @@ struct BorrowedValue {
                            &foundReborrows) const {
     bool foundAnyReborrows = false;
     for (auto *op : value->getUses()) {
-      if (auto borrowingOperand = BorrowingOperand::get(op)) {
+      if (auto borrowingOperand = BorrowingOperand(op)) {
         if (borrowingOperand.isReborrow()) {
           foundReborrows.push_back(
               {value->getParentBlock(), op->getOperandNumber()});
@@ -647,6 +649,7 @@ public:
     RefElementAddr,
     RefTailAddr,
     OpenExistentialBox,
+    ProjectBox,
     StoreBorrow,
   };
 
@@ -674,6 +677,8 @@ public:
       return Kind::RefTailAddr;
     case SILInstructionKind::OpenExistentialBoxInst:
       return Kind::OpenExistentialBox;
+    case SILInstructionKind::ProjectBoxInst:
+      return Kind::ProjectBox;
     case SILInstructionKind::StoreBorrowInst:
       return Kind::StoreBorrow;
     }
@@ -692,6 +697,8 @@ public:
       return Kind::RefTailAddr;
     case ValueKind::OpenExistentialBoxInst:
       return Kind::OpenExistentialBox;
+    case ValueKind::ProjectBoxInst:
+      return Kind::ProjectBox;
     case ValueKind::StoreBorrowInst:
       return Kind::StoreBorrow;
     }
@@ -720,6 +727,8 @@ struct InteriorPointerOperand {
     return kind != InteriorPointerOperandKind::Invalid && operand;
   }
 
+  SILInstruction *getUser() const { return operand->getUser(); }
+
   /// If \p op has a user that is an interior pointer, return a valid
   /// value. Otherwise, return None.
   static InteriorPointerOperand get(Operand *op) {
@@ -745,6 +754,7 @@ struct InteriorPointerOperand {
     case InteriorPointerOperandKind::RefElementAddr:
     case InteriorPointerOperandKind::RefTailAddr:
     case InteriorPointerOperandKind::OpenExistentialBox:
+    case InteriorPointerOperandKind::ProjectBox:
     case InteriorPointerOperandKind::StoreBorrow: {
       // Ok, we have a valid instruction. Return the relevant operand.
       auto *op =
@@ -752,6 +762,7 @@ struct InteriorPointerOperand {
       return InteriorPointerOperand(op, kind);
     }
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Return the end scope of all borrow introducers of the parent value of this
@@ -785,6 +796,8 @@ struct InteriorPointerOperand {
       return cast<RefTailAddrInst>(operand->getUser());
     case InteriorPointerOperandKind::OpenExistentialBox:
       return cast<OpenExistentialBoxInst>(operand->getUser());
+    case InteriorPointerOperandKind::ProjectBox:
+      return cast<ProjectBoxInst>(operand->getUser());
     case InteriorPointerOperandKind::StoreBorrow:
       return cast<StoreBorrowInst>(operand->getUser());
     }
@@ -822,6 +835,25 @@ private:
   /// its usage since it assumes the code passed in is well formed.
   InteriorPointerOperand(Operand *op, InteriorPointerOperandKind kind)
       : operand(op), kind(kind) {}
+};
+
+/// Utility to check if an address may originate from a borrowed value. If so,
+/// then uses of the address cannot be replaced without ensuring that they are
+/// also within the same scope.
+///
+/// If mayBeBorrowed is false, then there is no enclosing borrow scope and
+/// interiorPointerOp is irrelevant.
+///
+/// If mayBeBorrowed is true, then interiorPointerOp refers to the operand that
+/// converts a non-address value into the address from which the contructor's
+/// address is derived. If the best-effort to find an InteriorPointerOperand
+/// fails, then interiorPointerOp remains invalid, and clients must be
+/// conservative.
+struct BorrowedAddress {
+  bool mayBeBorrowed = true;
+  InteriorPointerOperand interiorPointerOp;
+
+  BorrowedAddress(SILValue address);
 };
 
 class OwnedValueIntroducerKind {
@@ -1035,6 +1067,7 @@ struct OwnedValueIntroducer {
     case OwnedValueIntroducerKind::AllocRefInit:
       return false;
     }
+    llvm_unreachable("covered switch");
   }
 
   bool operator==(const OwnedValueIntroducer &other) const {
@@ -1076,10 +1109,10 @@ void findTransitiveReborrowBaseValuePairs(
     BorrowingOperand initialScopeOperand, SILValue origBaseValue,
     function_ref<void(SILPhiArgument *, SILValue)> visitReborrowBaseValuePair);
 
-/// Given a begin_borrow visit all end_borrow users of the borrow or its
-/// reborrows.
+/// Given a begin of a borrow scope, visit all end_borrow users of the borrow or
+/// its reborrows.
 void visitTransitiveEndBorrows(
-    BeginBorrowInst *borrowInst,
+    BorrowedValue beginBorrow,
     function_ref<void(EndBorrowInst *)> visitEndBorrow);
 
 } // namespace swift

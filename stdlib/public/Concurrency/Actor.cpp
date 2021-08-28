@@ -26,14 +26,15 @@
 #endif
 
 #include "../CompatibilityOverride/CompatibilityOverride.h"
-#include "../runtime/ThreadLocalStorage.h"
 #include "swift/Runtime/Atomic.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Once.h"
 #include "swift/Runtime/Mutex.h"
 #include "swift/Runtime/ThreadLocal.h"
+#include "swift/Runtime/ThreadLocalStorage.h"
 #include "swift/ABI/Task.h"
 #include "swift/ABI/Actor.h"
+#include "llvm/Config/config.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "TaskPrivate.h"
 
@@ -63,6 +64,11 @@
 
 #if HAVE_PTHREAD_H
 #include <pthread.h>
+
+// Only use __has_include since HAVE_PTHREAD_NP_H is not provided.
+#if __has_include(<pthread_np.h>)
+#include <pthread_np.h>
+#endif
 #endif
 
 #if defined(_WIN32)
@@ -107,15 +113,16 @@ class ExecutorTrackingInfo {
   /// information about the current thread, if any.
   ///
   /// TODO: this is obviously runtime-internal and therefore not
-  /// reasonable to make ABI. We might want to also provide a way 
+  /// reasonable to make ABI. We might want to also provide a way
   /// for generated code to efficiently query the identity of the
   /// current executor, in order to do a cheap comparison to avoid
   /// doing all the work to suspend the task when we're already on
   /// the right executor. It would make sense for that to be a
   /// separate thread-local variable (or whatever is most efficient
   /// on the target platform).
-  static SWIFT_RUNTIME_DECLARE_THREAD_LOCAL(Pointer<ExecutorTrackingInfo>,
-                                            ActiveInfoInThread);
+  static SWIFT_RUNTIME_DECLARE_THREAD_LOCAL(
+      Pointer<ExecutorTrackingInfo>, ActiveInfoInThread,
+      SWIFT_CONCURRENCY_EXECUTOR_TRACKING_INFO_KEY);
 
   /// The active executor.
   ExecutorRef ActiveExecutor = ExecutorRef::generic();
@@ -189,21 +196,11 @@ public:
   }
 };
 
-#ifdef SWIFT_TLS_HAS_RESERVED_PTHREAD_SPECIFIC
-class ActiveTask {
-public:
-  static void set(AsyncTask *task) {
-    SWIFT_THREAD_SETSPECIFIC(SWIFT_CONCURRENCY_TASK_KEY, task);
-  }
-  static AsyncTask *get() {
-    return (AsyncTask *)SWIFT_THREAD_GETSPECIFIC(SWIFT_CONCURRENCY_TASK_KEY);
-  }
-};
-#else
 class ActiveTask {
   /// A thread-local variable pointing to the active tracking
   /// information about the current thread, if any.
-  static SWIFT_RUNTIME_DECLARE_THREAD_LOCAL(Pointer<AsyncTask>, Value);
+  static SWIFT_RUNTIME_DECLARE_THREAD_LOCAL(Pointer<AsyncTask>, Value,
+                                            SWIFT_CONCURRENCY_TASK_KEY);
 
 public:
   static void set(AsyncTask *task) { Value.set(task); }
@@ -213,11 +210,13 @@ public:
 /// Define the thread-locals.
 SWIFT_RUNTIME_DECLARE_THREAD_LOCAL(
   Pointer<AsyncTask>,
-  ActiveTask::Value);
-#endif
+  ActiveTask::Value,
+  SWIFT_CONCURRENCY_TASK_KEY);
+
 SWIFT_RUNTIME_DECLARE_THREAD_LOCAL(
   Pointer<ExecutorTrackingInfo>,
-  ExecutorTrackingInfo::ActiveInfoInThread);
+  ExecutorTrackingInfo::ActiveInfoInThread,
+  SWIFT_CONCURRENCY_EXECUTOR_TRACKING_INFO_KEY);
 
 } // end anonymous namespace
 
@@ -232,15 +231,16 @@ void swift::runJobInEstablishedExecutorContext(Job *job) {
     // Update the active task in the current thread.
     ActiveTask::set(task);
 
-    // FIXME: update the task status to say that it's running
-    // on the current thread.  If the task suspends itself to run
-    // on an actor, it should update the task status appropriately;
-    // we don't need to update it afterwards.
+    // Update the task status to say that it's running on the
+    // current thread.  If the task suspends somewhere, it should
+    // update the task status appropriately; we don't need to update
+    // it afterwards.
+    task->flagAsRunning();
 
     task->runInFullyEstablishedContext();
 
-    // Clear the active task.
-    ActiveTask::set(nullptr);
+    assert(ActiveTask::get() == nullptr &&
+           "active task wasn't cleared before susspending?");
   } else {
     // There's no extra bookkeeping to do for simple jobs.
     job->runSimpleInFullyEstablishedContext();
@@ -254,7 +254,7 @@ void swift::runJobInEstablishedExecutorContext(Job *job) {
 }
 
 SWIFT_CC(swift)
-static AsyncTask *swift_task_getCurrentImpl() {
+AsyncTask *swift::swift_task_getCurrent() {
   return ActiveTask::get();
 }
 
@@ -269,9 +269,7 @@ static ExecutorRef swift_task_getCurrentExecutorImpl() {
   auto currentTracking = ExecutorTrackingInfo::current();
   auto result = (currentTracking ? currentTracking->getActiveExecutor()
                                  : ExecutorRef::generic());
-#if SWIFT_TASK_PRINTF_DEBUG
-  fprintf(stderr, "[%p] getting current executor %p\n", pthread_self(), result.getIdentity());
-#endif
+  SWIFT_TASK_DEBUG_LOG("getting current executor %p", result.getIdentity());
   return result;
 }
 
@@ -316,8 +314,7 @@ static bool swift_task_isCurrentExecutorImpl(ExecutorRef executor) {
     return currentTracking->getActiveExecutor() == executor;
   }
 
-  return executor == _swift_task_getMainExecutor()
-      && isExecutingOnMainThread();
+  return executor.isMainExecutor() && isExecutingOnMainThread();
 }
 
 /// Logging level for unexpected executors:
@@ -360,7 +357,7 @@ void swift::swift_task_reportUnexpectedExecutor(
 
   const char *functionIsolation;
   const char *whereExpected;
-  if (executor == _swift_task_getMainExecutor()) {
+  if (executor.isMainExecutor()) {
     functionIsolation = "@MainActor function";
     whereExpected = "the main thread";
   } else {
@@ -621,6 +618,8 @@ class DefaultActorImpl : public HeapObject {
 
       HasActiveInlineJob = 3,
 
+      IsDistributedRemote = 4,
+
       MaxPriority = 8,
       MaxPriority_width = JobFlags::Priority_width,
 
@@ -650,6 +649,12 @@ class DefaultActorImpl : public HeapObject {
     FLAGSET_DEFINE_FLAG_ACCESSORS(HasActiveInlineJob,
                                   hasActiveInlineJob, setHasActiveInlineJob)
 
+    /// Is the actor a distributed 'remote' actor?
+    /// I.e. it does not have storage for user-defined properties and all
+    /// function call must be transformed into $distributed_ function calls.
+    FLAGSET_DEFINE_FLAG_ACCESSORS(IsDistributedRemote,
+                                  isDistributedRemote, setIsDistributedRemote)
+
     /// What is the maximum priority of jobs that are currently running
     /// or enqueued on this actor?
     ///
@@ -677,10 +682,11 @@ class DefaultActorImpl : public HeapObject {
   };
 
 public:
-
   /// Properly construct an actor, except for the heap header.
-  void initialize() {
-    new (&CurrentState) std::atomic<State>(State{JobRef(), Flags()});
+  void initialize(bool isDistributedRemote = false) {
+    auto flags = Flags();
+    flags.setIsDistributedRemote(isDistributedRemote);
+    new (&CurrentState) std::atomic<State>(State{JobRef(), flags});
   }
 
   /// Properly destruct an actor, except for the heap header.
@@ -702,6 +708,12 @@ public:
 
   /// Claim the next job off the actor or give it up.
   Job *claimNextJobOrGiveUp(bool actorIsOwned, RunningJobInfo runner);
+
+  /// Check if the actor is actually a distributed *remote* actor.
+  ///
+  /// Note that a distributed *local* actor instance is the same as any other
+  /// ordinary default (local) actor, and no special handling is needed for them.
+  bool isDistributedRemote();
 
 private:
   void deallocateUnconditional();
@@ -897,7 +909,7 @@ public:
       IsAbandoned = true;
       shouldDelete = IsResolvedByJob && IsResolvedByActor;
     });
-    if (shouldDelete) delete this;    
+    if (shouldDelete) delete this;
   }
 
   /// Called by the job to notify the actor that the job has successfully
@@ -912,7 +924,7 @@ public:
       IsResolvedByJob = true;
       shouldDelete = IsResolvedByJob && IsResolvedByActor;
     });
-    if (shouldDelete) delete this;    
+    if (shouldDelete) delete this;
   }
 
   /// Called by the job to wait for the actor to resolve what the job
@@ -1036,8 +1048,7 @@ static void wakeOverrides(ProcessOverrideJob *nextOverride,
     nextOverride = cur->NextJob.getAsPreprocessedOverride();
 
     if (hasAlreadyActivated ||
-        !targetPriority ||
-        cur->getPriority() != *targetPriority)
+        !targetPriority)
       cur->wakeAndAbandon();
     else
       hasAlreadyActivated = cur->wakeAndActivate();
@@ -1160,9 +1171,7 @@ static Job *preprocessQueue(JobRef first,
 }
 
 void DefaultActorImpl::giveUpThread(RunningJobInfo runner) {
-#if SWIFT_TASK_PRINTF_DEBUG
-  fprintf(stderr, "[%p] giving up thread for actor %p\n", pthread_self(), this);
-#endif
+  SWIFT_TASK_DEBUG_LOG("giving up thread for actor %p", this);
   auto oldState = CurrentState.load(std::memory_order_acquire);
   assert(oldState.Flags.isAnyRunningStatus());
 
@@ -1199,8 +1208,7 @@ void DefaultActorImpl::giveUpThread(RunningJobInfo runner) {
     }
 
     bool hasMoreJobs = (bool) newState.FirstJob;
-    bool hasOverrideAtNewPriority =
-      (runner.Priority < oldState.Flags.getMaxPriority());
+    bool hasOverrideAtNewPriority = false;
     bool hasActiveInlineJob = newState.Flags.hasActiveInlineJob();
     bool needsNewProcessJob = hasMoreJobs && !hasOverrideAtNewPriority;
 
@@ -1223,13 +1231,11 @@ void DefaultActorImpl::giveUpThread(RunningJobInfo runner) {
       // Try again.
       continue;
     }
-    
-#if SWIFT_TASK_PRINTF_DEBUG
-#  define LOG_STATE_TRANSITION fprintf(stderr, "[%p] actor %p transitioned from %zx to %zx (%s)\n", \
-  pthread_self(), this, oldState.Flags.getOpaqueValue(), newState.Flags.getOpaqueValue(), __FUNCTION__)
-#else
-#  define LOG_STATE_TRANSITION ((void)0)
-#endif
+
+#define LOG_STATE_TRANSITION                                                   \
+  SWIFT_TASK_DEBUG_LOG("actor %p transitioned from %zx to %zx (%s)\n", this,   \
+                       oldState.Flags.getOpaqueValue(),                        \
+                       newState.Flags.getOpaqueValue(), __FUNCTION__)
     LOG_STATE_TRANSITION;
 
     // The priority of the remaining work.
@@ -1299,8 +1305,7 @@ Job *DefaultActorImpl::claimNextJobOrGiveUp(bool actorIsOwned,
 
       // If the actor is out of work, or its priority doesn't match our
       // priority, don't try to take over the actor.
-      if (!oldState.FirstJob ||
-          oldState.Flags.getMaxPriority() != runner.Priority) {
+      if (!oldState.FirstJob) {
 
         // The only change we need here is inline-runner bookkeeping.
         if (!tryUpdateForInlineRunner())
@@ -1345,7 +1350,7 @@ Job *DefaultActorImpl::claimNextJobOrGiveUp(bool actorIsOwned,
         continue;
       LOG_STATE_TRANSITION;
       _swift_tsan_acquire(this);
-      
+
       // If that succeeded, we can proceed to the main body.
       oldState = newState;
       runner.setRunning();
@@ -1382,8 +1387,7 @@ Job *DefaultActorImpl::claimNextJobOrGiveUp(bool actorIsOwned,
     // FIXME: should this be an exact match in priority instead of
     // potentially running jobs with too high a priority?
     Job *jobToRun;
-    if (oldState.Flags.getMaxPriority() <= runner.Priority &&
-        newFirstJob) {
+    if (newFirstJob) {
       jobToRun = newFirstJob;
       newState.FirstJob = getNextJobInQueue(newFirstJob);
       newState.Flags.setStatus(Status::Running);
@@ -1416,7 +1420,7 @@ Job *DefaultActorImpl::claimNextJobOrGiveUp(bool actorIsOwned,
       continue;
     }
     LOG_STATE_TRANSITION;
-    
+
     // We successfully updated the state.
 
     // If we're giving up the thread with jobs remaining, we need
@@ -1479,11 +1483,10 @@ static void swift_job_runImpl(Job *job, ExecutorRef executor) {
 ///                     the actor lives for the duration of job execution.
 ///                     Note that this may conflict with the retain/release
 ///                     design in the DefaultActorImpl, but it does fix bugs!
+SWIFT_CC(swiftasync)
 static void processDefaultActor(DefaultActorImpl *currentActor,
                                 RunningJobInfo runner) {
-#if SWIFT_TASK_PRINTF_DEBUG
-  fprintf(stderr, "[%p] processDefaultActor %p\n", pthread_self(), currentActor);
-#endif
+  SWIFT_TASK_DEBUG_LOG("processDefaultActor %p", currentActor);
   DefaultActorImpl *actor = currentActor;
 
   // If we actually have work to do, we'll need to set up tracking info.
@@ -1507,9 +1510,8 @@ static void processDefaultActor(DefaultActorImpl *currentActor,
     auto job = currentActor->claimNextJobOrGiveUp(threadIsRunningActor,
                                                   runner);
 
-#if SWIFT_TASK_PRINTF_DEBUG
-    fprintf(stderr, "[%p] processDefaultActor %p claimed job %p\n", pthread_self(), currentActor, job);
-#endif
+    SWIFT_TASK_DEBUG_LOG("processDefaultActor %p claimed job %p", currentActor,
+                         job);
 
     // If we failed to claim a job, we have nothing to do.
     if (!job) {
@@ -1529,9 +1531,8 @@ static void processDefaultActor(DefaultActorImpl *currentActor,
     // If it's become nil, or not a default actor, we have nothing to do.
     auto currentExecutor = trackingInfo.getActiveExecutor();
 
-#if SWIFT_TASK_PRINTF_DEBUG
-    fprintf(stderr, "[%p] processDefaultActor %p current executor now %p\n", pthread_self(), currentActor, currentExecutor.getIdentity());
-#endif
+    SWIFT_TASK_DEBUG_LOG("processDefaultActor %p current executor now %p",
+                         currentActor, currentExecutor.getIdentity());
 
     if (!currentExecutor.isDefaultActor()) {
       // The job already gave up the thread for us.
@@ -1553,6 +1554,7 @@ static void processDefaultActor(DefaultActorImpl *currentActor,
   swift_release(actor);
 }
 
+SWIFT_CC(swiftasync)
 void ProcessInlineJob::process(Job *job) {
   DefaultActorImpl *actor = DefaultActorImpl::fromInlineJob(job);
 
@@ -1561,11 +1563,11 @@ void ProcessInlineJob::process(Job *job) {
   auto targetPriority = job->getPriority();
   auto runner = RunningJobInfo::forInline(targetPriority);
 
-  // FIXME: force tail call
   swift_retain(actor);
-  return processDefaultActor(actor, runner);
+  return processDefaultActor(actor, runner); // 'return' forces tail call
 }
 
+SWIFT_CC(swiftasync)
 void ProcessOutOfLineJob::process(Job *job) {
   auto self = cast<ProcessOutOfLineJob>(job);
   DefaultActorImpl *actor = self->Actor;
@@ -1577,11 +1579,11 @@ void ProcessOutOfLineJob::process(Job *job) {
 
   delete self;
 
-  // FIXME: force tail call
   swift_retain(actor);
-  return processDefaultActor(actor, runner);
+  return processDefaultActor(actor, runner); // 'return' forces tail call
 }
 
+SWIFT_CC(swiftasync)
 void ProcessOverrideJob::process(Job *job) {
   auto self = cast<ProcessOverrideJob>(job);
 
@@ -1589,9 +1591,8 @@ void ProcessOverrideJob::process(Job *job) {
   auto actor = self->Actor;
   auto runner = RunningJobInfo::forOverride(self);
 
-  // FIXME: force tail call
   swift_retain(actor);
-  return processDefaultActor(actor, runner);
+  return processDefaultActor(actor, runner); // 'return' forces tail call
 }
 
 void DefaultActorImpl::enqueue(Job *job) {
@@ -1625,7 +1626,7 @@ void DefaultActorImpl::enqueue(Job *job) {
 
     // If we need an override job, create it (if necessary) and
     // register it with the queue.
-    bool needsOverride = !wasIdle && newPriority != oldPriority;
+    bool needsOverride = false;
     if (needsOverride) {
       overrideJob.addToState(this, newState);
     } else {
@@ -1735,6 +1736,11 @@ void swift::swift_defaultActor_deallocateResilient(HeapObject *actor) {
                       metadata->getInstanceAlignMask());
 }
 
+/// FIXME: only exists for the quick-and-dirty MainActor implementation.
+namespace swift {
+  Metadata* MainActorMetadata = nullptr;
+}
+
 /*****************************************************************************/
 /****************************** ACTOR SWITCHING ******************************/
 /*****************************************************************************/
@@ -1802,14 +1808,16 @@ SWIFT_CC(swiftasync)
 static void runOnAssumedThread(AsyncTask *task, ExecutorRef executor,
                                ExecutorTrackingInfo *oldTracking,
                                RunningJobInfo runner) {
+  // Note that this doesn't change the active task and so doesn't
+  // need to either update ActiveTask or flagAsRunning/flagAsSuspended.
+
   // If there's alreaady tracking info set up, just change the executor
   // there and tail-call the task.  We don't want these frames to
   // potentially accumulate linearly.
   if (oldTracking) {
     oldTracking->setActiveExecutor(executor);
 
-    // FIXME: force tail call
-    return task->runInFullyEstablishedContext();
+    return task->runInFullyEstablishedContext(); // 'return' forces tail call
   }
 
   // Otherwise, set up tracking info.
@@ -1828,9 +1836,8 @@ static void runOnAssumedThread(AsyncTask *task, ExecutorRef executor,
   executor = trackingInfo.getActiveExecutor();
   trackingInfo.leave();
 
-#if SWIFT_TASK_PRINTF_DEBUG
-  fprintf(stderr, "[%p] leaving assumed thread, current executor is %p\n", pthread_self(), executor.getIdentity());
-#endif
+  SWIFT_TASK_DEBUG_LOG("leaving assumed thread, current executor is %p",
+                       executor.getIdentity());
 
   if (executor.isDefaultActor())
     asImpl(executor.getDefaultActor())->giveUpThread(runner);
@@ -1844,16 +1851,15 @@ static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContex
   auto currentExecutor =
     (trackingInfo ? trackingInfo->getActiveExecutor()
                   : ExecutorRef::generic());
-#if SWIFT_TASK_PRINTF_DEBUG
-  fprintf(stderr, "[%p] trying to switch from executor %p to %p\n", pthread_self(), currentExecutor.getIdentity(), newExecutor.getIdentity());
-#endif
+  SWIFT_TASK_DEBUG_LOG("trying to switch from executor %p to %p",
+                       currentExecutor.getIdentity(),
+                       newExecutor.getIdentity());
 
   // If the current executor is compatible with running the new executor,
   // we can just immediately continue running with the resume function
   // we were passed in.
   if (!currentExecutor.mustSwitchToRun(newExecutor)) {
-    // FIXME: force tail call
-    return resumeFunction(resumeContext);
+    return resumeFunction(resumeContext); // 'return' forces tail call
   }
 
   auto task = swift_task_getCurrent();
@@ -1873,19 +1879,20 @@ static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContex
   if (canGiveUpThreadForSwitch(trackingInfo, currentExecutor) &&
       !shouldYieldThread() &&
       tryAssumeThreadForSwitch(newExecutor, runner)) {
-#if SWIFT_TASK_PRINTF_DEBUG
-    fprintf(stderr, "[%p] switch succeeded, task %p assumed thread for executor %p\n", pthread_self(), task, newExecutor.getIdentity());
-#endif
+    SWIFT_TASK_DEBUG_LOG(
+        "switch succeeded, task %p assumed thread for executor %p", task,
+        newExecutor.getIdentity());
     giveUpThreadForSwitch(currentExecutor, runner);
-    // FIXME: force tail call
+    // 'return' forces tail call
     return runOnAssumedThread(task, newExecutor, trackingInfo, runner);
   }
 
   // Otherwise, just asynchronously enqueue the task on the given
   // executor.
-#if SWIFT_TASK_PRINTF_DEBUG
-  fprintf(stderr, "[%p] switch failed, task %p enqueued on executor %p\n", pthread_self(), task, newExecutor.getIdentity());
-#endif
+  SWIFT_TASK_DEBUG_LOG("switch failed, task %p enqueued on executor %p", task,
+                       newExecutor.getIdentity());
+  task->flagAsSuspended();
+  _swift_task_clearCurrent();
   swift_task_enqueue(task, newExecutor);
 }
 
@@ -1903,9 +1910,8 @@ void _swift_task_enqueueOnExecutor(Job *job, HeapObject *executor,
 
 SWIFT_CC(swift)
 static void swift_task_enqueueImpl(Job *job, ExecutorRef executor) {
-#if SWIFT_TASK_PRINTF_DEBUG
-  fprintf(stderr, "[%p] enqueue job %p on executor %p\n", pthread_self(), job, executor.getIdentity());
-#endif
+  SWIFT_TASK_DEBUG_LOG("enqueue job %p on executor %p", job,
+                       executor.getIdentity());
 
   assert(job && "no job provided");
 
@@ -1925,3 +1931,49 @@ static void swift_task_enqueueImpl(Job *job, ExecutorRef executor) {
 
 #define OVERRIDE_ACTOR COMPATIBILITY_OVERRIDE
 #include COMPATIBILITY_OVERRIDE_INCLUDE_PATH
+
+
+/*****************************************************************************/
+/***************************** DISTRIBUTED ACTOR *****************************/
+/*****************************************************************************/
+
+OpaqueValue*
+swift::swift_distributedActor_remote_initialize(const Metadata *actorType) {
+  auto *classMetadata = actorType->getClassObject();
+
+  // TODO(distributed): make this allocation smaller
+  // ==== Allocate the memory for the remote instance
+  HeapObject *alloc = swift_allocObject(classMetadata,
+                                        classMetadata->getInstanceSize(),
+                                        classMetadata->getInstanceAlignMask());
+
+  // TODO: remove this memset eventually, today we only do this to not have
+  //       to modify the destructor logic, as releasing zeroes is no-op
+  memset(alloc + 1, 0, classMetadata->getInstanceSize() - sizeof(HeapObject));
+
+  // TODO(distributed): a remote one does not have to have the "real"
+  //  default actor body, e.g. we don't need an executor at all; so
+  //  we can allocate more efficiently and only share the flags/status field
+  //  between the both memory representations
+  // --- Currently we ride on the DefaultActorImpl to reuse the memory layout
+  // of the flags etc. So initialize the default actor into the allocation.
+  auto actor = asImpl(reinterpret_cast<DefaultActor*>(alloc));
+  actor->initialize(/*remote*/true);
+  assert(actor->isDistributedRemote());
+
+  return reinterpret_cast<OpaqueValue*>(actor);
+}
+
+void swift::swift_distributedActor_destroy(DefaultActor *_actor) {
+  // FIXME(distributed): if this is a proxy, we would destroy a bit differently I guess? less memory was allocated etc.
+  asImpl(_actor)->destroy(); // today we just replicate what defaultActor_destroy does
+}
+
+bool swift::swift_distributed_actor_is_remote(DefaultActor *_actor) {
+  return asImpl(_actor)->isDistributedRemote();
+}
+
+bool DefaultActorImpl::isDistributedRemote() {
+  auto state = CurrentState.load(std::memory_order_relaxed);
+  return state.Flags.isDistributedRemote();
+}

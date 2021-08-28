@@ -294,30 +294,38 @@ bool ide::initCompilerInvocation(
   StreamDiagConsumer DiagConsumer(ErrOS);
   Diags.addConsumer(DiagConsumer);
 
-  bool HadError = driver::getSingleFrontendInvocationFromDriverArguments(
-      Args, Diags, [&](ArrayRef<const char *> FrontendArgs) {
-    return Invocation.parseArgs(FrontendArgs, Diags);
-  }, /*ForceNoOutputs=*/true);
+  bool InvocationCreationFailed =
+      driver::getSingleFrontendInvocationFromDriverArguments(
+          Args, Diags,
+          [&](ArrayRef<const char *> FrontendArgs) {
+            return Invocation.parseArgs(FrontendArgs, Diags);
+          },
+          /*ForceNoOutputs=*/true);
 
   // Remove the StreamDiagConsumer as it's no longer needed.
   Diags.removeConsumer(DiagConsumer);
 
-  if (HadError) {
-    Error = std::string(ErrOS.str());
+  Error = std::string(ErrOS.str());
+  if (InvocationCreationFailed) {
     return true;
   }
 
+  std::string SymlinkResolveError;
   Invocation.getFrontendOptions().InputsAndOutputs =
       resolveSymbolicLinksInInputs(
           Invocation.getFrontendOptions().InputsAndOutputs,
-          UnresolvedPrimaryFile, FileSystem, Error);
+          UnresolvedPrimaryFile, FileSystem, SymlinkResolveError);
 
   // SourceKit functionalities want to proceed even if there are missing inputs.
   Invocation.getFrontendOptions().InputsAndOutputs
       .setShouldRecoverMissingInputs();
 
-  if (!Error.empty())
+  if (!SymlinkResolveError.empty()) {
+    // resolveSymbolicLinksInInputs fails if the unresolved primary file is not
+    // in the input files. We can't recover from that.
+    Error += SymlinkResolveError;
     return true;
+  }
 
   ClangImporterOptions &ImporterOpts = Invocation.getClangImporterOptions();
   ImporterOpts.DetailedPreprocessingRecord = true;
@@ -1009,9 +1017,6 @@ accept(SourceManager &SM, RegionType Type, ArrayRef<Replacement> Replacements) {
   }
 }
 
-swift::ide::SourceEditTextConsumer::
-SourceEditTextConsumer(llvm::raw_ostream &OS) : OS(OS) { }
-
 void swift::ide::SourceEditTextConsumer::
 accept(SourceManager &SM, RegionType Type, ArrayRef<Replacement> Replacements) {
   for (const auto &Replacement: Replacements) {
@@ -1108,6 +1113,14 @@ accept(SourceManager &SM, RegionType RegionType,
   }
 }
 
+void swift::ide::BroadcastingSourceEditConsumer::accept(
+    SourceManager &SM, RegionType RegionType,
+    ArrayRef<Replacement> Replacements) {
+  for (auto &Consumer : Consumers) {
+    Consumer->accept(SM, RegionType, Replacements);
+  }
+}
+
 bool swift::ide::isFromClang(const Decl *D) {
   if (getEffectiveClangNode(D))
     return true;
@@ -1140,7 +1153,11 @@ ClangNode swift::ide::extensionGetClangNode(const ExtensionDecl *ext) {
   return ClangNode();
 }
 
-std::pair<Type, ConcreteDeclRef> swift::ide::getReferencedDecl(Expr *expr) {
+std::pair<Type, ConcreteDeclRef> swift::ide::getReferencedDecl(Expr *expr,
+                                                               bool semantic) {
+  if (semantic)
+    expr = expr->getSemanticsProvidingExpr();
+
   auto exprTy = expr->getType();
 
   // Look through unbound instance member accesses.
@@ -1206,12 +1223,18 @@ Expr *swift::ide::getBase(ArrayRef<Expr *> ExprStack) {
   Expr *CurrentE = ExprStack.back();
   Expr *ParentE = getContainingExpr(ExprStack, 1);
   Expr *Base = nullptr;
+
   if (auto DSE = dyn_cast_or_null<DotSyntaxCallExpr>(ParentE))
     Base = DSE->getBase();
   else if (auto MRE = dyn_cast<MemberRefExpr>(CurrentE))
     Base = MRE->getBase();
   else if (auto SE = dyn_cast<SubscriptExpr>(CurrentE))
     Base = SE->getBase();
+
+  // Look through curry thunks
+  if (auto ACE = dyn_cast_or_null<AutoClosureExpr>(Base))
+    if (auto *Unwrapped = ACE->getUnwrappedCurryThunkExpr())
+      Base = Unwrapped;
 
   if (Base) {
     while (auto ICE = dyn_cast<ImplicitConversionExpr>(Base))

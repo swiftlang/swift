@@ -6,9 +6,11 @@ import _Concurrency
 
 // Make sure the type shows up (including under its old name, for
 // short-term source compatibility)
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 extension PartialAsyncTask {
+  // expected-warning@-1 {{'PartialAsyncTask' is deprecated: renamed to 'UnownedJob'}}
+  // expected-note@-2 {{use 'UnownedJob' instead}}
 }
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 extension UnownedJob {
 }

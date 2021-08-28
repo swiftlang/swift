@@ -31,14 +31,15 @@
 
 #define DEBUG_TYPE "diagnose-lifetime-issues"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/Demangling/Demangler.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/BasicBlockBits.h"
+#include "swift/SIL/OwnershipUtils.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/PrunedLiveness.h"
-#include "swift/Demangling/Demangler.h"
+#include "clang/AST/DeclObjC.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/Debug.h"
-#include "clang/AST/DeclObjC.h"
 
 using namespace swift;
 
@@ -156,19 +157,24 @@ static bool isStoreObjcWeak(SILInstruction *inst, Operand *op) {
 /// Returns the state of \p def. See DiagnoseLifetimeIssues::State.
 DiagnoseLifetimeIssues::State DiagnoseLifetimeIssues::
 visitUses(SILValue def, bool updateLivenessAndWeakStores, int callDepth) {
-  SmallSetVector<SILValue, 32> defUseWorklist;
-  defUseWorklist.insert(def);
+  SmallPtrSet<SILValue, 32> defUseVisited;
+  SmallVector<SILValue, 32> defUseVector;
+  auto pushDef = [&](SILValue value) {
+    if (defUseVisited.insert(value).second)
+      defUseVector.push_back(value);
+  };
+
+  pushDef(def);
   bool foundWeakStore = false;
-  while (!defUseWorklist.empty()) {
-    SILValue value = defUseWorklist.pop_back_val();
+  while (!defUseVector.empty()) {
+    SILValue value = defUseVector.pop_back_val();
     for (Operand *use : value->getUses()) {
       auto *user = use->getUser();
 
       // Recurse through copies and enums. Enums are important because the
       // operand of a store_weak is always an Optional.
-      if (isa<CopyValueInst>(user) || isa<EnumInst>(user) ||
-          isa<InitExistentialRefInst>(user)) {
-        defUseWorklist.insert(cast<SingleValueInstruction>(user));
+      if (isa<CopyValueInst>(user)) {
+        pushDef(cast<SingleValueInstruction>(user));
         continue;
       }
       if (isa<StoreWeakInst>(user) || isStoreObjcWeak(user, use)) {
@@ -208,22 +214,53 @@ visitUses(SILValue def, bool updateLivenessAndWeakStores, int callDepth) {
         if (updateLivenessAndWeakStores)
           liveness.updateForUse(user, /*lifetimeEnding*/ false);
         break;
+      case OperandOwnership::ForwardingBorrow:
       case OperandOwnership::ForwardingConsume:
-        // TODO: handle forwarding instructions, e.g. casts.
-        return CanEscape;
+        // TermInst includes ReturnInst, which is generally an escape.
+        // If this is called as part of getArgumentState, then it is not really
+        // an escape, but we don't currently follow returned values.
+        if (isa<TermInst>(user))
+          return CanEscape;
+
+        for (SILValue result : user->getResults()) {
+          // This assumes that forwarding to a trivial value cannot extend the
+          // lifetime. This way, simply projecting a trivial value out of an
+          // aggregate isn't considered an escape.
+          if (result.getOwnershipKind() == OwnershipKind::None)
+            continue;
+
+          pushDef(result);
+        }
+        continue;
       case OperandOwnership::DestroyingConsume:
         // destroy_value does not force pruned liveness (but store etc. does).
         if (!isa<DestroyValueInst>(user))
           return CanEscape;
         break;
-      case OperandOwnership::Borrow:
+      case OperandOwnership::Borrow: {
         if (updateLivenessAndWeakStores &&
             !liveness.updateForBorrowingOperand(use))
           return CanEscape;
+        BorrowingOperand borrowOper(use);
+        if (borrowOper.hasBorrowIntroducingUser()) {
+          if (auto *beginBorrow = dyn_cast<BeginBorrowInst>(user))
+            pushDef(beginBorrow);
+          else
+            return CanEscape;
+        }
         break;
-      case OperandOwnership::InteriorPointer:
-      case OperandOwnership::ForwardingBorrow:
+      }
       case OperandOwnership::EndBorrow:
+        continue;
+
+      case OperandOwnership::InteriorPointer:
+        // Treat most interior pointers as escapes until they can be audited.
+        // But if the interior pointer cannot be used to copy the parent
+        // reference, then it does not need to be considered an escape.
+        if (isa<RefElementAddrInst>(user)) {
+          continue;
+        }
+        return CanEscape;
       case OperandOwnership::Reborrow:
         return CanEscape;
       }

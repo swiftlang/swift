@@ -290,6 +290,7 @@ struct DebugVarCarryingInst {
     case Kind::AllocBox:
       return cast<AllocBoxInst>(inst)->getDecl();
     }
+    llvm_unreachable("covered switch");
   }
 
   Optional<SILDebugVariable> getVarInfo() const {
@@ -304,6 +305,25 @@ struct DebugVarCarryingInst {
       return cast<AllocStackInst>(inst)->getVarInfo();
     case Kind::AllocBox:
       return cast<AllocBoxInst>(inst)->getVarInfo();
+    }
+    llvm_unreachable("covered switch");
+  }
+
+  void setDebugVarScope(const SILDebugScope *NewDS) {
+    switch (kind) {
+    case Kind::Invalid:
+      llvm_unreachable("Invalid?!");
+    case Kind::DebugValue:
+      cast<DebugValueInst>(inst)->setDebugVarScope(NewDS);
+      break;
+    case Kind::DebugValueAddr:
+      cast<DebugValueAddrInst>(inst)->setDebugVarScope(NewDS);
+      break;
+    case Kind::AllocStack:
+      cast<AllocStackInst>(inst)->setDebugVarScope(NewDS);
+      break;
+    case Kind::AllocBox:
+      llvm_unreachable("Not implemented");
     }
   }
 };

@@ -13,9 +13,9 @@
 #include <cstring>
 
 #include "../SwiftShims/ThreadLocalStorage.h"
-#include "../runtime/ThreadLocalStorage.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Debug.h"
+#include "swift/Runtime/ThreadLocalStorage.h"
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 void _stdlib_destroyTLS(void *);

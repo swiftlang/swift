@@ -294,6 +294,11 @@ class DependentComponentSplitterStep final : public SolverStep {
   /// Array containing all of the partial solutions for the parent split.
   MutableArrayRef<SmallVector<Solution, 4>> AllPartialSolutions;
 
+  /// The solutions computed the \c ComponentSteps created for each partial
+  /// solution combinations. Will be merged into the final \c Solutions vector
+  /// in \c resume.
+  std::vector<std::unique_ptr<SmallVector<Solution, 2>>> ContextualSolutions;
+
   /// Take all of the constraints in this component and put them into
   /// \c Constraints.
   void injectConstraints() {

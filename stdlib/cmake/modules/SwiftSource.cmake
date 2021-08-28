@@ -113,7 +113,7 @@ function(handle_swift_sources
     # FIXME: We shouldn't /have/ to build things in a single process.
     # <rdar://problem/15972329>
     list(APPEND swift_compile_flags "-whole-module-optimization")
-    if(sdk IN_LIST SWIFT_APPLE_PLATFORMS OR sdk STREQUAL "MACCATALYST")
+    if(sdk IN_LIST SWIFT_DARWIN_PLATFORMS OR sdk STREQUAL "MACCATALYST")
       list(APPEND swift_compile_flags "-save-optimization-record=bitstream")
     endif()
     if (SWIFTSOURCES_ENABLE_LTO)
@@ -218,7 +218,7 @@ function(_add_target_variant_swift_compile_flags
     list(APPEND result "-sdk" "${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH}")
   endif()
 
-  if("${sdk}" IN_LIST SWIFT_APPLE_PLATFORMS)
+  if("${sdk}" IN_LIST SWIFT_DARWIN_PLATFORMS)
     set(sdk_deployment_version "${SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION}")
     get_target_triple(target target_variant "${sdk}" "${arch}"
     MACCATALYST_BUILD_FLAVOR "${VARIANT_MACCATALYST_BUILD_FLAVOR}"
@@ -241,7 +241,7 @@ function(_add_target_variant_swift_compile_flags
     list(APPEND result "-resource-dir" "${SWIFTLIB_DIR}")
   endif()
 
-  if("${sdk}" IN_LIST SWIFT_APPLE_PLATFORMS)
+  if("${sdk}" IN_LIST SWIFT_DARWIN_PLATFORMS)
     # We collate -F with the framework path to avoid unwanted deduplication
     # of options by target_compile_options -- this way no undesired
     # side effects are introduced should a new search path be added.
@@ -266,6 +266,10 @@ function(_add_target_variant_swift_compile_flags
 
   if(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
     list(APPEND result "-D" "SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY")
+  endif()
+
+  if(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED)
+    list(APPEND result "-D" "SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED")
   endif()
 
   if(SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS)
@@ -543,7 +547,7 @@ function(_compile_swift_files
     endif()
 
     set(optional_arg)
-    if(SWIFTFILE_SDK IN_LIST SWIFT_APPLE_PLATFORMS OR
+    if(SWIFTFILE_SDK IN_LIST SWIFT_DARWIN_PLATFORMS OR
        SWIFTFILE_SDK STREQUAL "MACCATALYST")
       # Allow installation of stdlib without building all variants on Darwin.
       set(optional_arg "OPTIONAL")
@@ -630,7 +634,17 @@ function(_compile_swift_files
   if(CMAKE_HOST_SYSTEM_NAME STREQUAL Windows)
     set(HOST_EXECUTABLE_SUFFIX .exe)
   endif()
-  set(swift_compiler_tool "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swiftc${HOST_EXECUTABLE_SUFFIX}")
+  if(SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER)
+    if(SWIFT_PREBUILT_SWIFT)
+      set(swift_compiler_tool "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swiftc${HOST_EXECUTABLE_SUFFIX}")
+    elseif(CMAKE_Swift_COMPILER)
+      set(swift_compiler_tool "${CMAKE_Swift_COMPILER}")
+    else()
+      message(ERROR "Must pass in prebuilt tools using SWIFT_NATIVE_SWIFT_TOOLS_PATH or set CMAKE_Swift_COMPILER")
+    endif()
+  else()
+    set(swift_compiler_tool "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swiftc${HOST_EXECUTABLE_SUFFIX}")
+  endif()
 
   set(swift_compiler_tool_dep)
   if(SWIFT_INCLUDE_TOOLS)

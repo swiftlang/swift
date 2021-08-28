@@ -26,6 +26,7 @@
 #include "swift/Basic/OptimizationMode.h"
 #include "swift/Basic/Version.h"
 #include "swift/Basic/Located.h"
+#include "swift/AST/ASTAllocated.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/AutoDiff.h"
@@ -60,7 +61,8 @@ class PatternBindingInitializer;
 class TrailingWhereClause;
 class TypeExpr;
 
-class alignas(1 << AttrAlignInBits) AttributeBase {
+class alignas(1 << AttrAlignInBits) AttributeBase
+    : public ASTAllocated<AttributeBase> {
 public:
   /// The location of the '@'.
   const SourceLoc AtLoc;
@@ -79,17 +81,6 @@ public:
       return {AtLoc, Range.End};
     return Range;
   }
-
-  // Only allow allocation of attributes using the allocator in ASTContext
-  // or by doing a placement new.
-  void *operator new(size_t Bytes, ASTContext &C,
-                     unsigned Alignment = alignof(AttributeBase));
-
-  void operator delete(void *Data) throw() { }
-  void *operator new(size_t Bytes, void *Mem) throw() { return Mem; }
-
-  // Make vanilla new/delete illegal for attributes.
-  void *operator new(size_t Bytes) throw() = delete;
 
   AttributeBase(const AttributeBase &) = delete;
 
@@ -160,10 +151,6 @@ protected:
 
     SWIFT_INLINE_BITFIELD(InlineAttr, DeclAttribute, NumInlineKindBits,
       kind : NumInlineKindBits
-    );
-
-    SWIFT_INLINE_BITFIELD(ActorIndependentAttr, DeclAttribute, NumActorIndependentKindBits,
-      kind : NumActorIndependentKindBits
     );
 
     SWIFT_INLINE_BITFIELD(OptimizeAttr, DeclAttribute, NumOptimizationModeBits,
@@ -298,6 +285,9 @@ public:
 
     /// Whether this attribute is only valid when concurrency is enabled.
     ConcurrencyOnly = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 16),
+
+    /// Whether this attribute is only valid when distributed is enabled.
+    DistributedOnly = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 17),
   };
 
   LLVM_READNONE
@@ -390,6 +380,10 @@ public:
 
   static bool isConcurrencyOnly(DeclAttrKind DK) {
     return getOptions(DK) & ConcurrencyOnly;
+  }
+
+  static bool isDistributedOnly(DeclAttrKind DK) {
+    return getOptions(DK) & DistributedOnly;
   }
 
   static bool isUserInaccessible(DeclAttrKind DK) {
@@ -626,7 +620,7 @@ public:
 
   AvailableAttr(SourceLoc AtLoc, SourceRange Range,
                    PlatformKind Platform,
-                   StringRef Message, StringRef Rename,
+                   StringRef Message, StringRef Rename, ValueDecl *RenameDecl,
                    const llvm::VersionTuple &Introduced,
                    SourceRange IntroducedRange,
                    const llvm::VersionTuple &Deprecated,
@@ -636,7 +630,7 @@ public:
                    PlatformAgnosticAvailabilityKind PlatformAgnostic,
                    bool Implicit)
     : DeclAttribute(DAK_Available, AtLoc, Range, Implicit),
-      Message(Message), Rename(Rename),
+      Message(Message), Rename(Rename), RenameDecl(RenameDecl),
       INIT_VER_TUPLE(Introduced), IntroducedRange(IntroducedRange),
       INIT_VER_TUPLE(Deprecated), DeprecatedRange(DeprecatedRange),
       INIT_VER_TUPLE(Obsoleted), ObsoletedRange(ObsoletedRange),
@@ -656,6 +650,12 @@ public:
   /// name, optionally with a prefixed type, similar to the syntax used for
   /// the `NS_SWIFT_NAME` annotation in Objective-C.
   const StringRef Rename;
+
+  /// The declaration referred to by \c Rename. Note that this is only set for
+  /// deserialized attributes or inferred attributes from ObjectiveC code.
+  /// \c ValueDecl::getRenamedDecl should be used to find the declaration
+  /// corresponding to \c Rename.
+  ValueDecl *RenameDecl;
 
   /// Indicates when the symbol was introduced.
   const Optional<llvm::VersionTuple> Introduced;
@@ -742,6 +742,11 @@ public:
                          = PlatformAgnosticAvailabilityKind::Unavailable,
                          llvm::VersionTuple Obsoleted
                          = llvm::VersionTuple());
+
+  /// Create an AvailableAttr that indicates the given \p AsyncFunc should be
+  /// preferentially used in async contexts
+  static AvailableAttr *createForAlternative(ASTContext &C,
+                                             AbstractFunctionDecl *AsyncFunc);
 
   AvailableAttr *clone(ASTContext &C, bool implicit) const;
 
@@ -858,6 +863,7 @@ public:
   /// Determine whether the name associated with this attribute was
   /// implicit.
   bool isNameImplicit() const { return Bits.ObjCAttr.ImplicitName; }
+  void setNameImplicit(bool newValue) { Bits.ObjCAttr.ImplicitName = newValue; }
 
   /// Set the name of this entity.
   void setName(ObjCSelector name, bool implicit) {
@@ -884,11 +890,6 @@ public:
   /// @objc inference rules.
   void setSwift3Inferred(bool inferred = true) {
     Bits.ObjCAttr.Swift3Inferred = inferred;
-  }
-
-  /// Clear the name of this entity.
-  void clearName() {
-    NameData = nullptr;
   }
 
   /// Retrieve the source locations for the names in a non-implicit
@@ -1217,25 +1218,6 @@ public:
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_ReferenceOwnership;
-  }
-};
-
-/// Represents an actorIndependent/actorIndependent(unsafe) decl attribute.
-class ActorIndependentAttr : public DeclAttribute {
-public:
-  ActorIndependentAttr(SourceLoc atLoc, SourceRange range, ActorIndependentKind kind)
-      : DeclAttribute(DAK_ActorIndependent, atLoc, range, /*Implicit=*/false) {
-    Bits.ActorIndependentAttr.kind = unsigned(kind);
-  }
-
-  ActorIndependentAttr(ActorIndependentKind kind, bool IsImplicit=false)
-    : ActorIndependentAttr(SourceLoc(), SourceRange(), kind) {
-      setImplicit(IsImplicit);
-    }
-
-  ActorIndependentKind getKind() const { return ActorIndependentKind(Bits.ActorIndependentAttr.kind); }
-  static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_ActorIndependent;
   }
 };
 
@@ -2041,57 +2023,6 @@ public:
   }
 };
 
-/// The `@completionHandlerAsync` attribute marks a function as having an async
-/// alternative, optionally providing a name (for cases when the alternative
-/// has a different name).
-class CompletionHandlerAsyncAttr final : public DeclAttribute {
-public:
-  /// Reference to the async alternative function. Only set for deserialized
-  /// attributes or inferred attributes from ObjectiveC code.
-  AbstractFunctionDecl *AsyncFunctionDecl;
-
-  /// DeclName of the async function in the attribute. Only set from actual
-  /// Swift code, deserialization/ObjectiveC imports will set the decl instead.
-  const DeclNameRef AsyncFunctionName;
-
-  /// Source location of the async function name in the attribute
-  const SourceLoc AsyncFunctionNameLoc;
-
-  /// The index of the completion handler
-  const size_t CompletionHandlerIndex;
-
-  /// Source location of the completion handler index passed to the index
-  const SourceLoc CompletionHandlerIndexLoc;
-
-  CompletionHandlerAsyncAttr(DeclNameRef asyncFunctionName,
-                             SourceLoc asyncFunctionNameLoc,
-                             size_t completionHandlerIndex,
-                             SourceLoc completionHandlerIndexLoc,
-                             SourceLoc atLoc, SourceRange range)
-      : DeclAttribute(DAK_CompletionHandlerAsync, atLoc, range,
-                      /*implicit*/ false),
-        AsyncFunctionDecl(nullptr),
-        AsyncFunctionName(asyncFunctionName),
-        AsyncFunctionNameLoc(asyncFunctionNameLoc),
-        CompletionHandlerIndex(completionHandlerIndex),
-        CompletionHandlerIndexLoc(completionHandlerIndexLoc) {}
-
-  CompletionHandlerAsyncAttr(AbstractFunctionDecl &asyncFunctionDecl,
-                             size_t completionHandlerIndex,
-                             SourceLoc completionHandlerIndexLoc,
-                             SourceLoc atLoc, SourceRange range,
-                             bool implicit)
-      : DeclAttribute(DAK_CompletionHandlerAsync, atLoc, range,
-                      implicit),
-        AsyncFunctionDecl(&asyncFunctionDecl) ,
-        CompletionHandlerIndex(completionHandlerIndex),
-        CompletionHandlerIndexLoc(completionHandlerIndexLoc) {}
-
-  static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_CompletionHandlerAsync;
-  }
-};
-
 /// Attributes that may be applied to declarations.
 class DeclAttributes {
   /// Linked list of declaration attributes.
@@ -2147,6 +2078,10 @@ public:
   /// Returns the first @available attribute that indicates
   /// a declaration is deprecated on all deployment targets, or null otherwise.
   const AvailableAttr *getDeprecated(const ASTContext &ctx) const;
+
+  /// Returns the first @available attribute that indicates
+  /// a declaration will be deprecated in the future, or null otherwise.
+  const AvailableAttr *getSoftDeprecated(const ASTContext &ctx) const;
 
   SWIFT_DEBUG_DUMPER(dump(const Decl *D = nullptr));
   void print(ASTPrinter &Printer, const PrintOptions &Options,

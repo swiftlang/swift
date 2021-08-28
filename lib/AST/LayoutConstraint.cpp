@@ -140,12 +140,6 @@ bool LayoutConstraintInfo::isNativeRefCounted(LayoutConstraintKind Kind) {
          Kind == LayoutConstraintKind::NativeClass;
 }
 
-void *LayoutConstraintInfo::operator new(size_t bytes, const ASTContext &ctx,
-                                         AllocationArena arena,
-                                         unsigned alignment) {
-  return ctx.Allocate(bytes, alignment, arena);
-}
-
 SourceRange LayoutConstraintLoc::getSourceRange() const { return getLoc(); }
 
 #define MERGE_LOOKUP(lhs, rhs)                                                 \
@@ -357,5 +351,19 @@ LayoutConstraintInfo LayoutConstraintInfo::NativeClassConstraintInfo(
 
 LayoutConstraintInfo LayoutConstraintInfo::TrivialConstraintInfo(
     LayoutConstraintKind::Trivial);
+
+int LayoutConstraint::compare(LayoutConstraint rhs) const {
+  if (Ptr->getKind() != rhs->getKind())
+    return int(rhs->getKind()) - int(Ptr->getKind());
+
+  if (Ptr->SizeInBits != rhs->SizeInBits)
+    return int(rhs->SizeInBits) - int(Ptr->SizeInBits);
+
+  if (Ptr->Alignment != rhs->Alignment)
+    return int(rhs->Alignment) - int(Ptr->Alignment);
+
+  assert(*this == rhs);
+  return 0;
+}
 
 } // end namespace swift

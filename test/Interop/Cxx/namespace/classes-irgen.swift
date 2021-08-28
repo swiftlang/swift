@@ -6,6 +6,7 @@ import Classes
 // CHECK: call i8* @{{_ZN10ClassesNS111BasicStruct11basicMemberEv|"\?basicMember@BasicStruct@ClassesNS1@@QEAAPEBDXZ"}}(%"struct.ClassesNS1::BasicStruct"*
 // CHECK: call i8* @{{_ZN10ClassesNS110ClassesNS211BasicStruct11basicMemberEv|"\?basicMember@BasicStruct@ClassesNS2@ClassesNS1@@QEAAPEBDXZ"}}(%"struct.ClassesNS1::ClassesNS2::BasicStruct"*
 // CHECK: call i8* @{{_ZN10ClassesNS311BasicStruct11basicMemberEv|"\?basicMember@BasicStruct@ClassesNS3@@QEAAPEBDXZ"}}(%"struct.ClassesNS3::BasicStruct"*
+// CHECK: call i8* @{{_ZN10ClassesNS111BasicStruct11basicMemberEv|"\?basicMember@BasicStruct@ClassesNS1@@QEAAPEBDXZ"}}(%"struct.ClassesNS1::BasicStruct"*
 // CHECK: ret void
 public func basicTests() {
   var basicStructInst = ClassesNS1.BasicStruct()
@@ -16,6 +17,9 @@ public func basicTests() {
 
   var siblingBasicStruct = ClassesNS3.BasicStruct()
   siblingBasicStruct.basicMember()
+
+  var basicStructViaAlias = ClassesNS4.AliasToGlobalNS1.BasicStruct()
+  basicStructViaAlias.basicMember()
 }
 
 // CHECK-LABEL: define {{.*}}void @"$s4main15forwardDeclaredyyF"()

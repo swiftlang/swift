@@ -116,6 +116,12 @@ static bool canonicalizeInputFunction(Function &F, ARCEntryPointBuilder &B,
           ++NumNoopDeleted;
           continue;
         }
+        if (!CI.use_empty()) {
+          // Do not get RC identical value here, could end up with a
+          // crash in replaceAllUsesWith as the type maybe different.
+          CI.replaceAllUsesWith(CI.getArgOperand(0));
+          Changed = true;
+        }
         // Rewrite unknown retains into swift_retains.
         NativeRefs.insert(ArgVal);
         for (auto &X : UnknownObjectRetains[ArgVal]) {
@@ -138,7 +144,12 @@ static bool canonicalizeInputFunction(Function &F, ARCEntryPointBuilder &B,
           ++NumNoopDeleted;
           continue;
         }
-
+        if (!CI.use_empty()) {
+          // Do not get RC identical value here, could end up with a
+          // crash in replaceAllUsesWith as the type maybe different.
+          CI.replaceAllUsesWith(CI.getArgOperand(0));
+          Changed = true;
+        }
         // Have not encountered a strong retain/release. keep it in the
         // unknown retain/release list for now. It might get replaced
         // later.

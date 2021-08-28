@@ -238,6 +238,7 @@ extension MutableCollection {
   ///   the range must be valid indices of the collection.
   ///
   /// - Complexity: O(1)
+  @available(*, unavailable)
   @inlinable
   public subscript(bounds: Range<Index>) -> Slice<Self> {
     get {
@@ -247,6 +248,19 @@ extension MutableCollection {
     set {
       _writeBackMutableSlice(&self, bounds: bounds, slice: newValue)
     }
+  }
+
+  // This unavailable default implementation of `subscript(bounds: Range<_>)`
+  // prevents incomplete MutableCollection implementations from satisfying the
+  // protocol through the use of the generic convenience implementation
+  // `subscript<R: RangeExpression>(r: R)`. If that were the case, at
+  // runtime the generic implementation would call itself
+  // in an infinite recursion due to the absence of a better option.
+  @available(*, unavailable)
+  @_alwaysEmitIntoClient
+  public subscript(bounds: Range<Index>) -> SubSequence {
+    get { fatalError() }
+    set { fatalError() }
   }
 
   /// Exchanges the values at the specified indices of the collection.
@@ -266,6 +280,45 @@ extension MutableCollection {
     let tmp = self[i]
     self[i] = self[j]
     self[j] = tmp
+  }
+}
+
+extension MutableCollection where SubSequence == Slice<Self> {
+
+  /// Accesses a contiguous subrange of the collection's elements.
+  ///
+  /// The accessed slice uses the same indices for the same elements as the
+  /// original collection. Always use the slice's `startIndex` property
+  /// instead of assuming that its indices start at a particular value.
+  ///
+  /// This example demonstrates getting a slice of an array of strings, finding
+  /// the index of one of the strings in the slice, and then using that index
+  /// in the original array.
+  ///
+  ///     var streets = ["Adams", "Bryant", "Channing", "Douglas", "Evarts"]
+  ///     let streetsSlice = streets[2 ..< streets.endIndex]
+  ///     print(streetsSlice)
+  ///     // Prints "["Channing", "Douglas", "Evarts"]"
+  ///
+  ///     let index = streetsSlice.firstIndex(of: "Evarts")    // 4
+  ///     streets[index!] = "Eustace"
+  ///     print(streets[index!])
+  ///     // Prints "Eustace"
+  ///
+  /// - Parameter bounds: A range of the collection's indices. The bounds of
+  ///   the range must be valid indices of the collection.
+  ///
+  /// - Complexity: O(1)
+  @inlinable
+  @_alwaysEmitIntoClient
+  public subscript(bounds: Range<Index>) -> Slice<Self> {
+    get {
+      _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
+      return Slice(base: self, bounds: bounds)
+    }
+    set {
+      _writeBackMutableSlice(&self, bounds: bounds, slice: newValue)
+    }
   }
 }
 

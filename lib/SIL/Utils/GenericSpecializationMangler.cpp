@@ -79,7 +79,7 @@ appendSubstitutions(GenericSignature sig, SubstitutionMap subs) {
   bool First = true;
   sig->forEachParam([&](GenericTypeParamType *ParamType, bool Canonical) {
     if (Canonical) {
-      appendType(Type(ParamType).subst(subs)->getCanonicalType());
+      appendType(Type(ParamType).subst(subs)->getCanonicalType(), nullptr);
       appendListSeparator(First);
     }
   });
@@ -127,7 +127,7 @@ getSubstitutionMapForPrespecialization(GenericSignature genericSig,
                                        GenericSignature specSig) {
   auto CalleeGenericSig = genericSig;
   auto SpecializedGenericSig = specSig;
-  auto SpecializedGenericEnv = specSig->getGenericEnvironment();
+  auto SpecializedGenericEnv = specSig.getGenericEnvironment();
 
   auto CalleeInterfaceToSpecializedInterfaceMap = SubstitutionMap::get(
       CalleeGenericSig,

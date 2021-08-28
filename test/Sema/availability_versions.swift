@@ -1385,7 +1385,7 @@ protocol ProtocolWithRequirementMentioningUnavailable {
 
 protocol HasMethodF {
   associatedtype T
-  func f(_ p: T) // expected-note 4{{protocol requirement here}}
+  func f(_ p: T) // expected-note 3{{protocol requirement here}}
 }
 
 class TriesToConformWithFunctionIntroducedOn10_51 : HasMethodF {
@@ -1499,17 +1499,14 @@ extension TakesClassAvailableOn10_51_B : HasTakesClassAvailableOn10_51 {
 }
 
 
-// We do not want potential unavailability to play a role in picking a witness for a
-// protocol requirement. Rather, the witness should be chosen, regardless of its
-// potential unavailability, and then it should be diagnosed if it is less available
-// than the protocol requires.
-class TestAvailabilityDoesNotAffectWitnessCandidacy : HasMethodF {
-  // Test that we choose the more specialized witness even though it is
-  // less available than the protocol requires and there is a less specialized
-  // witness that has suitable availability.
+// We want conditional availability to play a role in picking a witness for a
+// protocol requirement.
+class TestAvailabilityAffectsWitnessCandidacy : HasMethodF {
+  // Test that we choose the less specialized witness, because the more specialized
+  // witness is conditionally unavailable.
 
   @available(OSX, introduced: 10.51)
-  func f(_ p: Int) { } // expected-error {{protocol 'HasMethodF' requires 'f' to be available in macOS 10.50.0 and newer}}
+  func f(_ p: Int) { }
 
   func f<T>(_ p: T) { }
 }

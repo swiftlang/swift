@@ -20,6 +20,7 @@
 #include "swift/AST/SILOptions.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/LLVMInitialize.h"
+#include "swift/Basic/InitializeLibSwift.h"
 #include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
@@ -104,6 +105,10 @@ EnableExperimentalConcurrency("enable-experimental-concurrency",
                    llvm::cl::desc("Enable experimental concurrency model."));
 
 static llvm::cl::opt<bool>
+EnableExperimentalDistributed("enable-experimental-distributed",
+                   llvm::cl::desc("Enable experimental distributed actors."));
+
+static llvm::cl::opt<bool>
 VerifyExclusivity("enable-verify-exclusivity",
                   llvm::cl::desc("Verify the access markers used to enforce exclusivity."));
 
@@ -116,6 +121,14 @@ static llvm::cl::opt<bool> EnableOSSAModules(
     llvm::cl::desc("Do we always serialize SIL in OSSA form? If "
                    "this is disabled we do not serialize in OSSA "
                    "form when optimizing."));
+
+static llvm::cl::opt<bool> EnableCopyPropagation(
+    "enable-copy-propagation",
+    llvm::cl::desc("Enable the copy propagation pass."));
+
+static llvm::cl::opt<bool> DisableCopyPropagation(
+    "disable-copy-propagation",
+    llvm::cl::desc("Disable the copy propagation pass."));
 
 namespace {
 enum class EnforceExclusivityMode {
@@ -311,6 +324,11 @@ static llvm::cl::opt<bool>
                        llvm::cl::desc("Ignore [always_inline] attribute."),
                        llvm::cl::init(false));
 
+static llvm::cl::opt<std::string> EnableRequirementMachine(
+    "requirement-machine",
+    llvm::cl::desc("Control usage of experimental generics implementation: "
+                   "'on', 'off', or 'verify'."));
+
 static void runCommandLineSelectedPasses(SILModule *Module,
                                          irgen::IRGenModule *IRGenMod) {
   auto &opts = Module->getOptions();
@@ -352,6 +370,8 @@ int main(int argc, char **argv) {
   llvm::EnablePrettyStackTraceOnSigInfoForThisThread();
 
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift SIL optimizer\n");
+
+  initializeLibSwift();
 
   if (PrintStats)
     llvm::EnableStatistics();
@@ -395,6 +415,8 @@ int main(int argc, char **argv) {
   }
   Invocation.getLangOptions().EnableExperimentalConcurrency =
     EnableExperimentalConcurrency;
+  Invocation.getLangOptions().EnableExperimentalDistributed =
+    EnableExperimentalDistributed;
 
   Invocation.getLangOptions().EnableObjCInterop =
     EnableObjCInterop ? true :
@@ -417,6 +439,23 @@ int main(int argc, char **argv) {
 
   Invocation.getDiagnosticOptions().VerifyMode =
       VerifyMode ? DiagnosticOptions::Verify : DiagnosticOptions::NoVerify;
+
+  if (EnableRequirementMachine.size()) {
+    auto value = llvm::StringSwitch<Optional<RequirementMachineMode>>(
+        EnableRequirementMachine)
+      .Case("off", RequirementMachineMode::Disabled)
+      .Case("on", RequirementMachineMode::Enabled)
+      .Case("verify", RequirementMachineMode::Verify)
+      .Default(None);
+
+    if (value)
+      Invocation.getLangOptions().EnableRequirementMachine = *value;
+    else {
+      fprintf(stderr, "Invalid value for -requirement-machine flag: %s\n",
+              EnableRequirementMachine.c_str());
+      exit(-1);
+    }
+  }
 
   // Setup the SIL Options.
   SILOptions &SILOpts = Invocation.getSILOptions();
@@ -463,6 +502,8 @@ int main(int argc, char **argv) {
   SILOpts.EnableSpeculativeDevirtualization = EnableSpeculativeDevirtualization;
   SILOpts.IgnoreAlwaysInline = IgnoreAlwaysInline;
   SILOpts.EnableOSSAModules = EnableOSSAModules;
+  SILOpts.EnableCopyPropagation = EnableCopyPropagation;
+  SILOpts.DisableCopyPropagation = DisableCopyPropagation;
 
   serialization::ExtendedValidationInfo extendedInfo;
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =

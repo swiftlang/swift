@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-experimental-concurrency -enable-experimental-flow-sensitive-concurrent-captures -verify -emit-sil %s -o - >/dev/null
+// RUN: %target-swift-frontend  -disable-availability-checking -enable-experimental-flow-sensitive-concurrent-captures -verify -emit-sil %s -o - >/dev/null
 
 // REQUIRES: concurrency
 

@@ -657,9 +657,8 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   B.createReturn(ImplicitReturnLocation(Loc), initedSelfValue);
 }
 
-static void emitDefaultActorInitialization(SILGenFunction &SGF,
-                                           SILLocation loc,
-                                           ManagedValue self) {
+static void emitDefaultActorInitialization(
+    SILGenFunction &SGF, SILLocation loc, ManagedValue self) {
   auto &ctx = SGF.getASTContext();
   auto builtinName = ctx.getIdentifier(
     getBuiltinName(BuiltinValueKind::InitializeDefaultActor));
@@ -678,7 +677,7 @@ void SILGenFunction::emitConstructorPrologActorHop(
 
   if (auto executor = emitExecutor(loc, *maybeIso, None)) {
     ExpectedExecutor = *executor;
-    B.createHopToExecutor(loc, *executor);
+    B.createHopToExecutor(loc, *executor, /*mandatory*/ false);
   }
 }
 
@@ -778,6 +777,11 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
       selfArg = B.createMarkUninitialized(selfDecl, selfArg, MUKind);
       VarLocs[selfDecl] = VarLoc::get(selfArg.getValue());
     }
+  }
+
+  // Distributed actor initializers implicitly initialize their transport and id
+  if (selfClassDecl->isDistributedActor() && !isDelegating) {
+    initializeDistributedActorImplicitStorageInit(ctor, selfArg);
   }
 
   // Prepare the end of initializer location.
@@ -920,12 +924,18 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
     // problem.
     ReturnDest = std::move(ReturnDest).translate(getTopCleanup());
   }
-  
+
   // Emit the epilog and post-matter.
   auto returnLoc = emitEpilog(ctor, /*UsesCustomEpilog*/true);
 
   // Unpop our selfArg cleanup, so we can forward.
   std::move(SelfCleanupSave).pop();
+
+  // TODO(distributed): rdar://81783599 if this is a distributed actor, jump to the distributedReady block?
+  //  // For distributed actors, emit "actor ready" since we successfully initialized
+  //  if (selfClassDecl->isDistributedActor() && !isDelegating) {
+  //    emitDistributedActorReady(ctor, selfArg);
+  //  }
 
   // Finish off the epilog by returning.  If this is a failable ctor, then we
   // actually jump to the failure epilog to keep the invariant that there is
@@ -1012,6 +1022,7 @@ emitMemberInit(SILGenFunction &SGF, VarDecl *selfDecl, Pattern *pattern) {
 #include "swift/AST/PatternNodes.def"
     llvm_unreachable("Refutable pattern in stored property pattern binding");
   }
+  llvm_unreachable("covered switch");
 }
 
 static std::pair<AbstractionPattern, CanType>
@@ -1117,10 +1128,22 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
         // abstraction level. To undo this, we use a converting
         // initialization and rely on the peephole that optimizes
         // out the redundant conversion.
-        auto loweredResultTy = getLoweredType(origType, substType);
-        auto loweredSubstTy = getLoweredType(substType);
+        SILType loweredResultTy;
+        SILType loweredSubstTy;
 
-        if (loweredResultTy != loweredSubstTy) {
+        // A converting initialization isn't necessary if the member is
+        // a property wrapper. Though the initial value can have a
+        // reabstractable type, the result of the initialization is
+        // always the property wrapper type, which is never reabstractable.
+        bool needsConvertingInit = false;
+        auto *singleVar = varPattern->getSingleVar();
+        if (!(singleVar && singleVar->getOriginalWrappedProperty())) {
+          loweredResultTy = getLoweredType(origType, substType);
+          loweredSubstTy = getLoweredType(substType);
+          needsConvertingInit = loweredResultTy != loweredSubstTy;
+        }
+
+        if (needsConvertingInit) {
           Conversion conversion = Conversion::getSubstToOrig(
               origType, substType,
               loweredResultTy);
@@ -1174,3 +1197,4 @@ void SILGenFunction::emitIVarInitializer(SILDeclRef ivarInitializer) {
 
   emitEpilog(loc);
 }
+

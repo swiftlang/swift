@@ -67,6 +67,9 @@ static void printNameTranslationInfo(sourcekitd_variant_t Info, llvm::raw_ostrea
 static void printRangeInfo(sourcekitd_variant_t Info, StringRef Filename,
                            llvm::raw_ostream &OS);
 static void printExpressionType(sourcekitd_variant_t Info, llvm::raw_ostream &OS);
+static void printVariableType(sourcekitd_variant_t Info,
+                              llvm::MemoryBuffer *SourceBuf,
+                              llvm::raw_ostream &OS);
 static void printDocInfo(sourcekitd_variant_t Info, StringRef Filename);
 static void printInterfaceGen(sourcekitd_variant_t Info, bool CheckASCII);
 static void printSemanticInfo();
@@ -489,6 +492,49 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
   return 0;
 }
 
+static void setRefactoringFields(sourcekitd_object_t &Req, TestOptions Opts,
+                                 sourcekitd_uid_t RefactoringKind,
+                                 llvm::MemoryBuffer *SourceBuf) {
+  if (Opts.Offset && !Opts.Line && !Opts.Col) {
+    auto LineCol = resolveToLineCol(Opts.Offset, SourceBuf);
+    Opts.Line = LineCol.first;
+    Opts.Col = LineCol.second;
+  }
+  sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
+                                        RequestSemanticRefactoring);
+  sourcekitd_request_dictionary_set_uid(Req, KeyActionUID, RefactoringKind);
+  sourcekitd_request_dictionary_set_string(Req, KeyName, Opts.Name.c_str());
+  sourcekitd_request_dictionary_set_int64(Req, KeyLine, Opts.Line);
+  sourcekitd_request_dictionary_set_int64(Req, KeyColumn, Opts.Col);
+  sourcekitd_request_dictionary_set_int64(Req, KeyLength, Opts.Length);
+}
+
+/// Returns the number of instructions executed by the SourceKit process since
+/// its launch. If SourceKit is running in-process this is the instruction count
+/// of the current process. If it's running out-of process it is the instruction
+/// count of the XPC process.
+int64_t getSourceKitInstructionCount() {
+  sourcekitd_object_t Req =
+      sourcekitd_request_dictionary_create(nullptr, nullptr, 0);
+  sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestStatistics);
+  sourcekitd_response_t Resp = sourcekitd_send_request_sync(Req);
+  sourcekitd_variant_t Info = sourcekitd_response_get_value(Resp);
+  sourcekitd_variant_t Results =
+      sourcekitd_variant_dictionary_get_value(Info, KeyResults);
+  __block size_t InstructionCount = 0;
+  sourcekitd_variant_array_apply(
+      Results, ^bool(size_t index, sourcekitd_variant_t value) {
+        auto UID = sourcekitd_variant_dictionary_get_uid(value, KeyKind);
+        if (UID == KindStatInstructionCount) {
+          InstructionCount =
+              sourcekitd_variant_dictionary_get_int64(value, KeyValue);
+          return false;
+        }
+        return true;
+      });
+  return InstructionCount;
+}
+
 static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
   if (!Opts.JsonRequestPath.empty())
     return handleJsonRequestPath(Opts.JsonRequestPath, Opts);
@@ -721,16 +767,21 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     break;
   }
 
-#define SEMANTIC_REFACTORING(KIND, NAME, ID) case SourceKitRequest::KIND:                 \
-    {                                                                                     \
-      sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestSemanticRefactoring); \
-      sourcekitd_request_dictionary_set_uid(Req, KeyActionUID, KindRefactoring##KIND);    \
-      sourcekitd_request_dictionary_set_string(Req, KeyName, Opts.Name.c_str());          \
-      sourcekitd_request_dictionary_set_int64(Req, KeyLine, Opts.Line);                   \
-      sourcekitd_request_dictionary_set_int64(Req, KeyColumn, Opts.Col);                  \
-      sourcekitd_request_dictionary_set_int64(Req, KeyLength, Opts.Length);               \
-      break;                                                                              \
+  case SourceKitRequest::CollectVariableType: {
+    sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
+                                          RequestCollectVariableType);
+    if (Opts.Length) {
+      sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
+      sourcekitd_request_dictionary_set_int64(Req, KeyLength, Opts.Length);
     }
+    addRequestOptionsDirect(Req, Opts);
+    break;
+  }
+
+#define SEMANTIC_REFACTORING(KIND, NAME, ID)                                   \
+  case SourceKitRequest::KIND:                                                 \
+    setRefactoringFields(Req, Opts, KindRefactoring##KIND, SourceBuf.get());   \
+    break;
 #include "swift/IDE/RefactoringKinds.def"
 
   case SourceKitRequest::MarkupToXML: {
@@ -834,11 +885,24 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     break;
 
   case SourceKitRequest::ExpandPlaceholder:
-    sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestEditorOpen);
-    sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
-    sourcekitd_request_dictionary_set_int64(Req, KeyEnableSyntaxMap, false);
-    sourcekitd_request_dictionary_set_int64(Req, KeyEnableStructure, false);
-    sourcekitd_request_dictionary_set_int64(Req, KeySyntacticOnly, !Opts.UsedSema);
+    if (Opts.Length) {
+      // Single placeholder by location.
+      sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestEditorExpandPlaceholder);
+      sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
+      sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
+      sourcekitd_request_dictionary_set_int64(Req, KeyLength, Opts.Length);
+    } else {
+      if (ByteOffset) {
+        llvm::errs() << "Missing '-length <number>'\n";
+        return 1;
+      }
+      // Expand all placeholders.
+      sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestEditorOpen);
+      sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
+      sourcekitd_request_dictionary_set_int64(Req, KeyEnableSyntaxMap, false);
+      sourcekitd_request_dictionary_set_int64(Req, KeyEnableStructure, false);
+      sourcekitd_request_dictionary_set_int64(Req, KeySyntacticOnly, !Opts.UsedSema);
+    }
     break;
 
   case SourceKitRequest::SyntaxTree:
@@ -1102,8 +1166,19 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     sourcekitd_request_release(files);
   }
 
+  int64_t BeforeInstructions;
+  if (Opts.measureInstructions)
+    BeforeInstructions = getSourceKitInstructionCount();
+
   if (!Opts.isAsyncRequest) {
     sourcekitd_response_t Resp = sendRequestSync(Req, Opts);
+
+    if (Opts.measureInstructions) {
+      int64_t AfterInstructions = getSourceKitInstructionCount();
+      llvm::errs() << "request instructions: "
+                   << (AfterInstructions - BeforeInstructions);
+    }
+
     sourcekitd_request_release(Req);
     return handleResponse(Resp, Opts, SemaName, std::move(SourceBuf),
                           &InitOpts)
@@ -1131,6 +1206,12 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     llvm::report_fatal_error(
         "-async not supported when sourcekitd is built without blocks support");
 #endif
+
+    if (Opts.measureInstructions) {
+      int64_t AfterInstructions = getSourceKitInstructionCount();
+      llvm::errs() << "request instructions: "
+                   << (AfterInstructions - BeforeInstructions);
+    }
 
     sourcekitd_request_release(Req);
     return 0;
@@ -1228,6 +1309,10 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
 
     case SourceKitRequest::CollectExpresstionType:
       printExpressionType(Info, llvm::outs());
+      break;
+
+    case SourceKitRequest::CollectVariableType:
+      printVariableType(Info, SourceBuf.get(), llvm::outs());
       break;
 
     case SourceKitRequest::DocInfo:
@@ -1341,7 +1426,13 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
       break;
 
       case SourceKitRequest::ExpandPlaceholder:
-        expandPlaceholders(SourceBuf.get(), llvm::outs());
+        if (Opts.Length) {
+          // Single placeholder by location.
+          sourcekitd_response_description_dump_filedesc(Resp, STDOUT_FILENO);
+        } else {
+          // Expand all placeholders.
+          expandPlaceholders(SourceBuf.get(), llvm::outs());
+        }
         break;
       case SourceKitRequest::ModuleGroups:
         printModuleGroupNames(Info, llvm::outs());
@@ -1913,6 +2004,36 @@ static void printExpressionType(sourcekitd_variant_t Info, llvm::raw_ostream &OS
     }
   }
   OS << "</ExpressionTypes>\n";
+}
+
+static void printVariableType(sourcekitd_variant_t Info,
+                              llvm::MemoryBuffer *SourceBuf,
+                              llvm::raw_ostream &OS) {
+  auto TypeBuffer =
+      sourcekitd_variant_dictionary_get_value(Info, KeyVariableTypeList);
+  unsigned Count = sourcekitd_variant_array_get_count(TypeBuffer);
+  if (!Count) {
+    OS << "cannot find variable types in the file\n";
+    return;
+  }
+  OS << "<VariableTypes>\n";
+  for (unsigned i = 0; i != Count; ++i) {
+    sourcekitd_variant_t Item = sourcekitd_variant_array_get_value(TypeBuffer, i);
+    unsigned Offset = sourcekitd_variant_dictionary_get_int64(Item, KeyVariableOffset);
+    unsigned Length = sourcekitd_variant_dictionary_get_int64(Item, KeyVariableLength);
+    auto Start = resolveToLineCol(Offset, SourceBuf);
+    auto End = resolveToLineCol(Offset + Length, SourceBuf);
+    bool HasExplicitType = sourcekitd_variant_dictionary_get_bool(Item, KeyVariableTypeExplicit);
+    auto PrintedType = sourcekitd_variant_dictionary_get_string(Item, KeyVariableType);
+    OS << "("
+       << Start.first << ":" << Start.second
+       << ", "
+       << End.first << ":" << End.second
+       << "): "
+       << PrintedType
+       << " (explicit type: " << HasExplicitType << ")\n";
+  }
+  OS << "</VariableTypes>\n";
 }
 
 static void printFoundInterface(sourcekitd_variant_t Info,

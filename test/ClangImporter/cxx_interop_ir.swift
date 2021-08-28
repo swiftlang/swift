@@ -1,4 +1,7 @@
 // RUN: %target-swiftxx-frontend -module-name cxx_ir -I %S/Inputs/custom-modules -emit-ir -o - -primary-file %s | %FileCheck %s
+//
+// We can't yet call member functions correctly on Windows (SR-13129).
+// XFAIL: OS=windows-msvc
 
 import CXXInterop
 
@@ -40,9 +43,10 @@ func basicMethods(a: UnsafeMutablePointer<Methods>) -> Int32 {
 }
 
 // CHECK-LABEL: define hidden swiftcc i32 @"$s6cxx_ir17basicMethodsConst1as5Int32VSpySo0D0VG_tF"(i8* %0)
-// CHECK: [[THIS_PTR1:%.*]] = bitcast i8* %0 to %TSo7MethodsV*
+// CHECK: [[THIS_PTR1:%.*]] = alloca %TSo7MethodsV, align {{4|8}}
 // CHECK: [[THIS_PTR2:%.*]] = bitcast %TSo7MethodsV* [[THIS_PTR1]] to %class.Methods*
-// CHECK: [[RESULT:%.*]] = call {{(signext )?}}i32 @{{_ZNK7Methods17SimpleConstMethodEi|"\?SimpleConstMethod@Methods@@QEBAHH@Z"}}(%class.Methods* [[THIS_PTR2]], i32{{( signext)?}} 3)
+// CHECK: [[THIS_PTR3:%.*]] = bitcast %TSo7MethodsV* [[THIS_PTR1]] to %class.Methods*
+// CHECK: [[RESULT:%.*]] = call {{(signext )?}}i32 @{{_ZNK7Methods17SimpleConstMethodEi|"\?SimpleConstMethod@Methods@@QEBAHH@Z"}}(%class.Methods* [[THIS_PTR3]], i32{{( signext)?}} 3)
 // CHECK: ret i32 [[RESULT]]
 func basicMethodsConst(a: UnsafeMutablePointer<Methods>) -> Int32 {
   return a.pointee.SimpleConstMethod(3)

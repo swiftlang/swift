@@ -410,6 +410,18 @@ broadenSingleElementStores(StoreInst *storeInst,
 //                            Simple ARC Peepholes
 //===----------------------------------------------------------------------===//
 
+/// "dead" copies are removed in OSSA, but this may shorten object lifetimes,
+/// changing program semantics in unexpected ways by releasing weak references
+/// and running deinitializers early. This copy may be the only thing keeping a
+/// variable's reference alive. But just because the copy's current SSA value
+/// contains no other uses does not mean that there aren't other uses that still
+/// correspond to the original variable whose lifetime is protected by this
+/// copy. The only way to guarantee the lifetime of a variable is to use a
+/// borrow scope--copy/destroy is insufficient by itself.
+///
+/// FIXME: Technically this should be guarded by a compiler flag like
+/// -enable-copy-propagation until SILGen protects scoped variables by borrow
+/// scopes.
 static SILBasicBlock::iterator
 eliminateSimpleCopies(CopyValueInst *cvi, CanonicalizeInstruction &pass) {
   auto next = std::next(cvi->getIterator());
@@ -432,6 +444,8 @@ eliminateSimpleCopies(CopyValueInst *cvi, CanonicalizeInstruction &pass) {
   return next;
 }
 
+/// Unlike dead copy elimination, dead borrows can be safely removed because the
+/// semantics of a borrow scope
 static SILBasicBlock::iterator
 eliminateSimpleBorrows(BeginBorrowInst *bbi, CanonicalizeInstruction &pass) {
   auto next = std::next(bbi->getIterator());

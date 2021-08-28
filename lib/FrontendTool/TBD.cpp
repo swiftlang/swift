@@ -84,7 +84,8 @@ static bool validateSymbols(DiagnosticEngine &diags,
     if (auto GV = dyn_cast<llvm::GlobalValue>(value)) {
       // Is this a symbol that should be listed?
       auto externallyVisible =
-          GV->hasExternalLinkage() && !GV->hasHiddenVisibility();
+          (GV->hasExternalLinkage() || GV->hasCommonLinkage())
+        && !GV->hasHiddenVisibility();
       if (!GV->isDeclaration() && externallyVisible) {
         // Is it listed?
         if (!symbolSet.erase(name))

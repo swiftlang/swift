@@ -93,9 +93,24 @@ bool SerializedLocalizationWriter::emit(llvm::StringRef filePath) {
   return OS.has_error();
 }
 
+void LocalizationProducer::initializeIfNeeded() {
+  if (state != NotInitialized)
+    return;
+
+  if (initializeImpl())
+    state = Initialized;
+  else
+    state = FailedInitialization;
+}
+
 llvm::StringRef
 LocalizationProducer::getMessageOr(swift::DiagID id,
                                    llvm::StringRef defaultMessage) {
+  initializeIfNeeded();
+  if (getState() == FailedInitialization) {
+    return defaultMessage;
+  }
+
   auto localizedMessage = getMessage(id);
   if (localizedMessage.empty())
     return defaultMessage;
@@ -108,14 +123,22 @@ LocalizationProducer::getMessageOr(swift::DiagID id,
   return localizedMessage;
 }
 
+LocalizationProducerState LocalizationProducer::getState() const {
+  return state;
+}
+
 SerializedLocalizationProducer::SerializedLocalizationProducer(
     std::unique_ptr<llvm::MemoryBuffer> buffer, bool printDiagnosticNames)
     : LocalizationProducer(printDiagnosticNames), Buffer(std::move(buffer)) {
+}
+
+bool SerializedLocalizationProducer::initializeImpl() {
   auto base =
       reinterpret_cast<const unsigned char *>(Buffer.get()->getBufferStart());
   auto tableOffset = endian::read<offset_type>(base, little);
   SerializedTable.reset(SerializedLocalizationTable::Create(
       base + tableOffset, base + sizeof(offset_type), base));
+  return true;
 }
 
 llvm::StringRef
@@ -128,12 +151,16 @@ SerializedLocalizationProducer::getMessage(swift::DiagID id) const {
 
 YAMLLocalizationProducer::YAMLLocalizationProducer(llvm::StringRef filePath,
                                                    bool printDiagnosticNames)
-    : LocalizationProducer(printDiagnosticNames) {
+    : LocalizationProducer(printDiagnosticNames), filePath(filePath) {
+}
+
+bool YAMLLocalizationProducer::initializeImpl() {
   auto FileBufOrErr = llvm::MemoryBuffer::getFileOrSTDIN(filePath);
   llvm::MemoryBuffer *document = FileBufOrErr->get();
   diag::LocalizationInput yin(document->getBuffer());
   yin >> diagnostics;
   unknownIDs = std::move(yin.unknownIDs);
+  return true;
 }
 
 llvm::StringRef YAMLLocalizationProducer::getMessage(swift::DiagID id) const {
@@ -141,12 +168,45 @@ llvm::StringRef YAMLLocalizationProducer::getMessage(swift::DiagID id) const {
 }
 
 void YAMLLocalizationProducer::forEachAvailable(
-    llvm::function_ref<void(swift::DiagID, llvm::StringRef)> callback) const {
+    llvm::function_ref<void(swift::DiagID, llvm::StringRef)> callback) {
+  initializeIfNeeded();
+  if (getState() == FailedInitialization) {
+    return;
+  }
+
   for (uint32_t i = 0, n = diagnostics.size(); i != n; ++i) {
     auto translation = diagnostics[i];
     if (!translation.empty())
       callback(static_cast<swift::DiagID>(i), translation);
   }
+}
+
+std::unique_ptr<LocalizationProducer>
+LocalizationProducer::producerFor(llvm::StringRef locale, llvm::StringRef path,
+                                  bool printDiagnosticNames) {
+  std::unique_ptr<LocalizationProducer> producer;
+  llvm::SmallString<128> filePath(path);
+  llvm::sys::path::append(filePath, locale);
+  llvm::sys::path::replace_extension(filePath, ".db");
+
+  // If the serialized diagnostics file not available,
+  // fallback to the `YAML` file.
+  if (llvm::sys::fs::exists(filePath)) {
+    if (auto file = llvm::MemoryBuffer::getFile(filePath)) {
+      producer = std::make_unique<diag::SerializedLocalizationProducer>(
+          std::move(file.get()), printDiagnosticNames);
+    }
+  } else {
+    llvm::sys::path::replace_extension(filePath, ".yaml");
+    // In case of missing localization files, we should fallback to messages
+    // from `.def` files.
+    if (llvm::sys::fs::exists(filePath)) {
+      producer = std::make_unique<diag::YAMLLocalizationProducer>(
+          filePath.str(), printDiagnosticNames);
+    }
+  }
+
+  return producer;
 }
 
 llvm::Optional<uint32_t> LocalizationInput::readID(llvm::yaml::IO &io) {

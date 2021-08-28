@@ -1,5 +1,6 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -parse-as-library %import-libdispatch) | %FileCheck %s
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library %import-libdispatch) | %FileCheck %s
 
+// REQUIRES: rdar82092187
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
@@ -8,13 +9,13 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 enum TL {
   @TaskLocal
   static var number = 0
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @discardableResult
 func printTaskLocal<V>(
     _ key: TaskLocal<V>,
@@ -32,7 +33,7 @@ func printTaskLocal<V>(
 
 // ==== ------------------------------------------------------------------------
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func groups() async {
   // no value
   _ = await withTaskGroup(of: Int.self) { group in
@@ -44,7 +45,7 @@ func groups() async {
     group.spawn {
       printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(defaultValue: 0) (0)
       // inside the child task, set a value
-      _ = await TL.$number.withValue(1) {
+      _ = TL.$number.withValue(1) {
         printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(defaultValue: 0) (1)
       }
       printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(defaultValue: 0) (0)
@@ -78,9 +79,39 @@ func groups() async {
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
+func taskInsideGroup() async {
+  Task {
+    print("outside") // CHECK: outside
+    _ = await withTaskGroup(of: Int.self) { group -> Int in
+      print("in group") // CHECK: in group
+      printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(defaultValue: 0) (0)
+
+      for _ in 0..<5 {
+        Task {
+          printTaskLocal(TL.$number)
+          print("some task")
+        }
+      }
+
+      return 0
+    }
+  }
+
+  // CHECK: some task
+  // CHECK: some task
+  // CHECK: some task
+  // CHECK: some task
+
+  await Task.sleep(5 * 1_000_000_000)
+
+//  await t.value
+}
+
+@available(SwiftStdlib 5.5, *)
 @main struct Main {
   static func main() async {
     await groups()
+    await taskInsideGroup()
   }
 }

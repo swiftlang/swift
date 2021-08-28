@@ -173,3 +173,56 @@ func testLocalReference(count: Int) {
   // setter of value #1 in testLocalReference(count:)
   // CHECK: sil private [ossa] @$s22property_wrapper_local18testLocalReference5countySi_tF5valueL_Sivs : $@convention(thin) (Int, @guaranteed { var BoundedNumber<Int> }) -> ()
 }
+
+func takesAutoclosure(_: @autoclosure () -> Int) {}
+
+// CHECK-LABEL: sil hidden [ossa] @$s22property_wrapper_local12testCapturesyyF : $@convention(thin) () -> ()
+func testCaptures() {
+  @Wrapper var value = 10
+  takesAutoclosure(value)
+  // implicit closure #1 in testCaptures()
+  // CHECK-LABEL: sil private [transparent] [ossa] @$s22property_wrapper_local12testCapturesyyFSiyXEfu_ : $@convention(thin) (@guaranteed { var Wrapper<Int> }) -> Int
+
+  let _: () -> Void = {
+    _ = value
+    value = 100
+  }
+  // closure #1 in testCaptures()
+  // CHECK-LABEL: sil private [ossa] @$s22property_wrapper_local12testCapturesyyFyycfU_ : $@convention(thin) (@guaranteed { var Wrapper<Int> }) -> ()
+}
+
+@propertyWrapper
+struct DefaultInit {
+  var wrappedValue: Int
+
+  // CHECK-LABEL: sil hidden [ossa] @$s22property_wrapper_local11DefaultInitVACycfC : $@convention(method) (@thin DefaultInit.Type) -> DefaultInit
+  init() {
+    self.wrappedValue = 0
+  }
+
+  // CHECK-LABEL: sil hidden [ossa] @$s22property_wrapper_local11DefaultInitV5valueACSi_tcfC : $@convention(method) (Int, @thin DefaultInit.Type) -> DefaultInit
+  init(value: Int) {
+    self.wrappedValue = value
+  }
+}
+
+@propertyWrapper
+struct DefaultWrappedValue {
+  // CHECK-LABEL: sil hidden [ossa] @$s22property_wrapper_local19DefaultWrappedValueVACycfC : $@convention(method) (@thin DefaultWrappedValue.Type) -> DefaultWrappedValue
+  var wrappedValue: Int = 10
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s22property_wrapper_local20testLocalDefaultInityyF : $@convention(thin) () -> ()
+func testLocalDefaultInit() {
+  // CHECK: function_ref @$s22property_wrapper_local11DefaultInitVACycfC : $@convention(method) (@thin DefaultInit.Type) -> DefaultInit
+  @DefaultInit var x: Int
+
+  // CHECK: function_ref @$s22property_wrapper_local11DefaultInitV5valueACSi_tcfC : $@convention(method) (Int, @thin DefaultInit.Type) -> DefaultInit
+  @DefaultInit(value: 10) var z: Int
+
+  // CHECK: function_ref @$s22property_wrapper_local11DefaultInitVACycfC : $@convention(method) (@thin DefaultInit.Type) -> DefaultInit
+  @DefaultInit() var y: Int
+
+  // CHECK: function_ref @$s22property_wrapper_local19DefaultWrappedValueVACycfC : $@convention(method) (@thin DefaultWrappedValue.Type) -> DefaultWrappedValue
+  @DefaultWrappedValue var w: Int
+}

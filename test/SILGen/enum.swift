@@ -219,3 +219,23 @@ func sr7799_1(bar: SR7799??) {
   default: print("default")
   }
 }
+
+// Make sure that we handle enum, tuple initialization composed
+// correctly. Previously, we leaked down a failure path due to us misusing
+// scopes.
+enum rdar81817725 {
+    case localAddress
+    case setOption(Int, Any)
+
+    static func takeAny(_:Any) -> Bool { return true }
+
+    static func testSwitchCleanup(syscall: rdar81817725, expectedLevel: Int,
+                                  valueMatcher: (Any) -> Bool)
+      throws -> Bool {
+        if case .setOption(expectedLevel, let value) = syscall {
+            return rdar81817725.takeAny(value)
+        } else {
+            return false
+        }
+    }
+}

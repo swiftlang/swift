@@ -142,22 +142,43 @@ func testRepeatWhile2(_ fooObject: FooStruct) {
   } while localFooObject.#^COND_DO_WHILE_2?check=COND-WITH-RELATION1^#
 }
 
-func testCStyleForInit1(_ fooObject: FooStruct) {
+func testForeachPattern1(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
-  for #^C_STYLE_FOR_INIT_1?check=COND_NONE^#
+  for #^FOREACH_PATTERN_1^#
+// FOREACH_PATTERN_1: Begin completions, 4 items
+// FOREACH_PATTERN_1-DAG: Keyword[try]/None:                  try; name=try
+// FOREACH_PATTERN_1-DAG: Keyword/None:                       await; name=await
+// FOREACH_PATTERN_1-DAG: Keyword[var]/None:                  var; name=var
+// FOREACH_PATTERN_1-DAG: Keyword[case]/None:                 case; name=case
+// FOREACH_PATTERN_1: End completions
 }
 
-func testCStyleForInit2(_ fooObject: FooStruct) {
+func testForeachPattern2(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
-  for #^C_STYLE_FOR_INIT_2?check=COND_COMMON^#;
+  for try #^FOREACH_PATTERN_2^#
+// FOREACH_PATTERN_2: Begin completions, 3 items
+// FOREACH_PATTERN_2-DAG: Keyword/None:                       await; name=await
+// FOREACH_PATTERN_2-DAG: Keyword[var]/None:                  var; name=var
+// FOREACH_PATTERN_2-DAG: Keyword[case]/None:                 case; name=case
+// FOREACH_PATTERN_2: End completions
 }
 
-func testCStyleForInit3(_ fooObject: FooStruct) {
+func testForeachPattern3(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
-  for #^C_STYLE_FOR_INIT_3?check=COND_COMMON^# ;
+  for try await #^FOREACH_PATTERN_3^#
+// FOREACH_PATTERN_3: Begin completions, 2 items
+// FOREACH_PATTERN_3-DAG: Keyword[var]/None:                  var; name=var
+// FOREACH_PATTERN_3-DAG: Keyword[case]/None:                 case; name=case
+// FOREACH_PATTERN_3: End completions
+}
+
+func testForeachPattern4(_ fooObject: FooStruct) {
+  var localInt = 42
+  var localFooObject = FooStruct(localInt)
+  for var #^FOREACH_PATTERN_4?check=COND_NONE^#
 }
 
 func testCStyleForCond1(_ fooObject: FooStruct) {
@@ -400,7 +421,7 @@ func testSwitchCaseWhereExprIJ1(_ fooObject: FooStruct) {
 enum A { case aaa }
 enum B { case bbb }
 // UNRESOLVED_B-NOT: aaa
-// UNRESOLVED_B: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     bbb[#B#]; name=bbb
+// UNRESOLVED_B: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]:     bbb[#B#]; name=bbb
 // UNRESOLVED_B-NOT: aaa
 
 struct AA {
@@ -525,14 +546,14 @@ func testGuardCase(x:FooStruct?) {
 // OPTIONAL_FOOSTRUCT: Begin completions, 9 items
 // OPTIONAL_FOOSTRUCT-DAG: Keyword[nil]/None/Erase[1]/TypeRelation[Identical]:         nil[#FooStruct?#]; name=nil
 // OPTIONAL_FOOSTRUCT-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Identical]: none[#Optional<FooStruct>#]; name=none
-// OPTIONAL_FOOSTRUCT-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Identical]: some({#FooStruct#})[#Optional<FooStruct>#]; name=some(FooStruct)
+// OPTIONAL_FOOSTRUCT-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Identical]: some({#FooStruct#})[#Optional<FooStruct>#]; name=some()
 // FIXME: 'FooStruct' members should not be shown.
 // OPTIONAL_FOOSTRUCT-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: init()[#FooStruct#]; name=init()
-// OPTIONAL_FOOSTRUCT-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: init({#Int#})[#FooStruct#]; name=init(Int)
-// OPTIONAL_FOOSTRUCT-DAG: Decl[InstanceMethod]/CurrNominal:   boolGen({#(self): FooStruct#})[#() -> Bool#]; name=boolGen(self: FooStruct)
-// OPTIONAL_FOOSTRUCT-DAG: Decl[InstanceMethod]/CurrNominal:   intGen({#(self): FooStruct#})[#() -> Int#]; name=intGen(self: FooStruct)
-// OPTIONAL_FOOSTRUCT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: map({#(self): Optional<FooStruct>#})[#((FooStruct) throws -> U) -> U?#]; name=map(self: Optional<FooStruct>)
-// OPTIONAL_FOOSTRUCT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: flatMap({#(self): Optional<FooStruct>#})[#((FooStruct) throws -> U?) -> U?#]; name=flatMap(self: Optional<FooStruct>)
+// OPTIONAL_FOOSTRUCT-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: init({#Int#})[#FooStruct#]; name=init()
+// OPTIONAL_FOOSTRUCT-DAG: Decl[InstanceMethod]/CurrNominal:   boolGen({#(self): FooStruct#})[#() -> Bool#]; name=boolGen(:)
+// OPTIONAL_FOOSTRUCT-DAG: Decl[InstanceMethod]/CurrNominal:   intGen({#(self): FooStruct#})[#() -> Int#]; name=intGen(:)
+// OPTIONAL_FOOSTRUCT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: map({#(self): Optional<FooStruct>#})[#((FooStruct) throws -> U) -> U?#]; name=map(:)
+// OPTIONAL_FOOSTRUCT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: flatMap({#(self): Optional<FooStruct>#})[#((FooStruct) throws -> U?) -> U?#]; name=flatMap(:)
 // OPTIONAL_FOOSTRUCT-NOT: init({#(some):
 // OPTIONAL_FOOSTRUCT-NOT: init({#nilLiteral:
 // OPTIONAL_FOOSTRUCT: End completions

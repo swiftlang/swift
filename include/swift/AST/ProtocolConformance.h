@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -66,7 +66,10 @@ enum class ProtocolConformanceKind {
   Specialized,
   /// Conformance of a generic class type projected through one of its
   /// superclass's conformances.
-  Inherited
+  Inherited,
+  /// Builtin conformances are special conformaces that the runtime handles
+  /// and isn't implemented directly in Swift.
+  Builtin
 };
 
 /// Describes the state of a protocol conformance, which may be complete,
@@ -88,7 +91,8 @@ enum class ProtocolConformanceState {
 ///
 /// ProtocolConformance is an abstract base class, implemented by subclasses
 /// for the various kinds of conformance (normal, specialized, inherited).
-class alignas(1 << DeclAlignInBits) ProtocolConformance {
+class alignas(1 << DeclAlignInBits) ProtocolConformance
+    : public ASTAllocated<ProtocolConformance> {
   /// The kind of protocol conformance.
   ProtocolConformanceKind Kind;
 
@@ -281,20 +285,6 @@ public:
   /// is either the default definition or was otherwise deduced.
   bool usesDefaultDefinition(AssociatedTypeDecl *requirement) const;
 
-  // Make vanilla new/delete illegal for protocol conformances.
-  void *operator new(size_t bytes) = delete;
-  void operator delete(void *data) = delete;
-
-  // Only allow allocation of protocol conformances using the allocator in
-  // ASTContext or by doing a placement new.
-  void *operator new(size_t bytes, ASTContext &context,
-                     AllocationArena arena,
-                     unsigned alignment = alignof(ProtocolConformance));
-  void *operator new(size_t bytes, void *mem) {
-    assert(mem);
-    return mem;
-  }
-
   /// Print a parseable and human-readable description of the identifying
   /// information of the protocol conformance.
   void printName(raw_ostream &os,
@@ -329,7 +319,9 @@ public:
 /// - the type is directly declared to conform to the protocol (a
 ///   normal conformance) or
 /// - the protocol's existential type is known to conform to itself (a
-///   self-conformance).
+///   self-conformance) or
+/// - the type's conformance is declared within the runtime (a builtin
+///   conformance).
 class RootProtocolConformance : public ProtocolConformance {
 protected:
   RootProtocolConformance(ProtocolConformanceKind kind, Type conformingType)
@@ -380,7 +372,8 @@ public:
 
   static bool classof(const ProtocolConformance *conformance) {
     return conformance->getKind() == ProtocolConformanceKind::Normal ||
-           conformance->getKind() == ProtocolConformanceKind::Self;
+           conformance->getKind() == ProtocolConformanceKind::Self ||
+           conformance->getKind() == ProtocolConformanceKind::Builtin;
   }
 };
 
@@ -412,11 +405,20 @@ class NormalProtocolConformance : public RootProtocolConformance,
   /// The location of this protocol conformance in the source.
   SourceLoc Loc;
 
+  // Flag bits used in ContextAndBits.
+  enum {
+    /// The conformance is invalid.
+    InvalidFlag = 0x01,
+
+    /// The conformance was labeled with @unchecked.
+    UncheckedFlag = 0x02,
+  };
+
   /// The declaration context containing the ExtensionDecl or
   /// NominalTypeDecl that declared the conformance.
   ///
-  /// Also stores the "invalid" bit.
-  llvm::PointerIntPair<DeclContext *, 1, bool> ContextAndInvalid;
+  /// Also stores the "invalid" and "unchecked" bits.
+  llvm::PointerIntPair<DeclContext *, 2, unsigned> ContextAndBits;
 
   /// The reason that this conformance exists.
   ///
@@ -457,11 +459,12 @@ class NormalProtocolConformance : public RootProtocolConformance,
 public:
   NormalProtocolConformance(Type conformingType, ProtocolDecl *protocol,
                             SourceLoc loc, DeclContext *dc,
-                            ProtocolConformanceState state)
+                            ProtocolConformanceState state,
+                            bool isUnchecked)
       : RootProtocolConformance(ProtocolConformanceKind::Normal,
                                 conformingType),
         ProtocolAndState(protocol, state), Loc(loc),
-        ContextAndInvalid(dc, false) {
+        ContextAndBits(dc, isUnchecked ? UncheckedFlag : 0) {
     assert(!conformingType->hasArchetype() &&
            "ProtocolConformances should store interface types");
   }
@@ -475,7 +478,7 @@ public:
   /// Get the declaration context that contains the conforming extension or
   /// nominal type declaration.
   DeclContext *getDeclContext() const {
-    return ContextAndInvalid.getPointer();
+    return ContextAndBits.getPointer();
   }
 
   /// Get any additional requirements that are required for this conformance to
@@ -497,13 +500,18 @@ public:
 
   /// Determine whether this conformance is invalid.
   bool isInvalid() const {
-    return ContextAndInvalid.getInt();
+    return ContextAndBits.getInt() & InvalidFlag;
   }
 
   /// Mark this conformance as invalid.
   void setInvalid() {
-    ContextAndInvalid.setInt(true);
+    ContextAndBits.setInt(ContextAndBits.getInt() | InvalidFlag);
     SignatureConformances = {};
+  }
+
+  /// Whether this is an "unchecked" conformance.
+  bool isUnchecked() const {
+    return ContextAndBits.getInt() & UncheckedFlag;
   }
 
   /// Get the kind of source from which this conformance comes.
@@ -969,6 +977,124 @@ public:
 
   static bool classof(const ProtocolConformance *conformance) {
     return conformance->getKind() == ProtocolConformanceKind::Inherited;
+  }
+};
+
+/// Describes the kind of a builtin conformance.
+enum class BuiltinConformanceKind {
+  // A builtin conformance that has been synthesized by the implementation.
+  Synthesized = 0,
+  // A missing conformance that we have nonetheless synthesized so that
+  // we can diagnose it later.
+  Missing,
+};
+
+/// A builtin conformance appears when a non-nominal type has a
+/// conformance that is synthesized by the implementation.
+class BuiltinProtocolConformance final : public RootProtocolConformance,
+      private llvm::TrailingObjects<BuiltinProtocolConformance, Requirement> {
+  friend ASTContext;
+  friend TrailingObjects;
+
+  ProtocolDecl *protocol;
+  GenericSignature genericSig;
+  size_t numConditionalRequirements : 31;
+  unsigned builtinConformanceKind : 1;
+
+  size_t numTrailingObjects(OverloadToken<Requirement>) const {
+    return numConditionalRequirements;
+  }
+
+  BuiltinProtocolConformance(Type conformingType, ProtocolDecl *protocol,
+                             GenericSignature genericSig,
+                             ArrayRef<Requirement> conditionalRequirements,
+                             BuiltinConformanceKind kind);
+
+public:
+  /// Get the protocol being conformed to.
+  ProtocolDecl *getProtocol() const {
+    return protocol;
+  }
+
+  /// Retrieve the generic signature that describes the type parameters used
+  /// within the conforming type.
+  GenericSignature getGenericSignature() const {
+    return genericSig;
+  }
+
+  BuiltinConformanceKind getBuiltinConformanceKind() const {
+    return static_cast<BuiltinConformanceKind>(builtinConformanceKind);
+  }
+
+  /// Whether this represents a "missing" conformance that should be diagnosed
+  /// later.
+  bool isMissing() const {
+    return getBuiltinConformanceKind() == BuiltinConformanceKind::Missing;
+  }
+
+  /// Get any requirements that must be satisfied for this conformance to apply.
+  Optional<ArrayRef<Requirement>>
+  getConditionalRequirementsIfAvailable() const {
+    return getConditionalRequirements();
+  }
+
+  /// Get any requirements that must be satisfied for this conformance to apply.
+  ArrayRef<Requirement> getConditionalRequirements() const {
+    return {getTrailingObjects<Requirement>(), numConditionalRequirements};
+  }
+
+  /// Get the declaration context that contains the nominal type declaration.
+  DeclContext *getDeclContext() const {
+    return getProtocol();
+  }
+
+  /// Retrieve the state of this conformance.
+  ProtocolConformanceState getState() const {
+    return ProtocolConformanceState::Complete;
+  }
+
+  /// Get the kind of source from which this conformance comes.
+  ConformanceEntryKind getSourceKind() const {
+    return ConformanceEntryKind::Synthesized;
+  }
+  /// Get the protocol conformance which implied this implied conformance.
+  NormalProtocolConformance *getImplyingConformance() const {
+    return nullptr;
+  }
+
+  bool hasTypeWitness(AssociatedTypeDecl *assocType) const {
+    llvm_unreachable("builtin-conformances never have associated types");
+  }
+
+  /// Retrieve the type witness and type decl (if one exists)
+  /// for the given associated type.
+  TypeWitnessAndDecl
+  getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
+                        SubstOptions options=None) const {
+    llvm_unreachable("builtin-conformances never have associated types");
+  }
+
+  /// Given that the requirement signature of the protocol directly states
+  /// that the given dependent type must conform to the given protocol,
+  /// return its associated conformance.
+  ProtocolConformanceRef
+  getAssociatedConformance(Type assocType, ProtocolDecl *protocol) const {
+    llvm_unreachable("builtin-conformances never have associated types");
+  }
+
+  /// Retrieve the witness corresponding to the given value requirement.
+  ConcreteDeclRef getWitnessDeclRef(ValueDecl *requirement) const {
+    return ConcreteDeclRef(requirement);
+  }
+
+  /// Determine whether the witness for the given requirement
+  /// is either the default definition or was otherwise deduced.
+  bool usesDefaultDefinition(AssociatedTypeDecl *requirement) const {
+    llvm_unreachable("builtin-conformances never have associated types");
+  }
+
+  static bool classof(const ProtocolConformance *conformance) {
+    return conformance->getKind() == ProtocolConformanceKind::Builtin;
   }
 };
 

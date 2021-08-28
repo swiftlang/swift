@@ -196,8 +196,7 @@ extension ${Self}: Equatable where T: Equatable {
   }
 }
 
-extension ${Self}: SignedNumeric & Numeric
-where T: SignedNumeric, T == T.Magnitude {
+extension ${Self}: Numeric where T: Numeric {
   public typealias Magnitude = ${Self}<T.Magnitude>
 
   public init?<U>(exactly source: U) where U: BinaryInteger {
@@ -214,6 +213,12 @@ where T: SignedNumeric, T == T.Magnitude {
 
   public static func *= (lhs: inout ${Self}, rhs: ${Self}) {
     lhs = lhs * rhs
+  }
+}
+
+extension ${Self}: SignedNumeric where T: SignedNumeric, T == T.Magnitude {
+  public prefix static func - (operand: ${Self}) -> ${Self} {
+    ${Self}(-operand.value)
   }
 }
 

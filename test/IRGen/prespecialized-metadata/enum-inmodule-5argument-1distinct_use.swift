@@ -5,38 +5,38 @@
 // UNSUPPORTED: CPU=armv7 && OS=ios
 // UNSUPPORTED: CPU=armv7s && OS=ios
 
-// CHECK: @"$s4main5ValueOyS5iGWV" = linkonce_odr hidden constant %swift.enum_vwtable { 
-// CHECK-SAME:   i8* bitcast ({{([^@]+@"\$s4main5ValueOyS5iGwCP+[^\)]+ to i8\*|[^@]+@__swift_memcpy[0-9]+_[0-9]+[^)]+ to i8\*)}}), 
-// CHECK-SAME:   i8* bitcast ({{[^@]+}}@__swift_noop_void_return{{[^)]*}} to i8*), 
-// CHECK-SAME:   i8* bitcast ({{[^@]+}}@__swift_memcpy{{[0-9]+}}_{{[0-9]+}}{{[^)]*}} to i8*), 
-// CHECK-SAME:   i8* bitcast ({{[^@]+}}@__swift_memcpy{{[0-9]+}}_{{[0-9]+}}{{[^)]*}} to i8*), 
-// CHECK-SAME:   i8* bitcast ({{[^@]+}}@__swift_memcpy{{[0-9]+}}_{{[0-9]+}}{{[^)]*}} to i8*), 
-// CHECK-SAME:   i8* bitcast ({{[^@]+}}@__swift_memcpy{{[0-9]+}}_{{[0-9]+}}{{[^)]*}} to i8*), 
-// CHECK-SAME:   i8* bitcast ({{[^@]+}}@"$s4main5ValueOyS5iGwet{{[^)]+}} to i8*), 
-// CHECK-SAME:   i8* bitcast ({{[^@]+}}@"$s4main5ValueOyS5iGwst{{[^)]+}} to i8*), 
-// CHECK-SAME:   [[INT]] {{[0-9]+}}, 
-// CHECK-SAME:   [[INT]] {{[0-9]+}}, 
-// CHECK-SAME:   i32 {{[0-9]+}}, 
-// CHECK-SAME:   i32 {{[0-9]+}}, 
-// CHECK-SAME:   i8* bitcast ({{[^@]+}}@"$s4main5ValueOyS5iGwug{{[^)]+}} to i8*), 
-// CHECK-SAME:   i8* bitcast ({{[^@]+}}@"$s4main5ValueOyS5iGwup{{[^)]+}} to i8*), 
-// CHECK-SAME    i8* bitcast ({{[^@]+}}@"$s4main5ValueOyS5iGwui{{[^)]+}} to i8*) 
+// CHECK: @"$s4main5ValueOyS5iGWV" = linkonce_odr hidden constant %swift.enum_vwtable {
+// CHECK-SAME:   i8* bitcast ({{[^@]+}}@"$s4main5ValueOwCP{{[^)]*}} to i8*)
+// CHECK-SAME:   i8* bitcast ({{[^@]+}}@"$s4main5ValueOwxx{{[^)]*}} to i8*)
+// CHECK-SAME:   i8* bitcast ({{[^@]+}}@"$s4main5ValueOwcp{{[^)]*}} to i8*)
+// CHECK-SAME:   i8* bitcast ({{[^@]+}}@"$s4main5ValueOwca{{[^)]*}} to i8*)
+// CHECK-SAME:   i8* bitcast ({{[^@]+}}@"$s4main5ValueOwtk{{[^)]*}} to i8*)
+// CHECK-SAME:   i8* bitcast ({{[^@]+}}@"$s4main5ValueOwta{{[^)]*}} to i8*)
+// CHECK-SAME:   i8* bitcast ({{[^@]+}}@swift_getMultiPayloadEnumTagSinglePayload{{[^)]*}} to i8*),
+// CHECK-SAME:   i8* bitcast ({{[^@]+}}@swift_storeMultiPayloadEnumTagSinglePayload{{[^)]*}} to i8*),
+// CHECK-SAME:   [[INT]] {{[0-9]+}},
+// CHECK-SAME:   [[INT]] {{[0-9]+}},
+// CHECK-SAME:   i32 {{[0-9]+}},
+// CHECK-SAME:   i32 {{[0-9]+}},
+// CHECK-SAME:   i8* bitcast ({{[^@]+}}@"$s4main5ValueOwug{{[^)]*}} to i8*)
+// CHECK-SAME:   i8* bitcast ({{[^@]+}}@"$s4main5ValueOwup{{[^)]*}} to i8*)
+// CHECK-SAME    i8* bitcast ({{[^@]+}}@"$s4main5ValueOwui{{[^)]*}} to i8*)
 // CHECK-SAME: }, align [[ALIGNMENT]]
-// CHECK: @"$s4main5ValueOyS5iGMf" = linkonce_odr hidden constant <{ 
-// CHECK-SAME:   i8**, 
-// CHECK-SAME:   [[INT]], 
-// CHECK-SAME:   %swift.type_descriptor*, 
-// CHECK-SAME:   %swift.type*, 
-// CHECK-SAME:   i64 
-// CHECK-SAME:   }> <{ 
-// CHECK-SAME:   i8** getelementptr inbounds (%swift.enum_vwtable, %swift.enum_vwtable* @"$s4main5ValueOyS5iGWV", i32 0, i32 0), 
-// CHECK-SAME:   [[INT]] 513, 
+// CHECK: @"$s4main5ValueOyS5iGMf" = linkonce_odr hidden constant <{
+// CHECK-SAME:   i8**,
+// CHECK-SAME:   [[INT]],
+// CHECK-SAME:   %swift.type_descriptor*,
+// CHECK-SAME:   %swift.type*,
+// CHECK-SAME:   i64
+// CHECK-SAME:   }> <{
+// CHECK-SAME:   i8** getelementptr inbounds (%swift.enum_vwtable, %swift.enum_vwtable* @"$s4main5ValueOyS5iGWV", i32 0, i32 0),
+// CHECK-SAME:   [[INT]] 513,
 // CHECK-SAME:   %swift.type_descriptor* bitcast (
 // CHECK-SAME:     {{.*}}$s4main5ValueOMn{{.*}} to %swift.type_descriptor*
-// CHECK-SAME:   ), 
-// CHECK-SAME:   %swift.type* @"$sSiN", 
-// CHECK-SAME:   [[INT]] {{40|20}}, 
-// CHECK-SAME:   i64 3 
+// CHECK-SAME:   ),
+// CHECK-SAME:   %swift.type* @"$sSiN",
+// CHECK-SAME:   [[INT]] {{40|20}},
+// CHECK-SAME:   i64 3
 // CHECK-SAME: }>, align [[ALIGNMENT]]
 enum Value<First, Second, Third, Fourth, Fifth> {
   case first(First)

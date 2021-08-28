@@ -1,5 +1,30 @@
-// RUN: %target-swift-frontend -typecheck -emit-module-interface-path - %s -enable-library-evolution -module-name PreferTypeRepr -module-interface-preserve-types-as-written | %FileCheck %s --check-prefix PREFER
-// RUN: %target-swift-frontend -typecheck -emit-module-interface-path - %s -enable-library-evolution -module-name PreferTypeRepr | %FileCheck %s --check-prefix DONTPREFER
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend %s -typecheck -enable-library-evolution -emit-module-interface-path %t/External.swiftinterface -module-name External -DEXTERNAL
+// RUN: %target-swift-frontend -typecheck -emit-module-interface-path - %s -enable-library-evolution -module-name PreferTypeRepr -module-interface-preserve-types-as-written -I %t | %FileCheck %s --check-prefix PREFER
+// RUN: %target-swift-frontend -typecheck -emit-module-interface-path - %s -enable-library-evolution -module-name PreferTypeRepr -I %t | %FileCheck %s --check-prefix DONTPREFER
+
+#if EXTERNAL
+public struct Toy {
+    public init() {}
+}
+
+public struct GenericToy<T> {
+    public init() {}
+}
+#else
+import External
+
+// PREFER: extension Toy
+// DONTPREFER: extension External.Toy
+extension Toy {
+    public static var new: Toy { Toy() }
+}
+
+// PREFER: extension GenericToy {
+// DONTPREFER: extension External.GenericToy {
+extension GenericToy {
+    public static var new: GenericToy<T> { GenericToy() }
+}
 
 public protocol Pet {}
 
@@ -32,3 +57,4 @@ extension My where T: Pet {
 // PREFER: public func isNoMore(_ pet: Ex<Parrot>) -> Bool
 // DONTPREFER: public func isNoMore(_ pet: PreferTypeRepr.Ex<PreferTypeRepr.Parrot>) -> Swift.Bool
 public func isNoMore(_ pet: Ex<Parrot>) -> Bool {}
+#endif

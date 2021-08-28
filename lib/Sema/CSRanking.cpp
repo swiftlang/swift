@@ -370,8 +370,8 @@ static bool isProtocolExtensionAsSpecializedAs(DeclContext *dc1,
 
   // Bind the 'Self' type from the first extension to the type parameter from
   // opening 'Self' of the second extension.
-  Type selfType1 = sig1->getGenericParams()[0];
-  Type selfType2 = sig2->getGenericParams()[0];
+  Type selfType1 = sig1.getGenericParams()[0];
+  Type selfType2 = sig2.getGenericParams()[0];
   cs.addConstraint(ConstraintKind::Bind,
                    replacements[cast<GenericTypeParamType>(selfType2->getCanonicalType())],
                    dc1->mapTypeIntoContext(selfType1),

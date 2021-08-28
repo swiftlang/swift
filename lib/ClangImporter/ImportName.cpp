@@ -1316,7 +1316,7 @@ NameImporter::considerAsyncImport(
   // void (^)()), we cannot importer it.
   auto completionHandlerFunctionType =
       completionHandlerParam->getType()->castAs<clang::BlockPointerType>()
-      ->getPointeeType()->getAs<clang::FunctionProtoType>();
+      ->getPointeeType()->getAs<clang::FunctionType>();
   if (!completionHandlerFunctionType)
     return notAsync("block parameter does not have a prototype");
 
@@ -1328,8 +1328,13 @@ NameImporter::considerAsyncImport(
   // nullable NSError type, which would indicate that the async method could
   // throw.
   Optional<unsigned> completionHandlerErrorParamIndex;
-  auto completionHandlerParamTypes =
-      completionHandlerFunctionType->getParamTypes();
+
+  ArrayRef<clang::QualType> completionHandlerParamTypes;
+  if (auto prototype = completionHandlerFunctionType
+          ->getAs<clang::FunctionProtoType>()) {
+    completionHandlerParamTypes = prototype->getParamTypes();
+  }
+
   auto &clangCtx = clangDecl->getASTContext();
   for (unsigned paramIdx : indices(completionHandlerParamTypes)) {
     auto paramType = completionHandlerParamTypes[paramIdx];

@@ -36,7 +36,7 @@ struct SILAnalysisKind {
 };
 
 /// The base class for all SIL-level analysis.
-class SILAnalysis : public DeleteNotificationHandler {
+class SILAnalysis {
 public:
   /// This is a list of values that allow passes to communicate to analysis
   /// which traits of the code were invalidated. Based on this information

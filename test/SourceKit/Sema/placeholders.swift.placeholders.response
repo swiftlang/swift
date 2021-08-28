@@ -5,6 +5,7 @@
     key.column: 19,
     key.filepath: placeholders.swift,
     key.severity: source.diagnostic.severity.error,
+    key.id: "cannot_find_type_in_scope",
     key.description: "cannot find type '<#OtherClass#>' in scope",
     key.diagnostic_stage: source.diagnostic.stage.swift.sema,
     key.ranges: [
@@ -19,6 +20,7 @@
     key.column: 19,
     key.filepath: placeholders.swift,
     key.severity: source.diagnostic.severity.error,
+    key.id: "foreach_sequence_does_not_conform_to_expected_protocol",
     key.description: "for-in loop requires '()' to conform to 'Sequence'",
     key.diagnostic_stage: source.diagnostic.stage.swift.sema,
     key.ranges: [
@@ -33,6 +35,7 @@
     key.column: 5,
     key.filepath: placeholders.swift,
     key.severity: source.diagnostic.severity.warning,
+    key.id: "type_inferred_to_undesirable_type",
     key.description: "constant 'myArray' inferred to have type '[()]', which may be unexpected",
     key.diagnostic_stage: source.diagnostic.stage.swift.sema,
     key.diagnostics: [
@@ -41,6 +44,7 @@
         key.column: 5,
         key.filepath: placeholders.swift,
         key.severity: source.diagnostic.severity.note,
+        key.id: "add_explicit_type_annotation_to_silence",
         key.description: "add an explicit type annotation to silence this warning",
         key.fixits: [
           {

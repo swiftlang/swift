@@ -165,7 +165,7 @@ SILType SILType::getFieldType(VarDecl *field, TypeConverter &TC,
     substFieldTy = origFieldTy.getType();
   } else {
     substFieldTy =
-      getASTType()->getTypeOfMember(&TC.M, field, nullptr)->getCanonicalType();
+      getASTType()->getTypeOfMember(&TC.M, field)->getCanonicalType();
   }
 
   auto loweredTy =

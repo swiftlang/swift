@@ -276,6 +276,26 @@ internal func _getEnumCaseName<T>(_ value: T) -> UnsafePointer<CChar>?
 @_silgen_name("swift_OpaqueSummary")
 internal func _opaqueSummary(_ metadata: Any.Type) -> UnsafePointer<CChar>?
 
+/// Obtain a fallback raw value for an enum type without metadata; this
+/// should be OK for enums from C/C++ until they have metadata (see
+/// <rdar://22036374>).  Note that if this turns out to be a Swift Enum
+/// with missing metadata, the raw value may be misleading.
+@_semantics("optimize.sil.specialize.generic.never")
+internal func _fallbackEnumRawValue<T>(_ value: T) -> Int64? {
+  switch MemoryLayout.size(ofValue: value) {
+  case 8:
+    return unsafeBitCast(value, to:Int64.self)
+  case 4:
+    return Int64(unsafeBitCast(value, to:Int32.self))
+  case 2:
+    return Int64(unsafeBitCast(value, to:Int16.self))
+  case 1:
+    return Int64(unsafeBitCast(value, to:Int8.self))
+  default:
+    return nil
+  }
+}
+
 /// Do our best to print a value that cannot be printed directly.
 @_semantics("optimize.sil.specialize.generic.never")
 internal func _adHocPrint_unlocked<T, TargetStream: TextOutputStream>(
@@ -342,8 +362,14 @@ internal func _adHocPrint_unlocked<T, TargetStream: TextOutputStream>(
           }
           target.write(caseName)
         } else {
-          // If the case name is garbage, just print the type name.
           printTypeName(mirror.subjectType)
+          // The case name is garbage; this might be a C/C++ enum without
+          // metadata, so see if we can get a raw value
+          if let rawValue = _fallbackEnumRawValue(value) {
+            target.write("(rawValue: ")
+            _debugPrint_unlocked(rawValue, &target);
+            target.write(")")
+          }
         }
         if let (_, value) = mirror.children.first {
           if Mirror(reflecting: value).displayStyle == .tuple {

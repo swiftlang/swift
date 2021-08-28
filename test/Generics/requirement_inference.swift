@@ -363,6 +363,7 @@ struct X26<T: X3> : P26 {
 // CHECK-NEXT: Canonical requirement signature: <τ_0_0 where τ_0_0.A == X26<τ_0_0.B>, τ_0_0.B : X3>
 protocol P27a {
   associatedtype A: P26 // expected-warning{{redundant conformance constraint 'Self.A' : 'P26'}}
+
   associatedtype B: X3 where A == X26<B> // expected-note{{conformance constraint 'Self.A' : 'P26' implied here}}
 }
 

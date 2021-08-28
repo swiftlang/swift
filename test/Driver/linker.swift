@@ -1,6 +1,8 @@
 // Must be able to run xcrun-return-self.sh
 // REQUIRES: shell
 // REQUIRES: rdar65281056
+// FIXME: When this is turned on, please move the test from linker-library-with-space.swift
+// to this file and remove that file.
 // RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-macosx10.9 %s 2>&1 > %t.simple.txt
 // RUN: %FileCheck %s < %t.simple.txt
 // RUN: %FileCheck -check-prefix SIMPLE %s < %t.simple.txt

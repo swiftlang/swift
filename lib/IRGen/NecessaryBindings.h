@@ -94,6 +94,7 @@ public:
     case Kind::AsyncFunction:
       return RequirementsVector[i];
     }
+    llvm_unreachable("covered switch");
   }
 
   ProtocolConformanceRef

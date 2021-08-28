@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency %import-libdispatch -parse-as-library)
+// RUN: %target-run-simple-swift( -Xfrontend -sil-verify-all -Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library)
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -8,7 +8,7 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 actor Counter {
   private var value = 0
   private let scratchBuffer: UnsafeMutableBufferPointer<Int>
@@ -28,10 +28,21 @@ actor Counter {
     value = value + 1
     return current
   }
+
+  deinit {
+      for i in 0..<value {
+          assert(scratchBuffer[i] == 1)
+      }
+  }
 }
 
+// Produce a random priority.
+nonisolated var randomPriority: TaskPriority? {
+  let priorities: [TaskPriority?] = [ .background, .low, .medium, .high, nil ]
+  return priorities.randomElement()!
+}
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func worker(identity: Int, counters: [Counter], numIterations: Int) async {
   for i in 0..<numIterations {
     let counterIndex = Int.random(in: 0 ..< counters.count)
@@ -41,7 +52,7 @@ func worker(identity: Int, counters: [Counter], numIterations: Int) async {
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func runTest(numCounters: Int, numWorkers: Int, numIterations: Int) async {
   // Create counter actors.
   var counters: [Counter] = []
@@ -53,8 +64,8 @@ func runTest(numCounters: Int, numWorkers: Int, numIterations: Int) async {
   var workers: [Task.Handle<Void, Error>] = []
   for i in 0..<numWorkers {
     workers.append(
-      detach { [counters] in
-        await Task.sleep(UInt64.random(in: 0..<100) * 1_000_000)
+      Task.detached(priority: randomPriority) { [counters] in
+        await try! Task.sleep(nanoseconds: UInt64.random(in: 0..<100) * 1_000_000)
         await worker(identity: i, counters: counters, numIterations: numIterations)
       }
     )
@@ -68,7 +79,7 @@ func runTest(numCounters: Int, numWorkers: Int, numIterations: Int) async {
   print("DONE!")
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @main struct Main {
   static func main() async {
     // Useful for debugging: specify counter/worker/iteration counts

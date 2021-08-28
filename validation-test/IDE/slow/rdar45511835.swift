@@ -10,4 +10,4 @@ func testing() {
     .map { $0 + "b" as String }
     .filter { $0 != "" } #^COMPLETE^#
 }
-// CHECK: Decl[InfixOperatorFunction]/{{.*}}: [' ']+ {#[String]#}[#[String]#]; name=+ [String]
+// CHECK: Decl[InfixOperatorFunction]/{{.*}}: [' ']+ {#[String]#}[#[String]#]; name=+

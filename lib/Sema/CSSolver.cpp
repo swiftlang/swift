@@ -175,6 +175,9 @@ Solution ConstraintSystem::finalize() {
   for (auto &nodeType : NodeTypes) {
     solution.nodeTypes.insert(nodeType);
   }
+  for (auto &keyPathComponentType : KeyPathComponentTypes) {
+    solution.keyPathComponentTypes.insert(keyPathComponentType);
+  }
 
   // Remember contextual types.
   solution.contextualTypes.assign(
@@ -255,6 +258,11 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   // Add the node types back.
   for (auto &nodeType : solution.nodeTypes) {
     setType(nodeType.first, nodeType.second);
+  }
+
+  for (auto &nodeType : solution.keyPathComponentTypes) {
+    setType(nodeType.getFirst().first, nodeType.getFirst().second,
+            nodeType.getSecond());
   }
 
   // Add the contextual types.
@@ -414,6 +422,11 @@ ConstraintSystem::SolverState::~SolverState() {
          "Expected constraint system to have this solver state!");
   CS.solverState = nullptr;
 
+  // If constraint system ended up being in an invalid state
+  // let's just drop the state without attempting to rollback.
+  if (CS.inInvalidState())
+    return;
+
   // Make sure that all of the retired constraints have been returned
   // to constraint system.
   assert(!hasRetiredConstraints());
@@ -486,6 +499,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numOpenedExistentialTypes = cs.OpenedExistentialTypes.size();
   numDefaultedConstraints = cs.DefaultedConstraints.size();
   numAddedNodeTypes = cs.addedNodeTypes.size();
+  numAddedKeyPathComponentTypes = cs.addedKeyPathComponentTypes.size();
   numDisabledConstraints = cs.solverState->getNumDisabledConstraints();
   numFavoredConstraints = cs.solverState->getNumFavoredConstraints();
   numResultBuilderTransformed = cs.resultBuilderTransformed.size();
@@ -504,6 +518,10 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
 }
 
 ConstraintSystem::SolverScope::~SolverScope() {
+  // Don't attempt to rollback from an incorrect state.
+  if (cs.inInvalidState())
+    return;
+
   // Erase the end of various lists.
   while (cs.TypeVariables.size() > numTypeVariables)
     cs.TypeVariables.pop_back();
@@ -566,6 +584,19 @@ ConstraintSystem::SolverScope::~SolverScope() {
       cs.NodeTypes.erase(node);
   }
   truncate(cs.addedNodeTypes, numAddedNodeTypes);
+
+  // Remove any node types we registered.
+  for (unsigned i : reverse(range(numAddedKeyPathComponentTypes,
+                                  cs.addedKeyPathComponentTypes.size()))) {
+    auto KeyPath = std::get<0>(cs.addedKeyPathComponentTypes[i]);
+    auto KeyPathIndex = std::get<1>(cs.addedKeyPathComponentTypes[i]);
+    if (Type oldType = std::get<2>(cs.addedKeyPathComponentTypes[i])) {
+      cs.KeyPathComponentTypes[{KeyPath, KeyPathIndex}] = oldType;
+    } else {
+      cs.KeyPathComponentTypes.erase({KeyPath, KeyPathIndex});
+    }
+  }
+  truncate(cs.addedKeyPathComponentTypes, numAddedKeyPathComponentTypes);
 
   /// Remove any builder transformed closures.
   truncate(cs.resultBuilderTransformed, numResultBuilderTransformed);
@@ -884,8 +915,8 @@ void ConstraintSystem::shrink(Expr *expr) {
         return isArithmeticExprOfLiterals(postfix->getArg());
 
       if (auto binary = dyn_cast<BinaryExpr>(expr))
-        return isArithmeticExprOfLiterals(binary->getArg()->getElement(0)) &&
-               isArithmeticExprOfLiterals(binary->getArg()->getElement(1));
+        return isArithmeticExprOfLiterals(binary->getLHS()) &&
+               isArithmeticExprOfLiterals(binary->getRHS());
 
       return isa<IntegerLiteralExpr>(expr) || isa<FloatLiteralExpr>(expr);
     }
@@ -1362,6 +1393,13 @@ void ConstraintSystem::solveImpl(SmallVectorImpl<Solution> &solutions) {
   if (failedConstraint)
     return;
 
+  // Attempt to solve a constraint system already in an invalid
+  // state should be immediately aborted.
+  if (inInvalidState()) {
+    solutions.clear();
+    return;
+  }
+
   // Allocate new solver scope, so constraint system
   // could be restored to its original state afterwards.
   // Otherwise there is a risk that some of the constraints
@@ -1404,6 +1442,14 @@ void ConstraintSystem::solveImpl(SmallVectorImpl<Solution> &solutions) {
     // or error, which means that current path is inconsistent.
     {
       auto result = advance(step.get(), prevFailed);
+
+      // If execution of this step let constraint system in an
+      // invalid state, let's drop all of the solutions and abort.
+      if (inInvalidState()) {
+        solutions.clear();
+        return;
+      }
+
       switch (result.getKind()) {
       // It was impossible to solve this step, let's note that
       // for followup steps, to propogate the error.
@@ -1890,7 +1936,7 @@ void DisjunctionChoiceProducer::partitionGenericOperators(
       return refined->inheritsFrom(protocol);
 
     return (bool)TypeChecker::conformsToProtocol(nominal->getDeclaredType(), protocol,
-                                                 nominal->getDeclContext());
+                                                 CS.DC->getParentModule());
   };
 
   // Gather Numeric and Sequence overloads into separate buckets.
@@ -1938,15 +1984,18 @@ void DisjunctionChoiceProducer::partitionGenericOperators(
     if (argType->isTypeVariableOrMember())
       continue;
 
-    if (conformsToKnownProtocol(CS.DC, argType,
-                                KnownProtocolKind::AdditiveArithmetic)) {
+    if (TypeChecker::conformsToKnownProtocol(
+            argType, KnownProtocolKind::AdditiveArithmetic,
+            CS.DC->getParentModule())) {
       first =
           std::copy(numericOverloads.begin(), numericOverloads.end(), first);
       numericOverloads.clear();
       break;
     }
 
-    if (conformsToKnownProtocol(CS.DC, argType, KnownProtocolKind::Sequence)) {
+    if (TypeChecker::conformsToKnownProtocol(
+            argType, KnownProtocolKind::Sequence,
+            CS.DC->getParentModule())) {
       first =
           std::copy(sequenceOverloads.begin(), sequenceOverloads.end(), first);
       sequenceOverloads.clear();

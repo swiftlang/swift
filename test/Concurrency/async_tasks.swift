@@ -1,11 +1,11 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
+// RUN: %target-typecheck-verify-swift  -disable-availability-checking
 // REQUIRES: concurrency
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func someAsyncFunc() async -> String { "" }
 
 struct MyError: Error {}
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func someThrowingAsyncFunc() async throws -> String { throw MyError() }
 
 // ==== Unsafe Continuations ---------------------------------------------------
@@ -27,7 +27,7 @@ func buyVegetables(
 ) {}
 
 // returns 1 or more vegetables or throws an error
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func buyVegetables(shoppingList: [String]) async throws -> [Vegetable] {
   try await withUnsafeThrowingContinuation { continuation in
     var veggies: [Vegetable] = []
@@ -43,7 +43,7 @@ func buyVegetables(shoppingList: [String]) async throws -> [Vegetable] {
 }
 
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func test_unsafeContinuations() async {
   // the closure should not allow async operations;
   // after all: if you have async code, just call it directly, without the unsafe continuation
@@ -64,7 +64,7 @@ func test_unsafeContinuations() async {
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func test_unsafeThrowingContinuations() async throws {
   let _: String = try await withUnsafeThrowingContinuation { continuation in
     continuation.resume(returning: "")
@@ -89,24 +89,24 @@ func test_unsafeThrowingContinuations() async throws {
 
 // ==== Detached Tasks ---------------------------------------------------------
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func test_detached() async throws {
-  let handle = detach() {
+  let handle = Task.detached {
     await someAsyncFunc() // able to call async functions
   }
 
-  let result: String = await handle.get()
+  let result: String = await handle.value
   _ = result
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func test_detached_throwing() async -> String {
-  let handle: Task.Handle<String, Error> = detach() {
+  let handle: Task<String, Error> = Task.detached {
     try await someThrowingAsyncFunc() // able to call async functions
   }
 
   do {
-    return try await handle.get()
+    return try await handle.value
   } catch {
     print("caught: \(error)")
   }

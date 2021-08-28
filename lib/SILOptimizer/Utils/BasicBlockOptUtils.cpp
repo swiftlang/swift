@@ -244,7 +244,7 @@ void BasicBlockCloner::sinkAddressProjections() {
     deleter.trackIfDead(&*ii);
     ii = nextII;
   }
-  deleter.cleanUpDeadInstructions();
+  deleter.cleanupDeadInstructions();
 }
 
 // Populate 'projections' with the chain of address projections leading

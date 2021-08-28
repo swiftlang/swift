@@ -3,26 +3,219 @@ CHANGELOG
 
 _**Note:** This is in reverse chronological order, so newer entries are added to the top._
 
+Swift 5.6
+---------
+* [SE-0315][]:
+
+  Type expressions and annotations can now include "type placeholders" which
+  directs the compiler to fill in that portion of the type according to the usual
+  type inference rules. Type placeholders are spelled as an underscore ("`_`") in
+  a type name. For instance:
+  
+  ```swift
+  // This is OK--the compiler can infer the key type as `Int`.
+  let dict: [_: String] = [0: "zero", 1: "one", 2: "two"]
+  ```
+
+* [SE-0290][]:
+
+  It is now possible to write inverted availability conditions by using the new `#unavailable` keyword:
+
+  ```swift
+  if #unavailable(iOS 15.0) {
+      // Old functionality
+  } else {
+      // iOS 15 functionality 
+  }
+  ```
+
+**Add new entries to the top of this section, not here!**
+
 Swift 5.5
 ---------
 
+* [SE-0313][]:
+
+  Parameters of actor type can be declared as `isolated`, which means that they
+  represent the actor on which that code will be executed. `isolated` parameters
+  extend the actor-isolated semantics of the `self` parameter of actor methods
+  to arbitrary parameters. For example:
+
+  ```swift
+  actor MyActor {
+    func f() { }
+  }
+
+  func g(actor: isolated MyActor) {
+    actor.f()   // okay, this code is always executing on "actor"
+  }
+
+  func h(actor: MyActor) async {
+    g(actor: actor)        // error, call must be asynchronous
+    await g(actor: actor)  // okay, hops to "actor" before calling g
+  }
+  ```
+
+  The `self` parameter of actor methods are implicitly `isolated`. The
+  `nonisolated` keyword makes the `self` parameter no longer `isolated`.
+
+* [SR-14731][]:
+
+  The compiler now correctly rejects the application of generic arguments to the
+  special `Self` type:
+
+  ```swift
+  struct Box<T> {
+    // previously interpreted as a return type of Box<T>, ignoring the <Int> part;
+    // now we diagnose an error with a fix-it suggesting replacing `Self` with `Box`
+    static func makeBox() -> Self<Int> {...}
+  }
+  ```
+
+* [SR-14878][]:
+
+  The compiler now correctly rejects `@available` annotations on enum cases with
+  associated values with an OS version newer than the current deployment target:
+
+  ```swift
+  @available(macOS 12, *)
+  public struct Crayon {}
+
+  public enum Pen {
+    case pencil
+
+    @available(macOS 12, *)
+    case crayon(Crayon)
+  }
+  ```
+
+  While this worked with some examples, there is no way for the Swift runtime to
+  perform the requisite dynamic layout needed to support this in general, which
+  could cause crashes at runtime.
+
+  Note that conditional availability on stored properties in structs and classes
+  is not supported for similar reasons; it was already correctly detected and
+  diagnosed.
+
+* [SE-0311][]:
+
+  Task local values can be defined using the new `@TaskLocal` property wrapper.
+  Such values are carried implicitly by the task in which the binding was made,
+  as well as any child-tasks, and unstructured task created from the tasks context.
+  
+  ```swift
+  struct TraceID { 
+    @TaskLocal
+    static var current: TraceID? 
+  }
+  
+  func printTraceID() {
+    if let traceID = TraceID.current {
+      print("\(traceID)")
+    } else {
+      print("nil")
+    }
+  }
+  
+  func run() async { 
+    printTraceID()    // prints: nil
+    TraceID.$current.withValue("1234-5678") { 
+      printTraceID()  // prints: 1234-5678
+      inner()         // prints: 1234-5678
+    }
+    printTraceID()    // prints: nil
+  }
+  
+  func inner() {
+    // if called from a context in which the task-local value
+    // was bound, it will print it (or 'nil' otherwise)
+    printTraceID()
+  }
+  ```
+
+* [SE-0316][]:
+
+	A type can be defined as a global actor. Global actors extend the notion
+	of actor isolation outside of a single actor type, so that global state
+	(and the functions that access it) can benefit from actor isolation,
+	even if the state and functions are scattered across many different
+	types, functions and modules. Global actors make it possible to safely
+	work with global variables in a concurrent program, as well as modeling
+	other global program constraints such as code that must only execute on
+  the "main thread" or "UI thread". A new global actor can be defined with
+  the `globalActor` attribute:
+
+  ```swift
+  @globalActor
+  struct DatabaseActor {
+    actor ActorType { }
+
+    static let shared: ActorType = ActorType()
+  }
+  ```
+
+  Global actor types can be used as custom attributes on various declarations,
+  which ensures that those declarations are only accessed on the actor described
+  by the global actor's `shared` instance. For example:
+
+  ```swift
+  @DatabaseActor func queryDB(query: Query) throws -> QueryResult
+
+  func runQuery(queryString: String) async throws -> QueryResult {
+    let query = try Query(parsing: queryString)
+    return try await queryDB(query: query) // 'await' because this implicitly hops to DatabaseActor.shared
+  }
+  ```
+
+  The concurrency library defines one global actor, `MainActor`, which
+  represents the main thread of execution. It should be used for any code that
+  must execute on the main thread, e.g., for updating UI.
+
+* [SE-0313][]:
+
+  Declarations inside an actor that would normally be actor-isolated can
+  explicitly become non-isolated using the `nonisolated` keyword. Non-isolated
+  declarations can be used to conform to synchronous protocol requirements:
+
+  ```swift
+  actor Account: Hashable {
+    let idNumber: Int
+    var balance: Double
+
+    nonisolated func hash(into hasher: inout Hasher) { // okay, non-isolated satisfies synchronous requirement
+      hasher.combine(idNumber) // okay, can reference idNumber from outside the let
+      hasher.combine(balance) // error: cannot synchronously access actor-isolated property
+    }
+  }
+  ```
+
+* [SE-0300][]:
+
+  Async functions can now be suspended using the `withUnsafeContinuation`
+  and `withUnsafeThrowingContinuation` functions. These both take a closure,
+  and then suspend the current async task, executing that closure with a
+  continuation value for the current task. The program must use that
+  continuation at some point in the future to resume the task, passing in
+  a value or error, which then becomes the result of the `withUnsafeContinuation`
+  call in the resumed task.
+
 * Type names are no longer allowed as an argument to a subscript parameter that expects a metatype type
 
-```swift
-struct MyValue {
-}
+  ```swift
+  struct MyValue {
+  }
 
-struct MyStruct {
-  subscript(a: MyValue.Type) -> Int { get { ... } }
-}
+  struct MyStruct {
+    subscript(a: MyValue.Type) -> Int { get { ... } }
+  }
 
-func test(obj: MyStruct) {
-  let _ = obj[MyValue]
-}
-```
+  func test(obj: MyStruct) {
+    let _ = obj[MyValue]
+  }
+  ```
 
-Accepting subscripts with `MyValue` as an argument was an oversight because `MyValue` requires explicit `.self`
-to reference its metatype, so correct syntax would be to use `obj[MyValue.self]`.
+  Accepting subscripts with `MyValue` as an argument was an oversight because `MyValue` requires explicit `.self`
+  to reference its metatype, so correct syntax would be to use `obj[MyValue.self]`.
 
 * [SE-0310][]:
   
@@ -8488,13 +8681,19 @@ Swift 1.0
 [SE-0284]: <https://github.com/apple/swift-evolution/blob/main/proposals/0284-multiple-variadic-parameters.md>
 [SE-0286]: <https://github.com/apple/swift-evolution/blob/main/proposals/0286-forward-scan-trailing-closures.md>
 [SE-0287]: <https://github.com/apple/swift-evolution/blob/main/proposals/0287-implicit-member-chains.md>
+[SE-0290]: <https://github.com/apple/swift-evolution/blob/main/proposals/0290-negative-availability.md>
 [SE-0293]: <https://github.com/apple/swift-evolution/blob/main/proposals/0293-extend-property-wrappers-to-function-and-closure-parameters.md>
 [SE-0296]: <https://github.com/apple/swift-evolution/blob/main/proposals/0296-async-await.md>
 [SE-0297]: <https://github.com/apple/swift-evolution/blob/main/proposals/0297-concurrency-objc.md>
 [SE-0298]: <https://github.com/apple/swift-evolution/blob/main/proposals/0298-asyncsequence.md>
 [SE-0299]: <https://github.com/apple/swift-evolution/blob/main/proposals/0299-extend-generic-static-member-lookup.md>
+[SE-0300]: <https://github.com/apple/swift-evolution/blob/main/proposals/0300-continuation.md>
 [SE-0306]: <https://github.com/apple/swift-evolution/blob/main/proposals/0306-actors.md>
 [SE-0310]: <https://github.com/apple/swift-evolution/blob/main/proposals/0310-effectful-readonly-properties.md>
+[SE-0311]: <https://github.com/apple/swift-evolution/blob/main/proposals/0311-task-locals.md>
+[SE-0313]: <https://github.com/apple/swift-evolution/blob/main/proposals/0313-actor-isolation-control.md>
+[SE-0315]: <https://github.com/apple/swift-evolution/blob/main/proposals/0315-placeholder-types.md>
+[SE-0316]: <https://github.com/apple/swift-evolution/blob/main/proposals/0316-global-actors.md>
 
 [SR-75]: <https://bugs.swift.org/browse/SR-75>
 [SR-106]: <https://bugs.swift.org/browse/SR-106>
@@ -8533,3 +8732,5 @@ Swift 1.0
 [SR-11429]: <https://bugs.swift.org/browse/SR-11429>
 [SR-11700]: <https://bugs.swift.org/browse/SR-11700>
 [SR-11841]: <https://bugs.swift.org/browse/SR-11841>
+[SR-14731]: <https://bugs.swift.org/browse/SR-14731>
+[SR-14878]: <https://bugs.swift.org/browse/SR-14878>

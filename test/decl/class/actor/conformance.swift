@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency -enable-experimental-async-handler
+// RUN: %target-typecheck-verify-swift  -disable-availability-checking
 
 // REQUIRES: concurrency
 
@@ -20,8 +20,6 @@ protocol SyncProtocol {
 
   func syncMethodA()
 
-  func syncMethodB()
-
   func syncMethodC() -> Int
 
   subscript (index: Int) -> String { get }
@@ -42,11 +40,6 @@ actor OtherActor: SyncProtocol {
   func syncMethodA() { }
   // expected-error@-1{{actor-isolated instance method 'syncMethodA()' cannot be used to satisfy a protocol requirement}}
   // expected-note@-2{{add 'nonisolated' to 'syncMethodA()' to make this instance method not isolated to the actor}}{{3-3=nonisolated }}
-  // expected-note@-3{{add '@asyncHandler' to function 'syncMethodA()' to create an implicit asynchronous context}}{{3-3=@asyncHandler }}
-
-  // Async handlers are okay.
-  @asyncHandler
-  func syncMethodB() { }
 
   // nonisolated methods are okay.
   // FIXME: Consider suggesting nonisolated if this didn't match.
@@ -59,4 +52,30 @@ actor OtherActor: SyncProtocol {
   // Static methods and properties are okay.
   static func staticMethod() { }
   static var staticProperty: Int = 17
+}
+
+protocol Initializers {
+  init()
+  init(string: String)
+  init(int: Int) async
+}
+
+protocol SelfReqs {
+  func withBells() async -> Self
+}
+
+actor A1: Initializers, SelfReqs {
+  init() { }
+  init(string: String) { }
+  init(int: Int) async { }
+
+  func withBells() async -> A1 { self }
+}
+
+actor A2: Initializers {
+  init() { }
+  init(string: String) { }
+  init(int: Int) { }
+
+  func withBells() async -> A2 { self }
 }

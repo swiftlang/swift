@@ -89,7 +89,7 @@ void COWOptsPass::run() {
   LLVM_DEBUG(llvm::dbgs() << "*** RedundantPhiElimination on function: "
                           << F->getName() << " ***\n");
 
-  AA = PM->getAnalysis<AliasAnalysis>();
+  AA = PM->getAnalysis<AliasAnalysis>(F);
 
   bool changed = false;
   for (SILBasicBlock &block : *F) {
@@ -247,6 +247,7 @@ void COWOptsPass::collectEscapePoints(SILValue v,
       case SILInstructionKind::BeginCOWMutationInst:
       case SILInstructionKind::RefElementAddrInst:
       case SILInstructionKind::RefTailAddrInst:
+      case SILInstructionKind::DebugValueInst:
         break;
       case SILInstructionKind::BranchInst:
         collectEscapePoints(cast<BranchInst>(user)->getArgForOperand(use),

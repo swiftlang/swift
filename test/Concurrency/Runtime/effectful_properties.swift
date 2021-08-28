@@ -20,7 +20,7 @@ enum BallKind {
   case KirksandLignature
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 class Specs {
   // obtains the number of dimples
   subscript(_ bk : BallKind) -> Int {
@@ -37,7 +37,7 @@ class Specs {
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 actor Database {
   var currentData : Specs {
     get async {
@@ -52,21 +52,21 @@ actor Database {
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 protocol SphericalObject {
   var name : String { get async throws }
   var dimples : Int { get async throws }
   var description : String { get async throws }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 class Ball : SphericalObject {
   var name : String { get async throws { throw GeneralError.Todo } }
   var dimples : Int { get async throws { throw GeneralError.Todo } }
   var description : String { get async throws { throw GeneralError.Todo } }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 class GolfBall : Ball {
   private static let db : Database = Database()
 
@@ -110,17 +110,17 @@ class GolfBall : Ball {
 // CHECK: obtaining specs...
 // CHECK: this golf ball has 0 dimples
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func printAsBall(_ b : Ball) async {
   print(try! await b.description)
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func printAsAsSphericalObject(_ b : SphericalObject) async {
   print(try! await b.description)
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @main struct RunIt {
   static func main() async {
     let balls : [(Bool, Ball)] = [

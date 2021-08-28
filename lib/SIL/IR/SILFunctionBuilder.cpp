@@ -11,8 +11,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/SILFunctionBuilder.h"
+#include "swift/AST/AttrKind.h"
 #include "swift/AST/Availability.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/SemanticAttrs.h"
+
 using namespace swift;
 
 SILFunction *SILFunctionBuilder::getOrCreateFunction(
@@ -44,6 +47,13 @@ void SILFunctionBuilder::addFunctionAttributes(
 
   for (auto *A : Attrs.getAttributes<SemanticsAttr>())
     F->addSemanticsAttr(cast<SemanticsAttr>(A)->Value);
+
+  // If we are asked to emit assembly vision remarks for this function, mark the
+  // function as force emitting all optremarks including assembly vision
+  // remarks. This allows us to emit the assembly vision remarks without needing
+  // to change any of the underlying optremark mechanisms.
+  if (auto *A = Attrs.getAttribute(DAK_EmitAssemblyVisionRemarks))
+    F->addSemanticsAttr(semantics::FORCE_EMIT_OPT_REMARK_PREFIX);
 
   // Propagate @_specialize.
   for (auto *A : Attrs.getAttributes<SpecializeAttr>()) {

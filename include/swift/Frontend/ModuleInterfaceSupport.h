@@ -20,6 +20,7 @@
 #define SWIFT_INTERFACE_FORMAT_VERSION_KEY "swift-interface-format-version"
 #define SWIFT_COMPILER_VERSION_KEY "swift-compiler-version"
 #define SWIFT_MODULE_FLAGS_KEY "swift-module-flags"
+#define SWIFT_MODULE_FLAGS_IGNORABLE_KEY "swift-module-flags-ignorable"
 
 namespace swift {
 
@@ -40,6 +41,10 @@ struct ModuleInterfaceOptions {
   /// generation time, re-applied to CompilerInvocation when reading
   /// back .swiftinterface and reconstructing .swiftmodule.
   std::string Flags;
+
+  /// Flags that should be emitted to the .swiftinterface file but are OK to be
+  /// ignored by the earlier version of the compiler.
+  std::string IgnorableFlags;
 
   /// Print SPI decls and attributes.
   bool PrintSPIs = false;

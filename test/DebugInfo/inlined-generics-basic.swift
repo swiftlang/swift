@@ -65,8 +65,8 @@ public class C<R> {
     // IR: call {{.*}}3use
 #sourceLocation(file: "f.swift", line: 3)
     g(r)
-    // IR: dbg.declare({{.*}}, metadata ![[GRS_T:[0-9]+]]
-    // IR: dbg.declare({{.*}}, metadata ![[GRS_U:[0-9]+]]
+    // IR: dbg.value({{.*}}, metadata ![[GRS_T:[0-9]+]]
+    // IR: dbg.value({{.*}}, metadata ![[GRS_U:[0-9]+]]
     // IR: call {{.*}}3use
 #sourceLocation(file: "f.swift", line: 4)
     g((r, s))

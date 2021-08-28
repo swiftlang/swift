@@ -197,8 +197,8 @@ extension AnotherBazProtocol where BazValue: AnotherBazProtocol {} // ok, does n
 // Protocol extensions with additional requirements
 // ----------------------------------------------------------------------------
 extension P4 where Self.AssocP4 : P1 {
-// expected-note@-1 {{candidate requires that 'Int' conform to 'P1' (requirement specified as 'Self.AssocP4' == 'P1')}}
-// expected-note@-2 {{candidate requires that 'S4aHelper' conform to 'P1' (requirement specified as 'Self.AssocP4' == 'P1')}}
+// expected-note@-1 {{candidate requires that 'Int' conform to 'P1' (requirement specified as 'Self.AssocP4' : 'P1')}}
+// expected-note@-2 {{candidate requires that 'S4aHelper' conform to 'P1' (requirement specified as 'Self.AssocP4' : 'P1')}}
   func extP4a() {
     acceptsP1(reqP4a())
   }

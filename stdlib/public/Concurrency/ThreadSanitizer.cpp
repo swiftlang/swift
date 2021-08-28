@@ -31,12 +31,14 @@ TSanFunc *tsan_acquire, *tsan_release;
 void swift::_swift_tsan_acquire(void *addr) {
   if (tsan_acquire) {
     tsan_acquire(addr);
+    SWIFT_TASK_DEBUG_LOG("tsan_acquire on %p", addr);
   }
 }
 
 void swift::_swift_tsan_release(void *addr) {
   if (tsan_release) {
     tsan_release(addr);
+    SWIFT_TASK_DEBUG_LOG("tsan_release on %p", addr);
   }
 }
 

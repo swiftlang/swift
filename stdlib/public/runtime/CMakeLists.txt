@@ -45,6 +45,7 @@ set(swift_runtime_sources
     ExistentialContainer.cpp
     Float16Support.cpp
     FoundationSupport.cpp
+    FunctionReplacement.cpp
     Heap.cpp
     HeapObject.cpp
     ImageInspectionCommon.cpp
@@ -65,7 +66,8 @@ set(swift_runtime_sources
     RefCount.cpp
     ReflectionMirror.cpp
     RuntimeInvocationsTracking.cpp
-    SwiftDtoa.cpp)
+    SwiftDtoa.cpp
+    SwiftTLSContext.cpp)
 
 # Acknowledge that the following sources are known.
 set(LLVM_OPTIONAL_SOURCES

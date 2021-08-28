@@ -105,7 +105,7 @@ CastTrapsTestSuite.test("${t1}__${t2}")
 % end
 
 protocol P2 {}
-if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+if #available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *) {
 CastTrapsTestSuite.test("Unexpected null")
   .crashOutputMatches("Found unexpected null pointer value while trying to cast value of type '")
   .crashOutputMatches("Foo'")
@@ -125,7 +125,7 @@ CastTrapsTestSuite.test("Unexpected null")
 
 
 #if _runtime(_ObjC)
-if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+if #available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *) {
 CastTrapsTestSuite.test("Unexpected Obj-C null")
   .crashOutputMatches("Found unexpected null pointer value while trying to cast value of type '")
   .crashOutputMatches("NSObject'")

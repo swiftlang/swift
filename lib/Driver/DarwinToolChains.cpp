@@ -255,8 +255,11 @@ toolchains::Darwin::addLinkerInputArgs(InvocationInfo &II,
     addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
                            file_types::TY_Object);
     addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
+                           file_types::TY_TBD);
+    addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
                            file_types::TY_LLVM_BC);
     addInputsOfType(Arguments, context.InputActions, file_types::TY_Object);
+    addInputsOfType(Arguments, context.InputActions, file_types::TY_TBD);
     addInputsOfType(Arguments, context.InputActions, file_types::TY_LLVM_BC);
   }
 
@@ -318,10 +321,29 @@ toolchains::Darwin::addArgsToLinkARCLite(ArgStringList &Arguments,
 
 void toolchains::Darwin::addLTOLibArgs(ArgStringList &Arguments,
                                        const JobContext &context) const {
-  llvm::SmallString<128> LTOLibPath;
-  if (findXcodeClangLibPath("libLTO.dylib", LTOLibPath)) {
+  if (!context.OI.LibLTOPath.empty()) {
+    // Check for user-specified LTO library.
     Arguments.push_back("-lto_library");
-    Arguments.push_back(context.Args.MakeArgString(LTOLibPath));
+    Arguments.push_back(context.Args.MakeArgString(context.OI.LibLTOPath));
+  } else {
+    // Check for relative libLTO.dylib. This would be the expected behavior in an
+    // Xcode toolchain.
+    StringRef P = llvm::sys::path::parent_path(getDriver().getSwiftProgramPath());
+    llvm::SmallString<128> LibLTOPath(P);
+    llvm::sys::path::remove_filename(LibLTOPath); // Remove '/bin'
+    llvm::sys::path::append(LibLTOPath, "lib");
+    llvm::sys::path::append(LibLTOPath, "libLTO.dylib");
+    if (llvm::sys::fs::exists(LibLTOPath)) {
+      Arguments.push_back("-lto_library");
+      Arguments.push_back(context.Args.MakeArgString(LibLTOPath));
+    } else {
+      // Use libLTO.dylib from the default toolchain if a relative one does not exist.
+      llvm::SmallString<128> LibLTOPath;
+      if (findXcodeClangLibPath("libLTO.dylib", LibLTOPath)) {
+        Arguments.push_back("-lto_library");
+        Arguments.push_back(context.Args.MakeArgString(LibLTOPath));
+      }
+    }
   }
 }
 
@@ -774,7 +796,9 @@ toolchains::Darwin::constructInvocation(const DynamicLinkJobAction &job,
   Arguments.push_back("-no_objc_category_merging");
 
   // These custom arguments should be right before the object file at the end.
-  context.Args.AddAllArgs(Arguments, options::OPT_linker_option_Group);
+  context.Args.AddAllArgsExcept(Arguments, {options::OPT_linker_option_Group},
+                                {options::OPT_l});
+  ToolChain::addLinkedLibArgs(context.Args, Arguments);
   context.Args.AddAllArgValues(Arguments, options::OPT_Xlinker);
 
   // This should be the last option, for convenience in checking output.

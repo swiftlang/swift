@@ -16,7 +16,6 @@
         (set (make-local-variable 'swift-project-directory)
          this-directory)
         )
-  (tab-width . 2)
   (fill-column . 80)
   (c-file-style . "swift"))
  (c++-mode

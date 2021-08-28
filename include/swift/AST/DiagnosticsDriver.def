@@ -119,9 +119,6 @@ ERROR(error_input_changed_during_build,none,
 ERROR(error_conflicting_options, none,
       "conflicting options '%0' and '%1'",
       (StringRef, StringRef))
-ERROR(error_option_not_supported, none,
-      "'%0' is not supported with '%1'",
-      (StringRef, StringRef))
 ERROR(error_requirement_not_met, none,
       "'%0' requires '%1'",
       (StringRef, StringRef))
@@ -173,5 +170,10 @@ WARNING(warn_drv_darwin_sdk_invalid_settings, none,
     "SDK settings were ignored because 'SDKSettings.json' could not be parsed",
     ())
 
+WARNING(warning_unsupported_driver_option,none,
+        "option '%0' is ony supported in swift-driver", (StringRef))
+
+WARNING(old_driver_deprecated,none,
+        "legacy driver is now deprecated; consider avoiding specifying `%0`", (StringRef))
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

@@ -599,8 +599,22 @@ func foo() {}
 ##"abc \##(foo)"##
 
 foo()
-#if true
+#if COND1
   .bar?()!
+#elseif COND2
+  #if true
+    .call()
+  #elseif true
+    #if true
+      .other
+    #endif
+  #else
+    .before()
+    #if true
+      .after()
+    #endif
+  #endif
+  .member
 #else
   .baz() {}
 #endif

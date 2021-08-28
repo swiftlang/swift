@@ -31,5 +31,5 @@ func deserializeName(_ data: Array<UInt16>, flag: Bool) {
 }
 
 // CHECK: Begin completions
-// CHECK-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: utf8[#Encoding#];
+// CHECK-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: utf8[#Encoding#];
 // CHECK: End completions

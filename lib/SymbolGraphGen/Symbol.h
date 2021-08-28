@@ -76,6 +76,8 @@ class Symbol {
 
   void serializeAvailabilityMixin(llvm::json::OStream &OS) const;
 
+  void serializeSPIMixin(llvm::json::OStream &OS) const;
+
 public:
   Symbol(SymbolGraph *Graph, const ValueDecl *VD,
          const NominalTypeDecl *SynthesizedBaseTypeDecl,

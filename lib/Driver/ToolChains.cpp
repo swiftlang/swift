@@ -142,6 +142,7 @@ static void addLTOArgs(const OutputInfo &OI, ArgStringList &arguments) {
   }
 }
 
+
 void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
                                       const CommandOutput &output,
                                       const ArgList &inputArgs,
@@ -173,6 +174,10 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
       Triple.getArch() == llvm::Triple::aarch64_32) {
     arguments.push_back("-Xllvm");
     arguments.push_back("-aarch64-use-tbi");
+  }
+
+  if (output.getPrimaryOutputType() == file_types::TY_SwiftModuleFile) {
+    arguments.push_back("-warn-on-potentially-unavailable-enum-case");
   }
 
   // Enable or disable ObjC interop appropriately for the platform
@@ -278,10 +283,6 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_diagnostic_style);
   inputArgs.AddLastArg(arguments,
                        options::OPT_enable_experimental_concise_pound_file);
-  inputArgs.AddLastArg(
-      arguments,
-      options::OPT_enable_fuzzy_forward_scan_trailing_closure_matching,
-      options::OPT_disable_fuzzy_forward_scan_trailing_closure_matching);
   inputArgs.AddLastArg(arguments,
                        options::OPT_verify_incremental_dependencies);
   inputArgs.AddLastArg(arguments, options::OPT_access_notes_path);
@@ -583,6 +584,7 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     context.Args.AddLastArg(Arguments, options::OPT_emit_symbol_graph);
     context.Args.AddLastArg(Arguments, options::OPT_emit_symbol_graph_dir);
   }
+  context.Args.AddLastArg(Arguments, options::OPT_include_spi_symbols);
 
   return II;
 }
@@ -838,7 +840,8 @@ ToolChain::constructInvocation(const InterpretJobAction &job,
   Arguments.push_back("-module-name");
   Arguments.push_back(context.Args.MakeArgString(context.OI.ModuleName));
 
-  context.Args.AddAllArgs(Arguments, options::OPT_l, options::OPT_framework);
+  context.Args.AddAllArgs(Arguments, options::OPT_framework);
+  ToolChain::addLinkedLibArgs(context.Args, Arguments);
 
   // The immediate arguments must be last.
   context.Args.AddLastArg(Arguments, options::OPT__DASH_DASH);
@@ -1072,6 +1075,7 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
 
   context.Args.AddLastArg(Arguments, options::OPT_emit_symbol_graph);
   context.Args.AddLastArg(Arguments, options::OPT_emit_symbol_graph_dir);
+  context.Args.AddLastArg(Arguments, options::OPT_include_spi_symbols);
 
   context.Args.AddLastArg(Arguments, options::OPT_import_objc_header);
 
@@ -1191,8 +1195,8 @@ ToolChain::constructInvocation(const REPLJobAction &job,
   addRuntimeLibraryFlags(context.OI, FrontendArgs);
 
   context.Args.AddLastArg(FrontendArgs, options::OPT_import_objc_header);
-  context.Args.AddAllArgs(FrontendArgs, options::OPT_l, options::OPT_framework,
-                          options::OPT_L);
+  context.Args.AddAllArgs(FrontendArgs, options::OPT_framework, options::OPT_L);
+  ToolChain::addLinkedLibArgs(context.Args, FrontendArgs);
 
   if (!useLLDB) {
     FrontendArgs.insert(FrontendArgs.begin(), {"-frontend", "-repl"});

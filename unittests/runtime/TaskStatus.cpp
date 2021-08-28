@@ -52,14 +52,17 @@ static void simpleTaskInvokeFunction(SWIFT_ASYNC_CONTEXT AsyncContext *context,
 }
 
 template <class T>
-static void withSimpleTask(JobFlags flags, T &&value,
+static void withSimpleTask(TaskCreateFlags flags, T &&value,
                            undeduced<InvokeFunctionRef<T>> invokeFn,
                            BodyFunctionRef body) {
   auto taskAndContext =
-      swift_task_create_f(flags,
-                          reinterpret_cast<TaskContinuationFunction *>(
-                              &simpleTaskInvokeFunction<T>),
-                          sizeof(ValueContext<T>));
+      swift_task_create_common(flags.getOpaqueValue(),
+                               nullptr,
+                               nullptr,
+                               reinterpret_cast<TaskContinuationFunction *>(
+                                 &simpleTaskInvokeFunction<T>),
+                               nullptr,
+                               sizeof(ValueContext<T>));
 
   auto valueContext =
     static_cast<ValueContext<T>*>(taskAndContext.InitialContext);
@@ -75,7 +78,7 @@ template <class T>
 static void withSimpleTask(T &&value,
                            undeduced<InvokeFunctionRef<T>> invokeFn,
                            BodyFunctionRef bodyFn) {
-  withSimpleTask(JobKind::Task, std::forward<T>(value), invokeFn, bodyFn);
+  withSimpleTask(TaskCreateFlags(), std::forward<T>(value), invokeFn, bodyFn);
 }
 
 static ExecutorRef createFakeExecutor(uintptr_t value) {
@@ -125,11 +128,11 @@ TEST(TaskStatusTest, cancellation_simple) {
   withSimpleTask(Storage{47},
     [&](ValueContext<Storage> *context) {
     auto task = swift_task_getCurrent();
-    EXPECT_FALSE(task->isCancelled());
+    EXPECT_FALSE(swift_task_isCancelled(task));
     swift_task_cancel(task);
-    EXPECT_TRUE(task->isCancelled());
+    EXPECT_TRUE(swift_task_isCancelled(task));
     swift_task_cancel(task);
-    EXPECT_TRUE(task->isCancelled());
+    EXPECT_TRUE(swift_task_isCancelled(task));
   }, [&](AsyncTask *task) {
     swift_job_run(task, createFakeExecutor(1234));
   });
@@ -143,7 +146,7 @@ TEST(TaskStatusTest, deadline) {
   withSimpleTask(Storage{47},
     [&](ValueContext<Storage> *context) {
     auto task = swift_task_getCurrent();
-    EXPECT_FALSE(task->isCancelled());
+    EXPECT_FALSE(swift_task_isCancelled(task));
 
     TaskDeadline deadlineOne = { 1234 };
     TaskDeadline deadlineTwo = { 2345 };
@@ -250,7 +253,7 @@ TEST(TaskStatusTest, deadline) {
 
     // Cancel.
     swift_task_cancel(task);
-    EXPECT_TRUE(task->isCancelled());
+    EXPECT_TRUE(swift_task_isCancelled(task));
 
     // We should report already cancelled now.
     nearest = swift_task_getNearestDeadline(task);
@@ -275,7 +278,7 @@ TEST(TaskStatusTest, deadline) {
     nearest = swift_task_getNearestDeadline(task);
     EXPECT_EQ(NearestTaskDeadline::AlreadyCancelled, nearest.ValueKind);
 
-    EXPECT_TRUE(task->isCancelled());
+    EXPECT_TRUE(swift_task_isCancelled(task));
   }, [&](AsyncTask *task) {
     swift_job_run(task, createFakeExecutor(1234));
   });

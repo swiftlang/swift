@@ -162,7 +162,7 @@ func checkFields<T>(
   expectEqual(fields.count, count)
 }
 
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
 func checkFieldsWithKeyPath<T>(
   of type: T.Type,
   options: _EachFieldOptions = [],
@@ -298,7 +298,7 @@ if #available(macOS 10.15.4, iOS 13.4, tvOS 13.4, watchOS 6.2, *) {
     })
   }
 
-  if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+  if #available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *) {
     tests.test("StructKeyPath") {
       checkFieldsWithKeyPath(
         of: TestStruct.self,

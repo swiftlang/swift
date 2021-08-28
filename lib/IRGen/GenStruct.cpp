@@ -216,6 +216,13 @@ namespace {
       return nullptr;
     }
 
+    const TypeInfo *getFieldTypeInfo(IRGenModule &IGM, VarDecl *field) const {
+      auto &fieldInfo = getFieldInfo(field);
+      if (fieldInfo.isEmpty())
+        return nullptr;
+      return &fieldInfo.getTypeInfo();
+    }
+
     MemberAccessStrategy getFieldAccessStrategy(IRGenModule &IGM,
                                              SILType T, VarDecl *field) const {
       auto &fieldInfo = getFieldInfo(field);
@@ -1135,6 +1142,12 @@ Optional<unsigned> irgen::getPhysicalStructFieldIndex(IRGenModule &IGM,
                                                       SILType baseType,
                                                       VarDecl *field) {
   FOR_STRUCT_IMPL(IGM, baseType, getFieldIndexIfNotEmpty, field);
+}
+
+const TypeInfo *irgen::getPhysicalStructFieldTypeInfo(IRGenModule &IGM,
+                                                      SILType baseType,
+                                                      VarDecl *field) {
+  FOR_STRUCT_IMPL(IGM, baseType, getFieldTypeInfo, field);
 }
 
 void IRGenModule::emitStructDecl(StructDecl *st) {

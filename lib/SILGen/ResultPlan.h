@@ -38,7 +38,8 @@ class CalleeTypeInfo;
 class ResultPlan {
 public:
   virtual RValue finish(SILGenFunction &SGF, SILLocation loc, CanType substType,
-                        ArrayRef<ManagedValue> &directResults) = 0;
+                        ArrayRef<ManagedValue> &directResults,
+                        SILValue bridgedForeignError) = 0;
   virtual ~ResultPlan() = default;
 
   virtual void
@@ -49,9 +50,9 @@ public:
   emitForeignErrorArgument(SILGenFunction &SGF, SILLocation loc) {
     return None;
   }
-  
-  virtual ManagedValue
-  emitForeignAsyncCompletionHandler(SILGenFunction &SGF, SILLocation loc) {
+
+  virtual ManagedValue emitForeignAsyncCompletionHandler(
+      SILGenFunction &SGF, AbstractionPattern origFormalType, SILLocation loc) {
     return {};
   }
 };

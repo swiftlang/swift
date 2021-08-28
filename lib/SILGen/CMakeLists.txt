@@ -1,4 +1,4 @@
-set_swift_llvm_is_available()
+
 add_swift_host_library(swiftSILGen STATIC
   ArgumentSource.cpp
   Cleanup.cpp
@@ -18,6 +18,7 @@ add_swift_host_library(swiftSILGen STATIC
   SILGenConvert.cpp
   SILGenDecl.cpp
   SILGenDestructor.cpp
+  SILGenDistributed.cpp
   SILGenDynamicCast.cpp
   SILGenEpilog.cpp
   SILGenExpr.cpp
@@ -35,3 +36,5 @@ add_swift_host_library(swiftSILGen STATIC
   SILGenType.cpp)
 target_link_libraries(swiftSILGen PRIVATE
   swiftSIL)
+
+set_swift_llvm_is_available(swiftSILGen)

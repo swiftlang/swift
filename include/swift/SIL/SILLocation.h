@@ -51,8 +51,9 @@ public:
   /// Describes a position in a source file by explicitly storing the file name,
   /// line and column.
   ///
-  /// This is used for parsed locations from a SIL file, for "-gsil" (see
-  /// SILDebugInfoGenerator) and for the "compiler-generated" singleton location.
+  /// This is used for parsed locations from a SIL file, for
+  /// "-sil-based-debuginfo" (see SILDebugInfoGenerator) and for the
+  /// "compiler-generated" singleton location.
   /// In future we might also use it for de-serialized locations from a
   /// swiftmodule file.
   struct FilenameAndLocation : public SILAllocated<FilenameAndLocation> {
@@ -207,6 +208,7 @@ private:
     case FilenameAndLocationKind:
       llvm_unreachable("location type has no AST node");
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Returns true if the location has a separate AST node for debugging.
@@ -300,6 +302,7 @@ public:
     case FilenameAndLocationKind: return storage.filePositionLoc == nullptr;;
     case SourceLocKind:           return storage.sourceLoc.isInvalid();
     }
+    llvm_unreachable("covered switch");
   }
   explicit operator bool() const { return !isNull(); }
 
@@ -313,6 +316,7 @@ public:
     case FilenameAndLocationKind:
       return false;
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Returns true if this location came from a SIL file.

@@ -2,7 +2,7 @@
 ::
 :: This source file is part of the Swift.org open source project
 ::
-:: Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
+:: Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 :: Licensed under Apache License v2.0 with Runtime Library Exception
 ::
 :: See https://swift.org/LICENSE.txt for license information
@@ -79,9 +79,10 @@ call :build_swift %exitOnError%
 
 call :build_lldb %exitOnError%
 
+path %PATH%;C:\Program Files\Git\usr\bin
 call :build_libdispatch %exitOnError%
 
-path %source_root%\icu-%icu_version%\bin64;%install_directory%\bin;%build_root%\swift\bin;%build_root%\swift\libdispatch-prefix\bin;%PATH%;C:\Program Files\Git\usr\bin
+path %source_root%\icu-%icu_version%\bin64;%install_directory%\bin;%build_root%\swift\bin;%build_root%\swift\libdispatch-prefix\bin;%PATH%
 call :test_swift %exitOnError%
 call :test_libdispatch %exitOnError%
 
@@ -120,7 +121,7 @@ git -C "%source_root%\swift" checkout-index --force --all
 @set "skip_repositories_arg=%skip_repositories_arg% --skip-repository tensorflow-swift-apis"
 @set "skip_repositories_arg=%skip_repositories_arg% --skip-repository yams"
 
-call "%source_root%\swift\utils\update-checkout.cmd" %scheme_arg% %skip_repositories_arg% --clone --skip-history --github-comment "%ghprbCommentBody%" >NUL 2>NUL
+call "%source_root%\swift\utils\update-checkout.cmd" %scheme_arg% %skip_repositories_arg% --clone --skip-history --skip-tags --github-comment "%ghprbCommentBody%" >NUL 2>NUL
 
 goto :eof
 endlocal
@@ -180,6 +181,7 @@ cmake^
     -DCMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE%^
     -DCMAKE_C_COMPILER=cl^
     -DCMAKE_CXX_COMPILER=cl^
+    -DCMAKE_MT=mt^
     -DCMAKE_INSTALL_PREFIX:PATH=%install_directory%^
     -DLLVM_DEFAULT_TARGET_TRIPLE=x86_64-unknown-windows-msvc^
     -DLLVM_ENABLE_PDB:BOOL=YES^
@@ -222,6 +224,7 @@ cmake^
     -DCMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE%^
     -DCMAKE_C_COMPILER=cl^
     -DCMAKE_CXX_COMPILER=cl^
+    -DCMAKE_MT=mt^
     -DCMAKE_CXX_FLAGS:STRING="/GS- /Oy"^
     -DCMAKE_EXE_LINKER_FLAGS:STRING=/INCREMENTAL:NO^
     -DCMAKE_SHARED_LINKER_FLAGS:STRING=/INCREMENTAL:NO^
@@ -245,6 +248,7 @@ cmake^
     -DCMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE%^
     -DCMAKE_C_COMPILER=cl^
     -DCMAKE_CXX_COMPILER=cl^
+    -DCMAKE_MT=mt^
     -DCMAKE_INSTALL_PREFIX:PATH=%install_directory%^
     -DClang_DIR:PATH=%build_root%\llvm\lib\cmake\clang^
     -DSWIFT_PATH_TO_CMARK_BUILD:PATH=%build_root%\cmark^
@@ -265,6 +269,7 @@ cmake^
     -DSWIFT_BUILD_SOURCEKIT:BOOL=YES^
     -DSWIFT_ENABLE_SOURCEKIT_TESTS:BOOL=YES^
     -DSWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY=YES^
+    -DSWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED=YES^
     -DSWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING=YES^
     -DSWIFT_INSTALL_COMPONENTS="autolink-driver;compiler;clang-resource-dir-symlink;stdlib;sdk-overlay;editor-integration;tools;sourcekit-inproc;swift-remote-mirror;swift-remote-mirror-headers"^
     -DSWIFT_PARALLEL_LINK_JOBS=8^
@@ -272,6 +277,7 @@ cmake^
     -DCMAKE_CXX_FLAGS:STRING="/GS- /Oy"^
     -DCMAKE_EXE_LINKER_FLAGS:STRING=/INCREMENTAL:NO^
     -DCMAKE_SHARED_LINKER_FLAGS:STRING=/INCREMENTAL:NO^
+    -DSWIFT_LIT_ARGS="--time-tests"^
     -S "%source_root%\swift" %exitOnError%
 
 cmake --build "%build_root%\swift" %exitOnError%
@@ -301,6 +307,7 @@ cmake^
     -DCMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE%^
     -DCMAKE_C_COMPILER=cl^
     -DCMAKE_CXX_COMPILER=cl^
+    -DCMAKE_MT=mt^
     -DCMAKE_INSTALL_PREFIX:PATH=%install_directory%^
     -DLLVM_DIR:PATH=%build_root%\llvm\lib\cmake\llvm^
     -DClang_DIR:PATH=%build_root%\llvm\lib\cmake\clang^
@@ -327,12 +334,15 @@ endlocal
 :: Configures, builds, and installs Dispatch
 setlocal enableextensions enabledelayedexpansion
 
+for /f "delims=" %%O in ('cygpath -m %install_directory%\lib\swift') do set RESOURCE_DIR=%%O
+
 cmake^
     -B "%build_root%\swift-corelibs-libdispatch"^
     -G Ninja^
     -DCMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE%^
     -DCMAKE_C_COMPILER=clang-cl^
     -DCMAKE_CXX_COMPILER=clang-cl^
+    -DCMAKE_MT=mt^
     -DCMAKE_Swift_COMPILER=swiftc^
     -DSwift_DIR:PATH=%build_root%\swift\lib\cmake\swift^
     -DCMAKE_INSTALL_PREFIX:PATH=%install_directory%^
@@ -345,8 +355,8 @@ cmake^
     -DCMAKE_EXE_LINKER_FLAGS:STRING="/INCREMENTAL:NO"^
     -DCMAKE_SHARED_LINKER_FLAGS:STRING="/INCREMENTAL:NO"^
     -DCMAKE_Swift_COMPILER_TARGET:STRING=x86_64-unknown-windows-msvc^
-    -DCMAKE_Swift_FLAGS:STRING="-resource-dir \"%install_directory%\lib\swift\""^
-    -DCMAKE_Swift_LINK_FLAGS:STRING="-resource-dir \"%install_directory%\lib\swift\""^
+    -DCMAKE_Swift_FLAGS:STRING="-resource-dir \"%RESOURCE_DIR%\""^
+    -DCMAKE_Swift_LINK_FLAGS:STRING="-resource-dir \"%RESOURCE_DIR%\""^
     -S "%source_root%\swift-corelibs-libdispatch" %exitOnError%
 
 cmake --build "%build_root%\swift-corelibs-libdispatch" %exitOnError%

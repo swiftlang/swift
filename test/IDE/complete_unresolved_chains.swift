@@ -48,7 +48,7 @@ func testChains() {
 // UNRESOLVED_CHAIN_2-DAG: Decl[InstanceVar]/CurrNominal:      chainStruct2[#ChainStruct2#]; name=chainStruct2
 // UNRESOLVED_CHAIN_2-DAG: Decl[InstanceMethod]/CurrNominal:   chainStruct2Func()[#ChainStruct2#]; name=chainStruct2Func()
 // UNRESOLVED_CHAIN_2-DAG: Decl[InstanceVar]/CurrNominal:      hashValue[#Int#]; name=hashValue
-// UNRESOLVED_CHAIN_2-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#into: &Hasher#})[#Void#]; name=hash(into: &Hasher)
+// UNRESOLVED_CHAIN_2-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#into: &Hasher#})[#Void#]; name=hash(into:)
 // UNRESOLVED_CHAIN_2: End completions
 
 // UNRESOLVED_CHAIN_3: Begin completions, 5 items

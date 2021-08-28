@@ -140,10 +140,14 @@ static std::pair<AsyncTask*, Context*>
 createTaskWithContext(JobPriority priority, Fn &&fn) {
   auto invoke =
     TaskContinuationFromLambda<Fn, Context>::get(std::move(fn));
-
-  auto pair = swift_task_create_f(JobFlags(JobKind::Task, priority),
-                                  invoke,
-                                  sizeof(Context));
+  TaskCreateFlags flags;
+  flags.setPriority(priority);
+  auto pair = swift_task_create_common(flags.getOpaqueValue(),
+                                       nullptr,
+                                       nullptr,
+                                       invoke,
+                                       nullptr,
+                                       sizeof(Context));
   return std::make_pair(pair.Task,
                         static_cast<Context*>(pair.InitialContext));
 }
@@ -158,6 +162,8 @@ template <class Context, class Fn>
 static void parkTask(AsyncTask *task, Context *context, Fn &&fn) {
   auto invoke =
     TaskContinuationFromLambda<Fn, Context>::get(std::move(fn));
+  auto currentTask = swift_task_suspend();
+  EXPECT_EQ(task, currentTask);
   task->ResumeTask = invoke;
   task->ResumeContext = context;
 }

@@ -96,12 +96,6 @@ SourceLoc TypeLoc::getLoc() const {
   return SourceLoc();
 }
 
-// Only allow allocation of Types using the allocator in ASTContext.
-void *TypeBase::operator new(size_t bytes, const ASTContext &ctx,
-                             AllocationArena arena, unsigned alignment) {
-  return ctx.Allocate(bytes, alignment, arena);
-}
-
 NominalTypeDecl *CanType::getAnyNominal() const {
   return dyn_cast_or_null<NominalTypeDecl>(getAnyGeneric());
 }
@@ -1163,38 +1157,6 @@ static void addProtocols(Type T,
   Superclass = T;
 }
 
-/// Add the protocol (or protocols) in the type T to the stack of
-/// protocols, checking whether any of the protocols had already been seen and
-/// zapping those in the original list that we find again.
-static void
-addMinimumProtocols(Type T, SmallVectorImpl<ProtocolDecl *> &Protocols,
-                    llvm::SmallDenseMap<ProtocolDecl *, unsigned> &Known,
-                    llvm::SmallPtrSetImpl<ProtocolDecl *> &Visited,
-                    SmallVector<ProtocolDecl *, 16> &Stack, bool &ZappedAny) {
-  if (auto Proto = T->getAs<ProtocolType>()) {
-    auto KnownPos = Known.find(Proto->getDecl());
-    if (KnownPos != Known.end()) {
-      // We've come across a protocol that is in our original list. Zap it.
-      Protocols[KnownPos->second] = nullptr;
-      ZappedAny = true;
-    }
-
-    if (Visited.insert(Proto->getDecl()).second) {
-      Stack.push_back(Proto->getDecl());
-      for (auto Inherited : Proto->getDecl()->getInheritedProtocols())
-        addMinimumProtocols(Inherited->getDeclaredInterfaceType(),
-                            Protocols, Known, Visited, Stack, ZappedAny);
-    }
-    return;
-  }
-  
-  if (auto PC = T->getAs<ProtocolCompositionType>()) {
-    for (auto C : PC->getMembers()) {
-      addMinimumProtocols(C, Protocols, Known, Visited, Stack, ZappedAny);
-    }
-  }
-}
-
 bool ProtocolType::visitAllProtocols(
                                  ArrayRef<ProtocolDecl *> protocols,
                                  llvm::function_ref<bool(ProtocolDecl *)> fn) {
@@ -1229,44 +1191,48 @@ bool ProtocolType::visitAllProtocols(
 void ProtocolType::canonicalizeProtocols(
        SmallVectorImpl<ProtocolDecl *> &protocols) {
   llvm::SmallDenseMap<ProtocolDecl *, unsigned> known;
-  llvm::SmallPtrSet<ProtocolDecl *, 16> visited;
-  SmallVector<ProtocolDecl *, 16> stack;
   bool zappedAny = false;
 
   // Seed the stack with the protocol declarations in the original list.
   // Zap any obvious duplicates along the way.
-  for (unsigned I = 0, N = protocols.size(); I != N; ++I) {
-    // Check whether we've seen this protocol before.
-    auto knownPos = known.find(protocols[I]);
-    
+  for (unsigned i : indices(protocols)) {
     // If we have not seen this protocol before, record its index.
-    if (knownPos == known.end()) {
-      known[protocols[I]] = I;
-      stack.push_back(protocols[I]);
+    if (known.count(protocols[i]) == 0) {
+      known[protocols[i]] = i;
       continue;
     }
-    
+
     // We have seen this protocol before; zap this occurrence.
-    protocols[I] = nullptr;
+    protocols[i] = nullptr;
     zappedAny = true;
   }
   
   // Walk the inheritance hierarchies of all of the protocols. If we run into
   // one of the known protocols, zap it from the original list.
-  while (!stack.empty()) {
-    ProtocolDecl *Current = stack.back();
-    stack.pop_back();
-    
+  for (unsigned i : indices(protocols)) {
+    auto *proto = protocols[i];
+    if (proto == nullptr)
+      continue;
+
     // Add the protocols we inherited.
-    for (auto Inherited : Current->getInheritedProtocols()) {
-      addMinimumProtocols(Inherited->getDeclaredInterfaceType(),
-                          protocols, known, visited, stack, zappedAny);
-    }
+    proto->walkInheritedProtocols([&](ProtocolDecl *inherited) {
+      if (inherited == proto)
+        return TypeWalker::Action::Continue;
+
+      auto found = known.find(inherited);
+      if (found != known.end()) {
+        protocols[found->second] = nullptr;
+        zappedAny = true;
+      }
+
+      return TypeWalker::Action::Continue;
+    });
   }
   
-  if (zappedAny)
+  if (zappedAny) {
     protocols.erase(std::remove(protocols.begin(), protocols.end(), nullptr),
                     protocols.end());
+  }
 
   // Sort the set of protocols by module + name, to give a stable
   // ordering.
@@ -1561,6 +1527,7 @@ Type SugarType::getSinglyDesugaredTypeSlow() {
   case TypeKind::TypeAlias:
     llvm_unreachable("bound type alias types always have an underlying type");
   case TypeKind::ArraySlice:
+  case TypeKind::VariadicSequence:
     implDecl = Context->getArrayDecl();
     break;
   case TypeKind::Optional:
@@ -2121,11 +2088,11 @@ public:
     bool didChange = newParent != substBGT.getParent();
     
     auto depthStart =
-      genericSig->getGenericParams().size() - bgt->getGenericArgs().size();
+      genericSig.getGenericParams().size() - bgt->getGenericArgs().size();
     for (auto i : indices(bgt->getGenericArgs())) {
       auto orig = bgt->getGenericArgs()[i]->getCanonicalType();
       auto subst = substBGT.getGenericArgs()[i];
-      auto gp = genericSig->getGenericParams()[depthStart + i];
+      auto gp = genericSig.getGenericParams()[depthStart + i];
       
       // The new type is upper-bounded by the constraints the nominal type
       // requires. The substitution operation may be interested in transforming
@@ -2152,7 +2119,7 @@ public:
       didChange |= (newParam != subst);
     }
 
-    for (const auto &req : genericSig->getRequirements()) {
+    for (const auto &req : genericSig.getRequirements()) {
       if (req.getKind() != RequirementKind::Conformance) continue;
 
       auto canTy = req.getFirstType()->getCanonicalType();
@@ -2638,9 +2605,7 @@ getForeignRepresentable(Type type, ForeignLanguage language,
           if (auto objcBridgeable
                 = ctx.getProtocol(KnownProtocolKind::ObjectiveCBridgeable)) {
             SmallVector<ProtocolConformance *, 1> conformances;
-            if (nominal->lookupConformance(dc->getParentModule(),
-                                           objcBridgeable,
-                                           conformances))
+            if (nominal->lookupConformance(objcBridgeable, conformances))
               break;
           }
         }
@@ -3003,7 +2968,8 @@ Type ArchetypeType::getExistentialType() const {
     constraintTypes.push_back(proto->getDeclaredInterfaceType());
   }
   return ProtocolCompositionType::get(
-     const_cast<ArchetypeType*>(this)->getASTContext(), constraintTypes, false);
+     const_cast<ArchetypeType*>(this)->getASTContext(), constraintTypes,
+                                      requiresClass());
 }
 
 PrimaryArchetypeType::PrimaryArchetypeType(const ASTContext &Ctx,
@@ -3472,7 +3438,7 @@ void ArchetypeType::registerNestedType(Identifier name, Type nested) {
          "Unable to find nested type?");
   assert(!found->second ||
          found->second->isEqual(nested) ||
-         (found->second->hasError() && nested->hasError()));
+         found->second->is<ErrorType>());
   found->second = nested;
 }
 
@@ -3636,9 +3602,10 @@ bool SILFunctionType::hasSameExtInfoAs(const SILFunctionType *otherFn) {
 }
 
 FunctionType *
-GenericFunctionType::substGenericArgs(SubstitutionMap subs) {
+GenericFunctionType::substGenericArgs(SubstitutionMap subs,
+                                      SubstOptions options) {
   return substGenericArgs(
-    [=](Type t) { return t.subst(subs); });
+    [=](Type t) { return t.subst(subs, options); });
 }
 
 FunctionType *GenericFunctionType::substGenericArgs(
@@ -3770,7 +3737,8 @@ operator()(CanType dependentType, Type conformingReplacementType,
     return ProtocolConformanceRef(conformedProtocol);
 
   return M->lookupConformance(conformingReplacementType,
-                              conformedProtocol);
+                              conformedProtocol,
+                              /*allowMissing=*/true);
 }
 
 ProtocolConformanceRef LookUpConformanceInSubstitutionMap::
@@ -4188,7 +4156,7 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
     baseTy = baseTy->getSuperclassForDecl(ownerClass);
 
   // Gather all of the substitutions for all levels of generic arguments.
-  auto params = genericSig->getGenericParams();
+  auto params = genericSig.getGenericParams();
   unsigned n = params.size();
 
   while (baseTy && n > 0) {
@@ -4282,7 +4250,7 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(
     auto *innerDC = member->getInnermostDeclContext();
     if (innerDC->isInnermostContextGeneric()) {
       if (auto sig = innerDC->getGenericSignatureOfContext()) {
-        for (auto param : sig->getInnermostGenericParams()) {
+        for (auto param : sig.getInnermostGenericParams()) {
           auto *genericParam = param->getCanonicalType()
               ->castTo<GenericTypeParamType>();
           substitutions[genericParam] =
@@ -4311,8 +4279,16 @@ SubstitutionMap TypeBase::getMemberSubstitutionMap(
       LookUpConformanceInModule(module));
 }
 
+Type TypeBase::getTypeOfMember(ModuleDecl *module, const VarDecl *member) {
+  return getTypeOfMember(module, member, member->getInterfaceType());
+}
+
 Type TypeBase::getTypeOfMember(ModuleDecl *module, const ValueDecl *member,
                                Type memberType) {
+  assert(memberType);
+  assert(!memberType->is<GenericFunctionType>() &&
+         "Generic function types are not supported");
+
   if (is<ErrorType>())
     return ErrorType::get(getASTContext());
 
@@ -4320,12 +4296,6 @@ Type TypeBase::getTypeOfMember(ModuleDecl *module, const ValueDecl *member,
     auto objectTy = lvalue->getObjectType();
     return objectTy->getTypeOfMember(module, member, memberType);
   }
-
-  // If no member type was provided, use the member's type.
-  if (!memberType)
-    memberType = member->getInterfaceType();
-
-  assert(memberType);
 
   // Perform the substitution.
   auto substitutions = getMemberSubstitutionMap(module, member);
@@ -4704,7 +4674,7 @@ case TypeKind::Id:
          return newSubs[index];
        },
        LookUpConformanceInModule(opaque->getDecl()->getModuleContext()));
-    return OpaqueTypeArchetypeType::get(opaque->getDecl(),
+    return OpaqueTypeArchetypeType::get(opaque->getDecl(), opaque->getOrdinal(),
                                         newSubMap);
   }
   case TypeKind::NestedArchetype: {
@@ -4967,6 +4937,18 @@ case TypeKind::Id:
       return *this;
 
     return OptionalType::get(baseTy);
+  }
+
+  case TypeKind::VariadicSequence: {
+    auto seq = cast<VariadicSequenceType>(base);
+    auto baseTy = seq->getBaseType().transformRec(fn);
+    if (!baseTy)
+      return Type();
+
+    if (baseTy.getPointer() == seq->getBaseType().getPointer())
+      return *this;
+
+    return VariadicSequenceType::get(baseTy);
   }
 
   case TypeKind::Dictionary: {

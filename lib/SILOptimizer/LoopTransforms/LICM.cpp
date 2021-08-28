@@ -939,7 +939,8 @@ void LoopTreeOptimization::analyzeCurrentLoop(
     // how to rematerialize global_addr, then we don't need this base.
     auto access = AccessPathWithBase::compute(SI->getDest());
     auto accessPath = access.accessPath;
-    if (accessPath.isValid() && isLoopInvariant(access.base, Loop)) {
+    if (accessPath.isValid() &&
+        (access.base && isLoopInvariant(access.base, Loop))) {
       if (isOnlyLoadedAndStored(AA, sideEffects, Loads, Stores, SI->getDest(),
                                 accessPath)) {
         if (!LoadAndStoreAddrs.count(accessPath)) {
@@ -1467,7 +1468,7 @@ public:
 
     DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
     PostDominanceAnalysis *PDA = PM->getAnalysis<PostDominanceAnalysis>();
-    AliasAnalysis *AA = PM->getAnalysis<AliasAnalysis>();
+    AliasAnalysis *AA = PM->getAnalysis<AliasAnalysis>(F);
     SideEffectAnalysis *SEA = PM->getAnalysis<SideEffectAnalysis>();
     AccessedStorageAnalysis *ASA = getAnalysis<AccessedStorageAnalysis>();
     DominanceInfo *DomTree = nullptr;

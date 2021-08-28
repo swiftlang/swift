@@ -7,6 +7,10 @@
 
 import Builtin
 
+class C {}
+
+sil @getOwnedC : $@convention(thin) () -> (@owned C)
+
 sil [ossa] @coroutine_callee : $@yield_once (@guaranteed Builtin.NativeObject) -> () {
 bb0(%0 : @guaranteed $Builtin.NativeObject):
   yield (), resume bb1, unwind bb2
@@ -171,4 +175,26 @@ bb2:
 bb3:
   %r = tuple ()
   return %r : $()
+}
+
+// Test a reborrow on the same branch as the consume.
+sil [ossa] @testReborrow : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  cond_br undef, bb1, bb2
+bb1:
+  destroy_value %0 : $C
+  %f = function_ref @getOwnedC : $@convention(thin) () -> (@owned C)
+  %owned1 = apply %f() : $@convention(thin) () -> (@owned C)
+  %copy1 = copy_value %owned1 : $C
+  %borrow1 = begin_borrow %copy1 : $C
+  destroy_value %owned1 : $C
+  br bb3(%borrow1 : $C, %copy1 : $C)
+bb2:
+  %borrow2 = begin_borrow %0 : $C
+  br bb3(%borrow2 : $C, %0 : $C)
+bb3(%borrow3 : @guaranteed $C, %copy3 : @owned $C):
+  end_borrow %borrow3 : $C
+  destroy_value %copy3 : $C
+  %result = tuple ()
+  return %result : $()
 }

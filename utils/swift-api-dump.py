@@ -330,6 +330,8 @@ def main():
     extra_args = ['-skip-imports']
     if args.enable_experimental_concurrency:
         extra_args = extra_args + ['-enable-experimental-concurrency']
+    if args.enable_experimental_distributed:
+        extra_args = extra_args + ['-enable-experimental-distributed']
     if args.swift_version:
         extra_args = extra_args + ['-swift-version', '%s' % args.swift_version]
 

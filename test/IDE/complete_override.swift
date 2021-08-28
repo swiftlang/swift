@@ -428,8 +428,8 @@ class C1 : P1 {
 }
 
 // ASSOC_TYPE1: Begin completions, 2 items
-// ASSOC_TYPE1: Decl[AssociatedType]/Super:         typealias T2 = {#(Type)#}; name=T2 = Type
-// ASSOC_TYPE1: Decl[AssociatedType]/Super:         typealias T3 = {#(Type)#}; name=T3 = Type
+// ASSOC_TYPE1: Decl[AssociatedType]/Super:         typealias T2 = {#(Type)#}; name=T2 =
+// ASSOC_TYPE1: Decl[AssociatedType]/Super:         typealias T3 = {#(Type)#}; name=T3 =
 
 class Deprecated1 {
   @available(*, deprecated)
@@ -585,7 +585,7 @@ class Override26 : OverrideBase, OverrideP {
 // MODIFIER1-DAG: Decl[InstanceVar]/Super:            override var varDecl: Int; name=varDecl: Int
 // MODIFIER1-DAG: Decl[Constructor]/Super:            override init(x: Int) {|}; name=init(x: Int)
 // MODIFIER1-DAG: Decl[Constructor]/Super:            required init(a: Int) {|}; name=required init(a: Int)
-// MODIFIER1-DAG: Decl[AssociatedType]/Super:         typealias Assoc = {#(Type)#}; name=Assoc = Type
+// MODIFIER1-DAG: Decl[AssociatedType]/Super:         typealias Assoc = {#(Type)#}; name=Assoc =
 // MODIFIER1: End completions
 
 // MODIFIER2: Begin completions, 6 items
@@ -610,7 +610,7 @@ class Override26 : OverrideBase, OverrideP {
 // MODIFIER5: End completions
 
 // MODIFIER6: Begin completions, 1 items
-// MODIFIER6-DAG: Decl[AssociatedType]/Super:         Assoc = {#(Type)#}; name=Assoc = Type
+// MODIFIER6-DAG: Decl[AssociatedType]/Super:         Assoc = {#(Type)#}; name=Assoc =
 // MODIFIER6: End completions
 
 // MODIFIER7: Begin completions, 8 items
@@ -756,4 +756,14 @@ class SynthesizedConformance5: SynthesizedConformance2 {
 // OVERRIDE_SYNTHESIZED_5-DAG: Decl[Constructor]/Super/IsSystem:       required init(from decoder: Decoder) throws {|};
 // OVERRIDE_SYNTHESIZED_5-DAG: Decl[Constructor]/Super:                required init(from decoder: Decoder) throws {|};
 // FIXME: 'required init(from decoder: Decoder)' is suggested twice
+}
+
+protocol ProtocolSr14687 {
+  var value: Int { get }
+}
+struct StructSr14687: ProtocolSr14687 {
+  let foo = val, #^MULTI_VAR_DECL_OVERRIDE^#
+// MULTI_VAR_DECL_OVERRIDE:     Begin completions, 1 items
+// MULTI_VAR_DECL_OVERRIDE-DAG: Decl[InstanceVar]/Super:            value: Int;
+// MULTI_VAR_DECL_OVERRIDE:     End completions
 }

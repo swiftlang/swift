@@ -178,6 +178,12 @@ static bool isTrivialEnumElem(EnumElementDecl *elem, SILType enumType,
         enumType.getEnumElementType(elem, function).isTrivial(*function);
 }
 
+static bool isOrHasEnum(SILType type) {
+  return type.getASTType().findIf([](Type ty) {
+    return ty->getEnumOrBoundGenericEnum() != nullptr;
+  });
+}
+
 bool MemoryLifetimeVerifier::storesTrivialEnum(int locIdx,
                         SILBasicBlock::reverse_iterator start,
                         SILBasicBlock::reverse_iterator end) {
@@ -191,7 +197,7 @@ bool MemoryLifetimeVerifier::storesTrivialEnum(int locIdx,
     if (auto *SI = dyn_cast<StoreInst>(&inst)) {
       const Location *loc = locations.getLocation(SI->getDest());
       if (loc && loc->isSubLocation(locIdx) &&
-          SI->getSrc()->getType().getEnumOrBoundGenericEnum()) {
+          isOrHasEnum(SI->getSrc()->getType())) {
         return SI->getOwnershipQualifier() == StoreOwnershipQualifier::Trivial;
       }
     }

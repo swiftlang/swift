@@ -57,12 +57,6 @@ StringRef swift::getFunctionRefKindStr(FunctionRefKind refKind) {
 // Expr methods.
 //===----------------------------------------------------------------------===//
 
-// Only allow allocation of Stmts using the allocator in ASTContext.
-void *Expr::operator new(size_t Bytes, ASTContext &C,
-                         unsigned Alignment) {
-  return C.Allocate(Bytes, Alignment);
-}
-
 StringRef Expr::getKindName(ExprKind K) {
   switch (K) {
 #define EXPR(Id, Parent) case ExprKind::Id: return #Id;
@@ -742,6 +736,135 @@ llvm::DenseMap<Expr *, Expr *> Expr::getParentMap() {
   return parentMap;
 }
 
+bool Expr::isValidParentOfTypeExpr(Expr *typeExpr) const {
+  // Allow references to types as a part of:
+  // - member references T.foo, T.Type, T.self, etc.
+  // - constructor calls T()
+  // - Subscripts T[]
+  //
+  // This is an exhaustive list of the accepted syntactic forms.
+  switch (getKind()) {
+  case ExprKind::Error:
+  case ExprKind::DotSelf:
+  case ExprKind::MemberRef:
+  case ExprKind::UnresolvedMember:
+  case ExprKind::DotSyntaxCall:
+  case ExprKind::ConstructorRefCall:
+  case ExprKind::UnresolvedDot:
+  case ExprKind::DotSyntaxBaseIgnored:
+  case ExprKind::UnresolvedSpecialize:
+  case ExprKind::OpenExistential:
+    return true;
+
+  // For these cases we need to ensure the type expr is the function or base.
+  // We do not permit e.g 'foo(T)'.
+  case ExprKind::Call:
+    return cast<CallExpr>(this)->getFn() == typeExpr;
+  case ExprKind::Subscript:
+    return cast<SubscriptExpr>(this)->getBase() == typeExpr;
+
+  case ExprKind::NilLiteral:
+  case ExprKind::BooleanLiteral:
+  case ExprKind::IntegerLiteral:
+  case ExprKind::FloatLiteral:
+  case ExprKind::StringLiteral:
+  case ExprKind::MagicIdentifierLiteral:
+  case ExprKind::InterpolatedStringLiteral:
+  case ExprKind::ObjectLiteral:
+  case ExprKind::DiscardAssignment:
+  case ExprKind::DeclRef:
+  case ExprKind::SuperRef:
+  case ExprKind::Type:
+  case ExprKind::OtherConstructorDeclRef:
+  case ExprKind::OverloadedDeclRef:
+  case ExprKind::UnresolvedDeclRef:
+  case ExprKind::DynamicMemberRef:
+  case ExprKind::DynamicSubscript:
+  case ExprKind::Sequence:
+  case ExprKind::Paren:
+  case ExprKind::Await:
+  case ExprKind::UnresolvedMemberChainResult:
+  case ExprKind::Try:
+  case ExprKind::ForceTry:
+  case ExprKind::OptionalTry:
+  case ExprKind::Tuple:
+  case ExprKind::Array:
+  case ExprKind::Dictionary:
+  case ExprKind::KeyPathApplication:
+  case ExprKind::TupleElement:
+  case ExprKind::CaptureList:
+  case ExprKind::Closure:
+  case ExprKind::AutoClosure:
+  case ExprKind::InOut:
+  case ExprKind::VarargExpansion:
+  case ExprKind::DynamicType:
+  case ExprKind::RebindSelfInConstructor:
+  case ExprKind::OpaqueValue:
+  case ExprKind::PropertyWrapperValuePlaceholder:
+  case ExprKind::AppliedPropertyWrapper:
+  case ExprKind::DefaultArgument:
+  case ExprKind::BindOptional:
+  case ExprKind::OptionalEvaluation:
+  case ExprKind::ForceValue:
+  case ExprKind::MakeTemporarilyEscapable:
+  case ExprKind::PrefixUnary:
+  case ExprKind::PostfixUnary:
+  case ExprKind::Binary:
+  case ExprKind::Load:
+  case ExprKind::DestructureTuple:
+  case ExprKind::UnresolvedTypeConversion:
+  case ExprKind::FunctionConversion:
+  case ExprKind::CovariantFunctionConversion:
+  case ExprKind::CovariantReturnConversion:
+  case ExprKind::ImplicitlyUnwrappedFunctionConversion:
+  case ExprKind::MetatypeConversion:
+  case ExprKind::CollectionUpcastConversion:
+  case ExprKind::Erasure:
+  case ExprKind::AnyHashableErasure:
+  case ExprKind::BridgeToObjC:
+  case ExprKind::BridgeFromObjC:
+  case ExprKind::ConditionalBridgeFromObjC:
+  case ExprKind::DerivedToBase:
+  case ExprKind::ArchetypeToSuper:
+  case ExprKind::InjectIntoOptional:
+  case ExprKind::ClassMetatypeToObject:
+  case ExprKind::ExistentialMetatypeToObject:
+  case ExprKind::ProtocolMetatypeToObject:
+  case ExprKind::InOutToPointer:
+  case ExprKind::ArrayToPointer:
+  case ExprKind::StringToPointer:
+  case ExprKind::PointerToPointer:
+  case ExprKind::ForeignObjectConversion:
+  case ExprKind::UnevaluatedInstance:
+  case ExprKind::UnderlyingToOpaque:
+  case ExprKind::DifferentiableFunction:
+  case ExprKind::LinearFunction:
+  case ExprKind::DifferentiableFunctionExtractOriginal:
+  case ExprKind::LinearFunctionExtractOriginal:
+  case ExprKind::LinearToDifferentiableFunction:
+  case ExprKind::ForcedCheckedCast:
+  case ExprKind::ConditionalCheckedCast:
+  case ExprKind::Is:
+  case ExprKind::Coerce:
+  case ExprKind::Arrow:
+  case ExprKind::If:
+  case ExprKind::EnumIsCase:
+  case ExprKind::Assign:
+  case ExprKind::CodeCompletion:
+  case ExprKind::UnresolvedPattern:
+  case ExprKind::LazyInitializer:
+  case ExprKind::EditorPlaceholder:
+  case ExprKind::ObjCSelector:
+  case ExprKind::KeyPath:
+  case ExprKind::KeyPathDot:
+  case ExprKind::OneWay:
+  case ExprKind::Tap:
+    return false;
+  }
+
+  llvm_unreachable("Unhandled ExprKind in switch.");
+}
+
 //===----------------------------------------------------------------------===//
 // Support methods for Exprs.
 //===----------------------------------------------------------------------===//
@@ -1229,7 +1352,18 @@ UnresolvedSpecializeExpr *UnresolvedSpecializeExpr::create(ASTContext &ctx,
                                              UnresolvedParams, RAngleLoc);
 }
 
+CaptureListEntry::CaptureListEntry(PatternBindingDecl *PBD) : PBD(PBD) {
+  assert(PBD);
+  assert(PBD->getSingleVar() &&
+         "Capture lists only support single-var patterns");
+}
+
+VarDecl *CaptureListEntry::getVar() const {
+  return PBD->getSingleVar();
+}
+
 bool CaptureListEntry::isSimpleSelfCapture() const {
+  auto *Var = getVar();
   auto &ctx = Var->getASTContext();
 
   if (Var->getName() != ctx.Id_self)
@@ -1239,10 +1373,10 @@ bool CaptureListEntry::isSimpleSelfCapture() const {
     if (attr->get() == ReferenceOwnership::Weak)
       return false;
 
-  if (Init->getPatternList().size() != 1)
+  if (PBD->getPatternList().size() != 1)
     return false;
 
-  auto *expr = Init->getInit(0);
+  auto *expr = PBD->getInit(0);
 
   if (auto *DRE = dyn_cast<DeclRefExpr>(expr)) {
     if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
@@ -1265,7 +1399,7 @@ CaptureListExpr *CaptureListExpr::create(ASTContext &ctx,
   auto *expr = ::new(mem) CaptureListExpr(captureList, closureBody);
 
   for (auto capture : captureList)
-    capture.Var->setParentCaptureList(expr);
+    capture.getVar()->setParentCaptureList(expr);
 
   return expr;
 }
@@ -1768,6 +1902,30 @@ Expr *CallExpr::getDirectCallee() const {
   }
 }
 
+PrefixUnaryExpr *PrefixUnaryExpr::create(ASTContext &ctx, Expr *fn,
+                                         Expr *operand, Type ty) {
+  return new (ctx) PrefixUnaryExpr(fn, operand, ty);
+}
+
+PostfixUnaryExpr *PostfixUnaryExpr::create(ASTContext &ctx, Expr *fn,
+                                           Expr *operand, Type ty) {
+  return new (ctx) PostfixUnaryExpr(fn, operand, ty);
+}
+
+BinaryExpr *BinaryExpr::create(ASTContext &ctx, Expr *lhs, Expr *fn, Expr *rhs,
+                               bool implicit, Type ty) {
+  auto *packedArg = TupleExpr::createImplicit(ctx, {lhs, rhs}, /*labels*/ {});
+  computeSingleArgumentType(ctx, packedArg, /*implicit*/ true,
+                            [](Expr *E) { return E->getType(); });
+  return new (ctx) BinaryExpr(fn, packedArg, implicit, ty);
+}
+
+DotSyntaxCallExpr *DotSyntaxCallExpr::create(ASTContext &ctx, Expr *fnExpr,
+                                             SourceLoc dotLoc, Expr *baseExpr,
+                                             Type ty) {
+  return new (ctx) DotSyntaxCallExpr(fnExpr, dotLoc, baseExpr, ty);
+}
+
 SourceLoc DotSyntaxCallExpr::getLoc() const {
   if (isImplicit()) {
     SourceLoc baseLoc = getBase()->getLoc();
@@ -1793,6 +1951,13 @@ SourceLoc DotSyntaxCallExpr::getEndLoc() const {
   }
 
   return getFn()->getEndLoc();
+}
+
+ConstructorRefCallExpr *ConstructorRefCallExpr::create(ASTContext &ctx,
+                                                       Expr *fnExpr,
+                                                       Expr *baseExpr,
+                                                       Type ty) {
+  return new (ctx) ConstructorRefCallExpr(fnExpr, baseExpr, ty);
 }
 
 void ExplicitCastExpr::setCastType(Type type) {
@@ -1931,10 +2096,11 @@ void AbstractClosureExpr::setParameterList(ParameterList *P) {
 Type AbstractClosureExpr::getResultType(
     llvm::function_ref<Type(Expr *)> getType) const {
   auto *E = const_cast<AbstractClosureExpr *>(this);
-  if (getType(E)->hasError())
-    return getType(E);
+  Type T = getType(E);
+  if (!T || T->hasError())
+    return T;
 
-  return getType(E)->castTo<FunctionType>()->getResult();
+  return T->castTo<FunctionType>()->getResult();
 }
 
 bool AbstractClosureExpr::isBodyThrowing() const {
@@ -2359,7 +2525,7 @@ KeyPathExpr::Component::Component(ASTContext *ctxForCopyingLabels,
     : Decl(decl), SubscriptIndexExpr(indexExpr), KindValue(kind),
       ComponentType(type), Loc(loc)
 {
-  assert(kind != Kind::TupleElement || subscriptLabels.empty());
+  assert(kind == Kind::Subscript || kind == Kind::UnresolvedSubscript);
   assert(subscriptLabels.size() == indexHashables.size()
          || indexHashables.empty());
   SubscriptLabelsData = subscriptLabels.data();
@@ -2398,6 +2564,7 @@ void KeyPathExpr::Component::setSubscriptIndexHashableConformances(
   case Kind::Identity:
   case Kind::TupleElement:
   case Kind::DictionaryKey:
+  case Kind::CodeCompletion:
     llvm_unreachable("no hashable conformances for this kind");
   }
 }

@@ -36,7 +36,8 @@ using namespace swift::syntax;
 TypeRepr *Parser::applyAttributeToType(TypeRepr *ty,
                                        const TypeAttributes &attrs,
                                        ParamDecl::Specifier specifier,
-                                       SourceLoc specifierLoc) {
+                                       SourceLoc specifierLoc,
+                                       SourceLoc isolatedLoc) {
   // Apply those attributes that do apply.
   if (!attrs.empty()) {
     ty = new (Context) AttributedTypeRepr(attrs, ty);
@@ -57,6 +58,11 @@ TypeRepr *Parser::applyAttributeToType(TypeRepr *ty,
     case ParamDecl::Specifier::Default:
       break;
     }
+  }
+
+  // Apply 'isolated'.
+  if (isolatedLoc.isValid()) {
+    ty = new (Context) IsolatedTypeRepr(ty, isolatedLoc);
   }
 
   return ty;
@@ -151,7 +157,9 @@ LayoutConstraint Parser::parseLayoutConstraint(Identifier LayoutConstraintID) {
 ///     type-simple '!'
 ///     type-collection
 ///     type-array
-ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID) {
+///     '_'
+ParserResult<TypeRepr> Parser::parseTypeSimple(
+    Diag<> MessageID, ParseTypeReason reason) {
   ParserResult<TypeRepr> ty;
 
   if (Tok.is(tok::kw_inout) ||
@@ -182,6 +190,9 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID) {
     ty = parseTypeCollection();
     break;
   }
+  case tok::kw__:
+    ty = makeParserResult(new (Context) PlaceholderTypeRepr(consumeToken()));
+    break;
   case tok::kw_protocol:
     if (startsWithLess(peekToken())) {
       ty = parseOldStyleProtocolComposition();
@@ -228,16 +239,16 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID) {
 
     if (!Tok.isAtStartOfLine()) {
       if (isOptionalToken(Tok)) {
-        ty = parseTypeOptional(ty.get());
+        ty = parseTypeOptional(ty);
         continue;
       }
       if (isImplicitlyUnwrappedOptionalToken(Tok)) {
-        ty = parseTypeImplicitlyUnwrappedOptional(ty.get());
+        ty = parseTypeImplicitlyUnwrappedOptional(ty);
         continue;
       }
       // Parse legacy array types for migration.
-      if (Tok.is(tok::l_square)) {
-        ty = parseTypeArray(ty.get());
+      if (Tok.is(tok::l_square) && reason != ParseTypeReason::CustomAttribute) {
+        ty = parseTypeArray(ty);
         continue;
       }
     }
@@ -311,7 +322,7 @@ ParserResult<TypeRepr> Parser::parseSILBoxType(GenericParamList *generics,
                                      LAngleLoc, Args, RAngleLoc);
   return makeParserResult(applyAttributeToType(repr, attrs,
                                                ParamDecl::Specifier::Owned,
-                                               SourceLoc()));
+                                               SourceLoc(), SourceLoc()));
 }
 
 
@@ -323,16 +334,20 @@ ParserResult<TypeRepr> Parser::parseSILBoxType(GenericParamList *generics,
 ///   type-function:
 ///     type-composition 'async'? 'throws'? '->' type
 ///
-ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
-                                         bool IsSILFuncDecl) {
+ParserResult<TypeRepr> Parser::parseType(
+    Diag<> MessageID, ParseTypeReason reason) {
   // Start a context for creating type syntax.
   SyntaxParsingContext TypeParsingContext(SyntaxContext,
                                           SyntaxContextKind::Type);
+
+  ParserStatus status;
+
   // Parse attributes.
   ParamDecl::Specifier specifier;
   SourceLoc specifierLoc;
+  SourceLoc isolatedLoc;
   TypeAttributes attrs;
-  parseTypeAttributeList(specifier, specifierLoc, attrs);
+  status |= parseTypeAttributeList(specifier, specifierLoc, isolatedLoc, attrs);
 
   // Parse generic parameters in SIL mode.
   GenericParamList *generics = nullptr;
@@ -359,11 +374,11 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
     return parseSILBoxType(generics, attrs);
   }
 
-  ParserResult<TypeRepr> ty = parseTypeSimpleOrComposition(MessageID);
+  ParserResult<TypeRepr> ty = parseTypeSimpleOrComposition(MessageID, reason);
+  status |= ParserStatus(ty);
   if (ty.isNull())
-    return ty;
+    return status;
   auto tyR = ty.get();
-  auto status = ParserStatus(ty);
 
   // Parse effects specifiers.
   // Don't consume them, if there's no following '->', so we can emit a more
@@ -387,11 +402,11 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
 
     ParserResult<TypeRepr> SecondHalf =
         parseType(diag::expected_type_function_result);
+    status |= SecondHalf;
     if (SecondHalf.isNull()) {
       status.setIsParseError();
       return status;
     }
-    status |= SecondHalf;
 
     if (SyntaxContext->isEnabled()) {
       ParsedFunctionTypeSyntaxBuilder Builder(*SyntaxContext);
@@ -529,11 +544,33 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
     if (tyR)
       tyR->walk(walker);
   }
-  if (specifierLoc.isValid() || !attrs.empty())
+  if (specifierLoc.isValid() || isolatedLoc.isValid() || !attrs.empty())
     SyntaxContext->setCreateSyntax(SyntaxKind::AttributedType);
 
-  return makeParserResult(status, applyAttributeToType(tyR, attrs, specifier,
-                                                       specifierLoc));
+  return makeParserResult(
+      status,
+      applyAttributeToType(tyR, attrs, specifier, specifierLoc, isolatedLoc));
+}
+
+ParserResult<TypeRepr> Parser::parseTypeWithOpaqueParams(Diag<> MessageID) {
+  GenericParamList *genericParams = nullptr;
+  if (Context.LangOpts.EnableExperimentalNamedOpaqueTypes) {
+    auto result = maybeParseGenericParams();
+    genericParams = result.getPtrOrNull();
+    if (result.hasCodeCompletion())
+      return makeParserCodeCompletionStatus();
+  }
+
+  auto typeResult = parseType(MessageID);
+  if (auto type = typeResult.getPtrOrNull()) {
+    return makeParserResult(
+        ParserStatus(typeResult),
+        genericParams ? new (Context)
+                            NamedOpaqueReturnTypeRepr(type, genericParams)
+                      : type);
+  } else {
+    return typeResult;
+  }
 }
 
 ParserResult<TypeRepr> Parser::parseDeclResultType(Diag<> MessageID) {
@@ -544,7 +581,7 @@ ParserResult<TypeRepr> Parser::parseDeclResultType(Diag<> MessageID) {
     return makeParserCodeCompletionStatus();
   }
 
-  auto result = parseType(MessageID);
+  auto result = parseTypeWithOpaqueParams(MessageID);
 
   if (!result.isParseErrorOrHasCompletion()) {
     if (Tok.is(tok::r_square)) {
@@ -751,7 +788,7 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
 ///     'some'? type-simple
 ///     type-composition '&' type-simple
 ParserResult<TypeRepr>
-Parser::parseTypeSimpleOrComposition(Diag<> MessageID) {
+Parser::parseTypeSimpleOrComposition(Diag<> MessageID, ParseTypeReason reason) {
   SyntaxParsingContext SomeTypeContext(SyntaxContext, SyntaxKind::SomeType);
   // Check for the opaque modifier.
   // This is only semantically allowed in certain contexts, but we parse it
@@ -775,7 +812,7 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID) {
   
   SyntaxParsingContext CompositionContext(SyntaxContext, SyntaxContextKind::Type);
   // Parse the first type
-  ParserResult<TypeRepr> FirstType = parseTypeSimple(MessageID);
+  ParserResult<TypeRepr> FirstType = parseTypeSimple(MessageID, reason);
   if (FirstType.isNull())
     return FirstType;
   if (!Tok.isContextualPunctuator("&")) {
@@ -833,7 +870,7 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID) {
 
     // Parse next type.
     ParserResult<TypeRepr> ty =
-      parseTypeSimple(diag::expected_identifier_for_type);
+      parseTypeSimple(diag::expected_identifier_for_type, reason);
     if (ty.hasCodeCompletion())
       return makeParserCodeCompletionResult<TypeRepr>();
     Status |= ty;
@@ -1005,20 +1042,11 @@ ParserResult<TypeRepr> Parser::parseTypeTupleBody() {
       Backtracking.emplace(*this);
       ObsoletedInOutLoc = consumeToken(tok::kw_inout);
     }
-                                    
-    // If the label is "some", this could end up being an opaque type
-    // description if there's `some <identifier>` without a following colon,
-    // so we may need to backtrack as well.
-    if (Tok.isContextualKeyword("some")) {
-      Backtracking.emplace(*this);
-    }
 
     // If the tuple element starts with a potential argument label followed by a
     // ':' or another potential argument label, then the identifier is an
     // element tag, and it is followed by a type annotation.
-    if (Tok.canBeArgumentLabel()
-        && (peekToken().is(tok::colon)
-            || peekToken().canBeArgumentLabel())) {
+    if (startsParameterName(false)) {
       // Consume a name.
       element.NameLoc = consumeArgumentLabel(element.Name,
                                              /*diagnoseDollarPrefix=*/true);
@@ -1174,12 +1202,11 @@ ParserResult<TypeRepr> Parser::parseTypeTupleBody() {
 ///     type-array '[' ']'
 ///     type-array '[' expr ']'
 ///
-ParserResult<TypeRepr> Parser::parseTypeArray(TypeRepr *Base) {
+ParserResult<TypeRepr> Parser::parseTypeArray(ParserResult<TypeRepr> Base) {
   assert(Tok.isFollowingLSquare());
   Parser::StructureMarkerRAII ParsingArrayBound(*this, Tok);
   SourceLoc lsquareLoc = consumeToken();
-  ArrayTypeRepr *ATR = nullptr;
-  
+
   // Handle a postfix [] production, a common typo for a C-like array.
 
   // If we have something that might be an array size expression, parse it as
@@ -1192,19 +1219,23 @@ ParserResult<TypeRepr> Parser::parseTypeArray(TypeRepr *Base) {
   
   SourceLoc rsquareLoc;
   if (parseMatchingToken(tok::r_square, rsquareLoc,
-                         diag::expected_rbracket_array_type, lsquareLoc))
-    return makeParserErrorResult(Base);
+                         diag::expected_rbracket_array_type, lsquareLoc)) {
+    Base.setIsParseError();
+    return Base;
+  }
+
+  auto baseTyR = Base.get();
 
   // If we parsed something valid, diagnose it with a fixit to rewrite it to
   // Swift syntax.
   diagnose(lsquareLoc, diag::new_array_syntax)
-    .fixItInsert(Base->getStartLoc(), "[")
+    .fixItInsert(baseTyR->getStartLoc(), "[")
     .fixItRemove(lsquareLoc);
   
   // Build a normal array slice type for recovery.
-  ATR = new (Context) ArrayTypeRepr(Base,
-                              SourceRange(Base->getStartLoc(), rsquareLoc));
-  return makeParserResult(ATR);
+  ArrayTypeRepr *ATR = new (Context) ArrayTypeRepr(
+      baseTyR, SourceRange(baseTyR->getStartLoc(), rsquareLoc));
+  return makeParserResult(ParserStatus(Base), ATR);
 }
 
 ParserResult<TypeRepr> Parser::parseTypeCollection() {
@@ -1309,22 +1340,22 @@ SourceLoc Parser::consumeImplicitlyUnwrappedOptionalToken() {
 /// Parse a single optional suffix, given that we are looking at the
 /// question mark.
 ParserResult<TypeRepr>
-Parser::parseTypeOptional(TypeRepr *base) {
+Parser::parseTypeOptional(ParserResult<TypeRepr> base) {
   SourceLoc questionLoc = consumeOptionalToken();
-  auto TyR = new (Context) OptionalTypeRepr(base, questionLoc);
+  auto TyR = new (Context) OptionalTypeRepr(base.get(), questionLoc);
   SyntaxContext->createNodeInPlace(SyntaxKind::OptionalType);
-  return makeParserResult(TyR);
+  return makeParserResult(ParserStatus(base), TyR);
 }
 
 /// Parse a single implicitly unwrapped optional suffix, given that we
 /// are looking at the exclamation mark.
 ParserResult<TypeRepr>
-Parser::parseTypeImplicitlyUnwrappedOptional(TypeRepr *base) {
+Parser::parseTypeImplicitlyUnwrappedOptional(ParserResult<TypeRepr> base) {
   SourceLoc exclamationLoc = consumeImplicitlyUnwrappedOptionalToken();
   auto TyR =
-      new (Context) ImplicitlyUnwrappedOptionalTypeRepr(base, exclamationLoc);
+      new (Context) ImplicitlyUnwrappedOptionalTypeRepr(base.get(), exclamationLoc);
   SyntaxContext->createNodeInPlace(SyntaxKind::ImplicitlyUnwrappedOptionalType);
-  return makeParserResult(TyR);
+  return makeParserResult(ParserStatus(base), TyR);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1441,6 +1472,9 @@ bool Parser::canParseType() {
     }
     if (!consumeIf(tok::r_square))
       return false;
+    break;
+  case tok::kw__:
+    consumeToken();
     break;
 
 

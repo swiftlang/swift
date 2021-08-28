@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency %import-libdispatch -parse-as-library) | %FileCheck %s
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -10,19 +10,19 @@
 
 import Dispatch
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func asyncEcho(_ value: Int) async -> Int {
   value
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func test_taskGroup_isEmpty() async {
   print("before all")
   let result = await withTaskGroup(of: Int.self, returning: Int.self) { group in
     // CHECK: before add: isEmpty=true
     print("before add: isEmpty=\(group.isEmpty)")
 
-    group.spawn {
+    group.async {
       await Task.sleep(2_000_000_000)
       return await asyncEcho(1)
     }
@@ -44,7 +44,7 @@ func test_taskGroup_isEmpty() async {
   print("result: \(result)")
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @main struct Main {
   static func main() async {
     await test_taskGroup_isEmpty()

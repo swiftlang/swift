@@ -358,7 +358,9 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
   }
 
   // These custom arguments should be right before the object file at the end.
-  context.Args.AddAllArgs(Arguments, options::OPT_linker_option_Group);
+  context.Args.AddAllArgsExcept(Arguments, {options::OPT_linker_option_Group},
+                                {options::OPT_l});
+  ToolChain::addLinkedLibArgs(context.Args, Arguments);
   context.Args.AddAllArgs(Arguments, options::OPT_Xlinker);
   context.Args.AddAllArgValues(Arguments, options::OPT_Xclang_linker);
 

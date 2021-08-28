@@ -268,8 +268,9 @@ public:
   const ContextDescriptor *
   _searchConformancesByMangledTypeName(Demangle::NodePointer node);
 
+  SWIFT_RUNTIME_EXPORT
   Demangle::NodePointer _swift_buildDemanglingForMetadata(const Metadata *type,
-                                                      Demangle::Demangler &Dem);
+                                                          Demangle::Demangler &Dem);
 
   /// Callback used to provide the substitution of a generic parameter
   /// (described by depth/index) to its metadata.
@@ -367,13 +368,15 @@ public:
                                         unsigned index) const;
   };
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wreturn-type-c-linkage" 
   /// Retrieve the type metadata described by the given demangled type name.
   ///
   /// \p substGenericParam Function that provides generic argument metadata
   /// given a particular generic parameter specified by depth/index.
   /// \p substWitnessTable Function that provides witness tables given a
   /// particular dependent conformance index.
-  SWIFT_CC(swift)
+  SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
   TypeLookupErrorOr<TypeInfo> swift_getTypeByMangledNode(
                                MetadataRequest request,
                                Demangler &demangler,
@@ -388,13 +391,14 @@ public:
   /// given a particular generic parameter specified by depth/index.
   /// \p substWitnessTable Function that provides witness tables given a
   /// particular dependent conformance index.
-  SWIFT_CC(swift)
+  SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
   TypeLookupErrorOr<TypeInfo> swift_getTypeByMangledName(
                                MetadataRequest request,
                                StringRef typeName,
                                const void * const *arguments,
                                SubstGenericParameterFn substGenericParam,
                                SubstDependentWitnessTableFn substWitnessTable);
+#pragma clang diagnostic pop
 
   /// Function object that produces substitutions for the generic parameters
   /// that occur within a mangled name, using the complete set of generic

@@ -27,6 +27,7 @@
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Demangling/ManglingUtils.h"
 #include "swift/Frontend/Frontend.h"
@@ -83,7 +84,13 @@ void EditorDiagConsumer::handleDiagnostic(SourceManager &SM,
   }
 
   // Filter out benign diagnostics for editing.
-  if (Info.ID == diag::lex_editor_placeholder.ID)
+  // oslog_invalid_log_message is spuriously output for live issues as modules
+  // in the index build are built without function bodies (including inline
+  // functions). OSLogOptimization expects SIL for bodies and hence errors
+  // when there isn't any. Ignore in live issues for now and re-evaluate if
+  // this (not having SIL for inline functions) becomes a more widespread issue.
+  if (Info.ID == diag::lex_editor_placeholder.ID ||
+      Info.ID == diag::oslog_invalid_log_message.ID)
     return;
 
   bool IsNote = (Info.Kind == DiagnosticKind::Note);
@@ -99,6 +106,14 @@ void EditorDiagConsumer::handleDiagnostic(SourceManager &SM,
   }
 
   DiagnosticEntryInfo SKInfo;
+
+  SKInfo.ID = DiagnosticEngine::diagnosticIDStringFor(Info.ID).str();
+
+  if (Info.Category == "deprecation") {
+    SKInfo.Categories.push_back(DiagnosticCategory::Deprecation);
+  } else if (Info.Category == "no-usage") {
+    SKInfo.Categories.push_back(DiagnosticCategory::NoUsage);
+  }
 
   // Actually substitute the diagnostic arguments into the diagnostic text.
   llvm::SmallString<256> Text;
@@ -677,7 +692,8 @@ class SwiftDocumentSyntaxInfo {
   std::string PrimaryFile;
   /// Whether or not the AST stored in the source file is up-to-date or just an
   /// artifact of incremental syntax parsing
-  bool HasUpToDateAST;
+  bool IncrementalParsingEnabled;
+  bool IsParsed;
 
 public:
   SwiftDocumentSyntaxInfo(const CompilerInvocation &CompInv,
@@ -713,13 +729,16 @@ public:
         Parser->getParser().Context.evaluator);
     Parser->getDiagnosticEngine().addConsumer(DiagConsumer);
 
-    // If there is a syntax parsing cache, incremental syntax parsing is
-    // performed and thus the generated AST may not be up-to-date.
-    HasUpToDateAST = CompInv.getMainFileSyntaxParsingCache() == nullptr;
+    IncrementalParsingEnabled =
+        CompInv.getMainFileSyntaxParsingCache() != nullptr;
+    IsParsed = false;
   }
 
-  void parse() {
-    Parser->parse();
+  void parseIfNeeded() {
+    if (!IsParsed) {
+      Parser->parse();
+      IsParsed = true;
+    }
   }
 
   SourceFile &getSourceFile() {
@@ -738,7 +757,7 @@ public:
     return SM;
   }
 
-  bool hasUpToDateAST() { return HasUpToDateAST; }
+  bool isIncrementalParsingEnabled() { return IncrementalParsingEnabled; }
 
   ArrayRef<DiagnosticEntryInfo> getDiagnostics() {
     return DiagConsumer.getDiagnosticsForBuffer(BufferID);
@@ -1074,6 +1093,7 @@ struct SwiftEditorDocument::Implementation {
 
   std::shared_ptr<SwiftDocumentSyntaxInfo> getSyntaxInfo() {
     llvm::sys::ScopedLock L(AccessMtx);
+    SyntaxInfo->parseIfNeeded();
     return SyntaxInfo;
   }
 
@@ -1949,9 +1969,10 @@ void SwiftEditorDocument::updateSemaInfo() {
   ::updateSemaInfo(SemanticInfo, EditableBuffer);
 }
 
-void SwiftEditorDocument::parse(ImmutableTextSnapshotRef Snapshot,
-                                SwiftLangSupport &Lang, bool BuildSyntaxTree,
-                                SyntaxParsingCache *SyntaxCache) {
+void SwiftEditorDocument::resetSyntaxInfo(ImmutableTextSnapshotRef Snapshot,
+                                          SwiftLangSupport &Lang,
+                                          bool BuildSyntaxTree,
+                                          SyntaxParsingCache *SyntaxCache) {
   llvm::sys::ScopedLock L(Impl.AccessMtx);
 
   assert(Impl.SemanticInfo && "Impl.SemanticInfo must be set");
@@ -1982,8 +2003,6 @@ void SwiftEditorDocument::parse(ImmutableTextSnapshotRef Snapshot,
   // Access to Impl.SyntaxInfo is guarded by Impl.AccessMtx
   Impl.SyntaxInfo.reset(
     new SwiftDocumentSyntaxInfo(CompInv, Snapshot, Args, Impl.FilePath));
-
-  Impl.SyntaxInfo->parse();
 }
 
 static UIdent SemaDiagStage("source.diagnostic.stage.swift.sema");
@@ -1991,6 +2010,7 @@ static UIdent ParseDiagStage("source.diagnostic.stage.swift.parse");
 
 void SwiftEditorDocument::readSyntaxInfo(EditorConsumer &Consumer, bool ReportDiags) {
   llvm::sys::ScopedLock L(Impl.AccessMtx);
+  Impl.SyntaxInfo->parseIfNeeded();
 
   Impl.ParserDiagnostics = Impl.SyntaxInfo->getDiagnostics();
   if (ReportDiags) {
@@ -2105,8 +2125,8 @@ SwiftEditorDocument::getSyntaxTree() const {
 
 std::string SwiftEditorDocument::getFilePath() const { return Impl.FilePath; }
 
-bool SwiftEditorDocument::hasUpToDateAST() const {
-  return Impl.SyntaxInfo->hasUpToDateAST();
+bool SwiftEditorDocument::isIncrementalParsingEnabled() const {
+  return Impl.SyntaxInfo->isIncrementalParsingEnabled();
 }
 
 llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
@@ -2295,17 +2315,6 @@ ImmutableTextSnapshotRef SwiftEditorDocument::getLatestSnapshot() const {
   return Impl.EditableBuffer->getSnapshot();
 }
 
-std::pair<unsigned, unsigned>
-SwiftEditorDocument::getLineAndColumnInBuffer(unsigned Offset) {
-  llvm::sys::ScopedLock L(Impl.AccessMtx);
-
-  auto SyntaxInfo = Impl.getSyntaxInfo();
-  auto &SM = SyntaxInfo->getSourceManager();
-
-  auto Loc = SM.getLocForOffset(SyntaxInfo->getBufferID(), Offset);
-  return SM.getLineAndColumnInBuffer(Loc);
-}
-
 void SwiftEditorDocument::reportDocumentStructure(SourceFile &SrcFile,
                                                   EditorConsumer &Consumer) {
   ide::SyntaxModelContext ModelContext(SrcFile);
@@ -2335,7 +2344,7 @@ void SwiftLangSupport::editorOpen(
     EditorDoc = new SwiftEditorDocument(Name, *this, fileSystem);
     Snapshot = EditorDoc->initializeText(
         Buf, Args, Consumer.needsSemanticInfo(), fileSystem);
-    EditorDoc->parse(Snapshot, *this, Consumer.syntaxTreeEnabled());
+    EditorDoc->resetSyntaxInfo(Snapshot, *this, Consumer.syntaxTreeEnabled());
     if (EditorDocuments->getOrUpdate(Name, *this, EditorDoc)) {
       // Document already exists, re-initialize it. This should only happen
       // if we get OPEN request while the previous document is not closed.
@@ -2349,11 +2358,18 @@ void SwiftLangSupport::editorOpen(
   if (!Snapshot) {
     Snapshot = EditorDoc->initializeText(
         Buf, Args, Consumer.needsSemanticInfo(), fileSystem);
-    EditorDoc->parse(Snapshot, *this, Consumer.syntaxTreeEnabled());
+    EditorDoc->resetSyntaxInfo(Snapshot, *this, Consumer.syntaxTreeEnabled());
   }
 
   if (Consumer.needsSemanticInfo()) {
     EditorDoc->updateSemaInfo();
+  }
+
+  if (!Consumer.documentStructureEnabled() &&
+      !Consumer.syntaxMapEnabled() &&
+      !Consumer.diagnosticsEnabled() &&
+      !Consumer.syntaxTreeEnabled()) {
+    return;
   }
 
   EditorDoc->readSyntaxInfo(Consumer, /*ReportDiags=*/true);
@@ -2402,7 +2418,7 @@ void verifyIncrementalParse(SwiftEditorDocumentRef EditorDoc,
   SwiftDocumentSyntaxInfo ScratchSyntaxInfo(Invocation,
                                             EditorDoc->getLatestSnapshot(),
                                             Args, EditorDoc->getFilePath());
-  ScratchSyntaxInfo.parse();
+  ScratchSyntaxInfo.parseIfNeeded();
 
   // Dump the from-scratch syntax tree
   std::string FromScratchTreeString;
@@ -2507,6 +2523,15 @@ void SwiftLangSupport::editorReplaceText(StringRef Name,
     }
 
     // If client doesn't need any information, we doen't need to parse it.
+
+
+    SyntaxParsingCache *SyntaxCachePtr = nullptr;
+    if (SyntaxCache.hasValue()) {
+      SyntaxCachePtr = SyntaxCache.getPointer();
+    }
+    EditorDoc->resetSyntaxInfo(Snapshot, *this, Consumer.syntaxTreeEnabled(),
+                               SyntaxCachePtr);
+
     if (!Consumer.documentStructureEnabled() &&
         !Consumer.syntaxMapEnabled() &&
         !Consumer.diagnosticsEnabled() &&
@@ -2514,12 +2539,6 @@ void SwiftLangSupport::editorReplaceText(StringRef Name,
       return;
     }
 
-    SyntaxParsingCache *SyntaxCachePtr = nullptr;
-    if (SyntaxCache.hasValue()) {
-      SyntaxCachePtr = SyntaxCache.getPointer();
-    }
-    EditorDoc->parse(Snapshot, *this, Consumer.syntaxTreeEnabled(),
-                     SyntaxCachePtr);
     // Do not report syntactic diagnostics; will be handled in readSemanticInfo.
     EditorDoc->readSyntaxInfo(Consumer, /*ReportDiags=*/false);
 
@@ -2578,11 +2597,12 @@ void SwiftLangSupport::editorFormatText(StringRef Name, unsigned Line,
     return;
   }
 
-  if (!EditorDoc->hasUpToDateAST()) {
-    // An up-to-date AST is needed for formatting. If it does not exist, fall
-    // back to a full reparse of the file
-    EditorDoc->parse(EditorDoc->getLatestSnapshot(), *this,
-                     /*BuildSyntaxTree=*/true);
+  if (EditorDoc->isIncrementalParsingEnabled()) {
+    // If incremental parsing is enabled, AST is not updated properly. Fall
+    // back to a full reparse of the file.
+    EditorDoc->resetSyntaxInfo(EditorDoc->getLatestSnapshot(), *this,
+                               /*BuildSyntaxTree=*/true,
+                               /*SyntaxCache=*/nullptr);
   }
 
   EditorDoc->formatText(Line, Length, Consumer);
@@ -2614,6 +2634,14 @@ void SwiftLangSupport::editorExpandPlaceholder(StringRef Name, unsigned Offset,
   if (!EditorDoc) {
     Consumer.handleRequestError("No associated Editor Document");
     return;
+  }
+
+  if (EditorDoc->isIncrementalParsingEnabled()) {
+    // If incremental parsing is enabled, AST is not updated properly. Fall
+    // back to a full reparse of the file.
+    EditorDoc->resetSyntaxInfo(EditorDoc->getLatestSnapshot(), *this,
+                               /*BuildSyntaxTree=*/true,
+                               /*SyntaxCache=*/nullptr);
   }
 
   EditorDoc->expandPlaceholder(Offset, Length, Consumer);

@@ -31,6 +31,10 @@ class Ninja(product.Product):
         return False
 
     @classmethod
+    def is_before_build_script_impl_product(cls):
+        return False
+
+    @classmethod
     def new_builder(cls, args, toolchain, workspace, host):
         return NinjaBuilder(cls, args, toolchain, workspace)
 

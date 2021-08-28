@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift
+// RUN: %target-run-simple-swift(-Xfrontend -requirement-machine=off)
 // REQUIRES: executable_test
 
 import StdlibUnittest
