@@ -9,6 +9,9 @@
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
+// FIXME(distributed): remote functions dont seem to work on windows?
+// XFAIL: OS=windows-msvc
+
 import _Distributed
 
 @available(SwiftStdlib 5.5, *)
