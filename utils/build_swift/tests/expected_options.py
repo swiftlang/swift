@@ -169,6 +169,7 @@ EXPECTED_DEFAULTS = {
     'only_executable_test': False,
     'only_non_executable_test': False,
     'infer_dependencies': False,
+    'install_backdeployconcurrency': False,
     'install_prefix': targets.install_prefix(),
     'install_symroot': None,
     'install_destdir': None,
@@ -476,6 +477,8 @@ EXPECTED_OPTIONS = [
               dest='test_early_swift_driver', value=False),
 
     SetTrueOption('--back-deploy-concurrency', dest='build_backdeployconcurrency'),
+    SetTrueOption('--install-back-deploy-concurrency',
+                  dest='install_backdeployconcurrency'),
     SetTrueOption('--benchmark'),
     SetTrueOption('--clean'),
     SetTrueOption('--dry-run'),
