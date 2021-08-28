@@ -215,6 +215,7 @@ void swift::checkDistributedActorConstructor(const ClassDecl *decl, ConstructorD
 // ==== ------------------------------------------------------------------------
 
 void TypeChecker::checkDistributedActor(ClassDecl *decl) {
+  fprintf(stderr, "[%s:%d] (%s) CHECK DIST [%s]\n", __FILE__, __LINE__, __FUNCTION__, decl->getNameStr().str().c_str());
   if (!decl)
     return;
 
