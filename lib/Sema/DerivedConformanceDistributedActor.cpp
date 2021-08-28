@@ -160,6 +160,8 @@ static ValueDecl *deriveDistributedActor_actorTransport(
 
 ValueDecl *DerivedConformance::deriveDistributedActor(ValueDecl *requirement) {
   if (auto var = dyn_cast<VarDecl>(requirement)) {
+    fprintf(stderr, "[%s:%d] (%s) DERIVE: [%s]\n", __FILE__, __LINE__, __FUNCTION__, var->getName().str().str().c_str());
+
     if (var->getName() == Context.Id_id)
       return deriveDistributedActor_id(*this);
 
@@ -168,6 +170,8 @@ ValueDecl *DerivedConformance::deriveDistributedActor(ValueDecl *requirement) {
   }
 
   if (auto func = dyn_cast<FuncDecl>(requirement)) {
+    fprintf(stderr, "[%s:%d] (%s) DERIVE: [%s]\n", __FILE__, __LINE__, __FUNCTION__, func->getName().getBaseIdentifier().str().str().c_str());
+
     // just a simple name check is enough here,
     // if we are invoked here we know for sure it is for the "right" function
     if (func->getName().getBaseName() == Context.Id_resolve)

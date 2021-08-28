@@ -20,6 +20,7 @@ import _Concurrency
 ///
 /// FIXME(distributed): We'd need Actor to also conform to this, but don't want to add that conformance in _Concurrency yet.
 @_marker
+@available(SwiftStdlib 5.5, *)
 public protocol AnyActor: Sendable, AnyObject {}
 
 // ==== Distributed Actor -----------------------------------------------------
