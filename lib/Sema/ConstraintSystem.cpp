@@ -5096,7 +5096,7 @@ ConstraintSystem::isConversionEphemeral(ConversionRestrictionKind conversion,
         // For an instance member, the base must be an @lvalue struct type.
         if (auto *lvt = simplifyType(getType(base))->getAs<LValueType>()) {
           auto *nominal = lvt->getObjectType()->getAnyNominal();
-          if (nominal && isa<StructDecl>(nominal)) {
+          if (isa_and_nonnull<StructDecl>(nominal)) {
             subExpr = base;
             continue;
           }

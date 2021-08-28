@@ -1591,7 +1591,7 @@ namespace {
           }
         }
 
-      } else if (llvm::isa_and_nonnull<SelfApplyExpr>(context) &&
+      } else if (isa_and_nonnull<SelfApplyExpr>(context) &&
           isa<AbstractFunctionDecl>(decl)) {
         // actor-isolated non-isolated-self calls are implicitly async
         // and thus OK.
@@ -1649,7 +1649,7 @@ namespace {
       ValueDecl *decl = concDeclRef.getDecl();
       ThrowsMarkingResult result = ThrowsMarkingResult::NotFound;
 
-      if (llvm::isa_and_nonnull<SelfApplyExpr>(context)) {
+      if (isa_and_nonnull<SelfApplyExpr>(context)) {
         if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
           if (func->isDistributed() && !func->hasThrows()) {
             // A distributed function is implicitly throwing if called from
