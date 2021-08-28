@@ -124,6 +124,9 @@ class SavedTypeVariableBinding {
   /// The parent or fixed type.
   llvm::PointerUnion<TypeVariableType *, TypeBase *> ParentOrFixed;
 
+  /// The locator associated with bound type
+  ConstraintLocator *BoundLocator;
+
 public:
   explicit SavedTypeVariableBinding(TypeVariableType *typeVar);
 
@@ -239,6 +242,8 @@ class TypeVariableType::Implementation {
   /// type is bound.
   llvm::PointerUnion<TypeVariableType *, TypeBase *> ParentOrFixed;
 
+  constraints::ConstraintLocator *BoundLocator = nullptr;
+
   /// The corresponding node in the constraint graph.
   constraints::ConstraintGraphNode *GraphNode = nullptr;
 
@@ -338,6 +343,12 @@ public:
     return locator;
   }
 
+  /// Retrieve the locator describing where the type bound to this type variable
+  /// originated.
+  constraints::ConstraintLocator *getBoundLocator() const {
+    return BoundLocator;
+  }
+
   /// Retrieve the generic parameter opened by this type variable.
   GenericTypeParamType *getGenericParameter() const;
 
@@ -359,6 +370,10 @@ public:
   /// Determine whether this type variable represents
   /// a type of a key path expression.
   bool isKeyPathType() const;
+
+  /// Determine whether this type variable represents a code completion
+  /// expression.
+  bool isCodeCompletionToken() const;
 
   /// Retrieve the representative of the equivalence class to which this
   /// type variable belongs.
@@ -460,7 +475,7 @@ public:
   }
 
   /// Assign a fixed type to this equivalence class.
-  void assignFixedType(Type type,
+  void assignFixedType(Type type, constraints::ConstraintLocator *loc,
                        constraints::SavedTypeVariableBindings *record) {
     assert((!getFixedType(0) || getFixedType(0)->isEqual(type)) &&
            "Already has a fixed type!");
@@ -468,6 +483,7 @@ public:
     if (record)
       rep->getImpl().recordBinding(*record);
     rep->getImpl().ParentOrFixed = type.getPointer();
+    rep->getImpl().BoundLocator = loc;
   }
 
   void setCanBindToLValue(constraints::SavedTypeVariableBindings *record,
@@ -3053,9 +3069,9 @@ public:
     return TypeVariables.count(typeVar) > 0;
   }
 
-  /// Whether the given expression's source range contains the code
+  /// Whether the given ASTNode's source range contains the code
   /// completion location.
-  bool containsCodeCompletionLoc(Expr *expr) const;
+  bool containsCodeCompletionLoc(ASTNode node) const;
 
   void setClosureType(const ClosureExpr *closure, FunctionType *type) {
     assert(closure);
@@ -3904,7 +3920,7 @@ public:
   /// \param notifyBindingInference Whether to notify binding inference about
   /// the change to this type variable.
   void assignFixedType(TypeVariableType *typeVar, Type type,
-                       bool updateState = true,
+                       ConstraintLocator *loc, bool updateState = true,
                        bool notifyBindingInference = true);
 
   /// Determine if the type in question is an Array<T> and, if so, provide the
@@ -5321,7 +5337,37 @@ public:
   /// \returns true to indicate that this should cause a failure, false
   /// otherwise.
   virtual bool relabelArguments(ArrayRef<Identifier> newNames);
+
+  /// Indicates that arguments after the code completion token were not valid
+  /// and ignored.
+  ///
+  /// \returns true to indicate that this should cause a failure, false
+  /// otherwise.
+  virtual bool invalidArgumentsAfterCompletion();
 };
+
+/// For a callsite containing a code completion expression, stores the index of
+/// the arg containing it along with the index of the first trailing closure.
+struct CompletionArgInfo {
+  unsigned completionIdx;
+  Optional<unsigned> firstTrailingIdx;
+  unsigned argCount;
+
+  /// \returns true if the given argument index is possibly about to be written
+  /// by the user (given the completion index) so shouldn't be penalised as
+  /// missing when ranking solutions.
+  bool allowsMissingArgAt(unsigned argInsertIdx, AnyFunctionType::Param param);
+
+  /// \returns true if the argument containing the completion location is before
+  /// the argument with the given index.
+  bool isBefore(unsigned argIdx) { return completionIdx < argIdx; }
+};
+
+/// Extracts the index of the argument containing the code completion location
+/// from the provided anchor if it's a \c CallExpr, \c SubscriptExpr, or
+///  \c ObjectLiteralExpr).
+Optional<CompletionArgInfo>
+getCompletionArgInfo(ASTNode anchor, constraints::ConstraintSystem &cs);
 
 /// Match the call arguments (as described by the given argument type) to
 /// the parameters (as described by the given parameter type).
@@ -5343,14 +5389,13 @@ public:
 /// \returns the bindings produced by performing this matching, or \c None if
 /// the match failed.
 Optional<MatchCallArgumentResult>
-matchCallArguments(
-    SmallVectorImpl<AnyFunctionType::Param> &args,
-    ArrayRef<AnyFunctionType::Param> params,
-    const ParameterListInfo &paramInfo,
-    Optional<unsigned> unlabeledTrailingClosureIndex,
-    bool allowFixes,
-    MatchCallArgumentListener &listener,
-    Optional<TrailingClosureMatching> trailingClosureMatching);
+matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
+                   ArrayRef<AnyFunctionType::Param> params,
+                   const ParameterListInfo &paramInfo,
+                   Optional<unsigned> unlabeledTrailingClosureIndex,
+                   Optional<CompletionArgInfo> completionInfo, bool allowFixes,
+                   MatchCallArgumentListener &listener,
+                   Optional<TrailingClosureMatching> trailingClosureMatching);
 
 ConstraintSystem::TypeMatchResult
 matchCallArguments(ConstraintSystem &cs,

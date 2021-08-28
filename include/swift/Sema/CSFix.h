@@ -331,7 +331,12 @@ enum class FixKind : uint8_t {
 
   /// Specify a type for an explicitly written placeholder that could not be
   /// resolved.
-  SpecifyTypeForPlaceholder
+  SpecifyTypeForPlaceholder,
+
+  /// Ignore all failures in call or subscript arguments after the argument
+  /// containing the code completion location. This is only produced when
+  /// solving for code completion.
+  IgnoreFailureAfterCompletionArg,
 };
 
 class ConstraintFix {
@@ -1729,6 +1734,27 @@ public:
   static SkipUnhandledConstructInResultBuilder *
   create(ConstraintSystem &cs, UnhandledNode unhandledNode,
          NominalTypeDecl *builder, ConstraintLocator *locator);
+};
+
+class IgnoreFailureAfterCompletionArg final : public ConstraintFix {
+  IgnoreFailureAfterCompletionArg(ConstraintSystem &cs,
+                                  ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::IgnoreFailureAfterCompletionArg, locator,
+                      true) {}
+
+public:
+  std::string getName() const override {
+    return "ignore arguments after the code completion position in a call or "
+           "subscript";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override {
+    // Diagnostics are ignored when solving for code completion.
+    return false;
+  }
+
+  static IgnoreFailureAfterCompletionArg *create(ConstraintSystem &cs,
+                                                 ConstraintLocator *locator);
 };
 
 class AllowTupleSplatForSingleParameter final : public ConstraintFix {

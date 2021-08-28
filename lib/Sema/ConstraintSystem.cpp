@@ -155,12 +155,12 @@ bool ConstraintSystem::typeVarOccursInType(TypeVariableType *typeVar,
 }
 
 void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
-                                       bool updateState,
+                                       ConstraintLocator *loc, bool updateState,
                                        bool notifyBindingInference) {
   assert(!type->hasError() &&
          "Should not be assigning a type involving ErrorType!");
 
-  typeVar->getImpl().assignFixedType(type, getSavedBindings());
+  typeVar->getImpl().assignFixedType(type, loc, getSavedBindings());
 
   if (!updateState)
     return;
@@ -378,8 +378,8 @@ getAlternativeLiteralTypes(KnownProtocolKind kind) {
   return *AlternativeLiteralTypes[index];
 }
 
-bool ConstraintSystem::containsCodeCompletionLoc(Expr *expr) const {
-  SourceRange range = expr->getSourceRange();
+bool ConstraintSystem::containsCodeCompletionLoc(ASTNode node) const {
+  SourceRange range = node.getSourceRange();
   if (range.isInvalid())
     return false;
   return Context.SourceMgr.rangeContainsCodeCompletionLoc(range);
@@ -2888,7 +2888,13 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     refType = subscriptTy;
 
     // Increase the score so that actual subscripts get preference.
-    increaseScore(SK_KeyPathSubscript);
+    // ...except if we're solving for code completion and the index expression
+    // contains the completion location
+    auto SE = getAsExpr<SubscriptExpr>(locator->getAnchor());
+    if (!isForCodeCompletion() ||
+        (SE && !containsCodeCompletionLoc(SE->getIndex()))) {
+      increaseScore(SK_KeyPathSubscript);
+    }
     break;
   }
   }

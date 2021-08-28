@@ -57,12 +57,14 @@ void TypeVariableType::Implementation::print(llvm::raw_ostream &OS) {
 }
 
 SavedTypeVariableBinding::SavedTypeVariableBinding(TypeVariableType *typeVar)
-  : TypeVar(typeVar), Options(typeVar->getImpl().getRawOptions()),
-    ParentOrFixed(typeVar->getImpl().ParentOrFixed) { }
+    : TypeVar(typeVar), Options(typeVar->getImpl().getRawOptions()),
+      ParentOrFixed(typeVar->getImpl().ParentOrFixed),
+      BoundLocator(typeVar->getImpl().BoundLocator) {}
 
 void SavedTypeVariableBinding::restore() {
   TypeVar->getImpl().setRawOptions(Options);
   TypeVar->getImpl().ParentOrFixed = ParentOrFixed;
+  TypeVar->getImpl().BoundLocator = BoundLocator;
 }
 
 GenericTypeParamType *
@@ -113,6 +115,10 @@ bool TypeVariableType::Implementation::isClosureResultType() const {
 
 bool TypeVariableType::Implementation::isKeyPathType() const {
   return locator && locator->isKeyPathType();
+}
+
+bool TypeVariableType::Implementation::isCodeCompletionToken() const {
+  return locator && locator->directlyAt<CodeCompletionExpr>();
 }
 
 void *operator new(size_t bytes, ConstraintSystem& cs,
