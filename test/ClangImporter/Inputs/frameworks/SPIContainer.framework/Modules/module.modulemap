@@ -1,0 +1,7 @@
+framework module SPIContainer {
+  umbrella header "SPIContainer.h"
+  export *
+  module * {
+    export *
+  }
+}

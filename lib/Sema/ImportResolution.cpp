@@ -28,6 +28,7 @@
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Subsystems.h"
+#include "swift/Strings.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/TinyPtrVector.h"
@@ -316,6 +317,23 @@ void ImportResolver::bindImport(UnboundImport &&I) {
     if (ID)
       ID.get()->setModule(nullptr);
     return;
+  }
+  // If the imported module is a clang module, add an implicit import statement
+  // to request the SPIs from the module.
+  if (M->isNonSwiftModule() && ID &&
+      !ID.get()->getAttrs().hasAttribute<SPIAccessControlAttr>()) {
+    ImportDecl *id = ID.get();
+    auto *newId = ImportDecl::create(id->getASTContext(), id->getDeclContext(),
+      SourceLoc(), id->getImportKind(), SourceLoc(), id->getImportPath());
+    // Copy all the existing attribute from the actual import statement.
+    llvm::for_each(id->getAttrs(),
+                  [&](DeclAttribute *attr) {newId->getAttrs().add(attr);});
+    // Add SPI attribute with the default group name.
+    newId->getAttrs().add(SPIAccessControlAttr::create(id->getASTContext(),
+      SourceLoc(), SourceRange(),
+      { ctx.getIdentifier(CLANG_MODULE_DEFUALT_SPI_GROUP_NAME) }));
+    // So we'll resolve the new import.
+    unboundImports.push_back(UnboundImport(newId));
   }
 
   auto topLevelModule = I.getTopLevelModule(M, SF);
