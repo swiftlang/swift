@@ -235,7 +235,7 @@ class BuildScriptInvocation(object):
             args.extra_cmake_options.append('-DSWIFT_DISABLE_DEAD_STRIPPING:BOOL=TRUE')
         if args.build_backdeployconcurrency:
             args.extra_cmake_options.append(
-                '-DSWIFT_ALLOW_BACK_DEPLOY_CONCURRENCY:BOOL=TRUE')
+                '-DSWIFT_BACK_DEPLOY_CONCURRENCY:BOOL=TRUE')
 
         # Then add subproject install flags that either skip building them /or/
         # if we are going to build them and install_all is set, we also install
