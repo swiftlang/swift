@@ -301,10 +301,6 @@ namespace swift {
     /// Enable experimental concurrency model.
     bool EnableExperimentalConcurrency = false;
 
-    /// Enable experimental back-deployment of the concurrency model.
-    bool EnableExperimentalBackDeployConcurrency =
-      SWIFT_ALLOW_BACK_DEPLOY_CONCURRENCY;
-
     /// Enable experimental support for named opaque result types, e.g.
     /// `func f() -> <T> T`.
     bool EnableExperimentalNamedOpaqueTypes = false;

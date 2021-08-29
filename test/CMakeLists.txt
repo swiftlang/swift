@@ -181,7 +181,7 @@ normalize_boolean_spelling(SWIFT_BUILD_SYNTAXPARSERLIB)
 normalize_boolean_spelling(SWIFT_ENABLE_SOURCEKIT_TESTS)
 normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
 normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
-normalize_boolean_spelling(SWIFT_ALLOW_BACK_DEPLOY_CONCURRENCY)
+normalize_boolean_spelling(SWIFT_BACK_DEPLOY_CONCURRENCY)
 normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED)
 is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" SWIFT_OPTIMIZED)
 
@@ -359,7 +359,7 @@ foreach(SDK ${SWIFT_SDKS})
           list(APPEND LIT_ARGS "--param" "concurrency")
         endif()
 
-        if(SWIFT_ALLOW_BACK_DEPLOY_CONCURRENCY)
+        if(SWIFT_BACK_DEPLOY_CONCURRENCY)
           list(APPEND LIT_ARGS "--param" "back_deploy_concurrency")
         endif()
 
