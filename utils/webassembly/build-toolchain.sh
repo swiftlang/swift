@@ -105,6 +105,12 @@ build_target_toolchain() {
     -S "$SOURCE_PATH/llvm-project/llvm"
 
   local SWIFT_STDLIB_BUILD_DIR="$TARGET_BUILD_ROOT/swift-stdlib-wasi-wasm32"
+
+  # FIXME(katei): Platform/WASI is not recognized as a platform in LLVM, so it reports
+  # "Unable to determine platform" while handling LLVM options.
+  # Set WASI as a UNIX platform to spoof LLVM
+  # FIXME(katei): host-build clang's libcxx is capable with LLVM, but it somehow
+  # fails libcxx version check. So activate LLVM_COMPILER_CHECKED to spoof the checker
   cmake -B "$SWIFT_STDLIB_BUILD_DIR" \
     -C "$SOURCE_PATH/swift/cmake/caches/Runtime-WASI-wasm32.cmake" \
     -D CMAKE_TOOLCHAIN_FILE="$SOURCE_PATH/swift/utils/webassembly/toolchain-wasi.cmake" \
@@ -114,6 +120,8 @@ build_target_toolchain() {
     -D CMAKE_INSTALL_PREFIX="$DIST_TOOLCHAIN_SDK/usr" \
     -D LLVM_BIN="$HOST_BUILD_DIR/llvm-$HOST_SUFFIX/bin" \
     -D LLVM_DIR="$LLVM_TARGET_BUILD_DIR/lib/cmake/llvm/" \
+    -D LLVM_COMPILER_CHECKED=YES \
+    -D UNIX=1 \
     -D SWIFT_NATIVE_SWIFT_TOOLS_PATH="$HOST_BUILD_DIR/swift-$HOST_SUFFIX/bin" \
     -D SWIFT_WASI_SYSROOT_PATH="$WASI_SYSROOT_PATH" \
     -D SWIFT_WASI_wasm32_ICU_UC_INCLUDE="$BUILD_SDK_PATH/icu/include" \
