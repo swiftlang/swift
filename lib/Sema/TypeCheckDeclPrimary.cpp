@@ -2941,10 +2941,8 @@ public:
 
     checkExplicitAvailability(ED);
 
-    if (nominal->isDistributedActor()) {
-      auto decl = dyn_cast<ClassDecl>(nominal);
-      TypeChecker::checkDistributedActor(decl);
-    }
+    if (nominal->isDistributedActor())
+      TypeChecker::checkDistributedActor(dyn_cast<ClassDecl>(nominal));
   }
 
   void visitTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
