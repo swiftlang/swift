@@ -490,6 +490,8 @@ public:
   }
 };
 
+std::unique_ptr<SILModule> cloneModule(SILModule &originalModule);
+
 template<typename ImplClass>
 SILValue
 SILCloner<ImplClass>::getMappedValue(SILValue Value) {

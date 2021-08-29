@@ -49,6 +49,7 @@ class SILFunctionBuilder {
   friend class SILSerializationFunctionBuilder;
   friend class SILOptFunctionBuilder;
   friend class Lowering::SILGenFunctionBuilder;
+  friend std::unique_ptr<SILModule> cloneModule(SILModule &originalModule);
 
   SILFunctionBuilder(SILModule &mod)
       : SILFunctionBuilder(mod,
