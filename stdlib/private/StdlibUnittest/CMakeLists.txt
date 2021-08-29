@@ -20,12 +20,6 @@ if (SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED)
   list(APPEND swift_stdlib_unittest_link_libraries "swift_Distributed")
 endif()
 
-if (SWIFT_ALLOW_BACK_DEPLOY_CONCURRENCY)
-  set(swift_concurrency_availability "macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0")
-else()
-  set(swift_concurrency_availability "macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0")
-endif()
-
 add_swift_target_library(swiftStdlibUnittest ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   # This file should be listed the first.  Module name is inferred from the
   # filename.
@@ -61,7 +55,7 @@ add_swift_target_library(swiftStdlibUnittest ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES}
   SWIFT_MODULE_DEPENDS_WINDOWS CRT WinSDK
   SWIFT_COMPILE_FLAGS ${swift_stdlib_unittest_compile_flags} ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
     -Xfrontend -define-availability
-    -Xfrontend "SwiftStdlib 5.5:${swift_concurrency_availability}"
+    -Xfrontend "SwiftStdlib 5.5:macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0"
   INSTALL_IN_COMPONENT stdlib-experimental
   DARWIN_INSTALL_NAME_DIR "${SWIFT_DARWIN_STDLIB_PRIVATE_INSTALL_NAME_DIR}"
   LINK_LIBRARIES ${swift_stdlib_unittest_link_libraries})
