@@ -1066,6 +1066,12 @@ def create_argument_parser():
            toggle_false('test_android_host'),
            help='skip testing Android device targets on the host machine (the '
                 'phone itself)')
+    option('--skip-clean-libdispatch', toggle_false('clean_libdispatch'),
+           help='skip cleaning up libdispatch')
+    option('--skip-clean-foundation', toggle_false('clean_foundation'),
+           help='skip cleaning up foundation')
+    option('--skip-clean-xctest', toggle_false('clean_xctest'),
+           help='skip cleaning up xctest')
     option('--skip-clean-llbuild', toggle_false('clean_llbuild'),
            help='skip cleaning up llbuild')
     option('--clean-early-swift-driver', toggle_true('clean_early_swift_driver'),
