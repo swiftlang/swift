@@ -20,6 +20,11 @@
 // RUN:   -F %t/sdk/System/Library/PrivateFrameworks/ \
 // RUN:   -library-level spi -D PUBLIC_IMPORTS
 
+/// The driver should also accept the flag and pass it along.
+// RUN: %swiftc_driver -typecheck -sdk %t/sdk -module-cache-path %t %s \
+// RUN:   -F %t/sdk/System/Library/PrivateFrameworks/ \
+// RUN:   -library-level spi -D PUBLIC_IMPORTS
+
 /// Expect no warnings when building a client with some other library level.
 // RUN: %target-swift-frontend -typecheck -sdk %t/sdk -module-cache-path %t %s \
 // RUN:   -F %t/sdk/System/Library/PrivateFrameworks/ \
