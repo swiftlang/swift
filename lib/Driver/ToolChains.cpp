@@ -286,6 +286,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments,
                        options::OPT_verify_incremental_dependencies);
   inputArgs.AddLastArg(arguments, options::OPT_access_notes_path);
+  inputArgs.AddLastArg(arguments, options::OPT_library_level);
 
   // Pass on any build config options
   inputArgs.AddAllArgs(arguments, options::OPT_D);

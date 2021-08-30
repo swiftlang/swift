@@ -152,6 +152,11 @@ KNOWN_SETTINGS=(
     build-swift-stdlib-unittest-extra             "0"               "set to 1 to build optional StdlibUnittest components"
     build-swift-tools                             "1"               "set to 1 to build Swift host tools"
 
+    ## Skip cleaning build directories ...
+    skip-clean-libdispatch                        "0"               "skip cleaning the libdispatch build"
+    skip-clean-foundation                         "0"               "skip cleaning the foundation build"
+    skip-clean-xctest                             "0"               "skip cleaning the xctest build"
+
     ## Test Options
     llvm-include-tests                            "1"               "Set to true to generate testing targets for LLVM. Set to true by default."
     long-test                                     "0"               "set to run the long test suite"
@@ -2319,6 +2324,14 @@ for host in "${ALL_HOSTS[@]}"; do
                 FOUNDATION_BUILD_DIR=$(build_directory ${host} foundation)
                 SWIFT_BUILD_DIR=$(build_directory ${host} swift)
 
+                if [[ "${SKIP_CLEAN_XCTEST}" == "0" ]]
+                then
+                  # The Swift project might have been changed, but CMake might
+                  # not be aware and will not rebuild.
+                  echo "Cleaning the XCTest build directory"
+                  call rm -rf "${XCTEST_BUILD_DIR}"
+                fi
+
                 case "${host}" in
                 macosx-*)
                   # Staging: require opt-in for building with dispatch
@@ -2346,12 +2359,6 @@ for host in "${ALL_HOSTS[@]}"; do
                   continue
                 ;;
                 *)
-                  # FIXME: Always re-build XCTest on non-darwin platforms.
-                  # The Swift project might have been changed, but CMake might
-                  # not be aware and will not rebuild.
-                  echo "Cleaning the XCTest build directory"
-                  call rm -rf "${XCTEST_BUILD_DIR}"
-
                   cmake_options=(
                     ${cmake_options[@]}
                     -DCMAKE_BUILD_TYPE:STRING="${XCTEST_BUILD_TYPE}"
@@ -2411,11 +2418,13 @@ for host in "${ALL_HOSTS[@]}"; do
                     LIBICU_BUILD_ARGS=()
                 fi
 
-                # FIXME: Always re-build XCTest on non-darwin platforms.
-                # The Swift project might have been changed, but CMake might
-                # not be aware and will not rebuild.
-                echo "Cleaning the Foundation build directory"
-                call rm -rf "${build_dir}"
+                if [[ "${SKIP_CLEAN_FOUNDATION}" == "0" ]]
+                then
+                  # The Swift project might have been changed, but CMake might
+                  # not be aware and will not rebuild.
+                  echo "Cleaning the Foundation build directory"
+                  call rm -rf "${build_dir}"
+                fi
 
                 # Set the PKG_CONFIG_PATH so that core-foundation can find the libraries and
                 # header files
@@ -2476,11 +2485,13 @@ for host in "${ALL_HOSTS[@]}"; do
                   exit 1
                 ;;
                 *)
-                  # FIXME: Always re-build XCTest on non-darwin platforms.
-                  # The Swift project might have been changed, but CMake might
-                  # not be aware and will not rebuild.
-                  echo "Cleaning the libdispatch build directory"
-                  call rm -rf "${LIBDISPATCH_BUILD_DIR}"
+                  if [[ "${SKIP_CLEAN_LIBDISPATCH}" == "0" ]]
+                  then
+                    # The Swift project might have been changed, but CMake might
+                    # not be aware and will not rebuild.
+                    echo "Cleaning the libdispatch build directory"
+                    call rm -rf "${LIBDISPATCH_BUILD_DIR}"
+                  fi
 
                   cmake_options=(
                     -DENABLE_SWIFT=YES
