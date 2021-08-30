@@ -418,6 +418,11 @@ def define_availability : Separate<["-"], "define-availability">,
   HelpText<"Define an availability macro in the format 'macroName : iOS 13.0, macOS 10.15'">,
   MetaVarName<"<macro>">;
 
+def library_level : Separate<["-"], "library-level">,
+  MetaVarName<"<level>">,
+  Flags<[HelpHidden, FrontendOption, ModuleInterfaceOption]>,
+  HelpText<"Library distribution level 'api', 'spi' or 'other' (the default)">;
+
 def module_name : Separate<["-"], "module-name">,
   Flags<[FrontendOption, ModuleInterfaceOption, SwiftAPIExtractOption,
          SwiftSymbolGraphExtractOption]>,
