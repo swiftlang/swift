@@ -10,8 +10,9 @@
 #
 #===----------------------------------------------------------------------===#
 
-set(LLVM_OPTIONAL_SOURCES
-  ${swift_concurrency_objc_sources})
+if(NOT swift_concurrency_extra_sources)
+  set(swift_concurrency_extra_sources)
+endif()
 
 if(NOT swift_concurrency_install_component)
   set(swift_concurrency_install_component stdlib)
@@ -98,7 +99,7 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   AsyncStream.cpp
   Deque.swift
   YieldingContinuation.swift
-  ${swift_concurrency_objc_sources}
+  ${swift_concurrency_extra_sources}
 
   SWIFT_MODULE_DEPENDS_LINUX Glibc
   SWIFT_MODULE_DEPENDS_FREEBSD Glibc
