@@ -206,19 +206,99 @@ void RewriteSystem::processMergedAssociatedTypes() {
 
   unsigned i = 0;
 
-  // Chase the end of the vector; calls to RewriteSystem::addRule()
-  // can theoretically add new elements below.
+  // Chase the end of the vector, since addRule() might add new elements below.
   while (i < MergedAssociatedTypes.size()) {
-    auto pair = MergedAssociatedTypes[i++];
-    const auto &lhs = pair.first;
-    const auto &rhs = pair.second;
+    // Copy the entry out, since addRule() might add new elements below.
+    auto entry = MergedAssociatedTypes[i++];
 
-    // If we have X.[P2:T] => Y.[P1:T], add a new pair of rules:
-    // X.[P1:T] => X.[P1&P2:T]
-    // X.[P2:T] => X.[P1&P2:T]
     if (Debug.contains(DebugFlags::Merge)) {
-      llvm::dbgs() << "## Processing associated type merge candidate ";
-      llvm::dbgs() << lhs << " => " << rhs << "\n";
+      llvm::dbgs() << "## Processing associated type merge with ";
+      llvm::dbgs() << entry.rhs << ", ";
+      llvm::dbgs() << entry.lhsSymbol << ", ";
+      llvm::dbgs() << entry.mergedSymbol << "\n";
+    }
+
+    // If we have X.[P2:T] => Y.[P1:T], add a new rule:
+    // X.[P1:T] => X.[P1&P2:T]
+    MutableTerm lhs(entry.rhs);
+
+    // Build the term X.[P1&P2:T].
+    MutableTerm rhs(entry.rhs);
+    rhs.back() = entry.mergedSymbol;
+
+    // Add the rule X.[P1:T] => X.[P1&P2:T].
+    addRule(lhs, rhs);
+
+    // Collect new rules here so that we're not adding rules while traversing
+    // the trie.
+    SmallVector<std::pair<MutableTerm, MutableTerm>, 2> inducedRules;
+
+    // Look for conformance requirements on [P1:T] and [P2:T].
+    auto visitRule = [&](unsigned ruleID) {
+      const auto &otherRule = Rules[ruleID];
+      const auto &otherLHS = otherRule.getLHS();
+      if (otherLHS.size() == 2 &&
+          otherLHS[1].getKind() == Symbol::Kind::Protocol) {
+        if (otherLHS[0] == entry.lhsSymbol ||
+            otherLHS[0] == entry.rhs.back()) {
+          // We have a rule of the form
+          //
+          //   [P1:T].[Q] => [P1:T]
+          //
+          // or
+          //
+          //   [P2:T].[Q] => [P2:T]
+          if (Debug.contains(DebugFlags::Merge)) {
+            llvm::dbgs() << "### Lifting conformance rule " << otherRule << "\n";
+          }
+
+          // We know that [P1:T] or [P2:T] conforms to Q, therefore the
+          // merged type [P1&P2:T] must conform to Q as well. Add a new rule
+          // of the form:
+          //
+          //   [P1&P2:T].[Q] => [P1&P2:T]
+          //
+          MutableTerm newLHS;
+          newLHS.add(entry.mergedSymbol);
+          newLHS.add(otherLHS[1]);
+
+          MutableTerm newRHS;
+          newRHS.add(entry.mergedSymbol);
+
+          inducedRules.emplace_back(newLHS, newRHS);
+        }
+      }
+    };
+
+    // Visit rhs first to preserve the ordering of protocol requirements in the
+    // the property map. This is just for aesthetic purposes in the debug dump,
+    // it doesn't change behavior.
+    Trie.findAll(entry.rhs.back(), visitRule);
+    Trie.findAll(entry.lhsSymbol, visitRule);
+
+    // Now add the new rules.
+    for (const auto &pair : inducedRules)
+      addRule(pair.first, pair.second);
+  }
+
+  MergedAssociatedTypes.clear();
+}
+
+/// Check if we have a rule of the form
+///
+///   X.[P1:T] => X.[P2:T]
+///
+/// If so, record this rule for later. We'll try to merge the associated
+/// types in RewriteSystem::processMergedAssociatedTypes().
+void RewriteSystem::checkMergedAssociatedType(Term lhs, Term rhs) {
+  if (lhs.size() == rhs.size() &&
+      std::equal(lhs.begin(), lhs.end() - 1, rhs.begin()) &&
+      lhs.back().getKind() == Symbol::Kind::AssociatedType &&
+      rhs.back().getKind() == Symbol::Kind::AssociatedType &&
+      lhs.back().getName() == rhs.back().getName()) {
+    if (Debug.contains(DebugFlags::Merge)) {
+      llvm::dbgs() << "## Associated type merge candidate ";
+      llvm::dbgs() << lhs << " => " << rhs << "\n\n";
     }
 
     auto mergedSymbol = Context.mergeAssociatedTypes(lhs.back(), rhs.back(),
@@ -240,69 +320,11 @@ void RewriteSystem::processMergedAssociatedTypes() {
         llvm::dbgs() << "### Skipping\n";
       }
 
-      continue;
+      return;
     }
 
-    // Build the term X.[P1&P2:T].
-    MutableTerm mergedTerm = lhs;
-    mergedTerm.back() = mergedSymbol;
-
-    // Add the rule X.[P1:T] => X.[P1&P2:T].
-    addRule(rhs, mergedTerm);
-
-    // Collect new rules here so that we're not adding rules while traversing
-    // the trie.
-    SmallVector<std::pair<MutableTerm, MutableTerm>, 2> inducedRules;
-
-    // Look for conformance requirements on [P1:T] and [P2:T].
-    auto visitRule = [&](unsigned ruleID) {
-      const auto &otherRule = Rules[ruleID];
-      const auto &otherLHS = otherRule.getLHS();
-      if (otherLHS.size() == 2 &&
-          otherLHS[1].getKind() == Symbol::Kind::Protocol) {
-        if (otherLHS[0] == lhs.back() ||
-            otherLHS[0] == rhs.back()) {
-          // We have a rule of the form
-          //
-          //   [P1:T].[Q] => [P1:T]
-          //
-          // or
-          //
-          //   [P2:T].[Q] => [P2:T]
-          if (Debug.contains(DebugFlags::Merge)) {
-            llvm::dbgs() << "### Lifting conformance rule " << otherRule << "\n";
-          }
-
-          // We know that [P1:T] or [P2:T] conforms to Q, therefore the
-          // merged type [P1&P2:T] must conform to Q as well. Add a new rule
-          // of the form:
-          //
-          //   [P1&P2:T].[Q] => [P1&P2:T]
-          //
-          MutableTerm newLHS;
-          newLHS.add(mergedSymbol);
-          newLHS.add(otherLHS[1]);
-
-          MutableTerm newRHS;
-          newRHS.add(mergedSymbol);
-
-          inducedRules.emplace_back(newLHS, newRHS);
-        }
-      }
-    };
-
-    // Visit rhs first to preserve the ordering of protocol requirements in the
-    // the property map. This is just for aesthetic purposes in the debug dump,
-    // it doesn't change behavior.
-    Trie.findAll(rhs.back(), visitRule);
-    Trie.findAll(lhs.back(), visitRule);
-
-    // Now add the new rules.
-    for (const auto &pair : inducedRules)
-      addRule(pair.first, pair.second);
+    MergedAssociatedTypes.push_back({rhs, lhs.back(), mergedSymbol});
   }
-
-  MergedAssociatedTypes.clear();
 }
 
 /// Compute a critical pair from the left hand sides of two rewrite rules,
