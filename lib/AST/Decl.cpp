@@ -7217,14 +7217,19 @@ bool AbstractFunctionDecl::isSendable() const {
 }
 
 bool AbstractFunctionDecl::isDistributed() const {
-  auto func = dyn_cast<FuncDecl>(this);
-  if (!func)
-    return false;
+  return this->getAttrs().hasAttribute<DistributedActorAttr>();
+}
 
-  auto mutableFunc = const_cast<FuncDecl *>(func);
-  return evaluateOrDefault(getASTContext().evaluator,
-                           IsDistributedFuncRequest{mutableFunc},
-                           false);
+AbstractFunctionDecl*
+AbstractFunctionDecl::getDistributedActorRemoteFuncDecl() const {
+  if (!this->isDistributed())
+    return nullptr;
+
+  auto mutableThis = const_cast<AbstractFunctionDecl *>(this);
+  return evaluateOrDefault(
+      getASTContext().evaluator,
+      GetDistributedRemoteFuncRequest{mutableThis},
+      nullptr);
 }
 
 BraceStmt *AbstractFunctionDecl::getBody(bool canSynthesize) const {

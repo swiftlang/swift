@@ -1410,28 +1410,6 @@ static void maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl) {
   diagnoseClassWithoutInitializers(classDecl);
 }
 
-void TypeChecker::checkResultType(Type resultType,
-                                  DeclContext *owner) {
-//  // Only distributed functions have special requirements on return types.
-//  if (!owner->isDistributed())
-//    return;
-//
-//  auto conformanceDC = owner->getConformanceContext();
-//
-//  // Result type of distributed functions must be Codable.
-//  auto target =
-//      conformanceDC->mapTypeIntoContext(it->second->getValueInterfaceType());
-//  if (TypeChecker::conformsToProtocol(target, derived.Protocol, conformanceDC)
-//      .isInvalid()) {
-//    TypeLoc typeLoc = {
-//        it->second->getTypeReprOrParentPatternTypeRepr(),
-//        it->second->getType(),
-//    };
-//    it->second->diagnose(diag::codable_non_conforming_property_here,
-//                         derived.getProtocolType(), typeLoc);
-//    propertiesAreValid = false;
-}
-
 void TypeChecker::diagnoseDuplicateBoundVars(Pattern *pattern) {
   SmallVector<VarDecl *, 2> boundVars;
   pattern->collectVariables(boundVars);
@@ -2694,7 +2672,6 @@ public:
       checkAccessControl(FD);
 
       TypeChecker::checkParameterList(FD->getParameters(), FD);
-      TypeChecker::checkResultType(FD->getResultInterfaceType(), FD);
     }
 
     TypeChecker::checkDeclAttributes(FD);
@@ -2930,11 +2907,6 @@ public:
 
     TypeChecker::checkDeclAttributes(ED);
 
-    if (nominal->isDistributedActor()) {
-      auto decl = dyn_cast<ClassDecl>(nominal);
-      TypeChecker::checkDistributedActor(decl);
-    }
-
     for (Decl *Member : ED->getMembers())
       visit(Member);
 
@@ -2945,6 +2917,9 @@ public:
     checkAccessControl(ED);
 
     checkExplicitAvailability(ED);
+
+    if (nominal->isDistributedActor())
+      TypeChecker::checkDistributedActor(dyn_cast<ClassDecl>(nominal));
   }
 
   void visitTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
