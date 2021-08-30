@@ -1,5 +1,6 @@
 import Submodule
 @_implementationOnly import PrivateSubmodule
+@_implementationOnly import PrivateCModule
 
 private enum PE<T> {
   case A
@@ -268,10 +269,18 @@ public func callUnrelated<T>(_ t: T) -> T {
   return t
 }
 
-public func callImplementationOnly<T>(_ t: T) -> T {
+public func callImplementationOnlyType<T>(_ t: T) -> T {
   let p = PrivateStr(i: 27)
   print(p.test())
   return t
+}
+
+public func callImplementationOnlyFunc<T>(_ t: T) -> Int {
+  return privateFunc()
+}
+
+public func callCImplementationOnly<T>(_ t: T) -> Int {
+  return Int(privateCFunc())
 }
 
 

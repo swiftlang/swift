@@ -406,7 +406,14 @@ SILFunction *SILDeserializer::getFuncForReference(StringRef name,
   // SIL.
   SourceLoc sourceLoc;
   SILSerializationFunctionBuilder builder(SILMod);
-  return builder.createDeclaration(name, type, RegularLocation(sourceLoc));
+  fn = builder.createDeclaration(name, type,
+                                 RegularLocation(sourceLoc));
+  // The function is not really de-serialized, but it's important to call
+  // `didDeserialize` on every new function. Otherwise some Analysis might miss
+  // `notifyAddedOrModifiedFunction` notifications.
+  if (Callback)
+    Callback->didDeserialize(MF->getAssociatedModule(), fn);
+  return fn;
 }
 
 /// Helper function to find a SILFunction, given its name and type.
