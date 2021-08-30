@@ -417,7 +417,7 @@ bb0(%0 : $*Optional<T>):
   %1 = load_borrow %0 : $*Optional<T>
   switch_enum %1 : $Optional<T>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
 
-bb1(%3 : $T):
+bb1(%3 : @guaranteed $T):
   end_borrow %1 : $Optional<T>
   %2 = unchecked_take_enum_data_addr %0 : $*Optional<T>, #Optional.some!enumelt
   destroy_addr %2 : $*T

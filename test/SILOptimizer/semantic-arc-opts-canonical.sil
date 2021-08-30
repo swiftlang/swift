@@ -372,8 +372,7 @@ bb1(%2 : @owned $Builtin.NativeObject):
   destroy_value %2 : $Builtin.NativeObject
   br bb3
 
-bb2(%3 : @owned $FakeOptional<Builtin.NativeObject>):
-  destroy_value %3 : $FakeOptional<Builtin.NativeObject>
+bb2:
   br bb3
 
 bb3:
@@ -436,8 +435,7 @@ bb1(%2 : @owned $Builtin.NativeObject):
   destroy_value %2 : $Builtin.NativeObject
   br bb3
 
-bb2(%3 : @owned $FakeOptional<Builtin.NativeObject>):
-  destroy_value %3 : $FakeOptional<Builtin.NativeObject>
+bb2:
   br bb3
 
 bb3:

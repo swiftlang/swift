@@ -16,24 +16,6 @@ class Klass {
 class SubKlass : Klass {
 }
 
-// CHECK-LABEL: sil [ossa] @switch_test : $@convention(thin) () -> () {
-// CHECK: switch_enum {{.*}}, forwarding: @guaranteed
-// CHECK-LABEL: } // end sil function 'switch_test'
-sil [ossa] @switch_test : $@convention(thin) () -> () {
-  %none = enum $FakeOptional<Klass>, #FakeOptional.none
-  switch_enum %none : $FakeOptional<Klass>, case #FakeOptional.some!enumelt:bb1, case #FakeOptional.none!enumelt:bb2, forwarding: @guaranteed
-
-bb1(%arg : @guaranteed $Klass):
-  br bb3
-
-bb2:
-  br bb3
-
-bb3:
-  %8 = tuple ()
-  return %8 : $()
-}
-
 // Test checked_cast_br ownership forwarding.
 //
 // Also test unchecked_ownership_conversion @none serialization (@none
@@ -58,3 +40,22 @@ bb3:
   %8 = tuple ()
   return %8 : $()
 }
+
+// CHECK-LABEL: sil [ossa] @switch_test : $@convention(thin) () -> () {
+// CHECK: switch_enum {{.*}}, forwarding: @guaranteed
+// CHECK-LABEL: } // end sil function 'switch_test'
+sil [ossa] @switch_test : $@convention(thin) () -> () {
+  %none = enum $FakeOptional<Klass>, #FakeOptional.none
+  switch_enum %none : $FakeOptional<Klass>, case #FakeOptional.some!enumelt:bb1, case #FakeOptional.none!enumelt:bb2, forwarding: @guaranteed
+
+bb1(%arg : @guaranteed $Klass):
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %8 = tuple ()
+  return %8 : $()
+}
+

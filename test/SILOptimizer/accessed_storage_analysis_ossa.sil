@@ -644,7 +644,7 @@ sil [ossa] @readUnidentifiedArgCaller : $@convention(thin) (@guaranteed Indirect
 bb0(%0 : @guaranteed $IndirectEnum, %1 : $Int):
   switch_enum %0 : $IndirectEnum, case #IndirectEnum.V!enumelt: bb2, default bb1
 
-bb1(%defaultArg : @guaranteed $IndirectEnum):
+bb1:
   br bb3(%1 : $Int)
 
 bb2(%7 : @guaranteed ${ var Int }):

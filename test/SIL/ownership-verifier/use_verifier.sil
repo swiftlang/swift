@@ -484,7 +484,7 @@ bb3:
 sil [ossa] @switch_enum_owned_payload_test3 : $@convention(thin) () -> () {
 bb0:
   %1 = enum $Optional<Builtin.NativeObject>, #Optional.none!enumelt
-  switch_enum %1 : $Optional<Builtin.NativeObject>, case #Optional.none!enumelt: bb1, case #Optional.some!enumelt: bb2
+  switch_enum %1 : $Optional<Builtin.NativeObject>, case #Optional.none!enumelt: bb1, case #Optional.some!enumelt: bb2, forwarding: @owned
 
 bb1:
   br bb3
@@ -597,7 +597,7 @@ bb3:
 sil [ossa] @switch_enum_no_payload_test : $@convention(thin) () -> () {
 bb0:
   %0 = enum $Optional<Builtin.NativeObject>, #Optional.none!enumelt
-  switch_enum %0 : $Optional<Builtin.NativeObject>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+  switch_enum %0 : $Optional<Builtin.NativeObject>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2, forwarding: @owned
 
 bb1(%1 : @owned $Builtin.NativeObject):
   destroy_value %1 : $Builtin.NativeObject
@@ -676,7 +676,7 @@ bb12:
 
 bb13:
   %e2 = enum $ThreeDifferingPayloadEnum, #ThreeDifferingPayloadEnum.trivial_payload!enumelt, %0 : $Builtin.Int32
-  switch_enum %e2 : $ThreeDifferingPayloadEnum, case #ThreeDifferingPayloadEnum.nontrivial_payload!enumelt: bb16, case #ThreeDifferingPayloadEnum.trivial_payload!enumelt: bb18, case #ThreeDifferingPayloadEnum.nopayload!enumelt: bb20
+  switch_enum %e2 : $ThreeDifferingPayloadEnum, case #ThreeDifferingPayloadEnum.nontrivial_payload!enumelt: bb16, case #ThreeDifferingPayloadEnum.trivial_payload!enumelt: bb18, case #ThreeDifferingPayloadEnum.nopayload!enumelt: bb20, forwarding: @owned
 
 bb16(%17 : @owned $Builtin.NativeObject):
   destroy_value %17 : $Builtin.NativeObject
@@ -689,7 +689,7 @@ bb20:
   br bb21
 
 bb21:  
-  switch_enum %e2 : $ThreeDifferingPayloadEnum, case #ThreeDifferingPayloadEnum.trivial_payload!enumelt: bb24, case #ThreeDifferingPayloadEnum.nopayload!enumelt: bb26, case #ThreeDifferingPayloadEnum.nontrivial_payload!enumelt: bb22
+  switch_enum %e2 : $ThreeDifferingPayloadEnum, case #ThreeDifferingPayloadEnum.trivial_payload!enumelt: bb24, case #ThreeDifferingPayloadEnum.nopayload!enumelt: bb26, case #ThreeDifferingPayloadEnum.nontrivial_payload!enumelt: bb22, forwarding: @owned
 
 bb22(%23 : @owned $Builtin.NativeObject):
   destroy_value %23 : $Builtin.NativeObject
@@ -702,7 +702,7 @@ bb26:
   br bb27
 
 bb27:
-  switch_enum %e2 : $ThreeDifferingPayloadEnum, case #ThreeDifferingPayloadEnum.nopayload!enumelt: bb32, case #ThreeDifferingPayloadEnum.nontrivial_payload!enumelt: bb28, case #ThreeDifferingPayloadEnum.trivial_payload!enumelt: bb30
+  switch_enum %e2 : $ThreeDifferingPayloadEnum, case #ThreeDifferingPayloadEnum.nopayload!enumelt: bb32, case #ThreeDifferingPayloadEnum.nontrivial_payload!enumelt: bb28, case #ThreeDifferingPayloadEnum.trivial_payload!enumelt: bb30, forwarding: @owned
 
 bb28(%29 : @owned $Builtin.NativeObject):
   destroy_value %29 : $Builtin.NativeObject
@@ -716,7 +716,7 @@ bb32:
 
 bb33:
   %e3 = enum $ThreeDifferingPayloadEnum, #ThreeDifferingPayloadEnum.nopayload!enumelt
-  switch_enum %e3 : $ThreeDifferingPayloadEnum, case #ThreeDifferingPayloadEnum.nontrivial_payload!enumelt: bb34, case #ThreeDifferingPayloadEnum.trivial_payload!enumelt: bb36, case #ThreeDifferingPayloadEnum.nopayload!enumelt: bb38
+  switch_enum %e3 : $ThreeDifferingPayloadEnum, case #ThreeDifferingPayloadEnum.nontrivial_payload!enumelt: bb34, case #ThreeDifferingPayloadEnum.trivial_payload!enumelt: bb36, case #ThreeDifferingPayloadEnum.nopayload!enumelt: bb38, forwarding: @owned
 
 bb34(%35 : @owned $Builtin.NativeObject):
   destroy_value %35 : $Builtin.NativeObject
@@ -729,7 +729,7 @@ bb38:
   br bb39
 
 bb39:
-  switch_enum %e3 : $ThreeDifferingPayloadEnum, case #ThreeDifferingPayloadEnum.trivial_payload!enumelt: bb42, case #ThreeDifferingPayloadEnum.nopayload!enumelt: bb44, case #ThreeDifferingPayloadEnum.nontrivial_payload!enumelt: bb40
+  switch_enum %e3 : $ThreeDifferingPayloadEnum, case #ThreeDifferingPayloadEnum.trivial_payload!enumelt: bb42, case #ThreeDifferingPayloadEnum.nopayload!enumelt: bb44, case #ThreeDifferingPayloadEnum.nontrivial_payload!enumelt: bb40, forwarding: @owned
 
 bb40(%41 : @owned $Builtin.NativeObject):
   destroy_value %41 : $Builtin.NativeObject
@@ -742,7 +742,7 @@ bb44:
   br bb45
 
 bb45:
-  switch_enum %e3 : $ThreeDifferingPayloadEnum, case #ThreeDifferingPayloadEnum.nopayload!enumelt: bb50, case #ThreeDifferingPayloadEnum.nontrivial_payload!enumelt: bb46, case #ThreeDifferingPayloadEnum.trivial_payload!enumelt: bb48
+  switch_enum %e3 : $ThreeDifferingPayloadEnum, case #ThreeDifferingPayloadEnum.nopayload!enumelt: bb50, case #ThreeDifferingPayloadEnum.nontrivial_payload!enumelt: bb46, case #ThreeDifferingPayloadEnum.trivial_payload!enumelt: bb48, forwarding: @owned
 
 bb46(%47 : @owned $Builtin.NativeObject):
   destroy_value %47 : $Builtin.NativeObject
@@ -1073,7 +1073,7 @@ bb0:
 sil [ossa] @transforming_terminator_undef_test : $@convention(thin) () -> () {
 bb0:
   %0 = unchecked_ref_cast undef : $Builtin.NativeObject to $Builtin.NativeObject
-  checked_cast_br %0 : $Builtin.NativeObject to SuperKlass, bb1, bb2
+  checked_cast_br %0 : $Builtin.NativeObject to SuperKlass, bb1, bb2, forwarding: @owned
 
 bb1(%1 : @owned $SuperKlass):
   destroy_value %1 : $SuperKlass
