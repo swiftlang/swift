@@ -8810,6 +8810,7 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
 
       if (patternBinding->getInit(index)) {
         patternBinding->setInit(index, resultTarget->getAsExpr());
+        patternBinding->setInitializerChecked(index);
       }
     }
 
@@ -8829,11 +8830,9 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
     auto contextualPattern = target.getContextualPattern();
     auto patternType = target.getTypeOfUninitializedVar();
 
-    TypeResolutionOptions options = TypeResolverContext::PatternBindingDecl;
-    options |= TypeResolutionFlags::OverrideType;
-
     if (auto coercedPattern = TypeChecker::coercePatternToType(
-            contextualPattern, patternType, options)) {
+            contextualPattern, patternType,
+            TypeResolverContext::PatternBindingDecl)) {
       auto resultTarget = target;
       resultTarget.setPattern(coercedPattern);
       return resultTarget;

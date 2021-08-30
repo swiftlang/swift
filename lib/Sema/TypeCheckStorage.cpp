@@ -2873,16 +2873,17 @@ PropertyWrapperInitializerInfoRequest::evaluate(Evaluator &evaluator,
         && parentPBD->isDefaultInitializable(patternNumber)
         && !wrapperInfo.defaultInit) {
       auto ty = parentPBD->getPattern(patternNumber)->getType();
-      if (auto defaultInit = TypeChecker::buildDefaultInitializer(ty))
-        parentPBD->setInit(patternNumber, defaultInit);
-    }
-
-    if (parentPBD->isInitialized(patternNumber) &&
-        !parentPBD->isInitializerChecked(patternNumber)) {
-      TypeChecker::typeCheckPatternBinding(parentPBD, patternNumber);
+      if (auto defaultInit = TypeChecker::buildDefaultInitializer(ty)) {
+        typeCheckSynthesizedWrapperInitializer(var, defaultInit);
+        parentPBD->setInit(0, defaultInit);
+        parentPBD->setInitializerChecked(0);
+      }
     }
 
     if ((initializer = parentPBD->getInit(patternNumber))) {
+      assert(parentPBD->isInitializerChecked(0) &&
+             "Initializer should to be type-checked");
+
       pbd->setInit(0, initializer);
       pbd->setInitializerChecked(0);
       wrappedValue = findWrappedValuePlaceholder(initializer);
