@@ -43,10 +43,6 @@ void checkDistributedActorConstructor(const ClassDecl *decl, ConstructorDecl *ct
 
 bool checkDistributedFunction(FuncDecl *decl, bool diagnose);
 
-/// Synthesis of members which are not directly driven filling in protocol requirements,
-/// such as the default local and resolve constructors, and `_remote_` function stubs.
-void addImplicitDistributedActorMembersToClass(ClassDecl *decl);
-
 }
 
 
