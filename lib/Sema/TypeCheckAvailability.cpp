@@ -2000,7 +2000,7 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
     // Continue on to diagnose any argument label renames.
 
   } else if (parsed.BaseName == "init" && isa_and_nonnull<CallExpr>(call)) {
-    auto *CE = dyn_cast<CallExpr>(call);
+    auto *CE = cast<CallExpr>(call);
 
     // For initializers, replace with a "call" of the context type...but only
     // if we know we're doing a call (rather than a first-class reference).
@@ -2022,6 +2022,14 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
     if (auto *CE = dyn_cast_or_null<CallExpr>(call)) {
       // Renaming from CallExpr to SubscriptExpr. Remove function name and
       // replace parens with square brackets.
+
+      if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(CE->getFn())) {
+        if (DSCE->getBase()->isImplicit()) {
+          // If self is implicit, self must be inserted before subscript syntax.
+          diag.fixItInsert(CE->getStartLoc(), "self");
+        }
+      }
+
       diag.fixItReplace(CE->getFn()->getEndLoc(), "[");
       diag.fixItReplace(CE->getEndLoc(), "]");
     }
@@ -2036,12 +2044,12 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
     baseReplace += parsed.BaseName;
 
     if (parsed.IsFunctionName && isa_and_nonnull<SubscriptExpr>(call)) {
-      auto *SE = dyn_cast<SubscriptExpr>(call);
+      auto *SE = cast<SubscriptExpr>(call);
+
       // Renaming from SubscriptExpr to CallExpr. Insert function name and
       // replace square brackets with parens.
-
       diag.fixItReplace(SE->getIndex()->getStartLoc(),
-                        ("." + baseReplace.str()).str());
+                        ("." + baseReplace.str() + "(").str());
       diag.fixItReplace(SE->getEndLoc(), ")");
     } else {
       if (parsed.IsFunctionName && parsed.ArgumentLabels.empty() &&
@@ -3043,7 +3051,7 @@ bool ExprAvailabilityWalker::diagnoseDeclRefAvailability(
     if (diagnoseIncDecRemoval(D, R, attr))
       return true;
     if (isa_and_nonnull<ApplyExpr>(call) &&
-        diagnoseMemoryLayoutMigration(D, R, attr, dyn_cast<ApplyExpr>(call)))
+        diagnoseMemoryLayoutMigration(D, R, attr, cast<ApplyExpr>(call)))
       return true;
   }
 
