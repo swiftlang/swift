@@ -138,15 +138,18 @@ class HostSpecificConfiguration(object):
                 #
                 # NOTE: We currently do not seperate testing options for
                 # stage1/stage2 compiler. This can change with time.
-                if stage_dependent_args.build_swift_stdlib_unittest_extra or \
-                        args.validation_test or args.long_test or \
-                        args.stress_test:
-                    self.swift_stdlib_build_targets.append(
-                        "swift-stdlib-" + name)
-                else:
-                    # This matches the logic in test/CMakeLists.txt around if
-                    # this target is meant to be generated.
-                    if stage_dependent_args.swift_build_dynamic_stdlib:
+                #
+                # This matches the logic in test/CMakeLists.txt around if
+                # this target is meant to be generated.
+                if stage_dependent_args.swift_build_dynamic_stdlib:
+                    query = \
+                        stage_dependent_args.build_swift_stdlib_unittest_extra
+                    if query or \
+                       args.validation_test or args.long_test or \
+                       args.stress_test:
+                        self.swift_stdlib_build_targets.append(
+                            "swift-stdlib-" + name)
+                    else:
                         self.swift_stdlib_build_targets.append(
                             "swift-test-stdlib-" + name)
             if build_benchmarks:
