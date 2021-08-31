@@ -89,10 +89,9 @@ class CodeCompletionResultBuilder {
   CodeCompletionResult::ExpectedTypeRelation ExpectedTypeRelation =
       CodeCompletionResult::Unknown;
   bool Cancelled = false;
-  ArrayRef<std::pair<StringRef, StringRef>> CommentWords;
   CodeCompletionResult::NotRecommendedReason NotRecReason =
       CodeCompletionResult::NotRecommendedReason::None;
-  StringRef BriefDocComment = StringRef();
+  StringRef BriefDocComment;
 
   void addChunkWithText(CodeCompletionString::Chunk::ChunkKind Kind,
                         StringRef Text);
@@ -242,11 +241,6 @@ public:
     addChunkWithTextNoCopy(
        CodeCompletionString::Chunk::ChunkKind::EffectsSpecifierKeyword,
        " async");
-  }
-
-  void addDeclDocCommentWords(ArrayRef<std::pair<StringRef, StringRef>> Pairs) {
-    assert(Kind == CodeCompletionResult::ResultKind::Declaration);
-    CommentWords = Pairs;
   }
 
   void addAnnotatedRethrows() {
