@@ -144,8 +144,11 @@ class HostSpecificConfiguration(object):
                     self.swift_stdlib_build_targets.append(
                         "swift-stdlib-" + name)
                 else:
-                    self.swift_stdlib_build_targets.append(
-                        "swift-test-stdlib-" + name)
+                    # This matches the logic in test/CMakeLists.txt around if
+                    # this target is meant to be generated.
+                    if stage_dependent_args.swift_build_dynamic_stdlib:
+                        self.swift_stdlib_build_targets.append(
+                            "swift-test-stdlib-" + name)
             if build_benchmarks:
                 self.swift_benchmark_build_targets.append(
                     "swift-benchmark-" + name)
