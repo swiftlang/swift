@@ -1203,15 +1203,20 @@ struct UnavailableSubscripts {
 
   subscript(arg1 arg1: Int, arg2 arg2: Int, arg3 arg3: Int) -> Int { 3 }
 
+  @available(*, deprecated, renamed: "subscriptTo(_:)")
+  subscript(to to: Int) -> Int { 3 }
+  func subscriptTo(_ index: Int) -> Int { 3 }
+
   func testUnavailableSubscripts(_ x: UnavailableSubscripts) { 
     _ = self[old: 3] // expected-error {{'subscript(old:)' has been renamed to 'subscript(new:)'}} {{14-17=new}}
     _ = x[old: 3] // expected-error {{'subscript(old:)' has been renamed to 'subscript(new:)'}} {{11-14=new}}
 
     _ = self.getValue(old: 3) // expected-error {{'getValue(old:)' has been renamed to 'subscript(new:)'}} {{14-22=[}} {{29-30=]}} {{23-26=new}}
+    _ = getValue(old: 3) // expected-error {{'getValue(old:)' has been renamed to 'subscript(new:)'}} {{9-9=self}} {{9-17=[}} {{24-25=]}} {{18-21=new}}
     _ = x.getValue(old: 3) // expected-error {{'getValue(old:)' has been renamed to 'subscript(new:)'}} {{11-19=[}} {{26-27=]}} {{20-23=new}}
 
-    _ = self[getAValue: 3] // expected-error {{'subscript(getAValue:)' has been renamed to 'getAValue(new:)'}} {{13-14=.getAValue}} {{26-27=)}} {{14-23=new}}
-    _ = x[getAValue: 3] // expected-error {{'subscript(getAValue:)' has been renamed to 'getAValue(new:)'}} {{10-11=.getAValue}} {{23-24=)}} {{11-20=new}}
+    _ = self[getAValue: 3] // expected-error {{'subscript(getAValue:)' has been renamed to 'getAValue(new:)'}} {{13-14=.getAValue(}} {{26-27=)}} {{14-23=new}}
+    _ = x[getAValue: 3] // expected-error {{'subscript(getAValue:)' has been renamed to 'getAValue(new:)'}} {{10-11=.getAValue(}} {{23-24=)}} {{11-20=new}}
 
     _ = self[argg1: 3, argg2: 3, argg3: 3] // expected-warning {{'subscript(argg1:argg2:argg3:)' is deprecated: renamed to 'subscript(arg1:arg2:arg3:)'}} // expected-note {{use 'subscript(arg1:arg2:arg3:)' instead}} {{14-19=arg1}} {{24-29=arg2}} {{34-39=arg3}}
     _ = x[argg1: 3, argg2: 3, argg3: 3] // expected-warning {{'subscript(argg1:argg2:argg3:)' is deprecated: renamed to 'subscript(arg1:arg2:arg3:)'}} // expected-note {{use 'subscript(arg1:arg2:arg3:)' instead}} {{11-16=arg1}} {{21-26=arg2}} {{31-36=arg3}}
@@ -1221,5 +1226,8 @@ struct UnavailableSubscripts {
 
     _ = self[3, 3, 3] // expected-error {{'subscript(_:_:_:)' has been renamed to 'subscript(arg1:arg2:arg3:)'}} {{14-14=arg1: }} {{17-17=arg2: }} {{20-20=arg3: }}
     _ = x[3, 3, 3] // expected-error {{'subscript(_:_:_:)' has been renamed to 'subscript(arg1:arg2:arg3:)'}} {{11-11=arg1: }} {{14-14=arg2: }} {{17-17=arg3: }}
+
+    _ = self[to: 3] // expected-warning {{'subscript(to:)' is deprecated: renamed to 'subscriptTo(_:)'}} // expected-note {{use 'subscriptTo(_:)' instead}} {{13-14=.subscriptTo(}} {{19-20=)}} {{14-18=}}
+    _ = x[to: 3] // expected-warning {{'subscript(to:)' is deprecated: renamed to 'subscriptTo(_:)'}} // expected-note {{use 'subscriptTo(_:)' instead}} {{10-11=.subscriptTo(}} {{16-17=)}} {{11-15=}}
   }
 }
