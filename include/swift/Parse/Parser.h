@@ -1869,6 +1869,8 @@ struct ParsedDeclName {
   /// Whether this is a setter for the named property.
   bool IsSetter = false;
 
+  bool IsSubscript = false;
+
   /// For a declaration name that makes the declaration into an
   /// instance member, the index of the "Self" parameter.
   Optional<unsigned> SelfIndex;

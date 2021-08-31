@@ -1855,7 +1855,7 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
                                      SourceRange referenceRange,
                                      const ValueDecl *renamedDecl,
                                      const AvailableAttr *attr,
-                                     const ApplyExpr *call) {
+                                     const Expr *call) {
   if (isa<AccessorDecl>(renamedDecl))
     return;
 
@@ -1875,21 +1875,21 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
 
   auto &ctx = renamedDecl->getASTContext();
   SourceManager &sourceMgr = ctx.SourceMgr;
-
   if (parsed.isInstanceMember()) {
+    auto *CE = dyn_cast_or_null<CallExpr>(call);
+    if (!CE)
+      return;
+
     // Replace the base of the call with the "self argument".
     // We can only do a good job with the fix-it if we have the whole call
     // expression.
     // FIXME: Should we be validating the ContextName in some way?
-    if (!call || !isa<CallExpr>(call))
-      return;
-
     unsigned selfIndex = parsed.SelfIndex.getValue();
     const Expr *selfExpr = nullptr;
     SourceLoc removeRangeStart;
     SourceLoc removeRangeEnd;
 
-    auto *argExpr = call->getArg();
+    auto *argExpr = CE->getArg();
     auto argList = getOriginalArgumentList(argExpr);
 
     size_t numElementsWithinParens = argList.args.size();
@@ -1986,9 +1986,11 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
     selfReplace += base;
     if (needsParens)
       selfReplace.push_back(')');
+
     selfReplace.push_back('.');
     selfReplace += parsed.BaseName;
-    diag.fixItReplace(call->getFn()->getSourceRange(), selfReplace);
+
+    diag.fixItReplace(CE->getFn()->getSourceRange(), selfReplace);
 
     if (!parsed.isPropertyAccessor())
       diag.fixItRemoveChars(removeRangeStart, removeRangeEnd);
@@ -1996,44 +1998,79 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
     // Continue on to diagnose any argument label renames.
 
   } else if (parsed.BaseName == "init" && isa_and_nonnull<CallExpr>(call)) {
+    auto *CE = cast<CallExpr>(call);
+
     // For initializers, replace with a "call" of the context type...but only
     // if we know we're doing a call (rather than a first-class reference).
     if (parsed.isMember()) {
-      diag.fixItReplace(call->getFn()->getSourceRange(), parsed.ContextName);
-
-    } else if (auto *dotCall = dyn_cast<DotSyntaxCallExpr>(call->getFn())) {
+      diag.fixItReplace(CE->getFn()->getSourceRange(), parsed.ContextName);
+    } else if (auto *dotCall = dyn_cast<DotSyntaxCallExpr>(CE->getFn())) {
       SourceLoc removeLoc = dotCall->getDotLoc();
       if (removeLoc.isInvalid())
         return;
 
       diag.fixItRemove(SourceRange(removeLoc, dotCall->getFn()->getEndLoc()));
-    } else if (!isa<ConstructorRefCallExpr>(call->getFn())) {
+    } else if (!isa<ConstructorRefCallExpr>(CE->getFn())) {
       return;
     }
 
     // Continue on to diagnose any constructor argument label renames.
-    
+
+  } else if (parsed.IsSubscript) {
+    if (auto *CE = dyn_cast_or_null<CallExpr>(call)) {
+      // Renaming from CallExpr to SubscriptExpr. Remove function name and
+      // replace parens with square brackets.
+
+      if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(CE->getFn())) {
+        if (DSCE->getBase()->isImplicit()) {
+          // If self is implicit, self must be inserted before subscript syntax.
+          diag.fixItInsert(CE->getStartLoc(), "self");
+        }
+      }
+
+      diag.fixItReplace(CE->getFn()->getEndLoc(), "[");
+      diag.fixItReplace(CE->getEndLoc(), "]");
+    }
   } else {
     // Just replace the base name.
     SmallString<64> baseReplace;
+
     if (!parsed.ContextName.empty()) {
       baseReplace += parsed.ContextName;
       baseReplace += '.';
     }
     baseReplace += parsed.BaseName;
-    if (parsed.IsFunctionName && parsed.ArgumentLabels.empty() &&
-        isa<VarDecl>(renamedDecl)) {
-      // If we're going from a var to a function with no arguments, emit an
-      // empty parameter list.
-      baseReplace += "()";
+
+    if (parsed.IsFunctionName && isa_and_nonnull<SubscriptExpr>(call)) {
+      auto *SE = cast<SubscriptExpr>(call);
+
+      // Renaming from SubscriptExpr to CallExpr. Insert function name and
+      // replace square brackets with parens.
+      diag.fixItReplace(SE->getIndex()->getStartLoc(),
+                        ("." + baseReplace.str() + "(").str());
+      diag.fixItReplace(SE->getEndLoc(), ")");
+    } else {
+      if (parsed.IsFunctionName && parsed.ArgumentLabels.empty() &&
+          isa<VarDecl>(renamedDecl)) {
+        // If we're going from a var to a function with no arguments, emit an
+        // empty parameter list.
+        baseReplace += "()";
+      }
+      diag.fixItReplace(referenceRange, baseReplace);
     }
-    diag.fixItReplace(referenceRange, baseReplace);
   }
 
-  if (!call || !isa<CallExpr>(call))
+  if (!call)
     return;
 
-  auto *argExpr = call->getArg();
+  Expr *argExpr;
+  if (auto *CE = dyn_cast<CallExpr>(call))
+    argExpr = CE->getArg();
+  else if (auto *SE = dyn_cast<SubscriptExpr>(call))
+    argExpr = SE->getIndex();
+  else
+    return;
+
   auto argList = getOriginalArgumentList(argExpr);
 
   if (parsed.IsGetter) {
@@ -2146,7 +2183,8 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
     if (argList.isUnlabeledTrailingClosureIdx(i))
       continue;
     if (argumentLabelIDs[i] != argList.labels[i]) {
-      diagnoseArgumentLabelError(ctx, argExpr, argumentLabelIDs, false, &diag);
+      diagnoseArgumentLabelError(ctx, argExpr, argumentLabelIDs,
+                                 parsed.IsSubscript, &diag);
       return;
     }
   }
@@ -2189,7 +2227,7 @@ describeRename(ASTContext &ctx, const AvailableAttr *attr, const ValueDecl *D,
     name << parsed.ContextName << '.';
 
   if (parsed.IsFunctionName) {
-    name << parsed.formDeclName(ctx);
+    name << parsed.formDeclName(ctx, (D && isa<SubscriptDecl>(D)));
   } else {
     name << parsed.BaseName;
   }
@@ -2206,7 +2244,7 @@ describeRename(ASTContext &ctx, const AvailableAttr *attr, const ValueDecl *D,
 void TypeChecker::diagnoseIfDeprecated(SourceRange ReferenceRange,
                                        const ExportContext &Where,
                                        const ValueDecl *DeprecatedDecl,
-                                       const ApplyExpr *Call) {
+                                       const Expr *Call) {
   const AvailableAttr *Attr = TypeChecker::getDeprecated(DeprecatedDecl);
   if (!Attr)
     return;
@@ -2390,10 +2428,9 @@ void swift::diagnoseUnavailableOverride(ValueDecl *override,
 
 /// Emit a diagnostic for references to declarations that have been
 /// marked as unavailable, either through "unavailable" or "obsoleted:".
-bool swift::diagnoseExplicitUnavailability(const ValueDecl *D,
-                                           SourceRange R,
+bool swift::diagnoseExplicitUnavailability(const ValueDecl *D, SourceRange R,
                                            const ExportContext &Where,
-                                           const ApplyExpr *call,
+                                           const Expr *call,
                                            DeclAvailabilityFlags Flags) {
   return diagnoseExplicitUnavailability(D, R, Where, Flags,
                                         [=](InFlightDiagnostic &diag) {
@@ -2760,7 +2797,7 @@ public:
       diagnoseDeclRefAvailability(DS->getMember(), DS->getSourceRange());
     if (auto S = dyn_cast<SubscriptExpr>(E)) {
       if (S->hasDecl()) {
-        diagnoseDeclRefAvailability(S->getDecl(), S->getSourceRange());
+        diagnoseDeclRefAvailability(S->getDecl(), S->getSourceRange(), S);
         maybeDiagStorageAccess(S->getDecl().getDecl(), S->getSourceRange(), DC);
       }
     }
@@ -2818,7 +2855,7 @@ public:
   }
 
   bool diagnoseDeclRefAvailability(ConcreteDeclRef declRef, SourceRange R,
-                                   const ApplyExpr *call = nullptr,
+                                   const Expr *call = nullptr,
                                    DeclAvailabilityFlags flags = None) const;
 
 private:
@@ -3001,9 +3038,8 @@ private:
 
 /// Diagnose uses of unavailable declarations. Returns true if a diagnostic
 /// was emitted.
-bool
-ExprAvailabilityWalker::diagnoseDeclRefAvailability(
-    ConcreteDeclRef declRef, SourceRange R, const ApplyExpr *call,
+bool ExprAvailabilityWalker::diagnoseDeclRefAvailability(
+    ConcreteDeclRef declRef, SourceRange R, const Expr *call,
     DeclAvailabilityFlags Flags) const {
   if (!declRef)
     return false;
@@ -3012,7 +3048,8 @@ ExprAvailabilityWalker::diagnoseDeclRefAvailability(
   if (auto *attr = AvailableAttr::isUnavailable(D)) {
     if (diagnoseIncDecRemoval(D, R, attr))
       return true;
-    if (call && diagnoseMemoryLayoutMigration(D, R, attr, call))
+    if (isa_and_nonnull<ApplyExpr>(call) &&
+        diagnoseMemoryLayoutMigration(D, R, attr, cast<ApplyExpr>(call)))
       return true;
   }
 
@@ -3030,12 +3067,10 @@ ExprAvailabilityWalker::diagnoseDeclRefAvailability(
 
 /// Diagnose uses of unavailable declarations. Returns true if a diagnostic
 /// was emitted.
-bool
-swift::diagnoseDeclAvailability(const ValueDecl *D,
-                                SourceRange R,
-                                const ApplyExpr *call,
-                                const ExportContext &Where,
-                                DeclAvailabilityFlags Flags) {
+bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
+                                     const Expr *call,
+                                     const ExportContext &Where,
+                                     DeclAvailabilityFlags Flags) {
   assert(!Where.isImplicit());
 
   // Generic parameters are always available.
@@ -3094,7 +3129,6 @@ swift::diagnoseDeclAvailability(const ValueDecl *D,
   }
   return false;
 }
-
 
 /// Return true if the specified type looks like an integer of floating point
 /// type.
