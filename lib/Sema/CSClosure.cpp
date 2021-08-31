@@ -38,8 +38,36 @@ public:
   std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
     if (auto *DRE = dyn_cast<DeclRefExpr>(expr)) {
       if (auto type = CS.getTypeIfAvailable(DRE->getDecl())) {
-        if (auto *typeVar = type->getAs<TypeVariableType>())
+        // The logic below is handling not-yet resolved parameter
+        // types referenced in the body e.g. `$0` or `x`.
+        if (auto *typeVar = type->getAs<TypeVariableType>()) {
           referencedVars.insert(typeVar);
+
+          // It is possible that contextual type of a parameter
+          // has been assigned to an anonymous of named argument
+          // early, to facilitate closure type checking. Such a
+          // type can have type variables inside e.g.
+          //
+          // func test<T>(_: (UnsafePointer<T>) -> Void) {}
+          //
+          // test { ptr in
+          //  ...
+          // }
+          //
+          // Type variable representing `ptr` in the body of
+          // this closure would be bound to `UnsafePointer<$T>`
+          // in this case, where `$T` is a type variable for a
+          // generic parameter `T`.
+          auto simplifiedTy =
+              CS.getFixedTypeRecursive(typeVar, /*wantRValue=*/false);
+
+          if (!simplifiedTy->isEqual(typeVar) &&
+              simplifiedTy->hasTypeVariable()) {
+            SmallPtrSet<TypeVariableType *, 4> typeVars;
+            simplifiedTy->getTypeVariables(typeVars);
+            referencedVars.insert(typeVars.begin(), typeVars.end());
+          }
+        }
       }
     }
 
