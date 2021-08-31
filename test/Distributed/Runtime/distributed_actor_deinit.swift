@@ -7,6 +7,9 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
+// temporary non-support. tracked in rdar://82593574
+// UNSUPPORTED: windows
+
 import _Distributed
 
 @available(SwiftStdlib 5.5, *)
