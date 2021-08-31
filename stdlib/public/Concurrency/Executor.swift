@@ -93,6 +93,7 @@ func _checkExpectedExecutor(_filenameStart: Builtin.RawPointer,
     _filenameStart, _filenameLength, _filenameIsASCII, _line, _executor)
 }
 
+#if !SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
 // This must take a DispatchQueueShim, not something like AnyObject,
 // or else SILGen will emit a retain/release in unoptimized builds,
 // which won't work because DispatchQueues aren't actually
@@ -119,3 +120,4 @@ internal final class DispatchQueueShim: UnsafeSendable, SerialExecutor {
     return UnownedSerialExecutor(ordinary: self)
   }
 }
+#endif

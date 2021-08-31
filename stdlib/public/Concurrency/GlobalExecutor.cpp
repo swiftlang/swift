@@ -59,10 +59,13 @@
 #include "TaskPrivate.h"
 #include "Error.h"
 
+#if !SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
 #include <dispatch/dispatch.h>
 
 #if !defined(_WIN32)
 #include <dlfcn.h>
+#endif
+
 #endif
 
 using namespace swift;
@@ -180,7 +183,7 @@ void swift::donateThreadToGlobalExecutorUntil(bool (*condition)(void *),
   while (!condition(conditionContext)) {
     auto job = claimNextFromJobQueue();
     if (!job) return;
-    job->run(ExecutorRef::generic());
+    swift_job_run(job, ExecutorRef::generic());
   }
 }
 
@@ -405,21 +408,35 @@ void swift::swift_task_enqueueMainExecutor(Job *job) {
     swift_task_enqueueMainExecutorImpl(job);
 }
 
+#if !SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
 void swift::swift_task_enqueueOnDispatchQueue(Job *job,
                                               HeapObject *_queue) {
   JobPriority priority = job->getPriority();
   auto queue = reinterpret_cast<dispatch_queue_t>(_queue);
   dispatchEnqueue(queue, job, (dispatch_qos_class_t)priority, queue);
 }
+#endif
+
+#if SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
+static HeapObject _swift_mainExecutorIdentity;
+#endif
 
 ExecutorRef swift::swift_task_getMainExecutor() {
+#if SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
+  return ExecutorRef::forOrdinary(&_swift_mainExecutorIdentity, nullptr);
+#else
   return ExecutorRef::forOrdinary(
            reinterpret_cast<HeapObject*>(&_dispatch_main_q),
            _swift_task_getDispatchQueueSerialExecutorWitnessTable());
+#endif
 }
 
 bool ExecutorRef::isMainExecutor() const {
+#if SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
+  return Identity == &_swift_mainExecutorIdentity;
+#else
   return Identity == reinterpret_cast<HeapObject*>(&_dispatch_main_q);
+#endif
 }
 
 #define OVERRIDE_GLOBAL_EXECUTOR COMPATIBILITY_OVERRIDE
