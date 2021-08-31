@@ -1173,8 +1173,7 @@ Completion *CompletionBuilder::finish() {
           current.getModuleName(), current.getSourceFilePath(),
           current.getNotRecommendedReason(), current.getDiagnosticSeverity(),
           current.getDiagnosticMessage(), current.getBriefDocComment(),
-          current.getAssociatedUSRs(), current.getDeclKeywords(),
-          typeRelation, opKind);
+          current.getAssociatedUSRs(), typeRelation, opKind);
     } else {
       base = SwiftResult(current.getKind(), semanticContext, flair,
                          current.getNumBytesToErase(), completionString,
