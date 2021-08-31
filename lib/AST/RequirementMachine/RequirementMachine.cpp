@@ -243,8 +243,20 @@ void RewriteSystemBuilder::processProtocolDependencies() {
     for (auto *assocType : info.InheritedAssociatedTypes)
       addAssociatedType(assocType, proto);
 
-    for (auto req : info.Requirements)
-      addRequirement(req.getCanonical(), proto);
+    // If this protocol is part of the initial connected component, we're
+    // building requirement signatures for all protocols in this component,
+    // and so we must start with the structural requirements.
+    //
+    // Otherwise, we should either already have a requirement signature, or
+    // we can trigger the computation of the requirement signatures of the
+    // next component recursively.
+    if (info.InitialComponent) {
+      for (auto req : proto->getStructuralRequirements())
+        addRequirement(req.req.getCanonical(), proto);
+    } else {
+      for (auto req : proto->getRequirementSignature())
+        addRequirement(req.getCanonical(), proto);
+    }
 
     if (Dump) {
       llvm::dbgs() << "}\n";

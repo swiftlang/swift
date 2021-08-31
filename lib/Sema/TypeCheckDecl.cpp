@@ -1093,7 +1093,12 @@ ProtocolDependenciesRequest::evaluate(Evaluator &evaluator,
 
   // If we have a serialized requirement signature, deserialize it and
   // look at conformance requirements.
-  if (proto->hasLazyRequirementSignature()) {
+  //
+  // FIXME: For now we just fall back to the GSB for all protocols
+  // unless -requirement-machine-protocol-signatures=on is passed.
+  if (proto->hasLazyRequirementSignature() ||
+      (ctx.LangOpts.RequirementMachineProtocolSignatures
+        == RequirementMachineMode::Disabled)) {
     for (auto req : proto->getRequirementSignature()) {
       if (req.getKind() == RequirementKind::Conformance) {
         result.push_back(req.getProtocolDecl());

@@ -23,7 +23,7 @@ using namespace rewriting;
 void ProtocolGraph::visitRequirements(ArrayRef<Requirement> reqs) {
   for (auto req : reqs) {
     if (req.getKind() == RequirementKind::Conformance) {
-      addProtocol(req.getProtocolDecl());
+      addProtocol(req.getProtocolDecl(), /*initialComponent=*/false);
     }
   }
 }
@@ -32,7 +32,7 @@ void ProtocolGraph::visitRequirements(ArrayRef<Requirement> reqs) {
 /// \p protos.
 void ProtocolGraph::visitProtocols(ArrayRef<const ProtocolDecl *> protos) {
   for (auto proto : protos) {
-    addProtocol(proto);
+    addProtocol(proto, /*initialComponent=*/true);
   }
 }
 
@@ -50,13 +50,15 @@ const ProtocolInfo &ProtocolGraph::getProtocolInfo(
 }
 
 /// Record information about a protocol if we have no seen it yet.
-void ProtocolGraph::addProtocol(const ProtocolDecl *proto) {
+void ProtocolGraph::addProtocol(const ProtocolDecl *proto,
+                                bool initialComponent) {
   if (Info.count(proto) > 0)
     return;
 
   Info[proto] = {proto->getInheritedProtocols(),
                  proto->getAssociatedTypeMembers(),
-                 proto->getRequirementSignature()};
+                 proto->getProtocolDependencies(),
+                 initialComponent};
   Protocols.push_back(proto);
 }
 
@@ -66,7 +68,9 @@ void ProtocolGraph::computeTransitiveClosure() {
   unsigned i = 0;
   while (i < Protocols.size()) {
     auto *proto = Protocols[i++];
-    visitRequirements(getProtocolInfo(proto).Requirements);
+    for (auto *proto : getProtocolInfo(proto).Dependencies) {
+      addProtocol(proto, /*initialComponent=*/false);
+    }
   }
 }
 
