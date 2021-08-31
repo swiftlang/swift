@@ -1049,10 +1049,8 @@ void diagnosePotentialAccessorUnavailability(
 const AvailableAttr *getDeprecated(const Decl *D);
 
 /// Emits a diagnostic for a reference to a declaration that is deprecated.
-void diagnoseIfDeprecated(SourceRange SourceRange,
-                          const ExportContext &Where,
-                          const ValueDecl *DeprecatedDecl,
-                          const ApplyExpr *Call);
+void diagnoseIfDeprecated(SourceRange SourceRange, const ExportContext &Where,
+                          const ValueDecl *DeprecatedDecl, const Expr *Call);
 
 /// Emits a diagnostic for a reference to a conformnace that is deprecated.
 bool diagnoseIfDeprecated(SourceLoc loc,
