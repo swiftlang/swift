@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
 // REQUIRES: VENDOR=apple
+// REQUIRES: OS=macosx
 
 /// Prepare the SDK.
 // RUN: cp -r %S/Inputs/public-private-sdk %t/sdk
