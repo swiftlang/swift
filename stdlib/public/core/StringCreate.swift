@@ -120,15 +120,8 @@ extension String {
       )
       return result.asString
     case .error(let initialRange):
-      // repairUTF8 will call reserveCapacity, invalidating result.codeUnits if
-      // we use it directly. This could be a little faster, but this error path
-      // shouldn't be perf-sensitive anyway.
-      let temporaryCodeUnits = Array(result.codeUnits)
-      defer { _fixLifetime(temporaryCodeUnits) }
-      return temporaryCodeUnits.withContiguousStorageIfAvailable {
-        //This could be optimized to use excess tail capacity
-        return repairUTF8($0, firstKnownBrokenRange: initialRange)
-      }!
+      //This could be optimized to use excess tail capacity
+      return repairUTF8(result.codeUnits, firstKnownBrokenRange: initialRange)
     }
   }
 
