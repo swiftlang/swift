@@ -57,22 +57,33 @@ if #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
       }
       expectEqual(expected, actual)
     }
-
+        
     let validUTF8: [UInt8] = [0x43, 0x61, 0x66, 0xC3, 0xA9]
     let invalidUTF8: [UInt8] = [0x43, 0x61, 0x66, 0xC3]
-
-    let cafe1 = String(unsafeUninitializedCapacity: validUTF8.count) {
-      _ = $0.initialize(from: validUTF8)
-      return validUTF8.count
+    let longerValidUTF8: [UInt8] = [0x21, 0x21, 0x21, 0x21, 0x21, 0x21, 0x21, 0x21, 0x21, 0x21, 0x43, 0x61, 0x66, 0xC3, 0xA9]
+    let longerInvalidUTF8: [UInt8] = [0x21, 0x21, 0x43, 0x61, 0x66, 0xC3, 0x43, 0x61, 0x66, 0xC3, 0x43, 0x61, 0x66, 0xC3]
+    
+    func test(bufferSize: Int, input: [UInt8], expected: String) {
+      let strs = (0..<100).map { _ in
+        String(unsafeUninitializedCapacity: bufferSize) { buffer in
+          _ = buffer.initialize(from: input)
+          return input.count
+        }
+      }
+      for str in strs {
+        expectEqual(expected, str)
+      }
     }
-    expectEqual("Café", cafe1)
-
-    let cafe2 = String(unsafeUninitializedCapacity: invalidUTF8.count) {
-      _ = $0.initialize(from: invalidUTF8)
-      return invalidUTF8.count
-    }
-    expectEqual("Caf�", cafe2)
-
+    
+    test(bufferSize: validUTF8.count, input: validUTF8, expected: "Café")
+    test(bufferSize: invalidUTF8.count, input: invalidUTF8, expected: "Caf�")
+    // Force non-smol strings by using a larger capacity
+    test(bufferSize: 16, input: validUTF8, expected: "Café")
+    test(bufferSize: 16, input: invalidUTF8, expected: "Caf�")
+    test(bufferSize: longerValidUTF8.count, input: longerValidUTF8, expected: "!!!!!!!!!!Café")
+    test(bufferSize: longerInvalidUTF8.count, input: longerInvalidUTF8, expected: "!!Caf�Caf�Caf�")
+    test(bufferSize: 16, input: longerValidUTF8, expected: "!!!!!!!!!!Café")
+    test(bufferSize: 16, input: longerInvalidUTF8, expected: "!!Caf�Caf�Caf�")
     let empty = String(unsafeUninitializedCapacity: 16) { _ in
       // Can't initialize the buffer (e.g. the capacity is too small).
       return 0
