@@ -78,11 +78,13 @@ final class NewHalfOpenRangeGenerator : NewRangeGenerator1 {
 sil_global @total_klass : $Klass
 sil_global @total_nontrivialstruct : $NonTrivialStruct
 
+sil @use : $@convention(thin) (Builtin.Int32) -> ()
 sil @use_Klass : $@convention(thin) (@owned Klass) -> ()
 sil @use_nontrivialstruct : $@convention(thin) (@owned NonTrivialStruct) -> ()
 sil @use_a : $@convention(thin) (@owned A) -> ()
 sil @use_twofield : $@convention(thin) (@owned TwoField) -> ()
 sil @init_twofield : $@convention(thin) (@thin TwoField.Type) -> @owned TwoField
+sil @get_nontrivialstruct : $@convention(thin) () -> @owned NonTrivialStruct
 
 // We have a bug in the old projection code which this test case exposes.
 // Make sure its handled properly in the new projection.
@@ -1051,7 +1053,6 @@ bb8:
   unreachable
 }
 
-
 // CHECK-LABEL: @infinite_loop_and_unreachable :
 // CHECK:   [[V:%[0-9]+]] = load [copy]
 // CHECK:   [[C1:%[0-9]+]] = copy_value [[V]]
@@ -1076,5 +1077,173 @@ bb2:
 
 bb3:
   unreachable
+}
+
+// CHECK-LABEL: @test_available_value1 :
+// CHECK:   load [trivial]
+// CHECK-NOT:   load [trivial]
+// CHECK: } // end sil function 'test_available_value1'
+sil [ossa] @test_available_value1 : $@convention(thin) (@in Builtin.Int32) -> () {
+
+bb0(%0 : $*Builtin.Int32):
+  %1 = load [trivial] %0 : $*Builtin.Int32
+
+  %2 = function_ref @use : $@convention(thin) (Builtin.Int32) -> ()
+  %3 = apply %2(%1) : $@convention(thin) (Builtin.Int32) -> ()
+  cond_br undef, bb2, bb3
+
+bb1:
+  cond_br undef, bb9, bb10
+
+bb2:
+  br bb4
+
+bb3:
+  br bb8
+
+bb4:
+  br bb5
+
+bb5:
+
+  %9 = function_ref @use : $@convention(thin) (Builtin.Int32) -> ()
+  %10 = apply %9(%1) : $@convention(thin) (Builtin.Int32) -> ()
+  cond_br undef, bb6, bb7
+
+bb6:
+  br bb4
+
+bb7:
+  br bb8
+
+bb8:
+  br bb1
+
+bb9:
+  br bb11
+
+bb10:
+  br bb11
+
+bb11:
+  %17 = tuple ()
+  return %17 : $()
+}
+
+sil [ossa] @test_available_value2 : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> () {
+bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
+  %2 = alloc_stack $Builtin.Int32
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3(%0 : $Builtin.Int32)
+
+bb2:
+  br bb3(%1 : $Builtin.Int32)
+
+
+bb3(%6 : $Builtin.Int32):
+  store %6 to [trivial] %2 : $*Builtin.Int32
+  cond_br undef, bb5, bb6
+
+bb4:
+  cond_br undef, bb12, bb13
+
+bb5:
+  br bb7
+
+bb6:
+  br bb11
+
+bb7:
+  br bb8
+
+bb8:
+
+  %13 = function_ref @use : $@convention(thin) (Builtin.Int32) -> ()
+  %14 = apply %13(%6) : $@convention(thin) (Builtin.Int32) -> ()
+  cond_br undef, bb9, bb10
+
+bb9:
+  br bb7
+
+bb10:
+  br bb11
+
+bb11:
+  br bb4
+
+bb12:
+  br bb14
+
+bb13:
+  br bb14
+
+bb14:
+  dealloc_stack %2 : $*Builtin.Int32
+  %22 = tuple ()
+  return %22 : $()
+}
+
+// CHECK-LABEL: @test_available_value3 :
+// CHECK-NOT:   load
+// CHECK: } // end sil function 'test_available_value3'
+sil [ossa] @test_available_value3 : $@convention(method) (@owned NonTrivialStruct) -> () {
+bb0(%0 : @owned $NonTrivialStruct):
+  %1 = alloc_stack $NonTrivialStruct
+  store %0 to [init] %1 : $*NonTrivialStruct
+  br bb1
+
+bb1:
+  cond_br undef, bb2, bb3
+
+bb2:
+  %5 = function_ref @get_nontrivialstruct : $@convention(thin) () -> @owned NonTrivialStruct
+  %6 = apply %5() : $@convention(thin) () -> @owned NonTrivialStruct
+  store %6 to [assign] %1 : $*NonTrivialStruct
+  cond_br undef, bb4, bb13
+
+bb3:
+  unreachable
+
+bb4:
+  cond_br undef, bb5, bb12
+
+bb5:
+  br bb6
+
+bb6:
+  br bb7
+
+bb7:
+  cond_br undef, bb8, bb11
+
+bb8:
+  cond_br undef, bb9, bb10
+
+bb9:
+  %15 = load [take] %1 : $*NonTrivialStruct
+  destroy_value %15 : $NonTrivialStruct
+  dealloc_stack %1 : $*NonTrivialStruct
+  br bb14
+
+bb10:
+  br bb6
+
+bb11:
+  br bb1
+
+bb12:
+  br bb1
+
+bb13:
+  %22 = load [take] %1 : $*NonTrivialStruct
+  destroy_value %22 : $NonTrivialStruct
+  dealloc_stack %1 : $*NonTrivialStruct
+  br bb14
+
+bb14:
+  %26 = tuple ()
+  return %26 : $()
 }
 
