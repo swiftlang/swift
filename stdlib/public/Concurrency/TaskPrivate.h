@@ -112,12 +112,14 @@ void _swift_tsan_release(void *addr);
 /// executors.
 #define DISPATCH_QUEUE_GLOBAL_EXECUTOR (void *)1
 
+#if !defined(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
 inline SerialExecutorWitnessTable *
 _swift_task_getDispatchQueueSerialExecutorWitnessTable() {
   extern SerialExecutorWitnessTable wtable
     SWIFT_ASM_LABEL_WITH_PREFIX("$ss17DispatchQueueShimCScfsWP");
   return &wtable;
 }
+#endif
 
 // ==== ------------------------------------------------------------------------
 
