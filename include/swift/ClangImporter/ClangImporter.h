@@ -499,6 +499,9 @@ public:
                          VarDecl *swiftDecl,
                          DeclContext *dc) override;
 
+  Type importTypedefType(const clang::TypedefNameDecl *decl,
+                         DeclContext *dc) override;
+
   Optional<std::string>
   getOrCreatePCH(const ClangImporterOptions &ImporterOptions,
                  StringRef SwiftPCHHash);

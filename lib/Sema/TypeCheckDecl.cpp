@@ -1848,6 +1848,12 @@ IsImplicitlyUnwrappedOptionalRequest::evaluate(Evaluator &evaluator,
   return (TyR && TyR->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional);
 }
 
+static Type getUnderlyingClangTypedefType(TypeAliasDecl *typeAlias) {
+  auto *clangLoader = typeAlias->getASTContext().getClangModuleLoader();
+  auto *clangDecl = cast<clang::TypedefNameDecl>(typeAlias->getClangDecl());
+  return clangLoader->importTypedefType(clangDecl, typeAlias->getDeclContext());
+}
+
 /// Validate the underlying type of the given typealias.
 Type
 UnderlyingTypeRequest::evaluate(Evaluator &evaluator,
@@ -1857,6 +1863,9 @@ UnderlyingTypeRequest::evaluate(Evaluator &evaluator,
                                      : TypeResolverContext::TypeAliasDecl));
   if (typeAlias->preconcurrency())
     options |= TypeResolutionFlags::Preconcurrency;
+
+  if (typeAlias->getClangDecl())
+    return getUnderlyingClangTypedefType(typeAlias);
 
   // This can happen when code completion is attempted inside
   // of typealias underlying type e.g. `typealias F = () -> Int#^TOK^#`

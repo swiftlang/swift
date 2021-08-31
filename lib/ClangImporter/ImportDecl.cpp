@@ -1427,21 +1427,6 @@ namespace {
           if (auto newtype = importSwiftNewtype(Decl, newtypeAttr, DC, Name))
             return newtype;
 
-      if (!SwiftType) {
-        // Note that the code below checks to see if the typedef allows
-        // bridging, i.e. if the imported typealias should name a bridged type
-        // or the original C type.
-        clang::QualType ClangType = Decl->getUnderlyingType();
-        SwiftType = Impl.importTypeIgnoreIUO(
-            ClangType, ImportTypeKind::Typedef,
-            ImportDiagnosticAdder(Impl, Decl, Decl->getLocation()),
-            isInSystemModule(DC), getTypedefBridgeability(Decl),
-            getImportTypeAttrs(Decl), OTK_Optional);
-      }
-
-      if (!SwiftType)
-        return nullptr;
-
       auto Loc = Impl.importSourceLoc(Decl->getLocation());
       auto Result = Impl.createDeclWithClangNode<TypeAliasDecl>(Decl,
                                       AccessLevel::Public,
@@ -1450,7 +1435,8 @@ namespace {
                                       Loc,
                                       /*genericparams*/nullptr, DC);
 
-      Result->setUnderlyingType(SwiftType);
+      if (SwiftType)
+        Result->setUnderlyingType(SwiftType);
 
       // Make Objective-C's 'id' unavailable.
       if (Impl.SwiftContext.LangOpts.EnableObjCInterop && isObjCId(Decl)) {

@@ -801,6 +801,13 @@ namespace {
 
       Type mappedType = decl->getDeclaredInterfaceType();
 
+      // Type aliases will load their types lazily. If we fail to load a type
+      // alias type, we won't know until the type is requested. So, request the
+      // type and bail if there was an error.
+      if (auto typeAlias = dyn_cast<TypeAliasDecl>(decl))
+        if (isa<ErrorType>(typeAlias->getUnderlyingType().getPointer()))
+          return {};
+
       if (getSwiftNewtypeAttr(type->getDecl(), Impl.CurrentVersion)) {
         auto underlying = Visit(type->getDecl()->getUnderlyingType());
         switch (underlying.Hint) {

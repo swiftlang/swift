@@ -286,6 +286,8 @@ public:
   /// Determine the effective Clang context for the given Swift nominal type.
   virtual EffectiveClangContext getEffectiveClangContext(
       const NominalTypeDecl *nominal) = 0;
+  virtual Type importTypedefType(const clang::TypedefNameDecl *decl,
+                                 DeclContext *dc) = 0;
 };
 
 /// Describes a C++ template instantiation error.

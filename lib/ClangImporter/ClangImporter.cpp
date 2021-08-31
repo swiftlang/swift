@@ -5559,45 +5559,57 @@ Type ClangImporter::importFunctionReturnType(
 }
 
 Type ClangImporter::importVarDeclType(
-    const clang::VarDecl *decl, VarDecl *swiftDecl, DeclContext *dc) {
+                                      const clang::VarDecl *decl, VarDecl *swiftDecl, DeclContext *dc) {
   if (decl->getTemplateInstantiationPattern())
     Impl.getClangSema().InstantiateVariableDefinition(
-        decl->getLocation(),
-        const_cast<clang::VarDecl *>(decl));
-
+                                                      decl->getLocation(),
+                                                      const_cast<clang::VarDecl *>(decl));
+  
   // If the declaration is const, consider it audited.
   // We can assume that loading a const global variable doesn't
   // involve an ownership transfer.
   bool isAudited = decl->getType().isConstQualified();
-
+  
   auto declType = decl->getType();
-
+  
   // Special case: NS Notifications
   if (isNSNotificationGlobal(decl))
     if (auto newtypeDecl = findSwiftNewtype(decl, Impl.getClangSema(),
                                             Impl.CurrentVersion))
       declType = Impl.getClangASTContext().getTypedefType(newtypeDecl);
-
+  
   bool isInSystemModule =
-      cast<ClangModuleUnit>(dc->getModuleScopeContext())->isSystemModule();
-
+  cast<ClangModuleUnit>(dc->getModuleScopeContext())->isSystemModule();
+  
   // Note that we deliberately don't bridge most globals because we want to
   // preserve pointer identity.
   auto importedType =
-      Impl.importType(declType,
-                      (isAudited ? ImportTypeKind::AuditedVariable
-                                 : ImportTypeKind::Variable),
-                      ImportDiagnosticAdder(Impl, decl, decl->getLocation()),
-                      isInSystemModule, Bridgeability::None,
-                      getImportTypeAttrs(decl));
-
+  Impl.importType(declType,
+                  (isAudited ? ImportTypeKind::AuditedVariable
+                   : ImportTypeKind::Variable),
+                  ImportDiagnosticAdder(Impl, decl, decl->getLocation()),
+                  isInSystemModule, Bridgeability::None,
+                  getImportTypeAttrs(decl));
+  
   if (!importedType)
     return nullptr;
-
+  
   if (importedType.isImplicitlyUnwrapped())
     swiftDecl->setImplicitlyUnwrappedOptional(true);
-
+  
   return importedType.getType();
+}
+
+Type ClangImporter::importTypedefType(const clang::TypedefNameDecl *decl,
+                                      DeclContext *dc) {
+  ImportDiagnosticAdder addDiag(Impl, decl, decl->getLocation());
+  bool isInSystemModule =
+      cast<ClangModuleUnit>(dc->getModuleScopeContext())->isSystemModule();
+  return Impl.importTypeIgnoreIUO(decl->getUnderlyingType(),
+                                  ImportTypeKind::Typedef, addDiag,
+                                  isInSystemModule,
+                                  getTypedefBridgeability(decl),
+                                  getImportTypeAttrs(decl), OTK_Optional);
 }
 
 bool ClangImporter::isInOverlayModuleForImportedModule(
