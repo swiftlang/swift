@@ -5202,6 +5202,20 @@ StringRef ProtocolDecl::getObjCRuntimeName(
   return mangleObjCRuntimeName(this, buffer);
 }
 
+ArrayRef<StructuralRequirement>
+ProtocolDecl::getStructuralRequirements() const {
+  return evaluateOrDefault(getASTContext().evaluator,
+               StructuralRequirementsRequest { const_cast<ProtocolDecl *>(this) },
+               None);
+}
+
+ArrayRef<ProtocolDecl *>
+ProtocolDecl::getProtocolDependencies() const {
+  return evaluateOrDefault(getASTContext().evaluator,
+               ProtocolDependenciesRequest { const_cast<ProtocolDecl *>(this) },
+               None);
+}
+
 ArrayRef<Requirement> ProtocolDecl::getRequirementSignature() const {
   return evaluateOrDefault(getASTContext().evaluator,
                RequirementSignatureRequest { const_cast<ProtocolDecl *>(this) },
