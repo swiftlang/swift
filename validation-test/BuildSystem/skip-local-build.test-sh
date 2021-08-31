@@ -1,10 +1,10 @@
 # REQUIRES: standalone_build
 
 # RUN: %empty-directory(%t)
-# RUN: SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --cmake %cmake --dump-config --skip-local-build 2>&1 | %FileCheck %s -check-prefix=CONFIG
+# RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --cmake %cmake --dump-config --skip-local-build 2>&1 | %FileCheck %s -check-prefix=CONFIG
 # CONFIG: "skip_local_build": true
 
 # RUN: %empty-directory(%t)
-# RUN: SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --cmake %cmake --dry-run --verbose-build --skip-local-build 2>&1 | %FileCheck %s -check-prefix=DRY
+# RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --cmake %cmake --dry-run --verbose-build --skip-local-build 2>&1 | %FileCheck %s -check-prefix=DRY
 # DRY: build-script-impl
 # DRY-SAME: --skip-local-build
