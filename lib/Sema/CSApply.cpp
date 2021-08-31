@@ -8011,18 +8011,66 @@ namespace {
   public:
     ExprWalker(ExprRewriter &Rewriter) : Rewriter(Rewriter) { }
 
+    ~ExprWalker() {
+      assert(ClosuresToTypeCheck.empty());
+      assert(TapsToTypeCheck.empty());
+    }
+
     bool shouldWalkIntoPropertyWrapperPlaceholderValue() override {
       // Property wrapper placeholder underlying values are filled in
       // with already-type-checked expressions. Don't walk into them.
       return false;
     }
 
-    const SmallVectorImpl<ClosureExpr *> &getClosuresToTypeCheck() const {
-      return ClosuresToTypeCheck;
-    }
+    /// Process delayed closure bodies and `Tap` expressions.
+    ///
+    /// \returns true if any part of the processing fails.
+    bool processDelayed() {
+      bool hadError = false;
 
-    const SmallVectorImpl<std::pair<TapExpr *, DeclContext *>> &getTapsToTypeCheck() const {
-      return TapsToTypeCheck;
+      while (!ClosuresToTypeCheck.empty()) {
+        auto *closure = ClosuresToTypeCheck.pop_back_val();
+        // If experimental multi-statement closure support
+        // is enabled, solution should have all of required
+        // information.
+        //
+        // Note that in this mode `ClosuresToTypeCheck` acts
+        // as a stack because multi-statement closures could
+        // have other multi-statement closures in the body.
+        auto &ctx = closure->getASTContext();
+        if (ctx.TypeCheckerOpts.EnableMultiStatementClosureInference) {
+          auto &solution = Rewriter.solution;
+          auto &cs = solution.getConstraintSystem();
+
+          hadError |= cs.applySolutionToBody(
+              solution, closure, Rewriter.dc,
+              [&](SolutionApplicationTarget target) {
+                auto resultTarget = rewriteTarget(target);
+                if (resultTarget) {
+                  if (auto expr = resultTarget->getAsExpr())
+                    solution.setExprTypes(expr);
+                }
+
+                return resultTarget;
+              });
+          continue;
+        }
+
+        hadError |= TypeChecker::typeCheckClosureBody(closure);
+      }
+
+      // Tap expressions too; they should or should not be
+      // type-checked under the same conditions as closure bodies.
+      {
+        for (const auto &tuple : TapsToTypeCheck) {
+          auto tap = std::get<0>(tuple);
+          auto tapDC = std::get<1>(tuple);
+          hadError |= TypeChecker::typeCheckTapBody(tap, tapDC);
+        }
+        TapsToTypeCheck.clear();
+      }
+
+      return hadError;
     }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
@@ -8819,19 +8867,10 @@ Optional<SolutionApplicationTarget> ConstraintSystem::applySolution(
   if (!resultTarget)
     return None;
 
-  // Visit closures that have non-single expression bodies.
-  bool hadError = false;
-
-  for (auto *closure : walker.getClosuresToTypeCheck())
-    hadError |= TypeChecker::typeCheckClosureBody(closure);
-
-  // Tap expressions too; they should or should not be
-  // type-checked under the same conditions as closure bodies.
-  for (auto tuple : walker.getTapsToTypeCheck()) {
-    auto tap = std::get<0>(tuple);
-    auto tapDC = std::get<1>(tuple);
-    hadError |= TypeChecker::typeCheckTapBody(tap, tapDC);
-  }
+  // Visit closures that have non-single expression bodies, tap expressions,
+  // and possibly other types of AST nodes which could only be processed
+  // after contextual expression.
+  bool hadError = walker.processDelayed();
 
   // If any of them failed to type check, bail.
   if (hadError)
