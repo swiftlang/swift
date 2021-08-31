@@ -282,19 +282,19 @@ static bool matchCallArgumentsImpl(
   // requiring further checking at the end.
   bool potentiallyOutOfOrder = false;
 
-  // Local function that claims the argument at \c argNumber, returning the
+  // Local function that claims the argument at \c argIdx, returning the
   // index of the claimed argument. This is primarily a helper for
   // \c claimNextNamed.
-  auto claim = [&](Identifier expectedName, unsigned argNumber,
+  auto claim = [&](Identifier expectedName, unsigned argIdx,
                    bool ignoreNameClash = false)  -> unsigned {
     // Make sure we can claim this argument.
-    assert(argNumber != numArgs && "Must have a valid index to claim");
-    assert(!claimedArgs[argNumber] && "Argument already claimed");
+    assert(argIdx != numArgs && "Must have a valid index to claim");
+    assert(!claimedArgs[argIdx] && "Argument already claimed");
 
-    auto argLabel = args[argNumber].getLabel();
+    auto argLabel = args[argIdx].getLabel();
     if (!actualArgNames.empty()) {
       // We're recording argument names; record this one.
-      actualArgNames[argNumber] = expectedName;
+      actualArgNames[argIdx] = expectedName;
     } else if (argLabel != expectedName && !ignoreNameClash &&
                !(argLabel.str().startswith("$") &&
                  argLabel.str().drop_front() == expectedName.str())) {
@@ -313,12 +313,12 @@ static bool matchCallArgumentsImpl(
       }
 
       // Record this argument name.
-      actualArgNames[argNumber] = expectedName;
+      actualArgNames[argIdx] = expectedName;
     }
 
-    claimedArgs[argNumber] = true;
+    claimedArgs[argIdx] = true;
     ++numClaimedArgs;
-    return argNumber;
+    return argIdx;
   };
 
   // Local function that skips over any claimed arguments.
