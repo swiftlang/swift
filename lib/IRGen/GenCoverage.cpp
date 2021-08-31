@@ -79,7 +79,11 @@ void IRGenModule::emitCoverageMapping() {
   llvm::LLVMContext &Ctx = getLLVMContext();
   {
     llvm::raw_string_ostream OS(Filenames);
-    llvm::coverage::CoverageFilenamesSectionWriter(FilenameStrs).write(OS);
+    std::vector<StringRef> Strings;
+    std::transform(std::begin(FilenameStrs), std::end(FilenameStrs),
+                   std::begin(Strings),
+                   [](const std::string &S) -> StringRef { return S; });
+    llvm::coverage::CoverageFilenamesSectionWriter(Strings).write(OS);
   }
   auto *FilenamesVal =
       llvm::ConstantDataArray::getString(Ctx, Filenames, false);
