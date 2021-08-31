@@ -2672,7 +2672,7 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
     if (requiresOSSACleanup(newCallee)) {
       newCallee = SILBuilderWithScope(newCallee->getNextInstruction())
         .createCopyValue(calleeLoc, newCallee);
-      newCallee = makeNewValueAvailable(newCallee, TAI->getParent());
+      newCallee = makeValueAvailable(newCallee, TAI->getParent());
     }
 
     ApplyOptions Options = TAI->getApplyOptions();

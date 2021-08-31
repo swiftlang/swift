@@ -1363,7 +1363,7 @@ SILValue RLEContext::computePredecessorLocationValue(SILBasicBlock *BB,
     }
     endLifetimeAtLeakingBlocks(phi, userBBs);
   }
-  return makeNewValueAvailable(Val, BB);
+  return makeValueAvailable(Val, BB);
 }
 
 bool RLEContext::collectLocationValues(SILBasicBlock *BB, LSLocation &L,
