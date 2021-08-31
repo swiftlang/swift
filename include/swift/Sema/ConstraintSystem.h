@@ -4524,8 +4524,25 @@ public:
     Type underlyingType;
     if (auto *fnTy = type->getAs<AnyFunctionType>())
       underlyingType = replaceFinalResultTypeWithUnderlying(fnTy);
-    else
+    else if (auto *typeVar =
+                 type->getWithoutSpecifierType()->getAs<TypeVariableType>()) {
+      auto *locator = typeVar->getImpl().getLocator();
+
+      // If `type` hasn't been resolved yet, we need to allocate a type
+      // variable to represent an object type of a future optional, and
+      // add a constraint beetween `type` and `underlyingType` to model it.
+      underlyingType = createTypeVariable(
+          getConstraintLocator(locator, LocatorPathElt::GenericArgument(0)),
+          TVO_PrefersSubtypeBinding | TVO_CanBindToLValue |
+              TVO_CanBindToNoEscape);
+
+      // Using a `typeVar` here because l-value is going to be applied
+      // to the underlying type below.
+      addConstraint(ConstraintKind::OptionalObject, typeVar, underlyingType,
+                    locator);
+    } else {
       underlyingType = type->getWithoutSpecifierType()->getOptionalObjectType();
+    }
 
     assert(underlyingType);
 
