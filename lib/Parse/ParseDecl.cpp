@@ -2762,18 +2762,11 @@ ParserResult<CustomAttr> Parser::parseCustomAttribute(
     return ParserResult<CustomAttr>(ParserStatus(type));
   }
 
-  // Parse the optional arguments.
-  SourceLoc lParenLoc, rParenLoc;
-  SmallVector<Expr *, 2> args;
-  SmallVector<Identifier, 2> argLabels;
-  SmallVector<SourceLoc, 2> argLabelLocs;
-  SmallVector<TrailingClosure, 2> trailingClosures;
-  bool hasInitializer = false;
-
   // If we're not in a local context, we'll need a context to parse
   // initializers into (should we have one).  This happens for properties
   // and global variables in libraries.
   ParserStatus status;
+  ArgumentList *argList = nullptr;
   if (Tok.isFollowingLParen() && isCustomAttributeArgument()) {
     if (peekToken().is(tok::code_complete)) {
       consumeToken(tok::l_paren);
@@ -2800,22 +2793,20 @@ ParserResult<CustomAttr> Parser::parseCustomAttribute(
 
         initParser.emplace(*this, initContext);
       }
-      status |= parseExprList(tok::l_paren, tok::r_paren,
-                              /*isPostfix=*/false, /*isExprBasic=*/true,
-                              lParenLoc, args, argLabels, argLabelLocs,
-                              rParenLoc,
-                              trailingClosures,
-                              SyntaxKind::TupleExprElementList);
-      assert(trailingClosures.empty() && "Cannot parse a trailing closure here");
-      hasInitializer = true;
+      auto result = parseArgumentList(tok::l_paren, tok::r_paren,
+                                      /*isExprBasic*/ true,
+                                      /*allowTrailingClosure*/ false);
+      status |= result;
+      argList = result.get();
+      assert(!argList->hasAnyTrailingClosures() &&
+             "Cannot parse a trailing closure here");
     }
   }
 
   // Form the attribute.
   auto *TE = new (Context) TypeExpr(type.get());
-  auto customAttr = CustomAttr::create(Context, atLoc, TE, hasInitializer,
-                                       initContext, lParenLoc, args, argLabels,
-                                       argLabelLocs, rParenLoc);
+  auto *customAttr = CustomAttr::create(Context, atLoc, TE, initContext,
+                                        argList);
   return makeParserResult(status, customAttr);
 }
 

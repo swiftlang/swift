@@ -840,21 +840,14 @@ ParserResult<Stmt> Parser::parseStmtYield(SourceLoc tryLoc) {
 
     SyntaxParsingContext YieldsCtxt(SyntaxContext, SyntaxKind::YieldList);
 
-    SmallVector<Identifier, 4> yieldLabels;
-    SmallVector<SourceLoc, 4> yieldLabelLocs;
-    SmallVector<TrailingClosure, 2> trailingClosures;
-
-    status = parseExprList(tok::l_paren, tok::r_paren,
-                           /*postfix (allow trailing closure)*/ false,
-                           /*expr basic (irrelevant)*/ true,
-                           lpLoc,
-                           yields, yieldLabels, yieldLabelLocs,
-                           rpLoc,
-                           trailingClosures,
-                           SyntaxKind::ExprList);
-    assert(trailingClosures.empty());
-    assert(yieldLabels.empty());
-    assert(yieldLabelLocs.empty());
+    SmallVector<ExprListElt, 4> yieldElts;
+    status = parseExprList(tok::l_paren, tok::r_paren, /*isArgumentList*/ false,
+                           lpLoc, yieldElts, rpLoc, SyntaxKind::ExprList);
+    for (auto &elt : yieldElts) {
+      assert(elt.Label.empty());
+      assert(elt.LabelLoc.isInvalid());
+      yields.push_back(elt.E);
+    }
   } else {
     SourceLoc beginLoc = Tok.getLoc();
 
