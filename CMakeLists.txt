@@ -127,6 +127,10 @@ option(SWIFT_BUILD_PERF_TESTSUITE
 
 option(SWIFT_INCLUDE_TESTS "Create targets for building/running tests." TRUE)
 
+option(SWIFT_INCLUDE_TEST_BINARIES
+  "Create targets for building/running test binaries even if SWIFT_INCLUDE_TESTS is disabled"
+  TRUE)
+
 option(SWIFT_INCLUDE_DOCS
     "Create targets for building docs."
     TRUE)
