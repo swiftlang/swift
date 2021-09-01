@@ -1908,9 +1908,8 @@ public:
       << " kind='" << E->getLiteralKindPlainName() << "'";
     PrintWithColorRAII(OS, LiteralValueColor) << " initializer=";
     E->getInitializer().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
-    printArgumentLabels(E->getArgumentLabels());
     OS << "\n";
-    printRec(E->getArg());
+    printArgumentList(E->getArgs());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
@@ -2023,8 +2022,6 @@ public:
   }
   void visitParenExpr(ParenExpr *E) {
     printCommon(E, "paren_expr");
-    if (E->hasTrailingClosure())
-      OS << " trailing-closure";
     OS << '\n';
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
@@ -2043,8 +2040,6 @@ public:
   }
   void visitTupleExpr(TupleExpr *E) {
     printCommon(E, "tuple_expr");
-    if (E->hasTrailingClosure())
-      OS << " trailing-closure";
 
     if (E->hasElementNames()) {
       PrintWithColorRAII(OS, IdentifierColor) << " names=";
@@ -2097,11 +2092,10 @@ public:
       PrintWithColorRAII(OS, DeclColor) << " decl=";
       printDeclRef(E->getDecl());
     }
-    printArgumentLabels(E->getArgumentLabels());
     OS << '\n';
     printRec(E->getBase());
     OS << '\n';
-    printRec(E->getIndex());
+    printArgumentList(E->getArgs());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitKeyPathApplicationExpr(KeyPathApplicationExpr *E) {
@@ -2116,11 +2110,10 @@ public:
     printCommon(E, "dynamic_subscript_expr");
     PrintWithColorRAII(OS, DeclColor) << " decl=";
     printDeclRef(E->getMember());
-    printArgumentLabels(E->getArgumentLabels());
     OS << '\n';
     printRec(E->getBase());
     OS << '\n';
-    printRec(E->getIndex());
+    printArgumentList(E->getArgs());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
@@ -2496,14 +2489,6 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
-  void printArgumentLabels(ArrayRef<Identifier> argLabels) {
-    PrintWithColorRAII(OS, ArgumentsColor) << " arg_labels=";
-    for (auto label : argLabels) {
-      PrintWithColorRAII(OS, ArgumentsColor)
-        << (label.empty() ? "_" : label.str()) << ":";
-    }
-  }
-
   void printArgument(const Argument &arg) {
     OS.indent(Indent);
     PrintWithColorRAII(OS, ParenthesisColor) << '(';
@@ -2567,13 +2552,10 @@ public:
       PrintWithColorRAII(OS, ExprModifierColor)
         << (E->throws() ? " throws" : " nothrow");
     }
-    if (auto call = dyn_cast<CallExpr>(E))
-      printArgumentLabels(call->getArgumentLabels());
-
     OS << '\n';
     printRec(E->getFn());
     OS << '\n';
-    printRec(E->getArg());
+    printArgumentList(E->getArgs());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
@@ -2804,7 +2786,6 @@ public:
         
       case KeyPathExpr::Component::Kind::UnresolvedSubscript:
         PrintWithColorRAII(OS, ASTNodeColor) << "unresolved_subscript";
-        printArgumentLabels(component.getSubscriptLabels());
         break;
       case KeyPathExpr::Component::Kind::Identity:
         PrintWithColorRAII(OS, ASTNodeColor) << "identity";
@@ -2826,11 +2807,9 @@ public:
       }
       PrintWithColorRAII(OS, TypeColor)
         << " type='" << GetTypeOfKeyPathComponent(E, i) << "'";
-      if (auto indexExpr = component.getIndexExpr()) {
+      if (auto *args = component.getSubscriptArgs()) {
         OS << '\n';
-        Indent += 2;
-        printRec(indexExpr);
-        Indent -= 2;
+        printArgumentList(args);
       }
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }

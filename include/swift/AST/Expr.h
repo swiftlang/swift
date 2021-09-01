@@ -17,6 +17,7 @@
 #ifndef SWIFT_AST_EXPR_H
 #define SWIFT_AST_EXPR_H
 
+#include "swift/AST/ArgumentList.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/CaptureInfo.h"
 #include "swift/AST/ConcreteDeclRef.h"
@@ -24,7 +25,6 @@
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/FunctionRefKind.h"
 #include "swift/AST/ProtocolConformanceRef.h"
-#include "swift/AST/TrailingCallArguments.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/AST/Availability.h"
 #include "swift/Basic/Debug.h"
@@ -66,18 +66,6 @@ namespace swift {
   class CallExpr;
   class KeyPathExpr;
   class CaptureListExpr;
-
-struct TrailingClosure {
-  Identifier Label;
-  SourceLoc LabelLoc;
-  Expr *ClosureExpr;
-
-  TrailingClosure(Expr *closure)
-      : TrailingClosure(Identifier(), SourceLoc(), closure) {}
-
-  TrailingClosure(Identifier label, SourceLoc labelLoc, Expr *closure)
-      : Label(label), LabelLoc(labelLoc), ClosureExpr(closure) {}
-};
 
 enum class ExprKind : uint8_t {
 #define EXPR(Id, Parent) Id,
@@ -173,10 +161,7 @@ protected:
   );
   SWIFT_INLINE_BITFIELD_EMPTY(DynamicLookupExpr, LookupExpr);
 
-  SWIFT_INLINE_BITFIELD(ParenExpr, IdentityExpr, 1,
-    /// Whether we're wrapping a trailing closure expression.
-    HasTrailingClosure : 1
-  );
+  SWIFT_INLINE_BITFIELD_EMPTY(ParenExpr, IdentityExpr);
 
   SWIFT_INLINE_BITFIELD(NumberLiteralExpr, LiteralExpr, 1+1,
     IsNegative : 1,
@@ -231,28 +216,11 @@ protected:
     FunctionRefKind : 2
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(SubscriptExpr, LookupExpr, 2+1+1+16,
-    Semantics : 2, // an AccessSemantics
-    /// Whether the SubscriptExpr also has source locations for the argument
-    /// label.
-    HasArgLabelLocs : 1,
-    /// Whether the last argument is a trailing closure.
-    HasTrailingClosure : 1,
-    : NumPadBits,
-    /// # of argument labels stored after the SubscriptExpr.
-    NumArgLabels : 16
+  SWIFT_INLINE_BITFIELD_FULL(SubscriptExpr, LookupExpr, 2,
+    Semantics : 2 // an AccessSemantics
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(DynamicSubscriptExpr, DynamicLookupExpr, 1+1+16,
-    /// Whether the DynamicSubscriptExpr also has source locations for the
-    /// argument label.
-    HasArgLabelLocs : 1,
-    /// Whether the last argument is a trailing closure.
-    HasTrailingClosure : 1,
-    : NumPadBits,
-    /// # of argument labels stored after the DynamicSubscriptExpr.
-    NumArgLabels : 16
-  );
+  SWIFT_INLINE_BITFIELD_EMPTY(DynamicSubscriptExpr, DynamicLookupExpr);
 
   SWIFT_INLINE_BITFIELD_FULL(UnresolvedMemberExpr, Expr, 2,
     FunctionRefKind : 2
@@ -271,16 +239,8 @@ protected:
     StringEncoding : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(ObjectLiteralExpr, LiteralExpr, 3+1+1+16,
-    LitKind : 3,
-    /// Whether the ObjectLiteralExpr also has source locations for the argument
-    /// label.
-    HasArgLabelLocs : 1,
-    /// Whether the last argument is a trailing closure.
-    HasTrailingClosure : 1,
-    : NumPadBits,
-    /// # of argument labels stored after the ObjectLiteralExpr.
-    NumArgLabels : 16
+  SWIFT_INLINE_BITFIELD_FULL(ObjectLiteralExpr, LiteralExpr, 3,
+    LitKind : 3
   );
 
   SWIFT_INLINE_BITFIELD(AbstractClosureExpr, Expr, (16-NumExprBits)+16,
@@ -355,15 +315,7 @@ protected:
     NoAsync : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(CallExpr, ApplyExpr, 1+1+16,
-    /// Whether the CallExpr also has source locations for the argument label.
-    HasArgLabelLocs : 1,
-    /// Whether the last argument is a trailing closure.
-    HasTrailingClosure : 1,
-    : NumPadBits,
-    /// # of argument labels stored after the CallExpr.
-    NumArgLabels : 16
-  );
+  SWIFT_INLINE_BITFIELD_EMPTY(CallExpr, ApplyExpr);
 
   enum { NumCheckedCastKindBits = 4 };
   SWIFT_INLINE_BITFIELD(CheckedCastExpr, Expr, NumCheckedCastKindBits,
@@ -548,10 +500,9 @@ public:
   bool isSelfExprOf(const AbstractFunctionDecl *AFD,
                     bool sameBase = false) const;
 
-  /// Given that this is a packed argument expression of the sort that
-  /// would be produced from packSingleArgument, return the index of the
-  /// unlabeled trailing closure, if there is one.
-  Optional<unsigned> getUnlabeledTrailingClosureIndexOfPackedArgument() const;
+  /// If the expression has an argument list, returns it. Otherwise, returns
+  /// \c nullptr.
+  ArgumentList *getArgs() const;
 
   /// Produce a mapping from each subexpression to its parent
   /// expression, with the provided expression serving as the root of
@@ -1081,9 +1032,7 @@ public:
 // '#colorLiteral(red: 1, blue: 0, green: 0, alpha: 1)' with a name and a list
 // argument. The components of the list argument are meant to be themselves
 // constant.
-class ObjectLiteralExpr final
-    : public LiteralExpr,
-      public TrailingCallArguments<ObjectLiteralExpr> {
+class ObjectLiteralExpr final : public LiteralExpr {
 public:
   /// The kind of object literal.
   enum LiteralKind : unsigned {
@@ -1092,63 +1041,28 @@ public:
   };
 
 private:
-  Expr *Arg;
+  ArgumentList *ArgList;
   SourceLoc PoundLoc;
 
-  ObjectLiteralExpr(SourceLoc PoundLoc, LiteralKind LitKind,
-                    Expr *Arg,
-                    ArrayRef<Identifier> argLabels,
-                    ArrayRef<SourceLoc> argLabelLocs,
-                    bool hasTrailingClosure,
+  ObjectLiteralExpr(SourceLoc poundLoc, LiteralKind litKind, ArgumentList *args,
                     bool implicit);
 
 public:
   /// Create a new object literal expression.
-  ///
-  /// Note: prefer to use the second entry point, which separates out
-  /// arguments/labels/etc.
   static ObjectLiteralExpr *create(ASTContext &ctx, SourceLoc poundLoc,
-                                   LiteralKind kind, Expr *arg, bool implicit,
-                                   llvm::function_ref<Type(Expr *)> getType);
-
-  /// Create a new object literal expression.
-  static ObjectLiteralExpr *create(ASTContext &ctx, SourceLoc poundLoc,
-                                   LiteralKind kind,
-                                   SourceLoc lParenLoc,
-                                   ArrayRef<Expr *> args,
-                                   ArrayRef<Identifier> argLabels,
-                                   ArrayRef<SourceLoc> argLabelLocs,
-                                   SourceLoc rParenLoc,
-                                   ArrayRef<TrailingClosure> trailingClosures,
+                                   LiteralKind kind, ArgumentList *args,
                                    bool implicit);
 
   LiteralKind getLiteralKind() const {
     return static_cast<LiteralKind>(Bits.ObjectLiteralExpr.LitKind);
   }
 
-  Expr *getArg() const { return Arg; }
-  void setArg(Expr *arg) { Arg = arg; }
-
-  unsigned getNumArguments() const {
-    return Bits.ObjectLiteralExpr.NumArgLabels;
-  }
-  bool hasArgumentLabelLocs() const {
-    return Bits.ObjectLiteralExpr.HasArgLabelLocs;
-  }
-
-  /// Whether this call with written with a trailing closure.
-  bool hasTrailingClosure() const {
-    return Bits.ObjectLiteralExpr.HasTrailingClosure;
-  }
-
-  /// Return the index of the unlabeled trailing closure argument.
-  Optional<unsigned> getUnlabeledTrailingClosureIndex() const {
-    return getArg()->getUnlabeledTrailingClosureIndexOfPackedArgument();
-  }
+  ArgumentList *getArgs() const { return ArgList; }
+  void setArgs(ArgumentList *newArgs) { ArgList = newArgs; }
 
   SourceLoc getSourceLoc() const { return PoundLoc; }
-  SourceRange getSourceRange() const { 
-    return SourceRange(PoundLoc, Arg->getEndLoc());
+  SourceRange getSourceRange() const {
+    return SourceRange(PoundLoc, ArgList->getEndLoc());
   }
 
   /// Return the string form of the literal name.
@@ -1812,57 +1726,24 @@ public:
 /// var x : AnyObject = <some value>
 /// print(x[27]! // x[27] has type String?
 /// \endcode
-class DynamicSubscriptExpr final
-    : public DynamicLookupExpr,
-      public TrailingCallArguments<DynamicSubscriptExpr> {
-  friend TrailingCallArguments;
+class DynamicSubscriptExpr final : public DynamicLookupExpr {
+  ArgumentList *ArgList;
 
-  Expr *Index;
-
-  DynamicSubscriptExpr(Expr *base, Expr *index, ArrayRef<Identifier> argLabels,
-                       ArrayRef<SourceLoc> argLabelLocs,
-                       bool hasTrailingClosure, ConcreteDeclRef member,
-                       bool implicit);
+  DynamicSubscriptExpr(Expr *base, ArgumentList *argList,
+                       ConcreteDeclRef member, bool implicit);
 
 public:
-  /// Create a dynamic subscript.
-  ///
-  /// Note: do not create new callers to this entry point; use the entry point
-  /// that takes separate index arguments.
-  static DynamicSubscriptExpr *create(
-      ASTContext &ctx, Expr *base, Expr *index, ConcreteDeclRef decl,
-      bool implicit,
-      llvm::function_ref<Type(Expr *)> getType = [](Expr *E) -> Type {
-        return E->getType();
-      });
+  static DynamicSubscriptExpr *create(ASTContext &ctx, Expr *base,
+                                      ArgumentList *argList,
+                                      ConcreteDeclRef member, bool implicit);
 
-  /// getIndex - Retrieve the index of the subscript expression, i.e., the
-  /// "offset" into the base value.
-  Expr *getIndex() const { return Index; }
-  void setIndex(Expr *E) { Index = E; }
+  ArgumentList *getArgs() const { return ArgList; }
+  void setArgs(ArgumentList *newArgs) { ArgList = newArgs; }
 
-  unsigned getNumArguments() const {
-    return Bits.DynamicSubscriptExpr.NumArgLabels;
-  }
-
-  bool hasArgumentLabelLocs() const {
-    return Bits.DynamicSubscriptExpr.HasArgLabelLocs;
-  }
-
-  /// Whether this call with written with a trailing closure.
-  bool hasTrailingClosure() const {
-    return Bits.DynamicSubscriptExpr.HasTrailingClosure;
-  }
-
-  /// Return the index of the unlabeled trailing closure argument.
-  Optional<unsigned> getUnlabeledTrailingClosureIndex() const {
-    return Index->getUnlabeledTrailingClosureIndexOfPackedArgument();
-  }
-
-  SourceLoc getLoc() const { return Index->getStartLoc(); }
+  SourceLoc getLoc() const { return getArgs()->getStartLoc(); }
 
   SourceLoc getStartLoc() const { return getBase()->getStartLoc(); }
-  SourceLoc getEndLoc() const { return Index->getEndLoc(); }
+  SourceLoc getEndLoc() const { return getArgs()->getEndLoc(); }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::DynamicSubscript;
@@ -2060,12 +1941,9 @@ class ParenExpr : public IdentityExpr {
   SourceLoc LParenLoc, RParenLoc;
   
 public:
-  ParenExpr(SourceLoc lploc, Expr *subExpr, SourceLoc rploc,
-            bool hasTrailingClosure,
-            Type ty = Type())
-    : IdentityExpr(ExprKind::Paren, subExpr, ty),
-      LParenLoc(lploc), RParenLoc(rploc) {
-    Bits.ParenExpr.HasTrailingClosure = hasTrailingClosure;
+  ParenExpr(SourceLoc lploc, Expr *subExpr, SourceLoc rploc, Type ty = Type())
+      : IdentityExpr(ExprKind::Paren, subExpr, ty), LParenLoc(lploc),
+        RParenLoc(rploc) {
     assert(lploc.isValid() == rploc.isValid() &&
            "Mismatched source location information");
   }
@@ -2081,19 +1959,9 @@ public:
     return (LParenLoc.isInvalid() ? getSubExpr()->getStartLoc() : LParenLoc);
   }
   SourceLoc getEndLoc() const {
-    // If we have a trailing closure, our end point is the end of the
-    // trailing closure.
-    if (RParenLoc.isInvalid() || Bits.ParenExpr.HasTrailingClosure)
+    if (RParenLoc.isInvalid())
       return getSubExpr()->getEndLoc();
     return RParenLoc;
-  }
-
-  /// Whether this expression has a trailing closure as its argument.
-  bool hasTrailingClosure() const { return Bits.ParenExpr.HasTrailingClosure; }
-
-  Optional<unsigned>
-  getUnlabeledTrailingClosureIndexOfPackedArgument() const {
-    return hasTrailingClosure() ? Optional<unsigned>(0) : None;
   }
 
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Paren; }
@@ -2149,18 +2017,14 @@ public:
   }
 };
 
-  
-/// TupleExpr - Parenthesized expressions like '(a: x+x)' and '(x, y, 4)'.  Also
-/// used to represent the operands to a binary operator.  Note that
-/// expressions like '(4)' are represented with a ParenExpr.
+/// TupleExpr - Parenthesized expressions like '(a: x+x)' and '(x, y, 4)'. Note
+/// that expressions like '(4)' are represented with a ParenExpr.
 class TupleExpr final : public Expr,
     private llvm::TrailingObjects<TupleExpr, Expr *, Identifier, SourceLoc> {
   friend TrailingObjects;
 
   SourceLoc LParenLoc;
   SourceLoc RParenLoc;
-
-  Optional<unsigned> FirstTrailingArgumentAt;
 
   size_t numTrailingObjects(OverloadToken<Expr *>) const {
     return getNumElements();
@@ -2189,10 +2053,8 @@ class TupleExpr final : public Expr,
   }
 
   TupleExpr(SourceLoc LParenLoc, SourceLoc RParenLoc,
-            ArrayRef<Expr *> SubExprs,
-            ArrayRef<Identifier> ElementNames,
-            ArrayRef<SourceLoc> ElementNameLocs,
-            Optional<unsigned> FirstTrailingArgumentAt, bool Implicit, Type Ty);
+            ArrayRef<Expr *> SubExprs, ArrayRef<Identifier> ElementNames,
+            ArrayRef<SourceLoc> ElementNameLocs, bool Implicit, Type Ty);
 
 public:
   /// Create a tuple.
@@ -2201,17 +2063,8 @@ public:
                            ArrayRef<Expr *> SubExprs,
                            ArrayRef<Identifier> ElementNames, 
                            ArrayRef<SourceLoc> ElementNameLocs,
-                           SourceLoc RParenLoc, bool HasTrailingClosure, 
-                           bool Implicit, Type Ty = Type());
-
-  static TupleExpr *create(ASTContext &ctx,
-                           SourceLoc LParenLoc,
-                           SourceLoc RParenLoc,
-                           ArrayRef<Expr *> SubExprs,
-                           ArrayRef<Identifier> ElementNames,
-                           ArrayRef<SourceLoc> ElementNameLocs,
-                           Optional<unsigned> FirstTrailingArgumentAt,
-                           bool Implicit, Type Ty = Type());
+                           SourceLoc RParenLoc, bool Implicit,
+                           Type Ty = Type());
 
   /// Create an empty tuple.
   static TupleExpr *createEmpty(ASTContext &ctx, SourceLoc LParenLoc, 
@@ -2226,26 +2079,6 @@ public:
 
   SourceRange getSourceRange() const;
 
-  bool hasAnyTrailingClosures() const {
-    return (bool) FirstTrailingArgumentAt;
-  }
-
-  /// Whether this expression has a trailing closure as its argument.
-  bool hasTrailingClosure() const {
-    return FirstTrailingArgumentAt
-               ? *FirstTrailingArgumentAt == getNumElements() - 1
-               : false;
-  }
-
-  bool hasMultipleTrailingClosures() const {
-    return FirstTrailingArgumentAt ? !hasTrailingClosure() : false;
-  }
-
-  Optional<unsigned>
-  getUnlabeledTrailingClosureIndexOfPackedArgument() const {
-    return FirstTrailingArgumentAt;
-  }
-
   /// Retrieve the elements of this tuple.
   MutableArrayRef<Expr*> getElements() {
     return { getTrailingObjects<Expr *>(), getNumElements() };
@@ -2256,22 +2089,8 @@ public:
     return { getTrailingObjects<Expr *>(), getNumElements() };
   }
 
-  MutableArrayRef<Expr*> getTrailingElements() {
-    return getElements().take_back(getNumTrailingElements());
-  }
-  
-  ArrayRef<Expr*> getTrailingElements() const {
-    return getElements().take_back(getNumTrailingElements());
-  }
-  
   unsigned getNumElements() const { return Bits.TupleExpr.NumElements; }
 
-  unsigned getNumTrailingElements() const {
-    return FirstTrailingArgumentAt
-               ? getNumElements() - *FirstTrailingArgumentAt
-               : 0;
-  }
-  
   Expr *getElement(unsigned i) const {
     return getElements()[i];
   }
@@ -2477,75 +2296,32 @@ public:
 /// type-checked and well-formed subscript expression refers to a subscript
 /// declaration, which provides a getter and (optionally) a setter that will
 /// be used to perform reads/writes.
-class SubscriptExpr final : public LookupExpr,
-                            public TrailingCallArguments<SubscriptExpr> {
-  friend TrailingCallArguments;
+class SubscriptExpr final : public LookupExpr {
+  ArgumentList *ArgList;
 
-  Expr *Index;
+  SubscriptExpr(Expr *base, ArgumentList *argList, ConcreteDeclRef decl,
+                bool implicit, AccessSemantics semantics);
 
-  SubscriptExpr(Expr *base, Expr *index, ArrayRef<Identifier> argLabels,
-                ArrayRef<SourceLoc> argLabelLocs, bool hasTrailingClosure,
-                ConcreteDeclRef decl, bool implicit, AccessSemantics semantics);
-  
 public:
-  /// Create a subscript.
-  ///
-  /// Note: do not create new callers to this entry point; use the entry point
-  /// that takes separate index arguments.
-  static SubscriptExpr *create(
-      ASTContext &ctx, Expr *base, Expr *index,
-      ConcreteDeclRef decl = ConcreteDeclRef(), bool implicit = false,
-      AccessSemantics semantics = AccessSemantics::Ordinary,
-      llvm::function_ref<Type(Expr *)> getType = [](Expr *E) -> Type {
-        return E->getType();
-      });
-
   /// Create a new subscript.
-  static SubscriptExpr *create(ASTContext &ctx, Expr *base,
-                               SourceLoc lSquareLoc,
-                               ArrayRef<Expr *> indexArgs,
-                               ArrayRef<Identifier> indexArgLabels,
-                               ArrayRef<SourceLoc> indexArgLabelLocs,
-                               SourceLoc rSquareLoc,
-                               ArrayRef<TrailingClosure> trailingClosures,
-                               ConcreteDeclRef decl = ConcreteDeclRef(),
-                               bool implicit = false,
-                               AccessSemantics semantics
-                                 = AccessSemantics::Ordinary);
+  static SubscriptExpr *
+  create(ASTContext &ctx, Expr *base, ArgumentList *argList,
+         ConcreteDeclRef decl = ConcreteDeclRef(), bool implicit = false,
+         AccessSemantics semantics = AccessSemantics::Ordinary);
 
-  /// getIndex - Retrieve the index of the subscript expression, i.e., the
-  /// "offset" into the base value.
-  Expr *getIndex() const { return Index; }
-  void setIndex(Expr *E) { Index = E; }
-
-  unsigned getNumArguments() const {
-    return Bits.SubscriptExpr.NumArgLabels;
-  }
-
-  bool hasArgumentLabelLocs() const {
-    return Bits.SubscriptExpr.HasArgLabelLocs;
-  }
-
-  /// Whether this call was written with a trailing closure.
-  bool hasTrailingClosure() const {
-    return Bits.SubscriptExpr.HasTrailingClosure;
-  }
-
-  /// Return the index of the unlabeled trailing closure argument.
-  Optional<unsigned> getUnlabeledTrailingClosureIndex() const {
-    return getIndex()->getUnlabeledTrailingClosureIndexOfPackedArgument();
-  }
+  ArgumentList *getArgs() const { return ArgList; }
+  void setArgs(ArgumentList *newArgs) { ArgList = newArgs; }
 
   /// Determine whether this subscript reference should bypass the
   /// ordinary accessors.
   AccessSemantics getAccessSemantics() const {
     return (AccessSemantics) Bits.SubscriptExpr.Semantics;
   }
-  
-  SourceLoc getLoc() const { return Index->getStartLoc(); }
+
+  SourceLoc getLoc() const { return getArgs()->getStartLoc(); }
   SourceLoc getStartLoc() const { return getBase()->getStartLoc(); }
   SourceLoc getEndLoc() const {
-    auto end = Index->getEndLoc();
+    auto end = getArgs()->getEndLoc();
     return end.isValid() ? end : getBase()->getEndLoc();
   }
   
@@ -4544,20 +4320,17 @@ class ApplyExpr : public Expr {
   /// The function being called.
   Expr *Fn;
 
-  /// The argument being passed to it.
-  Expr *Arg;
+  /// The list of arguments to call the function with.
+  ArgumentList *ArgList;
 
   ImplicitActorHopTarget implicitActorHopTarget;
 
-  /// Returns true if \c e could be used as the call's argument. For most \c ApplyExpr
-  /// subclasses, this means it is a \c ParenExpr or \c TupleExpr.
-  bool validateArg(Expr *e) const;
-
 protected:
-  ApplyExpr(ExprKind Kind, Expr *Fn, Expr *Arg, bool Implicit, Type Ty = Type())
-    : Expr(Kind, Implicit, Ty), Fn(Fn), Arg(Arg) {
+  ApplyExpr(ExprKind kind, Expr *fn, ArgumentList *argList, bool implicit,
+            Type ty = Type())
+      : Expr(kind, implicit, ty), Fn(fn), ArgList(argList) {
+    assert(ArgList);
     assert(classof((Expr*)this) && "ApplyExpr::classof out of date");
-    assert(validateArg(Arg) && "Arg is not a permitted expr kind");
     Bits.ApplyExpr.ThrowsIsSet = false;
     Bits.ApplyExpr.ImplicitlyAsync = false;
     Bits.ApplyExpr.ImplicitlyThrows = false;
@@ -4568,12 +4341,9 @@ public:
   Expr *getFn() const { return Fn; }
   void setFn(Expr *e) { Fn = e; }
   Expr *getSemanticFn() const { return Fn->getSemanticsProvidingExpr(); }
-  
-  Expr *getArg() const { return Arg; }
-  void setArg(Expr *e) {
-    assert(validateArg(e) && "Arg is not a permitted expr kind");
-    Arg = e;
-  }
+
+  ArgumentList *getArgs() const { return ArgList; }
+  void setArgs(ArgumentList *newArgList) { ArgList = newArgList; }
 
   /// Has the type-checker set the 'throws' bit yet?
   ///
@@ -4651,19 +4421,6 @@ public:
 
   ValueDecl *getCalledValue() const;
 
-  /// Retrieve the argument labels provided at the call site.
-  ///
-  /// \param scratch Scratch space that will be used when the argument labels
-  /// aren't already stored in the AST context.
-  ArrayRef<Identifier>
-  getArgumentLabels(SmallVectorImpl<Identifier> &scratch) const;
-
-  /// Whether this application was written using a trailing closure.
-  bool hasTrailingClosure() const;
-
-  /// Return the index of the unlabeled trailing closure argument.
-  Optional<unsigned> getUnlabeledTrailingClosureIndex() const;
-
   static bool classof(const Expr *E) {
     return E->getKind() >= ExprKind::First_ApplyExpr &&
            E->getKind() <= ExprKind::Last_ApplyExpr;
@@ -4673,97 +4430,46 @@ public:
 /// CallExpr - Application of an argument to a function, which occurs
 /// syntactically through juxtaposition with a TupleExpr whose
 /// leading '(' is unspaced.
-class CallExpr final : public ApplyExpr,
-                       public TrailingCallArguments<CallExpr> {
-  friend TrailingCallArguments;
-
-  CallExpr(Expr *fn, Expr *arg, bool Implicit,
-           ArrayRef<Identifier> argLabels,
-           ArrayRef<SourceLoc> argLabelLocs,
-           bool hasTrailingClosure,
-           Type ty);
+class CallExpr final : public ApplyExpr {
+  CallExpr(Expr *fn, ArgumentList *argList, bool implicit, Type ty);
 
 public:
   /// Create a new call expression.
   ///
-  /// Note: prefer to use the entry points that separate out the arguments.
-  static CallExpr *create(
-      ASTContext &ctx, Expr *fn, Expr *arg, ArrayRef<Identifier> argLabels,
-      ArrayRef<SourceLoc> argLabelLocs, bool hasTrailingClosure, bool implicit,
-      Type type = Type(),
-      llvm::function_ref<Type(Expr *)> getType = [](Expr *E) -> Type {
-        return E->getType();
-      });
+  /// \param fn The function being called
+  /// \param argList The argument list.
+  static CallExpr *create(ASTContext &ctx, Expr *fn, ArgumentList *argList,
+                          bool implicit);
 
   /// Create a new implicit call expression without any source-location
   /// information.
   ///
-  /// \param fn The function being called
-  /// \param args The call arguments, not including a trailing closure (if any).
-  /// \param argLabels The argument labels, whose size must equal args.size(),
-  /// or which must be empty.
-  static CallExpr *createImplicit(
-      ASTContext &ctx, Expr *fn, ArrayRef<Expr *> args,
-      ArrayRef<Identifier> argLabels,
-      llvm::function_ref<Type(Expr *)> getType = [](Expr *E) -> Type {
-        return E->getType();
-      }) {
-    return create(ctx, fn, SourceLoc(), args, argLabels, {}, SourceLoc(),
-                  /*trailingClosures=*/{}, /*implicit=*/true, getType);
+  /// \param fn The function being called.
+  /// \param argList The argument list.
+  static CallExpr *createImplicit(ASTContext &ctx, Expr *fn,
+                                  ArgumentList *argList) {
+    return create(ctx, fn, argList, /*implicit*/ true);
   }
 
   /// Create a new implicit call expression with no arguments and no
   /// source-location information.
   ///
   /// \param fn The nullary function being called.
-  static CallExpr *createImplicitEmpty(ASTContext &ctx, Expr *fn) {
-    return createImplicit(ctx, fn, {}, {});
-  }
-
-  /// Create a new call expression.
-  ///
-  /// \param fn The function being called
-  /// \param args The call arguments, not including a trailing closure (if any).
-  /// \param argLabels The argument labels, whose size must equal args.size(),
-  /// or which must be empty.
-  /// \param argLabelLocs The locations of the argument labels, whose size must
-  /// equal args.size() or which must be empty.
-  /// \param trailingClosures The list of trailing closures, if any.
-  static CallExpr *create(
-      ASTContext &ctx, Expr *fn, SourceLoc lParenLoc, ArrayRef<Expr *> args,
-      ArrayRef<Identifier> argLabels, ArrayRef<SourceLoc> argLabelLocs,
-      SourceLoc rParenLoc, ArrayRef<TrailingClosure> trailingClosures,
-      bool implicit,
-      llvm::function_ref<Type(Expr *)> getType = [](Expr *E) -> Type {
-        return E->getType();
-      });
+  static CallExpr *createImplicitEmpty(ASTContext &ctx, Expr *fn);
 
   SourceLoc getStartLoc() const {
     SourceLoc fnLoc = getFn()->getStartLoc();
-    return (fnLoc.isValid() ? fnLoc : getArg()->getStartLoc());
+    return (fnLoc.isValid() ? fnLoc : getArgs()->getStartLoc());
   }
   SourceLoc getEndLoc() const {
-    SourceLoc argLoc = getArg()->getEndLoc();
+    SourceLoc argLoc = getArgs()->getEndLoc();
     return (argLoc.isValid() ? argLoc : getFn()->getEndLoc());
   }
   
   SourceLoc getLoc() const { 
     SourceLoc FnLoc = getFn()->getLoc(); 
-    return FnLoc.isValid() ? FnLoc : getArg()->getLoc();
+    return FnLoc.isValid() ? FnLoc : getArgs()->getStartLoc();
   }
-
-  unsigned getNumArguments() const { return Bits.CallExpr.NumArgLabels; }
-  bool hasArgumentLabelLocs() const { return Bits.CallExpr.HasArgLabelLocs; }
-
-  /// Whether this call with written with a single trailing closure.
-  bool hasTrailingClosure() const { return Bits.CallExpr.HasTrailingClosure; }
-
-  /// Return the index of the unlabeled trailing closure argument.
-  Optional<unsigned> getUnlabeledTrailingClosureIndex() const {
-    return getArg()->getUnlabeledTrailingClosureIndexOfPackedArgument();
-  }
-
-  using TrailingCallArguments::getArgumentLabels;
 
   /// Retrieve the expression that directly represents the callee.
   ///
@@ -4778,8 +4484,10 @@ public:
   
 /// PrefixUnaryExpr - Prefix unary expressions like '!y'.
 class PrefixUnaryExpr : public ApplyExpr {
-  PrefixUnaryExpr(Expr *fn, Expr *operand, Type ty = Type())
-      : ApplyExpr(ExprKind::PrefixUnary, fn, operand, /*implicit*/ false, ty) {}
+  PrefixUnaryExpr(Expr *fn, ArgumentList *argList, Type ty = Type())
+      : ApplyExpr(ExprKind::PrefixUnary, fn, argList, /*implicit*/ false, ty) {
+    assert(argList->isUnlabeledUnary());
+  }
 
 public:
   static PrefixUnaryExpr *create(ASTContext &ctx, Expr *fn, Expr *operand,
@@ -4790,9 +4498,10 @@ public:
   SourceLoc getStartLoc() const {
     return getFn()->getStartLoc();
   }
-  SourceLoc getEndLoc() const {
-    return getArg()->getEndLoc();
-  }
+  SourceLoc getEndLoc() const { return getOperand()->getEndLoc(); }
+
+  Expr *getOperand() const { return getArgs()->getExpr(0); }
+  void setOperand(Expr *E) { getArgs()->setExpr(0, E); }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::PrefixUnary;
@@ -4801,8 +4510,9 @@ public:
 
 /// PostfixUnaryExpr - Postfix unary expressions like 'y!'.
 class PostfixUnaryExpr : public ApplyExpr {
-  PostfixUnaryExpr(Expr *fn, Expr *operand, Type ty = Type())
-      : ApplyExpr(ExprKind::PostfixUnary, fn, operand, /*implicit*/ false, ty) {
+  PostfixUnaryExpr(Expr *fn, ArgumentList *argList, Type ty = Type())
+      : ApplyExpr(ExprKind::PostfixUnary, fn, argList, /*implicit*/ false, ty) {
+    assert(argList->isUnlabeledUnary());
   }
 
 public:
@@ -4810,13 +4520,14 @@ public:
                                   Type ty = Type());
 
   SourceLoc getLoc() const { return getFn()->getStartLoc(); }
-  
-  SourceLoc getStartLoc() const {
-    return getArg()->getStartLoc();
-  }
+
+  SourceLoc getStartLoc() const { return getOperand()->getStartLoc(); }
   SourceLoc getEndLoc() const {
     return getFn()->getEndLoc();
   }
+
+  Expr *getOperand() const { return getArgs()->getExpr(0); }
+  void setOperand(Expr *E) { getArgs()->setExpr(0, E); }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::PostfixUnary;
@@ -4826,9 +4537,9 @@ public:
 /// BinaryExpr - Infix binary expressions like 'x+y'.  The argument is always
 /// an implicit tuple expression of the type expected by the function.
 class BinaryExpr : public ApplyExpr {
-  BinaryExpr(Expr *fn, TupleExpr *arg, bool implicit, Type ty = Type())
-      : ApplyExpr(ExprKind::Binary, fn, arg, implicit, ty) {
-    assert(arg->getNumElements() == 2);
+  BinaryExpr(Expr *fn, ArgumentList *argList, bool implicit, Type ty = Type())
+      : ApplyExpr(ExprKind::Binary, fn, argList, implicit, ty) {
+    assert(argList->size() == 2);
   }
 
 public:
@@ -4836,16 +4547,16 @@ public:
                             bool implicit, Type ty = Type());
 
   /// The left-hand argument of the binary operation.
-  Expr *getLHS() const { return cast<TupleExpr>(getArg())->getElement(0); }
+  Expr *getLHS() const { return getArgs()->getExpr(0); }
 
   /// The right-hand argument of the binary operation.
-  Expr *getRHS() const { return cast<TupleExpr>(getArg())->getElement(1); }
+  Expr *getRHS() const { return getArgs()->getExpr(1); }
 
   SourceLoc getLoc() const { return getFn()->getLoc(); }
 
-  SourceRange getSourceRange() const { return getArg()->getSourceRange(); }
-  SourceLoc getStartLoc() const { return getArg()->getStartLoc(); }
-  SourceLoc getEndLoc() const { return getArg()->getEndLoc(); }
+  SourceRange getSourceRange() const { return getArgs()->getSourceRange(); }
+  SourceLoc getStartLoc() const { return getArgs()->getStartLoc(); }
+  SourceLoc getEndLoc() const { return getArgs()->getEndLoc(); }
 
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Binary;}
 };
@@ -4858,12 +4569,14 @@ public:
 /// materialized from an rvalue.
 class SelfApplyExpr : public ApplyExpr {
 protected:
-  SelfApplyExpr(ExprKind K, Expr *FnExpr, Expr *BaseExpr, Type Ty)
-    : ApplyExpr(K, FnExpr, BaseExpr, FnExpr->isImplicit(), Ty) { }
-  
+  SelfApplyExpr(ExprKind kind, Expr *fnExpr, ArgumentList *argList, Type ty)
+      : ApplyExpr(kind, fnExpr, argList, fnExpr->isImplicit(), ty) {
+    assert(argList->isUnary());
+  }
+
 public:
-  Expr *getBase() const { return getArg(); }
-  void setBase(Expr *E) { setArg(E); }
+  Expr *getBase() const { return getArgs()->getExpr(0); }
+  void setBase(Expr *E) { getArgs()->setExpr(0, E); }
 
   static bool classof(const Expr *E) {
     return E->getKind() >= ExprKind::First_SelfApplyExpr &&
@@ -4876,9 +4589,9 @@ public:
 class DotSyntaxCallExpr : public SelfApplyExpr {
   SourceLoc DotLoc;
 
-  DotSyntaxCallExpr(Expr *fnExpr, SourceLoc dotLoc, Expr *baseExpr,
+  DotSyntaxCallExpr(Expr *fnExpr, SourceLoc dotLoc, ArgumentList *argList,
                     Type ty = Type())
-      : SelfApplyExpr(ExprKind::DotSyntaxCall, fnExpr, baseExpr, ty),
+      : SelfApplyExpr(ExprKind::DotSyntaxCall, fnExpr, argList, ty),
         DotLoc(dotLoc) {
     setImplicit(DotLoc.isInvalid());
   }
@@ -4903,8 +4616,8 @@ public:
 /// actual reference to function which returns the constructor is modeled
 /// as a DeclRefExpr.
 class ConstructorRefCallExpr : public SelfApplyExpr {
-  ConstructorRefCallExpr(Expr *fnExpr, Expr *baseExpr, Type ty = Type())
-      : SelfApplyExpr(ExprKind::ConstructorRefCall, fnExpr, baseExpr, ty) {}
+  ConstructorRefCallExpr(Expr *fnExpr, ArgumentList *argList, Type ty = Type())
+      : SelfApplyExpr(ExprKind::ConstructorRefCall, fnExpr, argList, ty) {}
 
 public:
   static ConstructorRefCallExpr *create(ASTContext &ctx, Expr *fnExpr,
@@ -5586,30 +5299,19 @@ public:
       DeclNameOrRef(DeclNameRef un) : UnresolvedName(un) {}
       DeclNameOrRef(ConcreteDeclRef rd) : ResolvedDecl(rd) {}
     } Decl;
-    
-    
-    Expr *SubscriptIndexExpr;
-    const Identifier *SubscriptLabelsData;
+
+    ArgumentList *SubscriptArgList;
     const ProtocolConformanceRef *SubscriptHashableConformancesData;
-    
-    union {
-      unsigned SubscriptSize;
-      unsigned TupleIndex;
-    };
-      
+
+    unsigned TupleIndex;
     Kind KindValue;
     Type ComponentType;
     SourceLoc Loc;
 
     // Private constructor for subscript component.
-    explicit Component(ASTContext *ctxForCopyingLabels,
-                       DeclNameOrRef decl,
-                       Expr *indexExpr,
-                       ArrayRef<Identifier> subscriptLabels,
+    explicit Component(DeclNameOrRef decl, ArgumentList *argList,
                        ArrayRef<ProtocolConformanceRef> indexHashables,
-                       Kind kind,
-                       Type type,
-                       SourceLoc loc);
+                       Kind kind, Type type, SourceLoc loc);
 
     // Private constructor for property or #keyPath dictionary key.
     explicit Component(DeclNameOrRef decl, Kind kind, Type type, SourceLoc loc)
@@ -5640,29 +5342,8 @@ public:
     
     /// Create an unresolved component for a subscript.
     static Component forUnresolvedSubscript(ASTContext &ctx,
-                                     SourceLoc lSquareLoc,
-                                     ArrayRef<Expr *> indexArgs,
-                                     ArrayRef<Identifier> indexArgLabels,
-                                     ArrayRef<SourceLoc> indexArgLabelLocs,
-                                     SourceLoc rSquareLoc,
-                                     ArrayRef<TrailingClosure> trailingClosures);
-    
-    /// Create an unresolved component for a subscript.
-    ///
-    /// You shouldn't add new uses of this overload; use the one that takes a
-    /// list of index arguments.
-    static Component forUnresolvedSubscriptWithPrebuiltIndexExpr(
-                                         ASTContext &context,
-                                         Expr *index,
-                                         ArrayRef<Identifier> subscriptLabels,
-                                         SourceLoc loc) {
-      
-      return Component(&context,
-                       {}, index, subscriptLabels, {},
-                       Kind::UnresolvedSubscript,
-                       Type(), loc);
-    }
-    
+                                            ArgumentList *argList);
+
     /// Create an unresolved optional force `!` component.
     static Component forUnresolvedOptionalForce(SourceLoc BangLoc) {
       return Component(Kind::OptionalForce, Type(), BangLoc);
@@ -5688,26 +5369,11 @@ public:
     }
     
     /// Create a component for a subscript.
-    static Component forSubscript(ASTContext &ctx,
-                              ConcreteDeclRef subscript,
-                              SourceLoc lSquareLoc,
-                              ArrayRef<Expr *> indexArgs,
-                              ArrayRef<Identifier> indexArgLabels,
-                              ArrayRef<SourceLoc> indexArgLabelLocs,
-                              SourceLoc rSquareLoc,
-                              ArrayRef<TrailingClosure> trailingClosures,
-                              Type elementType,
-                              ArrayRef<ProtocolConformanceRef> indexHashables);
+    static Component
+    forSubscript(ASTContext &ctx, ConcreteDeclRef subscript,
+                 ArgumentList *argList, Type elementType,
+                 ArrayRef<ProtocolConformanceRef> indexHashables);
 
-    /// Create a component for a subscript.
-    ///
-    /// You shouldn't add new uses of this overload; use the one that takes a
-    /// list of index arguments.
-    static Component forSubscriptWithPrebuiltIndexExpr(
-       ConcreteDeclRef subscript, Expr *index, ArrayRef<Identifier> labels,
-       Type elementType, SourceLoc loc,
-       ArrayRef<ProtocolConformanceRef> indexHashables);
-    
     /// Create an optional-forcing `!` component.
     static Component forOptionalForce(Type forcedType, SourceLoc bangLoc) {
       return Component(Kind::OptionalForce, forcedType, bangLoc);
@@ -5745,8 +5411,8 @@ public:
     }
     
     SourceRange getSourceRange() const {
-      if (auto *indexExpr = getIndexExpr()) {
-        return indexExpr->getSourceRange();
+      if (auto *args = getSubscriptArgs()) {
+        return args->getSourceRange();
       }
       return Loc;
     }
@@ -5783,11 +5449,11 @@ public:
       llvm_unreachable("unhandled kind");
     }
 
-    Expr *getIndexExpr() const {
+    ArgumentList *getSubscriptArgs() const {
       switch (getKind()) {
       case Kind::Subscript:
       case Kind::UnresolvedSubscript:
-        return SubscriptIndexExpr;
+        return SubscriptArgList;
 
       case Kind::Invalid:
       case Kind::OptionalChain:
@@ -5804,25 +5470,9 @@ public:
       llvm_unreachable("unhandled kind");
     }
 
-    ArrayRef<Identifier> getSubscriptLabels() const {
-      switch (getKind()) {
-      case Kind::Subscript:
-      case Kind::UnresolvedSubscript:
-        return {SubscriptLabelsData, (size_t)SubscriptSize};
-
-      case Kind::Invalid:
-      case Kind::OptionalChain:
-      case Kind::OptionalWrap:
-      case Kind::OptionalForce:
-      case Kind::UnresolvedProperty:
-      case Kind::Property:
-      case Kind::Identity:
-      case Kind::TupleElement:
-      case Kind::DictionaryKey:
-      case Kind::CodeCompletion:
-        llvm_unreachable("no subscript labels for this kind");
-      }
-      llvm_unreachable("unhandled kind");
+    void setSubscriptArgs(ArgumentList *newArgs) {
+      assert(getSubscriptArgs() && "Should be replacing existing args");
+      SubscriptArgList = newArgs;
     }
 
     ArrayRef<ProtocolConformanceRef>
@@ -5831,7 +5481,7 @@ public:
       case Kind::Subscript:
         if (!SubscriptHashableConformancesData)
           return {};
-        return {SubscriptHashableConformancesData, (size_t)SubscriptSize};
+        return {SubscriptHashableConformancesData, SubscriptArgList->size()};
 
       case Kind::UnresolvedSubscript:
       case Kind::Invalid:
@@ -5848,9 +5498,6 @@ public:
       }
       llvm_unreachable("unhandled kind");
     }
-
-    void setSubscriptIndexHashableConformances(
-      ArrayRef<ProtocolConformanceRef> hashables);
 
     DeclNameRef getUnresolvedDeclName() const {
       switch (getKind()) {
@@ -5992,6 +5639,11 @@ public:
     return false;
   }
 
+  /// If the provided expression appears as an argument to a subscript component
+  /// of the key path, returns the index of that component. Otherwise, returns
+  /// \c None.
+  Optional<unsigned> findComponentWithSubscriptArg(Expr *arg);
+
   /// Retrieve the string literal expression, which will be \c NULL prior to
   /// type checking and a string literal after type checking for an
   /// @objc key path.
@@ -6090,15 +5742,6 @@ inline bool Expr::isInfixOperator() const {
   return isa<BinaryExpr>(this) || isa<IfExpr>(this) ||
          isa<AssignExpr>(this) || isa<ExplicitCastExpr>(this);
 }
-  
-inline bool ApplyExpr::validateArg(Expr *e) const {
-  if (isa<SelfApplyExpr>(this))
-    return true;
-  else if (isa<BinaryExpr>(this))
-    return isa<TupleExpr>(e);
-  else
-    return isa<ParenExpr>(e) || isa<TupleExpr>(e);
-}
 
 inline Expr *const *CollectionExpr::getTrailingObjectsPointer() const {
   if (auto ty = dyn_cast<ArrayExpr>(this))
@@ -6117,25 +5760,6 @@ inline const SourceLoc *CollectionExpr::getTrailingSourceLocs() const {
 }
 
 #undef SWIFT_FORWARD_SOURCE_LOCS_TO
-
-/// Pack the argument information into a single argument, to match the
-/// representation expected by the AST.
-///
-/// \param argLabels The argument labels, which might be updated by this
-/// function.
-///
-/// \param argLabelLocs The argument label locations, which might be updated by
-/// this function.
-Expr *packSingleArgument(
-    ASTContext &ctx, SourceLoc lParenLoc, ArrayRef<Expr *> args,
-    ArrayRef<Identifier> &argLabels, ArrayRef<SourceLoc> &argLabelLocs,
-    SourceLoc rParenLoc, ArrayRef<TrailingClosure> trailingClosures,
-    bool implicit,
-    SmallVectorImpl<Identifier> &argLabelsScratch,
-    SmallVectorImpl<SourceLoc> &argLabelLocsScratch,
-    llvm::function_ref<Type(Expr *)> getType = [](Expr *E) -> Type {
-      return E->getType();
-    });
 
 void simple_display(llvm::raw_ostream &out, const ClosureExpr *CE);
 void simple_display(llvm::raw_ostream &out, const DefaultArgumentExpr *expr);
