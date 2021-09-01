@@ -811,59 +811,11 @@ private:
 
 } // end namespace
 
-// Determine if the target expression is the implicit BinaryExpr generated for
-// pattern-matching in a switch/if/guard case (<completion> ~= matchValue).
-static bool isForPatternMatch(SolutionApplicationTarget &target) {
-  if (target.getExprContextualTypePurpose() != CTP_Condition)
-    return false;
-  Expr *condition = target.getAsExpr();
-  if (!condition->isImplicit())
-    return false;
-  if (auto *BE = dyn_cast<BinaryExpr>(condition)) {
-    Identifier id;
-    if (auto *ODRE = dyn_cast<OverloadedDeclRefExpr>(BE->getFn())) {
-      id = ODRE->getDecls().front()->getBaseIdentifier();
-    } else if (auto *DRE = dyn_cast<DeclRefExpr>(BE->getFn())) {
-      id = DRE->getDecl()->getBaseIdentifier();
-    }
-    if (id != target.getDeclContext()->getASTContext().Id_MatchOperator)
-      return false;
-    return isa<CodeCompletionExpr>(BE->getLHS());
-  }
-  return false;
-}
-
-/// Remove any solutions from the provided vector that both require fixes and have a
-/// score worse than the best.
+/// Remove any solutions from the provided vector that both require fixes and
+/// have a score worse than the best.
 static void filterSolutions(SolutionApplicationTarget &target,
                             SmallVectorImpl<Solution> &solutions,
                             CodeCompletionExpr *completionExpr) {
-  // FIXME: this is only needed because in pattern matching position, the
-  // code completion expression always becomes an expression pattern, which
-  // requires the ~= operator to be defined on the type being matched against.
-  // Pattern matching against an enum doesn't require that however, so valid
-  // solutions always end up having fixes. This is a problem because there will
-  // always be a valid solution as well. Optional defines ~= between Optional
-  // and _OptionalNilComparisonType (which defines a nilLiteral initializer),
-  // and the matched-against value can implicitly be made Optional if it isn't
-  // already, so _OptionalNilComparisonType is always a valid solution for the
-  // completion. That only generates the 'nil' completion, which is rarely what
-  // the user intends to write in this position and shouldn't be preferred over
-  // the other formed solutions (which require fixes). We should generate enum
-  // pattern completions separately, but for now ignore the
-  // _OptionalNilComparisonType solution.
-  if (isForPatternMatch(target) && completionExpr) {
-    solutions.erase(llvm::remove_if(solutions, [&](const Solution &S) {
-      ASTContext &ctx = S.getConstraintSystem().getASTContext();
-      if (!S.hasType(completionExpr))
-        return false;
-      if (auto ty = S.getResolvedType(completionExpr))
-        if (auto *NTD = ty->getAnyNominal())
-          return NTD->getBaseIdentifier() == ctx.Id_OptionalNilComparisonType;
-      return false;
-    }), solutions.end());
-  }
-
   if (solutions.size() <= 1)
     return;
 
@@ -1286,6 +1238,69 @@ sawSolution(const constraints::Solution &S) {
   }
 }
 
+/// If the code completion variable occurs in a pattern matching position, we
+/// have an AST that looks like this.
+/// \code
+/// (binary_expr implicit type='$T3'
+///   (overloaded_decl_ref_expr function_ref=compound decls=[
+///     Swift.(file).~=,
+///     Swift.(file).Optional extension.~=])
+///   (tuple_expr implicit type='($T1, (OtherEnum))'
+///     (code_completion_expr implicit type='$T1')
+///     (declref_expr implicit decl=swift_ide_test.(file).foo(x:).$match)))
+/// \endcode
+/// If the code completion expression occurs in such an AST, return the
+/// declaration of the \c $match variable, otherwise return \c nullptr.
+VarDecl *getMatchVarIfInPatternMatch(CodeCompletionExpr *CompletionExpr,
+                                     ConstraintSystem &CS) {
+  auto &Context = CS.getASTContext();
+
+  TupleExpr *ArgTuple =
+      dyn_cast_or_null<TupleExpr>(CS.getParentExpr(CompletionExpr));
+  if (!ArgTuple || !ArgTuple->isImplicit() || ArgTuple->getNumElements() != 2) {
+    return nullptr;
+  }
+
+  auto Binary = dyn_cast_or_null<BinaryExpr>(CS.getParentExpr(ArgTuple));
+  if (!Binary || !Binary->isImplicit()) {
+    return nullptr;
+  }
+
+  auto CalledOperator = Binary->getFn();
+  if (!CalledOperator || !CalledOperator->isImplicit()) {
+    return nullptr;
+  }
+  // The reference to the ~= operator might be an OverloadedDeclRefExpr or a
+  // DeclRefExpr, depending on how many ~= operators are viable.
+  if (auto Overloaded =
+          dyn_cast_or_null<OverloadedDeclRefExpr>(CalledOperator)) {
+    if (!llvm::all_of(Overloaded->getDecls(), [&Context](ValueDecl *D) {
+          return D->getBaseName() == Context.Id_MatchOperator;
+        })) {
+      return nullptr;
+    }
+  } else if (auto Ref = dyn_cast_or_null<DeclRefExpr>(CalledOperator)) {
+    if (Ref->getDecl()->getBaseName() != Context.Id_MatchOperator) {
+      return nullptr;
+    }
+  } else {
+    return nullptr;
+  }
+
+  auto MatchArg = dyn_cast_or_null<DeclRefExpr>(ArgTuple->getElement(1));
+  if (!MatchArg || !MatchArg->isImplicit()) {
+    return nullptr;
+  }
+
+  auto MatchVar = MatchArg->getDecl();
+  if (MatchVar && MatchVar->isImplicit() &&
+      MatchVar->getBaseName() == Context.Id_PatternMatchVar) {
+    return dyn_cast<VarDecl>(MatchVar);
+  } else {
+    return nullptr;
+  }
+}
+
 void UnresolvedMemberTypeCheckCompletionCallback::
 sawSolution(const constraints::Solution &S) {
   GotCallback = true;
@@ -1295,18 +1310,34 @@ sawSolution(const constraints::Solution &S) {
   // If the type couldn't be determined (e.g. because there isn't any context
   // to derive it from), let's not attempt to do a lookup since it wouldn't
   // produce any useful results anyway.
-  if (!ExpectedTy || ExpectedTy->is<UnresolvedType>())
-    return;
-
-  // If ExpectedTy is a duplicate of any other result, ignore this solution.
-  if (llvm::any_of(Results, [&](const Result &R) {
-    return R.ExpectedTy->isEqual(ExpectedTy);
-  })) {
-    return;
+  if (ExpectedTy && !ExpectedTy->is<UnresolvedType>()) {
+    // If ExpectedTy is a duplicate of any other result, ignore this solution.
+    if (!llvm::any_of(ExprResults, [&](const ExprResult &R) {
+          return R.ExpectedTy->isEqual(ExpectedTy);
+        })) {
+      bool SingleExprBody =
+          isImplicitSingleExpressionReturn(CS, CompletionExpr);
+      ExprResults.push_back({ExpectedTy, SingleExprBody});
+    }
   }
 
-  bool SingleExprBody = isImplicitSingleExpressionReturn(CS, CompletionExpr);
-  Results.push_back({ExpectedTy, SingleExprBody});
+  if (auto MatchVar = getMatchVarIfInPatternMatch(CompletionExpr, CS)) {
+    Type MatchVarType;
+    // If the MatchVar has an explicit type, it's not part of the solution. But
+    // we can look it up in the constraint system directly.
+    if (auto T = S.getConstraintSystem().getVarType(MatchVar)) {
+      MatchVarType = T;
+    } else {
+      MatchVarType = S.getResolvedType(MatchVar);
+    }
+    if (MatchVarType && !MatchVarType->is<UnresolvedType>()) {
+      if (!llvm::any_of(EnumPatternTypes, [&](const Type &R) {
+            return R->isEqual(MatchVarType);
+          })) {
+        EnumPatternTypes.push_back(MatchVarType);
+      }
+    }
+  }
 }
 
 void KeyPathTypeCheckCompletionCallback::sawSolution(

@@ -3312,8 +3312,6 @@ public:
         getSemanticContext(EED, Reason, dynamicLookupInfo),
         expectedTypeContext);
     Builder.setAssociatedDecl(EED);
-    if (HasTypeContext)
-      Builder.addFlair(CodeCompletionFlairBit::ExpressionSpecific);
 
     addLeadingDot(Builder);
     addValueBaseName(Builder, EED->getBaseIdentifier());
@@ -4372,6 +4370,23 @@ public:
     addObjCPoundKeywordCompletions(/*needPound=*/true);
   }
 
+  /// Returns \c true if \p VD is an initializer on the \c Optional or \c
+  /// Id_OptionalNilComparisonType type from the Swift stdlib.
+  static bool isInitializerOnOptional(Type T, ValueDecl *VD) {
+    bool IsOptionalType = false;
+    IsOptionalType |= static_cast<bool>(T->getOptionalObjectType());
+    if (auto *NTD = T->getAnyNominal()) {
+      IsOptionalType |= NTD->getBaseIdentifier() ==
+                        VD->getASTContext().Id_OptionalNilComparisonType;
+    }
+    if (IsOptionalType && VD->getModuleContext()->isStdlibModule() &&
+        isa<ConstructorDecl>(VD)) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+
   void getUnresolvedMemberCompletions(Type T) {
     if (!T->mayHaveMembers())
       return;
@@ -4389,16 +4404,11 @@ public:
     // We can only say .foo where foo is a static member of the contextual
     // type and has the same type (or if the member is a function, then the
     // same result type) as the contextual type.
-    FilteredDeclConsumer consumer(*this, [=](ValueDecl *VD,
-                                             DeclVisibilityKind Reason) {
-      if (T->getOptionalObjectType() &&
-          VD->getModuleContext()->isStdlibModule()) {
-        // In optional context, ignore '.init(<some>)', 'init(nilLiteral:)',
-        if (isa<ConstructorDecl>(VD))
-          return false;
-      }
-      return true;
-    });
+    FilteredDeclConsumer consumer(
+        *this, [=](ValueDecl *VD, DeclVisibilityKind Reason) {
+          // In optional context, ignore '.init(<some>)', 'init(nilLiteral:)',
+          return !isInitializerOnOptional(T, VD);
+        });
 
     auto baseType = MetatypeType::get(T);
     llvm::SaveAndRestore<LookupKind> SaveLook(Kind, LookupKind::ValueExpr);
@@ -4408,6 +4418,21 @@ public:
                              /*includeInstanceMembers=*/false,
                              /*includeDerivedRequirements*/false,
                              /*includeProtocolExtensionMembers*/true);
+  }
+
+  /// Complete all enum members declared on \p T.
+  void getEnumElementPatternCompletions(Type T) {
+    if (!isa_and_nonnull<EnumDecl>(T->getAnyNominal()))
+      return;
+
+    auto baseType = MetatypeType::get(T);
+    llvm::SaveAndRestore<LookupKind> SaveLook(Kind, LookupKind::EnumElement);
+    llvm::SaveAndRestore<Type> SaveType(ExprType, baseType);
+    llvm::SaveAndRestore<bool> SaveUnresolved(IsUnresolvedMember, true);
+    lookupVisibleMemberDecls(*this, baseType, CurrDeclContext,
+                             /*includeInstanceMembers=*/false,
+                             /*includeDerivedRequirements=*/false,
+                             /*includeProtocolExtensionMembers=*/true);
   }
 
   void getUnresolvedMemberCompletions(ArrayRef<Type> Types) {
@@ -6461,8 +6486,8 @@ static void deliverCompletionResults(CodeCompletionContext &CompletionContext,
 }
 
 void deliverUnresolvedMemberResults(
-    ArrayRef<UnresolvedMemberTypeCheckCompletionCallback::Result> Results,
-    DeclContext *DC, SourceLoc DotLoc,
+    ArrayRef<UnresolvedMemberTypeCheckCompletionCallback::ExprResult> Results,
+    ArrayRef<Type> EnumPatternTypes, DeclContext *DC, SourceLoc DotLoc,
     ide::CodeCompletionContext &CompletionCtx,
     CodeCompletionConsumer &Consumer) {
   ASTContext &Ctx = DC->getASTContext();
@@ -6471,7 +6496,7 @@ void deliverUnresolvedMemberResults(
 
   assert(DotLoc.isValid());
   Lookup.setHaveDot(DotLoc);
-  Lookup.shouldCheckForDuplicates(Results.size() > 1);
+  Lookup.shouldCheckForDuplicates(Results.size() + EnumPatternTypes.size() > 1);
 
   // Get the canonical versions of the top-level types
   SmallPtrSet<CanType, 4> originalTypes;
@@ -6494,6 +6519,22 @@ void deliverUnresolvedMemberResults(
         Lookup.getUnresolvedMemberCompletions(Unwrapped);
     }
     Lookup.getUnresolvedMemberCompletions(Result.ExpectedTy);
+  }
+
+  // Offer completions when interpreting the pattern match as an
+  // EnumElementPattern.
+  for (auto &Ty : EnumPatternTypes) {
+    Lookup.setExpectedTypes({Ty}, /*IsImplicitSingleExpressionReturn=*/false,
+                            /*expectsNonVoid=*/true);
+    Lookup.setIdealExpectedType(Ty);
+
+    // We can pattern match MyEnum against Optional<MyEnum>
+    if (Ty->getOptionalObjectType()) {
+      Type Unwrapped = Ty->lookThroughAllOptionalTypes();
+      Lookup.getEnumElementPatternCompletions(Unwrapped);
+    }
+
+    Lookup.getEnumElementPatternCompletions(Ty);
   }
 
   deliverCompletionResults(CompletionCtx, Lookup, DC, Consumer);
@@ -6608,8 +6649,9 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
       Lookup.fallbackTypeCheck(CurDeclContext);
 
     addKeywords(CompletionContext.getResultSink(), MaybeFuncBody);
-    deliverUnresolvedMemberResults(Lookup.getResults(), CurDeclContext, DotLoc,
-                                   CompletionContext, Consumer);
+    deliverUnresolvedMemberResults(Lookup.getExprResults(),
+                                   Lookup.getEnumPatternTypes(), CurDeclContext,
+                                   DotLoc, CompletionContext, Consumer);
     return true;
   }
   case CompletionKind::KeyPathExprSwift: {

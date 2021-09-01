@@ -108,8 +108,8 @@ func test002() {
 func test003() {
   do {} catch Error4.#^CATCH2^#
 // CATCH2: Begin completions
-// CATCH2: Decl[EnumElement]/CurrNominal/TypeRelation[Convertible]: E1[#Error4#]{{; name=.+$}}
-// CATCH2: Decl[EnumElement]/CurrNominal/TypeRelation[Convertible]: E2({#Int32#})[#Error4#]{{; name=.+$}}
+// CATCH2: Decl[EnumElement]/CurrNominal: E1[#Error4#]{{; name=.+$}}
+// CATCH2: Decl[EnumElement]/CurrNominal: E2({#Int32#})[#Error4#]{{; name=.+$}}
 // CATCH2: End completions
 }
 

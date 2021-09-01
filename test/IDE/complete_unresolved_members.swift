@@ -477,7 +477,6 @@ case let .#^GENERIC_4?check=GENERIC_1_INT^#
 // GENERIC_1_INT: Begin completions
 // GENERIC_1_INT-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: contains({#content: Int#})[#Generic<Int>#];
 // GENERIC_1_INT-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: empty[#Generic<Int>#];
-// GENERIC_1_INT-DAG: Decl[StaticMethod]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: create({#Int#})[#Generic<Int>#];
 // GENERIC_1_INT: End completions
 
 // GENERIC_1_U: Begin completions
@@ -524,7 +523,7 @@ func testOverload(val: HasOverloaded) {
 // Same as OVERLOADED_METHOD_1.
 }
 
-protocol HasStatic {
+protocol HasStatic: Equatable {
   static var instance: Self { get }
 }
 func receiveHasStatic<T: HasStatic>(x: T)  {}
