@@ -340,11 +340,8 @@ static bool matchCallArgumentsImpl(
     // Go hunting for an unclaimed argument whose name does match.
     Optional<unsigned> claimedWithSameName;
     for (unsigned i = nextArgIdx; i != numArgs; ++i) {
-      auto argLabel = args[i].getLabel();
 
-      if (argLabel != paramLabel &&
-          !(argLabel.str().startswith("$") &&
-            argLabel.str().drop_front() == paramLabel.str())) {
+      if (!args[i].matchParameterLabel(paramLabel)) {
         // If this is an attempt to claim additional unlabeled arguments
         // for variadic parameter, we have to stop at first labeled argument.
         if (forVariadic)
@@ -376,7 +373,7 @@ static bool matchCallArgumentsImpl(
         // func foo(_ a: Int, _ b: Int = 0, c: Int = 0, _ d: Int) {}
         // foo(1, c: 2, 3) // -> `3` will be claimed as '_ b:'.
         // ```
-        if (argLabel.empty())
+        if (args[i].getLabel().empty())
           continue;
 
         potentiallyOutOfOrder = true;
