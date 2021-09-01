@@ -364,6 +364,9 @@ class ModelASTWalker : public ASTWalker {
   /// A mapping of argument expressions to their full argument info.
   llvm::DenseMap<Expr *, Argument> ArgumentInfo;
 
+  /// The number of ArgumentList parents in the walk.
+  unsigned ArgumentListDepth = 0;
+
 public:
   SyntaxModelWalker &Walker;
   ArrayRef<SyntaxNode> TokenNodes;
@@ -383,6 +386,7 @@ public:
 
   std::pair<bool, ArgumentList *>
   walkToArgumentListPre(ArgumentList *ArgList) override;
+  ArgumentList *walkToArgumentListPost(ArgumentList *ArgList) override;
 
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override;
   Expr *walkToExprPost(Expr *E) override;
@@ -529,7 +533,17 @@ ModelASTWalker::walkToArgumentListPre(ArgumentList *ArgList) {
     assert(res.second && "Duplicate arguments?");
     (void)res;
   }
+  ArgumentListDepth += 1;
   return {true, ArgList};
+}
+
+ArgumentList *ModelASTWalker::walkToArgumentListPost(ArgumentList *ArgList) {
+  // If there are no more argument lists above us, we can clear out the argument
+  // mapping to save memory.
+  ArgumentListDepth -= 1;
+  if (ArgumentListDepth == 0)
+    ArgumentInfo.clear();
+  return ArgList;
 }
 
 std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
