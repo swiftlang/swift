@@ -664,6 +664,10 @@ def main_normal():
                                         ".build_script_log")
         open(build_script_log, 'w').close()
 
+    if args.clean_install_destdir:
+        sys.stdout.write("Cleaning install destdir!\n")
+        shell.rmtree(args.install_destdir)
+
     # Build ninja if required, which will update the toolchain.
     if args.build_ninja:
         invocation.build_ninja()
