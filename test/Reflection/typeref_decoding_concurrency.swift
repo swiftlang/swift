@@ -3,6 +3,7 @@
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 
+// REQUIRES: CPU=x86_64
 // REQUIRES: OS=macosx
 
 // rdar://76038845
