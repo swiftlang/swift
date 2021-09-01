@@ -286,7 +286,6 @@ protected:
   SILValue borrowFunctionArgument(SILValue callArg, FullApplySite AI);
 
   void visitDebugValueInst(DebugValueInst *Inst);
-  void visitDebugValueAddrInst(DebugValueAddrInst *Inst);
   void visitHopToExecutorInst(HopToExecutorInst *Inst);
 
   void visitTerminator(SILBasicBlock *BB);
@@ -613,13 +612,6 @@ void SILInlineCloner::visitDebugValueInst(DebugValueInst *Inst) {
 
   return SILCloner<SILInlineCloner>::visitDebugValueInst(Inst);
 }
-void SILInlineCloner::visitDebugValueAddrInst(DebugValueAddrInst *Inst) {
-  // The mandatory inliner drops debug_value_addr instructions when inlining, as
-  // if it were a "nodebug" function in C.
-  if (IKind == InlineKind::MandatoryInline) return;
-
-  return SILCloner<SILInlineCloner>::visitDebugValueAddrInst(Inst);
-}
 void SILInlineCloner::visitHopToExecutorInst(HopToExecutorInst *Inst) {
   // Drop hop_to_executor in non async functions.
   if (!Apply.getFunction()->isAsync()) {
@@ -681,7 +673,6 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::IntegerLiteralInst:
   case SILInstructionKind::FloatLiteralInst:
   case SILInstructionKind::DebugValueInst:
-  case SILInstructionKind::DebugValueAddrInst:
   case SILInstructionKind::StringLiteralInst:
   case SILInstructionKind::FixLifetimeInst:
   case SILInstructionKind::EndBorrowInst:

@@ -537,7 +537,6 @@ struct ImmutableAddressUseVerifier {
       }
       case SILInstructionKind::MarkDependenceInst:
       case SILInstructionKind::LoadBorrowInst:
-      case SILInstructionKind::DebugValueAddrInst:
       case SILInstructionKind::ExistentialMetatypeInst:
       case SILInstructionKind::ValueMetatypeInst:
       case SILInstructionKind::FixLifetimeInst:
@@ -545,6 +544,13 @@ struct ImmutableAddressUseVerifier {
       case SILInstructionKind::SwitchEnumAddrInst:
       case SILInstructionKind::SelectEnumAddrInst:
         break;
+      case SILInstructionKind::DebugValueInst:
+        if (cast<DebugValueInst>(inst)->hasAddrVal())
+          break;
+        else {
+          llvm::errs() << "Unhandled, unexpected instruction: " << *inst;
+          llvm_unreachable("invoking standard assertion failure");
+        }
       case SILInstructionKind::AddressToPointerInst:
         // We assume that the user is attempting to do something unsafe since we
         // are converting to a raw pointer. So just ignore this use.
@@ -1212,8 +1218,6 @@ public:
     else if (auto *di = dyn_cast<AllocBoxInst>(inst))
       varInfo = di->getVarInfo();
     else if (auto *di = dyn_cast<DebugValueInst>(inst))
-      varInfo = di->getVarInfo();
-    else if (auto *di = dyn_cast<DebugValueAddrInst>(inst))
       varInfo = di->getVarInfo();
 
     if (!varInfo)

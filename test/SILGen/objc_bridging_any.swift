@@ -30,14 +30,14 @@ func passingToId<T: CP, U>(receiver: NSIdLover,
   // CHECK:   debug_value [[OBJECT:%.*]] : $AnyObject
   // CHECK:   debug_value [[CLASS_GENERIC:%.*]] : $T
   // CHECK:   debug_value [[CLASS_EXISTENTIAL:%.*]] : $CP
-  // CHECK:   debug_value_addr [[GENERIC:%.*]] : $*U
-  // CHECK:   debug_value_addr [[EXISTENTIAL:%.*]] : $*P
+  // CHECK:   debug_value [[GENERIC:%.*]] : $*U, {{.*}} expr op_deref
+  // CHECK:   debug_value [[EXISTENTIAL:%.*]] : $*P, {{.*}} expr op_deref
   // CHECK:   debug_value [[ERROR:%.*]] : $Error
-  // CHECK:   debug_value_addr [[ANY:%.*]] : $*Any
+  // CHECK:   debug_value [[ANY:%.*]] : $*Any, {{.*}} expr op_deref
   // CHECK:   debug_value [[KNOWN_UNBRIDGED:%.*]] : $KnownUnbridged
   // CHECK:   debug_value [[OPT_STRING:%.*]] : $Optional<String>
   // CHECK:   debug_value [[OPT_NSSTRING:%.*]] : $Optional<NSString>
-  // CHECK:   debug_value_addr [[OPT_ANY:%.*]] : $*Optional<Any>
+  // CHECK:   debug_value [[OPT_ANY:%.*]] : $*Optional<Any>, {{.*}} expr op_deref
 
   // CHECK:   [[STRING_COPY:%.*]] = copy_value [[STRING]]
   // CHECK:   [[BRIDGE_STRING:%.*]] = function_ref @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF

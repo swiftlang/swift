@@ -123,7 +123,6 @@ bool ObjectOutliner::isValidUseOfObject(SILInstruction *I,
     return true;
 
   switch (I->getKind()) {
-  case SILInstructionKind::DebugValueAddrInst:
   case SILInstructionKind::DebugValueInst:
   case SILInstructionKind::LoadInst:
   case SILInstructionKind::DeallocRefInst:

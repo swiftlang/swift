@@ -48,8 +48,8 @@ bb0:
 
   // CHECK: debug_value undef : $()
   debug_value undef : $()
-  // CHECK: debug_value_addr undef : $*()
-  debug_value_addr undef : $*()
+  // CHECK: debug_value undef : $*(), expr op_deref
+  debug_value undef : $*(), expr op_deref
 
   // Accessing memory
 

@@ -158,7 +158,7 @@ bool swift::isInstructionTriviallyDead(SILInstruction *inst) {
   if (isa<MarkUninitializedInst>(inst))
     return false;
 
-  if (isa<DebugValueInst>(inst) || isa<DebugValueAddrInst>(inst))
+  if (isa<DebugValueInst>(inst))
     return false;
 
   // These invalidate enums so "write" memory, but that is not an essential
@@ -756,8 +756,13 @@ getConcreteValueOfExistentialBoxAddr(SILValue addr, SILInstruction *ignoreUser) 
       break;
     }
     case SILInstructionKind::DeallocStackInst:
-    case SILInstructionKind::DebugValueAddrInst:
     case SILInstructionKind::LoadInst:
+      break;
+    case SILInstructionKind::DebugValueInst:
+      if (!DebugValueInst::hasAddrVal(stackUser)) {
+        if (stackUser != ignoreUser)
+          return SILValue();
+      }
       break;
     case SILInstructionKind::StoreInst: {
       auto *store = cast<StoreInst>(stackUser);

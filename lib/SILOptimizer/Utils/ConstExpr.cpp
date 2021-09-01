@@ -1422,7 +1422,7 @@ ConstExprFunctionState::initializeAddressFromSingleWriter(SILValue addr) {
     // Ignore markers, loads, and other things that aren't stores to this stack
     // value.
     if (isa<LoadInst>(user) || isa<DeallocStackInst>(user) ||
-        isa<DestroyAddrInst>(user) || isa<DebugValueAddrInst>(user))
+        isa<DestroyAddrInst>(user) || DebugValueInst::hasAddrVal(user))
       continue;
 
     // TODO: Allow BeginAccess/EndAccess users.
@@ -1737,8 +1737,7 @@ llvm::Optional<SymbolicValue> ConstExprFunctionState::evaluateClosureCreation(
 llvm::Optional<SymbolicValue>
 ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
   // These are just markers.
-  if (isa<DebugValueInst>(inst) || isa<DebugValueAddrInst>(inst) ||
-      isa<EndAccessInst>(inst) ||
+  if (isa<DebugValueInst>(inst) || isa<EndAccessInst>(inst) ||
       // The interpreter doesn't model these memory management instructions, so
       // skip them.
       isa<DestroyAddrInst>(inst) || isa<RetainValueInst>(inst) ||

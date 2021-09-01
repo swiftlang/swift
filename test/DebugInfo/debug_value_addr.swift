@@ -5,7 +5,7 @@
 // instructions.
 
 // CHECK-SIL: sil hidden @$s16debug_value_addr4testyyxlF
-// CHECK-SIL: debug_value_addr %0 : $*T, let, name "t"
+// CHECK-SIL: debug_value %0 : $*T, let, name "t", {{.*}}, expr op_deref
 
 // CHECK: define {{.*}}$s16debug_value_addr4testyyxlF
 // CHECK: entry:
