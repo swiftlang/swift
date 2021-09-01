@@ -151,6 +151,6 @@ jobs:
       - name: Run integration tests
         if: ${{ matrix.run_e2e_test }}
         run: |
-          swift run # Use TOOLCHAIN env value
+          $TOOLCHAIN/usr/bin/swift run # Use TOOLCHAIN env value
         working-directory: ${{ github.workspace }}/integration-tests
 
