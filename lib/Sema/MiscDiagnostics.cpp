@@ -76,11 +76,6 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     SmallPtrSet<Expr*, 4> AlreadyDiagnosedMetatypes;
     SmallPtrSet<DeclRefExpr*, 4> AlreadyDiagnosedBitCasts;
 
-    /// Keep track of the arguments to CallExprs.
-    ///  Key -> an argument expression,
-    ///  Value -> a call argument is associated with.
-    llvm::SmallDenseMap<Expr *, Expr *, 2> CallArgs;
-
     bool IsExprStmt;
 
   public:
@@ -142,32 +137,14 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       if (isa<TypeExpr>(Base))
         checkUseOfMetaTypeName(Base);
 
-      if (auto *OLE = dyn_cast<ObjectLiteralExpr>(E)) {
-        CallArgs.insert({OLE->getArg(), E});
-      }
-
-      if (auto *SE = dyn_cast<SubscriptExpr>(E))
-        CallArgs.insert({SE->getIndex(), E});
-
-      if (auto *DSE = dyn_cast<DynamicSubscriptExpr>(E))
-        CallArgs.insert({DSE->getIndex(), E});
-
       if (auto *KPE = dyn_cast<KeyPathExpr>(E)) {
         // raise an error if this KeyPath contains an effectful member.
         checkForEffectfulKeyPath(KPE);
-
-        for (auto Comp : KPE->getComponents()) {
-          if (auto *Arg = Comp.getIndexExpr())
-            CallArgs.insert({Arg, E});
-        }
       }
 
       // Check function calls, looking through implicit conversions on the
       // function and inspecting the arguments directly.
       if (auto *Call = dyn_cast<ApplyExpr>(E)) {
-        // Record call arguments.
-        CallArgs.insert({Call->getArg(), E});
-
         // Warn about surprising implicit optional promotions.
         checkOptionalPromotions(Call);
         
@@ -216,8 +193,10 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         }
 
         if (callee) {
-          visitArguments(Call, [&](unsigned argIndex, Expr *arg) {
-            checkMagicIdentifierMismatch(callee, uncurryLevel, argIndex, arg);
+          auto *args = Call->getArgs();
+          for (auto idx : indices(*args)) {
+            auto *arg = args->getExpr(idx);
+            checkMagicIdentifierMismatch(callee, uncurryLevel, idx, arg);
 
             // InOutExprs can be wrapped in some implicit casts.
             Expr *unwrapped = arg;
@@ -234,10 +213,10 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 
               // Also do some additional work based on how the function uses
               // the argument.
-              checkConvertedPointerArgument(callee, uncurryLevel, argIndex,
+              checkConvertedPointerArgument(callee, uncurryLevel, idx,
                                             unwrapped, operand);
             }
-          });
+          }
         }
       }
       
@@ -273,51 +252,47 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 
       // Diagnose single-element tuple expressions.
       if (auto *tupleExpr = dyn_cast<TupleExpr>(E)) {
-        if (!CallArgs.count(tupleExpr)) {
-          if (tupleExpr->getNumElements() == 1) {
-            Ctx.Diags.diagnose(tupleExpr->getElementNameLoc(0),
-                               diag::tuple_single_element)
-              .fixItRemoveChars(tupleExpr->getElementNameLoc(0),
-                                tupleExpr->getElement(0)->getStartLoc());
-          }
+        if (tupleExpr->getNumElements() == 1) {
+          Ctx.Diags.diagnose(tupleExpr->getElementNameLoc(0),
+                             diag::tuple_single_element)
+            .fixItRemoveChars(tupleExpr->getElementNameLoc(0),
+                              tupleExpr->getElement(0)->getStartLoc());
         }
       }
 
-      // Diagnose tuple expressions with duplicate element label
+      auto diagnoseDuplicateLabels = [&](SourceLoc loc,
+                                         ArrayRef<Identifier> labels) {
+        llvm::SmallDenseSet<Identifier> names;
+        names.reserve(labels.size());
+
+        for (auto name : labels) {
+          if (name.empty())
+            continue;
+
+          auto inserted = names.insert(name).second;
+          if (!inserted) {
+            Ctx.Diags.diagnose(loc, diag::tuple_duplicate_label);
+            return;
+          }
+        }
+      };
+
+      // FIXME: Duplicate labels on enum payloads should be diagnosed
+      // when declared, not when called.
+      if (auto *CE = dyn_cast_or_null<CallExpr>(E)) {
+        auto calledValue = CE->getCalledValue();
+        if (calledValue && isa<EnumElementDecl>(calledValue)) {
+          auto *args = CE->getArgs();
+          SmallVector<Identifier, 4> scratch;
+          diagnoseDuplicateLabels(args->getLoc(),
+                                  args->getArgumentLabels(scratch));
+        }
+      }
+
+      // Diagnose tuple expressions with duplicate element label.
       if (auto *tupleExpr = dyn_cast<TupleExpr>(E)) {
-        // FIXME: Duplicate labels on enum payloads should be diagnosed
-        // when declared, not when called.
-        bool isEnumCase = false;
-        if (auto CE = dyn_cast_or_null<CallExpr>(Parent.getAsExpr())) {
-          auto calledValue = CE->getCalledValue();
-          if (calledValue) {
-            isEnumCase = isa<EnumElementDecl>(calledValue);
-          }
-        }
-
-        if ((!CallArgs.count(tupleExpr)) || isEnumCase) {
-          auto diagnose = false;
-
-          llvm::SmallDenseSet<Identifier> names;
-          names.reserve(tupleExpr->getNumElements());
-
-          for (auto name : tupleExpr->getElementNames()) {
-            if (name.empty())
-              continue;
-
-            if (names.count(name) == 1) {
-              diagnose = true;
-              break;
-            }
-
-            names.insert(name);
-          }
-
-          if (diagnose) {
-            Ctx.Diags.diagnose(tupleExpr->getLoc(),
-                               diag::tuple_duplicate_label);
-          }
-        }
+        diagnoseDuplicateLabels(tupleExpr->getLoc(),
+                                tupleExpr->getElementNames());
       }
 
       // Diagnose checked casts that involve marker protocols.
@@ -362,30 +337,6 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
                              proto->getDecl()->getName());
         }
       }
-    }
-    
-    /// Visit the argument/s represented by either a ParenExpr or TupleExpr,
-    /// unshuffling if needed. If any other kind of expression, will pass it
-    /// straight back.
-    static void argExprVisitArguments(Expr* arg,
-                                      llvm::function_ref
-                                        <void(unsigned, Expr*)> fn) {
-      // The argument is either a ParenExpr or TupleExpr.
-      if (auto *TE = dyn_cast<TupleExpr>(arg)) {
-        auto elts = TE->getElements();
-        for (auto i : indices(elts))
-          fn(i, elts[i]);
-      } else if (auto *PE = dyn_cast<ParenExpr>(arg)) {
-        fn(0, PE->getSubExpr());
-      } else {
-        fn(0, arg);
-      }
-    }
-
-    static void visitArguments(ApplyExpr *apply,
-                               llvm::function_ref<void(unsigned, Expr*)> fn) {
-      auto *arg = apply->getArg();
-      argExprVisitArguments(arg, fn);
     }
 
     static Expr *lookThroughArgument(Expr *arg) {
@@ -625,12 +576,12 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
           return;
 
         if (!Ctx.LangOpts.isSwiftVersionAtLeast(6)) {
-          auto argument = CallArgs.find(ParentExpr);
-          if (argument != CallArgs.end()) {
-            auto *callExpr = argument->second;
-            if (isa<SubscriptExpr>(callExpr) ||
-                isa<DynamicSubscriptExpr>(callExpr) ||
-                isa<ObjectLiteralExpr>(callExpr))
+          if (isa<SubscriptExpr>(ParentExpr) ||
+              isa<DynamicSubscriptExpr>(ParentExpr) ||
+              isa<ObjectLiteralExpr>(ParentExpr)) {
+            auto *argList = ParentExpr->getArgs();
+            assert(argList);
+            if (argList->isUnlabeledUnary())
               behavior = DiagnosticBehavior::Warning;
           }
         }
@@ -821,20 +772,18 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       Expr *subExpr = nullptr;
       CharSourceRange removeBeforeRange, removeAfterRange;
       if (auto apply = dyn_cast_or_null<ApplyExpr>(Parent)) {
-        if (auto args = dyn_cast<TupleExpr>(apply->getArg())) {
-          subExpr = args->getElement(0);
-          // Determine the fixit range from the start of the application to
-          // the first argument, `unsafeBitCast(`
-          removeBeforeRange = CharSourceRange(Ctx.SourceMgr, DRE->getLoc(),
-                                              subExpr->getStartLoc());
-          // Determine the fixit range from the end of the first argument to
-          // the end of the application, `, to: T.self)`
-          removeAfterRange = CharSourceRange(Ctx.SourceMgr,
-                         Lexer::getLocForEndOfToken(Ctx.SourceMgr,
-                                                    subExpr->getEndLoc()),
-                         Lexer::getLocForEndOfToken(Ctx.SourceMgr,
-                                                    apply->getEndLoc()));          
-        }
+        subExpr = apply->getArgs()->getExpr(0);
+        // Determine the fixit range from the start of the application to
+        // the first argument, `unsafeBitCast(`
+        removeBeforeRange = CharSourceRange(Ctx.SourceMgr, DRE->getLoc(),
+                                            subExpr->getStartLoc());
+        // Determine the fixit range from the end of the first argument to
+        // the end of the application, `, to: T.self)`
+        removeAfterRange = CharSourceRange(Ctx.SourceMgr,
+                       Lexer::getLocForEndOfToken(Ctx.SourceMgr,
+                                                  subExpr->getEndLoc()),
+                       Lexer::getLocForEndOfToken(Ctx.SourceMgr,
+                                                  apply->getEndLoc()));
       }
   
       // Casting to the same type or a superclass is a no-op.
@@ -1297,7 +1246,8 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     ///
     void checkOptionalPromotions(ApplyExpr *call) {
       // We only care about binary expressions.
-      if (!isa<BinaryExpr>(call)) return;
+      auto *BE = dyn_cast<BinaryExpr>(call);
+      if (!BE) return;
 
       // Dig out the function we're calling.
       auto fnExpr = call->getSemanticFn();
@@ -1305,13 +1255,11 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         fnExpr = dotSyntax->getSemanticFn();
 
       auto DRE = dyn_cast<DeclRefExpr>(fnExpr);
-      auto args = dyn_cast<TupleExpr>(call->getArg());
-      if (!DRE || !DRE->getDecl()->isOperator() ||
-          !args || args->getNumElements() != 2)
+      if (!DRE || !DRE->getDecl()->isOperator())
         return;
       
-      auto lhs = args->getElement(0);
-      auto rhs = args->getElement(1);
+      auto lhs = BE->getLHS();
+      auto rhs = BE->getRHS();
       auto calleeName = DRE->getDecl()->getBaseName();
 
       Expr *subExpr = nullptr;
@@ -1856,7 +1804,7 @@ bool TypeChecker::getDefaultGenericArgumentsString(
 /// Diagnose an argument labeling issue, returning true if we successfully
 /// diagnosed the issue.
 bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
-                                       Expr *expr,
+                                       const ArgumentList *argList,
                                        ArrayRef<Identifier> newNames,
                                        bool isSubscript,
                                        InFlightDiagnostic *existingDiag) {
@@ -1869,12 +1817,12 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
 
   auto &diags = ctx.Diags;
 
-  OriginalArgumentList argList = getOriginalArgumentList(expr);
+  auto originalArgs = argList->getOriginalArguments();
 
   // Figure out how many extraneous, missing, and wrong labels are in
   // the call.
   unsigned numExtra = 0, numMissing = 0, numWrong = 0;
-  unsigned n = std::max(argList.args.size(), newNames.size());
+  unsigned n = std::max(originalArgs.size(), (unsigned)newNames.size());
 
   llvm::SmallString<16> missingBuffer;
   llvm::SmallString<16> extraBuffer;
@@ -1884,8 +1832,8 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
     //  - nullptr for an argument without a label
     //  - have a value if the argument has a label
     Optional<Identifier> oldName;
-    if (i < argList.args.size())
-      oldName = argList.labels[i];
+    if (i < originalArgs.size())
+      oldName = originalArgs[i].getLabel();
     Optional<Identifier> newName;
     if (i < newNames.size())
       newName = newNames[i];
@@ -1893,7 +1841,7 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
     assert(oldName || newName && "We can't have oldName and newName out of "
                                  "bounds, otherwise n would be smaller");
 
-    if (oldName == newName || argList.isUnlabeledTrailingClosureIdx(i))
+    if (oldName == newName || originalArgs.isUnlabeledTrailingClosureIndex(i))
       continue;
 
     if (!oldName.hasValue() && newName.hasValue()) {
@@ -1928,8 +1876,8 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
   if (!existingDiag) {
     bool plural = (numMissing + numExtra + numWrong) > 1;
     if (numWrong > 0 || (numMissing > 0 && numExtra > 0)) {
-      for (unsigned i = 0, n = argList.args.size(); i != n; ++i) {
-        auto haveName = argList.labels[i];
+      for (unsigned i = 0, n = originalArgs.size(); i != n; ++i) {
+        auto haveName = originalArgs[i].getLabel();
         if (haveName.empty())
           haveBuffer += '_';
         else
@@ -1947,19 +1895,19 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
 
       StringRef haveStr = haveBuffer;
       StringRef expectedStr = expectedBuffer;
-      diagOpt.emplace(diags.diagnose(expr->getLoc(),
+      diagOpt.emplace(diags.diagnose(argList->getLoc(),
                                      diag::wrong_argument_labels,
                                      plural, haveStr, expectedStr,
                                      isSubscript));
     } else if (numMissing > 0) {
       StringRef missingStr = missingBuffer;
-      diagOpt.emplace(diags.diagnose(expr->getLoc(),
+      diagOpt.emplace(diags.diagnose(argList->getLoc(),
                                      diag::missing_argument_labels,
                                      plural, missingStr, isSubscript));
     } else {
       assert(numExtra > 0);
       StringRef extraStr = extraBuffer;
-      diagOpt.emplace(diags.diagnose(expr->getLoc(),
+      diagOpt.emplace(diags.diagnose(argList->getLoc(),
                                      diag::extra_argument_labels,
                                      plural, extraStr, isSubscript));
     }
@@ -1967,25 +1915,25 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
 
   // Emit Fix-Its to correct the names.
   auto &diag = getDiag();
-  for (unsigned i = 0, n = argList.args.size(); i != n; ++i) {
-    Identifier oldName = argList.labels[i];
+  for (unsigned i = 0, n = originalArgs.size(); i != n; ++i) {
+    Identifier oldName = originalArgs[i].getLabel();
     Identifier newName;
     if (i < newNames.size())
       newName = newNames[i];
 
-    if (oldName == newName || argList.isUnlabeledTrailingClosureIdx(i))
+    if (oldName == newName || originalArgs.isUnlabeledTrailingClosureIndex(i))
       continue;
 
     if (newName.empty()) {
       // If this is a labeled trailing closure, we need to replace with '_'.
-      if (argList.isLabeledTrailingClosureIdx(i)) {
-        diag.fixItReplace(argList.labelLocs[i], "_");
+      if (originalArgs.isLabeledTrailingClosureIndex(i)) {
+        diag.fixItReplace(originalArgs[i].getLabelLoc(), "_");
         continue;
       }
 
       // Otherwise, delete the old name.
-      diag.fixItRemoveChars(argList.labelLocs[i],
-                            argList.args[i]->getStartLoc());
+      diag.fixItRemoveChars(originalArgs[i].getLabelLoc(),
+                            originalArgs[i].getExpr()->getStartLoc());
       continue;
     }
 
@@ -2000,15 +1948,15 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
     // If the argument was previously unlabeled, insert the new label. Note that
     // we don't do this for labeled trailing closures as they write unlabeled
     // args as '_:', and therefore need replacement.
-    if (oldName.empty() && !argList.isLabeledTrailingClosureIdx(i)) {
+    if (oldName.empty() && !originalArgs.isLabeledTrailingClosureIndex(i)) {
       // Insert the name.
       newStr += ": ";
-      diag.fixItInsert(argList.args[i]->getStartLoc(), newStr);
+      diag.fixItInsert(originalArgs[i].getExpr()->getStartLoc(), newStr);
       continue;
     }
 
     // Change the name.
-    diag.fixItReplace(argList.labelLocs[i], newStr);
+    diag.fixItReplace(originalArgs[i].getLabelLoc(), newStr);
   }
 
   // If the diagnostic is local, flush it before returning.
@@ -3112,8 +3060,8 @@ void VarDeclUsageChecker::markStoredOrInOutExpr(Expr *E, unsigned Flags) {
   // are mutating the base expression.  We also need to visit the index
   // expressions as loads though.
   if (auto *SE = dyn_cast<SubscriptExpr>(E)) {
-    // The index of the subscript is evaluated as an rvalue.
-    SE->getIndex()->walk(*this);
+    // The arguments of a subscript are evaluated as rvalues.
+    SE->getArgs()->walk(*this);
     markBaseOfStorageUse(SE->getBase(), SE->getDecl(), Flags);
     return;
   }
@@ -3200,7 +3148,7 @@ std::pair<bool, Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
     }
   }
   if (auto SE = dyn_cast<SubscriptExpr>(E)) {
-    SE->getIndex()->walk(*this);
+    SE->getArgs()->walk(*this);
     markBaseOfStorageUse(SE->getBase(), SE->getDecl(), RK_Read);
     return { false, E };
   }
@@ -3385,19 +3333,18 @@ void swift::fixItEncloseTrailingClosure(ASTContext &ctx,
                                         InFlightDiagnostic &diag,
                                         const CallExpr *call,
                                         Identifier closureLabel) {
-  auto argsExpr = call->getArg();
+  auto *argList = call->getArgs();
 
   SmallString<32> replacement;
   SourceLoc lastLoc;
   SourceRange closureRange;
 
-  auto argList = getOriginalArgumentList(argsExpr);
+  auto originalArgs = argList->getOriginalArguments();
+  assert(originalArgs.size() >= 1 && "must have at least one argument");
 
-  assert(argList.args.size() >= 1 && "must have at least one argument");
-
-  if (argList.args.size() == 1) {
-    closureRange = argList.args[0]->getSourceRange();
-    lastLoc = argList.lParenLoc; // e.g funcName() { 1 }
+  if (originalArgs.size() == 1) {
+    closureRange = originalArgs[0].getExpr()->getSourceRange();
+    lastLoc = argList->getLParenLoc(); // e.g funcName() { 1 }
     if (!lastLoc.isValid()) {
       // Bare trailing closure: e.g. funcName { 1 }
       replacement = "(";
@@ -3405,9 +3352,9 @@ void swift::fixItEncloseTrailingClosure(ASTContext &ctx,
     }
   } else {
     // Tuple + trailing closure: e.g. funcName(x: 1) { 1 }
-    auto numElements = argList.args.size();
-    closureRange = argList.args[numElements - 1]->getSourceRange();
-    lastLoc = argList.args[numElements - 2]->getEndLoc();
+    auto numElements = originalArgs.size();
+    closureRange = originalArgs[numElements - 1].getExpr()->getSourceRange();
+    lastLoc = originalArgs[numElements - 2].getExpr()->getEndLoc();
     replacement = ", ";
   }
 
@@ -3432,28 +3379,21 @@ static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Expr *E) {
     ASTContext &Ctx;
 
     void diagnoseIt(const CallExpr *E) {
-      if (!E->hasTrailingClosure()) return;
+      // FIXME: We ought to handle multiple trailing closures here (SR-15055)
+      auto *args = E->getArgs();
+      if (!args->hasSingleTrailingClosure()) return;
 
-      auto argsExpr = E->getArg();
-      auto argsTy = argsExpr->getType();
+      auto closureArg = *args->getOriginalArguments().getFirstTrailingClosure();
+      auto *closureExpr = closureArg.getExpr();
+      auto closureTy = closureExpr->getType();
+
       // Ignore invalid argument type. Some diagnostics are already emitted.
-      if (!argsTy || argsTy->hasError()) return;
+      if (!closureTy || closureTy->hasError())
+        return;
 
-      SourceLoc closureLoc;
-      if (auto PE = dyn_cast<ParenExpr>(argsExpr))
-        closureLoc = PE->getSubExpr()->getStartLoc();
-      else if (auto TE = dyn_cast<TupleExpr>(argsExpr))
-        closureLoc = TE->getElements().back()->getStartLoc();
-
-      Identifier closureLabel;
-      if (auto TT = argsTy->getAs<TupleType>()) {
-        assert(TT->getNumElements() != 0 && "Unexpected empty TupleType");
-        closureLabel = TT->getElement(TT->getNumElements() - 1).getName();
-      }
-
-      auto diag = Ctx.Diags.diagnose(closureLoc,
+      auto diag = Ctx.Diags.diagnose(closureExpr->getStartLoc(),
                                      diag::trailing_closure_requires_parens);
-      fixItEncloseTrailingClosure(Ctx, diag, E, closureLabel);
+      fixItEncloseTrailingClosure(Ctx, diag, E, closureArg.getLabel());
     }
 
   public:
@@ -3635,13 +3575,8 @@ public:
       else if (!argNames[0].empty())
         return { true, expr };
 
-      Expr *arg = call->getArg();
-
-      if (auto paren = dyn_cast<ParenExpr>(arg))
-        arg = paren->getSubExpr();
-      else if (auto tuple = dyn_cast<TupleExpr>(arg))
-        arg = tuple->getElement(0);
-      else
+      auto *arg = call->getArgs()->getUnaryExpr();
+      if (!arg)
         return { true, expr };
 
       // Track whether we had parentheses around the string literal.
@@ -4219,7 +4154,7 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
                                            UnintendedInterpolationKind kind) {
       if (interpolationWouldBeUnintended(segment->getCalledValue(), kind))
         if (auto firstArg =
-              getFirstArgIfUnintendedInterpolation(segment->getArg(), kind))
+              getFirstArgIfUnintendedInterpolation(segment->getArgs(), kind))
           diagnoseUnintendedInterpolation(firstArg, kind);
     }
 
@@ -4256,22 +4191,14 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
     }
 
     Expr *
-    getFirstArgIfUnintendedInterpolation(Expr *args,
+    getFirstArgIfUnintendedInterpolation(ArgumentList *args,
                                          UnintendedInterpolationKind kind) {
       // Just check the first argument, which is usually the value 
       // being interpolated.
-      Expr *firstArg;
-      if (auto parenExpr = dyn_cast_or_null<ParenExpr>(args)) {
-        firstArg = parenExpr->getSubExpr();
-      } else if (auto tupleExpr = dyn_cast_or_null<TupleExpr>(args)) {
-        if (tupleExpr->getNumElements())
-          firstArg = tupleExpr->getElement(0);
-        else
-          return nullptr;
-      }
-      else {
-        firstArg = args;
-      }
+      if (args->empty())
+        return nullptr;
+
+      auto *firstArg = args->getExpr(0);
 
       // Allow explicit casts.
       if (isa<ExplicitCastExpr>(firstArg->getSemanticsProvidingExpr()))
@@ -4442,8 +4369,8 @@ static void maybeDiagnoseCallToKeyValueObserveMethod(const Expr *E,
       if (!fn->getName().isCompoundName("observe",
                                         {"", "options", "changeHandler"}))
         return;
-      auto args = cast<TupleExpr>(expr->getArg());
-      auto firstArg = dyn_cast<KeyPathExpr>(args->getElement(0));
+      auto *args = expr->getArgs();
+      auto firstArg = dyn_cast<KeyPathExpr>(args->getExpr(0));
       if (!firstArg)
         return;
       auto lastComponent = firstArg->getComponents().back();
