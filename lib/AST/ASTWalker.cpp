@@ -1342,16 +1342,17 @@ public:
   }
 
   ArgumentList *doIt(ArgumentList *ArgList) {
-    auto Pre = Walker.walkToArgumentListPre(ArgList);
-    if (!Pre.first || !Pre.second)
-      return Pre.second;
+    bool WalkChildren;
+    std::tie(WalkChildren, ArgList) = Walker.walkToArgumentListPre(ArgList);
+    if (!WalkChildren || !ArgList)
+      return ArgList;
 
-    for (auto Idx : indices(*Pre.second)) {
+    for (auto Idx : indices(*ArgList)) {
       auto *E = doIt(ArgList->getExpr(Idx));
       if (!E) return nullptr;
       ArgList->setExpr(Idx, E);
     }
-    return Walker.walkToArgumentListPost(Pre.second);
+    return Walker.walkToArgumentListPost(ArgList);
   }
 };
 
