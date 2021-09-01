@@ -1884,7 +1884,7 @@ static void printTripleInfo(const llvm::Triple &triple,
   }
 
   out << "    \"librariesRequireRPath\": "
-      << (tripleRequiresRPathForSwiftInOS(triple) ? "true" : "false")
+      << (tripleRequiresRPathForSwiftLibrariesInOS(triple) ? "true" : "false")
       << "\n";
 
   out << "  }";
