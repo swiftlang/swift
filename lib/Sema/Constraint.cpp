@@ -346,8 +346,7 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
                   getLocator());
 
   case ConstraintKind::ClosureBodyElement:
-    return createClosureBodyElement(cs, getClosureElement(), getLocator(),
-                                    getTypeVariables());
+    return createClosureBodyElement(cs, getClosureElement(), getLocator());
   }
 
   llvm_unreachable("Unhandled ConstraintKind in switch.");
@@ -1015,19 +1014,17 @@ Constraint *Constraint::createApplicableFunction(
   return constraint;
 }
 
-Constraint *Constraint::createClosureBodyElement(
-    ConstraintSystem &cs, ASTNode node, ConstraintLocator *locator,
-    ArrayRef<TypeVariableType *> referencedVars) {
-  return createClosureBodyElement(cs, node, ContextualTypeInfo(), locator,
-                                  referencedVars);
+Constraint *Constraint::createClosureBodyElement(ConstraintSystem &cs,
+                                                 ASTNode node,
+                                                 ConstraintLocator *locator) {
+  return createClosureBodyElement(cs, node, ContextualTypeInfo(), locator);
 }
 
-Constraint *Constraint::createClosureBodyElement(
-    ConstraintSystem &cs, ASTNode node, ContextualTypeInfo context,
-    ConstraintLocator *locator, ArrayRef<TypeVariableType *> referencedVars) {
+Constraint *Constraint::createClosureBodyElement(ConstraintSystem &cs,
+                                                 ASTNode node,
+                                                 ContextualTypeInfo context,
+                                                 ConstraintLocator *locator) {
   SmallPtrSet<TypeVariableType *, 4> typeVars;
-  typeVars.insert(referencedVars.begin(), referencedVars.end());
-
   unsigned size = totalSizeToAlloc<TypeVariableType *>(typeVars.size());
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
   return new (mem) Constraint(node, context, locator, typeVars);

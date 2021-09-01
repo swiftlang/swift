@@ -29,46 +29,18 @@ class TypeVariableRefFinder : public ASTWalker {
   ConstraintSystem &CS;
   ASTNode Parent;
 
-  llvm::SmallSetVector<TypeVariableType *, 2> referencedVars;
+  llvm::SmallPtrSetImpl<TypeVariableType *> &ReferencedVars;
 
 public:
-  TypeVariableRefFinder(ConstraintSystem &cs, ASTNode parent)
-      : CS(cs), Parent(parent) {}
+  TypeVariableRefFinder(
+      ConstraintSystem &cs, ASTNode parent,
+      llvm::SmallPtrSetImpl<TypeVariableType *> &referencedVars)
+      : CS(cs), Parent(parent), ReferencedVars(referencedVars) {}
 
   std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
     if (auto *DRE = dyn_cast<DeclRefExpr>(expr)) {
-      if (auto type = CS.getTypeIfAvailable(DRE->getDecl())) {
-        // The logic below is handling not-yet resolved parameter
-        // types referenced in the body e.g. `$0` or `x`.
-        if (auto *typeVar = type->getAs<TypeVariableType>()) {
-          referencedVars.insert(typeVar);
-
-          // It is possible that contextual type of a parameter
-          // has been assigned to an anonymous of named argument
-          // early, to facilitate closure type checking. Such a
-          // type can have type variables inside e.g.
-          //
-          // func test<T>(_: (UnsafePointer<T>) -> Void) {}
-          //
-          // test { ptr in
-          //  ...
-          // }
-          //
-          // Type variable representing `ptr` in the body of
-          // this closure would be bound to `UnsafePointer<$T>`
-          // in this case, where `$T` is a type variable for a
-          // generic parameter `T`.
-          auto simplifiedTy =
-              CS.getFixedTypeRecursive(typeVar, /*wantRValue=*/false);
-
-          if (!simplifiedTy->isEqual(typeVar) &&
-              simplifiedTy->hasTypeVariable()) {
-            SmallPtrSet<TypeVariableType *, 4> typeVars;
-            simplifiedTy->getTypeVariables(typeVars);
-            referencedVars.insert(typeVars.begin(), typeVars.end());
-          }
-        }
-      }
+      if (auto type = CS.getTypeIfAvailable(DRE->getDecl()))
+        inferVariables(type);
     }
 
     return {true, expr};
@@ -80,17 +52,45 @@ public:
     // explicitly.
     if (isa<ReturnStmt>(stmt)) {
       if (auto *closure = getAsExpr<ClosureExpr>(Parent)) {
-        auto resultTy = CS.getClosureType(closure)->getResult();
-        if (auto *typeVar = resultTy->getAs<TypeVariableType>())
-          referencedVars.insert(typeVar);
+        inferVariables(CS.getClosureType(closure)->getResult());
       }
     }
 
     return {true, stmt};
   }
 
-  ArrayRef<TypeVariableType *> getReferencedVars() const {
-    return referencedVars.getArrayRef();
+private:
+  void inferVariables(Type type) {
+    auto *typeVar = type->getWithoutSpecifierType()->getAs<TypeVariableType>();
+    if (!typeVar)
+      return;
+
+    // Record the type variable itself because it has to
+    // be in scope even when already bound.
+    ReferencedVars.insert(typeVar);
+
+    // It is possible that contextual type of a parameter/result
+    // has been assigned to e.g. an anonymous or named argument
+    // early, to facilitate closure type checking. Such a
+    // type can have type variables inside e.g.
+    //
+    // func test<T>(_: (UnsafePointer<T>) -> Void) {}
+    //
+    // test { ptr in
+    //  ...
+    // }
+    //
+    // Type variable representing `ptr` in the body of
+    // this closure would be bound to `UnsafePointer<$T>`
+    // in this case, where `$T` is a type variable for a
+    // generic parameter `T`.
+    auto simplifiedTy = CS.getFixedTypeRecursive(typeVar, /*wantRValue=*/false);
+
+    if (!simplifiedTy->isEqual(typeVar) && simplifiedTy->hasTypeVariable()) {
+      SmallPtrSet<TypeVariableType *, 4> typeVars;
+      simplifiedTy->getTypeVariables(typeVars);
+      ReferencedVars.insert(typeVars.begin(), typeVars.end());
+    }
   }
 };
 
@@ -151,16 +151,8 @@ static void createConjunction(ConstraintSystem &cs,
     if (!isViableElement(element))
       continue;
 
-    TypeVariableRefFinder refFinder(cs, locator->getAnchor());
-
-    // Solvable elements have to bring any of the referenced
-    // outer context type variables into scope.
-    if (element.is<Decl *>() || element.is<StmtCondition *>() ||
-        element.is<Expr *>() || element.isStmt(StmtKind::Return))
-      element.walk(refFinder);
-
-    constraints.push_back(Constraint::createClosureBodyElement(
-        cs, element, context, elementLoc, refFinder.getReferencedVars()));
+    constraints.push_back(
+        Constraint::createClosureBodyElement(cs, element, context, elementLoc));
   }
 
   cs.addUnsolvedConstraint(Constraint::createConjunction(
@@ -1333,4 +1325,22 @@ bool ConstraintSystem::applySolutionToBody(Solution &solution,
   TypeChecker::checkClosureAttributes(closure);
   closure->setBodyState(ClosureExpr::BodyState::TypeCheckedWithSignature);
   return false;
+}
+
+void ConjunctionElement::findReferencedVariables(
+    ConstraintSystem &cs, SmallPtrSetImpl<TypeVariableType *> &typeVars) const {
+  auto referencedVars = Element->getTypeVariables();
+  typeVars.insert(referencedVars.begin(), referencedVars.end());
+
+  if (Element->getKind() != ConstraintKind::ClosureBodyElement)
+    return;
+
+  ASTNode element = Element->getClosureElement();
+  auto *locator = Element->getLocator();
+
+  TypeVariableRefFinder refFinder(cs, locator->getAnchor(), typeVars);
+
+  if (element.is<Decl *>() || element.is<StmtCondition *>() ||
+      element.is<Expr *>() || element.isStmt(StmtKind::Return))
+    element.walk(refFinder);
 }

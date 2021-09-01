@@ -2313,6 +2313,15 @@ void DisjunctionChoice::propagateConversionInfo(ConstraintSystem &cs) const {
 }
 
 bool ConjunctionElement::attempt(ConstraintSystem &cs) const {
+  // First, let's bring all referenced variables into scope.
+  {
+    llvm::SmallPtrSet<TypeVariableType *, 4> referencedVars;
+    findReferencedVariables(cs, referencedVars);
+
+    for (auto *typeVar : referencedVars)
+      cs.addTypeVariable(typeVar);
+  }
+
   auto result = cs.simplifyConstraint(*Element);
   return result != ConstraintSystem::SolutionKind::Error;
 }

@@ -583,16 +583,14 @@ public:
       Optional<TrailingClosureMatching> trailingClosureMatching,
       ConstraintLocator *locator);
 
-  static Constraint *
-  createClosureBodyElement(ConstraintSystem &cs, ASTNode node,
-                           ConstraintLocator *locator,
-                           ArrayRef<TypeVariableType *> referencedVars = {});
+  static Constraint *createClosureBodyElement(ConstraintSystem &cs,
+                                              ASTNode node,
+                                              ConstraintLocator *locator);
 
-  static Constraint *
-  createClosureBodyElement(ConstraintSystem &cs, ASTNode node,
-                           ContextualTypeInfo context,
-                           ConstraintLocator *locator,
-                           ArrayRef<TypeVariableType *> referencedVars = {});
+  static Constraint *createClosureBodyElement(ConstraintSystem &cs,
+                                              ASTNode node,
+                                              ContextualTypeInfo context,
+                                              ConstraintLocator *locator);
 
   /// Determine the kind of constraint.
   ConstraintKind getKind() const { return Kind; }

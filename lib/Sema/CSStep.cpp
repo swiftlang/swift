@@ -799,10 +799,6 @@ bool ConjunctionStep::attempt(const ConjunctionElement &element) {
     CS.applySolution(Solutions.pop_back_val());
   }
 
-  // Bring all of the referenced variables into scope.
-  for (auto *typeVar : element.getReferencedVars())
-    CS.addTypeVariable(typeVar);
-
   // Make sure that element is solved in isolation
   // by dropping all scoring information.
   CS.CurrentScore = Score();

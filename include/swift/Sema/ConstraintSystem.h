@@ -2226,6 +2226,7 @@ public:
   friend class ComponentStep;
   friend class TypeVariableStep;
   friend class ConjunctionStep;
+  friend class ConjunctionElement;
   friend class RequirementFailure;
   friend class MissingMemberFailure;
 
@@ -5609,14 +5610,17 @@ public:
 
   bool attempt(ConstraintSystem &cs) const;
 
-  ArrayRef<TypeVariableType *> getReferencedVars() const {
-    return Element->getTypeVariables();
-  }
-
   void print(llvm::raw_ostream &Out, SourceManager *SM) const {
     Out << "conjunction element ";
     Element->print(Out, SM);
   }
+
+private:
+  /// Find type variables referenced by this conjunction element.
+  /// If this is a closure body element, it would look inside \c ASTNode.
+  void
+  findReferencedVariables(ConstraintSystem &cs,
+                          SmallPtrSetImpl<TypeVariableType *> &typeVars) const;
 };
 
 class TypeVariableBinding {
