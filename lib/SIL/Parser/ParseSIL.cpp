@@ -1649,7 +1649,10 @@ bool SILParser::parseSILDebugInfoExpression(SILDebugInfoExpression &DIExpr) {
     return true;
 
   // All operators that we currently support
-  static const SILDIExprOperator AllOps[] = {SILDIExprOperator::Fragment};
+  static const SILDIExprOperator AllOps[] = {
+    SILDIExprOperator::Dereference,
+    SILDIExprOperator::Fragment
+  };
 
   do {
     P.consumeToken();
@@ -3170,20 +3173,16 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     break;
   }
 
-  case SILInstructionKind::DebugValueInst:
-  case SILInstructionKind::DebugValueAddrInst: {
+  case SILInstructionKind::DebugValueInst: {
     bool poisonRefs = false;
     SILDebugVariable VarInfo;
     if (parseSILOptional(poisonRefs, *this, "poison")
         || parseTypedValueRef(Val, B) || parseSILDebugVar(VarInfo) ||
         parseSILDebugLocation(InstLoc, B))
       return true;
-    if (Opcode == SILInstructionKind::DebugValueInst)
-      ResultVal = B.createDebugValue(InstLoc, Val, VarInfo, poisonRefs);
-    else {
-      assert(!poisonRefs && "debug_value_addr does not support poison");
-      ResultVal = B.createDebugValueAddr(InstLoc, Val, VarInfo);
-    }
+    if (Val->getType().isAddress())
+      assert(!poisonRefs && "debug_value w/ address value does not support poison");
+    ResultVal = B.createDebugValue(InstLoc, Val, VarInfo, poisonRefs);
     break;
   }
 

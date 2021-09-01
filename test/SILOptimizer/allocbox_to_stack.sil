@@ -502,8 +502,8 @@ bb0(%0 : $@callee_guaranteed () -> @out U):
 sil @callWithAutoclosure : $@convention(thin) <T where T : P> (@in T) -> () {
 // CHECK: bb0
 bb0(%0 : $*T):
-  // CHECK: debug_value_addr
-  debug_value_addr %0 : $*T
+  // CHECK: debug_value {{.*}} expr op_deref
+  debug_value %0 : $*T, expr op_deref
   // CHECK: function_ref @mightApply
   %2 = function_ref @mightApply : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@owned @callee_owned () -> @out τ_0_0) -> ()
   %3 = function_ref @closure_to_specialize : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@owned <τ_0_0> { var τ_0_0 } <τ_0_0>) -> @out τ_0_0
@@ -530,8 +530,8 @@ bb0(%0 : $*T):
 sil @callWithAutoclosure_2 : $@convention(thin) <T where T : P> (@in T) -> () {
 // CHECK: bb0
 bb0(%0 : $*T):
-  // CHECK: debug_value_addr
-  debug_value_addr %0 : $*T
+  // CHECK: debug_value {{.*}} expr op_deref
+  debug_value %0 : $*T, expr op_deref
   // CHECK: function_ref @mightApply
   %2 = function_ref @mightApply : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@owned @callee_owned () -> @out τ_0_0) -> ()
   %3 = function_ref @closure_to_specialize : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@owned <τ_0_0> { var τ_0_0 } <τ_0_0>) -> @out τ_0_0
@@ -618,7 +618,7 @@ sil shared @specialized : $@convention(method) (Int, @in S<Q>) -> Bool {
 // CHECK: bb0
 bb0(%0 : $Int, %1 : $*S<Q>):
   debug_value %0 : $Int
-  debug_value_addr %1 : $*S<Q>
+  debug_value %1 : $*S<Q>, expr op_deref
   %4 = function_ref @outer : $@convention(thin) (@owned @callee_owned () -> Bool) -> Bool
   %5 = function_ref @closure1 : $@convention(thin) <T where T : Count> (Int, @owned <τ_0_0 where τ_0_0 : Count> { var S<τ_0_0> } <T>) -> Bool
   %6 = alloc_box $<τ_0_0 where τ_0_0 : Count> { var S<τ_0_0> } <Q>
@@ -636,7 +636,7 @@ sil @unspecialized : $@convention(method) <T where T : Count> (Int, @in S<T>) ->
 // CHECK: bb0
 bb0(%0 : $Int, %1 : $*S<T>):
   debug_value %0 : $Int
-  debug_value_addr %1 : $*S<T>
+  debug_value %1 : $*S<T>, expr op_deref
   %4 = function_ref @outer : $@convention(thin) (@owned @callee_owned () -> Bool) -> Bool
   %5 = function_ref @closure1 : $@convention(thin) <τ_0_0 where τ_0_0 : Count> (Int, @owned <τ_0_0 : Count> { var S<τ_0_0> } <τ_0_0>) -> Bool
   %6 = alloc_box $<τ_0_0 where τ_0_0 : Count> { var S<τ_0_0> } <T>
@@ -735,7 +735,7 @@ bb0(%0 : $<τ_0_0> { var τ_0_0 } <T>):
 
 sil hidden [noinline] @consume : $@convention(thin) <T> (@in T) -> () {
 bb0(%0 : $*T):
-  debug_value_addr %0 : $*T
+  debug_value %0 : $*T, expr op_deref
   destroy_addr %0 : $*T
   %3 = tuple ()
   return %3 : $()

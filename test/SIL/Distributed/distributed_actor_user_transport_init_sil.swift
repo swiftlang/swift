@@ -15,7 +15,7 @@ distributed actor SimpleUserDefinedInitDistributedActor {
 // CHECK: // %1 "other" // user: %4
 // CHECK: // %2 "self" // users: %7, %14, %6, %18, %5
 // CHECK: bb0(%0 : $*ActorTransport, %1 : $Int, %2 : $SimpleUserDefinedInitDistributedActor):
-// CHECK:  debug_value_addr %0 : $*ActorTransport, let, name "transport", argno 1 // id: %3
+// CHECK:  debug_value %0 : $*ActorTransport, let, name "transport", argno 1, expr op_deref // id: %3
 // CHECK:  debug_value %1 : $Int, let, name "other", argno 2 // id: %4
 // CHECK:  debug_value %2 : $SimpleUserDefinedInitDistributedActor, let, name "self", argno 3, implicit // id: %5
 // CHECK:  %6 = builtin "initializeDefaultActor"(%2 : $SimpleUserDefinedInitDistributedActor) : $()
@@ -48,7 +48,7 @@ distributed actor SimpleUserDefinedInitDistributedActor {
 // CHECK: // %2 "self" // users: %7, %14, %6, %18, %5
 // CHECK: bb0(%0 : $Int, %1 : $*ActorTransport, %2 : $SimpleUserDefinedInitDistributedActor):
 // CHECK:  debug_value %0 : $Int, let, name "other", argno 1 // id: %3
-// CHECK:  debug_value_addr %1 : $*ActorTransport, let, name "theTransport", argno 2 // id: %4
+// CHECK:  debug_value %1 : $*ActorTransport, let, name "theTransport", argno 2, expr op_deref // id: %4
 // CHECK:  debug_value %2 : $SimpleUserDefinedInitDistributedActor, let, name "self", argno 3, implicit // id: %5
 // CHECK:  %6 = builtin "initializeDefaultActor"(%2 : $SimpleUserDefinedInitDistributedActor) : $()
 

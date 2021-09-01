@@ -1179,31 +1179,37 @@ public:
 
   void printDebugVar(Optional<SILDebugVariable> Var,
                      const SourceManager *SM = nullptr) {
-    if (!Var || Var->Name.empty())
+    if (!Var)
       return;
-    if (Var->Constant)
-      *this << ", let";
-    else
-      *this << ", var";
 
-    if ((Var->Loc || Var->Scope) && SM) {
-      *this << ", (name \"" << Var->Name << '"';
-      if (Var->Loc)
-        printDebugLocRef(*Var->Loc, *SM);
-      if (Var->Scope)
-        printDebugScopeRef(Var->Scope, *SM);
-      *this << ")";
-    } else
-      *this << ", name \"" << Var->Name << '"';
+    if (!Var->Name.empty()) {
+      if (Var->Constant)
+        *this << ", let";
+      else
+        *this << ", var";
 
-    if (Var->ArgNo)
-      *this << ", argno " << Var->ArgNo;
-    if (Var->Implicit)
-      *this << ", implicit";
-    if (Var->Type) {
-      *this << ", type ";
-      Var->Type->print(PrintState.OS, PrintState.ASTOptions);
+      if ((Var->Loc || Var->Scope) && SM) {
+        *this << ", (name \"" << Var->Name << '"';
+        if (Var->Loc)
+          printDebugLocRef(*Var->Loc, *SM);
+        if (Var->Scope)
+          printDebugScopeRef(Var->Scope, *SM);
+        *this << ")";
+      } else
+        *this << ", name \"" << Var->Name << '"';
+
+      if (Var->ArgNo)
+        *this << ", argno " << Var->ArgNo;
+      if (Var->Implicit)
+        *this << ", implicit";
+      if (Var->Type) {
+        *this << ", type ";
+        Var->Type->print(PrintState.OS, PrintState.ASTOptions);
+      }
     }
+    // Although it's rare in real-world use cases, but during testing,
+    // sometimes we want to print out di-expression, even the debug
+    // variable name is empty.
     if (Var->DIExpr)
       printDebugInfoExpression(Var->DIExpr);
   }
@@ -1578,12 +1584,6 @@ public:
     *this << getIDAndType(DVI->getOperand());
     printDebugVar(DVI->getVarInfo(),
                   &DVI->getModule().getASTContext().SourceMgr);
-  }
-
-  void visitDebugValueAddrInst(DebugValueAddrInst *DVAI) {
-    *this << getIDAndType(DVAI->getOperand());
-    printDebugVar(DVAI->getVarInfo(),
-                  &DVAI->getModule().getASTContext().SourceMgr);
   }
 
 #define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \

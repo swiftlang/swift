@@ -437,10 +437,13 @@ isStringStoreToIdentifyableObject(SILInstruction *inst) {
     switch (user->getKind()) {
       // Those instructions do not write to destAddr nor let they destAddr
       // escape.
-      case SILInstructionKind::DebugValueAddrInst:
       case SILInstructionKind::DeallocStackInst:
       case SILInstructionKind::LoadInst:
         break;
+      case SILInstructionKind::DebugValueInst:
+        if (DebugValueInst::hasAddrVal(user))
+          break;
+        LLVM_FALLTHROUGH;
       default:
         if (!mayWriteToIdentifyableObject(user)) {
           // We don't handle user. It is some instruction which may write to
