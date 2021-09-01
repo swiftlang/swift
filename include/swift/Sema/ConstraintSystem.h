@@ -662,7 +662,7 @@ public:
 
   /// Whether the argument is a trailing closure.
   bool isTrailingClosure() const {
-    return ArgList->isRawTrailingClosureIndex(ArgIdx);
+    return ArgList->isTrailingClosureIndex(ArgIdx);
   }
 
   /// \returns The interface type for the function being applied. Note that this

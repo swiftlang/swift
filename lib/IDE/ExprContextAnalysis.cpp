@@ -212,20 +212,32 @@ public:
   CCExprRemover(ASTContext &Ctx) : Ctx(Ctx) {}
 
   Expr *visitCallExpr(CallExpr *E) {
-    auto *args = E->getArgs();
+    auto *args = E->getArgs()->getOriginalArgs();
 
+    Optional<unsigned> newTrailingClosureIdx;
     SmallVector<Argument, 4> newArgs;
-    for (auto arg : *args) {
+    for (auto idx : indices(*args)) {
+      // Update the trailing closure index if we have one.
+      if (args->hasAnyTrailingClosures() &&
+          idx == *args->getFirstTrailingClosureIndex()) {
+        newTrailingClosureIdx = newArgs.size();
+      }
+      auto arg = args->get(idx);
       if (!isa<CodeCompletionExpr>(arg.getExpr()))
         newArgs.push_back(arg);
     }
     if (newArgs.size() == args->size())
       return E;
 
+    // If we ended up removing the last trailing closure, drop the index.
+    if (newTrailingClosureIdx && *newTrailingClosureIdx == newArgs.size())
+      newTrailingClosureIdx = None;
+
     Removed = true;
-    auto *argList = ArgumentList::create(Ctx, args->getLParenLoc(), newArgs,
-                                         args->getRParenLoc(),
-                                         args->isImplicit());
+
+    auto *argList = ArgumentList::create(
+        Ctx, args->getLParenLoc(), newArgs, args->getRParenLoc(),
+        newTrailingClosureIdx, E->isImplicit());
     return CallExpr::create(Ctx, E->getFn(), argList, E->isImplicit());
   }
 
@@ -728,9 +740,8 @@ static bool getPositionInTuple(DeclContext &DC, TupleExpr *TE, Expr *CCExpr,
 /// \returns the position index number on success, \c None if \p CCExpr is not
 /// a part of \p Args.
 static Optional<unsigned>
-getPositionInParams(DeclContext &DC, const OriginalArguments &Args,
-                    Expr *CCExpr, ArrayRef<AnyFunctionType::Param> Params,
-                    bool Lenient) {
+getPositionInParams(DeclContext &DC, const ArgumentList *Args, Expr *CCExpr,
+                    ArrayRef<AnyFunctionType::Param> Params, bool Lenient) {
   auto &SM = DC.getASTContext().SourceMgr;
   unsigned PosInParams = 0;
   unsigned PosInArgs = 0;
@@ -740,11 +751,11 @@ getPositionInParams(DeclContext &DC, const OriginalArguments &Args,
   // For each argument, we try to find a matching parameter either by matching
   // argument labels, in which case PosInParams may be advanced by more than 1,
   // or by advancing PosInParams and PosInArgs both by 1.
-  for (; PosInArgs < Args.size(); ++PosInArgs) {
-    if (!SM.isBeforeInBuffer(Args[PosInArgs].getExpr()->getEndLoc(),
+  for (; PosInArgs < Args->size(); ++PosInArgs) {
+    if (!SM.isBeforeInBuffer(Args->getExpr(PosInArgs)->getEndLoc(),
                              CCExpr->getStartLoc())) {
       // The arg is after the code completion position. Stop.
-      if (LastParamWasVariadic && Args[PosInArgs].getLabel().empty()) {
+      if (LastParamWasVariadic && Args->getLabel(PosInArgs).empty()) {
         // If the last parameter was variadic and this argument stands by itself
         // without a label, assume that it belongs to the previous vararg
         // list.
@@ -753,7 +764,7 @@ getPositionInParams(DeclContext &DC, const OriginalArguments &Args,
       break;
     }
 
-    auto ArgName = Args[PosInArgs].getLabel();
+    auto ArgName = Args->getLabel(PosInArgs);
     // If the last parameter we matched was variadic, we claim all following
     // unlabeled arguments for that variadic parameter -> advance PosInArgs but
     // not PosInParams.
@@ -778,7 +789,7 @@ getPositionInParams(DeclContext &DC, const OriginalArguments &Args,
       }
     }
 
-    if (!AdvancedPosInParams && Args.isTrailingClosureIndex(PosInArgs)) {
+    if (!AdvancedPosInParams && Args->isTrailingClosureIndex(PosInArgs)) {
       // If the argument is a trailing closure, it can't match non-function
       // parameters. Advance to the next function parameter.
       for (unsigned i = PosInParams; i < Params.size(); ++i) {
@@ -802,7 +813,7 @@ getPositionInParams(DeclContext &DC, const OriginalArguments &Args,
       }
     }
   }
-  if (PosInArgs < Args.size() && PosInParams < Params.size()) {
+  if (PosInArgs < Args->size() && PosInParams < Params.size()) {
     // We didn't search until the end, so we found a position in Params. Success
     return PosInParams;
   } else {
@@ -900,7 +911,7 @@ class ExprContextAnalyzer {
       llvm::SmallVector<Optional<unsigned>, 2> posInParams;
       {
         bool found = false;
-        auto originalArgs = Args->getOriginalArguments();
+        auto *originalArgs = Args->getOriginalArgs();
         for (auto &typeAndDecl : Candidates) {
           Optional<unsigned> pos = getPositionInParams(
               *DC, originalArgs, ParsedExpr, typeAndDecl.Type->getParams(),

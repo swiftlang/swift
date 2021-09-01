@@ -1258,9 +1258,9 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
         return nullptr;
 
       // Trailing closure implicitly forms a call.
-      auto *argList = ArgumentList::create(Context, SourceLoc(),
-                                           trailingClosures,
-                                           SourceLoc(), /*implicit*/ false);
+      auto *argList = ArgumentList::createParsed(Context, SourceLoc(),
+                                                 trailingClosures, SourceLoc(),
+                                                 /*trailingClosureIdx*/ 0);
       Result = makeParserResult(
           ParserStatus(Result) | trailingResult,
           CallExpr::create(Context, Result.get(), argList, /*implicit*/ false));
@@ -3102,22 +3102,17 @@ Parser::parseArgumentList(tok leftTok, tok rightTok, bool isExprBasic,
 
   auto numNonTrailing = args.size();
   Optional<unsigned> trailingClosureIndex;
-  bool hasMultipleTrailing = false;
 
   // If we can parse trailing closures, do so.
   if (allowTrailingClosure && Tok.is(tok::l_brace) &&
       isValidTrailingClosure(isExprBasic, *this)) {
     status |= parseTrailingClosures(isExprBasic, SourceRange(leftLoc, rightLoc),
                                     args);
-    auto numTrailing = args.size() - numNonTrailing;
-    if (numTrailing > 0) {
+    if (args.size() > numNonTrailing)
       trailingClosureIndex = numNonTrailing;
-      hasMultipleTrailing = numTrailing > 1;
-    }
   }
-  auto *argList = ArgumentList::create(Context, leftLoc, args, rightLoc,
-                                       trailingClosureIndex,
-                                       hasMultipleTrailing, /*implicit*/ false);
+  auto *argList = ArgumentList::createParsed(Context, leftLoc, args, rightLoc,
+                                             trailingClosureIndex);
   return makeParserResult(status, argList);
 }
 
@@ -3463,9 +3458,9 @@ Parser::parseExprCallSuffix(ParserResult<Expr> fn, bool isExprBasic) {
     auto lParenLoc = consumeToken(tok::l_paren);
     auto CCE = new (Context) CodeCompletionExpr(Tok.getLoc());
     auto rParenLoc = Tok.getLoc();
-    auto *argList = ArgumentList::create(Context, lParenLoc,
-                                         {Argument::unlabeled(CCE)}, rParenLoc,
-                                         /*implicit*/ false);
+    auto *argList = ArgumentList::createParsed(
+        Context, lParenLoc, {Argument::unlabeled(CCE)}, rParenLoc,
+        /*trailingClosureIdx*/ None);
     auto Result = makeParserResult(
         fn, CallExpr::create(Context, fn.get(), argList, /*implicit*/ false));
     CodeCompletion->completePostfixExprParen(fn.get(), CCE);

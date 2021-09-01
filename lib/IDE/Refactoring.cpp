@@ -3734,19 +3734,18 @@ bool RefactoringActionTrailingClosure::performChange() {
   if (!CE)
     return true;
 
-  auto *ArgList = CE->getArgs();
+  auto *ArgList = CE->getArgs()->getOriginalArgs();
   auto LParenLoc = ArgList->getLParenLoc();
   auto RParenLoc = ArgList->getRParenLoc();
 
   if (LParenLoc.isInvalid() || RParenLoc.isInvalid())
     return true;
 
-  auto OriginalArgs = ArgList->getOriginalArguments();
-  auto NumArgs = OriginalArgs.size();
+  auto NumArgs = ArgList->size();
   if (NumArgs == 0)
     return true;
 
-  auto *ClosureArg = OriginalArgs[NumArgs - 1].getExpr();
+  auto *ClosureArg = ArgList->getExpr(NumArgs - 1);
   if (auto *ICE = dyn_cast<ImplicitConversionExpr>(ClosureArg))
     ClosureArg = ICE->getSyntacticSubExpr();
 
@@ -3754,7 +3753,7 @@ bool RefactoringActionTrailingClosure::performChange() {
   //   * Open paren with ' ' if the closure is sole argument.
   //   * Comma with ') ' otherwise.
   if (NumArgs > 1) {
-    auto *PrevArg = OriginalArgs[NumArgs - 2].getExpr();
+    auto *PrevArg = ArgList->getExpr(NumArgs - 2);
     CharSourceRange PreRange(
         SM,
         Lexer::getLocForEndOfToken(SM, PrevArg->getEndLoc()),

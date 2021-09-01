@@ -805,15 +805,15 @@ static Expr* getSingleNonImplicitChild(Expr *Parent) {
 std::vector<CallArgInfo> swift::ide::
 getCallArgInfo(SourceManager &SM, ArgumentList *Args, LabelRangeEndAt EndKind) {
   std::vector<CallArgInfo> InfoVec;
-  auto OriginalArgs = Args->getOriginalArguments();
-  for (auto ElemIndex : indices(OriginalArgs)) {
-    auto *Elem = OriginalArgs[ElemIndex].getExpr();
+  auto *OriginalArgs = Args->getOriginalArgs();
+  for (auto ElemIndex : indices(*OriginalArgs)) {
+    auto *Elem = OriginalArgs->getExpr(ElemIndex);
 
     SourceLoc LabelStart(Elem->getStartLoc());
     SourceLoc LabelEnd(LabelStart);
 
-    bool IsTrailingClosure = OriginalArgs.isTrailingClosureIndex(ElemIndex);
-    auto NameLoc = OriginalArgs[ElemIndex].getLabelLoc();
+    bool IsTrailingClosure = OriginalArgs->isTrailingClosureIndex(ElemIndex);
+    auto NameLoc = OriginalArgs->getLabelLoc(ElemIndex);
     if (NameLoc.isValid()) {
       LabelStart = NameLoc;
       if (EndKind == LabelRangeEndAt::LabelNameOnly || IsTrailingClosure) {

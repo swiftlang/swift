@@ -5750,9 +5750,6 @@ ArgumentList *ExprRewriter::coerceCallArguments(
       !paramInfo.anyContextualInfo())
     return args;
 
-  const auto oldTrailingClosureIndex = args->getRawFirstTrailingClosureIndex();
-  Optional<unsigned> newTrailingClosureIndex;
-
   // Determine the parameter bindings that were applied.
   auto *locatorPtr = cs.getConstraintLocator(locator);
   assert(solution.argumentMatchingChoices.count(locatorPtr) == 1);
@@ -5783,12 +5780,6 @@ ArgumentList *ExprRewriter::coerceCallArguments(
       for (auto argIdx : varargIndices) {
         auto *arg = args->getExpr(argIdx);
         auto argType = cs.getType(arg);
-
-        // Update the trailing closure index if needed.
-        if (oldTrailingClosureIndex && *oldTrailingClosureIndex == argIdx) {
-          assert(!newTrailingClosureIndex);
-          newTrailingClosureIndex = newArgs.size();
-        }
 
         // If the argument type exactly matches, this just works.
         if (argType->isEqual(param.getPlainType())) {
@@ -5848,12 +5839,6 @@ ArgumentList *ExprRewriter::coerceCallArguments(
     auto arg = args->get(argIdx);
     auto *argExpr = arg.getExpr();
     auto argType = cs.getType(argExpr);
-
-    // Update the trailing closure index if needed.
-    if (oldTrailingClosureIndex && *oldTrailingClosureIndex == argIdx) {
-      assert(!newTrailingClosureIndex);
-      newTrailingClosureIndex = newArgs.size();
-    }
 
     // Update the argument label to match the parameter. This may be necessary
     // for things like trailing closures and args to property wrapper params.
@@ -5986,19 +5971,15 @@ ArgumentList *ExprRewriter::coerceCallArguments(
     if (!convertedArg)
       return nullptr;
 
+    // Write back the rewritten argument to the original argument list. This
+    // ensures it has the same semantic argument information as the rewritten
+    // argument list, which may be required by IDE logic.
+    args->setExpr(argIdx, convertedArg);
+
     arg.setExpr(convertedArg);
     newArgs.push_back(arg);
   }
-  auto *result = ArgumentList::create(
-      ctx, args->getLParenLoc(), newArgs, args->getRParenLoc(),
-      newTrailingClosureIndex, args->hasMultipleTrailingClosures(),
-      args->isImplicit());
-#ifndef NDEBUG
-  auto origArgs = result->getOriginalArguments();
-  assert(origArgs.getFirstTrailingClosureIndex() == oldTrailingClosureIndex);
-  assert(origArgs.size() == args->size());
-#endif
-  return result;
+  return ArgumentList::createTypeChecked(ctx, args, newArgs);
 }
 
 static bool isClosureLiteralExpr(Expr *expr) {

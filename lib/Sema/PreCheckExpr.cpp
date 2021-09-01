@@ -1037,8 +1037,10 @@ namespace {
                     DeclNameRef(Context.Id_appendInterpolation),
                     /*nameloc=*/DeclNameLoc(), /*Implicit=*/true);
 
-                auto *newArgList = ArgumentList::create(
-                    Context, lParen, {*newArg}, rParen, /*implicit*/ false);
+                auto *newArgList =
+                    ArgumentList::create(Context, lParen, {*newArg}, rParen,
+                                         /*trailingClosureIdx*/ None,
+                                         /*implicit*/ false);
                 E = CallExpr::create(Context, newCallee, newArgList,
                                      /*implicit=*/false);
               }
