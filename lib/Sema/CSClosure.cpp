@@ -155,6 +155,13 @@ static void createConjunction(ConstraintSystem &cs,
         Constraint::createClosureBodyElement(cs, element, context, elementLoc));
   }
 
+  // It's possible that there are no viable elements in the body,
+  // because e.g. whole body is an `#if` statement or it only has
+  // declarations that are checked during solution application.
+  // In such cases, let's avoid creating a conjunction.
+  if (constraints.empty())
+    return;
+
   cs.addUnsolvedConstraint(Constraint::createConjunction(
       cs, constraints, isIsolated, locator, referencedVars));
 }
