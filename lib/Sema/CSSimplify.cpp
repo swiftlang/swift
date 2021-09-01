@@ -291,13 +291,10 @@ static bool matchCallArgumentsImpl(
     assert(argIdx != numArgs && "Must have a valid index to claim");
     assert(!claimedArgs[argIdx] && "Argument already claimed");
 
-    auto argLabel = args[argIdx].getLabel();
     if (!actualArgNames.empty()) {
       // We're recording argument names; record this one.
       actualArgNames[argIdx] = expectedName;
-    } else if (argLabel != expectedName && !ignoreNameClash &&
-               !(argLabel.str().startswith("$") &&
-                 argLabel.str().drop_front() == expectedName.str())) {
+    } else if (!ignoreNameClash && !args[argIdx].matchParameterLabel(expectedName)) {
       // We have an argument name mismatch. Start recording argument names.
       actualArgNames.resize(numArgs);
 
