@@ -1191,9 +1191,11 @@ sawSolution(const constraints::Solution &S) {
 ///   (overloaded_decl_ref_expr function_ref=compound decls=[
 ///     Swift.(file).~=,
 ///     Swift.(file).Optional extension.~=])
-///   (tuple_expr implicit type='($T1, (OtherEnum))'
-///     (code_completion_expr implicit type='$T1')
-///     (declref_expr implicit decl=swift_ide_test.(file).foo(x:).$match)))
+///   (argument_list implicit
+///     (argument
+///       (code_completion_expr implicit type='$T1'))
+///     (argument
+///       (declref_expr implicit decl=swift_ide_test.(file).foo(x:).$match))))
 /// \endcode
 /// If the code completion expression occurs in such an AST, return the
 /// declaration of the \c $match variable, otherwise return \c nullptr.
@@ -1201,14 +1203,8 @@ VarDecl *getMatchVarIfInPatternMatch(CodeCompletionExpr *CompletionExpr,
                                      ConstraintSystem &CS) {
   auto &Context = CS.getASTContext();
 
-  TupleExpr *ArgTuple =
-      dyn_cast_or_null<TupleExpr>(CS.getParentExpr(CompletionExpr));
-  if (!ArgTuple || !ArgTuple->isImplicit() || ArgTuple->getNumElements() != 2) {
-    return nullptr;
-  }
-
-  auto Binary = dyn_cast_or_null<BinaryExpr>(CS.getParentExpr(ArgTuple));
-  if (!Binary || !Binary->isImplicit()) {
+  auto *Binary = dyn_cast_or_null<BinaryExpr>(CS.getParentExpr(CompletionExpr));
+  if (!Binary || !Binary->isImplicit() || Binary->getLHS() != CompletionExpr) {
     return nullptr;
   }
 
@@ -1233,7 +1229,7 @@ VarDecl *getMatchVarIfInPatternMatch(CodeCompletionExpr *CompletionExpr,
     return nullptr;
   }
 
-  auto MatchArg = dyn_cast_or_null<DeclRefExpr>(ArgTuple->getElement(1));
+  auto MatchArg = dyn_cast_or_null<DeclRefExpr>(Binary->getRHS());
   if (!MatchArg || !MatchArg->isImplicit()) {
     return nullptr;
   }
