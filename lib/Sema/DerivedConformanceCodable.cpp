@@ -632,20 +632,17 @@ static CallExpr *createContainerKeyedByCall(ASTContext &C, DeclContext *DC,
                                                      SourceLoc(), SourceLoc());
 
   // Full bound base.container(keyedBy: CodingKeys.self) call
-  Expr *args[1] = {codingKeysMetaTypeExpr};
-  Identifier argLabels[1] = {C.Id_keyedBy};
-  return CallExpr::createImplicit(C, unboundCall, C.AllocateCopy(args),
-                                  C.AllocateCopy(argLabels));
+  auto *argList =
+      ArgumentList::forImplicitSingle(C, C.Id_keyedBy, codingKeysMetaTypeExpr);
+  return CallExpr::createImplicit(C, unboundCall, argList);
 }
 
 static CallExpr *createNestedContainerKeyedByForKeyCall(
     ASTContext &C, DeclContext *DC, Expr *base, NominalTypeDecl *codingKeysType,
     EnumElementDecl *key) {
-  SmallVector<Identifier, 2> argNames{C.Id_keyedBy, C.Id_forKey};
-
   // base.nestedContainer(keyedBy:, forKey:) expr
   auto *unboundCall = UnresolvedDotExpr::createImplicit(
-      C, base, C.Id_nestedContainer, argNames);
+      C, base, C.Id_nestedContainer, {C.Id_keyedBy, C.Id_forKey});
 
   // CodingKeys.self expr
   auto *codingKeysExpr = TypeExpr::createImplicitForDecl(
@@ -662,9 +659,9 @@ static CallExpr *createNestedContainerKeyedByForKeyCall(
                                         DeclNameLoc(), /*Implicit=*/true);
 
   // Full bound base.nestedContainer(keyedBy: CodingKeys.self, forKey: key) call
-  Expr *args[2] = {codingKeysMetaTypeExpr, keyExpr};
-  return CallExpr::createImplicit(C, unboundCall, C.AllocateCopy(args),
-                                  argNames);
+  auto *argList = ArgumentList::forImplicitCallTo(
+      unboundCall->getName(), {codingKeysMetaTypeExpr, keyExpr}, C);
+  return CallExpr::createImplicit(C, unboundCall, argList);
 }
 
 static ThrowStmt *createThrowCodingErrorStmt(ASTContext &C, Expr *containerExpr,
@@ -689,32 +686,30 @@ static ThrowStmt *createThrowCodingErrorStmt(ASTContext &C, Expr *containerExpr,
 
   auto *codingPathExpr =
       UnresolvedDotExpr::createImplicit(C, containerExpr, C.Id_codingPath);
+  auto *underlyingErrorExpr =
+      new (C) NilLiteralExpr(SourceLoc(), /*implicit*/ true);
 
-  auto *contextInitCallExpr = CallExpr::createImplicit(
-      C, contextInitCall,
-      {codingPathExpr, debugMessageExpr,
-       new (C) NilLiteralExpr(SourceLoc(), /* Implicit */ true)},
-      {C.Id_codingPath, C.Id_debugDescription, C.Id_underlyingError});
-
+  auto *initArgList = ArgumentList::forImplicitCallTo(
+      contextInitCall->getName(),
+      {codingPathExpr, debugMessageExpr, underlyingErrorExpr}, C);
+  auto *contextInitCallExpr = CallExpr::createImplicit(C, contextInitCall,
+                                                       initArgList);
   llvm::SmallVector<Expr *, 2> arguments;
-  llvm::SmallVector<Identifier, 2> argumentLabels;
-
   if (argument.hasValue()) {
     arguments.push_back(argument.getValue());
-    argumentLabels.push_back(Identifier());
   }
-
   arguments.push_back(contextInitCallExpr);
-  argumentLabels.push_back(Identifier());
 
+  SmallVector<Identifier, 2> scratch;
+  auto *decodeArgList = ArgumentList::forImplicitUnlabeled(C, arguments);
   auto *decodingErrorTypeExpr =
       TypeExpr::createImplicit(errorDecl->getDeclaredType(), C);
   auto *decodingErrorCall = UnresolvedDotExpr::createImplicit(
-      C, decodingErrorTypeExpr, errorId, C.AllocateCopy(argumentLabels));
+      C, decodingErrorTypeExpr, errorId,
+      decodeArgList->getArgumentLabels(scratch));
 
   auto *decodingErrorCallExpr =
-      CallExpr::createImplicit(C, decodingErrorCall, C.AllocateCopy(arguments),
-                               C.AllocateCopy(argumentLabels));
+      CallExpr::createImplicit(C, decodingErrorCall, decodeArgList);
   return new (C) ThrowStmt(SourceLoc(), decodingErrorCallExpr);
 }
 
@@ -771,15 +766,13 @@ static TryExpr *createEncodeCall(ASTContext &C, Type codingKeysType,
 
   // encode(_:forKey:)/encodeIfPresent(_:forKey:)
   auto methodName = useIfPresentVariant ? C.Id_encodeIfPresent : C.Id_encode;
-  SmallVector<Identifier, 2> argNames{Identifier(), C.Id_forKey};
-
-  auto *encodeCall =
-      UnresolvedDotExpr::createImplicit(C, containerExpr, methodName, argNames);
+  auto *encodeCall = UnresolvedDotExpr::createImplicit(
+      C, containerExpr, methodName, {Identifier(), C.Id_forKey});
 
   // container.encode(x, forKey: CodingKeys.x)
-  Expr *args[2] = {varExpr, keyExpr};
-  auto *callExpr = CallExpr::createImplicit(C, encodeCall, C.AllocateCopy(args),
-                                            C.AllocateCopy(argNames));
+  auto *argList = ArgumentList::forImplicitCallTo(encodeCall->getName(),
+                                                  {varExpr, keyExpr}, C);
+  auto *callExpr = CallExpr::createImplicit(C, encodeCall, argList);
 
   // try container.encode(x, forKey: CodingKeys.x)
   auto *tryExpr = new (C) TryExpr(SourceLoc(), callExpr, Type(),
@@ -913,11 +906,8 @@ deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl, void *) {
         DotSyntaxCallExpr::create(C, superRef, SourceLoc(), encodeDeclRef);
 
     // super.encode(to: container.superEncoder())
-    Expr *args[1] = {superEncoderRef};
-    Identifier argLabels[1] = {C.Id_to};
-    auto *callExpr = CallExpr::createImplicit(C, encodeCall,
-                                              C.AllocateCopy(args),
-                                              C.AllocateCopy(argLabels));
+    auto *args = ArgumentList::forImplicitSingle(C, C.Id_to, superEncoderRef);
+    auto *callExpr = CallExpr::createImplicit(C, encodeCall, args);
 
     // try super.encode(to: container.superEncoder())
     auto *tryExpr = new (C) TryExpr(SourceLoc(), callExpr, Type(),
@@ -1278,14 +1268,13 @@ static TryExpr *createDecodeCall(ASTContext &C, Type resultType,
                             /*Implicit=*/true);
 
   // decode(_:forKey:)/decodeIfPresent(_:forKey:)
-  SmallVector<Identifier, 2> argNames{Identifier(), C.Id_forKey};
-  auto *decodeCall =
-      UnresolvedDotExpr::createImplicit(C, containerExpr, methodName, argNames);
+  auto *decodeCall = UnresolvedDotExpr::createImplicit(
+      C, containerExpr, methodName, {Identifier(), C.Id_forKey});
 
   // container.decode(Type.self, forKey: CodingKeys.x)
-  Expr *args[2] = {targetExpr, keyExpr};
-  auto *callExpr = CallExpr::createImplicit(C, decodeCall, C.AllocateCopy(args),
-                                            C.AllocateCopy(argNames));
+  auto *argList = ArgumentList::forImplicitCallTo(decodeCall->getName(),
+                                                  {targetExpr, keyExpr}, C);
+  auto *callExpr = CallExpr::createImplicit(C, decodeCall, argList);
 
   // try container.decode(Type.self, forKey: CodingKeys.x)
   auto *tryExpr = new (C) TryExpr(SourceLoc(), callExpr, Type(),
@@ -1483,11 +1472,9 @@ deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
             C, superRef, DeclBaseName::createConstructor(), {C.Id_from});
 
         // super.decode(from: container.superDecoder())
-        Expr *args[1] = {superDecoderCall};
-        Identifier argLabels[1] = {C.Id_from};
-        auto *callExpr = CallExpr::createImplicit(C, initCall,
-                                                  C.AllocateCopy(args),
-                                                  C.AllocateCopy(argLabels));
+        auto *argList =
+            ArgumentList::forImplicitSingle(C, C.Id_from, superDecoderCall);
+        auto *callExpr = CallExpr::createImplicit(C, initCall, argList);
 
         // try super.init(from: container.superDecoder())
         auto *tryExpr = new (C) TryExpr(SourceLoc(), callExpr, Type(),
@@ -1692,8 +1679,7 @@ deriveBodyDecodable_enum_init(AbstractFunctionDecl *initDecl, void *) {
           caseStatements.push_back(bindingDecl);
           caseStatements.push_back(nestedContainerDecl);
 
-          llvm::SmallVector<Expr *, 3> decodeCalls;
-          llvm::SmallVector<Identifier, 3> params;
+          llvm::SmallVector<Argument, 3> decodeArgs;
           if (elt->hasAssociatedValues()) {
             for (auto entry : llvm::enumerate(*elt->getParameterList())) {
               auto *paramDecl = entry.value();
@@ -1705,14 +1691,15 @@ deriveBodyDecodable_enum_init(AbstractFunctionDecl *initDecl, void *) {
               auto *caseCodingKey =
                   lookupEnumCase(C, caseCodingKeys, identifier);
 
-              params.push_back(getVarNameForCoding(paramDecl));
+              auto argLabel = getVarNameForCoding(paramDecl);
 
               // If no key is defined for this parameter, use the default value
               if (!caseCodingKey) {
                 // This should have been verified to have a default expr in the
                 // CodingKey synthesis
                 assert(paramDecl->hasDefaultExpr());
-                decodeCalls.push_back(paramDecl->getTypeCheckedDefaultExpr());
+                decodeArgs.emplace_back(SourceLoc(), argLabel,
+                                        paramDecl->getTypeCheckedDefaultExpr());
                 continue;
               }
 
@@ -1733,7 +1720,7 @@ deriveBodyDecodable_enum_init(AbstractFunctionDecl *initDecl, void *) {
                   C, varType, caseCodingKeys->getDeclaredType(), caseCodingKey,
                   nestedContainerExpr, useIfPresentVariant);
 
-              decodeCalls.push_back(tryExpr);
+              decodeArgs.emplace_back(SourceLoc(), argLabel, tryExpr);
             }
           }
 
@@ -1743,7 +1730,7 @@ deriveBodyDecodable_enum_init(AbstractFunctionDecl *initDecl, void *) {
           auto *selfTypeExpr =
               TypeExpr::createImplicit(targetEnum->getDeclaredType(), C);
 
-          if (params.empty()) {
+          if (decodeArgs.empty()) {
             auto *selfCaseExpr =
                 new (C) MemberRefExpr(selfTypeExpr, SourceLoc(), elt,
                                       DeclNameLoc(), /*Implicit=*/true);
@@ -1757,14 +1744,15 @@ deriveBodyDecodable_enum_init(AbstractFunctionDecl *initDecl, void *) {
             caseStatements.push_back(assignExpr);
           } else {
             // Foo.bar(x:)
+            SmallVector<Identifier, 3> scratch;
+            auto *argList = ArgumentList::createImplicit(C, decodeArgs);
             auto *selfCaseExpr = UnresolvedDotExpr::createImplicit(
                 C, selfTypeExpr, elt->getBaseIdentifier(),
-                C.AllocateCopy(params));
+                argList->getArgumentLabels(scratch));
 
             // Foo.bar(x: try nestedContainer.decode(Int.self, forKey: .x))
-            auto *caseCallExpr = CallExpr::createImplicit(
-                C, selfCaseExpr, C.AllocateCopy(decodeCalls),
-                C.AllocateCopy(params));
+            auto *caseCallExpr =
+                CallExpr::createImplicit(C, selfCaseExpr, argList);
 
             // self = Foo.bar(x: try nestedContainer.decode(Int.self))
             auto *assignExpr =
