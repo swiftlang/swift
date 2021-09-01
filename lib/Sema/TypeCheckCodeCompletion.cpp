@@ -119,16 +119,9 @@ public:
 
   std::pair<bool, ArgumentList *>
   walkToArgumentListPre(ArgumentList *argList) override {
-    // Strip default arguments and varargs from type-checked call
-    // argument lists.
-    auto originalArgs = argList->getOriginalArguments();
-    auto newArgs = originalArgs.getArray();
-    if (!argList->hasSameArgs(newArgs)) {
-      argList = ArgumentList::create(C, argList->getLParenLoc(), newArgs,
-                                     argList->getRParenLoc(),
-                                     argList->isImplicit());
-    }
-    return {true, argList};
+    // Return the argument list to the state prior to being rewritten. This will
+    // strip default arguments and expand variadic args.
+    return {true, argList->getOriginalArgs()};
   }
 
   std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {

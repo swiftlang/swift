@@ -1825,13 +1825,12 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
   };
 
   auto &diags = ctx.Diags;
-
-  auto originalArgs = argList->getOriginalArguments();
+  argList = argList->getOriginalArgs();
 
   // Figure out how many extraneous, missing, and wrong labels are in
   // the call.
   unsigned numExtra = 0, numMissing = 0, numWrong = 0;
-  unsigned n = std::max(originalArgs.size(), (unsigned)newNames.size());
+  unsigned n = std::max(argList->size(), (unsigned)newNames.size());
 
   llvm::SmallString<16> missingBuffer;
   llvm::SmallString<16> extraBuffer;
@@ -1841,8 +1840,8 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
     //  - nullptr for an argument without a label
     //  - have a value if the argument has a label
     Optional<Identifier> oldName;
-    if (i < originalArgs.size())
-      oldName = originalArgs[i].getLabel();
+    if (i < argList->size())
+      oldName = argList->getLabel(i);
     Optional<Identifier> newName;
     if (i < newNames.size())
       newName = newNames[i];
@@ -1850,7 +1849,7 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
     assert(oldName || newName && "We can't have oldName and newName out of "
                                  "bounds, otherwise n would be smaller");
 
-    if (oldName == newName || originalArgs.isUnlabeledTrailingClosureIndex(i))
+    if (oldName == newName || argList->isUnlabeledTrailingClosureIndex(i))
       continue;
 
     if (!oldName.hasValue() && newName.hasValue()) {
@@ -1885,8 +1884,8 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
   if (!existingDiag) {
     bool plural = (numMissing + numExtra + numWrong) > 1;
     if (numWrong > 0 || (numMissing > 0 && numExtra > 0)) {
-      for (unsigned i = 0, n = originalArgs.size(); i != n; ++i) {
-        auto haveName = originalArgs[i].getLabel();
+      for (unsigned i = 0, n = argList->size(); i != n; ++i) {
+        auto haveName = argList->getLabel(i);
         if (haveName.empty())
           haveBuffer += '_';
         else
@@ -1924,25 +1923,25 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
 
   // Emit Fix-Its to correct the names.
   auto &diag = getDiag();
-  for (unsigned i = 0, n = originalArgs.size(); i != n; ++i) {
-    Identifier oldName = originalArgs[i].getLabel();
+  for (unsigned i = 0, n = argList->size(); i != n; ++i) {
+    Identifier oldName = argList->getLabel(i);
     Identifier newName;
     if (i < newNames.size())
       newName = newNames[i];
 
-    if (oldName == newName || originalArgs.isUnlabeledTrailingClosureIndex(i))
+    if (oldName == newName || argList->isUnlabeledTrailingClosureIndex(i))
       continue;
 
     if (newName.empty()) {
       // If this is a labeled trailing closure, we need to replace with '_'.
-      if (originalArgs.isLabeledTrailingClosureIndex(i)) {
-        diag.fixItReplace(originalArgs[i].getLabelLoc(), "_");
+      if (argList->isLabeledTrailingClosureIndex(i)) {
+        diag.fixItReplace(argList->getLabelLoc(i), "_");
         continue;
       }
 
       // Otherwise, delete the old name.
-      diag.fixItRemoveChars(originalArgs[i].getLabelLoc(),
-                            originalArgs[i].getExpr()->getStartLoc());
+      diag.fixItRemoveChars(argList->getLabelLoc(i),
+                            argList->getExpr(i)->getStartLoc());
       continue;
     }
 
@@ -1957,15 +1956,15 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
     // If the argument was previously unlabeled, insert the new label. Note that
     // we don't do this for labeled trailing closures as they write unlabeled
     // args as '_:', and therefore need replacement.
-    if (oldName.empty() && !originalArgs.isLabeledTrailingClosureIndex(i)) {
+    if (oldName.empty() && !argList->isLabeledTrailingClosureIndex(i)) {
       // Insert the name.
       newStr += ": ";
-      diag.fixItInsert(originalArgs[i].getExpr()->getStartLoc(), newStr);
+      diag.fixItInsert(argList->getExpr(i)->getStartLoc(), newStr);
       continue;
     }
 
     // Change the name.
-    diag.fixItReplace(originalArgs[i].getLabelLoc(), newStr);
+    diag.fixItReplace(argList->getLabelLoc(i), newStr);
   }
 
   // If the diagnostic is local, flush it before returning.
@@ -3340,17 +3339,15 @@ void swift::fixItEncloseTrailingClosure(ASTContext &ctx,
                                         InFlightDiagnostic &diag,
                                         const CallExpr *call,
                                         Identifier closureLabel) {
-  auto *argList = call->getArgs();
+  auto *argList = call->getArgs()->getOriginalArgs();
+  assert(argList->size() >= 1 && "must have at least one argument");
 
   SmallString<32> replacement;
   SourceLoc lastLoc;
   SourceRange closureRange;
 
-  auto originalArgs = argList->getOriginalArguments();
-  assert(originalArgs.size() >= 1 && "must have at least one argument");
-
-  if (originalArgs.size() == 1) {
-    closureRange = originalArgs[0].getExpr()->getSourceRange();
+  if (argList->isUnary()) {
+    closureRange = argList->getExpr(0)->getSourceRange();
     lastLoc = argList->getLParenLoc(); // e.g funcName() { 1 }
     if (!lastLoc.isValid()) {
       // Bare trailing closure: e.g. funcName { 1 }
@@ -3359,9 +3356,9 @@ void swift::fixItEncloseTrailingClosure(ASTContext &ctx,
     }
   } else {
     // Tuple + trailing closure: e.g. funcName(x: 1) { 1 }
-    auto numElements = originalArgs.size();
-    closureRange = originalArgs[numElements - 1].getExpr()->getSourceRange();
-    lastLoc = originalArgs[numElements - 2].getExpr()->getEndLoc();
+    auto numElements = argList->size();
+    closureRange = argList->getExpr(numElements - 1)->getSourceRange();
+    lastLoc = argList->getExpr(numElements - 2)->getEndLoc();
     replacement = ", ";
   }
 
@@ -3387,10 +3384,11 @@ static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Expr *E) {
 
     void diagnoseIt(const CallExpr *E) {
       // FIXME: We ought to handle multiple trailing closures here (SR-15055)
-      auto *args = E->getArgs();
-      if (!args->hasSingleTrailingClosure()) return;
+      auto *args = E->getArgs()->getOriginalArgs();
+      if (args->getNumTrailingClosures() != 1)
+        return;
 
-      auto closureArg = *args->getOriginalArguments().getFirstTrailingClosure();
+      auto closureArg = *args->getFirstTrailingClosure();
       auto *closureExpr = closureArg.getExpr();
       auto closureTy = closureExpr->getType();
 
@@ -3398,9 +3396,30 @@ static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Expr *E) {
       if (!closureTy || closureTy->hasError())
         return;
 
+      // Figure out the label of the parameter the closure is being passed to.
+      // This will be present in the type-checked argument list (but not the
+      // original), so search it for the relevant argument, looking into
+      // variadic expansions if necessary.
+      Identifier label;
+      for (auto arg : *E->getArgs()) {
+        if (arg.getExpr() == closureExpr) {
+          label = arg.getLabel();
+          break;
+        }
+        if (auto *varg = dyn_cast<VarargExpansionExpr>(arg.getExpr())) {
+          if (auto *array = dyn_cast<ArrayExpr>(varg->getSubExpr())) {
+            if (!array->getElements().empty() &&
+                array->getElements()[0] == closureExpr) {
+              label = arg.getLabel();
+              break;
+            }
+          }
+        }
+      }
+
       auto diag = Ctx.Diags.diagnose(closureExpr->getStartLoc(),
                                      diag::trailing_closure_requires_parens);
-      fixItEncloseTrailingClosure(Ctx, diag, E, closureArg.getLabel());
+      fixItEncloseTrailingClosure(Ctx, diag, E, label);
     }
 
   public:

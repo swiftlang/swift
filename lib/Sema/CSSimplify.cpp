@@ -1038,7 +1038,7 @@ getCompletionArgInfo(ASTNode anchor, ConstraintSystem &CS) {
 
   for (unsigned i : indices(*args)) {
     if (CS.containsCodeCompletionLoc(args->getExpr(i)))
-      return CompletionArgInfo{i, args->getRawFirstTrailingClosureIndex()};
+      return CompletionArgInfo{i, args->getFirstTrailingClosureIndex()};
   }
   return None;
 }
@@ -1321,7 +1321,7 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
     ArgumentFailureTracker listener(cs, argsWithLabels, params, locator);
     auto callArgumentMatch = constraints::matchCallArguments(
         argsWithLabels, params, paramInfo,
-        argList->getRawFirstTrailingClosureIndex(), cs.shouldAttemptFixes(),
+        argList->getFirstTrailingClosureIndex(), cs.shouldAttemptFixes(),
         listener, trailingClosureMatching);
     if (!callArgumentMatch)
       return cs.getTypeMatchFailure(locator);
@@ -1434,7 +1434,7 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
       // let's produce a warning which would suggest to add a label
       // to disambiguate in the future.
       if (selectedTrailingMatching == TrailingClosureMatching::Backward &&
-          argIdx == *argList->getRawFirstTrailingClosureIndex()) {
+          argIdx == *argList->getFirstTrailingClosureIndex()) {
         cs.recordFix(SpecifyLabelToAssociateTrailingClosure::create(
             cs, cs.getConstraintLocator(loc)));
       }
@@ -9932,7 +9932,7 @@ retry_after_fail:
           auto labelsMatch = [&](MatchCallArgumentListener &listener) {
             if (areConservativelyCompatibleArgumentLabels(
                     choice, argsWithLabels, listener,
-                    argList->getRawFirstTrailingClosureIndex()))
+                    argList->getFirstTrailingClosureIndex()))
               return true;
 
             labelMismatch = true;

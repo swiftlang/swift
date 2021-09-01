@@ -39,103 +39,11 @@ bool Argument::isInOut() const {
   return ArgExpr->isSemanticallyInOutExpr();
 }
 
-/// Attempt to extract the underlying array expr from an implicit variadic
-/// expansion expr.
-static ArrayExpr *getVariadicArrayFrom(const Expr *E) {
-  auto *vargExpr = dyn_cast<VarargExpansionExpr>(E);
-  if (!vargExpr || !vargExpr->isImplicit())
-    return nullptr;
-  auto *vargArray = dyn_cast<ArrayExpr>(vargExpr->getSubExpr());
-  if (!vargArray || !vargArray->isImplicit())
-    return nullptr;
-  return vargArray;
-}
-
-namespace {
-struct TrailingClosureInfo {
-  Optional<unsigned> ArgIndex;
-  bool HasMultiple;
-
-  TrailingClosureInfo() : HasMultiple(false) {}
-  TrailingClosureInfo(Optional<unsigned> argIndex, bool hasMultiple)
-      : ArgIndex(argIndex), HasMultiple(hasMultiple) {}
-};
-} // end anonymous namespace
-
-static bool argExprHasValidSourceRange(const Expr *expr) {
-  // Default arguments may have source info, but it's not a valid argument
-  // source range.
-  return !isa<DefaultArgumentExpr>(expr) && expr->getSourceRange().isValid();
-}
-
-/// Whether a given argument expression in a non-implicit arg list is either a
-/// trailing closure, or is a variadic expansion containing a trailing closure.
-static bool isTrailingArgOfNonImplicitArgList(const Expr *argExpr,
-                                              SourceLoc rparenLoc) {
-  // If the argument has no valid source info, we can't count it as a trailing
-  // closure.
-  if (!argExprHasValidSourceRange(argExpr))
-    return false;
-
-  // If the right paren loc is invalid, this is something like 'fn {}'.
-  if (rparenLoc.isInvalid())
-    return true;
-
-  // Otherwise the argument must come after the r-paren. Note we check the end
-  // loc of the argument to match against variadic args that contain both
-  // non-trailing and trailing closures.
-  return rparenLoc.getOpaquePointerValue() <
-         argExpr->getEndLoc().getOpaquePointerValue();
-}
-
-static TrailingClosureInfo
-computeTrailingClosureInfo(ArrayRef<Argument> args, SourceLoc rparenLoc,
-                           bool isImplicit) {
-  // Implicit argument lists never have trailing closures.
-  if (isImplicit)
-    return {};
-
-  auto iter = llvm::find_if(args, [&](const auto &arg) {
-    return isTrailingArgOfNonImplicitArgList(arg.getExpr(), rparenLoc);
-  });
-  if (iter == args.end()) {
-    assert(rparenLoc.isValid() &&
-           "Explicit argument list with no parens and no trailing closures?");
-    return {};
-  }
-  auto argIdx = iter - args.begin();
-
-  // For the variadic case we need to dig into the variadic array to figure out
-  // if we have multiple trailing closures.
-  if (auto *array = getVariadicArrayFrom(args[argIdx].getExpr())) {
-    auto numTrailing = llvm::count_if(array->getElements(), [&](auto *expr) {
-      return isTrailingArgOfNonImplicitArgList(expr, rparenLoc);
-    });
-    assert(numTrailing > 0 && "Variadic args didn't have trailing closure?");
-    if (numTrailing > 1)
-      return TrailingClosureInfo(argIdx, /*HasMultiple*/ true);
-  }
-
-  // Otherwise, look for the next trailing closure if any.
-  auto restOfArgs = args.drop_front(argIdx + 1);
-  auto nextIter = llvm::find_if(restOfArgs, [&](const auto &arg) {
-    return isTrailingArgOfNonImplicitArgList(arg.getExpr(), rparenLoc);
-  });
-  return TrailingClosureInfo(argIdx, /*HasMultiple*/ nextIter != args.end());
-}
-
 ArgumentList *ArgumentList::create(ASTContext &ctx, SourceLoc lParenLoc,
                                    ArrayRef<Argument> args, SourceLoc rParenLoc,
                                    Optional<unsigned> firstTrailingClosureIndex,
-                                   bool hasMultipleTrailingClosures,
-                                   bool isImplicit, AllocationArena arena) {
-#ifndef NDEBUG
-  auto trailingInfo = computeTrailingClosureInfo(args, rParenLoc, isImplicit);
-  assert(trailingInfo.ArgIndex == firstTrailingClosureIndex);
-  assert(trailingInfo.HasMultiple == hasMultipleTrailingClosures);
-#endif
-
-  assert(lParenLoc.isValid() == rParenLoc.isValid());
+                                   bool isImplicit, ArgumentList *originalArgs,
+                                   AllocationArena arena) {
   SmallVector<Expr *, 4> exprs;
   SmallVector<Identifier, 4> labels;
   SmallVector<SourceLoc, 4> labelLocs;
@@ -156,12 +64,13 @@ ArgumentList *ArgumentList::create(ASTContext &ctx, SourceLoc lParenLoc,
   if (!hasLabelLocs)
     labelLocs.clear();
 
-  auto numBytes = totalSizeToAlloc<Expr *, Identifier, SourceLoc>(
-      exprs.size(), labels.size(), labelLocs.size());
+  auto numBytes =
+      totalSizeToAlloc<Expr *, Identifier, SourceLoc, ArgumentList *>(
+          exprs.size(), labels.size(), labelLocs.size(), originalArgs ? 1 : 0);
   auto *mem = ctx.Allocate(numBytes, alignof(ArgumentList), arena);
-  auto *argList = new (mem) ArgumentList(
-      lParenLoc, rParenLoc, args.size(), firstTrailingClosureIndex,
-      hasMultipleTrailingClosures, isImplicit, hasLabels, hasLabelLocs);
+  auto *argList = new (mem)
+      ArgumentList(lParenLoc, rParenLoc, args.size(), firstTrailingClosureIndex,
+                   originalArgs, isImplicit, hasLabels, hasLabelLocs);
 
   std::uninitialized_copy(exprs.begin(), exprs.end(),
                           argList->getExprsBuffer().begin());
@@ -173,24 +82,35 @@ ArgumentList *ArgumentList::create(ASTContext &ctx, SourceLoc lParenLoc,
     std::uninitialized_copy(labelLocs.begin(), labelLocs.end(),
                             argList->getLabelLocsBuffer().begin());
   }
+  if (originalArgs) {
+    *argList->getTrailingObjects<ArgumentList *>() = originalArgs;
+  }
   return argList;
 }
 
-ArgumentList *ArgumentList::create(ASTContext &ctx, SourceLoc lParenLoc,
-                                   ArrayRef<Argument> args, SourceLoc rParenLoc,
-                                   bool isImplicit, AllocationArena arena) {
-  auto trailingClosureInfo =
-      computeTrailingClosureInfo(args, rParenLoc, isImplicit);
-  return ArgumentList::create(
-      ctx, lParenLoc, args, rParenLoc, trailingClosureInfo.ArgIndex,
-      trailingClosureInfo.HasMultiple, isImplicit, arena);
+ArgumentList *
+ArgumentList::createParsed(ASTContext &ctx, SourceLoc lParenLoc,
+                           ArrayRef<Argument> args, SourceLoc rParenLoc,
+                           Optional<unsigned> firstTrailingClosureIndex) {
+  return create(ctx, lParenLoc, args, rParenLoc, firstTrailingClosureIndex,
+                /*implicit*/ false);
+}
+
+ArgumentList *ArgumentList::createTypeChecked(ASTContext &ctx,
+                                              ArgumentList *originalArgs,
+                                              ArrayRef<Argument> newArgs) {
+  return create(ctx, originalArgs->getLParenLoc(), newArgs,
+                originalArgs->getRParenLoc(), /*trailingClosureIdx*/ None,
+                originalArgs->isImplicit(), originalArgs);
 }
 
 ArgumentList *ArgumentList::createImplicit(ASTContext &ctx, SourceLoc lParenLoc,
                                            ArrayRef<Argument> args,
                                            SourceLoc rParenLoc,
                                            AllocationArena arena) {
-  return create(ctx, lParenLoc, args, rParenLoc, /*implicit*/ true, arena);
+  return create(ctx, lParenLoc, args, rParenLoc,
+                /*firstTrailingClosureIdx*/ None, /*implicit*/ true,
+                /*originalArgs*/ nullptr, arena);
 }
 
 ArgumentList *ArgumentList::createImplicit(ASTContext &ctx,
@@ -258,24 +178,13 @@ SourceRange ArgumentList::getSourceRange() const {
     }
   }
   auto end = RParenLoc;
-  if (hasAnyTrailingClosures()) {
-    // If we have trailing closures, the end loc is the end loc of the last
-    // trailing closure.
-    for (auto arg : llvm::reverse(*this)) {
-      if (isTrailingArgOfNonImplicitArgList(arg.getExpr(), RParenLoc)) {
-        end = arg.getEndLoc();
+  if (hasAnyTrailingClosures() || RParenLoc.isInvalid()) {
+    // Scan backward for the first valid source loc. We use getOriginalArgs to
+    // filter out default arguments and get accurate trailing closure info.
+    for (auto arg : llvm::reverse(*getOriginalArgs())) {
+      end = arg.getEndLoc();
+      if (end.isValid())
         break;
-      }
-    }
-  } else if (RParenLoc.isInvalid()) {
-    // If we don't have trailing closures and the r-paren loc is invalid, this
-    // is an implicit argument list. Take the last valid argument loc.
-    assert(isImplicit());
-    for (auto arg : llvm::reverse(*this)) {
-      if (argExprHasValidSourceRange(arg.getExpr())) {
-        end = arg.getEndLoc();
-        break;
-      }
     }
   }
   if (start.isInvalid() || end.isInvalid())
@@ -392,60 +301,4 @@ bool ArgumentList::matches(ArrayRef<AnyFunctionType::Param> params,
       return false;
   }
   return true;
-}
-
-OriginalArguments ArgumentList::getOriginalArguments() const {
-  // We need to sort out the trailing closures separately to handle cases like:
-  //
-  // func foo(fn: () -> Void, x: Int = 0) {}
-  // foo(x: 0) {}
-  //
-  // where we currently allow the re-ordering of a trailing closure argument
-  // such that it appears as the first argument in the type-checked AST. To
-  // remedy this, separate out the trailing closures and make sure to append
-  // them after the regular arguments.
-  OriginalArguments::Storage newArgs;
-  SmallVector<Argument, 1> trailingClosures;
-
-  auto addArg = [&](Argument arg) {
-    if (hasAnyTrailingClosures() &&
-        isTrailingArgOfNonImplicitArgList(arg.getExpr(), getRParenLoc())) {
-      trailingClosures.push_back(arg);
-      return;
-    }
-    newArgs.push_back(arg);
-  };
-  for (auto arg : *this) {
-    auto *expr = arg.getExpr();
-    if (isa<DefaultArgumentExpr>(expr))
-      continue;
-
-    if (auto *vargArray = getVariadicArrayFrom(expr)) {
-      auto elts = vargArray->getElements();
-      for (auto idx : indices(elts)) {
-        // The first element in a variadic expansion takes the argument label,
-        // the rest are unlabeled.
-        if (idx == 0) {
-          addArg(Argument(arg.getLabelLoc(), arg.getLabel(), elts[idx]));
-        } else {
-          addArg(Argument::unlabeled(elts[idx]));
-        }
-      }
-      continue;
-    }
-    addArg(arg);
-  }
-  Optional<unsigned> trailingClosureIdx;
-  if (!trailingClosures.empty())
-    trailingClosureIdx = newArgs.size();
-
-  newArgs.append(trailingClosures.begin(), trailingClosures.end());
-  auto origArgs = OriginalArguments(std::move(newArgs), trailingClosureIdx);
-#ifndef NDEBUG
-  auto trailingInfo = computeTrailingClosureInfo(origArgs.getArray(),
-                                                 getRParenLoc(), isImplicit());
-  assert(trailingInfo.ArgIndex == trailingClosureIdx);
-  assert(trailingInfo.HasMultiple == origArgs.hasMultipleTrailingClosures());
-#endif
-  return origArgs;
 }

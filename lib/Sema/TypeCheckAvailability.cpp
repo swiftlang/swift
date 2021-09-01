@@ -1889,11 +1889,9 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
     SourceLoc removeRangeStart;
     SourceLoc removeRangeEnd;
 
-    auto *argList = CE->getArgs();
-    auto originalArgs = argList->getOriginalArguments();
-
-    size_t numElementsWithinParens = originalArgs.size();
-    numElementsWithinParens -= originalArgs.getNumTrailingClosures();
+    auto *originalArgs = CE->getArgs()->getOriginalArgs();
+    size_t numElementsWithinParens = originalArgs->size();
+    numElementsWithinParens -= originalArgs->getNumTrailingClosures();
     if (selfIndex >= numElementsWithinParens)
       return;
 
@@ -1904,48 +1902,48 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
       if (numElementsWithinParens != 2)
         return;
     } else {
-      if (parsed.ArgumentLabels.size() != originalArgs.size() - 1)
+      if (parsed.ArgumentLabels.size() != originalArgs->size() - 1)
         return;
     }
 
-    selfExpr = originalArgs[selfIndex].getExpr();
+    selfExpr = originalArgs->getExpr(selfIndex);
 
     if (selfIndex + 1 == numElementsWithinParens) {
       if (selfIndex > 0) {
         // Remove from the previous comma to the close-paren (half-open).
-        removeRangeStart = originalArgs[selfIndex - 1].getExpr()->getEndLoc();
+        removeRangeStart = originalArgs->getExpr(selfIndex - 1)->getEndLoc();
         removeRangeStart = Lexer::getLocForEndOfToken(sourceMgr,
                                                       removeRangeStart);
       } else {
         // Remove from after the open paren to the close paren (half-open).
         removeRangeStart =
-            Lexer::getLocForEndOfToken(sourceMgr, argList->getStartLoc());
+            Lexer::getLocForEndOfToken(sourceMgr, originalArgs->getStartLoc());
       }
 
       // Prefer the r-paren location, so that we get the right behavior when
       // there's a trailing closure, but handle some implicit cases too.
-      removeRangeEnd = argList->getRParenLoc();
+      removeRangeEnd = originalArgs->getRParenLoc();
       if (removeRangeEnd.isInvalid())
-        removeRangeEnd = argList->getEndLoc();
+        removeRangeEnd = originalArgs->getEndLoc();
 
     } else {
       // Remove from the label to the start of the next argument (half-open).
-      SourceLoc labelLoc = originalArgs[selfIndex].getLabelLoc();
+      SourceLoc labelLoc = originalArgs->getLabelLoc(selfIndex);
       if (labelLoc.isValid())
         removeRangeStart = labelLoc;
       else
         removeRangeStart = selfExpr->getStartLoc();
 
-      SourceLoc nextLabelLoc = originalArgs[selfIndex + 1].getLabelLoc();
+      SourceLoc nextLabelLoc = originalArgs->getLabelLoc(selfIndex + 1);
       if (nextLabelLoc.isValid())
         removeRangeEnd = nextLabelLoc;
       else
-        removeRangeEnd = originalArgs[selfIndex + 1].getExpr()->getStartLoc();
+        removeRangeEnd = originalArgs->getExpr(selfIndex + 1)->getStartLoc();
     }
 
     // Avoid later argument label fix-its for this argument.
     if (!parsed.isPropertyAccessor()) {
-      Identifier oldLabel = originalArgs[selfIndex].getLabel();
+      Identifier oldLabel = originalArgs->getLabel(selfIndex);
       StringRef oldLabelStr;
       if (!oldLabel.empty())
         oldLabelStr = oldLabel.str();
@@ -2063,34 +2061,32 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
   if (!call || !call->getArgs())
     return;
 
-  auto *argList = call->getArgs();
-  auto originalArgs = argList->getOriginalArguments();
-
+  auto *originalArgs = call->getArgs()->getOriginalArgs();
   if (parsed.IsGetter) {
-    diag.fixItRemove(argList->getSourceRange());
+    diag.fixItRemove(originalArgs->getSourceRange());
     return;
   }
 
   if (parsed.IsSetter) {
     const Expr *newValueExpr = nullptr;
 
-    if (originalArgs.size() >= 1) {
+    if (originalArgs->size() >= 1) {
       size_t newValueIndex = 0;
       if (parsed.isInstanceMember()) {
         assert(parsed.SelfIndex.getValue() == 0 ||
                parsed.SelfIndex.getValue() == 1);
         newValueIndex = !parsed.SelfIndex.getValue();
       }
-      newValueExpr = originalArgs[newValueIndex].getExpr();
+      newValueExpr = originalArgs->getExpr(newValueIndex);
     } else {
-      newValueExpr = originalArgs[0].getExpr();
+      newValueExpr = originalArgs->getExpr(0);
     }
 
-    diag.fixItReplaceChars(argList->getStartLoc(), newValueExpr->getStartLoc(),
-                           " = ");
+    diag.fixItReplaceChars(originalArgs->getStartLoc(),
+                           newValueExpr->getStartLoc(), " = ");
     diag.fixItRemoveChars(
         Lexer::getLocForEndOfToken(sourceMgr, newValueExpr->getEndLoc()),
-        Lexer::getLocForEndOfToken(sourceMgr, argList->getEndLoc()));
+        Lexer::getLocForEndOfToken(sourceMgr, originalArgs->getEndLoc()));
     return;
   }
 
@@ -2154,23 +2150,23 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
     return false;
   };
 
-  for (auto arg : *argList) {
+  for (auto arg : *call->getArgs()) {
     if (updateLabelsForArg(arg.getExpr()))
       return;
   }
 
-  if (argumentLabelIDs.size() != originalArgs.size()) {
+  if (argumentLabelIDs.size() != originalArgs->size()) {
     // Mismatched lengths; give up.
     return;
   }
 
   // If any of the argument labels are mismatched, perform label correction.
-  for (auto i : indices(originalArgs)) {
+  for (auto i : indices(*originalArgs)) {
     // The argument label of an unlabeled trailing closure is ignored.
-    if (originalArgs.isUnlabeledTrailingClosureIndex(i))
+    if (originalArgs->isUnlabeledTrailingClosureIndex(i))
       continue;
-    if (argumentLabelIDs[i] != originalArgs[i].getLabel()) {
-      diagnoseArgumentLabelError(ctx, argList, argumentLabelIDs,
+    if (argumentLabelIDs[i] != originalArgs->getLabel(i)) {
+      diagnoseArgumentLabelError(ctx, originalArgs, argumentLabelIDs,
                                  parsed.IsSubscript, &diag);
       return;
     }

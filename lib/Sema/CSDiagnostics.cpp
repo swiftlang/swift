@@ -1713,7 +1713,7 @@ bool TrailingClosureAmbiguityFailure::diagnoseAsNote() {
     return false;
 
   // FIXME: We ought to handle multiple trailing closures here (SR-15054)
-  if (!callExpr->getArgs()->hasSingleTrailingClosure())
+  if (callExpr->getArgs()->getNumTrailingClosures() != 1)
     return false;
   if (callExpr->getFn() != anchor)
     return false;
@@ -4392,7 +4392,7 @@ bool MissingArgumentsFailure::diagnoseSingleMissingArgument() const {
       ->lookThroughAllOptionalTypes()->is<AnyFunctionType>();
 
   // Determine whether we're inserting as a trailing closure.
-  auto firstTrailingClosureIdx = args->getRawFirstTrailingClosureIndex();
+  auto firstTrailingClosureIdx = args->getFirstTrailingClosureIndex();
   auto insertingTrailingClosure =
       firstTrailingClosureIdx && position > *firstTrailingClosureIdx;
 
@@ -4407,7 +4407,7 @@ bool MissingArgumentsFailure::diagnoseSingleMissingArgument() const {
   forFixIt(insertText, argument.param);
 
   if (position == 0 && !args->empty() &&
-      !args->isRawTrailingClosureIndex(position)) {
+      !args->isTrailingClosureIndex(position)) {
     insertText << ", ";
   }
 
@@ -5116,7 +5116,7 @@ bool ExtraneousArgumentsFailure::diagnoseAsError() {
   bool areTrailingClosures = false;
   if (auto *argList = getArgumentListFor(getLocator())) {
     areTrailingClosures = llvm::all_of(ExtraArgs, [&](auto &pair) {
-      return argList->isRawTrailingClosureIndex(pair.first);
+      return argList->isTrailingClosureIndex(pair.first);
     });
   }
 
@@ -5169,7 +5169,7 @@ bool ExtraneousArgumentsFailure::diagnoseSingleExtraArgument() const {
 
   auto *argExpr = arguments->getExpr(index);
   auto loc = argExpr->getLoc();
-  if (arguments->isRawTrailingClosureIndex(index)) {
+  if (arguments->isTrailingClosureIndex(index)) {
     emitDiagnosticAt(loc, diag::extra_trailing_closure_in_call)
         .highlight(argExpr->getSourceRange());
   } else if (ContextualType->getNumParams() == 0) {

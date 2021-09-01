@@ -666,8 +666,7 @@ private:
               return Stop;
           }
         } else {
-          auto OriginalArgs = Args->getOriginalArguments();
-          handleImplicitRange(OriginalArgs.getTrailingSourceRange(),
+          handleImplicitRange(Args->getOriginalArgs()->getTrailingSourceRange(),
                               ContextLoc);
         }
       }
@@ -2692,7 +2691,7 @@ private:
 
       return getIndentContextFrom(CE, ContextLoc);
     }
-    auto ClosuresRange = Args->getOriginalArguments().getTrailingSourceRange();
+    auto ClosuresRange = Args->getOriginalArgs()->getTrailingSourceRange();
     if (!overlapsTarget(ClosuresRange) && !TrailingTarget)
       return None;
 
@@ -2731,8 +2730,7 @@ private:
     }
 
     ListAligner Aligner(SM, TargetLocation, ContextLoc, L, R);
-    auto OriginalArgs = Args->getOriginalArguments();
-    for (auto Arg : OriginalArgs.getNonTrailingArgs()) {
+    for (auto Arg : Args->getOriginalArgs()->getNonTrailingArgs()) {
       SourceRange ElemRange = Arg.getLabelLoc();
       auto *Elem = Arg.getExpr();
       assert(Elem);
