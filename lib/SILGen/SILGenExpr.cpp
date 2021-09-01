@@ -2524,7 +2524,7 @@ visitObjectLiteralExpr(ObjectLiteralExpr *E, SGFContext C) {
   AnyFunctionType *fnTy = decl->getMethodInterfaceType()
                               .subst(init.getSubstitutions())
                               ->getAs<AnyFunctionType>();
-  PreparedArguments args(fnTy->getParams(), E->getArg());
+  PreparedArguments args(fnTy->getParams(), E->getArgs());
   return SGF.emitApplyAllocatingInitializer(SILLocation(E), init,
                                             std::move(args), E->getType(), C);
 }
@@ -3673,7 +3673,7 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
       auto subscript = cast<SubscriptDecl>(decl);
       auto loweredArgs = SGF.emitKeyPathSubscriptOperands(
           subscript, component.getDeclRef().getSubstitutions(),
-          component.getIndexExpr());
+          component.getSubscriptArgs());
 
       for (auto &arg : loweredArgs) {
         operands.push_back(arg.forward(SGF));
