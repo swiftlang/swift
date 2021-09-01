@@ -1615,6 +1615,15 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       // Diagnostics should correct the innermost closure
       auto *ACE = Closures[Closures.size() - 1];
       assert(ACE);
+
+      // Until Swift 6, only emit a warning when we get this with an
+      // explicit capture, since we used to not diagnose this at all.
+      auto shouldOnlyWarn = [&](Expr *selfRef) {
+        // We know that isImplicitSelfParamUseLikelyToCauseCycle is true,
+        // which means all these casts are valid.
+        return !cast<VarDecl>(cast<DeclRefExpr>(selfRef)->getDecl())
+                  ->isSelfParameter();
+      };
       
       SourceLoc memberLoc = SourceLoc();
       if (auto *MRE = dyn_cast<MemberRefExpr>(E))
@@ -1624,7 +1633,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
           Diags.diagnose(memberLoc,
                          diag::property_use_in_closure_without_explicit_self,
                          baseName.getIdentifier())
-               .warnUntilSwiftVersionIf(Closures.size() > 1, 6);
+               .warnUntilSwiftVersionIf(shouldOnlyWarn(MRE->getBase()), 6);
         }
 
       // Handle method calls with a specific diagnostic + fixit.
@@ -1636,7 +1645,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
           Diags.diagnose(DSCE->getLoc(),
                          diag::method_call_in_closure_without_explicit_self,
                          MethodExpr->getDecl()->getBaseIdentifier())
-               .warnUntilSwiftVersionIf(Closures.size() > 1, 6);
+               .warnUntilSwiftVersionIf(shouldOnlyWarn(DSCE->getBase()), 6);
         }
 
       if (memberLoc.isValid()) {
@@ -1647,7 +1656,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       // Catch any other implicit uses of self with a generic diagnostic.
       if (isImplicitSelfParamUseLikelyToCauseCycle(E, ACE))
         Diags.diagnose(E->getLoc(), diag::implicit_use_of_self_in_closure)
-             .warnUntilSwiftVersionIf(Closures.size() > 1, 6);
+             .warnUntilSwiftVersionIf(shouldOnlyWarn(E), 6);
 
       return { true, E };
     }
