@@ -77,7 +77,8 @@ static Expr *constructUnownedSerialExecutor(ASTContext &ctx,
 
     // Call the constructor, building an expression of type
     // UnownedSerialExecutor.
-    auto call = CallExpr::createImplicit(ctx, selfApply, arg, /*labels*/ {});
+    auto *argList = ArgumentList::forImplicitUnlabeled(ctx, {arg});
+    auto call = CallExpr::createImplicit(ctx, selfApply, argList);
     call->setType(executorType);
     call->setThrows(false);
     return call;
