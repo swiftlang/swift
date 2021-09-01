@@ -12,6 +12,7 @@
 // RUN: %target-build-swift -target x86_64-apple-macosx10.15 %s -o %t/test_mangling -Xfrontend -disable-availability-checking
 // RUN: %target-run %t/test_mangling
 
+// REQUIRES: CPU=x86_64
 // REQUIRES: OS=macosx
 // REQUIRES: executable_test
 
