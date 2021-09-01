@@ -328,19 +328,18 @@ public:
   Remangler(SymbolicResolver Resolver, NodeFactory &Factory)
        : RemanglerBase(Factory), Resolver(Resolver) { }
 
-  void mangle(Node *node, unsigned depth) {
+  ManglingError mangle(Node *node, unsigned depth) {
     if (depth > Remangler::MaxDepth) {
-      // FIXME: error handling needs doing properly (rdar://79725187)
-      unreachable("too complex to remangle");
+      return ManglingError(ManglingError::TooComplex, node);
     }
 
     switch (node->getKind()) {
 #define NODE(ID)                                                               \
   case Node::Kind::ID:                                                         \
-    return mangle##ID(node, depth);
+    mangle##ID(node, depth); return ManglingError(ManglingError::Success);
 #include "swift/Demangling/DemangleNodes.def"
     }
-    unreachable("bad demangling tree node");
+    return ManglingError(ManglingError::BadNodeKind, node);
   }
 };
 
@@ -2744,20 +2743,20 @@ void Remangler::mangleAssociatedTypeGenericParamRef(Node *node,
 }
 
 void Remangler::mangleTypeSymbolicReference(Node *node, unsigned depth) {
-  return mangle(
+  mangle(
       Resolver(SymbolicReferenceKind::Context, (const void *)node->getIndex()),
       depth + 1);
 }
 
 void Remangler::mangleProtocolSymbolicReference(Node *node, unsigned depth) {
-  return mangle(
+  mangle(
       Resolver(SymbolicReferenceKind::Context, (const void *)node->getIndex()),
       depth + 1);
 }
 
 void Remangler::mangleOpaqueTypeDescriptorSymbolicReference(Node *node,
                                                             unsigned depth) {
-  return mangle(
+  mangle(
       Resolver(SymbolicReferenceKind::Context, (const void *)node->getIndex()),
       depth + 1);
 }
@@ -2870,32 +2869,37 @@ void Remangler::mangleGlobalVariableOnceDeclList(Node *node, unsigned depth) {
 } // anonymous namespace
 
 /// The top-level interface to the remangler.
-std::string Demangle::mangleNode(NodePointer node) {
+ManglingErrorOr<std::string> Demangle::mangleNode(NodePointer node) {
   return mangleNode(node, [](SymbolicReferenceKind, const void *) -> NodePointer {
-    unreachable("should not try to mangle a symbolic reference; "
-                "resolve it to a non-symbolic demangling tree instead");
-  });
+                            return nullptr;
+                          });
+  //  unreachable("should not try to mangle a symbolic reference; "
+  //              "resolve it to a non-symbolic demangling tree instead");
 }
 
-std::string
+ManglingErrorOr<std::string>
 Demangle::mangleNode(NodePointer node, SymbolicResolver resolver) {
-  if (!node) return "";
+  if (!node) return std::string();
 
   NodeFactory Factory;
   Remangler remangler(resolver, Factory);
-  remangler.mangle(node, 0);
+  ManglingError err = remangler.mangle(node, 0);
+  if (!err.isSuccess())
+    return err;
 
   return remangler.str();
 }
 
-llvm::StringRef
+ManglingErrorOr<llvm::StringRef>
 Demangle::mangleNode(NodePointer node, SymbolicResolver resolver,
                      NodeFactory &Factory) {
   if (!node)
     return StringRef();
 
   Remangler remangler(resolver, Factory);
-  remangler.mangle(node, 0);
+  ManglingError err = remangler.mangle(node, 0);
+  if (!err.isSuccess())
+    return err;
 
   return remangler.getBufferStr();
 }

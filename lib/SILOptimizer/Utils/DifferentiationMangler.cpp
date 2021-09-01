@@ -81,7 +81,9 @@ std::string DifferentiationMangler::mangleAutoDiffFunction(
     Demangler demangler;
     auto node = mangleAutoDiffFunctionAsNode(
         originalName, kind, config, demangler);
-    return Demangle::mangleNode(node);
+    auto mangling = Demangle::mangleNode(node);
+    assert(mangling.isSuccess());
+    return mangling.result();
   }
   // Otherwise, treat the original function symbol as a black box and just
   // mangle the other parts.
@@ -162,7 +164,9 @@ DifferentiationMangler::mangleDerivativeFunctionSubsetParametersThunk(
     auto node = mangleDerivativeFunctionSubsetParametersThunkAsNode(
         originalName, toType, kind, fromParamIndices, fromResultIndices,
         toParamIndices, demangler);
-    return Demangle::mangleNode(node);
+    auto mangling = Demangle::mangleNode(node);
+    assert(mangling.isSuccess());
+    return mangling.result();
   }
   // Otherwise, treat the original function symbol as a black box and just
   // mangle the other parts.

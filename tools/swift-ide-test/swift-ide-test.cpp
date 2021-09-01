@@ -2395,7 +2395,14 @@ static int doPrintLocalTypes(const CompilerInvocation &InitInvok,
       while (node->getKind() != NodeKind::LocalDeclName)
         node = node->getChild(1); // local decl name
 
-      auto remangled = Demangle::mangleNode(typeNode);
+      auto mangling = Demangle::mangleNode(typeNode);
+      if (!mangling.isSuccess()) {
+        llvm::errs() << "Couldn't remangle type (failed at Node "
+                     << mangling.errorNode() << " with error "
+                     << mangling.errorCode() << ")\n";
+        return EXIT_FAILURE;
+      }
+      auto remangled = mangling.result();
 
       auto LTD = M->lookupLocalType(remangled);
 

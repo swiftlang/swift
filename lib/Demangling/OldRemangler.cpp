@@ -74,19 +74,18 @@ namespace {
       };
     };
 
-    void mangle(Node *node, unsigned depth) {
+    ManglingError mangle(Node *node, unsigned depth) {
       if (depth > Remangler::MaxDepth) {
-        // FIXME: error handling needs doing properly (rdar://79725187)
-        unreachable("too complex to remangle");
+        return ManglingError(ManglingError::TooComplex, node);
       }
 
       switch (node->getKind()) {
 #define NODE(ID)                                                               \
   case Node::Kind::ID:                                                         \
-    return mangle##ID(node, depth);
+    mangle##ID(node, depth); return ManglingError(ManglingError::Success);
 #include "swift/Demangling/DemangleNodes.def"
       }
-      unreachable("bad demangling tree node");
+      return ManglingError(ManglingError::BadNodeKind, node);
     }
 
     void mangleGenericArgs(Node *node, EntityContext &ctx, unsigned depth);
@@ -2403,32 +2402,41 @@ void Remangler::mangleCanonicalPrespecializedGenericTypeCachingOnceToken(
 }
 
 /// The top-level interface to the remangler.
-std::string Demangle::mangleNodeOld(NodePointer node) {
-  if (!node) return "";
+ManglingErrorOr<std::string>
+Demangle::mangleNodeOld(NodePointer node) {
+  if (!node) return std::string();
 
   NodeFactory Factory;
   Remangler remangler(Factory);
-  remangler.mangle(node, 0);
+  ManglingError err = remangler.mangle(node, 0);
+  if (!err.isSuccess())
+    return err;
 
   return remangler.str();
 }
 
-llvm::StringRef Demangle::mangleNodeOld(NodePointer node, NodeFactory &Factory) {
-  if (!node) return "";
+ManglingErrorOr<llvm::StringRef>
+Demangle::mangleNodeOld(NodePointer node, NodeFactory &Factory) {
+  if (!node) return llvm::StringRef();
 
   Remangler remangler(Factory);
-  remangler.mangle(node, 0);
+  ManglingError err = remangler.mangle(node, 0);
+  if (!err.isSuccess())
+    return err;
 
   return remangler.getBufferStr();
 }
 
-const char *Demangle::mangleNodeAsObjcCString(NodePointer node,
-                                              NodeFactory &Factory) {
+ManglingErrorOr<const char *>
+Demangle::mangleNodeAsObjcCString(NodePointer node,
+                                  NodeFactory &Factory) {
   assert(node);
 
   Remangler remangler(Factory);
   remangler.append("_Tt");
-  remangler.mangle(node, 0);
+  ManglingError err = remangler.mangle(node, 0);
+  if (!err.isSuccess())
+    return err;
   remangler.append(StringRef("_", 2)); // Include the trailing 0 char.
 
   return remangler.getBufferStr().data();

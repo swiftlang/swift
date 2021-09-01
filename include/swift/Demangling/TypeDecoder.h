@@ -608,8 +608,13 @@ protected:
       return decodeMangledType(genericArgs->getChild(0), depth + 1);
     }
     case NodeKind::BuiltinTypeName: {
-      auto mangledName = Demangle::mangleNode(Node);
-      return Builder.createBuiltinType(Node->getText().str(), mangledName);
+      auto mangling = Demangle::mangleNode(Node);
+      if (!mangling.isSuccess()) {
+        return MAKE_NODE_TYPE_ERROR(Node,
+                                    "failed to mangle node (%d)",
+                                    mangling.errorCode());
+      }
+      return Builder.createBuiltinType(Node->getText().str(), mangling.result());
     }
     case NodeKind::Metatype:
     case NodeKind::ExistentialMetatype: {

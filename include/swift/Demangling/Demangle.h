@@ -512,8 +512,57 @@ enum class OperatorKind {
   Infix,
 };
 
+/// A mangling error, which consists of an error code and a Node pointer
+struct ManglingError {
+  enum Code {
+    Success = 0,
+    Uninitialized,
+    TooComplex,
+    BadNodeKind,
+    BadNominalTypeKind,
+    NotAStorageNode,
+    UnsupportedNodeKind,
+    UnexpectedBuiltinVectorType,
+    UnexpectedBuiltinType,
+  };
+
+  Code        code;
+  NodePointer node;
+
+  ManglingError() : code(Uninitialized), node(nullptr) {}
+  ManglingError(Code c, NodePointer n = nullptr) : code(c), node(n) {}
+
+  bool isSuccess() const { return code == Success; }
+};
+
+/// Used as a return type for mangling functions that may fail
+template <typename T>
+class ManglingErrorOr {
+private:
+  ManglingError err_;
+  T             value_;
+
+public:
+  ManglingErrorOr() : err_() {}
+  ManglingErrorOr(ManglingError::Code code, NodePointer node = nullptr)
+    : err_(code, node) {}
+  ManglingErrorOr(const ManglingError &err) : err_(err) {}
+  ManglingErrorOr(const T &t) : err_(ManglingError::Success), value_(t) {}
+  ManglingErrorOr(T &&t) : err_(ManglingError::Success), value_(std::move(t)) {}
+
+  bool isSuccess() const { return err_.code == ManglingError::Success; }
+
+  ManglingError::Code errorCode() const { return err_.code; }
+  NodePointer errorNode() const { return err_.node; }
+
+  const T &result() const {
+    assert(isSuccess());
+    return value_;
+  }
+};
+
 /// Remangle a demangled parse tree.
-std::string mangleNode(NodePointer root);
+ManglingErrorOr<std::string> mangleNode(NodePointer root);
 
 using SymbolicResolver =
   llvm::function_ref<Demangle::NodePointer (SymbolicReferenceKind,
@@ -521,33 +570,36 @@ using SymbolicResolver =
 
 /// Remangle a demangled parse tree, using a callback to resolve
 /// symbolic references.
-std::string mangleNode(NodePointer root, SymbolicResolver resolver);
+ManglingErrorOr<std::string> mangleNode(NodePointer root, SymbolicResolver resolver);
 
 /// Remangle a demangled parse tree, using a callback to resolve
 /// symbolic references.
 ///
 /// The returned string is owned by \p Factory. This means \p Factory must stay
 /// alive as long as the returned string is used.
-llvm::StringRef mangleNode(NodePointer root, SymbolicResolver resolver,
-                           NodeFactory &Factory);
+ManglingErrorOr<llvm::StringRef> mangleNode(NodePointer root,
+                                            SymbolicResolver resolver,
+                                            NodeFactory &Factory);
 
 /// Remangle in the old mangling scheme.
 ///
 /// This is only used for objc-runtime names.
-std::string mangleNodeOld(NodePointer root);
+ManglingErrorOr<std::string> mangleNodeOld(NodePointer root);
 
 /// Remangle in the old mangling scheme.
 ///
 /// This is only used for objc-runtime names.
 /// The returned string is owned by \p Factory. This means \p Factory must stay
 /// alive as long as the returned string is used.
-llvm::StringRef mangleNodeOld(NodePointer node, NodeFactory &Factory);
+ManglingErrorOr<llvm::StringRef> mangleNodeOld(NodePointer node,
+                                               NodeFactory &Factory);
 
 /// Remangle in the old mangling scheme and embed the name in "_Tt<name>_".
 ///
 /// The returned string is null terminated and owned by \p Factory. This means
 /// \p Factory must stay alive as long as the returned string is used.
-const char *mangleNodeAsObjcCString(NodePointer node, NodeFactory &Factory);
+ManglingErrorOr<const char *> mangleNodeAsObjcCString(NodePointer node,
+                                                      NodeFactory &Factory);
 
 /// Transform the node structure to a string.
 ///

@@ -151,7 +151,12 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
       // mangling and demangling tests.
       remangled = name.str();
     } else {
-      remangled = swift::Demangle::mangleNode(pointer);
+      auto mangling = swift::Demangle::mangleNode(pointer);
+      if (!mangling.isSuccess()) {
+        llvm::errs() << "\nError: unable to re-mangle " << name << '\n';
+        exit(1);
+      }
+      remangled = mangling.result();
       unsigned prefixLen = swift::Demangle::getManglingPrefixLength(remangled);
       assert(prefixLen > 0);
       // Replace the prefix if we remangled with a different prefix.
@@ -174,7 +179,12 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
   } else if (RemangleRtMode) {
     std::string remangled = name.str();
     if (pointer) {
-      remangled = swift::Demangle::mangleNodeOld(pointer);
+      auto mangling = swift::Demangle::mangleNodeOld(pointer);
+      if (!mangling.isSuccess()) {
+        llvm::errs() << "\nError: unable to re-mangle " << name << '\n';
+        exit(1);
+      }
+      remangled = mangling.result();
     }
     llvm::outs() << remangled;
   }
@@ -184,13 +194,23 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
         llvm::errs() << "Can't de-mangle " << name << '\n';
         exit(1);
       }
-      std::string remangled = swift::Demangle::mangleNode(pointer);
+      auto mangling = swift::Demangle::mangleNode(pointer);
+      if (!mangling.isSuccess()) {
+        llvm::errs() << "Can't re-mangle " << name << '\n';
+        exit(1);
+      }
+      std::string remangled = mangling.result();
       llvm::outs() << remangled;
       return;
     }
     if (StripSpecialization) {
       stripSpecialization(pointer);
-      std::string remangled = swift::Demangle::mangleNode(pointer);
+      auto mangling = swift::Demangle::mangleNode(pointer);
+      if (!mangling.isSuccess()) {
+        llvm::errs() << "Can't re-mangle " << name << '\n';
+        exit(1);
+      }
+      std::string remangled = mangling.result();
       llvm::outs() << remangled;
       return;
     }
