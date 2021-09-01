@@ -1367,6 +1367,19 @@ public:
 
     return false;
   }
+
+  ArgumentList *doIt(ArgumentList *ArgList) {
+    auto Pre = Walker.walkToArgumentListPre(ArgList);
+    if (!Pre.first || !Pre.second)
+      return Pre.second;
+
+    for (auto Idx : indices(*Pre.second)) {
+      auto *E = doIt(ArgList->getExpr(Idx));
+      if (!E) return nullptr;
+      ArgList->setExpr(Idx, E);
+    }
+    return Walker.walkToArgumentListPost(Pre.second);
+  }
 };
 
 } // end anonymous namespace
@@ -1910,5 +1923,9 @@ bool Decl::walk(ASTWalker &walker) {
 }
 
 bool GenericParamList::walk(ASTWalker &walker) {
+  return Traversal(walker).doIt(this);
+}
+
+ArgumentList *ArgumentList::walk(ASTWalker &walker) {
   return Traversal(walker).doIt(this);
 }
