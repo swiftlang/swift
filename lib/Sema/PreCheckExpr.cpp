@@ -340,16 +340,12 @@ UnresolvedMemberExpr *TypeChecker::getUnresolvedMemberChainBase(Expr *expr) {
     return dyn_cast<UnresolvedMemberExpr>(expr);
 }
 
-/// Whether this expression is a member of a member chain.
-static bool isMemberChainMember(Expr *expr) {
-  return getMemberChainSubExpr(expr) != nullptr;
-}
 /// Whether this expression sits at the end of a chain of member accesses.
 static bool isMemberChainTail(Expr *expr, Expr *parent) {
   assert(expr && "isMemberChainTail called with null expr!");
   // If this expression's parent is not itself part of a chain (or, this expr
   // has no parent expr), this must be the tail of the chain.
-  return parent == nullptr || !isMemberChainMember(parent);
+  return !parent || getMemberChainSubExpr(parent) != expr;
 }
 
 static bool isValidForwardReference(ValueDecl *D, DeclContext *DC,
