@@ -364,7 +364,6 @@ static bool hasEscapingUses(SILValue address, int &numChecks) {
       return true;
 
     switch (user->getKind()) {
-      case SILInstructionKind::DebugValueAddrInst:
       case SILInstructionKind::FixLifetimeInst:
       case SILInstructionKind::LoadInst:
       case SILInstructionKind::StoreInst:
@@ -374,6 +373,10 @@ static bool hasEscapingUses(SILValue address, int &numChecks) {
       case SILInstructionKind::EndAccessInst:
         // Those instructions have no result and cannot escape the address.
         break;
+      case SILInstructionKind::DebugValueInst:
+        if (DebugValueInst::hasAddrVal(user))
+          break;
+        return true;
       case SILInstructionKind::ApplyInst:
       case SILInstructionKind::TryApplyInst:
       case SILInstructionKind::BeginApplyInst:

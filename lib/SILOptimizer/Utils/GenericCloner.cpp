@@ -111,17 +111,21 @@ void GenericCloner::populateCloned() {
           auto *NewArg = ClonedEntryBB->createFunctionArgument(
               mappedType, OrigArg->getDecl());
 
-          // Try to create a new debug_value from an existing debug_value_addr
-          // for the argument. We do this before storing to ensure that when we
-          // are cloning code in ossa the argument has not been consumed by the
-          // store below.
+          // Try to create a new debug_value from an existing debug_value w/
+          // address value for the argument. We do this before storing to
+          // ensure that when we are cloning code in ossa the argument has
+          // not been consumed by the store below.
           for (Operand *ArgUse : OrigArg->getUses()) {
-            if (auto *DVAI = dyn_cast<DebugValueAddrInst>(ArgUse->getUser())) {
+            if (auto *DVI = DebugValueInst::hasAddrVal(ArgUse->getUser())) {
               auto *oldScope = getBuilder().getCurrentDebugScope();
               getBuilder().setCurrentDebugScope(
-                  remapScope(DVAI->getDebugScope()));
-              getBuilder().createDebugValue(DVAI->getLoc(), NewArg,
-                                            *DVAI->getVarInfo());
+                  remapScope(DVI->getDebugScope()));
+              auto VarInfo = DVI->getVarInfo();
+              assert(VarInfo && VarInfo->DIExpr &&
+                     "No DebugVarInfo or no DIExpr operand?");
+              // Drop the op_deref
+              VarInfo->DIExpr.eraseElement(VarInfo->DIExpr.element_begin());
+              getBuilder().createDebugValue(DVI->getLoc(), NewArg, *VarInfo);
               getBuilder().setCurrentDebugScope(oldScope);
               break;
             }

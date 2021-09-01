@@ -927,10 +927,10 @@ public:
   DebugValueInst *createDebugValue(SILLocation Loc, SILValue src,
                                    SILDebugVariable Var,
                                    bool poisonRefs = false);
-  DebugValueAddrInst *createDebugValueAddr(SILLocation Loc, SILValue src,
-                                           SILDebugVariable Var);
+  DebugValueInst *createDebugValueAddr(SILLocation Loc, SILValue src,
+                                       SILDebugVariable Var);
 
-  /// Create a debug_value_addr if \p src is an address; a debug_value if not.
+  /// Create a debug_value according to the type of \p src
   SILInstruction *emitDebugDescription(SILLocation Loc, SILValue src,
                                        SILDebugVariable Var) {
     if (src->getType().isAddress())

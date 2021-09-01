@@ -366,21 +366,20 @@ bb2:
   return %9999 : $()
 }
 
-// We cannot remove the local store as the debug_value_addr could
-// be turned to a debug_value and thus act as a read on the memory
-// location..
+// We cannot remove the local store as the debug_value w/ address value
+// could be promoted and thus act as a read on the memory location..
 //
 // CHECK-LABEL: blocking_debug_value_addr_on_dead_store
 // CHECK: bb0
 // CHECK: {{ store}}
-// CHECK: debug_value_addr
+// CHECK: debug_value %{{.*}} : $*Int
 sil hidden @blocking_debug_value_addr_on_dead_store : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack $Int, var, name "a"
   %1 = integer_literal $Builtin.Int64, 1
   %2 = struct $Int (%1 : $Builtin.Int64)
   store %2 to %0 : $*Int
-  debug_value_addr %0 : $*Int
+  debug_value %0 : $*Int
   %4 = tuple ()
   dealloc_stack %0 : $*Int
   return %4 : $()

@@ -25,7 +25,7 @@ sil @getGenericClosure_closure : $@convention(thin) <T> (@owned <τ_0_0> { var �
 
 sil [noinline] @getGenericClosure : $@convention(thin) <T> (@in T) -> @owned @callee_owned () -> @out T {
 bb0(%0 : $*T):
-  debug_value_addr %0 : $*T, let, name "t" // id: %1
+  debug_value %0 : $*T, let, name "t", expr op_deref // id: %1
   %2 = function_ref @getGenericClosure_closure : $@convention(thin) <τ_0_0> (@owned <τ_0_0> { var τ_0_0 } <τ_0_0>) -> @out τ_0_0 // user: %5
   %3 = alloc_box $<τ_0_0> { var τ_0_0 } <T>                               // users: %4, %5, %5
   %3a = project_box %3 : $<τ_0_0> { var τ_0_0 } <T>, 0

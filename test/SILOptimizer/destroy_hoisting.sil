@@ -301,7 +301,7 @@ bb5:
 // CHECK:       } // end sil function 'test_debug_value'
 sil [ossa] @test_debug_value : $@convention(method) (@inout S2, @owned X, @owned S, @inout E) -> () {
 bb0(%0 : $*S2, %1 : @owned $X, %2 : @owned $S, %3 : $*E):
-  debug_value_addr %0 : $*S2, var, name "self", argno 1
+  debug_value %0 : $*S2, var, name "self", argno 1, expr op_deref
   br bb1
 
 bb1:

@@ -63,7 +63,7 @@ public func functionWithResilientTypesSize(_ s: __owned Size, f: (__owned Size) 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s17struct_resilience35functionWithResilientTypesRectangleyy010resilient_A00G0VF"(%T16resilient_struct9RectangleV* noalias nocapture %0)
 public func functionWithResilientTypesRectangle(_ r: Rectangle) {
 // CHECK: entry:
-// CHECK-NEXT: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s16resilient_struct9RectangleVMa"([[INT]] 0)
+// CHECK:      [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s16resilient_struct9RectangleVMa"([[INT]] 0)
 // CHECK-NEXT: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK-NEXT: [[METADATA_ADDR:%.*]] = bitcast %swift.type* [[METADATA]] to i32*
 // CHECK-NEXT: [[FIELD_OFFSET_PTR:%.*]] = getelementptr inbounds i32, i32* [[METADATA_ADDR]], [[INT]] [[IDX:2|4|6]]
@@ -202,7 +202,7 @@ public func resilientAny(s : ResilientWeakRef) {
 // CHECK: entry:
 // CHECK: [[ANY:%.*]] = alloca %Any
 // CHECK: [[META:%.*]] = call swiftcc %swift.metadata_response @"$s16resilient_struct16ResilientWeakRefVMa"([[INT]] 0)
-// CHECK: [[META2:%.*]] = extractvalue %swift.metadata_response %3, 0
+// CHECK: [[META2:%.*]] = extractvalue %swift.metadata_response [[META]], 0
 // CHECK: [[TYADDR:%.*]] = getelementptr inbounds %Any, %Any* [[ANY]], i32 0, i32 1
 // CHECK: store %swift.type* [[META2]], %swift.type** [[TYADDR]]
 // CHECK: [[BITCAST:%.*]] = bitcast %Any* [[ANY]] to %__opaque_existential_type_0*

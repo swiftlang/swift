@@ -178,16 +178,16 @@ bb0(%0 : $*()):
   return %3 : $()
 }
 
-// CHECK-LABEL: sil @mem2reg_debug_value_addr
+// CHECK-LABEL: sil @mem2reg_debug_value
 // CHECK-NOT: alloc_stack
-// CHECK-NOT: debug_value_addr
+// CHECK-NOT: debug_value {{.*}} expr op_deref
 // CHECK: debug_value %0
 // CHECK: return
-sil @mem2reg_debug_value_addr : $@convention(thin) (Int) -> Int {
+sil @mem2reg_debug_value : $@convention(thin) (Int) -> Int {
 bb0(%0 : $Int):
   %1 = alloc_stack $Int
   store %0 to %1 : $*Int
-  debug_value_addr %1 : $*Int
+  debug_value %1 : $*Int, expr op_deref
   %2 = load %1 : $*Int
   dealloc_stack %1 : $*Int
   return %2 : $Int
@@ -327,8 +327,8 @@ sil @no_real_uses : $@convention(thin) () -> () {
 bb0:
   // CHECK-NOT: alloc_stack
   %0 = alloc_stack $Builtin.Int32
-  // CHECK-NOT: debug_value_addr
-  debug_value_addr %0 : $*Builtin.Int32, let, name "x", argno 1
+  // CHECK-NOT: debug_value {{.*}} expr op_deref
+  debug_value %0 : $*Builtin.Int32, let, name "x", argno 1, expr op_deref
   // CHECK-NOT: dealloc_stack
   dealloc_stack %0 : $*Builtin.Int32
   // CHECK: [[VAL:%.*]] = tuple ()

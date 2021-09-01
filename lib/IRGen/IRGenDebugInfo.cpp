@@ -2410,6 +2410,9 @@ bool IRGenDebugInfoImpl::buildDebugInfoExpression(
       if (!handleFragmentDIExpr(ExprOperand, Operands))
         return false;
       break;
+    case SILDIExprOperator::Dereference:
+      Operands.push_back(llvm::dwarf::DW_OP_deref);
+      break;
     default:
       llvm_unreachable("Unrecognized operator");
     }

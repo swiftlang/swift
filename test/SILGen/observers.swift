@@ -30,7 +30,7 @@ public struct DidSetWillSetTests {
     willSet(newA) {
       // CHECK: bb0(%0 : $Int, %1 : $*DidSetWillSetTests):
       // CHECK-NEXT: debug_value %0
-      // CHECK-NEXT: debug_value_addr %1 : $*DidSetWillSetTests
+      // CHECK-NEXT: debug_value %1 : $*DidSetWillSetTests, {{.*}} expr op_deref
 
       takeInt(a)
 
@@ -64,7 +64,7 @@ public struct DidSetWillSetTests {
     // CHECK-LABEL: sil private [ossa] @$s9observers010DidSetWillC5TestsV1a{{[_0-9a-zA-Z]*}}vW
     didSet {
       // CHECK: bb0(%0 : $*DidSetWillSetTests):
-      // CHECK-NEXT: debug_value_addr %0 : $*DidSetWillSetTests
+      // CHECK-NEXT: debug_value %0 : $*DidSetWillSetTests, {{.*}} expr op_deref
 
       takeInt(a)
 
@@ -102,7 +102,7 @@ public struct DidSetWillSetTests {
     // CHECK-LABEL: sil [ossa] @$s9observers010DidSetWillC5TestsV1aSivs : $@convention(method) (Int, @inout DidSetWillSetTests) -> () {
     // CHECK: bb0([[NEWVALUE:%.*]] : $Int, %1 : $*DidSetWillSetTests):
     // CHECK-NEXT: debug_value [[NEWVALUE]] : $Int, let, name "value", argno 1
-    // CHECK-NEXT: debug_value_addr %1
+    // CHECK-NEXT: debug_value %1{{.*}} expr op_deref
 
     // CHECK-NEXT: [[MODIFY_ONE:%.*]] = begin_access [modify] [unknown] %1 : $*DidSetWillSetTests
     // CHECK-NEXT: // function_ref observers.DidSetWillSetTests.a.willset : Swift.Int
@@ -313,7 +313,7 @@ func propertyWithDidSetTakingOldValue() {
 // CHECK: bb0([[ARG1:%.*]] : $Int, [[ARG2:%.*]] : @guaranteed ${ var Int }):
 // CHECK-NEXT:  debug_value [[ARG1]] : $Int, let, name "value", argno 1
 // CHECK-NEXT:  [[ARG2_PB:%.*]] = project_box [[ARG2]]
-// CHECK-NEXT:  debug_value_addr [[ARG2_PB]] : $*Int, var, name "p", argno 2
+// CHECK-NEXT:  debug_value [[ARG2_PB]] : $*Int, var, name "p", argno 2, expr op_deref
 // CHECK-NEXT:  [[READ:%.*]] = begin_access [read] [unknown] [[ARG2_PB]]
 // CHECK-NEXT:  [[ARG2_PB_VAL:%.*]] = load [trivial] [[READ]] : $*Int
 // CHECK-NEXT:  end_access [[READ]]

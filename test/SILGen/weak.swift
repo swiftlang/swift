@@ -55,7 +55,7 @@ func test0(c c: C) {
 // CHECK-LABEL: sil private [ossa] @$s4weak19testClosureOverWeakyyFSiycfU_ : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }) -> Int {
 // CHECK: bb0(%0 : @guaranteed ${ var @sil_weak Optional<C> }):
 // CHECK-NEXT:  %1 = project_box %0
-// CHECK-NEXT:  debug_value_addr %1 : $*@sil_weak Optional<C>, var, name "bC", argno 1
+// CHECK-NEXT:  debug_value %1 : $*@sil_weak Optional<C>, var, name "bC", argno 1, expr op_deref
 // CHECK-NEXT:  [[READ:%.*]] = begin_access [read] [unknown] %1
 // CHECK-NEXT:  [[VAL:%.*]] = load_weak [[READ]] : $*@sil_weak Optional<C>
 // CHECK-NEXT:  end_access [[READ]]

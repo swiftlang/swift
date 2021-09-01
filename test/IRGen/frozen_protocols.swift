@@ -43,7 +43,7 @@ public struct ConformsToFrozenProtocol : FrozenProtocol {
 // CHECK: [[ADDR:%.*]] = getelementptr inbounds i8*, i8** %T.OtherFrozenProtocol, i32 1
 // CHECK: [[FN:%.*]] = load i8*, i8** [[ADDR]]
 // CHECK: [[CAST:%.*]] = bitcast i8* [[FN]] to void (%swift.opaque*, %swift.type*, i8**)*
-// CHECK: call swiftcc void %3(%swift.opaque* noalias nocapture swiftself %0, %swift.type* %T, i8** %T.OtherFrozenProtocol)
+// CHECK: call swiftcc void [[CAST]](%swift.opaque* noalias nocapture swiftself %0, %swift.type* %T, i8** %T.OtherFrozenProtocol)
 // CHECK: ret void
 
 // @_fixed_layout protocols still emit method dispatch thunks though, which
