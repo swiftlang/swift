@@ -4329,6 +4329,19 @@ public:
       llvm::function_ref<ConstraintFix *(unsigned, const OverloadChoice &)>
           getFix = [](unsigned, const OverloadChoice &) { return nullptr; });
 
+  /// Generate constraints for the given property that has an
+  /// attached property wrapper.
+  ///
+  /// \param wrappedVar The property that has a property wrapper.
+  /// \param initializerType The type of the initializer for the
+  ///        backing storage variable.
+  /// \param propertyType The type of the wrapped property.
+  ///
+  /// \returns true if there is an error.
+  bool generateWrappedPropertyTypeConstraints(VarDecl *wrappedVar,
+                                              Type initializerType,
+                                              Type propertyType);
+
   /// Propagate constraints in an effort to enforce local
   /// consistency to reduce the time to solve the system.
   ///
