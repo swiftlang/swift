@@ -3950,7 +3950,7 @@ bool ConstraintSystem::generateConstraints(
                                init, dc, patternType, patternBinding, index,
                                /*bindPatternVarsOneWay=*/true)
                          : SolutionApplicationTarget::forUninitializedVar(
-                               patternBinding, index, pattern, patternType);
+                               patternBinding, index, patternType);
 
       if (generateConstraints(target, FreeTypeVariableBinding::Disallow)) {
         hadError = true;
