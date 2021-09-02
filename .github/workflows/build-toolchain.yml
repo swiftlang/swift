@@ -54,7 +54,7 @@ jobs:
         if: ${{ matrix.build_os == 'ubuntu-20.04' || matrix.build_os == 'ubuntu-18.04' }}
         run: |
           df -h
-          sudo apt-get purge libgcc-9-dev gcc-9 libstdc++-9-dev clang-6.0 llvm-6.0
+          sudo apt-get purge libgcc-9-dev gcc-9 libstdc++-9-dev libgcc-10-dev gcc-10 libstdc++-10-dev clang-6.0 llvm-6.0
           sudo swapoff -a
           sudo rm -f /swapfile
           sudo rm -rf /opt/hostedtoolcache
