@@ -698,6 +698,9 @@ def create_argument_parser():
     option(['-c', '--clean'], store_true,
            help='do a clean build')
 
+    option(['--clean-install-destdir'], store_true,
+           help='Clean the install destroot before building.')
+
     option('--export-compile-commands', toggle_true,
            help='generate compilation databases in addition to building')
 
