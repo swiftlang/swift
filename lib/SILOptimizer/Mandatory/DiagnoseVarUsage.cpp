@@ -125,23 +125,6 @@ static SILValue getDebugVarValue(SILInstruction *I) {
   return nullptr;
 }
 
-/// Returns the value referenced by the \c DebugValueAddrInst
-static SILValue getDebugVarAddrValue(SILInstruction *I) {
-  if (auto DVAI = dyn_cast<DebugValueAddrInst>(I)) {
-    // DebugValueAddrInst are unused, so use the instruction it references.
-    if (SILValue Value = DVAI->getOperand()) {
-      // FIXME: what else can we step into?
-      if (auto Inst = Value->getDefiningInstruction()) {
-        if (auto LI = dyn_cast<LoadInst>(Inst)) {
-          return LI->getOperand();
-        }
-      }
-      return Value;
-    }
-  }
-  return nullptr;
-}
-
 static bool shouldTrackDebugVar(SILInstruction *I) {
   if (auto *DVI = dyn_cast<DebugValueInst>(I)) {
     
@@ -452,8 +435,6 @@ public:
     
     if (auto DVO = getDebugVarValue(EntryInst)) {
       appendValue(DVO);
-    } else if (auto DVAO = getDebugVarAddrValue(EntryInst)) {
-      appendValue(DVAO);
     }
     
     while (!Worklist.empty()) {
@@ -1056,8 +1037,6 @@ public:
       return true;
     } else if (auto DVO = getDebugVarValue(EntryInst)) {
       appendValue(DVO);
-    } else if (auto DVAO = getDebugVarAddrValue(EntryInst)) {
-      appendValue(DVAO);
     }
     
     while (!Worklist.empty()) {
