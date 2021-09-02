@@ -963,6 +963,8 @@ public:
   /// \returns \c true if there was a parsing error.
   bool parseTopLevelSIL();
 
+  bool isStartOfGetSetAccessor();
+
   /// Flags that control the parsing of declarations.
   enum ParseDeclFlags {
     PD_Default              = 0,
