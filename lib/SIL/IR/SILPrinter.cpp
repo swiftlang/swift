@@ -606,6 +606,7 @@ class SILPrinter : public SILInstructionVisitor<SILPrinter> {
   SIMPLE_PRINTER(char)
   SIMPLE_PRINTER(unsigned)
   SIMPLE_PRINTER(uint64_t)
+  SIMPLE_PRINTER(int64_t)
   SIMPLE_PRINTER(StringRef)
   SIMPLE_PRINTER(Identifier)
   SIMPLE_PRINTER(ID)
@@ -1190,32 +1191,46 @@ public:
     assert(DIExpr && "DIExpression empty?");
     *this << ", expr ";
     bool IsFirst = true;
-    for (const auto &E : DIExpr.elements()) {
+    for (const auto &Operand : DIExpr.operands()) {
       if (IsFirst)
         IsFirst = false;
       else
         *this << ":";
 
-      switch (E.getKind()) {
-      case SILDIExprElement::OperatorKind: {
-        SILDIExprOperator Op = E.getAsOperator();
-        assert(Op != SILDIExprOperator::INVALID &&
-               "Invalid SILDIExprOperator kind");
-        *this << SILDIExprInfo::get(Op)->OpText;
-        break;
-      }
-      case SILDIExprElement::DeclKind: {
-        const Decl *D = E.getAsDecl();
-        // FIXME: Can we generalize this special handling for VarDecl
-        // to other kinds of Decl?
-        if (const auto *VD = dyn_cast<VarDecl>(D)) {
-          *this << "#";
-          printFullContext(VD->getDeclContext(), PrintState.OS);
-          *this << VD->getName().get();
-        } else
-          D->print(PrintState.OS, PrintState.ASTOptions);
-        break;
-      }
+      // Print the operator
+      SILDIExprOperator Op = Operand.getOperator();
+      assert(Op != SILDIExprOperator::INVALID &&
+             "Invalid SILDIExprOperator kind");
+      *this << SILDIExprInfo::get(Op)->OpText;
+
+      // Print arguments
+      for (const auto &Arg : Operand.args()) {
+        *this << ":";
+        switch (Arg.getKind()) {
+        case SILDIExprElement::OperatorKind:
+          llvm_unreachable("Cannot use operator as argument");
+          break;
+        case SILDIExprElement::DeclKind: {
+          const Decl *D = Arg.getAsDecl();
+          // FIXME: Can we generalize this special handling for VarDecl
+          // to other kinds of Decl?
+          if (const auto *VD = dyn_cast<VarDecl>(D)) {
+            *this << "#";
+            printFullContext(VD->getDeclContext(), PrintState.OS);
+            *this << VD->getName().get();
+          } else
+            D->print(PrintState.OS, PrintState.ASTOptions);
+          break;
+        }
+        case SILDIExprElement::ConstIntKind: {
+          uint64_t V = *Arg.getAsConstInt();
+          if (Op == SILDIExprOperator::ConstSInt)
+            *this << static_cast<int64_t>(V);
+          else
+            *this << V;
+          break;
+        }
+        }
       }
     }
   }
