@@ -146,6 +146,12 @@ struct SupplementaryOutputPaths {
   /// The output path to generate ABI baseline.
   std::string ABIDescriptorOutputPath;
 
+  /// The output path for YAML optimization record file.
+  std::string YAMLOptRecordPath;
+
+  /// The output path for bitstream optimization record file.
+  std::string BitstreamOptRecordPath;
+
   SupplementaryOutputPaths() = default;
   SupplementaryOutputPaths(const SupplementaryOutputPaths &) = default;
 
@@ -179,6 +185,10 @@ struct SupplementaryOutputPaths {
       fn(ModuleSummaryOutputPath);
     if (!ABIDescriptorOutputPath.empty())
       fn(ABIDescriptorOutputPath);
+    if (!YAMLOptRecordPath.empty())
+      fn(YAMLOptRecordPath);
+    if (!BitstreamOptRecordPath.empty())
+      fn(BitstreamOptRecordPath);
   }
 
   bool empty() const {
@@ -187,7 +197,8 @@ struct SupplementaryOutputPaths {
            ReferenceDependenciesFilePath.empty() &&
            SerializedDiagnosticsPath.empty() && LoadedModuleTracePath.empty() &&
            TBDPath.empty() && ModuleInterfaceOutputPath.empty() &&
-           ModuleSourceInfoOutputPath.empty() && ABIDescriptorOutputPath.empty();
+           ModuleSourceInfoOutputPath.empty() && ABIDescriptorOutputPath.empty() &&
+           YAMLOptRecordPath.empty() && BitstreamOptRecordPath.empty();
   }
 };
 } // namespace swift

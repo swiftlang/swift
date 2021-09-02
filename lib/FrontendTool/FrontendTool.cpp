@@ -695,16 +695,28 @@ static bool performCompileStepsPostSema(CompilerInstance &Instance,
                                         int &ReturnValue,
                                         FrontendObserver *observer) {
   const auto &Invocation = Instance.getInvocation();
-  const SILOptions &SILOpts = Invocation.getSILOptions();
   const FrontendOptions &opts = Invocation.getFrontendOptions();
+
+  auto getSILOptions = [&](const PrimarySpecificPaths &PSPs) -> SILOptions {
+    SILOptions SILOpts = Invocation.getSILOptions();
+    if (SILOpts.OptRecordFile.empty()) {
+      // Check if the record file path was passed via supplemental outputs.
+      SILOpts.OptRecordFile = SILOpts.OptRecordFormat ==
+        llvm::remarks::Format::YAML ?
+          PSPs.SupplementaryOutputs.YAMLOptRecordPath :
+          PSPs.SupplementaryOutputs.BitstreamOptRecordPath;
+    }
+    return SILOpts;
+  };
 
   auto *mod = Instance.getMainModule();
   if (!opts.InputsAndOutputs.hasPrimaryInputs()) {
     // If there are no primary inputs the compiler is in WMO mode and builds one
     // SILModule for the entire module.
-    auto SM = performASTLowering(mod, Instance.getSILTypes(), SILOpts);
     const PrimarySpecificPaths PSPs =
         Instance.getPrimarySpecificPathsForWholeModuleOptimizationMode();
+    SILOptions SILOpts = getSILOptions(PSPs);
+    auto SM = performASTLowering(mod, Instance.getSILTypes(), SILOpts);
     return performCompileStepsPostSILGen(Instance, std::move(SM), mod, PSPs,
                                          ReturnValue, observer);
   }
@@ -714,10 +726,11 @@ static bool performCompileStepsPostSema(CompilerInstance &Instance,
   if (!Instance.getPrimarySourceFiles().empty()) {
     bool result = false;
     for (auto *PrimaryFile : Instance.getPrimarySourceFiles()) {
-      auto SM = performASTLowering(*PrimaryFile, Instance.getSILTypes(),
-                                   SILOpts);
       const PrimarySpecificPaths PSPs =
           Instance.getPrimarySpecificPathsForSourceFile(*PrimaryFile);
+      SILOptions SILOpts = getSILOptions(PSPs);
+      auto SM = performASTLowering(*PrimaryFile, Instance.getSILTypes(),
+                                   SILOpts);
       result |= performCompileStepsPostSILGen(Instance, std::move(SM),
                                               PrimaryFile, PSPs, ReturnValue,
                                               observer);
@@ -732,9 +745,10 @@ static bool performCompileStepsPostSema(CompilerInstance &Instance,
   for (FileUnit *fileUnit : mod->getFiles()) {
     if (auto SASTF = dyn_cast<SerializedASTFile>(fileUnit))
       if (opts.InputsAndOutputs.isInputPrimary(SASTF->getFilename())) {
-        auto SM = performASTLowering(*SASTF, Instance.getSILTypes(), SILOpts);
         const PrimarySpecificPaths &PSPs =
             Instance.getPrimarySpecificPathsForPrimary(SASTF->getFilename());
+        SILOptions SILOpts = getSILOptions(PSPs);
+        auto SM = performASTLowering(*SASTF, Instance.getSILTypes(), SILOpts);
         result |= performCompileStepsPostSILGen(Instance, std::move(SM), mod,
                                                 PSPs, ReturnValue, observer);
       }
