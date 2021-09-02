@@ -94,6 +94,38 @@ private:
   }
 };
 
+/// Find any references to not yet resolved outer closure parameters
+/// used in the body of the inner closure. This is required because
+/// isolated conjunctions, just like single-expression closures, have
+/// to be connected to type variables they are going to use, otherwise
+/// they'll get placed in a separate solver component and would never
+/// produce a solution.
+class UnresolvedClosureParameterCollector : public ASTWalker {
+  ConstraintSystem &CS;
+
+  llvm::SmallSetVector<TypeVariableType *, 4> Vars;
+
+public:
+  UnresolvedClosureParameterCollector(ConstraintSystem &cs) : CS(cs) {}
+
+  std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+    if (auto *DRE = dyn_cast<DeclRefExpr>(expr)) {
+      auto *decl = DRE->getDecl();
+      if (isa<ParamDecl>(decl)) {
+        if (auto type = CS.getTypeIfAvailable(decl)) {
+          if (auto *typeVar = type->getAs<TypeVariableType>())
+            Vars.insert(typeVar);
+        }
+      }
+    }
+    return {true, expr};
+  }
+
+  ArrayRef<TypeVariableType *> getVariables() const {
+    return Vars.getArrayRef();
+  }
+};
+
 // MARK: Constraint generation
 
 /// Check whether it makes sense to convert this element into a constrant.
@@ -143,6 +175,8 @@ static void createConjunction(ConstraintSystem &cs,
     isIsolated = true;
   }
 
+  UnresolvedClosureParameterCollector paramCollector(cs);
+
   for (const auto &entry : elements) {
     ASTNode element = std::get<0>(entry);
     ContextualTypeInfo context = std::get<1>(entry);
@@ -150,6 +184,12 @@ static void createConjunction(ConstraintSystem &cs,
 
     if (!isViableElement(element))
       continue;
+
+    // If this conjunction going to represent a body of a closure,
+    // let's collect references to not yet resolved outer
+    // closure parameters.
+    if (isIsolated)
+      element.walk(paramCollector);
 
     constraints.push_back(
         Constraint::createClosureBodyElement(cs, element, context, elementLoc));
@@ -161,6 +201,9 @@ static void createConjunction(ConstraintSystem &cs,
   // In such cases, let's avoid creating a conjunction.
   if (constraints.empty())
     return;
+
+  for (auto *externalVar : paramCollector.getVariables())
+    referencedVars.push_back(externalVar);
 
   cs.addUnsolvedConstraint(Constraint::createConjunction(
       cs, constraints, isIsolated, locator, referencedVars));
