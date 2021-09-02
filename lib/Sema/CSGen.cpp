@@ -3602,16 +3602,8 @@ static Expr *generateConstraintsFor(ConstraintSystem &cs, Expr *expr,
   return result;
 }
 
-/// Generate constraints to produce the wrapped value type given the property
-/// that has an attached property wrapper.
-///
-/// \param initializerType The type of the adjusted initializer, which
-/// initializes the underlying storage variable.
-/// \param wrappedVar The property that has a property wrapper.
-/// \returns the type of the property.
-static bool generateWrappedPropertyTypeConstraints(
-    ConstraintSystem &cs, Type initializerType, VarDecl *wrappedVar,
-    Type propertyType) {
+bool ConstraintSystem::generateWrappedPropertyTypeConstraints(
+    VarDecl *wrappedVar, Type initializerType, Type propertyType) {
   auto dc = wrappedVar->getInnermostDeclContext();
 
   Type wrappedValueType;
@@ -3630,33 +3622,33 @@ static bool generateWrappedPropertyTypeConstraints(
 
     if (!wrappedValueType) {
       // Equate the outermost wrapper type to the initializer type.
-      auto *locator = cs.getConstraintLocator(typeExpr);
+      auto *locator = getConstraintLocator(typeExpr);
       wrapperType =
-          cs.replaceInferableTypesWithTypeVars(rawWrapperType, locator);
+          replaceInferableTypesWithTypeVars(rawWrapperType, locator);
       if (initializerType)
-        cs.addConstraint(ConstraintKind::Equal, wrapperType, initializerType, locator);
+        addConstraint(ConstraintKind::Equal, wrapperType, initializerType, locator);
     } else {
       // The former wrappedValue type must be equal to the current wrapper type
-      auto *locator = cs.getConstraintLocator(
+      auto *locator = getConstraintLocator(
           typeExpr, LocatorPathElt::WrappedValue(wrapperType));
       wrapperType =
-          cs.replaceInferableTypesWithTypeVars(rawWrapperType, locator);
-      cs.addConstraint(ConstraintKind::Equal, wrapperType, wrappedValueType, locator);
+          replaceInferableTypesWithTypeVars(rawWrapperType, locator);
+      addConstraint(ConstraintKind::Equal, wrapperType, wrappedValueType, locator);
     }
 
-    cs.setType(typeExpr, wrapperType);
+    setType(typeExpr, wrapperType);
 
     wrappedValueType = wrapperType->getTypeOfMember(
         dc->getParentModule(), wrapperInfo.valueVar);
   }
 
   // The property type must be equal to the wrapped value type
-  cs.addConstraint(
+  addConstraint(
       ConstraintKind::Equal, propertyType, wrappedValueType,
-      cs.getConstraintLocator(
+      getConstraintLocator(
           wrappedVar, LocatorPathElt::ContextualType(CTP_WrappedProperty)));
-  cs.setContextualType(wrappedVar, TypeLoc::withoutLoc(wrappedValueType),
-                       CTP_WrappedProperty);
+  setContextualType(wrappedVar, TypeLoc::withoutLoc(wrappedValueType),
+                    CTP_WrappedProperty);
   return false;
 }
 
@@ -3675,8 +3667,8 @@ static bool generateInitPatternConstraints(
     return true;
 
   if (auto wrappedVar = target.getInitializationWrappedVar())
-    return generateWrappedPropertyTypeConstraints(
-        cs, cs.getType(target.getAsExpr()), wrappedVar, patternType);
+    return cs.generateWrappedPropertyTypeConstraints(
+        wrappedVar, cs.getType(target.getAsExpr()), patternType);
 
   if (!patternType->is<OpaqueTypeArchetypeType>()) {
     // Add a conversion constraint between the types.
@@ -3968,7 +3960,7 @@ bool ConstraintSystem::generateConstraints(
         return true;
 
       return generateWrappedPropertyTypeConstraints(
-        *this, /*initializerType=*/Type(), wrappedVar, propertyType);
+        wrappedVar, /*initializerType=*/Type(), propertyType);
     } else {
       auto pattern = target.getAsUninitializedVar();
       auto locator = getConstraintLocator(
@@ -4158,7 +4150,7 @@ ConstraintSystem::applyPropertyWrapperToParameter(
 
     initKind = PropertyWrapperInitKind::ProjectedValue;
   } else {
-    generateWrappedPropertyTypeConstraints(*this, wrapperType, param, paramType);
+    generateWrappedPropertyTypeConstraints(param, wrapperType, paramType);
     initKind = PropertyWrapperInitKind::WrappedValue;
   }
 
