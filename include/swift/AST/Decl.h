@@ -514,7 +514,7 @@ protected:
     IsComputingSemanticMembers : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+1+1+1+1+8+16,
+  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+1+1+8+16,
     /// Whether the \c RequiresClass bit is valid.
     RequiresClassValid : 1,
 
@@ -526,12 +526,6 @@ protected:
 
     /// Whether the existential of this protocol conforms to itself.
     ExistentialConformsToSelf : 1,
-
-    /// Whether the \c ExistentialTypeSupported bit is valid.
-    ExistentialTypeSupportedValid : 1,
-
-    /// Whether the existential of this protocol can be represented.
-    ExistentialTypeSupported : 1,
 
     /// True if the protocol has requirements that cannot be satisfied (e.g.
     /// because they could not be imported from Objective-C).
@@ -4151,21 +4145,6 @@ class ProtocolDecl final : public NominalTypeDecl {
     Bits.ProtocolDecl.ExistentialConformsToSelf = result;
   }
 
-  /// Returns the cached result of \c existentialTypeSupported or \c None if it
-  /// hasn't yet been computed.
-  Optional<bool> getCachedExistentialTypeSupported() {
-    if (Bits.ProtocolDecl.ExistentialTypeSupportedValid)
-      return Bits.ProtocolDecl.ExistentialTypeSupported;
-
-    return None;
-  }
-
-  /// Caches the result of \c existentialTypeSupported
-  void setCachedExistentialTypeSupported(bool supported) {
-    Bits.ProtocolDecl.ExistentialTypeSupportedValid = true;
-    Bits.ProtocolDecl.ExistentialTypeSupported = supported;
-  }
-
   bool hasLazyRequirementSignature() const {
     return Bits.ProtocolDecl.HasLazyRequirementSignature;
   }
@@ -4175,7 +4154,6 @@ class ProtocolDecl final : public NominalTypeDecl {
   friend class RequirementSignatureRequest;
   friend class ProtocolRequiresClassRequest;
   friend class ExistentialConformsToSelfRequest;
-  friend class ExistentialTypeSupportedRequest;
   friend class InheritedProtocolsRequest;
   
 public:
@@ -4263,12 +4241,6 @@ public:
   /// the member does not contain any associated types, and does not
   /// contain 'Self' in 'parameter' or 'other' position.
   bool isAvailableInExistential(const ValueDecl *decl) const;
-
-  /// Determine whether we are allowed to refer to an existential type
-  /// conforming to this protocol. This is only permitted if the types of
-  /// all the members do not contain any associated types, and do not
-  /// contain 'Self' in 'parameter' or 'other' position.
-  bool existentialTypeSupported() const;
 
   /// Returns a list of protocol requirements that must be assessed to
   /// determine a concrete's conformance effect polymorphism kind.
