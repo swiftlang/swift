@@ -517,23 +517,6 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
       // original asyncHandler.
       !F.isAsync()) {
     emitAsyncHandler(fd);
-  } else if (llvm::any_of(*fd->getParameters(),
-                          [](ParamDecl *p){ return p->hasAttachedPropertyWrapper(); })) {
-    // If any parameters have property wrappers, emit the local auxiliary
-    // variables before emitting the function body.
-    LexicalScope BraceScope(*this, CleanupLocation(fd));
-    for (auto *param : *fd->getParameters()) {
-      param->visitAuxiliaryDecls([&](VarDecl *auxiliaryVar) {
-        SILLocation WrapperLoc(auxiliaryVar);
-        WrapperLoc.markAsPrologue();
-        if (auto *patternBinding = auxiliaryVar->getParentPatternBinding())
-          visitPatternBindingDecl(patternBinding);
-
-        visit(auxiliaryVar);
-      });
-    }
-
-    emitStmt(fd->getTypecheckedBody());
   } else {
     emitStmt(fd->getTypecheckedBody());
   }
@@ -606,11 +589,6 @@ void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
   emitProlog(captureInfo, ace->getParameters(), /*selfParam=*/nullptr,
              ace, resultIfaceTy, ace->isBodyThrowing(), ace->getLoc());
   prepareEpilog(true, ace->isBodyThrowing(), CleanupLocation(ace));
-  for (auto *param : *ace->getParameters()) {
-    param->visitAuxiliaryDecls([&](VarDecl *auxiliaryVar) {
-      visit(auxiliaryVar);
-    });
-  }
 
   if (auto *ce = dyn_cast<ClosureExpr>(ace)) {
     emitStmt(ce->getBody());
