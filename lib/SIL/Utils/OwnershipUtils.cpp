@@ -948,6 +948,9 @@ BorrowedValue swift::getSingleBorrowIntroducingValue(SILValue inputValue) {
       return scopeIntroducer;
     }
 
+    if (currentValue.getOwnershipKind() == OwnershipKind::None)
+      return {};
+
     // Otherwise if v is an ownership forwarding value, add its defining
     // instruction
     if (isForwardingBorrow(currentValue)) {
