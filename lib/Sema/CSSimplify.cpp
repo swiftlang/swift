@@ -8897,6 +8897,11 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
         setType(projection, computeProjectedValueType(paramDecl, backingType));
       }
 
+      if (!paramDecl->getName().hasDollarPrefix()) {
+        generateWrappedPropertyTypeConstraints(paramDecl, backingType,
+                                               param.getParameterType());
+      }
+
       auto result = applyPropertyWrapperToParameter(backingType, param.getParameterType(),
                                                     paramDecl, paramDecl->getName(),
                                                     ConstraintKind::Equal,
