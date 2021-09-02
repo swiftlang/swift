@@ -4202,11 +4202,10 @@ llvm::GlobalValue *IRGenModule::defineAlias(LinkEntity entity,
 /// public symbol for the metadata references. This function will rewrite any
 /// existing external declaration to the address point as an alias into the
 /// full metadata object.
-llvm::GlobalValue *IRGenModule::defineTypeMetadata(CanType concreteType,
-                                                   bool isPattern,
-                                                   bool isConstant,
-                                                   ConstantInitFuture init,
-                                                   llvm::StringRef section) {
+llvm::GlobalValue *IRGenModule::defineTypeMetadata(
+    CanType concreteType, bool isPattern, bool isConstant,
+    ConstantInitFuture init, llvm::StringRef section,
+    SmallVector<std::pair<Size, SILDeclRef>, 8> vtableEntries) {
   assert(init);
 
   auto isPrespecialized = concreteType->getAnyGeneric() &&
@@ -4240,6 +4239,12 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(CanType concreteType,
   var->setConstant(isConstant);
   if (!section.empty())
     var->setSection(section);
+
+  if (getOptions().VirtualFunctionElimination) {
+    if (auto classDecl = concreteType->getClassOrBoundGenericClass()) {
+      addVTableTypeMetadata(classDecl, var, vtableEntries);
+    }
+  }
 
   LinkInfo link = LinkInfo::get(*this, entity, ForDefinition);
   if (link.isUsed())

@@ -489,6 +489,10 @@ def enable_implicit_dynamic : Flag<["-"], "enable-implicit-dynamic">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
   HelpText<"Add 'dynamic' to all declarations">;
 
+def enable_llvm_vfe : Flag<["-"], "enable-llvm-vfe">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
+  HelpText<"Use LLVM Virtual Function Elimination on Swift class virtual tables">;
+
 def disable_previous_implementation_calls_in_dynamic_replacements :
   Flag<["-"], "disable-previous-implementation-calls-in-dynamic-replacements">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,

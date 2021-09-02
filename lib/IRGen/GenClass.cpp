@@ -2672,6 +2672,44 @@ irgen::emitClassResilientInstanceSizeAndAlignMask(IRGenFunction &IGF,
   return {size, alignMask};
 }
 
+llvm::MDString *irgen::typeIdForMethod(IRGenModule &IGM, SILDeclRef method) {
+  assert(!method.getOverridden() && "must always be base method");
+
+  auto entity = LinkEntity::forMethodDescriptor(method);
+  auto mangled = entity.mangleAsString();
+  auto typeId = llvm::MDString::get(*IGM.LLVMContext, mangled);
+  return typeId;
+}
+
+static llvm::Value *emitVTableSlotLoad(IRGenFunction &IGF, Address slot,
+                                       SILDeclRef method, Signature signature) {
+  if (IGF.IGM.getOptions().VirtualFunctionElimination) {
+    // For LLVM IR VFE, emit a @llvm.type.checked.load with the type of the
+    // method.
+    llvm::Function *checkedLoadIntrinsic = llvm::Intrinsic::getDeclaration(
+        &IGF.IGM.Module, llvm::Intrinsic::type_checked_load);
+    auto slotAsPointer = IGF.Builder.CreateBitCast(slot, IGF.IGM.Int8PtrTy);
+    auto typeId = typeIdForMethod(IGF.IGM, method);
+
+    // Arguments for @llvm.type.checked.load: 1) target address, 2) offset -
+    // always 0 because target address is directly pointing to the right slot,
+    // 3) type identifier, i.e. the mangled name of the *base* method.
+    SmallVector<llvm::Value *, 8> args;
+    args.push_back(slotAsPointer.getAddress());
+    args.push_back(llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0));
+    args.push_back(llvm::MetadataAsValue::get(*IGF.IGM.LLVMContext, typeId));
+
+    llvm::Value *checkedLoad =
+        IGF.Builder.CreateCall(checkedLoadIntrinsic, args);
+    auto fnPtr = IGF.Builder.CreateExtractValue(checkedLoad, 0);
+    return IGF.Builder.CreateBitCast(fnPtr,
+                                     signature.getType()->getPointerTo());
+  }
+
+  // Not doing LLVM IR VFE, can just be a direct load.
+  return IGF.emitInvariantLoad(slot);
+}
+
 FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
                                               llvm::Value *metadata,
                                               SILDeclRef method,
@@ -2690,7 +2728,7 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
     auto slot = IGF.emitAddressAtOffset(metadata, offset,
                                         signature.getType()->getPointerTo(),
                                         IGF.IGM.getPointerAlignment());
-    auto fnPtr = IGF.emitInvariantLoad(slot);
+    auto fnPtr = emitVTableSlotLoad(IGF, slot, method, signature);
     auto &schema = methodType->isAsync()
                        ? IGF.getOptions().PointerAuth.AsyncSwiftClassMethods
                        : IGF.getOptions().PointerAuth.SwiftClassMethods;
