@@ -269,6 +269,7 @@ EXPECTED_DEFAULTS = {
     'watchos': False,
     'watchos_all': False,
     'llvm_install_components': defaults.llvm_install_components(),
+    'clean_install_destdir': False,
 }
 
 
@@ -484,6 +485,7 @@ EXPECTED_OPTIONS = [
                   dest='install_backdeployconcurrency'),
     SetTrueOption('--benchmark'),
     SetTrueOption('--clean'),
+    SetTrueOption('--clean-install-destdir'),
     SetTrueOption('--dry-run'),
     SetTrueOption('--dump-config'),
     SetTrueOption('--disable-guaranteed-normal-arguments'),
