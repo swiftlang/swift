@@ -288,3 +288,30 @@ func testReabstractedWitness(_ f: ReabstractedP) {
 public func testReabstracted(f: Optional<()->()>) {
   testReabstractedWitness(f)
 }
+
+
+// Test that we don't devirtualize calls to protocol requirements with covariant `Self` nested
+// inside a collection type – the devirtualizer does not support handling these yet.
+protocol CovariantSelfInsideCollection {
+  func array() -> Array<Self>
+  func dictionary() -> Dictionary<String, Self>
+  func mixed(_: (Array<(Dictionary<String, String>, Self)>) -> Void)
+}
+// CHECK-LABEL: sil @$s34devirt_protocol_method_invocations12testNoDevirtyyF
+//
+// CHECK: witness_method $S, #CovariantSelfInsideCollection.array
+// CHECK: witness_method $S, #CovariantSelfInsideCollection.dictionary
+// CHECK: witness_method $S, #CovariantSelfInsideCollection.mixed
+// CHECK: end sil function '$s34devirt_protocol_method_invocations12testNoDevirtyyF'
+public func testNoDevirt() {
+  struct S: CovariantSelfInsideCollection {
+    func array() -> Array<Self> { fatalError() }
+    func dictionary() -> Dictionary<String, Self> { fatalError() }
+    func mixed(_: (Array<(Dictionary<String, String>, Self)>) -> Void) {}
+  }
+
+  let p: CovariantSelfInsideCollection = S()
+  _ = p.array()
+  _ = p.dictionary()
+  p.mixed { _ in }
+}
