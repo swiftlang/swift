@@ -6683,13 +6683,19 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
     // If we syntactically match the second decl-var production, with a
     // var-get-set clause, parse the var-get-set clause.
     if (Tok.is(tok::l_brace)) {
-      HasAccessors = true;
-      auto boundVar =
-          parseDeclVarGetSet(PBDEntries.back(),
-                             Flags, StaticLoc, StaticSpelling, VarLoc,
-                             PatternInit != nullptr, Attributes, Decls);
-      if (boundVar.hasCodeCompletion())
-        return makeResult(makeParserCodeCompletionStatus());
+
+      // Skip parsing the var-get-set clause if '{' is at start of line
+      // and next token is not 'didSet' or 'willSet'. Parsing as 'do'
+      // statement gives useful errors for missing 'do' before brace.
+      // See SR-14836.
+      if (!PatternInit || !Tok.isAtStartOfLine() || isStartOfGetSetAccessor()) {
+        HasAccessors = true;
+        auto boundVar = parseDeclVarGetSet(
+            PBDEntries.back(), Flags, StaticLoc, StaticSpelling, VarLoc,
+            PatternInit != nullptr, Attributes, Decls);
+        if (boundVar.hasCodeCompletion())
+          return makeResult(makeParserCodeCompletionStatus());
+      }
     }
     
     // Propagate back types for simple patterns, like "var A, B : T".
