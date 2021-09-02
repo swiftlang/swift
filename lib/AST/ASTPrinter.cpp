@@ -2224,8 +2224,11 @@ void PrintAST::printMembers(ArrayRef<Decl *> members, bool needComma,
 
 void PrintAST::printGenericDeclGenericParams(GenericContext *decl) {
   if (decl->isGeneric())
-    if (auto GenericSig = decl->getGenericSignature())
+    if (auto GenericSig = decl->getGenericSignature()) {
+      Printer.printStructurePre(PrintStructureKind::DeclGenericParameterClause);
       printGenericSignature(GenericSig, PrintParams | InnermostOnly);
+      Printer.printStructurePost(PrintStructureKind::DeclGenericParameterClause);
+    }
 }
 
 void PrintAST::printDeclGenericRequirements(GenericContext *decl) {
@@ -2239,12 +2242,14 @@ void PrintAST::printDeclGenericRequirements(GenericContext *decl) {
   if (parentSig && parentSig->isEqual(genericSig))
     return;
 
+  Printer.printStructurePre(PrintStructureKind::DeclGenericParameterClause);
   printGenericSignature(genericSig, PrintRequirements,
                         [parentSig](const Requirement &req) {
                           if (parentSig)
                             return !parentSig->isRequirementSatisfied(req);
                           return true;
                         });
+  Printer.printStructurePost(PrintStructureKind::DeclGenericParameterClause);
 }
 
 void PrintAST::printInherited(const Decl *decl) {
@@ -3236,25 +3241,32 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
       Printer.printName(decl->getName(), getTypeMemberPrintNameContext(decl));
     });
 
-  auto type = decl->getInterfaceType();
-  Printer << ": ";
-  TypeLoc tyLoc;
-  if (auto *repr = decl->getTypeReprOrParentPatternTypeRepr()) {
-    tyLoc = TypeLoc(repr, type);
-  } else {
-    tyLoc = TypeLoc::withoutLoc(type);
+  {
+    Printer.printStructurePre(PrintStructureKind::DeclResultTypeClause);
+    SWIFT_DEFER {
+      Printer.printStructurePost(PrintStructureKind::DeclResultTypeClause);
+    };
+
+    auto type = decl->getInterfaceType();
+    Printer << ": ";
+    TypeLoc tyLoc;
+    if (auto *repr = decl->getTypeReprOrParentPatternTypeRepr()) {
+      tyLoc = TypeLoc(repr, type);
+    } else {
+      tyLoc = TypeLoc::withoutLoc(type);
+    }
+    Printer.printDeclResultTypePre(decl, tyLoc);
+
+    // HACK: When printing result types for vars with opaque result types,
+    //       always print them using the `some` keyword instead of printing
+    //       the full stable reference.
+    llvm::SaveAndRestore<PrintOptions::OpaqueReturnTypePrintingMode>
+    x(Options.OpaqueReturnTypePrinting,
+      PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword);
+
+    printTypeLocForImplicitlyUnwrappedOptional(
+      tyLoc, decl->isImplicitlyUnwrappedOptional());
   }
-  Printer.printDeclResultTypePre(decl, tyLoc);
-
-  // HACK: When printing result types for vars with opaque result types,
-  //       always print them using the `some` keyword instead of printing
-  //       the full stable reference.
-  llvm::SaveAndRestore<PrintOptions::OpaqueReturnTypePrintingMode>
-  x(Options.OpaqueReturnTypePrinting,
-    PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword);
-
-  printTypeLocForImplicitlyUnwrappedOptional(
-    tyLoc, decl->isImplicitlyUnwrappedOptional());
 
   printAccessors(decl);
 }
@@ -3332,20 +3344,31 @@ void PrintAST::printOneParameter(const ParamDecl *param,
       TheTypeLoc.setType(BGT->getGenericArgs()[0]);
   }
 
-  if (!param->isVariadic() &&
-      !willUseTypeReprPrinting(TheTypeLoc, CurrentType, Options)) {
-    auto type = TheTypeLoc.getType();
-    printParameterFlags(Printer, Options, paramFlags,
-                        isEscaping(type));
+  {
+    Printer.printStructurePre(PrintStructureKind::FunctionParameterType);
+    SWIFT_DEFER {
+      Printer.printStructurePost(PrintStructureKind::FunctionParameterType);
+    };
+    if (!param->isVariadic() &&
+        !willUseTypeReprPrinting(TheTypeLoc, CurrentType, Options)) {
+      auto type = TheTypeLoc.getType();
+      printParameterFlags(Printer, Options, paramFlags,
+                          isEscaping(type));
+    }
+
+    printTypeLocForImplicitlyUnwrappedOptional(
+      TheTypeLoc, param->isImplicitlyUnwrappedOptional());
+
+    if (param->isVariadic())
+      Printer << "...";
   }
 
-  printTypeLocForImplicitlyUnwrappedOptional(
-    TheTypeLoc, param->isImplicitlyUnwrappedOptional());
-
-  if (param->isVariadic())
-    Printer << "...";
-
   if (param->isDefaultArgument() && Options.PrintDefaultArgumentValue) {
+    Printer.callPrintStructurePre(PrintStructureKind::DefaultArgumentClause);
+    SWIFT_DEFER {
+      Printer.printStructurePost(PrintStructureKind::DefaultArgumentClause);
+    };
+
     SmallString<128> scratch;
     auto defaultArgStr = param->getDefaultValueStringRepresentation(scratch);
 
@@ -3368,6 +3391,10 @@ void PrintAST::printOneParameter(const ParamDecl *param,
 void PrintAST::printParameterList(ParameterList *PL,
                                   ArrayRef<AnyFunctionType::Param> params,
                                   bool isAPINameByDefault) {
+  Printer.printStructurePre(PrintStructureKind::FunctionParameterList);
+  SWIFT_DEFER {
+    Printer.printStructurePost(PrintStructureKind::FunctionParameterList);
+  };
   Printer << "(";
   const unsigned paramSize = params.size();
   for (unsigned i = 0, e = PL->size(); i != e; ++i) {
@@ -3398,19 +3425,25 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
   printParameterList(BodyParams, parameterListTypes,
                      AFD->argumentNameIsAPIByDefault());
 
-  if (AFD->hasAsync()) {
-    Printer << " ";
-    if (AFD->getAttrs().hasAttribute<ReasyncAttr>())
-      Printer.printKeyword("reasync", Options);
-    else
-      Printer.printKeyword("async", Options);
-  }
+  if (AFD->hasAsync() || AFD->hasThrows()) {
+    Printer.printStructurePre(PrintStructureKind::EffectsSpecifiers);
+    SWIFT_DEFER {
+      Printer.printStructurePost(PrintStructureKind::EffectsSpecifiers);
+    };
+    if (AFD->hasAsync()) {
+      Printer << " ";
+      if (AFD->getAttrs().hasAttribute<ReasyncAttr>())
+        Printer.printKeyword("reasync", Options);
+      else
+        Printer.printKeyword("async", Options);
+    }
 
-  if (AFD->hasThrows()) {
-    if (AFD->getAttrs().hasAttribute<RethrowsAttr>())
-      Printer << " " << tok::kw_rethrows;
-    else
-      Printer << " " << tok::kw_throws;
+    if (AFD->hasThrows()) {
+      if (AFD->getAttrs().hasAttribute<RethrowsAttr>())
+        Printer << " " << tok::kw_rethrows;
+      else
+        Printer << " " << tok::kw_throws;
+    }
   }
 }
 
@@ -3522,6 +3555,10 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
 
     Type ResultTy = decl->getResultInterfaceType();
     if (ResultTy && !ResultTy->isVoid()) {
+      Printer.printStructurePre(PrintStructureKind::DeclResultTypeClause);
+      SWIFT_DEFER {
+        Printer.printStructurePost(PrintStructureKind::DeclResultTypeClause);
+      };
       TypeLoc ResultTyLoc(decl->getResultTypeRepr(), ResultTy);
 
       // When printing a protocol requirement with types substituted for a
@@ -3699,23 +3736,32 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
     printParameterList(decl->getIndices(), params,
                        /*isAPINameByDefault*/false);
   });
-  Printer << " -> ";
 
-  TypeLoc elementTy(decl->getElementTypeRepr(),
-                    decl->getElementInterfaceType());
-  Printer.printDeclResultTypePre(decl, elementTy);
-  Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
+  {
+    Printer.printStructurePre(PrintStructureKind::DeclResultTypeClause);
+    SWIFT_DEFER {
+      Printer.printStructurePost(PrintStructureKind::DeclResultTypeClause);
+    };
 
-  // HACK: When printing result types for subscripts with opaque result types,
-  //       always print them using the `some` keyword instead of printing
-  //       the full stable reference.
-  llvm::SaveAndRestore<PrintOptions::OpaqueReturnTypePrintingMode>
-  x(Options.OpaqueReturnTypePrinting,
-    PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword);
+    Printer << " -> ";
 
-  printTypeLocForImplicitlyUnwrappedOptional(
-    elementTy, decl->isImplicitlyUnwrappedOptional());
-  Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
+    TypeLoc elementTy(decl->getElementTypeRepr(),
+                      decl->getElementInterfaceType());
+    Printer.printDeclResultTypePre(decl, elementTy);
+    Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
+
+    // HACK: When printing result types for subscripts with opaque result types,
+    //       always print them using the `some` keyword instead of printing
+    //       the full stable reference.
+    llvm::SaveAndRestore<PrintOptions::OpaqueReturnTypePrintingMode>
+    x(Options.OpaqueReturnTypePrinting,
+      PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword);
+
+    printTypeLocForImplicitlyUnwrappedOptional(
+      elementTy, decl->isImplicitlyUnwrappedOptional());
+    Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
+  }
+
   printDeclGenericRequirements(decl);
   printAccessors(decl);
 }
