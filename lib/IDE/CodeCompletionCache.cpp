@@ -102,7 +102,7 @@ CodeCompletionCache::~CodeCompletionCache() {}
 ///
 /// This should be incremented any time we commit a change to the format of the
 /// cached results. This isn't expected to change very often.
-static constexpr uint32_t onDiskCompletionCacheVersion = 1;
+static constexpr uint32_t onDiskCompletionCacheVersion = 2;
 
 /// Deserializes CodeCompletionResults from \p in and stores them in \p V.
 /// \see writeCacheModule.
@@ -219,14 +219,6 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
       assocUSRs.push_back(getString(read32le(cursor)));
     }
 
-    auto declKeywordCount = read32le(cursor);
-    SmallVector<std::pair<StringRef, StringRef>, 4> declKeywords;
-    for (unsigned i = 0; i < declKeywordCount; ++i) {
-      auto first = getString(read32le(cursor));
-      auto second = getString(read32le(cursor));
-      declKeywords.push_back(std::make_pair(first, second));
-    }
-
     CodeCompletionString *string = getCompletionString(chunkIndex);
     auto moduleName = getString(moduleIndex);
     auto sourceFilePath = getString(sourceFilePathIndex);
@@ -240,7 +232,6 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
           declKind, isSystem, moduleName, sourceFilePath, notRecommended,
           diagSeverity, diagMessage, briefDocComment,
           copyArray(*V.Sink.Allocator, ArrayRef<StringRef>(assocUSRs)),
-          copyArray(*V.Sink.Allocator, ArrayRef<std::pair<StringRef, StringRef>>(declKeywords)),
           CodeCompletionResult::Unknown, opKind);
     } else {
       result = new (*V.Sink.Allocator)
@@ -385,13 +376,6 @@ static void writeCachedModule(llvm::raw_ostream &out,
       LE.write(static_cast<uint32_t>(R->getAssociatedUSRs().size()));
       for (unsigned i = 0; i < R->getAssociatedUSRs().size(); ++i) {
         LE.write(addString(R->getAssociatedUSRs()[i]));
-      }
-
-      auto AllKeywords = R->getDeclKeywords();
-      LE.write(static_cast<uint32_t>(AllKeywords.size()));
-      for (unsigned i = 0; i < AllKeywords.size(); ++i) {
-        LE.write(addString(AllKeywords[i].first));
-        LE.write(addString(AllKeywords[i].second));
       }
     }
   }

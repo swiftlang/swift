@@ -287,32 +287,6 @@ public:
   void cacheResult(bool value) const;
 };
 
-/// Determine whether we are allowed to refer to an existential type conforming
-/// to this protocol.
-class ExistentialTypeSupportedRequest :
-    public SimpleRequest<ExistentialTypeSupportedRequest,
-                         bool(ProtocolDecl *),
-                         RequestFlags::SeparatelyCached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  // Evaluation.
-  bool evaluate(Evaluator &evaluator, ProtocolDecl *decl) const;
-
-public:
-  // Cycle handling.
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
-
-  // Separate caching.
-  bool isCached() const { return true; }
-  Optional<bool> getCachedResult() const;
-  void cacheResult(bool value) const;
-};
-
 class PolymorphicEffectRequirementsRequest :
     public SimpleRequest<PolymorphicEffectRequirementsRequest,
                          PolymorphicEffectRequirementList(EffectKind, ProtocolDecl *),
@@ -933,18 +907,18 @@ public:
     bool isCached() const { return true; }
 };
 
-/// Determine whether the given func is distributed.
-class IsDistributedFuncRequest :
-    public SimpleRequest<IsDistributedFuncRequest,
-        bool(FuncDecl *),
-        RequestFlags::Cached> {
+/// Obtain the 'remote' counterpart of a 'distributed func'.
+class GetDistributedRemoteFuncRequest :
+    public SimpleRequest<GetDistributedRemoteFuncRequest,
+                         AbstractFunctionDecl *(AbstractFunctionDecl *),
+                         RequestFlags::Cached> {
 public:
-    using SimpleRequest::SimpleRequest;
+  using SimpleRequest::SimpleRequest;
 
 private:
-    friend SimpleRequest;
+  friend SimpleRequest;
 
-    bool evaluate(Evaluator &evaluator, FuncDecl *func) const;
+  AbstractFunctionDecl *evaluate(Evaluator &evaluator, AbstractFunctionDecl *func) const;
 
 public:
     // Caching

@@ -27,14 +27,14 @@
 ///     bb0(%arg : @owned $T, %addr : @trivial $*T):
 ///       %copy = copy_value %arg : $T
 ///       store %copy to [init] %addr : $*T
-///       debug_value_addr %addr : $*T
+///       debug_value %addr : $*T, expr op_deref
 ///       destroy_value %arg : $T
 ///
 /// Will be transformed to:
 ///
 ///     bb0(%arg : @owned $T, %addr : @trivial $*T):
 ///       store %copy to [init] %addr : $*T
-///       debug_value_addr %addr : $*T
+///       debug_value %addr : $*T, expr op_deref
 ///
 /// Example #2: Destroys are hoisted to the last use. Copies are inserted only
 /// at consumes within the lifetime (to directly satisfy ownership conventions):
@@ -43,7 +43,7 @@
 ///       %copy1 = copy_value %arg : $T
 ///       store %arg to [init] %addr : $*T
 ///       %_ = apply %_(%copy1) : $@convention(thin) (@guaranteed T) -> ()
-///       debug_value_addr %addr : $*T
+///       debug_value %addr : $*T, expr op_deref
 ///       destroy_value %copy1 : $T
 ///
 /// Will be transformed to:
@@ -53,7 +53,7 @@
 ///       store %copy1 to [init] %addr : $*T
 ///       %_ = apply %_(%arg) : $@convention(thin) (@guaranteed T) -> ()
 ///       destroy_value %arg : $T
-///       debug_value_addr %addr : $*T
+///       debug_value %addr : $*T, expr op_deref
 ///
 /// Example #3: Handle control flow.
 ///

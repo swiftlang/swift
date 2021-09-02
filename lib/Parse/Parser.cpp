@@ -1405,6 +1405,11 @@ ParsedDeclName swift::parseDeclName(StringRef name) {
     baseName = baseName.substr(7);
   }
 
+  // If the base name is prefixed by "subscript", it's an subscript.
+  if (baseName == "subscript") {
+    result.IsSubscript = true;
+  }
+
   // Parse the base name.
   if (parseBaseName(baseName)) return ParsedDeclName();
 

@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 // This file contains utilities to work with debug-info related instructions:
-// debug_value and debug_value_addr.
+// debug_value, alloc_stack, and alloc_box.
 //
 // SIL optimizations should deal with debug-info related instructions when
 // looking at the uses of a value.
@@ -228,7 +228,6 @@ struct DebugVarCarryingInst {
   enum class Kind {
     Invalid = 0,
     DebugValue,
-    DebugValueAddr,
     AllocStack,
     AllocBox,
   };
@@ -239,8 +238,6 @@ struct DebugVarCarryingInst {
   DebugVarCarryingInst() : kind(Kind::Invalid), inst(nullptr) {}
   DebugVarCarryingInst(DebugValueInst *dvi)
       : kind(Kind::DebugValue), inst(dvi) {}
-  DebugVarCarryingInst(DebugValueAddrInst *dvai)
-      : kind(Kind::DebugValueAddr), inst(dvai) {}
   DebugVarCarryingInst(AllocStackInst *asi)
       : kind(Kind::AllocStack), inst(asi) {}
   DebugVarCarryingInst(AllocBoxInst *abi) : kind(Kind::AllocBox), inst(abi) {}
@@ -251,9 +248,6 @@ struct DebugVarCarryingInst {
       return;
     case SILInstructionKind::DebugValueInst:
       kind = Kind::DebugValue;
-      break;
-    case SILInstructionKind::DebugValueAddrInst:
-      kind = Kind::DebugValueAddr;
       break;
     case SILInstructionKind::AllocStackInst:
       kind = Kind::AllocStack;
@@ -283,8 +277,6 @@ struct DebugVarCarryingInst {
       llvm_unreachable("Invalid?!");
     case Kind::DebugValue:
       return cast<DebugValueInst>(inst)->getDecl();
-    case Kind::DebugValueAddr:
-      return cast<DebugValueAddrInst>(inst)->getDecl();
     case Kind::AllocStack:
       return cast<AllocStackInst>(inst)->getDecl();
     case Kind::AllocBox:
@@ -299,8 +291,6 @@ struct DebugVarCarryingInst {
       llvm_unreachable("Invalid?!");
     case Kind::DebugValue:
       return cast<DebugValueInst>(inst)->getVarInfo();
-    case Kind::DebugValueAddr:
-      return cast<DebugValueAddrInst>(inst)->getVarInfo();
     case Kind::AllocStack:
       return cast<AllocStackInst>(inst)->getVarInfo();
     case Kind::AllocBox:
@@ -315,9 +305,6 @@ struct DebugVarCarryingInst {
       llvm_unreachable("Invalid?!");
     case Kind::DebugValue:
       cast<DebugValueInst>(inst)->setDebugVarScope(NewDS);
-      break;
-    case Kind::DebugValueAddr:
-      cast<DebugValueAddrInst>(inst)->setDebugVarScope(NewDS);
       break;
     case Kind::AllocStack:
       cast<AllocStackInst>(inst)->setDebugVarScope(NewDS);

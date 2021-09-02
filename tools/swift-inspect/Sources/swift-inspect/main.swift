@@ -159,10 +159,10 @@ struct UniversalOptions: ParsableArguments {
 
 struct BacktraceOptions: ParsableArguments {
   @Flag(help: "Show the backtrace for each allocation")
-  var backtrace: Bool
+  var backtrace: Bool = false
 
   @Flag(help: "Show a long-form backtrace for each allocation")
-  var backtraceLong: Bool
+  var backtraceLong: Bool = false
 
   var style: Backtrace.Style? {
     backtrace ? .oneLine :

@@ -12,7 +12,7 @@ distributed actor SimpleEmptyDistributedActor {
 // CHECK: // %0 "transport" // users: %15, %7, %6, %2
 // CHECK: // %1 "self" // users: %5, %12, %4, %16, %3
 // CHECK: bb0(%0 : $*ActorTransport, %1 : $SimpleEmptyDistributedActor):
-// CHECK:  debug_value_addr %0 : $*ActorTransport, let, name "transport", argno 1, implicit // id: %2
+// CHECK:  debug_value %0 : $*ActorTransport, let, name "transport", argno 1, implicit, expr op_deref // id: %2
 // CHECK:  debug_value %1 : $SimpleEmptyDistributedActor, let, name "self", argno 2, implicit // id: %3
 // CHECK:  %4 = builtin "initializeDefaultActor"(%1 : $SimpleEmptyDistributedActor) : $()
 

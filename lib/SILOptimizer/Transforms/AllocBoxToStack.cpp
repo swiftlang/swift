@@ -65,7 +65,7 @@ static bool useCaptured(Operand *UI) {
   auto *User = UI->getUser();
 
   // These instructions do not cause the address to escape.
-  if (isa<DebugValueInst>(User) || isa<DebugValueAddrInst>(User)
+  if (isa<DebugValueInst>(User)
       || isa<StrongReleaseInst>(User) || isa<StrongRetainInst>(User)
       || isa<DestroyValueInst>(User))
     return false;

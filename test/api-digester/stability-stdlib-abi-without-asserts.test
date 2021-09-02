@@ -2,7 +2,7 @@
 // mkdir %t.tmp/module-cache && mkdir %t.tmp/dummy.sdk
 // RUN: %api-digester -diagnose-sdk -module Swift -o %t.tmp/changes.txt -module-cache-path %t.tmp/module-cache -sdk %t.tmp/dummy.sdk -abi -avoid-location -v
 // RUN: %clang -E -P -x c %S/stability-stdlib-abi-without-asserts.test -o - | sed '/^\s*$/d' | sort > %t.tmp/stability-stdlib-abi.swift.expected
-// RUN: %clang -E -P -x c %t.tmp/changes.txt -o - | sed '/^\s*$/d' | sort > %t.tmp/changes.txt.tmp
+// RUN: %clang -E -P -x c %t.tmp/changes.txt -o - | sed -E -e '/^\s*$/d' -e 's/ in _[0-9A-F]{32}/ in #UNSTABLE ID#/g' | sort > %t.tmp/changes.txt.tmp
 // RUN: diff -u %t.tmp/stability-stdlib-abi.swift.expected %t.tmp/changes.txt.tmp
 
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment below.)

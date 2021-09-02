@@ -202,8 +202,7 @@ Solution::resolveConcreteDeclRef(ValueDecl *decl,
 
   // If this is a C++ function template, get it's specialization for the given
   // substitution map and update the decl accordingly.
-  if (decl->getClangDecl() &&
-      isa<clang::FunctionTemplateDecl>(decl->getClangDecl())) {
+  if (isa_and_nonnull<clang::FunctionTemplateDecl>(decl->getClangDecl())) {
     auto *newFn =
         decl->getASTContext()
             .getClangModuleLoader()
@@ -8811,6 +8810,7 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
 
       if (patternBinding->getInit(index)) {
         patternBinding->setInit(index, resultTarget->getAsExpr());
+        patternBinding->setInitializerChecked(index);
       }
     }
 
@@ -8830,11 +8830,9 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
     auto contextualPattern = target.getContextualPattern();
     auto patternType = target.getTypeOfUninitializedVar();
 
-    TypeResolutionOptions options = TypeResolverContext::PatternBindingDecl;
-    options |= TypeResolutionFlags::OverrideType;
-
     if (auto coercedPattern = TypeChecker::coercePatternToType(
-            contextualPattern, patternType, options)) {
+            contextualPattern, patternType,
+            TypeResolverContext::PatternBindingDecl)) {
       auto resultTarget = target;
       resultTarget.setPattern(coercedPattern);
       return resultTarget;

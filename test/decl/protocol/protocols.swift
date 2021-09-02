@@ -102,10 +102,10 @@ struct DoesNotConform : Up {
 // Circular protocols
 
 protocol CircleMiddle : CircleStart { func circle_middle() } // expected-error {{protocol 'CircleMiddle' refines itself}}
-// expected-note@-1 2 {{protocol 'CircleMiddle' declared here}}
-protocol CircleStart : CircleEnd { func circle_start() } // expected-error 2 {{protocol 'CircleStart' refines itself}}
+// expected-note@-1 {{protocol 'CircleMiddle' declared here}}
+protocol CircleStart : CircleEnd { func circle_start() } // expected-error {{protocol 'CircleStart' refines itself}}
 // expected-note@-1 {{protocol 'CircleStart' declared here}}
-protocol CircleEnd : CircleMiddle { func circle_end()} // expected-note 3 {{protocol 'CircleEnd' declared here}}
+protocol CircleEnd : CircleMiddle { func circle_end()} // expected-note 2 {{protocol 'CircleEnd' declared here}}
 
 protocol CircleEntry : CircleTrivial { }
 protocol CircleTrivial : CircleTrivial { } // expected-error {{protocol 'CircleTrivial' refines itself}}
@@ -261,55 +261,6 @@ struct HasIsEqual : IsEqualComparable {
 
 struct WrongIsEqual : IsEqualComparable { // expected-error{{type 'WrongIsEqual' does not conform to protocol 'IsEqualComparable'}}
   func isEqual(other: Int) -> Bool {}  // expected-note{{candidate has non-matching type '(Int) -> Bool'}}
-}
-
-//===----------------------------------------------------------------------===//
-// Using values of existential type.
-//===----------------------------------------------------------------------===//
-
-func existentialSequence(_ e: Sequence) { // expected-error{{has Self or associated type requirements}}
-  var x = e.makeIterator() // expected-error{{member 'makeIterator' cannot be used on value of protocol type 'Sequence'; use a generic constraint instead}}
-  x.next()
-  x.nonexistent()
-}
-
-protocol HasSequenceAndStream {
-  associatedtype R : IteratorProtocol, Sequence
-  func getR() -> R
-}
-
-func existentialSequenceAndStreamType(_ h: HasSequenceAndStream) { // expected-error{{has Self or associated type requirements}}
-  // FIXME: Crummy diagnostics.
-  var x = h.getR() // expected-error{{member 'getR' cannot be used on value of protocol type 'HasSequenceAndStream'; use a generic constraint instead}}
-  x.makeIterator()
-  x.next()
-
-  x.nonexistent()
-}
-
-//===----------------------------------------------------------------------===//
-// Subscripting
-//===----------------------------------------------------------------------===//
-protocol IntIntSubscriptable {
-  subscript (i: Int) -> Int { get }
-}
-
-protocol IntSubscriptable {
-  associatedtype Element
-  subscript (i: Int) -> Element { get }
-}
-
-struct DictionaryIntInt {
-  subscript (i: Int) -> Int {
-    get {
-      return i
-    }
-  }
-}
-
-func testSubscripting(_ iis: IntIntSubscriptable, i_s: IntSubscriptable) { // expected-error{{has Self or associated type requirements}}
-  var i: Int = iis[17] 
-  var i2 = i_s[17] // expected-error{{member 'subscript' cannot be used on value of protocol type 'IntSubscriptable'; use a generic constraint instead}}
 }
 
 //===----------------------------------------------------------------------===//
@@ -488,18 +439,18 @@ func g<T : C2>(_ x : T) {
 
 class C3 : P1 {} // expected-error{{type 'C3' does not conform to protocol 'P1'}}
 func h<T : C3>(_ x : T) {
-  _ = x as P1 // expected-error{{protocol 'P1' can only be used as a generic constraint because it has Self or associated type requirements}}
+  _ = x as P1
 }
 func i<T : C3>(_ x : T?) -> Bool {
-  return x is P1 // expected-error{{protocol 'P1' can only be used as a generic constraint because it has Self or associated type requirements}}
+  return x is P1
   // FIXME: Bogus diagnostic.  See SR-11920.
   // expected-warning@-2 {{checking a value with optional type 'T?' against dynamic type 'P1' succeeds whenever the value is non-nil; did you mean to use '!= nil'?}}
 }
 func j(_ x : C1) -> Bool {
-  return x is P1 // expected-error{{protocol 'P1' can only be used as a generic constraint because it has Self or associated type requirements}}
+  return x is P1
 }
 func k(_ x : C1?) -> Bool {
-  return x is P1 // expected-error{{protocol 'P1' can only be used as a generic constraint because it has Self or associated type requirements}}
+  return x is P1
 }
 
 

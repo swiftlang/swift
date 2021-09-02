@@ -47,7 +47,7 @@ bb0:
   unreachable
 
 bb1:
-  debug_value_addr %0 : $*S, let, name "newvalue", argno 1
+  debug_value %0 : $*S, let, name "newvalue", argno 1, expr op_deref
   br bb2
 
 bb2:

@@ -47,7 +47,7 @@ sil @$s37concurrentfunction_capturediagnostics1FCfD : $@convention(method) (@own
 // This is address only so we shouldn't crash.
 sil hidden [ossa] @$s37concurrentfunction_capturediagnostics20testCaseAddressOnly21iyx_tAA6MyProtRzlF : $@convention(thin) <T where T : MyProt> (@in_guaranteed T) -> () {
 bb0(%0 : $*T):
-  debug_value_addr %0 : $*T, let, name "i", argno 1 // id: %1
+  debug_value %0 : $*T, let, name "i", argno 1, expr op_deref // id: %1
   %2 = alloc_stack $F, var, name "f2"             // users: %34, %33, %7
   %3 = metatype $@thick F.Type                    // user: %5
   // function_ref F.__allocating_init()

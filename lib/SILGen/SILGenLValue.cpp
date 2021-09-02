@@ -3138,8 +3138,7 @@ bool isCallToReplacedInDynamicReplacement(SILGenFunction &SGF,
                                           bool &isObjCReplacementSelfCall);
 
 static bool isCallToSelfOfCurrentFunction(SILGenFunction &SGF, LookupExpr *e) {
-  return SGF.FunctionDC->getAsDecl() &&
-         isa<AbstractFunctionDecl>(SGF.FunctionDC->getAsDecl()) &&
+  return isa_and_nonnull<AbstractFunctionDecl>(SGF.FunctionDC->getAsDecl()) &&
          e->getBase()->isSelfExprOf(
              cast<AbstractFunctionDecl>(SGF.FunctionDC->getAsDecl()), false);
 }

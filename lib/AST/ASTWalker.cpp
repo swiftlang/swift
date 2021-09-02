@@ -1253,7 +1253,7 @@ public:
       if (Walker.Parent.getAsDecl() && VD->getParentPatternBinding())
         return true;
       auto walkerParentAsStmt = Walker.Parent.getAsStmt();
-      if (walkerParentAsStmt && isa<BraceStmt>(walkerParentAsStmt))
+      if (isa_and_nonnull<BraceStmt>(walkerParentAsStmt))
         return true;
     }
     return false;

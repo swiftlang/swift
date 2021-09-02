@@ -1,0 +1,27 @@
+# REQUIRES: standalone_build
+# UNSUPPORTED: OS=macosx
+# UNSUPPORTED: OS=ios
+# UNSUPPORTED: OS=tvos
+# UNSUPPORTED: OS=watchos
+
+# RUN: %empty-directory(%t)
+# RUN: mkdir -p %t
+# RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --xctest --cmake %cmake  2>&1 | %FileCheck --check-prefix=CLEAN-CORELIBS-CHECK %s
+
+# RUN: %empty-directory(%t)
+# RUN: mkdir -p %t
+# RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --xctest --skip-clean-libdispatch --skip-clean-foundation --skip-clean-xctest --cmake %cmake  2>&1 | %FileCheck --check-prefix=SKIP-CLEAN-CORELIBS-CHECK %s
+
+# CLEAN-CORELIBS-CHECK: Cleaning the libdispatch build directory
+# CLEAN-CORELIBS-CHECK-NEXT: rm -rf
+# CLEAN-CORELIBS-CHECK: Cleaning the Foundation build directory
+# CLEAN-CORELIBS-CHECK-NEXT: rm -rf
+# CLEAN-CORELIBS-CHECK: Cleaning the XCTest build directory
+# CLEAN-CORELIBS-CHECK-NEXT: rm -rf
+
+# SKIP-CLEAN-CORELIBS-CHECK-NOT: Cleaning the libdispatch build directory
+# SKIP-CLEAN-CORELIBS-CHECK-NOT: rm -rf {{.*/libdispatch-[^/]*}}
+# SKIP-CLEAN-CORELIBS-CHECK-NOT: Cleaning the Foundation build directory
+# SKIP-CLEAN-CORELIBS-CHECK-NOT: rm -rf {{.*/foundation-[^/]*}}
+# SKIP-CLEAN-CORELIBS-CHECK-NOT: Cleaning the XCTest build directory
+# SKIP-CLEAN-CORELIBS-CHECK-NOT: rm -rf {{.*/xctest-[^/]*}}

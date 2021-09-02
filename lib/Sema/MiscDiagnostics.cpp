@@ -248,7 +248,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         // Void to _ then warn, because that is redundant.
         if (auto DAE = dyn_cast<DiscardAssignmentExpr>(destExpr)) {
           if (auto CE = dyn_cast<CallExpr>(AE->getSrc())) {
-            if (CE->getCalledValue() && isa<FuncDecl>(CE->getCalledValue()) &&
+            if (isa_and_nonnull<FuncDecl>(CE->getCalledValue()) &&
                 CE->getType()->isVoid()) {
               Ctx.Diags
                   .diagnose(DAE->getLoc(),
@@ -1427,7 +1427,7 @@ static void diagRecursivePropertyAccess(const Expr *E, const DeclContext *DC) {
 
             // But silence the warning if the base was explicitly qualified.
             auto parentAsExpr = Parent.getAsExpr();
-            if (parentAsExpr && isa<DotSyntaxBaseIgnoredExpr>(parentAsExpr))
+            if (isa_and_nonnull<DotSyntaxBaseIgnoredExpr>(parentAsExpr))
               shouldDiagnose = false;
 
             if (shouldDiagnose) {
@@ -1615,6 +1615,15 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       // Diagnostics should correct the innermost closure
       auto *ACE = Closures[Closures.size() - 1];
       assert(ACE);
+
+      // Until Swift 6, only emit a warning when we get this with an
+      // explicit capture, since we used to not diagnose this at all.
+      auto shouldOnlyWarn = [&](Expr *selfRef) {
+        // We know that isImplicitSelfParamUseLikelyToCauseCycle is true,
+        // which means all these casts are valid.
+        return !cast<VarDecl>(cast<DeclRefExpr>(selfRef)->getDecl())
+                  ->isSelfParameter();
+      };
       
       SourceLoc memberLoc = SourceLoc();
       if (auto *MRE = dyn_cast<MemberRefExpr>(E))
@@ -1624,7 +1633,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
           Diags.diagnose(memberLoc,
                          diag::property_use_in_closure_without_explicit_self,
                          baseName.getIdentifier())
-               .warnUntilSwiftVersionIf(Closures.size() > 1, 6);
+               .warnUntilSwiftVersionIf(shouldOnlyWarn(MRE->getBase()), 6);
         }
 
       // Handle method calls with a specific diagnostic + fixit.
@@ -1636,7 +1645,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
           Diags.diagnose(DSCE->getLoc(),
                          diag::method_call_in_closure_without_explicit_self,
                          MethodExpr->getDecl()->getBaseIdentifier())
-               .warnUntilSwiftVersionIf(Closures.size() > 1, 6);
+               .warnUntilSwiftVersionIf(shouldOnlyWarn(DSCE->getBase()), 6);
         }
 
       if (memberLoc.isValid()) {
@@ -1647,7 +1656,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       // Catch any other implicit uses of self with a generic diagnostic.
       if (isImplicitSelfParamUseLikelyToCauseCycle(E, ACE))
         Diags.diagnose(E->getLoc(), diag::implicit_use_of_self_in_closure)
-             .warnUntilSwiftVersionIf(Closures.size() > 1, 6);
+             .warnUntilSwiftVersionIf(shouldOnlyWarn(E), 6);
 
       return { true, E };
     }
@@ -3329,8 +3338,6 @@ static void checkSwitch(ASTContext &ctx, const SwitchStmt *stmt) {
   // We want to warn about "case .Foo, .Bar where 1 != 100:" since the where
   // clause only applies to the second case, and this is surprising.
   for (auto cs : stmt->getCases()) {
-    TypeChecker::checkUnsupportedProtocolType(ctx, cs);
-
     // The case statement can have multiple case items, each can have a where.
     // If we find a "where", and there is a preceding item without a where, and
     // if they are on the same source line, then warn.
@@ -4078,7 +4085,7 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
 
       if (auto *apply = dyn_cast<ApplyExpr>(E)) {
         auto *decl = apply->getCalledValue();
-        if (decl && isa<AbstractFunctionDecl>(decl))
+        if (isa_and_nonnull<AbstractFunctionDecl>(decl))
           return decl;
       }
       return nullptr;
@@ -4747,8 +4754,6 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
 void swift::performStmtDiagnostics(const Stmt *S, DeclContext *DC) {
   auto &ctx = DC->getASTContext();
 
-  TypeChecker::checkUnsupportedProtocolType(ctx, const_cast<Stmt *>(S));
-    
   if (auto switchStmt = dyn_cast<SwitchStmt>(S))
     checkSwitch(ctx, switchStmt);
 
