@@ -1206,8 +1206,8 @@ void Remangler::mangleEntityType(Node *node, EntityContext &ctx,
              node->getKind() == Node::Kind::NoEscapeFunctionType)
                 ? 'F'
                 : 'f');
+    assert(node->getNumChildren() >= 2);
     unsigned inputIndex = node->getNumChildren() - 2;
-    assert(inputIndex <= 1);
     for (unsigned i = 0; i <= inputIndex; ++i)
       mangle(node->begin()[i], depth + 1);
     auto returnType = node->begin()[inputIndex+1];

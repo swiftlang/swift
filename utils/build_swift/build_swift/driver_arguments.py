@@ -599,6 +599,10 @@ def create_argument_parser():
     option(['--back-deploy-concurrency'], toggle_true('build_backdeployconcurrency'),
            help='build back-deployment support for concurrency')
 
+    option(['--install-back-deploy-concurrency'],
+           toggle_true('install_backdeployconcurrency'),
+           help='install back-deployment support libraries for concurrency')
+
     option(['--libcxx'], toggle_true('build_libcxx'),
            help='build libcxx')
 
@@ -1062,6 +1066,12 @@ def create_argument_parser():
            toggle_false('test_android_host'),
            help='skip testing Android device targets on the host machine (the '
                 'phone itself)')
+    option('--skip-clean-libdispatch', toggle_false('clean_libdispatch'),
+           help='skip cleaning up libdispatch')
+    option('--skip-clean-foundation', toggle_false('clean_foundation'),
+           help='skip cleaning up foundation')
+    option('--skip-clean-xctest', toggle_false('clean_xctest'),
+           help='skip cleaning up xctest')
     option('--skip-clean-llbuild', toggle_false('clean_llbuild'),
            help='skip cleaning up llbuild')
     option('--clean-early-swift-driver', toggle_true('clean_early_swift_driver'),

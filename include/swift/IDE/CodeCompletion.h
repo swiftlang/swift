@@ -646,7 +646,6 @@ private:
   StringRef SourceFilePath;
   StringRef BriefDocComment;
   ArrayRef<StringRef> AssociatedUSRs;
-  ArrayRef<std::pair<StringRef, StringRef>> DocWords;
   unsigned TypeDistance : 3;
   unsigned DiagnosticSeverity: 3;
   StringRef DiagnosticMessage;
@@ -731,15 +730,13 @@ public:
                        CodeCompletionResult::NotRecommendedReason NotRecReason,
                        StringRef BriefDocComment,
                        ArrayRef<StringRef> AssociatedUSRs,
-                       ArrayRef<std::pair<StringRef, StringRef>> DocWords,
                        enum ExpectedTypeRelation TypeDistance)
       : Kind(ResultKind::Declaration), KnownOperatorKind(0),
         SemanticContext(unsigned(SemanticContext)), Flair(unsigned(Flair.toRaw())),
         NotRecommended(unsigned(NotRecReason)),
         NumBytesToErase(NumBytesToErase), CompletionString(CompletionString),
         ModuleName(ModuleName), BriefDocComment(BriefDocComment),
-        AssociatedUSRs(AssociatedUSRs), DocWords(DocWords),
-        TypeDistance(TypeDistance) {
+        AssociatedUSRs(AssociatedUSRs), TypeDistance(TypeDistance) {
     assert(AssociatedDecl && "should have a decl");
     AssociatedKind = unsigned(getCodeCompletionDeclKind(AssociatedDecl));
     IsSystem = getDeclIsSystem(AssociatedDecl);
@@ -762,7 +759,6 @@ public:
                        CodeCompletionDiagnosticSeverity diagSeverity,
                        StringRef DiagnosticMessage, StringRef BriefDocComment,
                        ArrayRef<StringRef> AssociatedUSRs,
-                       ArrayRef<std::pair<StringRef, StringRef>> DocWords,
                        ExpectedTypeRelation TypeDistance,
                        CodeCompletionOperatorKind KnownOperatorKind)
       : Kind(ResultKind::Declaration),
@@ -772,8 +768,7 @@ public:
         NumBytesToErase(NumBytesToErase), CompletionString(CompletionString),
         ModuleName(ModuleName), SourceFilePath(SourceFilePath),
         BriefDocComment(BriefDocComment), AssociatedUSRs(AssociatedUSRs),
-        DocWords(DocWords), TypeDistance(TypeDistance),
-        DiagnosticSeverity(unsigned(diagSeverity)),
+        TypeDistance(TypeDistance), DiagnosticSeverity(unsigned(diagSeverity)),
         DiagnosticMessage(DiagnosticMessage) {
     AssociatedKind = static_cast<unsigned>(DeclKind);
     assert(CompletionString);
@@ -867,10 +862,6 @@ public:
 
   ArrayRef<StringRef> getAssociatedUSRs() const {
     return AssociatedUSRs;
-  }
-
-  ArrayRef<std::pair<StringRef, StringRef>> getDeclKeywords() const {
-    return DocWords;
   }
 
   void setSourceFilePath(StringRef value) {

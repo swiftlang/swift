@@ -60,239 +60,7 @@
 using namespace swift;
 using namespace ide;
 
-using CommandWordsPairs = std::vector<std::pair<StringRef, StringRef>>;
 using NotRecommendedReason = CodeCompletionResult::NotRecommendedReason;
-
-enum CodeCompletionCommandKind {
-  none,
-  keyword,
-  recommended,
-  recommendedover,
-  mutatingvariant,
-  nonmutatingvariant,
-};
-
-CodeCompletionCommandKind getCommandKind(StringRef Command) {
-#define CHECK_CASE(KIND)                                                      \
-  if (Command == #KIND)                                                       \
-    return CodeCompletionCommandKind::KIND;
-  CHECK_CASE(keyword);
-  CHECK_CASE(recommended);
-  CHECK_CASE(recommendedover);
-  CHECK_CASE(mutatingvariant);
-  CHECK_CASE(nonmutatingvariant);
-#undef CHECK_CASE
-  return CodeCompletionCommandKind::none;
-}
-
-StringRef getCommandName(CodeCompletionCommandKind Kind) {
-#define CHECK_CASE(KIND)                                                    \
-  if (CodeCompletionCommandKind::KIND == Kind) {                            \
-    static std::string Name(#KIND);                                         \
-    return Name;                                                            \
-  }
-  CHECK_CASE(keyword)
-  CHECK_CASE(recommended)
-  CHECK_CASE(recommendedover)
-  CHECK_CASE(mutatingvariant);
-  CHECK_CASE(nonmutatingvariant);
-#undef CHECK_CASE
-  llvm_unreachable("Cannot handle this Kind.");
-}
-
-bool containsInterestedWords(StringRef Content, StringRef Splitter,
-                             bool AllowWhitespace) {
-  do {
-    Content = Content.split(Splitter).second;
-    Content = AllowWhitespace ? Content.trim() : Content;
-#define CHECK_CASE(KIND)                                                       \
-if (Content.startswith(#KIND))                                                 \
-return true;
-    CHECK_CASE(keyword)
-    CHECK_CASE(recommended)
-    CHECK_CASE(recommendedover)
-    CHECK_CASE(mutatingvariant);
-    CHECK_CASE(nonmutatingvariant);
-#undef CHECK_CASE
-  } while (!Content.empty());
-  return false;
-}
-
-void splitTextByComma(StringRef Text, std::vector<StringRef>& Subs) {
-  do {
-    auto Pair = Text.split(',');
-    auto Key = Pair.first.trim();
-    if (!Key.empty())
-      Subs.push_back(Key);
-    Text = Pair.second;
-  } while (!Text.empty());
-}
-
-namespace clang {
-namespace comments {
-class WordPairsArrangedViewer {
-  ArrayRef<std::pair<StringRef, StringRef>> Content;
-  std::vector<StringRef> ViewedText;
-  std::vector<StringRef> Words;
-  StringRef Key;
-
-  bool isKeyViewed(StringRef K) {
-    return std::find(ViewedText.begin(), ViewedText.end(), K) != ViewedText.end();
-  }
-
-public:
-  WordPairsArrangedViewer(ArrayRef<std::pair<StringRef, StringRef>> Content):
-    Content(Content) {}
-
-  bool hasNext() {
-    Words.clear();
-    bool Found = false;
-    for (auto P : Content) {
-      if (!Found && !isKeyViewed(P.first)) {
-        Key = P.first;
-        Found = true;
-      }
-      if (Found && P.first == Key)
-        Words.push_back(P.second);
-    }
-    return Found;
-  }
-
-  std::pair<StringRef, ArrayRef<StringRef>> next() {
-    bool HasNext = hasNext();
-    (void) HasNext;
-    assert(HasNext && "Have no more data.");
-    ViewedText.push_back(Key);
-    return std::make_pair(Key, llvm::makeArrayRef(Words));
-  }
-};
-
-class ClangCommentExtractor : public ConstCommentVisitor<ClangCommentExtractor> {
-  CommandWordsPairs &Words;
-  const CommandTraits &Traits;
-  std::vector<const Comment *> Parents;
-
-  void visitChildren(const Comment* C) {
-    Parents.push_back(C);
-    for (auto It = C->child_begin(); It != C->child_end(); ++ It)
-      visit(*It);
-    Parents.pop_back();
-  }
-
-public:
-  ClangCommentExtractor(CommandWordsPairs &Words,
-                        const CommandTraits &Traits) : Words(Words),
-                                                       Traits(Traits) {}
-#define CHILD_VISIT(NAME) \
-  void visit##NAME(const NAME *C) {\
-    visitChildren(C);\
-  }
-  CHILD_VISIT(FullComment)
-  CHILD_VISIT(ParagraphComment)
-#undef CHILD_VISIT
-
-  void visitInlineCommandComment(const InlineCommandComment *C) {
-    auto Command = C->getCommandName(Traits);
-    auto CommandKind = getCommandKind(Command);
-    if (CommandKind == CodeCompletionCommandKind::none)
-      return;
-    auto &Parent = Parents.back();
-    for (auto CIT = std::find(Parent->child_begin(), Parent->child_end(), C) + 1;
-         CIT != Parent->child_end(); ++CIT) {
-      if (auto TC = dyn_cast<TextComment>(*CIT)) {
-        auto Text = TC->getText();
-        std::vector<StringRef> Subs;
-        splitTextByComma(Text, Subs);
-        auto Kind = getCommandName(CommandKind);
-        for (auto S : Subs)
-          Words.push_back(std::make_pair(Kind, S));
-      } else
-        break;
-    }
-  }
-};
-
-void getClangDocKeyword(ClangImporter &Importer, const Decl *D,
-                        CommandWordsPairs &Words) {
-  ClangCommentExtractor Extractor(Words, Importer.getClangASTContext().
-    getCommentCommandTraits());
-  if (auto RC = Importer.getClangASTContext().getRawCommentForAnyRedecl(D)) {
-    auto RT = RC->getRawText(Importer.getClangASTContext().getSourceManager());
-    if (containsInterestedWords(RT, "@", /*AllowWhitespace*/false)) {
-      FullComment* Comment = Importer.getClangASTContext().
-        getLocalCommentForDeclUncached(D);
-      Extractor.visit(Comment);
-    }
-  }
-}
-} // end namespace comments
-} // end namespace clang
-
-namespace swift {
-namespace markup {
-class SwiftDocWordExtractor : public MarkupASTWalker {
-  CommandWordsPairs &Pairs;
-  CodeCompletionCommandKind Kind;
-public:
-  SwiftDocWordExtractor(CommandWordsPairs &Pairs) :
-    Pairs(Pairs), Kind(CodeCompletionCommandKind::none) {}
-  void visitKeywordField(const KeywordField *Field) override {
-    Kind = CodeCompletionCommandKind::keyword;
-  }
-  void visitRecommendedField(const RecommendedField *Field) override {
-    Kind = CodeCompletionCommandKind::recommended;
-  }
-  void visitRecommendedoverField(const RecommendedoverField *Field) override {
-    Kind = CodeCompletionCommandKind::recommendedover;
-  }
-  void visitMutatingvariantField(const MutatingvariantField *Field) override {
-    Kind = CodeCompletionCommandKind::mutatingvariant;
-  }
-  void visitNonmutatingvariantField(const NonmutatingvariantField *Field) override {
-    Kind = CodeCompletionCommandKind::nonmutatingvariant;
-  }
-  void visitText(const Text *Text) override {
-    if (Kind == CodeCompletionCommandKind::none)
-      return;
-    StringRef CommandName = getCommandName(Kind);
-    std::vector<StringRef> Subs;
-    splitTextByComma(Text->str(), Subs);
-    for (auto S : Subs)
-      Pairs.push_back(std::make_pair(CommandName, S));
-  }
-};
-
-void getSwiftDocKeyword(const Decl* D, CommandWordsPairs &Words) {
-  auto Interested = false;
-  for (auto C : D->getRawComment(/*SerializedOK=*/false).Comments) {
-    if (containsInterestedWords(C.RawText, "-", /*AllowWhitespace*/true)) {
-      Interested = true;
-      break;
-    }
-  }
-  if (!Interested)
-    return;
-  static swift::markup::MarkupContext MC;
-  auto DC = getSingleDocComment(MC, D);
-  if (!DC)
-    return;
-  SwiftDocWordExtractor Extractor(Words);
-  for (auto Part : DC->getBodyNodes()) {
-    switch (Part->getKind()) {
-      case ASTNodeKind::KeywordField:
-      case ASTNodeKind::RecommendedField:
-      case ASTNodeKind::RecommendedoverField:
-      case ASTNodeKind::MutatingvariantField:
-      case ASTNodeKind::NonmutatingvariantField:
-        Extractor.walk(Part);
-        break;
-      default:
-        break;
-    }
-  }
-}
-} // end namespace markup
-} // end namespace swift
 
 using DeclFilter = std::function<bool(ValueDecl *, DeclVisibilityKind)>;
 static bool DefaultFilter(ValueDecl* VD, DeclVisibilityKind Kind) {
@@ -774,22 +542,6 @@ void CodeCompletionResult::printPrefix(raw_ostream &OS) const {
       break;
   }
 
-  for (clang::comments::WordPairsArrangedViewer Viewer(DocWords);
-       Viewer.hasNext();) {
-    auto Pair = Viewer.next();
-    Prefix.append("/");
-    Prefix.append(Pair.first);
-    Prefix.append("[");
-    StringRef Sep = ", ";
-    for (auto KW : Pair.second) {
-      Prefix.append(KW);
-      Prefix.append(Sep);
-    }
-    for (unsigned I = 0, N = Sep.size(); I < N; ++I)
-      Prefix.pop_back();
-    Prefix.append("]");
-  }
-
   Prefix.append(": ");
   while (Prefix.size() < 36) {
     Prefix.append(" ");
@@ -812,8 +564,7 @@ CodeCompletionResult::withFlair(CodeCompletionFlair newFlair,
         getCompletionString(), getAssociatedDeclKind(), isSystem(),
         getModuleName(), getSourceFilePath(), getNotRecommendedReason(),
         getDiagnosticSeverity(), getDiagnosticMessage(),
-        getBriefDocComment(), getAssociatedUSRs(), getDeclKeywords(),
-        getExpectedTypeRelation(),
+        getBriefDocComment(), getAssociatedUSRs(), getExpectedTypeRelation(),
         isOperator() ? getOperatorKind() : CodeCompletionOperatorKind::None);
   } else {
     return new (*Sink.Allocator) CodeCompletionResult(
@@ -839,7 +590,9 @@ void CodeCompletionResultBuilder::addChunkWithText(
 
 void CodeCompletionResultBuilder::setAssociatedDecl(const Decl *D) {
   assert(Kind == CodeCompletionResult::ResultKind::Declaration);
+
   AssociatedDecl = D;
+
   if (auto *ClangD = D->getClangDecl())
     CurrentModule = ClangD->getImportedOwningModule();
   // FIXME: macros
@@ -860,6 +613,18 @@ void CodeCompletionResultBuilder::setAssociatedDecl(const Decl *D) {
     setNotRecommended(NotRecommendedReason::Deprecated);
   else if (D->getAttrs().getSoftDeprecated(D->getASTContext()))
     setNotRecommended(NotRecommendedReason::SoftDeprecated);
+
+  if (D->getClangNode()) {
+    if (auto *ClangD = D->getClangDecl()) {
+      const auto &ClangContext = ClangD->getASTContext();
+      if (const clang::RawComment *RC =
+          ClangContext.getRawCommentForAnyRedecl(ClangD)) {
+        setBriefDocComment(RC->getBriefText(ClangContext));
+      }
+    }
+  } else {
+    setBriefDocComment(AssociatedDecl->getBriefComment());
+  }
 }
 
 namespace {
@@ -1296,19 +1061,6 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
 
   switch (Kind) {
   case CodeCompletionResult::ResultKind::Declaration: {
-    StringRef BriefComment;
-    auto MaybeClangNode = AssociatedDecl->getClangNode();
-    if (MaybeClangNode) {
-      if (auto *D = MaybeClangNode.getAsDecl()) {
-        const auto &ClangContext = D->getASTContext();
-        if (const clang::RawComment *RC =
-                ClangContext.getRawCommentForAnyRedecl(D))
-          BriefComment = RC->getBriefText(ClangContext);
-      }
-    } else {
-      BriefComment = AssociatedDecl->getBriefComment();
-    }
-
     StringRef ModuleName;
     if (CurrentModule) {
       if (Sink.LastModule.first == CurrentModule.getOpaqueValue()) {
@@ -1328,9 +1080,9 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
 
     CodeCompletionResult *result = new (*Sink.Allocator) CodeCompletionResult(
         SemanticContext, Flair, NumBytesToErase, CCS, AssociatedDecl,
-        ModuleName, NotRecReason, copyString(*Sink.Allocator, BriefComment),
+        ModuleName, NotRecReason, copyString(*Sink.Allocator, BriefDocComment),
         copyAssociatedUSRs(*Sink.Allocator, AssociatedDecl),
-        copyArray(*Sink.Allocator, CommentWords), ExpectedTypeRelation);
+        ExpectedTypeRelation);
     if (!result->isSystem())
       result->setSourceFilePath(getSourceFilePathForDecl(AssociatedDecl));
     if (NotRecReason != NotRecommendedReason::None) {
@@ -1996,16 +1748,6 @@ private:
     }
     if (!Params[0].hasLabel())
       FoundFunctionsWithoutFirstKeyword = true;
-  }
-
-  void setClangDeclKeywords(const ValueDecl *VD, CommandWordsPairs &Pairs,
-                            CodeCompletionResultBuilder &Builder) {
-    if (auto *CD = VD->getClangDecl()) {
-      clang::comments::getClangDocKeyword(*Importer, CD, Pairs);
-    } else {
-      swift::markup::getSwiftDocKeyword(VD, Pairs);
-    }
-    Builder.addDeclDocCommentWords(llvm::makeArrayRef(Pairs));
   }
 
   /// Returns \c true if \p TAD is usable as a first type of a requirement in
@@ -2716,14 +2458,12 @@ public:
       NotRecommended = NotRecommendedReason::InvalidAsyncContext;
     }
 
-    CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
         Sink, CodeCompletionResult::ResultKind::Declaration,
         getSemanticContext(VD, Reason, dynamicLookupInfo), expectedTypeContext);
     Builder.setAssociatedDecl(VD);
     addLeadingDot(Builder);
     addValueBaseName(Builder, Name);
-    setClangDeclKeywords(VD, Pairs, Builder);
 
     if (NotRecommended)
       Builder.setNotRecommended(*NotRecommended);
@@ -2979,17 +2719,14 @@ public:
     if (SD)
       genericSig = SD->getGenericSignatureOfContext();
 
-    CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
         Sink,
         SD ? CodeCompletionResult::ResultKind::Declaration
            : CodeCompletionResult::ResultKind::Pattern,
         SemanticContext ? *SemanticContext : getSemanticContextKind(SD),
         expectedTypeContext);
-    if (SD) {
+    if (SD)
       Builder.setAssociatedDecl(SD);
-      setClangDeclKeywords(SD, Pairs, Builder);
-    }
     if (!HaveLParen) {
       Builder.addLeftBracket();
     } else {
@@ -3024,7 +2761,6 @@ public:
     // Add the pattern, possibly including any default arguments.
     auto addPattern = [&](ArrayRef<const ParamDecl *> declParams = {},
                           bool includeDefaultArgs = true) {
-      CommandWordsPairs Pairs;
       CodeCompletionResultBuilder Builder(
           Sink,
           AFD ? CodeCompletionResult::ResultKind::Declaration
@@ -3032,10 +2768,8 @@ public:
           SemanticContext ? *SemanticContext : getSemanticContextKind(AFD),
           expectedTypeContext);
       Builder.addFlair(CodeCompletionFlairBit::ArgumentLabels);
-      if (AFD) {
+      if (AFD)
         Builder.setAssociatedDecl(AFD);
-        setClangDeclKeywords(AFD, Pairs, Builder);
-      }
 
       if (!HaveLParen)
         Builder.addLeftParen();
@@ -3185,12 +2919,10 @@ public:
     // Add the method, possibly including any default arguments.
     auto addMethodImpl = [&](bool includeDefaultArgs = true,
                              bool trivialTrailingClosure = false) {
-      CommandWordsPairs Pairs;
       CodeCompletionResultBuilder Builder(
           Sink, CodeCompletionResult::ResultKind::Declaration,
           getSemanticContext(FD, Reason, dynamicLookupInfo),
           expectedTypeContext);
-      setClangDeclKeywords(FD, Pairs, Builder);
       Builder.setAssociatedDecl(FD);
 
       if (IsSuperRefExpr && CurrentMethod &&
@@ -3333,12 +3065,10 @@ public:
 
     // Add the constructor, possibly including any default arguments.
     auto addConstructorImpl = [&](bool includeDefaultArgs = true) {
-      CommandWordsPairs Pairs;
       CodeCompletionResultBuilder Builder(
           Sink, CodeCompletionResult::ResultKind::Declaration,
           getSemanticContext(CD, Reason, dynamicLookupInfo),
           expectedTypeContext);
-      setClangDeclKeywords(CD, Pairs, Builder);
       Builder.setAssociatedDecl(CD);
 
       if (IsSuperRefExpr && CurrentMethod &&
@@ -3444,12 +3174,10 @@ public:
       NotRecommended = NotRecommendedReason::InvalidAsyncContext;
     }
 
-    CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
         Sink, CodeCompletionResult::ResultKind::Declaration,
         getSemanticContext(SD, Reason, dynamicLookupInfo), expectedTypeContext);
     Builder.setAssociatedDecl(SD);
-    setClangDeclKeywords(SD, Pairs, Builder);
 
     if (NotRecommended)
       Builder.setNotRecommended(*NotRecommended);
@@ -3484,13 +3212,11 @@ public:
 
   void addNominalTypeRef(const NominalTypeDecl *NTD, DeclVisibilityKind Reason,
                          DynamicLookupInfo dynamicLookupInfo) {
-    CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
         Sink, CodeCompletionResult::ResultKind::Declaration,
         getSemanticContext(NTD, Reason, dynamicLookupInfo),
         expectedTypeContext);
     Builder.setAssociatedDecl(NTD);
-    setClangDeclKeywords(NTD, Pairs, Builder);
     addLeadingDot(Builder);
     Builder.addBaseName(NTD->getName().str());
 
@@ -3512,13 +3238,11 @@ public:
 
   void addTypeAliasRef(const TypeAliasDecl *TAD, DeclVisibilityKind Reason,
                        DynamicLookupInfo dynamicLookupInfo) {
-    CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
         Sink, CodeCompletionResult::ResultKind::Declaration,
         getSemanticContext(TAD, Reason, dynamicLookupInfo),
         expectedTypeContext);
     Builder.setAssociatedDecl(TAD);
-    setClangDeclKeywords(TAD, Pairs, Builder);
     addLeadingDot(Builder);
     Builder.addBaseName(TAD->getName().str());
     if (auto underlyingType = TAD->getUnderlyingType()) {
@@ -3542,11 +3266,9 @@ public:
   void addGenericTypeParamRef(const GenericTypeParamDecl *GP,
                               DeclVisibilityKind Reason,
                               DynamicLookupInfo dynamicLookupInfo) {
-    CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
         Sink, CodeCompletionResult::ResultKind::Declaration,
         getSemanticContext(GP, Reason, dynamicLookupInfo), expectedTypeContext);
-    setClangDeclKeywords(GP, Pairs, Builder);
     Builder.setAssociatedDecl(GP);
     addLeadingDot(Builder);
     Builder.addBaseName(GP->getName().str());
@@ -3556,11 +3278,9 @@ public:
   void addAssociatedTypeRef(const AssociatedTypeDecl *AT,
                             DeclVisibilityKind Reason,
                             DynamicLookupInfo dynamicLookupInfo) {
-    CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
         Sink, CodeCompletionResult::ResultKind::Declaration,
         getSemanticContext(AT, Reason, dynamicLookupInfo), expectedTypeContext);
-    setClangDeclKeywords(AT, Pairs, Builder);
     Builder.setAssociatedDecl(AT);
     addLeadingDot(Builder);
     Builder.addBaseName(AT->getName().str());
@@ -3587,15 +3307,11 @@ public:
         EED->shouldHideFromEditor())
       return;
 
-    CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
         Sink, CodeCompletionResult::ResultKind::Declaration,
         getSemanticContext(EED, Reason, dynamicLookupInfo),
         expectedTypeContext);
     Builder.setAssociatedDecl(EED);
-    setClangDeclKeywords(EED, Pairs, Builder);
-    if (HasTypeContext)
-      Builder.addFlair(CodeCompletionFlairBit::ExpressionSpecific);
 
     addLeadingDot(Builder);
     addValueBaseName(Builder, EED->getBaseIdentifier());
@@ -3699,12 +3415,10 @@ public:
     if (dropCurryLevel && isDuplicate(AFD, funcTy))
       return true;
 
-    CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
         Sink, CodeCompletionResult::ResultKind::Declaration,
         getSemanticContext(AFD, Reason, dynamicLookupInfo),
         expectedTypeContext);
-    setClangDeclKeywords(AFD, Pairs, Builder);
     Builder.setAssociatedDecl(AFD);
 
     // Base name
@@ -4656,6 +4370,23 @@ public:
     addObjCPoundKeywordCompletions(/*needPound=*/true);
   }
 
+  /// Returns \c true if \p VD is an initializer on the \c Optional or \c
+  /// Id_OptionalNilComparisonType type from the Swift stdlib.
+  static bool isInitializerOnOptional(Type T, ValueDecl *VD) {
+    bool IsOptionalType = false;
+    IsOptionalType |= static_cast<bool>(T->getOptionalObjectType());
+    if (auto *NTD = T->getAnyNominal()) {
+      IsOptionalType |= NTD->getBaseIdentifier() ==
+                        VD->getASTContext().Id_OptionalNilComparisonType;
+    }
+    if (IsOptionalType && VD->getModuleContext()->isStdlibModule() &&
+        isa<ConstructorDecl>(VD)) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+
   void getUnresolvedMemberCompletions(Type T) {
     if (!T->mayHaveMembers())
       return;
@@ -4673,16 +4404,11 @@ public:
     // We can only say .foo where foo is a static member of the contextual
     // type and has the same type (or if the member is a function, then the
     // same result type) as the contextual type.
-    FilteredDeclConsumer consumer(*this, [=](ValueDecl *VD,
-                                             DeclVisibilityKind Reason) {
-      if (T->getOptionalObjectType() &&
-          VD->getModuleContext()->isStdlibModule()) {
-        // In optional context, ignore '.init(<some>)', 'init(nilLiteral:)',
-        if (isa<ConstructorDecl>(VD))
-          return false;
-      }
-      return true;
-    });
+    FilteredDeclConsumer consumer(
+        *this, [=](ValueDecl *VD, DeclVisibilityKind Reason) {
+          // In optional context, ignore '.init(<some>)', 'init(nilLiteral:)',
+          return !isInitializerOnOptional(T, VD);
+        });
 
     auto baseType = MetatypeType::get(T);
     llvm::SaveAndRestore<LookupKind> SaveLook(Kind, LookupKind::ValueExpr);
@@ -4692,6 +4418,21 @@ public:
                              /*includeInstanceMembers=*/false,
                              /*includeDerivedRequirements*/false,
                              /*includeProtocolExtensionMembers*/true);
+  }
+
+  /// Complete all enum members declared on \p T.
+  void getEnumElementPatternCompletions(Type T) {
+    if (!isa_and_nonnull<EnumDecl>(T->getAnyNominal()))
+      return;
+
+    auto baseType = MetatypeType::get(T);
+    llvm::SaveAndRestore<LookupKind> SaveLook(Kind, LookupKind::EnumElement);
+    llvm::SaveAndRestore<Type> SaveType(ExprType, baseType);
+    llvm::SaveAndRestore<bool> SaveUnresolved(IsUnresolvedMember, true);
+    lookupVisibleMemberDecls(*this, baseType, CurrDeclContext,
+                             /*includeInstanceMembers=*/false,
+                             /*includeDerivedRequirements=*/false,
+                             /*includeProtocolExtensionMembers=*/true);
   }
 
   void getUnresolvedMemberCompletions(ArrayRef<Type> Types) {
@@ -6366,7 +6107,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
     if (ParsedDecl && ParsedDecl == CurDeclContext->getAsDecl())
       DC = ParsedDecl->getDeclContext();
     if (!isa<ProtocolDecl>(DC))
-      if (DC->isTypeContext() || (ParsedDecl && isa<FuncDecl>(ParsedDecl)))
+      if (DC->isTypeContext() || isa_and_nonnull<FuncDecl>(ParsedDecl))
         addOpaqueTypeKeyword(Sink);
 
     LLVM_FALLTHROUGH;
@@ -6745,8 +6486,8 @@ static void deliverCompletionResults(CodeCompletionContext &CompletionContext,
 }
 
 void deliverUnresolvedMemberResults(
-    ArrayRef<UnresolvedMemberTypeCheckCompletionCallback::Result> Results,
-    DeclContext *DC, SourceLoc DotLoc,
+    ArrayRef<UnresolvedMemberTypeCheckCompletionCallback::ExprResult> Results,
+    ArrayRef<Type> EnumPatternTypes, DeclContext *DC, SourceLoc DotLoc,
     ide::CodeCompletionContext &CompletionCtx,
     CodeCompletionConsumer &Consumer) {
   ASTContext &Ctx = DC->getASTContext();
@@ -6755,7 +6496,7 @@ void deliverUnresolvedMemberResults(
 
   assert(DotLoc.isValid());
   Lookup.setHaveDot(DotLoc);
-  Lookup.shouldCheckForDuplicates(Results.size() > 1);
+  Lookup.shouldCheckForDuplicates(Results.size() + EnumPatternTypes.size() > 1);
 
   // Get the canonical versions of the top-level types
   SmallPtrSet<CanType, 4> originalTypes;
@@ -6778,6 +6519,22 @@ void deliverUnresolvedMemberResults(
         Lookup.getUnresolvedMemberCompletions(Unwrapped);
     }
     Lookup.getUnresolvedMemberCompletions(Result.ExpectedTy);
+  }
+
+  // Offer completions when interpreting the pattern match as an
+  // EnumElementPattern.
+  for (auto &Ty : EnumPatternTypes) {
+    Lookup.setExpectedTypes({Ty}, /*IsImplicitSingleExpressionReturn=*/false,
+                            /*expectsNonVoid=*/true);
+    Lookup.setIdealExpectedType(Ty);
+
+    // We can pattern match MyEnum against Optional<MyEnum>
+    if (Ty->getOptionalObjectType()) {
+      Type Unwrapped = Ty->lookThroughAllOptionalTypes();
+      Lookup.getEnumElementPatternCompletions(Unwrapped);
+    }
+
+    Lookup.getEnumElementPatternCompletions(Ty);
   }
 
   deliverCompletionResults(CompletionCtx, Lookup, DC, Consumer);
@@ -6892,8 +6649,9 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
       Lookup.fallbackTypeCheck(CurDeclContext);
 
     addKeywords(CompletionContext.getResultSink(), MaybeFuncBody);
-    deliverUnresolvedMemberResults(Lookup.getResults(), CurDeclContext, DotLoc,
-                                   CompletionContext, Consumer);
+    deliverUnresolvedMemberResults(Lookup.getExprResults(),
+                                   Lookup.getEnumPatternTypes(), CurDeclContext,
+                                   DotLoc, CompletionContext, Consumer);
     return true;
   }
   case CompletionKind::KeyPathExprSwift: {
@@ -7012,7 +6770,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   }
   if (auto *DRE = dyn_cast_or_null<DeclRefExpr>(ParsedExpr)) {
     Lookup.setIsSelfRefExpr(DRE->getDecl()->getName() == Context.Id_self);
-  } else if (ParsedExpr && isa<SuperRefExpr>(ParsedExpr)) {
+  } else if (isa_and_nonnull<SuperRefExpr>(ParsedExpr)) {
     Lookup.setIsSuperRefExpr();
   }
 
@@ -7205,7 +6963,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       Lookup.setHaveLParen(true);
       for (auto &typeAndDecl : ContextInfo.getPossibleCallees()) {
         auto apply = ContextInfo.getAnalyzedExpr();
-        if (apply && isa<SubscriptExpr>(apply)) {
+        if (isa_and_nonnull<SubscriptExpr>(apply)) {
           Lookup.addSubscriptCallPattern(
               typeAndDecl.Type,
               dyn_cast_or_null<SubscriptDecl>(typeAndDecl.Decl),

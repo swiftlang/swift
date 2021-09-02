@@ -422,9 +422,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableExperimentalConcurrency |=
     Args.hasArg(OPT_enable_experimental_concurrency);
 
-  Opts.EnableExperimentalBackDeployConcurrency |=
-    Args.hasArg(OPT_enable_experimental_back_deploy_concurrency);
-
   Opts.EnableExperimentalNamedOpaqueTypes |=
       Args.hasArg(OPT_enable_experimental_named_opaque_types);
 
@@ -1843,6 +1840,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
         runtimeCompatibilityVersion = llvm::VersionTuple(5, 0);
       } else if (version.equals("5.1")) {
         runtimeCompatibilityVersion = llvm::VersionTuple(5, 1);
+      } else if (version.equals("5.5")) {
+        runtimeCompatibilityVersion = llvm::VersionTuple(5, 5);
       } else {
         Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                        versionArg->getAsString(Args), version);
@@ -1865,6 +1864,12 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
         getRuntimeCompatVersion();
   }
 
+  if (!Args.hasArg(
+          options::OPT_disable_autolinking_runtime_compatibility_concurrency)) {
+    Opts.AutolinkRuntimeCompatibilityConcurrencyLibraryVersion =
+        getRuntimeCompatVersion();
+  }
+
   if (const Arg *A = Args.getLastArg(OPT_num_threads)) {
     if (StringRef(A->getValue()).getAsInteger(10, Opts.NumThreads)) {
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
@@ -1880,7 +1885,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   if (SWIFT_ENABLE_GLOBAL_ISEL_ARM64 &&
       (Triple.getArch() == llvm::Triple::aarch64 ||
-       Triple.getArch() == llvm::Triple::aarch64_32)) {
+       Triple.getArch() == llvm::Triple::aarch64_32) &&
+      Triple.getArchName() != "arm64e") {
     Opts.EnableGlobalISel = true;
   }
 

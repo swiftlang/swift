@@ -357,31 +357,30 @@ DebugValueInst *DebugValueInst::create(SILDebugLocation DebugLoc,
   return ::new (buf) DebugValueInst(DebugLoc, Operand, Var, poisonRefs);
 }
 
-DebugValueAddrInst::DebugValueAddrInst(SILDebugLocation DebugLoc,
-                                       SILValue Operand, SILDebugVariable Var)
-    : UnaryInstructionBase(DebugLoc, Operand),
-      SILDebugVariableSupplement(Var.DIExpr.getNumElements(),
-                                 Var.Type.hasValue(), Var.Loc.hasValue(),
-                                 Var.Scope),
-      VarInfo(Var, getTrailingObjects<char>(), getTrailingObjects<SILType>(),
-              getTrailingObjects<SILLocation>(),
-              getTrailingObjects<const SILDebugScope *>(),
-              getTrailingObjects<SILDIExprElement>()) {
-  if (auto *VD = DebugLoc.getLocation().getAsASTNode<VarDecl>())
-    VarInfo.setImplicit(VD->isImplicit() || VarInfo.isImplicit());
+DebugValueInst *DebugValueInst::createAddr(SILDebugLocation DebugLoc,
+                                           SILValue Operand, SILModule &M,
+                                           SILDebugVariable Var) {
+  // For alloc_stack, debug_value is used to annotate the associated
+  // memory location, so we shouldn't attach op_deref.
+  if (!isa<AllocStackInst>(Operand))
+    Var.DIExpr.prependElements(
+      {SILDIExprElement::createOperator(SILDIExprOperator::Dereference)});
+  void *buf = allocateDebugVarCarryingInst<DebugValueInst>(M, Var);
+  return ::new (buf) DebugValueInst(DebugLoc, Operand, Var,
+                                    /*poisonRefs=*/false);
 }
 
-DebugValueAddrInst *DebugValueAddrInst::create(SILDebugLocation DebugLoc,
-                                               SILValue Operand, SILModule &M,
-                                               SILDebugVariable Var) {
-  void *buf = allocateDebugVarCarryingInst<DebugValueAddrInst>(M, Var);
-  return ::new (buf) DebugValueAddrInst(DebugLoc, Operand, Var);
+bool DebugValueInst::exprStartsWithDeref() const {
+  if (!NumDIExprOperands)
+    return false;
+
+  llvm::ArrayRef<SILDIExprElement> DIExprElements(
+      getTrailingObjects<SILDIExprElement>(), NumDIExprOperands);
+  return DIExprElements.front().getAsOperator()
+          == SILDIExprOperator::Dereference;
 }
 
 VarDecl *DebugValueInst::getDecl() const {
-  return getLoc().getAsASTNode<VarDecl>();
-}
-VarDecl *DebugValueAddrInst::getDecl() const {
   return getLoc().getAsASTNode<VarDecl>();
 }
 

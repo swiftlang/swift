@@ -45,7 +45,7 @@ bb2:                                              // Preds: bb0
 bb3:                                              // Preds: bb1 bb2
   copy_addr [take] %2 to [initialization] %0 : $*T // id: %17
   %18 = tuple ()                                  // user: %20
-  debug_value_addr %0 : $*T
+  debug_value %0 : $*T, expr op_deref
   dealloc_stack %2 : $*T         // id: %19
   return %18 : $()                                // id: %20
 }
@@ -56,13 +56,13 @@ bb3:                                              // Preds: bb1 bb2
 // CHECK-LABEL: } // end sil function 'forward_init'
 sil hidden [ossa] @forward_init : $@convention(thin) <T> (@in T) -> () {
 bb0(%0 : $*T):
-  debug_value_addr %0 : $*T
+  debug_value %0 : $*T, expr op_deref
   %l1 = alloc_stack $T
   copy_addr %0 to [initialization] %l1 : $*T
   %f1 = function_ref @f_in : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
   %c1 = apply %f1<T>(%l1) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
   dealloc_stack %l1 : $*T
-  debug_value_addr %0 : $*T
+  debug_value %0 : $*T, expr op_deref
   destroy_addr %0 : $*T
   %r1 = tuple ()
   return %r1 : $()
@@ -74,13 +74,13 @@ bb0(%0 : $*T):
 // CHECK-LABEL: } // end sil function 'forward_noinit'
 sil hidden [ossa] @forward_noinit : $@convention(thin) <T> (@in T) -> () {
 bb0(%0 : $*T):
-  debug_value_addr %0 : $*T
+  debug_value %0 : $*T, expr op_deref
   %l1 = alloc_stack $T
   %f1 = function_ref @f_out : $@convention(thin) <τ_0_0> () -> @out τ_0_0
   %c1 = apply %f1<T>(%l1) : $@convention(thin) <τ_0_0> () -> @out τ_0_0
   copy_addr %0 to %l1 : $*T
-  debug_value_addr %l1 : $*T
-  debug_value_addr %0 : $*T
+  debug_value %l1 : $*T, expr op_deref
+  debug_value %0 : $*T, expr op_deref
   %f2 = function_ref @f_in : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
   %c2 = apply %f2<T>(%l1) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
   dealloc_stack %l1 : $*T
@@ -95,7 +95,7 @@ bb0(%0 : $*T):
 // CHECK-LABEL: } // end sil function 'forward_takeinit'
 sil hidden [ossa] @forward_takeinit : $@convention(thin) <T> (@in T) -> () {
 bb0(%0 : $*T):
-  debug_value_addr %0 : $*T
+  debug_value %0 : $*T, expr op_deref
   %l1 = alloc_stack $T
   copy_addr [take] %0 to [initialization] %l1 : $*T
   %f1 = function_ref @f_in : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
@@ -111,7 +111,7 @@ bb0(%0 : $*T):
 // CHECK-LABEL: } // end sil function 'forward_takenoinit'
 sil hidden [ossa] @forward_takenoinit : $@convention(thin) <T> (@in T) -> () {
 bb0(%0 : $*T):
-  debug_value_addr %0 : $*T
+  debug_value %0 : $*T, expr op_deref
   %l1 = alloc_stack $T
   %f1 = function_ref @f_out : $@convention(thin) <τ_0_0> () -> @out τ_0_0
   %c1 = apply %f1<T>(%l1) : $@convention(thin) <τ_0_0> () -> @out τ_0_0
@@ -132,10 +132,10 @@ bb0(%0 : $*T):
   %l1 = alloc_stack $T
   %f1 = function_ref @f_out : $@convention(thin) <τ_0_0> () -> @out τ_0_0
   %c1 = apply %f1<T>(%l1) : $@convention(thin) <τ_0_0> () -> @out τ_0_0
-  debug_value_addr %l1 : $*T
+  debug_value %l1 : $*T, expr op_deref
   copy_addr %l1 to [initialization] %0 : $*T
-  debug_value_addr %0 : $*T
-  debug_value_addr %l1 : $*T
+  debug_value %0 : $*T, expr op_deref
+  debug_value %l1 : $*T, expr op_deref
   destroy_addr %l1 : $*T
   dealloc_stack %l1 : $*T
   %t = tuple ()
@@ -169,9 +169,9 @@ bb0(%0 : $*T):
   %l1 = alloc_stack $T
   %f1 = function_ref @f_out : $@convention(thin) <τ_0_0> () -> @out τ_0_0
   %c1 = apply %f1<T>(%l1) : $@convention(thin) <τ_0_0> () -> @out τ_0_0
-  debug_value_addr %l1 : $*T
+  debug_value %l1 : $*T, expr op_deref
   copy_addr [take] %l1 to [initialization] %0 : $*T
-  debug_value_addr %0 : $*T
+  debug_value %0 : $*T, expr op_deref
   dealloc_stack %l1 : $*T
   %t = tuple ()
   return %t : $()
@@ -536,7 +536,7 @@ public struct S<T> {
 // CHECK-LABEL: sil [ossa] @deadtemp :
 // CHECK: %[[G:.*]] = struct_element_addr %0 : $*S<T>, #S.g
 // CHECK-NOT: copy_addr
-// CHECK-NOT: debug_value_addr
+// CHECK-NOT: debug_value {{.*}} expr op_deref
 // CHECK: %[[F:.*]] = struct_element_addr %0 : $*S<T>, #S.f
 // CHECK: copy_addr %[[G]] to %[[F]] : $*T
 // CHECK-LABEL: } // end sil function 'deadtemp'
@@ -545,7 +545,7 @@ bb0(%0 : $*S<T>):
   %1 = struct_element_addr %0 : $*S<T>, #S.g
   %2 = alloc_stack $T
   copy_addr %1 to [initialization] %2 : $*T
-  debug_value_addr %2 : $*T
+  debug_value %2 : $*T, expr op_deref
   %4 = struct_element_addr %0 : $*S<T>, #S.f
   copy_addr [take] %2 to %4 : $*T
   dealloc_stack %2 : $*T

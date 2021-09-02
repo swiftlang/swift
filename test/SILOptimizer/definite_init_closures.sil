@@ -45,7 +45,7 @@ bb0(%0 : $Bool):
 
 sil private [transparent] [ossa] @implicit_closure_struct : $@convention(thin) (@inout_aliasable SimpleStruct) -> (Bool, @error Error) {
 bb0(%0 : $*SimpleStruct):
-  debug_value_addr %0 : $*SimpleStruct, var, name "self", argno 2
+  debug_value %0 : $*SimpleStruct, var, name "self", argno 2, expr op_deref
   %3 = begin_access [read] [static] %0 : $*SimpleStruct
   %4 = struct_element_addr %3 : $*SimpleStruct, #SimpleStruct.x
   %5 = load [trivial] %4 : $*Bool

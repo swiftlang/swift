@@ -242,8 +242,9 @@ static void initializeDispatchEnqueueFunc(dispatch_queue_t queue, void *obj,
                                           dispatch_qos_class_t qos) {
   dispatchEnqueueFuncType func = nullptr;
 
-  // Always fall back to plain dispatch_async_f on Windows for now.
-#if !defined(_WIN32)
+  // Always fall back to plain dispatch_async_f on Windows for now, and
+  // also for back-deployed concurrency.
+#if !defined(_WIN32) && !defined(SWIFT_CONCURRENCY_BACK_DEPLOYMENT)
   if (runtime::environment::concurrencyEnableJobDispatchIntegration())
     func = reinterpret_cast<dispatchEnqueueFuncType>(
         dlsym(RTLD_NEXT, "dispatch_async_swift_job"));
@@ -417,9 +418,13 @@ void swift::swift_task_enqueueOnDispatchQueue(Job *job,
 }
 #endif
 
+#if SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
+static HeapObject _swift_mainExecutorIdentity;
+#endif
+
 ExecutorRef swift::swift_task_getMainExecutor() {
 #if SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
-  return ExecutorRef::generic();
+  return ExecutorRef::forOrdinary(&_swift_mainExecutorIdentity, nullptr);
 #else
   return ExecutorRef::forOrdinary(
            reinterpret_cast<HeapObject*>(&_dispatch_main_q),
@@ -429,7 +434,7 @@ ExecutorRef swift::swift_task_getMainExecutor() {
 
 bool ExecutorRef::isMainExecutor() const {
 #if SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
-  return isGeneric();
+  return Identity == &_swift_mainExecutorIdentity;
 #else
   return Identity == reinterpret_cast<HeapObject*>(&_dispatch_main_q);
 #endif

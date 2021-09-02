@@ -313,7 +313,7 @@ private:
 
   SILValue getProjectBoxMappedVal(SILValue operandValue);
 
-  void visitDebugValueAddrInst(DebugValueAddrInst *inst);
+  void visitDebugValueInst(DebugValueInst *inst);
   void visitDestroyValueInst(DestroyValueInst *inst);
   void visitStructElementAddrInst(StructElementAddrInst *inst);
   void visitLoadInst(LoadInst *inst);
@@ -570,16 +570,17 @@ SILValue ClosureCloner::getProjectBoxMappedVal(SILValue operandValue) {
   return SILValue();
 }
 
-/// Handle a debug_value_addr instruction during cloning of a closure;
-/// if its operand is the promoted address argument then lower it to a
-/// debug_value, otherwise it is handled normally.
-void ClosureCloner::visitDebugValueAddrInst(DebugValueAddrInst *inst) {
-  if (SILValue value = getProjectBoxMappedVal(inst->getOperand())) {
-    getBuilder().setCurrentDebugScope(getOpScope(inst->getDebugScope()));
-    getBuilder().createDebugValue(inst->getLoc(), value, *inst->getVarInfo());
-    return;
-  }
-  SILCloner<ClosureCloner>::visitDebugValueAddrInst(inst);
+/// Handle a debug_value instruction during cloning of a closure;
+/// if its operand is the promoted address argument then lower it to
+/// another debug_value, otherwise it is handled normally.
+void ClosureCloner::visitDebugValueInst(DebugValueInst *inst) {
+  if (inst->hasAddrVal())
+    if (SILValue value = getProjectBoxMappedVal(inst->getOperand())) {
+      getBuilder().setCurrentDebugScope(getOpScope(inst->getDebugScope()));
+      getBuilder().createDebugValue(inst->getLoc(), value, *inst->getVarInfo());
+      return;
+    }
+  SILCloner<ClosureCloner>::visitDebugValueInst(inst);
 }
 
 /// Handle a destroy_value instruction during cloning of a closure; if it is a
@@ -854,7 +855,7 @@ getPartialApplyArgMutationsAndEscapes(PartialApplyInst *pai,
       return false;
     }
 
-    if (isa<DebugValueAddrInst>(addrUser) ||
+    if (DebugValueInst::hasAddrVal(addrUser) ||
         isa<MarkFunctionEscapeInst>(addrUser) || isa<EndAccessInst>(addrUser)) {
       return false;
     }

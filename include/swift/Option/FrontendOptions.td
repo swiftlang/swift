@@ -247,10 +247,6 @@ def enable_experimental_concurrency :
   Flag<["-"], "enable-experimental-concurrency">,
   HelpText<"Enable experimental concurrency model">;
 
-def enable_experimental_back_deploy_concurrency :
-  Flag<["-"], "enable-experimental-back-deploy-concurrency">,
-  HelpText<"Enable experimental back-deployment of the concurrency model">;
-
 def enable_experimental_distributed :
   Flag<["-"], "enable-experimental-distributed">,
   HelpText<"Enable experimental 'distributed' actors and functions">;
@@ -488,11 +484,6 @@ def disable_swift3_objc_inference :
   Flag<["-"], "disable-swift3-objc-inference">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Disable Swift 3's @objc inference rules for NSObject-derived classes and 'dynamic' members (emulates Swift 4 behavior)">;
-
-def library_level : Separate<["-"], "library-level">,
-  MetaVarName<"<level>">,
-  Flags<[FrontendOption, ModuleInterfaceOption]>,
-  HelpText<"Library distribution level 'api', 'spi' or 'other' (the default)">;
 
 def enable_implicit_dynamic : Flag<["-"], "enable-implicit-dynamic">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,

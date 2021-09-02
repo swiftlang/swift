@@ -1343,8 +1343,7 @@ synthesizeValueConstructorBody(AbstractFunctionDecl *afd, void *context) {
     for (unsigned i = 0, e = members.size(); i < e; ++i) {
       auto var = members[i];
 
-      if (var->hasClangNode() &&
-          isa<clang::IndirectFieldDecl>(var->getClangDecl()))
+      if (isa_and_nonnull<clang::IndirectFieldDecl>(var->getClangDecl()))
         continue;
 
       if (var->hasStorage() == (pass != 0)) {
@@ -8545,6 +8544,21 @@ Optional<bool> swift::importer::isMainActorAttr(
   return None;
 }
 
+static bool isUsingMacroName(clang::SourceManager &SM,
+                             clang::SourceLocation loc,
+                             StringRef MacroName) {
+  if (!loc.isMacroID())
+    return false;
+  auto Sloc = SM.getExpansionLoc(loc);
+  if (Sloc.isInvalid())
+    return false;
+  auto Eloc = Sloc.getLocWithOffset(MacroName.size());
+  if (Eloc.isInvalid())
+    return false;
+  StringRef content(SM.getCharacterData(Sloc), MacroName.size());
+  return content == MacroName;
+}
+
 /// Import Clang attributes as Swift attributes.
 void ClangImporter::Implementation::importAttributes(
     const clang::NamedDecl *ClangDecl,
@@ -8666,6 +8680,17 @@ void ClangImporter::Implementation::importAttributes(
       if (avail->getUnavailable()) {
         PlatformAgnostic = PlatformAgnosticAvailabilityKind::Unavailable;
         AnyUnavailable = true;
+      }
+
+      if (isUsingMacroName(getClangASTContext().getSourceManager(),
+                            avail->getLoc(), "SPI_AVAILABLE") ||
+           isUsingMacroName(getClangASTContext().getSourceManager(),
+                            avail->getLoc(), "__SPI_AVAILABLE")) {
+        // The decl has been marked as SPI in the header by using the SPI macro,
+        // thus we add the SPI attribute to it with a default group name.
+        MappedDecl->getAttrs().add(SPIAccessControlAttr::create(SwiftContext,
+          SourceLoc(), SourceRange(),
+          SwiftContext.getIdentifier(CLANG_MODULE_DEFUALT_SPI_GROUP_NAME)));
       }
 
       StringRef message = avail->getMessage();

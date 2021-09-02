@@ -91,7 +91,7 @@ func multipleLabelsVar(e: E) {
   // CHECK-NEXT: br bb3
 
   // CHECK:      bb3:
-  // CHECK-NEXT: debug_value_addr [[X_PHI]] : $*Any, var, name "x"
+  // CHECK-NEXT: debug_value [[X_PHI]] : $*Any, var, name "x"
   // CHECK-NEXT: [[ANY_BOX:%.*]] = alloc_box ${ var Any }, var, name "x"
   // CHECK-NEXT: [[BOX_PAYLOAD:%.*]] = project_box [[ANY_BOX]] : ${ var Any }, 0
   // CHECK-NEXT: copy_addr [take] [[X_PHI]] to [initialization] [[BOX_PAYLOAD]]

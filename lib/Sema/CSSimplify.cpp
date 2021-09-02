@@ -2318,7 +2318,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
 
     if (shouldAttemptFixes()) {
       auto *anchor = locator.trySimplifyToExpr();
-      if (anchor && isa<ClosureExpr>(anchor) &&
+      if (isa_and_nonnull<ClosureExpr>(anchor) &&
           isSingleTupleParam(ctx, func2Params) &&
           canImplodeParams(func1Params)) {
         auto *fix = AllowClosureParamDestructuring::create(
@@ -4761,7 +4761,7 @@ bool ConstraintSystem::repairFailures(
     path.pop_back();
 
     // Drop the tuple type path elements too, but extract each tuple type first.
-    if (path.back().is<LocatorPathElt::TupleType>()) {
+    if (!path.empty() && path.back().is<LocatorPathElt::TupleType>()) {
       rhs = path.back().getAs<LocatorPathElt::TupleType>()->getType();
       path.pop_back();
       lhs = path.back().getAs<LocatorPathElt::TupleType>()->getType();
@@ -7322,7 +7322,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
     // Dig out the instance type and figure out what members of the instance type
     // we are going to see.
     auto baseTy = candidate.getBaseType();
-    auto baseObjTy = baseTy->getRValueType();
+    const auto baseObjTy = baseTy->getRValueType();
 
     bool hasInstanceMembers = false;
     bool hasInstanceMethods = false;
@@ -7369,18 +7369,6 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
       hasInstanceMethods = true;
     }
 
-    // If our base is an existential type, we can't make use of any
-    // member whose signature involves associated types.
-    if (instanceTy->isExistentialType()) {
-      if (auto *proto = decl->getDeclContext()->getSelfProtocolDecl()) {
-        if (!proto->isAvailableInExistential(decl)) {
-          result.addUnviable(candidate,
-                             MemberLookupResult::UR_UnavailableInExistential);
-          return;
-        }
-      }
-    }
-
     // If the invocation's argument expression has a favored type,
     // use that information to determine whether a specific overload for
     // the candidate should be favored.
@@ -7400,6 +7388,20 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
       }
     }
 
+    const auto isUnsupportedExistentialMemberAccess = [&] {
+      // If our base is an existential type, we can't make use of any
+      // member whose signature involves associated types.
+      if (instanceTy->isExistentialType()) {
+        if (auto *proto = decl->getDeclContext()->getSelfProtocolDecl()) {
+          if (!proto->isAvailableInExistential(decl)) {
+            return true;
+          }
+        }
+      }
+
+      return false;
+    };
+
     // See if we have an instance method, instance member or static method,
     // and check if it can be accessed on our base type.
 
@@ -7413,20 +7415,35 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
                           ? candidate
                           : OverloadChoice(instanceTy, decl,
                                            FunctionRefKind::SingleApply);
-        // If this is an instance member referenced from metatype
-        // let's add unviable result to the set because it could be
-        // either curried reference or an  invalid call.
-        //
-        // New candidate shouldn't affect performance because such
-        // choice would only be attempted when solver is in diagnostic mode.
-        result.addUnviable(choice, MemberLookupResult::UR_InstanceMemberOnType);
 
-        bool invalidMethodRef = isa<FuncDecl>(decl) && !hasInstanceMethods;
-        bool invalidMemberRef = !isa<FuncDecl>(decl) && !hasInstanceMembers;
-        // If this is definitely an invalid way to reference a method or member
-        // on the metatype, let's stop here.
-        if (invalidMethodRef || invalidMemberRef)
+        const bool invalidMethodRef = isa<FuncDecl>(decl) && !hasInstanceMethods;
+        const bool invalidMemberRef = !isa<FuncDecl>(decl) && !hasInstanceMembers;
+
+        if (invalidMethodRef || invalidMemberRef) {
+          // If this is definitely an invalid way to reference a method or member
+          // on the metatype, let's stop here.
+          result.addUnviable(choice,
+                             MemberLookupResult::UR_InstanceMemberOnType);
           return;
+        } else if (isUnsupportedExistentialMemberAccess()) {
+          // If the member reference itself is legal, but it turns out to be an
+          // unsupported existential member access, do not make further
+          // assumptions about the correctness of a potential call -- let
+          // the unsupported member access error prevail.
+          result.addUnviable(candidate,
+                             MemberLookupResult::UR_UnavailableInExistential);
+          return;
+        } else {
+          // Otherwise, still add an unviable result to the set, because it
+          // could be an invalid call that was supposed to be performed on an
+          // instance of the type.
+          //
+          // New candidate shouldn't affect performance because such
+          // choice would only be attempted when solver is in diagnostic mode.
+          result.addUnviable(choice,
+                             MemberLookupResult::UR_InstanceMemberOnType);
+
+        }
       }
 
     // If the underlying type of a typealias is fully concrete, it is legal
@@ -7475,6 +7492,12 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
                            MemberLookupResult::UR_TypeMemberOnInstance);
         return;
       }
+    }
+
+    if (isUnsupportedExistentialMemberAccess()) {
+      result.addUnviable(candidate,
+                         MemberLookupResult::UR_UnavailableInExistential);
+      return;
     }
 
     // If we have an rvalue base, make sure that the result isn't 'mutating'

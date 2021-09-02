@@ -265,24 +265,6 @@ test_combo(.genericWithReqs([42]))
 test_combo(.genericWithReqs(()))
 // expected-error@-1 {{contextual member reference to static method 'genericWithReqs' requires 'Self' constraint in the protocol extension}}
 
-protocol Z {
-  associatedtype T = Int
-
-  static var prop: T { get }
-}
-
-extension Z {
-  static func method() -> T { fatalError() }
-}
-
-_ = Z.prop
-// expected-error@-1 {{member 'prop' cannot be used on value of protocol type 'Z.Protocol'; use a generic constraint instead}}
-// expected-error@-2 {{protocol 'Z' can only be used as a generic constraint because it has Self or associated type requirements}}
-
-_ = Z.method()
-// expected-error@-1 {{member 'method' cannot be used on value of protocol type 'Z.Protocol'; use a generic constraint instead}}
-// expected-error@-2 {{protocol 'Z' can only be used as a generic constraint because it has Self or associated type requirements}}
-
 protocol TestWithAssoc {
   associatedtype U
 }
