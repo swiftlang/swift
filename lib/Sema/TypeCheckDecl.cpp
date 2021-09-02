@@ -2237,6 +2237,11 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
 
   case DeclKind::Param: {
     auto *PD = cast<ParamDecl>(D);
+
+    if (PD->getClangDecl())
+      return Context.getClangModuleLoader()->importParamType(
+          cast<clang::ParmVarDecl>(PD->getClangDecl()), PD);
+
     if (PD->isSelfParameter()) {
       auto *AFD = cast<AbstractFunctionDecl>(PD->getDeclContext());
       auto selfParam = computeSelfParam(AFD,
