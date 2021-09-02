@@ -132,6 +132,14 @@ public:
     Equal,
     Whitespace,
 
+    /// The first chunk of a whole generic parameter clause.
+    /// E.g '<T, C: Collection>'
+    GenericParameterClauseBegin,
+
+    /// The first chunk of a generic quirement clause.
+    /// E.g. 'where T: Collection, T.Element == Int'
+    GenericRequirementClauseBegin,
+
     /// The first chunk of a substring that describes the parameter for a
     /// generic type.
     GenericParameterBegin,
@@ -194,6 +202,30 @@ public:
     /// desired.
     OptionalMethodCallTail,
 
+    /// The first chunk of a substring that describes the single parameter
+    /// declaration for a parameter clause.
+    ParameterDeclBegin,
+
+    ParameterDeclExternalName,
+
+    ParameterDeclLocalName,
+
+    ParameterDeclColon,
+
+    ParameterDeclTypeBegin,
+
+    /// Default argument clause for parameter declarations.
+    DefaultArgumentClauseBegin,
+
+    /// First chunk for effect specifiers. i.e. 'async' and 'throws'.
+    EffectsSpecifierClauseBegin,
+
+    /// First chunk for result type clause i.e. ' -> ResultTy' or ': ResultTy'.
+    DeclResultTypeClauseBegin,
+
+    /// First chunk for attribute and modifier list i.e. 'override public'
+    AttributeAndModifierListBegin,
+
     /// Specifies the type of the whole entity that is returned in this code
     /// completion result.  For example, for variable references it is the
     /// variable type, for function calls it is the return type.
@@ -219,7 +251,15 @@ public:
            Kind == ChunkKind::GenericParameterBegin ||
            Kind == ChunkKind::OptionalBegin ||
            Kind == ChunkKind::CallArgumentTypeBegin ||
-           Kind == ChunkKind::TypeAnnotationBegin;
+           Kind == ChunkKind::TypeAnnotationBegin ||
+           Kind == ChunkKind::ParameterDeclBegin ||
+           Kind == ChunkKind::ParameterDeclTypeBegin ||
+           Kind == ChunkKind::DefaultArgumentClauseBegin ||
+           Kind == ChunkKind::GenericParameterClauseBegin ||
+           Kind == ChunkKind::EffectsSpecifierClauseBegin ||
+           Kind == ChunkKind::DeclResultTypeClauseBegin ||
+           Kind == ChunkKind::GenericRequirementClauseBegin ||
+           Kind == ChunkKind::AttributeAndModifierListBegin;
   }
 
   static bool chunkHasText(ChunkKind Kind) {
@@ -249,11 +289,14 @@ public:
            Kind == ChunkKind::CallArgumentName ||
            Kind == ChunkKind::CallArgumentInternalName ||
            Kind == ChunkKind::CallArgumentColon ||
-           Kind == ChunkKind::DeclAttrParamColon ||
-           Kind == ChunkKind::DeclAttrParamKeyword ||
            Kind == ChunkKind::CallArgumentType ||
            Kind == ChunkKind::CallArgumentClosureType ||
            Kind == ChunkKind::CallArgumentClosureExpr ||
+           Kind == ChunkKind::ParameterDeclExternalName ||
+           Kind == ChunkKind::ParameterDeclLocalName ||
+           Kind == ChunkKind::ParameterDeclColon ||
+           Kind == ChunkKind::DeclAttrParamColon ||
+           Kind == ChunkKind::DeclAttrParamKeyword ||
            Kind == ChunkKind::GenericParameterName ||
            Kind == ChunkKind::DynamicLookupMethodCallTail ||
            Kind == ChunkKind::OptionalMethodCallTail ||
@@ -1053,6 +1096,7 @@ class PrintingCodeCompletionConsumer
   llvm::raw_ostream &OS;
   bool IncludeKeywords;
   bool IncludeComments;
+  bool IncludeSourceText;
   bool PrintAnnotatedDescription;
   bool RequiresSourceFileInfo = false;
 
@@ -1060,10 +1104,12 @@ public:
  PrintingCodeCompletionConsumer(llvm::raw_ostream &OS,
                                 bool IncludeKeywords = true,
                                 bool IncludeComments = true,
+                                bool IncludeSourceText = false,
                                 bool PrintAnnotatedDescription = false)
      : OS(OS),
        IncludeKeywords(IncludeKeywords),
        IncludeComments(IncludeComments),
+       IncludeSourceText(IncludeSourceText),
        PrintAnnotatedDescription(PrintAnnotatedDescription) {}
 
   void handleResults(CodeCompletionContext &context) override;

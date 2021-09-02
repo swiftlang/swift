@@ -86,6 +86,20 @@ enum class PrintStructureKind {
   TupleElement,
   NumberLiteral,
   StringLiteral,
+  /// ' = defaultValue'.
+  DefaultArgumentClause,
+  /// '<T, U: Requirement>'.
+  DeclGenericParameterClause,
+  /// 'where T: Collection, T.Element: Equtable'.
+  DeclGenericRequirementClause,
+  /// ' async throws'.
+  EffectsSpecifiers,
+  /// ' -> ResultTy' or ': ResultTy'.
+  DeclResultTypeClause,
+  /// '(a: Int, b param: String)' in function declarations.
+  FunctionParameterList,
+  /// '@attribute ParamTy...' in parameter declarations.
+  FunctionParameterType,
 };
 
 /// An abstract class used to print an AST.
