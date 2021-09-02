@@ -36,7 +36,7 @@ const char *getManglingForWitness(swift::Demangle::ValueWitnessKind kind) {
 
 std::string IRGenMangler::mangleValueWitness(Type type, ValueWitness witness) {
   beginMangling();
-  appendType(type);
+  appendType(type, nullptr);
 
   const char *Code = nullptr;
   switch (witness) {
@@ -97,7 +97,7 @@ IRGenMangler::withSymbolicReferences(IRGenModule &IGM,
       // The short-substitution types in the standard library have compact
       // manglings already, and the runtime ought to have a lookup table for
       // them. Symbolic referencing would be wasteful.
-      if (type->getModuleContext()->isStdlibModule()
+      if (type->getModuleContext()->hasStandardSubstitutions()
           && Mangle::getStandardTypeSubst(type->getName().str())) {
         return false;
       }
@@ -147,8 +147,7 @@ IRGenMangler::mangleTypeForReflection(IRGenModule &IGM,
                                       CanGenericSignature Sig,
                                       CanType Ty) {
   return withSymbolicReferences(IGM, [&]{
-    bindGenericParameters(Sig);
-    appendType(Ty);
+    appendType(Ty, Sig);
   });
 }
 
@@ -191,7 +190,7 @@ std::string IRGenMangler::mangleTypeForLLVMTypeName(CanType Ty) {
     appendProtocolName(P->getDecl(), /*allowStandardSubstitution=*/false);
     appendOperator("P");
   } else {
-    appendType(Ty);
+    appendType(Ty, nullptr);
   }
   return finalize();
 }
@@ -224,7 +223,7 @@ mangleProtocolForLLVMTypeName(ProtocolCompositionType *type) {
           ->getDeclaredType();
       }
 
-      appendType(CanType(superclass));
+      appendType(CanType(superclass), nullptr);
       appendOperator("Xc");
     } else if (layout.getLayoutConstraint()) {
       appendOperator("Xl");
@@ -305,7 +304,7 @@ std::string IRGenMangler::mangleSymbolNameForMangledMetadataAccessorString(
     appendGenericSignature(genericSig);
 
   if (type)
-    appendType(type);
+    appendType(type, genericSig);
   return finalize();
 }
 

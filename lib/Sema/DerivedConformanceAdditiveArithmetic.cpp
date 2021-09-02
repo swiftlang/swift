@@ -77,7 +77,8 @@ bool DerivedConformance::canDeriveAdditiveArithmetic(NominalTypeDecl *nominal,
     if (v->getInterfaceType()->hasError())
       return false;
     auto varType = DC->mapTypeIntoContext(v->getValueInterfaceType());
-    return (bool)TypeChecker::conformsToProtocol(varType, proto, DC);
+    return (bool)TypeChecker::conformsToProtocol(varType, proto,
+                                                 DC->getParentModule());
   });
 }
 
@@ -97,7 +98,7 @@ deriveBodyMathOperator(AbstractFunctionDecl *funcDecl, MathOperator op) {
   auto *nominalTypeExpr = TypeExpr::createImplicitForDecl(
       DeclNameLoc(), nominal, funcDecl,
       funcDecl->mapTypeIntoContext(nominal->getInterfaceType()));
-  auto *initExpr = new (C) ConstructorRefCallExpr(initDRE, nominalTypeExpr);
+  auto *initExpr = ConstructorRefCallExpr::create(C, initDRE, nominalTypeExpr);
 
   // Get operator protocol requirement.
   auto *proto = C.getProtocol(KnownProtocolKind::AdditiveArithmetic);
@@ -142,13 +143,8 @@ deriveBodyMathOperator(AbstractFunctionDecl *funcDecl, MathOperator op) {
                                          DeclNameLoc(), /*Implicit*/ true);
     auto *rhsArg = new (C) MemberRefExpr(rhsDRE, SourceLoc(), member,
                                          DeclNameLoc(), /*Implicit*/ true);
-    auto *memberOpArgs =
-        TupleExpr::create(C, SourceLoc(), {lhsArg, rhsArg}, {}, {}, SourceLoc(),
-                          /*HasTrailingClosure*/ false,
-                          /*Implicit*/ true);
-    auto *memberOpCallExpr =
-        new (C) BinaryExpr(memberOpExpr, memberOpArgs, /*Implicit*/ true);
-    return memberOpCallExpr;
+    return BinaryExpr::create(C, lhsArg, memberOpExpr, rhsArg,
+                              /*implicit*/ true);
   };
 
   // Create array of member operator call expressions.
@@ -233,7 +229,7 @@ deriveBodyPropertyGetter(AbstractFunctionDecl *funcDecl, ProtocolDecl *proto,
   auto *nominalTypeExpr = TypeExpr::createImplicitForDecl(
       DeclNameLoc(), nominal, funcDecl,
       funcDecl->mapTypeIntoContext(nominal->getInterfaceType()));
-  auto *initExpr = new (C) ConstructorRefCallExpr(initDRE, nominalTypeExpr);
+  auto *initExpr = ConstructorRefCallExpr::create(C, initDRE, nominalTypeExpr);
 
   auto createMemberPropertyExpr = [&](VarDecl *member) -> Expr * {
     auto memberType =

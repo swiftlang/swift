@@ -69,9 +69,16 @@ void TupleInitialization::copyOrInitValueInto(SILGenFunction &SGF,
   // In the address case, we forward the underlying value and store it
   // into memory and then create a +1 cleanup. since we assume here
   // that we have a +1 value since we are forwarding into memory.
+  //
+  // In order to ensure that we properly clean up along any failure paths, we
+  // need to mark value as being persistently active. We then unforward it once
+  // we are done.
   assert(value.isPlusOne(SGF) && "Can not store a +0 value into memory?!");
-  value = ManagedValue::forUnmanaged(value.forward(SGF));
-  return copyOrInitValueIntoHelper(
+  CleanupStateRestorationScope valueScope(SGF.Cleanups);
+  if (value.hasCleanup())
+    valueScope.pushCleanupState(value.getCleanup(),
+                                CleanupState::PersistentlyActive);
+  copyOrInitValueIntoHelper(
       SGF, loc, value, isInit, SubInitializations,
       [&](ManagedValue aggregate, unsigned i,
           SILType fieldType) -> ManagedValue {
@@ -83,6 +90,8 @@ void TupleInitialization::copyOrInitValueInto(SILGenFunction &SGF,
 
         return SGF.emitManagedRValueWithCleanup(elt.getValue());
       });
+  std::move(valueScope).pop();
+  value.forward(SGF);
 }
 
 void TupleInitialization::finishUninitialized(SILGenFunction &SGF) {
@@ -290,13 +299,13 @@ public:
 namespace {
 /// Cleanup to destroy an uninitialized local variable.
 class DeallocateUninitializedLocalVariable : public Cleanup {
-  VarDecl *Var;
+  SILValue Box;
 public:
-  DeallocateUninitializedLocalVariable(VarDecl *var) : Var(var) {}
+  DeallocateUninitializedLocalVariable(SILValue box) : Box(box) {}
 
   void emit(SILGenFunction &SGF, CleanupLocation l,
             ForUnwind_t forUnwind) override {
-    SGF.deallocateUninitializedLocalVariable(l, Var);
+    SGF.B.createDeallocBox(l, Box);
   }
 
   void dump(SILGenFunction &) const override {
@@ -315,7 +324,12 @@ namespace {
 class LocalVariableInitialization : public SingleBufferInitialization {
   /// The local variable decl being initialized.
   VarDecl *decl;
-  SILGenFunction &SGF;
+
+  /// The alloc_box instruction.
+  SILValue Box;
+
+  /// The projected address.
+  SILValue Addr;
 
   /// The cleanup we pushed to deallocate the local variable before it
   /// gets initialized.
@@ -332,7 +346,7 @@ public:
   LocalVariableInitialization(VarDecl *decl,
                               Optional<MarkUninitializedInst::Kind> kind,
                               uint16_t ArgNo, SILGenFunction &SGF)
-      : decl(decl), SGF(SGF) {
+      : decl(decl) {
     assert(decl->getDeclContext()->isLocalContext() &&
            "can't emit a local var for a non-local var decl");
     assert(decl->hasStorage() && "can't emit storage for a computed variable");
@@ -348,17 +362,13 @@ public:
     // The variable may have its lifetime extended by a closure, heap-allocate
     // it using a box.
     SILDebugVariable DbgVar(decl->isLet(), ArgNo);
-    SILValue allocBox = SGF.B.createAllocBox(decl, boxType, DbgVar);
+    Box = SGF.B.createAllocBox(decl, boxType, DbgVar);
 
     // Mark the memory as uninitialized, so DI will track it for us.
     if (kind)
-      allocBox = SGF.B.createMarkUninitialized(decl, allocBox, kind.getValue());
+      Box = SGF.B.createMarkUninitialized(decl, Box, kind.getValue());
 
-    SILValue addr = SGF.B.createProjectBox(decl, allocBox, 0);
-
-    /// Remember that this is the memory location that we're emitting the
-    /// decl to.
-    SGF.VarLocs[decl] = SILGenFunction::VarLoc::get(addr, allocBox);
+    Addr = SGF.B.createProjectBox(decl, Box, 0);
 
     // Push a cleanup to destroy the local variable.  This has to be
     // inactive until the variable is initialized.
@@ -366,8 +376,10 @@ public:
                                                           decl);
     ReleaseCleanup = SGF.Cleanups.getTopCleanup();
 
-    // Push a cleanup to deallocate the local variable.
-    SGF.Cleanups.pushCleanup<DeallocateUninitializedLocalVariable>(decl);
+    // Push a cleanup to deallocate the local variable. This references the
+    // box directly since it might be activated before we update
+    // SGF.VarLocs.
+    SGF.Cleanups.pushCleanup<DeallocateUninitializedLocalVariable>(Box);
     DeallocCleanup = SGF.Cleanups.getTopCleanup();
   }
 
@@ -376,8 +388,7 @@ public:
   }
 
   SILValue getAddress() const {
-    assert(SGF.VarLocs.count(decl) && "did not emit var?!");
-    return SGF.VarLocs[decl].value;    
+    return Addr;
   }
 
   SILValue getAddressForInPlaceInitialization(SILGenFunction &SGF,
@@ -394,6 +405,11 @@ public:
   }
 
   void finishInitialization(SILGenFunction &SGF) override {
+    /// Remember that this is the memory location that we've emitted the
+    /// decl to.
+    assert(SGF.VarLocs.count(decl) == 0 && "Already emitted the local?");
+    SGF.VarLocs[decl] = SILGenFunction::VarLoc::get(Addr, Box);
+
     SingleBufferInitialization::finishInitialization(SGF);
     assert(!DidFinish &&
            "called LocalVariableInitialization::finishInitialization twice!");
@@ -440,7 +456,7 @@ public:
       // buffer.  DI will make sure it is only assigned to once.
       needsTemporaryBuffer = true;
       isUninitialized = true;
-    } else if (vd->isSpawnLet()) {
+    } else if (vd->isAsyncLet()) {
       // If this is an async let, treat it like a let-value without an
       // initializer. The initializer runs concurrently in a child task,
       // and value will be initialized at the point the variable in the
@@ -1137,14 +1153,11 @@ SILGenFunction::emitInitializationForVarDecl(VarDecl *vd, bool forceImmutable) {
 
 void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
                                         unsigned idx) {
-
-
-  auto initialization = emitPatternBindingInitialization(PBD->getPattern(idx),
-                                                         JumpDest::invalid());
+  auto &C = PBD->getASTContext();
 
   // If this is an async let, create a child task to compute the initializer
   // value.
-  if (PBD->isSpawnLet()) {
+  if (PBD->isAsyncLet()) {
     // Look through the implicit await (if present), try (if present), and
     // call to reach the autoclosure that computes the value.
     auto *init = PBD->getExecutableInit(idx);
@@ -1157,28 +1170,48 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
            "Could not find async let autoclosure");
     bool isThrowing = init->getType()->castTo<AnyFunctionType>()->isThrowing();
 
+    // Allocate space to receive the child task's result.
+    auto initLoweredTy = getLoweredType(AbstractionPattern::getOpaque(),
+                                        PBD->getPattern(idx)->getType());
+    SILLocation loc(PBD);
+    SILValue resultBuf = emitTemporaryAllocation(loc, initLoweredTy);
+    SILValue resultBufPtr = B.createAddressToPointer(loc, resultBuf,
+                          SILType::getPrimitiveObjectType(C.TheRawPointerType));
+    
     // Emit the closure for the child task.
     // Prepare the opaque `AsyncLet` representation.
     SILValue alet;
     {
-      SILLocation loc(PBD);
+
+      // Currently we don't pass any task options here, so just grab a 'nil'.
+
+      // If we can statically detect some option needs to be passed, e.g.
+      // an executor preference, we'd construct the appropriate option here and
+      // pass it to the async let start.
+      auto options = B.createManagedOptionalNone(
+          loc, SILType::getOptionalType(SILType::getRawPointerType(C)));
+
       alet = emitAsyncLetStart(
           loc,
+          options.forward(*this), // options is B.createManagedOptionalNone
           init->getType(),
-          emitRValue(init).getScalarValue()
+          emitRValue(init).getScalarValue(),
+          resultBufPtr
         ).forward(*this);
     }
-
+    
     // Push a cleanup to destroy the AsyncLet along with the task and child record.
-    enterAsyncLetCleanup(alet);
+    enterAsyncLetCleanup(alet, resultBufPtr);
 
     // Save the child task so we can await it as needed.
-    AsyncLetChildTasks[{PBD, idx}] = { alet, isThrowing };
+    AsyncLetChildTasks[{PBD, idx}] = {alet, resultBufPtr, isThrowing};
+    return;
+  }
 
-    // Mark as uninitialized; actual initialization will occur when the
-    // variables are referenced.
-    initialization->finishUninitialized(*this);
-  } else if (auto *Init = PBD->getExecutableInit(idx)) {
+  auto initialization = emitPatternBindingInitialization(PBD->getPattern(idx),
+                                                         JumpDest::invalid());
+
+  if (auto *Init = PBD->getExecutableInit(idx)) {
     // If an initial value expression was specified by the decl, emit it into
     // the initialization.
     FullExpr Scope(Cleanups, CleanupLocation(Init));
@@ -1329,7 +1362,8 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
     case StmtConditionElement::CK_Availability:
       // Check the running OS version to determine whether it is in the range
       // specified by elt.
-      VersionRange OSVersion = elt.getAvailability()->getAvailableRange();
+      PoundAvailableInfo *availability = elt.getAvailability();
+      VersionRange OSVersion = availability->getAvailableRange();
       
       // The OS version might be left empty if availability checking was
       // disabled. Treat it as always-true in that case.
@@ -1338,11 +1372,21 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
         
       if (OSVersion.isEmpty() || OSVersion.isAll()) {
         // If there's no check for the current platform, this condition is
-        // trivially true.
+        // trivially true  (or false, for unavailability).
         SILType i1 = SILType::getBuiltinIntegerType(1, getASTContext());
-        booleanTestValue = B.createIntegerLiteral(loc, i1, true);
+        bool value = !availability->isUnavailability();
+        booleanTestValue = B.createIntegerLiteral(loc, i1, value);
       } else {
         booleanTestValue = emitOSVersionRangeCheck(loc, OSVersion);
+        if (availability->isUnavailability()) {
+          // If this is an unavailability check, invert the result
+          // by emitting a call to Builtin.xor_Int1(lhs, -1).
+          SILType i1 = SILType::getBuiltinIntegerType(1, getASTContext());
+          SILValue minusOne = B.createIntegerLiteral(loc, i1, -1);
+          booleanTestValue =
+            B.createBuiltinBinaryFunction(loc, "xor", i1, i1,
+                                          {booleanTestValue, minusOne});
+        }
       }
       break;
     }
@@ -1503,26 +1547,30 @@ namespace {
 /// A cleanup that destroys the AsyncLet along with the child task and record.
 class AsyncLetCleanup: public Cleanup {
   SILValue alet;
+  SILValue resultBuf;
 public:
-  AsyncLetCleanup(SILValue alet) : alet(alet) { }
+  AsyncLetCleanup(SILValue alet, SILValue resultBuf)
+    : alet(alet), resultBuf(resultBuf) { }
 
   void emit(SILGenFunction &SGF, CleanupLocation l,
             ForUnwind_t forUnwind) override {
-    SGF.emitEndAsyncLet(l, alet);
+    SGF.emitFinishAsyncLet(l, alet, resultBuf);
   }
 
   void dump(SILGenFunction &) const override {
 #ifndef NDEBUG
     llvm::errs() << "AsyncLetCleanup\n"
-                 << "AsyncLet:" << alet << "\n";
+                 << "AsyncLet:" << alet << "\n"
+                 << "result buffer:" << resultBuf << "\n";
 #endif
   }
 };
 } // end anonymous namespace
 
-CleanupHandle SILGenFunction::enterAsyncLetCleanup(SILValue alet) {
+CleanupHandle SILGenFunction::enterAsyncLetCleanup(SILValue alet,
+                                                   SILValue resultBuf) {
   Cleanups.pushCleanupInState<AsyncLetCleanup>(
-      CleanupState::Active, alet);
+      CleanupState::Active, alet, resultBuf);
   return Cleanups.getTopCleanup();
 }
 
@@ -1679,21 +1727,4 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
     B.emitDestroyValueOperation(silLoc, Val);
   else
     B.createDestroyAddr(silLoc, Val);
-}
-
-void SILGenFunction::deallocateUninitializedLocalVariable(SILLocation silLoc,
-                                                          VarDecl *vd) {
-  assert(vd->getDeclContext()->isLocalContext() &&
-         "can't emit a local var for a non-local var decl");
-  assert(vd->hasStorage() && "can't emit storage for a computed variable");
-
-  assert(VarLocs.count(vd) && "var decl wasn't emitted?!");
-
-  auto loc = VarLocs[vd];
-
-  // Ignore let values captured without a memory location.
-  if (!loc.value->getType().isAddress()) return;
-
-  assert(loc.box && "captured var should have been given a box");
-  B.createDeallocBox(silLoc, loc.box);
 }

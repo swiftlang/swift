@@ -4,6 +4,7 @@
     key.column: 1,
     key.filepath: rdar_18677108-2-a.swift,
     key.severity: source.diagnostic.severity.error,
+    key.id: "expected_rparen_expr_list",
     key.description: "expected ')' in expression list",
     key.diagnostic_stage: source.diagnostic.stage.swift.sema,
     key.diagnostics: [
@@ -12,6 +13,7 @@
         key.column: 46,
         key.filepath: rdar_18677108-2-a.swift,
         key.severity: source.diagnostic.severity.note,
+        key.id: "opening_paren",
         key.description: "to match this opening '('"
       }
     ]
@@ -21,6 +23,7 @@
     key.column: 1,
     key.filepath: rdar_18677108-2-a.swift,
     key.severity: source.diagnostic.severity.error,
+    key.id: "expected_rbrace_in_brace_stmt",
     key.description: "expected '}' at end of brace statement",
     key.diagnostic_stage: source.diagnostic.stage.swift.sema,
     key.diagnostics: [
@@ -29,6 +32,7 @@
         key.column: 3,
         key.filepath: rdar_18677108-2-a.swift,
         key.severity: source.diagnostic.severity.note,
+        key.id: "opening_brace",
         key.description: "to match this opening '{'"
       }
     ]
@@ -38,6 +42,7 @@
     key.column: 1,
     key.filepath: rdar_18677108-2-a.swift,
     key.severity: source.diagnostic.severity.error,
+    key.id: "expected_rbrace_class",
     key.description: "expected '}' in class",
     key.diagnostic_stage: source.diagnostic.stage.swift.sema,
     key.diagnostics: [
@@ -46,6 +51,7 @@
         key.column: 1,
         key.filepath: rdar_18677108-2-a.swift,
         key.severity: source.diagnostic.severity.note,
+        key.id: "opening_brace",
         key.description: "to match this opening '{'"
       }
     ]

@@ -64,6 +64,7 @@ enum class SourceKitRequest {
   SyntaxTree,
   EnableCompileNotifications,
   CollectExpresstionType,
+  CollectVariableType,
   GlobalConfiguration,
   DependencyUpdated,
 #define SEMANTIC_REFACTORING(KIND, NAME, ID) KIND,
@@ -113,6 +114,7 @@ struct TestOptions {
   bool CollectActionables = false;
   bool isAsyncRequest = false;
   bool timeRequest = false;
+  bool measureInstructions = false;
   bool DisableImplicitConcurrencyModuleImport = false;
   llvm::Optional<unsigned> CompletionCheckDependencyInterval;
   unsigned repeatRequest = 1;

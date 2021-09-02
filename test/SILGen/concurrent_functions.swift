@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s -module-name test -swift-version 5 -enable-experimental-concurrency -enable-experimental-flow-sensitive-concurrent-captures | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s -module-name test -swift-version 5  -disable-availability-checking -enable-experimental-flow-sensitive-concurrent-captures | %FileCheck %s
 // REQUIRES: concurrency
 
 func acceptsConcurrent(_: @escaping @Sendable () -> Int) { }

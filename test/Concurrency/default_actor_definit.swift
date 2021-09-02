@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil %s -enable-experimental-concurrency | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil %s  -disable-availability-checking | %FileCheck %s
 // REQUIRES: concurrency
 
 actor A {

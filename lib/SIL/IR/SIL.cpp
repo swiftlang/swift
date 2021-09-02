@@ -107,8 +107,14 @@ bool SILModule::isTypeMetadataAccessible(CanType type) {
   return !type.findIf([&](CanType type) {
     // Note that this function returns true if the type is *illegal* to use.
 
-    // Ignore non-nominal types.
-    auto decl = type.getNominalOrBoundGenericNominal();
+    // Ignore non-nominal types -- except for opaque result types which can be
+    // private and in a different translation unit in which case they can't be
+    // accessed.
+    ValueDecl *decl = type.getNominalOrBoundGenericNominal();
+    if (!decl)
+      decl = isa<OpaqueTypeArchetypeType>(type)
+                 ? cast<OpaqueTypeArchetypeType>(type)->getDecl()
+                 : nullptr;
     if (!decl)
       return false;
 
@@ -139,6 +145,31 @@ bool SILModule::isTypeMetadataAccessible(CanType type) {
     }
     llvm_unreachable("bad linkage");
   });
+}
+
+/// Return the minimum linkage structurally required to reference the given formal type.
+FormalLinkage swift::getTypeLinkage(CanType t) {
+  assert(t->isLegalFormalType());
+  
+  class Walker : public TypeWalker {
+  public:
+    FormalLinkage Linkage;
+    Walker() : Linkage(FormalLinkage::PublicUnique) {}
+
+    Action walkToTypePre(Type ty) override {
+      // Non-nominal types are always available.
+      auto decl = ty->getNominalOrBoundGenericNominal();
+      if (!decl)
+        return Action::Continue;
+      
+      Linkage = std::min(Linkage, getDeclLinkage(decl));
+      return Action::Continue;
+    }
+  };
+
+  Walker w;
+  t.walk(w);
+  return w.Linkage;
 }
 
 /// Answer whether IRGen's emitTypeMetadataForLayout can fetch metadata for

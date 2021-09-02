@@ -71,11 +71,37 @@ bool Evaluator::checkDependency(const ActiveRequest &request) {
 
 void Evaluator::diagnoseCycle(const ActiveRequest &request) {
   if (debugDumpCycles) {
-    llvm::errs() << "===CYCLE DETECTED===\n";
-    for (auto &req : activeRequests) {
-      simple_display(llvm::errs(), req);
-      llvm::errs() << "\n";
+    const auto printIndent = [](llvm::raw_ostream &OS, unsigned indent) {
+      OS.indent(indent);
+      OS << "`--";
+    };
+
+    unsigned indent = 1;
+    auto &OS = llvm::errs();
+
+    OS << "===CYCLE DETECTED===\n";
+    for (const auto &step : activeRequests) {
+      printIndent(OS, indent);
+      if (step == request) {
+        OS.changeColor(llvm::raw_ostream::GREEN);
+        simple_display(OS, step);
+        OS.resetColor();
+      } else {
+        simple_display(OS, step);
+      }
+      OS << "\n";
+      indent += 4;
     }
+
+    printIndent(OS, indent);
+    OS.changeColor(llvm::raw_ostream::GREEN);
+    simple_display(OS, request);
+
+    OS.changeColor(llvm::raw_ostream::RED);
+    OS << " (cyclic dependency)";
+    OS.resetColor();
+
+    OS << "\n";
   }
 
   request.diagnoseCycle(diags);

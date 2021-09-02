@@ -168,6 +168,7 @@ public:
     return SILDynamicCastInst(cast<ID>(inst));
 #include "swift/SIL/SILNodes.def"
     }
+    llvm_unreachable("covered switch");
   }
 
   SILDynamicCastKind getKind() const {
@@ -359,6 +360,7 @@ public:
     case SILDynamicCastKind::UnconditionalCheckedCastValueInst:
       return cast<UnconditionalCheckedCastValueInst>(inst)->getSourceLoweredType();
     }
+    llvm_unreachable("covered switch");
   }
 
   CanType getTargetFormalType() const {

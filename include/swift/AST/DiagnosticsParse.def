@@ -435,11 +435,12 @@ ERROR(deprecated_operator_body_use_group,PointsToFirstBadToken,
       "use a precedence group instead", ())
 ERROR(operator_decl_no_fixity,none,
       "operator must be declared as 'prefix', 'postfix', or 'infix'", ())
+ERROR(operator_decl_expected_precedencegroup, none,
+      "expected precedence group name after ':' in operator declaration", ())
 
-ERROR(operator_decl_expected_type,none,
-      "expected designated type in operator declaration", ())
-ERROR(operator_decl_trailing_comma,none,
-      "trailing comma in operator declaration", ())
+WARNING(operator_decl_remove_designated_types,none,
+        "designated types are no longer used by the compiler; please remove "
+        "the designated type list from this operator declaration", ())
 
 // PrecedenceGroup
 ERROR(precedencegroup_not_infix,none,
@@ -487,6 +488,7 @@ ERROR(referenced_value_no_accessor,none,
       "referenced declaration has no %select{getter|setter}0", (unsigned))
 ERROR(expected_sil_value_ownership_kind,none,
       "expected value ownership kind in SIL code", ())
+ERROR(unrecognized_sil_qualifier,none, "unrecognized SIL qualifier", ())
 ERROR(silfunc_and_silarg_have_incompatible_sil_value_ownership,none,
       "SILFunction and SILArgument have mismatching ValueOwnershipKinds. "
       "Function type specifies: '@%0'. SIL argument specifies: '@%1'.",
@@ -589,14 +591,19 @@ ERROR(sil_missing_substitutions,none,
       "missing substitutions", ())
 ERROR(sil_too_many_substitutions,none,
       "too many substitutions", ())
-ERROR(sil_dbg_unknown_key,none,
-      "unknown key '%0' in debug variable declaration", (StringRef))
 ERROR(sil_objc_with_tail_elements,none,
       "alloc_ref [objc] cannot have tail allocated elements", ())
 ERROR(sil_expected_access_kind,none,
       "%0 instruction must have explicit access kind", (StringRef))
 ERROR(sil_expected_access_enforcement,none,
       "%0 instruction must have explicit access enforcement", (StringRef))
+
+ERROR(sil_dbg_unknown_key,none,
+      "unknown key '%0' in debug variable declaration", (StringRef))
+ERROR(sil_dbg_unknown_expr_part,none,
+      "unrecognized debug info expression %0", (StringRef))
+ERROR(sil_dbg_expr_expect_operand_kind,none,
+      "operator %0 expects a %1 kind operand here", (StringRef, StringRef))
 
 ERROR(sil_keypath_expected_component_kind,none,
       "expected keypath component kind", ())
@@ -931,6 +938,12 @@ WARNING(parameter_unnamed_warn,none,
 ERROR(parameter_curry_syntax_removed,none,
       "cannot have more than one parameter list", ())
 
+ERROR(availability_cannot_be_mixed,none,
+      "#available and #unavailable cannot be in the same statement", ())
+
+ERROR(false_available_is_called_unavailable,none,
+      "#available cannot be used as an expression, did you mean to use '#unavailable'?", ())
+
 ERROR(initializer_as_typed_pattern,none,
       "unexpected initializer in pattern; did you mean to use '='?", ())
 
@@ -1133,7 +1146,7 @@ ERROR(default_with_where,none,
       "'default' cannot be used with a 'where' guard expression",
       ())
 ERROR(case_stmt_without_body,none,
-      "%select{'case'|'default'}0 label in a 'switch' should have at least one "
+      "%select{'case'|'default'}0 label in a 'switch' must have at least one "
       "executable statement", (bool))
 
 // 'try' on statements
@@ -1223,8 +1236,8 @@ ERROR(invalid_float_literal_missing_leading_zero,none,
       "'.%0' is not a valid floating point literal; it must be written '0.%0'",
       (StringRef))
 ERROR(availability_query_outside_if_stmt_guard, none,
-      "#available may only be used as condition of an 'if', 'guard'"
-      " or 'while' statement", ())
+      "%0 may only be used as condition of an 'if', 'guard'"
+      " or 'while' statement", (StringRef))
 
 ERROR(empty_arg_label_underscore, none,
       "an empty argument label is spelled with '_'", ())
@@ -1428,6 +1441,8 @@ ERROR(attr_renamed, none,
       "'@%0' has been renamed to '@%1'", (StringRef, StringRef))
 WARNING(attr_renamed_warning, none,
         "'@%0' has been renamed to '@%1'", (StringRef, StringRef))
+WARNING(attr_renamed_to_modifier_warning, none,
+        "'@%0' has been renamed to '%1'", (StringRef, StringRef))
 ERROR(attr_name_close_match, none,
       "no attribute named '@%0'; did you mean '@%1'?", (StringRef, StringRef))
 ERROR(attr_unsupported_on_target, none,
@@ -1690,11 +1705,6 @@ ERROR(sil_inst_autodiff_invalid_witness_generic_signature,PointsToFirstBadToken,
       "parameters as original function generic signature '%1'",
       (StringRef, StringRef))
 
-// completionHandlerAsync
-ERROR(attr_completion_handler_async_invalid_name, none,
-      "argument of '%0' attribute must be an identifier or full function name",
-      (StringRef))
-
 //------------------------------------------------------------------------------
 // MARK: Generics parsing diagnostics
 //------------------------------------------------------------------------------
@@ -1753,7 +1763,7 @@ ERROR(version_component_not_number,none,
       "version component contains non-numeric characters", ())
 ERROR(compiler_version_too_many_components,none,
       "compiler version must not have more than five components", ())
-WARNING(unused_compiler_version_component,none,
+WARNING(unused_compiler_version_component,NoUsage,
       "the second version component is not used for comparison", ())
 ERROR(empty_version_component,none,
       "found empty version component", ())
@@ -1810,21 +1820,29 @@ ERROR(avail_query_version_comparison_not_needed,
 ERROR(availability_query_wildcard_required, none,
       "must handle potential future platforms with '*'", ())
 
+ERROR(unavailability_query_wildcard_not_required, none,
+      "platform wildcard '*' is always implicit in #unavailable", ())
+
 ERROR(availability_must_occur_alone, none,
       "'%0' version-availability must be specified alone", (StringRef))
 
 ERROR(pound_available_swift_not_allowed, none,
-      "Swift language version checks not allowed in #available(...)", ())
+      "Swift language version checks not allowed in %0(...)", (StringRef))
 
 ERROR(pound_available_package_description_not_allowed, none,
-      "PackageDescription version checks not allowed in #available(...)", ())
+      "PackageDescription version checks not allowed in %0(...)", (StringRef))
 
 ERROR(availability_query_repeated_platform, none,
       "version for '%0' already specified", (StringRef))
 
-ERROR(attr_requires_concurrency,none,
+ERROR(attr_requires_concurrency, none,
       "'%0' %select{attribute|modifier}1 is only valid when experimental "
       "concurrency is enabled",
+      (StringRef, bool))
+
+ERROR(attr_requires_distributed, none,
+      "'%0' %select{attribute|modifier}1 is only valid when experimental "
+      "distributed support is enabled",
       (StringRef, bool))
 
 //------------------------------------------------------------------------------

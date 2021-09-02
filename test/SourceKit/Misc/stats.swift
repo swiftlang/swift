@@ -2,6 +2,7 @@ func foo() {}
 
 // RUN: %sourcekitd-test -req=syntax-map %s == -req=stats | %FileCheck %s -check-prefix=SYNTAX_1
 
+// SYNTAX_1:   {{.*}} source.statistic.instruction-count
 // SYNTAX_1: 2 {{.*}} source.statistic.num-requests
 // SYNTAX_1: 0 {{.*}} source.statistic.num-semantic-requests
 // SYNTAX_1: 0 {{.*}} source.statistic.num-ast-builds

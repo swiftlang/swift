@@ -1,7 +1,7 @@
-// RUN: %target-swift-frontend -c -Xllvm -sil-verify-after-pass=loadable-address %s
-// RUN: %target-swift-frontend -emit-sil %s | %FileCheck %s -check-prefix=CHECK-SIL
-// RUN: %target-swift-frontend -c -Xllvm -sil-print-after=loadable-address %s 2>&1 | %FileCheck %s -check-prefix=CHECK-LBA-SIL
-// RUN: %target-run-simple-swift
+// RUN: %target-swift-frontend -c -Xllvm -sil-verify-after-pass=loadable-address %s -requirement-machine=off
+// RUN: %target-swift-frontend -emit-sil %s -requirement-machine=off | %FileCheck %s -check-prefix=CHECK-SIL
+// RUN: %target-swift-frontend -c -Xllvm -sil-print-after=loadable-address %s -requirement-machine=off 2>&1 | %FileCheck %s -check-prefix=CHECK-LBA-SIL
+// RUN: %target-run-simple-swift(-Xfrontend -requirement-machine=off)
 // REQUIRES: executable_test
 
 // `isLargeLoadableType` depends on the ABI and differs between architectures.

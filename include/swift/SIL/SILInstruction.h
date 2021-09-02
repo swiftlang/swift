@@ -32,6 +32,7 @@
 #include "swift/SIL/Consumption.h"
 #include "swift/SIL/SILAllocated.h"
 #include "swift/SIL/SILArgumentArrayRef.h"
+#include "swift/SIL/SILDebugInfoExpression.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILFunctionConventions.h"
 #include "swift/SIL/SILLocation.h"
@@ -320,6 +321,7 @@ class SILInstruction : public llvm::ilist_node<SILInstruction> {
   friend llvm::ilist_traits<SILInstruction>;
   friend llvm::ilist_traits<SILBasicBlock>;
   friend SILBasicBlock;
+  friend SILModule;
 
   /// A backreference to the containing basic block.  This is maintained by
   /// ilist_traits<SILInstruction>.
@@ -364,9 +366,14 @@ class SILInstruction : public llvm::ilist_node<SILInstruction> {
   SILInstructionResultArray getResultsImpl() const;
 
 protected:
+  friend class LibswiftPassInvocation;
+
   SILInstruction() {
     NumCreatedInstructions++;
   }
+
+  /// This method unlinks 'self' from the containing basic block.
+  void removeFromParent();
 
   ~SILInstruction() {
     NumDeletedInstructions++;
@@ -380,6 +387,10 @@ public:
                      size_t Alignment = alignof(ValueBase)) {
     return C.allocateInst(Bytes, Alignment);
   }
+
+  /// Returns true if this instruction is removed from its function and
+  /// scheduled to be deleted.
+  bool isDeleted() const { return !ParentBB; }
 
   enum class MemoryBehavior {
     None,
@@ -463,6 +474,9 @@ public:
 
   /// Drops all uses that belong to this instruction.
   void dropAllReferences();
+
+  /// Drops all references that aren't represented by operands.
+  void dropNonOperandReferences();
 
   /// Replace all uses of all results of this instruction with undef.
   void replaceAllUsesOfAllResultsWithUndef();
@@ -732,6 +746,10 @@ public:
   /// Verify that all operands of this instruction have compatible ownership
   /// with this instruction.
   void verifyOperandOwnership() const;
+
+  /// Verify that this instruction and its associated debug information follow
+  /// all SIL debug info invariants.
+  void verifyDebugInfo() const;
 
   /// Get the number of created SILInstructions.
   static int getNumCreatedInstructions() {
@@ -1708,14 +1726,39 @@ struct SILDebugVariable {
   StringRef Name;
   unsigned ArgNo : 16;
   unsigned Constant : 1;
+  unsigned Implicit : 1;
+  Optional<SILType> Type;
+  Optional<SILLocation> Loc;
+  const SILDebugScope *Scope;
+  SILDebugInfoExpression DIExpr;
 
-  SILDebugVariable() : ArgNo(0), Constant(false) {}
+  // Use vanilla copy ctor / operator
+  SILDebugVariable(const SILDebugVariable &) = default;
+  SILDebugVariable &operator=(const SILDebugVariable &) = default;
+
+  SILDebugVariable()
+      : ArgNo(0), Constant(false), Implicit(false), Scope(nullptr) {}
   SILDebugVariable(bool Constant, uint16_t ArgNo)
-      : ArgNo(ArgNo), Constant(Constant) {}
-  SILDebugVariable(StringRef Name, bool Constant, unsigned ArgNo)
-      : Name(Name), ArgNo(ArgNo), Constant(Constant) {}
+      : ArgNo(ArgNo), Constant(Constant), Implicit(false), Scope(nullptr) {}
+  SILDebugVariable(StringRef Name, bool Constant, unsigned ArgNo,
+                   bool IsImplicit = false, Optional<SILType> AuxType = {},
+                   Optional<SILLocation> DeclLoc = {},
+                   const SILDebugScope *DeclScope = nullptr,
+                   llvm::ArrayRef<SILDIExprElement> ExprElements = {})
+      : Name(Name), ArgNo(ArgNo), Constant(Constant), Implicit(IsImplicit),
+        Type(AuxType), Loc(DeclLoc), Scope(DeclScope), DIExpr(ExprElements) {}
+
+  /// Created from either AllocStack or AllocBox instruction
+  static Optional<SILDebugVariable>
+  createFromAllocation(const AllocationInst *AI);
+
+  // We're not comparing DIExpr here because strictly speaking,
+  // DIExpr is not part of the debug variable. We simply piggyback
+  // it in this class so that's it's easier to carry DIExpr around.
   bool operator==(const SILDebugVariable &V) {
-    return ArgNo == V.ArgNo && Constant == V.Constant && Name == V.Name;
+    return ArgNo == V.ArgNo && Constant == V.Constant && Name == V.Name &&
+           Implicit == V.Implicit && Type == V.Type && Loc == V.Loc &&
+           Scope == V.Scope;
   }
 };
 
@@ -1730,17 +1773,23 @@ class TailAllocatedDebugVariable {
       int_type HasValue : 1;
       /// True if this is a let-binding.
       int_type Constant : 1;
+      /// True if this variable is created by compiler
+      int_type Implicit : 1;
       /// When this is nonzero there is a tail-allocated string storing
       /// variable name present. This typically only happens for
       /// instructions that were created from parsing SIL assembler.
-      int_type NameLength : 14;
+      int_type NameLength : 13;
       /// The source function argument position from left to right
       /// starting with 1 or 0 if this is a local variable.
       int_type ArgNo : 16;
     } Data;
   } Bits;
 public:
-  TailAllocatedDebugVariable(Optional<SILDebugVariable>, char *buf);
+  TailAllocatedDebugVariable(Optional<SILDebugVariable>, char *buf,
+                             SILType *AuxVarType = nullptr,
+                             SILLocation *DeclLoc = nullptr,
+                             const SILDebugScope **DeclScope = nullptr,
+                             SILDIExprElement *DIExprOps = nullptr);
   TailAllocatedDebugVariable(int_type RawValue) { Bits.RawValue = RawValue; }
   int_type getRawValue() const { return Bits.RawValue; }
 
@@ -1751,18 +1800,72 @@ public:
   StringRef getName(const char *buf) const;
   bool isLet() const { return Bits.Data.Constant; }
 
-  Optional<SILDebugVariable> get(VarDecl *VD, const char *buf) const {
+  bool isImplicit() const { return Bits.Data.Implicit; }
+  void setImplicit(bool V = true) { Bits.Data.Implicit = V; }
+
+  Optional<SILDebugVariable>
+  get(VarDecl *VD, const char *buf, Optional<SILType> AuxVarType = {},
+      Optional<SILLocation> DeclLoc = {},
+      const SILDebugScope *DeclScope = nullptr,
+      llvm::ArrayRef<SILDIExprElement> DIExprElements = {}) const {
     if (!Bits.Data.HasValue)
       return None;
+
     if (VD)
       return SILDebugVariable(VD->getName().empty() ? "" : VD->getName().str(),
-                              VD->isLet(), getArgNo());
+                              VD->isLet(), getArgNo(), isImplicit(), AuxVarType,
+                              DeclLoc, DeclScope, DIExprElements);
     else
-      return SILDebugVariable(getName(buf), isLet(), getArgNo());
+      return SILDebugVariable(getName(buf), isLet(), getArgNo(), isImplicit(),
+                              AuxVarType, DeclLoc, DeclScope, DIExprElements);
   }
 };
 static_assert(sizeof(TailAllocatedDebugVariable) == 4,
               "SILNode inline bitfield needs updating");
+
+/// Used for keeping track of advanced / supplement debug variable info
+/// stored in trailing objects space inside debug instructions (e.g.
+/// debug_value)
+class SILDebugVariableSupplement {
+protected:
+  enum SourceLocKind : unsigned { SLK_Loc = 0b01, SLK_Scope = 0b10 };
+
+  unsigned NumDIExprOperands : 8;
+
+  unsigned HasAuxDebugVariableType : 1;
+
+  unsigned AuxVariableSourceLoc : 2;
+
+  SILDebugVariableSupplement(unsigned NumDIExprOps, bool AuxType, bool AuxLoc,
+                             bool AuxScope)
+      : NumDIExprOperands(NumDIExprOps), HasAuxDebugVariableType(AuxType),
+        AuxVariableSourceLoc((AuxLoc ? SLK_Loc : 0) |
+                             (AuxScope ? SLK_Scope : 0)) {}
+};
+
+#define SIL_DEBUG_VAR_SUPPLEMENT_TRAILING_OBJS_IMPL()                          \
+  inline bool hasAuxDebugLocation() const {                                    \
+    return AuxVariableSourceLoc & SLK_Loc;                                     \
+  }                                                                            \
+  inline bool hasAuxDebugScope() const {                                       \
+    return AuxVariableSourceLoc & SLK_Scope;                                   \
+  }                                                                            \
+                                                                               \
+  size_t numTrailingObjects(OverloadToken<SILType>) const {                    \
+    return HasAuxDebugVariableType ? 1 : 0;                                    \
+  }                                                                            \
+                                                                               \
+  size_t numTrailingObjects(OverloadToken<SILLocation>) const {                \
+    return hasAuxDebugLocation() ? 1 : 0;                                      \
+  }                                                                            \
+                                                                               \
+  size_t numTrailingObjects(OverloadToken<const SILDebugScope *>) const {      \
+    return hasAuxDebugScope() ? 1 : 0;                                         \
+  }                                                                            \
+                                                                               \
+  size_t numTrailingObjects(OverloadToken<SILDIExprElement>) const {           \
+    return NumDIExprOperands;                                                  \
+  }
 
 //===----------------------------------------------------------------------===//
 // Allocation Instructions
@@ -1791,7 +1894,10 @@ class DeallocStackInst;
 class AllocStackInst final
     : public InstructionBase<SILInstructionKind::AllocStackInst,
                              AllocationInst>,
-      private llvm::TrailingObjects<AllocStackInst, Operand, char> {
+      private SILDebugVariableSupplement,
+      private llvm::TrailingObjects<AllocStackInst, SILType, SILLocation,
+                                    const SILDebugScope *, SILDIExprElement,
+                                    Operand, char> {
   friend TrailingObjects;
   friend SILBuilder;
 
@@ -1806,6 +1912,8 @@ class AllocStackInst final
                                 SILFunction &F,
                                 Optional<SILDebugVariable> Var,
                                 bool hasDynamicLifetime);
+
+  SIL_DEBUG_VAR_SUPPLEMENT_TRAILING_OBJS_IMPL()
 
   size_t numTrailingObjects(OverloadToken<Operand>) const {
     return SILNode::Bits.AllocStackInst.NumOperands;
@@ -1836,15 +1944,35 @@ public:
 
   /// Return the debug variable information attached to this instruction.
   Optional<SILDebugVariable> getVarInfo() const {
+    Optional<SILType> AuxVarType;
+    Optional<SILLocation> VarDeclLoc;
+    const SILDebugScope *VarDeclScope = nullptr;
+    if (HasAuxDebugVariableType)
+      AuxVarType = *getTrailingObjects<SILType>();
+
+    if (hasAuxDebugLocation())
+      VarDeclLoc = *getTrailingObjects<SILLocation>();
+    if (hasAuxDebugScope())
+      VarDeclScope = *getTrailingObjects<const SILDebugScope *>();
+
+    llvm::ArrayRef<SILDIExprElement> DIExprElements(
+        getTrailingObjects<SILDIExprElement>(), NumDIExprOperands);
+
     auto RawValue = SILNode::Bits.AllocStackInst.VarInfo;
     auto VI = TailAllocatedDebugVariable(RawValue);
-    return VI.get(getDecl(), getTrailingObjects<char>());
+    return VI.get(getDecl(), getTrailingObjects<char>(), AuxVarType, VarDeclLoc,
+                  VarDeclScope, DIExprElements);
   };
   void setArgNo(unsigned N) {
     auto RawValue = SILNode::Bits.AllocStackInst.VarInfo;
     auto VI = TailAllocatedDebugVariable(RawValue);
     VI.setArgNo(N);
     SILNode::Bits.AllocStackInst.VarInfo = VI.getRawValue();
+  }
+
+  void setDebugVarScope(const SILDebugScope *NewDS) {
+    if (hasAuxDebugScope())
+      *getTrailingObjects<const SILDebugScope *>() = NewDS;
   }
 
   /// getElementType - Get the type of the allocated memory (as opposed to the
@@ -3460,11 +3588,15 @@ class HopToExecutorInst
   friend SILBuilder;
 
   HopToExecutorInst(SILDebugLocation debugLoc, SILValue executor,
-                    bool hasOwnership)
-      : UnaryInstructionBase(debugLoc, executor) { }
+                    bool hasOwnership, bool isMandatory)
+      : UnaryInstructionBase(debugLoc, executor) {
+    SILNode::Bits.HopToExecutorInst.mandatory = isMandatory;
+  }
 
 public:
   SILValue getTargetExecutor() const { return getOperand(); }
+
+  bool isMandatory() const { return SILNode::Bits.HopToExecutorInst.mandatory; }
 };
 
 /// Extract the ex that the code is executing on the operand executor already.
@@ -3895,13 +4027,20 @@ class BeginBorrowInst
                                   SingleValueInstruction> {
   friend class SILBuilder;
 
-  BeginBorrowInst(SILDebugLocation DebugLoc, SILValue LValue)
+  bool defined;
+
+  BeginBorrowInst(SILDebugLocation DebugLoc, SILValue LValue, bool defined)
       : UnaryInstructionBase(DebugLoc, LValue,
-                             LValue->getType().getObjectType()) {}
+                             LValue->getType().getObjectType()),
+        defined(defined) {}
 
 public:
   using EndBorrowRange =
       decltype(std::declval<ValueBase>().getUsersOfType<EndBorrowInst>());
+
+  /// Whether the borrow scope defined by this instruction corresponds to a
+  /// source-level VarDecl.
+  bool isDefined() const { return defined; }
 
   /// Return a range over all EndBorrow instructions for this BeginBorrow.
   EndBorrowRange getEndBorrows() const;
@@ -4519,9 +4658,13 @@ public:
 class DebugValueInst final
     : public UnaryInstructionBase<SILInstructionKind::DebugValueInst,
                                   NonValueInstruction>,
-      private llvm::TrailingObjects<DebugValueInst, char> {
+      private SILDebugVariableSupplement,
+      private llvm::TrailingObjects<DebugValueInst, SILType, SILLocation,
+                                    const SILDebugScope *, SILDIExprElement,
+                                    char> {
   friend TrailingObjects;
   friend SILBuilder;
+
   TailAllocatedDebugVariable VarInfo;
 
   DebugValueInst(SILDebugLocation DebugLoc, SILValue Operand,
@@ -4529,6 +4672,8 @@ class DebugValueInst final
   static DebugValueInst *create(SILDebugLocation DebugLoc, SILValue Operand,
                                 SILModule &M, SILDebugVariable Var,
                                 bool poisonRefs);
+
+  SIL_DEBUG_VAR_SUPPLEMENT_TRAILING_OBJS_IMPL()
 
   size_t numTrailingObjects(OverloadToken<char>) const { return 1; }
 
@@ -4538,7 +4683,27 @@ public:
   VarDecl *getDecl() const;
   /// Return the debug variable information attached to this instruction.
   Optional<SILDebugVariable> getVarInfo() const {
-    return VarInfo.get(getDecl(), getTrailingObjects<char>());
+    Optional<SILType> AuxVarType;
+    Optional<SILLocation> VarDeclLoc;
+    const SILDebugScope *VarDeclScope = nullptr;
+    if (HasAuxDebugVariableType)
+      AuxVarType = *getTrailingObjects<SILType>();
+
+    if (hasAuxDebugLocation())
+      VarDeclLoc = *getTrailingObjects<SILLocation>();
+    if (hasAuxDebugScope())
+      VarDeclScope = *getTrailingObjects<const SILDebugScope *>();
+
+    llvm::ArrayRef<SILDIExprElement> DIExprElements(
+        getTrailingObjects<SILDIExprElement>(), NumDIExprOperands);
+
+    return VarInfo.get(getDecl(), getTrailingObjects<char>(), AuxVarType,
+                       VarDeclLoc, VarDeclScope, DIExprElements);
+  }
+
+  void setDebugVarScope(const SILDebugScope *NewDS) {
+    if (hasAuxDebugScope())
+      *getTrailingObjects<const SILDebugScope *>() = NewDS;
   }
 
   /// True if all references within this debug value will be overwritten with a
@@ -4560,11 +4725,15 @@ public:
 /// Define the start or update to a symbolic variable value (for address-only
 /// types) .
 class DebugValueAddrInst final
-  : public UnaryInstructionBase<SILInstructionKind::DebugValueAddrInst,
-                                NonValueInstruction>,
-    private llvm::TrailingObjects<DebugValueAddrInst, char> {
+    : public UnaryInstructionBase<SILInstructionKind::DebugValueAddrInst,
+                                  NonValueInstruction>,
+      private SILDebugVariableSupplement,
+      private llvm::TrailingObjects<DebugValueAddrInst, SILType, SILLocation,
+                                    const SILDebugScope *, SILDIExprElement,
+                                    char> {
   friend TrailingObjects;
   friend SILBuilder;
+
   TailAllocatedDebugVariable VarInfo;
 
   DebugValueAddrInst(SILDebugLocation DebugLoc, SILValue Operand,
@@ -4573,16 +4742,37 @@ class DebugValueAddrInst final
                                     SILValue Operand, SILModule &M,
                                     SILDebugVariable Var);
 
+  SIL_DEBUG_VAR_SUPPLEMENT_TRAILING_OBJS_IMPL()
+
 public:
   /// Return the underlying variable declaration that this denotes,
   /// or null if we don't have one.
   VarDecl *getDecl() const;
   /// Return the debug variable information attached to this instruction.
   Optional<SILDebugVariable> getVarInfo() const {
-    return VarInfo.get(getDecl(), getTrailingObjects<char>());
-  };
-};
+    Optional<SILType> AuxVarType;
+    Optional<SILLocation> VarDeclLoc;
+    const SILDebugScope *VarDeclScope = nullptr;
+    if (HasAuxDebugVariableType)
+      AuxVarType = *getTrailingObjects<SILType>();
 
+    if (hasAuxDebugLocation())
+      VarDeclLoc = *getTrailingObjects<SILLocation>();
+    if (hasAuxDebugScope())
+      VarDeclScope = *getTrailingObjects<const SILDebugScope *>();
+
+    llvm::ArrayRef<SILDIExprElement> DIExprElements(
+        getTrailingObjects<SILDIExprElement>(), NumDIExprOperands);
+
+    return VarInfo.get(getDecl(), getTrailingObjects<char>(), AuxVarType,
+                       VarDeclLoc, VarDeclScope, DIExprElements);
+  }
+
+  void setDebugVarScope(const SILDebugScope *NewDS) {
+    if (hasAuxDebugScope())
+      *getTrailingObjects<const SILDebugScope *>() = NewDS;
+  }
+};
 
 /// An abstract class representing a load from some kind of reference storage.
 template <SILInstructionKind K>
@@ -6245,6 +6435,8 @@ public:
 /// Postcondition: The returned index is unique across all properties in the
 ///                object, including properties declared in a superclass.
 unsigned getFieldIndex(NominalTypeDecl *decl, VarDecl *property);
+
+unsigned getCaseIndex(EnumElementDecl *enumElement);
 
 /// Get the property for a struct or class by its unique index, or nullptr if
 /// the index does not match a property declared in this struct or class or

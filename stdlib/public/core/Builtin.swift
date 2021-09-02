@@ -346,12 +346,18 @@ internal func _class_getInstancePositiveExtentSize(_ theClass: AnyClass) -> Int 
 }
 
 #if INTERNAL_CHECKS_ENABLED
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+// "9999" means: enable if linked with a built library, but not when linked with
+// the OS libraries.
+// Note: this must not be changed to a "real" OS version.
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
 @usableFromInline
 @_silgen_name("_swift_isImmutableCOWBuffer")
 internal func _swift_isImmutableCOWBuffer(_ object: AnyObject) -> Bool
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+// "9999" means: enable if linked with a built library, but not when linked with
+// the OS libraries.
+// Note: this must not be changed to a "real" OS version.
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
 @usableFromInline
 @_silgen_name("_swift_setImmutableCOWBuffer")
 internal func _swift_setImmutableCOWBuffer(_ object: AnyObject, _ immutable: Bool) -> Bool

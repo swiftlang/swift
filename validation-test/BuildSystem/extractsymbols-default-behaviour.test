@@ -1,0 +1,93 @@
+# REQUIRES: standalone_build
+# REQUIRES: OS=macosx
+
+# RUN: %empty-directory(%t)
+# RUN: mkdir -p %t
+# RUN: split-file %s %t
+
+# Even though we are running build-script with dry-run,
+# symbol extraction runs real commands against the file system.
+# Thus we generate a series of files
+# to target each of the cases handled by the code
+# RUN: mkdir -p %t/destdir
+# RUN: %swiftc_driver %t/hello.swift -o %t/destdir/swift-demangle
+# RUN: ln -s %t/destdir/swift-demangle %t/destdir/swift-api-digester
+# RUN: cp %t/swift-util.py %t/destdir/
+# RUN: chmod a+x %t/destdir/swift-util.py
+# RUN: %swiftc_driver %t/dylib.swift -emit-library -o %t/destdir/libswiftDemangle.dylib
+# RUN: %swiftc_driver %t/dylib.swift -emit-library -static -o %t/destdir/libswiftASTSectionImporter.a 
+# Targets marked with INSTALL_WITH_SHARED are executable (e.g. compatibility libraries)
+# RUN: cp %t/destdir/libswiftASTSectionImporter.a %t/destdir/libswiftCompatibility51.a
+# RUN: chmod a+x %t/destdir/libswiftCompatibility51.a
+# RUN: mkdir -p %t/symroot/macosx-%target-cpu
+
+# RUN: SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script-impl --dry-run --build-dir=%t/build --workspace=%swift_src_root/.. --cmake %cmake --only-execute macosx-%target-cpu-extractsymbols --host-cc /usr/bin/true --darwin-install-extract-symbols=1 --host-target=macosx-%target-cpu --install-symroot=%t/symroot --install-destdir=%t/destdir --build-jobs=1 > %t/build-script-impl-output.txt 2>&1
+# RUN: %FileCheck --input-file=%t/build-script-impl-output.txt %s
+# RUN: %FileCheck --input-file=%t/build-script-impl-output.txt --check-prefixes CHECK-SKIPPED %s
+
+# CHECK: --- Extracting symbols ---
+
+# Ensure we copy executable regular files to the symroot
+# CHECK-LABEL: cpio
+# CHECK-DAG: swift-demangle
+# CHECK-DAG: swift-util.py
+# CHECK-DAG: libswiftDemangle.dylib
+# CHECK-DAG: libswiftCompatibility51.a
+
+# Ensure we extract symbols only for executables and
+# and dylibs
+# CHECK-LABEL: command": "dsymutil", "start"
+# CHECK-DAG: dsymutil {{.*}}swift-demangle
+# CHECK-DAG: dsymutil {{.*}}libswiftDemangle.dylib
+
+# Ensure we strip executables, shared libraries and static
+# libraries
+# CHECK-LABEL: xcrun_find_tool strip
+# CHECK-DAG: strip {{.*}}swift-demangle
+# CHECK-DAG: strip {{.*}}libswiftDemangle.dylib
+# CHECK-DAG: strip {{.*}}libswiftASTSectionImporter.a
+# CHECK-DAG: strip {{.*}}libswiftCompatibility51.a
+# CHECK-DAG: strip {{.*}}swift-util.py
+
+# Ensure we codesign dylibds
+# CHECK-LABEL: xcrun_find_tool codesign
+# CHECK: codesign {{.*}}libswiftDemangle.dylib
+
+# CHECK-SKIPPED: --- Extracting symbols ---
+
+# Ensure symroot does not contain symlinks and static archives
+# that are not executable
+# CHECK-SKIPPED-LABEL: cpio
+# CHECK-SKIPPED-NOT: swift-api-digester
+# CHECK-SKIPPED-NOT: libswiftASTSectionImporter.a
+
+# Ensure we don't extract symbols for static archives, symlinks
+# and Python scripts
+# CHECK-SKIPPED-LABEL: command": "dsymutil", "start"
+# CHECK-SKIPPED-NOT: dsymutil {{.*}}libswiftASTSectionImporter.a
+# CHECK-SKIPPED-NOT: dsymutil {{.*}}libswiftCompatibility51.a
+# CHECK-SKIPPED-NOT: dsymutil {{.*}}swift-util.py
+# CHECK-SKIPPED-NOT: dsymutil {{.*}}swift-api-digester
+
+# Ensure we don't strip symlinks
+# CHECK-SKIPPED-LABEL: xcrun_find_tool strip
+# CHECK-SKIPPED-NOT: strip {{.*}}swift-api-digester
+
+# Ensure we don't codesign executables, symlinks,
+# static archives and python scripts
+# CHECK-SKIPPED-LABEL: xcrun_find_tool codesign
+# CHECK-SKIPPED-NOT: codesign {{.*}}swift-demangle
+# CHECK-SKIPPED-NOT: codesign {{.*}}libswiftASTSectionImporter.a
+# CHECK-SKIPPED-NOT: codesign {{.*}}libswiftCompatibility51.a
+# CHECK-SKIPPED-NOT: codesign {{.*}}swift-util.py
+# CHECK-SKIPPED-NOT: codesign {{.*}}swift-api-digester
+
+#--- hello.swift
+print("hello")
+
+#--- dylib.swift
+func greet(person: String) -> String {
+    return "Hello \(person)"
+}
+#--- swift-util.py
+print("hello")

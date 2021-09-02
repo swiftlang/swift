@@ -213,3 +213,16 @@ _ = G<Base & P>() // expected-error {{'G' requires that 'Base & P' inherit from 
 
 func badClassConstrainedType(_: G<Base & P>) {}
 // expected-error@-1 {{'G' requires that 'Base & P' inherit from 'Base'}}
+
+// Reduced from CoreStore in source compat suite
+public protocol Pony {}
+
+public class Teddy: Pony {}
+
+public struct Paddock<P: Pony> {}
+
+public struct Barn<T: Teddy> {
+  // CHECK-DAG: Barn.foo@
+  // CHECK: Generic signature: <T, S where T : Teddy>
+  public func foo<S>(_: S, _: Barn<T>, _: Paddock<T>) {}
+}

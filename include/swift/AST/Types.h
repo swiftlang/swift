@@ -18,6 +18,7 @@
 #ifndef SWIFT_TYPES_H
 #define SWIFT_TYPES_H
 
+#include "swift/AST/ASTAllocated.h"
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/ExtInfo.h"
@@ -293,7 +294,8 @@ using TypeMatchOptions = OptionSet<TypeMatchFlags>;
 /// Base class for all types which describe the Swift and SIL ASTs.
 ///
 /// See TypeNodes.def for a succinct description of the full class hierarchy.
-class alignas(1 << TypeAlignInBits) TypeBase {
+class alignas(1 << TypeAlignInBits) TypeBase
+    : public ASTAllocated<std::aligned_storage<8, 8>::type> {
   
   friend class ASTContext;
   TypeBase(const TypeBase&) = delete;
@@ -492,13 +494,7 @@ public:
   TypeBase *getWithoutSyntaxSugar();
 
   /// getASTContext - Return the ASTContext that this type belongs to.
-  ASTContext &getASTContext() {
-    // If this type is canonical, it has the ASTContext in it.
-    if (isCanonical())
-      return *const_cast<ASTContext*>(Context);
-    // If not, canonicalize it to get the Context.
-    return *const_cast<ASTContext*>(getCanonicalType()->Context);
-  }
+  ASTContext &getASTContext();
   
   /// isEqual - Return true if these two types are equal, ignoring sugar.
   ///
@@ -1122,10 +1118,22 @@ public:
   TypeSubstitutionMap getMemberSubstitutions(const ValueDecl *member,
                                              GenericEnvironment *genericEnv=nullptr);
 
+  /// Retrieve the type of the given property as seen through the given base
+  /// type, substituting generic arguments where necessary. This is the same as
+  /// the more general overload of \c TypeBase::getTypeOfMember, but defaults to
+  /// the property's interface type for the \c memberType.
+  ///
+  /// \param module The module in which the substitution occurs.
+  ///
+  /// \param member The property whose type we are substituting.
+  ///
+  /// \returns The resulting property type.
+  Type getTypeOfMember(ModuleDecl *module, const VarDecl *member);
+
   /// Retrieve the type of the given member as seen through the given base
   /// type, substituting generic arguments where necessary.
   ///
-  /// This routine allows one to take a concrete type (the "this" type) and
+  /// This routine allows one to take a concrete type (the "self" type) and
   /// and a member of that type (or one of its superclasses), then determine
   /// what type an access to that member through the base type will have.
   /// For example, given:
@@ -1136,20 +1144,23 @@ public:
   /// }
   /// \endcode
   ///
-  /// Given the type \c Vector<Int> and the member \c add, the resulting type
-  /// of the member will be \c (self : Vector<Int>) -> (value : Int) -> ().
+  /// Given the type \c Vector<Int>, the member \c add, and its method interface
+  /// type (value: T) -> Void the resulting type will be (value: Int) -> Void.
   ///
   /// \param module The module in which the substitution occurs.
   ///
   /// \param member The member whose type we are substituting.
   ///
-  /// \param memberType The type of the member, in which archetypes will be
-  /// replaced by the generic arguments provided by the base type. If null,
-  /// the member's type will be used.
+  /// \param memberType The type of the member in which generic parameters will
+  /// be replaced by the generic arguments provided by the base type. Note this
+  /// must not be a GenericFunctionType. For a method, either strip the self
+  /// parameter and generic signature using e.g \c getMethodInterfaceType, or
+  /// use \c substGenericArgs if you want to substitute types for any of the
+  /// method's generic parameters.
   ///
-  /// \returns the resulting member type.
+  /// \returns The resulting member type.
   Type getTypeOfMember(ModuleDecl *module, const ValueDecl *member,
-                       Type memberType = Type());
+                       Type memberType);
 
   /// Get the type of a superclass member as seen from the subclass,
   /// substituting generic parameters, dynamic Self return, and the
@@ -1223,17 +1234,6 @@ public:
   /// return `None`.
   Optional<TangentSpace>
   getAutoDiffTangentSpace(LookupConformanceFn lookupConformance);
-
-private:
-  // Make vanilla new/delete illegal for Types.
-  void *operator new(size_t Bytes) throw() = delete;
-  void operator delete(void *Data) throw() = delete;
-public:
-  // Only allow allocation of Types using the allocator in ASTContext
-  // or by doing a placement new.
-  void *operator new(size_t bytes, const ASTContext &ctx,
-                     AllocationArena arena, unsigned alignment = 8);
-  void *operator new(size_t Bytes, void *Mem) throw() { return Mem; }
 };
 
 /// AnyGenericType - This abstract class helps types ensure that fields
@@ -1816,12 +1816,6 @@ protected:
     Bits.SugarType.HasCachedType = true;
   }
 
-  void setUnderlyingType(Type type) {
-    assert(!Bits.SugarType.HasCachedType && "Cached type already set");
-    Bits.SugarType.HasCachedType = true;
-    UnderlyingType = type.getPointer();
-  }
-
 public:
   /// Remove one level of top-level sugar from this type.
   Type getSinglyDesugaredTypeSlow();
@@ -1929,10 +1923,11 @@ class ParameterTypeFlags {
     OwnershipShift = 3,
     Ownership    = 7 << OwnershipShift,
     NoDerivative = 1 << 6,
-    NumBits = 7
+    Isolated     = 1 << 7,
+    NumBits = 8
   };
   OptionSet<ParameterFlags> value;
-  static_assert(NumBits < 8*sizeof(OptionSet<ParameterFlags>), "overflowed");
+  static_assert(NumBits <= 8*sizeof(OptionSet<ParameterFlags>), "overflowed");
 
   ParameterTypeFlags(OptionSet<ParameterFlags, uint8_t> val) : value(val) {}
 
@@ -1943,17 +1938,18 @@ public:
   }
 
   ParameterTypeFlags(bool variadic, bool autoclosure, bool nonEphemeral,
-                     ValueOwnership ownership, bool noDerivative)
+                     ValueOwnership ownership, bool isolated, bool noDerivative)
       : value((variadic ? Variadic : 0) | (autoclosure ? AutoClosure : 0) |
               (nonEphemeral ? NonEphemeral : 0) |
               uint8_t(ownership) << OwnershipShift |
+              (isolated ? Isolated : 0) |
               (noDerivative ? NoDerivative : 0)) {}
 
   /// Create one from what's present in the parameter type
   inline static ParameterTypeFlags
   fromParameterType(Type paramTy, bool isVariadic, bool isAutoClosure,
                     bool isNonEphemeral, ValueOwnership ownership,
-                    bool isNoDerivative);
+                    bool isolated, bool isNoDerivative);
 
   bool isNone() const { return !value; }
   bool isVariadic() const { return value.contains(Variadic); }
@@ -1962,6 +1958,7 @@ public:
   bool isInOut() const { return getValueOwnership() == ValueOwnership::InOut; }
   bool isShared() const { return getValueOwnership() == ValueOwnership::Shared;}
   bool isOwned() const { return getValueOwnership() == ValueOwnership::Owned; }
+  bool isIsolated() const { return value.contains(Isolated); }
   bool isNoDerivative() const { return value.contains(NoDerivative); }
 
   ValueOwnership getValueOwnership() const {
@@ -2003,6 +2000,12 @@ public:
     return ParameterTypeFlags(isNonEphemeral
                                   ? value | ParameterTypeFlags::NonEphemeral
                                   : value - ParameterTypeFlags::NonEphemeral);
+  }
+
+  ParameterTypeFlags withIsolated(bool isolated) const {
+    return ParameterTypeFlags(isolated
+                                  ? value | ParameterTypeFlags::Isolated
+                                  : value - ParameterTypeFlags::Isolated);
   }
 
   ParameterTypeFlags withNoDerivative(bool noDerivative) const {
@@ -2078,7 +2081,7 @@ public:
     return ParameterTypeFlags(/*variadic*/ false,
                               /*autoclosure*/ false,
                               /*nonEphemeral*/ false, getValueOwnership(),
-                              /*noDerivative*/ false);
+                              /*isolated*/ false, /*noDerivative*/ false);
   }
 
   bool operator ==(const YieldTypeFlags &other) const {
@@ -2857,6 +2860,9 @@ public:
     /// Whether the parameter is marked '@_nonEphemeral'
     bool isNonEphemeral() const { return Flags.isNonEphemeral(); }
 
+    /// Whether the parameter is 'isolated'.
+    bool isIsolated() const { return Flags.isIsolated(); }
+
     /// Whether the parameter is marked '@noDerivative'.
     bool isNoDerivative() const { return Flags.isNoDerivative(); }
 
@@ -2997,19 +3003,16 @@ protected:
   }
 
 public:
-  /// Break an input type into an array of \c AnyFunctionType::Params.
-  static void decomposeInput(Type type,
+  /// Break a tuple or paren type into an array of \c AnyFunctionType::Params.
+  static void decomposeTuple(Type type,
                              SmallVectorImpl<Param> &result);
 
-  /// Take an array of parameters and turn it into an input type.
-  ///
-  /// The result type is only there as a way to extract the ASTContext when
-  /// needed.
-  static Type composeInput(ASTContext &ctx, ArrayRef<Param> params,
+  /// Take an array of parameters and turn it into a tuple or paren type.
+  static Type composeTuple(ASTContext &ctx, ArrayRef<Param> params,
                            bool canonicalVararg);
-  static Type composeInput(ASTContext &ctx, CanParamArrayRef params,
+  static Type composeTuple(ASTContext &ctx, CanParamArrayRef params,
                            bool canonicalVararg) {
-    return composeInput(ctx, params.getOriginalArray(), canonicalVararg);
+    return composeTuple(ctx, params.getOriginalArray(), canonicalVararg);
   }
 
   /// Given two arrays of parameters determine if they are equal in their
@@ -3497,7 +3500,8 @@ public:
                               
   /// Substitute the given generic arguments into this generic
   /// function type and return the resulting non-generic type.
-  FunctionType *substGenericArgs(SubstitutionMap subs);
+  FunctionType *substGenericArgs(SubstitutionMap subs,
+                                 SubstOptions options = None);
   FunctionType *substGenericArgs(llvm::function_ref<Type(Type)> substFn) const;
 
   void Profile(llvm::FoldingSetNodeID &ID) {
@@ -5026,6 +5030,21 @@ public:
   }
 };
 
+/// The type T..., which is sugar for a sequence of argument values.
+class VariadicSequenceType : public UnarySyntaxSugarType {
+  VariadicSequenceType(const ASTContext &ctx, Type base,
+                       RecursiveTypeProperties properties)
+    : UnarySyntaxSugarType(TypeKind::VariadicSequence, ctx, base, properties) {}
+
+public:
+  /// Return a uniqued variadic sequence type with the specified base type.
+  static VariadicSequenceType *get(Type baseTy);
+
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::VariadicSequence;
+  }
+};
+
 /// ProtocolType - A protocol type describes an abstract interface implemented
 /// by another type.
 class ProtocolType : public NominalType {
@@ -5453,13 +5472,13 @@ class OpaqueTypeArchetypeType final : public ArchetypeType,
   GenericEnvironment *Environment;
   
 public:
-  /// Get 
-  
   /// Get an opaque archetype representing the underlying type of the given
-  /// opaque type decl.
-  static OpaqueTypeArchetypeType *get(OpaqueTypeDecl *Decl,
+  /// opaque type decl's opaque param with ordinal `ordinal`. For example, in
+  /// `(some P, some Q)`, `some P`'s type param would have ordinal 0 and `some
+  /// Q`'s type param would have ordinal 1.
+  static OpaqueTypeArchetypeType *get(OpaqueTypeDecl *Decl, unsigned ordinal,
                                       SubstitutionMap Substitutions);
-  
+
   OpaqueTypeDecl *getDecl() const {
     return OpaqueDecl;
   }
@@ -5490,7 +5509,7 @@ public:
   ///
   /// then the underlying type of `some P` would be ordinal 0, and `some Q` would be ordinal 1.
   unsigned getOrdinal() const {
-    // TODO: multiple opaque types
+    // TODO [OPAQUE SUPPORT]: multiple opaque types
     return 0;
   }
   
@@ -5982,6 +6001,22 @@ public:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(PlaceholderType, Type)
 
+/// getASTContext - Return the ASTContext that this type belongs to.
+inline ASTContext &TypeBase::getASTContext() {
+  // If this type is canonical, it has the ASTContext in it.
+  if (isCanonical())
+    return *const_cast<ASTContext*>(Context);
+
+  // getCanonicalType() on GenericFunctionType is very expensive;
+  // instead we can more easily fish the ASTContext out of any
+  // structural sub-component.
+  if (auto *genericFnType = dyn_cast<GenericFunctionType>(this))
+    return genericFnType->getGenericParams()[0]->getASTContext();
+
+  // If not, canonicalize it to get the Context.
+  return *const_cast<ASTContext*>(getCanonicalType()->Context);
+}
+
 inline bool TypeBase::isTypeVariableOrMember() {
   if (is<TypeVariableType>())
     return true;
@@ -6204,7 +6239,7 @@ inline bool CanType::isActuallyCanonicalOrNull() const {
 
 inline Type TupleTypeElt::getVarargBaseTy() const {
   TypeBase *T = getType().getPointer();
-  if (auto *AT = dyn_cast<ArraySliceType>(T))
+  if (auto *AT = dyn_cast<VariadicSequenceType>(T))
     return AT->getBaseType();
   if (auto *BGT = dyn_cast<BoundGenericType>(T)) {
     // It's the stdlib Array<T>.
@@ -6227,7 +6262,7 @@ inline TupleTypeElt TupleTypeElt::getWithType(Type T) const {
 /// Create one from what's present in the parameter decl and type
 inline ParameterTypeFlags ParameterTypeFlags::fromParameterType(
     Type paramTy, bool isVariadic, bool isAutoClosure, bool isNonEphemeral,
-    ValueOwnership ownership, bool isNoDerivative) {
+    ValueOwnership ownership, bool isolated, bool isNoDerivative) {
   // FIXME(Remove InOut): The last caller that needs this is argument
   // decomposition.  Start by enabling the assertion there and fixing up those
   // callers, then remove this, then remove
@@ -6237,7 +6272,8 @@ inline ParameterTypeFlags ParameterTypeFlags::fromParameterType(
            ownership == ValueOwnership::InOut);
     ownership = ValueOwnership::InOut;
   }
-  return {isVariadic, isAutoClosure, isNonEphemeral, ownership, isNoDerivative};
+  return {isVariadic, isAutoClosure, isNonEphemeral, ownership, isolated,
+          isNoDerivative};
 }
 
 inline const Type *BoundGenericType::getTrailingObjectsPointer() const {

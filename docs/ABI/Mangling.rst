@@ -251,6 +251,8 @@ types where the metadata itself has unknown layout.)
   REABSTRACT-THUNK-TYPE ::= 'R'          // reabstraction thunk
   REABSTRACT-THUNK-TYPE ::= 'r'          // reabstraction thunk (obsolete)
 
+  global ::= reabstraction-thunk type 'TU' // reabstraction thunk with global actor constraint
+
 The `from-type` and `to-type` in a reabstraction thunk helper function
 are always non-polymorphic ``<impl-function-type>`` types.
 
@@ -464,6 +466,7 @@ Types
   KNOWN-TYPE-KIND ::= 'a'                    // Swift.Array
   KNOWN-TYPE-KIND ::= 'B'                    // Swift.BinaryFloatingPoint
   KNOWN-TYPE-KIND ::= 'b'                    // Swift.Bool
+  KNOWN-TYPE-KIND ::= 'c' KNOWN-TYPE-KIND-2  // Second set of standard types
   KNOWN-TYPE-KIND ::= 'D'                    // Swift.Dictionary
   KNOWN-TYPE-KIND ::= 'd'                    // Swift.Float64
   KNOWN-TYPE-KIND ::= 'E'                    // Swift.Encodable
@@ -508,6 +511,25 @@ Types
   KNOWN-TYPE-KIND ::= 'y'                    // Swift.StringProtocol
   KNOWN-TYPE-KIND ::= 'Z'                    // Swift.SignedInteger
   KNOWN-TYPE-KIND ::= 'z'                    // Swift.BinaryInteger
+
+  KNOWN-TYPE-KIND-2 ::= 'A'        // Swift.Actor
+  KNOWN-TYPE-KIND-2 ::= 'C'        // Swift.CheckedContinuation
+  KNOWN-TYPE-KIND-2 ::= 'c'        // Swift.UnsafeContinuation
+  KNOWN-TYPE-KIND-2 ::= 'E'        // Swift.CancellationError
+  KNOWN-TYPE-KIND-2 ::= 'e'        // Swift.UnownedSerialExecutor
+  KNOWN-TYPE-KIND-2 ::= 'F'        // Swift.Executor
+  KNOWN-TYPE-KIND-2 ::= 'f'        // Swift.SerialExecutor
+  KNOWN-TYPE-KIND-2 ::= 'G'        // Swift.TaskGroup
+  KNOWN-TYPE-KIND-2 ::= 'g'        // Swift.ThrowingTaskGroup
+  KNOWN-TYPE-KIND-2 ::= 'I'        // Swift.AsyncIteratorProtocol
+  KNOWN-TYPE-KIND-2 ::= 'i'        // Swift.AsyncSequence
+  KNOWN-TYPE-KIND-2 ::= 'J'        // Swift.UnownedJob
+  KNOWN-TYPE-KIND-2 ::= 'M'        // Swift.MainActor
+  KNOWN-TYPE-KIND-2 ::= 'P'        // Swift.TaskPriority
+  KNOWN-TYPE-KIND-2 ::= 'S'        // Swift.AsyncStream
+  KNOWN-TYPE-KIND-2 ::= 's'        // Swift.AsyncThrowingStream
+  KNOWN-TYPE-KIND-2 ::= 'T'        // Swift.Task
+  KNOWN-TYPE-KIND-2 ::= 't'        // Swift.UnsafeCurrentTask
 
   protocol ::= context decl-name
   protocol ::= standard-substitutions
@@ -567,7 +589,7 @@ Types
   C-TYPE is mangled according to the Itanium ABI, and prefixed with the length.
   Non-ASCII identifiers are preserved as-is; we do not use Punycode.
 
-  function-signature ::= params-type params-type async? sendable? throws? differentiable? // results and parameters
+  function-signature ::= params-type params-type async? sendable? throws? differentiable? global-actor? // results and parameters
 
   params-type ::= type 'z'? 'h'?             // tuple in case of multiple parameters or a single parameter with a single tuple type
                                              // with optional inout convention, shared convention. parameters don't have labels,
@@ -577,6 +599,7 @@ Types
   #if SWIFT_RUNTIME_VERSION >= 5.5
     async ::= 'Ya'                             // 'async' annotation on function types
     sendable ::= 'Yb'                          // @Sendable on function types
+    global-actor :: = type 'Yc'                // Global actor on function type
   #endif
   throws ::= 'K'                             // 'throws' annotation on function types
   differentiable ::= 'Yjf'                   // @differentiable(_forward) on function type
@@ -588,7 +611,7 @@ Types
   type-list ::= empty-list
 
                                                   // FIXME: Consider replacing 'h' with a two-char code
-  list-type ::= type identifier? 'Yk'? 'z'? 'h'? 'n'? 'd'?  // type with optional label, '@noDerivative', inout convention, shared convention, owned convention, and variadic specifier
+  list-type ::= type identifier? 'Yk'? 'z'? 'h'? 'n'? 'Yi'? 'd'?  // type with optional label, '@noDerivative', inout convention, shared convention, owned convention, actor 'isolated', and variadic specifier
 
   METATYPE-REPR ::= 't'                      // Thin metatype representation
   METATYPE-REPR ::= 'T'                      // Thick metatype representation

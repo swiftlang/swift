@@ -1,4 +1,3 @@
-
 # Testing Swift
 
 This document describes how we test the Swift compiler, the Swift runtime, and
@@ -26,22 +25,6 @@ We use multiple approaches to test the Swift toolchain.
 * Buildbots run all tests, on all supported platforms.
   [Smoke testing](ContinuousIntegration.md#smoke-testing)
   skips the iOS, tvOS, and watchOS platforms.
-
-The [test/lit.cfg](https://github.com/apple/swift/blob/main/test/lit.cfg)
-uses an iOS 10.3 simulator configuration named "iPhone 5" for 32-bit testing.
-
-1.  Download and install the iOS 10.3 simulator runtime, in Xcode's
-    [Components](https://help.apple.com/xcode/#/deva7379ae35) preferences.
-
-2.  Create an "iPhone 5" simulator configuration, either in Xcode's
-    [Devices and Simulators](https://help.apple.com/xcode/#/devf225e58da)
-    window, or with the command line:
-
-    ```sh
-    xcrun simctl create 'iPhone 5' com.apple.CoreSimulator.SimDeviceType.iPhone-5 com.apple.CoreSimulator.SimRuntime.iOS-10-3
-    ```
-
-3.  Append `--ios` to the `utils/build-script` command line (see below).
 
 ### Testsuite subsets
 
@@ -367,6 +350,9 @@ code for the target that is not the build machine:
 * ``%target-cc-options``: the clang flags to setup the target with the right
   architecture and platform version.
 
+* ``%target-sanitizer-opt``: if sanitizers are enabled for the build, the
+  corresponding ``-fsanitize=`` option.
+
 * ``%target-triple``: a triple composed of the ``%target-cpu``, the vendor,
   the ``%target-os``, and the operating system version number. Possible values
   include ``i386-apple-ios7.0`` or ``armv7k-apple-watchos2.0``.
@@ -397,6 +383,16 @@ code for the target that is not the build machine:
 * ``%target-static-stdlib-path``: the path to the static standard library.
 
   Add ``REQUIRES: static_stdlib`` to the test.
+
+* ``%target-rtti-opt``: the ``-frtti`` or ``-fno-rtti`` option required to
+  link with the Swift libraries on the target platform.
+
+* ``%target-cxx-lib``: the argument to add to the command line when using
+  ``swiftc`` and linking in a C++ object file.  Typically ``-lc++`` or
+  ``-lstdc++`` depending on platform.
+
+* ``%target-msvc-runtime-opt``: for Windows, the MSVC runtime option, e.g.
+  ``-MD``, to use when building C/C++ code to link with Swift.
 
 Always use ``%target-*`` substitutions unless you have a good reason.  For
 example, an exception would be a test that checks how the compiler handles

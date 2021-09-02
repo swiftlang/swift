@@ -177,6 +177,11 @@ swift::getIRTargetOptions(const IRGenOptions &Opts, ASTContext &Ctx) {
     TargetOpts.ThreadModel = llvm::ThreadModel::Single;
   }
 
+  if (Opts.EnableGlobalISel) {
+    TargetOpts.EnableGlobalISel = true;
+    TargetOpts.GlobalISelAbort = GlobalISelAbortMode::DisableWithDiag;
+  }
+
   clang::TargetOptions &ClangOpts = Clang->getTargetInfo().getTargetOpts();
   return std::make_tuple(TargetOpts, ClangOpts.CPU, ClangOpts.Features, ClangOpts.Triple);
 }

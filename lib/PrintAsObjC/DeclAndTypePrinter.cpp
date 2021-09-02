@@ -23,6 +23,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SwiftNameTranslation.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/IDE/CommentConversion.h"
 #include "swift/Parse/Lexer.h"
@@ -591,7 +592,7 @@ private:
       if (asyncConvention &&
           i == asyncConvention->completionHandlerParamIndex()) {
         os << piece << ":(";
-        print(asyncConvention->completionHandlerType(), None);
+        print(asyncConvention->completionHandlerType(), OTK_None);
         os << ")completionHandler";
         continue;
       }
@@ -927,96 +928,15 @@ private:
     return hasPrintedAnything;
   }
 
-  const ValueDecl *getRenameDecl(const ValueDecl *D,
-                                 const ParsedDeclName renamedParsedDeclName) {
-    auto declContext = D->getDeclContext();
-    ASTContext &astContext = D->getASTContext();
-    auto renamedDeclName = renamedParsedDeclName.formDeclNameRef(astContext);
-
-    if (isa<ClassDecl>(D) || isa<ProtocolDecl>(D)) {
-      if (!renamedParsedDeclName.ContextName.empty()) {
-        return nullptr;
-      }
-      SmallVector<ValueDecl *, 1> decls;
-      declContext->lookupQualified(declContext->getParentModule(),
-                                   renamedDeclName.withoutArgumentLabels(),
-                                   NL_OnlyTypes,
-                                   decls);
-      if (decls.size() == 1)
-        return decls[0];
-      return nullptr;
-    }
-
-    TypeDecl *typeDecl = declContext->getSelfNominalTypeDecl();
-
-    const ValueDecl *renamedDecl = nullptr;
-    SmallVector<ValueDecl *, 4> lookupResults;
-    declContext->lookupQualified(typeDecl->getDeclaredInterfaceType(),
-                                 renamedDeclName, NL_QualifiedDefault,
-                                 lookupResults);
-
-    if (lookupResults.size() == 1) {
-      auto candidate = lookupResults[0];
-      if (!shouldInclude(candidate))
-        return nullptr;
-      if (candidate->getKind() != D->getKind() ||
-          (candidate->isInstanceMember() !=
-           cast<ValueDecl>(D)->isInstanceMember()))
-        return nullptr;
-
-      renamedDecl = candidate;
-    } else {
-      for (auto candidate : lookupResults) {
-        if (!shouldInclude(candidate))
-          continue;
-
-        if (candidate->getKind() != D->getKind() ||
-            (candidate->isInstanceMember() !=
-             cast<ValueDecl>(D)->isInstanceMember()))
-          continue;
-
-        if (isa<AbstractFunctionDecl>(candidate)) {
-          auto cParams = cast<AbstractFunctionDecl>(candidate)->getParameters();
-          auto dParams = cast<AbstractFunctionDecl>(D)->getParameters();
-
-          if (cParams->size() != dParams->size())
-            continue;
-
-          bool hasSameParameterTypes = true;
-          for (auto index : indices(*cParams)) {
-            auto cParamsType = cParams->get(index)->getType();
-            auto dParamsType = dParams->get(index)->getType();
-            if (!cParamsType->matchesParameter(dParamsType,
-                                               TypeMatchOptions())) {
-              hasSameParameterTypes = false;
-              break;
-            }
-          }
-
-          if (!hasSameParameterTypes) {
-            continue;
-          }
-        }
-
-        if (renamedDecl) {
-          // If we found a duplicated candidate then we would silently fail.
-          renamedDecl = nullptr;
-          break;
-        }
-        renamedDecl = candidate;
-      }
-    }
-    return renamedDecl;
-  }
-
   void printRenameForDecl(const AvailableAttr *AvAttr, const ValueDecl *D,
                           bool includeQuotes) {
     assert(!AvAttr->Rename.empty());
 
-    const ValueDecl *renamedDecl =
-        getRenameDecl(D, parseDeclName(AvAttr->Rename));
-
+    auto *renamedDecl = evaluateOrDefault(
+        getASTContext().evaluator, RenamedDeclRequest{D, AvAttr}, nullptr);
     if (renamedDecl) {
+      assert(shouldInclude(renamedDecl) &&
+             "ObjC printer logic mismatch with renamed decl");
       SmallString<128> scratch;
       auto renamedObjCRuntimeName =
           renamedDecl->getObjCRuntimeName()->getString(scratch);
@@ -1183,7 +1103,7 @@ private:
             copyTy->isDictionary() ||
             copyTy->isSet() ||
             copyTy->isString() ||
-            (!getKnownTypeInfo(nominal) && getObjCBridgedClass(nominal))) {
+            getObjCBridgedClass(nominal)) {
           // We fast-path the most common cases in the condition above.
           os << ", copy";
         } else if (copyTy->isUnmanaged()) {
@@ -1371,10 +1291,15 @@ private:
 
 public:
   /// If \p nominal is bridged to an Objective-C class (via a conformance to
-  /// _ObjectiveCBridgeable), return that class.
+  /// _ObjectiveCBridgeable) and is not an imported Clang type or a known type,
+  /// return that class.
   ///
   /// Otherwise returns null.
   const ClassDecl *getObjCBridgedClass(const NominalTypeDecl *nominal) {
+    // Print known types as their unbridged type.
+    if (getKnownTypeInfo(nominal))
+      return nullptr;
+
     // Print imported bridgeable decls as their unbridged type.
     if (nominal->hasClangNode())
       return nullptr;
@@ -1387,7 +1312,7 @@ public:
 
     // Determine whether this nominal type is _ObjectiveCBridgeable.
     SmallVector<ProtocolConformance *, 2> conformances;
-    if (!nominal->lookupConformance(&owningPrinter.M, proto, conformances))
+    if (!nominal->lookupConformance(proto, conformances))
       return nullptr;
 
     // Dig out the Objective-C type.
@@ -2092,7 +2017,7 @@ auto DeclAndTypePrinter::getImpl() -> Implementation {
 }
 
 bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
-  return isVisibleToObjC(VD, minRequiredAccess) &&
+  return !VD->isInvalid() && isVisibleToObjC(VD, minRequiredAccess) &&
          !VD->getAttrs().hasAttribute<ImplementationOnlyAttr>();
 }
 

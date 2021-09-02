@@ -40,6 +40,10 @@ DeclContext *DerivedConformance::getConformanceContext() const {
   return cast<DeclContext>(ConformanceDecl);
 }
 
+ModuleDecl *DerivedConformance::getParentModule() const {
+  return cast<DeclContext>(ConformanceDecl)->getParentModule();
+}
+
 void DerivedConformance::addMembersToConformanceContext(
     ArrayRef<Decl *> children) {
   auto IDC = cast<IterableDeclContext>(ConformanceDecl);
@@ -73,6 +77,8 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
 
   if (*derivableKind == KnownDerivableProtocolKind::Actor)
     return canDeriveActor(DC, Nominal);
+  if (*derivableKind == KnownDerivableProtocolKind::DistributedActor)
+    return canDeriveDistributedActor(Nominal, DC);
 
   if (*derivableKind == KnownDerivableProtocolKind::AdditiveArithmetic)
     return canDeriveAdditiveArithmetic(Nominal, DC);
@@ -162,7 +168,7 @@ DerivedConformance::storedPropertiesNotConformingToProtocol(
       nonconformingProperties.push_back(propertyDecl);
 
     if (!TypeChecker::conformsToProtocol(DC->mapTypeIntoContext(type), protocol,
-                                         DC)) {
+                                         DC->getParentModule())) {
       nonconformingProperties.push_back(propertyDecl);
     }
   }
@@ -306,6 +312,14 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     if (name.isSimpleName(ctx.Id_unownedExecutor))
       return getRequirement(KnownProtocolKind::Actor);
 
+    // DistributedActor.id
+    if(name.isSimpleName(ctx.Id_id))
+      return getRequirement(KnownProtocolKind::DistributedActor);
+
+    // DistributedActor.actorTransport
+    if(name.isSimpleName(ctx.Id_actorTransport))
+      return getRequirement(KnownProtocolKind::DistributedActor);
+
     return nullptr;
   }
 
@@ -343,6 +357,17 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
       auto argumentNames = name.getArgumentNames();
       if (argumentNames.size() == 1 && argumentNames[0] == ctx.Id_into)
         return getRequirement(KnownProtocolKind::Hashable);
+    }
+
+    // static DistributedActor.resolve(_:using:)
+    if (name.isCompoundName() && name.getBaseName() == ctx.Id_resolve &&
+        func->isStatic()) {
+      auto argumentNames = name.getArgumentNames();
+      if (argumentNames.size() == 2 &&
+          argumentNames[0] == Identifier() &&
+          argumentNames[1] == ctx.Id_using) {
+        return getRequirement(KnownProtocolKind::DistributedActor);
+      }
     }
 
     return nullptr;
@@ -539,7 +564,7 @@ bool DerivedConformance::checkAndDiagnoseDisallowedContext(
   // A non-final class can't have an protocol-witnesss initializer in an
   // extension.
   if (auto CD = dyn_cast<ClassDecl>(Nominal)) {
-    if (!CD->isFinal() && isa<ConstructorDecl>(synthesizing) &&
+    if (!CD->isSemanticallyFinal() && isa<ConstructorDecl>(synthesizing) &&
         isa<ExtensionDecl>(ConformanceDecl)) {
       ConformanceDecl->diagnose(
           diag::cannot_synthesize_init_in_extension_of_nonfinal,
@@ -573,13 +598,8 @@ GuardStmt *DerivedConformance::returnIfNotEqualGuard(ASTContext &C,
   auto cmpFuncExpr = new (C) UnresolvedDeclRefExpr(
     DeclNameRef(C.Id_EqualsOperator), DeclRefKind::BinaryOperator,
     DeclNameLoc());
-  auto cmpArgsTuple = TupleExpr::create(C, SourceLoc(),
-                                        { lhsExpr, rhsExpr },
-                                        { }, { }, SourceLoc(),
-                                        /*HasTrailingClosure*/false,
-                                        /*Implicit*/true);
-  auto cmpExpr = new (C) BinaryExpr(cmpFuncExpr, cmpArgsTuple,
-                                    /*Implicit*/true);
+  auto *cmpExpr = BinaryExpr::create(C, lhsExpr, cmpFuncExpr, rhsExpr,
+                                     /*implicit*/ true);
   conditions.emplace_back(cmpExpr);
 
   // Build and return the complete guard statement.
@@ -613,12 +633,8 @@ GuardStmt *DerivedConformance::returnComparisonIfNotEqualGuard(ASTContext &C,
   auto ltFuncExpr = new (C) UnresolvedDeclRefExpr(
     DeclNameRef(C.Id_LessThanOperator), DeclRefKind::BinaryOperator,
     DeclNameLoc());
-  auto ltArgsTuple = TupleExpr::create(C, SourceLoc(),
-                                        { lhsExpr, rhsExpr },
-                                        { }, { }, SourceLoc(),
-                                        /*HasTrailingClosure*/false,
-                                        /*Implicit*/true);
-  auto ltExpr = new (C) BinaryExpr(ltFuncExpr, ltArgsTuple, /*Implicit*/true);
+  auto *ltExpr = BinaryExpr::create(C, lhsExpr, ltFuncExpr, rhsExpr,
+                                    /*implicit*/ true);
   return returnIfNotEqualGuard(C, lhsExpr, rhsExpr, ltExpr);
 }
 
@@ -715,8 +731,8 @@ DeclRefExpr *DerivedConformance::convertEnumToIndex(SmallVectorImpl<ASTNode> &st
 /// \p protocol The protocol being requested.
 /// \return The ParamDecl of each associated value whose type does not conform.
 SmallVector<ParamDecl *, 4>
-DerivedConformance::associatedValuesNotConformingToProtocol(DeclContext *DC, EnumDecl *theEnum,
-                                        ProtocolDecl *protocol) {
+DerivedConformance::associatedValuesNotConformingToProtocol(
+    DeclContext *DC, EnumDecl *theEnum, ProtocolDecl *protocol) {
   SmallVector<ParamDecl *, 4> nonconformingAssociatedValues;
   for (auto elt : theEnum->getAllElements()) {
     auto PL = elt->getParameterList();
@@ -726,7 +742,7 @@ DerivedConformance::associatedValuesNotConformingToProtocol(DeclContext *DC, Enu
     for (auto param : *PL) {
       auto type = param->getInterfaceType();
       if (TypeChecker::conformsToProtocol(DC->mapTypeIntoContext(type),
-                                          protocol, DC)
+                                          protocol, DC->getParentModule())
               .isInvalid()) {
         nonconformingAssociatedValues.push_back(param);
       }

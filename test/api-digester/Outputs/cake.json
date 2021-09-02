@@ -4,6 +4,30 @@
   "printedName": "TopLevel",
   "children": [
     {
+      "kind": "Import",
+      "name": "SwiftOnoneSupport",
+      "printedName": "SwiftOnoneSupport",
+      "declKind": "Import",
+      "moduleName": "cake"
+    },
+    {
+      "kind": "Import",
+      "name": "_Concurrency",
+      "printedName": "_Concurrency",
+      "declKind": "Import",
+      "moduleName": "cake"
+    },
+    {
+      "kind": "Import",
+      "name": "cake",
+      "printedName": "cake",
+      "declKind": "Import",
+      "moduleName": "cake",
+      "declAttributes": [
+        "Exported"
+      ]
+    },
+    {
       "kind": "TypeDecl",
       "name": "P1",
       "printedName": "P1",
@@ -1135,10 +1159,6 @@
           "usr": "s:4cake6PSuperPAAE9futureFooyyF",
           "moduleName": "cake",
           "genericSig": "<Self where Self : cake.PSuper>",
-          "intro_Macosx": "10.15",
-          "intro_iOS": "13",
-          "intro_tvOS": "13",
-          "intro_watchOS": "6",
           "funcSelfKind": "NonMutating"
         }
       ],

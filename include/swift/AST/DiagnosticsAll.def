@@ -20,6 +20,7 @@
 #define DIAG_NO_UNDEF
 
 #include "DiagnosticsCommon.def"
+#include "DiagnosticsIDE.def"
 #include "DiagnosticsParse.def"
 #include "DiagnosticsSema.def"
 #include "DiagnosticsClangImporter.def"

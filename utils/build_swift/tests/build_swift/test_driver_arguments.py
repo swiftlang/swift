@@ -586,6 +586,14 @@ class TestDriverArgumentParser(unittest.TestCase):
         namespace = self.parse_default_args(['--test-optimize-for-size'])
         self.assertTrue(namespace.test)
 
+    def test_implied_defaults_test_early_swift_driver(self):
+        namespace = self.parse_default_args(['--test'])
+        self.assertTrue(namespace.test_early_swift_driver)
+
+    def test_implied_defaults_test_no_early_swift_driver(self):
+        namespace = self.parse_default_args(['--test --skip-early-swift-driver'])
+        self.assertTrue(namespace.test_early_swift_driver is None)
+
     def test_implied_defaults_test_optimize_none_with_implicit_dynamic(self):
         namespace = self.parse_default_args(
             ['--test-optimize-none-with-implicit-dynamic'])

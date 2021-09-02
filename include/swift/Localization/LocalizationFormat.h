@@ -44,6 +44,12 @@ namespace diag {
 
 using namespace llvm::support;
 
+enum LocalizationProducerState : uint8_t {
+  NotInitialized,
+  Initialized,
+  FailedInitialization
+};
+
 class DefToYAMLConverter {
   llvm::ArrayRef<const char *> IDs;
   llvm::ArrayRef<const char *> Messages;
@@ -162,6 +168,7 @@ class LocalizationProducer {
   llvm::BumpPtrAllocator localizationAllocator;
   llvm::StringSaver localizationSaver;
   bool printDiagnosticNames;
+  LocalizationProducerState state = NotInitialized;
 
 public:
   LocalizationProducer(bool printDiagnosticNames = false)
@@ -173,9 +180,25 @@ public:
   virtual llvm::StringRef getMessageOr(swift::DiagID id,
                                        llvm::StringRef defaultMessage);
 
+  /// \returns a `SerializedLocalizationProducer` pointer if the serialized
+  /// diagnostics file available, otherwise returns a `YAMLLocalizationProducer`
+  /// if the `YAML` file is available. If both files aren't available returns a
+  /// `nullptr`.
+  static std::unique_ptr<LocalizationProducer>
+  producerFor(llvm::StringRef locale, llvm::StringRef path,
+              bool printDiagnosticNames);
+
   virtual ~LocalizationProducer() {}
 
 protected:
+  LocalizationProducerState getState() const;
+
+  /// Used to lazily initialize `LocalizationProducer`s.
+  /// \returns true if the producer is successfully initialized, false
+  /// otherwise.
+  virtual bool initializeImpl() = 0;
+  virtual void initializeIfNeeded() final;
+
   /// Retrieve a message for the given diagnostic id.
   /// \returns empty string if message couldn't be found.
   virtual llvm::StringRef getMessage(swift::DiagID id) const = 0;
@@ -183,6 +206,7 @@ protected:
 
 class YAMLLocalizationProducer final : public LocalizationProducer {
   std::vector<std::string> diagnostics;
+  std::string filePath;
 
 public:
   /// The diagnostics IDs that are no longer available in `.def`
@@ -194,9 +218,10 @@ public:
   /// maintained by this producer, callback gets each translation
   /// with its unique identifier.
   void forEachAvailable(
-      llvm::function_ref<void(swift::DiagID, llvm::StringRef)> callback) const;
+      llvm::function_ref<void(swift::DiagID, llvm::StringRef)> callback);
 
 protected:
+  bool initializeImpl() override;
   llvm::StringRef getMessage(swift::DiagID id) const override;
 };
 
@@ -213,6 +238,7 @@ public:
       bool printDiagnosticNames = false);
 
 protected:
+  bool initializeImpl() override;
   llvm::StringRef getMessage(swift::DiagID id) const override;
 };
 

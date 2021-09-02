@@ -56,3 +56,21 @@ func canImportVersioned() {
   let h = 1 // expected-warning {{initialization of immutable value 'h' was never used; consider replacing with assignment to '_' or removing it}}
 #endif
 }
+
+func canImportVersionedString() {
+#if canImport(Foo, _version: "113.331")
+  let a = 1
+#endif
+
+#if canImport(Foo, _version: "113.3000")
+  let b = 1
+#endif
+
+#if canImport(Foo, _version: "4")
+  let d = 1 // expected-warning {{initialization of immutable value 'd' was never used; consider replacing with assignment to '_' or removing it}}
+#endif
+
+#if canImport(Foo, _version: "113.33")
+  let e = 1 // expected-warning {{initialization of immutable value 'e' was never used; consider replacing with assignment to '_' or removing it}}
+#endif
+}

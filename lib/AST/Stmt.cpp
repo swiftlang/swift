@@ -33,12 +33,6 @@ using namespace swift;
 // Stmt methods.
 //===----------------------------------------------------------------------===//
 
-// Only allow allocation of Stmts using the allocator in ASTContext.
-void *Stmt::operator new(size_t Bytes, ASTContext &C,
-                         unsigned Alignment) {
-  return C.Allocate(Bytes, Alignment);
-}
-
 StringRef Stmt::getKindName(StmtKind K) {
   switch (K) {
 #define STMT(Id, Parent) case StmtKind::Id: return #Id;
@@ -281,15 +275,15 @@ void LabeledConditionalStmt::setCond(StmtCondition e) {
   Cond = e;
 }
 
-PoundAvailableInfo *PoundAvailableInfo::create(ASTContext &ctx,
-                                               SourceLoc PoundLoc,
-                                               SourceLoc LParenLoc,
-                                       ArrayRef<AvailabilitySpec *> queries,
-                                                     SourceLoc RParenLoc) {
+PoundAvailableInfo *
+PoundAvailableInfo::create(ASTContext &ctx, SourceLoc PoundLoc,
+                           SourceLoc LParenLoc,
+                           ArrayRef<AvailabilitySpec *> queries,
+                           SourceLoc RParenLoc, bool isUnavailability) {
   unsigned size = totalSizeToAlloc<AvailabilitySpec *>(queries.size());
   void *Buffer = ctx.Allocate(size, alignof(PoundAvailableInfo));
   return ::new (Buffer) PoundAvailableInfo(PoundLoc, LParenLoc, queries,
-                                           RParenLoc);
+                                           RParenLoc, isUnavailability);
 }
 
 SourceLoc PoundAvailableInfo::getEndLoc() const {

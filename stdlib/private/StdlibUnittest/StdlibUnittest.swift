@@ -35,6 +35,12 @@ import WinSDK
 import ObjectiveC
 #endif
 
+#if os(WASI)
+let platformSupportSpawnChild = false
+#else
+let platformSupportSpawnChild = true
+#endif
+
 extension String {
   /// Returns the lines in `self`.
   public var _lines : [String] {
@@ -884,6 +890,7 @@ func _childProcess() {
 }
 
 #if SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
+@available(SwiftStdlib 5.5, *)
 @inline(never)
 func _childProcessAsync() async {
 #if !os(WASI)
@@ -1380,6 +1387,7 @@ class _ParentProcess {
   }
 
 #if SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
+  @available(SwiftStdlib 5.5, *)
   internal func runOneTestAsync(
     fullTestName: String,
     testSuite: TestSuite,
@@ -1546,6 +1554,7 @@ class _ParentProcess {
   }
 
 #if SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
+  @available(SwiftStdlib 5.5, *)
   func runAsync() async {
     if let filter = _filter {
       print("StdlibUnittest: using filter: \(filter)")
@@ -1568,7 +1577,7 @@ class _ParentProcess {
             continue
           }
 
-          switch runOneTest(
+          switch await runOneTestAsync(
             fullTestName: fullTestName,
             testSuite: testSuite,
             test: t,
@@ -1687,12 +1696,7 @@ public func runAllTests() {
   if _isChildProcess {
     _childProcess()
   } else {
-    #if os(WASI)
-    // WASI doesn't support child process
-    var runTestsInProcess: Bool = true
-    #else
-    var runTestsInProcess: Bool = false
-    #endif
+    var runTestsInProcess: Bool = !platformSupportSpawnChild
     var filter: String?
     var args = [String]()
     var i = 0
@@ -1735,6 +1739,7 @@ public func runAllTests() {
 }
 
 #if SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
+@available(SwiftStdlib 5.5, *)
 public func runAllTestsAsync() async {
   if PersistentState.runNoTestsWasCalled {
     print("runAllTests() called after runNoTests(). Aborting.")
@@ -1761,7 +1766,7 @@ public func runAllTestsAsync() async {
   if _isChildProcess {
     await _childProcessAsync()
   } else {
-    var runTestsInProcess: Bool = false
+    var runTestsInProcess: Bool = !platformSupportSpawnChild
     var filter: String?
     var args = [String]()
     var i = 0
@@ -1922,6 +1927,7 @@ public final class TestSuite {
   }
 
 #if SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
+  @available(SwiftStdlib 5.5, *)
   func _runTestAsync(name testName: String, parameter: Int?) async {
     PersistentState.ranSomething = true
     for r in _allResettables {

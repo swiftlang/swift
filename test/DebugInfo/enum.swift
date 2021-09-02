@@ -59,7 +59,7 @@ public func foo(_ empty : Nothing) { }
 // CHECK-SAME:             {{.*}}identifier: "$s4enum4RoseOyxG{{z?}}D")
 enum Rose<A> {
 	case MkRose(() -> A, () -> [Rose<A>])
-  // DWARF: !DICompositeType({{.*}}name: "Rose",{{.*}}identifier: "$s4enum4RoseOyxGD")
+  // DWARF: !DICompositeType({{.*}}name: "Rose",{{.*}}flags: DIFlagFwdDecl{{.*}}identifier: "$s4enum4RoseOyxGD")
 	case IORose(() -> Rose<A>)
 }
 

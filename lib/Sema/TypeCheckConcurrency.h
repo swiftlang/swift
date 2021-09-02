@@ -17,18 +17,22 @@
 #ifndef SWIFT_SEMA_TYPECHECKCONCURRENCY_H
 #define SWIFT_SEMA_TYPECHECKCONCURRENCY_H
 
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/Type.h"
 #include <cassert>
 
 namespace swift {
 
 class AbstractFunctionDecl;
+class ConstructorDecl;
 class ActorIsolation;
 class AnyFunctionType;
 class ASTContext;
 class ClassDecl;
+class ClosureActorIsolation;
 class ClosureExpr;
 class ConcreteDeclRef;
 class CustomAttr;
@@ -38,15 +42,15 @@ class EnumElementDecl;
 class Expr;
 class FuncDecl;
 class Initializer;
-class LangOptions;
 class PatternBindingDecl;
 class ProtocolConformance;
 class TopLevelCodeDecl;
 class TypeBase;
 class ValueDecl;
+class VarDecl;
 
-/// Add notes suggesting the addition of 'async' or '@asyncHandler', as
-/// appropriate, to a diagnostic for a function that isn't an async context.
+/// Add notes suggesting the addition of 'async', as appropriate,
+/// to a diagnostic for a function that isn't an async context.
 void addAsyncNotes(AbstractFunctionDecl const* func);
 
 /// Check actor isolation rules.
@@ -54,8 +58,17 @@ void checkTopLevelActorIsolation(TopLevelCodeDecl *decl);
 void checkFunctionActorIsolation(AbstractFunctionDecl *decl);
 void checkInitializerActorIsolation(Initializer *init, Expr *expr);
 void checkEnumElementActorIsolation(EnumElementDecl *element, Expr *expr);
-void checkPropertyWrapperActorIsolation(
-    PatternBindingDecl *binding, Expr *expr);
+void checkPropertyWrapperActorIsolation(VarDecl *wrappedVar, Expr *expr);
+
+/// Determine the isolation of a particular closure.
+///
+/// This forwards to \c ActorIsolationChecker::determineClosureActorIsolation
+/// and thus assumes that enclosing closures have already had their isolation
+/// checked.
+///
+/// This does not set the closure's actor isolation
+ClosureActorIsolation
+determineClosureActorIsolation(AbstractClosureExpr *closure);
 
 /// Describes the kind of operation that introduced the concurrent refernece.
 enum class ConcurrentReferenceKind {
@@ -68,6 +81,8 @@ enum class ConcurrentReferenceKind {
   LocalCapture,
   /// Concurrent function
   ConcurrentFunction,
+  /// Nonisolated declaration.
+  Nonisolated,
 };
 
 /// The isolation restriction in effect for a given declaration that is
@@ -100,6 +115,10 @@ public:
     /// are permitted from elsewhere as a cross-actor reference, but
     /// contexts with unspecified isolation won't diagnose anything.
     GlobalActorUnsafe,
+
+    /// References to declarations that are part of a distributed actor are
+    /// only permitted if they are async.
+    DistributedActorSelf,
   };
 
 private:
@@ -129,7 +148,9 @@ public:
 
   /// Retrieve the actor type that the declaration is within.
   NominalTypeDecl *getActorType() const {
-    assert(kind == ActorSelf || kind == CrossActorSelf);
+    assert(kind == ActorSelf || 
+           kind == CrossActorSelf || 
+           kind == DistributedActorSelf);
     return data.actorType;
   }
 
@@ -159,6 +180,15 @@ public:
     return result;
   }
 
+  /// Accesses to the given declaration can only be made via the 'self' of
+  /// the current actor.
+  static ActorIsolationRestriction forDistributedActorSelf(
+      NominalTypeDecl *actor, bool isCrossActor) {
+    ActorIsolationRestriction result(DistributedActorSelf, isCrossActor);
+    result.data.actorType = actor;
+    return result;
+  }
+
   /// Accesses to the given declaration can only be made via this particular
   /// global actor or is a cross-actor access.
   static ActorIsolationRestriction forGlobalActor(
@@ -174,7 +204,8 @@ public:
   /// \param fromExpression Indicates that the reference is coming from an
   /// expression.
   static ActorIsolationRestriction forDeclaration(
-      ConcreteDeclRef declRef, bool fromExpression = true);
+      ConcreteDeclRef declRef, const DeclContext *fromDC,
+      bool fromExpression = true);
 
   operator Kind() const { return kind; };
 };
@@ -199,7 +230,7 @@ bool contextUsesConcurrencyFeatures(const DeclContext *dc);
 /// domain, including the substitutions so that (e.g.) we can consider the
 /// specific types at the use site.
 ///
-/// \param dc The declaration context from which the reference occurs. This is
+/// \param module The module from which the reference occurs. This is
 /// used to perform lookup of conformances to the \c Sendable protocol.
 ///
 /// \param loc The location at which the reference occurs, which will be
@@ -209,14 +240,48 @@ bool contextUsesConcurrencyFeatures(const DeclContext *dc);
 /// used to tailor the diagnostic.
 ///
 /// \returns true if an problem was detected, false otherwise.
-bool diagnoseNonConcurrentTypesInReference(
-    ConcreteDeclRef declRef, const DeclContext *dc, SourceLoc loc,
-    ConcurrentReferenceKind refKind,
-    DiagnosticBehavior behavior = DiagnosticBehavior::Unspecified);
+bool diagnoseNonSendableTypesInReference(
+    ConcreteDeclRef declRef, ModuleDecl *module, SourceLoc loc,
+    ConcurrentReferenceKind refKind);
 
-/// Whether we should diagnose cases where Sendable conformances are
-/// missing.
-bool shouldDiagnoseNonSendableViolations(const LangOptions &langOpts);
+/// Produce a diagnostic for a missing conformance to Sendable.
+void diagnoseMissingSendableConformance(
+    SourceLoc loc, Type type, ModuleDecl *module);
+
+/// Diagnose any non-Sendable types that occur within the given type, using
+/// the given diagnostic.
+///
+/// \param diagnose Emit a diagnostic indicating that the current type
+/// is non-Sendable, with the suggested behavior limitation. Returns \c true
+/// if an error was produced.
+///
+/// \returns \c true if any diagnostics were produced, \c false otherwise.
+bool diagnoseNonSendableTypes(
+    Type type, ModuleDecl *module, SourceLoc loc,
+    llvm::function_ref<bool(Type, DiagnosticBehavior)> diagnose);
+
+namespace detail {
+  template<typename T>
+  struct Identity {
+    typedef T type;
+  };
+}
+/// Diagnose any non-Sendable types that occur within the given type, using
+/// the given diagnostic.
+///
+/// \returns \c true if any errors were produced, \c false otherwise.
+template<typename ...DiagArgs>
+bool diagnoseNonSendableTypes(
+    Type type, ModuleDecl *module, SourceLoc loc, Diag<Type, DiagArgs...> diag,
+    typename detail::Identity<DiagArgs>::type ...diagArgs) {
+  ASTContext &ctx = module->getASTContext();
+  return diagnoseNonSendableTypes(
+      type, module, loc, [&](Type specificType, DiagnosticBehavior behavior) {
+    ctx.Diags.diagnose(loc, diag, type, diagArgs...)
+      .limitBehavior(behavior);
+    return behavior == DiagnosticBehavior::Unspecified;
+  });
+}
 
 /// How the concurrent value check should be performed.
 enum class SendableCheck {
@@ -228,7 +293,7 @@ enum class SendableCheck {
   /// protocols that added Sendable after-the-fact.
   ImpliedByStandardProtocol,
 
-  /// Implicit conformance to Sendable for structs and enums.
+  /// Implicit conformance to Sendable.
   Implicit,
 };
 
@@ -238,8 +303,8 @@ enum class SendableCheck {
 Optional<std::pair<CustomAttr *, NominalTypeDecl *>>
 checkGlobalActorAttributes(
     SourceLoc loc, DeclContext *dc, ArrayRef<CustomAttr *> attrs);
-
 /// Get the explicit global actor specified for a closure.
+
 Type getExplicitGlobalActor(ClosureExpr *closure);
 
 /// Check the correctness of the given Sendable conformance.

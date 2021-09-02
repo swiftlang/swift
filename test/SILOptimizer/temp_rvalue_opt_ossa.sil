@@ -1386,3 +1386,27 @@ bb0(%0 : @owned $Klass):
   return %105 : $Klass
 }
 
+// CHECK-LABEL: sil [ossa] @test_yield
+// CHECK:   [[TA:%[0-9]+]] = ref_tail_addr
+// CHECK-NOT: copy_addr
+// CHECK:   yield [[TA]]
+// CHECK: } // end sil function 'test_yield'
+sil [ossa] @test_yield : $@yield_once @convention(thin) (@guaranteed Klass) -> @yields @in_guaranteed Two {
+bb0(%0 : @guaranteed $Klass):
+  %1 = alloc_stack $Two
+  %2 = ref_tail_addr [immutable] %0 : $Klass, $Two
+  copy_addr %2 to [initialization] %1 : $*Two
+  yield %1 : $*Two, resume bb1, unwind bb2
+
+bb1:
+  destroy_addr %1 : $*Two
+  dealloc_stack %1 : $*Two
+  %90 = tuple ()
+  return %90 : $()
+
+bb2:
+  destroy_addr %1 : $*Two
+  dealloc_stack %1 : $*Two
+  unwind
+}
+

@@ -54,9 +54,13 @@ static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal,
   switch (vars.size()) {
   case 0:
     if (!allowMissing) {
+      std::string fixIt = "var wrappedValue: <#Value#>";
+      auto fixitLocation = nominal->getBraces().Start;
       nominal->diagnose(diag::property_wrapper_no_value_property,
-                        nominal->getDeclaredType(), name);
+                        nominal->getDeclaredType(), name)
+        .fixItInsertAfter(fixitLocation, fixIt);
     }
+
     return nullptr;
 
   case 1:
@@ -85,6 +89,7 @@ static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal,
   // The property must not be isolated to an actor instance.
   switch (auto isolation = getActorIsolation(var)) {
   case ActorIsolation::ActorInstance:
+  case ActorIsolation::DistributedActorInstance:
     var->diagnose(
         diag::actor_instance_property_wrapper, var->getName(),
         nominal->getName());
@@ -621,6 +626,11 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
 
   if (!type)
     return Type();
+
+  // If the declaration came from a module file, there's no need to
+  // compute the auxiliary variables.
+  if (!var->getDeclContext()->getParentSourceFile())
+    return type;
 
   // Set the interface type of each synthesized declaration.
   auto auxiliaryVars = var->getPropertyWrapperAuxiliaryVariables();

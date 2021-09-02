@@ -44,7 +44,7 @@ namespace ast_scope {
 
 #pragma mark ScopeCreator
 
-class ScopeCreator final {
+class ScopeCreator final : public ASTAllocated<ScopeCreator> {
   friend class ASTSourceFileScope;
   /// For allocating scopes.
   ASTContext &ctx;
@@ -180,18 +180,6 @@ public:
 
   void print(raw_ostream &out) const {
     out << "(swift::ASTSourceFileScope*) " << sourceFileScope << "\n";
-  }
-
-  // Make vanilla new illegal.
-  void *operator new(size_t bytes) = delete;
-
-  // Only allow allocation of scopes using the allocator of a particular source
-  // file.
-  void *operator new(size_t bytes, const ASTContext &ctx,
-                     unsigned alignment = alignof(ScopeCreator));
-  void *operator new(size_t Bytes, void *Mem) {
-    ASTScopeAssert(Mem, "Allocation failed");
-    return Mem;
   }
 };
 } // ast_scope
@@ -480,9 +468,15 @@ ScopeCreator::addToScopeTreeAndReturnInsertionPoint(ASTNode n,
   if (!n)
     return parent;
 
+  // HACK: LLDB creates implicit pattern bindings that... contain user
+  // expressions. We need to actually honor lookups through those bindings
+  // in case they contain closures that bind additional variables in further
+  // scopes.
   if (auto *d = n.dyn_cast<Decl *>())
     if (d->isImplicit())
-      return parent;
+      if (!isa<PatternBindingDecl>(d)
+          || !cast<PatternBindingDecl>(d)->isDebuggerBinding())
+        return parent;
 
   NodeAdder adder(endLoc);
   if (auto *p = n.dyn_cast<Decl *>())
@@ -733,6 +727,23 @@ PatternEntryDeclScope::expandAScopeThatCreatesANewInsertionPoint(
             this, decl, patternEntryIndex);
   }
 
+  // If this pattern binding entry was created by the debugger, it will always
+  // have a synthesized init that is created from user code. We special-case
+  // lookups into these scopes to look through the debugger's chicanery to the
+  // underlying user-defined scopes, if any.
+  if (patternEntry.isFromDebugger() && patternEntry.getInit()) {
+    ASTScopeAssert(
+        patternEntry.getInit()->getSourceRange().isValid(),
+        "pattern initializer has invalid source range");
+    ASTScopeAssert(
+        !getSourceManager().isBeforeInBuffer(
+            patternEntry.getInit()->getStartLoc(), decl->getStartLoc()),
+        "inits are always after the '='");
+    scopeCreator
+        .constructExpandAndInsert<PatternEntryInitializerScope>(
+            this, decl, patternEntryIndex);
+  }
+
   // Add accessors for the variables in this pattern.
   patternEntry.getPattern()->forEachVariable([&](VarDecl *var) {
     scopeCreator.addChildrenForParsedAccessors(var, this);
@@ -751,8 +762,7 @@ void
 PatternEntryInitializerScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
     ScopeCreator &scopeCreator) {
   // Create a child for the initializer expression.
-  scopeCreator.addToScopeTree(ASTNode(getPatternEntry().getOriginalInit()),
-                              this);
+  scopeCreator.addToScopeTree(ASTNode(initAsWrittenWhenCreated), this);
 }
 
 
@@ -1141,25 +1151,6 @@ AbstractPatternEntryScope::AbstractPatternEntryScope(
     : decl(declBeingScoped), patternEntryIndex(entryIndex) {
   ASTScopeAssert(entryIndex < declBeingScoped->getPatternList().size(),
                  "out of bounds");
-}
-
-#pragma mark new operators
-void *ASTScopeImpl::operator new(size_t bytes, const ASTContext &ctx,
-                                 unsigned alignment) {
-  return ctx.Allocate(bytes, alignment);
-}
-
-void *Portion::operator new(size_t bytes, const ASTContext &ctx,
-                             unsigned alignment) {
-  return ctx.Allocate(bytes, alignment);
-}
-void *ASTScope::operator new(size_t bytes, const ASTContext &ctx,
-                             unsigned alignment) {
-  return ctx.Allocate(bytes, alignment);
-}
-void *ScopeCreator::operator new(size_t bytes, const ASTContext &ctx,
-                                 unsigned alignment) {
-  return ctx.Allocate(bytes, alignment);
 }
 
 #pragma mark - expandBody

@@ -10,7 +10,7 @@ let doubler = {
 If a closure body is not a single expression, it will not be considered when inferring the closure type. This is consistent with how type inference works in other parts of the language, where it proceeds one statement at a time. For example, in the following code an error will be reported because the type of `evenDoubler` cannot be inferred from its surrounding context and no signature was provided:
 
 ```swift
-// error: unable to infer complex closure return type; add explicit type to disambiguate
+// error: cannot infer return type for closure with multiple statements; add explicit type to disambiguate
 let evenDoubler = { x in
   if x.isMultiple(of: 2) {
     return x * 2

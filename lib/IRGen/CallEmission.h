@@ -119,6 +119,9 @@ public:
 
     return result;
   }
+
+  virtual llvm::Value *getResumeFunctionPointer() = 0;
+  virtual llvm::Value *getAsyncContext() = 0;
 };
 
 std::unique_ptr<CallEmission>

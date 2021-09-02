@@ -22,6 +22,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/Requirement.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Types.h"
 #include "swift/Sema/IDETypeChecking.h"
@@ -169,13 +170,13 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     bool Unmergable;
     unsigned InheritsCount;
     std::set<Requirement> Requirements;
-    void addRequirement(GenericSignature GenericSig,
-                        Type First, Type Second, RequirementKind Kind) {
-      CanType CanFirst = GenericSig->getCanonicalTypeInContext(First);
-      CanType CanSecond;
-      if (Second) CanSecond = GenericSig->getCanonicalTypeInContext(Second);
+    void addRequirement(swift::Requirement Req) {
+      auto First = Req.getFirstType();
+      auto CanFirst = First->getCanonicalType();
+      auto Second = Req.getSecondType();
+      auto CanSecond = Second->getCanonicalType();
 
-      Requirements.insert({First, Second, Kind, CanFirst, CanSecond});
+      Requirements.insert({First, Second, Req.getKind(), CanFirst, CanSecond});
     }
     bool operator== (const ExtensionMergeInfo& Another) const {
       // Trivially unmergeable.
@@ -254,7 +255,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
   InfoMap(collectSynthesizedExtensionInfo(AllGroups)) {}
 
   unsigned countInherits(ExtensionDecl *ED) {
-    SmallVector<TypeLoc, 4> Results;
+    SmallVector<InheritedEntry, 4> Results;
     getInheritedForPrinting(ED, Options, Results);
     return Results.size();
   }
@@ -283,90 +284,58 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     }
 
     auto handleRequirements = [&](SubstitutionMap subMap,
-                                  GenericSignature GenericSig,
                                   ExtensionDecl *OwningExt,
                                   ArrayRef<Requirement> Reqs) {
       ProtocolDecl *BaseProto = OwningExt->getInnermostDeclContext()
         ->getSelfProtocolDecl();
       for (auto Req : Reqs) {
-        auto Kind = Req.getKind();
-
-        // FIXME: Could do something here
-        if (Kind == RequirementKind::Layout)
+        // FIXME: Don't skip layout requirements.
+        if (Req.getKind() == RequirementKind::Layout)
           continue;
-
-        Type First = Req.getFirstType();
-        Type Second = Req.getSecondType();
 
         // Skip protocol's Self : <Protocol> requirement.
         if (BaseProto &&
             Req.getKind() == RequirementKind::Conformance &&
-            First->isEqual(BaseProto->getSelfInterfaceType()) &&
-            Second->getAnyNominal() == BaseProto)
+            Req.getFirstType()->isEqual(BaseProto->getSelfInterfaceType()) &&
+            Req.getProtocolDecl() == BaseProto)
           continue;
 
         if (!BaseType->isExistentialType()) {
           // Apply any substitutions we need to map the requirements from a
           // a protocol extension to an extension on the conforming type.
-          First = First.subst(subMap);
-          Second = Second.subst(subMap);
-
-          if (First->hasError() || Second->hasError()) {
+          auto SubstReq = Req.subst(subMap);
+          if (!SubstReq) {
             // Substitution with interface type bases can only fail
             // if a concrete type fails to conform to a protocol.
             // In this case, just give up on the extension altogether.
             return true;
           }
+
+          Req = *SubstReq;
         }
 
-        assert(!First->hasArchetype() && !Second->hasArchetype());
-        switch (Kind) {
-        case RequirementKind::Conformance: {
-          auto *M = DC->getParentModule();
-          auto *Proto = Second->castTo<ProtocolType>()->getDecl();
-          if (!First->isTypeParameter() &&
-              M->conformsToProtocol(First, Proto).isInvalid())
-            return true;
-          if (M->conformsToProtocol(First, Proto).isInvalid())
-            MergeInfo.addRequirement(GenericSig, First, Second, Kind);
-          break;
-        }
+        assert(!Req.getFirstType()->hasArchetype());
+        assert(!Req.getSecondType()->hasArchetype());
 
-        case RequirementKind::Superclass:
-          // If the subject type of the requirement is still a type parameter,
-          // we need to check if the contextual type could possibly be bound to
-          // the superclass. If not, this extension isn't applicable.
-          if (First->isTypeParameter()) {
-            if (!Target->mapTypeIntoContext(First)->isBindableTo(
-                    Target->mapTypeIntoContext(Second))) {
-              return true;
-            }
-            MergeInfo.addRequirement(GenericSig, First, Second, Kind);
-            break;
-          }
+        auto *M = DC->getParentModule();
+        auto SubstReq = Req.subst(
+          [&](Type type) -> Type {
+            if (type->isTypeParameter())
+              return Target->mapTypeIntoContext(type);
 
-          // If we've substituted in a concrete type for the subject, we can
-          // check for an exact superclass match, and disregard the extension if
-          // it missed.
-          // FIXME: What if it ends being something like `C<U> : C<Int>`?
-          // Arguably we should allow that to be mirrored with a U == Int
-          // constraint.
-          if (!Second->isExactSuperclassOf(First))
+            return type;
+          },
+          LookUpConformanceInModule(M));
+        if (!SubstReq)
+          return true;
+
+        // FIXME: Need to handle conditional requirements here!
+        ArrayRef<Requirement> conditionalRequirements;
+        if (!SubstReq->isSatisfied(conditionalRequirements)) {
+          if (!SubstReq->canBeSatisfied())
             return true;
 
-          break;
-
-        case RequirementKind::SameType:
-          if (!First->isBindableTo(Second) &&
-              !Second->isBindableTo(First)) {
-            return true;
-          } else if (!First->isEqual(Second)) {
-            MergeInfo.addRequirement(GenericSig, First, Second, Kind);
-          }
-          break;
-
-        case RequirementKind::Layout:
-          llvm_unreachable("Handled above");
+          MergeInfo.addRequirement(Req);
         }
       }
       return false;
@@ -385,7 +354,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
 
       assert(Ext->getGenericSignature() && "No generic signature.");
       auto GenericSig = Ext->getGenericSignature();
-      if (handleRequirements(subMap, GenericSig, Ext, GenericSig->getRequirements()))
+      if (handleRequirements(subMap, Ext, GenericSig.getRequirements()))
         return {Result, MergeInfo};
     }
 
@@ -396,7 +365,6 @@ struct SynthesizedExtensionAnalyzer::Implementation {
           subMap = BaseType->getContextSubstitutionMap(M, NTD);
       }
       if (handleRequirements(subMap,
-                             Conf->getGenericSignature(),
                              EnablingExt,
                              Conf->getConditionalRequirements()))
         return {Result, MergeInfo};
@@ -759,6 +727,117 @@ swift::collectExpressionType(SourceFile &SF,
     CanonicalType, OS);
   Walker.walk(SF);
   return Scratch;
+}
+
+/// This walker will traverse the AST and report types for every variable
+/// declaration.
+class VariableTypeCollector : public SourceEntityWalker {
+private:
+  const SourceManager &SM;
+  unsigned int BufferId;
+
+  /// The range in which variable types are to be collected.
+  SourceRange TotalRange;
+
+  /// The output vector for VariableTypeInfos emitted during traversal.
+  std::vector<VariableTypeInfo> &Results;
+
+  /// We print all types into a single output stream (e.g. into a string buffer)
+  /// and provide offsets into this string buffer to describe individual types,
+  /// i.e. \c OS builds a string that contains all null-terminated printed type
+  /// strings. When referring to one of these types, we can use the offsets at
+  /// which it starts in the \c OS.
+  llvm::raw_ostream &OS;
+
+  /// Map from a printed type to the offset in \c OS where the type starts.
+  llvm::StringMap<uint32_t> TypeOffsets;
+
+  /// Returns the start offset of this string in \c OS. If \c PrintedType
+  /// hasn't been printed to \c OS yet, this function will do so.
+  uint32_t getTypeOffset(StringRef PrintedType) {
+    auto It = TypeOffsets.find(PrintedType);
+    if (It == TypeOffsets.end()) {
+      TypeOffsets[PrintedType] = OS.tell();
+      OS << PrintedType << '\0';
+    }
+    return TypeOffsets[PrintedType];
+  }
+
+  /// Checks whether the given range overlaps the total range in which we
+  /// collect variable types.
+  bool overlapsTotalRange(SourceRange Range) {
+    return TotalRange.isInvalid() || Range.overlaps(TotalRange);
+  }
+
+public:
+  VariableTypeCollector(const SourceFile &SF, SourceRange Range,
+                        std::vector<VariableTypeInfo> &Results,
+                        llvm::raw_ostream &OS)
+      : SM(SF.getASTContext().SourceMgr), BufferId(*SF.getBufferID()),
+        TotalRange(Range), Results(Results), OS(OS) {}
+
+  bool walkToDeclPre(Decl *D, CharSourceRange DeclNameRange) override {
+    if (DeclNameRange.isInvalid()) {
+      return true;
+    }
+    // Skip this declaration and its subtree if outside the range
+    if (!overlapsTotalRange(D->getSourceRange())) {
+      return false;
+    }
+    if (auto VD = dyn_cast<VarDecl>(D)) {
+      unsigned VarOffset =
+          SM.getLocOffsetInBuffer(DeclNameRange.getStart(), BufferId);
+      unsigned VarLength = DeclNameRange.getByteLength();
+      // Print the type to a temporary buffer
+      SmallString<64> Buffer;
+      {
+        llvm::raw_svector_ostream OS(Buffer);
+        PrintOptions Options;
+        Options.SynthesizeSugarOnTypes = true;
+        auto Ty = VD->getType();
+        // Skip this declaration and its children if the type is an error type.
+        if (Ty->is<ErrorType>()) {
+          return false;
+        }
+        Ty->print(OS, Options);
+      }
+      // Transfer the type to `OS` if needed and get the offset of this string
+      // in `OS`.
+      auto TyOffset = getTypeOffset(Buffer.str());
+      bool HasExplicitType =
+          VD->getTypeReprOrParentPatternTypeRepr() != nullptr;
+      // Add the type information to the result list.
+      Results.emplace_back(VarOffset, VarLength, HasExplicitType, TyOffset);
+    }
+    return true;
+  }
+
+  bool walkToStmtPre(Stmt *S) override {
+    // Skip this statement and its subtree if outside the range
+    return overlapsTotalRange(S->getSourceRange());
+  }
+
+  bool walkToExprPre(Expr *E) override {
+    // Skip this expression and its subtree if outside the range
+    return overlapsTotalRange(E->getSourceRange());
+  }
+
+  bool walkToPatternPre(Pattern *P) override {
+    // Skip this pattern and its subtree if outside the range
+    return overlapsTotalRange(P->getSourceRange());
+  }
+};
+
+VariableTypeInfo::VariableTypeInfo(uint32_t Offset, uint32_t Length,
+                                   bool HasExplicitType, uint32_t TypeOffset)
+    : Offset(Offset), Length(Length), HasExplicitType(HasExplicitType),
+      TypeOffset(TypeOffset) {}
+
+void swift::collectVariableType(
+    SourceFile &SF, SourceRange Range,
+    std::vector<VariableTypeInfo> &VariableTypeInfos, llvm::raw_ostream &OS) {
+  VariableTypeCollector Walker(SF, Range, VariableTypeInfos, OS);
+  Walker.walk(SF);
 }
 
 ArrayRef<ValueDecl*> swift::

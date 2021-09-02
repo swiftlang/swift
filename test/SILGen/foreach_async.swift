@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s -module-name foreach_async -swift-version 5 -enable-experimental-concurrency  | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s -module-name foreach_async -swift-version 5  -disable-availability-checking  | %FileCheck %s
 // REQUIRES: concurrency
 
 //////////////////

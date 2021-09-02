@@ -57,8 +57,8 @@ SILFunction *SILDebugScope::getParentFunction() const {
 }
 
 /// Determine whether an instruction may not have a SILDebugScope.
-bool swift::maybeScopeless(SILInstruction &I) {
-  if (I.getFunction()->isBare())
+bool swift::maybeScopeless(const SILInstruction &inst) {
+  if (inst.getFunction()->isBare())
     return true;
-  return !isa<DebugValueInst>(I) && !isa<DebugValueAddrInst>(I);
+  return !isa<DebugValueInst>(inst) && !isa<DebugValueAddrInst>(inst);
 }

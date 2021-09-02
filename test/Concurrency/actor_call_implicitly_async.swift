@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency -warn-concurrency
+// RUN: %target-typecheck-verify-swift  -disable-availability-checking -warn-concurrency
 // REQUIRES: concurrency
 
 
@@ -13,7 +13,7 @@ func rethrower(_ f : @autoclosure () throws -> Any) rethrows -> Any {
 func asAutoclosure(_ f : @autoclosure () -> Any) -> Any { return f() }
 
 // not a concurrency-safe type
-class Box {
+class Box { // expected-note 4{{class 'Box' does not conform to the `Sendable` protocol}}
   var counter : Int = 0
 }
 
@@ -33,11 +33,9 @@ actor BankAccount {
     curBalance = initialDeposit
   }
 
-  // NOTE: this func is accessed through both async and sync calls.
-  // expected-note@+1 {{calls to instance method 'balance()' from outside of its actor context are implicitly asynchronous}}
   func balance() -> Int { return curBalance }
 
-  // expected-note@+1 2{{calls to instance method 'deposit' from outside of its actor context are implicitly asynchronous}}
+  // expected-note@+1 {{calls to instance method 'deposit' from outside of its actor context are implicitly asynchronous}}
   func deposit(_ amount : Int) -> Int {
     guard amount >= 0 else { return 0 }
 
@@ -231,9 +229,9 @@ func anotherAsyncFunc() async {
   // expected-note@+1{{calls to instance method 'balance()' from outside of its actor context are implicitly asynchronous}}
   _ = b.balance()
 
-  _ = b.balance // expected-error {{actor-isolated instance method 'balance()' can only be referenced from inside the actor}}
+  _ = b.balance // expected-error {{actor-isolated instance method 'balance()' can not be partially applied}}
 
-  a.owner = "cat" // expected-error{{actor-isolated property 'owner' can only be mutated from inside the actor}}
+  a.owner = "cat" // expected-error{{actor-isolated property 'owner' can not be mutated from a non-isolated context}}
   // expected-error@+1{{expression is 'async' but is not marked with 'await'}} {{7-7=await }} expected-note@+1{{property access is 'async'}}
   _ = b.owner
   _ = await b.owner == "cat"
@@ -244,9 +242,9 @@ func anotherAsyncFunc() async {
 func regularFunc() {
   let a = BankAccount(initialDeposit: 34)
 
-  _ = a.deposit //expected-error{{actor-isolated instance method 'deposit' can only be referenced from inside the actor}}
+  _ = a.deposit //expected-error{{actor-isolated instance method 'deposit' can not be partially applied}}
 
-  _ = a.deposit(1)  // expected-error{{actor-isolated instance method 'deposit' can only be referenced from inside the actor}}
+  _ = a.deposit(1)  // expected-error{{actor-isolated instance method 'deposit' can not be referenced from a non-isolated context}}
 }
 
 
@@ -361,18 +359,23 @@ actor Calculator {
 @OrangeActor func doSomething() async {
   let _ = (await bananaAdd(1))(2)
   // expected-warning@-1{{cannot call function returning non-sendable type}}
+  // expected-note@-2{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
   let _ = await (await bananaAdd(1))(2) // expected-warning{{no 'async' operations occur within 'await' expression}}
   // expected-warning@-1{{cannot call function returning non-sendable type}}
+  // expected-note@-2{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
 
   let calc = Calculator()
   
   let _ = (await calc.addCurried(1))(2)
   // expected-warning@-1{{cannot call function returning non-sendable type}}
+  // expected-note@-2{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
   let _ = await (await calc.addCurried(1))(2) // expected-warning{{no 'async' operations occur within 'await' expression}}
   // expected-warning@-1{{cannot call function returning non-sendable type}}
+  // expected-note@-2{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
 
   let plusOne = await calc.addCurried(await calc.add(0, 1))
   // expected-warning@-1{{cannot call function returning non-sendable type}}
+  // expected-note@-2{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
   let _ = plusOne(2)
 }
 

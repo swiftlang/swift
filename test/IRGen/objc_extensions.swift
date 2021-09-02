@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-irgen-test-overlays
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -disable-objc-attr-requires-foundation-module -emit-module %S/Inputs/objc_extension_base.swift -o %t
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -primary-file %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -primary-file %s -emit-ir -g | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop
@@ -195,3 +195,52 @@ class SwiftSubGizmo : SwiftBaseGizmo {
   }
 }
 
+@inline(never) func opaquePrint(_ value: Any) { print(value) }
+
+/*
+ * Check that we can extend ObjC generics and use both the type and metatype of
+ * the generic parameter. Specifically, we're checking that we emit debug info
+ * if we look up the existential bound, and that we derive the argument to
+ * `opaquePrint(_:)` from the actual parameter, not just the fixed metadata.
+ */
+extension FungingArray {
+  // CHECK-LABEL: define {{.*}} @"$sSo12FungingArrayC15objc_extensionsEyAByxGxcfC"
+  // CHECK-SAME: (%objc_object* %0, %swift.type* swiftself %1)
+  // CHECK: @__swift_instantiateConcreteTypeFromMangledName{{.*}}@"$sSo9NSFunging_XlMD"{{.*}}!dbg
+
+  // CHECK-LABEL: define {{.*}} @"$sSo12FungingArrayC15objc_extensionsEyAByxGxcfc"
+  // CHECK-SAME: (%objc_object* %0, %TSo12FungingArrayC* swiftself %1)
+  // CHECK: [[ALLOCA:%[^, =]+]] = alloca %Any, align 8
+  // CHECK: @__swift_instantiateConcreteTypeFromMangledName{{.*}}@"$sSo9NSFunging_XlMD"{{.*}}!dbg
+  // CHECK: {{%[^, =]+}} = getelementptr inbounds %Any, %Any* [[ALLOCA]], i32 0, i32 0
+  // CHECK: [[ANYBUF:%[^, =]+]] = getelementptr inbounds %Any, %Any* [[ALLOCA]], i32 0, i32 0
+  // CHECK: [[BUFPTR:%[^, =]+]] = {{.*}} [[ANYBUF]]
+  // CHECK: [[BUF_0:%[^, =]+]] = {{.*}} [[BUFPTR]]
+  // CHECK: store {{.*}} %0, {{.*}} [[BUF_0]]
+  // CHECK: call swiftcc void @"$s15objc_extensions11opaquePrintyyypF"(%Any* {{.*}} [[ALLOCA]])
+  @objc public convenience init(_ elem: Element) {
+    opaquePrint(elem)
+    self.init()
+  }
+
+  // CHECK-LABEL: define {{.*}} @"$sSo12FungingArrayC15objc_extensionsE7pinningAByxGxm_tcfC"
+  // CHECK-SAME: (%swift.type* %0, %swift.type* swiftself %1)
+  // CHECK: @__swift_instantiateConcreteTypeFromMangledName{{.*}}@"$sSo9NSFunging_XlMD"{{.*}}!dbg
+
+  // CHECK-LABEL: define {{.*}} @"$sSo12FungingArrayC15objc_extensionsE7pinningAByxGxm_tcfc"
+  // CHECK-SAME: (%swift.type* %0, %TSo12FungingArrayC* swiftself %1)
+  // CHECK: [[ALLOCA:%[^, =]+]] = alloca %Any, align 8
+  // CHECK: @__swift_instantiateConcreteTypeFromMangledName{{.*}}@"$sSo9NSFunging_XlMD"{{.*}}!dbg
+  // CHECK: [[OBJC_CLASS:%[^, =]+]] = call %objc_class* @swift_getObjCClassFromMetadata(%swift.type* %0)
+  // CHECK: [[OBJC_CLASS_OBJ:%[^, =]+]] = bitcast %objc_class* [[OBJC_CLASS]]
+  // CHECK: {{%[^, =]+}} = getelementptr inbounds %Any, %Any* [[ALLOCA]], i32 0, i32 0
+  // CHECK: [[ANYBUF:%[^, =]+]] = getelementptr inbounds %Any, %Any* [[ALLOCA]], i32 0, i32 0
+  // CHECK: [[BUFPTR:%[^, =]+]] = {{.*}} [[ANYBUF]]
+  // CHECK: [[BUF_0:%[^, =]+]] = {{.*}} [[BUFPTR]]
+  // CHECK: store {{.*}} [[OBJC_CLASS_OBJ]], {{.*}} [[BUF_0]]
+  // CHECK: call swiftcc void @"$s15objc_extensions11opaquePrintyyypF"(%Any* {{.*}} [[ALLOCA]])
+  @objc public convenience init(pinning: Element.Type) {
+    opaquePrint(pinning as AnyObject)
+    self.init()
+  }
+}

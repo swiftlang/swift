@@ -43,4 +43,4 @@ struct X { var y: Int = 0 }
 var x = X()
 x ~> \X.y ≈> { a in a += 1; return 3 }
 // expected-error@-1 {{referencing operator function '~>' on 'P' requires that 'M<WritableKeyPath<X, Int>, R>' conform to 'P'}}
-// expected-error@-2 {{unable to infer complex closure return type; add explicit type to disambiguate}}
+// expected-error@-2 {{cannot infer return type for closure with multiple statements; add explicit type to disambiguate}}

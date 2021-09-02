@@ -88,7 +88,10 @@ protected:
       virtual void verify(NonLocalAccessBlocks *accessBlocks) const override {
         NonLocalAccessBlocks checkAccessBlocks(accessBlocks->function);
         checkAccessBlocks.compute();
-        assert(checkAccessBlocks.accessBlocks == accessBlocks->accessBlocks);
+        assert(llvm::all_of(checkAccessBlocks.accessBlocks,
+                            [&](SILBasicBlock *bb) {
+                              return accessBlocks->accessBlocks.count(bb);
+                            }));
       })
 };
 

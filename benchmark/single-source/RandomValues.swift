@@ -23,10 +23,26 @@ public let RandomValues = [
     tags: [.api], legacyFactor: 100),
   BenchmarkInfo(name: "RandomIntegersLCG", runFunction: run_RandomIntegersLCG,
     tags: [.api]),
+  BenchmarkInfo(name: "RandomInt8Def", runFunction: run_RandomInt8Def,
+    tags: [.api], legacyFactor: 100),
+  BenchmarkInfo(name: "RandomInt8LCG", runFunction: run_RandomInt8LCG,
+    tags: [.api]),
+  BenchmarkInfo(name: "RandomInt64Def", runFunction: run_RandomInt64Def,
+    tags: [.api], legacyFactor: 100),
+  BenchmarkInfo(name: "RandomInt64LCG", runFunction: run_RandomInt64LCG,
+    tags: [.api]),
   BenchmarkInfo(name: "RandomDoubleDef", runFunction: run_RandomDoubleDef,
     tags: [.api], legacyFactor: 100),
   BenchmarkInfo(name: "RandomDoubleLCG", runFunction: run_RandomDoubleLCG,
-    tags: [.api], legacyFactor: 2),
+    tags: [.api]),
+  BenchmarkInfo(name: "RandomDoubleOpaqueDef", runFunction: run_RandomDoubleOpaqueDef,
+    tags: [.api], legacyFactor: 100),
+  BenchmarkInfo(name: "RandomDoubleOpaqueLCG", runFunction: run_RandomDoubleOpaqueLCG,
+    tags: [.api]),
+  BenchmarkInfo(name: "RandomDouble01Def", runFunction: run_RandomDouble01Def,
+    tags: [.api], legacyFactor: 100),
+  BenchmarkInfo(name: "RandomDouble01LCG", runFunction: run_RandomDouble01LCG,
+    tags: [.api]),
 ]
 
 /// A linear congruential PRNG.
@@ -49,7 +65,7 @@ public func run_RandomIntegersDef(_ N: Int) {
   for _ in 0 ..< N {
     var x = 0
     for _ in 0 ..< 1_000 {
-      x &+= Int.random(in: 0...10_000)
+      x &+= .random(in: 0...10_000)
     }
     blackHole(x)
   }
@@ -58,10 +74,61 @@ public func run_RandomIntegersDef(_ N: Int) {
 @inline(never)
 public func run_RandomIntegersLCG(_ N: Int) {
   for _ in 0 ..< N {
+    var x = 0
+    var generator = LCRNG(seed: 0)
+    for _ in 0 ..< 100_000 {
+      x &+= .random(in: 0 ... 10_000, using: &generator)
+    }
+    blackHole(x)
+  }
+}
+
+@inline(never)
+public func run_RandomInt8Def(_ N: Int) {
+  for _ in 0 ..< N {
+    var x: Int8 = 0
+    for _ in 0 ..< 1_000 {
+      x &+= .random(in: -65 ... identity(65))
+    }
+    blackHole(x)
+  }
+}
+
+@inline(never)
+public func run_RandomInt8LCG(_ N: Int) {
+  for _ in 0 ..< N {
+    var x: Int8 = 0
+    var generator = LCRNG(seed: 0)
+    for _ in 0 ..< 100_000 {
+      x &+= .random(in: -65 ... identity(65), using: &generator)
+    }
+    blackHole(x)
+  }
+}
+
+@inline(never)
+public func run_RandomInt64Def(_ N: Int) {
+  for _ in 0 ..< N {
+    var x: Int64 = 0
+    for _ in 0 ..< 1_000 {
+      x &+= .random(in:
+        -5_000_000_000_000_000_000 ... identity(5_000_000_000_000_000_000)
+      )
+    }
+    blackHole(x)
+  }
+}
+
+@inline(never)
+public func run_RandomInt64LCG(_ N: Int) {
+  for _ in 0 ..< N {
     var x: Int64 = 0
     var generator = LCRNG(seed: 0)
     for _ in 0 ..< 100_000 {
-      x &+= Int64.random(in: 0...10_000, using: &generator)
+      x &+= .random(in:
+        -5_000_000_000_000_000_000 ... identity(5_000_000_000_000_000_000),
+        using: &generator
+      )
     }
     blackHole(x)
   }
@@ -72,7 +139,7 @@ public func run_RandomDoubleDef(_ N: Int) {
   for _ in 0 ..< N {
     var x = 0.0
     for _ in 0 ..< 1_000 {
-      x += Double.random(in: -1000...1000)
+      x += .random(in: -1000 ... 1000)
     }
     blackHole(x)
   }
@@ -83,9 +150,56 @@ public func run_RandomDoubleLCG(_ N: Int) {
   for _ in 0 ..< N {
     var x = 0.0
     var generator = LCRNG(seed: 0)
-    for _ in 0 ..< 50_000 {
-      x += Double.random(in: -1000...1000, using: &generator)
+    for _ in 0 ..< 100_000 {
+      x += .random(in: -1000 ... 1000, using: &generator)
     }
     blackHole(x)
   }
 }
+
+@inline(never)
+public func run_RandomDoubleOpaqueDef(_ N: Int) {
+  for _ in 0 ..< N {
+    var x = 0.0
+    for _ in 0 ..< 1_000 {
+      x += .random(in: -1000 ... identity(1000))
+    }
+    blackHole(x)
+  }
+}
+
+@inline(never)
+public func run_RandomDoubleOpaqueLCG(_ N: Int) {
+  for _ in 0 ..< N {
+    var x = 0.0
+    var generator = LCRNG(seed: 0)
+    for _ in 0 ..< 100_000 {
+      x += .random(in: -1000 ... identity(1000), using: &generator)
+    }
+    blackHole(x)
+  }
+}
+
+@inline(never)
+public func run_RandomDouble01Def(_ N: Int) {
+  for _ in 0 ..< N {
+    var x = 0.0
+    for _ in 0 ..< 1_000 {
+      x += .random(in: 0 ..< 1)
+    }
+    blackHole(x)
+  }
+}
+
+@inline(never)
+public func run_RandomDouble01LCG(_ N: Int) {
+  for _ in 0 ..< N {
+    var x = 0.0
+    var generator = LCRNG(seed: 0)
+    for _ in 0 ..< 100_000 {
+      x += .random(in: 0 ..< 1, using: &generator)
+    }
+    blackHole(x)
+  }
+}
+ 

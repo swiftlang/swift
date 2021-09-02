@@ -69,4 +69,15 @@ struct Generic<T : P> {
   }
 }
 
+class Base { }
+
+class Derived : Base {
+  var x: Bool
+  var y: Bool
+
+  init(_: Int) {
+    x = false
+    y = true || x
+  }
+}
 

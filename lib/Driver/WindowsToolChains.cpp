@@ -172,20 +172,16 @@ toolchains::Windows::constructInvocation(const DynamicLinkJobAction &job,
   }
 
   if (context.Args.hasArg(options::OPT_profile_generate)) {
-    SmallString<128> LibProfile(SharedResourceDirPath);
-    llvm::sys::path::remove_filename(LibProfile); // remove platform name
-    llvm::sys::path::append(LibProfile, "clang", "lib");
-
-    llvm::sys::path::append(LibProfile, getTriple().getOSName(),
-                            Twine("clang_rt.profile-") +
-                                getTriple().getArchName() + ".lib");
-    Arguments.push_back(context.Args.MakeArgString(LibProfile));
+    Arguments.push_back(context.Args.MakeArgString("-Xlinker"));
     Arguments.push_back(context.Args.MakeArgString(
-        Twine("-u", llvm::getInstrProfRuntimeHookVarName())));
+        Twine({"-include:", llvm::getInstrProfRuntimeHookVarName()})));
+    Arguments.push_back(context.Args.MakeArgString("-lclang_rt.profile"));
   }
 
   context.Args.AddAllArgs(Arguments, options::OPT_Xlinker);
-  context.Args.AddAllArgs(Arguments, options::OPT_linker_option_Group);
+  context.Args.AddAllArgsExcept(Arguments, {options::OPT_linker_option_Group},
+                                {options::OPT_l});
+  ToolChain::addLinkedLibArgs(context.Args, Arguments);
   context.Args.AddAllArgValues(Arguments, options::OPT_Xclang_linker);
 
   // Run clang in verbose mode if "-v" is set

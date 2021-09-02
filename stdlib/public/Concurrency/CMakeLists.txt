@@ -10,14 +10,18 @@
 #
 #===----------------------------------------------------------------------===#
 
-set(swift_concurrency_objc_sources
-  SwiftNativeNSObject.mm)
-
 set(LLVM_OPTIONAL_SOURCES
   ${swift_concurrency_objc_sources})
 
-set(swift_concurrency_link_libraries
-  swiftCore)
+if (SWIFT_ALLOW_BACK_DEPLOY_CONCURRENCY OR BUILD_SWIFT_CONCURRENCY_BACK_DEPLOYMENT_LIBRARIES)
+  set(swift_concurrency_availability "macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0")
+else()
+  set(swift_concurrency_availability "macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0")
+endif()
+
+if(NOT swift_concurrency_install_component)
+  set(swift_concurrency_install_component stdlib)
+endif()
 
 if(SWIFT_CONCURRENCY_USES_DISPATCH)
   if(NOT CMAKE_SYSTEM_NAME STREQUAL Darwin)
@@ -31,7 +35,6 @@ if(SWIFT_CONCURRENCY_USES_DISPATCH)
       dispatch)
   endif()
 endif()
-
 
 add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   ../CompatibilityOverride/CompatibilityOverride.cpp
@@ -60,7 +63,10 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   AsyncThrowingFlatMapSequence.swift
   AsyncThrowingMapSequence.swift
   AsyncThrowingPrefixWhileSequence.swift
+  GlobalActor.swift
+  MainActor.swift
   PartialAsyncTask.swift
+  SourceCompatibilityShims.swift
   Task.cpp
   Task.swift
   TaskCancellation.swift
@@ -70,9 +76,14 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   TaskGroup.swift
   TaskLocal.cpp
   TaskLocal.swift
+  TaskSleep.swift
   ThreadSanitizer.cpp
   Mutex.cpp
-  YieldingContinuation.swift
+  AsyncStreamBuffer.swift
+  AsyncStream.swift
+  AsyncThrowingStream.swift
+  AsyncStream.cpp
+  Deque.swift
   ${swift_concurrency_objc_sources}
 
   SWIFT_MODULE_DEPENDS_LINUX Glibc
@@ -91,7 +102,8 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
     -parse-stdlib
     -Xfrontend -enable-experimental-concurrency
     -Xfrontend -define-availability
-    -Xfrontend \"SwiftStdlib 5.5:macOS 9999, iOS 9999, watchOS 9999, tvOS 9999\"
-  LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
-  INSTALL_IN_COMPONENT stdlib
+    -Xfrontend "SwiftStdlib 5.5:${swift_concurrency_availability}"
+  LINK_FLAGS "${SWIFT_RUNTIME_CONCURRENCY_SWIFT_LINK_FLAGS}"
+  ${swift_concurrency_options}
+  INSTALL_IN_COMPONENT ${swift_concurrency_install_component}
 )

@@ -51,7 +51,7 @@ struct HasWrapped {
 func testStructDefaultInit() {
   Point(#^POINT_PAREN^#
 // POINT_PAREN: Begin completions, 1 items
-// POINT_PAREN-DAG: Decl[Constructor]/CurrNominal:      ['(']{#x: Int#}, {#y: Int#}[')'][#Point#];
+// POINT_PAREN-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#x: Int#}, {#y: Int#}[')'][#Point#];
 // POINT_PAREN: End completions
   func sync() {}
   Point.#^POINT_DOT^#

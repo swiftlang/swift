@@ -23,6 +23,7 @@
 #include "swift/AST/Availability.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/GenericParamList.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/NameLookup.h"
@@ -38,8 +39,10 @@
 
 namespace swift {
 
+class Decl;
+class DeclAttribute;
+class DiagnosticEngine;
 class ExportContext;
-class GenericSignatureBuilder;
 class NominalTypeDecl;
 class NormalProtocolConformance;
 class RootProtocolConformance;
@@ -122,22 +125,15 @@ enum class TypeCheckExprFlags {
   /// disables constraints forcing an lvalue result to be loadable.
   IsDiscarded = 0x01,
 
-  /// If set, the client wants a best-effort solution to the constraint system,
-  /// but can tolerate a solution where all of the constraints are solved, but
-  /// not all type variables have been determined.  In this case, the constraint
-  /// system is not applied to the expression AST, but the ConstraintSystem is
-  /// left in-tact.
-  AllowUnresolvedTypeVariables = 0x02,
-
   /// If set, this expression isn't embedded in a larger expression or
   /// statement. This should only be used for syntactic restrictions, and should
   /// not affect type checking itself.
-  IsExprStmt = 0x04,
+  IsExprStmt = 0x02,
 
   /// Don't try to type check closure expression bodies, and leave them
   /// unchecked. This is used by source tooling functionalities such as code
   /// completion.
-  LeaveClosureBodyUnchecked = 0x08,
+  LeaveClosureBodyUnchecked = 0x04,
 };
 
 using TypeCheckExprOptions = OptionSet<TypeCheckExprFlags>;
@@ -195,7 +191,7 @@ enum class Comparison {
 /// formatted with \c diagnoseConformanceStack.
 struct ParentConditionalConformance {
   Type ConformingType;
-  ProtocolType *Protocol;
+  ProtocolDecl *Protocol;
 
   /// Format the stack \c conformances as a series of notes that trace a path of
   /// conditional conformances that lead to some other failing requirement (that
@@ -235,7 +231,6 @@ enum class CheckedCastContextKind {
 };
 
 namespace TypeChecker {
-Type getArraySliceType(SourceLoc loc, Type elementType);
 Type getOptionalType(SourceLoc loc, Type elementType);
 
 /// Bind an UnresolvedDeclRefExpr by performing name lookup and
@@ -424,6 +419,7 @@ void addImplicitDynamicAttribute(Decl *D);
 void checkDeclAttributes(Decl *D);
 void checkClosureAttributes(ClosureExpr *closure);
 void checkParameterList(ParameterList *params, DeclContext *owner);
+void checkResultType(Type resultType, DeclContext *owner);
 
 void diagnoseDuplicateBoundVars(Pattern *pattern);
 
@@ -505,13 +501,19 @@ RequirementCheckResult checkGenericArguments(
     ArrayRef<Requirement> requirements, TypeSubstitutionFn substitutions,
     SubstOptions options = None);
 
+/// A lower-level version of the above without diagnostic emission.
+RequirementCheckResult checkGenericArguments(
+    ModuleDecl *module,
+    ArrayRef<Requirement> requirements,
+    TypeSubstitutionFn substitutions);
+
 bool checkContextualRequirements(GenericTypeDecl *decl,
                                  Type parentTy,
                                  SourceLoc loc,
                                  DeclContext *dc);
 
 /// Add any implicitly-defined constructors required for the given
-/// struct or class.
+/// struct, class or actor.
 void addImplicitConstructors(NominalTypeDecl *typeDecl);
 
 /// Fold the given sequence expression into an (unchecked) expression
@@ -717,13 +719,10 @@ Expr *addImplicitLoadExpr(
 
 /// Determine whether the given type contains the given protocol.
 ///
-/// \param DC The context in which to check conformance. This affects, for
-/// example, extension visibility.
-///
 /// \returns the conformance, if \c T conforms to the protocol \c Proto, or
 /// an empty optional.
 ProtocolConformanceRef containsProtocol(Type T, ProtocolDecl *Proto,
-                                        DeclContext *DC,
+                                        ModuleDecl *M,
                                         bool skipConditionalRequirements=false);
 
 /// Determine whether the given type conforms to the given protocol.
@@ -731,25 +730,22 @@ ProtocolConformanceRef containsProtocol(Type T, ProtocolDecl *Proto,
 /// Unlike subTypeOfProtocol(), this will return false for existentials of
 /// non-self conforming protocols.
 ///
-/// \param DC The context in which to check conformance. This affects, for
-/// example, extension visibility.
-///
 /// \returns The protocol conformance, if \c T conforms to the
 /// protocol \c Proto, or \c None.
 ProtocolConformanceRef conformsToProtocol(Type T, ProtocolDecl *Proto,
-                                          DeclContext *DC);
+                                          ModuleDecl *M);
+
+/// Check whether the type conforms to a given known protocol.
+bool conformsToKnownProtocol(Type type, KnownProtocolKind protocol,
+                             ModuleDecl *module);
 
 /// This is similar to \c conformsToProtocol, but returns \c true for cases where
 /// the type \p T could be dynamically cast to \p Proto protocol, such as a non-final
 /// class where a subclass conforms to \p Proto.
 ///
-/// \param DC The context in which to check conformance. This affects, for
-/// example, extension visibility.
-///
-///
 /// \returns True if \p T conforms to the protocol \p Proto, false otherwise.
 bool couldDynamicallyConformToProtocol(Type T, ProtocolDecl *Proto,
-                                       DeclContext *DC);
+                                       ModuleDecl *M);
 /// Completely check the given conformance.
 void checkConformance(NormalProtocolConformance *conformance);
 
@@ -849,13 +845,15 @@ enum class UnsupportedMemberTypeAccessKind : uint8_t {
   TypeAliasOfUnboundGeneric,
   TypeAliasOfExistential,
   AssociatedTypeOfUnboundGeneric,
-  AssociatedTypeOfExistential
+  AssociatedTypeOfExistential,
+  NominalTypeOfUnboundGeneric
 };
 
 /// Check whether the given declaration can be written as a
 /// member of the given base type.
 UnsupportedMemberTypeAccessKind
-isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl);
+isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl,
+                              bool hasUnboundOpener);
 
 /// @}
 
@@ -963,6 +961,10 @@ AvailabilityContext overApproximateAvailabilityAtLocation(
 /// Walk the AST to build the hierarchy of TypeRefinementContexts
 void buildTypeRefinementContextHierarchy(SourceFile &SF);
 
+/// Walk the AST to complete the hierarchy of TypeRefinementContexts for
+/// the delayed function body of \p AFD.
+void buildTypeRefinementContextHierarchyDelayed(SourceFile &SF, AbstractFunctionDecl *AFD);
+
 /// Build the hierarchy of TypeRefinementContexts for the entire
 /// source file, if it has not already been built. Returns the root
 /// TypeRefinementContext for the source file.
@@ -1021,6 +1023,12 @@ void
 diagnosePotentialOpaqueTypeUnavailability(SourceRange ReferenceRange,
                                           const DeclContext *ReferenceDC,
                                           const UnavailabilityReason &Reason);
+
+/// Type check a 'distributed actor' declaration.
+void checkDistributedActor(ClassDecl *decl);
+
+void checkConcurrencyAvailability(SourceRange ReferenceRange,
+                                  const DeclContext *ReferenceDC);
 
 /// Emits a diagnostic for a reference to a storage accessor that is
 /// potentially unavailable.
@@ -1110,7 +1118,7 @@ void performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
                            Type baseTypeOrNull,
                            NameLookupOptions lookupOptions,
                            TypoCorrectionResults &corrections,
-                           GenericSignatureBuilder *gsb = nullptr,
+                           GenericSignature genericSig = GenericSignature(),
                            unsigned maxResults = 4);
 
 /// Check if the given decl has a @_semantics attribute that gives it
@@ -1160,23 +1168,20 @@ bool typeSupportsBuilderOp(Type builderType, DeclContext *dc, Identifier fnName,
 /// once.
 void applyAccessNote(ValueDecl *VD);
 
+/// Returns true if the given type conforms to `Differentiable` in the
+/// module of `dc`. If `tangentVectorEqualsSelf` is true, returns true iff
+/// the given type additionally satisfies `Self == Self.TangentVector`.
+bool isDifferentiable(Type type, bool tangentVectorEqualsSelf, DeclContext *dc,
+                      Optional<TypeResolutionStage> stage);
+
+/// Emits diagnostics if the given function type's parameter/result types are
+/// not compatible with the ext info. Returns whether an error was diagnosed.
+bool diagnoseInvalidFunctionType(FunctionType *fnTy, SourceLoc loc,
+                                 Optional<FunctionTypeRepr *>repr,
+                                 DeclContext *dc,
+                                 Optional<TypeResolutionStage> stage);
+
 }; // namespace TypeChecker
-
-/// Temporary on-stack storage and unescaping for encoded diagnostic
-/// messages.
-///
-///
-class EncodedDiagnosticMessage {
-  llvm::SmallString<128> Buf;
-
-public:
-  /// \param S A string with an encoded message
-  EncodedDiagnosticMessage(StringRef S)
-      : Message(Lexer::getEncodedStringSegment(S, Buf, true, true, ~0U)) {}
-
-  /// The unescaped message to display to the user.
-  const StringRef Message;
-};
 
 /// Returns the protocol requirement kind of the given declaration.
 /// Used in diagnostics.
@@ -1188,13 +1193,13 @@ diag::RequirementKind getProtocolRequirementKind(ValueDecl *Requirement);
 /// @dynamicCallable attribute requirement. The method is given to be defined
 /// as one of the following: `dynamicallyCall(withArguments:)` or
 /// `dynamicallyCall(withKeywordArguments:)`.
-bool isValidDynamicCallableMethod(FuncDecl *decl, DeclContext *DC,
+bool isValidDynamicCallableMethod(FuncDecl *decl, ModuleDecl *module,
                                   bool hasKeywordArguments);
 
 /// Returns true if the given subscript method is an valid implementation of
 /// the `subscript(dynamicMember:)` requirement for @dynamicMemberLookup.
 /// The method is given to be defined as `subscript(dynamicMember:)`.
-bool isValidDynamicMemberLookupSubscript(SubscriptDecl *decl, DeclContext *DC,
+bool isValidDynamicMemberLookupSubscript(SubscriptDecl *decl, ModuleDecl *module,
                                          bool ignoreLabel = false);
 
 /// Returns true if the given subscript method is an valid implementation of
@@ -1202,7 +1207,7 @@ bool isValidDynamicMemberLookupSubscript(SubscriptDecl *decl, DeclContext *DC,
 /// The method is given to be defined as `subscript(dynamicMember:)` which
 /// takes a single non-variadic parameter that conforms to
 /// `ExpressibleByStringLiteral` protocol.
-bool isValidStringDynamicMemberLookup(SubscriptDecl *decl, DeclContext *DC,
+bool isValidStringDynamicMemberLookup(SubscriptDecl *decl, ModuleDecl *module,
                                       bool ignoreLabel = false);
 
 /// Returns true if the given subscript method is an valid implementation of
@@ -1260,7 +1265,7 @@ Type getMemberTypeForComparison(const ValueDecl *member,
 /// Determine whether the given declaration is an override by comparing type
 /// information.
 bool isOverrideBasedOnType(const ValueDecl *decl, Type declTy,
-                           const ValueDecl *parentDecl, Type parentDeclTy);
+                           const ValueDecl *parentDecl);
 
 /// Determine whether the given declaration is an operator defined in a
 /// protocol. If \p type is not null, check specifically whether \p decl
@@ -1291,11 +1296,6 @@ bool diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf);
 /// DiagnosticsSema.def.
 std::pair<unsigned, DeclName> getObjCMethodDiagInfo(
                                 AbstractFunctionDecl *method);
-
-bool areGenericRequirementsSatisfied(const DeclContext *DC,
-                                     GenericSignature sig,
-                                     SubstitutionMap Substitutions,
-                                     bool isExtension);
 
 /// Check for restrictions on the use of the @unknown attribute on a
 /// case statement.
@@ -1328,6 +1328,54 @@ void bindSwitchCasePatternVars(DeclContext *dc, CaseStmt *stmt);
 /// update the given function type to include the global actor.
 AnyFunctionType *applyGlobalActorType(
     AnyFunctionType *fnType, ValueDecl *funcOrEnum, DeclContext *dc);
+
+/// If \p attr was added by an access note, wraps the error in
+/// \c diag::wrap_invalid_attr_added_by_access_note and limits it as an access
+/// note-related diagnostic should be.
+InFlightDiagnostic softenIfAccessNote(const Decl *D, const DeclAttribute *attr,
+                                      InFlightDiagnostic &diag);
+
+/// Diagnose an error concerning an incorrect attribute (softening it if it's
+/// caused by an access note) and emit a fix-it offering to remove it.
+template<typename ...ArgTypes>
+InFlightDiagnostic
+diagnoseAttrWithRemovalFixIt(const Decl *D, const DeclAttribute *attr,
+                             ArgTypes &&...Args) {
+  assert(D);
+
+  if (D->hasClangNode() && (!attr || !attr->getAddedByAccessNote())) {
+    assert(false && "Clang importer propagated a bogus attribute");
+    return InFlightDiagnostic();
+  }
+
+  auto &Diags = D->getASTContext().Diags;
+
+  Optional<InFlightDiagnostic> diag;
+  if (!attr || !attr->getLocation().isValid())
+    diag.emplace(Diags.diagnose(D, std::forward<ArgTypes>(Args)...));
+  else
+    diag.emplace(std::move(Diags.diagnose(attr->getLocation(),
+                                          std::forward<ArgTypes>(Args)...)
+                               .fixItRemove(attr->getRangeWithAt())));
+
+  return softenIfAccessNote(D, attr, *diag);
+}
+
+/// Diagnose an error concerning an incorrect attribute (softening it if it's
+/// caused by an access note), emit a fix-it offering to remove it, and mark the
+/// attribute invalid so that it will be ignored by other parts of the compiler.
+template<typename ...ArgTypes>
+InFlightDiagnostic
+diagnoseAndRemoveAttr(const Decl *D, const DeclAttribute *attr,
+                      ArgTypes &&...Args) {
+  if (attr)
+    // FIXME: Due to problems with the design of DeclAttributes::getAttribute(),
+    // many callers try to pass us const DeclAttributes. This is a hacky
+    // workaround.
+    const_cast<DeclAttribute *>(attr)->setInvalid();
+
+  return diagnoseAttrWithRemovalFixIt(D, attr, std::forward<ArgTypes>(Args)...);
+}
 
 } // end namespace swift
 

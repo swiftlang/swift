@@ -230,14 +230,14 @@ func good(_ a: A<EE>) -> Int {
 }
 
 func bad(_ a: A<EE>) {
-  a.map { // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{none}}
+  a.map { // expected-error {{cannot infer return type for closure with multiple statements; add explicit type to disambiguate}} {{none}}
     let _: EE = $0
     return 1
   }
 }
 
 func ugly(_ a: A<EE>) {
-  a.map { // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{none}}
+  a.map { // expected-error {{cannot infer return type for closure with multiple statements; add explicit type to disambiguate}} {{none}}
     switch $0 {
     case .A:
       return 1
@@ -512,5 +512,11 @@ func rdar64157451() {
 
   func test(e: E) {
     if case .foo(let v as DoeNotExist) = e {} // expected-error {{cannot find type 'DoeNotExist' in scope}}
+  }
+}
+
+// rdar://80797176 - circular reference incorrectly diagnosed while reaching for a type of a pattern.
+func rdar80797176 () {
+  for x: Int in [1, 2] where x.bitWidth == 32 { // Ok
   }
 }

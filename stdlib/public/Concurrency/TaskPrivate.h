@@ -17,29 +17,55 @@
 #ifndef SWIFT_CONCURRENCY_TASKPRIVATE_H
 #define SWIFT_CONCURRENCY_TASKPRIVATE_H
 
-#include "swift/Runtime/Concurrency.h"
-#include "swift/ABI/Task.h"
+#include "Error.h"
 #include "swift/ABI/Metadata.h"
-#include "swift/Runtime/HeapObject.h"
+#include "swift/ABI/Task.h"
+#include "swift/Runtime/Atomic.h"
+#include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/Error.h"
+#include "swift/Runtime/Exclusivity.h"
+#include "swift/Runtime/HeapObject.h"
+
+#define SWIFT_FATAL_ERROR swift_Concurrency_fatalError
+#include "../runtime/StackAllocator.h"
+
+#if HAVE_PTHREAD_H
+#include <pthread.h>
+#endif
+#if defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#define VC_EXTRA_LEAN
+#define NOMINMAX
+#include <Windows.h>
+#endif
 
 namespace swift {
 
-// Uncomment to enable helpful debug spew to stderr
-//#define SWIFT_TASK_PRINTF_DEBUG 1
+// Set to 1 to enable helpful debug spew to stderr
+#if 0
+#define SWIFT_TASK_DEBUG_LOG(fmt, ...)                                         \
+  fprintf(stderr, "[%lu] " fmt "\n", (unsigned long)_swift_get_thread_id(),    \
+          __VA_ARGS__)
+#else
+#define SWIFT_TASK_DEBUG_LOG(fmt, ...) (void)0
+#endif
+
+#if defined(_WIN32)
+using ThreadID = decltype(GetCurrentThreadId());
+#else
+using ThreadID = decltype(pthread_self());
+#endif
+
+inline ThreadID _swift_get_thread_id() {
+#if defined(_WIN32)
+  return GetCurrentThreadId();
+#else
+  return pthread_self();
+#endif
+}
 
 class AsyncTask;
 class TaskGroup;
-
-/// Initialize the task-local allocator in the given task.
-void _swift_task_alloc_initialize(AsyncTask *task);
-
-void _swift_task_alloc_initialize_with_slab(AsyncTask *task,
-                   void *firstSlabBuffer,
-                   size_t bufferCapacity);
-
-/// Destroy the task-local allocator in the given task.
-void _swift_task_alloc_destroy(AsyncTask *task);
 
 /// Allocate task-local memory on behalf of a specific task,
 /// not necessarily the current one.  Generally this should only be
@@ -56,13 +82,12 @@ void _swift_task_dealloc_specific(AsyncTask *task, void *ptr);
 /// related to the active task.
 void runJobInEstablishedExecutorContext(Job *job);
 
+/// Initialize the async let storage for the given async-let child task.
+void asyncLet_addImpl(AsyncTask *task, AsyncLet *asyncLet,
+                      bool didAllocateInParentTask);
+
 /// Clear the active task reference for the current thread.
 AsyncTask *_swift_task_clearCurrent();
-
-AsyncTaskAndContext swift_task_create_async_let_future(JobFlags flags,
-                     const Metadata *futureResultType,
-                     void *closureEntry,
-                     void *closureContext);
 
 #if defined(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
 #define SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR 1
@@ -86,15 +111,15 @@ void _swift_tsan_release(void *addr);
 /// Special values used with DispatchQueueIndex to indicate the global and main
 /// executors.
 #define DISPATCH_QUEUE_GLOBAL_EXECUTOR (void *)1
-#define DISPATCH_QUEUE_MAIN_EXECUTOR (void *)2
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wreturn-type-c-linkage"
-// FIXME: remove this and switch to a representation that uses
-// _dispatch_main_q somehow
-extern "C" SWIFT_CC(swift)
-ExecutorRef _swift_task_getMainExecutor();
-#pragma clang diagnostic pop
+#if !defined(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
+inline SerialExecutorWitnessTable *
+_swift_task_getDispatchQueueSerialExecutorWitnessTable() {
+  extern SerialExecutorWitnessTable wtable
+    SWIFT_ASM_LABEL_WITH_PREFIX("$ss17DispatchQueueShimCScfsWP");
+  return &wtable;
+}
+#endif
 
 // ==== ------------------------------------------------------------------------
 
@@ -114,14 +139,14 @@ namespace {
 ///   @_silgen_name("swift_asyncLet_waitThrowing")
 ///   func _asyncLetGetThrowing<T>(_ task: Builtin.RawPointer) async throws -> T
 ///
+///   @_silgen_name("swift_taskGroup_wait_next_throwing")
+///   func _taskGroupWaitNext<T>(group: Builtin.RawPointer) async throws -> T?
+///
 class TaskFutureWaitAsyncContext : public AsyncContext {
 public:
   SwiftError *errorResult;
 
   OpaqueValue *successResultPointer;
-
-  AsyncVoidClosureResumeEntryPoint *__ptrauth_swift_task_resume_function
-      asyncResumeEntryPoint;
 
   void fillWithSuccess(AsyncTask::FutureFragment *future) {
     fillWithSuccess(future->getStoragePtr(), future->getResultType(),
@@ -141,36 +166,270 @@ public:
   }
 };
 
-/// The layout of a frame to call the following function:
-///
-///   @_silgen_name("swift_taskGroup_wait_next_throwing")
-///   func _taskGroupWaitNext<T>(group: Builtin.RawPointer) async throws -> T?
-///
-class TaskGroupNextAsyncContext : public AsyncContext {
+} // end anonymous namespace
+
+/// The current state of a task's status records.
+class alignas(sizeof(void*) * 2) ActiveTaskStatus {
+  enum : uintptr_t {
+    /// The current running priority of the task.
+    PriorityMask = 0xFF,
+
+    /// Has the task been cancelled?
+    IsCancelled = 0x100,
+
+    /// Whether the task status is "locked", meaning that further
+    /// accesses need to wait on the task status record lock
+    IsLocked = 0x200,
+
+    /// Whether the running priority has been escalated above the
+    /// priority recorded in the Job header.
+    IsEscalated = 0x400,
+
+    /// Whether the task is actively running.
+    /// We don't really need to be tracking this in the runtime right
+    /// now, but we will need to eventually track enough information to
+    /// escalate the thread that's running a task, so doing the stores
+    /// necessary to maintain this gives us a more realistic baseline
+    /// for performance.
+    IsRunning = 0x800,
+  };
+
+  TaskStatusRecord *Record;
+  uintptr_t Flags;
+
+  ActiveTaskStatus(TaskStatusRecord *record, uintptr_t flags)
+    : Record(record), Flags(flags) {}
+
 public:
-  SwiftError *errorResult;
+#ifdef __GLIBCXX__
+  /// We really don't want to provide this constructor, but in old
+  /// versions of libstdc++, std::atomic<T>::load incorrectly requires
+  /// the type to be default-constructible.
+  ActiveTaskStatus() = default;
+#endif
 
-  OpaqueValue *successResultPointer;
+  constexpr ActiveTaskStatus(JobFlags flags)
+    : Record(nullptr), Flags(uintptr_t(flags.getPriority())) {}
 
-  AsyncVoidClosureResumeEntryPoint *__ptrauth_swift_task_resume_function
-      asyncResumeEntryPoint;
-
-  // Arguments.
-  TaskGroup *group;
-
-  const Metadata *successType;
-
-  void fillWithSuccess(OpaqueValue *src, const Metadata *successType) {
-    successType->vw_initializeWithCopy(successResultPointer, src);
+  /// Is the task currently cancelled?
+  bool isCancelled() const { return Flags & IsCancelled; }
+  ActiveTaskStatus withCancelled() const {
+    return ActiveTaskStatus(Record, Flags | IsCancelled);
   }
 
-  void fillWithError(SwiftError *error) {
-    errorResult = error;
-    swift_errorRetain(error);
+  /// Is the task currently running?
+  /// Eventually we'll track this with more specificity, like whether
+  /// it's running on a specific thread, enqueued on a specific actor,
+  /// etc.
+  bool isRunning() const { return Flags & IsRunning; }
+  ActiveTaskStatus withRunning(bool isRunning) const {
+    return ActiveTaskStatus(Record, isRunning ? (Flags | IsRunning)
+                                              : (Flags & ~IsRunning));
+  }
+
+  /// Is there an active lock on the cancellation information?
+  bool isLocked() const { return Flags & IsLocked; }
+  ActiveTaskStatus withLockingRecord(TaskStatusRecord *lockRecord) const {
+    assert(!isLocked());
+    assert(lockRecord->Parent == Record);
+    return ActiveTaskStatus(lockRecord, Flags | IsLocked);
+  }
+
+  JobPriority getStoredPriority() const {
+    return JobPriority(Flags & PriorityMask);
+  }
+  bool isStoredPriorityEscalated() const {
+    return Flags & IsEscalated;
+  }
+  ActiveTaskStatus withEscalatedPriority(JobPriority priority) const {
+    assert(priority > getStoredPriority());
+    return ActiveTaskStatus(Record,
+                            (Flags & ~PriorityMask)
+                               | IsEscalated | uintptr_t(priority));
+  }
+  ActiveTaskStatus withoutStoredPriorityEscalation() const {
+    assert(isStoredPriorityEscalated());
+    return ActiveTaskStatus(Record, Flags & ~IsEscalated);
+  }
+
+  /// Return the innermost cancellation record.  Code running
+  /// asynchronously with this task should not access this record
+  /// without having first locked it; see swift_taskCancel.
+  TaskStatusRecord *getInnermostRecord() const {
+    return Record;
+  }
+  ActiveTaskStatus withInnermostRecord(TaskStatusRecord *newRecord) {
+    return ActiveTaskStatus(newRecord, Flags);
+  }
+
+  static TaskStatusRecord *getStatusRecordParent(TaskStatusRecord *ptr);
+
+  using record_iterator =
+    LinkedListIterator<TaskStatusRecord, getStatusRecordParent>;
+  llvm::iterator_range<record_iterator> records() const {
+    return record_iterator::rangeBeginning(getInnermostRecord());
   }
 };
 
-} // end anonymous namespace
+/// The size of an allocator slab.
+static constexpr size_t SlabCapacity = 1000;
+
+using TaskAllocator = StackAllocator<SlabCapacity>;
+
+/// Private storage in an AsyncTask object.
+struct AsyncTask::PrivateStorage {
+  /// The currently-active information about cancellation.
+  /// Currently two words.
+  swift::atomic<ActiveTaskStatus> Status;
+
+  /// The allocator for the task stack.
+  /// Currently 2 words + 8 bytes.
+  TaskAllocator Allocator;
+
+  /// Storage for task-local values.
+  /// Currently one word.
+  TaskLocal::Storage Local;
+
+  /// State inside the AsyncTask whose state is only managed by the exclusivity
+  /// runtime in stdlibCore. We zero initialize to provide a safe initial value,
+  /// but actually initialize its bit state to a const global provided by
+  /// libswiftCore so that libswiftCore can control the layout of our initial
+  /// state.
+  uintptr_t ExclusivityAccessSet[2] = {0, 0};
+
+  PrivateStorage(JobFlags flags)
+      : Status(ActiveTaskStatus(flags)), Local(TaskLocal::Storage()) {}
+
+  PrivateStorage(JobFlags flags, void *slab, size_t slabCapacity)
+      : Status(ActiveTaskStatus(flags)), Allocator(slab, slabCapacity),
+        Local(TaskLocal::Storage()) {}
+
+  void complete(AsyncTask *task) {
+    // Destroy and deallocate any remaining task local items.
+    // We need to do this before we destroy the task local deallocator.
+    Local.destroy(task);
+
+    this->~PrivateStorage();
+  }
+};
+
+static_assert(sizeof(AsyncTask::PrivateStorage)
+                <= sizeof(AsyncTask::OpaquePrivateStorage) &&
+              alignof(AsyncTask::PrivateStorage)
+                <= alignof(AsyncTask::OpaquePrivateStorage),
+              "Task-private storage doesn't fit in reserved space");
+
+inline AsyncTask::PrivateStorage &
+AsyncTask::OpaquePrivateStorage::get() {
+  return reinterpret_cast<PrivateStorage &>(*this);
+}
+inline const AsyncTask::PrivateStorage &
+AsyncTask::OpaquePrivateStorage::get() const {
+  return reinterpret_cast<const PrivateStorage &>(*this);
+}
+inline void AsyncTask::OpaquePrivateStorage::initialize(AsyncTask *task) {
+  new (this) PrivateStorage(task->Flags);
+}
+inline void
+AsyncTask::OpaquePrivateStorage::initializeWithSlab(AsyncTask *task,
+                                                    void *slab,
+                                                    size_t slabCapacity) {
+  new (this) PrivateStorage(task->Flags, slab, slabCapacity);
+}
+inline void AsyncTask::OpaquePrivateStorage::complete(AsyncTask *task) {
+  get().complete(task);
+}
+inline void AsyncTask::OpaquePrivateStorage::destroy() {
+  // nothing else to do
+}
+
+inline AsyncTask::PrivateStorage &AsyncTask::_private() {
+  return Private.get();
+}
+inline const AsyncTask::PrivateStorage &AsyncTask::_private() const {
+  return Private.get();
+}
+
+inline bool AsyncTask::isCancelled() const {
+  return _private().Status.load(std::memory_order_relaxed)
+                          .isCancelled();
+}
+
+inline void AsyncTask::flagAsRunning() {
+  auto oldStatus = _private().Status.load(std::memory_order_relaxed);
+  while (true) {
+    assert(!oldStatus.isRunning());
+    if (oldStatus.isLocked()) {
+      flagAsRunning_slow();
+      swift_task_enterThreadLocalContext(
+          (char *)&_private().ExclusivityAccessSet[0]);
+      return;
+    }
+
+    auto newStatus = oldStatus.withRunning(true);
+    if (newStatus.isStoredPriorityEscalated()) {
+      newStatus = newStatus.withoutStoredPriorityEscalation();
+      Flags.setPriority(oldStatus.getStoredPriority());
+    }
+
+    if (_private().Status.compare_exchange_weak(oldStatus, newStatus,
+                                                std::memory_order_relaxed,
+                                                std::memory_order_relaxed)) {
+      swift_task_enterThreadLocalContext(
+          (char *)&_private().ExclusivityAccessSet[0]);
+      return;
+    }
+  }
+}
+
+inline void AsyncTask::flagAsSuspended() {
+  auto oldStatus = _private().Status.load(std::memory_order_relaxed);
+  while (true) {
+    assert(oldStatus.isRunning());
+    if (oldStatus.isLocked()) {
+      flagAsSuspended_slow();
+      swift_task_exitThreadLocalContext(
+          (char *)&_private().ExclusivityAccessSet[0]);
+      return;
+    }
+
+    auto newStatus = oldStatus.withRunning(false);
+    if (newStatus.isStoredPriorityEscalated()) {
+      newStatus = newStatus.withoutStoredPriorityEscalation();
+      Flags.setPriority(oldStatus.getStoredPriority());
+    }
+
+    if (_private().Status.compare_exchange_weak(oldStatus, newStatus,
+                                                std::memory_order_relaxed,
+                                                std::memory_order_relaxed)) {
+      swift_task_exitThreadLocalContext(
+          (char *)&_private().ExclusivityAccessSet[0]);
+      return;
+    }
+  }
+}
+
+// READ ME: This is not a dead function! Do not remove it! This is a function
+// that can be used when debugging locally to instrument when a task actually is
+// dealloced.
+inline void AsyncTask::flagAsCompleted() {
+  SWIFT_TASK_DEBUG_LOG("task completed %p", this);
+}
+
+inline void AsyncTask::localValuePush(const HeapObject *key,
+                                      /* +1 */ OpaqueValue *value,
+                                      const Metadata *valueType) {
+  _private().Local.pushValue(this, key, value, valueType);
+}
+
+inline OpaqueValue *AsyncTask::localValueGet(const HeapObject *key) {
+  return _private().Local.getValue(this, key);
+}
+
+/// Returns true if storage has still more bindings.
+inline bool AsyncTask::localValuePop() {
+  return _private().Local.popValue(this);
+}
 
 } // end namespace swift
 

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -471,6 +471,8 @@ tests.test("testMutableArray") {
 }
 
 tests.test("rdar://problem/27905230") {
+  // Casting an NSArray to Array<Any> would trap because of an erroneous
+  // precondition.
   let dict = RDar27905230.mutableDictionaryOfMutableLists()!
   let arr = dict["list"]!
   expectEqual(arr[0] as! NSNull, NSNull())
@@ -480,6 +482,71 @@ tests.test("rdar://problem/27905230") {
   expectEqual((arr[4] as! NSValue).rangeValue.location, 0)
   expectEqual((arr[4] as! NSValue).rangeValue.length, 1)
   expectEqual(arr[5] as! Date, Date(timeIntervalSince1970: 0))
+}
+
+tests.test("verbatimBridged/Base/withUnsafeBufferPointer") {
+  let a = NSArray(array: [Base(0), Base(1), Base(2), Base(3)])
+  let b = a as! [Base]
+  let success: Bool = b.withUnsafeBufferPointer { buffer in
+    expectEqual(buffer.count, 4)
+    guard buffer.count == 4 else { return false }
+    expectEqual(buffer[0].value, 0)
+    expectEqual(buffer[1].value, 1)
+    expectEqual(buffer[2].value, 2)
+    expectEqual(buffer[3].value, 3)
+    return true
+  }
+  expectTrue(success)
+}
+
+// https://bugs.swift.org/browse/SR-14663
+tests.test("verbatimBridged/AnyObject/withUnsafeBufferPointer") {
+  let a = NSArray(array: [Base(0), Base(1), Base(2), Base(3)])
+  let b = a as [AnyObject]
+  let success: Bool = b.withUnsafeBufferPointer { buffer in
+    expectEqual(buffer.count, 4)
+    guard buffer.count == 4 else { return false }
+    expectEqual((buffer[0] as? Base)?.value, 0)
+    expectEqual((buffer[1] as? Base)?.value, 1)
+    expectEqual((buffer[2] as? Base)?.value, 2)
+    expectEqual((buffer[3] as? Base)?.value, 3)
+    return true
+  }
+  expectTrue(success)
+}
+
+tests.test("verbatimBridged/Base/withUnsafeMutableBufferPointer") {
+  let a = NSArray(array: [Base(0), Base(1), Base(2), Base(3)])
+  var b = a as! [Base]
+  let success: Bool = b.withUnsafeMutableBufferPointer { buffer in
+    expectEqual(buffer.count, 4)
+    guard buffer.count == 4 else { return false }
+    expectEqual(buffer[0].value, 0)
+    expectEqual(buffer[1].value, 1)
+    expectEqual(buffer[2].value, 2)
+    expectEqual(buffer[3].value, 3)
+    buffer[0] = Base(4)
+    return true
+  }
+  expectTrue(success)
+  expectEqual(b[0].value, 4)
+}
+
+tests.test("verbatimBridged/AnyObject/withUnsafeMutableBufferPointer") {
+  let a = NSArray(array: [Base(0), Base(1), Base(2), Base(3)])
+  var b = a as [AnyObject]
+  let success: Bool = b.withUnsafeMutableBufferPointer { buffer in
+    expectEqual(buffer.count, 4)
+    guard buffer.count == 4 else { return false }
+    expectEqual((buffer[0] as? Base)?.value, 0)
+    expectEqual((buffer[1] as? Base)?.value, 1)
+    expectEqual((buffer[2] as? Base)?.value, 2)
+    expectEqual((buffer[3] as? Base)?.value, 3)
+    buffer[0] = Base(4)
+    return true
+  }
+  expectTrue(success)
+  expectEqual((b[0] as? Base)?.value, 4)
 }
 
 runAllTests()

@@ -6,6 +6,9 @@
 #define MAIN_ACTOR __attribute__((__swift_attr__("@MainActor")))
 #define MAIN_ACTOR_UNSAFE __attribute__((__swift_attr__("@_unsafeMainActor")))
 
+#define NS_EXTENSIBLE_STRING_ENUM __attribute__((swift_wrapper(struct)));
+typedef NSString *Flavor NS_EXTENSIBLE_STRING_ENUM;
+
 @protocol ServiceProvider
 @property(readonly) NSArray<NSString *> *allOperations;
 -(void)allOperationsWithCompletionHandler:(void (^)(NSArray<NSString *> *))completion;
@@ -24,7 +27,7 @@ typedef void (^CompletionHandler)(NSString * _Nullable, NSString * _Nullable_res
 -(BOOL)findAnswerFailinglyWithError:(NSError * _Nullable * _Nullable)error completion:(void (^)(NSString *_Nullable, NSError * _Nullable))handler __attribute__((swift_name("findAnswerFailingly(completionHandler:)")));
 -(void)findQAndAWithCompletionHandler:(void (^)(NSString *_Nullable_result, NSString *_Nullable answer, NSError * _Nullable))handler;
 -(void)findQuestionableAnswersWithCompletionHandler:(CompletionHandler)handler;
--(void)doSomethingFun:(NSString *)operation then:(void (^)(void))completionHandler;
+-(void)doSomethingFun:(NSString *)operation then:(void (^)())completionHandler;
 -(void)getFortuneAsynchronouslyWithCompletionHandler:(void (^)(NSString *_Nullable, NSError * _Nullable))handler;
 -(void)getMagicNumberAsynchronouslyWithSeed:(NSInteger)seed completionHandler:(void (^)(NSInteger, NSError * _Nullable))handler;
 @property(readwrite) void (^completionHandler)(NSInteger);
@@ -57,6 +60,13 @@ typedef void (^CompletionHandler)(NSString * _Nullable, NSString * _Nullable_res
 // rdar://73798726
 - (void)getSomeObjectWithCompletionHandler:(nullable void (^)(NSObject *_Nullable x, NSError *_Nullable error))handler;
 
+- (void)performVoid2VoidWithCompletion:(void (^ _Nonnull)(void (^ _Nonnull)(void)))completion;
+- (void)performId2VoidWithCompletion:(void (^ _Nonnull)(void (^ _Nonnull)(id _Nonnull)))completion;
+- (void)performId2IdWithCompletion:(void (^ _Nonnull)(id _Nonnull (^ _Nonnull)(id _Nonnull)))completion;
+- (void)performNSString2NSStringWithCompletion:(void (^ _Nonnull)(NSString * _Nonnull (^ _Nonnull)(NSString * _Nonnull)))completion;
+- (void)performNSString2NSStringNSStringWithCompletion:(void (^ _Nonnull)(NSString * _Nonnull (^ _Nonnull)(NSString * _Nonnull), NSString * _Nonnull))completion;
+- (void)performId2VoidId2VoidWithCompletion:(void (^ _Nonnull)(void (^ _Nonnull)(id _Nonnull), void (^ _Nonnull)(id _Nonnull)))completion;
+
 -(void)oldAPIWithCompletionHandler:(void (^ _Nonnull)(NSString *_Nullable, NSError *_Nullable))handler __attribute__((availability(macosx, deprecated=10.14)));
 
 -(void)someAsyncMethodWithBlock:(void (^ _Nonnull)(NSString *_Nullable, NSError *_Nullable))completionHandler;
@@ -77,6 +87,12 @@ typedef void (^CompletionHandler)(NSString * _Nullable, NSString * _Nullable_res
 -(void)asyncImportSame:(NSString *)operation replyTo:(void (^)(NSInteger))handler __attribute__((swift_async(none)));
 
 -(void)overridableButRunsOnMainThreadWithCompletionHandler:(MAIN_ACTOR_UNSAFE void (^ _Nullable)(NSString *))completion;
+- (void)obtainClosureWithCompletionHandler:(void (^)(void (^_Nullable)(void),
+                                                     NSError *_Nullable,
+                                                     BOOL))completionHandler
+    __attribute__((swift_async_error(zero_argument, 3)));
+- (void)getIceCreamFlavorWithCompletionHandler:
+    (void (^)(Flavor flavor, NSError *__nullable error))completionHandler;
 @end
 
 @protocol RefrigeratorDelegate<NSObject>
@@ -96,12 +112,12 @@ typedef void (^CompletionHandler)(NSString * _Nullable, NSString * _Nullable_res
 
 @protocol ProtocolWithSwiftAttributes
 -(void)independentMethod __attribute__((__swift_attr__("@actorIndependent")));
--(void)asyncHandlerMethod __attribute__((__swift_attr__("@asyncHandler")));
+-(void)nonisolatedMethod __attribute__((__swift_attr__("nonisolated")));
 -(void)mainActorMethod __attribute__((__swift_attr__("@MainActor")));
 -(void)uiActorMethod __attribute__((__swift_attr__("@UIActor")));
 
 @optional
--(void)missingAtAttributeMethod __attribute__((__swift_attr__("asyncHandler")));
+-(void)missingAtAttributeMethod __attribute__((__swift_attr__("MainActor")));
 @end
 
 @protocol OptionalObserver <NSObject>

@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -g %s -emit-ir -parse-as-library -module-name main | %FileCheck %s --check-prefix=CHECK-LL
-// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -g %s -parse-as-library -module-name main -o %t/main %target-rpath(%t) 
+// RUN: %target-build-swift  -Xfrontend -disable-availability-checking -g %s -emit-ir -parse-as-library -module-name main | %FileCheck %s --check-prefix=CHECK-LL
+// RUN: %target-build-swift  -Xfrontend -disable-availability-checking -g %s -parse-as-library -module-name main -o %t/main %target-rpath(%t) 
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s
 

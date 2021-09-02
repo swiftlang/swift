@@ -17,6 +17,7 @@
 #ifndef SWIFT_LAYOUT_CONSTRAINT_H
 #define SWIFT_LAYOUT_CONSTRAINT_H
 
+#include "swift/AST/ASTAllocated.h"
 #include "swift/AST/LayoutConstraintKind.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/TypeAlignments.h"
@@ -29,12 +30,12 @@
 
 namespace swift {
 
-enum class AllocationArena;
-class ASTContext;
 class ASTPrinter;
 
 /// This is a class representing the layout constraint.
-class LayoutConstraintInfo : public llvm::FoldingSetNode {
+class LayoutConstraintInfo
+    : public llvm::FoldingSetNode,
+      public ASTAllocated<std::aligned_storage<8, 8>::type> {
   friend class LayoutConstraint;
   // Alignment of the layout in bytes.
   const unsigned Alignment : 16;
@@ -208,16 +209,6 @@ class LayoutConstraintInfo : public llvm::FoldingSetNode {
                       LayoutConstraintKind Kind,
                       unsigned SizeInBits,
                       unsigned Alignment);
-  private:
-  // Make vanilla new/delete illegal for LayoutConstraintInfo.
-  void *operator new(size_t Bytes) throw() = delete;
-  void operator delete(void *Data) throw() = delete;
-  public:
-  // Only allow allocation of LayoutConstraintInfo using the allocator in
-  // ASTContext or by doing a placement new.
-  void *operator new(size_t bytes, const ASTContext &ctx,
-                     AllocationArena arena, unsigned alignment = 8);
-  void *operator new(size_t Bytes, void *Mem) throw() { return Mem; }
 
   // Representation of the non-parameterized layouts.
   static LayoutConstraintInfo UnknownLayoutConstraintInfo;
@@ -284,6 +275,10 @@ class LayoutConstraint {
   bool operator!=(LayoutConstraint rhs) const {
     return !(*this == rhs);
   }
+
+  /// Defines a somewhat arbitrary linear order on layout constraints.
+  /// -1 if this < rhs, 0 if this == rhs, 1 if this > rhs.
+  int compare(LayoutConstraint rhs) const;
 };
 
 // Permit direct uses of isa/cast/dyn_cast on LayoutConstraint.
@@ -313,12 +308,6 @@ public:
 
   bool isError() const;
 
-  // FIXME: We generally shouldn't need to build LayoutConstraintLoc without
-  // a location.
-  static LayoutConstraintLoc withoutLoc(LayoutConstraint Layout) {
-    return LayoutConstraintLoc(Layout, SourceLoc());
-  }
-
   /// Get the representative location of this type, for diagnostic
   /// purposes.
   SourceLoc getLoc() const { return Loc; }
@@ -328,13 +317,7 @@ public:
   bool hasLocation() const { return Loc.isValid(); }
   LayoutConstraint getLayoutConstraint() const { return Layout; }
 
-  void setLayoutConstraint(LayoutConstraint value) {
-    Layout = value;
-  }
-
   bool isNull() const { return Layout.isNull(); }
-
-  LayoutConstraintLoc clone(ASTContext &ctx) const { return *this; }
 };
 
 /// Checks if ID is a name of a layout constraint and returns this

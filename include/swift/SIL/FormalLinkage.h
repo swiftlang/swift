@@ -43,6 +43,7 @@ enum class FormalLinkage {
 };
 
 FormalLinkage getDeclLinkage(const ValueDecl *decl);
+FormalLinkage getTypeLinkage(CanType formalType);
 SILLinkage getSILLinkage(FormalLinkage linkage,
                          ForDefinition_t forDefinition);
 SILLinkage

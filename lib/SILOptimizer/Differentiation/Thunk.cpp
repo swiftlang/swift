@@ -61,7 +61,7 @@ CanGenericSignature buildThunkSignature(SILFunction *fn, bool inheritGenericSig,
     if (auto genericSig =
             fn->getLoweredFunctionType()->getSubstGenericSignature()) {
       builder.addGenericSignature(genericSig);
-      depth = genericSig->getGenericParams().back()->getDepth() + 1;
+      depth = genericSig.getGenericParams().back()->getDepth() + 1;
     }
   }
 
@@ -77,7 +77,7 @@ CanGenericSignature buildThunkSignature(SILFunction *fn, bool inheritGenericSig,
 
   auto genericSig = std::move(builder).computeGenericSignature(
       /*allowConcreteGenericParams=*/true);
-  genericEnv = genericSig->getGenericEnvironment();
+  genericEnv = genericSig.getGenericEnvironment();
 
   newArchetype =
       genericEnv->mapTypeIntoContext(newGenericParam)->castTo<ArchetypeType>();
@@ -104,7 +104,7 @@ CanGenericSignature buildThunkSignature(SILFunction *fn, bool inheritGenericSig,
       },
       MakeAbstractConformanceForGenericType());
 
-  return genericSig->getCanonicalSignature();
+  return genericSig.getCanonicalSignature();
 }
 
 CanSILFunctionType buildThunkType(SILFunction *fn,
@@ -324,7 +324,7 @@ SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
 
   Mangle::ASTMangler mangler;
   std::string name = mangler.mangleReabstractionThunkHelper(
-      thunkType, fromInterfaceType, toInterfaceType, Type(),
+      thunkType, fromInterfaceType, toInterfaceType, Type(), Type(),
       module.getSwiftModule());
 
   auto *thunk = fb.getOrCreateSharedFunction(
@@ -610,7 +610,8 @@ getOrCreateSubsetParametersThunkForLinearMap(
   };
 
   // Build a `.zero` argument for the given `Differentiable`-conforming type.
-  auto buildZeroArgument = [&](SILType zeroSILType) {
+  auto buildZeroArgument = [&](SILParameterInfo zeroSILParameter) {
+    auto zeroSILType = zeroSILParameter.getSILStorageInterfaceType();
     auto zeroSILObjType = zeroSILType.getObjectType();
     auto zeroType = zeroSILType.getASTType();
     auto *swiftMod = parentThunk->getModule().getSwiftModule();
@@ -623,13 +624,17 @@ getOrCreateSubsetParametersThunkForLinearMap(
       localAllocations.push_back(buf);
       builder.emitZeroIntoBuffer(loc, buf, IsInitialization);
       if (zeroSILType.isAddress()) {
-        valuesToCleanup.push_back(buf);
         arguments.push_back(buf);
+        if (zeroSILParameter.isGuaranteed()) {
+          valuesToCleanup.push_back(buf);
+        }
       } else {
         auto arg = builder.emitLoadValueOperation(loc, buf,
                                                   LoadOwnershipQualifier::Take);
-        valuesToCleanup.push_back(arg);
         arguments.push_back(arg);
+        if (zeroSILParameter.isGuaranteed()) {
+          valuesToCleanup.push_back(arg);
+        }
       }
       break;
     }
@@ -687,10 +692,9 @@ getOrCreateSubsetParametersThunkForLinearMap(
       }
       // Otherwise, construct and use a zero argument.
       else {
-        auto zeroSILType =
-            linearMapType->getParameters()[mapOriginalParameterIndex(i)]
-                .getSILStorageInterfaceType();
-        buildZeroArgument(zeroSILType);
+        auto zeroSILParameter =
+            linearMapType->getParameters()[mapOriginalParameterIndex(i)];
+        buildZeroArgument(zeroSILParameter);
       }
     }
     break;

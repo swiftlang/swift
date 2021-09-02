@@ -40,12 +40,12 @@
 ///
 /// * Fast.  It uses only fixed-width integer arithmetic and has
 ///   constant memory requirements.  For double-precision values on
-///   64-bit processors, it is competitive with Ryu.  For double-precision
+///   64-bit processors, it is competitive with Ryu. For double-precision
 ///   values on 32-bit processors, and higher-precision values on all
 ///   processors, it is considerably faster.
 ///
 /// * Always Accurate. Converting the decimal form back to binary
-///   will always yield exactly the same value.  For the IEEE 754
+///   will always yield exactly the same value. For the IEEE 754
 ///   formats, the round-trip will produce exactly the same bit
 ///   pattern in memory.
 ///
@@ -125,7 +125,7 @@ static void intervalContainingPowerOf10_Binary32(int p, uint64_t *lower, uint64_
 #endif
 
 //
-// Helpers used by binary32, binary64, float80, and binary128
+// Helpers used by binary32, binary64, float80, and binary128.
 //
 
 #if SWIFT_DTOA_BINARY32_SUPPORT || SWIFT_DTOA_BINARY64_SUPPORT || SWIFT_DTOA_FLOAT80_SUPPORT || SWIFT_DTOA_BINARY128_SUPPORT
@@ -782,7 +782,7 @@ size_t swift_dtoa_optimal_binary64_p(const void *d, char *dest, size_t length)
     // bias.  That's because they treat the significand as a
     // fixed-point number with one bit (the hidden bit) integer
     // portion.  The logic here reconstructs the significand as a
-    // pure fraction, so we need to accomodate that when
+    // pure fraction, so we need to accommodate that when
     // reconstructing the binary exponent.
     static const int64_t exponentBias = (1 << (exponentBitCount - 1)) - 2; // 1022
 
@@ -911,14 +911,14 @@ size_t swift_dtoa_optimal_binary64_p(const void *d, char *dest, size_t length)
         // This ensures accuracy but, as explained in Loitsch' paper,
         // this carries a risk that there will be a shorter digit
         // sequence outside of our narrowed interval that we will
-        // miss.  This risk obviously gets lower with increased
+        // miss. This risk obviously gets lower with increased
         // precision, but it wasn't until the Errol paper that anyone
         // had a good way to test whether a particular implementation
-        // had sufficient precision.  That paper shows a way to enumerate
+        // had sufficient precision. That paper shows a way to enumerate
         // the worst-case numbers; those numbers that are extremely close
         // to the mid-points between adjacent floating-point values.
         // These are the values that might sit just outside of the
-        // narrowed interval.  By testing these values, we can verify
+        // narrowed interval. By testing these values, we can verify
         // the correctness of our implementation.
 
         // Multiply out the upper midpoint, rounding down...
@@ -1202,7 +1202,8 @@ size_t swift_dtoa_optimal_binary64_p(const void *d, char *dest, size_t length)
       // value 0.1234 and computed u = 0.1257, l = 0.1211.  The above
       // digit generation works with `u`, so produces 0.125.  But the
       // values 0.122, 0.123, and 0.124 are just as short and 0.123 is
-      // the best choice, since it's closest to the original value.
+      // therefore the best choice, since it's closest to the original
+      // value.
 
       // We know delta and t are both less than 10.0 here, so we can
       // shed some excess integer bits to simplify the following:

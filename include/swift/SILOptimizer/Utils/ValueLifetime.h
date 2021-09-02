@@ -37,6 +37,14 @@ namespace swift {
 /// Frontier implementation by adding a utility method that populates a vector
 /// of insertion points based on this boundary, where each each
 /// block-terminating lastUser adds an insertion point at each successor block.
+///
+/// Note: A dead live range will have no last users and no boundary
+/// edges. Always check if the definition passed to ValueLifetimeAnalysis is
+/// dead before assuming that this boundary covers all points at which a value
+/// must be destroyed. Normally, a live range with uses will have at least one
+/// lastUser or boundaryEdge. But with infinite loops, it is possible for both
+/// lastUsers and boundaryEdges to be empty even if there are uses within the
+/// loop.
 struct ValueLifetimeBoundary {
   SmallVector<SILInstruction *, 8> lastUsers;
   SmallVector<SILBasicBlock *, 8> boundaryEdges;

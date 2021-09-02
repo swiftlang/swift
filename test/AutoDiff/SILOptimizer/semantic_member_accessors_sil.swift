@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -Xllvm -sil-print-after=differentiation %s -module-name null -o /dev/null 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -Xllvm -sil-print-after=differentiation %s -module-name null -o /dev/null -requirement-machine=off 2>&1 | %FileCheck %s
 
 // Test differentiation of semantic member accessors:
 // - Stored property accessors.

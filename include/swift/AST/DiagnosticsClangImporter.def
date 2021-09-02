@@ -67,6 +67,13 @@ WARNING(inconsistent_swift_name,none,
         (bool, StringRef, StringRef, DeclName, StringRef, DeclName,
          StringRef))
 
+WARNING(swift_name_circular_context_import,none,
+        "cycle detected while resolving '%0' in swift_name attribute for '%1'",
+        (StringRef, StringRef))
+NOTE(swift_name_circular_context_import_other,none,
+     "while resolving '%0' in swift_name attribute for '%1'",
+     (StringRef, StringRef))
+
 WARNING(unresolvable_clang_decl,none,
         "imported declaration '%0' could not be mapped to '%1'",
         (StringRef, StringRef))
@@ -75,8 +82,8 @@ NOTE(unresolvable_clang_decl_is_a_framework_bug,none,
      "please report this issue to the owners of '%0'",
      (StringRef))
 
-WARNING(clang_swift_attr_without_at,none,
-        "Swift attribute '%0' does not start with '@'", (StringRef))
+WARNING(clang_swift_attr_unhandled,none,
+        "Ignoring unknown Swift attribute or modifier '%0'", (StringRef))
 
 WARNING(implicit_bridging_header_imported_from_module,none,
         "implicit import of bridging header '%0' via module %1 "

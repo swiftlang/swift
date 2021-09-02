@@ -4,7 +4,7 @@ import PartiallyPreDefinedClassTemplate
 
 public func getWrappedMagicInt() -> CInt {
   let myInt = IntWrapper(value: 21)
-  var magicInt = PartiallyPreDefinedMagicallyWrappedInt(t: myInt)
+  let magicInt = PartiallyPreDefinedMagicallyWrappedInt(t: myInt)
   return magicInt.getValuePlusArg(32)
 }
 
@@ -13,9 +13,9 @@ public func getWrappedMagicInt() -> CInt {
 // CHECK: [[INT_WRAPPER:%.*]] = struct $IntWrapper ([[_:%.*]] : $Int32)
 // CHECK: [[_:%.*]] = struct $__CxxTemplateInst12MagicWrapperI10IntWrapperE ([[INT_WRAPPER]] : $IntWrapper)
 // CHECK: // function_ref {{_ZNK12MagicWrapperI10IntWrapperE15getValuePlusArgEi|\?getValuePlusArg@\?\$MagicWrapper@UIntWrapper@@@@QEBAHH@Z}}
-// CHECK: [[_:%.*]] = function_ref @{{_ZNK12MagicWrapperI10IntWrapperE15getValuePlusArgEi|\?getValuePlusArg@\?\$MagicWrapper@UIntWrapper@@@@QEBAHH@Z}} : $@convention(c) (@inout __CxxTemplateInst12MagicWrapperI10IntWrapperE, Int32) -> Int32
+// CHECK: [[_:%.*]] = function_ref @{{_ZNK12MagicWrapperI10IntWrapperE15getValuePlusArgEi|\?getValuePlusArg@\?\$MagicWrapper@UIntWrapper@@@@QEBAHH@Z}} : $@convention(c) (@in __CxxTemplateInst12MagicWrapperI10IntWrapperE, Int32) -> Int32
 
 // CHECK: // {{_ZNK12MagicWrapperI10IntWrapperE15getValuePlusArgEi|\?getValuePlusArg@\?\$MagicWrapper@UIntWrapper@@@@QEBAHH@Z}}
 // CHECK: MagicWrapper<IntWrapper>::getValuePlusArg
 
-// CHECK: sil [clang __CxxTemplateInst12MagicWrapperI10IntWrapperE.getValuePlusArg] @{{_ZNK12MagicWrapperI10IntWrapperE15getValuePlusArgEi|\?getValuePlusArg@\?\$MagicWrapper@UIntWrapper@@@@QEBAHH@Z}} : $@convention(c) (@inout __CxxTemplateInst12MagicWrapperI10IntWrapperE, Int32) -> Int32
+// CHECK: sil [clang __CxxTemplateInst12MagicWrapperI10IntWrapperE.getValuePlusArg] @{{_ZNK12MagicWrapperI10IntWrapperE15getValuePlusArgEi|\?getValuePlusArg@\?\$MagicWrapper@UIntWrapper@@@@QEBAHH@Z}} : $@convention(c) (@in __CxxTemplateInst12MagicWrapperI10IntWrapperE, Int32) -> Int32

@@ -252,7 +252,7 @@ struct CC {}
 func callCC<U>(_ f: (CC) -> U) -> () {}
 
 func typeCheckMultiStmtClosureCrash() {
-  callCC { // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{none}}
+  callCC { // expected-error {{cannot infer return type for closure with multiple statements; add explicit type to disambiguate}} {{none}}
     _ = $0
     return 1
   }
@@ -313,7 +313,7 @@ struct Thing {
   init?() {}
 }
 // This throws a compiler error
-let things = Thing().map { thing in  // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{34-34=-> <#Result#> }}
+let things = Thing().map { thing in  // expected-error {{cannot infer return type for closure with multiple statements; add explicit type to disambiguate}} {{34-34=-> <#Result#> }}
   // Commenting out this makes it compile
   _ = thing
   return thing
@@ -322,7 +322,7 @@ let things = Thing().map { thing in  // expected-error {{unable to infer complex
 
 // <rdar://problem/21675896> QoI: [Closure return type inference] Swift cannot find members for the result of inlined lambdas with branches
 func r21675896(file : String) {
-  let x: String = { // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{20-20= () -> <#Result#> in }}
+  let x: String = { // expected-error {{cannot infer return type for closure with multiple statements; add explicit type to disambiguate}} {{20-20= () -> <#Result#> in }}
     if true {
       return "foo"
     }
@@ -349,8 +349,8 @@ takeVoidVoidFn { () -> Void in
 }
 
 // <rdar://problem/19997471> Swift: Incorrect compile error when calling a function inside a closure
-func f19997471(_ x: String) {} // expected-note {{candidate expects value of type 'String' for parameter #1}}
-func f19997471(_ x: Int) {}    // expected-note {{candidate expects value of type 'Int' for parameter #1}}
+func f19997471(_ x: String) {} // expected-note {{candidate expects value of type 'String' for parameter #1 (got 'T')}}
+func f19997471(_ x: Int) {}    // expected-note {{candidate expects value of type 'Int' for parameter #1 (got 'T')}}
 
 func someGeneric19997471<T>(_ x: T) {
   takeVoidVoidFn {
@@ -360,7 +360,7 @@ func someGeneric19997471<T>(_ x: T) {
 
 
 // <rdar://problem/20921068> Swift fails to compile: [0].map() { _ in let r = (1,2).0; return r }
-[0].map {  // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{5-5=-> <#Result#> }}
+[0].map {  // expected-error {{cannot infer return type for closure with multiple statements; add explicit type to disambiguate}} {{5-5=-> <#Result#> }}
   _ in
   let r =  (1,2).0
   return r
@@ -408,7 +408,7 @@ func r20789423() {
   print(p.f(p)())  // expected-error {{cannot convert value of type 'C' to expected argument type 'Int'}}
   // expected-error@-1:11 {{cannot call value of non-function type '()'}}
   
-  let _f = { (v: Int) in  // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{23-23=-> <#Result#> }}
+  let _f = { (v: Int) in  // expected-error {{cannot infer return type for closure with multiple statements; add explicit type to disambiguate}} {{23-23=-> <#Result#> }}
     print("a")
     return "hi"
   }
@@ -499,7 +499,7 @@ struct S_3520 {
 func sr3520_set_via_closure<S, T>(_ closure: (inout S, T) -> ()) {} // expected-note {{in call to function 'sr3520_set_via_closure'}}
 sr3520_set_via_closure({ $0.number1 = $1 })
 // expected-error@-1 {{generic parameter 'S' could not be inferred}}
-// expected-error@-2 {{unable to infer type of a closure parameter $1 in the current context}}
+// expected-error@-2 {{unable to infer type of a closure parameter '$1' in the current context}}
 
 // SR-3073: UnresolvedDotExpr in single expression closure
 
@@ -1105,3 +1105,61 @@ struct R_76250381<Result, Failure: Error> {
 // expected-error@-1 {{contextual closure type '(Range<Int>.Element) throws -> ()' (aka '(Int) throws -> ()') expects 1 argument, but 3 were used in closure body}}
 (0..<10).map { x, y, z, w in } 
 // expected-error@-1 {{contextual closure type '(Range<Int>.Element) throws -> ()' (aka '(Int) throws -> ()') expects 1 argument, but 4 were used in closure body}}
+
+// rdar://77022842 - crash due to a missing argument to a ternary operator
+func rdar77022842(argA: Bool? = nil, argB: Bool? = nil) {
+  if let a = argA ?? false, if let b = argB ?? {
+    // expected-error@-1 {{initializer for conditional binding must have Optional type, not 'Bool'}}
+    // expected-error@-2 {{cannot convert value of type '() -> ()' to expected argument type 'Bool?'}}
+    // expected-error@-3 {{expected expression in conditional}}
+  } // expected-error {{expected '{' after 'if' condition}}
+}
+
+// rdar://76058892 - spurious ambiguity diagnostic
+func rdar76058892() {
+  struct S {
+    var test: Int = 0
+  }
+
+  func test(_: Int) {}
+  func test(_: () -> String) {}
+
+  func experiment(arr: [S]?) {
+    test { // expected-error {{contextual closure type '() -> String' expects 0 arguments, but 1 was used in closure body}}
+      if let arr = arr {
+        arr.map($0.test) // expected-note {{anonymous closure parameter '$0' is used here}}
+      }
+    }
+  }
+}
+
+// rdar://78917861 - Invalid generic type parameter inference
+
+func rdar78917861() {
+  class Cell {}
+  class MyCell : Cell {}
+
+  class DataCollection<D, C: Cell> {
+  }
+
+  class MyCollection {
+    typealias DataType = String
+    typealias CellType = MyCell
+
+    var data: DataCollection<DataType, CellType>
+
+    init() {
+      self.data = DataCollection<DataType, CellType>()
+    }
+  }
+
+  class Test {
+    let collection = MyCollection()
+
+    lazy var prop: DataCollection = {
+      collection.data // Ok
+      // Since contextual type `DataCollection` doesn't specify generic parameters they have to be inferred
+      // but that has to wait until the closure is resolved because types can flow both ways
+    }()
+  }
+}

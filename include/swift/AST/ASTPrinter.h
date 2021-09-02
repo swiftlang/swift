@@ -17,6 +17,7 @@
 #include "swift/Basic/QuotedString.h"
 #include "swift/Basic/UUID.h"
 #include "swift/AST/Identifier.h"
+#include "swift/AST/Decl.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/DenseSet.h"
@@ -47,6 +48,8 @@ enum class PrintNameContext {
   Normal,
   /// Keyword context, where no keywords are escaped.
   Keyword,
+  /// Keyword for introducing a declarations e.g. 'func', 'struct'.
+  IntroducerKeyword,
   /// Type member context, e.g. properties or enum cases.
   TypeMember,
   /// Generic parameter context, where 'Self' is not escaped.
@@ -216,6 +219,17 @@ public:
     *this << Suffix;
   }
 
+  void printIntroducerKeyword(StringRef name,
+                              const PrintOptions &Opts,
+                              StringRef Suffix = "") {
+    if (Opts.SkipIntroducerKeywords)
+      return;
+    callPrintNamePre(PrintNameContext::IntroducerKeyword);
+    *this << name;
+    printNamePost(PrintNameContext::IntroducerKeyword);
+    *this << Suffix;
+  }
+
   void printAttrName(StringRef name, bool needAt = false) {
     callPrintNamePre(PrintNameContext::Attribute);
     if (needAt)
@@ -351,8 +365,9 @@ void printEnumElementsAsCases(
     llvm::DenseSet<EnumElementDecl *> &UnhandledElements,
     llvm::raw_ostream &OS);
 
-void getInheritedForPrinting(const Decl *decl, const PrintOptions &options,
-                             llvm::SmallVectorImpl<TypeLoc> &Results);
+void getInheritedForPrinting(
+  const Decl *decl, const PrintOptions &options,
+  llvm::SmallVectorImpl<InheritedEntry> &Results);
 
 StringRef getAccessorKindString(AccessorKind value);
 

@@ -24,6 +24,7 @@
 #include "swift/Frontend/ModuleInterfaceSupport.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/Serialization/SerializationOptions.h"
+#include "swift/APIDigester/ModuleAnalyzerNodes.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Lex/PreprocessorOptions.h"
 #include "llvm/ADT/Hashing.h"
@@ -103,7 +104,11 @@ bool ModuleInterfaceBuilder::collectDepsForSerialization(
     // dependency list -- don't serialize that.
     if (!prebuiltCachePath.empty() && DepName.startswith(prebuiltCachePath))
       continue;
-
+    // Don't serialize interface path if it's from the preferred interface dir.
+    // This ensures the prebuilt module caches generated from these interfaces are
+    // relocatable.
+    if (!backupInterfaceDir.empty() && DepName.startswith(backupInterfaceDir))
+      continue;
     if (dependencyTracker) {
       dependencyTracker->addDependency(DepName, /*isSystem*/IsSDKRelative);
     }
@@ -278,6 +283,9 @@ bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
     }
     if (SubInstance.getDiags().hadAnyError()) {
       return std::make_error_code(std::errc::not_supported);
+    }
+    if (!ABIDescriptorPath.empty()) {
+      swift::ide::api::dumpModuleContent(Mod, ABIDescriptorPath, true);
     }
     return std::error_code();
     });

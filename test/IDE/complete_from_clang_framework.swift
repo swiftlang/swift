@@ -78,8 +78,8 @@ func testSwiftCompletions(foo: SwiftStruct) {
 // CLANG_FOO-DAG: Decl[FreeFunction]/OtherModule[Foo]: fooFuncWithComment3()[#Void#]{{; name=.+$}}
 // CLANG_FOO-DAG: Decl[FreeFunction]/OtherModule[Foo]: fooFuncWithComment4()[#Void#]{{; name=.+$}}
 // CLANG_FOO-DAG: Decl[FreeFunction]/OtherModule[Foo]: fooFuncWithComment5()[#Void#]{{; name=.+$}}
-// CLANG_FOO-DAG: Decl[Protocol]/OtherModule[Foo]:     FooProtocolBase[#FooProtocolBase#]{{; name=.+$}}
-// CLANG_FOO-DAG: Decl[Protocol]/OtherModule[Foo]:     FooProtocolDerived[#FooProtocolDerived#]{{; name=.+$}}
+// CLANG_FOO-DAG: Decl[Protocol]/OtherModule[Foo]/Flair[RareType]: FooProtocolBase[#FooProtocolBase#]{{; name=.+$}}
+// CLANG_FOO-DAG: Decl[Protocol]/OtherModule[Foo]/Flair[RareType]: FooProtocolDerived[#FooProtocolDerived#]{{; name=.+$}}
 // CLANG_FOO-DAG: Decl[Class]/OtherModule[Foo]:        FooClassBase[#FooClassBase#]{{; name=.+$}}
 // CLANG_FOO-DAG: Decl[Class]/OtherModule[Foo]:        FooClassDerived[#FooClassDerived#]{{; name=.+$}}
 // CLANG_FOO-DAG: Decl[GlobalVar]/OtherModule[Foo]:    FOO_MACRO_1[#Int32#]{{; name=.+$}}
@@ -198,9 +198,9 @@ func testCompleteModuleQualifiedFoo2() {
 // CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule[Foo.FooSub]: .FooSubEnum1Y[#FooSubEnum1#]{{; name=.+$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule[Foo.FooSub]: .FooSubUnnamedEnumeratorA1[#Int#]{{; name=.+$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule[Foo]:     .fooIntVar[#Int32#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[Protocol]/OtherModule[Foo]:      ._InternalProt[#_InternalProt#]
-// CLANG_QUAL_FOO_2-DAG: Decl[Protocol]/OtherModule[Foo]:      .FooProtocolBase[#FooProtocolBase#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[Protocol]/OtherModule[Foo]:      .FooProtocolDerived[#FooProtocolDerived#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[Protocol]/OtherModule[Foo]/Flair[RareType]: ._InternalProt[#_InternalProt#]
+// CLANG_QUAL_FOO_2-DAG: Decl[Protocol]/OtherModule[Foo]/Flair[RareType]: .FooProtocolBase[#FooProtocolBase#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[Protocol]/OtherModule[Foo]/Flair[RareType]: .FooProtocolDerived[#FooProtocolDerived#]{{; name=.+$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[Struct]/OtherModule[Foo]:        .FooEnum1[#FooEnum1#]{{; name=.+$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[Struct]/OtherModule[Foo]:        .FooEnum2[#FooEnum2#]{{; name=.+$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[Struct]/OtherModule[Foo]:        .FooEnum3[#FooEnum3#]{{; name=.+$}}
@@ -230,7 +230,7 @@ func testCompleteModuleQualifiedBar1() {
 func testCompleteFunctionCall1() {
   fooFunc1#^FUNCTION_CALL_1^#
 // FUNCTION_CALL_1: Begin completions
-// FUNCTION_CALL_1-NEXT: Decl[FreeFunction]/OtherModule[Foo]: ({#(a): Int32#})[#Int32#]{{; name=.+$}}
+// FUNCTION_CALL_1-NEXT: Decl[FreeFunction]/OtherModule[Foo]/Flair[ArgLabels]: ({#(a): Int32#})[#Int32#]{{; name=.+$}}
 // FUNCTION_CALL_1-NEXT: Keyword[self]/CurrNominal: .self[#(Int32) -> Int32#]; name=self
 // FUNCTION_CALL_1-NEXT: End completions
 }
@@ -238,7 +238,7 @@ func testCompleteFunctionCall1() {
 func testCompleteFunctionCall2() {
   fooFunc1AnonymousParam#^FUNCTION_CALL_2^#
 // FUNCTION_CALL_2: Begin completions
-// FUNCTION_CALL_2-NEXT: Decl[FreeFunction]/OtherModule[Foo]: ({#Int32#})[#Int32#]{{; name=.+$}}
+// FUNCTION_CALL_2-NEXT: Decl[FreeFunction]/OtherModule[Foo]/Flair[ArgLabels]: ({#Int32#})[#Int32#]{{; name=.+$}}
 // FUNCTION_CALL_2-NEXT: Keyword[self]/CurrNominal: .self[#(Int32) -> Int32#]; name=self
 // FUNCTION_CALL_2-NEXT: End completions
 }
@@ -246,8 +246,8 @@ func testCompleteFunctionCall2() {
 func testCompleteStructMembers1() {
   FooStruct1#^CLANG_STRUCT_MEMBERS_1^#
 // CLANG_STRUCT_MEMBERS_1: Begin completions
-// CLANG_STRUCT_MEMBERS_1-NEXT: Decl[Constructor]/CurrNominal: ()[#FooStruct1#]{{; name=.+$}}
-// CLANG_STRUCT_MEMBERS_1-NEXT: Decl[Constructor]/CurrNominal: ({#x: Int32#}, {#y: Double#})[#FooStruct1#]{{; name=.+$}}
+// CLANG_STRUCT_MEMBERS_1-NEXT: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ()[#FooStruct1#]{{; name=.+$}}
+// CLANG_STRUCT_MEMBERS_1-NEXT: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ({#x: Int32#}, {#y: Double#})[#FooStruct1#]{{; name=.+$}}
 // CLANG_STRUCT_MEMBERS_1-NEXT: Keyword[self]/CurrNominal: .self[#FooStruct1.Type#]; name=self
 // CLANG_STRUCT_MEMBERS_1-NEXT: Keyword/CurrNominal: .Type[#FooStruct1.Type#]; name=Type
 // CLANG_STRUCT_MEMBERS_1-NEXT: End completions
@@ -261,12 +261,12 @@ func testCompleteClassMembers1() {
 // CLANG_CLASS_MEMBERS_1-NEXT: Decl[InstanceMethod]/CurrNominal:   .fooBaseInstanceFunc0({#(self): FooClassBase#})[#() -> Void#]{{; name=.+$}}
 // CLANG_CLASS_MEMBERS_1-NEXT: Decl[StaticMethod]/CurrNominal:     .fooBaseInstanceFunc1({#(anObject): Any!#})[#FooClassBase!#]{{; name=.+$}}
 // CLANG_CLASS_MEMBERS_1-NEXT: Decl[InstanceMethod]/CurrNominal:   .fooBaseInstanceFunc1({#(self): FooClassBase#})[#(Any?) -> FooClassBase?#]{{; name=.+$}}
-// CLANG_CLASS_MEMBERS_1-NEXT: Decl[Constructor]/CurrNominal:      ()[#FooClassBase!#]
-// CLANG_CLASS_MEMBERS_1-NEXT: Decl[Constructor]/CurrNominal:      ({#float: Float#})[#FooClassBase!#]{{; name=.+$}}
+// CLANG_CLASS_MEMBERS_1-NEXT: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ()[#FooClassBase!#]
+// CLANG_CLASS_MEMBERS_1-NEXT: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ({#float: Float#})[#FooClassBase!#]{{; name=.+$}}
 // CLANG_CLASS_MEMBERS_1-NEXT: Decl[StaticMethod]/CurrNominal:     .fooBaseInstanceFuncOverridden()[#Void#]{{; name=.+$}}
 // CLANG_CLASS_MEMBERS_1-NEXT: Decl[InstanceMethod]/CurrNominal:   .fooBaseInstanceFuncOverridden({#(self): FooClassBase#})[#() -> Void#]{{; name=.+$}}
 // CLANG_CLASS_MEMBERS_1-NEXT: Decl[StaticMethod]/CurrNominal:     .fooBaseClassFunc0()[#Void#]{{; name=.+$}}
-// CLANG_CLASS_MEMBERS_1-NEXT: Decl[Constructor]/CurrNominal:      ({#(x): Int32#})[#FooClassBase!#]
+// CLANG_CLASS_MEMBERS_1-NEXT: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ({#(x): Int32#})[#FooClassBase!#]
 // CLANG_CLASS_MEMBERS_1-NEXT: Decl[StaticMethod]/CurrNominal:     ._internalMeth3()[#Any!#]
 // CLANG_CLASS_MEMBERS_1-NEXT: Decl[InstanceMethod]/CurrNominal:   ._internalMeth3({#(self): FooClassBase#})[#() -> Any?#]
 // CLANG_CLASS_MEMBERS_1-NEXT: Decl[StaticMethod]/CurrNominal:     ._internalMeth2()[#Any!#]
@@ -289,8 +289,8 @@ func testCompleteClassMembers2() {
 // CLANG_CLASS_MEMBERS_2-NEXT: Decl[InstanceMethod]/CurrNominal:   .fooInstanceFunc2({#(self): FooClassDerived#})[#(Int32, withB: Int32) -> Void#]{{; name=.+$}}
 // CLANG_CLASS_MEMBERS_2-NEXT: Decl[InstanceMethod]/CurrNominal:   .fooBaseInstanceFuncOverridden({#(self): FooClassDerived#})[#() -> Void#]{{; name=.+$}}
 // CLANG_CLASS_MEMBERS_2-NEXT: Decl[StaticMethod]/CurrNominal:     .fooClassFunc0()[#Void#]{{; name=.+$}}
-// CLANG_CLASS_MEMBERS_2-NEXT: Decl[Constructor]/CurrNominal:      ()[#FooClassDerived!#]
-// CLANG_CLASS_MEMBERS_2-NEXT: Decl[Constructor]/CurrNominal:      ({#float: Float#})[#FooClassDerived!#]{{; name=.+$}}
+// CLANG_CLASS_MEMBERS_2-NEXT: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ()[#FooClassDerived!#]
+// CLANG_CLASS_MEMBERS_2-NEXT: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ({#float: Float#})[#FooClassDerived!#]{{; name=.+$}}
 // CLANG_CLASS_MEMBERS_2-NEXT: Decl[InstanceMethod]/CurrNominal:   .fooProtoFunc({#(self): FooClassDerived#})[#() -> Void#]{{; name=.+$}}
 // CLANG_CLASS_MEMBERS_2-NEXT: Decl[InstanceMethod]/CurrNominal:   .fooProtoFuncWithExtraIndentation1({#(self): FooClassDerived#})[#() -> Void#]{{; name=.+$}}
 // CLANG_CLASS_MEMBERS_2-NEXT: Decl[InstanceMethod]/CurrNominal:   .fooProtoFuncWithExtraIndentation2({#(self): FooClassDerived#})[#() -> Void#]{{; name=.+$}}

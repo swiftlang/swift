@@ -77,7 +77,9 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     SmallPtrSet<DeclRefExpr*, 4> AlreadyDiagnosedBitCasts;
 
     /// Keep track of the arguments to CallExprs.
-    SmallPtrSet<Expr *, 2> CallArgs;
+    ///  Key -> an argument expression,
+    ///  Value -> a call argument is associated with.
+    llvm::SmallDenseMap<Expr *, Expr *, 2> CallArgs;
 
     bool IsExprStmt;
 
@@ -141,14 +143,14 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         checkUseOfMetaTypeName(Base);
 
       if (auto *OLE = dyn_cast<ObjectLiteralExpr>(E)) {
-        CallArgs.insert(OLE->getArg());
+        CallArgs.insert({OLE->getArg(), E});
       }
 
       if (auto *SE = dyn_cast<SubscriptExpr>(E))
-        CallArgs.insert(SE->getIndex());
+        CallArgs.insert({SE->getIndex(), E});
 
       if (auto *DSE = dyn_cast<DynamicSubscriptExpr>(E))
-        CallArgs.insert(DSE->getIndex());
+        CallArgs.insert({DSE->getIndex(), E});
 
       if (auto *KPE = dyn_cast<KeyPathExpr>(E)) {
         // raise an error if this KeyPath contains an effectful member.
@@ -156,7 +158,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 
         for (auto Comp : KPE->getComponents()) {
           if (auto *Arg = Comp.getIndexExpr())
-            CallArgs.insert(Arg);
+            CallArgs.insert({Arg, E});
         }
       }
 
@@ -164,7 +166,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       // function and inspecting the arguments directly.
       if (auto *Call = dyn_cast<ApplyExpr>(E)) {
         // Record call arguments.
-        CallArgs.insert(Call->getArg());
+        CallArgs.insert({Call->getArg(), E});
 
         // Warn about surprising implicit optional promotions.
         checkOptionalPromotions(Call);
@@ -613,30 +615,30 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       if (!AlreadyDiagnosedMetatypes.insert(E).second)
         return;
 
-      // Allow references to types as a part of:
-      // - member references T.foo, T.Type, T.self, etc.
-      // - constructor calls T()
-      // - Subscripts T[]
+      // In Swift < 6 warn about plain type name passed as an
+      // argument to a subscript, dynamic subscript, or ObjC
+      // literal since it used to be accepted.
+      DiagnosticBehavior behavior = DiagnosticBehavior::Error;
+
       if (auto *ParentExpr = Parent.getAsExpr()) {
-        // This is an exhaustive list of the accepted syntactic forms.
-        if (isa<ErrorExpr>(ParentExpr) ||
-            isa<DotSelfExpr>(ParentExpr) ||               // T.self
-            isa<CallExpr>(ParentExpr) ||                  // T()
-            isa<MemberRefExpr>(ParentExpr) ||             // T.foo
-            isa<UnresolvedMemberExpr>(ParentExpr) ||
-            isa<SelfApplyExpr>(ParentExpr) ||             // T.foo()  T()
-            isa<UnresolvedDotExpr>(ParentExpr) ||
-            isa<DotSyntaxBaseIgnoredExpr>(ParentExpr) ||
-            isa<UnresolvedSpecializeExpr>(ParentExpr) ||
-            isa<OpenExistentialExpr>(ParentExpr) ||
-            isa<SubscriptExpr>(ParentExpr)) {
+        if (ParentExpr->isValidParentOfTypeExpr(E))
           return;
+
+        if (!Ctx.LangOpts.isSwiftVersionAtLeast(6)) {
+          auto argument = CallArgs.find(ParentExpr);
+          if (argument != CallArgs.end()) {
+            auto *callExpr = argument->second;
+            if (isa<SubscriptExpr>(callExpr) ||
+                isa<DynamicSubscriptExpr>(callExpr) ||
+                isa<ObjectLiteralExpr>(callExpr))
+              behavior = DiagnosticBehavior::Warning;
+          }
         }
       }
 
       // Is this a protocol metatype?
-
-      Ctx.Diags.diagnose(E->getStartLoc(), diag::value_of_metatype_type);
+      Ctx.Diags.diagnose(E->getStartLoc(), diag::value_of_metatype_type)
+          .limitBehavior(behavior);
 
       // Add fix-it to insert '()', only if this is a metatype of
       // non-existential type and has any initializers.
@@ -1621,7 +1623,8 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
           memberLoc = MRE->getLoc();
           Diags.diagnose(memberLoc,
                          diag::property_use_in_closure_without_explicit_self,
-                         baseName.getIdentifier());
+                         baseName.getIdentifier())
+               .warnUntilSwiftVersionIf(Closures.size() > 1, 6);
         }
 
       // Handle method calls with a specific diagnostic + fixit.
@@ -1632,7 +1635,8 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
           memberLoc = DSCE->getLoc();
           Diags.diagnose(DSCE->getLoc(),
                          diag::method_call_in_closure_without_explicit_self,
-                         MethodExpr->getDecl()->getBaseIdentifier());
+                         MethodExpr->getDecl()->getBaseIdentifier())
+               .warnUntilSwiftVersionIf(Closures.size() > 1, 6);
         }
 
       if (memberLoc.isValid()) {
@@ -1642,7 +1646,8 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       
       // Catch any other implicit uses of self with a generic diagnostic.
       if (isImplicitSelfParamUseLikelyToCauseCycle(E, ACE))
-        Diags.diagnose(E->getLoc(), diag::implicit_use_of_self_in_closure);
+        Diags.diagnose(E->getLoc(), diag::implicit_use_of_self_in_closure)
+             .warnUntilSwiftVersionIf(Closures.size() > 1, 6);
 
       return { true, E };
     }
@@ -1840,13 +1845,9 @@ bool TypeChecker::getDefaultGenericArgumentsString(
     genericParamText << contextTy;
   };
 
-  // FIXME: We can potentially be in the middle of creating a generic signature
-  // if we get here.  Break this cycle.
-  if (typeDecl->hasComputedGenericSignature()) {
-    llvm::interleave(typeDecl->getInnermostGenericParamTypes(),
-                     printGenericParamSummary,
-                     [&] { genericParamText << ", "; });
-  }
+  llvm::interleave(typeDecl->getInnermostGenericParamTypes(),
+                   printGenericParamSummary,
+                   [&] { genericParamText << ", "; });
   
   genericParamText << ">";
   return true;
@@ -1892,9 +1893,7 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
     assert(oldName || newName && "We can't have oldName and newName out of "
                                  "bounds, otherwise n would be smaller");
 
-    if (oldName == newName ||
-        (argList.hasTrailingClosure && i == argList.args.size() - 1 &&
-         (numMissing > 0 || numExtra > 0 || numWrong > 0)))
+    if (oldName == newName || argList.isUnlabeledTrailingClosureIdx(i))
       continue;
 
     if (!oldName.hasValue() && newName.hasValue()) {
@@ -1974,11 +1973,17 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
     if (i < newNames.size())
       newName = newNames[i];
 
-    if (oldName == newName || (i == n-1 && argList.hasTrailingClosure))
+    if (oldName == newName || argList.isUnlabeledTrailingClosureIdx(i))
       continue;
 
     if (newName.empty()) {
-      // Delete the old name.
+      // If this is a labeled trailing closure, we need to replace with '_'.
+      if (argList.isLabeledTrailingClosureIdx(i)) {
+        diag.fixItReplace(argList.labelLocs[i], "_");
+        continue;
+      }
+
+      // Otherwise, delete the old name.
       diag.fixItRemoveChars(argList.labelLocs[i],
                             argList.args[i]->getStartLoc());
       continue;
@@ -1992,7 +1997,10 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
     if (newNameIsReserved)
       newStr += "`";
 
-    if (oldName.empty()) {
+    // If the argument was previously unlabeled, insert the new label. Note that
+    // we don't do this for labeled trailing closures as they write unlabeled
+    // args as '_:', and therefore need replacement.
+    if (oldName.empty() && !argList.isLabeledTrailingClosureIdx(i)) {
       // Insert the name.
       newStr += ": ";
       diag.fixItInsert(argList.args[i]->getStartLoc(), newStr);
@@ -2496,26 +2504,16 @@ public:
     // If this is a VarDecl, then add it to our list of things to track.
     if (auto *vd = dyn_cast<VarDecl>(D)) {
       if (shouldTrackVarDecl(vd)) {
-        // Inline constructor.
-        auto defaultFlags = [&]() -> unsigned {
-          // If this VarDecl is nested inside of a CaptureListExpr, remember
-          // that fact for better diagnostics.
-          auto parentAsExpr = Parent.getAsExpr();
-          if (parentAsExpr && isa<CaptureListExpr>(parentAsExpr))
-            return RK_CaptureList | RK_Defined;
-          // Otherwise, return none.
-          return RK_Defined;
-        }();
+        unsigned flags = RK_Defined;
+        if (vd->isCaptureList())
+          flags |= RK_CaptureList;
 
-        if (!vd->isImplicit()) {
-          if (auto *childVd =
-                  vd->getCorrespondingCaseBodyVariable().getPtrOrNull()) {
-            // Child vars are never in capture lists.
-            assert(defaultFlags == RK_Defined);
-            VarDecls[childVd] |= RK_Defined;
-          }
+        if (auto childVd = vd->getCorrespondingCaseBodyVariable()) {
+          // Child vars are never in capture lists.
+          assert(flags == RK_Defined);
+          addMark(childVd.get(), flags);
         }
-        VarDecls[vd] |= defaultFlags;
+        addMark(vd, flags);
       }
     }
 
@@ -2639,11 +2637,13 @@ public:
 /// An AST walker that determines the underlying type of an opaque return decl
 /// from its associated function body.
 class OpaqueUnderlyingTypeChecker : public ASTWalker {
+  using Candidate = std::pair<Expr *, Type>;
+
   ASTContext &Ctx;
   AbstractFunctionDecl *Implementation;
   OpaqueTypeDecl *OpaqueDecl;
   BraceStmt *Body;
-  SmallVector<std::pair<Expr*, Type>, 4> Candidates;
+  SmallVector<Candidate, 4> Candidates;
 
   bool HasInvalidReturn = false;
 
@@ -2674,24 +2674,15 @@ public:
       Implementation->diagnose(diag::opaque_type_no_underlying_type_candidates);
       return;
     }
-    
+
     // Check whether all of the underlying type candidates match up.
-    auto opaqueTypeInContext =
-      Implementation->mapTypeIntoContext(OpaqueDecl->getDeclaredInterfaceType());
+    // TODO [OPAQUE SUPPORT]: multiple opaque types
     Type underlyingType = Candidates.front().second;
-    
-    bool mismatch = false;
-    for (auto otherCandidate : llvm::makeArrayRef(Candidates).slice(1)) {
-      // Disregard tautological candidates.
-      if (otherCandidate.second->isEqual(opaqueTypeInContext))
-        continue;
-        
-      if (!underlyingType->isEqual(otherCandidate.second)) {
-        mismatch = true;
-        break;
-      }
-    }
-    
+    bool mismatch =
+        std::any_of(Candidates.begin() + 1, Candidates.end(),
+                    [&](Candidate &otherCandidate) {
+                      return !underlyingType->isEqual(otherCandidate.second);
+                    });
     if (mismatch) {
       Implementation->diagnose(
           diag::opaque_type_mismatched_underlying_type_candidates);
@@ -2705,6 +2696,8 @@ public:
     
     // The underlying type can't be defined recursively
     // in terms of the opaque type itself.
+    auto opaqueTypeInContext = Implementation->mapTypeIntoContext(
+        OpaqueDecl->getDeclaredInterfaceType());
     auto isSelfReferencing = underlyingType.findIf([&](Type t) -> bool {
       return t->isEqual(opaqueTypeInContext);
     });
@@ -2736,14 +2729,11 @@ public:
   
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
     if (auto underlyingToOpaque = dyn_cast<UnderlyingToOpaqueExpr>(E)) {
-      assert(E->getType()->isEqual(
-       Implementation->mapTypeIntoContext(OpaqueDecl->getDeclaredInterfaceType()))
-             && "unexpected opaque type in function body");
-      
       Candidates.push_back(std::make_pair(underlyingToOpaque->getSubExpr(),
                                   underlyingToOpaque->getSubExpr()->getType()));
+      return {false, E};
     }
-    return std::make_pair(false, E);
+    return {true, E};
   }
 
   std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
@@ -2892,12 +2882,31 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
                   
                   // If the subexpr is an "as?" cast, we can rewrite it to
                   // be an "is" test.
-                  bool isIsTest = false;
-                  if (isa<ConditionalCheckedCastExpr>(initExpr) &&
-                      !initExpr->isImplicit()) {
-                    noParens = isIsTest = true;
+                  ConditionalCheckedCastExpr *CCE = nullptr;
+
+                  // initExpr can be wrapped inside parens or try expressions.
+                  if (auto ccExpr = dyn_cast<ConditionalCheckedCastExpr>(
+                          initExpr->getValueProvidingExpr())) {
+                    if (!ccExpr->isImplicit()) {
+                      CCE = ccExpr;
+                      noParens = true;
+                    }
                   }
-                  
+
+                  // In cases where the value is optional, the cast expr is
+                  // wrapped inside OptionalEvaluationExpr. Unwrap it to get
+                  // ConditionalCheckedCastExpr.
+                  if (auto oeExpr = dyn_cast<OptionalEvaluationExpr>(
+                          initExpr->getValueProvidingExpr())) {
+                    if (auto ccExpr = dyn_cast<ConditionalCheckedCastExpr>(
+                            oeExpr->getSubExpr()->getValueProvidingExpr())) {
+                      if (!ccExpr->isImplicit()) {
+                        CCE = ccExpr;
+                        noParens = true;
+                      }
+                    }
+                  }
+
                   auto diagIF = Diags.diagnose(var->getLoc(),
                                                diag::pbd_never_used_stmtcond,
                                             var->getName());
@@ -2905,10 +2914,9 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
                   diagIF.fixItReplaceChars(introducerLoc,
                                            initExpr->getStartLoc(),
                                            &"("[noParens]);
-                  
-                  if (isIsTest) {
+
+                  if (CCE) {
                     // If this was an "x as? T" check, rewrite it to "x is T".
-                    auto CCE = cast<ConditionalCheckedCastExpr>(initExpr);
                     diagIF.fixItReplace(SourceRange(CCE->getLoc(),
                                                     CCE->getQuestionLoc()),
                                         "is");
@@ -4532,11 +4540,6 @@ static void diagnoseComparisonWithNaN(const Expr *E, const DeclContext *DC) {
     void tryDiagnoseComparisonWithNaN(BinaryExpr *BE) {
       ValueDecl *comparisonDecl = nullptr;
 
-      // Comparison functions like == or <= take two arguments.
-      if (BE->getArg()->getNumElements() != 2) {
-        return;
-      }
-
       // Dig out the function declaration.
       if (auto Fn = BE->getFn()) {
         if (auto DSCE = dyn_cast<DotSyntaxCallExpr>(Fn)) {
@@ -4557,16 +4560,25 @@ static void diagnoseComparisonWithNaN(const Expr *E, const DeclContext *DC) {
         return;
       }
 
-      auto firstArg = BE->getArg()->getElement(0);
-      auto secondArg = BE->getArg()->getElement(1);
+      auto *firstArg = BE->getLHS();
+      auto *secondArg = BE->getRHS();
+
+      // Make sure that both arguments are valid before doing anything else,
+      // this helps us to debug reports of crashes in `conformsToKnownProtocol`
+      // referencing arguments (rdar://78920375).
+      //
+      // Since this diagnostic should only be run on type-checked AST,
+      // it's unclear what caused one of the arguments to have null type.
+      assert(firstArg->getType() && "Expected valid type for first argument");
+      assert(secondArg->getType() && "Expected valid type for second argument");
 
       // Both arguments must conform to FloatingPoint protocol.
-      if (!conformsToKnownProtocol(const_cast<DeclContext *>(DC),
-                                   firstArg->getType(),
-                                   KnownProtocolKind::FloatingPoint) ||
-          !conformsToKnownProtocol(const_cast<DeclContext *>(DC),
-                                   secondArg->getType(),
-                                   KnownProtocolKind::FloatingPoint)) {
+      if (!TypeChecker::conformsToKnownProtocol(firstArg->getType(),
+                                                KnownProtocolKind::FloatingPoint,
+                                                DC->getParentModule()) ||
+          !TypeChecker::conformsToKnownProtocol(secondArg->getType(),
+                                                KnownProtocolKind::FloatingPoint,
+                                                DC->getParentModule())) {
         return;
       }
 
@@ -4669,8 +4681,17 @@ public:
           if (!asyncFunc)
             return {false, call};
           ctx.Diags.diagnose(call->getLoc(), diag::warn_use_async_alternative);
-          ctx.Diags.diagnose(asyncFunc->getLoc(), diag::decl_declared_here,
-                             asyncFunc->getName());
+
+          if (auto *accessor = dyn_cast<AccessorDecl>(asyncFunc)) {
+            SmallString<32> name;
+            llvm::raw_svector_ostream os(name);
+            accessor->printUserFacingName(os);
+            ctx.Diags.diagnose(asyncFunc->getLoc(),
+                               diag::descriptive_decl_declared_here, name);
+          } else {
+            ctx.Diags.diagnose(asyncFunc->getLoc(), diag::decl_declared_here,
+                               asyncFunc->getName());
+          }
         }
       }
     }

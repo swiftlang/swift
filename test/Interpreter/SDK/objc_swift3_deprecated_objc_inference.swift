@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -swift-version 4 -Xfrontend -enable-swift3-objc-inference %s -o %t/a.out
+// RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out 2>&1 | %FileCheck %s -check-prefix=CHECK_WARNINGS
 // RUN: env %env-SWIFT_DEBUG_IMPLICIT_OBJC_ENTRYPOINT=0 %target-run %t/a.out 2>&1 | %FileCheck %s -check-prefix=CHECK_NOTHING
 
@@ -45,15 +46,15 @@ DeprecatedObjCInferenceTestSuite.test("messagingObjCInference") {
 	// CHECK_CRASH: ---Begin 
 	fputs("---Begin\n", stderr)
 
-	// CHECK_WARNINGS: .swift:29:3: implicit Objective-C entrypoint -[a.MyClass foo]
-	// CHECK_CRASH: .swift:29:3: implicit Objective-C entrypoint -[a.MyClass foo]
+	// CHECK_WARNINGS: .swift:30:3: implicit Objective-C entrypoint -[a.MyClass foo]
+	// CHECK_CRASH: .swift:30:3: implicit Objective-C entrypoint -[a.MyClass foo]
 	x.perform(Selector(fooSel))
-	// CHECK_WARNINGS-NOT: .swift:29:3: implicit Objective-C entrypoint -[a.MyClass foo]
+	// CHECK_WARNINGS-NOT: .swift:30:3: implicit Objective-C entrypoint -[a.MyClass foo]
 	x.perform(Selector(fooSel))
 
-	// CHECK_WARNINGS: .swift:30:3: implicit Objective-C entrypoint +[a.MyClass bar]
+	// CHECK_WARNINGS: .swift:31:3: implicit Objective-C entrypoint +[a.MyClass bar]
 	type(of: x).perform(Selector(barSel))
-	// CHECK_WARNINGS-NOT: .swift:30:3: implicit Objective-C entrypoint +[a.MyClass bar]
+	// CHECK_WARNINGS-NOT: .swift:31:3: implicit Objective-C entrypoint +[a.MyClass bar]
 	type(of: x).perform(Selector(barSel))
 
 	// CHECK_NOTHING-NEXT: ---End 

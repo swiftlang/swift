@@ -28,6 +28,13 @@
 #include <objc/message.h>
 #include <TargetConditionals.h>
 
+#if __has_include(<mach-o/dyld_priv.h>)
+#include <mach-o/dyld_priv.h>
+#define APPLE_OS_SYSTEM 1
+#else
+#define APPLE_OS_SYSTEM 0
+#endif
+
 // Note: There are more #includes below under "Function patching machinery".
 // Those are only relevant to the function patching machinery.
 
@@ -69,11 +76,17 @@ getImageNameFromSwiftClass(Class _Nullable objcClass,
     const void *descriptor = classAsMetadata->getDescription();
     assert(descriptor &&
            "all non-artificial Swift classes should have a descriptor");
+#if APPLE_OS_SYSTEM
+    // Use a more efficient internal API when building the system libraries
+    // for Apple OSes.
+    *outImageName = dyld_image_path_containing_address(descriptor);
+#else
     Dl_info imageInfo = {};
     if (!dladdr(descriptor, &imageInfo))
       return NO;
     *outImageName = imageInfo.dli_fname;
-    return imageInfo.dli_fname != nullptr;
+#endif
+    return *outImageName != nullptr;
   }
   
   return NO;

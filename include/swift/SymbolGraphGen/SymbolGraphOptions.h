@@ -42,6 +42,9 @@ struct SymbolGraphOptions {
   
   /// Whether to skip docs for symbols with compound, "SYNTHESIZED" USRs.
   bool SkipInheritedDocs;
+
+  /// Whether to emit symbols with SPI information.
+  bool IncludeSPISymbols;
 };
 
 } // end namespace symbolgraphgen

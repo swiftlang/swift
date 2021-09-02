@@ -45,10 +45,11 @@ namespace {
 // FIXME: Reconcile the similarities between this and
 //        isInstructionTriviallyDead.
 static bool seemsUseful(SILInstruction *I) {
-  // Even though begin_access/destroy_value/copy_value have side-effects, they
-  // can be DCE'ed if they do not have useful dependencies/reverse dependencies
+  // Even though begin_access/destroy_value/copy_value/end_lifetime have
+  // side-effects, they can be DCE'ed if they do not have useful
+  // dependencies/reverse dependencies
   if (isa<BeginAccessInst>(I) || isa<CopyValueInst>(I) ||
-      isa<DestroyValueInst>(I))
+      isa<DestroyValueInst>(I) || isa<EndLifetimeInst>(I))
     return false;
 
   // A load [copy] is okay to be DCE'ed if there are no useful dependencies
@@ -72,6 +73,10 @@ static bool seemsUseful(SILInstruction *I) {
     if (TI->isFunctionExiting())
       return true;
   }
+
+  // Is useful if it's associating with a function argument
+  if (isa<DebugValueInst>(I) || isa<DebugValueAddrInst>(I))
+    return isa<SILFunctionArgument>(I->getOperand(0));
 
   return false;
 }
@@ -268,7 +273,8 @@ void DCE::markLive() {
         break;
       }
       case SILInstructionKind::DestroyValueInst:
-      case SILInstructionKind::EndBorrowInst: {
+      case SILInstructionKind::EndBorrowInst:
+      case SILInstructionKind::EndLifetimeInst: {
         // The instruction is live only if it's operand value is also live
         addReverseDependency(I.getOperand(0), &I);
         break;
@@ -282,10 +288,10 @@ void DCE::markLive() {
             OwnershipKind::Owned) {
           markInstructionLive(borrowInst);
           // Visit all end_borrows and mark them live
-          auto visitEndBorrow = [&](EndBorrowInst *endBorrow) {
-            markInstructionLive(endBorrow);
-          };
-          visitTransitiveEndBorrows(borrowInst, visitEndBorrow);
+          visitTransitiveEndBorrows(BorrowedValue(borrowInst),
+            [&](EndBorrowInst *endBorrow) {
+              markInstructionLive(endBorrow);
+            });
           continue;
         }
         // If not populate reborrowDependencies for this borrow

@@ -43,7 +43,7 @@ public protocol StringProtocol
   var unicodeScalars: UnicodeScalarView { get }
 
   func hasPrefix(_ prefix: String) -> Bool
-  func hasSuffix(_ prefix: String) -> Bool
+  func hasSuffix(_ suffix: String) -> Bool
 
   func lowercased() -> String
   func uppercased() -> String

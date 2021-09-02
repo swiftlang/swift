@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s -module-name a -swift-version 5 -enable-experimental-concurrency -Xllvm -sil-print-debuginfo -emit-verbose-sil -parse-as-library | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s -module-name a -swift-version 5  -disable-availability-checking -Xllvm -sil-print-debuginfo -emit-verbose-sil -parse-as-library | %FileCheck %s
 // REQUIRES: concurrency
 
 // Test that the async dispatch code in the prologue has auto-generated debug

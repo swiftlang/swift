@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -parse-as-library) | %FileCheck %s --dump-input=always
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library) | %FileCheck %s --dump-input=always
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -8,9 +8,8 @@
 // UNSUPPORTED: back_deployment_runtime
 
 // UNSUPPORTED: linux
-// XFAIL: windows
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func test_taskGroup_is_asyncSequence() async {
   print(#function)
 
@@ -34,7 +33,7 @@ func test_taskGroup_is_asyncSequence() async {
   print("result: \(sum)")
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func test_throwingTaskGroup_is_asyncSequence() async throws {
   print(#function)
 
@@ -58,7 +57,7 @@ func test_throwingTaskGroup_is_asyncSequence() async throws {
   print("result: \(sum)")
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @main struct Main {
   static func main() async {
     await test_taskGroup_is_asyncSequence()

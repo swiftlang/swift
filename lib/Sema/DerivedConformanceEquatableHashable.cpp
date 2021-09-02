@@ -123,7 +123,8 @@ deriveBodyEquatable_enum_noAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
                                     AccessSemantics::Ordinary, fnType);
 
     fnType = fnType->getResult()->castTo<FunctionType>();
-    auto *callExpr = new (C) DotSyntaxCallExpr(ref, SourceLoc(), base, fnType);
+    auto *callExpr =
+        DotSyntaxCallExpr::create(C, ref, SourceLoc(), base, fnType);
     callExpr->setImplicit();
     callExpr->setThrows(false);
     cmpFuncExpr = callExpr;
@@ -134,16 +135,9 @@ deriveBodyEquatable_enum_noAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
                                       fnType);
   }
 
-  TupleTypeElt abTupleElts[2] = { aIndex->getType(), bIndex->getType() };
-  TupleExpr *abTuple = TupleExpr::create(C, SourceLoc(), { aIndex, bIndex },
-                                         { }, { }, SourceLoc(),
-                                         /*HasTrailingClosure*/ false,
-                                         /*Implicit*/ true,
-                                         TupleType::get(abTupleElts, C));
-
-  auto *cmpExpr = new (C) BinaryExpr(
-      cmpFuncExpr, abTuple, /*implicit*/ true,
-      fnType->castTo<FunctionType>()->getResult());
+  auto *cmpExpr =
+      BinaryExpr::create(C, aIndex, cmpFuncExpr, bIndex, /*implicit*/ true,
+                         fnType->castTo<FunctionType>()->getResult());
   cmpExpr->setThrows(false);
   statements.push_back(new (C) ReturnStmt(SourceLoc(), cmpExpr));
 
@@ -557,6 +551,12 @@ deriveHashable_hashInto(
   hashDecl->copyFormalAccessFrom(derived.Nominal,
                                  /*sourceIsParentContext=*/true);
 
+  // The derived hash(into:) for an actor must be non-isolated.
+  if (derived.Nominal->isActor() ||
+      getActorIsolation(derived.Nominal) == ActorIsolation::GlobalActor) {
+    hashDecl->getAttrs().add(new (C) NonisolatedAttr(/*IsImplicit*/true));
+  }
+
   derived.addMembersToConformanceContext({hashDecl});
 
   return hashDecl;
@@ -864,17 +864,16 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
 
   // We can't form a Hashable conformance if Int isn't Hashable or
   // ExpressibleByIntegerLiteral.
-  if (TypeChecker::conformsToProtocol(
-          intType, C.getProtocol(KnownProtocolKind::Hashable), parentDC)
-          .isInvalid()) {
+  if (!TypeChecker::conformsToKnownProtocol(
+          intType, KnownProtocolKind::Hashable,
+          derived.getParentModule())) {
     derived.ConformanceDecl->diagnose(diag::broken_int_hashable_conformance);
     return nullptr;
   }
 
-  ProtocolDecl *intLiteralProto =
-      C.getProtocol(KnownProtocolKind::ExpressibleByIntegerLiteral);
-  if (TypeChecker::conformsToProtocol(intType, intLiteralProto, parentDC)
-          .isInvalid()) {
+  if (!TypeChecker::conformsToKnownProtocol(
+          intType, KnownProtocolKind::ExpressibleByIntegerLiteral,
+          derived.getParentModule())) {
     derived.ConformanceDecl->diagnose(
       diag::broken_int_integer_literal_convertible_conformance);
     return nullptr;
@@ -911,6 +910,12 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   hashValueDecl->setAccessors(SourceLoc(), {getterDecl}, SourceLoc());
   hashValueDecl->copyFormalAccessFrom(derived.Nominal,
                                       /*sourceIsParentContext*/ true);
+
+  // The derived hashValue of an actor must be nonisolated.
+  if (derived.Nominal->isActor() ||
+      getActorIsolation(derived.Nominal) == ActorIsolation::GlobalActor) {
+    hashValueDecl->getAttrs().add(new (C) NonisolatedAttr(/*IsImplicit*/true));
+  }
 
   Pattern *hashValuePat = NamedPattern::createImplicit(C, hashValueDecl);
   hashValuePat->setType(intType);

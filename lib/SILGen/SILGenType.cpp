@@ -184,9 +184,7 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
   if (auto existingThunk = M.lookUpFunction(name))
     return SILVTable::Entry(base, existingThunk, implKind, false);
 
-  GenericEnvironment *genericEnv = nullptr;
-  if (auto genericSig = overrideInfo.FormalType.getOptGenericSignature())
-    genericEnv = genericSig->getGenericEnvironment();
+  auto *genericEnv = overrideInfo.FormalType.getOptGenericSignature().getGenericEnvironment();
 
   // Emit the thunk.
   SILLocation loc(derivedDecl);
@@ -1102,7 +1100,7 @@ public:
       return;
 
     // Emit any default argument generators.
-    SGM.emitDefaultArgGenerators(EED, EED->getParameterList());
+    SGM.emitArgumentGenerators(EED, EED->getParameterList());
   }
 
   void visitPatternBindingDecl(PatternBindingDecl *pd) {
@@ -1137,7 +1135,7 @@ public:
   }
 
   void visitSubscriptDecl(SubscriptDecl *sd) {
-    SGM.emitDefaultArgGenerators(sd, sd->getIndices());
+    SGM.emitArgumentGenerators(sd, sd->getIndices());
     visitAbstractStorageDecl(sd);
   }
 
@@ -1263,7 +1261,7 @@ public:
   }
 
   void visitSubscriptDecl(SubscriptDecl *sd) {
-    SGM.emitDefaultArgGenerators(sd, sd->getIndices());
+    SGM.emitArgumentGenerators(sd, sd->getIndices());
     visitAbstractStorageDecl(sd);
   }
 

@@ -81,8 +81,6 @@ class RequirementRepr {
     : SeparatorLoc(SeparatorLoc), Kind(Kind), Invalid(false),
       FirstType(FirstType), SecondLayout(SecondLayout) { }
 
-  void printImpl(ASTPrinter &OS) const;
-
 public:
   /// Construct a new type-constraint requirement.
   ///
@@ -339,14 +337,15 @@ public:
   /// to the given DeclContext.
   GenericParamList *clone(DeclContext *dc) const;
 
-  void print(raw_ostream &OS) const;
-  SWIFT_DEBUG_DUMP;
-
   bool walk(ASTWalker &walker);
 
   /// Finds a generic parameter declaration by name. This should only
   /// be used from the SIL parser.
   GenericTypeParamDecl *lookUpGenericParam(Identifier name) const;
+
+  SWIFT_DEBUG_DUMP;
+  void print(raw_ostream &OS, const PrintOptions &PO = PrintOptions()) const;
+  void print(ASTPrinter &Printer, const PrintOptions &PO) const;
 };
   
 /// A trailing where clause.

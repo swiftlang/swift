@@ -172,9 +172,15 @@ bool EpilogueARCContext::computeEpilogueARC() {
 //===----------------------------------------------------------------------===//
 
 void EpilogueARCAnalysis::initialize(SILPassManager *PM) {
-  AA = PM->getAnalysis<AliasAnalysis>();
+  passManager = PM;
   PO = PM->getAnalysis<PostOrderAnalysis>();
   RC = PM->getAnalysis<RCIdentityAnalysis>();
+}
+
+std::unique_ptr<EpilogueARCFunctionInfo>
+EpilogueARCAnalysis::newFunctionAnalysis(SILFunction *F) {
+  return std::make_unique<EpilogueARCFunctionInfo>(F, PO,
+    passManager->getAnalysis<AliasAnalysis>(F), RC);
 }
 
 SILAnalysis *swift::createEpilogueARCAnalysis(SILModule *M) {

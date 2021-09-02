@@ -262,55 +262,60 @@ void SILDeclRef::print(raw_ostream &OS) const {
   }
 
   bool isDot = true;
-  if (!hasDecl()) {
+  switch (getLocKind()) {
+  case LocKind::Closure:
     OS << "<anonymous function>";
-  } else if (kind == SILDeclRef::Kind::Func) {
-    auto *FD = cast<FuncDecl>(getDecl());
-    auto accessor = dyn_cast<AccessorDecl>(FD);
-    if (!accessor) {
-      printValueDecl(FD, OS);
-      isDot = false;
-    } else {
-      switch (accessor->getAccessorKind()) {
-      case AccessorKind::WillSet:
-        printValueDecl(accessor->getStorage(), OS);
-        OS << "!willSet";
-        break;
-      case AccessorKind::DidSet:
-        printValueDecl(accessor->getStorage(), OS);
-        OS << "!didSet";
-        break;
-      case AccessorKind::Get:
-        printValueDecl(accessor->getStorage(), OS);
-        OS << "!getter";
-        break;
-      case AccessorKind::Set:
-        printValueDecl(accessor->getStorage(), OS);
-        OS << "!setter";
-        break;
-      case AccessorKind::Address:
-        printValueDecl(accessor->getStorage(), OS);
-        OS << "!addressor";
-        break;
-      case AccessorKind::MutableAddress:
-        printValueDecl(accessor->getStorage(), OS);
-        OS << "!mutableAddressor";
-        break;
-      case AccessorKind::Read:
-        printValueDecl(accessor->getStorage(), OS);
-        OS << "!read";
-        break;
-      case AccessorKind::Modify:
-        printValueDecl(accessor->getStorage(), OS);
-        OS << "!modify";
-        break;
-      }
+    break;
+  case LocKind::File:
+    OS << "<file>";
+    break;
+  case LocKind::Decl: {
+    if (kind != Kind::Func) {
+      printValueDecl(getDecl(), OS);
+      break;
     }
-  } else {
-    printValueDecl(getDecl(), OS);
+
+    auto *accessor = dyn_cast<AccessorDecl>(getDecl());
+    if (!accessor) {
+      printValueDecl(getDecl(), OS);
+      isDot = false;
+      break;
+    }
+
+    printValueDecl(accessor->getStorage(), OS);
+    switch (accessor->getAccessorKind()) {
+    case AccessorKind::WillSet:
+      OS << "!willSet";
+      break;
+    case AccessorKind::DidSet:
+      OS << "!didSet";
+      break;
+    case AccessorKind::Get:
+      OS << "!getter";
+      break;
+    case AccessorKind::Set:
+      OS << "!setter";
+      break;
+    case AccessorKind::Address:
+      OS << "!addressor";
+      break;
+    case AccessorKind::MutableAddress:
+      OS << "!mutableAddressor";
+      break;
+    case AccessorKind::Read:
+      OS << "!read";
+      break;
+    case AccessorKind::Modify:
+      OS << "!modify";
+      break;
+    }
+    break;
   }
+  }
+
   switch (kind) {
   case SILDeclRef::Kind::Func:
+  case SILDeclRef::Kind::EntryPoint:
     break;
   case SILDeclRef::Kind::Allocator:
     OS << "!allocator";
@@ -467,17 +472,17 @@ static void printSILFunctionNameAndType(
   function->printName(OS);
   OS << " : $";
   auto *genEnv = function->getGenericEnvironment();
-  const GenericSignatureImpl *genSig = nullptr;
+  GenericSignature genSig;
 
   // If `genEnv` is defined, get sugared names of generic
   // parameter types for printing.
   if (genEnv) {
-    genSig = genEnv->getGenericSignature().getPointer();
+    genSig = genEnv->getGenericSignature();
 
     llvm::DenseSet<Identifier> usedNames;
     llvm::SmallString<16> disambiguatedNameBuf;
     unsigned disambiguatedNameCounter = 1;
-    for (auto *paramTy : genSig->getGenericParams()) {
+    for (auto *paramTy : genSig.getGenericParams()) {
       // Get a uniqued sugared name for the generic parameter type.
       auto sugaredTy = genEnv->getGenericSignature()->getSugaredType(paramTy);
       Identifier name = sugaredTy->getName();
@@ -501,7 +506,7 @@ static void printSILFunctionNameAndType(
     }
   }
   auto printOptions = PrintOptions::printSIL(silPrintContext);
-  printOptions.GenericSig = genSig;
+  printOptions.GenericSig = genSig.getPointer();
   printOptions.AlternativeTypeNames =
       sugaredTypeNames.empty() ? nullptr : &sugaredTypeNames;
   function->getLoweredFunctionType()->print(OS, printOptions);
@@ -976,9 +981,8 @@ public:
 
     // Print results.
     auto results = I->getResults();
-    if (results.size() == 1 &&
-        I->isStaticInitializerInst() &&
-        I == &I->getParent()->back()) {
+    if (results.size() == 1 && !I->isDeleted() && I->isStaticInitializerInst()
+        && I == &I->getParent()->back()) {
       *this << "%initval = ";
     } else if (results.size() == 1) {
       ID Name = Ctx.getID(results[0]);
@@ -1006,7 +1010,8 @@ public:
 
     // Maybe print debugging information.
     bool printedSlashes = false;
-    if (Ctx.printDebugInfo() && !I->isStaticInitializerInst()) {
+    if (Ctx.printDebugInfo() && !I->isDeleted()
+        && !I->isStaticInitializerInst()) {
       auto &SM = I->getModule().getASTContext().SourceMgr;
       printDebugLocRef(I->getLoc(), SM);
       printDebugScopeRef(I->getDebugScope(), SM);
@@ -1138,23 +1143,77 @@ public:
     }
   }
 
-  void printDebugVar(Optional<SILDebugVariable> Var) {
+  void printDebugInfoExpression(const SILDebugInfoExpression &DIExpr) {
+    assert(DIExpr && "DIExpression empty?");
+    *this << ", expr ";
+    bool IsFirst = true;
+    for (const auto &E : DIExpr.elements()) {
+      if (IsFirst)
+        IsFirst = false;
+      else
+        *this << ":";
+
+      switch (E.getKind()) {
+      case SILDIExprElement::OperatorKind: {
+        SILDIExprOperator Op = E.getAsOperator();
+        assert(Op != SILDIExprOperator::INVALID &&
+               "Invalid SILDIExprOperator kind");
+        *this << SILDIExprInfo::get(Op)->OpText;
+        break;
+      }
+      case SILDIExprElement::DeclKind: {
+        const Decl *D = E.getAsDecl();
+        // FIXME: Can we generalize this special handling for VarDecl
+        // to other kinds of Decl?
+        if (const auto *VD = dyn_cast<VarDecl>(D)) {
+          *this << "#";
+          printFullContext(VD->getDeclContext(), PrintState.OS);
+          *this << VD->getName().get();
+        } else
+          D->print(PrintState.OS, PrintState.ASTOptions);
+        break;
+      }
+      }
+    }
+  }
+
+  void printDebugVar(Optional<SILDebugVariable> Var,
+                     const SourceManager *SM = nullptr) {
     if (!Var || Var->Name.empty())
       return;
     if (Var->Constant)
       *this << ", let";
     else
       *this << ", var";
-    *this << ", name \"" << Var->Name << '"';
+
+    if ((Var->Loc || Var->Scope) && SM) {
+      *this << ", (name \"" << Var->Name << '"';
+      if (Var->Loc)
+        printDebugLocRef(*Var->Loc, *SM);
+      if (Var->Scope)
+        printDebugScopeRef(Var->Scope, *SM);
+      *this << ")";
+    } else
+      *this << ", name \"" << Var->Name << '"';
+
     if (Var->ArgNo)
       *this << ", argno " << Var->ArgNo;
+    if (Var->Implicit)
+      *this << ", implicit";
+    if (Var->Type) {
+      *this << ", type ";
+      Var->Type->print(PrintState.OS, PrintState.ASTOptions);
+    }
+    if (Var->DIExpr)
+      printDebugInfoExpression(Var->DIExpr);
   }
 
   void visitAllocStackInst(AllocStackInst *AVI) {
     if (AVI->hasDynamicLifetime())
       *this << "[dynamic_lifetime] ";
     *this << AVI->getElementType();
-    printDebugVar(AVI->getVarInfo());
+    printDebugVar(AVI->getVarInfo(),
+                  &AVI->getModule().getASTContext().SourceMgr);
   }
 
   void printAllocRefInstBase(AllocRefInstBase *ARI) {
@@ -1189,7 +1248,8 @@ public:
     if (ABI->hasDynamicLifetime())
       *this << "[dynamic_lifetime] ";
     *this << ABI->getType();
-    printDebugVar(ABI->getVarInfo());
+    printDebugVar(ABI->getVarInfo(),
+                  &ABI->getModule().getASTContext().SourceMgr);
   }
 
   void printSubstitutions(SubstitutionMap Subs,
@@ -1202,7 +1262,7 @@ public:
 
     *this << '<';
     bool first = true;
-    for (auto gp : genericSig->getGenericParams()) {
+    for (auto gp : genericSig.getGenericParams()) {
       if (first) first = false;
       else *this << ", ";
 
@@ -1397,6 +1457,9 @@ public:
   }
 
   void visitBeginBorrowInst(BeginBorrowInst *LBI) {
+    if (LBI->isDefined()) {
+      *this << "[defined] ";
+    }
     *this << getIDAndType(LBI->getOperand());
   }
 
@@ -1434,6 +1497,9 @@ public:
 
   void printForwardingOwnershipKind(OwnershipForwardingMixin *inst,
                                     SILValue op) {
+    if (!op)
+      return;
+
     if (inst->getForwardingOwnershipKind() != op.getOwnershipKind()) {
       *this << ", forwarding: @" << inst->getForwardingOwnershipKind();
     }
@@ -1510,12 +1576,14 @@ public:
     if (DVI->poisonRefs())
       *this << "[poison] ";
     *this << getIDAndType(DVI->getOperand());
-    printDebugVar(DVI->getVarInfo());
+    printDebugVar(DVI->getVarInfo(),
+                  &DVI->getModule().getASTContext().SourceMgr);
   }
 
   void visitDebugValueAddrInst(DebugValueAddrInst *DVAI) {
     *this << getIDAndType(DVAI->getOperand());
-    printDebugVar(DVAI->getVarInfo());
+    printDebugVar(DVAI->getVarInfo(),
+                  &DVAI->getModule().getASTContext().SourceMgr);
   }
 
 #define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
@@ -2149,6 +2217,8 @@ public:
   }
 
   void visitHopToExecutorInst(HopToExecutorInst *HTEI) {
+    if (HTEI->isMandatory())
+      *this << "[mandatory] ";
     *this << getIDAndType(HTEI->getTargetExecutor());
   }
 
@@ -3585,7 +3655,7 @@ void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
           genericSig);
       requirements = requirementsScratch;
     } else {
-      requirements = specializedSig->getRequirements();
+      requirements = specializedSig.getRequirements();
     }
   }
   if (targetFunction) {
@@ -3630,7 +3700,8 @@ SILPrintContext::SILPrintContext(llvm::raw_ostream &OS, bool Verbose,
 
 SILPrintContext::SILPrintContext(llvm::raw_ostream &OS, const SILOptions &Opts)
     : OutStream(OS), Verbose(Opts.EmitVerboseSIL),
-      SortedSIL(Opts.EmitSortedSIL), DebugInfo(SILPrintDebugInfo),
+      SortedSIL(Opts.EmitSortedSIL),
+      DebugInfo(Opts.PrintDebugInfo || SILPrintDebugInfo),
       PrintFullConvention(Opts.PrintFullConvention) {}
 
 SILPrintContext::SILPrintContext(llvm::raw_ostream &OS, bool Verbose,

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -disable-availability-checking
 
 // Currently, we don't support having property wrappers that are effectful.
 // Eventually we'd like to add this.

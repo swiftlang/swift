@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency -debugger-support
+// RUN: %target-typecheck-verify-swift  -disable-availability-checking -debugger-support
 // REQUIRES: concurrency
 
 // This test simulates LLDB's expression evaluator makeing an otherwise illegal

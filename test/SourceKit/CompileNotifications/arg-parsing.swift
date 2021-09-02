@@ -12,6 +12,7 @@
 // ARG_PARSE_0:     {
 // ARG_PARSE_0:       key.filepath: "<unknown>",
 // ARG_PARSE_0:       key.severity: source.diagnostic.severity.error,
+// ARG_PARSE_0:       key.id: "error_unknown_arg",
 // ARG_PARSE_0:       key.description: "unknown argument: '-no-such-arg'"
 // ARG_PARSE_0:     }
 // ARG_PARSE_0:   ]
@@ -34,6 +35,7 @@
 // ARG_PARSE_1:     {
 // ARG_PARSE_1:       key.filepath: "<unknown>",
 // ARG_PARSE_1:       key.severity: source.diagnostic.severity.error,
+// ARG_PARSE_1:       key.id: "error_unknown_arg",
 // ARG_PARSE_1:       key.description: "unknown argument: '-no-such-arg'"
 // ARG_PARSE_1:     }
 // ARG_PARSE_1:   ]
@@ -54,6 +56,7 @@
 // ARG_PARSE_2:     {
 // ARG_PARSE_2:       key.filepath: "<unknown>",
 // ARG_PARSE_2:       key.severity: source.diagnostic.severity.error,
+// ARG_PARSE_2:       key.id: "error_no_input_files",
 // ARG_PARSE_2:       key.description: "no input files"
 // ARG_PARSE_2:     }
 // ARG_PARSE_2:   ]

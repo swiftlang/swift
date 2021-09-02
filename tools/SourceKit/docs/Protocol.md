@@ -310,15 +310,19 @@ entity ::=
 ```
 diagnostic ::=
 {
-    <key.line>:        (int64)  // The line upon which the diagnostic was emitted.
-    <key.column>:      (int64)  // The column upon which the diagnostic was emitted.
-    <key.filepath>:    (string) // The absolute path to the file that was being parsed
-                                // when the diagnostic was emitted.
-    <key.severity>:    (UID)    // The severity of the diagnostic. Can be one of:
-                                //   - source.diagnostic.severity.note
-                                //   - source.diagnostic.severity.warning
-                                //   - source.diagnostic.severity.error
-    <key.description>: (string) // A description of the diagnostic.
+    <key.id>:               (string)       // The internal ID of the diagnostic.
+    <key.line>:             (int64)        // The line upon which the diagnostic was emitted.
+    <key.column>:           (int64)        // The column upon which the diagnostic was emitted.
+    <key.filepath>:         (string)       // The absolute path to the file that was being parsed
+                                           // when the diagnostic was emitted.
+    <key.severity>:         (UID)          // The severity of the diagnostic. Can be one of:
+                                           //   - source.diagnostic.severity.note
+                                           //   - source.diagnostic.severity.warning
+                                           //   - source.diagnostic.severity.error
+    <key.description>:      (string)       // A description of the diagnostic.
+    [opt] <key.categories>: (array) [UID*] // The categories of the diagnostic. Can be:
+                                           //   - source.diagnostic.category.deprecation
+                                           //   - source.diagnostic.category.no_usage
 }
 ```
 
@@ -779,6 +783,49 @@ expr-type-info ::=
 
 ```
 $ sourcekitd-test -req=collect-type /path/to/file.swift -- /path/to/file.swift
+```
+
+## Variable Type
+
+This request collects the types of all variable declarations in a source file after type checking.
+To fulfill this task, the client must provide the path to the Swift source file under
+type checking and the necessary compiler arguments to help resolve all dependencies.
+
+### Request
+
+```
+{
+    <key.request>:            (UID)     <source.request.variable.type>,
+    <key.sourcefile>:         (string)  // Absolute path to the file.
+    <key.compilerargs>:       [string*] // Array of zero or more strings for the compiler arguments,
+                                        // e.g ["-sdk", "/path/to/sdk"]. If key.sourcefile is provided,
+                                        // these must include the path to that file.
+    [opt] <key.offset>:       (int64)   // Offset of the requested range. Defaults to zero.
+    [opt] <key.length>:       (int64)   // Length of the requested range. Defaults to the entire file.
+}
+```
+
+### Response
+```
+{
+    <key.variable_type_list>: (array) [var-type-info*]   // A list of variable declarations and types
+}
+```
+
+```
+var-type-info ::=
+{
+    <key.variable_offset>:       (int64)    // Offset of a variable identifier in the source file
+    <key.variable_length>:       (int64)    // Length of a variable identifier an expression in the source file
+    <key.variable_type>:         (string)   // Printed type of the variable declaration
+    <key.variable_type_explicit> (bool)     // Whether the declaration has an explicit type annotation
+}
+```
+
+### Testing
+
+```
+$ sourcekitd-test -req=collect-var-type /path/to/file.swift -- /path/to/file.swift
 ```
 
 # UIDs

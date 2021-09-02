@@ -32,8 +32,7 @@ public func testPartialApply(_ obj: Test) {
     // CHECK: [[PROP1_TRUE]]([[PROP1_METHOD:%.+]] : $@convention(objc_method) (@opened([[PROP1_EXISTENTIAL]]) Test) -> @autoreleased AnyObject):
     // CHECK: [[PROP1_OBJ_COPY:%.*]] = copy_value [[PROP1_OBJ]]
     // CHECK: [[PROP1_PARTIAL:%.+]] = partial_apply [callee_guaranteed] [[PROP1_METHOD]]([[PROP1_OBJ_COPY]]) : $@convention(objc_method) (@opened([[PROP1_EXISTENTIAL]]) Test) -> @autoreleased AnyObject
-    // CHECK: [[PROP1_PARTIAL_COPY:%.*]] = copy_value [[PROP1_PARTIAL]]
-    // CHECK: = apply [[PROP1_PARTIAL_COPY]]() : $@callee_guaranteed () -> @owned AnyObject
+    // CHECK: = apply [[PROP1_PARTIAL]]() : $@callee_guaranteed () -> @owned AnyObject
     _ = prop1
   }
   if let prop2 = obj.innerPointerProp {

@@ -63,6 +63,7 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/CrashRecoveryContext.h"
 #include "llvm/Support/FileCollector.h"
+#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Memory.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/YAMLTraits.h"
@@ -773,7 +774,11 @@ importer::addCommonInvocationArguments(
     std::vector<std::string> &invocationArgStrs,
     ASTContext &ctx) {
   using ImporterImpl = ClangImporter::Implementation;
-  const llvm::Triple &triple = ctx.LangOpts.Target;
+  llvm::Triple triple = ctx.LangOpts.Target;
+  // Use clang specific target triple if given.
+  if (ctx.LangOpts.ClangTarget.hasValue()) {
+    triple = ctx.LangOpts.ClangTarget.getValue();
+  }
   SearchPathOptions &searchPathOpts = ctx.SearchPathOpts;
   const ClangImporterOptions &importerOpts = ctx.ClangImporterOpts;
 
@@ -1010,11 +1015,11 @@ ClangImporter::getClangArguments(ASTContext &ctx) {
   return invocationArgStrs;
 }
 
-std::unique_ptr<clang::CompilerInvocation>
-ClangImporter::createClangInvocation(ClangImporter *importer,
-                                     const ClangImporterOptions &importerOpts,
-                                     ArrayRef<std::string> invocationArgStrs,
-                                     std::vector<std::string> *CC1Args) {
+std::unique_ptr<clang::CompilerInvocation> ClangImporter::createClangInvocation(
+    ClangImporter *importer, const ClangImporterOptions &importerOpts,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS,
+    ArrayRef<std::string> invocationArgStrs,
+    std::vector<std::string> *CC1Args) {
   std::vector<const char *> invocationArgs;
   invocationArgs.reserve(invocationArgStrs.size());
   for (auto &argStr : invocationArgStrs)
@@ -1039,7 +1044,7 @@ ClangImporter::createClangInvocation(ClangImporter *importer,
                                                  /*owned*/false);
 
   auto CI = clang::createInvocationFromCommandLine(
-      invocationArgs, tempClangDiags, nullptr, false, CC1Args);
+      invocationArgs, tempClangDiags, VFS, false, CC1Args);
 
   if (!CI) {
     return CI;
@@ -1055,12 +1060,12 @@ ClangImporter::createClangInvocation(ClangImporter *importer,
   // to missing files and report the error that clang would throw manually.
   // rdar://77516546 is tracking that the clang importer should be more
   // resilient and provide a module even if there were building it.
-  auto VFS = clang::createVFSFromCompilerInvocation(
+  auto TempVFS = clang::createVFSFromCompilerInvocation(
       *CI, *tempClangDiags,
-      importer->Impl.SwiftContext.SourceMgr.getFileSystem());
+      VFS ? VFS : importer->Impl.SwiftContext.SourceMgr.getFileSystem());
   std::vector<std::string> FilteredModuleMapFiles;
   for (auto ModuleMapFile : CI->getFrontendOpts().ModuleMapFiles) {
-    if (VFS->exists(ModuleMapFile)) {
+    if (TempVFS->exists(ModuleMapFile)) {
       FilteredModuleMapFiles.push_back(ModuleMapFile);
     } else {
       importer->Impl.diagnose(SourceLoc(), diag::module_map_not_found,
@@ -1105,11 +1110,15 @@ ClangImporter::create(ASTContext &ctx,
     }
   }
 
+  // Wrap Swift's FS to allow Clang to override the working directory
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS =
+      llvm::vfs::RedirectingFileSystem::create({}, true,
+                                               *ctx.SourceMgr.getFileSystem());
+
   // Create a new Clang compiler invocation.
   {
-    importer->Impl.Invocation = createClangInvocation(importer.get(),
-                                                      importerOpts,
-                                                      invocationArgStrs);
+    importer->Impl.Invocation = createClangInvocation(
+        importer.get(), importerOpts, VFS, invocationArgStrs);
     if (!importer->Impl.Invocation)
       return nullptr;
   }
@@ -1161,11 +1170,9 @@ ClangImporter::create(ASTContext &ctx,
 
   // Set up the file manager.
   {
-    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS =
-        clang::createVFSFromCompilerInvocation(instance.getInvocation(),
-                                               instance.getDiagnostics(),
-                                               ctx.SourceMgr.getFileSystem());
-    instance.createFileManager(std::move(VFS));
+    VFS = clang::createVFSFromCompilerInvocation(
+        instance.getInvocation(), instance.getDiagnostics(), std::move(VFS));
+    instance.createFileManager(VFS);
   }
 
   // Don't stop emitting messages if we ever can't load a module.
@@ -2906,6 +2913,11 @@ void ClangImporter::lookupTypeDecl(
           continue;
         }
         auto *imported = Impl.importDecl(clangDecl, Impl.CurrentVersion);
+
+        // Namespaces are imported as extensions for enums.
+        if (auto ext = dyn_cast_or_null<ExtensionDecl>(imported)) {
+          imported = ext->getExtendedNominal();
+        }
         if (auto *importedType = dyn_cast_or_null<TypeDecl>(imported)) {
           foundViaClang = true;
           receiver(importedType);
@@ -3872,11 +3884,22 @@ void ClangImporter::Implementation::lookupValue(
     // If the entry is not visible, skip it.
     if (!isVisibleClangEntry(entry)) continue;
 
-    ValueDecl *decl;
+    ValueDecl *decl = nullptr;
     // If it's a Clang declaration, try to import it.
     if (auto clangDecl = entry.dyn_cast<clang::NamedDecl *>()) {
-      decl = cast_or_null<ValueDecl>(
-          importDeclReal(clangDecl->getMostRecentDecl(), CurrentVersion));
+      bool isNamespace = isa<clang::NamespaceDecl>(clangDecl);
+      Decl *realDecl =
+          importDeclReal(clangDecl->getMostRecentDecl(), CurrentVersion,
+                         /*useCanonicalDecl*/ !isNamespace);
+
+      if (isNamespace) {
+        if (auto extension = cast_or_null<ExtensionDecl>(realDecl))
+          realDecl = extension->getExtendedNominal();
+      }
+
+      if (!realDecl)
+        continue;
+      decl = cast<ValueDecl>(realDecl);
       if (!decl) continue;
     } else if (!name.isSpecial()) {
       // Try to import a macro.
@@ -4341,4 +4364,9 @@ ClangImporter::instantiateCXXClassTemplate(
 
   return dyn_cast_or_null<StructDecl>(
       Impl.importDecl(ctsd, Impl.CurrentVersion));
+}
+
+bool ClangImporter::isCXXMethodMutating(const clang::CXXMethodDecl *method) {
+  return isa<clang::CXXConstructorDecl>(method) || !method->isConst() ||
+         method->getParent()->hasMutableFields();
 }

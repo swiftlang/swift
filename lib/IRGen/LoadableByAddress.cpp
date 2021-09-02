@@ -38,8 +38,7 @@ using namespace swift;
 using namespace swift::irgen;
 
 static GenericEnvironment *getSubstGenericEnvironment(CanSILFunctionType fnTy) {
-  auto sig = fnTy->getSubstGenericSignature();
-  return sig ? sig->getGenericEnvironment() : nullptr;
+  return fnTy->getSubstGenericSignature().getGenericEnvironment();
 }
 
 static GenericEnvironment *getSubstGenericEnvironment(SILFunction *F) {
@@ -2069,6 +2068,11 @@ static void rewriteFunction(StructLoweringState &pass,
     pass.applies.append(currentModApplies.begin(), currentModApplies.end());
   } while (repeat);
 
+  while (!pass.modYieldInsts.empty()) {
+    YieldInst *inst = pass.modYieldInsts.pop_back_val();
+    allocateAndSetAll(pass, allocator, inst, inst->getAllOperands());
+  }
+
   for (SILInstruction *instr : pass.instsToMod) {
     for (Operand &operand : instr->getAllOperands()) {
       auto currOperand = operand.get();
@@ -2323,11 +2327,6 @@ static void rewriteFunction(StructLoweringState &pass,
     auto newRetTuple = retBuilder.createTuple(regLoc, emptyTy, {});
     retBuilder.createReturn(newRetTuple->getLoc(), newRetTuple);
     instr->eraseFromParent();
-  }
-
-  while (!pass.modYieldInsts.empty()) {
-    YieldInst *inst = pass.modYieldInsts.pop_back_val();
-    allocateAndSetAll(pass, allocator, inst, inst->getAllOperands());
   }
 }
 
@@ -2729,9 +2728,7 @@ bool LoadableByAddress::recreateDifferentiabilityWitnessFunction(
   auto *currIRMod = getIRGenModule()->IRGen.getGenModule(instr->getFunction());
   auto resultFnTy = instr->getType().castTo<SILFunctionType>();
   auto genSig = resultFnTy->getSubstGenericSignature();
-  GenericEnvironment *genEnv = nullptr;
-  if (genSig)
-    genEnv = genSig->getGenericEnvironment();
+  auto *genEnv = genSig.getGenericEnvironment();
   auto newResultFnTy =
       MapperCache.getNewSILFunctionType(genEnv, resultFnTy, *currIRMod);
   if (resultFnTy == newResultFnTy)
@@ -2799,9 +2796,9 @@ bool LoadableByAddress::recreateConvInstr(SILInstruction &I,
   if (convInstr->getKind() == SILInstructionKind::DifferentiableFunctionInst ||
       convInstr->getKind() == SILInstructionKind::DifferentiableFunctionExtractInst ||
       convInstr->getKind() == SILInstructionKind::LinearFunctionInst ||
-      convInstr->getKind() == SILInstructionKind::LinearFunctionExtractInst)
-    if (auto genSig = currSILFunctionType->getSubstGenericSignature())
-      genEnv = genSig->getGenericEnvironment();
+      convInstr->getKind() == SILInstructionKind::LinearFunctionExtractInst) {
+    genEnv = currSILFunctionType->getSubstGenericSignature().getGenericEnvironment();
+  }
   CanSILFunctionType newFnType = MapperCache.getNewSILFunctionType(
       genEnv, currSILFunctionType, *currIRMod);
   SILType newType = SILType::getPrimitiveObjectType(newFnType);

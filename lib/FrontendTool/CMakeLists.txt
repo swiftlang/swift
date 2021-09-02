@@ -1,4 +1,4 @@
-set_swift_llvm_is_available()
+
 add_swift_host_library(swiftFrontendTool STATIC
   FrontendTool.cpp
   ImportedModules.cpp
@@ -27,3 +27,5 @@ target_link_libraries(swiftFrontendTool PRIVATE
     swiftSILGen
     swiftSILOptimizer
     swiftTBDGen)
+
+set_swift_llvm_is_available(swiftFrontendTool)

@@ -1,8 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -enable-experimental-concurrency -emit-module-path %t/a.swiftmodule -module-name a %s
+// RUN: %target-swift-frontend  -disable-availability-checking -emit-module-path %t/a.swiftmodule -module-name a %s
+// RUN: llvm-bcanalyzer -dump %t/a.swiftmodule | %FileCheck --implicit-check-not UnknownCode %s
 // RUN: %target-swift-ide-test -print-module -module-to-print a -source-filename x -I %t | %FileCheck -check-prefix MODULE-CHECK %s
-// RUN: %target-swift-frontend -enable-experimental-concurrency -emit-module-path %t/b.swiftmodule -module-name a %t/a.swiftmodule
-// RUN: cmp -s %t/a.swiftmodule %t/b.swiftmodule
 
 // REQUIRES: concurrency
 
@@ -14,7 +13,6 @@
 
 // MODULE-CHECK:       actor A {
 // MODULE-CHECK-NEXT:    init() async
-
 actor A {
   init() async {}
 }
@@ -25,20 +23,18 @@ class C {
   init() async {}
 }
 
+// MODULE-CHECK:       enum E {
+// MODULE-CHECK-NEXT:    case nothing
+// MODULE-CHECK-NEXT:    init() async
+enum E {
+  case nothing
+  init() async {
+    self = .nothing
+  }
+}
+
 // MODULE-CHECK:       struct S {
 // MODULE-CHECK-NEXT:    init() async
 struct S {
   init() async {}
 }
-
-// ignore-----MODULE-CHECK:       enum E {
-// ignore-----MODULE-CHECK-NEXT:    case nothing
-// ignore-----MODULE-CHECK-NEXT:    init() async
-
-// FIXME: until rdar://76678907 is fixed, this won't work.
-// enum E {
-//   case nothing
-//   init() async {
-//     self = .nothing
-//   }
-// }

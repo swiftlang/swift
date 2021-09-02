@@ -606,7 +606,7 @@ private:
 
 public:
   // Caching
-  bool isCached() const;
+  bool isCached() const { return true; }
 };
 
 /// Request the nominal type declaration to which the given custom attribute
@@ -627,7 +627,7 @@ private:
 
 public:
   // Caching
-  bool isCached() const;
+  bool isCached() const { return true; }
 };
 
 /// Request the raw (possibly unbound generic) type of the property wrapper
@@ -648,7 +648,7 @@ private:
 
 public:
   // Caching
-  bool isCached() const;
+  bool isCached() const { return true; }
 };
 
 /// Request the nominal type declaration to which the given custom attribute
@@ -669,7 +669,7 @@ private:
 
 public:
   // Caching
-  bool isCached() const;
+  bool isCached() const { return true; }
 };
 
 /// Request information about the mutability of composed property wrappers.
@@ -689,7 +689,7 @@ private:
 
 public:
   // Caching
-  bool isCached() const;
+  bool isCached() const { return true; }
 };
 
 /// Request information about the l-valueness of composed property wrappers.
@@ -709,7 +709,7 @@ private:
 
 public:
   // Caching
-  bool isCached() const;
+  bool isCached() const { return true; }
 };
 
 /// Request the synthesized auxiliary declarations for a wrapped property.
@@ -729,7 +729,7 @@ private:
 
 public:
   // Caching
-  bool isCached() const;
+  bool isCached() const { return true; }
 };
 
 /// Request information about initialization of the backing property
@@ -750,7 +750,7 @@ private:
 
 public:
   // Caching
-  bool isCached() const;
+  bool isCached() const { return true; }
 };
 
 /// Retrieve the structural type of an alias type.
@@ -833,7 +833,7 @@ private:
 
 public:
   // Caching
-  bool isCached() const;
+  bool isCached() const { return true; }
 };
 
 /// Request the result builder type attached to the given declaration,
@@ -878,45 +878,6 @@ public:
   void cacheResult(SelfAccessKind value) const;
 };
 
-/// Determine whether the given function is an @asyncHandler.
-class IsAsyncHandlerRequest :
-    public SimpleRequest<IsAsyncHandlerRequest,
-                         bool(FuncDecl *),
-                         RequestFlags::SeparatelyCached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  bool evaluate(Evaluator &evaluator, FuncDecl *func) const;
-
-public:
-  // Separate caching.
-  bool isCached() const { return true; }
-  Optional<bool> getCachedResult() const;
-  void cacheResult(bool value) const;
-};
-
-/// Determine whether the given function can be an @asyncHandler, without
-/// producing any diagnostics.
-class CanBeAsyncHandlerRequest :
-    public SimpleRequest<CanBeAsyncHandlerRequest,
-                         bool(FuncDecl *),
-                         RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  bool evaluate(Evaluator &evaluator, FuncDecl *func) const;
-
-public:
-  // Caching
-  bool isCached() const { return true; }
-};
-
 /// Determine whether the given nominal type is an actor.
 class IsActorRequest :
     public SimpleRequest<IsActorRequest,
@@ -952,6 +913,42 @@ private:
 public:
   // Caching
   bool isCached() const { return true; }
+};
+
+/// Determine whether the given class is a distributed actor.
+class IsDistributedActorRequest :
+    public SimpleRequest<IsDistributedActorRequest,
+        bool(NominalTypeDecl *),
+        RequestFlags::Cached> {
+public:
+    using SimpleRequest::SimpleRequest;
+
+private:
+    friend SimpleRequest;
+
+    bool evaluate(Evaluator &evaluator, NominalTypeDecl *nominal) const;
+
+public:
+    // Caching
+    bool isCached() const { return true; }
+};
+
+/// Determine whether the given func is distributed.
+class IsDistributedFuncRequest :
+    public SimpleRequest<IsDistributedFuncRequest,
+        bool(FuncDecl *),
+        RequestFlags::Cached> {
+public:
+    using SimpleRequest::SimpleRequest;
+
+private:
+    friend SimpleRequest;
+
+    bool evaluate(Evaluator &evaluator, FuncDecl *func) const;
+
+public:
+    // Caching
+    bool isCached() const { return true; }
 };
 
 /// Retrieve the static "shared" property within a global actor that provides
@@ -1021,6 +1018,20 @@ private:
 public:
   // Caching
   bool isCached() const { return true; }
+};
+
+/// Determine whether the given function should have an isolated 'self'.
+class HasIsolatedSelfRequest :
+    public SimpleRequest<HasIsolatedSelfRequest,
+                         bool(ValueDecl *),
+                         RequestFlags::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  bool evaluate(Evaluator &evaluator, ValueDecl *func) const;
 };
 
 /// Request whether the storage has a mutating getter.
@@ -1403,7 +1414,7 @@ private:
 
 public:
   // Separate caching.
-  bool isCached() const;
+  bool isCached() const { return true; }
 
   /// Abstract generic signature requests never have source-location info.
   SourceLoc getNearestLoc() const {
@@ -1438,7 +1449,7 @@ private:
 
 public:
   // Separate caching.
-  bool isCached() const;
+  bool isCached() const { return true; }
 
   /// Inferred generic signature requests don't have source-location info.
   SourceLoc getNearestLoc() const {
@@ -2034,6 +2045,9 @@ enum class ImplicitMemberAction : uint8_t {
   ResolveCodingKeys,
   ResolveEncodable,
   ResolveDecodable,
+  ResolveDistributedActor,
+  ResolveDistributedActorIdentity,
+  ResolveDistributedActorTransport,
 };
 
 class ResolveImplicitMemberRequest
@@ -2214,6 +2228,24 @@ public:
   void diagnoseCycle(DiagnosticEngine &diags) const;
   void noteCycleStep(DiagnosticEngine &diags) const;
 
+  // Cached.
+  bool isCached() const { return true; }
+};
+
+/// Checks if the _Distributed module is available.
+class DistributedModuleIsAvailableRequest
+    : public SimpleRequest<DistributedModuleIsAvailableRequest, bool(Decl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  bool evaluate(Evaluator &evaluator, Decl *decl) const;
+
+public:
   // Cached.
   bool isCached() const { return true; }
 };
@@ -2955,9 +2987,9 @@ public:
   bool isCached() const { return true; }
 };
 
-class AsyncAlternativeRequest
-    : public SimpleRequest<AsyncAlternativeRequest,
-                           AbstractFunctionDecl *(AbstractFunctionDecl *),
+class RenamedDeclRequest
+    : public SimpleRequest<RenamedDeclRequest,
+                           ValueDecl *(const ValueDecl *, const AvailableAttr *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -2965,8 +2997,8 @@ public:
 private:
   friend SimpleRequest;
 
-  AbstractFunctionDecl *evaluate(
-      Evaluator &evaluator, AbstractFunctionDecl *attachedFunctionDecl) const;
+  ValueDecl *evaluate(Evaluator &evaluator, const ValueDecl *attached,
+                      const AvailableAttr *attr) const;
 
 public:
   bool isCached() const { return true; }

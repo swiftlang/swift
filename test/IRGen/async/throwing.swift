@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -parse-as-library -Xfrontend -enable-experimental-concurrency -g %s -module-name main -o %t/main
+// RUN: %target-build-swift -parse-as-library  -Xfrontend -disable-availability-checking -g %s -module-name main -o %t/main
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s
 

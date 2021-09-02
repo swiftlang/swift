@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency  -enable-actor-data-race-checks %import-libdispatch -parse-as-library) > %t.log 2>&1
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking  -enable-actor-data-race-checks %import-libdispatch -parse-as-library) > %t.log 2>&1
 // RUN: %FileCheck %s < %t.log
 
 // REQUIRES: executable_test

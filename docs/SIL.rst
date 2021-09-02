@@ -3489,7 +3489,7 @@ debug_value
 
 ::
 
-  sil-instruction ::= debug_value '[poison]'? sil-operand (',' debug-var-attr)*
+  sil-instruction ::= debug_value '[poison]'? sil-operand (',' debug-var-attr)* advanced-debug-var-attr* (',' 'expr' debug-info-expr)?
 
   debug_value %1 : $Int
 
@@ -3505,11 +3505,29 @@ The operand must have loadable type.
    debug-var-attr ::= 'let'
    debug-var-attr ::= 'name' string-literal
    debug-var-attr ::= 'argno' integer-literal
+   debug-var-attr ::= 'implicit'
+
+::
+
+  advanced-debug-var-attr ::= '(' 'name' string-literal (',' sil-instruction-source-info)? ')'
+  advanced-debug-var-attr ::= 'type' sil-type
+
+::
+
+  debug-info-expr   ::= di-expr-operand (':' di-expr-operand)*
+  di-expr-operand   ::= di-expr-operator (':' sil-operand)*
+  di-expr-operator  ::= 'op_fragment'
 
 There are a number of attributes that provide details about the source
 variable that is being described, including the name of the
 variable. For function and closure arguments ``argno`` is the number
-of the function argument starting with 1.
+of the function argument starting with 1. A compiler-generated source
+variable will be marked ``implicit`` and optimizers are free to remove
+it even in -Onone. The advanced debug variable attributes represent source
+locations and type of the source variable when it was originally declared.
+It is useful when we're indirectly associating the SSA value with the
+source variable (via di-expression, for example) in which case SSA value's
+type is different from that of source variable.
 
 If the '[poison]' flag is set, then all references within this debug
 value will be overwritten with a sentinel at this point in the
@@ -3520,12 +3538,32 @@ generated until OSSA islowered. They are not expected to be serialized
 within the module, and the pipeline is not expected to do any
 significant code motion after lowering.
 
+Debug info expression (di-expression) is a powerful method to connect SSA
+value with the source variable in an indirect fashion. For example,
+we can use the ``op_fragment`` operator to specify that the SSA value
+is originated from a struct field inside the source variable (which has
+an aggregate data type). Di-expression in SIL works similarly to LLVM's
+``!DIExpression`` metadata. Where both of them adopt a stack based
+execution model to evaluate the expression. The biggest difference between
+them is that LLVM always represent ``!DIExpression`` elements as 64-bit
+integers, while SIL's di-expression can have elements with various types,
+like AST nodes or strings. Here is an example::
+
+  struct MyStruct {
+    var x: Int
+    var y: Int
+  }
+  ...
+  debug_value %1 : $Int, var, (name "the_struct", loc "file.swift":8:7), type $MyStruct, expr op_fragment:#MyStruct.y, loc "file.swift":9:4
+
+In the snippet above, source variable "the_struct" has an aggregate type ``$MyStruct`` and we use di-expression with ``op_fragment`` operator to associate ``%1`` to the ``y`` member variable inside "the_struct". Note that the extra source location directive follows rigt after ``name "the_struct"`` indicate that "the_struct" was originally declared in line 8, but not until line 9, the current ``debug_value`` instruction's source location, does member ``y`` got updated with SSA value ``%1``.
+
 debug_value_addr
 ````````````````
 
 ::
 
-  sil-instruction ::= debug_value_addr sil-operand (',' debug-var-attr)*
+  sil-instruction ::= debug_value_addr sil-operand (',' debug-var-attr)* advanced-debug-var-attr* (',' 'expr' debug-info-expr)?
 
   debug_value_addr %7 : $*SomeProtocol
 
@@ -3534,6 +3572,7 @@ has changed value to the specified operand.  The declaration in
 question is identified by the SILLocation attached to the
 debug_value_addr instruction.
 
+Note that this instruction can be replaced by ``debug_value`` + di-expression operator that is equivalent to LLVM's ``DW_OP_deref``.
 
 Accessing Memory
 ~~~~~~~~~~~~~~~~
@@ -3613,7 +3652,7 @@ begin_borrow
 
 ::
 
-   sil-instruction ::= 'begin_borrow' sil-operand
+   sil-instruction ::= 'begin_borrow' '[defined]'? sil-operand
 
    %1 = begin_borrow %0 : $T
 
@@ -3625,6 +3664,10 @@ in `Dead End Blocks`_. This `begin_borrow`_ and the lifetime ending uses of
 region in between this borrow and its lifetime ending use, ``%0`` must be
 live. This makes sense semantically since ``%1`` is modeling a new value with a
 dependent lifetime on ``%0``.
+
+The optional ``defined`` attribute specifies that the operand corresponds to a
+local variable in the Swift source, so special care must be taken when moving
+the end_borrow.
 
 This instruction is only valid in functions in Ownership SSA form.
 

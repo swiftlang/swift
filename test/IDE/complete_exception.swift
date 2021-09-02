@@ -92,7 +92,7 @@ func test002() {
 // THROW1-DAG:  Decl[Class]/CurrModule:             Error3[#Error3#]; name=Error3{{$}}
 // THROW1-DAG:  Decl[Class]/CurrModule:             Error2[#Error2#]; name=Error2{{$}}
 // THROW1-DAG:  Decl[Class]/CurrModule:             Error1[#Error1#]; name=Error1{{$}}
-// THROW1-DAG:  Decl[Protocol]/CurrModule:          ErrorPro1[#ErrorPro1#]; name=ErrorPro1{{$}}
+// THROW1-DAG:  Decl[Protocol]/CurrModule/Flair[RareType]: ErrorPro1[#ErrorPro1#]; name=ErrorPro1{{$}}
 // THROW1-DAG:  Decl[FreeFunction]/CurrModule:      getError1()[#Error1#]{{; name=.+$}}
 // THROW1-DAG:  Decl[FreeFunction]/CurrModule:      getNSError()[#NSError#]{{; name=.+$}}
 
@@ -124,7 +124,7 @@ func test004() {
 func test005() {
   do {} catch Error4.E2#^CATCH3^#
 // CATCH3: Begin completions
-// CATCH3: Pattern/CurrModule:               ({#Int32#})[#Error4#]{{; name=.+$}}
+// CATCH3: Pattern/CurrModule/Flair[ArgLabels]:               ({#Int32#})[#Error4#]{{; name=.+$}}
 // CATCH3: End completions
 }
 
@@ -225,7 +225,7 @@ func test014() {
 // NSERROR_DOT-DAG: Decl[InstanceVar]/CurrNominal/IsSystem: code[#Int#]; name=code
 // NSERROR_DOT-DAG: Decl[InstanceVar]/Super:                hashValue[#Int#]; name=hashValue
 // NSERROR_DOT-DAG: Decl[InstanceMethod]/Super/IsSystem:    myClass()[#AnyClass!#]; name=myClass()
-// NSERROR_DOT-DAG: Decl[InstanceMethod]/Super/IsSystem:    isEqual({#(other): NSObject!#})[#Bool#]; name=isEqual(other: NSObject!)
+// NSERROR_DOT-DAG: Decl[InstanceMethod]/Super/IsSystem:    isEqual({#(other): NSObject!#})[#Bool#]; name=isEqual(:)
 // NSERROR_DOT-DAG: Decl[InstanceVar]/Super/IsSystem:       hash[#Int#]; name=hash
 // NSERROR_DOT-DAG: Decl[InstanceVar]/Super/IsSystem:       description[#String#]; name=description
 // NSERROR_DOT: End completions

@@ -12,6 +12,7 @@
 
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Effects.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ASTDemangler.h"
 #include "swift/Basic/SourceManager.h"
@@ -377,41 +378,45 @@ public:
   ResolvedRangeInfo resolve();
 };
 
-static bool hasUnhandledError(ArrayRef<ASTNode> Nodes) {
-  class ThrowingEntityAnalyzer : public SourceEntityWalker {
-    bool Throwing;
+static PossibleEffects getUnhandledEffects(ArrayRef<ASTNode> Nodes) {
+  class EffectsAnalyzer : public SourceEntityWalker {
+    PossibleEffects Effects;
   public:
-    ThrowingEntityAnalyzer(): Throwing(false) {}
     bool walkToStmtPre(Stmt *S) override {
       if (auto DCS = dyn_cast<DoCatchStmt>(S)) {
         if (DCS->isSyntacticallyExhaustive())
           return false;
-        Throwing = true;
+        Effects |= EffectKind::Throws;
       } else if (isa<ThrowStmt>(S)) {
-        Throwing = true;
+        Effects |= EffectKind::Throws;
       }
-      return !Throwing;
+      return true;
     }
     bool walkToExprPre(Expr *E) override {
-      if (isa<TryExpr>(E)) {
-        Throwing = true;
-      }
-      return !Throwing;
+      // Don't walk into closures, they only produce effects when called.
+      if (isa<ClosureExpr>(E))
+        return false;
+
+      if (isa<TryExpr>(E))
+        Effects |= EffectKind::Throws;
+      if (isa<AwaitExpr>(E))
+        Effects |= EffectKind::Async;
+
+      return true;
     }
     bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
       return false;
     }
-    bool walkToDeclPost(Decl *D) override { return !Throwing; }
-    bool walkToStmtPost(Stmt *S) override { return !Throwing; }
-    bool walkToExprPost(Expr *E) override { return !Throwing; }
-    bool isThrowing() { return Throwing; }
+    PossibleEffects getEffects() const { return Effects; }
   };
 
-  return Nodes.end() != std::find_if(Nodes.begin(), Nodes.end(), [](ASTNode N) {
-    ThrowingEntityAnalyzer Analyzer;
+  PossibleEffects Effects;
+  for (auto N : Nodes) {
+    EffectsAnalyzer Analyzer;
     Analyzer.walk(N);
-    return Analyzer.isThrowing();
-  });
+    Effects |= Analyzer.getEffects();
+  }
+  return Effects;
 }
 
 struct RangeResolver::Implementation {
@@ -549,7 +554,7 @@ private:
     assert(ContainedASTNodes.size() == 1);
     // Single node implies single entry point, or is it?
     bool SingleEntry = true;
-    bool UnhandledError = hasUnhandledError({Node});
+    auto UnhandledEffects = getUnhandledEffects({Node});
     OrphanKind Kind = getOrphanKind(ContainedASTNodes);
     if (Node.is<Expr*>())
       return ResolvedRangeInfo(RangeKind::SingleExpression,
@@ -558,7 +563,7 @@ private:
                                getImmediateContext(),
                                /*Common Parent Expr*/nullptr,
                                SingleEntry,
-                               UnhandledError, Kind,
+                               UnhandledEffects, Kind,
                                llvm::makeArrayRef(ContainedASTNodes),
                                llvm::makeArrayRef(DeclaredDecls),
                                llvm::makeArrayRef(ReferencedDecls));
@@ -569,7 +574,7 @@ private:
                                getImmediateContext(),
                                /*Common Parent Expr*/nullptr,
                                SingleEntry,
-                               UnhandledError, Kind,
+                               UnhandledEffects, Kind,
                                llvm::makeArrayRef(ContainedASTNodes),
                                llvm::makeArrayRef(DeclaredDecls),
                                llvm::makeArrayRef(ReferencedDecls));
@@ -581,7 +586,7 @@ private:
                                getImmediateContext(),
                                /*Common Parent Expr*/nullptr,
                                SingleEntry,
-                               UnhandledError, Kind,
+                               UnhandledEffects, Kind,
                                llvm::makeArrayRef(ContainedASTNodes),
                                llvm::makeArrayRef(DeclaredDecls),
                                llvm::makeArrayRef(ReferencedDecls));
@@ -642,7 +647,7 @@ public:
           getImmediateContext(),
           Parent,
           hasSingleEntryPoint(ContainedASTNodes),
-          hasUnhandledError(ContainedASTNodes),
+          getUnhandledEffects(ContainedASTNodes),
           getOrphanKind(ContainedASTNodes),
           llvm::makeArrayRef(ContainedASTNodes),
           llvm::makeArrayRef(DeclaredDecls),
@@ -889,7 +894,7 @@ public:
                 TokensInRange,
                 getImmediateContext(), nullptr,
                 hasSingleEntryPoint(ContainedASTNodes),
-                hasUnhandledError(ContainedASTNodes),
+                getUnhandledEffects(ContainedASTNodes),
                 getOrphanKind(ContainedASTNodes),
                 llvm::makeArrayRef(ContainedASTNodes),
                 llvm::makeArrayRef(DeclaredDecls),
@@ -904,7 +909,7 @@ public:
                 getImmediateContext(),
                 /*Common Parent Expr*/ nullptr,
                 /*SinleEntry*/ true,
-                hasUnhandledError(ContainedASTNodes),
+                getUnhandledEffects(ContainedASTNodes),
                 getOrphanKind(ContainedASTNodes),
                 llvm::makeArrayRef(ContainedASTNodes),
                 llvm::makeArrayRef(DeclaredDecls),

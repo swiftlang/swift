@@ -1,8 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module-path %t/a.swiftmodule -module-name a %s
+// RUN: %target-swift-frontend -emit-module-path %t/a.swiftmodule -module-name a %s -disable-availability-checking
+// RUN: llvm-bcanalyzer -dump %t/a.swiftmodule | %FileCheck --implicit-check-not UnknownCode %s
 // RUN: %target-swift-ide-test -print-module -module-to-print a -source-filename x -I %t | %FileCheck -check-prefix MODULE-CHECK %s
-// RUN: %target-swift-frontend -emit-module-path %t/b.swiftmodule -module-name a  %t/a.swiftmodule
-// RUN: cmp -s %t/a.swiftmodule %t/b.swiftmodule
 
 ///////////
 // This test checks for correct serialization & deserialization of

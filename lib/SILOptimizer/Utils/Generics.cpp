@@ -915,7 +915,7 @@ getGenericEnvironmentAndSignatureWithRequirements(
         OrigGenSig.getPointer(), { }, std::move(RequirementsCopy)},
       GenericSignature());
 
-  auto NewGenEnv = NewGenSig->getGenericEnvironment();
+  auto NewGenEnv = NewGenSig.getGenericEnvironment();
   return { NewGenEnv, NewGenSig };
 }
 
@@ -946,7 +946,7 @@ void ReabstractionInfo::performFullSpecializationPreparation(
 static bool hasNonSelfContainedRequirements(ArchetypeType *Archetype,
                                             GenericSignature Sig,
                                             GenericEnvironment *Env) {
-  auto Reqs = Sig->getRequirements();
+  auto Reqs = Sig.getRequirements();
   auto CurrentGP = Archetype->getInterfaceType()
                        ->getCanonicalType()
                        ->getRootGenericParam();
@@ -989,7 +989,7 @@ static bool hasNonSelfContainedRequirements(ArchetypeType *Archetype,
 static void collectRequirements(ArchetypeType *Archetype, GenericSignature Sig,
                                 GenericEnvironment *Env,
                                 SmallVectorImpl<Requirement> &CollectedReqs) {
-  auto Reqs = Sig->getRequirements();
+  auto Reqs = Sig.getRequirements();
   auto CurrentGP = Archetype->getInterfaceType()
                        ->getCanonicalType()
                        ->getRootGenericParam();
@@ -1261,14 +1261,14 @@ public:
         M(M), SM(M.getSwiftModule()), Ctx(M.getASTContext()) {
 
     // Create the new generic signature using provided requirements.
-    SpecializedGenericEnv = SpecializedGenericSig->getGenericEnvironment();
+    SpecializedGenericEnv = SpecializedGenericSig.getGenericEnvironment();
 
     // Compute SubstitutionMaps required for re-mapping.
 
     // Callee's generic signature and specialized generic signature
     // use the same set of generic parameters, i.e. each generic
     // parameter should be mapped to itself.
-    for (auto GP : CalleeGenericSig->getGenericParams()) {
+    for (auto GP : CalleeGenericSig.getGenericParams()) {
       CalleeInterfaceToSpecializedInterfaceMapping[GP] = Type(GP);
     }
     computeCalleeInterfaceToSpecializedInterfaceMap();
@@ -1437,7 +1437,7 @@ void FunctionSignaturePartialSpecializer::
 /// which requires a substitution.
 void FunctionSignaturePartialSpecializer::
     createGenericParamsForCalleeGenericParams() {
-  for (auto GP : CalleeGenericSig->getGenericParams()) {
+  for (auto GP : CalleeGenericSig.getGenericParams()) {
     auto CanTy = GP->getCanonicalType();
     auto CanTyInContext =
         CalleeGenericSig->getCanonicalTypeInContext(CanTy);
@@ -1570,9 +1570,8 @@ void FunctionSignaturePartialSpecializer::addCallerRequirements() {
 
 /// Add requirements from the callee's signature.
 void FunctionSignaturePartialSpecializer::addCalleeRequirements() {
-  if (CalleeGenericSig)
-    addRequirements(CalleeGenericSig->getRequirements(),
-                    CalleeInterfaceToSpecializedInterfaceMap);
+  addRequirements(CalleeGenericSig.getRequirements(),
+                  CalleeInterfaceToSpecializedInterfaceMap);
 }
 
 std::pair<GenericEnvironment *, GenericSignature>
@@ -1586,7 +1585,7 @@ FunctionSignaturePartialSpecializer::
       Ctx.evaluator,
       AbstractGenericSignatureRequest{nullptr, AllGenericParams, AllRequirements},
       GenericSignature());
-  auto GenEnv = GenSig ? GenSig->getGenericEnvironment() : nullptr;
+  auto *GenEnv = GenSig.getGenericEnvironment();
   return { GenEnv, GenSig };
 }
 
@@ -1657,7 +1656,7 @@ void FunctionSignaturePartialSpecializer::
     SpecializedGenericEnv = GenPair.first;
   }
 
-  for (auto GP : CalleeGenericSig->getGenericParams()) {
+  for (auto GP : CalleeGenericSig.getGenericParams()) {
     CalleeInterfaceToSpecializedInterfaceMapping[GP] = Type(GP);
   }
   computeCalleeInterfaceToSpecializedInterfaceMap();

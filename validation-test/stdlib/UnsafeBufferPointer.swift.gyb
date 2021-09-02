@@ -361,6 +361,22 @@ UnsafeMutableBufferPointerTestSuite.test("withContiguous(Mutable)StorageIfAvaila
   expectEqual(result1, result2)
 }
 
+UnsafeMutableBufferPointerTestSuite.test("initialize(from: Slice)") {
+  let o = 91
+  let c = 1_000
+  let a = Slice(base: Array(0..<c), bounds: o..<c)
+
+  let buffer = UnsafeMutableBufferPointer<Int>.allocate(capacity: c-o)
+  defer { buffer.deallocate() }
+
+  var (iterator, copied) = buffer.initialize(from: a)
+  expectEqual(iterator.next(), nil)
+  expectEqual(copied, c-o)
+
+  let t = buffer.indices.randomElement()!
+  expectEqual(a[t+o], buffer[t])
+}
+
 UnsafeMutableBufferPointerTestSuite.test("Slice.withContiguousStorageIfAvailable") {
   guard #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) else {
     return

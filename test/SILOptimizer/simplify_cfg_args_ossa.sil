@@ -1,9 +1,11 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -jumpthread-simplify-cfg | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -simplify-cfg | %FileCheck %s
 
 sil_stage raw
 
 import Builtin
 import Swift
+
+class A {}
 
 sil_global private @globalinit_token11 : $Builtin.Word
 

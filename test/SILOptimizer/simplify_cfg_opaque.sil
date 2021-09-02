@@ -1,4 +1,8 @@
-// RUN: %target-sil-opt -enable-sil-opaque-values -enable-sil-verify-all %s -jumpthread-simplify-cfg | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-opaque-values -enable-sil-verify-all %s -jumpthread-simplify-cfg -enable-ossa-rewriteterminator | %FileCheck %s
+
+// REQUIRES: EnableOSSASimplifyCFG
+
+// FIXME: Convert XCHECK to CHECK
 
 sil_stage canonical
 
@@ -6,31 +10,43 @@ protocol P {}
 
 // Test jump threading into a destination block terminated by checked_cast_value_br.
 //
-// CHECK-LABEL: sil @testJumpThread : $@convention(thin) (Any, Any) -> () {
-// CHECK: bb0(%0 : $Any, %1 : $Any):
+// CHECK-LABEL: sil [ossa] @testJumpThread : $@convention(thin) (@owned Any, @owned Any) -> () {
+// CHECK: bb0(%0 : @owned $Any, %1 : @owned $Any):
 // CHECK:   cond_br undef, bb1, bb2
 // CHECK: bb1:
-// CHECK:   retain_value %0 : $Any
-// CHECK:   release_value %0 : $Any
-// CHECK:   checked_cast_value_br Any in %0 : $Any to P
-// CHECK: bb2:
-// CHECK:   checked_cast_value_br Any in %1 : $Any to P
+// CHECK:   destroy_value %0 : $Any
+// CHECK:   destroy_value %1 : $Any
+// XCHECK:   checked_cast_value_br Any in %0 : $Any to P
+// XCHECK: bb2:
+// XCHECK:   destroy_value %0 : $Any
+// XCHECK:   destroy_value %1 : $Any
+// XCHECK:   checked_cast_value_br Any in %1 : $Any to P
 // CHECK-LABEL: } // end sil function 'testJumpThread'
-sil @testJumpThread : $@convention(thin) (Any, Any) -> () {
-bb0(%0 : $Any, %1 : $Any):
+sil [ossa] @testJumpThread : $@convention(thin) (@owned Any, @owned Any) -> () {
+bb0(%0 : @owned $Any, %1 : @owned $Any):
   cond_br undef, bb1, bb2
+
 bb1:
-  retain_value %0 : $Any // force jump-threading
-  br bb6(%0 : $Any)
+  %2 = copy_value %0 : $Any // force jump-threading?
+  br bb6(%2 : $Any)
+
 bb2:
-  br bb6(%1 : $Any)
-bb6(%any : $Any):
-  release_value %any : $Any // force jump-threading
+  %3 = copy_value %1 : $Any
+  br bb6(%3 : $Any)
+
+bb6(%any : @owned $Any):
+  destroy_value %0 : $Any
+  destroy_value %1 : $Any
   checked_cast_value_br Any in %any : $Any to P, bb7, bb8
+
 bb7(%p : $P):
+  destroy_value %p : $P
   br bb9
-bb8:
+
+bb8(%fail : $Any):
+  destroy_value %fail : $Any
   br bb9
+
 bb9:
   %999 = tuple ()
   return %999 : $()

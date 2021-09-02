@@ -14,32 +14,32 @@ func takeIntOpt(x: Int, y: Int?)
 func takeString(x: Int, y: String)
 func takeAny(x: Int, y: Any)
 
-takeInt(1, y: #^TOP_LEVEL_0^#)
+takeInt(x: 1, y: #^TOP_LEVEL_0^#)
 // TOP_LEVEL_0-NOT: nil
 // TOP_LEVEL_0: valueZ
 // TOP_LEVEL_0: Int
 // TOP_LEVEL_0: valueA
 // TOP_LEVEL_0: valueS
 
-takeString(1, y: #^TOP_LEVEL_1^#)
+takeString(x: 1, y: #^TOP_LEVEL_1^#)
 // TOP_LEVEL_1: valueS
 // TOP_LEVEL_1: String
 // TOP_LEVEL_1: valueA
 // TOP_LEVEL_1: valueZ
 
-takeAny(1, y: #^TOP_LEVEL_2^#)
+takeAny(x: 1, y: #^TOP_LEVEL_2^#)
 // TOP_LEVEL_2: valueA
 // TOP_LEVEL_2: valueS
 // TOP_LEVEL_2: valueZ
 
-takeIntOpt(1, y: #^TOP_LEVEL_3^#)
+takeIntOpt(x: 1, y: #^TOP_LEVEL_3^#)
 // TOP_LEVEL_3: nil
 // TOP_LEVEL_3: valueZ
 // TOP_LEVEL_3: valueA
 // TOP_LEVEL_3: valueS
 
 func testCrossContext(x: Int, y: String, z: Any) {
-  takeInt(1, y: #^CROSS_CONTEXT_0^#)
+  takeInt(x: 1, y: #^CROSS_CONTEXT_0^#)
 }
 // CROSS_CONTEXT_0: x
 // CROSS_CONTEXT_0: valueZ
@@ -56,7 +56,7 @@ struct FromMethod {
 }
 
 func testFromMethod(x: FromMethod) {
-  takeInt(1, y: x.#^FROM_METHOD_0^#)
+  takeInt(x: 1, y: x.#^FROM_METHOD_0^#)
 }
 // FROM_METHOD_0: valueZ()
 // FROM_METHOD_0: valueA()

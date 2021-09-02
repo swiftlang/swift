@@ -62,6 +62,19 @@ STATISTIC(DeadAllocApplyEliminated,
 
 using UserList = llvm::SmallSetVector<SILInstruction *, 16>;
 
+namespace {
+
+/// Side effects of a destructor.
+enum class DestructorEffects {
+  None,
+
+  /// The destructor contains a "destroyArray" builtin which destroys the tail
+  /// elements of the object - like in Array.
+  DestroysTailElems,
+
+  Unknown
+};
+
 // Analyzing the body of this class destructor is valid because the object is
 // dead. This means that the object is never passed to objc_setAssociatedObject,
 // so its destructor cannot be extended at runtime.
@@ -98,14 +111,21 @@ static SILFunction *getDestructor(AllocRefInst *ARI) {
   return Fn;
 }
 
+static bool isDestroyArray(SILInstruction *inst) {
+  BuiltinInst *bi = dyn_cast<BuiltinInst>(inst);
+  return bi && bi->getBuiltinInfo().ID == BuiltinValueKind::DestroyArray;
+}
+
 /// Analyze the destructor for the class of ARI to see if any instructions in it
 /// could have side effects on the program outside the destructor. If it does
 /// not, then we can eliminate the destructor.
-static bool doesDestructorHaveSideEffects(AllocRefInst *ARI) {
+static DestructorEffects doesDestructorHaveSideEffects(AllocRefInst *ARI) {
   SILFunction *Fn = getDestructor(ARI);
   // If we can't find a constructor then assume it has side effects.
   if (!Fn)
-    return true;
+    return DestructorEffects::Unknown;
+
+  DestructorEffects effects = DestructorEffects::None;
 
   // A destructor only has one argument, self.
   assert(Fn->begin()->getNumArguments() == 1 &&
@@ -115,7 +135,7 @@ static bool doesDestructorHaveSideEffects(AllocRefInst *ARI) {
   LLVM_DEBUG(llvm::dbgs() << "    Analyzing destructor.\n");
 
   // For each BB in the destructor...
-  for (auto &BB : *Fn)
+  for (auto &BB : *Fn) {
     // For each instruction I in BB...
     for (auto &I : BB) {
       LLVM_DEBUG(llvm::dbgs() << "        Visiting: " << I);
@@ -125,6 +145,14 @@ static bool doesDestructorHaveSideEffects(AllocRefInst *ARI) {
         LLVM_DEBUG(llvm::dbgs() << "            SAFE! Instruction has no side "
                    "effects.\n");
         continue;
+      }
+
+      if (auto *fl = dyn_cast<FixLifetimeInst>(&I)) {
+        // A fix_lifetime of self does cannot have a side effect, because in the
+        // destructor, Self is deleted.
+        if (stripCasts(fl->getOperand()) == Self)
+          continue;
+        return DestructorEffects::Unknown;
       }
 
       // RefCounting operations on Self are ok since we are already in the
@@ -142,7 +170,7 @@ static bool doesDestructorHaveSideEffects(AllocRefInst *ARI) {
         } else {
           LLVM_DEBUG(llvm::dbgs() << "            UNSAFE! Ref count operation "
                      "not on self.\n");
-          return true;
+          return DestructorEffects::Unknown;
         }
       }
 
@@ -162,7 +190,7 @@ static bool doesDestructorHaveSideEffects(AllocRefInst *ARI) {
         } else {
           LLVM_DEBUG(llvm::dbgs() << "            UNSAFE! dealloc_ref on value "
                      "besides self.\n");
-          return true;
+          return DestructorEffects::Unknown;
         }
       }
 
@@ -174,22 +202,28 @@ static bool doesDestructorHaveSideEffects(AllocRefInst *ARI) {
           continue;
         }
 
+      if (isDestroyArray(&I)) {
+        // Check if the "destroyArray" destroys the tail elements of the object,
+        // like in Array.
+        SILValue addr = I.getOperand(1);
+        auto *atp = dyn_cast<AddressToPointerInst>(addr);
+        if (!atp)
+          return DestructorEffects::Unknown;
+        auto *rta = dyn_cast<RefTailAddrInst>(atp->getOperand());
+        if (!rta)
+          return DestructorEffects::Unknown;
+        effects = DestructorEffects::DestroysTailElems;
+        if (rta->getOperand() == Self)
+          continue;
+      }
+
       LLVM_DEBUG(llvm::dbgs() << "            UNSAFE! Unknown instruction.\n");
       // Otherwise, we can't remove the deallocation completely.
-      return true;
+      return DestructorEffects::Unknown;
     }
-
-  // We didn't find any side effects.
-  return false;
-}
-
-void static
-removeInstructions(ArrayRef<SILInstruction*> UsersToRemove) {
-  for (auto *I : UsersToRemove) {
-    I->replaceAllUsesOfAllResultsWithUndef();
-    // Now we know that I should not have any uses... erase it from its parent.
-    I->eraseFromParent();
   }
+  // We didn't find any side effects.
+  return effects;
 }
 
 //===----------------------------------------------------------------------===//
@@ -326,11 +360,6 @@ static bool onlyStoresToTailObjects(BuiltinInst *destroyArray,
   return true;
 }
 
-static bool isDestroyArray(SILInstruction *inst) {
-  BuiltinInst *bi = dyn_cast<BuiltinInst>(inst);
-  return bi && bi->getBuiltinInfo().ID == BuiltinValueKind::DestroyArray;
-}
-
 /// Inserts releases of all stores in \p users.
 static void insertCompensatingReleases(SILInstruction *before,
                                        const UserList &users) {
@@ -433,7 +462,6 @@ hasUnremovableUsers(SILInstruction *allocation, UserList *Users,
 //                     NonTrivial DeadObject Elimination
 //===----------------------------------------------------------------------===//
 
-namespace {
 /// Determine if an object is dead. Compute its original lifetime. Find the
 /// lifetime endpoints reached by each store of a refcounted object into the
 /// object.
@@ -682,6 +710,228 @@ static void insertReleases(ArrayRef<StoreInst*> Stores,
   }
 }
 
+//===----------------------------------------------------------------------===//
+//                            Function Processing
+//===----------------------------------------------------------------------===//
+
+/// Does this instruction perform object allocation with no other observable
+/// side effect?
+static bool isAllocatingApply(SILInstruction *Inst) {
+  ArraySemanticsCall ArrayAlloc(Inst);
+  return ArrayAlloc.getKind() == ArrayCallKind::kArrayUninitialized ||
+         ArrayAlloc.getKind() == ArrayCallKind::kArrayUninitializedIntrinsic;
+}
+
+namespace {
+class DeadObjectElimination : public SILFunctionTransform {
+
+  llvm::DenseMap<SILType, DestructorEffects> DestructorAnalysisCache;
+
+  InstructionDeleter deleter;
+
+  void removeInstructions(ArrayRef<SILInstruction*> toRemove);
+
+  bool processAllocRef(AllocRefInst *ARI);
+  bool processAllocStack(AllocStackInst *ASI);
+  bool processKeyPath(KeyPathInst *KPI);
+  bool processAllocBox(AllocBoxInst *ABI){ return false;}
+  bool processAllocApply(ApplyInst *AI, DeadEndBlocks &DEBlocks);
+
+  bool getDeadInstsAfterInitializerRemoved(
+    ApplyInst *AI, llvm::SmallVectorImpl<SILInstruction *> &ToDestroy);
+  bool removeAndReleaseArray(
+    SingleValueInstruction *NewArrayValue, DeadEndBlocks &DEBlocks);
+
+  bool processFunction(SILFunction &Fn) {
+    DeadEndBlocks DEBlocks(&Fn);
+    DestructorAnalysisCache.clear();
+
+    bool Changed = false;
+
+    for (auto &BB : Fn) {
+
+      for (SILInstruction *inst : deleter.updatingRange(&BB)) {
+        if (auto *A = dyn_cast<AllocRefInst>(inst))
+          Changed |= processAllocRef(A);
+        else if (auto *A = dyn_cast<AllocStackInst>(inst))
+          Changed |= processAllocStack(A);
+        else if (auto *KPI = dyn_cast<KeyPathInst>(inst))
+          Changed |= processKeyPath(KPI);
+        else if (auto *A = dyn_cast<AllocBoxInst>(inst))
+          Changed |= processAllocBox(A);
+        else if (auto *A = dyn_cast<ApplyInst>(inst))
+          Changed |= processAllocApply(A, DEBlocks);
+      }
+      deleter.cleanupDeadInstructions();
+    }
+    return Changed;
+  }
+
+  void run() override {
+    // FIXME: We should support ownership eventually.
+    if (getFunction()->hasOwnership())
+      return;
+
+    if (processFunction(*getFunction())) {
+      invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
+    }
+  }
+
+};
+} // end anonymous namespace
+
+void
+DeadObjectElimination::removeInstructions(ArrayRef<SILInstruction*> toRemove) {
+  for (auto *I : toRemove) {
+    I->replaceAllUsesOfAllResultsWithUndef();
+    // Now we know that I should not have any uses... erase it from its parent.
+    deleter.forceDelete(I);
+  }
+}
+
+bool DeadObjectElimination::processAllocRef(AllocRefInst *ARI) {
+  // Ok, we have an alloc_ref. Check the cache to see if we have already
+  // computed the destructor behavior for its SILType.
+  DestructorEffects destructorEffects;
+  SILType Type = ARI->getType();
+  auto CacheSearchResult = DestructorAnalysisCache.find(Type);
+  if (CacheSearchResult != DestructorAnalysisCache.end()) {
+    // Ok we found a value in the cache.
+    destructorEffects = CacheSearchResult->second;
+  } else {
+    // We did not find a value in the cache for our destructor. Analyze the
+    // destructor to make sure it has no side effects. For now this only
+    // supports alloc_ref of classes so any alloc_ref with a reference type
+    // that is not a class this will return false for. Once we have analyzed
+    // it, set Behavior to that value and insert the value into the Cache.
+    //
+    // TODO: We should be able to handle destructors that do nothing but release
+    // members of the object.
+    destructorEffects = doesDestructorHaveSideEffects(ARI);
+    DestructorAnalysisCache[Type] = destructorEffects;
+  }
+
+  // Our destructor has no side effects, so if we can prove that no loads
+  // escape, then we can completely remove the use graph of this alloc_ref.
+  UserList UsersToRemove;
+  if (hasUnremovableUsers(ARI, &UsersToRemove,
+      /*acceptRefCountInsts=*/ destructorEffects != DestructorEffects::Unknown,
+      /*onlyAcceptTrivialStores*/false)) {
+    LLVM_DEBUG(llvm::dbgs() << "    Found a use that cannot be zapped...\n");
+    return false;
+  }
+
+  // Find the instruction which releases the object's tail elements.
+  SILInstruction *releaseOfTailElems = nullptr;
+  for (SILInstruction *user : UsersToRemove) {
+    if (isDestroyArray(user) ||
+       (destructorEffects == DestructorEffects::DestroysTailElems &&
+        isa<RefCountingInst>(user) && user->mayRelease())) {
+      // Bail if we find multiple such instructions.
+      if (releaseOfTailElems)
+        return false;
+      releaseOfTailElems = user;
+    }
+  }
+  if (releaseOfTailElems)
+    insertCompensatingReleases(releaseOfTailElems, UsersToRemove);
+
+  // Remove the AllocRef and all of its users.
+  removeInstructions(
+    ArrayRef<SILInstruction*>(UsersToRemove.begin(), UsersToRemove.end()));
+  LLVM_DEBUG(llvm::dbgs() << "    Success! Eliminating alloc_ref.\n");
+
+  ++DeadAllocRefEliminated;
+  return true;
+}
+
+bool DeadObjectElimination::processAllocStack(AllocStackInst *ASI) {
+  // Trivial types don't have destructors.
+  bool isTrivialType = ASI->getElementType().isTrivial(*ASI->getFunction());
+  UserList UsersToRemove;
+  if (hasUnremovableUsers(ASI, &UsersToRemove, /*acceptRefCountInsts=*/ true,
+      /*onlyAcceptTrivialStores*/!isTrivialType)) {
+    LLVM_DEBUG(llvm::dbgs() << "    Found a use that cannot be zapped...\n");
+    return false;
+  }
+
+  // Remove the AllocRef and all of its users.
+  removeInstructions(
+    ArrayRef<SILInstruction*>(UsersToRemove.begin(), UsersToRemove.end()));
+  LLVM_DEBUG(llvm::dbgs() << "    Success! Eliminating alloc_stack.\n");
+
+  ++DeadAllocStackEliminated;
+  return true;
+}
+
+bool DeadObjectElimination::processKeyPath(KeyPathInst *KPI) {
+  UserList UsersToRemove;
+  if (hasUnremovableUsers(KPI, &UsersToRemove, /*acceptRefCountInsts=*/ true,
+      /*onlyAcceptTrivialStores*/ false)) {
+    LLVM_DEBUG(llvm::dbgs() << "    Found a use that cannot be zapped...\n");
+    return false;
+  }
+
+  // For simplicity just bail if the keypath has a non-trivial operands.
+  // TODO: don't bail but insert compensating destroys for such operands.
+  for (const Operand &Op : KPI->getAllOperands()) {
+    if (!Op.get()->getType().isTrivial(*KPI->getFunction()))
+      return false;
+  }
+
+  // Remove the keypath and all of its users.
+  removeInstructions(
+    ArrayRef<SILInstruction*>(UsersToRemove.begin(), UsersToRemove.end()));
+  LLVM_DEBUG(llvm::dbgs() << "    Success! Eliminating keypath.\n");
+
+  ++DeadKeyPathEliminated;
+  return true;
+}
+
+/// If AI is the version of an initializer where we pass in either an apply or
+/// an alloc_ref to initialize in place, validate that we are able to continue
+/// optimizing and return To
+bool DeadObjectElimination::getDeadInstsAfterInitializerRemoved(
+    ApplyInst *AI, llvm::SmallVectorImpl<SILInstruction *> &ToDestroy) {
+  assert(ToDestroy.empty() && "We assume that ToDestroy is empty, so on "
+                              "failure we can clear without worrying about the "
+                              "caller accumulating and thus our eliminating "
+                              "passed in state.");
+  SILValue Arg0 = AI->getArgument(0);
+
+  if (Arg0->getType().isExistentialType()) {
+    // This is a version of the initializer which receives a pre-allocated
+    // buffer as first argument. To completely eliminate the allocation, we must
+    // destroy the extra allocations as well as the initializer,
+    if (auto *Result = dyn_cast<ApplyInst>(Arg0)) {
+      ToDestroy.emplace_back(Result);
+      return true;
+    }
+
+    return false;
+  }
+
+  if (auto *ARI = dyn_cast<AllocRefInst>(Arg0)) {
+    if (all_of(ARI->getUses(), [&](Operand *Op) -> bool {
+          if (Op->getUser() == AI)
+            return true;
+          if (auto *SRI = dyn_cast<StrongReleaseInst>(Op->getUser())) {
+            ToDestroy.emplace_back(SRI);
+            return true;
+          }
+          return false;
+        })) {
+      return true;
+    }
+  }
+
+  // We may have added elements to the array before we failed. To avoid such a
+  // problem, we clear the out array here. We assert at the beginning that the
+  // out array is empty, so this is safe.
+  ToDestroy.clear();
+  return true;
+}
+
 // Attempt to remove the array allocated at NewAddrValue and release its
 // refcounted elements.
 //
@@ -692,8 +942,8 @@ static void insertReleases(ArrayRef<StoreInst*> Stores,
 // TODO: This relies on the lowest level array.uninitialized not being
 // inlined. To do better we could either run this pass before semantic inlining,
 // or we could also handle calls to array.init.
-static bool removeAndReleaseArray(SingleValueInstruction *NewArrayValue,
-                                  DeadEndBlocks &DEBlocks) {
+bool DeadObjectElimination::removeAndReleaseArray(
+    SingleValueInstruction *NewArrayValue, DeadEndBlocks &DEBlocks) {
   TupleExtractInst *ArrayDef = nullptr;
   TupleExtractInst *StorageAddress = nullptr;
   for (auto *Op : NewArrayValue->getUses()) {
@@ -769,232 +1019,6 @@ static bool removeAndReleaseArray(SingleValueInstruction *NewArrayValue,
   return true;
 }
 
-//===----------------------------------------------------------------------===//
-//                            Function Processing
-//===----------------------------------------------------------------------===//
-
-/// Does this instruction perform object allocation with no other observable
-/// side effect?
-static bool isAllocatingApply(SILInstruction *Inst) {
-  ArraySemanticsCall ArrayAlloc(Inst);
-  return ArrayAlloc.getKind() == ArrayCallKind::kArrayUninitialized ||
-         ArrayAlloc.getKind() == ArrayCallKind::kArrayUninitializedIntrinsic;
-}
-
-namespace {
-class DeadObjectElimination : public SILFunctionTransform {
-  llvm::DenseMap<SILType, bool> DestructorAnalysisCache;
-
-  // This is not a SILBasicBlock::iterator because we need a null value and we
-  // don't have a specific block whose end() we could use.
-  SILInstruction *nextInstToProcess = nullptr;
-
-  /// Advance nextInstToProcess to the next instruction in its block.
-  /// If nextInstToProcess is the last instruction in its block, it is set to
-  /// null.
-  void advance() {
-    if (!nextInstToProcess)
-      return;
-    SILBasicBlock *block = nextInstToProcess->getParent();
-    auto nextIter = std::next(nextInstToProcess->getIterator());
-    if (nextIter == block->end()) {
-      nextInstToProcess = nullptr;
-    } else {
-      nextInstToProcess = &*nextIter;
-    }
-  }
-
-  void handleDeleteNotification(SILNode *node) override {
-    if (auto *inst = dyn_cast<SILInstruction>(node)) {
-      if (inst == nextInstToProcess)
-        advance();
-    }
-  }
-
-  bool needsNotifications() override { return true; }
-
-  bool processAllocRef(AllocRefInst *ARI);
-  bool processAllocStack(AllocStackInst *ASI);
-  bool processKeyPath(KeyPathInst *KPI);
-  bool processAllocBox(AllocBoxInst *ABI){ return false;}
-  bool processAllocApply(ApplyInst *AI, DeadEndBlocks &DEBlocks);
-
-  bool processFunction(SILFunction &Fn) {
-    DeadEndBlocks DEBlocks(&Fn);
-    DestructorAnalysisCache.clear();
-
-    bool Changed = false;
-
-    for (auto &BB : Fn) {
-      nextInstToProcess = &BB.front();
-      
-      // We cannot just iterate over the instructions, because the processing
-      // functions might deleted instruction before or after the current
-      // instruction - and also inst itself.
-      while (SILInstruction *inst = nextInstToProcess) {
-        advance();
-
-        if (auto *A = dyn_cast<AllocRefInst>(inst))
-          Changed |= processAllocRef(A);
-        else if (auto *A = dyn_cast<AllocStackInst>(inst))
-          Changed |= processAllocStack(A);
-        else if (auto *KPI = dyn_cast<KeyPathInst>(inst))
-          Changed |= processKeyPath(KPI);
-        else if (auto *A = dyn_cast<AllocBoxInst>(inst))
-          Changed |= processAllocBox(A);
-        else if (auto *A = dyn_cast<ApplyInst>(inst))
-          Changed |= processAllocApply(A, DEBlocks);
-      }
-    }
-    return Changed;
-  }
-
-  void run() override {
-    // FIXME: We should support ownership eventually.
-    if (getFunction()->hasOwnership())
-      return;
-
-    if (processFunction(*getFunction())) {
-      invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
-    }
-  }
-
-};
-} // end anonymous namespace
-
-bool DeadObjectElimination::processAllocRef(AllocRefInst *ARI) {
-  // Ok, we have an alloc_ref. Check the cache to see if we have already
-  // computed the destructor behavior for its SILType.
-  bool HasSideEffects;
-  SILType Type = ARI->getType();
-  auto CacheSearchResult = DestructorAnalysisCache.find(Type);
-  if (CacheSearchResult != DestructorAnalysisCache.end()) {
-    // Ok we found a value in the cache.
-    HasSideEffects = CacheSearchResult->second;
-  } else {
-    // We did not find a value in the cache for our destructor. Analyze the
-    // destructor to make sure it has no side effects. For now this only
-    // supports alloc_ref of classes so any alloc_ref with a reference type
-    // that is not a class this will return false for. Once we have analyzed
-    // it, set Behavior to that value and insert the value into the Cache.
-    //
-    // TODO: We should be able to handle destructors that do nothing but release
-    // members of the object.
-    HasSideEffects = doesDestructorHaveSideEffects(ARI);
-    DestructorAnalysisCache[Type] = HasSideEffects;
-  }
-
-  // Our destructor has no side effects, so if we can prove that no loads
-  // escape, then we can completely remove the use graph of this alloc_ref.
-  UserList UsersToRemove;
-  if (hasUnremovableUsers(ARI, &UsersToRemove,
-                          /*acceptRefCountInsts=*/ !HasSideEffects,
-                          /*onlyAcceptTrivialStores*/false)) {
-    LLVM_DEBUG(llvm::dbgs() << "    Found a use that cannot be zapped...\n");
-    return false;
-  }
-
-  auto iter = std::find_if(UsersToRemove.begin(), UsersToRemove.end(),
-                           isDestroyArray);
-  if (iter != UsersToRemove.end())
-    insertCompensatingReleases(*iter, UsersToRemove);
-
-  // Remove the AllocRef and all of its users.
-  removeInstructions(
-    ArrayRef<SILInstruction*>(UsersToRemove.begin(), UsersToRemove.end()));
-  LLVM_DEBUG(llvm::dbgs() << "    Success! Eliminating alloc_ref.\n");
-
-  ++DeadAllocRefEliminated;
-  return true;
-}
-
-bool DeadObjectElimination::processAllocStack(AllocStackInst *ASI) {
-  // Trivial types don't have destructors.
-  bool isTrivialType = ASI->getElementType().isTrivial(*ASI->getFunction());
-  UserList UsersToRemove;
-  if (hasUnremovableUsers(ASI, &UsersToRemove, /*acceptRefCountInsts=*/ true,
-      /*onlyAcceptTrivialStores*/!isTrivialType)) {
-    LLVM_DEBUG(llvm::dbgs() << "    Found a use that cannot be zapped...\n");
-    return false;
-  }
-
-  // Remove the AllocRef and all of its users.
-  removeInstructions(
-    ArrayRef<SILInstruction*>(UsersToRemove.begin(), UsersToRemove.end()));
-  LLVM_DEBUG(llvm::dbgs() << "    Success! Eliminating alloc_stack.\n");
-
-  ++DeadAllocStackEliminated;
-  return true;
-}
-
-bool DeadObjectElimination::processKeyPath(KeyPathInst *KPI) {
-  UserList UsersToRemove;
-  if (hasUnremovableUsers(KPI, &UsersToRemove, /*acceptRefCountInsts=*/ true,
-      /*onlyAcceptTrivialStores*/ false)) {
-    LLVM_DEBUG(llvm::dbgs() << "    Found a use that cannot be zapped...\n");
-    return false;
-  }
-
-  // For simplicity just bail if the keypath has a non-trivial operands.
-  // TODO: don't bail but insert compensating destroys for such operands.
-  for (const Operand &Op : KPI->getAllOperands()) {
-    if (!Op.get()->getType().isTrivial(*KPI->getFunction()))
-      return false;
-  }
-
-  // Remove the keypath and all of its users.
-  removeInstructions(
-    ArrayRef<SILInstruction*>(UsersToRemove.begin(), UsersToRemove.end()));
-  LLVM_DEBUG(llvm::dbgs() << "    Success! Eliminating keypath.\n");
-
-  ++DeadKeyPathEliminated;
-  return true;
-}
-
-/// If AI is the version of an initializer where we pass in either an apply or
-/// an alloc_ref to initialize in place, validate that we are able to continue
-/// optimizing and return To
-static bool getDeadInstsAfterInitializerRemoved(
-    ApplyInst *AI, llvm::SmallVectorImpl<SILInstruction *> &ToDestroy) {
-  assert(ToDestroy.empty() && "We assume that ToDestroy is empty, so on "
-                              "failure we can clear without worrying about the "
-                              "caller accumulating and thus our eliminating "
-                              "passed in state.");
-  SILValue Arg0 = AI->getArgument(0);
-
-  if (Arg0->getType().isExistentialType()) {
-    // This is a version of the initializer which receives a pre-allocated
-    // buffer as first argument. To completely eliminate the allocation, we must
-    // destroy the extra allocations as well as the initializer,
-    if (auto *Result = dyn_cast<ApplyInst>(Arg0)) {
-      ToDestroy.emplace_back(Result);
-      return true;
-    }
-
-    return false;
-  }
-
-  if (auto *ARI = dyn_cast<AllocRefInst>(Arg0)) {
-    if (all_of(ARI->getUses(), [&](Operand *Op) -> bool {
-          if (Op->getUser() == AI)
-            return true;
-          if (auto *SRI = dyn_cast<StrongReleaseInst>(Op->getUser())) {
-            ToDestroy.emplace_back(SRI);
-            return true;
-          }
-          return false;
-        })) {
-      return true;
-    }
-  }
-
-  // We may have added elements to the array before we failed. To avoid such a
-  // problem, we clear the out array here. We assert at the beginning that the
-  // out array is empty, so this is safe.
-  ToDestroy.clear();
-  return true;
-}
-
 bool DeadObjectElimination::processAllocApply(ApplyInst *AI,
                                               DeadEndBlocks &DEBlocks) {
   // Currently only handle array.uninitialized
@@ -1011,13 +1035,11 @@ bool DeadObjectElimination::processAllocApply(ApplyInst *AI,
 
   LLVM_DEBUG(llvm::dbgs() << "    Success! Eliminating apply allocate(...).\n");
 
-  eraseUsesOfInstruction(AI);
-  assert(AI->use_empty() && "All users should have been removed.");
-  recursivelyDeleteTriviallyDeadInstructions(AI, true);
-  if (instsDeadAfterInitializerRemoved.size()) {
-    recursivelyDeleteTriviallyDeadInstructions(instsDeadAfterInitializerRemoved,
-                                               true);
+  deleter.forceDeleteWithUsers(AI);
+  for (auto *toDelete : instsDeadAfterInitializerRemoved) {
+    deleter.trackIfDead(toDelete);
   }
+
   ++DeadAllocApplyEliminated;
   return true;
 }

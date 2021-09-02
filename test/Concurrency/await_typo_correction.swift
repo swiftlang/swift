@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency -parse-as-library
+// RUN: %target-typecheck-verify-swift  -disable-availability-checking -parse-as-library
 // REQUIRES: concurrency
 
 func asyncFunc() async throws {}
@@ -21,9 +21,8 @@ func async() throws { }
     // expected-error@+1 {{found 'async' in expression; did you mean 'await'?}}{{13-18=await}}
     let _ = async anotherAsyncFunc()
 
-    // Don't emit a diagnostic here related to 'await'
+    // Don't emit a diagnostic here
     async let foo = anotherAsyncFunc()
-    // expected-warning@-1{{'async let' is now 'spawn let'}}{{5-10=spawn}}
     let _ = await foo
 
     // I question the name choice, but it's valid

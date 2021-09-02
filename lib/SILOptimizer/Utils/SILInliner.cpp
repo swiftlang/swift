@@ -348,6 +348,9 @@ SILInliner::inlineFullApply(FullApplySite apply,
                             SILInliner::InlineKind inlineKind,
                             SILOptFunctionBuilder &funcBuilder) {
   assert(apply.canOptimize());
+  assert(!apply.getFunction()->hasOwnership() ||
+         apply.getReferencedFunctionOrNull()->hasOwnership());
+
   SmallVector<SILValue, 8> appliedArgs;
   for (const auto arg : apply.getArguments())
     appliedArgs.push_back(arg);
@@ -575,15 +578,21 @@ void SILInlineCloner::fixUp(SILFunction *calleeFunction) {
 
   assert(!Apply.getInstruction()->hasUsesOfAnyResult());
 
-  auto callbacks = InstModCallbacks().onNotifyWillBeDeleted(
-      [this](SILInstruction *deletedI) {
-        if (NextIter == deletedI->getIterator())
-          ++NextIter;
-        if (DeletionCallback)
-          DeletionCallback(deletedI);
-      });
-  recursivelyDeleteTriviallyDeadInstructions(Apply.getInstruction(), true,
-                                             callbacks);
+  auto callbacks = InstModCallbacks().onDelete([&](SILInstruction *deadInst) {
+    if (NextIter == deadInst->getIterator())
+      ++NextIter;
+    deadInst->eraseFromParent();
+  });
+  if (DeletionCallback) {
+    callbacks =
+        callbacks.onNotifyWillBeDeleted([this](SILInstruction *toDeleteInst) {
+          DeletionCallback(toDeleteInst);
+        });
+  }
+  InstructionDeleter deleter(callbacks);
+  callbacks.notifyWillBeDeleted(Apply.getInstruction());
+  deleter.forceDelete(Apply.getInstruction());
+  deleter.cleanupDeadInstructions();
 }
 
 SILValue SILInlineCloner::borrowFunctionArgument(SILValue callArg,

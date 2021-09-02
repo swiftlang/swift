@@ -1401,8 +1401,8 @@ emitFunctionArgumentForAsyncTaskEntryPoint(SILGenFunction &SGF,
   return function.ensurePlusOne(SGF, loc);
 }
 
-// Emit SIL for the named builtin: createAsyncTaskFuture.
-static ManagedValue emitBuiltinCreateAsyncTaskFuture(
+// Emit SIL for the named builtin: createAsyncTask.
+static ManagedValue emitBuiltinCreateAsyncTask(
     SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
     ArrayRef<ManagedValue> args, SGFContext C) {
   ASTContext &ctx = SGF.getASTContext();
@@ -1449,15 +1449,14 @@ static ManagedValue emitBuiltinCreateAsyncTaskFuture(
 
   auto apply = SGF.B.createBuiltin(
       loc,
-      ctx.getIdentifier(
-          getBuiltinName(BuiltinValueKind::CreateAsyncTaskFuture)),
+      ctx.getIdentifier(getBuiltinName(BuiltinValueKind::CreateAsyncTask)),
       SGF.getLoweredType(getAsyncTaskAndContextType(ctx)), subs,
       { flags, futureResultMetadata, function.forward(SGF) });
   return SGF.emitManagedRValueWithCleanup(apply);
 }
 
-// Emit SIL for the named builtin: createAsyncTaskGroupFuture.
-static ManagedValue emitBuiltinCreateAsyncTaskGroupFuture(
+// Emit SIL for the named builtin: createAsyncTaskInGroup.
+static ManagedValue emitBuiltinCreateAsyncTaskInGroup(
     SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
     ArrayRef<ManagedValue> args, SGFContext C) {
   ASTContext &ctx = SGF.getASTContext();
@@ -1485,7 +1484,7 @@ static ManagedValue emitBuiltinCreateAsyncTaskGroupFuture(
   auto apply = SGF.B.createBuiltin(
       loc,
       ctx.getIdentifier(
-          getBuiltinName(BuiltinValueKind::CreateAsyncTaskGroupFuture)),
+          getBuiltinName(BuiltinValueKind::CreateAsyncTaskInGroup)),
       SGF.getLoweredType(getAsyncTaskAndContextType(ctx)), subs,
       { flags, group, futureResultMetadata, function.forward(SGF) });
   return SGF.emitManagedRValueWithCleanup(apply);
@@ -1568,6 +1567,14 @@ static ManagedValue emitBuiltinWithUnsafeThrowingContinuation(
     ArrayRef<ManagedValue> args, SGFContext C) {
   return emitBuiltinWithUnsafeContinuation(SGF, loc, subs, args, C,
                                            /*throws=*/true);
+}
+
+static ManagedValue emitBuiltinHopToActor(SILGenFunction &SGF, SILLocation loc,
+                                          SubstitutionMap subs,
+                                          ArrayRef<ManagedValue> args,
+                                          SGFContext C) {
+  SGF.emitHopToActorValue(loc, args[0]);
+  return ManagedValue::forUnmanaged(SGF.emitEmptyTuple(loc));
 }
 
 static ManagedValue emitBuiltinAutoDiffCreateLinearMapContext(

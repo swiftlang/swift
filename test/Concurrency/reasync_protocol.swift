@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
+// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency -disable-availability-checking
 // REQUIRES: concurrency
 
 @reasync protocol ReasyncProtocol {}

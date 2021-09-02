@@ -121,14 +121,26 @@ static void computeLoweredStoredProperties(NominalTypeDecl *decl) {
   // If this is an actor, check conformance to the Actor protocol to
   // ensure that the actor storage will get created (if needed).
   if (auto classDecl = dyn_cast<ClassDecl>(decl)) {
+    // If this is an actor class, check conformance to the Actor protocol to
+    // ensure that the actor storage will get created (if needed).
     if (classDecl->isActor()) {
       ASTContext &ctx = decl->getASTContext();
+
       if (auto actorProto = ctx.getProtocol(KnownProtocolKind::Actor)) {
         SmallVector<ProtocolConformance *, 1> conformances;
-        classDecl->lookupConformance(
-            decl->getModuleContext(), actorProto, conformances);
+        classDecl->lookupConformance(actorProto, conformances);
         for (auto conformance : conformances)
           TypeChecker::checkConformance(conformance->getRootNormalConformance());
+      }
+
+      // If this is a distributed actor, synthesize its special stored properties.
+      if (classDecl->isDistributedActor()) {
+        if (auto actorProto = ctx.getProtocol(KnownProtocolKind::DistributedActor)) {
+          SmallVector<ProtocolConformance *, 1> conformances;
+          classDecl->lookupConformance(actorProto, conformances);
+          for (auto conformance : conformances)
+            TypeChecker::checkConformance(conformance->getRootNormalConformance());
+        }
       }
     }
   }
@@ -219,6 +231,14 @@ PatternBindingEntryRequest::evaluate(Evaluator &eval,
     }
   }
 
+  // Reject "class" methods on actors.
+  if (StaticSpelling == StaticSpellingKind::KeywordClass &&
+      binding->getDeclContext()->getSelfClassDecl() &&
+      binding->getDeclContext()->getSelfClassDecl()->isActor()) {
+    binding->diagnose(diag::class_var_not_in_class, false)
+        .fixItReplace(binding->getStaticLoc(), "static");
+  }
+
   // Check the pattern.
   auto contextualPattern =
       ContextualPattern::forPatternBindingDecl(binding, entryNumber);
@@ -245,6 +265,7 @@ PatternBindingEntryRequest::evaluate(Evaluator &eval,
   // If the pattern contains some form of unresolved type, we'll need to
   // check the initializer.
   if (patternType->hasUnresolvedType() ||
+      patternType->hasPlaceholder() ||
       patternType->hasUnboundGenericType()) {
     if (TypeChecker::typeCheckPatternBinding(binding, entryNumber,
                                              patternType)) {
@@ -978,7 +999,8 @@ static ProtocolConformanceRef checkConformanceToNSCopying(VarDecl *var,
   auto proto = ctx.getNSCopyingDecl();
 
   if (proto) {
-    if (auto result = TypeChecker::conformsToProtocol(type, proto, dc))
+    if (auto result = TypeChecker::conformsToProtocol(type, proto,
+                                                      dc->getParentModule()))
       return result;
   }
 
@@ -1053,7 +1075,7 @@ static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
   // Drop the self type
   copyMethodType = copyMethodType->getResult()->castTo<FunctionType>();
 
-  auto DSCE = new (Ctx) DotSyntaxCallExpr(DRE, SourceLoc(), Val);
+  auto DSCE = DotSyntaxCallExpr::create(Ctx, DRE, SourceLoc(), Val);
   DSCE->setImplicit();
   DSCE->setType(copyMethodType);
   DSCE->setThrows(false);
@@ -1228,8 +1250,8 @@ namespace {
       if (auto CLE = dyn_cast<CaptureListExpr>(E)) {
         // Make sure to recontextualize any decls in the capture list as well.
         for (auto &CLE : CLE->getCaptureList()) {
-          CLE.Var->setDeclContext(NewDC);
-          CLE.Init->setDeclContext(NewDC);
+          CLE.getVar()->setDeclContext(NewDC);
+          CLE.PBD->setDeclContext(NewDC);
         }
       }
       
@@ -1538,7 +1560,7 @@ synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
       auto *SelfDRE =
           buildSelfReference(SelfDecl, SelfAccessorKind::Peer, IsSelfLValue);
       SelfDRE = maybeWrapInOutExpr(SelfDRE, Ctx);
-      auto *DSCE = new (Ctx) DotSyntaxCallExpr(Callee, SourceLoc(), SelfDRE);
+      auto *DSCE = DotSyntaxCallExpr::create(Ctx, Callee, SourceLoc(), SelfDRE);
 
       if (auto funcType = type->getAs<FunctionType>())
         type = funcType->getResult();
@@ -1551,7 +1573,7 @@ synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
     if (arg) {
       Call = CallExpr::createImplicit(Ctx, Callee, {ValueDRE}, {Identifier()});
     } else {
-      Call = CallExpr::createImplicit(Ctx, Callee, {}, {});
+      Call = CallExpr::createImplicitEmpty(Ctx, Callee);
     }
 
     if (auto funcType = type->getAs<FunctionType>())
@@ -1719,7 +1741,7 @@ synthesizeModifyCoroutineBodyWithSimpleDidSet(AccessorDecl *accessor,
       auto *SelfDRE = buildSelfReference(SelfDecl, SelfAccessorKind::Peer,
                                          storage->isSetterMutating());
       SelfDRE = maybeWrapInOutExpr(SelfDRE, ctx);
-      auto *DSCE = new (ctx) DotSyntaxCallExpr(Callee, SourceLoc(), SelfDRE);
+      auto *DSCE = DotSyntaxCallExpr::create(ctx, Callee, SourceLoc(), SelfDRE);
 
       if (auto funcType = type->getAs<FunctionType>())
         type = funcType->getResult();
@@ -1728,7 +1750,7 @@ synthesizeModifyCoroutineBodyWithSimpleDidSet(AccessorDecl *accessor,
       Callee = DSCE;
     }
 
-    auto *Call = CallExpr::createImplicit(ctx, Callee, {}, {});
+    auto *Call = CallExpr::createImplicitEmpty(ctx, Callee);
     if (auto funcType = type->getAs<FunctionType>())
       type = funcType->getResult();
     Call->setType(type);
@@ -2563,26 +2585,24 @@ static VarDecl *synthesizePropertyWrapperProjectionVar(
 
 static void typeCheckSynthesizedWrapperInitializer(VarDecl *wrappedVar,
                                                    Expr *&initializer) {
-  // Figure out the context in which the initializer was written.
-  auto *parentPBD = wrappedVar->getParentPatternBinding();
-  auto i = parentPBD->getPatternEntryIndexForVarDecl(wrappedVar);
-  DeclContext *originalDC = parentPBD->getDeclContext();
-  if (!originalDC->isLocalContext()) {
-    auto initContext =
-        cast_or_null<PatternBindingInitializer>(parentPBD->getInitContext(i));
-    if (initContext)
-      originalDC = initContext;
-  }
+  auto *dc = wrappedVar->getInnermostDeclContext();
+  auto &ctx = wrappedVar->getASTContext();
+  auto *initContext = new (ctx) PropertyWrapperInitializer(
+      dc, wrappedVar, PropertyWrapperInitializer::Kind::WrappedValue);
 
   // Type-check the initialization.
-  auto *pattern = parentPBD->getPattern(i);
-  TypeChecker::typeCheckBinding(pattern, initializer, originalDC,
-                                wrappedVar->getType(), parentPBD, i);
+  using namespace constraints;
+  auto target = SolutionApplicationTarget::forPropertyWrapperInitializer(
+      wrappedVar, initContext, initializer);
+  auto result = TypeChecker::typeCheckExpression(target);
+  if (!result)
+    return;
 
-  if (auto initializerContext =
-          dyn_cast_or_null<Initializer>(parentPBD->getInitContext(i))) {
-    TypeChecker::contextualizeInitializer(initializerContext, initializer);
-  }
+  initializer = result->getAsExpr();
+
+  TypeChecker::contextualizeInitializer(initContext, initializer);
+  checkPropertyWrapperActorIsolation(wrappedVar, initializer);
+  TypeChecker::checkInitializerEffects(initContext, initializer);
 }
 
 static PropertyWrapperMutability::Value
@@ -2870,10 +2890,16 @@ PropertyWrapperInitializerInfoRequest::evaluate(Evaluator &evaluator,
       if (!parentPBD->isInitialized(patternNumber) && wrapperInfo.defaultInit) {
         // FIXME: Record this expression somewhere so that DI can perform the
         // initialization itself.
-        Expr *initializer = nullptr;
-        typeCheckSynthesizedWrapperInitializer(var, initializer);
-        pbd->setInit(0, initializer);
+        Expr *defaultInit = nullptr;
+        typeCheckSynthesizedWrapperInitializer(var, defaultInit);
+        pbd->setInit(0, defaultInit);
         pbd->setInitializerChecked(0);
+
+        // If a static, global, or local wrapped property has a default
+        // initializer, this is the only initializer that will be used.
+        if (var->isStatic() || !dc->isTypeContext()) {
+          initializer = defaultInit;
+        }
       } else if (var->hasObservers() && !dc->isTypeContext()) {
         var->diagnose(diag::observingprop_requires_initializer);
       }
@@ -2935,21 +2961,7 @@ PropertyWrapperInitializerInfoRequest::evaluate(Evaluator &evaluator,
              !var->getName().hasDollarPrefix()) {
     wrappedValueInit = PropertyWrapperValuePlaceholderExpr::create(
         ctx, var->getSourceRange(), var->getType(), /*wrappedValue=*/nullptr);
-
-    if (auto *param = dyn_cast<ParamDecl>(var)) {
-      wrappedValueInit = buildPropertyWrapperInitCall(
-          var, storageType, wrappedValueInit, PropertyWrapperInitKind::WrappedValue);
-      TypeChecker::typeCheckExpression(wrappedValueInit, dc);
-
-      // Check initializer effects.
-      auto *initContext = new (ctx) PropertyWrapperInitializer(
-          dc, param, PropertyWrapperInitializer::Kind::WrappedValue);
-      TypeChecker::contextualizeInitializer(initContext, wrappedValueInit);
-      checkInitializerActorIsolation(initContext, wrappedValueInit);
-      TypeChecker::checkInitializerEffects(initContext, wrappedValueInit);
-    } else {
-      typeCheckSynthesizedWrapperInitializer(var, wrappedValueInit);
-    }
+    typeCheckSynthesizedWrapperInitializer(var, wrappedValueInit);
   }
 
   return PropertyWrapperInitializerInfo(wrappedValueInit, projectedValueInit);
@@ -2991,15 +3003,6 @@ static void finishProtocolStorageImplInfo(AbstractStorageDecl *storage,
   }
 }
 
-/// This emits a diagnostic with a fixit to remove the attribute.
-template<typename ...ArgTypes>
-void diagnoseAndRemoveAttr(Decl *D, DeclAttribute *attr,
-                           ArgTypes &&...Args) {
-  auto &ctx = D->getASTContext();
-  ctx.Diags.diagnose(attr->getLocation(), std::forward<ArgTypes>(Args)...)
-    .fixItRemove(attr->getRangeWithAt());
-}
-
 static void finishLazyVariableImplInfo(VarDecl *var,
                                        StorageImplInfo &info) {
   auto *attr = var->getAttrs().getAttribute<LazyAttr>();
@@ -3007,16 +3010,16 @@ static void finishLazyVariableImplInfo(VarDecl *var,
   // It cannot currently be used on let's since we don't have a mutability model
   // that supports it.
   if (var->isLet())
-    diagnoseAndRemoveAttr(var, attr, diag::lazy_not_on_let);
+    diagnoseAttrWithRemovalFixIt(var, attr, diag::lazy_not_on_let);
 
   // lazy must have an initializer.
   if (!var->getParentInitializer())
-    diagnoseAndRemoveAttr(var, attr, diag::lazy_requires_initializer);
+    diagnoseAttrWithRemovalFixIt(var, attr, diag::lazy_requires_initializer);
 
   bool invalid = false;
 
   if (isa<ProtocolDecl>(var->getDeclContext())) {
-    diagnoseAndRemoveAttr(var, attr, diag::lazy_not_in_protocol);
+    diagnoseAttrWithRemovalFixIt(var, attr, diag::lazy_not_in_protocol);
     invalid = true;
   }
 
@@ -3024,13 +3027,13 @@ static void finishLazyVariableImplInfo(VarDecl *var,
   if (info.getReadImpl() != ReadImplKind::Stored &&
       (info.getWriteImpl() != WriteImplKind::Stored &&
        info.getWriteImpl() != WriteImplKind::StoredWithObservers)) {
-    diagnoseAndRemoveAttr(var, attr, diag::lazy_not_on_computed);
+    diagnoseAttrWithRemovalFixIt(var, attr, diag::lazy_not_on_computed);
     invalid = true;
   }
 
   // The pattern binding must only bind a single variable.
   if (!var->getParentPatternBinding()->getSingleVar())
-    diagnoseAndRemoveAttr(var, attr, diag::lazy_requires_single_var);
+    diagnoseAttrWithRemovalFixIt(var, attr, diag::lazy_requires_single_var);
 
   if (!invalid)
     info = StorageImplInfo::getMutableComputed();
@@ -3082,7 +3085,7 @@ static void finishNSManagedImplInfo(VarDecl *var,
   auto *attr = var->getAttrs().getAttribute<NSManagedAttr>();
 
   if (var->isLet())
-    diagnoseAndRemoveAttr(var, attr, diag::attr_NSManaged_let_property);
+    diagnoseAttrWithRemovalFixIt(var, attr, diag::attr_NSManaged_let_property);
 
   SourceFile *parentFile = var->getDeclContext()->getParentSourceFile();
 
@@ -3094,7 +3097,7 @@ static void finishNSManagedImplInfo(VarDecl *var,
     if (parentFile && parentFile->Kind == SourceFileKind::Interface)
       return;
 
-    diagnoseAndRemoveAttr(var, attr, diag::attr_NSManaged_not_stored, kind);
+    diagnoseAttrWithRemovalFixIt(var, attr, diag::attr_NSManaged_not_stored, kind);
   };
 
   // @NSManaged properties must be written as stored.

@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "SILGenFunction.h"
+#include "SILGenFunctionBuilder.h"
 #include "RValue.h"
 #include "ArgumentScope.h"
 #include "swift/AST/GenericSignature.h"
@@ -73,6 +74,15 @@ void SILGenFunction::emitDestroyingDestructor(DestructorDecl *dd) {
                                     subMap, baseSelf);
   } else {
     resultSelfValue = selfValue;
+  }
+
+  /// A distributed actor resigns its identity as it is deallocated.
+  /// This way the transport knows it must not deliver any more messages to it,
+  /// and can remove it from its (weak) lookup tables.
+  if (cd->isDistributedActor()) {
+    SILBasicBlock *continueBB = createBasicBlock();
+    emitDistributedActor_resignAddress(dd, selfValue, continueBB);
+    B.emitBlock(continueBB);
   }
 
   ArgumentScope S(*this, Loc);
@@ -187,34 +197,76 @@ void SILGenFunction::emitIVarDestroyer(SILDeclRef ivarDestroyer) {
   emitEpilog(loc);
 }
 
+void SILGenFunction::destroyClassMember(SILLocation cleanupLoc,
+                                        ManagedValue selfValue, VarDecl *D) {
+  const TypeLowering &ti = getTypeLowering(D->getType());
+  if (!ti.isTrivial()) {
+    SILValue addr =
+        B.createRefElementAddr(cleanupLoc, selfValue.getValue(), D,
+                               ti.getLoweredType().getAddressType());
+    addr = B.createBeginAccess(
+        cleanupLoc, addr, SILAccessKind::Deinit, SILAccessEnforcement::Static,
+        false /*noNestedConflict*/, false /*fromBuiltin*/);
+    B.createDestroyAddr(cleanupLoc, addr);
+    B.createEndAccess(cleanupLoc, addr, false /*is aborting*/);
+  }
+}
+
 void SILGenFunction::emitClassMemberDestruction(ManagedValue selfValue,
                                                 ClassDecl *cd,
                                                 CleanupLocation cleanupLoc) {
   assert(selfValue.getOwnershipKind() == OwnershipKind::Guaranteed);
-  for (VarDecl *vd : cd->getStoredProperties()) {
-    const TypeLowering &ti = getTypeLowering(vd->getType());
-    if (!ti.isTrivial()) {
-      SILValue addr =
-          B.createRefElementAddr(cleanupLoc, selfValue.getValue(), vd,
-                                 ti.getLoweredType().getAddressType());
-      addr = B.createBeginAccess(
-          cleanupLoc, addr, SILAccessKind::Deinit, SILAccessEnforcement::Static,
-          false /*noNestedConflict*/, false /*fromBuiltin*/);
-      B.createDestroyAddr(cleanupLoc, addr);
-      B.createEndAccess(cleanupLoc, addr, false /*is aborting*/);
+
+  /// If this ClassDecl is a distributed actor, we must synthesise another code
+  /// path for deallocating a 'remote' actor. In that case, these basic blocks
+  /// are used to return to the "normal" (i.e. 'local' instance) destruction.
+  ///
+  /// For other cases, the basic blocks are not necessary and the destructor
+  /// can just emit all the normal destruction code right into the current block.
+  // If set, used as the basic block for the destroying of all members.
+  SILBasicBlock* normalMemberDestroyBB = nullptr;
+  // If set, used as the basic block after members have been destroyed,
+  // and we're ready to perform final cleanups before returning.
+  SILBasicBlock* finishBB = nullptr;
+
+  /// A distributed actor may be 'remote' in which case there is no need to
+  /// destroy "all" members, because they never had storage to begin with.
+  if (cd->isDistributedActor()) {
+    finishBB = createBasicBlock();
+    normalMemberDestroyBB = createBasicBlock();
+
+    emitDistributedActorClassMemberDestruction(cleanupLoc, selfValue, cd,
+                                               normalMemberDestroyBB,
+                                               finishBB);
+  }
+
+  /// Destroy all members.
+  {
+    if (normalMemberDestroyBB)
+      B.emitBlock(normalMemberDestroyBB);
+
+    for (VarDecl *vd : cd->getStoredProperties())
+      destroyClassMember(cleanupLoc, selfValue, vd);
+
+    if (finishBB)
+      B.createBranch(cleanupLoc, finishBB);
+  }
+
+  {
+    if (finishBB)
+      B.emitBlock(finishBB);
+
+    if (cd->isRootDefaultActor()) {
+      // TODO(distributed): we may need to call the distributed destroy here instead?
+      auto builtinName = getASTContext().getIdentifier(
+          getBuiltinName(BuiltinValueKind::DestroyDefaultActor));
+      auto resultTy = SGM.Types.getEmptyTupleType();
+
+      B.createBuiltin(cleanupLoc, builtinName, resultTy, /*subs*/{},
+                      { selfValue.getValue() });
     }
   }
-
-  if (cd->isRootDefaultActor()) {
-    auto builtinName = getASTContext().getIdentifier(
-      getBuiltinName(BuiltinValueKind::DestroyDefaultActor));
-    auto resultTy = SGM.Types.getEmptyTupleType();
-
-    B.createBuiltin(cleanupLoc, builtinName, resultTy, /*subs*/{},
-                    { selfValue.getValue() });
-  }
 }
-
 
 void SILGenFunction::emitObjCDestructor(SILDeclRef dtor) {
   auto dd = cast<DestructorDecl>(dtor.getDecl());

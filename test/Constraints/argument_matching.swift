@@ -1153,7 +1153,7 @@ func testUnlabeledParameterBindingPosition() {
     // expected-error@-2:22 {{missing argument for parameter 'dd' in call}}
 
     f(1, xx: 2, dd: 3)
-    // expected-error@-1 {{incorrect argument labels in call (have '_:xx:dd:', expected '_:_:cc:dd:')}}
+    // expected-error@-1 {{extraneous argument label 'xx:' in call}}
     // expected-error@-2:15 {{missing argument for parameter 'cc' in call}}
 
     f(xx: 1, 2, cc: 3)
@@ -1161,7 +1161,7 @@ func testUnlabeledParameterBindingPosition() {
     // expected-error@-2:22 {{missing argument for parameter 'dd' in call}}
 
     f(xx: 1, 2, dd: 3)
-    // expected-error@-1 {{incorrect argument labels in call (have 'xx:_:dd:', expected '_:_:cc:dd:')}}
+    // expected-error@-1 {{extraneous argument label 'xx:' in call}}
     // expected-error@-2:15 {{missing argument for parameter 'cc' in call}}
 
     f(1, xx: 2, cc: 3, dd: 4)
@@ -1207,23 +1207,26 @@ func testUnlabeledParameterBindingPosition() {
 
     f(1, xx: 2)
     // expected-error@-1:6 {{missing arguments for parameters 'aa', 'bb' in call}}
-    // expected-error@-2 {{incorrect argument labels in call (have '_:xx:', expected 'aa:bb:_:_:')}}
+    // expected-error@-2 {{extraneous argument label 'xx:' in call}}
 
     f(xx: 1, 2)
-    // expected-error@-1 {{incorrect argument labels in call (have 'xx:_:', expected 'aa:bb:_:_:')}}
+    // expected-error@-1 {{extraneous argument label 'xx:' in call}}
     // expected-error@-2:6 {{missing arguments for parameters 'aa', 'bb' in call}}
 
     f(bb: 1, 2, xx: 3)
     // expected-error@-1:7 {{missing argument for parameter 'aa' in call}}
+    // expected-error@-2:6 {{extraneous argument label 'xx:' in call}}
 
     f(bb: 1, xx: 2, 3)
     // expected-error@-1:7 {{missing argument for parameter 'aa' in call}}
+    // expected-error@-2:6 {{extraneous argument label 'xx:' in call}}
 
     f(aa: 1, 2, xx: 3)
     // expected-error@-1:12 {{missing argument for parameter 'bb' in call}}
+    // expected-error@-2:6 {{extraneous argument label 'xx:' in call}}
 
     f(aa: 1, xx: 2, 3)
-    // expected-error@-1 {{incorrect argument labels in call (have 'aa:xx:_:', expected 'aa:bb:_:_:')}}
+    // expected-error@-1 {{extraneous argument label 'xx:' in call}}
     // expected-error@-2:12 {{missing argument for parameter 'bb' in call}}
 
     f(aa: 1, bb: 2, 3, xx: 4)
@@ -1639,7 +1642,7 @@ _ = CurriedClass.method3(1, 2)           // expected-error {{instance member 'me
 // expected-error@-1 {{missing argument label 'b:' in call}}
 CurriedClass.method3(c)(1.0, b: 1)       // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 CurriedClass.method3(c)(1)               // expected-error {{missing argument for parameter 'b' in call}}
-CurriedClass.method3(c)(c: 1.0)          // expected-error {{incorrect argument labels in call (have 'c:', expected '_:b:')}}
+CurriedClass.method3(c)(c: 1.0)          // expected-error {{incorrect argument label in call (have 'c:', expected 'b:')}}
 // expected-error@-1 {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 // expected-error@-2 {{missing argument for parameter #1 in call}}
 
@@ -1758,4 +1761,24 @@ func rdar70764991() {
   func test(_ str: String) {
     bar(str, S.foo) // expected-error {{unnamed argument #1 must precede unnamed argument #2}}  {{9-12=}} {{14-14=str}}
   }
+}
+
+func testExtraTrailingClosure() {
+  func foo() {}
+  foo() {} // expected-error@:9 {{extra trailing closure passed in call}}
+  foo {} // expected-error@:7 {{extra trailing closure passed in call}}
+  foo {} x: {} // expected-error@:7 {{argument passed to call that takes no arguments}}
+
+  func bar(_ x: Int) {} // expected-note 2{{'bar' declared here}}
+  bar(5) {} // expected-error@:10 {{extra trailing closure passed in call}}
+  bar(0) {} x: {} // expected-error@:6 {{extra trailing closures at positions #2, #3 in call}}
+  bar(5, "") {} // expected-error@:6 {{extra arguments at positions #2, #3 in call}}
+
+  func baz(_ fn: () -> Void) {} // expected-note {{'baz' declared here}}
+  baz {} x: {} // expected-error@:13 {{extra trailing closure passed in call}}
+  baz({}) {} // expected-error@:11 {{extra trailing closure passed in call}}
+  baz({}) {} y: {} // expected-error@:6 {{extra trailing closures at positions #2, #3 in call}}
+
+  func qux(x: () -> Void, y: () -> Void, z: () -> Void) {} // expected-note {{'qux(x:y:z:)' declared here}}
+  qux() {} m: {} y: {} n: {} z: {} o: {} // expected-error@:6 {{extra trailing closures at positions #2, #4, #6 in call}}
 }

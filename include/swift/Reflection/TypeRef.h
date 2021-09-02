@@ -462,10 +462,12 @@ class FunctionTypeRef final : public TypeRef {
   const TypeRef *Result;
   FunctionTypeFlags Flags;
   FunctionMetadataDifferentiabilityKind DifferentiabilityKind;
+  const TypeRef *GlobalActor;
 
   static TypeRefID Profile(const std::vector<Param> &Parameters,
                            const TypeRef *Result, FunctionTypeFlags Flags,
-                           FunctionMetadataDifferentiabilityKind DiffKind) {
+                           FunctionMetadataDifferentiabilityKind DiffKind,
+                           const TypeRef *GlobalActor) {
     TypeRefID ID;
     for (const auto &Param : Parameters) {
       ID.addString(Param.getLabel().str());
@@ -475,21 +477,27 @@ class FunctionTypeRef final : public TypeRef {
     ID.addPointer(Result);
     ID.addInteger(static_cast<uint64_t>(Flags.getIntValue()));
     ID.addInteger(static_cast<uint64_t>(DiffKind.getIntValue()));
+    ID.addPointer(GlobalActor);
+
     return ID;
   }
 
 public:
   FunctionTypeRef(std::vector<Param> Params, const TypeRef *Result,
                   FunctionTypeFlags Flags,
-                  FunctionMetadataDifferentiabilityKind DiffKind)
+                  FunctionMetadataDifferentiabilityKind DiffKind,
+                  const TypeRef *GlobalActor)
       : TypeRef(TypeRefKind::Function), Parameters(Params), Result(Result),
-        Flags(Flags), DifferentiabilityKind(DiffKind) {}
+        Flags(Flags), DifferentiabilityKind(DiffKind),
+        GlobalActor(GlobalActor) {}
 
   template <typename Allocator>
   static const FunctionTypeRef *create(
       Allocator &A, std::vector<Param> Params, const TypeRef *Result,
-      FunctionTypeFlags Flags, FunctionMetadataDifferentiabilityKind DiffKind) {
-    FIND_OR_CREATE_TYPEREF(A, FunctionTypeRef, Params, Result, Flags, DiffKind);
+      FunctionTypeFlags Flags, FunctionMetadataDifferentiabilityKind DiffKind,
+      const TypeRef *GlobalActor) {
+    FIND_OR_CREATE_TYPEREF(
+        A, FunctionTypeRef, Params, Result, Flags, DiffKind, GlobalActor);
   }
 
   const std::vector<Param> &getParameters() const { return Parameters; };
@@ -504,6 +512,10 @@ public:
 
   FunctionMetadataDifferentiabilityKind getDifferentiabilityKind() const {
     return DifferentiabilityKind;
+  }
+
+  const TypeRef *getGlobalActor() const {
+    return GlobalActor;
   }
 
   static bool classof(const TypeRef *TR) {

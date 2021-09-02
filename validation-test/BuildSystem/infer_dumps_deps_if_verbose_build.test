@@ -1,8 +1,34 @@
 # RUN: %empty-directory(%t)
 # RUN: mkdir -p %t
-# RUN: SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --verbose-build --dry-run --infer --swiftpm --cmake %cmake 2>&1 | %FileCheck %s
+# RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --verbose-build --dry-run --infer --swiftpm --cmake %cmake 2>&1 | %FileCheck %s
 
 # REQUIRES: standalone_build
+
+# Just make sure we compute the build graph/emit output.
+#
+# CHECK: -- Build Graph Inference --
+# CHECK: Initial Product List:
+# CHECK:     earlyswiftdriver
+# CHECK: -- Build Graph Inference --
+# CHECK-NEXT: Initial Product List:
+# CHECK:     llvm
+# CHECK:     swift
+# CHECK-NOT: llbuild
+# CHECK: -- Build Graph Inference --
+# CHECK-NEXT: Initial Product List:
+# CHECK:     swiftpm
+# CHECK-NOT: llbuild
+# CHECK: Final Build Order:
+# CHECK:     earlyswiftdriver
+# CHECK:     cmark
+# CHECK:     llvm
+# CHECK:     swift
+# CHECK:     llbuild
+# CHECK:     swiftpm
+
+# Ensure early SwiftDriver is built first
+#
+# CHECK: --- Building earlyswiftdriver ---
 
 # Build and install the SwiftPM dependencies first.
 #
@@ -10,18 +36,6 @@
 # CHECK: --- Installing llvm ---
 # CHECK: --- Installing swift ---
 # CHECK: --- Installing llbuild ---
-
-# Just make sure we compute the build graph/emit output.
-#
-# CHECK: -- Build Graph Inference --
-# CHECK: Initial Product List:
-# CHECK:     cmark
-# CHECK:     llvm
-# CHECK:     swift
-# CHECK: Final Build Order:
-# CHECK:     cmark
-# CHECK:     llvm
-# CHECK:     swift
 
 # Then make sure we are installing/building SwiftPM last.
 #

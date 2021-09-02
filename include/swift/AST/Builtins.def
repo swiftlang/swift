@@ -512,6 +512,9 @@ BUILTIN_SIL_OPERATION(WithUnsafeContinuation, "withUnsafeContinuation", Special)
 /// the continuation is resumed.
 BUILTIN_SIL_OPERATION(WithUnsafeThrowingContinuation, "withUnsafeThrowingContinuation", Special)
 
+/// Force the current task to be rescheduled on the specified actor.
+BUILTIN_SIL_OPERATION(HopToActor, "hopToActor", None)
+
 #undef BUILTIN_SIL_OPERATION
 
 // BUILTIN_RUNTIME_CALL - A call into a runtime function.
@@ -724,6 +727,14 @@ BUILTIN_MISC_OPERATION(InitializeDefaultActor, "initializeDefaultActor", "", Spe
 /// Destroy the default-actor instance in a default actor object.
 BUILTIN_MISC_OPERATION(DestroyDefaultActor, "destroyDefaultActor", "", Special)
 
+/// Allocate a "proxy" for a distributed remote actor.  TODO(distributed) change the name of this to create throughout.
+BUILTIN_MISC_OPERATION(InitializeDistributedRemoteActor,
+                       "initializeDistributedRemoteActor", "", Special)
+
+/// Destroy the distributed-actor instance in a "proxy" actor object.
+BUILTIN_MISC_OPERATION(DestroyDistributedActor,
+                       "destroyDistributedActor", "", Special)
+
 /// Resume a non-throwing continuation normally with the given result.
 BUILTIN_MISC_OPERATION(ResumeNonThrowingContinuationReturning,
                        "resumeNonThrowingContinuationReturning", "", Special)
@@ -782,11 +793,28 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(CancelAsyncTask, "cancelAsyncTask", "", Speci
 ///     __owned @Sendable @escaping () async throws -> T
 /// ) -> Builtin.RawPointer
 ///
+/// DEPRECATED. startAsyncLetWithLocalBuffer is used instead.
+///
 /// Create, initialize and start a new async-let and associated task.
 /// Returns an AsyncLet* that must be passed to endAsyncLet for destruction.
 BUILTIN_MISC_OPERATION(StartAsyncLet, "startAsyncLet", "", Special)
 
-/// asyncLetEnd(): (Builtin.RawPointer) -> Void
+/// startAsyncLetWithLocalBuffer()<T>: (
+///     __owned @Sendable @escaping () async throws -> T,
+///     _ resultBuf: Builtin.RawPointer
+/// ) -> Builtin.RawPointer
+///
+/// Create, initialize and start a new async-let and associated task, with a
+/// locally-allocated buffer assigned to receive the result if the task
+/// completes.
+/// Returns an AsyncLet* that must be passed to endAsyncLetLifetime for
+/// destruction.
+BUILTIN_MISC_OPERATION(StartAsyncLetWithLocalBuffer, "startAsyncLetWithLocalBuffer", "", Special)
+
+/// endAsyncLet(): (Builtin.RawPointer) -> Void
+///
+/// DEPRECATED. The swift_asyncLet_finish intrinsic and endAsyncLetLifetime
+/// builtin are used instead.
 ///
 /// Ends and destroys an async-let.
 /// The ClosureLifetimeFixup pass adds a second operand to the builtin to
@@ -794,26 +822,34 @@ BUILTIN_MISC_OPERATION(StartAsyncLet, "startAsyncLet", "", Special)
 /// until the endAsyncLet.
 BUILTIN_MISC_OPERATION_WITH_SILGEN(EndAsyncLet, "endAsyncLet", "", Special)
 
-/// createAsyncTaskFuture(): (
-///     Int, Builtin.NativeObject?, @escaping () async throws -> T
+/// endAsyncLetLifetime(): (Builtin.RawPointer) -> Void
+///
+/// Marks the end of an async-let's lifetime.
+/// The ClosureLifetimeFixup pass adds a second operand to the builtin to
+/// ensure that optimizations keep the stack-allocated closure arguments alive
+/// until the endAsyncLet.
+BUILTIN_MISC_OPERATION(EndAsyncLetLifetime, "endAsyncLetLifetime", "", Special)
+
+/// createAsyncTask(): (
+///     Int,                            // task-creation flags
+///     @escaping () async throws -> T  // function
 /// ) -> Builtin.NativeObject
 ///
-/// Create a new asynchronous task future, given flags, an (optional) parent
-/// task and a function to execute.
-BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTaskFuture,
-    "createAsyncTaskFuture", "", Special)
+/// Create a new asynchronous task, given flags, options, and a function to
+/// execute.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTask,
+    "createAsyncTask", "", Special)
 
-/// createAsyncTaskGroupFuture(): (
-///     Int, // flags
-///     Builtin.NativeObject?, // parent
-///     Builtin.RawPointer?, // group
-///     @escaping () async throws -> T
+/// createAsyncTaskInGroup(): (
+///     Int,                            // flags
+///     Builtin.RawPointer,             // group
+///     @escaping () async throws -> T  // function
 /// ) -> Builtin.NativeObject
 ///
 /// Create a new asynchronous task future, given flags, a parent task,
 /// task group and a function to execute.
-BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTaskGroupFuture,
-    "createAsyncTaskGroupFuture", "", Special)
+BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTaskInGroup,
+    "createAsyncTaskInGroup", "", Special)
 
 /// globalStringTablePointer has type String -> Builtin.RawPointer.
 /// It returns an immortal, global string table pointer for strings constructed

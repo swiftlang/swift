@@ -43,6 +43,11 @@ inline void deleteAllDebugUses(SILInstruction *inst,
   }
 }
 
+/// Transfer debug info associated with (the result of) \p I to a
+/// new `debug_value` or `debug_value_addr` instruction before \p I is
+/// deleted.
+void salvageDebugInfo(SILInstruction *I);
+
 /// Erases the instruction \p I from it's parent block and deletes it, including
 /// all debug instructions which use \p I.
 /// Precondition: The instruction may only have debug instructions as uses.
@@ -76,6 +81,7 @@ eraseFromParentWithDebugInsts(SILInstruction *inst,
   // Just matching what eraseFromParentWithDebugInsts is today.
   if (nextII == inst->getIterator())
     ++nextII;
+  swift::salvageDebugInfo(inst);
   callbacks.deleteInst(inst, false /*do not notify*/);
   return nextII;
 }

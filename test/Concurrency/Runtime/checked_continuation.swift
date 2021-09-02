@@ -1,11 +1,9 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -parse-as-library)
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library)
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
-
-// UNSUPPORTED: OS=windows-msvc
 
 import _Concurrency
 import StdlibUnittest
@@ -16,7 +14,7 @@ struct TestError: Error {}
   static func main() async {
     var tests = TestSuite("CheckedContinuation")
 
-    if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+    if #available(SwiftStdlib 5.5, *) {
       tests.test("trap on double resume non-throwing continuation") {
         expectCrashLater()
 

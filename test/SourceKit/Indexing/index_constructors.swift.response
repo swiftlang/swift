@@ -9,13 +9,6 @@
   ],
   key.entities: [
     {
-      key.kind: source.lang.swift.ref.module,
-      key.name: "Foundation",
-      key.usr: "c:@M@Foundation",
-      key.line: 6,
-      key.column: 8
-    },
-    {
       key.kind: source.lang.swift.decl.class,
       key.name: "HorseObject",
       key.usr: "s:18index_constructors11HorseObjectC",

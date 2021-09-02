@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil %s -o /dev/null -verify
+// RUN: %target-swift-frontend -emit-sil %s -enable-copy-propagation -o /dev/null -verify
 // REQUIRES: objc_interop
 
 import Foundation

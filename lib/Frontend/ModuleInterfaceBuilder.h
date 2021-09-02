@@ -35,12 +35,14 @@ class DependencyTracker;
 
 class ModuleInterfaceBuilder {
   SourceManager &sourceMgr;
-  DiagnosticEngine &diags;
+  DiagnosticEngine *diags;
   InterfaceSubContextDelegate &subASTDelegate;
   const StringRef interfacePath;
   const StringRef moduleName;
   const StringRef moduleCachePath;
   const StringRef prebuiltCachePath;
+  const StringRef backupInterfaceDir;
+  const StringRef ABIDescriptorPath;
   const bool disableInterfaceFileLock;
   const SourceLoc diagnosticLoc;
   DependencyTracker *const dependencyTracker;
@@ -50,7 +52,7 @@ public:
   /// Emit a diagnostic tied to this declaration.
   template<typename ...ArgTypes>
   static InFlightDiagnostic diagnose(
-      DiagnosticEngine &Diags,
+      DiagnosticEngine *Diags,
       SourceManager &SM,
       StringRef InterfacePath,
       SourceLoc Loc,
@@ -60,7 +62,7 @@ public:
       // Diagnose this inside the interface file, if possible.
       Loc = SM.getLocFromExternalSource(InterfacePath, 1, 1);
     }
-    return Diags.diagnose(Loc, ID, std::move(Args)...);
+    return Diags->diagnose(Loc, ID, std::move(Args)...);
   }
 
 private:
@@ -88,12 +90,14 @@ private:
                                 std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
                                 ArrayRef<std::string> CandidateModules);
 public:
-  ModuleInterfaceBuilder(SourceManager &sourceMgr, DiagnosticEngine &diags,
+  ModuleInterfaceBuilder(SourceManager &sourceMgr, DiagnosticEngine *diags,
                             InterfaceSubContextDelegate &subASTDelegate,
                             StringRef interfacePath,
                             StringRef moduleName,
                             StringRef moduleCachePath,
+                            StringRef backupInterfaceDir,
                             StringRef prebuiltCachePath,
+                            StringRef ABIDescriptorPath,
                             bool disableInterfaceFileLock = false,
                             SourceLoc diagnosticLoc = SourceLoc(),
                             DependencyTracker *tracker = nullptr)
@@ -101,6 +105,8 @@ public:
       subASTDelegate(subASTDelegate),
       interfacePath(interfacePath), moduleName(moduleName),
       moduleCachePath(moduleCachePath), prebuiltCachePath(prebuiltCachePath),
+      backupInterfaceDir(backupInterfaceDir),
+      ABIDescriptorPath(ABIDescriptorPath),
       disableInterfaceFileLock(disableInterfaceFileLock),
       diagnosticLoc(diagnosticLoc), dependencyTracker(tracker) {}
 

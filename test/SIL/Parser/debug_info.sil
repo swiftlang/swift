@@ -1,0 +1,26 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -sil-print-debuginfo %s | %FileCheck %s
+sil_stage canonical
+
+import Builtin
+import Swift
+
+struct TheStruct {
+  var data : Builtin.Int64
+  init()
+}
+
+sil_scope 1 {  parent @struct_debug_info_test : $@convention(thin) (TheStruct) -> TheStruct }
+
+// SR-14814: Make sure the `forwarding` directive being optional in the presence
+// of debug info directives (i.e. `loc` and `scope`)
+
+// CHECK-LABEL: sil [transparent] @struct_debug_info_test :
+sil [transparent] @struct_debug_info_test : $@convention(thin) (TheStruct) -> TheStruct {
+bb0(%0 : $TheStruct):
+  // CHECK: %1 = struct_extract %0 : $TheStruct, #TheStruct.data, loc "input.swift":3:4, scope 1
+  %1 = struct_extract %0 : $TheStruct, #TheStruct.data, loc "input.swift":3:4, scope 1
+  // CHECK: %2 = struct $TheStruct (%1 : $Builtin.Int64), loc "input.swift":5:6, scope 1
+  %2 = struct $TheStruct (%1 : $Builtin.Int64), loc "input.swift":5:6, scope 1
+  return %2 : $TheStruct, loc "input.swift":7:8, scope 1
+}
+// CHECK: } // end sil function 'struct_debug_info_test'

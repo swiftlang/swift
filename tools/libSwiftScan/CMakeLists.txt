@@ -9,14 +9,17 @@ set(LLVM_EXPORTED_SYMBOL_FILE
 
 add_swift_host_library(libSwiftScan SHARED
   libSwiftScan.cpp
-  c-include-check.c)
+  c-include-check.c
+  HAS_LIBSWIFT)
 
 add_dependencies(libSwiftScan
   clang
   swiftDependencyScan)
 
 target_link_libraries(libSwiftScan PRIVATE
-    swiftDependencyScan)
+    swiftDependencyScan
+    swiftDriverTool
+    libswift)
 
 set_target_properties(libSwiftScan
     PROPERTIES

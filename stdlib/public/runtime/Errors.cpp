@@ -92,20 +92,18 @@ static bool getSymbolNameAddr(llvm::StringRef libraryName,
   // providing failure status instead of just returning the original string like
   // swift demangle.
 #if defined(_WIN32)
-  DWORD dwFlags = UNDNAME_COMPLETE;
-#if !defined(_WIN64)
-  dwFlags |= UNDNAME_32_BIT_DECODE;
-#endif
-  static std::mutex mutex;
+  static StaticMutex mutex;
 
   char szUndName[1024];
-  DWORD dwResult;
+  DWORD dwResult = mutex.withLock([&syminfo, &szUndName]() {
+    DWORD dwFlags = UNDNAME_COMPLETE;
+#if !defined(_WIN64)
+    dwFlags |= UNDNAME_32_BIT_DECODE;
+#endif
 
-  {
-    std::lock_guard<std::mutex> lock(mutex);
-    dwResult = UnDecorateSymbolName(syminfo.symbolName.get(), szUndName,
-                                    sizeof(szUndName), dwFlags);
-  }
+    return UnDecorateSymbolName(syminfo.symbolName.get(), szUndName,
+                                sizeof(szUndName), dwFlags);
+  });
 
   if (dwResult == TRUE) {
     symbolName += szUndName;

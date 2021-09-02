@@ -22,7 +22,10 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Version.h"
+#include "swift/Option/Options.h"
 
+#include "llvm/Option/OptTable.h"
+#include "llvm/Option/ArgList.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Debug.h"
@@ -85,18 +88,10 @@ Optional<bool> forEachModuleSearchPath(
   // Apple platforms have extra implicit framework search paths:
   // $SDKROOT/System/Library/Frameworks/ and $SDKROOT/Library/Frameworks/.
   if (Ctx.LangOpts.Target.isOSDarwin()) {
-    SmallString<128> scratch;
-    scratch = Ctx.SearchPathOpts.SDKPath;
-    llvm::sys::path::append(scratch, "System", "Library", "Frameworks");
-    if (auto result =
-            callback(scratch, SearchPathKind::Framework, /*isSystem=*/true))
-      return result;
-
-    scratch = Ctx.SearchPathOpts.SDKPath;
-    llvm::sys::path::append(scratch, "Library", "Frameworks");
-    if (auto result =
-            callback(scratch, SearchPathKind::Framework, /*isSystem=*/true))
-      return result;
+    for (const auto &path : Ctx.getDarwinImplicitFrameworkSearchPaths())
+      if (auto result =
+          callback(path, SearchPathKind::Framework, /*isSystem=*/true))
+        return result;
   }
 
   for (auto importPath : Ctx.SearchPathOpts.RuntimeLibraryImportPaths) {
@@ -733,6 +728,8 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
       M.setHasIncrementalInfo();
     if (!loadedModuleFile->getModuleABIName().empty())
       M.setABIName(Ctx.getIdentifier(loadedModuleFile->getModuleABIName()));
+    if (loadedModuleFile->isConcurrencyChecked())
+      M.setIsConcurrencyChecked();
     M.setUserModuleVersion(loadedModuleFile->getUserModuleVersion());
     auto diagLocOrInvalid = diagLoc.getValueOr(SourceLoc());
     loadInfo.status = loadedModuleFile->associateWithFileContext(
@@ -961,7 +958,8 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
   }
 }
 
-bool swift::extractCompilerFlagsFromInterface(StringRef buffer,
+bool swift::extractCompilerFlagsFromInterface(StringRef interfacePath,
+                                              StringRef buffer,
                                               llvm::StringSaver &ArgSaver,
                                               SmallVectorImpl<const char *> &SubArgs) {
   SmallVector<StringRef, 1> FlagMatches;
@@ -970,7 +968,79 @@ bool swift::extractCompilerFlagsFromInterface(StringRef buffer,
     return true;
   assert(FlagMatches.size() == 2);
   llvm::cl::TokenizeGNUCommandLine(FlagMatches[1], ArgSaver, SubArgs);
+
+  auto intFileName = llvm::sys::path::filename(interfacePath);
+
+  // Sanitize arch if the file name and the encoded flags disagree.
+  // It's a known issue that we are using arm64e interfaces contents for the arm64 target,
+  // meaning the encoded module flags are using -target arm64e-x-x. Fortunately,
+  // we can tell the target arch from the interface file name, so we could sanitize
+  // the target to use by inferring target from the file name.
+  StringRef arm64 = "arm64";
+  StringRef arm64e = "arm64e";
+  if (intFileName.contains(arm64) && !intFileName.contains(arm64e)) {
+    for (unsigned I = 1; I < SubArgs.size(); ++I) {
+      if (strcmp(SubArgs[I - 1], "-target") != 0) {
+        continue;
+      }
+      StringRef triple(SubArgs[I]);
+      if (triple.startswith(arm64e)) {
+        SubArgs[I] = ArgSaver.save((llvm::Twine(arm64) +
+          triple.substr(arm64e.size())).str()).data();
+      }
+    }
+  }
+
+  SmallVector<StringRef, 1> IgnFlagMatches;
+  // Cherry-pick supported options from the ignorable list.
+  auto IgnFlagRe = llvm::Regex("^// swift-module-flags-ignorable:(.*)$",
+                               llvm::Regex::Newline);
+  // It's OK the interface doesn't have the ignorable list, we just ignore them
+  // all.
+  if (!IgnFlagRe.match(buffer, &IgnFlagMatches))
+    return false;
+  SmallVector<const char *, 8> IgnSubArgs;
+  llvm::cl::TokenizeGNUCommandLine(IgnFlagMatches[1], ArgSaver, IgnSubArgs);
+  std::unique_ptr<llvm::opt::OptTable> table = swift::createSwiftOptTable();
+  unsigned missingArgIdx = 0;
+  unsigned missingArgCount = 0;
+  auto parsedIgns = table->ParseArgs(IgnSubArgs, missingArgIdx, missingArgCount);
+  for (auto parse: parsedIgns) {
+    // Check if the option is a frontend option. This will filter out unknown
+    // options and input-like options.
+    if (!parse->getOption().hasFlag(options::FrontendOption))
+      continue;
+    // Push the supported option and its value to the list.
+    // We shouldn't need to worry about cases like -tbd-install_name=Foo because
+    // the parsing function should have droped alias options already.
+    SubArgs.push_back(ArgSaver.save(parse->getSpelling()).data());
+    for (auto value: parse->getValues())
+      SubArgs.push_back(value);
+  }
+
   return false;
+}
+
+llvm::VersionTuple
+swift::extractUserModuleVersionFromInterface(StringRef moduleInterfacePath) {
+  llvm::VersionTuple result;
+  // Read the inteface file and extract its compiler arguments line
+  if (auto file = llvm::MemoryBuffer::getFile(moduleInterfacePath)) {
+    llvm::BumpPtrAllocator alloc;
+    llvm::StringSaver argSaver(alloc);
+    SmallVector<const char*, 8> args;
+    (void)extractCompilerFlagsFromInterface(moduleInterfacePath,
+                                            (*file)->getBuffer(), argSaver, args);
+    for (unsigned I = 0, N = args.size(); I + 1 < N; I++) {
+      // Check the version number specified via -user-module-version.
+      StringRef current(args[I]), next(args[I + 1]);
+      if (current == "-user-module-version") {
+        result.tryParse(next);
+        break;
+      }
+    }
+  }
+  return result;
 }
 
 bool SerializedModuleLoaderBase::canImportModule(
@@ -1009,21 +1079,7 @@ bool SerializedModuleLoaderBase::canImportModule(
   assert(!underlyingVersion);
   llvm::VersionTuple currentVersion;
   if (!moduleInterfacePath.empty()) {
-    // Read the inteface file and extract its compiler arguments line
-    if (auto file = llvm::MemoryBuffer::getFile(moduleInterfacePath)) {
-      llvm::BumpPtrAllocator alloc;
-      llvm::StringSaver argSaver(alloc);
-      SmallVector<const char*, 8> args;
-      (void)extractCompilerFlagsFromInterface((*file)->getBuffer(), argSaver, args);
-      for (unsigned I = 0, N = args.size(); I + 1 < N; I++) {
-        // Check the version number specified via -user-module-version.
-        StringRef current(args[I]), next(args[I + 1]);
-        if (current == "-user-module-version") {
-          currentVersion.tryParse(next);
-          break;
-        }
-      }
-    }
+    currentVersion = extractUserModuleVersionFromInterface(moduleInterfacePath);
   }
   // If failing to extract the user version from the interface file, try the binary
   // format, if present.

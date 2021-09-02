@@ -59,15 +59,17 @@ void emitGetCurrentExecutor(IRGenFunction &IGF, Explosion &out);
 
 /// Emit the createAsyncLet builtin.
 llvm::Value *emitBuiltinStartAsyncLet(IRGenFunction &IGF,
+                                      llvm::Value *taskOptions,
                                       llvm::Value *taskFunction,
                                       llvm::Value *localContextInfo,
+                                      llvm::Value *resultBuffer,
                                       SubstitutionMap subs);
 
 /// Emit the endAsyncLet builtin.
 void emitEndAsyncLet(IRGenFunction &IGF, llvm::Value *alet);
 
 /// Emit the createTaskGroup builtin.
-llvm::Value *emitCreateTaskGroup(IRGenFunction &IGF);
+llvm::Value *emitCreateTaskGroup(IRGenFunction &IGF, SubstitutionMap subs);
 
 /// Emit the destroyTaskGroup builtin.
 void emitDestroyTaskGroup(IRGenFunction &IGF, llvm::Value *group);

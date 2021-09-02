@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -108,6 +108,7 @@ toStableDifferentiabilityKind(swift::DifferentiabilityKind kind) {
   case swift::DifferentiabilityKind::Linear:
     return (unsigned)serialization::DifferentiabilityKind::Linear;
   }
+  llvm_unreachable("covered switch");
 }
 
 namespace {
@@ -1403,12 +1404,16 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       Attr = unsigned(SILValue(UOCI).getOwnershipKind());
     } else if (auto *IEC = dyn_cast<IsEscapingClosureInst>(&SI)) {
       Attr = IEC->getVerificationType();
+    } else if (auto *HTE = dyn_cast<HopToExecutorInst>(&SI)) {
+      Attr = HTE->isMandatory();
     } else if (auto *DVI = dyn_cast<DestroyValueInst>(&SI)) {
       Attr = DVI->poisonRefs();
     } else if (auto *BCMI = dyn_cast<BeginCOWMutationInst>(&SI)) {
       Attr = BCMI->isNative();
     } else if (auto *ECMI = dyn_cast<EndCOWMutationInst>(&SI)) {
       Attr = ECMI->doKeepUnique();
+    } else if (auto *BBI = dyn_cast<BeginBorrowInst>(&SI)) {
+      Attr = BBI->isDefined();
     }
     writeOneOperandLayout(SI.getKind(), Attr, SI.getOperand(0));
     break;
@@ -2235,10 +2240,10 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
 
     ArrayRef<Requirement> reqts;
     if (auto sig = pattern->getGenericSignature()) {
-      ListOfValues.push_back(sig->getGenericParams().size());
-      for (auto param : sig->getGenericParams())
+      ListOfValues.push_back(sig.getGenericParams().size());
+      for (auto param : sig.getGenericParams())
         ListOfValues.push_back(S.addTypeRef(param));
-      reqts = sig->getRequirements();
+      reqts = sig.getRequirements();
     } else {
       ListOfValues.push_back(0);
     }
@@ -2775,6 +2780,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<decls_block::SelfProtocolConformanceLayout>();
   registerSILAbbr<decls_block::SpecializedProtocolConformanceLayout>();
   registerSILAbbr<decls_block::InheritedProtocolConformanceLayout>();
+  registerSILAbbr<decls_block::BuiltinProtocolConformanceLayout>();
   registerSILAbbr<decls_block::NormalProtocolConformanceIdLayout>();
   registerSILAbbr<decls_block::ProtocolConformanceXrefLayout>();
   registerSILAbbr<decls_block::GenericRequirementLayout>();

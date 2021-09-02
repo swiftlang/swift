@@ -1108,7 +1108,7 @@ bb0(%0 : $*Error, %1 : $*E1):
 // CHECK-LABEL: sil [ossa] @always_fail_protocolmeta_to_concretemeta_checkedcastbr : $@convention(thin) (@thin P.Protocol) -> Builtin.Int1 {
 // CHECK: bb0(
 // CHECK-NEXT: metatype
-// CHECK-NEXT: br bb2(
+// CHECK-NEXT: br bb2
 // CHECK: } // end sil function 'always_fail_protocolmeta_to_concretemeta_checkedcastbr'
 sil [ossa] @always_fail_protocolmeta_to_concretemeta_checkedcastbr : $@convention(thin) (@thin P.Protocol) -> Builtin.Int1 {
 bb0(%0 : $@thin P.Protocol):
@@ -1131,7 +1131,7 @@ bb3(%11 : $Builtin.Int1):
 // CHECK-LABEL: sil [ossa] @always_succeed_subtoparent : $@convention(thin) (@owned AnSubObject) -> Builtin.Int1 {
 // CHECK: bb0(
 // CHECK-NEXT: upcast
-// CHECK-NEXT: br bb1(
+// CHECK-NEXT: br bb1
 // CHECK: } // end sil function 'always_succeed_subtoparent'
 sil [ossa] @always_succeed_subtoparent : $@convention(thin) (@owned AnSubObject) -> Builtin.Int1 {
 bb0(%0 : @owned $AnSubObject):

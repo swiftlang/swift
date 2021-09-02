@@ -46,9 +46,9 @@ endif()
 
 # Build any target libdispatch if needed.
 foreach(sdk ${SWIFT_SDKS})
-  # Apple targets have libdispatch available, do not build it.
+  # Darwin targets have libdispatch available, do not build it.
   # Wasm/WASI doesn't support libdispatch yet.
-  if(NOT "${sdk}" IN_LIST SWIFT_APPLE_PLATFORMS AND NOT "${sdk}" STREQUAL WASI)
+  if(NOT "${sdk}" IN_LIST SWIFT_DARWIN_PLATFORMS AND NOT "${sdk}" STREQUAL WASI)
     list(APPEND DISPATCH_SDKS "${sdk}")
   endif()
 endforeach()
@@ -87,6 +87,7 @@ foreach(sdk ${DISPATCH_SDKS})
                           -DCMAKE_INSTALL_LIBDIR=lib
                           -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
                           -DCMAKE_LINKER=${CMAKE_LINKER}
+                          -DCMAKE_MT=${CMAKE_MT}
                           -DCMAKE_RANLIB=${CMAKE_RANLIB}
                           -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
                           -DCMAKE_SYSTEM_NAME=${SWIFT_SDK_${sdk}_NAME}
@@ -110,6 +111,14 @@ foreach(sdk ${DISPATCH_SDKS})
                           ${CMAKE_COMMAND} -E copy
                           <INSTALL_DIR>/${LIBDISPATCH_RUNTIME_DIR}/${SWIFT_SDK_${sdk}_SHARED_LIBRARY_PREFIX}BlocksRuntime${SWIFT_SDK_${sdk}_SHARED_LIBRARY_SUFFIX}
                           ${SWIFTLIB_DIR}/${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}/${SWIFT_SDK_${sdk}_SHARED_LIBRARY_PREFIX}BlocksRuntime${SWIFT_SDK_${sdk}_SHARED_LIBRARY_SUFFIX}
+                        COMMAND
+                          ${CMAKE_COMMAND} -E copy
+                          <INSTALL_DIR>/${LIBDISPATCH_RUNTIME_DIR}/${SWIFT_SDK_${sdk}_SHARED_LIBRARY_PREFIX}dispatch${SWIFT_SDK_${sdk}_SHARED_LIBRARY_SUFFIX}
+                          ${SWIFTLIB_DIR}/${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${SWIFT_SDK_${sdk}_SHARED_LIBRARY_PREFIX}dispatch${SWIFT_SDK_${sdk}_SHARED_LIBRARY_SUFFIX}
+                        COMMAND
+			  ${CMAKE_COMMAND} -E copy
+                          <INSTALL_DIR>/${LIBDISPATCH_RUNTIME_DIR}/${SWIFT_SDK_${sdk}_SHARED_LIBRARY_PREFIX}BlocksRuntime${SWIFT_SDK_${sdk}_SHARED_LIBRARY_SUFFIX}
+                          ${SWIFTLIB_DIR}/${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${SWIFT_SDK_${sdk}_SHARED_LIBRARY_PREFIX}BlocksRuntime${SWIFT_SDK_${sdk}_SHARED_LIBRARY_SUFFIX}
                         STEP_TARGETS
                           install
                         BUILD_BYPRODUCTS

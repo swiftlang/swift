@@ -299,3 +299,47 @@ func test_fixit_with_where_clause() {
   func test_assoc<T: TestWithAssoc>(_: T) {}
   test_assoc(.intVar) // expected-error {{contextual member reference to static property 'intVar' requires 'Self' constraint in the protocol extension}}
 }
+
+// rdar://77700261 - incorrect warning about assuming non-optional base for unresolved member lookup
+struct WithShadowedMember : P {}
+
+extension WithShadowedMember {
+  static var warnTest: WithShadowedMember { get { WithShadowedMember() } }
+}
+
+extension P where Self == WithShadowedMember {
+  static var warnTest: WithShadowedMember { get { fatalError() } }
+}
+
+func test_no_warning_about_optional_base() {
+  func test(_: WithShadowedMember?) {}
+
+  test(.warnTest) // Ok and no warning even though the `warnTest` name is shadowed
+}
+
+// rdar://78425221 - invalid defaulting of literal argument when base is inferred from protocol
+
+protocol Style {}
+
+struct FormatString : ExpressibleByStringInterpolation {
+  init(stringLiteral: String) {}
+}
+
+struct Number : ExpressibleByIntegerLiteral {
+  init(integerLiteral: Int) {}
+}
+
+struct TestStyle: Style {
+  public init(format: FormatString)  {
+  }
+}
+
+extension Style where Self == TestStyle {
+  static func formattedString(format: FormatString) -> TestStyle { fatalError() }
+  static func number(_: Number) -> TestStyle { fatalError() }
+}
+
+func acceptStyle<S: Style>(_: S) {}
+
+acceptStyle(.formattedString(format: "hi")) // Ok
+acceptStyle(.number(42)) // Ok

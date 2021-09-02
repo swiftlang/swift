@@ -15,6 +15,7 @@
       key.column: 1,
       key.filepath: syntaxmap-edit-del.swift,
       key.severity: source.diagnostic.severity.error,
+      key.id: "extra_rbrace",
       key.description: "extraneous '}' at top level",
       key.diagnostic_stage: source.diagnostic.stage.swift.parse,
       key.fixits: [
@@ -64,6 +65,7 @@
       key.column: 19,
       key.filepath: syntaxmap-edit-del.swift,
       key.severity: source.diagnostic.severity.error,
+      key.id: "lex_unexpected_block_comment_end",
       key.description: "unexpected end of block comment",
       key.diagnostic_stage: source.diagnostic.stage.swift.parse
     },
@@ -72,6 +74,7 @@
       key.column: 1,
       key.filepath: syntaxmap-edit-del.swift,
       key.severity: source.diagnostic.severity.error,
+      key.id: "expected_decl",
       key.description: "expected declaration",
       key.diagnostic_stage: source.diagnostic.stage.swift.parse,
       key.diagnostics: [
@@ -80,6 +83,7 @@
           key.column: 8,
           key.filepath: syntaxmap-edit-del.swift,
           key.severity: source.diagnostic.severity.note,
+          key.id: "note_in_decl_extension",
           key.description: "in declaration of 'Foo'"
         }
       ]

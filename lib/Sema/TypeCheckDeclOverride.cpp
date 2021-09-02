@@ -146,13 +146,11 @@ areAccessorsOverrideCompatible(const AbstractStorageDecl *storage,
 }
 
 bool swift::isOverrideBasedOnType(const ValueDecl *decl, Type declTy,
-                                  const ValueDecl *parentDecl,
-                                  Type parentDeclTy) {
+                                  const ValueDecl *parentDecl) {
   auto genericSig =
       decl->getInnermostDeclContext()->getGenericSignatureOfContext();
 
   auto canDeclTy = declTy->getCanonicalType(genericSig);
-  auto canParentDeclTy = parentDeclTy->getCanonicalType(genericSig);
 
   auto declIUOAttr = decl->isImplicitlyUnwrappedOptional();
   auto parentDeclIUOAttr = parentDecl->isImplicitlyUnwrappedOptional();
@@ -167,17 +165,32 @@ bool swift::isOverrideBasedOnType(const ValueDecl *decl, Type declTy,
   // We can still succeed with a subtype match later in
   // OverrideMatcher::match().
   if (decl->getDeclContext()->getSelfClassDecl()) {
-    if (auto declGenericCtx = decl->getAsGenericContext()) {
+    if (auto declCtx = decl->getAsGenericContext()) {
+      auto *parentCtx = parentDecl->getAsGenericContext();
+
+      if (declCtx->isGeneric() != parentCtx->isGeneric())
+        return false;
+
+      if (declCtx->isGeneric() &&
+          (declCtx->getGenericParams()->size() !=
+           parentCtx->getGenericParams()->size()))
+        return false;
+
       auto &ctx = decl->getASTContext();
       auto sig = ctx.getOverrideGenericSignature(parentDecl, decl);
-
       if (sig &&
-          declGenericCtx->getGenericSignature().getCanonicalSignature() !=
+          declCtx->getGenericSignature().getCanonicalSignature() !=
               sig.getCanonicalSignature()) {
         return false;
       }
     }
   }
+
+  auto parentDeclTy = getMemberTypeForComparison(parentDecl, decl);
+  if (parentDeclTy->hasError())
+    return false;
+
+  auto canParentDeclTy = parentDeclTy->getCanonicalType(genericSig);
 
   // If this is a constructor, let's compare only parameter types.
   if (isa<ConstructorDecl>(decl)) {
@@ -284,6 +297,11 @@ static bool areOverrideCompatibleSimple(ValueDecl *decl,
   if (auto genDecl = decl->getAsGenericContext()) {
     auto genParentDecl = parentDecl->getAsGenericContext();
     if (genDecl->isGeneric() != genParentDecl->isGeneric())
+      return false;
+
+    if (genDecl->isGeneric() &&
+        (genDecl->getGenericParams()->size() !=
+         genParentDecl->getGenericParams()->size()))
       return false;
   }
 
@@ -463,7 +481,7 @@ static bool noteFixableMismatchedTypes(ValueDecl *decl, const ValueDecl *base) {
     // input arguments.
     auto *fnType = baseTy->getAs<AnyFunctionType>();
     baseTy = fnType->getResult();
-    Type argTy = FunctionType::composeInput(
+    Type argTy = FunctionType::composeTuple(
         ctx, baseTy->getAs<AnyFunctionType>()->getParams(), false);
     auto diagKind = diag::override_type_mismatch_with_fixits_init;
     unsigned numArgs = baseInit->getParameters()->size();
@@ -908,13 +926,22 @@ SmallVector<OverrideMatch, 2> OverrideMatcher::match(
     (void)parentMethod;
     (void)parentStorage;
 
-    // Check whether the types are identical.
-    auto parentDeclTy = getMemberTypeForComparison(parentDecl, decl);
-    if (parentDeclTy->hasError())
-      continue;
+    // If the generic requirements don't match, don't try anything else below,
+    // because it will compute an invalid interface type by applying malformed
+    // substitutions.
+    if (isClassOverride()) {
+      using Direction = ASTContext::OverrideGenericSignatureReqCheck;
+      if (decl->getAsGenericContext()) {
+        if (!ctx.overrideGenericSignatureReqsSatisfied(
+                parentDecl, decl, Direction::DerivedReqSatisfiedByBase)) {
+          continue;
+        }
+      }
+    }
 
+    // Check whether the types are identical.
     Type declTy = getDeclComparisonType();
-    if (isOverrideBasedOnType(decl, declTy, parentDecl, parentDeclTy)) {
+    if (isOverrideBasedOnType(decl, declTy, parentDecl)) {
       matches.push_back({parentDecl, true});
       continue;
     }
@@ -944,6 +971,7 @@ SmallVector<OverrideMatch, 2> OverrideMatcher::match(
     }
 
     auto declFnTy = getDeclComparisonType()->getAs<AnyFunctionType>();
+    auto parentDeclTy = getMemberTypeForComparison(parentDecl, decl);
     auto parentDeclFnTy = parentDeclTy->getAs<AnyFunctionType>();
     if (declFnTy && parentDeclFnTy) {
       auto paramsAndResultMatch = [=]() -> bool {
@@ -1028,7 +1056,7 @@ static void checkOverrideAccessControl(ValueDecl *baseDecl, ValueDecl *decl,
   } else if (baseHasOpenAccess &&
              classDecl->hasOpenAccess(dc) &&
              decl->getFormalAccess() < AccessLevel::Public &&
-             !decl->isFinal()) {
+             !decl->isSemanticallyFinal()) {
     {
       auto diag = diags.diagnose(decl, diag::override_not_accessible,
                                  /*setter*/false,
@@ -1102,26 +1130,6 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
     emittedMatchError = true;
   }
 
-  if (isClassOverride()) {
-    auto baseGenericCtx = baseDecl->getAsGenericContext();
-    auto derivedGenericCtx = decl->getAsGenericContext();
-
-    using Direction = ASTContext::OverrideGenericSignatureReqCheck;
-    if (baseGenericCtx && derivedGenericCtx) {
-      if (!ctx.overrideGenericSignatureReqsSatisfied(
-              baseDecl, decl, Direction::DerivedReqSatisfiedByBase)) {
-        auto newSig = ctx.getOverrideGenericSignature(baseDecl, decl);
-        diags.diagnose(decl, diag::override_method_different_generic_sig,
-                       decl->getBaseName(),
-                       derivedGenericCtx->getGenericSignature()->getAsString(),
-                       baseGenericCtx->getGenericSignature()->getAsString(),
-                       newSig->getAsString());
-        diags.diagnose(baseDecl, diag::overridden_here);
-        emittedMatchError = true;
-      }
-    }
-  }
-
   // If we have an explicit ownership modifier and our parent doesn't,
   // complain.
   auto parentAttr =
@@ -1150,7 +1158,7 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
   if (decl->getASTContext().isSwiftVersionAtLeast(5) &&
       baseDecl->getInterfaceType()->hasDynamicSelfType() &&
       !decl->getInterfaceType()->hasDynamicSelfType() &&
-      !classDecl->isFinal()) {
+      !classDecl->isSemanticallyFinal()) {
     diags.diagnose(decl, diag::override_dynamic_self_mismatch);
     diags.diagnose(baseDecl, diag::overridden_here);
   }
@@ -1438,7 +1446,6 @@ namespace  {
     UNINTERESTING_ATTR(AccessControl)
     UNINTERESTING_ATTR(Alignment)
     UNINTERESTING_ATTR(AlwaysEmitIntoClient)
-    UNINTERESTING_ATTR(AsyncHandler)
     UNINTERESTING_ATTR(Borrowed)
     UNINTERESTING_ATTR(CDecl)
     UNINTERESTING_ATTR(Consuming)
@@ -1449,7 +1456,6 @@ namespace  {
     UNINTERESTING_ATTR(Exported)
     UNINTERESTING_ATTR(ForbidSerializingReference)
     UNINTERESTING_ATTR(GKInspectable)
-    UNINTERESTING_ATTR(CompletionHandlerAsync)
     UNINTERESTING_ATTR(HasMissingDesignatedInitializers)
     UNINTERESTING_ATTR(IBAction)
     UNINTERESTING_ATTR(IBDesignable)
@@ -1481,6 +1487,7 @@ namespace  {
     UNINTERESTING_ATTR(Required)
     UNINTERESTING_ATTR(Convenience)
     UNINTERESTING_ATTR(Semantics)
+    UNINTERESTING_ATTR(EmitAssemblyVisionRemarks)
     UNINTERESTING_ATTR(SetterAccess)
     UNINTERESTING_ATTR(TypeEraser)
     UNINTERESTING_ATTR(SPIAccessControl)
@@ -1534,10 +1541,10 @@ namespace  {
     UNINTERESTING_ATTR(ProjectedValueProperty)
     UNINTERESTING_ATTR(OriginallyDefinedIn)
     UNINTERESTING_ATTR(Actor)
-    UNINTERESTING_ATTR(ActorIndependent)
+    UNINTERESTING_ATTR(DistributedActor)
+    UNINTERESTING_ATTR(DistributedActorIndependent)
     UNINTERESTING_ATTR(GlobalActor)
     UNINTERESTING_ATTR(Async)
-    UNINTERESTING_ATTR(Spawn)
     UNINTERESTING_ATTR(Sendable)
 
     UNINTERESTING_ATTR(AtRethrows)
@@ -1549,6 +1556,7 @@ namespace  {
     UNINTERESTING_ATTR(UnsafeMainActor)
     UNINTERESTING_ATTR(ImplicitSelfCapture)
     UNINTERESTING_ATTR(InheritActorContext)
+    UNINTERESTING_ATTR(Isolated)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {
@@ -1940,7 +1948,7 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
   }
 
   // The overridden declaration cannot be 'final'.
-  if (base->isFinal() && !isAccessor) {
+  if (base->isSemanticallyFinal() && !isAccessor) {
     // Use a special diagnostic for overriding an actor's unownedExecutor
     // method.  TODO: only if it's implicit?  But then we need to
     // propagate implicitness in module interfaces.

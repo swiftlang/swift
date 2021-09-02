@@ -41,6 +41,7 @@
 #include "swift/Serialization/Validation.h"
 #include "swift/Subsystems.h"
 #include "swift/TBDGen/TBDGen.h"
+#include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Option/ArgList.h"
@@ -86,6 +87,7 @@ class CompilerInvocation {
   TypeCheckerOptions TypeCheckerOpts;
   FrontendOptions FrontendOpts;
   ClangImporterOptions ClangImporterOpts;
+  symbolgraphgen::SymbolGraphOptions SymbolGraphOpts;
   SearchPathOptions SearchPathOpts;
   DiagnosticOptions DiagnosticOpts;
   MigratorOptions MigratorOpts;
@@ -257,6 +259,11 @@ public:
     return ClangImporterOpts;
   }
 
+  symbolgraphgen::SymbolGraphOptions &getSymbolGraphOptions() { return SymbolGraphOpts; }
+  const symbolgraphgen::SymbolGraphOptions &getSymbolGraphOptions() const {
+    return SymbolGraphOpts;
+  }
+
   SearchPathOptions &getSearchPathOptions() { return SearchPathOpts; }
   const SearchPathOptions &getSearchPathOptions() const {
     return SearchPathOpts;
@@ -381,8 +388,6 @@ public:
   std::string getModuleInterfaceOutputPathForWholeModule() const;
   std::string getPrivateModuleInterfaceOutputPathForWholeModule() const;
 
-  std::string getLdAddCFileOutputPathForWholeModule() const;
-
 public:
   /// Given the current configuration of this frontend invocation, a set of
   /// supplementary output paths, and a module, compute the appropriate set of
@@ -393,15 +398,6 @@ public:
   SerializationOptions
   computeSerializationOptions(const SupplementaryOutputPaths &outs,
                               const ModuleDecl *module) const;
-
-  /// Returns an approximation of whether the given module could be
-  /// redistributed and consumed by external clients.
-  ///
-  /// FIXME: The scope of this computation should be limited entirely to
-  /// PrintAsObjC. Unfortunately, it has been co-opted to support the
-  /// \c SerializeOptionsForDebugging hack. Once this information can be
-  /// transferred from module files to the dSYMs, remove this.
-  bool isModuleExternallyConsumed(const ModuleDecl *mod) const;
 };
 
 /// A class which manages the state and execution of the compiler.

@@ -145,6 +145,26 @@ extension Unsafe${Mutable}RawBufferPointer: Sequence {
   public func makeIterator() -> Iterator {
     return Iterator(_position: _position, _end: _end)
   }
+
+  /// Copies the elements of `self` to the memory at `destination.baseAddress`,
+  /// stopping when either `self` or `destination` is exhausted.
+  ///
+  /// - Returns: an iterator over any remaining elements of `self` and the
+  ///   number of elements copied.
+  @inlinable // unsafe-performance
+  @_alwaysEmitIntoClient
+  public func _copyContents(
+    initializing destination: UnsafeMutableBufferPointer<UInt8>
+  ) -> (Iterator, UnsafeMutableBufferPointer<UInt8>.Index) {
+    guard let s = _position, let e = _end, e > s, !destination.isEmpty else {
+      return (makeIterator(), 0)
+    }
+    let destinationAddress = destination.baseAddress._unsafelyUnwrappedUnchecked
+    let d = UnsafeMutableRawPointer(destinationAddress)
+    let n = Swift.min(destination.count, self.count)
+    d.copyMemory(from: s, byteCount: n)
+    return (Iterator(_position: s.advanced(by: n), _end: e), n)
+  }
 }
 
 extension Unsafe${Mutable}RawBufferPointer: ${Mutable}Collection {
@@ -263,15 +283,21 @@ extension Unsafe${Mutable}RawBufferPointer: RandomAccessCollection { }
 
 extension Unsafe${Mutable}RawBufferPointer {
 %  if mutable:
-  /// Returns a newly allocated buffer with the given size, in bytes.
+  /// Allocates uninitialized memory with the specified size and alignment.
   ///
-  /// The memory referenced by the new buffer is allocated, but not
-  /// initialized.
+  /// You are in charge of managing the allocated memory. Be sure to deallocate
+  /// any memory that you manually allocate.
+  ///
+  /// The allocated memory is not bound to any specific type and must be bound
+  /// before performing any typed operations. If you are using the memory for
+  /// a specific type, allocate memory using the
+  /// `UnsafeMutablePointerBuffer.allocate(capacity:)` static method instead.
   ///
   /// - Parameters:
-  ///   - byteCount: The number of bytes to allocate.
+  ///   - byteCount: The number of bytes to allocate. `byteCount` must not be
+  ///     negative.
   ///   - alignment: The alignment of the new region of allocated memory, in
-  ///     bytes.
+  ///     bytes. `alignment` must be a whole power of 2.
   /// - Returns: A buffer pointer to a newly allocated region of memory aligned 
   ///     to `alignment`.
   @inlinable
@@ -412,6 +438,16 @@ extension Unsafe${Mutable}RawBufferPointer {
     guard let position = _position else {
       return
     }
+    
+    if source.withContiguousStorageIfAvailable({
+      (buffer: UnsafeBufferPointer<C.Element>) -> Void in
+      if let base = buffer.baseAddress {
+        position.copyMemory(from: base, byteCount: buffer.count)
+      }
+    }) != nil {
+      return
+    }
+
     for (index, byteValue) in source.enumerated() {
       position.storeBytes(
         of: byteValue, toByteOffset: index, as: UInt8.self)

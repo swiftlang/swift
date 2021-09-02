@@ -78,10 +78,8 @@ public:
   void run() override;
 
 private:
-  AliasAnalysis *AA = nullptr;
-  
-  bool tempLValueOpt(CopyAddrInst *copyInst);
-  bool combineCopyAndDestroy(CopyAddrInst *copyInst);
+  void tempLValueOpt(CopyAddrInst *copyInst);
+  void combineCopyAndDestroy(CopyAddrInst *copyInst);
 };
 
 void TempLValueOptPass::run() {
@@ -92,9 +90,6 @@ void TempLValueOptPass::run() {
   LLVM_DEBUG(llvm::dbgs() << "*** TempLValueOptPass on function: "
                           << F->getName() << " ***\n");
 
-  AA = PM->getAnalysis<AliasAnalysis>();
-
-  bool changed = false;
   for (SILBasicBlock &block : *F) {
     // First collect all copy_addr instructions upfront to avoid iterator
     // invalidation problems (the optimizations might delete the copy_addr
@@ -106,13 +101,9 @@ void TempLValueOptPass::run() {
     }
     // Do the optimizations.
     for (CopyAddrInst *copyInst : copyInsts) {
-      changed |= combineCopyAndDestroy(copyInst);
-      changed |= tempLValueOpt(copyInst);
+      combineCopyAndDestroy(copyInst);
+      tempLValueOpt(copyInst);
     }
-  }
-
-  if (changed) {
-    invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 }
 
@@ -129,7 +120,7 @@ static SingleValueInstruction *isMovableProjection(SILValue addr) {
   return nullptr;
 }
 
-bool TempLValueOptPass::tempLValueOpt(CopyAddrInst *copyInst) {
+void TempLValueOptPass::tempLValueOpt(CopyAddrInst *copyInst) {
 
   // An overview of the algorithm:
   //
@@ -147,11 +138,11 @@ bool TempLValueOptPass::tempLValueOpt(CopyAddrInst *copyInst) {
   // 'destroy_addr %destination' is inserted before the first use of %temp.
 
   if (!copyInst->isTakeOfSrc())
-    return false;
+    return;
 
   auto *temporary = dyn_cast<AllocStackInst>(copyInst->getSrc());
   if (!temporary)
-    return false;
+    return;
 
   // Collect all users of the temporary into a set. Also, for simplicity,
   // require that all users are within a single basic block.
@@ -160,7 +151,7 @@ bool TempLValueOptPass::tempLValueOpt(CopyAddrInst *copyInst) {
   for (Operand *use : temporary->getUses()) {
     SILInstruction *user = use->getUser();
     if (user->getParent() != block)
-      return false;
+      return;
     users.insert(user);
   }
 
@@ -176,7 +167,7 @@ bool TempLValueOptPass::tempLValueOpt(CopyAddrInst *copyInst) {
     // Just to be on the safe side, bail if it's not the case (instead of an
     // assert).
     if (users.count(projInst))
-      return false;
+      return;
     projections.insert(projInst);
     destRootAddr = projInst->getOperand(0);
   }
@@ -185,6 +176,7 @@ bool TempLValueOptPass::tempLValueOpt(CopyAddrInst *copyInst) {
   SILInstruction *destRootInst = destRootAddr->getDefiningInstruction();
 
   // Iterate over the liferange of the temporary and make some validity checks.
+  AliasAnalysis *AA = nullptr;
   SILInstruction *beginOfLiferange = nullptr;
   bool endOfLiferangeReached = false;
   for (auto iter = temporary->getIterator(); iter != block->end(); ++iter) {
@@ -197,7 +189,7 @@ bool TempLValueOptPass::tempLValueOpt(CopyAddrInst *copyInst) {
       // Check if the copyInst is the last user of the temporary (beside the
       // dealloc_stack).
       if (endOfLiferangeReached)
-        return false;
+        return;
 
       // Find the first user of the temporary to get a more precise liferange.
       // It would be too conservative to treat the alloc_stack itself as the
@@ -213,8 +205,11 @@ bool TempLValueOptPass::tempLValueOpt(CopyAddrInst *copyInst) {
       // temporary, we cannot replace all uses of the temporary with the
       // destination (it would break the def-use dominance rule).
       if (inst == destRootInst)
-        return false;
+        return;
         
+      if (!AA)
+        AA = PM->getAnalysis<AliasAnalysis>(getFunction());
+  
       // Check if the destination is not accessed within the liferange of
       // the temporary.
       // This is unlikely, because the destination is initialized at the
@@ -223,7 +218,7 @@ bool TempLValueOptPass::tempLValueOpt(CopyAddrInst *copyInst) {
       if (AA->mayReadOrWriteMemory(inst, destination) &&
           // Needed to treat init_existential_addr as not-writing projection.
           projections.count(inst) == 0)
-        return false;
+        return;
     }
   }
   assert(endOfLiferangeReached);
@@ -253,18 +248,17 @@ bool TempLValueOptPass::tempLValueOpt(CopyAddrInst *copyInst) {
         user->eraseFromParent();
         break;
       default:
-        AA->invalidateInstruction(user);
         use->set(destination);
     }
   }
   temporary->eraseFromParent();
   copyInst->eraseFromParent();
-  return true;
+  invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
 }
 
-bool TempLValueOptPass::combineCopyAndDestroy(CopyAddrInst *copyInst) {
+void TempLValueOptPass::combineCopyAndDestroy(CopyAddrInst *copyInst) {
   if (copyInst->isTakeOfSrc())
-    return false;
+    return;
 
   // Find a destroy_addr of the copy's source address.
   DestroyAddrInst *destroy = nullptr;
@@ -274,7 +268,7 @@ bool TempLValueOptPass::combineCopyAndDestroy(CopyAddrInst *copyInst) {
   }
   SILBasicBlock *block = copyInst->getParent();
   if (!destroy || destroy->getParent() != block)
-    return false;
+    return;
   assert(destroy->getOperand() == copyInst->getSrc());
 
   // Check if the destroy_addr is after the copy_addr and if there are no
@@ -290,16 +284,16 @@ bool TempLValueOptPass::combineCopyAndDestroy(CopyAddrInst *copyInst) {
       for (auto debugInst : debugInsts) {
         debugInst->eraseFromParent();
       }
-      return true;
+      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+      return;
     }
     if (auto *debugInst = dyn_cast<DebugValueAddrInst>(inst)) {
       if (debugInst->getOperand() == copyInst->getSrc())
         debugInsts.push_back(debugInst);
     }
     if (inst->mayReadOrWriteMemory())
-      return false;
+      return;
   }
-  return false;
 }
 
 } // end anonymous namespace

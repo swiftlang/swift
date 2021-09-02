@@ -270,6 +270,15 @@ void SourceRange::widen(SourceRange Other) {
     End = Other.End;
 }
 
+bool SourceRange::contains(SourceLoc Loc) const {
+  return Start.Value.getPointer() <= Loc.Value.getPointer() &&
+         Loc.Value.getPointer() <= End.Value.getPointer();
+}
+
+bool SourceRange::overlaps(SourceRange Other) const {
+  return contains(Other.Start) || Other.contains(Start);
+}
+
 void SourceLoc::printLineAndColumn(raw_ostream &OS, const SourceManager &SM,
                                    unsigned BufferID) const {
   if (isInvalid()) {

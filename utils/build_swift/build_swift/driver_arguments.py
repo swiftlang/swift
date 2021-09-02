@@ -147,9 +147,6 @@ def _apply_default_arguments(args):
     if not args.android or not args.build_android:
         args.build_android = False
 
-    if not args.wasm or not args.build_wasm:
-        args.build_wasm = False
-
     # --test-paths implies --test and/or --validation-test
     # depending on what directories/files have been specified.
     if args.test_paths:
@@ -186,7 +183,7 @@ def _apply_default_arguments(args):
         args.test_tvos = False
         args.test_watchos = False
         args.test_android = False
-        args.test_wasm = False
+        args.test_cmark = False
         args.test_swiftpm = False
         args.test_swift_driver = False
         args.test_swiftsyntax = False
@@ -196,6 +193,12 @@ def _apply_default_arguments(args):
         args.test_swiftformat = False
         args.test_swiftevolve = False
         args.test_toolchainbenchmarks = False
+
+    # --test implies --test-early-swift-driver
+    # (unless explicitly skipped with `--skip-test-early-swift-driver`)
+    if args.test and (args.build_early_swift_driver and
+                      args.test_early_swift_driver is None):
+        args.test_early_swift_driver = True
 
     # --skip-test-ios is merely a shorthand for host and simulator tests.
     if not args.test_ios:
@@ -239,19 +242,11 @@ def _apply_default_arguments(args):
     if not args.test_android:
         args.test_android_host = False
 
-    if not args.build_wasm:
-        args.test_wasm = False
-        args.test_wasm_host = False
-
-    if not args.test_android:
-        args.test_android_host = False
-
     if not args.host_test:
         args.test_ios_host = False
         args.test_tvos_host = False
         args.test_watchos_host = False
         args.test_android_host = False
-        args.test_wasm_host = False
 
 
 def create_argument_parser():
@@ -293,6 +288,9 @@ def create_argument_parser():
     option('--dump-config', toggle_true,
            help='instead of building, write JSON to stdout containing '
                 'various values used to build in this configuration')
+
+    option(['--reconfigure'], store_true,
+           help="Reconfigure all projects as we build")
 
     option('--legacy-impl', store_true('legacy_impl'),
            help='use legacy implementation')
@@ -339,9 +337,6 @@ def create_argument_parser():
 
     option('--android', toggle_true,
            help='also build for Android')
-
-    option('--wasm', toggle_true,
-           help='also build for WebAssembly')
 
     option('--swift-analyze-code-coverage', store,
            choices=['false', 'not-merged', 'merged'],
@@ -601,6 +596,9 @@ def create_argument_parser():
     option(['-b', '--llbuild'], toggle_true('build_llbuild'),
            help='build llbuild')
 
+    option(['--back-deploy-concurrency'], toggle_true('build_backdeployconcurrency'),
+           help='build back-deployment support for concurrency')
+
     option(['--libcxx'], toggle_true('build_libcxx'),
            help='build libcxx')
 
@@ -624,6 +622,9 @@ def create_argument_parser():
 
     option(['--swift-driver'], toggle_true('build_swift_driver'),
            help='build swift-driver')
+
+    option(['--skip-early-swift-driver'], toggle_false('build_early_swift_driver'),
+           help='skip building the early swift-driver')
 
     option(['--indexstore-db'], toggle_true('build_indexstoredb'),
            help='build IndexStoreDB')
@@ -699,6 +700,12 @@ def create_argument_parser():
     option('--symbols-package', store_path,
            help='if provided, an archive of the symbols directory will be '
                 'generated at this path')
+    option('--darwin-symroot-path-filters', append,
+           type=argparse.ShellSplitType(),
+           help='Space separated list of patterns used to match '
+                'a subset of files to generate symbols for. '
+                'Only supported on Darwin. Can be called multiple times '
+                'to add multiple such options.')
 
     # -------------------------------------------------------------------------
     in_group('Build variant')
@@ -995,9 +1002,6 @@ def create_argument_parser():
     option('--skip-build-android', toggle_false('build_android'),
            help='skip building Swift stdlibs for Android')
 
-    option('--skip-build-wasm', toggle_false('build_wasm'),
-           help='skip building Swift stdlibs for WebAssembly')
-
     option('--skip-build-benchmarks', toggle_false('build_benchmarks'),
            help='skip building Swift Benchmark Suite')
 
@@ -1058,22 +1062,19 @@ def create_argument_parser():
            toggle_false('test_android_host'),
            help='skip testing Android device targets on the host machine (the '
                 'phone itself)')
-
     option('--skip-clean-llbuild', toggle_false('clean_llbuild'),
            help='skip cleaning up llbuild')
+    option('--clean-early-swift-driver', toggle_true('clean_early_swift_driver'),
+           help='Clean up the early SwiftDriver')
+    option('--skip-test-early-swift-driver',
+           store('test_early_swift_driver', const=False),
+           help='Test the early SwiftDriver against the host toolchain')
     option('--skip-clean-swiftpm', toggle_false('clean_swiftpm'),
            help='skip cleaning up swiftpm')
     option('--skip-clean-swift-driver', toggle_false('clean_swift_driver'),
            help='skip cleaning up Swift driver')
-
-    option('--skip-test-wasm',
-           toggle_false('test_wasm'),
-           help='skip testing all WebAssembly targets.')
-    option('--skip-test-wasm-host',
-           toggle_false('test_wasm_host'),
-           help='skip testing WebAssembly device targets on the host machine (the '
-                'WebAssembly runtime)')
-
+    option('--skip-test-cmark', toggle_false('test_cmark'),
+           help='skip testing cmark')
     option('--skip-test-swiftpm', toggle_false('test_swiftpm'),
            help='skip testing swiftpm')
     option('--skip-test-swift-driver', toggle_false('test_swift_driver'),
@@ -1168,13 +1169,6 @@ def create_argument_parser():
                 '%(default)s is the default.')
 
     # -------------------------------------------------------------------------
-    in_group('Build settings for WebAssembly')
-
-    option('--wasi-sysroot', store_path,
-           help='An absolute path to wasi-sysroot that will be used as a libc '
-                'implementation for Wasm builds')
-
-    # -------------------------------------------------------------------------
     in_group('Experimental language features')
 
     option('--enable-experimental-differentiable-programming', toggle_true,
@@ -1185,6 +1179,10 @@ def create_argument_parser():
     option('--enable-experimental-concurrency', toggle_true,
            default=True,
            help='Enable experimental Swift concurrency model.')
+
+    option('--enable-experimental-distributed', toggle_true,
+           default=True,
+           help='Enable experimental Swift distributed actors.')
 
     # -------------------------------------------------------------------------
     in_group('Unsupported options')

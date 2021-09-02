@@ -62,8 +62,7 @@ bb0(%0 : $*T):
   %f1 = function_ref @f_in : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
   %c1 = apply %f1<T>(%l1) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
   dealloc_stack %l1 : $*T
-  // forwardPropagateCopy should cleanup debug_value_addr. See rdar://66000188
-  // debug_value_addr %0 : $*T
+  debug_value_addr %0 : $*T
   destroy_addr %0 : $*T
   %r1 = tuple ()
   return %r1 : $()
@@ -136,8 +135,7 @@ bb0(%0 : $*T):
   debug_value_addr %l1 : $*T
   copy_addr %l1 to [initialization] %0 : $*T
   debug_value_addr %0 : $*T
-  // backwardPropagateCopy should cleanup debug_value_addr. See rdar://66000188
-  // debug_value_addr %l1 : $*T
+  debug_value_addr %l1 : $*T
   destroy_addr %l1 : $*T
   dealloc_stack %l1 : $*T
   %t = tuple ()

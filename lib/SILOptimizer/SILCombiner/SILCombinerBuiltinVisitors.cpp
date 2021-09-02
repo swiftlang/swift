@@ -185,6 +185,7 @@ SILCombiner::optimizeBuiltinCOWBufferForReadingOSSA(BuiltinInst *bi) {
             cast<RefTailAddrInst>(intPtrOperand->getUser())->setImmutable();
             return;
           case InteriorPointerOperandKind::OpenExistentialBox:
+          case InteriorPointerOperandKind::ProjectBox:
           case InteriorPointerOperandKind::StoreBorrow:
             // Can not mark this immutable.
             return;

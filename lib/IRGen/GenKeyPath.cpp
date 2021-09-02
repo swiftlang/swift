@@ -1193,12 +1193,9 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
   // Collect the required parameters for the keypath's generic environment.
   SmallVector<GenericRequirement, 4> requirements;
   
-  GenericEnvironment *genericEnv = nullptr;
-  if (auto sig = pattern->getGenericSignature()) {
-    genericEnv = sig->getGenericEnvironment();
-    enumerateGenericSignatureRequirements(pattern->getGenericSignature(),
-      [&](GenericRequirement reqt) { requirements.push_back(reqt); });
-  }
+  auto *genericEnv = pattern->getGenericSignature().getGenericEnvironment();
+  enumerateGenericSignatureRequirements(pattern->getGenericSignature(),
+    [&](GenericRequirement reqt) { requirements.push_back(reqt); });
 
   // Start building the key path pattern.
   ConstantInitBuilder builder(*this);

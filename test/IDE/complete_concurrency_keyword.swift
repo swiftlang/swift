@@ -22,7 +22,7 @@ enum Namespace {
 func testFunc() {
   #^STMT^#
 // STMT: Begin completions
-// STMT-DAG: Keyword/None:                       actor; name=actor
+// STMT-DAG: Keyword/None/Flair[RareKeyword]:    actor; name=actor
 // STMT-DAG: Keyword/None:                       await; name=await
 // STMT: End completion
 }

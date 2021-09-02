@@ -65,7 +65,6 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   case ConstraintKind::OptionalObject:
   case ConstraintKind::FunctionInput:
   case ConstraintKind::FunctionResult:
-  case ConstraintKind::OpaqueUnderlyingType:
   case ConstraintKind::OneWayEqual:
   case ConstraintKind::OneWayBindParam:
   case ConstraintKind::UnresolvedMemberChainBase:
@@ -142,7 +141,6 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, Type Third,
   case ConstraintKind::Disjunction:
   case ConstraintKind::FunctionInput:
   case ConstraintKind::FunctionResult:
-  case ConstraintKind::OpaqueUnderlyingType:
   case ConstraintKind::OneWayEqual:
   case ConstraintKind::OneWayBindParam:
   case ConstraintKind::DefaultClosureType:
@@ -274,7 +272,6 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
   case ConstraintKind::Defaultable:
   case ConstraintKind::FunctionInput:
   case ConstraintKind::FunctionResult:
-  case ConstraintKind::OpaqueUnderlyingType:
   case ConstraintKind::OneWayEqual:
   case ConstraintKind::OneWayBindParam:
   case ConstraintKind::DefaultClosureType:
@@ -303,7 +300,9 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
         getMemberUseDC(), getFunctionRefKind(), getLocator());
 
   case ConstraintKind::Disjunction:
-    return createDisjunction(cs, getNestedConstraints(), getLocator());
+    return createDisjunction(
+        cs, getNestedConstraints(), getLocator(),
+        static_cast<RememberChoice_t>(shouldRememberChoice()));
 
   case ConstraintKind::KeyPath:
   case ConstraintKind::KeyPathApplication:
@@ -355,7 +354,6 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
   case ConstraintKind::BindToPointerType: Out << " bind to pointer "; break;
   case ConstraintKind::Subtype: Out << " subtype "; break;
   case ConstraintKind::Conversion: Out << " conv "; break;
-  case ConstraintKind::OpaqueUnderlyingType: Out << " underlying type of opaque "; break;
   case ConstraintKind::BridgingConversion: Out << " bridging conv "; break;
   case ConstraintKind::ArgumentConversion: Out << " arg conv "; break;
   case ConstraintKind::OperatorArgumentConversion:
@@ -609,7 +607,6 @@ gatherReferencedTypeVars(Constraint *constraint,
   case ConstraintKind::SelfObjectOfProtocol:
   case ConstraintKind::FunctionInput:
   case ConstraintKind::FunctionResult:
-  case ConstraintKind::OpaqueUnderlyingType:
   case ConstraintKind::OneWayEqual:
   case ConstraintKind::OneWayBindParam:
   case ConstraintKind::DefaultClosureType:

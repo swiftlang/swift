@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -swift-version 5 -enable-library-evolution -emit-module-interface-path %t.swiftinterface %s -module-name EffProps
+// RUN: %target-swift-frontend -typecheck -swift-version 5 -enable-library-evolution -emit-module-interface-path %t.swiftinterface %s -module-name EffProps -disable-availability-checking
 // RUN: %FileCheck %s < %t.swiftinterface
 
 public struct MyStruct {}

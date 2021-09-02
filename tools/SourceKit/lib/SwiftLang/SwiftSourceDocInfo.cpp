@@ -352,6 +352,7 @@ private:
         return ExternalParamNameTag;
       return "tuple.element.argument_label";
     case PrintNameContext::Keyword:
+    case PrintNameContext::IntroducerKeyword:
       return SyntaxKeywordTag;
     case PrintNameContext::GenericParameter:
       return GenericParamNameTag;
@@ -639,7 +640,7 @@ static void mapLocToLatestSnapshot(
   }
 
   std::tie(Location.Line, Location.Column) =
-      EditorDoc->getLineAndColumnInBuffer(Location.Offset);
+      LatestSnap->getBuffer()->getLineAndColumn(Location.Offset);
 }
 
 
@@ -959,6 +960,7 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
         /*EmitSynthesizedMembers*/ false,
         /*PrintMessages*/ false,
         /*SkipInheritedDocs*/ false,
+        /*IncludeSPISymbols*/ true,
     };
 
     symbolgraphgen::printSymbolGraphForDecl(DInfo.VD, DInfo.BaseType,
@@ -1057,6 +1059,8 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
       // differentiate them.
       PrintOptions PO;
       PO.SkipAttributes = true;
+      PO.PrintStaticKeyword = false;
+      PO.PrintSelfAccessKindKeyword = false;
       PO.SkipIntroducerKeywords = true;
       PO.ArgAndParamPrinting =
           PrintOptions::ArgAndParamPrintingMode::ArgumentOnly;
@@ -1447,24 +1451,24 @@ static void resolveCursor(
         Range.Line = Pair.first;
         Range.Column = Pair.second;
         Range.Length = Length;
-        bool RangeStartMayNeedRename = false;
+        bool CollectRangeStartRefactorings = false;
         collectAvailableRefactorings(&AstUnit->getPrimarySourceFile(), Range,
-                                     RangeStartMayNeedRename, Kinds, {});
+                                     CollectRangeStartRefactorings, Kinds, {});
         for (RefactoringKind Kind : Kinds) {
           Actions.emplace_back(SwiftLangSupport::getUIDForRefactoringKind(Kind),
                                getDescriptiveRefactoringKindName(Kind),
                                /*UnavailableReason*/ StringRef());
         }
-        if (!RangeStartMayNeedRename) {
-          // If Length is given, then the cursor-info request should only about
-          // collecting available refactorings for the range.
+        if (!CollectRangeStartRefactorings) {
+          // If Length is given then this request is only for refactorings,
+          // return straight away unless we need cursor based refactorings as
+          // well.
           CursorInfoData Data;
           Data.AvailableActions = llvm::makeArrayRef(Actions);
           Receiver(RequestResult<CursorInfoData>::fromResult(Data));
           return;
         }
-        // If the range start may need rename, we fall back to a regular cursor
-        // info request to get the available rename kinds.
+        // Fall through to collect cursor based refactorings
       }
 
       auto *File = &AstUnit->getPrimarySourceFile();
@@ -1473,12 +1477,6 @@ static void resolveCursor(
                           CursorInfoRequest{CursorInfoOwner(File, Loc)},
                           ResolvedCursorInfo());
 
-      if (CursorInfo.isInvalid()) {
-        CursorInfoData Info;
-        Info.InternalDiagnostic = "Unable to resolve cursor info.";
-        Receiver(RequestResult<CursorInfoData>::fromResult(Info));
-        return;
-      }
       CompilerInvocation CompInvok;
       ASTInvok->applyTo(CompInvok);
 
@@ -1525,9 +1523,15 @@ static void resolveCursor(
         Receiver(RequestResult<CursorInfoData>::fromResult(Info));
         return;
       }
-      case CursorInfoKind::Invalid: {
-        llvm_unreachable("bad sema token kind");
-      }
+      case CursorInfoKind::Invalid:
+        CursorInfoData Data;
+        if (Actionables) {
+          Data.AvailableActions = llvm::makeArrayRef(Actions);
+        } else {
+          Data.InternalDiagnostic = "Unable to resolve cursor info.";
+        }
+        Receiver(RequestResult<CursorInfoData>::fromResult(Data));
+        return;
       }
     }
 
@@ -1788,8 +1792,10 @@ void SwiftLangSupport::getCursorInfo(
   std::string Error;
   SwiftInvocationRef Invok =
       ASTMgr->getInvocation(Args, InputFile, fileSystem, Error);
+  if (!Error.empty()) {
+    LOG_WARN_FUNC("error creating ASTInvocation: " << Error);
+  }
   if (!Invok) {
-    LOG_WARN_FUNC("failed to create an ASTInvocation: " << Error);
     Receiver(RequestResult<CursorInfoData>::fromError(Error));
     return;
   }
@@ -2358,6 +2364,82 @@ void SwiftLangSupport::collectExpressionTypes(StringRef FileName,
   auto Collector = std::make_shared<ExpressionTypeCollector>(Receiver,
                                                              ExpectedProtocols,
                                                              CanonicalType);
+  /// FIXME: When request cancellation is implemented and Xcode adopts it,
+  /// don't use 'OncePerASTToken'.
+  static const char OncePerASTToken = 0;
+  getASTManager()->processASTAsync(Invok, std::move(Collector),
+                                   &OncePerASTToken,
+                                   llvm::vfs::getRealFileSystem());
+}
+
+void SwiftLangSupport::collectVariableTypes(
+    StringRef FileName, ArrayRef<const char *> Args, Optional<unsigned> Offset,
+    Optional<unsigned> Length,
+    std::function<void(const RequestResult<VariableTypesInFile> &)> Receiver) {
+  std::string Error;
+  SwiftInvocationRef Invok = ASTMgr->getInvocation(Args, FileName, Error);
+  if (!Invok) {
+    LOG_WARN_FUNC("failed to create an ASTInvocation: " << Error);
+    Receiver(RequestResult<VariableTypesInFile>::fromError(Error));
+    return;
+  }
+  assert(Invok);
+
+  class VariableTypeCollectorASTConsumer : public SwiftASTConsumer {
+  private:
+    std::function<void(const RequestResult<VariableTypesInFile> &)> Receiver;
+    Optional<unsigned> Offset;
+    Optional<unsigned> Length;
+
+  public:
+    VariableTypeCollectorASTConsumer(
+        std::function<void(const RequestResult<VariableTypesInFile> &)>
+            Receiver,
+        Optional<unsigned> Offset, Optional<unsigned> Length)
+        : Receiver(std::move(Receiver)), Offset(Offset), Length(Length) {}
+
+    void handlePrimaryAST(ASTUnitRef AstUnit) override {
+      auto &CompInst = AstUnit->getCompilerInstance();
+      auto *SF = CompInst.getPrimarySourceFile();
+
+      // Construct the range for which variable types are to be queried. If
+      // offset/length are unset, the (default) range will be used, which
+      // corresponds to the entire document.
+      SourceRange Range;
+      if (Offset.hasValue() && Length.hasValue()) {
+        auto &SM = CompInst.getSourceMgr();
+        unsigned BufferID = SF->getBufferID().getValue();
+        SourceLoc Start = Lexer::getLocForStartOfToken(SM, BufferID, *Offset);
+        SourceLoc End =
+            Lexer::getLocForStartOfToken(SM, BufferID, *Offset + *Length);
+        Range = SourceRange(Start, End);
+      }
+
+      std::vector<VariableTypeInfo> Infos;
+      std::string TypeBuffer;
+      llvm::raw_string_ostream OS(TypeBuffer);
+      VariableTypesInFile Result;
+
+      collectVariableType(*SF, Range, Infos, OS);
+
+      for (auto Info : Infos) {
+        Result.Results.push_back({Info.Offset, Info.Length, Info.TypeOffset, Info.HasExplicitType});
+      }
+      Result.TypeBuffer = OS.str();
+      Receiver(RequestResult<VariableTypesInFile>::fromResult(Result));
+    }
+
+    void cancelled() override {
+      Receiver(RequestResult<VariableTypesInFile>::cancelled());
+    }
+
+    void failed(StringRef Error) override {
+      Receiver(RequestResult<VariableTypesInFile>::fromError(Error));
+    }
+  };
+
+  auto Collector = std::make_shared<VariableTypeCollectorASTConsumer>(
+      Receiver, Offset, Length);
   /// FIXME: When request cancellation is implemented and Xcode adopts it,
   /// don't use 'OncePerASTToken'.
   static const char OncePerASTToken = 0;

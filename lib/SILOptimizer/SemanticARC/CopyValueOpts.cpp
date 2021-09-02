@@ -473,7 +473,7 @@ static bool tryJoinIfDestroyConsumingUseInSameBlock(
     // we need to only find scopes that end within the region in between the
     // singleConsumingUse (the original forwarded use) and the destroy_value. In
     // such a case, we must bail!
-    if (auto operand = BorrowingOperand::get(use))
+    if (auto operand = BorrowingOperand(use))
       if (!operand.visitScopeEndingUses([&](Operand *endScopeUse) {
             // Return false if we did see the relevant end scope instruction
             // in the block. That means that we are going to exit early and

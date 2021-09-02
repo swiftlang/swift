@@ -863,7 +863,7 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     return true;
 
   // The presence of 'final' blocks the inference of 'dynamic'.
-  if (decl->isFinal())
+  if (decl->isSemanticallyFinal())
     return false;
 
   // Types are never 'dynamic'.
@@ -940,7 +940,7 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator,
   auto reqSignature = std::move(builder).computeGenericSignature(
                         /*allowConcreteGenericParams=*/false,
                         /*requirementSignatureSelfProto=*/proto);
-  return reqSignature->getRequirements();
+  return reqSignature.getRequirements();
 }
 
 Type
@@ -1102,13 +1102,13 @@ swift::computeAutomaticEnumValueKind(EnumDecl *ED) {
   
   if (ED->getGenericEnvironmentOfContext() != nullptr)
     rawTy = ED->mapTypeIntoContext(rawTy);
-  
+
+  auto *module = ED->getParentModule();
+
   // Swift enums require that the raw type is convertible from one of the
   // primitive literal protocols.
   auto conformsToProtocol = [&](KnownProtocolKind protoKind) {
-    ProtocolDecl *proto = ED->getASTContext().getProtocol(protoKind);
-    return proto &&
-        TypeChecker::conformsToProtocol(rawTy, proto, ED->getDeclContext());
+    return TypeChecker::conformsToKnownProtocol(rawTy, protoKind, module);
   };
 
   static auto otherLiteralProtocolKinds = {
@@ -1516,46 +1516,6 @@ TypeChecker::lookupPrecedenceGroup(DeclContext *dc, Identifier name,
   return PrecedenceGroupLookupResult(dc, name, std::move(groups));
 }
 
-static NominalTypeDecl *resolveSingleNominalTypeDecl(
-    DeclContext *DC, SourceLoc loc, Identifier ident, ASTContext &Ctx,
-    TypeResolutionFlags flags = TypeResolutionFlags(0)) {
-  auto *TyR = new (Ctx) SimpleIdentTypeRepr(DeclNameLoc(loc),
-                                            DeclNameRef(ident));
-
-  const auto options =
-      TypeResolutionOptions(TypeResolverContext::TypeAliasDecl) | flags;
-
-  const auto result =
-      TypeResolution::forInterface(DC, options,
-                                   // FIXME: Should unbound generics be allowed
-                                   // to appear amongst designated types?
-                                   /*unboundTyOpener*/ nullptr,
-                                   /*placeholderHandler*/ nullptr)
-          .resolveType(TyR);
-
-  if (result->hasError())
-    return nullptr;
-  return result->getAnyNominal();
-}
-
-bool swift::checkDesignatedTypes(OperatorDecl *OD,
-                                 ArrayRef<Located<Identifier>> identifiers) {
-  auto &ctx = OD->getASTContext();
-  auto *DC = OD->getDeclContext();
-
-  SmallVector<NominalTypeDecl *, 1> designatedNominalTypes;
-  for (auto ident : identifiers) {
-    auto *decl = resolveSingleNominalTypeDecl(DC, ident.Loc, ident.Item, ctx);
-    if (!decl)
-      return true;
-
-    designatedNominalTypes.push_back(decl);
-  }
-
-  OD->setDesignatedNominalTypes(ctx.AllocateCopy(designatedNominalTypes));
-  return false;
-}
-
 /// Validate the given operator declaration.
 ///
 /// This establishes key invariants, such as an InfixOperatorDecl's
@@ -1567,49 +1527,26 @@ OperatorPrecedenceGroupRequest::evaluate(Evaluator &evaluator,
   auto &ctx = IOD->getASTContext();
   auto *dc = IOD->getDeclContext();
 
-  auto enableOperatorDesignatedTypes =
-      ctx.TypeCheckerOpts.EnableOperatorDesignatedTypes;
-
-  PrecedenceGroupDecl *group = nullptr;
-
-  auto identifiers = IOD->getIdentifiers();
-  if (!identifiers.empty()) {
-    auto name = identifiers[0].Item;
-    auto loc = identifiers[0].Loc;
-
-    auto canResolveType = [&]() -> bool {
-      return enableOperatorDesignatedTypes &&
-             resolveSingleNominalTypeDecl(dc, loc, name, ctx,
-                                          TypeResolutionFlags::SilenceErrors);
-    };
-
-    // Make sure not to diagnose in the case where we failed to find a
-    // precedencegroup, but we could resolve a type instead.
+  auto name = IOD->getPrecedenceGroupName();
+  if (!name.empty()) {
+    auto loc = IOD->getPrecedenceGroupLoc();
     auto groups = TypeChecker::lookupPrecedenceGroup(dc, name, loc);
-    if (groups.hasResults() || !canResolveType()) {
-      group = groups.getSingleOrDiagnose(loc);
-      identifiers = identifiers.slice(1);
-    }
+
+    if (groups.hasResults() ||
+        !ctx.TypeCheckerOpts.EnableOperatorDesignatedTypes)
+      return groups.getSingleOrDiagnose(loc);
+
+    // We didn't find the named precedence group and designated types are
+    // enabled, so we will assume that it was actually a designated type. Warn
+    // and fall through as though `PrecedenceGroupName` had never been set.
+    ctx.Diags.diagnose(IOD->getColonLoc(),
+                       diag::operator_decl_remove_designated_types)
+        .fixItRemove({IOD->getColonLoc(), loc});
   }
 
-  // Unless operator designed types are enabled, the parser will ensure that
-  // only one identifier is allowed in the clause, which we should have just
-  // handled.
-  assert(identifiers.empty() || enableOperatorDesignatedTypes);
-
-  if (!group) {
-    auto groups = TypeChecker::lookupPrecedenceGroup(
-        dc, ctx.Id_DefaultPrecedence, SourceLoc());
-    group = groups.getSingleOrDiagnose(IOD->getLoc(), /*forBuiltin*/ true);
-  }
-
-  auto nominalTypes = IOD->getDesignatedNominalTypes();
-  if (nominalTypes.empty() && enableOperatorDesignatedTypes) {
-    if (checkDesignatedTypes(IOD, identifiers)) {
-      IOD->setInvalid();
-    }
-  }
-  return group;
+  auto groups = TypeChecker::lookupPrecedenceGroup(
+      dc, ctx.Id_DefaultPrecedence, SourceLoc());
+  return groups.getSingleOrDiagnose(IOD->getLoc(), /*forBuiltin*/ true);
 }
 
 SelfAccessKind
@@ -1860,7 +1797,7 @@ FunctionOperatorRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
   if (dc->isTypeContext()) {
     if (auto classDecl = dc->getSelfClassDecl()) {
       // For a class, we also need the function or class to be 'final'.
-      if (!classDecl->isFinal() && !FD->isFinal() &&
+      if (!classDecl->isSemanticallyFinal() && !FD->isFinal() &&
           FD->getStaticLoc().isValid() &&
           FD->getStaticSpelling() != StaticSpellingKind::KeywordStatic) {
         FD->diagnose(diag::nonfinal_operator_in_class,
@@ -2149,6 +2086,9 @@ ParamSpecifierRequest::evaluate(Evaluator &evaluator,
     nestedRepr = tupleRepr->getElementType(0);
   }
 
+  if (auto isolated = dyn_cast<IsolatedTypeRepr>(nestedRepr))
+    nestedRepr = isolated->getBase();
+  
   if (isa<InOutTypeRepr>(nestedRepr) &&
       param->isDefaultArgument()) {
     auto &ctx = param->getASTContext();
@@ -2186,7 +2126,9 @@ static Type validateParameterType(ParamDecl *decl) {
     };
     // FIXME: Don't let placeholder types escape type resolution.
     // For now, just return the placeholder type.
-    placeholderHandler = PlaceholderType::get;
+    placeholderHandler = [](auto &ctx, auto *originator) {
+      return Type();
+    };
   } else if (isa<AbstractFunctionDecl>(dc)) {
     options = TypeResolutionOptions(TypeResolverContext::AbstractFunctionDecl);
   } else if (isa<SubscriptDecl>(dc)) {
@@ -2218,9 +2160,10 @@ static Type validateParameterType(ParamDecl *decl) {
   }
 
   if (decl->isVariadic()) {
-    Ty = TypeChecker::getArraySliceType(decl->getStartLoc(), Ty);
-    if (Ty->hasError()) {
-      decl->setInvalid();
+    Ty = VariadicSequenceType::get(Ty);
+    if (!ctx.getArrayDecl()) {
+      ctx.Diags.diagnose(decl->getTypeRepr()->getLoc(),
+                         diag::sugar_type_not_found, 0);
       return ErrorType::get(ctx);
     }
 
@@ -2299,6 +2242,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       auto selfParam = computeSelfParam(AFD,
                                         /*isInitializingCtor*/true,
                                         /*wantDynamicSelf*/true);
+      PD->setIsolated(selfParam.isIsolated());
       return selfParam.getPlainType();
     }
 
@@ -2754,8 +2698,8 @@ bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
   if (!nominalSig) return true;
 
   // Check that the type parameters are the same the whole way through.
-  auto nominalGenericParams = nominalSig->getGenericParams();
-  auto typealiasGenericParams = typealiasSig->getGenericParams();
+  auto nominalGenericParams = nominalSig.getGenericParams();
+  auto typealiasGenericParams = typealiasSig.getGenericParams();
   if (nominalGenericParams.size() != typealiasGenericParams.size())
     return false;
   if (!std::equal(nominalGenericParams.begin(), nominalGenericParams.end(),
@@ -2773,7 +2717,7 @@ bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
 
   // If our arguments line up with our innermost generic parameters, it's
   // a passthrough typealias.
-  auto innermostGenericParams = typealiasSig->getInnermostGenericParams();
+  auto innermostGenericParams = typealiasSig.getInnermostGenericParams();
   auto boundArgs = boundGenericType->getGenericArgs();
   if (boundArgs.size() != innermostGenericParams.size())
     return false;
@@ -2818,7 +2762,9 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
       },
       // FIXME: Don't let placeholder types escape type resolution.
       // For now, just return the placeholder type.
-      PlaceholderType::get);
+      [](auto &ctx, auto *originator) {
+        return Type();
+      });
 
   const auto extendedType = resolution.resolveType(extendedRepr);
 

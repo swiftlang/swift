@@ -1004,6 +1004,7 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
   auto TargetFormalType = dynamicCast.getTargetFormalType();
   auto Loc = dynamicCast.getLocation();
   auto *SuccessBB = dynamicCast.getSuccessBlock();
+  auto *FailureBB = dynamicCast.getFailureBlock();
   auto Op = dynamicCast.getSource();
   auto *F = dynamicCast.getFunction();
 
@@ -1016,10 +1017,13 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
 
   SILBuilderWithScope Builder(Inst, builderContext);
   if (Feasibility == DynamicCastFeasibility::WillFail) {
-    TinyPtrVector<SILValue> Args;
-    if (Builder.hasOwnership())
-      Args.push_back(Inst->getOperand());
-    auto *NewI = Builder.createBranch(Loc, dynamicCast.getFailureBlock(), Args);
+    auto *NewI = Builder.createBranch(Loc, FailureBB);
+    if (Builder.hasOwnership()) {
+      FailureBB->getArgument(0)->replaceAllUsesWith(Op);
+      FailureBB->eraseArgument(0);
+      SuccessBB->getArgument(0)->replaceAllUsesWithUndef();
+      SuccessBB->eraseArgument(0);
+    }
     eraseInstAction(Inst);
     willFailAction();
     return NewI;
@@ -1063,7 +1067,19 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
     CastedValue = Op;
   }
 
-  auto *NewI = Builder.createBranch(Loc, SuccessBB, CastedValue);
+  BranchInst *NewI = nullptr;
+
+  if (Builder.hasOwnership()) {
+    NewI = Builder.createBranch(Loc, SuccessBB);
+    SuccessBB->getArgument(0)->replaceAllUsesWith(CastedValue);
+    SuccessBB->eraseArgument(0);
+    FailureBB->getArgument(0)->replaceAllUsesWithUndef();
+    FailureBB->eraseArgument(0);
+  }
+  else {
+    NewI = Builder.createBranch(Loc, SuccessBB, CastedValue);
+  }
+
   eraseInstAction(Inst);
   willSucceedAction();
   return NewI;

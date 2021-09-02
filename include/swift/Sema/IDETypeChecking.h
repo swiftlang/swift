@@ -206,6 +206,33 @@ namespace swift {
   /// the decl context.
   ProtocolDecl *resolveProtocolName(DeclContext *dc, StringRef Name);
 
+  /// Reported type of a variable declaration.
+  struct VariableTypeInfo {
+    /// The start of the variable identifier.
+    uint32_t Offset;
+
+    /// The length of the variable identifier.
+    uint32_t Length;
+
+    /// Whether the variable has an explicit type annotation.
+    bool HasExplicitType;
+
+    /// The start of the printed type in a separate string buffer.
+    uint32_t TypeOffset;
+
+    VariableTypeInfo(uint32_t Offset, uint32_t Length, bool HasExplicitType,
+                     uint32_t TypeOffset);
+  };
+
+  /// Collect type information for every variable declaration in \c SF
+  /// within the given range into \c VariableTypeInfos.
+  /// All types will be printed to \c OS and the type offsets of the
+  /// \c VariableTypeInfos will index into the string that backs this
+  /// stream.
+  void collectVariableType(SourceFile &SF, SourceRange Range,
+                           std::vector<VariableTypeInfo> &VariableTypeInfos,
+                           llvm::raw_ostream &OS);
+
   /// FIXME: All of the below goes away once CallExpr directly stores its
   /// arguments.
 
@@ -216,7 +243,32 @@ namespace swift {
     SmallVector<SourceLoc, 4> labelLocs;
     SourceLoc lParenLoc;
     SourceLoc rParenLoc;
-    bool hasTrailingClosure = false;
+    Optional<unsigned> unlabeledTrailingClosureIdx;
+
+    /// The number of trailing closures in the argument list.
+    unsigned getNumTrailingClosures() const {
+      if (!unlabeledTrailingClosureIdx)
+        return 0;
+      return args.size() - *unlabeledTrailingClosureIdx;
+    }
+
+    /// Whether any unlabeled or labeled trailing closures are present.
+    bool hasAnyTrailingClosures() const {
+      return unlabeledTrailingClosureIdx.hasValue();
+    }
+
+    /// Whether the given index is for an unlabeled trailing closure.
+    bool isUnlabeledTrailingClosureIdx(unsigned i) const {
+      return unlabeledTrailingClosureIdx && *unlabeledTrailingClosureIdx == i;
+    }
+
+    /// Whether the given index is for a labeled trailing closure in an
+    /// argument list with multiple trailing closures.
+    bool isLabeledTrailingClosureIdx(unsigned i) const {
+      if (!unlabeledTrailingClosureIdx)
+        return false;
+      return i > *unlabeledTrailingClosureIdx && i < args.size();
+    }
   };
 
   /// When applying a solution to a constraint system, the type checker rewrites
@@ -278,6 +330,9 @@ namespace swift {
   /// for a Fix-It that adds a new build* function to a result builder.
   std::tuple<SourceLoc, std::string, Type>
   determineResultBuilderBuildFixItInfo(NominalTypeDecl *builder);
+
+  /// Just a proxy to swift::contextUsesConcurrencyFeatures() from lib/IDE code.
+  bool completionContextUsesConcurrencyFeatures(const DeclContext *dc);
 }
 
 #endif

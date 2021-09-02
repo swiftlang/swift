@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -dump-ast -enable-experimental-concurrency -parse-as-library %s | %FileCheck %s --check-prefix=CHECK-AST
-// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -Xfrontend -parse-as-library %s -o %t_binary
+// RUN: %target-swift-frontend -dump-ast  -disable-availability-checking -parse-as-library %s | %FileCheck %s --check-prefix=CHECK-AST
+// RUN: %target-build-swift  -Xfrontend -disable-availability-checking -Xfrontend -parse-as-library %s -o %t_binary
 // RUN: %target-run %t_binary | %FileCheck %s --check-prefix=CHECK-EXEC
 
 // REQUIRES: concurrency

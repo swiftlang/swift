@@ -9,7 +9,7 @@
 
 import Foundation
 
-// Make sure that we keep the escaping closures alive accross the ultimate call.
+// Make sure that we keep the escaping closures alive across the ultimate call.
 // CHECK-LABEL: sil @$s1A19bridgeNoescapeBlock5optFn0D3Fn2yySSSgcSg_AFtF
 // CHECK: bb0
 // CHECK:  retain_value %0
@@ -39,7 +39,7 @@ public func bridgeNoescapeBlock( optFn: ((String?) -> ())?, optFn2: ((String?) -
 @_silgen_name("_returnOptionalEscape")
 public func returnOptionalEscape() -> (() ->())?
 
-// Make sure that we keep the escaping closure alive accross the ultimate call.
+// Make sure that we keep the escaping closure alive across the ultimate call.
 
 // CHECK-LABEL: sil @$s1A19bridgeNoescapeBlockyyF : $@convention(thin) () -> () {
 // CHECK: bb0:

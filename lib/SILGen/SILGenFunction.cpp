@@ -26,6 +26,7 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILProfiler.h"
 #include "swift/SIL/SILUndef.h"
@@ -140,6 +141,9 @@ DeclName SILGenModule::getMagicFunctionName(SILDeclRef ref) {
   case SILDeclRef::Kind::EnumElement:
     return getMagicFunctionName(cast<EnumElementDecl>(ref.getDecl())
                                   ->getDeclContext());
+  case SILDeclRef::Kind::EntryPoint:
+    auto *file = ref.getDecl()->getDeclContext()->getParentSourceFile();
+    return getMagicFunctionName(file);
   }
 
   llvm_unreachable("Unhandled SILDeclRefKind in switch.");
@@ -510,90 +514,20 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
   emitProfilerIncrement(fd->getTypecheckedBody());
   emitProlog(captureInfo, fd->getParameters(), fd->getImplicitSelfDecl(), fd,
              fd->getResultInterfaceType(), fd->hasThrows(), fd->getThrowsLoc());
-  prepareEpilog(true, fd->hasThrows(), CleanupLocation(fd));
 
-  if (fd->isAsyncHandler() &&
-      // If F.isAsync() we are emitting the asyncHandler body and not the
-      // original asyncHandler.
-      !F.isAsync()) {
-    emitAsyncHandler(fd);
-  } else if (llvm::any_of(*fd->getParameters(),
-                          [](ParamDecl *p){ return p->hasAttachedPropertyWrapper(); })) {
-    // If any parameters have property wrappers, emit the local auxiliary
-    // variables before emitting the function body.
-    LexicalScope BraceScope(*this, CleanupLocation(fd));
-    for (auto *param : *fd->getParameters()) {
-      param->visitAuxiliaryDecls([&](VarDecl *auxiliaryVar) {
-        SILLocation WrapperLoc(auxiliaryVar);
-        WrapperLoc.markAsPrologue();
-        if (auto *patternBinding = auxiliaryVar->getParentPatternBinding())
-          visitPatternBindingDecl(patternBinding);
-
-        visit(auxiliaryVar);
-      });
-    }
-
-    emitStmt(fd->getTypecheckedBody());
+  if (fd->isDistributedActorFactory()) {
+    // Synthesize the factory function body
+    emitDistributedActorFactory(fd);
   } else {
+    prepareEpilog(true, fd->hasThrows(), CleanupLocation(fd));
+    
+    // Emit the actual function body as usual
     emitStmt(fd->getTypecheckedBody());
-  }
 
-  emitEpilog(fd);
+    emitEpilog(fd);
+  }
 
   mergeCleanupBlocks();
-}
-
-/// An asyncHandler function is split into two functions:
-/// 1. The asyncHandler body function: it contains the body of the function, but
-///    is emitted as an async function.
-/// 2. The original function: it just contains
-///      _runAsyncHandler(operation: asyncHandlerBodyFunction)
-void SILGenFunction::emitAsyncHandler(FuncDecl *fd) {
-
-  // 1. step: create the asyncHandler body function
-  //
-  auto origFnTy = F.getLoweredFunctionType();
-  assert(!F.isAsync() && "an asyncHandler function cannot be async");
-  
-  // The body function type is the same as the original type, just with "async".
-  auto bodyFnTy = origFnTy->getWithExtInfo(origFnTy->getExtInfo().withAsync());
-
-  SILDeclRef constant(fd, SILDeclRef::Kind::Func);
-  std::string name = constant.mangle(SILDeclRef::ManglingKind::AsyncHandlerBody);
-  SILLocation loc = F.getLocation();
-  SILGenFunctionBuilder builder(*this);
-
-  SILFunction  *bodyFn = builder.createFunction(
-    SILLinkage::Hidden, name, bodyFnTy, F.getGenericEnvironment(),
-    loc, F.isBare(), F.isTransparent(),
-    F.isSerialized(), IsNotDynamic, ProfileCounter(), IsNotThunk,
-    SubclassScope::NotApplicable, F.getInlineStrategy(), F.getEffectsKind());
-  bodyFn->setDebugScope(new (getModule()) SILDebugScope(loc, bodyFn));
-
-  SILGenFunction(SGM, *bodyFn, fd).emitFunction(fd);
-  SGM.emitLazyConformancesForFunction(bodyFn);
-
-  // 2. step: emit the original asyncHandler function
-  //
-  Scope scope(*this, loc);
-
-  // %bodyFnRef = partial_apply %bodyFn(%originalArg0, %originalArg1, ...)
-  //
-  SmallVector<ManagedValue, 4> managedArgs;
-  for (SILValue arg : F.getArguments()) {
-    ManagedValue argVal = ManagedValue(arg, CleanupHandle::invalid());
-    managedArgs.push_back(argVal.copy(*this, loc));
-  }
-  auto *bodyFnRef = B.createFunctionRef(loc, bodyFn);
-  ManagedValue bodyFnValue =
-    B.createPartialApply(loc, bodyFnRef, F.getForwardingSubstitutionMap(),
-                         managedArgs, ParameterConvention::Direct_Guaranteed);
-  
-  // apply %_runAsyncHandler(%bodyFnValue)
-  //
-  FuncDecl *asyncHandlerDecl = SGM.getRunAsyncHandler();
-  emitApplyOfLibraryIntrinsic(loc, asyncHandlerDecl, SubstitutionMap(),
-    { bodyFnValue }, SGFContext());
 }
 
 void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
@@ -606,11 +540,6 @@ void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
   emitProlog(captureInfo, ace->getParameters(), /*selfParam=*/nullptr,
              ace, resultIfaceTy, ace->isBodyThrowing(), ace->getLoc());
   prepareEpilog(true, ace->isBodyThrowing(), CleanupLocation(ace));
-  for (auto *param : *ace->getParameters()) {
-    param->visitAuxiliaryDecls([&](VarDecl *auxiliaryVar) {
-      visit(auxiliaryVar);
-    });
-  }
 
   if (auto *ce = dyn_cast<ClosureExpr>(ace)) {
     emitStmt(ce->getBody());
@@ -627,9 +556,13 @@ void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
 }
 
 void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
-  // Load argc and argv from the entry point arguments.
-  SILValue argc = F.begin()->getArgument(0);
-  SILValue argv = F.begin()->getArgument(1);
+  // Create the argc and argv arguments.
+  auto entry = B.getInsertionBB();
+  auto paramTypeIter = F.getConventions()
+                           .getParameterSILTypes(getTypeExpansionContext())
+                           .begin();
+  SILValue argc = entry->createFunctionArgument(*paramTypeIter);
+  SILValue argv = entry->createFunctionArgument(*std::next(paramTypeIter));
 
   switch (mainDecl->getArtificialMainKind()) {
   case ArtificialMainKind::UIApplicationMain: {

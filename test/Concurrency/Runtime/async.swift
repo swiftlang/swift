@@ -1,11 +1,12 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency %import-libdispatch)
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking %import-libdispatch)
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 
-// rdar://76038845
+// rdar://82123254
 // UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 import Dispatch
 import StdlibUnittest
@@ -19,11 +20,11 @@ import StdlibUnittest
 
 var asyncTests = TestSuite("Async")
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 actor MyActor {
   func synchronous() { }
 
-  func doSomething(expectedPriority: Task.Priority) {
+  func doSomething(expectedPriority: TaskPriority) {
     async {
       synchronous() // okay to be synchronous
       assert(Task.currentPriority == expectedPriority)
@@ -31,7 +32,7 @@ actor MyActor {
   }
 }
 
-if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+if #available(SwiftStdlib 5.5, *) {
   let actor = MyActor()
 
   asyncTests.test("Detach") {
@@ -67,4 +68,3 @@ if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
 }
 
 runAllTests()
-

@@ -18,6 +18,7 @@
 #include "sourcekitd/RawData.h"
 #include "sourcekitd/TokenAnnotationsArray.h"
 #include "sourcekitd/ExpressionTypeArray.h"
+#include "sourcekitd/VariableTypeArray.h"
 #include "sourcekitd/Logging.h"
 #include "SourceKit/Core/LLVM.h"
 #include "SourceKit/Support/UIdent.h"
@@ -254,6 +255,7 @@ public:
       case CustomBufferKind::DocStructureElementArray:
       case CustomBufferKind::AttributesArray:
       case CustomBufferKind::ExpressionTypeArray:
+      case CustomBufferKind::VariableTypeArray:
         return SOURCEKITD_VARIANT_TYPE_ARRAY;
       case CustomBufferKind::RawData:
         return SOURCEKITD_VARIANT_TYPE_DATA;
@@ -660,6 +662,15 @@ void ResponseBuilder::Dictionary::set(SourceKit::UIdent Key,
   static_cast<SKDObject *>(Impl)->set(SKDUIDFromUIdent(Key), ArrayObject);
 }
 
+void ResponseBuilder::Dictionary::set(SourceKit::UIdent Key,
+                                      ArrayRef<SourceKit::UIdent> UIDs) {
+  auto ArrayObject = new SKDArray();
+  for (auto UID : UIDs) {
+    ArrayObject->set(SOURCEKITD_ARRAY_APPEND, new SKDUID(SKDUIDFromUIdent(UID)));
+  }
+  static_cast<SKDObject *>(Impl)->set(SKDUIDFromUIdent(Key), ArrayObject);
+}
+
 void ResponseBuilder::Dictionary::setBool(UIdent Key, bool Val) {
   static_cast<SKDObject *>(Impl)->set(SKDUIDFromUIdent(Key), new SKDBool(Val));
 }
@@ -983,6 +994,9 @@ static sourcekitd_variant_t variantFromSKDObject(SKDObjectRef Object) {
       case CustomBufferKind::ExpressionTypeArray:
         return {{ (uintptr_t)getVariantFunctionsForExpressionTypeArray(),
           (uintptr_t)DataObject->getDataPtr(), 0 }};
+      case CustomBufferKind::VariableTypeArray:
+        return {{ (uintptr_t)getVariantFunctionsForVariableTypeArray(),
+                  (uintptr_t)DataObject->getDataPtr(), 0 }};
       case CustomBufferKind::RawData:
         return {{ (uintptr_t)getVariantFunctionsForRawData(),
                   (uintptr_t)DataObject->getDataPtr(),

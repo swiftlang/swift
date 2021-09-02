@@ -599,26 +599,8 @@ extension Unsafe${Mutable}BufferPointer {
   @inlinable // unsafe-performance
   public static func allocate(capacity count: Int) 
     -> UnsafeMutableBufferPointer<Element> {
-    let size = MemoryLayout<Element>.stride * count
-    // For any alignment <= _minAllocationAlignment, force alignment = 0.
-    // This forces the runtime's "aligned" allocation path so that
-    // deallocation does not require the original alignment.
-    //
-    // The runtime guarantees:
-    //
-    // align == 0 || align > _minAllocationAlignment:
-    //   Runtime uses "aligned allocation".
-    //
-    // 0 < align <= _minAllocationAlignment:
-    //   Runtime may use either malloc or "aligned allocation".
-    var align = Builtin.alignof(Element.self)
-    if Int(align) <= _minAllocationAlignment() {
-      align = (0)._builtinWordValue
-    }
-    let raw  = Builtin.allocRaw(size._builtinWordValue, align)
-    Builtin.bindMemory(raw, count._builtinWordValue, Element.self)
-    return UnsafeMutableBufferPointer(
-      start: UnsafeMutablePointer(raw), count: count)
+    let base  = UnsafeMutablePointer<Element>.allocate(capacity: count)
+    return UnsafeMutableBufferPointer(start: base, count: count)
   }
   
   /// Initializes every element in this buffer's memory to a copy of the given value.

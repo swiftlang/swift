@@ -1,4 +1,4 @@
-// RUN: %target-swiftc_driver %s -Xfrontend -enable-experimental-concurrency -parse-as-library %import-libdispatch -target %sanitizers-target-triple -g -sanitize=thread -o %t
+// RUN: %target-swiftc_driver %s  -parse-as-library %import-libdispatch -target %sanitizers-target-triple -g -sanitize=thread -o %t
 // RUN: %target-codesign %t
 // RUN: env %env-TSAN_OPTIONS="abort_on_error=0" not %target-run %t 2>&1 | %swift-demangle --simplified | %FileCheck %s
 
@@ -9,6 +9,10 @@
 
 // rdar://76038845
 // UNSUPPORTED: use_os_stdlib
+
+// rdar://80274830 ([Swift CI] Sanitizer report symbolication fails because we fail to start atos, sanbox issue?)
+// REQUIRES: 80274830
+// Might be related/same issue as below
 
 // rdar://75365575 (Failing to start atos external symbolizer)
 // UNSUPPORTED: OS=watchos

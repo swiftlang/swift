@@ -305,7 +305,7 @@ static const std::vector<std::string> URLProtocols = {
   // Use RegexStrURL:
   "acap", "afp", "afs", "cid", "data", "fax", "feed", "file", "ftp", "go",
   "gopher", "http", "https", "imap", "ldap", "mailserver", "mid", "modem",
-  "news", "nntp", "opaquelocktoken", "pop", "prospero", "rdar", "rtsp", "service"
+  "news", "nntp", "opaquelocktoken", "pop", "prospero", "rdar", "rtsp", "service",
   "sip", "soap.beep", "soap.beeps", "tel", "telnet", "tip", "tn3270", "urn",
   "vemmi", "wais", "xcdoc", "z39.50r","z39.50s",
 
@@ -484,8 +484,12 @@ CharSourceRange innerCharSourceRangeFromSourceRange(const SourceManager &SM,
   return CharSourceRange(SM, SRS, (SR.End != SR.Start) ? SR.End : SRS);
 }
 
-CharSourceRange parameterNameRangeOfCallArg(const TupleExpr *TE,
+CharSourceRange parameterNameRangeOfCallArg(const Expr *ArgListExpr,
                                             const Expr *Arg) {
+  if (isa<ParenExpr>(ArgListExpr))
+    return CharSourceRange();
+
+  auto *TE = cast<TupleExpr>(ArgListExpr);
   if (!TE->hasElementNameLocs() || !TE->hasElementNames())
     return CharSourceRange();
 
@@ -547,12 +551,11 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
   if (isVisitedBefore(E))
     return {false, E};
 
-  auto addCallArgExpr = [&](Expr *Elem, TupleExpr *ParentTupleExpr) {
-    if (isa<DefaultArgumentExpr>(Elem) ||
-        !isCurrentCallArgExpr(ParentTupleExpr))
+  auto addCallArgExpr = [&](Expr *Elem, Expr *ArgListExpr) {
+    if (isa<DefaultArgumentExpr>(Elem) || !isCurrentCallArgExpr(ArgListExpr))
       return;
 
-    CharSourceRange NR = parameterNameRangeOfCallArg(ParentTupleExpr, Elem);
+    CharSourceRange NR = parameterNameRangeOfCallArg(ArgListExpr, Elem);
     SyntaxStructureNode SN;
     SN.Kind = SyntaxStructureKind::Argument;
     SN.NameRange = NR;
@@ -568,15 +571,9 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
     pushStructureNode(SN, Elem);
   };
 
-  if (auto *ParentTupleExpr = dyn_cast_or_null<TupleExpr>(Parent.getAsExpr())) {
-    // the argument value is a tuple expression already, we can just extract it
-    addCallArgExpr(E, ParentTupleExpr);
-  } else if (auto *ParentOptionalExpr = dyn_cast_or_null<OptionalEvaluationExpr>(Parent.getAsExpr())) {
-    // if an argument value is an optional expression, we should extract the
-    // argument from the subexpression
-    if (auto *ParentTupleExpr = dyn_cast_or_null<TupleExpr>(ParentOptionalExpr->getSubExpr())) {
-      addCallArgExpr(E, ParentTupleExpr);
-    }
+  if (auto *ParentExpr = Parent.getAsExpr()) {
+    if (isa<TupleExpr>(ParentExpr) || isa<ParenExpr>(ParentExpr))
+      addCallArgExpr(E, ParentExpr);
   }
 
   if (E->isImplicit())
@@ -667,23 +664,6 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
                           Closure->getExplicitResultTypeRepr()->getSourceRange());
 
     pushStructureNode(SN, Closure);
-
-  } else if (auto *CLE = dyn_cast<CaptureListExpr>(E)) {
-    // The ASTWalker visits captured variables twice, from a `CaptureListEntry` they are visited
-    // from the `VarDecl` and the `PatternBindingDecl` entries.
-    // We take over visitation here to avoid walking the `PatternBindingDecl` ones.
-    for (auto c : CLE->getCaptureList()) {
-      if (auto *VD = c.Var) {
-        // We're skipping over the PatternBindingDecl so we need to handle the
-        // the VarDecl's attributes that we'd normally process visiting the PBD.
-        if (!handleAttrs(VD->getAttrs()))
-          return { false, nullptr };
-        VD->walk(*this);
-      }
-    }
-    if (auto *CE = CLE->getClosureBody())
-      CE->walk(*this);
-    return { false, walkToExprPost(E) };
 
   } else if (auto SE = dyn_cast<SequenceExpr>(E)) {
     // In SequenceExpr, explicit cast expressions (e.g. 'as', 'is') appear
