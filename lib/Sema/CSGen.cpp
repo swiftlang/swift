@@ -4153,7 +4153,8 @@ ConstraintSystem::applyPropertyWrapperToParameter(
 
     initKind = PropertyWrapperInitKind::ProjectedValue;
   } else {
-    generateWrappedPropertyTypeConstraints(param, wrapperType, paramType);
+    Type wrappedValueType = computeWrappedValueType(param, wrapperType);
+    addConstraint(matchKind, paramType, wrappedValueType, locator);
     initKind = PropertyWrapperInitKind::WrappedValue;
   }
 
