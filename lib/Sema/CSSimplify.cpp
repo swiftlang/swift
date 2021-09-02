@@ -4761,7 +4761,7 @@ bool ConstraintSystem::repairFailures(
     path.pop_back();
 
     // Drop the tuple type path elements too, but extract each tuple type first.
-    if (path.back().is<LocatorPathElt::TupleType>()) {
+    if (!path.empty() && path.back().is<LocatorPathElt::TupleType>()) {
       rhs = path.back().getAs<LocatorPathElt::TupleType>()->getType();
       path.pop_back();
       lhs = path.back().getAs<LocatorPathElt::TupleType>()->getType();
