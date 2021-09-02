@@ -55,9 +55,10 @@ namespace swift {
   bool triplesAreValidForZippering(const llvm::Triple &target,
                                    const llvm::Triple &targetVariant);
 
-  /// Returns true if the given triple represents an OS that ships with
-  /// ABI-stable swift libraries (eg. in /usr/lib/swift).
-  bool tripleRequiresRPathForSwiftInOS(const llvm::Triple &triple);
+  /// Returns true if the given triple represents an OS that has all the
+  /// "built-in" ABI-stable libraries (stdlib and _Concurrency)
+  /// (eg. in /usr/lib/swift).
+  bool tripleRequiresRPathForSwiftLibrariesInOS(const llvm::Triple &triple);
 
   /// Returns the platform name for a given target triple.
   ///
