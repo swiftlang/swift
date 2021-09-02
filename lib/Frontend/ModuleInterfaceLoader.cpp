@@ -1083,7 +1083,7 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
   std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
   std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
   std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-  bool IsFramework) {
+  bool skipBuildingInterface, bool IsFramework) {
 
   // If running in OnlySerialized mode, ModuleInterfaceLoader
   // should not have been constructed at all.
@@ -1109,6 +1109,16 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
   // If present, use the private interface instead of the public one.
   if (fs.exists(PrivateInPath)) {
     InPath = PrivateInPath;
+  }
+
+  // If we've been told to skip building interfaces, we are done here and do
+  // not need to have the module actually built. For example, if we are
+  // currently answering a `canImport` query, it is enough to have found
+  // the interface.
+  if (skipBuildingInterface) {
+    if (ModuleInterfacePath)
+      *ModuleInterfacePath = InPath;
+    return std::error_code();
   }
 
   // Create an instance of the Impl to do the heavy lifting.
@@ -1711,7 +1721,7 @@ bool ExplicitSwiftModuleLoader::findModule(ImportPath::Element ModuleID,
            std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
            std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
            std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-           bool &IsFramework, bool &IsSystemModule) {
+           bool skipBuildingInterface, bool &IsFramework, bool &IsSystemModule) {
   StringRef moduleName = ModuleID.Item.str();
   auto it = Impl.ExplicitModuleMap.find(moduleName);
   // If no explicit module path is given matches the name, return with an
@@ -1783,7 +1793,7 @@ std::error_code ExplicitSwiftModuleLoader::findModuleFilesInDirectory(
   std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
   std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
   std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-  bool IsFramework) {
+  bool skipBuildingInterface, bool IsFramework) {
   llvm_unreachable("Not supported in the Explicit Swift Module Loader.");
   return std::make_error_code(std::errc::not_supported);
 }
