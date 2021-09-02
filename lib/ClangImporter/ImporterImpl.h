@@ -995,6 +995,9 @@ public:
                             bool isStatic,
                             ClangNode ClangN);
 
+  static std::pair<BraceStmt *, bool>
+  synthesizeConstantGetterBody(AbstractFunctionDecl *afd, void *voidContext);
+
   /// Determine whether the given declaration is considered
   /// 'unavailable' in Swift.
   bool isUnavailableInSwift(const clang::Decl *decl) {

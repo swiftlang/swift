@@ -55,6 +55,9 @@ namespace swift {
   bool triplesAreValidForZippering(const llvm::Triple &target,
                                    const llvm::Triple &targetVariant);
 
+  const Optional<llvm::VersionTuple>
+  minimumABIStableOSVersionForTriple(const llvm::Triple &triple);
+
   /// Returns true if the given triple represents an OS that ships with
   /// ABI-stable swift libraries (eg. in /usr/lib/swift).
   bool tripleRequiresRPathForSwiftInOS(const llvm::Triple &triple);
