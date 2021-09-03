@@ -788,3 +788,19 @@ let ts1 = MyTupleStruct {
 
 // CHECK: MyTupleStruct<(Int, String, Optional<String>), (Double, String)>(first: (Function), second: (3.14159, "blah"))
 print(ts1)
+
+// Make sure that `weakV` is `Test?` and not `Test??`
+func test_weak_optionality_stays_the_same() {
+  class Test {
+    func fn() -> Int { 42 }
+  }
+
+  tuplify(true) { c in
+    weak var weakV: Test? = Test()
+
+    0
+    if let v = weakV {
+      v.fn()
+    }
+  }
+}

@@ -2209,12 +2209,17 @@ namespace {
 
         switch (optionality) {
         case ReferenceOwnershipOptionality::Required:
-          varType = TypeChecker::getOptionalType(var->getLoc(), varType);
-          assert(!varType->hasError());
+          // If the externally-imposed type is already optional,
+          // let's not add optionality to the pattern.
+          if (!externalPatternType ||
+              !externalPatternType->getOptionalObjectType()) {
+            varType = TypeChecker::getOptionalType(var->getLoc(), varType);
+            assert(!varType->hasError());
 
-          if (oneWayVarType) {
-            oneWayVarType =
-                TypeChecker::getOptionalType(var->getLoc(), oneWayVarType);
+            if (oneWayVarType) {
+              oneWayVarType =
+                  TypeChecker::getOptionalType(var->getLoc(), oneWayVarType);
+            }
           }
           break;
 
