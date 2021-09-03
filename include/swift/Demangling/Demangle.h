@@ -513,7 +513,7 @@ enum class OperatorKind {
 };
 
 /// A mangling error, which consists of an error code and a Node pointer
-struct ManglingError {
+struct SWIFT_NODISCARD ManglingError {
   enum Code {
     Success = 0,
     Uninitialized,
@@ -524,20 +524,32 @@ struct ManglingError {
     UnsupportedNodeKind,
     UnexpectedBuiltinVectorType,
     UnexpectedBuiltinType,
+    MultipleChildNodes,
+    WrongNodeType,
+    WrongDependentMemberType,
+    BadDirectness,
+    UnknownEncoding,
+    InvalidImplCalleeConvention,
+    InvalidImplDifferentiability,
+    InvalidImplFunctionAttribute,
+    InvalidImplParameterConvention,
+    InvalidMetatypeRepresentation,
+    MultiByteRelatedEntity,
   };
 
   Code        code;
   NodePointer node;
 
   ManglingError() : code(Uninitialized), node(nullptr) {}
-  ManglingError(Code c, NodePointer n = nullptr) : code(c), node(n) {}
+  ManglingError(Code c) : code(c), node(nullptr) {}
+  ManglingError(Code c, NodePointer n) : code(c), node(n) {}
 
   bool isSuccess() const { return code == Success; }
 };
 
 /// Used as a return type for mangling functions that may fail
 template <typename T>
-class ManglingErrorOr {
+class SWIFT_NODISCARD ManglingErrorOr {
 private:
   ManglingError err_;
   T             value_;
@@ -552,6 +564,7 @@ public:
 
   bool isSuccess() const { return err_.code == ManglingError::Success; }
 
+  const ManglingError &error() const { return err_; }
   ManglingError::Code errorCode() const { return err_.code; }
   NodePointer errorNode() const { return err_.node; }
 
