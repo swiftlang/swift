@@ -153,6 +153,9 @@ def suppress_config_request : Flag<["-"], "suppress-config-request">,
 def module_cache_path: Separate<["-"], "module-cache-path">, HelpText<"module cache path">;
 def module_cache_path_EQ : Joined<["-"], "module-cache-path=">, Alias<module_cache_path>;
 
+def resource_dir : Separate<["-"], "resource-dir">, HelpText<"resource dir">;
+def resource_dir_EQ : Joined<["-"], "resource-dir=">, Alias<resource_dir>;
+
 def shell: Flag<["-"], "shell">,
   HelpText<"Run shell command">;
 

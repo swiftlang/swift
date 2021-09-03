@@ -416,6 +416,10 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       ModuleCachePath = InputArg->getValue();
       break;
 
+    case OPT_resource_dir:
+      ResourceDir = InputArg->getValue();
+      break;
+
     case OPT_shell:
       ShellExecution = true;
       break;

@@ -474,6 +474,9 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
   if (!Opts.ModuleCachePath.empty())
     InitOpts.ModuleCachePath = Opts.ModuleCachePath;
 
+  if (!Opts.ResourceDir.empty())
+    InitOpts.ResourceDir = Opts.ResourceDir;
+
   if (Optargc < Args.size())
     Opts.CompilerArgs = Args.slice(Optargc+1);
 
@@ -1102,6 +1105,14 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
         sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND, Opts.ModuleCachePath.c_str());
       }
     }
+
+    if (!Opts.ResourceDir.empty()) {
+      sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND,
+                                          "-resource-dir");
+      sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND,
+                                          Opts.ResourceDir.c_str());
+    }
+
     if (Opts.DisableImplicitConcurrencyModuleImport && !compilerArgsAreClang) {
       sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND,
                                           "-Xfrontend");

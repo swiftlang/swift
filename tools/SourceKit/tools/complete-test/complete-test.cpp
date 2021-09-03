@@ -66,6 +66,7 @@ struct TestOptions {
   Optional<unsigned> popularityBonus;
   StringRef filterRulesJSON;
   std::string moduleCachePath;
+  std::string resourceDirPath;
   bool rawOutput = false;
   bool structureOutput = false;
   bool disableImplicitConcurrencyModuleImport = false;
@@ -255,6 +256,8 @@ static bool parseOptions(ArrayRef<const char *> args, TestOptions &options,
       options.showTopNonLiteral = uval;
     } else if (opt == "module-cache-path") {
       options.moduleCachePath = value.str();
+    } else if (opt == "resource-dir") {
+      options.resourceDirPath = value.str();
     } else if (opt == "disable-implicit-concurrency-module-import") {
       options.disableImplicitConcurrencyModuleImport = true;
     }
@@ -682,6 +685,12 @@ static bool codeCompleteRequest(sourcekitd_uid_t requestUID, const char *name,
     if (!options.moduleCachePath.empty()) {
       sourcekitd_request_array_set_string(args, SOURCEKITD_ARRAY_APPEND, "-module-cache-path");
       sourcekitd_request_array_set_string(args, SOURCEKITD_ARRAY_APPEND, options.moduleCachePath.c_str());
+    }
+    if (!options.resourceDirPath.empty()) {
+      sourcekitd_request_array_set_string(args, SOURCEKITD_ARRAY_APPEND,
+                                          "-resource-dir");
+      sourcekitd_request_array_set_string(args, SOURCEKITD_ARRAY_APPEND,
+                                          options.resourceDirPath.c_str());
     }
     // Add -- options.
     for (const char *arg : options.compilerArgs)
