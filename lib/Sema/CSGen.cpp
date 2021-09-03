@@ -3926,10 +3926,13 @@ bool ConstraintSystem::generateConstraints(
       if (!pattern)
         return true;
 
-      // Type check the pattern. Note use of `forRawPattern` here instead
-      // of `forPatternBindingDecl` because resolved `pattern` is not
-      // associated with `patternBinding`.
-      auto contextualPattern = ContextualPattern::forRawPattern(pattern, dc);
+      // Reset binding to point to the resolved pattern. This is required
+      // before calling `forPatternBindingDecl`.
+      patternBinding->setPattern(index, pattern,
+                                 patternBinding->getInitContext(index));
+
+      auto contextualPattern =
+          ContextualPattern::forPatternBindingDecl(patternBinding, index);
       Type patternType = TypeChecker::typeCheckPattern(contextualPattern);
 
       // Fail early if pattern couldn't be type-checked.
@@ -3944,10 +3947,10 @@ bool ConstraintSystem::generateConstraints(
 
       auto init = patternBinding->getInit(index);
       auto target = init ? SolutionApplicationTarget::forInitialization(
-                               init, dc, patternType, pattern,
+                               init, dc, patternType, patternBinding, index,
                                /*bindPatternVarsOneWay=*/true)
                          : SolutionApplicationTarget::forUninitializedVar(
-                               patternBinding, index, pattern, patternType);
+                               patternBinding, index, patternType);
 
       if (generateConstraints(target, FreeTypeVariableBinding::Disallow)) {
         hadError = true;

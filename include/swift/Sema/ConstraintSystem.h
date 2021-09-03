@@ -1735,9 +1735,9 @@ public:
   }
 
   static SolutionApplicationTarget
-  forUninitializedVar(PatternBindingDecl *binding, unsigned index, Pattern *var,
+  forUninitializedVar(PatternBindingDecl *binding, unsigned index,
                       Type patternTy) {
-    return {binding, index, var, patternTy};
+    return {binding, index, binding->getPattern(index), patternTy};
   }
 
   /// Form a target for a synthesized property wrapper initializer.
