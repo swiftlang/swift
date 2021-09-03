@@ -3493,11 +3493,10 @@ debug_value
 
   debug_value %1 : $Int
 
-This indicates that the value of a declaration with loadable type has changed
-value to the specified operand.  The declaration in question is identified by
-the SILLocation attached to the debug_value instruction.
-
-The operand must have loadable type.
+This indicates that the value of a declaration has changed value to the
+specified operand.  The declaration in question is identified by either the
+SILLocation attached to the debug_value instruction or the SILLocation specified
+in the advanced debug variable attributes.
 
 ::
 
@@ -3507,47 +3506,74 @@ The operand must have loadable type.
    debug-var-attr ::= 'argno' integer-literal
    debug-var-attr ::= 'implicit'
 
+There are a number of attributes that provide details about the source
+variable that is being described, including the name of the
+variable. For function and closure arguments ``argno`` is the number
+of the function argument starting with 1. A compiler-generated source
+variable will be marked ``implicit`` and optimizers are free to remove
+it even in -Onone.
+
+If the '[poison]' flag is set, then all references within this debug
+value will be overwritten with a sentinel at this point in the
+program. This is used in debug builds when shortening non-trivial
+value lifetimes to ensure the debugger cannot inspect invalid
+memory. ``debug_value`` instructions with the poison flag are not
+generated until OSSA is lowered. They are not expected to be serialized
+within the module, and the pipeline is not expected to do any
+significant code motion after lowering.
+
 ::
 
   advanced-debug-var-attr ::= '(' 'name' string-literal (',' sil-instruction-source-info)? ')'
   advanced-debug-var-attr ::= 'type' sil-type
+
+Advanced debug variable attributes represent source locations and the type of
+the source variable when it was originally declared. It is useful when
+we're indirectly associating the SSA value with the source variable
+(via SIL DIExpression, for example) in which case SSA value's type is different
+from that of source variable.
 
 ::
 
   debug-info-expr   ::= di-expr-operand (':' di-expr-operand)*
   di-expr-operand   ::= di-expr-operator (':' sil-operand)*
   di-expr-operator  ::= 'op_fragment'
+  di-expr-operator  ::= 'op_deref'
 
-There are a number of attributes that provide details about the source
-variable that is being described, including the name of the
-variable. For function and closure arguments ``argno`` is the number
-of the function argument starting with 1. A compiler-generated source
-variable will be marked ``implicit`` and optimizers are free to remove
-it even in -Onone. The advanced debug variable attributes represent source
-locations and type of the source variable when it was originally declared.
-It is useful when we're indirectly associating the SSA value with the
-source variable (via di-expression, for example) in which case SSA value's
-type is different from that of source variable.
+SIL debug info expression (SIL DIExpression) is a powerful method to connect SSA
+value with the source variable in an indirect fashion. Di-expression in SIL
+uses a stack based execution model to evaluate the expression and apply on
+the associated (SIL) SSA value before connecting it with the debug variable.
+For instance, given the following SIL code::
 
-If the '[poison]' flag is set, then all references within this debug
-value will be overwritten with a sentinel at this point in the
-program. This is used in debug builds when shortening non-trivial
-value lifetimes to ensure the debugger cannot inspect invalid
-memory. `debug_value` instructions with the poison flag are not
-generated until OSSA islowered. They are not expected to be serialized
-within the module, and the pipeline is not expected to do any
-significant code motion after lowering.
+  debug_value %a : $*Int, name "x", expr op_deref
 
-Debug info expression (di-expression) is a powerful method to connect SSA
-value with the source variable in an indirect fashion. For example,
-we can use the ``op_fragment`` operator to specify that the SSA value
-is originated from a struct field inside the source variable (which has
-an aggregate data type). Di-expression in SIL works similarly to LLVM's
-``!DIExpression`` metadata. Where both of them adopt a stack based
-execution model to evaluate the expression. The biggest difference between
-them is that LLVM always represent ``!DIExpression`` elements as 64-bit
-integers, while SIL's di-expression can have elements with various types,
-like AST nodes or strings. Here is an example::
+It means: "You can get the value of source variable 'x' by *dereferencing*
+SSA value ``%a``". The ``op_deref`` is a SIL DIExpression operator that represents
+"dereference". If there are multiple SIL DIExpression operators (or arguments), they
+are evaluated from left to right::
+
+  debug_value %b : $**Int, name "y", expr op_deref:op_deref
+
+In the snippet above, two ``op_deref`` operators will be applied on SSA value
+``%b`` sequentially.
+
+Note that normally when the SSA value has an address type, there will be a ``op_deref``
+in the SIL DIExpression. Because there is no pointer in Swift so you always need to
+dereference an address-type SSA value to get the value of a source variable.
+However, if the SSA value is a ``alloc_stack``, the ``debug_value`` is used to indicate
+the *declaration* of a source variable. Or, you can say, used to specify the location
+(memory address) of the source variable. Therefore, we don't need to add a ``op_deref``
+in this case::
+
+  %a = alloc_stack $Int, ...
+  debug_value %a : $*Int, name "my_var"
+
+
+The ``op_fragment`` operator is used to specify the SSA value of a specific
+field in an aggregate-type source variable. This SIL DIExpression operator takes
+a field declaration -- which references the desired sub-field in source variable
+-- as its argument. Here is an example::
 
   struct MyStruct {
     var x: Int
@@ -3556,23 +3582,13 @@ like AST nodes or strings. Here is an example::
   ...
   debug_value %1 : $Int, var, (name "the_struct", loc "file.swift":8:7), type $MyStruct, expr op_fragment:#MyStruct.y, loc "file.swift":9:4
 
-In the snippet above, source variable "the_struct" has an aggregate type ``$MyStruct`` and we use di-expression with ``op_fragment`` operator to associate ``%1`` to the ``y`` member variable inside "the_struct". Note that the extra source location directive follows rigt after ``name "the_struct"`` indicate that "the_struct" was originally declared in line 8, but not until line 9, the current ``debug_value`` instruction's source location, does member ``y`` got updated with SSA value ``%1``.
+In the snippet above, source variable "the_struct" has an aggregate type ``$MyStruct`` and we use a SIL DIExpression with ``op_fragment`` operator to associate ``%1`` to the ``y`` member variable (via the ``#MyStruct.y`` directive) inside "the_struct".
+Note that the extra source location directive follows rigt after ``name "the_struct"`` indicate that "the_struct" was originally declared in line 8, but not until line 9 -- the current ``debug_value`` instruction's source location -- does member ``y`` got updated with SSA value ``%1``.
 
-debug_value_addr
-````````````````
-
-::
-
-  sil-instruction ::= debug_value_addr sil-operand (',' debug-var-attr)* advanced-debug-var-attr* (',' 'expr' debug-info-expr)?
-
-  debug_value_addr %7 : $*SomeProtocol
-
-This indicates that the value of a declaration with address-only type
-has changed value to the specified operand.  The declaration in
-question is identified by the SILLocation attached to the
-debug_value_addr instruction.
-
-Note that this instruction can be replaced by ``debug_value`` + di-expression operator that is equivalent to LLVM's ``DW_OP_deref``.
+It is worth noting that a SIL DIExpression is similar to
+`!DIExpression <https://www.llvm.org/docs/LangRef.html#diexpression>`_ in LLVM debug
+info metadata. While LLVM represents ``!DIExpression`` are a list of 64-bit integers,
+SIL DIExpression can have elements with various types, like AST nodes or strings.
 
 Accessing Memory
 ~~~~~~~~~~~~~~~~
