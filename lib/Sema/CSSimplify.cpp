@@ -3657,15 +3657,17 @@ bool ConstraintSystem::repairFailures(
     if (!fnType)
       return false;
 
+    // If the locator isn't anchored at an expression, or the expression is
+    // implicit, don't try to insert an explicit call into the source code.
+    auto *loc = getConstraintLocator(locator);
+    auto *anchor = getAsExpr(simplifyLocatorToAnchor(loc));
+    if (!anchor || anchor->isImplicit())
+      return false;
+
     // If argument is a function type and all of its parameters have
     // default values, let's see whether error is related to missing
     // explicit call.
     if (fnType->getNumParams() > 0) {
-      auto *loc = getConstraintLocator(locator);
-      auto *anchor = getAsExpr(simplifyLocatorToAnchor(loc));
-      if (!anchor)
-        return false;
-
       auto overload = findSelectedOverloadFor(anchor);
       if (!(overload && overload->choice.isDecl()))
         return false;

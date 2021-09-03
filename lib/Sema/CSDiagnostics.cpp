@@ -2641,6 +2641,12 @@ void ContextualFailure::tryFixIts(InFlightDiagnostic &diagnostic) const {
 }
 
 bool ContextualFailure::diagnoseMissingFunctionCall() const {
+  // Don't suggest inserting a function call if the function expression
+  // isn't written explicitly in the source code.
+  auto *anchor = getAsExpr(simplifyLocatorToAnchor(getLocator()));
+  if (!anchor || anchor->isImplicit())
+    return false;
+
   if (getLocator()
       ->isLastElement<LocatorPathElt::UnresolvedMemberChainResult>())
     return false;
