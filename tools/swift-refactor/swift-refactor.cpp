@@ -138,6 +138,10 @@ static llvm::cl::list<std::string>
 static llvm::cl::opt<std::string>
 Triple("target", llvm::cl::desc("target triple"));
 
+static llvm::cl::opt<std::string> ResourceDir(
+    "resource-dir",
+    llvm::cl::desc("The directory that holds the compiler resource files"));
+
 enum class DumpType {
   REWRITTEN,
   JSON,
@@ -293,6 +297,9 @@ int main(int argc, char *argv[]) {
   Invocation.setImportSearchPaths(options::ImportPaths);
   if (!options::Triple.empty())
     Invocation.setTargetTriple(options::Triple);
+
+  if (!options::ResourceDir.empty())
+    Invocation.setRuntimeResourcePath(options::ResourceDir);
 
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(
       options::SourceFilename);
