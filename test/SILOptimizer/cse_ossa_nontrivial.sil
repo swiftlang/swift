@@ -25,6 +25,11 @@ public enum FakeOptional2 {
   case some2(Klass)
 }
 
+public enum FakeOptional3 {
+  case none
+  case some(WrapperStruct)
+}
+
 struct StructWithEnum {
   var val:FakeOptional
 }
@@ -35,6 +40,7 @@ struct StructWithEnum2 {
 
 sil @use_nontrivialstruct1 : $@convention(thin) (@guaranteed NonTrivialStruct) -> ()
 sil @use_nontrivialstruct2 : $@convention(thin) (@owned NonTrivialStruct) -> ()
+sil @use_nontrivialstruct3 : $@convention(thin) (@in_guaranteed NonTrivialStruct) -> ()
 sil @use_superklass1 : $@convention(thin) (@owned SuperKlass) -> ()
 
 // CHECK-LABEL: sil [ossa] @structliteral1 :
@@ -893,3 +899,36 @@ bb0(%0 : @guaranteed $TestKlass):
   %18 = tuple ()
   return %18 : $()
 }
+
+
+struct WrapperStruct {
+  var val: TestKlass
+}
+
+// CHECK-LABEL: sil [ossa] @cse_ossa_utilstest :
+// CHECK: ref_element_addr
+// CHECK: ref_element_addr
+// CHECK-LABEL: } // end sil function 'cse_ossa_utilstest'
+sil [ossa] @cse_ossa_utilstest : $@convention(thin) (@guaranteed WrapperStruct) -> () {
+bb0(%0 : @guaranteed $WrapperStruct):
+%f = function_ref @use_nontrivialstruct3 : $@convention(thin) (@in_guaranteed NonTrivialStruct) -> ()
+%none = enum $FakeOptional3, #FakeOptional3.none
+switch_enum %none : $FakeOptional3, case #FakeOptional3.some!enumelt:bb1, case #FakeOptional3.none!enumelt:bb2
+
+bb1(%arg : @guaranteed $WrapperStruct):
+%ex = struct_extract %arg : $WrapperStruct, #WrapperStruct.val
+%1 = ref_element_addr %ex : $TestKlass, #TestKlass.testStruct
+apply %f (%1) : $@convention(thin) (@in_guaranteed NonTrivialStruct) -> ()
+%2 = ref_element_addr %ex : $TestKlass, #TestKlass.testStruct
+apply %f (%2) : $@convention(thin) (@in_guaranteed NonTrivialStruct) -> ()
+br bb3
+
+bb2:
+br bb3
+
+bb3:
+%res = tuple ()
+return %res : $()
+}
+
+
