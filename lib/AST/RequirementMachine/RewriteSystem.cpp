@@ -97,7 +97,11 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs) {
   }
 
   unsigned i = Rules.size();
-  Rules.emplace_back(Term::get(lhs, Context), Term::get(rhs, Context));
+
+  auto uniquedLHS = Term::get(lhs, Context);
+  auto uniquedRHS = Term::get(rhs, Context);
+  Rules.emplace_back(uniquedLHS, uniquedRHS);
+
   auto oldRuleID = Trie.insert(lhs.begin(), lhs.end(), i);
   if (oldRuleID) {
     llvm::errs() << "Duplicate rewrite rule!\n";
@@ -112,23 +116,7 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs) {
     abort();
   }
 
-  // Check if we have a rule of the form
-  //
-  //   X.[P1:T] => X.[P2:T]
-  //
-  // If so, record this rule for later. We'll try to merge the associated
-  // types in RewriteSystem::processMergedAssociatedTypes().
-  if (lhs.size() == rhs.size() &&
-      std::equal(lhs.begin(), lhs.end() - 1, rhs.begin()) &&
-      lhs.back().getKind() == Symbol::Kind::AssociatedType &&
-      rhs.back().getKind() == Symbol::Kind::AssociatedType &&
-      lhs.back().getName() == rhs.back().getName()) {
-    if (Debug.contains(DebugFlags::Merge)) {
-      llvm::dbgs() << "## Associated type merge candidate ";
-      llvm::dbgs() << lhs << " => " << rhs << "\n\n";
-    }
-    MergedAssociatedTypes.emplace_back(lhs, rhs);
-  }
+  checkMergedAssociatedType(uniquedLHS, uniquedRHS);
 
   // Tell the caller that we added a new rule.
   return true;
