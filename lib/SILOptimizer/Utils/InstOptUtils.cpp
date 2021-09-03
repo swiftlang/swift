@@ -1389,14 +1389,12 @@ static bool keepArgsOfPartialApplyAlive(PartialApplyInst *pai,
 
   for (Operand *argOp : argsToHandle) {
     SILValue arg = argOp->get();
-    int argIdx = argOp->getOperandNumber() - pai->getArgumentOperandNumber();
-    SILDebugVariable dbgVar(/*Constant*/ true, argIdx);
 
     SILValue tmp = arg;
     if (arg->getType().isAddress()) {
       // Move the value to a stack-allocated temporary.
       SILBuilderWithScope builder(pai, builderCtxt);
-      tmp = builder.createAllocStack(pai->getLoc(), arg->getType(), dbgVar);
+      tmp = builder.createAllocStack(pai->getLoc(), arg->getType());
       builder.createCopyAddr(pai->getLoc(), arg, tmp, IsTake_t::IsTake,
                              IsInitialization_t::IsInitialization);
     }
