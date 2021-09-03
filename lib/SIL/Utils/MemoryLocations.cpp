@@ -366,7 +366,21 @@ bool MemoryLocations::analyzeLocationUsesRecursively(SILValue V, unsigned locIdx
         if (cast<DebugValueInst>(user)->hasAddrVal())
           break;
         return false;
-      case SILInstructionKind::InjectEnumAddrInst:
+      case SILInstructionKind::InjectEnumAddrInst: {
+        auto *ieai = cast<InjectEnumAddrInst>(user);
+        if (ieai->getElement()->hasAssociatedValues()) {
+          auto eleType = ieai->getOperand()->getType().getEnumElementType(
+              ieai->getElement(), ieai->getFunction());
+          if (isEmptyType(eleType, ieai->getFunction()))
+            return false;
+          auto key = std::make_pair(locIdx, /* fieldNr*/ 0);
+          unsigned subLocIdx = subLocationMap[key];
+          if (subLocIdx > 0 &&
+              getLocation(subLocIdx)->representativeValue->getType() != eleType)
+            return false;
+        }
+        break;
+      }
       case SILInstructionKind::SelectEnumAddrInst:
       case SILInstructionKind::ExistentialMetatypeInst:
       case SILInstructionKind::ValueMetatypeInst:
