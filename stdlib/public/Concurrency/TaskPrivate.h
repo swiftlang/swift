@@ -82,6 +82,14 @@ void _swift_task_dealloc_specific(AsyncTask *task, void *ptr);
 /// related to the active task.
 void runJobInEstablishedExecutorContext(Job *job);
 
+/// Adopt the voucher stored in `task`. This removes the voucher from the task
+/// and adopts it on the current thread.
+void adoptTaskVoucher(AsyncTask *task);
+
+/// Restore the voucher for `task`. This un-adopts the current thread's voucher
+/// and stores it back into the task again.
+void restoreTaskVoucher(AsyncTask *task);
+
 /// Initialize the async let storage for the given async-let child task.
 void asyncLet_addImpl(AsyncTask *task, AsyncLet *asyncLet,
                       bool didAllocateInParentTask);
@@ -356,11 +364,13 @@ inline bool AsyncTask::isCancelled() const {
 }
 
 inline void AsyncTask::flagAsRunning() {
+  SWIFT_TASK_DEBUG_LOG("%p->flagAsRunning()", this);
   auto oldStatus = _private().Status.load(std::memory_order_relaxed);
   while (true) {
     assert(!oldStatus.isRunning());
     if (oldStatus.isLocked()) {
       flagAsRunning_slow();
+      adoptTaskVoucher(this);
       swift_task_enterThreadLocalContext(
           (char *)&_private().ExclusivityAccessSet[0]);
       return;
@@ -375,6 +385,7 @@ inline void AsyncTask::flagAsRunning() {
     if (_private().Status.compare_exchange_weak(oldStatus, newStatus,
                                                 std::memory_order_relaxed,
                                                 std::memory_order_relaxed)) {
+      adoptTaskVoucher(this);
       swift_task_enterThreadLocalContext(
           (char *)&_private().ExclusivityAccessSet[0]);
       return;
@@ -383,6 +394,7 @@ inline void AsyncTask::flagAsRunning() {
 }
 
 inline void AsyncTask::flagAsSuspended() {
+  SWIFT_TASK_DEBUG_LOG("%p->flagAsSuspended()", this);
   auto oldStatus = _private().Status.load(std::memory_order_relaxed);
   while (true) {
     assert(oldStatus.isRunning());
@@ -390,6 +402,7 @@ inline void AsyncTask::flagAsSuspended() {
       flagAsSuspended_slow();
       swift_task_exitThreadLocalContext(
           (char *)&_private().ExclusivityAccessSet[0]);
+      restoreTaskVoucher(this);
       return;
     }
 
@@ -404,6 +417,7 @@ inline void AsyncTask::flagAsSuspended() {
                                                 std::memory_order_relaxed)) {
       swift_task_exitThreadLocalContext(
           (char *)&_private().ExclusivityAccessSet[0]);
+      restoreTaskVoucher(this);
       return;
     }
   }

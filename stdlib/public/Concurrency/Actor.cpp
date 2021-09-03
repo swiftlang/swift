@@ -37,6 +37,7 @@
 #include "llvm/Config/config.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "TaskPrivate.h"
+#include "VoucherSupport.h"
 
 #if !SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
 #include <dispatch/dispatch.h>
@@ -132,6 +133,8 @@ class ExecutorTrackingInfo {
   /// unless the passed-in executor is generic.
   bool AllowsSwitching = true;
 
+  VoucherManager voucherManager;
+
   /// The tracking info that was active when this one was entered.
   ExecutorTrackingInfo *SavedInfo;
 
@@ -150,23 +153,9 @@ public:
     ActiveInfoInThread.set(this);
   }
 
-  /// Initialize a tracking state on the current thread if there
-  /// isn't one already, or else update the current tracking state.
-  ///
-  /// Returns a pointer to the active tracking info.  If this is the
-  /// same as the object on which this was called, leave() must be
-  /// called before the object goes out of scope.
-  ExecutorTrackingInfo *enterOrUpdate(ExecutorRef currentExecutor) {
-    if (auto activeInfo = ActiveInfoInThread.get()) {
-      activeInfo->ActiveExecutor = currentExecutor;
-      return activeInfo;
-    }
+  void swapToJob(Job *job) { voucherManager.swapToJob(job); }
 
-    ActiveExecutor = currentExecutor;
-    SavedInfo = nullptr;
-    ActiveInfoInThread.set(this);
-    return this;
-  }
+  void restoreVoucher(AsyncTask *task) { voucherManager.restoreVoucher(task); }
 
   ExecutorRef getActiveExecutor() const {
     return ActiveExecutor;
@@ -192,6 +181,7 @@ public:
   }
 
   void leave() {
+    voucherManager.leave();
     ActiveInfoInThread.set(SavedInfo);
   }
 };
@@ -242,7 +232,9 @@ void swift::runJobInEstablishedExecutorContext(Job *job) {
     assert(ActiveTask::get() == nullptr &&
            "active task wasn't cleared before susspending?");
   } else {
-    // There's no extra bookkeeping to do for simple jobs.
+    // There's no extra bookkeeping to do for simple jobs besides swapping in
+    // the voucher.
+    ExecutorTrackingInfo::current()->swapToJob(job);
     job->runSimpleInFullyEstablishedContext();
   }
 
@@ -251,6 +243,14 @@ void swift::runJobInEstablishedExecutorContext(Job *job) {
 #endif
 
   _swift_tsan_release(job);
+}
+
+void swift::adoptTaskVoucher(AsyncTask *task) {
+  ExecutorTrackingInfo::current()->swapToJob(task);
+}
+
+void swift::restoreTaskVoucher(AsyncTask *task) {
+  ExecutorTrackingInfo::current()->restoreVoucher(task);
 }
 
 SWIFT_CC(swift)
@@ -676,6 +676,12 @@ class DefaultActorImpl : public HeapObject {
 
   friend class ProcessInlineJob;
   union {
+    // When the ProcessInlineJob storage is initialized, its metadata pointer
+    // will point to Job's metadata. When it isn't, the metadata pointer is
+    // NULL. Use HeapObject to initialize the metadata pointer to NULL and allow
+    // it to be checked without fully initializing the ProcessInlineJob.
+    HeapObject JobStorageHeapObject{nullptr};
+
     ProcessInlineJob JobStorage;
   };
 
@@ -685,6 +691,7 @@ public:
     auto flags = Flags();
     flags.setIsDistributedRemote(isDistributedRemote);
     new (&CurrentState) std::atomic<State>(State{JobRef(), flags});
+    JobStorageHeapObject.metadata = nullptr;
   }
 
   /// Properly destruct an actor, except for the heap header.
@@ -812,6 +819,8 @@ void DefaultActorImpl::deallocate() {
 }
 
 void DefaultActorImpl::deallocateUnconditional() {
+  if (JobStorageHeapObject.metadata != nullptr)
+    JobStorage.~ProcessInlineJob();
   auto metadata = cast<ClassMetadata>(this->metadata);
   swift_deallocObject(this, metadata->getInstanceSize(),
                       metadata->getInstanceAlignMask());
@@ -848,6 +857,8 @@ void DefaultActorImpl::scheduleNonOverrideProcessJob(JobPriority priority,
   if (hasActiveInlineJob) {
     job = new ProcessOutOfLineJob(this, priority);
   } else {
+    if (JobStorageHeapObject.metadata != nullptr)
+      JobStorage.~ProcessInlineJob();
     job = new (&JobStorage) ProcessInlineJob(priority);
   }
   swift_task_enqueueGlobal(job);
@@ -1455,6 +1466,7 @@ static void swift_job_runImpl(Job *job, ExecutorRef executor) {
 
   trackingInfo.enterAndShadow(executor);
 
+  SWIFT_TASK_DEBUG_LOG("%s(%p)", __func__, job);
   runJobInEstablishedExecutorContext(job);
 
   trackingInfo.leave();
