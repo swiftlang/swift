@@ -108,6 +108,9 @@ class IRGenDebugInfoImpl : public IRGenDebugInfo {
 
   /// Various caches.
   /// @{
+  using SILVarScope = llvm::PointerUnion<const SILDebugScope *, SILFunction *>;
+  using VarID = std::tuple<SILVarScope, const char *, uint16_t>;
+  llvm::DenseMap<VarID, llvm::TrackingMDNodeRef> LocalVarCache;
   llvm::DenseMap<const SILDebugScope *, llvm::TrackingMDNodeRef> ScopeCache;
   llvm::DenseMap<const SILDebugScope *, llvm::TrackingMDNodeRef> InlinedAtCache;
   llvm::DenseMap<const void *, SILLocation::FilenameAndLocation>
@@ -2437,15 +2440,18 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
   if (!DbgTy.getSize())
     DbgTy.setSize(getStorageSize(IGM.DataLayout, Storage));
 
+  SILVarScope KeyScope = DS;
   auto *Scope = dyn_cast_or_null<llvm::DILocalScope>(getOrCreateScope(DS));
   assert(Scope && "variable has no local scope");
   auto DInstLoc = getStartLocation(DbgInstLoc);
 
   // FIXME: this should be the scope of the type's declaration.
   // If this is an argument, attach it to the current function scope.
-  if (VarInfo.ArgNo > 0) {
+  uint16_t ArgNo = VarInfo.ArgNo;
+  if (ArgNo > 0) {
     while (isa<llvm::DILexicalBlock>(Scope))
       Scope = cast<llvm::DILexicalBlock>(Scope)->getScope();
+    KeyScope = DS->getInlinedFunction();
   }
   assert(isa_and_nonnull<llvm::DIScope>(Scope) && "variable has no scope");
   llvm::DIFile *Unit = getFile(Scope);
@@ -2457,16 +2463,13 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
   unsigned DInstLine = DInstLoc.line;
 
   // Self is always an artificial argument, so are variables without location.
-  if (!DInstLine ||
-      (VarInfo.ArgNo > 0 && VarInfo.Name == IGM.Context.Id_self.str()))
+  if (!DInstLine || (ArgNo > 0 && VarInfo.Name == IGM.Context.Id_self.str()))
     Artificial = ArtificialValue;
 
   llvm::DINode::DIFlags Flags = llvm::DINode::FlagZero;
   if (Artificial || DITy->isArtificial() || DITy == InternalType)
     Flags |= llvm::DINode::FlagArtificial;
 
-  // This could be Opts.Optimize if we would also unique DIVariables here.
-  bool Optimized = false;
   // Create the descriptor for the variable.
   unsigned DVarLine = DInstLine;
   if (VarInfo.Loc) {
@@ -2474,21 +2477,33 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
     DVarLine = DVarLoc.line;
   }
   llvm::DIScope *VarScope = Scope;
-  if (VarInfo.Scope) {
+  if (ArgNo == 0 && VarInfo.Scope) {
     if (auto *VS = dyn_cast_or_null<llvm::DILocalScope>(
-            getOrCreateScope(VarInfo.Scope)))
+            getOrCreateScope(VarInfo.Scope))) {
       VarScope = VS;
+      KeyScope = VarInfo.Scope;
+    }
   }
-  // The llvm.dbg.value(undef) emitted for zero-sized variables get filtered out
-  // by DwarfDebug::collectEntityInfo() otherwise.
-  bool Preserve = true;
-  llvm::DILocalVariable *Var =
-      (VarInfo.ArgNo > 0)
-          ? DBuilder.createParameterVariable(VarScope, VarInfo.Name,
-                                             VarInfo.ArgNo, Unit, DVarLine,
-                                             DITy, Preserve, Flags)
-          : DBuilder.createAutoVariable(VarScope, VarInfo.Name, Unit, DVarLine,
+
+  // Get or create the DILocalVariable.
+  llvm::DILocalVariable *Var;
+  auto CachedVar = LocalVarCache.find({KeyScope, VarInfo.Name.data(), ArgNo});
+  if (CachedVar != LocalVarCache.end()) {
+    Var = cast<llvm::DILocalVariable>(CachedVar->second);
+  } else {
+    // The llvm.dbg.value(undef) emitted for zero-sized variables get filtered
+    // out by DwarfDebug::collectEntityInfo(), so all variables need to be
+    // preserved even at -Onone.
+    bool Preserve = true;
+    if (ArgNo > 0)
+      Var = DBuilder.createParameterVariable(
+          VarScope, VarInfo.Name, ArgNo, Unit, DVarLine, DITy, Preserve, Flags);
+    else
+      Var = DBuilder.createAutoVariable(VarScope, VarInfo.Name, Unit, DVarLine,
                                         DITy, Preserve, Flags);
+    LocalVarCache.insert(
+        {{KeyScope, VarInfo.Name.data(), ArgNo}, llvm::TrackingMDNodeRef(Var)});
+  }
 
   auto appendDIExpression =
       [&VarInfo, this](llvm::DIExpression *DIExpr) -> llvm::DIExpression * {
