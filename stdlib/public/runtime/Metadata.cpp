@@ -6123,17 +6123,6 @@ const HeapObject *swift_getKeyPathImpl(const void *pattern,
 #define OVERRIDE_WITNESSTABLE COMPATIBILITY_OVERRIDE
 #include COMPATIBILITY_OVERRIDE_INCLUDE_PATH
 
-#if defined(_WIN32) && defined(_M_ARM64)
-namespace std {
-template <>
-inline void _Atomic_storage<::PoolRange, 16>::_Unlock() const noexcept {
-  __dmb(0x8);
-  __iso_volatile_store32(&reinterpret_cast<volatile int &>(_Spinlock), 0);
-  __dmb(0x8);
-}
-}
-#endif
-
 // Autolink with libc++, for cases where libswiftCore is linked statically.
 #if defined(__MACH__)
 asm(".linker_option \"-lc++\"\n");
