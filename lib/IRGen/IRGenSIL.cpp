@@ -649,7 +649,7 @@ public:
     if (Name.empty()) {
       {
         llvm::raw_svector_ostream S(Name);
-        S << '_' << NumAnonVars++;
+        S << "$_" << NumAnonVars++;
       }
       AnonymousVariables.insert({Decl, Name});
     }
