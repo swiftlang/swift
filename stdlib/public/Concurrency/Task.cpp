@@ -592,15 +592,18 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   // Initialize the task so that resuming it will run the given
   // function on the initial context.
   AsyncTask *task = nullptr;
+  bool captureCurrentVoucher = taskCreateFlags.copyTaskLocals() || jobFlags.task_isChildTask();
   if (asyncLet) {
     // Initialize the refcount bits to "immortal", so that
     // ARC operations don't have any effect on the task.
     task = new(allocation) AsyncTask(&taskHeapMetadata,
                              InlineRefCounts::Immortal, jobFlags,
-                             function, initialContext);
+                             function, initialContext,
+                             captureCurrentVoucher);
   } else {
     task = new(allocation) AsyncTask(&taskHeapMetadata, jobFlags,
-                                    function, initialContext);
+                                    function, initialContext,
+                                    captureCurrentVoucher);
   }
 
   // Initialize the child fragment if applicable.
