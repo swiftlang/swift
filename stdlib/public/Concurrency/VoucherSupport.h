@@ -44,7 +44,7 @@ public:
     if (OriginalVoucher) {
       SWIFT_TASK_DEBUG_LOG("[%p] Restoring original voucher %p", this,
                            *OriginalVoucher);
-      if (voucher_needs_adopt(*OriginalVoucher)) {
+      if (swift_voucher_needs_adopt(*OriginalVoucher)) {
         auto previous = voucher_adopt(*OriginalVoucher);
         swift_voucher_release(previous);
       } else {
@@ -67,7 +67,7 @@ public:
     assert(job->Voucher != SWIFT_DEAD_VOUCHER);
 
     voucher_t previous;
-    if (voucher_needs_adopt(job->Voucher)) {
+    if (swift_voucher_needs_adopt(job->Voucher)) {
       // If we need to adopt the voucher, do so, and grab the old one.
       SWIFT_TASK_DEBUG_LOG("[%p] Swapping jobs to %p, adopting voucher %p",
                            this, job, job->Voucher);
@@ -104,7 +104,7 @@ public:
     assert(OriginalVoucher);
     assert(task->Voucher == SWIFT_DEAD_VOUCHER);
 
-    if (voucher_needs_adopt(*OriginalVoucher)) {
+    if (swift_voucher_needs_adopt(*OriginalVoucher)) {
       // Adopt the execution thread's original voucher. The task's voucher is
       // the one currently adopted, and is returned by voucher_adopt.
       task->Voucher = voucher_adopt(*OriginalVoucher);
