@@ -325,7 +325,10 @@ _findExtendedTypeContextDescriptor(const ContextDescriptor *maybeExtension,
     node = node->getChild(0);
   }
   if (Demangle::isSpecialized(node)) {
-    node = Demangle::getUnspecialized(node, demangler);
+    auto unspec = Demangle::getUnspecialized(node, demangler);
+    if (!unspec.isSuccess())
+      return nullptr;
+    node = unspec.result();
   }
 
   return _findContextDescriptor(node, demangler);

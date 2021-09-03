@@ -1378,7 +1378,10 @@ private:
         parent = decodeMangledType(parentContext, depth + 1).getType();
         // Remove any generic arguments from the context node, producing a
         // node that references the nominal type declaration.
-        declNode = Demangle::getUnspecialized(node, Builder.getNodeFactory());
+        auto unspec = Demangle::getUnspecialized(node, Builder.getNodeFactory());
+        if (!unspec.isSuccess())
+          return TypeLookupError("Failed to unspecialize type");
+        declNode = unspec.result();
         break;
       }
     }

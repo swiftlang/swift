@@ -691,7 +691,7 @@ bool nodeConsumesGenericArgs(Node *node);
 
 bool isSpecialized(Node *node);
 
-NodePointer getUnspecialized(Node *node, NodeFactory &Factory);
+ManglingErrorOr<NodePointer> getUnspecialized(Node *node, NodeFactory &Factory);
 
 /// Returns true if the node \p kind refers to a context node, e.g. a nominal
 /// type or a function.

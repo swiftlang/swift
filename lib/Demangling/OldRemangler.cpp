@@ -1937,7 +1937,10 @@ void Remangler::mangleAnyNominalType(Node *node, EntityContext &ctx,
   if (isSpecialized(node)) {
     Buffer << 'G';
 
-    NodePointer unboundType = getUnspecialized(node, Factory);
+    auto unspec = getUnspecialized(node, Factory);
+    if (!unspec.isSuccess())
+      unreachable("unable to unspecialize");
+    NodePointer unboundType = unspec.result();
 
     mangleAnyNominalType(unboundType, ctx, depth + 1);
     mangleGenericArgs(node, ctx, depth + 1);

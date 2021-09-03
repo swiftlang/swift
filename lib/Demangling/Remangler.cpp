@@ -39,12 +39,6 @@ using namespace Mangle;
       return err;                                                              \
   } while (0)
 
-[[noreturn]]
-static void unreachable(const char *Message) {
-  fprintf(stderr, "fatal error: %s\n", Message);
-  std::abort();
-}
-
 static char getCharOfNodeText(Node *node, unsigned idx) {
   switch (node->getKind()) {
   case Node::Kind::InfixOperator:
@@ -500,7 +494,10 @@ ManglingError Remangler::mangleAnyNominalType(Node *node, unsigned depth) {
     if (trySubstitution(node, entry))
       return ManglingError::Success;
 
-    NodePointer unboundType = getUnspecialized(node, Factory);
+    auto unspec = getUnspecialized(node, Factory);
+    if (!unspec.isSuccess())
+      return unspec.error();
+    NodePointer unboundType = unspec.result();
     RETURN_IF_ERROR(mangleAnyNominalType(unboundType, depth + 1));
     char Separator = 'y';
     RETURN_IF_ERROR(mangleGenericArgs(node, Separator, depth + 1));
@@ -642,7 +639,8 @@ ManglingError Remangler::mangleAbstractStorage(Node *node,
   switch (node->getKind()) {
     case Node::Kind::Subscript: Buffer << "i"; break;
     case Node::Kind::Variable: Buffer << "v"; break;
-    default: unreachable("Not a storage node");
+    default:
+      return ManglingError(ManglingError::NotAStorageNode, node);
   }
   Buffer << accessorCode;
   return ManglingError::Success;
@@ -815,7 +813,10 @@ ManglingError Remangler::mangleBoundGenericFunction(Node *node,
   if (trySubstitution(node, entry))
     return ManglingError::Success;
 
-  NodePointer unboundFunction = getUnspecialized(node, Factory);
+  auto unspec = getUnspecialized(node, Factory);
+  if (!unspec.isSuccess())
+    return unspec.error();
+  NodePointer unboundFunction = unspec.result();
   RETURN_IF_ERROR(mangleFunction(unboundFunction, depth + 1));
   char Separator = 'y';
   RETURN_IF_ERROR(mangleGenericArgs(node, Separator, depth + 1));
@@ -3418,7 +3419,8 @@ bool Demangle::isSpecialized(Node *node) {
   }
 }
 
-NodePointer Demangle::getUnspecialized(Node *node, NodeFactory &Factory) {
+ManglingErrorOr<NodePointer> Demangle::getUnspecialized(Node *node,
+                                                        NodeFactory &Factory) {
   unsigned NumToCopy = 2;
   switch (node->getKind()) {
     case Node::Kind::Function:
@@ -3450,8 +3452,12 @@ NodePointer Demangle::getUnspecialized(Node *node, NodeFactory &Factory) {
     case Node::Kind::OtherNominalType: {
       NodePointer result = Factory.createNode(node->getKind());
       NodePointer parentOrModule = node->getChild(0);
-      if (isSpecialized(parentOrModule))
-        parentOrModule = getUnspecialized(parentOrModule, Factory);
+      if (isSpecialized(parentOrModule)) {
+        auto unspec = getUnspecialized(parentOrModule, Factory);
+        if (!unspec.isSuccess())
+          return unspec;
+        parentOrModule = unspec.result();
+      }
       result->addChild(parentOrModule, Factory);
       for (unsigned Idx = 1; Idx < NumToCopy; ++Idx) {
         result->addChild(node->getChild(Idx), Factory);
@@ -3486,9 +3492,12 @@ NodePointer Demangle::getUnspecialized(Node *node, NodeFactory &Factory) {
       NodePointer parent = node->getChild(1);
       if (!isSpecialized(parent))
         return node;
+      auto unspec = getUnspecialized(parent, Factory);
+      if (!unspec.isSuccess())
+        return unspec.error();
       NodePointer result = Factory.createNode(Node::Kind::Extension);
       result->addChild(node->getFirstChild(), Factory);
-      result->addChild(getUnspecialized(parent, Factory), Factory);
+      result->addChild(unspec.result(), Factory);
       if (node->getNumChildren() == 3) {
         // Add the generic signature of the extension.
         result->addChild(node->getChild(2), Factory);
@@ -3496,6 +3505,6 @@ NodePointer Demangle::getUnspecialized(Node *node, NodeFactory &Factory) {
       return result;
     }
     default:
-      unreachable("bad nominal type kind");
+      return ManglingError(ManglingError::BadNominalTypeKind, node);
   }
 }
