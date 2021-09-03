@@ -32,6 +32,31 @@ namespace swift {
 // Uncomment to enable helpful debug spew to stderr
 //#define SWIFT_TASK_PRINTF_DEBUG 1
 
+// Set to 1 to enable helpful debug spew to stderr
+#if 0
+#define SWIFT_TASK_DEBUG_LOG(fmt, ...)                                         \
+  fprintf(stderr, "[%lu] [%s:%d](%s) " fmt "\n",                               \
+          (unsigned long)_swift_get_thread_id(),                               \
+          __FILE__, __LINE__, __FUNCTION__,                                    \
+          __VA_ARGS__)
+#else
+#define SWIFT_TASK_DEBUG_LOG(fmt, ...) (void)0
+#endif
+
+#if defined(_WIN32)
+using ThreadID = decltype(GetCurrentThreadId());
+#else
+using ThreadID = decltype(pthread_self());
+#endif
+
+inline ThreadID _swift_get_thread_id() {
+#if defined(_WIN32)
+  return GetCurrentThreadId();
+#else
+  return pthread_self();
+#endif
+}
+
 class AsyncTask;
 class TaskGroup;
 
