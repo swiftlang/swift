@@ -489,16 +489,8 @@ void TaskGroupImpl::destroy() {
   // First, remove the group from the task and deallocate the record
   swift_task_removeStatusRecord(getTaskRecord());
 
-  mutex.lock(); // TODO: remove lock, and use status for synchronization
-  // Release all ready tasks which are kept retained, the group destroyed,
-  // so no other task will ever await on them anymore;
-  ReadyQueueItem item;
-  bool taskDequeued = readyQueue.dequeue(item);
-  while (taskDequeued) {
-    swift_release(item.getTask());
-    taskDequeued = readyQueue.dequeue(item);
-  }
-  mutex.unlock(); // TODO: remove fragment lock, and use status for synchronization
+  // By the time we call destroy, all tasks inside the group must have been
+  // awaited on already; We handle this on the swift side.
 }
 
 // =============================================================================
@@ -513,16 +505,18 @@ bool TaskGroup::isCancelled() {
 }
 
 static void fillGroupNextResult(TaskFutureWaitAsyncContext *context,
-                                PollResult result) {
+                                PollResult result,
+                                bool releaseResultRetainedTask) {
   /// Fill in the result value
   switch (result.status) {
   case PollStatus::MustWait:
     assert(false && "filling a waiting status?");
     return;
 
-  case PollStatus::Error:
-    context->fillWithError(reinterpret_cast<SwiftError*>(result.storage));
-    return;
+  case PollStatus::Error: {
+    context->fillWithError(reinterpret_cast<SwiftError *>(result.storage));
+    break;
+  }
 
   case PollStatus::Success: {
     // Initialize the result as an Optional<Success>.
@@ -533,7 +527,7 @@ static void fillGroupNextResult(TaskFutureWaitAsyncContext *context,
     // remaining references to it.
     successType->vw_initializeWithCopy(destPtr, result.storage);
     successType->vw_storeEnumTagSinglePayload(destPtr, 0, 1);
-    return;
+    break;
   }
 
   case PollStatus::Empty: {
@@ -541,9 +535,20 @@ static void fillGroupNextResult(TaskFutureWaitAsyncContext *context,
     const Metadata *successType = result.successType;
     OpaqueValue *destPtr = context->successResultPointer;
     successType->vw_storeEnumTagSinglePayload(destPtr, 1, 1);
-    return;
+    break;
   }
   }
+
+  // We only release if asked to; This is because this function is called in two
+  // cases "immediately":
+  // a) when a completed task arrives and a waiting one existed then we don't
+  //    need to retain the completed task at all, thus we also don't release it.
+  // b) when the task was stored in the readyQueue it was retained. As a
+  //    waitingTask arrives we will fill-in with the value from the retained
+  //    task. In this situation we must release the ready task, to allow it to
+  //    be destroyed.
+  if (releaseResultRetainedTask)
+    swift_release(result.retainedTask);
 }
 
 void TaskGroupImpl::offer(AsyncTask *completedTask, AsyncContext *context) {
@@ -552,16 +557,7 @@ void TaskGroupImpl::offer(AsyncTask *completedTask, AsyncContext *context) {
   assert(completedTask->hasChildFragment());
   assert(completedTask->hasGroupChildFragment());
   assert(completedTask->groupChildFragment()->getGroup() == asAbstract(this));
-
-  // We retain the completed task, because we will either:
-  // - (a) schedule the waiter to resume on the next() that it is waiting on, or
-  // - (b) will need to store this task until the group task enters next() and
-  //       picks up this task.
-  // either way, there is some time between us returning here, and the `completeTask`
-  // issuing a swift_release on this very task. We need to keep it alive until
-  // we have the chance to poll it from the queue (via the waiter task entering
-  // calling next()).
-  swift_retain(completedTask);
+  SWIFT_TASK_DEBUG_LOG("offer task %p to group %p\n", completedTask, group);
 
   mutex.lock(); // TODO: remove fragment lock, and use status for synchronization
 
@@ -585,6 +581,8 @@ void TaskGroupImpl::offer(AsyncTask *completedTask, AsyncContext *context) {
   // ==== a) has waiting task, so let us complete it right away
   if (assumed.hasWaitingTask()) {
     auto waitingTask = waitQueue.load(std::memory_order_acquire);
+    SWIFT_TASK_DEBUG_LOG("group has waiting task = %p, complete with = %p",
+                         waitingTask, completedTask);
     while (true) {
       // ==== a) run waiting task directly -------------------------------------
       assert(assumed.hasWaitingTask());
@@ -605,8 +603,7 @@ void TaskGroupImpl::offer(AsyncTask *completedTask, AsyncContext *context) {
             static_cast<TaskFutureWaitAsyncContext *>(
                 waitingTask->ResumeContext);
 
-        fillGroupNextResult(waitingContext, result);
-
+        fillGroupNextResult(waitingContext, result, /*release*/false);
         _swift_tsan_acquire(static_cast<Job *>(waitingTask));
 
         // TODO: allow the caller to suggest an executor
@@ -614,6 +611,8 @@ void TaskGroupImpl::offer(AsyncTask *completedTask, AsyncContext *context) {
         return;
       } // else, try again
     }
+
+    llvm_unreachable("should have enqueued and returned.");
   }
 
   // ==== b) enqueue completion ------------------------------------------------
@@ -622,7 +621,8 @@ void TaskGroupImpl::offer(AsyncTask *completedTask, AsyncContext *context) {
   // queue when a task polls during next() it will notice that we have a value
   // ready for it, and will process it immediately without suspending.
   assert(!waitQueue.load(std::memory_order_relaxed));
-
+  SWIFT_TASK_DEBUG_LOG("group has no waiting tasks, store ready task = %p",
+                       completedTask);
   // Retain the task while it is in the queue;
   // it must remain alive until the task group is alive.
   swift_retain(completedTask);
@@ -667,6 +667,7 @@ SWIFT_CC(swiftasync) static void workaround_function_swift_taskGroup_wait_next_t
 
 // =============================================================================
 // ==== group.next() implementation (wait_next and groupPoll) ------------------
+
 SWIFT_CC(swiftasync)
 static void swift_taskGroup_wait_next_throwingImpl(
     OpaqueValue *resultPointer, SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
@@ -690,6 +691,8 @@ static void swift_taskGroup_wait_next_throwingImpl(
   PollResult polled = group->poll(waitingTask);
   switch (polled.status) {
   case PollStatus::MustWait:
+    SWIFT_TASK_DEBUG_LOG("poll group = %p, no ready tasks, waiting task = %p\n",
+                         group, waitingTask);
     // The waiting task has been queued on the channel,
     // there were pending tasks so it will be woken up eventually.
 #ifdef __ARM_ARCH_7K__
@@ -702,7 +705,9 @@ static void swift_taskGroup_wait_next_throwingImpl(
   case PollStatus::Empty:
   case PollStatus::Error:
   case PollStatus::Success:
-    fillGroupNextResult(context, polled);
+    SWIFT_TASK_DEBUG_LOG("poll group = %p, task = %p, ready task available = %p\n",
+                         group, waitingTask, polled.retainedTask);
+    fillGroupNextResult(context, polled, /*release*/true);
     return waitingTask->runInFullyEstablishedContext();
   }
 }
