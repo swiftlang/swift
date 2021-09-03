@@ -32,7 +32,7 @@ std::error_code ModuleDependencyScanner::findModuleFilesInDirectory(
                                       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
                                       std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
                                       std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-                                      bool IsFramework) {
+                                      bool skipBuildingInterface, bool IsFramework) {
   using namespace llvm::sys;
 
   auto &fs = *Ctx.SourceMgr.getFileSystem();
@@ -77,7 +77,7 @@ std::error_code PlaceholderSwiftModuleScanner::findModuleFilesInDirectory(
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-    bool IsFramework) {
+    bool skipBuildingInterface, bool IsFramework) {
   StringRef moduleName = ModuleID.Item.str();
   auto it = PlaceholderDependencyModuleMap.find(moduleName);
   // If no placeholder module stub path is given matches the name, return with an

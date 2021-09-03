@@ -20,6 +20,9 @@
 #include "swift/Runtime/Config.h"
 #include <assert.h>
 #include <atomic>
+#if defined(_WIN64)
+#include <intrin.h>
+#endif
 
 // FIXME: Workaround for rdar://problem/18889711. 'Consume' does not require
 // a barrier on ARM64, but LLVM doesn't know that. Although 'relaxed'
@@ -72,7 +75,6 @@ public:
 };
 
 #if defined(_WIN64)
-#include <intrin.h>
 
 /// MSVC's std::atomic uses an inline spin lock for 16-byte atomics,
 /// which is not only unnecessarily inefficient but also doubles the size

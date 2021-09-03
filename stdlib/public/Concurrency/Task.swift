@@ -824,7 +824,14 @@ func _getCurrentThreadPriority() -> Int
 @_alwaysEmitIntoClient
 @usableFromInline
 internal func _runTaskForBridgedAsyncMethod(@_inheritActorContext _ body: __owned @Sendable @escaping () async -> Void) {
+#if compiler(>=5.6)
   Task(operation: body)
+#else
+  Task<Int, Error> {
+    await body()
+    return 0
+  }
+#endif
 }
 
 #endif
