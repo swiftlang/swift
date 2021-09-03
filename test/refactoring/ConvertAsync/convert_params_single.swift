@@ -87,14 +87,12 @@ func testParamsSingle() async throws {
   // BOUND-COMMENT-NEXT: // l
   // BOUND-COMMENT-NEXT: print("after")
   // BOUND-COMMENT-NEXT: // m
-  // BOUND-COMMENT-NEXT: {{ }}
   // BOUND-COMMENT-NEXT: } catch let bad {
   // BOUND-COMMENT-NEXT: // d
   // BOUND-COMMENT-NEXT: // e
   // BOUND-COMMENT-NEXT: print("got error \(bad)")
   // BOUND-COMMENT-NEXT: // f
   // BOUND-COMMENT-NEXT: // g
-  // BOUND-COMMENT-NEXT: {{ }}
   // BOUND-COMMENT-NEXT: }
 
 
