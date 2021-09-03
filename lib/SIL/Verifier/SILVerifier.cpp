@@ -1224,6 +1224,8 @@ public:
       return;
 
     auto *debugScope = inst->getDebugScope();
+    if (varInfo->ArgNo)
+      require(!varInfo->Name.empty(), "function argument without a name");
 
     // Check that there is at most one debug variable defined for each argument
     // slot if our debug scope is not an inlined call site.
@@ -1234,8 +1236,7 @@ public:
     if (debugScope && !debugScope->InlinedCallSite)
       if (unsigned argNum = varInfo->ArgNo) {
         // It is a function argument.
-        if (argNum < DebugVars.size() && !DebugVars[argNum].empty() &&
-            !varInfo->Name.empty()) {
+        if (argNum < DebugVars.size() && !DebugVars[argNum].empty()) {
           require(DebugVars[argNum] == varInfo->Name,
                   "Scope contains conflicting debug variables for one function "
                   "argument");

@@ -18,9 +18,8 @@ typealias MyFloat = Float
 // PROMO-CHECK: call void @llvm.dbg.declare(metadata %Ts5Int64V** %
 // PROMO-CHECK-SAME:   metadata ![[A1:[0-9]+]], metadata !DIExpression(DW_OP_deref))
 
-// PROMO-CHECK-DAG: ![[INT:.*]] = !DICompositeType({{.*}}identifier: "$ss5Int64VD"
-// PROMO-CHECK: ![[A1]] = !DILocalVariable(name: "a", arg: 1
-// PROMO-CHECK-SAME:                       type: ![[INT]]
+// PROMO-CHECK: ![[INT:.*]] = !DICompositeType({{.*}}identifier: "$ss5Int64VD"
+// PROMO-CHECK: ![[A1]] = !DILocalVariable(name: "a", arg: 1,{{.*}} type: ![[INT]]
 func modifyFooHeap(_ a: inout Int64,
   // CHECK-DAG: ![[A]] = !DILocalVariable(name: "a", arg: 1{{.*}} line: [[@LINE-1]],{{.*}} type: ![[RINT:[0-9]+]]
   // CHECK-DAG: ![[RINT]] = !DICompositeType({{.*}}identifier: "$ss5Int64VD"
