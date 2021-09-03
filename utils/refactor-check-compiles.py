@@ -87,6 +87,9 @@ def parse_args():
         '-target',
         help='The target triple to build for'
     )
+    parser.add_argument(
+        '-resource-dir',
+        help='The resource dir where the stdlib is stored')
 
     return parser.parse_known_args()
 
@@ -107,6 +110,8 @@ def main():
         extra_both_args += ['-sdk', args.sdk]
     if args.target:
         extra_both_args += ['-target', args.target]
+    if args.resource_dir:
+        extra_both_args += ['-resource-dir', args.resource_dir]
 
     dump_text_output = run_cmd([
         args.swift_refactor,
