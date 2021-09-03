@@ -275,12 +275,11 @@ struct ArgumentInitHelper {
     // Emit debug information for the argument.
     SILLocation loc(PD);
     loc.markAsPrologue();
+    SILDebugVariable DebugVar(PD->isLet(), ArgNo);
     if (argrv.getType().isAddress())
-      SGF.B.createDebugValueAddr(loc, argrv.getValue(),
-                                 SILDebugVariable(PD->isLet(), ArgNo));
+      SGF.B.createDebugValueAddr(loc, argrv.getValue(), DebugVar);
     else
-      SGF.B.createDebugValue(loc, argrv.getValue(),
-                             SILDebugVariable(PD->isLet(), ArgNo));
+      SGF.B.createDebugValue(loc, argrv.getValue(), DebugVar);
   }
 };
 } // end anonymous namespace
