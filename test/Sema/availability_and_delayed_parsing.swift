@@ -1,13 +1,13 @@
 /// Check for reliable availability checking in inlinable code even when
 /// skipping some function bodies. rdar://82269657
 
-// RUN: %target-swift-frontend -typecheck -dump-type-refinement-contexts %s -target x86_64-apple-macos10.10 2>&1 \
+// RUN: %target-swift-frontend -typecheck -dump-type-refinement-contexts %s -target %target-cpu-apple-macos10.10 2>&1 \
 // RUN:    | %FileCheck %s --check-prefixes TRC-API,TRC-INLINABLE,TRC-WITHTYPES,TRC-FULL
-// RUN: %target-swift-frontend -typecheck -dump-type-refinement-contexts %s -target x86_64-apple-macos10.10 -experimental-skip-non-inlinable-function-bodies-without-types 2>&1 \
+// RUN: %target-swift-frontend -typecheck -dump-type-refinement-contexts %s -target %target-cpu-apple-macos10.10 -experimental-skip-non-inlinable-function-bodies-without-types 2>&1 \
 // RUN:    | %FileCheck %s --check-prefixes TRC-API,TRC-INLINABLE,TRC-WITHTYPES,TRC-FULL-NOT
-// RUN: %target-swift-frontend -typecheck -dump-type-refinement-contexts %s -target x86_64-apple-macos10.10 -experimental-skip-non-inlinable-function-bodies 2>&1 \
+// RUN: %target-swift-frontend -typecheck -dump-type-refinement-contexts %s -target %target-cpu-apple-macos10.10 -experimental-skip-non-inlinable-function-bodies 2>&1 \
 // RUN:    | %FileCheck %s --check-prefixes TRC-API,TRC-INLINABLE,TRC-WITHTYPES-NOT,TRC-FULL-NOT
-// RUN: %target-swift-frontend -typecheck -dump-type-refinement-contexts %s -target x86_64-apple-macos10.10 -experimental-skip-all-function-bodies 2>&1 \
+// RUN: %target-swift-frontend -typecheck -dump-type-refinement-contexts %s -target %target-cpu-apple-macos10.10 -experimental-skip-all-function-bodies 2>&1 \
 // RUN:    | %FileCheck %s --check-prefixes TRC-API,TRC-INLINABLE-NOT,TRC-WITHTYPES-NOT,TRC-FULL-NOT
 
 // REQUIRES: OS=macosx
