@@ -421,7 +421,7 @@ std::error_code ImplicitSerializedModuleLoader::findModuleFilesInDirectory(
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-    bool IsFramework) {
+    bool skipBuildingInterface, bool IsFramework) {
   assert(((ModuleBuffer && ModuleDocBuffer) ||
           (!ModuleBuffer && !ModuleDocBuffer)) &&
          "Module and Module Doc buffer must both be initialized or NULL");
@@ -514,7 +514,7 @@ SerializedModuleLoaderBase::findModule(ImportPath::Element moduleID,
            std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
            std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
            std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
-           bool &isFramework, bool &isSystemModule) {
+           bool skipBuildingInterface, bool &isFramework, bool &isSystemModule) {
   SmallString<32> moduleName(moduleID.Item.str());
   SerializedModuleBaseName genericBaseName(moduleName);
 
@@ -552,6 +552,7 @@ SerializedModuleLoaderBase::findModule(ImportPath::Element moduleID,
                         moduleInterfacePath,
                         moduleBuffer, moduleDocBuffer,
                         moduleSourceInfoBuffer,
+                        skipBuildingInterface,
                         IsFramework);
       if (!result) {
         return true;
@@ -609,7 +610,8 @@ SerializedModuleLoaderBase::findModule(ImportPath::Element moduleID,
 
           auto result = findModuleFilesInDirectory(
               moduleID, absoluteBaseName, moduleInterfacePath,
-              moduleBuffer, moduleDocBuffer, moduleSourceInfoBuffer, isFramework);
+              moduleBuffer, moduleDocBuffer, moduleSourceInfoBuffer,
+              skipBuildingInterface, isFramework);
           if (!result)
             return true;
           else if (result == std::errc::not_supported)
@@ -998,9 +1000,10 @@ bool SerializedModuleLoaderBase::canImportModule(
   std::unique_ptr<llvm::MemoryBuffer> *unusedModuleSourceInfoBuffer = nullptr;
   bool isFramework = false;
   bool isSystemModule = false;
+  bool skipBuildingInterface = true;
   return findModule(mID, unusedModuleInterfacePath, unusedModuleBuffer,
                     unusedModuleDocBuffer, unusedModuleSourceInfoBuffer,
-                    isFramework, isSystemModule);
+                    skipBuildingInterface, isFramework, isSystemModule);
 }
 
 bool MemoryBufferSerializedModuleLoader::canImportModule(
@@ -1028,7 +1031,7 @@ SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
   // Look on disk.
   if (!findModule(moduleID, &moduleInterfacePath, &moduleInputBuffer,
                   &moduleDocInputBuffer, &moduleSourceInfoInputBuffer,
-                  isFramework, isSystemModule)) {
+                  /* skipBuildingInterface */ false, isFramework, isSystemModule)) {
     return nullptr;
   }
 
@@ -1142,7 +1145,7 @@ std::error_code MemoryBufferSerializedModuleLoader::findModuleFilesInDirectory(
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-    bool IsFramework) {
+    bool skipBuildingInterface, bool IsFramework) {
   // This is a soft error instead of an llvm_unreachable because this API is
   // primarily used by LLDB which makes it more likely that unwitting changes to
   // the Swift compiler accidentally break the contract.

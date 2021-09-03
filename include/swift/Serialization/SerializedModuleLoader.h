@@ -77,7 +77,7 @@ protected:
                           std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
                           std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
                           std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
-                          bool &isFramework, bool &isSystemModule);
+                          bool skipBuildingInterface, bool &isFramework, bool &isSystemModule);
 
   /// Attempts to search the provided directory for a loadable serialized
   /// .swiftmodule with the provided `ModuleFilename`. Subclasses must
@@ -98,7 +98,7 @@ protected:
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-      bool IsFramework) = 0;
+      bool skipBuildingInterface, bool IsFramework) = 0;
 
   std::error_code
   openModuleFile(
@@ -218,7 +218,7 @@ class ImplicitSerializedModuleLoader : public SerializedModuleLoaderBase {
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-      bool IsFramework) override;
+      bool skipBuildingInterface, bool IsFramework) override;
 
   bool maybeDiagnoseTargetMismatch(
       SourceLoc sourceLocation,
@@ -264,7 +264,7 @@ class MemoryBufferSerializedModuleLoader : public SerializedModuleLoaderBase {
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-      bool IsFramework) override;
+      bool skipBuildingInterface, bool IsFramework) override;
 
   bool maybeDiagnoseTargetMismatch(
       SourceLoc sourceLocation,
