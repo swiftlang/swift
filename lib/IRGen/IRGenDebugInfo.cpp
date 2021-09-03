@@ -2487,7 +2487,8 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
 
   // Get or create the DILocalVariable.
   llvm::DILocalVariable *Var;
-  auto CachedVar = LocalVarCache.find({KeyScope, VarInfo.Name.data(), ArgNo});
+  VarID Key(KeyScope, VarInfo.Name.data(), ArgNo);
+  auto CachedVar = LocalVarCache.find(Key);
   if (CachedVar != LocalVarCache.end()) {
     Var = cast<llvm::DILocalVariable>(CachedVar->second);
   } else {
@@ -2501,8 +2502,7 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
     else
       Var = DBuilder.createAutoVariable(VarScope, VarInfo.Name, Unit, DVarLine,
                                         DITy, Preserve, Flags);
-    LocalVarCache.insert(
-        {{KeyScope, VarInfo.Name.data(), ArgNo}, llvm::TrackingMDNodeRef(Var)});
+    LocalVarCache.insert({Key, llvm::TrackingMDNodeRef(Var)});
   }
 
   auto appendDIExpression =
