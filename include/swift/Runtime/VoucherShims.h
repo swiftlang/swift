@@ -39,8 +39,18 @@
 
 #if SWIFT_HAS_VOUCHERS
 
+#if SWIFT_HAS_VOUCHER_HEADER
+
+static inline bool swift_voucher_needs_adopt(voucher_t _Nullable voucher) {
+  if (__builtin_available(macOS 12.0, iOS 15.0, tvOS 15.0, watchOS 8.0, *)) {
+    return voucher_needs_adopt(voucher);
+  }
+  return true;
+}
+
+#else
+
 // If the header isn't available, declare the necessary calls here.
-#if !SWIFT_HAS_VOUCHER_HEADER
 
 #include <os/object.h>
 
@@ -54,7 +64,7 @@ extern "C" voucher_t _Nullable voucher_copy(void);
 // Consumes argument, returns retained value.
 extern "C" voucher_t _Nullable voucher_adopt(voucher_t _Nullable voucher);
 
-static inline bool voucher_needs_adopt(voucher_t _Nullable voucher) {
+static inline bool swift_voucher_needs_adopt(voucher_t _Nullable voucher) {
   return true;
 }
 
@@ -78,7 +88,7 @@ static inline voucher_t _Nullable voucher_copy(void) { return nullptr; }
 static inline voucher_t _Nullable voucher_adopt(voucher_t _Nullable voucher) {
   return nullptr;
 }
-static inline bool voucher_needs_adopt(voucher_t _Nullable voucher) {
+static inline bool swift_voucher_needs_adopt(voucher_t _Nullable voucher) {
   return true;
 }
 static inline void swift_voucher_release(voucher_t _Nullable voucher) {}
