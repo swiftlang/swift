@@ -139,7 +139,8 @@ class ExplicitSwiftModuleLoader: public SerializedModuleLoaderBase {
                   std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
                   std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
                   std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
-                  bool &isFramework, bool &isSystemModule) override;
+                  bool skipBuildingInterface, bool &isFramework,
+                  bool &isSystemModule) override;
 
   std::error_code findModuleFilesInDirectory(
                   ImportPath::Element ModuleID,
@@ -148,7 +149,7 @@ class ExplicitSwiftModuleLoader: public SerializedModuleLoaderBase {
                   std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
                   std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
                   std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-                  bool IsFramework) override;
+                  bool skipBuildingInterface, bool IsFramework) override;
 
   bool canImportModule(ImportPath::Element mID, llvm::VersionTuple version,
                        bool underlyingVersion) override;
@@ -400,7 +401,7 @@ class ModuleInterfaceLoader : public SerializedModuleLoaderBase {
      std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
      std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
      std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-     bool IsFramework) override;
+     bool skipBuildingInterface, bool IsFramework) override;
 
   bool isCached(StringRef DepPath) override;
 public:

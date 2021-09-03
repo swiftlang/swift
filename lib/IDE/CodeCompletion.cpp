@@ -143,13 +143,15 @@ CodeCompletionString *CodeCompletionString::create(llvm::BumpPtrAllocator &Alloc
 }
 
 void CodeCompletionString::print(raw_ostream &OS) const {
+
   unsigned PrevNestingLevel = 0;
+  SmallVector<StringRef, 3> closeTags;
+
   auto chunks = getChunks();
   for (auto I = chunks.begin(), E = chunks.end(); I != E; ++I) {
-    bool AnnotatedTextChunk = false;
-
-    if (I->getNestingLevel() < PrevNestingLevel) {
-      OS << "#}";
+    while (I->endsPreviousNestedGroup(PrevNestingLevel)) {
+      OS << closeTags.pop_back_val();
+      --PrevNestingLevel;
     }
     switch (I->getKind()) {
     using ChunkKind = Chunk::ChunkKind;
@@ -179,57 +181,53 @@ void CodeCompletionString::print(raw_ostream &OS) const {
     case ChunkKind::BaseName:
     case ChunkKind::TypeIdSystem:
     case ChunkKind::TypeIdUser:
-      AnnotatedTextChunk = I->isAnnotation();
-      LLVM_FALLTHROUGH;
     case ChunkKind::CallArgumentName:
-    case ChunkKind::CallArgumentInternalName:
     case ChunkKind::CallArgumentColon:
-    case ChunkKind::DeclAttrParamColon:
     case ChunkKind::CallArgumentType:
-    case ChunkKind::CallArgumentClosureType:
+    case ChunkKind::ParameterDeclExternalName:
+    case ChunkKind::ParameterDeclLocalName:
+    case ChunkKind::ParameterDeclColon:
+    case ChunkKind::DeclAttrParamColon:
     case ChunkKind::GenericParameterName:
-      if (AnnotatedTextChunk)
-        OS << "['";
-      else if (I->getKind() == ChunkKind::CallArgumentInternalName)
-        OS << "(";
-      else if (I->getKind() == ChunkKind::CallArgumentClosureType)
-        OS << "##";
-      for (char Ch : I->getText()) {
-        if (Ch == '\n')
-          OS << "\\n";
-        else
-          OS << Ch;
-      }
-      if (AnnotatedTextChunk)
-        OS << "']";
-      else if (I->getKind() == ChunkKind::CallArgumentInternalName)
-        OS << ")";
+      if (I->isAnnotation())
+        OS << "['" << I->getText() << "']";
+      else
+        OS << I->getText();
+      break;
+    case ChunkKind::CallArgumentInternalName:
+      OS << "(" << I->getText() << ")";
+      break;
+    case ChunkKind::CallArgumentClosureType:
+      OS << "##" << I->getText();
       break;
     case ChunkKind::OptionalBegin:
     case ChunkKind::CallArgumentBegin:
-    case ChunkKind::CallArgumentTypeBegin:
     case ChunkKind::GenericParameterBegin:
       OS << "{#";
+      closeTags.emplace_back("#}");
       break;
     case ChunkKind::DynamicLookupMethodCallTail:
     case ChunkKind::OptionalMethodCallTail:
       OS << I->getText();
       break;
-    case ChunkKind::TypeAnnotationBegin: {
+    case ChunkKind::GenericParameterClauseBegin:
+    case ChunkKind::GenericRequirementClauseBegin:
+    case ChunkKind::CallArgumentTypeBegin:
+    case ChunkKind::DefaultArgumentClauseBegin:
+    case ChunkKind::ParameterDeclBegin:
+    case ChunkKind::EffectsSpecifierClauseBegin:
+    case ChunkKind::DeclResultTypeClauseBegin:
+    case ChunkKind::ParameterDeclTypeBegin:
+    case ChunkKind::AttributeAndModifierListBegin:
+      assert(I->getNestingLevel() == PrevNestingLevel + 1);
+      closeTags.emplace_back("");
+      break;
+    case ChunkKind::TypeAnnotationBegin:
       OS << "[#";
-      ++I;
-      auto level = I->getNestingLevel();
-      for (; I != E && !I->endsPreviousNestedGroup(level); ++I)
-        if (I->hasText())
-          OS << I->getText();
-      --I;
-      OS << "#]";
-      continue;
-    }
+      closeTags.emplace_back("#]");
+      break;
     case ChunkKind::TypeAnnotation:
-      OS << "[#";
-      OS << I->getText();
-      OS << "#]";
+      OS << "[#" << I->getText() << "#]";
       break;
     case ChunkKind::CallArgumentClosureExpr:
       OS << " {" << I->getText() << "|}";
@@ -241,13 +239,89 @@ void CodeCompletionString::print(raw_ostream &OS) const {
     PrevNestingLevel = I->getNestingLevel();
   }
   while (PrevNestingLevel > 0) {
-    OS << "#}";
+    OS << closeTags.pop_back_val();
     --PrevNestingLevel;
   }
+
+  assert(closeTags.empty());
 }
 
 void CodeCompletionString::dump() const {
-  print(llvm::errs());
+  llvm::raw_ostream &OS = llvm::errs();
+
+  OS << "Chunks: \n";
+  for (auto &chunk : getChunks()) {
+    OS << "- ";
+    for (unsigned i = 0, e = chunk.getNestingLevel(); i != e; ++i)
+      OS << "| ";
+    OS << "(";
+
+    switch (chunk.getKind()) {
+#define CASE(K) case Chunk::ChunkKind::K: OS << #K; break;
+    CASE(AccessControlKeyword)
+    CASE(DeclAttrKeyword)
+    CASE(DeclAttrParamKeyword)
+    CASE(OverrideKeyword)
+    CASE(EffectsSpecifierKeyword)
+    CASE(DeclIntroducer)
+    CASE(Keyword)
+    CASE(Attribute)
+    CASE(Text)
+    CASE(BaseName)
+    CASE(OptionalBegin)
+    CASE(LeftParen)
+    CASE(RightParen)
+    CASE(LeftBracket)
+    CASE(RightBracket)
+    CASE(LeftAngle)
+    CASE(RightAngle)
+    CASE(Dot)
+    CASE(Ellipsis)
+    CASE(Comma)
+    CASE(ExclamationMark)
+    CASE(QuestionMark)
+    CASE(Ampersand)
+    CASE(Equal)
+    CASE(Whitespace)
+    CASE(GenericParameterClauseBegin)
+    CASE(GenericRequirementClauseBegin)
+    CASE(GenericParameterBegin)
+    CASE(GenericParameterName)
+    CASE(CallArgumentBegin)
+    CASE(CallArgumentName)
+    CASE(CallArgumentInternalName)
+    CASE(CallArgumentColon)
+    CASE(DeclAttrParamColon)
+    CASE(CallArgumentType)
+    CASE(CallArgumentTypeBegin)
+    CASE(TypeIdSystem)
+    CASE(TypeIdUser)
+    CASE(CallArgumentClosureType)
+    CASE(CallArgumentClosureExpr)
+    CASE(DynamicLookupMethodCallTail)
+    CASE(OptionalMethodCallTail)
+    CASE(ParameterDeclBegin)
+    CASE(ParameterDeclExternalName)
+    CASE(ParameterDeclLocalName)
+    CASE(ParameterDeclColon)
+    CASE(ParameterDeclTypeBegin)
+    CASE(DefaultArgumentClauseBegin)
+    CASE(EffectsSpecifierClauseBegin)
+    CASE(DeclResultTypeClauseBegin)
+    CASE(AttributeAndModifierListBegin)
+    CASE(TypeAnnotation)
+    CASE(TypeAnnotationBegin)
+    CASE(BraceStmtWithCursor)
+    }
+    if (chunk.isAnnotation())
+      OS << " [annotation]";
+    if (chunk.hasText()) {
+      OS << " \"";
+      OS.write_escaped(chunk.getText());
+      OS << "\"";
+    }
+    OS << ")\n";
+  }
 }
 
 CodeCompletionDeclKind
@@ -628,22 +702,104 @@ void CodeCompletionResultBuilder::setAssociatedDecl(const Decl *D) {
 }
 
 namespace {
-class AnnotatedTypePrinter : public ASTPrinter {
+
+/// 'ASTPrinter' printing to 'CodeCompletionString' with appropriate ChunkKind.
+/// This is mainly used for printing types and override completions.
+class CodeCompletionStringPrinter : public ASTPrinter {
+protected:
   using ChunkKind = CodeCompletionString::Chunk::ChunkKind;
+
+private:
   CodeCompletionResultBuilder &Builder;
   SmallString<16> Buffer;
   ChunkKind CurrChunkKind = ChunkKind::Text;
   ChunkKind NextChunkKind = ChunkKind::Text;
+  SmallVector<PrintStructureKind, 2> StructureStack;
+  unsigned int TypeDepth = 0;
+  bool InPreamble = false;
 
-  Optional<ChunkKind> getChunkKindForPrintNameContext(PrintNameContext context) {
+  bool isCurrentStructureKind(PrintStructureKind Kind) const {
+    return !StructureStack.empty() && StructureStack.back() == Kind;
+  }
+
+  bool isInType() const {
+    return TypeDepth > 0;
+  }
+
+  Optional<ChunkKind>
+  getChunkKindForPrintNameContext(PrintNameContext context) const {
     switch (context) {
     case PrintNameContext::Keyword:
+      if(isCurrentStructureKind(PrintStructureKind::EffectsSpecifiers)) {
+        return ChunkKind::EffectsSpecifierKeyword;
+      }
       return ChunkKind::Keyword;
+    case PrintNameContext::IntroducerKeyword:
+      return ChunkKind::DeclIntroducer;
     case PrintNameContext::Attribute:
       return ChunkKind::Attribute;
+    case PrintNameContext::FunctionParameterExternal:
+      if (isInType()) {
+        return None;
+      }
+      return ChunkKind::ParameterDeclExternalName;
+    case PrintNameContext::FunctionParameterLocal:
+      if (isInType()) {
+        return None;
+      }
+      return ChunkKind::ParameterDeclLocalName;
     default:
       return None;
     }
+  }
+
+  Optional<ChunkKind>
+  getChunkKindForStructureKind(PrintStructureKind Kind) const {
+    switch (Kind) {
+    case PrintStructureKind::FunctionParameter:
+      if (isInType()) {
+        return None;
+      }
+      return ChunkKind::ParameterDeclBegin;
+    case PrintStructureKind::DefaultArgumentClause:
+      return ChunkKind::DefaultArgumentClauseBegin;
+    case PrintStructureKind::DeclGenericParameterClause:
+      return ChunkKind::GenericParameterClauseBegin;
+    case PrintStructureKind::DeclGenericRequirementClause:
+      return ChunkKind::GenericRequirementClauseBegin;
+    case PrintStructureKind::EffectsSpecifiers:
+      return ChunkKind::EffectsSpecifierClauseBegin;
+    case PrintStructureKind::DeclResultTypeClause:
+      return ChunkKind::DeclResultTypeClauseBegin;
+    case PrintStructureKind::FunctionParameterType:
+      return ChunkKind::ParameterDeclTypeBegin;
+    default:
+      return None;
+    }
+  }
+
+  void startNestedGroup(ChunkKind Kind) {
+    flush();
+    Builder.CurrentNestingLevel++;
+    Builder.addSimpleChunk(Kind);
+  }
+
+  void endNestedGroup() {
+    flush();
+    Builder.CurrentNestingLevel--;
+  }
+
+protected:
+  void setNextChunkKind(ChunkKind Kind) {
+    NextChunkKind = Kind;
+  }
+
+public:
+  CodeCompletionStringPrinter(CodeCompletionResultBuilder &Builder) : Builder(Builder) {}
+
+  ~CodeCompletionStringPrinter() {
+    // Flush the remainings.
+    flush();
   }
 
   void flush() {
@@ -653,15 +809,38 @@ class AnnotatedTypePrinter : public ASTPrinter {
     Buffer.clear();
   }
 
-public:
-  AnnotatedTypePrinter(CodeCompletionResultBuilder &Builder) : Builder(Builder) {}
-
-  ~AnnotatedTypePrinter() {
-    // Flush the remainings.
-    flush();
+  /// Start \c AttributeAndModifierListBegin group. This must be called before
+  /// any attributes/modifiers printed to the output when printing an override
+  /// compleion.
+  void startPreamble() {
+    assert(!InPreamble);
+    startNestedGroup(ChunkKind::AttributeAndModifierListBegin);
+    InPreamble = true;
   }
 
+  /// End the current \c AttributeAndModifierListBegin group if it's still open.
+  /// This is automatically called before the main part of the signature.
+  void endPremable() {
+    if (!InPreamble)
+      return;
+    InPreamble = false;
+    endNestedGroup();
+  }
+
+  /// Implement \c ASTPrinter .
+public:
   void printText(StringRef Text) override {
+    // Detect ': ' and ', ' in parameter clauses.
+    // FIXME: Is there a better way?
+    if (isCurrentStructureKind(PrintStructureKind::FunctionParameter) &&
+        Text == ": ") {
+      setNextChunkKind(ChunkKind::ParameterDeclColon);
+    } else if (
+        isCurrentStructureKind(PrintStructureKind::FunctionParameterList) &&
+        Text == ", ") {
+      setNextChunkKind(ChunkKind::Comma);
+    }
+
     if (CurrChunkKind != NextChunkKind) {
       // If the next desired kind is different from the current buffer, flush
       // the current buffer.
@@ -683,14 +862,49 @@ public:
     NextChunkKind = ChunkKind::Text;
   }
 
+  void printDeclLoc(const Decl *D) override {
+    endPremable();
+    setNextChunkKind(ChunkKind::BaseName);
+  }
+
+  void printDeclNameEndLoc(const Decl *D) override {
+    setNextChunkKind(ChunkKind::Text);
+  }
+
   void printNamePre(PrintNameContext context) override {
+    if (context == PrintNameContext::IntroducerKeyword)
+      endPremable();
     if (auto Kind = getChunkKindForPrintNameContext(context))
-      NextChunkKind = *Kind;
+      setNextChunkKind(*Kind);
   }
 
   void printNamePost(PrintNameContext context) override {
-    if (auto Kind = getChunkKindForPrintNameContext(context))
-      NextChunkKind = ChunkKind::Text;
+    if (getChunkKindForPrintNameContext(context))
+      setNextChunkKind(ChunkKind::Text);
+  }
+
+  void printTypePre(const TypeLoc &TL) override {
+    ++TypeDepth;
+  }
+
+  void printTypePost(const TypeLoc &TL) override {
+    assert(TypeDepth > 0);
+    --TypeDepth;
+  }
+
+  void printStructurePre(PrintStructureKind Kind, const Decl *D) override {
+    StructureStack.push_back(Kind);
+
+    if (auto chunkKind = getChunkKindForStructureKind(Kind))
+      startNestedGroup(*chunkKind);
+  }
+
+  void printStructurePost(PrintStructureKind Kind, const Decl *D) override {
+    if (getChunkKindForStructureKind(Kind))
+      endNestedGroup();
+
+    assert(Kind == StructureStack.back());
+    StructureStack.pop_back();
   }
 };
 } // namespcae
@@ -780,8 +994,11 @@ void CodeCompletionResultBuilder::addCallArgument(
     PO.setBaseType(ContextTy);
   if (shouldAnnotateResults()) {
     withNestedGroup(ChunkKind::CallArgumentTypeBegin, [&]() {
-      AnnotatedTypePrinter printer(*this);
+      CodeCompletionStringPrinter printer(*this);
+      auto TL = TypeLoc::withoutLoc(Ty);
+      printer.printTypePre(TL);
       Ty->print(printer, PO);
+      printer.printTypePost(TL);
     });
   } else {
     std::string TypeName = Ty->getString(PO);
@@ -792,8 +1009,8 @@ void CodeCompletionResultBuilder::addCallArgument(
   // function type.
   Ty = Ty->lookThroughAllOptionalTypes();
   if (auto AFT = Ty->getAs<AnyFunctionType>()) {
-    // If this is a closure type, add ChunkKind::CallParameterClosureType or
-    // ChunkKind::CallParameterClosureExpr for labeled trailing closures.
+    // If this is a closure type, add ChunkKind::CallArgumentClosureType or
+    // ChunkKind::CallArgumentClosureExpr for labeled trailing closures.
     PrintOptions PO;
     PO.PrintFunctionRepresentationAttrs =
       PrintOptions::FunctionRepresentationMode::None;
@@ -860,8 +1077,11 @@ void CodeCompletionResultBuilder::addTypeAnnotation(Type T, PrintOptions PO,
   if (shouldAnnotateResults()) {
     withNestedGroup(CodeCompletionString::Chunk::ChunkKind::TypeAnnotationBegin,
                     [&]() {
-                      AnnotatedTypePrinter printer(*this);
+                      CodeCompletionStringPrinter printer(*this);
+                      auto TL = TypeLoc::withoutLoc(T);
+                      printer.printTypePre(TL);
                       T->print(printer, PO);
+                      printer.printTypePost(TL);
                       if (!suffix.empty())
                         printer.printText(suffix);
                     });
@@ -1143,12 +1363,21 @@ MutableArrayRef<CodeCompletionResult *> CodeCompletionContext::takeResults() {
 Optional<unsigned> CodeCompletionString::getFirstTextChunkIndex(
     bool includeLeadingPunctuation) const {
   for (auto i : indices(getChunks())) {
-    auto &C = getChunks()[i];
+    const Chunk &C = getChunks()[i];
     switch (C.getKind()) {
     using ChunkKind = Chunk::ChunkKind;
     case ChunkKind::Text:
+      // Skip white-space only chunks.
+      if (C.getText().find_first_not_of(" \r\n") == StringRef::npos)
+        continue;
+      return i;
     case ChunkKind::CallArgumentName:
     case ChunkKind::CallArgumentInternalName:
+    case ChunkKind::ParameterDeclExternalName:
+    case ChunkKind::ParameterDeclLocalName:
+    case ChunkKind::ParameterDeclColon:
+    case ChunkKind::GenericParameterClauseBegin:
+    case ChunkKind::GenericRequirementClauseBegin:
     case ChunkKind::GenericParameterName:
     case ChunkKind::LeftParen:
     case ChunkKind::LeftBracket:
@@ -1161,6 +1390,11 @@ Optional<unsigned> CodeCompletionString::getFirstTextChunkIndex(
     case ChunkKind::TypeIdSystem:
     case ChunkKind::TypeIdUser:
     case ChunkKind::CallArgumentBegin:
+    case ChunkKind::DefaultArgumentClauseBegin:
+    case ChunkKind::ParameterDeclBegin:
+    case ChunkKind::EffectsSpecifierClauseBegin:
+    case ChunkKind::DeclResultTypeClauseBegin:
+    case ChunkKind::AttributeAndModifierListBegin:
       return i;
     case ChunkKind::Dot:
     case ChunkKind::ExclamationMark:
@@ -1182,10 +1416,11 @@ Optional<unsigned> CodeCompletionString::getFirstTextChunkIndex(
     case ChunkKind::DeclIntroducer:
     case ChunkKind::CallArgumentColon:
     case ChunkKind::CallArgumentTypeBegin:
-    case ChunkKind::DeclAttrParamColon:
     case ChunkKind::CallArgumentType:
     case ChunkKind::CallArgumentClosureType:
     case ChunkKind::CallArgumentClosureExpr:
+    case ChunkKind::ParameterDeclTypeBegin:
+    case ChunkKind::DeclAttrParamColon:
     case ChunkKind::OptionalBegin:
     case ChunkKind::GenericParameterBegin:
     case ChunkKind::DynamicLookupMethodCallTail:
@@ -2983,7 +3218,9 @@ public:
       if (Builder.shouldAnnotateResults()) {
         Builder.withNestedGroup(
             CodeCompletionString::Chunk::ChunkKind::TypeAnnotationBegin, [&] {
-              AnnotatedTypePrinter printer(Builder);
+              CodeCompletionStringPrinter printer(Builder);
+              auto TL = TypeLoc::withoutLoc(AnnotationTy);
+              printer.printTypePre(TL);
               if (IsImplicitlyCurriedInstanceMethod) {
                 auto *FnType = AnnotationTy->castTo<AnyFunctionType>();
                 AnyFunctionType::printParams(FnType->getParams(), printer,
@@ -2996,6 +3233,7 @@ public:
               if (AnnotationTy->isVoid())
                 AnnotationTy = Ctx.getVoidDecl()->getDeclaredInterfaceType();
               AnnotationTy.print(printer, PO);
+              printer.printTypePost(TL);
             });
       } else {
         llvm::SmallString<32> TypeStr;
@@ -4895,14 +5133,16 @@ public:
            !CurrDeclContext->getSelfProtocolDecl();
   }
 
-  void addAccessControl(const ValueDecl *VD,
+  /// Add an access modifier (i.e. `public`) to \p Builder is necessary.
+  /// Returns \c true if the modifier is actually added, \c false otherwise.
+  bool addAccessControl(const ValueDecl *VD,
                         CodeCompletionResultBuilder &Builder) {
     auto CurrentNominal = CurrDeclContext->getSelfNominalTypeDecl();
     assert(CurrentNominal);
 
     auto AccessOfContext = CurrentNominal->getFormalAccess();
     if (AccessOfContext < AccessLevel::Public)
-      return;
+      return false;
 
     auto Access = VD->getFormalAccess();
     // Use the greater access between the protocol requirement and the witness.
@@ -4934,8 +5174,11 @@ public:
 
     Access = std::min(Access, AccessOfContext);
     // Only emit 'public', not needed otherwise.
-    if (Access >= AccessLevel::Public)
-      Builder.addAccessControlKeyword(Access);
+    if (Access < AccessLevel::Public)
+      return false;
+
+    Builder.addAccessControlKeyword(Access);
+    return true;
   }
 
   /// Return type if the result type if \p VD should be represented as opaque
@@ -5012,73 +5255,75 @@ public:
                         DynamicLookupInfo dynamicLookupInfo,
                         CodeCompletionResultBuilder &Builder,
                         bool hasDeclIntroducer) {
-    class DeclPrinter : public StreamPrinter {
+    Type opaqueResultType = getOpaqueResultType(VD, Reason, dynamicLookupInfo);
+
+    class DeclPrinter : public CodeCompletionStringPrinter {
       Type OpaqueBaseTy;
 
     public:
-      using StreamPrinter::StreamPrinter;
+      DeclPrinter(CodeCompletionResultBuilder &Builder, Type OpaqueBaseTy)
+          : CodeCompletionStringPrinter(Builder), OpaqueBaseTy(OpaqueBaseTy) { }
 
-      Optional<unsigned> NameOffset;
-
-      DeclPrinter(raw_ostream &OS, Type OpaqueBaseTy)
-          : StreamPrinter(OS), OpaqueBaseTy(OpaqueBaseTy) {}
-
-      void printDeclLoc(const Decl *D) override {
-        if (!NameOffset.hasValue())
-          NameOffset = OS.tell();
-      }
-
-      // As for FuncDecl, SubscriptDecl, and VarDecl,
+      // As for FuncDecl, SubscriptDecl, and VarDecl, substitute the result type
+      // with 'OpaqueBaseTy' if specified.
       void printDeclResultTypePre(ValueDecl *VD, TypeLoc &TL) override {
         if (!OpaqueBaseTy.isNull()) {
-          OS << "some ";
+          setNextChunkKind(ChunkKind::Keyword);
+          printText("some ");
+          setNextChunkKind(ChunkKind::Text);
           TL = TypeLoc::withoutLoc(OpaqueBaseTy);
         }
+        CodeCompletionStringPrinter::printDeclResultTypePre(VD, TL);
       }
     };
 
-    llvm::SmallString<256> DeclStr;
-    unsigned NameOffset = 0;
-    {
-      llvm::raw_svector_ostream OS(DeclStr);
-      DeclPrinter Printer(
-          OS, getOpaqueResultType(VD, Reason, dynamicLookupInfo));
-      PrintOptions Options;
-      if (auto transformType = CurrDeclContext->getDeclaredTypeInContext())
-        Options.setBaseType(transformType);
-      Options.SkipUnderscoredKeywords = true;
-      Options.PrintImplicitAttrs = false;
-      Options.ExclusiveAttrList.push_back(TAK_escaping);
-      Options.ExclusiveAttrList.push_back(TAK_autoclosure);
-      Options.PrintOverrideKeyword = false;
-      Options.PrintPropertyAccessors = false;
-      Options.PrintSubscriptAccessors = false;
-      Options.PrintStaticKeyword = !hasStaticOrClass;
-      VD->print(Printer, Options);
-      NameOffset = Printer.NameOffset.getValue();
+    DeclPrinter Printer(Builder, opaqueResultType);
+    Printer.startPreamble();
+
+    bool modifierAdded = false;
+
+    // 'public' if needed.
+    modifierAdded |= !hasAccessModifier && addAccessControl(VD, Builder);
+
+    // 'override' if needed
+    if (missingOverride(Reason)) {
+      Builder.addOverrideKeyword();
+      modifierAdded |= true;
     }
 
-    if (!hasDeclIntroducer && !hasAccessModifier)
-      addAccessControl(VD, Builder);
-
-    if (missingOverride(Reason)) {
-      if (!hasDeclIntroducer)
-        Builder.addOverrideKeyword();
-      else {
-        auto dist = Ctx.SourceMgr.getByteDistance(
-            introducerLoc, Ctx.SourceMgr.getCodeCompletionLoc());
-        if (dist <= CodeCompletionResult::MaxNumBytesToErase) {
-          Builder.setNumBytesToErase(dist);
-          Builder.addOverrideKeyword();
-          Builder.addDeclIntroducer(DeclStr.str().substr(0, NameOffset));
-        }
+    // Erase existing introducer (e.g. 'func') if any modifiers are added.
+    if (hasDeclIntroducer && modifierAdded) {
+      auto dist = Ctx.SourceMgr.getByteDistance(
+          introducerLoc, Ctx.SourceMgr.getCodeCompletionLoc());
+      if (dist <= CodeCompletionResult::MaxNumBytesToErase) {
+        Builder.setNumBytesToErase(dist);
+        hasDeclIntroducer = false;
       }
     }
 
-    if (!hasDeclIntroducer && NameOffset != 0)
-      Builder.addDeclIntroducer(DeclStr.str().substr(0, NameOffset));
+    PrintOptions PO;
+    if (auto transformType = CurrDeclContext->getDeclaredTypeInContext())
+      PO.setBaseType(transformType);
+    PO.PrintPropertyAccessors = false;
+    PO.PrintSubscriptAccessors = false;
 
-    Builder.addTextChunk(DeclStr.str().substr(NameOffset));
+    PO.SkipUnderscoredKeywords = true;
+    PO.PrintImplicitAttrs = false;
+    PO.ExclusiveAttrList.push_back(TAK_escaping);
+    PO.ExclusiveAttrList.push_back(TAK_autoclosure);
+    // Print certain modifiers only when the introducer is not written.
+    // Otherwise, the user can add it after the completion.
+    if (!hasDeclIntroducer) {
+      PO.ExclusiveAttrList.push_back(DAK_Nonisolated);
+    }
+
+    PO.PrintAccess = false;
+    PO.PrintOverrideKeyword = false;
+    PO.PrintSelfAccessKindKeyword = false;
+
+    PO.PrintStaticKeyword = !hasStaticOrClass && !hasDeclIntroducer;
+    PO.SkipIntroducerKeywords = hasDeclIntroducer;
+    VD->print(Printer, PO);
   }
 
   void addMethodOverride(const FuncDecl *FD, DeclVisibilityKind Reason,
@@ -5131,10 +5376,10 @@ public:
         CodeCompletionResult::ExpectedTypeRelation::NotApplicable);
     Builder.setAssociatedDecl(ATD);
     if (!hasTypealiasIntroducer && !hasAccessModifier)
-      addAccessControl(ATD, Builder);
+      (void)addAccessControl(ATD, Builder);
     if (!hasTypealiasIntroducer)
       Builder.addDeclIntroducer("typealias ");
-    Builder.addTextChunk(ATD->getName().str());
+    Builder.addBaseName(ATD->getName().str());
     Builder.addTextChunk(" = ");
     Builder.addSimpleNamedParameter("Type");
   }
@@ -5149,8 +5394,11 @@ public:
         CodeCompletionResult::ExpectedTypeRelation::NotApplicable);
     Builder.setAssociatedDecl(CD);
 
+    CodeCompletionStringPrinter printer(Builder);
+    printer.startPreamble();
+
     if (!hasAccessModifier)
-      addAccessControl(CD, Builder);
+      (void)addAccessControl(CD, Builder);
 
     if (missingOverride(Reason) && CD->isDesignatedInit() && !CD->isRequired())
       Builder.addOverrideKeyword();
@@ -5174,20 +5422,19 @@ public:
       default: break;
       }
     }
-
-    llvm::SmallString<256> DeclStr;
     if (needRequired)
-      DeclStr += "required ";
+      Builder.addRequiredKeyword();
+
     {
-      llvm::raw_svector_ostream OS(DeclStr);
       PrintOptions Options;
       if (auto transformType = CurrDeclContext->getDeclaredTypeInContext())
         Options.setBaseType(transformType);
       Options.PrintImplicitAttrs = false;
       Options.SkipAttributes = true;
-      CD->print(OS, Options);
+      CD->print(printer, Options);
     }
-    Builder.addTextChunk(DeclStr);
+    printer.flush();
+
     Builder.addBraceStmtWithCursor();
   }
 
@@ -7240,6 +7487,16 @@ void PrintingCodeCompletionConsumer::handleResults(
 
     OS << "; name=";
     printCodeCompletionResultFilterName(*Result, OS);
+
+    if (IncludeSourceText) {
+      OS << "; sourcetext=";
+      SmallString<64> buf;
+      {
+        llvm::raw_svector_ostream bufOS(buf);
+        printCodeCompletionResultSourceText(*Result, bufOS);
+      }
+      OS.write_escaped(buf);
+    }
 
     StringRef comment = Result->getBriefDocComment();
     if (IncludeComments && !comment.empty()) {
