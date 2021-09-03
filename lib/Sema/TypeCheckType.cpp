@@ -401,7 +401,7 @@ Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
     // type within the context.
     if (auto *nominalType = dyn_cast<NominalTypeDecl>(typeDecl)) {
       for (auto *parentDC = fromDC; !parentDC->isModuleScopeContext();
-           parentDC = parentDC->getParent()) {
+           parentDC = parentDC->getParentForLookup()) {
         auto *parentNominal = parentDC->getSelfNominalTypeDecl();
         if (parentNominal == nominalType)
           return mapTypeIntoContext(parentDC->getDeclaredInterfaceType());
@@ -421,7 +421,7 @@ Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
     // referenced without generic arguments as well.
     if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
       for (auto *parentDC = fromDC; !parentDC->isModuleScopeContext();
-           parentDC = parentDC->getParent()) {
+           parentDC = parentDC->getParentForLookup()) {
         if (auto *ext = dyn_cast<ExtensionDecl>(parentDC)) {
           auto extendedType = ext->getExtendedType();
           if (auto *unboundGeneric =
