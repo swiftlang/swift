@@ -187,6 +187,7 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
       remangled = mangling.result();
     }
     llvm::outs() << remangled;
+    return;
   }
   if (!TreeOnly) {
     if (RemangleNew) {
