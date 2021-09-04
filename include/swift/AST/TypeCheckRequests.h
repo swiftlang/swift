@@ -1491,6 +1491,8 @@ public:
   bool isCached() const { return true; }
   Optional<GenericSignature> getCachedResult() const;
   void cacheResult(GenericSignature value) const;
+
+  void diagnoseCycle(DiagnosticEngine &diags) const;
 };
 
 /// Compute the underlying interface type of a typealias.
