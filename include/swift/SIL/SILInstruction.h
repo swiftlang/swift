@@ -1727,6 +1727,7 @@ struct SILDebugVariable {
   unsigned ArgNo : 16;
   unsigned Constant : 1;
   unsigned Implicit : 1;
+  unsigned DiagnoseUsage : 1;
   Optional<SILType> Type;
   Optional<SILLocation> Loc;
   const SILDebugScope *Scope;
@@ -1737,16 +1738,21 @@ struct SILDebugVariable {
   SILDebugVariable &operator=(const SILDebugVariable &) = default;
 
   SILDebugVariable()
-      : ArgNo(0), Constant(false), Implicit(false), Scope(nullptr) {}
+      : ArgNo(0), Constant(false), Implicit(false), DiagnoseUsage(true),
+        Scope(nullptr) {}
   SILDebugVariable(bool Constant, uint16_t ArgNo)
-      : ArgNo(ArgNo), Constant(Constant), Implicit(false), Scope(nullptr) {}
+      : ArgNo(ArgNo), Constant(Constant), Implicit(false),
+        DiagnoseUsage(true), Scope(nullptr) {}
   SILDebugVariable(StringRef Name, bool Constant, unsigned ArgNo,
-                   bool IsImplicit = false, Optional<SILType> AuxType = {},
+                   bool IsImplicit = false,
+                   bool shouldDiagnoseUsage = true,
+                   Optional<SILType> AuxType = {},
                    Optional<SILLocation> DeclLoc = {},
                    const SILDebugScope *DeclScope = nullptr,
                    llvm::ArrayRef<SILDIExprElement> ExprElements = {})
       : Name(Name), ArgNo(ArgNo), Constant(Constant), Implicit(IsImplicit),
-        Type(AuxType), Loc(DeclLoc), Scope(DeclScope), DIExpr(ExprElements) {}
+        DiagnoseUsage(shouldDiagnoseUsage), Type(AuxType), Loc(DeclLoc),
+        Scope(DeclScope), DIExpr(ExprElements) {}
 
   /// Created from either AllocStack or AllocBox instruction
   static Optional<SILDebugVariable>
@@ -1757,8 +1763,8 @@ struct SILDebugVariable {
   // it in this class so that's it's easier to carry DIExpr around.
   bool operator==(const SILDebugVariable &V) {
     return ArgNo == V.ArgNo && Constant == V.Constant && Name == V.Name &&
-           Implicit == V.Implicit && Type == V.Type && Loc == V.Loc &&
-           Scope == V.Scope;
+           Implicit == V.Implicit && DiagnoseUsage == V.DiagnoseUsage &&
+           Type == V.Type && Loc == V.Loc && Scope == V.Scope;
   }
 };
 
@@ -1769,8 +1775,10 @@ class TailAllocatedDebugVariable {
   union {
     int_type RawValue;
     struct {
-      /// Whether this is a debug variable at all.
-      int_type HasValue : 1;
+      /// Whether usage of this is debug variable should be tracked.
+      /// False if the variable appears in inactive if-config clauses, where
+      /// def-use can not be constructed.
+      int_type DiagnoseUsage : 1;
       /// True if this is a let-binding.
       int_type Constant : 1;
       /// True if this variable is created by compiler
@@ -1799,6 +1807,9 @@ public:
   /// instruction.
   StringRef getName(const char *buf) const;
   bool isLet() const { return Bits.Data.Constant; }
+  
+  bool shouldDiagnoseUsage() const { return Bits.Data.DiagnoseUsage; }
+  void setDiagnoseUsage(bool V) { Bits.Data.DiagnoseUsage = V; }
 
   bool isImplicit() const { return Bits.Data.Implicit; }
   void setImplicit(bool V = true) { Bits.Data.Implicit = V; }
@@ -1808,16 +1819,19 @@ public:
       Optional<SILLocation> DeclLoc = {},
       const SILDebugScope *DeclScope = nullptr,
       llvm::ArrayRef<SILDIExprElement> DIExprElements = {}) const {
-    if (!Bits.Data.HasValue)
+    
+    if (!Bits.RawValue)
       return None;
 
     if (VD)
       return SILDebugVariable(VD->getName().empty() ? "" : VD->getName().str(),
-                              VD->isLet(), getArgNo(), isImplicit(), AuxVarType,
-                              DeclLoc, DeclScope, DIExprElements);
+                              VD->isLet(), getArgNo(), isImplicit(),
+                              VD->shouldDiagnoseUsage(), AuxVarType, DeclLoc,
+                              DeclScope, DIExprElements);
     else
       return SILDebugVariable(getName(buf), isLet(), getArgNo(), isImplicit(),
-                              AuxVarType, DeclLoc, DeclScope, DIExprElements);
+                              true, AuxVarType, DeclLoc,
+                              DeclScope, DIExprElements);
   }
 };
 static_assert(sizeof(TailAllocatedDebugVariable) == 4,

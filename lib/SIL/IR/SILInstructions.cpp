@@ -135,7 +135,7 @@ TailAllocatedDebugVariable::TailAllocatedDebugVariable(
     return;
   }
 
-  Bits.Data.HasValue = true;
+  Bits.Data.DiagnoseUsage = Var->DiagnoseUsage;
   Bits.Data.Constant = Var->Constant;
   Bits.Data.ArgNo = Var->ArgNo;
   Bits.Data.Implicit = Var->Implicit;
