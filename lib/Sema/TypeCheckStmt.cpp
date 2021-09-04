@@ -2100,7 +2100,10 @@ void TypeChecker::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
   TLCD->setBody(Body);
   checkTopLevelActorIsolation(TLCD);
   checkTopLevelEffects(TLCD);
-  performTopLevelDeclDiagnostics(TLCD);
+  auto &ctx = TLCD->getDeclContext()->getASTContext();
+  if (!ctx.Diags.getSilUsageDiagnostics()) {
+    performTopLevelDeclDiagnostics(TLCD);
+  }
 }
 
 void swift::checkUnknownAttrRestrictions(
