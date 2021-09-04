@@ -24,7 +24,6 @@
 #include <cassert>
 #include <cstdint>
 #include "llvm/ADT/StringRef.h"
-#include "swift/Runtime/Config.h"
 #include "swift/Demangling/NamespaceMacros.h"
 
 namespace llvm {
@@ -644,31 +643,5 @@ llvm::StringRef makeSymbolicMangledNameStringRef(const char *base);
 SWIFT_END_INLINE_NAMESPACE
 } // end namespace Demangle
 } // end namespace swift
-
-// NB: This function is not used directly in the Swift codebase, but is
-// exported for Xcode support and is used by the sanitizers. Please coordinate
-// before changing.
-//
-/// Demangles a Swift symbol name.
-///
-/// \param mangledName is the symbol name that needs to be demangled.
-/// \param mangledNameLength is the length of the string that should be
-/// demangled.
-/// \param outputBuffer is the user provided buffer where the demangled name
-/// will be placed. If nullptr, a new buffer will be malloced. In that case,
-/// the user of this API is responsible for freeing the returned buffer.
-/// \param outputBufferSize is the size of the output buffer. If the demangled
-/// name does not fit into the outputBuffer, the output will be truncated and
-/// the size will be updated, indicating how large the buffer should be.
-/// \param flags can be used to select the demangling style. TODO: We should
-//// define what these will be.
-/// \returns the demangled name. Returns nullptr if the input String is not a
-/// Swift mangled name.
-SWIFT_RUNTIME_EXPORT
-char *swift_demangle(const char *mangledName,
-                     size_t mangledNameLength,
-                     char *outputBuffer,
-                     size_t *outputBufferSize,
-                     uint32_t flags);
 
 #endif // SWIFT_DEMANGLING_DEMANGLE_H
