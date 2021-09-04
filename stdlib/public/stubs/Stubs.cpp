@@ -265,16 +265,19 @@ swift_stdlib_readLine_stdin(unsigned char **LinePtr) {
 #endif
 }
 
-#if defined(__CYGWIN__) || defined(_WIN32)
-  #define strcasecmp _stricmp
-#endif
-
 static bool swift_stringIsSignalingNaN(const char *nptr) {
   if (nptr[0] == '+' || nptr[0] == '-') {
     ++nptr;
   }
 
-  return strcasecmp(nptr, "snan") == 0;
+  if ((nptr[0] == 's' || nptr[0] == 'S') &&
+      (nptr[1] == 'n' || nptr[1] == 'N') &&
+      (nptr[2] == 'a' || nptr[2] == 'A') &&
+      (nptr[3] == 'n' || nptr[3] == 'N') && (nptr[4] == '\0')) {
+    return true;
+  }
+
+  return false;
 }
 
 // This implementation should only be used on platforms without the
