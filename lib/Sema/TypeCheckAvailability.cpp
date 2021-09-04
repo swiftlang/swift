@@ -1889,11 +1889,9 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
     SourceLoc removeRangeStart;
     SourceLoc removeRangeEnd;
 
-    auto *argExpr = CE->getArg();
-    auto argList = getOriginalArgumentList(argExpr);
-
-    size_t numElementsWithinParens = argList.args.size();
-    numElementsWithinParens -= argList.getNumTrailingClosures();
+    auto *originalArgs = CE->getArgs()->getOriginalArgs();
+    size_t numElementsWithinParens = originalArgs->size();
+    numElementsWithinParens -= originalArgs->getNumTrailingClosures();
     if (selfIndex >= numElementsWithinParens)
       return;
 
@@ -1904,48 +1902,48 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
       if (numElementsWithinParens != 2)
         return;
     } else {
-      if (parsed.ArgumentLabels.size() != argList.args.size() - 1)
+      if (parsed.ArgumentLabels.size() != originalArgs->size() - 1)
         return;
     }
 
-    selfExpr = argList.args[selfIndex];
+    selfExpr = originalArgs->getExpr(selfIndex);
 
     if (selfIndex + 1 == numElementsWithinParens) {
       if (selfIndex > 0) {
         // Remove from the previous comma to the close-paren (half-open).
-        removeRangeStart = argList.args[selfIndex-1]->getEndLoc();
+        removeRangeStart = originalArgs->getExpr(selfIndex - 1)->getEndLoc();
         removeRangeStart = Lexer::getLocForEndOfToken(sourceMgr,
                                                       removeRangeStart);
       } else {
         // Remove from after the open paren to the close paren (half-open).
-        removeRangeStart = Lexer::getLocForEndOfToken(sourceMgr,
-                                                      argExpr->getStartLoc());
+        removeRangeStart =
+            Lexer::getLocForEndOfToken(sourceMgr, originalArgs->getStartLoc());
       }
 
       // Prefer the r-paren location, so that we get the right behavior when
       // there's a trailing closure, but handle some implicit cases too.
-      removeRangeEnd = argList.rParenLoc;
+      removeRangeEnd = originalArgs->getRParenLoc();
       if (removeRangeEnd.isInvalid())
-        removeRangeEnd = argExpr->getEndLoc();
+        removeRangeEnd = originalArgs->getEndLoc();
 
     } else {
       // Remove from the label to the start of the next argument (half-open).
-      SourceLoc labelLoc = argList.labelLocs[selfIndex];
+      SourceLoc labelLoc = originalArgs->getLabelLoc(selfIndex);
       if (labelLoc.isValid())
         removeRangeStart = labelLoc;
       else
         removeRangeStart = selfExpr->getStartLoc();
 
-      SourceLoc nextLabelLoc = argList.labelLocs[selfIndex + 1];
+      SourceLoc nextLabelLoc = originalArgs->getLabelLoc(selfIndex + 1);
       if (nextLabelLoc.isValid())
         removeRangeEnd = nextLabelLoc;
       else
-        removeRangeEnd = argList.args[selfIndex + 1]->getStartLoc();
+        removeRangeEnd = originalArgs->getExpr(selfIndex + 1)->getStartLoc();
     }
 
     // Avoid later argument label fix-its for this argument.
     if (!parsed.isPropertyAccessor()) {
-      Identifier oldLabel = argList.labels[selfIndex];
+      Identifier oldLabel = originalArgs->getLabel(selfIndex);
       StringRef oldLabelStr;
       if (!oldLabel.empty())
         oldLabelStr = oldLabel.str();
@@ -2046,7 +2044,7 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
 
       // Renaming from SubscriptExpr to CallExpr. Insert function name and
       // replace square brackets with parens.
-      diag.fixItReplace(SE->getIndex()->getStartLoc(),
+      diag.fixItReplace(SE->getArgs()->getStartLoc(),
                         ("." + baseReplace.str() + "(").str());
       diag.fixItReplace(SE->getEndLoc(), ")");
     } else {
@@ -2060,45 +2058,35 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
     }
   }
 
-  if (!call)
+  if (!call || !call->getArgs())
     return;
 
-  Expr *argExpr;
-  if (auto *CE = dyn_cast<CallExpr>(call))
-    argExpr = CE->getArg();
-  else if (auto *SE = dyn_cast<SubscriptExpr>(call))
-    argExpr = SE->getIndex();
-  else
-    return;
-
-  auto argList = getOriginalArgumentList(argExpr);
-
+  auto *originalArgs = call->getArgs()->getOriginalArgs();
   if (parsed.IsGetter) {
-    diag.fixItRemove(argExpr->getSourceRange());
+    diag.fixItRemove(originalArgs->getSourceRange());
     return;
   }
 
   if (parsed.IsSetter) {
     const Expr *newValueExpr = nullptr;
 
-    if (argList.args.size() >= 1) {
+    if (originalArgs->size() >= 1) {
       size_t newValueIndex = 0;
       if (parsed.isInstanceMember()) {
         assert(parsed.SelfIndex.getValue() == 0 ||
                parsed.SelfIndex.getValue() == 1);
         newValueIndex = !parsed.SelfIndex.getValue();
       }
-      newValueExpr = argList.args[newValueIndex];
+      newValueExpr = originalArgs->getExpr(newValueIndex);
     } else {
-      newValueExpr = argList.args[0];
+      newValueExpr = originalArgs->getExpr(0);
     }
 
-    diag.fixItReplaceChars(argExpr->getStartLoc(), newValueExpr->getStartLoc(),
-                           " = ");
-    diag.fixItRemoveChars(Lexer::getLocForEndOfToken(sourceMgr,
-                                                     newValueExpr->getEndLoc()),
-                          Lexer::getLocForEndOfToken(sourceMgr,
-                                                     argExpr->getEndLoc()));
+    diag.fixItReplaceChars(originalArgs->getStartLoc(),
+                           newValueExpr->getStartLoc(), " = ");
+    diag.fixItRemoveChars(
+        Lexer::getLocForEndOfToken(sourceMgr, newValueExpr->getEndLoc()),
+        Lexer::getLocForEndOfToken(sourceMgr, originalArgs->getEndLoc()));
     return;
   }
 
@@ -2162,28 +2150,23 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
     return false;
   };
 
-  if (auto *parenExpr = dyn_cast<ParenExpr>(argExpr)) {
-    if (updateLabelsForArg(parenExpr->getSubExpr()))
+  for (auto arg : *call->getArgs()) {
+    if (updateLabelsForArg(arg.getExpr()))
       return;
-  } else {
-    for (auto *arg : cast<TupleExpr>(argExpr)->getElements()) {
-      if (updateLabelsForArg(arg))
-        return;
-    }
   }
 
-  if (argumentLabelIDs.size() != argList.args.size()) {
+  if (argumentLabelIDs.size() != originalArgs->size()) {
     // Mismatched lengths; give up.
     return;
   }
 
   // If any of the argument labels are mismatched, perform label correction.
-  for (auto i : indices(argList.args)) {
+  for (auto i : indices(*originalArgs)) {
     // The argument label of an unlabeled trailing closure is ignored.
-    if (argList.isUnlabeledTrailingClosureIdx(i))
+    if (originalArgs->isUnlabeledTrailingClosureIndex(i))
       continue;
-    if (argumentLabelIDs[i] != argList.labels[i]) {
-      diagnoseArgumentLabelError(ctx, argExpr, argumentLabelIDs,
+    if (argumentLabelIDs[i] != originalArgs->getLabel(i)) {
+      diagnoseArgumentLabelError(ctx, originalArgs, argumentLabelIDs,
                                  parsed.IsSubscript, &diag);
       return;
     }
@@ -3172,8 +3155,8 @@ ExprAvailabilityWalker::diagnoseIncDecRemoval(const ValueDecl *D, SourceRange R,
     // Otherwise, it must be an index type.  Rewrite to:
     // "lvalue = lvalue.successor()".
     auto &SM = Context.SourceMgr;
-    auto CSR = Lexer::getCharSourceRangeFromSourceRange(SM,
-                                         call->getArg()->getSourceRange());
+    auto CSR = Lexer::getCharSourceRangeFromSourceRange(
+        SM, call->getArgs()->getSourceRange());
     replacement = " = " + SM.extractText(CSR).str();
     replacement += isInc ? ".successor()" : ".predecessor()";
   }
@@ -3191,7 +3174,7 @@ ExprAvailabilityWalker::diagnoseIncDecRemoval(const ValueDecl *D, SourceRange R,
     if (isa<PrefixUnaryExpr>(call)) {
       // Prefix: remove the ++ or --.
       diag.fixItRemove(call->getFn()->getSourceRange());
-      diag.fixItInsertAfter(call->getArg()->getEndLoc(), replacement);
+      diag.fixItInsertAfter(call->getArgs()->getEndLoc(), replacement);
     } else {
       // Postfix: replace the ++ or --.
       diag.fixItReplace(call->getFn()->getSourceRange(), replacement);
@@ -3227,8 +3210,9 @@ ExprAvailabilityWalker::diagnoseMemoryLayoutMigration(const ValueDecl *D,
   if (Property.empty())
     return false;
 
-  auto args = dyn_cast<ParenExpr>(call->getArg());
-  if (!args)
+  auto *args = call->getArgs();
+  auto *subject = args->getUnlabeledUnaryExpr();
+  if (!subject)
     return false;
 
   DeclName Name;
@@ -3241,8 +3225,6 @@ ExprAvailabilityWalker::diagnoseMemoryLayoutMigration(const ValueDecl *D,
           R.Start, diag::availability_decl_unavailable, RawAccessorKind,
           Name, true, "", EncodedMessage.Message);
   diag.highlight(R);
-
-  auto subject = args->getSubExpr();
 
   StringRef Prefix = "MemoryLayout<";
   StringRef Suffix = ">.";
