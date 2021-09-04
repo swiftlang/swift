@@ -738,6 +738,22 @@ void GenericSignatureRequest::cacheResult(GenericSignature value) const {
   GC->GenericSigAndBit.setPointerAndInt(value, true);
 }
 
+void GenericSignatureRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  auto *GC = std::get<0>(getStorage());
+  auto *D = GC->getAsDecl();
+
+  if (auto *VD = dyn_cast<ValueDecl>(D)) {
+    VD->diagnose(diag::recursive_generic_signature,
+                 VD->getDescriptiveKind(), VD->getBaseName());
+  } else {
+    auto *ED = cast<ExtensionDecl>(D);
+    auto *NTD = ED->getExtendedNominal();
+
+    ED->diagnose(diag::recursive_generic_signature_extension,
+                 NTD->getDescriptiveKind(), NTD->getName());
+  }
+}
+
 //----------------------------------------------------------------------------//
 // InferredGenericSignatureRequest computation.
 //----------------------------------------------------------------------------//

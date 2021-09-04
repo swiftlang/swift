@@ -3709,24 +3709,12 @@ static CallExpr *findTrailingClosureTarget(
     return nullptr;
   CallExpr *CE = cast<CallExpr>(contexts.back().get<Expr*>());
 
-  if (CE->getUnlabeledTrailingClosureIndex().hasValue())
-    // Call expression already has a trailing closure.
+  // The last argument is a non-trailing closure?
+  auto *Args = CE->getArgs();
+  if (Args->empty() || Args->hasAnyTrailingClosures())
     return nullptr;
 
-  // The last argument is a closure?
-  Expr *Args = CE->getArg();
-  if (!Args)
-    return nullptr;
-  Expr *LastArg;
-  if (auto *PE = dyn_cast<ParenExpr>(Args)) {
-    LastArg = PE->getSubExpr();
-  } else {
-    auto *TE = cast<TupleExpr>(Args);
-    if (TE->getNumElements() == 0)
-      return nullptr;
-    LastArg = TE->getElements().back();
-  }
-
+  auto *LastArg = Args->back().getExpr();
   if (auto *ICE = dyn_cast<ImplicitConversionExpr>(LastArg))
     LastArg = ICE->getSyntacticSubExpr();
 
@@ -3745,45 +3733,41 @@ bool RefactoringActionTrailingClosure::performChange() {
   auto *CE = findTrailingClosureTarget(SM, CursorInfo);
   if (!CE)
     return true;
-  Expr *Arg = CE->getArg();
 
-  Expr *ClosureArg = nullptr;
-  Expr *PrevArg = nullptr;
+  auto *ArgList = CE->getArgs()->getOriginalArgs();
+  auto LParenLoc = ArgList->getLParenLoc();
+  auto RParenLoc = ArgList->getRParenLoc();
 
-  OriginalArgumentList ArgList = getOriginalArgumentList(Arg);
+  if (LParenLoc.isInvalid() || RParenLoc.isInvalid())
+    return true;
 
-  auto NumArgs = ArgList.args.size();
+  auto NumArgs = ArgList->size();
   if (NumArgs == 0)
     return true;
-  ClosureArg = ArgList.args[NumArgs - 1];
-  if (NumArgs > 1)
-    PrevArg = ArgList.args[NumArgs - 2];
 
+  auto *ClosureArg = ArgList->getExpr(NumArgs - 1);
   if (auto *ICE = dyn_cast<ImplicitConversionExpr>(ClosureArg))
     ClosureArg = ICE->getSyntacticSubExpr();
-
-  if (ArgList.lParenLoc.isInvalid() || ArgList.rParenLoc.isInvalid())
-    return true;
 
   // Replace:
   //   * Open paren with ' ' if the closure is sole argument.
   //   * Comma with ') ' otherwise.
-  if (PrevArg) {
+  if (NumArgs > 1) {
+    auto *PrevArg = ArgList->getExpr(NumArgs - 2);
     CharSourceRange PreRange(
         SM,
         Lexer::getLocForEndOfToken(SM, PrevArg->getEndLoc()),
         ClosureArg->getStartLoc());
     EditConsumer.accept(SM, PreRange, ") ");
   } else {
-    CharSourceRange PreRange(
-        SM, ArgList.lParenLoc, ClosureArg->getStartLoc());
+    CharSourceRange PreRange(SM, LParenLoc, ClosureArg->getStartLoc());
     EditConsumer.accept(SM, PreRange, " ");
   }
   // Remove original closing paren.
   CharSourceRange PostRange(
       SM,
       Lexer::getLocForEndOfToken(SM, ClosureArg->getEndLoc()),
-      Lexer::getLocForEndOfToken(SM, ArgList.rParenLoc));
+      Lexer::getLocForEndOfToken(SM, RParenLoc));
   EditConsumer.remove(SM, PostRange);
   return false;
 }
@@ -3912,40 +3896,6 @@ Decl *singleSwitchSubject(const SwitchStmt *Switch) {
   return nullptr;
 }
 
-// Wrapper to make dealing with single elements easier (ie. for Paren|TupleExpr
-// arguments)
-template <typename T>
-class PtrArrayRef {
-  bool IsSingle = false;
-  union Storage {
-    ArrayRef<T> ManyElements;
-    T SingleElement;
-  } Storage = {ArrayRef<T>()};
-
-public:
-  PtrArrayRef() {}
-  PtrArrayRef(T Element) : IsSingle(true) { Storage.SingleElement = Element; }
-  PtrArrayRef(ArrayRef<T> Ref) : IsSingle(Ref.size() == 1), Storage({Ref}) {
-    if (IsSingle)
-      Storage.SingleElement = Ref[0];
-  }
-
-  ArrayRef<T> ref() {
-    if (IsSingle)
-      return ArrayRef<T>(Storage.SingleElement);
-    return Storage.ManyElements;
-  }
-};
-
-PtrArrayRef<Expr *> callArgs(const ApplyExpr *AE) {
-  if (auto *PE = dyn_cast<ParenExpr>(AE->getArg())) {
-    return PtrArrayRef<Expr *>(PE->getSubExpr());
-  } else if (auto *TE = dyn_cast<TupleExpr>(AE->getArg())) {
-    return PtrArrayRef<Expr *>(TE->getElements());
-  }
-  return PtrArrayRef<Expr *>();
-}
-
 /// A more aggressive variant of \c Expr::getReferencedDecl that also looks
 /// through autoclosures created to pass the \c self parameter to a member funcs
 ValueDecl *getReferencedDecl(const Expr *Fn) {
@@ -4048,21 +3998,22 @@ FuncDecl *isOperator(const BinaryExpr *BE) {
 ///   completion(nil, MyError.Bad) // Result = [MyError.Bad], IsError = true
 /// }
 class HandlerResult {
-  PtrArrayRef<Expr *> Results;
+  SmallVector<Argument, 2> Args;
   bool IsError = false;
 
 public:
   HandlerResult() {}
 
-  HandlerResult(ArrayRef<Expr *> Results)
-      : Results(PtrArrayRef<Expr *>(Results)) {}
+  HandlerResult(ArrayRef<Argument> ArgsRef)
+      : Args(ArgsRef.begin(), ArgsRef.end()) {}
 
-  HandlerResult(Expr *Result, bool IsError)
-      : Results(PtrArrayRef<Expr *>(Result)), IsError(IsError) {}
+  HandlerResult(Argument Arg, bool IsError) : IsError(IsError) {
+    Args.push_back(Arg);
+  }
 
   bool isError() { return IsError; }
 
-  ArrayRef<Expr *> args() { return Results.ref(); }
+  ArrayRef<Argument> args() { return Args; }
 };
 
 /// The type of the handler, ie. whether it takes regular parameters or a
@@ -4269,7 +4220,7 @@ struct AsyncHandlerDesc {
       // Only param handlers with an error can pass both an error AND a result.
       return false;
     }
-    auto Args = callArgs(CE).ref();
+    auto Args = CE->getArgs()->getArgExprs();
     if (!isa<NilLiteralExpr>(Args.back())) {
       // We've got an error parameter. If any of the success params is not nil,
       // the call is ambiguous.
@@ -4290,8 +4241,9 @@ struct AsyncHandlerDesc {
   /// determines whether the success or error parameters are passed.
   HandlerResult extractResultArgs(const CallExpr *CE,
                                   bool ReturnErrorArgsIfAmbiguous) const {
-    auto ArgList = callArgs(CE);
-    auto Args = ArgList.ref();
+    auto *ArgList = CE->getArgs();
+    SmallVector<Argument, 2> Scratch(ArgList->begin(), ArgList->end());
+    auto Args = llvm::makeArrayRef(Scratch);
 
     if (Type == HandlerType::PARAMS) {
       bool IsErrorResult;
@@ -4300,7 +4252,8 @@ struct AsyncHandlerDesc {
       } else {
         // If there's an error parameter and the user isn't passing nil to it,
         // assume this is the error path.
-        IsErrorResult = (HasError && !isa<NilLiteralExpr>(Args.back()));
+        IsErrorResult =
+            (HasError && !isa<NilLiteralExpr>(Args.back().getExpr()));
       }
       if (IsErrorResult)
         return HandlerResult(Args.back(), true);
@@ -4314,7 +4267,7 @@ struct AsyncHandlerDesc {
       if (Args.size() != 1)
         return HandlerResult(Args);
 
-      auto *ResultCE = dyn_cast<CallExpr>(Args[0]);
+      auto *ResultCE = dyn_cast<CallExpr>(Args[0].getExpr());
       if (!ResultCE)
         return HandlerResult(Args);
 
@@ -4327,7 +4280,7 @@ struct AsyncHandlerDesc {
       if (!D)
         return HandlerResult(Args);
 
-      auto ResultArgList = callArgs(ResultCE);
+      auto ResultArgList = ResultCE->getArgs();
       auto isFailure = D->getNameStr() == StringRef("failure");
 
       // We can drop the arg altogether if it's just Void.
@@ -4335,7 +4288,7 @@ struct AsyncHandlerDesc {
         return HandlerResult();
 
       // Otherwise the arg gets the .success() or .failure() call dropped.
-      return HandlerResult(ResultArgList.ref()[0], isFailure);
+      return HandlerResult(ResultArgList->get(0), isFailure);
     }
 
     llvm_unreachable("Unhandled result type");
@@ -4606,7 +4559,7 @@ struct CallbackCondition {
       auto *Callee = PrefixOp->getCalledValue();
       if (Callee && Callee->isOperator() && Callee->getBaseName() == "!") {
         CondType = ConditionType::IS_FALSE;
-        E = PrefixOp->getArg()->getSemanticsProvidingExpr();
+        E = PrefixOp->getOperand()->getSemanticsProvidingExpr();
       }
     }
 
@@ -6704,7 +6657,7 @@ private:
     // declaration doesn't exist anymore, which is the case if it's in
     // Placeholders but not in Unwraps (if it's in Placeholders and Unwraps
     // an optional Error has simply been promoted to a non-optional Error).
-    if (auto DRE = dyn_cast<DeclRefExpr>(Result.args().back())) {
+    if (auto *DRE = dyn_cast<DeclRefExpr>(Result.args().back().getExpr())) {
       if (Placeholders.count(DRE->getDecl()) &&
           !Unwraps.count(DRE->getDecl())) {
         return true;
@@ -6767,7 +6720,7 @@ private:
                                  "retrieved its error representation");
       assert(Result.args().size() == 1 &&
              "There should only be one error parameter");
-      Expr *ErrorExpr = Result.args().back();
+      Expr *ErrorExpr = Result.args().back().getExpr();
       if (isErrorAlreadyHandled(Result)) {
         // The error has already been handled, interpret the call as a success
         // call.
@@ -6839,12 +6792,12 @@ private:
       OS << tok::kw_throw;
     }
 
-    ArrayRef<Expr *> Args = Result.args();
+    auto Args = Result.args();
     if (!Args.empty()) {
       if (AddedReturnOrThrow)
         OS << ' ';
-      unsigned I = 0;
-      addTupleOf(Args, OS, [&](Expr *Elt) {
+
+      addTupleOf(Args, OS, [&](Argument Arg) {
         // Special case: If the completion handler is a params handler that
         // takes an error, we could pass arguments to it without unwrapping
         // them. E.g.
@@ -6864,20 +6817,20 @@ private:
         // which correctly yields
         //   return res
         // Synthesize the force unwrap so that we get the expected results.
+        auto *E = Arg.getExpr();
         if (TopHandler.getHandlerType() == HandlerType::PARAMS &&
             TopHandler.HasError) {
           if (auto DRE =
-                  dyn_cast<DeclRefExpr>(Elt->getSemanticsProvidingExpr())) {
+                  dyn_cast<DeclRefExpr>(E->getSemanticsProvidingExpr())) {
             auto D = DRE->getDecl();
             if (Unwraps.count(D)) {
-              Elt = new (getASTContext()) ForceValueExpr(Elt, SourceLoc());
+              E = new (getASTContext()) ForceValueExpr(E, SourceLoc());
             }
           }
         }
         // Can't just add the range as we need to perform replacements
-        convertNode(Elt, /*StartOverride=*/CE->getArgumentLabelLoc(I),
+        convertNode(E, /*StartOverride=*/Arg.getLabelLoc(),
                     /*ConvertCalls=*/false);
-        I++;
       });
     }
   }
@@ -6906,7 +6859,7 @@ private:
                                               HandlerResult Result) {
     assert(Scopes.back().isWrappedInContination());
 
-    std::vector<Expr *> Args;
+    std::vector<Argument> Args;
     StringRef ResumeArgumentLabel;
     switch (TopHandler.getHandlerType()) {
     case HandlerType::PARAMS: {
@@ -6919,7 +6872,7 @@ private:
       break;
     }
     case HandlerType::RESULT: {
-      Args = callArgs(CE).ref();
+      Args = {CE->getArgs()->begin(), CE->getArgs()->end()};
       ResumeArgumentLabel = "with";
       break;
     }
@@ -6960,9 +6913,10 @@ private:
 
     unsigned ArgIndex = 0;
     for (auto Arg : Args) {
+      auto *ArgExpr = Arg.getExpr();
       Identifier ArgName;
-      if (isExpressionOptional(Arg) && TopHandler.HasError) {
-        ArgName = GetSuitableNameForGuardUnwrap(Arg, ArgIndex);
+      if (isExpressionOptional(ArgExpr) && TopHandler.HasError) {
+        ArgName = GetSuitableNameForGuardUnwrap(ArgExpr, ArgIndex);
         Scopes.back().Names.insert(ArgName);
         OS << tok::kw_guard << ' ' << tok::kw_let << ' ' << ArgName << ' '
            << tok::equal << ' ';
@@ -6972,15 +6926,15 @@ private:
         // e.g. 'guard let result1 = value.map { $0 + 1 } else { ... }'
         // doesn't compile. Adding parentheses makes the code compile.
         auto HasTrailingClosure = false;
-        if (auto *CE = dyn_cast<CallExpr>(Arg)) {
-          if (CE->getUnlabeledTrailingClosureIndex().hasValue())
+        if (auto *CE = dyn_cast<CallExpr>(ArgExpr)) {
+          if (CE->getArgs()->hasAnyTrailingClosures())
             HasTrailingClosure = true;
         }
 
         if (HasTrailingClosure)
           OS << tok::l_paren;
 
-        convertNode(Arg, /*StartOverride=*/CE->getArgumentLabelLoc(ArgIndex),
+        convertNode(ArgExpr, /*StartOverride=*/Arg.getLabelLoc(),
                     /*ConvertCalls=*/false);
 
         if (HasTrailingClosure)
@@ -7005,13 +6959,13 @@ private:
        << ResumeArgumentLabel << tok::colon << ' ';
 
     ArgIndex = 0;
-    addTupleOf(Args, OS, [&](Expr *Elt) {
+    addTupleOf(Args, OS, [&](Argument Arg) {
       Identifier ArgName = ArgNames[ArgIndex];
       if (!ArgName.empty()) {
         OS << ArgName;
       } else {
         // Can't just add the range as we need to perform replacements
-        convertNode(Elt, /*StartOverride=*/CE->getArgumentLabelLoc(ArgIndex),
+        convertNode(Arg.getExpr(), /*StartOverride=*/Arg.getLabelLoc(),
                     /*ConvertCalls=*/false);
       }
       ArgIndex++;
@@ -7048,17 +7002,17 @@ private:
                           const AsyncHandlerParamDesc &HandlerDesc) {
     llvm::SaveAndRestore<bool> RestoreHoisting(Hoisting, true);
 
-    auto ArgList = callArgs(CE);
-    if (HandlerDesc.Index >= ArgList.ref().size()) {
+    auto *ArgList = CE->getArgs();
+    if (HandlerDesc.Index >= ArgList->size()) {
       DiagEngine.diagnose(CE->getStartLoc(), diag::missing_callback_arg);
       return;
     }
 
     Expr *CallbackArg =
-        lookThroughFunctionConversionExpr(ArgList.ref()[HandlerDesc.Index]);
+        lookThroughFunctionConversionExpr(ArgList->getExpr(HandlerDesc.Index));
     if (ClosureExpr *Callback = extractCallback(CallbackArg)) {
       // The user is using a closure for the completion handler
-      addHoistedClosureCallback(CE, HandlerDesc, Callback, ArgList);
+      addHoistedClosureCallback(CE, HandlerDesc, Callback);
       return;
     }
     if (auto CallbackDecl = getReferencedDecl(CallbackArg)) {
@@ -7072,8 +7026,8 @@ private:
           OS << tok::kw_return << " ";
         }
         InlinePatternsToPrint InlinePatterns;
-        addAwaitCall(CE, ArgList.ref(), ClassifiedBlock(), {}, InlinePatterns,
-                     HandlerDesc, /*AddDeclarations*/ false);
+        addAwaitCall(CE, ClassifiedBlock(), {}, InlinePatterns, HandlerDesc,
+                     /*AddDeclarations*/ false);
         return;
       }
       // We are not removing the completion handler, so we can call it once the
@@ -7090,9 +7044,8 @@ private:
           addHoistedNamedCallback(
               CalledFunc, CompletionHandler, HandlerName, [&] {
                 InlinePatternsToPrint InlinePatterns;
-                addAwaitCall(CE, ArgList.ref(), ClassifiedBlock(), {},
-                             InlinePatterns, HandlerDesc,
-                             /*AddDeclarations*/ false);
+                addAwaitCall(CE, ClassifiedBlock(), {}, InlinePatterns,
+                             HandlerDesc, /*AddDeclarations*/ false);
               });
           return;
         }
@@ -7107,8 +7060,7 @@ private:
   /// are the arguments being passed in \p CE.
   void addHoistedClosureCallback(const CallExpr *CE,
                                  const AsyncHandlerParamDesc &HandlerDesc,
-                                 const ClosureExpr *Callback,
-                                 PtrArrayRef<Expr *> ArgList) {
+                                 const ClosureExpr *Callback) {
     ArrayRef<const ParamDecl *> CallbackParams =
         Callback->getParameters()->getArray();
     auto CallbackBody = Callback->getBody();
@@ -7163,8 +7115,8 @@ private:
 
       addFallbackVars(CallbackParams, Blocks);
       addDo();
-      addAwaitCall(CE, ArgList.ref(), Blocks.SuccessBlock, SuccessParams,
-                   InlinePatterns, HandlerDesc, /*AddDeclarations*/ false);
+      addAwaitCall(CE, Blocks.SuccessBlock, SuccessParams, InlinePatterns,
+                   HandlerDesc, /*AddDeclarations*/ false);
       addFallbackCatch(ErrParam);
       OS << "\n";
       convertNodes(NodesToPrint::inBraceStmt(CallbackBody));
@@ -7183,7 +7135,8 @@ private:
             HandlerCall, /*ReturnErrorArgsIfAmbiguous=*/true);
         if (Res.args().size() == 1) {
           // Skip if we have the param itself or the name it's bound to
-          auto *SingleDecl = Res.args()[0]->getReferencedDecl().getDecl();
+          auto *ArgExpr = Res.args()[0].getExpr();
+          auto *SingleDecl = ArgExpr->getReferencedDecl().getDecl();
           auto ErrName = Blocks.ErrorBlock.boundName(ErrParam);
           RequireDo = SingleDecl != ErrParam &&
                       !(Res.isError() && SingleDecl &&
@@ -7213,8 +7166,8 @@ private:
     preparePlaceholdersAndUnwraps(HandlerDesc, SuccessParams, ErrParam,
                                   /*Success=*/true);
 
-    addAwaitCall(CE, ArgList.ref(), Blocks.SuccessBlock, SuccessParams,
-                 InlinePatterns, HandlerDesc, /*AddDeclarations=*/true);
+    addAwaitCall(CE, Blocks.SuccessBlock, SuccessParams, InlinePatterns,
+                 HandlerDesc, /*AddDeclarations=*/true);
     printOutOfLineBindingPatterns(Blocks.SuccessBlock, InlinePatterns);
     convertNodes(Blocks.SuccessBlock.nodesToPrint());
     clearNames(SuccessParams);
@@ -7367,7 +7320,6 @@ private:
   /// into variables.
   ///
   /// \param CE The call expr to convert.
-  /// \param Args The arguments of the call expr.
   /// \param SuccessBlock The nodes present in the success block following the
   /// call.
   /// \param SuccessParams The success parameters, which will be printed as
@@ -7377,12 +7329,13 @@ private:
   /// \param HandlerDesc A description of the completion handler.
   /// \param AddDeclarations Whether or not to add \c let or \c var keywords to
   /// the return value bindings.
-  void addAwaitCall(const CallExpr *CE, ArrayRef<Expr *> Args,
-                    const ClassifiedBlock &SuccessBlock,
+  void addAwaitCall(const CallExpr *CE, const ClassifiedBlock &SuccessBlock,
                     ArrayRef<const ParamDecl *> SuccessParams,
                     const InlinePatternsToPrint &InlinePatterns,
                     const AsyncHandlerParamDesc &HandlerDesc,
                     bool AddDeclarations) {
+    auto *Args = CE->getArgs();
+
     // Print the bindings to match the completion handler success parameters,
     // making sure to omit in the case of a Void return.
     if (!SuccessParams.empty() && !HandlerDesc.willAsyncReturnVoid()) {
@@ -7454,9 +7407,11 @@ private:
     ArrayRef<ParamDecl *> AlternativeParams;
     if (HandlerDesc.Alternative)
       AlternativeParams = HandlerDesc.Alternative->getParameters()->getArray();
-    ArrayRef<Identifier> ArgLabels = CE->getArgumentLabels();
-    for (size_t I = 0, E = Args.size(); I < E; ++I) {
-      if (I == HandlerDesc.Index || isa<DefaultArgumentExpr>(Args[I]))
+
+    for (auto I : indices(*Args)) {
+      auto Arg = Args->get(I);
+      auto *ArgExpr = Arg.getExpr();
+      if (I == HandlerDesc.Index || isa<DefaultArgumentExpr>(ArgExpr))
         continue;
 
       if (ConvertedArgIndex > 0)
@@ -7467,7 +7422,7 @@ private:
         while (ConvertedArgIndex < AlternativeParams.size() &&
                AlternativeParams[ConvertedArgIndex]->isDefaultArgument() &&
                AlternativeParams[ConvertedArgIndex]->getArgumentName() !=
-               ArgLabels[I]) {
+               Arg.getLabel()) {
           ConvertedArgIndex++;
         }
 
@@ -7476,7 +7431,7 @@ private:
           auto Name = AlternativeParams[ConvertedArgIndex]->getArgumentName();
           if (!Name.empty())
             OS << Name << ": ";
-          convertNode(Args[I], /*StartOverride=*/{}, /*ConvertCalls=*/false);
+          convertNode(ArgExpr, /*StartOverride=*/{}, /*ConvertCalls=*/false);
 
           ConvertedArgIndex++;
           continue;
@@ -7487,7 +7442,7 @@ private:
 
       // Can't just add the range as we need to perform replacements. Also
       // make sure to include the argument label (if any)
-      convertNode(Args[I], /*StartOverride=*/CE->getArgumentLabelLoc(I),
+      convertNode(ArgExpr, /*StartOverride=*/Arg.getLabelLoc(),
                   /*ConvertCalls=*/false);
       ConvertedArgIndex++;
     }

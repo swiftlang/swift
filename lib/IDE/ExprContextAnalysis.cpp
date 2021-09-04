@@ -212,62 +212,33 @@ public:
   CCExprRemover(ASTContext &Ctx) : Ctx(Ctx) {}
 
   Expr *visitCallExpr(CallExpr *E) {
-    SourceLoc lParenLoc, rParenLoc;
-    SmallVector<Identifier, 2> argLabels;
-    SmallVector<SourceLoc, 2> argLabelLocs;
-    SmallVector<Expr *, 2> args;
-    SmallVector<TrailingClosure, 2> trailingClosures;
-    bool removing = false;
+    auto *args = E->getArgs()->getOriginalArgs();
 
-    if (auto paren = dyn_cast<ParenExpr>(E->getArg())) {
-      if (isa<CodeCompletionExpr>(paren->getSubExpr())) {
-        lParenLoc = paren->getLParenLoc();
-        rParenLoc = paren->getRParenLoc();
-        removing = true;
+    Optional<unsigned> newTrailingClosureIdx;
+    SmallVector<Argument, 4> newArgs;
+    for (auto idx : indices(*args)) {
+      // Update the trailing closure index if we have one.
+      if (args->hasAnyTrailingClosures() &&
+          idx == *args->getFirstTrailingClosureIndex()) {
+        newTrailingClosureIdx = newArgs.size();
       }
-    } else if (auto tuple = dyn_cast<TupleExpr>(E->getArg())) {
-      lParenLoc = tuple->getLParenLoc();
-      rParenLoc = tuple->getRParenLoc();
-
-      assert((!E->getUnlabeledTrailingClosureIndex().hasValue() ||
-              (tuple->getNumElements() == E->getArgumentLabels().size() &&
-               tuple->getNumElements() == E->getArgumentLabelLocs().size())) &&
-             "CallExpr with trailing closure must have the same number of "
-             "argument labels");
-      assert(tuple->getNumElements() == E->getArgumentLabels().size());
-      assert(tuple->getNumElements() == E->getArgumentLabelLocs().size() ||
-             E->getArgumentLabelLocs().size() == 0);
-
-      bool hasArgumentLabelLocs = E->getArgumentLabelLocs().size() > 0;
-
-      for (unsigned i = 0, e = tuple->getNumElements(); i != e; ++i) {
-        if (isa<CodeCompletionExpr>(tuple->getElement(i))) {
-          removing = true;
-          continue;
-        }
-
-        if (!E->getUnlabeledTrailingClosureIndex().hasValue() ||
-            i < *E->getUnlabeledTrailingClosureIndex()) {
-          // Normal arguments.
-          argLabels.push_back(E->getArgumentLabels()[i]);
-          if (hasArgumentLabelLocs)
-            argLabelLocs.push_back(E->getArgumentLabelLocs()[i]);
-          args.push_back(tuple->getElement(i));
-        } else {
-          // Trailing closure arguments.
-          trailingClosures.emplace_back(E->getArgumentLabels()[i],
-                                        E->getArgumentLabelLocs()[i],
-                                        tuple->getElement(i));
-        }
-      }
+      auto arg = args->get(idx);
+      if (!isa<CodeCompletionExpr>(arg.getExpr()))
+        newArgs.push_back(arg);
     }
-    if (removing) {
-      Removed = true;
-      return CallExpr::create(Ctx, E->getFn(), lParenLoc, args, argLabels,
-                              argLabelLocs, rParenLoc, trailingClosures,
-                              E->isImplicit());
-    }
-    return E;
+    if (newArgs.size() == args->size())
+      return E;
+
+    // If we ended up removing the last trailing closure, drop the index.
+    if (newTrailingClosureIdx && *newTrailingClosureIdx == newArgs.size())
+      newTrailingClosureIdx = None;
+
+    Removed = true;
+
+    auto *argList = ArgumentList::create(
+        Ctx, args->getLParenLoc(), newArgs, args->getRParenLoc(),
+        newTrailingClosureIdx, E->isImplicit());
+    return CallExpr::create(Ctx, E->getFn(), argList, E->isImplicit());
   }
 
   Expr *visitExpr(Expr *E) {
@@ -656,12 +627,12 @@ static bool collectPossibleCalleesForApply(
   } else if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(fnExpr)) {
     if (auto *DRE = dyn_cast<DeclRefExpr>(DSCE->getFn())) {
       collectPossibleCalleesByQualifiedLookup(
-          DC, DSCE->getArg(), DeclNameRef(DRE->getDecl()->getName()),
+          DC, DSCE->getBase(), DeclNameRef(DRE->getDecl()->getName()),
           candidates);
     }
   } else if (auto CRCE = dyn_cast<ConstructorRefCallExpr>(fnExpr)) {
     collectPossibleCalleesByQualifiedLookup(
-        DC, CRCE->getArg(), DeclNameRef::createConstructor(), candidates);
+        DC, CRCE->getBase(), DeclNameRef::createConstructor(), candidates);
   } else if (auto TE = dyn_cast<TypeExpr>(fnExpr)) {
     collectPossibleCalleesByQualifiedLookup(
         DC, TE, DeclNameRef::createConstructor(), candidates);
@@ -730,47 +701,36 @@ static bool collectPossibleCalleesForSubscript(
   return !candidates.empty();
 }
 
-/// Get index of \p CCExpr in \p Args. \p Args is usually a \c TupleExpr
-/// or \c ParenExpr.
+/// Get index of \p CCExpr in \p Args.
 /// \returns \c true if success, \c false if \p CCExpr is not a part of \p Args.
-static bool getPositionInArgs(DeclContext &DC, Expr *Args, Expr *CCExpr,
+static bool getPositionInArgs(DeclContext &DC, ArgumentList *Args, Expr *CCExpr,
                               unsigned &Position, bool &HasName) {
-  if (isa<ParenExpr>(Args)) {
-    HasName = false;
-    Position = 0;
-    return true;
-  }
-
-  auto *tuple = dyn_cast<TupleExpr>(Args);
-  if (!tuple)
-    return false;
-
   auto &SM = DC.getASTContext().SourceMgr;
-  for (unsigned i = 0, n = tuple->getNumElements(); i != n; ++i) {
-    if (SM.isBeforeInBuffer(tuple->getElement(i)->getEndLoc(),
-                            CCExpr->getStartLoc()))
+  for (auto idx : indices(*Args)) {
+    auto arg = Args->get(idx);
+    if (SM.isBeforeInBuffer(arg.getExpr()->getEndLoc(), CCExpr->getStartLoc()))
       continue;
-    HasName = tuple->getElementNameLoc(i).isValid();
-    Position = i;
+    HasName = arg.getLabelLoc().isValid();
+    Position = idx;
     return true;
   }
   return false;
 }
 
-/// For function call arguments \p Args, return the argument at \p Position
-/// computed by \c getPositionInArgs
-static Expr *getArgAtPosition(Expr *Args, unsigned Position) {
-  if (isa<ParenExpr>(Args)) {
-    assert(Position == 0);
-    return Args;
+/// Get index of \p CCExpr in \p TE.
+/// \returns \c true if success, \c false if \p CCExpr is not a part of \p Args.
+static bool getPositionInTuple(DeclContext &DC, TupleExpr *TE, Expr *CCExpr,
+                               unsigned &Position, bool &HasName) {
+  auto &SM = DC.getASTContext().SourceMgr;
+  for (auto idx : indices(TE->getElements())) {
+    if (SM.isBeforeInBuffer(TE->getElement(idx)->getEndLoc(),
+                            CCExpr->getStartLoc()))
+      continue;
+    HasName = TE->getElementNameLoc(idx).isValid();
+    Position = idx;
+    return true;
   }
-
-  if (auto *tuple = dyn_cast<TupleExpr>(Args)) {
-    return tuple->getElement(Position);
-  } else {
-    llvm_unreachable("Unable to retrieve arg at position returned by "
-                     "getPositionInArgs?");
-  }
+  return false;
 }
 
 /// Get index of \p CCExpr in \p Params. Note that the position in \p Params may
@@ -780,17 +740,8 @@ static Expr *getArgAtPosition(Expr *Args, unsigned Position) {
 /// \returns the position index number on success, \c None if \p CCExpr is not
 /// a part of \p Args.
 static Optional<unsigned>
-getPositionInParams(DeclContext &DC, Expr *Args, Expr *CCExpr,
+getPositionInParams(DeclContext &DC, const ArgumentList *Args, Expr *CCExpr,
                     ArrayRef<AnyFunctionType::Param> Params, bool Lenient) {
-  if (isa<ParenExpr>(Args)) {
-    return 0;
-  }
-
-  auto *tuple = dyn_cast<TupleExpr>(Args);
-  if (!tuple) {
-    return None;
-  }
-
   auto &SM = DC.getASTContext().SourceMgr;
   unsigned PosInParams = 0;
   unsigned PosInArgs = 0;
@@ -800,11 +751,11 @@ getPositionInParams(DeclContext &DC, Expr *Args, Expr *CCExpr,
   // For each argument, we try to find a matching parameter either by matching
   // argument labels, in which case PosInParams may be advanced by more than 1,
   // or by advancing PosInParams and PosInArgs both by 1.
-  for (; PosInArgs < tuple->getNumElements(); ++PosInArgs) {
-    if (!SM.isBeforeInBuffer(tuple->getElement(PosInArgs)->getEndLoc(),
+  for (; PosInArgs < Args->size(); ++PosInArgs) {
+    if (!SM.isBeforeInBuffer(Args->getExpr(PosInArgs)->getEndLoc(),
                              CCExpr->getStartLoc())) {
       // The arg is after the code completion position. Stop.
-      if (LastParamWasVariadic && tuple->getElementName(PosInArgs).empty()) {
+      if (LastParamWasVariadic && Args->getLabel(PosInArgs).empty()) {
         // If the last parameter was variadic and this argument stands by itself
         // without a label, assume that it belongs to the previous vararg
         // list.
@@ -813,7 +764,7 @@ getPositionInParams(DeclContext &DC, Expr *Args, Expr *CCExpr,
       break;
     }
 
-    auto ArgName = tuple->getElementName(PosInArgs);
+    auto ArgName = Args->getLabel(PosInArgs);
     // If the last parameter we matched was variadic, we claim all following
     // unlabeled arguments for that variadic parameter -> advance PosInArgs but
     // not PosInParams.
@@ -838,9 +789,7 @@ getPositionInParams(DeclContext &DC, Expr *Args, Expr *CCExpr,
       }
     }
 
-    bool IsTrailingClosure =
-        PosInArgs >= tuple->getNumElements() - tuple->getNumTrailingElements();
-    if (!AdvancedPosInParams && IsTrailingClosure) {
+    if (!AdvancedPosInParams && Args->isTrailingClosureIndex(PosInArgs)) {
       // If the argument is a trailing closure, it can't match non-function
       // parameters. Advance to the next function parameter.
       for (unsigned i = PosInParams; i < Params.size(); ++i) {
@@ -864,7 +813,7 @@ getPositionInParams(DeclContext &DC, Expr *Args, Expr *CCExpr,
       }
     }
   }
-  if (PosInArgs < tuple->getNumElements() && PosInParams < Params.size()) {
+  if (PosInArgs < Args->size() && PosInParams < Params.size()) {
     // We didn't search until the end, so we found a position in Params. Success
     return PosInParams;
   } else {
@@ -902,15 +851,15 @@ class ExprContextAnalyzer {
   bool analyzeApplyExpr(Expr *E) {
     // Collect parameter lists for possible func decls.
     SmallVector<FunctionTypeAndDecl, 2> Candidates;
-    Expr *Args = nullptr;
+    ArgumentList *Args = nullptr;
     if (auto *applyExpr = dyn_cast<ApplyExpr>(E)) {
       if (!collectPossibleCalleesForApply(*DC, applyExpr, Candidates))
         return false;
-      Args = applyExpr->getArg();
+      Args = applyExpr->getArgs();
     } else if (auto *subscriptExpr = dyn_cast<SubscriptExpr>(E)) {
       if (!collectPossibleCalleesForSubscript(*DC, subscriptExpr, Candidates))
         return false;
-      Args = subscriptExpr->getIndex();
+      Args = subscriptExpr->getArgs();
     } else {
       llvm_unreachable("unexpected expression kind");
     }
@@ -944,8 +893,8 @@ class ExprContextAnalyzer {
       //
       // Varargs are represented by a VarargExpansionExpr that contains an
       // ArrayExpr on the call side.
-      if (auto Vararg = dyn_cast<VarargExpansionExpr>(
-              getArgAtPosition(Args, PositionInArgs))) {
+      if (auto Vararg =
+              dyn_cast<VarargExpansionExpr>(Args->getExpr(PositionInArgs))) {
         if (auto Array = dyn_cast_or_null<ArrayExpr>(Vararg->getSubExpr())) {
           if (Array->getNumElements() > 0 &&
               !isa<CodeCompletionExpr>(Array->getElement(0))) {
@@ -962,9 +911,10 @@ class ExprContextAnalyzer {
       llvm::SmallVector<Optional<unsigned>, 2> posInParams;
       {
         bool found = false;
+        auto *originalArgs = Args->getOriginalArgs();
         for (auto &typeAndDecl : Candidates) {
           Optional<unsigned> pos = getPositionInParams(
-              *DC, Args, ParsedExpr, typeAndDecl.Type->getParams(),
+              *DC, originalArgs, ParsedExpr, typeAndDecl.Type->getParams(),
               /*lenient=*/false);
           posInParams.push_back(pos);
           found |= pos.hasValue();
@@ -974,7 +924,7 @@ class ExprContextAnalyzer {
           // non-matching argument labels mis-typed.
           for (auto i : indices(Candidates)) {
             posInParams[i] = getPositionInParams(
-                *DC, Args, ParsedExpr, Candidates[i].Type->getParams(),
+                *DC, originalArgs, ParsedExpr, Candidates[i].Type->getParams(),
                 /*lenient=*/true);
           }
         }
@@ -1152,7 +1102,8 @@ class ExprContextAnalyzer {
 
       unsigned Position = 0;
       bool HasName;
-      if (getPositionInArgs(*DC, Parent, ParsedExpr, Position, HasName)) {
+      if (getPositionInTuple(*DC, cast<TupleExpr>(Parent), ParsedExpr, Position,
+                             HasName)) {
         // The expected type may have fewer number of elements.
         if (Position < tupleT->getNumElements())
           recordPossibleType(tupleT->getElementType(Position));
@@ -1361,14 +1312,14 @@ public:
           // Iff the cursor is in argument position.
           auto call = cast<CallExpr>(E);
           auto fnRange = call->getFn()->getSourceRange();
-          auto argsRange = call->getArg()->getSourceRange();
+          auto argsRange = call->getArgs()->getSourceRange();
           auto exprRange = ParsedExpr->getSourceRange();
           return !SM.rangeContains(fnRange, exprRange) &&
                  SM.rangeContains(argsRange, exprRange);
         }
         case ExprKind::Subscript: {
           // Iff the cursor is in index position.
-          auto argsRange = cast<SubscriptExpr>(E)->getIndex()->getSourceRange();
+          auto argsRange = cast<SubscriptExpr>(E)->getArgs()->getSourceRange();
           return SM.rangeContains(argsRange, ParsedExpr->getSourceRange());
         }
         case ExprKind::Binary:

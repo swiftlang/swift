@@ -279,7 +279,7 @@ public:
     AbstractStorageDecl *Storage;
     bool IsSuper;
     const PreparedArguments *Indices;
-    Expr *IndexExprForDiagnostics;
+    ArgumentList *ArgListForDiagnostics;
   };
 
   /// Get the storage accessed by this component.
@@ -459,7 +459,7 @@ public:
                           AccessStrategy accessStrategy,
                           CanType formalRValueType,
                           PreparedArguments &&indices,
-                          Expr *indexExprForDiagnostics);
+                          ArgumentList *argListForDiagnostics);
 
   void addMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
                              VarDecl *var,
@@ -481,7 +481,7 @@ public:
                                    AccessStrategy accessStrategy,
                                    CanType formalRValueType,
                                    PreparedArguments &&indices,
-                                   Expr *indexExprForDiagnostics,
+                                   ArgumentList *argListForDiagnostics,
                                    bool isOnSelfParameter = false,
                                    Optional<ActorIsolation> actorIso = None);
 

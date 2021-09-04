@@ -89,18 +89,16 @@ static bool isKeyPathCurriedThunkCallExpr(Expr *E) {
       thunk->getParameters()->get(0)->getParameterName().str() != "$kp$")
     return false;
 
-  auto PE = dyn_cast<ParenExpr>(CE->getArg());
-  if (!PE)
+  auto *unaryArg = CE->getArgs()->getUnlabeledUnaryExpr();
+  if (!unaryArg)
     return false;
-  return isa<KeyPathExpr>(PE->getSubExpr());
+  return isa<KeyPathExpr>(unaryArg);
 }
 
 // Extract the keypath expression from the curried thunk expression.
 static Expr *extractKeyPathFromCurryThunkCall(Expr *E) {
   assert(isKeyPathCurriedThunkCallExpr(E));
-  auto call = cast<CallExpr>(E);
-  auto arg = cast<ParenExpr>(call->getArg());
-  return arg->getSubExpr();
+  return cast<CallExpr>(E)->getArgs()->getUnlabeledUnaryExpr();
 }
 
 namespace {
@@ -118,6 +116,13 @@ public:
   SanitizeExpr(ASTContext &C,
                bool shouldReusePrecheckedType)
     : C(C), ShouldReusePrecheckedType(shouldReusePrecheckedType) { }
+
+  std::pair<bool, ArgumentList *>
+  walkToArgumentListPre(ArgumentList *argList) override {
+    // Return the argument list to the state prior to being rewritten. This will
+    // strip default arguments and expand variadic args.
+    return {true, argList->getOriginalArgs()};
+  }
 
   std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
     while (true) {
@@ -198,42 +203,33 @@ public:
         EPE->setSemanticExpr(nullptr);
       }
 
-      // Strip default arguments and varargs from type-checked call
-      // argument lists.
-      if (isa<ParenExpr>(expr) || isa<TupleExpr>(expr)) {
-        if (shouldSanitizeArgumentList(expr))
-          expr = sanitizeArgumentList(expr);
-      }
-
       // If this expression represents keypath based dynamic member
       // lookup, let's convert it back to the original form of
       // member or subscript reference.
       if (auto *SE = dyn_cast<SubscriptExpr>(expr)) {
-        if (auto *TE = dyn_cast<TupleExpr>(SE->getIndex())) {
-          auto isImplicitKeyPathExpr = [](Expr *argExpr) -> bool {
-            if (auto *KP = dyn_cast<KeyPathExpr>(argExpr))
-              return KP->isImplicit();
-            return false;
-          };
+        auto *args = SE->getArgs();
+        auto isImplicitKeyPathExpr = [](Expr *argExpr) -> bool {
+          if (auto *KP = dyn_cast<KeyPathExpr>(argExpr))
+            return KP->isImplicit();
+          return false;
+        };
 
-          if (TE->isImplicit() && TE->getNumElements() == 1 &&
-              TE->getElementName(0) == C.Id_dynamicMember &&
-              isImplicitKeyPathExpr(TE->getElement(0))) {
-            auto *keyPathExpr = cast<KeyPathExpr>(TE->getElement(0));
-            auto *componentExpr = keyPathExpr->getParsedPath();
+        if (SE->isImplicit() && args->isUnary() &&
+            args->front().getLabel() == C.Id_dynamicMember &&
+            isImplicitKeyPathExpr(args->front().getExpr())) {
+          auto *keyPathExpr = cast<KeyPathExpr>(args->front().getExpr());
+          auto *componentExpr = keyPathExpr->getParsedPath();
 
-            if (auto *UDE = dyn_cast<UnresolvedDotExpr>(componentExpr)) {
-              UDE->setBase(SE->getBase());
-              return {true, UDE};
-            }
-
-            if (auto *subscript = dyn_cast<SubscriptExpr>(componentExpr)) {
-              subscript->setBase(SE->getBase());
-              return {true, subscript};
-            }
-
-            llvm_unreachable("unknown keypath component type");
+          if (auto *UDE = dyn_cast<UnresolvedDotExpr>(componentExpr)) {
+            UDE->setBase(SE->getBase());
+            return {true, UDE};
           }
+
+          if (auto *subscript = dyn_cast<SubscriptExpr>(componentExpr)) {
+            subscript->setBase(SE->getBase());
+            return {true, subscript};
+          }
+          llvm_unreachable("unknown keypath component type");
         }
       }
 
@@ -250,57 +246,6 @@ public:
       // Now, we're ready to walk into sub expressions.
       return {true, expr};
     }
-  }
-
-  bool isSyntheticArgumentExpr(const Expr *expr) {
-    if (isa<DefaultArgumentExpr>(expr))
-      return true;
-
-    if (auto *varargExpr = dyn_cast<VarargExpansionExpr>(expr))
-      if (isa<ArrayExpr>(varargExpr->getSubExpr()))
-        return true;
-
-    return false;
-  }
-
-  bool shouldSanitizeArgumentList(const Expr *expr) {
-    if (auto *parenExpr = dyn_cast<ParenExpr>(expr)) {
-      return isSyntheticArgumentExpr(parenExpr->getSubExpr());
-    } else if (auto *tupleExpr = dyn_cast<TupleExpr>(expr)) {
-      for (auto *arg : tupleExpr->getElements()) {
-        if (isSyntheticArgumentExpr(arg))
-          return true;
-      }
-
-      return false;
-    } else {
-      return isSyntheticArgumentExpr(expr);
-    }
-  }
-
-  Expr *sanitizeArgumentList(Expr *original) {
-    auto argList = getOriginalArgumentList(original);
-
-    if (argList.args.size() == 1 &&
-        argList.labels[0].empty() &&
-        !isa<VarargExpansionExpr>(argList.args[0])) {
-      auto *result =
-        new (C) ParenExpr(argList.lParenLoc,
-                          argList.args[0],
-                          argList.rParenLoc,
-                          argList.hasAnyTrailingClosures());
-      result->setImplicit();
-      return result;
-    }
-
-    return TupleExpr::create(C,
-                             argList.lParenLoc,
-                             argList.rParenLoc,
-                             argList.args,
-                             argList.labels,
-                             argList.labelLocs,
-                             argList.unlabeledTrailingClosureIdx,
-                             /*implicit=*/true);
   }
 
   Expr *walkToExprPost(Expr *expr) override {
@@ -518,14 +463,10 @@ getTypeOfCompletionOperatorImpl(DeclContext *DC, Expr *expr,
   // Return '(ArgType[, ArgType]) -> ResultType' as a function type.
   // We don't use the type of the operator expression because we want the types
   // of the *arguments* instead of the types of the parameters.
-  Expr *argsExpr = cast<ApplyExpr>(expr)->getArg();
+  auto *args = cast<ApplyExpr>(expr)->getArgs();
   SmallVector<FunctionType::Param, 2> argTypes;
-  if (auto *PE = dyn_cast<ParenExpr>(argsExpr)) {
-    argTypes.emplace_back(solution.simplifyType(CS.getType(PE->getSubExpr())));
-  } else if (auto *TE = dyn_cast<TupleExpr>(argsExpr)) {
-    for (auto arg : TE->getElements())
-      argTypes.emplace_back(solution.simplifyType(CS.getType(arg)));
-  }
+  for (auto arg : *args)
+    argTypes.emplace_back(solution.simplifyType(CS.getType(arg.getExpr())));
 
   // FIXME: Verify ExtInfo state is correct, not working by accident.
   FunctionType::ExtInfo info;
@@ -571,18 +512,16 @@ TypeChecker::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
   case DeclRefKind::PostfixOperator: {
     // (postfix_unary_expr
     //   (declref_expr name=<opName>)
-    //   (paren_expr
+    //   (argument_list
     //     (<LHS>)))
-    ParenExpr Args(SourceLoc(), LHS, SourceLoc(),
-                   /*hasTrailingClosure=*/false);
-    auto *postfixExpr = PostfixUnaryExpr::create(ctx, opExpr, &Args);
+    auto *postfixExpr = PostfixUnaryExpr::create(ctx, opExpr, LHS);
     return getTypeOfCompletionOperatorImpl(DC, postfixExpr, referencedDecl);
   }
 
   case DeclRefKind::BinaryOperator: {
     // (binary_expr
     //   (declref_expr name=<opName>)
-    //   (tuple_expr
+    //   (argument_list
     //     (<LHS>)
     //     (code_completion_expr)))
     CodeCompletionExpr dummyRHS(Loc);
@@ -1245,9 +1184,11 @@ sawSolution(const constraints::Solution &S) {
 ///   (overloaded_decl_ref_expr function_ref=compound decls=[
 ///     Swift.(file).~=,
 ///     Swift.(file).Optional extension.~=])
-///   (tuple_expr implicit type='($T1, (OtherEnum))'
-///     (code_completion_expr implicit type='$T1')
-///     (declref_expr implicit decl=swift_ide_test.(file).foo(x:).$match)))
+///   (argument_list implicit
+///     (argument
+///       (code_completion_expr implicit type='$T1'))
+///     (argument
+///       (declref_expr implicit decl=swift_ide_test.(file).foo(x:).$match))))
 /// \endcode
 /// If the code completion expression occurs in such an AST, return the
 /// declaration of the \c $match variable, otherwise return \c nullptr.
@@ -1255,14 +1196,8 @@ VarDecl *getMatchVarIfInPatternMatch(CodeCompletionExpr *CompletionExpr,
                                      ConstraintSystem &CS) {
   auto &Context = CS.getASTContext();
 
-  TupleExpr *ArgTuple =
-      dyn_cast_or_null<TupleExpr>(CS.getParentExpr(CompletionExpr));
-  if (!ArgTuple || !ArgTuple->isImplicit() || ArgTuple->getNumElements() != 2) {
-    return nullptr;
-  }
-
-  auto Binary = dyn_cast_or_null<BinaryExpr>(CS.getParentExpr(ArgTuple));
-  if (!Binary || !Binary->isImplicit()) {
+  auto *Binary = dyn_cast_or_null<BinaryExpr>(CS.getParentExpr(CompletionExpr));
+  if (!Binary || !Binary->isImplicit() || Binary->getLHS() != CompletionExpr) {
     return nullptr;
   }
 
@@ -1287,7 +1222,7 @@ VarDecl *getMatchVarIfInPatternMatch(CodeCompletionExpr *CompletionExpr,
     return nullptr;
   }
 
-  auto MatchArg = dyn_cast_or_null<DeclRefExpr>(ArgTuple->getElement(1));
+  auto MatchArg = dyn_cast_or_null<DeclRefExpr>(Binary->getRHS());
   if (!MatchArg || !MatchArg->isImplicit()) {
     return nullptr;
   }
