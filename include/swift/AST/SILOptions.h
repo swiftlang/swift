@@ -84,6 +84,9 @@ public:
 
   /// Are we debugging sil serialization.
   bool DebugSerialization = false;
+  
+  /// Use the DiagnoseVarUsage SIL pass for variable usage diagnostics.
+  bool SilUsageDiagnostics = false;
 
   /// Whether to dump verbose SIL with scope and location information.
   bool EmitVerboseSIL = false;

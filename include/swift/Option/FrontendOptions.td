@@ -648,6 +648,10 @@ def sil_stop_optzns_before_lowering_ownership :
 def print_inst_counts : Flag<["-"], "print-inst-counts">,
   HelpText<"Before IRGen, count all the various SIL instructions. Must be used "
            "in conjunction with -print-stats.">;
+           
+def sil_usage_diagnostics :
+  Flag<["-"], "sil-usage-diagnostics">,
+  HelpText<"Diagnose variable usage with the DiagnoseVarUsage SIL pass.">;
 
 def debug_on_sil : Flag<["-"], "sil-based-debuginfo">,
   HelpText<"Write the SIL into a file and generate debug-info to debug on SIL "

@@ -442,6 +442,9 @@ void CompilerInstance::setUpDiagnosticOptions() {
   if (Invocation.getDiagnosticOptions().PrintDiagnosticNames) {
     Diagnostics.setPrintDiagnosticNames(true);
   }
+  if (Invocation.getDiagnosticOptions().SilUsageDiagnostics) {
+    Diagnostics.setSilUsageDiagnostics(true);
+  }
   Diagnostics.setDiagnosticDocumentationPath(
       Invocation.getDiagnosticOptions().DiagnosticDocumentationPath);
   Diagnostics.setLanguageVersion(
