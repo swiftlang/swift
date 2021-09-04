@@ -2243,6 +2243,9 @@ bool ContextualFailure::diagnoseAsError() {
   if (diagnoseMissingFunctionCall())
     return true;
 
+  if (diagnoseExtraneousAssociatedValues())
+    return true;
+
   // Special case of some common conversions involving Swift.String
   // indexes, catching cases where people attempt to index them with an integer.
   if (isIntegerToStringIndexConversion()) {
@@ -2662,8 +2665,15 @@ bool ContextualFailure::diagnoseMissingFunctionCall() const {
       !TypeChecker::isConvertibleTo(srcFT->getResult(), toType, getDC()))
     return false;
 
-  // Diagnose cases where the pattern tried to match associated values but
-  // the case we found had none.
+  emitDiagnostic(diag::missing_nullary_call, srcFT->getResult())
+      .highlight(getSourceRange())
+      .fixItInsertAfter(getSourceRange().End, "()");
+
+  tryComputedPropertyFixIts();
+  return true;
+}
+
+bool ContextualFailure::diagnoseExtraneousAssociatedValues() const {
   if (auto match =
           getLocator()->getLastElementAs<LocatorPathElt::PatternMatch>()) {
     if (auto enumElementPattern =
@@ -2678,12 +2688,7 @@ bool ContextualFailure::diagnoseMissingFunctionCall() const {
     }
   }
 
-  emitDiagnostic(diag::missing_nullary_call, srcFT->getResult())
-      .highlight(getSourceRange())
-      .fixItInsertAfter(getSourceRange().End, "()");
-
-  tryComputedPropertyFixIts();
-  return true;
+  return false;
 }
 
 bool ContextualFailure::diagnoseCoercionToUnrelatedType() const {
