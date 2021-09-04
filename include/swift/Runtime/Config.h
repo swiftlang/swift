@@ -326,6 +326,14 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #define swift_ptrauth_sign_opaque_modify_resume_function(__fn, __buffer) (__fn)
 #endif
 
+#ifndef SWIFT_USE_RELATIVE_POINTER
+#ifdef __wasm__
+#define SWIFT_USE_RELATIVE_POINTER 0
+#else
+#define SWIFT_USE_RELATIVE_POINTER 1
+#endif
+#endif
+
 #ifdef __cplusplus
 
 /// Copy an address-discriminated signed pointer from the source to the dest.

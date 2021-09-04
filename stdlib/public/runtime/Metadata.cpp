@@ -5285,7 +5285,13 @@ static const WitnessTable *swift_getAssociatedConformanceWitnessSlowImpl(
     // Resolve the relative reference to the witness function.
     int32_t offset;
     memcpy(&offset, mangledName.data() + 1, 4);
-    auto ptr = detail::applyRelativeOffset(mangledName.data() + 1, offset);
+#if SWIFT_USE_RELATIVE_POINTER
+    auto ptr =
+        detail::Relative::applyRelativeOffset(mangledName.data() + 1, offset);
+#else
+    auto ptr =
+        detail::Absolute::applyRelativeOffset(mangledName.data() + 1, offset);
+#endif
 
     // Call the witness function.
     auto witnessFn = (AssociatedWitnessTableAccessFunction *)ptr;

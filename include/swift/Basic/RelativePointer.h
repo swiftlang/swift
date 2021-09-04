@@ -138,49 +138,66 @@ namespace swift {
 
 namespace detail {
 
-/// Apply a relative offset to a base pointer. The offset is applied to the base
-/// pointer using sign-extended, wrapping arithmetic.
-template<typename BasePtrTy, typename Offset>
-static inline uintptr_t applyRelativeOffset(BasePtrTy *basePtr, Offset offset) {
-  static_assert(std::is_integral<Offset>::value &&
-                std::is_signed<Offset>::value,
-                "offset type should be signed integer");
+struct Relative {
+  /// Apply a relative offset to a base pointer. The offset is applied to the
+  /// base pointer using sign-extended, wrapping arithmetic.
+  template <typename BasePtrTy, typename Offset>
+  static inline uintptr_t applyRelativeOffset(BasePtrTy *basePtr,
+                                              Offset offset) {
+    static_assert(std::is_integral<Offset>::value &&
+                      std::is_signed<Offset>::value,
+                  "offset type should be signed integer");
+    auto base = reinterpret_cast<uintptr_t>(basePtr);
+    // We want to do wrapping arithmetic, but with a sign-extended
+    // offset. To do this in C, we need to do signed promotion to get
+    // the sign extension, but we need to perform arithmetic on unsigned values,
+    // since signed overflow is undefined behavior.
+    auto extendOffset = (uintptr_t)(intptr_t)offset;
+    return base + extendOffset;
+  }
 
-  auto base = reinterpret_cast<uintptr_t>(basePtr);
-  // We want to do wrapping arithmetic, but with a sign-extended
-  // offset. To do this in C, we need to do signed promotion to get
-  // the sign extension, but we need to perform arithmetic on unsigned values,
-  // since signed overflow is undefined behavior.
-  auto extendOffset = (uintptr_t)(intptr_t)offset;
-  return base + extendOffset;
-}
+  /// Measure the relative offset between two pointers. This measures
+  /// (referent - base) using wrapping arithmetic. The result is truncated if
+  /// Offset is smaller than a pointer, with an assertion that the
+  /// pre-truncation result is a sign extension of the truncated result.
+  template <typename Offset, typename A, typename B>
+  static inline Offset measureRelativeOffset(A *referent, B *base) {
+    static_assert(std::is_integral<Offset>::value &&
+                      std::is_signed<Offset>::value,
+                  "offset type should be signed integer");
+    auto distance = (uintptr_t)referent - (uintptr_t)base;
+    // Truncate as unsigned, then wrap around to signed.
+    auto truncatedDistance =
+        (Offset)(typename std::make_unsigned<Offset>::type)distance;
+    // Assert that the truncation didn't discard any non-sign-extended bits.
+    assert((intptr_t)truncatedDistance == (intptr_t)distance &&
+           "pointers are too far apart to fit in offset type");
+    return truncatedDistance;
+  }
+};
 
-/// Measure the relative offset between two pointers. This measures
-/// (referent - base) using wrapping arithmetic. The result is truncated if
-/// Offset is smaller than a pointer, with an assertion that the
-/// pre-truncation result is a sign extension of the truncated result.
-template<typename Offset, typename A, typename B>
-static inline Offset measureRelativeOffset(A *referent, B *base) {
-  static_assert(std::is_integral<Offset>::value &&
-                std::is_signed<Offset>::value,
-                "offset type should be signed integer");
+struct Absolute {
+  template <typename BasePtrTy, typename Offset>
+  static inline uintptr_t applyRelativeOffset(BasePtrTy *basePtr,
+                                              Offset offset) {
+    return (uintptr_t)(intptr_t)offset;
+  }
 
-  auto distance = (uintptr_t)referent - (uintptr_t)base;
-  // Truncate as unsigned, then wrap around to signed.
-  auto truncatedDistance =
-    (Offset)(typename std::make_unsigned<Offset>::type)distance;
-  // Assert that the truncation didn't discard any non-sign-extended bits.
-  assert((intptr_t)truncatedDistance == (intptr_t)distance
-         && "pointers are too far apart to fit in offset type");
-  return truncatedDistance;
-}
-
+  template <typename Offset, typename A, typename B>
+  static inline Offset measureRelativeOffset(A *referent, B *base) {
+    auto offset = (Offset)(uintptr_t)referent;
+    assert((intptr_t)offset == (intptr_t)(uintptr_t)referent &&
+           "pointer too large to fit in offset type");
+    return offset;
+  }
+};
 } // namespace detail
 
 /// A relative reference to an object stored in memory. The reference may be
 /// direct or indirect, and uses the low bit of the (assumed at least
 /// 2-byte-aligned) pointer to differentiate.
-template<typename ValueTy, bool Nullable = false, typename Offset = int32_t>
+template <typename ValueTy, bool Nullable = false, typename Offset = int32_t,
+          typename Addr = swift::detail::Relative>
 class RelativeIndirectPointer {
 private:
   static_assert(std::is_integral<Offset>::value &&
@@ -207,7 +224,7 @@ public:
     if (Nullable && RelativeOffset == 0)
       return nullptr;
 
-    uintptr_t address = detail::applyRelativeOffset(this, RelativeOffset);
+    uintptr_t address = Addr::applyRelativeOffset(this, RelativeOffset);
     return *reinterpret_cast<const ValueTy * const *>(address);
   }
 
@@ -228,7 +245,9 @@ public:
 /// A relative reference to an object stored in memory. The reference may be
 /// direct or indirect, and uses the low bit of the (assumed at least
 /// 2-byte-aligned) pointer to differentiate.
-template<typename ValueTy, bool Nullable = false, typename Offset = int32_t, typename IndirectType = const ValueTy *>
+template <typename ValueTy, bool Nullable = false, typename Offset = int32_t,
+          typename IndirectType = const ValueTy *,
+          typename Addr = swift::detail::Relative>
 class RelativeIndirectablePointer {
 private:
   static_assert(std::is_integral<Offset>::value &&
@@ -254,23 +273,26 @@ public:
   /// Allow construction and reassignment from an absolute pointer.
   /// These always produce a direct relative offset.
   RelativeIndirectablePointer(ValueTy *absolute)
-  : RelativeOffsetPlusIndirect(
-      Nullable && absolute == nullptr
-        ? 0
-        : detail::measureRelativeOffset<Offset>(absolute, this)) {
+      : RelativeOffsetPlusIndirect(
+            Nullable && absolute == nullptr
+                ? 0
+                : typename Addr::template measureRelativeOffset<Offset>(
+                      absolute, this)) {
     if (!Nullable)
       assert(absolute != nullptr &&
              "constructing non-nullable relative pointer from null");
   }
-  
+
   RelativeIndirectablePointer &operator=(ValueTy *absolute) & {
     if (!Nullable)
       assert(absolute != nullptr &&
              "constructing non-nullable relative pointer from null");
-      
-    RelativeOffsetPlusIndirect = Nullable && absolute == nullptr
-      ? 0
-      : detail::measureRelativeOffset<Offset>(absolute, this);
+
+    RelativeOffsetPlusIndirect =
+        Nullable && absolute == nullptr
+            ? 0
+            : typename Addr::template measureRelativeOffset<Offset>(absolute,
+                                                                    this);
     return *this;
   }
 
@@ -284,8 +306,8 @@ public:
       return nullptr;
     
     Offset offsetPlusIndirect = RelativeOffsetPlusIndirect;
-    uintptr_t address = detail::applyRelativeOffset(this,
-                                                    offsetPlusIndirect & ~1);
+    uintptr_t address =
+        Addr::applyRelativeOffset(this, offsetPlusIndirect & ~1);
 
     // If the low bit is set, then this is an indirect address. Otherwise,
     // it's direct.
@@ -314,9 +336,9 @@ public:
 /// may be direct or indirect, and uses the low bit of the (assumed at least
 /// 2-byte-aligned) pointer to differentiate. The remaining low bits store
 /// an additional tiny integer value.
-template<typename ValueTy, typename IntTy, bool Nullable = false,
-         typename Offset = int32_t,
-         typename IndirectType = const ValueTy *>
+template <typename ValueTy, typename IntTy, bool Nullable = false,
+          typename Offset = int32_t, typename IndirectType = const ValueTy *,
+          typename Addr = swift::detail::Relative>
 class RelativeIndirectablePointerIntPair {
 private:
   static_assert(std::is_integral<Offset>::value &&
@@ -358,8 +380,8 @@ public:
       return nullptr;
 
     Offset offsetPlusIndirect = offset;
-    uintptr_t address = detail::applyRelativeOffset(this,
-                                                    offsetPlusIndirect & ~1);
+    uintptr_t address =
+        Addr::applyRelativeOffset(this, offsetPlusIndirect & ~1);
 
     // If the low bit is set, then this is an indirect address. Otherwise,
     // it's direct.
@@ -384,7 +406,7 @@ public:
 /// A relative reference to a function, intended to reference private metadata
 /// functions for the current executable or dynamic library image from
 /// position-independent constant data.
-template<typename T, bool Nullable, typename Offset>
+template <typename T, bool Nullable, typename Offset, typename Addr>
 class RelativeDirectPointerImpl {
 private:
   /// The relative offset of the function's entry point from *this.
@@ -409,10 +431,11 @@ public:
 
   // Allow construction and reassignment from an absolute pointer.
   RelativeDirectPointerImpl(PointerTy absolute)
-    : RelativeOffset(Nullable && absolute == nullptr
-                       ? 0
-                       : detail::measureRelativeOffset<Offset>(absolute, this))
-  {
+      : RelativeOffset(
+            Nullable && absolute == nullptr
+                ? 0
+                : typename Addr::template measureRelativeOffset<Offset>(
+                      absolute, this)) {
     if (!Nullable)
       assert(absolute != nullptr &&
              "constructing non-nullable relative pointer from null");
@@ -426,9 +449,11 @@ public:
     if (!Nullable)
       assert(absolute != nullptr &&
              "constructing non-nullable relative pointer from null");
-    RelativeOffset = Nullable && absolute == nullptr
-      ? 0
-      : detail::measureRelativeOffset<Offset>(absolute, this);
+    RelativeOffset =
+        Nullable && absolute == nullptr
+            ? 0
+            : typename Addr::template measureRelativeOffset<Offset>(absolute,
+                                                                    this);
     return *this;
   }
 
@@ -438,7 +463,7 @@ public:
       return nullptr;
     
     // The value is addressed relative to `this`.
-    uintptr_t absolute = detail::applyRelativeOffset(this, RelativeOffset);
+    uintptr_t absolute = Addr::applyRelativeOffset(this, RelativeOffset);
     return reinterpret_cast<PointerTy>(absolute);
   }
 
@@ -449,16 +474,17 @@ public:
 };
 
 template <typename T, bool Nullable = true, typename Offset = int32_t,
-          typename = void>
+          typename Addr = swift::detail::Relative, typename = void>
 class RelativeDirectPointer;
 
 /// A direct relative reference to an object that is not a function pointer.
-template <typename T, bool Nullable, typename Offset>
-class RelativeDirectPointer<T, Nullable, Offset,
+template <typename T, bool Nullable, typename Offset, typename Addr>
+class RelativeDirectPointer<
+    T, Nullable, Offset, Addr,
     typename std::enable_if<!std::is_function<T>::value>::type>
-    : private RelativeDirectPointerImpl<T, Nullable, Offset>
-{
-  using super = RelativeDirectPointerImpl<T, Nullable, Offset>;
+    : private RelativeDirectPointerImpl<T, Nullable, Offset, Addr> {
+  using super = RelativeDirectPointerImpl<T, Nullable, Offset, Addr>;
+
 public:
   using super::get;
   using super::super;
@@ -481,12 +507,13 @@ public:
 
 /// A specialization of RelativeDirectPointer for function pointers,
 /// allowing for calls.
-template<typename T, bool Nullable, typename Offset>
-class RelativeDirectPointer<T, Nullable, Offset,
+template <typename T, bool Nullable, typename Offset, typename Addr>
+class RelativeDirectPointer<
+    T, Nullable, Offset, Addr,
     typename std::enable_if<std::is_function<T>::value>::type>
-    : private RelativeDirectPointerImpl<T, Nullable, Offset>
-{
-  using super = RelativeDirectPointerImpl<T, Nullable, Offset>;
+    : private RelativeDirectPointerImpl<T, Nullable, Offset, Addr> {
+  using super = RelativeDirectPointerImpl<T, Nullable, Offset, Addr>;
+
 public:
   using super::super;
 
@@ -526,8 +553,8 @@ public:
 
 /// A direct relative reference to an aligned object, with an additional
 /// tiny integer value crammed into its low bits.
-template<typename PointeeTy, typename IntTy, bool Nullable = false,
-         typename Offset = int32_t>
+template <typename PointeeTy, typename IntTy, bool Nullable = false,
+          typename Offset = int32_t, typename Addr = swift::detail::Relative>
 class RelativeDirectPointerIntPairImpl {
   Offset RelativeOffsetPlusInt;
 
@@ -557,7 +584,7 @@ public:
       return nullptr;
 
     // The value is addressed relative to `this`.
-    uintptr_t absolute = detail::applyRelativeOffset(this, offset);
+    uintptr_t absolute = Addr::applyRelativeOffset(this, offset);
     return reinterpret_cast<PointerTy>(absolute);
   }
 
@@ -572,16 +599,21 @@ public:
 
 /// A direct relative reference to an aligned object, with an additional
 /// tiny integer value crammed into its low bits.
-template<typename PointeeTy, typename IntTy, bool Nullable = false,
-         typename Offset = int32_t, typename = void>
+template <typename PointeeTy, typename IntTy, bool Nullable = false,
+          typename Offset = int32_t, typename Addr = swift::detail::Relative,
+          typename = void>
 class RelativeDirectPointerIntPair;
 
-template<typename PointeeTy, typename IntTy, bool Nullable, typename Offset>
-class RelativeDirectPointerIntPair<PointeeTy, IntTy, Nullable, Offset,
+template <typename PointeeTy, typename IntTy, bool Nullable, typename Offset,
+          typename Addr>
+class RelativeDirectPointerIntPair<
+    PointeeTy, IntTy, Nullable, Offset, Addr,
     typename std::enable_if<!std::is_function<PointeeTy>::value>::type>
-    : private RelativeDirectPointerIntPairImpl<PointeeTy, IntTy, Nullable, Offset>
-{
-  using super = RelativeDirectPointerIntPairImpl<PointeeTy, IntTy, Nullable, Offset>;
+    : private RelativeDirectPointerIntPairImpl<PointeeTy, IntTy, Nullable,
+                                               Offset, Addr> {
+  using super = RelativeDirectPointerIntPairImpl<PointeeTy, IntTy, Nullable,
+                                                 Offset, Addr>;
+
 public:
   using super::getPointer;
   using super::getInt;
@@ -592,12 +624,15 @@ public:
 // across the full address space instead of only across a single small-code-
 // model image.
 
-template<typename T, bool Nullable = false>
+template <typename T, bool Nullable = false,
+          typename Addr = swift::detail::Relative>
 using FarRelativeIndirectablePointer =
-  RelativeIndirectablePointer<T, Nullable, intptr_t>;
+    RelativeIndirectablePointer<T, Nullable, intptr_t, const T *, Addr>;
 
-template<typename T, bool Nullable = false>
-using FarRelativeDirectPointer = RelativeDirectPointer<T, Nullable, intptr_t>;
+template <typename T, bool Nullable = false,
+          typename Addr = swift::detail::Relative>
+using FarRelativeDirectPointer =
+    RelativeDirectPointer<T, Nullable, intptr_t, Addr>;
 
 } // end namespace swift
 

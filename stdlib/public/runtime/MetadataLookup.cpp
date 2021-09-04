@@ -76,7 +76,11 @@ static uintptr_t resolveSymbolicReferenceOffset(SymbolicReferenceKind kind,
                                                 Directness isIndirect,
                                                 int32_t offset,
                                                 const void *base) {
-  auto ptr = detail::applyRelativeOffset(base, offset);
+#if SWIFT_USE_RELATIVE_POINTER
+  auto ptr = detail::Relative::applyRelativeOffset(base, offset);
+#else
+  auto ptr = detail::Absolute::applyRelativeOffset(base, offset);
+#endif
 
   // Indirect references may be authenticated in a way appropriate for the
   // referent.
@@ -2612,7 +2616,7 @@ public:
 
 /// A map from original to replaced opaque type descriptor of a some type.
 class DynamicReplacementSomeDescriptor {
-  RelativeIndirectablePointer<
+  InProcess::RelativeIndirectablePointer<
       const OpaqueTypeDescriptor, false, int32_t,
       TargetSignedPointer<InProcess, OpaqueTypeDescriptor *
                                          __ptrauth_swift_type_descriptor>>

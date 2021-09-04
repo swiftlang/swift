@@ -128,16 +128,57 @@ struct InProcess {
 
   template <typename T>
   using SignedPointer = T;
-  
+
+#if SWIFT_USE_RELATIVE_POINTER
   template <typename T, bool Nullable = false>
   using FarRelativeDirectPointer = FarRelativeDirectPointer<T, Nullable>;
 
-  template <typename T, bool Nullable = false>
+  template <typename T, bool Nullable = false, typename Offset = int32_t,
+            typename IndirectType = const T *>
   using RelativeIndirectablePointer =
-    RelativeIndirectablePointer<T, Nullable>;
-  
+      RelativeIndirectablePointer<T, Nullable, Offset, IndirectType>;
+
   template <typename T, bool Nullable = true>
   using RelativeDirectPointer = RelativeDirectPointer<T, Nullable>;
+
+  template <typename T, typename IntTy, bool Nullable = false>
+  using RelativeDirectPointerIntPair =
+      RelativeDirectPointerIntPair<T, IntTy, Nullable>;
+
+  template <typename T, typename IntTy, bool Nullable = false,
+            typename Offset = int32_t, typename IndirectType = const T *>
+  using RelativeIndirectablePointerIntPair =
+      RelativeIndirectablePointerIntPair<T, IntTy, Nullable, Offset,
+                                         IndirectType>;
+#else
+  static_assert(sizeof(void *) <= 4,
+                "pointer size must be less than or equal 4 bytes");
+
+  template <typename T, bool Nullable = false>
+  using FarRelativeDirectPointer =
+      FarRelativeDirectPointer<T, Nullable, detail::Absolute>;
+
+  template <typename T, bool Nullable = false, typename Offset = int32_t,
+            typename IndirectType = const T *>
+  using RelativeIndirectablePointer =
+      RelativeIndirectablePointer<T, Nullable, Offset, IndirectType,
+                                  detail::Absolute>;
+
+  template <typename T, bool Nullable = true>
+  using RelativeDirectPointer =
+      RelativeDirectPointer<T, Nullable, int32_t, detail::Absolute>;
+
+  template <typename T, typename IntTy, bool Nullable = false>
+  using RelativeDirectPointerIntPair =
+      RelativeDirectPointerIntPair<T, IntTy, Nullable, int32_t,
+                                   detail::Absolute>;
+
+  template <typename T, typename IntTy, bool Nullable = false,
+            typename Offset = int32_t, typename IndirectType = const T *>
+  using RelativeIndirectablePointerIntPair =
+      RelativeIndirectablePointerIntPair<T, IntTy, Nullable, Offset,
+                                         IndirectType, detail::Absolute>;
+#endif
 };
 
 /// Represents a pointer in another address space.
@@ -238,6 +279,12 @@ using TargetRelativeDirectPointer
 template <typename Runtime, typename Pointee, bool Nullable = true>
 using TargetRelativeIndirectablePointer
   = typename Runtime::template RelativeIndirectablePointer<Pointee,Nullable>;
+
+template <typename Runtime, typename Pointee, typename IntTy,
+          bool Nullable = false>
+using TargetRelativeDirectPointerIntPair =
+    typename Runtime::template RelativeDirectPointerIntPair<Pointee, IntTy,
+                                                            Nullable>;
 
 struct HeapObject;
 class WeakReference;
@@ -932,38 +979,40 @@ template<typename Runtime,
 using TargetSignedContextPointer = TargetSignedPointer<Runtime,
                           Context<Runtime> * __ptrauth_swift_type_descriptor>;
 
-template<typename Runtime,
-         template<typename _Runtime> class Context = TargetContextDescriptor>
-using TargetRelativeContextPointer =
-  RelativeIndirectablePointer<const Context<Runtime>,
-                              /*nullable*/ true, int32_t,
-                              TargetSignedContextPointer<Runtime, Context>>;
+template <typename Runtime,
+          template <typename _Runtime> class Context = TargetContextDescriptor>
+using TargetRelativeContextPointer = InProcess::RelativeIndirectablePointer<
+    const Context<Runtime>,
+    /*nullable*/ true, int32_t, TargetSignedContextPointer<Runtime, Context>>;
 
 using RelativeContextPointer = TargetRelativeContextPointer<InProcess>;
 
-template<typename Runtime, typename IntTy,
-         template<typename _Runtime> class Context = TargetContextDescriptor>
+template <typename Runtime, typename IntTy,
+          template <typename _Runtime> class Context = TargetContextDescriptor>
 using RelativeContextPointerIntPair =
-  RelativeIndirectablePointerIntPair<const Context<Runtime>, IntTy,
-                              /*nullable*/ true, int32_t,
-                              TargetSignedContextPointer<Runtime, Context>>;
+    InProcess::RelativeIndirectablePointerIntPair<
+        const Context<Runtime>, IntTy,
+        /*nullable*/ true, int32_t,
+        TargetSignedContextPointer<Runtime, Context>>;
 
 template<typename Runtime> struct TargetMethodDescriptor;
 
-template<typename Runtime>
+template <typename Runtime>
 using TargetRelativeMethodDescriptorPointer =
-  RelativeIndirectablePointer<const TargetMethodDescriptor<Runtime>,
-                              /*nullable*/ true>;
+    InProcess::RelativeIndirectablePointer<
+        const TargetMethodDescriptor<Runtime>,
+        /*nullable*/ true>;
 
 using RelativeMethodDescriptorPointer =
   TargetRelativeMethodDescriptorPointer<InProcess>;
 
 template<typename Runtime> struct TargetProtocolRequirement;
 
-template<typename Runtime>
+template <typename Runtime>
 using TargetRelativeProtocolRequirementPointer =
-  RelativeIndirectablePointer<const TargetProtocolRequirement<Runtime>,
-                              /*nullable*/ true>;
+    InProcess::RelativeIndirectablePointer<
+        const TargetProtocolRequirement<Runtime>,
+        /*nullable*/ true>;
 
 using RelativeProtocolRequirementPointer =
   TargetRelativeProtocolRequirementPointer<InProcess>;
@@ -2099,7 +2148,8 @@ struct TargetProtocolRequirement {
   // TODO: name, type
 
   /// The optional default implementation of the protocol.
-  RelativeDirectPointer<void, /*nullable*/ true> DefaultImplementation;
+  TargetRelativeDirectPointer<Runtime, void, /*nullable*/ true>
+      DefaultImplementation;
 };
 
 using ProtocolRequirement = TargetProtocolRequirement<InProcess>;
@@ -2385,7 +2435,7 @@ using GenericBoxHeapMetadata = TargetGenericBoxHeapMetadata<InProcess>;
 template <typename Runtime>
 struct TargetResilientWitness {
   TargetRelativeProtocolRequirementPointer<Runtime> Requirement;
-  RelativeDirectPointer<void> Witness;
+  TargetRelativeDirectPointer<Runtime, void> Witness;
 };
 using ResilientWitness = TargetResilientWitness<InProcess>;
 
@@ -2448,16 +2498,19 @@ struct TargetGenericWitnessTable {
   uint16_t WitnessTablePrivateSizeInWordsAndRequiresInstantiation;
 
   /// The instantiation function, which is called after the template is copied.
-  RelativeDirectPointer<void(TargetWitnessTable<Runtime> *instantiatedTable,
-                             const TargetMetadata<Runtime> *type,
-                             const void * const *instantiationArgs),
-                        /*nullable*/ true> Instantiator;
+  TargetRelativeDirectPointer<
+      Runtime,
+      void(TargetWitnessTable<Runtime> *instantiatedTable,
+           const TargetMetadata<Runtime> *type,
+           const void *const *instantiationArgs),
+      /*nullable*/ true>
+      Instantiator;
 
   using PrivateDataType = void *[swift::NumGenericMetadataPrivateDataWords];
 
   /// Private data for the instantiator.  Out-of-line so that the rest
   /// of this structure can be constant.
-  RelativeDirectPointer<PrivateDataType> PrivateData;
+  TargetRelativeDirectPointer<Runtime, PrivateDataType> PrivateData;
 
   uint16_t getWitnessTablePrivateSizeInWords() const {
     return WitnessTablePrivateSizeInWordsAndRequiresInstantiation >> 1;
@@ -2480,14 +2533,16 @@ struct TargetTypeMetadataRecord {
 private:
   union {
     /// A direct reference to a nominal type descriptor.
-    RelativeDirectPointerIntPair<TargetContextDescriptor<Runtime>,
-                                 TypeReferenceKind>
-      DirectNominalTypeDescriptor;
+    InProcess::RelativeDirectPointerIntPair<TargetContextDescriptor<Runtime>,
+                                            TypeReferenceKind>
+        DirectNominalTypeDescriptor;
 
     /// An indirect reference to a nominal type descriptor.
-    RelativeDirectPointerIntPair<TargetSignedPointer<Runtime, TargetContextDescriptor<Runtime> * __ptrauth_swift_type_descriptor>,
-                                 TypeReferenceKind>
-      IndirectNominalTypeDescriptor;
+    InProcess::RelativeDirectPointerIntPair<
+        TargetSignedPointer<Runtime, TargetContextDescriptor<Runtime> *
+                                         __ptrauth_swift_type_descriptor>,
+        TypeReferenceKind>
+        IndirectNominalTypeDescriptor;
 
     // We only allow a subset of the TypeReferenceKinds here.
     // Should we just acknowledge that this is a different enum?
@@ -2550,7 +2605,7 @@ class RelativeTargetProtocolDescriptorPointer {
     /// The \c bool value will be false to indicate that the protocol
     /// is a Swift protocol, or true to indicate that this references
     /// an Objective-C protocol.
-    RelativeIndirectablePointerIntPair<Protocol, bool> objcPointer;
+    InProcess::RelativeIndirectablePointerIntPair<Protocol, bool> objcPointer;
 #endif
   };
 
@@ -2591,22 +2646,23 @@ struct TargetTypeReference {
 
   union {
     /// A direct reference to a TypeContextDescriptor or ProtocolDescriptor.
-    RelativeDirectPointer<TargetContextDescriptor<Runtime>>
-      DirectTypeDescriptor;
+    TargetRelativeDirectPointer<Runtime, TargetContextDescriptor<Runtime>>
+        DirectTypeDescriptor;
 
     /// An indirect reference to a TypeContextDescriptor or ProtocolDescriptor.
-    RelativeDirectPointer<
-        TargetSignedPointer<Runtime, TargetContextDescriptor<Runtime> * __ptrauth_swift_type_descriptor>>
-      IndirectTypeDescriptor;
+    TargetRelativeDirectPointer<
+        Runtime,
+        TargetSignedPointer<Runtime, TargetContextDescriptor<Runtime> *
+                                         __ptrauth_swift_type_descriptor>>
+        IndirectTypeDescriptor;
 
     /// An indirect reference to an Objective-C class.
-    RelativeDirectPointer<
-        ConstTargetMetadataPointer<Runtime, TargetClassMetadata>>
+    TargetRelativeDirectPointer<
+        Runtime, ConstTargetMetadataPointer<Runtime, TargetClassMetadata>>
         IndirectObjCClass;
 
     /// A direct reference to an Objective-C class name.
-    RelativeDirectPointer<const char>
-      DirectObjCClassName;
+    TargetRelativeDirectPointer<Runtime, const char> DirectObjCClassName;
   };
 
   const TargetContextDescriptor<Runtime> *
@@ -2694,7 +2750,8 @@ private:
   TargetTypeReference<Runtime> TypeRef;
 
   /// The witness table pattern, which may also serve as the witness table.
-  RelativeDirectPointer<const TargetWitnessTable<Runtime>> WitnessTablePattern;
+  TargetRelativeDirectPointer<Runtime, const TargetWitnessTable<Runtime>>
+      WitnessTablePattern;
 
   /// Various flags, including the kind of conformance.
   ConformanceFlags Flags;
@@ -2833,10 +2890,11 @@ private:
 using ProtocolConformanceDescriptor
   = TargetProtocolConformanceDescriptor<InProcess>;
 
-template<typename Runtime>
+template <typename Runtime>
 using TargetProtocolConformanceRecord =
-  RelativeDirectPointer<TargetProtocolConformanceDescriptor<Runtime>,
-                        /*Nullable=*/false>;
+    TargetRelativeDirectPointer<Runtime,
+                                TargetProtocolConformanceDescriptor<Runtime>,
+                                /*Nullable=*/false>;
 
 using ProtocolConformanceRecord = TargetProtocolConformanceRecord<InProcess>;
 
@@ -2901,7 +2959,7 @@ inline bool isCImportedModuleName(llvm::StringRef name) {
 template<typename Runtime>
 struct TargetModuleContextDescriptor final : TargetContextDescriptor<Runtime> {
   /// The module name.
-  RelativeDirectPointer<const char, /*nullable*/ false> Name;
+  TargetRelativeDirectPointer<Runtime, const char, /*nullable*/ false> Name;
 
   /// Is this module a special C-imported module?
   bool isCImportedContext() const {
@@ -2951,15 +3009,15 @@ public:
   GenericRequirementFlags Flags;
 
   /// The type that's constrained, described as a mangled name.
-  RelativeDirectPointer<const char, /*nullable*/ false> Param;
+  TargetRelativeDirectPointer<Runtime, const char, /*nullable*/ false> Param;
 
   union {
     /// A mangled representation of the same-type or base class the param is
     /// constrained to.
     ///
     /// Only valid if the requirement has SameType or BaseClass kind.
-    RelativeDirectPointer<const char, /*nullable*/ false> Type;
-    
+    TargetRelativeDirectPointer<Runtime, const char, /*nullable*/ false> Type;
+
     /// The protocol the param is constrained to.
     ///
     /// Only valid if the requirement has Protocol kind.
@@ -2968,9 +3026,11 @@ public:
     /// The conformance the param is constrained to use.
     ///
     /// Only valid if the requirement has SameConformance kind.
-    RelativeIndirectablePointer<TargetProtocolConformanceDescriptor<Runtime>,
-                                /*nullable*/ false> Conformance;
-    
+    TargetRelativeIndirectablePointer<
+        InProcess, TargetProtocolConformanceDescriptor<Runtime>,
+        /*nullable*/ false>
+        Conformance;
+
     /// The kind of layout constraint.
     ///
     /// Only valid if the requirement has Layout kind.
@@ -3244,7 +3304,7 @@ public:
   ///
   /// Note that the Parent of the extension will be the module context the
   /// extension is declared inside.
-  RelativeDirectPointer<const char> ExtendedContext;
+  TargetRelativeDirectPointer<Runtime, const char> ExtendedContext;
 
   using TrailingGenericContextObjects::getGenericContext;
 
@@ -3390,7 +3450,8 @@ public:
 
   /// Associated type names, as a space-separated list in the same order
   /// as the requirements.
-  RelativeDirectPointer<const char, /*Nullable=*/true> AssociatedTypeNames;
+  TargetRelativeDirectPointer<Runtime, const char, /*Nullable=*/true>
+      AssociatedTypeNames;
 
   ProtocolContextDescriptorFlags getProtocolContextDescriptorFlags() const {
     return ProtocolContextDescriptorFlags(this->Flags.getKindSpecificFlags());
@@ -3432,16 +3493,15 @@ public:
 /// The descriptor for an opaque type.
 template <typename Runtime>
 struct TargetOpaqueTypeDescriptor final
-  : TargetContextDescriptor<Runtime>,
-    TrailingGenericContextObjects<TargetOpaqueTypeDescriptor<Runtime>,
-                                  TargetGenericContextDescriptorHeader,
-                                  RelativeDirectPointer<const char>>
-{
+    : TargetContextDescriptor<Runtime>,
+      TrailingGenericContextObjects<
+          TargetOpaqueTypeDescriptor<Runtime>,
+          TargetGenericContextDescriptorHeader,
+          TargetRelativeDirectPointer<Runtime, const char>> {
 private:
-  using TrailingGenericContextObjects =
-      swift::TrailingGenericContextObjects<TargetOpaqueTypeDescriptor<Runtime>,
-                                           TargetGenericContextDescriptorHeader,
-                                           RelativeDirectPointer<const char>>;
+  using TrailingGenericContextObjects = swift::TrailingGenericContextObjects<
+      TargetOpaqueTypeDescriptor<Runtime>, TargetGenericContextDescriptorHeader,
+      TargetRelativeDirectPointer<Runtime, const char>>;
   using TrailingObjects =
     typename TrailingGenericContextObjects::TrailingObjects;
   friend TrailingObjects;
@@ -3462,15 +3522,16 @@ public:
   }
   
   using TrailingGenericContextObjects::numTrailingObjects;
-  size_t numTrailingObjects(OverloadToken<RelativeDirectPointer<const char>>) const {
+  size_t numTrailingObjects(
+      OverloadToken<TargetRelativeDirectPointer<Runtime, const char>>) const {
     return getNumUnderlyingTypeArguments();
   }
-  
-  const RelativeDirectPointer<const char> &
+
+  const TargetRelativeDirectPointer<Runtime, const char> &
   getUnderlyingTypeArgumentMangledName(unsigned i) const {
     assert(i < getNumUnderlyingTypeArguments());
-    return (this
-         ->template getTrailingObjects<RelativeDirectPointer<const char>>())[i];
+    return (this->template getTrailingObjects<
+            TargetRelativeDirectPointer<Runtime, const char>>())[i];
   }
 
   llvm::StringRef getUnderlyingTypeArgument(unsigned i) const {
@@ -3483,7 +3544,7 @@ public:
     return cd->getKind() == ContextDescriptorKind::OpaqueType;
   }
 };
-  
+
 using OpaqueTypeDescriptor = TargetOpaqueTypeDescriptor<InProcess>;
 
 /// The instantiation cache for generic metadata.  This must be guaranteed
@@ -5056,7 +5117,8 @@ struct DynamicReplacementChainEntry {
 
 /// A record describing the root of dynamic replacements for a function.
 struct DynamicReplacementKey {
-  RelativeDirectPointer<DynamicReplacementChainEntry, false> root;
+  TargetRelativeDirectPointer<InProcess, DynamicReplacementChainEntry, false>
+      root;
   uint32_t flags;
 
   uint16_t getExtraDiscriminator() const {
@@ -5069,14 +5131,15 @@ struct DynamicReplacementKey {
 
 /// A record describing a dynamic function replacement.
 class DynamicReplacementDescriptor {
-  RelativeIndirectablePointer<
+  InProcess::RelativeIndirectablePointer<
       const DynamicReplacementKey, false, int32_t,
       TargetSignedPointer<InProcess,
                           DynamicReplacementKey *
                               __ptrauth_swift_dynamic_replacement_key>>
       replacedFunctionKey;
-  RelativeDirectPointer<void, false> replacementFunction;
-  RelativeDirectPointer<DynamicReplacementChainEntry, false> chainEntry;
+  TargetRelativeDirectPointer<InProcess, void, false> replacementFunction;
+  TargetRelativeDirectPointer<InProcess, DynamicReplacementChainEntry, false>
+      chainEntry;
   uint32_t flags;
 
   enum : uint32_t { EnableChainingMask = 0x1 };

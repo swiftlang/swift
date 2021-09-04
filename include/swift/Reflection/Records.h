@@ -17,6 +17,7 @@
 #ifndef SWIFT_REFLECTION_RECORDS_H
 #define SWIFT_REFLECTION_RECORDS_H
 
+#include "swift/ABI/Metadata.h"
 #include "swift/Basic/RelativePointer.h"
 #include "swift/Demangling/Demangle.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -86,8 +87,8 @@ class FieldRecord {
   const FieldRecordFlags Flags;
 
 public:
-  const RelativeDirectPointer<const char> MangledTypeName;
-  const RelativeDirectPointer<const char> FieldName;
+  const InProcess::RelativeDirectPointer<const char> MangledTypeName;
+  const InProcess::RelativeDirectPointer<const char> FieldName;
 
   FieldRecord() = delete;
 
@@ -179,8 +180,8 @@ class FieldDescriptor {
   }
 
 public:
-  const RelativeDirectPointer<const char> MangledTypeName;
-  const RelativeDirectPointer<const char> Superclass;
+  const InProcess::RelativeDirectPointer<const char> MangledTypeName;
+  const InProcess::RelativeDirectPointer<const char> Superclass;
 
   FieldDescriptor() = delete;
 
@@ -247,8 +248,8 @@ public:
 // type to the type witness of a conformance.
 class AssociatedTypeRecord {
 public:
-  const RelativeDirectPointer<const char> Name;
-  const RelativeDirectPointer<const char> SubstitutedTypeName;
+  const InProcess::RelativeDirectPointer<const char> Name;
+  const InProcess::RelativeDirectPointer<const char> SubstitutedTypeName;
 
   StringRef getName() const {
     return Name.get();
@@ -308,8 +309,8 @@ struct AssociatedTypeRecordIterator {
 // type records for a conformance.
 struct AssociatedTypeDescriptor {
 public:
-  const RelativeDirectPointer<const char> ConformingTypeName;
-  const RelativeDirectPointer<const char> ProtocolTypeName;
+  const InProcess::RelativeDirectPointer<const char> ConformingTypeName;
+  const InProcess::RelativeDirectPointer<const char> ProtocolTypeName;
 
   uint32_t NumAssociatedTypes;
   uint32_t AssociatedTypeRecordSize;
@@ -345,7 +346,7 @@ public:
 // any builtin types referenced from the other sections.
 class BuiltinTypeDescriptor {
 public:
-  const RelativeDirectPointer<const char> TypeName;
+  const InProcess::RelativeDirectPointer<const char> TypeName;
 
   uint32_t Size;
 
@@ -376,7 +377,7 @@ public:
 
 class CaptureTypeRecord {
 public:
-  const RelativeDirectPointer<const char> MangledTypeName;
+  const InProcess::RelativeDirectPointer<const char> MangledTypeName;
 
   CaptureTypeRecord() = delete;
 
@@ -421,8 +422,8 @@ struct CaptureTypeRecordIterator {
 
 class MetadataSourceRecord {
 public:
-  const RelativeDirectPointer<const char> MangledTypeName;
-  const RelativeDirectPointer<const char> MangledMetadataSource;
+  const InProcess::RelativeDirectPointer<const char> MangledTypeName;
+  const InProcess::RelativeDirectPointer<const char> MangledMetadataSource;
 
   MetadataSourceRecord() = delete;
 
