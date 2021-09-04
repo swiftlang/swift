@@ -4664,6 +4664,60 @@ static void diagnoseComparisonWithNaN(const Expr *E, const DeclContext *DC) {
   const_cast<Expr *>(E)->walk(Walker);
 }
 
+static void diagUnqualifiedAccessToMethodNamedSelf(const Expr *E,
+                                                   const DeclContext *DC) {
+  if (!E || isa<ErrorExpr>(E) || !E->getType())
+    return;
+
+  class DiagnoseWalker : public ASTWalker {
+    ASTContext &Ctx;
+    const DeclContext *DC;
+
+  public:
+    DiagnoseWalker(const DeclContext *DC) : Ctx(DC->getASTContext()), DC(DC) {}
+
+    bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
+      return false;
+    }
+
+    bool shouldWalkIntoTapExpression() override { return false; }
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      if (!E || isa<ErrorExpr>(E) || !E->getType())
+        return {false, E};
+
+      if (auto *declRefExpr = dyn_cast<DeclRefExpr>(E)) {
+        if (declRefExpr->getDecl()->getBaseName() == Ctx.Id_self &&
+            declRefExpr->getType()->is<AnyFunctionType>()) {
+          if (auto typeContext = DC->getInnermostTypeContext()) {
+            // self() is not easily confusable
+            if (!isa<CallExpr>(Parent.getAsExpr())) {
+
+              auto baseType = typeContext->getDeclaredInterfaceType();
+              auto baseTypeString = baseType.getString();
+
+              Ctx.Diags.diagnose(E->getLoc(), diag::self_refers_to_method,
+                                 baseTypeString);
+
+              Ctx.Diags
+                  .diagnose(E->getLoc(),
+                            diag::fix_unqualified_access_member_named_self,
+                            baseTypeString)
+                  .fixItInsert(E->getLoc(), diag::insert_type_qualification,
+                               baseType);
+            }
+          }
+        }
+      }
+
+      return {true, E};
+    }
+  };
+
+  DiagnoseWalker Walker(DC);
+  const_cast<Expr *>(E)->walk(Walker);
+}
+
 namespace {
 
 class CompletionHandlerUsageChecker final : public ASTWalker {
@@ -4749,6 +4803,7 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
   if (ctx.LangOpts.EnableObjCInterop)
     diagDeprecatedObjCSelectors(DC, E);
   diagnoseConstantArgumentRequirement(E, DC);
+  diagUnqualifiedAccessToMethodNamedSelf(E, DC);
 }
 
 void swift::performStmtDiagnostics(const Stmt *S, DeclContext *DC) {
