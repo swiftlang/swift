@@ -1,9 +1,10 @@
-// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library) | %FileCheck %s
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library) 2>&1 | %FileCheck %s --dump-input=always
 // REQUIRES: executable_test
 // REQUIRES: concurrency
+// REQUIRES: swift_task_debug_log
+
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
-// UNSUPPORTED: linux
 
 #if os(Linux)
 import Glibc
@@ -13,10 +14,16 @@ import MSVCRT
 import Darwin
 #endif
 
-@available(SwiftStdlib 5.5, *)
 func test_taskGroup_next() async {
+  // CHECK: creating task [[MAIN_TASK:0x.*]] with parent 0x0
+  // CHECK: creating task [[GROUP_TASK_1:0x.*]] with parent [[MAIN_TASK]]
+  // CHECK: creating task [[GROUP_TASK_2:0x.*]] with parent [[MAIN_TASK]]
+  // CHECK: creating task [[GROUP_TASK_3:0x.*]] with parent [[MAIN_TASK]]
+  // CHECK: creating task [[GROUP_TASK_4:0x.*]] with parent [[MAIN_TASK]]
+  // CHECK: creating task [[GROUP_TASK_5:0x.*]] with parent [[MAIN_TASK]]
+
   _ = await withTaskGroup(of: Int.self, returning: Int.self) { group in
-    for n in 0..<100 {
+    for n in 0..<5 {
       group.spawn {
         return n
       }
@@ -30,12 +37,18 @@ func test_taskGroup_next() async {
 
     return sum
   }
-
-  // CHECK: result with group.next(): 100
-  print("result with group.next(): \(100)")
+  // as we exit the group, it must be guaranteed that its child tasks were destroyed
+  //
+  // NOTE: there is no great way to express "any of GROUP_TASK_n",
+  //       so we just check that 5 tasks were destroyed
+  //
+  // CHECK: destroy task [[DESTROY_GROUP_TASK_1:0x.*]]
+  // CHECK: destroy task [[DESTROY_GROUP_TASK_2:0x.*]]
+  // CHECK: destroy task [[DESTROY_GROUP_TASK_3:0x.*]]
+  // CHECK: destroy task [[DESTROY_GROUP_TASK_4:0x.*]]
+  // CHECK: destroy task [[DESTROY_GROUP_TASK_5:0x.*]]
 }
 
-@available(SwiftStdlib 5.5, *)
 @main struct Main {
   static func main() async {
     await test_taskGroup_next()

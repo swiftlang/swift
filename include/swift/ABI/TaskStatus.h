@@ -182,7 +182,6 @@ public:
 
   /// Attach the passed in `child` task to this group.
   void attachChild(AsyncTask *child) {
-    assert(child->groupChildFragment());
     assert(child->hasGroupChildFragment());
     assert(child->groupChildFragment()->getGroup() == getGroup());
 
@@ -209,6 +208,33 @@ public:
     }
 
     cur->childFragment()->setNextChild(child);
+  }
+
+  void detachChild(AsyncTask *child) {
+    assert(child && "cannot remove a null child from group");
+    if (FirstChild == child) {
+      FirstChild = getNextChildTask(child);
+      return;
+    }
+
+    AsyncTask *prev = FirstChild;
+    // Remove the child from the linked list, i.e.:
+    //     prev -> afterPrev -> afterChild
+    //                 ==
+    //               child   -> afterChild
+    // Becomes:
+    //     prev --------------> afterChild
+    while (prev) {
+      auto afterPrev = getNextChildTask(prev);
+
+      if (afterPrev == child) {
+        auto afterChild = getNextChildTask(child);
+        prev->childFragment()->setNextChild(afterChild);
+        return;
+      }
+
+      prev = afterPrev;
+    }
   }
 
   static AsyncTask *getNextChildTask(AsyncTask *task) {
