@@ -35,6 +35,10 @@ import WinSDK
 import ObjectiveC
 #endif
 
+#if SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
+import _Concurrency
+#endif
+
 #if os(WASI)
 let platformSupportSpawnChild = false
 #else
