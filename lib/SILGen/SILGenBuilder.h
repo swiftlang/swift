@@ -153,6 +153,9 @@ public:
 
   // Create the block argument for a phi.
   ManagedValue createPhi(SILType type, ValueOwnershipKind ownership);
+  
+  using SILBuilder::createMarkDiscarded;
+  ManagedValue createMarkDiscarded(ValueDecl *decl, ManagedValue operand);
 
   using SILBuilder::createMarkUninitialized;
   ManagedValue createMarkUninitialized(ValueDecl *decl, ManagedValue operand,

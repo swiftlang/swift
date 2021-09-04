@@ -4563,6 +4563,17 @@ public:
   }
 };
 
+/// Indicates that a variable has been assigned to a discarded value.
+class MarkDiscardedInst
+    : public UnaryInstructionBase<SILInstructionKind::MarkDiscardedInst,
+                                  NonValueInstruction> {
+  friend SILBuilder;
+
+private:
+  MarkDiscardedInst(SILDebugLocation DebugLoc, SILValue Value)
+      : UnaryInstructionBase(DebugLoc, Value) {}
+};
+
 /// Indicates that a memory location is uninitialized at this point and needs to
 /// be initialized by the end of the function and before any escape point for
 /// this instruction. This is only valid in Raw SIL.
