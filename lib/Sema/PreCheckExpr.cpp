@@ -340,16 +340,12 @@ UnresolvedMemberExpr *TypeChecker::getUnresolvedMemberChainBase(Expr *expr) {
     return dyn_cast<UnresolvedMemberExpr>(expr);
 }
 
-/// Whether this expression is a member of a member chain.
-static bool isMemberChainMember(Expr *expr) {
-  return getMemberChainSubExpr(expr) != nullptr;
-}
 /// Whether this expression sits at the end of a chain of member accesses.
 static bool isMemberChainTail(Expr *expr, Expr *parent) {
   assert(expr && "isMemberChainTail called with null expr!");
   // If this expression's parent is not itself part of a chain (or, this expr
   // has no parent expr), this must be the tail of the chain.
-  return parent == nullptr || !isMemberChainMember(parent);
+  return !parent || getMemberChainSubExpr(parent) != expr;
 }
 
 static bool isValidForwardReference(ValueDecl *D, DeclContext *DC,
@@ -909,9 +905,6 @@ namespace {
     /// node when visited.
     Expr *UnresolvedCtorRebindTarget = nullptr;
 
-    /// The expressions that are direct arguments of call expressions.
-    llvm::SmallPtrSet<Expr *, 4> CallArgs;
-
     /// Keep track of acceptable DiscardAssignmentExpr's.
     llvm::SmallPtrSet<DiscardAssignmentExpr*, 2> CorrectDiscardAssignmentExprs;
 
@@ -948,11 +941,12 @@ namespace {
     bool canSimplifyDiscardAssignmentExpr(DiscardAssignmentExpr *DAE);
 
     /// In Swift < 5, diagnose and correct invalid multi-argument or
-    /// argument-labeled interpolations.
-    void correctInterpolationIfStrange(InterpolatedStringLiteralExpr *ISLE) {
+    /// argument-labeled interpolations. Returns \c true if the AST walk should
+    /// continue, or \c false if it should be aborted.
+    bool correctInterpolationIfStrange(InterpolatedStringLiteralExpr *ISLE) {
       // These expressions are valid in Swift 5+.
       if (getASTContext().isSwiftVersionAtLeast(5))
-        return;
+        return true;
 
       /// Diagnoses appendInterpolation(...) calls with multiple
       /// arguments or argument labels and corrects them.
@@ -978,20 +972,19 @@ namespace {
           if (!isa<CallExpr>(E))
             return { true, E };
 
-          auto call = cast<CallExpr>(E);
+          auto *call = cast<CallExpr>(E);
+          auto *args = call->getArgs();
+
+          auto lParen = args->getLParenLoc();
+          auto rParen = args->getRParenLoc();
+
           if (auto callee = dyn_cast<UnresolvedDotExpr>(call->getFn())) {
             if (callee->getName().getBaseName() ==
                 Context.Id_appendInterpolation) {
-              Expr *newArg = nullptr;
-              SourceLoc lParen, rParen;
 
-              if (call->getNumArguments() > 1) {
-                auto *args = cast<TupleExpr>(call->getArg());
-
-                lParen = args->getLParenLoc();
-                rParen = args->getRParenLoc();
-                Expr *secondArg = args->getElement(1);
-
+              Optional<Argument> newArg;
+              if (args->size() > 1) {
+                auto *secondArg = args->get(1).getExpr();
                 Context.Diags
                     .diagnose(secondArg->getLoc(),
                               diag::string_interpolation_list_changing)
@@ -1002,18 +995,27 @@ namespace {
                     .fixItInsertAfter(lParen, "(")
                     .fixItInsert(rParen, ")");
 
-                newArg = args;
-              }
-              else if(call->getNumArguments() == 1 &&
-                      call->getArgumentLabels().front() != Identifier()) {
-                auto *args = cast<TupleExpr>(call->getArg());
-                newArg = args->getElement(0);
+                // Make sure we don't have an inout arg somewhere, as that's
+                // invalid even with the compatibility fix.
+                for (auto arg : *args) {
+                  if (arg.isInOut()) {
+                    Context.Diags.diagnose(arg.getExpr()->getStartLoc(),
+                                           diag::extraneous_address_of);
+                    return {false, nullptr};
+                  }
+                }
 
-                lParen = args->getLParenLoc();
-                rParen = args->getRParenLoc();
+                // Form a new argument tuple from the argument list.
+                auto *packed = args->packIntoImplicitTupleOrParen(Context);
+                newArg = Argument::unlabeled(packed);
+              } else if (args->size() == 1 &&
+                         args->front().getLabel() != Identifier()) {
+                // Form a new argument that drops the label.
+                auto *argExpr = args->front().getExpr();
+                newArg = Argument::unlabeled(argExpr);
 
-                SourceLoc argLabelLoc = call->getArgumentLabelLoc(0),
-                          argLoc = newArg->getStartLoc();
+                SourceLoc argLabelLoc = args->front().getLabelLoc(),
+                          argLoc = argExpr->getStartLoc();
 
                 Context.Diags
                     .diagnose(argLabelLoc,
@@ -1022,7 +1024,7 @@ namespace {
                 Context.Diags
                     .diagnose(argLabelLoc,
                               diag::string_interpolation_remove_label,
-                              call->getArgumentLabels().front())
+                              args->front().getLabel())
                     .fixItRemoveChars(argLabelLoc, argLoc);
               }
 
@@ -1035,9 +1037,11 @@ namespace {
                     DeclNameRef(Context.Id_appendInterpolation),
                     /*nameloc=*/DeclNameLoc(), /*Implicit=*/true);
 
-                E = CallExpr::create(Context, newCallee, lParen, {newArg},
-                                     {Identifier()}, {SourceLoc()}, rParen,
-                                     /*trailingClosures=*/{},
+                auto *newArgList =
+                    ArgumentList::create(Context, lParen, {*newArg}, rParen,
+                                         /*trailingClosureIdx*/ None,
+                                         /*implicit*/ false);
+                E = CallExpr::create(Context, newCallee, newArgList,
                                      /*implicit=*/false);
               }
             }
@@ -1050,7 +1054,7 @@ namespace {
         }
       };
 
-      ISLE->getAppendingExpr()->walk(
+      return ISLE->getAppendingExpr()->walk(
           StrangeInterpolationRewriter(getASTContext()));
     }
 
@@ -1111,27 +1115,6 @@ namespace {
     }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      // If this is a call or subscript, record the argument expression.
-      {
-        if (auto call = dyn_cast<ApplyExpr>(expr)) {
-          if (!isa<SelfApplyExpr>(expr)) {
-            CallArgs.insert(call->getArg());
-          }
-        }
-
-        if (auto *subscript = dyn_cast<SubscriptExpr>(expr)) {
-          CallArgs.insert(subscript->getIndex());
-        }
-
-        if (auto *dynamicSubscript = dyn_cast<DynamicSubscriptExpr>(expr)) {
-          CallArgs.insert(dynamicSubscript->getIndex());
-        }
-
-        if (auto *OLE = dyn_cast<ObjectLiteralExpr>(expr)) {
-          CallArgs.insert(OLE->getArg());
-        }
-      }
-
       // FIXME(diagnostics): `InOutType` could appear here as a result
       // of successful re-typecheck of the one of the sub-expressions e.g.
       // `let _: Int = { (s: inout S) in s.bar() }`. On the first
@@ -1215,55 +1198,34 @@ namespace {
 
           SourceLoc lastInnerParenLoc;
           // Unwrap to the outermost paren in the sequence.
-          if (isa<ParenExpr>(parent)) {
-            for (;;) {
-              auto nextParent = parents.find(parent);
-              if (nextParent == parents.end())
-                break;
-
-              // e.g. `foo((&bar), x: ...)`
-              if (isa<TupleExpr>(nextParent->second)) {
-                lastInnerParenLoc = cast<ParenExpr>(parent)->getLParenLoc();
-                parent = nextParent->second;
-                break;
-              }
-
-              // e.g. `foo(((&bar))`
-              if (isa<ParenExpr>(nextParent->second)) {
-                lastInnerParenLoc = cast<ParenExpr>(parent)->getLParenLoc();
-                parent = nextParent->second;
-                continue;
-              }
-
+          // e.g. `foo(((&bar))`
+          while (auto *PE = dyn_cast<ParenExpr>(parent)) {
+            auto nextParent = parents.find(parent);
+            if (nextParent == parents.end())
               break;
-            }
+
+            lastInnerParenLoc = PE->getLParenLoc();
+            parent = nextParent->second;
           }
 
-          if (isa<TupleExpr>(parent) || isa<ParenExpr>(parent)) {
-            auto call = parents.find(parent);
-            if (call != parents.end()) {
-              if (isa<ApplyExpr>(call->getSecond()) ||
-                  isa<UnresolvedMemberExpr>(call->getSecond())) {
-                // If outermost paren is associated with a call or
-                // a member reference, it might be valid to have `&`
-                // before all of the parens.
-                if (lastInnerParenLoc.isValid()) {
-                  auto &DE = getASTContext().Diags;
-                  auto diag = DE.diagnose(expr->getStartLoc(),
-                                          diag::extraneous_address_of);
-                  diag.fixItExchange(expr->getLoc(), lastInnerParenLoc);
-                }
-
-                return finish(true, expr);
-              }
-
-              if (isa<SubscriptExpr>(call->getSecond())) {
-                getASTContext().Diags.diagnose(
-                    expr->getStartLoc(),
-                    diag::cannot_pass_inout_arg_to_subscript);
-                return finish(false, nullptr);
-              }
+          if (isa<ApplyExpr>(parent) || isa<UnresolvedMemberExpr>(parent)) {
+            // If outermost paren is associated with a call or
+            // a member reference, it might be valid to have `&`
+            // before all of the parens.
+            if (lastInnerParenLoc.isValid()) {
+              auto &DE = getASTContext().Diags;
+              auto diag = DE.diagnose(expr->getStartLoc(),
+                                      diag::extraneous_address_of);
+              diag.fixItExchange(expr->getLoc(), lastInnerParenLoc);
             }
+            return finish(true, expr);
+          }
+
+          if (isa<SubscriptExpr>(parent)) {
+            getASTContext().Diags.diagnose(
+                expr->getStartLoc(),
+                diag::cannot_pass_inout_arg_to_subscript);
+            return finish(false, nullptr);
           }
         }
 
@@ -1272,8 +1234,10 @@ namespace {
         return finish(false, nullptr);
       }
 
-      if (auto *ISLE = dyn_cast<InterpolatedStringLiteralExpr>(expr))
-        correctInterpolationIfStrange(ISLE);
+      if (auto *ISLE = dyn_cast<InterpolatedStringLiteralExpr>(expr)) {
+        if (!correctInterpolationIfStrange(ISLE))
+          return finish(false, nullptr);
+      }
 
       if (auto *assignment = dyn_cast<AssignExpr>(expr))
         markAcceptableDiscardExprs(assignment->getDest());
@@ -1352,11 +1316,9 @@ namespace {
             if (isa<IdentityExpr>(ancestor) ||
                 isa<ForceValueExpr>(ancestor) ||
                 isa<AnyTryExpr>(ancestor)) {
-              if (!CallArgs.count(ancestor)) {
-                if (target)
-                  target = ancestor;
-                continue;
-              }
+              if (target)
+                target = ancestor;
+              continue;
             }
 
             // No other expression kinds are permitted.
@@ -1583,7 +1545,7 @@ bool PreCheckExpression::possiblyInTypeContext(Expr *E) {
     if (ParentExpr->isValidParentOfTypeExpr(E))
       return true;
 
-    if (!exprLooksLikeAType(ParentExpr) || CallArgs.count(ParentExpr))
+    if (!exprLooksLikeAType(ParentExpr))
       return false;
 
     E = ParentExpr;
@@ -1603,10 +1565,6 @@ bool PreCheckExpression::canSimplifyDiscardAssignmentExpr(
 /// as expressions due to the parser not knowing which identifiers are
 /// type names.
 TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
-  // Don't try simplifying a call argument, because we don't want to
-  // simplify away the required ParenExpr/TupleExpr.
-  if (CallArgs.count(E) > 0) return nullptr;
-
   // Fold member types.
   if (auto *UDE = dyn_cast<UnresolvedDotExpr>(E)) {
     return simplifyNestedTypeExpr(UDE);
@@ -1681,9 +1639,8 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
   
   // Fold a tuple expr like (T1,T2) into a tuple type (T1,T2).
   if (auto *TE = dyn_cast<TupleExpr>(E)) {
-    if (TE->hasTrailingClosure() ||
-        // FIXME: Decide what to do about ().  It could be a type or an expr.
-        TE->getNumElements() == 0)
+    // FIXME: Decide what to do about ().  It could be a type or an expr.
+    if (TE->getNumElements() == 0)
       return nullptr;
 
     SmallVector<TupleTypeReprElement, 4> Elts;
@@ -1965,10 +1922,8 @@ void PreCheckExpression::resolveKeyPathExpr(KeyPathExpr *KPE) {
         }
       } else if (auto SE = dyn_cast<SubscriptExpr>(expr)) {
         // .[0] or just plain [0]
-        components.push_back(
-            KeyPathExpr::Component::forUnresolvedSubscriptWithPrebuiltIndexExpr(
-                getASTContext(), SE->getIndex(), SE->getArgumentLabels(),
-                SE->getLoc()));
+        components.push_back(KeyPathExpr::Component::forUnresolvedSubscript(
+            getASTContext(), SE->getArgs()));
 
         expr = SE->getBase();
       } else if (auto BOE = dyn_cast<BindOptionalExpr>(expr)) {
@@ -2059,15 +2014,18 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
   }
 
   auto *call = dyn_cast<CallExpr>(E);
-  if (!call || call->getNumArguments() != 1)
+  if (!call)
     return nullptr;
 
   auto *typeExpr = dyn_cast<TypeExpr>(call->getFn());
   if (!typeExpr)
     return nullptr;
 
-  auto *argExpr = call->getArg()->getSemanticsProvidingExpr();
-  auto *literal = dyn_cast<LiteralExpr>(argExpr);
+  auto *unaryArg = call->getArgs()->getUnlabeledUnaryExpr();
+  if (!unaryArg)
+    return nullptr;
+
+  auto *literal = dyn_cast<LiteralExpr>(unaryArg->getSemanticsProvidingExpr());
   if (!literal)
     return nullptr;
 
@@ -2112,7 +2070,7 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
 
   SmallVector<ProtocolConformance *, 2> conformances;
   return castTy->getAnyNominal()->lookupConformance(protocol, conformances)
-             ? CoerceExpr::forLiteralInit(getASTContext(), argExpr,
+             ? CoerceExpr::forLiteralInit(getASTContext(), literal,
                                           call->getSourceRange(),
                                           typeExpr->getTypeRepr())
              : nullptr;
