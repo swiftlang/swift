@@ -597,7 +597,7 @@ static Type formExtensionInterfaceType(
   if (!nominal->isGeneric() || isa<ProtocolDecl>(nominal)) {
     resultType = NominalType::get(nominal, parentType,
                                   nominal->getASTContext());
-  } else {
+  } else if (genericParams) {
     auto currentBoundType = type->getAs<BoundGenericType>();
 
     // Form the bound generic type with the type parameters provided.
