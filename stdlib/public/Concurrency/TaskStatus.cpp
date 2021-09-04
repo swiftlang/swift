@@ -354,6 +354,8 @@ static bool swift_task_tryAddStatusRecordImpl(TaskStatusRecord *newRecord) {
 SWIFT_CC(swift)
 static bool swift_task_removeStatusRecordImpl(TaskStatusRecord *record) {
   auto task = swift_task_getCurrent();
+  SWIFT_TASK_DEBUG_LOG("remove status record = %p, from current task = %p",
+                       record, task);
 
   // Load the current state.
   auto &status = task->_private().Status;
@@ -454,6 +456,8 @@ static ChildTaskStatusRecord*
 swift_task_attachChildImpl(AsyncTask *child) {
   void *allocation = malloc(sizeof(swift::ChildTaskStatusRecord));
   auto record = new (allocation) swift::ChildTaskStatusRecord(child);
+  SWIFT_TASK_DEBUG_LOG("attach child task = %p, record = %p, to current task = %p",
+                       child, record, swift_task_getCurrent());
   swift_task_addStatusRecord(record);
   return record;
 }
@@ -548,6 +552,7 @@ static void performGroupCancellationAction(TaskStatusRecord *record) {
 
 SWIFT_CC(swift)
 static void swift_task_cancelImpl(AsyncTask *task) {
+  SWIFT_TASK_DEBUG_LOG("cancel task = %p", task);
   Optional<StatusRecordLockRecord> recordLockRecord;
 
   // Acquire the status record lock.
