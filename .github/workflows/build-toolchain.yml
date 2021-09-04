@@ -78,9 +78,9 @@ jobs:
       - uses: actions/cache@v1
         with:
           path: build-cache
-          key: ${{ matrix.target }}-sccache-v10-${{ steps.cache_timestamp.outputs.timestamp }}
+          key: ${{ matrix.target }}-sccache-v11-${{ steps.cache_timestamp.outputs.timestamp }}
           restore-keys: |
-            ${{ matrix.target }}-sccache-v10-
+            ${{ matrix.target }}-sccache-v11-
 
       - name: Select Xcode version
         if: ${{ matrix.build_os == 'macos-10.15' }}
@@ -102,6 +102,9 @@ jobs:
               exit 1
             ;;
           esac
+
+      - name: Check cache hit rate
+        run: sccache --show-stats
 
       - name: Upload ${{ matrix.target }} installable archive
         uses: actions/upload-artifact@v1
