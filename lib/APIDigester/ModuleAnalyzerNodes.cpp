@@ -1797,12 +1797,17 @@ SwiftDeclCollector::addMembersToRoot(SDKNode *Root, IterableDeclContext *Context
       Root->addChild(constructSubscriptDeclNode(SD));
     } else if (isa<PatternBindingDecl>(Member)) {
       // All containing variables should have been handled.
+    } else if (isa<EnumCaseDecl>(Member)) {
+      // All containing variables should have been handled.
+    } else if (isa<IfConfigDecl>(Member)) {
+      // All containing members should have been handled.
     } else if (isa<DestructorDecl>(Member)) {
       // deinit has no impact.
     } else if (isa<MissingMemberDecl>(Member)) {
       // avoid adding MissingMemberDecl
     } else {
-      llvm_unreachable("unhandled member decl kind.");
+      llvm::errs() << "Unhandled decl:\n";
+      Member->dump(llvm::errs());
     }
   }
 }
