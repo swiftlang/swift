@@ -468,6 +468,10 @@ static Optional<PartialApplyThunkInfo> decomposePartialApplyThunk(
         != AutoClosureExpr::Kind::DoubleCurryThunk)
     return None;
 
+  auto *unarySelfArg = apply->getArgs()->getUnlabeledUnaryExpr();
+  assert(unarySelfArg &&
+         "Double curry should start with a unary (Self) -> ... arg");
+
   auto memberFn = outerAutoclosure->getUnwrappedCurryThunkExpr();
   if (!memberFn)
     return None;
@@ -480,7 +484,7 @@ static Optional<PartialApplyThunkInfo> decomposePartialApplyThunk(
     isEscaping = fnType && !fnType->isNoEscape();
   }
 
-  return PartialApplyThunkInfo{apply->getArg(), memberFn, isEscaping};
+  return PartialApplyThunkInfo{unarySelfArg, memberFn, isEscaping};
 }
 
 /// Find the immediate member reference in the given expression.
@@ -1098,10 +1102,10 @@ namespace {
         Expr *fn = call->getFn()->getValueProvidingExpr();
         if (auto memberRef = findMemberReference(fn)) {
           checkMemberReference(
-              call->getArg(), memberRef->first, memberRef->second,
+              call->getBase(), memberRef->first, memberRef->second,
               /*partialApply=*/None, call);
 
-          call->getArg()->walk(*this);
+          call->getBase()->walk(*this);
 
           if (applyStack.size() >= 2) {
             ApplyExpr *outerCall = applyStack[applyStack.size() - 2];
@@ -1109,7 +1113,7 @@ namespace {
               // This call is a partial application within an async call.
               // If the partial application take a value inout, it is bad.
               if (InOutExpr *inoutArg = dyn_cast<InOutExpr>(
-                      call->getArg()->getSemanticsProvidingExpr()))
+                      call->getBase()->getSemanticsProvidingExpr()))
                 diagnoseInOutArg(outerCall, inoutArg, true);
             }
           }
@@ -1688,27 +1692,6 @@ namespace {
       return result;
     }
 
-    /// Retrieve the call argument at the given index from the overall
-    /// call.
-    static Expr *getCallArgument(ApplyExpr *apply, unsigned index) {
-      Expr *arg = apply->getArg();
-
-      if (auto tuple = dyn_cast<TupleExpr>(arg)) {
-        if (index < tuple->getNumElements())
-          return tuple->getElement(index);
-
-        return nullptr;
-      }
-
-      if (index != 0)
-        return nullptr;
-
-      if (auto paren = dyn_cast<ParenExpr>(arg))
-        return paren->getSubExpr();
-
-      return arg;
-    }
-
     /// Check actor isolation for a particular application.
     bool checkApply(ApplyExpr *apply) {
       auto fnExprType = apply->getFn()->getType();
@@ -1751,10 +1734,11 @@ namespace {
         if (!fnType->getParams()[paramIdx].isIsolated())
           continue;
 
-        Expr *arg = getCallArgument(apply, paramIdx);
-        if (!arg)
+        auto *args = apply->getArgs();
+        if (paramIdx >= args->size())
           continue;
 
+        auto *arg = args->getExpr(paramIdx);
         if (getIsolatedActor(arg))
           continue;
 
@@ -2109,16 +2093,18 @@ namespace {
         }
 
         // Captured values in a path component must conform to Sendable.
-        // These captured values appear in Subscript, aka "index" components,
-        // such as \Type.dict[k] where k is a captured dictionary key.
-        if (auto indexExpr = component.getIndexExpr()) {
-          auto type = indexExpr->getType();
-          if (type &&
-              shouldDiagnoseExistingDataRaces(getDeclContext()) &&
-              diagnoseNonSendableTypes(
-                  type, getParentModule(), component.getLoc(),
-                  diag::non_sendable_keypath_capture))
-            diagnosed = true;
+        // These captured values appear in Subscript, such as \Type.dict[k]
+        // where k is a captured dictionary key.
+        if (auto *args = component.getSubscriptArgs()) {
+          for (auto arg : *args) {
+            auto type = arg.getExpr()->getType();
+            if (type &&
+                shouldDiagnoseExistingDataRaces(getDeclContext()) &&
+                diagnoseNonSendableTypes(
+                    type, getParentModule(), component.getLoc(),
+                    diag::non_sendable_keypath_capture))
+              diagnosed = true;
+          }
         }
       }
 
@@ -2648,7 +2634,7 @@ static Optional<ActorIsolation> getIsolationFromAttributes(
 
     // Handle @<global attribute type>(unsafe).
     bool isUnsafe = globalActorAttr->first->isArgUnsafe();
-    if (globalActorAttr->first->getArg() && !isUnsafe) {
+    if (globalActorAttr->first->hasArgs() && !isUnsafe) {
       ctx.Diags.diagnose(
           globalActorAttr->first->getLocation(),
           diag::global_actor_non_unsafe_init, globalActorType);
