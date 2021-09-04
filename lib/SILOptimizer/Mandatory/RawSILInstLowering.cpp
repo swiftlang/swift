@@ -317,6 +317,13 @@ static bool lowerRawSILOperations(SILFunction &fn) {
         changed = true;
         continue;
       }
+      
+      // mark_discarded just becomes a noop, resolving to its operand.
+      if (auto *mdi = dyn_cast<MarkDiscardedInst>(inst)) {
+        mdi->eraseFromParent();
+        changed = true;
+        continue;
+      }
 
       // mark_uninitialized just becomes a noop, resolving to its operand.
       if (auto *mui = dyn_cast<MarkUninitializedInst>(inst)) {
