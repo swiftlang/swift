@@ -97,17 +97,24 @@ class RewriteSystem final {
   /// rewrite rules, used for the linear order on symbols.
   ProtocolGraph Protos;
 
+  /// Constructed from a rule of the form X.[P2:T] => X.[P1:T] by
+  /// checkMergedAssociatedType().
+  struct MergedAssociatedType {
+    /// The *right* hand side of the original rule, X.[P1:T].
+    Term rhs;
+
+    /// The associated type symbol appearing at the end of the *left*
+    /// hand side of the original rule, [P2:T].
+    Symbol lhsSymbol;
+
+    /// The merged associated type symbol, [P1&P2:T].
+    Symbol mergedSymbol;
+  };
+
   /// A list of pending terms for the associated type merging completion
-  /// heuristic.
-  ///
-  /// The pair (lhs, rhs) satisfies the following conditions:
-  /// - lhs > rhs
-  /// - all symbols but the last are pair-wise equal in lhs and rhs
-  /// - the last symbol in both lhs and rhs is an associated type symbol
-  /// - the last symbol in both lhs and rhs has the same name
-  ///
-  /// See RewriteSystem::processMergedAssociatedTypes() for details.
-  std::vector<std::pair<MutableTerm, MutableTerm>> MergedAssociatedTypes;
+  /// heuristic. Entries are added by checkMergedAssociatedType(), and
+  /// consumed in processMergedAssociatedTypes().
+  std::vector<MergedAssociatedType> MergedAssociatedTypes;
 
   /// Pairs of rules which have already been checked for overlap.
   llvm::DenseSet<std::pair<unsigned, unsigned>> CheckedOverlaps;
@@ -166,11 +173,15 @@ public:
   void dump(llvm::raw_ostream &out) const;
 
 private:
-  std::pair<MutableTerm, MutableTerm>
+  bool
   computeCriticalPair(ArrayRef<Symbol>::const_iterator from,
-                      const Rule &lhs, const Rule &rhs) const;
+                      const Rule &lhs, const Rule &rhs,
+                      std::vector<std::pair<MutableTerm,
+                                            MutableTerm>> &result) const;
 
   void processMergedAssociatedTypes();
+
+  void checkMergedAssociatedType(Term lhs, Term rhs);
 };
 
 } // end namespace rewriting

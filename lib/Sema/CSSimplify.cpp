@@ -2435,7 +2435,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
           getFixedTypeRecursive(func1Param.getPlainType(), /*wantRValue=*/true);
       auto varargsType = func2Param.getPlainType();
 
-      // Delay solving this constriant until argument is resolved.
+      // Delay solving this constraint until argument is resolved.
       if (argType->is<TypeVariableType>()) {
         addUnsolvedConstraint(Constraint::create(
             *this, kind, func1, func2, getConstraintLocator(locator)));
@@ -2689,8 +2689,6 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
     // Optionals have a lot of special diagnostics and only one
     // generic argument so if we' re dealing with one, don't produce generic
     // arguments mismatch fixes.
-    // TODO(diagnostics): Move Optional diagnostics over to the
-    // new framework.
     if (bound1->getDecl()->isOptionalDecl())
       return matchDeepTypeArguments(*this, subflags, args1, args2, locator);
 

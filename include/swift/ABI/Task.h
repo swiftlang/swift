@@ -23,6 +23,7 @@
 #include "swift/ABI/Metadata.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/Runtime/Config.h"
+#include "swift/Runtime/VoucherShims.h"
 #include "swift/Basic/STLExtras.h"
 #include "bitset"
 #include "queue" // TODO: remove and replace with our own mpsc
@@ -72,7 +73,13 @@ public:
   // Derived classes can use this to store a Job Id.
   uint32_t Id = 0;
 
-  void *Reserved[2] = {};
+  /// The voucher associated with the job. Note: this is currently unused on
+  /// non-Darwin platforms, with stub implementations of the functions for
+  /// consistency.
+  voucher_t Voucher = nullptr;
+
+  /// Reserved for future use.
+  void *Reserved = nullptr;
 
   // We use this union to avoid having to do a second indirect branch
   // when resuming an asynchronous task, which we expect will be the
@@ -88,22 +95,31 @@ public:
   Job(JobFlags flags, JobInvokeFunction *invoke,
       const HeapMetadata *metadata = &jobHeapMetadata)
       : HeapObject(metadata), Flags(flags), RunJob(invoke) {
+    Voucher = voucher_copy();
     assert(!isAsyncTask() && "wrong constructor for a task");
   }
 
   Job(JobFlags flags, TaskContinuationFunction *invoke,
-      const HeapMetadata *metadata = &jobHeapMetadata)
+      const HeapMetadata *metadata = &jobHeapMetadata,
+      bool captureCurrentVoucher = true)
       : HeapObject(metadata), Flags(flags), ResumeTask(invoke) {
+    if (captureCurrentVoucher)
+      Voucher = voucher_copy();
     assert(isAsyncTask() && "wrong constructor for a non-task job");
   }
 
   /// Create a job with "immortal" reference counts.
   /// Used for async let tasks.
   Job(JobFlags flags, TaskContinuationFunction *invoke,
-      const HeapMetadata *metadata, InlineRefCounts::Immortal_t immortal)
+      const HeapMetadata *metadata, InlineRefCounts::Immortal_t immortal,
+      bool captureCurrentVoucher = true)
       : HeapObject(metadata, immortal), Flags(flags), ResumeTask(invoke) {
+    if (captureCurrentVoucher)
+      Voucher = voucher_copy();
     assert(isAsyncTask() && "wrong constructor for a non-task job");
   }
+
+  ~Job() { swift_voucher_release(Voucher); }
 
   bool isAsyncTask() const {
     return Flags.isAsyncTask();
@@ -229,8 +245,9 @@ public:
   /// Private.initialize separately.
   AsyncTask(const HeapMetadata *metadata, JobFlags flags,
             TaskContinuationFunction *run,
-            AsyncContext *initialContext)
-    : Job(flags, run, metadata),
+            AsyncContext *initialContext,
+            bool captureCurrentVoucher)
+    : Job(flags, run, metadata, captureCurrentVoucher),
       ResumeContext(initialContext) {
     assert(flags.isAsyncTask());
     Id = getNextTaskId();
@@ -243,8 +260,9 @@ public:
   AsyncTask(const HeapMetadata *metadata, InlineRefCounts::Immortal_t immortal,
             JobFlags flags,
             TaskContinuationFunction *run,
-            AsyncContext *initialContext)
-    : Job(flags, run, metadata, immortal),
+            AsyncContext *initialContext,
+            bool captureCurrentVoucher)
+    : Job(flags, run, metadata, immortal, captureCurrentVoucher),
       ResumeContext(initialContext) {
     assert(flags.isAsyncTask());
     Id = getNextTaskId();
