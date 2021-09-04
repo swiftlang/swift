@@ -3906,11 +3906,18 @@ bool GenericSignatureBuilder::addGenericParameterRequirements(
 void GenericSignatureBuilder::addGenericParameter(GenericTypeParamType *GenericParam) {
   auto params = getGenericParams();
   (void)params;
-  assert(params.empty() ||
-         ((GenericParam->getDepth() == params.back()->getDepth() &&
-           GenericParam->getIndex() == params.back()->getIndex() + 1) ||
-          (GenericParam->getDepth() > params.back()->getDepth() &&
-           GenericParam->getIndex() == 0)));
+
+#ifndef NDEBUG
+  if (params.empty()) {
+    assert(GenericParam->getDepth() == 0);
+    assert(GenericParam->getIndex() == 0);
+  } else {
+    assert((GenericParam->getDepth() == params.back()->getDepth() &&
+            GenericParam->getIndex() == params.back()->getIndex() + 1) ||
+           (GenericParam->getDepth() > params.back()->getDepth() &&
+            GenericParam->getIndex() == 0));
+  }
+#endif
 
   // Create a potential archetype for this type parameter.
   auto PA = new (Impl->Allocator) PotentialArchetype(GenericParam);
