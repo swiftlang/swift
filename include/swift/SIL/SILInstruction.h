@@ -1785,7 +1785,7 @@ class TailAllocatedDebugVariable {
   } Bits;
 public:
   TailAllocatedDebugVariable(Optional<SILDebugVariable>, char *buf,
-                             SILType *AuxVarType = nullptr,
+                             bool HasDeclName, SILType *AuxVarType = nullptr,
                              SILLocation *DeclLoc = nullptr,
                              const SILDebugScope **DeclScope = nullptr,
                              SILDIExprElement *DIExprOps = nullptr);
@@ -1810,13 +1810,11 @@ public:
     if (!Bits.Data.HasValue)
       return None;
 
-    if (VD)
-      return SILDebugVariable(VD->getName().empty() ? "" : VD->getName().str(),
-                              VD->isLet(), getArgNo(), isImplicit(), AuxVarType,
-                              DeclLoc, DeclScope, DIExprElements);
-    else
-      return SILDebugVariable(getName(buf), isLet(), getArgNo(), isImplicit(),
-                              AuxVarType, DeclLoc, DeclScope, DIExprElements);
+    StringRef name = getName(buf);
+    if (VD && name.empty())
+      name = VD->getName().str();
+    return SILDebugVariable(name, isLet(), getArgNo(), isImplicit(), AuxVarType,
+                            DeclLoc, DeclScope, DIExprElements);
   }
 };
 static_assert(sizeof(TailAllocatedDebugVariable) == 4,

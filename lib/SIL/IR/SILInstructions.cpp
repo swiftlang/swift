@@ -127,12 +127,21 @@ static void *allocateDebugVarCarryingInst(SILModule &M,
 }
 
 TailAllocatedDebugVariable::TailAllocatedDebugVariable(
-    Optional<SILDebugVariable> Var, char *buf, SILType *AuxVarType,
-    SILLocation *DeclLoc, const SILDebugScope **DeclScope,
+    Optional<SILDebugVariable> Var, char *buf, bool HasDeclName,
+    SILType *AuxVarType, SILLocation *DeclLoc, const SILDebugScope **DeclScope,
     SILDIExprElement *DIExprOps) {
   if (!Var) {
     Bits.RawValue = 0;
     return;
+  }
+
+  // Substitute anonymous function arguments with "_$ArgNo". This is an odd
+  // function to do this, but because SILDebugVariable uses a StringRef for Name
+  // there isn't really a better one.
+  llvm::SmallString<4> Name;
+  if (!HasDeclName && Var->Name.size() == 0 && Var->ArgNo) {
+    llvm::raw_svector_ostream(Name) << '_' << (Var->ArgNo - 1);
+    Var->Name = Name;
   }
 
   Bits.Data.HasValue = true;
@@ -202,14 +211,15 @@ AllocStackInst::AllocStackInst(SILDebugLocation Loc, SILType elementType,
     TypeDependentOperands.size();
   assert(SILNode::Bits.AllocStackInst.NumOperands ==
          TypeDependentOperands.size() && "Truncation");
+  auto *VD = Loc.getLocation().getAsASTNode<VarDecl>();
   SILNode::Bits.AllocStackInst.VarInfo =
-      TailAllocatedDebugVariable(Var, getTrailingObjects<char>(),
-                                 getTrailingObjects<SILType>(),
-                                 getTrailingObjects<SILLocation>(),
-                                 getTrailingObjects<const SILDebugScope *>(),
-                                 getTrailingObjects<SILDIExprElement>())
+      TailAllocatedDebugVariable(
+          Var, getTrailingObjects<char>(), VD ? !VD->getName().empty() : false,
+          getTrailingObjects<SILType>(), getTrailingObjects<SILLocation>(),
+          getTrailingObjects<const SILDebugScope *>(),
+          getTrailingObjects<SILDIExprElement>())
           .getRawValue();
-  if (auto *VD = Loc.getLocation().getAsASTNode<VarDecl>()) {
+  if (Var && VD) {
     TailAllocatedDebugVariable DbgVar(SILNode::Bits.AllocStackInst.VarInfo);
     DbgVar.setImplicit(VD->isImplicit() || DbgVar.isImplicit());
     SILNode::Bits.AllocStackInst.VarInfo = DbgVar.getRawValue();
@@ -305,15 +315,19 @@ AllocRefDynamicInst::create(SILDebugLocation DebugLoc, SILFunction &F,
       AllocRefDynamicInst(DebugLoc, ty, objc, ElementTypes, AllOperands);
 }
 
+static bool hasDeclName(SILDebugLocation Loc) {
+  auto *VD = Loc.getLocation().getAsASTNode<VarDecl>();
+  return VD ? !VD->getName().empty() : false;
+}
+
 AllocBoxInst::AllocBoxInst(SILDebugLocation Loc, CanSILBoxType BoxType,
                            ArrayRef<SILValue> TypeDependentOperands,
                            SILFunction &F, Optional<SILDebugVariable> Var,
                            bool hasDynamicLifetime)
-    : InstructionBaseWithTrailingOperands(TypeDependentOperands, Loc,
-                                      SILType::getPrimitiveObjectType(BoxType)),
-      VarInfo(Var, getTrailingObjects<char>()),
-      dynamicLifetime(hasDynamicLifetime) {
-}
+    : InstructionBaseWithTrailingOperands(
+          TypeDependentOperands, Loc, SILType::getPrimitiveObjectType(BoxType)),
+      VarInfo(Var, getTrailingObjects<char>(), hasDeclName(Loc)),
+      dynamicLifetime(hasDynamicLifetime) {}
 
 AllocBoxInst *AllocBoxInst::create(SILDebugLocation Loc,
                                    CanSILBoxType BoxType,
@@ -341,8 +355,8 @@ DebugValueInst::DebugValueInst(SILDebugLocation DebugLoc, SILValue Operand,
       SILDebugVariableSupplement(Var.DIExpr.getNumElements(),
                                  Var.Type.hasValue(), Var.Loc.hasValue(),
                                  Var.Scope),
-      VarInfo(Var, getTrailingObjects<char>(), getTrailingObjects<SILType>(),
-              getTrailingObjects<SILLocation>(),
+      VarInfo(Var, getTrailingObjects<char>(), hasDeclName(DebugLoc),
+              getTrailingObjects<SILType>(), getTrailingObjects<SILLocation>(),
               getTrailingObjects<const SILDebugScope *>(),
               getTrailingObjects<SILDIExprElement>()) {
   if (auto *VD = DebugLoc.getLocation().getAsASTNode<VarDecl>())
