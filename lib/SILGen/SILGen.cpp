@@ -2005,6 +2005,14 @@ public:
     performTypeChecking(*sf);
 
     SourceFileScope scope(SGM, sf);
+    if (auto *SSF = sf->getSynthesizedFile()) {
+      for (Decl *D : SSF->getTopLevelDecls()) {
+        FrontendStatsTracer StatsTracer(SGM.getASTContext().Stats,
+                                        "SILgen-synthesized-decl", D);
+        SGM.visit(D);
+      }
+    }
+    
     for (auto *D : sf->getTopLevelDecls()) {
       FrontendStatsTracer StatsTracer(SGM.getASTContext().Stats,
                                       "SILgen-decl", D);
