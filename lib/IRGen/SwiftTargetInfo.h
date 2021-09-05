@@ -115,6 +115,8 @@ public:
   bool SwiftRetainIgnoresNegativeValues = false;
 
   bool UsableSwiftAsyncContextAddrIntrinsic = false;
+
+  bool UsableRelativePointer = true;
 };
 
 }

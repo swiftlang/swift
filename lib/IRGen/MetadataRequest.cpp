@@ -2763,14 +2763,21 @@ emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
                                                        IGM.Int32Ty);
     stringAddrOffset = subIGF.Builder.CreateSExtOrBitCast(stringAddrOffset,
                                                           IGM.SizeTy);
-    auto stringAddrBase = subIGF.Builder.CreatePtrToInt(cache, IGM.SizeTy);
-    if (IGM.getModule()->getDataLayout().isBigEndian()) {
-      stringAddrBase = subIGF.Builder.CreateAdd(stringAddrBase,
-                                      llvm::ConstantInt::get(IGM.SizeTy, 4));
+
+    llvm::Value *stringAddr;
+    if (IGM.TargetInfo.UsableRelativePointer) {
+      auto stringAddrBase = subIGF.Builder.CreatePtrToInt(cache, IGM.SizeTy);
+      if (IGM.getModule()->getDataLayout().isBigEndian()) {
+        stringAddrBase = subIGF.Builder.CreateAdd(stringAddrBase,
+                                        llvm::ConstantInt::get(IGM.SizeTy, 4));
+      }
+      stringAddr = subIGF.Builder.CreateAdd(stringAddrBase,
+                                                stringAddrOffset);
+      stringAddr = subIGF.Builder.CreateIntToPtr(stringAddr, IGM.Int8PtrTy);
+    } else {
+      stringAddr =
+          subIGF.Builder.CreateIntToPtr(stringAddrOffset, IGM.Int8PtrTy);
     }
-    auto stringAddr = subIGF.Builder.CreateAdd(stringAddrBase,
-                                               stringAddrOffset);
-    stringAddr = subIGF.Builder.CreateIntToPtr(stringAddr, IGM.Int8PtrTy);
 
     llvm::CallInst *call;
     if (request.isStaticallyAbstract()) {

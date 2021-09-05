@@ -162,6 +162,12 @@ static void configureSystemZ(IRGenModule &IGM, const llvm::Triple &triple,
   target.SwiftRetainIgnoresNegativeValues = true;
 }
 
+/// Configures target-specific information for wasm32 platforms.
+static void configureWasm32(IRGenModule &IGM, const llvm::Triple &triple,
+                            SwiftTargetInfo &target) {
+  target.UsableRelativePointer = false;
+}
+
 /// Configure a default target.
 SwiftTargetInfo::SwiftTargetInfo(
   llvm::Triple::ObjectFormatType outputObjectFormat,
@@ -229,12 +235,21 @@ SwiftTargetInfo SwiftTargetInfo::get(IRGenModule &IGM) {
   case llvm::Triple::systemz:
     configureSystemZ(IGM, triple, target);
     break;
-
+  case llvm::Triple::wasm32:
+    configureWasm32(IGM, triple, target);
+    break;
   default:
     // FIXME: Complain here? Default target info is unlikely to be correct.
     break;
   }
 
+  if (!target.UsableRelativePointer) {
+    // If using absolute pointer, the target arch must be less than 32bit
+    // because many runtime struct expect it aligned under 4 byte. Unless that,
+    // runtime structs will have extra padding bytes for alignments and it
+    // breaks runtime assumption.
+    assert(IGM.DataLayout.getPointerSizeInBits() <= 32);
+  }
   return target;
 }
 
