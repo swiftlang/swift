@@ -516,6 +516,7 @@ enum class OperatorKind {
 struct SWIFT_NODISCARD ManglingError {
   enum Code {
     Success = 0,
+    AssertionFailed,
     Uninitialized,
     TooComplex,
     BadNodeKind,

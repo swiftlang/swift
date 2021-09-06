@@ -25,19 +25,13 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "RemanglerBase.h"
+#include "DemanglerAssert.h"
 #include <cstdio>
 #include <cstdlib>
 
 using namespace swift;
 using namespace Demangle;
 using namespace Mangle;
-
-#define RETURN_IF_ERROR(x)                                                     \
-  do {                                                                         \
-    ManglingError err = (x);                                                   \
-    if (!err.isSuccess())                                                      \
-      return err;                                                              \
-  } while (0)
 
 static char getCharOfNodeText(Node *node, unsigned idx) {
   switch (node->getKind()) {
@@ -594,7 +588,7 @@ ManglingError Remangler::mangleGenericArgs(Node *node, char &Separator,
         fullSubstitutionMap = true;
 
       NodePointer unboundType = node->getChild(0);
-      assert(unboundType->getKind() == Node::Kind::Type);
+      DEMANGLER_ASSERT(unboundType->getKind() == Node::Kind::Type, node);
       NodePointer nominalType = unboundType->getChild(0);
       NodePointer parentOrModule = nominalType->getChild(0);
       RETURN_IF_ERROR(mangleGenericArgs(parentOrModule, Separator, depth + 1,
@@ -609,8 +603,9 @@ ManglingError Remangler::mangleGenericArgs(Node *node, char &Separator,
       fullSubstitutionMap = true;
 
       NodePointer unboundFunction = node->getChild(0);
-      assert(unboundFunction->getKind() == Node::Kind::Function ||
-             unboundFunction->getKind() == Node::Kind::Constructor);
+      DEMANGLER_ASSERT(unboundFunction->getKind() == Node::Kind::Function ||
+                       unboundFunction->getKind() == Node::Kind::Constructor,
+                       node);
       NodePointer parentOrModule = unboundFunction->getChild(0);
       RETURN_IF_ERROR(mangleGenericArgs(parentOrModule, Separator, depth + 1,
                                         fullSubstitutionMap));
@@ -771,7 +766,7 @@ ManglingError Remangler::mangleBoundGenericClass(Node *node, unsigned depth) {
 
 ManglingError Remangler::mangleBoundGenericEnum(Node *node, unsigned depth) {
   Node *Enum = node->getChild(0)->getChild(0);
-  assert(Enum->getKind() == Node::Kind::Enum);
+  DEMANGLER_ASSERT(Enum->getKind() == Node::Kind::Enum, node);
   Node *Mod = Enum->getChild(0);
   Node *Id = Enum->getChild(1);
   if (Mod->getKind() == Node::Kind::Module && Mod->getText() == STDLIB_NAME &&
@@ -974,7 +969,7 @@ Remangler::mangleDependentGenericConformanceRequirement(Node *node,
     if (!Mangling.isSuccess())
       return Mangling.error();
     auto NumMembersAndParamIdx = Mangling.result();
-    assert(NumMembersAndParamIdx.first < 0 || NumMembersAndParamIdx.second);
+    DEMANGLER_ASSERT(NumMembersAndParamIdx.first < 0 || NumMembersAndParamIdx.second, node);
     switch (NumMembersAndParamIdx.first) {
     case -1:
       Buffer << "RQ";
@@ -997,7 +992,7 @@ Remangler::mangleDependentGenericConformanceRequirement(Node *node,
   if (!Mangling.isSuccess())
     return Mangling.error();
   auto NumMembersAndParamIdx = Mangling.result();
-  assert(NumMembersAndParamIdx.first < 0 || NumMembersAndParamIdx.second);
+  DEMANGLER_ASSERT(NumMembersAndParamIdx.first < 0 || NumMembersAndParamIdx.second, node);
   switch (NumMembersAndParamIdx.first) {
   case -1:
     Buffer << "RB";
@@ -1042,7 +1037,7 @@ Remangler::mangleDependentGenericSameTypeRequirement(Node *node,
   if (!Mangling.isSuccess())
     return Mangling.error();
   auto NumMembersAndParamIdx = Mangling.result();
-  assert(NumMembersAndParamIdx.first < 0 || NumMembersAndParamIdx.second);
+  DEMANGLER_ASSERT(NumMembersAndParamIdx.first < 0 || NumMembersAndParamIdx.second, node);
   switch (NumMembersAndParamIdx.first) {
   case -1:
     Buffer << "RS";
@@ -1067,7 +1062,7 @@ Remangler::mangleDependentGenericLayoutRequirement(Node *node, unsigned depth) {
   if (!Mangling.isSuccess())
     return Mangling.error();
   auto NumMembersAndParamIdx = Mangling.result();
-  assert(NumMembersAndParamIdx.first < 0 || NumMembersAndParamIdx.second);
+  DEMANGLER_ASSERT(NumMembersAndParamIdx.first < 0 || NumMembersAndParamIdx.second, node);
   switch (NumMembersAndParamIdx.first) {
     case -1: Buffer << "RL"; break; // substitution
     case 0: Buffer << "Rl"; break;
@@ -1077,8 +1072,8 @@ Remangler::mangleDependentGenericLayoutRequirement(Node *node, unsigned depth) {
   // If not a substitution, mangle the dependent generic param index.
   if (NumMembersAndParamIdx.first != -1)
     mangleDependentGenericParamIndex(NumMembersAndParamIdx.second);
-  assert(node->getChild(1)->getKind() == Node::Kind::Identifier);
-  assert(node->getChild(1)->getText().size() == 1);
+  DEMANGLER_ASSERT(node->getChild(1)->getKind() == Node::Kind::Identifier, node);
+  DEMANGLER_ASSERT(node->getChild(1)->getText().size() == 1, node);
   Buffer << node->getChild(1)->getText()[0];
   if (node->getNumChildren() >=3)
     RETURN_IF_ERROR(mangleChildNode(node, 2, depth + 1));
@@ -1520,7 +1515,7 @@ Remangler::mangleGenericSpecializationNode(Node *node, const char *operatorStr,
       mangleListSeparator(FirstParam);
     }
   }
-  assert(!FirstParam && "generic specialization with no substitutions");
+  DEMANGLER_ASSERT(!FirstParam && "generic specialization with no substitutions", node);
 
   Buffer << operatorStr;
 
@@ -1687,7 +1682,7 @@ ManglingError Remangler::mangleImplConvention(Node *node, unsigned depth) {
 ManglingError
 Remangler::mangleImplParameterResultDifferentiability(Node *node,
                                                       unsigned depth) {
-  assert(node->hasText());
+  DEMANGLER_ASSERT(node->hasText(), node);
   // Empty string represents default differentiability.
   if (node->getText().empty())
     return ManglingError::Success;
@@ -1721,7 +1716,7 @@ ManglingError Remangler::mangleImplFunctionConvention(Node *node,
                       .Case("closure", 'K')
                       .Case("witness_method", 'W')
                       .Default(0);
-  assert(FuncAttr && "invalid impl function convention");
+  DEMANGLER_ASSERT(FuncAttr && "invalid impl function convention", node);
   if ((FuncAttr == 'B' || FuncAttr == 'C') && node->getNumChildren() > 1 &&
       node->getChild(1)->getKind() == Node::Kind::ClangType) {
     Buffer << 'z' << FuncAttr;
@@ -1766,7 +1761,7 @@ ManglingError Remangler::mangleImplFunctionType(Node *node, unsigned depth) {
     case Node::Kind::ImplYield:
     case Node::Kind::ImplErrorResult:
       // Mangle type. Type should be the last child.
-      assert(Child->getNumChildren() == 2 || Child->getNumChildren() == 3);
+      DEMANGLER_ASSERT(Child->getNumChildren() == 2 || Child->getNumChildren() == 3, node);
       RETURN_IF_ERROR(mangle(Child->getLastChild(), depth + 1));
       break;
     case Node::Kind::DependentPseudogenericSignature:
@@ -2372,9 +2367,10 @@ Remangler::mangleDependentProtocolConformanceAssociated(Node *node,
 
 ManglingError Remangler::mangleDependentConformanceIndex(Node *node,
                                                          unsigned depth) {
-  assert(node->getKind() == Node::Kind::Index ||
-         node->getKind() == Node::Kind::UnknownIndex);
-  assert(node->hasIndex() == (node->getKind() == Node::Kind::Index));
+  DEMANGLER_ASSERT(node->getKind() == Node::Kind::Index ||
+                   node->getKind() == Node::Kind::UnknownIndex, node);
+  DEMANGLER_ASSERT(node->hasIndex() == (node->getKind() == Node::Kind::Index),
+                   node);
   mangleIndex(node->hasIndex() ? node->getIndex() + 2 : 1);
   return ManglingError::Success;
 }
@@ -3080,16 +3076,18 @@ ManglingError Remangler::mangleOutlinedBridgedMethod(Node *node,
 
 ManglingError Remangler::mangleSILBoxTypeWithLayout(Node *node,
                                                     unsigned depth) {
-  assert(node->getNumChildren() == 1 || node->getNumChildren() == 3);
-  assert(node->getChild(0)->getKind() == Node::Kind::SILBoxLayout);
+  DEMANGLER_ASSERT(node->getNumChildren() == 1 || node->getNumChildren() == 3, node);
+  DEMANGLER_ASSERT(node->getChild(0)->getKind() == Node::Kind::SILBoxLayout, node);
   auto layout = node->getChild(0);
   auto layoutTypeList = Factory.createNode(Node::Kind::TypeList);
   for (unsigned i = 0, e = layout->getNumChildren(); i < e; ++i) {
-    assert(layout->getChild(i)->getKind() == Node::Kind::SILBoxImmutableField
-           || layout->getChild(i)->getKind() == Node::Kind::SILBoxMutableField);
+    DEMANGLER_ASSERT(layout->getChild(i)->getKind() == Node::Kind::SILBoxImmutableField
+                     || layout->getChild(i)->getKind() == Node::Kind::SILBoxMutableField,
+                     layout->getChild(i));
     auto field = layout->getChild(i);
-    assert(field->getNumChildren() == 1
-           && field->getChild(0)->getKind() == Node::Kind::Type);
+    DEMANGLER_ASSERT(field->getNumChildren() == 1
+                     && field->getChild(0)->getKind() == Node::Kind::Type,
+                     field);
     auto fieldType = field->getChild(0);
     // 'inout' mangling is used to represent mutable fields.
     if (field->getKind() == Node::Kind::SILBoxMutableField) {
@@ -3105,8 +3103,8 @@ ManglingError Remangler::mangleSILBoxTypeWithLayout(Node *node,
   if (node->getNumChildren() == 3) {
     auto signature = node->getChild(1);
     auto genericArgs = node->getChild(2);
-    assert(signature->getKind() == Node::Kind::DependentGenericSignature);
-    assert(genericArgs->getKind() == Node::Kind::TypeList);
+    DEMANGLER_ASSERT(signature->getKind() == Node::Kind::DependentGenericSignature, node);
+    DEMANGLER_ASSERT(genericArgs->getKind() == Node::Kind::TypeList, node);
     RETURN_IF_ERROR(mangleTypeList(genericArgs, depth + 1));
     RETURN_IF_ERROR(mangleDependentGenericSignature(signature, depth + 1));
     Buffer << "XX";
@@ -3472,7 +3470,7 @@ ManglingErrorOr<NodePointer> Demangle::getUnspecialized(Node *node,
     case Node::Kind::BoundGenericOtherNominalType:
     case Node::Kind::BoundGenericTypeAlias: {
       NodePointer unboundType = node->getChild(0);
-      assert(unboundType->getKind() == Node::Kind::Type);
+      DEMANGLER_ASSERT(unboundType->getKind() == Node::Kind::Type, unboundType);
       NodePointer nominalType = unboundType->getChild(0);
       if (isSpecialized(nominalType))
         return getUnspecialized(nominalType, Factory);
@@ -3481,8 +3479,9 @@ ManglingErrorOr<NodePointer> Demangle::getUnspecialized(Node *node,
 
     case Node::Kind::BoundGenericFunction: {
       NodePointer unboundFunction = node->getChild(0);
-      assert(unboundFunction->getKind() == Node::Kind::Function ||
-             unboundFunction->getKind() == Node::Kind::Constructor);
+      DEMANGLER_ASSERT(unboundFunction->getKind() == Node::Kind::Function ||
+                       unboundFunction->getKind() == Node::Kind::Constructor,
+                       unboundFunction);
       if (isSpecialized(unboundFunction))
         return getUnspecialized(unboundFunction, Factory);
       return unboundFunction;

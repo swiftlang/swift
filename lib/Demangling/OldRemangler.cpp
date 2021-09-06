@@ -22,18 +22,12 @@
 #include "swift/AST/Ownership.h"
 #include "swift/Strings.h"
 #include "RemanglerBase.h"
+#include "DemanglerAssert.h"
 #include <cstdio>
 #include <cstdlib>
 
 using namespace swift;
 using namespace Demangle;
-
-#define RETURN_IF_ERROR(x)                                                     \
-  do {                                                                         \
-    ManglingError err = (x);                                                   \
-    if (!err.isSuccess())                                                      \
-      return err;                                                              \
-  } while (0)
 
 namespace {
   class Remangler : public RemanglerBase {
@@ -122,7 +116,7 @@ namespace {
       return mangle(*node->begin(), depth);
     }
     ManglingError mangleChildNode(Node *node, unsigned index, unsigned depth) {
-      assert(index < node->getNumChildren());
+      DEMANGLER_ASSERT(index < node->getNumChildren(), node);
       return mangle(node->begin()[index], depth);
     }
 
@@ -547,7 +541,7 @@ Remangler::mangleDependentProtocolConformanceAssociated(Node *node,
 
 ManglingError Remangler::mangleProtocolConformance(Node *node, unsigned depth) {
   // type, protocol name, context
-  assert(node->getNumChildren() == 3);
+  DEMANGLER_ASSERT(node->getNumChildren() == 3, node);
   RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));
   RETURN_IF_ERROR(mangleProtocolWithoutPrefix(node->begin()[1], depth + 1));
   return mangleChildNode(node, 2, depth + 1);
@@ -909,7 +903,7 @@ ManglingError
 Remangler::mangleAssociatedTypeWitnessTableAccessor(Node *node,
                                                     unsigned depth) {
   Buffer << "WT";
-  assert(node->getNumChildren() == 3);
+  DEMANGLER_ASSERT(node->getNumChildren() == 3, node);
   RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1)); // protocol conformance
   RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1)); // type
   return mangleProtocolWithoutPrefix(node->begin()[2], depth + 1); // type
@@ -1010,7 +1004,7 @@ ManglingError Remangler::mangleVariable(Node *node, EntityContext &ctx,
 
 ManglingError Remangler::mangleSubscript(Node *node, EntityContext &ctx,
                                          unsigned depth) {
-  assert(node->getNumChildren() >= 2);
+  DEMANGLER_ASSERT(node->getNumChildren() >= 2, node);
   Buffer << 'i';
   RETURN_IF_ERROR(mangleEntityContext(node->begin()[0], ctx, depth + 1));
   if (node->getLastChild()->getKind() == Node::Kind::PrivateDeclName)
@@ -1056,7 +1050,7 @@ ManglingError Remangler::mangleAccessor(Node *storageNode,
 
   case Demangle::Node::Kind::Subscript: {
     auto NumChildren = storageNode->getNumChildren();
-    assert(NumChildren <= 4);
+    DEMANGLER_ASSERT(NumChildren <= 4, storageNode);
 
     auto PrivateName = storageNode->getChild(NumChildren - 1);
     if (PrivateName->getKind() == Node::Kind::PrivateDeclName)
@@ -1238,7 +1232,7 @@ ManglingError Remangler::mangleSimpleEntity(Node *node, char basicKind,
                                             StringRef entityKind,
                                             EntityContext &ctx,
                                             unsigned depth) {
-  assert(node->getNumChildren() == 1);
+  DEMANGLER_ASSERT(node->getNumChildren() == 1, node);
   Buffer << basicKind;
   RETURN_IF_ERROR(mangleEntityContext(node->begin()[0], ctx, depth + 1));
   Buffer << entityKind;
@@ -1249,7 +1243,7 @@ ManglingError
 Remangler::mangleNamedEntity(Node *node, char basicKind, StringRef entityKind,
                              EntityContext &ctx, unsigned depth,
                              StringRef artificialPrivateDiscriminator) {
-  assert(node->getNumChildren() == 2);
+  DEMANGLER_ASSERT(node->getNumChildren() == 2, node);
   if (basicKind != '\0') Buffer << basicKind;
   RETURN_IF_ERROR(mangleEntityContext(node->begin()[0], ctx, depth + 1));
   Buffer << entityKind;
@@ -1275,7 +1269,8 @@ Remangler::mangleNamedEntity(Node *node, char basicKind, StringRef entityKind,
 ManglingError Remangler::mangleTypedEntity(Node *node, char basicKind,
                                            StringRef entityKind,
                                            EntityContext &ctx, unsigned depth) {
-  assert(node->getNumChildren() == 2 || node->getNumChildren() == 3);
+  DEMANGLER_ASSERT(node->getNumChildren() == 2 || node->getNumChildren() == 3,
+                   node);
   Buffer << basicKind;
   RETURN_IF_ERROR(mangleEntityContext(node->begin()[0], ctx, depth + 1));
   Buffer << entityKind;
@@ -1295,7 +1290,8 @@ ManglingError Remangler::mangleNamedAndTypedEntity(Node *node, char basicKind,
                                                    StringRef entityKind,
                                                    EntityContext &ctx,
                                                    unsigned depth) {
-  assert(node->getNumChildren() == 3 || node->getNumChildren() == 4);
+  DEMANGLER_ASSERT(node->getNumChildren() == 3 || node->getNumChildren() == 4,
+                   node);
   Buffer << basicKind;
   RETURN_IF_ERROR(mangleEntityContext(node->begin()[0], ctx, depth + 1));
   Buffer << entityKind;
@@ -1349,8 +1345,8 @@ ManglingError Remangler::mangleEntityContext(Node *node, EntityContext &ctx,
 
 ManglingError Remangler::mangleEntityType(Node *node, EntityContext &ctx,
                                           unsigned depth) {
-  assert(node->getKind() == Node::Kind::Type);
-  assert(node->getNumChildren() == 1);
+  DEMANGLER_ASSERT(node->getKind() == Node::Kind::Type, node);
+  DEMANGLER_ASSERT(node->getNumChildren() == 1, node);
   node = node->begin()[0];
 
   // Expand certain kinds of type within the entity context.
@@ -1362,13 +1358,13 @@ ManglingError Remangler::mangleEntityType(Node *node, EntityContext &ctx,
              node->getKind() == Node::Kind::NoEscapeFunctionType)
                 ? 'F'
                 : 'f');
-    assert(node->getNumChildren() >= 2);
+    DEMANGLER_ASSERT(node->getNumChildren() >= 2, node);
     unsigned inputIndex = node->getNumChildren() - 2;
     for (unsigned i = 0; i <= inputIndex; ++i)
       RETURN_IF_ERROR(mangle(node->begin()[i], depth + 1));
     auto returnType = node->begin()[inputIndex+1];
-    assert(returnType->getKind() == Node::Kind::ReturnType);
-    assert(returnType->getNumChildren() == 1);
+    DEMANGLER_ASSERT(returnType->getKind() == Node::Kind::ReturnType, returnType);
+    DEMANGLER_ASSERT(returnType->getNumChildren() == 1, returnType);
     return mangleEntityType(returnType->begin()[0], ctx, depth + 1);
   }
   default:
@@ -1604,23 +1600,23 @@ ManglingError Remangler::mangleClangType(Node *node, unsigned depth) {
 }
 
 ManglingError Remangler::mangleImplParameter(Node *node, unsigned depth) {
-  assert(node->getNumChildren() == 2);
+  DEMANGLER_ASSERT(node->getNumChildren() == 2, node);
   return mangleChildNodes(node, depth + 1); // impl convention, type
 }
 
 ManglingError Remangler::mangleImplErrorResult(Node *node, unsigned depth) {
-  assert(node->getNumChildren() == 2);
+  DEMANGLER_ASSERT(node->getNumChildren() == 2, node);
   Buffer << 'z';
   return mangleChildNodes(node, depth + 1); // impl convention, type
 }
 
 ManglingError Remangler::mangleImplResult(Node *node, unsigned depth) {
-  assert(node->getNumChildren() == 2);
+  DEMANGLER_ASSERT(node->getNumChildren() == 2, node);
   return mangleChildNodes(node, depth + 1); // impl convention, type
 }
 
 ManglingError Remangler::mangleImplYield(Node *node, unsigned depth) {
-  assert(node->getNumChildren() == 2);
+  DEMANGLER_ASSERT(node->getNumChildren() == 2, node);
   Buffer << 'Y';
   return mangleChildNodes(node, depth + 1); // impl convention, type
 }
@@ -1650,7 +1646,7 @@ ManglingError Remangler::mangleImplInvocationSubstitutions(Node *node,
 }
 
 ManglingError Remangler::mangleImplConvention(Node *node, unsigned depth) {
-  assert(node->getKind() == Node::Kind::ImplConvention);
+  DEMANGLER_ASSERT(node->getKind() == Node::Kind::ImplConvention, node);
   StringRef text = node->getText();
   if (text == "@autoreleased") {
     Buffer << 'a';
@@ -1679,7 +1675,8 @@ ManglingError Remangler::mangleImplConvention(Node *node, unsigned depth) {
 ManglingError
 Remangler::mangleImplParameterResultDifferentiability(Node *node,
                                                       unsigned depth) {
-  assert(node->getKind() == Node::Kind::ImplDifferentiabilityKind);
+  DEMANGLER_ASSERT(node->getKind() == Node::Kind::ImplDifferentiabilityKind,
+                   node);
   StringRef text = node->getText();
   // Empty string represents default differentiability.
   if (text.empty())
@@ -1711,7 +1708,7 @@ ManglingError Remangler::mangleMetatype(Node *node, unsigned depth) {
     Buffer << 'M';
     return mangleSingleChildNode(node, depth + 1); // type
   } else {
-    assert(node->getNumChildren() == 2);
+    DEMANGLER_ASSERT(node->getNumChildren() == 2, node);
     Buffer << "XM";
     return mangleChildNodes(node, depth + 1); // metatype representation, type
   }
@@ -1722,7 +1719,7 @@ ManglingError Remangler::mangleExistentialMetatype(Node *node, unsigned depth) {
     Buffer << "PM";
     return mangleSingleChildNode(node, depth + 1); // type
   } else {
-    assert(node->getNumChildren() == 2);
+    DEMANGLER_ASSERT(node->getNumChildren() == 2, node);
     Buffer << "XPM";
     return mangleChildNodes(node, depth + 1); // metatype representation, type
   }
@@ -1752,10 +1749,10 @@ ManglingError Remangler::mangleProtocolList(Node *node, unsigned depth) {
 ManglingError
 Remangler::mangleProtocolListWithoutPrefix(Node *node, unsigned depth,
                                            Node *additionalProto) {
-  assert(node->getKind() == Node::Kind::ProtocolList);
-  assert(node->getNumChildren() == 1);
+  DEMANGLER_ASSERT(node->getKind() == Node::Kind::ProtocolList, node);
+  DEMANGLER_ASSERT(node->getNumChildren() == 1, node);
   auto typeList = node->begin()[0];
-  assert(typeList->getKind() == Node::Kind::TypeList);
+  DEMANGLER_ASSERT(typeList->getKind() == Node::Kind::TypeList, typeList);
   for (auto &child : *typeList) {
     RETURN_IF_ERROR(mangleProtocolWithoutPrefix(child, depth + 1));
   }
@@ -1932,7 +1929,7 @@ ManglingError Remangler::mangleConstrainedType(Node *node, unsigned depth) {
 
 ManglingError Remangler::mangleAssociatedType(Node *node, unsigned depth) {
   if (node->hasChildren()) {
-    assert(node->getNumChildren() == 1);
+    DEMANGLER_ASSERT(node->getNumChildren() == 1, node);
     return mangleProtocolListWithoutPrefix(*node->begin(), depth + 1);
   } else {
     Buffer << '_';
@@ -1946,7 +1943,8 @@ ManglingError Remangler::mangleDeclContext(Node *node, unsigned depth) {
 
 ManglingError Remangler::mangleExtension(Node *node, EntityContext &ctx,
                                          unsigned depth) {
-  assert(node->getNumChildren() == 2 || node->getNumChildren() == 3);
+  DEMANGLER_ASSERT(node->getNumChildren() == 2 || node->getNumChildren() == 3,
+                   node);
   if (node->getNumChildren() == 3) {
     Buffer << 'e';
   } else {
@@ -2006,10 +2004,10 @@ ManglingError Remangler::mangleDependentMemberType(Node *node, unsigned depth) {
     base = base->getFirstChild()->getFirstChild();
   } while (base->getKind() == Node::Kind::DependentMemberType);
 
-  assert(base->getKind() == Node::Kind::DependentGenericParamType
-         && "dependent members not based on a generic param are non-canonical"
-            " and shouldn't need remangling");
-  assert(members.size() >= 1);
+  DEMANGLER_ASSERT(base->getKind() == Node::Kind::DependentGenericParamType
+                   && "dependent members not based on a generic param are "
+                   "non-canonical and shouldn't need remangling", base);
+  DEMANGLER_ASSERT(members.size() >= 1, node);
   if (members.size() == 1) {
     Buffer << 'w';
     RETURN_IF_ERROR(mangleDependentGenericParamIndex(base, depth + 1));
@@ -2098,11 +2096,11 @@ ManglingError Remangler::mangleProtocolWithoutPrefix(Node *node,
     return ManglingError::Success;
 
   if (node->getKind() == Node::Kind::Type) {
-    assert(node->getNumChildren() == 1);
+    DEMANGLER_ASSERT(node->getNumChildren() == 1, node);
     node = node->begin()[0];
   }
 
-  assert(node->getKind() == Node::Kind::Protocol);
+  DEMANGLER_ASSERT(node->getKind() == Node::Kind::Protocol, node);
   EntityContext ctx;
   return mangleNominalType(node, '\0', ctx, depth + 1);
 }
@@ -2125,7 +2123,7 @@ ManglingError Remangler::mangleGenericArgs(Node *node, EntityContext &ctx,
   case Node::Kind::BoundGenericEnum:
   case Node::Kind::BoundGenericClass: {
     NodePointer unboundType = node->getChild(0);
-    assert(unboundType->getKind() == Node::Kind::Type);
+    DEMANGLER_ASSERT(unboundType->getKind() == Node::Kind::Type, unboundType);
     NodePointer nominalType = unboundType->getChild(0);
     NodePointer parentOrModule = nominalType->getChild(0);
     RETURN_IF_ERROR(mangleGenericArgs(parentOrModule, ctx, depth + 1));
@@ -2490,18 +2488,20 @@ ManglingError Remangler::mangleVTableThunk(Node *node, unsigned depth) {
 
 ManglingError Remangler::mangleSILBoxTypeWithLayout(Node *node,
                                                     unsigned depth) {
-  assert(node->getKind() == Node::Kind::SILBoxTypeWithLayout);
-  assert(node->getNumChildren() == 1 || node->getNumChildren() == 3);
+  DEMANGLER_ASSERT(node->getKind() == Node::Kind::SILBoxTypeWithLayout, node);
+  DEMANGLER_ASSERT(node->getNumChildren() == 1 || node->getNumChildren() == 3,
+                   node);
   Buffer << "XB";
   auto layout = node->getChild(0);
-  assert(layout->getKind() == Node::Kind::SILBoxLayout);
+  DEMANGLER_ASSERT(layout->getKind() == Node::Kind::SILBoxLayout, layout);
   NodePointer genericArgs = nullptr;
   if (node->getNumChildren() == 3) {
     NodePointer signature = node->getChild(1);
-    assert(signature->getKind() == Node::Kind::DependentGenericSignature);
+    DEMANGLER_ASSERT(signature->getKind() == Node::Kind::DependentGenericSignature,
+                     signature);
     genericArgs = node->getChild(2);
-    assert(genericArgs->getKind() == Node::Kind::TypeList);
-    
+    DEMANGLER_ASSERT(genericArgs->getKind() == Node::Kind::TypeList, genericArgs);
+
     Buffer << 'G';
     RETURN_IF_ERROR(mangleDependentGenericSignature(signature, depth + 1));
   }
@@ -2509,7 +2509,7 @@ ManglingError Remangler::mangleSILBoxTypeWithLayout(Node *node,
   if (genericArgs) {
     for (unsigned i = 0; i < genericArgs->getNumChildren(); ++i) {
       auto type = genericArgs->getChild(i);
-      assert(genericArgs->getKind() == Node::Kind::Type);
+      DEMANGLER_ASSERT(genericArgs->getKind() == Node::Kind::Type, genericArgs);
       RETURN_IF_ERROR(mangleType(type, depth + 1));
     }
     Buffer << '_';
@@ -2519,10 +2519,11 @@ ManglingError Remangler::mangleSILBoxTypeWithLayout(Node *node,
 }
 
 ManglingError Remangler::mangleSILBoxLayout(Node *node, unsigned depth) {
-  assert(node->getKind() == Node::Kind::SILBoxLayout);
+  DEMANGLER_ASSERT(node->getKind() == Node::Kind::SILBoxLayout, node);
   for (unsigned i = 0; i < node->getNumChildren(); ++i) {
-    assert(node->getKind() == Node::Kind::SILBoxImmutableField
-           || node->getKind() == Node::Kind::SILBoxMutableField);
+    DEMANGLER_ASSERT(node->getKind() == Node::Kind::SILBoxImmutableField
+                     || node->getKind() == Node::Kind::SILBoxMutableField,
+                     node);
     RETURN_IF_ERROR(mangle(node->getChild(i), depth + 1));
   }
   Buffer << '_';
@@ -2532,16 +2533,16 @@ ManglingError Remangler::mangleSILBoxLayout(Node *node, unsigned depth) {
 
 ManglingError Remangler::mangleSILBoxMutableField(Node *node, unsigned depth) {
   Buffer << 'm';
-  assert(node->getNumChildren() == 1
-         && node->getChild(0)->getKind() == Node::Kind::Type);
+  DEMANGLER_ASSERT(node->getNumChildren() == 1
+                   && node->getChild(0)->getKind() == Node::Kind::Type, node);
   return mangleType(node->getChild(0), depth + 1);
 }
 
 ManglingError Remangler::mangleSILBoxImmutableField(Node *node,
                                                     unsigned depth) {
   Buffer << 'i';
-  assert(node->getNumChildren() == 1
-         && node->getChild(0)->getKind() == Node::Kind::Type);
+  DEMANGLER_ASSERT(node->getNumChildren() == 1
+                   && node->getChild(0)->getKind() == Node::Kind::Type, node);
   return mangleType(node->getChild(0), depth + 1);
 }
 
@@ -2730,7 +2731,7 @@ Demangle::mangleNodeOld(NodePointer node, NodeFactory &Factory) {
 ManglingErrorOr<const char *>
 Demangle::mangleNodeAsObjcCString(NodePointer node,
                                   NodeFactory &Factory) {
-  assert(node);
+  DEMANGLER_ASSERT(node, node);
 
   Remangler remangler(Factory);
   remangler.append("_Tt");
