@@ -2165,7 +2165,9 @@ static parseJsonEmit(SDKContext &Ctx, StringRef FileName) {
 
   // Load the input file.
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
-    vfs::getFileOrSTDIN(*Ctx.getSourceMgr().getFileSystem(), FileName);
+    vfs::getFileOrSTDIN(*Ctx.getSourceMgr().getFileSystem(), FileName,
+                        /*FileSize*/-1, /*RequiresNullTerminator*/true,
+                        /*IsVolatile*/false, /*RetryCount*/30);
   if (!FileBufOrErr) {
     llvm_unreachable("Failed to read JSON file");
   }
