@@ -1989,3 +1989,13 @@ AllowInvalidStaticMemberRefOnProtocolMetatype::create(
   return new (cs.getAllocator())
       AllowInvalidStaticMemberRefOnProtocolMetatype(cs, locator);
 }
+
+bool AllowNonOptionalWeak::diagnose(const Solution &solution,
+                                    bool asNote) const {
+  return false;
+}
+
+AllowNonOptionalWeak *AllowNonOptionalWeak::create(ConstraintSystem &cs,
+                                                   ConstraintLocator *locator) {
+  return new (cs.getAllocator()) AllowNonOptionalWeak(cs, locator);
+}
