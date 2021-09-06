@@ -112,7 +112,7 @@ Expr *FailureDiagnostic::findParentExpr(const Expr *subExpr) const {
 
 ArgumentList *
 FailureDiagnostic::getArgumentListFor(ConstraintLocator *locator) const {
-  return getConstraintSystem().getArgumentList(locator);
+  return S.getArgumentList(locator);
 }
 
 Expr *FailureDiagnostic::getBaseExprFor(const Expr *anchor) const {

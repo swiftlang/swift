@@ -1198,6 +1198,11 @@ public:
   /// A map from argument expressions to their applied property wrapper expressions.
   llvm::MapVector<ASTNode, SmallVector<AppliedPropertyWrapper, 2>> appliedPropertyWrappers;
 
+  /// A mapping from the constraint locators for references to various
+  /// names (e.g., member references, normal name references, possible
+  /// constructions) to the argument lists for the call to that locator.
+  llvm::MapVector<ConstraintLocator *, ArgumentList *> argumentLists;
+
   /// Record a new argument matching choice for given locator that maps a
   /// single argument to a single parameter.
   void recordSingleArgMatchingChoice(ConstraintLocator *locator);
@@ -1331,6 +1336,10 @@ public:
   /// expression that reads the type from the Solution
   /// expression type map.
   bool isStaticallyDerivedMetatype(Expr *E) const;
+
+  /// Retrieve the argument list that is associated with a call at the given
+  /// locator.
+  ArgumentList *getArgumentList(ConstraintLocator *locator) const;
 
   SWIFT_DEBUG_DUMP;
 
@@ -2409,7 +2418,7 @@ private:
   /// A mapping from the constraint locators for references to various
   /// names (e.g., member references, normal name references, possible
   /// constructions) to the argument lists for the call to that locator.
-  llvm::DenseMap<ConstraintLocator *, ArgumentList *> ArgumentLists;
+  llvm::MapVector<ConstraintLocator *, ArgumentList *> ArgumentLists;
 
 public:
   /// A map from argument expressions to their applied property wrapper expressions.
@@ -2898,6 +2907,9 @@ public:
 
     /// The length of \c ImplicitValueConversions.
     unsigned numImplicitValueConversions;
+
+    /// The length of \c ArgumentLists.
+    unsigned numArgumentLists;
 
     /// The previous score.
     Score PreviousScore;

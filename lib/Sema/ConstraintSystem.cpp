@@ -3713,10 +3713,11 @@ static bool diagnoseAmbiguity(
                   /*isApplication=*/false, decl->getDescriptiveKind(),
                   name.isSpecial(), name.getBaseName());
     } else {
-      bool isApplication =
-          llvm::any_of(cs.ArgumentLists, [&](const auto &pair) {
+      bool isApplication = llvm::any_of(solutions, [&](const auto &S) {
+          return llvm::any_of(S.argumentLists, [&](const auto &pair) {
             return pair.first->getAnchor() == commonAnchor;
           });
+      });
 
       DE.diagnose(getLoc(commonAnchor),
                   diag::no_overloads_match_exactly_in_call, isApplication,
@@ -3757,7 +3758,7 @@ static bool diagnoseAmbiguity(
 
         if (fn->getNumParams() == 1) {
           auto *argList =
-              cs.getArgumentList(solution.Fixes.front()->getLocator());
+              solution.getArgumentList(solution.Fixes.front()->getLocator());
           assert(argList);
 
           const auto &param = fn->getParams()[0];
@@ -4671,6 +4672,18 @@ void ConstraintSystem::associateArgumentList(ConstraintLocator *locator,
   (void)inserted;
 }
 
+ArgumentList *Solution::getArgumentList(ConstraintLocator *locator) const {
+  if (!locator)
+    return nullptr;
+
+  if (auto *infoLocator = constraintSystem->getArgumentInfoLocator(locator)) {
+    auto known = argumentLists.find(infoLocator);
+    if (known != argumentLists.end())
+      return known->second;
+  }
+  return nullptr;
+}
+
 /// Given an apply expr, returns true if it is expected to have a direct callee
 /// overload, resolvable using `getChoiceFor`. Otherwise, returns false.
 static bool shouldHaveDirectCalleeOverload(const CallExpr *callExpr) {
@@ -4728,12 +4741,10 @@ Type Solution::resolveInterfaceType(Type type) const {
 
 Optional<FunctionArgApplyInfo>
 Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
-  auto &cs = getConstraintSystem();
-
   // It's only valid to use `&` in argument positions, but we need
   // to figure out exactly where it was used.
   if (auto *argExpr = getAsExpr<InOutExpr>(locator->getAnchor())) {
-    auto *argLoc = cs.getArgumentLocator(argExpr);
+    auto *argLoc = getConstraintSystem().getArgumentLocator(argExpr);
     assert(argLoc && "Incorrect use of `inout` expression");
     locator = argLoc;
   }
@@ -4766,7 +4777,7 @@ Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
   if (!argExpr)
     return None;
 
-  auto *argList = cs.getArgumentList(argLocator);
+  auto *argList = getArgumentList(argLocator);
   if (!argList)
     return None;
 
