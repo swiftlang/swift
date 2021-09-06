@@ -2191,9 +2191,16 @@ namespace {
           }
         }
 
-        if (!varType)
+        if (!varType) {
           varType = CS.createTypeVariable(CS.getConstraintLocator(locator),
                                           TVO_CanBindToNoEscape);
+
+          // If this is either a `weak` declaration or capture e.g.
+          // `weak var ...` or `[weak self]`. Let's wrap type variable
+          // into an optional.
+          if (optionality == ReferenceOwnershipOptionality::Required)
+            varType = TypeChecker::getOptionalType(var->getLoc(), varType);
+        }
 
         // When we are supposed to bind pattern variables, create a fresh
         // type variable and a one-way constraint to assign it to either the
@@ -2202,27 +2209,36 @@ namespace {
         if (bindPatternVarsOneWay) {
           oneWayVarType = CS.createTypeVariable(
               CS.getConstraintLocator(locator), TVO_CanBindToNoEscape);
-          CS.addConstraint(
-              ConstraintKind::OneWayEqual, oneWayVarType,
-              externalPatternType ? externalPatternType : varType, locator);
-        }
 
-        // If there is an externally-imposed type.
+          // If there is an externally-imposed pattern type and the
+          // binding/capture is marked as `weak`, let's make sure
+          // that the imposed type is optional.
+          //
+          // Note that there is no need to check `varType` since
+          // it's only "externally" bound if this pattern isn't marked
+          // as `weak`.
+          if (externalPatternType &&
+              optionality == ReferenceOwnershipOptionality::Required) {
+            // If the type is not yet known, let's add a constraint
+            // to make sure that it can only be bound to an optional type.
+            if (externalPatternType->isTypeVariableOrMember()) {
+              auto objectTy = CS.createTypeVariable(
+                  CS.getConstraintLocator(locator.withPathElement(
+                      ConstraintLocator::OptionalPayload)),
+                  TVO_CanBindToLValue | TVO_CanBindToNoEscape);
 
-        switch (optionality) {
-        case ReferenceOwnershipOptionality::Required:
-          varType = TypeChecker::getOptionalType(var->getLoc(), varType);
-          assert(!varType->hasError());
-
-          if (oneWayVarType) {
-            oneWayVarType =
-                TypeChecker::getOptionalType(var->getLoc(), oneWayVarType);
+              CS.addConstraint(ConstraintKind::OptionalObject,
+                               externalPatternType, objectTy, locator);
+            } else if (!externalPatternType->getOptionalObjectType()) {
+              // TODO(diagnostics): A tailored fix to indiciate that `weak`
+              // should have an optional type.
+              return Type();
+            }
           }
-          break;
 
-        case ReferenceOwnershipOptionality::Allowed:
-        case ReferenceOwnershipOptionality::Disallowed:
-          break;
+          CS.addConstraint(ConstraintKind::OneWayEqual, oneWayVarType,
+                           externalPatternType ? externalPatternType : varType,
+                           locator);
         }
 
         // If we have a type to ascribe to the variable, do so now.
