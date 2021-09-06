@@ -139,7 +139,7 @@ void DeclContext::forEachGenericContext(
         if (auto *gpList = genericCtx->getGenericParams())
           fn(gpList);
     }
-  } while ((dc = dc->getParent()));
+  } while ((dc = dc->getParentForLookup()));
 }
 
 unsigned DeclContext::getGenericContextDepth() const {

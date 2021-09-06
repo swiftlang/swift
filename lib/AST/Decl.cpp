@@ -982,10 +982,47 @@ bool GenericContext::isComputingGenericSignature() const {
                  GenericSignatureRequest{const_cast<GenericContext*>(this)});
 }
 
+/// If we hit a cycle while building the generic signature, we can't return
+/// nullptr, since this breaks invariants elsewhere. Instead, build a dummy
+/// signature with no requirements.
+static GenericSignature getPlaceholderGenericSignature(
+    const DeclContext *DC) {
+  SmallVector<GenericParamList *, 2> gpLists;
+  DC->forEachGenericContext([&](GenericParamList *genericParams) {
+    gpLists.push_back(genericParams);
+  });
+
+  if (gpLists.empty())
+    return nullptr;
+
+  std::reverse(gpLists.begin(), gpLists.end());
+  for (unsigned i : indices(gpLists))
+    gpLists[i]->setDepth(i);
+
+  SmallVector<GenericTypeParamType *, 2> result;
+  for (auto *genericParams : gpLists) {
+    for (auto *genericParam : *genericParams) {
+      result.push_back(genericParam->getDeclaredInterfaceType()
+                                   ->castTo<GenericTypeParamType>());
+    }
+  }
+
+  return GenericSignature::get(result, {});
+}
+
 GenericSignature GenericContext::getGenericSignature() const {
-  return evaluateOrDefault(
-      getASTContext().evaluator,
-      GenericSignatureRequest{const_cast<GenericContext *>(this)}, nullptr);
+  // Don't use evaluateOrDefault() here, because getting the 'default value'
+  // is slightly expensive here so we don't want to do it eagerly.
+  auto result = getASTContext().evaluator(
+      GenericSignatureRequest{const_cast<GenericContext *>(this)});
+  if (auto err = result.takeError()) {
+    llvm::handleAllErrors(std::move(err),
+      [](const CyclicalRequestError<GenericSignatureRequest> &E) {
+        // cycle detected
+      });
+    return getPlaceholderGenericSignature(this);
+  }
+  return *result;
 }
 
 GenericEnvironment *GenericContext::getGenericEnvironment() const {
@@ -1493,7 +1530,7 @@ bool PatternBindingEntry::isInitialized(bool onlyExplicit) const {
   // Initialized via a property wrapper.
   if (auto var = getPattern()->getSingleVar()) {
     auto customAttrs = var->getAttachedPropertyWrappers();
-    if (customAttrs.size() > 0 && customAttrs[0]->getArg() != nullptr)
+    if (customAttrs.size() > 0 && customAttrs[0]->hasArgs())
       return true;
   }
 
@@ -6119,7 +6156,7 @@ bool VarDecl::hasExternalPropertyWrapper() const {
     return true;
 
   // Wrappers with attribute arguments are always implementation-detail.
-  if (getAttachedPropertyWrappers().front()->getArg())
+  if (getAttachedPropertyWrappers().front()->hasArgs())
     return false;
 
   auto wrapperInfo = getAttachedPropertyWrapperTypeInfo(0);
@@ -6277,7 +6314,7 @@ bool VarDecl::isPropertyMemberwiseInitializedWithWrappedType() const {
 
   // If there was an initializer on the outermost wrapper, initialize
   // via the full wrapper.
-  if (customAttrs[0]->getArg() != nullptr)
+  if (customAttrs[0]->hasArgs())
     return false;
 
   // Default initialization does not use a value.
@@ -6785,9 +6822,9 @@ ParamDecl::getDefaultValueStringRepresentation(
       auto wrapperAttrs = original->getAttachedPropertyWrappers();
       if (wrapperAttrs.size() > 0) {
         auto attr = wrapperAttrs.front();
-        if (auto arg = attr->getArg()) {
+        if (auto *args = attr->getArgs()) {
           SourceRange fullRange(attr->getTypeRepr()->getSourceRange().Start,
-                                arg->getEndLoc());
+                                args->getEndLoc());
           auto charRange = Lexer::getCharSourceRangeFromSourceRange(
               getASTContext().SourceMgr, fullRange);
           return getASTContext().SourceMgr.extractText(charRange);

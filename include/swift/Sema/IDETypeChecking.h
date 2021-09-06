@@ -233,50 +233,6 @@ namespace swift {
                            std::vector<VariableTypeInfo> &VariableTypeInfos,
                            llvm::raw_ostream &OS);
 
-  /// FIXME: All of the below goes away once CallExpr directly stores its
-  /// arguments.
-
-  /// Return value for getOriginalArgumentList().
-  struct OriginalArgumentList {
-    SmallVector<Expr *, 4> args;
-    SmallVector<Identifier, 4> labels;
-    SmallVector<SourceLoc, 4> labelLocs;
-    SourceLoc lParenLoc;
-    SourceLoc rParenLoc;
-    Optional<unsigned> unlabeledTrailingClosureIdx;
-
-    /// The number of trailing closures in the argument list.
-    unsigned getNumTrailingClosures() const {
-      if (!unlabeledTrailingClosureIdx)
-        return 0;
-      return args.size() - *unlabeledTrailingClosureIdx;
-    }
-
-    /// Whether any unlabeled or labeled trailing closures are present.
-    bool hasAnyTrailingClosures() const {
-      return unlabeledTrailingClosureIdx.hasValue();
-    }
-
-    /// Whether the given index is for an unlabeled trailing closure.
-    bool isUnlabeledTrailingClosureIdx(unsigned i) const {
-      return unlabeledTrailingClosureIdx && *unlabeledTrailingClosureIdx == i;
-    }
-
-    /// Whether the given index is for a labeled trailing closure in an
-    /// argument list with multiple trailing closures.
-    bool isLabeledTrailingClosureIdx(unsigned i) const {
-      if (!unlabeledTrailingClosureIdx)
-        return false;
-      return i > *unlabeledTrailingClosureIdx && i < args.size();
-    }
-  };
-
-  /// When applying a solution to a constraint system, the type checker rewrites
-  /// argument lists of calls to insert default arguments and collect varargs.
-  /// Sometimes for diagnostics we want to work on the original argument list as
-  /// written by the user; this performs the reverse transformation.
-  OriginalArgumentList getOriginalArgumentList(Expr *expr);
-
   /// Returns the root type and result type of the keypath type in a keypath
   /// dynamic member lookup subscript, or \c None if it cannot be determined.
   ///

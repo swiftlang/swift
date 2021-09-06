@@ -75,10 +75,8 @@ deriveBodyEquatable_enum_uninhabited_eq(AbstractFunctionDecl *eqDecl, void *) {
                                   AccessSemantics::Ordinary,
                                   bParam->getType());
   TupleTypeElt abTupleElts[2] = { aParam->getType(), bParam->getType() };
-  auto abExpr = TupleExpr::create(C, SourceLoc(), {aRef, bRef}, {}, {},
-                                  SourceLoc(), /*HasTrailingClosure*/ false,
-                                  /*implicit*/ true,
-                                  TupleType::get(abTupleElts, C));
+  auto abExpr = TupleExpr::createImplicit(C, {aRef, bRef}, /*labels*/ {});
+  abExpr->setType(TupleType::get(abTupleElts, C));
   auto switchStmt =
       SwitchStmt::createImplicit(LabeledStmtInfo(), abExpr, cases, C);
   statements.push_back(switchStmt);
@@ -267,9 +265,7 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
   // switch (a, b) { <case statements> }
   auto aRef = new (C) DeclRefExpr(aParam, DeclNameLoc(), /*implicit*/true);
   auto bRef = new (C) DeclRefExpr(bParam, DeclNameLoc(), /*implicit*/true);
-  auto abExpr = TupleExpr::create(C, SourceLoc(), { aRef, bRef }, {}, {},
-                                  SourceLoc(), /*HasTrailingClosure*/ false,
-                                  /*implicit*/ true);
+  auto abExpr = TupleExpr::createImplicit(C, {aRef, bRef}, /*labels*/ {});
   auto switchStmt =
       SwitchStmt::createImplicit(LabeledStmtInfo(), abExpr, cases, C);
   statements.push_back(switchStmt);
@@ -498,7 +494,8 @@ static CallExpr *createHasherCombineCall(ASTContext &C,
       C, hasherExpr, C.Id_combine, {Identifier()});
   
   // hasher.combine(hashable)
-  return CallExpr::createImplicit(C, combineCall, {hashable}, {Identifier()});
+  auto *argList = ArgumentList::forImplicitUnlabeled(C, {hashable});
+  return CallExpr::createImplicit(C, combineCall, argList);
 }
 
 static FuncDecl *
@@ -840,8 +837,8 @@ deriveBodyHashable_hashValue(AbstractFunctionDecl *hashValueDecl, void *) {
                                       hashFuncType);
   Type hashFuncResultType =
       hashFuncType->castTo<AnyFunctionType>()->getResult();
-  auto callExpr = CallExpr::createImplicit(C, hashExpr,
-                                           { selfRef }, { C.Id_for });
+  auto *argList = ArgumentList::forImplicitSingle(C, C.Id_for, selfRef);
+  auto *callExpr = CallExpr::createImplicit(C, hashExpr, argList);
   callExpr->setType(hashFuncResultType);
   callExpr->setThrows(false);
 

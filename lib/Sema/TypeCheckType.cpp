@@ -590,8 +590,6 @@ bool TypeChecker::checkContextualRequirements(GenericTypeDecl *decl,
     return true;
   }
 
-  auto &ctx = dc->getASTContext();
-
   SourceLoc noteLoc;
   {
     // We are interested in either a contextual where clause or
@@ -610,14 +608,6 @@ bool TypeChecker::checkContextualRequirements(GenericTypeDecl *decl,
 
   const auto subMap = parentTy->getContextSubstitutions(decl->getDeclContext());
   const auto genericSig = decl->getGenericSignature();
-  if (!genericSig) {
-    if (loc.isValid()) {
-      ctx.Diags.diagnose(loc, diag::recursive_decl_reference,
-                         decl->getDescriptiveKind(), decl->getName());
-      decl->diagnose(diag::kind_declared_here, DescriptiveDeclKind::Type);
-    }
-    return false;
-  }
 
   const auto result =
     TypeChecker::checkGenericArguments(
@@ -763,14 +753,6 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
         return BoundGenericType::get(nominal, /*parent*/ Type(), objectType);
       }
     }  
-  }
-
-  // FIXME: More principled handling of circularity.
-  if (!decl->getGenericSignature()) {
-    diags.diagnose(loc, diag::recursive_decl_reference,
-                   decl->getDescriptiveKind(), decl->getName());
-    decl->diagnose(diag::kind_declared_here, DescriptiveDeclKind::Type);
-    return ErrorType::get(ctx);
   }
 
   // Resolve the types of the generic arguments.
