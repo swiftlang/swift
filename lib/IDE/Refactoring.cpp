@@ -4916,6 +4916,11 @@ public:
   }
 };
 
+/// The type of block rewritten code may be placed in.
+enum class BlockKind {
+  SUCCESS, ERROR, FALLBACK
+};
+
 /// A completion handler function parameter that is known to be a Bool flag
 /// indicating success or failure.
 struct KnownBoolFlagParam {
@@ -4937,7 +4942,7 @@ public:
       : HandlerDesc(HandlerDesc),
         AllParams(Closure->getParameters()->getArray()) {
     assert(AllParams.size() == HandlerDesc.params().size());
-    assert(!(HandlerDesc.Type == HandlerType::RESULT && AllParams.size() != 1));
+    assert(HandlerDesc.Type != HandlerType::RESULT || AllParams.size() == 1);
 
     SuccessParams.insert(AllParams.begin(), AllParams.end());
     if (HandlerDesc.HasError && HandlerDesc.Type == HandlerType::PARAMS)
@@ -4976,29 +4981,41 @@ public:
     return HandlerDesc.shouldUnwrap(Param->getType());
   }
 
-  /// Whether \p Param is a closure parameter that has a binding available in
-  /// the async variant of the call, either as a thrown error, or a success
-  /// return value.
-  bool hasBinding(const ParamDecl *Param) const {
-    if (!hasParam(Param))
-      return false;
-    if (auto BoolFlag = getKnownBoolFlagParam()) {
-      if (Param == BoolFlag->Param)
-        return false;
-    }
-    return true;
+  /// Whether \p Param is the known Bool parameter that indicates success or
+  /// failure.
+  bool isKnownBoolFlagParam(const ParamDecl *Param) const {
+    if (auto BoolFlag = getKnownBoolFlagParam())
+      return BoolFlag->Param == Param;
+    return false;
   }
 
-  /// Retrieve the success parameters that have a binding in a call to the
-  /// async variant.
-  ArrayRef<const ParamDecl *>
-  getSuccessParamsToBind(SmallVectorImpl<const ParamDecl *> &Scratch) {
-    assert(Scratch.empty());
-    for (auto *Param : SuccessParams) {
-      if (hasBinding(Param))
-        Scratch.push_back(Param);
+  /// Whether \p Param is a closure parameter that has a binding available in
+  /// the async variant of the call for a particular \p Block.
+  bool hasBinding(const ParamDecl *Param, BlockKind Block) const {
+    switch (Block) {
+    case BlockKind::SUCCESS:
+      // Known bool flags get dropped from the imported async variant.
+      if (isKnownBoolFlagParam(Param))
+        return false;
+
+      return isSuccessParam(Param);
+    case BlockKind::ERROR:
+      return Param == ErrParam;
+    case BlockKind::FALLBACK:
+      // We generally want to bind everything in the fallback case.
+      return hasParam(Param);
     }
-    return Scratch;
+    llvm_unreachable("Unhandled case in switch");
+  }
+
+  /// Retrieve the parameters to bind in a given \p Block.
+  TinyPtrVector<const ParamDecl *> getParamsToBind(BlockKind Block) {
+    TinyPtrVector<const ParamDecl *> Result;
+    for (auto *Param : AllParams) {
+      if (hasBinding(Param, Block))
+        Result.push_back(Param);
+    }
+    return Result;
   }
 
   /// If there is a known Bool flag parameter indicating success or failure,
@@ -5248,7 +5265,7 @@ private:
     // Check to see if we have a known bool flag parameter that indicates
     // success or failure.
     if (auto KnownBoolFlag = Params.getKnownBoolFlagParam()) {
-      if (KnownBoolFlag->Param != Cond.Subject)
+      if (KnownBoolFlag->Param != SubjectParam)
         return None;
 
       // The path may need to be flipped depending on whether the flag indicates
@@ -6722,10 +6739,21 @@ private:
   }
 
   void addFallbackVars(ArrayRef<const ParamDecl *> FallbackParams,
-                       ClassifiedBlocks &Blocks) {
-    for (auto Param : FallbackParams) {
-      OS << tok::kw_var << " " << newNameFor(Param) << ": ";
+                       const ClosureCallbackParams &AllParams) {
+    for (auto *Param : FallbackParams) {
       auto Ty = Param->getType();
+      auto ParamName = newNameFor(Param);
+
+      // If this is the known bool success param, we can use 'let' and type it
+      // as non-optional, as it gets bound in both blocks.
+      if (AllParams.isKnownBoolFlagParam(Param)) {
+        OS << tok::kw_let << " " << ParamName << ": ";
+        Ty->print(OS);
+        OS << "\n";
+        continue;
+      }
+
+      OS << tok::kw_var << " " << ParamName << ": ";
       Ty->print(OS);
       if (!Ty->getOptionalObjectType())
         OS << "?";
@@ -7144,6 +7172,30 @@ private:
     DiagEngine.diagnose(CE->getStartLoc(), diag::missing_callback_arg);
   }
 
+  /// Add a binding to a known bool flag that indicates success or failure.
+  void addBoolFlagParamBindingIfNeeded(Optional<KnownBoolFlagParam> Flag,
+                                       BlockKind Block) {
+    if (!Flag)
+      return;
+    // Figure out the polarity of the binding based on the block we're in and
+    // whether the flag indicates success.
+    auto Polarity = true;
+    switch (Block) {
+    case BlockKind::SUCCESS:
+      break;
+    case BlockKind::ERROR:
+      Polarity = !Polarity;
+      break;
+    case BlockKind::FALLBACK:
+      llvm_unreachable("Not a valid place to bind");
+    }
+    if (!Flag->IsSuccessFlag)
+      Polarity = !Polarity;
+
+    OS << newNameFor(Flag->Param) << " " << tok::equal << " ";
+    OS << (Polarity ? tok::kw_true : tok::kw_false) << "\n";
+  }
+
   /// Add a call to the async alternative of \p CE and convert the \p Callback
   /// to be executed after the async call. \p HandlerDesc describes the
   /// completion handler in the function that's called by \p CE and \p ArgList
@@ -7165,8 +7217,7 @@ private:
                                        DiagEngine, CallbackBody);
     }
 
-    SmallVector<const ParamDecl *, 4> Scratch;
-    auto SuccessBindings = CallbackParams.getSuccessParamsToBind(Scratch);
+    auto SuccessBindings = CallbackParams.getParamsToBind(BlockKind::SUCCESS);
     auto *ErrParam = CallbackParams.getErrParam();
     if (DiagEngine.hadAnyError()) {
       // For now, only fallback when the results are params with an error param,
@@ -7180,18 +7231,21 @@ private:
       // assignments to the names in the outer scope.
       InlinePatternsToPrint InlinePatterns;
 
-      SmallVector<const ParamDecl *, 4> AllBindings;
-      AllBindings.append(SuccessBindings.begin(), SuccessBindings.end());
-      AllBindings.push_back(ErrParam);
+      auto AllBindings = CallbackParams.getParamsToBind(BlockKind::FALLBACK);
 
       prepareNames(ClassifiedBlock(), AllBindings, InlinePatterns);
       preparePlaceholdersAndUnwraps(HandlerDesc, CallbackParams,
-                                    PlaceholderMode::FALLBACK);
-      addFallbackVars(AllBindings, Blocks);
+                                    BlockKind::FALLBACK);
+      addFallbackVars(AllBindings, CallbackParams);
       addDo();
       addAwaitCall(CE, Blocks.SuccessBlock, SuccessBindings, InlinePatterns,
                    HandlerDesc, /*AddDeclarations*/ false);
-      addFallbackCatch(ErrParam);
+      OS << "\n";
+
+      // If we have a known Bool success param, we need to bind it.
+      addBoolFlagParamBindingIfNeeded(CallbackParams.getKnownBoolFlagParam(),
+                                      BlockKind::SUCCESS);
+      addFallbackCatch(CallbackParams);
       OS << "\n";
       convertNodes(NodesToPrint::inBraceStmt(CallbackBody));
 
@@ -7242,7 +7296,7 @@ private:
 
     prepareNames(Blocks.SuccessBlock, SuccessBindings, InlinePatterns);
     preparePlaceholdersAndUnwraps(HandlerDesc, CallbackParams,
-                                  PlaceholderMode::SUCCESS_BLOCK);
+                                  BlockKind::SUCCESS);
 
     addAwaitCall(CE, Blocks.SuccessBlock, SuccessBindings, InlinePatterns,
                  HandlerDesc, /*AddDeclarations=*/true);
@@ -7259,7 +7313,7 @@ private:
                    ErrInlinePatterns,
                    /*AddIfMissing=*/HandlerDesc.Type != HandlerType::RESULT);
       preparePlaceholdersAndUnwraps(HandlerDesc, CallbackParams,
-                                    PlaceholderMode::ERROR_BLOCK);
+                                    BlockKind::ERROR);
 
       addCatch(ErrOrResultParam);
       convertNodes(Blocks.ErrorBlock.nodesToPrint());
@@ -7529,12 +7583,17 @@ private:
       OS << tok::r_paren;
   }
 
-  void addFallbackCatch(const ParamDecl *ErrParam) {
+  void addFallbackCatch(const ClosureCallbackParams &Params) {
+    auto *ErrParam = Params.getErrParam();
+    assert(ErrParam);
     auto ErrName = newNameFor(ErrParam);
-    OS << "\n"
-       << tok::r_brace << " " << tok::kw_catch << " " << tok::l_brace << "\n"
-       << ErrName << " = error\n"
-       << tok::r_brace;
+    OS << tok::r_brace << " " << tok::kw_catch << " " << tok::l_brace << "\n"
+       << ErrName << " = error\n";
+
+    // If we have a known Bool success param, we need to bind it.
+    addBoolFlagParamBindingIfNeeded(Params.getKnownBoolFlagParam(),
+                                    BlockKind::ERROR);
+    OS << tok::r_brace;
   }
 
   void addCatch(const ParamDecl *ErrParam) {
@@ -7546,31 +7605,27 @@ private:
     OS << tok::l_brace;
   }
 
-  enum class PlaceholderMode {
-    SUCCESS_BLOCK, ERROR_BLOCK, FALLBACK
-  };
-
   void preparePlaceholdersAndUnwraps(AsyncHandlerDesc HandlerDesc,
                                      const ClosureCallbackParams &Params,
-                                     PlaceholderMode Mode) {
+                                     BlockKind Block) {
     // Params that have been dropped always need placeholdering.
     for (auto *Param : Params.getAllParams()) {
-      if (!Params.hasBinding(Param))
+      if (!Params.hasBinding(Param, Block))
         Placeholders.insert(Param);
     }
     // For the fallback case, no other params need placeholdering, as they are
     // all freely accessible in the fallback case.
-    if (Mode == PlaceholderMode::FALLBACK)
+    if (Block == BlockKind::FALLBACK)
       return;
 
     switch (HandlerDesc.Type) {
     case HandlerType::PARAMS: {
       auto *ErrParam = Params.getErrParam();
       auto SuccessParams = Params.getSuccessParams();
-      switch (Mode) {
-      case PlaceholderMode::FALLBACK:
+      switch (Block) {
+      case BlockKind::FALLBACK:
         llvm_unreachable("Already handled");
-      case PlaceholderMode::ERROR_BLOCK:
+      case BlockKind::ERROR:
         if (ErrParam) {
           if (HandlerDesc.shouldUnwrap(ErrParam->getType())) {
             Placeholders.insert(ErrParam);
@@ -7580,7 +7635,7 @@ private:
           Placeholders.insert(SuccessParams.begin(), SuccessParams.end());
         }
         break;
-      case PlaceholderMode::SUCCESS_BLOCK:
+      case BlockKind::SUCCESS:
         for (auto *SuccessParam : SuccessParams) {
           auto Ty = SuccessParam->getType();
           if (HandlerDesc.shouldUnwrap(Ty)) {
