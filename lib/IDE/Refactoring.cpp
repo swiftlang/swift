@@ -6137,26 +6137,30 @@ private:
     return OutputStr;
   }
 
+  /// Retrieves the SourceRange of the preceding comment, or an invalid range if
+  /// there is no preceding comment.
+  CharSourceRange getPrecedingCommentRange(SourceLoc Loc) {
+    auto Tokens = SF->getAllTokens();
+    auto TokenIter = token_lower_bound(Tokens, Loc);
+    if (TokenIter == Tokens.end() || !TokenIter->hasComment())
+      return CharSourceRange();
+    return TokenIter->getCommentRange();
+  }
+
   /// Retrieves the location for the start of a comment attached to the token
   /// at the provided location, or the location itself if there is no comment.
   SourceLoc getLocIncludingPrecedingComment(SourceLoc Loc) {
-    auto Tokens = SF->getAllTokens();
-    auto TokenIter = token_lower_bound(Tokens, Loc);
-    if (TokenIter != Tokens.end() && TokenIter->hasComment())
-      return TokenIter->getCommentStart();
-    return Loc;
+    auto CommentRange = getPrecedingCommentRange(Loc);
+    if (CommentRange.isInvalid())
+      return Loc;
+    return CommentRange.getStart();
   }
 
-  /// If the provided SourceLoc has a preceding comment, print it out. Returns
-  /// true if a comment was printed, false otherwise.
-  bool printCommentIfNeeded(SourceLoc Loc, bool AddNewline = false) {
-    auto PrecedingLoc = getLocIncludingPrecedingComment(Loc);
-    if (Loc == PrecedingLoc)
-      return false;
-    if (AddNewline)
-      OS << "\n";
-    OS << CharSourceRange(SM, PrecedingLoc, Loc).str();
-    return true;
+  /// If the provided SourceLoc has a preceding comment, print it out.
+  void printCommentIfNeeded(SourceLoc Loc) {
+    auto CommentRange = getPrecedingCommentRange(Loc);
+    if (CommentRange.isValid())
+      OS << "\n" << CommentRange.str();
   }
 
   void convertNodes(const NodesToPrint &ToPrint) {
@@ -6171,8 +6175,6 @@ private:
 
     // First print the nodes we've been asked to print.
     for (auto Node : ToPrint.getNodes()) {
-      OS << "\n";
-
       // If we need to print comments, do so now.
       while (!CommentLocs.empty()) {
         auto CommentLoc = CommentLocs.back().getOpaquePointerValue();
@@ -6187,16 +6189,13 @@ private:
 
         printCommentIfNeeded(CommentLocs.pop_back_val());
       }
+      OS << "\n";
       convertNode(Node);
     }
 
     // We're done printing nodes. Make sure to output the remaining comments.
-    bool HasPrintedComment = false;
-    while (!CommentLocs.empty()) {
-      HasPrintedComment |=
-          printCommentIfNeeded(CommentLocs.pop_back_val(),
-                               /*AddNewline*/ !HasPrintedComment);
-    }
+    while (!CommentLocs.empty())
+      printCommentIfNeeded(CommentLocs.pop_back_val());
   }
 
   void convertNode(ASTNode Node, SourceLoc StartOverride = {},
