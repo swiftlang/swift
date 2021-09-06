@@ -382,7 +382,8 @@ extension ContiguousArray: RandomAccessCollection, MutableCollection {
     // NOTE: This method is a no-op for performance reasons.
   }
 
-  /// Accesses the element at the specified position.
+  /// Accesses the element at the specified position and panics with a
+  /// fatal error if the index is out of range.
   ///
   /// The following example uses indexed subscripting to update an array's
   /// second element. After assigning the new value (`"Butler"`) at a specific

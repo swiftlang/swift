@@ -65,7 +65,8 @@ where SubSequence: MutableCollection
   override associatedtype Index
   override associatedtype SubSequence
 
-  /// Accesses the element at the specified position.
+  /// Accesses the element at the specified position and panics with a
+  /// fatal error if the index is out of range.
   ///
   /// For example, you can replace an element of an array by using its
   /// subscript.
