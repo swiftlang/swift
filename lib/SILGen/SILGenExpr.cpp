@@ -1096,7 +1096,8 @@ void SILGenFunction::ForceTryEmission::finish() {
 
     if (auto diagnoseError = SGF.getASTContext().getDiagnoseUnexpectedError()) {
       ASTContext &ctx = SGF.getASTContext();
-      auto error = SGF.B.createOwnedPhiArgument(SILType::getExceptionType(ctx));
+      auto error = SGF.B.createTermResult(SILType::getExceptionType(ctx),
+                                          OwnershipKind::Owned);
       auto args = SGF.emitSourceLocationArgs(Loc->getExclaimLoc(), Loc);
 
       SGF.emitApplyOfLibraryIntrinsic(

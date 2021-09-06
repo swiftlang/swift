@@ -198,7 +198,9 @@ SILGenFunction::emitPreconditionOptionalHasValue(SILLocation loc,
 
   // If we have an object, make sure the object is at +1. All switch_enum of
   // objects is done at +1.
-  if (optional.getType().isAddress()) {
+  bool isAddress = optional.getType().isAddress();
+  SwitchEnumInst *switchEnum = nullptr;
+  if (isAddress) {
     // We forward in the creation routine for
     // unchecked_take_enum_data_addr. switch_enum_addr is a +0 operation.
     B.createSwitchEnumAddr(loc, optional.getValue(),
@@ -208,9 +210,9 @@ SILGenFunction::emitPreconditionOptionalHasValue(SILLocation loc,
     optional = optional.ensurePlusOne(*this, loc);
     hadCleanup = true;
     hadLValue = false;
-    B.createSwitchEnum(loc, optional.forward(*this),
-                       /*defaultDest*/ nullptr,
-                       {{someDecl, contBB}, {noneDecl, failBB}});
+    switchEnum = B.createSwitchEnum(loc, optional.forward(*this),
+                                    /*defaultDest*/ nullptr,
+                                    {{someDecl, contBB}, {noneDecl, failBB}});
   }
   B.emitBlock(failBB);
 
@@ -241,13 +243,12 @@ SILGenFunction::emitPreconditionOptionalHasValue(SILLocation loc,
   B.emitBlock(contBB);
 
   ManagedValue result;
-  SILType payloadType = optional.getType().getOptionalObjectType();
-
-  if (payloadType.isObject()) {
-    result = B.createOwnedPhiArgument(payloadType);
-  } else {
+  if (isAddress) {
+    SILType payloadType = optional.getType().getOptionalObjectType();
     result =
         B.createUncheckedTakeEnumDataAddr(loc, optional, someDecl, payloadType);
+  } else {
+    result = B.createOptionalSomeResult(switchEnum);
   }
 
   if (hadCleanup) {
@@ -415,15 +416,14 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
   // If the result is address-only, we need to return something in memory,
   // otherwise the result is the BBArgument in the merge point.
   // TODO: use the SGFContext passed in.
-  ManagedValue finalResult;
-  if (resultTL.isAddressOnly() && silConv.useLoweredAddresses()) {
-    finalResult = emitManagedBufferWithCleanup(
+  ManagedValue resultAddress;
+  bool addressOnly = resultTL.isAddressOnly() && silConv.useLoweredAddresses();
+  if (addressOnly) {
+    resultAddress = emitManagedBufferWithCleanup(
         emitTemporaryAllocation(loc, resultTy), resultTL);
-  } else {
-    SILGenSavedInsertionPoint IP(*this, contBB);
-    finalResult = B.createOwnedPhiArgument(resultTL.getLoweredType());
   }
 
+  ValueOwnershipKind resultOwnership = OwnershipKind::Any;
   SEBuilder.addOptionalSomeCase(
       isPresentBB, contBB, [&](ManagedValue input, SwitchCaseFullExpr &&scope) {
         // If we have an address only type, we want to match the old behavior of
@@ -439,8 +439,8 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
 
         ManagedValue result = transformValue(*this, loc, input, noOptResultTy,
                                              SGFContext());
-
-        if (!(resultTL.isAddressOnly() && silConv.useLoweredAddresses())) {
+        resultOwnership = result.getValue()->getOwnershipKind();
+        if (!addressOnly) {
           SILValue some = B.createOptionalSome(loc, result).forward(*this);
           return scope.exitAndBranch(loc, some);
         }
@@ -448,27 +448,33 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
         RValue R(*this, loc, noOptResultTy.getASTType(), result);
         ArgumentSource resultValueRV(loc, std::move(R));
         emitInjectOptionalValueInto(loc, std::move(resultValueRV),
-                                    finalResult.getValue(), resultTL);
+                                    resultAddress.getValue(), resultTL);
         return scope.exitAndBranch(loc);
       });
 
   SEBuilder.addOptionalNoneCase(
       isNotPresentBB, contBB,
       [&](ManagedValue input, SwitchCaseFullExpr &&scope) {
-        if (!(resultTL.isAddressOnly() && silConv.useLoweredAddresses())) {
+        if (!addressOnly) {
           SILValue none =
               B.createManagedOptionalNone(loc, resultTy).forward(*this);
           return scope.exitAndBranch(loc, none);
         }
 
-        emitInjectOptionalNothingInto(loc, finalResult.getValue(), resultTL);
+        emitInjectOptionalNothingInto(loc, resultAddress.getValue(), resultTL);
         return scope.exitAndBranch(loc);
       });
 
   std::move(SEBuilder).emit();
 
   B.emitBlock(contBB);
-  return finalResult;
+  if (addressOnly)
+    return resultAddress;
+
+  // This phi's ownership is derived from the transformed value's
+  // ownership, not the input ownership. Transformation can convert a value with
+  // no ownership to an owned value.
+  return B.createPhi(resultTL.getLoweredType(), resultOwnership);
 }
 
 SILGenFunction::OpaqueValueRAII::~OpaqueValueRAII() {
@@ -712,8 +718,9 @@ ManagedValue SILGenFunction::emitExistentialErasure(
         { ctx.getOptionalSomeDecl(), isPresentBB },
         { ctx.getOptionalNoneDecl(), isNotPresentBB }
       };
-      B.createSwitchEnum(loc, potentialNSError.forward(*this),
-                         /*default*/ nullptr, cases);
+      auto *switchEnum =
+          B.createSwitchEnum(loc, potentialNSError.forward(*this),
+                             /*default*/ nullptr, cases);
 
       // If we did get an NSError, emit the existential erasure from that
       // NSError.
@@ -726,9 +733,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
 
         // Receive the error value.  It's typed as an 'AnyObject' for
         // layering reasons, so perform an unchecked cast down to NSError.
-        SILType anyObjectTy =
-            potentialNSError.getType().getOptionalObjectType();
-        ManagedValue nsError = B.createOwnedPhiArgument(anyObjectTy);
+        auto nsError = B.createOptionalSomeResult(switchEnum);
         nsError = B.createUncheckedRefCast(loc, nsError, 
                                            getLoweredType(nsErrorType));
 

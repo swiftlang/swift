@@ -1715,17 +1715,15 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
         {getASTContext().getOptionalSomeDecl(), hasCompletionBB},
         {getASTContext().getOptionalNoneDecl(), noCompletionBB},
       };
-      
-      B.createSwitchEnum(loc, completionBlock, nullptr, dests);
-      
+
+      auto *switchEnum =
+          B.createSwitchEnum(loc, completionBlock, nullptr, dests);
+
       B.emitBlock(noCompletionBB);
       B.createBranch(loc, doneBBOrNull);
 
       B.emitBlock(hasCompletionBB);
-      completionBlock = hasCompletionBB->createPhiArgument(
-                                  SILType::getPrimitiveObjectType(completionTy),
-                                  OwnershipKind::Guaranteed);
-      
+      completionBlock = switchEnum->createOptionalSomeResult();
     }
   };
   

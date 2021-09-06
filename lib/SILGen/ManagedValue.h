@@ -91,6 +91,14 @@ public:
     return ManagedValue(value, false, CleanupHandle::invalid());
   }
 
+  /// Create a managed value for a SILValue whose ownership is
+  /// forwarded. Creates a new cleanup for +1 values. Forwarded +0 values
+  /// require no cleanup.
+  ///
+  /// Use this for values that do not introduce a new borrow scope. This is
+  /// correct for casts and terminator results, not for phis.
+  static ManagedValue forForwardedRValue(SILGenFunction &SGF, SILValue value);
+
   /// Create a managed value for a +1 rvalue object.
   static ManagedValue forOwnedObjectRValue(SILValue value,
                                            CleanupHandle cleanup) {

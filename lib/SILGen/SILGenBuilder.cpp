@@ -187,23 +187,38 @@ ManagedValue SILGenBuilder::createCopyValue(SILLocation loc,
   }
 #include "swift/AST/ReferenceStorage.def"
 
-ManagedValue SILGenBuilder::createOwnedPhiArgument(SILType type) {
-  SILPhiArgument *arg =
-      getInsertionBB()->createPhiArgument(type, OwnershipKind::Owned);
-  return SGF.emitManagedRValueWithCleanup(arg);
+ManagedValue SILGenBuilder::createForwardedTermResult(SILType type) {
+  auto *succBB = getInsertionBB();
+  auto *term = cast<OwnershipForwardingTermInst>(
+      succBB->getSinglePredecessorBlock()->getTerminator());
+  auto *arg = term->createResult(succBB, type);
+  return ManagedValue::forForwardedRValue(SGF, arg);
 }
 
-ManagedValue SILGenBuilder::createGuaranteedPhiArgument(SILType type) {
-  SILPhiArgument *arg =
-      getInsertionBB()->createPhiArgument(type, OwnershipKind::Guaranteed);
-  return SGF.emitManagedBorrowedArgumentWithCleanup(arg);
+ManagedValue SILGenBuilder::createTermResult(SILType type,
+                                             ValueOwnershipKind ownership) {
+  // Despite the name, 'arg' is a terminator result, not a phi.
+  auto *arg = getInsertionBB()->createPhiArgument(type, ownership);
+  return ManagedValue::forForwardedRValue(SGF, arg);
 }
 
-ManagedValue
-SILGenBuilder::createGuaranteedTransformingTerminatorArgument(SILType type) {
-  SILPhiArgument *arg =
-      getInsertionBB()->createPhiArgument(type, OwnershipKind::Guaranteed);
-  return ManagedValue::forUnmanaged(arg);
+ManagedValue SILGenBuilder::createPhi(SILType type,
+                                      ValueOwnershipKind ownership) {
+  SILPhiArgument *arg = getInsertionBB()->createPhiArgument(type, ownership);
+  switch (ownership) {
+  case OwnershipKind::Any:
+    llvm_unreachable("Invalid ownership for value");
+
+  case OwnershipKind::Owned:
+    return SGF.emitManagedRValueWithCleanup(arg);
+
+  case OwnershipKind::Guaranteed:
+    return SGF.emitManagedBorrowedArgumentWithCleanup(arg);
+
+  case OwnershipKind::None:
+  case OwnershipKind::Unowned:
+    return ManagedValue::forUnmanaged(arg);
+  }
 }
 
 ManagedValue SILGenBuilder::createAllocRef(
