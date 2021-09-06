@@ -2406,6 +2406,11 @@ private:
   /// Cache of the effects any closures visited.
   llvm::SmallDenseMap<ClosureExpr *, FunctionType::ExtInfo, 4> closureEffectsCache;
 
+  /// A mapping from the constraint locators for references to various
+  /// names (e.g., member references, normal name references, possible
+  /// constructions) to the argument lists for the call to that locator.
+  llvm::DenseMap<ConstraintLocator *, ArgumentList *> ArgumentLists;
+
 public:
   /// A map from argument expressions to their applied property wrapper expressions.
   llvm::SmallMapVector<ASTNode, SmallVector<AppliedPropertyWrapper, 2>, 4> appliedPropertyWrappers;
@@ -2784,19 +2789,17 @@ public:
   /// we're exploring.
   SolverState *solverState = nullptr;
 
-  /// A mapping from the constraint locators for references to various
-  /// names (e.g., member references, normal name references, possible
-  /// constructions) to the argument lists for the call to that locator.
-  llvm::DenseMap<ConstraintLocator *, ArgumentList *> ArgumentLists;
-
   /// Form a locator that can be used to retrieve argument information cached in
   /// the constraint system for the callee described by the anchor of the
   /// passed locator.
   ConstraintLocator *getArgumentInfoLocator(ConstraintLocator *locator);
 
-  /// Retrieve the argument list that is associated with a member
-  /// reference at the given locator.
+  /// Retrieve the argument list that is associated with a call at the given
+  /// locator.
   ArgumentList *getArgumentList(ConstraintLocator *locator);
+
+  /// Associate an argument list with a call at a given locator.
+  void associateArgumentList(ConstraintLocator *locator, ArgumentList *args);
 
   Optional<SelectedOverload>
   findSelectedOverloadFor(ConstraintLocator *locator) const {

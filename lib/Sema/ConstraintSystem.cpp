@@ -4662,6 +4662,15 @@ ArgumentList *ConstraintSystem::getArgumentList(ConstraintLocator *locator) {
   return nullptr;
 }
 
+void ConstraintSystem::associateArgumentList(ConstraintLocator *locator,
+                                             ArgumentList *args) {
+  assert(locator && locator->getAnchor());
+  auto *argInfoLoc = getArgumentInfoLocator(locator);
+  auto inserted = ArgumentLists.insert({argInfoLoc, args}).second;
+  assert(inserted && "Multiple argument lists at locator?");
+  (void)inserted;
+}
+
 /// Given an apply expr, returns true if it is expected to have a direct callee
 /// overload, resolvable using `getChoiceFor`. Otherwise, returns false.
 static bool shouldHaveDirectCalleeOverload(const CallExpr *callExpr) {
