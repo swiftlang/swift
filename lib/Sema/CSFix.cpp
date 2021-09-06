@@ -1992,7 +1992,8 @@ AllowInvalidStaticMemberRefOnProtocolMetatype::create(
 
 bool AllowNonOptionalWeak::diagnose(const Solution &solution,
                                     bool asNote) const {
-  return false;
+  InvalidWeakAttributeUse failure(solution, getLocator());
+  return failure.diagnose(asNote);
 }
 
 AllowNonOptionalWeak *AllowNonOptionalWeak::create(ConstraintSystem &cs,
