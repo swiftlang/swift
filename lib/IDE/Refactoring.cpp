@@ -5037,6 +5037,10 @@ public:
   bool hasBinding(const ParamDecl *Param) const {
     if (!hasParam(Param))
       return false;
+    if (auto BoolFlag = getKnownBoolFlagParam()) {
+      if (Param == BoolFlag->Param)
+        return false;
+    }
     return true;
   }
 
