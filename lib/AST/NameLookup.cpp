@@ -2105,10 +2105,21 @@ directReferencesForUnqualifiedTypeLookup(DeclNameRef name,
   auto descriptor = UnqualifiedLookupDescriptor(name, dc, loc, options);
   auto lookup = evaluateOrDefault(ctx.evaluator,
                                   UnqualifiedLookupRequest{descriptor}, {});
+
+  unsigned nominalTypeDeclCount = 0;
   for (const auto &result : lookup.allResults()) {
     auto typeDecl = cast<TypeDecl>(result.getValueDecl());
+
+    if (isa<NominalTypeDecl>(typeDecl))
+      nominalTypeDeclCount++;
+
     results.push_back(typeDecl);
   }
+
+  // If we saw multiple nominal type declarations with the same name,
+  // the result of the lookup is definitely ambiguous.
+  if (nominalTypeDeclCount > 1)
+    results.clear();
 
   return results;
 }
