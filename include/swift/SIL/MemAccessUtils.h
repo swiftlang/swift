@@ -91,8 +91,8 @@
 /// way, nested accesses do not appear to conflict.
 ///
 /// AccessPath identifies both the accessed storage and the path to a specific
-/// storage location within that storage object. See SILProgrammersManual.md and the
-/// class comments below for details. AccessPath::compute() and
+/// storage location within that storage object. See SILProgrammersManual.md
+/// and the class comments below for details. AccessPath::compute() and
 /// AccessPath::computeInScope() mirror the AccessedStorage API.
 /// AccessPath::contains() and AccessPath::mayOverlap() provide efficient
 /// comparison of access paths.
