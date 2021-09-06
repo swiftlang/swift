@@ -535,6 +535,8 @@ struct SWIFT_NODISCARD ManglingError {
     InvalidImplParameterConvention,
     InvalidMetatypeRepresentation,
     MultiByteRelatedEntity,
+    BadValueWitnessKind,
+    NotAContextNode,
   };
 
   Code        code;
