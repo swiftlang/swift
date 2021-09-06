@@ -2940,16 +2940,13 @@ bool SimplifyCFG::canonicalizeSwitchEnums() {
     if (!SWI.hasDefault())
       continue;
 
-    NullablePtr<EnumElementDecl> elementDecl = SWI.getUniqueCaseForDefault();
-    if (!elementDecl)
+    NullablePtr<EnumElementDecl> defaultDecl = SWI.getUniqueCaseForDefault();
+    if (!defaultDecl)
       continue;
     
     if (!EnableOSSARewriteTerminator && Fn.hasOwnership()) {
       if (!SWI.getOperand()->getType().isTrivial(Fn)) {
-        // TODO: OSSA. In OSSA, the default switch_enum case passes the original
-        // enum as a block argument. This needs to check that the block argument
-        // is dead, then replace it with the a new argument for the default
-        // payload.
+        // TODO: Test and enable this case.
         continue;
       }
     }
@@ -2962,24 +2959,9 @@ bool SimplifyCFG::canonicalizeSwitchEnums() {
     }
     // Add the default-entry of the original instruction as case-entry.
     auto *defaultBB = SWI.getDefaultBB();
-    CaseBBs.push_back(std::make_pair(elementDecl.get(), defaultBB));
+    CaseBBs.push_back(std::make_pair(defaultDecl.get(), defaultBB));
 
     if (isa<SwitchEnumInst>(*SWI)) {
-      if (Fn.hasOwnership()) {
-        assert(defaultBB->getNumArguments() == 1);
-        defaultBB->getArgument(0)->replaceAllUsesWith(SWI.getOperand());
-        defaultBB->eraseArgument(0);
-        // TODO: handle non-trivial payloads. The new block argument must be
-        // destroyed. The old default argument may need to be copied. But it may
-        // also be possible to optimize the common case on-the-fly without the
-        // extra copy/destroy.
-        if (elementDecl.get()->hasAssociatedValues()) {
-          // Note: this is not really a phi.
-          auto elementTy = SWI.getOperand()->getType().getEnumElementType(
-              elementDecl.get(), Fn.getModule(), Fn.getTypeExpansionContext());
-          defaultBB->createPhiArgument(elementTy, OwnershipKind::None);
-        }
-      }
       SILBuilderWithScope(SWI).createSwitchEnum(SWI->getLoc(), SWI.getOperand(),
                                                 nullptr, CaseBBs);
     } else {
