@@ -7248,10 +7248,9 @@ private:
       AllBindings.append(SuccessBindings.begin(), SuccessBindings.end());
       AllBindings.push_back(ErrParam);
 
-      // Don't do any unwrapping or placeholder replacement since all params
-      // are still valid in the fallback case
       prepareNames(ClassifiedBlock(), AllBindings, InlinePatterns);
-
+      preparePlaceholdersAndUnwraps(HandlerDesc, CallbackParams,
+                                    PlaceholderMode::FALLBACK);
       addFallbackVars(AllBindings, Blocks);
       addDo();
       addAwaitCall(CE, ArgList.ref(), Blocks.SuccessBlock, SuccessBindings,
@@ -7306,7 +7305,7 @@ private:
 
     prepareNames(Blocks.SuccessBlock, SuccessBindings, InlinePatterns);
     preparePlaceholdersAndUnwraps(HandlerDesc, CallbackParams,
-                                  /*Success=*/true);
+                                  PlaceholderMode::SUCCESS_BLOCK);
 
     addAwaitCall(CE, ArgList.ref(), Blocks.SuccessBlock, SuccessBindings,
                  InlinePatterns, HandlerDesc, /*AddDeclarations=*/true);
@@ -7323,7 +7322,7 @@ private:
                    ErrInlinePatterns,
                    /*AddIfMissing=*/HandlerDesc.Type != HandlerType::RESULT);
       preparePlaceholdersAndUnwraps(HandlerDesc, CallbackParams,
-                                    /*Success=*/false);
+                                    PlaceholderMode::ERROR_BLOCK);
 
       addCatch(ErrOrResultParam);
       convertNodes(Blocks.ErrorBlock.nodesToPrint());
@@ -7608,14 +7607,31 @@ private:
     OS << tok::l_brace;
   }
 
+  enum class PlaceholderMode {
+    SUCCESS_BLOCK, ERROR_BLOCK, FALLBACK
+  };
+
   void preparePlaceholdersAndUnwraps(AsyncHandlerDesc HandlerDesc,
                                      const ClosureCallbackParams &Params,
-                                     bool Success) {
+                                     PlaceholderMode Mode) {
+    // Params that have been dropped always need placeholdering.
+    for (auto *Param : Params.getAllParams()) {
+      if (!Params.hasBinding(Param))
+        Placeholders.insert(Param);
+    }
+    // For the fallback case, no other params need placeholdering, as they are
+    // all freely accessible in the fallback case.
+    if (Mode == PlaceholderMode::FALLBACK)
+      return;
+
     switch (HandlerDesc.Type) {
     case HandlerType::PARAMS: {
       auto *ErrParam = Params.getErrParam();
       auto SuccessParams = Params.getSuccessParams();
-      if (!Success) {
+      switch (Mode) {
+      case PlaceholderMode::FALLBACK:
+        llvm_unreachable("Already handled");
+      case PlaceholderMode::ERROR_BLOCK:
         if (ErrParam) {
           if (HandlerDesc.shouldUnwrap(ErrParam->getType())) {
             Placeholders.insert(ErrParam);
@@ -7624,7 +7640,8 @@ private:
           // Can't use success params in the error body
           Placeholders.insert(SuccessParams.begin(), SuccessParams.end());
         }
-      } else {
+        break;
+      case PlaceholderMode::SUCCESS_BLOCK:
         for (auto *SuccessParam : SuccessParams) {
           auto Ty = SuccessParam->getType();
           if (HandlerDesc.shouldUnwrap(Ty)) {
@@ -7634,10 +7651,6 @@ private:
             Placeholders.insert(SuccessParam);
           }
 
-          // If the parameter doesn't have a binding, it needs placeholdering.
-          if (!Params.hasBinding(SuccessParam))
-            Placeholders.insert(SuccessParam);
-
           // Void parameters get omitted where possible, so turn any reference
           // into a placeholder, as its usage is unlikely what the user wants.
           if (HandlerDesc.getSuccessParamAsyncReturnType(Ty)->isVoid())
@@ -7646,6 +7659,7 @@ private:
         // Can't use the error param in the success body
         if (ErrParam)
           Placeholders.insert(ErrParam);
+        break;
       }
       break;
     }

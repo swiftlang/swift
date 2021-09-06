@@ -459,4 +459,21 @@ func testConvertBool() async throws {
   // OBJC-BOOL-WITH-ERR2-NEXT:   print("neat")
   // OBJC-BOOL-WITH-ERR2-NEXT:   print("neato")
   // OBJC-BOOL-WITH-ERR2-NEXT: }
+
+  // RUN: %refactor-check-compiles -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 -I %S/Inputs -I %t -target %target-triple %clang-importer-sdk-nosource | %FileCheck -check-prefix=OBJC-BOOL-WITH-ERR-FALLBACK %s
+  ClassWithHandlerMethods.firstBoolFlagSuccess("") { str, success, unrelated, err in
+    guard success && success == .random() else { fatalError() }
+    print("much success", unrelated, str)
+  }
+  // OBJC-BOOL-WITH-ERR-FALLBACK:      var str: String? = nil
+  // OBJC-BOOL-WITH-ERR-FALLBACK-NEXT: var unrelated: Bool? = nil
+  // OBJC-BOOL-WITH-ERR-FALLBACK-NEXT: var err: Error? = nil
+  // OBJC-BOOL-WITH-ERR-FALLBACK-NEXT: do {
+  // OBJC-BOOL-WITH-ERR-FALLBACK-NEXT:   (str, unrelated) = try await ClassWithHandlerMethods.firstBoolFlagSuccess("")
+  // OBJC-BOOL-WITH-ERR-FALLBACK-NEXT: } catch {
+  // OBJC-BOOL-WITH-ERR-FALLBACK-NEXT:   err = error
+  // OBJC-BOOL-WITH-ERR-FALLBACK-NEXT: }
+  // OBJC-BOOL-WITH-ERR-FALLBACK-EMPTY:
+  // OBJC-BOOL-WITH-ERR-FALLBACK-NEXT: guard <#success#> && <#success#> == .random() else { fatalError() }
+  // OBJC-BOOL-WITH-ERR-FALLBACK-NEXT: print("much success", unrelated, str)
 }
