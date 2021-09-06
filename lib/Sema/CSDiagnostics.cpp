@@ -2240,9 +2240,6 @@ bool ContextualFailure::diagnoseAsError() {
     return false;
   }
 
-  if (diagnoseMissingFunctionCall())
-    return true;
-
   if (diagnoseExtraneousAssociatedValues())
     return true;
 
@@ -2641,36 +2638,6 @@ void ContextualFailure::tryFixIts(InFlightDiagnostic &diagnostic) const {
 
   if (tryTypeCoercionFixIt(diagnostic))
     return;
-}
-
-bool ContextualFailure::diagnoseMissingFunctionCall() const {
-  // Don't suggest inserting a function call if the function expression
-  // isn't written explicitly in the source code.
-  auto *anchor = getAsExpr(simplifyLocatorToAnchor(getLocator()));
-  if (!anchor || anchor->isImplicit())
-    return false;
-
-  if (getLocator()
-      ->isLastElement<LocatorPathElt::UnresolvedMemberChainResult>())
-    return false;
-
-  auto *srcFT = getFromType()->getAs<FunctionType>();
-  if (!srcFT ||
-      !(srcFT->getParams().empty() ||
-        getLocator()->isLastElement<LocatorPathElt::PatternMatch>()))
-    return false;
-
-  auto toType = getToType();
-  if (toType->is<AnyFunctionType>() ||
-      !TypeChecker::isConvertibleTo(srcFT->getResult(), toType, getDC()))
-    return false;
-
-  emitDiagnostic(diag::missing_nullary_call, srcFT->getResult())
-      .highlight(getSourceRange())
-      .fixItInsertAfter(getSourceRange().End, "()");
-
-  tryComputedPropertyFixIts();
-  return true;
 }
 
 bool ContextualFailure::diagnoseExtraneousAssociatedValues() const {
@@ -3094,7 +3061,7 @@ bool ContextualFailure::tryProtocolConformanceFixIt(
   return true;
 }
 
-void ContextualFailure::tryComputedPropertyFixIts() const {
+void MissingCallFailure::tryComputedPropertyFixIts() const {
   if (!isExpr<ClosureExpr>(getAnchor()))
     return;
 
@@ -3305,7 +3272,8 @@ bool MissingCallFailure::diagnoseAsError() {
   if (isExpr<KeyPathExpr>(anchor))
     return false;
 
-  auto path = getLocator()->getPath();
+  auto *locator = getLocator();
+  auto path = locator->getPath();
   if (!path.empty()) {
     const auto &last = path.back();
 
@@ -3314,8 +3282,17 @@ bool MissingCallFailure::diagnoseAsError() {
     case ConstraintLocator::ApplyArgToParam: {
       auto type = getType(anchor)->lookThroughAllOptionalTypes();
       auto fnType = type->castTo<FunctionType>();
+
+      if (MissingArgumentsFailure::isMisplacedMissingArgument(getSolution(), locator)) {
+        ArgumentMismatchFailure failure(
+            getSolution(), fnType, fnType->getResult(), locator);
+        return failure.diagnoseMisplacedMissingArgument();
+      }
+
       emitDiagnostic(diag::missing_nullary_call, fnType->getResult())
+          .highlight(getSourceRange())
           .fixItInsertAfter(insertLoc, "()");
+      tryComputedPropertyFixIts();
       return true;
     }
 
@@ -4708,8 +4685,9 @@ bool MissingArgumentsFailure::isMisplacedMissingArgument(
   auto *argLoc = solution.getConstraintLocator(
       callLocator, LocatorPathElt::ApplyArgToParam(0, 0, argFlags));
 
-  if (!(hasFixFor(FixKind::AllowArgumentTypeMismatch, argLoc) &&
-        hasFixFor(FixKind::AddMissingArguments, callLocator)))
+  bool hasArgumentMismatch = hasFixFor(FixKind::AllowArgumentTypeMismatch, argLoc) ||
+                             hasFixFor(FixKind::InsertCall, argLoc);
+  if (!(hasArgumentMismatch && hasFixFor(FixKind::AddMissingArguments, callLocator)))
     return false;
 
   auto *anchorExpr = getAsExpr(anchor);

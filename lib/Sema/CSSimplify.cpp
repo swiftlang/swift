@@ -3664,6 +3664,16 @@ bool ConstraintSystem::repairFailures(
     if (!anchor || anchor->isImplicit())
       return false;
 
+    if (isArgumentOfPatternMatchingOperator(loc))
+      return false;
+
+    // Don't attempt this fix for trailing closures.
+    if (auto elt = loc->getLastElementAs<LocatorPathElt::ApplyArgToParam>()) {
+      auto argumentList = getArgumentList(loc);
+      if (argumentList->isTrailingClosureIndex(elt->getArgIdx()))
+        return false;
+    }
+
     // If argument is a function type and all of its parameters have
     // default values, let's see whether error is related to missing
     // explicit call.
@@ -3703,7 +3713,14 @@ bool ConstraintSystem::repairFailures(
         convertTo->isAny())
       return false;
 
-    auto result = matchTypes(resultType, dstType, ConstraintKind::Conversion,
+    ConstraintKind matchKind;
+    if (resultType->is<TypeVariableType>()) {
+      matchKind = ConstraintKind::Equal;
+    } else {
+      matchKind = ConstraintKind::Conversion;
+    }
+
+    auto result = matchTypes(resultType, dstType, matchKind,
                              TypeMatchFlags::TMF_ApplyingFix, locator);
 
     if (result.isSuccess()) {
@@ -4540,6 +4557,9 @@ bool ConstraintSystem::repairFailures(
 
   case ConstraintLocator::ClosureBody:
   case ConstraintLocator::ClosureResult: {
+    if (repairByInsertingExplicitCall(lhs, rhs))
+      break;
+
     if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind, conversionsOrFixes,
                                 locator))
       return true;
