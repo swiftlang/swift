@@ -611,8 +611,9 @@ protected:
       auto mangling = Demangle::mangleNode(Node);
       if (!mangling.isSuccess()) {
         return MAKE_NODE_TYPE_ERROR(Node,
-                                    "failed to mangle node (%d)",
-                                    mangling.errorCode());
+                                    "failed to mangle node (%d:%u)",
+                                    mangling.error().code,
+                                    mangling.error().line);
       }
       return Builder.createBuiltinType(Node->getText().str(), mangling.result());
     }

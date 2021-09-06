@@ -542,13 +542,16 @@ struct SWIFT_NODISCARD ManglingError {
 
   Code        code;
   NodePointer node;
+  unsigned    line;
 
   ManglingError() : code(Uninitialized), node(nullptr) {}
-  ManglingError(Code c) : code(c), node(nullptr) {}
-  ManglingError(Code c, NodePointer n) : code(c), node(n) {}
+  ManglingError(Code c) : code(c), node(nullptr), line(0) {}
+  ManglingError(Code c, NodePointer n, unsigned l) : code(c), node(n), line(l) {}
 
   bool isSuccess() const { return code == Success; }
 };
+
+#define MANGLING_ERROR(c,n)     ManglingError((c), (n), __LINE__)
 
 /// Used as a return type for mangling functions that may fail
 template <typename T>
@@ -559,8 +562,10 @@ private:
 
 public:
   ManglingErrorOr() : err_() {}
-  ManglingErrorOr(ManglingError::Code code, NodePointer node = nullptr)
-    : err_(code, node) {}
+  ManglingErrorOr(ManglingError::Code code,
+                  NodePointer node = nullptr,
+                  unsigned line = 0)
+  : err_(code, node, line) {}
   ManglingErrorOr(const ManglingError &err) : err_(err) {}
   ManglingErrorOr(const T &t) : err_(ManglingError::Success), value_(t) {}
   ManglingErrorOr(T &&t) : err_(ManglingError::Success), value_(std::move(t)) {}
@@ -568,8 +573,6 @@ public:
   bool isSuccess() const { return err_.code == ManglingError::Success; }
 
   const ManglingError &error() const { return err_; }
-  ManglingError::Code errorCode() const { return err_.code; }
-  NodePointer errorNode() const { return err_.node; }
 
   const T &result() const {
     assert(isSuccess());

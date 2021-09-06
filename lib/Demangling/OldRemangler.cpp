@@ -16,13 +16,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Demangling/Demangler.h"
-#include "swift/Demangling/Punycode.h"
-#include "swift/Demangling/ManglingUtils.h"
-#include "swift/AST/Ownership.h"
-#include "swift/Strings.h"
-#include "RemanglerBase.h"
 #include "DemanglerAssert.h"
+#include "RemanglerBase.h"
+#include "swift/AST/Ownership.h"
+#include "swift/Demangling/Demangler.h"
+#include "swift/Demangling/ManglingUtils.h"
+#include "swift/Demangling/Punycode.h"
+#include "swift/Strings.h"
 #include <cstdio>
 #include <cstdlib>
 
@@ -71,7 +71,7 @@ namespace {
 
     ManglingError mangle(Node *node, unsigned depth) {
       if (depth > Remangler::MaxDepth) {
-        return ManglingError(ManglingError::TooComplex, node);
+        return MANGLING_ERROR(ManglingError::TooComplex, node);
       }
 
       switch (node->getKind()) {
@@ -80,7 +80,7 @@ namespace {
     return mangle##ID(node, depth);
 #include "swift/Demangling/DemangleNodes.def"
       }
-      return ManglingError(ManglingError::BadNodeKind, node);
+      return MANGLING_ERROR(ManglingError::BadNodeKind, node);
     }
 
     ManglingError mangleGenericArgs(Node *node, EntityContext &ctx,
@@ -111,7 +111,7 @@ namespace {
     }
     ManglingError mangleSingleChildNode(Node *node, unsigned depth) {
       if (node->getNumChildren() != 1)
-        return ManglingError(ManglingError::MultipleChildNodes, node);
+        return MANGLING_ERROR(ManglingError::MultipleChildNodes, node);
 
       return mangle(*node->begin(), depth);
     }
@@ -391,54 +391,54 @@ ManglingError Remangler::mangleSuffix(Node *node, unsigned depth) {
 
 ManglingError Remangler::mangleGenericSpecialization(Node *node,
                                                      unsigned depth) {
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
 ManglingError
 Remangler::mangleGenericSpecializationPrespecialized(Node *node,
                                                      unsigned depth) {
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 ManglingError
 Remangler::mangleGenericSpecializationNotReAbstracted(Node *node,
                                                       unsigned depth) {
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 ManglingError
 Remangler::mangleGenericSpecializationInResilienceDomain(Node *node,
                                                          unsigned depth) {
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
 ManglingError Remangler::mangleInlinedGenericFunction(Node *node,
                                                       unsigned depth) {
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
 ManglingError Remangler::mangleGenericPartialSpecialization(Node *node,
                                                             unsigned depth) {
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
 ManglingError
 Remangler::mangleGenericPartialSpecializationNotReAbstracted(Node *node,
                                                              unsigned depth) {
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
 ManglingError Remangler::mangleGenericSpecializationParam(Node *node,
                                                           unsigned depth) {
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
 ManglingError Remangler::mangleFunctionSignatureSpecialization(Node *node,
                                                                unsigned depth) {
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
 ManglingError Remangler::mangleSpecializationPassID(Node *node,
                                                     unsigned depth) {
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
 ManglingError Remangler::mangleIsSerialized(Node *node, unsigned depth) {
@@ -449,13 +449,13 @@ ManglingError Remangler::mangleIsSerialized(Node *node, unsigned depth) {
 ManglingError
 Remangler::mangleFunctionSignatureSpecializationReturn(Node *node,
                                                        unsigned depth) {
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
 ManglingError
 Remangler::mangleFunctionSignatureSpecializationParam(Node *node,
                                                       unsigned depth) {
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
 ManglingError
@@ -463,7 +463,7 @@ Remangler::mangleFunctionSignatureSpecializationParamPayload(Node *node,
                                                              unsigned depth) {
   // This should never be called since mangling parameter payloads require
   // knowing what the parameter kind is.
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
 ManglingError
@@ -471,72 +471,72 @@ Remangler::mangleFunctionSignatureSpecializationParamKind(Node *node,
                                                           unsigned depth) {
   // This should never be called since mangling parameter kinds have influence
   // on the payloads.
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
 ManglingError Remangler::mangleRetroactiveConformance(Node *node,
                                                       unsigned depth) {
   // Retroactive conformances aren't in the old mangling
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
 ManglingError
 Remangler::mangleProtocolConformanceRefInTypeModule(Node *node,
                                                     unsigned depth) {
   // Protocol conformance references aren't in the old mangling
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
 ManglingError
 Remangler::mangleProtocolConformanceRefInProtocolModule(Node *node,
                                                         unsigned depth) {
   // Protocol conformance references aren't in the old mangling
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
 ManglingError
 Remangler::mangleProtocolConformanceRefInOtherModule(Node *node,
                                                      unsigned depth) {
   // Protocol conformance references aren't in the old mangling
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
 ManglingError Remangler::mangleConcreteProtocolConformance(Node *node,
                                                            unsigned depth) {
   // Concrete conformances aren't in the old mangling
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
 ManglingError Remangler::mangleAnyProtocolConformanceList(Node *node,
                                                           unsigned depth) {
   // Conformance lists aren't in the old mangling
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
 ManglingError Remangler::mangleDependentAssociatedConformance(Node *node,
                                                               unsigned depth) {
   // Dependent associated conformances aren't in the old mangling
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
 ManglingError
 Remangler::mangleDependentProtocolConformanceRoot(Node *node, unsigned depth) {
   // Dependent conformances aren't in the old mangling
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
 ManglingError
 Remangler::mangleDependentProtocolConformanceInherited(Node *node,
                                                        unsigned depth) {
   // Dependent conformances aren't in the old mangling
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
 ManglingError
 Remangler::mangleDependentProtocolConformanceAssociated(Node *node,
                                                         unsigned depth) {
   // Dependent conformances aren't in the old mangling
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
 ManglingError Remangler::mangleProtocolConformance(Node *node, unsigned depth) {
@@ -613,7 +613,7 @@ ManglingError Remangler::mangleTypeMetadataCompletionFunction(Node *node,
 ManglingError Remangler::mangleTypeMetadataDemanglingCache(Node *node,
                                                            unsigned depth) {
   // not supported
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
 ManglingError Remangler::mangleTypeMetadataLazyCache(Node *node,
@@ -641,7 +641,7 @@ ManglingError Remangler::mangleNominalTypeDescriptor(Node *node,
 
 ManglingError Remangler::manglePropertyDescriptor(Node *node, unsigned depth) {
   // not supported
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
 ManglingError Remangler::mangleTypeMetadata(Node *node, unsigned depth) {
@@ -670,7 +670,7 @@ Remangler::mangleProtocolRequirementsBaseDescriptor(Node *node,
 ManglingError Remangler::mangleProtocolWitnessTablePattern(Node *node,
                                                            unsigned depth) {
   // todo
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
 ManglingError Remangler::mangleProtocolConformanceDescriptor(Node *node,
@@ -731,11 +731,11 @@ Remangler::mangleDynamicallyReplaceableFunctionVar(Node *node, unsigned depth) {
 
 ManglingError Remangler::mangleAsyncAwaitResumePartialFunction(Node *node,
                                                                unsigned depth) {
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 ManglingError
 Remangler::mangleAsyncSuspendResumePartialFunction(Node *node, unsigned depth) {
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
 ManglingError Remangler::mangleDirectness(Node *node, unsigned depth) {
@@ -747,7 +747,7 @@ ManglingError Remangler::mangleDirectness(Node *node, unsigned depth) {
     Buffer << 'i';
     break;
   default:
-    return ManglingError(ManglingError::BadDirectness, node);
+    return MANGLING_ERROR(ManglingError::BadDirectness, node);
   }
   return ManglingError::Success;
 }
@@ -761,7 +761,7 @@ ManglingError Remangler::mangleValueWitness(Node *node, unsigned depth) {
     break;
 #include "swift/Demangling/ValueWitnessMangling.def"
   default:
-    return ManglingError(ManglingError::BadValueWitnessKind, node);
+    return MANGLING_ERROR(ManglingError::BadValueWitnessKind, node);
   }
   Buffer << 'w' << Code;
   return mangleChildNode(node, 1, depth + 1); // type
@@ -832,7 +832,7 @@ ManglingError Remangler::mangleGenericProtocolWitnessTable(Node *node,
 ManglingError Remangler::mangleResilientProtocolWitnessTable(Node *node,
                                                              unsigned depth) {
   // todo
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
 ManglingError Remangler::mangleGenericProtocolWitnessTableInstantiationFunction(
@@ -1061,7 +1061,7 @@ ManglingError Remangler::mangleAccessor(Node *storageNode,
     break;
   }
   default:
-    return ManglingError(ManglingError::NotAStorageNode, storageNode);
+    return MANGLING_ERROR(ManglingError::NotAStorageNode, storageNode);
   }
 
   return ManglingError::Success;
@@ -1331,7 +1331,7 @@ ManglingError Remangler::mangleEntityContext(Node *node, EntityContext &ctx,
   case Node::Kind::ID:
 #define CONTEXT_NODE(ID)
 #include "swift/Demangling/DemangleNodes.def"
-    return ManglingError(ManglingError::NotAContextNode, node);
+    return MANGLING_ERROR(ManglingError::NotAContextNode, node);
 
 #define NODE(ID)
 #define CONTEXT_NODE(ID)                                                       \
@@ -1340,7 +1340,7 @@ ManglingError Remangler::mangleEntityContext(Node *node, EntityContext &ctx,
 #include "swift/Demangling/DemangleNodes.def"
   }
 
-  return ManglingError(ManglingError::BadNodeKind, node);
+  return MANGLING_ERROR(ManglingError::BadNodeKind, node);
 }
 
 ManglingError Remangler::mangleEntityType(Node *node, EntityContext &ctx,
@@ -1363,7 +1363,8 @@ ManglingError Remangler::mangleEntityType(Node *node, EntityContext &ctx,
     for (unsigned i = 0; i <= inputIndex; ++i)
       RETURN_IF_ERROR(mangle(node->begin()[i], depth + 1));
     auto returnType = node->begin()[inputIndex+1];
-    DEMANGLER_ASSERT(returnType->getKind() == Node::Kind::ReturnType, returnType);
+    DEMANGLER_ASSERT(returnType->getKind() == Node::Kind::ReturnType,
+                     returnType);
     DEMANGLER_ASSERT(returnType->getNumChildren() == 1, returnType);
     return mangleEntityType(returnType->begin()[0], ctx, depth + 1);
   }
@@ -1442,10 +1443,10 @@ ManglingError Remangler::mangleBuiltinTypeName(Node *node, unsigned depth) {
     } else if (stripPrefix(element, "Int")) {
       Buffer << 'i' << element << '_';
     } else {
-      return ManglingError(ManglingError::UnexpectedBuiltinVectorType, node);
+      return MANGLING_ERROR(ManglingError::UnexpectedBuiltinVectorType, node);
     }
   } else {
-    return ManglingError(ManglingError::UnexpectedBuiltinType, node);
+    return MANGLING_ERROR(ManglingError::UnexpectedBuiltinType, node);
   }
 
   return ManglingError::Success;
@@ -1527,7 +1528,7 @@ ManglingError Remangler::mangleImplFunctionType(Node *node, unsigned depth) {
     } else if (text == "@callee_owned") {
       Buffer << 'o';
     } else {
-      return ManglingError(ManglingError::InvalidImplCalleeConvention, *i);
+      return MANGLING_ERROR(ManglingError::InvalidImplCalleeConvention, *i);
     }
   } else {
     Buffer << 't';
@@ -1566,7 +1567,7 @@ ManglingError Remangler::mangleImplFunctionAttribute(Node *node,
   } else if (text == "@async") {
     Buffer << "H";
   } else {
-    return ManglingError(ManglingError::InvalidImplFunctionAttribute, node);
+    return MANGLING_ERROR(ManglingError::InvalidImplFunctionAttribute, node);
   }
   return ManglingError::Success;
 }
@@ -1590,13 +1591,13 @@ ManglingError Remangler::mangleImplFunctionConventionName(Node *node,
   } else if (text == "witness_method") {
     Buffer << "Cw";
   } else {
-    return ManglingError(ManglingError::InvalidImplCalleeConvention, node);
+    return MANGLING_ERROR(ManglingError::InvalidImplCalleeConvention, node);
   }
   return ManglingError::Success;
 }
 
 ManglingError Remangler::mangleClangType(Node *node, unsigned depth) {
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
 ManglingError Remangler::mangleImplParameter(Node *node, unsigned depth) {
@@ -1667,7 +1668,7 @@ ManglingError Remangler::mangleImplConvention(Node *node, unsigned depth) {
   } else if (text == "@owned") {
     Buffer << 'o';
   } else {
-    return ManglingError(ManglingError::InvalidImplParameterConvention, node);
+    return MANGLING_ERROR(ManglingError::InvalidImplParameterConvention, node);
   }
   return ManglingError::Success;
 }
@@ -1685,7 +1686,7 @@ Remangler::mangleImplParameterResultDifferentiability(Node *node,
     Buffer << 'w';
     return ManglingError::Success;
   }
-  return ManglingError(ManglingError::InvalidImplDifferentiability, node);
+  return MANGLING_ERROR(ManglingError::InvalidImplDifferentiability, node);
 }
 
 ManglingError Remangler::mangleDynamicSelf(Node *node, unsigned depth) {
@@ -1735,7 +1736,7 @@ ManglingError Remangler::mangleMetatypeRepresentation(Node *node,
   } else if (text == "@objc_metatype") {
     Buffer << 'o';
   } else {
-    return ManglingError(ManglingError::InvalidMetatypeRepresentation, node);
+    return MANGLING_ERROR(ManglingError::InvalidMetatypeRepresentation, node);
   }
   return ManglingError::Success;
 }
@@ -1868,7 +1869,7 @@ mangle_requirements:
 ManglingError Remangler::mangleDependentGenericParamCount(Node *node,
                                                           unsigned depth) {
   // handled inline in DependentGenericSignature
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
 ManglingError
@@ -2004,9 +2005,10 @@ ManglingError Remangler::mangleDependentMemberType(Node *node, unsigned depth) {
     base = base->getFirstChild()->getFirstChild();
   } while (base->getKind() == Node::Kind::DependentMemberType);
 
-  DEMANGLER_ASSERT(base->getKind() == Node::Kind::DependentGenericParamType
-                   && "dependent members not based on a generic param are "
-                   "non-canonical and shouldn't need remangling", base);
+  DEMANGLER_ASSERT(base->getKind() == Node::Kind::DependentGenericParamType &&
+                       "dependent members not based on a generic param are "
+                       "non-canonical and shouldn't need remangling",
+                   base);
   DEMANGLER_ASSERT(members.size() >= 1, node);
   if (members.size() == 1) {
     Buffer << 'w';
@@ -2082,7 +2084,7 @@ ManglingError Remangler::mangleIndex(Node *node, unsigned depth) {
 
 ManglingError Remangler::mangleUnknownIndex(Node *node, unsigned depth) {
   // should not be reached in an arbitrary context
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
 ManglingError Remangler::mangleProtocol(Node *node, EntityContext &ctx,
@@ -2148,7 +2150,7 @@ ManglingError Remangler::mangleGenericArgs(Node *node, EntityContext &ctx,
 ManglingError Remangler::mangleAnyNominalType(Node *node, EntityContext &ctx,
                                               unsigned depth) {
   if (depth > Remangler::MaxDepth)
-    return ManglingError(ManglingError::TooComplex, node);
+    return MANGLING_ERROR(ManglingError::TooComplex, node);
 
   if (isSpecialized(node)) {
     Buffer << 'G';
@@ -2187,7 +2189,7 @@ ManglingError Remangler::mangleAnyNominalType(Node *node, EntityContext &ctx,
     RETURN_IF_ERROR(mangleNominalType(node, 'a', ctx, depth + 1));
     break;
   default:
-    return ManglingError(ManglingError::BadNominalTypeKind, node);
+    return MANGLING_ERROR(ManglingError::BadNominalTypeKind, node);
   }
   return ManglingError::Success;
 }
@@ -2314,7 +2316,7 @@ Remangler::mangleReflectionMetadataSuperclassDescriptor(Node *node,
 ManglingError Remangler::mangleGenericTypeParamDecl(Node *node,
                                                     unsigned depth) {
   // todo
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
 ManglingError Remangler::mangleCurryThunk(Node *node, unsigned depth) {
@@ -2497,10 +2499,12 @@ ManglingError Remangler::mangleSILBoxTypeWithLayout(Node *node,
   NodePointer genericArgs = nullptr;
   if (node->getNumChildren() == 3) {
     NodePointer signature = node->getChild(1);
-    DEMANGLER_ASSERT(signature->getKind() == Node::Kind::DependentGenericSignature,
+    DEMANGLER_ASSERT(signature->getKind() ==
+                         Node::Kind::DependentGenericSignature,
                      signature);
     genericArgs = node->getChild(2);
-    DEMANGLER_ASSERT(genericArgs->getKind() == Node::Kind::TypeList, genericArgs);
+    DEMANGLER_ASSERT(genericArgs->getKind() == Node::Kind::TypeList,
+                     genericArgs);
 
     Buffer << 'G';
     RETURN_IF_ERROR(mangleDependentGenericSignature(signature, depth + 1));
@@ -2521,8 +2525,8 @@ ManglingError Remangler::mangleSILBoxTypeWithLayout(Node *node,
 ManglingError Remangler::mangleSILBoxLayout(Node *node, unsigned depth) {
   DEMANGLER_ASSERT(node->getKind() == Node::Kind::SILBoxLayout, node);
   for (unsigned i = 0; i < node->getNumChildren(); ++i) {
-    DEMANGLER_ASSERT(node->getKind() == Node::Kind::SILBoxImmutableField
-                     || node->getKind() == Node::Kind::SILBoxMutableField,
+    DEMANGLER_ASSERT(node->getKind() == Node::Kind::SILBoxImmutableField ||
+                         node->getKind() == Node::Kind::SILBoxMutableField,
                      node);
     RETURN_IF_ERROR(mangle(node->getChild(i), depth + 1));
   }
@@ -2533,72 +2537,74 @@ ManglingError Remangler::mangleSILBoxLayout(Node *node, unsigned depth) {
 
 ManglingError Remangler::mangleSILBoxMutableField(Node *node, unsigned depth) {
   Buffer << 'm';
-  DEMANGLER_ASSERT(node->getNumChildren() == 1
-                   && node->getChild(0)->getKind() == Node::Kind::Type, node);
+  DEMANGLER_ASSERT(node->getNumChildren() == 1 &&
+                       node->getChild(0)->getKind() == Node::Kind::Type,
+                   node);
   return mangleType(node->getChild(0), depth + 1);
 }
 
 ManglingError Remangler::mangleSILBoxImmutableField(Node *node,
                                                     unsigned depth) {
   Buffer << 'i';
-  DEMANGLER_ASSERT(node->getNumChildren() == 1
-                   && node->getChild(0)->getKind() == Node::Kind::Type, node);
+  DEMANGLER_ASSERT(node->getNumChildren() == 1 &&
+                       node->getChild(0)->getKind() == Node::Kind::Type,
+                   node);
   return mangleType(node->getChild(0), depth + 1);
 }
 
 ManglingError Remangler::mangleAssocTypePath(Node *node, unsigned depth) {
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
 ManglingError Remangler::mangleModuleDescriptor(Node *node, unsigned depth) {
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
 ManglingError Remangler::mangleExtensionDescriptor(Node *node, unsigned depth) {
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
 ManglingError Remangler::mangleAnonymousDescriptor(Node *node, unsigned depth) {
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
 ManglingError Remangler::mangleAssociatedTypeGenericParamRef(Node *node,
                                                              unsigned depth) {
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
 ManglingError Remangler::mangleTypeSymbolicReference(Node *node,
                                                      EntityContext &,
                                                      unsigned depth) {
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
 ManglingError Remangler::mangleProtocolSymbolicReference(Node *node,
                                                          EntityContext &,
                                                          unsigned depth) {
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
 ManglingError
 Remangler::mangleOpaqueTypeDescriptorSymbolicReference(Node *node,
                                                        unsigned depth) {
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
 ManglingError Remangler::mangleSugaredOptional(Node *node, unsigned depth) {
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
 ManglingError Remangler::mangleSugaredArray(Node *node, unsigned depth) {
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
 ManglingError Remangler::mangleSugaredDictionary(Node *node, unsigned depth) {
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
 ManglingError Remangler::mangleSugaredParen(Node *node, unsigned depth) {
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
 ManglingError Remangler::mangleOpaqueReturnType(Node *node, unsigned depth) {
@@ -2608,59 +2614,59 @@ ManglingError Remangler::mangleOpaqueReturnType(Node *node, unsigned depth) {
 ManglingError Remangler::mangleOpaqueReturnTypeOf(Node *node,
                                                   EntityContext &ctx,
                                                   unsigned depth) {
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 ManglingError Remangler::mangleOpaqueType(Node *node, unsigned depth) {
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 ManglingError Remangler::mangleOpaqueTypeDescriptor(Node *node,
                                                     unsigned depth) {
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 ManglingError Remangler::mangleOpaqueTypeDescriptorAccessor(Node *node,
                                                             unsigned depth) {
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 ManglingError
 Remangler::mangleOpaqueTypeDescriptorAccessorImpl(Node *node, unsigned depth) {
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 ManglingError Remangler::mangleOpaqueTypeDescriptorAccessorKey(Node *node,
                                                                unsigned depth) {
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 ManglingError Remangler::mangleOpaqueTypeDescriptorAccessorVar(Node *node,
                                                                unsigned depth) {
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 ManglingError Remangler::mangleAccessorFunctionReference(Node *node,
                                                          unsigned depth) {
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 ManglingError Remangler::mangleMetadataInstantiationCache(Node *node,
                                                           unsigned depth) {
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 ManglingError Remangler::mangleGlobalVariableOnceToken(Node *node,
                                                        unsigned depth) {
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 ManglingError Remangler::mangleGlobalVariableOnceFunction(Node *node,
                                                           unsigned depth) {
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 ManglingError Remangler::mangleGlobalVariableOnceDeclList(Node *node,
                                                           unsigned depth) {
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 ManglingError
 Remangler::manglePredefinedObjCAsyncCompletionHandlerImpl(Node *node,
                                                           unsigned depth) {
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 ManglingError Remangler::mangleObjCAsyncCompletionHandlerImpl(Node *node,
                                                               unsigned depth) {
-  return ManglingError(ManglingError::UnsupportedNodeKind, node);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
 ManglingError

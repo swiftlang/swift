@@ -644,9 +644,10 @@ void swift_reflection_dumpInfoForTypeRef(SwiftReflectionContextRef ContextRef,
               MangledName.c_str());
     } else {
       MangledName = "<failed to mangle name>";
-      fprintf(stdout, "Failed to get mangled name: Node %p, error code %d\n",
-              Mangling.errorNode(),
-              Mangling.errorCode());
+      fprintf(stdout, "Failed to get mangled name: Node %p, error %d:%u\n",
+              Mangling.error().node,
+              Mangling.error().code,
+              Mangling.error().line);
     }
 
     char *DemangledName =

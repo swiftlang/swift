@@ -2398,8 +2398,9 @@ static int doPrintLocalTypes(const CompilerInvocation &InitInvok,
       auto mangling = Demangle::mangleNode(typeNode);
       if (!mangling.isSuccess()) {
         llvm::errs() << "Couldn't remangle type (failed at Node "
-                     << mangling.errorNode() << " with error "
-                     << mangling.errorCode() << ")\n";
+                     << mangling.error().node << " with error "
+                     << mangling.error().code << ":" << mangling.error().line
+                     << ")\n";
         return EXIT_FAILURE;
       }
       auto remangled = mangling.result();

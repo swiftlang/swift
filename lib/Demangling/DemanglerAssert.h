@@ -19,13 +19,13 @@
 #define SWIFT_DEMANGLING_ASSERT_H
 
 #if SWIFT_RUNTIME
-#define DEMANGLER_ASSERT(expr, node)                            \
-do {                                                            \
-  if (!(expr))                                                  \
-    return ManglingError(ManglingError::AssertionFailed, node); \
-} while (0)
+#define DEMANGLER_ASSERT(expr, node)                                           \
+  do {                                                                         \
+    if (!(expr))                                                               \
+      return ManglingError(ManglingError::AssertionFailed, (node), __LINE__);  \
+  } while (0)
 #else
-#define DEMANGLER_ASSERT(expr, node)    assert(expr)
+#define DEMANGLER_ASSERT(expr, node) assert(expr)
 #endif
 
 #endif // SWIFT_DEMANGLING_ASSERT_H
