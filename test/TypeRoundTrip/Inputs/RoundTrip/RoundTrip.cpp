@@ -32,8 +32,8 @@ extern "C" SWIFT_CC(swift) void roundTripType(const Metadata *md) {
   // Mangle that
   auto mangling = Demangle::__runtime::mangleNode(nodeTree);
   if (!mangling.isSuccess()) {
-    printf("FAIL: %s (%p) -> mangling error %d\n", mdName.c_str(), md,
-           mangling.errorCode());
+    printf("FAIL: %s (%p) -> mangling error %d:%u\n", mdName.c_str(), md,
+           mangling.error().code, mangling.error().line);
     return;
   }
   std::string mangledName = mangling.result();

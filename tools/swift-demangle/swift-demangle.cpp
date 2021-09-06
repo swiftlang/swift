@@ -153,7 +153,9 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
     } else {
       auto mangling = swift::Demangle::mangleNode(pointer);
       if (!mangling.isSuccess()) {
-        llvm::errs() << "Error: unable to re-mangle " << name << '\n';
+        llvm::errs() << "Error: (" << mangling.error().code << ":"
+                     << mangling.error().line << ") unable to re-mangle "
+                     << name << '\n';
         exit(1);
       }
       remangled = mangling.result();
@@ -181,7 +183,9 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
     if (pointer) {
       auto mangling = swift::Demangle::mangleNodeOld(pointer);
       if (!mangling.isSuccess()) {
-        llvm::errs() << "Error: unable to re-mangle " << name << '\n';
+        llvm::errs() << "Error: (" << mangling.error().code << ":"
+                     << mangling.error().line << ") unable to re-mangle "
+                     << name << '\n';
         exit(1);
       }
       remangled = mangling.result();
@@ -197,7 +201,9 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
       }
       auto mangling = swift::Demangle::mangleNode(pointer);
       if (!mangling.isSuccess()) {
-        llvm::errs() << "Error: unable to re-mangle " << name << '\n';
+        llvm::errs() << "Error: (" << mangling.error().code << ":"
+                     << mangling.error().line << ") unable to re-mangle "
+                     << name << '\n';
         exit(1);
       }
       std::string remangled = mangling.result();
@@ -208,7 +214,9 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
       stripSpecialization(pointer);
       auto mangling = swift::Demangle::mangleNode(pointer);
       if (!mangling.isSuccess()) {
-        llvm::errs() << "Error: unable to re-mangle " << name << '\n';
+        llvm::errs() << "Error: (" << mangling.error().code << ":"
+                     << mangling.error().line << ") unable to re-mangle "
+                     << name << '\n';
         exit(1);
       }
       std::string remangled = mangling.result();
