@@ -466,14 +466,37 @@ func testConvertBool() async throws {
     print("much success", unrelated, str)
   }
   // OBJC-BOOL-WITH-ERR-FALLBACK:      var str: String? = nil
+  // OBJC-BOOL-WITH-ERR-FALLBACK-NEXT: let success: Bool
   // OBJC-BOOL-WITH-ERR-FALLBACK-NEXT: var unrelated: Bool? = nil
   // OBJC-BOOL-WITH-ERR-FALLBACK-NEXT: var err: Error? = nil
   // OBJC-BOOL-WITH-ERR-FALLBACK-NEXT: do {
   // OBJC-BOOL-WITH-ERR-FALLBACK-NEXT:   (str, unrelated) = try await ClassWithHandlerMethods.firstBoolFlagSuccess("")
+  // OBJC-BOOL-WITH-ERR-FALLBACK-NEXT:   success = true
   // OBJC-BOOL-WITH-ERR-FALLBACK-NEXT: } catch {
   // OBJC-BOOL-WITH-ERR-FALLBACK-NEXT:   err = error
+  // OBJC-BOOL-WITH-ERR-FALLBACK-NEXT:   success = false
   // OBJC-BOOL-WITH-ERR-FALLBACK-NEXT: }
   // OBJC-BOOL-WITH-ERR-FALLBACK-EMPTY:
-  // OBJC-BOOL-WITH-ERR-FALLBACK-NEXT: guard <#success#> && <#success#> == .random() else { fatalError() }
+  // OBJC-BOOL-WITH-ERR-FALLBACK-NEXT: guard success && success == .random() else { fatalError() }
   // OBJC-BOOL-WITH-ERR-FALLBACK-NEXT: print("much success", unrelated, str)
+
+  // RUN: %refactor-check-compiles -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 -I %S/Inputs -I %t -target %target-triple %clang-importer-sdk-nosource | %FileCheck -check-prefix=OBJC-BOOL-WITH-ERR-FALLBACK2 %s
+  ClassWithHandlerMethods.secondBoolFlagFailure("") { str, unrelated, failure, err in
+    guard !failure && failure == .random() else { fatalError() }
+    print("much fails", unrelated, str)
+  }
+  // OBJC-BOOL-WITH-ERR-FALLBACK2:      var str: String? = nil
+  // OBJC-BOOL-WITH-ERR-FALLBACK2-NEXT: var unrelated: Bool? = nil
+  // OBJC-BOOL-WITH-ERR-FALLBACK2-NEXT: let failure: Bool
+  // OBJC-BOOL-WITH-ERR-FALLBACK2-NEXT: var err: Error? = nil
+  // OBJC-BOOL-WITH-ERR-FALLBACK2-NEXT: do {
+  // OBJC-BOOL-WITH-ERR-FALLBACK2-NEXT:   (str, unrelated) = try await ClassWithHandlerMethods.secondBoolFlagFailure("")
+  // OBJC-BOOL-WITH-ERR-FALLBACK2-NEXT:   failure = false
+  // OBJC-BOOL-WITH-ERR-FALLBACK2-NEXT: } catch {
+  // OBJC-BOOL-WITH-ERR-FALLBACK2-NEXT:   err = error
+  // OBJC-BOOL-WITH-ERR-FALLBACK2-NEXT:   failure = true
+  // OBJC-BOOL-WITH-ERR-FALLBACK2-NEXT: }
+  // OBJC-BOOL-WITH-ERR-FALLBACK2-EMPTY:
+  // OBJC-BOOL-WITH-ERR-FALLBACK2-NEXT: guard !failure && failure == .random() else { fatalError() }
+  // OBJC-BOOL-WITH-ERR-FALLBACK2-NEXT: print("much fails", unrelated, str)
 }
