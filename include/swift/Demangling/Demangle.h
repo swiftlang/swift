@@ -19,12 +19,13 @@
 #ifndef SWIFT_DEMANGLING_DEMANGLE_H
 #define SWIFT_DEMANGLING_DEMANGLE_H
 
-#include <memory>
-#include <string>
+#include "swift/Demangling/NamespaceMacros.h"
+#include "swift/Runtime/Config.h"
+#include "llvm/ADT/StringRef.h"
 #include <cassert>
 #include <cstdint>
-#include "llvm/ADT/StringRef.h"
-#include "swift/Demangling/NamespaceMacros.h"
+#include <memory>
+#include <string>
 
 namespace llvm {
   class raw_ostream;
