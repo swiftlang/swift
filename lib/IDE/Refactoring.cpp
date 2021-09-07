@@ -4916,6 +4916,134 @@ public:
   }
 };
 
+/// The type of block rewritten code may be placed in.
+enum class BlockKind {
+  SUCCESS, ERROR, FALLBACK
+};
+
+/// A completion handler function parameter that is known to be a Bool flag
+/// indicating success or failure.
+struct KnownBoolFlagParam {
+  const ParamDecl *Param;
+  bool IsSuccessFlag;
+};
+
+/// A set of parameters for a completion callback closure.
+class ClosureCallbackParams final {
+  const AsyncHandlerParamDesc &HandlerDesc;
+  ArrayRef<const ParamDecl *> AllParams;
+  llvm::SetVector<const ParamDecl *> SuccessParams;
+  const ParamDecl *ErrParam = nullptr;
+  Optional<KnownBoolFlagParam> BoolFlagParam;
+
+public:
+  ClosureCallbackParams(const AsyncHandlerParamDesc &HandlerDesc,
+                        const ClosureExpr *Closure)
+      : HandlerDesc(HandlerDesc),
+        AllParams(Closure->getParameters()->getArray()) {
+    assert(AllParams.size() == HandlerDesc.params().size());
+    assert(HandlerDesc.Type != HandlerType::RESULT || AllParams.size() == 1);
+
+    SuccessParams.insert(AllParams.begin(), AllParams.end());
+    if (HandlerDesc.HasError && HandlerDesc.Type == HandlerType::PARAMS)
+      ErrParam = SuccessParams.pop_back_val();
+
+    // Check to see if we have a known bool flag parameter.
+    if (auto *AsyncAlt = HandlerDesc.Func->getAsyncAlternative()) {
+      if (auto Conv = AsyncAlt->getForeignAsyncConvention()) {
+        auto FlagIdx = Conv->completionHandlerFlagParamIndex();
+        if (FlagIdx && *FlagIdx >= 0 && *FlagIdx < AllParams.size()) {
+          auto IsSuccessFlag = Conv->completionHandlerFlagIsErrorOnZero();
+          BoolFlagParam = {AllParams[*FlagIdx], IsSuccessFlag};
+        }
+      }
+    }
+  }
+
+  /// Whether the closure has a particular parameter.
+  bool hasParam(const ParamDecl *Param) const {
+    return Param == ErrParam || SuccessParams.contains(Param);
+  }
+
+  /// Whether \p Param is a success param.
+  bool isSuccessParam(const ParamDecl *Param) const {
+    return SuccessParams.contains(Param);
+  }
+
+  /// Whether \p Param is a closure parameter that may be unwrapped. This
+  /// includes optional parameters as well as \c Result parameters that may be
+  /// unwrapped through e.g 'try? res.get()'.
+  bool isUnwrappableParam(const ParamDecl *Param) const {
+    if (!hasParam(Param))
+      return false;
+    if (getResultParam() == Param)
+      return true;
+    return HandlerDesc.shouldUnwrap(Param->getType());
+  }
+
+  /// Whether \p Param is the known Bool parameter that indicates success or
+  /// failure.
+  bool isKnownBoolFlagParam(const ParamDecl *Param) const {
+    if (auto BoolFlag = getKnownBoolFlagParam())
+      return BoolFlag->Param == Param;
+    return false;
+  }
+
+  /// Whether \p Param is a closure parameter that has a binding available in
+  /// the async variant of the call for a particular \p Block.
+  bool hasBinding(const ParamDecl *Param, BlockKind Block) const {
+    switch (Block) {
+    case BlockKind::SUCCESS:
+      // Known bool flags get dropped from the imported async variant.
+      if (isKnownBoolFlagParam(Param))
+        return false;
+
+      return isSuccessParam(Param);
+    case BlockKind::ERROR:
+      return Param == ErrParam;
+    case BlockKind::FALLBACK:
+      // We generally want to bind everything in the fallback case.
+      return hasParam(Param);
+    }
+    llvm_unreachable("Unhandled case in switch");
+  }
+
+  /// Retrieve the parameters to bind in a given \p Block.
+  TinyPtrVector<const ParamDecl *> getParamsToBind(BlockKind Block) {
+    TinyPtrVector<const ParamDecl *> Result;
+    for (auto *Param : AllParams) {
+      if (hasBinding(Param, Block))
+        Result.push_back(Param);
+    }
+    return Result;
+  }
+
+  /// If there is a known Bool flag parameter indicating success or failure,
+  /// returns it, \c None otherwise.
+  Optional<KnownBoolFlagParam> getKnownBoolFlagParam() const {
+    return BoolFlagParam;
+  }
+
+  /// All the parameters of the closure passed as the completion handler.
+  ArrayRef<const ParamDecl *> getAllParams() const { return AllParams; }
+
+  /// The success parameters of the closure passed as the completion handler.
+  /// Note this includes a \c Result parameter.
+  ArrayRef<const ParamDecl *> getSuccessParams() const {
+    return SuccessParams.getArrayRef();
+  }
+
+  /// The error parameter of the closure passed as the completion handler, or
+  /// \c nullptr if there is no error parameter.
+  const ParamDecl *getErrParam() const { return ErrParam; }
+
+  /// If the closure has a single \c Result parameter, returns it, \c nullptr
+  /// otherwise.
+  const ParamDecl *getResultParam() const {
+    return HandlerDesc.Type == HandlerType::RESULT ? SuccessParams[0] : nullptr;
+  }
+};
+
 /// Whether or not the given statement starts a new scope. Note that most
 /// statements are handled by the \c BraceStmt check. The others listed are
 /// a somewhat special case since they can also declare variables in their
@@ -4953,30 +5081,21 @@ struct CallbackClassifier {
   /// Updates the success and error block of `Blocks` with nodes and bound
   /// names from `Body`. Errors are added through `DiagEngine`, possibly
   /// resulting in partially filled out blocks.
-  static void classifyInto(ClassifiedBlocks &Blocks, const FuncDecl *Callee,
-                           ArrayRef<const ParamDecl *> SuccessParams,
+  static void classifyInto(ClassifiedBlocks &Blocks,
+                           const ClosureCallbackParams &Params,
                            llvm::DenseSet<SwitchStmt *> &HandledSwitches,
-                           DiagnosticEngine &DiagEngine,
-                           llvm::DenseSet<const Decl *> UnwrapParams,
-                           const ParamDecl *ErrParam, HandlerType ResultType,
-                           BraceStmt *Body) {
+                           DiagnosticEngine &DiagEngine, BraceStmt *Body) {
     assert(!Body->getElements().empty() && "Cannot classify empty body");
-    CallbackClassifier Classifier(Blocks, Callee, SuccessParams,
-                                  HandledSwitches, DiagEngine, UnwrapParams,
-                                  ErrParam, ResultType == HandlerType::RESULT);
+    CallbackClassifier Classifier(Blocks, Params, HandledSwitches, DiagEngine);
     Classifier.classifyNodes(Body->getElements(), Body->getRBraceLoc());
   }
 
 private:
   ClassifiedBlocks &Blocks;
-  const FuncDecl *Callee;
-  ArrayRef<const ParamDecl *> SuccessParams;
+  const ClosureCallbackParams &Params;
   llvm::DenseSet<SwitchStmt *> &HandledSwitches;
   DiagnosticEngine &DiagEngine;
   ClassifiedBlock *CurrentBlock;
-  llvm::DenseSet<const Decl *> UnwrapParams;
-  const ParamDecl *ErrParam;
-  bool IsResultParam;
 
   /// This is set to \c true if we're currently classifying on a known condition
   /// path, where \c CurrentBlock is set to the appropriate block. This lets us
@@ -4984,16 +5103,12 @@ private:
   /// we're supposed to be in.
   bool IsKnownConditionPath = false;
 
-  CallbackClassifier(ClassifiedBlocks &Blocks, const FuncDecl *Callee,
-                     ArrayRef<const ParamDecl *> SuccessParams,
+  CallbackClassifier(ClassifiedBlocks &Blocks,
+                     const ClosureCallbackParams &Params,
                      llvm::DenseSet<SwitchStmt *> &HandledSwitches,
-                     DiagnosticEngine &DiagEngine,
-                     llvm::DenseSet<const Decl *> UnwrapParams,
-                     const ParamDecl *ErrParam, bool IsResultParam)
-      : Blocks(Blocks), Callee(Callee), SuccessParams(SuccessParams),
-        HandledSwitches(HandledSwitches), DiagEngine(DiagEngine),
-        CurrentBlock(&Blocks.SuccessBlock), UnwrapParams(UnwrapParams),
-        ErrParam(ErrParam), IsResultParam(IsResultParam) {}
+                     DiagnosticEngine &DiagEngine)
+      : Blocks(Blocks), Params(Params), HandledSwitches(HandledSwitches),
+        DiagEngine(DiagEngine), CurrentBlock(&Blocks.SuccessBlock) {}
 
   void classifyNodes(ArrayRef<ASTNode> Nodes, SourceLoc endCommentLoc) {
     for (auto I = Nodes.begin(), E = Nodes.end(); I < E; ++I) {
@@ -5026,7 +5141,8 @@ private:
   /// Whether any of the provided ASTNodes have a child expression that force
   /// unwraps the error parameter. Note that this doesn't walk into new scopes.
   bool hasForceUnwrappedErrorParam(ArrayRef<ASTNode> Nodes) {
-    if (IsResultParam || !ErrParam)
+    auto *ErrParam = Params.getErrParam();
+    if (!ErrParam)
       return false;
 
     class ErrUnwrapFinder : public ASTWalker {
@@ -5095,22 +5211,26 @@ private:
     if (Cond.BindPattern && Cond.BindPattern->isRefutablePattern())
       return None;
 
-    // For certain types of condition, they need to appear in certain lists.
+    auto *SubjectParam = dyn_cast<ParamDecl>(Cond.Subject);
+    if (!SubjectParam)
+      return None;
+
+    // For certain types of condition, they need to be certain kinds of params.
     auto CondType = *Cond.Type;
     switch (CondType) {
     case ConditionType::NOT_NIL:
     case ConditionType::NIL:
-      if (!UnwrapParams.count(Cond.Subject))
+      if (!Params.isUnwrappableParam(SubjectParam))
         return None;
       break;
     case ConditionType::IS_TRUE:
     case ConditionType::IS_FALSE:
-      if (!llvm::is_contained(SuccessParams, Cond.Subject))
+      if (!Params.isSuccessParam(SubjectParam))
         return None;
       break;
     case ConditionType::SUCCESS_PATTERN:
     case ConditionType::FAILURE_PATTEN:
-      if (!IsResultParam || Cond.Subject != ErrParam)
+      if (SubjectParam != Params.getResultParam())
         return None;
       break;
     }
@@ -5119,7 +5239,7 @@ private:
     auto Path = ConditionPath::SUCCESS;
 
     // If it's an error param, that's a flip.
-    if (Cond.Subject == ErrParam && !IsResultParam)
+    if (SubjectParam == Params.getErrParam())
       Path = flippedConditionPath(Path);
 
     // If we have a nil, false, or failure condition, that's a flip.
@@ -5142,29 +5262,15 @@ private:
       return ClassifiedCondition(Cond, Path, /*ObjCFlagCheck*/ false);
     }
 
-    // Check to see if the async alternative function has a convention that
-    // specifies where the flag is and what it indicates.
-    Optional<std::pair</*Idx*/ unsigned, /*SuccessFlag*/ bool>> CustomFlag;
-    if (auto *AsyncAlt = Callee->getAsyncAlternative()) {
-      if (auto Conv = AsyncAlt->getForeignAsyncConvention()) {
-        if (auto Idx = Conv->completionHandlerFlagParamIndex()) {
-          auto IsSuccessFlag = Conv->completionHandlerFlagIsErrorOnZero();
-          CustomFlag = std::make_pair(*Idx, IsSuccessFlag);
-        }
-      }
-    }
-    if (CustomFlag) {
-      auto Idx = CustomFlag->first;
-      if (Idx < 0 || Idx >= SuccessParams.size())
-        return None;
-
-      if (SuccessParams[Idx] != Cond.Subject)
+    // Check to see if we have a known bool flag parameter that indicates
+    // success or failure.
+    if (auto KnownBoolFlag = Params.getKnownBoolFlagParam()) {
+      if (KnownBoolFlag->Param != SubjectParam)
         return None;
 
       // The path may need to be flipped depending on whether the flag indicates
       // success.
-      auto IsSuccessFlag = CustomFlag->second;
-      if (!IsSuccessFlag)
+      if (!KnownBoolFlag->IsSuccessFlag)
         Path = flippedConditionPath(Path);
 
       return ClassifiedCondition(Cond, Path, /*ObjCStyleFlagCheck*/ true);
@@ -5290,7 +5396,7 @@ private:
     ClassifiedCallbackConditions CallbackConditions;
     bool UnhandledConditions = classifyConditionsOf(
         Condition, ThenNodesToPrint, ElseStmt, CallbackConditions);
-    auto ErrCondition = CallbackConditions.lookup(ErrParam);
+    auto ErrCondition = CallbackConditions.lookup(Params.getErrParam());
 
     if (UnhandledConditions) {
       // Some unknown conditions. If there's an else, assume we can't handle
@@ -5413,7 +5519,8 @@ private:
   }
 
   void classifySwitch(SwitchStmt *SS) {
-    if (!IsResultParam || singleSwitchSubject(SS) != ErrParam) {
+    auto *ResultParam = Params.getResultParam();
+    if (singleSwitchSubject(SS) != ResultParam) {
       CurrentBlock->addNode(SS);
       return;
     }
@@ -5455,7 +5562,7 @@ private:
 
       // Classify the case pattern.
       auto CC = classifyCallbackCondition(
-          CallbackCondition(ErrParam, &Items[0]), SuccessNodes,
+          CallbackCondition(ResultParam, &Items[0]), SuccessNodes,
           /*elseStmt*/ nullptr);
       if (!CC) {
         DiagEngine.diagnose(CS->getLoc(), diag::unknown_callback_case_item);
@@ -6631,10 +6738,21 @@ private:
   }
 
   void addFallbackVars(ArrayRef<const ParamDecl *> FallbackParams,
-                       ClassifiedBlocks &Blocks) {
-    for (auto Param : FallbackParams) {
-      OS << tok::kw_var << " " << newNameFor(Param) << ": ";
+                       const ClosureCallbackParams &AllParams) {
+    for (auto *Param : FallbackParams) {
       auto Ty = Param->getType();
+      auto ParamName = newNameFor(Param);
+
+      // If this is the known bool success param, we can use 'let' and type it
+      // as non-optional, as it gets bound in both blocks.
+      if (AllParams.isKnownBoolFlagParam(Param)) {
+        OS << tok::kw_let << " " << ParamName << ": ";
+        Ty->print(OS);
+        OS << "\n";
+        continue;
+      }
+
+      OS << tok::kw_var << " " << ParamName << ": ";
       Ty->print(OS);
       if (!Ty->getOptionalObjectType())
         OS << "?";
@@ -7053,6 +7171,30 @@ private:
     DiagEngine.diagnose(CE->getStartLoc(), diag::missing_callback_arg);
   }
 
+  /// Add a binding to a known bool flag that indicates success or failure.
+  void addBoolFlagParamBindingIfNeeded(Optional<KnownBoolFlagParam> Flag,
+                                       BlockKind Block) {
+    if (!Flag)
+      return;
+    // Figure out the polarity of the binding based on the block we're in and
+    // whether the flag indicates success.
+    auto Polarity = true;
+    switch (Block) {
+    case BlockKind::SUCCESS:
+      break;
+    case BlockKind::ERROR:
+      Polarity = !Polarity;
+      break;
+    case BlockKind::FALLBACK:
+      llvm_unreachable("Not a valid place to bind");
+    }
+    if (!Flag->IsSuccessFlag)
+      Polarity = !Polarity;
+
+    OS << newNameFor(Flag->Param) << " " << tok::equal << " ";
+    OS << (Polarity ? tok::kw_true : tok::kw_false) << "\n";
+  }
+
   /// Add a call to the async alternative of \p CE and convert the \p Callback
   /// to be executed after the async call. \p HandlerDesc describes the
   /// completion handler in the function that's called by \p CE and \p ArgList
@@ -7060,42 +7202,22 @@ private:
   void addHoistedClosureCallback(const CallExpr *CE,
                                  const AsyncHandlerParamDesc &HandlerDesc,
                                  const ClosureExpr *Callback) {
-    ArrayRef<const ParamDecl *> CallbackParams =
-        Callback->getParameters()->getArray();
-    auto CallbackBody = Callback->getBody();
-    if (HandlerDesc.params().size() != CallbackParams.size()) {
+    if (HandlerDesc.params().size() != Callback->getParameters()->size()) {
       DiagEngine.diagnose(CE->getStartLoc(), diag::mismatched_callback_args);
       return;
     }
-
-    // Note that the `ErrParam` may be a Result (in which case it's also the
-    // only element in `SuccessParams`)
-    ArrayRef<const ParamDecl *> SuccessParams = CallbackParams;
-    const ParamDecl *ErrParam = nullptr;
-    if (HandlerDesc.Type == HandlerType::RESULT) {
-      ErrParam = SuccessParams.back();
-    } else if (HandlerDesc.HasError) {
-      assert(HandlerDesc.Type == HandlerType::PARAMS);
-      ErrParam = SuccessParams.back();
-      SuccessParams = SuccessParams.drop_back();
-    }
-
+    ClosureCallbackParams CallbackParams(HandlerDesc, Callback);
     ClassifiedBlocks Blocks;
+    auto *CallbackBody = Callback->getBody();
     if (!HandlerDesc.HasError) {
       Blocks.SuccessBlock.addNodesInBraceStmt(CallbackBody);
     } else if (!CallbackBody->getElements().empty()) {
-      llvm::DenseSet<const Decl *> UnwrapParams;
-      for (auto *Param : SuccessParams) {
-        if (HandlerDesc.shouldUnwrap(Param->getType()))
-          UnwrapParams.insert(Param);
-      }
-      if (ErrParam)
-        UnwrapParams.insert(ErrParam);
-      CallbackClassifier::classifyInto(
-          Blocks, HandlerDesc.Func, SuccessParams, HandledSwitches, DiagEngine,
-          UnwrapParams, ErrParam, HandlerDesc.Type, CallbackBody);
+      CallbackClassifier::classifyInto(Blocks, CallbackParams, HandledSwitches,
+                                       DiagEngine, CallbackBody);
     }
 
+    auto SuccessBindings = CallbackParams.getParamsToBind(BlockKind::SUCCESS);
+    auto *ErrParam = CallbackParams.getErrParam();
     if (DiagEngine.hadAnyError()) {
       // For now, only fallback when the results are params with an error param,
       // in which case only the names are used (defaulted to the names of the
@@ -7108,21 +7230,31 @@ private:
       // assignments to the names in the outer scope.
       InlinePatternsToPrint InlinePatterns;
 
-      // Don't do any unwrapping or placeholder replacement since all params
-      // are still valid in the fallback case
-      prepareNames(ClassifiedBlock(), CallbackParams, InlinePatterns);
+      auto AllBindings = CallbackParams.getParamsToBind(BlockKind::FALLBACK);
 
-      addFallbackVars(CallbackParams, Blocks);
+      prepareNames(ClassifiedBlock(), AllBindings, InlinePatterns);
+      preparePlaceholdersAndUnwraps(HandlerDesc, CallbackParams,
+                                    BlockKind::FALLBACK);
+      addFallbackVars(AllBindings, CallbackParams);
       addDo();
-      addAwaitCall(CE, Blocks.SuccessBlock, SuccessParams, InlinePatterns,
+      addAwaitCall(CE, Blocks.SuccessBlock, SuccessBindings, InlinePatterns,
                    HandlerDesc, /*AddDeclarations*/ false);
-      addFallbackCatch(ErrParam);
+      OS << "\n";
+
+      // If we have a known Bool success param, we need to bind it.
+      addBoolFlagParamBindingIfNeeded(CallbackParams.getKnownBoolFlagParam(),
+                                      BlockKind::SUCCESS);
+      addFallbackCatch(CallbackParams);
       OS << "\n";
       convertNodes(NodesToPrint::inBraceStmt(CallbackBody));
 
-      clearNames(CallbackParams);
+      clearNames(AllBindings);
       return;
     }
+
+    auto *ErrOrResultParam = ErrParam;
+    if (auto *ResultParam = CallbackParams.getResultParam())
+      ErrOrResultParam = ResultParam;
 
     auto ErrorNodes = Blocks.ErrorBlock.nodesToPrint().getNodes();
     bool RequireDo = !ErrorNodes.empty();
@@ -7136,8 +7268,8 @@ private:
           // Skip if we have the param itself or the name it's bound to
           auto *ArgExpr = Res.args()[0].getExpr();
           auto *SingleDecl = ArgExpr->getReferencedDecl().getDecl();
-          auto ErrName = Blocks.ErrorBlock.boundName(ErrParam);
-          RequireDo = SingleDecl != ErrParam &&
+          auto ErrName = Blocks.ErrorBlock.boundName(ErrOrResultParam);
+          RequireDo = SingleDecl != ErrOrResultParam &&
                       !(Res.isError() && SingleDecl &&
                         SingleDecl->getName().isSimpleName(ErrName));
         }
@@ -7158,34 +7290,34 @@ private:
       addDo();
     }
 
-    auto InlinePatterns =
-        getInlinePatternsToPrint(Blocks.SuccessBlock, SuccessParams, Callback);
+    auto InlinePatterns = getInlinePatternsToPrint(Blocks.SuccessBlock,
+                                                   SuccessBindings, Callback);
 
-    prepareNames(Blocks.SuccessBlock, SuccessParams, InlinePatterns);
-    preparePlaceholdersAndUnwraps(HandlerDesc, SuccessParams, ErrParam,
-                                  /*Success=*/true);
+    prepareNames(Blocks.SuccessBlock, SuccessBindings, InlinePatterns);
+    preparePlaceholdersAndUnwraps(HandlerDesc, CallbackParams,
+                                  BlockKind::SUCCESS);
 
-    addAwaitCall(CE, Blocks.SuccessBlock, SuccessParams, InlinePatterns,
+    addAwaitCall(CE, Blocks.SuccessBlock, SuccessBindings, InlinePatterns,
                  HandlerDesc, /*AddDeclarations=*/true);
     printOutOfLineBindingPatterns(Blocks.SuccessBlock, InlinePatterns);
     convertNodes(Blocks.SuccessBlock.nodesToPrint());
-    clearNames(SuccessParams);
+    clearNames(SuccessBindings);
 
     if (RequireDo) {
       // We don't use inline patterns for the error path.
       InlinePatternsToPrint ErrInlinePatterns;
 
       // Always use the ErrParam name if none is bound.
-      prepareNames(Blocks.ErrorBlock, llvm::makeArrayRef(ErrParam),
+      prepareNames(Blocks.ErrorBlock, llvm::makeArrayRef(ErrOrResultParam),
                    ErrInlinePatterns,
                    /*AddIfMissing=*/HandlerDesc.Type != HandlerType::RESULT);
-      preparePlaceholdersAndUnwraps(HandlerDesc, SuccessParams, ErrParam,
-                                    /*Success=*/false);
+      preparePlaceholdersAndUnwraps(HandlerDesc, CallbackParams,
+                                    BlockKind::ERROR);
 
-      addCatch(ErrParam);
+      addCatch(ErrOrResultParam);
       convertNodes(Blocks.ErrorBlock.nodesToPrint());
       OS << "\n" << tok::r_brace;
-      clearNames(llvm::makeArrayRef(ErrParam));
+      clearNames(llvm::makeArrayRef(ErrOrResultParam));
     }
   }
 
@@ -7450,12 +7582,17 @@ private:
       OS << tok::r_paren;
   }
 
-  void addFallbackCatch(const ParamDecl *ErrParam) {
+  void addFallbackCatch(const ClosureCallbackParams &Params) {
+    auto *ErrParam = Params.getErrParam();
+    assert(ErrParam);
     auto ErrName = newNameFor(ErrParam);
-    OS << "\n"
-       << tok::r_brace << " " << tok::kw_catch << " " << tok::l_brace << "\n"
-       << ErrName << " = error\n"
-       << tok::r_brace;
+    OS << tok::r_brace << " " << tok::kw_catch << " " << tok::l_brace << "\n"
+       << ErrName << " = error\n";
+
+    // If we have a known Bool success param, we need to bind it.
+    addBoolFlagParamBindingIfNeeded(Params.getKnownBoolFlagParam(),
+                                    BlockKind::ERROR);
+    OS << tok::r_brace;
   }
 
   void addCatch(const ParamDecl *ErrParam) {
@@ -7468,11 +7605,26 @@ private:
   }
 
   void preparePlaceholdersAndUnwraps(AsyncHandlerDesc HandlerDesc,
-                                     ArrayRef<const ParamDecl *> SuccessParams,
-                                     const ParamDecl *ErrParam, bool Success) {
+                                     const ClosureCallbackParams &Params,
+                                     BlockKind Block) {
+    // Params that have been dropped always need placeholdering.
+    for (auto *Param : Params.getAllParams()) {
+      if (!Params.hasBinding(Param, Block))
+        Placeholders.insert(Param);
+    }
+    // For the fallback case, no other params need placeholdering, as they are
+    // all freely accessible in the fallback case.
+    if (Block == BlockKind::FALLBACK)
+      return;
+
     switch (HandlerDesc.Type) {
-    case HandlerType::PARAMS:
-      if (!Success) {
+    case HandlerType::PARAMS: {
+      auto *ErrParam = Params.getErrParam();
+      auto SuccessParams = Params.getSuccessParams();
+      switch (Block) {
+      case BlockKind::FALLBACK:
+        llvm_unreachable("Already handled");
+      case BlockKind::ERROR:
         if (ErrParam) {
           if (HandlerDesc.shouldUnwrap(ErrParam->getType())) {
             Placeholders.insert(ErrParam);
@@ -7481,7 +7633,8 @@ private:
           // Can't use success params in the error body
           Placeholders.insert(SuccessParams.begin(), SuccessParams.end());
         }
-      } else {
+        break;
+      case BlockKind::SUCCESS:
         for (auto *SuccessParam : SuccessParams) {
           auto Ty = SuccessParam->getType();
           if (HandlerDesc.shouldUnwrap(Ty)) {
@@ -7499,14 +7652,18 @@ private:
         // Can't use the error param in the success body
         if (ErrParam)
           Placeholders.insert(ErrParam);
+        break;
       }
       break;
-    case HandlerType::RESULT:
+    }
+    case HandlerType::RESULT: {
       // Any uses of the result parameter in the current body (that aren't
       // replaced) are invalid, so replace them with a placeholder.
-      assert(SuccessParams.size() == 1 && SuccessParams[0] == ErrParam);
-      Placeholders.insert(ErrParam);
+      auto *ResultParam = Params.getResultParam();
+      assert(ResultParam);
+      Placeholders.insert(ResultParam);
       break;
+    }
     default:
       llvm_unreachable("Unhandled handler type");
     }
