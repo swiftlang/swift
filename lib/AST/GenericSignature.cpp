@@ -23,6 +23,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/Basic/STLExtras.h"
 #include "RequirementMachine/RequirementMachine.h"
 #include <functional>
@@ -1492,9 +1493,12 @@ int swift::compareAssociatedTypes(AssociatedTypeDecl *assocType1,
     return compareProtocols;
 
   // Error case: if we have two associated types with the same name in the
-  // same protocol, just tie-break based on address.
-  if (assocType1 != assocType2)
-    return assocType1 < assocType2 ? -1 : +1;
+  // same protocol, just tie-break based on source location.
+  if (assocType1 != assocType2) {
+    auto &ctx = assocType1->getASTContext();
+    return ctx.SourceMgr.isBeforeInBuffer(assocType1->getLoc(),
+                                          assocType2->getLoc()) ? -1 : +1;
+  }
 
   return 0;
 }

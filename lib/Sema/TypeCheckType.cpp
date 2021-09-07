@@ -1080,6 +1080,14 @@ static Type diagnoseUnknownType(TypeResolution resolution,
 
   // Unqualified lookup case.
   if (parentType.isNull()) {
+    // Tailored diagnostic for custom attributes.
+    if (resolution.getOptions().is(TypeResolverContext::CustomAttr)) {
+      diags.diagnose(comp->getNameLoc(), diag::unknown_attribute,
+                     comp->getNameRef().getBaseIdentifier().str());
+
+      return ErrorType::get(ctx);
+    }
+
     if (comp->getNameRef().isSimpleName(ctx.Id_Self) &&
         !isa<GenericIdentTypeRepr>(comp)) {
       DeclContext *nominalDC = nullptr;
@@ -1642,6 +1650,15 @@ resolveIdentTypeComponent(TypeResolution resolution,
       !options.is(TypeResolverContext::TypeAliasDecl)) {
 
     if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
+      // Tailored diagnostic for custom attributes.
+      if (options.is(TypeResolverContext::CustomAttr)) {
+        auto &ctx = resolution.getASTContext();
+        ctx.Diags.diagnose(lastComp->getNameLoc(), diag::unknown_attribute,
+                           lastComp->getNameRef().getBaseIdentifier().str());
+
+        return ErrorType::get(ctx);
+      }
+
       diagnoseUnboundGenericType(result,
                                  lastComp->getNameLoc().getBaseNameLoc());
     }
@@ -3605,6 +3622,7 @@ NeverNullType TypeResolver::resolveImplicitlyUnwrappedOptionalType(
   case TypeResolverContext::AbstractFunctionDecl:
   case TypeResolverContext::ClosureExpr:
   case TypeResolverContext::Inherited:
+  case TypeResolverContext::CustomAttr:
     doDiag = true;
     break;
   }
