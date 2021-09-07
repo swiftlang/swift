@@ -6663,6 +6663,13 @@ static ConstraintFix *maybeWarnAboutExtraneousCast(
     return fix;
   }
   if (extraOptionals > 0) {
+    // Conditional cast in this case can be an attempt to just unwrap a nil
+    // value.
+    if (isExpr<ConditionalCheckedCastExpr>(anchor) &&
+        castKind == CheckedCastKind::BridgingCoercion) {
+      return nullptr;
+    }
+
     return AllowCheckedCastCoercibleOptionalType::create(
         cs, origFromType, origToType, castKind,
         cs.getConstraintLocator(locator));
