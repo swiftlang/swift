@@ -31,6 +31,10 @@ import WinSDK
 import ObjectiveC
 #endif
 
+#if SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
+import _Concurrency
+#endif
+
 extension String {
   /// Returns the lines in `self`.
   public var _lines : [String] {
