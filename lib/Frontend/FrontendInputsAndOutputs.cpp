@@ -521,6 +521,18 @@ bool FrontendInputsAndOutputs::hasTBDPath() const {
         return outs.TBDPath;
       });
 }
+bool FrontendInputsAndOutputs::hasYAMLOptRecordPath() const {
+  return hasSupplementaryOutputPath(
+      [](const SupplementaryOutputPaths &outs) -> const std::string & {
+        return outs.YAMLOptRecordPath;
+      });
+}
+bool FrontendInputsAndOutputs::hasBitstreamOptRecordPath() const {
+  return hasSupplementaryOutputPath(
+      [](const SupplementaryOutputPaths &outs) -> const std::string & {
+        return outs.BitstreamOptRecordPath;
+      });
+}
 
 bool FrontendInputsAndOutputs::hasDependencyTrackerPath() const {
   return hasDependenciesPath() || hasReferenceDependenciesPath() ||
