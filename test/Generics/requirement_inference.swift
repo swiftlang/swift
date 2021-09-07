@@ -508,13 +508,15 @@ extension X1WithP2MoreArgs {
   }
 }
 
-// Inference from protocol inheritance clauses.
+// Inference from protocol inheritance clauses is not allowed.
 typealias ExistentialP4WithP2Assoc<T: P4> = P4 where T.P4Assoc : P2
 
 protocol P37 : ExistentialP4WithP2Assoc<Self> { }
+// expected-error@-1 {{type 'Self.P4Assoc' does not conform to protocol 'P2'}}
 
 extension P37 {
   func f() {
-    _ = X5<P4Assoc>() // requires P2
+    _ = X5<P4Assoc>()
+    // expected-error@-1 {{type 'Self.P4Assoc' does not conform to protocol 'P2'}}
   }
 }

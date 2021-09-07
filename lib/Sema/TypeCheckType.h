@@ -133,6 +133,9 @@ enum class TypeResolverContext : uint8_t {
 
   /// Whether this is an "inherited" type.
   Inherited,
+
+  /// Whether this is a custom attribute.
+  CustomAttr
 };
 
 /// Options that determine how type resolution should work.
@@ -215,6 +218,7 @@ public:
     case Context::ImmediateOptionalTypeArgument:
     case Context::AbstractFunctionDecl:
     case Context::Inherited:
+    case Context::CustomAttr:
       return false;
     }
     llvm_unreachable("unhandled kind");

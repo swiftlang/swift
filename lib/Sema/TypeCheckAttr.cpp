@@ -2955,7 +2955,30 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
   auto nominal = evaluateOrDefault(
     Ctx.evaluator, CustomAttrNominalRequest{attr, dc}, nullptr);
 
+  // Diagnose errors.
   if (!nominal) {
+    auto typeRepr = attr->getTypeRepr();
+
+    auto type = TypeResolution::forInterface(dc, TypeResolverContext::CustomAttr,
+                                             // Unbound generics and placeholders
+                                             // are not allowed within this
+                                             // attribute.
+                                             /*unboundTyOpener*/ nullptr,
+                                             /*placeholderHandler*/ nullptr)
+        .resolveType(typeRepr);
+
+    if (type->is<ErrorType>()) {
+      // Type resolution has failed, and we should have diagnosed something already.
+      assert(Ctx.hadError());
+    } else {
+      // Otherwise, something odd happened.
+      std::string typeName;
+      llvm::raw_string_ostream out(typeName);
+      typeRepr->print(out);
+
+      Ctx.Diags.diagnose(attr->getLocation(), diag::unknown_attribute, typeName);
+    }
+
     attr->setInvalid();
     return;
   }
