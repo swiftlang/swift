@@ -444,7 +444,7 @@ option(SWIFT_ENABLE_DISPATCH
   TRUE)
 
 option(SWIFT_ENABLE_GLOBAL_ISEL_ARM64
-  "Enable global isel on arm64, arm64e, arm64_32"
+  "Enable global isel on arm64"
   FALSE)
 
 cmake_dependent_option(SWIFT_BUILD_SYNTAXPARSERLIB
