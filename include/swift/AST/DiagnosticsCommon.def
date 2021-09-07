@@ -209,13 +209,6 @@ REMARK(remark_save_cache, none,
 // MARK: custom attribute diagnostics
 //------------------------------------------------------------------------------
 
-ERROR(ambiguous_custom_attribute_ref,none,
-      "ambiguous use of attribute %0", (Identifier))
-NOTE(ambiguous_custom_attribute_ref_fix,none,
-     "use '%0.' to reference the attribute %1 in module %2",
-     (StringRef, Identifier, Identifier))
-NOTE(found_attribute_candidate,none,
-     "found this attribute", ())
 ERROR(unknown_attribute,none,
       "unknown attribute '%0'", (StringRef))
 
