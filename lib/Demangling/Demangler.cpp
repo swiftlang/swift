@@ -15,10 +15,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Demangling/Demangler.h"
-#include "swift/Demangling/ManglingUtils.h"
+#include "DemanglerAssert.h"
 #include "swift/Demangling/ManglingMacros.h"
+#include "swift/Demangling/ManglingUtils.h"
 #include "swift/Demangling/Punycode.h"
 #include "swift/Strings.h"
+#include <stdio.h>
+#include <stdlib.h>
 
 using namespace swift;
 using namespace Mangle;
@@ -86,6 +89,14 @@ static bool isRequirement(Node::Kind kind) {
 //////////////////////////////////
 // Public utility functions    //
 //////////////////////////////////
+
+SWIFT_NORETURN void swift::Demangle::failAssert(const char *file, unsigned line,
+                                                NodePointer node,
+                                                const char *expr) {
+  fprintf(stderr, "%s:%u: assertion failed for Node %p: %s", file, line, node,
+          expr);
+  abort();
+}
 
 bool swift::Demangle::isContext(Node::Kind kind) {
   switch (kind) {
