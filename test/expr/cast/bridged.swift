@@ -77,8 +77,8 @@ func testBridgeDowncastSuperclass(_ obj: NSObject, objOpt: NSObject?,
 func testBridgeDowncastExact(_ obj: BridgedClass, objOpt: BridgedClass?,
                              objImplicitOpt: BridgedClass!) -> BridgedStruct? {
   _ = obj as? BridgedStruct // expected-warning{{conditional cast from 'BridgedClass' to 'BridgedStruct' always succeeds}}
-  _ = objOpt as? BridgedStruct // expected-warning{{conditional downcast from 'BridgedClass?' to 'BridgedStruct' is a bridging conversion; did you mean to use 'as'?}}{{14-17=as}}{{31-31=?}}
-  _ = objImplicitOpt as? BridgedStruct // expected-warning{{conditional downcast from 'BridgedClass?' to 'BridgedStruct' is a bridging conversion; did you mean to use 'as'?}}{{22-25=as}}{{39-39=?}}
+  _ = objOpt as? BridgedStruct
+  _ = objImplicitOpt as? BridgedStruct
 
   _ = obj as! BridgedStruct // expected-warning{{forced cast from 'BridgedClass' to 'BridgedStruct' always succeeds; did you mean to use 'as'?}}{{11-14=as}}
   _ = objOpt as! BridgedStruct // expected-warning{{forced cast from 'BridgedClass?' to 'BridgedStruct' only unwraps and bridges; did you mean to use '!' with 'as'?}}{{13-13=!}}{{14-17=as}}

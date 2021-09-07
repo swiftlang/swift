@@ -1891,8 +1891,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   }
 
   if (SWIFT_ENABLE_GLOBAL_ISEL_ARM64 &&
-      (Triple.getArch() == llvm::Triple::aarch64 ||
-       Triple.getArch() == llvm::Triple::aarch64_32) &&
+      Triple.getArch() == llvm::Triple::aarch64 &&
       Triple.getArchName() != "arm64e") {
     Opts.EnableGlobalISel = true;
   }
