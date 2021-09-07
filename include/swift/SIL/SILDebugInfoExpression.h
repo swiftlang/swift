@@ -259,6 +259,19 @@ public:
 
   /// Create a op_fragment expression
   static SILDebugInfoExpression createFragment(VarDecl *Field);
+
+  /// Return true if this DIExpression starts with op_deref
+  bool startsWithDeref() const {
+    return Elements.size() &&
+           Elements[0].getAsOperator() == SILDIExprOperator::Dereference;
+  }
+
+  /// Return true if this DIExpression has op_fragment (at the end)
+  bool hasFragment() const {
+    return Elements.size() >= 2 &&
+           Elements[Elements.size() - 2].getAsOperator() ==
+            SILDIExprOperator::Fragment;
+  }
 };
 } // end namespace swift
 #endif
