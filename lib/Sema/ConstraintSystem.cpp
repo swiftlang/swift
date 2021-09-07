@@ -4327,6 +4327,12 @@ void constraints::simplifyLocator(ASTNode &anchor,
         continue;
       }
 
+      // If the anchor is an unapplied decl ref, there's nothing to extract.
+      if (isExpr<DeclRefExpr>(anchor) || isExpr<OverloadedDeclRefExpr>(anchor)) {
+        path = path.slice(1);
+        continue;
+      }
+
       break;
 
     case ConstraintLocator::AutoclosureResult:

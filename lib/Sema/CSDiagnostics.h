@@ -633,9 +633,9 @@ public:
   /// Diagnose failed conversion in a `CoerceExpr`.
   bool diagnoseCoercionToUnrelatedType() const;
 
-  /// If we're trying to convert something of type "() -> T" to T,
-  /// then we probably meant to call the value.
-  bool diagnoseMissingFunctionCall() const;
+  /// Diagnose cases where a pattern tried to match associated values but
+  /// the enum case had none.
+  bool diagnoseExtraneousAssociatedValues() const;
 
   /// Produce a specialized diagnostic if this is an invalid conversion to Bool.
   bool diagnoseConversionToBool() const;
@@ -682,10 +682,6 @@ private:
   Type resolve(Type rawType) const {
     return resolveType(rawType)->getWithoutSpecifierType();
   }
-
-  /// Try to add a fix-it to convert a stored property into a computed
-  /// property
-  void tryComputedPropertyFixIts() const;
 
   bool isIntegerType(Type type) const {
     return conformsToKnownProtocol(
@@ -1046,6 +1042,10 @@ public:
 };
 
 class MissingCallFailure final : public FailureDiagnostic {
+  /// Try to add a fix-it to convert a stored property into a computed
+  /// property
+  void tryComputedPropertyFixIts() const;
+
 public:
   MissingCallFailure(const Solution &solution, ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator) {}
@@ -1954,6 +1954,15 @@ public:
   /// result value.
   bool diagnoseKeyPathAsFunctionResultMismatch() const;
 
+  /// Situations like this:
+  ///
+  /// func foo(_: Int, _: String) {}
+  /// foo("")
+  ///
+  /// Are currently impossible to fix correctly,
+  /// so we have to attend to that in diagnostics.
+  bool diagnoseMisplacedMissingArgument() const;
+
 protected:
   /// \returns The position of the argument being diagnosed, starting at 1.
   unsigned getArgPosition() const { return Info.getArgPosition(); }
@@ -2038,15 +2047,6 @@ protected:
   ParameterTypeFlags getParameterFlagsAtIndex(unsigned idx) const {
     return Info.getParameterFlagsAtIndex(idx);
   }
-
-  /// Situations like this:
-  ///
-  /// func foo(_: Int, _: String) {}
-  /// foo("")
-  ///
-  /// Are currently impossible to fix correctly,
-  /// so we have to attend to that in diagnostics.
-  bool diagnoseMisplacedMissingArgument() const;
 };
 
 /// Replace a coercion ('as') with a runtime checked cast ('as!' or 'as?').
