@@ -601,13 +601,74 @@ void SILBuilder::emitScopedBorrowOperation(SILLocation loc, SILValue original,
     createEndBorrow(loc, value);
 }
 
+/// Attempt to propagate ownership from \p operand to the returned forwarding
+/// ownership where the forwarded value has type \p targetType. If this fails,
+/// return Owned forwarding ownership instead.
+///
+/// Propagation only fails when \p operand is dynamically trivial, as indicated
+/// by ownership None, AND \p targetType is statically nontrivial.
+///
+/// Example:
+///
+///     %e = enum $Optional<AnyObject>, #Optional.none!enumelt
+///     switch_enum %e : $Optional<AnyObject>,
+///                      case #Optional.some!enumelt: bb2...,
+///                      forwarding: @owned
+///   bb2(%arg : @owned AnyObject):
+///
+/// Example:
+///
+///     %mt = metatype $@thick C.Type
+///     checked_cast_br %mt : $@thick C.Type to AnyObject.Type, bb1, bb2,
+///                           forwarding: @owned
+///   bb1(%arg : @owned AnyObject.Type):
+///
+/// If the forwarded value is statically known nontrivial, then the forwarding
+/// ownership cannot be None. Such a result is unreachable, but the SIL on that
+/// path must still be valid. When creating ownership out of thin air, default
+/// to Owned because that allows the value to be consumed without generating a
+/// copy. This does require the client code to handle ending the lifetime of an
+/// owned result even if the input was passed as guaranteed.
+///
+/// Note: For simplicitly, ownership None is not propagated for any statically
+/// nontrivial result, even if \p targetType may also be dynamically
+/// trivial. For example, the operand of a switch_enum could be a nested enum
+/// such that all switch cases may be dynamically trivial. Or a checked_cast_br
+/// could cast from one dynamically trivial enum to another. Figuring out
+/// whether the dynamically trivial operand value maps onto a dynamically
+/// trivial terminator result would be very complex with no practical benefit.
+static ValueOwnershipKind deriveForwardingOwnership(SILValue operand,
+                                                    SILType targetType,
+                                                    SILFunction &func) {
+  if (operand.getOwnershipKind() != OwnershipKind::None
+      || targetType.isTrivial(func)) {
+    return operand.getOwnershipKind();
+  }
+  return OwnershipKind::Owned;
+}
+
+SwitchEnumInst *SILBuilder::createSwitchEnum(
+    SILLocation Loc, SILValue Operand, SILBasicBlock *DefaultBB,
+    ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
+    Optional<ArrayRef<ProfileCounter>> CaseCounts,
+    ProfileCounter DefaultCount) {
+  // Consider the operand's type to be the target's type since a switch
+  // covers all cases including the default argument.
+  auto forwardingOwnership =
+      deriveForwardingOwnership(Operand, Operand->getType(), getFunction());
+  return createSwitchEnum(Loc, Operand, DefaultBB, CaseBBs, CaseCounts,
+                          DefaultCount, forwardingOwnership);
+}
+
 CheckedCastBranchInst *SILBuilder::createCheckedCastBranch(
     SILLocation Loc, bool isExact, SILValue op,
     SILType destLoweredTy, CanType destFormalTy,
     SILBasicBlock *successBB, SILBasicBlock *failureBB,
     ProfileCounter target1Count, ProfileCounter target2Count) {
+  auto forwardingOwnership =
+      deriveForwardingOwnership(op, destLoweredTy, getFunction());
   return createCheckedCastBranch(Loc, isExact, op, destLoweredTy, destFormalTy,
-                                 successBB, failureBB, op.getOwnershipKind(),
+                                 successBB, failureBB, forwardingOwnership,
                                  target1Count, target2Count);
 }
 
@@ -619,10 +680,11 @@ CheckedCastBranchInst *SILBuilder::createCheckedCastBranch(
   assert((!hasOwnership() || !failureBB->getNumArguments() ||
           failureBB->getArgument(0)->getType() == op->getType()) &&
          "failureBB's argument doesn't match incoming argument type");
+
   return insertTerminator(CheckedCastBranchInst::create(
       getSILDebugLocation(Loc), isExact, op, destLoweredTy, destFormalTy,
-      successBB, failureBB, getFunction(), target1Count,
-      target2Count, forwardingOwnershipKind));
+      successBB, failureBB, getFunction(), target1Count, target2Count,
+      forwardingOwnershipKind));
 }
 
 void SILBuilderWithScope::insertAfter(SILInstruction *inst,
