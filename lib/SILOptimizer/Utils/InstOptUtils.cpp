@@ -22,6 +22,7 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILDebugInfoExpression.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
@@ -2126,5 +2127,46 @@ void swift::salvageDebugInfo(SILInstruction *I) {
           SILBuilder(SI, ASI->getDebugScope())
               .createDebugValue(SI->getLoc(), SI->getSrc(), *VarInfo);
       }
+  }
+
+  // If a `struct` SIL instruction is "unwrapped" and removed,
+  // for instance, in favor of using its enclosed value directly,
+  // we need to make sure any of its related `debug_value` instruction
+  // is preserved.
+  if (auto *STI = dyn_cast<StructInst>(I)) {
+    auto STVal = STI->getResult(0);
+    llvm::ArrayRef<VarDecl *> FieldDecls =
+      STI->getStructDecl()->getStoredProperties();
+    for (Operand *U : getDebugUses(STVal)) {
+      auto *DbgInst = cast<DebugValueInst>(U->getUser());
+      auto VarInfo = DbgInst->getVarInfo();
+      if (!VarInfo)
+        continue;
+      if (VarInfo->DIExpr.hasFragment())
+        // Since we can't merge two different op_fragment
+        // now, we're simply bailing out if there is an
+        // existing op_fragment in DIExpresison.
+        // TODO: Try to merge two op_fragment expressions here.
+        continue;
+      for (VarDecl *FD : FieldDecls) {
+        SILDebugVariable NewVarInfo = *VarInfo;
+        auto FieldVal = STI->getFieldValue(FD);
+        // Build the corresponding fragment DIExpression
+        auto FragDIExpr = SILDebugInfoExpression::createFragment(FD);
+        NewVarInfo.DIExpr.append(FragDIExpr);
+
+        // Coalesce auxiliary debug variable info
+        if (!NewVarInfo.Type)
+          NewVarInfo.Type = STI->getType();
+        if (!NewVarInfo.Loc)
+          NewVarInfo.Loc = DbgInst->getLoc();
+        if (!NewVarInfo.Scope)
+          NewVarInfo.Scope = DbgInst->getDebugScope();
+
+        // Create a new debug_value
+        SILBuilder(DbgInst, DbgInst->getDebugScope())
+          .createDebugValue(DbgInst->getLoc(), FieldVal, NewVarInfo);
+      }
+    }
   }
 }
