@@ -41,13 +41,6 @@
 
 #if SWIFT_HAS_VOUCHER_HEADER
 
-static inline bool swift_voucher_needs_adopt(voucher_t _Nullable voucher) {
-  if (__builtin_available(macOS 12.0, iOS 15.0, tvOS 15.0, watchOS 8.0, *)) {
-    return voucher_needs_adopt(voucher);
-  }
-  return true;
-}
-
 #else
 
 // If the header isn't available, declare the necessary calls here.
@@ -63,10 +56,6 @@ extern "C" voucher_t _Nullable voucher_copy(void);
 
 // Consumes argument, returns retained value.
 extern "C" voucher_t _Nullable voucher_adopt(voucher_t _Nullable voucher);
-
-static inline bool swift_voucher_needs_adopt(voucher_t _Nullable voucher) {
-  return true;
-}
 
 #endif // __has_include(<os/voucher_private.h>)
 
@@ -88,10 +77,26 @@ static inline voucher_t _Nullable voucher_copy(void) { return nullptr; }
 static inline voucher_t _Nullable voucher_adopt(voucher_t _Nullable voucher) {
   return nullptr;
 }
-static inline bool swift_voucher_needs_adopt(voucher_t _Nullable voucher) {
-  return true;
-}
 static inline void swift_voucher_release(voucher_t _Nullable voucher) {}
 #endif // __APPLE__
 
+// Declare our own voucher_needs_adopt for when we don't get it from the SDK.
+// This declaration deliberately takes `void *` instead of `voucher_t`. When the
+// SDK provides one that takes `voucher_t`, then C++ overload resolution will
+// favor that one. When the SDK does not provide a declaration, then the call
+// site will invoke this stub instead.
+static inline bool voucher_needs_adopt(void * _Nullable voucher) {
+  return true;
+}
+
+static inline bool swift_voucher_needs_adopt(voucher_t _Nullable voucher) {
+#if __APPLE__
+  if (__builtin_available(macOS 12.0, iOS 15.0, tvOS 15.0, watchOS 8.0, *))
+    return voucher_needs_adopt(voucher);
+  return true;
+#else
+  return voucher_needs_adopt(voucher);
 #endif
+}
+
+#endif // SWIFT_CONCURRENCY_VOUCHERSHIMS_H
