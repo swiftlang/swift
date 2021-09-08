@@ -199,6 +199,11 @@ Solution ConstraintSystem::finalize() {
     solution.ImplicitValueConversions.push_back(valueConversion);
   }
 
+  // Remember argument lists.
+  for (const auto &argListMapping : ArgumentLists) {
+    solution.argumentLists.insert(argListMapping);
+  }
+
   return solution;
 }
 
@@ -295,6 +300,11 @@ void ConstraintSystem::applySolution(const Solution &solution) {
 
   for (auto &valueConversion : solution.ImplicitValueConversions) {
     ImplicitValueConversions.push_back(valueConversion);
+  }
+
+  // Register the argument lists.
+  for (auto &argListMapping : solution.argumentLists) {
+    ArgumentLists.insert(argListMapping);
   }
 
   // Register any fixes produced along this path.
@@ -510,6 +520,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numSolutionApplicationTargets = cs.solutionApplicationTargets.size();
   numCaseLabelItems = cs.caseLabelItems.size();
   numImplicitValueConversions = cs.ImplicitValueConversions.size();
+  numArgumentLists = cs.ArgumentLists.size();
 
   PreviousScore = cs.CurrentScore;
 
@@ -618,6 +629,9 @@ ConstraintSystem::SolverScope::~SolverScope() {
 
   // Remove any implicit value conversions.
   truncate(cs.ImplicitValueConversions, numImplicitValueConversions);
+
+  // Remove any argument lists no longer in scope.
+  truncate(cs.ArgumentLists, numArgumentLists);
 
   // Reset the previous score.
   cs.CurrentScore = PreviousScore;
