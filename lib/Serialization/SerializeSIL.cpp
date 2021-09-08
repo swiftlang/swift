@@ -111,6 +111,11 @@ toStableDifferentiabilityKind(swift::DifferentiabilityKind kind) {
   llvm_unreachable("covered switch");
 }
 
+static unsigned encodeValueOwnership(ValueOwnershipKind ownership) {
+  assert(ownership.value > 0 && "invalid value ownership");
+  return ownership.value - 1;
+}
+
 namespace {
     /// Used to serialize the on-disk func hash table.
   class FuncTableInfo {
@@ -1213,10 +1218,11 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   case SILInstructionKind::SwitchEnumInst:
   case SILInstructionKind::SwitchEnumAddrInst: {
-    // Format: condition, a list of cases (EnumElementDecl + Basic Block ID),
-    // default basic block ID. Use SILOneTypeValuesLayout: the type is
-    // for condition, the list has value for condition, hasDefault, default
-    // basic block ID, a list of (DeclID, BasicBlock ID).
+    // Format:
+    // - [ownership]
+    // - the type of the condition operand,
+    // - a list a values: operand, hasDefault, defaultBB,
+    //                    [EnumElementDecl,  Basic Block ID]*
     SwitchEnumTermInst SOI(&SI);
     assert(SOI);
     SmallVector<ValueID, 4> ListOfValues;
@@ -1234,11 +1240,22 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       ListOfValues.push_back(S.addDeclRef(elt));
       ListOfValues.push_back(BasicBlockMap[dest]);
     }
-    SILOneTypeValuesLayout::emitRecord(
-        Out, ScratchRecord, SILAbbrCodes[SILOneTypeValuesLayout::Code],
-        (unsigned)SI.getKind(),
-        S.addTypeRef(SOI.getOperand()->getType().getASTType()),
-        (unsigned)SOI.getOperand()->getType().getCategory(), ListOfValues);
+    if (auto *switchEnum = dyn_cast<SwitchEnumInst>(&SI)) {
+      unsigned ownershipField =
+        encodeValueOwnership(switchEnum->getForwardingOwnershipKind());
+      SILOneTypeOwnershipValuesLayout::emitRecord(
+          Out, ScratchRecord,
+          SILAbbrCodes[SILOneTypeOwnershipValuesLayout::Code],
+          (unsigned)SI.getKind(), ownershipField,
+          S.addTypeRef(SOI.getOperand()->getType().getASTType()),
+          (unsigned)SOI.getOperand()->getType().getCategory(), ListOfValues);
+    } else {
+      SILOneTypeValuesLayout::emitRecord(
+          Out, ScratchRecord, SILAbbrCodes[SILOneTypeValuesLayout::Code],
+          (unsigned)SI.getKind(),
+          S.addTypeRef(SOI.getOperand()->getType().getASTType()),
+          (unsigned)SOI.getOperand()->getType().getCategory(), ListOfValues);
+    }
     break;
   }
   case SILInstructionKind::SelectEnumInst:
@@ -1400,7 +1417,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     else if (auto *RCI = dyn_cast<RefCountingInst>(&SI))
       Attr = RCI->isNonAtomic();
     else if (auto *UOCI = dyn_cast<UncheckedOwnershipConversionInst>(&SI)) {
-      Attr = unsigned(SILValue(UOCI).getOwnershipKind());
+      Attr = encodeValueOwnership(UOCI->getOwnershipKind());
     } else if (auto *IEC = dyn_cast<IsEscapingClosureInst>(&SI)) {
       Attr = IEC->getVerificationType();
     } else if (auto *HTE = dyn_cast<HopToExecutorInst>(&SI)) {
@@ -2153,12 +2170,14 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       BasicBlockMap[CBI->getSuccessBB()],
       BasicBlockMap[CBI->getFailureBB()]
     };
-
-    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
-             SILAbbrCodes[SILOneTypeValuesLayout::Code], (unsigned)SI.getKind(),
-             S.addTypeRef(CBI->getTargetLoweredType().getASTType()),
-             (unsigned)CBI->getTargetLoweredType().getCategory(),
-             llvm::makeArrayRef(listOfValues));
+    unsigned ownershipField =
+      encodeValueOwnership(CBI->getForwardingOwnershipKind());
+    SILOneTypeOwnershipValuesLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILOneTypeOwnershipValuesLayout::Code],
+        (unsigned)SI.getKind(), ownershipField,
+        S.addTypeRef(CBI->getTargetLoweredType().getASTType()),
+        (unsigned)CBI->getTargetLoweredType().getCategory(),
+        llvm::makeArrayRef(listOfValues));
     break;
   }
   case SILInstructionKind::CheckedCastValueBranchInst: {
@@ -2744,6 +2763,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<SILOneTypeOneOperandLayout>();
   registerSILAbbr<SILInitExistentialLayout>();
   registerSILAbbr<SILOneTypeValuesLayout>();
+  registerSILAbbr<SILOneTypeOwnershipValuesLayout>();
   registerSILAbbr<SILTwoOperandsLayout>();
   registerSILAbbr<SILTwoOperandsExtraAttributeLayout>();
   registerSILAbbr<SILTailAddrLayout>();

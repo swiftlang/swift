@@ -89,12 +89,12 @@ entry(%result : $*Int, %0: $*R<T>, %1 : $*Int, %b : @guaranteed $<τ_0_0> { var 
   %e = load_borrow %a : $*E<(R<T>)->Int>
   switch_enum %e : $E<(R<T>)->Int>, case #E.Some!enumelt : bb1, default bb2
 
-bb1(%f : $@callee_guaranteed @substituted <A, B> (@in_guaranteed A) -> @out B for <R<T>, Int>):
+bb1(%f : @guaranteed $@callee_guaranteed @substituted <A, B> (@in_guaranteed A) -> @out B for <R<T>, Int>):
   apply %f(%result, %0) : $@callee_guaranteed @substituted <A, B> (@in_guaranteed A) -> @out B for <R<T>, Int>
   end_borrow %e : $E<(R<T>)->Int>
   br exit
 
-bb2(%default : @guaranteed $E<(R<T>)->Int>):
+bb2:
   end_borrow %e : $E<(R<T>)->Int>
   copy_addr %1 to %result : $*Int
   br exit

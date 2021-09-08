@@ -1896,12 +1896,10 @@ void PatternMatchEmission::emitEnumElementObjectDispatch(
   CaseBlocks blocks{SGF, rows, sourceType, SGF.B.getInsertionBB()};
 
   RegularLocation loc(PatternMatchStmt, rows[0].Pattern, SGF.SGM.M);
-  bool isPlusZero =
-      src.getFinalConsumption() == CastConsumptionKind::BorrowAlways;
   SILValue srcValue = src.getFinalManagedValue().forward(SGF);
-  SGF.B.createSwitchEnum(loc, srcValue, blocks.getDefaultBlock(),
-                         blocks.getCaseBlocks(), blocks.getCounts(),
-                         defaultCastCount);
+  auto *sei = SGF.B.createSwitchEnum(loc, srcValue, blocks.getDefaultBlock(),
+                                     blocks.getCaseBlocks(), blocks.getCounts(),
+                                     defaultCastCount);
 
   // Okay, now emit all the cases.
   blocks.forEachCase([&](EnumElementDecl *elt, SILBasicBlock *caseBB,
@@ -1920,13 +1918,25 @@ void PatternMatchEmission::emitEnumElementObjectDispatch(
     SILType eltTy;
     bool hasNonVoidAssocValue = false;
     bool hasAssocValue = elt->hasAssociatedValues();
+    ManagedValue caseResult;
+    auto caseConsumption = CastConsumptionKind::BorrowAlways;
     if (hasAssocValue) {
       eltTy = src.getType().getEnumElementType(elt, SGF.SGM.M,
                                                SGF.getTypeExpansionContext());
       hasNonVoidAssocValue = !eltTy.getASTType()->isVoid();
+
+      caseResult = SGF.B.createForwardedTermResult(eltTy);
+
+      // The consumption kind of a switch enum's source and its case result can
+      // differ. For example, a TakeAlways source may have no ownership because
+      // it holds a trivial value, but its nontrivial result may be
+      // Guaranteed. For valid OSSA, we reconcile it with the case result
+      // value's ownership here.
+      if (caseResult.getOwnershipKind() == OwnershipKind::Owned)
+        caseConsumption = CastConsumptionKind::TakeAlways;
     }
 
-    ConsumableManagedValue eltCMV, origCMV;
+    ConsumableManagedValue eltCMV;
 
     // Void (i.e. empty) cases.
     //
@@ -1937,8 +1947,7 @@ void PatternMatchEmission::emitEnumElementObjectDispatch(
         // still need to create the argument. So do that instead of creating the
         // empty-tuple. Otherwise, we need to create undef or the empty-tuple.
         if (hasAssocValue) {
-          return {SGF.B.createOwnedPhiArgument(eltTy),
-                  CastConsumptionKind::TakeAlways};
+          return {caseResult, caseConsumption};
         }
 
         // Otherwise, try to avoid making an empty tuple value if it's obviously
@@ -1962,21 +1971,12 @@ void PatternMatchEmission::emitEnumElementObjectDispatch(
     } else {
       auto *eltTL = &SGF.getTypeLowering(eltTy);
 
-      SILValue eltValue;
-      if (isPlusZero) {
-        origCMV = {SGF.B.createGuaranteedTransformingTerminatorArgument(eltTy),
-                   CastConsumptionKind::BorrowAlways};
-      } else {
-        origCMV = {SGF.B.createOwnedPhiArgument(eltTy),
-                   CastConsumptionKind::TakeAlways};
-      }
-
-      eltCMV = origCMV;
+      eltCMV = {caseResult, caseConsumption};
 
       // If the payload is boxed, project it.
       if (elt->isIndirect() || elt->getParentEnum()->isIndirect()) {
         ManagedValue boxedValue =
-            SGF.B.createProjectBox(loc, origCMV.getFinalManagedValue(), 0);
+            SGF.B.createProjectBox(loc, eltCMV.getFinalManagedValue(), 0);
         eltTL = &SGF.getTypeLowering(boxedValue.getType());
         if (eltTL->isLoadable()) {
           boxedValue = SGF.B.createLoadBorrow(loc, boxedValue);
@@ -2013,11 +2013,7 @@ void PatternMatchEmission::emitEnumElementObjectDispatch(
   // Emit the default block if we needed one.
   if (SILBasicBlock *defaultBB = blocks.getDefaultBlock()) {
     SGF.B.setInsertionPoint(defaultBB);
-    if (isPlusZero) {
-      SGF.B.createGuaranteedTransformingTerminatorArgument(src.getType());
-    } else {
-      SGF.B.createOwnedPhiArgument(src.getType());
-    }
+    ManagedValue::forForwardedRValue(SGF, sei->createDefaultResult());
     outerFailure(rows.back().Pattern);
   }
 }

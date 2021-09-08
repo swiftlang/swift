@@ -28,6 +28,7 @@ using ValueIDField = DeclIDField;
 
 using SILInstOpCodeField = BCFixed<8>;
 using SILTypeCategoryField = BCFixed<2>;
+using SILValueOwnershipField = BCFixed<2>;
 
 enum SILStringEncoding : uint8_t {
   SIL_UTF8,
@@ -126,6 +127,7 @@ namespace sil_block {
     SIL_ONE_OPERAND,
     SIL_ONE_TYPE_ONE_OPERAND,
     SIL_ONE_TYPE_VALUES,
+    SIL_ONE_TYPE_OWNERSHIP_VALUES,
     SIL_TWO_OPERANDS,
     SIL_TAIL_ADDR,
     SIL_INST_APPLY,
@@ -361,6 +363,16 @@ namespace sil_block {
     SILTypeCategoryField,
     BCArray<ValueIDField>
   >;
+
+  // SIL instructions with one type, forwarding ownership, and a list of values.
+  // For OwnershipForwardingTermInst.
+  using SILOneTypeOwnershipValuesLayout = BCRecordLayout<
+    SIL_ONE_TYPE_OWNERSHIP_VALUES,
+    SILInstOpCodeField,
+    SILValueOwnershipField,
+    TypeIDField,
+    SILTypeCategoryField,
+    BCArray<ValueIDField>>;
 
   enum ApplyKind : unsigned {
     SIL_APPLY = 0,

@@ -332,7 +332,8 @@ void swift::replaceBranchTarget(TermInst *t, SILBasicBlock *oldDest,
     SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 8> cases;
     auto *defaultBB = replaceSwitchDest(sei, cases, oldDest, newDest);
     builder.createSwitchEnum(sei->getLoc(), sei->getOperand(), defaultBB,
-                             cases);
+                             cases, None, ProfileCounter(),
+                             sei->getForwardingOwnershipKind());
     sei->eraseFromParent();
     return;
   }
@@ -373,7 +374,8 @@ void swift::replaceBranchTarget(TermInst *t, SILBasicBlock *oldDest,
     builder.createCheckedCastBranch(
         cbi->getLoc(), cbi->isExact(), cbi->getOperand(),
         cbi->getTargetLoweredType(), cbi->getTargetFormalType(),
-        successBB, failureBB, cbi->getTrueBBCount(), cbi->getFalseBBCount());
+        successBB, failureBB, cbi->getForwardingOwnershipKind(),
+        cbi->getTrueBBCount(), cbi->getFalseBBCount());
     cbi->eraseFromParent();
     return;
   }
