@@ -492,6 +492,8 @@ ModuleImplicitImportsRequest::evaluate(Evaluator &evaluator,
   auto *clangImporter =
       static_cast<ClangImporter *>(ctx.getClangModuleLoader());
 
+  SmallVector<Identifier, 4> clangSpiGroups;
+  clangSpiGroups.push_back(ctx.getIdentifier(CLANG_MODULE_DEFUALT_SPI_GROUP_NAME));
   // Implicitly import the bridging header module if needed.
   auto bridgingHeaderPath = importInfo.BridgingHeaderPath;
   if (!bridgingHeaderPath.empty() &&
@@ -499,6 +501,8 @@ ModuleImplicitImportsRequest::evaluate(Evaluator &evaluator,
     auto *headerModule = clangImporter->getImportedHeaderModule();
     assert(headerModule && "Didn't load bridging header?");
     imports.emplace_back(ImportedModule(headerModule), ImportFlags::Exported);
+    imports.back().options |= ImportFlags::SPIAccessControl;
+    imports.back().spiGroups = ctx.AllocateCopy(clangSpiGroups);
   }
 
   // Implicitly import the underlying Clang half of this module if needed.
@@ -509,6 +513,8 @@ ModuleImplicitImportsRequest::evaluate(Evaluator &evaluator,
     unloadedImports.emplace_back(UnloadedImportedModule(importPath.copyTo(ctx),
                                                         /*isScoped=*/false),
                                  ImportFlags::Exported);
+    imports.back().options |= ImportFlags::SPIAccessControl;
+    imports.back().spiGroups = ctx.AllocateCopy(clangSpiGroups);
   }
 
   return { ctx.AllocateCopy(imports), ctx.AllocateCopy(unloadedImports) };
