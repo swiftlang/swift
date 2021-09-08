@@ -2547,6 +2547,7 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
     if (Indirection == IndirectValue || Indirection == CoroIndirectValue)
       Operands.push_back(llvm::dwarf::DW_OP_deref);
 
+    bool HasFragment = false;
     if (IsPiece) {
       // Advance the offset and align it for the next piece.
       OffsetInBits += llvm::alignTo(SizeInBits, AlignInBits);
@@ -2557,18 +2558,19 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
 
       // Sanity checks.
       assert(SizeInBits && "zero-sized piece");
-      assert(SizeInBits < getSizeInBits(Var) && "piece covers entire var");
-      assert(OffsetInBits + SizeInBits <= getSizeInBits(Var) && "pars > totum");
-
-      // Add the piece DWARF expression.
-      Operands.push_back(llvm::dwarf::DW_OP_LLVM_fragment);
-      Operands.push_back(OffsetInBits);
-      Operands.push_back(SizeInBits);
+      if (SizeInBits < getSizeInBits(Var) &&
+          OffsetInBits + SizeInBits <= getSizeInBits(Var)) {
+        HasFragment = true;
+        // Add the piece DWARF expression.
+        Operands.push_back(llvm::dwarf::DW_OP_LLVM_fragment);
+        Operands.push_back(OffsetInBits);
+        Operands.push_back(SizeInBits);
+      }
     }
     llvm::DIExpression *DIExpr = DBuilder.createExpression(Operands);
     // DW_OP_LLVM_fragment must be the last part of an DIExpr
-    // so we can't append more if IsPiece is true.
-    if (!IsPiece)
+    // so we can't append more if there is already one.
+    if (!HasFragment)
       DIExpr = appendDIExpression(DIExpr);
     if (DIExpr)
       emitDbgIntrinsic(

@@ -37,6 +37,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILValue.h"
+#include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
@@ -309,7 +310,9 @@ public:
   void eraseInstFromFunction(SILInstruction &instruction,
                              SILBasicBlock::iterator &iterator,
                              bool addOperandsToWorklist = true) {
-    // Delete any debug users first.
+    // Try to salvage debug info first.
+    swift::salvageDebugInfo(&instruction);
+    // Then delete old debug users.
     for (auto result : instruction.getResults()) {
       while (!result->use_empty()) {
         auto *user = result->use_begin()->getUser();

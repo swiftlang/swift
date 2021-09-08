@@ -2155,18 +2155,40 @@ void swift::salvageDebugInfo(SILInstruction *I) {
         auto FragDIExpr = SILDebugInfoExpression::createFragment(FD);
         NewVarInfo.DIExpr.append(FragDIExpr);
 
-        // Coalesce auxiliary debug variable info
         if (!NewVarInfo.Type)
           NewVarInfo.Type = STI->getType();
-        if (!NewVarInfo.Loc)
-          NewVarInfo.Loc = DbgInst->getLoc();
-        if (!NewVarInfo.Scope)
-          NewVarInfo.Scope = DbgInst->getDebugScope();
 
         // Create a new debug_value
         SILBuilder(DbgInst, DbgInst->getDebugScope())
           .createDebugValue(DbgInst->getLoc(), FieldVal, NewVarInfo);
       }
     }
+  }
+
+  if (auto *IA = dyn_cast<IndexAddrInst>(I)) {
+    if (IA->getBase() && IA->getIndex())
+      // Only handle cases where offset is constant.
+      if (const auto *LiteralInst =
+            dyn_cast<IntegerLiteralInst>(IA->getIndex())) {
+        SILValue Base = IA->getBase();
+        SILValue ResultAddr = IA->getResult(0);
+        APInt OffsetVal = LiteralInst->getValue();
+        const SILDIExprElement ExprElements[3] = {
+          SILDIExprElement::createOperator(OffsetVal.isNegative() ?
+            SILDIExprOperator::ConstSInt : SILDIExprOperator::ConstUInt),
+          SILDIExprElement::createConstInt(OffsetVal.getLimitedValue()),
+          SILDIExprElement::createOperator(SILDIExprOperator::Plus)
+        };
+        for (Operand *U : getDebugUses(ResultAddr)) {
+          auto *DbgInst = cast<DebugValueInst>(U->getUser());
+          auto VarInfo = DbgInst->getVarInfo();
+          if (!VarInfo)
+            continue;
+          VarInfo->DIExpr.prependElements(ExprElements);
+          // Create a new debug_value
+          SILBuilder(DbgInst, DbgInst->getDebugScope())
+            .createDebugValue(DbgInst->getLoc(), Base, *VarInfo);
+        }
+      }
   }
 }
