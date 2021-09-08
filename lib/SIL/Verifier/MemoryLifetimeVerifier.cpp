@@ -178,6 +178,16 @@ static bool isTrivialEnumElem(EnumElementDecl *elem, SILType enumType,
         enumType.getEnumElementType(elem, function).isTrivial(*function);
 }
 
+static bool injectsNoPayloadCase(InjectEnumAddrInst *IEAI) {
+  if (!IEAI->getElement()->hasAssociatedValues())
+    return true;
+  SILType enumType = IEAI->getOperand()->getType();
+  SILFunction *function = IEAI->getFunction();
+  SILType elemType = enumType.getEnumElementType(IEAI->getElement(), function);
+  // Handle empty types (e.g. the empty tuple) as no-payload.
+  return elemType.isEmpty(*function);
+}
+
 static bool isOrHasEnum(SILType type) {
   return type.getASTType().findIf([](Type ty) {
     return ty->getEnumOrBoundGenericEnum() != nullptr;
@@ -349,7 +359,7 @@ void MemoryLifetimeVerifier::initDataflowInBlock(SILBasicBlock *block,
       case SILInstructionKind::InjectEnumAddrInst: {
         auto *IEAI = cast<InjectEnumAddrInst>(&I);
         int enumIdx = locations.getLocationIdx(IEAI->getOperand());
-        if (enumIdx >= 0 && !IEAI->getElement()->hasAssociatedValues()) {
+        if (enumIdx >= 0 && injectsNoPayloadCase(IEAI)) {
           // This is a bit tricky: an injected no-payload case means that the
           // "full" enum is initialized. So, for the purpose of dataflow, we
           // treat it like a full initialization of the payload data.
@@ -588,7 +598,7 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
       case SILInstructionKind::InjectEnumAddrInst: {
         auto *IEAI = cast<InjectEnumAddrInst>(&I);
         int enumIdx = locations.getLocationIdx(IEAI->getOperand());
-        if (enumIdx >= 0 && !IEAI->getElement()->hasAssociatedValues()) {
+        if (enumIdx >= 0 && injectsNoPayloadCase(IEAI)) {
           // Again, an injected no-payload case is treated like a "full"
           // initialization. See initDataflowInBlock().
           requireBitsClear(bits & nonTrivialLocations, IEAI->getOperand(), &I);
