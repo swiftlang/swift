@@ -590,8 +590,8 @@ def experimental_cxx_stdlib :
 
 def experimental_emit_module_separately:
   Flag<["-"], "experimental-emit-module-separately">,
-  Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
-  HelpText<"Schedule a swift module emission job instead of a merge-modules job (new Driver only)">;
+  Flags<[NoInteractiveOption, HelpHidden]>,
+  HelpText<"Emit module files as a distinct job (new Driver only)">;
 
 def requirement_machine_EQ : Joined<["-"], "requirement-machine=">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
