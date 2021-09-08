@@ -43,5 +43,6 @@ set(swift_concurrency_options
   BACK_DEPLOYMENT_LIBRARY 5.5
   DARWIN_INSTALL_NAME_DIR "@rpath")
 set(swift_concurrency_extra_sources "../BackDeployConcurrency/Exclusivity.cpp")
+set(swift_concurrency_async_fp_mode "never")
 
 add_subdirectory(../Concurrency stdlib/public/BackDeployConcurrency)
