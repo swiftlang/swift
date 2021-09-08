@@ -1785,7 +1785,7 @@ class TailAllocatedDebugVariable {
   } Bits;
 public:
   TailAllocatedDebugVariable(Optional<SILDebugVariable>, char *buf,
-                             bool HasDeclName, SILType *AuxVarType = nullptr,
+                             SILType *AuxVarType = nullptr,
                              SILLocation *DeclLoc = nullptr,
                              const SILDebugScope **DeclScope = nullptr,
                              SILDIExprElement *DIExprOps = nullptr);
