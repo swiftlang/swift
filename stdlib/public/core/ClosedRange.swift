@@ -396,12 +396,14 @@ extension ClosedRange: CustomDebugStringConvertible {
   }
 }
 
+#if SWIFT_ENABLE_REFLECTION
 extension ClosedRange: CustomReflectable {
   public var customMirror: Mirror {
     return Mirror(
       self, children: ["lowerBound": lowerBound, "upperBound": upperBound])
   }
 }
+#endif
 
 extension ClosedRange {
   /// Returns a copy of this range clamped to the given limiting range.

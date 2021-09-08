@@ -296,6 +296,7 @@ internal func _fallbackEnumRawValue<T>(_ value: T) -> Int64? {
   }
 }
 
+#if SWIFT_ENABLE_REFLECTION
 /// Do our best to print a value that cannot be printed directly.
 @_semantics("optimize.sil.specialize.generic.never")
 internal func _adHocPrint_unlocked<T, TargetStream: TextOutputStream>(
@@ -396,6 +397,7 @@ internal func _adHocPrint_unlocked<T, TargetStream: TextOutputStream>(
     }
   }
 }
+#endif
 
 @usableFromInline
 @_semantics("optimize.sil.specialize.generic.never")
@@ -435,8 +437,12 @@ internal func _print_unlocked<T, TargetStream: TextOutputStream>(
     return
   }
 
+#if SWIFT_ENABLE_REFLECTION
   let mirror = Mirror(reflecting: value)
   _adHocPrint_unlocked(value, mirror, &target, isDebugPrint: false)
+#else
+  target.write("(value cannot be printed without reflection)")
+#endif
 }
 
 //===----------------------------------------------------------------------===//
@@ -463,10 +469,15 @@ public func _debugPrint_unlocked<T, TargetStream: TextOutputStream>(
     return
   }
 
+#if SWIFT_ENABLE_REFLECTION
   let mirror = Mirror(reflecting: value)
   _adHocPrint_unlocked(value, mirror, &target, isDebugPrint: true)
+#else
+  target.write("(value cannot be printed without reflection)")
+#endif
 }
 
+#if SWIFT_ENABLE_REFLECTION
 @_semantics("optimize.sil.specialize.generic.never")
 internal func _dumpPrint_unlocked<T, TargetStream: TextOutputStream>(
     _ value: T, _ mirror: Mirror, _ target: inout TargetStream
@@ -533,6 +544,7 @@ internal func _dumpPrint_unlocked<T, TargetStream: TextOutputStream>(
 
   _adHocPrint_unlocked(value, mirror, &target, isDebugPrint: true)
 }
+#endif
 
 //===----------------------------------------------------------------------===//
 // OutputStreams

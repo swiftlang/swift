@@ -1019,6 +1019,7 @@ extension ContiguousArray: RangeReplaceableCollection {
   }
 }
 
+#if SWIFT_ENABLE_REFLECTION
 extension ContiguousArray: CustomReflectable {
   /// A mirror that reflects the array.
   public var customMirror: Mirror {
@@ -1028,6 +1029,7 @@ extension ContiguousArray: CustomReflectable {
       displayStyle: .collection)
   }
 }
+#endif
 
 extension ContiguousArray: CustomStringConvertible, CustomDebugStringConvertible {
   /// A textual representation of the array and its elements.
