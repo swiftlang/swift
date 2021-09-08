@@ -24,7 +24,7 @@ bb0(%0 : $Int, %1 : $Int):
   %16 = struct $Int (%13 : $Builtin.Int64), loc "file.swift":2:15, scope 1
   // In addition to checking if `op_fragment` is generated, we're also checking if "z"'s declared
   // source location, as well as `debug_value`'s instruction source location are preserved.
-  // CHECK: debug_value %[[RESULT]] : $Builtin.Int{{[0-9]+}}, let, (name "z", loc "file.swift":2:9, scope 1)
+  // CHECK: debug_value %[[RESULT]] : $Builtin.Int{{[0-9]+}}, let, name "z"
   // CHECK-SAME: type $Int
   // CHECK-SAME: expr op_fragment:#Int._value
   // CHECK-SAME: loc "file.swift":2:9, scope 1
