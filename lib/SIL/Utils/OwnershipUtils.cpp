@@ -1190,7 +1190,7 @@ void ForwardingOperand::setOwnershipKind(ValueOwnershipKind newKind) const {
 
   if (auto *ofti = dyn_cast<OwnershipForwardingTermInst>(user)) {
     assert(ofti->getNumOperands() == 1);
-    if (!ofti->getOperand(0)->getType().isTrivial(*ofti->getFunction())) {
+    if (!ofti->getOperand()->getType().isTrivial(*ofti->getFunction())) {
       ofti->setForwardingOwnershipKind(newKind);
 
       // Then convert all of its incoming values that are owned to be guaranteed.

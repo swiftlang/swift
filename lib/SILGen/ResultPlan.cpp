@@ -667,9 +667,9 @@ public:
       
       auto errorTy = SGF.getASTContext().getErrorDecl()->getDeclaredType()
         ->getCanonicalType();
-      auto errorVal
-        = SGF.B.createOwnedPhiArgument(SILType::getPrimitiveObjectType(errorTy));
-      
+      auto errorVal = SGF.B.createTermResult(
+        SILType::getPrimitiveObjectType(errorTy), OwnershipKind::Owned);
+
       SGF.emitThrow(loc, errorVal, true);
     }
     

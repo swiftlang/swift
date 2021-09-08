@@ -101,8 +101,7 @@ bb1(%f : @owned $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guarantee
   destroy_value %f : $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <R<T>, Int>
   br exit
 
-bb2(%original : @owned $E<(R<T>)->Int>):
-  destroy_value %original : $E<(R<T>)->Int>
+bb2:
   br exit
 
 exit:

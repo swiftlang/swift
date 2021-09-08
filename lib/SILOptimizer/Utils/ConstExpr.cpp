@@ -1928,13 +1928,13 @@ ConstExprFunctionState::evaluateInstructionAndGetNext(
     // tuple-typed argument.
     assert(caseBB->getNumArguments() == 1);
 
-    if (caseBB->getParent()->hasOwnership() &&
-        switchInst.getDefaultBBOrNull() == caseBB) {
-      // If we are visiting the default block and we are in ossa, then we may
-      // have uses of the failure parameter. That means we need to map the
-      // original value to the argument.
-      setValue(caseBB->getArgument(0), value);
-      return {caseBB->begin(), None};
+    if (caseBB == switchInst.getDefaultBBOrNull().getPtrOrNull()) {
+      if (!switchInst.getUniqueCaseForDefault()) {
+        // In OSSA, the default block forward the original enum value whenever
+        // it does not correspond to a unique case.
+        setValue(caseBB->getArgument(0), value);
+        return {caseBB->begin(), None};
+      }
     }
 
     assert(value.getKind() == SymbolicValue::EnumWithPayload);

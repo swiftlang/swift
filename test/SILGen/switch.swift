@@ -890,21 +890,21 @@ func test_switch_two_unions(x: Foo, y: Foo) {
   // CHECK:   function_ref @$s6switch1ayyF
     a()
 
-  // CHECK: [[IS_NOT_CASE1]](
+  // CHECK: [[IS_NOT_CASE1]]:
   // CHECK:   switch_enum [[X]] : $Foo, case #Foo.B!enumelt: [[IS_CASE2:bb[0-9]+]], default [[IS_NOT_CASE2:bb[0-9]+]]
   // CHECK: [[IS_CASE2]]:
   case (Foo.B, _):
   // CHECK:   function_ref @$s6switch1byyF
     b()
 
-  // CHECK: [[IS_NOT_CASE2]](
+  // CHECK: [[IS_NOT_CASE2]]:
   // CHECK:   switch_enum [[Y]] : $Foo, case #Foo.B!enumelt: [[IS_CASE3:bb[0-9]+]], default [[UNREACHABLE:bb[0-9]+]]
   // CHECK: [[IS_CASE3]]:
   case (_, Foo.B):
   // CHECK:   function_ref @$s6switch1cyyF
     c()
 
-  // CHECK: [[UNREACHABLE]](
+  // CHECK: [[UNREACHABLE]]:
   // CHECK:   unreachable
   }
 }
