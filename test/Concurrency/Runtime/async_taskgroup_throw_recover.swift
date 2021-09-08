@@ -41,7 +41,7 @@ func test_taskGroup_throws() async {
         return 3
       }
 
-      switch await group.nextResult() {
+      switch /*FIXME:*/try! await group.nextResult() {
       case .success(let third):
         print("task group returning normally: \(third)")
         return third
@@ -53,9 +53,6 @@ func test_taskGroup_throws() async {
         print("task group failed to get 3")
         return 0
       }
-
-      print("task group returning normally: \(third)")
-      return third
     }
 
     fatalError("Should have thrown and handled inside the catch block")
