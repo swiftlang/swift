@@ -26,9 +26,11 @@ func test_taskGroup_next() async {
       do {
         while let r = try await group.next() {
           sum += r
+          print("add \(r) -> sum: \(sum)")
         }
       } catch {
         catches += 1
+        print("catch: \(catches)")
       }
     }
 
