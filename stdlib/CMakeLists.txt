@@ -102,6 +102,10 @@ set(SWIFT_STDLIB_ENABLE_LTO OFF CACHE STRING "Build Swift stdlib with LTO. One
     must specify the form of LTO by setting this to one of: 'full', 'thin'. This
     option only affects the standard library and runtime, not tools.")
 
+option(SWIFT_ENABLE_REFLECTION
+  "Build stdlib with support for runtime reflection and mirrors."
+  TRUE)
+
 #
 # End of user-configurable options.
 #
