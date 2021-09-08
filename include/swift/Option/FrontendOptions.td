@@ -765,9 +765,14 @@ def type_info_dump_filter_EQ : Joined<["-"], "type-info-dump-filter=">,
   Flags<[FrontendOption]>,
   HelpText<"One of 'all', 'resilient' or 'fragile'">;
 
+
 def emit_ldadd_cfile_path
   : Separate<["-"], "emit-ldadd-cfile-path">, MetaVarName<"<path>">,
     HelpText<"Generate .c file defining symbols to add back">;
+
+def swift_async_frame_pointer_EQ : Joined<["-"], "swift-async-frame-pointer=">,
+  Flags<[FrontendOption]>,
+  HelpText<"One of 'auto', 'always' or 'never'">;
 
 def previous_module_installname_map_file
   : Separate<["-"], "previous-module-installname-map-file">, MetaVarName<"<path>">,
