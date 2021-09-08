@@ -39,15 +39,16 @@ if(NOT swift_concurrency_async_fp_mode)
   set(swift_concurrency_async_fp_mode "always")
 endif()
 
-# Don't emit extended frame info on linux, system backtracer and system debugger
-# are unlikely to support it.
-if(CMAKE_SYSTEM_NAME STREQUAL Linux)
-  list(APPEND SWIFT_RUNTIME_CONCURRENCY_C_FLAGS "-fswift-async-fp=never")
-elseif(CMAKE_SYSTEM_NAME STREQUAL Darwin)
-  list(APPEND SWIFT_RUNTIME_CONCURRENCY_C_FLAGS "-fswift-async-fp=${swift_concurrency_async_fp_mode}")
+# Don't emit extended frame info on platforms other than darwin, system
+# backtracer and system debugger are unlikely to support it.
+if(CMAKE_SYSTEM_NAME STREQUAL Darwin)
+  list(APPEND SWIFT_RUNTIME_CONCURRENCY_C_FLAGS
+    "-fswift-async-fp=${swift_concurrency_async_fp_mode}")
   list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS
     "-Xfrontend"
     "-swift-async-frame-pointer=${swift_concurrency_async_fp_mode}")
+else()
+  list(APPEND SWIFT_RUNTIME_CONCURRENCY_C_FLAGS "-fswift-async-fp=never")
 endif()
 
 add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
