@@ -917,7 +917,7 @@ namespace {
         CS.getConstraintLocator(locator,
                                 ConstraintLocator::FunctionResult);
 
-      associateArgumentList(memberLocator, argList);
+      CS.associateArgumentList(memberLocator, argList);
 
       Type outputTy;
 
@@ -1174,7 +1174,7 @@ namespace {
 
     Type visitObjectLiteralExpr(ObjectLiteralExpr *expr) {
       auto *exprLoc = CS.getConstraintLocator(expr);
-      associateArgumentList(exprLoc, expr->getArgs());
+      CS.associateArgumentList(exprLoc, expr->getArgs());
 
       // If the expression has already been assigned a type; just use that type.
       if (expr->getType())
@@ -2687,7 +2687,7 @@ namespace {
     Type visitApplyExpr(ApplyExpr *expr) {
       auto fnExpr = expr->getFn();
 
-      associateArgumentList(CS.getConstraintLocator(expr), expr->getArgs());
+      CS.associateArgumentList(CS.getConstraintLocator(expr), expr->getArgs());
 
       if (auto *UDE = dyn_cast<UnresolvedDotExpr>(fnExpr)) {
         auto typeOperation = getTypeOperation(UDE, CS.getASTContext());
@@ -3441,11 +3441,6 @@ namespace {
       }
       }
       llvm_unreachable("unhandled operation");
-    }
-
-    void associateArgumentList(ConstraintLocator *locator, ArgumentList *args) {
-      assert(locator && locator->getAnchor());
-      CS.ArgumentLists[CS.getArgumentInfoLocator(locator)] = args;
     }
   };
 
