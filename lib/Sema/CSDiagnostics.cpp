@@ -2240,7 +2240,7 @@ bool ContextualFailure::diagnoseAsError() {
     return false;
   }
 
-  if (diagnoseMissingFunctionCall())
+  if (diagnoseExtraneousAssociatedValues())
     return true;
 
   // Special case of some common conversions involving Swift.String
@@ -2640,24 +2640,7 @@ void ContextualFailure::tryFixIts(InFlightDiagnostic &diagnostic) const {
     return;
 }
 
-bool ContextualFailure::diagnoseMissingFunctionCall() const {
-  if (getLocator()
-      ->isLastElement<LocatorPathElt::UnresolvedMemberChainResult>())
-    return false;
-
-  auto *srcFT = getFromType()->getAs<FunctionType>();
-  if (!srcFT ||
-      !(srcFT->getParams().empty() ||
-        getLocator()->isLastElement<LocatorPathElt::PatternMatch>()))
-    return false;
-
-  auto toType = getToType();
-  if (toType->is<AnyFunctionType>() ||
-      !TypeChecker::isConvertibleTo(srcFT->getResult(), toType, getDC()))
-    return false;
-
-  // Diagnose cases where the pattern tried to match associated values but
-  // the case we found had none.
+bool ContextualFailure::diagnoseExtraneousAssociatedValues() const {
   if (auto match =
           getLocator()->getLastElementAs<LocatorPathElt::PatternMatch>()) {
     if (auto enumElementPattern =
@@ -2672,12 +2655,7 @@ bool ContextualFailure::diagnoseMissingFunctionCall() const {
     }
   }
 
-  emitDiagnostic(diag::missing_nullary_call, srcFT->getResult())
-      .highlight(getSourceRange())
-      .fixItInsertAfter(getSourceRange().End, "()");
-
-  tryComputedPropertyFixIts();
-  return true;
+  return false;
 }
 
 bool ContextualFailure::diagnoseCoercionToUnrelatedType() const {
@@ -3083,7 +3061,7 @@ bool ContextualFailure::tryProtocolConformanceFixIt(
   return true;
 }
 
-void ContextualFailure::tryComputedPropertyFixIts() const {
+void MissingCallFailure::tryComputedPropertyFixIts() const {
   if (!isExpr<ClosureExpr>(getAnchor()))
     return;
 
@@ -3294,7 +3272,8 @@ bool MissingCallFailure::diagnoseAsError() {
   if (isExpr<KeyPathExpr>(anchor))
     return false;
 
-  auto path = getLocator()->getPath();
+  auto *locator = getLocator();
+  auto path = locator->getPath();
   if (!path.empty()) {
     const auto &last = path.back();
 
@@ -3303,8 +3282,17 @@ bool MissingCallFailure::diagnoseAsError() {
     case ConstraintLocator::ApplyArgToParam: {
       auto type = getType(anchor)->lookThroughAllOptionalTypes();
       auto fnType = type->castTo<FunctionType>();
+
+      if (MissingArgumentsFailure::isMisplacedMissingArgument(getSolution(), locator)) {
+        ArgumentMismatchFailure failure(
+            getSolution(), fnType, fnType->getResult(), locator);
+        return failure.diagnoseMisplacedMissingArgument();
+      }
+
       emitDiagnostic(diag::missing_nullary_call, fnType->getResult())
+          .highlight(getSourceRange())
           .fixItInsertAfter(insertLoc, "()");
+      tryComputedPropertyFixIts();
       return true;
     }
 
@@ -4697,8 +4685,9 @@ bool MissingArgumentsFailure::isMisplacedMissingArgument(
   auto *argLoc = solution.getConstraintLocator(
       callLocator, LocatorPathElt::ApplyArgToParam(0, 0, argFlags));
 
-  if (!(hasFixFor(FixKind::AllowArgumentTypeMismatch, argLoc) &&
-        hasFixFor(FixKind::AddMissingArguments, callLocator)))
+  bool hasArgumentMismatch = hasFixFor(FixKind::AllowArgumentTypeMismatch, argLoc) ||
+                             hasFixFor(FixKind::InsertCall, argLoc);
+  if (!(hasArgumentMismatch && hasFixFor(FixKind::AddMissingArguments, callLocator)))
     return false;
 
   auto *anchorExpr = getAsExpr(anchor);

@@ -4012,7 +4012,7 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
     // Add all of the inherited protocol requirements, recursively.
     auto inheritedReqResult =
       addInheritedRequirements(proto, selfType.getUnresolvedType(), source,
-                               proto->getModuleContext());
+                               nullptr);
     if (isErrorResult(inheritedReqResult))
       return inheritedReqResult;
   }

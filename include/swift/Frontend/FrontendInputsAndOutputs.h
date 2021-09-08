@@ -259,6 +259,8 @@ public:
   bool hasABIDescriptorOutputPath() const;
   bool hasModuleSummaryOutputPath() const;
   bool hasTBDPath() const;
+  bool hasYAMLOptRecordPath() const;
+  bool hasBitstreamOptRecordPath() const;
 
   bool hasDependencyTrackerPath() const;
 };

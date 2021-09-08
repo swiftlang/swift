@@ -3657,15 +3657,27 @@ bool ConstraintSystem::repairFailures(
     if (!fnType)
       return false;
 
+    // If the locator isn't anchored at an expression, or the expression is
+    // implicit, don't try to insert an explicit call into the source code.
+    auto *loc = getConstraintLocator(locator);
+    auto *anchor = getAsExpr(simplifyLocatorToAnchor(loc));
+    if (!anchor || anchor->isImplicit())
+      return false;
+
+    if (isArgumentOfPatternMatchingOperator(loc))
+      return false;
+
+    // Don't attempt this fix for trailing closures.
+    if (auto elt = loc->getLastElementAs<LocatorPathElt::ApplyArgToParam>()) {
+      auto argumentList = getArgumentList(loc);
+      if (argumentList->isTrailingClosureIndex(elt->getArgIdx()))
+        return false;
+    }
+
     // If argument is a function type and all of its parameters have
     // default values, let's see whether error is related to missing
     // explicit call.
     if (fnType->getNumParams() > 0) {
-      auto *loc = getConstraintLocator(locator);
-      auto *anchor = getAsExpr(simplifyLocatorToAnchor(loc));
-      if (!anchor)
-        return false;
-
       auto overload = findSelectedOverloadFor(anchor);
       if (!(overload && overload->choice.isDecl()))
         return false;
@@ -3701,7 +3713,14 @@ bool ConstraintSystem::repairFailures(
         convertTo->isAny())
       return false;
 
-    auto result = matchTypes(resultType, dstType, ConstraintKind::Conversion,
+    ConstraintKind matchKind;
+    if (resultType->is<TypeVariableType>()) {
+      matchKind = ConstraintKind::Equal;
+    } else {
+      matchKind = ConstraintKind::Conversion;
+    }
+
+    auto result = matchTypes(resultType, dstType, matchKind,
                              TypeMatchFlags::TMF_ApplyingFix, locator);
 
     if (result.isSuccess()) {
@@ -4538,6 +4557,9 @@ bool ConstraintSystem::repairFailures(
 
   case ConstraintLocator::ClosureBody:
   case ConstraintLocator::ClosureResult: {
+    if (repairByInsertingExplicitCall(lhs, rhs))
+      break;
+
     if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind, conversionsOrFixes,
                                 locator))
       return true;
@@ -6663,6 +6685,13 @@ static ConstraintFix *maybeWarnAboutExtraneousCast(
     return fix;
   }
   if (extraOptionals > 0) {
+    // Conditional cast in this case can be an attempt to just unwrap a nil
+    // value.
+    if (isExpr<ConditionalCheckedCastExpr>(anchor) &&
+        castKind == CheckedCastKind::BridgingCoercion) {
+      return nullptr;
+    }
+
     return AllowCheckedCastCoercibleOptionalType::create(
         cs, origFromType, origToType, castKind,
         cs.getConstraintLocator(locator));
