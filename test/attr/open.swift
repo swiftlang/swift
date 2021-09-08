@@ -134,3 +134,12 @@ open class OpenSubClass : OpenSuperClass {
   open override subscript(index: MarkerForNonOpenSubscripts) -> Int { return 0 }
   
 }
+
+class InvalidOpenExtensionClass { }
+
+open extension InvalidOpenExtensionClass {  // expected-error {{extensions cannot be declared 'open'; declare individual members as 'open' instead}} {{1-6=}} {{3-3=public }} {{3-3=public }}
+  func C() { } // Insert public
+  private func A() { } // OK
+  var F: Int { 3 } // Insert public
+  private var G: Int { 3 } // Okay
+}
