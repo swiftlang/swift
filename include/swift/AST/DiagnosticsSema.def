@@ -1496,7 +1496,7 @@ ERROR(access_control_extension_more,none,
       "be declared %select{%error|fileprivate|internal|public|%error}2",
       (AccessLevel, DescriptiveDeclKind, AccessLevel))
 ERROR(access_control_extension_open,none,
-      "extensions cannot use 'open' as their default access; use 'public'",
+      "extensions cannot be declared 'open'; declare individual members as 'open' instead",
       ())
 ERROR(access_control_open_bad_decl,none,
       "only classes and overridable class members can be declared 'open';"

@@ -737,8 +737,25 @@ void AttributeChecker::visitAccessControlAttr(AccessControlAttr *attr) {
 
   if (auto extension = dyn_cast<ExtensionDecl>(D)) {
     if (attr->getAccess() == AccessLevel::Open) {
-      diagnose(attr->getLocation(), diag::access_control_extension_open)
-        .fixItReplace(attr->getRange(), "public");
+      auto diag =
+          diagnose(attr->getLocation(), diag::access_control_extension_open);
+      diag.fixItRemove(attr->getRange());
+      for (auto Member : extension->getMembers()) {
+        if (auto *VD = dyn_cast<ValueDecl>(Member)) {
+          if (VD->getAttrs().hasAttribute<AccessControlAttr>())
+            continue;
+
+          StringRef accessLevel = VD->isObjC() ? "open " : "public ";
+
+          if (auto *FD = dyn_cast<FuncDecl>(VD))
+            diag.fixItInsert(FD->getFuncLoc(), accessLevel);
+
+          if (auto *VAD = dyn_cast<VarDecl>(VD))
+            diag.fixItInsert(VAD->getParentPatternBinding()->getLoc(),
+                             accessLevel);
+        }
+      }
+
       attr->setInvalid();
       return;
     }
