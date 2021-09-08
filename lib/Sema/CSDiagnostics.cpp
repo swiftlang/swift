@@ -7784,7 +7784,7 @@ bool InvalidWeakAttributeUse::diagnoseAsError() {
     return false;
 
   auto *var = pattern->getDecl();
-  auto varType = getType(var);
+  auto varType = OptionalType::get(getType(var));
 
   auto diagnostic =
       emitDiagnosticAt(var, diag::invalid_ownership_not_optional,
