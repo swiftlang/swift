@@ -418,7 +418,7 @@ extension String {
         var iterAndCount = unsafeBitCast(
           buffer, to: UnsafeMutableBufferPointer<C.Element>.self
         ).initialize(from: input)
-        precondition(
+        _precondition(
           iterAndCount.0.next() == nil,
           "Collection contains more than 'count' elements"
         )
