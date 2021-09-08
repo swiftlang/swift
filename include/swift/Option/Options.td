@@ -584,6 +584,11 @@ def experimental_emit_module_separately:
   Flags<[NoInteractiveOption, HelpHidden]>,
   HelpText<"Emit module files as a distinct job (new Driver only)">;
 
+def no_emit_module_separately:
+  Flag<["-"], "no-emit-module-separately">,
+  Flags<[NoInteractiveOption, HelpHidden]>,
+  HelpText<"Force using merge-module as the incremental build mode (new Driver only)">;
+
 // Diagnostic control options
 def suppress_warnings : Flag<["-"], "suppress-warnings">,
   Flags<[FrontendOption]>,
