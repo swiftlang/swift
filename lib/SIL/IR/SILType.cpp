@@ -104,6 +104,30 @@ bool SILType::isTrivial(const SILFunction &F) const {
   return F.getTypeLowering(contextType).isTrivial();
 }
 
+bool SILType::isEmpty(const SILFunction &F) const {
+  if (auto tupleTy = getAs<TupleType>()) {
+    // A tuple is empty if it either has no elements or if all elements are
+    // empty.
+    for (unsigned idx = 0, num = tupleTy->getNumElements(); idx < num; ++idx) {
+      if (!getTupleElementType(idx).isEmpty(F))
+        return false;
+    }
+    return true;
+  }
+  if (StructDecl *structDecl = getStructOrBoundGenericStruct()) {
+    // Also, a struct is empty if it either has no fields or if all fields are
+    // empty.
+    SILModule &module = F.getModule();
+    TypeExpansionContext typeEx = F.getTypeExpansionContext();
+    for (VarDecl *field : structDecl->getStoredProperties()) {
+      if (!getFieldType(field, module, typeEx).isEmpty(F))
+        return false;
+    }
+    return true;
+  }
+  return false;
+}
+
 bool SILType::isReferenceCounted(SILModule &M) const {
   return M.Types.getTypeLowering(*this,
                                  TypeExpansionContext::minimal())
