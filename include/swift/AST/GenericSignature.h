@@ -200,6 +200,9 @@ public:
   /// (archetypes) that correspond to the interface types in this generic
   /// signature.
   GenericEnvironment *getGenericEnvironment() const;
+
+  /// Check invariants.
+  void verify() const;
 };
 
 /// A reference to a canonical generic signature.
