@@ -22,6 +22,25 @@
 using namespace swift;
 using namespace Lowering;
 
+ManagedValue ManagedValue::forForwardedRValue(SILGenFunction &SGF,
+                                              SILValue value) {
+  if (!value)
+    return ManagedValue();
+
+  switch (value->getOwnershipKind()) {
+  case OwnershipKind::Any:
+    llvm_unreachable("Invalid ownership for value");
+
+  case OwnershipKind::Owned:
+    return ManagedValue(value, SGF.enterDestroyCleanup(value));
+
+  case OwnershipKind::Guaranteed:
+  case OwnershipKind::None:
+  case OwnershipKind::Unowned:
+    return ManagedValue::forUnmanaged(value);
+  }
+}
+
 /// Emit a copy of this value with independent ownership.
 ManagedValue ManagedValue::copy(SILGenFunction &SGF, SILLocation loc) const {
   auto &lowering = SGF.getTypeLowering(getType());

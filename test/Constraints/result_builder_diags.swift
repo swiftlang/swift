@@ -781,3 +781,19 @@ func test_rdar65667992() {
     }
   }
 }
+
+func test_weak_with_nonoptional_type() {
+  class X {
+    func test() -> Int { 0 }
+  }
+
+  tuplify(true) { c in
+    weak var x: X = X() // expected-error {{'weak' variable should have optional type 'X?'}}
+
+    if let x = x {
+      x.test()
+    }
+
+    42
+  }
+}

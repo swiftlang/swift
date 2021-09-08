@@ -1056,6 +1056,7 @@ protected:
                            ValueOwnershipKind ownershipKind)
       : ownershipKind(ownershipKind) {
     assert(isa(kind) && "Invalid subclass?!");
+    assert(ownershipKind && "invalid forwarding ownership");
   }
 
 public:
@@ -7875,6 +7876,7 @@ public:
   }
 };
 
+// Forwards the first operand to a result in each successor block.
 class OwnershipForwardingTermInst : public TermInst,
                                     public OwnershipForwardingMixin {
 protected:
@@ -7901,6 +7903,11 @@ public:
     return kind == SILInstructionKind::SwitchEnumInst ||
            kind == SILInstructionKind::CheckedCastBranchInst;
   }
+
+  SILValue getOperand() const { return getAllOperands()[0].get(); }
+
+  /// Create a result for this terminator on the given successor block.
+  SILPhiArgument *createResult(SILBasicBlock *succ, SILType resultTy);
 };
 
 /// UnreachableInst - Position in the code which would be undefined to reach.
@@ -8640,6 +8647,14 @@ private:
          SILFunction &F, Optional<ArrayRef<ProfileCounter>> CaseCounts,
          ProfileCounter DefaultCount,
          ValueOwnershipKind forwardingOwnershipKind);
+
+public:
+  /// Create the default result for a partially built switch_enum.
+  /// Returns nullptr if no default argument is needed.
+  SILPhiArgument *createDefaultResult();
+
+  /// Create the .some result for an optional switch_enum.
+  SILPhiArgument *createOptionalSomeResult();
 };
 /// A switch on an enum's discriminator in memory.
 class SwitchEnumAddrInst

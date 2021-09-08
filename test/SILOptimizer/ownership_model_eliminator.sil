@@ -228,8 +228,8 @@ bb1(%1 : @owned $Builtin.NativeObject):
   destroy_value %1 : $Builtin.NativeObject
   br bb3
 
-bb2(%2 : @owned $Either<Builtin.NativeObject, Builtin.AnyObject>):
-  destroy_value %2 : $Either<Builtin.NativeObject, Builtin.AnyObject>
+bb2(%2 : @owned $Builtin.AnyObject):
+  destroy_value %2 : $Builtin.AnyObject
   br bb3
 
 bb3:

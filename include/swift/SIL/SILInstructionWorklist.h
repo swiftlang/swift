@@ -185,7 +185,10 @@ public:
   /// Intended to be called during visitation after \p instruction has been
   /// removed from the worklist.
   ///
-  /// \p instruction the instruction whose usages will be replaced
+  /// \p instruction the instruction whose usages will be replaced. This
+  /// instruction may already be deleted to maintain valid SIL. For example, if
+  /// it was a block terminator.
+  ///
   /// \p result the instruction whose usages will replace \p instruction
   ///
   /// \return whether the instruction was deleted or modified.

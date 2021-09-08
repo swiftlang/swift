@@ -2210,31 +2210,19 @@ namespace {
           oneWayVarType = CS.createTypeVariable(
               CS.getConstraintLocator(locator), TVO_CanBindToNoEscape);
 
-          // If there is an externally-imposed pattern type and the
-          // binding/capture is marked as `weak`, let's make sure
-          // that the imposed type is optional.
+          // If there is externally-imposed type, and the variable
+          // is marked as `weak`, let's fallthrough and allow the
+          // `one-way` constraint to be fixed in diagnostic mode.
           //
-          // Note that there is no need to check `varType` since
-          // it's only "externally" bound if this pattern isn't marked
-          // as `weak`.
-          if (externalPatternType &&
-              optionality == ReferenceOwnershipOptionality::Required) {
-            // If the type is not yet known, let's add a constraint
-            // to make sure that it can only be bound to an optional type.
-            if (externalPatternType->isTypeVariableOrMember()) {
-              auto objectTy = CS.createTypeVariable(
-                  CS.getConstraintLocator(locator.withPathElement(
-                      ConstraintLocator::OptionalPayload)),
-                  TVO_CanBindToLValue | TVO_CanBindToNoEscape);
-
-              CS.addConstraint(ConstraintKind::OptionalObject,
-                               externalPatternType, objectTy, locator);
-            } else if (!externalPatternType->getOptionalObjectType()) {
-              // TODO(diagnostics): A tailored fix to indiciate that `weak`
-              // should have an optional type.
-              return Type();
-            }
-          }
+          // That would make sure that type of this variable is
+          // recorded in the constraint  system, which would then
+          // be used instead of `getVarType` upon discovering a
+          // reference to this variable in subsequent expression(s).
+          //
+          // If we let constraint generation fail here, it would trigger
+          // interface type request via `var->getType()` that would
+          // attempt to validate `weak` attribute, and produce a
+          // diagnostic in the middle of the solver path.
 
           CS.addConstraint(ConstraintKind::OneWayEqual, oneWayVarType,
                            externalPatternType ? externalPatternType : varType,
