@@ -116,7 +116,7 @@ ArgumentList *ArgumentList::createImplicit(ASTContext &ctx, SourceLoc lParenLoc,
 ArgumentList *ArgumentList::createImplicit(ASTContext &ctx,
                                            ArrayRef<Argument> args,
                                            AllocationArena arena) {
-  return createImplicit(ctx, SourceLoc(), args, SourceLoc());
+  return createImplicit(ctx, SourceLoc(), args, SourceLoc(), arena);
 }
 
 ArgumentList *ArgumentList::forImplicitSingle(ASTContext &ctx, Identifier label,

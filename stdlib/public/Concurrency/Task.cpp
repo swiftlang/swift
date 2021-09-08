@@ -35,6 +35,10 @@
 #include <dlfcn.h>
 #endif
 
+#if defined(SWIFT_CONCURRENCY_BACK_DEPLOYMENT)
+asm("\n .globl _swift_async_extendedFramePointerFlags" \
+    "\n _swift_async_extendedFramePointerFlags = 0x0");
+#else
 #ifdef __APPLE__
 #if __POINTER_WIDTH__ == 64
 asm("\n .globl _swift_async_extendedFramePointerFlags" \
@@ -47,6 +51,7 @@ asm("\n .globl _swift_async_extendedFramePointerFlags" \
     "\n _swift_async_extendedFramePointerFlags = 0x0");
 #endif
 #endif // __APPLE__
+#endif // !defined(SWIFT_CONCURRENCY_BACK_DEPLOYMENT)
 
 using namespace swift;
 using FutureFragment = AsyncTask::FutureFragment;
