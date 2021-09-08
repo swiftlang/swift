@@ -331,7 +331,10 @@ enum class FixKind : uint8_t {
 
   /// Specify a type for an explicitly written placeholder that could not be
   /// resolved.
-  SpecifyTypeForPlaceholder
+  SpecifyTypeForPlaceholder,
+
+  /// Allow `weak` declarations to be bound to a non-optional type.
+  AllowNonOptionalWeak,
 };
 
 class ConstraintFix {
@@ -2422,6 +2425,21 @@ class AllowInvalidStaticMemberRefOnProtocolMetatype final
 
   static AllowInvalidStaticMemberRefOnProtocolMetatype *
   create(ConstraintSystem &cs, ConstraintLocator *locator);
+};
+
+class AllowNonOptionalWeak final : public ConstraintFix {
+  AllowNonOptionalWeak(ConstraintSystem &cs, ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowNonOptionalWeak, locator) {}
+
+public:
+  std::string getName() const override {
+    return "allow `weak` with non-optional type";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static AllowNonOptionalWeak *create(ConstraintSystem &cs,
+                                      ConstraintLocator *locator);
 };
 
 } // end namespace constraints

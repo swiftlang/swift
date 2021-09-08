@@ -2589,6 +2589,25 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose situations where `weak` attribute is used with a non-optional type
+/// in declaration e.g. `weak var x: <Type>`:
+///
+/// \code
+/// class X {
+/// }
+///
+/// weak var x: X = ...
+/// \endcode
+///
+/// `weak` declaration is required to use an optional type e.g. `X?`.
+class InvalidWeakAttributeUse final : public FailureDiagnostic {
+public:
+  InvalidWeakAttributeUse(const Solution &solution, ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 

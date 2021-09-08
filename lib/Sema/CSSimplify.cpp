@@ -4956,6 +4956,25 @@ bool ConstraintSystem::repairFailures(
           *this, lhs, rhs, getConstraintLocator(locator)));
     }
 
+    // `weak` declaration with an explicit non-optional type e.g.
+    // `weak x: X = ...` where `X` is a class.
+    if (auto *TP = dyn_cast<TypedPattern>(pattern)) {
+      if (auto *NP = dyn_cast<NamedPattern>(TP->getSubPattern())) {
+        auto *var = NP->getDecl();
+
+        auto ROK = ReferenceOwnership::Strong;
+        if (auto *OA = var->getAttrs().getAttribute<ReferenceOwnershipAttr>())
+          ROK = OA->get();
+
+        if (!rhs->getOptionalObjectType() &&
+            optionalityOf(ROK) == ReferenceOwnershipOptionality::Required) {
+          conversionsOrFixes.push_back(
+              AllowNonOptionalWeak::create(*this, getConstraintLocator(NP)));
+          break;
+        }
+      }
+    }
+
     break;
   }
 
@@ -11705,6 +11724,17 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
           increaseScore(SK_Fix);
       }
     }
+
+    return SolutionKind::Solved;
+  }
+
+  case FixKind::AllowNonOptionalWeak: {
+    if (recordFix(fix))
+      return SolutionKind::Error;
+
+    (void)matchTypes(type1, OptionalType::get(type2),
+                     ConstraintKind::Conversion,
+                     TypeMatchFlags::TMF_ApplyingFix, locator);
 
     return SolutionKind::Solved;
   }
