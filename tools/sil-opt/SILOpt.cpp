@@ -228,6 +228,9 @@ EmitVerboseSIL("emit-verbose-sil",
 static llvm::cl::opt<bool>
 EmitSIB("emit-sib", llvm::cl::desc("Emit serialized AST + SIL file(s)"));
 
+static llvm::cl::opt<bool>
+Serialize("serialize", llvm::cl::desc("Emit serialized AST + SIL file(s)"));
+
 static llvm::cl::opt<std::string>
 ModuleCachePath("module-cache-path", llvm::cl::desc("Clang module cache path"));
 
@@ -564,7 +567,7 @@ int main(int argc, char **argv) {
   }
   }
 
-  if (EmitSIB) {
+  if (EmitSIB || Serialize) {
     llvm::SmallString<128> OutputFile;
     if (OutputFilename.size()) {
       OutputFile = OutputFilename;
@@ -580,8 +583,8 @@ int main(int argc, char **argv) {
 
     SerializationOptions serializationOpts;
     serializationOpts.OutputPath = OutputFile.c_str();
-    serializationOpts.SerializeAllSIL = true;
-    serializationOpts.IsSIB = true;
+    serializationOpts.SerializeAllSIL = EmitSIB;
+    serializationOpts.IsSIB = EmitSIB;
 
     serialize(CI.getMainModule(), serializationOpts, SILMod.get());
   } else {
