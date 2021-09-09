@@ -30,6 +30,17 @@ bb0(%0 : @owned $Builtin.NativeObject):
   return undef : $()
 }
 
+// CHECK-LABEL: sil @test_movevalue_parsing_non_ossa : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+// CHECK: bb0(%0 :
+// CHECK-NEXT: %1 = move_value %0 : $Builtin.NativeObject
+// CHECK-NEXT: return
+// CHECK-NEXT: } // end sil function 'test_movevalue_parsing_non_ossa'
+sil @test_movevalue_parsing_non_ossa : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = move_value %0 : $Builtin.NativeObject
+  return %1 : $Builtin.NativeObject
+}
+
 class TestArrayStorage {
   @_hasStorage var count: Int32
   init()
@@ -57,6 +68,17 @@ bb0(%0 : @owned $(Builtin.NativeObject, Builtin.Int32), %1 : @owned $TestArray2)
   (%4, %5, %6) = destructure_struct %1 : $TestArray2
   %7 = tuple(%2 : $Builtin.NativeObject, %3 : $Builtin.Int32, %4 : $TestArrayStorage, %5 : $Int32, %6 : $TestArrayStorage)
   return %7 : $(Builtin.NativeObject, Builtin.Int32, TestArrayStorage, Int32, TestArrayStorage)
+}
+
+// CHECK-LABEL: sil [ossa] @test_movevalue_parsing : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+// CHECK: bb0(%0 :
+// CHECK-NEXT: %1 = move_value %0 : $Builtin.NativeObject
+// CHECK-NEXT: return
+// CHECK-NEXT: } // end sil function 'test_movevalue_parsing'
+sil [ossa] @test_movevalue_parsing : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = move_value %0 : $Builtin.NativeObject
+  return %1 : $Builtin.NativeObject
 }
 
 // CHECK-LABEL: sil [serialized] [ossa] @test_subst_function_type_generic_context : $@convention(thin) <X, Y> (@guaranteed @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in τ_0_0, @in τ_0_1) -> () for <X, Y>) -> ()

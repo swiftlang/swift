@@ -1232,6 +1232,14 @@ public:
                                                      operand, poisonRefs));
   }
 
+  MoveValueInst *createMoveValue(SILLocation loc, SILValue operand) {
+    assert(!operand->getType().isTrivial(getFunction()) &&
+           "Should not be passing trivial values to this api. Use instead "
+           "emitMoveValueOperation");
+    return insert(new (getModule())
+                  MoveValueInst(getSILDebugLocation(loc), operand));
+  }
+
   UnconditionalCheckedCastInst *
   createUnconditionalCheckedCast(SILLocation Loc, SILValue op,
                                  SILType destLoweredTy,
@@ -2464,6 +2472,17 @@ public:
     if (v->getType().isObject())
       return emitDestroyValueOperation(loc, v);
     createDestroyAddr(loc, v);
+  }
+
+  /// Convenience function that is a no-op for trivial values and inserts a
+  /// move_value on non-trivial instructions.
+  SILValue emitMoveValueOperation(SILLocation Loc, SILValue v) {
+    assert(!v->getType().isAddress());
+    if (v->getType().isTrivial(*getInsertionBB()->getParent()))
+      return v;
+    assert(v.getOwnershipKind() == OwnershipKind::Owned &&
+           "move_value consumes its argument");
+    return createMoveValue(Loc, v);
   }
 
   SILValue emitTupleExtract(SILLocation Loc, SILValue Operand, unsigned FieldNo,

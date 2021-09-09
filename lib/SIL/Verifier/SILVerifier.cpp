@@ -5271,6 +5271,13 @@ public:
             "convention");
   }
 
+  void checkMoveValueInst(MoveValueInst *mvi) {
+    require(mvi->getOperand()->getType().isObject(),
+            "Operand value should be an object");
+    require(mvi->getType() == mvi->getOperand()->getType(),
+            "Result and operand must have the same type, today.");
+  }
+
   void verifyEpilogBlocks(SILFunction *F) {
     bool FoundReturnBlock = false;
     bool FoundThrowBlock = false;

@@ -1826,6 +1826,10 @@ public:
     *this << getIDAndType(I->getOperand());
   }
 
+  void visitMoveValueInst(MoveValueInst *I) {
+    *this << getIDAndType(I->getOperand());
+  }
+
 #define UNCHECKED_REF_STORAGE(Name, ...)                                       \
   void visitStrongCopy##Name##ValueInst(StrongCopy##Name##ValueInst *I) {      \
     *this << getIDAndType(I->getOperand());                                    \
